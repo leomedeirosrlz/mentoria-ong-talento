@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
-import { Sora, JetBrains_Mono } from "next/font/google";
+import { Mitr, JetBrains_Mono } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
-const sora = Sora({
+const mitr = Mitr({
   variable: "--font-sans",
+  weight: ["400", "500", "600", "700"],
   subsets: ["latin"],
 });
 
@@ -22,7 +23,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="pt-BR"
-      className={`${sora.variable} ${jbMono.variable} h-full antialiased`}
+      className={`${mitr.variable} ${jbMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
         {children}

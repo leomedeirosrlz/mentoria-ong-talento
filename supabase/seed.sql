@@ -39,17 +39,18 @@ insert into public.materiais (titulo, descricao, tipo, url, audiencia, encontro_
   ('Plataforma de mentoria', 'Onde os encontros oficiais sao agendados e avaliados.', 'link', 'https://mentoria.realiza.vc', 'todos', null, 20),
   ('Formacao EaD gratuita', 'Trilha opcional com certificado para mentores.', 'link', 'https://ead.realiza.vc', 'todos', null, 21);
 
--- ===== demo local (senha: senha123) =====
+-- ===== demo (senha: senha123) =====
+-- profiles primeiro: o trigger handle_new_user vincula user_id no insert do auth.users
+insert into public.profiles (id, nome, email, whatsapp, role) values
+  ('11111111-1111-1111-1111-111111111111', 'Thiago', 'ti@realiza.vc', '5511999990001', 'coordenacao'),
+  ('22222222-2222-2222-2222-222222222222', 'Ana Ribeiro', 'ana@realiza.vc', '5511999990002', 'mentor_dpp'),
+  ('33333333-3333-3333-3333-333333333333', 'Carlos Menezes', 'carlos@realiza.vc', '5511999990003', 'supervisor');
+
 insert into auth.users (instance_id, id, aud, role, email, encrypted_password, email_confirmed_at, invited_at, confirmation_token, recovery_token, raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
 values
   ('00000000-0000-0000-0000-000000000000', '11111111-1111-1111-1111-111111111111', 'authenticated', 'authenticated', 'ti@realiza.vc', crypt('senha123', gen_salt('bf')), now(), now(), '', '', '{"provider":"email","providers":["email"]}', '{"nome":"Thiago"}', now(), now()),
   ('00000000-0000-0000-0000-000000000000', '22222222-2222-2222-2222-222222222222', 'authenticated', 'authenticated', 'ana@realiza.vc', crypt('senha123', gen_salt('bf')), now(), now(), '', '', '{"provider":"email","providers":["email"]}', '{"nome":"Ana Ribeiro"}', now(), now()),
   ('00000000-0000-0000-0000-000000000000', '33333333-3333-3333-3333-333333333333', 'authenticated', 'authenticated', 'carlos@realiza.vc', crypt('senha123', gen_salt('bf')), now(), now(), '', '', '{"provider":"email","providers":["email"]}', '{"nome":"Carlos Menezes"}', now(), now());
-
-insert into public.profiles (user_id, nome, email, whatsapp, role) values
-  ('11111111-1111-1111-1111-111111111111', 'Thiago', 'ti@realiza.vc', '5511999990001', 'coordenacao'),
-  ('22222222-2222-2222-2222-222222222222', 'Ana Ribeiro', 'ana@realiza.vc', '5511999990002', 'mentor_dpp'),
-  ('33333333-3333-3333-3333-333333333333', 'Carlos Menezes', 'carlos@realiza.vc', '5511999990003', 'supervisor');
 
 insert into public.mentor_profiles (profile_id, tipo, areas, capacidade, termo_ok, formacao_ok)
 select id, 'dpp', '{}', 1, true, true from public.profiles where email = 'ana@realiza.vc';

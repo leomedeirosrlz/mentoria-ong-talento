@@ -46,7 +46,7 @@ export default async function AgendaPage() {
                 )}
               </div>
               {corrente && (
-                <Badge className="bg-[var(--brand-lime)] text-[oklch(0.22_0.03_140)] shrink-0">
+                <Badge className="bg-[var(--brand-lime)] text-[var(--primary-foreground)] shrink-0">
                   esta semana
                 </Badge>
               )}

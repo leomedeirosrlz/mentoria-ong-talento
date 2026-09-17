@@ -51,13 +51,13 @@ export function MentorHome({
 
         return (
           <Card key={dupla.id} className="overflow-hidden">
-            <CardHeader className="border-b bg-[oklch(0.21_0.02_150)] text-white">
+            <CardHeader className="border-b bg-[var(--brand-ink)] text-white">
               <div className="flex items-center justify-between gap-4">
                 <div>
                   <p className="text-[11px] uppercase tracking-[0.14em] text-white/50">Sua dupla</p>
                   <CardTitle className="text-lg mt-1">Voce e {dupla.mentorado.nome}</CardTitle>
                 </div>
-                <span className="font-mono text-sm text-[oklch(0.8_0.17_118)]">
+                <span className="font-mono text-sm text-[var(--brand-lime)]">
                   {feitos}/16 encontros
                 </span>
               </div>

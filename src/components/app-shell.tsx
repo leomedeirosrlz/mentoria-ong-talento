@@ -28,12 +28,11 @@ export function AppShell({ me, children }: { me: Profile; children: React.ReactN
 
   return (
     <div className="min-h-[100dvh] flex">
-      <aside className="w-60 shrink-0 bg-[oklch(0.21_0.02_150)] text-[oklch(0.92_0.01_120)] flex flex-col fixed inset-y-0">
+      <aside className="w-60 shrink-0 bg-sidebar text-sidebar-foreground border-r border-sidebar-border flex flex-col fixed inset-y-0">
         <div className="px-5 pt-6 pb-8">
-          <p className="font-bold italic text-lg tracking-tight text-white">
-            REALIZA<span className="text-[oklch(0.8_0.17_118)]">.VC</span>
-          </p>
-          <p className="text-[11px] uppercase tracking-[0.14em] text-white/50 mt-1">Mentoria</p>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo-realiza.png" alt="Realiza.vc" className="h-6 w-auto" />
+          <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground mt-2">Programa de mentoria</p>
         </div>
 
         <nav className="flex-1 px-3 space-y-1">
@@ -46,8 +45,8 @@ export function AppShell({ me, children }: { me: Profile; children: React.ReactN
                 className={cn(
                   "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors",
                   ativo
-                    ? "bg-[oklch(0.8_0.17_118)] text-[oklch(0.22_0.03_140)] font-medium"
-                    : "text-white/70 hover:bg-white/8 hover:text-white"
+                    ? "bg-[var(--brand-lime)] text-sidebar-primary-foreground font-semibold"
+                    : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                 )}
               >
                 <item.icon size={18} weight={ativo ? "fill" : "regular"} />
@@ -57,13 +56,13 @@ export function AppShell({ me, children }: { me: Profile; children: React.ReactN
           })}
         </nav>
 
-        <div className="p-3 border-t border-white/10">
+        <div className="p-3 border-t border-sidebar-border">
           <div className="px-2 py-2">
-            <p className="text-sm font-medium text-white truncate">{me.nome}</p>
-            <p className="text-xs text-white/50 truncate">{papelLabel(me.role)}</p>
+            <p className="text-sm font-medium truncate">{me.nome}</p>
+            <p className="text-xs text-muted-foreground truncate">{papelLabel(me.role)}</p>
           </div>
           <form action={signOut}>
-            <button className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-white/60 hover:bg-white/8 hover:text-white transition-colors">
+            <button className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors">
               <SignOut size={18} />
               Sair
             </button>

@@ -53,10 +53,9 @@ function LoginForm() {
     <div className="min-h-[100dvh] grid place-items-center bg-background px-4">
       <div className="w-full max-w-sm">
         <div className="mb-8">
-          <p className="font-bold italic text-2xl tracking-tight text-foreground">
-            REALIZA<span className="text-[oklch(0.62_0.13_140)]">.VC</span>
-          </p>
-          <p className="text-sm text-muted-foreground mt-1">Programa de Mentoria Social</p>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo-realiza.png" alt="Realiza.vc" className="h-8 w-auto" />
+          <p className="text-sm text-muted-foreground mt-3">Programa de Mentoria Social</p>
         </div>
 
         {enviado ? (
