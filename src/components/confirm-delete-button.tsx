@@ -17,6 +17,7 @@ export function ConfirmDeleteButton({
   open,
   onOpenChange,
   sucesso = "Excluído.",
+  acao = "Excluir",
 }: {
   titulo: string;
   descricao: string;
@@ -27,6 +28,8 @@ export function ConfirmDeleteButton({
   onOpenChange?: (open: boolean) => void;
   /** toast de sucesso — nomeie a entidade ("Cadastro de X excluído.") */
   sucesso?: string;
+  /** verbo do botão de confirmação — "Desativar", "Excluir" (default)… */
+  acao?: string;
 }) {
   const [interno, setInterno] = useState(false);
   const [pending, start] = useTransition();
@@ -76,7 +79,7 @@ export function ConfirmDeleteButton({
             }
           >
             {pending && <CircleNotch className="animate-spin" />}
-            {pending ? "Excluindo..." : "Excluir"}
+            {pending ? `${acao.replace(/r$/, "")}ndo…` : acao}
           </Button>
         </DialogFooter>
       </DialogContent>

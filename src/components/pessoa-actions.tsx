@@ -32,6 +32,9 @@ type MentorProfile = {
 export function PessoaActions({ pessoa, podeExcluir }: { pessoa: Profile; podeExcluir: boolean }) {
   const [editOpen, setEditOpen] = useState(false);
   const [delOpen, setDelOpen] = useState(false);
+  // desativar com duplas em andamento pede confirmação — o server devolve a
+  // contagem num primeiro chamado e esse dialog conclui com forcar=true
+  const [duplasEmCurso, setDuplasEmCurso] = useState(0);
   const [mp, setMp] = useState<MentorProfile | undefined>(undefined);
   const [pending, start] = useTransition();
   const router = useRouter();
@@ -95,6 +98,7 @@ export function PessoaActions({ pessoa, podeExcluir }: { pessoa: Profile; podeEx
                 try {
                   const res = await setPessoaAtivo(pessoa.id, !pessoa.ativo);
                   if (res?.error) toast.error(res.error);
+                  else if (res?.pendente) setDuplasEmCurso(res.pendente);
                   else {
                     toast.success(
                       pessoa.ativo
@@ -229,6 +233,22 @@ export function PessoaActions({ pessoa, podeExcluir }: { pessoa: Profile; podeEx
         descricao="Remove o cadastro da plataforma. Só é possível excluir quem nunca entrou e não tem dupla; nos demais casos, desative."
         sucesso={`Cadastro de ${pessoa.nome} excluído.`}
         onConfirm={() => deletePessoa(pessoa.id)}
+      />
+
+      {/* confirmação de impacto — desativar mentor/supervisor com duplas em
+          andamento deixa elas sem responsável até a coordenação remanejar */}
+      <ConfirmDeleteButton
+        open={duplasEmCurso > 0}
+        onOpenChange={(o) => !o && setDuplasEmCurso(0)}
+        titulo={`Desativar ${pessoa.nome}?`}
+        descricao={`${primeiroNome} está em ${duplasEmCurso} ${duplasEmCurso === 1 ? "dupla" : "duplas"} em andamento — desativar corta o acesso e a dupla fica sem o responsável até o remanejo. O histórico e os encontros ficam salvos.`}
+        sucesso={`Cadastro de ${primeiroNome} desativado.`}
+        acao="Desativar"
+        onConfirm={async () => {
+          const res = await setPessoaAtivo(pessoa.id, false, true);
+          if (!res.error) router.refresh();
+          return res;
+        }}
       />
     </>
   );

@@ -386,11 +386,21 @@ export async function updatePessoa(profileId: string, formData: FormData) {
   return { ok: true, aviso };
 }
 
-export async function setPessoaAtivo(profileId: string, ativo: boolean) {
+export async function setPessoaAtivo(profileId: string, ativo: boolean, forcar = false) {
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada — entre de novo." };
   if (profileId === eu.id) {
     return { error: "Não é possível alterar o próprio cadastro." };
+  }
+  // desativar com duplas em andamento é decisão de impacto: o primeiro chamado
+  // devolve a contagem pra UI confirmar; `forcar` conclui de fato
+  if (!ativo && !forcar) {
+    const { count } = await supabase
+      .from("duplas")
+      .select("id", { count: "exact", head: true })
+      .or(`mentor_id.eq.${profileId},supervisor_id.eq.${profileId}`)
+      .in("status", ["ativa", "pausada"]);
+    if (count) return { pendente: count };
   }
   const { data, error } = await supabase
     .from("profiles").update({ ativo }).eq("id", profileId).select("id");
