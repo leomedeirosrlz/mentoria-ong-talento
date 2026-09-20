@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Confirmado } from "./confirmado";
 
 export const metadata: Metadata = {
-  title: "E-mail confirmado · Realiza.vc",
+  title: "E-mail confirmado",
 };
 
 export default async function ConfirmadoPage({

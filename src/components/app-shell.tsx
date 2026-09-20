@@ -15,7 +15,8 @@ import { signOut } from "@/lib/actions";
 import { papelLabel } from "@/lib/ciclo";
 import { Avatar } from "@/components/avatar";
 import { T } from "@/components/motion";
-import type { Profile } from "@/lib/types";
+import { NotificacoesBell, NotificacoesProvider } from "@/components/notificacoes";
+import type { Notificacao, Profile } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 const NAV = [
@@ -30,17 +31,20 @@ export function AppShell({
   me,
   avatarUrl,
   gravatarUrl,
+  notificacoes,
   children,
 }: {
   me: Profile;
   avatarUrl: string | null;
   gravatarUrl: string;
+  notificacoes: { itens: Notificacao[]; naoLidas: number };
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
   const items = NAV.filter((i) => !i.roles || (me.role && (i.roles as readonly string[]).includes(me.role)));
 
   return (
+    <NotificacoesProvider inicial={notificacoes}>
     <div className="min-h-[100dvh] md:flex">
       {/* skip-link: invisível até o primeiro Tab — teclado pula top bar + nav
           inteira e cai direto no <main id="conteudo"> */}
@@ -64,6 +68,7 @@ export function AppShell({
           </span>
         </div>
         <div className="flex items-center gap-1">
+          <NotificacoesBell side="bottom" align="end" />
           <Link
             href="/perfil"
             aria-label="Meu perfil"
@@ -128,17 +133,22 @@ export function AppShell({
         </nav>
 
         <div className="p-3 border-t border-sidebar-border">
-          <Link
-            href="/perfil"
-            aria-current={pathname === "/perfil" ? "page" : undefined}
-            className="flex items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-          >
-            <Avatar nome={me.nome} src={avatarUrl} fallbackSrc={gravatarUrl} size={32} />
-            <div className="min-w-0">
-              <p className="text-sm font-medium truncate" title={me.nome}>{me.nome}</p>
-              <p className="text-xs text-muted-foreground truncate" title={papelLabel(me.role)}>{papelLabel(me.role)}</p>
-            </div>
-          </Link>
+          <div className="flex items-center gap-1">
+            <Link
+              href="/perfil"
+              aria-current={pathname === "/perfil" ? "page" : undefined}
+              className="flex min-w-0 flex-1 items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+            >
+              <Avatar nome={me.nome} src={avatarUrl} fallbackSrc={gravatarUrl} size={32} />
+              <div className="min-w-0">
+                <p className="text-sm font-medium truncate" title={me.nome}>{me.nome}</p>
+                <p className="text-xs text-muted-foreground truncate" title={papelLabel(me.role)}>{papelLabel(me.role)}</p>
+              </div>
+            </Link>
+            {/* zona de usuário: perfil + sino + sair ficam juntos no desktop —
+                não existe top bar pra abrigar o sino fora da sidebar */}
+            <NotificacoesBell side="right" align="end" />
+          </div>
           <form action={signOut}>
             <button type="submit" className="mt-1 flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors">
               <SignOut size={18} aria-hidden />
@@ -186,6 +196,7 @@ export function AppShell({
         </div>
       </nav>
     </div>
+    </NotificacoesProvider>
   );
 }
 

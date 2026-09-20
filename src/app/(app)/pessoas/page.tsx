@@ -14,7 +14,7 @@ import { ImportarCsvDialog } from "@/components/importar-csv-dialog";
 import { PessoasListas } from "@/components/pessoas-listas";
 
 export const metadata: Metadata = {
-  title: "Pessoas · Realiza.vc",
+  title: "Pessoas",
 };
 
 export default async function PessoasPage() {

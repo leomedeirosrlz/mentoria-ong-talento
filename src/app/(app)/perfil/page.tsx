@@ -5,7 +5,7 @@ import { avatarPublicUrl, gravatarUrl } from "@/lib/avatar";
 import { PerfilForm } from "./perfil-form";
 
 export const metadata: Metadata = {
-  title: "Meu perfil · Realiza.vc",
+  title: "Meu perfil",
 };
 
 export default async function PerfilPage() {

@@ -16,7 +16,10 @@ const jbMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Realiza.vc · Programa de Mentoria Social",
+  title: {
+    default: "Realiza.vc · Programa de Mentoria Social",
+    template: "%s · Realiza.vc",
+  },
   description: "Acompanhamento operacional do Programa de Mentoria Social do Instituto Realiza.vc",
   appleWebApp: {
     capable: true,

@@ -172,3 +172,25 @@ export type Material = {
   encontro_num: number | null;
   ordem: number;
 };
+
+export type ComunicadoAudiencia = "todos" | "dpp" | "especialista" | "coordenacao";
+
+export type Comunicado = {
+  id: string;
+  titulo: string;
+  corpo: string;
+  audiencia: ComunicadoAudiencia;
+  created_by: string;
+  created_at: string;
+  autor?: { nome: string } | null;
+};
+
+export type Notificacao = {
+  id: string;
+  tipo: "comunicado" | "pedido_apoio" | "apoio_resolvido" | "dupla_formada";
+  titulo: string;
+  corpo: string | null;
+  href: string | null;
+  lida_em: string | null;
+  created_at: string;
+};

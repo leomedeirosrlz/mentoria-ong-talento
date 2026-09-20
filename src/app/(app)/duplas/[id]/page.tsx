@@ -2,7 +2,6 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import {
-  ArrowLeft,
   BookOpen,
   CaretDown,
   ClockCounterClockwise,
@@ -15,6 +14,7 @@ import { getAnexosPorRegistros } from "@/lib/anexos";
 import { avatarPublicUrl, gravatarUrl } from "@/lib/avatar";
 import { Avatar } from "@/components/avatar";
 import { DuplaNomes } from "@/components/dupla-nomes";
+import { VoltarLink } from "@/components/voltar-link";
 import {
   DIFICULDADE_LABEL,
   PROXIMO_PASSO_LABEL,
@@ -176,9 +176,9 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
   return (
     <div className="space-y-6">
       <div>
-        <Link href={souCoord || me.role === "supervisor" ? "/duplas" : "/"} className="text-sm text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5">
-          <ArrowLeft size={14} /> Voltar
-        </Link>
+        {/* Voltar contextual: link colado cai em /duplas (o mentor tem lista
+            própria agora); vindo de dentro do app retorna à origem real */}
+        <VoltarLink fallback="/duplas" />
       </div>
 
       <header className="flex flex-wrap items-start justify-between gap-4">

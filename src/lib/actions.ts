@@ -41,7 +41,7 @@ async function me() {
   const { data: claimsData } = await supabase.auth.getClaims();
   const { data } = await supabase
     .from("profiles")
-    .select("id, role")
+    .select("id, role, nome")
     .eq("user_id", (claimsData?.claims?.sub as string) ?? "")
     .single();
   return { supabase, me: data };
@@ -51,6 +51,32 @@ const FOTO_TIPOS = ["image/png", "image/jpeg", "image/webp"];
 const FOTO_MAX = 2 * 1024 * 1024;
 
 type Supa = Awaited<ReturnType<typeof createClient>>;
+
+/** Fan-out de notificações in-app — um insert em lote. A RLS escopa pelo
+ *  papel do destinatário (coord → qualquer um; demais → só staff). Falha vira
+ *  console.error, não erro da ação: a notificação é complemento, e o autor
+ *  nunca se auto-notifica. */
+async function notificar(
+  supabase: Supa,
+  rows: {
+    profile_id: string | null | undefined;
+    tipo: string;
+    titulo: string;
+    corpo?: string | null;
+    href?: string | null;
+    comunicado_id?: string | null;
+  }[],
+  autorId: string
+) {
+  const limpos = rows
+    .filter((r): r is typeof r & { profile_id: string } => !!r.profile_id)
+    .filter((r) => r.profile_id !== autorId);
+  if (!limpos.length) return;
+  const { error } = await supabase
+    .from("notificacoes")
+    .insert(limpos.map((r) => ({ ...r, created_by: autorId })));
+  if (error) console.error("notificar: falha ao gravar notificações", error);
+}
 
 /** Foto opcional vinda do FormData — sobe pro bucket `avatares` na pasta do
  *  dono (`<id>/<uuid>.<ext>`) e devolve o path. Falha de upload não derruba
@@ -219,13 +245,33 @@ export async function createDupla(formData: FormData) {
       ? inicioDefaultDupla([{ tipo: "encontro", data: primeiroEv.data }])!
       : new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date());
   }
-  const { error } = await supabase.from("duplas").insert({
+  const { data: novaDupla, error } = await supabase.from("duplas").insert({
     mentor_id,
     mentorado_id,
     supervisor_id,
     iniciada_em,
-  });
+  }).select("id").single();
   if (error) return { error: erroAmigavel(error) };
+  // avisa o mentor — o pareamento é a notícia que muda a rotina dele
+  const { data: md } = await supabase
+    .from("mentorados").select("nome").eq("id", mentorado_id).single();
+  const hrefDupla = novaDupla?.id ? `/duplas/${novaDupla.id}` : "/duplas";
+  await notificar(supabase, [
+    {
+      profile_id: mentor_id,
+      tipo: "dupla_formada",
+      titulo: "Sua dupla foi formada",
+      corpo: md?.nome ? `Você e ${md.nome} — combinem o 1º encontro.` : null,
+      href: hrefDupla,
+    },
+    {
+      profile_id: supervisor_id,
+      tipo: "dupla_formada",
+      titulo: "Nova dupla sob sua supervisão",
+      corpo: md?.nome ? `${md.nome} — acompanhe a ficha da dupla.` : null,
+      href: hrefDupla,
+    },
+  ], eu.id);
   revalidatePath("/duplas");
   revalidatePath("/");
   return { ok: true };
@@ -480,7 +526,7 @@ export async function updateDupla(duplaId: string, formData: FormData) {
   // então só valida quando o novo status volta a contar. A própria dupla sai da
   // conta (.neq) pra edição simples não brigar com ela mesma
   const { data: atualDupla } = await supabase
-    .from("duplas").select("mentor_id, mentorado_id, status").eq("id", duplaId).single();
+    .from("duplas").select("mentor_id, mentorado_id, supervisor_id, status").eq("id", duplaId).single();
   if (atualDupla && status !== "encerrada") {
     // encerrada voltando a ativa/pausada precisa revalidar — a vaga pode ter sido
     // ocupada por outra dupla enquanto estava encerrada
@@ -522,6 +568,28 @@ export async function updateDupla(duplaId: string, formData: FormData) {
   if (error) return { error: erroAmigavel(error) };
   if (!data?.length) {
     return { error: "Não foi possível concluir. Recarregue a página e tente de novo." };
+  }
+  // troca de mentor/supervisor notifica o novo responsável — ele precisa saber
+  // que a dupla passou pra ele sem a coord mandar mensagem à parte
+  if (atualDupla && (mentor_id !== atualDupla.mentor_id || supervisor_id !== atualDupla.supervisor_id)) {
+    const { data: mdTroca } = await supabase
+      .from("mentorados").select("nome").eq("id", mentorado_id).single();
+    await notificar(supabase, [
+      mentor_id !== atualDupla.mentor_id ? {
+        profile_id: mentor_id,
+        tipo: "dupla_formada",
+        titulo: "Você assumiu uma dupla",
+        corpo: mdTroca?.nome ? `Você e ${mdTroca.nome} — vejam onde a jornada está.` : null,
+        href: `/duplas/${duplaId}`,
+      } : null,
+      supervisor_id && supervisor_id !== atualDupla.supervisor_id ? {
+        profile_id: supervisor_id,
+        tipo: "dupla_formada",
+        titulo: "Nova dupla sob sua supervisão",
+        corpo: mdTroca?.nome ? `${mdTroca.nome} — acompanhe a ficha da dupla.` : null,
+        href: `/duplas/${duplaId}`,
+      } : null,
+    ].filter((r): r is NonNullable<typeof r> => r !== null), eu.id);
   }
   revalidatePath("/");
   revalidatePath("/duplas");
@@ -895,7 +963,7 @@ export async function salvarRegistro(formData: FormData) {
   // só registra encontro da própria dupla que já aconteceu (ou foi marcado realizado)
   const { data: encDb } = await supabase
     .from("encontros")
-    .select("dupla_id, status, data_hora, realizado_em")
+    .select("dupla_id, numero, status, data_hora, realizado_em")
     .eq("id", encontro_id)
     .single();
   if (!encDb || encDb.dupla_id !== dupla_id) return { error: "Encontro inválido." };
@@ -911,6 +979,10 @@ export async function salvarRegistro(formData: FormData) {
   // update preserva created_by de quem registrou primeiro; insert marca o autor
   const { data: regExistente } = await supabase
     .from("registros").select("id, precisa_apoio").eq("encontro_id", encontro_id).maybeSingle();
+  // pedido de apoio novo nessa gravação dispara aviso pra coordenação —
+  // edição que mantém o flag não repete a notificação
+  const novoApoio =
+    !regExistente?.precisa_apoio && formData.get("precisa_apoio") === "on";
   const payload = {
     tema: String(formData.get("tema") ?? "").trim() || null,
     ferramenta: String(formData.get("ferramenta") ?? "").trim() || null,
@@ -1003,6 +1075,24 @@ export async function salvarRegistro(formData: FormData) {
         aviso = `Só ${concluidos} de ${concluirIds.length} combinados foram marcados como feitos. Confira a lista de combinados.`;
       }
     }
+  }
+
+  if (novoApoio) {
+    // coordenação toda + o supervisor dessa dupla (não todos os supervisores)
+    const [{ data: equipe }, { data: dApoio }] = await Promise.all([
+      supabase.from("profiles").select("id").eq("role", "coordenacao").eq("ativo", true),
+      supabase.from("duplas").select("supervisor_id").eq("id", dupla_id).single(),
+    ]);
+    await notificar(supabase, [
+      ...(equipe ?? []).map((p) => p.id),
+      dApoio?.supervisor_id,
+    ].map((pid) => ({
+      profile_id: pid,
+      tipo: "pedido_apoio",
+      titulo: "Pedido de apoio",
+      corpo: `${eu.nome} sinalizou no registro do ${encDb.numero}º encontro.`,
+      href: `/duplas/${dupla_id}`,
+    })), eu.id);
   }
 
   revalidatePath("/");
@@ -1134,11 +1224,21 @@ export async function resolverApoio(registroId: string, duplaId: string) {
     .from("registros")
     .update({ precisa_apoio: false })
     .eq("id", registroId)
-    .select("id");
+    .select("id, created_by");
   if (error) return { error: erroAmigavel(error) };
   if (!data?.length) {
     return { error: "Não foi possível concluir. Recarregue a página e tente de novo." };
   }
+  // o mentor fica sabendo que o pedido foi visto — fecha o ciclo do pedido
+  const { data: dApoio } = await supabase
+    .from("duplas").select("mentor_id").eq("id", duplaId).single();
+  await notificar(supabase, [{
+    profile_id: data[0].created_by ?? dApoio?.mentor_id,
+    tipo: "apoio_resolvido",
+    titulo: "Pedido de apoio atendido",
+    corpo: "A coordenação marcou seu pedido como atendido.",
+    href: `/duplas/${duplaId}`,
+  }], eu.id);
   revalidatePath("/");
   revalidatePath("/duplas");
   revalidatePath(`/duplas/${duplaId}`);
@@ -1349,4 +1449,114 @@ export async function signOut() {
   const supabase = await createClient();
   await supabase.auth.signOut();
   redirect("/login");
+}
+
+// ---------- comunicados & notificações ----------
+
+const AUDIENCIAS_COMUNICADO = ["todos", "dpp", "especialista", "coordenacao"] as const;
+const ROLES_POR_AUDIENCIA: Record<string, string[]> = {
+  todos: ["coordenacao", "supervisor", "mentor_dpp", "mentor_especialista"],
+  dpp: ["mentor_dpp"],
+  especialista: ["mentor_especialista"],
+  coordenacao: ["coordenacao"],
+};
+
+/** Aviso geral da coordenação — grava o comunicado e cria a notificação de
+ *  cada destinatário da audiência (o autor não se notifica do próprio aviso). */
+export async function publicarComunicado(formData: FormData) {
+  const { supabase, me: eu } = await me();
+  if (!eu) return { error: "Sessão expirada — entre de novo." };
+  if (eu.role !== "coordenacao") return { error: "Só a coordenação publica avisos." };
+  const titulo = String(formData.get("titulo") ?? "").trim();
+  const corpo = String(formData.get("corpo") ?? "").trim();
+  const audiencia = String(formData.get("audiencia") ?? "todos");
+  if (titulo.length < 2 || titulo.length > 140) {
+    return { error: "O título precisa de 2 a 140 caracteres." };
+  }
+  if (corpo.length < 2 || corpo.length > 5000) {
+    return { error: "O texto precisa de 2 a 5000 caracteres." };
+  }
+  if (!(AUDIENCIAS_COMUNICADO as readonly string[]).includes(audiencia)) {
+    return { error: "Audiência inválida." };
+  }
+
+  const { data: aviso, error } = await supabase
+    .from("comunicados")
+    .insert({ titulo, corpo, audiencia, created_by: eu.id })
+    .select("id").single();
+  if (error) return { error: erroAmigavel(error) };
+
+  const { data: dests } = await supabase
+    .from("profiles").select("id")
+    .in("role", ROLES_POR_AUDIENCIA[audiencia]).eq("ativo", true);
+  const resumo = corpo.length > 180 ? `${corpo.slice(0, 177)}…` : corpo;
+  await notificar(supabase, (dests ?? []).map((p) => ({
+    profile_id: p.id,
+    tipo: "comunicado",
+    titulo,
+    corpo: resumo,
+    href: "/#avisos",
+    comunicado_id: aviso?.id,
+  })), eu.id);
+
+  revalidatePath("/");
+  return { ok: true };
+}
+
+export async function excluirComunicado(id: string) {
+  const { supabase, me: eu } = await me();
+  if (!eu) return { error: "Sessão expirada — entre de novo." };
+  const { data, error } = await supabase
+    .from("comunicados").delete().eq("id", id).select("id");
+  if (error) return { error: erroAmigavel(error) };
+  if (!data?.length) {
+    return { error: "Não foi possível excluir. Recarregue a página e tente de novo." };
+  }
+  revalidatePath("/");
+  return { ok: true };
+}
+
+/** Poll do sino — mesma leitura de getNotificacoes, mas como action pra rodar
+ *  no intervalo do client sem navegação. */
+export async function listarNotificacoes() {
+  const { supabase, me: eu } = await me();
+  if (!eu) return { error: "Sessão expirada — entre de novo." };
+  const [{ data }, { count }] = await Promise.all([
+    supabase
+      .from("notificacoes")
+      .select("id, tipo, titulo, corpo, href, lida_em, created_at")
+      .order("created_at", { ascending: false })
+      .limit(15),
+    supabase
+      .from("notificacoes")
+      .select("*", { count: "exact", head: true })
+      .eq("profile_id", eu.id)
+      .is("lida_em", null),
+  ]);
+  return { ok: true, itens: data ?? [], naoLidas: count ?? 0 };
+}
+
+export async function marcarNotificacaoLida(id: string) {
+  const { supabase, me: eu } = await me();
+  if (!eu) return { error: "Sessão expirada — entre de novo." };
+  const { error } = await supabase
+    .from("notificacoes")
+    .update({ lida_em: new Date().toISOString() })
+    .eq("id", id)
+    .eq("profile_id", eu.id)
+    .is("lida_em", null);
+  if (error) return { error: "Não foi possível marcar como lida." };
+  return { ok: true };
+}
+
+export async function marcarTodasNotificacoesLidas() {
+  const { supabase, me: eu } = await me();
+  if (!eu) return { error: "Sessão expirada — entre de novo." };
+  const { error } = await supabase
+    .from("notificacoes")
+    .update({ lida_em: new Date().toISOString() })
+    .eq("profile_id", eu.id)
+    .is("lida_em", null);
+  if (error) return { error: "Não foi possível marcar como lidas." };
+  return { ok: true };
 }

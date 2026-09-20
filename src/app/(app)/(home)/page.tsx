@@ -1,6 +1,7 @@
 import { headers } from "next/headers";
 import {
   getCicloEventos,
+  getComunicados,
   getContagemPessoas,
   getDuplas,
   getMe,
@@ -15,11 +16,12 @@ export default async function HomePage({
 }: {
   searchParams: Promise<{ filtro?: string | string[] }>;
 }) {
-  const [me, eventos, h, params] = await Promise.all([
+  const [me, eventos, h, params, avisos] = await Promise.all([
     getMe(),
     getCicloEventos(),
     headers(),
     searchParams,
+    getComunicados(),
   ]);
   // um único instante pra página inteira — semáforo e "semana do encontro" consistentes
   const agora = new Date().toISOString();
@@ -38,6 +40,7 @@ export default async function HomePage({
         origem={origem}
         interacoes={interacoes}
         pessoas={pessoas}
+        avisos={avisos}
         filtro={filtro}
       />
     );
@@ -54,11 +57,12 @@ export default async function HomePage({
         origem={origem}
         interacoes={interacoes}
         supervisor
+        avisos={avisos}
         filtro={filtro}
       />
     );
   }
 
   const duplas = await getMinhasDuplas();
-  return <MentorHome duplas={duplas} eventos={eventos} me={me!} />;
+  return <MentorHome duplas={duplas} eventos={eventos} me={me!} avisos={avisos} />;
 }

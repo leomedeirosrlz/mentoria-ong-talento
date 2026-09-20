@@ -1,6 +1,6 @@
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
-import type { CicloEvento, Dupla, DuplaResumo, DuplaStatus, Material, Mentorado, PessoaNota, Profile } from "./types";
+import type { CicloEvento, Comunicado, Dupla, DuplaResumo, DuplaStatus, Material, Mentorado, Notificacao, PessoaNota, Profile } from "./types";
 
 // getClaims valida o JWT localmente (sem round-trip); RLS segue valendo no banco.
 export const getMe = cache(async (): Promise<Profile | null> => {
@@ -107,18 +107,23 @@ export const getContagemPessoas = cache(async (): Promise<number> => {
   return (profiles.count ?? 0) + (mentorados.count ?? 0);
 });
 
+// a collation do banco ordena acentos depois de Z (Álvaro no fim da lista) —
+// a ordenação final é sempre pt-BR no app
+const porNome = (a: { nome: string }, b: { nome: string }) =>
+  a.nome.localeCompare(b.nome, "pt-BR");
+
 export const getPessoas = cache(async (): Promise<Profile[]> => {
   const supabase = await createClient();
   const { data, error } = await supabase.from("profiles").select("*").order("nome");
   if (error) throw error;
-  return data ?? [];
+  return (data ?? []).sort(porNome);
 });
 
 export const getMentorados = cache(async (): Promise<Mentorado[]> => {
   const supabase = await createClient();
   const { data, error } = await supabase.from("mentorados").select("*").order("nome");
   if (error) throw error;
-  return data ?? [];
+  return (data ?? []).sort(porNome);
 });
 
 /** Card de dupla na página de perfil — nomes e status, sem a árvore de encontros. */
@@ -214,4 +219,42 @@ export const getMentorProfiles = cache(async (): Promise<MentorProfile[]> => {
     .select("profile_id,tipo,areas,capacidade,termo_ok,formacao_ok");
   if (error) throw error;
   return (data as unknown as MentorProfile[]) ?? [];
+});
+
+/** Notificações do usuário logado — as 15 mais recentes + contagem exata de
+ *  não-lidas (o badge pode passar de 15 mesmo com a lista paginada). */
+export const getNotificacoes = cache(
+  async (): Promise<{ itens: Notificacao[]; naoLidas: number }> => {
+    const supabase = await createClient();
+    const [{ data, error }, { count, error: e2 }] = await Promise.all([
+      supabase
+        .from("notificacoes")
+        .select("id, tipo, titulo, corpo, href, lida_em, created_at")
+        .order("created_at", { ascending: false })
+        .limit(15),
+      supabase
+        .from("notificacoes")
+        .select("*", { count: "exact", head: true })
+        .is("lida_em", null),
+    ]);
+    if (error) throw error;
+    if (e2) throw e2;
+    return { itens: (data ?? []) as Notificacao[], naoLidas: count ?? 0 };
+  }
+);
+
+/** Comunicados visíveis pro usuário — a RLS já filtra por audiência. */
+export const getComunicados = cache(async (): Promise<Comunicado[]> => {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("comunicados")
+    .select("id, titulo, corpo, audiencia, created_by, created_at, autor:profiles!created_by(nome)")
+    .order("created_at", { ascending: false })
+    .limit(5);
+  if (error) throw error;
+  return (data ?? []).map((c) => ({
+    ...c,
+    // supabase-js tipa join 1:1 como array — normaliza pra objeto
+    autor: Array.isArray(c.autor) ? (c.autor[0] ?? null) : c.autor,
+  })) as Comunicado[];
 });

@@ -1,6 +1,6 @@
 import { AppShell } from "@/components/app-shell";
 import { signOut } from "@/lib/actions";
-import { getMe } from "@/lib/queries";
+import { getMe, getNotificacoes } from "@/lib/queries";
 import { avatarPublicUrl, gravatarUrl } from "@/lib/avatar";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -66,11 +66,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     );
   }
 
+  const notificacoes = await getNotificacoes();
   return (
     <AppShell
       me={me}
       avatarUrl={me.avatar_path ? avatarPublicUrl(me.avatar_path) : null}
       gravatarUrl={gravatarUrl(me.email)}
+      notificacoes={notificacoes}
     >
       {children}
     </AppShell>

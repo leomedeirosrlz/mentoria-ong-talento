@@ -10,7 +10,7 @@ import {
   toDateStr,
   totalEncontros,
 } from "@/lib/ciclo";
-import type { CicloEvento, Dupla, Profile } from "@/lib/types";
+import type { CicloEvento, Comunicado, Dupla, Profile } from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { buttonVariants } from "@/components/ui/button";
 import { AgendarEncontroDialog } from "@/components/agendar-encontro-dialog";
@@ -18,15 +18,18 @@ import { DuplaNomes } from "@/components/dupla-nomes";
 import { RegistrarRetroativoDialog } from "@/components/registrar-retroativo-dialog";
 import { TrilhaJornada } from "@/components/trilha-jornada";
 import { MarcoNotifier } from "@/components/marco-notifier";
+import { AvisosSection } from "@/components/avisos-section";
 
 export function MentorHome({
   duplas,
   eventos,
   me,
+  avisos = [],
 }: {
   duplas: Dupla[];
   eventos: CicloEvento[];
   me: Profile;
+  avisos?: Comunicado[];
 }) {
   const hoje = new Date();
   const eventoSemana = eventoDaSemana(eventos, hoje);
@@ -314,6 +317,8 @@ export function MentorHome({
           </Card>
         );
       })}
+
+      <AvisosSection avisos={avisos} souCoord={false} />
     </div>
   );
 }

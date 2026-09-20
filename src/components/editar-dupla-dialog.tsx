@@ -41,6 +41,9 @@ export function EditarDuplaDialog({ dupla }: { dupla: Dupla }) {
   const [mentoradosOcupados, setMentoradosOcupados] = useState<Set<string>>(new Set());
   // carga de supervisão: quantas duplas ativas/pausadas cada supervisor já tem
   const [emSup, setEmSup] = useState<Record<string, number>>({});
+  // os Selects só montam com os items carregados — antes disso o trigger
+  // exibiria o UUID cru do defaultValue
+  const [pronto, setPronto] = useState(false);
   // status escolhido agora — a nota de efeito (FR-3) reage à escolha, não ao valor salvo
   const [statusSel, setStatusSel] = useState<DuplaStatus>(dupla.status);
   const [pending, start] = useTransition();
@@ -48,31 +51,35 @@ export function EditarDuplaDialog({ dupla }: { dupla: Dupla }) {
 
   useEffect(() => {
     if (!open) return;
+    // depois da 1ª carga pronto segue true: reabrir o dialog já monta os
+    // Selects com os items em cache (o refetch abaixo atualiza em segundo plano)
     const supabase = createClient();
-    supabase
-      .from("profiles")
-      .select("id, nome, role")
-      .in("role", ["mentor_dpp", "mentor_especialista", "supervisor"])
-      .eq("ativo", true)
-      .order("nome")
-      .then(({ data }) => {
-        const ms: Opt[] = (data ?? []).filter((p) => p.role !== "supervisor");
-        const ss: Opt[] = (data ?? []).filter((p) => p.role === "supervisor");
-        if (!ms.some((m) => m.id === dupla.mentor.id)) {
-          ms.unshift({ id: dupla.mentor.id, nome: `${dupla.mentor.nome} (atual)` });
-        }
-        const sup = dupla.supervisor;
-        if (sup && !ss.some((s) => s.id === sup.id)) {
-          ss.unshift({ id: sup.id, nome: `${sup.nome} (atual)` });
-        }
-        setMentores(ms);
-        setSupervisores(ss);
-      });
-    supabase
-      .from("mentorados")
-      .select("id, nome")
-      .order("nome")
-      .then(({ data }) => setMentorados(data ?? []));
+    void Promise.all([
+      supabase
+        .from("profiles")
+        .select("id, nome, role")
+        .in("role", ["mentor_dpp", "mentor_especialista", "supervisor"])
+        .eq("ativo", true)
+        .order("nome")
+        .then(({ data }) => {
+          const ms: Opt[] = (data ?? []).filter((p) => p.role !== "supervisor");
+          const ss: Opt[] = (data ?? []).filter((p) => p.role === "supervisor");
+          if (!ms.some((m) => m.id === dupla.mentor.id)) {
+            ms.unshift({ id: dupla.mentor.id, nome: `${dupla.mentor.nome} (atual)` });
+          }
+          const sup = dupla.supervisor;
+          if (sup && !ss.some((s) => s.id === sup.id)) {
+            ss.unshift({ id: sup.id, nome: `${sup.nome} (atual)` });
+          }
+          setMentores(ms);
+          setSupervisores(ss);
+        }),
+      supabase
+        .from("mentorados")
+        .select("id, nome")
+        .order("nome")
+        .then(({ data }) => setMentorados(data ?? [])),
+    ]).then(() => setPronto(true));
     // a própria dupla não conta — senão o mentor atual apareceria lotado por
     // causa dela e o próprio mentorado sairia marcado como ocupado
     supabase
@@ -176,6 +183,18 @@ export function EditarDuplaDialog({ dupla }: { dupla: Dupla }) {
             <DialogTitle>Editar dupla</DialogTitle>
           </DialogHeader>
           <form onSubmit={submit} className="space-y-4">
+            {!pronto ? (
+              <div className="space-y-4" aria-hidden>
+                {[0, 1, 2].map((i) => (
+                  <div key={i} className="space-y-2">
+                    <div className="h-4 w-20 animate-pulse rounded bg-muted" />
+                    <div className="h-9 animate-pulse rounded-lg bg-muted" />
+                  </div>
+                ))}
+                <div className="h-9 animate-pulse rounded-lg bg-muted" />
+              </div>
+            ) : (
+            <>
             <div className="space-y-2">
               <Label id="edit-mentor-label">
                 {/* dot de papel — distinção não-cromática é o texto; a cor é redundância */}
@@ -286,6 +305,8 @@ export function EditarDuplaDialog({ dupla }: { dupla: Dupla }) {
             <Button type="submit" className="w-full" disabled={pending}>
               {pending ? "Salvando..." : "Salvar"}
             </Button>
+            </>
+            )}
           </form>
 
           <div className="border-t pt-4">

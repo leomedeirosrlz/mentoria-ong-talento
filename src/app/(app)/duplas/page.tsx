@@ -1,12 +1,12 @@
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { DownloadSimple } from "@phosphor-icons/react/dist/ssr";
-import { getCicloEventos, getDuplas, getMe } from "@/lib/queries";
+import { getCicloEventos, getDuplas, getMe, getMinhasDuplas } from "@/lib/queries";
 import { DuplasLista } from "@/components/duplas-lista";
 import { buttonVariants } from "@/components/ui/button";
 
 export const metadata: Metadata = {
-  title: "Duplas · Realiza.vc",
+  title: "Duplas",
 };
 
 export default async function DuplasPage() {
@@ -16,10 +16,12 @@ export default async function DuplasPage() {
   if (me?.role !== "coordenacao" && me?.role !== "supervisor" && !mentor)
     redirect("/");
 
-  const [duplas, eventos] = await Promise.all([getDuplas(), getCicloEventos()]);
-
-  const lista =
-    me.role === "supervisor" ? duplas.filter((d) => d.supervisor?.id === me.id) : duplas;
+  // coord vê tudo; supervisor/mentor já vêm escopados da query (uma leitura,
+  // sem baixar o ciclo inteiro pra filtrar em JS)
+  const [lista, eventos] = await Promise.all([
+    me.role === "coordenacao" ? getDuplas() : getMinhasDuplas(),
+    getCicloEventos(),
+  ]);
 
   return (
     <div className="space-y-6">

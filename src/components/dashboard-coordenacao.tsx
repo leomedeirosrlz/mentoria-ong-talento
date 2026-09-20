@@ -13,13 +13,14 @@ import {
   type DuplaSaude,
   type Semaforo,
 } from "@/lib/ciclo";
-import type { CicloEvento, Dupla } from "@/lib/types";
+import type { CicloEvento, Comunicado, Dupla } from "@/lib/types";
 import type { Interacao } from "@/lib/interacoes";
 import { AvaliacaoBadge, SemaforoDot } from "@/components/semaforo";
 import { SetupChecklist } from "@/components/setup-checklist";
 import { NudgeButton } from "@/components/nudge-button";
 import { CopiarResumoButton } from "@/components/copiar-resumo-button";
 import { DuplaNomes } from "@/components/dupla-nomes";
+import { AvisosSection } from "@/components/avisos-section";
 import { TrajetoriaAvaliacoes } from "@/components/trajetoria-avaliacoes";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -57,6 +58,7 @@ export function DashboardCoordenacao({
   interacoes,
   pessoas = 0,
   supervisor = false,
+  avisos = [],
   filtro,
 }: {
   duplas: Dupla[];
@@ -70,6 +72,8 @@ export function DashboardCoordenacao({
   /** profiles + mentorados — primeiro passo do checklist de setup (só coordenação passa). */
   pessoas?: number;
   supervisor?: boolean;
+  /** avisos da coordenação já filtrados por audiência (RLS). */
+  avisos?: Comunicado[];
   /** valor cru de ?filtro= — validado contra FILTROS; desconhecido = visão cheia. */
   filtro?: string;
 }) {
@@ -227,6 +231,8 @@ export function DashboardCoordenacao({
           </div>
         </section>
       )}
+
+      <AvisosSection avisos={avisos} souCoord={!supervisor} />
 
       <section className="space-y-3">
         {filtroAtivo && saude.length > 0 && visiveis.length > 0 && (

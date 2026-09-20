@@ -21,6 +21,7 @@ import {
   Flag,
   GraduationCap,
   Users,
+  VideoCamera,
 } from "@phosphor-icons/react";
 import { DuplaNomes } from "@/components/dupla-nomes";
 import { NotaEncontro } from "@/components/nota-encontro";
@@ -1570,42 +1571,33 @@ function EncontroDuplaRow({
     (encontro.status === "realizado" ||
       (encontro.status === "agendado" && encontro.data_hora != null));
 
-  // CTA + modal do follow-up. "Aconteceu?" no limbo porque a pergunta é real:
-  // o encontro agendado pode não ter rolado — remarcar segue no bloco do dia.
-  // O wizard abre em Dialog: o painel lateral é estreito demais pra ele e o
-  // modal já é responsivo por si (mobile ocupa a tela útil inteira)
-  const blocoRegistro = podeTerRegistro && (
-    <>
-      <div className="px-2 pb-1.5">
-        <Button
-          type="button"
-          variant={encontro.status === "realizado" ? "default" : "outline"}
-          size="sm"
-          onClick={() => onAlternarRegistro(true)}
-        >
-          {encontro.status === "realizado"
-            ? "Registrar como foi"
-            : "Aconteceu? Registre como foi"}
-        </Button>
-      </div>
-      <Dialog open={aberto} onOpenChange={onAlternarRegistro}>
-        <DialogContent className="sm:max-w-xl">
-          <DialogHeader>
-            <DialogTitle>
-              Como foi o {encontro.numero}º encontro
-            </DialogTitle>
-          </DialogHeader>
-          <RegistroForm
-            embutido
-            encontroId={encontro.id}
-            duplaId={dupla.id}
-            evento={evento}
-            combinadosPendentes={combinadosPendentes}
-            onSaved={onRegistroSalvo}
-          />
-        </DialogContent>
-      </Dialog>
-    </>
+  // CTA do follow-up. "Aconteceu?" no limbo porque a pergunta é real: o
+  // encontro agendado pode não ter rolado — remarcar segue no bloco do dia.
+  const ctaRegistro = podeTerRegistro && (
+    <Button
+      type="button"
+      variant={encontro.status === "realizado" ? "default" : "outline"}
+      size="sm"
+      onClick={() => onAlternarRegistro(true)}
+    >
+      {encontro.status === "realizado"
+        ? "Registrar como foi"
+        : "Aconteceu? Registre como foi"}
+    </Button>
+  );
+
+  // link da chamada é ação própria perto da hora — chip, não texto corrido
+  const chamada = encontro.status === "agendado" && encontro.link && (
+    <a
+      href={encontro.link}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-[var(--ok)]/40 bg-[var(--ok)]/10 px-2.5 text-xs font-medium text-[var(--ok-text)] transition-colors hover:bg-[var(--ok)]/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    >
+      <VideoCamera size={14} aria-hidden />
+      Entrar na chamada
+      <span className="sr-only"> (abre em nova aba)</span>
+    </a>
   );
 
   return (
@@ -1646,13 +1638,38 @@ function EncontroDuplaRow({
       {/* realizado libera na hora; agendado só vira limbo quando a hora passa —
           RevelarApos cobre a aba deixada aberta atravessando o encontro, sem
           depender de re-render (mesmo padrão da ficha). O gate por
-          podeTerRegistro evita montar o timer em linhas sem follow-up */}
-      {podeTerRegistro &&
-        (encontro.status === "realizado" ? (
-          blocoRegistro
-        ) : (
-          <RevelarApos from={encontro.data_hora!}>{blocoRegistro}</RevelarApos>
-        ))}
+          podeTerRegistro evita montar o timer em linhas sem follow-up.
+          O wizard abre em Dialog: o painel lateral é estreito demais pra ele e
+          o modal já é responsivo por si (mobile ocupa a tela útil inteira) */}
+      {podeTerRegistro && (
+        <Dialog open={aberto} onOpenChange={onAlternarRegistro}>
+          <DialogContent className="sm:max-w-xl">
+            <DialogHeader>
+              <DialogTitle>
+                Como foi o {encontro.numero}º encontro
+              </DialogTitle>
+            </DialogHeader>
+            <RegistroForm
+              embutido
+              encontroId={encontro.id}
+              duplaId={dupla.id}
+              evento={evento}
+              combinadosPendentes={combinadosPendentes}
+              onSaved={onRegistroSalvo}
+            />
+          </DialogContent>
+        </Dialog>
+      )}
+      {(ctaRegistro || chamada) && (
+        <div className="flex flex-wrap items-center gap-2 px-2 pb-1.5">
+          {encontro.status === "realizado"
+            ? ctaRegistro
+            : ctaRegistro && (
+                <RevelarApos from={encontro.data_hora!}>{ctaRegistro}</RevelarApos>
+              )}
+          {chamada}
+        </div>
+      )}
     </li>
   );
 }
