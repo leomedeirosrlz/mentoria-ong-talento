@@ -172,15 +172,14 @@ Planos em `.devin/plan-mural-perfil.md` + `.devin/plan-agenda-zero-friccao.md`. 
 
 - [ ] Vitest: `saudadeDaDupla`, `parseCsv`, `normWhatsapp`, `mapRole`, `erroAmigavel`, `primeiroEncontroFaltante` — a suíte de QA em `/tmp/qa` (~90 casos) é o ponto de partida.
 
-## Notificações in-app + avisos (em andamento)
+## Notificações in-app + avisos (feito)
 
-Código completo e deployado; **a migration `0018_comunicados_notificacoes.sql`
-ainda não foi aplicada** — o MCP do Supabase perdeu a sessão (HTTP 401) e não
-há outro caminho autenticado pro DDL remoto. Passos pra concluir:
+Migration `0018` aplicada via Management API (o `db push` diverge do histórico
+remoto: 17 versões timestamped aplicadas pelo MCP não existem como arquivos
+locais — reconciliar algum dia com `db pull` ou repair). Smoke test E2E contra o
+remoto passou: mentor→mentor negado (403), mentor→staff permitido, fan-out de
+comunicado, marcar lida própria, RLS bloqueia mexer em notificação alheia,
+delete do comunicado faz cascade nos pings.
 
-1. Re-autenticar o MCP `supabase` (ou `supabase login` + `supabase link
-   --project-ref yhjzmxleotahijinjepl`) e rodar `supabase db push`.
-2. Até lá, `getNotificacoes`/`getComunicados` falham na home (a tabela não
-   existe) — avaliar try/catch com fallback vazio se a migration demorar.
-3. Smoke test: aviso publicado → badge dos destinatários; pedido de apoio →
-   ping pra coord + supervisor da dupla; apoio resolvido → ping pro mentor.
+Pendente só de UX real: primeira publicação de aviso pela coord no app e olhar
+o painel do sino no browser (abrir, marcar lida, mobile).
