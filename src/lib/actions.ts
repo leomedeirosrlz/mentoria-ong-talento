@@ -1338,6 +1338,9 @@ export async function salvarMaterial(formData: FormData) {
   ) {
     return { error: "Número de encontro inválido." };
   }
+  // material criado à mão entra depois dos oficiais — ordem era sempre 0
+  const { data: maxOrd } = await supabase
+    .from("materiais").select("ordem").order("ordem", { ascending: false }).limit(1).maybeSingle();
   const { data: novo, error } = await supabase.from("materiais").insert({
     titulo,
     descricao: String(formData.get("descricao") ?? "").trim() || null,
@@ -1346,11 +1349,58 @@ export async function salvarMaterial(formData: FormData) {
     path,
     audiencia,
     encontro_num: encontroNum,
+    ordem: (maxOrd?.ordem ?? 0) + 1,
   }).select("id").single();
   if (error) return { error: erroAmigavel(error) };
   revalidatePath("/materiais");
   // id volta pro client poder desfazer a row se o upload do arquivo falhar
   return { ok: true, id: novo.id as string };
+}
+
+export async function editarMaterial(id: string, formData: FormData) {
+  const { supabase, me: eu } = await me();
+  if (!eu) return { error: "Sessão expirada — entre de novo." };
+  const titulo = String(formData.get("titulo") ?? "").trim();
+  if (!titulo) return { error: "Título é obrigatório." };
+  const tipo = String(formData.get("tipo") || "link");
+  const audiencia = String(formData.get("audiencia") || "todos");
+  if (!(TIPOS_MATERIAL as readonly string[]).includes(tipo) ||
+      !(AUDIENCIAS_MATERIAL as readonly string[]).includes(audiencia)) {
+    return { error: "Valor inválido para um dos campos." };
+  }
+  const url = String(formData.get("url") ?? "").trim() || null;
+  if (url && !urlOk(url)) return { error: "Link inválido." };
+  const encontroRaw = String(formData.get("encontro_num") ?? "").trim();
+  const encontroNum = encontroRaw ? Number(encontroRaw) : null;
+  const { data: maxEv } = await supabase
+    .from("ciclo_eventos").select("numero")
+    .eq("tipo", "encontro").order("numero", { ascending: false }).limit(1).maybeSingle();
+  if (
+    encontroRaw &&
+    (!Number.isInteger(encontroNum) ||
+      encontroNum! < 1 ||
+      (maxEv?.numero != null && encontroNum! > maxEv.numero))
+  ) {
+    return { error: "Número de encontro inválido." };
+  }
+  const { data, error } = await supabase
+    .from("materiais")
+    .update({
+      titulo,
+      descricao: String(formData.get("descricao") ?? "").trim() || null,
+      tipo,
+      url,
+      audiencia,
+      encontro_num: encontroNum,
+    })
+    .eq("id", id)
+    .select("id");
+  if (error) return { error: erroAmigavel(error) };
+  if (!data?.length) {
+    return { error: "Não foi possível concluir. Recarregue a página e tente de novo." };
+  }
+  revalidatePath("/materiais");
+  return { ok: true };
 }
 
 /** Anexa arquivo a material existente: grava o path na row (o upload vem depois,

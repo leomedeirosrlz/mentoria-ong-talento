@@ -1,18 +1,28 @@
 "use client";
 
-import { useRef, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { CircleNotch, Paperclip } from "@phosphor-icons/react";
+import { CircleNotch, Paperclip, PencilSimple } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import {
   anexarArquivoMaterial,
   deleteMaterial,
+  editarMaterial,
   removerArquivoMaterial,
 } from "@/lib/actions";
 import { createClient } from "@/lib/supabase/client";
 import type { Material } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
+import {
+  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 
 const LIMITE_BYTES = 20 * 1024 * 1024;
 const BUCKET = "materiais";
@@ -30,8 +40,22 @@ function saneiaNome(nome: string): string {
   return limpo || "arquivo";
 }
 
-export function MaterialActions({ material }: { material: Material }) {
+const TIPO_LABEL = {
+  guia: "Guia",
+  template: "Template",
+  conteudo: "Conteúdo",
+  link: "Link",
+} as const;
+const AUDIENCIA_LABEL = {
+  todos: "Todos",
+  dpp: "Mentor DPP",
+  especialista: "Especialista",
+  coordenacao: "Coordenação",
+} as const;
+
+export function MaterialActions({ material, maxEncontro }: { material: Material; maxEncontro?: number }) {
   const [pending, start] = useTransition();
+  const [editOpen, setEditOpen] = useState(false);
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -119,6 +143,15 @@ export function MaterialActions({ material }: { material: Material }) {
         type="button"
         variant="ghost"
         size="icon"
+        aria-label={`Editar "${material.titulo}"`}
+        onClick={() => setEditOpen(true)}
+      >
+        <PencilSimple size={15} />
+      </Button>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
         aria-label={
           pending
             ? "Enviando arquivo"
@@ -142,6 +175,91 @@ export function MaterialActions({ material }: { material: Material }) {
         sucesso={`Material "${material.titulo}" excluído.`}
         onConfirm={() => remover(material)}
       />
+
+      {/* metadados do material — o arquivo em si troca pelo clip */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Editar material</DialogTitle>
+          </DialogHeader>
+          <form
+            className="space-y-4"
+            onSubmit={(e) => {
+              e.preventDefault();
+              const fd = new FormData(e.currentTarget);
+              start(async () => {
+                try {
+                  const res = await editarMaterial(material.id, fd);
+                  if (res?.error) toast.error(res.error);
+                  else {
+                    toast.success("Material atualizado.");
+                    setEditOpen(false);
+                    router.refresh();
+                  }
+                } catch {
+                  toast.error("Sem conexão — tente de novo.");
+                }
+              });
+            }}
+          >
+            <div className="space-y-2">
+              <Label htmlFor="mat-titulo">Título</Label>
+              <Input id="mat-titulo" name="titulo" required defaultValue={material.titulo} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="mat-descricao">Descrição</Label>
+              <Textarea id="mat-descricao" name="descricao" rows={2} defaultValue={material.descricao ?? ""} />
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label id="mat-tipo-label">Tipo</Label>
+                <Select name="tipo" defaultValue={material.tipo}>
+                  <SelectTrigger aria-labelledby="mat-tipo-label"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(TIPO_LABEL).map(([v, l]) => (
+                      <SelectItem key={v} value={v}>{l}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label id="mat-aud-label">Audiência</Label>
+                <Select name="audiencia" defaultValue={material.audiencia}>
+                  <SelectTrigger aria-labelledby="mat-aud-label"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(AUDIENCIA_LABEL).map(([v, l]) => (
+                      <SelectItem key={v} value={v}>{l}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="mat-encontro">Encontro (nº, opcional)</Label>
+                <Input
+                  id="mat-encontro" name="encontro_num" type="number"
+                  min={1} max={maxEncontro ?? 99}
+                  defaultValue={material.encontro_num ?? ""}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="mat-url">Link externo</Label>
+                <Input
+                  id="mat-url" name="url" type="url"
+                  placeholder="https://…"
+                  defaultValue={material.url ?? ""}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="submit" disabled={pending}>
+                {pending ? "Salvando…" : "Salvar"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

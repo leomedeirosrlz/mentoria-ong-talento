@@ -112,7 +112,7 @@ export default async function MateriaisPage() {
             </h2>
             <div className="rounded-xl bg-card shadow-[var(--shadow-border)] divide-y divide-border overflow-hidden">
               {itens.map((m) => (
-                <MaterialRow key={m.id} m={m} ehCoord={ehCoord} />
+                <MaterialRow key={m.id} m={m} ehCoord={ehCoord} maxEncontro={totalEncontros(eventos)} />
               ))}
             </div>
           </section>
@@ -144,7 +144,7 @@ function agrupar(materiais: Material[]): [string, Material[]][] {
   return [...mapa.entries()].sort(([a], [b]) => peso(a) - peso(b));
 }
 
-function MaterialRow({ m, ehCoord }: { m: Material; ehCoord: boolean }) {
+function MaterialRow({ m, ehCoord, maxEncontro }: { m: Material; ehCoord: boolean; maxEncontro: number }) {
   const Icone = TIPO_ICONE[m.tipo];
   // arquivo oficial ganha da url externa; sem os dois, o material ainda não chegou
   const href = m.path ? `/api/material/${m.id}` : m.url;
@@ -194,7 +194,7 @@ function MaterialRow({ m, ehCoord }: { m: Material; ehCoord: boolean }) {
       ) : (
         <div className="flex min-w-0 flex-1 items-center gap-4 px-5 py-3.5">{inner}</div>
       )}
-      {ehCoord && <MaterialActions material={m} />}
+      {ehCoord && <MaterialActions material={m} maxEncontro={maxEncontro} />}
     </div>
   );
 }
