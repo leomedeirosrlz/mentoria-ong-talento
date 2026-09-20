@@ -50,31 +50,45 @@
 
 :root {
   /* Realiza.vc — tokens extraidos do CSS de realiza.vc */
-  --background: hsl(0 0% 100%);
-  --foreground: hsl(0 0% 20%);
+  /* ground plane: neutro frio claro na família de --muted/--sidebar (hsl 240 2%)
+     para que --card branco leia como superfície elevada, não como o fundo */
+  --background: hsl(240 2% 97%);
+  /* texto corpo na mesma profundidade de --brand-ink (15%) — foregrounds de
+     card/popover/sidebar seguem o mesmo valor: um papel de texto, um valor */
+  --foreground: hsl(0 0% 15%);
   --card: hsl(0 0% 100%);
-  --card-foreground: hsl(0 0% 20%);
+  --card-foreground: hsl(0 0% 15%);
   --popover: hsl(0 0% 100%);
-  --popover-foreground: hsl(0 0% 20%);
+  --popover-foreground: hsl(0 0% 15%);
   --primary: hsl(78 56% 53%);
   --primary-foreground: hsl(0 0% 12%);
   --secondary: hsl(0 0% 15%);
   --secondary-foreground: hsl(0 0% 100%);
   --muted: hsl(240 2% 96%);
   --muted-foreground: hsl(240 1% 43%);
-  --accent: hsl(48 100% 60%);
-  --accent-foreground: hsl(0 0% 20%);
-  --destructive: hsl(0 84% 60%);
+  /* hover de menu/select/dropdown: superfície neutra (mesma lightness de
+     --sidebar-accent) — um acento só no app: lime */
+  --accent: hsl(240 4% 93%);
+  --accent-foreground: hsl(0 0% 15%);
+  --destructive: hsl(0 74% 45%);
   --destructive-foreground: hsl(0 0% 100%);
   --border: hsl(240 2% 90%);
   --input: hsl(240 2% 90%);
   --ring: hsl(78 56% 53%);
   --brand-lime: hsl(78 56% 53%);
-  --brand-yellow: hsl(48 100% 60%);
   --brand-ink: hsl(0 0% 15%);
   --ok: hsl(78 58% 38%);
   --warn: hsl(43 95% 44%);
-  --danger: hsl(0 80% 52%);
+  --danger: hsl(0 80% 48%);
+  /* versões escuras para texto (AA ≥4.5:1 sobre fundo claro) — fills/dots seguem com as cores claras acima */
+  --ok-text: hsl(78 55% 30%);
+  --warn-text: hsl(43 90% 30%);
+  /* identidade de papel na dupla: mentor = tinta do sistema (quem age);
+     mentorado = amarelo do ponto do logo (rgb 255,213,49 — = --chart-2),
+     sempre como marcador (dot/disco) — nunca como cor de texto. Spec §1 */
+  --role-mentor: var(--brand-ink);
+  --role-mentor-text: var(--foreground);
+  --role-mentorado: hsl(48 100% 60%);
   --chart-1: hsl(78 56% 53%);
   --chart-2: hsl(48 100% 60%);
   --chart-3: hsl(0 0% 15%);
@@ -82,7 +96,7 @@
   --chart-5: hsl(48 60% 80%);
   --radius: 0.75rem;
   --sidebar: hsl(240 2% 98%);
-  --sidebar-foreground: hsl(0 0% 20%);
+  --sidebar-foreground: hsl(0 0% 15%);
   --sidebar-primary: hsl(78 56% 53%);
   --sidebar-primary-foreground: hsl(0 0% 12%);
   --sidebar-accent: hsl(240 2% 93%);
@@ -91,38 +105,118 @@
   --sidebar-ring: hsl(78 56% 53%);
 }
 
-.dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+/* === Micro-interações (fundação) === */
+/* tokens em @theme: emite --ease-snappy em :root (contrato) e registra os
+   utilities ease-snappy / animate-shimmer / animate-ping-once */
+@theme {
+  /* easing padrão das micro-interações — entrada rápida, sem overshoot */
+  --ease-snappy: cubic-bezier(0.2, 0, 0, 1);
+  /* shimmer do Skeleton — loading é estado transitório: único loop infinito permitido */
+  --animate-shimmer: shimmer 1.4s ease-in-out infinite;
+  /* ping único de atenção do semáforo em risco — dispara uma vez no mount, nunca em loop */
+  --animate-ping-once: ping-once 700ms ease-out both;
+  /* sombra-como-borda (better-ui surfaces): 1ª camada = ring de 1px, 2ª = lift
+     sutil, 3ª = profundidade ambiente. Preto neutro apenas — sem tinta de cor.
+     Em @theme emite o token em :root e registra as utilities shadow-border /
+     shadow-border-hover. Uso: shadow-[var(--shadow-border)] ou shadow-border. */
+  --shadow-border:
+    0 0 0 1px hsl(0 0% 0% / 0.05),
+    0 1px 2px -1px hsl(0 0% 0% / 0.05),
+    0 2px 4px 0 hsl(0 0% 0% / 0.04);
+  --shadow-border-hover:
+    0 0 0 1px hsl(0 0% 0% / 0.08),
+    0 1px 2px -1px hsl(0 0% 0% / 0.08),
+    0 2px 4px 0 hsl(0 0% 0% / 0.06);
+}
+
+/* stagger de entrada de listas: .animate-enter + --i inline (0, 1, 2…).
+   O guard global de prefers-reduced-motion zera a animação.
+   NB: keyframes nomeados enter-stagger — "enter" já existe no tw-animate-css
+   (utility animate-in) e a colisão silenciaria a animação. */
+@keyframes enter-stagger {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+.animate-enter {
+  animation: enter-stagger 180ms var(--ease-snappy) both;
+  animation-delay: calc(var(--i, 0) * 35ms);
+}
+
+/* entrada direcional no eixo X (painéis, drawers, colunas laterais).
+   --dir define o lado: padrão 8px entra deslizando da direita; --dir: -8px da
+   esquerda. Coberta pelo guard global de prefers-reduced-motion — sem duplicar. */
+@keyframes enter-x {
+  from {
+    opacity: 0;
+    transform: translateX(var(--dir, 8px));
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+.animate-enter-x {
+  animation: enter-x 200ms var(--ease-snappy) both;
+}
+
+/* hatch de "tempo bloqueado" (recesso) nas células da agenda — padrão semântico
+   que carrega estado, não textura decorativa. background-image (não background)
+   para sobrepor o bg-color que a célula já tiver. Nome único de domínio em
+   pt-BR; sem alias .bg-hatch para não duplicar API. Sem animação. */
+.hatch-recesso {
+  background-image: repeating-linear-gradient(
+    45deg,
+    transparent 0 4px,
+    hsl(240 2% 92%) 4px 5px
+  );
+}
+
+/* varredura do sheen no Skeleton — com background-size 200% o ciclo fecha sem salto */
+@keyframes shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+/* scale 1→2.2 esmaecendo — um único pulso de atenção, fill both termina invisível */
+@keyframes ping-once {
+  from {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+  to {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}
+
+/* tela /auth/confirmado: disco lime entra com pop e o check se desenha — uma
+   vez só; o guard global de prefers-reduced-motion deixa o check aparecer direto */
+@keyframes confirm-pop {
+  from {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+}
+@keyframes confirm-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+.confirm-pop {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: confirm-pop 280ms var(--ease-snappy) both;
+}
+.confirm-draw {
+  stroke-dasharray: 40;
+  stroke-dashoffset: 40;
+  animation: confirm-draw 420ms var(--ease-snappy) 260ms forwards;
 }
 
 @layer base {
@@ -135,4 +229,36 @@
   html {
     @apply font-sans;
   }
+  /* seleção de texto em lime cheio — craft de marca barato; tinta ink mantém
+     contraste AA (~7:1) sobre o lime */
+  ::selection {
+    background: var(--brand-lime);
+    color: var(--brand-ink);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+/* trilhas e rails horizontais — a barra nativa ocupa ~12px de faixa; fina e
+   discreta, some de graça onde o scroll já é overlay (macOS/iOS) */
+.scroll-fina {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+.scroll-fina::-webkit-scrollbar {
+  height: 4px;
+}
+.scroll-fina::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 999px;
+}
+.scroll-fina::-webkit-scrollbar-track {
+  background: transparent;
 }

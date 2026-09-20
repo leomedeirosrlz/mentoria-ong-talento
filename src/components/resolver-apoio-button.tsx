@@ -21,13 +21,13 @@ export function ResolverApoioButton({ registroId, duplaId }: { registroId: strin
           const res = await resolverApoio(registroId, duplaId);
           if (res?.error) toast.error(res.error);
           else {
-            toast.success("Apoio marcado como acionado.");
+            toast.success("Pedido de apoio atendido.");
             router.refresh();
           }
         })
       }
     >
-      <HandHeart size={14} /> Acionar apoio
+      <HandHeart size={14} /> Marcar apoio como atendido
     </Button>
   );
 }

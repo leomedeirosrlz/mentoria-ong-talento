@@ -159,7 +159,7 @@ create policy mentorados_select on public.mentorados for select
     public.my_role() in ('coordenacao', 'supervisor')
     or exists (
       select 1 from public.duplas d
-      where d.mentorado_id = id and d.mentor_id = public.my_profile_id()
+      where d.mentorado_id = mentorados.id and d.mentor_id = public.my_profile_id()
     )
   );
 create policy mentorados_coord on public.mentorados for all

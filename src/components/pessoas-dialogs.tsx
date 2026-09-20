@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Plus, UserPlus } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { createMentorado, createPessoa } from "@/lib/actions";
+import { FotoField } from "@/components/foto-field";
 import { Button } from "@/components/ui/button";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
@@ -16,20 +17,33 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 
+// labels dos papéis — registradas no Select pra o trigger fechado não mostrar
+// o valor cru do enum ("mentor_dpp")
+const PAPEL_LABEL: Record<string, string> = {
+  mentor_dpp: "Mentor DPP",
+  mentor_especialista: "Mentor especialista",
+  supervisor: "Supervisor",
+  coordenacao: "Coordenação",
+};
+
 function useSubmit(
-  action: (fd: FormData) => Promise<{ error?: string; ok?: boolean }>,
-  okMsg: string,
+  action: (fd: FormData) => Promise<{ error?: string; ok?: boolean; aviso?: string }>,
+  okMsg: (nome: string) => string,
   close: () => void
 ) {
   const [pending, start] = useTransition();
   const router = useRouter();
   const submit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    const fd = new FormData(e.currentTarget);
+    const nome = String(fd.get("nome") ?? "").trim().split(" ")[0];
     start(async () => {
-      const res = await action(new FormData(e.currentTarget));
+      const res = await action(fd);
       if (res?.error) toast.error(res.error);
       else {
-        toast.success(okMsg);
+        toast.success(okMsg(nome));
+        // cadastro salvo mas a foto não subiu → aviso separado, não erro
+        if (res?.aviso) toast.warning(res.aviso);
         close();
         router.refresh();
       }
@@ -40,7 +54,7 @@ function useSubmit(
 
 export function NovaPessoaDialog() {
   const [open, setOpen] = useState(false);
-  const { submit, pending } = useSubmit(createPessoa, "Pessoa cadastrada.", () => setOpen(false));
+  const { submit, pending } = useSubmit(createPessoa, (n) => `Cadastro de ${n} salvo.`, () => setOpen(false));
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -55,32 +69,32 @@ export function NovaPessoaDialog() {
             <Input id="nome" name="nome" required />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="email">E-mail (login por magic link)</Label>
+            <Label htmlFor="email">E-mail</Label>
             <Input id="email" name="email" type="email" required />
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="whatsapp">WhatsApp</Label>
-              <Input id="whatsapp" name="whatsapp" placeholder="5511..." />
+              <Input id="whatsapp" name="whatsapp" type="tel" inputMode="tel" autoComplete="tel" placeholder="5511..." />
             </div>
             <div className="space-y-2">
-              <Label>Papel</Label>
-              <Select name="role" required defaultValue="mentor_dpp">
-                <SelectTrigger><SelectValue /></SelectTrigger>
+              <Label id="papel-label">Papel</Label>
+              <Select name="role" required defaultValue="mentor_dpp" items={PAPEL_LABEL}>
+                <SelectTrigger id="papel-select" aria-labelledby="papel-label papel-select"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="mentor_dpp">Mentor DPP</SelectItem>
-                  <SelectItem value="mentor_especialista">Mentor especialista</SelectItem>
-                  <SelectItem value="supervisor">Supervisor</SelectItem>
-                  <SelectItem value="coordenacao">Coordenacao</SelectItem>
+                  {Object.entries(PAPEL_LABEL).map(([v, l]) => (
+                    <SelectItem key={v} value={v}>{l}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
           </div>
+          <FotoField id="foto" />
           <Button type="submit" className="w-full" disabled={pending}>
             {pending ? "Salvando..." : "Cadastrar"}
           </Button>
           <p className="text-xs text-muted-foreground">
-            A pessoa entra com o e-mail por magic link; o papel ja vem definido.
+            A pessoa entra com o e-mail por link de acesso; o papel define o que ela vê e dá pra trocar depois na lista.
           </p>
         </form>
       </DialogContent>
@@ -90,28 +104,28 @@ export function NovaPessoaDialog() {
 
 export function NovoMentoradoDialog() {
   const [open, setOpen] = useState(false);
-  const { submit, pending } = useSubmit(createMentorado, "Mentorado(a) cadastrado(a).", () => setOpen(false));
+  const { submit, pending } = useSubmit(createMentorado, (n) => `Cadastro de ${n} salvo.`, () => setOpen(false));
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger render={<Button size="sm" variant="outline"><Plus size={16} /> Novo mentorado</Button>} />
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Cadastrar mentorado(a)</DialogTitle>
+          <DialogTitle>Cadastrar mentorado</DialogTitle>
         </DialogHeader>
         <form onSubmit={submit} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="m_nome">Nome</Label>
             <Input id="m_nome" name="nome" required />
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="m_whatsapp">WhatsApp</Label>
-              <Input id="m_whatsapp" name="whatsapp" placeholder="5511..." />
+              <Input id="m_whatsapp" name="whatsapp" type="tel" inputMode="tel" autoComplete="tel" placeholder="5511..." />
             </div>
             <div className="space-y-2">
               <Label htmlFor="m_ong">ONG de origem</Label>
-              <Input id="m_ong" name="ong_origem" placeholder="Juventude Solidaria" />
+              <Input id="m_ong" name="ong_origem" placeholder="Juventude Solidária" />
             </div>
           </div>
           <div className="space-y-2">
@@ -119,9 +133,10 @@ export function NovoMentoradoDialog() {
             <Input id="m_email" name="email" type="email" />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="m_notas">Notas / referencia da anamnese</Label>
+            <Label htmlFor="m_notas">Notas / referência da anamnese</Label>
             <Textarea id="m_notas" name="notas" rows={2} />
           </div>
+          <FotoField id="m_foto" />
           <Button type="submit" className="w-full" disabled={pending}>
             {pending ? "Salvando..." : "Cadastrar"}
           </Button>

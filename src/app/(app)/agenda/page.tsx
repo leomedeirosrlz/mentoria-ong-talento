@@ -1,66 +1,65 @@
-import { getCicloEventos } from "@/lib/queries";
-import { formatDate, toDateStr } from "@/lib/ciclo";
-import { Badge } from "@/components/ui/badge";
-import { cn } from "@/lib/utils";
+import type { Metadata } from "next";
+import { getCicloEventos, getDuplas, getMe } from "@/lib/queries";
+import { eventoDaSemana, toDateStr, totalEncontros } from "@/lib/ciclo";
+import { AgendaCalendario } from "@/components/agenda-calendario";
 
-export default async function AgendaPage() {
-  const eventos = await getCicloEventos();
-  const hoje = toDateStr(new Date());
+export const metadata: Metadata = { title: "Agenda do ciclo" };
+
+export default async function AgendaPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ dia?: string }>;
+}) {
+  // ?dia=YYYY-MM-DD abre a agenda já no dia (deep-link da ficha/notificações)
+  const { dia } = await searchParams;
+  const diaInicial = dia && /^\d{4}-\d{2}-\d{2}$/.test(dia) ? dia : null;
+
+  // getDuplas vem no escopo do RLS: mentor→a própria, supervisor→supervisionadas, coord→todas
+  const [eventos, me, duplas] = await Promise.all([
+    getCicloEventos(),
+    getMe(),
+    getDuplas(),
+  ]);
+  const agora = new Date();
+  const hoje = toDateStr(agora);
+  const semana = eventoDaSemana(eventos, agora);
 
   return (
     <div className="space-y-6">
-      <header>
-        <h1 className="text-2xl font-semibold tracking-tight">Agenda do ciclo</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Ciclo 2026/2027 · 16 encontros das duplas, sempre as tercas-feiras
-        </p>
+      <header className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Agenda do ciclo</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Ciclo 2026/2027 · {totalEncontros(eventos)} encontros das duplas, sempre às terças-feiras
+          </p>
+        </div>
+        {semana?.numero != null && (
+          <p className="mt-1.5 flex items-center gap-2 text-sm font-medium">
+            <span
+              aria-hidden
+              className="size-2 rounded-full bg-[var(--brand-lime)]"
+            />
+            Semana do {semana.numero}º encontro
+          </p>
+        )}
       </header>
 
-      <div className="rounded-xl border bg-card divide-y divide-border overflow-hidden">
-        {eventos.map((e) => {
-          const passou = e.data < hoje;
-          const corrente = e.tipo === "encontro" && e.data <= hoje && diffDias(e.data, hoje) <= 7;
-          return (
-            <div
-              key={e.id}
-              className={cn(
-                "flex items-center gap-4 px-5 py-3.5",
-                passou && "opacity-55",
-                corrente && "bg-[var(--brand-lime)]/10"
-              )}
-            >
-              <span className="w-24 shrink-0 font-mono text-xs text-muted-foreground">
-                {formatDate(e.data)}
-                {e.data_fim && ` - ${formatDate(e.data_fim)}`}
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium">
-                  {e.numero ? `${e.numero}o encontro · ` : ""}
-                  {e.titulo}
-                </p>
-                {e.fase && (
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {e.fase}
-                    {e.instrumentos.length > 0 && ` · ${e.instrumentos.join(", ")}`}
-                  </p>
-                )}
-              </div>
-              {corrente && (
-                <Badge className="bg-[var(--brand-lime)] text-[var(--primary-foreground)] shrink-0">
-                  esta semana
-                </Badge>
-              )}
-              {e.tipo === "recesso" && (
-                <Badge variant="outline" className="shrink-0">recesso</Badge>
-              )}
-            </div>
-          );
-        })}
-      </div>
+      {eventos.length === 0 ? (
+        <div className="rounded-xl bg-card px-5 py-10 text-center shadow-[var(--shadow-border)]">
+          <p className="text-sm text-muted-foreground">
+            A agenda do ciclo ainda não foi publicada pela coordenação.
+          </p>
+        </div>
+      ) : (
+        <AgendaCalendario
+          eventos={eventos}
+          hoje={hoje}
+          semanaId={semana?.id ?? null}
+          diaInicial={diaInicial}
+          duplas={duplas}
+          role={me?.role ?? null}
+        />
+      )}
     </div>
   );
-}
-
-function diffDias(a: string, b: string): number {
-  return Math.round((new Date(b).getTime() - new Date(a).getTime()) / 86400000);
 }

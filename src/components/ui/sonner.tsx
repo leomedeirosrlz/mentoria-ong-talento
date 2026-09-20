@@ -1,31 +1,32 @@
 "use client"
 
-import { useTheme } from "next-themes"
 import { Toaster as Sonner, type ToasterProps } from "sonner"
-import { CircleCheckIcon, InfoIcon, TriangleAlertIcon, OctagonXIcon, Loader2Icon } from "lucide-react"
+import { CheckCircle, Info, Warning, XCircle, SpinnerGap } from "@phosphor-icons/react"
 
 const Toaster = ({ ...props }: ToasterProps) => {
-  const { theme = "system" } = useTheme()
-
   return (
     <Sonner
-      theme={theme as ToasterProps["theme"]}
+      theme="light"
       className="toaster group"
+      /* sonner 2.x não tem duração por tipo no toastOptions — 8s global pra dar
+         tempo de ler erro com copy longa; um erro específico ainda pode pedir
+         mais via toast.error(msg, { duration }) */
+      duration={8000}
       icons={{
         success: (
-          <CircleCheckIcon className="size-4" />
+          <CheckCircle className="size-4" />
         ),
         info: (
-          <InfoIcon className="size-4" />
+          <Info className="size-4" />
         ),
         warning: (
-          <TriangleAlertIcon className="size-4" />
+          <Warning className="size-4" />
         ),
         error: (
-          <OctagonXIcon className="size-4" />
+          <XCircle className="size-4" />
         ),
         loading: (
-          <Loader2Icon className="size-4 animate-spin" />
+          <SpinnerGap className="size-4 animate-spin" />
         ),
       }}
       style={
@@ -34,6 +35,19 @@ const Toaster = ({ ...props }: ToasterProps) => {
           "--normal-text": "var(--popover-foreground)",
           "--normal-border": "var(--border)",
           "--border-radius": "var(--radius)",
+          /* richColors (ativado no layout) tingido pelos tokens do tema */
+          "--success-bg": "color-mix(in oklab, var(--ok) 12%, var(--popover))",
+          "--success-border": "color-mix(in oklab, var(--ok) 35%, var(--border))",
+          "--success-text": "var(--ok-text)",
+          "--error-bg": "color-mix(in oklab, var(--danger) 8%, var(--popover))",
+          "--error-border": "color-mix(in oklab, var(--danger) 30%, var(--border))",
+          "--error-text": "var(--danger)",
+          "--warning-bg": "color-mix(in oklab, var(--warn) 15%, var(--popover))",
+          "--warning-border": "color-mix(in oklab, var(--warn) 40%, var(--border))",
+          "--warning-text": "var(--warn-text)",
+          "--info-bg": "var(--muted)",
+          "--info-border": "var(--border)",
+          "--info-text": "var(--foreground)",
         } as React.CSSProperties
       }
       toastOptions={{

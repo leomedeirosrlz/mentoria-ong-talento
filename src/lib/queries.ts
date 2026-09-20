@@ -1,78 +1,217 @@
+import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
-import type { CicloEvento, Dupla, Material, Mentorado, Profile } from "./types";
+import type { CicloEvento, Dupla, DuplaResumo, DuplaStatus, Material, Mentorado, PessoaNota, Profile } from "./types";
 
-export async function getMe(): Promise<Profile | null> {
+// getClaims valida o JWT localmente (sem round-trip); RLS segue valendo no banco.
+export const getMe = cache(async (): Promise<Profile | null> => {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return null;
-  const { data } = await supabase.from("profiles").select("*").eq("user_id", user.id).single();
-  return data;
-}
+  const { data } = await supabase.auth.getClaims();
+  const sub = data?.claims?.sub;
+  if (!sub) return null;
+  // maybeSingle: profile ainda não criado (ou removido) -> null -> layout manda pro login
+  const { data: profile, error } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("user_id", sub)
+    .maybeSingle();
+  if (error) throw error;
+  return profile;
+});
 
-export async function getCicloEventos(): Promise<CicloEvento[]> {
+export const getCicloEventos = cache(async (): Promise<CicloEvento[]> => {
   const supabase = await createClient();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("ciclo_eventos")
     .select("*")
     .order("data", { ascending: true });
+  if (error) throw error;
   return data ?? [];
-}
+});
 
 const DUPLA_SELECT = `
   *,
   mentor:profiles!duplas_mentor_id_fkey(*),
   mentorado:mentorados(*),
   supervisor:profiles!duplas_supervisor_id_fkey(*),
-  encontros(*, registro:registros(*)),
-  encaminhamentos(*)
+  encontros(*, registro:registros(*, autor:profiles!registros_created_by_fkey(nome))),
+  encaminhamentos(*),
+  notas:encontro_notas(*)
 `;
 
-export async function getDuplas(): Promise<Dupla[]> {
+export const getDuplas = cache(async (): Promise<Dupla[]> => {
   const supabase = await createClient();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("duplas")
     .select(DUPLA_SELECT)
     .order("created_at", { ascending: true });
+  if (error) throw error;
   return (data as unknown as Dupla[]) ?? [];
-}
+});
 
-export async function getDupla(id: string): Promise<Dupla | null> {
+export const getDupla = cache(async (id: string): Promise<Dupla | null> => {
   const supabase = await createClient();
-  const { data } = await supabase.from("duplas").select(DUPLA_SELECT).eq("id", id).single();
+  // maybeSingle: id inexistente -> null -> page chama notFound()
+  const { data, error } = await supabase
+    .from("duplas")
+    .select(DUPLA_SELECT)
+    .eq("id", id)
+    .maybeSingle();
+  if (error) throw error;
   return (data as unknown as Dupla) ?? null;
-}
+});
 
-export async function getMinhasDuplas(): Promise<Dupla[]> {
+export const getMinhasDuplas = cache(async (): Promise<Dupla[]> => {
   const me = await getMe();
   if (!me) return [];
   const supabase = await createClient();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("duplas")
     .select(DUPLA_SELECT)
     .or(`mentor_id.eq.${me.id},supervisor_id.eq.${me.id}`)
     .order("created_at", { ascending: true });
+  if (error) throw error;
   return (data as unknown as Dupla[]) ?? [];
-}
+});
 
-export async function getPessoas(): Promise<Profile[]> {
+/** Só os vínculos — pra checar "está em dupla" sem arrastar encontros/registros. */
+export const getDuplasResumo = cache(async (): Promise<DuplaResumo[]> => {
   const supabase = await createClient();
-  const { data } = await supabase.from("profiles").select("*").order("nome");
+  const { data, error } = await supabase
+    .from("duplas")
+    .select("id,mentor_id,mentorado_id,supervisor_id")
+    .neq("status", "encerrada");
+  if (error) throw error;
   return data ?? [];
-}
+});
 
-export async function getMentorados(): Promise<Mentorado[]> {
+/** Vínculos de qualquer status (inclusive encerrada) — espelha a guarda de
+ *  exclusão das actions, que bloqueia pessoa/mentorado com QUALQUER dupla. */
+export const getDuplasResumoTodas = cache(async (): Promise<DuplaResumo[]> => {
   const supabase = await createClient();
-  const { data } = await supabase.from("mentorados").select("*").order("nome");
+  const { data, error } = await supabase
+    .from("duplas")
+    .select("id,mentor_id,mentorado_id,supervisor_id");
+  if (error) throw error;
   return data ?? [];
-}
+});
 
-export async function getMateriais(): Promise<Material[]> {
+/** Só a contagem (head: true, sem rows) — alimenta o checklist de setup da home. */
+export const getContagemPessoas = cache(async (): Promise<number> => {
   const supabase = await createClient();
-  const { data } = await supabase
+  const [profiles, mentorados] = await Promise.all([
+    supabase.from("profiles").select("*", { count: "exact", head: true }),
+    supabase.from("mentorados").select("*", { count: "exact", head: true }),
+  ]);
+  if (profiles.error) throw profiles.error;
+  if (mentorados.error) throw mentorados.error;
+  return (profiles.count ?? 0) + (mentorados.count ?? 0);
+});
+
+export const getPessoas = cache(async (): Promise<Profile[]> => {
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("profiles").select("*").order("nome");
+  if (error) throw error;
+  return data ?? [];
+});
+
+export const getMentorados = cache(async (): Promise<Mentorado[]> => {
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("mentorados").select("*").order("nome");
+  if (error) throw error;
+  return data ?? [];
+});
+
+/** Card de dupla na página de perfil — nomes e status, sem a árvore de encontros. */
+export type DuplaPerfil = {
+  id: string;
+  status: DuplaStatus;
+  iniciada_em: string | null;
+  mentor: { id: string; nome: string; avatar_path?: string | null; email?: string | null } | null;
+  mentorado: { id: string; nome: string; avatar_path?: string | null } | null;
+};
+
+export type PessoaPerfil =
+  | { tipo: "profile"; pessoa: Profile }
+  | { tipo: "mentorado"; pessoa: Mentorado };
+
+/** Perfil público interno (/pessoas/[id]) — resolve profile OU mentorado pelo
+ *  id, traz as duplas da pessoa e o mural de notas. O RLS já limita: mentor
+ *  que consulta mentorado fora da própria dupla recebe null → notFound. */
+export const getPessoaPerfil = cache(async (id: string): Promise<
+  (PessoaPerfil & { duplas: DuplaPerfil[]; notas: PessoaNota[] }) | null
+> => {
+  const supabase = await createClient();
+  const DUPLA_PERFIL_SELECT = `
+    id, status, iniciada_em,
+    mentor:profiles!duplas_mentor_id_fkey(id, nome, avatar_path, email),
+    mentorado:mentorados(id, nome, avatar_path)
+  `;
+  // notas são privadas do autor (0017) — só voltam as minhas; embed de autor
+  // seria sempre eu mesmo, então não vale o join
+  const NOTA_SELECT = `id, profile_id, mentorado_id, texto, created_by, created_at`;
+
+  const [{ data: p }, { data: m }] = await Promise.all([
+    supabase.from("profiles").select("*").eq("id", id).maybeSingle(),
+    supabase.from("mentorados").select("*").eq("id", id).maybeSingle(),
+  ]);
+  if (p) {
+    const [{ data: duplas }, { data: notas }] = await Promise.all([
+      supabase.from("duplas").select(DUPLA_PERFIL_SELECT)
+        .or(`mentor_id.eq.${id},supervisor_id.eq.${id}`)
+        .order("created_at", { ascending: false }),
+      supabase.from("pessoa_notas").select(NOTA_SELECT)
+        .eq("profile_id", id).order("created_at", { ascending: false }),
+    ]);
+    return {
+      tipo: "profile",
+      pessoa: p as Profile,
+      duplas: (duplas as unknown as DuplaPerfil[]) ?? [],
+      notas: (notas as unknown as PessoaNota[]) ?? [],
+    };
+  }
+  if (m) {
+    const [{ data: duplas }, { data: notas }] = await Promise.all([
+      supabase.from("duplas").select(DUPLA_PERFIL_SELECT)
+        .eq("mentorado_id", id)
+        .order("created_at", { ascending: false }),
+      supabase.from("pessoa_notas").select(NOTA_SELECT)
+        .eq("mentorado_id", id).order("created_at", { ascending: false }),
+    ]);
+    return {
+      tipo: "mentorado",
+      pessoa: m as Mentorado,
+      duplas: (duplas as unknown as DuplaPerfil[]) ?? [],
+      notas: (notas as unknown as PessoaNota[]) ?? [],
+    };
+  }
+  return null;
+});
+
+export const getMateriais = cache(async (): Promise<Material[]> => {
+  const supabase = await createClient();
+  const { data, error } = await supabase
     .from("materiais")
     .select("*")
     .order("ordem", { ascending: true });
+  if (error) throw error;
   return data ?? [];
-}
+});
+
+/** mentor_profiles — tipo local porque a tabela ainda não está em types.ts. */
+export type MentorProfile = {
+  profile_id: string;
+  tipo: "dpp" | "especialista";
+  areas: string[];
+  capacidade: number;
+  termo_ok: boolean;
+  formacao_ok: boolean;
+};
+
+export const getMentorProfiles = cache(async (): Promise<MentorProfile[]> => {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("mentor_profiles")
+    .select("profile_id,tipo,areas,capacidade,termo_ok,formacao_ok");
+  if (error) throw error;
+  return (data as unknown as MentorProfile[]) ?? [];
+});

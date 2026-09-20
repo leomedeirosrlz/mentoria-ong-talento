@@ -23,24 +23,26 @@ export async function updateSession(request: NextRequest) {
     }
   );
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { data } = await supabase.auth.getClaims();
+  const user = data?.claims ? { id: data.claims.sub as string } : null;
 
-  const isPublic =
-    request.nextUrl.pathname.startsWith("/login") ||
-    request.nextUrl.pathname.startsWith("/auth");
+  const p = request.nextUrl.pathname;
+  const isPublic = p === "/login" || p.startsWith("/login/") || p === "/auth" || p.startsWith("/auth/");
 
   if (!user && !isPublic) {
     const url = request.nextUrl.clone();
+    // preserva o destino (path+query) pro login devolver depois do magic link —
+    // ex.: nudge do WhatsApp pousa em /duplas/{id} deslogado e volta pra lá
+    const destino = p + request.nextUrl.search;
     url.pathname = "/login";
+    url.search = `?next=${encodeURIComponent(destino)}`;
     return NextResponse.redirect(url);
   }
 
   if (user && request.nextUrl.pathname === "/login") {
-    const url = request.nextUrl.clone();
-    url.pathname = "/";
-    return NextResponse.redirect(url);
+    const next = request.nextUrl.searchParams.get("next");
+    const destino = next?.startsWith("/") && !next.startsWith("//") ? next : "/";
+    return NextResponse.redirect(new URL(destino, request.url));
   }
 
   return supabaseResponse;

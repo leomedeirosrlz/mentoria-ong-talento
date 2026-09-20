@@ -1,8 +1,16 @@
-import { getMateriais, getMe } from "@/lib/queries";
-import { ArrowSquareOut, FileText, LinkSimple, BookOpen, PuzzlePiece } from "@phosphor-icons/react/dist/ssr";
+import type { Metadata } from "next";
+import type { CSSProperties } from "react";
+import Link from "next/link";
+import { getCicloEventos, getMateriais, getMe } from "@/lib/queries";
+import { totalEncontros } from "@/lib/ciclo";
+import { ArrowSquareOut, File, FileText, FolderOpen, LinkSimple, BookOpen, PuzzlePiece } from "@phosphor-icons/react/dist/ssr";
 import { Badge } from "@/components/ui/badge";
 import { NovoMaterialDialog } from "@/components/novo-material-dialog";
+import { MaterialActions } from "@/components/material-actions";
 import type { Material } from "@/lib/types";
+import { cn } from "@/lib/utils";
+
+export const metadata: Metadata = { title: "Materiais" };
 
 const TIPO_ICONE = {
   guia: BookOpen,
@@ -15,11 +23,32 @@ const AUDIENCIA_LABEL = {
   todos: "todos",
   dpp: "mentor DPP",
   especialista: "especialista",
-  coordenacao: "coordenacao",
+  coordenacao: "coordenação",
+} as const;
+
+// nome legível do tipo — os ícones de TIPO_ICONE são decorativos, este texto é
+// o equivalente pra leitor de tela
+const TIPO_LABEL = {
+  guia: "guia",
+  template: "template",
+  conteudo: "conteúdo",
+  link: "link",
+} as const;
+
+// seções fixas pra material sem encontro — cada tipo cai no rótulo do próprio tipo
+const GRUPO_TIPO = {
+  guia: "Guias",
+  template: "Templates gerais",
+  conteudo: "Conteúdos",
+  link: "Links",
 } as const;
 
 export default async function MateriaisPage() {
-  const [materiais, me] = await Promise.all([getMateriais(), getMe()]);
+  const [materiais, me, eventos] = await Promise.all([
+    getMateriais(),
+    getMe(),
+    getCicloEventos(),
+  ]);
 
   const visiveis = materiais.filter((m) => {
     if (m.audiencia === "todos") return true;
@@ -29,32 +58,66 @@ export default async function MateriaisPage() {
     return false;
   });
 
+  const ehCoord = me?.role === "coordenacao";
   const grupos = agrupar(visiveis);
 
   return (
     <div className="space-y-6">
-      <header className="flex items-center justify-between">
+      <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Materiais</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Guias, templates e instrumentos da metodologia
+            A biblioteca oficial do ciclo — a coordenação publica ao longo do programa
           </p>
         </div>
-        {me?.role === "coordenacao" && <NovoMaterialDialog />}
+        {/* biblioteca vazia: o CTA mora dentro do card de estado vazio, não aqui */}
+        {ehCoord && grupos.length > 0 && (
+          <NovoMaterialDialog maxEncontro={totalEncontros(eventos)} />
+        )}
       </header>
 
-      {grupos.map(([rotulo, itens]) => (
-        <section key={rotulo} className="space-y-2">
-          <h2 className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
-            {rotulo}
-          </h2>
-          <div className="rounded-xl border bg-card divide-y divide-border overflow-hidden">
-            {itens.map((m) => (
-              <MaterialRow key={m.id} m={m} />
-            ))}
+      {grupos.length === 0 ? (
+        <div className="flex flex-col items-center gap-1.5 rounded-xl bg-card px-5 py-10 text-center shadow-[var(--shadow-border)]">
+          <FolderOpen size={32} className="text-muted-foreground" aria-hidden />
+          <p className="text-sm font-medium">
+            {ehCoord ? "Nenhum material publicado ainda" : "Nenhum material disponível para o seu perfil"}
+          </p>
+          <p className="text-sm text-muted-foreground">
+            {ehCoord
+              ? "Publique o primeiro guia, template ou instrumento do ciclo."
+              : "Os guias e instrumentos do ciclo aparecem aqui quando a coordenação publicar."}
+          </p>
+          <div className="mt-3">
+            {ehCoord ? (
+              <NovoMaterialDialog maxEncontro={totalEncontros(eventos)} />
+            ) : (
+              <Link
+                href="/agenda"
+                className="text-sm font-medium underline underline-offset-2 transition-colors hover:text-muted-foreground"
+              >
+                Ver a agenda do ciclo
+              </Link>
+            )}
           </div>
-        </section>
-      ))}
+        </div>
+      ) : (
+        grupos.map(([rotulo, itens], i) => (
+          <section
+            key={rotulo}
+            className="animate-enter space-y-2"
+            style={{ "--i": Math.min(i, 10) } as CSSProperties}
+          >
+            <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+              {rotulo}
+            </h2>
+            <div className="rounded-xl bg-card shadow-[var(--shadow-border)] divide-y divide-border overflow-hidden">
+              {itens.map((m) => (
+                <MaterialRow key={m.id} m={m} ehCoord={ehCoord} />
+              ))}
+            </div>
+          </section>
+        ))
+      )}
     </div>
   );
 }
@@ -63,48 +126,75 @@ function agrupar(materiais: Material[]): [string, Material[]][] {
   const mapa = new Map<string, Material[]>();
   for (const m of materiais) {
     const rotulo =
-      m.encontro_num != null
-        ? `Encontro ${m.encontro_num}`
-        : m.tipo === "guia"
-          ? "Guias"
-          : m.tipo === "template"
-            ? "Templates gerais"
-            : "Links";
+      m.encontro_num != null ? `Encontro ${m.encontro_num}` : GRUPO_TIPO[m.tipo];
     mapa.set(rotulo, [...(mapa.get(rotulo) ?? []), m]);
   }
-  return [...mapa.entries()].sort(([a], [b]) => {
-    const peso = (r: string) =>
-      r === "Guias" ? -1 : r.startsWith("Encontro") ? Number(r.split(" ")[1]) : 99;
-    return peso(a) - peso(b);
-  });
+  // guias da metodologia primeiro, encontros na ordem do ciclo, grupos soltos
+  // por último numa ordem fixa (não depende da ordem dos dados)
+  const peso = (r: string) =>
+    r === "Guias"
+      ? -1
+      : r.startsWith("Encontro")
+        ? Number(r.split(" ")[1])
+        : r === "Templates gerais"
+          ? 100
+          : r === "Conteúdos"
+            ? 101
+            : 102;
+  return [...mapa.entries()].sort(([a], [b]) => peso(a) - peso(b));
 }
 
-function MaterialRow({ m }: { m: Material }) {
+function MaterialRow({ m, ehCoord }: { m: Material; ehCoord: boolean }) {
   const Icone = TIPO_ICONE[m.tipo];
+  // arquivo oficial ganha da url externa; sem os dois, o material ainda não chegou
+  const href = m.path ? `/api/material/${m.id}` : m.url;
   const inner = (
-    <div className="flex items-center gap-4 px-5 py-3.5">
-      <Icone size={18} className="shrink-0 text-muted-foreground" />
+    <>
+      <Icone size={18} className="shrink-0 text-muted-foreground" aria-hidden />
       <div className="min-w-0 flex-1">
         <p className="text-sm font-medium">{m.titulo}</p>
         {m.descricao && <p className="text-xs text-muted-foreground mt-0.5">{m.descricao}</p>}
+        {/* equivalente textual dos ícones de tipo/destino — pro tipo "link" a
+            palavra já cobre o destino, sem "link externo" repetido */}
+        <span className="sr-only">
+          {TIPO_LABEL[m.tipo]}
+          {m.path ? " — arquivo" : m.url && m.tipo !== "link" ? " — link externo" : ""}
+        </span>
       </div>
       <div className="flex items-center gap-2 shrink-0">
         {m.audiencia !== "todos" && (
           <Badge variant="outline" className="text-xs">{AUDIENCIA_LABEL[m.audiencia]}</Badge>
         )}
-        {m.url ? (
-          <ArrowSquareOut size={15} className="text-muted-foreground" />
+        {m.path ? (
+          // path aceita imagem além de PDF — ícone genérico de arquivo
+          <File size={15} className="text-muted-foreground" aria-hidden />
+        ) : m.url ? (
+          <ArrowSquareOut size={15} className="text-muted-foreground" aria-hidden />
         ) : (
-          <span className="text-xs text-muted-foreground">em breve</span>
+          // sem destino: estado legítimo "a caminho" — badge estático, a row
+          // não vira link nem ganha hover pra não parecer clicável/quebrado
+          <Badge variant="outline" className="text-xs text-muted-foreground">
+            {ehCoord ? "sem conteúdo" : "em breve"}
+          </Badge>
         )}
       </div>
-    </div>
+    </>
   );
-  return m.url ? (
-    <a href={m.url} target="_blank" rel="noopener noreferrer" className="block transition-colors hover:bg-muted/50">
-      {inner}
-    </a>
-  ) : (
-    <div>{inner}</div>
+  return (
+    <div className={cn("flex items-center pr-2 transition-colors", href && "hover:bg-muted/50")}>
+      {href ? (
+        <a
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex min-w-0 flex-1 items-center gap-4 px-5 py-3.5 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+        >
+          {inner}
+        </a>
+      ) : (
+        <div className="flex min-w-0 flex-1 items-center gap-4 px-5 py-3.5">{inner}</div>
+      )}
+      {ehCoord && <MaterialActions material={m} />}
+    </div>
   );
 }

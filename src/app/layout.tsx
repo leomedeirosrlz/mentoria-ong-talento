@@ -1,5 +1,6 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Mitr, JetBrains_Mono } from "next/font/google";
+import { MotionConfig } from "motion/react";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
@@ -15,8 +16,17 @@ const jbMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Realiza.vc · Programa de Mentoria",
+  title: "Realiza.vc · Programa de Mentoria Social",
   description: "Acompanhamento operacional do Programa de Mentoria Social do Instituto Realiza.vc",
+  appleWebApp: {
+    capable: true,
+    title: "Realiza.vc",
+    statusBarStyle: "default",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#a2ca44",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
@@ -26,8 +36,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${mitr.variable} ${jbMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        {children}
-        <Toaster richColors position="bottom-right" />
+        {/* reducedMotion="user": o guard CSS de prefers-reduced-motion não cobre
+            animação JS — aqui transform/layout viram instantâneos (fades ficam) */}
+        <MotionConfig reducedMotion="user">{children}</MotionConfig>
+        <Toaster richColors position="bottom-right" mobileOffset={{ bottom: "5.5rem" }} />
       </body>
     </html>
   );
