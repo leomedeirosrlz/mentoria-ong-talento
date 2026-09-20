@@ -1217,6 +1217,49 @@ export async function toggleEncaminhamento(id: string, feito: boolean, duplaId: 
   return { ok: true };
 }
 
+export async function editarEncaminhamento(id: string, duplaId: string, formData: FormData) {
+  const { supabase, me: eu } = await me();
+  if (!eu) return { error: "Sessão expirada — entre de novo." };
+  const descricao = String(formData.get("descricao") ?? "").trim();
+  const responsavel = String(formData.get("responsavel") ?? "mentorado");
+  const prazo = String(formData.get("prazo") ?? "").trim();
+  if (descricao.length < 2 || descricao.length > 500) {
+    return { error: "A descrição precisa de 2 a 500 caracteres." };
+  }
+  if (!["mentor", "mentorado"].includes(responsavel)) {
+    return { error: "Responsável inválido." };
+  }
+  if (prazo && !/^\d{4}-\d{2}-\d{2}$/.test(prazo)) {
+    return { error: "Prazo inválido." };
+  }
+  const { data, error } = await supabase
+    .from("encaminhamentos")
+    .update({ descricao, responsavel, prazo: prazo || null })
+    .eq("id", id)
+    .select("id");
+  if (error) return { error: erroAmigavel(error) };
+  if (!data?.length) {
+    return { error: "Não foi possível concluir. Recarregue a página e tente de novo." };
+  }
+  revalidatePath("/");
+  revalidatePath(`/duplas/${duplaId}`);
+  return { ok: true };
+}
+
+export async function excluirEncaminhamento(id: string, duplaId: string) {
+  const { supabase, me: eu } = await me();
+  if (!eu) return { error: "Sessão expirada — entre de novo." };
+  const { data, error } = await supabase
+    .from("encaminhamentos").delete().eq("id", id).select("id");
+  if (error) return { error: erroAmigavel(error) };
+  if (!data?.length) {
+    return { error: "Não foi possível excluir. Recarregue a página e tente de novo." };
+  }
+  revalidatePath("/");
+  revalidatePath(`/duplas/${duplaId}`);
+  return { ok: true };
+}
+
 export async function resolverApoio(registroId: string, duplaId: string) {
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada — entre de novo." };

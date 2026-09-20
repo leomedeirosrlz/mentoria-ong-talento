@@ -310,7 +310,7 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
               <h2 className="text-sm font-semibold">Combinados</h2>
               {souMentor && combinadosPendentes.length > 0 && combinadosHref && (
                 <a
-                  href={combinadosHref}
+                  href={`/api/nudge?d=${dupla.id}&to=${encodeURIComponent(combinadosHref)}&t=contato`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className={buttonVariants({ variant: "outline", size: "sm" })}
