@@ -84,7 +84,8 @@ function DialogHeader({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="dialog-header"
-      className={cn("flex flex-col gap-2", className)}
+      // pr-8: o X absoluto do popup não pode ficar por cima de título longo
+      className={cn("flex flex-col gap-2 pr-8", className)}
       {...props}
     />
   )

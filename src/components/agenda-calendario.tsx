@@ -768,16 +768,20 @@ export function AgendaCalendario({
                         pedirRolarSePonteiro(ev, e.data);
                         moverPara(e.data);
                       }}
-                      className={cn(
-                        "grid shrink-0 place-items-center rounded-full font-mono text-[11px] font-semibold leading-none tabular-nums transition-[color,background-color,box-shadow] hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-lime)]",
-                        atual
-                          ? "size-7 bg-[var(--brand-lime)] text-[var(--brand-ink)] ring-2 ring-[var(--brand-lime)]/40 ring-offset-2 ring-offset-card"
-                          : passou
-                            ? "size-6 bg-[var(--brand-lime)] text-[var(--brand-ink)] sm:size-7"
-                            : "size-6 bg-muted text-muted-foreground sm:size-7"
-                      )}
+                      className="grid size-9 shrink-0 place-items-center rounded-full font-mono text-[11px] font-semibold leading-none tabular-nums transition-[color,background-color,box-shadow] hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-lime)]"
                     >
-                      {e.numero}
+                      <span
+                        className={cn(
+                          "grid place-items-center rounded-full",
+                          atual
+                            ? "size-7 bg-[var(--brand-lime)] text-[var(--brand-ink)] ring-2 ring-[var(--brand-lime)]/40 ring-offset-2 ring-offset-card"
+                            : passou
+                              ? "size-6 bg-[var(--brand-lime)] text-[var(--brand-ink)] sm:size-7"
+                              : "size-6 bg-muted text-muted-foreground sm:size-7"
+                        )}
+                      >
+                        {e.numero}
+                      </span>
                     </button>
                   </Fragment>
                 );
@@ -857,7 +861,9 @@ export function AgendaCalendario({
                         aria-label={rotuloDia}
                         onClick={(e) => {
                           pedirRolarSePonteiro(e, iso);
-                          setRegistroAberto(null);
+                          // reclicar no dia já aberto não deve derrubar o modal
+                          // de registro que está dentro dele
+                          if (iso !== selecionado) setRegistroAberto(null);
                           setSelecionado(iso);
                         }}
                         onKeyDown={(e) => onDiaKeyDown(e, iso)}
@@ -877,7 +883,7 @@ export function AgendaCalendario({
                               ehHoje
                                 ? "rounded-full bg-[var(--brand-ink)] text-white"
                                 : fimDeSemana
-                                  ? "text-muted-foreground/70"
+                                  ? "text-muted-foreground/80"
                                   : passou
                                     ? "text-muted-foreground"
                                     : "text-foreground"
@@ -1592,7 +1598,7 @@ function EncontroDuplaRow({
       href={encontro.link}
       target="_blank"
       rel="noopener noreferrer"
-      className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-[var(--ok)]/40 bg-[var(--ok)]/10 px-2.5 text-xs font-medium text-[var(--ok-text)] transition-colors hover:bg-[var(--ok)]/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-[var(--ok)]/40 bg-[var(--ok)]/10 px-2.5 text-xs font-medium text-[var(--ok-text)] transition-colors hover:bg-[var(--ok)]/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:min-h-9"
     >
       <VideoCamera size={14} aria-hidden />
       Entrar na chamada

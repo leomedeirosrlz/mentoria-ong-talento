@@ -4,7 +4,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 // (campos em 2 colunas) + card de segurança.
 export default function Loading() {
   return (
-    <div role="status" aria-label="Carregando" className="space-y-6">
+    <div role="status" aria-label="Carregando" className="max-w-lg space-y-6">
       <header className="flex items-center gap-4">
         <Skeleton className="size-16 shrink-0 rounded-full" />
         <div>

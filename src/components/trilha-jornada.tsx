@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { Flag, FlagCheckered, Medal, Trophy } from "@phosphor-icons/react";
 import {
@@ -149,7 +149,11 @@ export function TrilhaJornada({
           const rotulo = rotuloNo(no, atual);
           const IconeMarco = no.marco ? ICONE_MARCO[no.marco] : null;
           return (
-            <Fragment key={no.evento.id}>
+            <li
+              key={no.evento.id}
+              ref={atual ? refAtual : undefined}
+              className={cn("flex items-center", i > 0 ? "flex-1" : "shrink-0")}
+            >
               {i > 0 && (
                 <span
                   aria-hidden
@@ -164,10 +168,6 @@ export function TrilhaJornada({
                   )}
                 />
               )}
-              <li
-                ref={atual ? refAtual : undefined}
-                className="shrink-0"
-              >
                 {/* size-9 = hit area de 36px em volta do disco de 24–28px —
                     tocar o passo abre o card dele na ficha */}
                 <Link
@@ -214,8 +214,7 @@ export function TrilhaJornada({
                     )}
                   </span>
                 </Link>
-              </li>
-            </Fragment>
+            </li>
           );
         })}
       </ol>

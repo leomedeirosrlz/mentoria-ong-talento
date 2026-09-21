@@ -30,6 +30,9 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: "#a2ca44",
+  // teclado virtual encolhe o layout em vez de cobrir dialogs/footers
+  // sticky (Chrome/Android; iOS Safari ignora, limitação conhecida)
+  interactiveWidget: "resizes-content",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

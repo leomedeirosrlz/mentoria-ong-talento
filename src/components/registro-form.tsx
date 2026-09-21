@@ -96,6 +96,7 @@ export function RegistroForm({
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
   const tituloEtapaRef = useRef<HTMLHeadingElement>(null);
+  const addEncRef = useRef<HTMLButtonElement>(null);
   // foco pedido junto com a troca de etapa — o efeito roda depois do commit,
   // quando o `hidden` da seção alvo já saiu da árvore renderizada
   const focoPendente = useRef<"titulo" | "avaliacao" | null>(null);
@@ -307,6 +308,12 @@ export function RegistroForm({
 
   function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    // Enter num input das etapas 1–2 avança, não salva — o submit implícito
+    // do browser chega aqui por qualquer campo de texto
+    if (etapa < ETAPAS.length - 1) {
+      avancar();
+      return;
+    }
     const fd = new FormData(e.currentTarget);
     if (!fd.get("avaliacao")) {
       cobrarAvaliacao();
@@ -395,7 +402,7 @@ export function RegistroForm({
           <button
             type="button"
             onClick={discardDraft}
-            className="font-medium text-foreground underline underline-offset-2 hover:text-muted-foreground"
+            className="-my-2 min-h-11 rounded-md px-2 font-medium text-foreground underline underline-offset-2 hover:text-muted-foreground"
           >
             Descartar rascunho
           </button>
@@ -595,14 +602,16 @@ export function RegistroForm({
                 <SelectItem value="outro">Outro</SelectItem>
               </SelectContent>
             </Select>
-            {dificuldade === "outro" && (
-              <Input
-                name="dificuldade_detalhe"
-                placeholder="Qual dificuldade?"
-                aria-label="Detalhe da dificuldade"
-                defaultValue={restored?.dificuldadeDetalhe ?? registro?.dificuldade_detalhe ?? ""}
-              />
-            )}
+            {/* montado sempre: desmontar perdia o texto digitado e o disabled
+                tira o campo do FormData quando não é "outro" */}
+            <Input
+              name="dificuldade_detalhe"
+              placeholder="Qual dificuldade?"
+              aria-label="Detalhe da dificuldade"
+              hidden={dificuldade !== "outro"}
+              disabled={dificuldade !== "outro"}
+              defaultValue={restored?.dificuldadeDetalhe ?? registro?.dificuldade_detalhe ?? ""}
+            />
           </div>
 
           <label className="flex items-start gap-3 rounded-lg border border-[var(--warn)]/40 bg-[var(--warn)]/8 px-4 py-3 text-sm cursor-pointer">
@@ -639,20 +648,20 @@ export function RegistroForm({
                 <SelectItem value="outro">Outro</SelectItem>
               </SelectContent>
             </Select>
-            {proximoPasso === "outro" && (
-              <Input
-                name="proximo_passo_detalhe"
-                placeholder="Qual próximo passo?"
-                aria-label="Detalhe do próximo passo"
-                defaultValue={restored?.proximoPassoDetalhe ?? registro?.proximo_passo_detalhe ?? ""}
-              />
-            )}
+            <Input
+              name="proximo_passo_detalhe"
+              placeholder="Qual próximo passo?"
+              aria-label="Detalhe do próximo passo"
+              hidden={proximoPasso !== "outro"}
+              disabled={proximoPasso !== "outro"}
+              defaultValue={restored?.proximoPassoDetalhe ?? registro?.proximo_passo_detalhe ?? ""}
+            />
           </div>
 
           <div className="space-y-3">
             <div className="flex items-start justify-between gap-2">
               <div>
-                <Label>Novos combinados</Label>
+                <p className="text-sm font-medium">Novos combinados</p>
                 <p className="text-xs text-muted-foreground">
                   o que ficou combinado de fazer até a próxima vez
                 </p>
@@ -661,6 +670,7 @@ export function RegistroForm({
                 type="button"
                 variant="outline"
                 size="sm"
+                ref={addEncRef}
                 onClick={() => setEncaminhamentos([...encaminhamentos, { id: crypto.randomUUID(), descricao: "", responsavel: "mentorado", prazo: "" }])}
               >
                 <Plus size={14} /> Adicionar
@@ -698,7 +708,11 @@ export function RegistroForm({
                     size="icon"
                     aria-label="Remover combinado"
                     className="justify-self-center"
-                    onClick={() => setEncaminhamentos(encaminhamentos.filter((x) => x.id !== t.id))}
+                    onClick={() => {
+                      setEncaminhamentos(encaminhamentos.filter((x) => x.id !== t.id));
+                      // o botão desmonta consigo — devolve o foco pro Adicionar
+                      addEncRef.current?.focus();
+                    }}
                   >
                     <Trash size={15} />
                   </Button>
