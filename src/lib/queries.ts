@@ -1,7 +1,7 @@
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { registroTardio } from "./ciclo";
-import type { AvaliacaoJovem, CicloEvento, Comunicado, Dupla, DuplaResumo, DuplaStatus, EncontroStatus, Material, Mentorado, Notificacao, PessoaNota, Profile, Registro } from "./types";
+import type { AvaliacaoJovem, CicloEvento, Comunicado, Dupla, DuplaResumo, DuplaStatus, EncontroStatus, EspecialistaEvento, Material, Mentorado, Notificacao, PessoaNota, Profile, Registro, Trilha } from "./types";
 
 /** Colunas de profiles legíveis por qualquer autenticado — grant de coluna
  *  da 0026 (Postgres não tem RLS por coluna). email/whatsapp/documento_path
@@ -377,6 +377,7 @@ export type RegistroResumo = Registro & {
     dupla: {
       id: string;
       status: DuplaStatus;
+      trilha: Trilha;
       mentor: { id: string; nome: string; email: string | null; avatar_path: string | null } | null;
       mentorado: { id: string; nome: string; avatar_path: string | null } | null;
     } | null;
@@ -413,7 +414,7 @@ const REGISTRO_RESUMO_SELECT = `
   encontro:encontros!registros_encontro_id_fkey!inner(
     id, numero, data_hora, realizado_em, status,
     dupla:duplas!encontros_dupla_id_fkey(
-      id, status,
+      id, status, trilha,
       mentor:profiles!duplas_mentor_id_fkey(id, nome, avatar_path),
       mentorado:mentorados!duplas_mentorado_id_fkey(id, nome, avatar_path)
     )
@@ -541,3 +542,20 @@ export const getDuplasOpcoes = cache(async (): Promise<DuplaOpcao[]> => {
       (a.mentor?.nome ?? "").localeCompare(b.mentor?.nome ?? "", "pt-BR")
     );
 });
+
+// ---------- trilha de especialista (0027) ----------
+
+/** Os 5 encontros do guia do especialista — título + foco, na ordem. */
+export const getEspecialistaEventos = cache(
+  async (): Promise<EspecialistaEvento[]> => {
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("especialista_eventos")
+      .select("numero, titulo, foco")
+      .order("numero");
+    if (error) throw error;
+    return data ?? [];
+  }
+);
+
+

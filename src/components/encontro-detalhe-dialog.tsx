@@ -23,9 +23,15 @@ import { RegistroView } from "@/components/registro-view";
 import { ResolverApoioButton } from "@/components/resolver-apoio-button";
 import { formatTamanho } from "@/components/anexos-registro";
 import { createClient } from "@/lib/supabase/client";
-import { formatDate, formatDateTime, formatDiaMes, linkSeguro, registroTardio } from "@/lib/ciclo";
+import {
+  formatDate,
+  formatDateTime,
+  formatDiaMes,
+  linkSeguro,
+  registroTardio,
+  type PassoGuia,
+} from "@/lib/ciclo";
 import type {
-  CicloEvento,
   Dupla,
   Encontro,
   EncontroStatus,
@@ -54,8 +60,8 @@ export function EncontroDetalheDialog({
 }: {
   encontro: Encontro;
   dupla: Dupla;
-  /** Evento oficial do nº — título/instrumentos sugeridos pelo guia. */
-  evento: CicloEvento | null;
+  /** Passo do guia do nº — título/instrumentos (DPP) ou foco (especialista). */
+  evento: PassoGuia | null;
   souCoord: boolean;
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -172,6 +178,7 @@ export function EncontroDetalheDialog({
               Sugestão do guia: {evento.titulo}
               {evento.instrumentos.length > 0 &&
                 ` · ${evento.instrumentos.join(", ")}`}
+              {evento.foco ? ` · ${evento.foco}` : ""}
             </p>
           )}
 

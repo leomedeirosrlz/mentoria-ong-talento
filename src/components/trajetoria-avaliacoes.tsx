@@ -2,8 +2,6 @@ import { AVALIACAO_LABEL } from "@/lib/ciclo";
 import { cn } from "@/lib/utils";
 import type { Encontro } from "@/lib/types";
 
-const TOTAL_ENCONTROS = 16;
-
 // mesma escala do SemaforoDot: verde → âmbar → vermelho; "boa" usa o verde-lima da marca
 const COR_AVALIACAO: Record<string, string> = {
   excelente: "bg-[var(--ok)]",
@@ -14,8 +12,15 @@ const COR_AVALIACAO: Record<string, string> = {
 
 /** Sequência de dots por nº de encontro — trajetória das avaliações da dupla.
  *  Cheio = avaliado (cor da avaliação), contorno = realizado sem avaliação,
- *  miúdo e claro = futuro/sem encontro. Server-safe, sem estado. */
-export function TrajetoriaAvaliacoes({ encontros }: { encontros: Encontro[] }) {
+ *  miúdo e claro = futuro/sem encontro. `total` vem da trilha (16 DPP / 5
+ *  especialista). Server-safe, sem estado. */
+export function TrajetoriaAvaliacoes({
+  encontros,
+  total,
+}: {
+  encontros: Encontro[];
+  total: number;
+}) {
   const avaliados = encontros
     .filter((e) => e.status === "realizado" && e.registro?.avaliacao)
     .sort((a, b) => a.numero - b.numero);
@@ -39,7 +44,7 @@ export function TrajetoriaAvaliacoes({ encontros }: { encontros: Encontro[] }) {
         title={a11y}
         className="inline-flex items-center gap-1"
       >
-        {Array.from({ length: TOTAL_ENCONTROS }, (_, i) => {
+        {Array.from({ length: total }, (_, i) => {
           const numero = i + 1;
           const enc = porNumero.get(numero);
           const realizado = enc?.status === "realizado";

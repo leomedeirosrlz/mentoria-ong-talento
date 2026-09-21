@@ -14,9 +14,11 @@ import {
 import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import { TRILHA_LABEL } from "@/lib/ciclo";
 
 type Opt = { id: string; nome: string; role?: string | null };
 const NENHUM = "__nenhum";
@@ -37,8 +39,9 @@ export function EditarDuplaDialog({ dupla }: { dupla: Dupla }) {
   // vagas por mentor: quantas duplas ativas/pausadas já tem vs. capacidade
   const [emUso, setEmUso] = useState<Record<string, number>>({});
   const [capacidade, setCapacidade] = useState<Record<string, number>>({});
-  // mentorado em outra dupla ativa/pausada não pode migrar — encerrada libera
-  const [mentoradosOcupados, setMentoradosOcupados] = useState<Set<string>>(new Set());
+  // mentorado ocupado POR TRILHA em outra dupla ativa/pausada — a de
+  // especialista convive com a DPP do mesmo mentorado
+  const [ocupacao, setOcupacao] = useState<Map<string, Set<string>>>(new Map());
   // carga de supervisão: quantas duplas ativas/pausadas cada supervisor já tem
   const [emSup, setEmSup] = useState<Record<string, number>>({});
   // os Selects só montam com os items carregados — antes disso o trigger
@@ -46,6 +49,8 @@ export function EditarDuplaDialog({ dupla }: { dupla: Dupla }) {
   const [pronto, setPronto] = useState(false);
   // status escolhido agora — a nota de efeito (FR-3) reage à escolha, não ao valor salvo
   const [statusSel, setStatusSel] = useState<DuplaStatus>(dupla.status);
+  // mentor escolhido agora — supervisor/demanda reagem à trilha que ele impõe
+  const [mentorSel, setMentorSel] = useState<string>(dupla.mentor.id);
   const [pending, start] = useTransition();
   const router = useRouter();
 
@@ -65,7 +70,11 @@ export function EditarDuplaDialog({ dupla }: { dupla: Dupla }) {
           const ms: Opt[] = (data ?? []).filter((p) => p.role !== "supervisor");
           const ss: Opt[] = (data ?? []).filter((p) => p.role === "supervisor");
           if (!ms.some((m) => m.id === dupla.mentor.id)) {
-            ms.unshift({ id: dupla.mentor.id, nome: `${dupla.mentor.nome} (atual)` });
+            ms.unshift({
+              id: dupla.mentor.id,
+              nome: `${dupla.mentor.nome} (atual)`,
+              role: dupla.mentor.role,
+            });
           }
           const sup = dupla.supervisor;
           if (sup && !ss.some((s) => s.id === sup.id)) {
@@ -84,16 +93,18 @@ export function EditarDuplaDialog({ dupla }: { dupla: Dupla }) {
     // causa dela e o próprio mentorado sairia marcado como ocupado
     supabase
       .from("duplas")
-      .select("mentor_id, mentorado_id, supervisor_id")
+      .select("mentor_id, mentorado_id, supervisor_id, trilha")
       .in("status", ["ativa", "pausada"])
       .neq("id", dupla.id)
       .then(({ data }) => {
         const contagem: Record<string, number> = {};
-        const ocupados = new Set<string>();
+        const ocup = new Map<string, Set<string>>();
         const sup: Record<string, number> = {};
         for (const d of data ?? []) {
           contagem[d.mentor_id] = (contagem[d.mentor_id] ?? 0) + 1;
-          ocupados.add(d.mentorado_id);
+          const trilhas = ocup.get(d.mentorado_id) ?? new Set<string>();
+          trilhas.add(d.trilha ?? "dpp");
+          ocup.set(d.mentorado_id, trilhas);
           if (d.supervisor_id) sup[d.supervisor_id] = (sup[d.supervisor_id] ?? 0) + 1;
         }
         // a query excluiu a própria dupla, mas ela conta na carga do supervisor atual
@@ -101,7 +112,7 @@ export function EditarDuplaDialog({ dupla }: { dupla: Dupla }) {
           sup[dupla.supervisor.id] = (sup[dupla.supervisor.id] ?? 0) + 1;
         }
         setEmUso(contagem);
-        setMentoradosOcupados(ocupados);
+        setOcupacao(ocup);
         setEmSup(sup);
       });
     supabase
@@ -112,25 +123,49 @@ export function EditarDuplaDialog({ dupla }: { dupla: Dupla }) {
         for (const mp of data ?? []) porMentor[mp.profile_id] = mp.capacidade;
         setCapacidade(porMentor);
       });
-  }, [open, dupla.id, dupla.mentor.id, dupla.mentor.nome, dupla.supervisor, dupla.status]);
+  }, [open, dupla.id, dupla.mentor.id, dupla.mentor.nome, dupla.mentor.role, dupla.supervisor, dupla.status]);
+
+  // trilha exibida = a do mentor escolhido agora — trocar de papel migra a
+  // dupla (o server barra quando já existem encontros). Fallback = a trilha
+  // atual (o mentor atual sempre está na lista, mas o guarda-chuva cobre
+  // dados inconsistentes)
+  const papelSel = mentores.find((m) => m.id === mentorSel)?.role;
+  const ehEsp =
+    papelSel != null
+      ? papelSel === "mentor_especialista"
+      : dupla.trilha === "especialista";
+  const trilhaSel: "dpp" | "especialista" = ehEsp ? "especialista" : "dpp";
+  const temEncontros = dupla.encontros.length > 0;
+  // mentor de papel diferente troca a trilha da dupla — bloqueado com
+  // encontros criados (a numeração entre calendário e trilha livre não migra)
+  const trilhaBloqueada = (m: Opt) =>
+    temEncontros &&
+    (m.role === "mentor_especialista" ? "especialista" : "dpp") !== dupla.trilha;
+  const ocupadoEm = (id: string) => {
+    if (id === dupla.mentorado.id) return null;
+    const trilhas = ocupacao.get(id);
+    return trilhas?.has(trilhaSel) ? trilhaSel : null;
+  };
+  const rotuloOcupado = (id: string) => {
+    if (id === dupla.mentorado.id) return null;
+    const trilhas = ocupacao.get(id);
+    if (!trilhas) return null;
+    const lista = [...trilhas].map((t) => (t === "especialista" ? "especialista" : "DPP"));
+    return `em dupla ${lista.join(" e ")}`;
+  };
 
   // selects longos (>7): relevância antes de alfabética — quem pode ser
   // escolhido aparece primeiro, disabled afunda, nome (pt-BR) só desempata
-  const mentoresOrd = [...mentores].sort((a, b) => {
-    // especialista está bloqueado (trilha de 5 não modelada) — afunda sempre
-    const espA = a.role === "mentor_especialista";
-    const espB = b.role === "mentor_especialista";
-    const livresA = espA
-      ? -Infinity
-      : (capacidade[a.id] ?? 1) - (emUso[a.id] ?? 0);
-    const livresB = espB
-      ? -Infinity
-      : (capacidade[b.id] ?? 1) - (emUso[b.id] ?? 0);
-    return livresB - livresA || a.nome.localeCompare(b.nome, "pt-BR");
-  });
+  const mentoresOrd = [...mentores].sort(
+    (a, b) =>
+      Number(trilhaBloqueada(a)) - Number(trilhaBloqueada(b)) ||
+      (capacidade[b.id] ?? 1) - (emUso[b.id] ?? 0) -
+        ((capacidade[a.id] ?? 1) - (emUso[a.id] ?? 0)) ||
+      a.nome.localeCompare(b.nome, "pt-BR")
+  );
   const mentoradosOrd = [...mentorados].sort((a, b) => {
-    const ocA = a.id !== dupla.mentorado.id && mentoradosOcupados.has(a.id) ? 1 : 0;
-    const ocB = b.id !== dupla.mentorado.id && mentoradosOcupados.has(b.id) ? 1 : 0;
+    const ocA = ocupadoEm(a.id) != null ? 1 : 0;
+    const ocB = ocupadoEm(b.id) != null ? 1 : 0;
     return ocA - ocB || a.nome.localeCompare(b.nome, "pt-BR");
   });
   // supervisor com menos duplas primeiro — distribui a carga de acompanhamento
@@ -181,7 +216,10 @@ export function EditarDuplaDialog({ dupla }: { dupla: Dupla }) {
         onOpenChange={(o) => {
           setOpen(o);
           // Select desmonta com o dialog e volta ao defaultValue — alinha a nota
-          if (o) setStatusSel(dupla.status);
+          if (o) {
+            setStatusSel(dupla.status);
+            setMentorSel(dupla.mentor.id);
+          }
         }}
       >
         <DialogTrigger render={<Button variant="outline" size="sm"><PencilSimple size={15} /> Editar</Button>} />
@@ -203,6 +241,18 @@ export function EditarDuplaDialog({ dupla }: { dupla: Dupla }) {
             ) : (
             <>
             <div className="space-y-2">
+              <Label id="edit-trilha-label">Trilha</Label>
+              <p className="flex h-11 items-center rounded-lg bg-muted/40 px-2.5 text-sm md:h-8">
+                {TRILHA_LABEL[dupla.trilha]}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Definida pelo papel do mentor
+                {temEncontros
+                  ? " — não muda mais, a dupla já tem encontros."
+                  : " — trocar o mentor por outro papel migra a dupla."}
+              </p>
+            </div>
+            <div className="space-y-2">
               <Label id="edit-mentor-label">
                 {/* dot de papel — distinção não-cromática é o texto; a cor é redundância */}
                 <span aria-hidden className="size-1.5 rounded-full bg-[var(--role-mentor)]" />
@@ -215,21 +265,26 @@ export function EditarDuplaDialog({ dupla }: { dupla: Dupla }) {
                 items={Object.fromEntries(mentoresOrd.map((m) => [
                   m.id,
                   m.role === "mentor_especialista"
-                    ? `${m.nome} — trilha especialista — indisponível`
+                    ? `${m.nome} — ${emUso[m.id] ?? 0}/${capacidade[m.id] ?? 1} · especialista`
                     : `${m.nome} — ${emUso[m.id] ?? 0}/${capacidade[m.id] ?? 1}`,
                 ]))}
+                onValueChange={(v) => setMentorSel(v ?? dupla.mentor.id)}
               >
                 <SelectTrigger id="edit-mentor-select" aria-labelledby="edit-mentor-label edit-mentor-select"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {mentoresOrd.map((m) => {
                     const usadas = emUso[m.id] ?? 0;
                     const total = capacidade[m.id] ?? 1;
-                    // trilha especialista (5 encontros) ainda não modelada —
-                    // mover a dupla pra ela quebraria o calendário
                     const esp = m.role === "mentor_especialista";
                     return (
-                      <SelectItem key={m.id} value={m.id} disabled={usadas >= total || esp}>
-                        {m.nome} — {esp ? "trilha especialista — indisponível" : `${usadas}/${total}`}
+                      <SelectItem
+                        key={m.id}
+                        value={m.id}
+                        disabled={(m.id !== dupla.mentor.id && usadas >= total) || trilhaBloqueada(m)}
+                      >
+                        {m.nome} — {usadas}/{total}
+                        {esp ? " · especialista" : ""}
+                        {trilhaBloqueada(m) ? " · trilha fechada" : ""}
                       </SelectItem>
                     );
                   })}
@@ -247,7 +302,7 @@ export function EditarDuplaDialog({ dupla }: { dupla: Dupla }) {
                 defaultValue={dupla.mentorado.id}
                 items={Object.fromEntries(mentoradosOrd.map((m) => [
                   m.id,
-                  m.id !== dupla.mentorado.id && mentoradosOcupados.has(m.id) ? `${m.nome} (em dupla)` : m.nome,
+                  rotuloOcupado(m.id) ? `${m.nome} (${rotuloOcupado(m.id)})` : m.nome,
                 ]))}
               >
                 <SelectTrigger id="edit-mentorado-select" aria-labelledby="edit-mentorado-label edit-mentorado-select"><SelectValue /></SelectTrigger>
@@ -255,10 +310,10 @@ export function EditarDuplaDialog({ dupla }: { dupla: Dupla }) {
                   {mentoradosOrd.map((m) => {
                     // o da própria dupla nunca aparece ocupado (a query já a
                     // exclui; o guarda-chuva cobre dados inconsistentes)
-                    const emDupla = m.id !== dupla.mentorado.id && mentoradosOcupados.has(m.id);
+                    const ocupado = ocupadoEm(m.id) != null;
                     return (
-                      <SelectItem key={m.id} value={m.id} disabled={emDupla}>
-                        {emDupla ? `${m.nome} (em dupla)` : m.nome}
+                      <SelectItem key={m.id} value={m.id} disabled={ocupado}>
+                        {rotuloOcupado(m.id) ? `${m.nome} (${rotuloOcupado(m.id)})` : m.nome}
                       </SelectItem>
                     );
                   })}
@@ -266,22 +321,32 @@ export function EditarDuplaDialog({ dupla }: { dupla: Dupla }) {
               </Select>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label id="edit-supervisor-label">Supervisor</Label>
-                <Select
-                  name="supervisor_id"
-                  defaultValue={dupla.supervisor?.id ?? NENHUM}
-                  items={{ [NENHUM]: "Nenhum", ...Object.fromEntries(supervisoresOrd.map((s) => [s.id, s.nome])) }}
-                >
-                  <SelectTrigger id="edit-supervisor-select" aria-labelledby="edit-supervisor-label edit-supervisor-select"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={NENHUM}>Nenhum</SelectItem>
-                    {supervisoresOrd.map((s) => (
-                      <SelectItem key={s.id} value={s.id}>{s.nome}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              {/* supervisor só existe na trilha DPP — especialista segue sem */}
+              {!ehEsp ? (
+                <div className="space-y-2">
+                  <Label id="edit-supervisor-label">Supervisor</Label>
+                  <Select
+                    name="supervisor_id"
+                    defaultValue={dupla.supervisor?.id ?? NENHUM}
+                    items={{ [NENHUM]: "Nenhum", ...Object.fromEntries(supervisoresOrd.map((s) => [s.id, s.nome])) }}
+                  >
+                    <SelectTrigger id="edit-supervisor-select" aria-labelledby="edit-supervisor-label edit-supervisor-select"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={NENHUM}>Nenhum</SelectItem>
+                      {supervisoresOrd.map((s) => (
+                        <SelectItem key={s.id} value={s.id}>{s.nome}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <Label id="edit-supervisor-label">Supervisor</Label>
+                  <p className="flex h-11 items-center rounded-lg bg-muted/40 px-2.5 text-sm text-muted-foreground md:h-8">
+                    Não se aplica à trilha especialista
+                  </p>
+                </div>
+              )}
               <div className="space-y-2">
                 <Label id="edit-status-label">Status</Label>
                 <Select
@@ -312,6 +377,21 @@ export function EditarDuplaDialog({ dupla }: { dupla: Dupla }) {
                 )}
               </div>
             </div>
+            {ehEsp && (
+              <div className="space-y-2">
+                <Label htmlFor="edit-demanda">Demanda</Label>
+                <Textarea
+                  id="edit-demanda"
+                  name="demanda"
+                  rows={3}
+                  defaultValue={dupla.demanda ?? ""}
+                  placeholder="Por que essa mentoria existe — o que o mentorado precisa trabalhar com o especialista"
+                />
+                <p className="text-xs text-muted-foreground">
+                  O contexto aparece na ficha da dupla pro especialista.
+                </p>
+              </div>
+            )}
             <div className="space-y-2">
               <Label htmlFor="inicio">Início da mentoria</Label>
               <Input id="inicio" name="iniciada_em" type="date" defaultValue={dupla.iniciada_em ?? ""} />

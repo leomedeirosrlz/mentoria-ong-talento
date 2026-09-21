@@ -5,15 +5,16 @@ import {
   eventoDaSemana,
   formatDiaMes,
   formatDateTime,
+  maxEncontros,
   resumoSemana,
   saudadeDaDupla,
   textoResumoSemana,
-  totalEncontros,
+  TRILHA_LABEL,
   ultimoRegistro,
   type DuplaSaude,
   type Semaforo,
 } from "@/lib/ciclo";
-import type { CicloEvento, Comunicado, Dupla } from "@/lib/types";
+import type { CicloEvento, Comunicado, Dupla, SolicitacaoEspecialista } from "@/lib/types";
 import type { Interacao } from "@/lib/interacoes";
 import { AvaliacaoBadge, SemaforoDot } from "@/components/semaforo";
 import { DuplaAvatares } from "@/components/dupla-avatares";
@@ -22,6 +23,7 @@ import { NudgeButton } from "@/components/nudge-button";
 import { CopiarResumoButton } from "@/components/copiar-resumo-button";
 import { DuplaNomes } from "@/components/dupla-nomes";
 import { AvisosSection } from "@/components/avisos-section";
+import { SolicitacoesCoordCard } from "@/components/solicitacoes-coord-card";
 import { TrajetoriaAvaliacoes } from "@/components/trajetoria-avaliacoes";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -60,6 +62,7 @@ export function DashboardCoordenacao({
   pessoas = 0,
   supervisor = false,
   avisos = [],
+  solicitacoes = [],
   filtro,
 }: {
   duplas: Dupla[];
@@ -75,6 +78,9 @@ export function DashboardCoordenacao({
   supervisor?: boolean;
   /** avisos da coordenação já filtrados por audiência (RLS). */
   avisos?: Comunicado[];
+  /** demandas de especialista visíveis ao papel — só a coordenação monitora
+   *  o mural; supervisor não pede nem gerencia especialista. */
+  solicitacoes?: SolicitacaoEspecialista[];
   /** valor cru de ?filtro= — validado contra FILTROS; desconhecido = visão cheia. */
   filtro?: string;
 }) {
@@ -240,6 +246,10 @@ export function DashboardCoordenacao({
 
       <AvisosSection avisos={avisos} souCoord={!supervisor} />
 
+      {/* mural de demandas entre mentores — a coordenação observa e gerencia;
+          o fluxo em si é DPP → especialista, sem coordenação no caminho */}
+      {!supervisor && <SolicitacoesCoordCard solicitacoes={solicitacoes} />}
+
       <section className="space-y-3">
         {filtroAtivo && saude.length > 0 && visiveis.length > 0 && (
           <p className="text-sm text-muted-foreground">
@@ -320,7 +330,6 @@ export function DashboardCoordenacao({
             saude={saude}
             origem={origem}
             interacoes={interacoes}
-            total={totalEncontros(eventos)}
             hoje={hoje}
             i={i}
           />
@@ -401,7 +410,6 @@ function DuplaCard({
   saude,
   origem,
   interacoes,
-  total,
   hoje,
   i,
 }: {
@@ -409,11 +417,12 @@ function DuplaCard({
   saude: ReturnType<typeof saudadeDaDupla>;
   origem: string;
   interacoes: Record<string, Interacao>;
-  total: number;
   hoje: Date;
   /** posição na lista — alimenta o stagger do animate-enter (cap 10) */
   i: number;
 }) {
+  // denominador e saúde seguem a trilha da dupla — 16 no DPP, 5 no especialista
+  const total = maxEncontros(dupla.trilha);
   const encontroAtual = dupla.encontros.filter((e) => e.status === "realizado").length;
   const ultimoReg = ultimoRegistro(dupla);
   // pendência de registro mais antiga — realizado sem registro ou agendado
@@ -474,7 +483,12 @@ function DuplaCard({
             <p className="font-semibold truncate">
               <DuplaNomes mentor={dupla.mentor.nome} mentorado={dupla.mentorado.nome} />
             </p>
-            <TrajetoriaAvaliacoes encontros={dupla.encontros} />
+            {dupla.trilha === "especialista" && (
+              <Badge variant="secondary" className="font-normal shrink-0">
+                {TRILHA_LABEL[dupla.trilha]}
+              </Badge>
+            )}
+            <TrajetoriaAvaliacoes encontros={dupla.encontros} total={total} />
           </div>
           <p className="mt-1.5 text-sm text-muted-foreground">
             {saude.motivo}

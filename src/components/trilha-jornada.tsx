@@ -62,7 +62,9 @@ function rotuloNo(no: NoJornada, atual: boolean): string {
       base = `${n}, não aconteceu`;
       break;
     case "futuro":
-      base = `${n}, a realizar — sugerido ${formatDate(no.evento.data)}`;
+      base = no.evento.data
+        ? `${n}, a realizar — sugerido ${formatDate(no.evento.data)}`
+        : `${n}, a realizar — data a combinar`;
       break;
   }
   if (atual) base += " — próximo passo";
@@ -80,7 +82,9 @@ function textoProximo(no: NoJornada | undefined): string | null {
     return `Próximo: ${no.numero}º — agendado ${formatDateTime(no.encontro?.data_hora)}`;
   if (no.estado === "nao_aconteceu")
     return `Próximo: ${no.numero}º — não aconteceu, remarcar`;
-  return `Próximo: ${no.numero}º — sugerido ${formatDate(no.evento.data)}`;
+  return no.evento.data
+    ? `Próximo: ${no.numero}º — sugerido ${formatDate(no.evento.data)}`
+    : `Próximo: ${no.numero}º — data a combinar`;
 }
 
 /** Mapa do ciclo da dupla: os encontros oficiais da janela como trilha de

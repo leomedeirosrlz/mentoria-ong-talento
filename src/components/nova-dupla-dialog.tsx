@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -28,10 +29,13 @@ export function NovaDuplaDialog() {
   // vagas por mentor: quantas duplas ativas/pausadas já tem vs. capacidade
   const [emUso, setEmUso] = useState<Record<string, number>>({});
   const [capacidade, setCapacidade] = useState<Record<string, number>>({});
-  // mentorado em dupla ativa/pausada não pode entrar em outra — encerrada libera
-  const [mentoradosOcupados, setMentoradosOcupados] = useState<Set<string>>(new Set());
+  // mentorado ocupado POR TRILHA — a de especialista convive com a DPP do
+  // mesmo mentorado; só ocupa vaga de novo na trilha em que já está
+  const [ocupacao, setOcupacao] = useState<Map<string, Set<string>>>(new Map());
   // carga de supervisão: quantas duplas ativas/pausadas cada supervisor já tem
   const [emSup, setEmSup] = useState<Record<string, number>>({});
+  // mentor escolhido — a trilha da dupla nasce do papel dele
+  const [mentorSel, setMentorSel] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const router = useRouter();
 
@@ -55,19 +59,21 @@ export function NovaDuplaDialog() {
       .then(({ data }) => setMentorados(data ?? []));
     supabase
       .from("duplas")
-      .select("mentor_id, mentorado_id, supervisor_id")
+      .select("mentor_id, mentorado_id, supervisor_id, trilha")
       .in("status", ["ativa", "pausada"])
       .then(({ data }) => {
         const contagem: Record<string, number> = {};
-        const ocupados = new Set<string>();
+        const ocup = new Map<string, Set<string>>();
         const sup: Record<string, number> = {};
         for (const d of data ?? []) {
           contagem[d.mentor_id] = (contagem[d.mentor_id] ?? 0) + 1;
-          ocupados.add(d.mentorado_id);
+          const trilhas = ocup.get(d.mentorado_id) ?? new Set<string>();
+          trilhas.add(d.trilha ?? "dpp");
+          ocup.set(d.mentorado_id, trilhas);
           if (d.supervisor_id) sup[d.supervisor_id] = (sup[d.supervisor_id] ?? 0) + 1;
         }
         setEmUso(contagem);
-        setMentoradosOcupados(ocupados);
+        setOcupacao(ocup);
         setEmSup(sup);
       });
     supabase
@@ -80,23 +86,35 @@ export function NovaDuplaDialog() {
       });
   }, [open]);
 
+  const ehEsp = mentores.find((m) => m.id === mentorSel)?.role === "mentor_especialista";
+  const trilhaSel: "dpp" | "especialista" | null = mentorSel
+    ? ehEsp ? "especialista" : "dpp"
+    : null;
+  // mentorado indisponível só na trilha em que já está — estar na DPP não
+  // impede a de especialista (é exatamente o caso de uso dela)
+  const ocupadoEm = (id: string) => {
+    const trilhas = ocupacao.get(id);
+    if (!trilhas) return null;
+    return trilhaSel ? (trilhas.has(trilhaSel) ? trilhaSel : null) : null;
+  };
+  const rotuloOcupado = (id: string) => {
+    const trilhas = ocupacao.get(id);
+    if (!trilhas) return null;
+    const lista = [...trilhas].map((t) => (t === "especialista" ? "especialista" : "DPP"));
+    return `em dupla ${lista.join(" e ")}`;
+  };
+
   // selects longos (>7): relevância antes de alfabética — quem pode ser
   // escolhido aparece primeiro, disabled afunda, nome (pt-BR) só desempata
-  const mentoresOrd = [...mentores].sort((a, b) => {
-    // especialista está bloqueado (trilha de 5 não modelada) — afunda sempre
-    const espA = a.role === "mentor_especialista";
-    const espB = b.role === "mentor_especialista";
-    const livresA = espA
-      ? -Infinity
-      : (capacidade[a.id] ?? 1) - (emUso[a.id] ?? 0);
-    const livresB = espB
-      ? -Infinity
-      : (capacidade[b.id] ?? 1) - (emUso[b.id] ?? 0);
-    return livresB - livresA || a.nome.localeCompare(b.nome, "pt-BR");
-  });
+  const mentoresOrd = [...mentores].sort(
+    (a, b) =>
+      (capacidade[b.id] ?? 1) - (emUso[b.id] ?? 0) -
+        ((capacidade[a.id] ?? 1) - (emUso[a.id] ?? 0)) ||
+      a.nome.localeCompare(b.nome, "pt-BR")
+  );
   const mentoradosOrd = [...mentorados].sort(
     (a, b) =>
-      Number(mentoradosOcupados.has(a.id)) - Number(mentoradosOcupados.has(b.id)) ||
+      Number(ocupadoEm(a.id) != null) - Number(ocupadoEm(b.id) != null) ||
       a.nome.localeCompare(b.nome, "pt-BR")
   );
   // supervisor com menos duplas primeiro — distribui a carga de acompanhamento
@@ -108,6 +126,8 @@ export function NovaDuplaDialog() {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
     if (fd.get("supervisor_id") === NENHUM) fd.set("supervisor_id", "");
+    // dupla de especialista nunca leva supervisor — o server força null também
+    if (ehEsp) fd.set("supervisor_id", "");
     start(async () => {
       try {
         const res = await createDupla(fd);
@@ -131,7 +151,14 @@ export function NovaDuplaDialog() {
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        setOpen(o);
+        // Select desmonta com o dialog — a trilha rederiva do próximo mentor
+        if (o) setMentorSel(null);
+      }}
+    >
       <DialogTrigger render={<Button size="sm"><Plus size={16} /> Nova dupla</Button>} />
       <DialogContent>
         <DialogHeader>
@@ -150,9 +177,10 @@ export function NovaDuplaDialog() {
               items={Object.fromEntries(mentoresOrd.map((m) => [
                 m.id,
                 m.role === "mentor_especialista"
-                  ? `${m.nome} — trilha especialista — indisponível`
+                  ? `${m.nome} — ${emUso[m.id] ?? 0}/${capacidade[m.id] ?? 1} · especialista`
                   : `${m.nome} — ${emUso[m.id] ?? 0}/${capacidade[m.id] ?? 1}`,
               ]))}
+              onValueChange={(v) => setMentorSel(v ? String(v) : null)}
             >
               <SelectTrigger id="mentor" aria-labelledby="mentor-label mentor"><SelectValue placeholder="Selecione" /></SelectTrigger>
               <SelectContent>
@@ -162,17 +190,21 @@ export function NovaDuplaDialog() {
                 {mentoresOrd.map((m) => {
                   const usadas = emUso[m.id] ?? 0;
                   const total = capacidade[m.id] ?? 1;
-                  // especialista tem trilha própria de 5 encontros ainda não
-                  // modelada — bloqueado até o calendário dela existir
                   const esp = m.role === "mentor_especialista";
                   return (
-                    <SelectItem key={m.id} value={m.id} disabled={usadas >= total || esp}>
-                      {m.nome} — {esp ? "trilha especialista — indisponível" : `${usadas}/${total}`}
+                    <SelectItem key={m.id} value={m.id} disabled={usadas >= total}>
+                      {m.nome} — {usadas}/{total}{esp ? " · especialista" : ""}
                     </SelectItem>
                   );
                 })}
               </SelectContent>
             </Select>
+            {ehEsp && (
+              <p className="text-xs text-muted-foreground">
+                Trilha especialista — até 5 encontros de 1h em até 3 meses, com
+                datas combinadas pela dupla (sem calendário fixo).
+              </p>
+            )}
             {mentores.length === 0 && (
               <CampoVazio texto="Nenhum mentor cadastrado ainda." />
             )}
@@ -187,7 +219,7 @@ export function NovaDuplaDialog() {
               required
               items={Object.fromEntries(mentoradosOrd.map((m) => [
                 m.id,
-                mentoradosOcupados.has(m.id) ? `${m.nome} (em dupla)` : m.nome,
+                rotuloOcupado(m.id) ? `${m.nome} (${rotuloOcupado(m.id)})` : m.nome,
               ]))}
             >
               <SelectTrigger id="mentorado" aria-labelledby="mentorado-label mentorado"><SelectValue placeholder="Selecione" /></SelectTrigger>
@@ -196,10 +228,10 @@ export function NovaDuplaDialog() {
                   <SelectItem value="__vazio" disabled>Nenhum mentorado cadastrado</SelectItem>
                 )}
                 {mentoradosOrd.map((m) => {
-                  const emDupla = mentoradosOcupados.has(m.id);
+                  const ocupado = ocupadoEm(m.id) != null;
                   return (
-                    <SelectItem key={m.id} value={m.id} disabled={emDupla}>
-                      {emDupla ? `${m.nome} (em dupla)` : m.nome}
+                    <SelectItem key={m.id} value={m.id} disabled={ocupado}>
+                      {rotuloOcupado(m.id) ? `${m.nome} (${rotuloOcupado(m.id)})` : m.nome}
                     </SelectItem>
                   );
                 })}
@@ -209,28 +241,47 @@ export function NovaDuplaDialog() {
               <CampoVazio texto="Nenhum mentorado cadastrado ainda." />
             )}
           </div>
-          <div className="space-y-2">
-            <Label id="supervisor-label">Supervisor de relacionamento (opcional)</Label>
-            <Select
-              name="supervisor_id"
-              defaultValue={NENHUM}
-              items={{ [NENHUM]: "Nenhum", ...Object.fromEntries(supervisoresOrd.map((m) => [m.id, m.nome])) }}
-            >
-              <SelectTrigger id="supervisor" aria-labelledby="supervisor-label supervisor"><SelectValue placeholder="Nenhum" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value={NENHUM}>Nenhum</SelectItem>
-                {supervisoresOrd.map((m) => (
-                  <SelectItem key={m.id} value={m.id}>{m.nome}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {/* dupla de especialista não tem supervisor — o campo some em vez de
+              desabilitar pra não sugerir uma supervisão que não existe */}
+          {!ehEsp && (
+            <div className="space-y-2">
+              <Label id="supervisor-label">Supervisor de relacionamento (opcional)</Label>
+              <Select
+                name="supervisor_id"
+                defaultValue={NENHUM}
+                items={{ [NENHUM]: "Nenhum", ...Object.fromEntries(supervisoresOrd.map((m) => [m.id, m.nome])) }}
+              >
+                <SelectTrigger id="supervisor" aria-labelledby="supervisor-label supervisor"><SelectValue placeholder="Nenhum" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NENHUM}>Nenhum</SelectItem>
+                  {supervisoresOrd.map((m) => (
+                    <SelectItem key={m.id} value={m.id}>{m.nome}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+          {ehEsp && (
+            <div className="space-y-2">
+              <Label htmlFor="demanda">Demanda (opcional)</Label>
+              <Textarea
+                id="demanda"
+                name="demanda"
+                rows={3}
+                placeholder="Por que essa mentoria existe — o que o mentorado precisa trabalhar com o especialista"
+              />
+              <p className="text-xs text-muted-foreground">
+                O contexto aparece na ficha da dupla pro especialista.
+              </p>
+            </div>
+          )}
           <div className="space-y-2">
             <Label htmlFor="iniciada_em">Início da mentoria</Label>
             <Input id="iniciada_em" name="iniciada_em" type="date" />
             <p className="text-xs text-muted-foreground">
-              Deixe em branco se a dupla já existia desde o início do ciclo. Se
-              ela está começando agora, use a data de hoje.
+              {ehEsp
+                ? "Deixe em branco se a mentoria está começando agora — a dupla nasce hoje."
+                : "Deixe em branco se a dupla já existia desde o início do ciclo. Se ela está começando agora, use a data de hoje."}
             </p>
           </div>
           <Button type="submit" className="w-full" disabled={pending}>

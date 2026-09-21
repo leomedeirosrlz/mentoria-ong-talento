@@ -9,7 +9,17 @@ import {
   VideoCamera,
 
 } from "@phosphor-icons/react/dist/ssr";
-import { getCicloEventos, getDupla, getMateriais, getMe } from "@/lib/queries";
+import {
+  getCicloEventos,
+  getDupla,
+  getEspecialistaEventos,
+  getMateriais,
+  getMe,
+} from "@/lib/queries";
+import {
+  getEspecialistas,
+  getSolicitacaoDaDupla,
+} from "@/lib/queries-especialista";
 import { getAnexosPorRegistros } from "@/lib/anexos";
 import { avatarPublicUrl } from "@/lib/avatar";
 import { Avatar } from "@/components/avatar";
@@ -23,10 +33,12 @@ import {
   formatDateTime,
   jornadaDaDupla,
   linkSeguro,
+  passosDaTrilha,
   registroTardio,
   saudadeDaDupla,
   toDateStr,
-  totalEncontros,
+  TRILHA_LABEL,
+  type PassoGuia,
 } from "@/lib/ciclo";
 import { SemaforoBadge, SemaforoDot } from "@/components/semaforo";
 import { NudgeButton } from "@/components/nudge-button";
@@ -46,13 +58,15 @@ import { EncaminhamentosList } from "@/components/encaminhamentos-list";
 import { RevelarApos } from "@/components/revelar-apos";
 import { ResolverApoioButton } from "@/components/resolver-apoio-button";
 import { TrajetoriaAvaliacoes } from "@/components/trajetoria-avaliacoes";
+import { SolicitacaoStatusChip } from "@/components/solicitacao-status-chip";
+import { SolicitarEspecialistaDialog } from "@/components/solicitar-especialista-dialog";
 import { TrilhaJornada } from "@/components/trilha-jornada";
 import { MarcoNotifier } from "@/components/marco-notifier";
 import { AnexosRegistro } from "@/components/anexos-registro";
 import { RegistroView } from "@/components/registro-view";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
-import type { CicloEvento, Encaminhamento, Encontro, Material, RegistroAnexo } from "@/lib/types";
+import type { Encaminhamento, Encontro, Material, RegistroAnexo } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 export async function generateMetadata({
@@ -87,12 +101,26 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
 
   const souMentor = dupla.mentor.id === me.id;
   const souCoord = me.role === "coordenacao";
+  const ehEsp = dupla.trilha === "especialista";
+  // passos do guia da trilha — ciclo_eventos (DPP, com datas) ou os 5 passos
+  // do especialista (sem data: a dupla combina dentro dos 3 meses)
+  const espEventos = ehEsp ? await getEspecialistaEventos() : [];
+  // fluxo entre mentores do guia: a demanda de especialista nasce na dupla
+  // DPP. O chip conta o estado a quem olha a ficha; o botão some enquanto uma
+  // solicitação está aberta (re-pedir é pra quando a anterior se resolveu)
+  const solicitacao = !ehEsp ? await getSolicitacaoDaDupla(id) : null;
+  const podeSolicitar =
+    !ehEsp &&
+    dupla.status === "ativa" &&
+    solicitacao?.status !== "aberta" &&
+    (souMentor || souCoord);
+  const especialistas = podeSolicitar ? await getEspecialistas() : [];
+  const passos = passosDaTrilha(dupla.trilha, eventos, espEventos);
   const saude = saudadeDaDupla(dupla, eventos);
-  const encontroEventos = eventos.filter((e) => e.tipo === "encontro");
-  const total = totalEncontros(eventos);
+  const total = passos.length;
   const { proximoNumero, encontroAlvo, sugeridoProximo, faltantes } =
     alvoAgendamento(dupla, eventos);
-  const jornada = jornadaDaDupla(dupla, eventos);
+  const jornada = jornadaDaDupla(dupla, passos);
 
   const primeiroNomeMentor = dupla.mentor.nome.split(" ")[0];
   const primeiroNomeMentorado = dupla.mentorado.nome.split(" ")[0];
@@ -113,10 +141,15 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
       .join(" ") +
     ` — ${primeiroNomeMentor}`;
 
-  // material de apoio por nº de encontro (guia/template daquele encontro)
+  // material de apoio por nº de encontro (guia/template daquele encontro) —
+  // a audiência segue a trilha: material DPP nunca cai na trilha especialista
+  // (pra coordenação, que enxerga tudo, o número coincidiria errado)
+  const audienciasDaTrilha = ehEsp
+    ? new Set(["todos", "especialista", "coordenacao"])
+    : new Set(["todos", "dpp", "coordenacao"]);
   const materiaisPorNumero = new Map<number, Material[]>();
   for (const m of materiais) {
-    if (m.encontro_num == null) continue;
+    if (m.encontro_num == null || !audienciasDaTrilha.has(m.audiencia)) continue;
     const arr = materiaisPorNumero.get(m.encontro_num) ?? [];
     arr.push(m);
     materiaisPorNumero.set(m.encontro_num, arr);
@@ -125,13 +158,17 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
   const hojeStr = toDateStr(new Date());
   const podeRetroativo = souMentor && dupla.status === "ativa" && faltantes.length > 0;
 
-  // encontros depois do oficial da semana ficam colapsados (página tem 16 linhas)
-  const numeroSemana = eventoDaSemana(eventos, new Date())?.numero ?? null;
-  const encontrosVisiveis = encontroEventos.filter(
-    (ev) => numeroSemana == null || ev.numero == null || ev.numero <= numeroSemana
+  // encontros depois do oficial da semana ficam colapsados (página tem 16
+  // linhas). Na trilha especialista não há "semana oficial" — os 5 passos
+  // ficam sempre abertos.
+  const numeroSemana = ehEsp
+    ? null
+    : (eventoDaSemana(eventos, new Date())?.numero ?? null);
+  const encontrosVisiveis = passos.filter(
+    (ev) => numeroSemana == null || ev.numero <= numeroSemana
   );
-  const encontrosFuturos = encontroEventos.filter(
-    (ev) => numeroSemana != null && ev.numero != null && ev.numero > numeroSemana
+  const encontrosFuturos = passos.filter(
+    (ev) => numeroSemana != null && ev.numero > numeroSemana
   );
   // pendência de registro (realizado sem registro ou agendado já vencido) —
   // nunca entra no <details>: o deep link #registrar-{id} precisa sempre existir
@@ -149,12 +186,12 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
     (ev) => !futurosComPendencia.includes(ev)
   );
 
-  const renderEncontro = (ev: CicloEvento) => {
-    const enc = dupla.encontros.find((e) => e.numero === ev.numero);
+  const renderEncontro = (passo: PassoGuia) => {
+    const enc = dupla.encontros.find((e) => e.numero === passo.numero);
     return (
       <EncontroRow
-        key={ev.id}
-        evento={ev}
+        key={passo.id}
+        passo={passo}
         encontro={enc ?? null}
         duplaId={dupla.id}
         podeEditar={souMentor && dupla.status === "ativa"}
@@ -166,9 +203,9 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
         podeAnexar={souMentor && dupla.status === "ativa"}
         podeRemoverAnexos={souCoord || (souMentor && dupla.status === "ativa")}
         anexos={(enc?.registro && anexosPorRegistro[enc.registro.id]) || []}
-        materiais={(ev.numero != null && materiaisPorNumero.get(ev.numero)) || []}
+        materiais={materiaisPorNumero.get(passo.numero) ?? []}
         combinadosPendentes={combinadosPendentes}
-        nota={dupla.notas?.find((n) => n.numero === ev.numero)?.texto ?? null}
+        nota={dupla.notas?.find((n) => n.numero === passo.numero)?.texto ?? null}
       />
     );
   };
@@ -213,7 +250,15 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
             )}
             {/* mono fica só no contador — "encontros" é prosa, volta pro sans */}
             <span><span className="font-mono">{saude.feitos}/{total}</span> encontros</span>
-            <TrajetoriaAvaliacoes encontros={dupla.encontros} />
+            <TrajetoriaAvaliacoes encontros={dupla.encontros} total={total} />
+            {/* trilha fora do padrão DPP é fato da dupla — aparece como badge
+                quieto pra ninguém ler o contador /5 como bug */}
+            {ehEsp && (
+              <Badge variant="secondary" className="font-normal">
+                {TRILHA_LABEL[dupla.trilha]}
+              </Badge>
+            )}
+            {!ehEsp && <SolicitacaoStatusChip solicitacao={solicitacao} />}
             {dupla.supervisor && (
               // terciário — não compete em text-sm com o semáforo (§4)
               <span className="text-xs">Supervisor: {dupla.supervisor.nome}</span>
@@ -239,6 +284,14 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
               atual={encontroAlvo}
               sugerido={sugeridoProximo}
               piso={dupla.iniciada_em ?? undefined}
+            />
+          )}
+          {/* pedir especialista é decisão do mentor DPP (guia) — a coordenação
+              também registra demanda, mas quem aceita e agenda é o especialista */}
+          {podeSolicitar && (
+            <SolicitarEspecialistaDialog
+              duplaId={dupla.id}
+              especialistas={especialistas}
             />
           )}
         </div>
@@ -268,7 +321,13 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
                 {data}" na própria linha) */}
             <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
               Encontros
-              <span className="font-normal normal-case tracking-normal"> · datas sugeridas pelo guia</span>
+              <span className="font-normal normal-case tracking-normal">
+                {" "}
+                ·{" "}
+                {ehEsp
+                  ? "datas combinadas pela dupla"
+                  : "datas sugeridas pelo guia"}
+              </span>
             </h2>
             {podeRetroativo && (
               <RegistrarRetroativoDialog
@@ -296,6 +355,26 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
         </section>
 
         <aside className="space-y-6">
+          {/* o porquê da mentoria especialista — contexto pro especialista
+              antes do 1º encontro e pra coordenação acompanhar */}
+          {ehEsp && (
+            <section className="rounded-xl bg-card p-4 text-sm space-y-2 shadow-[var(--shadow-border)]">
+              <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                Demanda
+              </h2>
+              {dupla.demanda ? (
+                <p className="whitespace-pre-line text-muted-foreground">
+                  {dupla.demanda}
+                </p>
+              ) : (
+                <p className="text-xs italic text-muted-foreground">
+                  {souCoord
+                    ? "Sem demanda registrada — edite a dupla pra descrever o contexto."
+                    : "Sem demanda registrada."}
+                </p>
+              )}
+            </section>
+          )}
           <section
             id="combinados"
             className="scroll-mt-20 rounded-xl bg-card p-4 shadow-[var(--shadow-border)]"
@@ -387,7 +466,7 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
 }
 
 function EncontroRow({
-  evento,
+  passo,
   encontro,
   duplaId,
   podeEditar,
@@ -402,7 +481,8 @@ function EncontroRow({
   combinadosPendentes,
   nota,
 }: {
-  evento: CicloEvento;
+  /** Passo do guia da trilha (data sugerida no DPP; sem data no especialista). */
+  passo: PassoGuia;
   encontro: Encontro | null;
   duplaId: string;
   podeEditar: boolean;
@@ -468,7 +548,7 @@ function EncontroRow({
   // a data oficial é ruído e a meta abre direto no "realizado {data}" (§4).
   // Join com " · " evita separador órfão quando a primeira cláusula some
   const metaEncontro = [
-    !(feito && !diverge) && formatDate(evento.data),
+    !(feito && !diverge) && passo.data && formatDate(passo.data),
     encontro?.data_hora &&
       `${feito && !diverge ? "realizado" : "agendado"} ${formatDateTime(encontro.data_hora)}`,
     diverge && `realizado em ${formatDate(encontro?.realizado_em)}`,
@@ -511,11 +591,14 @@ function EncontroRow({
                   : "bg-muted text-muted-foreground"
             )}
           >
-            {evento.numero}
+            {passo.numero}
           </span>
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium line-clamp-2">{evento.titulo}</p>
-            <p className="text-xs text-muted-foreground">{metaEncontro}</p>
+            <p className="text-sm font-medium line-clamp-2">{passo.titulo}</p>
+            <p className="text-xs text-muted-foreground">
+              {[metaEncontro, passo.foco].filter(Boolean).join(" · ") ||
+                "Data a combinar"}
+            </p>
             {(linkSeguro(encontro?.link) || materialHref) && (
               <div className="mt-2 flex flex-wrap gap-2">
                 {linkSeguro(encontro?.link) && (
@@ -584,11 +667,11 @@ function EncontroRow({
 
       {/* anotações/plano do encontro — o mentor prepara aqui; pra quem não
           edita (coord/sup, dupla inativa) a nota existente vira leitura */}
-      {evento.numero != null && (podeEditar || nota) && (
+      {(podeEditar || nota) && (
         <div className="border-t px-4 py-2.5">
           <NotaEncontro
             duplaId={duplaId}
-            numero={evento.numero}
+            numero={passo.numero}
             nota={nota}
             somenteLeitura={!podeEditar}
           />
@@ -616,7 +699,7 @@ function EncontroRow({
               <EditarRegistro
                 encontroId={encontro.id}
                 duplaId={duplaId}
-                evento={evento}
+                evento={passo}
                 registro={reg}
               />
             </div>
@@ -638,7 +721,7 @@ function EncontroRow({
             <RegistroForm
               encontroId={encontro.id}
               duplaId={duplaId}
-              evento={evento}
+              evento={passo}
               combinadosPendentes={combinadosPendentes}
             />
           </RegistroInlinePanel>

@@ -80,6 +80,11 @@ export function RegistrarRetroativoDialog({
     setNumero(v);
     const f = faltantes.find((x) => String(x.numero) === v);
     if (!f) return;
+    // trilha sem data oficial (especialista) não tem sugestão — prefill cai em agora
+    if (!f.dataSugerida) {
+      setQuando(agora);
+      return;
+    }
     // prefill na data sugerida às 19h — se ainda não passou (sugerido hoje), cai em agora
     const pre = `${f.dataSugerida}T19:00`;
     setQuando(pre > agora ? agora : pre);
@@ -161,7 +166,9 @@ export function RegistrarRetroativoDialog({
               // sem items o trigger fechado mostra só "3" — o label é o texto cheio
               items={Object.fromEntries(faltantes.map((f) => [
                 String(f.numero),
-                `${f.numero}º encontro · sugerido ${formatDate(f.dataSugerida)}`,
+                f.dataSugerida
+                  ? `${f.numero}º encontro · sugerido ${formatDate(f.dataSugerida)}`
+                  : `${f.numero}º encontro`,
               ]))}
               onValueChange={(v) => escolherNumero(v ?? null)}
             >
@@ -174,7 +181,9 @@ export function RegistrarRetroativoDialog({
               <SelectContent>
                 {faltantes.map((f) => (
                   <SelectItem key={f.numero} value={String(f.numero)}>
-                    {f.numero}º encontro · sugerido {formatDate(f.dataSugerida)}
+                    {f.dataSugerida
+                      ? `${f.numero}º encontro · sugerido ${formatDate(f.dataSugerida)}`
+                      : `${f.numero}º encontro`}
                   </SelectItem>
                 ))}
               </SelectContent>

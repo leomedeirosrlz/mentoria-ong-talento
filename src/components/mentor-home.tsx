@@ -7,11 +7,18 @@ import {
   formatDateTime,
   jornadaDaDupla,
   linkSeguro,
+  maxEncontros,
+  passosDaTrilha,
   saudadeDaDupla,
   toDateStr,
-  totalEncontros,
 } from "@/lib/ciclo";
-import type { CicloEvento, Comunicado, Dupla, Profile } from "@/lib/types";
+import type {
+  CicloEvento,
+  Comunicado,
+  Dupla,
+  EspecialistaEvento,
+  Profile,
+} from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { buttonVariants } from "@/components/ui/button";
 import { AgendarEncontroDialog } from "@/components/agendar-encontro-dialog";
@@ -24,23 +31,30 @@ import { AvisosSection } from "@/components/avisos-section";
 export function MentorHome({
   duplas,
   eventos,
+  espEventos = [],
   me,
   avisos = [],
 }: {
   duplas: Dupla[];
+  /** Calendário oficial DPP — a trilha especialista não o usa. */
   eventos: CicloEvento[];
+  /** Passos da trilha especialista — alimenta a jornada das duplas dela. */
+  espEventos?: EspecialistaEvento[];
   me: Profile;
   avisos?: Comunicado[];
 }) {
   const hoje = new Date();
   const eventoSemana = eventoDaSemana(eventos, hoje);
-  const total = totalEncontros(eventos);
+  // "Semana do Nº encontro" é o calendário DPP — pra quem só tem trilha
+  // especialista (sem terças oficiais) a faixa seria um dado alheio
+  const soEspecialista =
+    duplas.length > 0 && duplas.every((d) => d.trilha === "especialista");
 
   return (
     <div className="space-y-8">
       <header>
         <h1 className="text-2xl font-semibold tracking-tight">Olá, {me.nome.split(" ")[0]}</h1>
-        {eventoSemana && (
+        {eventoSemana && !soEspecialista && (
           <p className="text-sm text-muted-foreground mt-1 flex items-center gap-1.5">
             <span aria-hidden className="size-2 shrink-0 rounded-full bg-[var(--brand-lime)]" />
             <span>
@@ -74,15 +88,21 @@ export function MentorHome({
 
       {duplas.map((dupla) => {
         const ativa = dupla.status === "ativa";
+        const ehEsp = dupla.trilha === "especialista";
         // saude.proximo já vem ordenado por data_hora — o find sem sort podia
         // pegar um encontro agendado mais distante que outro agendado antes
         const saude = saudadeDaDupla(dupla, eventos, hoje);
         const feitos = saude.feitos;
+        const totalDupla = maxEncontros(dupla.trilha);
         const proximoAgendado = saude.proximo;
         const {
           proximoNumero, encontroAlvo, sugeridoProximo, faltantes, cicloCompleto,
         } = alvoAgendamento(dupla, eventos, hoje);
-        const jornada = jornadaDaDupla(dupla, eventos, hoje);
+        const jornada = jornadaDaDupla(
+          dupla,
+          passosDaTrilha(dupla.trilha, eventos, espEventos),
+          hoje
+        );
         // pendência de registro mais antiga — realizado sem registro ou
         // agendado cuja data já passou (pode ter rolado: o mentor resolve
         // registrando, remarcando ou marcando não-aconteceu)
@@ -117,9 +137,14 @@ export function MentorHome({
                 </div>
                 <div className="flex flex-col items-end gap-0.5 text-right">
                   <span className="text-sm text-[var(--brand-lime)]">
-                    <span className="font-mono tabular-nums">{feitos}/{total}</span>{" "}
+                    <span className="font-mono tabular-nums">{feitos}/{totalDupla}</span>{" "}
                     encontros
                   </span>
+                  {ehEsp && (
+                    <span className="text-[11px] uppercase tracking-wider text-white/50">
+                      Trilha especialista
+                    </span>
+                  )}
                   {!ativa && (
                     <span className="text-[11px] uppercase tracking-wider text-white/50">
                       {dupla.status === "pausada" ? "Pausada" : "Encerrada"}
@@ -193,7 +218,9 @@ export function MentorHome({
                         : "Ciclo encerrado. Agradecemos pela jornada!"}
                     </p>
                   ) : cicloCompleto ? (
-                    <p className="font-medium">{total} encontros do ciclo concluídos.</p>
+                    <p className="font-medium">
+                      {totalDupla} encontros {ehEsp ? "da trilha" : "do ciclo"} concluídos.
+                    </p>
                   ) : proximoAgendado ? (
                     <>
                       <p className="font-medium">
@@ -233,7 +260,9 @@ export function MentorHome({
                           "Próximo encontro" (mesma elipse do "nº · data") */}
                       <p className="font-medium">{proximoNumero}º ainda não agendado</p>
                       <p className="text-sm text-muted-foreground mt-0.5">
-                        sugerido: {sugeridoProximo ? formatDate(sugeridoProximo) : "a combinar"}
+                        {sugeridoProximo
+                          ? `sugerido: ${formatDate(sugeridoProximo)}`
+                          : "data a combinar"}
                       </p>
                     </>
                   )}

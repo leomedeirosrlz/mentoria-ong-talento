@@ -5,9 +5,14 @@ import { useRouter } from "next/navigation";
 import { CaretLeft, CaretRight, Plus, Trash } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { salvarRegistro } from "@/lib/actions";
-import { ATIVIDADES_ENCONTRO, formatDiaMes, PROXIMO_PASSO_LABEL, toDateStr } from "@/lib/ciclo";
+import {
+  ATIVIDADES_ENCONTRO,
+  formatDiaMes,
+  PROXIMO_PASSO_LABEL,
+  toDateStr,
+  type PassoGuia,
+} from "@/lib/ciclo";
 import type {
-  CicloEvento,
   Dificuldade,
   Encaminhamento,
   ProximoPasso,
@@ -71,7 +76,8 @@ export function RegistroForm({
 }: {
   encontroId: string;
   duplaId: string;
-  evento: CicloEvento | null;
+  /** Passo do guia da trilha — título/instrumentos (DPP) ou foco (especialista). */
+  evento: PassoGuia | null;
   registro?: Registro | null;
   /** Encaminhamentos da dupla ainda não feitos (status !== "feito"), por prazo. */
   combinadosPendentes?: Encaminhamento[];
@@ -392,6 +398,7 @@ export function RegistroForm({
           <p className="text-xs text-muted-foreground mt-0.5">
             Sugestão do guia: {evento.titulo}
             {evento.instrumentos.length > 0 && ` · instrumentos: ${evento.instrumentos.join(", ")}`}
+            {evento.foco ? ` · ${evento.foco}` : ""}
           </p>
         )}
       </div>

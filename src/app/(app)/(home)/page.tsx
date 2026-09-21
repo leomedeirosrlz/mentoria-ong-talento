@@ -4,11 +4,14 @@ import {
   getComunicados,
   getContagemPessoas,
   getDuplas,
+  getEspecialistaEventos,
   getMe,
   getMinhasDuplas,
 } from "@/lib/queries";
 import { getUltimasInteracoes } from "@/lib/interacoes";
+import { getSolicitacoesVisiveis } from "@/lib/queries-especialista";
 import { DashboardCoordenacao } from "@/components/dashboard-coordenacao";
+import { DemandasEspecialista } from "@/components/demandas-especialista";
 import { MentorHome } from "@/components/mentor-home";
 
 export default async function HomePage({
@@ -30,7 +33,11 @@ export default async function HomePage({
   const filtro = typeof params.filtro === "string" ? params.filtro : undefined;
 
   if (me?.role === "coordenacao") {
-    const [duplas, pessoas] = await Promise.all([getDuplas(), getContagemPessoas()]);
+    const [duplas, pessoas, solicitacoes] = await Promise.all([
+      getDuplas(),
+      getContagemPessoas(),
+      getSolicitacoesVisiveis(),
+    ]);
     const interacoes = await getUltimasInteracoes(duplas.map((d) => d.id));
     return (
       <DashboardCoordenacao
@@ -42,6 +49,7 @@ export default async function HomePage({
         pessoas={pessoas}
         avisos={avisos}
         filtro={filtro}
+        solicitacoes={solicitacoes}
       />
     );
   }
@@ -64,5 +72,29 @@ export default async function HomePage({
   }
 
   const duplas = await getMinhasDuplas();
-  return <MentorHome duplas={duplas} eventos={eventos} me={me!} avisos={avisos} />;
+  const [espEventos, solicitacoes] = await Promise.all([
+    // passos da trilha especialista só valem a leitura quando há dupla dela —
+    // mentor DPP puro não paga o round-trip
+    duplas.some((d) => d.trilha === "especialista")
+      ? getEspecialistaEventos()
+      : Promise.resolve([]),
+    // o mural de demandas é a home do especialista — pros demais não existe
+    me?.role === "mentor_especialista"
+      ? getSolicitacoesVisiveis()
+      : Promise.resolve([]),
+  ]);
+  return (
+    <div className="space-y-8">
+      {me?.role === "mentor_especialista" && (
+        <DemandasEspecialista solicitacoes={solicitacoes} meuId={me.id} />
+      )}
+      <MentorHome
+        duplas={duplas}
+        eventos={eventos}
+        espEventos={espEventos}
+        me={me!}
+        avisos={avisos}
+      />
+    </div>
+  );
 }

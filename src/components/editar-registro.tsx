@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { PencilSimple } from "@phosphor-icons/react";
-import type { CicloEvento, Registro } from "@/lib/types";
+import type { PassoGuia } from "@/lib/ciclo";
+import type { Registro } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { RegistroForm } from "@/components/registro-form";
 
@@ -14,7 +15,7 @@ export function EditarRegistro({
 }: {
   encontroId: string;
   duplaId: string;
-  evento: CicloEvento | null;
+  evento: PassoGuia | null;
   registro: Registro;
 }) {
   const [aberto, setAberto] = useState(false);

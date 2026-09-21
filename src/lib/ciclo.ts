@@ -1,6 +1,82 @@
-import type { CicloEvento, Dificuldade, Dupla, Encontro, Registro } from "./types";
+import type {
+  CicloEvento,
+  Dificuldade,
+  Dupla,
+  Encontro,
+  EspecialistaEvento,
+  Registro,
+  Trilha,
+} from "./types";
 
 export type Semaforo = "ok" | "atencao" | "risco";
+
+// ---------- trilhas (0027) ----------
+
+/** Encontros por trilha: DPP = 16 (calendário oficial de terças), especialista
+ *  = 5 (até 3 meses, sem datas fixas — o especialista agenda). */
+export const TRILHA_LEN: Record<Trilha, number> = { dpp: 16, especialista: 5 };
+
+/** Teto de encontros da dupla — null/undefined cai em DPP (todas as duplas
+ *  anteriores à 0027 são DPP). */
+export function maxEncontros(trilha: Trilha | null | undefined): number {
+  return TRILHA_LEN[trilha ?? "dpp"];
+}
+
+export const TRILHA_LABEL: Record<Trilha, string> = {
+  dpp: "DPP",
+  especialista: "Especialista",
+};
+
+/** Passo do guia de uma trilha — forma unificada do CicloEvento (DPP, com
+ *  data oficial no calendário) e do EspecialistaEvento (sem data: a dupla
+ *  combina os 5 encontros dentro dos 3 meses). É o que a jornada, a ficha e
+ *  a "sugestão do guia" do registro consomem. */
+export type PassoGuia = {
+  id: string;
+  numero: number;
+  titulo: string;
+  /** Data oficial do ciclo (YYYY-MM-DD) — null na trilha especialista. */
+  data: string | null;
+  fase: string | null;
+  /** Instrumentos sugeridos pelo guia (DPP) — vazio na especialista. */
+  instrumentos: string[];
+  /** Foco do encontro (trilha especialista) — complementa a sugestão do guia. */
+  foco?: string | null;
+};
+
+/** Normaliza os passos da trilha: DPP vem de `ciclo_eventos` (encontros
+ *  numerados, com data); especialista vem de `especialista_eventos` (sempre
+ *  sem data — nunca inventar uma). */
+export function passosDaTrilha(
+  trilha: Trilha | null | undefined,
+  eventos: CicloEvento[],
+  especialista: EspecialistaEvento[] = []
+): PassoGuia[] {
+  if (trilha === "especialista") {
+    return [...especialista]
+      .sort((a, b) => a.numero - b.numero)
+      .map((e) => ({
+        id: `esp-${e.numero}`,
+        numero: e.numero,
+        titulo: e.titulo,
+        data: null,
+        fase: null,
+        instrumentos: [],
+        foco: e.foco,
+      }));
+  }
+  return eventos
+    .filter((e) => e.tipo === "encontro" && e.numero != null)
+    .sort((a, b) => a.numero! - b.numero!)
+    .map((e) => ({
+      id: e.id,
+      numero: e.numero!,
+      titulo: e.titulo,
+      data: e.data,
+      fase: e.fase,
+      instrumentos: e.instrumentos,
+    }));
+}
 
 // opções do form "Avaliação de Encontro Semanal - Mentores"
 export const ATIVIDADES_ENCONTRO = [
@@ -160,7 +236,11 @@ export function resumoSemana(
 ): ResumoSemana | null {
   const evento = eventoDaSemana(eventos, agora);
   if (!evento || evento.numero == null) return null;
-  const ativas = duplas.filter((d) => d.status === "ativa");
+  // semana oficial é métrica da trilha DPP — duplas de especialista não seguem
+  // o calendário de terças e ficariam sempre "sem encontro esta semana"
+  const ativas = duplas.filter(
+    (d) => d.status === "ativa" && d.trilha !== "especialista"
+  );
   const oficialRealizado = (d: Dupla) =>
     d.encontros.find((e) => e.numero === evento.numero && e.status === "realizado");
   const feitos = ativas.map(oficialRealizado).filter((e): e is Encontro => !!e);
@@ -208,6 +288,11 @@ export function textoResumoSemana(resumo: ResumoSemana, emRisco: string[] = []):
 
 export function saudadeDaDupla(dupla: Dupla, eventos: CicloEvento[], hoje = new Date()): DuplaSaude {
   const hojeStr = toDateStr(hoje);
+  // trilha especialista não tem calendário oficial: nada vence "por data", o
+  // semáforo dela é feito só dos sinais que a própria dupla emite (pedido de
+  // apoio, avaliação/dificuldade, registro pendente, agendado vencido,
+  // combinado vencido). "Esperado = feitos" mantém o atraso zerado.
+  const ehEspecialista = dupla.trilha === "especialista";
   // "limbo": agendado cuja data já passou e ainda não tem registro — pode ter
   // rolado ou não; a ambiguidade exige ação do mentor (registrar, remarcar ou
   // marcar não-aconteceu), então conta como pendência de registro, não atraso
@@ -217,23 +302,26 @@ export function saudadeDaDupla(dupla: Dupla, eventos: CicloEvento[], hoje = new 
     e.data_hora != null &&
     new Date(e.data_hora).getTime() < hoje.getTime();
   const limbo = new Set(dupla.encontros.filter(emLimbo).map((e) => e.numero));
+  const feitos = dupla.encontros.filter((e) => e.status === "realizado").length;
   // um encontro em limbo cobre o evento esperado do seu número — sai da conta
   // de atraso enquanto a pendência estiver aberta
-  const numerosEsperados = new Set(
-    eventos
-      .filter(
-        (e) =>
-          e.tipo === "encontro" &&
-          e.numero != null &&
-          e.data <= hojeStr &&
-          (!dupla.iniciada_em || e.data >= dupla.iniciada_em)
-      )
-      .map((e) => e.numero)
-  );
-  const esperado =
-    encontroEsperado(eventos, hoje, dupla.iniciada_em) -
-    [...limbo].filter((n) => numerosEsperados.has(n)).length;
-  const feitos = dupla.encontros.filter((e) => e.status === "realizado").length;
+  const numerosEsperados = ehEspecialista
+    ? new Set<number>()
+    : new Set(
+        eventos
+          .filter(
+            (e) =>
+              e.tipo === "encontro" &&
+              e.numero != null &&
+              e.data <= hojeStr &&
+              (!dupla.iniciada_em || e.data >= dupla.iniciada_em)
+          )
+          .map((e) => e.numero)
+      );
+  const esperado = ehEspecialista
+    ? feitos
+    : encontroEsperado(eventos, hoje, dupla.iniciada_em) -
+      [...limbo].filter((n) => numerosEsperados.has(n)).length;
   const proximo =
     dupla.encontros
       .filter((e) => e.status === "agendado" && e.data_hora && new Date(e.data_hora) >= hoje)
@@ -280,9 +368,10 @@ export function saudadeDaDupla(dupla: Dupla, eventos: CicloEvento[], hoje = new 
       motivo: `Avaliação baixa e dificuldade de ${DIFICULDADE_LABEL[ultimoReg!.dificuldade!] ?? ultimoReg!.dificuldade} no último encontro`,
       esperado, feitos, proximo, registroPendente, pediuApoio,
     };
-  if (atraso >= 2)
+  // atraso só existe contra um calendário — na especialista esperado = feitos
+  if (!ehEspecialista && atraso >= 2)
     return { semaforo: "risco", motivo: `${atraso} encontros em atraso`, esperado, feitos, proximo, registroPendente, pediuApoio };
-  if (atraso === 1)
+  if (!ehEspecialista && atraso === 1)
     return {
       semaforo: "atencao",
       motivo: `Encontro ${primeiroEncontroFaltante(dupla, eventos, hoje, limbo) ?? esperado} ainda não aconteceu (reposição na mesma semana)`,
@@ -301,24 +390,27 @@ export function saudadeDaDupla(dupla: Dupla, eventos: CicloEvento[], hoje = new 
       esperado, feitos, proximo, registroPendente, pediuApoio,
     };
   // preventivo: encontro oficial da semana bate em ≤5 dias e a dupla ainda não marcou nada
-  // (qualquer row com esse numero — agendada, realizada, cancelada — já cobre o encontro)
-  const oficial = eventoDaSemana(eventos, hoje);
-  const diasAteOficial = oficial ? diffDias(oficial.data, toDateStr(hoje)) : null;
-  const oficialNaDupla =
-    oficial?.numero != null && dupla.encontros.some((e) => e.numero === oficial.numero);
-  if (
-    oficial?.numero != null &&
-    diasAteOficial != null &&
-    diasAteOficial >= 0 &&
-    diasAteOficial <= 5 &&
-    !proximo &&
-    !oficialNaDupla
-  )
-    return {
-      semaforo: "atencao",
-      motivo: `O ${oficial.numero}º encontro é ${formatDiaSemanaMes(oficial.data)} e ainda não foi agendado`,
-      esperado, feitos, proximo, registroPendente, pediuApoio,
-    };
+  // (qualquer row com esse numero — agendada, realizada, cancelada — já cobre o encontro).
+  // Só DPP: a especialista não tem terça oficial — "ainda não agendou" não é sinal.
+  if (!ehEspecialista) {
+    const oficial = eventoDaSemana(eventos, hoje);
+    const diasAteOficial = oficial ? diffDias(oficial.data, toDateStr(hoje)) : null;
+    const oficialNaDupla =
+      oficial?.numero != null && dupla.encontros.some((e) => e.numero === oficial.numero);
+    if (
+      oficial?.numero != null &&
+      diasAteOficial != null &&
+      diasAteOficial >= 0 &&
+      diasAteOficial <= 5 &&
+      !proximo &&
+      !oficialNaDupla
+    )
+      return {
+        semaforo: "atencao",
+        motivo: `O ${oficial.numero}º encontro é ${formatDiaSemanaMes(oficial.data)} e ainda não foi agendado`,
+        esperado, feitos, proximo, registroPendente, pediuApoio,
+      };
+  }
   if (pendencia)
     return {
       semaforo: "atencao",
@@ -337,9 +429,11 @@ export function saudadeDaDupla(dupla: Dupla, eventos: CicloEvento[], hoje = new 
   };
 }
 
-/** Encontro oficial do ciclo que já venceu (na janela da dupla) e não tem row
- *  em `encontros` — candidato a "aconteceu sem agendar" (registro retroativo). */
-export type EncontroFaltante = { numero: number; dataSugerida: string };
+/** Encontro da trilha ainda sem row em `encontros` — candidato a "aconteceu
+ *  sem agendar" (registro retroativo). DPP: só oficiais já vencidos na janela
+ *  da dupla, com a data oficial como sugestão. Especialista: qualquer nº sem
+ *  row — sem data sugerida (não existe calendário pra sugerir). */
+export type EncontroFaltante = { numero: number; dataSugerida: string | null };
 
 /** O que a superfície de agendamento precisa saber da dupla — derivação única
  *  usada pela ficha, pela home do mentor e pela agenda (era copiada em cada). */
@@ -362,8 +456,10 @@ export function alvoAgendamento(
   hoje = new Date()
 ): AlvoAgendamento {
   const saude = saudadeDaDupla(dupla, eventos, hoje);
+  const ehEspecialista = dupla.trilha === "especialista";
   const encontroEventos = eventos.filter((e) => e.tipo === "encontro");
-  const total = totalEncontros(eventos);
+  // DPP mede contra os encontros do ciclo; a especialista tem o teto próprio
+  const total = ehEspecialista ? TRILHA_LEN.especialista : totalEncontros(eventos);
   // primeiro número ainda não realizado — reposição deixa buracos na sequência
   // (ex.: fez o 4º antes do 3º), então "feitos + 1" podia cair num realizado
   const numerosFeitos = new Set(
@@ -375,18 +471,27 @@ export function alvoAgendamento(
   // a row real desse número é o que o dialog edita; saude.proximo só cobre
   // agendados futuros
   const encontroAlvo = dupla.encontros.find((e) => e.numero === proximoNumero) ?? null;
-  const sugeridoProximo = encontroEventos.find((e) => e.numero === proximoNumero)?.data;
+  // sem calendário oficial não há data a sugerir — o dialog abre em branco
+  const sugeridoProximo = ehEspecialista
+    ? undefined
+    : encontroEventos.find((e) => e.numero === proximoNumero)?.data;
 
   const hojeStr = toDateStr(hoje);
   const comEncontro = new Set(dupla.encontros.map((e) => e.numero));
-  const faltantes = encontroEventos.flatMap((e) =>
-    e.numero != null &&
-    e.data <= hojeStr &&
-    (!dupla.iniciada_em || e.data >= dupla.iniciada_em) &&
-    !comEncontro.has(e.numero)
-      ? [{ numero: e.numero, dataSugerida: e.data }]
-      : []
-  );
+  const faltantes: EncontroFaltante[] = ehEspecialista
+    ? // qualquer nº sem row pode ter rolado — a trilha não tem data oficial
+      // limitando "o que já devia ter acontecido"
+      Array.from({ length: total }, (_, i) => i + 1)
+        .filter((n) => !comEncontro.has(n))
+        .map((n) => ({ numero: n, dataSugerida: null }))
+    : encontroEventos.flatMap((e) =>
+        e.numero != null &&
+        e.data <= hojeStr &&
+        (!dupla.iniciada_em || e.data >= dupla.iniciada_em) &&
+        !comEncontro.has(e.numero)
+          ? [{ numero: e.numero, dataSugerida: e.data }]
+          : []
+      );
 
   return {
     proximoNumero,
@@ -414,7 +519,8 @@ export type NoJornada = {
   /** 1..total dentro da janela da dupla (não é o nº oficial do encontro). */
   posicao: number;
   numero: number;
-  evento: CicloEvento;
+  /** Passo do guia — data null na trilha especialista. */
+  evento: PassoGuia;
   estado: EstadoNoJornada;
   encontro: Encontro | null;
   /** Marco cuja posição-limiar é este nó — só setado depois de atingido. */
@@ -460,26 +566,25 @@ export function marcosEntre(antes: number, depois: number, total: number): Marco
     .map(([m]) => m);
 }
 
-/** Mapa de progresso da dupla: os encontros oficiais da janela `iniciada_em`
- *  como passos numerados. Derivação pura — o estado já está gravado nas rows;
- *  nada aqui persiste. Encontros oficiais anteriores ao início da dupla não
- *  entram: buraco no começo leria como perda, e a trilha é só-positiva. */
+/** Mapa de progresso da dupla: os passos da trilha (`passosDaTrilha`) como
+ *  nós numerados. Derivação pura — o estado já está gravado nas rows; nada
+ *  aqui persiste. Passos oficiais anteriores ao início da dupla não entram:
+ *  buraco no começo leria como perda, e a trilha é só-positiva. Na trilha
+ *  especialista os passos não têm data — `janela` é sempre o guia inteiro. */
 export function jornadaDaDupla(
   dupla: Dupla,
-  eventos: CicloEvento[],
+  passos: PassoGuia[],
   hoje = new Date()
 ): JornadaDupla {
-  const oficiais = eventos
-    .filter((e) => e.tipo === "encontro" && e.numero != null)
-    .sort((a, b) => a.numero! - b.numero!);
+  const oficiais = [...passos].sort((a, b) => a.numero - b.numero);
   const janela = dupla.iniciada_em
-    ? oficiais.filter((e) => e.data >= dupla.iniciada_em!)
+    ? oficiais.filter((e) => e.data == null || e.data >= dupla.iniciada_em!)
     : oficiais;
   const total = janela.length;
   const porNumero = new Map(dupla.encontros.map((e) => [e.numero, e]));
 
   const nos: NoJornada[] = janela.map((evento, i) => {
-    const encontro = porNumero.get(evento.numero!) ?? null;
+    const encontro = porNumero.get(evento.numero) ?? null;
     let estado: EstadoNoJornada;
     if (!encontro) estado = "futuro";
     else if (encontro.status === "realizado")
@@ -494,7 +599,7 @@ export function jornadaDaDupla(
     else if (encontro.status === "agendado" || encontro.status === "remarcado")
       estado = "agendado";
     else estado = "nao_aconteceu";
-    return { posicao: i + 1, numero: evento.numero!, evento, estado, encontro, marco: null };
+    return { posicao: i + 1, numero: evento.numero, evento, estado, encontro, marco: null };
   });
 
   const realizado = (n: NoJornada) =>

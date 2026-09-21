@@ -7,6 +7,7 @@ import {
   getAlertasRegistros,
   getCicloEventos,
   getDuplasOpcoes,
+  getEspecialistaEventos,
   getMe,
   getRegistros,
   REGISTROS_PAGINA,
@@ -94,17 +95,25 @@ export default async function RegistrosPage({
   const maxEncontro = totalEncontros(eventos);
   const filtros = parseFiltros(await searchParams, maxEncontro);
 
-  const [{ itens, total }, duplas, alertas] = await Promise.all([
+  const [{ itens, total }, duplas, alertas, espEventos] = await Promise.all([
     getRegistros(filtros),
     getDuplasOpcoes(),
     getAlertasRegistros(),
+    getEspecialistaEventos(),
   ]);
 
-  const tituloEncontro = new Map(
+  // título do encontro por nº — por trilha: o nº 3 DPP e o nº 3 especialista
+  // são eventos diferentes (ciclo_eventos vs especialista_eventos)
+  const tituloDpp = new Map(
     eventos
       .filter((e) => e.tipo === "encontro" && e.numero != null)
       .map((e) => [e.numero!, e.titulo])
   );
+  const tituloEsp = new Map(espEventos.map((e) => [e.numero, e.titulo]));
+  const tituloEncontro = (r: RegistroResumo) =>
+    r.encontro?.dupla?.trilha === "especialista"
+      ? (tituloEsp.get(r.encontro.numero) ?? null)
+      : (tituloDpp.get(r.encontro?.numero ?? 0) ?? null);
 
   // o banco já ordena por realizado_em; o sort estável acerta a fatia
   // carregada e empurra quem pede atenção pra cima dentro do mesmo dia
@@ -277,9 +286,7 @@ export default async function RegistrosPage({
                   <div className={cn("min-w-0 flex-1", !ultimo && "pb-5")}>
                     <RegistroCard
                       r={r}
-                      tituloEncontro={
-                        tituloEncontro.get(r.encontro?.numero ?? 0) ?? null
-                      }
+                      tituloEncontro={tituloEncontro(r)}
                       souCoord={souCoord}
                     />
                   </div>

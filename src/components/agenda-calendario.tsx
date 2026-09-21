@@ -45,7 +45,9 @@ import {
   formatDateTime,
   formatDiaSemana,
   linkSeguro,
+  passosDaTrilha,
   toDateStr,
+  type PassoGuia,
 } from "@/lib/ciclo";
 import type {
   AppRole,
@@ -53,6 +55,7 @@ import type {
   Dupla,
   Encontro,
   EncontroStatus,
+  EspecialistaEvento,
 } from "@/lib/types";
 import { cn, normaliza } from "@/lib/utils";
 
@@ -237,9 +240,11 @@ function coberturaEncontro(
   duplas: Dupla[],
   numero: number
 ): { registraram: number; total: number } {
-  // denominador = duplas ativas — mesmo denominador de resumoSemana (pausada
-  // e encerrada não contam cobertura)
-  const ativas = duplas.filter((d) => d.status === "ativa");
+  // denominador = duplas ativas da trilha do calendário — a especialista não
+  // deve o encontro oficial DPP de nº igual (o dela é outra trilha)
+  const ativas = duplas.filter(
+    (d) => d.status === "ativa" && d.trilha !== "especialista"
+  );
   let registraram = 0;
   for (const d of ativas)
     if (
@@ -337,6 +342,7 @@ function ChaveDotsDupla({ className }: { className?: string }) {
 
 export function AgendaCalendario({
   eventos,
+  espEventos = [],
   hoje,
   semanaId,
   diaInicial,
@@ -344,6 +350,9 @@ export function AgendaCalendario({
   role,
 }: {
   eventos: CicloEvento[];
+  /** Passos da trilha especialista — resolve a "sugestão do guia" das duplas
+   *  dela (o nº 1–5 não bate com nenhum evento do ciclo DPP). */
+  espEventos?: EspecialistaEvento[];
   hoje: string;
   semanaId: string | null;
   /** ?dia= da URL — sobrepõe a heurística "semana atual senão hoje". */
@@ -398,11 +407,30 @@ export function AgendaCalendario({
     [eventos]
   );
 
-  // nº → evento oficial — alimenta a "sugestão do guia" do form de registro
-  const eventoPorNumero = useMemo(
-    () => new Map(encontrosRail.map((e) => [e.numero!, e])),
-    [encontrosRail]
+  // nº → passo do guia por trilha — a "sugestão do guia" do form de registro
+  // e do detalhe. Especialista (1–5) não bate com nenhum evento do ciclo DPP:
+  // o lookup certo depende da trilha da dupla, não só do número
+  const passosDppPorNumero = useMemo(
+    () =>
+      new Map(passosDaTrilha("dpp", eventos, []).map((p) => [p.numero, p])),
+    [eventos]
   );
+  const passosEspPorNumero = useMemo(
+    () =>
+      new Map(
+        passosDaTrilha("especialista", [], espEventos).map((p) => [
+          p.numero,
+          p,
+        ])
+      ),
+    [espEventos]
+  );
+  /** Passo do guia do nº pra esta dupla — DPP sai do ciclo; especialista sai
+   *  dos 5 passos próprios (sem data). */
+  const passoDe = (dupla: Dupla, numero: number): PassoGuia | null =>
+    dupla.trilha === "especialista"
+      ? (passosEspPorNumero.get(numero) ?? null)
+      : (passosDppPorNumero.get(numero) ?? null);
 
   const mesesComEventos = useMemo(() => {
     const set = new Set<number>();
@@ -605,7 +633,9 @@ export function AgendaCalendario({
       ? [
           ...duplasDoDia,
           ...duplas
-            .filter((dupla) => dupla.status === "ativa")
+            // numero-match só vale na trilha do calendário: o nº da
+            // especialista (1–5) coincide com eventos DPP por acidente
+            .filter((dupla) => dupla.status === "ativa" && dupla.trilha !== "especialista")
             .flatMap((dupla) =>
               dupla.encontros
                 .filter((e) => numerosOficiais.has(e.numero) && !idsNoDia.has(e.id))
@@ -614,8 +644,11 @@ export function AgendaCalendario({
         ]
       : duplasDoDia;
   // anotações do mentor: uma por dupla ativa no bloco do encontro oficial
-  // (âncora no nº — aparece no dia oficial mesmo com a dupla remarcada)
+  // (âncora no nº — aparece no dia oficial mesmo com a dupla remarcada).
+  // Só DPP: a especialista não tem encontro oficial pra ancorar a nota —
+  // a dela aparece sob a própria linha em "Sua dupla"
   const duplasAtivas = ehMentor ? duplas.filter((d) => d.status === "ativa") : [];
+  const duplasAtivasDpp = duplasAtivas.filter((d) => d.trilha !== "especialista");
 
   // "Hoje" só navega quando o mês de hoje está dentro da janela de meses do ciclo
   const mesHoje = mesIndice(hoje);
@@ -1111,11 +1144,12 @@ export function AgendaCalendario({
                       duplas.length > 0 && (
                         <CoberturaEncontro duplas={duplas} numero={e.numero} />
                       )}
-                    {/* plano de aula/anotações do mentor — uma por dupla ativa,
-                        rotulada pelo mentorado quando ele tem mais de uma */}
+                    {/* plano de aula/anotações do mentor — uma por dupla ativa
+                        da trilha DPP, rotulada pelo mentorado quando ele tem
+                        mais de uma */}
                     {e.tipo === "encontro" &&
                       e.numero != null &&
-                      duplasAtivas.map((d) => (
+                      duplasAtivasDpp.map((d) => (
                         <NotaEncontro
                           key={d.id}
                           duplaId={d.id}
@@ -1124,7 +1158,7 @@ export function AgendaCalendario({
                             d.notas?.find((n) => n.numero === e.numero)?.texto ?? null
                           }
                           rotulo={
-                            duplasAtivas.length > 1 ? d.mentorado.nome : undefined
+                            duplasAtivasDpp.length > 1 ? d.mentorado.nome : undefined
                           }
                         />
                       ))}
@@ -1157,9 +1191,7 @@ export function AgendaCalendario({
                       ehMentor={ehMentor}
                       souCoord={role === "coordenacao"}
                       indice={i}
-                      evento={
-                        eventoPorNumero.get(item.encontro.numero) ?? null
-                      }
+                      evento={passoDe(item.dupla, item.encontro.numero)}
                       aberto={registroAberto === item.encontro.id}
                       onAlternarRegistro={(abrir) =>
                         setRegistroAberto(abrir ? item.encontro.id : null)
@@ -1176,7 +1208,13 @@ export function AgendaCalendario({
                     linha, rotulada pelo nº (v1: só o mentor escreve) */}
                 {ehMentor &&
                   itensDupla
-                    .filter((i) => !numerosOficiais.has(i.encontro.numero))
+                    // na trilha especialista o nº nunca tem "dia oficial" — a
+                    // nota mora sempre sob a linha do encontro dela
+                    .filter(
+                      (i) =>
+                        i.dupla.trilha === "especialista" ||
+                        !numerosOficiais.has(i.encontro.numero)
+                    )
                     .map((i) => (
                       <div key={i.encontro.id} className="px-2">
                         <NotaEncontro
@@ -1391,9 +1429,14 @@ function AcaoDiaMentor({
 }) {
   const alvo = alvoAgendamento(dupla, eventos, parseDia(hoje));
   const diaPassou = selecionado < hoje;
-  // encontro oficial do dia — no máximo 1 (encontros são terças semanais)
+  // encontro oficial do dia — no máximo 1 (encontros são terças semanais).
+  // Na trilha especialista não existe oficial: o CTA cai sempre no ramo
+  // "próximo encontro pendente", sem importar o nº do calendário DPP
   const oficial =
-    eventosDoDia.find((e) => e.tipo === "encontro" && e.numero != null) ?? null;
+    dupla.trilha === "especialista"
+      ? null
+      : (eventosDoDia.find((e) => e.tipo === "encontro" && e.numero != null) ??
+        null);
   const rowOficial = oficial
     ? (dupla.encontros.find((e) => e.numero === oficial.numero) ?? null)
     : null;
@@ -1537,8 +1580,8 @@ function EncontroDuplaRow({
   ehMentor: boolean;
   souCoord: boolean;
   indice: number;
-  /** Evento oficial do nº do encontro — sugestão de tema/instrumento do form. */
-  evento: CicloEvento | null;
+  /** Passo do guia do nº na trilha da dupla — sugestão de tema/foco do form. */
+  evento: PassoGuia | null;
   /** O form de registro desta linha está aberto (um por vez no painel). */
   aberto: boolean;
   onAlternarRegistro: (abrir: boolean) => void;

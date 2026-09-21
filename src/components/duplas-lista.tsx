@@ -3,7 +3,7 @@
 import { type CSSProperties, useState } from "react";
 import Link from "next/link";
 import { MagnifyingGlass, Users } from "@phosphor-icons/react";
-import { saudadeDaDupla, totalEncontros } from "@/lib/ciclo";
+import { maxEncontros, saudadeDaDupla, TRILHA_LABEL } from "@/lib/ciclo";
 import type { CicloEvento, Dupla } from "@/lib/types";
 import { normaliza } from "@/lib/utils";
 import { DuplaAvatares } from "@/components/dupla-avatares";
@@ -41,7 +41,6 @@ export function DuplasLista({
 }) {
   const [busca, setBusca] = useState("");
   const hoje = new Date(agora);
-  const total = totalEncontros(eventos);
 
   const q = normaliza(busca.trim());
   const filtradas = q
@@ -122,7 +121,9 @@ export function DuplasLista({
         {filtradas.map((d, i) => {
           const saude = saudadeDaDupla(d, eventos, hoje);
           const feitos = d.encontros.filter((e) => e.status === "realizado").length;
-          const progresso = total > 0 ? Math.min(feitos / total, 1) : 0;
+          // denominador da trilha da dupla — 16 no DPP, 5 no especialista
+          const totalDaDupla = maxEncontros(d.trilha);
+          const progresso = totalDaDupla > 0 ? Math.min(feitos / totalDaDupla, 1) : 0;
           // dupla fora do radar (pausada/encerrada sem pedido de apoio): o motivo
           // é literalmente o status — o chip da coluna-meta já o diz; o "Mentor
           // pediu apoio" da pausada-com-apoio (risco) precisa ficar (CC-5)
@@ -150,8 +151,15 @@ export function DuplasLista({
                   antes do nome (o link inteiro já leva à ficha) */}
               <DuplaAvatares mentor={d.mentor} mentorado={d.mentorado} size={36} />
               <div className="min-w-0 flex-1">
-                <p className="font-semibold truncate">
+                <p className="font-semibold truncate flex items-center gap-1.5">
                   <DuplaNomes mentor={d.mentor.nome} mentorado={d.mentorado.nome} />
+                  {/* especialista é a exceção à escala /16 — a marca evita
+                      ler "2/5" como erro de dado */}
+                  {d.trilha === "especialista" && (
+                    <span className="rounded-full bg-muted px-1.5 py-px text-[10px] font-medium text-muted-foreground">
+                      {TRILHA_LABEL[d.trilha]}
+                    </span>
+                  )}
                 </p>
                 {sub && (
                   <p className="text-xs text-muted-foreground mt-0.5">{sub}</p>
@@ -160,14 +168,14 @@ export function DuplasLista({
               {/* uma zona de meta só: n/N + barra + status empilham à direita */}
               <div className="flex w-16 shrink-0 flex-col items-end gap-1 sm:w-20">
                 <span className="font-mono text-xs text-muted-foreground tabular-nums">
-                  {feitos}/{total}
+                  {feitos}/{totalDaDupla}
                 </span>
                 <div
                   role="progressbar"
                   aria-valuenow={feitos}
                   aria-valuemin={0}
-                  aria-valuemax={total}
-                  aria-label={`${feitos} de ${total} encontros`}
+                  aria-valuemax={totalDaDupla}
+                  aria-label={`${feitos} de ${totalDaDupla} encontros`}
                   className="h-1 w-full overflow-hidden rounded-full bg-muted"
                 >
                   <div

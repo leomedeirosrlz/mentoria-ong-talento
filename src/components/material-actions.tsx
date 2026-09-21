@@ -10,6 +10,7 @@ import {
   editarMaterial,
   removerArquivoMaterial,
 } from "@/lib/actions";
+import { TRILHA_LEN } from "@/lib/ciclo";
 import { createClient } from "@/lib/supabase/client";
 import type { Material } from "@/lib/types";
 import { Button } from "@/components/ui/button";
@@ -56,6 +57,10 @@ const AUDIENCIA_LABEL = {
 export function MaterialActions({ material, maxEncontro }: { material: Material; maxEncontro?: number }) {
   const [pending, start] = useTransition();
   const [editOpen, setEditOpen] = useState(false);
+  // audiência controlada — o teto de "encontro" segue a trilha dela
+  const [audiencia, setAudiencia] = useState(material.audiencia);
+  const maxEncontroSel =
+    audiencia === "especialista" ? TRILHA_LEN.especialista : (maxEncontro ?? 99);
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -224,7 +229,11 @@ export function MaterialActions({ material, maxEncontro }: { material: Material;
               </div>
               <div className="space-y-2">
                 <Label id="mat-aud-label">Quem recebe</Label>
-                <Select name="audiencia" defaultValue={material.audiencia}>
+                <Select
+                  name="audiencia"
+                  defaultValue={material.audiencia}
+                  onValueChange={(v) => setAudiencia((v ?? material.audiencia) as Material["audiencia"])}
+                >
                   <SelectTrigger aria-labelledby="mat-aud-label"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {Object.entries(AUDIENCIA_LABEL).map(([v, l]) => (
@@ -239,7 +248,7 @@ export function MaterialActions({ material, maxEncontro }: { material: Material;
                 <Label htmlFor="mat-encontro">Encontro (nº, opcional)</Label>
                 <Input
                   id="mat-encontro" name="encontro_num" type="number"
-                  min={1} max={maxEncontro ?? 99}
+                  min={1} max={maxEncontroSel}
                   defaultValue={material.encontro_num ?? ""}
                 />
               </div>

@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { MOTIVOS_REAGENDAMENTO, inicioDefaultDupla } from "@/lib/ciclo";
+import { MOTIVOS_REAGENDAMENTO, inicioDefaultDupla, maxEncontros } from "@/lib/ciclo";
+import type { Trilha } from "@/lib/types";
 import {
   emailValido,
   mapRole,
@@ -12,6 +13,7 @@ import {
   normWhatsapp,
   type LinhaImportada,
 } from "@/lib/importar";
+import { notificar } from "./notificar";
 
 /** Traduz erro do Postgres/PostgREST pra mensagem de UI (sem vazar schema nem inglês). */
 function erroAmigavel(e: { message: string; code?: string }): string {
@@ -60,32 +62,6 @@ const FOTO_TIPOS = ["image/png", "image/jpeg", "image/webp"];
 const FOTO_MAX = 2 * 1024 * 1024;
 
 type Supa = Awaited<ReturnType<typeof createClient>>;
-
-/** Fan-out de notificações in-app — um insert em lote. A RLS escopa pelo
- *  papel do destinatário (coord → qualquer um; demais → só staff). Falha vira
- *  console.error, não erro da ação: a notificação é complemento, e o autor
- *  nunca se auto-notifica. */
-async function notificar(
-  supabase: Supa,
-  rows: {
-    profile_id: string | null | undefined;
-    tipo: string;
-    titulo: string;
-    corpo?: string | null;
-    href?: string | null;
-    comunicado_id?: string | null;
-  }[],
-  autorId: string
-) {
-  const limpos = rows
-    .filter((r): r is typeof r & { profile_id: string } => !!r.profile_id)
-    .filter((r) => r.profile_id !== autorId);
-  if (!limpos.length) return;
-  const { error } = await supabase
-    .from("notificacoes")
-    .insert(limpos.map((r) => ({ ...r, created_by: autorId })));
-  if (error) console.error("notificar: falha ao gravar notificações", error);
-}
 
 /** Foto opcional vinda do FormData — sobe pro bucket `avatares` na pasta do
  *  dono (`<id>/<uuid>.<ext>`) e devolve o path. Falha de upload não derruba
@@ -212,30 +188,33 @@ export async function createDupla(formData: FormData) {
   if (mentor?.role !== "mentor_dpp" && mentor?.role !== "mentor_especialista") {
     return { error: "A pessoa escolhida como mentor não tem papel de mentor." };
   }
-  // a trilha de especialista (5 encontros) ainda não está modelada — criar ou
-  // mover a dupla pra ela agora jogaria a dupla no calendário DPP de 16 com
-  // semáforo e sugestões errados, e corrigir depois exigiria reparo de dados
-  if (mentor?.role === "mentor_especialista") {
-    return {
-      error:
-        "A trilha de especialistas (5 encontros) ainda não está no sistema — a dupla ficaria com o calendário errado.",
-    };
-  }
-  if (supervisor_id) {
+  // a trilha é derivada do papel do mentor — o client não escolhe (o campo
+  // oculto/role no banco é a fonte de verdade; mentor_especialista nunca vira DPP)
+  const trilha: Trilha = mentor.role === "mentor_especialista" ? "especialista" : "dpp";
+  // dupla de especialista não tem supervisor — força null mesmo se o form mandar
+  const supervisorFinal = trilha === "especialista" ? null : supervisor_id;
+  if (supervisorFinal) {
     const { data: supervisor } = await supabase
-      .from("profiles").select("role").eq("id", supervisor_id).single();
+      .from("profiles").select("role").eq("id", supervisorFinal).single();
     if (supervisor?.role !== "supervisor") {
       return { error: "A pessoa escolhida como supervisor não tem esse papel." };
     }
   }
-  // um mentorado só ocupa uma vaga por vez — dupla pausada segue contando
+  // um mentorado ocupa uma vaga POR trilha — a dupla de especialista convive
+  // com a DPP em paralelo (índice único do 0027 é ciclo+mentorado+trilha)
   const { data: emDupla } = await supabase
     .from("duplas").select("id")
     .eq("mentorado_id", mentorado_id)
+    .eq("trilha", trilha)
     .in("status", ["ativa", "pausada"])
     .limit(1);
   if (emDupla?.length) {
-    return { error: "Esse mentorado já está em uma dupla ativa." };
+    return {
+      error:
+        trilha === "especialista"
+          ? "Esse mentorado já está em uma dupla de especialista ativa."
+          : "Esse mentorado já está em uma dupla ativa.",
+    };
   }
   // mentor sem linha em mentor_profiles vale capacidade 1
   const [{ data: doMentor }, { data: mp }] = await Promise.all([
@@ -251,23 +230,35 @@ export async function createDupla(formData: FormData) {
   if (iniciadaRaw && !/^\d{4}-\d{2}-\d{2}$/.test(iniciadaRaw)) {
     return { error: "Confira a data de início." };
   }
-  // sem data informada, a dupla nasce uma semana antes do 1º encontro oficial
-  // do ciclo — coord cadastra a dupla depois dela existir de fato, e "hoje"
-  // apagaria os encontros já passados do semáforo. Sem ciclo, cai em hoje.
+  // sem data informada, a dupla DPP nasce uma semana antes do 1º encontro
+  // oficial do ciclo — coord cadastra a dupla depois dela existir de fato, e
+  // "hoje" apagaria os encontros já passados do semáforo. A especialista não
+  // tem calendário a ancorar: sem data informada, cai direto em hoje.
   let iniciada_em = iniciadaRaw;
   if (!iniciada_em) {
-    const { data: primeiroEv } = await supabase
-      .from("ciclo_eventos").select("data")
-      .eq("tipo", "encontro").order("data", { ascending: true }).limit(1).maybeSingle();
-    iniciada_em = primeiroEv
-      ? inicioDefaultDupla([{ tipo: "encontro", data: primeiroEv.data }])!
-      : new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date());
+    if (trilha === "especialista") {
+      iniciada_em = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date());
+    } else {
+      const { data: primeiroEv } = await supabase
+        .from("ciclo_eventos").select("data")
+        .eq("tipo", "encontro").order("data", { ascending: true }).limit(1).maybeSingle();
+      iniciada_em = primeiroEv
+        ? inicioDefaultDupla([{ tipo: "encontro", data: primeiroEv.data }])!
+        : new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date());
+    }
   }
+  // a demanda é o contexto da trilha especialista (por que essa mentoria
+  // existe) — DPP não tem o campo, fica null
+  const demanda = trilha === "especialista"
+    ? String(formData.get("demanda") ?? "").trim() || null
+    : null;
   const { data: novaDupla, error } = await supabase.from("duplas").insert({
     mentor_id,
     mentorado_id,
-    supervisor_id,
+    supervisor_id: supervisorFinal,
     iniciada_em,
+    trilha,
+    demanda,
   }).select("id").single();
   if (error) return { error: erroAmigavel(error) };
   // avisa o mentor — o pareamento é a notícia que muda a rotina dele
@@ -283,7 +274,7 @@ export async function createDupla(formData: FormData) {
       href: hrefDupla,
     },
     {
-      profile_id: supervisor_id,
+      profile_id: supervisorFinal,
       tipo: "dupla_formada",
       titulo: "Nova dupla sob sua supervisão",
       corpo: md?.nome ? `${md.nome} — acompanhe a ficha da dupla.` : null,
@@ -562,40 +553,47 @@ export async function updateDupla(duplaId: string, formData: FormData) {
   if (mentor?.role !== "mentor_dpp" && mentor?.role !== "mentor_especialista") {
     return { error: "A pessoa escolhida como mentor não tem papel de mentor." };
   }
-  // a trilha de especialista (5 encontros) ainda não está modelada — criar ou
-  // mover a dupla pra ela agora jogaria a dupla no calendário DPP de 16 com
-  // semáforo e sugestões errados, e corrigir depois exigiria reparo de dados
-  if (mentor?.role === "mentor_especialista") {
-    return {
-      error:
-        "A trilha de especialistas (5 encontros) ainda não está no sistema — a dupla ficaria com o calendário errado.",
-    };
-  }
-  if (supervisor_id) {
-    const { data: supervisor } = await supabase
-      .from("profiles").select("role").eq("id", supervisor_id).single();
-    if (supervisor?.role !== "supervisor") {
-      return { error: "A pessoa escolhida como supervisor não tem esse papel." };
-    }
-  }
+  // a trilha segue o papel do mentor — trocar de mentor DPP pra especialista
+  // (ou o contrário) migra a dupla; com encontros já criados ela é imutável
+  // (mover numerariação entre calendário e trilha livre exigiria reparo de dados)
+  const trilhaNova: Trilha = mentor.role === "mentor_especialista" ? "especialista" : "dpp";
   // dupla ativa/pausada ocupa vaga do mentor e do mentorado; encerrada não ocupa,
   // então só valida quando o novo status volta a contar. A própria dupla sai da
   // conta (.neq) pra edição simples não brigar com ela mesma
   const { data: atualDupla } = await supabase
-    .from("duplas").select("mentor_id, mentorado_id, supervisor_id, status").eq("id", duplaId).single();
+    .from("duplas").select("mentor_id, mentorado_id, supervisor_id, status, trilha").eq("id", duplaId).single();
+  if (atualDupla && trilhaNova !== atualDupla.trilha) {
+    const { count } = await supabase
+      .from("encontros")
+      .select("id", { count: "exact", head: true })
+      .eq("dupla_id", duplaId);
+    if ((count ?? 0) > 0) {
+      return { error: "A trilha não pode mudar — a dupla já tem encontros." };
+    }
+  }
+  // dupla de especialista não tem supervisor — null forçado, nunca confia no form
+  const supervisorFinal = trilhaNova === "especialista" ? null : supervisor_id;
+  if (supervisorFinal) {
+    const { data: supervisor } = await supabase
+      .from("profiles").select("role").eq("id", supervisorFinal).single();
+    if (supervisor?.role !== "supervisor") {
+      return { error: "A pessoa escolhida como supervisor não tem esse papel." };
+    }
+  }
   if (atualDupla && status !== "encerrada") {
     // encerrada voltando a ativa/pausada precisa revalidar — a vaga pode ter sido
     // ocupada por outra dupla enquanto estava encerrada
     const voltando = atualDupla.status === "encerrada";
-    if (voltando || mentorado_id !== atualDupla.mentorado_id) {
+    if (voltando || mentorado_id !== atualDupla.mentorado_id || trilhaNova !== atualDupla.trilha) {
       const { data: emDupla } = await supabase
         .from("duplas").select("id")
         .eq("mentorado_id", mentorado_id)
+        .eq("trilha", trilhaNova)
         .in("status", ["ativa", "pausada"])
         .neq("id", duplaId)
         .limit(1);
       if (emDupla?.length) {
-        return { error: "Esse mentorado já está em uma dupla ativa ou pausada." };
+        return { error: "Esse mentorado já está em uma dupla ativa ou pausada nessa trilha." };
       }
     }
     if (voltando || mentor_id !== atualDupla.mentor_id) {
@@ -616,8 +614,15 @@ export async function updateDupla(duplaId: string, formData: FormData) {
   const patch: Record<string, unknown> = {
     mentor_id,
     mentorado_id,
-    supervisor_id,
+    supervisor_id: supervisorFinal,
     status,
+    trilha: trilhaNova,
+    // demanda só existe na trilha especialista — volta null se a dupla migra
+    // pra DPP (correção de mentor errado antes do 1º encontro)
+    demanda:
+      trilhaNova === "especialista"
+        ? String(formData.get("demanda") ?? "").trim() || null
+        : null,
   };
   if (iniciada_em) patch.iniciada_em = iniciada_em;
   const { data, error } = await supabase.from("duplas").update(patch).eq("id", duplaId).select("id");
@@ -629,7 +634,7 @@ export async function updateDupla(duplaId: string, formData: FormData) {
   // saber que assumiu, e quem sai não pode ver a dupla sumir sem explicação.
   // Pausa/encerramento também avisa — é o tipo de notícia pra que o sino existe.
   const trocouPessoas =
-    atualDupla && (mentor_id !== atualDupla.mentor_id || supervisor_id !== atualDupla.supervisor_id);
+    atualDupla && (mentor_id !== atualDupla.mentor_id || supervisorFinal !== atualDupla.supervisor_id);
   const mudouStatus =
     atualDupla && status !== atualDupla.status &&
     (status === "pausada" || status === "encerrada");
@@ -645,8 +650,8 @@ export async function updateDupla(duplaId: string, formData: FormData) {
         corpo: nomeMd ? `Você e ${nomeMd} — vejam onde a jornada está.` : null,
         href: `/duplas/${duplaId}`,
       } : null,
-      supervisor_id && supervisor_id !== atualDupla.supervisor_id ? {
-        profile_id: supervisor_id,
+      supervisorFinal && supervisorFinal !== atualDupla.supervisor_id ? {
+        profile_id: supervisorFinal,
         tipo: "dupla_formada",
         titulo: "Nova dupla sob sua supervisão",
         corpo: nomeMd ? `${nomeMd} — acompanhe a ficha da dupla.` : null,
@@ -662,7 +667,7 @@ export async function updateDupla(duplaId: string, formData: FormData) {
           : "A coordenação reorganizou o ciclo.",
         href: "/",
       } : null,
-      atualDupla.supervisor_id && supervisor_id !== atualDupla.supervisor_id ? {
+      atualDupla.supervisor_id && supervisorFinal !== atualDupla.supervisor_id ? {
         profile_id: atualDupla.supervisor_id,
         tipo: "dupla_formada",
         titulo: "Dupla saiu da sua supervisão",
@@ -678,8 +683,8 @@ export async function updateDupla(duplaId: string, formData: FormData) {
         corpo: "A coordenação atualizou o ciclo — fale com ela se tiver dúvidas.",
         href: `/duplas/${duplaId}`,
       } : null,
-      mudouStatus && supervisor_id ? {
-        profile_id: supervisor_id,
+      mudouStatus && supervisorFinal ? {
+        profile_id: supervisorFinal,
         tipo: "dupla_formada",
         titulo: status === "pausada" ? "Dupla supervisionada pausada" : "Dupla supervisionada encerrada",
         corpo: nomeMd ? `A dupla com ${nomeMd} — a coordenação atualizou o ciclo.` : null,
@@ -862,7 +867,7 @@ export async function agendarEncontro(formData: FormData) {
   const motivo = String(formData.get("motivo") ?? "").trim();
   const motivoOutro = String(formData.get("motivo_outro") ?? "").trim();
   if (!dupla_id || !numero || !data_hora) return { error: "Data e horário são obrigatórios." };
-  const { data: d } = await supabase.from("duplas").select("status").eq("id", dupla_id).single();
+  const { data: d } = await supabase.from("duplas").select("status, trilha").eq("id", dupla_id).single();
   if (d && d.status !== "ativa") return { error: "Essa dupla não está ativa." };
   const quando = parseDataHora(data_hora);
   if (!quando) return { error: "Confira a data." };
@@ -887,12 +892,16 @@ export async function agendarEncontro(formData: FormData) {
   if (link && !urlOk(link)) return { error: "Confira o link — precisa ser um endereço completo (https://…)." };
   if (!(ORIGENS as readonly string[]).includes(origem)) return { error: "Não foi possível identificar a origem. Recarregue a página." };
 
-  const { data: maxEv } = await supabase
-    .from("ciclo_eventos").select("numero")
-    .eq("tipo", "encontro").order("numero", { ascending: false }).limit(1).maybeSingle();
-  const maxNum = maxEv?.numero ?? 16;
+  // teto de nº por trilha — especialista tem 5 passos próprios, sem ciclo_eventos
+  const maxNum = d?.trilha === "especialista"
+    ? maxEncontros("especialista")
+    : (
+        await supabase
+          .from("ciclo_eventos").select("numero")
+          .eq("tipo", "encontro").order("numero", { ascending: false }).limit(1).maybeSingle()
+      ).data?.numero ?? 16;
   if (!Number.isInteger(numero) || numero < 1 || numero > maxNum) {
-    return { error: "Escolha um encontro do ciclo." };
+    return { error: "Escolha um encontro da trilha." };
   }
 
   // remarcação de verdade = a data mudou; salvar de novo com a mesma data
@@ -1000,7 +1009,7 @@ export async function registrarEncontroRetroativo(
   if (!duplaId || !numero || !dataHora) return { error: "Encontro e data são obrigatórios." };
 
   const { data: d } = await supabase
-    .from("duplas").select("status, iniciada_em").eq("id", duplaId).single();
+    .from("duplas").select("status, iniciada_em, trilha").eq("id", duplaId).single();
   if (!d) return { error: "Dupla não encontrada." };
   if (d.status === "encerrada") return { error: "Essa dupla está encerrada." };
 
@@ -1010,13 +1019,17 @@ export async function registrarEncontroRetroativo(
     return { error: "A data precisa ser de quando o encontro já aconteceu." };
   }
 
-  // o ciclo real define o teto de numero e o piso de data (início da dupla ou do ciclo)
-  const { data: evs } = await supabase
-    .from("ciclo_eventos").select("numero, data")
-    .eq("tipo", "encontro").order("numero", { ascending: true });
-  const maxNum = evs?.at(-1)?.numero ?? 16;
+  // teto de nº e piso de data por trilha — na especialista não existe
+  // ciclo_eventos próprio: o teto é o da trilha e o piso é só o início da dupla
+  const ehEspecialista = d.trilha === "especialista";
+  const { data: evs } = ehEspecialista
+    ? { data: null }
+    : await supabase
+        .from("ciclo_eventos").select("numero, data")
+        .eq("tipo", "encontro").order("numero", { ascending: true });
+  const maxNum = ehEspecialista ? maxEncontros("especialista") : evs?.at(-1)?.numero ?? 16;
   if (!Number.isInteger(numero) || numero < 1 || numero > maxNum) {
-    return { error: "Escolha um encontro do ciclo." };
+    return { error: "Escolha um encontro da trilha." };
   }
   const piso = d.iniciada_em ?? evs?.[0]?.data ?? null;
   if (piso && quando < new Date(`${piso}T00:00:00-03:00`)) {
@@ -1245,16 +1258,20 @@ export async function salvarNotaEncontro(duplaId: string, numero: number, texto:
     return { error: "A nota do encontro é do mentor da dupla." };
   }
 
-  const { data: maxEv } = await supabase
-    .from("ciclo_eventos").select("numero")
-    .eq("tipo", "encontro").order("numero", { ascending: false }).limit(1).maybeSingle();
-  const maxNum = maxEv?.numero ?? 16;
-  if (!Number.isInteger(numero) || numero < 1 || numero > maxNum) {
-    return { error: "Escolha um encontro do ciclo." };
-  }
-
-  const { data: d } = await supabase.from("duplas").select("status").eq("id", duplaId).single();
+  const { data: d } = await supabase.from("duplas").select("status, trilha").eq("id", duplaId).single();
   if (d && d.status !== "ativa") return { error: "Essa dupla não está ativa." };
+
+  // teto de nº por trilha — a nota segue o passo do guia (16 DPP / 5 especialista)
+  const maxNum = d?.trilha === "especialista"
+    ? maxEncontros("especialista")
+    : (
+        await supabase
+          .from("ciclo_eventos").select("numero")
+          .eq("tipo", "encontro").order("numero", { ascending: false }).limit(1).maybeSingle()
+      ).data?.numero ?? 16;
+  if (!Number.isInteger(numero) || numero < 1 || numero > maxNum) {
+    return { error: "Escolha um encontro da trilha." };
+  }
 
   const limpo = texto.trim();
   if (limpo.length > 10000) return { error: "Anotação muito longa (máx. 10.000 caracteres)." };
@@ -1459,11 +1476,15 @@ export async function salvarMaterial(formData: FormData) {
   const { data: maxEv } = await supabase
     .from("ciclo_eventos").select("numero")
     .eq("tipo", "encontro").order("numero", { ascending: false }).limit(1).maybeSingle();
+  // encontro_num segue a trilha da audiência: material de especialista
+  // numera dentro dos 5 passos dela, o resto dentro do ciclo DPP
+  const maxNumMat =
+    audiencia === "especialista"
+      ? maxEncontros("especialista")
+      : (maxEv?.numero ?? 16);
   if (
     encontroRaw &&
-    (!Number.isInteger(encontroNum) ||
-      encontroNum! < 1 ||
-      (maxEv?.numero != null && encontroNum! > maxEv.numero))
+    (!Number.isInteger(encontroNum) || encontroNum! < 1 || encontroNum! > maxNumMat)
   ) {
     return { error: "Escolha um encontro do ciclo." };
   }
@@ -1504,11 +1525,13 @@ export async function editarMaterial(id: string, formData: FormData) {
   const { data: maxEv } = await supabase
     .from("ciclo_eventos").select("numero")
     .eq("tipo", "encontro").order("numero", { ascending: false }).limit(1).maybeSingle();
+  const maxNumMat =
+    audiencia === "especialista"
+      ? maxEncontros("especialista")
+      : (maxEv?.numero ?? 16);
   if (
     encontroRaw &&
-    (!Number.isInteger(encontroNum) ||
-      encontroNum! < 1 ||
-      (maxEv?.numero != null && encontroNum! > maxEv.numero))
+    (!Number.isInteger(encontroNum) || encontroNum! < 1 || encontroNum! > maxNumMat)
   ) {
     return { error: "Escolha um encontro do ciclo." };
   }

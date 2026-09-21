@@ -1,5 +1,6 @@
 export type AppRole = "coordenacao" | "supervisor" | "mentor_dpp" | "mentor_especialista";
 export type DuplaStatus = "ativa" | "pausada" | "encerrada";
+export type Trilha = "dpp" | "especialista";
 export type EncontroStatus = "agendado" | "realizado" | "remarcado" | "nao_aconteceu" | "cancelado";
 export type EncaminhamentoStatus = "pendente" | "feito" | "atrasado";
 export type AvaliacaoJovem = "excelente" | "boa" | "regular" | "baixa";
@@ -144,6 +145,12 @@ export type Dupla = {
   ciclo: string;
   status: DuplaStatus;
   iniciada_em: string | null;
+  /** "dpp" = trilha de 16 encontros; "especialista" = trilha de 5 (sem datas fixas). */
+  trilha: Trilha;
+  /** Demanda registrada pelo mentor DPP que originou a dupla de especialista. */
+  demanda: string | null;
+  /** Solicitação que originou a dupla de especialista (null nas DPP). */
+  solicitacao_id: string | null;
   mentor: Profile;
   mentorado: Mentorado;
   supervisor: Profile | null;
@@ -198,4 +205,35 @@ export type Notificacao = {
   href: string | null;
   lida_em: string | null;
   created_at: string;
+};
+
+// ---------- trilha de especialista (0027) ----------
+
+/** Os 5 encontros do guia do especialista — sem data fixa, o especialista agenda. */
+export type EspecialistaEvento = {
+  numero: number;
+  titulo: string;
+  foco: string | null;
+};
+
+export type SolicitacaoEspecialistaStatus = "aberta" | "aceita" | "cancelada";
+
+/** Demanda de especialista registrada pelo mentor DPP (ou coord) — vira dupla
+ *  quando um especialista aceita (`dupla_id` aponta pra ela). */
+export type SolicitacaoEspecialista = {
+  id: string;
+  mentorado_id: string;
+  dupla_dpp_id: string;
+  demanda: string;
+  especialista_desejado_id: string | null;
+  especialista_id: string | null;
+  dupla_id: string | null;
+  status: SolicitacaoEspecialistaStatus;
+  created_by: string | null;
+  created_at: string;
+  respondida_em: string | null;
+  // embeds quando selecionados:
+  mentorado?: { nome: string } | null;
+  solicitante?: { nome: string } | null;
+  especialista?: { nome: string } | null;
 };

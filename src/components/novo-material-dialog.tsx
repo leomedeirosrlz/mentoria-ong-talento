@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Plus } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { deleteMaterial, salvarMaterial } from "@/lib/actions";
+import { TRILHA_LEN } from "@/lib/ciclo";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import {
@@ -51,6 +52,11 @@ function saneiaNome(nome: string): string {
 export function NovoMaterialDialog({ maxEncontro }: { maxEncontro: number }) {
   const [open, setOpen] = useState(false);
   const [destino, setDestino] = useState<"link" | "arquivo">("arquivo");
+  // audiência controlada — o teto de "encontro relacionado" segue a trilha
+  // dela (5 no especialista, N do ciclo nas demais)
+  const [audiencia, setAudiencia] = useState("todos");
+  const maxEncontroSel =
+    audiencia === "especialista" ? TRILHA_LEN.especialista : maxEncontro;
   const [pending, start] = useTransition();
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -151,7 +157,12 @@ export function NovoMaterialDialog({ maxEncontro }: { maxEncontro: number }) {
             </div>
             <div className="space-y-2">
               <Label id="mat-audiencia-label">Quem recebe</Label>
-              <Select name="audiencia" defaultValue="todos" items={AUDIENCIA_LABEL}>
+              <Select
+                name="audiencia"
+                defaultValue="todos"
+                items={AUDIENCIA_LABEL}
+                onValueChange={(v) => setAudiencia(v ?? "todos")}
+              >
                 <SelectTrigger id="mat-audiencia-select" aria-labelledby="mat-audiencia-label mat-audiencia-select"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {Object.entries(AUDIENCIA_LABEL).map(([v, l]) => (
@@ -202,9 +213,10 @@ export function NovoMaterialDialog({ maxEncontro }: { maxEncontro: number }) {
           </fieldset>
           <div className="space-y-2">
             <Label htmlFor="encontro_num">Encontro relacionado</Label>
-            <Input id="encontro_num" name="encontro_num" type="number" min={1} max={maxEncontro} inputMode="numeric" placeholder="-" />
+            <Input id="encontro_num" name="encontro_num" type="number" min={1} max={maxEncontroSel} inputMode="numeric" placeholder="-" />
             <p className="text-xs text-muted-foreground">
-              Opcional — agrupa o material na seção daquele encontro na biblioteca.
+              Opcional — agrupa o material na seção daquele encontro na biblioteca
+              {audiencia === "especialista" ? " (trilha de 5)" : ""}.
             </p>
           </div>
           <Button type="submit" className="w-full" disabled={pending}>

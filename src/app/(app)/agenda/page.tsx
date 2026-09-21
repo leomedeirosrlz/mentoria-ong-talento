@@ -1,7 +1,13 @@
 import type { Metadata } from "next";
-import { getCicloEventos, getDuplas, getMe } from "@/lib/queries";
+import {
+  getCicloEventos,
+  getDuplas,
+  getEspecialistaEventos,
+  getMe,
+} from "@/lib/queries";
 import { eventoDaSemana, toDateStr, totalEncontros } from "@/lib/ciclo";
 import { AgendaCalendario } from "@/components/agenda-calendario";
+import { AgendaEspecialista } from "@/components/agenda-especialista";
 
 export const metadata: Metadata = { title: "Agenda do ciclo" };
 
@@ -23,6 +29,17 @@ export default async function AgendaPage({
   const agora = new Date();
   const hoje = toDateStr(agora);
   const semana = eventoDaSemana(eventos, agora);
+  const temEspecialista = duplas.some((d) => d.trilha === "especialista");
+  const espEventos = temEspecialista ? await getEspecialistaEventos() : [];
+  // mentor cuja única trilha é a especialista não tem calendário de terças —
+  // a agenda dele é a fila combinada da própria dupla, não o ciclo DPP
+  const soEspecialista =
+    me?.role === "mentor_especialista" &&
+    duplas.length > 0 &&
+    duplas.every((d) => d.trilha === "especialista");
+
+  if (soEspecialista)
+    return <AgendaEspecialista duplas={duplas} espEventos={espEventos} />;
 
   return (
     <div className="space-y-6">
@@ -53,6 +70,7 @@ export default async function AgendaPage({
       ) : (
         <AgendaCalendario
           eventos={eventos}
+          espEventos={espEventos}
           hoje={hoje}
           semanaId={semana?.id ?? null}
           diaInicial={diaInicial}
