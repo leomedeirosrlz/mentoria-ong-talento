@@ -201,8 +201,8 @@ export function NovaDuplaDialog() {
             </Select>
             {ehEsp && (
               <p className="text-xs text-muted-foreground">
-                Trilha especialista — até 5 encontros de 1h em até 3 meses, com
-                datas combinadas pela dupla (sem calendário fixo).
+                Mentoria especializada — até 5 encontros de 1h em até 3 meses,
+                com datas combinadas pela dupla (sem calendário fixo).
               </p>
             )}
             {mentores.length === 0 && (
@@ -263,7 +263,7 @@ export function NovaDuplaDialog() {
           )}
           {ehEsp && (
             <div className="space-y-2">
-              <Label htmlFor="demanda">Demanda (opcional)</Label>
+              <Label htmlFor="demanda">Contexto (opcional)</Label>
               <Textarea
                 id="demanda"
                 name="demanda"
@@ -281,7 +281,7 @@ export function NovaDuplaDialog() {
             <p className="text-xs text-muted-foreground">
               {ehEsp
                 ? "Deixe em branco se a mentoria está começando agora — a dupla nasce hoje."
-                : "Deixe em branco se a dupla já existia desde o início do ciclo. Se ela está começando agora, use a data de hoje."}
+                : "Deixe em branco se a dupla já existia desde o início do programa. Se ela está começando agora, use a data de hoje."}
             </p>
           </div>
           <Button type="submit" className="w-full" disabled={pending}>

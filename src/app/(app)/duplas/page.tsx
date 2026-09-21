@@ -29,7 +29,7 @@ export default async function DuplasPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Duplas</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            {lista.length} {lista.length === 1 ? "dupla" : "duplas"} no ciclo 2026/2027
+            {lista.length} {lista.length === 1 ? "dupla" : "duplas"} no programa 2026/2027
           </p>
         </div>
         {me.role === "coordenacao" && (

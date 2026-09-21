@@ -98,14 +98,14 @@ export function SolicitarEspecialistaDialog({
         <DialogHeader>
           <DialogTitle>Solicitar mentor especialista</DialogTitle>
           <DialogDescription>
-            A demanda vai pro mural dos especialistas — quem aceitar vira uma
+            O pedido aparece na lista dos especialistas — quem aceitar vira uma
             dupla de até 5 encontros com o jovem.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={submit} className="space-y-4">
           <div className="space-y-2">
             <div className="flex items-baseline justify-between gap-2">
-              <Label htmlFor="demanda">Demanda</Label>
+              <Label htmlFor="demanda">Contexto</Label>
               <span
                 aria-hidden
                 className="text-xs tabular-nums text-muted-foreground"

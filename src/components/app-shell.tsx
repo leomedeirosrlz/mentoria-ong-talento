@@ -25,7 +25,7 @@ const NAV = [
   { href: "/", label: "Visão geral", curto: "Início", icon: ChartLineUp, roles: null },
   { href: "/duplas", label: "Duplas", curto: "Duplas", icon: UserCircle, roles: ["coordenacao", "supervisor", "mentor_dpp", "mentor_especialista"] },
   { href: "/registros", label: "Registros", curto: "Registros", icon: ClipboardText, roles: ["coordenacao", "supervisor"] },
-  { href: "/agenda", label: "Agenda do ciclo", curto: "Agenda", icon: CalendarDots, roles: null },
+  { href: "/agenda", label: "Agenda", curto: "Agenda", icon: CalendarDots, roles: null },
   { href: "/materiais", label: "Materiais", curto: "Materiais", icon: FolderOpen, roles: null },
   { href: "/pessoas", label: "Pessoas", curto: "Pessoas", icon: UsersThree, roles: ["coordenacao"] },
 ] as const;

@@ -140,7 +140,7 @@ export default async function PessoaPerfilPage({
 
       <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
         <section className="rounded-xl bg-card p-4 shadow-[var(--shadow-border)] sm:p-5">
-          <h2 className="mb-3 text-sm font-semibold">Mural de notas</h2>
+          <h2 className="mb-3 text-sm font-semibold">Notas</h2>
           <PessoaMural
             pessoaId={p.id}
             tipo={perfil.tipo}

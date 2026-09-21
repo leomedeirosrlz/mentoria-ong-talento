@@ -675,7 +675,7 @@ export async function updateDupla(duplaId: string, formData: FormData) {
       .select("id", { count: "exact", head: true })
       .eq("dupla_id", duplaId);
     if ((count ?? 0) > 0) {
-      return { error: "A trilha não pode mudar — a dupla já tem encontros." };
+      return { error: "O tipo de mentoria não pode mudar — a dupla já tem encontros." };
     }
   }
   // dupla de especialista não tem supervisor — null forçado, nunca confia no form
@@ -700,7 +700,7 @@ export async function updateDupla(duplaId: string, formData: FormData) {
         .neq("id", duplaId)
         .limit(1);
       if (emDupla?.length) {
-        return { error: "Esse mentorado já está em uma dupla ativa ou pausada nessa trilha." };
+        return { error: "Esse mentorado já está em uma dupla ativa ou pausada nesse tipo de mentoria." };
       }
     }
     if (voltando || mentor_id !== atualDupla.mentor_id) {
@@ -770,8 +770,8 @@ export async function updateDupla(duplaId: string, formData: FormData) {
         tipo: "dupla_formada",
         titulo: "Sua dupla mudou de mentor",
         corpo: nomeMd
-          ? `A dupla com ${nomeMd} segue com outro mentor — a coordenação reorganizou o ciclo.`
-          : "A coordenação reorganizou o ciclo.",
+          ? `A dupla com ${nomeMd} segue com outro mentor — a coordenação reorganizou as duplas.`
+          : "A coordenação reorganizou as duplas.",
         href: "/",
       } : null,
       atualDupla.supervisor_id && supervisorFinal !== atualDupla.supervisor_id ? {
@@ -780,21 +780,21 @@ export async function updateDupla(duplaId: string, formData: FormData) {
         titulo: "Dupla saiu da sua supervisão",
         corpo: nomeMd
           ? `A dupla com ${nomeMd} passou pra outro supervisor.`
-          : "A coordenação reorganizou o ciclo.",
+          : "A coordenação reorganizou as duplas.",
         href: "/",
       } : null,
       mudouStatus ? {
         profile_id: mentor_id,
         tipo: "dupla_formada",
         titulo: status === "pausada" ? "Sua dupla foi pausada" : "Sua dupla foi encerrada",
-        corpo: "A coordenação atualizou o ciclo — fale com ela se tiver dúvidas.",
+        corpo: "A coordenação atualizou a sua dupla — fale com ela se tiver dúvidas.",
         href: `/duplas/${duplaId}`,
       } : null,
       mudouStatus && supervisorFinal ? {
         profile_id: supervisorFinal,
         tipo: "dupla_formada",
         titulo: status === "pausada" ? "Dupla supervisionada pausada" : "Dupla supervisionada encerrada",
-        corpo: nomeMd ? `A dupla com ${nomeMd} — a coordenação atualizou o ciclo.` : null,
+        corpo: nomeMd ? `A dupla com ${nomeMd} — a coordenação fez a alteração.` : null,
         href: `/duplas/${duplaId}`,
       } : null,
     ].filter((r): r is NonNullable<typeof r> => r !== null), eu.id);
@@ -964,7 +964,7 @@ export async function agendarEncontro(formData: FormData) {
   // a regra "a dupla agenda" mora na action, não só na UI — a RLS deixaria
   // a coord escrever (policy larga pra correções), então o contrato é aqui
   if (eu.role === "coordenacao") {
-    return { error: "Quem agenda é a dupla — a coordenação acompanha pelo semáforo." };
+    return { error: "Quem agenda é a dupla — a coordenação acompanha o andamento." };
   }
   const dupla_id = String(formData.get("dupla_id") ?? "");
   const numero = Number(formData.get("numero"));
@@ -1008,7 +1008,7 @@ export async function agendarEncontro(formData: FormData) {
           .eq("tipo", "encontro").order("numero", { ascending: false }).limit(1).maybeSingle()
       ).data?.numero ?? 16;
   if (!Number.isInteger(numero) || numero < 1 || numero > maxNum) {
-    return { error: "Escolha um encontro da trilha." };
+    return { error: "Escolha um encontro da lista." };
   }
 
   // remarcação de verdade = a data mudou; salvar de novo com a mesma data
@@ -1111,7 +1111,7 @@ export async function registrarEncontroRetroativo(
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada — entre de novo." };
   if (eu.role === "coordenacao") {
-    return { error: "O registro é do mentor — a coordenação acompanha pelo semáforo." };
+    return { error: "O registro é do mentor — a coordenação acompanha o andamento." };
   }
   if (!duplaId || !numero || !dataHora) return { error: "Encontro e data são obrigatórios." };
 
@@ -1136,7 +1136,7 @@ export async function registrarEncontroRetroativo(
         .eq("tipo", "encontro").order("numero", { ascending: true });
   const maxNum = ehEspecialista ? maxEncontros("especialista") : evs?.at(-1)?.numero ?? 16;
   if (!Number.isInteger(numero) || numero < 1 || numero > maxNum) {
-    return { error: "Escolha um encontro da trilha." };
+    return { error: "Escolha um encontro da lista." };
   }
   const piso = d.iniciada_em ?? evs?.[0]?.data ?? null;
   if (piso && quando < new Date(`${piso}T00:00:00-03:00`)) {
@@ -1182,7 +1182,7 @@ export async function salvarRegistro(formData: FormData) {
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada — entre de novo." };
   if (eu.role === "coordenacao") {
-    return { error: "O registro é do mentor — a coordenação acompanha pelo semáforo." };
+    return { error: "O registro é do mentor — a coordenação acompanha o andamento." };
   }
   const encontro_id = String(formData.get("encontro_id") ?? "");
   const dupla_id = String(formData.get("dupla_id") ?? "");
@@ -1377,7 +1377,7 @@ export async function salvarNotaEncontro(duplaId: string, numero: number, texto:
           .eq("tipo", "encontro").order("numero", { ascending: false }).limit(1).maybeSingle()
       ).data?.numero ?? 16;
   if (!Number.isInteger(numero) || numero < 1 || numero > maxNum) {
-    return { error: "Escolha um encontro da trilha." };
+    return { error: "Escolha um encontro da lista." };
   }
 
   const limpo = texto.trim();
@@ -1593,7 +1593,7 @@ export async function salvarMaterial(formData: FormData) {
     encontroRaw &&
     (!Number.isInteger(encontroNum) || encontroNum! < 1 || encontroNum! > maxNumMat)
   ) {
-    return { error: "Escolha um encontro do ciclo." };
+    return { error: "Escolha um encontro do programa." };
   }
   // material criado à mão entra depois dos oficiais — ordem era sempre 0
   const { data: maxOrd } = await supabase
@@ -1640,7 +1640,7 @@ export async function editarMaterial(id: string, formData: FormData) {
     encontroRaw &&
     (!Number.isInteger(encontroNum) || encontroNum! < 1 || encontroNum! > maxNumMat)
   ) {
-    return { error: "Escolha um encontro do ciclo." };
+    return { error: "Escolha um encontro do programa." };
   }
   const { data, error } = await supabase
     .from("materiais")

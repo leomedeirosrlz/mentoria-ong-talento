@@ -53,7 +53,7 @@ const SECOES: { titulo: string; corpo: React.ReactNode }[] = [
         <ul className="list-disc space-y-1 pl-5">
           <li>Operar o programa de mentoria: formação de duplas, agenda de encontros e acompanhamento</li>
           <li>Permitir a comunicação entre mentor, mentorado e coordenação (inclusive por WhatsApp)</li>
-          <li>Registrar evidências e produzir relatórios e prestações de contas do ciclo</li>
+          <li>Registrar evidências e produzir relatórios e prestações de contas do programa</li>
           <li>Cumprir obrigações legais e regulatórias</li>
         </ul>
       </>

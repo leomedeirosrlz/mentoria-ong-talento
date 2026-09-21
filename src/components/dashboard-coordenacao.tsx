@@ -293,7 +293,7 @@ export function DashboardCoordenacao({
                     <Link href="/duplas" className="underline underline-offset-2">
                       monte as duplas
                     </Link>{" "}
-                    do ciclo.
+                    do programa.
                   </>
                 )}
               </p>

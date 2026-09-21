@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
     .maybeSingle();
   if (me?.role !== "coordenacao") {
     return NextResponse.json(
-      { error: "Só a coordenação pode exportar o relatório do ciclo." },
+      { error: "Só a coordenação pode exportar o relatório do programa." },
       { status: 403 }
     );
   }

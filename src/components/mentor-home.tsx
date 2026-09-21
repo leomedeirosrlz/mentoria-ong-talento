@@ -142,7 +142,7 @@ export function MentorHome({
                   </span>
                   {ehEsp && (
                     <span className="text-[11px] uppercase tracking-wider text-white/50">
-                      Trilha especialista
+                      Mentoria especializada
                     </span>
                   )}
                   {!ativa && (
@@ -215,11 +215,11 @@ export function MentorHome({
                     <p className="font-medium text-muted-foreground">
                       {dupla.status === "pausada"
                         ? "Dupla pausada. A coordenação retoma quando for a hora."
-                        : "Ciclo encerrado. Agradecemos pela jornada!"}
+                        : "Dupla encerrada. Agradecemos pela jornada!"}
                     </p>
                   ) : cicloCompleto ? (
                     <p className="font-medium">
-                      {totalDupla} encontros {ehEsp ? "da trilha" : "do ciclo"} concluídos.
+                      {totalDupla} encontros concluídos.
                     </p>
                   ) : proximoAgendado ? (
                     <>

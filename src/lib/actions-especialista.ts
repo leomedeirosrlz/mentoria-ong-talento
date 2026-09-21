@@ -62,7 +62,7 @@ export async function criarSolicitacao(formData: FormData) {
 
   if (!dupla_dpp_id) return { error: "Dupla não informada." };
   if (demanda.length < 10 || demanda.length > 1000) {
-    return { error: "Descreva a demanda em 10 a 1.000 caracteres." };
+    return { error: "Descreva o contexto em 10 a 1.000 caracteres." };
   }
 
   // a dupla de origem precisa ser DPP e estar ativa — a solicitação nasce da
@@ -79,7 +79,7 @@ export async function criarSolicitacao(formData: FormData) {
     return { error: "Só o mentor da dupla ou a coordenação podem pedir um especialista." };
   }
   if ((dupla.trilha ?? "dpp") !== "dpp") {
-    return { error: "A solicitação de especialista parte da trilha DPP." };
+    return { error: "Só dá pra pedir um especialista a partir de uma dupla DPP." };
   }
   if (dupla.status !== "ativa") {
     return { error: "A dupla precisa estar ativa para pedir um especialista." };
@@ -135,7 +135,7 @@ export async function criarSolicitacao(formData: FormData) {
       ...(esps.data ?? []).map((d: { id: string }) => ({
         profile_id: d.id,
         tipo: "demanda_especialista",
-        titulo: "Nova demanda de mentoria especialista",
+        titulo: "Novo pedido de mentoria especializada",
         corpo: resumo(demanda),
         href: "/",
       })),
@@ -188,8 +188,8 @@ export async function aceitarSolicitacao(solicitacaoId: string) {
       {
         profile_id: s?.created_by,
         tipo: "especialista_aceitou",
-        titulo: "Um especialista aceitou a demanda",
-        corpo: `${eu.nome} vai mentorar essa trilha.`,
+        titulo: "Um especialista aceitou o pedido",
+        corpo: `${eu.nome} vai mentorar esse jovem.`,
         href: `/duplas/${s?.dupla_dpp_id}`,
       },
       // a coordenação gerencia: link direto pra dupla recém-nascida. Quem
@@ -199,7 +199,7 @@ export async function aceitarSolicitacao(solicitacaoId: string) {
         .map((c: { id: string }) => ({
           profile_id: c.id,
           tipo: "especialista_aceitou",
-          titulo: "Demanda de especialista aceita",
+          titulo: "Pedido de especialista aceito",
           corpo: `${eu.nome} assumiu — a dupla foi criada.`,
           href: `/duplas/${duplaId}`,
         })),

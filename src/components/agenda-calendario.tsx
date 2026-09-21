@@ -14,12 +14,18 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
 import {
+  ArrowSquareOut,
   ArrowUpRight,
+  BookOpen,
   CaretLeft,
   CaretRight,
   ClockCounterClockwise,
+  File,
+  FileText,
   Flag,
   GraduationCap,
+  LinkSimple,
+  PuzzlePiece,
   Users,
   VideoCamera,
 } from "@phosphor-icons/react";
@@ -31,6 +37,7 @@ import { RegistroForm } from "@/components/registro-form";
 import { EncontroDetalheDialog } from "@/components/encontro-detalhe-dialog";
 import { RevelarApos } from "@/components/revelar-apos";
 import { fade, T } from "@/components/motion";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -56,6 +63,7 @@ import type {
   Encontro,
   EncontroStatus,
   EspecialistaEvento,
+  Material,
 } from "@/lib/types";
 import { cn, normaliza } from "@/lib/utils";
 
@@ -343,6 +351,7 @@ function ChaveDotsDupla({ className }: { className?: string }) {
 export function AgendaCalendario({
   eventos,
   espEventos = [],
+  materiais = [],
   hoje,
   semanaId,
   diaInicial,
@@ -353,6 +362,9 @@ export function AgendaCalendario({
   /** Passos da trilha especialista — resolve a "sugestão do guia" das duplas
    *  dela (o nº 1–5 não bate com nenhum evento do ciclo DPP). */
   espEventos?: EspecialistaEvento[];
+  /** Materiais visíveis pro papel (audiência já filtrada na page) — a seção
+   *  "Materiais do encontro" do detalhe do dia lê os que têm encontro_num. */
+  materiais?: Material[];
   hoje: string;
   semanaId: string | null;
   /** ?dia= da URL — sobrepõe a heurística "semana atual senão hoje". */
@@ -406,6 +418,16 @@ export function AgendaCalendario({
         .sort((a, b) => (a.numero ?? 0) - (b.numero ?? 0)),
     [eventos]
   );
+
+  // nº do encontro → materiais que o guia pede pra ele (na ordem da biblioteca,
+  // que já vem por `ordem`); sem encontro_num o material não é de encontro
+  const materiaisPorNumero = useMemo(() => {
+    const mapa = new Map<number, Material[]>();
+    for (const m of materiais)
+      if (m.encontro_num != null)
+        mapa.set(m.encontro_num, [...(mapa.get(m.encontro_num) ?? []), m]);
+    return mapa;
+  }, [materiais]);
 
   // nº → passo do guia por trilha — a "sugestão do guia" do form de registro
   // e do detalhe. Especialista (1–5) não bate com nenhum evento do ciclo DPP:
@@ -771,7 +793,7 @@ export function AgendaCalendario({
             de disco das células, conector lime só no trecho já percorrido */}
         {encontrosRail.length >= 2 && (
           <nav
-            aria-label="Encontros do ciclo"
+            aria-label="Encontros da jornada"
             className="border-b px-3 pb-1.5 pt-2 sm:px-4"
           >
             <div className="scroll-fina flex items-center overflow-x-auto pb-1">
@@ -877,7 +899,7 @@ export function AgendaCalendario({
                   const rotuloDia =
                     (doDia.length > 0
                       ? `${doDia.map(descricaoEvento).join(" e ")}, ${fmtCompleta.format(parseDia(iso))}`
-                      : `${fmtCompleta.format(parseDia(iso))}, sem eventos do ciclo`) +
+                      : `${fmtCompleta.format(parseDia(iso))}, sem eventos oficiais`) +
                     (duplasDoDia.length > 0
                       ? `, ${resumoEncontrosDupla(duplasDoDia)}`
                       : "");
@@ -1075,7 +1097,7 @@ export function AgendaCalendario({
             {eventosSelecionados.length === 0 ? (
               <div className="mt-3">
                 <p className="text-sm text-muted-foreground">
-                  Nenhum evento do ciclo neste dia.
+                  Nenhum evento oficial neste dia.
                 </p>
                 {proximoDiaIso && (
                   <button
@@ -1086,7 +1108,7 @@ export function AgendaCalendario({
                     }}
                     className="mt-1 block w-full rounded-md py-3 text-left text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
-                    Próximo evento do ciclo:{" "}
+                    Próximo evento oficial:{" "}
                     <span className="font-medium text-foreground">
                       {descricaoEvento(porDia.get(proximoDiaIso)![0])} ·{" "}
                       {diaCompacto(proximoDiaIso)}
@@ -1102,6 +1124,12 @@ export function AgendaCalendario({
                       ? `${e.numero}º encontro · ${e.titulo}`
                       : e.titulo;
                   const tipoJaDito = tipoDitoNoNome(e.tipo, nomeEvento);
+                  // materiais que o guia pede pra este encontro (por nº) — a
+                  // seção só renderiza quando existe o que mostrar
+                  const materiaisDoEncontro =
+                    e.tipo === "encontro" && e.numero != null
+                      ? (materiaisPorNumero.get(e.numero) ?? [])
+                      : [];
                   return (
                   <div key={e.id} className="space-y-1.5">
                     <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
@@ -1136,6 +1164,20 @@ export function AgendaCalendario({
                           {e.instrumentos.join(", ")}
                         </span>
                       </p>
+                    )}
+                    {/* materiais que o guia pede pro encontro — sem material,
+                        o bloco não renderiza (nada de seção vazia) */}
+                    {materiaisDoEncontro.length > 0 && (
+                      <div className="pt-1.5">
+                        <h3 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                          Materiais do encontro
+                        </h3>
+                        <ul className="mt-0.5">
+                          {materiaisDoEncontro.map((m) => (
+                            <MaterialDoEncontro key={m.id} m={m} />
+                          ))}
+                        </ul>
+                      </div>
                     )}
                     {/* cobertura do encontro oficial entre as duplas — só coord/supervisor */}
                     {ehCoordSup &&
@@ -1774,6 +1816,84 @@ function EncontroDuplaRow({
               )}
           {chamada}
         </div>
+      )}
+    </li>
+  );
+}
+
+// ===== materiais do encontro (detalhe do dia) =====
+
+const MATERIAL_ICONE = {
+  guia: BookOpen,
+  template: FileText,
+  conteudo: PuzzlePiece,
+  link: LinkSimple,
+} as const;
+
+// nome legível do tipo — os ícones são decorativos, este texto é o
+// equivalente pra leitor de tela (mesma convenção de /materiais)
+const MATERIAL_TIPO_LABEL = {
+  guia: "guia",
+  template: "modelo",
+  conteudo: "conteúdo",
+  link: "link",
+} as const;
+
+/** Linha de material no detalhe do dia — mesma gramática da row de
+ *  /materiais (ícone por tipo, arquivo oficial > url externa > "em breve"),
+ *  enxuta pro painel estreito. Duplicada de propósito: a row de /materiais
+ *  carrega badge de audiência e ações de coordenação que não pertencem aqui. */
+function MaterialDoEncontro({ m }: { m: Material }) {
+  const Icone = MATERIAL_ICONE[m.tipo];
+  // arquivo oficial ganha da url externa; sem os dois, o material ainda não chegou
+  const href = m.path ? `/api/material/${m.id}` : m.url;
+  const inner = (
+    <>
+      <Icone size={16} className="shrink-0 text-muted-foreground" aria-hidden />
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-medium">{m.titulo}</span>
+        {m.descricao && (
+          <span className="mt-0.5 line-clamp-2 block text-xs text-muted-foreground">
+            {m.descricao}
+          </span>
+        )}
+        <span className="sr-only">
+          {MATERIAL_TIPO_LABEL[m.tipo]}
+          {m.path ? " — arquivo" : m.url && m.tipo !== "link" ? " — link externo" : ""}
+          {href ? " (abre em nova aba)" : ""}
+        </span>
+      </span>
+      {m.path ? (
+        // path aceita imagem além de PDF — ícone genérico de arquivo
+        <File size={14} className="shrink-0 text-muted-foreground" aria-hidden />
+      ) : m.url ? (
+        <ArrowSquareOut size={14} className="shrink-0 text-muted-foreground" aria-hidden />
+      ) : (
+        // sem destino: "a caminho" é estado legítimo — a row não vira link
+        // nem ganha hover pra não parecer clicável/quebrado
+        <Badge variant="outline" className="shrink-0 text-xs text-muted-foreground">
+          em breve
+        </Badge>
+      )}
+    </>
+  );
+  const classeRow = "flex min-w-0 items-center gap-2.5 rounded-lg px-2 py-2";
+  return (
+    <li>
+      {href ? (
+        <a
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={cn(
+            classeRow,
+            "transition-colors hover:bg-muted/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          )}
+        >
+          {inner}
+        </a>
+      ) : (
+        <div className={classeRow}>{inner}</div>
       )}
     </li>
   );

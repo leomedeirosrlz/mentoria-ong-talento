@@ -127,11 +127,11 @@ export function TrilhaJornada({
 
   const caption =
     statusDupla === "pausada"
-      ? "Jornada pausada — a trilha segue onde a dupla parou."
+      ? "Jornada pausada — ela retoma de onde a dupla parou."
       : statusDupla === "encerrada"
-        ? "Ciclo encerrado — a trilha guarda o que aconteceu."
+        ? "Dupla encerrada — a jornada guarda o que aconteceu."
         : jornada.completa
-          ? `Ciclo completo — ${jornada.total} encontros realizados.`
+          ? `Jornada concluída — ${jornada.total} encontros realizados.`
           : null;
 
   return (
@@ -238,7 +238,7 @@ export function TrilhaJornada({
         {jornada.janelaCortada && (
           <>
             {" "}
-            · a trilha conta a partir do início da dupla
+            · a contagem começa no início da dupla
             {inicioDupla ? ` (${formatDate(inicioDupla)})` : ""}
           </>
         )}

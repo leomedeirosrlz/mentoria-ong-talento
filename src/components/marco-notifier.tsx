@@ -23,13 +23,13 @@ function textoMarco(marco: MarcoJornada, feitos: number, total: number) {
       return {
         titulo: "Reta final",
         descricao: faltam === 1
-          ? "Falta só 1 encontro pra fechar o ciclo."
-          : `Faltam só ${faltam} encontros pra fechar o ciclo.`,
+          ? "Falta só 1 encontro pra fechar a jornada."
+          : `Faltam só ${faltam} encontros pra fechar a jornada.`,
       };
     }
     case "completo":
       return {
-        titulo: "Ciclo completo",
+        titulo: "Jornada completa",
         descricao: `${total} encontros realizados — jornada concluída.`,
       };
   }

@@ -2,11 +2,21 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import type { CSSProperties } from "react";
-import { LinkBreak, MagnifyingGlass, Student, UsersThree } from "@phosphor-icons/react";
+import type { CSSProperties, ReactNode } from "react";
+import {
+  CaretDown,
+  FileText,
+  GraduationCap,
+  LinkBreak,
+  MagnifyingGlass,
+  Student,
+  Users,
+  UsersThree,
+  type Icon,
+} from "@phosphor-icons/react";
 import type { Mentorado, Profile } from "@/lib/types";
 import type { MentorProfile } from "@/lib/queries";
-import { normaliza } from "@/lib/utils";
+import { cn, normaliza } from "@/lib/utils";
 import { avatarPublicUrl } from "@/lib/avatar";
 import { Avatar } from "@/components/avatar";
 import { PessoaActions } from "@/components/pessoa-actions";
@@ -69,7 +79,7 @@ export function PessoasListas({
       )
     : mentorados;
 
-  // matching board: "Sem dupla" deixa só mentores e mentorados livres pra parear
+  // matching board: "Livres para dupla" deixa só mentores e mentorados livres pra parear
   const livres =
     pessoas.filter((p) => ehMentor(p) && !emDupla.has(p.id)).length +
     mentorados.filter((m) => !emDupla.has(m.id)).length;
@@ -110,7 +120,7 @@ export function PessoasListas({
               : "border-border text-muted-foreground hover:text-foreground")
           }
         >
-          Sem dupla
+          Livres para dupla
           <span className="font-mono text-[11px]">{livres}</span>
         </button>
       </div>
@@ -163,94 +173,17 @@ export function PessoasListas({
               )}
             </div>
           )}
-          {pessoasFiltradas.map((p, i) => {
-            const mp = mentorProfiles[p.id];
-            // mentor sem linha em mentor_profiles vale capacidade 1 (mesma regra do createDupla)
-            const capacidade = mp?.capacidade ?? 1;
-            const vagas = contagemPorMentor[p.id] ?? 0;
-            const cheio = vagas >= capacidade;
-            // pendências do mentor consolidadas num badge warn só (HH-2, máx 2/row)
-            const pendencias = [
-              ...(mp?.termo_ok ? [] : ["termo"]),
-              ...(mp?.formacao_ok ? [] : ["formação"]),
-            ];
-            return (
-              <div
-                key={p.id}
-                className="animate-enter flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3.5 sm:px-5"
-                style={{ "--i": Math.min(i, 10) } as CSSProperties}
-              >
-                {/* um Link só engloba avatar+nome+meta — tabstop único e alvo
-                    de toque maior; aria-label pro nome acessível não virar
-                    "Nome email +55…" (o Avatar já é aria-hidden) */}
-                <Link
-                  href={`/pessoas/${p.id}`}
-                  aria-label={`Abrir perfil de ${p.nome}`}
-                  className="group -my-1.5 flex min-w-0 flex-1 basis-48 items-center gap-3 rounded-lg py-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                  <Avatar
-                    nome={p.nome}
-                    src={p.avatar_path ? avatarPublicUrl(p.avatar_path) : null}
-                    size={32}
-                  />
-                  <span className="min-w-0">
-                    <span className="block truncate text-sm font-medium underline-offset-4 transition-colors group-hover:underline">
-                      {p.nome}
-                    </span>
-                    <span className="block truncate text-xs text-muted-foreground">
-                      {p.email}
-                      {p.whatsapp ? ` · ${formatarWhatsApp(p.whatsapp)}` : ""}
-                    </span>
-                  </span>
-                </Link>
-                {!p.ativo && (
-                  <Badge variant="outline" className="text-xs shrink-0 border-[var(--danger)]/50 text-[var(--danger)]">
-                    inativa
-                  </Badge>
-                )}
-                {p.ativo && !p.user_id && (
-                  <Badge variant="outline" className="text-xs shrink-0">ainda não entrou</Badge>
-                )}
-                {/* pra mentor o contador vagas/capacidade já diz "em dupla" —
-                    o badge só aparece quando o contador não cobriria (vagas 0) */}
-                {emDupla.has(p.id) && !(ehMentor(p) && vagas > 0) && (
-                  <Badge variant="outline" className="text-xs shrink-0">em dupla</Badge>
-                )}
-                {ehMentor(p) && (
-                  <>
-                    {/* sem badge "especialista": o seletor de papel na mesma
-                        linha já diz "mentor especialista" (mp.tipo é derivado
-                        de role) — a palavra não se repete */}
-                    <Badge
-                      variant="outline"
-                      className={
-                        "text-[11px] shrink-0 font-mono " +
-                        (cheio ? "border-[var(--warn)]/50 text-[var(--warn-text)]" : "")
-                      }
-                    >
-                      {vagas}/{capacidade} {capacidade === 1 ? "dupla" : "duplas"}
-                    </Badge>
-                    {pendencias.length > 0 && (
-                      <Badge variant="outline" className="text-[11px] shrink-0 border-[var(--warn)]/50 text-[var(--warn-text)]">
-                        {pendencias.length === 1 ? "pendência" : "pendências"}:{" "}
-                        {pendencias.join(" · ")}
-                      </Badge>
-                    )}
-                  </>
-                )}
-                <div className="flex items-center gap-2 ml-auto">
-                  <div className="w-40">
-                    <RoleSelect profileId={p.id} role={p.role} nome={p.nome} />
-                  </div>
-                  <PessoaActions
-                    pessoa={p}
-                    // mesma guarda do server: qualquer dupla (até encerrada) bloqueia excluir
-                    podeExcluir={!p.user_id && !temQualquerDupla.has(p.id)}
-                  />
-                </div>
-              </div>
-            );
-          })}
+          {pessoasFiltradas.map((p, i) => (
+            <PessoaRow
+              key={p.id}
+              p={p}
+              indice={i}
+              emDupla={emDupla.has(p.id)}
+              podeExcluir={!p.user_id && !temQualquerDupla.has(p.id)}
+              mentorProfile={mentorProfiles[p.id]}
+              vagas={contagemPorMentor[p.id] ?? 0}
+            />
+          ))}
         </div>
       </section>
 
@@ -303,54 +236,299 @@ export function PessoasListas({
             </div>
           )}
           {mentoradosFiltrados.map((m, i) => (
-            <div
+            <MentoradoRow
               key={m.id}
-              className="animate-enter flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3.5 sm:px-5"
-              style={{ "--i": Math.min(i, 10) } as CSSProperties}
-            >
-              <Link
-                href={`/pessoas/${m.id}`}
-                aria-label={`Abrir perfil de ${m.nome}`}
-                className="group -my-1.5 flex min-w-0 flex-1 basis-48 items-center gap-3 rounded-lg py-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                <Avatar
-                  nome={m.nome}
-                  src={m.avatar_path ? avatarPublicUrl(m.avatar_path) : null}
-                  papel="mentorado"
-                  size={32}
-                />
-                <span className="min-w-0">
-                  <span className="flex items-center gap-1.5 text-sm font-medium">
-                    {!m.avatar_path && (
-                      <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-[var(--role-mentorado)]" />
-                    )}
-                    <span className="truncate underline-offset-4 transition-colors group-hover:underline">
-                      {m.nome}
-                    </span>
-                  </span>
-                  <span className="block truncate text-xs text-muted-foreground">
-                    {m.ong_origem ?? <span className="italic">sem ONG</span>}
-                    {m.whatsapp ? ` · ${formatarWhatsApp(m.whatsapp)}` : ""}
-                  </span>
-                </span>
-              </Link>
-              {emDupla.has(m.id) && (
-                <Badge variant="outline" className="text-xs shrink-0">em dupla</Badge>
-              )}
-              {/* LGPD: parear menor sem a autorização do responsável no arquivo
-                  é pendência jurídica — mesmo tratamento do "sem termo" */}
-              {!m.documento_path && (
-                <Badge variant="outline" className="text-[11px] shrink-0 border-[var(--warn)]/50 text-[var(--warn-text)]">
-                  sem autorização
-                </Badge>
-              )}
-              <div className="flex items-center gap-2 ml-auto">
-                <MentoradoActions mentorado={m} temDupla={temQualquerDupla.has(m.id)} />
-              </div>
-            </div>
+              m={m}
+              indice={i}
+              emDupla={emDupla.has(m.id)}
+              temDupla={temQualquerDupla.has(m.id)}
+            />
           ))}
         </div>
       </section>
     </>
+  );
+}
+
+/** Botão "Detalhes" com chevron — abre a região operacional da linha (vagas,
+ *  pendências, autorização), que saiu da linha principal pra não poluir a
+ *  leitura. O dot warn sinaliza "tem pendência aqui" sem devolver jargão. */
+function DetalhesTrigger({
+  aberto,
+  controlsId,
+  temPendencia,
+  onAlternar,
+}: {
+  aberto: boolean;
+  controlsId: string;
+  temPendencia: boolean;
+  onAlternar: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-expanded={aberto}
+      aria-controls={controlsId}
+      onClick={onAlternar}
+      className="inline-flex min-h-11 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:min-h-8"
+    >
+      Detalhes
+      {temPendencia && (
+        <>
+          <span aria-hidden className="size-1.5 rounded-full bg-[var(--warn)]" />
+          <span className="sr-only">(com pendências)</span>
+        </>
+      )}
+      <CaretDown
+        aria-hidden
+        size={13}
+        className={cn(
+          "transition-transform duration-150",
+          aberto && "rotate-180"
+        )}
+      />
+    </button>
+  );
+}
+
+/** Item da região "Detalhes" — ícone discreto + frase completa em linguagem
+ *  humana (o que era "pendências: termo · formação" vira uma linha por item). */
+function ItemDetalhe({
+  icone: Icone,
+  warn = false,
+  children,
+}: {
+  icone: Icon;
+  /** Pendência que pede ação — ícone e texto ganham destaque discreto. */
+  warn?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <li className="flex items-start gap-2 text-sm">
+      <Icone
+        aria-hidden
+        size={15}
+        className={cn(
+          "mt-0.5 shrink-0",
+          warn ? "text-[var(--warn-text)]" : "text-muted-foreground"
+        )}
+      />
+      <span className={warn ? undefined : "text-muted-foreground"}>
+        {children}
+      </span>
+    </li>
+  );
+}
+
+/** Região colapsável de detalhes — sempre montada com `hidden` pra que
+ *  aria-controls resolva também fechada; largura cheia abaixo da linha, segura
+ *  em 390px. */
+function DetalhesRegiao({
+  id,
+  nome,
+  aberto,
+  children,
+}: {
+  id: string;
+  /** Nome da pessoa — compõe o aria-label da região. */
+  nome: string;
+  aberto: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <div
+      id={id}
+      role="region"
+      aria-label={`Detalhes de ${nome}`}
+      hidden={!aberto}
+      className="mt-2.5 rounded-lg bg-muted/40 px-3 py-2.5"
+    >
+      <ul className="space-y-1.5">{children}</ul>
+    </div>
+  );
+}
+
+/** Linha de pessoa com acesso — avatar, nome e contexto essencial na linha;
+ *  vagas e pendências do mentor ficam na região "Detalhes" colapsável. */
+function PessoaRow({
+  p,
+  indice,
+  emDupla,
+  podeExcluir,
+  mentorProfile: mp,
+  vagas,
+}: {
+  p: Profile;
+  indice: number;
+  emDupla: boolean;
+  podeExcluir: boolean;
+  mentorProfile: MentorProfile | undefined;
+  vagas: number;
+}) {
+  const [detalhesAbertos, setDetalhesAbertos] = useState(false);
+  // mentor sem linha em mentor_profiles vale capacidade 1 (mesma regra do createDupla)
+  const capacidade = mp?.capacidade ?? 1;
+  const detalhesId = `detalhes-${p.id}`;
+  const temPendencia = ehMentor(p) && (!mp?.termo_ok || !mp?.formacao_ok);
+  return (
+    <div
+      className="animate-enter px-4 py-3.5 sm:px-5"
+      style={{ "--i": Math.min(indice, 10) } as CSSProperties}
+    >
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        {/* um Link só engloba avatar+nome+meta — tabstop único e alvo
+            de toque maior; aria-label pro nome acessível não virar
+            "Nome email +55…" (o Avatar já é aria-hidden) */}
+        <Link
+          href={`/pessoas/${p.id}`}
+          aria-label={`Abrir perfil de ${p.nome}`}
+          className="group -my-1.5 flex min-w-0 flex-1 basis-48 items-center gap-3 rounded-lg py-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <Avatar
+            nome={p.nome}
+            src={p.avatar_path ? avatarPublicUrl(p.avatar_path) : null}
+            size={32}
+          />
+          <span className="min-w-0">
+            <span className="block truncate text-sm font-medium underline-offset-4 transition-colors group-hover:underline">
+              {p.nome}
+            </span>
+            <span className="block truncate text-xs text-muted-foreground">
+              {p.email}
+              {p.whatsapp ? ` · ${formatarWhatsApp(p.whatsapp)}` : ""}
+            </span>
+          </span>
+        </Link>
+        {!p.ativo && (
+          <Badge variant="outline" className="text-xs shrink-0 border-[var(--danger)]/50 text-[var(--danger)]">
+            inativa
+          </Badge>
+        )}
+        {p.ativo && !p.user_id && (
+          <Badge variant="outline" className="text-xs shrink-0">ainda não entrou</Badge>
+        )}
+        {/* pra mentor a linha "Cuida de X de Y" em Detalhes já diz "em dupla" —
+            o badge só aparece quando ela não cobriria (vagas 0) */}
+        {emDupla && !(ehMentor(p) && vagas > 0) && (
+          <Badge variant="outline" className="text-xs shrink-0">em dupla</Badge>
+        )}
+        {/* vagas e pendências do mentor saíram da linha — ficam em "Detalhes".
+            Sem badge "especialista": o seletor de papel na mesma linha já diz
+            "mentor especialista" (mp.tipo é derivado de role) */}
+        {ehMentor(p) && (
+          <DetalhesTrigger
+            aberto={detalhesAbertos}
+            controlsId={detalhesId}
+            temPendencia={temPendencia}
+            onAlternar={() => setDetalhesAbertos((v) => !v)}
+          />
+        )}
+        <div className="flex items-center gap-2 ml-auto">
+          <div className="w-40">
+            <RoleSelect profileId={p.id} role={p.role} nome={p.nome} />
+          </div>
+          <PessoaActions
+            pessoa={p}
+            // mesma guarda do server: qualquer dupla (até encerrada) bloqueia excluir
+            podeExcluir={podeExcluir}
+          />
+        </div>
+      </div>
+      {ehMentor(p) && (
+        <DetalhesRegiao id={detalhesId} nome={p.nome} aberto={detalhesAbertos}>
+          <ItemDetalhe icone={Users}>
+            {vagas === 0
+              ? `Ainda sem dupla — ${capacidade === 1 ? "vaga para 1" : `vagas para ${capacidade}`}`
+              : `Cuida de ${vagas} de ${capacidade} ${capacidade === 1 ? "dupla" : "duplas"}`}
+          </ItemDetalhe>
+          {!mp?.termo_ok && (
+            <ItemDetalhe icone={FileText} warn>
+              Termo de responsabilidade pendente
+            </ItemDetalhe>
+          )}
+          {!mp?.formacao_ok && (
+            <ItemDetalhe icone={GraduationCap} warn>
+              Formação inicial pendente
+            </ItemDetalhe>
+          )}
+        </DetalhesRegiao>
+      )}
+    </div>
+  );
+}
+
+/** Linha de mentorado — mesma gramática da de pessoa; a autorização do
+ *  responsável (LGPD) vira frase completa em "Detalhes", não badge de jargão. */
+function MentoradoRow({
+  m,
+  indice,
+  emDupla,
+  temDupla,
+}: {
+  m: Mentorado;
+  indice: number;
+  emDupla: boolean;
+  temDupla: boolean;
+}) {
+  const [detalhesAbertos, setDetalhesAbertos] = useState(false);
+  const detalhesId = `detalhes-${m.id}`;
+  // LGPD: parear menor sem a autorização do responsável no arquivo é
+  // pendência jurídica — mesmo tratamento do "termo" do mentor
+  const semAutorizacao = !m.documento_path;
+  return (
+    <div
+      className="animate-enter px-4 py-3.5 sm:px-5"
+      style={{ "--i": Math.min(indice, 10) } as CSSProperties}
+    >
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <Link
+          href={`/pessoas/${m.id}`}
+          aria-label={`Abrir perfil de ${m.nome}`}
+          className="group -my-1.5 flex min-w-0 flex-1 basis-48 items-center gap-3 rounded-lg py-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <Avatar
+            nome={m.nome}
+            src={m.avatar_path ? avatarPublicUrl(m.avatar_path) : null}
+            papel="mentorado"
+            size={32}
+          />
+          <span className="min-w-0">
+            <span className="flex items-center gap-1.5 text-sm font-medium">
+              {!m.avatar_path && (
+                <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-[var(--role-mentorado)]" />
+              )}
+              <span className="truncate underline-offset-4 transition-colors group-hover:underline">
+                {m.nome}
+              </span>
+            </span>
+            <span className="block truncate text-xs text-muted-foreground">
+              {m.ong_origem ?? <span className="italic">sem ONG</span>}
+              {m.whatsapp ? ` · ${formatarWhatsApp(m.whatsapp)}` : ""}
+            </span>
+          </span>
+        </Link>
+        {emDupla && (
+          <Badge variant="outline" className="text-xs shrink-0">em dupla</Badge>
+        )}
+        {semAutorizacao && (
+          <DetalhesTrigger
+            aberto={detalhesAbertos}
+            controlsId={detalhesId}
+            temPendencia
+            onAlternar={() => setDetalhesAbertos((v) => !v)}
+          />
+        )}
+        <div className="flex items-center gap-2 ml-auto">
+          <MentoradoActions mentorado={m} temDupla={temDupla} />
+        </div>
+      </div>
+      {semAutorizacao && (
+        <DetalhesRegiao id={detalhesId} nome={m.nome} aberto={detalhesAbertos}>
+          <ItemDetalhe icone={FileText} warn>
+            Autorização do responsável ainda não enviada
+          </ItemDetalhe>
+        </DetalhesRegiao>
+      )}
+    </div>
   );
 }

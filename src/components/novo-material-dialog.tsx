@@ -216,7 +216,7 @@ export function NovoMaterialDialog({ maxEncontro }: { maxEncontro: number }) {
             <Input id="encontro_num" name="encontro_num" type="number" min={1} max={maxEncontroSel} inputMode="numeric" placeholder="-" />
             <p className="text-xs text-muted-foreground">
               Opcional — agrupa o material na seção daquele encontro na biblioteca
-              {audiencia === "especialista" ? " (trilha de 5)" : ""}.
+              {audiencia === "especialista" ? " (5 encontros)" : ""}.
             </p>
           </div>
           <Button type="submit" className="w-full" disabled={pending}>

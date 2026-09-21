@@ -360,7 +360,7 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
           {ehEsp && (
             <section className="rounded-xl bg-card p-4 text-sm space-y-2 shadow-[var(--shadow-border)]">
               <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                Demanda
+                Contexto
               </h2>
               {dupla.demanda ? (
                 <p className="whitespace-pre-line text-muted-foreground">
@@ -369,8 +369,8 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
               ) : (
                 <p className="text-xs italic text-muted-foreground">
                   {souCoord
-                    ? "Sem demanda registrada — edite a dupla pra descrever o contexto."
-                    : "Sem demanda registrada."}
+                    ? "Sem contexto registrado — edite a dupla pra adicionar."
+                    : "Sem contexto registrado."}
                 </p>
               )}
             </section>

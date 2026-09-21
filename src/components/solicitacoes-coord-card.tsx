@@ -45,7 +45,7 @@ export function SolicitacoesCoordCard({
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          Demandas de especialista
+          Pedidos de especialista
           {abertas.length > 0 && (
             <Badge variant="secondary">{abertas.length}</Badge>
           )}
@@ -54,7 +54,7 @@ export function SolicitacoesCoordCard({
       <CardContent>
         {abertas.length === 0 ? (
           <p className="py-2 text-sm text-muted-foreground">
-            Nenhuma demanda aberta no momento.
+            Nenhum pedido aberto no momento.
           </p>
         ) : (
           <ul className="divide-y divide-border/60">
@@ -74,7 +74,7 @@ export function SolicitacoesCoordCard({
                 </div>
                 <ConfirmDeleteButton
                   titulo="Cancelar solicitação?"
-                  descricao={`A demanda${s.mentorado?.nome ? ` de ${s.mentorado.nome}` : ""} sai do mural dos especialistas. Quem pediu é avisado.`}
+                  descricao={`O pedido${s.mentorado?.nome ? ` de ${s.mentorado.nome}` : ""} sai da lista dos especialistas. Quem pediu é avisado.`}
                   acao="Cancelar"
                   sucesso="Solicitação cancelada."
                   onConfirm={() => cancelarSolicitacao(s.id)}

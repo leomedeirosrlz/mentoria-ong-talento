@@ -67,7 +67,7 @@ export default async function MateriaisPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Materiais</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            A biblioteca oficial do ciclo — a coordenação publica ao longo do programa
+            A biblioteca oficial do programa — a coordenação publica conforme a jornada avança
           </p>
         </div>
         {/* biblioteca vazia: o CTA mora dentro do card de estado vazio, não aqui */}
@@ -84,8 +84,8 @@ export default async function MateriaisPage() {
           </p>
           <p className="text-sm text-muted-foreground">
             {ehCoord
-              ? "Publique o primeiro guia, modelo ou instrumento do ciclo."
-              : "Os guias e instrumentos do ciclo aparecem aqui quando a coordenação publicar."}
+              ? "Publique o primeiro guia, modelo ou instrumento do programa."
+              : "Os guias e instrumentos do programa aparecem aqui quando a coordenação publicar."}
           </p>
           <div className="mt-3">
             {ehCoord ? (
@@ -95,7 +95,7 @@ export default async function MateriaisPage() {
                 href="/agenda"
                 className="text-sm font-medium underline underline-offset-2 transition-colors hover:text-muted-foreground"
               >
-                Ver a agenda do ciclo
+                Ver a agenda
               </Link>
             )}
           </div>

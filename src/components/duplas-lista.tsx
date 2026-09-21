@@ -84,8 +84,8 @@ export function DuplasLista({
             <p className="mt-3 font-medium text-foreground">Nenhuma dupla formada ainda.</p>
             <p className="mt-1 text-sm text-muted-foreground">
               {podeCriar
-                ? "Monte a primeira dupla do ciclo escolhendo mentor e mentorado."
-                : "A coordenação forma as duplas no matching — elas aparecem aqui."}
+                ? "Monte a primeira dupla do programa escolhendo mentor e mentorado."
+                : "A coordenação monta as duplas — elas aparecem aqui."}
             </p>
             {/* vazio não é beco: o CTA real mora aqui, não só no topo da página */}
             {podeCriar && (

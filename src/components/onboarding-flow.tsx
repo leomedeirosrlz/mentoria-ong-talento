@@ -40,16 +40,16 @@ type Recurso = { icon: Icon; texto: string };
 /** "O que você pode fazer aqui" — os 4-5 pontos que mudam a rotina de cada papel. */
 const RECURSOS: Record<AppRole, Recurso[]> = {
   coordenacao: [
-    { icon: TrafficSignal, texto: "A saúde das duplas em tempo real — o semáforo mostra quem precisa de atenção." },
-    { icon: HandHeart, texto: "Pedidos de apoio e demandas de especialista chegam pra você." },
+    { icon: TrafficSignal, texto: "O andamento das duplas em tempo real — quem precisa de atenção aparece destacado." },
+    { icon: HandHeart, texto: "Pedidos de apoio e de mentoria especializada chegam pra você." },
     { icon: UsersThree, texto: "Formar duplas e gerenciar os cadastros da equipe e dos mentorados." },
-    { icon: Megaphone, texto: "Comunicados pra equipe e pra cada trilha." },
-    { icon: ChartLineUp, texto: "Exportar relatórios do ciclo." },
+    { icon: Megaphone, texto: "Comunicados pra equipe e pra cada grupo de mentores." },
+    { icon: ChartLineUp, texto: "Exportar relatórios do programa." },
   ],
   supervisor: [
     { icon: UsersThree, texto: "As duplas sob sua supervisão num lugar só." },
     { icon: NotePencil, texto: "Notas de acompanhamento na ficha de cada dupla." },
-    { icon: TrafficSignal, texto: "O semáforo de cada dupla — quem vai bem e quem precisa de atenção." },
+    { icon: TrafficSignal, texto: "O andamento de cada dupla — quem vai bem e quem precisa de atenção." },
     { icon: FolderOpen, texto: "Os materiais oficiais do programa." },
   ],
   mentor_dpp: [
@@ -60,8 +60,8 @@ const RECURSOS: Record<AppRole, Recurso[]> = {
     { icon: FolderOpen, texto: "Os materiais oficiais do programa." },
   ],
   mentor_especialista: [
-    { icon: ClipboardText, texto: "Um mural de demandas que combinam com o seu perfil." },
-    { icon: Handshake, texto: "Aceitar uma demanda e conduzir até 5 encontros." },
+    { icon: ClipboardText, texto: "Uma lista de pedidos que combinam com o seu perfil." },
+    { icon: Handshake, texto: "Aceitar um pedido e conduzir até 5 encontros." },
     { icon: NotePencil, texto: "Registrar cada encontro realizado." },
     { icon: FolderOpen, texto: "Os materiais oficiais do programa." },
   ],

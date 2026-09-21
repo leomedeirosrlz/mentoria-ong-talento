@@ -40,8 +40,8 @@ export function AgendaEspecialista({
       <header>
         <h1 className="text-2xl font-semibold tracking-tight">Agenda</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Trilha especialista · até 5 encontros de 1h em até 3 meses — as datas
-          são combinadas por vocês, sem terça oficial.
+          Mentoria especializada · até 5 encontros de 1h em até 3 meses — as
+          datas são combinadas por vocês, sem terça oficial.
         </p>
       </header>
 
@@ -74,7 +74,7 @@ export function AgendaEspecialista({
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                    Trilha especialista
+                    Mentoria especializada
                   </p>
                   <CardTitle className="mt-1 text-lg font-semibold">
                     <DuplaNomes mentor="Você" mentorado={dupla.mentorado.nome} />
@@ -142,7 +142,7 @@ export function AgendaEspecialista({
               )}
               {cicloCompleto && (
                 <p className="border-t border-border pt-4 text-sm text-muted-foreground">
-                  Trilha concluída — os 5 encontros foram realizados.
+                  Jornada concluída — os 5 encontros foram realizados.
                 </p>
               )}
             </CardContent>

@@ -241,15 +241,15 @@ export function EditarDuplaDialog({ dupla }: { dupla: Dupla }) {
             ) : (
             <>
             <div className="space-y-2">
-              <Label id="edit-trilha-label">Trilha</Label>
+              <Label id="edit-trilha-label">Tipo de mentoria</Label>
               <p className="flex h-11 items-center rounded-lg bg-muted/40 px-2.5 text-sm md:h-8">
                 {TRILHA_LABEL[dupla.trilha]}
               </p>
               <p className="text-xs text-muted-foreground">
-                Definida pelo papel do mentor
+                Definido pelo papel do mentor
                 {temEncontros
                   ? " — não muda mais, a dupla já tem encontros."
-                  : " — trocar o mentor por outro papel migra a dupla."}
+                  : " — trocar o mentor por outro papel muda o tipo."}
               </p>
             </div>
             <div className="space-y-2">
@@ -284,7 +284,7 @@ export function EditarDuplaDialog({ dupla }: { dupla: Dupla }) {
                       >
                         {m.nome} — {usadas}/{total}
                         {esp ? " · especialista" : ""}
-                        {trilhaBloqueada(m) ? " · trilha fechada" : ""}
+                        {trilhaBloqueada(m) ? " · outro tipo" : ""}
                       </SelectItem>
                     );
                   })}
@@ -343,7 +343,7 @@ export function EditarDuplaDialog({ dupla }: { dupla: Dupla }) {
                 <div className="space-y-2">
                   <Label id="edit-supervisor-label">Supervisor</Label>
                   <p className="flex h-11 items-center rounded-lg bg-muted/40 px-2.5 text-sm text-muted-foreground md:h-8">
-                    Não se aplica à trilha especialista
+                    Não se aplica à mentoria especializada
                   </p>
                 </div>
               )}
@@ -365,21 +365,21 @@ export function EditarDuplaDialog({ dupla }: { dupla: Dupla }) {
                 {/* alto impacto mas reversível: declara o efeito antes de salvar */}
                 {statusSel === "pausada" && (
                   <p className="text-xs text-muted-foreground">
-                    Pausada sai do semáforo e do acompanhamento até voltar pra Ativa —
+                    Pausada sai do acompanhamento até voltar pra Ativa —
                     pedido de apoio continua visível.
                   </p>
                 )}
                 {statusSel === "encerrada" && (
                   <p className="text-xs text-muted-foreground">
-                    Encerrada sai do semáforo e do acompanhamento — nem pedido de apoio
-                    reaparece. O histórico fica salvo e a pausa pode ser revertida reabrindo a edição.
+                    Encerrada sai do acompanhamento — nem pedido de apoio
+                    reaparece. O histórico fica salvo; pra desfazer, reabra a edição.
                   </p>
                 )}
               </div>
             </div>
             {ehEsp && (
               <div className="space-y-2">
-                <Label htmlFor="edit-demanda">Demanda</Label>
+                <Label htmlFor="edit-demanda">Contexto</Label>
                 <Textarea
                   id="edit-demanda"
                   name="demanda"

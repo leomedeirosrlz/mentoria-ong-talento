@@ -43,7 +43,7 @@ export function DemandasEspecialista({
           setAceitando(null);
           return;
         }
-        toast.success("Demanda aceita — a dupla foi criada.");
+        toast.success("Pedido aceito — a dupla foi criada.");
         router.push(`/duplas/${res.duplaId}`);
       } catch {
         toast.error("Sem conexão — tente de novo.");
@@ -53,16 +53,16 @@ export function DemandasEspecialista({
   }
 
   return (
-    <section aria-label="Demandas de mentoria especialista" className="space-y-3">
+    <section aria-label="Pedidos de mentoria especializada" className="space-y-3">
       <h2 className="flex items-center gap-2 text-lg font-semibold tracking-tight">
         <HandHeart aria-hidden className="size-5 text-muted-foreground" />
-        Demandas de especialista
+        Pedidos de especialista
       </h2>
 
       {abertas.length === 0 ? (
         <Card>
           <CardContent className="py-8 text-center text-sm text-muted-foreground">
-            Nenhuma demanda aberta no momento.
+            Nenhum pedido aberto no momento.
           </CardContent>
         </Card>
       ) : (
@@ -106,7 +106,7 @@ export function DemandasEspecialista({
                       )}
                       {pending && aceitando === s.id
                         ? "Aceitando…"
-                        : "Aceitar demanda"}
+                        : "Aceitar pedido"}
                     </Button>
                   </CardContent>
                 </Card>
