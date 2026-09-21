@@ -18,7 +18,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 
-type Opt = { id: string; nome: string };
+type Opt = { id: string; nome: string; role?: string | null };
 const NENHUM = "__nenhum";
 
 // sem items o trigger fechado mostra o value cru (UUID/enum)
@@ -212,9 +212,12 @@ export function EditarDuplaDialog({ dupla }: { dupla: Dupla }) {
                   {mentoresOrd.map((m) => {
                     const usadas = emUso[m.id] ?? 0;
                     const total = capacidade[m.id] ?? 1;
+                    // trilha especialista (5 encontros) ainda não modelada —
+                    // mover a dupla pra ela quebraria o calendário
+                    const esp = m.role === "mentor_especialista";
                     return (
-                      <SelectItem key={m.id} value={m.id} disabled={usadas >= total}>
-                        {m.nome} — {usadas}/{total}
+                      <SelectItem key={m.id} value={m.id} disabled={usadas >= total || esp}>
+                        {m.nome} — {esp ? "trilha especialista (em breve)" : `${usadas}/${total}`}
                       </SelectItem>
                     );
                   })}

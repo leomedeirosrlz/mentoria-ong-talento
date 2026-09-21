@@ -17,7 +17,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 
-type Opt = { id: string; nome: string };
+type Opt = { id: string; nome: string; role?: string | null };
 const NENHUM = "__nenhum";
 
 export function NovaDuplaDialog() {
@@ -150,9 +150,12 @@ export function NovaDuplaDialog() {
                 {mentoresOrd.map((m) => {
                   const usadas = emUso[m.id] ?? 0;
                   const total = capacidade[m.id] ?? 1;
+                  // especialista tem trilha própria de 5 encontros ainda não
+                  // modelada — bloqueado até o calendário dela existir
+                  const esp = m.role === "mentor_especialista";
                   return (
-                    <SelectItem key={m.id} value={m.id} disabled={usadas >= total}>
-                      {m.nome} — {usadas}/{total}
+                    <SelectItem key={m.id} value={m.id} disabled={usadas >= total || esp}>
+                      {m.nome} — {esp ? "trilha especialista (em breve)" : `${usadas}/${total}`}
                     </SelectItem>
                   );
                 })}

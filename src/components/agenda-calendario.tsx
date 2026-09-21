@@ -28,6 +28,7 @@ import { NotaEncontro } from "@/components/nota-encontro";
 import { AgendarEncontroDialog } from "@/components/agendar-encontro-dialog";
 import { RegistrarRetroativoDialog } from "@/components/registrar-retroativo-dialog";
 import { RegistroForm } from "@/components/registro-form";
+import { EncontroDetalheDialog } from "@/components/encontro-detalhe-dialog";
 import { RevelarApos } from "@/components/revelar-apos";
 import { fade, T } from "@/components/motion";
 import { Button } from "@/components/ui/button";
@@ -1153,6 +1154,7 @@ export function AgendaCalendario({
                       item={item}
                       selecionado={selecionado}
                       ehMentor={ehMentor}
+                      souCoord={role === "coordenacao"}
                       indice={i}
                       evento={
                         eventoPorNumero.get(item.encontro.numero) ?? null
@@ -1522,6 +1524,7 @@ function EncontroDuplaRow({
   item,
   selecionado,
   ehMentor,
+  souCoord,
   indice,
   evento,
   aberto,
@@ -1531,6 +1534,7 @@ function EncontroDuplaRow({
   item: ItemDupla;
   selecionado: string;
   ehMentor: boolean;
+  souCoord: boolean;
   indice: number;
   /** Evento oficial do nº do encontro — sugestão de tema/instrumento do form. */
   evento: CicloEvento | null;
@@ -1539,6 +1543,9 @@ function EncontroDuplaRow({
   onAlternarRegistro: (abrir: boolean) => void;
   onRegistroSalvo: () => void;
 }) {
+  // coord/sup: a linha abre o "Detalhes do encontro" — registro, plano do
+  // mentor e evidências do dia sem sair da agenda
+  const [detalheAberto, setDetalheAberto] = useState(false);
   const { encontro, dupla } = item;
   const iso = isoDoEncontro(encontro);
   // numero-match do mentor pode trazer encontro de outro dia — aí a data aparece completa
@@ -1558,9 +1565,9 @@ function EncontroDuplaRow({
   // mentor com registro pendente cai direto no card do encontro na página da
   // dupla — lá a âncora abre o RegistroInline; aqui o caminho curto é o CTA
   const href =
-    ehMentor && registroPendente
-      ? `/duplas/${dupla.id}#registrar-${encontro.id}`
-      : `/duplas/${dupla.id}`;
+    ehMentor && !registroPendente
+      ? `/duplas/${dupla.id}`
+      : `/duplas/${dupla.id}#registrar-${encontro.id}`;
 
   // combinados ainda abertos — mesmo recorte da ficha (por prazo), alimenta o
   // "marcar como feito" do form
@@ -1611,36 +1618,82 @@ function EncontroDuplaRow({
       className="animate-enter"
       style={{ "--i": Math.min(indice, 10) } as CSSProperties}
     >
-      <Link
-        href={href}
-        className="group flex min-h-11 items-center gap-2.5 rounded-lg px-2 py-2 transition-colors hover:bg-muted/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-lime)]"
-      >
-        <span
-          aria-hidden
-          className={cn("size-2 shrink-0 rounded-full", corDotEncontro(encontro))}
+      {ehMentor ? (
+        <Link
+          href={href}
+          className="group flex min-h-11 items-center gap-2.5 rounded-lg px-2 py-2 transition-colors hover:bg-muted/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-lime)]"
+        >
+          <span
+            aria-hidden
+            className={cn("size-2 shrink-0 rounded-full", corDotEncontro(encontro))}
+          />
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-sm font-medium">
+              <DuplaNomes mentor={dupla.mentor.nome} mentorado={dupla.mentorado.nome} />
+            </span>
+            <span className="block truncate text-xs text-muted-foreground">
+              {encontro.numero}º encontro · {STATUS_ENCONTRO_LABEL[encontro.status].toLowerCase()}
+              {iso
+                ? `, ${mesmoDia ? `às ${fmtHora.format(new Date(iso))}` : formatDateTime(iso)}`
+                : ", data a definir"}
+              {encontro.status === "realizado" &&
+                (encontro.registro ? (
+                  <span className="text-[var(--ok-text)]">, registro entregue</span>
+                ) : (
+                  <span className="text-[var(--warn-text)]">, registro pendente</span>
+                ))}
+            </span>
+          </span>
+          <span className="inline-flex shrink-0 items-center gap-0.5 text-xs font-medium text-muted-foreground transition-colors group-hover:text-foreground">
+            <span className="hidden sm:inline">Abrir dupla</span>
+            <ArrowUpRight aria-hidden size={13} />
+          </span>
+        </Link>
+      ) : (
+        // coord/sup não escrevem no encontro — a linha abre o detalhe do dia
+        // (registro, plano do mentor, evidências) num modal
+        <button
+          type="button"
+          onClick={() => setDetalheAberto(true)}
+          className="group flex min-h-11 w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left transition-colors hover:bg-muted/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-lime)]"
+        >
+          <span
+            aria-hidden
+            className={cn("size-2 shrink-0 rounded-full", corDotEncontro(encontro))}
+          />
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-sm font-medium">
+              <DuplaNomes mentor={dupla.mentor.nome} mentorado={dupla.mentorado.nome} />
+            </span>
+            <span className="block truncate text-xs text-muted-foreground">
+              {encontro.numero}º encontro · {STATUS_ENCONTRO_LABEL[encontro.status].toLowerCase()}
+              {iso
+                ? `, ${mesmoDia ? `às ${fmtHora.format(new Date(iso))}` : formatDateTime(iso)}`
+                : ", data a definir"}
+              {encontro.status === "realizado" &&
+                (encontro.registro ? (
+                  <span className="text-[var(--ok-text)]">, registro entregue</span>
+                ) : (
+                  <span className="text-[var(--warn-text)]">, registro pendente</span>
+                ))}
+            </span>
+          </span>
+          <span className="inline-flex shrink-0 items-center gap-0.5 text-xs font-medium text-muted-foreground transition-colors group-hover:text-foreground">
+            <span className="hidden sm:inline">Ver detalhes</span>
+            <ArrowUpRight aria-hidden size={13} />
+          </span>
+        </button>
+      )}
+      {!ehMentor && (
+        <EncontroDetalheDialog
+          encontro={encontro}
+          dupla={dupla}
+          evento={evento}
+          souCoord={souCoord}
+          open={detalheAberto}
+          onOpenChange={setDetalheAberto}
         />
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-sm font-medium">
-            <DuplaNomes mentor={dupla.mentor.nome} mentorado={dupla.mentorado.nome} />
-          </span>
-          <span className="block truncate text-xs text-muted-foreground">
-            {encontro.numero}º encontro · {STATUS_ENCONTRO_LABEL[encontro.status].toLowerCase()}
-            {iso
-              ? `, ${mesmoDia ? `às ${fmtHora.format(new Date(iso))}` : formatDateTime(iso)}`
-              : ", data a definir"}
-            {encontro.status === "realizado" &&
-              (encontro.registro ? (
-                <span className="text-[var(--ok-text)]">, registro entregue</span>
-              ) : (
-                <span className="text-[var(--warn-text)]">, registro pendente</span>
-              ))}
-          </span>
-        </span>
-        <span className="inline-flex shrink-0 items-center gap-0.5 text-xs font-medium text-muted-foreground transition-colors group-hover:text-foreground">
-          <span className="hidden sm:inline">Abrir dupla</span>
-          <ArrowUpRight aria-hidden size={13} />
-        </span>
-      </Link>
+      )}
       {/* realizado libera na hora; agendado só vira limbo quando a hora passa —
           RevelarApos cobre a aba deixada aberta atravessando o encontro, sem
           depender de re-render (mesmo padrão da ficha). O gate por

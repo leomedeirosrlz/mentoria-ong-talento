@@ -16,20 +16,17 @@ import { Avatar } from "@/components/avatar";
 import { DuplaNomes } from "@/components/dupla-nomes";
 import { VoltarLink } from "@/components/voltar-link";
 import {
-  DIFICULDADE_LABEL,
-  PROXIMO_PASSO_LABEL,
   alvoAgendamento,
   eventoDaSemana,
   formatDate,
   formatDateTime,
-  formatDiaMes,
   jornadaDaDupla,
   saudadeDaDupla,
   toDateStr,
   totalEncontros,
   waLink,
 } from "@/lib/ciclo";
-import { AvaliacaoBadge, SemaforoBadge } from "@/components/semaforo";
+import { SemaforoBadge } from "@/components/semaforo";
 import { NudgeButton } from "@/components/nudge-button";
 import { NotaEncontro } from "@/components/nota-encontro";
 import { AgendarEncontroDialog } from "@/components/agendar-encontro-dialog";
@@ -50,6 +47,7 @@ import { TrajetoriaAvaliacoes } from "@/components/trajetoria-avaliacoes";
 import { TrilhaJornada } from "@/components/trilha-jornada";
 import { MarcoNotifier } from "@/components/marco-notifier";
 import { AnexosRegistro } from "@/components/anexos-registro";
+import { RegistroView } from "@/components/registro-view";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import type { CicloEvento, Encaminhamento, Encontro, Material, RegistroAnexo } from "@/lib/types";
@@ -163,8 +161,9 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
         ativa={dupla.status === "ativa"}
         souCoord={souCoord}
         autorId={me.id}
-        // evidência: coord anexa em qualquer dupla; mentor só na própria e ativa
-        podeEditarAnexos={souCoord || (souMentor && dupla.status === "ativa")}
+        // evidência é do mentor — coord só remove (moderação), sup só lê
+        podeAnexar={souMentor && dupla.status === "ativa"}
+        podeRemoverAnexos={souCoord || (souMentor && dupla.status === "ativa")}
         anexos={(enc?.registro && anexosPorRegistro[enc.registro.id]) || []}
         materiais={(ev.numero != null && materiaisPorNumero.get(ev.numero)) || []}
         combinadosPendentes={combinadosPendentes}
@@ -400,7 +399,8 @@ function EncontroRow({
   ativa,
   souCoord,
   autorId,
-  podeEditarAnexos,
+  podeAnexar,
+  podeRemoverAnexos,
   anexos,
   materiais,
   combinadosPendentes,
@@ -415,7 +415,8 @@ function EncontroRow({
   ativa: boolean;
   souCoord: boolean;
   autorId: string;
-  podeEditarAnexos: boolean;
+  podeAnexar: boolean;
+  podeRemoverAnexos: boolean;
   anexos: RegistroAnexo[];
   materiais: Material[];
   combinadosPendentes: Encaminhamento[];
@@ -604,64 +605,19 @@ function EncontroRow({
 
       {reg && (
         <div className="border-t bg-muted/40 px-4 py-3.5 text-sm space-y-2">
-          <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-            <span>
-              Registrado em {formatDiaMes(reg.created_at)}
-              {reg.autor?.nome ? ` por ${reg.autor.nome}` : ""}
-            </span>
-            {tardio && (
-              <Badge
-                variant="outline"
-                className="border-[var(--warn)]/60 px-1.5 py-0 text-[11px] font-normal text-[var(--warn-text)]"
-              >
-                registro tardio
-              </Badge>
-            )}
-          </p>
-          {(reg.avaliacao || (reg.dificuldade && reg.dificuldade !== "nenhuma")) && (
-            <div className="flex flex-wrap items-center gap-2 pb-0.5">
-              {reg.avaliacao && <AvaliacaoBadge avaliacao={reg.avaliacao} />}
-              {reg.dificuldade && reg.dificuldade !== "nenhuma" && (
-                <Badge variant="outline" className="border-[var(--warn)]/60 text-[var(--warn-text)] text-xs">
-                  dificuldade: {DIFICULDADE_LABEL[reg.dificuldade]}
-                  {reg.dificuldade === "outro" && reg.dificuldade_detalhe
-                    ? ` (${reg.dificuldade_detalhe})`
-                    : ""}
-                </Badge>
-              )}
-            </div>
-          )}
-          {reg.atividades.length > 0 && (
-            <p>
-              <span className="text-muted-foreground">Realizado: </span>
-              {reg.atividades.join(", ")}
-            </p>
-          )}
-          {reg.tema && (
-            <p>
-              <span className="text-muted-foreground">Tema: </span>
-              {reg.tema}
-              {reg.ferramenta && <span className="text-muted-foreground"> · {reg.ferramenta}</span>}
-            </p>
-          )}
-          {reg.reflexoes && <p className="leading-relaxed">{reg.reflexoes}</p>}
-          {reg.proximo_passo && (
-            <p>
-              <span className="text-muted-foreground">Próximo passo: </span>
-              {reg.proximo_passo === "outro" && reg.proximo_passo_detalhe
-                ? reg.proximo_passo_detalhe
-                : PROXIMO_PASSO_LABEL[reg.proximo_passo]}
-            </p>
-          )}
-          {reg.observacoes && (
-            <p className="text-muted-foreground leading-relaxed">Obs: {reg.observacoes}</p>
-          )}
-          <AnexosRegistro
-            registroId={reg.id}
-            duplaId={duplaId}
-            autorId={autorId}
-            podeEditar={podeEditarAnexos}
-            anexos={anexos}
+          <RegistroView
+            reg={reg}
+            tardio={tardio}
+            anexos={
+              <AnexosRegistro
+                registroId={reg.id}
+                duplaId={duplaId}
+                autorId={autorId}
+                podeAnexar={podeAnexar}
+                podeRemover={podeRemoverAnexos}
+                anexos={anexos}
+              />
+            }
           />
           {podeEditar && encontro && (
             <div className="pt-1">

@@ -203,6 +203,15 @@ export async function createDupla(formData: FormData) {
   if (mentor?.role !== "mentor_dpp" && mentor?.role !== "mentor_especialista") {
     return { error: "A pessoa escolhida como mentor não tem papel de mentor." };
   }
+  // a trilha de especialista (5 encontros) ainda não está modelada — criar ou
+  // mover a dupla pra ela agora jogaria a dupla no calendário DPP de 16 com
+  // semáforo e sugestões errados, e corrigir depois exigiria reparo de dados
+  if (mentor?.role === "mentor_especialista") {
+    return {
+      error:
+        "A trilha de especialistas (5 encontros) ainda não está no sistema — a dupla ficaria com o calendário errado.",
+    };
+  }
   if (supervisor_id) {
     const { data: supervisor } = await supabase
       .from("profiles").select("role").eq("id", supervisor_id).single();
@@ -524,6 +533,15 @@ export async function updateDupla(duplaId: string, formData: FormData) {
     .from("profiles").select("role").eq("id", mentor_id).single();
   if (mentor?.role !== "mentor_dpp" && mentor?.role !== "mentor_especialista") {
     return { error: "A pessoa escolhida como mentor não tem papel de mentor." };
+  }
+  // a trilha de especialista (5 encontros) ainda não está modelada — criar ou
+  // mover a dupla pra ela agora jogaria a dupla no calendário DPP de 16 com
+  // semáforo e sugestões errados, e corrigir depois exigiria reparo de dados
+  if (mentor?.role === "mentor_especialista") {
+    return {
+      error:
+        "A trilha de especialistas (5 encontros) ainda não está no sistema — a dupla ficaria com o calendário errado.",
+    };
   }
   if (supervisor_id) {
     const { data: supervisor } = await supabase
@@ -1361,6 +1379,7 @@ export async function resolverApoio(registroId: string, duplaId: string) {
   }], eu.id);
   revalidatePath("/");
   revalidatePath("/duplas");
+  revalidatePath("/registros");
   revalidatePath(`/duplas/${duplaId}`);
   return { ok: true };
 }

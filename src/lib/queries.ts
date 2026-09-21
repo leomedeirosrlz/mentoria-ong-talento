@@ -1,6 +1,6 @@
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
-import type { CicloEvento, Comunicado, Dupla, DuplaResumo, DuplaStatus, Material, Mentorado, Notificacao, PessoaNota, Profile } from "./types";
+import type { AvaliacaoJovem, CicloEvento, Comunicado, Dupla, DuplaResumo, DuplaStatus, EncontroStatus, Material, Mentorado, Notificacao, PessoaNota, Profile, Registro } from "./types";
 
 // getClaims valida o JWT localmente (sem round-trip); RLS segue valendo no banco.
 export const getMe = cache(async (): Promise<Profile | null> => {
@@ -265,4 +265,134 @@ export const getComunicados = cache(async (): Promise<Comunicado[]> => {
     // supabase-js tipa join 1:1 como array — normaliza pra objeto
     autor: Array.isArray(c.autor) ? (c.autor[0] ?? null) : c.autor,
   })) as Comunicado[];
+});
+
+// ---------- /registros — leitura de conteúdo do form semanal (coord/sup) ----------
+
+export type RegistroResumo = Registro & {
+  encontro: {
+    id: string;
+    numero: number;
+    data_hora: string | null;
+    realizado_em: string | null;
+    status: EncontroStatus;
+    dupla: {
+      id: string;
+      status: DuplaStatus;
+      mentor: { id: string; nome: string } | null;
+      mentorado: { id: string; nome: string } | null;
+    } | null;
+  } | null;
+  encaminhamentos: { id: string }[];
+  anexos: { id: string }[];
+};
+
+export type FiltrosRegistro = {
+  encontro?: number;
+  avaliacao?: AvaliacaoJovem;
+  apoio?: boolean;
+  /** enum de dificuldade ou "com" = qualquer uma ≠ nenhuma. */
+  dificuldade?: string;
+  dupla?: string;
+  /** busca em tema/reflexões/observações — já sanitizada. */
+  q?: string;
+  /** cumulativa: página 2 devolve as 2 primeiras páginas (grupos não quebram). */
+  pagina: number;
+};
+
+export const REGISTROS_PAGINA = 100;
+
+const REGISTRO_RESUMO_SELECT = `
+  id, tema, ferramenta, reflexoes, observacoes, precisa_apoio,
+  atividades, avaliacao, dificuldade, dificuldade_detalhe,
+  proximo_passo, proximo_passo_detalhe, created_at, encontro_id,
+  autor:profiles!registros_created_by_fkey(nome),
+  encaminhamentos(id),
+  anexos:registro_anexos(id),
+  encontro:encontros!registros_encontro_id_fkey!inner(
+    id, numero, data_hora, realizado_em, status,
+    dupla:duplas!encontros_dupla_id_fkey(
+      id, status,
+      mentor:profiles!duplas_mentor_id_fkey(id, nome),
+      mentorado:mentorados!duplas_mentorado_id_fkey(id, nome)
+    )
+  )`;
+
+/** Registros visíveis pelo papel (RLS: coord = todos, supervisor = suas duplas). */
+export async function getRegistros(
+  f: FiltrosRegistro
+): Promise<{ itens: RegistroResumo[]; total: number }> {
+  const supabase = await createClient();
+  let q = supabase
+    .from("registros")
+    .select(REGISTRO_RESUMO_SELECT, { count: "exact" })
+    // o !inner no encontro é o que permite filtrar/ordenar por coluna do embed
+    .order("numero", { referencedTable: "encontros", ascending: false })
+    .order("created_at", { ascending: false })
+    .range(0, f.pagina * REGISTROS_PAGINA - 1);
+  if (f.encontro) q = q.eq("encontro.numero", f.encontro);
+  if (f.dupla) q = q.eq("encontro.dupla_id", f.dupla);
+  if (f.avaliacao) q = q.eq("avaliacao", f.avaliacao);
+  if (f.apoio) q = q.eq("precisa_apoio", true);
+  if (f.dificuldade === "com") q = q.neq("dificuldade", "nenhuma");
+  else if (f.dificuldade) q = q.eq("dificuldade", f.dificuldade);
+  if (f.q)
+    q = q.or(
+      `tema.ilike.%${f.q}%,reflexoes.ilike.%${f.q}%,observacoes.ilike.%${f.q}%`
+    );
+  const { data, error, count } = await q;
+  if (error) throw error;
+  const norm = (v: unknown) => (Array.isArray(v) ? (v[0] ?? null) : v);
+  const itens = ((data ?? []) as unknown as RegistroResumo[]).map((r) => ({
+    ...r,
+    autor: norm(r.autor),
+    encontro: r.encontro
+      ? { ...r.encontro, dupla: norm(r.encontro.dupla) }
+      : null,
+  }));
+  return { itens, total: count ?? 0 };
+}
+
+/** Contadores de triagem do topo — globais ao papel, não seguem os filtros. */
+export async function getAlertasRegistros(): Promise<{
+  apoio: number;
+  baixa: number;
+  comDificuldade: number;
+}> {
+  const supabase = await createClient();
+  const head = { count: "exact" as const, head: true };
+  const [apoio, baixa, dif] = await Promise.all([
+    supabase.from("registros").select("*", head).eq("precisa_apoio", true),
+    supabase.from("registros").select("*", head).eq("avaliacao", "baixa"),
+    supabase.from("registros").select("*", head).neq("dificuldade", "nenhuma").not("dificuldade", "is", null),
+  ]);
+  return {
+    apoio: apoio.count ?? 0,
+    baixa: baixa.count ?? 0,
+    comDificuldade: dif.count ?? 0,
+  };
+}
+
+/** Opções do filtro de dupla — RLS devolve só o escopo do papel. */
+export type DuplaOpcao = {
+  id: string;
+  mentor: { nome: string } | null;
+  mentorado: { nome: string } | null;
+};
+
+export const getDuplasOpcoes = cache(async (): Promise<DuplaOpcao[]> => {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("duplas")
+    .select(
+      "id, mentor:profiles!duplas_mentor_id_fkey(nome), mentorado:mentorados!duplas_mentorado_id_fkey(nome)"
+    )
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+  const norm = (v: unknown) => (Array.isArray(v) ? (v[0] ?? null) : v);
+  return ((data ?? []) as unknown as DuplaOpcao[])
+    .map((d) => ({ ...d, mentor: norm(d.mentor), mentorado: norm(d.mentorado) }))
+    .sort((a, b) =>
+      (a.mentor?.nome ?? "").localeCompare(b.mentor?.nome ?? "", "pt-BR")
+    );
 });

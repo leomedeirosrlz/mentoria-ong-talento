@@ -38,7 +38,8 @@ function saneiaNome(nome: string): string {
 export function AnexosRegistro({
   registroId,
   autorId,
-  podeEditar,
+  podeAnexar,
+  podeRemover,
   anexos,
 }: {
   registroId: string;
@@ -46,7 +47,10 @@ export function AnexosRegistro({
   duplaId: string;
   /** Profile de quem anexa — vira `created_by` na row de metadados. */
   autorId: string;
-  podeEditar: boolean;
+  /** Anexar é escrita do mentor (RLS mentor-only). */
+  podeAnexar: boolean;
+  /** Remover cobre moderação da coordenação (RLS mentor+coord). */
+  podeRemover: boolean;
   anexos: RegistroAnexo[];
 }) {
   const [pending, start] = useTransition();
@@ -126,7 +130,7 @@ export function AnexosRegistro({
   }
 
   // estado vazio não renderiza nada — o botão de anexar mora junto ao registro
-  if (anexos.length === 0 && !podeEditar) return null;
+  if (anexos.length === 0 && !podeAnexar) return null;
 
   return (
     <div className="space-y-2 pt-1">
@@ -153,7 +157,7 @@ export function AnexosRegistro({
                   .filter(Boolean)
                   .join(" · ")}
               </span>
-              {podeEditar && (
+              {podeRemover && (
                 <ConfirmDeleteButton
                   titulo={`Remover "${a.nome}"?`}
                   descricao="A evidência sai do registro e o arquivo é apagado."
@@ -175,7 +179,7 @@ export function AnexosRegistro({
           ))}
         </ul>
       )}
-      {podeEditar && (
+      {podeAnexar && (
         <div>
           <input
             ref={fileRef}

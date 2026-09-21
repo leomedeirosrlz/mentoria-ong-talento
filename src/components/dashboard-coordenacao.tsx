@@ -224,9 +224,14 @@ export function DashboardCoordenacao({
                 </span>
               </span>
             )}
+            <Link
+              href={`/registros?encontro=${resumo.evento.numero}`}
+              className="ml-auto text-xs font-medium underline underline-offset-2 transition-colors hover:text-foreground"
+            >
+              Ver registros →
+            </Link>
             <CopiarResumoButton
               texto={textoResumoSemana(resumo, emRisco)}
-              className="ml-auto"
             />
           </div>
         </section>
