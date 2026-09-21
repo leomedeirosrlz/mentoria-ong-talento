@@ -1,4 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
+import { demoRole } from "./demo/mode";
+import { demoAnexosPorRegistros } from "./demo/queries";
 import type { RegistroAnexo } from "./types";
 
 const ANEXO_SELECT = "*, autor:profiles!registro_anexos_created_by_fkey(nome)";
@@ -9,6 +11,9 @@ export async function getAnexosPorRegistros(
   registroIds: string[]
 ): Promise<Record<string, RegistroAnexo[]>> {
   if (registroIds.length === 0) return {};
+  // modo demo: anexos do dataset, agrupados por registro_id
+  const demo = await demoRole();
+  if (demo) return demoAnexosPorRegistros(demo, registroIds);
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("registro_anexos")

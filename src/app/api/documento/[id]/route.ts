@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { demoRole } from "@/lib/demo/mode";
+import { getDemoData } from "@/lib/demo/data";
+import { demoPdf } from "@/lib/demo/pdf";
 
 // Download de documento oficial (termo do mentor, autorização do mentorado):
 // a autorização mora na policy do storage.objects — só a coordenação lê objeto
@@ -14,6 +17,35 @@ export async function GET(
   if (tipo !== "pessoa" && tipo !== "mentorado") {
     return new NextResponse("Documento não encontrado.", { status: 404 });
   }
+
+  // modo demo: documento oficial é restrito — só a coordenação baixa (a policy
+  // do bucket garante isso no real; aqui o 404 reproduz pros demais papéis)
+  const demo = await demoRole();
+  if (demo) {
+    if (demo !== "coordenacao") {
+      return new NextResponse("Documento não encontrado.", { status: 404 });
+    }
+    const d = getDemoData();
+    const doc =
+      tipo === "mentorado"
+        ? d.mentorados.find((x) => x.id === id)?.documento_path
+        : d.profiles.find((x) => x.id === id)?.documento_path;
+    if (!doc) {
+      return new NextResponse("Documento não encontrado.", { status: 404 });
+    }
+    const pdf = demoPdf(
+      `Documento oficial — ${
+        tipo === "mentorado" ? "autorização do mentorado" : "termo do mentor"
+      }`
+    );
+    return new NextResponse(new Uint8Array(pdf), {
+      headers: {
+        "Content-Type": "application/pdf",
+        "Content-Disposition": 'inline; filename="demo-documento.pdf"',
+      },
+    });
+  }
+
   const supabase = await createClient();
 
   // middleware já protege /api/*; checagem extra porque route handler não

@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { MOTIVOS_REAGENDAMENTO, inicioDefaultDupla, maxEncontros } from "@/lib/ciclo";
-import type { Trilha } from "@/lib/types";
+import type { Notificacao, Trilha } from "@/lib/types";
 import {
   emailValido,
   mapRole,
@@ -14,6 +14,9 @@ import {
   type LinhaImportada,
 } from "@/lib/importar";
 import { notificar } from "./notificar";
+import { demoAtivo, demoRole, limparDemo, marcarOnboardingDemo } from "./demo/mode";
+import { DEMO_MSG } from "./demo/shared";
+import { getDemoData } from "./demo/data";
 
 /** Traduz erro do Postgres/PostgREST pra mensagem de UI (sem vazar schema nem inglês). */
 function erroAmigavel(e: { message: string; code?: string }): string {
@@ -191,6 +194,7 @@ function camposApresentacao(
 }
 
 export async function createPessoa(formData: FormData) {
+  if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada — entre de novo." };
   const role = String(formData.get("role") ?? "");
@@ -241,6 +245,7 @@ export async function createPessoa(formData: FormData) {
 }
 
 export async function createMentorado(formData: FormData) {
+  if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada — entre de novo." };
   const nome = normNome(String(formData.get("nome") ?? ""));
@@ -275,6 +280,7 @@ export async function createMentorado(formData: FormData) {
 }
 
 export async function createDupla(formData: FormData) {
+  if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada — entre de novo." };
   const mentor_id = String(formData.get("mentor_id") ?? "");
@@ -385,6 +391,7 @@ export async function createDupla(formData: FormData) {
 }
 
 export async function setPessoaRole(profileId: string, role: string | null) {
+  if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada — entre de novo." };
   if (profileId === eu.id) {
@@ -437,6 +444,7 @@ export async function setPessoaRole(profileId: string, role: string | null) {
 // ---------- gestao ----------
 
 export async function updatePessoa(profileId: string, formData: FormData) {
+  if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada — entre de novo." };
   const nome = normNome(String(formData.get("nome") ?? ""));
@@ -518,6 +526,7 @@ export async function updatePessoa(profileId: string, formData: FormData) {
 }
 
 export async function setPessoaAtivo(profileId: string, ativo: boolean, forcar = false) {
+  if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada — entre de novo." };
   if (profileId === eu.id) {
@@ -545,6 +554,7 @@ export async function setPessoaAtivo(profileId: string, ativo: boolean, forcar =
 }
 
 export async function deletePessoa(profileId: string) {
+  if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada — entre de novo." };
   const { data: duplas } = await supabase
@@ -576,6 +586,7 @@ export async function deletePessoa(profileId: string) {
 }
 
 export async function updateMentorado(id: string, formData: FormData) {
+  if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada — entre de novo." };
   const nome = normNome(String(formData.get("nome") ?? ""));
@@ -620,6 +631,7 @@ export async function updateMentorado(id: string, formData: FormData) {
 }
 
 export async function deleteMentorado(id: string) {
+  if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada — entre de novo." };
   const { data: duplas } = await supabase
@@ -643,6 +655,7 @@ export async function deleteMentorado(id: string) {
 }
 
 export async function updateDupla(duplaId: string, formData: FormData) {
+  if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada — entre de novo." };
   const mentor_id = String(formData.get("mentor_id") ?? "");
@@ -806,6 +819,7 @@ export async function updateDupla(duplaId: string, formData: FormData) {
 }
 
 export async function deleteDupla(duplaId: string) {
+  if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada — entre de novo." };
   // cascata remove encontros, registros e encaminhamentos da dupla
@@ -821,6 +835,7 @@ export async function deleteDupla(duplaId: string) {
 }
 
 export async function deleteMaterial(id: string) {
+  if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada — entre de novo." };
   const { data, error } = await supabase
@@ -840,6 +855,7 @@ export async function deleteMaterial(id: string) {
 const MAX_IMPORT = 500;
 
 export async function importPessoas(rows: LinhaImportada[]) {
+  if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada — entre de novo." };
   if (eu.role !== "coordenacao") return { error: "Só a coordenação importa cadastros." };
@@ -893,6 +909,7 @@ export async function importPessoas(rows: LinhaImportada[]) {
 }
 
 export async function importMentorados(rows: LinhaImportada[]) {
+  if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada — entre de novo." };
   if (eu.role !== "coordenacao") return { error: "Só a coordenação importa cadastros." };
@@ -959,6 +976,7 @@ function parseDataHora(s: string): Date | null {
 }
 
 export async function agendarEncontro(formData: FormData) {
+  if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada — entre de novo." };
   // a regra "a dupla agenda" mora na action, não só na UI — a RLS deixaria
@@ -1055,6 +1073,7 @@ export async function agendarEncontro(formData: FormData) {
 }
 
 export async function marcarNaoAconteceu(encontroId: string, duplaId: string) {
+  if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada — entre de novo." };
   // só encontro já passado de dupla ativa — UI esconde o botão, a action garante
@@ -1081,6 +1100,7 @@ export async function marcarNaoAconteceu(encontroId: string, duplaId: string) {
 }
 
 export async function desfazerNaoAconteceu(encontroId: string, duplaId: string) {
+  if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada — entre de novo." };
   const { data, error } = await supabase
@@ -1108,6 +1128,7 @@ export async function registrarEncontroRetroativo(
   numero: number,
   dataHora: string,
 ): Promise<{ error?: string; ok?: boolean; encontroId?: string }> {
+  if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada — entre de novo." };
   if (eu.role === "coordenacao") {
@@ -1179,6 +1200,7 @@ const DIFICULDADES = ["nenhuma", "aprendizagem", "participacao", "comportamental
 const PROXIMOS_PASSOS = ["continuar", "reforcar", "novo_feedback", "acompanhar_de_perto", "conversa_individual", "outro"] as const;
 
 export async function salvarRegistro(formData: FormData) {
+  if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada — entre de novo." };
   if (eu.role === "coordenacao") {
@@ -1358,6 +1380,7 @@ export async function salvarRegistro(formData: FormData) {
  *  existe). Chave (dupla_id, numero): a nota precede o agendamento e segue o
  *  nº do encontro na remarcação. */
 export async function salvarNotaEncontro(duplaId: string, numero: number, texto: string) {
+  if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada — entre de novo." };
   // a nota é o plano de aula do mentor — nem a coord escreve nela
@@ -1416,6 +1439,7 @@ export async function addPessoaNota({
   mentoradoId?: string;
   texto: string;
 }) {
+  if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada — entre de novo." };
   const limpo = texto.trim();
@@ -1442,6 +1466,7 @@ export async function addPessoaNota({
 
 /** Remove nota do mural — o autor ou a coordenação (policy garante). */
 export async function deletePessoaNota(notaId: string, pessoaId: string) {
+  if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada — entre de novo." };
   const { data, error } = await supabase
@@ -1455,6 +1480,7 @@ export async function deletePessoaNota(notaId: string, pessoaId: string) {
 }
 
 export async function toggleEncaminhamento(id: string, feito: boolean, duplaId: string) {
+  if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada — entre de novo." };
   const { data, error } = await supabase
@@ -1473,6 +1499,7 @@ export async function toggleEncaminhamento(id: string, feito: boolean, duplaId: 
 }
 
 export async function editarEncaminhamento(id: string, duplaId: string, formData: FormData) {
+  if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada — entre de novo." };
   // o texto do acordo é da dupla — a coord só marca feito (toggleEncaminhamento)
@@ -1506,6 +1533,7 @@ export async function editarEncaminhamento(id: string, duplaId: string, formData
 }
 
 export async function excluirEncaminhamento(id: string, duplaId: string) {
+  if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada — entre de novo." };
   if (eu.role === "coordenacao") {
@@ -1523,6 +1551,7 @@ export async function excluirEncaminhamento(id: string, duplaId: string) {
 }
 
 export async function resolverApoio(registroId: string, duplaId: string) {
+  if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada — entre de novo." };
   const { data, error } = await supabase
@@ -1560,6 +1589,7 @@ const AUDIENCIAS_MATERIAL = ["todos", "dpp", "especialista", "coordenacao"] as c
 const MATERIAL_PATH_RE = /^materiais\/[0-9a-f-]{36}-[a-zA-Z0-9._-]+$/;
 
 export async function salvarMaterial(formData: FormData) {
+  if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada — entre de novo." };
   const titulo = String(formData.get("titulo") ?? "").trim();
@@ -1615,6 +1645,7 @@ export async function salvarMaterial(formData: FormData) {
 }
 
 export async function editarMaterial(id: string, formData: FormData) {
+  if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada — entre de novo." };
   const titulo = String(formData.get("titulo") ?? "").trim();
@@ -1665,6 +1696,7 @@ export async function editarMaterial(id: string, formData: FormData) {
 /** Anexa arquivo a material existente: grava o path na row (o upload vem depois,
  *  via client — a policy do storage só aceita objeto com row path = name). */
 export async function anexarArquivoMaterial(id: string, path: string) {
+  if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada — entre de novo." };
   if (!MATERIAL_PATH_RE.test(path)) {
@@ -1683,6 +1715,7 @@ export async function anexarArquivoMaterial(id: string, path: string) {
 /** Desfaz o vínculo do arquivo (path -> null). O objeto no storage é removido
  *  pelo client ANTES de chamar — aqui só zera a referência. */
 export async function removerArquivoMaterial(id: string) {
+  if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada — entre de novo." };
   const { data, error } = await supabase
@@ -1710,6 +1743,7 @@ export async function definirDocumentoPessoa(
   id: string,
   path: string
 ) {
+  if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada — entre de novo." };
   if (eu.role !== "coordenacao") {
@@ -1737,6 +1771,7 @@ export async function removerDocumentoPessoa(
   tipo: "profile" | "mentorado",
   id: string
 ) {
+  if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada — entre de novo." };
   if (eu.role !== "coordenacao") {
@@ -1758,6 +1793,7 @@ export async function removerDocumentoPessoa(
 // ---------- meu perfil (self-service) ----------
 
 export async function updateMeuPerfil(formData: FormData) {
+  if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada — entre de novo." };
   const nome = normNome(String(formData.get("nome") ?? ""));
@@ -1782,6 +1818,7 @@ export async function updateMeuPerfil(formData: FormData) {
 /** path novo já subiu no bucket `avatares` pelo client — aqui persiste a
  *  referência e remove o arquivo antigo (pasta <profile_id>/ é só dele). */
 export async function setAvatarPath(path: string | null) {
+  if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada — entre de novo." };
   if (path != null && !path.startsWith(`${eu.id}/`)) {
@@ -1814,6 +1851,8 @@ export async function setAvatarPath(path: string | null) {
  *  opcionais; `areas` chega em JSON do TagInput) + foto opcional. O que não
  *  veio no FormData não é tocado — cada passo salva o seu pedaço. */
 export async function salvarOnboarding(formData: FormData) {
+  // o wizard do demo avança sem gravar — os campos do perfil não persistem
+  if (await demoAtivo()) return { ok: true };
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada — entre de novo." };
 
@@ -1853,6 +1892,11 @@ export async function salvarOnboarding(formData: FormData) {
  *  fica fora do guard_profiles_self_columns (0023): o self-update grava
  *  nela direto. */
 export async function concluirOnboarding() {
+  // na demo o "concluído" mora num cookie, não em profiles.onboarded_em
+  if (await demoAtivo()) {
+    await marcarOnboardingDemo();
+    return { ok: true };
+  }
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada — entre de novo." };
   const { error } = await supabase
@@ -1867,6 +1911,11 @@ export async function concluirOnboarding() {
 // ---------- auth ----------
 
 export async function signOut() {
+  // a "sessão" da demo é só cookie — limpa e volta pra seleção de papel
+  if (await demoAtivo()) {
+    await limparDemo();
+    redirect("/demo");
+  }
   const supabase = await createClient();
   await supabase.auth.signOut();
   redirect("/login");
@@ -1890,6 +1939,7 @@ const ROLES_POR_AUDIENCIA: Record<string, string[]> = {
 /** Aviso geral da coordenação — grava o comunicado e cria a notificação de
  *  cada destinatário da audiência (o autor não se notifica do próprio aviso). */
 export async function publicarComunicado(formData: FormData) {
+  if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada — entre de novo." };
   if (eu.role !== "coordenacao") return { error: "Só a coordenação publica avisos." };
@@ -1930,6 +1980,7 @@ export async function publicarComunicado(formData: FormData) {
 }
 
 export async function excluirComunicado(id: string) {
+  if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada — entre de novo." };
   if (eu.role !== "coordenacao") return { error: "Só a coordenação exclui avisos." };
@@ -1946,6 +1997,12 @@ export async function excluirComunicado(id: string) {
 /** Poll do sino — mesma leitura de getNotificacoes, mas como action pra rodar
  *  no intervalo do client sem navegação. */
 export async function listarNotificacoes() {
+  // leitura — o sino faz poll mesmo na demo; devolve o dataset do papel ativo
+  const demo = await demoRole();
+  if (demo) {
+    const itens = getDemoData().notificacoes[demo] ?? [];
+    return { ok: true, itens: itens.slice(0, 15), naoLidas: itens.filter((n: Notificacao) => !n.lida_em).length };
+  }
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada — entre de novo." };
   const [{ data, error: errItens }, { count, error: errCount }] = await Promise.all([
@@ -1969,6 +2026,8 @@ export async function listarNotificacoes() {
 }
 
 export async function marcarNotificacaoLida(id: string) {
+  // no-op silencioso na demo — a UI já marcou otimista; erro dispararia toast
+  if (await demoAtivo()) return { ok: true };
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada — entre de novo." };
   const { error } = await supabase
@@ -1982,6 +2041,7 @@ export async function marcarNotificacaoLida(id: string) {
 }
 
 export async function marcarTodasNotificacoesLidas() {
+  if (await demoAtivo()) return { ok: true };
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada — entre de novo." };
   const { error } = await supabase

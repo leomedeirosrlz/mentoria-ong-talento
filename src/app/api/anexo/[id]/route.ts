@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { demoRole } from "@/lib/demo/mode";
+import { getDemoData } from "@/lib/demo/data";
+import { demoPdf } from "@/lib/demo/pdf";
 
 // Download de evidência: a RLS de registro_anexos já faz a autorização —
 // quem não pode ler o registro nem vê a row (404). O arquivo sai do bucket
@@ -9,6 +12,27 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
+
+  // modo demo: anexo é evidência de registro fictício — PDF placeholder com o
+  // nome do arquivo; sem linha no dataset é 404 (mesmo que a RLS faria)
+  const demo = await demoRole();
+  if (demo) {
+    const a = getDemoData().anexos.find((x) => x.id === id);
+    if (!a) {
+      return new NextResponse("Anexo não encontrado.", { status: 404 });
+    }
+    const pdf = demoPdf(
+      a.nome,
+      "Evidência de exemplo — registro de encontro (dados fictícios)."
+    );
+    return new NextResponse(new Uint8Array(pdf), {
+      headers: {
+        "Content-Type": "application/pdf",
+        "Content-Disposition": 'inline; filename="demo-anexo.pdf"',
+      },
+    });
+  }
+
   // id cru no eq() — string malformada vira erro PostgREST (500); uuid ruim é 404
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
     return new NextResponse("Anexo não encontrado.", { status: 404 });

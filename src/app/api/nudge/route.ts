@@ -1,10 +1,16 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { DEMO_ROLE_COOKIE, papelDemoValido } from "@/lib/demo/shared";
 import type { InteracaoTipo } from "@/lib/interacoes";
 
 const TIPOS: ReadonlySet<string> = new Set<InteracaoTipo>(["nudge", "contato", "apoio"]);
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+// destino obrigatoriamente wa.me/<dígitos> — qualquer outra URL seria open
+// redirect; wa.me/ sem número abre a página de erro do WhatsApp. A âncora de
+// fim importa: sem ela "https://wa.me/1@evil.com" casa o regex mas o URL
+// parser lê "wa.me" como userinfo e "evil.com" como host → open redirect
+const WA_ME_RE = /^https:\/\/wa\.me\/\d+$/;
 
 // GET /api/nudge?d=<dupla_id>&to=<wa.me url>&t=<tipo>
 // Loga o contato em `interacoes` e redireciona pro WhatsApp — o botão de nudge
@@ -12,6 +18,17 @@ const UUID_RE =
 // o redirect acontece mesmo assim (o nudge não pode depender do banco).
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
+
+  // modo demo: sem sessão nem banco — valida o destino com a mesma regra e
+  // redireciona direto; nada de logar interação em dupla fictícia
+  const demo = papelDemoValido(request.cookies.get(DEMO_ROLE_COOKIE)?.value);
+  if (demo) {
+    const to = searchParams.get("to") ?? "";
+    if (!WA_ME_RE.test(to)) {
+      return NextResponse.json({ error: "Destino inválido." }, { status: 400 });
+    }
+    return NextResponse.redirect(new URL(to), 302);
+  }
 
   const supabase = await createClient();
   const { data: claimsData } = await supabase.auth.getClaims();
@@ -24,12 +41,8 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  // destino obrigatoriamente wa.me/<dígitos> — qualquer outra URL seria open
-  // redirect; wa.me/ sem número abre a página de erro do WhatsApp
   const to = searchParams.get("to") ?? "";
-  // âncora de fim: sem ela "https://wa.me/1@evil.com" casa o regex mas o URL
-  // parser lê "wa.me" como userinfo e "evil.com" como host → open redirect
-  if (!/^https:\/\/wa\.me\/\d+$/.test(to)) {
+  if (!WA_ME_RE.test(to)) {
     return NextResponse.json({ error: "Destino inválido." }, { status: 400 });
   }
 

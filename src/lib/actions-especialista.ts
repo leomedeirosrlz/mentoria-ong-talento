@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { notificar } from "@/lib/notificar";
+import { demoAtivo } from "./demo/mode";
+import { DEMO_MSG } from "./demo/shared";
 
 /** Traduz erro do Postgres/PostgREST pra mensagem de UI — mesma convenção de
  *  actions.ts (cópia local: o helper de lá não é exportado). As exceções de
@@ -53,6 +55,7 @@ function resumo(texto: string, max = 200): string {
 }
 
 export async function criarSolicitacao(formData: FormData) {
+  if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada — entre de novo." };
 
@@ -158,6 +161,7 @@ export async function criarSolicitacao(formData: FormData) {
 }
 
 export async function aceitarSolicitacao(solicitacaoId: string) {
+  if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada — entre de novo." };
 
@@ -212,6 +216,7 @@ export async function aceitarSolicitacao(solicitacaoId: string) {
 }
 
 export async function cancelarSolicitacao(solicitacaoId: string) {
+  if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada — entre de novo." };
 

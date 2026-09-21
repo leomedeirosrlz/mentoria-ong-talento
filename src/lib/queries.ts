@@ -1,6 +1,28 @@
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { registroTardio } from "./ciclo";
+import { demoOnboarded, demoRole } from "./demo/mode";
+import {
+  demoAlertasRegistros,
+  demoCicloEventos,
+  demoComunicados,
+  demoContagemPessoas,
+  demoContatosMap,
+  demoDupla,
+  demoDuplas,
+  demoDuplasOpcoes,
+  demoDuplasResumo,
+  demoEspecialistaEventos,
+  demoMateriais,
+  demoMe,
+  demoMentorProfiles,
+  demoMentorados,
+  demoMinhasDuplas,
+  demoNotificacoes,
+  demoPessoaPerfil,
+  demoPessoas,
+  demoRegistros,
+} from "./demo/queries";
 import type { AvaliacaoJovem, CicloEvento, Comunicado, Dupla, DuplaResumo, DuplaStatus, EncontroStatus, EspecialistaEvento, Material, Mentorado, Notificacao, PessoaNota, Profile, Registro, Trilha } from "./types";
 
 /** Colunas de profiles legíveis por qualquer autenticado — grant de coluna
@@ -25,6 +47,9 @@ type Contato = {
  *  própria linha. Quem não está no mapa fica sem contato — nome e avatar
  *  seguem visíveis pelas colunas públicas. */
 const getContatos = cache(async (): Promise<Map<string, Contato>> => {
+  // modo demo: o escopo da view profiles_contato é replicado sobre o dataset
+  const demo = await demoRole();
+  if (demo) return demoContatosMap(demo);
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("profiles_contato")
@@ -58,6 +83,9 @@ function comContato<P extends { id: string }>(
 
 // getClaims valida o JWT localmente (sem round-trip); RLS segue valendo no banco.
 export const getMe = cache(async (): Promise<Profile | null> => {
+  // modo demo: persona do papel + onboarding do cookie demo_onboarded
+  const demo = await demoRole();
+  if (demo) return demoMe(demo, await demoOnboarded());
   const supabase = await createClient();
   const { data } = await supabase.auth.getClaims();
   const sub = data?.claims?.sub;
@@ -78,6 +106,8 @@ export const getMe = cache(async (): Promise<Profile | null> => {
 });
 
 export const getCicloEventos = cache(async (): Promise<CicloEvento[]> => {
+  const demo = await demoRole();
+  if (demo) return demoCicloEventos();
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("ciclo_eventos")
@@ -113,6 +143,8 @@ function mergeContatoDuplas(
 }
 
 export const getDuplas = cache(async (): Promise<Dupla[]> => {
+  const demo = await demoRole();
+  if (demo) return demoDuplas(demo);
   const supabase = await createClient();
   const [{ data, error }, contatos] = await Promise.all([
     supabase
@@ -126,6 +158,9 @@ export const getDuplas = cache(async (): Promise<Dupla[]> => {
 });
 
 export const getDupla = cache(async (id: string): Promise<Dupla | null> => {
+  // modo demo: id fora do escopo do papel -> null -> page chama notFound()
+  const demo = await demoRole();
+  if (demo) return demoDupla(demo, id);
   const supabase = await createClient();
   // maybeSingle: id inexistente -> null -> page chama notFound()
   const [{ data, error }, contatos] = await Promise.all([
@@ -141,6 +176,8 @@ export const getDupla = cache(async (id: string): Promise<Dupla | null> => {
 });
 
 export const getMinhasDuplas = cache(async (): Promise<Dupla[]> => {
+  const demo = await demoRole();
+  if (demo) return demoMinhasDuplas(demo);
   const me = await getMe();
   if (!me) return [];
   const supabase = await createClient();
@@ -158,6 +195,8 @@ export const getMinhasDuplas = cache(async (): Promise<Dupla[]> => {
 
 /** Só os vínculos — pra checar "está em dupla" sem arrastar encontros/registros. */
 export const getDuplasResumo = cache(async (): Promise<DuplaResumo[]> => {
+  const demo = await demoRole();
+  if (demo) return demoDuplasResumo(demo, false);
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("duplas")
@@ -170,6 +209,8 @@ export const getDuplasResumo = cache(async (): Promise<DuplaResumo[]> => {
 /** Vínculos de qualquer status (inclusive encerrada) — espelha a guarda de
  *  exclusão das actions, que bloqueia pessoa/mentorado com QUALQUER dupla. */
 export const getDuplasResumoTodas = cache(async (): Promise<DuplaResumo[]> => {
+  const demo = await demoRole();
+  if (demo) return demoDuplasResumo(demo, true);
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("duplas")
@@ -180,6 +221,8 @@ export const getDuplasResumoTodas = cache(async (): Promise<DuplaResumo[]> => {
 
 /** Só a contagem (head: true, sem rows) — alimenta o checklist de setup da home. */
 export const getContagemPessoas = cache(async (): Promise<number> => {
+  const demo = await demoRole();
+  if (demo) return demoContagemPessoas();
   const supabase = await createClient();
   const [profiles, mentorados] = await Promise.all([
     // select=* falharia até no head:true — o * expande pras colunas sem
@@ -198,6 +241,8 @@ const porNome = (a: { nome: string }, b: { nome: string }) =>
   a.nome.localeCompare(b.nome, "pt-BR");
 
 export const getPessoas = cache(async (): Promise<Profile[]> => {
+  const demo = await demoRole();
+  if (demo) return demoPessoas(demo);
   const supabase = await createClient();
   const [{ data, error }, contatos] = await Promise.all([
     supabase.from("profiles").select(PROFILE_COLS_PUBLICAS).order("nome"),
@@ -212,6 +257,8 @@ export const getPessoas = cache(async (): Promise<Profile[]> => {
 });
 
 export const getMentorados = cache(async (): Promise<Mentorado[]> => {
+  const demo = await demoRole();
+  if (demo) return demoMentorados();
   const supabase = await createClient();
   const { data, error } = await supabase.from("mentorados").select("*").order("nome");
   if (error) throw error;
@@ -237,6 +284,9 @@ export type PessoaPerfil =
 export const getPessoaPerfil = cache(async (id: string): Promise<
   (PessoaPerfil & { duplas: DuplaPerfil[]; notas: PessoaNota[] }) | null
 > => {
+  // modo demo: fora do escopo do papel -> null -> a page dá notFound() igual
+  const demo = await demoRole();
+  if (demo) return demoPessoaPerfil(demo, id);
   const supabase = await createClient();
   // email não entra no embed de profiles (grant de coluna, 0026) — vem do
   // merge com a view quando o papel alcança; o gravatar cai nas iniciais senão
@@ -294,6 +344,8 @@ export const getPessoaPerfil = cache(async (id: string): Promise<
 });
 
 export const getMateriais = cache(async (): Promise<Material[]> => {
+  const demo = await demoRole();
+  if (demo) return demoMateriais();
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("materiais")
@@ -314,6 +366,8 @@ export type MentorProfile = {
 };
 
 export const getMentorProfiles = cache(async (): Promise<MentorProfile[]> => {
+  const demo = await demoRole();
+  if (demo) return demoMentorProfiles();
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("mentor_profiles")
@@ -326,6 +380,8 @@ export const getMentorProfiles = cache(async (): Promise<MentorProfile[]> => {
  *  não-lidas (o badge pode passar de 15 mesmo com a lista paginada). */
 export const getNotificacoes = cache(
   async (): Promise<{ itens: Notificacao[]; naoLidas: number }> => {
+    const demo = await demoRole();
+    if (demo) return demoNotificacoes(demo);
     const supabase = await createClient();
     const [{ data, error }, { count, error: e2 }] = await Promise.all([
       supabase
@@ -350,6 +406,8 @@ export const getNotificacoes = cache(
 
 /** Comunicados visíveis pro usuário — a RLS já filtra por audiência. */
 export const getComunicados = cache(async (): Promise<Comunicado[]> => {
+  const demo = await demoRole();
+  if (demo) return demoComunicados(demo);
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("comunicados")
@@ -427,6 +485,8 @@ const REGISTRO_RESUMO_SELECT = `
 export async function getRegistros(
   f: FiltrosRegistro
 ): Promise<{ itens: RegistroResumo[]; total: number }> {
+  const demo = await demoRole();
+  if (demo) return demoRegistros(demo, f);
   const supabase = await createClient();
   let q = supabase
     .from("registros")
@@ -495,6 +555,8 @@ export async function getAlertasRegistros(): Promise<{
   comDificuldade: number;
   tardios: number;
 }> {
+  const demo = await demoRole();
+  if (demo) return demoAlertasRegistros(demo);
   const supabase = await createClient();
   const head = { count: "exact" as const, head: true };
   const [apoio, baixa, dif, tData] = await Promise.all([
@@ -530,6 +592,8 @@ export type DuplaOpcao = {
 };
 
 export const getDuplasOpcoes = cache(async (): Promise<DuplaOpcao[]> => {
+  const demo = await demoRole();
+  if (demo) return demoDuplasOpcoes(demo);
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("duplas")
@@ -551,6 +615,8 @@ export const getDuplasOpcoes = cache(async (): Promise<DuplaOpcao[]> => {
 /** Os 5 encontros do guia do especialista — título + foco, na ordem. */
 export const getEspecialistaEventos = cache(
   async (): Promise<EspecialistaEvento[]> => {
+    const demo = await demoRole();
+    if (demo) return demoEspecialistaEventos();
     const supabase = await createClient();
     const { data, error } = await supabase
       .from("especialista_eventos")

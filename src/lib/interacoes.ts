@@ -1,5 +1,7 @@
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
+import { demoRole } from "./demo/mode";
+import { demoUltimasInteracoes } from "./demo/queries";
 
 // tipos locais — interacoes ainda não entra em types.ts
 export type InteracaoTipo = "nudge" | "contato" | "apoio";
@@ -19,6 +21,9 @@ export type Interacao = {
 export const getUltimasInteracoes = cache(
   async (duplaIds: string[]): Promise<Record<string, Interacao>> => {
     if (duplaIds.length === 0) return {};
+    // modo demo: últimas interações do dataset, restritas às duplas pedidas
+    const demo = await demoRole();
+    if (demo) return demoUltimasInteracoes(demo, duplaIds);
     const supabase = await createClient();
     const { data, error } = await supabase
       .from("interacoes")

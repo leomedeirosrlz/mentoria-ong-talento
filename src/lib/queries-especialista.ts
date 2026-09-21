@@ -1,5 +1,11 @@
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
+import { demoRole } from "./demo/mode";
+import {
+  demoEspecialistas,
+  demoSolicitacaoDaDupla,
+  demoSolicitacoesVisiveis,
+} from "./demo/queries";
 import type { SolicitacaoEspecialista } from "./types";
 
 /** A leitura é da view `solicitacoes_mural` (0030): as mesmas colunas da
@@ -41,6 +47,9 @@ function normalize(row: Record<string, unknown>): SolicitacaoEspecialista {
  *  o caller pode usar a informação (ex.: esconder o botão de solicitar). */
 export const getSolicitacaoDaDupla = cache(
   async (duplaDppId: string): Promise<SolicitacaoEspecialista | null> => {
+    // modo demo: a dupla precisa estar no escopo do papel (sol_select, 0027)
+    const demo = await demoRole();
+    if (demo) return demoSolicitacaoDaDupla(demo, duplaDppId);
     const supabase = await createClient();
     const { data, error } = await supabase
       .from("solicitacoes_mural")
@@ -64,6 +73,8 @@ export const getSolicitacaoDaDupla = cache(
  *  aberta → aceita → cancelada), mais recentes antes dentro de cada grupo. */
 export const getSolicitacoesVisiveis = cache(
   async (): Promise<SolicitacaoEspecialista[]> => {
+    const demo = await demoRole();
+    if (demo) return demoSolicitacoesVisiveis(demo);
     const supabase = await createClient();
     const { data, error } = await supabase
       .from("solicitacoes_mural")
@@ -84,6 +95,8 @@ export const getSolicitacoesVisiveis = cache(
  *  "direcionar a um especialista específico" do dialog de solicitação. */
 export const getEspecialistas = cache(
   async (): Promise<{ id: string; nome: string; areas: string[] | null }[]> => {
+    const demo = await demoRole();
+    if (demo) return demoEspecialistas();
     const supabase = await createClient();
     const { data, error } = await supabase
       .from("profiles")

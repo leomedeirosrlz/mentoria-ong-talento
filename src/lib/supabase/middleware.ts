@@ -1,8 +1,15 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { pathInterno } from "@/lib/utils";
+import { DEMO_ROLE_COOKIE, papelDemoValido } from "@/lib/demo/shared";
 
 export async function updateSession(request: NextRequest) {
+  // modo demo: o cookie demo_role dispensa sessão de verdade — a navegação
+  // inteira (inclusive /login e /demo) passa sem auth nem refresh de token
+  if (papelDemoValido(request.cookies.get(DEMO_ROLE_COOKIE)?.value)) {
+    return NextResponse.next({ request });
+  }
+
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(
@@ -31,6 +38,9 @@ export async function updateSession(request: NextRequest) {
   const isPublic =
     p === "/login" || p.startsWith("/login/") ||
     p === "/auth" || p.startsWith("/auth/") ||
+    // a landing da demo precisa abrir sem cookie nenhum (ela é quem SETA o
+    // cookie); com cookie o bypass acima já resolveu antes daqui
+    p === "/demo" || p.startsWith("/demo/") ||
     p === "/privacidade";
 
   if (!user && !isPublic) {

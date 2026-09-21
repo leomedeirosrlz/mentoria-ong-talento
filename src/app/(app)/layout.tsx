@@ -1,11 +1,17 @@
 import { AppShell } from "@/components/app-shell";
+import { DemoBar } from "@/components/demo-bar";
 import { OnboardingFlow } from "@/components/onboarding-flow";
 import { signOut } from "@/lib/actions";
+import { getDemoData } from "@/lib/demo/data";
+import { demoRole } from "@/lib/demo/mode";
+import { DEMO_ROLES } from "@/lib/demo/shared";
 import { getMe, getNotificacoes } from "@/lib/queries";
 import { avatarPublicUrl, gravatarUrl } from "@/lib/avatar";
+import type { AppRole } from "@/lib/types";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const me = await getMe();
+  const demo = await demoRole();
   // autenticado sem profile vinculado: redirect("/login") voltaria pra cá pelo
   // middleware e viraria loop — tela bloqueada com saída, como os casos abaixo
   if (!me) {
@@ -67,10 +73,28 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     );
   }
 
+  // mapa papel→primeiro nome pra DemoBar — só monta o dataset quando a demo
+  // está ativa (fora dela seria leitura à toa, ainda que pura/barata)
+  const demoPersonas = demo
+    ? (Object.fromEntries(
+        DEMO_ROLES.map((r) => [r, getDemoData().personas[r].nome.split(" ")[0]])
+      ) as Record<AppRole, string>)
+    : null;
+  const demoBar = demo && demoPersonas && (
+    <DemoBar papel={demo} personas={demoPersonas} />
+  );
+
   // onboarding pendente (0031): o wizard substitui o shell inteiro, como as
   // telas bloqueadas acima — concluirOnboarding + router.refresh() devolve o app
   if (!me.onboarded_em) {
-    return <OnboardingFlow me={me} />;
+    // DemoBar depois do wizard: mesma z-50, ordem de paint decide — ela precisa
+    // ficar clicável por cima do onboarding pra trocar de papel / sair da demo
+    return (
+      <>
+        <OnboardingFlow me={me} />
+        {demoBar}
+      </>
+    );
   }
 
   const notificacoes = await getNotificacoes();
@@ -82,6 +106,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       notificacoes={notificacoes}
     >
       {children}
+      {demoBar}
     </AppShell>
   );
 }
