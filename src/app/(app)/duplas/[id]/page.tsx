@@ -22,10 +22,10 @@ import {
   formatDate,
   formatDateTime,
   jornadaDaDupla,
+  registroTardio,
   saudadeDaDupla,
   toDateStr,
   totalEncontros,
-
 } from "@/lib/ciclo";
 import { SemaforoBadge, SemaforoDot } from "@/components/semaforo";
 import { NudgeButton } from "@/components/nudge-button";
@@ -435,11 +435,7 @@ function EncontroRow({
     msAteInicio <= 15 * 60000 &&
     msAteInicio >= -2 * 3600000;
   // registro feito mais de 3 dias depois do encontro → "registro tardio"
-  const aconteceuEm = encontro?.realizado_em ?? encontro?.data_hora ?? null;
-  const tardio =
-    reg != null &&
-    aconteceuEm != null &&
-    new Date(reg.created_at).getTime() - new Date(aconteceuEm).getTime() > 3 * 86400000;
+  const tardio = reg != null && registroTardio(reg, encontro);
   // CTA e form de registro: realizado libera na hora; pros demais status
   // (agendado vencido, não-aconteceu) só depois do horário — RevelarApos cobre
   // a aba que ficou aberta atravessando o encontro, sem depender de re-render

@@ -605,6 +605,55 @@ export function formatDiaMes(iso: string | null | undefined): string {
   return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", timeZone: TZ });
 }
 
+/** "15" — só o dia, pro nó da timeline de /registros. */
+export function formatDiaNum(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const d = paraData(iso);
+  if (isNaN(d.getTime())) return "";
+  return d.toLocaleDateString("pt-BR", { day: "2-digit", timeZone: TZ });
+}
+
+/** "set" — mês abreviado sem o ponto que o Intl pt-BR devolve ("set."). */
+export function formatMesAbrev(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const d = paraData(iso);
+  if (isNaN(d.getTime())) return "";
+  return d
+    .toLocaleDateString("pt-BR", { month: "short", timeZone: TZ })
+    .replace(/\.$/, "");
+}
+
+const TRES_DIAS_MS = 3 * 86400000;
+
+/** Registro tardio: entregue mais de 3 dias depois de o encontro acontecer.
+ *  Sem `realizado_em` cai na `data_hora` agendada; sem nenhuma das duas não dá
+ *  pra atrasar → false. (Antes essa conta vivia duplicada em 3 componentes.) */
+export function registroTardio(
+  registro: { created_at: string },
+  encontro?: { realizado_em: string | null; data_hora: string | null } | null
+): boolean {
+  const quando = encontro?.realizado_em ?? encontro?.data_hora;
+  return (
+    quando != null &&
+    new Date(registro.created_at).getTime() - new Date(quando).getTime() >
+      TRES_DIAS_MS
+  );
+}
+
+/** Dias inteiros entre o encontro e a entrega do registro (0 quando não tardio). */
+export function diasAtrasoRegistro(
+  registro: { created_at: string },
+  encontro?: { realizado_em: string | null; data_hora: string | null } | null
+): number {
+  const quando = encontro?.realizado_em ?? encontro?.data_hora;
+  if (quando == null) return 0;
+  const dias = Math.round(
+    (new Date(registro.created_at).getTime() - new Date(quando).getTime()) /
+      86400000
+  );
+  return Math.max(0, dias);
+}
+
 /** "terça-feira" — dia da semana por extenso; "" se a data for inválida. */
 export function formatDiaSemana(iso: string | null | undefined): string {
   if (!iso) return "";

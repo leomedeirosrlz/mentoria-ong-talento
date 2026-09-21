@@ -23,7 +23,7 @@ import { RegistroView } from "@/components/registro-view";
 import { ResolverApoioButton } from "@/components/resolver-apoio-button";
 import { formatTamanho } from "@/components/anexos-registro";
 import { createClient } from "@/lib/supabase/client";
-import { formatDate, formatDateTime, formatDiaMes } from "@/lib/ciclo";
+import { formatDate, formatDateTime, formatDiaMes, registroTardio } from "@/lib/ciclo";
 import type {
   CicloEvento,
   Dupla,
@@ -69,12 +69,7 @@ export function EncontroDetalheDialog({
   const combinados = reg
     ? (dupla.encaminhamentos ?? []).filter((e) => e.registro_id === reg.id)
     : [];
-  const tardio =
-    reg != null &&
-    (encontro.realizado_em ?? encontro.data_hora) != null &&
-    new Date(reg.created_at).getTime() -
-      new Date(encontro.realizado_em ?? encontro.data_hora!).getTime() >
-      3 * 86400000;
+  const tardio = reg != null && registroTardio(reg, encontro);
 
   // anexos não vêm no payload da agenda — busca sob demanda ao abrir;
   // fecha/troca de registro → reseta (sem flash da lista velha ao reabrir)

@@ -1,43 +1,43 @@
 import { Skeleton } from "@/components/ui/skeleton";
 
-// Espelho de /registros: header, chips de triagem, barra de filtros e grupos
-// com overline + card de linhas (nomes, meta, preview, badges).
+// Espelho de /registros: header, resumo operacional, barra busca+filtros e a
+// timeline (rail dia/mês + nó + linha) com cards.
 export default function Loading() {
   return (
-    <div role="status" aria-label="Carregando" className="space-y-6">
+    <div role="status" aria-label="Carregando" className="mx-auto max-w-3xl space-y-6">
       <header>
-        <Skeleton className="h-8 w-32" />
+        <Skeleton className="h-9 w-32" />
         <Skeleton className="mt-2 h-4 w-80 max-w-full" />
       </header>
-      <div className="flex gap-2">
-        <Skeleton className="h-6 w-44 rounded-full" />
-        <Skeleton className="h-6 w-36 rounded-full" />
+      <Skeleton className="h-4 w-72 max-w-full" />
+      <div className="flex items-center gap-2">
+        <Skeleton className="h-11 flex-1 rounded-lg sm:h-8 sm:max-w-md" />
+        <Skeleton className="h-11 w-24 rounded-lg sm:h-8" />
       </div>
-      <div className="grid grid-cols-2 gap-2 sm:flex">
-        <Skeleton className="col-span-2 h-11 rounded-lg sm:h-8 sm:flex-1" />
-        <Skeleton className="h-11 rounded-lg sm:h-8 sm:w-36" />
-        <Skeleton className="h-11 rounded-lg sm:h-8 sm:w-36" />
-        <Skeleton className="h-11 rounded-lg sm:h-8 sm:w-36" />
-        <Skeleton className="h-11 rounded-lg sm:h-8 sm:w-44" />
-      </div>
-      {[3, 2].map((rows, g) => (
-        <section key={g} className="space-y-2">
-          <Skeleton className="h-3 w-40" />
-          <div className="divide-y divide-border overflow-hidden rounded-xl bg-card shadow-[var(--shadow-border)]">
-            {Array.from({ length: rows }, (_, i) => (
-              <div key={i} className="px-4 py-3">
-                <Skeleton className="h-4 w-2/5" />
-                <Skeleton className="mt-1.5 h-3 w-1/3" />
-                <Skeleton className="mt-1.5 h-4 w-4/5" />
+      <ol>
+        {[0, 1, 2].map((i) => (
+          <li key={i} className="flex gap-3 sm:gap-4">
+            <div className="flex w-10 shrink-0 flex-col items-center sm:w-12">
+              <Skeleton className="mt-4 h-4 w-5" />
+              <Skeleton className="mt-1 h-2.5 w-6" />
+              <Skeleton className="mt-2 size-2 rounded-full" />
+              {i < 2 && <div className="mt-1.5 w-px flex-1 bg-border" />}
+            </div>
+            <div className={i < 2 ? "min-w-0 flex-1 pb-5" : "min-w-0 flex-1"}>
+              <div className="rounded-xl bg-card px-4 py-3.5 shadow-[var(--shadow-border)] sm:px-5">
+                <Skeleton className="h-5 w-3/5" />
+                <Skeleton className="mt-2 h-4 w-2/5" />
+                <Skeleton className="mt-1.5 h-3 w-4/5" />
+                <Skeleton className="mt-2 h-4 w-full" />
                 <div className="mt-2 flex gap-1.5">
-                  <Skeleton className="h-5 w-16 rounded-4xl" />
-                  <Skeleton className="h-5 w-24 rounded-4xl" />
+                  <Skeleton className="h-5 w-28 rounded-4xl" />
+                  <Skeleton className="h-5 w-20 rounded-4xl" />
                 </div>
               </div>
-            ))}
-          </div>
-        </section>
-      ))}
+            </div>
+          </li>
+        ))}
+      </ol>
     </div>
   );
 }

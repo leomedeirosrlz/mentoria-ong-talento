@@ -135,7 +135,7 @@ export function AppShell({
           })}
         </nav>
 
-        <div className="p-3 border-t border-sidebar-border">
+        <div className="border-t border-sidebar-border px-3 pb-4 pt-4">
           <div className="flex items-center gap-1">
             <Link
               href="/perfil"
@@ -153,7 +153,7 @@ export function AppShell({
             <NotificacoesBell side="right" align="end" />
           </div>
           <form action={signOut}>
-            <button type="submit" className="mt-1 flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors">
+            <button type="submit" className="mt-2 flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors">
               <SignOut size={18} aria-hidden />
               Sair
             </button>

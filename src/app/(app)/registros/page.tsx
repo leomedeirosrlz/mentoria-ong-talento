@@ -15,10 +15,14 @@ import {
 import {
   AVALIACAO_LABEL,
   DIFICULDADE_LABEL,
+  formatDiaNum,
+  formatMesAbrev,
+  registroTardio,
   totalEncontros,
 } from "@/lib/ciclo";
 import { RegistrosFiltros } from "@/components/registros-filtros";
-import { RegistroRow } from "@/components/registro-row";
+import { RegistroCard } from "@/components/registro-card";
+import { cn } from "@/lib/utils";
 import type { AvaliacaoJovem, Dificuldade } from "@/lib/types";
 
 export const metadata: Metadata = { title: "Registros" };
@@ -46,6 +50,7 @@ function parseFiltros(
   if (avaliacao && Object.hasOwn(AVALIACAO_LABEL, avaliacao))
     f.avaliacao = avaliacao as AvaliacaoJovem;
   if (primeiro(p.apoio) === "1") f.apoio = true;
+  if (primeiro(p.tardio) === "1") f.tardio = true;
   const dificuldade = primeiro(p.dificuldade);
   if (dificuldade === "com" || (dificuldade && Object.hasOwn(DIFICULDADE_LABEL, dificuldade)))
     f.dificuldade = dificuldade as Dificuldade | "com";
@@ -67,6 +72,13 @@ function scoreAlerta(r: RegistroResumo): number {
   return 0;
 }
 
+/** A data que a timeline exibe — quando o encontro aconteceu de fato. */
+function aconteceuEmDe(r: RegistroResumo): string {
+  return (
+    r.encontro?.realizado_em ?? r.encontro?.data_hora ?? r.created_at
+  );
+}
+
 export default async function RegistrosPage({
   searchParams,
 }: {
@@ -86,28 +98,26 @@ export default async function RegistrosPage({
     getAlertasRegistros(),
   ]);
 
-  const eventoPorNumero = new Map(
-    eventos.filter((e) => e.tipo === "encontro" && e.numero != null).map((e) => [e.numero!, e])
+  const tituloEncontro = new Map(
+    eventos
+      .filter((e) => e.tipo === "encontro" && e.numero != null)
+      .map((e) => [e.numero!, e.titulo])
   );
-  const grupos = new Map<number, RegistroResumo[]>();
-  for (const r of itens) {
-    const n = r.encontro?.numero ?? 0;
-    const g = grupos.get(n) ?? [];
-    g.push(r);
-    grupos.set(n, g);
-  }
-  const gruposOrd = [...grupos.entries()].sort((a, b) => b[0] - a[0]);
-  for (const regs of gruposOrd.map(([, g]) => g))
-    regs.sort(
-      (a, b) =>
-        scoreAlerta(b) - scoreAlerta(a) ||
-        b.created_at.localeCompare(a.created_at)
-    );
+
+  // o banco já ordena por realizado_em; o sort estável acerta a fatia
+  // carregada e empurra quem pede atenção pra cima dentro do mesmo dia
+  const ordenados = [...itens].sort(
+    (a, b) =>
+      aconteceuEmDe(b).localeCompare(aconteceuEmDe(a)) ||
+      scoreAlerta(b) - scoreAlerta(a) ||
+      b.created_at.localeCompare(a.created_at)
+  );
 
   const temFiltro = !!(
     filtros.encontro ||
     filtros.avaliacao ||
     filtros.apoio ||
+    filtros.tardio ||
     filtros.dificuldade ||
     filtros.dupla ||
     filtros.q
@@ -117,6 +127,7 @@ export default async function RegistrosPage({
     if (filtros.encontro) p.set("encontro", String(filtros.encontro));
     if (filtros.avaliacao) p.set("avaliacao", filtros.avaliacao);
     if (filtros.apoio) p.set("apoio", "1");
+    if (filtros.tardio) p.set("tardio", "1");
     if (filtros.dificuldade) p.set("dificuldade", filtros.dificuldade);
     if (filtros.dupla) p.set("dupla", filtros.dupla);
     if (filtros.q) p.set("q", filtros.q);
@@ -125,9 +136,9 @@ export default async function RegistrosPage({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="mx-auto max-w-3xl space-y-6">
       <header>
-        <h1 className="text-2xl font-semibold tracking-tight">Registros</h1>
+        <h1 className="text-3xl font-bold tracking-tight">Registros</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           {souCoord
             ? "O que os mentores reportaram em cada encontro — todas as duplas"
@@ -135,46 +146,58 @@ export default async function RegistrosPage({
         </p>
       </header>
 
-      {/* triagem: contagens globais do papel, clicáveis pro filtro */}
-      {(alertas.apoio > 0 || alertas.baixa > 0 || alertas.comDificuldade > 0) && (
-        <div
-          role="group"
-          className="flex flex-wrap gap-2"
-          aria-label="Sinais de atenção"
-        >
+      {/* resumo operacional: o que pede ação vem antes da busca; clicar num
+          número aplica o filtro correspondente */}
+      {(total > 0 || alertas.apoio > 0 || alertas.tardios > 0) && (
+        <p className="text-sm text-muted-foreground" aria-live="polite">
+          {temFiltro ? (
+            <Link
+              href="/registros"
+              scroll={false}
+              className="font-medium text-foreground underline-offset-4 transition-colors hover:underline"
+            >
+              {total} {total === 1 ? "registro" : "registros"}
+            </Link>
+          ) : (
+            <span className="font-medium text-foreground">
+              {total} {total === 1 ? "registro" : "registros"}
+            </span>
+          )}
+          {itens.length < total && ` · mostrando ${itens.length}`}
           {alertas.apoio > 0 && (
-            <Link
-              href="/registros?apoio=1"
-              className="inline-flex min-h-9 items-center rounded-full border border-[var(--danger)]/50 px-3 text-xs font-medium text-[var(--danger)] transition-colors hover:bg-[var(--danger)]/5"
-            >
-              {alertas.apoio}{" "}
-              {alertas.apoio === 1 ? "pedido de apoio" : "pedidos de apoio"} em
-              aberto
-            </Link>
+            <>
+              {" · "}
+              <Link
+                href="/registros?apoio=1"
+                scroll={false}
+                aria-current={filtros.apoio ? "true" : undefined}
+                className="font-medium text-[var(--danger)] underline-offset-4 transition-colors hover:underline"
+              >
+                {alertas.apoio}{" "}
+                {alertas.apoio === 1 ? "apoio em aberto" : "apoios em aberto"}
+              </Link>
+            </>
           )}
-          {alertas.baixa > 0 && (
-            <Link
-              href="/registros?avaliacao=baixa"
-              className="inline-flex min-h-9 items-center rounded-full border border-[var(--warn)]/60 px-3 text-xs font-medium text-[var(--warn-text)] transition-colors hover:bg-[var(--warn)]/5"
-            >
-              {alertas.baixa}{" "}
-              {alertas.baixa === 1 ? "avaliação baixa" : "avaliações baixas"}
-            </Link>
+          {alertas.tardios > 0 && (
+            <>
+              {" · "}
+              <Link
+                href="/registros?tardio=1"
+                scroll={false}
+                aria-current={filtros.tardio ? "true" : undefined}
+                className="font-medium text-[var(--warn-text)] underline-offset-4 transition-colors hover:underline"
+              >
+                {alertas.tardios}{" "}
+                {alertas.tardios === 1 ? "registro tardio" : "registros tardios"}
+              </Link>
+            </>
           )}
-          {alertas.comDificuldade > 0 && (
-            <Link
-              href="/registros?dificuldade=com"
-              className="inline-flex min-h-9 items-center rounded-full border px-3 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted"
-            >
-              {alertas.comDificuldade} com dificuldade sinalizada
-            </Link>
-          )}
-        </div>
+        </p>
       )}
 
       <RegistrosFiltros filtros={filtros} duplas={duplas} maxEncontro={maxEncontro} />
 
-      {itens.length === 0 ? (
+      {ordenados.length === 0 ? (
         <div className="rounded-xl bg-card px-6 py-10 text-center shadow-[var(--shadow-border)]">
           <p className="font-medium">
             {temFiltro
@@ -195,29 +218,61 @@ export default async function RegistrosPage({
         </div>
       ) : (
         <>
-          <p className="text-xs text-muted-foreground" aria-live="polite">
-            {total} {total === 1 ? "registro" : "registros"}
-            {itens.length < total ? ` · mostrando ${itens.length}` : ""}
-          </p>
-          {gruposOrd.map(([numero, regs], i) => (
-            <section
-              key={numero}
-              className="animate-enter space-y-2"
-              style={{ "--i": Math.min(i, 10) } as CSSProperties}
-            >
-              <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                {numero}º encontro
-                {eventoPorNumero.get(numero)
-                  ? ` · ${eventoPorNumero.get(numero)!.titulo}`
-                  : ""}
-              </h2>
-              <div className="divide-y divide-border overflow-hidden rounded-xl bg-card shadow-[var(--shadow-border)]">
-                {regs.map((r) => (
-                  <RegistroRow key={r.id} r={r} souCoord={souCoord} />
-                ))}
-              </div>
-            </section>
-          ))}
+          {/* timeline: o rail mostra o dia em que o encontro aconteceu e a
+              linha conecta os nós — a página conta a sequência, não uma
+              coleção genérica de cards */}
+          <ol>
+            {ordenados.map((r, i) => {
+              const aconteceuEm = aconteceuEmDe(r);
+              const ultimo = i === ordenados.length - 1;
+              const tardio = registroTardio(r, r.encontro);
+              return (
+                <li
+                  key={r.id}
+                  className="animate-enter flex gap-3 sm:gap-4"
+                  style={{ "--i": Math.min(i, 10) } as CSSProperties}
+                >
+                  <div
+                    aria-hidden
+                    className="flex w-10 shrink-0 flex-col items-center sm:w-12"
+                  >
+                    <p className="pt-4 text-center leading-none">
+                      <span className="block text-sm font-semibold tabular-nums">
+                        {formatDiaNum(aconteceuEm)}
+                      </span>
+                      <span className="mt-1 block text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                        {formatMesAbrev(aconteceuEm)}
+                      </span>
+                    </p>
+                    {/* precedência do nó: apoio > tardio > ok — a cor é sinal
+                        secundário; os badges no card carregam a informação */}
+                    <span
+                      className={cn(
+                        "mt-2 size-2 shrink-0 rounded-full",
+                        r.precisa_apoio
+                          ? "bg-[var(--danger)]"
+                          : tardio
+                            ? "bg-[var(--warn)]"
+                            : "bg-[var(--brand-lime)]"
+                      )}
+                    />
+                    {!ultimo && (
+                      <span className="mt-1.5 w-px flex-1 bg-border" />
+                    )}
+                  </div>
+                  <div className={cn("min-w-0 flex-1", !ultimo && "pb-5")}>
+                    <RegistroCard
+                      r={r}
+                      tituloEncontro={
+                        tituloEncontro.get(r.encontro?.numero ?? 0) ?? null
+                      }
+                      souCoord={souCoord}
+                    />
+                  </div>
+                </li>
+              );
+            })}
+          </ol>
           {itens.length < total && (
             <div className="flex justify-center pt-1">
               <Link

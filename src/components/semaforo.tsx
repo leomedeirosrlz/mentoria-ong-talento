@@ -46,20 +46,22 @@ export function SemaforoBadge({ nivel, motivo }: { nivel: Semaforo; motivo?: str
   );
 }
 
-export function AvaliacaoBadge({ avaliacao }: { avaliacao: string }) {
+/** `rotulo` prefixa "avaliação:" — em listas densas (/registros) a palavra
+ *  solta ("Boa") não diz o que está sendo medida. Vermelho é reservado a
+ *  pedido de apoio: baixa é warn, o texto já carrega a distinção. */
+export function AvaliacaoBadge({ avaliacao, rotulo }: { avaliacao: string; rotulo?: boolean }) {
+  const label = AVALIACAO_LABEL[avaliacao] ?? avaliacao;
   return (
     <Badge
       variant="outline"
       className={cn(
         "text-xs",
-        avaliacao === "baixa"
-          ? "border-[var(--danger)]/60 text-[var(--danger)]"
-          : avaliacao === "regular"
-            ? "border-[var(--warn)]/60 text-[var(--warn-text)]"
-            : "border-[var(--ok)]/60 text-[var(--ok-text)]"
+        avaliacao === "baixa" || avaliacao === "regular"
+          ? "border-[var(--warn)]/60 text-[var(--warn-text)]"
+          : "border-[var(--ok)]/60 text-[var(--ok-text)]"
       )}
     >
-      {AVALIACAO_LABEL[avaliacao] ?? avaliacao}
+      {rotulo ? `avaliação: ${label.toLowerCase()}` : label}
     </Badge>
   );
 }

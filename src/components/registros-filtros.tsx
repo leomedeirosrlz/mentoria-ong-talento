@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Check, Funnel, MagnifyingGlass } from "@phosphor-icons/react";
+import { Check, Funnel, MagnifyingGlass, X } from "@phosphor-icons/react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,6 +19,7 @@ import {
   DIFICULDADE_LABEL,
 } from "@/lib/ciclo";
 import type { DuplaOpcao, FiltrosRegistro } from "@/lib/queries";
+import type { Dificuldade } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 const TODAS = "todas";
@@ -29,6 +31,7 @@ type Draft = {
   dificuldade: string;
   dupla: string;
   apoio: boolean;
+  tardio: boolean;
 };
 
 function draftDe(f: FiltrosRegistro): Draft {
@@ -38,6 +41,7 @@ function draftDe(f: FiltrosRegistro): Draft {
     dificuldade: f.dificuldade ?? TODAS,
     dupla: f.dupla ?? TODAS,
     apoio: !!f.apoio,
+    tardio: !!f.tardio,
   };
 }
 
@@ -79,6 +83,51 @@ function OpcaoPilula({
         className="sr-only"
       />
       {children}
+    </label>
+  );
+}
+
+/** Checkbox do fieldset Sinal — mesmo truque do radio: input sr-only dentro
+ *  do label, estilo via has-checked. */
+function OpcaoCheck({
+  marcado,
+  onChange,
+  children,
+}: {
+  marcado: boolean;
+  onChange: (v: boolean) => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <label
+      className={cn(
+        "flex min-h-10 cursor-pointer items-center gap-2.5 rounded-lg px-3 text-sm transition-colors",
+        "hover:bg-muted has-checked:bg-muted",
+        "has-focus-visible:ring-2 has-focus-visible:ring-ring"
+      )}
+    >
+      <input
+        type="checkbox"
+        checked={marcado}
+        onChange={(e) => onChange(e.target.checked)}
+        className="sr-only"
+      />
+      <span
+        aria-hidden
+        className={cn(
+          "grid size-4.5 shrink-0 place-items-center rounded-[5px] border transition-colors",
+          marcado
+            ? "border-foreground bg-foreground text-background"
+            : "border-input bg-card"
+        )}
+      >
+        <Check
+          size={11}
+          weight="bold"
+          className={marcado ? "opacity-100" : "opacity-0"}
+        />
+      </span>
+      <span className="flex-1">{children}</span>
     </label>
   );
 }
@@ -157,6 +206,7 @@ export function RegistrosFiltros({
     filtros.encontro,
     filtros.avaliacao,
     filtros.apoio,
+    filtros.tardio,
     filtros.dificuldade,
     filtros.dupla,
     filtros.q,
@@ -174,6 +224,7 @@ export function RegistrosFiltros({
       encontro: f.encontro ? String(f.encontro) : undefined,
       avaliacao: f.avaliacao,
       apoio: f.apoio ? "1" : undefined,
+      tardio: f.tardio ? "1" : undefined,
       dificuldade: f.dificuldade,
       dupla: f.dupla,
       q: f.q,
@@ -200,13 +251,15 @@ export function RegistrosFiltros({
     (filtros.avaliacao ? 1 : 0) +
     (filtros.dificuldade ? 1 : 0) +
     (filtros.dupla ? 1 : 0) +
-    (filtros.apoio ? 1 : 0);
+    (filtros.apoio ? 1 : 0) +
+    (filtros.tardio ? 1 : 0);
   const draftAtivos =
     (draft.encontro !== TODAS ? 1 : 0) +
     (draft.avaliacao !== TODAS ? 1 : 0) +
     (draft.dificuldade !== TODAS ? 1 : 0) +
     (draft.dupla !== TODAS ? 1 : 0) +
-    (draft.apoio ? 1 : 0);
+    (draft.apoio ? 1 : 0) +
+    (draft.tardio ? 1 : 0);
 
   function aplicarDraft() {
     const p = new URLSearchParams();
@@ -215,64 +268,135 @@ export function RegistrosFiltros({
     if (draft.dificuldade !== TODAS) p.set("dificuldade", draft.dificuldade);
     if (draft.dupla !== TODAS) p.set("dupla", draft.dupla);
     if (draft.apoio) p.set("apoio", "1");
+    if (draft.tardio) p.set("tardio", "1");
     if (filtrosRef.current.q) p.set("q", filtrosRef.current.q);
     const qs = p.toString();
     router.replace(`/registros${qs ? `?${qs}` : ""}`, { scroll: false });
     setAberto(false);
   }
 
-  const sel = (k: keyof Omit<Draft, "apoio">) => (v: string) =>
+  // chips removíveis sob a barra — cada um limpa um param e mantém os demais
+  const sem = (k: string) => {
+    const p = new URLSearchParams();
+    const atual: Record<string, string | undefined> = {
+      encontro: filtros.encontro ? String(filtros.encontro) : undefined,
+      avaliacao: filtros.avaliacao,
+      apoio: filtros.apoio ? "1" : undefined,
+      tardio: filtros.tardio ? "1" : undefined,
+      dificuldade: filtros.dificuldade,
+      dupla: filtros.dupla,
+      q: filtros.q,
+    };
+    delete atual[k];
+    for (const [chave, v] of Object.entries(atual)) if (v) p.set(chave, v);
+    const qs = p.toString();
+    return `/registros${qs ? `?${qs}` : ""}`;
+  };
+  const chips: { rotulo: string; href: string }[] = [];
+  if (filtros.encontro)
+    chips.push({ rotulo: `Encontro: ${filtros.encontro}º`, href: sem("encontro") });
+  if (filtros.avaliacao)
+    chips.push({
+      rotulo: `Avaliação: ${AVALIACAO_LABEL[filtros.avaliacao]}`,
+      href: sem("avaliacao"),
+    });
+  if (filtros.dificuldade)
+    chips.push({
+      rotulo:
+        filtros.dificuldade === "com"
+          ? "Dificuldade sinalizada"
+          : `Dificuldade: ${DIFICULDADE_LABEL[filtros.dificuldade as Dificuldade] ?? filtros.dificuldade}`,
+      href: sem("dificuldade"),
+    });
+  if (filtros.dupla) {
+    const d = duplas.find((x) => x.id === filtros.dupla);
+    chips.push({
+      rotulo: `Dupla: ${d ? `${d.mentor?.nome ?? "—"} e ${d.mentorado?.nome ?? "—"}` : "selecionada"}`,
+      href: sem("dupla"),
+    });
+  }
+  if (filtros.apoio) chips.push({ rotulo: "Apoio em aberto", href: sem("apoio") });
+  if (filtros.tardio) chips.push({ rotulo: "Registros tardios", href: sem("tardio") });
+  if (filtros.q) chips.push({ rotulo: `Busca: “${filtros.q}”`, href: sem("q") });
+
+  const sel = (k: keyof Omit<Draft, "apoio" | "tardio">) => (v: string) =>
     setDraft((d) => ({ ...d, [k]: v }));
 
   return (
     <>
-      <div
-        role="search"
-        aria-label="Filtrar registros"
-        className="flex items-end gap-2"
-      >
-        <div className="min-w-0 flex-1 space-y-1.5 sm:max-w-md">
-          <label htmlFor="flt-busca" className={cn("block", OVERLINE)}>
-            Busca
-          </label>
-          <div className="relative">
+      <div className="space-y-2.5">
+        <div
+          role="search"
+          aria-label="Filtrar registros"
+          className="flex items-center gap-2"
+        >
+          {/* placeholder + ícone já comunicam o campo — sem label visual;
+              aria-label mantém o nome acessível */}
+          <div className="relative min-w-0 flex-1 sm:max-w-md">
             <MagnifyingGlass
               size={15}
               aria-hidden
               className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
             />
             <Input
-              id="flt-busca"
               type="search"
+              aria-label="Buscar nos registros"
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              placeholder="Tema, reflexão ou observação"
+              placeholder="Buscar nos registros"
               className="pl-8"
             />
           </div>
+          <Button
+            type="button"
+            variant={ativos > 0 ? "default" : "outline"}
+            onClick={() => {
+              setDraft(draftDe(filtrosRef.current));
+              setAberto(true);
+            }}
+            aria-label={
+              ativos > 0 ? `Filtros — ${ativos} ativos` : "Filtros"
+            }
+          >
+            <Funnel size={16} aria-hidden />
+            Filtros
+            {ativos > 0 && (
+              <span
+                aria-hidden
+                className="grid size-5 place-items-center rounded-full bg-[var(--brand-lime)] text-[11px] font-bold text-[var(--brand-ink)]"
+              >
+                {ativos}
+              </span>
+            )}
+          </Button>
         </div>
-        <Button
-          type="button"
-          variant={ativos > 0 ? "default" : "outline"}
-          onClick={() => {
-            setDraft(draftDe(filtrosRef.current));
-            setAberto(true);
-          }}
-          aria-label={
-            ativos > 0 ? `Filtros — ${ativos} ativos` : "Filtros"
-          }
-        >
-          <Funnel size={16} aria-hidden />
-          Filtros
-          {ativos > 0 && (
-            <span
-              aria-hidden
-              className="grid size-5 place-items-center rounded-full bg-[var(--brand-lime)] text-[11px] font-bold text-[var(--brand-ink)]"
-            >
-              {ativos}
-            </span>
-          )}
-        </Button>
+
+        {chips.length > 0 && (
+          <ul className="flex flex-wrap items-center gap-1.5" aria-label="Filtros ativos">
+            {chips.map((c) => (
+              <li key={c.rotulo}>
+                <Link
+                  href={c.href}
+                  scroll={false}
+                  aria-label={`Remover filtro ${c.rotulo}`}
+                  className="inline-flex min-h-11 items-center gap-1 rounded-full border bg-card px-3 text-xs font-medium transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)] sm:min-h-7"
+                >
+                  {c.rotulo}
+                  <X size={12} aria-hidden className="text-muted-foreground" />
+                </Link>
+              </li>
+            ))}
+            <li>
+              <Link
+                href="/registros"
+                scroll={false}
+                className="inline-flex min-h-11 items-center px-2 text-xs text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline sm:min-h-7"
+              >
+                Limpar tudo
+              </Link>
+            </li>
+          </ul>
+        )}
       </div>
 
       <Dialog open={aberto} onOpenChange={setAberto}>
@@ -287,40 +411,20 @@ export function RegistrosFiltros({
           <div className="space-y-5">
             <fieldset>
               <legend className={OVERLINE}>Sinal</legend>
-              <label
-                className={cn(
-                  "mt-1.5 flex min-h-10 cursor-pointer items-center gap-2.5 rounded-lg px-3 text-sm transition-colors",
-                  "hover:bg-muted has-checked:bg-muted",
-                  "has-focus-visible:ring-2 has-focus-visible:ring-ring"
-                )}
-              >
-                <input
-                  type="checkbox"
-                  checked={draft.apoio}
-                  onChange={(e) =>
-                    setDraft((d) => ({ ...d, apoio: e.target.checked }))
-                  }
-                  className="sr-only"
-                />
-                <span
-                  aria-hidden
-                  className={cn(
-                    "grid size-4.5 shrink-0 place-items-center rounded-[5px] border transition-colors",
-                    draft.apoio
-                      ? "border-foreground bg-foreground text-background"
-                      : "border-input bg-card"
-                  )}
+              <div className="mt-1.5 -mx-1 space-y-0.5">
+                <OpcaoCheck
+                  marcado={draft.apoio}
+                  onChange={(v) => setDraft((d) => ({ ...d, apoio: v }))}
                 >
-                  <Check
-                    size={11}
-                    weight="bold"
-                    className={draft.apoio ? "opacity-100" : "opacity-0"}
-                  />
-                </span>
-                <span className="flex-1">
                   Somente pedidos de apoio em aberto
-                </span>
-              </label>
+                </OpcaoCheck>
+                <OpcaoCheck
+                  marcado={draft.tardio}
+                  onChange={(v) => setDraft((d) => ({ ...d, tardio: v }))}
+                >
+                  Somente registros tardios
+                </OpcaoCheck>
+              </div>
             </fieldset>
 
             <fieldset>
@@ -448,6 +552,7 @@ export function RegistrosFiltros({
                   dificuldade: TODAS,
                   dupla: TODAS,
                   apoio: false,
+                  tardio: false,
                 })
               }
             >

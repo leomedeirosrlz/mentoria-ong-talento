@@ -1,5 +1,6 @@
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
+import { registroTardio } from "./ciclo";
 import type { AvaliacaoJovem, CicloEvento, Comunicado, Dupla, DuplaResumo, DuplaStatus, EncontroStatus, Material, Mentorado, Notificacao, PessoaNota, Profile, Registro } from "./types";
 
 // getClaims valida o JWT localmente (sem round-trip); RLS segue valendo no banco.
@@ -296,6 +297,9 @@ export type FiltrosRegistro = {
   dupla?: string;
   /** busca em tema/reflexões/observações — já sanitizada. */
   q?: string;
+  /** created_at > realizado_em ?? data_hora + 3d — PostgREST não compara
+   *  colunas, então esse filtro é aplicado em JS sobre o resultado completo. */
+  tardio?: boolean;
   /** cumulativa: página 2 devolve as 2 primeiras páginas (grupos não quebram). */
   pagina: number;
 };
@@ -327,11 +331,15 @@ export async function getRegistros(
     .from("registros")
     .select(REGISTRO_RESUMO_SELECT, { count: "exact" })
     // o !inner no encontro é o que permite filtrar/ordenar por coluna do
-    // embed — to-one ordena com `encontro(numero)` (referencedTable seria
-    // ignorado: ordena dentro de embed to-many, não o top-level)
-    .order("encontro(numero)", { ascending: false })
-    .order("created_at", { ascending: false })
-    .range(0, f.pagina * REGISTROS_PAGINA - 1);
+    // embed — to-one ordena com `encontro(col)` (referencedTable seria
+    // ignorado: ordena dentro de embed to-many, não o top-level). A timeline
+    // de /registros conta a história por data do encontro, não por número.
+    .order("encontro(realizado_em)", { ascending: false, nullsFirst: false })
+    .order("encontro(data_hora)", { ascending: false })
+    .order("created_at", { ascending: false });
+  // com f.tardio o corte é em JS (comparação entre colunas não existe em
+  // PostgREST) — pedir range aqui paginaria o conjunto errado
+  if (!f.tardio) q = q.range(0, f.pagina * REGISTROS_PAGINA - 1);
   if (f.encontro) q = q.eq("encontro.numero", f.encontro);
   if (f.dupla) q = q.eq("encontro.dupla_id", f.dupla);
   if (f.avaliacao) q = q.eq("avaliacao", f.avaliacao);
@@ -345,13 +353,18 @@ export async function getRegistros(
   const { data, error, count } = await q;
   if (error) throw error;
   const norm = (v: unknown) => (Array.isArray(v) ? (v[0] ?? null) : v);
-  const itens = ((data ?? []) as unknown as RegistroResumo[]).map((r) => ({
+  let itens = ((data ?? []) as unknown as RegistroResumo[]).map((r) => ({
     ...r,
     autor: norm(r.autor),
     encontro: r.encontro
       ? { ...r.encontro, dupla: norm(r.encontro.dupla) }
       : null,
   }));
+  if (f.tardio) {
+    itens = itens.filter((r) => registroTardio(r, r.encontro));
+    // o count do PostgREST ignorou o filtro JS — o total real é o que sobrou
+    return { itens, total: itens.length };
+  }
   return { itens, total: count ?? 0 };
 }
 
@@ -360,20 +373,32 @@ export async function getAlertasRegistros(): Promise<{
   apoio: number;
   baixa: number;
   comDificuldade: number;
+  tardios: number;
 }> {
   const supabase = await createClient();
   const head = { count: "exact" as const, head: true };
-  const [apoio, baixa, dif] = await Promise.all([
+  const [apoio, baixa, dif, tData] = await Promise.all([
     supabase.from("registros").select("*", head).eq("precisa_apoio", true),
     supabase.from("registros").select("*", head).eq("avaliacao", "baixa"),
     supabase.from("registros").select("*", head).neq("dificuldade", "nenhuma"),
+    // tardio compara created_at com a data do encontro — head:true não
+    // comporta isso, então esse é um select real de colunas mínimas (RLS
+    // já limita ao escopo; volume ≈ 16 × nº de duplas por ciclo)
+    supabase
+      .from("registros")
+      .select("created_at, encontro:encontros!inner(realizado_em, data_hora)"),
   ]);
-  const err = apoio.error ?? baixa.error ?? dif.error;
+  const err = apoio.error ?? baixa.error ?? dif.error ?? tData.error;
   if (err) console.error("getAlertasRegistros:", err);
+  const tardios = (tData.data ?? []).filter((r) => {
+    const enc = Array.isArray(r.encontro) ? r.encontro[0] : r.encontro;
+    return registroTardio(r, enc);
+  }).length;
   return {
     apoio: apoio.count ?? 0,
     baixa: baixa.count ?? 0,
     comDificuldade: dif.count ?? 0,
+    tardios,
   };
 }
 
