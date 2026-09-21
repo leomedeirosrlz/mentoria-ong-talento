@@ -33,24 +33,43 @@ export function RegistrosFiltros({
   const router = useRouter();
   const [q, setQ] = useState(filtros.q ?? "");
   const timer = useRef<ReturnType<typeof setTimeout>>(null);
+  // filtros da prop congelam no render que armou o timer — o debounce leria
+  // valores velhos e reverteria um Select trocado dentro dos 350ms
+  const filtrosRef = useRef(filtros);
+  useEffect(() => {
+    filtrosRef.current = filtros;
+  });
+  // echo local: o Select mostra a escolha já, sem esperar o roundtrip do RSC
+  const [echo, setEcho] = useState<Record<string, string | undefined>>({});
 
-  // params de fora (chip de triagem, limpar) sincronizam o campo de busca
-  const qExterno = filtros.q ?? "";
-  const [qSincronizado, setQSincronizado] = useState(qExterno);
-  if (qExterno !== qSincronizado) {
-    setQSincronizado(qExterno);
-    setQ(qExterno);
+  // qualquer mudança de filtro (Select, chip de triagem, limpar, debounce)
+  // resincroniza o estado local — eco só vale até a URL refletir a escolha
+  const assinatura = JSON.stringify([
+    filtros.encontro,
+    filtros.avaliacao,
+    filtros.apoio,
+    filtros.dificuldade,
+    filtros.dupla,
+    filtros.q,
+  ]);
+  const [sync, setSync] = useState(assinatura);
+  if (assinatura !== sync) {
+    setSync(assinatura);
+    setEcho({});
+    setQ(filtros.q ?? "");
   }
 
   function aplicar(patch: Record<string, string | null>) {
+    setEcho((e) => ({ ...e, ...Object.fromEntries(Object.entries(patch).map(([k, v]) => [k, v ?? undefined])) }));
+    const f = filtrosRef.current;
     const p = new URLSearchParams();
     const atual: Record<string, string | undefined> = {
-      encontro: filtros.encontro ? String(filtros.encontro) : undefined,
-      avaliacao: filtros.avaliacao,
-      apoio: filtros.apoio ? "1" : undefined,
-      dificuldade: filtros.dificuldade,
-      dupla: filtros.dupla,
-      q: filtros.q,
+      encontro: f.encontro ? String(f.encontro) : undefined,
+      avaliacao: f.avaliacao,
+      apoio: f.apoio ? "1" : undefined,
+      dificuldade: f.dificuldade,
+      dupla: f.dupla,
+      q: f.q,
       ...patch,
     };
     for (const [k, v] of Object.entries(atual)) if (v) p.set(k, v);
@@ -68,6 +87,12 @@ export function RegistrosFiltros({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- aplicar depende dos filtros; só q dispara
   }, [q]);
+
+  // valor exibido: echo imediato se a chave foi tocada, senão o da URL
+  const val = (
+    k: "encontro" | "avaliacao" | "dificuldade" | "dupla",
+    atual?: string | number | null
+  ) => (k in echo ? echo[k] : atual != null ? String(atual) : TODAS) ?? TODAS;
 
   const triggerCls = "w-full sm:w-auto sm:min-w-36";
 
@@ -93,7 +118,7 @@ export function RegistrosFiltros({
         />
       </div>
       <Select
-        value={filtros.encontro ? String(filtros.encontro) : TODAS}
+        value={val("encontro", filtros.encontro)}
         onValueChange={(v) =>
           aplicar({ encontro: v === TODAS ? null : String(v) })
         }
@@ -111,7 +136,7 @@ export function RegistrosFiltros({
         </SelectContent>
       </Select>
       <Select
-        value={filtros.avaliacao ?? TODAS}
+        value={val("avaliacao", filtros.avaliacao)}
         onValueChange={(v) =>
           aplicar({ avaliacao: v === TODAS ? null : String(v) })
         }
@@ -129,7 +154,7 @@ export function RegistrosFiltros({
         </SelectContent>
       </Select>
       <Select
-        value={filtros.dificuldade ?? TODAS}
+        value={val("dificuldade", filtros.dificuldade)}
         onValueChange={(v) =>
           aplicar({ dificuldade: v === TODAS ? null : String(v) })
         }
@@ -148,7 +173,7 @@ export function RegistrosFiltros({
         </SelectContent>
       </Select>
       <Select
-        value={filtros.dupla ?? TODAS}
+        value={val("dupla", filtros.dupla)}
         onValueChange={(v) => aplicar({ dupla: v === TODAS ? null : String(v) })}
       >
         <SelectTrigger

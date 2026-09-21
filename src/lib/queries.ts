@@ -326,8 +326,10 @@ export async function getRegistros(
   let q = supabase
     .from("registros")
     .select(REGISTRO_RESUMO_SELECT, { count: "exact" })
-    // o !inner no encontro é o que permite filtrar/ordenar por coluna do embed
-    .order("numero", { referencedTable: "encontros", ascending: false })
+    // o !inner no encontro é o que permite filtrar/ordenar por coluna do
+    // embed — to-one ordena com `encontro(numero)` (referencedTable seria
+    // ignorado: ordena dentro de embed to-many, não o top-level)
+    .order("encontro(numero)", { ascending: false })
     .order("created_at", { ascending: false })
     .range(0, f.pagina * REGISTROS_PAGINA - 1);
   if (f.encontro) q = q.eq("encontro.numero", f.encontro);
@@ -364,7 +366,7 @@ export async function getAlertasRegistros(): Promise<{
   const [apoio, baixa, dif] = await Promise.all([
     supabase.from("registros").select("*", head).eq("precisa_apoio", true),
     supabase.from("registros").select("*", head).eq("avaliacao", "baixa"),
-    supabase.from("registros").select("*", head).neq("dificuldade", "nenhuma").not("dificuldade", "is", null),
+    supabase.from("registros").select("*", head).neq("dificuldade", "nenhuma"),
   ]);
   const err = apoio.error ?? baixa.error ?? dif.error;
   if (err) console.error("getAlertasRegistros:", err);

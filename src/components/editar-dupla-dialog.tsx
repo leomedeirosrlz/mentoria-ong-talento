@@ -117,8 +117,15 @@ export function EditarDuplaDialog({ dupla }: { dupla: Dupla }) {
   // selects longos (>7): relevância antes de alfabética — quem pode ser
   // escolhido aparece primeiro, disabled afunda, nome (pt-BR) só desempata
   const mentoresOrd = [...mentores].sort((a, b) => {
-    const livresA = (capacidade[a.id] ?? 1) - (emUso[a.id] ?? 0);
-    const livresB = (capacidade[b.id] ?? 1) - (emUso[b.id] ?? 0);
+    // especialista está bloqueado (trilha de 5 não modelada) — afunda sempre
+    const espA = a.role === "mentor_especialista";
+    const espB = b.role === "mentor_especialista";
+    const livresA = espA
+      ? -Infinity
+      : (capacidade[a.id] ?? 1) - (emUso[a.id] ?? 0);
+    const livresB = espB
+      ? -Infinity
+      : (capacidade[b.id] ?? 1) - (emUso[b.id] ?? 0);
     return livresB - livresA || a.nome.localeCompare(b.nome, "pt-BR");
   });
   const mentoradosOrd = [...mentorados].sort((a, b) => {
@@ -205,7 +212,12 @@ export function EditarDuplaDialog({ dupla }: { dupla: Dupla }) {
                 name="mentor_id"
                 required
                 defaultValue={dupla.mentor.id}
-                items={Object.fromEntries(mentoresOrd.map((m) => [m.id, `${m.nome} — ${emUso[m.id] ?? 0}/${capacidade[m.id] ?? 1}`]))}
+                items={Object.fromEntries(mentoresOrd.map((m) => [
+                  m.id,
+                  m.role === "mentor_especialista"
+                    ? `${m.nome} — trilha especialista (em breve)`
+                    : `${m.nome} — ${emUso[m.id] ?? 0}/${capacidade[m.id] ?? 1}`,
+                ]))}
               >
                 <SelectTrigger id="edit-mentor-select" aria-labelledby="edit-mentor-label edit-mentor-select"><SelectValue /></SelectTrigger>
                 <SelectContent>

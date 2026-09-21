@@ -147,7 +147,7 @@ export default async function PessoaPerfilPage({
                   <li key={d.id}>
                     <Link
                       href={`/duplas/${d.id}`}
-                      className="group flex min-h-11 items-center gap-2 rounded-lg px-2 py-2 transition-colors hover:bg-muted/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-lime)]"
+                      className="group flex min-h-11 items-center gap-2 rounded-lg px-2 py-2 transition-colors hover:bg-muted/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     >
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm font-medium">

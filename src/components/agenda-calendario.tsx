@@ -697,7 +697,7 @@ export function AgendaCalendario({
             aria-label="Mês anterior"
             disabled={mes <= minMes}
             onClick={() => irParaMes(mes - 1)}
-            className="grid size-11 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-lime)] disabled:pointer-events-none disabled:opacity-40 md:size-9"
+            className="grid size-11 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-40 md:size-9"
           >
             <CaretLeft size={18} />
           </button>
@@ -706,7 +706,7 @@ export function AgendaCalendario({
             aria-label="Próximo mês"
             disabled={mes >= maxMes}
             onClick={() => irParaMes(mes + 1)}
-            className="grid size-11 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-lime)] disabled:pointer-events-none disabled:opacity-40 md:size-9"
+            className="grid size-11 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-40 md:size-9"
           >
             <CaretRight size={18} />
           </button>
@@ -714,7 +714,7 @@ export function AgendaCalendario({
             type="button"
             disabled={mes === mesHoje || !hojeNoAlcance}
             onClick={() => irParaMes(mesHoje)}
-            className="ms-0.5 min-h-11 rounded-lg px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-lime)] disabled:pointer-events-none disabled:opacity-40 md:min-h-9"
+            className="ms-0.5 min-h-11 rounded-lg px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-40 md:min-h-9"
           >
             Hoje
           </button>
@@ -769,7 +769,7 @@ export function AgendaCalendario({
                         pedirRolarSePonteiro(ev, e.data);
                         moverPara(e.data);
                       }}
-                      className="grid size-9 shrink-0 place-items-center rounded-full font-mono text-[11px] font-semibold leading-none tabular-nums transition-[color,background-color,box-shadow] hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-lime)]"
+                      className="grid size-9 shrink-0 place-items-center rounded-full font-mono text-[11px] font-semibold leading-none tabular-nums transition-[color,background-color,box-shadow] hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     >
                       <span
                         className={cn(
@@ -869,7 +869,7 @@ export function AgendaCalendario({
                         }}
                         onKeyDown={(e) => onDiaKeyDown(e, iso)}
                         className={cn(
-                          "flex min-h-11 w-full flex-col items-start rounded-lg px-1.5 pb-1 pt-1 transition-[color,background-color,box-shadow] hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-lime)] sm:min-h-12",
+                          "flex min-h-11 w-full flex-col items-start rounded-lg px-1.5 pb-1 pt-1 transition-[color,background-color,box-shadow] hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-12",
                           temRecesso && "hatch-recesso",
                           ehSelecionado && "ring-2 ring-foreground/30"
                         )}
@@ -1050,7 +1050,7 @@ export function AgendaCalendario({
                       pedirRolarSePonteiro(e, proximoDiaIso);
                       moverPara(proximoDiaIso);
                     }}
-                    className="mt-1 block w-full rounded-md py-3 text-left text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-lime)]"
+                    className="mt-1 block w-full rounded-md py-3 text-left text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
                     Próximo evento do ciclo:{" "}
                     <span className="font-medium text-foreground">
@@ -1293,7 +1293,7 @@ export function AgendaCalendario({
                       setSelecionado(alvo);
                     }}
                     className={cn(
-                      "flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--brand-lime)] sm:gap-4 sm:px-5",
+                      "flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:gap-4 sm:px-5",
                       passou && "text-muted-foreground"
                     )}
                   >
@@ -1563,7 +1563,8 @@ function EncontroDuplaRow({
   const registroPendente =
     !encontro.registro && (encontro.status === "realizado" || limbo);
   // mentor com registro pendente cai direto no card do encontro na página da
-  // dupla — lá a âncora abre o RegistroInline; aqui o caminho curto é o CTA
+  // dupla — lá a âncora abre o RegistroInline; aqui o caminho curto é o CTA.
+  // (só usado no ramo ehMentor — coord/sup abrem o detalhe em modal)
   const href =
     ehMentor && !registroPendente
       ? `/duplas/${dupla.id}`
@@ -1621,7 +1622,7 @@ function EncontroDuplaRow({
       {ehMentor ? (
         <Link
           href={href}
-          className="group flex min-h-11 items-center gap-2.5 rounded-lg px-2 py-2 transition-colors hover:bg-muted/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-lime)]"
+          className="group flex min-h-11 items-center gap-2.5 rounded-lg px-2 py-2 transition-colors hover:bg-muted/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           <span
             aria-hidden
@@ -1654,8 +1655,9 @@ function EncontroDuplaRow({
         // (registro, plano do mentor, evidências) num modal
         <button
           type="button"
+          aria-haspopup="dialog"
           onClick={() => setDetalheAberto(true)}
-          className="group flex min-h-11 w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left transition-colors hover:bg-muted/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-lime)]"
+          className="group flex min-h-11 w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left transition-colors hover:bg-muted/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           <span
             aria-hidden

@@ -1,5 +1,10 @@
 import Link from "next/link";
-import { HandHeart, Paperclip } from "@phosphor-icons/react/dist/ssr";
+import {
+  ArrowUpRight,
+  CaretDown,
+  HandHeart,
+  Paperclip,
+} from "@phosphor-icons/react/dist/ssr";
 import { Badge } from "@/components/ui/badge";
 import { DuplaNomes } from "@/components/dupla-nomes";
 import { AvaliacaoBadge } from "@/components/semaforo";
@@ -7,7 +12,6 @@ import { RegistroView } from "@/components/registro-view";
 import { ResolverApoioButton } from "@/components/resolver-apoio-button";
 import { DIFICULDADE_LABEL, formatDate, formatDiaMes } from "@/lib/ciclo";
 import type { RegistroResumo } from "@/lib/queries";
-import { cn } from "@/lib/utils";
 
 const TRES_DIAS = 3 * 86400000;
 
@@ -37,28 +41,41 @@ export function RegistroRow({
     dupla && enc ? `/duplas/${dupla.id}#registrar-${enc.id}` : null;
 
   return (
-    <div className="relative px-4 py-3">
+    <div className="group/row relative px-4 py-3 transition-colors hover:bg-muted/40">
       {href && (
         <Link
           href={href}
-          className="absolute inset-0 rounded-none"
+          className="absolute inset-0 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[var(--ring)]"
           aria-label={`Abrir na ficha — ${dupla?.mentor?.nome ?? ""} e ${dupla?.mentorado?.nome ?? ""}`}
         />
       )}
       <div className="pointer-events-none space-y-1.5">
-        <p className="text-sm font-medium">
-          {dupla ? (
-            <DuplaNomes
-              mentor={dupla.mentor?.nome ?? "—"}
-              mentorado={dupla.mentorado?.nome ?? "—"}
+        <p className="flex items-start justify-between gap-2 text-sm font-medium">
+          <span>
+            {dupla ? (
+              <DuplaNomes
+                mentor={dupla.mentor?.nome ?? "—"}
+                mentorado={dupla.mentorado?.nome ?? "—"}
+              />
+            ) : (
+              "Dupla removida"
+            )}
+            {dupla && dupla.status !== "ativa" && (
+              <span className="ml-2 text-xs font-normal text-muted-foreground">
+                (
+                {dupla.status === "pausada"
+                  ? "dupla pausada"
+                  : "dupla encerrada"}
+                )
+              </span>
+            )}
+          </span>
+          {href && (
+            <ArrowUpRight
+              size={15}
+              aria-hidden
+              className="mt-0.5 shrink-0 text-muted-foreground/50 transition-all group-hover/row:-translate-y-0.5 group-hover/row:translate-x-0.5 group-hover/row:text-muted-foreground"
             />
-          ) : (
-            "Dupla removida"
-          )}
-          {dupla && dupla.status !== "ativa" && (
-            <span className="ml-2 text-xs font-normal text-muted-foreground">
-              ({dupla.status === "pausada" ? "dupla pausada" : "dupla encerrada"})
-            </span>
           )}
         </p>
         <p className="text-xs text-muted-foreground">
@@ -103,13 +120,19 @@ export function RegistroRow({
               </Badge>
             )}
             {r.encaminhamentos.length > 0 && (
-              <Badge variant="outline" className="text-xs font-normal text-muted-foreground">
+              <Badge
+                variant="outline"
+                className="text-xs font-normal text-muted-foreground"
+              >
                 {r.encaminhamentos.length}{" "}
                 {r.encaminhamentos.length === 1 ? "combinado" : "combinados"}
               </Badge>
             )}
             {r.anexos.length > 0 && (
-              <Badge variant="outline" className="text-xs font-normal text-muted-foreground">
+              <Badge
+                variant="outline"
+                className="text-xs font-normal text-muted-foreground"
+              >
                 <Paperclip size={11} data-icon="inline-start" />
                 {r.anexos.length}
               </Badge>
@@ -117,12 +140,21 @@ export function RegistroRow({
           </div>
         )}
       </div>
-      {/* acima do stretched link: o summary precisa ser clicável por cima */}
-      <details className={cn("group relative mt-1")}>
-        <summary className="inline-flex min-h-8 cursor-pointer list-none items-center text-xs font-medium text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline [&::-webkit-details-marker]:hidden">
-          Ver registro completo
+      {/* acima do stretched link: summary e conteúdo clicáveis por cima; a
+          sobra do details deixa o clique passar pro link (sem zona morta) */}
+      <details className="group/detalhe pointer-events-none relative mt-1">
+        <summary className="pointer-events-auto inline-flex min-h-11 cursor-pointer list-none items-center gap-1 text-xs font-medium text-muted-foreground underline-offset-2 transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)] [&::-webkit-details-marker]:hidden">
+          <CaretDown
+            size={13}
+            aria-hidden
+            className="-ml-0.5 transition-transform group-open/detalhe:rotate-180"
+          />
+          <span className="group-open/detalhe:hidden">Ver registro completo</span>
+          <span className="hidden group-open/detalhe:inline">
+            Ocultar registro
+          </span>
         </summary>
-        <div className="mt-2 space-y-2 rounded-lg bg-muted/40 p-3.5 text-sm">
+        <div className="pointer-events-auto mt-1 space-y-2 rounded-lg bg-muted/40 p-3.5 text-sm">
           <RegistroView reg={r} tardio={tardio} />
           {souCoord && r.precisa_apoio && dupla && (
             <div className="pt-1">

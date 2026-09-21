@@ -29,9 +29,9 @@ function primeiro(v: string | string[] | undefined): string | undefined {
   return Array.isArray(v) ? v[0] : v;
 }
 
-/** PostgREST `or()` quebra com vírgula/parenteses/curinga no valor — limpa. */
+/** PostgREST `or()` quebra com vírgula/parenteses/curinga/`::` no valor — limpa. */
 function saneiaBusca(q: string): string {
-  return q.replace(/[%(),."\\]/g, " ").replace(/\s+/g, " ").trim();
+  return q.replace(/[%(),."\\:]/g, " ").replace(/\s+/g, " ").trim();
 }
 
 function parseFiltros(
@@ -43,11 +43,11 @@ function parseFiltros(
   if (Number.isInteger(encontro) && encontro >= 1 && encontro <= maxEncontro)
     f.encontro = encontro;
   const avaliacao = primeiro(p.avaliacao);
-  if (avaliacao && avaliacao in AVALIACAO_LABEL)
+  if (avaliacao && Object.hasOwn(AVALIACAO_LABEL, avaliacao))
     f.avaliacao = avaliacao as AvaliacaoJovem;
   if (primeiro(p.apoio) === "1") f.apoio = true;
   const dificuldade = primeiro(p.dificuldade);
-  if (dificuldade === "com" || (dificuldade && dificuldade in DIFICULDADE_LABEL))
+  if (dificuldade === "com" || (dificuldade && Object.hasOwn(DIFICULDADE_LABEL, dificuldade)))
     f.dificuldade = dificuldade as Dificuldade | "com";
   const dupla = primeiro(p.dupla);
   if (dupla && UUID_RE.test(dupla)) f.dupla = dupla;
@@ -137,11 +137,15 @@ export default async function RegistrosPage({
 
       {/* triagem: contagens globais do papel, clicáveis pro filtro */}
       {(alertas.apoio > 0 || alertas.baixa > 0 || alertas.comDificuldade > 0) && (
-        <div className="flex flex-wrap gap-2" aria-label="Sinais de atenção">
+        <div
+          role="group"
+          className="flex flex-wrap gap-2"
+          aria-label="Sinais de atenção"
+        >
           {alertas.apoio > 0 && (
             <Link
               href="/registros?apoio=1"
-              className="inline-flex items-center rounded-full border border-[var(--danger)]/50 px-3 py-1 text-xs font-medium text-[var(--danger)] transition-colors hover:bg-[var(--danger)]/5"
+              className="inline-flex min-h-9 items-center rounded-full border border-[var(--danger)]/50 px-3 text-xs font-medium text-[var(--danger)] transition-colors hover:bg-[var(--danger)]/5"
             >
               {alertas.apoio}{" "}
               {alertas.apoio === 1 ? "pedido de apoio" : "pedidos de apoio"} em
@@ -151,7 +155,7 @@ export default async function RegistrosPage({
           {alertas.baixa > 0 && (
             <Link
               href="/registros?avaliacao=baixa"
-              className="inline-flex items-center rounded-full border border-[var(--warn)]/60 px-3 py-1 text-xs font-medium text-[var(--warn-text)] transition-colors hover:bg-[var(--warn)]/5"
+              className="inline-flex min-h-9 items-center rounded-full border border-[var(--warn)]/60 px-3 text-xs font-medium text-[var(--warn-text)] transition-colors hover:bg-[var(--warn)]/5"
             >
               {alertas.baixa}{" "}
               {alertas.baixa === 1 ? "avaliação baixa" : "avaliações baixas"}
@@ -160,7 +164,7 @@ export default async function RegistrosPage({
           {alertas.comDificuldade > 0 && (
             <Link
               href="/registros?dificuldade=com"
-              className="inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted"
+              className="inline-flex min-h-9 items-center rounded-full border px-3 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted"
             >
               {alertas.comDificuldade} com dificuldade sinalizada
             </Link>
@@ -218,6 +222,7 @@ export default async function RegistrosPage({
             <div className="flex justify-center pt-1">
               <Link
                 href={hrefPagina(filtros.pagina + 1)}
+                scroll={false}
                 className="rounded-lg border px-4 py-2 text-sm font-medium transition-colors hover:bg-muted"
               >
                 Mostrar mais ({Math.min(total - itens.length, REGISTROS_PAGINA)}{" "}

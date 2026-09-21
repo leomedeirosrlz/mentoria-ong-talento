@@ -19,6 +19,7 @@ import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { RegistroView } from "@/components/registro-view";
 import { ResolverApoioButton } from "@/components/resolver-apoio-button";
+import { formatTamanho } from "@/components/anexos-registro";
 import { createClient } from "@/lib/supabase/client";
 import { formatDate, formatDateTime, formatDiaMes } from "@/lib/ciclo";
 import type {
@@ -36,12 +37,6 @@ const STATUS_LABEL: Record<EncontroStatus, string> = {
   nao_aconteceu: "Não aconteceu",
   cancelado: "Cancelado",
 };
-
-function formatTamanho(bytes: number): string {
-  if (bytes >= 1024 * 1024)
-    return `${(bytes / 1024 / 1024).toFixed(1).replace(".", ",")} MB`;
-  return `${Math.max(1, Math.round(bytes / 1024))} KB`;
-}
 
 /** "Detalhes do encontro" — a leitura do dia pra coordenação/supervisor:
  *  status, sugestão do guia, plano do mentor, registro completo, combinados
@@ -64,6 +59,9 @@ export function EncontroDetalheDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const reg = encontro.registro ?? null;
+  // "vencido" congela na abertura — um prazo vencendo durante a leitura não
+  // muda o item sob o olhar
+  const [agora] = useState(() => Date.now());
   const nota =
     dupla.notas?.find((n) => n.numero === encontro.numero)?.texto ?? null;
   const combinados = reg
@@ -76,8 +74,15 @@ export function EncontroDetalheDialog({
       new Date(encontro.realizado_em ?? encontro.data_hora!).getTime() >
       3 * 86400000;
 
-  // anexos não vêm no payload da agenda — busca sob demanda ao abrir
+  // anexos não vêm no payload da agenda — busca sob demanda ao abrir;
+  // fecha/troca de registro → reseta (sem flash da lista velha ao reabrir)
   const [anexos, setAnexos] = useState<RegistroAnexo[] | null>(null);
+  const [anexosDe, setAnexosDe] = useState<string | null>(null);
+  const alvoAnexos = open && reg ? reg.id : null;
+  if (anexosDe !== alvoAnexos) {
+    setAnexosDe(alvoAnexos);
+    setAnexos(null);
+  }
   useEffect(() => {
     if (!open || !reg) return;
     let vivo = true;
@@ -97,18 +102,21 @@ export function EncontroDetalheDialog({
     };
   }, [open, reg]);
 
+  const divergiu =
+    encontro.realizado_em != null &&
+    encontro.data_hora != null &&
+    encontro.realizado_em !== encontro.data_hora;
   const meta = [
-    encontro.data_hora &&
-      `agendado ${formatDateTime(encontro.data_hora)}`,
-    encontro.realizado_em &&
-      encontro.realizado_em !== encontro.data_hora &&
+    encontro.status === "realizado" && !divergiu
+      ? `realizado ${formatDate(encontro.realizado_em ?? encontro.data_hora)}`
+      : encontro.data_hora
+        ? `agendado ${formatDateTime(encontro.data_hora)}`
+        : null,
+    divergiu &&
       `realizado em ${formatDate(encontro.realizado_em)}`,
     encontro.origem === "externo" && "marcado fora da plataforma",
     encontro.motivo_reagendamento &&
       `remarcado: ${encontro.motivo_reagendamento}`,
-    encontro.status === "realizado" &&
-      !reg &&
-      "registro pendente — a dupla ainda deve o follow-up",
   ]
     .filter(Boolean)
     .join(" · ");
@@ -220,35 +228,47 @@ export function EncontroDetalheDialog({
                 Combinados deste encontro
               </p>
               <ul className="mt-1 space-y-1">
-                {combinados.map((c) => (
-                  <li key={c.id} className="flex items-start gap-2 text-sm">
-                    {c.status === "feito" ? (
-                      <CheckCircle
-                        size={15}
-                        className="mt-0.5 shrink-0 text-[var(--ok)]"
-                      />
-                    ) : (
-                      <Circle
-                        size={15}
-                        className="mt-0.5 shrink-0 text-muted-foreground/60"
-                      />
-                    )}
-                    <span
-                      className={
-                        c.status === "feito"
-                          ? "text-muted-foreground line-through"
-                          : undefined
-                      }
-                    >
-                      {c.descricao}
-                      <span className="text-xs text-muted-foreground">
-                        {" "}
-                        · {c.responsavel}
-                        {c.prazo ? ` · até ${formatDate(c.prazo)}` : ""}
+                {combinados.map((c) => {
+                  const vencido =
+                    c.status !== "feito" &&
+                    c.prazo != null &&
+                    new Date(`${c.prazo}T23:59:59`).getTime() < agora;
+                  return (
+                    <li key={c.id} className="flex items-start gap-2 text-sm">
+                      {c.status === "feito" ? (
+                        <CheckCircle
+                          size={15}
+                          className="mt-0.5 shrink-0 text-[var(--ok)]"
+                        />
+                      ) : (
+                        <Circle
+                          size={15}
+                          className="mt-0.5 shrink-0 text-muted-foreground/60"
+                        />
+                      )}
+                      <span
+                        className={
+                          c.status === "feito"
+                            ? "text-muted-foreground line-through"
+                            : undefined
+                        }
+                      >
+                        {c.descricao}
+                        <span className="text-xs text-muted-foreground">
+                          {" "}
+                          · {c.responsavel === "mentorado" ? "Mentorado" : "Mentor"}
+                          {c.prazo ? ` · até ${formatDate(c.prazo)}` : ""}
+                        </span>
+                        {vencido && (
+                          <span className="text-xs font-medium text-[var(--danger)]">
+                            {" "}
+                            (vencido)
+                          </span>
+                        )}
                       </span>
-                    </span>
-                  </li>
-                ))}
+                    </li>
+                  );
+                })}
               </ul>
             </div>
           )}

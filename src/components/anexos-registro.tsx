@@ -17,7 +17,7 @@ const TIPOS_ACEITOS = ["application/pdf", "image/png", "image/jpeg", "image/webp
 const ACCEPT = TIPOS_ACEITOS.join(",");
 
 /** "3,4 MB" / "218 KB" — pt-BR com vírgula decimal. */
-function formatTamanho(bytes: number): string {
+export function formatTamanho(bytes: number): string {
   if (bytes >= 1024 * 1024) {
     const mb = bytes / (1024 * 1024);
     return `${mb >= 10 ? Math.round(mb) : mb.toFixed(1).replace(".", ",")} MB`;

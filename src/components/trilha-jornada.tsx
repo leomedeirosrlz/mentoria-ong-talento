@@ -179,7 +179,7 @@ export function TrilhaJornada({
                   aria-label={rotulo}
                   title={rotulo}
                   aria-current={atual ? "step" : undefined}
-                  className="group grid size-9 place-items-center rounded-full outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-lime)]"
+                  className="group grid size-9 place-items-center rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   <span className="relative">
                     {atual && (
