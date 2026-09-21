@@ -161,16 +161,22 @@ export function AppShell({
         </div>
       </aside>
 
-      {/* tabIndex=-1: o skip-link consegue mover o foco pro main, não só rolar */}
-      <main id="conteudo" tabIndex={-1} className="flex-1 min-w-0 md:ml-56">
-        <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6 md:py-8">
-          {children}
+      {/* coluna de conteúdo: único filho in-flow do flex row no desktop —
+          md:ml-56 e flex-1 min-w-0 moram aqui pra main e footer não
+          disputarem largura na row; no mobile é um flex-col comum */}
+      <div className="flex min-w-0 flex-1 flex-col md:ml-56">
+        {/* tabIndex=-1: o skip-link consegue mover o foco pro main, não só rolar;
+            flex-1 empurra o footer pro rodapé quando a página é curta */}
+        <main id="conteudo" tabIndex={-1} className="flex-1">
+          <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6 md:py-8">
+            {children}
+          </div>
+        </main>
+        {/* footer fora do <main> — dentro ele não expõe o landmark contentinfo;
+            o padding-bottom mantém distância do bottom nav no mobile */}
+        <div className="mx-auto w-full max-w-5xl px-4 pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:px-6 md:pb-8">
+          <SiteFooter className="mt-2 border-t border-border pt-5" />
         </div>
-      </main>
-      {/* footer fora do <main> — dentro ele não expõe o landmark contentinfo;
-          o padding-bottom mantém distância do bottom nav no mobile */}
-      <div className="mx-auto w-full max-w-5xl px-4 pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:px-6 md:ml-56 md:pb-8">
-        <SiteFooter className="mt-2 border-t border-border pt-5" />
       </div>
 
       {/* bottom nav — só mobile */}
