@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { CircleNotch } from "@phosphor-icons/react";
 import { createClient } from "@/lib/supabase/client";
+import { pathInterno } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,7 +20,7 @@ export function DefinirSenhaForm() {
   const supabase = useMemo(() => createClient(), []);
 
   const next = params.get("next");
-  const destino = next?.startsWith("/") && !next.startsWith("//") ? next : "/";
+  const destino = pathInterno(next) ?? "/";
 
   // /auth/* é rota pública pro middleware — a página só faz sentido com a
   // sessão que o /auth/confirm acabou de criar; sem ela, volta pro login
@@ -116,7 +117,7 @@ export function DefinirSenhaForm() {
             )}
 
             <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Salvando..." : "Salvar senha e entrar"}
+              {loading ? "Salvando…" : "Salvar senha e entrar"}
             </Button>
           </form>
         ) : (

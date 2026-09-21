@@ -18,11 +18,6 @@
   --color-sidebar-primary: var(--sidebar-primary);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar: var(--sidebar);
-  --color-chart-5: var(--chart-5);
-  --color-chart-4: var(--chart-4);
-  --color-chart-3: var(--chart-3);
-  --color-chart-2: var(--chart-2);
-  --color-chart-1: var(--chart-1);
   --color-ring: var(--ring);
   --color-input: var(--input);
   --color-border: var(--border);
@@ -73,7 +68,9 @@
      de --sidebar-accent) — um acento só no app: lime */
   --accent: hsl(75 8% 91%);
   --accent-foreground: hsl(0 0% 15%);
-  --destructive: hsl(0 74% 45%);
+  /* um vermelho só: destructive (usado pelos primitives ui/*) e danger são o
+     mesmo valor — dois tokens, uma cor, sem escolha ambígua */
+  --destructive: hsl(0 80% 48%);
   --destructive-foreground: hsl(0 0% 100%);
   --border: hsl(75 6% 87%);
   --input: hsl(75 6% 87%);
@@ -86,17 +83,11 @@
   /* versões escuras para texto (AA ≥4.5:1 sobre fundo claro) — fills/dots seguem com as cores claras acima */
   --ok-text: hsl(78 55% 30%);
   --warn-text: hsl(43 90% 30%);
-  /* identidade de papel na dupla: mentor = tinta do sistema (quem age);
-     mentorado = amarelo do ponto do logo (rgb 255,213,49 — = --chart-2),
-     sempre como marcador (dot/disco) — nunca como cor de texto. Spec §1 */
-  --role-mentor: var(--brand-ink);
-  --role-mentor-text: var(--foreground);
+  /* identidade de papel na dupla: mentor = lime do disco (quem age);
+     mentorado = amarelo do ponto do logo (rgb 255,213,49) — sempre como
+     marcador (dot/disco), nunca como cor de texto. Spec §1 */
+  --role-mentor: var(--brand-lime);
   --role-mentorado: hsl(48 100% 60%);
-  --chart-1: hsl(78 56% 53%);
-  --chart-2: hsl(48 100% 60%);
-  --chart-3: hsl(0 0% 15%);
-  --chart-4: hsl(78 30% 70%);
-  --chart-5: hsl(48 60% 80%);
   --radius: 0.75rem;
   --sidebar: hsl(75 8% 96.5%);
   --sidebar-foreground: hsl(0 0% 15%);

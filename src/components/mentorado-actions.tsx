@@ -119,7 +119,7 @@ export function MentoradoActions({ mentorado, temDupla }: { mentorado: Mentorado
               documentoPath={mentorado.documento_path}
             />
             <Button type="submit" className="w-full" disabled={pending}>
-              {pending ? "Salvando..." : "Salvar"}
+              {pending ? "Salvando…" : "Salvar"}
             </Button>
           </form>
         </DialogContent>

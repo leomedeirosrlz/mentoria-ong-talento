@@ -234,7 +234,7 @@ export function NovaDuplaDialog() {
             </p>
           </div>
           <Button type="submit" className="w-full" disabled={pending}>
-            {pending ? "Salvando..." : "Formar dupla"}
+            {pending ? "Salvando…" : "Formar dupla"}
           </Button>
         </form>
       </DialogContent>

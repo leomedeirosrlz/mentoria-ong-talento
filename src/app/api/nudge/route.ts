@@ -27,7 +27,9 @@ export async function GET(request: NextRequest) {
   // destino obrigatoriamente wa.me/<dígitos> — qualquer outra URL seria open
   // redirect; wa.me/ sem número abre a página de erro do WhatsApp
   const to = searchParams.get("to") ?? "";
-  if (!/^https:\/\/wa\.me\/\d+/.test(to)) {
+  // âncora de fim: sem ela "https://wa.me/1@evil.com" casa o regex mas o URL
+  // parser lê "wa.me" como userinfo e "evil.com" como host → open redirect
+  if (!/^https:\/\/wa\.me\/\d+$/.test(to)) {
     return NextResponse.json({ error: "Destino inválido." }, { status: 400 });
   }
 

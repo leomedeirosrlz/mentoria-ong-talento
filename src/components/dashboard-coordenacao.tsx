@@ -373,8 +373,14 @@ function Stat({
       )}
     >
       <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-        {destaque === "danger" && (
-          <span aria-hidden className="size-2 rounded-full bg-[var(--danger)]" />
+        {destaque && (
+          <span
+            aria-hidden
+            className={cn(
+              "size-2 rounded-full",
+              destaque === "danger" ? "bg-[var(--danger)]" : "bg-[var(--warn)]"
+            )}
+          />
         )}
         {label}
       </p>
@@ -479,8 +485,9 @@ function DuplaCard({
           </p>
         </div>
         <div className="relative flex shrink-0 flex-col items-end gap-2">
-          <span className="font-mono text-xs text-muted-foreground tabular-nums">
-            {encontroAtual}/{total} encontros
+          <span className="text-xs text-muted-foreground">
+            <span className="font-mono tabular-nums">{encontroAtual}/{total}</span>{" "}
+            encontros
           </span>
           <div
             role="progressbar"

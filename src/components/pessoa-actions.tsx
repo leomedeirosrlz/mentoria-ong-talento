@@ -220,7 +220,7 @@ export function PessoaActions({ pessoa, podeExcluir }: { pessoa: Profile; podeEx
             />
 
             <Button type="submit" className="w-full" disabled={pending}>
-              {pending ? "Salvando..." : "Salvar"}
+              {pending ? "Salvando…" : "Salvar"}
             </Button>
           </form>
         </DialogContent>

@@ -58,7 +58,7 @@ export function NudgeButton({
           title="Sem WhatsApp cadastrado"
           className={`${CLASSES} cursor-not-allowed border-dashed text-muted-foreground/50`}
         >
-          <WhatsappLogo size={15} />
+          <WhatsappLogo size={15} aria-hidden />
           {label}
         </span>
         <span className="text-xs text-muted-foreground">sem WhatsApp cadastrado</span>
@@ -70,14 +70,13 @@ export function NudgeButton({
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      aria-busy={abrindo}
       onClick={onClick}
       className={`${CLASSES} text-muted-foreground hover:bg-[var(--brand-lime)]/15 hover:text-foreground hover:border-[var(--brand-lime)]/60`}
     >
       {abrindo ? (
-        <CircleNotch size={15} className="animate-spin" />
+        <CircleNotch size={15} className="animate-spin" aria-hidden />
       ) : (
-        <WhatsappLogo size={15} />
+        <WhatsappLogo size={15} aria-hidden />
       )}
       {label}
     </a>

@@ -688,3 +688,9 @@ export function waLink(phone: string | null | undefined, mensagem: string): stri
   if (!digits.length) return null;
   return `https://wa.me/${digits}?text=${encodeURIComponent(mensagem)}`;
 }
+
+/** href seguro: só http(s). O CHECK do banco (0023) barra a escrita; este
+ *  guard cobre dado pré-constraint e qualquer escrita fora do app. */
+export function linkSeguro(url: string | null | undefined): string | null {
+  return url != null && /^https?:\/\//i.test(url) ? url : null;
+}

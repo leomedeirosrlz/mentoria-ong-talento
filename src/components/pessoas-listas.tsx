@@ -186,7 +186,7 @@ export function PessoasListas({
                 <Link
                   href={`/pessoas/${p.id}`}
                   aria-label={`Abrir perfil de ${p.nome}`}
-                  className="group flex min-w-0 flex-1 basis-48 items-center gap-3 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="group -my-1.5 flex min-w-0 flex-1 basis-48 items-center gap-3 rounded-lg py-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   <Avatar
                     nome={p.nome}
@@ -311,7 +311,7 @@ export function PessoasListas({
               <Link
                 href={`/pessoas/${m.id}`}
                 aria-label={`Abrir perfil de ${m.nome}`}
-                className="group flex min-w-0 flex-1 basis-48 items-center gap-3 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="group -my-1.5 flex min-w-0 flex-1 basis-48 items-center gap-3 rounded-lg py-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <Avatar
                   nome={m.nome}

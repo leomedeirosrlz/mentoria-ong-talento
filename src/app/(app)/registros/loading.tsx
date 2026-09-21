@@ -6,7 +6,7 @@ export default function Loading() {
   return (
     <div role="status" aria-label="Carregando" className="mx-auto max-w-3xl space-y-6">
       <header>
-        <Skeleton className="h-9 w-32" />
+        <Skeleton className="h-8 w-32" />
         <Skeleton className="mt-2 h-4 w-80 max-w-full" />
       </header>
       <Skeleton className="h-4 w-72 max-w-full" />

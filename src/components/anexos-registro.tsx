@@ -199,7 +199,7 @@ export function AnexosRegistro({
             onClick={() => fileRef.current?.click()}
           >
             {pending ? <CircleNotch size={14} className="animate-spin" /> : <Paperclip size={14} />}
-            {pending ? "Enviando..." : "Anexar evidência"}
+            {pending ? "Enviando…" : "Anexar evidência"}
           </Button>
         </div>
       )}

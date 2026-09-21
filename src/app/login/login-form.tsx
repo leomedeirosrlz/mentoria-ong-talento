@@ -10,7 +10,7 @@ import { fade, T } from "@/components/motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { cn } from "@/lib/utils";
+import { cn, pathInterno } from "@/lib/utils";
 
 // janela do resend do supabase — quando o 429 traz "after N seconds" usa o N real
 const COOLDOWN = 60;
@@ -52,7 +52,7 @@ export function LoginForm() {
   const destinoFinal = useCallback(() => {
     const next = params.get("next");
     const hash = location.hash.startsWith("#error=") ? "" : location.hash;
-    return (next?.startsWith("/") && !next.startsWith("//") ? next : "/") + hash;
+    return (pathInterno(next) ?? "/") + hash;
   }, [params]);
 
   // verify falhou (otp expirado/usado): o supabase despeja #error=… na raiz,
@@ -211,7 +211,7 @@ export function LoginForm() {
                   {cooldown > 0 ? (
                     <span className="tabular-nums">Reenviar em {mmss}</span>
                   ) : loading ? (
-                    "Enviando..."
+                    "Enviando…"
                   ) : (
                     "Reenviar link"
                   )}
@@ -344,7 +344,7 @@ export function LoginForm() {
 
                 <Button type="submit" className="w-full" disabled={loading}>
                   {loading
-                    ? modo === "link" ? "Enviando..." : "Entrando..."
+                    ? modo === "link" ? "Enviando…" : "Entrando…"
                     : modo === "link" ? "Receber link de acesso" : "Entrar"}
                 </Button>
 

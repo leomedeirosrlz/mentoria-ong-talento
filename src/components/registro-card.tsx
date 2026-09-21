@@ -48,7 +48,7 @@ export function RegistroCard({
   return (
     <article
       className={cn(
-        "overflow-hidden rounded-xl border bg-card shadow-[var(--shadow-border)] transition-shadow hover:shadow-md",
+        "overflow-hidden rounded-xl border bg-card shadow-[var(--shadow-border)] transition-shadow hover:shadow-[var(--shadow-border-hover)]",
         // apoio em aberto escala até a superfície — é o que mais pede ação
         r.precisa_apoio ? "border-[var(--danger)]/50" : "border-transparent"
       )}
@@ -158,7 +158,7 @@ export function RegistroCard({
         </summary>
 
         <div className="space-y-2 border-t bg-muted/40 px-4 py-3.5 text-sm sm:px-5">
-          <RegistroView reg={r} tardio={tardio} />
+          <RegistroView reg={r} tardio={tardio} ocultarMeta />
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2 pt-1">
             {href && (
               <Link

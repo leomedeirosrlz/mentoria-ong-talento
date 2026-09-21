@@ -72,12 +72,14 @@ export function EncaminhamentosList({
         {ordenados.map((t) => {
           const vencido = t.status === "pendente" && t.prazo && t.prazo < hoje;
           const criadoNo = t.registro_id ? encontroNumeroPorRegistroId?.[t.registro_id] : undefined;
+          // spans com block — o mesmo conteúdo vai dentro do botão/checkbox
+          // interativo (só phrasing content é válido ali) e do div read-only
           const texto = (
-            <div className="min-w-0 flex-1">
-              <p className={cn("text-sm", t.status === "feito" && "line-through text-muted-foreground")}>
+            <span className="block min-w-0 flex-1">
+              <span className={cn("block text-sm", t.status === "feito" && "line-through text-muted-foreground")}>
                 {t.descricao}
-              </p>
-              <p className="text-xs text-muted-foreground mt-0.5">
+              </span>
+              <span className="block text-xs text-muted-foreground mt-0.5">
                 {/* dot de papel só no mentorado (§1); mentor fica só no texto */}
                 {t.responsavel === "mentor" ? (
                   "Mentor"
@@ -95,15 +97,15 @@ export function EncaminhamentosList({
                 {criadoNo != null && (
                   <span className="text-[11px] text-muted-foreground"> · criado no {criadoNo}º encontro</span>
                 )}
-              </p>
-            </div>
+              </span>
+            </span>
           );
 
           const menu = podeEditar && (
             <DropdownMenu>
               <DropdownMenuTrigger
                 aria-label={`Opções do combinado "${t.descricao}"`}
-                className="mt-0.5 grid size-9 shrink-0 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="mt-0.5 grid size-11 shrink-0 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:size-9"
               >
                 <DotsThree size={18} weight="bold" aria-hidden />
               </DropdownMenuTrigger>

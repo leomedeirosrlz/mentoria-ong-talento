@@ -156,7 +156,7 @@ export function ImportarCsvDialog({ tipoInicial = "equipe" }: { tipoInicial?: Ti
         </DialogHeader>
 
         {resultado ? (
-          <div className="space-y-3">
+          <div ref={(el) => el?.focus()} tabIndex={-1} className="space-y-3 outline-none">
             <p className="text-sm">
               <span className="font-medium">{resultado.criados}</span>{" "}
               {resultado.criados === 1 ? "cadastro criado" : "cadastros criados"}.
@@ -173,7 +173,9 @@ export function ImportarCsvDialog({ tipoInicial = "equipe" }: { tipoInicial?: Ti
             <Button className="w-full" onClick={() => setOpen(false)}>Fechar</Button>
           </div>
         ) : linhas ? (
-          <div className="space-y-3 min-w-0">
+          // ref callback leva o foco pra nova etapa — o botão que disparou
+          // desmontou e o foco cairia no body do modal
+          <div ref={(el) => el?.focus()} tabIndex={-1} className="space-y-3 min-w-0 outline-none">
             <p className="text-sm text-muted-foreground">
               <span className="text-foreground font-medium">{validas}</span>{" "}
               {validas === 1 ? "linha pronta" : "linhas prontas"}
@@ -217,7 +219,7 @@ export function ImportarCsvDialog({ tipoInicial = "equipe" }: { tipoInicial?: Ti
               <Button variant="outline" onClick={() => setLinhas(null)}>Voltar</Button>
               <Button className="flex-1" disabled={pending || validas === 0} onClick={importar}>
                 <UploadSimple size={15} />
-                {pending ? "Importando..." : `Importar ${validas} ${validas === 1 ? "cadastro" : "cadastros"}`}
+                {pending ? "Importando…" : `Importar ${validas} ${validas === 1 ? "cadastro" : "cadastros"}`}
               </Button>
             </div>
           </div>

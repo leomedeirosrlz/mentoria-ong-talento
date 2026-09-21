@@ -172,16 +172,18 @@ export default function PrivacidadePage() {
         <h1 className="mt-2 text-3xl font-semibold tracking-tight">
           Privacidade e proteção de dados
         </h1>
-        <p className="mt-3 text-[15px] leading-relaxed text-muted-foreground">
+        <p className="mt-3 text-base leading-relaxed text-muted-foreground">
           Política de privacidade da plataforma do Programa de Mentoria Social,
           em conformidade com a LGPD — Lei Geral de Proteção de Dados.
         </p>
 
-        <div className="mt-10 space-y-8">
+        {/* long-form: medida ~70ch e corpo 16px — legibilidade antes de
+            alinhar com o container */}
+        <div className="mt-10 max-w-prose space-y-8">
           {SECOES.map((s) => (
             <section key={s.titulo}>
               <h2 className="text-base font-semibold">{s.titulo}</h2>
-              <div className="mt-2 space-y-3 text-[15px] leading-relaxed text-muted-foreground [&_strong]:font-medium [&_strong]:text-foreground">
+              <div className="mt-2 space-y-3 text-base leading-relaxed text-muted-foreground [&_strong]:font-medium [&_strong]:text-foreground">
                 {s.corpo}
               </div>
             </section>

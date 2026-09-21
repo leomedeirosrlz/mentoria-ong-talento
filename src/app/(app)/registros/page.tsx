@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import type { CSSProperties } from "react";
+import { ClipboardText } from "@phosphor-icons/react/dist/ssr";
 import {
   getAlertasRegistros,
   getCicloEventos,
@@ -21,6 +22,7 @@ import {
   totalEncontros,
 } from "@/lib/ciclo";
 import { RegistrosFiltros } from "@/components/registros-filtros";
+import { buttonVariants } from "@/components/ui/button";
 import { RegistroCard } from "@/components/registro-card";
 import { cn } from "@/lib/utils";
 import type { AvaliacaoJovem, Dificuldade } from "@/lib/types";
@@ -59,7 +61,7 @@ function parseFiltros(
   const q = saneiaBusca(primeiro(p.q) ?? "");
   if (q) f.q = q.slice(0, 80);
   const pagina = Number(primeiro(p.pagina));
-  if (Number.isInteger(pagina) && pagina > 1) f.pagina = Math.min(pagina, 10);
+  if (Number.isInteger(pagina) && pagina > 1) f.pagina = Math.min(pagina, 50);
   return f;
 }
 
@@ -138,7 +140,7 @@ export default async function RegistrosPage({
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <header>
-        <h1 className="text-3xl font-bold tracking-tight">Registros</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Registros</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           {souCoord
             ? "O que os mentores reportaram em cada encontro — todas as duplas"
@@ -154,7 +156,7 @@ export default async function RegistrosPage({
             <Link
               href="/registros"
               scroll={false}
-              className="font-medium text-foreground underline-offset-4 transition-colors hover:underline"
+              className="font-medium text-foreground underline underline-offset-4 transition-colors hover:text-muted-foreground"
             >
               {total} {total === 1 ? "registro" : "registros"}
             </Link>
@@ -171,7 +173,7 @@ export default async function RegistrosPage({
                 href="/registros?apoio=1"
                 scroll={false}
                 aria-current={filtros.apoio ? "true" : undefined}
-                className="font-medium text-[var(--danger)] underline-offset-4 transition-colors hover:underline"
+                className="font-medium text-[var(--danger)] underline underline-offset-4 transition-colors hover:text-[var(--danger)]/80"
               >
                 {alertas.apoio}{" "}
                 {alertas.apoio === 1 ? "apoio em aberto" : "apoios em aberto"}
@@ -185,7 +187,7 @@ export default async function RegistrosPage({
                 href="/registros?tardio=1"
                 scroll={false}
                 aria-current={filtros.tardio ? "true" : undefined}
-                className="font-medium text-[var(--warn-text)] underline-offset-4 transition-colors hover:underline"
+                className="font-medium text-[var(--warn-text)] underline underline-offset-4 transition-colors hover:text-[var(--warn-text)]/80"
               >
                 {alertas.tardios}{" "}
                 {alertas.tardios === 1 ? "registro tardio" : "registros tardios"}
@@ -198,8 +200,13 @@ export default async function RegistrosPage({
       <RegistrosFiltros filtros={filtros} duplas={duplas} maxEncontro={maxEncontro} />
 
       {ordenados.length === 0 ? (
-        <div className="rounded-xl bg-card px-6 py-10 text-center shadow-[var(--shadow-border)]">
-          <p className="font-medium">
+        <div className="flex flex-col items-center rounded-xl bg-card px-6 py-10 text-center shadow-[var(--shadow-border)]">
+          <ClipboardText
+            size={32}
+            aria-hidden
+            className="text-muted-foreground/50"
+          />
+          <p className="mt-3 font-medium">
             {temFiltro
               ? "Nenhum registro com esses filtros."
               : souCoord
@@ -207,14 +214,21 @@ export default async function RegistrosPage({
                 : "Nenhum registro nas suas duplas ainda."}
           </p>
           <p className="mt-1 text-sm text-muted-foreground">
-            {temFiltro ? (
-              <Link href="/registros" className="underline underline-offset-2">
-                Limpar filtros
-              </Link>
-            ) : (
-              "Os registros semanais dos mentores aparecem aqui conforme forem enviados."
-            )}
+            {temFiltro
+              ? "Tente ajustar ou limpar os filtros."
+              : "Os registros semanais dos mentores aparecem aqui conforme forem enviados."}
           </p>
+          {temFiltro && (
+            <Link
+              href="/registros"
+              className={cn(
+                buttonVariants({ variant: "outline", size: "sm" }),
+                "mt-4"
+              )}
+            >
+              Limpar filtros
+            </Link>
+          )}
         </div>
       ) : (
         <>
@@ -240,7 +254,7 @@ export default async function RegistrosPage({
                       <span className="block text-sm font-semibold tabular-nums">
                         {formatDiaNum(aconteceuEm)}
                       </span>
-                      <span className="mt-1 block text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                      <span className="mt-1 block text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
                         {formatMesAbrev(aconteceuEm)}
                       </span>
                     </p>
@@ -253,7 +267,7 @@ export default async function RegistrosPage({
                           ? "bg-[var(--danger)]"
                           : tardio
                             ? "bg-[var(--warn)]"
-                            : "bg-[var(--brand-lime)]"
+                            : "bg-[var(--ok)]"
                       )}
                     />
                     {!ultimo && (
@@ -278,7 +292,7 @@ export default async function RegistrosPage({
               <Link
                 href={hrefPagina(filtros.pagina + 1)}
                 scroll={false}
-                className="rounded-lg border px-4 py-2 text-sm font-medium transition-colors hover:bg-muted"
+                className={buttonVariants({ variant: "outline" })}
               >
                 Mostrar mais ({Math.min(total - itens.length, REGISTROS_PAGINA)}{" "}
                 restantes)

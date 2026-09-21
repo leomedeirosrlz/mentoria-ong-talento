@@ -18,29 +18,34 @@ export function RegistroView({
   reg,
   tardio,
   anexos,
+  ocultarMeta = false,
 }: {
   reg: Registro;
   /** >3 dias entre encontro e registro — badge "registro tardio". */
   tardio?: boolean;
   /** Slot de evidências (AnexosRegistro com as permissões do papel). */
   anexos?: ReactNode;
+  /** o summary do card em /registros já mostra data+autor — o meta repete */
+  ocultarMeta?: boolean;
 }) {
   return (
     <>
-      <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-        <span>
-          Registrado em {formatDiaMes(reg.created_at)}
-          {reg.autor?.nome ? ` por ${reg.autor.nome}` : ""}
-        </span>
-        {tardio && (
-          <Badge
-            variant="outline"
-            className="border-[var(--warn)]/60 px-1.5 py-0 text-[11px] font-normal text-[var(--warn-text)]"
-          >
-            registro tardio
-          </Badge>
-        )}
-      </p>
+      {!ocultarMeta && (
+        <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+          <span>
+            Registrado em {formatDiaMes(reg.created_at)}
+            {reg.autor?.nome ? ` por ${reg.autor.nome}` : ""}
+          </span>
+          {tardio && (
+            <Badge
+              variant="outline"
+              className="border-[var(--warn)]/60 px-1.5 py-0 text-[11px] font-normal text-[var(--warn-text)]"
+            >
+              registro tardio
+            </Badge>
+          )}
+        </p>
+      )}
       {(reg.avaliacao || (reg.dificuldade && reg.dificuldade !== "nenhuma")) && (
         <div className="flex flex-wrap items-center gap-2 pb-0.5">
           {reg.avaliacao && <AvaliacaoBadge avaliacao={reg.avaliacao} />}

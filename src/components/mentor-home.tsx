@@ -6,6 +6,7 @@ import {
   formatDate,
   formatDateTime,
   jornadaDaDupla,
+  linkSeguro,
   saudadeDaDupla,
   toDateStr,
   totalEncontros,
@@ -115,8 +116,9 @@ export function MentorHome({
                   </p>
                 </div>
                 <div className="flex flex-col items-end gap-0.5 text-right">
-                  <span className="font-mono text-sm tabular-nums text-[var(--brand-lime)]">
-                    {feitos}/{total} encontros
+                  <span className="text-sm text-[var(--brand-lime)]">
+                    <span className="font-mono tabular-nums">{feitos}/{total}</span>{" "}
+                    encontros
                   </span>
                   {!ativa && (
                     <span className="text-[11px] uppercase tracking-wider text-white/50">
@@ -199,9 +201,9 @@ export function MentorHome({
                       </p>
                       {/* na hora do encontro o link da chamada é a ação nº1 —
                           chip próprio, não texto corrido (mesmo fix do CC-1) */}
-                      {proximoAgendado.link && (
+                      {linkSeguro(proximoAgendado.link) && (
                         <a
-                          href={proximoAgendado.link}
+                          href={linkSeguro(proximoAgendado.link)!}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="mt-2 inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-[var(--ok)]/40 bg-[var(--ok)]/10 px-2.5 text-sm font-medium text-[var(--ok-text)] transition-colors hover:bg-[var(--ok)]/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:min-h-7"

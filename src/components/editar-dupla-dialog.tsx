@@ -318,7 +318,7 @@ export function EditarDuplaDialog({ dupla }: { dupla: Dupla }) {
               <p className="text-xs text-muted-foreground">vazio mantém a data atual</p>
             </div>
             <Button type="submit" className="w-full" disabled={pending}>
-              {pending ? "Salvando..." : "Salvar"}
+              {pending ? "Salvando…" : "Salvar"}
             </Button>
             </>
             )}

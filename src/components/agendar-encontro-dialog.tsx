@@ -237,12 +237,12 @@ export function AgendarEncontroDialog({
               </div>
               <div className="space-y-2">
                 <Label htmlFor="link">Link da chamada (opcional)</Label>
-                <Input id="link" name="link" type="url" placeholder="https://meet.google.com/..." defaultValue={atual?.link ?? ""} />
+                <Input id="link" name="link" type="url" placeholder="https://meet.google.com/…" defaultValue={atual?.link ?? ""} />
               </div>
             </>
           )}
           <Button type="submit" className="w-full" disabled={pending}>
-            {pending ? "Salvando..." : ehRetroativo ? "Registrar encontro" : atual ? "Confirmar remarcação" : "Confirmar agendamento"}
+            {pending ? "Salvando…" : ehRetroativo ? "Registrar encontro" : atual ? "Confirmar remarcação" : "Confirmar agendamento"}
           </Button>
         </form>
       </DialogContent>

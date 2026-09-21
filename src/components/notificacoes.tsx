@@ -8,7 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   Bell,
   Check,
@@ -24,7 +24,7 @@ import {
   marcarTodasNotificacoesLidas,
 } from "@/lib/actions";
 import { Popover, PopoverContent, PopoverTitle, PopoverTrigger } from "@/components/ui/popover";
-import { cn } from "@/lib/utils";
+import { cn, pathInterno } from "@/lib/utils";
 import type { Notificacao } from "@/lib/types";
 
 type Estado = { itens: Notificacao[]; naoLidas: number };
@@ -117,6 +117,10 @@ export function NotificacoesProvider({
           ? "1 notificação não lida"
           : `${estado.naoLidas} notificações não lidas`
       );
+      // esvazia depois de anunciar — texto idêntico não re-anuncia na live
+      // region, então "3 não lidas" → lê → 3 novas precisa do reset pra soar
+      const t = setTimeout(() => setAnuncio(""), 2000);
+      return () => clearTimeout(t);
     }
     ultimoAnunciado.current = estado.naoLidas;
   }, [estado.naoLidas]);
@@ -201,7 +205,6 @@ export function NotificacoesBell({
   align: "start" | "end" | "center";
 }) {
   const ctx = useContext(NotificacoesCtx);
-  const router = useRouter();
   const [aberto, setAberto] = useState(false);
   if (!ctx) return null;
   const { itens, naoLidas, marcar, marcarTodas, recarregar } = ctx;
@@ -223,10 +226,12 @@ export function NotificacoesBell({
         className="relative grid size-11 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
       >
         <Bell size={20} weight={naoLidas > 0 ? "fill" : "regular"} aria-hidden />
+        {/* lime, não danger — contagem não-lida não é alerta; o vermelho
+            fica reservado a apoio/risco */}
         {naoLidas > 0 && (
           <span
             aria-hidden
-            className="absolute right-1 top-1 grid min-w-4 place-items-center rounded-full bg-[var(--danger)] px-1 text-[11px] font-semibold leading-4 text-white tabular-nums"
+            className="absolute right-1 top-1 grid min-w-4 place-items-center rounded-full bg-[var(--brand-lime)] px-1 text-[11px] font-semibold leading-4 text-[var(--brand-ink)] tabular-nums"
           >
             {naoLidas > 9 ? "9+" : naoLidas}
           </span>
@@ -244,7 +249,7 @@ export function NotificacoesBell({
             <button
               type="button"
               onClick={marcarTodas}
-              className="-my-2 rounded-md px-2 py-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              className="-my-2 rounded-md px-3 py-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground min-h-11 sm:min-h-0 sm:py-2"
             >
               Marcar todas como lidas
             </button>
@@ -262,39 +267,49 @@ export function NotificacoesBell({
               const lida = !!n.lida_em;
               return (
                 <li key={n.id} className={cn("flex items-stretch", !lida && "bg-muted/40")}>
-                  <button
-                    type="button"
-                    onClick={() => {
+                  {(() => {
+                    // com href é navegação real → <a>: Cmd+click, nova aba e
+                    // preview de URL funcionam; sem href continua botão
+                    const hrefOk = pathInterno(n.href);
+                    const conteudo = (
+                      <>
+                        <span className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-full bg-muted text-muted-foreground">
+                          <Icone size={14} aria-hidden />
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          {!lida && <span className="sr-only">Não lida · </span>}
+                          <span className="flex items-baseline gap-2">
+                            <span className={cn("truncate text-sm", !lida && "font-medium")}>
+                              {n.titulo}
+                            </span>
+                            <span className="ml-auto shrink-0 text-[11px] text-muted-foreground">
+                              {tempoRelativo(n.created_at)}
+                            </span>
+                          </span>
+                          {n.corpo && (
+                            <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+                              {n.corpo}
+                            </span>
+                          )}
+                        </span>
+                      </>
+                    );
+                    const classe =
+                      "flex min-w-0 flex-1 items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/60";
+                    const aoClicar = () => {
                       if (!lida) marcar(n.id);
                       setAberto(false);
-                      // href é path interno (o banco garante) — o guard contra
-                      // '//' é defesa em profundidade pro router.push
-                      if (n.href?.startsWith("/") && !n.href.startsWith("//")) {
-                        router.push(n.href);
-                      }
-                    }}
-                    className="flex min-w-0 flex-1 items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/60"
-                  >
-                    <span className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-full bg-muted text-muted-foreground">
-                      <Icone size={14} aria-hidden />
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      {!lida && <span className="sr-only">Não lida · </span>}
-                      <span className="flex items-baseline gap-2">
-                        <span className={cn("truncate text-sm", !lida && "font-medium")}>
-                          {n.titulo}
-                        </span>
-                        <span className="ml-auto shrink-0 text-[11px] text-muted-foreground">
-                          {tempoRelativo(n.created_at)}
-                        </span>
-                      </span>
-                      {n.corpo && (
-                        <span className="mt-0.5 block truncate text-xs text-muted-foreground">
-                          {n.corpo}
-                        </span>
-                      )}
-                    </span>
-                  </button>
+                    };
+                    return hrefOk ? (
+                      <Link href={hrefOk} onClick={aoClicar} className={classe}>
+                        {conteudo}
+                      </Link>
+                    ) : (
+                      <button type="button" onClick={aoClicar} className={classe}>
+                        {conteudo}
+                      </button>
+                    );
+                  })()}
                   {!lida && (
                     <button
                       type="button"

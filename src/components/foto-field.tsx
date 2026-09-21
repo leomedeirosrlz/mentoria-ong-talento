@@ -41,13 +41,17 @@ export function FotoField({
             <Camera size={18} aria-hidden />
           )}
         </span>
+        {/* fora da tab order — o botão abaixo é o controle (ref.click);
+            sr-only deixaria um foco invisível no meio do form */}
         <input
           ref={ref}
           id={id}
           name="foto"
           type="file"
           accept={AVATAR_ACCEPT}
-          className="sr-only"
+          className="hidden"
+          tabIndex={-1}
+          aria-hidden="true"
           onChange={(e) => {
             const f = e.target.files?.[0];
             if (!f) return;

@@ -143,7 +143,7 @@ export function DocumentoPessoa({
             onClick={() => fileRef.current?.click()}
           >
             {pending ? <CircleNotch size={14} className="animate-spin" /> : <Paperclip size={14} />}
-            {pending ? "Enviando..." : "Substituir"}
+            {pending ? "Enviando…" : "Substituir"}
           </Button>
           <ConfirmDeleteButton
             titulo="Remover o documento?"
@@ -168,7 +168,7 @@ export function DocumentoPessoa({
             onClick={() => fileRef.current?.click()}
           >
             {pending ? <CircleNotch size={14} className="animate-spin" /> : <Paperclip size={14} />}
-            {pending ? "Enviando..." : "Anexar documento"}
+            {pending ? "Enviando…" : "Anexar documento"}
           </Button>
           <p className="text-xs text-muted-foreground">
             {`Nenhum documento — anexe a ${nomeDoc} (PDF ou imagem, até 20 MB).`}

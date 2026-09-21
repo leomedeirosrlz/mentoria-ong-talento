@@ -162,12 +162,16 @@ export function AppShell({
       </aside>
 
       {/* tabIndex=-1: o skip-link consegue mover o foco pro main, não só rolar */}
-      <main id="conteudo" tabIndex={-1} className="flex-1 min-w-0 pb-[calc(5rem+env(safe-area-inset-bottom))] md:ml-56 md:pb-0">
+      <main id="conteudo" tabIndex={-1} className="flex-1 min-w-0 md:ml-56">
         <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6 md:py-8">
           {children}
-          <SiteFooter className="mt-14 border-t border-border pt-5" />
         </div>
       </main>
+      {/* footer fora do <main> — dentro ele não expõe o landmark contentinfo;
+          o padding-bottom mantém distância do bottom nav no mobile */}
+      <div className="mx-auto w-full max-w-5xl px-4 pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:px-6 md:ml-56 md:pb-8">
+        <SiteFooter className="mt-2 border-t border-border pt-5" />
+      </div>
 
       {/* bottom nav — só mobile */}
       <nav aria-label="Navegação principal" className="fixed inset-x-0 bottom-0 z-40 border-t border-sidebar-border bg-sidebar pb-[env(safe-area-inset-bottom)] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] md:hidden">

@@ -197,7 +197,7 @@ export function NovoMaterialDialog({ maxEncontro }: { maxEncontro: number }) {
                 </p>
               </>
             ) : (
-              <Input id="url" name="url" type="url" required placeholder="https://..." />
+              <Input id="url" name="url" type="url" required placeholder="https://…" />
             )}
           </fieldset>
           <div className="space-y-2">
@@ -208,7 +208,7 @@ export function NovoMaterialDialog({ maxEncontro }: { maxEncontro: number }) {
             </p>
           </div>
           <Button type="submit" className="w-full" disabled={pending}>
-            {pending ? "Salvando..." : "Adicionar"}
+            {pending ? "Salvando…" : "Adicionar"}
           </Button>
         </form>
       </DialogContent>

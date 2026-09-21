@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { publicarComunicado } from "@/lib/actions";
 import { Button } from "@/components/ui/button";
 import {
-  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -28,6 +28,7 @@ const AUDIENCIA_LABEL = {
 
 export function NovoComunicadoDialog() {
   const [open, setOpen] = useState(false);
+  const [titulo, setTitulo] = useState("");
   const [pending, start] = useTransition();
   const router = useRouter();
 
@@ -41,6 +42,7 @@ export function NovoComunicadoDialog() {
         return;
       }
       toast.success("Aviso publicado.");
+      setTitulo("");
       setOpen(false);
       router.refresh();
     });
@@ -55,11 +57,26 @@ export function NovoComunicadoDialog() {
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Novo aviso</DialogTitle>
+          <DialogDescription>
+            O aviso aparece no mural e notifica quem você escolher abaixo.
+          </DialogDescription>
         </DialogHeader>
         <form onSubmit={submit} className="space-y-4">
           <div className="space-y-1.5">
-            <Label htmlFor="aviso-titulo">Título</Label>
-            <Input id="aviso-titulo" name="titulo" required maxLength={140} />
+            <div className="flex items-baseline justify-between gap-2">
+              <Label htmlFor="aviso-titulo">Título</Label>
+              <span className="text-xs text-muted-foreground">
+                {titulo.length}/140
+              </span>
+            </div>
+            <Input
+              id="aviso-titulo"
+              name="titulo"
+              required
+              maxLength={140}
+              value={titulo}
+              onChange={(e) => setTitulo(e.target.value)}
+            />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="aviso-corpo">Texto</Label>

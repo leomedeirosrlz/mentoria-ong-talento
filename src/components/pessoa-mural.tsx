@@ -142,7 +142,7 @@ export function PessoaMural({
                 onClick={() => apagar(n.id)}
                 disabled={apagando === n.id}
                 aria-label="Apagar nota"
-                className="inline-flex min-h-11 shrink-0 items-center gap-1 rounded-md text-xs text-muted-foreground/70 transition-colors hover:text-[var(--danger)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:min-h-6 md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100"
+                className="inline-flex min-h-11 shrink-0 items-center gap-1 rounded-md text-xs text-muted-foreground transition-colors hover:text-[var(--danger)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:min-h-6 md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100"
               >
                 {apagando === n.id ? (
                   <CircleNotch size={13} className="animate-spin" aria-hidden />

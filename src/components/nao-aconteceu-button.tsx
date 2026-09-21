@@ -57,7 +57,7 @@ export function NaoAconteceuButton({
               })
             }
           >
-            {pending ? "Salvando..." : "Sim, não aconteceu"}
+            {pending ? "Salvando…" : "Sim, não aconteceu"}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -112,7 +112,7 @@ export function DesfazerNaoAconteceuButton({
               })
             }
           >
-            {pending ? "Salvando..." : "Voltar para agendado"}
+            {pending ? "Salvando…" : "Voltar para agendado"}
           </Button>
         </DialogFooter>
       </DialogContent>

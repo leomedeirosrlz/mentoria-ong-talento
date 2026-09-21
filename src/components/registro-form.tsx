@@ -761,7 +761,7 @@ export function RegistroForm({
           </>
         ) : (
           <Button type="submit" className="flex-1" disabled={pending}>
-            {pending ? "Salvando..." : registro ? "Salvar alterações" : "Salvar registro"}
+            {pending ? "Salvando…" : registro ? "Salvar alterações" : "Salvar registro"}
           </Button>
         )}
       </div>

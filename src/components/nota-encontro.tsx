@@ -102,7 +102,7 @@ export function NotaEncontro({
           Anotações{rotulo ? ` · ${rotulo}` : ""}
         </span>
         {preview && (
-          <span className="min-w-0 flex-1 truncate text-muted-foreground/70">
+          <span className="min-w-0 flex-1 truncate text-muted-foreground">
             — {preview}
           </span>
         )}

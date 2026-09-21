@@ -68,7 +68,7 @@ function OpcaoPilula({
   return (
     <label
       className={cn(
-        "flex min-h-9 cursor-pointer items-center justify-center rounded-lg border px-2.5 text-sm transition-colors",
+        "flex min-h-11 cursor-pointer items-center justify-center rounded-lg border px-2.5 text-sm transition-colors sm:min-h-9",
         "hover:bg-muted has-checked:border-foreground has-checked:bg-foreground has-checked:font-medium has-checked:text-background",
         "has-focus-visible:ring-2 has-focus-visible:ring-ring has-focus-visible:ring-offset-2 has-focus-visible:ring-offset-background",
         className
@@ -101,7 +101,7 @@ function OpcaoCheck({
   return (
     <label
       className={cn(
-        "flex min-h-10 cursor-pointer items-center gap-2.5 rounded-lg px-3 text-sm transition-colors",
+        "flex min-h-11 cursor-pointer items-center gap-2.5 rounded-lg px-3 text-sm transition-colors sm:min-h-10",
         "hover:bg-muted has-checked:bg-muted",
         "has-focus-visible:ring-2 has-focus-visible:ring-ring"
       )}
@@ -149,7 +149,7 @@ function OpcaoLinha({
   return (
     <label
       className={cn(
-        "flex min-h-10 cursor-pointer items-center gap-2.5 rounded-lg px-3 text-sm transition-colors",
+        "flex min-h-11 cursor-pointer items-center gap-2.5 rounded-lg px-3 text-sm transition-colors sm:min-h-10",
         "hover:bg-muted has-checked:bg-muted has-checked:font-medium",
         "has-focus-visible:ring-2 has-focus-visible:ring-ring"
       )}
@@ -400,7 +400,7 @@ export function RegistrosFiltros({
       </div>
 
       <Dialog open={aberto} onOpenChange={setAberto}>
-        <DialogContent className="sm:max-w-lg" aria-label="Filtros de registros">
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Filtros</DialogTitle>
             <DialogDescription>

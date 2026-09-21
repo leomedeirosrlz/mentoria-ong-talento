@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { pathInterno } from "@/lib/utils";
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
@@ -44,7 +45,7 @@ export async function updateSession(request: NextRequest) {
 
   if (user && request.nextUrl.pathname === "/login") {
     const next = request.nextUrl.searchParams.get("next");
-    const destino = next?.startsWith("/") && !next.startsWith("//") ? next : "/";
+    const destino = pathInterno(next) ?? "/";
     return NextResponse.redirect(new URL(destino, request.url));
   }
 

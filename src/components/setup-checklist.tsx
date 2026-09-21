@@ -100,7 +100,7 @@ export function SetupChecklist({
                 </Link>
               )}
               {!passo.feito && passo.dica && (
-                <p className="text-xs italic text-muted-foreground/70">{passo.dica}</p>
+                <p className="text-xs italic text-muted-foreground">{passo.dica}</p>
               )}
             </div>
           </li>

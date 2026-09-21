@@ -75,7 +75,7 @@ export function NovaPessoaDialog() {
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="whatsapp">WhatsApp</Label>
-              <Input id="whatsapp" name="whatsapp" type="tel" inputMode="tel" autoComplete="tel" placeholder="5511..." />
+              <Input id="whatsapp" name="whatsapp" type="tel" inputMode="tel" autoComplete="tel" placeholder="5511…" />
             </div>
             <div className="space-y-2">
               <Label id="papel-label">Papel</Label>
@@ -91,7 +91,7 @@ export function NovaPessoaDialog() {
           </div>
           <FotoField id="foto" />
           <Button type="submit" className="w-full" disabled={pending}>
-            {pending ? "Salvando..." : "Cadastrar"}
+            {pending ? "Salvando…" : "Cadastrar"}
           </Button>
           <p className="text-xs text-muted-foreground">
             A pessoa entra com o e-mail por link de acesso; o papel define o que ela vê e dá pra trocar depois na lista.
@@ -121,7 +121,7 @@ export function NovoMentoradoDialog() {
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="m_whatsapp">WhatsApp</Label>
-              <Input id="m_whatsapp" name="whatsapp" type="tel" inputMode="tel" autoComplete="tel" placeholder="5511..." />
+              <Input id="m_whatsapp" name="whatsapp" type="tel" inputMode="tel" autoComplete="tel" placeholder="5511…" />
             </div>
             <div className="space-y-2">
               <Label htmlFor="m_ong">ONG de origem</Label>
@@ -138,7 +138,7 @@ export function NovoMentoradoDialog() {
           </div>
           <FotoField id="m_foto" />
           <Button type="submit" className="w-full" disabled={pending}>
-            {pending ? "Salvando..." : "Cadastrar"}
+            {pending ? "Salvando…" : "Cadastrar"}
           </Button>
         </form>
       </DialogContent>

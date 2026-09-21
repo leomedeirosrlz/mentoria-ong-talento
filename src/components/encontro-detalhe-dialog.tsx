@@ -23,7 +23,7 @@ import { RegistroView } from "@/components/registro-view";
 import { ResolverApoioButton } from "@/components/resolver-apoio-button";
 import { formatTamanho } from "@/components/anexos-registro";
 import { createClient } from "@/lib/supabase/client";
-import { formatDate, formatDateTime, formatDiaMes, registroTardio } from "@/lib/ciclo";
+import { formatDate, formatDateTime, formatDiaMes, linkSeguro, registroTardio } from "@/lib/ciclo";
 import type {
   CicloEvento,
   Dupla,
@@ -75,10 +75,12 @@ export function EncontroDetalheDialog({
   // fecha/troca de registro → reseta (sem flash da lista velha ao reabrir)
   const [anexos, setAnexos] = useState<RegistroAnexo[] | null>(null);
   const [anexosDe, setAnexosDe] = useState<string | null>(null);
+  const [erroAnexos, setErroAnexos] = useState(false);
   const alvoAnexos = open && reg ? reg.id : null;
   if (anexosDe !== alvoAnexos) {
     setAnexosDe(alvoAnexos);
     setAnexos(null);
+    setErroAnexos(false);
   }
   useEffect(() => {
     if (!open || !reg) return;
@@ -89,9 +91,12 @@ export function EncontroDetalheDialog({
       .eq("registro_id", reg.id)
       .order("created_at", { ascending: true })
       .then(({ data, error }) => {
-        // falha de leitura vira lista vazia — distinguir de "sem anexos" não
-        // muda a ação disponível (tudo é read-only), mas o erro precisa logar
-        if (error) console.error("EncontroDetalheDialog anexos:", error);
+        if (error) {
+          console.error("EncontroDetalheDialog anexos:", error);
+          // "falhou" ≠ "sem anexos" — a lista vazia silenciosa escondia o erro
+          if (vivo) setErroAnexos(true);
+          return;
+        }
         if (vivo) setAnexos((data as unknown as RegistroAnexo[]) ?? []);
       });
     return () => {
@@ -151,9 +156,9 @@ export function EncontroDetalheDialog({
           </div>
           {meta && <p className="text-xs text-muted-foreground">{meta}</p>}
 
-          {encontro.status === "agendado" && encontro.link && (
+          {encontro.status === "agendado" && linkSeguro(encontro.link) && (
             <a
-              href={encontro.link}
+              href={linkSeguro(encontro.link)!}
               target="_blank"
               rel="noopener noreferrer"
               className={buttonVariants({ variant: "outline", size: "sm" })}
@@ -182,6 +187,12 @@ export function EncontroDetalheDialog({
           {reg ? (
             <div className="space-y-2 rounded-lg border p-3.5">
               <RegistroView reg={reg} tardio={tardio} />
+              {erroAnexos && (
+                <p className="pt-1 text-xs text-muted-foreground">
+                  Não foi possível carregar as evidências — elas estão na ficha
+                  da dupla.
+                </p>
+              )}
               {anexos && anexos.length > 0 && (
                 <ul className="space-y-1.5 pt-1">
                   {anexos.map((a) => (
@@ -283,7 +294,7 @@ export function EncontroDetalheDialog({
           <div className="border-t pt-3">
             <Link
               href={`/duplas/${dupla.id}#registrar-${encontro.id}`}
-              className="inline-flex items-center gap-1 text-xs font-medium underline underline-offset-2 hover:text-muted-foreground"
+              className="inline-flex min-h-11 items-center gap-1 text-xs font-medium underline underline-offset-2 hover:text-muted-foreground sm:min-h-0"
             >
               Abrir na ficha da dupla
               <ArrowUpRight size={12} aria-hidden />

@@ -22,6 +22,7 @@ import {
   formatDate,
   formatDateTime,
   jornadaDaDupla,
+  linkSeguro,
   registroTardio,
   saudadeDaDupla,
   toDateStr,
@@ -191,6 +192,7 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
                 mentorado={dupla.mentorado}
                 size={40}
                 linkar
+                sobrePapel
               />
             </span>
             <DuplaNomes mentor={dupla.mentor.nome} mentorado={dupla.mentorado.nome} />
@@ -209,7 +211,8 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
             ) : (
               <SemaforoBadge nivel={saude.semaforo} motivo={saude.motivo} />
             )}
-            <span className="font-mono">{saude.feitos}/{total} encontros</span>
+            {/* mono fica só no contador — "encontros" é prosa, volta pro sans */}
+            <span><span className="font-mono">{saude.feitos}/{total}</span> encontros</span>
             <TrajetoriaAvaliacoes encontros={dupla.encontros} />
             {dupla.supervisor && (
               // terciário — não compete em text-sm com o semáforo (§4)
@@ -283,9 +286,9 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
           {encontrosVisiveis.concat(futurosComPendencia).map(renderEncontro)}
           {encontrosColapsados.length > 0 && (
             <details className="group">
-              <summary className="flex min-h-11 cursor-pointer list-none items-center gap-1.5 py-3 text-sm text-muted-foreground [&::-webkit-details-marker]:hidden">
+              <summary className="flex min-h-11 cursor-pointer list-none items-center gap-1.5 rounded-lg py-3 text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
                 Próximos {encontrosColapsados.length} encontros
-                <CaretDown size={14} className="transition-transform group-open:rotate-180" />
+                <CaretDown size={14} aria-hidden className="transition-transform group-open:rotate-180" />
               </summary>
               <div className="space-y-3">{encontrosColapsados.map(renderEncontro)}</div>
             </details>
@@ -298,7 +301,9 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
             className="scroll-mt-20 rounded-xl bg-card p-4 shadow-[var(--shadow-border)]"
           >
             <div className="mb-1 flex items-center justify-between gap-2">
-              <h2 className="text-sm font-semibold">Combinados</h2>
+              <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                Combinados
+              </h2>
               {/* sem WhatsApp o botão fica desabilitado com a razão visível —
                   esconder deixaria o mentor procurando uma ação que sumiu */}
               {souMentor && combinadosPendentes.length > 0 && (
@@ -333,7 +338,7 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
             <Link
               href={`/pessoas/${dupla.mentorado.id}`}
               aria-label={`Abrir perfil de ${dupla.mentorado.nome}`}
-              className="group flex items-center gap-2.5 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="group -my-1.5 flex items-center gap-2.5 rounded-lg py-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               <Avatar
                 nome={dupla.mentorado.nome}
@@ -356,7 +361,7 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
               // dado faltante não imita dado presente — vira nota discreta só
               // pra coordenação, que pode completar o cadastro
               souCoord && (
-                <p className="text-xs italic text-muted-foreground/70">
+                <p className="text-xs italic text-muted-foreground">
                   sem ONG de origem cadastrada
                 </p>
               )
@@ -511,11 +516,11 @@ function EncontroRow({
           <div className="min-w-0 flex-1">
             <p className="text-sm font-medium line-clamp-2">{evento.titulo}</p>
             <p className="text-xs text-muted-foreground">{metaEncontro}</p>
-            {(encontro?.link || materialHref) && (
+            {(linkSeguro(encontro?.link) || materialHref) && (
               <div className="mt-2 flex flex-wrap gap-2">
-                {encontro?.link && (
+                {linkSeguro(encontro?.link) && (
                   <a
-                    href={encontro.link}
+                    href={linkSeguro(encontro?.link)!}
                     target="_blank"
                     rel="noopener noreferrer"
                     className={buttonVariants({

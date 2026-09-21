@@ -194,7 +194,7 @@ export function RegistrarRetroativoDialog({
           </div>
           <Button type="submit" className="w-full" disabled={pending}>
             <ClockCounterClockwise size={16} />
-            {pending ? "Salvando..." : "Registrar encontro"}
+            {pending ? "Salvando…" : "Registrar encontro"}
           </Button>
         </form>
       </DialogContent>

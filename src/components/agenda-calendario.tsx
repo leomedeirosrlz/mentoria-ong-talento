@@ -44,6 +44,7 @@ import {
   formatDate,
   formatDateTime,
   formatDiaSemana,
+  linkSeguro,
   toDateStr,
 } from "@/lib/ciclo";
 import type {
@@ -1601,9 +1602,9 @@ function EncontroDuplaRow({
   );
 
   // link da chamada é ação própria perto da hora — chip, não texto corrido
-  const chamada = encontro.status === "agendado" && encontro.link && (
+  const chamada = encontro.status === "agendado" && linkSeguro(encontro.link) && (
     <a
-      href={encontro.link}
+      href={linkSeguro(encontro.link)!}
       target="_blank"
       rel="noopener noreferrer"
       className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-[var(--ok)]/40 bg-[var(--ok)]/10 px-2.5 text-xs font-medium text-[var(--ok-text)] transition-colors hover:bg-[var(--ok)]/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:min-h-9"

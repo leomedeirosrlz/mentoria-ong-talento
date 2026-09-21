@@ -157,7 +157,7 @@ export function PerfilForm({
               onClick={() => fileRef.current?.click()}
             >
               <Camera size={15} aria-hidden />
-              {uploading ? "Enviando..." : src ? "Trocar foto" : "Enviar foto"}
+              {uploading ? "Enviando…" : src ? "Trocar foto" : "Enviar foto"}
             </Button>
             {src && (
               <button
@@ -204,7 +204,7 @@ export function PerfilForm({
             </p>
           </div>
           <Button type="submit" disabled={salvando}>
-            {salvando ? "Salvando..." : "Salvar"}
+            {salvando ? "Salvando…" : "Salvar"}
           </Button>
         </form>
       </section>
@@ -238,7 +238,7 @@ export function PerfilForm({
             />
           </div>
           <Button type="submit" disabled={salvandoSenha}>
-            {salvandoSenha ? "Salvando..." : "Trocar senha"}
+            {salvandoSenha ? "Salvando…" : "Trocar senha"}
           </Button>
         </form>
       </section>
