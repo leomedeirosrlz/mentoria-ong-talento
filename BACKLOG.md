@@ -150,11 +150,11 @@ Planos em `.devin/plan-mural-perfil.md` + `.devin/plan-agenda-zero-friccao.md`. 
 - [ ] **wa.me diretos na página da dupla** ("Falar com mentorado", "Enviar combinados") não passam por `/api/nudge` → não logam em `interacoes`. Decidir se contato do mentor entra no log (hoje só nudges de coord/supervisor via NudgeButton).
 - [ ] **`me()` em actions.ts não falha sem sessão**: RLS cobre a autorização (42501→erroAmigavel), mas um early-return `{error:"Sessão expirada."}` seria mais explícito que propagar `me:null`.
 - [ ] **Refactor de complexidade** (react-doctor): `duplas/[id]/page.tsx` e `registro-form.tsx` estão grandes — candidatos a split quando a próxima feature tocar neles.
-- [ ] **Anexos**: teste E2E no browser pendente (banco sem duplas com registro na sessão — RLS provado via SQL).
+- [x] ~~**Anexos**: teste E2E~~ — RLS provado contra o remoto (coord INSERT 403, mentor INSERT 201, coord DELETE ok). Falta só clicar o upload no browser.
 
 ## Decisões de produto — maiores
 
-- [ ] **Trilha especialista**: `trilha` em `duplas` + `ciclo_eventos` (5 encontros) ou slice só-DPP. Hoje `mentor_especialista` cai numa trilha de 16 errada. **Decidir antes de popular dados.**
+- [ ] **Trilha especialista**: `trilha` em `duplas` + `ciclo_eventos` (5 encontros). **Bloqueada na entrada** — `createDupla`/`updateDupla` rejeitam mentor especialista e os selects marcam "trilha especialista (em breve)", porque criar jogava a dupla no calendário DPP de 16 com semáforo fantasma. Falta: conteúdo dos 5 encontros (guia do especialista) + modelar `trilha` (o agente mapeou os ~12 pontos que assumem 16: `ciclo.ts` inteiro, `trajetoria-avaliacoes`, `materiaisPorNumero`, rail da agenda, caps `maxNum` nas actions).
 - [x] ~~Materiais de verdade~~ — `0010`: `materiais.path` + bucket privado `materiais` (policies de storage espelham a audiência — coord lê tudo, trilha só a própria, supervisor só "todos"); upload no `NovoMaterialDialog` (toggle arquivo/link, 20MB, PDF/imagem) e "Anexar arquivo" no `MaterialActions`; `/api/material/[id]` → signed URL 300s; card de encontro na página da dupla abre o arquivo.
 - [ ] **PDM da dupla**: `duplas.pdm_url` (link Drive/Docs) ou storage por dupla.
 
@@ -166,7 +166,7 @@ Planos em `.devin/plan-mural-perfil.md` + `.devin/plan-agenda-zero-friccao.md`. 
 - [x] ~~Deploy Vercel~~ — `https://realizavc.vercel.app` no ar (projeto `thisux1s-projects/realiza.vc`, repo `thisux1/realiza.vc` conectado — push na main já dispara redeploy). Envs de prod: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_SITE_URL` (todas Config/exposed). **Falta no dashboard Supabase** (não dá via MCP): Auth → URL Configuration — Site URL `https://realizavc.vercel.app` + Redirect URLs `https://realizavc.vercel.app/**` (sem isso o magic link de prod não confirma) e o SMTP da tarefa acima.
 - [ ] E-mail pra coordenação quando `precisa_apoio = true` (após Resend).
 - [ ] Export CSV de pessoas/mentorados.
-- [ ] `middleware`→`proxy`: convenção deprecated no Next 16 (aviso do build, codemod disponível).
+- [x] ~~`middleware`→`proxy`~~ — feito (build reconhece `ƒ Proxy`).
 
 ## Qualidade
 
@@ -185,3 +185,46 @@ vale no contrato, não só na UI. Smoke test E2E das policies passou no remoto.
 
 Pendente só de UX real: primeira publicação de aviso pela coord no app e olhar
 o painel do sino no browser (abrir, marcar lida, mobile).
+
+## Sprint leitura de registros + evidência do mentor (set/2026)
+
+**Evidência é escrita do mentor** — `0020`: `registro_anexos` INSERT e storage
+INSERT ficaram mentor-only (coord perdeu o "Anexar evidência" que aparecia na
+ficha); coord mantém SELECT (acompanha) e DELETE (moderação). UI dividida:
+`podeAnexar` (mentor) vs `podeRemover` (mentor+coord) no `AnexosRegistro`.
+Foco com contraste real: `--ring` era o lime 53% (~1.9:1 no branco) → 38% (~4:1).
+
+**`/registros`** (coord + supervisor, nav "Registros") — resposta a "uma página
+pra ver tudo que os mentores responderam no form": cards agrupados por nº de
+encontro (desc), chips de triagem clicáveis (apoio em aberto / avaliação baixa /
+dificuldade — contagens globais do papel), filtros server-side por searchParams
+(encontro, avaliação, dificuldade+`com`, dupla, busca em tema/reflexões/obs),
+`<details>` com o `RegistroView` completo + `ResolverApoioButton` inline,
+stretched-link pra `duplas/[id]#registrar-{encontro}`, paginação acumulativa
+`?pagina=` (100/página, grupos nunca quebram). RLS faz o escopo — supervisor
+vê só as suas. Entrada contextual: "Ver registros →" na faixa "Esta semana"
+do dashboard (já filtrada no encontro corrente).
+
+**"Detalhes do encontro" na agenda** — pra coord/sup a linha da dupla no
+detalhe do dia virou botão que abre modal (`EncontroDetalheDialog`): status,
+meta (agendado/realizado/remarcação), sugestão do guia, plano do mentor
+(read-only), `RegistroView` completo, combinados gerados por aquele registro,
+anexos lazy-fetch (`registro_anexos` via RLS de select), `ResolverApoioButton`
+pra coord, "Abrir na ficha" no rodapé. `RegistroView` extraído da ficha —
+display do registro vive num componente só.
+
+**Dupla especialista bloqueada** — `createDupla`/`updateDupla` rejeitam
+`mentor_especialista` e os selects de mentor marcam "trilha especialista (em
+breve)": criar produzia calendário/semáforo errados silenciosos (trilha de 5
+encontros não modelada). `setPessoaRole` também trava: trocar papel de quem
+tem dupla ativa/pausada deixava escrita indevida via `mentor_id` nas policies.
+
+**Auditoria pós-diff — abertos (decisão):**
+- Policies `*_mentor_write` de `encontros`/`registros`/`encaminhamentos`/
+  `encontro_notas` seguem `for all` + coord — "largas pra correções", mas a
+  0020 endureceu anexos na RLS: postura inconsistente. Apertar exige trigger
+  por coluna (coord escreve `precisa_apoio`, status de encontro, toggle de
+  combinado — write parcial legítimo).
+- Objetos órfãos no bucket `registro-anexos`: cascade de `deleteDupla` apaga
+  rows, não os arquivos — e a storage-delete exige a row existir, então o
+  objeto vira indeletável por policy. Cleanup via trigger ou no deleteDupla.

@@ -86,7 +86,10 @@ export function EncontroDetalheDialog({
       .select("*, autor:profiles!registro_anexos_created_by_fkey(nome)")
       .eq("registro_id", reg.id)
       .order("created_at", { ascending: true })
-      .then(({ data }) => {
+      .then(({ data, error }) => {
+        // falha de leitura vira lista vazia — distinguir de "sem anexos" não
+        // muda a ação disponível (tudo é read-only), mas o erro precisa logar
+        if (error) console.error("EncontroDetalheDialog anexos:", error);
         if (vivo) setAnexos((data as unknown as RegistroAnexo[]) ?? []);
       });
     return () => {

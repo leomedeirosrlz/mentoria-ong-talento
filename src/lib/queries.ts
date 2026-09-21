@@ -366,6 +366,8 @@ export async function getAlertasRegistros(): Promise<{
     supabase.from("registros").select("*", head).eq("avaliacao", "baixa"),
     supabase.from("registros").select("*", head).neq("dificuldade", "nenhuma").not("dificuldade", "is", null),
   ]);
+  const err = apoio.error ?? baixa.error ?? dif.error;
+  if (err) console.error("getAlertasRegistros:", err);
   return {
     apoio: apoio.count ?? 0,
     baixa: baixa.count ?? 0,

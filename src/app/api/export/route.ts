@@ -96,7 +96,11 @@ export async function GET() {
 // import usa o mesmo); `""` escapa aspas internas.
 
 function celula(v: string | null | undefined): string {
-  return `"${(v ?? "").replace(/"/g, '""')}"`;
+  let s = v ?? "";
+  // formula injection: Excel/Sheets executam célula abrindo com = + - @ (ou
+  // após tab/CR) — campos de texto livre do mentor passam por aqui
+  if (/^[\t\r ]*[=+\-@]/.test(s)) s = `'${s}`;
+  return `"${s.replace(/"/g, '""')}"`;
 }
 
 // mesmo mapa do STATUS_ENCONTRO_LABEL da agenda — copiado porque lá é local

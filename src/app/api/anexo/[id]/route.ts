@@ -9,6 +9,10 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
+  // id cru no eq() — string malformada vira erro PostgREST (500); uuid ruim é 404
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+    return new NextResponse("Anexo não encontrado.", { status: 404 });
+  }
   const supabase = await createClient();
 
   // middleware já protege /api/*; checagem extra porque route handler não

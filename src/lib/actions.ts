@@ -293,6 +293,21 @@ export async function setPessoaRole(profileId: string, role: string | null) {
     return { error: "Não é possível alterar o próprio cadastro." };
   }
   const novoRole = role && (ROLES as readonly string[]).includes(role) ? role : null;
+  // trocar papel de quem está em dupla ativa/pausada deixa a dupla apontando
+  // pra quem não é mais mentor/supervisor — e como as policies de escrita
+  // amarram mentor_id (não o papel), a pessoa manteria escrita indevida
+  const { data: vinculos } = await supabase
+    .from("duplas")
+    .select("id")
+    .or(`mentor_id.eq.${profileId},supervisor_id.eq.${profileId}`)
+    .in("status", ["ativa", "pausada"])
+    .limit(1);
+  if (vinculos?.length) {
+    return {
+      error:
+        "A pessoa está em uma dupla ativa ou pausada — pause, encerre ou reatribua a dupla antes de mudar o papel.",
+    };
+  }
   const { data, error } = await supabase
     .from("profiles")
     .update({ role: novoRole })
@@ -1185,6 +1200,7 @@ export async function salvarRegistro(formData: FormData) {
   revalidatePath("/");
   revalidatePath("/duplas");
   revalidatePath("/agenda");
+  revalidatePath("/registros");
   revalidatePath(`/duplas/${dupla_id}`);
   return { ok: true, concluidos, aviso };
 }
