@@ -16,6 +16,7 @@ import {
 import type { CicloEvento, Comunicado, Dupla } from "@/lib/types";
 import type { Interacao } from "@/lib/interacoes";
 import { AvaliacaoBadge, SemaforoDot } from "@/components/semaforo";
+import { DuplaAvatares } from "@/components/dupla-avatares";
 import { SetupChecklist } from "@/components/setup-checklist";
 import { NudgeButton } from "@/components/nudge-button";
 import { CopiarResumoButton } from "@/components/copiar-resumo-button";
@@ -463,6 +464,7 @@ function DuplaCard({
         <div className="min-w-0">
           <div className="flex items-center gap-2.5">
             <SemaforoDot nivel={saude.semaforo} />
+            <DuplaAvatares mentor={dupla.mentor} mentorado={dupla.mentorado} size={24} />
             <p className="font-semibold truncate">
               <DuplaNomes mentor={dupla.mentor.nome} mentorado={dupla.mentorado.nome} />
             </p>

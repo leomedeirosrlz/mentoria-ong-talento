@@ -1,11 +1,12 @@
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { AVALIACAO_LABEL, toDateStr } from "@/lib/ciclo";
+import { AVALIACAO_LABEL, papelLabel, toDateStr } from "@/lib/ciclo";
 import type { Dupla, EncontroStatus } from "@/lib/types";
 
-// GET /api/export — relatório do ciclo em CSV (uma linha por encontro), só pra
-// coordenação: é a prestação de contas, com dados de todas as duplas.
-export async function GET() {
+// GET /api/export — só pra coordenação. ?tipo=ciclo (default): relatório do
+// ciclo em CSV, uma linha por encontro — a prestação de contas. ?tipo=pessoas:
+// cadastro completo (equipe + mentorados) pra mala direta/backup.
+export async function GET(request: NextRequest) {
   const supabase = await createClient();
 
   // middleware já protege /api/*; checagem extra porque route handler não
@@ -29,6 +30,10 @@ export async function GET() {
       { error: "Só a coordenação pode exportar o relatório do ciclo." },
       { status: 403 }
     );
+  }
+
+  if (request.nextUrl.searchParams.get("tipo") === "pessoas") {
+    return exportPessoas(supabase);
   }
 
   const { data, error } = await supabase
@@ -87,6 +92,60 @@ export async function GET() {
       "Content-Type": "text/csv; charset=utf-8",
       // mês no nome: exports de meses diferentes não se sobrepõem na pasta de downloads
       "Content-Disposition": `attachment; filename="encontros-${toDateStr(new Date()).slice(0, 7)}.csv"`,
+    },
+  });
+}
+
+// tipo=pessoas — cadastro único: equipe (papel, status) + mentorados (ONG de
+// origem). Ordenado por nome; mesmo formato `;`+BOM do relatório do ciclo.
+async function exportPessoas(supabase: Awaited<ReturnType<typeof createClient>>) {
+  const [{ data: pessoas, error: eP }, { data: mentorados, error: eM }, { data: mps }] =
+    await Promise.all([
+      supabase.from("profiles").select("id,nome,email,whatsapp,role,ativo"),
+      supabase.from("mentorados").select("nome,email,whatsapp,ong_origem"),
+      supabase.from("mentor_profiles").select("profile_id,capacidade"),
+    ]);
+  if (eP || eM) {
+    return NextResponse.json(
+      { error: "Não foi possível gerar o relatório — tente de novo." },
+      { status: 500 }
+    );
+  }
+  const capacidade = new Map((mps ?? []).map((m) => [m.profile_id, m.capacidade]));
+
+  type Linha = { nome: string; resto: string[] };
+  const linhas: Linha[] = [
+    ...(pessoas ?? []).map((p) => ({
+      nome: p.nome,
+      resto: [
+        p.role ? papelLabel(p.role) : "Sem papel",
+        p.email,
+        p.whatsapp ?? "",
+        p.role?.startsWith("mentor") ? String(capacidade.get(p.id) ?? "") : "",
+        "",
+        p.ativo ? "ativo" : "inativo",
+      ],
+    })),
+    ...(mentorados ?? []).map((m) => ({
+      nome: m.nome,
+      resto: ["Mentorado", m.email ?? "", m.whatsapp ?? "", "", m.ong_origem ?? "", ""],
+    })),
+  ];
+
+  const csv =
+    "\uFEFF" +
+    [
+      "nome;tipo;email;whatsapp;capacidade;ong_origem;status",
+      ...linhas
+        .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"))
+        .map((l) => [l.nome, ...l.resto].map(celula).join(";")),
+    ].join("\r\n") +
+    "\r\n";
+
+  return new NextResponse(csv, {
+    headers: {
+      "Content-Type": "text/csv; charset=utf-8",
+      "Content-Disposition": `attachment; filename="pessoas-${toDateStr(new Date())}.csv"`,
     },
   });
 }

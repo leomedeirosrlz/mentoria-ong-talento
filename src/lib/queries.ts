@@ -279,8 +279,8 @@ export type RegistroResumo = Registro & {
     dupla: {
       id: string;
       status: DuplaStatus;
-      mentor: { id: string; nome: string } | null;
-      mentorado: { id: string; nome: string } | null;
+      mentor: { id: string; nome: string; email: string | null; avatar_path: string | null } | null;
+      mentorado: { id: string; nome: string; avatar_path: string | null } | null;
     } | null;
   } | null;
   encaminhamentos: { id: string }[];
@@ -313,8 +313,8 @@ const REGISTRO_RESUMO_SELECT = `
     id, numero, data_hora, realizado_em, status,
     dupla:duplas!encontros_dupla_id_fkey(
       id, status,
-      mentor:profiles!duplas_mentor_id_fkey(id, nome),
-      mentorado:mentorados!duplas_mentorado_id_fkey(id, nome)
+      mentor:profiles!duplas_mentor_id_fkey(id, nome, email, avatar_path),
+      mentorado:mentorados!duplas_mentorado_id_fkey(id, nome, avatar_path)
     )
   )`;
 

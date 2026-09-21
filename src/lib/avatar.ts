@@ -15,9 +15,10 @@ export function gravatarUrl(email: string, size = 128): string {
   return `https://www.gravatar.com/avatar/${hash}?s=${size}&d=404`;
 }
 
-/** "Thiago Costa" -> "TC" · "madalena" -> "M" */
+/** "Thiago Costa" -> "TC" · "madalena" -> "MA" */
 export function iniciais(nome: string): string {
   const partes = nome.trim().split(/\s+/).filter(Boolean);
   if (partes.length === 0) return "?";
-  return (partes[0][0] + (partes.length > 1 ? partes[partes.length - 1][0] : "")).toUpperCase();
+  if (partes.length === 1) return partes[0].slice(0, 2).toUpperCase();
+  return (partes[0][0] + partes[partes.length - 1][0]).toUpperCase();
 }

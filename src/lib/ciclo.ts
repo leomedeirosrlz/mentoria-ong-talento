@@ -634,5 +634,8 @@ export function papelLabel(role: string | null | undefined) {
 export function waLink(phone: string | null | undefined, mensagem: string): string | null {
   if (!phone) return null;
   const digits = phone.replace(/\D/g, "");
+  // dado legado/edição manual pode ter caractere mas zero dígito ("-", "abc")
+  // — wa.me/ vazio abre a página de erro do WhatsApp, então falha aqui
+  if (!digits.length) return null;
   return `https://wa.me/${digits}?text=${encodeURIComponent(mensagem)}`;
 }

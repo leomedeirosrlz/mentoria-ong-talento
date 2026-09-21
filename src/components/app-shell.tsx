@@ -17,6 +17,7 @@ import { papelLabel } from "@/lib/ciclo";
 import { Avatar } from "@/components/avatar";
 import { T } from "@/components/motion";
 import { NotificacoesBell, NotificacoesProvider } from "@/components/notificacoes";
+import { SiteFooter } from "@/components/site-footer";
 import type { Notificacao, Profile } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -92,7 +93,7 @@ export function AppShell({
       </header>
 
       {/* sidebar — só desktop */}
-      <aside className="hidden md:flex w-60 shrink-0 bg-sidebar text-sidebar-foreground border-r border-sidebar-border flex-col fixed inset-y-0">
+      <aside className="hidden md:flex w-56 shrink-0 bg-sidebar text-sidebar-foreground border-r border-sidebar-border flex-col fixed inset-y-0">
         <div className="px-5 pt-6 pb-8">
           {/* convenção logo→home, igual à top bar mobile */}
           <Link href="/" className="inline-block">
@@ -111,7 +112,7 @@ export function AppShell({
                 href={item.href}
                 aria-current={ativo ? "page" : undefined}
                 className={cn(
-                  "relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors",
+                  "relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
                   ativo
                     ? "text-[var(--brand-ink)] font-semibold"
                     : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
@@ -161,8 +162,11 @@ export function AppShell({
       </aside>
 
       {/* tabIndex=-1: o skip-link consegue mover o foco pro main, não só rolar */}
-      <main id="conteudo" tabIndex={-1} className="flex-1 min-w-0 pb-[calc(5rem+env(safe-area-inset-bottom))] md:ml-60 md:pb-0">
-        <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6 md:py-8">{children}</div>
+      <main id="conteudo" tabIndex={-1} className="flex-1 min-w-0 pb-[calc(5rem+env(safe-area-inset-bottom))] md:ml-56 md:pb-0">
+        <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6 md:py-8">
+          {children}
+          <SiteFooter className="mt-14 border-t border-border pt-5" />
+        </div>
       </main>
 
       {/* bottom nav — só mobile */}

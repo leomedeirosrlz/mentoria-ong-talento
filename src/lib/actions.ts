@@ -22,6 +22,8 @@ function erroAmigavel(e: { message: string; code?: string }): string {
   if (e.code === "23505" || /duplicate key/i.test(e.message)) {
     // e-mail é a identidade do magic link — o constraint "..._email_key" diz qual coluna conflitou
     if (/email/i.test(e.message)) return "Esse e-mail já está cadastrado.";
+    if (/whatsapp/i.test(e.message))
+      return "Esse WhatsApp já está cadastrado em outra pessoa.";
     return "Já existe um cadastro com esses dados.";
   }
   if (e.code === "42501" || /row-level security|row level security/i.test(e.message)) {

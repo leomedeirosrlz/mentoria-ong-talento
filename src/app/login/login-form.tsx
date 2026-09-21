@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "motion/react";
 import { CircleNotch, EnvelopeSimple, Key } from "@phosphor-icons/react";
 import { createClient } from "@/lib/supabase/client";
+import { SiteFooter } from "@/components/site-footer";
 import { fade, T } from "@/components/motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -363,6 +364,7 @@ export function LoginForm() {
             </motion.div>
           )}
         </AnimatePresence>
+        <SiteFooter className="mt-10" />
       </div>
     </div>
   );

@@ -6,6 +6,7 @@ import {
   Paperclip,
 } from "@phosphor-icons/react/dist/ssr";
 import { Badge } from "@/components/ui/badge";
+import { DuplaAvatares } from "@/components/dupla-avatares";
 import { DuplaNomes } from "@/components/dupla-nomes";
 import { AvaliacaoBadge } from "@/components/semaforo";
 import { RegistroView } from "@/components/registro-view";
@@ -51,8 +52,20 @@ export function RegistroRow({
       )}
       <div className="pointer-events-none space-y-1.5">
         <p className="flex items-start justify-between gap-2 text-sm font-medium">
-          <span>
-            {dupla ? (
+          <span className="flex items-center gap-2">
+            {dupla?.mentor && dupla?.mentorado ? (
+              <>
+                <DuplaAvatares
+                  mentor={dupla.mentor}
+                  mentorado={dupla.mentorado}
+                  size={26}
+                />
+                <DuplaNomes
+                  mentor={dupla.mentor.nome}
+                  mentorado={dupla.mentorado.nome}
+                />
+              </>
+            ) : dupla ? (
               <DuplaNomes
                 mentor={dupla.mentor?.nome ?? "—"}
                 mentorado={dupla.mentorado?.nome ?? "—"}

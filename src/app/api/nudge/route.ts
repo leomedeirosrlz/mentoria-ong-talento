@@ -24,9 +24,10 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  // destino obrigatoriamente wa.me — qualquer outra URL seria open redirect
+  // destino obrigatoriamente wa.me/<dígitos> — qualquer outra URL seria open
+  // redirect; wa.me/ sem número abre a página de erro do WhatsApp
   const to = searchParams.get("to") ?? "";
-  if (!to.startsWith("https://wa.me/")) {
+  if (!/^https:\/\/wa\.me\/\d+/.test(to)) {
     return NextResponse.json({ error: "Destino inválido." }, { status: 400 });
   }
 

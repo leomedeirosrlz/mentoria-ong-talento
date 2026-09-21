@@ -9,9 +9,11 @@ import {
   getPessoas,
   type MentorProfile,
 } from "@/lib/queries";
+import { DownloadSimple } from "@phosphor-icons/react/dist/ssr";
 import { NovaPessoaDialog, NovoMentoradoDialog } from "@/components/pessoas-dialogs";
 import { ImportarCsvDialog } from "@/components/importar-csv-dialog";
 import { PessoasListas } from "@/components/pessoas-listas";
+import { buttonVariants } from "@/components/ui/button";
 
 export const metadata: Metadata = {
   title: "Pessoas",
@@ -64,6 +66,13 @@ export default async function PessoasPage() {
         </div>
         <div className="flex flex-wrap gap-2">
           <ImportarCsvDialog />
+          <a
+            href="/api/export?tipo=pessoas"
+            className={buttonVariants({ variant: "outline", size: "sm" })}
+          >
+            <DownloadSimple />
+            Exportar CSV
+          </a>
           <NovoMentoradoDialog />
           <NovaPessoaDialog />
         </div>

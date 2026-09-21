@@ -7,6 +7,7 @@ import { avatarPublicUrl, gravatarUrl } from "@/lib/avatar";
 import { formatDate, papelLabel, waLink } from "@/lib/ciclo";
 import { Avatar } from "@/components/avatar";
 import { Badge } from "@/components/ui/badge";
+import { DuplaAvatares } from "@/components/dupla-avatares";
 import { DuplaNomes } from "@/components/dupla-nomes";
 import { PessoaMural, type MuralNota } from "@/components/pessoa-mural";
 import { VoltarLink } from "@/components/voltar-link";
@@ -149,6 +150,13 @@ export default async function PessoaPerfilPage({
                       href={`/duplas/${d.id}`}
                       className="group flex min-h-11 items-center gap-2 rounded-lg px-2 py-2 transition-colors hover:bg-muted/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     >
+                      {d.mentor && d.mentorado && (
+                        <DuplaAvatares
+                          mentor={d.mentor}
+                          mentorado={d.mentorado}
+                          size={26}
+                        />
+                      )}
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm font-medium">
                           {d.mentor && d.mentorado ? (

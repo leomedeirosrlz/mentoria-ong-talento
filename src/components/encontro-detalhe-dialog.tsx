@@ -16,6 +16,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
+import { DuplaAvatares } from "@/components/dupla-avatares";
+import { DuplaNomes } from "@/components/dupla-nomes";
 import { buttonVariants } from "@/components/ui/button";
 import { RegistroView } from "@/components/registro-view";
 import { ResolverApoioButton } from "@/components/resolver-apoio-button";
@@ -125,9 +127,19 @@ export function EncontroDetalheDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle>
-            {encontro.numero}º encontro — {dupla.mentor.nome} e{" "}
-            {dupla.mentorado.nome}
+          <DialogTitle className="flex items-center gap-2.5">
+            <DuplaAvatares
+              mentor={dupla.mentor}
+              mentorado={dupla.mentorado}
+              size={26}
+            />
+            <span>
+              {encontro.numero}º encontro —{" "}
+              <DuplaNomes
+                mentor={dupla.mentor.nome}
+                mentorado={dupla.mentorado.nome}
+              />
+            </span>
           </DialogTitle>
         </DialogHeader>
         <div className="space-y-4 text-sm">

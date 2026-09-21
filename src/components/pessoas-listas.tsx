@@ -337,6 +337,13 @@ export function PessoasListas({
               {emDupla.has(m.id) && (
                 <Badge variant="outline" className="text-xs shrink-0">em dupla</Badge>
               )}
+              {/* LGPD: parear menor sem a autorização do responsável no arquivo
+                  é pendência jurídica — mesmo tratamento do "sem termo" */}
+              {!m.documento_path && (
+                <Badge variant="outline" className="text-[11px] shrink-0 border-[var(--warn)]/50 text-[var(--warn-text)]">
+                  sem autorização
+                </Badge>
+              )}
               <div className="flex items-center gap-2 ml-auto">
                 <MentoradoActions mentorado={m} temDupla={temQualquerDupla.has(m.id)} />
               </div>

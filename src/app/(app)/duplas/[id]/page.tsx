@@ -7,12 +7,13 @@ import {
   ClockCounterClockwise,
   HandHeart,
   VideoCamera,
-  WhatsappLogo,
+
 } from "@phosphor-icons/react/dist/ssr";
 import { getCicloEventos, getDupla, getMateriais, getMe } from "@/lib/queries";
 import { getAnexosPorRegistros } from "@/lib/anexos";
-import { avatarPublicUrl, gravatarUrl } from "@/lib/avatar";
+import { avatarPublicUrl } from "@/lib/avatar";
 import { Avatar } from "@/components/avatar";
+import { DuplaAvatares } from "@/components/dupla-avatares";
 import { DuplaNomes } from "@/components/dupla-nomes";
 import { VoltarLink } from "@/components/voltar-link";
 import {
@@ -24,7 +25,7 @@ import {
   saudadeDaDupla,
   toDateStr,
   totalEncontros,
-  waLink,
+
 } from "@/lib/ciclo";
 import { SemaforoBadge, SemaforoDot } from "@/components/semaforo";
 import { NudgeButton } from "@/components/nudge-button";
@@ -110,7 +111,6 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
       .map((t, i) => `${i + 1}) ${t.descricao}${t.prazo ? ` (até ${formatDate(t.prazo)})` : ""}`)
       .join(" ") +
     ` — ${primeiroNomeMentor}`;
-  const combinadosHref = waLink(dupla.mentorado.whatsapp, msgCombinados);
 
   // material de apoio por nº de encontro (guia/template daquele encontro)
   const materiaisPorNumero = new Map<number, Material[]>();
@@ -185,33 +185,8 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
           <h1 className="text-2xl font-semibold tracking-tight text-balance">
             {/* par de avatares sobrepostos — a dupla como unidade visual (§4);
                 cada foto é o link do próprio perfil */}
-            <span className="mr-2 inline-flex -space-x-2 align-[-6px]">
-              <Link
-                href={`/pessoas/${dupla.mentor.id}`}
-                aria-label={`Abrir perfil de ${dupla.mentor.nome}`}
-                className="relative rounded-full transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                <Avatar
-                  nome={dupla.mentor.nome}
-                  src={dupla.mentor.avatar_path ? avatarPublicUrl(dupla.mentor.avatar_path) : null}
-                  fallbackSrc={gravatarUrl(dupla.mentor.email)}
-                  size={28}
-                  className="ring-2 ring-background"
-                />
-              </Link>
-              <Link
-                href={`/pessoas/${dupla.mentorado.id}`}
-                aria-label={`Abrir perfil de ${dupla.mentorado.nome}`}
-                className="relative rounded-full transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                <Avatar
-                  papel="mentorado"
-                  nome={dupla.mentorado.nome}
-                  src={dupla.mentorado.avatar_path ? avatarPublicUrl(dupla.mentorado.avatar_path) : null}
-                  size={28}
-                  className="ring-2 ring-background"
-                />
-              </Link>
+            <span className="mr-2 inline-flex align-[-6px]">
+              <DuplaAvatares mentor={dupla.mentor} mentorado={dupla.mentorado} linkar />
             </span>
             <DuplaNomes mentor={dupla.mentor.nome} mentorado={dupla.mentorado.nome} />
           </h1>
@@ -319,16 +294,16 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
           >
             <div className="mb-1 flex items-center justify-between gap-2">
               <h2 className="text-sm font-semibold">Combinados</h2>
-              {souMentor && combinadosPendentes.length > 0 && combinadosHref && (
-                <a
-                  href={`/api/nudge?d=${dupla.id}&to=${encodeURIComponent(combinadosHref)}&t=contato`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={buttonVariants({ variant: "outline", size: "sm" })}
-                >
-                  <WhatsappLogo />
-                  Enviar combinados
-                </a>
+              {/* sem WhatsApp o botão fica desabilitado com a razão visível —
+                  esconder deixaria o mentor procurando uma ação que sumiu */}
+              {souMentor && combinadosPendentes.length > 0 && (
+                <NudgeButton
+                  telefone={dupla.mentorado.whatsapp}
+                  mensagem={msgCombinados}
+                  label="Enviar combinados"
+                  duplaId={dupla.id}
+                  t="contato"
+                />
               )}
             </div>
             <p className="mb-2 text-xs text-muted-foreground">
@@ -381,20 +356,19 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
                 </p>
               )
             )}
-            {dupla.mentorado.whatsapp &&
-              (souMentor || souCoord || me.role === "supervisor") && (
-                <NudgeButton
-                  telefone={dupla.mentorado.whatsapp}
-                  mensagem={
-                    souMentor
-                      ? `Olá ${primeiroNomeMentorado}! Aqui é ${primeiroNomeMentor}, seu mentor no Programa de Mentoria Social.`
-                      : `Oi ${primeiroNomeMentorado}, tudo bem? Aqui é ${me.nome.split(" ")[0]}, da equipe do Realiza.vc. Como está indo a mentoria?`
-                  }
-                  label="Falar com mentorado"
-                  duplaId={dupla.id}
-                  t="contato"
-                />
-              )}
+            {(souMentor || souCoord || me.role === "supervisor") && (
+              <NudgeButton
+                telefone={dupla.mentorado.whatsapp}
+                mensagem={
+                  souMentor
+                    ? `Olá ${primeiroNomeMentorado}! Aqui é ${primeiroNomeMentor}, seu mentor no Programa de Mentoria Social.`
+                    : `Oi ${primeiroNomeMentorado}, tudo bem? Aqui é ${me.nome.split(" ")[0]}, da equipe do Realiza.vc. Como está indo a mentoria?`
+                }
+                label="Falar com mentorado"
+                duplaId={dupla.id}
+                t="contato"
+              />
+            )}
           </section>
         </aside>
       </div>

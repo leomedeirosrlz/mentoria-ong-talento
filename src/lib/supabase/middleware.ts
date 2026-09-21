@@ -27,7 +27,10 @@ export async function updateSession(request: NextRequest) {
   const user = data?.claims ? { id: data.claims.sub as string } : null;
 
   const p = request.nextUrl.pathname;
-  const isPublic = p === "/login" || p.startsWith("/login/") || p === "/auth" || p.startsWith("/auth/");
+  const isPublic =
+    p === "/login" || p.startsWith("/login/") ||
+    p === "/auth" || p.startsWith("/auth/") ||
+    p === "/privacidade";
 
   if (!user && !isPublic) {
     const url = request.nextUrl.clone();

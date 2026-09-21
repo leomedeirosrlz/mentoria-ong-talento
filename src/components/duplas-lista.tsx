@@ -6,6 +6,7 @@ import { MagnifyingGlass, Users } from "@phosphor-icons/react";
 import { saudadeDaDupla, totalEncontros } from "@/lib/ciclo";
 import type { CicloEvento, Dupla } from "@/lib/types";
 import { normaliza } from "@/lib/utils";
+import { DuplaAvatares } from "@/components/dupla-avatares";
 import { DuplaNomes } from "@/components/dupla-nomes";
 import { SemaforoDot } from "@/components/semaforo";
 import { NovaDuplaDialog } from "@/components/nova-dupla-dialog";
@@ -145,6 +146,9 @@ export function DuplasLista({
               className="animate-enter flex items-center gap-4 px-5 py-4 transition-colors hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
             >
               <SemaforoDot nivel={nivel} />
+              {/* o par de discos é a identidade da dupla — reforça quem são
+                  antes do nome (o link inteiro já leva à ficha) */}
+              <DuplaAvatares mentor={d.mentor} mentorado={d.mentorado} size={30} />
               <div className="min-w-0 flex-1">
                 <p className="font-semibold truncate">
                   <DuplaNomes mentor={d.mentor.nome} mentorado={d.mentorado.nome} />

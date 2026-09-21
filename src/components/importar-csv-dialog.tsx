@@ -68,8 +68,17 @@ export function ImportarCsvDialog({ tipoInicial = "equipe" }: { tipoInicial?: Ti
     e.target.value = "";
     if (!file) return;
     file
-      .text()
-      .then((t) => {
+      .arrayBuffer()
+      .then((buf) => {
+        // "CSV (delimitado por vírgulas)" do Excel pt-BR sai em Windows-1252 —
+        // decodificar como UTF-8 vira mojibake silencioso. Tenta UTF-8
+        // estrito; se houver byte inválido (U+FFFD no fatal), cai pro 1252.
+        let t: string;
+        try {
+          t = new TextDecoder("utf-8", { fatal: true }).decode(buf);
+        } catch {
+          t = new TextDecoder("windows-1252").decode(buf);
+        }
         setTexto(t);
         // arquivo escolhido já cai na prévia — sem passo morto entre "quero" e "feito"
         preVisualizar(t);
