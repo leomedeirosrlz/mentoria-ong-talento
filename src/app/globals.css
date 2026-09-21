@@ -50,9 +50,10 @@
 
 :root {
   /* Realiza.vc — tokens extraidos do CSS de realiza.vc */
-  /* ground plane: neutro frio claro na família de --muted/--sidebar (hsl 240 2%)
-     para que --card branco leia como superfície elevada, não como o fundo */
-  --background: hsl(240 2% 97%);
+  /* ground plane: "papel" quente da família do lime (hue 75, sat baixa) —
+     fundo tingido e 5% abaixo do branco pra que --card leia como superfície
+     elevada de verdade (97% neutro era separação invisível) */
+  --background: hsl(75 10% 95%);
   /* texto corpo na mesma profundidade de --brand-ink (15%) — foregrounds de
      card/popover/sidebar seguem o mesmo valor: um papel de texto, um valor */
   --foreground: hsl(0 0% 15%);
@@ -64,16 +65,18 @@
   --primary-foreground: hsl(0 0% 12%);
   --secondary: hsl(0 0% 15%);
   --secondary-foreground: hsl(0 0% 100%);
-  --muted: hsl(240 2% 96%);
-  --muted-foreground: hsl(240 1% 43%);
-  /* hover de menu/select/dropdown: superfície neutra (mesma lightness de
-     --sidebar-accent) — um acento só no app: lime */
-  --accent: hsl(240 4% 93%);
+  /* painéis internos/hover: mesma temperatura do fundo, um degrau abaixo do
+     card — o inset lê como recorte, não como mancha cinza fria */
+  --muted: hsl(75 7% 93%);
+  --muted-foreground: hsl(75 4% 40%);
+  /* hover de menu/select/dropdown: superfície neutra quente (mesma lightness
+     de --sidebar-accent) — um acento só no app: lime */
+  --accent: hsl(75 8% 91%);
   --accent-foreground: hsl(0 0% 15%);
   --destructive: hsl(0 74% 45%);
   --destructive-foreground: hsl(0 0% 100%);
-  --border: hsl(240 2% 90%);
-  --input: hsl(240 2% 90%);
+  --border: hsl(75 6% 87%);
+  --input: hsl(75 6% 87%);
   --ring: hsl(78 58% 38%);
   --brand-lime: hsl(78 56% 53%);
   --brand-ink: hsl(0 0% 15%);
@@ -95,13 +98,13 @@
   --chart-4: hsl(78 30% 70%);
   --chart-5: hsl(48 60% 80%);
   --radius: 0.75rem;
-  --sidebar: hsl(240 2% 98%);
+  --sidebar: hsl(75 8% 96.5%);
   --sidebar-foreground: hsl(0 0% 15%);
   --sidebar-primary: hsl(78 56% 53%);
   --sidebar-primary-foreground: hsl(0 0% 12%);
-  --sidebar-accent: hsl(240 2% 93%);
+  --sidebar-accent: hsl(75 8% 91%);
   --sidebar-accent-foreground: hsl(0 0% 15%);
-  --sidebar-border: hsl(240 2% 90%);
+  --sidebar-border: hsl(75 6% 87%);
   --sidebar-ring: hsl(78 56% 53%);
 }
 
@@ -120,13 +123,13 @@
      Em @theme emite o token em :root e registra as utilities shadow-border /
      shadow-border-hover. Uso: shadow-[var(--shadow-border)] ou shadow-border. */
   --shadow-border:
-    0 0 0 1px hsl(0 0% 0% / 0.05),
-    0 1px 2px -1px hsl(0 0% 0% / 0.05),
-    0 2px 4px 0 hsl(0 0% 0% / 0.04);
+    0 0 0 1px hsl(0 0% 0% / 0.06),
+    0 1px 2px -1px hsl(0 0% 0% / 0.06),
+    0 4px 8px -2px hsl(0 0% 0% / 0.05);
   --shadow-border-hover:
-    0 0 0 1px hsl(0 0% 0% / 0.08),
-    0 1px 2px -1px hsl(0 0% 0% / 0.08),
-    0 2px 4px 0 hsl(0 0% 0% / 0.06);
+    0 0 0 1px hsl(0 0% 0% / 0.09),
+    0 1px 2px -1px hsl(0 0% 0% / 0.09),
+    0 4px 8px -2px hsl(0 0% 0% / 0.07);
 }
 
 /* stagger de entrada de listas: .animate-enter + --i inline (0, 1, 2…).
@@ -169,7 +172,7 @@
   background-image: repeating-linear-gradient(
     45deg,
     transparent 0 4px,
-    hsl(240 2% 92%) 4px 5px
+    hsl(75 5% 89%) 4px 5px
   );
 }
 

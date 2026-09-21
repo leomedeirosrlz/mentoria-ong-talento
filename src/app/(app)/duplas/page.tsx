@@ -49,6 +49,7 @@ export default async function DuplasPage() {
         agora={new Date().toISOString()}
         podeCriar={me.role === "coordenacao"}
         mostrarSupervisor={me.role === "coordenacao"}
+        paraMentor={mentor}
       />
     </div>
   );

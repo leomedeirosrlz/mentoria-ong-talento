@@ -24,6 +24,7 @@ export function DuplasLista({
   agora,
   podeCriar = false,
   mostrarSupervisor = true,
+  paraMentor = false,
 }: {
   lista: Dupla[];
   eventos: CicloEvento[];
@@ -33,6 +34,9 @@ export function DuplasLista({
   /** false na visão do supervisor: a lista já é filtrada por ele, então
    *  "Supervisor: {ele mesmo}" seria prefixo constante em toda linha. */
   mostrarSupervisor?: boolean;
+  /** true na visão do mentor: o próprio pedido de apoio não é "risco" —
+   *  pra quem pediu, o estado é "solicitado" e a resposta vem da coordenação */
+  paraMentor?: boolean;
 }) {
   const [busca, setBusca] = useState("");
   const hoje = new Date(agora);
@@ -123,9 +127,13 @@ export function DuplasLista({
           // pediu apoio" da pausada-com-apoio (risco) precisa ficar (CC-5)
           const motivo =
             d.status !== "ativa" && saude.semaforo === "ok" ? null : saude.motivo;
+          // pedido de apoio do próprio mentor: apoio solicitado, não alarme
+          const apoioProprio = paraMentor && saude.pediuApoio;
+          const nivel = apoioProprio ? "atencao" : saude.semaforo;
+          const motivoExibido = apoioProprio ? "Apoio solicitado" : motivo;
           const sub = [
             mostrarSupervisor && d.supervisor ? `Supervisor: ${d.supervisor.nome}` : null,
-            motivo,
+            motivoExibido,
           ]
             .filter(Boolean)
             .join(" · ");
@@ -136,7 +144,7 @@ export function DuplasLista({
               style={{ "--i": Math.min(i, 10) } as CSSProperties}
               className="animate-enter flex items-center gap-4 px-5 py-4 transition-colors hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
             >
-              <SemaforoDot nivel={saude.semaforo} />
+              <SemaforoDot nivel={nivel} />
               <div className="min-w-0 flex-1">
                 <p className="font-semibold truncate">
                   <DuplaNomes mentor={d.mentor.nome} mentorado={d.mentorado.nome} />

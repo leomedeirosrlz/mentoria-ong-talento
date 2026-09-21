@@ -94,103 +94,130 @@ export function RegistrosFiltros({
     atual?: string | number | null
   ) => (k in echo ? echo[k] : atual != null ? String(atual) : TODAS) ?? TODAS;
 
-  const triggerCls = "w-full sm:w-auto sm:min-w-36";
+  const triggerCls = "w-full";
+  const campoCls = "space-y-1.5";
+  // label visível sobre o controle — "Todas" solto num trigger não diz o que
+  // filtra até abrir; o overline é a gramática da casa pra rótulo de campo
+  const labelCls =
+    "block text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground";
 
   return (
     <div
       role="search"
       aria-label="Filtrar registros"
-      className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center"
+      className="grid grid-cols-2 gap-x-2 gap-y-3 sm:flex sm:flex-wrap sm:items-end sm:gap-3"
     >
-      <div className="relative col-span-2 sm:flex-1 sm:min-w-52">
-        <MagnifyingGlass
-          size={15}
-          aria-hidden
-          className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-        />
-        <Input
-          type="search"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Buscar tema, reflexão ou observação"
-          aria-label="Buscar no conteúdo dos registros"
-          className="pl-8"
-        />
+      <div className={`${campoCls} col-span-2 sm:flex-1 sm:min-w-52`}>
+        <label htmlFor="flt-busca" className={labelCls}>
+          Busca
+        </label>
+        <div className="relative">
+          <MagnifyingGlass
+            size={15}
+            aria-hidden
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+          />
+          <Input
+            id="flt-busca"
+            type="search"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Tema, reflexão ou observação"
+            className="pl-8"
+          />
+        </div>
       </div>
-      <Select
-        value={val("encontro", filtros.encontro)}
-        onValueChange={(v) =>
-          aplicar({ encontro: v === TODAS ? null : String(v) })
-        }
-      >
-        <SelectTrigger className={triggerCls} aria-label="Filtrar por encontro">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value={TODAS}>Todos os encontros</SelectItem>
-          {Array.from({ length: maxEncontro }, (_, i) => i + 1).map((n) => (
-            <SelectItem key={n} value={String(n)}>
-              {n}º encontro
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      <Select
-        value={val("avaliacao", filtros.avaliacao)}
-        onValueChange={(v) =>
-          aplicar({ avaliacao: v === TODAS ? null : String(v) })
-        }
-      >
-        <SelectTrigger className={triggerCls} aria-label="Filtrar por avaliação">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value={TODAS}>Toda avaliação</SelectItem>
-          {Object.entries(AVALIACAO_LABEL).map(([v, l]) => (
-            <SelectItem key={v} value={v}>
-              {l}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      <Select
-        value={val("dificuldade", filtros.dificuldade)}
-        onValueChange={(v) =>
-          aplicar({ dificuldade: v === TODAS ? null : String(v) })
-        }
-      >
-        <SelectTrigger className={triggerCls} aria-label="Filtrar por dificuldade">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value={TODAS}>Toda dificuldade</SelectItem>
-          <SelectItem value="com">Qualquer dificuldade</SelectItem>
-          {Object.entries(DIFICULDADE_LABEL).map(([v, l]) => (
-            <SelectItem key={v} value={v}>
-              {l}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      <Select
-        value={val("dupla", filtros.dupla)}
-        onValueChange={(v) => aplicar({ dupla: v === TODAS ? null : String(v) })}
-      >
-        <SelectTrigger
-          className={`${triggerCls} col-span-2 sm:min-w-56`}
-          aria-label="Filtrar por dupla"
+      <div className={`${campoCls} sm:min-w-36`}>
+        <span id="flt-encontro" className={labelCls}>
+          Encontro
+        </span>
+        <Select
+          value={val("encontro", filtros.encontro)}
+          onValueChange={(v) =>
+            aplicar({ encontro: v === TODAS ? null : String(v) })
+          }
         >
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value={TODAS}>Todas as duplas</SelectItem>
-          {duplas.map((d) => (
-            <SelectItem key={d.id} value={d.id}>
-              {d.mentor?.nome ?? "—"} e {d.mentorado?.nome ?? "—"}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+          <SelectTrigger className={triggerCls} aria-labelledby="flt-encontro">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={TODAS}>Todos</SelectItem>
+            {Array.from({ length: maxEncontro }, (_, i) => i + 1).map((n) => (
+              <SelectItem key={n} value={String(n)}>
+                {n}º encontro
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <div className={`${campoCls} sm:min-w-36`}>
+        <span id="flt-avaliacao" className={labelCls}>
+          Avaliação
+        </span>
+        <Select
+          value={val("avaliacao", filtros.avaliacao)}
+          onValueChange={(v) =>
+            aplicar({ avaliacao: v === TODAS ? null : String(v) })
+          }
+        >
+          <SelectTrigger className={triggerCls} aria-labelledby="flt-avaliacao">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={TODAS}>Todas</SelectItem>
+            {Object.entries(AVALIACAO_LABEL).map(([v, l]) => (
+              <SelectItem key={v} value={v}>
+                {l}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <div className={`${campoCls} sm:min-w-40`}>
+        <span id="flt-dificuldade" className={labelCls}>
+          Dificuldade
+        </span>
+        <Select
+          value={val("dificuldade", filtros.dificuldade)}
+          onValueChange={(v) =>
+            aplicar({ dificuldade: v === TODAS ? null : String(v) })
+          }
+        >
+          <SelectTrigger className={triggerCls} aria-labelledby="flt-dificuldade">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={TODAS}>Todas</SelectItem>
+            <SelectItem value="com">Qualquer dificuldade</SelectItem>
+            {Object.entries(DIFICULDADE_LABEL).map(([v, l]) => (
+              <SelectItem key={v} value={v}>
+                {l}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <div className={`${campoCls} col-span-2 sm:min-w-56`}>
+        <span id="flt-dupla" className={labelCls}>
+          Dupla
+        </span>
+        <Select
+          value={val("dupla", filtros.dupla)}
+          onValueChange={(v) => aplicar({ dupla: v === TODAS ? null : String(v) })}
+        >
+          <SelectTrigger className={triggerCls} aria-labelledby="flt-dupla">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={TODAS}>Todas</SelectItem>
+            {duplas.map((d) => (
+              <SelectItem key={d.id} value={d.id}>
+                {d.mentor?.nome ?? "—"} e {d.mentorado?.nome ?? "—"}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
     </div>
   );
 }

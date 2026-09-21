@@ -26,7 +26,7 @@ import {
   totalEncontros,
   waLink,
 } from "@/lib/ciclo";
-import { SemaforoBadge } from "@/components/semaforo";
+import { SemaforoBadge, SemaforoDot } from "@/components/semaforo";
 import { NudgeButton } from "@/components/nudge-button";
 import { NotaEncontro } from "@/components/nota-encontro";
 import { AgendarEncontroDialog } from "@/components/agendar-encontro-dialog";
@@ -216,7 +216,19 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
             <DuplaNomes mentor={dupla.mentor.nome} mentorado={dupla.mentorado.nome} />
           </h1>
           <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-            <SemaforoBadge nivel={saude.semaforo} motivo={saude.motivo} />
+            {/* pro mentor o próprio pedido de apoio não é "risco" — é um
+                pedido já recebido; o tom é "avisamos, relaxa", não alarme */}
+            {souMentor && saude.pediuApoio ? (
+              <span className="inline-flex items-center gap-2">
+                <SemaforoDot nivel="atencao" />
+                <span className="font-medium text-foreground">
+                  Apoio solicitado
+                </span>
+                <span>a coordenação entra em contato com você</span>
+              </span>
+            ) : (
+              <SemaforoBadge nivel={saude.semaforo} motivo={saude.motivo} />
+            )}
             <span className="font-mono">{saude.feitos}/{total} encontros</span>
             <TrajetoriaAvaliacoes encontros={dupla.encontros} />
             {dupla.supervisor && (

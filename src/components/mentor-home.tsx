@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowUpRight, ClipboardText, Users, VideoCamera, Warning } from "@phosphor-icons/react/dist/ssr";
+import { ArrowUpRight, ClipboardText, HandHeart, Users, VideoCamera, Warning } from "@phosphor-icons/react/dist/ssr";
 import {
   alvoAgendamento,
   eventoDaSemana,
@@ -137,6 +137,21 @@ export function MentorHome({
             </CardHeader>
 
             <CardContent className="pt-5 space-y-5">
+              {/* pedido de apoio feito pelo próprio mentor: confirma recebimento
+                  em tom de acolhida — não o semáforo de risco da coordenação */}
+              {saude.pediuApoio && dupla.status !== "encerrada" && (
+                <p className="flex items-start gap-2.5 rounded-lg border border-[var(--warn)]/40 bg-[var(--warn)]/8 px-4 py-3 text-sm">
+                  <HandHeart
+                    size={18}
+                    aria-hidden
+                    className="mt-0.5 shrink-0 text-[var(--warn-text)]"
+                  />
+                  <span>
+                    <span className="font-medium">Apoio solicitado</span> — a
+                    coordenação já foi avisada e vai entrar em contato com você.
+                  </span>
+                </p>
+              )}
               {/* a trilha é o mapa do card inteiro — a pendência de registro
                   embaixo já explica o nó âmbar */}
               <TrilhaJornada
