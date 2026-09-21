@@ -186,7 +186,12 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
             {/* par de avatares sobrepostos — a dupla como unidade visual (§4);
                 cada foto é o link do próprio perfil */}
             <span className="mr-2 inline-flex align-[-6px]">
-              <DuplaAvatares mentor={dupla.mentor} mentorado={dupla.mentorado} linkar />
+              <DuplaAvatares
+                mentor={dupla.mentor}
+                mentorado={dupla.mentorado}
+                size={40}
+                linkar
+              />
             </span>
             <DuplaNomes mentor={dupla.mentor.nome} mentorado={dupla.mentorado.nome} />
           </h1>

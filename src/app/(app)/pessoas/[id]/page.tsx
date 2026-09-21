@@ -154,7 +154,7 @@ export default async function PessoaPerfilPage({
                         <DuplaAvatares
                           mentor={d.mentor}
                           mentorado={d.mentorado}
-                          size={26}
+                          size={32}
                         />
                       )}
                       <span className="min-w-0 flex-1">

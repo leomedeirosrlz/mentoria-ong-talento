@@ -15,7 +15,7 @@ type Pessoa = {
 export function DuplaAvatares({
   mentor,
   mentorado,
-  size = 28,
+  size = 32,
   linkar = false,
 }: {
   mentor: Pessoa;
@@ -50,7 +50,7 @@ export function DuplaAvatares({
     },
   ];
   return (
-    <span className="inline-flex shrink-0 -space-x-2">
+    <span className="inline-flex shrink-0 -space-x-2.5">
       {discos.map(({ pessoa, el }) =>
         linkar ? (
           <Link

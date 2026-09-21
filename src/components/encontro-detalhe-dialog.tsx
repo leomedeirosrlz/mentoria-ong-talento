@@ -126,7 +126,7 @@ export function EncontroDetalheDialog({
             <DuplaAvatares
               mentor={dupla.mentor}
               mentorado={dupla.mentorado}
-              size={26}
+              size={32}
             />
             <span>
               {encontro.numero}º encontro —{" "}

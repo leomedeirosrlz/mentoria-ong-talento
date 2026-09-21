@@ -69,7 +69,7 @@ export function RegistroCard({
                     <DuplaAvatares
                       mentor={dupla.mentor}
                       mentorado={dupla.mentorado}
-                      size={20}
+                      size={32}
                     />
                     <DuplaNomes
                       mentor={dupla.mentor.nome}

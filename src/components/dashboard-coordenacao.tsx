@@ -464,7 +464,7 @@ function DuplaCard({
         <div className="min-w-0">
           <div className="flex items-center gap-2.5">
             <SemaforoDot nivel={saude.semaforo} />
-            <DuplaAvatares mentor={dupla.mentor} mentorado={dupla.mentorado} size={24} />
+            <DuplaAvatares mentor={dupla.mentor} mentorado={dupla.mentorado} size={32} />
             <p className="font-semibold truncate">
               <DuplaNomes mentor={dupla.mentor.nome} mentorado={dupla.mentorado.nome} />
             </p>

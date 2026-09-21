@@ -148,7 +148,7 @@ export function DuplasLista({
               <SemaforoDot nivel={nivel} />
               {/* o par de discos é a identidade da dupla — reforça quem são
                   antes do nome (o link inteiro já leva à ficha) */}
-              <DuplaAvatares mentor={d.mentor} mentorado={d.mentorado} size={30} />
+              <DuplaAvatares mentor={d.mentor} mentorado={d.mentorado} size={36} />
               <div className="min-w-0 flex-1">
                 <p className="font-semibold truncate">
                   <DuplaNomes mentor={d.mentor.nome} mentorado={d.mentorado.nome} />
