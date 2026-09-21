@@ -174,12 +174,14 @@ Planos em `.devin/plan-mural-perfil.md` + `.devin/plan-agenda-zero-friccao.md`. 
 
 ## Notificações in-app + avisos (feito)
 
-Migration `0018` aplicada via Management API (o `db push` diverge do histórico
-remoto: 17 versões timestamped aplicadas pelo MCP não existem como arquivos
-locais — reconciliar algum dia com `db pull` ou repair). Smoke test E2E contra o
-remoto passou: mentor→mentor negado (403), mentor→staff permitido, fan-out de
-comunicado, marcar lida própria, RLS bloqueia mexer em notificação alheia,
-delete do comunicado faz cascade nos pings.
+Migrations `0018` + `0019` aplicadas via Management API (o `db push` diverge do
+histórico remoto: 17 versões timestamped aplicadas pelo MCP não existem como
+arquivos locais — reconciliar algum dia com `db pull` ou repair). Auditoria em
+4 frentes + correções: href não aceita mais `//externo`, insert por não-coord
+restrito ao fluxo de pedido de apoio, UPDATE só mexe em `lida_em`, delete pra
+coord, audiência `equipe` (coord+supervisores), `'todos'` não vaza pra anon.
+Coord bloqueada nas actions de agenda/registro/nota — a regra "a dupla agenda"
+vale no contrato, não só na UI. Smoke test E2E das policies passou no remoto.
 
 Pendente só de UX real: primeira publicação de aviso pela coord no app e olhar
 o painel do sino no browser (abrir, marcar lida, mobile).
