@@ -404,10 +404,23 @@ export function OnboardingFlow({ me }: { me: Profile }) {
               Agora não
             </Button>
           )}
+          {/* sempre type=button + requestSubmit explícito: um botão que vira
+              submit no MESMO clique dispara o form do passo seguinte — o
+              default action do clique é avaliado depois do re-render, então
+              "Continuar" avançava 2 passos (pulava a foto) */}
           <Button
-            type={passoComCampos ? "submit" : "button"}
-            form={passoComCampos ? FORM_ID : undefined}
-            onClick={passoComCampos ? undefined : ultimo ? concluir : avancar}
+            type="button"
+            onClick={() => {
+              if (passoComCampos) {
+                (
+                  document.getElementById(FORM_ID) as HTMLFormElement | null
+                )?.requestSubmit();
+              } else if (ultimo) {
+                concluir();
+              } else {
+                avancar();
+              }
+            }}
             disabled={pending}
             className="h-11 flex-1 font-semibold"
           >
