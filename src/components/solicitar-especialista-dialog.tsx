@@ -26,6 +26,12 @@ import {
 
 const QUALQUER = "qualquer";
 
+/** "Ana Souza — finanças, carreira": as áreas (0030) ajudam a escolher pra
+ *  quem direcionar — sem áreas cadastradas fica só o nome. */
+function rotuloEspecialista(e: { nome: string; areas: string[] | null }) {
+  return e.areas?.length ? `${e.nome} — ${e.areas.join(", ")}` : e.nome;
+}
+
 /** Botão + dialog "Solicitar mentor especialista" — fica na ficha da dupla
  *  DPP. A demanda é o briefing pro especialista decidir aceitar; o select
  *  direciona pra uma pessoa específica ou deixa aberto pra qualquer um. */
@@ -35,7 +41,7 @@ export function SolicitarEspecialistaDialog({
   trigger,
 }: {
   duplaId: string;
-  especialistas: { id: string; nome: string }[];
+  especialistas: { id: string; nome: string; areas: string[] | null }[];
   /** Elemento do trigger — default é o botão padrão da casa. */
   trigger?: React.ReactElement;
 }) {
@@ -131,7 +137,9 @@ export function SolicitarEspecialistaDialog({
               onValueChange={(v) => setEsp(v ?? QUALQUER)}
               items={{
                 [QUALQUER]: "Qualquer especialista disponível",
-                ...Object.fromEntries(especialistas.map((e) => [e.id, e.nome])),
+                ...Object.fromEntries(
+                  especialistas.map((e) => [e.id, rotuloEspecialista(e)])
+                ),
               }}
             >
               <SelectTrigger
@@ -146,7 +154,7 @@ export function SolicitarEspecialistaDialog({
                 </SelectItem>
                 {especialistas.map((e) => (
                   <SelectItem key={e.id} value={e.id}>
-                    {e.nome}
+                    {rotuloEspecialista(e)}
                   </SelectItem>
                 ))}
               </SelectContent>

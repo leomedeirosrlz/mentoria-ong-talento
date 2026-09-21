@@ -21,6 +21,7 @@ import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
 import { DocumentoPessoa } from "@/components/documento-pessoa";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 
 type MentorProfile = {
   capacidade: number;
@@ -36,6 +37,8 @@ export function PessoaActions({ pessoa, podeExcluir }: { pessoa: Profile; podeEx
   // contagem num primeiro chamado e esse dialog conclui com forcar=true
   const [duplasEmCurso, setDuplasEmCurso] = useState(0);
   const [mp, setMp] = useState<MentorProfile | undefined>(undefined);
+  const [bioLen, setBioLen] = useState(0);
+  const [volLen, setVolLen] = useState(0);
   const [pending, start] = useTransition();
   const router = useRouter();
   const ehMentor = pessoa.role === "mentor_dpp" || pessoa.role === "mentor_especialista";
@@ -139,7 +142,17 @@ export function PessoaActions({ pessoa, podeExcluir }: { pessoa: Profile; podeEx
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+      <Dialog
+        open={editOpen}
+        onOpenChange={(o) => {
+          setEditOpen(o);
+          // contadores acompanham o valor carregado na abertura do dialog
+          if (o) {
+            setBioLen(pessoa.bio?.length ?? 0);
+            setVolLen(pessoa.voluntariado?.length ?? 0);
+          }
+        }}
+      >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Editar {primeiroNome}</DialogTitle>
@@ -174,6 +187,55 @@ export function PessoaActions({ pessoa, podeExcluir }: { pessoa: Profile; podeEx
                 O e-mail é a identidade do link de acesso e não pode mais ser alterado após o primeiro acesso.
               </p>
             )}
+
+            {/* apresentação profissional (0030) — mesmos campos do /perfil;
+                o `areas` do mentor_profile já existe, então o do perfil vai
+                como `areas_perfil` pra não colidir no FormData */}
+            <div className="space-y-2">
+              <div className="flex items-baseline justify-between gap-2">
+                <Label htmlFor="e_bio">Biografia</Label>
+                <span aria-hidden className="text-xs tabular-nums text-muted-foreground">
+                  {bioLen}/1.000
+                </span>
+              </div>
+              <Textarea
+                id="e_bio" name="bio" rows={3} maxLength={1000}
+                defaultValue={pessoa.bio ?? ""}
+                onChange={(e) => setBioLen(e.target.value.length)}
+              />
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="e_linkedin">LinkedIn</Label>
+                <Input
+                  id="e_linkedin" name="linkedin" type="url" inputMode="url"
+                  defaultValue={pessoa.linkedin ?? ""}
+                  placeholder="https://linkedin.com/in/..."
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="e_areas_perfil">Áreas de atuação (vírgula)</Label>
+                <Input
+                  id="e_areas_perfil" name="areas_perfil"
+                  defaultValue={(pessoa.areas ?? []).join(", ")}
+                  placeholder="finanças, tecnologia"
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-baseline justify-between gap-2">
+                <Label htmlFor="e_voluntariado">Experiência com voluntariado</Label>
+                <span aria-hidden className="text-xs tabular-nums text-muted-foreground">
+                  {volLen}/300
+                </span>
+              </div>
+              <Input
+                id="e_voluntariado" name="voluntariado" maxLength={300}
+                defaultValue={pessoa.voluntariado ?? ""}
+                onChange={(e) => setVolLen(e.target.value.length)}
+                placeholder="ex.: 2 anos como voluntário no Projeto X"
+              />
+            </div>
 
             {ehMentor && mp !== undefined && (
               <div className="space-y-4 rounded-lg bg-muted/40 p-3.5">

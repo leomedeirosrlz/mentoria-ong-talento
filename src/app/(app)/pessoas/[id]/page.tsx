@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ArrowUpRight, Buildings, EnvelopeSimple, WhatsappLogo } from "@phosphor-icons/react/dist/ssr";
+import { ArrowUpRight, Buildings, EnvelopeSimple, HandHeart, LinkedinLogo, WhatsappLogo } from "@phosphor-icons/react/dist/ssr";
 import { getMe, getPessoaPerfil } from "@/lib/queries";
 import { avatarPublicUrl, gravatarUrl } from "@/lib/avatar";
-import { formatDate, papelLabel, waLink } from "@/lib/ciclo";
+import { formatDate, linkSeguro, papelLabel, waLink } from "@/lib/ciclo";
 import { Avatar } from "@/components/avatar";
 import { Badge } from "@/components/ui/badge";
 import { DuplaAvatares } from "@/components/dupla-avatares";
@@ -48,6 +48,21 @@ export default async function PessoaPerfilPage({
   const avatarSrc = p.avatar_path ? avatarPublicUrl(p.avatar_path) : null;
   const gravatar = !ehMentorado && "email" in p && p.email ? gravatarUrl(p.email) : null;
   const wa = p.whatsapp ? waLink(p.whatsapp, "") : null;
+
+  // apresentação profissional (0030) — só profiles têm; o card some quando
+  // nada foi preenchido (perfil vazio não é um estado a exibir)
+  const perfilPro =
+    perfil.tipo === "profile"
+      ? {
+          bio: perfil.pessoa.bio,
+          linkedin: linkSeguro(perfil.pessoa.linkedin),
+          areas: perfil.pessoa.areas ?? [],
+          voluntariado: perfil.pessoa.voluntariado,
+        }
+      : null;
+  const temPerfilPro = !!perfilPro && Boolean(
+    perfilPro.bio || perfilPro.linkedin || perfilPro.areas.length || perfilPro.voluntariado
+  );
 
   // RLS devolve só as minhas notas — o feed não precisa de autor
   const notas: MuralNota[] = perfil.notas.map((n) => ({
@@ -136,6 +151,51 @@ export default async function PessoaPerfilPage({
         </section>
 
         <aside className="space-y-4">
+          {/* vitrine profissional (0030) — bio corrida, LinkedIn externo,
+              áreas como chips e voluntariado numa linha discreta */}
+          {perfilPro && temPerfilPro && (
+            <section className="rounded-xl bg-card p-4 text-sm shadow-[var(--shadow-border)]">
+              <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                Perfil profissional
+              </h2>
+              {perfilPro.bio && (
+                <p className="mt-2 whitespace-pre-wrap text-muted-foreground">
+                  {perfilPro.bio}
+                </p>
+              )}
+              {perfilPro.linkedin && (
+                <a
+                  href={perfilPro.linkedin}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-3 inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-border px-3 text-sm transition-colors hover:bg-muted/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:min-h-8"
+                >
+                  <LinkedinLogo size={15} aria-hidden />
+                  LinkedIn
+                  <span className="sr-only"> (abre em nova aba)</span>
+                </a>
+              )}
+              {perfilPro.areas.length > 0 && (
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  {perfilPro.areas.map((a) => (
+                    <Badge key={a} variant="secondary" className="font-normal">
+                      {a}
+                    </Badge>
+                  ))}
+                </div>
+              )}
+              {perfilPro.voluntariado && (
+                <p className="mt-3 flex items-start gap-1.5 text-xs text-muted-foreground">
+                  <HandHeart size={13} aria-hidden className="mt-0.5 shrink-0" />
+                  <span>
+                    <span className="font-medium">Voluntariado:</span>{" "}
+                    {perfilPro.voluntariado}
+                  </span>
+                </p>
+              )}
+            </section>
+          )}
+
           <section className="rounded-xl bg-card p-4 text-sm shadow-[var(--shadow-border)]">
             <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
               Duplas

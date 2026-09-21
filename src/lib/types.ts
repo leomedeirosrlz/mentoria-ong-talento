@@ -31,6 +31,12 @@ export type Profile = {
   avatar_path?: string | null;
   /** Documento oficial no bucket `documentos` (termo de responsabilidade) — só a coordenação vê e gerencia. */
   documento_path?: string | null;
+  /** Apresentação profissional (0030) — legível por qualquer autenticado,
+   *  editável pelo próprio dono e pela coordenação. */
+  bio: string | null;
+  linkedin: string | null;
+  areas: string[] | null;
+  voluntariado: string | null;
 };
 
 export type Mentorado = {

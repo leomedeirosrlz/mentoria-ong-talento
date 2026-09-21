@@ -10,6 +10,7 @@ import { Avatar } from "@/components/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { papelLabel } from "@/lib/ciclo";
 import type { Profile } from "@/lib/types";
 
@@ -30,6 +31,8 @@ export function PerfilForm({
   const [salvandoSenha, setSalvandoSenha] = useState(false);
   const [senha, setSenha] = useState("");
   const [confirmacao, setConfirmacao] = useState("");
+  const [bioLen, setBioLen] = useState(me.bio?.length ?? 0);
+  const [volLen, setVolLen] = useState(me.voluntariado?.length ?? 0);
 
   async function trocarFoto(file: File) {
     if (file.size > AVATAR_MAX_BYTES) {
@@ -202,6 +205,64 @@ export function PerfilForm({
             <p className="text-xs text-muted-foreground">
               O e-mail é sua credencial de acesso — para trocar, fale com a coordenação.
             </p>
+          </div>
+          {/* apresentação profissional (0030) — aparece em /pessoas/[id] e nas
+              áreas do select de especialista */}
+          <div className="space-y-2">
+            <div className="flex items-baseline justify-between gap-2">
+              <Label htmlFor="bio">Biografia</Label>
+              <span aria-hidden className="text-xs tabular-nums text-muted-foreground">
+                {bioLen}/1.000
+              </span>
+            </div>
+            <Textarea
+              id="bio"
+              name="bio"
+              rows={4}
+              maxLength={1000}
+              defaultValue={me.bio ?? ""}
+              onChange={(e) => setBioLen(e.target.value.length)}
+              placeholder="Conte um pouco da sua trajetória — formação, trabalho, o que te trouxe ao programa."
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="linkedin">LinkedIn</Label>
+            <Input
+              id="linkedin"
+              name="linkedin"
+              type="url"
+              inputMode="url"
+              defaultValue={me.linkedin ?? ""}
+              placeholder="https://linkedin.com/in/..."
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="areas">Áreas de atuação</Label>
+            <Input
+              id="areas"
+              name="areas"
+              defaultValue={(me.areas ?? []).join(", ")}
+              placeholder="finanças, tecnologia, carreira"
+            />
+            <p className="text-xs text-muted-foreground">
+              Separe por vírgula — ex.: finanças, tecnologia, carreira.
+            </p>
+          </div>
+          <div className="space-y-2">
+            <div className="flex items-baseline justify-between gap-2">
+              <Label htmlFor="voluntariado">Experiência com voluntariado</Label>
+              <span aria-hidden className="text-xs tabular-nums text-muted-foreground">
+                {volLen}/300
+              </span>
+            </div>
+            <Input
+              id="voluntariado"
+              name="voluntariado"
+              maxLength={300}
+              defaultValue={me.voluntariado ?? ""}
+              onChange={(e) => setVolLen(e.target.value.length)}
+              placeholder="ex.: 2 anos como voluntário no Projeto X"
+            />
           </div>
           <Button type="submit" disabled={salvando}>
             {salvando ? "Salvando…" : "Salvar"}

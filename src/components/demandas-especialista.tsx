@@ -76,7 +76,9 @@ export function DemandasEspecialista({
                     <div className="min-w-0 space-y-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="font-medium">
-                          {s.mentorado?.nome ?? "Mentorado(a)"}
+                          {/* nome vem sempre — a view solicitacoes_mural dá
+                              mentorado_nome no escopo do papel */}
+                          {s.mentorado?.nome}
                         </span>
                         {praMim && (
                           <Badge

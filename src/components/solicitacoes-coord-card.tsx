@@ -62,7 +62,9 @@ export function SolicitacoesCoordCard({
               <li key={s.id} className="flex items-start gap-3 py-3 first:pt-0 last:pb-0">
                 <div className="min-w-0 flex-1 space-y-0.5">
                   <p className="text-sm font-medium">
-                    {s.mentorado?.nome ?? "Mentorado(a)"}
+                    {/* nome vem sempre — a view solicitacoes_mural dá
+                        mentorado_nome no escopo do papel */}
+                    {s.mentorado?.nome}
                   </p>
                   <p className="text-sm text-muted-foreground">{corta(s.demanda)}</p>
                   <p className="text-xs text-muted-foreground">
@@ -72,7 +74,7 @@ export function SolicitacoesCoordCard({
                 </div>
                 <ConfirmDeleteButton
                   titulo="Cancelar solicitação?"
-                  descricao={`A demanda de ${s.mentorado?.nome ?? "mentorado(a)"} sai do mural dos especialistas. Quem pediu é avisado.`}
+                  descricao={`A demanda${s.mentorado?.nome ? ` de ${s.mentorado.nome}` : ""} sai do mural dos especialistas. Quem pediu é avisado.`}
                   acao="Cancelar"
                   sucesso="Solicitação cancelada."
                   onConfirm={() => cancelarSolicitacao(s.id)}

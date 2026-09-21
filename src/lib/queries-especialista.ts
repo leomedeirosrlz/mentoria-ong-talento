@@ -2,16 +2,16 @@ import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import type { SolicitacaoEspecialista } from "./types";
 
-/** Só `nome` nos embeds de profiles — as demais colunas públicas não fazem
- *  falta aqui e email/whatsapp/documento_path dariam permission denied (0026).
- *  O embed `mentorado` volta null pra quem a RLS de mentorados não alcança
- *  (ex.: especialista vendo o mural — a privacidade do jovem vale mais que a
- *  conveniência do nome; a demanda em si é o conteúdo). */
+/** A leitura é da view `solicitacoes_mural` (0030): as mesmas colunas da
+ *  tabela + `mentorado_nome` — o nome do jovem vem escopado por papel na
+ *  view (só o nome; um embed de mentorados voltaria null pra quem a RLS de
+ *  mentorados não alcança, ex.: o especialista no mural).
+ *  Só `nome` nos embeds de profiles — as demais colunas públicas não fazem
+ *  falta aqui e email/whatsapp/documento_path dariam permission denied (0026). */
 const SOLICITACAO_SELECT = `
   id, mentorado_id, dupla_dpp_id, demanda,
   especialista_desejado_id, especialista_id, dupla_id,
-  status, created_by, created_at, respondida_em,
-  mentorado:mentorados!mentorado_id(nome),
+  status, created_by, created_at, respondida_em, mentorado_nome,
   solicitante:profiles!solicitacoes_especialista_created_by_fkey(nome),
   especialista:profiles!solicitacoes_especialista_especialista_id_fkey(nome)
 `;
@@ -23,9 +23,14 @@ function norm(v: unknown): { nome: string } | null {
 }
 
 function normalize(row: Record<string, unknown>): SolicitacaoEspecialista {
+  // mentorado_nome é coluna plana da view — a UI consome `mentorado.nome`
+  const { mentorado_nome, ...rest } = row;
   return {
-    ...(row as unknown as SolicitacaoEspecialista),
-    mentorado: norm(row.mentorado),
+    ...(rest as unknown as SolicitacaoEspecialista),
+    mentorado:
+      typeof mentorado_nome === "string" && mentorado_nome
+        ? { nome: mentorado_nome }
+        : null,
     solicitante: norm(row.solicitante),
     especialista: norm(row.especialista),
   };
@@ -38,7 +43,7 @@ export const getSolicitacaoDaDupla = cache(
   async (duplaDppId: string): Promise<SolicitacaoEspecialista | null> => {
     const supabase = await createClient();
     const { data, error } = await supabase
-      .from("solicitacoes_especialista")
+      .from("solicitacoes_mural")
       .select(SOLICITACAO_SELECT)
       .eq("dupla_dpp_id", duplaDppId)
       .order("created_at", { ascending: false })
@@ -61,7 +66,7 @@ export const getSolicitacoesVisiveis = cache(
   async (): Promise<SolicitacaoEspecialista[]> => {
     const supabase = await createClient();
     const { data, error } = await supabase
-      .from("solicitacoes_especialista")
+      .from("solicitacoes_mural")
       .select(SOLICITACAO_SELECT)
       .order("status", { ascending: true })
       .order("created_at", { ascending: false });
@@ -75,14 +80,14 @@ export const getSolicitacoesVisiveis = cache(
   }
 );
 
-/** Especialistas ativos (id + nome) — pro select "direcionar a um
- *  especialista específico" do dialog de solicitação. */
+/** Especialistas ativos (id + nome + áreas de atuação, 0030) — pro select
+ *  "direcionar a um especialista específico" do dialog de solicitação. */
 export const getEspecialistas = cache(
-  async (): Promise<{ id: string; nome: string }[]> => {
+  async (): Promise<{ id: string; nome: string; areas: string[] | null }[]> => {
     const supabase = await createClient();
     const { data, error } = await supabase
       .from("profiles")
-      .select("id, nome")
+      .select("id, nome, areas")
       .eq("role", "mentor_especialista")
       .eq("ativo", true)
       .order("nome");
@@ -91,8 +96,8 @@ export const getEspecialistas = cache(
       return [];
     }
     // a collation do banco ordena acentos depois de Z — pt-BR no app
-    return ((data ?? []) as { id: string; nome: string }[]).sort((a, b) =>
-      a.nome.localeCompare(b.nome, "pt-BR")
-    );
+    return (
+      (data ?? []) as { id: string; nome: string; areas: string[] | null }[]
+    ).sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
   }
 );

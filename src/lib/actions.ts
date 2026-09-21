@@ -92,6 +92,49 @@ async function subirFoto(
 
 const ROLES = ["coordenacao", "supervisor", "mentor_dpp", "mentor_especialista"] as const;
 
+const MAX_AREAS = 10;
+
+/** Normaliza os campos de apresentação do perfil (bio/linkedin/areas/
+ *  voluntariado, 0030) — self-edit em /perfil e ficha da coordenação passam
+ *  pela mesma validação. `areasKey` permite outro nome de campo quando o
+ *  form já tem um `areas` (o do mentor_profile no dialog da coordenação). */
+function camposApresentacao(
+  formData: FormData,
+  areasKey = "areas"
+):
+  | { bio: string | null; linkedin: string | null; areas: string[] | null; voluntariado: string | null }
+  | { error: string } {
+  const bio = String(formData.get("bio") ?? "").trim() || null;
+  if (bio && bio.length > 1000) {
+    return { error: "A biografia passa de 1.000 caracteres." };
+  }
+  const linkedin = String(formData.get("linkedin") ?? "").trim() || null;
+  // case-sensitive de propósito — o CHECK profiles_linkedin_http (0030) é `~`
+  if (linkedin && !/^https?:\/\//.test(linkedin)) {
+    return { error: "Confira o link do LinkedIn — precisa começar com http:// ou https://." };
+  }
+  // vírgula → trim → sem vazias → dedupe → teto (profiles_areas_ok, 0030)
+  const areas = [
+    ...new Set(
+      String(formData.get(areasKey) ?? "")
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean)
+    ),
+  ];
+  if (areas.length > MAX_AREAS) {
+    return { error: `Use no máximo ${MAX_AREAS} áreas — separe por vírgula.` };
+  }
+  if (areas.some((a) => a.length > 40)) {
+    return { error: "Cada área pode ter até 40 caracteres." };
+  }
+  const voluntariado = String(formData.get("voluntariado") ?? "").trim() || null;
+  if (voluntariado && voluntariado.length > 300) {
+    return { error: "A experiência com voluntariado passa de 300 caracteres." };
+  }
+  return { bio, linkedin, areas: areas.length ? areas : null, voluntariado };
+}
+
 export async function createPessoa(formData: FormData) {
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada — entre de novo." };
@@ -363,7 +406,16 @@ export async function updatePessoa(profileId: string, formData: FormData) {
   // e-mail = identidade do link de acesso; só muda enquanto a pessoa nunca entrou
   const { data: atual } = await supabase
     .from("profiles").select("user_id, role").eq("id", profileId).single();
-  const patch: Record<string, unknown> = { nome, whatsapp: whatsapp || null };
+  // campos de apresentação (0030) — a coordenação edita os mesmos que a
+  // pessoa edita em /perfil; o form manda `areas_perfil` porque `areas` já é
+  // o campo do mentor_profile
+  const apresentacao = camposApresentacao(formData, "areas_perfil");
+  if ("error" in apresentacao) return { error: apresentacao.error };
+  const patch: Record<string, unknown> = {
+    nome,
+    whatsapp: whatsapp || null,
+    ...apresentacao,
+  };
   if (email && !atual?.user_id) patch.email = email;
 
   const { data, error } = await supabase
@@ -1658,12 +1710,14 @@ export async function updateMeuPerfil(formData: FormData) {
   const whatsapp = normWhatsapp(whatsappRaw);
   if (!nome) return { error: "Informe seu nome." };
   if (whatsappRaw.trim() && !whatsapp) return { error: "Confira o WhatsApp — use DDD e o número completo." };
+  const apresentacao = camposApresentacao(formData);
+  if ("error" in apresentacao) return { error: apresentacao.error };
 
   // role/ativo/user_id ficam fora do patch — profiles_self_update também
   // barra role no banco, mas nem depende disso: a coluna nem é enviada
   const { error } = await supabase
     .from("profiles")
-    .update({ nome, whatsapp: whatsapp || null })
+    .update({ nome, whatsapp: whatsapp || null, ...apresentacao })
     .eq("id", eu.id);
   if (error) return { error: erroAmigavel(error) };
   revalidatePath("/", "layout");
