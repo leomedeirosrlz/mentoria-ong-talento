@@ -65,11 +65,13 @@ export function AvisosSection({
                   </p>
                 </div>
                 {souCoord && (
+                  // .bind gera a server reference serializável — closure
+                  // inline quebra a serialização no payload do router.refresh()
                   <ConfirmDeleteButton
                     titulo={`Excluir "${a.titulo}"?`}
                     descricao="O aviso sai da home de todo mundo e as notificações dele são removidas. Para corrigir, publique um novo."
                     sucesso="Aviso excluído."
-                    onConfirm={() => excluirComunicado(a.id)}
+                    onConfirm={excluirComunicado.bind(null, a.id)}
                     trigger={
                       <Button
                         variant="ghost"
