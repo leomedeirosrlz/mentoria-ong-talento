@@ -23,8 +23,11 @@ export async function GET(
     return new NextResponse("Sessão expirada — entre de novo.", { status: 401 });
   }
 
+  // documento_path de profiles está fora do grant de coluna (0026) — a view
+  // profiles_contato só devolve o campo pra coordenação; pros demais vem
+  // null (ou nem a linha) e cai no 404, como a policy do storage já faria
   const { data: pessoa, error } = await supabase
-    .from(tipo === "mentorado" ? "mentorados" : "profiles")
+    .from(tipo === "mentorado" ? "mentorados" : "profiles_contato")
     .select("id, documento_path")
     .eq("id", id)
     .maybeSingle();

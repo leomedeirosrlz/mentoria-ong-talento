@@ -455,13 +455,17 @@ export async function deletePessoa(profileId: string) {
   if (duplas?.length)
     return { error: "Essa pessoa tem dupla vinculada. Desative em vez de excluir." };
   const { data: p } = await supabase
-    .from("profiles").select("user_id, documento_path").eq("id", profileId).single();
+    .from("profiles").select("user_id").eq("id", profileId).single();
   if (p?.user_id)
     return { error: "Essa pessoa já entrou na plataforma. Desative em vez de excluir." };
+  // documento_path está fora do grant de coluna (0026) — vem da view, que só
+  // devolve o campo pra coordenação (a exclusão em si já é coord-only pela RLS)
+  const { data: contato } = await supabase
+    .from("profiles_contato").select("documento_path").eq("id", profileId).maybeSingle();
   // limpa o documento do bucket pra não deixar objeto órfão (best-effort:
   // a row é a referência; falha aqui não deve impedir excluir o cadastro)
-  if (p?.documento_path) {
-    await supabase.storage.from("documentos").remove([p.documento_path]);
+  if (contato?.documento_path) {
+    await supabase.storage.from("documentos").remove([contato.documento_path]);
   }
   const { data, error } = await supabase
     .from("profiles").delete().eq("id", profileId).select("id");
@@ -730,7 +734,9 @@ export async function importPessoas(rows: LinhaImportada[]) {
   if (rows.length > MAX_IMPORT) {
     return { error: `O arquivo tem ${rows.length} linhas — importe em lotes de até ${MAX_IMPORT}.` };
   }
-  const { data: existentes } = await supabase.from("profiles").select("email");
+  // email saiu do grant de coluna de profiles (0026) — a view profiles_contato
+  // devolve todas as linhas pra coordenação, que é quem chega até aqui
+  const { data: existentes } = await supabase.from("profiles_contato").select("email");
   const noBanco = new Set((existentes ?? []).map((p) => p.email.toLowerCase()));
   const vistos = new Set<string>();
   const validas: { nome: string; email: string; whatsapp: string | null; role: string }[] = [];

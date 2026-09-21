@@ -239,12 +239,17 @@ tem dupla ativa/pausada deixava escrita indevida via `mentor_id` nas policies.
 - Teste real em device: iOS/Safari + VoiceOver (sino, wizard modal, `<details>`
   dos registros) — tudo conferido por leitura, não por uso.
 
-**Auditoria de segurança (set/2026) — 0023/0024/0025 aplicadas; deferido:**
-- `profiles_select` segue "autenticado lê tudo" — qualquer papel lê e-mail,
-  WhatsApp e `documento_path` de todos via PostgREST direto. Postgres não tem
-  RLS por coluna: o fix é mover contato/documento pra tabela/view própria
-  (`security definer` ou grants por coluna com `profiles_publico` pros
-  embeds de nome/avatar). Refactor grande — medir antes de mexer.
+**Auditoria de segurança (set/2026) — 0023/0024/0025/0026 aplicadas; deferido:**
+- ~~`profiles_select` "autenticado lê tudo"~~ — **resolvido na `0026`**:
+  grant de coluna (`id, user_id, nome, role, ativo, avatar_path, created_at`)
+  + view `profiles_contato` (definer) escopada por papel — coord vê tudo com
+  `documento_path`, supervisor vê os mentores das duplas ativas/pausadas que
+  supervisiona, qualquer um vê a própria linha. `documento_path` sai null via
+  CASE pra não-coord. Policies `documentos_storage_*` recriadas lendo a view
+  (subconsultavam a coluna revogada). Queries mergeam contato por id via
+  `getContatos()`/`comContato()` em `queries.ts`; testado com JWT real —
+  `select=email` em `profiles` dá 403 pra mentor e coord (grant é por DB role,
+  a view é o caminho).
 - Policies `for all` remanescentes (fora anexos, já endurecidos): os triggers
   de autoria da 0023 cobrem a parte de autoria; o restante (colunas de status)
   exige trigger por coluna ou RPCs dedicadas.

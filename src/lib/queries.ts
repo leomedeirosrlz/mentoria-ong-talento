@@ -3,6 +3,56 @@ import { createClient } from "@/lib/supabase/server";
 import { registroTardio } from "./ciclo";
 import type { AvaliacaoJovem, CicloEvento, Comunicado, Dupla, DuplaResumo, DuplaStatus, EncontroStatus, Material, Mentorado, Notificacao, PessoaNota, Profile, Registro } from "./types";
 
+/** Colunas de profiles legíveis por qualquer autenticado — grant de coluna
+ *  da 0026 (Postgres não tem RLS por coluna). email/whatsapp/documento_path
+ *  ficam de fora: pedir qualquer uma delas em profiles dá permission denied. */
+const PROFILE_COLS_PUBLICAS =
+  "id, user_id, nome, role, ativo, avatar_path, created_at";
+
+/** Contato de uma pessoa, como devolvido pela view profiles_contato. */
+type Contato = {
+  email: string | null;
+  whatsapp: string | null;
+  documento_path: string | null;
+};
+
+/** id → contato visível pro papel (view profiles_contato, 0026): coordenação
+ *  vê todos (com documento_path), supervisor vê os mentores das duplas
+ *  ativas/pausadas que supervisiona (nudge por WhatsApp), qualquer um vê a
+ *  própria linha. Quem não está no mapa fica sem contato — nome e avatar
+ *  seguem visíveis pelas colunas públicas. */
+const getContatos = cache(async (): Promise<Map<string, Contato>> => {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("profiles_contato")
+    .select("id, email, whatsapp, documento_path");
+  if (error) {
+    // contato enriquece a tela — sem a view a página segue com os campos
+    // vazios (gravatar cai nas iniciais), mas o erro não pode sumir
+    console.error("getContatos:", error);
+    return new Map();
+  }
+  return new Map(
+    (data ?? []).map((c: { id: string } & Contato) => [c.id, c])
+  );
+});
+
+/** Merge do contato da view numa linha de profiles, por id. Os campos
+ *  sensíveis ficam ""/null quando o papel não os alcança: email "" e whatsapp
+ *  null são falsy — o Avatar cai nas iniciais e o nudge fica desabilitado. */
+function comContato<P extends { id: string }>(
+  p: P,
+  contatos: Map<string, Contato>
+): P & { email: string; whatsapp: string | null; documento_path: string | null } {
+  const c = contatos.get(p.id);
+  return {
+    ...p,
+    email: c?.email ?? "",
+    whatsapp: c?.whatsapp ?? null,
+    documento_path: c?.documento_path ?? null,
+  };
+}
+
 // getClaims valida o JWT localmente (sem round-trip); RLS segue valendo no banco.
 export const getMe = cache(async (): Promise<Profile | null> => {
   const supabase = await createClient();
@@ -10,13 +60,18 @@ export const getMe = cache(async (): Promise<Profile | null> => {
   const sub = data?.claims?.sub;
   if (!sub) return null;
   // maybeSingle: profile ainda não criado (ou removido) -> null -> layout manda pro login
-  const { data: profile, error } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("user_id", sub)
-    .maybeSingle();
+  const [{ data: profile, error }, contatos] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select(PROFILE_COLS_PUBLICAS)
+      .eq("user_id", sub)
+      .maybeSingle(),
+    // o self-scope da view garante a própria linha — email/whatsapp voltam
+    // pro Gravatar do shell e pro form de /perfil
+    getContatos(),
+  ]);
   if (error) throw error;
-  return profile;
+  return profile ? comContato(profile, contatos) : null;
 });
 
 export const getCicloEventos = cache(async (): Promise<CicloEvento[]> => {
@@ -31,47 +86,71 @@ export const getCicloEventos = cache(async (): Promise<CicloEvento[]> => {
 
 const DUPLA_SELECT = `
   *,
-  mentor:profiles!duplas_mentor_id_fkey(*),
+  mentor:profiles!duplas_mentor_id_fkey(${PROFILE_COLS_PUBLICAS}),
   mentorado:mentorados(*),
-  supervisor:profiles!duplas_supervisor_id_fkey(*),
+  supervisor:profiles!duplas_supervisor_id_fkey(${PROFILE_COLS_PUBLICAS}),
   encontros(*, registro:registros(*, autor:profiles!registros_created_by_fkey(nome))),
   encaminhamentos(*),
   notas:encontro_notas(*)
 `;
 
+/** Contato da view mergeado em mentor/supervisor de cada dupla — o nudge por
+ *  WhatsApp (coord/supervisor) e o Gravatar do mentor dependem disso. Quem o
+ *  papel não alcança (ex.: supervisor de dupla encerrada) fica sem contato. */
+function mergeContatoDuplas(
+  duplas: Dupla[],
+  contatos: Map<string, Contato>
+): Dupla[] {
+  return duplas.map((d) => ({
+    ...d,
+    // embed to-one pode vir null se a row referenciada sumir — preserva
+    mentor: d.mentor ? comContato(d.mentor, contatos) : d.mentor,
+    supervisor: d.supervisor ? comContato(d.supervisor, contatos) : null,
+  }));
+}
+
 export const getDuplas = cache(async (): Promise<Dupla[]> => {
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("duplas")
-    .select(DUPLA_SELECT)
-    .order("created_at", { ascending: true });
+  const [{ data, error }, contatos] = await Promise.all([
+    supabase
+      .from("duplas")
+      .select(DUPLA_SELECT)
+      .order("created_at", { ascending: true }),
+    getContatos(),
+  ]);
   if (error) throw error;
-  return (data as unknown as Dupla[]) ?? [];
+  return mergeContatoDuplas((data as unknown as Dupla[]) ?? [], contatos);
 });
 
 export const getDupla = cache(async (id: string): Promise<Dupla | null> => {
   const supabase = await createClient();
   // maybeSingle: id inexistente -> null -> page chama notFound()
-  const { data, error } = await supabase
-    .from("duplas")
-    .select(DUPLA_SELECT)
-    .eq("id", id)
-    .maybeSingle();
+  const [{ data, error }, contatos] = await Promise.all([
+    supabase
+      .from("duplas")
+      .select(DUPLA_SELECT)
+      .eq("id", id)
+      .maybeSingle(),
+    getContatos(),
+  ]);
   if (error) throw error;
-  return (data as unknown as Dupla) ?? null;
+  return data ? mergeContatoDuplas([data as unknown as Dupla], contatos)[0] : null;
 });
 
 export const getMinhasDuplas = cache(async (): Promise<Dupla[]> => {
   const me = await getMe();
   if (!me) return [];
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("duplas")
-    .select(DUPLA_SELECT)
-    .or(`mentor_id.eq.${me.id},supervisor_id.eq.${me.id}`)
-    .order("created_at", { ascending: true });
+  const [{ data, error }, contatos] = await Promise.all([
+    supabase
+      .from("duplas")
+      .select(DUPLA_SELECT)
+      .or(`mentor_id.eq.${me.id},supervisor_id.eq.${me.id}`)
+      .order("created_at", { ascending: true }),
+    getContatos(),
+  ]);
   if (error) throw error;
-  return (data as unknown as Dupla[]) ?? [];
+  return mergeContatoDuplas((data as unknown as Dupla[]) ?? [], contatos);
 });
 
 /** Só os vínculos — pra checar "está em dupla" sem arrastar encontros/registros. */
@@ -100,7 +179,9 @@ export const getDuplasResumoTodas = cache(async (): Promise<DuplaResumo[]> => {
 export const getContagemPessoas = cache(async (): Promise<number> => {
   const supabase = await createClient();
   const [profiles, mentorados] = await Promise.all([
-    supabase.from("profiles").select("*", { count: "exact", head: true }),
+    // select=* falharia até no head:true — o * expande pras colunas sem
+    // grant (0026) e a query inteira dá permission denied; id basta pra contar
+    supabase.from("profiles").select("id", { count: "exact", head: true }),
     supabase.from("mentorados").select("*", { count: "exact", head: true }),
   ]);
   if (profiles.error) throw profiles.error;
@@ -115,9 +196,16 @@ const porNome = (a: { nome: string }, b: { nome: string }) =>
 
 export const getPessoas = cache(async (): Promise<Profile[]> => {
   const supabase = await createClient();
-  const { data, error } = await supabase.from("profiles").select("*").order("nome");
+  const [{ data, error }, contatos] = await Promise.all([
+    supabase.from("profiles").select(PROFILE_COLS_PUBLICAS).order("nome"),
+    getContatos(),
+  ]);
   if (error) throw error;
-  return (data ?? []).sort(porNome);
+  // a tela (/pessoas) é da coordenação — a view devolve email/whatsapp/
+  // documento_path de todos; pra outro papel só a própria linha teria contato
+  return ((data ?? []) as { id: string; nome: string }[])
+    .map((p) => comContato(p, contatos))
+    .sort(porNome) as Profile[];
 });
 
 export const getMentorados = cache(async (): Promise<Mentorado[]> => {
@@ -147,19 +235,28 @@ export const getPessoaPerfil = cache(async (id: string): Promise<
   (PessoaPerfil & { duplas: DuplaPerfil[]; notas: PessoaNota[] }) | null
 > => {
   const supabase = await createClient();
+  // email não entra no embed de profiles (grant de coluna, 0026) — vem do
+  // merge com a view quando o papel alcança; o gravatar cai nas iniciais senão
   const DUPLA_PERFIL_SELECT = `
     id, status, iniciada_em,
-    mentor:profiles!duplas_mentor_id_fkey(id, nome, avatar_path, email),
+    mentor:profiles!duplas_mentor_id_fkey(id, nome, avatar_path),
     mentorado:mentorados(id, nome, avatar_path)
   `;
   // notas são privadas do autor (0017) — só voltam as minhas; embed de autor
   // seria sempre eu mesmo, então não vale o join
   const NOTA_SELECT = `id, profile_id, mentorado_id, texto, created_by, created_at`;
 
-  const [{ data: p }, { data: m }] = await Promise.all([
-    supabase.from("profiles").select("*").eq("id", id).maybeSingle(),
+  const [{ data: p }, { data: m }, contatos] = await Promise.all([
+    supabase.from("profiles").select(PROFILE_COLS_PUBLICAS).eq("id", id).maybeSingle(),
     supabase.from("mentorados").select("*").eq("id", id).maybeSingle(),
+    getContatos(),
   ]);
+  const comEmail = (d: DuplaPerfil): DuplaPerfil => ({
+    ...d,
+    mentor: d.mentor
+      ? { ...d.mentor, email: contatos.get(d.mentor.id)?.email ?? null }
+      : null,
+  });
   if (p) {
     const [{ data: duplas }, { data: notas }] = await Promise.all([
       supabase.from("duplas").select(DUPLA_PERFIL_SELECT)
@@ -170,8 +267,8 @@ export const getPessoaPerfil = cache(async (id: string): Promise<
     ]);
     return {
       tipo: "profile",
-      pessoa: p as Profile,
-      duplas: (duplas as unknown as DuplaPerfil[]) ?? [],
+      pessoa: comContato(p, contatos) as Profile,
+      duplas: ((duplas as unknown as DuplaPerfil[]) ?? []).map(comEmail),
       notas: (notas as unknown as PessoaNota[]) ?? [],
     };
   }
@@ -186,7 +283,7 @@ export const getPessoaPerfil = cache(async (id: string): Promise<
     return {
       tipo: "mentorado",
       pessoa: m as Mentorado,
-      duplas: (duplas as unknown as DuplaPerfil[]) ?? [],
+      duplas: ((duplas as unknown as DuplaPerfil[]) ?? []).map(comEmail),
       notas: (notas as unknown as PessoaNota[]) ?? [],
     };
   }
@@ -317,7 +414,7 @@ const REGISTRO_RESUMO_SELECT = `
     id, numero, data_hora, realizado_em, status,
     dupla:duplas!encontros_dupla_id_fkey(
       id, status,
-      mentor:profiles!duplas_mentor_id_fkey(id, nome, email, avatar_path),
+      mentor:profiles!duplas_mentor_id_fkey(id, nome, avatar_path),
       mentorado:mentorados!duplas_mentorado_id_fkey(id, nome, avatar_path)
     )
   )`;
@@ -350,16 +447,35 @@ export async function getRegistros(
     q = q.or(
       `tema.ilike.%${f.q}%,reflexoes.ilike.%${f.q}%,observacoes.ilike.%${f.q}%`
     );
-  const { data, error, count } = await q;
+  const [{ data, error, count }, contatos] = await Promise.all([
+    q,
+    getContatos(),
+  ]);
   if (error) throw error;
   const norm = (v: unknown) => (Array.isArray(v) ? (v[0] ?? null) : v);
-  let itens = ((data ?? []) as unknown as RegistroResumo[]).map((r) => ({
-    ...r,
-    autor: norm(r.autor),
-    encontro: r.encontro
-      ? { ...r.encontro, dupla: norm(r.encontro.dupla) }
-      : null,
-  }));
+  let itens = ((data ?? []) as unknown as RegistroResumo[]).map((r) => {
+    const dupla = norm(r.encontro?.dupla) ?? null;
+    return {
+      ...r,
+      autor: norm(r.autor),
+      encontro: r.encontro
+        ? {
+            ...r.encontro,
+            // email do mentor vem da view (grant de coluna, 0026) — coord vê
+            // todos; supervisor só perde o email quando a dupla já encerrou
+            dupla: dupla && {
+              ...dupla,
+              mentor: dupla.mentor
+                ? {
+                    ...dupla.mentor,
+                    email: contatos.get(dupla.mentor.id)?.email ?? null,
+                  }
+                : null,
+            },
+          }
+        : null,
+    };
+  });
   if (f.tardio) {
     itens = itens.filter((r) => registroTardio(r, r.encontro));
     // o count do PostgREST ignorou o filtro JS — o total real é o que sobrou

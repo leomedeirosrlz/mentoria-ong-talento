@@ -99,19 +99,28 @@ export async function GET(request: NextRequest) {
 // tipo=pessoas — cadastro único: equipe (papel, status) + mentorados (ONG de
 // origem). Ordenado por nome; mesmo formato `;`+BOM do relatório do ciclo.
 async function exportPessoas(supabase: Awaited<ReturnType<typeof createClient>>) {
-  const [{ data: pessoas, error: eP }, { data: mentorados, error: eM }, { data: mps }] =
-    await Promise.all([
-      supabase.from("profiles").select("id,nome,email,whatsapp,role,ativo"),
-      supabase.from("mentorados").select("nome,email,whatsapp,ong_origem"),
-      supabase.from("mentor_profiles").select("profile_id,capacidade"),
-    ]);
-  if (eP || eM) {
+  // email/whatsapp saíram do grant de coluna de profiles (0026) — a view
+  // profiles_contato devolve todas as linhas pra coordenação (única que
+  // passa na checagem acima) e o merge é por id
+  const [
+    { data: pessoas, error: eP },
+    { data: contatos, error: eC },
+    { data: mentorados, error: eM },
+    { data: mps },
+  ] = await Promise.all([
+    supabase.from("profiles").select("id,nome,role,ativo"),
+    supabase.from("profiles_contato").select("id,email,whatsapp"),
+    supabase.from("mentorados").select("nome,email,whatsapp,ong_origem"),
+    supabase.from("mentor_profiles").select("profile_id,capacidade"),
+  ]);
+  if (eP || eC || eM) {
     return NextResponse.json(
       { error: "Não foi possível gerar o relatório — tente de novo." },
       { status: 500 }
     );
   }
   const capacidade = new Map((mps ?? []).map((m) => [m.profile_id, m.capacidade]));
+  const contatoPorId = new Map((contatos ?? []).map((c) => [c.id, c]));
 
   type Linha = { nome: string; resto: string[] };
   const linhas: Linha[] = [
@@ -119,8 +128,8 @@ async function exportPessoas(supabase: Awaited<ReturnType<typeof createClient>>)
       nome: p.nome,
       resto: [
         p.role ? papelLabel(p.role) : "Sem papel",
-        p.email,
-        p.whatsapp ?? "",
+        contatoPorId.get(p.id)?.email ?? "",
+        contatoPorId.get(p.id)?.whatsapp ?? "",
         p.role?.startsWith("mentor") ? String(capacidade.get(p.id) ?? "") : "",
         "",
         p.ativo ? "ativo" : "inativo",
