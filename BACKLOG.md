@@ -238,3 +238,13 @@ tem dupla ativa/pausada deixava escrita indevida via `mentor_id` nas policies.
   unificar na próxima vez que tocar ali.
 - Teste real em device: iOS/Safari + VoiceOver (sino, wizard modal, `<details>`
   dos registros) — tudo conferido por leitura, não por uso.
+
+**Auditoria de segurança (set/2026) — 0023/0024/0025 aplicadas; deferido:**
+- `profiles_select` segue "autenticado lê tudo" — qualquer papel lê e-mail,
+  WhatsApp e `documento_path` de todos via PostgREST direto. Postgres não tem
+  RLS por coluna: o fix é mover contato/documento pra tabela/view própria
+  (`security definer` ou grants por coluna com `profiles_publico` pros
+  embeds de nome/avatar). Refactor grande — medir antes de mexer.
+- Policies `for all` remanescentes (fora anexos, já endurecidos): os triggers
+  de autoria da 0023 cobrem a parte de autoria; o restante (colunas de status)
+  exige trigger por coluna ou RPCs dedicadas.

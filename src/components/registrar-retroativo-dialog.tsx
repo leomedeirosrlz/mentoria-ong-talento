@@ -8,7 +8,7 @@ import { registrarEncontroRetroativo } from "@/lib/actions";
 import { formatDate, type EncontroFaltante } from "@/lib/ciclo";
 import { Button } from "@/components/ui/button";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
+  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -146,11 +146,11 @@ export function RegistrarRetroativoDialog({
         <DialogHeader>
           <DialogTitle>Registrar encontro que já aconteceu</DialogTitle>
         </DialogHeader>
-        <p className="text-sm text-muted-foreground leading-relaxed">
+        <DialogDescription className="leading-relaxed">
           Se encontraram sem agendar por aqui (combinaram por WhatsApp, por
           exemplo), conte quando foi. O encontro já nasce como realizado e você
           completa o registro em seguida.
-        </p>
+        </DialogDescription>
         <form onSubmit={submit} className="space-y-4">
           <div className="space-y-2">
             <Label id="retro-numero-label">Qual encontro foi</Label>

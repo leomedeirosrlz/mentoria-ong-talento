@@ -29,6 +29,7 @@ const AUDIENCIA_LABEL = {
 export function NovoComunicadoDialog() {
   const [open, setOpen] = useState(false);
   const [titulo, setTitulo] = useState("");
+  const [corpoLen, setCorpoLen] = useState(0);
   const [pending, start] = useTransition();
   const router = useRouter();
 
@@ -43,6 +44,7 @@ export function NovoComunicadoDialog() {
       }
       toast.success("Aviso publicado.");
       setTitulo("");
+      setCorpoLen(0);
       setOpen(false);
       router.refresh();
     });
@@ -65,7 +67,7 @@ export function NovoComunicadoDialog() {
           <div className="space-y-1.5">
             <div className="flex items-baseline justify-between gap-2">
               <Label htmlFor="aviso-titulo">Título</Label>
-              <span className="text-xs text-muted-foreground">
+              <span aria-hidden className="text-xs tabular-nums text-muted-foreground">
                 {titulo.length}/140
               </span>
             </div>
@@ -79,8 +81,20 @@ export function NovoComunicadoDialog() {
             />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="aviso-corpo">Texto</Label>
-            <Textarea id="aviso-corpo" name="corpo" required rows={4} maxLength={5000} />
+            <div className="flex items-baseline justify-between gap-2">
+              <Label htmlFor="aviso-corpo">Texto</Label>
+              <span aria-hidden className="text-xs tabular-nums text-muted-foreground">
+                {corpoLen}/5000
+              </span>
+            </div>
+            <Textarea
+              id="aviso-corpo"
+              name="corpo"
+              required
+              rows={4}
+              maxLength={5000}
+              onChange={(e) => setCorpoLen(e.target.value.length)}
+            />
           </div>
           <div className="space-y-1.5">
             <Label id="audiencia-label">Quem recebe</Label>

@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { marcarNaoAconteceu, desfazerNaoAconteceu } from "@/lib/actions";
 import { Button } from "@/components/ui/button";
 import {
-  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
 
 export function NaoAconteceuButton({
@@ -31,9 +31,9 @@ export function NaoAconteceuButton({
         <DialogHeader>
           <DialogTitle>O encontro não aconteceu?</DialogTitle>
         </DialogHeader>
-        <p className="text-sm text-muted-foreground leading-relaxed">
+        <DialogDescription className="leading-relaxed">
           O encontro ficará marcado como não realizado. Se foi um engano, você pode desfazer depois.
-        </p>
+        </DialogDescription>
         <DialogFooter>
           <Button variant="outline" onClick={() => setOpen(false)}>
             Cancelar
@@ -87,9 +87,9 @@ export function DesfazerNaoAconteceuButton({
         <DialogHeader>
           <DialogTitle>Desfazer &ldquo;não realizado&rdquo;?</DialogTitle>
         </DialogHeader>
-        <p className="text-sm text-muted-foreground leading-relaxed">
+        <DialogDescription className="leading-relaxed">
           O encontro voltará a ficar agendado na data original.
-        </p>
+        </DialogDescription>
         <DialogFooter>
           <Button variant="outline" onClick={() => setOpen(false)}>
             Cancelar

@@ -62,6 +62,7 @@ export function AgendarEncontroDialog({
   const [dataMudou, setDataMudou] = useState(false);
   // valor vivo do campo — decide se o submit agenda ou registra (modo dual)
   const [valorData, setValorData] = useState("");
+  const [motivoLen, setMotivoLen] = useState(0);
   // id do card recém-criado — scroll quando o refresh terminar (o card não
   // existia no DOM velho, então o hash sozinho não rola)
   const scrollTarget = useRef<string | null>(null);
@@ -206,13 +207,19 @@ export function AgendarEncontroDialog({
           )}
           {atual && motivo === "outro" && (
             <div className="space-y-2">
-              <Label htmlFor="motivo_outro">Descreva o motivo</Label>
+              <div className="flex items-baseline justify-between gap-2">
+                <Label htmlFor="motivo_outro">Descreva o motivo</Label>
+                <span aria-hidden className="text-xs tabular-nums text-muted-foreground">
+                  {motivoLen}/140
+                </span>
+              </div>
               <Input
                 id="motivo_outro"
                 name="motivo_outro"
                 required
                 minLength={2}
                 maxLength={140}
+                onChange={(e) => setMotivoLen(e.target.value.length)}
                 placeholder="ex.: mentorado não pôde comparecer"
               />
             </div>

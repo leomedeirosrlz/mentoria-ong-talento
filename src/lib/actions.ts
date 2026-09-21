@@ -35,6 +35,13 @@ function erroAmigavel(e: { message: string; code?: string }): string {
   if (e.code === "23503" || /foreign key/i.test(e.message)) {
     return "Esse cadastro está vinculado a outros dados — remova os vínculos antes de excluir.";
   }
+  // triggers de domínio (0023/0025) levantam P0001 com mensagem própria
+  if (/capacidade do mentor excedida/i.test(e.message)) {
+    return "Esse mentor já atingiu o número máximo de duplas.";
+  }
+  if (/autoria forjada/i.test(e.message)) {
+    return "Não foi possível concluir. Recarregue a página e tente de novo.";
+  }
   return "Não foi possível concluir. Tente de novo.";
 }
 
@@ -712,9 +719,17 @@ export async function deleteMaterial(id: string) {
 
 // ---------- importação ----------
 
+// cap de importação — lote grande demais estoura o payload da action e
+// transforma erro de planilha em falha silenciosa no meio do insert
+const MAX_IMPORT = 500;
+
 export async function importPessoas(rows: LinhaImportada[]) {
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada — entre de novo." };
+  if (eu.role !== "coordenacao") return { error: "Só a coordenação importa cadastros." };
+  if (rows.length > MAX_IMPORT) {
+    return { error: `O arquivo tem ${rows.length} linhas — importe em lotes de até ${MAX_IMPORT}.` };
+  }
   const { data: existentes } = await supabase.from("profiles").select("email");
   const noBanco = new Set((existentes ?? []).map((p) => p.email.toLowerCase()));
   const vistos = new Set<string>();
@@ -762,6 +777,10 @@ export async function importPessoas(rows: LinhaImportada[]) {
 export async function importMentorados(rows: LinhaImportada[]) {
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada — entre de novo." };
+  if (eu.role !== "coordenacao") return { error: "Só a coordenação importa cadastros." };
+  if (rows.length > MAX_IMPORT) {
+    return { error: `O arquivo tem ${rows.length} linhas — importe em lotes de até ${MAX_IMPORT}.` };
+  }
   const { data: existentes } = await supabase.from("mentorados").select("nome, whatsapp");
   const nomes = new Set((existentes ?? []).map((m) => normNome(m.nome).toLowerCase()));
   const was = new Set(

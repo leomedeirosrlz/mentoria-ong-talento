@@ -76,13 +76,20 @@ const SECOES: { titulo: string; corpo: React.ReactNode }[] = [
             <strong>Supervisores:</strong> dados das duplas que supervisionam.
           </li>
           <li>
-            <strong>Mentor e mentorado:</strong> dados de contato e registros do
+            <strong>Mentor e mentorado:</strong> dados de contato e registros da
             própria dupla.
           </li>
         </ul>
         <p>
-          Não vendemos dados pessoais nem os compartilhamos com empresas ou
-          terceiros para fins comerciais.
+          Fotos de perfil são servidas por link direto do nosso provedor de
+          armazenamento: quem tem o link consegue visualizá-las, mesmo sem
+          entrar na plataforma. Documentos oficiais e evidências de encontro,
+          por outro lado, ficam em área privada com links temporários.
+        </p>
+        <p>
+          A coordenação pode exportar listas de contato (nome, e-mail e
+          WhatsApp) para operar o programa. Não vendemos dados pessoais nem os
+          compartilhamos com empresas ou terceiros para fins comerciais.
         </p>
       </>
     ),

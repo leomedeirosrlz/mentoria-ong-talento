@@ -6,7 +6,7 @@ import { CircleNotch, Trash } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
-  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
 
 export function ConfirmDeleteButton({
@@ -54,7 +54,7 @@ export function ConfirmDeleteButton({
         <DialogHeader>
           <DialogTitle>{titulo}</DialogTitle>
         </DialogHeader>
-        <p className="text-sm text-muted-foreground leading-relaxed">{descricao}</p>
+        <DialogDescription className="leading-relaxed">{descricao}</DialogDescription>
         <DialogFooter>
           <Button variant="outline" onClick={() => setOpen(false)}>
             Cancelar

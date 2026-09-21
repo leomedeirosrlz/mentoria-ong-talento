@@ -49,6 +49,7 @@ export function EncaminhamentosList({
   const [pendingId, setPendingId] = useState<string | null>(null);
   // um dialog compartilhado pros dois fluxos — o item alvo fica em estado
   const [editando, setEditando] = useState<Encaminhamento | null>(null);
+  const [descLen, setDescLen] = useState(0);
   const [excluindo, setExcluindo] = useState<Encaminhamento | null>(null);
   const router = useRouter();
 
@@ -110,7 +111,7 @@ export function EncaminhamentosList({
                 <DotsThree size={18} weight="bold" aria-hidden />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-40">
-                <DropdownMenuItem onClick={() => setEditando(t)}>
+                <DropdownMenuItem onClick={() => { setEditando(t); setDescLen(t.descricao.length); }}>
                   <PencilSimple aria-hidden /> Editar
                 </DropdownMenuItem>
                 <DropdownMenuItem variant="destructive" onClick={() => setExcluindo(t)}>
@@ -123,33 +124,40 @@ export function EncaminhamentosList({
           return (
             <li key={t.id} className="flex items-start gap-1">
               {podeEditar || podeMarcar ? (
-                <button
-                  type="button"
-                  role="checkbox"
-                  aria-checked={t.status === "feito"}
-                  disabled={pending && pendingId === t.id}
-                  onClick={() => {
-                    setPendingId(t.id);
-                    start(async () => {
-                      try {
-                        const res = await toggleEncaminhamento(t.id, t.status !== "feito", duplaId);
-                        if (res?.error) toast.error(res.error);
-                        else router.refresh();
-                      } catch {
-                        toast.error("Sem conexão — tente de novo.");
-                      } finally {
-                        setPendingId(null);
-                      }
-                    });
-                  }}
-                  className="group flex min-w-0 flex-1 items-start gap-3 py-3 text-left transition-colors disabled:opacity-60"
+                // checkbox nativo + label: teclado, estado e o clique no texto
+                // funcionam sem ARIA manual; o quadrado é só a representação
+                <label
+                  className={cn(
+                    "group flex min-w-0 flex-1 cursor-pointer items-start gap-3 py-3 transition-colors",
+                    pending && pendingId === t.id && "opacity-60"
+                  )}
                 >
+                  <input
+                    type="checkbox"
+                    className="peer sr-only"
+                    checked={t.status === "feito"}
+                    disabled={pending && pendingId === t.id}
+                    onChange={() => {
+                      setPendingId(t.id);
+                      start(async () => {
+                        try {
+                          const res = await toggleEncaminhamento(t.id, t.status !== "feito", duplaId);
+                          if (res?.error) toast.error(res.error);
+                          else router.refresh();
+                        } catch {
+                          toast.error("Sem conexão — tente de novo.");
+                        } finally {
+                          setPendingId(null);
+                        }
+                      });
+                    }}
+                  />
                   <span
                     aria-hidden="true"
                     className={cn(
-                      "mt-0.5 size-4.5 rounded-md border shrink-0 grid place-items-center transition-colors",
+                      "mt-0.5 grid size-4.5 shrink-0 place-items-center rounded-md border transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-card",
                       t.status === "feito"
-                        ? "bg-[var(--ok)] border-[var(--ok)] text-white"
+                        ? "border-[var(--ok)] bg-[var(--ok)] text-white"
                         : "border-muted-foreground/40 group-hover:border-foreground"
                     )}
                   >
@@ -160,7 +168,7 @@ export function EncaminhamentosList({
                     )}
                   </span>
                   {texto}
-                </button>
+                </label>
               ) : (
                 <div className="flex min-w-0 flex-1 items-start gap-3 py-3">
                   {/* anel fino = gramática de leitura, não de controle — o dot
@@ -214,13 +222,19 @@ export function EncaminhamentosList({
               }}
             >
               <div className="space-y-2">
-                <Label htmlFor="enc-descricao">O que ficou combinado</Label>
+                <div className="flex items-baseline justify-between gap-2">
+                  <Label htmlFor="enc-descricao">O que ficou combinado</Label>
+                  <span aria-hidden className="text-xs tabular-nums text-muted-foreground">
+                    {descLen}/500
+                  </span>
+                </div>
                 <Input
                   id="enc-descricao"
                   name="descricao"
                   required
                   maxLength={500}
                   defaultValue={editando.descricao}
+                  onChange={(e) => setDescLen(e.target.value.length)}
                 />
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
