@@ -1556,12 +1556,17 @@ export async function signOut() {
 
 // ---------- comunicados & notificações ----------
 
-const AUDIENCIAS_COMUNICADO = ["todos", "dpp", "especialista", "coordenacao"] as const;
+// Mesma matriz do comunicados_select (0019) — se divergir, destinatário recebe
+// ping de aviso que a RLS não deixa abrir.
+const AUDIENCIAS_COMUNICADO = [
+  "todos", "dpp", "especialista", "coordenacao", "equipe",
+] as const;
 const ROLES_POR_AUDIENCIA: Record<string, string[]> = {
   todos: ["coordenacao", "supervisor", "mentor_dpp", "mentor_especialista"],
   dpp: ["mentor_dpp"],
   especialista: ["mentor_especialista"],
   coordenacao: ["coordenacao"],
+  equipe: ["coordenacao", "supervisor"],
 };
 
 /** Aviso geral da coordenação — grava o comunicado e cria a notificação de
@@ -1609,6 +1614,7 @@ export async function publicarComunicado(formData: FormData) {
 export async function excluirComunicado(id: string) {
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada — entre de novo." };
+  if (eu.role !== "coordenacao") return { error: "Só a coordenação exclui avisos." };
   const { data, error } = await supabase
     .from("comunicados").delete().eq("id", id).select("id");
   if (error) return { error: erroAmigavel(error) };
@@ -1624,10 +1630,11 @@ export async function excluirComunicado(id: string) {
 export async function listarNotificacoes() {
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada — entre de novo." };
-  const [{ data }, { count }] = await Promise.all([
+  const [{ data, error: errItens }, { count, error: errCount }] = await Promise.all([
     supabase
       .from("notificacoes")
       .select("id, tipo, titulo, corpo, href, lida_em, created_at")
+      .eq("profile_id", eu.id)
       .order("created_at", { ascending: false })
       .limit(15),
     supabase
@@ -1636,6 +1643,10 @@ export async function listarNotificacoes() {
       .eq("profile_id", eu.id)
       .is("lida_em", null),
   ]);
+  if (errItens || errCount) {
+    console.error("listarNotificacoes:", errItens ?? errCount);
+    return { error: "Não foi possível carregar as notificações." };
+  }
   return { ok: true, itens: data ?? [], naoLidas: count ?? 0 };
 }
 

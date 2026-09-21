@@ -173,7 +173,12 @@ export type Material = {
   ordem: number;
 };
 
-export type ComunicadoAudiencia = "todos" | "dpp" | "especialista" | "coordenacao";
+export type ComunicadoAudiencia =
+  | "todos"
+  | "dpp"
+  | "especialista"
+  | "coordenacao"
+  | "equipe";
 
 export type Comunicado = {
   id: string;

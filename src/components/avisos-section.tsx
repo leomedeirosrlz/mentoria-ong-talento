@@ -1,4 +1,5 @@
-import { Megaphone } from "@phosphor-icons/react/dist/ssr";
+import { Megaphone, Trash } from "@phosphor-icons/react/dist/ssr";
+import { Button } from "@/components/ui/button";
 import { excluirComunicado } from "@/lib/actions";
 import { formatDiaMes } from "@/lib/ciclo";
 import { Card, CardContent } from "@/components/ui/card";
@@ -9,8 +10,9 @@ import type { Comunicado } from "@/lib/types";
 const AUDIENCIA_LABEL = {
   todos: "Todos",
   dpp: "Mentores DPP",
-  especialista: "Especialistas",
-  coordenacao: "Coordenação",
+  especialista: "Mentores especialistas",
+  equipe: "Equipe",
+  coordenacao: "Só a coordenação",
 } as const;
 
 /** Avisos gerais da coordenação — seção compartilhada da home. O /#avisos do
@@ -37,7 +39,8 @@ export function AvisosSection({
       {avisos.length === 0 ? (
         <Card>
           <CardContent className="py-6 text-center text-sm text-muted-foreground">
-            Nenhum aviso publicado — o primeiro chega a todos os papéis da audiência.
+            Nenhum aviso publicado — o primeiro chega a quem você escolher no
+            campo Quem recebe.
           </CardContent>
         </Card>
       ) : (
@@ -67,6 +70,15 @@ export function AvisosSection({
                     descricao="O aviso sai da home de todo mundo e as notificações dele são removidas. Pra corrigir, exclua e publique de novo."
                     sucesso="Aviso excluído."
                     onConfirm={() => excluirComunicado(a.id)}
+                    trigger={
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label={`Excluir aviso "${a.titulo}"`}
+                      >
+                        <Trash size={15} />
+                      </Button>
+                    }
                   />
                 )}
               </article>

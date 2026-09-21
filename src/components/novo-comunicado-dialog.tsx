@@ -16,12 +16,14 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 
-// mesma matriz de audiência dos materiais — um modelo mental só
+// mesma matriz de audiência dos materiais + 'equipe' (coord + supervisores —
+// aviso interno sem pingar mentores)
 const AUDIENCIA_LABEL = {
   todos: "Todos",
   dpp: "Mentores DPP",
   especialista: "Mentores especialistas",
-  coordenacao: "Coordenação",
+  equipe: "Coordenação e supervisores",
+  coordenacao: "Só a coordenação",
 } as const;
 
 export function NovoComunicadoDialog() {
@@ -64,9 +66,12 @@ export function NovoComunicadoDialog() {
             <Textarea id="aviso-corpo" name="corpo" required rows={4} maxLength={5000} />
           </div>
           <div className="space-y-1.5">
-            <Label>Quem recebe</Label>
+            <Label id="audiencia-label">Quem recebe</Label>
             <Select name="audiencia" defaultValue="todos">
-              <SelectTrigger>
+              <SelectTrigger
+                id="audiencia-select"
+                aria-labelledby="audiencia-label audiencia-select"
+              >
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>

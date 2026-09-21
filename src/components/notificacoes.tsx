@@ -5,6 +5,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
 } from "react";
 import { useRouter } from "next/navigation";
@@ -16,6 +17,7 @@ import {
   Megaphone,
   UsersThree,
 } from "@phosphor-icons/react";
+import { toast } from "sonner";
 import {
   listarNotificacoes,
   marcarNotificacaoLida,
@@ -48,18 +50,76 @@ export function NotificacoesProvider({
   children: React.ReactNode;
 }) {
   const [estado, setEstado] = useState<Estado>(inicial);
+  // ids marcados localmente — o poll/refetch nunca reverte lida_em pra null
+  // (resposta emitida antes do UPDATE commitar chegaria com o item não-lido)
+  const marcadas = useRef(new Set<string>());
+  const emVoo = useRef(false);
+  const ultimoAnunciado = useRef(inicial.naoLidas);
+  const [anuncio, setAnuncio] = useState("");
+
   // navegação traz dados frescos do SSR — ajusta durante o render (padrão
   // oficial pra "props mudaram"), sem efeito cascata
   const [ultimoInicial, setUltimoInicial] = useState(inicial);
   if (inicial !== ultimoInicial) {
     setUltimoInicial(inicial);
-    setEstado(inicial);
+    // preserva marcações locais ainda não confirmadas pelo server — senão um
+    // refresh chegando entre o clique e o commit reverteria o item pra não-lido
+    setEstado((s) => {
+      const lidaLocal = (id: string) =>
+        s.itens.find((i) => i.id === id)?.lida_em;
+      const locais = inicial.itens.filter(
+        (n) => !n.lida_em && lidaLocal(n.id)
+      ).length;
+      return {
+        itens: inicial.itens.map((n) =>
+          !n.lida_em && lidaLocal(n.id)
+            ? { ...n, lida_em: lidaLocal(n.id)! }
+            : n
+        ),
+        naoLidas: Math.max(0, inicial.naoLidas - locais),
+      };
+    });
   }
 
   const recarregar = useCallback(async () => {
-    const r = await listarNotificacoes();
-    if (r.ok) setEstado({ itens: r.itens ?? [], naoLidas: r.naoLidas ?? 0 });
+    if (emVoo.current) return;
+    emVoo.current = true;
+    try {
+      const r = await listarNotificacoes();
+      if (r.ok) {
+        const raw = r.itens ?? [];
+        const locais = raw.filter(
+          (n) => !n.lida_em && marcadas.current.has(n.id)
+        ).length;
+        const itens = raw.map((n) =>
+          !n.lida_em && marcadas.current.has(n.id)
+            ? { ...n, lida_em: new Date().toISOString() }
+            : n
+        );
+        setEstado({
+          itens,
+          naoLidas: Math.max(0, (r.naoLidas ?? 0) - locais),
+        });
+      }
+    } catch (e) {
+      console.error("notificacoes poll:", e);
+    } finally {
+      emVoo.current = false;
+    }
   }, []);
+
+  // aria-live: anuncia só quando a contagem sobe — decremento é ação do próprio
+  // usuário (já tem feedback no clique), não precisa de live region
+  useEffect(() => {
+    if (estado.naoLidas > ultimoAnunciado.current) {
+      setAnuncio(
+        estado.naoLidas === 1
+          ? "1 notificação não lida"
+          : `${estado.naoLidas} notificações não lidas`
+      );
+    }
+    ultimoAnunciado.current = estado.naoLidas;
+  }, [estado.naoLidas]);
 
   useEffect(() => {
     const t = setInterval(recarregar, POLL_MS);
@@ -74,6 +134,7 @@ export function NotificacoesProvider({
   }, [recarregar]);
 
   const marcar = useCallback((id: string) => {
+    marcadas.current.add(id);
     setEstado((s) => {
       const alvo = s.itens.find((i) => i.id === id);
       if (!alvo || alvo.lida_em) return s;
@@ -84,20 +145,43 @@ export function NotificacoesProvider({
         naoLidas: Math.max(0, s.naoLidas - 1),
       };
     });
-    void marcarNotificacaoLida(id);
-  }, []);
+    void marcarNotificacaoLida(id).then((r) => {
+      if (r?.error) {
+        marcadas.current.delete(id);
+        toast.error(r.error);
+        void recarregar();
+      }
+    });
+  }, [recarregar]);
 
   const marcarTodas = useCallback(() => {
-    setEstado((s) => ({
-      itens: s.itens.map((i) => ({ ...i, lida_em: i.lida_em ?? new Date().toISOString() })),
-      naoLidas: 0,
-    }));
-    void marcarTodasNotificacoesLidas();
-  }, []);
+    setEstado((s) => {
+      s.itens.forEach((i) => marcadas.current.add(i.id));
+      return {
+        itens: s.itens.map((i) => ({
+          ...i,
+          lida_em: i.lida_em ?? new Date().toISOString(),
+        })),
+        naoLidas: 0,
+      };
+    });
+    void marcarTodasNotificacoesLidas().then((r) => {
+      if (r?.error) {
+        marcadas.current.clear();
+        toast.error(r.error);
+        void recarregar();
+      }
+    });
+  }, [recarregar]);
 
   return (
-    <NotificacoesCtx.Provider value={{ ...estado, marcar, marcarTodas, recarregar }}>
+    <NotificacoesCtx.Provider
+      value={{ ...estado, marcar, marcarTodas, recarregar }}
+    >
       {children}
+      <p aria-live="polite" className="sr-only">
+        {anuncio}
+      </p>
     </NotificacoesCtx.Provider>
   );
 }
@@ -142,7 +226,7 @@ export function NotificacoesBell({
         {naoLidas > 0 && (
           <span
             aria-hidden
-            className="absolute right-1 top-1 grid min-w-4 place-items-center rounded-full bg-[var(--danger)] px-1 text-[10px] font-semibold leading-4 text-white tabular-nums"
+            className="absolute right-1 top-1 grid min-w-4 place-items-center rounded-full bg-[var(--danger)] px-1 text-[11px] font-semibold leading-4 text-white tabular-nums"
           >
             {naoLidas > 9 ? "9+" : naoLidas}
           </span>
@@ -160,7 +244,7 @@ export function NotificacoesBell({
             <button
               type="button"
               onClick={marcarTodas}
-              className="text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+              className="-my-2 rounded-md px-2 py-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             >
               Marcar todas como lidas
             </button>
@@ -172,7 +256,7 @@ export function NotificacoesBell({
             <p className="text-sm text-muted-foreground">Nenhuma notificação ainda.</p>
           </div>
         ) : (
-          <ul className="scroll-fina max-h-96 divide-y divide-border/60 overflow-y-auto">
+          <ul className="scroll-fina max-h-[min(24rem,var(--available-height,24rem))] divide-y divide-border/60 overflow-y-auto">
             {itens.map((n) => {
               const Icone = ICONE[n.tipo] ?? Bell;
               const lida = !!n.lida_em;
@@ -183,7 +267,11 @@ export function NotificacoesBell({
                     onClick={() => {
                       if (!lida) marcar(n.id);
                       setAberto(false);
-                      if (n.href) router.push(n.href);
+                      // href é path interno (o banco garante) — o guard contra
+                      // '//' é defesa em profundidade pro router.push
+                      if (n.href?.startsWith("/") && !n.href.startsWith("//")) {
+                        router.push(n.href);
+                      }
                     }}
                     className="flex min-w-0 flex-1 items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/60"
                   >
@@ -191,6 +279,7 @@ export function NotificacoesBell({
                       <Icone size={14} aria-hidden />
                     </span>
                     <span className="min-w-0 flex-1">
+                      {!lida && <span className="sr-only">Não lida · </span>}
                       <span className="flex items-baseline gap-2">
                         <span className={cn("truncate text-sm", !lida && "font-medium")}>
                           {n.titulo}
@@ -212,7 +301,7 @@ export function NotificacoesBell({
                       onClick={() => marcar(n.id)}
                       aria-label="Marcar como lida"
                       title="Marcar como lida"
-                      className="grid w-9 shrink-0 place-items-center text-muted-foreground transition-colors hover:text-foreground"
+                      className="grid w-11 shrink-0 place-items-center text-muted-foreground transition-colors hover:text-foreground"
                     >
                       <Check size={14} aria-hidden />
                     </button>

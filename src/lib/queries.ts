@@ -237,9 +237,12 @@ export const getNotificacoes = cache(
         .select("*", { count: "exact", head: true })
         .is("lida_em", null),
     ]);
-    // migration 0018 pendente no remoto: tabela ausente degrada pra lista
-    // vazia em vez de derrubar a página inteira (auto-resolve ao aplicar)
-    if (error || e2) return { itens: [], naoLidas: 0 };
+    // tabela ausente/falha de leitura degrada pra lista vazia em vez de
+    // derrubar a página inteira — mas loga: erro silencioso esconde bug
+    if (error || e2) {
+      console.error("getNotificacoes:", error ?? e2);
+      return { itens: [], naoLidas: 0 };
+    }
     return { itens: (data ?? []) as Notificacao[], naoLidas: count ?? 0 };
   }
 );
@@ -252,8 +255,11 @@ export const getComunicados = cache(async (): Promise<Comunicado[]> => {
     .select("id, titulo, corpo, audiencia, created_by, created_at, autor:profiles!created_by(nome)")
     .order("created_at", { ascending: false })
     .limit(5);
-  // migration 0018 pendente: idem — avisos somem em vez de quebrar a home
-  if (error) return [];
+  // idem: avisos somem em vez de quebrar a home — com log
+  if (error) {
+    console.error("getComunicados:", error);
+    return [];
+  }
   return (data ?? []).map((c) => ({
     ...c,
     // supabase-js tipa join 1:1 como array — normaliza pra objeto
