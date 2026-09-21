@@ -774,6 +774,27 @@ export function formatDiaSemanaMes(iso: string | null | undefined): string {
   return dia ? `${dia} (${dm})` : dm;
 }
 
+/** Sugestões do TagInput de áreas de atuação (onboarding + /perfil + ficha da
+ *  coordenação) — o campo aceita digitação livre; a lista só acelera o toque.
+ *  Teto de 10 itens / 40 chars por área é o CHECK profiles_areas_ok (0030). */
+export const AREAS_SUGESTOES = [
+  "tecnologia",
+  "finanças",
+  "carreira",
+  "design",
+  "marketing",
+  "comunicação",
+  "empreendedorismo",
+  "educação",
+  "dados",
+  "direito",
+  "saúde",
+  "vendas",
+  "produto",
+  "RH",
+  "projetos sociais",
+];
+
 /** Rótulo do papel — mora aqui (não em app-shell) pra server components poderem usar. */
 export function papelLabel(role: string | null | undefined) {
   switch (role) {

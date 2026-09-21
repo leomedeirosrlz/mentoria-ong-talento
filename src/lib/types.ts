@@ -37,6 +37,9 @@ export type Profile = {
   linkedin: string | null;
   areas: string[] | null;
   voluntariado: string | null;
+  /** Marca do onboarding por papel (0031) — null = ainda não viu o wizard;
+   *  o gate no layout do app lê este campo. */
+  onboarded_em: string | null;
 };
 
 export type Mentorado = {

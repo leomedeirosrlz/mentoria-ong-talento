@@ -7,11 +7,12 @@ import { createClient } from "@/lib/supabase/client";
 import { setAvatarPath, updateMeuPerfil } from "@/lib/actions";
 import { avatarPublicUrl, AVATAR_ACCEPT, AVATAR_MAX_BYTES } from "@/lib/avatar";
 import { Avatar } from "@/components/avatar";
+import { TagInput } from "@/components/tag-input";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { papelLabel } from "@/lib/ciclo";
+import { AREAS_SUGESTOES, papelLabel } from "@/lib/ciclo";
 import type { Profile } from "@/lib/types";
 
 export function PerfilForm({
@@ -33,6 +34,7 @@ export function PerfilForm({
   const [confirmacao, setConfirmacao] = useState("");
   const [bioLen, setBioLen] = useState(me.bio?.length ?? 0);
   const [volLen, setVolLen] = useState(me.voluntariado?.length ?? 0);
+  const [areas, setAreas] = useState<string[]>(me.areas ?? []);
 
   async function trocarFoto(file: File) {
     if (file.size > AVATAR_MAX_BYTES) {
@@ -237,15 +239,19 @@ export function PerfilForm({
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="areas">Áreas de atuação</Label>
-            <Input
-              id="areas"
+            {/* o hidden do TagInput manda JSON — camposApresentacao aceita
+                JSON ou vírgula, então forms antigos continuam valendo */}
+            <Label>Áreas de atuação</Label>
+            <TagInput
               name="areas"
-              defaultValue={(me.areas ?? []).join(", ")}
-              placeholder="finanças, tecnologia, carreira"
+              sugestoes={AREAS_SUGESTOES}
+              value={areas}
+              onChange={setAreas}
+              placeholder="ex.: psicologia, idiomas…"
+              inputLabel="Digite uma área e pressione Enter"
             />
             <p className="text-xs text-muted-foreground">
-              Separe por vírgula — ex.: finanças, tecnologia, carreira.
+              Toque pra selecionar ou digite uma nova área.
             </p>
           </div>
           <div className="space-y-2">

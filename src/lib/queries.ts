@@ -5,11 +5,12 @@ import type { AvaliacaoJovem, CicloEvento, Comunicado, Dupla, DuplaResumo, Dupla
 
 /** Colunas de profiles legíveis por qualquer autenticado — grant de coluna
  *  da 0026 (Postgres não tem RLS por coluna), ampliado pela 0030 com os
- *  campos de apresentação (bio/linkedin/areas/voluntariado).
+ *  campos de apresentação (bio/linkedin/areas/voluntariado) e pela 0031 com
+ *  a marca de onboarding (onboarded_em — o gate do wizard lê via getMe).
  *  email/whatsapp/documento_path ficam de fora: pedir qualquer uma delas em
  *  profiles dá permission denied. */
 const PROFILE_COLS_PUBLICAS =
-  "id, user_id, nome, role, ativo, avatar_path, created_at, bio, linkedin, areas, voluntariado";
+  "id, user_id, nome, role, ativo, avatar_path, created_at, bio, linkedin, areas, voluntariado, onboarded_em";
 
 /** Contato de uma pessoa, como devolvido pela view profiles_contato. */
 type Contato = {

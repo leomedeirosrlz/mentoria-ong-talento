@@ -1,4 +1,5 @@
 import { AppShell } from "@/components/app-shell";
+import { OnboardingFlow } from "@/components/onboarding-flow";
 import { signOut } from "@/lib/actions";
 import { getMe, getNotificacoes } from "@/lib/queries";
 import { avatarPublicUrl, gravatarUrl } from "@/lib/avatar";
@@ -64,6 +65,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         </div>
       </div>
     );
+  }
+
+  // onboarding pendente (0031): o wizard substitui o shell inteiro, como as
+  // telas bloqueadas acima — concluirOnboarding + router.refresh() devolve o app
+  if (!me.onboarded_em) {
+    return <OnboardingFlow me={me} />;
   }
 
   const notificacoes = await getNotificacoes();

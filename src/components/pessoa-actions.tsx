@@ -8,6 +8,8 @@ import { deletePessoa, setPessoaAtivo, updatePessoa } from "@/lib/actions";
 import { createClient } from "@/lib/supabase/client";
 import { avatarPublicUrl } from "@/lib/avatar";
 import { FotoField } from "@/components/foto-field";
+import { TagInput } from "@/components/tag-input";
+import { AREAS_SUGESTOES } from "@/lib/ciclo";
 import type { Profile } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import {
@@ -39,6 +41,7 @@ export function PessoaActions({ pessoa, podeExcluir }: { pessoa: Profile; podeEx
   const [mp, setMp] = useState<MentorProfile | undefined>(undefined);
   const [bioLen, setBioLen] = useState(0);
   const [volLen, setVolLen] = useState(0);
+  const [areasPerfil, setAreasPerfil] = useState<string[]>(pessoa.areas ?? []);
   const [pending, start] = useTransition();
   const router = useRouter();
   const ehMentor = pessoa.role === "mentor_dpp" || pessoa.role === "mentor_especialista";
@@ -150,6 +153,7 @@ export function PessoaActions({ pessoa, podeExcluir }: { pessoa: Profile; podeEx
           if (o) {
             setBioLen(pessoa.bio?.length ?? 0);
             setVolLen(pessoa.voluntariado?.length ?? 0);
+            setAreasPerfil(pessoa.areas ?? []);
           }
         }}
       >
@@ -204,23 +208,25 @@ export function PessoaActions({ pessoa, podeExcluir }: { pessoa: Profile; podeEx
                 onChange={(e) => setBioLen(e.target.value.length)}
               />
             </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="e_linkedin">LinkedIn</Label>
-                <Input
-                  id="e_linkedin" name="linkedin" type="url" inputMode="url"
-                  defaultValue={pessoa.linkedin ?? ""}
-                  placeholder="https://linkedin.com/in/..."
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="e_areas_perfil">Áreas de atuação (vírgula)</Label>
-                <Input
-                  id="e_areas_perfil" name="areas_perfil"
-                  defaultValue={(pessoa.areas ?? []).join(", ")}
-                  placeholder="finanças, tecnologia"
-                />
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="e_linkedin">LinkedIn</Label>
+              <Input
+                id="e_linkedin" name="linkedin" type="url" inputMode="url"
+                defaultValue={pessoa.linkedin ?? ""}
+                placeholder="https://linkedin.com/in/..."
+              />
+            </div>
+            {/* o hidden do TagInput manda JSON — camposApresentacao aceita
+                JSON ou vírgula, então os dois formatos continuam valendo */}
+            <div className="space-y-2">
+              <Label>Áreas de atuação</Label>
+              <TagInput
+                name="areas_perfil"
+                sugestoes={AREAS_SUGESTOES}
+                value={areasPerfil}
+                onChange={setAreasPerfil}
+                inputLabel="Digite uma área e pressione Enter"
+              />
             </div>
             <div className="space-y-2">
               <div className="flex items-baseline justify-between gap-2">
