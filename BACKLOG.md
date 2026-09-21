@@ -130,16 +130,16 @@ Planos em `.devin/plan-mural-perfil.md` + `.devin/plan-agenda-zero-friccao.md`. 
 
 ## Gestão/domínio — pequenos, alto retorno
 
-- [ ] **Encaminhamento editável/apagável**: typo no prazo/descrição fica pra sempre.
+- [x] ~~**Encaminhamento editável/apagável**~~ — menu ⋯ por item (Editar em dialog / Excluir com confirm). Só o mentor edita/apaga; coord mantém o toggle feito/pendente (correção operacional, não reescrita do acordo).
 - [x] ~~**"Meu perfil"**~~ — `/perfil` com foto (upload → Gravatar do e-mail → iniciais), nome/WhatsApp self-edit e troca de senha. `0014`: `profiles.avatar_path` + bucket público `avatares` (pasta `<profile_id>/`). Avatar aparece no shell (sidebar/topbar) e no header da dupla. ✅ sprint perfis: avatar nas rows de /pessoas, `mentorados.avatar_path` + foto opcional no cadastro/edição.
 - [ ] **`duplas.ciclo` com default fixo**: seletor de ciclo ou default por config (vida útil até 2027.1).
-- [ ] **Desativar mentor com dupla ativa**: avisar/bloquear ou oferecer pausar junto.
-- [ ] **"Sem papel" em pessoa com dupla**: dupla continua listando ela como mentor — aviso.
+- [x] ~~**Desativar mentor com dupla ativa**~~ — o confirm nomeia o impacto ("tem N dupla(s) ativa(s) — vão ficar sem mentor") com label "Desativar" no botão.
+- [ ] **"Sem papel" em pessoa com dupla**: dupla continua listando ela como mentor — aviso. (Mitigado: `setPessoaRole` trava papel de quem tem dupla ativa/pausada; resta o caso do papel já removido antes do guard.)
 - [ ] **Statuses mortos**: `remarcado`/`cancelado`/`atrasado` — implementar ou remover do enum. `duracao_min` nunca coletado (sempre 60).
-- [ ] **`materiais.ordem`**: `max(ordem)+1` por audiência.
-- [ ] **Ordenação case-insensitive** de pessoas (`localeCompare pt-BR` no client ou collation).
+- [x] ~~**`materiais.ordem`**~~ — persistida no `editarMaterial` (edição de metadados implementada no MaterialActions).
+- [x] ~~**Ordenação case-insensitive**~~ — `localeCompare pt-BR` em pessoas e nos selects de parear.
 - [ ] **Trigger no banco**: bloquear transição `realizado`→outro status (defesa além da action — TOCTOU residual).
-- [ ] **Supervisor em `/duplas`**: filtra `getDuplas()` em JS → usar `getMinhasDuplas()`.
+- [x] ~~**Supervisor em `/duplas`**~~ — usa `getMinhasDuplas()` (RLS no banco, não filtro JS).
 - [ ] **`queries.ts`**: `as unknown as Dupla[]` → `supabase gen types`.
 - [ ] **Kit UI residual**: `material-actions.tsx` (1 uso) → inline. (Resto removido; `skeleton.tsx` agora usado pelo `loading.tsx`.)
 - [ ] **`sonner` `richColors`** usa paleta default, não tokens da marca.
@@ -228,3 +228,13 @@ tem dupla ativa/pausada deixava escrita indevida via `mentor_id` nas policies.
 - Objetos órfãos no bucket `registro-anexos`: cascade de `deleteDupla` apaga
   rows, não os arquivos — e a storage-delete exige a row existir, então o
   objeto vira indeletável por policy. Cleanup via trigger ou no deleteDupla.
+
+**Pós-review UX (`7aaad1b` corrigiu os médios) — baixos deferidos:**
+- Bottom nav mobile com 6 tabs pra coord ("Registros" ~60px em 360px) —
+  conferir visualmente em device real; se apertar, agrupar em "Mais".
+- `EncontroDetalheDialog` quase vazio pra encontro sem reg/nota/evento/link
+  (badge + link só) — estado legítimo; se incomodar, listar "o que falta".
+- `STATUS_LABEL` duplicado (dialog vs `STATUS_ENCONTRO_LABEL` da agenda) —
+  unificar na próxima vez que tocar ali.
+- Teste real em device: iOS/Safari + VoiceOver (sino, wizard modal, `<details>`
+  dos registros) — tudo conferido por leitura, não por uso.
