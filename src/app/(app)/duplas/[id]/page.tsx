@@ -327,7 +327,8 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
             <EncaminhamentosList
               itens={dupla.encaminhamentos}
               duplaId={dupla.id}
-              podeEditar={souMentor || souCoord}
+              podeEditar={souMentor}
+              podeMarcar={souMentor || souCoord}
               hoje={hojeStr}
               encontroNumeroPorRegistroId={encontroNumeroPorRegistroId}
             />

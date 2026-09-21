@@ -214,7 +214,8 @@ export function NovaDuplaDialog() {
             <Label htmlFor="iniciada_em">Início da mentoria</Label>
             <Input id="iniciada_em" name="iniciada_em" type="date" />
             <p className="text-xs text-muted-foreground">
-              vazio = uma semana antes do 1º encontro do ciclo
+              vazio = a dupla já existia desde o início do ciclo. Se ela está
+              começando agora, use a data de hoje.
             </p>
           </div>
           <Button type="submit" className="w-full" disabled={pending}>

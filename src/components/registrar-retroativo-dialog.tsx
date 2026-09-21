@@ -100,7 +100,7 @@ export function RegistrarRetroativoDialog({
         const res = await registrarEncontroRetroativo(duplaId, Number(numero), local);
         if (res?.error) toast.error(res.error);
         else {
-          toast.success("Encontro registrado — agora complete o follow-up.");
+          toast.success("Encontro registrado — agora complete o registro.");
           setOpen(false);
           setNumero(null);
           setQuando("");

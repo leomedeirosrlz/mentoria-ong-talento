@@ -30,12 +30,16 @@ export function EncaminhamentosList({
   itens,
   duplaId,
   podeEditar,
+  podeMarcar,
   hoje,
   encontroNumeroPorRegistroId,
 }: {
   itens: Encaminhamento[];
   duplaId: string;
+  /** editar/excluir o texto do acordo — só o mentor da dupla */
   podeEditar: boolean;
+  /** marcar como feito — a coord pode marcar como correção operacional */
+  podeMarcar?: boolean;
   /** "YYYY-MM-DD" no fuso do programa — vem do server pra hidratar igual. */
   hoje: string;
   /** registro_id → número do encontro; itens criados à mão não têm registro_id. */
@@ -116,7 +120,7 @@ export function EncaminhamentosList({
 
           return (
             <li key={t.id} className="flex items-start gap-1">
-              {podeEditar ? (
+              {podeEditar || podeMarcar ? (
                 <button
                   type="button"
                   role="checkbox"

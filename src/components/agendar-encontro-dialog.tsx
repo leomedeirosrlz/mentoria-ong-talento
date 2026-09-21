@@ -111,7 +111,7 @@ export function AgendarEncontroDialog({
             toast.error(res.error);
             return;
           }
-          toast.success("Encontro registrado — agora complete o follow-up.");
+          toast.success("Encontro registrado — agora complete o registro.");
           setOpen(false);
           if (res.encontroId) {
             if (onCreated) {

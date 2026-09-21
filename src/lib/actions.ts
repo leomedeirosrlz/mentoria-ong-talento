@@ -579,24 +579,64 @@ export async function updateDupla(duplaId: string, formData: FormData) {
   if (!data?.length) {
     return { error: "Não foi possível concluir. Recarregue a página e tente de novo." };
   }
-  // troca de mentor/supervisor notifica o novo responsável — ele precisa saber
-  // que a dupla passou pra ele sem a coord mandar mensagem à parte
-  if (atualDupla && (mentor_id !== atualDupla.mentor_id || supervisor_id !== atualDupla.supervisor_id)) {
+  // troca de mentor/supervisor notifica os DOIS lados — quem entra precisa
+  // saber que assumiu, e quem sai não pode ver a dupla sumir sem explicação.
+  // Pausa/encerramento também avisa — é o tipo de notícia pra que o sino existe.
+  const trocouPessoas =
+    atualDupla && (mentor_id !== atualDupla.mentor_id || supervisor_id !== atualDupla.supervisor_id);
+  const mudouStatus =
+    atualDupla && status !== atualDupla.status &&
+    (status === "pausada" || status === "encerrada");
+  if (atualDupla && (trocouPessoas || mudouStatus)) {
     const { data: mdTroca } = await supabase
       .from("mentorados").select("nome").eq("id", mentorado_id).single();
+    const nomeMd = mdTroca?.nome;
     await notificar(supabase, [
       mentor_id !== atualDupla.mentor_id ? {
         profile_id: mentor_id,
         tipo: "dupla_formada",
         titulo: "Você assumiu uma dupla",
-        corpo: mdTroca?.nome ? `Você e ${mdTroca.nome} — vejam onde a jornada está.` : null,
+        corpo: nomeMd ? `Você e ${nomeMd} — vejam onde a jornada está.` : null,
         href: `/duplas/${duplaId}`,
       } : null,
       supervisor_id && supervisor_id !== atualDupla.supervisor_id ? {
         profile_id: supervisor_id,
         tipo: "dupla_formada",
         titulo: "Nova dupla sob sua supervisão",
-        corpo: mdTroca?.nome ? `${mdTroca.nome} — acompanhe a ficha da dupla.` : null,
+        corpo: nomeMd ? `${nomeMd} — acompanhe a ficha da dupla.` : null,
+        href: `/duplas/${duplaId}`,
+      } : null,
+      // quem sai não enxerga mais a ficha (RLS) — link cai na home, não no 404
+      atualDupla.mentor_id && mentor_id !== atualDupla.mentor_id ? {
+        profile_id: atualDupla.mentor_id,
+        tipo: "dupla_formada",
+        titulo: "Sua dupla mudou de mentor",
+        corpo: nomeMd
+          ? `A dupla com ${nomeMd} segue com outro mentor — a coordenação reorganizou o ciclo.`
+          : "A coordenação reorganizou o ciclo.",
+        href: "/",
+      } : null,
+      atualDupla.supervisor_id && supervisor_id !== atualDupla.supervisor_id ? {
+        profile_id: atualDupla.supervisor_id,
+        tipo: "dupla_formada",
+        titulo: "Dupla saiu da sua supervisão",
+        corpo: nomeMd
+          ? `A dupla com ${nomeMd} passou pra outro supervisor.`
+          : "A coordenação reorganizou o ciclo.",
+        href: "/",
+      } : null,
+      mudouStatus ? {
+        profile_id: mentor_id,
+        tipo: "dupla_formada",
+        titulo: status === "pausada" ? "Sua dupla foi pausada" : "Sua dupla foi encerrada",
+        corpo: "A coordenação atualizou o ciclo — fale com ela se tiver dúvidas.",
+        href: `/duplas/${duplaId}`,
+      } : null,
+      mudouStatus && supervisor_id ? {
+        profile_id: supervisor_id,
+        tipo: "dupla_formada",
+        titulo: status === "pausada" ? "Dupla supervisionada pausada" : "Dupla supervisionada encerrada",
+        corpo: nomeMd ? `A dupla com ${nomeMd} — a coordenação atualizou o ciclo.` : null,
         href: `/duplas/${duplaId}`,
       } : null,
     ].filter((r): r is NonNullable<typeof r> => r !== null), eu.id);
@@ -749,6 +789,11 @@ function parseDataHora(s: string): Date | null {
 export async function agendarEncontro(formData: FormData) {
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada — entre de novo." };
+  // a regra "a dupla agenda" mora na action, não só na UI — a RLS deixaria
+  // a coord escrever (policy larga pra correções), então o contrato é aqui
+  if (eu.role === "coordenacao") {
+    return { error: "Quem agenda é a dupla — a coordenação acompanha pelo semáforo." };
+  }
   const dupla_id = String(formData.get("dupla_id") ?? "");
   const numero = Number(formData.get("numero"));
   const data_hora = String(formData.get("data_hora") ?? "");
@@ -889,6 +934,9 @@ export async function registrarEncontroRetroativo(
 ): Promise<{ error?: string; ok?: boolean; encontroId?: string }> {
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada — entre de novo." };
+  if (eu.role === "coordenacao") {
+    return { error: "Quem registra é a dupla — a coordenação acompanha pelo semáforo." };
+  }
   if (!duplaId || !numero || !dataHora) return { error: "Encontro e data são obrigatórios." };
 
   const { data: d } = await supabase
@@ -953,6 +1001,9 @@ const PROXIMOS_PASSOS = ["continuar", "reforcar", "novo_feedback", "acompanhar_d
 export async function salvarRegistro(formData: FormData) {
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada — entre de novo." };
+  if (eu.role === "coordenacao") {
+    return { error: "O follow-up é do mentor — a coordenação acompanha pelo semáforo." };
+  }
   const encontro_id = String(formData.get("encontro_id") ?? "");
   const dupla_id = String(formData.get("dupla_id") ?? "");
   if (!encontro_id) return { error: "Encontro inválido." };
@@ -1091,8 +1142,15 @@ export async function salvarRegistro(formData: FormData) {
     // coordenação toda + o supervisor dessa dupla (não todos os supervisores)
     const [{ data: equipe }, { data: dApoio }] = await Promise.all([
       supabase.from("profiles").select("id").eq("role", "coordenacao").eq("ativo", true),
-      supabase.from("duplas").select("supervisor_id").eq("id", dupla_id).single(),
+      supabase
+        .from("duplas")
+        .select("supervisor_id, mentorado:mentorados!mentorado_id(nome)")
+        .eq("id", dupla_id).single(),
     ]);
+    const mdJoin = dApoio?.mentorado as unknown;
+    const nomeMd = Array.isArray(mdJoin)
+      ? (mdJoin[0] as { nome?: string } | undefined)?.nome
+      : (mdJoin as { nome?: string } | null | undefined)?.nome;
     await notificar(supabase, [
       ...(equipe ?? []).map((p) => p.id),
       dApoio?.supervisor_id,
@@ -1100,8 +1158,9 @@ export async function salvarRegistro(formData: FormData) {
       profile_id: pid,
       tipo: "pedido_apoio",
       titulo: "Pedido de apoio",
-      corpo: `${eu.nome} sinalizou no registro do ${encDb.numero}º encontro.`,
-      href: `/duplas/${dupla_id}`,
+      corpo: `${eu.nome} sinalizou no registro do ${encDb.numero}º encontro${nomeMd ? ` — dupla com ${nomeMd}` : ""}.`,
+      // deep-link direto no card do registro que pediu apoio
+      href: `/duplas/${dupla_id}#registrar-${encontro_id}`,
     })), eu.id);
   }
 
@@ -1120,8 +1179,9 @@ export async function salvarRegistro(formData: FormData) {
 export async function salvarNotaEncontro(duplaId: string, numero: number, texto: string) {
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada — entre de novo." };
-  if (eu.role !== "coordenacao" && eu.role !== "mentor_dpp" && eu.role !== "mentor_especialista") {
-    return { error: "Você não tem permissão para essa ação." };
+  // a nota é o plano de aula do mentor — nem a coord escreve nela
+  if (eu.role !== "mentor_dpp" && eu.role !== "mentor_especialista") {
+    return { error: "A nota do encontro é do mentor da dupla." };
   }
 
   const { data: maxEv } = await supabase
@@ -1230,6 +1290,10 @@ export async function toggleEncaminhamento(id: string, feito: boolean, duplaId: 
 export async function editarEncaminhamento(id: string, duplaId: string, formData: FormData) {
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada — entre de novo." };
+  // o texto do acordo é da dupla — a coord só marca feito (toggleEncaminhamento)
+  if (eu.role === "coordenacao") {
+    return { error: "O combinado é da dupla — a coordenação só pode marcar como feito." };
+  }
   const descricao = String(formData.get("descricao") ?? "").trim();
   const responsavel = String(formData.get("responsavel") ?? "mentorado");
   const prazo = String(formData.get("prazo") ?? "").trim();
@@ -1259,6 +1323,9 @@ export async function editarEncaminhamento(id: string, duplaId: string, formData
 export async function excluirEncaminhamento(id: string, duplaId: string) {
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada — entre de novo." };
+  if (eu.role === "coordenacao") {
+    return { error: "O combinado é da dupla — a coordenação só pode marcar como feito." };
+  }
   const { data, error } = await supabase
     .from("encaminhamentos").delete().eq("id", id).select("id");
   if (error) return { error: erroAmigavel(error) };
