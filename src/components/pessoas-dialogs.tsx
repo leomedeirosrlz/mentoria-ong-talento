@@ -94,7 +94,7 @@ export function NovaPessoaDialog() {
             {pending ? "Salvando…" : "Cadastrar"}
           </Button>
           <p className="text-xs text-muted-foreground">
-            A pessoa entra com o e-mail por link de acesso; o papel define o que ela vê e dá pra trocar depois na lista.
+            A pessoa entra com o e-mail por link de acesso; o papel define o que ela vê e pode ser alterado depois na lista.
           </p>
         </form>
       </DialogContent>

@@ -150,7 +150,7 @@ export function NovaDuplaDialog() {
               items={Object.fromEntries(mentoresOrd.map((m) => [
                 m.id,
                 m.role === "mentor_especialista"
-                  ? `${m.nome} — trilha especialista (em breve)`
+                  ? `${m.nome} — trilha especialista — indisponível`
                   : `${m.nome} — ${emUso[m.id] ?? 0}/${capacidade[m.id] ?? 1}`,
               ]))}
             >
@@ -167,7 +167,7 @@ export function NovaDuplaDialog() {
                   const esp = m.role === "mentor_especialista";
                   return (
                     <SelectItem key={m.id} value={m.id} disabled={usadas >= total || esp}>
-                      {m.nome} — {esp ? "trilha especialista (em breve)" : `${usadas}/${total}`}
+                      {m.nome} — {esp ? "trilha especialista — indisponível" : `${usadas}/${total}`}
                     </SelectItem>
                   );
                 })}
@@ -229,8 +229,8 @@ export function NovaDuplaDialog() {
             <Label htmlFor="iniciada_em">Início da mentoria</Label>
             <Input id="iniciada_em" name="iniciada_em" type="date" />
             <p className="text-xs text-muted-foreground">
-              vazio = a dupla já existia desde o início do ciclo. Se ela está
-              começando agora, use a data de hoje.
+              Deixe em branco se a dupla já existia desde o início do ciclo. Se
+              ela está começando agora, use a data de hoje.
             </p>
           </div>
           <Button type="submit" className="w-full" disabled={pending}>

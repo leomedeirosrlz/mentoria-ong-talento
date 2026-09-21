@@ -129,7 +129,7 @@ export function NotaEncontro({
           {status === "salvando" && "Salvando…"}
           {status === "salvo" && salvoEm && `Salvo às ${fmtHora.format(salvoEm)}`}
           {status === "erro" && (
-            <span className="text-[var(--danger)]">Não salvou — saia e volte no campo pra tentar de novo.</span>
+            <span className="text-[var(--danger)]">Não salvou — saia e volte no campo para tentar de novo.</span>
           )}
         </p>
       </div>

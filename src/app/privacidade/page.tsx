@@ -51,7 +51,7 @@ const SECOES: { titulo: string; corpo: React.ReactNode }[] = [
       <>
         <p>Utilizamos os dados para:</p>
         <ul className="list-disc space-y-1 pl-5">
-          <li>Operar o programa de mentoria: pareamento, agenda de encontros e acompanhamento das duplas</li>
+          <li>Operar o programa de mentoria: formação de duplas, agenda de encontros e acompanhamento</li>
           <li>Permitir a comunicação entre mentor, mentorado e coordenação (inclusive por WhatsApp)</li>
           <li>Registrar evidências e produzir relatórios e prestações de contas do ciclo</li>
           <li>Cumprir obrigações legais e regulatórias</li>
@@ -77,7 +77,7 @@ const SECOES: { titulo: string; corpo: React.ReactNode }[] = [
           </li>
           <li>
             <strong>Mentor e mentorado:</strong> dados de contato e registros do
-            próprio par.
+            própria dupla.
           </li>
         </ul>
         <p>

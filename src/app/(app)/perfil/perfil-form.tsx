@@ -200,7 +200,7 @@ export function PerfilForm({
             <Label htmlFor="email">E-mail</Label>
             <Input id="email" value={me.email} disabled />
             <p className="text-xs text-muted-foreground">
-              O e-mail é sua credencial de acesso — pra trocar, fale com a coordenação.
+              O e-mail é sua credencial de acesso — para trocar, fale com a coordenação.
             </p>
           </div>
           <Button type="submit" disabled={salvando}>

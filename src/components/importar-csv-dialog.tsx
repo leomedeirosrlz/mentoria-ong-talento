@@ -33,7 +33,7 @@ const TIPO_LABEL: Record<Tipo, string> = {
 };
 
 const DICAS: Record<Tipo, string> = {
-  equipe: "Colunas esperadas: nome, e-mail, whatsapp e papel (mentor dpp / especialista / supervisor / coordenação; vazio vira mentor DPP).",
+  equipe: "Colunas esperadas: nome, e-mail, whatsapp e papel (mentor dpp / especialista / supervisor / coordenação — em branco, vira mentor DPP).",
   mentorados: "Colunas esperadas: nome, whatsapp, e-mail, ong e notas. Só o nome é obrigatório.",
 };
 
@@ -207,7 +207,7 @@ export function ImportarCsvDialog({ tipoInicial = "equipe" }: { tipoInicial?: Ti
                         <td className="px-3 py-1.5 text-xs">
                           {erro
                             ? <span className="text-[var(--danger)]">{erro}</span>
-                            : <span className="text-[var(--ok-text)]">ok</span>}
+                            : <span className="text-[var(--ok-text)]">Ok</span>}
                         </td>
                       </tr>
                     );
@@ -255,7 +255,7 @@ export function ImportarCsvDialog({ tipoInicial = "equipe" }: { tipoInicial?: Ti
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="csv_text">ou cole o conteúdo</Label>
+              <Label htmlFor="csv_text">Ou cole o conteúdo</Label>
               <Textarea
                 id="csv_text" rows={7}
                 placeholder={"nome;email;whatsapp;papel\nMaria Silva;maria@email.com;11999998888;mentor dpp"}

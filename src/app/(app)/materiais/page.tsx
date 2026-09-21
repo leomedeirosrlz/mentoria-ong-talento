@@ -21,8 +21,8 @@ const TIPO_ICONE = {
 
 const AUDIENCIA_LABEL = {
   todos: "todos",
-  dpp: "mentor DPP",
-  especialista: "especialista",
+  dpp: "mentores DPP",
+  especialista: "mentores especialistas",
   coordenacao: "coordenação",
 } as const;
 
@@ -30,7 +30,7 @@ const AUDIENCIA_LABEL = {
 // o equivalente pra leitor de tela
 const TIPO_LABEL = {
   guia: "guia",
-  template: "template",
+  template: "modelo",
   conteudo: "conteúdo",
   link: "link",
 } as const;
@@ -38,7 +38,7 @@ const TIPO_LABEL = {
 // seções fixas pra material sem encontro — cada tipo cai no rótulo do próprio tipo
 const GRUPO_TIPO = {
   guia: "Guias",
-  template: "Templates gerais",
+  template: "Modelos gerais",
   conteudo: "Conteúdos",
   link: "Links",
 } as const;
@@ -84,7 +84,7 @@ export default async function MateriaisPage() {
           </p>
           <p className="text-sm text-muted-foreground">
             {ehCoord
-              ? "Publique o primeiro guia, template ou instrumento do ciclo."
+              ? "Publique o primeiro guia, modelo ou instrumento do ciclo."
               : "Os guias e instrumentos do ciclo aparecem aqui quando a coordenação publicar."}
           </p>
           <div className="mt-3">
@@ -136,7 +136,7 @@ function agrupar(materiais: Material[]): [string, Material[]][] {
       ? -1
       : r.startsWith("Encontro")
         ? Number(r.split(" ")[1])
-        : r === "Templates gerais"
+        : r === "Modelos gerais"
           ? 100
           : r === "Conteúdos"
             ? 101

@@ -277,7 +277,7 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
                 trigger={
                   <Button variant="ghost" size="sm" className="-my-1 text-muted-foreground">
                     <ClockCounterClockwise size={14} />
-                    Registrar passado
+                    Registrar encontro já realizado
                   </Button>
                 }
               />
@@ -297,7 +297,7 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
 
         <aside className="space-y-6">
           <section
-            id="encaminhamentos"
+            id="combinados"
             className="scroll-mt-20 rounded-xl bg-card p-4 shadow-[var(--shadow-border)]"
           >
             <div className="mb-1 flex items-center justify-between gap-2">
@@ -553,7 +553,7 @@ function EncontroRow({
           <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
             {registroPendente && (
               <Badge variant="outline" className="border-[var(--warn)] text-[var(--warn-text)] shrink-0">
-                sem registro
+                registro pendente
               </Badge>
             )}
             {encontro && !reg && podeEditar &&

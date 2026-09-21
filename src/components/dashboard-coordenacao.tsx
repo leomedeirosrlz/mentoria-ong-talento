@@ -518,7 +518,7 @@ function DuplaCard({
             <NudgeButton
               telefone={dupla.mentor.whatsapp}
               mensagem={msg}
-              label="Chamar"
+              label="Chamar no WhatsApp"
               duplaId={dupla.id}
             />
           </div>

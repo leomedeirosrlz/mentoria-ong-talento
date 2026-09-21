@@ -42,14 +42,14 @@ function saneiaNome(nome: string): string {
 
 const TIPO_LABEL = {
   guia: "Guia",
-  template: "Template",
+  template: "Modelo",
   conteudo: "Conteúdo",
   link: "Link",
 } as const;
 const AUDIENCIA_LABEL = {
   todos: "Todos",
-  dpp: "Mentor DPP",
-  especialista: "Especialista",
+  dpp: "Mentores DPP",
+  especialista: "Mentores especialistas",
   coordenacao: "Coordenação",
 } as const;
 
@@ -223,7 +223,7 @@ export function MaterialActions({ material, maxEncontro }: { material: Material;
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label id="mat-aud-label">Audiência</Label>
+                <Label id="mat-aud-label">Quem recebe</Label>
                 <Select name="audiencia" defaultValue={material.audiencia}>
                   <SelectTrigger aria-labelledby="mat-aud-label"><SelectValue /></SelectTrigger>
                   <SelectContent>

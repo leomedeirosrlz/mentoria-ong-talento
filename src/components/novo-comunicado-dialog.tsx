@@ -58,7 +58,7 @@ export function NovoComunicadoDialog() {
         <DialogHeader>
           <DialogTitle>Novo aviso</DialogTitle>
           <DialogDescription>
-            O aviso aparece no mural e notifica quem você escolher abaixo.
+            O aviso aparece na home e notifica quem você escolher abaixo.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={submit} className="space-y-4">

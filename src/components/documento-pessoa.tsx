@@ -42,7 +42,8 @@ export function DocumentoPessoa({
 
   // rotas e copy por tipo: profiles guardam o termo, mentorados a autorização
   const tipoUrl = tipo === "mentorado" ? "mentorado" : "pessoa";
-  const nomeDoc = tipo === "mentorado"
+  const fem = tipo === "mentorado";
+  const nomeDoc = fem
     ? "autorização assinada pelo responsável"
     : "termo de responsabilidade assinado";
 
@@ -147,8 +148,8 @@ export function DocumentoPessoa({
           </Button>
           <ConfirmDeleteButton
             titulo="Remover o documento?"
-            descricao={`A ${nomeDoc} é apagada e a pessoa fica sem documento oficial.`}
-            sucesso={`${nomeDoc.charAt(0).toUpperCase()}${nomeDoc.slice(1)} removida.`}
+            descricao={`${fem ? "A" : "O"} ${nomeDoc} é apagad${fem ? "a" : "o"} e a pessoa fica sem documento oficial.`}
+            sucesso={`${nomeDoc.charAt(0).toUpperCase()}${nomeDoc.slice(1)} removid${fem ? "a" : "o"}.`}
             onConfirm={remover}
             trigger={
               <Button type="button" variant="ghost" size="sm" className="text-muted-foreground">
@@ -171,7 +172,7 @@ export function DocumentoPessoa({
             {pending ? "Enviando…" : "Anexar documento"}
           </Button>
           <p className="text-xs text-muted-foreground">
-            {`Nenhum documento — anexe a ${nomeDoc} (PDF ou imagem, até 20 MB).`}
+            {`Nenhum documento — anexe ${fem ? "a" : "o"} ${nomeDoc} (PDF ou imagem, até 20 MB).`}
           </p>
         </div>
       )}

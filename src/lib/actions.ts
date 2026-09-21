@@ -30,10 +30,10 @@ function erroAmigavel(e: { message: string; code?: string }): string {
     return "Você não tem permissão para essa ação.";
   }
   if (e.code === "23514" || /check constraint|invalid input value/i.test(e.message)) {
-    return "Valor inválido para um dos campos.";
+    return "Revise os campos — um dos valores não é válido.";
   }
   if (e.code === "23503" || /foreign key/i.test(e.message)) {
-    return "Esse registro está vinculado a outros dados.";
+    return "Esse cadastro está vinculado a outros dados — remova os vínculos antes de excluir.";
   }
   return "Não foi possível concluir. Tente de novo.";
 }
@@ -118,9 +118,9 @@ export async function createPessoa(formData: FormData) {
   const whatsappRaw = String(formData.get("whatsapp") ?? "");
   const whatsapp = normWhatsapp(whatsappRaw);
   if (!nome || !email) return { error: "Nome e e-mail são obrigatórios." };
-  if (!emailValido(email)) return { error: "E-mail inválido." };
-  if (whatsappRaw.trim() && !whatsapp) return { error: "WhatsApp inválido." };
-  if (!(ROLES as readonly string[]).includes(role)) return { error: "Papel inválido." };
+  if (!emailValido(email)) return { error: "Confira o e-mail." };
+  if (whatsappRaw.trim() && !whatsapp) return { error: "Confira o WhatsApp — use DDD e o número completo." };
+  if (!(ROLES as readonly string[]).includes(role)) return { error: "Escolha um papel válido." };
 
   const { data: profile, error } = await supabase
     .from("profiles")
@@ -143,7 +143,7 @@ export async function createPessoa(formData: FormData) {
   if (role === "mentor_dpp" || role === "mentor_especialista") {
     const capacidade = Number(formData.get("capacidade") || 1);
     if (!Number.isInteger(capacidade) || capacidade < 1) {
-      return { error: "Capacidade inválida." };
+      return { error: "Informe uma capacidade de pelo menos 1." };
     }
     // o profile já foi gravado — se isso falhar, o mentor fica sem perfil de
     // mentor e o erro precisa aparecer (não engolir como antes)
@@ -165,11 +165,11 @@ export async function createMentorado(formData: FormData) {
   const nome = normNome(String(formData.get("nome") ?? ""));
   if (!nome) return { error: "Nome é obrigatório." };
   const email = normEmail(String(formData.get("email") ?? ""));
-  if (email && !emailValido(email)) return { error: "E-mail inválido." };
+  if (email && !emailValido(email)) return { error: "Confira o e-mail." };
   // lixo digitado não pode zerar o campo silenciosamente
   const whatsappRaw = String(formData.get("whatsapp") ?? "");
   const whatsapp = normWhatsapp(whatsappRaw);
-  if (whatsappRaw.trim() && !whatsapp) return { error: "WhatsApp inválido." };
+  if (whatsappRaw.trim() && !whatsapp) return { error: "Confira o WhatsApp — use DDD e o número completo." };
   const { data: mentorado, error } = await supabase.from("mentorados").insert({
     nome,
     email: email || null,
@@ -199,7 +199,7 @@ export async function createDupla(formData: FormData) {
   const mentor_id = String(formData.get("mentor_id") ?? "");
   const mentorado_id = String(formData.get("mentorado_id") ?? "");
   const supervisor_id = String(formData.get("supervisor_id") || "") || null;
-  if (!mentor_id || !mentorado_id) return { error: "Escolha mentor e mentorado." };
+  if (!mentor_id || !mentorado_id) return { error: "Escolha o mentor e o mentorado." };
   const { data: mentor } = await supabase
     .from("profiles").select("role").eq("id", mentor_id).single();
   if (mentor?.role !== "mentor_dpp" && mentor?.role !== "mentor_especialista") {
@@ -238,11 +238,11 @@ export async function createDupla(formData: FormData) {
       .eq("profile_id", mentor_id).maybeSingle(),
   ]);
   if ((doMentor?.length ?? 0) >= (mp?.capacidade ?? 1)) {
-    return { error: "Esse mentor já está com a capacidade cheia." };
+    return { error: "Esse mentor já atingiu o número máximo de duplas." };
   }
   const iniciadaRaw = String(formData.get("iniciada_em") || "").trim();
   if (iniciadaRaw && !/^\d{4}-\d{2}-\d{2}$/.test(iniciadaRaw)) {
-    return { error: "Data de início inválida." };
+    return { error: "Confira a data de início." };
   }
   // sem data informada, a dupla nasce uma semana antes do 1º encontro oficial
   // do ciclo — coord cadastra a dupla depois dela existir de fato, e "hoje"
@@ -349,8 +349,8 @@ export async function updatePessoa(profileId: string, formData: FormData) {
   const email = normEmail(String(formData.get("email") ?? ""));
   if (!nome) return { error: "Nome é obrigatório." };
   // lixo digitado não pode zerar o campo silenciosamente
-  if (whatsappRaw.trim() && !whatsapp) return { error: "WhatsApp inválido." };
-  if (email && !emailValido(email)) return { error: "E-mail inválido." };
+  if (whatsappRaw.trim() && !whatsapp) return { error: "Confira o WhatsApp — use DDD e o número completo." };
+  if (email && !emailValido(email)) return { error: "Confira o e-mail." };
   // valida antes de qualquer escrita — "abc" virava NaN e 0 gravava;
   // campo presente mas apagado não pode virar 1 silenciosamente
   const capacidadeRaw = String(formData.get("capacidade") ?? "").trim();
@@ -359,7 +359,7 @@ export async function updatePessoa(profileId: string, formData: FormData) {
   }
   const capacidade = Number(capacidadeRaw || 1);
   if (formData.has("capacidade") && (!Number.isInteger(capacidade) || capacidade < 1)) {
-    return { error: "Capacidade inválida." };
+    return { error: "Informe uma capacidade de pelo menos 1." };
   }
 
   // e-mail = identidade do link de acesso; só muda enquanto a pessoa nunca entrou
@@ -472,11 +472,11 @@ export async function updateMentorado(id: string, formData: FormData) {
   const nome = normNome(String(formData.get("nome") ?? ""));
   const email = normEmail(String(formData.get("email") ?? ""));
   if (!nome) return { error: "Nome é obrigatório." };
-  if (email && !emailValido(email)) return { error: "E-mail inválido." };
+  if (email && !emailValido(email)) return { error: "Confira o e-mail." };
   // lixo digitado não pode zerar o campo silenciosamente
   const whatsappRaw = String(formData.get("whatsapp") ?? "");
   const whatsapp = normWhatsapp(whatsappRaw);
-  if (whatsappRaw.trim() && !whatsapp) return { error: "WhatsApp inválido." };
+  if (whatsappRaw.trim() && !whatsapp) return { error: "Confira o WhatsApp — use DDD e o número completo." };
   const { data, error } = await supabase.from("mentorados").update({
     nome,
     email: email || null,
@@ -516,7 +516,7 @@ export async function deleteMentorado(id: string) {
   const { data: duplas } = await supabase
     .from("duplas").select("id").eq("mentorado_id", id).limit(1);
   if (duplas?.length)
-    return { error: "O mentorado tem dupla. Encerre a dupla antes de excluir." };
+    return { error: "Esse mentorado já está em uma dupla. Encerre a dupla antes de excluir." };
   const { data: m } = await supabase
     .from("mentorados").select("documento_path").eq("id", id).single();
   // mesmo cuidado do delete de pessoa: remove o objeto do bucket antes da row
@@ -541,10 +541,10 @@ export async function updateDupla(duplaId: string, formData: FormData) {
   const supervisor_id = String(formData.get("supervisor_id") || "") || null;
   const iniciada_em = String(formData.get("iniciada_em") || "").trim();
   const status = String(formData.get("status") || "ativa");
-  if (!mentor_id || !mentorado_id) return { error: "Escolha mentor e mentorado." };
-  if (!["ativa", "pausada", "encerrada"].includes(status)) return { error: "Status inválido." };
+  if (!mentor_id || !mentorado_id) return { error: "Escolha o mentor e o mentorado." };
+  if (!["ativa", "pausada", "encerrada"].includes(status)) return { error: "Escolha um status válido." };
   if (iniciada_em && !/^\d{4}-\d{2}-\d{2}$/.test(iniciada_em)) {
-    return { error: "Data de início inválida." };
+    return { error: "Confira a data de início." };
   }
   const { data: mentor } = await supabase
     .from("profiles").select("role").eq("id", mentor_id).single();
@@ -584,7 +584,7 @@ export async function updateDupla(duplaId: string, formData: FormData) {
         .neq("id", duplaId)
         .limit(1);
       if (emDupla?.length) {
-        return { error: "Esse mentorado já está em uma dupla ativa." };
+        return { error: "Esse mentorado já está em uma dupla ativa ou pausada." };
       }
     }
     if (voltando || mentor_id !== atualDupla.mentor_id) {
@@ -597,7 +597,7 @@ export async function updateDupla(duplaId: string, formData: FormData) {
           .eq("profile_id", mentor_id).maybeSingle(),
       ]);
       if ((doMentor?.length ?? 0) >= (mp?.capacidade ?? 1)) {
-        return { error: "Esse mentor já está com a capacidade cheia." };
+        return { error: "Esse mentor já atingiu o número máximo de duplas." };
       }
     }
   }
@@ -728,9 +728,9 @@ export async function importPessoas(rows: LinhaImportada[]) {
     // papel em branco cai no default mentor_dpp; preenchido mas irreconhecível pula a linha
     const papelPreenchido = String(r.papel ?? "").trim() !== "";
     const role = papelPreenchido ? mapRole(r.papel) : ("mentor_dpp" as const);
-    if (!nome || !emailValido(email)) { puladas.push(`${r.nome || r.email || "?"}: nome ou e-mail inválido`); continue; }
+    if (!nome || !emailValido(email)) { puladas.push(`${r.nome || r.email || "?"}: nome vazio ou e-mail inválido`); continue; }
     // whatsapp preenchido mas ilegível pula a linha — antes caía como null silenciosamente
-    if (r.whatsapp.trim() && !whatsapp) { puladas.push(`${nome}: whatsapp inválido`); continue; }
+    if (r.whatsapp.trim() && !whatsapp) { puladas.push(`${nome}: whatsapp inválido (use DDD + número)`); continue; }
     if (role === null) { puladas.push(`${nome}: papel não reconhecido`); continue; }
     if (noBanco.has(email) || vistos.has(email)) { puladas.push(`${email}: já existe`); continue; }
     vistos.add(email);
@@ -779,7 +779,7 @@ export async function importMentorados(rows: LinhaImportada[]) {
     if (!nome) { puladas.push("linha sem nome"); continue; }
     if (email && !emailValido(email)) { puladas.push(`${nome}: e-mail inválido`); continue; }
     // whatsapp preenchido mas ilegível pula a linha — antes caía como null silenciosamente
-    if (r.whatsapp.trim() && !whatsapp) { puladas.push(`${nome}: whatsapp inválido`); continue; }
+    if (r.whatsapp.trim() && !whatsapp) { puladas.push(`${nome}: whatsapp inválido (use DDD + número)`); continue; }
     const chave = nome.toLowerCase();
     // vistosWa: mesmo whatsapp com nome diferente no arquivo também é duplicado
     if (nomes.has(chave) || (whatsapp && was.has(whatsapp)) ||
@@ -840,13 +840,13 @@ export async function agendarEncontro(formData: FormData) {
   const { data: d } = await supabase.from("duplas").select("status").eq("id", dupla_id).single();
   if (d && d.status !== "ativa") return { error: "Essa dupla não está ativa." };
   const quando = parseDataHora(data_hora);
-  if (!quando) return { error: "Data inválida." };
+  if (!quando) return { error: "Confira a data." };
 
   // não derruba um encontro já realizado (re-agendar apagaria o "realizado")
   const { data: existente } = await supabase
     .from("encontros").select("id, status, data_hora").eq("dupla_id", dupla_id).eq("numero", numero).maybeSingle();
   if (existente?.status === "realizado") {
-    return { error: "Esse encontro já foi realizado e não dá pra remarcar." };
+    return { error: "Esse encontro já foi realizado e não pode ser remarcado." };
   }
 
   // agendamento é sempre pra frente — encontro que já aconteceu entra pelo fluxo
@@ -856,18 +856,18 @@ export async function agendarEncontro(formData: FormData) {
     return {
       error: existente
         ? "Essa data já passou — se o encontro aconteceu, registre como foi ou marque 'não aconteceu' na ficha da dupla."
-        : "Essa data já passou — use 'Registrar passado' na ficha da dupla ou na agenda do dia.",
+        : "Essa data já passou — use 'Registrar encontro já realizado' na ficha da dupla ou na agenda do dia.",
     };
   }
-  if (link && !urlOk(link)) return { error: "Link inválido." };
-  if (!(ORIGENS as readonly string[]).includes(origem)) return { error: "Origem inválida." };
+  if (link && !urlOk(link)) return { error: "Confira o link — precisa ser um endereço completo (https://…)." };
+  if (!(ORIGENS as readonly string[]).includes(origem)) return { error: "Não foi possível identificar a origem. Recarregue a página." };
 
   const { data: maxEv } = await supabase
     .from("ciclo_eventos").select("numero")
     .eq("tipo", "encontro").order("numero", { ascending: false }).limit(1).maybeSingle();
   const maxNum = maxEv?.numero ?? 16;
   if (!Number.isInteger(numero) || numero < 1 || numero > maxNum) {
-    return { error: "Número de encontro inválido." };
+    return { error: "Escolha um encontro do ciclo." };
   }
 
   // remarcação de verdade = a data mudou; salvar de novo com a mesma data
@@ -887,7 +887,7 @@ export async function agendarEncontro(formData: FormData) {
       motivoReagendamento = motivoOutro;
     } else {
       const preset = MOTIVOS_REAGENDAMENTO.find((m) => m.value === motivo);
-      if (!preset) return { error: "Motivo de reagendamento inválido." };
+      if (!preset) return { error: "Escolha um motivo de reagendamento." };
       motivoReagendamento = preset.label;
     }
   }
@@ -949,7 +949,7 @@ export async function desfazerNaoAconteceu(encontroId: string, duplaId: string) 
     .eq("status", "nao_aconteceu")
     .select("id");
   if (error) return { error: erroAmigavel(error) };
-  if (!data?.length) return { error: "Esse encontro não está marcado como não realizado." };
+  if (!data?.length) return { error: 'Esse encontro não está marcado como "não aconteceu".' };
   revalidatePath("/");
   revalidatePath("/duplas");
   revalidatePath("/agenda");
@@ -970,7 +970,7 @@ export async function registrarEncontroRetroativo(
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada — entre de novo." };
   if (eu.role === "coordenacao") {
-    return { error: "Quem registra é a dupla — a coordenação acompanha pelo semáforo." };
+    return { error: "O registro é do mentor — a coordenação acompanha pelo semáforo." };
   }
   if (!duplaId || !numero || !dataHora) return { error: "Encontro e data são obrigatórios." };
 
@@ -980,7 +980,7 @@ export async function registrarEncontroRetroativo(
   if (d.status === "encerrada") return { error: "Essa dupla está encerrada." };
 
   const quando = parseDataHora(dataHora);
-  if (!quando) return { error: "Data inválida." };
+  if (!quando) return { error: "Confira a data." };
   if (quando.getTime() > Date.now()) {
     return { error: "A data precisa ser de quando o encontro já aconteceu." };
   }
@@ -991,7 +991,7 @@ export async function registrarEncontroRetroativo(
     .eq("tipo", "encontro").order("numero", { ascending: true });
   const maxNum = evs?.at(-1)?.numero ?? 16;
   if (!Number.isInteger(numero) || numero < 1 || numero > maxNum) {
-    return { error: "Número de encontro inválido." };
+    return { error: "Escolha um encontro do ciclo." };
   }
   const piso = d.iniciada_em ?? evs?.[0]?.data ?? null;
   if (piso && quando < new Date(`${piso}T00:00:00-03:00`)) {
@@ -1037,11 +1037,11 @@ export async function salvarRegistro(formData: FormData) {
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada — entre de novo." };
   if (eu.role === "coordenacao") {
-    return { error: "O follow-up é do mentor — a coordenação acompanha pelo semáforo." };
+    return { error: "O registro é do mentor — a coordenação acompanha pelo semáforo." };
   }
   const encontro_id = String(formData.get("encontro_id") ?? "");
   const dupla_id = String(formData.get("dupla_id") ?? "");
-  if (!encontro_id) return { error: "Encontro inválido." };
+  if (!encontro_id) return { error: "Não foi possível identificar o encontro. Recarregue a página." };
 
   // enums têm check constraint no banco — valida aqui pra erro claro em vez de 23514
   const avaliacao = String(formData.get("avaliacao") || "") || null;
@@ -1050,7 +1050,7 @@ export async function salvarRegistro(formData: FormData) {
   if ((avaliacao && !(AVALIACOES as readonly string[]).includes(avaliacao)) ||
       (dificuldade && !(DIFICULDADES as readonly string[]).includes(dificuldade)) ||
       (proximoPasso && !(PROXIMOS_PASSOS as readonly string[]).includes(proximoPasso))) {
-    return { error: "Valor inválido em um dos campos do registro." };
+    return { error: "Revise os campos — um dos valores não é válido." };
   }
 
   const { data: d } = await supabase.from("duplas").select("status").eq("id", dupla_id).single();
@@ -1062,7 +1062,7 @@ export async function salvarRegistro(formData: FormData) {
     .select("dupla_id, numero, status, data_hora, realizado_em")
     .eq("id", encontro_id)
     .single();
-  if (!encDb || encDb.dupla_id !== dupla_id) return { error: "Encontro inválido." };
+  if (!encDb || encDb.dupla_id !== dupla_id) return { error: "Não foi possível identificar o encontro. Recarregue a página." };
   const jaPassou = encDb.data_hora != null && new Date(encDb.data_hora) <= new Date();
   if (encDb.status !== "realizado" && !jaPassou) {
     return { error: "Esse encontro ainda não aconteceu." };
@@ -1225,7 +1225,7 @@ export async function salvarNotaEncontro(duplaId: string, numero: number, texto:
     .eq("tipo", "encontro").order("numero", { ascending: false }).limit(1).maybeSingle();
   const maxNum = maxEv?.numero ?? 16;
   if (!Number.isInteger(numero) || numero < 1 || numero > maxNum) {
-    return { error: "Número de encontro inválido." };
+    return { error: "Escolha um encontro do ciclo." };
   }
 
   const { data: d } = await supabase.from("duplas").select("status").eq("id", duplaId).single();
@@ -1272,7 +1272,7 @@ export async function addPessoaNota({
   const limpo = texto.trim();
   if (!limpo) return { error: "Escreva algo antes de publicar." };
   if (limpo.length > 10000) return { error: "Nota muito longa (máx. 10.000 caracteres)." };
-  if (!profileId && !mentoradoId) return { error: "Pessoa inválida." };
+  if (!profileId && !mentoradoId) return { error: "Não foi possível identificar a pessoa. Recarregue a página." };
 
   const { data, error } = await supabase
     .from("pessoa_notas")
@@ -1285,7 +1285,7 @@ export async function addPessoaNota({
     .select("id");
   if (error) return { error: erroAmigavel(error) };
   if (!data?.length) {
-    return { error: "Você não tem permissão para anotar nesse perfil." };
+    return { error: "Só a coordenação anota neste perfil." };
   }
   revalidatePath(`/pessoas/${profileId ?? mentoradoId}`);
   return { ok: true };
@@ -1337,10 +1337,10 @@ export async function editarEncaminhamento(id: string, duplaId: string, formData
     return { error: "A descrição precisa de 2 a 500 caracteres." };
   }
   if (!["mentor", "mentorado"].includes(responsavel)) {
-    return { error: "Responsável inválido." };
+    return { error: "Escolha quem fica responsável pelo combinado." };
   }
   if (prazo && !/^\d{4}-\d{2}-\d{2}$/.test(prazo)) {
-    return { error: "Prazo inválido." };
+    return { error: "Confira a data do prazo." };
   }
   const { data, error } = await supabase
     .from("encaminhamentos")
@@ -1419,15 +1419,15 @@ export async function salvarMaterial(formData: FormData) {
   const audiencia = String(formData.get("audiencia") || "todos");
   if (!(TIPOS_MATERIAL as readonly string[]).includes(tipo) ||
       !(AUDIENCIAS_MATERIAL as readonly string[]).includes(audiencia)) {
-    return { error: "Valor inválido para um dos campos." };
+    return { error: "Revise os campos — um dos valores não é válido." };
   }
   const url = String(formData.get("url") ?? "").trim() || null;
-  if (url && !urlOk(url)) return { error: "Link inválido." };
+  if (url && !urlOk(url)) return { error: "Confira o link — precisa ser um endereço completo (https://…)." };
   // a row precisa nascer já com path: a policy de INSERT do storage exige a row
   // com path = name. Com path, o arquivo é o destino (a url fica de lado).
   const path = String(formData.get("path") ?? "").trim() || null;
   if (path && !MATERIAL_PATH_RE.test(path)) {
-    return { error: "Valor inválido para um dos campos." };
+    return { error: "Revise os campos — um dos valores não é válido." };
   }
   const encontroRaw = String(formData.get("encontro_num") ?? "").trim();
   const encontroNum = encontroRaw ? Number(encontroRaw) : null;
@@ -1440,7 +1440,7 @@ export async function salvarMaterial(formData: FormData) {
       encontroNum! < 1 ||
       (maxEv?.numero != null && encontroNum! > maxEv.numero))
   ) {
-    return { error: "Número de encontro inválido." };
+    return { error: "Escolha um encontro do ciclo." };
   }
   // material criado à mão entra depois dos oficiais — ordem era sempre 0
   const { data: maxOrd } = await supabase
@@ -1470,10 +1470,10 @@ export async function editarMaterial(id: string, formData: FormData) {
   const audiencia = String(formData.get("audiencia") || "todos");
   if (!(TIPOS_MATERIAL as readonly string[]).includes(tipo) ||
       !(AUDIENCIAS_MATERIAL as readonly string[]).includes(audiencia)) {
-    return { error: "Valor inválido para um dos campos." };
+    return { error: "Revise os campos — um dos valores não é válido." };
   }
   const url = String(formData.get("url") ?? "").trim() || null;
-  if (url && !urlOk(url)) return { error: "Link inválido." };
+  if (url && !urlOk(url)) return { error: "Confira o link — precisa ser um endereço completo (https://…)." };
   const encontroRaw = String(formData.get("encontro_num") ?? "").trim();
   const encontroNum = encontroRaw ? Number(encontroRaw) : null;
   const { data: maxEv } = await supabase
@@ -1485,7 +1485,7 @@ export async function editarMaterial(id: string, formData: FormData) {
       encontroNum! < 1 ||
       (maxEv?.numero != null && encontroNum! > maxEv.numero))
   ) {
-    return { error: "Número de encontro inválido." };
+    return { error: "Escolha um encontro do ciclo." };
   }
   const { data, error } = await supabase
     .from("materiais")
@@ -1513,7 +1513,7 @@ export async function anexarArquivoMaterial(id: string, path: string) {
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada — entre de novo." };
   if (!MATERIAL_PATH_RE.test(path)) {
-    return { error: "Valor inválido para um dos campos." };
+    return { error: "Revise os campos — um dos valores não é válido." };
   }
   const { data, error } = await supabase
     .from("materiais").update({ path }).eq("id", id).select("id");
@@ -1558,10 +1558,10 @@ export async function definirDocumentoPessoa(
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada — entre de novo." };
   if (eu.role !== "coordenacao") {
-    return { error: "Você não tem permissão para essa ação." };
+    return { error: "Só a coordenação gerencia documentos." };
   }
   if (!DOCUMENTO_PATH_RE.test(path)) {
-    return { error: "Valor inválido para um dos campos." };
+    return { error: "Revise os campos — um dos valores não é válido." };
   }
   const { data, error } = await supabase
     .from(tipo === "mentorado" ? "mentorados" : "profiles")
@@ -1585,7 +1585,7 @@ export async function removerDocumentoPessoa(
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada — entre de novo." };
   if (eu.role !== "coordenacao") {
-    return { error: "Você não tem permissão para essa ação." };
+    return { error: "Só a coordenação gerencia documentos." };
   }
   const { data, error } = await supabase
     .from(tipo === "mentorado" ? "mentorados" : "profiles")
@@ -1609,7 +1609,7 @@ export async function updateMeuPerfil(formData: FormData) {
   const whatsappRaw = String(formData.get("whatsapp") ?? "");
   const whatsapp = normWhatsapp(whatsappRaw);
   if (!nome) return { error: "Informe seu nome." };
-  if (whatsappRaw.trim() && !whatsapp) return { error: "WhatsApp inválido." };
+  if (whatsappRaw.trim() && !whatsapp) return { error: "Confira o WhatsApp — use DDD e o número completo." };
 
   // role/ativo/user_id ficam fora do patch — profiles_self_update também
   // barra role no banco, mas nem depende disso: a coluna nem é enviada
@@ -1628,7 +1628,7 @@ export async function setAvatarPath(path: string | null) {
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada — entre de novo." };
   if (path != null && !path.startsWith(`${eu.id}/`)) {
-    return { error: "Arquivo inválido." };
+    return { error: "Não foi possível usar esse arquivo." };
   }
 
   const { data: atual } = await supabase
@@ -1689,7 +1689,7 @@ export async function publicarComunicado(formData: FormData) {
     return { error: "O texto precisa de 2 a 5000 caracteres." };
   }
   if (!(AUDIENCIAS_COMUNICADO as readonly string[]).includes(audiencia)) {
-    return { error: "Audiência inválida." };
+    return { error: "Escolha quem recebe o aviso." };
   }
 
   const { data: aviso, error } = await supabase

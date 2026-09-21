@@ -118,7 +118,7 @@ export function PessoaActions({ pessoa, podeExcluir }: { pessoa: Profile; podeEx
           {/* efeito declarado antes do clique — ação reversível mas de alto impacto */}
           <p className="px-2 pb-1 text-[11px] leading-snug text-muted-foreground">
             {pessoa.ativo
-              ? "Corta o acesso à plataforma na hora; dá pra reativar depois."
+              ? "Corta o acesso à plataforma na hora; a pessoa pode ser reativada depois."
               : "Devolve o acesso na hora."}
           </p>
           <DropdownMenuSeparator />

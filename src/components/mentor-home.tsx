@@ -66,7 +66,7 @@ export function MentorHome({
               Você ainda não está em nenhuma dupla.
             </p>
             <p className="mt-1 text-sm text-muted-foreground">
-              A coordenação forma as duplas no matching.
+              A coordenação forma as duplas. Assim que a sua estiver pronta, ela aparece aqui.
             </p>
           </CardContent>
         </Card>
@@ -306,7 +306,7 @@ export function MentorHome({
                       {pendentes.length > 4 && (
                         <li>
                           <Link
-                            href={`/duplas/${dupla.id}#encaminhamentos`}
+                            href={`/duplas/${dupla.id}#combinados`}
                             className="flex min-h-11 items-center gap-2 rounded-md text-sm font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:min-h-8"
                           >
                             <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-muted-foreground/40" />

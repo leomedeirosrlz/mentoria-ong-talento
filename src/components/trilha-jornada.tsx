@@ -248,7 +248,7 @@ export function TrilhaJornada({
         </span>
         <span className="flex items-center gap-1.5">
           <span aria-hidden className="size-2 rounded-full bg-[var(--warn)]" />
-          falta registro
+          registro pendente
         </span>
         <span className="flex items-center gap-1.5">
           <span

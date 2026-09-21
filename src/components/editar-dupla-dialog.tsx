@@ -215,7 +215,7 @@ export function EditarDuplaDialog({ dupla }: { dupla: Dupla }) {
                 items={Object.fromEntries(mentoresOrd.map((m) => [
                   m.id,
                   m.role === "mentor_especialista"
-                    ? `${m.nome} — trilha especialista (em breve)`
+                    ? `${m.nome} — trilha especialista — indisponível`
                     : `${m.nome} — ${emUso[m.id] ?? 0}/${capacidade[m.id] ?? 1}`,
                 ]))}
               >
@@ -229,7 +229,7 @@ export function EditarDuplaDialog({ dupla }: { dupla: Dupla }) {
                     const esp = m.role === "mentor_especialista";
                     return (
                       <SelectItem key={m.id} value={m.id} disabled={usadas >= total || esp}>
-                        {m.nome} — {esp ? "trilha especialista (em breve)" : `${usadas}/${total}`}
+                        {m.nome} — {esp ? "trilha especialista — indisponível" : `${usadas}/${total}`}
                       </SelectItem>
                     );
                   })}
@@ -307,7 +307,7 @@ export function EditarDuplaDialog({ dupla }: { dupla: Dupla }) {
                 {statusSel === "encerrada" && (
                   <p className="text-xs text-muted-foreground">
                     Encerrada sai do semáforo e do acompanhamento — nem pedido de apoio
-                    reaparece. O histórico fica salvo e dá pra reverter reabrindo a edição.
+                    reaparece. O histórico fica salvo e a pausa pode ser revertida reabrindo a edição.
                   </p>
                 )}
               </div>

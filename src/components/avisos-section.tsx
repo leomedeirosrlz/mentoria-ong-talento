@@ -67,7 +67,7 @@ export function AvisosSection({
                 {souCoord && (
                   <ConfirmDeleteButton
                     titulo={`Excluir "${a.titulo}"?`}
-                    descricao="O aviso sai da home de todo mundo e as notificações dele são removidas. Pra corrigir, exclua e publique de novo."
+                    descricao="O aviso sai da home de todo mundo e as notificações dele são removidas. Para corrigir, publique um novo."
                     sucesso="Aviso excluído."
                     onConfirm={() => excluirComunicado(a.id)}
                     trigger={

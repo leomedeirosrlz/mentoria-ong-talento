@@ -149,7 +149,7 @@ export function PessoaMural({
                 ) : (
                   <Trash size={13} aria-hidden />
                 )}
-                apagar
+                Apagar
               </button>
             </li>
           ))}

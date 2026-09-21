@@ -21,14 +21,14 @@ import {
 // cru do enum ("dpp", "coordenacao")
 const TIPO_LABEL = {
   guia: "Guia",
-  template: "Template",
+  template: "Modelo",
   conteudo: "Conteúdo",
   link: "Link",
 } as const;
 const AUDIENCIA_LABEL = {
   todos: "Todos",
-  dpp: "Mentor DPP",
-  especialista: "Especialista",
+  dpp: "Mentores DPP",
+  especialista: "Mentores especialistas",
   coordenacao: "Coordenação",
 } as const;
 
@@ -150,7 +150,7 @@ export function NovoMaterialDialog({ maxEncontro }: { maxEncontro: number }) {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label id="mat-audiencia-label">Audiência</Label>
+              <Label id="mat-audiencia-label">Quem recebe</Label>
               <Select name="audiencia" defaultValue="todos" items={AUDIENCIA_LABEL}>
                 <SelectTrigger id="mat-audiencia-select" aria-labelledby="mat-audiencia-label mat-audiencia-select"><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -162,7 +162,7 @@ export function NovoMaterialDialog({ maxEncontro }: { maxEncontro: number }) {
             </div>
           </div>
           <fieldset className="space-y-2">
-            <legend className="text-sm font-medium leading-none">Destino</legend>
+            <legend className="text-sm font-medium leading-none">Como publicar</legend>
             <div className="grid grid-cols-2 gap-2">
               <Button
                 type="button"
