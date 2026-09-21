@@ -224,7 +224,7 @@ export function PerfilForm({
               maxLength={1000}
               defaultValue={me.bio ?? ""}
               onChange={(e) => setBioLen(e.target.value.length)}
-              placeholder="Conte um pouco da sua trajetória — formação, trabalho, o que te trouxe ao programa."
+              placeholder="O que você faz, o que estudou, o que te trouxe ao programa."
             />
           </div>
           <div className="space-y-2">

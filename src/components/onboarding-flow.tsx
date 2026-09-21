@@ -199,7 +199,7 @@ export function OnboardingFlow({ me }: { me: Profile }) {
       case 2:
         return "PNG, JPG ou WebP até 2 MB — aparece no seu perfil e nas duplas.";
       case 3:
-        return "Formação, trabalho, o que te trouxe ao programa — aparece no seu perfil pra equipe e pros mentorados.";
+        return "O que você faz, o que estudou, o que te trouxe ao programa — aparece no seu perfil pra equipe e pros mentorados.";
       case 4:
         return "Toque pra selecionar ou digite uma nova — dá pra mudar depois no seu perfil.";
       case 5:
@@ -276,7 +276,7 @@ export function OnboardingFlow({ me }: { me: Profile }) {
               maxLength={1000}
               value={bio}
               onChange={(e) => setBio(e.target.value)}
-              placeholder="Formação, trabalho, o que te trouxe ao programa."
+              placeholder="O que você faz, o que estudou, o que te trouxe ao programa."
             />
           </div>
         );
