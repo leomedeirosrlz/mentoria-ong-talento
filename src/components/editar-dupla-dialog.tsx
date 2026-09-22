@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { PencilSimple } from "@phosphor-icons/react";
 import { toast } from "sonner";
@@ -18,7 +18,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { TRILHA_LABEL } from "@/lib/ciclo";
+import { TRILHA_LABEL, ciclosOpcoes } from "@/lib/ciclo";
 
 type Opt = { id: string; nome: string; role?: string | null };
 const NENHUM = "__nenhum";
@@ -27,6 +27,7 @@ const NENHUM = "__nenhum";
 const STATUS_DUPLA: Record<string, string> = {
   ativa: "Ativa",
   pausada: "Pausada",
+  concluida: "Concluída",
   encerrada: "Encerrada",
 };
 
@@ -44,86 +45,124 @@ export function EditarDuplaDialog({ dupla }: { dupla: Dupla }) {
   const [ocupacao, setOcupacao] = useState<Map<string, Set<string>>>(new Map());
   // carga de supervisão: quantas duplas ativas/pausadas cada supervisor já tem
   const [emSup, setEmSup] = useState<Record<string, number>>({});
+  // ciclos do select — calendário oficial + os já usados em duplas; o atual
+  // entra por último caso falte (dupla de ciclo sem eventos no calendário)
+  const [ciclos, setCiclos] = useState<string[]>([dupla.ciclo]);
   // os Selects só montam com os items carregados — antes disso o trigger
   // exibiria o UUID cru do defaultValue
   const [pronto, setPronto] = useState(false);
+  // fetch das opções com falha explícita — select vazio após erro não pode
+  // parecer "ninguém cadastrado"
+  const [falha, setFalha] = useState(false);
+  const [tentativa, setTentativa] = useState(0);
   // status escolhido agora — a nota de efeito (FR-3) reage à escolha, não ao valor salvo
   const [statusSel, setStatusSel] = useState<DuplaStatus>(dupla.status);
   // mentor escolhido agora — supervisor/demanda reagem à trilha que ele impõe
   const [mentorSel, setMentorSel] = useState<string>(dupla.mentor.id);
   const [pending, start] = useTransition();
   const router = useRouter();
+  // 1ª carga com skeleton; refetch de reabertura usa o cache — falha ali vira
+  // toast, não bloqueio (as opções já carregadas continuam valendo)
+  const carregou = useRef(false);
 
   useEffect(() => {
     if (!open) return;
-    // depois da 1ª carga pronto segue true: reabrir o dialog já monta os
-    // Selects com os items em cache (o refetch abaixo atualiza em segundo plano)
     const supabase = createClient();
-    void Promise.all([
-      supabase
-        .from("profiles")
-        .select("id, nome, role")
-        .in("role", ["mentor_dpp", "mentor_especialista", "supervisor"])
-        .eq("ativo", true)
-        .order("nome")
-        .then(({ data }) => {
-          const ms: Opt[] = (data ?? []).filter((p) => p.role !== "supervisor");
-          const ss: Opt[] = (data ?? []).filter((p) => p.role === "supervisor");
-          if (!ms.some((m) => m.id === dupla.mentor.id)) {
-            ms.unshift({
-              id: dupla.mentor.id,
-              nome: `${dupla.mentor.nome} (atual)`,
-              role: dupla.mentor.role,
-            });
-          }
-          const sup = dupla.supervisor;
-          if (sup && !ss.some((s) => s.id === sup.id)) {
-            ss.unshift({ id: sup.id, nome: `${sup.nome} (atual)` });
-          }
-          setMentores(ms);
-          setSupervisores(ss);
-        }),
-      supabase
-        .from("mentorados")
-        .select("id, nome")
-        .order("nome")
-        .then(({ data }) => setMentorados(data ?? [])),
-    ]).then(() => setPronto(true));
-    // a própria dupla não conta — senão o mentor atual apareceria lotado por
-    // causa dela e o próprio mentorado sairia marcado como ocupado
-    supabase
-      .from("duplas")
-      .select("mentor_id, mentorado_id, supervisor_id, trilha")
-      .in("status", ["ativa", "pausada"])
-      .neq("id", dupla.id)
-      .then(({ data }) => {
+    let cancelado = false;
+    (async () => {
+      try {
+        const [perfis, ments, ds, mps, evsCiclo] = await Promise.all([
+          supabase
+            .from("profiles")
+            .select("id, nome, role")
+            .in("role", ["mentor_dpp", "mentor_especialista", "supervisor"])
+            .eq("ativo", true)
+            .order("nome"),
+          supabase.from("mentorados").select("id, nome").order("nome"),
+          // sem filtro de status: a ocupação filtra em JS, e o histórico
+          // completo alimenta as opções de ciclo. A própria dupla sai pelo
+          // .neq — senão o mentor atual apareceria lotado por causa dela
+          supabase
+            .from("duplas")
+            .select("mentor_id, mentorado_id, supervisor_id, trilha, status, ciclo")
+            .neq("id", dupla.id),
+          supabase.from("mentor_profiles").select("profile_id, capacidade"),
+          supabase.from("ciclo_eventos").select("ciclo"),
+        ]);
+        const erro = [perfis, ments, ds, mps, evsCiclo].find((r) => r.error)?.error;
+        if (erro) throw erro;
+        if (cancelado) return;
+        const lista = (perfis.data ?? []) as Opt[];
+        const ms: Opt[] = lista.filter((p) => p.role !== "supervisor");
+        const ss: Opt[] = lista.filter((p) => p.role === "supervisor");
+        if (!ms.some((m) => m.id === dupla.mentor.id)) {
+          ms.unshift({
+            id: dupla.mentor.id,
+            nome: `${dupla.mentor.nome} (atual)`,
+            role: dupla.mentor.role,
+          });
+        }
+        const sup0 = dupla.supervisor;
+        if (sup0 && !ss.some((s) => s.id === sup0.id)) {
+          ss.unshift({ id: sup0.id, nome: `${sup0.nome} (atual)` });
+        }
+        setMentores(ms);
+        setSupervisores(ss);
+        const mts = (ments.data ?? []) as Opt[];
+        if (!mts.some((m) => m.id === dupla.mentorado.id)) {
+          mts.push({ id: dupla.mentorado.id, nome: dupla.mentorado.nome });
+        }
+        setMentorados(mts);
         const contagem: Record<string, number> = {};
         const ocup = new Map<string, Set<string>>();
         const sup: Record<string, number> = {};
-        for (const d of data ?? []) {
+        for (const d of (ds.data ?? []).filter((x) =>
+          x.status === "ativa" || x.status === "pausada"
+        )) {
           contagem[d.mentor_id] = (contagem[d.mentor_id] ?? 0) + 1;
           const trilhas = ocup.get(d.mentorado_id) ?? new Set<string>();
           trilhas.add(d.trilha ?? "dpp");
           ocup.set(d.mentorado_id, trilhas);
           if (d.supervisor_id) sup[d.supervisor_id] = (sup[d.supervisor_id] ?? 0) + 1;
         }
-        // a query excluiu a própria dupla, mas ela conta na carga do supervisor atual
-        if (dupla.supervisor && dupla.status !== "encerrada") {
+        // a query excluiu a própria dupla, mas ela conta na carga do
+        // supervisor atual — só quando ocupa vaga (ativa/pausada)
+        if (
+          dupla.supervisor &&
+          (dupla.status === "ativa" || dupla.status === "pausada")
+        ) {
           sup[dupla.supervisor.id] = (sup[dupla.supervisor.id] ?? 0) + 1;
         }
         setEmUso(contagem);
         setOcupacao(ocup);
         setEmSup(sup);
-      });
-    supabase
-      .from("mentor_profiles")
-      .select("profile_id, capacidade")
-      .then(({ data }) => {
         const porMentor: Record<string, number> = {};
-        for (const mp of data ?? []) porMentor[mp.profile_id] = mp.capacidade;
+        for (const mp of mps.data ?? []) porMentor[mp.profile_id] = mp.capacidade;
         setCapacidade(porMentor);
-      });
-  }, [open, dupla.id, dupla.mentor.id, dupla.mentor.nome, dupla.mentor.role, dupla.supervisor, dupla.status]);
+        setCiclos(
+          ciclosOpcoes(evsCiclo.data ?? [], [
+            ...(ds.data ?? []).map((d) => d.ciclo),
+            dupla.ciclo,
+          ])
+        );
+        carregou.current = true;
+        setPronto(true);
+      } catch {
+        if (cancelado) return;
+        if (carregou.current) {
+          toast.error(
+            "Não foi possível atualizar as opções — as carregadas antes continuam valendo."
+          );
+        } else {
+          setFalha(true);
+        }
+      }
+    })();
+    return () => {
+      cancelado = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- refetch por abertura/retry; dupla é prop estável por montagem
+  }, [open, tentativa]);
 
   // trilha exibida = a do mentor escolhido agora — trocar de papel migra a
   // dupla (o server barra quando já existem encontros). Fallback = a trilha
@@ -219,6 +258,7 @@ export function EditarDuplaDialog({ dupla }: { dupla: Dupla }) {
           if (o) {
             setStatusSel(dupla.status);
             setMentorSel(dupla.mentor.id);
+            setFalha(false);
           }
         }}
       >
@@ -228,7 +268,30 @@ export function EditarDuplaDialog({ dupla }: { dupla: Dupla }) {
             <DialogTitle>Editar dupla</DialogTitle>
           </DialogHeader>
           <form onSubmit={submit} className="space-y-4">
-            {!pronto ? (
+            {falha && !pronto ? (
+              // fetch das opções falhou — erro honesto com retry em vez de
+              // selects vazios fingindo "ninguém cadastrado"
+              <div
+                role="alert"
+                className="rounded-lg border border-[var(--danger)]/40 bg-[var(--danger)]/5 px-3.5 py-3 text-sm"
+              >
+                <p className="font-medium">Não foi possível carregar as opções.</p>
+                <p className="mt-0.5 text-muted-foreground">
+                  Confira a conexão e{" "}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFalha(false);
+                      setTentativa((t) => t + 1);
+                    }}
+                    className="rounded-sm font-medium text-foreground underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    tente de novo
+                  </button>
+                  .
+                </p>
+              </div>
+            ) : !pronto ? (
               <div className="space-y-4" aria-hidden>
                 {[0, 1, 2].map((i) => (
                   <div key={i} className="space-y-2">
@@ -251,6 +314,21 @@ export function EditarDuplaDialog({ dupla }: { dupla: Dupla }) {
                   ? " — não muda mais, a dupla já tem encontros."
                   : " — trocar o mentor por outro papel muda o tipo."}
               </p>
+            </div>
+            <div className="space-y-2">
+              <Label id="edit-ciclo-label">Ciclo</Label>
+              <Select
+                name="ciclo"
+                defaultValue={dupla.ciclo}
+                items={Object.fromEntries(ciclos.map((c) => [c, c]))}
+              >
+                <SelectTrigger id="edit-ciclo-select" aria-labelledby="edit-ciclo-label edit-ciclo-select"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {ciclos.map((c) => (
+                    <SelectItem key={c} value={c}>{c}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label id="edit-mentor-label">
@@ -359,6 +437,14 @@ export function EditarDuplaDialog({ dupla }: { dupla: Dupla }) {
                   <SelectContent>
                     <SelectItem value="ativa">Ativa</SelectItem>
                     <SelectItem value="pausada">Pausada</SelectItem>
+                    {/* concluída existe no enum (0037) mas não é escolha aqui:
+                        a jornada conclui pelo rito da seção Encerramento —
+                        o item só renderiza pra mostrar o estado atual */}
+                    {dupla.status === "concluida" && (
+                      <SelectItem value="concluida" disabled>
+                        Concluída
+                      </SelectItem>
+                    )}
                     <SelectItem value="encerrada">Encerrada</SelectItem>
                   </SelectContent>
                 </Select>
@@ -367,6 +453,12 @@ export function EditarDuplaDialog({ dupla }: { dupla: Dupla }) {
                   <p className="text-xs text-muted-foreground">
                     Pausada sai do acompanhamento até voltar pra Ativa —
                     pedido de apoio continua visível.
+                  </p>
+                )}
+                {statusSel === "concluida" && (
+                  <p className="text-xs text-muted-foreground">
+                    Concluída é o fechamento formal — registrado na seção
+                    Encerramento, com checklist e resumo da jornada.
                   </p>
                 )}
                 {statusSel === "encerrada" && (
@@ -396,6 +488,21 @@ export function EditarDuplaDialog({ dupla }: { dupla: Dupla }) {
               <Label htmlFor="inicio">Início da mentoria</Label>
               <Input id="inicio" name="iniciada_em" type="date" defaultValue={dupla.iniciada_em ?? ""} />
               <p className="text-xs text-muted-foreground">vazio mantém a data atual</p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="pdm-url">Link do PDM (opcional)</Label>
+              <Input
+                id="pdm-url"
+                name="pdm_url"
+                type="url"
+                inputMode="url"
+                defaultValue={dupla.pdm_url ?? ""}
+                placeholder="https://…"
+              />
+              <p className="text-xs text-muted-foreground">
+                Plano de desenvolvimento do mentorado — preenchido vira o botão
+                “Abrir PDM” na ficha e na home do mentor.
+              </p>
             </div>
             <Button type="submit" className="w-full" disabled={pending}>
               {pending ? "Salvando…" : "Salvar"}

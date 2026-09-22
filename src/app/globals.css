@@ -277,3 +277,23 @@
 .scroll-fina::-webkit-scrollbar-track {
   background: transparent;
 }
+
+/* impressão — o "Resumo da jornada" é o relatório final do ciclo: no papel
+   sai só o bloco, sem o chrome do app. visibility (não display) preserva o
+   fluxo do layout pra não explodir a paginação. */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .resumo-jornada,
+  .resumo-jornada * {
+    visibility: visible;
+  }
+  .resumo-jornada {
+    position: absolute;
+    inset: 0 auto auto 0;
+    width: 100%;
+    border: none;
+    box-shadow: none;
+  }
+}

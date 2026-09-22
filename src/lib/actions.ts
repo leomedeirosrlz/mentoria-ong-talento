@@ -3,13 +3,31 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { MOTIVOS_REAGENDAMENTO, inicioDefaultDupla, maxEncontros } from "@/lib/ciclo";
-import type { Notificacao, Trilha } from "@/lib/types";
+import {
+  ESCOLARIDADES,
+  GENEROS,
+  MOTIVOS_REAGENDAMENTO,
+  PREF_GENEROS,
+  UFS,
+  cicloVigente,
+  ciclosOpcoes,
+  inicioDefaultDupla,
+  maxEncontros,
+  parseDisponibilidade,
+} from "@/lib/ciclo";
+import { erroAmigavel } from "@/lib/utils";
+import type { Disponibilidade, Escolaridade, Genero, Notificacao, PrefGeneroPar, Trilha } from "@/lib/types";
 import {
   emailValido,
+  mapEscolaridade,
+  mapGenero,
+  mapPrefGenero,
   mapRole,
+  normData,
   normEmail,
+  normLista,
   normNome,
+  normUf,
   normWhatsapp,
   type LinhaImportada,
 } from "@/lib/importar";
@@ -18,44 +36,12 @@ import { demoAtivo, demoRole, limparDemo, marcarOnboardingDemo } from "./demo/mo
 import { DEMO_MSG } from "./demo/shared";
 import { getDemoData } from "./demo/data";
 
-/** Traduz erro do Postgres/PostgREST pra mensagem de UI (sem vazar schema nem inglês). */
-function erroAmigavel(e: { message: string; code?: string }): string {
-  // exceções de domínio levantadas por trigger já chegam em pt-BR
-  if (/apenas a coordenacao resolve pedidos/i.test(e.message)) {
-    return "Somente a coordenação pode atender um pedido de apoio.";
-  }
-  if (e.code === "23505" || /duplicate key/i.test(e.message)) {
-    // e-mail é a identidade do magic link — o constraint "..._email_key" diz qual coluna conflitou
-    if (/email/i.test(e.message)) return "Esse e-mail já está cadastrado.";
-    if (/whatsapp/i.test(e.message))
-      return "Esse WhatsApp já está cadastrado em outra pessoa.";
-    return "Já existe um cadastro com esses dados.";
-  }
-  if (e.code === "42501" || /row-level security|row level security/i.test(e.message)) {
-    return "Você não tem permissão para essa ação.";
-  }
-  if (e.code === "23514" || /check constraint|invalid input value/i.test(e.message)) {
-    return "Revise os campos — um dos valores não é válido.";
-  }
-  if (e.code === "23503" || /foreign key/i.test(e.message)) {
-    return "Esse cadastro está vinculado a outros dados — remova os vínculos antes de excluir.";
-  }
-  // triggers de domínio (0023/0025) levantam P0001 com mensagem própria
-  if (/capacidade do mentor excedida/i.test(e.message)) {
-    return "Esse mentor já atingiu o número máximo de duplas.";
-  }
-  if (/autoria forjada/i.test(e.message)) {
-    return "Não foi possível concluir. Recarregue a página e tente de novo.";
-  }
-  return "Não foi possível concluir. Tente de novo.";
-}
-
 async function me() {
   const supabase = await createClient();
   const { data: claimsData } = await supabase.auth.getClaims();
   const { data } = await supabase
     .from("profiles")
-    .select("id, role, nome")
+    .select("id, role, nome, consent_lgpd_em")
     .eq("user_id", (claimsData?.claims?.sub as string) ?? "")
     .single();
   return { supabase, me: data };
@@ -193,6 +179,282 @@ function camposApresentacao(
   return out;
 }
 
+// ---------- ficha pessoal & matching (0034) ----------
+// validação espelha os CHECKs da migration — erro claro em pt-BR em vez de
+// 23514 do banco. `parcial` (onboarding): só as chaves presentes no FormData
+// voltam no patch — o passo do wizard não toca no que não mandou.
+
+const MAX_INTERESSES = 20;
+const INTERESSE_MAX_CHARS = 60;
+
+/** Interesses do TagInput (JSON) ou campo texto (CSV/`;`) — trim, dedupe
+ *  case-insensitive, teto e cap por tag = CHECK interesses_ok (0034). */
+function interessesValidos(raw: string): string[] | { error: string } {
+  let itens: string[];
+  if (raw.trimStart().startsWith("[")) {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      return { error: "Os interesses chegaram num formato inválido." };
+    }
+    if (!Array.isArray(parsed)) {
+      return { error: "Os interesses chegaram num formato inválido." };
+    }
+    itens = parsed.map(String);
+  } else {
+    itens = normLista(raw);
+  }
+  const vistos = new Set<string>();
+  const lista: string[] = [];
+  for (const item of itens) {
+    const tag = item.trim();
+    if (!tag) continue;
+    const k = tag.toLocaleLowerCase("pt-BR");
+    if (vistos.has(k)) continue;
+    vistos.add(k);
+    lista.push(tag);
+  }
+  if (lista.length > MAX_INTERESSES) {
+    return { error: `Use no máximo ${MAX_INTERESSES} interesses.` };
+  }
+  if (lista.some((t) => t.length > INTERESSE_MAX_CHARS)) {
+    return { error: `Cada interesse pode ter até ${INTERESSE_MAX_CHARS} caracteres.` };
+  }
+  return lista;
+}
+
+type CamposFicha = Partial<{
+  nome_social: string | null;
+  data_nascimento: string | null;
+  genero: Genero | null;
+  cidade: string | null;
+  uf: string | null;
+  interesses: string[];
+  motivacao: string | null;
+  pref_genero_par: PrefGeneroPar | null;
+  origem: string | null;
+  cargo: string | null;
+  empresa: string | null;
+  objetivos: string | null;
+  escolaridade: Escolaridade | null;
+  disponibilidade: Disponibilidade | null;
+}>;
+
+/** Ficha pessoal/matching comum a profiles e mentorados (0034). `de` liga os
+ *  campos exclusivos de cada tabela (cargo/empresa só em profiles; objetivos/
+ *  escolaridade só em mentorados). Vazio vira null; enums fora do vocabulário
+ *  e datas impossíveis viram erro antes do CHECK. */
+function camposFicha(
+  formData: FormData,
+  opts: { parcial?: boolean; de: "pessoa" | "mentorado" }
+): CamposFicha | { error: string } {
+  const { parcial = false, de } = opts;
+  const tem = (k: string) => !parcial || formData.has(k);
+  const out: CamposFicha = {};
+
+  // texto livre com teto do CHECK — vazio vira null
+  const textos: [keyof CamposFicha & string, number, string][] = [
+    ["nome_social", 150, "Nome social"],
+    ["cidade", 100, "Cidade"],
+    ["origem", 300, "Como conheceu o programa"],
+    ["motivacao", 2000, "Motivação"],
+    ...(de === "pessoa"
+      ? [["cargo", 120, "Cargo"], ["empresa", 150, "Empresa"]] as [keyof CamposFicha & string, number, string][]
+      : [["objetivos", 2000, "Objetivos com a mentoria"]] as [keyof CamposFicha & string, number, string][]),
+  ];
+  for (const [key, max, rotulo] of textos) {
+    if (!tem(key)) continue;
+    const v = String(formData.get(key) ?? "").trim() || null;
+    if (v && v.length > max) {
+      return { error: `O campo "${rotulo}" aceita até ${max} caracteres.` };
+    }
+    (out as Record<string, unknown>)[key] = v;
+  }
+
+  if (tem("data_nascimento")) {
+    const raw = String(formData.get("data_nascimento") ?? "").trim();
+    if (!raw) {
+      out.data_nascimento = null;
+    } else {
+      const iso = normData(raw);
+      if (!iso || iso > new Date().toISOString().slice(0, 10)) {
+        return { error: "Confira a data de nascimento." };
+      }
+      out.data_nascimento = iso;
+    }
+  }
+
+  // Selects opcionais mandam "__nenhum" quando "Não informado" está marcado
+  // (mesmo contrato do supervisor nos dialogs de dupla) — vira null aqui
+  const enumOu = (key: string): string => {
+    const v = String(formData.get(key) ?? "").trim();
+    return v === "__nenhum" ? "" : v;
+  };
+
+  if (tem("genero")) {
+    const v = enumOu("genero");
+    if (!v) out.genero = null;
+    else if (!(GENEROS as readonly string[]).includes(v)) {
+      return { error: "Escolha uma opção de gênero válida." };
+    } else out.genero = v as Genero;
+  }
+
+  if (tem("pref_genero_par")) {
+    const v = enumOu("pref_genero_par");
+    if (!v) out.pref_genero_par = null;
+    else if (!(PREF_GENEROS as readonly string[]).includes(v)) {
+      return { error: "Escolha uma preferência de gênero válida." };
+    } else out.pref_genero_par = v as PrefGeneroPar;
+  }
+
+  if (tem("uf")) {
+    const v = enumOu("uf").toUpperCase();
+    if (!v) out.uf = null;
+    else if (!(UFS as readonly string[]).includes(v)) {
+      return { error: "Escolha um estado (UF) válido." };
+    } else out.uf = v;
+  }
+
+  if (tem("interesses")) {
+    const lista = interessesValidos(String(formData.get("interesses") ?? ""));
+    if (!Array.isArray(lista)) return lista;
+    out.interesses = lista;
+  }
+
+  if (de === "mentorado" && tem("escolaridade")) {
+    const v = enumOu("escolaridade");
+    if (!v) out.escolaridade = null;
+    else if (!(ESCOLARIDADES as readonly string[]).includes(v)) {
+      return { error: "Escolha uma escolaridade válida." };
+    } else out.escolaridade = v as Escolaridade;
+  }
+
+  // grade do jovem (0038) — mesmo formato da de mentor_profiles; pra
+  // `de === "pessoa"` a disponibilidade vive em camposMentor, não aqui
+  if (de === "mentorado" && tem("disponibilidade")) {
+    const disp = parseDisponibilidade(String(formData.get("disponibilidade") ?? ""));
+    if (disp && "error" in disp) return { error: disp.error };
+    out.disponibilidade = disp;
+  }
+
+  return out;
+}
+
+type CamposMentor = Partial<{
+  experiencia_previa: string | null;
+  formacao_externa: string | null;
+  disponibilidade: Disponibilidade | null;
+}>;
+
+/** Ficha de mentor (mentor_profiles, 0034) — experiência prévia, formação
+ *  externa e a grade semanal. A disponibilidade chega como JSON
+ *  {"dias":[],"periodos":[]} do grid de chips; grade com as duas listas
+ *  vazias grava null ("não informado"), nunca um esqueleto vazio. */
+function camposMentor(
+  formData: FormData,
+  opts: { parcial?: boolean } = {}
+): CamposMentor | { error: string } {
+  const { parcial = false } = opts;
+  const tem = (k: string) => !parcial || formData.has(k);
+  const out: CamposMentor = {};
+
+  for (const [key, rotulo] of [
+    ["experiencia_previa", "Experiência prévia como mentor"],
+    ["formacao_externa", "Formação e certificações"],
+  ] as const) {
+    if (!tem(key)) continue;
+    const v = String(formData.get(key) ?? "").trim() || null;
+    if (v && v.length > 2000) {
+      return { error: `O campo "${rotulo}" aceita até 2.000 caracteres.` };
+    }
+    out[key] = v;
+  }
+
+  if (tem("disponibilidade")) {
+    const disp = parseDisponibilidade(
+      String(formData.get("disponibilidade") ?? "")
+    );
+    if (disp && "error" in disp) return { error: disp.error };
+    out.disponibilidade = disp;
+  }
+
+  return out;
+}
+
+/** Carimbo LGPD: checkbox marcado grava now() quando ainda não havia —
+ *  desmarcado nunca apaga o carimbo (revogação não é um clique num form). */
+function consentPatch(
+  formData: FormData,
+  atual: string | null | undefined
+): { consent_lgpd_em?: string } {
+  return formData.get("consent_lgpd") === "on" && !atual
+    ? { consent_lgpd_em: new Date().toISOString() }
+    : {};
+}
+
+/** Mesma validação da ficha, mas sobre uma linha da planilha — valor bruto
+ *  preenchido e irreconhecível devolve motivo pra pular a linha (em vez de
+ *  gravar null ou estourar no CHECK do insert em lote). */
+function fichaLinha(
+  l: LinhaImportada,
+  de: "pessoa" | "mentorado"
+): Record<string, unknown> | { error: string } {
+  const out: Record<string, unknown> = {};
+  const texto = (campo: keyof LinhaImportada, col: string, max: number, rotulo: string) => {
+    const v = normNome(String(l[campo] ?? ""));
+    if (v.length > max) return `${rotulo} passa de ${max} caracteres`;
+    out[col] = v || null;
+    return null;
+  };
+  const specs: [keyof LinhaImportada, string, number, string][] = [
+    ["nome_social", "nome_social", 150, "nome social"],
+    ["cidade", "cidade", 100, "cidade"],
+    ["origem", "origem", 300, "origem"],
+    ["motivacao", "motivacao", 2000, "motivação"],
+    ...(de === "pessoa"
+      ? [["cargo", "cargo", 120, "cargo"], ["empresa", "empresa", 150, "empresa"]] as [keyof LinhaImportada, string, number, string][]
+      : [["objetivos", "objetivos", 2000, "objetivos"]] as [keyof LinhaImportada, string, number, string][]),
+  ];
+  for (const [campo, col, max, rotulo] of specs) {
+    const erro = texto(campo, col, max, rotulo);
+    if (erro) return { error: erro };
+  }
+
+  const nasc = normData(String(l.data_nascimento ?? ""));
+  if (String(l.data_nascimento ?? "").trim() && !nasc)
+    return { error: "data de nascimento inválida (use dd/mm/aaaa)" };
+  out.data_nascimento = nasc;
+
+  const genero = mapGenero(String(l.genero ?? ""));
+  if (String(l.genero ?? "").trim() && !genero) return { error: "gênero não reconhecido" };
+  out.genero = genero;
+
+  const uf = normUf(String(l.uf ?? ""));
+  if (String(l.uf ?? "").trim() && (!uf || !(UFS as readonly string[]).includes(uf)))
+    return { error: "UF inválida (use a sigla, ex.: SP)" };
+  out.uf = uf;
+
+  const interesses = normLista(String(l.interesses ?? ""));
+  if (interesses.length > MAX_INTERESSES) return { error: `mais de ${MAX_INTERESSES} interesses` };
+  if (interesses.some((t) => t.length > INTERESSE_MAX_CHARS))
+    return { error: `interesse com mais de ${INTERESSE_MAX_CHARS} caracteres` };
+  out.interesses = interesses;
+
+  const pref = mapPrefGenero(String(l.pref_genero_par ?? ""));
+  if (String(l.pref_genero_par ?? "").trim() && !pref)
+    return { error: "preferência de gênero do par não reconhecida" };
+  out.pref_genero_par = pref;
+
+  if (de === "mentorado") {
+    const esc = mapEscolaridade(String(l.escolaridade ?? ""));
+    if (String(l.escolaridade ?? "").trim() && !esc)
+      return { error: "escolaridade não reconhecida" };
+    out.escolaridade = esc;
+  }
+  return out;
+}
+
 export async function createPessoa(formData: FormData) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
@@ -206,10 +468,21 @@ export async function createPessoa(formData: FormData) {
   if (!emailValido(email)) return { error: "Confira o e-mail." };
   if (whatsappRaw.trim() && !whatsapp) return { error: "Confira o WhatsApp — use DDD e o número completo." };
   if (!(ROLES as readonly string[]).includes(role)) return { error: "Escolha um papel válido." };
+  const ficha = camposFicha(formData, { de: "pessoa" });
+  if ("error" in ficha) return { error: ficha.error };
+  const mentorCampos = camposMentor(formData);
+  if ("error" in mentorCampos) return { error: mentorCampos.error };
 
   const { data: profile, error } = await supabase
     .from("profiles")
-    .insert({ nome, email, whatsapp: whatsapp || null, role })
+    .insert({
+      nome,
+      email,
+      whatsapp: whatsapp || null,
+      role,
+      ...ficha,
+      ...consentPatch(formData, null),
+    })
     .select("id")
     .single();
   if (error) return { error: erroAmigavel(error) };
@@ -236,6 +509,7 @@ export async function createPessoa(formData: FormData) {
       profile_id: profile.id,
       tipo: role === "mentor_dpp" ? "dpp" : "especialista",
       capacidade,
+      ...mentorCampos,
     });
     if (mpErr) return { error: erroAmigavel(mpErr) };
   }
@@ -256,12 +530,15 @@ export async function createMentorado(formData: FormData) {
   const whatsappRaw = String(formData.get("whatsapp") ?? "");
   const whatsapp = normWhatsapp(whatsappRaw);
   if (whatsappRaw.trim() && !whatsapp) return { error: "Confira o WhatsApp — use DDD e o número completo." };
+  const ficha = camposFicha(formData, { de: "mentorado" });
+  if ("error" in ficha) return { error: ficha.error };
   const { data: mentorado, error } = await supabase.from("mentorados").insert({
     nome,
     email: email || null,
     whatsapp: whatsapp || null,
     ong_origem: String(formData.get("ong_origem") ?? "").trim() || null,
     notas: String(formData.get("notas") ?? "").trim() || null,
+    ...ficha,
   }).select("id").single();
   if (error) return { error: erroAmigavel(error) };
 
@@ -279,6 +556,19 @@ export async function createMentorado(formData: FormData) {
   return { ok: true, aviso };
 }
 
+/** Ciclos conhecidos do programa + o calendário oficial (o caller reusa pra
+ *  derivar o vigente e o 1º encontro do ciclo escolhido, sem segunda query). */
+async function dadosCiclos(supabase: Supa) {
+  const [{ data: evs }, { data: dps }] = await Promise.all([
+    supabase.from("ciclo_eventos").select("ciclo, tipo, data"),
+    supabase.from("duplas").select("ciclo"),
+  ]);
+  return {
+    evs: (evs ?? []) as { ciclo: string | null; tipo: string; data: string }[],
+    ciclos: ciclosOpcoes(evs ?? [], (dps ?? []).map((d) => d.ciclo)),
+  };
+}
+
 export async function createDupla(formData: FormData) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
@@ -287,6 +577,14 @@ export async function createDupla(formData: FormData) {
   const mentorado_id = String(formData.get("mentorado_id") ?? "");
   const supervisor_id = String(formData.get("supervisor_id") || "") || null;
   if (!mentor_id || !mentorado_id) return { error: "Escolha o mentor e o mentorado." };
+  // ciclo vem do select do dialog; vazio cai no vigente do calendário. Um
+  // valor fora da lista conhecida é recusado antes de qualquer escrita.
+  const cicloRaw = String(formData.get("ciclo") ?? "").trim();
+  const { evs: evsCiclo, ciclos: ciclosConhecidos } = await dadosCiclos(supabase);
+  if (cicloRaw && !ciclosConhecidos.includes(cicloRaw)) {
+    return { error: "Escolha um ciclo da lista." };
+  }
+  const ciclo = cicloRaw || cicloVigente(evsCiclo) || undefined;
   const { data: mentor } = await supabase
     .from("profiles").select("role").eq("id", mentor_id).single();
   if (mentor?.role !== "mentor_dpp" && mentor?.role !== "mentor_especialista") {
@@ -343,9 +641,10 @@ export async function createDupla(formData: FormData) {
     if (trilha === "especialista") {
       iniciada_em = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date());
     } else {
-      const { data: primeiroEv } = await supabase
-        .from("ciclo_eventos").select("data")
-        .eq("tipo", "encontro").order("data", { ascending: true }).limit(1).maybeSingle();
+      // 1º encontro DO ciclo escolhido — evsCiclo já tem o calendário inteiro
+      const primeiroEv = evsCiclo
+        .filter((e) => e.tipo === "encontro" && (!ciclo || e.ciclo === ciclo))
+        .sort((a, b) => a.data.localeCompare(b.data))[0];
       iniciada_em = primeiroEv
         ? inicioDefaultDupla([{ tipo: "encontro", data: primeiroEv.data }])!
         : new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date());
@@ -363,6 +662,8 @@ export async function createDupla(formData: FormData) {
     iniciada_em,
     trilha,
     demanda,
+    // sem ciclo válido resolvido a coluna aplica o default da migration
+    ...(ciclo ? { ciclo } : {}),
   }).select("id").single();
   if (error) return { error: erroAmigavel(error) };
   // avisa o mentor — o pareamento é a notícia que muda a rotina dele
@@ -468,16 +769,24 @@ export async function updatePessoa(profileId: string, formData: FormData) {
 
   // e-mail = identidade do link de acesso; só muda enquanto a pessoa nunca entrou
   const { data: atual } = await supabase
-    .from("profiles").select("user_id, role").eq("id", profileId).single();
+    .from("profiles").select("user_id, role, consent_lgpd_em").eq("id", profileId).single();
   // campos de apresentação (0030) — a coordenação edita os mesmos que a
   // pessoa edita em /perfil; o form manda `areas_perfil` porque `areas` já é
   // o campo do mentor_profile
   const apresentacao = camposApresentacao(formData, { areasKey: "areas_perfil" });
   if ("error" in apresentacao) return { error: apresentacao.error };
+  // ficha pessoal/matching (0034) — a escrita é table-level: coord edita de
+  // qualquer um; os sensíveis que ela lê via view ela também grava aqui
+  const ficha = camposFicha(formData, { de: "pessoa" });
+  if ("error" in ficha) return { error: ficha.error };
+  const mentorCampos = camposMentor(formData);
+  if ("error" in mentorCampos) return { error: mentorCampos.error };
   const patch: Record<string, unknown> = {
     nome,
     whatsapp: whatsapp || null,
     ...apresentacao,
+    ...ficha,
+    ...consentPatch(formData, atual?.consent_lgpd_em),
   };
   if (email && !atual?.user_id) patch.email = email;
 
@@ -517,6 +826,7 @@ export async function updatePessoa(profileId: string, formData: FormData) {
       areas,
       termo_ok: formData.get("termo_ok") === "on",
       formacao_ok: formData.get("formacao_ok") === "on",
+      ...mentorCampos,
     });
     if (mpErr) return { error: erroAmigavel(mpErr) };
   }
@@ -597,12 +907,15 @@ export async function updateMentorado(id: string, formData: FormData) {
   const whatsappRaw = String(formData.get("whatsapp") ?? "");
   const whatsapp = normWhatsapp(whatsappRaw);
   if (whatsappRaw.trim() && !whatsapp) return { error: "Confira o WhatsApp — use DDD e o número completo." };
+  const ficha = camposFicha(formData, { de: "mentorado" });
+  if ("error" in ficha) return { error: ficha.error };
   const { data, error } = await supabase.from("mentorados").update({
     nome,
     email: email || null,
     whatsapp: whatsapp || null,
     ong_origem: String(formData.get("ong_origem") ?? "").trim() || null,
     notas: String(formData.get("notas") ?? "").trim() || null,
+    ...ficha,
   }).eq("id", id).select("id");
   if (error) return { error: erroAmigavel(error) };
   if (!data?.length) {
@@ -664,9 +977,32 @@ export async function updateDupla(duplaId: string, formData: FormData) {
   const iniciada_em = String(formData.get("iniciada_em") || "").trim();
   const status = String(formData.get("status") || "ativa");
   if (!mentor_id || !mentorado_id) return { error: "Escolha o mentor e o mentorado." };
-  if (!["ativa", "pausada", "encerrada"].includes(status)) return { error: "Escolha um status válido." };
+  // 'concluida' entra pelo rito de encerramento (0037), não por escolha no
+  // dialog — mas a dupla concluída precisa conseguir editar os demais campos
+  if (!["ativa", "pausada", "concluida", "encerrada"].includes(status)) return { error: "Escolha um status válido." };
   if (iniciada_em && !/^\d{4}-\d{2}-\d{2}$/.test(iniciada_em)) {
     return { error: "Confira a data de início." };
+  }
+  // ciclo só muda quando o campo veio no form (dialog sem o campo não mexe);
+  // o valor precisa ser um dos ciclos conhecidos — mesmo critério da criação
+  let cicloNovo: string | undefined;
+  if (formData.has("ciclo")) {
+    const cicloRaw = String(formData.get("ciclo") ?? "").trim();
+    const { ciclos: conhecidos } = await dadosCiclos(supabase);
+    if (!cicloRaw || !conhecidos.includes(cicloRaw)) {
+      return { error: "Escolha um ciclo da lista." };
+    }
+    cicloNovo = cicloRaw;
+  }
+  // link do PDM (0044): campo presente no form → grava; vazio limpa. A coluna
+  // tem CHECK https — valida aqui pra mensagem clara em vez do 23514
+  let pdmNovo: string | null | undefined;
+  if (formData.has("pdm_url")) {
+    const pdm = String(formData.get("pdm_url") ?? "").trim();
+    if (pdm && !/^https:\/\/\S+$/i.test(pdm)) {
+      return { error: "O link do PDM precisa ser um endereço completo (https://…)." };
+    }
+    pdmNovo = pdm || null;
   }
   const { data: mentor } = await supabase
     .from("profiles").select("role").eq("id", mentor_id).single();
@@ -700,10 +1036,13 @@ export async function updateDupla(duplaId: string, formData: FormData) {
       return { error: "A pessoa escolhida como supervisor não tem esse papel." };
     }
   }
-  if (atualDupla && status !== "encerrada") {
-    // encerrada voltando a ativa/pausada precisa revalidar — a vaga pode ter sido
-    // ocupada por outra dupla enquanto estava encerrada
-    const voltando = atualDupla.status === "encerrada";
+  // só ocupa vaga quem vai pra ativa/pausada — concluída e encerrada liberam,
+  // então editar outros campos de uma dupla fechada não revalida capacidade
+  if (atualDupla && (status === "ativa" || status === "pausada")) {
+    // fechada (encerrada/concluída) voltando a ativa/pausada precisa revalidar
+    // — a vaga pode ter sido ocupada por outra dupla enquanto estava fechada
+    const voltando =
+      atualDupla.status === "encerrada" || atualDupla.status === "concluida";
     if (voltando || mentorado_id !== atualDupla.mentorado_id || trilhaNova !== atualDupla.trilha) {
       const { data: emDupla } = await supabase
         .from("duplas").select("id")
@@ -743,8 +1082,15 @@ export async function updateDupla(duplaId: string, formData: FormData) {
       trilhaNova === "especialista"
         ? String(formData.get("demanda") ?? "").trim() || null
         : null,
+    // dupla viva (ativa/pausada) não carrega carimbo de fechamento — reabrir
+    // uma trilha especialista limpa o rastro do encerramento anterior
+    ...(status === "ativa" || status === "pausada"
+      ? { encerrada_em: null, motivo_encerramento: null, devolutiva_pdm: null }
+      : {}),
   };
   if (iniciada_em) patch.iniciada_em = iniciada_em;
+  if (cicloNovo) patch.ciclo = cicloNovo;
+  if (pdmNovo !== undefined) patch.pdm_url = pdmNovo;
   const { data, error } = await supabase.from("duplas").update(patch).eq("id", duplaId).select("id");
   if (error) return { error: erroAmigavel(error) };
   if (!data?.length) {
@@ -757,7 +1103,7 @@ export async function updateDupla(duplaId: string, formData: FormData) {
     atualDupla && (mentor_id !== atualDupla.mentor_id || supervisorFinal !== atualDupla.supervisor_id);
   const mudouStatus =
     atualDupla && status !== atualDupla.status &&
-    (status === "pausada" || status === "encerrada");
+    (status === "pausada" || status === "encerrada" || status === "concluida");
   if (atualDupla && (trocouPessoas || mudouStatus)) {
     const { data: mdTroca } = await supabase
       .from("mentorados").select("nome").eq("id", mentorado_id).single();
@@ -799,14 +1145,24 @@ export async function updateDupla(duplaId: string, formData: FormData) {
       mudouStatus ? {
         profile_id: mentor_id,
         tipo: "dupla_formada",
-        titulo: status === "pausada" ? "Sua dupla foi pausada" : "Sua dupla foi encerrada",
+        titulo:
+          status === "pausada"
+            ? "Sua dupla foi pausada"
+            : status === "concluida"
+              ? "Sua dupla concluiu a jornada"
+              : "Sua dupla foi encerrada",
         corpo: "A coordenação atualizou a sua dupla — fale com ela se tiver dúvidas.",
         href: `/duplas/${duplaId}`,
       } : null,
       mudouStatus && supervisorFinal ? {
         profile_id: supervisorFinal,
         tipo: "dupla_formada",
-        titulo: status === "pausada" ? "Dupla supervisionada pausada" : "Dupla supervisionada encerrada",
+        titulo:
+          status === "pausada"
+            ? "Dupla supervisionada pausada"
+            : status === "concluida"
+              ? "Dupla supervisionada concluída"
+              : "Dupla supervisionada encerrada",
         corpo: nomeMd ? `A dupla com ${nomeMd} — a coordenação fez a alteração.` : null,
         href: `/duplas/${duplaId}`,
       } : null,
@@ -822,6 +1178,39 @@ export async function deleteDupla(duplaId: string) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada — entre de novo." };
+  // a cascata leva encontros→registros→registro_anexos (rows), mas os OBJETOS
+  // do bucket não seguem o cascade — e a policy de delete do storage exige a
+  // row do anexo existir, então a ordem é arquivo primeiro, row depois.
+  // Falha na remoção aborta a exclusão: dupla apagada com objeto restante
+  // viraria lixo invisível no bucket.
+  const { data: encs, error: encErr } = await supabase
+    .from("encontros").select("id").eq("dupla_id", duplaId);
+  const encIds = (encs ?? []).map((e) => e.id);
+  const { data: regs, error: regErr } = encIds.length
+    ? await supabase.from("registros").select("id").in("encontro_id", encIds)
+    : { data: [], error: null };
+  const regIds = (regs ?? []).map((r) => r.id);
+  const { data: anx, error: anxErr } = regIds.length
+    ? await supabase.from("registro_anexos").select("path").in("registro_id", regIds)
+    : { data: [], error: null };
+  // falha na LEITURA também aborta — com paths incompletos a exclusão
+  // deixaria objetos órfãos no bucket
+  if (encErr || regErr || anxErr) {
+    return {
+      error: "Não foi possível localizar os anexos da dupla — nada foi excluído. Tente de novo.",
+    };
+  }
+  const paths = (anx ?? []).map((a) => a.path).filter(Boolean);
+  if (paths.length) {
+    const { error: stErr } = await supabase
+      .storage.from("registro-anexos").remove(paths);
+    if (stErr) {
+      return {
+        error:
+          "Não foi possível remover os anexos de evidência da dupla — nada foi excluído. Tente de novo.",
+      };
+    }
+  }
   // cascata remove encontros, registros e encaminhamentos da dupla
   const { data, error } = await supabase
     .from("duplas").delete().eq("id", duplaId).select("id");
@@ -831,6 +1220,40 @@ export async function deleteDupla(duplaId: string) {
   }
   revalidatePath("/");
   revalidatePath("/duplas");
+  return { ok: true };
+}
+
+/** Link do PDM (0044): mentor edita o da própria dupla — UPDATE em duplas é
+ *  coord-only, então a escrita real é a RPC `definir_pdm_url` (definer,
+ *  escopada). Os checks aqui só antecipam a mensagem amigável; o banco
+ *  revalida papel, status e formato. */
+export async function definirPdmUrl(duplaId: string, url: string) {
+  if (await demoAtivo()) return { error: DEMO_MSG };
+  const { supabase, me: eu } = await me();
+  if (!eu) return { error: "Sessão expirada — entre de novo." };
+  const u = (url ?? "").trim();
+  if (u && !/^https:\/\/\S+$/i.test(u)) {
+    return { error: "O link do PDM precisa ser um endereço completo (https://…)." };
+  }
+  const { data: d } = await supabase
+    .from("duplas").select("mentor_id, status").eq("id", duplaId).maybeSingle();
+  if (!d) return { error: "Não foi possível identificar a dupla. Recarregue a página." };
+  if (eu.role !== "coordenacao") {
+    if (d.mentor_id !== eu.id) {
+      return { error: "Só o mentor da dupla pode definir o link do PDM." };
+    }
+    if (d.status !== "ativa" && d.status !== "pausada") {
+      return { error: "O link do PDM só pode ser editado com a dupla ativa ou pausada." };
+    }
+  }
+  const { error } = await supabase.rpc("definir_pdm_url", {
+    p_dupla: duplaId,
+    p_url: u || null,
+  });
+  if (error) return { error: erroAmigavel(error) };
+  revalidatePath("/");
+  revalidatePath("/duplas");
+  revalidatePath(`/duplas/${duplaId}`);
   return { ok: true };
 }
 
@@ -867,7 +1290,11 @@ export async function importPessoas(rows: LinhaImportada[]) {
   const { data: existentes } = await supabase.from("profiles_contato").select("email");
   const noBanco = new Set((existentes ?? []).map((p) => p.email.toLowerCase()));
   const vistos = new Set<string>();
-  const validas: { nome: string; email: string; whatsapp: string | null; role: string }[] = [];
+  const validas: Record<string, unknown>[] = [];
+  // email → ficha de mentor (experiência/formação) — a correlação com o id
+  // inserido vem depois por profiles_contato (a ordem do RETURNING não é
+  // contratual pra confiar o zip por índice)
+  const fichaMentorPorEmail = new Map<string, Record<string, unknown>>();
   const puladas: string[] = [];
 
   for (const r of rows) {
@@ -881,9 +1308,22 @@ export async function importPessoas(rows: LinhaImportada[]) {
     // whatsapp preenchido mas ilegível pula a linha — antes caía como null silenciosamente
     if (r.whatsapp.trim() && !whatsapp) { puladas.push(`${nome}: whatsapp inválido (use DDD + número)`); continue; }
     if (role === null) { puladas.push(`${nome}: papel não reconhecido`); continue; }
+    const ficha = fichaLinha(r, "pessoa");
+    if ("error" in ficha) { puladas.push(`${nome}: ${ficha.error}`); continue; }
+    // experiência/formação só fazem sentido em linha de mentor — valida antes
+    // de entrar na fila, senão a linha "pulada" seria inserida mesmo assim
+    const exp = normNome(String(r.experiencia_previa ?? ""));
+    const form = normNome(String(r.formacao_externa ?? ""));
+    if (exp.length > 2000 || form.length > 2000) { puladas.push(`${nome}: experiência/formação passa de 2.000 caracteres`); continue; }
     if (noBanco.has(email) || vistos.has(email)) { puladas.push(`${email}: já existe`); continue; }
     vistos.add(email);
-    validas.push({ nome, email, whatsapp, role });
+    validas.push({ nome, email, whatsapp, role, ...ficha });
+    if (exp || form) {
+      fichaMentorPorEmail.set(email, {
+        experiencia_previa: exp || null,
+        formacao_externa: form || null,
+      });
+    }
   }
   if (!validas.length) return { ok: true, criados: 0, puladas };
 
@@ -891,11 +1331,29 @@ export async function importPessoas(rows: LinhaImportada[]) {
     .from("profiles").insert(validas).select("id, role");
   if (error) return { error: erroAmigavel(error) };
 
+  // email → id dos mentores que trouxeram ficha de mentor (a view cobre as
+  // linhas recém-inseridas pra coordenação)
+  let idPorEmail = new Map<string, string>();
+  if (fichaMentorPorEmail.size) {
+    const { data: contatos } = await supabase
+      .from("profiles_contato")
+      .select("id, email")
+      .in("email", [...fichaMentorPorEmail.keys()]);
+    idPorEmail = new Map(
+      (contatos ?? []).map((c) => [c.email.toLowerCase(), c.id])
+    );
+  }
   const mentores = (inseridas ?? [])
     .filter((p) => p.role === "mentor_dpp" || p.role === "mentor_especialista")
     .map((p) => ({
       profile_id: p.id,
       tipo: p.role === "mentor_dpp" ? "dpp" : "especialista",
+      // procura a ficha pelo id — extra por email só chega em linha de mentor
+      ...(fichaMentorPorEmail.size
+        ? [...fichaMentorPorEmail.entries()].find(
+            ([em]) => idPorEmail.get(em) === p.id
+          )?.[1] ?? {}
+        : {}),
     }));
   if (mentores.length) {
     const { error: mpErr } = await supabase.from("mentor_profiles").insert(mentores);
@@ -934,6 +1392,8 @@ export async function importMentorados(rows: LinhaImportada[]) {
     if (email && !emailValido(email)) { puladas.push(`${nome}: e-mail inválido`); continue; }
     // whatsapp preenchido mas ilegível pula a linha — antes caía como null silenciosamente
     if (r.whatsapp.trim() && !whatsapp) { puladas.push(`${nome}: whatsapp inválido (use DDD + número)`); continue; }
+    const ficha = fichaLinha(r, "mentorado");
+    if ("error" in ficha) { puladas.push(`${nome}: ${ficha.error}`); continue; }
     const chave = nome.toLowerCase();
     // vistosWa: mesmo whatsapp com nome diferente no arquivo também é duplicado
     if (nomes.has(chave) || (whatsapp && was.has(whatsapp)) ||
@@ -948,6 +1408,7 @@ export async function importMentorados(rows: LinhaImportada[]) {
       whatsapp,
       ong_origem: String(r.ong ?? "").trim() || null,
       notas: String(r.notas ?? "").trim() || null,
+      ...ficha,
     });
   }
   if (!validas.length) return { ok: true, criados: 0, puladas };
@@ -1139,7 +1600,10 @@ export async function registrarEncontroRetroativo(
   const { data: d } = await supabase
     .from("duplas").select("status, iniciada_em, trilha").eq("id", duplaId).single();
   if (!d) return { error: "Dupla não encontrada." };
-  if (d.status === "encerrada") return { error: "Essa dupla está encerrada." };
+  // fechada (encerrada/concluída) não ganha encontro novo — a jornada acabou
+  if (d.status === "encerrada" || d.status === "concluida") {
+    return { error: "Essa dupla já está encerrada." };
+  }
 
   const quando = parseDataHora(dataHora);
   if (!quando) return { error: "Confira a data." };
@@ -1198,6 +1662,8 @@ export async function registrarEncontroRetroativo(
 const AVALIACOES = ["excelente", "boa", "regular", "baixa"] as const;
 const DIFICULDADES = ["nenhuma", "aprendizagem", "participacao", "comportamental", "organizacao", "outro"] as const;
 const PROXIMOS_PASSOS = ["continuar", "reforcar", "novo_feedback", "acompanhar_de_perto", "conversa_individual", "outro"] as const;
+// mesmas opções do select do registro-form — duracao_min mora em `encontros`
+const DURACOES_MIN = [30, 45, 60, 90, 120] as const;
 
 export async function salvarRegistro(formData: FormData) {
   if (await demoAtivo()) return { error: DEMO_MSG };
@@ -1217,6 +1683,14 @@ export async function salvarRegistro(formData: FormData) {
   if ((avaliacao && !(AVALIACOES as readonly string[]).includes(avaliacao)) ||
       (dificuldade && !(DIFICULDADES as readonly string[]).includes(dificuldade)) ||
       (proximoPasso && !(PROXIMOS_PASSOS as readonly string[]).includes(proximoPasso))) {
+    return { error: "Revise os campos — um dos valores não é válido." };
+  }
+
+  // duração real do encontro — o form manda sempre; grava junto com o
+  // status "realizado" no encontro (o campo mora lá, não em registros)
+  const duracaoRaw = String(formData.get("duracao_min") ?? "").trim();
+  const duracaoMin = Number(duracaoRaw);
+  if (duracaoRaw && !(DURACOES_MIN as readonly number[]).includes(duracaoMin)) {
     return { error: "Revise os campos — um dos valores não é válido." };
   }
 
@@ -1272,7 +1746,11 @@ export async function salvarRegistro(formData: FormData) {
   // registro retroativo e cai em data_hora no fluxo normal agendado→realizado
   const { data: encOk, error: encErr } = await supabase
     .from("encontros")
-    .update({ status: "realizado", realizado_em: encDb.realizado_em ?? encDb.data_hora })
+    .update({
+      status: "realizado",
+      realizado_em: encDb.realizado_em ?? encDb.data_hora,
+      ...(duracaoRaw ? { duracao_min: duracaoMin } : {}),
+    })
     .eq("id", encontro_id).select("id");
   if (encErr) return { error: erroAmigavel(encErr) };
   if (!encOk?.length) {
@@ -1796,21 +2274,65 @@ export async function updateMeuPerfil(formData: FormData) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada — entre de novo." };
-  const nome = normNome(String(formData.get("nome") ?? ""));
-  const whatsappRaw = String(formData.get("whatsapp") ?? "");
-  const whatsapp = normWhatsapp(whatsappRaw);
-  if (!nome) return { error: "Informe seu nome." };
-  if (whatsappRaw.trim() && !whatsapp) return { error: "Confira o WhatsApp — use DDD e o número completo." };
-  const apresentacao = camposApresentacao(formData);
+  // patch parcial: /perfil tem um form de "Dados" e outro só da ficha de
+  // mentor — cada um manda as próprias chaves e o que não veio não é tocado
+  // (senão o save da mentoria apagaria nome/whatsapp/bio).
+  const patch: Record<string, unknown> = {};
+  if (formData.has("nome")) {
+    const nome = normNome(String(formData.get("nome") ?? ""));
+    if (!nome) return { error: "Informe seu nome." };
+    patch.nome = nome;
+  }
+  if (formData.has("whatsapp")) {
+    const whatsappRaw = String(formData.get("whatsapp") ?? "");
+    const whatsapp = normWhatsapp(whatsappRaw);
+    // lixo digitado não pode zerar o campo silenciosamente
+    if (whatsappRaw.trim() && !whatsapp) return { error: "Confira o WhatsApp — use DDD e o número completo." };
+    patch.whatsapp = whatsapp || null;
+  }
+  const apresentacao = camposApresentacao(formData, { parcial: true });
   if ("error" in apresentacao) return { error: apresentacao.error };
+  // ficha pessoal (0034) — o self pode gravar os sensíveis próprios
+  // (guard_profiles_self_columns só trava email/role/ativo/…), mas não os
+  // lê de volta: /perfil pré-preenche o que o grant de coluna alcança
+  const ficha = camposFicha(formData, { de: "pessoa", parcial: true });
+  if ("error" in ficha) return { error: ficha.error };
+  // Quem não é coordenação não lê os próprios sensíveis (fora do grant de
+  // coluna — voltam null no getMe) — o input chega sempre em branco. Branco
+  // nesses campos significa "não mexer", nunca "apagar": senão cada save do
+  // /perfil zeraria nascimento/gênero/preferência/motivação já gravados.
+  // Pra coordenação os inputs vêm pré-preenchidos — branco = limpar, ok.
+  if (eu.role !== "coordenacao") {
+    for (const k of ["data_nascimento", "genero", "pref_genero_par", "motivacao"] as const) {
+      if (ficha[k] == null) delete ficha[k];
+    }
+  }
+  Object.assign(patch, apresentacao, ficha, consentPatch(formData, eu.consent_lgpd_em));
 
   // role/ativo/user_id ficam fora do patch — profiles_self_update também
   // barra role no banco, mas nem depende disso: a coluna nem é enviada
-  const { error } = await supabase
-    .from("profiles")
-    .update({ nome, whatsapp: whatsapp || null, ...apresentacao })
-    .eq("id", eu.id);
-  if (error) return { error: erroAmigavel(error) };
+  if (Object.keys(patch).length) {
+    const { error } = await supabase
+      .from("profiles")
+      .update(patch)
+      .eq("id", eu.id);
+    if (error) return { error: erroAmigavel(error) };
+  }
+
+  // ficha de mentor (mentor_profiles, 0034) — self-update cobre experiência/
+  // formação/disponibilidade; o guard da 0004 continua travando
+  // termo_ok/formacao_ok/capacidade/tipo. UPDATE direto: self não tem INSERT
+  // (a linha nasce no cadastro pela coordenação).
+  const ehMentor = eu.role === "mentor_dpp" || eu.role === "mentor_especialista";
+  if (ehMentor && formData.has("disponibilidade")) {
+    const mentorCampos = camposMentor(formData);
+    if ("error" in mentorCampos) return { error: mentorCampos.error };
+    const { error: mpErr } = await supabase
+      .from("mentor_profiles")
+      .update(mentorCampos)
+      .eq("profile_id", eu.id);
+    if (mpErr) return { error: erroAmigavel(mpErr) };
+  }
   revalidatePath("/", "layout");
   return { ok: true };
 }
@@ -1847,9 +2369,10 @@ export async function setAvatarPath(path: string | null) {
 // ---------- onboarding ----------
 
 /** Passo do wizard de primeiro acesso — grava no próprio profile só o
- *  subconjunto que o passo mandou (bio/linkedin/areas/voluntariado, todos
- *  opcionais; `areas` chega em JSON do TagInput) + foto opcional. O que não
- *  veio no FormData não é tocado — cada passo salva o seu pedaço. */
+ *  subconjunto que o passo mandou (bio/linkedin/areas/voluntariado + a ficha
+ *  pessoal do 0034, todos opcionais; listas chegam em JSON do TagInput) +
+ *  foto opcional. O que não veio no FormData não é tocado — cada passo salva
+ *  o seu pedaço. */
 export async function salvarOnboarding(formData: FormData) {
   // o wizard do demo avança sem gravar — os campos do perfil não persistem
   if (await demoAtivo()) return { ok: true };
@@ -1858,10 +2381,30 @@ export async function salvarOnboarding(formData: FormData) {
 
   const apresentacao = camposApresentacao(formData, { parcial: true });
   if ("error" in apresentacao) return { error: apresentacao.error };
-  if (Object.keys(apresentacao).length > 0) {
+  const ficha = camposFicha(formData, { de: "pessoa", parcial: true });
+  if ("error" in ficha) return { error: ficha.error };
+  const patch = {
+    ...apresentacao,
+    ...ficha,
+    ...consentPatch(formData, eu.consent_lgpd_em),
+  };
+  if (Object.keys(patch).length > 0) {
     const { error } = await supabase
-      .from("profiles").update(apresentacao).eq("id", eu.id);
+      .from("profiles").update(patch).eq("id", eu.id);
     if (error) return { error: erroAmigavel(error) };
+  }
+
+  // passo "Disponibilidade" (mentor): grade semanal + experiência/formação
+  // do mentor_profiles — self-update (0004 trava só os campos de validação)
+  const ehMentor = eu.role === "mentor_dpp" || eu.role === "mentor_especialista";
+  if (ehMentor) {
+    const mentorCampos = camposMentor(formData, { parcial: true });
+    if ("error" in mentorCampos) return { error: mentorCampos.error };
+    if (Object.keys(mentorCampos).length > 0) {
+      const { error: mpErr } = await supabase
+        .from("mentor_profiles").update(mentorCampos).eq("profile_id", eu.id);
+      if (mpErr) return { error: erroAmigavel(mpErr) };
+    }
   }
 
   // foto opcional — mesma mecânica da ficha da coordenação: sobe na pasta do
@@ -1892,9 +2435,10 @@ export async function salvarOnboarding(formData: FormData) {
  *  fica fora do guard_profiles_self_columns (0023): o self-update grava
  *  nela direto. */
 export async function concluirOnboarding() {
-  // na demo o "concluído" mora num cookie, não em profiles.onboarded_em
-  if (await demoAtivo()) {
-    await marcarOnboardingDemo();
+  // na demo o "concluído" mora num cookie por papel, não em profiles.onboarded_em
+  const demo = await demoRole();
+  if (demo) {
+    await marcarOnboardingDemo(demo);
     return { ok: true };
   }
   const { supabase, me: eu } = await me();

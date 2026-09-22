@@ -5,7 +5,10 @@ import type { AppRole } from "@/lib/types";
 // e no middleware (edge). Cookies legíveis no client de propósito.
 
 export const DEMO_ROLE_COOKIE = "demo_role";
-export const DEMO_OB_COOKIE = "demo_onboarded";
+/** Cookie de onboarding por papel (`demo_onboarded_mentor_dpp=1`): a
+ *  apresentação de cada persona aparece só no primeiro acesso DELA — trocar
+ *  de papel mostra o wizard do novo, voltar pro já visto cai direto no app. */
+export const demoObCookie = (role: AppRole) => `demo_onboarded_${role}`;
 
 /** Toast único das mutations bloqueadas — actions retornam `{ error: DEMO_MSG }`. */
 export const DEMO_MSG =
@@ -22,4 +25,21 @@ export function papelDemoValido(v: string | undefined | null): AppRole | null {
   return v != null && (DEMO_ROLES as readonly string[]).includes(v)
     ? (v as AppRole)
     : null;
+}
+
+/** Papel da demo lido do document.cookie — par client dos helpers server de
+ *  ./mode. Serve pra desligar persistência local (rascunhos em localStorage)
+ *  na demo: nada que o visitante digita pode sobreviver pro próximo. */
+export function demoRoleClient(): AppRole | null {
+  if (typeof document === "undefined") return null;
+  const raw = document.cookie
+    .split("; ")
+    .find((c) => c.startsWith(`${DEMO_ROLE_COOKIE}=`));
+  return papelDemoValido(
+    decodeURIComponent(raw?.slice(raw.indexOf("=") + 1) ?? "")
+  );
+}
+
+export function demoAtivoClient(): boolean {
+  return demoRoleClient() != null;
 }

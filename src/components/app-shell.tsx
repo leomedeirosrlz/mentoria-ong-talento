@@ -8,6 +8,7 @@ import {
   ChartLineUp,
   ClipboardText,
   FolderOpen,
+  ListChecks,
   SignOut,
   UserCircle,
   UsersThree,
@@ -27,6 +28,7 @@ const NAV = [
   { href: "/registros", label: "Registros", curto: "Registros", icon: ClipboardText, roles: ["coordenacao", "supervisor"] },
   { href: "/agenda", label: "Agenda", curto: "Agenda", icon: CalendarDots, roles: null },
   { href: "/materiais", label: "Materiais", curto: "Materiais", icon: FolderOpen, roles: null },
+  { href: "/formularios", label: "Formulários", curto: "Forms", icon: ListChecks, roles: ["coordenacao"] },
   { href: "/pessoas", label: "Pessoas", curto: "Pessoas", icon: UsersThree, roles: ["coordenacao"] },
 ] as const;
 

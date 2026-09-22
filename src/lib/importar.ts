@@ -1,5 +1,8 @@
-import type { AppRole } from "./types";
+import type { AppRole, Escolaridade, Genero, PrefGeneroPar } from "./types";
 
+/** Linha normalizada da planilha — união dos campos de pessoas (profiles +
+ *  mentor_profiles) e de mentorados. Campos que não se aplicam ao tipo são
+ *  ignorados na gravação; strings vazias viram null. */
 export type LinhaImportada = {
   nome: string;
   email: string;
@@ -7,9 +10,46 @@ export type LinhaImportada = {
   papel: string;
   ong: string;
   notas: string;
+  nome_social: string;
+  data_nascimento: string;
+  genero: string;
+  cidade: string;
+  uf: string;
+  interesses: string;
+  motivacao: string;
+  pref_genero_par: string;
+  cargo: string;
+  empresa: string;
+  origem: string;
+  objetivos: string;
+  escolaridade: string;
+  experiencia_previa: string;
+  formacao_externa: string;
 };
 
-const VAZIA: LinhaImportada = { nome: "", email: "", whatsapp: "", papel: "", ong: "", notas: "" };
+const VAZIA: LinhaImportada = {
+  nome: "",
+  email: "",
+  whatsapp: "",
+  papel: "",
+  ong: "",
+  notas: "",
+  nome_social: "",
+  data_nascimento: "",
+  genero: "",
+  cidade: "",
+  uf: "",
+  interesses: "",
+  motivacao: "",
+  pref_genero_par: "",
+  cargo: "",
+  empresa: "",
+  origem: "",
+  objetivos: "",
+  escolaridade: "",
+  experiencia_previa: "",
+  formacao_externa: "",
+};
 
 function semAcento(s: string): string {
   return s.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase().trim();
@@ -17,14 +57,31 @@ function semAcento(s: string): string {
 
 /** header da planilha -> campo canônico (colunas desconhecidas são ignoradas).
  *  \b só no início da palavra: aceita plurais ("notas", "organizações")
- *  sem sequestrar substrings ("longo" não é ong, "sobrenome" não é nome). */
+ *  sem sequestrar substrings ("longo" não é ong, "sobrenome" não é nome).
+ *  Ordem importa: padrões mais específicos (nome_social, pref_genero_par)
+ *  vêm antes dos genéricos (nome, genero) pra não serem engolidos. */
 function canonHeader(h: string): keyof LinhaImportada | null {
   const n = semAcento(h);
   if (/\b(e-?mail|correio)/.test(n)) return "email";
   if (/\b(whats|telefone|celular|fone|phone)/.test(n)) return "whatsapp";
-  if (/\b(papel|role|funcao|perfil|tipo)/.test(n)) return "papel";
-  if (/\b(ong|origem|organizacao|instituicao)/.test(n)) return "ong";
+  if (/\b(nome social|nome_social)/.test(n)) return "nome_social";
+  if (/\b(papel|role|funcao|perfil|tipo)\b/.test(n) && !/genero/.test(n)) return "papel";
+  if (/\bpref.*genero|\bgenero.*pref/.test(n)) return "pref_genero_par";
+  if (/\bgenero|sexo\b/.test(n)) return "genero";
+  if (/\b(nascimento|aniversario|data_nascimento)/.test(n)) return "data_nascimento";
+  if (/\bcidade|municipio|localidade/.test(n)) return "cidade";
+  if (n === "uf" || n === "estado" || /\buf\b/.test(n)) return "uf";
+  if (/\binteresse|hobb/.test(n)) return "interesses";
+  if (/\bmotivac|por que|porque\b/.test(n)) return "motivacao";
+  if (/\b(ong|organizacao|instituicao)/.test(n)) return "ong";
   if (/\b(nota|obs)/.test(n)) return "notas";
+  if (/\bobjetivo|\bmeta/.test(n)) return "objetivos";
+  if (/\b(escolaridade|instrucao)/.test(n)) return "escolaridade";
+  if (/\bexperiencia/.test(n)) return "experiencia_previa";
+  if (/\bformacao externa|formacao_externa/.test(n)) return "formacao_externa";
+  if (/\bcargo|profissao|ocupacao/.test(n)) return "cargo";
+  if (/\bempresa|companhia|\btrabalha em\b/.test(n)) return "empresa";
+  if (/\borigem|como conheceu|como chegou/.test(n)) return "origem";
   if (/\b(nome|name)/.test(n)) return "nome";
   return null;
 }
@@ -112,7 +169,7 @@ export function parseCsv(text: string): { linhas: LinhaImportada[]; ignoradas: n
 export const normNome = (s: string) => s.trim().replace(/\s+/g, " ");
 export const normEmail = (s: string) => s.trim().toLowerCase();
 export const emailValido = (s: string) =>
-  /^[^\s@.][^\s@]*@[^\s@.]+\.[^\s@.]{2,}$/.test(s) && !s.includes("..");
+  /^[^\s@.][^\s@]*@([^\s@.]+\.)+[^\s@.]{2,}$/.test(s) && !s.includes("..");
 
 /** whatsapp -> só dígitos; completa 55 quando vem DD+número BR (0800/curto não é whatsapp).
  *  Com "+" no input o número já vem com DDI — nunca prefixar 55. */
@@ -131,5 +188,74 @@ export function mapRole(s: string): AppRole | null {
   if (/supervis/.test(n)) return "supervisor";
   if (/especial/.test(n)) return "mentor_especialista";
   if (/mentor|dpp/.test(n)) return "mentor_dpp";
+  return null;
+}
+
+// ---------- campos do matching (0034) ----------
+// mesmos CHECKs do banco, validados aqui pra linha inválida virar skip
+// com motivo em pt-BR em vez de erro de banco no meio do import.
+
+/** "dd/mm/aaaa", "dd-mm-aaaa" ou ISO "aaaa-mm-dd" -> ISO; null = inválida/vazia. */
+export function normData(s: string): string | null {
+  const v = s.trim();
+  if (!v) return null;
+  const isoM = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v);
+  const brM = /^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{4})$/.exec(v);
+  const iso = isoM
+    ? `${isoM[1]}-${isoM[2]}-${isoM[3]}`
+    : brM
+      ? `${brM[3]}-${brM[2].padStart(2, "0")}-${brM[1].padStart(2, "0")}`
+      : null;
+  if (!iso) return null;
+  const d = new Date(`${iso}T12:00:00`);
+  // rejeita 31/02, 30/02 etc. — Date normaliza em vez de falhar
+  if (isNaN(d.getTime()) || `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}` !== iso)
+    return null;
+  return iso;
+}
+
+/** "sp", "São Paulo - SP" -> "SP"; null = não reconhecida. */
+export function normUf(s: string): string | null {
+  const m = /\b([A-Za-z]{2})\b/.exec(s.trim());
+  return m ? m[1].toUpperCase() : null;
+}
+
+/** Lista separada por ; | ou , -> array limpo (interesses na planilha). */
+export function normLista(s: string): string[] {
+  return s
+    .split(/[;|,]/)
+    .map((x) => x.trim().replace(/\s+/g, " "))
+    .filter(Boolean);
+}
+
+export function mapGenero(s: string): Genero | null {
+  const n = semAcento(s);
+  if (!n) return null;
+  if (/^fem|mulher/.test(n)) return "feminino";
+  if (/^masc|homem/.test(n)) return "masculino";
+  if (/nao.?bin|nb\b/.test(n)) return "nao_binario";
+  if (/prefiro/.test(n)) return "prefiro_nao_dizer";
+  if (/outro/.test(n)) return "outro";
+  return null;
+}
+
+export function mapPrefGenero(s: string): PrefGeneroPar | null {
+  const n = semAcento(s);
+  if (!n) return null;
+  if (/indiferente|tanto faz|qualquer|sem pref/.test(n)) return "indiferente";
+  if (/fem|mulher/.test(n)) return "feminino";
+  if (/masc|homem/.test(n)) return "masculino";
+  return null;
+}
+
+export function mapEscolaridade(s: string): Escolaridade | null {
+  const n = semAcento(s);
+  if (!n) return null;
+  if (/fund/.test(n)) return "fundamental";
+  if (/medio|em\b/.test(n)) return "medio";
+  if (/tec/.test(n)) return "tecnico";
+  if (/pos|mestrado|doutorado|mba|especializ/.test(n)) return "pos";
+  if (/incompleto|cursando|inacabado/.test(n)) return "superior_incompleto";
+  if (/superior|graduac|faculdade|bacharel|licenciat/.test(n)) return "superior";
   return null;
 }

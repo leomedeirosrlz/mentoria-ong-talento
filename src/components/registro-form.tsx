@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { CaretLeft, CaretRight, Plus, Trash } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { salvarRegistro } from "@/lib/actions";
+import { demoAtivoClient } from "@/lib/demo/shared";
 import {
   ATIVIDADES_ENCONTRO,
   formatDiaMes,
@@ -44,6 +45,16 @@ const RESPONSAVEL_OPCOES: Record<string, string> = {
   mentor: "Mentor",
 };
 
+// encontros.duracao_min — o guia fixa 1h por sessão, mas o registro é onde a
+// duração real é informada (default 60 = o que o banco já assume)
+const DURACAO_OPCOES: Record<string, string> = {
+  "30": "30 min",
+  "45": "45 min",
+  "60": "1h",
+  "90": "1h30",
+  "120": "2h",
+};
+
 const ETAPAS = ["Como foi", "Sinais de atenção", "Combinados"] as const;
 
 /** Rascunho local do form — autosave no localStorage pra refresh não perder tudo. */
@@ -51,6 +62,7 @@ type RegistroDraft = {
   savedAt: string;
   tema: string;
   ferramenta: string;
+  duracaoMin: string;
   reflexoes: string;
   observacoes: string;
   atividades: string[];
@@ -91,6 +103,9 @@ export function RegistroForm({
   const [concluirIds, setConcluirIds] = useState<Set<string>>(new Set());
   const [dificuldade, setDificuldade] = useState(registro?.dificuldade ?? "nenhuma");
   const [proximoPasso, setProximoPasso] = useState(registro?.proximo_passo ?? "continuar");
+  // duracao_min mora em `encontros`, não em `registros` — o form não recebe o
+  // encontro, então o default é o padrão do guia (60). O salvarRegistro grava.
+  const [duracaoMin, setDuracaoMin] = useState("60");
   const [restored, setRestored] = useState<RegistroDraft | null>(null);
   // avaliacao é o único obrigatório não-textual — erro inline pt-BR em vez do
   // balão nativo do browser (que nem indica qual campo faltou)
@@ -116,6 +131,10 @@ export function RegistroForm({
   const salvoOk = useRef(false);
   const draftKey = `registro-draft-${encontroId}`;
   const hojeStr = toDateStr(new Date());
+  // capturado no mount: na demo o rascunho não existe — nem lido nem gravado,
+  // pro que um visitante digita não sobrar pro próximo (o flush de desmonte
+  // roda depois do cookie ir embora, por isso não dá pra checar na hora)
+  const [demo] = useState(demoAtivoClient);
 
   // ---------- rascunho local ----------
 
@@ -123,6 +142,7 @@ export function RegistroForm({
   // adicionar/remover linha não — por isso o autosave também roda no efeito
   // abaixo, a cada mudança de estado
   const saveDraftNow = useCallback(() => {
+    if (demo) return;
     try {
       if (salvoOk.current) return;
       const form = formRef.current ?? ultimoForm.current;
@@ -133,6 +153,7 @@ export function RegistroForm({
         savedAt: new Date().toISOString(),
         tema: String(fd.get("tema") ?? ""),
         ferramenta: String(fd.get("ferramenta") ?? ""),
+        duracaoMin: String(fd.get("duracao_min") ?? ""),
         reflexoes: String(fd.get("reflexoes") ?? ""),
         observacoes: String(fd.get("observacoes") ?? ""),
         atividades: fd.getAll("atividade").map(String),
@@ -152,6 +173,7 @@ export function RegistroForm({
         !draft.dificuldadeDetalhe && !draft.proximoPassoDetalhe && !draft.precisaApoio &&
         (!draft.dificuldade || draft.dificuldade === "nenhuma") &&
         (!draft.proximoPasso || draft.proximoPasso === "continuar") &&
+        (!draft.duracaoMin || draft.duracaoMin === "60") &&
         !draft.encaminhamentos.some((t) => t.descricao.trim()) &&
         !draft.concluirIds.length;
       // rascunho vazio não vale guardar (e evita banner fantasma na próxima abertura)
@@ -160,7 +182,7 @@ export function RegistroForm({
     } catch {
       // modo privado pode negar localStorage — falha silenciosa é ok aqui
     }
-  }, [draftKey, encaminhamentos, concluirIds]);
+  }, [demo, draftKey, encaminhamentos, concluirIds]);
 
   const scheduleSave = useCallback(() => {
     // guarda o form a cada mudança — o flush de desmonte pode precisar dele
@@ -172,7 +194,7 @@ export function RegistroForm({
 
   useEffect(() => {
     scheduleSave();
-  }, [scheduleSave, dificuldade, proximoPasso]);
+  }, [scheduleSave, dificuldade, proximoPasso, duracaoMin]);
 
   // a versão atual do save pro cleanup de desmonte (efeito com [] capturaria
   // a primeira — o ref sempre aponta pra última)
@@ -195,7 +217,7 @@ export function RegistroForm({
   // setStates do corpo síncrono do efeito (storage é sistema externo)
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (restoredOnce.current || registro) return;
+      if (demo || restoredOnce.current || registro) return;
       restoredOnce.current = true;
       try {
         const raw = localStorage.getItem(draftKey);
@@ -224,6 +246,13 @@ export function RegistroForm({
         if (apoio instanceof HTMLInputElement) apoio.checked = d.precisaApoio === true;
         setDificuldade((d.dificuldade || "nenhuma") as Dificuldade);
         setProximoPasso((d.proximoPasso || "continuar") as ProximoPasso);
+        // fora das faixas conhecidas (rascunho editado à mão) cai no default —
+        // valor solto renderizaria cru no Select
+        setDuracaoMin(
+          typeof d.duracaoMin === "string" && d.duracaoMin in DURACAO_OPCOES
+            ? d.duracaoMin
+            : "60"
+        );
         setEncaminhamentos(
           (Array.isArray(d.encaminhamentos) ? d.encaminhamentos : [])
             .filter((t) => t && typeof t === "object" && typeof t.id === "string")
@@ -240,7 +269,7 @@ export function RegistroForm({
         setConcluirIds(new Set(ids.filter((id) => pendentes.has(id))));
         setRestored({
           savedAt: new Date().toISOString(),
-          tema: "", ferramenta: "", reflexoes: "", observacoes: "",
+          tema: "", ferramenta: "", duracaoMin: "", reflexoes: "", observacoes: "",
           atividades: [], atividadeOutro: "", avaliacao: "",
           dificuldade: "", dificuldadeDetalhe: "",
           proximoPasso: "", proximoPassoDetalhe: "",
@@ -252,7 +281,7 @@ export function RegistroForm({
       }
     }, 0);
     return () => clearTimeout(timer);
-  }, [draftKey, registro, combinadosPendentes]);
+  }, [demo, draftKey, registro, combinadosPendentes]);
 
   function discardDraft() {
     try {
@@ -263,6 +292,7 @@ export function RegistroForm({
     formRef.current?.reset();
     setDificuldade(registro?.dificuldade ?? "nenhuma");
     setProximoPasso(registro?.proximo_passo ?? "continuar");
+    setDuracaoMin("60");
     setEncaminhamentos([]);
     setConcluirIds(new Set());
     setErroAvaliacao(false);
@@ -505,7 +535,7 @@ export function RegistroForm({
             />
           </fieldset>
 
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-3">
             <div className="space-y-2">
               <Label htmlFor="tema">Tema trabalhado</Label>
               <Input
@@ -537,6 +567,24 @@ export function RegistroForm({
                     .map((i) => (
                       <SelectItem key={i} value={i}>{i}</SelectItem>
                     ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label id="duracao-label">Duração do encontro</Label>
+              <Select
+                name="duracao_min"
+                value={duracaoMin}
+                items={DURACAO_OPCOES}
+                onValueChange={(v) => setDuracaoMin(v ?? "60")}
+              >
+                <SelectTrigger id="duracao-select" aria-labelledby="duracao-label duracao-select"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="30">30 min</SelectItem>
+                  <SelectItem value="45">45 min</SelectItem>
+                  <SelectItem value="60">1h</SelectItem>
+                  <SelectItem value="90">1h30</SelectItem>
+                  <SelectItem value="120">2h</SelectItem>
                 </SelectContent>
               </Select>
             </div>

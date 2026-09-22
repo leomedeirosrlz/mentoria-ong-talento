@@ -19,24 +19,28 @@
 
 import type {
   AppRole,
+  Assinatura,
   AvaliacaoJovem,
   CicloEvento,
   Comunicado,
+  DocumentoTemplate,
   Dupla,
   Encaminhamento,
   Encontro,
   EspecialistaEvento,
   Material,
   Mentorado,
+  MentorProfile,
   Notificacao,
   PessoaNota,
+  Presenca,
   Profile,
   ProximoPasso,
   Registro,
   RegistroAnexo,
   SolicitacaoEspecialista,
+  Supervisao,
 } from "@/lib/types";
-import type { MentorProfile } from "@/lib/queries";
 import type { Interacao } from "@/lib/interacoes";
 
 export type DemoData = {
@@ -54,6 +58,10 @@ export type DemoData = {
   pessoaNotas: PessoaNota[];
   interacoes: Interacao[];
   notificacoes: Record<AppRole, Notificacao[]>;
+  documentoTemplates: DocumentoTemplate[];
+  assinaturas: Assinatura[];
+  presencas: Presenca[];
+  supervisoes: Supervisao[];
 };
 
 // ---------- ids ----------
@@ -68,7 +76,9 @@ const uid = (n: number): string =>
 // registros: 10xx · encaminhamentos: 12xx · encontro_notas: 14xx ·
 // anexos: 16xx · ciclo_eventos: 18xx · materiais: 20xx · comunicados: 22xx ·
 // solicitacoes: 24xx · pessoa_notas: 26xx · interacoes: 28xx ·
-// notificacoes: 30xx. user_id fake: f0xx. especialista_eventos não tem id.
+// notificacoes: 30xx · assinaturas: 32xx · doc_templates: 33xx · tokens de
+// assinatura: 34xx · presencas: 36xx · supervisoes: 38xx. user_id fake:
+// f0xx. especialista_eventos não tem id.
 const P = {
   marina: 0x0001, // persona coordenação
   paulo: 0x0002, // persona supervisor
@@ -150,12 +160,14 @@ const HOJE = new Date(
 /** Terça-feira da semana corrente — âncora do 5º encontro do ciclo. */
 const TERCA_ENCONTRO_5 = addDias(HOJE, ((2 - HOJE.getDay()) + 7) % 7);
 
-/** Dia oficial do encontro n do ciclo: 1..14 semanais a partir da âncora,
- *  recesso de ~3 semanas entre o 14 e o 15 (como no seed). */
+/** Dia oficial do encontro n do ciclo (espelha o seed/cronograma oficial):
+ *  1–8 semanais a partir da âncora; 15 dias entre o 8º e o 9º (tempo de
+ *  prática das submetas); 9–14 semanais; recesso de ~3 semanas; 15–16. */
 function diaEncontro(n: number): Date {
-  if (n <= 14) return addDias(TERCA_ENCONTRO_5, (n - 5) * 7);
-  if (n === 15) return addDias(TERCA_ENCONTRO_5, 84); // 14 + 21d
-  return addDias(TERCA_ENCONTRO_5, 91); // 15 + 7d
+  if (n <= 8) return addDias(TERCA_ENCONTRO_5, (n - 5) * 7);
+  if (n <= 14) return addDias(TERCA_ENCONTRO_5, (n - 5) * 7 + 7); // folga 8º→9º
+  if (n === 15) return addDias(TERCA_ENCONTRO_5, 91); // 14 + 21d (recesso)
+  return addDias(TERCA_ENCONTRO_5, 98); // 15 + 7d
 }
 
 // ---------- calendário oficial (conteúdo do seed.sql, datas deslocadas) ----------
@@ -184,15 +196,19 @@ function buildCicloEventos(): CicloEvento[] {
   const F1 = "Criar vínculo e construir o PDM";
   const F2 = "Colocar o plano em prática";
   const F3 = "Consolidar a autonomia";
-  const F4 = "Aprofundar vínculo e aprendizado";
+  const F4 = "Aprofundar o vínculo e o aprendizado";
   const F5 = "Roda da Vida";
   const F6 = "Encerrar e celebrar";
 
   return [
-    // formação: 2 dias logo antes do encontro 1 (o seed tem -5 e -4; aqui
-    // -6 e -5 pra sempre caírem antes da 1ª terça, mesmo com a âncora móvel)
-    ev("formacao", null, addDias(diaEncontro(1), -6), "Encontro inicial de formação de mentores"),
-    ev("formacao", null, addDias(diaEncontro(1), -5), "Encontro final de formação de mentores"),
+    // pré-ciclo no cronograma oficial: inscrições -40→-20d, triagem -19→-14d,
+    // matching -13→-6d, formação -5/-4 e abertura -4 (tudo antes do encontro 1)
+    ev("marco", null, addDias(diaEncontro(1), -40), "Inscrições e seleção", null, [], addDias(diaEncontro(1), -20)),
+    ev("marco", null, addDias(diaEncontro(1), -19), "Triagem e preparação do matching", null, [], addDias(diaEncontro(1), -14)),
+    ev("marco", null, addDias(diaEncontro(1), -13), "Matching das duplas", null, [], addDias(diaEncontro(1), -6)),
+    ev("formacao", null, addDias(diaEncontro(1), -5), "Encontro inicial de formação de mentores"),
+    ev("formacao", null, addDias(diaEncontro(1), -4), "Encontro final de formação de mentores"),
+    ev("marco", null, addDias(diaEncontro(1), -4), "Encontro de abertura com a coordenação"),
     ev("encontro", 1, diaEncontro(1), "Boas-vindas, histórias de vida e abertura", F1, ["Perguntas Eficazes", "Escuta Ativa", "PDM", "Roda da Vida (leitura inicial)"]),
     ev("encontro", 2, diaEncontro(2), "Avaliação por terceiros e visão de futuro", F1, ["PDM", "Construindo a sua Visão"]),
     ev("encontro", 3, diaEncontro(3), "Declaração de Visão e metas SMART", F1, ["PDM", "Modelo SMART"]),
@@ -200,16 +216,19 @@ function buildCicloEventos(): CicloEvento[] {
     ev("encontro", 5, diaEncontro(5), "Acompanhamento das primeiras submetas", F2, ["PDM", "Feedback Construtivo"]),
     ev("encontro", 6, diaEncontro(6), "Superação de obstáculos", F2, ["PDM", "Feedback Construtivo"]),
     ev("encontro", 7, diaEncontro(7), "Ajustes de prazos e desdobramentos", F2, ["PDM", "Feedback Construtivo"]),
-    ev("encontro", 8, diaEncontro(8), "Revisão de meio de percurso", F3, ["PDM", "Escuta Ativa"]),
-    ev("encontro", 9, diaEncontro(9), "Transferência gradual da condução", F3, ["PDM", "Escuta Ativa"]),
-    ev("encontro", 10, diaEncontro(10), "Trajetória do mentor e rede de apoio", F4, ["Papel de modelo", "Escuta Ativa"]),
-    ev("encontro", 11, diaEncontro(11), "Ampliação de espaços e repertório", F4, ["Papel de modelo", "Escuta Ativa"]),
-    ev("encontro", 12, diaEncontro(12), "Roda da Vida: explicação e leitura", F5, ["Roda da Vida", "Modelo SMART"]),
-    ev("encontro", 13, diaEncontro(13), "Roda da Vida: discussão por quadrante", F5, ["Roda da Vida", "Modelo SMART"]),
-    ev("encontro", 14, diaEncontro(14), "Roda da Vida: mapa de metas e submetas", F5, ["Roda da Vida", "Modelo SMART"]),
+    // títulos/fases/instrumentos 8–16 = a correção da 0035 (guia DPP oficial):
+    // 8 monitora e já transfere a condução; 9 é a revisão de meio de percurso
+    ev("encontro", 8, diaEncontro(8), "Monitoramento e responsabilidade", F3, ["PDM", "Escuta Ativa"]),
+    ev("encontro", 9, diaEncontro(9), "Revisão de meio de percurso", F3, ["PDM", "Escuta Ativa"]),
+    ev("encontro", 10, diaEncontro(10), "O mentor como espelho", F4, ["Papel de modelo", "Escuta Ativa"]),
+    ev("encontro", 11, diaEncontro(11), "Rede de apoio e novos espaços", F4, ["Papel de modelo", "Escuta Ativa"]),
+    ev("encontro", 12, diaEncontro(12), "Aplicação e leitura da Roda da Vida", F5, ["Roda da Vida", "Modelo SMART"]),
+    ev("encontro", 13, diaEncontro(13), "Metas das áreas prioritárias", F5, ["Roda da Vida", "Modelo SMART"]),
+    ev("encontro", 14, diaEncontro(14), "Desdobramento e plano de continuidade", F5, ["Roda da Vida", "Modelo SMART"]),
     ev("recesso", null, addDias(diaEncontro(14), 1), "Recesso de fim de ano", null, [], addDias(diaEncontro(14), 18)),
-    ev("encontro", 15, diaEncontro(15), "Revisão do percurso", F6, ["Roda da Vida", "Avaliação 360"]),
-    ev("encontro", 16, diaEncontro(16), "Celebração e encerramento simbólico", F6, ["Avaliação 360", "Autoavaliação do mentor"]),
+    ev("encontro", 15, diaEncontro(15), "Reflexão e reconhecimento", F6, ["PDM", "Roda da Vida"]),
+    ev("encontro", 16, diaEncontro(16), "Encerramento e celebração", F6, ["Avaliação 360º", "Autoavaliação do mentor"]),
+    // evento de encerramento: 15/01 no cronograma (+3d após o 16º encontro)
     ev("marco", null, addDias(diaEncontro(16), 3), "Evento de encerramento do programa"),
   ];
 }
@@ -305,7 +324,19 @@ const REG_DPP: Record<number, RegTmpl> = {
     reflexoes: (j) =>
       `Semana de provas — pouco avanço nas submetas. Repactuamos prazos no PDM sem cortar metas; ${j} saiu com o plano realista de novo.`,
   },
+  // 8–16 realinhados aos títulos oficiais do guia (mesma correção da 0035):
+  // o 8º já inclui a transferência gradual da condução e a revisão de meio
+  // de percurso é o 9º; 12–14 são os três momentos da Roda da Vida.
   8: {
+    tema: "Monitoramento e responsabilidade",
+    ferramenta: "PDM",
+    atividades: ["Acompanhamento de atividade/tarefa", "Conversa de acompanhamento"],
+    avaliacao: "boa",
+    proximo: "continuar",
+    reflexoes: (j) =>
+      `Monitoramento das metas com mais responsabilidade nas mãos de ${j} — dessa vez quem pautou o encontro e conduziu a revisão do PDM foi a pessoa mentorada, quase sem minha ajuda. A autonomia está aparecendo.`,
+  },
+  9: {
     tema: "Revisão de meio de percurso",
     ferramenta: "Escuta Ativa",
     atividades: ["Conversa de acompanhamento"],
@@ -314,35 +345,26 @@ const REG_DPP: Record<number, RegTmpl> = {
     reflexoes: (j) =>
       `Metade do caminho: relemos a Declaração de Visão e ${j} notou quanto já mudou desde o 1º encontro. Revisão honesta do que andou e do que ficou pelo caminho.`,
   },
-  9: {
-    tema: "Transferência gradual da condução",
-    ferramenta: "Escuta Ativa",
-    atividades: ["Conversa de acompanhamento", "Orientação individual"],
-    avaliacao: "boa",
-    proximo: "continuar",
-    reflexoes: (j) =>
-      `Dessa vez ${j} pautou o encontro — trouxe as próprias dúvidas e conduziu a revisão do PDM quase sem minha ajuda. A autonomia está aparecendo.`,
-  },
   10: {
-    tema: "Trajetória do mentor e rede de apoio",
+    tema: "O mentor como espelho",
     ferramenta: "Papel de modelo",
     atividades: ["Conversa de acompanhamento", "Orientação profissional"],
     avaliacao: "boa",
     proximo: "continuar",
     reflexoes: (j) =>
-      `Contei minha trajetória, incluindo os tropeços. ${j} perguntou bastante sobre o primeiro emprego; mapeamos pessoas da rede que podem ajudar nas metas.`,
+      `Contei minha trajetória, incluindo os tropeços. ${j} perguntou bastante sobre o primeiro emprego e as viradas de carreira — as histórias funcionaram como espelho pras próprias escolhas.`,
   },
   11: {
-    tema: "Ampliação de espaços e repertório",
+    tema: "Rede de apoio e novos espaços",
     ferramenta: "Papel de modelo",
     atividades: ["Desenvolvimento de competência", "Orientação profissional"],
     avaliacao: "boa",
     proximo: "continuar",
     reflexoes: (j) =>
-      `${j} voltou da feira de profissões da ONG com três cursos pra pesquisar. Plano novo: conversar com alguém que trabalha na área antes de decidir.`,
+      `${j} voltou da feira de profissões da ONG com três cursos pra pesquisar. Mapeamos a rede de apoio — quem pode abrir portas e apresentar espaços novos — e ficou de conversar com alguém da área antes de decidir.`,
   },
   12: {
-    tema: "Roda da Vida: explicação e leitura",
+    tema: "Aplicação e leitura da Roda da Vida",
     ferramenta: "Roda da Vida",
     atividades: ["Atividade prática"],
     avaliacao: "boa",
@@ -351,40 +373,40 @@ const REG_DPP: Record<number, RegTmpl> = {
       `Aplicamos a Roda da Vida completa — ${j} marcou saúde e lazer mais baixos e conectou isso com a rotina pesada de estudos.`,
   },
   13: {
-    tema: "Roda da Vida: discussão por quadrante",
+    tema: "Metas das áreas prioritárias",
     ferramenta: "Roda da Vida",
     atividades: ["Conversa de acompanhamento", "Identificação de dificuldades"],
     avaliacao: "boa",
     proximo: "reforcar",
     reflexoes: (j) =>
-      `Fundo no quadrante de desenvolvimento pessoal. ${j} percebeu sozinho que a meta de leitura estava parada e propôs 20 minutos por dia, sem eu sugerir.`,
+      `Fundo na área prioritária do quadrante de desenvolvimento pessoal. ${j} percebeu sozinho que a meta de leitura estava parada e propôs 20 minutos por dia, sem eu sugerir.`,
   },
   14: {
-    tema: "Roda da Vida: mapa de metas e submetas",
+    tema: "Desdobramento e plano de continuidade",
     ferramenta: "Modelo SMART",
     atividades: ["Atividade prática", "Desenvolvimento de competência"],
     avaliacao: "excelente",
     proximo: "continuar",
     reflexoes: (j) =>
-      `Da Roda pro plano: transformamos os dois quadrantes mais fracos em metas SMART novas no PDM — dessa vez quem escreveu as submetas foi ${j}.`,
+      `Da Roda pro plano: desdobramento das metas das áreas prioritárias em submetas novas no PDM — dessa vez quem escreveu foi ${j}. Fechamos com o plano de continuidade pro recesso.`,
   },
   15: {
-    tema: "Revisão do percurso",
-    ferramenta: "Avaliação 360",
+    tema: "Reflexão e reconhecimento",
+    ferramenta: "Roda da Vida",
     atividades: ["Conversa de acompanhamento"],
     avaliacao: "excelente",
     proximo: "continuar",
     reflexoes: (j) =>
-      `Voltamos ao primeiro registro e comparamos com hoje — ${j} listou por conta própria onde cresceu: autonomia, constância e clareza do que quer.`,
+      `Voltamos ao primeiro registro e relemos a Roda da Vida inicial — ${j} listou por conta própria onde cresceu: autonomia, constância e clareza do que quer. Reconhecimento merecido.`,
   },
   16: {
-    tema: "Celebração e encerramento simbólico",
-    ferramenta: "Autoavaliação do mentor",
+    tema: "Encerramento e celebração",
+    ferramenta: "Avaliação 360º",
     atividades: ["Conversa de acompanhamento"],
     avaliacao: "excelente",
     proximo: "outro",
     reflexoes: (j) =>
-      `Encontro de celebração — ${j} releu a Declaração de Visão e reconheceu cada meta cumprida. Fechamos combinando o que continua depois do programa.`,
+      `Encontro de encerramento — ${j} releu a Declaração de Visão e reconheceu cada meta cumprida. Preenchemos a avaliação final e fechamos combinando o que continua depois do programa.`,
     observacoes: () => "Ciclo encerrado com todos os combinados cumpridos.",
   },
 };
@@ -578,6 +600,13 @@ function build(): DemoData {
     role: "coordenacao", ativo: true, avatar_path: null,
     documento_path: "documentos/termo-marina-duarte.pdf",
     bio: null, linkedin: null, areas: null, voluntariado: null, onboarded_em: null,
+    nome_social: null, data_nascimento: "1988-03-15", genero: "feminino",
+    cidade: "São Paulo", uf: "SP",
+    interesses: ["gestão de programas sociais", "educação", "mentoria"],
+    motivacao: "Coordena o programa desde o primeiro ciclo — acredita em mentoria como alavanca de mobilidade.",
+    pref_genero_par: "indiferente",
+    cargo: "Coordenadora de programas", empresa: "Instituto Realiza",
+    origem: "Equipe fundadora", consent_lgpd_em: haDias(400),
   };
   const paulo: Profile = {
     id: uid(P.paulo), user_id: uid(0xf002), nome: "Paulo Serra",
@@ -585,6 +614,13 @@ function build(): DemoData {
     role: "supervisor", ativo: true, avatar_path: null,
     documento_path: "documentos/termo-paulo-serra.pdf",
     bio: null, linkedin: null, areas: null, voluntariado: null, onboarded_em: null,
+    nome_social: null, data_nascimento: "1979-06-22", genero: "masculino",
+    cidade: "São Paulo", uf: "SP",
+    interesses: ["psicologia", "adolescência", "supervisão de grupos"],
+    motivacao: "Psicólogo há 20 anos; entrou pra dar suporte técnico às duplas.",
+    pref_genero_par: "indiferente",
+    cargo: "Psicólogo", empresa: "Consultório próprio",
+    origem: "Indicação da coordenação", consent_lgpd_em: haDias(400),
   };
   const ricardo: Profile = {
     id: uid(P.ricardo), user_id: uid(0xf003), nome: "Ricardo Tavares",
@@ -592,6 +628,13 @@ function build(): DemoData {
     role: "mentor_dpp", ativo: true, avatar_path: null,
     documento_path: "documentos/termo-ricardo-tavares.pdf",
     bio: null, linkedin: null, areas: null, voluntariado: null, onboarded_em: null,
+    nome_social: null, data_nascimento: "1990-01-18", genero: "masculino",
+    cidade: "São Paulo", uf: "SP",
+    interesses: ["carreira", "produto", "tecnologia"],
+    motivacao: "Tive um mentor no começo da carreira que mudou minha trajetória — quero fazer o mesmo por alguém.",
+    pref_genero_par: "indiferente",
+    cargo: "Product manager", empresa: "Fintech",
+    origem: "Post no LinkedIn", consent_lgpd_em: haDias(45),
   };
   const sofia: Profile = {
     id: uid(P.sofia), user_id: uid(0xf004), nome: "Sofia Nogueira",
@@ -599,6 +642,13 @@ function build(): DemoData {
     role: "mentor_especialista", ativo: true, avatar_path: null,
     documento_path: "documentos/termo-sofia-nogueira.pdf",
     bio: null, linkedin: null, areas: null, voluntariado: null, onboarded_em: null,
+    nome_social: null, data_nascimento: "1992-09-05", genero: "feminino",
+    cidade: "São Paulo", uf: "SP",
+    interesses: ["matemática", "ENEM", "educação"],
+    motivacao: "Sou professora — sei destravar exatas pra quem trava na base.",
+    pref_genero_par: "indiferente",
+    cargo: "Professora de matemática", empresa: "Colégio particular",
+    origem: "Voluntária desde o ciclo anterior", consent_lgpd_em: haDias(50),
   };
 
   const beatriz: Profile = {
@@ -611,6 +661,13 @@ function build(): DemoData {
     areas: ["projetos sociais", "educação", "RH"],
     voluntariado: "Supervisora de duplas desde o primeiro ciclo do programa.",
     onboarded_em: haDias(90),
+    nome_social: null, data_nascimento: "1984-04-09", genero: "feminino",
+    cidade: "São Paulo", uf: "SP",
+    interesses: ["desenvolvimento de jovens", "RH", "projetos sociais"],
+    motivacao: "12 anos em programas de jovens — supervisão é onde mais contribuo.",
+    pref_genero_par: "indiferente",
+    cargo: "Psicóloga organizacional", empresa: "Consultoria própria",
+    origem: "Rede da coordenação", consent_lgpd_em: haDias(90),
   };
   const carlos: Profile = {
     id: uid(P.carlos), user_id: uid(0xf006), nome: "Carlos Menezes",
@@ -622,6 +679,13 @@ function build(): DemoData {
     areas: ["tecnologia", "carreira"],
     voluntariado: "Mentor voluntário desde 2024; antes, monitor em cursinho comunitário.",
     onboarded_em: haDias(60),
+    nome_social: null, data_nascimento: "1985-11-02", genero: "masculino",
+    cidade: "São Paulo", uf: "SP",
+    interesses: ["tecnologia", "carreira", "dados"],
+    motivacao: "Mentor desde 2024 — comecei como monitor em cursinho comunitário.",
+    pref_genero_par: "indiferente",
+    cargo: "Líder técnico", empresa: "Fintech",
+    origem: "Indicação de outro mentor", consent_lgpd_em: haDias(60),
   };
   const fernanda: Profile = {
     id: uid(P.fernanda), user_id: uid(0xf007), nome: "Fernanda Alves",
@@ -633,6 +697,13 @@ function build(): DemoData {
     areas: ["educação", "projetos sociais"],
     voluntariado: "Primeira vez como mentora; voluntariado anterior em alfabetização de adultos.",
     onboarded_em: haDias(60),
+    nome_social: null, data_nascimento: "1991-07-27", genero: "feminino",
+    cidade: "Guarulhos", uf: "SP",
+    interesses: ["educação", "reforço escolar", "projetos sociais"],
+    motivacao: "Trabalho com reforço escolar na rede pública — a mentoria é o próximo passo natural.",
+    pref_genero_par: "feminino",
+    cargo: "Pedagoga", empresa: "Prefeitura de Guarulhos",
+    origem: "ONG parceira", consent_lgpd_em: haDias(60),
   };
   const joaoPedro: Profile = {
     id: uid(P.joaoPedro), user_id: uid(0xf008), nome: "João Pedro Vital",
@@ -644,6 +715,13 @@ function build(): DemoData {
     areas: ["dados", "finanças"],
     voluntariado: null,
     onboarded_em: haDias(45),
+    nome_social: null, data_nascimento: "1999-03-11", genero: "masculino",
+    cidade: "São Paulo", uf: "SP",
+    interesses: ["dados", "finanças", "primeiro emprego"],
+    motivacao: "Fui mentorado na faculdade; agora quero retribuir.",
+    pref_genero_par: "indiferente",
+    cargo: "Analista de dados", empresa: "Banco",
+    origem: "Post no LinkedIn", consent_lgpd_em: haDias(45),
   };
   const luiza: Profile = {
     id: uid(P.luiza), user_id: uid(0xf009), nome: "Luiza Campos",
@@ -655,6 +733,13 @@ function build(): DemoData {
     areas: ["design", "comunicação"],
     voluntariado: "Mentora no ciclo anterior; voltou pra um segundo ciclo.",
     onboarded_em: haDias(200),
+    nome_social: null, data_nascimento: "1993-12-08", genero: "feminino",
+    cidade: "São Paulo", uf: "SP",
+    interesses: ["design", "comunicação", "portfólio"],
+    motivacao: "Segundo ciclo como mentora — a troca com o jovem me ensina tanto quanto ensino.",
+    pref_genero_par: "feminino",
+    cargo: "Designer de produto", empresa: "Freelancer",
+    origem: "Voltou do ciclo anterior", consent_lgpd_em: haDias(200),
   };
   const andre: Profile = {
     id: uid(P.andre), user_id: uid(0xf00a), nome: "André Rocha",
@@ -666,6 +751,13 @@ function build(): DemoData {
     areas: ["empreendedorismo", "finanças", "vendas"],
     voluntariado: "Quer assumir uma dupla — fez a formação e aguarda matching.",
     onboarded_em: haDias(30),
+    nome_social: null, data_nascimento: "1987-05-16", genero: "masculino",
+    cidade: "Osasco", uf: "SP",
+    interesses: ["empreendedorismo", "vendas", "finanças"],
+    motivacao: "Abri duas empresas do zero; quero ajudar um jovem a enxergar que também pode.",
+    pref_genero_par: "indiferente",
+    cargo: "Empreendedor", empresa: "Negócio próprio",
+    origem: "Evento da ONG Horizonte", consent_lgpd_em: haDias(30),
   };
   const helena: Profile = {
     id: uid(P.helena), user_id: uid(0xf00b), nome: "Helena Prado",
@@ -677,6 +769,13 @@ function build(): DemoData {
     areas: ["comunicação", "carreira"],
     voluntariado: "Mentora especialista — trilhas curtas de demanda pontual.",
     onboarded_em: haDias(50),
+    nome_social: null, data_nascimento: "1986-08-21", genero: "feminino",
+    cidade: "São Paulo", uf: "SP",
+    interesses: ["comunicação", "entrevistas", "apresentações"],
+    motivacao: "Destravo gente pra entrevista e apresentação — é o que faço todo dia.",
+    pref_genero_par: "feminino",
+    cargo: "Head de comunicação", empresa: "Varejo",
+    origem: "Indicação de uma mentora especialista", consent_lgpd_em: haDias(50),
   };
   const marcos: Profile = {
     id: uid(P.marcos), user_id: uid(0xf00c), nome: "Marcos Vinícius",
@@ -688,6 +787,13 @@ function build(): DemoData {
     areas: ["tecnologia", "dados", "educação"],
     voluntariado: "Disponível pra aceitar demandas do mural de especialistas.",
     onboarded_em: haDias(25),
+    nome_social: null, data_nascimento: "1989-02-14", genero: "masculino",
+    cidade: "São Paulo", uf: "SP",
+    interesses: ["tecnologia", "dados", "ensino técnico"],
+    motivacao: "Dou aula técnica aos sábados — a trilha curta encaixa na minha rotina.",
+    pref_genero_par: "indiferente",
+    cargo: "Engenheiro de dados", empresa: "Consultoria",
+    origem: "Post no LinkedIn", consent_lgpd_em: haDias(25),
   };
   // cadastro recebido, ainda não entrou: user_id null + ativo — a badge da
   // lista de pessoas deriva disso, não de flag própria
@@ -697,6 +803,13 @@ function build(): DemoData {
     role: null, ativo: true, avatar_path: null,
     documento_path: "documentos/termo-renata-costa.pdf",
     bio: null, linkedin: null, areas: null, voluntariado: null, onboarded_em: null,
+    // cadastro prévio pela coordenação — ficha de matching quase vazia e
+    // sem consentimento: ela ainda não entrou na plataforma pra aceitar
+    nome_social: null, data_nascimento: null, genero: null,
+    cidade: "São Paulo", uf: "SP", interesses: [],
+    motivacao: null, pref_genero_par: null,
+    cargo: null, empresa: null,
+    origem: "Formulário de inscrição", consent_lgpd_em: null,
   };
   const patricia: Profile = {
     id: uid(P.patricia), user_id: uid(0xf00e), nome: "Patrícia Gomes",
@@ -708,6 +821,13 @@ function build(): DemoData {
     areas: ["RH", "carreira"],
     voluntariado: "Afastada do programa neste ciclo.",
     onboarded_em: haDias(300),
+    nome_social: null, data_nascimento: "1982-10-30", genero: "feminino",
+    cidade: "São Paulo", uf: "SP",
+    interesses: ["RH", "carreira"],
+    motivacao: "Foi mentora em ciclos anteriores.",
+    pref_genero_par: "indiferente",
+    cargo: "Gerente de RH", empresa: "Indústria",
+    origem: "Ciclos anteriores", consent_lgpd_em: haDias(300),
   };
 
   const profiles: Profile[] = [
@@ -723,18 +843,52 @@ function build(): DemoData {
   };
 
   const mentorProfiles: MentorProfile[] = [
-    { profile_id: ricardo.id, tipo: "dpp", areas: ["carreira", "educação"], capacidade: 1, termo_ok: true, formacao_ok: true },
-    { profile_id: carlos.id, tipo: "dpp", areas: ["tecnologia", "carreira"], capacidade: 1, termo_ok: true, formacao_ok: true },
-    { profile_id: fernanda.id, tipo: "dpp", areas: ["educação", "projetos sociais"], capacidade: 1, termo_ok: true, formacao_ok: true },
+    // Ricardo sem termo_ok: persona mentor_dpp entra na demo com o banner
+    // "termo pendente" — é o que demonstra o fluxo de assinatura
+    { profile_id: ricardo.id, tipo: "dpp", areas: ["carreira", "educação"], capacidade: 1, termo_ok: false, formacao_ok: true,
+      experiencia_previa: "Primeiro ciclo como mentor — concluiu a formação e participou de duas rodas de conversa como ouvinte.",
+      formacao_externa: "Trilha de liderança e feedback da empresa.",
+      disponibilidade: { dias: ["ter", "qui"], periodos: ["noite"] } },
+    { profile_id: carlos.id, tipo: "dpp", areas: ["tecnologia", "carreira"], capacidade: 1, termo_ok: true, formacao_ok: true,
+      experiencia_previa: "Foi monitor em cursinho comunitário por dois anos.",
+      formacao_externa: "Mentor de novos devs no programa interno da fintech.",
+      disponibilidade: { dias: ["seg", "qua"], periodos: ["noite"] } },
+    { profile_id: fernanda.id, tipo: "dpp", areas: ["educação", "projetos sociais"], capacidade: 1, termo_ok: true, formacao_ok: true,
+      experiencia_previa: "Coordena projeto de reforço escolar com 40 alunos na rede pública.",
+      formacao_externa: null,
+      disponibilidade: { dias: ["ter", "qui"], periodos: ["tarde", "noite"] } },
     // João Pedro é o mentor novo que ainda não concluiu a formação — é o que
     // faz o board de matching mostrar o badge "sem formação"
-    { profile_id: joaoPedro.id, tipo: "dpp", areas: ["dados", "finanças"], capacidade: 1, termo_ok: true, formacao_ok: false },
-    { profile_id: luiza.id, tipo: "dpp", areas: ["design", "comunicação"], capacidade: 1, termo_ok: true, formacao_ok: true },
-    { profile_id: andre.id, tipo: "dpp", areas: ["empreendedorismo", "finanças"], capacidade: 2, termo_ok: true, formacao_ok: true },
-    { profile_id: sofia.id, tipo: "especialista", areas: ["educação", "dados"], capacidade: 1, termo_ok: true, formacao_ok: true },
-    { profile_id: helena.id, tipo: "especialista", areas: ["comunicação", "carreira"], capacidade: 1, termo_ok: true, formacao_ok: true },
-    { profile_id: marcos.id, tipo: "especialista", areas: ["tecnologia", "dados"], capacidade: 2, termo_ok: true, formacao_ok: true },
-    { profile_id: patricia.id, tipo: "dpp", areas: ["RH", "carreira"], capacidade: 1, termo_ok: true, formacao_ok: true },
+    { profile_id: joaoPedro.id, tipo: "dpp", areas: ["dados", "finanças"], capacidade: 1, termo_ok: true, formacao_ok: false,
+      experiencia_previa: null,
+      formacao_externa: null,
+      disponibilidade: { dias: ["sab"], periodos: ["manha"] } },
+    { profile_id: luiza.id, tipo: "dpp", areas: ["design", "comunicação"], capacidade: 1, termo_ok: true, formacao_ok: true,
+      experiencia_previa: "Mentora no ciclo anterior — a dupla concluiu o PDM inteiro.",
+      formacao_externa: "Workshops de portfólio pra estudantes de design.",
+      disponibilidade: { dias: ["qua", "sex"], periodos: ["tarde"] } },
+    { profile_id: andre.id, tipo: "dpp", areas: ["empreendedorismo", "finanças"], capacidade: 2, termo_ok: true, formacao_ok: true,
+      experiencia_previa: "Empreende há 8 anos; concluiu a formação e aguarda a primeira dupla.",
+      formacao_externa: "Mentorias do Sebrae pra pequenos negócios.",
+      disponibilidade: { dias: ["seg", "ter", "qua", "qui", "sex"], periodos: ["manha", "tarde"] } },
+    { profile_id: sofia.id, tipo: "especialista", areas: ["educação", "dados"], capacidade: 1, termo_ok: true, formacao_ok: true,
+      experiencia_previa: "Professora de matemática há 10 anos, com aulas particulares focadas em ENEM.",
+      formacao_externa: "Especialização em avaliação educacional.",
+      disponibilidade: { dias: ["sab", "dom"], periodos: ["manha", "tarde"] } },
+    { profile_id: helena.id, tipo: "especialista", areas: ["comunicação", "carreira"], capacidade: 1, termo_ok: true, formacao_ok: true,
+      experiencia_previa: "Treina equipes e executivos em apresentações e entrevistas.",
+      formacao_externa: "Formação em coaching de oratória.",
+      disponibilidade: { dias: ["ter", "qui"], periodos: ["manha", "noite"] } },
+    { profile_id: marcos.id, tipo: "especialista", areas: ["tecnologia", "dados"], capacidade: 2, termo_ok: true, formacao_ok: true,
+      experiencia_previa: "Professor de curso técnico aos sábados; engenheiro de dados durante a semana.",
+      formacao_externa: null,
+      disponibilidade: { dias: ["seg", "qua", "sab"], periodos: ["manha", "noite"] } },
+    // Patrícia afastada: ficha existe mas sem disponibilidade — o board de
+    // matching a mostra como indisponível
+    { profile_id: patricia.id, tipo: "dpp", areas: ["RH", "carreira"], capacidade: 1, termo_ok: true, formacao_ok: true,
+      experiencia_previa: "Mentora em dois ciclos anteriores.",
+      formacao_externa: null,
+      disponibilidade: null },
   ];
 
   // ---------- mentorados ----------
@@ -745,6 +899,14 @@ function build(): DemoData {
     ong_origem: "ONG Horizonte",
     notas: "3º ano do ensino médio. Quer prestar ENEM pra pedagogia; mora com a mãe e dois irmãos. Veio pela oficina de projetos da ONG.",
     avatar_path: null, documento_path: "documentos/autorizacao-ana-beatriz.pdf",
+    nome_social: "Bia", data_nascimento: "2008-04-12", genero: "feminino",
+    cidade: "São Paulo", uf: "SP",
+    interesses: ["pedagogia", "ENEM", "leitura"],
+    motivacao: "Quero ser a primeira da família na faculdade e dar aula pra crianças.",
+    pref_genero_par: "feminino",
+    objetivos: "Passar no ENEM pra pedagogia e montar um plano de estudos que eu consiga seguir.",
+    escolaridade: "medio", origem: "Oficina de projetos da ONG Horizonte",
+    disponibilidade: { dias: ["ter", "qui"], periodos: ["noite"] },
   };
   const caio: Mentorado = {
     id: uid(M.caio), nome: "Caio Henrique Oliveira",
@@ -752,6 +914,14 @@ function build(): DemoData {
     ong_origem: "Projeto Semente",
     notas: "1º ano. Interesse em tecnologia e intercâmbio; tímido no primeiro contato, engajado depois que pega confiança.",
     avatar_path: null, documento_path: "documentos/autorizacao-caio.pdf",
+    nome_social: null, data_nascimento: "2009-08-30", genero: "masculino",
+    cidade: "São Paulo", uf: "SP",
+    interesses: ["tecnologia", "inglês", "intercâmbio"],
+    motivacao: "Sonho em fazer intercâmbio e trabalhar com tecnologia.",
+    pref_genero_par: "indiferente",
+    objetivos: "Conquistar a bolsa de intercâmbio da escola e destravar o inglês instrumental.",
+    escolaridade: "medio", origem: "Projeto Semente",
+    disponibilidade: { dias: ["sab"], periodos: ["manha"] },
   };
   const dandara: Mentorado = {
     id: uid(M.dandara), nome: "Dandara Souza",
@@ -759,12 +929,26 @@ function build(): DemoData {
     ong_origem: "Casa do Saber",
     notas: "2º ano. Voltou a trabalhar fins de semana — agenda apertada. Sonha com vaga de jovem aprendiz.",
     avatar_path: null, documento_path: "documentos/autorizacao-dandara.pdf",
+    nome_social: null, data_nascimento: "2008-12-03", genero: "feminino",
+    cidade: "São Paulo", uf: "SP",
+    interesses: ["jovem aprendiz", "comunicação", "redação"],
+    motivacao: "Trabalho no fim de semana e quero uma vaga de jovem aprendiz pra ajudar em casa.",
+    pref_genero_par: "feminino",
+    objetivos: "Conseguir a vaga de jovem aprendiz e melhorar a redação pro ENEM.",
+    escolaridade: "medio", origem: "Casa do Saber",
+    disponibilidade: { dias: ["ter", "qua"], periodos: ["noite"] },
   };
   const eduardo: Mentorado = {
     id: uid(M.eduardo), nome: "Eduardo Lima",
     email: null, whatsapp: "5511976123004",
     ong_origem: "ONG Horizonte",
     notas: null, avatar_path: null, documento_path: null,
+    // ficha mínima — cadastro antigo, a coordenação ainda não enriqueceu
+    nome_social: null, data_nascimento: "2009-01-20", genero: "masculino",
+    cidade: "São Paulo", uf: "SP", interesses: [],
+    motivacao: null, pref_genero_par: null, objetivos: null,
+    escolaridade: "medio", origem: null,
+    disponibilidade: null,
   };
   const isabela: Mentorado = {
     id: uid(M.isabela), nome: "Isabela Ferreira",
@@ -772,6 +956,14 @@ function build(): DemoData {
     ong_origem: "Instituto Alavanca",
     notas: "Ciclo 2025/2026 concluído — fechou o PDM inteiro e entrou no curso técnico que planejava.",
     avatar_path: null, documento_path: "documentos/autorizacao-isabela.pdf",
+    nome_social: null, data_nascimento: "2007-02-14", genero: "feminino",
+    cidade: "São Paulo", uf: "SP",
+    interesses: ["curso técnico", "administração"],
+    motivacao: "Fechei o PDM inteiro — agora é terminar o técnico e estagiar.",
+    pref_genero_par: "feminino",
+    objetivos: "Concluir o técnico em administração e conseguir estágio na área.",
+    escolaridade: "tecnico", origem: "Instituto Alavanca",
+    disponibilidade: { dias: ["seg", "qua"], periodos: ["tarde"] },
   };
   const kaua: Mentorado = {
     id: uid(M.kaua), nome: "Kauã Rodrigues",
@@ -779,6 +971,14 @@ function build(): DemoData {
     ong_origem: "Projeto Semente",
     notas: "3º ano. Sem dupla ainda — interesse em empreendedorismo e primeiros empregos.",
     avatar_path: null, documento_path: "documentos/autorizacao-kaua.pdf",
+    nome_social: null, data_nascimento: "2008-07-19", genero: "masculino",
+    cidade: "São Paulo", uf: "SP",
+    interesses: ["empreendedorismo", "primeiro emprego", "vendas"],
+    motivacao: "Quero aprender a transformar a produção de doces da minha família num negócio.",
+    pref_genero_par: "masculino",
+    objetivos: "Conseguir o primeiro emprego e montar um plano realista pra microempresa da família.",
+    escolaridade: "medio", origem: "Projeto Semente",
+    disponibilidade: { dias: ["ter", "qui"], periodos: ["noite"] },
   };
   const laura: Mentorado = {
     id: uid(M.laura), nome: "Laura Mendes",
@@ -786,12 +986,25 @@ function build(): DemoData {
     ong_origem: "Casa do Saber",
     notas: "1º ano. Aguarda matching — família pediu reforço em rotina de estudos.",
     avatar_path: null, documento_path: null,
+    nome_social: null, data_nascimento: "2009-11-25", genero: "feminino",
+    cidade: "São Paulo", uf: "SP",
+    interesses: ["rotina de estudos", "vestibular"],
+    motivacao: "A família pediu acompanhamento — quero passar de ano direto.",
+    pref_genero_par: "feminino",
+    objetivos: "Organizar a rotina de estudos e subir as notas de exatas.",
+    escolaridade: "medio", origem: "Casa do Saber",
+    disponibilidade: { dias: ["ter", "qui"], periodos: ["tarde", "noite"] },
   };
   const pedro: Mentorado = {
     id: uid(M.pedro), nome: "Pedro Henrique Almeida",
     email: null, whatsapp: "5511976123008",
     ong_origem: "ONG Horizonte",
     notas: null, avatar_path: null, documento_path: null,
+    // ficha mínima, como a do Eduardo
+    nome_social: null, data_nascimento: "2008-05-08", genero: "masculino",
+    cidade: "São Paulo", uf: "SP", interesses: [],
+    motivacao: null, pref_genero_par: null, objetivos: null,
+    escolaridade: "medio", origem: null, disponibilidade: null,
   };
 
   const mentorados = [ana, caio, dandara, eduardo, isabela, kaua, laura, pedro];
@@ -924,6 +1137,7 @@ function build(): DemoData {
     status: "ativa",
     iniciada_em: inicioCiclo,
     trilha: "dpp",
+    pdm_url: "https://docs.google.com/document/d/1aBcDeFgHiJkLmNoPqRsTuVwXyZ/edit",
     demanda: null,
     solicitacao_id: null,
     mentor: ricardo,
@@ -1144,7 +1358,7 @@ function build(): DemoData {
   const duplaFim: Dupla = {
     id: uid(D.fim),
     ciclo: "2025/2026",
-    status: "encerrada",
+    status: "concluida",
     iniciada_em: ymd(addDias(FIM_CICLO_ANTERIOR, -15 * 7 - 7)),
     trilha: "dpp",
     demanda: null,
@@ -1490,6 +1704,17 @@ function build(): DemoData {
         lida_em: haDias(19, "08:00"),
         created_at: haDias(20, "18:05"),
       },
+      // formulario_respondido (0042) — a RPC de submit avisa a coordenação;
+      // aqui é a resposta da anamnese oficial da Ana (ver forms-data.ts)
+      {
+        id: uid(0x3004),
+        tipo: "formulario_respondido",
+        titulo: "Resposta de formulário",
+        corpo: 'Ana Beatriz Silva respondeu "Anamnese Social"',
+        href: "/formularios/de000000-0000-4000-8000-000000004004",
+        lida_em: haDias(31, "09:00"),
+        created_at: haDias(33, "19:12"),
+      },
     ],
     supervisor: [
       {
@@ -1530,6 +1755,17 @@ function build(): DemoData {
         lida_em: haDias(13, "07:00"),
         created_at: haDias(14, "09:35"),
       },
+      // supervisao_registrada (0041) — o mentor lê data e resumo da sessão
+      // que o supervisor registrou sobre ele (transparência)
+      {
+        id: uid(0x3022),
+        tipo: "supervisao_registrada",
+        titulo: "Sessão de supervisão registrada",
+        corpo: `Paulo Serra registrou a supervisão de ${ymd(addDias(HOJE, -13)).split("-").reverse().join("/")} sobre a dupla com Ana Beatriz Silva — o resumo está na ficha da dupla.`,
+        href: `/duplas/${uid(D.ok)}`,
+        lida_em: haDias(12, "08:00"),
+        created_at: haDias(13, "18:40"),
+      },
     ],
     mentor_especialista: [
       {
@@ -1553,6 +1789,145 @@ function build(): DemoData {
     ],
   };
 
+  // ---------- documentos & assinaturas (0033) ----------
+
+  const documentoTemplates: DocumentoTemplate[] = [
+    { id: uid(0x3301), slug: "termo-voluntario", titulo: "Termo de Adesão ao Trabalho Voluntário", versao: 1, signatario: "profile", ativo: true, created_at: haDias(400) },
+    { id: uid(0x3302), slug: "autorizacao-responsavel", titulo: "Autorização do Responsável", versao: 1, signatario: "mentorado", ativo: true, created_at: haDias(400) },
+  ];
+
+  const tplTermo = { slug: "termo-voluntario", titulo: "Termo de Adesão ao Trabalho Voluntário", versao: 1 };
+  const tplAutorizacao = { slug: "autorizacao-responsavel", titulo: "Autorização do Responsável", versao: 1 };
+
+  const dadosMarina = {
+    nome_civil: "Marina Duarte Ferreira",
+    rg: "34.567.890-1", cpf: "123.456.789-09", data_nascimento: "1988-03-15",
+    endereco: { logradouro: "Rua Vergueiro", numero: "1200", complemento: null, bairro: "Liberdade", cidade: "São Paulo", uf: "SP", cep: "01504001" },
+  };
+  const dadosCarlos = {
+    nome_civil: "Carlos Eduardo Menezes",
+    rg: "28.765.432-0", cpf: "987.654.321-00", data_nascimento: "1985-11-02",
+    endereco: { logradouro: "Av. Paulista", numero: "900", complemento: "cj 42", bairro: "Bela Vista", cidade: "São Paulo", uf: "SP", cep: "01310100" },
+  };
+
+  const assinaturas: Assinatura[] = [
+    // Marina e Carlos já assinaram o termo — evidências preenchidas
+    { id: uid(0x3201), template_id: uid(0x3301), profile_id: marina.id, mentorado_id: null,
+      status: "assinado", dados_snapshot: dadosMarina, token: uid(0x3401), token_expira_em: null,
+      assinatura_texto: "Marina Duarte Ferreira", assinado_em: haDias(35, "09:12"),
+      ip: "187.44.12.90", user_agent: "Mozilla/5.0 (Macintosh) Chrome/126",
+      hash_documento: "9f2c1a…demo", created_by: null, created_at: haDias(35, "09:12"),
+      template: tplTermo },
+    { id: uid(0x3202), template_id: uid(0x3301), profile_id: carlos.id, mentorado_id: null,
+      status: "assinado", dados_snapshot: dadosCarlos, token: uid(0x3402), token_expira_em: null,
+      assinatura_texto: "Carlos Eduardo Menezes", assinado_em: haDias(60, "20:40"),
+      ip: "177.92.4.11", user_agent: "Mozilla/5.0 (iPhone) Safari/17",
+      hash_documento: "77aa10…demo", created_by: null, created_at: haDias(60, "20:40"),
+      template: tplTermo },
+    // Ana: autorização do responsável já assinada via link tokenizado
+    { id: uid(0x3203), template_id: uid(0x3302), profile_id: null, mentorado_id: ana.id,
+      status: "assinado",
+      dados_snapshot: {
+        mentorado_nome: ana.nome,
+        responsavel: { nome_civil: "Cleusa Maria Silva", rg: "22.334.556-7", cpf: "321.654.987-11", data_nascimento: "1979-06-30", parentesco: "Mãe", endereco: { logradouro: "Rua das Flores", numero: "88", complemento: null, bairro: "Jardim Brasil", cidade: "São Paulo", uf: "SP", cep: "08410250" } },
+      },
+      token: uid(0x3403), token_expira_em: haDias(-35 + 30), // expirou depois de assinada — não importa
+      assinatura_texto: "Cleusa Maria Silva", assinado_em: haDias(35, "19:02"),
+      ip: "191.33.208.44", user_agent: "Mozilla/5.0 (Android) Chrome/125",
+      hash_documento: "be4410…demo", created_by: marina.id, created_at: haDias(37, "10:00"),
+      template: tplAutorizacao },
+    // Kauã: autorização pendente — o link /assinar/<uid(0x3404)> abre a tela pública
+    { id: uid(0x3204), template_id: uid(0x3302), profile_id: null, mentorado_id: kaua.id,
+      status: "pendente", dados_snapshot: null, token: uid(0x3404),
+      token_expira_em: haDias(-30), // 30 dias no futuro
+      assinatura_texto: null, assinado_em: null, ip: null, user_agent: null,
+      hash_documento: null, created_by: marina.id, created_at: haDias(2),
+      template: tplAutorizacao },
+    // Patrícia (inativa): termo revogado quando saiu do programa
+    { id: uid(0x3205), template_id: uid(0x3301), profile_id: patricia.id, mentorado_id: null,
+      status: "revogado", dados_snapshot: null, token: uid(0x3405), token_expira_em: null,
+      assinatura_texto: null, assinado_em: null, ip: null, user_agent: null,
+      hash_documento: null, created_by: marina.id, created_at: haDias(200),
+      template: tplTermo },
+    // Ricardo (persona mentor_dpp) NÃO tem assinatura — o banner "termo
+    // pendente" aparece pra ele e demonstra o fluxo novo
+  ];
+
+  // ---------- presenças na formação (0040) ----------
+
+  // Os dois encontros 'formacao' do calendário já passaram (semana pré-ciclo).
+  // História: chamada completa no 1º dia; no 2º o João Pedro faltou —
+  // presente=false é a ausência explícita que explica o formacao_ok=false
+  // dele no mentor_profiles (a sync do 0040 só acende a flag com cobertura
+  // total). Os demais mentores ativos (dpp + especialista) foram nos dois.
+  const formacaoEvts = cicloEventos.filter((e) => e.tipo === "formacao");
+  const mentoresAtivos = profiles.filter(
+    (p) =>
+      p.ativo && (p.role === "mentor_dpp" || p.role === "mentor_especialista")
+  );
+  let seqPres = 0;
+  const presencas: Presenca[] = formacaoEvts.flatMap((ev, diaIdx) =>
+    mentoresAtivos.map((p) => ({
+      id: uid(0x3600 + ++seqPres),
+      ciclo_evento_id: ev.id,
+      profile_id: p.id,
+      presente: !(diaIdx === 1 && p.id === joaoPedro.id),
+      marcado_por: marina.id, // a chamada é da coordenação
+      // carimbo da noite do evento — como o trigger stamp_presenca faria
+      marcado_em: em(new Date(`${ev.data}T12:00:00`), "20:30"),
+    }))
+  );
+
+  // ---------- sessões de supervisão (0041) ----------
+
+  // Ritual supervisor ↔ mentor do guia. As linhas já carregam os embeds do
+  // select da query real (supervisor/mentor/dupla>mentorado) — o stub e as
+  // queries demo consomem direto, sem resolver FK.
+  const supervisoes: Supervisao[] = [
+    {
+      id: uid(0x3801),
+      supervisor_id: paulo.id,
+      mentor_id: ricardo.id,
+      dupla_id: duplaOk.id,
+      data: ymd(addDias(HOJE, -13)),
+      resumo:
+        "Primeira supervisão do ciclo com o Ricardo. A dupla engatou rápido: a Bia já fechou o PDM e entrou na execução das submetas. Ponto trabalhado: ela tende a abraçar metas demais — combinamos segurar uma submeta por vez e revisar o ritmo no registro semanal. Ele sai com o combinado de trazer as dúvidas de condução na próxima sessão.",
+      created_by: paulo.id,
+      created_at: haDias(13, "18:40"),
+      supervisor: { id: paulo.id, nome: paulo.nome },
+      mentor: { id: ricardo.id, nome: ricardo.nome },
+      dupla: { id: duplaOk.id, mentorado: { nome: ana.nome } },
+    },
+    {
+      id: uid(0x3802),
+      supervisor_id: paulo.id,
+      mentor_id: sofia.id,
+      dupla_id: null, // sessão geral — não atada a uma dupla
+      data: ymd(addDias(HOJE, -5)),
+      resumo:
+        "Conversa geral sobre a trilha de especialista com a Bia: o diagnóstico de frações e funções saiu no 2º encontro e a Sofia já roda listas progressivas. Reforçamos o cuidado de registrar no PDM o que continua depois dos 5 encontros, pra mentoria DPP retomar o fio sem perder o ganho.",
+      created_by: paulo.id,
+      created_at: haDias(5, "19:10"),
+      supervisor: { id: paulo.id, nome: paulo.nome },
+      mentor: { id: sofia.id, nome: sofia.nome },
+      dupla: null,
+    },
+    {
+      id: uid(0x3803),
+      supervisor_id: beatriz.id,
+      mentor_id: fernanda.id,
+      dupla_id: duplaRisco.id,
+      data: ymd(addDias(HOJE, -2)),
+      resumo:
+        "Sessão sobre a queda de participação da Dandara: a Fernanda contou que a jovem voltou a trabalhar nos fins de semana e responde pouco no WhatsApp. Combinamos repactuar o horário com a família antes de escalar — o pedido de apoio do 2º encontro já foi encaminhado pra coordenação.",
+      created_by: beatriz.id,
+      created_at: haDias(2, "20:15"),
+      supervisor: { id: beatriz.id, nome: beatriz.nome },
+      mentor: { id: fernanda.id, nome: fernanda.nome },
+      dupla: { id: duplaRisco.id, mentorado: { nome: dandara.nome } },
+    },
+  ];
+
   return {
     personas,
     profiles,
@@ -1568,6 +1943,10 @@ function build(): DemoData {
     pessoaNotas,
     interacoes,
     notificacoes,
+    documentoTemplates,
+    assinaturas,
+    presencas,
+    supervisoes,
   };
 }
 

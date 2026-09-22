@@ -1,9 +1,15 @@
 import type {
   CicloEvento,
+  DiaSemana,
   Dificuldade,
+  Disponibilidade,
   Dupla,
   Encontro,
+  Escolaridade,
   EspecialistaEvento,
+  Genero,
+  Periodo,
+  PrefGeneroPar,
   Registro,
   Trilha,
 } from "./types";
@@ -123,6 +129,149 @@ export const MOTIVOS_REAGENDAMENTO = [
   { value: "imprevisto", label: "Doença ou imprevisto" },
   { value: "outro", label: "Outro motivo" },
 ] as const;
+
+// ---------- matching/cadastro (0034) ----------
+// labels dos enums novos — espelham os CHECKs da migration 0034
+
+/** Vocabulário fechado dos CHECKs da 0034 — a mesma lista serve pra validar
+ *  no server action antes de gravar (erro claro em vez de 23514). */
+export const GENEROS = [
+  "feminino", "masculino", "nao_binario", "outro", "prefiro_nao_dizer",
+] as const satisfies readonly Genero[];
+export const PREF_GENEROS = ["feminino", "masculino", "indiferente"] as const satisfies readonly PrefGeneroPar[];
+export const ESCOLARIDADES = [
+  "fundamental", "medio", "tecnico", "superior_incompleto", "superior", "pos",
+] as const satisfies readonly Escolaridade[];
+export const DIAS_SEMANA = ["seg", "ter", "qua", "qui", "sex", "sab", "dom"] as const satisfies readonly DiaSemana[];
+export const PERIODOS = ["manha", "tarde", "noite"] as const satisfies readonly Periodo[];
+
+export const GENERO_LABELS: Record<Genero, string> = {
+  feminino: "Feminino",
+  masculino: "Masculino",
+  nao_binario: "Não-binário",
+  outro: "Outro",
+  prefiro_nao_dizer: "Prefiro não dizer",
+};
+
+/** Preferência de gênero do par — "indiferente" vira "Sem preferência" na UI. */
+export const PREF_GENERO_LABELS: Record<PrefGeneroPar, string> = {
+  feminino: "Feminino",
+  masculino: "Masculino",
+  indiferente: "Sem preferência",
+};
+
+export const ESCOLARIDADE_LABELS: Record<Escolaridade, string> = {
+  fundamental: "Ensino fundamental",
+  medio: "Ensino médio",
+  tecnico: "Ensino técnico",
+  superior_incompleto: "Superior incompleto",
+  superior: "Superior completo",
+  pos: "Pós-graduação",
+};
+
+/** Grade de disponibilidade (mentor_profiles.disponibilidade) — dias na
+ *  ordem seg→dom pra iterar direto no checkbox/grade semanal. */
+export const DIAS_SEMANA_LABELS: Record<DiaSemana, string> = {
+  seg: "Segunda",
+  ter: "Terça",
+  qua: "Quarta",
+  qui: "Quinta",
+  sex: "Sexta",
+  sab: "Sábado",
+  dom: "Domingo",
+};
+
+export const PERIODOS_LABELS: Record<Periodo, string> = {
+  manha: "Manhã",
+  tarde: "Tarde",
+  noite: "Noite",
+};
+
+/** Siglas pra select de UF — o banco guarda char(2) maiúsculo (CHECK). */
+export const UFS = [
+  "AC", "AL", "AM", "AP", "BA", "CE", "DF", "ES", "GO", "MA", "MG", "MS",
+  "MT", "PA", "PB", "PE", "PI", "PR", "RJ", "RN", "RO", "RR", "RS", "SC",
+  "SE", "SP", "TO",
+] as const;
+
+/** Sugestões do TagInput de interesses (ficha da coordenação, onboarding e
+ *  /perfil) — mistura de temas de jovem e de mentor, o campo aceita digitação
+ *  livre. O teto (20 itens / 60 chars por tag) é o CHECK interesses_ok (0034). */
+export const INTERESSES_SUGESTOES = [
+  "esportes",
+  "música",
+  "leitura",
+  "jogos e games",
+  "tecnologia",
+  "arte e desenho",
+  "empreendedorismo",
+  "finanças pessoais",
+  "educação",
+  "carreira",
+  "idiomas",
+  "escrita",
+  "voluntariado",
+  "ciência",
+  "culinária",
+];
+
+/** Grade semanal do grid de chips (JSON {"dias":[],"periodos":[]}) — valida
+ *  contra o mesmo vocabulário do CHECK disponibilidade_ok. Vazio ou grade
+ *  sem nada marcado vira null ("não informado"), nunca esqueleto vazio. */
+export function parseDisponibilidade(
+  raw: string
+): Disponibilidade | null | { error: string } {
+  const v = raw.trim();
+  if (!v) return null;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(v);
+  } catch {
+    return { error: "A disponibilidade chegou num formato inválido." };
+  }
+  const d = parsed as { dias?: unknown; periodos?: unknown };
+  const dias = (Array.isArray(d?.dias) ? d.dias.map(String) : []).filter(
+    (x): x is DiaSemana => (DIAS_SEMANA as readonly string[]).includes(x)
+  );
+  const periodos = (
+    Array.isArray(d?.periodos) ? d.periodos.map(String) : []
+  ).filter((x): x is Periodo =>
+    (PERIODOS as readonly string[]).includes(x)
+  );
+  return dias.length || periodos.length ? { dias, periodos } : null;
+}
+
+/** "ter e qui à noite" — grade semanal do mentor em frase curta (ficha de
+ *  pessoa, board de matching). Grade vazia/ausente devolve null. */
+export function disponibilidadeTexto(d: Disponibilidade | null | undefined): string | null {
+  if (!d || (!d.dias?.length && !d.periodos?.length)) return null;
+  const dias = (d.dias ?? []).map((dia) => DIAS_SEMANA_LABELS[dia] ?? dia);
+  const periodos = (d.periodos ?? []).map(
+    (p) => PERIODOS_LABELS[p]?.toLocaleLowerCase("pt-BR") ?? p
+  );
+  const junta = (l: string[]) =>
+    l.length <= 1 ? (l[0] ?? "") : `${l.slice(0, -1).join(", ")} e ${l.at(-1)}`;
+  const partes = [
+    dias.length ? junta(dias) : null,
+    periodos.length ? `à${periodos.length > 1 ? "s" : ""} ${junta(periodos)}` : null,
+  ].filter(Boolean);
+  return partes.length ? partes.join(" ") : null;
+}
+
+/** Idade em anos a partir de "YYYY-MM-DD" — âncora no meio-dia pra não voltar
+ *  um dia no fuso; null quando a data é inválida. */
+export function idade(iso: string | null | undefined): number | null {
+  if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return null;
+  const nasc = new Date(`${iso}T12:00:00`);
+  if (isNaN(nasc.getTime())) return null;
+  const hoje = new Date(`${toDateStr(new Date())}T12:00:00`);
+  let anos = hoje.getFullYear() - nasc.getFullYear();
+  const aniversarioPassou =
+    hoje.getMonth() > nasc.getMonth() ||
+    (hoje.getMonth() === nasc.getMonth() && hoje.getDate() >= nasc.getDate());
+  if (!aniversarioPassou) anos--;
+  return anos >= 0 ? anos : null;
+}
 
 /** Registro mais recente da dupla (pelo número do encontro). */
 export function ultimoRegistro(dupla: Dupla): Registro | null {
@@ -350,15 +499,21 @@ export function saudadeDaDupla(dupla: Dupla, eventos: CicloEvento[], hoje = new 
   const avaliacaoBaixa = ultimoReg?.avaliacao === "baixa";
   const comDificuldade = !!ultimoReg?.dificuldade && ultimoReg.dificuldade !== "nenhuma";
 
-  if (pediuApoio && dupla.status !== "encerrada")
+  if (pediuApoio && (dupla.status === "ativa" || dupla.status === "pausada"))
     // motivo em locução nominal — quem lê pode ser o próprio mentor ("Mentor
     // pediu apoio" em 3ª pessoa lê como se fosse sobre outra pessoa)
     return { semaforo: "risco", motivo: "Pedido de apoio", esperado, feitos, proximo, registroPendente, pediuApoio };
-  // pedido de apoio fura o congelamento da pausada, mas não da encerrada — dupla fechada é capítulo encerrado
+  // pedido de apoio fura o congelamento da pausada, mas não do fechamento —
+  // dupla concluída ou encerrada é capítulo encerrado
   if (dupla.status !== "ativa")
     return {
       semaforo: "ok",
-      motivo: dupla.status === "pausada" ? "Dupla pausada" : "Dupla encerrada",
+      motivo:
+        dupla.status === "pausada"
+          ? "Dupla pausada"
+          : dupla.status === "concluida"
+            ? "Jornada concluída"
+            : "Dupla encerrada",
       esperado, feitos, proximo, registroPendente,
       pediuApoio: dupla.status === "pausada" && pediuApoio,
     };
@@ -657,6 +812,51 @@ export function inicioDefaultDupla(
   const d = new Date(`${primeiro.data}T12:00:00`);
   d.setDate(d.getDate() - 7);
   return toDateStr(d);
+}
+
+/** Ciclo vigente = o ciclo cujo calendário oficial cobre hoje; sem cobertura,
+ *  o próximo a começar; sem data futura, o mais recente. Os eventos carregam
+ *  `ciclo` na coluna própria (não no tipo CicloEvento — o dataset demo não
+ *  preenche), então a entrada aceita a forma parcial. `null` sem eventos. */
+export function cicloVigente(
+  eventos: { ciclo?: string | null; data: string }[],
+  hoje = new Date()
+): string | null {
+  const faixas = new Map<string, { min: string; max: string }>();
+  for (const e of eventos) {
+    if (!e.ciclo) continue;
+    const f = faixas.get(e.ciclo);
+    if (!f) faixas.set(e.ciclo, { min: e.data, max: e.data });
+    else {
+      if (e.data < f.min) f.min = e.data;
+      if (e.data > f.max) f.max = e.data;
+    }
+  }
+  const hojeStr = toDateStr(hoje);
+  for (const [ciclo, f] of faixas) {
+    if (f.min <= hojeStr && hojeStr <= f.max) return ciclo;
+  }
+  // nenhum cobre hoje → o próximo a começar; sem futuro, o mais recente
+  const futuros = [...faixas]
+    .filter(([, f]) => f.min > hojeStr)
+    .sort((a, b) => a[1].min.localeCompare(b[1].min));
+  if (futuros.length) return futuros[0][0];
+  const passados = [...faixas].sort((a, b) => b[1].max.localeCompare(a[1].max));
+  return passados[0]?.[0] ?? null;
+}
+
+/** Opções do select de ciclo: distinct do calendário oficial + ciclos que só
+ *  existem em duplas (histórico de um ciclo sem eventos continua escolhível).
+ *  Ordem alfabética — os ciclos do programa são 'AAAA/AAAA', alfabeto =
+ *  cronologia. */
+export function ciclosOpcoes(
+  eventos: { ciclo?: string | null }[],
+  emUso: (string | null | undefined)[]
+): string[] {
+  const set = new Set<string>();
+  for (const e of eventos) if (e.ciclo) set.add(e.ciclo);
+  for (const c of emUso) if (c) set.add(c);
+  return [...set].sort((a, b) => a.localeCompare(b));
 }
 
 const TZ = "America/Sao_Paulo";

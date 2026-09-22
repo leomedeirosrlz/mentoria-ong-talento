@@ -26,11 +26,20 @@ import { concluirOnboarding, salvarOnboarding } from "@/lib/actions";
 import { AREAS_SUGESTOES } from "@/lib/ciclo";
 import { avatarPublicUrl, AVATAR_ACCEPT, AVATAR_MAX_BYTES } from "@/lib/avatar";
 import { TagInput } from "@/components/tag-input";
+import {
+  CampoDisponibilidade,
+  CampoGenero,
+  CampoInteresses,
+  CampoNascimento,
+  CampoPrefGenero,
+  CampoUf,
+  SENTINEL_VAZIO,
+} from "@/components/campos-pessoais";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import type { AppRole, Profile } from "@/lib/types";
+import type { AppRole, Disponibilidade, Profile } from "@/lib/types";
 
 /** Um form por passo — o botão do footer fixo submete via atributo `form`. */
 const FORM_ID = "onboarding-passo";
@@ -67,15 +76,22 @@ const RECURSOS: Record<AppRole, Recurso[]> = {
   ],
 };
 
+// índices dos passos por papel — mentores seguem pros passos de ficha/perfil
+// (0034 + 0030) antes do fechamento; coord/supervisor param no "Sobre você"
+const PASSO_SOBRE = (ehMentor: boolean) => (ehMentor ? 6 : 2);
+const PASSO_PAREAMENTO = 7;
+const PASSO_DISPONIBILIDADE = 8;
+
 /** Wizard de primeiro acesso — balão de pergunta por passo, salvando um pedaço
- *  do perfil por vez (passos 2–5 dos mentores, via salvarOnboarding). O gate
- *  mora no layout: onboarded_em null renderiza isto no lugar do shell. */
+ *  do perfil por vez (salvarOnboarding com patch parcial: só o que o passo
+ *  mandou é escrito). O gate mora no layout: onboarded_em null renderiza isto
+ *  no lugar do shell. */
 export function OnboardingFlow({ me }: { me: Profile }) {
   const router = useRouter();
   const ehMentor = me.role === "mentor_dpp" || me.role === "mentor_especialista";
-  // coord/supervisor: boas-vindas + recursos (2 passos); mentores seguem pros
-  // passos de perfil opcionais + fechamento (7)
-  const total = ehMentor ? 7 : 2;
+  // coord/supervisor: boas-vindas + recursos + ficha pessoal + fechamento (4);
+  // mentores: + foto, apresentação, pareamento e disponibilidade (10)
+  const total = ehMentor ? 10 : 4;
   const [step, setStep] = useState(0);
   const [pending, start] = useTransition();
   const tituloRef = useRef<HTMLHeadingElement>(null);
@@ -90,6 +106,26 @@ export function OnboardingFlow({ me }: { me: Profile }) {
   const [areas, setAreas] = useState<string[]>(me.areas ?? []);
   const [linkedin, setLinkedin] = useState(me.linkedin ?? "");
   const [voluntariado, setVoluntariado] = useState(me.voluntariado ?? "");
+
+  // ficha pessoal (0034) — os sensíveis (nascimento/gênero/motivação) são
+  // write-only aqui: getMe não os devolve, então sempre começam em branco
+  const [nomeSocial, setNomeSocial] = useState(me.nome_social ?? "");
+  const [nascimento, setNascimento] = useState("");
+  const [genero, setGenero] = useState("");
+  const [cidade, setCidade] = useState(me.cidade ?? "");
+  const [uf, setUf] = useState(me.uf ?? "");
+  const [cargo, setCargo] = useState(me.cargo ?? "");
+  const [empresa, setEmpresa] = useState(me.empresa ?? "");
+  const [origem, setOrigem] = useState(me.origem ?? "");
+  const [interesses, setInteresses] = useState<string[]>(me.interesses ?? []);
+  const [motivacao, setMotivacao] = useState("");
+  const [consent, setConsent] = useState(false);
+
+  // ficha de mentor (0034) — pareamento + grade semanal
+  const [prefGenero, setPrefGenero] = useState("");
+  const [experiencia, setExperiencia] = useState("");
+  const [formacao, setFormacao] = useState("");
+  const [disponibilidade, setDisponibilidade] = useState<Disponibilidade | null>(null);
 
   const fileRef = useRef<HTMLInputElement>(null);
   const objUrl = useRef<string | null>(null);
@@ -109,8 +145,11 @@ export function OnboardingFlow({ me }: { me: Profile }) {
 
   const primeiroNome = me.nome.trim().split(/\s+/)[0] || me.nome;
   const ultimo = step === total - 1;
-  // passos de perfil dos mentores são opcionais — ganham o ghost "Agora não"
-  const passoComCampos = ehMentor && step >= 2 && step <= 5;
+  // passos de ficha/perfil são opcionais — ganham o ghost "Agora não"
+  const passoSobre = PASSO_SOBRE(ehMentor);
+  const passoComCampos =
+    step === passoSobre ||
+    (ehMentor && step >= 2 && step <= PASSO_DISPONIBILIDADE);
 
   function avancar() {
     setStep((s) => Math.min(s + 1, total - 1));
@@ -171,7 +210,153 @@ export function OnboardingFlow({ me }: { me: Profile }) {
     setFotoUrl(objUrl.current);
   }
 
+  /** Passo "Sobre você" (0034) — a ficha pessoal que alimenta o cadastro e o
+   *  matching. Os sensíveis são gravados, não lidos de volta: fora da
+   *  coordenação ninguém os vê depois (grant de coluna no banco). */
+  const passoSobreVoce = (
+    <div className="space-y-4">
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="space-y-2">
+          <Label htmlFor="ob-social">Nome social</Label>
+          <Input
+            id="ob-social"
+            name="nome_social"
+            maxLength={150}
+            value={nomeSocial}
+            onChange={(e) => setNomeSocial(e.target.value)}
+            placeholder="Como você prefere ser chamado(a)"
+          />
+        </div>
+        <CampoNascimento id="ob-nasc" value={nascimento} onChange={setNascimento} />
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <CampoGenero
+          value={genero}
+          onChange={(v) => setGenero(v === SENTINEL_VAZIO ? "" : v)}
+        />
+        <div className="space-y-2">
+          <Label htmlFor="ob-cidade">Cidade</Label>
+          <Input
+            id="ob-cidade"
+            name="cidade"
+            maxLength={100}
+            value={cidade}
+            onChange={(e) => setCidade(e.target.value)}
+          />
+        </div>
+      </div>
+      <div className="grid gap-4 sm:grid-cols-3">
+        <CampoUf
+          value={uf}
+          onChange={(v) => setUf(v === SENTINEL_VAZIO ? "" : v)}
+        />
+        <div className="space-y-2 sm:col-span-1">
+          <Label htmlFor="ob-cargo">Cargo</Label>
+          <Input
+            id="ob-cargo"
+            name="cargo"
+            maxLength={120}
+            value={cargo}
+            onChange={(e) => setCargo(e.target.value)}
+          />
+        </div>
+        <div className="space-y-2 sm:col-span-1">
+          <Label htmlFor="ob-empresa">Empresa</Label>
+          <Input
+            id="ob-empresa"
+            name="empresa"
+            maxLength={150}
+            value={empresa}
+            onChange={(e) => setEmpresa(e.target.value)}
+          />
+        </div>
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="ob-origem">Como você chegou ao programa</Label>
+        <Input
+          id="ob-origem"
+          name="origem"
+          maxLength={300}
+          value={origem}
+          onChange={(e) => setOrigem(e.target.value)}
+          placeholder="Indicação, ONG parceira, rede social…"
+        />
+      </div>
+      <CampoInteresses value={interesses} onChange={setInteresses} />
+      <div className="space-y-2">
+        <Label htmlFor="ob-motivacao">O que te traz ao programa</Label>
+        <Textarea
+          id="ob-motivacao"
+          name="motivacao"
+          rows={3}
+          maxLength={2000}
+          value={motivacao}
+          onChange={(e) => setMotivacao(e.target.value)}
+          placeholder="Sua motivação pra participar da mentoria"
+        />
+      </div>
+      {/* consent_lgpd → consentPatch grava o carimbo; unchecked não manda
+          a chave e não apaga um carimbo já existente */}
+      <label className="flex items-start gap-2 text-sm cursor-pointer">
+        <input
+          type="checkbox"
+          name="consent_lgpd"
+          checked={consent}
+          onChange={(e) => setConsent(e.target.checked)}
+          className="mt-0.5 accent-primary"
+        />
+        <span>
+          Autorizo o uso dos meus dados do cadastro no programa (LGPD).
+        </span>
+      </label>
+    </div>
+  );
+
+  /** Passo "Pareamento" (mentor, 0034) — o que ajuda a coordenação a escolher
+   *  a dupla: preferência de gênero do par + a bagagem que entra na ficha. */
+  const passoPareamento = (
+    <div className="space-y-4">
+      <CampoPrefGenero
+        value={prefGenero}
+        onChange={(v) => setPrefGenero(v === SENTINEL_VAZIO ? "" : v)}
+      />
+      <div className="space-y-2">
+        <Label htmlFor="ob-exp">Experiência prévia como mentor</Label>
+        <Textarea
+          id="ob-exp"
+          name="experiencia_previa"
+          rows={3}
+          maxLength={2000}
+          value={experiencia}
+          onChange={(e) => setExperiencia(e.target.value)}
+          placeholder="Mentorias anteriores, mediação, ensino…"
+        />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="ob-form">Formação e certificações</Label>
+        <Textarea
+          id="ob-form"
+          name="formacao_externa"
+          rows={3}
+          maxLength={2000}
+          value={formacao}
+          onChange={(e) => setFormacao(e.target.value)}
+          placeholder="Cursos e certificações relevantes pra mentoria"
+        />
+      </div>
+    </div>
+  );
+
+  /** Passo "Disponibilidade" (mentor, 0034) — a grade semanal que entra no
+   *  cruzamento de agenda do matching. */
+  const passoDisponibilidade = (
+    <CampoDisponibilidade value={disponibilidade} onChange={setDisponibilidade} />
+  );
+
   const titulo = (() => {
+    if (step === passoSobre) return "Sobre você";
+    if (ehMentor && step === PASSO_PAREAMENTO) return "O que ajuda a formar sua dupla";
+    if (ehMentor && step === PASSO_DISPONIBILIDADE) return "Quando você pode encontrar sua dupla";
     switch (step) {
       case 0:
         return `Bem-vindo(a) ao Realiza.vc, ${primeiroNome}!`;
@@ -191,6 +376,12 @@ export function OnboardingFlow({ me }: { me: Profile }) {
   })();
 
   const hint = (() => {
+    if (step === passoSobre)
+      return "Esses dados completam seu cadastro — nascimento, gênero e motivação ficam visíveis só pra coordenação.";
+    if (ehMentor && step === PASSO_PAREAMENTO)
+      return "A coordenação usa isso pra escolher a dupla — tudo opcional, dá pra completar depois no Perfil.";
+    if (ehMentor && step === PASSO_DISPONIBILIDADE)
+      return "Toque nos dias e períodos em que você costuma ter agenda livre — a coordenação cruza com a do mentorado.";
     switch (step) {
       case 0:
         return "A plataforma do Programa de Mentoria Social — a jornada da sua dupla, os registros e os materiais oficiais num lugar só.";
@@ -210,6 +401,9 @@ export function OnboardingFlow({ me }: { me: Profile }) {
   })();
 
   const corpo = (() => {
+    if (step === passoSobre) return passoSobreVoce;
+    if (ehMentor && step === PASSO_PAREAMENTO) return passoPareamento;
+    if (ehMentor && step === PASSO_DISPONIBILIDADE) return passoDisponibilidade;
     switch (step) {
       case 1:
         return (

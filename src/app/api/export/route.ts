@@ -2,7 +2,16 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { demoRole } from "@/lib/demo/mode";
 import { getDemoData } from "@/lib/demo/data";
-import { AVALIACAO_LABEL, papelLabel, toDateStr } from "@/lib/ciclo";
+import { demoPessoalMap } from "@/lib/demo/queries";
+import {
+  AVALIACAO_LABEL,
+  GENERO_LABELS,
+  papelLabel,
+  PREF_GENERO_LABELS,
+  toDateStr,
+  TRILHA_LABEL,
+} from "@/lib/ciclo";
+import type { DadosPessoais } from "@/lib/queries";
 import type { Dupla, EncontroStatus, Mentorado, Profile } from "@/lib/types";
 
 // GET /api/export — só pra coordenação. ?tipo=ciclo (default): relatório do
@@ -23,7 +32,9 @@ export async function GET(request: NextRequest) {
     }
     const d = getDemoData();
     if (tipo === "pessoas") {
-      // no dataset demo contato e capacidade já moram nas próprias linhas
+      // no dataset demo contato e capacidade já moram nas próprias linhas; os
+      // sensíveis passam pelo mesmo funil coord-only da real (demoPessoalMap
+      // replica o WHERE das views *_pessoal)
       const contatos = new Map(
         d.profiles.map(
           (p) => [p.id, { email: p.email, whatsapp: p.whatsapp }] as const
@@ -33,7 +44,14 @@ export async function GET(request: NextRequest) {
         d.mentorProfiles.map((m) => [m.profile_id, m.capacidade] as const)
       );
       return csvResponse(
-        csvPessoas(d.profiles, contatos, d.mentorados, capacidades),
+        csvPessoas(
+          d.profiles,
+          contatos,
+          d.mentorados,
+          capacidades,
+          demoPessoalMap(demo, "profiles_pessoal"),
+          demoPessoalMap(demo, "mentorados_pessoal")
+        ),
         nomeCsvPessoas()
       );
     }
@@ -72,7 +90,8 @@ export async function GET(request: NextRequest) {
   const { data, error } = await supabase
     .from("duplas")
     .select(
-      `mentor:profiles!duplas_mentor_id_fkey(nome),
+      `trilha,
+      mentor:profiles!duplas_mentor_id_fkey(nome),
       mentorado:mentorados(nome),
       supervisor:profiles!duplas_supervisor_id_fkey(nome),
       encontros(*, registro:registros(*))`
@@ -89,23 +108,35 @@ export async function GET(request: NextRequest) {
 }
 
 // tipo=pessoas — cadastro único: equipe (papel, status) + mentorados (ONG de
-// origem). Ordenado por nome; mesmo formato `;`+BOM do relatório do ciclo.
+// origem), com os 4 sensíveis da 0034. Ordenado por nome; mesmo formato
+// `;`+BOM do relatório do ciclo.
 async function exportPessoas(supabase: Awaited<ReturnType<typeof createClient>>) {
   // email/whatsapp saíram do grant de coluna de profiles (0026) — a view
   // profiles_contato devolve todas as linhas pra coordenação (única que
-  // passa na checagem acima) e o merge é por id
+  // passa na checagem acima) e o merge é por id. data_nascimento/genero/
+  // pref_genero_par/motivacao são revogados do grant de coluna das tabelas
+  // base — só entram pelas views *_pessoal, que têm `my_role()='coordenacao'`
+  // no WHERE (pra qualquer outro papel devolvem zero linhas)
   const [
     { data: pessoas, error: eP },
     { data: contatos, error: eC },
     { data: mentorados, error: eM },
-    { data: mps },
+    { data: mps, error: eMP },
+    { data: pessoalP, error: ePP },
+    { data: pessoalM, error: ePM },
   ] = await Promise.all([
     supabase.from("profiles").select("id,nome,role,ativo"),
     supabase.from("profiles_contato").select("id,email,whatsapp"),
-    supabase.from("mentorados").select("nome,email,whatsapp,ong_origem"),
+    supabase.from("mentorados").select("id,nome,email,whatsapp,ong_origem"),
     supabase.from("mentor_profiles").select("profile_id,capacidade"),
+    supabase
+      .from("profiles_pessoal")
+      .select("id,data_nascimento,genero,pref_genero_par,motivacao"),
+    supabase
+      .from("mentorados_pessoal")
+      .select("id,data_nascimento,genero,pref_genero_par,motivacao"),
   ]);
-  if (eP || eC || eM) {
+  if (eP || eC || eM || eMP || ePP || ePM) {
     return NextResponse.json(
       { error: "Não foi possível gerar o relatório — tente de novo." },
       { status: 500 }
@@ -113,9 +144,18 @@ async function exportPessoas(supabase: Awaited<ReturnType<typeof createClient>>)
   }
   const capacidades = new Map((mps ?? []).map((m) => [m.profile_id, m.capacidade]));
   const contatoPorId = new Map((contatos ?? []).map((c) => [c.id, c]));
+  const pessoalPorId = new Map((pessoalP ?? []).map((p) => [p.id, p]));
+  const pessoalMentoradoPorId = new Map((pessoalM ?? []).map((m) => [m.id, m]));
 
   return csvResponse(
-    csvPessoas(pessoas ?? [], contatoPorId, mentorados ?? [], capacidades),
+    csvPessoas(
+      pessoas ?? [],
+      contatoPorId,
+      mentorados ?? [],
+      capacidades,
+      pessoalPorId,
+      pessoalMentoradoPorId
+    ),
     nomeCsvPessoas()
   );
 }
@@ -138,6 +178,9 @@ function csvCiclo(duplas: Dupla[]): string {
             d.mentor.nome,
             d.mentorado.nome,
             d.supervisor?.nome ?? "",
+            // sem a trilha, encontro de dupla de especialista (5 passos)
+            // lê como DPP — "Especialista" desambigua na planilha
+            TRILHA_LABEL[d.trilha] ?? d.trilha,
             String(e.numero),
             dataHora(e.data_hora),
             dia(e.realizado_em),
@@ -156,7 +199,7 @@ function csvCiclo(duplas: Dupla[]): string {
   return (
     "\uFEFF" +
     [
-      "dupla_mentor;dupla_mentorado;supervisor;encontro_num;data_agendada;realizado_em;status;motivo_reagendamento;registro_em;registro_avaliacao;registro_atividades;precisa_apoio",
+      "dupla_mentor;dupla_mentorado;supervisor;trilha;encontro_num;data_agendada;realizado_em;status;motivo_reagendamento;registro_em;registro_avaliacao;registro_atividades;precisa_apoio",
       ...linhas,
     ].join("\r\n") +
     "\r\n"
@@ -166,9 +209,21 @@ function csvCiclo(duplas: Dupla[]): string {
 function csvPessoas(
   pessoas: Pick<Profile, "id" | "nome" | "role" | "ativo">[],
   contatos: Map<string, { email: string | null; whatsapp: string | null }>,
-  mentorados: Pick<Mentorado, "nome" | "email" | "whatsapp" | "ong_origem">[],
-  capacidades: Map<string, number | null>
+  mentorados: Pick<Mentorado, "id" | "nome" | "email" | "whatsapp" | "ong_origem">[],
+  capacidades: Map<string, number | null>,
+  pessoalP: Map<string, DadosPessoais>,
+  pessoalM: Map<string, DadosPessoais>
 ): string {
+  // sensíveis no fim, agrupados — quem abre a planilha vê de cara o bloco
+  // que exige o cuidado LGPD
+  const sens = (s: DadosPessoais | undefined): string[] => [
+    s?.data_nascimento ? dia(s.data_nascimento) : "",
+    s?.genero ? (GENERO_LABELS[s.genero] ?? s.genero) : "",
+    s?.pref_genero_par
+      ? (PREF_GENERO_LABELS[s.pref_genero_par] ?? s.pref_genero_par)
+      : "",
+    s?.motivacao ?? "",
+  ];
   type Linha = { nome: string; resto: string[] };
   const linhas: Linha[] = [
     ...pessoas.map((p) => ({
@@ -180,18 +235,27 @@ function csvPessoas(
         p.role?.startsWith("mentor") ? String(capacidades.get(p.id) ?? "") : "",
         "",
         p.ativo ? "ativo" : "inativo",
+        ...sens(pessoalP.get(p.id)),
       ],
     })),
     ...mentorados.map((m) => ({
       nome: m.nome,
-      resto: ["Mentorado", m.email ?? "", m.whatsapp ?? "", "", m.ong_origem ?? "", ""],
+      resto: [
+        "Mentorado",
+        m.email ?? "",
+        m.whatsapp ?? "",
+        "",
+        m.ong_origem ?? "",
+        "",
+        ...sens(pessoalM.get(m.id)),
+      ],
     })),
   ];
 
   return (
     "\uFEFF" +
     [
-      "nome;tipo;email;whatsapp;capacidade;ong_origem;status",
+      "nome;tipo;email;whatsapp;capacidade;ong_origem;status;data_nascimento;genero;pref_genero_par;motivacao",
       ...linhas
         .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"))
         .map((l) => [l.nome, ...l.resto].map(celula).join(";")),

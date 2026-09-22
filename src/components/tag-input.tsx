@@ -4,7 +4,8 @@ import { useState } from "react";
 import { Plus } from "@phosphor-icons/react";
 import { cn } from "cn";
 
-/** Mesmo teto do CHECK profiles_areas_ok (0030): tag de até 40 chars. */
+/** Teto default = CHECK profiles_areas_ok (0030). Interesses (0034,
+ *  interesses_ok) permite 60 por tag — o caller passa `maxChars=60`. */
 const TAG_MAX_CHARS = 40;
 
 /** chave de dedupe — case-insensitive: "Finanças" e "finanças" são a mesma tag */
@@ -21,6 +22,7 @@ export function TagInput({
   value,
   onChange,
   max = 10,
+  maxChars = TAG_MAX_CHARS,
   placeholder = "Outra área…",
   inputLabel,
 }: {
@@ -31,8 +33,10 @@ export function TagInput({
   /** tags selecionadas (controlado) */
   value: string[];
   onChange: (areas: string[]) => void;
-  /** teto de tags — profiles_areas_ok fecha em 10 no banco */
+  /** teto de tags — profiles_areas_ok fecha em 10 no banco (interesses: 20) */
   max?: number;
+  /** teto de caracteres por tag — CHECK interesses_ok permite 60 */
+  maxChars?: number;
   placeholder?: string;
   /** o label externo cobre o grupo, não este campo — nome acessível do input livre */
   inputLabel?: string;
@@ -64,8 +68,8 @@ export function TagInput({
   function adicionar() {
     const tag = draft.trim();
     setDraft("");
-    // maxLength já impede digitar além de 40 — o guard cobre colagem e afins
-    if (!tag || tag.length > TAG_MAX_CHARS || cheio) return;
+    // maxLength já impede digitar além do teto — o guard cobre colagem e afins
+    if (!tag || tag.length > maxChars || cheio) return;
     if (selecionadas.has(chave(tag))) return;
     // digitou uma sugestão com outra caixa? grava o rótulo canônico dela
     const canonica = sugestoes.find((s) => chave(s) === chave(tag));
@@ -109,7 +113,7 @@ export function TagInput({
               adicionar();
             }
           }}
-          maxLength={TAG_MAX_CHARS}
+          maxLength={maxChars}
           disabled={cheio}
           placeholder={placeholder}
           aria-label={inputLabel ?? placeholder}

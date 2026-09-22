@@ -9,8 +9,18 @@ import { createClient } from "@/lib/supabase/client";
 import { avatarPublicUrl } from "@/lib/avatar";
 import { FotoField } from "@/components/foto-field";
 import { TagInput } from "@/components/tag-input";
+import {
+  CampoConsentimento,
+  CampoDisponibilidade,
+  CampoGenero,
+  CampoInteresses,
+  CampoNascimento,
+  CampoPrefGenero,
+  CampoUf,
+  SecaoFicha,
+} from "@/components/campos-pessoais";
 import { AREAS_SUGESTOES } from "@/lib/ciclo";
-import type { Profile } from "@/lib/types";
+import type { Disponibilidade, Profile } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
@@ -21,15 +31,21 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
 import { DocumentoPessoa } from "@/components/documento-pessoa";
+import { AssinaturasPessoa } from "@/components/assinaturas-pessoa";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
+// subset do mentor_profile que a coordenação edita — inclui a ficha de
+// matching da 0034 (experiência/formação/disponibilidade)
 type MentorProfile = {
   capacidade: number;
   areas: string[];
   termo_ok: boolean;
   formacao_ok: boolean;
+  experiencia_previa: string | null;
+  formacao_externa: string | null;
+  disponibilidade: Disponibilidade | null;
 } | null;
 
 export function PessoaActions({ pessoa, podeExcluir }: { pessoa: Profile; podeExcluir: boolean }) {
@@ -42,16 +58,18 @@ export function PessoaActions({ pessoa, podeExcluir }: { pessoa: Profile; podeEx
   const [bioLen, setBioLen] = useState(0);
   const [volLen, setVolLen] = useState(0);
   const [areasPerfil, setAreasPerfil] = useState<string[]>(pessoa.areas ?? []);
+  const [interesses, setInteresses] = useState<string[]>(pessoa.interesses ?? []);
+  const [disponibilidade, setDisponibilidade] = useState<Disponibilidade | null>(null);
   const [pending, start] = useTransition();
   const router = useRouter();
   const ehMentor = pessoa.role === "mentor_dpp" || pessoa.role === "mentor_especialista";
-  const primeiroNome = pessoa.nome.split(" ")[0];
+  const primeiroNome = (pessoa.nome_social || pessoa.nome).split(" ")[0];
 
   useEffect(() => {
     if (!editOpen || !ehMentor) return;
     createClient()
       .from("mentor_profiles")
-      .select("capacidade, areas, termo_ok, formacao_ok")
+      .select("capacidade, areas, termo_ok, formacao_ok, experiencia_previa, formacao_externa, disponibilidade")
       .eq("profile_id", pessoa.id)
       .maybeSingle()
       .then(({ data, error }) => {
@@ -62,6 +80,7 @@ export function PessoaActions({ pessoa, podeExcluir }: { pessoa: Profile; podeEx
           return;
         }
         setMp(data);
+        setDisponibilidade(data?.disponibilidade ?? null);
       });
   }, [editOpen, ehMentor, pessoa.id]);
 
@@ -149,22 +168,35 @@ export function PessoaActions({ pessoa, podeExcluir }: { pessoa: Profile; podeEx
         open={editOpen}
         onOpenChange={(o) => {
           setEditOpen(o);
-          // contadores acompanham o valor carregado na abertura do dialog
+          // contadores e chips acompanham o valor carregado na abertura do dialog
           if (o) {
             setBioLen(pessoa.bio?.length ?? 0);
             setVolLen(pessoa.voluntariado?.length ?? 0);
             setAreasPerfil(pessoa.areas ?? []);
+            setInteresses(pessoa.interesses ?? []);
+            setDisponibilidade(null);
           }
         }}
       >
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Editar {primeiroNome}</DialogTitle>
           </DialogHeader>
           <form onSubmit={submit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="e_nome">Nome</Label>
-              <Input id="e_nome" name="nome" required defaultValue={pessoa.nome} />
+            <SecaoFicha>Identificação e contato</SecaoFicha>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="e_nome">Nome civil</Label>
+                <Input id="e_nome" name="nome" required defaultValue={pessoa.nome} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="e_social">Nome social</Label>
+                <Input
+                  id="e_social" name="nome_social" maxLength={150}
+                  defaultValue={pessoa.nome_social ?? ""}
+                  placeholder="Nome de uso, se diferente"
+                />
+              </div>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
@@ -191,10 +223,52 @@ export function PessoaActions({ pessoa, podeExcluir }: { pessoa: Profile; podeEx
                 O e-mail é a identidade do link de acesso e não pode mais ser alterado após o primeiro acesso.
               </p>
             )}
+            <div className="grid gap-4 sm:grid-cols-2">
+              <CampoNascimento id="e_nasc" defaultValue={pessoa.data_nascimento ?? ""} />
+              <CampoGenero defaultValue={pessoa.genero ?? ""} />
+            </div>
+
+            <SecaoFicha>Localização e interesses</SecaoFicha>
+            <div className="grid gap-4 sm:grid-cols-3">
+              <div className="space-y-2 sm:col-span-2">
+                <Label htmlFor="e_cidade">Cidade</Label>
+                <Input id="e_cidade" name="cidade" maxLength={100} defaultValue={pessoa.cidade ?? ""} />
+              </div>
+              <CampoUf defaultValue={pessoa.uf ?? ""} />
+            </div>
+            <CampoInteresses value={interesses} onChange={setInteresses} />
+
+            <SecaoFicha>Trabalho e origem</SecaoFicha>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="e_cargo">Cargo</Label>
+                <Input id="e_cargo" name="cargo" maxLength={120} defaultValue={pessoa.cargo ?? ""} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="e_empresa">Empresa</Label>
+                <Input id="e_empresa" name="empresa" maxLength={150} defaultValue={pessoa.empresa ?? ""} />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="e_origem">Como chegou ao programa</Label>
+              <Input id="e_origem" name="origem" maxLength={300} defaultValue={pessoa.origem ?? ""} />
+            </div>
+
+            <SecaoFicha>Motivação e pareamento</SecaoFicha>
+            <div className="space-y-2">
+              <Label htmlFor="e_motivacao">Motivação</Label>
+              <Textarea
+                id="e_motivacao" name="motivacao" rows={2} maxLength={2000}
+                defaultValue={pessoa.motivacao ?? ""}
+                placeholder="O que traz a pessoa ao programa"
+              />
+            </div>
+            <CampoPrefGenero defaultValue={pessoa.pref_genero_par ?? ""} />
 
             {/* apresentação profissional (0030) — mesmos campos do /perfil;
                 o `areas` do mentor_profile já existe, então o do perfil vai
                 como `areas_perfil` pra não colidir no FormData */}
+            <SecaoFicha>Apresentação pública</SecaoFicha>
             <div className="space-y-2">
               <div className="flex items-baseline justify-between gap-2">
                 <Label htmlFor="e_bio">Biografia</Label>
@@ -244,38 +318,57 @@ export function PessoaActions({ pessoa, podeExcluir }: { pessoa: Profile; podeEx
             </div>
 
             {ehMentor && mp !== undefined && (
-              <div className="space-y-4 rounded-lg bg-muted/40 p-3.5">
-                <div className="grid gap-4 sm:grid-cols-2">
+              <>
+                <SecaoFicha>Ficha de mentor</SecaoFicha>
+                <div className="space-y-4 rounded-lg bg-muted/40 p-3.5">
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="e_cap">Capacidade (duplas)</Label>
+                      <Input
+                        id="e_cap" name="capacidade" type="number" min={1} max={10}
+                        required
+                        defaultValue={mp?.capacidade ?? 1}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="e_areas">Áreas (separadas por vírgula)</Label>
+                      <Input
+                        id="e_areas" name="areas"
+                        defaultValue={(mp?.areas ?? []).join(", ")}
+                        placeholder="tecnologia, finanças"
+                      />
+                    </div>
+                  </div>
+                  <CampoDisponibilidade value={disponibilidade} onChange={setDisponibilidade} />
                   <div className="space-y-2">
-                    <Label htmlFor="e_cap">Capacidade (duplas)</Label>
-                    <Input
-                      id="e_cap" name="capacidade" type="number" min={1} max={10}
-                      required
-                      defaultValue={mp?.capacidade ?? 1}
+                    <Label htmlFor="e_exp">Experiência prévia como mentor</Label>
+                    <Textarea
+                      id="e_exp" name="experiencia_previa" rows={2} maxLength={2000}
+                      defaultValue={mp?.experiencia_previa ?? ""}
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="e_areas">Áreas (separadas por vírgula)</Label>
-                    <Input
-                      id="e_areas" name="areas"
-                      defaultValue={(mp?.areas ?? []).join(", ")}
-                      placeholder="tecnologia, finanças"
+                    <Label htmlFor="e_form">Formação e certificações externas</Label>
+                    <Textarea
+                      id="e_form" name="formacao_externa" rows={2} maxLength={2000}
+                      defaultValue={mp?.formacao_externa ?? ""}
                     />
                   </div>
+                  <div className="flex gap-6">
+                    <label className="flex items-center gap-2 text-sm cursor-pointer">
+                      <input type="checkbox" name="termo_ok" defaultChecked={mp?.termo_ok} className="accent-primary" />
+                      Termo assinado
+                    </label>
+                    <label className="flex items-center gap-2 text-sm cursor-pointer">
+                      <input type="checkbox" name="formacao_ok" defaultChecked={mp?.formacao_ok} className="accent-primary" />
+                      Formação concluída
+                    </label>
+                  </div>
                 </div>
-                <div className="flex gap-6">
-                  <label className="flex items-center gap-2 text-sm cursor-pointer">
-                    <input type="checkbox" name="termo_ok" defaultChecked={mp?.termo_ok} className="accent-primary" />
-                    Termo assinado
-                  </label>
-                  <label className="flex items-center gap-2 text-sm cursor-pointer">
-                    <input type="checkbox" name="formacao_ok" defaultChecked={mp?.formacao_ok} className="accent-primary" />
-                    Formação concluída
-                  </label>
-                </div>
-              </div>
+              </>
             )}
 
+            <SecaoFicha>Arquivos e consentimento</SecaoFicha>
             <FotoField
               id="e_foto"
               defaultUrl={pessoa.avatar_path ? avatarPublicUrl(pessoa.avatar_path) : null}
@@ -286,6 +379,8 @@ export function PessoaActions({ pessoa, podeExcluir }: { pessoa: Profile; podeEx
               id={pessoa.id}
               documentoPath={pessoa.documento_path}
             />
+            <AssinaturasPessoa tipo="profile" id={pessoa.id} nome={pessoa.nome} />
+            <CampoConsentimento carimbadoEm={pessoa.consent_lgpd_em} />
 
             <Button type="submit" className="w-full" disabled={pending}>
               {pending ? "Salvando…" : "Salvar"}

@@ -1,0 +1,133 @@
+## Cadastro de Voluntários(as) - Brasil Participativo
+- Carimbo de data/hora
+- CPF
+- Nome completo
+- Nome social (se houver)
+- RG / Órgão expedidor / UF
+- Nome da mãe / Responsável
+- Renda familiar mensal (R$)
+- Data de nascimento
+- Sexo
+- Escolaridade
+- Estado civil
+- Autodeclaração (marque todas as opções que se aplicam)
+- E-mail
+- Celular (WhatsApp)
+- Telefone fixo
+- Banco
+- Agência (com dígito)
+- Conta (com dígito)
+- CEP
+- Logradouro (rua, avenida)
+- Número
+- Complemento
+- Bairro
+- Cidade
+- UF (estado)
+- RG - documento de identidade (frente e verso)
+- CPF - documento
+- Comprovante bancário (cartão ou extrato com nome, banco, agência e conta)
+- Comprovante de residência (conta de luz, água ou telefone recente)
+- Tipo de conta bancária
+- Autorização de uso dos dados (LGPD)
+
+## Cópia de Modelo Mentores_ dados para o matching
+- Carimbo de data/hora
+- Nome completo civil (como está no seu documento de identidade oficial):
+- Nome social:
+- Data de nascimento
+- Como você se identifica em relação à gênero:
+- Como você se identifica em relação à cor/raça?
+- Estado/município de residência
+- Você tem hobbies? Pode nos contar um pouco sobre eles?
+- Você gosta de esportes? Quais? Gosta de assistir ou também praticar esportes?
+- Quais são suas inspirações?
+- Quais são os seus valores?
+- Principais realizações:
+- Por favor, faça uma descrição de você mesmo em um parágrafo, inserindo suas características mais marcantes.
+- Se a sua esposa, ou seu marido, ou seu companheiro(a) fossem fazer uma breve descrição de você, como eles lhe descreveriam?
+- Cargo:
+- Empresa/instituição:
+- Por favor, anexe um currículo atualizado para que possamos conhecer sua trajetória profissional.
+- Perfil no LinkedIn:
+- E-mail:
+- Telefone:
+- Possui a formação no método Mentoring Autêntico dada pela Erlich Mentoring?
+- Possui experiência prévia no trabalho como mentor?
+- Caso possua experiência prévia como mentor, por favor descreva-a.
+- Quais são seus objetivos em participar do programa e o que você espera dessa experiência?
+- Você tem preferência de ser mentor para mentorado homem ou mulher?
+- Adicione uma foto de perfil para a plataforma de mentoria:
+- Informe sua disponibilidade de agenda: [09h às 10h]
+- Informe sua disponibilidade de agenda: [10h às 11h]
+- Informe sua disponibilidade de agenda: [11h às 12h]
+- Informe sua disponibilidade de agenda: [12h às 13h]
+- Informe sua disponibilidade de agenda: [13h às 14h]
+- Informe sua disponibilidade de agenda: [14h às 15h]
+- Informe sua disponibilidade de agenda: [15h às 16h]
+- Informe sua disponibilidade de agenda: [16h às 17h]
+- Informe sua disponibilidade de agenda: [17h às 18h]
+- Informe sua disponibilidade de agenda: [18h às 19h]
+- Informe sua disponibilidade de agenda: [19h às 20h]
+- Anexo do RG ou CNH
+- Anexo de um comprovante de residência
+
+## Modelo Mentores_ dados para o matching
+- Carimbo de data/hora
+- Nome completo civil (como está no seu documento de identidade oficial):
+- Nome social:
+- Data de nascimento
+- Como você se identifica em relação à gênero:
+- Como você se identifica em relação à cor/raça?
+- Estado/município de residência
+- Você tem hobbies? Pode nos contar um pouco sobre eles?
+- Você gosta de esportes? Quais? Gosta de assistir ou também praticar esportes?
+- Quais são suas inspirações?
+- Quais são os seus valores?
+- Principais realizações:
+- Por favor, faça uma descrição de você mesmo em um parágrafo, inserindo suas características mais marcantes.
+- Se a sua esposa, ou seu marido, ou seu companheiro(a) fossem fazer uma breve descrição de você, como eles lhe descreveriam?
+- Cargo:
+- Empresa/instituição:
+- Por favor, anexe um currículo atualizado para que possamos conhecer sua trajetória profissional.
+- Perfil no LinkedIn:
+- E-mail:
+- Telefone:
+- Possui a formação no método Mentoring Autêntico dada pela Erlich Mentoring?
+- Possui experiência prévia no trabalho como mentor?
+- Caso possua experiência prévia como mentor, por favor descreva-a.
+- Quais são seus objetivos em participar do programa e o que você espera dessa experiência?
+- Você tem preferência de ser mentor para mentorado homem ou mulher?
+- Adicione uma foto de perfil para a plataforma de mentoria:
+- Informe sua disponibilidade de agenda: [09h às 10h]
+- Informe sua disponibilidade de agenda: [10h às 11h]
+- Informe sua disponibilidade de agenda: [11h às 12h]
+- Informe sua disponibilidade de agenda: [12h às 13h]
+- Informe sua disponibilidade de agenda: [13h às 14h]
+- Informe sua disponibilidade de agenda: [14h às 15h]
+- Informe sua disponibilidade de agenda: [15h às 16h]
+- Informe sua disponibilidade de agenda: [16h às 17h]
+- Informe sua disponibilidade de agenda: [17h às 18h]
+- Informe sua disponibilidade de agenda: [18h às 19h]
+- Informe sua disponibilidade de agenda: [19h às 20h]
+- Anexo do RG ou CNH
+- Anexo de um comprovante de residência
+
+## Modelo Mentorados_ dados para o matching
+- Carimbo de data/hora
+- Nome completo civil (como está no seu documento de identidade oficial):
+- Nome social:
+- Data de nascimento
+- Como você se identifica em relação à gênero:
+- Como você se identifica em relação à cor/raça?
+- Estado/município de residência
+- Você tem hobbies? Pode nos contar um pouco sobre eles?
+- Quais as coisas que você mais gosta?
+- Você gosta de esportes? Quais? Gosta de assistir ou também praticar esportes?
+- Por favor faça uma descrição de você mesmo em um parágrafo, inserindo suas características mais marcantes.
+- Se seus amigos/familiares fossem fazer uma breve descrição de você, como eles lhe descreveriam?
+- E-mail:
+- Telefone:
+- Quais são seus objetivos em participar do programa e o que você espera dessa experiência?
+- Você tem preferência de ser mentorando por um mentor homem ou mulher?
+- Por favor, anexe um currículo atualizado para que possamos conhecer sua trajetória profissional.

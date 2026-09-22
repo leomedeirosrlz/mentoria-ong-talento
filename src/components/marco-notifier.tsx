@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { Flag, FlagCheckered, Medal, Trophy } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { marcosEntre, type MarcoJornada } from "@/lib/ciclo";
+import { demoAtivoClient } from "@/lib/demo/shared";
 
 const ICONE_MARCO: Record<MarcoJornada, typeof Flag> = {
   primeiro: Flag,
@@ -49,7 +50,9 @@ export function MarcoNotifier({
   total: number;
 }) {
   useEffect(() => {
-    if (total <= 0) return;
+    // demo: baseline em localStorage persistiria entre visitantes — e com o
+    // dataset fixo `visto` seria sempre == feitos, então nada se perde
+    if (demoAtivoClient() || total <= 0) return;
     const chave = `realiza:marco:${duplaId}`;
     let visto: number;
     try {

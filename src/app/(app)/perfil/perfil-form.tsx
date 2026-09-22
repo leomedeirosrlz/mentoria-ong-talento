@@ -8,19 +8,30 @@ import { setAvatarPath, updateMeuPerfil } from "@/lib/actions";
 import { avatarPublicUrl, AVATAR_ACCEPT, AVATAR_MAX_BYTES } from "@/lib/avatar";
 import { Avatar } from "@/components/avatar";
 import { TagInput } from "@/components/tag-input";
+import {
+  CampoConsentimento,
+  CampoDisponibilidade,
+  CampoGenero,
+  CampoInteresses,
+  CampoNascimento,
+  CampoPrefGenero,
+  CampoUf,
+} from "@/components/campos-pessoais";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { AREAS_SUGESTOES, papelLabel } from "@/lib/ciclo";
-import type { Profile } from "@/lib/types";
+import type { Disponibilidade, MentorProfile, Profile } from "@/lib/types";
 
 export function PerfilForm({
   me,
+  mentorProfile,
   avatarUrl,
   gravatarUrl,
 }: {
   me: Profile;
+  mentorProfile: MentorProfile | null;
   avatarUrl: string | null;
   gravatarUrl: string;
 }) {
@@ -35,6 +46,17 @@ export function PerfilForm({
   const [bioLen, setBioLen] = useState(me.bio?.length ?? 0);
   const [volLen, setVolLen] = useState(me.voluntariado?.length ?? 0);
   const [areas, setAreas] = useState<string[]>(me.areas ?? []);
+  const [interesses, setInteresses] = useState<string[]>(me.interesses ?? []);
+  const [disponibilidade, setDisponibilidade] = useState<Disponibilidade | null>(
+    mentorProfile?.disponibilidade ?? null
+  );
+  // sensíveis (0034): fora do grant de coluna — só a coordenação vê os
+  // próprios pré-preenchidos; pros demais o input nasce vazio e "em branco"
+  // no save significa "manter o que já está cadastrado" (ver updateMeuPerfil)
+  const ehCoord = me.role === "coordenacao";
+  const dicaSensivel = ehCoord
+    ? undefined
+    : "Deixe em branco pra manter o que já está cadastrado — por privacidade, o valor atual não aparece aqui.";
 
   async function trocarFoto(file: File) {
     if (file.size > AVATAR_MAX_BYTES) {
@@ -185,9 +207,21 @@ export function PerfilForm({
       <section className="rounded-xl bg-card p-6 shadow-[var(--shadow-border)]">
         <h2 className="text-sm font-semibold">Dados</h2>
         <form onSubmit={salvarDados} className="mt-4 space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="nome">Nome</Label>
-            <Input id="nome" name="nome" required defaultValue={me.nome} autoComplete="name" />
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="nome">Nome civil</Label>
+              <Input id="nome" name="nome" required defaultValue={me.nome} autoComplete="name" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="nome_social">Nome social</Label>
+              <Input
+                id="nome_social"
+                name="nome_social"
+                maxLength={150}
+                defaultValue={me.nome_social ?? ""}
+                placeholder="Nome de uso, se diferente"
+              />
+            </div>
           </div>
           <div className="space-y-2">
             <Label htmlFor="whatsapp">WhatsApp</Label>
@@ -207,6 +241,55 @@ export function PerfilForm({
             <p className="text-xs text-muted-foreground">
               O e-mail é sua credencial de acesso — para trocar, fale com a coordenação.
             </p>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <CampoNascimento id="nasc" defaultValue={me.data_nascimento ?? ""} />
+              {dicaSensivel && <p className="text-xs text-muted-foreground">{dicaSensivel}</p>}
+            </div>
+            <div className="space-y-2">
+              <CampoGenero defaultValue={me.genero ?? ""} />
+              {dicaSensivel && <p className="text-xs text-muted-foreground">{dicaSensivel}</p>}
+            </div>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div className="space-y-2 sm:col-span-2">
+              <Label htmlFor="cidade">Cidade</Label>
+              <Input id="cidade" name="cidade" maxLength={100} defaultValue={me.cidade ?? ""} />
+            </div>
+            <CampoUf defaultValue={me.uf ?? ""} />
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="cargo">Cargo</Label>
+              <Input id="cargo" name="cargo" maxLength={120} defaultValue={me.cargo ?? ""} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="empresa">Empresa</Label>
+              <Input id="empresa" name="empresa" maxLength={150} defaultValue={me.empresa ?? ""} />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="origem">Como você chegou ao programa</Label>
+            <Input
+              id="origem" name="origem" maxLength={300}
+              defaultValue={me.origem ?? ""}
+              placeholder="Indicação, ONG parceira, rede social…"
+            />
+          </div>
+          <CampoInteresses value={interesses} onChange={setInteresses} />
+          <div className="space-y-2">
+            <Label htmlFor="motivacao">O que te traz ao programa</Label>
+            <Textarea
+              id="motivacao" name="motivacao" rows={2} maxLength={2000}
+              defaultValue={me.motivacao ?? ""}
+              placeholder="Sua motivação pra participar da mentoria"
+            />
+            {dicaSensivel && <p className="text-xs text-muted-foreground">{dicaSensivel}</p>}
+          </div>
+          <div className="space-y-2">
+            <CampoPrefGenero defaultValue={me.pref_genero_par ?? ""} />
+            {dicaSensivel && <p className="text-xs text-muted-foreground">{dicaSensivel}</p>}
           </div>
           {/* apresentação profissional (0030) — aparece em /pessoas/[id] e nas
               áreas do select de especialista */}
@@ -270,11 +353,45 @@ export function PerfilForm({
               placeholder="ex.: 2 anos como voluntário no Projeto X"
             />
           </div>
+          <CampoConsentimento carimbadoEm={me.consent_lgpd_em} />
           <Button type="submit" disabled={salvando}>
             {salvando ? "Salvando…" : "Salvar"}
           </Button>
         </form>
       </section>
+
+      {/* ficha de mentor (0034) — self-update cobre experiência/formação/
+          disponibilidade; capacidade/tipo/validações seguem só com a coord */}
+      {mentorProfile && (
+        <section className="rounded-xl bg-card p-6 shadow-[var(--shadow-border)]">
+          <h2 className="text-sm font-semibold">Mentoria</h2>
+          <form onSubmit={salvarDados} className="mt-4 space-y-4">
+            <CampoDisponibilidade value={disponibilidade} onChange={setDisponibilidade} />
+            <div className="space-y-2">
+              <Label htmlFor="experiencia_previa">Experiência prévia como mentor</Label>
+              <Textarea
+                id="experiencia_previa" name="experiencia_previa" rows={3} maxLength={2000}
+                defaultValue={mentorProfile.experiencia_previa ?? ""}
+                placeholder="Mentorias anteriores, mediação, ensino…"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="formacao_externa">Formação e certificações</Label>
+              <Textarea
+                id="formacao_externa" name="formacao_externa" rows={3} maxLength={2000}
+                defaultValue={mentorProfile.formacao_externa ?? ""}
+                placeholder="Cursos e certificações relevantes pra mentoria"
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              A coordenação cruza sua disponibilidade com a do mentorado na hora de formar a dupla.
+            </p>
+            <Button type="submit" disabled={salvando}>
+              {salvando ? "Salvando…" : "Salvar"}
+            </Button>
+          </form>
+        </section>
+      )}
 
       {/* senha — updateUser direto; a flag senha_em é o que pula o onboarding */}
       <section className="rounded-xl bg-card p-6 shadow-[var(--shadow-border)]">

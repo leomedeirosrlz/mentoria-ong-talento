@@ -1,8 +1,9 @@
 import { cookies } from "next/headers";
 import type { AppRole } from "@/lib/types";
 import {
-  DEMO_OB_COOKIE,
   DEMO_ROLE_COOKIE,
+  DEMO_ROLES,
+  demoObCookie,
   papelDemoValido,
 } from "./shared";
 
@@ -26,27 +27,35 @@ export async function demoAtivo(): Promise<boolean> {
   return (await demoRole()) != null;
 }
 
-/** Onboarding da demo já concluído — cookie separado pra "rever o onboarding"
- *  sem precisar trocar de papel. */
-export async function demoOnboarded(): Promise<boolean> {
+/** Onboarding da persona já visto — um cookie por papel (demoObCookie):
+ *  "rever a apresentação" desmarca só a ativa e trocar de papel mostra o
+ *  wizard de cada uma na primeira vez. */
+export async function demoOnboarded(papel: AppRole): Promise<boolean> {
   const store = await cookies();
-  return store.get(DEMO_OB_COOKIE)?.value === "1";
+  return store.get(demoObCookie(papel))?.value === "1";
 }
 
 export async function definirPapelDemo(papel: AppRole) {
   (await cookies()).set(DEMO_ROLE_COOKIE, papel, COOKIE_OPTS);
 }
 
-export async function marcarOnboardingDemo() {
-  (await cookies()).set(DEMO_OB_COOKIE, "1", COOKIE_OPTS);
+export async function marcarOnboardingDemo(papel: AppRole) {
+  (await cookies()).set(demoObCookie(papel), "1", COOKIE_OPTS);
 }
 
-export async function desmarcarOnboardingDemo() {
-  (await cookies()).delete(DEMO_OB_COOKIE);
+export async function desmarcarOnboardingDemo(papel: AppRole) {
+  (await cookies()).delete(demoObCookie(papel));
+}
+
+/** Zera os "já vistos" de todas as personas — entrar na demo é sessão nova:
+ *  cada papel passa pelo wizard de novo, uma vez por entrada. */
+export async function resetarOnboardingDemo() {
+  const store = await cookies();
+  for (const papel of DEMO_ROLES) store.delete(demoObCookie(papel));
 }
 
 export async function limparDemo() {
   const store = await cookies();
   store.delete(DEMO_ROLE_COOKIE);
-  store.delete(DEMO_OB_COOKIE);
+  await resetarOnboardingDemo();
 }

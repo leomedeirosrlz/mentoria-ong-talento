@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { CircleNotch, Trash } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { addPessoaNota, deletePessoaNota } from "@/lib/actions";
+import { demoAtivoClient } from "@/lib/demo/shared";
 import { Textarea } from "@/components/ui/textarea";
 import { formatDiaMes } from "@/lib/ciclo";
 
@@ -33,10 +34,13 @@ export function PessoaMural({
 }) {
   const router = useRouter();
   const draftKey = `mural-nota:${pessoaId}`;
+  // na demo o rascunho não existe — o que o visitante digita não pode sobrar
+  // em localStorage pro próximo (capturado no mount, como no registro-form)
+  const [demo] = useState(demoAtivoClient);
   // rascunho restaurado no init — no SSR o localStorage não existe, então o
   // textarea leva suppressHydrationWarning (o mismatch é o rascunho mesmo)
   const [texto, setTexto] = useState(() =>
-    typeof window === "undefined" ? "" : (localStorage.getItem(draftKey) ?? "")
+    typeof window === "undefined" || demo ? "" : (localStorage.getItem(draftKey) ?? "")
   );
   const [pending, start] = useTransition();
   const [apagando, setApagando] = useState<string | null>(null);
@@ -96,6 +100,7 @@ export function PessoaMural({
             suppressHydrationWarning
             onChange={(e) => {
               setTexto(e.target.value);
+              if (demo) return;
               if (e.target.value.trim()) localStorage.setItem(draftKey, e.target.value);
               else localStorage.removeItem(draftKey);
             }}

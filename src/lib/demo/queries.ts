@@ -3,6 +3,7 @@ import { registroTardio } from "../ciclo";
 import { normaliza } from "../utils";
 import type {
   AppRole,
+  Assinatura,
   CicloEvento,
   Comunicado,
   Dupla,
@@ -12,13 +13,16 @@ import type {
   Mentorado,
   Notificacao,
   PessoaNota,
+  Presenca,
   Profile,
   RegistroAnexo,
   SolicitacaoEspecialista,
+  Supervisao,
 } from "../types";
 // Só tipos das queries reais — `import type` é apagado no build, então o
 // ciclo queries.ts → demo/queries.ts → queries.ts não existe em runtime.
 import type {
+  DadosPessoais,
   DuplaOpcao,
   DuplaPerfil,
   FiltrosRegistro,
@@ -26,6 +30,9 @@ import type {
   PessoaPerfil,
   RegistroResumo,
 } from "../queries";
+import type { ResumoFormacao } from "../queries-presenca";
+import type { FormularioPublico } from "../forms/queries";
+import { getDemoFormularios } from "./forms-data";
 import type { Interacao } from "../interacoes";
 
 // Camada de leitura do modo demo: replica o escopo que o RLS aplicaria a
@@ -109,15 +116,36 @@ function comContato<P extends { id: string }>(
   };
 }
 
-/** Contato em mentor/supervisor de cada dupla — idem mergeContatoDuplas. */
+/** Os 4 sensíveis da 0034 — fora do grant por coluna de profiles/mentorados,
+ *  só voltam pra coordenação (views *_pessoal). O dataset carrega tudo; o
+ *  strip aqui reproduz a fronteira real: ninguém ≠ coord recebe esses campos
+ *  de terceiros, e nenhum papel os recebe via embed de dupla (o select
+ *  embutido da query real pede só as colunas públicas). */
+const CAMPOS_PESSOAIS = [
+  "data_nascimento",
+  "genero",
+  "pref_genero_par",
+  "motivacao",
+] as const;
+
+function semPessoal<P>(p: P): P {
+  const q = { ...(p as Record<string, unknown>) };
+  for (const k of CAMPOS_PESSOAIS) delete q[k];
+  return q as P;
+}
+
+/** Contato em mentor/supervisor de cada dupla — idem mergeContatoDuplas.
+ *  O embed real lista só colunas públicas: o strip dos sensíveis vale pra
+ *  TODO papel, inclusive coordenação (a ficha dela vem pelas views). */
 function comContatoDuplas(
   duplas: Dupla[],
   contatos: Map<string, Contato>
 ): Dupla[] {
   return duplas.map((d) => ({
     ...d,
-    mentor: d.mentor ? comContato(d.mentor, contatos) : d.mentor,
-    supervisor: d.supervisor ? comContato(d.supervisor, contatos) : null,
+    mentor: d.mentor ? semPessoal(comContato(d.mentor, contatos)) : d.mentor,
+    mentorado: d.mentorado ? semPessoal(d.mentorado) : d.mentorado,
+    supervisor: d.supervisor ? semPessoal(comContato(d.supervisor, contatos)) : null,
   }));
 }
 
@@ -125,10 +153,13 @@ function comContatoDuplas(
  *  lê onboarded_em via getMe). */
 export function demoMe(role: AppRole, onboarded: boolean): Profile {
   const p = getDemoData().personas[role];
-  return comContato(
+  const base = comContato(
     { ...p, onboarded_em: onboarded ? new Date().toISOString() : null },
     demoContatosMap(role)
   );
+  // getMe real nunca traz os sensíveis (grant de coluna) — nem do próprio
+  // usuário e nem pra coordenação, que os lê de volta via getPessoaPerfil
+  return semPessoal(base);
 }
 
 // ---------- catálogo — igual pra todos os papéis ----------
@@ -185,7 +216,7 @@ export function demoMinhasDuplas(role: AppRole): Dupla[] {
  *  das actions, que bloqueia pessoa/mentorado com QUALQUER dupla). */
 export function demoDuplasResumo(role: AppRole, todas: boolean): DuplaResumo[] {
   return duplasDoPapel(getDemoData(), role)
-    .filter((d) => todas || d.status !== "encerrada")
+    .filter((d) => todas || ["ativa", "pausada"].includes(d.status))
     .map((d) => ({
       id: d.id,
       mentor_id: d.mentor.id,
@@ -201,16 +232,47 @@ export function demoContagemPessoas(): number {
   return data.profiles.length + data.mentorados.length;
 }
 
-/** /pessoas é coord-only — o mapa de contato dela cobre todos os profiles. */
+/** /pessoas é coord-only — o mapa de contato dela cobre todos os profiles;
+ *  os sensíveis (profiles_pessoal) só entram pra coordenação, como na real. */
 export function demoPessoas(role: AppRole): Profile[] {
   const contatos = demoContatosMap(role);
   return getDemoData()
-    .profiles.map((p) => comContato(p, contatos))
+    .profiles.map((p) => {
+      const c = comContato(p, contatos);
+      return role === "coordenacao" ? c : semPessoal(c);
+    })
     .sort(porNome);
 }
 
-export function demoMentorados(): Mentorado[] {
-  return [...getDemoData().mentorados].sort(porNome);
+export function demoMentorados(role: AppRole): Mentorado[] {
+  const lista = [...getDemoData().mentorados].sort(porNome);
+  // grant por coluna da 0034: nascimento/gênero/pref./motivação ficam de fora
+  // pra qualquer papel ≠ coordenação (a real lê pela view mentorados_pessoal)
+  return role === "coordenacao" ? lista : lista.map(semPessoal);
+}
+
+/** Mapa id → sensíveis, espelhando o WHERE das views profiles_pessoal /
+ *  mentorados_pessoal (0034): coordenação recebe todas as linhas, qualquer
+ *  outro papel recebe mapa vazio — a real nem dispara a query. O /perfil da
+ *  coordenação usa a própria linha daqui pra pré-preencher o form. */
+export function demoPessoalMap(
+  role: AppRole,
+  tabela: "profiles_pessoal" | "mentorados_pessoal"
+): Map<string, DadosPessoais> {
+  const mapa = new Map<string, DadosPessoais>();
+  if (role !== "coordenacao") return mapa;
+  const data = getDemoData();
+  const fonte: (Profile | Mentorado)[] =
+    tabela === "profiles_pessoal" ? data.profiles : data.mentorados;
+  for (const p of fonte) {
+    mapa.set(p.id, {
+      data_nascimento: p.data_nascimento ?? null,
+      genero: p.genero ?? null,
+      pref_genero_par: p.pref_genero_par ?? null,
+      motivacao: p.motivacao ?? null,
+    });
+  }
+  return mapa;
 }
 
 /** Card de dupla da página de perfil — id, status, início e o par. */
@@ -265,9 +327,13 @@ export function demoPessoaPerfil(
   const p = data.profiles.find((x) => x.id === id);
   if (p) {
     if (!ehStaff && id !== eu.id) return null;
+    const ehMentor = p.role === "mentor_dpp" || p.role === "mentor_especialista";
     return {
       tipo: "profile",
-      pessoa: comContato(p, contatos),
+      pessoa: role === "coordenacao" ? comContato(p, contatos) : semPessoal(comContato(p, contatos)),
+      mentorProfile: ehMentor
+        ? (data.mentorProfiles.find((mp) => mp.profile_id === id) ?? null)
+        : null,
       duplas: escopo
         .filter((d) => d.mentor?.id === id || d.supervisor?.id === id)
         .sort(desc)
@@ -283,13 +349,26 @@ export function demoPessoaPerfil(
       .map((d) => duplaPerfil(d, contatos));
     // mentor sem vínculo ao mentorado: a RLS responderia vazio → notFound
     if (!ehStaff && duplas.length === 0) return null;
-    return { tipo: "mentorado", pessoa: m, duplas, notas: notasDe("mentorado_id") };
+    return {
+      tipo: "mentorado",
+      pessoa: role === "coordenacao" ? m : semPessoal(m),
+      duplas,
+      notas: notasDe("mentorado_id"),
+    };
   }
   return null;
 }
 
 export function demoMentorProfiles(): MentorProfile[] {
   return getDemoData().mentorProfiles;
+}
+
+/** mentor_profile da persona — a real só devolve pra mentor_dpp/especialista. */
+export function demoMeuMentorProfile(role: AppRole): MentorProfile | null {
+  if (role !== "mentor_dpp" && role !== "mentor_especialista") return null;
+  const data = getDemoData();
+  const eu = data.personas[role];
+  return data.mentorProfiles.find((mp) => mp.profile_id === eu.id) ?? null;
 }
 
 // ---------- avisos e notificações ----------
@@ -552,4 +631,221 @@ export function demoAnexosPorRegistros(
     (mapa[a.registro_id] ??= []).push(a);
   }
   return mapa;
+}
+
+// ---------- documentos & assinaturas (0033) ----------
+
+/** A assinatura de termo mais recente da persona — o banner do home e a
+ *  página /assinar decidem a partir dela. Ricardo não tem → pendente. */
+export function demoMinhaAssinaturaTermo(role: AppRole): Assinatura | null {
+  const data = getDemoData();
+  const eu = data.personas[role];
+  return (
+    [...data.assinaturas]
+      .filter(
+        (a) => a.profile_id === eu.id && a.template?.slug === "termo-voluntario"
+      )
+      .sort((a, b) => b.created_at.localeCompare(a.created_at))[0] ?? null
+  );
+}
+
+/** Uma assinatura por id — escopo da policy: dono ou coordenação. */
+export function demoAssinatura(role: AppRole, id: string): Assinatura | null {
+  const data = getDemoData();
+  const a = data.assinaturas.find((x) => x.id === id) ?? null;
+  if (!a) return null;
+  const eu = data.personas[role];
+  if (a.profile_id === eu.id || role === "coordenacao") return a;
+  return null;
+}
+
+/** Histórico da ficha — só a coordenação abre fichas de terceiros. */
+export function demoAssinaturasPessoa(
+  role: AppRole,
+  tipo: "profile" | "mentorado",
+  id: string
+): Assinatura[] {
+  if (role !== "coordenacao") return [];
+  const col = tipo === "profile" ? "profile_id" : "mentorado_id";
+  return [...getDemoData().assinaturas]
+    .filter((a) => a[col] === id)
+    .sort((a, b) => b.created_at.localeCompare(a.created_at));
+}
+
+/** Público da demo: o que assinatura_por_token devolveria — usado pela
+ *  página /assinar/<token> quando o cookie demo está ativo. */
+export function demoAssinaturaPorToken(token: string) {
+  const a = getDemoData().assinaturas.find((x) => x.token === token);
+  if (!a) return null;
+  const data = getDemoData();
+  const nome = a.profile_id
+    ? data.profiles.find((p) => p.id === a.profile_id)?.nome
+    : data.mentorados.find((m) => m.id === a.mentorado_id)?.nome;
+  return {
+    id: a.id,
+    status: a.status,
+    assinado_em: a.assinado_em,
+    template: a.template ?? { slug: "", titulo: "", versao: 1 },
+    alvo: { nome: nome ?? "" },
+  };
+}
+
+/** Via assinada por token (demo) — a row só aparece depois de assinada,
+ *  como a RPC assinatura_completa_por_token. */
+export function demoAssinaturaCompletaPorToken(token: string): Assinatura | null {
+  const a = getDemoData().assinaturas.find(
+    (x) => x.token === token && x.status === "assinado"
+  );
+  return a ?? null;
+}
+
+// ---------- presenças na formação (0040) ----------
+
+/** Escopo da policy presencas_select: coordenação lê tudo; a pessoa lê a
+ *  própria linha; supervisor lê a dos mentores de duplas ativas/pausadas
+ *  que supervisiona (mesmo recorte de profiles_contato). */
+function presencaVisivel(data: DemoData, role: AppRole, p: Presenca): boolean {
+  const eu = data.personas[role];
+  if (role === "coordenacao" || p.profile_id === eu.id) return true;
+  if (role !== "supervisor") return false;
+  return data.duplas.some(
+    (d) =>
+      d.supervisor?.id === eu.id &&
+      d.mentor?.id === p.profile_id &&
+      (d.status === "ativa" || d.status === "pausada")
+  );
+}
+
+/** Linhas da chamada pros eventos dados — idem getPresencas. */
+export function demoPresencas(role: AppRole, eventoIds: string[]): Presenca[] {
+  const ids = new Set(eventoIds);
+  return getDemoData().presencas.filter(
+    (p) => ids.has(p.ciclo_evento_id) && presencaVisivel(getDemoData(), role, p)
+  );
+}
+
+/** "N de M encontros de formação" da ficha — idem getResumoFormacao. O
+ *  dataset demo tem um único ciclo de formação, então o recorte "ciclo
+ *  vigente" da real é a lista inteira de eventos 'formacao'. Fora do escopo
+ *  de leitura o count zera — como a RLS devolveria. */
+export function demoResumoFormacao(
+  role: AppRole,
+  profileId: string
+): ResumoFormacao {
+  const data = getDemoData();
+  const ids = data.cicloEventos
+    .filter((e) => e.tipo === "formacao")
+    .map((e) => e.id);
+  const presentes = data.presencas.filter(
+    (p) =>
+      p.profile_id === profileId &&
+      p.presente &&
+      ids.includes(p.ciclo_evento_id) &&
+      presencaVisivel(data, role, p)
+  ).length;
+  return { presentes, total: ids.length };
+}
+
+// ---------- sessões de supervisão (0041) ----------
+
+/** Escopo da policy supervisoes_select: coordenação tudo; o supervisor
+ *  autor; o mentor sobre quem é a sessão; e o supervisor das sessões
+ *  vinculadas a duplas que ele supervisiona. */
+function demoSupervisoesEscopo(role: AppRole): Supervisao[] {
+  const data = getDemoData();
+  if (role === "coordenacao") return data.supervisoes;
+  const eu = data.personas[role];
+  const supervisionadas = new Set(
+    data.duplas.filter((d) => d.supervisor?.id === eu.id).map((d) => d.id)
+  );
+  return data.supervisoes.filter(
+    (s) =>
+      s.supervisor_id === eu.id ||
+      s.mentor_id === eu.id ||
+      (s.dupla_id != null && supervisionadas.has(s.dupla_id))
+  );
+}
+
+/** Últimas sessões no escopo do papel — ordenação da real (data desc,
+ *  created_at desc) + limit. */
+export function demoSupervisoesRecentes(
+  role: AppRole,
+  limite = 6
+): Supervisao[] {
+  return [...demoSupervisoesEscopo(role)]
+    .sort(
+      (a, b) =>
+        b.data.localeCompare(a.data) || b.created_at.localeCompare(a.created_at)
+    )
+    .slice(0, limite);
+}
+
+/** Sessões da dupla + as "gerais" do mentor dela — idem
+ *  getSupervisoesDaDupla (or dupla_id.eq.X,and(mentor_id.eq.Y,dupla_id.is.null)). */
+export function demoSupervisoesDaDupla(
+  role: AppRole,
+  duplaId: string,
+  mentorId: string
+): Supervisao[] {
+  return demoSupervisoesEscopo(role)
+    .filter(
+      (s) =>
+        s.dupla_id === duplaId ||
+        (s.mentor_id === mentorId && s.dupla_id == null)
+    )
+    .sort((a, b) => b.data.localeCompare(a.data));
+}
+
+/** Sessões da pessoa — conduzidas (supervisor) ou recebidas (mentor),
+ *  cap de 30 como a real. */
+export function demoSupervisoesDaPessoa(
+  role: AppRole,
+  profileId: string
+): Supervisao[] {
+  return demoSupervisoesEscopo(role)
+    .filter((s) => s.supervisor_id === profileId || s.mentor_id === profileId)
+    .sort((a, b) => b.data.localeCompare(a.data))
+    .slice(0, 30);
+}
+
+// ---------- formulários: leitura pública por token (0036/0042) ----------
+
+/** O que a RPC formulario_por_token devolveria — usado pelo stub do client
+ *  quando algum componente chama rpc() no browser. O status replica o CASE
+ *  da função: respondido > inativo > expirado > pendente. */
+export function demoFormularioPorToken(
+  token: string
+): FormularioPublico | null {
+  const { formularios, links } = getDemoFormularios();
+  const l = links.find((x) => x.token === token);
+  if (!l) return null;
+  const f = formularios.find((x) => x.id === l.formulario_id);
+  if (!f) return null;
+  const data = getDemoData();
+  const destinatario = l.dest_profile_id
+    ? (data.profiles.find((p) => p.id === l.dest_profile_id)?.nome ?? null)
+    : l.dest_mentorado_id
+      ? (data.mentorados.find((m) => m.id === l.dest_mentorado_id)?.nome ?? null)
+      : null;
+  const status: FormularioPublico["status"] = l.usado_em
+    ? "respondido"
+    : !f.ativo
+      ? "inativo"
+      : l.expira_em && new Date(l.expira_em).getTime() < Date.now()
+        ? "expirado"
+        : "pendente";
+  return {
+    status,
+    expira_em: l.expira_em,
+    respondido_em: l.usado_em,
+    destinatario,
+    formulario: {
+      id: f.id,
+      titulo: f.titulo,
+      descricao: f.descricao,
+      campos: f.campos,
+      versao: f.versao,
+      sistema: f.sistema ?? null,
+    },
+  };
 }

@@ -10,6 +10,8 @@ import {
 import type { Dupla, Encontro, EspecialistaEvento } from "@/lib/types";
 import { DuplaNomes } from "@/components/dupla-nomes";
 import { TrilhaJornada } from "@/components/trilha-jornada";
+import { TrilhaPrazoBadge } from "@/components/trilha-prazo-badge";
+import { EncerrarTrilhaDialog } from "@/components/encerrar-trilha-dialog";
 import { AgendarEncontroDialog } from "@/components/agendar-encontro-dialog";
 import { RegistrarRetroativoDialog } from "@/components/registrar-retroativo-dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -80,8 +82,13 @@ export function AgendaEspecialista({
                     <DuplaNomes mentor="Você" mentorado={dupla.mentorado.nome} />
                   </CardTitle>
                 </div>
-                <span className="font-mono text-sm tabular-nums text-muted-foreground">
-                  {jornada.feitos}/{jornada.total} encontros
+                <span className="flex flex-wrap items-center justify-end gap-2">
+                  {/* prazo de 3 meses da trilha — o relógio corre pro
+                      especialista; urgência vira warn na quinzena final */}
+                  <TrilhaPrazoBadge dupla={dupla} />
+                  <span className="font-mono text-sm tabular-nums text-muted-foreground">
+                    {jornada.feitos}/{jornada.total} encontros
+                  </span>
                 </span>
               </div>
             </CardHeader>
@@ -141,9 +148,16 @@ export function AgendaEspecialista({
                 </div>
               )}
               {cicloCompleto && (
-                <p className="border-t border-border pt-4 text-sm text-muted-foreground">
-                  Jornada concluída — os 5 encontros foram realizados.
-                </p>
+                <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-4">
+                  <p className="text-sm text-muted-foreground">
+                    {dupla.encerrada_em
+                      ? "Trilha fechada — a devolutiva já seguiu pro PDM."
+                      : "Os 5 encontros foram realizados — falta o fechamento com a devolutiva pro PDM."}
+                  </p>
+                  {!dupla.encerrada_em && (
+                    <EncerrarTrilhaDialog duplaId={dupla.id} />
+                  )}
+                </div>
               )}
             </CardContent>
           </Card>

@@ -15,24 +15,97 @@ import {
   demoEspecialistaEventos,
   demoMateriais,
   demoMe,
-  demoMentorProfiles,
   demoMentorados,
+  demoMentorProfiles,
+  demoMeuMentorProfile,
   demoMinhasDuplas,
   demoNotificacoes,
+  demoPessoalMap,
   demoPessoaPerfil,
   demoPessoas,
   demoRegistros,
 } from "./demo/queries";
-import type { AvaliacaoJovem, CicloEvento, Comunicado, Dupla, DuplaResumo, DuplaStatus, EncontroStatus, EspecialistaEvento, Material, Mentorado, Notificacao, PessoaNota, Profile, Registro, Trilha } from "./types";
+import type { AvaliacaoJovem, CicloEvento, Comunicado, Dupla, DuplaResumo, DuplaStatus, EncontroStatus, EspecialistaEvento, Genero, Material, Mentorado, MentorProfile, Notificacao, PessoaNota, PrefGeneroPar, Profile, Registro, Trilha } from "./types";
+
+/** mentor_profiles — re-export do tipo canônico (types.ts): os callers da
+ *  página de pessoas/board importam daqui historicamente. */
+export type { MentorProfile } from "./types";
 
 /** Colunas de profiles legíveis por qualquer autenticado — grant de coluna
  *  da 0026 (Postgres não tem RLS por coluna), ampliado pela 0030 com os
- *  campos de apresentação (bio/linkedin/areas/voluntariado) e pela 0031 com
- *  a marca de onboarding (onboarded_em — o gate do wizard lê via getMe).
- *  email/whatsapp/documento_path ficam de fora: pedir qualquer uma delas em
- *  profiles dá permission denied. */
+ *  campos de apresentação (bio/linkedin/areas/voluntariado), pela 0031 com
+ *  a marca de onboarding (onboarded_em — o gate do wizard lê via getMe) e
+ *  pela 0034 com a ficha interna de matching (nome_social/cidade/uf/
+ *  interesses/cargo/empresa/origem/consent_lgpd_em).
+ *  email/whatsapp/documento_path ficam de fora, assim como os sensíveis da
+ *  0034 (data_nascimento/genero/pref_genero_par/motivacao): pedir qualquer
+ *  um deles em profiles dá permission denied. */
 const PROFILE_COLS_PUBLICAS =
-  "id, user_id, nome, role, ativo, avatar_path, created_at, bio, linkedin, areas, voluntariado, onboarded_em";
+  "id, user_id, nome, role, ativo, avatar_path, created_at, bio, linkedin, areas, voluntariado, onboarded_em, nome_social, cidade, uf, interesses, cargo, empresa, origem, consent_lgpd_em";
+
+/** Colunas de mentorados legíveis por qualquer autenticado — a 0034 tirou o
+ *  SELECT table-level e voltou grant por coluna (as sensíveis ficam de fora).
+ *  `select("*")` expandiria pras colunas revogadas e derrubaria a query
+ *  inteira com permission denied — a lista é sempre explícita. */
+const MENTORADO_COLS_PUBLICAS =
+  "id, nome, email, whatsapp, ong_origem, notas, avatar_path, documento_path, created_at, nome_social, cidade, uf, interesses, objetivos, escolaridade, origem, disponibilidade";
+
+/** Os 4 sensíveis da 0034, idênticos em profiles e mentorados — fora do
+ *  grant de coluna; só a coordenação os lê, pelas views *_pessoal. Exportado
+ *  como tipo: a camada demo espelha o mesmo shape sem depender de runtime. */
+export type DadosPessoais = {
+  data_nascimento: string | null;
+  genero: Genero | null;
+  pref_genero_par: PrefGeneroPar | null;
+  motivacao: string | null;
+};
+
+/** id → dados sensíveis, como devolvido pelas views profiles_pessoal /
+ *  mentorados_pessoal (0034): o WHERE da view devolve zero linhas pra
+ *  qualquer papel ≠ coordenação — o gate por papel está no banco; aqui a
+ *  query nem é disparada pra não-coord (getMe já está em cache). Falha de
+ *  leitura degrada pra mapa vazio com log — a tela segue sem os campos.
+ *  Exportado pro /perfil da coordenação, que pré-preenche os sensíveis do
+ *  próprio cadastro (getMe nunca os traz — nem pra coord). */
+export const getPessoalMap = cache(
+  async (
+    tabela: "profiles_pessoal" | "mentorados_pessoal"
+  ): Promise<Map<string, DadosPessoais>> => {
+    // modo demo: replica o WHERE da view — só a coordenação recebe linhas
+    const demo = await demoRole();
+    if (demo) return demoPessoalMap(demo, tabela);
+    const me = await getMe();
+    if (me?.role !== "coordenacao") return new Map();
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from(tabela)
+      .select("id, data_nascimento, genero, pref_genero_par, motivacao");
+    if (error) {
+      console.error(`getPessoalMap(${tabela}):`, error);
+      return new Map();
+    }
+    return new Map(
+      (data ?? []).map((r: { id: string } & DadosPessoais) => [r.id, r])
+    );
+  }
+);
+
+/** Merge dos sensíveis numa linha de profiles/mentorados, por id — fora da
+ *  coordenação o mapa vem vazio e os campos ficam null (falsy), como a
+ *  ausência de coluna no grant faria. */
+function comPessoal<P extends { id: string }>(
+  p: P,
+  pessoal: Map<string, DadosPessoais>
+): P & DadosPessoais {
+  const d = pessoal.get(p.id);
+  return {
+    ...p,
+    data_nascimento: d?.data_nascimento ?? null,
+    genero: d?.genero ?? null,
+    pref_genero_par: d?.pref_genero_par ?? null,
+    motivacao: d?.motivacao ?? null,
+  };
+}
 
 /** Contato de uma pessoa, como devolvido pela view profiles_contato. */
 type Contato = {
@@ -83,9 +156,9 @@ function comContato<P extends { id: string }>(
 
 // getClaims valida o JWT localmente (sem round-trip); RLS segue valendo no banco.
 export const getMe = cache(async (): Promise<Profile | null> => {
-  // modo demo: persona do papel + onboarding do cookie demo_onboarded
+  // modo demo: persona do papel + "já vi o wizard" do cookie daquele papel
   const demo = await demoRole();
-  if (demo) return demoMe(demo, await demoOnboarded());
+  if (demo) return demoMe(demo, await demoOnboarded(demo));
   const supabase = await createClient();
   const { data } = await supabase.auth.getClaims();
   const sub = data?.claims?.sub;
@@ -120,7 +193,7 @@ export const getCicloEventos = cache(async (): Promise<CicloEvento[]> => {
 const DUPLA_SELECT = `
   *,
   mentor:profiles!duplas_mentor_id_fkey(${PROFILE_COLS_PUBLICAS}),
-  mentorado:mentorados(*),
+  mentorado:mentorados(${MENTORADO_COLS_PUBLICAS}),
   supervisor:profiles!duplas_supervisor_id_fkey(${PROFILE_COLS_PUBLICAS}),
   encontros(*, registro:registros(*, autor:profiles!registros_created_by_fkey(nome))),
   encaminhamentos(*),
@@ -201,7 +274,8 @@ export const getDuplasResumo = cache(async (): Promise<DuplaResumo[]> => {
   const { data, error } = await supabase
     .from("duplas")
     .select("id,mentor_id,mentorado_id,supervisor_id")
-    .neq("status", "encerrada");
+    // "está em dupla" = ocupa vaga — concluída e encerrada já liberaram
+    .in("status", ["ativa", "pausada"]);
   if (error) throw error;
   return data ?? [];
 });
@@ -226,9 +300,10 @@ export const getContagemPessoas = cache(async (): Promise<number> => {
   const supabase = await createClient();
   const [profiles, mentorados] = await Promise.all([
     // select=* falharia até no head:true — o * expande pras colunas sem
-    // grant (0026) e a query inteira dá permission denied; id basta pra contar
+    // grant (0026 em profiles, 0034 em mentorados) e a query inteira dá
+    // permission denied; id basta pra contar
     supabase.from("profiles").select("id", { count: "exact", head: true }),
-    supabase.from("mentorados").select("*", { count: "exact", head: true }),
+    supabase.from("mentorados").select("id", { count: "exact", head: true }),
   ]);
   if (profiles.error) throw profiles.error;
   if (mentorados.error) throw mentorados.error;
@@ -244,25 +319,32 @@ export const getPessoas = cache(async (): Promise<Profile[]> => {
   const demo = await demoRole();
   if (demo) return demoPessoas(demo);
   const supabase = await createClient();
-  const [{ data, error }, contatos] = await Promise.all([
+  const [{ data, error }, contatos, pessoal] = await Promise.all([
     supabase.from("profiles").select(PROFILE_COLS_PUBLICAS).order("nome"),
     getContatos(),
+    getPessoalMap("profiles_pessoal"),
   ]);
   if (error) throw error;
   // a tela (/pessoas) é da coordenação — a view devolve email/whatsapp/
-  // documento_path de todos; pra outro papel só a própria linha teria contato
+  // documento_path de todos; pra outro papel só a própria linha teria contato.
+  // Os sensíveis (nascimento/gênero/pref./motivação) só preenchem pra coord.
   return ((data ?? []) as { id: string; nome: string }[])
-    .map((p) => comContato(p, contatos))
+    .map((p) => comPessoal(comContato(p, contatos), pessoal))
     .sort(porNome) as Profile[];
 });
 
 export const getMentorados = cache(async (): Promise<Mentorado[]> => {
   const demo = await demoRole();
-  if (demo) return demoMentorados();
+  if (demo) return demoMentorados(demo);
   const supabase = await createClient();
-  const { data, error } = await supabase.from("mentorados").select("*").order("nome");
+  const [{ data, error }, pessoal] = await Promise.all([
+    supabase.from("mentorados").select(MENTORADO_COLS_PUBLICAS).order("nome"),
+    getPessoalMap("mentorados_pessoal"),
+  ]);
   if (error) throw error;
-  return (data ?? []).sort(porNome);
+  return ((data ?? []) as { id: string; nome: string }[])
+    .map((m) => comPessoal(m, pessoal))
+    .sort(porNome) as Mentorado[];
 });
 
 /** Card de dupla na página de perfil — nomes e status, sem a árvore de encontros. */
@@ -275,7 +357,7 @@ export type DuplaPerfil = {
 };
 
 export type PessoaPerfil =
-  | { tipo: "profile"; pessoa: Profile }
+  | { tipo: "profile"; pessoa: Profile; mentorProfile: MentorProfile | null }
   | { tipo: "mentorado"; pessoa: Mentorado };
 
 /** Perfil público interno (/pessoas/[id]) — resolve profile OU mentorado pelo
@@ -299,11 +381,14 @@ export const getPessoaPerfil = cache(async (id: string): Promise<
   // seria sempre eu mesmo, então não vale o join
   const NOTA_SELECT = `id, profile_id, mentorado_id, texto, created_by, created_at`;
 
-  const [{ data: p }, { data: m }, contatos] = await Promise.all([
-    supabase.from("profiles").select(PROFILE_COLS_PUBLICAS).eq("id", id).maybeSingle(),
-    supabase.from("mentorados").select("*").eq("id", id).maybeSingle(),
-    getContatos(),
-  ]);
+  const [{ data: p }, { data: m }, contatos, pessoalProf, pessoalMent] =
+    await Promise.all([
+      supabase.from("profiles").select(PROFILE_COLS_PUBLICAS).eq("id", id).maybeSingle(),
+      supabase.from("mentorados").select(MENTORADO_COLS_PUBLICAS).eq("id", id).maybeSingle(),
+      getContatos(),
+      getPessoalMap("profiles_pessoal"),
+      getPessoalMap("mentorados_pessoal"),
+    ]);
   const comEmail = (d: DuplaPerfil): DuplaPerfil => ({
     ...d,
     mentor: d.mentor
@@ -311,16 +396,24 @@ export const getPessoaPerfil = cache(async (id: string): Promise<
       : null,
   });
   if (p) {
-    const [{ data: duplas }, { data: notas }] = await Promise.all([
+    // mentor_profiles é legível por autenticado (grant table-level) — a ficha
+    // de mentor (disponibilidade/experiência/formação) entra no perfil dele
+    const ehMentor = p.role === "mentor_dpp" || p.role === "mentor_especialista";
+    const [{ data: duplas }, { data: notas }, { data: mp }] = await Promise.all([
       supabase.from("duplas").select(DUPLA_PERFIL_SELECT)
         .or(`mentor_id.eq.${id},supervisor_id.eq.${id}`)
         .order("created_at", { ascending: false }),
       supabase.from("pessoa_notas").select(NOTA_SELECT)
         .eq("profile_id", id).order("created_at", { ascending: false }),
+      ehMentor
+        ? supabase.from("mentor_profiles").select(MENTOR_PROFILE_COLS)
+            .eq("profile_id", id).maybeSingle()
+        : Promise.resolve({ data: null }),
     ]);
     return {
       tipo: "profile",
-      pessoa: comContato(p, contatos) as Profile,
+      pessoa: comPessoal(comContato(p, contatos), pessoalProf) as Profile,
+      mentorProfile: (mp as MentorProfile | null) ?? null,
       duplas: ((duplas as unknown as DuplaPerfil[]) ?? []).map(comEmail),
       notas: (notas as unknown as PessoaNota[]) ?? [],
     };
@@ -335,7 +428,7 @@ export const getPessoaPerfil = cache(async (id: string): Promise<
     ]);
     return {
       tipo: "mentorado",
-      pessoa: m as Mentorado,
+      pessoa: comPessoal(m, pessoalMent) as Mentorado,
       duplas: ((duplas as unknown as DuplaPerfil[]) ?? []).map(comEmail),
       notas: (notas as unknown as PessoaNota[]) ?? [],
     };
@@ -355,15 +448,11 @@ export const getMateriais = cache(async (): Promise<Material[]> => {
   return data ?? [];
 });
 
-/** mentor_profiles — tipo local porque a tabela ainda não está em types.ts. */
-export type MentorProfile = {
-  profile_id: string;
-  tipo: "dpp" | "especialista";
-  areas: string[];
-  capacidade: number;
-  termo_ok: boolean;
-  formacao_ok: boolean;
-};
+/** mentor_profiles é table-level legível por autenticado (0001) — a lista
+ *  completa inclui a ficha de matching da 0034 (disponibilidade jsonb,
+ *  experiência prévia, formação externa); o tipo canônico é o de types.ts. */
+const MENTOR_PROFILE_COLS =
+  "profile_id, tipo, areas, capacidade, termo_ok, formacao_ok, experiencia_previa, formacao_externa, disponibilidade";
 
 export const getMentorProfiles = cache(async (): Promise<MentorProfile[]> => {
   const demo = await demoRole();
@@ -371,10 +460,34 @@ export const getMentorProfiles = cache(async (): Promise<MentorProfile[]> => {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("mentor_profiles")
-    .select("profile_id,tipo,areas,capacidade,termo_ok,formacao_ok");
+    .select(MENTOR_PROFILE_COLS);
   if (error) throw error;
   return (data as unknown as MentorProfile[]) ?? [];
 });
+
+/** mentor_profile do usuário logado — /perfil (o mentor edita a própria
+ *  ficha: a self_update policy cobre as colunas novas; o guard da 0004 trava
+ *  só termo_ok/formacao_ok/capacidade/tipo). null pra quem não é mentor. */
+export const getMeuMentorProfile = cache(
+  async (): Promise<MentorProfile | null> => {
+    const demo = await demoRole();
+    if (demo) return demoMeuMentorProfile(demo);
+    const me = await getMe();
+    if (!me || (me.role !== "mentor_dpp" && me.role !== "mentor_especialista"))
+      return null;
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("mentor_profiles")
+      .select(MENTOR_PROFILE_COLS)
+      .eq("profile_id", me.id)
+      .maybeSingle();
+    if (error) {
+      console.error("getMeuMentorProfile:", error);
+      return null;
+    }
+    return (data as MentorProfile | null) ?? null;
+  }
+);
 
 /** Notificações do usuário logado — as 15 mais recentes + contagem exata de
  *  não-lidas (o badge pode passar de 15 mesmo com a lista paginada). */

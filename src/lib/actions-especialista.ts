@@ -5,36 +5,17 @@ import { createClient } from "@/lib/supabase/server";
 import { notificar } from "@/lib/notificar";
 import { demoAtivo } from "./demo/mode";
 import { DEMO_MSG } from "./demo/shared";
+import { erroAmigavel as erroAmigavelBase } from "./utils";
 
-/** Traduz erro do Postgres/PostgREST pra mensagem de UI — mesma convenção de
- *  actions.ts (cópia local: o helper de lá não é exportado). As exceções de
- *  domínio do RPC aceitar_solicitacao já chegam em pt-BR e passam direto. */
+/** Erro de UI do fluxo de especialista — as exceções de domínio do RPC
+ *  aceitar_solicitacao (raise exception → P0001) já chegam em pt-BR e passam
+ *  direto; a capacidade fala em "especialista", não "mentor". */
 function erroAmigavel(e: { message: string; code?: string }): string {
-  if (
-    /Só mentores especialistas podem aceitar|Solicitação não encontrada|não está mais aberta|direcionada a outro especialista/i.test(
-      e.message
-    )
-  ) {
-    return e.message;
-  }
-  // triggers de domínio (0029) levantam P0001 com mensagem própria em pt-BR
-  if (e.code === "P0001") return e.message;
-  if (e.code === "23505" || /duplicate key/i.test(e.message)) {
-    return "Já existe um cadastro com esses dados.";
-  }
-  if (e.code === "42501" || /row-level security|row level security/i.test(e.message)) {
-    return "Você não tem permissão para essa ação.";
-  }
-  if (e.code === "23514" || /check constraint|invalid input value/i.test(e.message)) {
-    return "Revise os campos — um dos valores não é válido.";
-  }
-  if (e.code === "23503" || /foreign key/i.test(e.message)) {
-    return "Esse cadastro está vinculado a outros dados — remova os vínculos antes de excluir.";
-  }
+  if (e.code === "P0001" && e.message) return e.message;
   if (/capacidade do mentor excedida/i.test(e.message)) {
     return "Esse especialista já atingiu o número máximo de duplas.";
   }
-  return "Não foi possível concluir. Tente de novo.";
+  return erroAmigavelBase(e);
 }
 
 async function me() {

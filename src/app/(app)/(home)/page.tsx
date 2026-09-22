@@ -10,9 +10,12 @@ import {
 } from "@/lib/queries";
 import { getUltimasInteracoes } from "@/lib/interacoes";
 import { getSolicitacoesVisiveis } from "@/lib/queries-especialista";
+import { getSupervisaoAlvos, getSupervisoesRecentes } from "@/lib/queries-supervisao";
+import { getMinhaAssinaturaTermo } from "@/lib/queries-assinaturas";
 import { DashboardCoordenacao } from "@/components/dashboard-coordenacao";
 import { DemandasEspecialista } from "@/components/demandas-especialista";
 import { MentorHome } from "@/components/mentor-home";
+import { TermoBanner } from "@/components/termo-banner";
 
 export default async function HomePage({
   searchParams,
@@ -55,7 +58,11 @@ export default async function HomePage({
   }
 
   if (me?.role === "supervisor") {
-    const duplas = await getMinhasDuplas();
+    const [duplas, supervisoes, supervisaoAlvos] = await Promise.all([
+      getMinhasDuplas(),
+      getSupervisoesRecentes(),
+      getSupervisaoAlvos(),
+    ]);
     const interacoes = await getUltimasInteracoes(duplas.map((d) => d.id));
     return (
       <DashboardCoordenacao
@@ -67,12 +74,14 @@ export default async function HomePage({
         supervisor
         avisos={avisos}
         filtro={filtro}
+        supervisaoItens={supervisoes}
+        supervisaoAlvos={supervisaoAlvos}
       />
     );
   }
 
   const duplas = await getMinhasDuplas();
-  const [espEventos, solicitacoes] = await Promise.all([
+  const [espEventos, solicitacoes, assinatura] = await Promise.all([
     // passos da trilha especialista só valem a leitura quando há dupla dela —
     // mentor DPP puro não paga o round-trip
     duplas.some((d) => d.trilha === "especialista")
@@ -82,9 +91,17 @@ export default async function HomePage({
     me?.role === "mentor_especialista"
       ? getSolicitacoesVisiveis()
       : Promise.resolve([]),
+    // o banner do termo só existe pros voluntários (coord/sup voltaram acima)
+    me?.role === "mentor_dpp" || me?.role === "mentor_especialista"
+      ? getMinhaAssinaturaTermo()
+      : Promise.resolve(null),
   ]);
   return (
     <div className="space-y-8">
+      {/* null = nunca assinou — qualquer estado ≠ assinado pede a assinatura;
+          a query acima só rodou pros papéis de voluntário */}
+      {(me?.role === "mentor_dpp" || me?.role === "mentor_especialista") &&
+        assinatura?.status !== "assinado" && <TermoBanner />}
       {me?.role === "mentor_especialista" && (
         <DemandasEspecialista solicitacoes={solicitacoes} meuId={me.id} />
       )}

@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import {
   BookOpen,
   CaretDown,
+  ChatsCircle,
   ClockCounterClockwise,
   HandHeart,
   VideoCamera,
@@ -20,6 +21,10 @@ import {
   getEspecialistas,
   getSolicitacaoDaDupla,
 } from "@/lib/queries-especialista";
+import { getEncerramentoDaDupla, getAvaliacao360DaDupla } from "@/lib/queries-encerramento";
+import { getSupervisoesDaDupla } from "@/lib/queries-supervisao";
+import { getFormularios } from "@/lib/forms/queries";
+import { dadosResumoJornada } from "@/lib/encerramento";
 import { getAnexosPorRegistros } from "@/lib/anexos";
 import { avatarPublicUrl } from "@/lib/avatar";
 import { Avatar } from "@/components/avatar";
@@ -60,7 +65,17 @@ import { ResolverApoioButton } from "@/components/resolver-apoio-button";
 import { TrajetoriaAvaliacoes } from "@/components/trajetoria-avaliacoes";
 import { SolicitacaoStatusChip } from "@/components/solicitacao-status-chip";
 import { SolicitarEspecialistaDialog } from "@/components/solicitar-especialista-dialog";
+import { PdmUrlDialog } from "@/components/pdm-url-dialog";
 import { TrilhaJornada } from "@/components/trilha-jornada";
+import { TrilhaPrazoBadge } from "@/components/trilha-prazo-badge";
+import { TrilhaFechamento } from "@/components/trilha-fechamento";
+import { EncerrarTrilhaDialog } from "@/components/encerrar-trilha-dialog";
+import { EncerramentoDupla } from "@/components/encerramento-dupla";
+import { EnviarFormularioDialog } from "@/components/enviar-formulario-dialog";
+import { ResumoJornadaSection } from "@/components/resumo-jornada";
+import { DevolutivaEspecialista } from "@/components/devolutiva-especialista";
+import { SupervisaoDialog } from "@/components/supervisao-dialog";
+import { SupervisoesSection } from "@/components/supervisoes-section";
 import { MarcoNotifier } from "@/components/marco-notifier";
 import { AnexosRegistro } from "@/components/anexos-registro";
 import { RegistroView } from "@/components/registro-view";
@@ -85,23 +100,44 @@ export async function generateMetadata({
 
 export default async function DuplaPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [dupla, eventos, me, materiais, anexosPorRegistro] = await Promise.all([
-    getDupla(id),
-    getCicloEventos(),
-    getMe(),
-    getMateriais(),
-    // getDupla é React.cache — a 2ª chamada reusa o mesmo fetch, sem round-trip extra
-    getDupla(id).then((d) =>
-      getAnexosPorRegistros(
-        (d?.encontros ?? []).flatMap((e) => (e.registro ? [e.registro.id] : []))
-      )
-    ),
-  ]);
+  const [dupla, eventos, me, materiais, anexosPorRegistro, encerramento, supervisoes] =
+    await Promise.all([
+      getDupla(id),
+      getCicloEventos(),
+      getMe(),
+      getMateriais(),
+      // getDupla é React.cache — a 2ª chamada reusa o mesmo fetch, sem round-trip extra
+      getDupla(id).then((d) =>
+        getAnexosPorRegistros(
+          (d?.encontros ?? []).flatMap((e) => (e.registro ? [e.registro.id] : []))
+        )
+      ),
+      // fechamento do ciclo — a row pode existir só com a autoavaliação do
+      // mentor (decisão da coordenação pendente)
+      getEncerramentoDaDupla(id),
+      // sessões de supervisão da dupla + as gerais do mentor dela (0041)
+      getDupla(id).then((d) =>
+        d ? getSupervisoesDaDupla(d.id, d.mentor.id) : []
+      ),
+    ]);
   if (!dupla || !me) notFound();
 
   const souMentor = dupla.mentor.id === me.id;
   const souCoord = me.role === "coordenacao";
+  // o supervisor da dupla registra a sessão daqui mesmo — alvo único, sem
+  // query extra (o dialog ganha mentor+dupla já resolvidos)
+  const podeRegistrarSupervisao =
+    dupla.supervisor?.id === me.id &&
+    (dupla.status === "ativa" || dupla.status === "pausada");
   const ehEsp = dupla.trilha === "especialista";
+  // forms ativos pra "Enviar formulário" da ficha e pro link de avaliação
+  // 360º do encerramento — escopo coord (a query já devolve [] pros demais)
+  const formulariosAtivos = souCoord
+    ? (await getFormularios()).filter((f) => f.ativo)
+    : [];
+  // data da resposta 360º oficial (0042) — escopo coord: a proveniência do
+  // check é detalhe operacional, e a policy de respostas já é coord-only
+  const avaliacao360Em = souCoord ? await getAvaliacao360DaDupla(id) : null;
   // passos do guia da trilha — ciclo_eventos (DPP, com datas) ou os 5 passos
   // do especialista (sem data: a dupla combina dentro dos 3 meses)
   const espEventos = ehEsp ? await getEspecialistaEventos() : [];
@@ -157,6 +193,28 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
 
   const hojeStr = toDateStr(new Date());
   const podeRetroativo = souMentor && dupla.status === "ativa" && faltantes.length > 0;
+
+  // fechamento da trilha especialista: especialista dono ou coordenação,
+  // enquanto a trilha está aberta (ativa/pausada e sem carimbo)
+  const podeEncerrarTrilha =
+    ehEsp &&
+    (souMentor || souCoord) &&
+    (dupla.status === "ativa" || dupla.status === "pausada") &&
+    !dupla.encerrada_em;
+  // resumo da jornada — gerado dos dados; o "fim" é o carimbo do fechamento
+  // (decisão DPP ou encerrada_em da trilha especialista)
+  const resumoJornada = dadosResumoJornada(
+    dupla,
+    passos,
+    eventos,
+    encerramento?.created_at ?? dupla.encerrada_em ?? null
+  );
+  // bloco só vale a pena com história — dupla zerada mostra a trilha, não um
+  // relatório vazio
+  const mostrarResumo =
+    resumoJornada.realizados > 0 ||
+    !!encerramento?.tipo ||
+    !!dupla.encerrada_em;
 
   // encontros depois do oficial da semana ficam colapsados (página tem 16
   // linhas). Na trilha especialista não há "semana oficial" — os 5 passos
@@ -258,6 +316,9 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
                 {TRILHA_LABEL[dupla.trilha]}
               </Badge>
             )}
+            {/* prazo da trilha curta — 3 meses do aceite (iniciada_em), com
+                urgência na quinzena final */}
+            {ehEsp && <TrilhaPrazoBadge dupla={dupla} />}
             {!ehEsp && <SolicitacaoStatusChip solicitacao={solicitacao} />}
             {dupla.supervisor && (
               // terciário — não compete em text-sm com o semáforo (§4)
@@ -267,6 +328,24 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {souCoord && <EditarDuplaDialog dupla={dupla} />}
+          {/* envia form ativo pra mentor e/ou mentorado — link único com
+              copiar/WhatsApp, sem sair da ficha */}
+          {souCoord && (
+            <EnviarFormularioDialog
+              formularios={formulariosAtivos}
+              duplaId={dupla.id}
+              mentor={{
+                id: dupla.mentor.id,
+                nome: dupla.mentor.nome,
+                whatsapp: dupla.mentor.whatsapp,
+              }}
+              mentorado={{
+                id: dupla.mentorado.id,
+                nome: dupla.mentorado.nome,
+                whatsapp: dupla.mentorado.whatsapp,
+              }}
+            />
+          )}
           {/* nudge é papel de coordenação/supervisão — pro próprio mentor o
               botão abriria conversa consigo mesmo e logaria contato falso */}
           {!souMentor && (
@@ -294,6 +373,9 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
               especialistas={especialistas}
             />
           )}
+          {/* fechar a trilha curta é do especialista dono ou da coordenação —
+              exige motivo e devolve o resultado pro PDM do jovem */}
+          {podeEncerrarTrilha && <EncerrarTrilhaDialog duplaId={dupla.id} />}
         </div>
       </header>
 
@@ -375,6 +457,9 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
               )}
             </section>
           )}
+          {/* depois do fechamento a trilha conta o desfecho: motivo + a
+              devolutiva que seguiu pro PDM do jovem */}
+          {ehEsp && <TrilhaFechamento dupla={dupla} />}
           <section
             id="combinados"
             className="scroll-mt-20 rounded-xl bg-card p-4 shadow-[var(--shadow-border)]"
@@ -458,9 +543,93 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
                 t="contato"
               />
             )}
+            {/* PDM do mentorado — o link é mantido pelo mentor da dupla (RPC
+                definir_pdm_url; UPDATE em duplas é coord-only) ou pela
+                coordenação. Preenchido vira saída direta pra todos os papéis */}
+            {(linkSeguro(dupla.pdm_url) ||
+              ((souMentor || souCoord) &&
+                (dupla.status === "ativa" || dupla.status === "pausada"))) && (
+              <div className="flex flex-wrap items-center gap-1 pt-1">
+                {linkSeguro(dupla.pdm_url) && (
+                  <a
+                    href={linkSeguro(dupla.pdm_url)!}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={buttonVariants({ variant: "outline", size: "sm" })}
+                  >
+                    <BookOpen />
+                    Abrir PDM
+                  </a>
+                )}
+                {(souMentor || souCoord) &&
+                  (dupla.status === "ativa" || dupla.status === "pausada") && (
+                    <PdmUrlDialog duplaId={dupla.id} atual={dupla.pdm_url ?? null} />
+                  )}
+              </div>
+            )}
           </section>
+
+          {/* supervisão (0041) — sessões da dupla + as gerais do mentor; a
+              seção fica visível pra coord/supervisor/mentor (o mentor lê o
+              resumo — transparência). Vazia só aparece pra quem pode
+              registrar — pro resto seria um card vazio de ruído */}
+          {(supervisoes.length > 0 || podeRegistrarSupervisao) && (
+            <SupervisoesSection
+              itens={supervisoes}
+              visao="mentor"
+              duplaAtualId={dupla.id}
+              podeExcluir={souCoord}
+              acao={
+                podeRegistrarSupervisao ? (
+                  <SupervisaoDialog
+                    alvos={[
+                      {
+                        dupla_id: dupla.id,
+                        mentor_id: dupla.mentor.id,
+                        mentor_nome: dupla.mentor.nome,
+                        mentorado_nome: dupla.mentorado.nome,
+                      },
+                    ]}
+                    trigger={
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="-my-1 text-muted-foreground"
+                      >
+                        <ChatsCircle size={14} />
+                        Registrar supervisão
+                      </Button>
+                    }
+                  />
+                ) : undefined
+              }
+            />
+          )}
+
+          {/* a trilha de especialista devolve o resultado pro PDM — chega ao
+              mentor DPP pela solicitação que ele abriu */}
+          {!ehEsp && <DevolutivaEspecialista solicitacao={solicitacao} />}
+
+          {/* o rito de fechamento do ciclo DPP: checklist da coordenação +
+              decisão; a autoavaliação é a parte do mentor */}
+          {!ehEsp && (
+            <EncerramentoDupla
+              dupla={dupla}
+              encerramento={encerramento}
+              souMentor={souMentor}
+              souCoord={souCoord}
+              formularios={formulariosAtivos}
+              avaliacao360Em={avaliacao360Em}
+            />
+          )}
         </aside>
       </div>
+
+      {/* resumo gerado da jornada — base do relatório final do guia; no
+          print o CSS isola este bloco */}
+      {mostrarResumo && (
+        <ResumoJornadaSection resumo={resumoJornada} encerramento={encerramento} />
+      )}
     </div>
   );
 }

@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input";
 const STATUS_LABEL: Record<string, string> = {
   ativa: "Ativa",
   pausada: "Pausada",
+  concluida: "Concluída",
   encerrada: "Encerrada",
 };
 

@@ -6,6 +6,7 @@ import {
   getMateriais,
   getMe,
 } from "@/lib/queries";
+import { getMentoresChamada, getPresencas } from "@/lib/queries-presenca";
 import { eventoDaSemana, toDateStr, totalEncontros } from "@/lib/ciclo";
 import { AgendaCalendario } from "@/components/agenda-calendario";
 import { AgendaEspecialista } from "@/components/agenda-especialista";
@@ -43,14 +44,50 @@ export default async function AgendaPage({
   const temEspecialista = duplas.some((d) => d.trilha === "especialista");
   const espEventos = temEspecialista ? await getEspecialistaEventos() : [];
   // mentor cuja única trilha é a especialista não tem calendário de terças —
-  // a agenda dele é a fila combinada da própria dupla, não o ciclo DPP
+  // a agenda dele é a fila combinada da própria dupla, não o ciclo DPP.
+  // `every` em lista vazia é true de propósito: especialista SEM dupla também
+  // cai aqui — o calendário DPP seria um dado alheio pra ele
   const soEspecialista =
     me?.role === "mentor_especialista" &&
-    duplas.length > 0 &&
     duplas.every((d) => d.trilha === "especialista");
 
-  if (soEspecialista)
+  if (soEspecialista) {
+    // sem dupla ainda: só o cabeçalho da trilha + o estado vazio — a grade de
+    // terças DPP não se aplica a ele
+    if (duplas.length === 0) {
+      return (
+        <div className="space-y-6">
+          <header>
+            <h1 className="text-2xl font-semibold tracking-tight">Agenda</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Mentoria especializada · até 5 encontros de 1h em até 3 meses — as
+              datas são combinadas por vocês, sem terça oficial.
+            </p>
+          </header>
+          <div className="rounded-xl bg-card px-5 py-10 text-center shadow-[var(--shadow-border)]">
+            <p className="text-sm text-muted-foreground">
+              Você ainda não está em nenhuma dupla. Quando a coordenação formar
+              uma, os encontros combinados aparecem aqui.
+            </p>
+          </div>
+        </div>
+      );
+    }
     return <AgendaEspecialista duplas={duplas} espEventos={espEventos} />;
+  }
+
+  // chamada dos encontros de formação — só a coordenação marca; pros demais
+  // papéis nem busca (a UI nem renderiza o painel fora da coordenação)
+  const idsFormacao = eventos
+    .filter((e) => e.tipo === "formacao")
+    .map((e) => e.id);
+  const [mentoresChamada, presencasLista] =
+    me?.role === "coordenacao"
+      ? await Promise.all([getMentoresChamada(), getPresencas(idsFormacao)])
+      : [[], []];
+  const presencasPorEvento: Record<string, Record<string, boolean>> = {};
+  for (const p of presencasLista)
+    (presencasPorEvento[p.ciclo_evento_id] ??= {})[p.profile_id] = p.presente;
 
   return (
     <div className="space-y-6">
@@ -88,6 +125,8 @@ export default async function AgendaPage({
           diaInicial={diaInicial}
           duplas={duplas}
           role={me?.role ?? null}
+          mentores={mentoresChamada}
+          presencas={presencasPorEvento}
         />
       )}
     </div>

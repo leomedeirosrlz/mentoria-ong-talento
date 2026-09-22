@@ -120,7 +120,7 @@ const SECOES: { titulo: string; corpo: React.ReactNode }[] = [
         </ul>
         <p>
           Para exercer seus direitos, fale com a coordenação do programa ou
-          escreva para contato@realiza.vc.
+          escreva para mentoria@realiza.vc.
         </p>
       </>
     ),
@@ -152,8 +152,8 @@ const SECOES: { titulo: string; corpo: React.ReactNode }[] = [
       <p>
         Para exercer seus direitos ou esclarecer dúvidas sobre privacidade,
         entre em contato:{" "}
-        <a href="mailto:contato@realiza.vc" className="font-medium text-foreground underline underline-offset-2">
-          contato@realiza.vc
+        <a href="mailto:mentoria@realiza.vc" className="font-medium text-foreground underline underline-offset-2">
+          mentoria@realiza.vc
         </a>
       </p>
     ),

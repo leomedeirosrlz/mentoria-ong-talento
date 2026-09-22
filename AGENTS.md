@@ -51,7 +51,14 @@ Plataforma operacional do Programa de Mentoria — vertical slice funcionando co
 
 Backlog completo e priorizado em **`BACKLOG.md`**. Resumo do que mais dói:
 
-- Trilha `mentor_especialista` (5 encontros) não modelada — a UI deixa criar, mas cai num ciclo de 16/DPP errado. Decidir antes de popular dados.
+- Trilha `mentor_especialista` completa (`0027`+`0037`): `duplas.trilha`, 5 passos em `especialista_eventos`, solicitação → mural → aceite atômico, prazo de 3 meses com badge (`TrilhaPrazoBadge`), encerramento antecipado (`encerrar_trilha_especialista`) e `devolutiva_pdm` chegando ao mentor DPP.
+- Forms engine nativa (`0036`+`0042`): coord cria formulários (`/formularios`, builder com 8 tipos de campo), gera links individuais por token e o público responde sem login em `/f/[token]` — é o canal do mentorado (avaliação de sessão, 360, anamnese). Forms oficiais do sistema (Anamnese Social, Avaliação 360º, Autoavaliação) são imutáveis (`sistema=true`); resposta 360º auto-marca o checklist do encerramento.
+- Encerramento do ciclo (`0037`): `encerramentos` com checklist do rito, autoavaliação do mentor via RPC, status `concluida` × `encerrada`, resumo da jornada print-friendly na ficha da dupla.
+- Campos de matching (`0034`+`0038`): ficha rica em profiles/mentorados (sensíveis coord-only via `*_pessoal`), grade `disponibilidade` dos dois lados, `AfinidadePar` no board de matching e no NovaDuplaDialog; aviso `&lt;18` → autorização do responsável.
+- Assinatura eletrônica (`0033`): termos versionados, CPF com DV, IP/UA + hash SHA-256, PDF com página de evidências, `/assinar` logado e `/assinar/[token]` público pro responsável; `termo_ok` deriva da assinatura.
+- Presenças de formação (`0040`): `presencas` por evento×profile; coord faz a chamada na agenda; `mentor_profiles.formacao_ok` deriva das presenças (bypass transaction-local do guard).
+- Supervisão (`0041`): `supervisoes` (supervisor×mentor, `dupla_id` opcional) — supervisor registra, mentor vê a sessão sobre ele (transparência), coord modera; notificação `supervisao_registrada`.
+- Guards novos: `0043` encontro `realizado` é imutável (status); `0044` `duplas.pdm_url` via RPC escopada; `0045` allowlist de signup — **só entra quem está pré-cadastrado em `profiles`** (magic link de e-mail novo falha; coord pré-cadastra).
 - Materiais com upload real (`0010`): `materiais.path` + bucket privado `materiais` + policies de storage espelhando audiência; `/api/material/[id]` → signed URL 300s. Documentos oficiais chegam ao longo do ciclo — material sem `path` nem `url` renderiza "em breve" (estado legítimo). Anexos de evidência por registro seguem separados (`registro_anexos` + bucket `registro-anexos`).
-- "Meu perfil" pra self-edit de nome/WhatsApp não existe.
-- Produção: SMTP Resend pro magic link, `SITE_URL`/`redirect_urls` de prod, remover login por senha, deploy Vercel.
+- Qualidade: `pnpm test` (Vitest, 136 testes das funções puras); `src/lib/database.types.ts` gerado do remoto — adoção gradual nos casts.
+- Produção (só o Thiago): sender Resend `no-reply@realiza.vc` (domínio preso em outra conta — liberar/recriar) + Supabase Auth Site URL `https://realizavc.vercel.app` e redirect `/**`.

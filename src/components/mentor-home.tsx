@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowUpRight, ClipboardText, HandHeart, Users, VideoCamera, Warning } from "@phosphor-icons/react/dist/ssr";
+import { ArrowUpRight, BookOpen, ClipboardText, HandHeart, Users, VideoCamera, Warning } from "@phosphor-icons/react/dist/ssr";
 import {
   alvoAgendamento,
   eventoDaSemana,
@@ -45,10 +45,12 @@ export function MentorHome({
 }) {
   const hoje = new Date();
   const eventoSemana = eventoDaSemana(eventos, hoje);
-  // "Semana do Nº encontro" é o calendário DPP — pra quem só tem trilha
-  // especialista (sem terças oficiais) a faixa seria um dado alheio
+  // "Semana do Nº encontro" é o calendário DPP — pra especialista a faixa é
+  // um dado alheio, tenha ele dupla ou não (every em [] = true cobre o caso
+  // de ainda não pareado; um DPP sem dupla segue vendo a semana do ciclo)
   const soEspecialista =
-    duplas.length > 0 && duplas.every((d) => d.trilha === "especialista");
+    me.role === "mentor_especialista" &&
+    duplas.every((d) => d.trilha === "especialista");
 
   return (
     <div className="space-y-8">
@@ -147,7 +149,11 @@ export function MentorHome({
                   )}
                   {!ativa && (
                     <span className="text-[11px] uppercase tracking-wider text-white/50">
-                      {dupla.status === "pausada" ? "Pausada" : "Encerrada"}
+                      {dupla.status === "pausada"
+                        ? "Pausada"
+                        : dupla.status === "concluida"
+                          ? "Concluída"
+                          : "Encerrada"}
                     </span>
                   )}
                   {/* o card todo não é link — a saída pra ficha precisa de
@@ -166,7 +172,7 @@ export function MentorHome({
             <CardContent className="pt-5 space-y-5">
               {/* pedido de apoio feito pelo próprio mentor: confirma recebimento
                   em tom de acolhida — não o semáforo de risco da coordenação */}
-              {saude.pediuApoio && dupla.status !== "encerrada" && (
+              {saude.pediuApoio && dupla.status !== "encerrada" && dupla.status !== "concluida" && (
                 <p className="flex items-start gap-2.5 rounded-lg border border-[var(--warn)]/40 bg-[var(--warn)]/8 px-4 py-3 text-sm">
                   <HandHeart
                     size={18}
@@ -215,7 +221,9 @@ export function MentorHome({
                     <p className="font-medium text-muted-foreground">
                       {dupla.status === "pausada"
                         ? "Dupla pausada. A coordenação retoma quando for a hora."
-                        : "Dupla encerrada. Agradecemos pela jornada!"}
+                        : dupla.status === "concluida"
+                          ? "Jornada concluída. Agradecemos pelo ciclo!"
+                          : "Dupla encerrada. Agradecemos pela jornada!"}
                     </p>
                   ) : cicloCompleto ? (
                     <p className="font-medium">
@@ -350,7 +358,7 @@ export function MentorHome({
 
               {/* navegação secundária — fecha o fluxo de leitura sem disputar
                   o lime com o próximo passo (agendar / registrar / chamada) */}
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-3">
                 <Link
                   href={`/duplas/${dupla.id}`}
                   className={buttonVariants({ variant: "outline", size: "sm" })}
@@ -358,6 +366,20 @@ export function MentorHome({
                   <ClipboardText size={16} />
                   Ver histórico da dupla
                 </Link>
+                {/* PDM preenchido na dupla vira saída direta — o mentor edita
+                    o link na ficha (RPC definir_pdm_url) ou a coordenação no
+                    dialog de edição */}
+                {linkSeguro(dupla.pdm_url) && (
+                  <a
+                    href={linkSeguro(dupla.pdm_url)!}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={buttonVariants({ variant: "outline", size: "sm" })}
+                  >
+                    <BookOpen size={16} />
+                    Abrir PDM
+                  </a>
+                )}
               </div>
             </CardContent>
           </Card>

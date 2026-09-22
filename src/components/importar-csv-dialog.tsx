@@ -7,11 +7,17 @@ import { toast } from "sonner";
 import { importMentorados, importPessoas } from "@/lib/actions";
 import {
   emailValido,
+  mapEscolaridade,
+  mapGenero,
+  mapPrefGenero,
+  normData,
   normNome,
+  normUf,
   normWhatsapp,
   parseCsv,
   type LinhaImportada,
 } from "@/lib/importar";
+import { UFS } from "@/lib/ciclo";
 import { Button } from "@/components/ui/button";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
@@ -33,9 +39,27 @@ const TIPO_LABEL: Record<Tipo, string> = {
 };
 
 const DICAS: Record<Tipo, string> = {
-  equipe: "Colunas esperadas: nome, e-mail, whatsapp e papel (mentor dpp / especialista / supervisor / coordenação — em branco, vira mentor DPP).",
-  mentorados: "Colunas esperadas: nome, whatsapp, e-mail, ong e notas. Só o nome é obrigatório.",
+  equipe:
+    "Colunas: nome, email, whatsapp, papel (mentor dpp / especialista / supervisor / coordenação — em branco vira mentor DPP) e a ficha opcional: nome_social, data_nascimento (dd/mm/aaaa), genero, cidade, uf, cargo, empresa, interesses (separados por vírgula), motivacao, pref_genero_par, origem, experiencia_previa e formacao_externa (estas duas gravam na ficha de mentor).",
+  mentorados:
+    "Colunas: nome, whatsapp, email, ong, notas e a ficha opcional: nome_social, data_nascimento (dd/mm/aaaa), genero, cidade, uf, escolaridade, interesses (por vírgula), objetivos, motivacao, pref_genero_par, origem. Só o nome é obrigatório.",
 };
+
+const MODELO: Record<Tipo, string> = {
+  equipe:
+    "nome;email;whatsapp;papel;nome_social;data_nascimento;genero;cidade;uf;cargo;empresa;interesses;motivacao;pref_genero_par;origem;experiencia_previa;formacao_externa",
+  mentorados:
+    "nome;whatsapp;email;ong;notas;nome_social;data_nascimento;genero;cidade;uf;escolaridade;interesses;objetivos;motivacao;pref_genero_par;origem",
+};
+
+/** Campos da ficha (0034) reconhecidos na linha — pro resumo da prévia. */
+function extrasDaLinha(r: LinhaImportada): number {
+  return [
+    r.nome_social, r.data_nascimento, r.genero, r.cidade, r.uf, r.interesses,
+    r.motivacao, r.pref_genero_par, r.cargo, r.empresa, r.origem, r.objetivos,
+    r.escolaridade, r.experiencia_previa, r.formacao_externa,
+  ].filter((v) => v.trim()).length;
+}
 
 function linhaValida(tipo: Tipo, r: LinhaImportada): string | null {
   if (!r.nome.trim()) return "sem nome";
@@ -43,6 +67,17 @@ function linhaValida(tipo: Tipo, r: LinhaImportada): string | null {
   if (tipo === "mentorados" && r.email.trim() && !emailValido(r.email)) return "e-mail inválido";
   // whatsapp preenchido mas ilegível — a action pula a linha; o preview já avisa
   if (r.whatsapp.trim() && !normWhatsapp(r.whatsapp)) return "whatsapp inválido";
+  // ficha (0034) — mesmas checagens do fichaLinha no server: campo preenchido
+  // mas irreconhecível marca a linha aqui em vez de falhar no import
+  if (r.data_nascimento.trim() && !normData(r.data_nascimento)) return "nascimento inválido (dd/mm/aaaa)";
+  if (r.genero.trim() && !mapGenero(r.genero)) return "gênero não reconhecido";
+  if (r.uf.trim()) {
+    const uf = normUf(r.uf);
+    if (!uf || !(UFS as readonly string[]).includes(uf)) return "UF inválida";
+  }
+  if (r.pref_genero_par.trim() && !mapPrefGenero(r.pref_genero_par)) return "pref. de par inválida";
+  if (tipo === "mentorados" && r.escolaridade.trim() && !mapEscolaridade(r.escolaridade))
+    return "escolaridade não reconhecida";
   return null;
 }
 
@@ -88,13 +123,9 @@ export function ImportarCsvDialog({ tipoInicial = "equipe" }: { tipoInicial?: Ti
 
   // modelo com o cabeçalho que o parseCsv reconhece — gerado no client, sem arquivo estático
   function baixarModelo() {
-    const header =
-      tipo === "equipe"
-        ? "nome;email;whatsapp;papel"
-        : "nome;whatsapp;email;ong;notas";
     // BOM pro Excel abrir os acentos como UTF-8 (mesma convenção do /api/export)
     const url = URL.createObjectURL(
-      new Blob(["\uFEFF" + header + "\r\n"], { type: "text/csv;charset=utf-8" })
+      new Blob(["\uFEFF" + MODELO[tipo] + "\r\n"], { type: "text/csv;charset=utf-8" })
     );
     const a = document.createElement("a");
     a.href = url;
@@ -183,26 +214,38 @@ export function ImportarCsvDialog({ tipoInicial = "equipe" }: { tipoInicial?: Ti
                 ` · ${comErro.length} ${comErro.length === 1 ? "com problema (será pulada)" : "com problemas (serão puladas)"}`}
             </p>
             <div className="max-h-72 overflow-auto rounded-lg border">
-              <table className="w-full min-w-[540px] text-sm">
+              <table className="w-full min-w-[640px] text-sm">
                 <thead className="sticky top-0 bg-card">
                   <tr className="border-b text-left text-xs text-muted-foreground">
                     <th className="px-3 py-2 font-medium">Nome</th>
                     <th className="px-3 py-2 font-medium">{tipo === "equipe" ? "E-mail" : "WhatsApp"}</th>
                     <th className="px-3 py-2 font-medium">{tipo === "equipe" ? "Papel" : "ONG"}</th>
+                    <th className="px-3 py-2 font-medium">Ficha</th>
                     <th className="px-3 py-2 font-medium">Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
                   {linhas.map((r, i) => {
                     const erro = linhaValida(tipo, r);
+                    const extras = extrasDaLinha(r);
                     return (
                       <tr key={i} className={cn(erro && "text-muted-foreground/60")}>
-                        <td className="px-3 py-1.5">{normNome(r.nome)}</td>
+                        <td className="px-3 py-1.5">
+                          {normNome(r.nome)}
+                          {r.nome_social.trim() && (
+                            <span className="block text-xs text-muted-foreground">
+                              ({normNome(r.nome_social)})
+                            </span>
+                          )}
+                        </td>
                         <td className="px-3 py-1.5 font-mono text-xs">
                           {tipo === "equipe" ? r.email.toLowerCase().trim() : normWhatsapp(r.whatsapp) ?? "-"}
                         </td>
                         <td className="px-3 py-1.5 text-xs">
                           {tipo === "equipe" ? (r.papel || "mentor DPP") : (r.ong || "-")}
+                        </td>
+                        <td className="px-3 py-1.5 text-xs text-muted-foreground">
+                          {extras ? `${extras} ${extras === 1 ? "campo" : "campos"}` : "—"}
                         </td>
                         <td className="px-3 py-1.5 text-xs">
                           {erro
@@ -215,6 +258,11 @@ export function ImportarCsvDialog({ tipoInicial = "equipe" }: { tipoInicial?: Ti
                 </tbody>
               </table>
             </div>
+            <p className="text-xs text-muted-foreground">
+              A coluna Ficha conta os campos de matching reconhecidos (nascimento, gênero,
+              cidade/UF, interesses, motivação, pref. de par e afins) — nascimento, gênero,
+              motivação e preferência de par ficam visíveis só pra coordenação.
+            </p>
             <div className="flex gap-2">
               <Button variant="outline" onClick={() => setLinhas(null)}>Voltar</Button>
               <Button className="flex-1" disabled={pending || validas === 0} onClick={importar}>
@@ -258,7 +306,7 @@ export function ImportarCsvDialog({ tipoInicial = "equipe" }: { tipoInicial?: Ti
               <Label htmlFor="csv_text">Ou cole o conteúdo</Label>
               <Textarea
                 id="csv_text" rows={7}
-                placeholder={"nome;email;whatsapp;papel\nMaria Silva;maria@email.com;11999998888;mentor dpp"}
+                placeholder={"nome;email;whatsapp;papel;cidade;uf;interesses\nMaria Silva;maria@email.com;11999998888;mentor dpp;São Paulo;SP;tecnologia, carreira"}
                 value={texto}
                 onChange={(e) => setTexto(e.target.value)}
                 className="font-mono text-xs"

@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Plus } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import { createDupla } from "@/lib/actions";
+import { cicloVigente, ciclosOpcoes } from "@/lib/ciclo";
+import { AfinidadePar } from "@/components/matching-afinidade";
 import { Button } from "@/components/ui/button";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
@@ -17,14 +19,45 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import type {
+  Disponibilidade,
+  Escolaridade,
+  Genero,
+  PrefGeneroPar,
+} from "@/lib/types";
 
-type Opt = { id: string; nome: string; role?: string | null };
+type Opt = {
+  id: string;
+  nome: string;
+  role?: string | null;
+  interesses?: string[] | null;
+  cidade?: string | null;
+  uf?: string | null;
+};
+type MentoradoOpt = {
+  id: string;
+  nome: string;
+  interesses?: string[] | null;
+  cidade?: string | null;
+  uf?: string | null;
+  objetivos?: string | null;
+  escolaridade?: Escolaridade | null;
+  disponibilidade?: Disponibilidade | null;
+};
+/** Campos sensíveis das views *_pessoal (0034) — coord-only; fora dela o
+ *  select volta vazio e a afinidade omite os campos. */
+type Pessoal = {
+  genero: Genero | null;
+  pref_genero_par: PrefGeneroPar | null;
+  motivacao: string | null;
+  data_nascimento?: string | null;
+};
 const NENHUM = "__nenhum";
 
 export function NovaDuplaDialog() {
   const [open, setOpen] = useState(false);
   const [mentores, setMentores] = useState<Opt[]>([]);
-  const [mentorados, setMentorados] = useState<Opt[]>([]);
+  const [mentorados, setMentorados] = useState<MentoradoOpt[]>([]);
   const [supervisores, setSupervisores] = useState<Opt[]>([]);
   // vagas por mentor: quantas duplas ativas/pausadas já tem vs. capacidade
   const [emUso, setEmUso] = useState<Record<string, number>>({});
@@ -34,38 +67,70 @@ export function NovaDuplaDialog() {
   const [ocupacao, setOcupacao] = useState<Map<string, Set<string>>>(new Map());
   // carga de supervisão: quantas duplas ativas/pausadas cada supervisor já tem
   const [emSup, setEmSup] = useState<Record<string, number>>({});
+  // ficha de matching por mentor (disponibilidade/áreas) e sensíveis por id —
+  // views *_pessoal só devolvem linhas pra coordenação
+  const [fichaMentor, setFichaMentor] = useState<
+    Map<string, { disponibilidade: Disponibilidade | null; areas: string[] | null }>
+  >(new Map());
+  const [pessoalMentor, setPessoalMentor] = useState<Map<string, Pessoal>>(new Map());
+  const [pessoalMentorado, setPessoalMentorado] = useState<Map<string, Pessoal>>(new Map());
+  // ciclos do select — distinct do calendário oficial + os já usados em duplas
+  const [ciclos, setCiclos] = useState<string[]>([]);
+  const [vigente, setVigente] = useState<string | null>(null);
   // mentor escolhido — a trilha da dupla nasce do papel dele
   const [mentorSel, setMentorSel] = useState<string | null>(null);
+  const [mentoradoSel, setMentoradoSel] = useState<string | null>(null);
+  // fetch das opções tem estado explícito — select vazio após erro não pode
+  // parecer "ninguém cadastrado"
+  const [pronto, setPronto] = useState(false);
+  const [falha, setFalha] = useState(false);
+  const [tentativa, setTentativa] = useState(0);
   const [pending, start] = useTransition();
   const router = useRouter();
+  // 1ª carga com skeleton; refetch de reabertura usa o cache — falha ali vira
+  // toast, não bloqueio (as opções já carregadas continuam valendo)
+  const carregou = useRef(false);
 
   useEffect(() => {
     if (!open) return;
     const supabase = createClient();
-    supabase
-      .from("profiles")
-      .select("id, nome, role")
-      .in("role", ["mentor_dpp", "mentor_especialista", "supervisor"])
-      .eq("ativo", true)
-      .order("nome")
-      .then(({ data }) => {
-        setMentores((data ?? []).filter((p) => p.role !== "supervisor"));
-        setSupervisores((data ?? []).filter((p) => p.role === "supervisor"));
-      });
-    supabase
-      .from("mentorados")
-      .select("id, nome")
-      .order("nome")
-      .then(({ data }) => setMentorados(data ?? []));
-    supabase
-      .from("duplas")
-      .select("mentor_id, mentorado_id, supervisor_id, trilha")
-      .in("status", ["ativa", "pausada"])
-      .then(({ data }) => {
+    let cancelado = false;
+    (async () => {
+      try {
+        const [perfis, ments, duplasRes, mps, evsCiclo] = await Promise.all([
+          supabase
+            .from("profiles")
+            .select("id, nome, role, interesses, cidade, uf")
+            .in("role", ["mentor_dpp", "mentor_especialista", "supervisor"])
+            .eq("ativo", true)
+            .order("nome"),
+          supabase
+            .from("mentorados")
+            .select("id, nome, interesses, objetivos, escolaridade, cidade, uf, disponibilidade")
+            .order("nome"),
+          // sem filtro de status: a ocupação filtra em JS, e o histórico
+          // completo alimenta as opções de ciclo (ciclo encerrado continua
+          // escolhível)
+          supabase
+            .from("duplas")
+            .select("mentor_id, mentorado_id, supervisor_id, trilha, status, ciclo"),
+          supabase
+            .from("mentor_profiles")
+            .select("profile_id, capacidade, disponibilidade, areas"),
+          supabase.from("ciclo_eventos").select("ciclo, data"),
+        ]);
+        const erro = [perfis, ments, duplasRes, mps, evsCiclo].find((r) => r.error)?.error;
+        if (erro) throw erro;
+        if (cancelado) return;
+        setMentores((perfis.data ?? []).filter((p) => p.role !== "supervisor"));
+        setSupervisores((perfis.data ?? []).filter((p) => p.role === "supervisor"));
+        setMentorados((ments.data ?? []) as MentoradoOpt[]);
         const contagem: Record<string, number> = {};
         const ocup = new Map<string, Set<string>>();
         const sup: Record<string, number> = {};
-        for (const d of data ?? []) {
+        for (const d of (duplasRes.data ?? []).filter((x) =>
+          x.status === "ativa" || x.status === "pausada"
+        )) {
           contagem[d.mentor_id] = (contagem[d.mentor_id] ?? 0) + 1;
           const trilhas = ocup.get(d.mentorado_id) ?? new Set<string>();
           trilhas.add(d.trilha ?? "dpp");
@@ -75,18 +140,64 @@ export function NovaDuplaDialog() {
         setEmUso(contagem);
         setOcupacao(ocup);
         setEmSup(sup);
-      });
-    supabase
-      .from("mentor_profiles")
-      .select("profile_id, capacidade")
-      .then(({ data }) => {
         const porMentor: Record<string, number> = {};
-        for (const mp of data ?? []) porMentor[mp.profile_id] = mp.capacidade;
+        const fichas = new Map<
+          string,
+          { disponibilidade: Disponibilidade | null; areas: string[] | null }
+        >();
+        for (const mp of mps.data ?? []) {
+          porMentor[mp.profile_id] = mp.capacidade;
+          fichas.set(mp.profile_id, {
+            disponibilidade: (mp.disponibilidade as Disponibilidade | null) ?? null,
+            areas: (mp.areas as string[] | null) ?? null,
+          });
+        }
         setCapacidade(porMentor);
-      });
-  }, [open]);
+        setFichaMentor(fichas);
+        setCiclos(
+          ciclosOpcoes(
+            evsCiclo.data ?? [],
+            (duplasRes.data ?? []).map((d) => d.ciclo)
+          )
+        );
+        setVigente(cicloVigente(evsCiclo.data ?? []));
+        carregou.current = true;
+        setPronto(true);
+      } catch {
+        if (cancelado) return;
+        if (carregou.current) {
+          toast.error(
+            "Não foi possível atualizar as opções — as carregadas antes continuam valendo."
+          );
+        } else {
+          setFalha(true);
+        }
+      }
+    })();
+    // sensíveis de matching — as views *_pessoal (0034) filtram por papel no
+    // banco: pra coord retornam linhas, pra qualquer outro papel voltam [].
+    // Best-effort de propósito: falha aqui não pode derrubar o form (o par
+    // só perde os campos de afinidade)
+    supabase
+      .from("profiles_pessoal")
+      .select("id, genero, pref_genero_par, motivacao")
+      .then(({ data }) =>
+        setPessoalMentor(new Map((data ?? []).map((r) => [r.id, r as Pessoal])))
+      );
+    supabase
+      .from("mentorados_pessoal")
+      .select("id, genero, pref_genero_par, motivacao, data_nascimento")
+      .then(({ data }) =>
+        setPessoalMentorado(new Map((data ?? []).map((r) => [r.id, r as Pessoal])))
+      );
+    return () => {
+      cancelado = true;
+    };
+  }, [open, tentativa]);
 
-  const ehEsp = mentores.find((m) => m.id === mentorSel)?.role === "mentor_especialista";
+  const mentorSelObj = mentores.find((m) => m.id === mentorSel) ?? null;
+  const mentoradoSelObj = mentorados.find((m) => m.id === mentoradoSel) ?? null;
+  const ehEsp = mentorSelObj?.role === "mentor_especialista";
   const trilhaSel: "dpp" | "especialista" | null = mentorSel
     ? ehEsp ? "especialista" : "dpp"
     : null;
@@ -156,7 +267,11 @@ export function NovaDuplaDialog() {
       onOpenChange={(o) => {
         setOpen(o);
         // Select desmonta com o dialog — a trilha rederiva do próximo mentor
-        if (o) setMentorSel(null);
+        if (o) {
+          setMentorSel(null);
+          setMentoradoSel(null);
+          setFalha(false);
+        }
       }}
     >
       <DialogTrigger render={<Button size="sm"><Plus size={16} /> Nova dupla</Button>} />
@@ -165,6 +280,43 @@ export function NovaDuplaDialog() {
           <DialogTitle>Formar dupla</DialogTitle>
         </DialogHeader>
         <form onSubmit={submit} className="space-y-4">
+          {falha && !pronto ? (
+            // fetch das opções falhou — melhor um erro honesto com retry que
+            // selects vazios fingindo "ninguém cadastrado"
+            <div
+              role="alert"
+              className="rounded-lg border border-[var(--danger)]/40 bg-[var(--danger)]/5 px-3.5 py-3 text-sm"
+            >
+              <p className="font-medium">Não foi possível carregar as opções.</p>
+              <p className="mt-0.5 text-muted-foreground">
+                Confira a conexão e{" "}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFalha(false);
+                    setTentativa((t) => t + 1);
+                  }}
+                  className="rounded-sm font-medium text-foreground underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  tente de novo
+                </button>
+                .
+              </p>
+            </div>
+          ) : !pronto ? (
+            // skeleton na gramática do form — não mostra select vazio nem
+            // placeholder que pareça estado final
+            <div className="space-y-4" aria-hidden>
+              {[0, 1, 2].map((i) => (
+                <div key={i} className="space-y-2">
+                  <div className="h-4 w-20 animate-pulse rounded bg-muted" />
+                  <div className="h-9 animate-pulse rounded-lg bg-muted" />
+                </div>
+              ))}
+              <div className="h-9 animate-pulse rounded-lg bg-muted" />
+            </div>
+          ) : (
+          <>
           <div className="space-y-2">
             <Label id="mentor-label">
               {/* dot de papel — distinção não-cromática é o texto; a cor é redundância */}
@@ -221,6 +373,7 @@ export function NovaDuplaDialog() {
                 m.id,
                 rotuloOcupado(m.id) ? `${m.nome} (${rotuloOcupado(m.id)})` : m.nome,
               ]))}
+              onValueChange={(v) => setMentoradoSel(v ? String(v) : null)}
             >
               <SelectTrigger id="mentorado" aria-labelledby="mentorado-label mentorado"><SelectValue placeholder="Selecione" /></SelectTrigger>
               <SelectContent>
@@ -241,6 +394,44 @@ export function NovaDuplaDialog() {
               <CampoVazio texto="Nenhum mentorado cadastrado ainda." />
             )}
           </div>
+          {/* comparação de afinidade — aparece quando os dois lados estão
+              escolhidos; sensíveis vêm das views *_pessoal (coord-only) */}
+          {mentorSelObj && mentoradoSelObj && (
+            <AfinidadePar
+              mentor={{
+                nome: mentorSelObj.nome,
+                interesses: mentorSelObj.interesses,
+                cidade: mentorSelObj.cidade,
+                uf: mentorSelObj.uf,
+                genero: pessoalMentor.get(mentorSelObj.id)?.genero ?? null,
+                pref_genero_par:
+                  pessoalMentor.get(mentorSelObj.id)?.pref_genero_par ?? null,
+                motivacao: pessoalMentor.get(mentorSelObj.id)?.motivacao ?? null,
+                disponibilidade:
+                  fichaMentor.get(mentorSelObj.id)?.disponibilidade ?? null,
+                trilha: ehEsp ? "especialista" : "dpp",
+                areas: fichaMentor.get(mentorSelObj.id)?.areas ?? null,
+              }}
+              mentorado={{
+                nome: mentoradoSelObj.nome,
+                interesses: mentoradoSelObj.interesses,
+                cidade: mentoradoSelObj.cidade,
+                uf: mentoradoSelObj.uf,
+                genero: pessoalMentorado.get(mentoradoSelObj.id)?.genero ?? null,
+                pref_genero_par:
+                  pessoalMentorado.get(mentoradoSelObj.id)?.pref_genero_par ??
+                  null,
+                motivacao:
+                  pessoalMentorado.get(mentoradoSelObj.id)?.motivacao ?? null,
+                objetivos: mentoradoSelObj.objetivos,
+                escolaridade: mentoradoSelObj.escolaridade,
+                data_nascimento:
+                  pessoalMentorado.get(mentoradoSelObj.id)?.data_nascimento ??
+                  null,
+                disponibilidade: mentoradoSelObj.disponibilidade ?? null,
+              }}
+            />
+          )}
           {/* dupla de especialista não tem supervisor — o campo some em vez de
               desabilitar pra não sugerir uma supervisão que não existe */}
           {!ehEsp && (
@@ -275,6 +466,25 @@ export function NovaDuplaDialog() {
               </p>
             </div>
           )}
+          {/* ciclo só aparece com opções carregadas — sem calendário o banco
+              aplica o default da coluna, e um select sem itens fingiria erro */}
+          {ciclos.length > 0 && (
+            <div className="space-y-2">
+              <Label id="ciclo-label">Ciclo</Label>
+              <Select
+                name="ciclo"
+                defaultValue={vigente ?? ciclos[ciclos.length - 1]}
+                items={Object.fromEntries(ciclos.map((c) => [c, c]))}
+              >
+                <SelectTrigger id="ciclo" aria-labelledby="ciclo-label ciclo"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {ciclos.map((c) => (
+                    <SelectItem key={c} value={c}>{c}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           <div className="space-y-2">
             <Label htmlFor="iniciada_em">Início da mentoria</Label>
             <Input id="iniciada_em" name="iniciada_em" type="date" />
@@ -287,6 +497,8 @@ export function NovaDuplaDialog() {
           <Button type="submit" className="w-full" disabled={pending}>
             {pending ? "Salvando…" : "Formar dupla"}
           </Button>
+          </>
+          )}
         </form>
       </DialogContent>
     </Dialog>

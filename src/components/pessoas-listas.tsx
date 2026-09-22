@@ -23,6 +23,7 @@ import { PessoaActions } from "@/components/pessoa-actions";
 import { MentoradoActions } from "@/components/mentorado-actions";
 import { RoleSelect } from "@/components/role-select";
 import { ImportarCsvDialog } from "@/components/importar-csv-dialog";
+import { MatchingPanel } from "@/components/matching-panel";
 import { NovaPessoaDialog, NovoMentoradoDialog } from "@/components/pessoas-dialogs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -80,9 +81,9 @@ export function PessoasListas({
     : mentorados;
 
   // matching board: "Livres para dupla" deixa só mentores e mentorados livres pra parear
-  const livres =
-    pessoas.filter((p) => ehMentor(p) && !emDupla.has(p.id)).length +
-    mentorados.filter((m) => !emDupla.has(m.id)).length;
+  const mentoresLivres = pessoas.filter((p) => ehMentor(p) && !emDupla.has(p.id));
+  const mentoradosLivres = mentorados.filter((m) => !emDupla.has(m.id));
+  const livres = mentoresLivres.length + mentoradosLivres.length;
   if (semDupla) {
     pessoasFiltradas = pessoasFiltradas.filter(
       (p) => ehMentor(p) && !emDupla.has(p.id)
@@ -124,6 +125,16 @@ export function PessoasListas({
           <span className="font-mono text-[11px]">{livres}</span>
         </button>
       </div>
+
+      {/* board de pareamento — comparação de afinidade mentorado × mentor
+          só faz sentido com o filtro de livres ligado */}
+      {semDupla && (
+        <MatchingPanel
+          mentores={mentoresLivres}
+          mentorados={mentoradosLivres}
+          mentorProfiles={mentorProfiles}
+        />
+      )}
 
       <section className="space-y-2">
         <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
@@ -179,6 +190,7 @@ export function PessoasListas({
               p={p}
               indice={i}
               emDupla={emDupla.has(p.id)}
+              temHistorico={temQualquerDupla.has(p.id)}
               podeExcluir={!p.user_id && !temQualquerDupla.has(p.id)}
               mentorProfile={mentorProfiles[p.id]}
               vagas={contagemPorMentor[p.id] ?? 0}
@@ -354,6 +366,7 @@ function PessoaRow({
   p,
   indice,
   emDupla,
+  temHistorico,
   podeExcluir,
   mentorProfile: mp,
   vagas,
@@ -361,6 +374,9 @@ function PessoaRow({
   p: Profile;
   indice: number;
   emDupla: boolean;
+  /** qualquer dupla — inclusive encerrada: quem tem histórico não é "sem
+   *  dupla" (e a exclusão fica bloqueada por isso) */
+  temHistorico: boolean;
   podeExcluir: boolean;
   mentorProfile: MentorProfile | undefined;
   vagas: number;
@@ -438,7 +454,9 @@ function PessoaRow({
         <DetalhesRegiao id={detalhesId} nome={p.nome} aberto={detalhesAbertos}>
           <ItemDetalhe icone={Users}>
             {vagas === 0
-              ? `Ainda sem dupla — ${capacidade === 1 ? "vaga para 1" : `vagas para ${capacidade}`}`
+              ? temHistorico
+                ? "Sem dupla ativa — histórico de dupla encerrada fica na ficha"
+                : `Ainda sem dupla — ${capacidade === 1 ? "vaga para 1" : `vagas para ${capacidade}`}`
               : `Cuida de ${vagas} de ${capacidade} ${capacidade === 1 ? "dupla" : "duplas"}`}
           </ItemDetalhe>
           {!mp?.termo_ok && (

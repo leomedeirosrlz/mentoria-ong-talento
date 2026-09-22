@@ -6,6 +6,7 @@ import {
   demoSolicitacaoDaDupla,
   demoSolicitacoesVisiveis,
 } from "./demo/queries";
+import { demoTrilhaFechamento } from "./demo/encerramento-data";
 import type { SolicitacaoEspecialista } from "./types";
 
 /** A leitura é da view `solicitacoes_mural` (0030): as mesmas colunas da
@@ -18,6 +19,7 @@ const SOLICITACAO_SELECT = `
   id, mentorado_id, dupla_dpp_id, demanda,
   especialista_desejado_id, especialista_id, dupla_id,
   status, created_by, created_at, respondida_em, mentorado_nome,
+  devolutiva_pdm, trilha_encerrada_em,
   solicitante:profiles!solicitacoes_especialista_created_by_fkey(nome),
   especialista:profiles!solicitacoes_especialista_especialista_id_fkey(nome)
 `;
@@ -49,7 +51,14 @@ export const getSolicitacaoDaDupla = cache(
   async (duplaDppId: string): Promise<SolicitacaoEspecialista | null> => {
     // modo demo: a dupla precisa estar no escopo do papel (sol_select, 0027)
     const demo = await demoRole();
-    if (demo) return demoSolicitacaoDaDupla(demo, duplaDppId);
+    if (demo) {
+      const s = demoSolicitacaoDaDupla(demo, duplaDppId);
+      if (!s) return null;
+      // a devolutiva do encerramento da trilha mora num dataset à parte
+      // (0037 — encerramento-data.ts), mergeada aqui como a view faria
+      const f = demoTrilhaFechamento(s.id);
+      return f ? { ...s, ...f } : s;
+    }
     const supabase = await createClient();
     const { data, error } = await supabase
       .from("solicitacoes_mural")

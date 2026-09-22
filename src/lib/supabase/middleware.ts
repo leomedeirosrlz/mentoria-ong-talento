@@ -41,6 +41,15 @@ export async function updateSession(request: NextRequest) {
     // a landing da demo precisa abrir sem cookie nenhum (ela é quem SETA o
     // cookie); com cookie o bypass acima já resolveu antes daqui
     p === "/demo" || p.startsWith("/demo/") ||
+    // /assinar/<token> é a página pública do responsável pelo mentorado —
+    // o token na URL é o fator de posse (RPC anon), não a sessão. `/assinar`
+    // sozinho segue protegido: é o fluxo logado do termo do voluntário.
+    p.startsWith("/assinar/") ||
+    // a via assinada em PDF também é baixada pelo token, sem login
+    p.startsWith("/api/assinar-token/") ||
+    // formulários públicos por token (/f/<token>) — o destinatário responde
+    // sem login; a segurança é a RPC (anon não tem grant de tabela, 0034)
+    p.startsWith("/f/") ||
     p === "/privacidade";
 
   if (!user && !isPublic) {

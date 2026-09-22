@@ -1,5 +1,7 @@
 export type AppRole = "coordenacao" | "supervisor" | "mentor_dpp" | "mentor_especialista";
-export type DuplaStatus = "ativa" | "pausada" | "encerrada";
+/** 'concluida' (0037) = jornada percorrida até o fim; 'encerrada' = fechamento
+ *  antecipado. Ambas liberam a vaga e congelam a trilha como a encerrada. */
+export type DuplaStatus = "ativa" | "pausada" | "concluida" | "encerrada";
 export type Trilha = "dpp" | "especialista";
 export type EncontroStatus = "agendado" | "realizado" | "remarcado" | "nao_aconteceu" | "cancelado";
 export type EncaminhamentoStatus = "pendente" | "feito" | "atrasado";
@@ -18,6 +20,29 @@ export type ProximoPasso =
   | "acompanhar_de_perto"
   | "conversa_individual"
   | "outro";
+
+// ---------- matching/cadastro (0034) ----------
+
+export type Genero =
+  | "feminino"
+  | "masculino"
+  | "nao_binario"
+  | "outro"
+  | "prefiro_nao_dizer";
+export type PrefGeneroPar = "feminino" | "masculino" | "indiferente";
+export type Escolaridade =
+  | "fundamental"
+  | "medio"
+  | "tecnico"
+  | "superior_incompleto"
+  | "superior"
+  | "pos";
+export type DiaSemana = "seg" | "ter" | "qua" | "qui" | "sex" | "sab" | "dom";
+export type Periodo = "manha" | "tarde" | "noite";
+
+/** Grade semanal do mentor — mentor_profiles.disponibilidade (jsonb com
+ *  CHECK no banco: só essas chaves e vocabulário fechado). */
+export type Disponibilidade = { dias: DiaSemana[]; periodos: Periodo[] };
 
 export type Profile = {
   id: string;
@@ -40,6 +65,30 @@ export type Profile = {
   /** Marca do onboarding por papel (0031) — null = ainda não viu o wizard;
    *  o gate no layout do app lê este campo. */
   onboarded_em: string | null;
+  // ---------- matching/cadastro (0034) ----------
+  // opcionais como avatar_path/documento_path: selects parciais ainda não
+  // trazem essas colunas (a 0026 restringe SELECT por grant de coluna)
+  /** Nome social — quando presente é o nome de uso; `nome` segue o civil. */
+  nome_social?: string | null;
+  /** "YYYY-MM-DD". Sensível: fora do grant de authenticated — coordenação lê
+   *  pela view profiles_pessoal. */
+  data_nascimento?: string | null;
+  /** Sensível (profiles_pessoal). */
+  genero?: Genero | null;
+  cidade?: string | null;
+  /** Sigla maiúscula ("SP") — CHECK no banco. */
+  uf?: string | null;
+  interesses?: string[];
+  /** Sensível (profiles_pessoal). */
+  motivacao?: string | null;
+  /** Preferência de gênero do par. Sensível (profiles_pessoal). */
+  pref_genero_par?: PrefGeneroPar | null;
+  cargo?: string | null;
+  empresa?: string | null;
+  /** Como a pessoa chegou ao programa (texto livre — sem enum). */
+  origem?: string | null;
+  /** Carimbo do consentimento LGPD no cadastro. */
+  consent_lgpd_em?: string | null;
 };
 
 export type Mentorado = {
@@ -53,6 +102,43 @@ export type Mentorado = {
   avatar_path?: string | null;
   /** Documento oficial no bucket `documentos` (autorização do responsável) — só a coordenação vê e gerencia. */
   documento_path?: string | null;
+  // ---------- matching/cadastro (0034) — mesma regra de opcionalidade do
+  // Profile: selects parciais não trazem essas colunas ainda ----------
+  nome_social?: string | null;
+  /** "YYYY-MM-DD". Sensível: fora do grant de authenticated — coordenação lê
+   *  pela view mentorados_pessoal. */
+  data_nascimento?: string | null;
+  /** Sensível (mentorados_pessoal). */
+  genero?: Genero | null;
+  cidade?: string | null;
+  uf?: string | null;
+  interesses?: string[];
+  /** Sensível (mentorados_pessoal). */
+  motivacao?: string | null;
+  /** Sensível (mentorados_pessoal). */
+  pref_genero_par?: PrefGeneroPar | null;
+  objetivos?: string | null;
+  escolaridade?: Escolaridade | null;
+  origem?: string | null;
+  /** Grade semanal {dias,periodos} (0038) — insumo do matching, mesma forma
+   *  da de mentor_profiles. */
+  disponibilidade?: Disponibilidade | null;
+};
+
+/** mentor_profiles — ficha do mentor que alimenta o board de matching
+ *  (tipo canônico; queries.ts ainda tem um local com o subconjunto do board). */
+export type MentorProfile = {
+  profile_id: string;
+  tipo: "dpp" | "especialista";
+  areas: string[];
+  capacidade: number;
+  termo_ok: boolean;
+  formacao_ok: boolean;
+  // ---------- matching (0034) — opcionais: o select do board ainda não
+  // traz essas colunas ----------
+  experiencia_previa?: string | null;
+  formacao_externa?: string | null;
+  disponibilidade?: Disponibilidade | null;
 };
 
 /** Nota individual no mural do perfil (/pessoas/[id]) — de profile OU mentorado. */
@@ -68,6 +154,8 @@ export type PessoaNota = {
 
 export type CicloEvento = {
   id: string;
+  /** Ciclo do evento (coluna real; o dataset demo não preenche). */
+  ciclo?: string;
   tipo: "encontro" | "formacao" | "recesso" | "marco";
   numero: number | null;
   data: string;
@@ -75,6 +163,19 @@ export type CicloEvento = {
   titulo: string;
   fase: string | null;
   instrumentos: string[];
+};
+
+/** Chamada da coordenação num evento do ciclo (0040) — hoje só os encontros
+ *  de formação usam. `presente=false` é ausência explícita, não falta de row;
+ *  cobertura total nas 'formacao' do ciclo acende mentor_profiles.formacao_ok
+ *  via trigger (só marca — exceção manual da coordenação nunca é desfeita). */
+export type Presenca = {
+  id: string;
+  ciclo_evento_id: string;
+  profile_id: string;
+  presente: boolean;
+  marcado_por: string | null;
+  marcado_em: string | null;
 };
 
 export type Encaminhamento = {
@@ -160,6 +261,16 @@ export type Dupla = {
   demanda: string | null;
   /** Solicitação que originou a dupla de especialista (null nas DPP). */
   solicitacao_id: string | null;
+  /** Link do PDM do mentorado (0044) — https obrigatório quando preenchido. */
+  pdm_url?: string | null;
+  // ---------- fechamento da trilha especialista (0037) — só trilha =
+  // 'especialista' carrega esses campos (CHECK duplas_encerramento_esp) ----------
+  /** Carimbo do fechamento da trilha — null enquanto a trilha não fechou. */
+  encerrada_em?: string | null;
+  /** Por que a trilha fechou (obrigatório junto com encerrada_em). */
+  motivo_encerramento?: string | null;
+  /** O que a trilha devolve pro PDM — chega ao mentor DPP via solicitacoes_mural. */
+  devolutiva_pdm?: string | null;
   mentor: Profile;
   mentorado: Mentorado;
   supervisor: Profile | null;
@@ -208,7 +319,22 @@ export type Comunicado = {
 
 export type Notificacao = {
   id: string;
-  tipo: "comunicado" | "pedido_apoio" | "apoio_resolvido" | "dupla_formada";
+  /** Os 4 originais (0018) + os 4 do fluxo de especialista (0028) +
+   *  trilha_encerrada (0037) + supervisao_registrada (0041) +
+   *  formulario_respondido (0042, inserido pela RPC de submit) — espelha o
+   *  CHECK notificacoes_tipo_check. */
+  tipo:
+    | "comunicado"
+    | "pedido_apoio"
+    | "apoio_resolvido"
+    | "dupla_formada"
+    | "demanda_especialista"
+    | "solicitacao_registrada"
+    | "especialista_aceitou"
+    | "solicitacao_cancelada"
+    | "trilha_encerrada"
+    | "supervisao_registrada"
+    | "formulario_respondido";
   titulo: string;
   corpo: string | null;
   href: string | null;
@@ -245,4 +371,127 @@ export type SolicitacaoEspecialista = {
   mentorado?: { nome: string } | null;
   solicitante?: { nome: string } | null;
   especialista?: { nome: string } | null;
+  // ---------- colunas do mural (0037) — vêm da dupla de especialista
+  // via join na view; null enquanto a trilha não fechou ----------
+  /** O que a trilha devolveu pro PDM do jovem — o mentor DPP lê aqui. */
+  devolutiva_pdm?: string | null;
+  /** Quando a trilha de especialista fechou (dupla.encerrada_em). */
+  trilha_encerrada_em?: string | null;
+};
+
+// ---------- supervisão (0041) ----------
+
+/** Sessão de supervisão (supervisor ↔ mentor) — o ritual de acompanhamento
+ *  do guia. dupla_id null = sessão geral, não atada a uma dupla. O mentor
+ *  lê data e resumo das sessões sobre ele (decisão de transparência —
+ *  ver 0041); a coordenação lê tudo e modera (só ela apaga). */
+export type Supervisao = {
+  id: string;
+  supervisor_id: string;
+  mentor_id: string;
+  dupla_id: string | null;
+  /** "YYYY-MM-DD" — dia em que a sessão aconteceu (não o do registro). */
+  data: string;
+  resumo: string;
+  created_by: string | null;
+  created_at: string;
+  // embeds quando selecionados:
+  supervisor?: { id: string; nome: string } | null;
+  mentor?: { id: string; nome: string } | null;
+  dupla?: { id: string; mentorado: { nome: string } | null } | null;
+};
+
+// ---------- fechamento do ciclo (0037) ----------
+
+/** As 5 chaves do rito de fechamento (guia DPP) — vocabulário fechado,
+ *  espelha o CHECK encerramento_checklist_ok. */
+export type EncerramentoChecklist = {
+  feedback_final?: boolean;
+  feedback_mutuo?: boolean;
+  revisao_pdm?: boolean;
+  avaliacao_360_enviada?: boolean;
+  autoavaliacao?: boolean;
+};
+
+/** Fechamento de uma dupla DPP — a row pode nascer antes da decisão, só com
+ *  a autoavaliação do mentor (tipo/decidido_por null = fechamento pendente). */
+export type Encerramento = {
+  id: string;
+  dupla_id: string;
+  /** 'concluida' = jornada completa · 'encerrada' = fechamento antecipado ·
+   *  null = só a autoavaliação do mentor chegou, decisão pendente. */
+  tipo: "concluida" | "encerrada" | null;
+  checklist: EncerramentoChecklist;
+  autoavaliacao_mentor: string | null;
+  /** Disponibilidade do mentor pro próximo ciclo — registrada na autoavaliação. */
+  disponivel_proximo_ciclo: boolean | null;
+  /** Snapshot gerado dos dados da jornada no momento do fechamento. */
+  resumo_jornada: string | null;
+  decidido_por: string | null;
+  created_at: string;
+  /** embed `decidido:profiles!encerramentos_decidido_por_fkey(nome)`. */
+  decidido?: { nome: string } | null;
+};
+
+// ---------- documentos & assinaturas (0033) ----------
+
+export type SignatarioTipo = "profile" | "mentorado";
+
+export type AssinaturaStatus = "pendente" | "assinado" | "revogado" | "expirado";
+
+/** Metadados do documento — o corpo é renderizado em código por slug. */
+export type DocumentoTemplate = {
+  id: string;
+  slug: string;
+  titulo: string;
+  versao: number;
+  signatario: SignatarioTipo;
+  ativo: boolean;
+  created_at: string;
+};
+
+export type Endereco = {
+  logradouro: string;
+  numero: string;
+  complemento: string | null;
+  bairro: string;
+  cidade: string;
+  uf: string;
+  cep: string;
+};
+
+/** Dados civis capturados no ato da assinatura — imutável, vive no snapshot
+ *  (não em profiles, que é legível por qualquer autenticado). */
+export type DadosCivis = {
+  nome_civil: string;
+  rg: string;
+  cpf: string;
+  data_nascimento: string | null;
+  endereco: Endereco;
+};
+
+/** Snapshot da autorização: quem é o jovem + dados civis do responsável. */
+export type DadosAutorizacao = {
+  mentorado_nome: string;
+  responsavel: DadosCivis & { parentesco: string };
+};
+
+export type Assinatura = {
+  id: string;
+  template_id: string;
+  profile_id: string | null;
+  mentorado_id: string | null;
+  status: AssinaturaStatus;
+  dados_snapshot: DadosCivis | DadosAutorizacao | null;
+  token: string;
+  token_expira_em: string | null;
+  assinatura_texto: string | null;
+  assinado_em: string | null;
+  ip: string | null;
+  user_agent: string | null;
+  hash_documento: string | null;
+  created_by: string | null;
+  created_at: string;
+  // embed quando selecionado:
+  template?: Pick<DocumentoTemplate, "slug" | "titulo" | "versao"> | null;
 };

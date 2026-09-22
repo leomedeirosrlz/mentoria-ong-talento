@@ -1,0 +1,3007 @@
+                                   I N ST I T U TO R E A L I ZA . VC
+
+
+
+
+PROGRAMA DE MENTORIA
+
+
+
+
+Guia do Mentor de
+Desenvolvimento
+Pessoal e Profissional
+Metodologia da Mentoria Social
+
+
+
+
+                           APOIO
+R E A L I ZA Ç ÃO
+                                                                                                                                                                                                                   Programa de Mentoria Social
+
+
+
+
+           Programa de Mentoria Social
+
+
+
+           METODOLOGIA DA MENTORIA SOCIAL
+
+
+           Guia do Mentor de
+
+           Desenvolvimento Pessoal e Profissional
+
+
+
+
+      Sumário
+
+
+
+01. Carta ao mentor voluntário.................................................................................................................................................................................................................................... 2
+
+02. Sobre o Instituto Realiza.vc...................................................................................................................................................................................................................................4
+
+03. Introdução: seu papel, nossa expectativa e o perfil dos jovens................................................................................................................................7
+
+04. Pré-requisitos e equipe do programa..................................................................................................................................................................................................... 10
+
+05. A jornada e a plataforma de mentoria.................................................................................................................................................................................................12
+
+06. As nove funções do mentor.............................................................................................................................................................................................................................. 15
+
+07. Instrumentos da metodologia..........................................................................................................................................................................................................................20
+
+08. Matching: como formamos as duplas..................................................................................................................................................................................................... 30
+
+09. Cronograma e carga horária.............................................................................................................................................................................................................................31
+
+10. Vamos começar: os 16 encontros................................................................................................................................................................................................................34
+
+11. Ferramentas de comunicação............................................................................................................................................................................................................................43
+
+12. Avaliação e suporte ao mentor......................................................................................................................................................................................................................47
+
+13. Conteúdo complementar.........................................................................................................................................................................................................................................49
+
+14. Templates e instrumentos.....................................................................................................................................................................................................................................53
+
+15. Considerações finais...................................................................................................................................................................................................................................................60
+
+
+
+
+                                                                                                                                                                                                                                                         APOIO
+   Mirella Ghachache Avenia · Leonardo Medeiros
+
+   mentoria@realiza.vc
+
+
+
+
+                                                                                                                                                    Guia do Mentor de Desenvolvimento Pessoal e Profissional                                                               1
+                                                                                       Programa de Mentoria Social
+
+
+
+
+  01 Carta ao mentor voluntário
+
+
+
+Olá, mentor(a). Seja bem-vindo(a) ao Programa de Mentoria Social do Instituto Realiza.vc!
+
+Estamos muito felizes em ter você conosco. Para nós, é motivo de grande alegria o seu desejo de
+fazer parte do nosso time de voluntários e voluntárias, com o propósito de contribuir para o
+desenvolvimento pessoal e profissional dos jovens que fazem parte da nossa rede, das ONGs parceiras
+e da nossa comunidade de voluntários.
+
+A mentoria é um espaço que ensina, na prática, que diferentes tipos de conhecimento e experiência
+constroem uma relação transformadora para as duas pessoas envolvidas. Aqui, a sua bagagem de
+vida tem o poder de inspirar, trazer referências e estimular o jovem a pensar em como colocar em
+prática o seu projeto de vida.
+
+Esteja aberto(a) e disposto(a) a criar vínculo, ouvir com atenção, pensar junto, emprestar o seu olhar
+e dar suporte. Tudo isso permite que o(a) jovem tome consciência da importância do protagonismo
+que exerce sobre a própria trajetória, e essa consciência certamente se refletirá em suas escolhas
+futuras.
+
+
+  Esse estímulo caminha lado a lado com o respeito à identidade do(a) jovem. Aqui não há espaço para a
+  projeção de desejos e expectativas individuais, e sim abertura para novas possibilidades. A jornada de
+  aprendizagem é mútua e está em constante movimento.
+
+
+
+
+As próximas páginas trazem a metodologia do programa, sugestões de condução dos encontros e as
+ferramentas que utilizamos. Em cada encontro haverá uma dinâmica a ser realizada, por isso a leitura
+deste material é essencial.
+
+Registre sempre as atividades e as reflexões de cada encontro: esses registros serão a base do
+relatório final que você entregará ao(à) seu(sua) mentorado(a) e à coordenação do programa.
+
+Nas seções finais você encontrará ferramentas de comunicação (Escuta Ativa, Comunicação Não
+Violenta, perguntas quebra-gelo, check-in e checkout) e conteúdo complementar sobre trabalho,
+estudo e vida financeira.
+
+Esta mentoria acontece entre você e um(a) jovem, mas o Instituto Realiza.vc está aqui para dar todo
+o suporte necessário.
+
+
+
+   “Se quer ir rápido, vá sozinho. Se quer ir longe, vá em grupo.”
+   Provérbio africano
+
+Equipe do Programa de Mentoria Social · Instituto Realiza.vc
+
+
+
+                                                         Guia do Mentor de Desenvolvimento Pessoal e Profissional   2
+                                                                                       Programa de Mentoria Social
+
+
+
+
+Como usar este material
+
+Este guia é uma referência de trabalho, não um roteiro rígido. Todas as sugestões aqui presentes são
+propostas: adapte o ritmo, a linguagem e as atividades à realidade do(a) jovem que você acompanha,
+mantendo a estrutura e os instrumentos da metodologia.
+
+
+
+
+                                                         Guia do Mentor de Desenvolvimento Pessoal e Profissional   3
+                                                                                    Programa de Mentoria Social
+
+
+
+
+  02 Sobre o Instituto Realiza.vc
+
+
+
+O Instituto Realiza.vc promove a autonomia e o desenvolvimento humano e social de jovens de baixa
+renda e em situação de vulnerabilidade, por meio da construção de redes de apoio, do
+desenvolvimento de habilidades e da inserção no mercado de trabalho.
+
+Conectamos jovens, organizações da sociedade civil e empresas em torno de um objetivo comum:
+ampliar oportunidades reais de trabalho, estudo e desenvolvimento pessoal. Atuamos com programas
+de empregabilidade, formação profissional, mentoria, acompanhamento pedagógico e assessoria a
+ONGs.
+
+
+
+
+  Nossa missão                                      Nossa visão
+
+  Promover a autonomia e o desenvolvimento          Ser a principal parceira estratégica para o
+  humano e social de jovens de baixa renda e em     aumento da empregabilidade das ONGs
+  situação de vulnerabilidade, por meio de redes    brasileiras e a referência em contratação com
+  de apoio, desenvolvimento de habilidades e        impacto social pelas empresas, reconhecida pela
+  inserção no mercado de trabalho.                  excelência dos seus serviços e pelo bom
+                                                    desempenho dos seus jovens.
+
+
+
+
+O que sustenta a nossa forma de trabalhar
+
+
+ • Protagonismo juvenil: o(a) jovem é o(a) autor(a) do próprio caminho; nosso papel é ampliar
+    repertório e oferecer suporte.
+
+ • Diversidade e inclusão: reconhecemos e respeitamos identidades, territórios e trajetórias.
+
+ • Rede de apoio: ninguém se desenvolve sozinho; conexões qualificadas transformam trajetórias.
+
+ • Transparência e ética: relações de confiança, sigilo e responsabilidade com quem atendemos.
+
+ • Impacto mensurável: acompanhamos resultados para melhorar continuamente o que
+    entregamos.
+
+
+
+
+O Programa de Mentoria Social
+
+
+O Programa de Mentoria Social é a frente do Instituto dedicada a aproximar jovens de profissionais
+voluntários dispostos a compartilhar experiência, ampliar horizontes e apoiar a construção de
+projetos de vida e de carreira. O programa se organiza em duas modalidades complementares:
+
+                                                      Guia do Mentor de Desenvolvimento Pessoal e Profissional   4
+                                                                                          Programa de Mentoria Social
+
+
+
+
+ Modalidade                       Foco                                        Duração            Encontros
+
+
+                                  Desenvolvimento amplo do(a) jovem:
+ Mentoria de Desenvolvimento
+                                  autoconhecimento, projeto de vida,          Até 6 meses        16 encontros
+ Pessoal e Profissional
+                                  metas pessoais e profissionais.
+
+
+                                  Resolução de demandas específicas
+ Mentoria com Especialista        de uma área do conhecimento ou              Até 3 meses        Até 5 encontros
+                                  nicho de carreira.
+
+
+
+
+  As duas modalidades conversam entre si: é o Mentor de Desenvolvimento Pessoal e Profissional, ou o próprio
+  jovem, quem identifica a necessidade de uma mentoria especializada e aciona o(a) especialista pela
+  plataforma do programa.
+
+
+
+
+Apoio institucional
+
+
+O Programa de Mentoria Social conta com o apoio da Erlich Mentoring Brasil-Europa na formação dos
+mentores e na consolidação da metodologia de mentoring aplicada ao contexto social brasileiro.
+
+Todo o programa é realizado através da plataforma de mentoria criada em parceria com a Top2You,
+a maior plataforma de mentoria para altos executivos do Brasil.
+
+
+
+
+                                                            Guia do Mentor de Desenvolvimento Pessoal e Profissional   5
+                                                  Programa de Mentoria Social
+
+
+
+
+ANTES DE COMEÇAR
+
+
+
+Introdução
+
+
+
+
+                   Guia do Mentor de Desenvolvimento Pessoal e Profissional   6
+                                                                                         Programa de Mentoria Social
+
+
+
+
+  03 Introdução
+
+
+
+Qual é o papel do Mentor de Desenvolvimento Pessoal e Profissional?
+
+
+Na Mentoria Social do Instituto Realiza.vc, o vínculo entre mentor(a) e mentorado(a) tem como base
+a troca de experiências. Nessa relação, você é facilitador(a) e motivador(a) para que o(a) jovem
+conclua a mentoria com clareza sobre o seu sonho individual e sobre o caminho que precisa trilhar
+para chegar até ele.
+
+Diferente da mentoria com especialista, que responde a uma demanda técnica pontual, a mentoria de
+desenvolvimento pessoal e profissional acompanha o(a) jovem de forma ampla ao longo de seis meses:
+autoconhecimento, valores, visão de futuro, metas, execução e autonomia.
+
+Essa troca traz benefícios para as duas pessoas envolvidas. Para você, mentor(a): satisfação pessoal,
+ampliação da rede de relacionamentos e melhor desempenho na própria atuação profissional,
+sobretudo em escuta, comunicação e desenvolvimento de pessoas. Para o(a) jovem: um(a)
+acompanhante em uma jornada inexplorada e o privilégio de trocar com profissionais experientes na
+área em que está ingressando.
+
+
+
+
+  O que a mentoria é                                     O que a mentoria não é
+
+  Um espaço de escuta, confiança e reflexão.             Terapia, aconselhamento clínico ou assistência
+
+  Uma relação de aprendizagem mútua.                     social.
+
+  Um processo estruturado, com metas e                   Um espaço para projetar seus próprios desejos
+
+  acompanhamento.                                        no(a) jovem.
+
+  Um convite ao protagonismo do(a) jovem.                Uma promessa de emprego ou de indicação
+                                                         garantida.
+
+                                                         Um favor: é um compromisso voluntário assumido
+                                                         com responsabilidade.
+
+
+
+
+  E você, teve algum(a) mentor(a)? Quem fez diferença e contribuiu com as suas escolhas? Antes do primeiro
+  encontro, vale reservar alguns minutos para lembrar dessas pessoas e do que elas fizeram por você. Muito
+  do que você precisa oferecer ao(à) jovem está nessa memória.
+
+
+
+
+                                                           Guia do Mentor de Desenvolvimento Pessoal e Profissional   7
+                                                                                            Programa de Mentoria Social
+
+
+
+
+O que esperamos de você
+
+
+A dedicação estimada para o Programa do Mentor de Desenvolvimento Pessoal e Profissional é de
+aproximadamente 19 horas ao longo de seis meses, considerando a formação e a prática da mentoria:
+
+
+
+
+ Etapa                                                      Tempo estimado               Formato
+
+
+ Encontro inicial de formação e alinhamento com a
+                                                            1h30                         Virtual
+ coordenação
+
+
+ Encontro final de formação, encerramento e avaliação       1h30                         Virtual
+
+
+ 16 encontros individuais de mentoria                       16h                          Virtual ou presencial
+
+
+ Total                                                      19h
+
+
+
+
+  Prepare-se
+
+  Além das horas previstas, reserve um tempo de preparação antes de cada encontro: releia as orientações
+  deste guia, revise os registros do encontro anterior e organize o material da atividade. Encontros preparados
+  rendem conversas muito mais profundas.
+
+
+
+
+  FORMAÇÃO EaD OPCIONAL E GRATUITA
+
+  Garanta uma certificação gratuita e vá além!
+
+
+  Além dos dois encontros de formação, o Instituto Realiza.vc oferece uma trilha EaD extra, gratuita e
+  opcional na plataforma ead.realiza.vc. Cadastre-se como voluntário(a) e faça o curso de Mentor de
+  Desenvolvimento Pessoal e Profissional no seu ritmo, com certificado ao final.
+
+  Já tem certificação pela Erlich Mentoring? Nesse caso, basta realizar o curso complementar, que cobre
+  apenas as especificidades do programa do Instituto Realiza.vc.
+
+  Acesse ead.realiza.vc · a participação é voluntária e não substitui os encontros de formação.
+
+
+
+
+Perfil dos(as) mentorados(as)
+
+
+O perfil dos jovens que ingressam na Mentoria Social é levantado por meio da Anamnese Social,
+instrumento de coleta de dados desenvolvido pelo Instituto Realiza.vc e aplicado antes do início da
+mentoria. Esse instrumento nos ajuda a compreender a realidade de cada jovem, qualificar o processo
+de matching e orientar o trabalho dos mentores.
+
+
+                                                             Guia do Mentor de Desenvolvimento Pessoal e Profissional   8
+                                                                                         Programa de Mentoria Social
+
+
+
+
+Tratando-se de jovens em situação de vulnerabilidade social, algumas das situações descritas a seguir
+podem aparecer ao longo do processo. Conhecê-las de antemão ajuda você a acolher sem se
+surpreender e sem julgar.
+
+Moradores de territórios em vulnerabilidade social convivem diariamente com as diferentes facetas
+de uma sociedade extremamente desigual, como é a realidade brasileira. Muitas vezes o acesso a
+direitos básicos, segurança e lazer não faz parte do repertório desse jovem. Esse cenário de
+precariedade leva muitos deles a desenvolver ansiedade e urgência na resolução dos próprios
+problemas.
+
+
+  Atenção
+
+  Fique atento(a): é possível que, ao longo dos encontros, você precise lidar com essa urgência. Nesses
+  momentos, sinalize ao(à) jovem que a mentoria é um espaço de desenvolvimento de técnicas e habilidades
+  cujos resultados se constroem no tempo, sem minimizar a necessidade real que ele(a) está trazendo.
+
+
+
+
+Para aprofundar o seu olhar sobre as juventudes
+
+ • Documentário “Nunca me sonharam” (2017), sobre o ensino médio público brasileiro e os sonhos
+    dos estudantes.
+
+ • Relatórios do Atlas das Juventudes, com dados sobre educação, trabalho, renda e saúde mental
+    da juventude brasileira.
+
+ • Materiais do Instituto Ayrton Senna sobre competências socioemocionais e educação integral.
+
+
+
+Ouvir, pensar junto e dar suporte para que o(a) jovem identifique a própria potência é o que faz
+dele(a) protagonista da sua trajetória. Quanto mais repertório você tiver sobre a realidade das
+juventudes brasileiras, mais qualificada será a sua escuta.
+
+
+
+
+                                                           Guia do Mentor de Desenvolvimento Pessoal e Profissional   9
+                                                                                         Programa de Mentoria Social
+
+
+
+
+ 04 Pré-requisitos e equipe do programa
+
+
+
+Pré-requisitos para ser mentor(a)
+
+
+ • Ter interesse genuíno em ajudar outra pessoa a se desenvolver;
+
+ • Boa capacidade de escuta;
+
+ • Respeito à diversidade;
+
+ • Disponibilidade de tempo na agenda;
+
+ • Conduta compatível com o papel de referência e modelo;
+
+ • Responsabilidade, ética e interesse real pelo outro.
+
+
+
+
+Pré-requisitos para ser mentorado(a)
+
+
+ • Ter no mínimo 18 anos de idade;
+
+ • Ter interesse em ter um(a) mentor(a);
+
+ • Estar disposto(a) a ser orientado(a);
+
+ • Ter disponibilidade de tempo;
+
+ • Estar disposto(a) a criar vínculo;
+
+ • Comprometer-se a participar da mentoria até o final.
+
+
+
+
+  Sobre idade e maturidade: consideramos como referência que mentores tenham a partir de 25 anos e
+  supervisores de relacionamento a partir de 35 anos. Essas idades não são regras rígidas: o que realmente
+  importa é a maturidade pessoal, a experiência adquirida e a capacidade de acompanhar e apoiar o
+  desenvolvimento de jovens.
+
+  No caso dos supervisores, além de uma trajetória sólida como mentores, esperamos vivência em trabalhos
+  com jovens e preparo para lidar com situações mais complexas. A bagagem de vida e profissional é sempre
+  o critério mais determinante.
+
+
+
+
+Quem faz o programa acontecer
+
+
+
+
+                                                         Guia do Mentor de Desenvolvimento Pessoal e Profissional   10
+                                                                               Programa de Mentoria Social
+
+
+
+
+Papel             Responsabilidade
+
+
+                  Responde pelo programa como um todo: seleção, formação, matching,
+Coordenação       acompanhamento, avaliação e relacionamento com as ONGs e empresas
+                  parceiras.
+
+
+                  Oferecem a mentoria aos jovens, nas modalidades de desenvolvimento pessoal
+Mentores
+                  e profissional e de especialista.
+
+
+                  Acompanham cada dupla mentor-mentorado para assegurar que os objetivos
+Supervisores de
+                  estejam sendo alcançados e apoiar a dupla na solução de dificuldades que
+relacionamento
+                  surjam ao longo do caminho.
+
+
+
+
+                                                Guia do Mentor de Desenvolvimento Pessoal e Profissional   11
+                                                                                     Programa de Mentoria Social
+
+
+
+
+ 05 A jornada e a plataforma de mentoria
+
+
+
+A jornada do programa
+
+
+ • Seleção e formação de mentores, mentorados e supervisores de relacionamento;
+
+ • Processo de matching mentor-mentorado e início da mentoria de desenvolvimento pessoal e
+   profissional;
+
+ • Mentoria(s) com mentor(es) especialista(s), de acordo com a necessidade de cada jovem;
+
+ • Supervisão dos relacionamentos;
+
+ • Avaliação de resultados para os mentorados, para os mentores e para as instituições
+   envolvidas;
+
+ • Encerramento ou renovação da jornada de mentoria.
+
+
+
+
+A jornada do(a) mentor(a)
+
+
+ 1. Inscrição no programa por meio de formulário online;
+
+ 2. Análise de pré-requisitos e seleção por entrevista, quando aplicável;
+
+ 3. Encontro inicial de formação de mentores;
+
+ 4. Encontro final de formação de mentores;
+
+ 5. Submissão de documentos e assinatura dos termos de voluntariado e compromisso;
+
+ 6. Cadastro na plataforma e registro de disponibilidade (horários e número de mentorados);
+
+ 7. Início da mentoria;
+
+ 8. Encerramento ou renovação do contrato de mentoria.
+
+
+
+
+                                                     Guia do Mentor de Desenvolvimento Pessoal e Profissional   12
+                                                                                     Programa de Mentoria Social
+
+
+
+
+A jornada do(a) jovem mentorado(a)
+
+
+ 1. Inscrição no programa por meio de formulário online;
+
+ 2. Análise de pré-requisitos e seleção;
+
+ 3. Realização da trilha preparatória para a mentoria;
+
+ 4. Resposta à Anamnese Social;
+
+ 5. Encontro de abertura com a coordenação do programa;
+
+ 6. Início da mentoria de desenvolvimento pessoal e profissional;
+
+ 7. Realização de sessões com mentor especialista, se aplicável;
+
+ 8. Encerramento ou renovação do contrato de mentoria.
+
+
+
+
+A plataforma de mentoria
+
+
+Todas as mentorias do Instituto Realiza.vc acontecem na plataforma criada em parceria com a
+Top2You, acessível em mentoria.realiza.vc. É por ela que você acompanha o Jovem Realizador,
+encontra o especialista certo para cada objetivo e agenda os encontros.
+
+
+
+
+                                                     Guia do Mentor de Desenvolvimento Pessoal e Profissional   13
+                                                                                            Programa de Mentoria Social
+
+
+
+
+Como você usa a plataforma
+
+ • Acesso: entre em mentoria.realiza.vc com o seu e-mail. Para que o login funcione, a
+    coordenação precisa ter cadastrado esse endereço previamente.
+
+ • Agendamento: todos os encontros de mentoria são agendados pelo sistema. Nenhum encontro
+    acontece fora dela.
+
+ • Avaliação: ao final de cada encontro, mentor(a) e mentorado(a) preenchem uma avaliação da
+    sessão na própria plataforma.
+
+ • Especialistas: a plataforma reúne mentores voluntários capacitados e especialistas de mercado,
+    organizados por área: design, eventos, finanças, inteligência emocional, planejamento de
+    carreira, tecnologia, entre outras.
+
+
+
+
+  Onde ficam o PDM e a Roda da Vida
+
+  O Plano de Desenvolvimento do Mentorado (PDM) e a Roda da Vida não ficam na plataforma: são documentos
+  de trabalho da dupla, guardados pelo(a) mentorado(a) e/ou pelo(a) mentor(a). Combinem desde o primeiro
+  encontro onde esses materiais serão mantidos e como serão compartilhados entre vocês.
+
+
+
+
+  Não confunda os dois endereços: mentoria.realiza.vc é a plataforma onde a mentoria acontece; ead.realiza.vc
+  é a plataforma de cursos, com a formação EaD opcional e gratuita.
+
+
+
+
+  FORMAÇÃO EaD OPCIONAL E GRATUITA
+
+  Garanta uma certificação gratuita e vá além!
+
+
+  Além dos dois encontros de formação, o Instituto Realiza.vc oferece uma trilha EaD extra, gratuita e
+  opcional na plataforma ead.realiza.vc. Cadastre-se como voluntário(a) e faça o curso de Mentor de
+  Desenvolvimento Pessoal e Profissional no seu ritmo, com certificado ao final.
+
+  Já tem certificação pela Erlich Mentoring? Nesse caso, basta realizar o curso complementar, que cobre
+  apenas as especificidades do programa do Instituto Realiza.vc.
+
+  Acesse ead.realiza.vc · a participação é voluntária e não substitui os encontros de formação.
+
+
+
+
+                                                            Guia do Mentor de Desenvolvimento Pessoal e Profissional   14
+                                                                                    Programa de Mentoria Social
+
+
+
+
+  06 As nove funções do mentor
+
+
+
+A seguir estão as nove funções que um Mentor de Desenvolvimento Pessoal e Profissional deve
+exercer:
+
+
+
+
+No contexto do nosso programa, compreendemos que o papel do(a) mentor(a) vai muito além de
+compartilhar conhecimentos técnicos ou experiências profissionais. A mentoria de desenvolvimento
+pessoal e profissional é, acima de tudo, uma relação de confiança, escuta e desenvolvimento mútuo.
+Para que esse processo seja realmente transformador, é fundamental que você esteja consciente das
+responsabilidades que assume ao se colocar ao lado do(a) mentorado(a) em sua trajetória.
+
+As nove responsabilidades essenciais que estruturam a atuação do(a) mentor(a) organizam-se em
+três grandes dimensões: trabalho e carreira, apoio socioemocional e função modelar. Juntas, elas
+compõem o alicerce da mentoria como uma experiência de impacto real e duradouro.
+
+
+
+
+Dimensão 1 · Trabalho e carreira
+
+
+1. Orientação
+
+Você oferece suporte na construção do projeto de vida do(a) mentorado(a), contribuindo com
+orientações sobre formação, mercado de trabalho, oportunidades de crescimento e tomada de
+
+
+                                                    Guia do Mentor de Desenvolvimento Pessoal e Profissional   15
+                                                                                           Programa de Mentoria Social
+
+
+
+
+decisões. Essa função ajuda o(a) jovem a enxergar possibilidades e traçar caminhos de forma mais
+segura e consciente.
+
+ • Ensine o que for normativo: como funcionam processos seletivos, contratos, rotinas de trabalho
+    e ambientes profissionais.
+
+ • Indique fontes de pesquisa: livros, periódicos, sites, cursos e pessoas que possam ser boas
+    referências.
+
+ • Proponha tarefas desafiadoras conforme o progresso dele(a) e ofereça sempre feedback
+    construtivo.
+
+ • Se necessário, conecte-o(a) com outras pessoas, criando uma rede de apoio para o seu
+    desenvolvimento.
+
+ • Não tenha receio de admitir quando não souber algo; diga que vai pesquisar. Assumir limitações
+    também é uma forma de ensinar.
+
+
+
+
+2. Proteção
+
+Você atua como figura de cuidado e suporte, promovendo um ambiente seguro para que o(a)
+mentorado(a) se desenvolva sem medo de julgamentos ou exposições inadequadas. Essa proteção
+também envolve alertas e orientações sobre riscos e comportamentos prejudiciais.
+
+Na prática, a função de proteção consiste em oferecer sugestões para evitar que ele(a) cometa erros
+comprometedores ou deixe de cumprir tarefas importantes. Ajude-o(a) a reconhecer comportamentos
+inadequados no ambiente de trabalho que possam comprometer o seu progresso. Oriente sobre como
+se portar diante de diferentes pessoas na empresa e explique os motivos de cada orientação.
+
+
+  Tome cuidado para não exagerar na proteção, para que ela não se torne uma limitação. Proteger é preparar
+  para o risco, não é evitar que o(a) jovem experimente.
+
+
+
+
+3. Exposição e visibilidade
+
+Sempre que possível, facilite o acesso do(a) mentorado(a) a novas redes de relacionamento,
+experiências, espaços profissionais e eventos que possam ampliar sua visão de mundo e aumentar
+sua visibilidade. Um convite para um evento, a apresentação a um colega de área ou a indicação de
+uma comunidade profissional podem abrir portas que nenhum conselho abriria.
+
+
+
+
+4. Patrocínio
+
+Você é um(a) defensor(a) do potencial do(a) seu(sua) mentorado(a). Apoiar, recomendar, valorizar e
+indicar o(a) jovem em oportunidades concretas são formas potentes de impulsionar sua trajetória e
+
+                                                           Guia do Mentor de Desenvolvimento Pessoal e Profissional   16
+                                                                                           Programa de Mentoria Social
+
+
+
+
+ampliar suas chances de sucesso. Patrocinar exige responsabilidade: indique com sinceridade, prepare
+o(a) jovem para a oportunidade e seja transparente sobre o que ele(a) já domina e o que ainda está
+desenvolvendo.
+
+
+
+
+Dimensão 2 · Apoio socioemocional
+
+
+5. Aceitação
+
+Um ambiente de escuta e acolhimento começa pela aceitação do outro como ele é. Reconheça e
+respeite as identidades, histórias e contextos do(a) mentorado(a), valorizando sua individualidade e
+a diversidade que ele(a) traz.
+
+ • Declare a intenção de formar uma aliança em benefício dele(a).
+
+ • Adote uma postura não julgadora, contribuindo para um clima de confiança e acolhimento.
+
+ • Mantenha uma atitude igualitária e não hierárquica, deixando-o(a) à vontade.
+
+ • Expresse seu compromisso com a confidencialidade dos assuntos tratados nas sessões.
+
+ • Ao perceber carências ou equívocos, demonstre que você os observa com respeito e com a
+    intenção de apoiar.
+
+ • Mostre-se sempre aberto(a) a receber feedback.
+
+
+
+
+6. Escuta e aconselhamento
+
+A escuta ativa e empática é uma das ferramentas mais importantes do(a) mentor(a). A partir dela é
+possível aconselhar com sensibilidade, sempre respeitando o ritmo, os desejos e os limites do(a)
+mentorado(a). Elimine distrações do ambiente e dedique-se totalmente ao momento com ele(a).
+
+Ouça atentamente e identifique significados implícitos no discurso. Controle-se para não fazer
+julgamentos    nem   antecipar   conclusões,   e   evite    interromper.      A    prioridade      é   compreender
+profundamente o que está sendo compartilhado.
+
+Para ser um bom conselheiro é essencial ter escuta qualificada. Tenha sempre em mente que o objetivo
+é ajudar o(a) mentorado(a) a encontrar as soluções por conta própria: entregar respostas prontas
+deve ser o último recurso. Estimule o autoconhecimento e a autonomia por meio de perguntas eficazes,
+e evite ser impositivo(a), a menos que seja absolutamente necessário, geralmente em situações
+ligadas à função de proteção.
+
+
+
+
+                                                           Guia do Mentor de Desenvolvimento Pessoal e Profissional   17
+                                                                                          Programa de Mentoria Social
+
+
+
+
+ Modo de
+                           Como funciona                                          Quando usar
+ aconselhamento
+
+
+                           Você faz perguntas e provoca reflexões,
+                           analisando com ele(a) alternativas,
+                                                                                  Sempre que possível. É o
+ A. Provocação reflexiva   possibilidades e prováveis consequências de
+                                                                                  modo preferencial.
+                           cada escolha. O objetivo é desafiá-lo(a) a
+                           encontrar as respostas por si mesmo(a).
+
+
+                           Você compartilha experiências próprias,
+                           positivas ou negativas, ou de terceiros,
+                           semelhantes à situação vivida. Ao final,               Quando a provocação
+ B. Compartilhamento de
+                           pergunte: “Que soluções você poderia imaginar          reflexiva não basta e falta
+ experiências
+                           a partir deste exemplo?” ou “O que essa                repertório ao(à) jovem.
+                           história pode trazer de útil para o que você
+                           está enfrentando?”.
+
+
+                                                                                  Último recurso. Em situações
+                                                                                  de risco em que, mesmo após
+ C. Sugestão ou            Modo mais diretivo, com orientações claras
+                                                                                  as abordagens anteriores,
+ direcionamento            sobre os próximos passos.
+                                                                                  ele(a) não tenha
+                                                                                  compreendido a gravidade.
+
+
+
+
+7. Confirmação
+
+Reconhecer e reforçar as qualidades, conquistas e potenciais do(a) mentorado(a) fortalece sua
+autoestima e senso de pertencimento. Essa validação é essencial para que ele(a) se sinta capaz,
+valorizado(a) e digno(a) de ocupar novos espaços. Seja específico(a): em vez de “você é ótimo”, diga
+o que exatamente você observou e por que aquilo importa.
+
+
+
+
+8. Abertura para o relacionamento
+
+Uma mentoria potente nasce da disposição genuína para construir vínculos de confiança. Ter presença,
+tempo e interesse real na jornada do outro é o que sustenta uma relação significativa e
+transformadora.
+
+ • Compartilhe todo o conhecimento que for relevante para ele(a).
+
+ • Cumpra os compromissos assumidos. Diante de imprevistos, peça desculpas, corrija a situação e
+    remarque com antecedência.
+
+ • Comente erros que você já cometeu, como os resolveu e os sentimentos envolvidos nesses
+    momentos.
+
+ • Evite criticar diretamente outras pessoas: descreva os fatos sem apontar culpados.
+
+
+                                                          Guia do Mentor de Desenvolvimento Pessoal e Profissional   18
+                                                                                        Programa de Mentoria Social
+
+
+
+
+ • Garanta a segurança de que tudo o que for dito será mantido em confidencialidade.
+
+
+
+
+Dimensão 3 · Função modelar
+
+
+9. Papel de modelo
+
+Por meio das suas atitudes e valores, você se torna uma referência para o(a) mentorado(a). Mais do
+que ser exemplo de sucesso, trata-se de inspirar pela coerência, pela escuta, pela ética e pela
+humanidade. Ser modelo é mostrar, na prática, que é possível crescer com dignidade e propósito.
+
+Sirva de exemplo tanto em relação ao seu conhecimento quanto ao seu comportamento. Se vocês
+fizerem parte da mesma organização, ofereça a oportunidade de observar a sua atuação, para que
+ele(a) conheça suas competências e possa aprender dentro e fora do contexto organizacional. Isso
+estimula a observação e a cooperação.
+
+
+
+
+  Nenhuma dessas nove funções exige perfeição. Elas exigem presença, consistência e honestidade. Um(a)
+  mentor(a) que admite não saber, que remarca com antecedência quando precisa e que escuta sem julgar já
+  está exercendo boa parte delas.
+
+
+
+
+                                                        Guia do Mentor de Desenvolvimento Pessoal e Profissional   19
+                                                                                        Programa de Mentoria Social
+
+
+
+
+  07 Instrumentos da metodologia
+
+
+
+Os instrumentos adotados no Programa do Mentor de Desenvolvimento Pessoal e Profissional são: as
+Perguntas Eficazes, o Feedback Construtivo, o Plano de Desenvolvimento do Mentorado (PDM), com a
+definição de metas e submetas, e a Roda da Vida. A seguir, apresentamos a descrição de cada
+instrumento e as orientações sobre a forma adequada de aplicá-los.
+
+
+
+
+Perguntas eficazes
+
+
+Perguntas eficazes são instigantes e estimulam a reflexão. Elas direcionam a atenção do(a)
+mentorado(a) para aquilo que ele(a) mesmo(a) está dizendo, incentivando a análise das próprias
+respostas. Reflexões sucessivas podem levá-lo(a) a decisões, conclusões e soluções construídas por
+conta própria.
+
+
+
+
+ Evite                             Prefira                              Por quê
+
+
+ “O que você acha de resolver                                           A primeira pergunta já entrega a
+                                   “Que caminhos você vê para
+ isso dando um feedback sincero                                         solução, e o objetivo é que ela
+                                   resolver essa situação?”
+ a essa pessoa?”                                                        venha do(a) jovem.
+
+
+                                                                        Perguntas iniciadas por “por que”
+ “Por que você não resolveu esse   “O que te impediu de resolver
+                                                                        podem soar acusatórias e gerar
+ problema?”                        esse problema?”
+                                                                        defensividade.
+
+
+                                                                        Perguntas fechadas e sugestivas
+ “Você não acha que deveria        “O que você precisaria para
+                                                                        encerram a reflexão em vez de abri-
+ estudar mais?”                    avançar nos estudos?”
+                                                                        la.
+
+
+
+
+  Você encontrará mais exemplos no documento “Perguntas Eficazes”, disponível no material complementar do
+  programa.
+
+
+
+
+                                                        Guia do Mentor de Desenvolvimento Pessoal e Profissional   20
+                                                                                          Programa de Mentoria Social
+
+
+
+
+Feedback construtivo
+
+
+Como transformar um feedback negativo em algo construtivo? O feedback construtivo melhora a
+autoconsciência, contribui para o aumento da autoconfiança, estimula a aprendizagem, eleva a
+motivação e incrementa o desempenho do(a) mentorado(a).
+
+Mesmo quando for necessário apontar aspectos negativos, o feedback deve ser oferecido de forma
+construtiva. Ele não precisa ser necessariamente agendado: pode surgir espontaneamente no decorrer
+de uma sessão, desde que feito com responsabilidade e respeito.
+
+
+
+
+  Modelo sugerido de feedback construtivo
+
+  “Olha, quando acontece determinada situação, eu me sinto (descreva como você se sente), porque (explique
+  o motivo). Eu gostaria que você considerasse (apresente uma sugestão ou alternativa).”
+
+  Em seguida, pergunte: “O que você pensa sobre o que acabei de dizer?”
+
+
+
+
+Esse modelo estimula o diálogo e a reflexão, sem gerar defensividade, favorecendo o crescimento
+mútuo.
+
+Veja os exemplos:
+
+
+
+
+                                                          Guia do Mentor de Desenvolvimento Pessoal e Profissional   21
+                                                                              Programa de Mentoria Social
+
+
+
+
+Feedback construtivo sobre o comportamento negativo
+
+
+
+
+                                              Guia do Mentor de Desenvolvimento Pessoal e Profissional   22
+                                                                                       Programa de Mentoria Social
+
+
+
+
+Relembrando:
+
+ • Aja no mesmo clima de acolhimento que deve estar presente em todo o processo de mentoria:
+    atitude não julgadora, confiança e respeito.
+
+ • Faça relatos baseados no que você realmente viu, percebeu ou sabe com segurança.
+
+ • Não rotule negativamente o(a) mentorado(a).
+
+ • Foque no comportamento, no fato ou no resultado, não na pessoa. Em vez de “Você não
+    conseguiu concluir o trabalho”, diga “Percebi que o trabalho ainda não foi concluído”.
+
+ • Tenha cuidado com palavras absolutas: tudo, nada, sempre, nunca.
+
+ • Pergunte o que o(a) mentorado(a) entendeu e abra espaço para discussão: “Você poderia
+    resumir o que entendeu sobre o que eu falei?”, “O que você acha sobre isso?”.
+
+ • Demonstre atenção à reação emocional: “Como você está se sentindo?”.
+
+
+
+Todo feedback deve resultar em uma ação relevante para o desenvolvimento do(a) jovem. Antes de
+encerrar, converse sobre isso: “Como a nossa conversa contribuiu para o que você precisa alcançar?”,
+“O que você vai fazer agora?”.
+
+
+
+
+Plano de Desenvolvimento do Mentorado (PDM)
+
+
+O Plano de Desenvolvimento do Mentorado é a ferramenta central do programa. Ele será construído
+ao longo dos seis meses de mentoria, em conjunto com você, e é o que orienta os encontros e dá
+direção ao processo de evolução do(a) jovem. As sessões giram em torno do desenvolvimento e da
+aplicação prática do PDM, até a concretização dos objetivos traçados pela dupla.
+
+
+
+
+ Etapa                    Encontros      O que acontece
+
+
+                                         Apresentações, histórias de vida, leitura inicial da Roda da Vida
+ Abertura e vínculo       1º             e etapa de abertura do PDM: interesses, eventos significativos e
+                                         autoavaliação.
+
+
+                                         Devolutiva da avaliação por terceiros, apresentação e
+ Visão de futuro          2º
+                                         refinamento da Declaração de Visão e orientação sobre metas.
+
+
+                                         Apresentação das metas, checagem pelo modelo SMART,
+ Metas                    3º
+                                         indicadores e prazos, e orientação sobre submetas.
+
+
+
+
+                                                       Guia do Mentor de Desenvolvimento Pessoal e Profissional   23
+                                                                                          Programa de Mentoria Social
+
+
+
+
+ Etapa                      Encontros       O que acontece
+
+
+ Submetas e                                 Verificação do desdobramento em submetas e definição de por
+                            4º
+ compromisso                                onde começar.
+
+
+ Execução e                                 Foco na execução e no monitoramento das metas e submetas,
+                            5º ao 11º
+ acompanhamento                             com feedback e ajustes no plano.
+
+
+ Roda da Vida e                             Ampliação do olhar para todas as áreas da vida, novas metas e
+                            12º ao 16º
+ encerramento                               encerramento da jornada.
+
+
+
+
+O ponto de partida: a visão de futuro
+
+O PDM começa pela construção de uma visão de futuro. O(a) mentorado(a) é convidado(a) a realizar
+um exercício de imaginação e projeção: como ele(a) se vê nos próximos anos? Que tipo de vida deseja
+construir? Essa visão é apresentada a você, e ambos trabalham juntos para amadurecê-la, discutindo
+possibilidades e refinando ideias até consolidar uma direção clara e inspiradora, que será o norte de
+toda a mentoria.
+
+A partir dessa visão são definidas as metas principais: quais conquistas precisam ser alcançadas para
+que a visão de futuro se torne realidade. Para cada meta será elaborado um plano concreto, com
+ações práticas e viáveis que o(a) jovem já pode começar a realizar no presente. O objetivo é tornar
+objetivo e mensurável o caminho até cada meta, promovendo clareza, foco e autonomia.
+
+O desdobramento acontece por meio de uma pergunta repetida em camadas: “O que você acha que
+precisa fazer para atingir essa meta?”. A resposta gera as submetas; a mesma pergunta aplicada às
+submetas gera novas submetas, num processo contínuo de aprofundamento. O resultado final é um
+grande mapa de ações, que se inicia com tarefas realizáveis imediatamente e avança, de forma
+encadeada, até a visão de futuro.
+
+
+
+
+  Ao atingir o conjunto das metas traçadas, espera-se que o(a) mentorado(a) esteja mais próximo(a), ou
+  plenamente realizado(a), em relação à visão de futuro que construiu no início da jornada. O PDM, portanto,
+  não é apenas um plano: é um processo de autoconhecimento, planejamento e ação que fortalece o
+  protagonismo juvenil e amplia as chances de transformação real e duradoura.
+
+
+
+
+Como construir uma boa meta
+
+As metas correspondem ao que o(a) mentorado(a) precisa criar, aprender, melhorar ou eliminar para
+alcançar a sua visão de futuro. Cada meta deve ter um indicador de sucesso e um prazo, e deve ser
+verificada pelo modelo SMART.
+
+
+
+                                                          Guia do Mentor de Desenvolvimento Pessoal e Profissional   24
+                                                                                         Programa de Mentoria Social
+
+
+
+
+Perguntas para apoiar a construção das metas
+
+ • No seu modo de ver, o que você precisa fazer para alcançar a sua visão?
+
+ • O que você precisa criar, aprender, melhorar ou eliminar para alcançar essa visão?
+
+ • Que competências você já tem e são pontos fortes que podem ajudar?
+
+ • Que competências você precisa adquirir ou melhorar?
+
+ • Que outros recursos você já possui? Quais precisa obter?
+
+
+
+Se a dificuldade persistir, retome os pontos que ele(a) mesmo(a) mencionou nas conversas anteriores
+e que você anotou: “No decorrer da nossa conversa, você citou alguns pontos que precisava criar,
+aprender, melhorar ou eliminar, como estes… Entre eles, qual você considera mais importante fazer
+neste momento?”.
+
+No contexto organizacional, o(a) mentorado(a) também pode definir metas contando com a ajuda
+do(a) seu(sua) gestor(a) e com base nas avaliações feitas pela organização.
+
+
+
+
+  Importante: as frases de todas as metas devem ser iniciadas por um verbo que indique ação.
+
+
+
+
+Exemplo:
+
+
+
+
+                                                         Guia do Mentor de Desenvolvimento Pessoal e Profissional   25
+                                                                                    Programa de Mentoria Social
+
+
+
+
+Indicador de sucesso (IS)
+
+Toda meta deve ter um indicador de sucesso, que define como o seu cumprimento será medido:
+
+ • Que dados indicarão que você alcançou a meta? (meta mensurável)
+
+ • Que fatos indicarão que você alcançou a meta? (meta observável)
+
+ • Que comportamentos seus indicarão que alcançou a meta? (meta observável)
+
+
+
+
+Prazo para atingimento (P)
+
+Deve haver um prazo estimado para a meta ser alcançada:
+
+ • Em que dia você vai fazer isso? (uma data exata)
+
+ • Qual o prazo para você fazer isso? (uma data limite)
+
+ • Em que período ou época você vai fazer isso? (um intervalo de tempo)
+
+ • A partir de quando você vai fazer isso? (apenas uma data inicial)
+
+
+
+
+Logo, a meta em sua versão final é:
+
+
+
+
+                                                    Guia do Mentor de Desenvolvimento Pessoal e Profissional   26
+                                                                                    Programa de Mentoria Social
+
+
+
+
+Faça sempre uma checagem da meta utilizando o modelo SMART. Uma boa meta deve atender a todos
+os critérios:
+
+
+
+
+Roda da Vida
+
+
+A Roda da Vida deve ser aplicada no início do sexto mês de mentoria. A partir dessa aplicação,
+define-se pelo menos uma meta para cada uma das 16 áreas, utilizando o modelo SMART. Em seguida,
+mentor(a) e mentorado(a) selecionam as áreas mais significativas para o(a) jovem naquele momento
+da vida, especialmente aquelas em que ele(a) perceba a necessidade de maior dedicação, com o
+objetivo de aumentar a sua pontuação na roda.
+
+Com base nessa escolha, as metas definidas para as áreas prioritárias devem ser desdobradas em
+submetas, da mesma forma que foi feito no PDM. Esse processo serve como reflexão final sobre toda
+a trajetória da mentoria, fortalecendo a autonomia do(a) mentorado(a) para que continue, por conta
+própria, acompanhando, ajustando e cumprindo suas metas rumo à realização dos seus objetivos de
+vida.
+
+A atividade costuma ter duração de dois a três encontros, a depender do ritmo e das necessidades
+do(a) jovem.
+
+
+
+
+                                                    Guia do Mentor de Desenvolvimento Pessoal e Profissional   27
+                                                                                         Programa de Mentoria Social
+
+
+
+
+A nossa Roda da Vida:
+
+
+
+
+A Roda da Vida do Realiza está dividida em quatro quadrantes (pessoal, profissional, relacionamentos
+e qualidade de vida), e cada um deles se divide em quatro elementos, totalizando 16 áreas:
+
+
+
+
+ Quadrante                  Áreas
+
+
+ Pessoal                    Saúde e disposição · Intelecto e cultura · Equilíbrio emocional · Independência
+
+
+ Profissional               Carreira e trabalho · Finanças · Escola / universidade · Contribuição social
+
+
+ Relacionamentos            Família · Amigos · Relacionamento amoroso · Vida social
+
+
+
+
+                                                         Guia do Mentor de Desenvolvimento Pessoal e Profissional   28
+                                                                                            Programa de Mentoria Social
+
+
+
+
+ Quadrante                     Áreas
+
+
+ Qualidade de vida             Hobbies e diversão · Atividade física · Realização e felicidade · Espiritualidade
+
+
+
+
+O(a) jovem deve marcar, em uma escala de 1 a 10, o seu grau de satisfação com cada um desses
+elementos no momento presente. A ferramenta permite não apenas criar metas para o
+desenvolvimento de cada área, mas também oferece uma visão ampla de todos os aspectos da vida,
+possibilitando refletir sobre quais áreas estão recebendo mais energia e atenção e quais estão sendo
+deixadas de lado.
+
+
+
+
+  O olhar do(a) mentor(a) sobre a pontuação
+
+  Como você já construiu vínculo e conhece um pouco da realidade do(a) jovem, observe atentamente se a
+  pontuação atribuída corresponde ao que ele(a) realmente vive. É importante perceber quando há valorização
+  excessiva ou subestimação de determinada área. Nesses casos, sua função é ajudar a desenvolver uma
+  visão mais justa e equilibrada, tanto dos desafios quanto das conquistas.
+
+  Uma boa forma de iniciar essa reflexão é perguntar: “Que motivos você teria para agradecer o que tem em
+  cada um desses quadrantes?”. Conduza a conversa para que ele(a) perceba, de forma consciente, aquilo que
+  já possui e que pode e deve ser celebrado.
+
+
+
+
+Por fim, estimule seu(sua) mentorado(a) a participar de outros projetos sociais no seu entorno, nas
+mais diversas áreas: esporte, lazer, música, atividades culturais. Estar inserido(a) em um grupo social
+qualificado tem enorme potencial de desenvolvimento humano: amplia a rede de apoio, fortalece a
+autoestima, favorece o enfrentamento de medos, possibilita o contato com novas realidades e
+contribui significativamente para o crescimento pessoal e social do(a) jovem.
+
+
+
+
+                                                            Guia do Mentor de Desenvolvimento Pessoal e Profissional   29
+                                                                                        Programa de Mentoria Social
+
+
+
+
+  08 Matching: como formamos as duplas
+
+
+
+O matching é o processo mais importante para o sucesso do programa de mentoria. Ele é o coração
+da metodologia, pois é a partir da escolha cuidadosa entre mentor(a) e mentorado(a) que se constrói
+uma relação significativa, com potencial de transformação para os dois lados.
+
+A formação das duplas não é aleatória. Ela é conduzida pela coordenação do programa com base em
+critérios que vão além de habilidades técnicas ou experiências profissionais: afinidades pessoais,
+histórias de vida, trajetórias individuais, interesses em comum e perfis comportamentais. O objetivo é
+criar conexões genuínas, capazes de gerar confiança, empatia e aprendizado mútuo.
+
+Para isso, mentores e mentorados respondem a um formulário com perguntas pessoais que abordam
+trajetórias de vida, áreas de interesse, hobbies, formação acadêmica ou curso atual, entre outros
+temas relevantes. A equipe cruza as respostas e identifica pontos de afinidade, buscando quem
+compartilha mais elementos em comum. Essa análise é feita com sensibilidade e atenção, justamente
+para garantir que as duplas formadas tenham potencial de estabelecer uma conexão significativa e
+produtiva.
+
+
+
+
+  O formulário também abre espaço para que mentor(a) e mentorado(a) indiquem preferência em relação ao
+  gênero da pessoa com quem desejam se relacionar na mentoria. Há quem se sinta mais confortável sendo
+  acompanhado(a) por alguém do mesmo gênero. Essa escuta é respeitada sempre que possível, levando em
+  consideração o bem-estar e a segurança emocional de todos os envolvidos.
+
+
+
+
+Ao garantir que cada pessoa esteja com o par mais adequado possível, o matching se torna elemento
+essencial para que os encontros sejam verdadeiramente potentes e impactantes, promovendo
+crescimento, troca e mobilidade social.
+
+
+
+
+                                                        Guia do Mentor de Desenvolvimento Pessoal e Profissional   30
+                                                                                             Programa de Mentoria Social
+
+
+
+
+  09 Cronograma e carga horária
+
+
+
+Carga horária
+
+
+O Programa do Mentor de Desenvolvimento Pessoal e Profissional tem duração total de seis meses,
+contemplando as horas dedicadas à formação do(a) mentor(a) e as horas de dedicação ao programa.
+A formação é composta por dois encontros: o encontro inicial e o encontro final.
+
+
+
+
+ Categoria                                            Mentoria de Desenvolvimento Pessoal e Profissional
+
+
+ Duração                                              6 meses
+
+
+ Horas de formação de mentores                        3 horas
+
+
+ Etapa · Encontro inicial                             1,5 hora
+
+
+ Etapa · Encontro final                               1,5 hora
+
+
+ Nº de encontros de mentoria                          16 encontros
+
+
+ Horas de aplicação                                   16 horas
+
+
+ Total de dedicação                                   19 horas
+
+
+
+
+Cada encontro de mentoria com o(a) jovem tem duração de 1 hora. Os dois encontros de formação
+com a coordenação têm duração de 1h30 cada.
+
+
+
+
+  A formação obrigatória se resume a esses dois encontros. Quem quiser se aprofundar conta ainda com a
+  trilha EaD gratuita e opcional do Instituto, com certificação. Acesse ead.realiza.vc.
+
+
+
+
+Passo a passo da metodologia
+
+
+A jornada da Mentoria de Desenvolvimento Pessoal e Profissional tem duração total de seis meses,
+contemplando dezesseis encontros individuais entre mentor(a) e mentorado(a). Essa estrutura foi
+desenvolvida de forma estratégica, com o objetivo de conduzir o(a) jovem por um processo gradual
+de desenvolvimento, que parte da criação de vínculo e do autoconhecimento, passa pela construção
+
+
+
+                                                             Guia do Mentor de Desenvolvimento Pessoal e Profissional   31
+                                                                                              Programa de Mentoria Social
+
+
+
+
+e execução de um plano de metas pessoais e profissionais e culmina na consolidação da autonomia
+e do protagonismo juvenil.
+
+Cada mês possui um objetivo central, um conjunto de atividades orientadas e o uso de instrumentos
+específicos da metodologia do Instituto Realiza.vc. Esses instrumentos não apenas estruturam o
+processo de mentoria, mas também fortalecem o caráter reflexivo, relacional e transformador da
+experiência.
+
+
+
+
+ Mês           Objetivo central      Atividades principais                    Instrumentos                 Nº enc.
+
+
+                                     Histórias de vida e acordos; leitura
+               Criar vínculo e       inicial da Roda da Vida; abertura
+                                                                              Perguntas Eficazes,
+ 1º            construir o PDM       do PDM; devolutiva da avaliação                                       4
+                                                                              Escuta Ativa e PDM
+               completo              por terceiros; visão, metas SMART,
+                                     submetas e compromisso.
+
+
+                                     Acompanhamento das primeiras
+               Colocar o plano       submetas; superação de                   PDM e Feedback
+ 2º                                                                                                        3
+               em prática            obstáculos; ajustes de prazos,           Construtivo
+                                     indicadores e desdobramentos.
+
+
+                                     Monitoramento das submetas;
+               Consolidar a          revisão de meio de percurso;
+ 3º                                                                           PDM e Escuta Ativa           2
+               autonomia             transferência gradual da condução
+                                     para o(a) jovem.
+
+
+                                     Compartilhamento de trajetória
+               Aprofundar o
+                                     do(a) mentor(a); ampliação da rede       Papel de modelo e
+ 4º            vínculo e o                                                                                 2
+                                     de apoio e do acesso a novos             Escuta Ativa
+               aprendizado
+                                     espaços.
+
+
+                                     Leitura das 16 áreas quadrante
+               Aplicar a Roda da     por quadrante; metas SMART para          Roda da Vida e
+ 5º                                                                                                        3
+               Vida                  as áreas prioritárias;                   Modelo SMART
+                                     desdobramento em submetas.
+
+
+                                     Revisão do percurso; reflexão
+               Encerrar e refletir   sobre conquistas e aprendizados;         Roda da Vida e
+ 6º                                                                                                        2
+               sobre a jornada       Avaliação 360º; encerramento             Avaliação 360º
+                                     simbólico.
+
+
+
+
+                                                              Guia do Mentor de Desenvolvimento Pessoal e Profissional   32
+                                                  Programa de Mentoria Social
+
+
+
+
+OS 16 ENCONTROS
+
+
+
+Vamos começar!
+
+
+
+
+                  Guia do Mentor de Desenvolvimento Pessoal e Profissional   33
+                                                                                          Programa de Mentoria Social
+
+
+
+
+  10 Os 16 encontros
+
+
+
+A seguir apresentamos a sugestão detalhada de condução dos dezesseis encontros, distribuídos ao
+longo de seis meses. Essa proposta está alinhada à metodologia do Instituto Realiza.vc e faz uso dos
+instrumentos previstos (Perguntas Eficazes, Feedback Construtivo, PDM e Roda da Vida), respeitando
+a sequência lógica de vínculo, planejamento, execução, reflexão e encerramento.
+
+
+
+
+Estrutura básica de todos os encontros
+
+
+Em cada encontro serão trabalhados atividades e temas diferentes, mas a estrutura é sempre a
+mesma:
+
+
+
+
+ Momento                       O que fazer
+
+
+                               Pergunte como ele(a) está e como foram os dias desde a última conversa.
+                               Verifique a conexão e se ele(a) tem o material necessário.
+ Check-in
+                               Retome a atividade combinada no encontro anterior.
+                               Explique o que vocês farão hoje.
+
+
+ Ferramenta                    Trabalhe com o(a) jovem o instrumento correspondente ao encontro.
+
+
+                               Combine o que ele(a) deve preparar e quais ações pode realizar até o
+ Encaminhamentos
+                               próximo encontro.
+
+
+                               Pergunte o que ele(a) achou do encontro e quais são as suas sugestões.
+ Checkout                      Pergunte por que valeu a pena a conversa.
+                               Deixe a próxima data e horário agendados.
+
+
+
+
+  Esses encontros estarão sob a sua responsabilidade. É fundamental ter sensibilidade e flexibilidade para
+  conduzi-los com foco e paciência, respeitando o momento e o ritmo do(a) jovem. Como os encontros
+  acontecem com intervalo de tempo, vale enviar uma mensagem no meio do caminho verificando como ele(a)
+  está e confirmando a próxima sessão.
+
+
+
+
+1º mês · Criar vínculo e construir o PDM
+
+
+
+
+                                                          Guia do Mentor de Desenvolvimento Pessoal e Profissional   34
+                                                                                          Programa de Mentoria Social
+
+
+
+
+Preparação
+
+Antes do primeiro encontro: preencha o Checklist de competências do mentor e envie ao(à) jovem a
+mensagem de preparação, pedindo o resumo da história de vida, a Roda da Vida preenchida e os contatos
+das pessoas que farão a avaliação inicial. Em seguida, envie a mensagem a essas pessoas. Todos os modelos
+estão no capítulo 14.
+
+
+
+
+1º ENCONTRO
+
+Boas-vindas, histórias de vida e abertura
+
+O primeiro encontro cria o ambiente de confiança que sustenta toda a jornada. Apresentem-se, compartilhem
+histórias de vida e construam juntos os acordos de convivência: respeito, confidencialidade e compromisso.
+Conte a sua trajetória com honestidade, inclusive os tropeços, porque é isso que autoriza o(a) jovem a
+fazer o mesmo.
+
+Converse sobre a Roda da Vida que ele(a) preencheu, perguntando quais áreas considera mais importantes
+de melhorar neste momento. Não é a aplicação formal do instrumento, que acontece no 5º mês: é uma
+primeira leitura para você conhecer o contexto dele(a).
+
+Em seguida, conduza a etapa de abertura do PDM com três blocos de perguntas: interesses (quais atividades
+dão mais satisfação e que valor têm para ele/a), eventos significativos (uma experiência marcante e o
+aprendizado que ficou) e autoavaliação (como se percebe e o que imagina que familiares, amigos e colegas
+diriam a seu respeito).
+
+Tarefa para o próximo encontro: realizar sozinho(a) o instrumento Construindo a sua Visão e trazer a
+Declaração de Visão pronta.
+
+Templates de apoio: Checklist de competências do mentor · Mensagem de preparação · Instrumento
+Construindo a sua Visão.
+
+
+
+
+                                                          Guia do Mentor de Desenvolvimento Pessoal e Profissional   35
+                                                                                          Programa de Mentoria Social
+
+
+
+
+2º ENCONTRO
+
+Avaliação por terceiros e visão de futuro
+
+Comece apresentando os resultados consolidados da avaliação feita pelas pessoas indicadas, sempre
+preservando o anonimato de quem respondeu. Peça que ele(a) compare essas percepções com a
+autoavaliação do encontro anterior e converse sobre as convergências e as surpresas.
+
+Depois, peça que comente como foi a experiência de construir a visão e apresente a Declaração de Visão.
+Ajude a refinar o texto até que fique claro, inspirador e com prazo definido. Essa declaração é o norte de
+toda a mentoria.
+
+Na sequência, oriente a criação de metas com perguntas de foco: que competências ele(a) já tem e podem
+ajudar, quais precisa adquirir ou melhorar, que recursos já possui e quais precisa obter, e o que precisa
+criar, aprender, melhorar ou eliminar para alcançar a visão.
+
+Tarefa para o próximo encontro: definir sozinho(a) as suas metas, começando cada frase por um verbo de
+ação.
+
+Templates de apoio: Consolidação da avaliação por terceiros · Plano de Desenvolvimento do Mentorado
+(PDM).
+
+
+
+
+3º ENCONTRO
+
+Metas e checagem SMART
+
+O(a) jovem apresenta as metas que criou. Se tiver dificuldade de formular, ajude retomando os pontos que
+ele(a) mesmo(a) mencionou nas conversas anteriores: “No decorrer das nossas conversas você citou alguns
+pontos que precisava criar, aprender, melhorar ou eliminar, como estes… Entre eles, qual considera mais
+importante agora?”.
+
+Verifiquem juntos a qualidade de cada meta pelo modelo SMART e acrescentem o indicador de sucesso e o
+prazo. Registrem no PDM a Declaração de Visão e cada meta com o seu indicador e prazo.
+
+Ao final, ensine como desdobrar metas em submetas: para cada meta, a pergunta “o que eu preciso fazer
+para conseguir isso?” gera as submetas de primeiro nível, e a mesma pergunta aplicada a cada submeta
+gera os níveis seguintes, até chegar a algo que possa ser feito de imediato ou em curto prazo.
+
+Tarefa para o próximo encontro: desdobrar as metas em submetas, com indicador de sucesso e prazo
+para cada uma.
+
+Templates de apoio: Plano de Desenvolvimento do Mentorado (PDM).
+
+
+
+
+                                                          Guia do Mentor de Desenvolvimento Pessoal e Profissional   36
+                                                                                            Programa de Mentoria Social
+
+
+
+
+  4º ENCONTRO
+
+  Submetas e compromisso
+
+  Verifiquem se o plano está construído de forma lógica: se as submetas realmente levam às metas e se os
+  prazos são realistas. Ajuste o que for necessário.
+
+  Com o plano fechado, passem à etapa de compromisso: por qual submeta ele(a) vai começar e quando vocês
+  vão avaliar os primeiros resultados. Se houver dificuldade em colocar o plano em prática, ajude a identificar
+  o obstáculo com perguntas como “o que impede você de colocar essa submeta em prática?”, “até que ponto
+  o desdobramento foi suficiente?” e “até que ponto essas são as metas de que você realmente precisa?”.
+
+  Este encontro fecha a construção do PDM. A partir daqui, os encontros passam a girar em torno da execução
+  do plano.
+
+  Tarefa para o próximo encontro: iniciar a execução das primeiras submetas combinadas.
+
+  Templates de apoio: Plano de Desenvolvimento do Mentorado (PDM) · Mensagem de encaminhamento entre
+  encontros.
+
+
+
+
+2º mês · Colocar o plano em prática
+
+
+
+
+  5º ENCONTRO
+
+  Primeiros resultados
+
+  Com o PDM em execução, este encontro marca o início do acompanhamento formal das ações planejadas.
+  Conduza a sessão com base na escuta ativa, incentivando o(a) jovem a compartilhar avanços, dificuldades
+  e aprendizados.
+
+  Por meio de Perguntas Eficazes e Feedbacks Construtivos, ajude-o(a) a identificar o que está funcionando
+  bem e o que precisa ser ajustado. O objetivo é promover a reflexão e o senso de responsabilidade sobre o
+  próprio progresso.
+
+  Templates de apoio: Mensagem de encaminhamento entre encontros.
+
+
+
+
+                                                            Guia do Mentor de Desenvolvimento Pessoal e Profissional   37
+                                                                                         Programa de Mentoria Social
+
+
+
+
+  6º ENCONTRO
+
+  Superando barreiras
+
+  Apoie o(a) jovem na superação de obstáculos encontrados durante a execução do plano. Esta etapa
+  demanda sensibilidade e empatia, pois é comum que surjam inseguranças, autocríticas ou desânimo.
+
+  Exerça sua função de escuta e aconselhamento, oferecendo suporte emocional e reforçando a confiança
+  dele(a) nas próprias capacidades. Quando um obstáculo se repete, vale rever se a submeta está grande
+  demais ou se falta um passo intermediário.
+
+
+
+
+  7º ENCONTRO
+
+  Ajustes no plano
+
+  Revisem juntos o andamento das submetas e ajustem o que for preciso: prazos, indicadores ou o próprio
+  desdobramento. Um PDM que não muda ao longo de seis meses provavelmente não está sendo usado.
+
+  Atue como facilitador(a), oferecendo feedback construtivo sobre a clareza, a coerência e a viabilidade do
+  que foi planejado, e estimulando o pensamento crítico e a autonomia.
+
+
+
+
+3º mês · Consolidar a autonomia
+
+
+
+
+  8º ENCONTRO
+
+  Monitoramento e responsabilidade
+
+  Retome o mapa de metas e submetas e converse sobre o que foi concluído desde o último encontro. Valorize
+  o que avançou e trate o que não avançou sem julgamento: o foco é entender o que atrapalhou.
+
+  Estimule o(a) jovem a assumir progressivamente a condução do processo: que ele(a) traga a pauta, aponte
+  o que quer discutir e proponha os próximos passos.
+
+
+
+
+  9º ENCONTRO
+
+  Revisão de meio de percurso
+
+  Metade da jornada é um bom momento para olhar para trás. Analisem as metas atingidas, as submetas em
+  andamento e os aprendizados gerados até aqui, comparando com a visão de futuro construída no início.
+
+  Valorize as conquistas e, quando necessário, apoie o(a) jovem na reformulação de estratégias para que o
+  plano continue realista e motivador.
+
+
+
+
+                                                         Guia do Mentor de Desenvolvimento Pessoal e Profissional   38
+                                                                                          Programa de Mentoria Social
+
+
+
+
+4º mês · Aprofundar o vínculo e o aprendizado
+
+
+
+
+  10º ENCONTRO
+
+  O mentor como espelho
+
+  Encontro de caráter mais relacional e simbólico. Compartilhe experiências de vida, aprendizados e momentos
+  de superação que possam inspirar o(a) jovem. Trata-se de um espaço para o exercício do papel modelar
+  do(a) mentor(a), aquele que ensina pelo exemplo, pela coerência e pela transparência.
+
+  Essa troca contribui para fortalecer o vínculo, demonstrando que o desenvolvimento humano é contínuo e
+  que tanto mentor(a) quanto mentorado(a) aprendem mutuamente durante o processo.
+
+
+
+
+  11º ENCONTRO
+
+  Rede de apoio e novos espaços
+
+  Converse sobre a rede de apoio do(a) jovem: quem são as pessoas com quem ele(a) pode contar e que
+  portas ainda não foram exploradas. Sempre que possível, faça pontes: apresente pessoas, indique eventos,
+  comunidades e oportunidades da sua área.
+
+  Estimule também a participação em projetos sociais do entorno, nas áreas de esporte, lazer, música e
+  cultura. Estar em um grupo social qualificado amplia repertório, fortalece a autoestima e cria novas
+  possibilidades.
+
+
+
+
+5º mês · Roda da Vida
+
+
+
+
+  A Roda da Vida ocupa três momentos: a explicação do instrumento ao final do encontro anterior, com a
+  tarefa de preenchimento em casa, e dois encontros de discussão. O roteiro completo de aplicação está no
+  capítulo 14.
+
+
+
+
+                                                          Guia do Mentor de Desenvolvimento Pessoal e Profissional   39
+                                                                                            Programa de Mentoria Social
+
+
+
+
+  12º ENCONTRO
+
+  Aplicação e leitura da Roda da Vida
+
+  Discutam os motivos que levaram a cada nota, quadrante por quadrante, ajudando o(a) jovem a perceber
+  quando uma área está subestimada ou superestimada. Ao final, pergunte se ele(a) está satisfeito(a) com o
+  retrato atual e o que gostaria de mudar.
+
+  Uma boa forma de conduzir essa reflexão é perguntar: “que motivos você teria para agradecer o que tem
+  em cada um desses quadrantes?”. Reconhecer o que já existe é parte do exercício.
+
+  Tarefa para o próximo encontro: criar pelo menos uma meta SMART para cada uma das 16 áreas da Roda
+  da Vida.
+
+  Templates de apoio: Roda da Vida: roteiro de aplicação.
+
+
+
+
+  13º ENCONTRO
+
+  Metas das áreas prioritárias
+
+  Revisem as metas que ele(a) elaborou para cada subárea, checando prazos e indicadores de sucesso. Em
+  seguida, elejam juntos um subconjunto de metas a detalhar, contemplando tanto as prioridades do(a) jovem
+  quanto as áreas de menor pontuação.
+
+  Essas novas metas ampliam o olhar sobre si mesmo(a) e reforçam o entendimento de que o desenvolvimento
+  profissional está diretamente ligado ao equilíbrio pessoal.
+
+  Tarefa para o próximo encontro: desdobrar as metas escolhidas em submetas, no mesmo modelo do PDM.
+
+
+
+
+  14º ENCONTRO
+
+  Desdobramento e plano de continuidade
+
+  Valide o mapa de metas e submetas que ele(a) elaborou, ajustando prazos e indicadores. Organizem tudo
+  em um plano de continuidade, que poderá ser seguido depois do fim da mentoria.
+
+  É um momento de síntese: revisitem os aprendizados do PDM e conectem todo o processo de
+  autoconhecimento, planejamento e execução vivenciado até aqui.
+
+
+
+
+6º mês · Encerrar e celebrar
+
+
+
+
+                                                            Guia do Mentor de Desenvolvimento Pessoal e Profissional   40
+                                                                                        Programa de Mentoria Social
+
+
+
+
+15º ENCONTRO
+
+Reflexão e reconhecimento
+
+No penúltimo encontro, mentor(a) e mentorado(a) refletem sobre toda a jornada percorrida. O(a) jovem é
+incentivado(a) a reconhecer suas conquistas, aprendizagens e mudanças pessoais. Você, por sua vez,
+oferece um feedback final sobre a evolução percebida, reforçando o senso de valor e de protagonismo
+dele(a).
+
+Este é também o momento para a troca de feedback mútuo, em que ambos reconhecem o impacto da relação
+construída ao longo dos meses.
+
+
+
+
+16º ENCONTRO
+
+Encerramento e celebração
+
+O último encontro é dedicado à celebração do percurso e ao encerramento formal da mentoria. Revisitem o
+PDM e a Roda da Vida, destacando os avanços alcançados e as perspectivas para o futuro. Conversem
+sobre as necessidades futuras do(a) jovem e sobre a continuidade ou o encerramento do processo.
+
+Reforce a importância da continuidade do autodesenvolvimento, incentivando o(a) jovem a manter hábitos
+de reflexão e planejamento mesmo após o término do programa. Também é realizado o preenchimento da
+Avaliação 360º, o único formulário de avaliação do programa, que consolida o fechamento do ciclo. O
+encontro se encerra em clima de reconhecimento e gratidão mútua, simbolizando não apenas o fim de um
+processo, mas o início de uma nova etapa de autonomia e amadurecimento.
+
+Templates de apoio: Autoavaliação do mentor · Avaliação 360º.
+
+
+
+
+Uma sugestão para o fechamento
+
+Agradeça ao(à) jovem por confiar em você como mentor(a). Verbalize as qualidades que você percebeu
+nele(a). Se já tiver dito antes, diga de novo. Expresse o quanto você acredita nele(a). Depois, respire e
+pergunte: “E você? Pelo que você é grato(a) nesta jornada?”.
+
+
+
+
+                                                        Guia do Mentor de Desenvolvimento Pessoal e Profissional   41
+                                                         Programa de Mentoria Social
+
+
+
+
+APOIO À SUA PRÁTICA
+
+
+
+Dicas e ferramentas de comunicação
+
+
+
+
+                         Guia do Mentor de Desenvolvimento Pessoal e Profissional   42
+                                                                                          Programa de Mentoria Social
+
+
+
+
+  11 Ferramentas de comunicação
+
+
+
+Boa parte do resultado de uma mentoria não está no conteúdo transmitido, mas na qualidade da
+conversa. As ferramentas a seguir apoiam você a criar um ambiente seguro, escutar de verdade e
+conduzir diálogos que geram reflexão.
+
+
+
+
+Escuta ativa
+
+
+Escuta ativa é a escuta profunda e empática: aquela em que a sua atenção está inteiramente
+disponível para a outra pessoa. Ela é a base de todas as demais funções do(a) mentor(a).
+
+ • Elimine distrações: silencie notificações, feche abas e dedique-se integralmente ao encontro.
+
+ • Ouça atentamente e busque identificar significados implícitos no que é dito e também no que
+    não é dito.
+
+ • Controle o impulso de julgar, antecipar conclusões ou completar as frases do(a) jovem.
+
+ • Evite interromper. Silêncios são parte da conversa e costumam preceder as respostas mais
+    importantes.
+
+ • Valide o seu entendimento: “Deixa eu ver se entendi: você me disse que… é isso mesmo?”.
+
+ • Registre o que for relevante para retomar nos próximos encontros.
+
+
+
+
+  Clareza e foco: muitas vezes o(a) jovem não tem consciência de certos comportamentos ou sentimentos. Ao
+  perguntar, você o(a) ajuda a construir essa clareza. Ajude-o(a) a identificar o que pode ter influenciado
+  determinados desfechos e quais pontos precisam ser revistos. Se a conversa se dispersar, sinalize com
+  gentileza e retome o tema central.
+
+
+
+
+Comunicação Não Violenta (CNV)
+
+
+A Comunicação Não Violenta foi desenvolvida pelo psicólogo norte-americano Marshall Rosenberg.
+Sua premissa é que todas as ações têm origem em necessidades humanas e que é possível falar o
+que é importante sem culpar, envergonhar, coagir ou ameaçar o outro. O objetivo é uma comunicação
+eficaz baseada na empatia.
+
+
+
+
+                                                          Guia do Mentor de Desenvolvimento Pessoal e Profissional   43
+                                                                                           Programa de Mentoria Social
+
+
+
+
+ Pilar                   O que fazer                                Exemplo
+
+
+                         Descrever o fato sem julgamento            “Percebi que nos últimos dois encontros não
+ 1. Observação
+                         nem interpretação.                         conseguimos falar sobre as suas metas.”
+
+
+                         Nomear o que você sente diante do
+ 2. Sentimento                                                      “Fico preocupado(a) com isso.”
+                         fato observado.
+
+
+                         Explicitar a necessidade por trás do       “Porque eu queria garantir que o nosso
+ 3. Necessidade
+                         sentimento.                                tempo juntos seja útil para você.”
+
+
+                         Fazer um pedido claro, concreto e          “Podemos reservar os primeiros 15 minutos
+ 4. Pedido
+                         negociável.                                do próximo encontro para isso?”
+
+
+
+
+A técnica básica é se conectar emocionalmente para identificar a necessidade do outro e escutá-lo
+sem julgamentos, evitando propor uma resolução rápida do problema. Ser empático não é ser simpático
+nem vitimizar o(a) jovem: é reconhecer a dificuldade dele(a) acreditando que ele(a) mesmo(a) tem, ou
+pode construir, a solução.
+
+
+
+
+Perguntas quebra-gelo
+
+
+Iniciar uma conversa nem sempre é fácil, especialmente entre pessoas que acabaram de se conhecer.
+Estas perguntas ajudam a aquecer a troca e a deixar o ambiente mais leve. Use uma ou duas, sem
+transformar o encontro em entrevista.
+
+
+
+
+  Para começar                                             Para aprofundar
+
+  Qual é o melhor conselho que você já recebeu?            Quando você era mais jovem, quais atividades te
+
+  Qual é o emprego dos seus sonhos?                        deixavam muito feliz?
+
+  Você pratica algum esporte ou tem algum hobby?           Quem é a pessoa que mais te inspira? Por quê?
+
+  Se pudesse aprender uma habilidade nova hoje,            O que as pessoas mais elogiam em você?
+
+  qual seria?                                              Se o dinheiro não fosse um problema, o que você
+
+  Qual foi a última coisa que te deixou                    faria?
+
+  orgulhoso(a)?                                            O que você gostaria de estar fazendo daqui a
+                                                           cinco anos?
+
+
+
+
+                                                           Guia do Mentor de Desenvolvimento Pessoal e Profissional   44
+                                                                                       Programa de Mentoria Social
+
+
+
+
+Check-in e checkout
+
+
+O check-in e o checkout são os dois momentos que abrem e fecham todos os encontros. Eles ajudam
+a construir vínculo, manter o alinhamento e consolidar aprendizados.
+
+
+
+
+ Momento                     O que fazer
+
+
+                             Pergunte como o(a) jovem está e como foram os dias desde a última
+                             conversa.
+ Check-in                    Verifique se a conexão de internet está boa e se ele(a) tem o material
+ (primeiros minutos)         necessário.
+                             Retome a atividade combinada no encontro anterior.
+                             Apresente os objetivos e a dinâmica do encontro de hoje.
+
+
+                             Trabalhe a ferramenta ou o tema previsto para o encontro, com escuta ativa
+ Desenvolvimento
+                             e perguntas eficazes.
+
+
+                             Combine com o(a) jovem o que ele(a) vai preparar, ler ou realizar até o
+ Encaminhamentos
+                             próximo encontro.
+
+
+                             Pergunte o que ele(a) achou do encontro, o que mais agregou e o que
+                             poderia ser diferente.
+ Checkout
+                             Compartilhe também a sua avaliação e o seu feedback.
+ (últimos 5 minutos)
+                             Deixe a próxima data e horário agendados.
+                             Encerre sempre em tom motivador.
+
+
+
+
+Dicas importantes
+
+
+ • Valide o entendimento com perguntas simples: “Deixa eu ver se eu entendi: você me disse… é
+    isso mesmo?”.
+
+ • Sem expor a sua vida, você pode apresentar uma situação da sua trajetória e pedir a opinião
+    do(a) jovem. Muitas vezes não temos a solução para os nossos problemas, mas conseguimos ver
+    a saída para o problema do outro. É importante que ele(a) perceba que você também tem
+    dúvidas e desafios.
+
+ • As pontes começam a ser criadas nas vulnerabilidades. Ao compartilhar seus próprios desafios,
+    você permite que o(a) jovem construa identificação com você.
+
+ • Prepare-se para os encontros: releia o guia, busque referências e estruture a jornada. As
+    pessoas eventualmente nos surpreendem, então flexibilidade é parte do preparo.
+
+ • Cumpra o combinado. Se precisar remarcar, avise com antecedência, peça desculpas e
+    reagende. Previsibilidade é uma forma de cuidado.
+
+
+
+                                                       Guia do Mentor de Desenvolvimento Pessoal e Profissional   45
+                                                                                        Programa de Mentoria Social
+
+
+
+
+• Mantenha a confidencialidade de tudo o que for tratado nas sessões.
+
+• Se identificar situações que extrapolam o seu papel, como questões de saúde mental, violência
+  ou violação de direitos, acione imediatamente o Supervisor de Relacionamento ou a
+  coordenação. Você não precisa (e não deve) lidar com isso sozinho(a).
+
+
+
+
+Privacidade e proteção de dados
+
+Cuidado com os dados do(a) jovem: registre apenas o que for necessário para o acompanhamento da
+mentoria, não compartilhe informações pessoais com terceiros e não divulgue histórias, imagens ou dados
+sensíveis sem autorização expressa. O respeito à privacidade faz parte do nosso compromisso ético e legal.
+
+
+
+
+                                                        Guia do Mentor de Desenvolvimento Pessoal e Profissional   46
+                                                                                       Programa de Mentoria Social
+
+
+
+
+  12 Avaliação e suporte ao mentor
+
+
+
+Avaliação 360º
+
+
+O acompanhamento da mentoria acontece de forma contínua na plataforma: ao final de cada encontro,
+mentor(a) e mentorado(a) preenchem a avaliação da sessão. Por isso, o programa tem um único
+formulário de avaliação formal, aplicado no encerramento do ciclo: a Avaliação 360º.
+
+A Avaliação 360º olha para a jornada inteira: a qualidade do vínculo construído, a evolução percebida
+no(a) jovem, os resultados do PDM e da Roda da Vida, e a experiência do(a) mentor(a) com o programa.
+É ela que consolida o fechamento e alimenta o aprimoramento contínuo da Mentoria Social.
+
+
+
+
+ Momento                      O que é avaliado                                       Onde
+
+
+                              Avaliação rápida da sessão, preenchida por
+ Ao final de cada encontro                                                           Plataforma de mentoria
+                              mentor(a) e mentorado(a).
+
+
+                              Avaliação 360º: vínculo, evolução do(a) jovem,
+ No encerramento do ciclo                                                            Formulário enviado pela
+                              resultados do PDM e da Roda da Vida e
+ (16º encontro)                                                                      coordenação
+                              experiência do(a) mentor(a).
+
+
+
+
+Supervisor de Relacionamento
+
+
+O Supervisor de Relacionamento é um mentor experiente, com vivência em trabalhos com jovens,
+disponível para apoiar duplas que enfrentem dificuldades. Ele pode ser acionado tanto pelo(a)
+mentor(a) quanto pelo(a) jovem, a qualquer momento.
+
+As sessões com o Supervisor de Relacionamento podem ocorrer de forma conjunta ou individual:
+mentor com supervisor, mentorado com supervisor, ou os três juntos.
+
+
+
+
+Grupos de troca
+
+
+O programa oferece grupos de discussão periódicos entre mentores, nos quais é possível compartilhar
+questões, dilemas e aprendizados, buscando coletivamente melhorias na condução das mentorias.
+Existe também um grupo específico para os jovens, com encontros periódicos voltados a escutar suas
+percepções sobre o processo, principais dificuldades e pontos de melhoria.
+
+
+                                                       Guia do Mentor de Desenvolvimento Pessoal e Profissional   47
+                                                                                           Programa de Mentoria Social
+
+
+
+
+Quer se aprofundar?
+
+
+Se ao longo da mentoria você sentir necessidade de aprofundar algum tema, como escuta, feedback
+ou construção de metas, a trilha EaD gratuita do Instituto está sempre disponível e pode ser feita a
+qualquer momento:
+
+
+
+
+  FORMAÇÃO EaD OPCIONAL E GRATUITA
+
+  Garanta uma certificação gratuita e vá além!
+
+
+  Além dos dois encontros de formação, o Instituto Realiza.vc oferece uma trilha EaD extra, gratuita e
+  opcional na plataforma ead.realiza.vc. Cadastre-se como voluntário(a) e faça o curso de Mentor de
+  Desenvolvimento Pessoal e Profissional no seu ritmo, com certificado ao final.
+
+  Já tem certificação pela Erlich Mentoring? Nesse caso, basta realizar o curso complementar, que cobre
+  apenas as especificidades do programa do Instituto Realiza.vc.
+
+  Acesse ead.realiza.vc · a participação é voluntária e não substitui os encontros de formação.
+
+
+
+
+  Fale com a coordenação
+
+  A coordenação do programa está disponível para qualquer dúvida. Escreva para mentoria@realiza.vc.
+
+
+
+
+                                                           Guia do Mentor de Desenvolvimento Pessoal e Profissional   48
+                                                                                     Programa de Mentoria Social
+
+
+
+
+  13 Conteúdo complementar
+
+
+
+Os conteúdos a seguir não fazem parte obrigatória da metodologia, mas costumam ser úteis nas
+conversas sobre trabalho, estudo e vida financeira. Use-os conforme a demanda do(a) seu(sua)
+mentorado(a).
+
+
+
+
+Currículo e vídeo currículo
+
+
+O currículo é a primeira apresentação do(a) jovem ao mercado. Já o vídeo currículo é uma forma
+dinâmica de mostrar habilidades e competências em desenvolvimento, e vem sendo usado por
+recrutadores como apoio na análise de perfil. Algumas orientações que você pode compartilhar:
+
+ • Pesquisar sobre a empresa antes de gravar ou de enviar o currículo, adequando a linguagem ao
+    contexto.
+
+ • Ser objetivo(a): entre 1 e 2 minutos no vídeo; no currículo, no máximo duas páginas.
+
+ • Destacar formação, cursos livres, trabalhos voluntários e experiências práticas, inclusive as
+    informais.
+
+ • Cuidar do ambiente de gravação: luz de frente, fundo neutro e áudio limpo.
+
+ • Praticar antes. Falar para a câmera não é uma habilidade natural para a maioria das pessoas.
+
+
+
+
+Processos seletivos e entrevistas virtuais
+
+
+A entrevista virtual tem o mesmo peso da presencial. Vale conversar com o(a) jovem sobre:
+
+ • Testar internet, câmera e microfone com antecedência e escolher um local silencioso.
+
+ • Preparar uma apresentação de dois minutos sobre a própria trajetória: formação, por que
+    escolheu a área, experiências (incluindo voluntariado e cursos) e o que despertou o interesse
+    pela vaga.
+
+ • Levar perguntas para o(a) recrutador(a): demonstra interesse e ajuda a avaliar a oportunidade.
+
+ • Combinar o que fazer se a conexão cair: pedir desculpas com naturalidade e retomar.
+
+ • Após a entrevista, agradecer por mensagem e registrar aprendizados para os próximos
+    processos.
+
+
+
+
+                                                     Guia do Mentor de Desenvolvimento Pessoal e Profissional   49
+                                                                                           Programa de Mentoria Social
+
+
+
+
+Plataformas gratuitas de busca de vagas
+
+
+
+
+ Plataforma                      Para que serve
+
+
+                                 Rede profissional, vagas e perfil online. Boa para construir rede de
+ LinkedIn (linkedin.com)
+                                 contatos e acompanhar empresas de interesse.
+
+
+ Vagas.com.br                    Portal gratuito de vagas com sistema de candidatura e testes de perfil.
+
+
+                                 Agregador de vagas de diversas fontes, com filtros por região e faixa
+ Indeed (br.indeed.com)
+                                 salarial.
+
+
+                                 Serviço público de intermediação de mão de obra, com vagas e acesso a
+ Portal Emprega Brasil / SINE
+                                 qualificação profissional.
+
+
+ Programas de Jovem Aprendiz     Portais de instituições formadoras e de empresas parceiras, com vagas
+ e estágio                       específicas para primeira experiência.
+
+
+
+
+Educação financeira
+
+
+Falar sobre dinheiro é sempre delicado, especialmente com jovens que vivem no limite dos recursos.
+Ainda assim, é um tema essencial: aprender a organizar o próprio dinheiro amplia autonomia e reduz
+vulnerabilidade. Comece pelo diagnóstico (quanto entra, quanto sai e para onde vai), antes de falar
+de investimentos.
+
+ • Registrar todos os gastos por 30 dias, mesmo os pequenos, para tornar visível o padrão de
+    consumo.
+
+ • Separar gastos fixos, variáveis e dívidas; negociar dívidas antes de qualquer outro
+    planejamento.
+
+ • Definir uma reserva inicial pequena e possível. O hábito importa mais que o valor.
+
+ • Desconfiar de promessas de ganho rápido e de crédito fácil com juros altos.
+
+
+
+Referências acessíveis para indicar: os conteúdos de educação financeira do Banco Central (programa
+Cidadania Financeira), o canal Nath Finanças, voltado a quem ganha até um salário mínimo, e as trilhas
+gratuitas de educação financeira do Sebrae para quem pensa em empreender.
+
+
+
+
+                                                          Guia do Mentor de Desenvolvimento Pessoal e Profissional   50
+                                                                                         Programa de Mentoria Social
+
+
+
+
+Sugestão de registros do(a) mentor(a)
+
+
+Manter registros simples e consistentes facilita o acompanhamento, a supervisão e a construção do
+relatório final. Sugerimos anotar, após cada encontro:
+
+
+
+
+ Campo                         O que registrar
+
+
+ Data e duração                Quando o encontro aconteceu e quanto tempo durou.
+
+
+ Tema e ferramenta             O que foi trabalhado e qual instrumento da metodologia foi utilizado.
+
+
+                               O que o(a) jovem trouxe de mais significativo, nas palavras dele(a), quando
+ Principais reflexões
+                               possível.
+
+
+ Encaminhamentos               O que ficou combinado para o próximo encontro, com prazos.
+
+
+ Observações do(a) mentor(a)   Percepções sobre avanços, dificuldades e pontos de atenção a acompanhar.
+
+
+
+
+                                                         Guia do Mentor de Desenvolvimento Pessoal e Profissional   51
+                                                           Programa de Mentoria Social
+
+
+
+
+MATERIAL DE APOIO
+
+
+
+Templates e instrumentos
+
+
+
+
+                           Guia do Mentor de Desenvolvimento Pessoal e Profissional   52
+                                                                                          Programa de Mentoria Social
+
+
+
+
+  14 Templates e instrumentos
+
+
+
+Este capítulo reúne os modelos citados ao longo do guia. Adapte a linguagem ao seu jeito de escrever
+e à realidade do(a) jovem. São pontos de partida, não formulários obrigatórios. As anotações de cada
+sessão não estão aqui porque são registradas diretamente na plataforma de mentoria.
+
+
+
+
+ Quando usar                       Template
+
+
+ Antes de começar                  Checklist de competências do mentor
+
+
+                                   Mensagem de preparação do(a) mentorado(a) · Mensagem às pessoas
+ Antes do 1º encontro
+                                   indicadas
+
+
+                                   Instrumento Construindo a sua Visão · Consolidação da avaliação por
+ Entre o 1º e o 2º encontro
+                                   terceiros
+
+
+ Do 2º ao 4º encontro              Plano de Desenvolvimento do Mentorado (PDM)
+
+
+ Entre todos os encontros          Mensagem de encaminhamento
+
+
+ 5º mês                            Roda da Vida: roteiro de aplicação
+
+
+ 16º encontro                      Autoavaliação do mentor
+
+
+
+
+1. Checklist de competências do mentor
+
+
+Preencha antes de iniciar o ciclo e novamente ao final, no 16º encontro. Marque como prioritário aquilo
+que você quer desenvolver e exercite esses pontos no dia a dia, com amigos, família e no trabalho,
+antes de aplicá-los na mentoria.
+
+
+
+
+                                                                                               Preciso
+ Competência                                                         Já faço bem
+                                                                                               desenvolver
+
+
+ Escutar sem interromper e sem antecipar conclusões
+
+
+ Fazer perguntas abertas em vez de dar respostas prontas
+
+
+ Sustentar o silêncio quando o outro está pensando
+
+
+ Dar feedback focado no comportamento, não na pessoa
+
+
+
+                                                          Guia do Mentor de Desenvolvimento Pessoal e Profissional   53
+                                                                                            Programa de Mentoria Social
+
+
+
+
+                                                                                                 Preciso
+ Competência                                                           Já faço bem
+                                                                                                 desenvolver
+
+
+ Reconhecer e nomear progressos concretos
+
+
+ Admitir quando não sei algo
+
+
+ Manter postura não julgadora diante de escolhas diferentes das
+ minhas
+
+
+ Cumprir combinados e avisar com antecedência quando preciso
+ remarcar
+
+
+ Separar o meu projeto de vida do projeto do(a) jovem
+
+
+ Perceber quando uma questão extrapola o meu papel e acionar
+ apoio
+
+
+
+
+2. Mensagem de preparação do(a) mentorado(a)
+
+
+Envie antes do primeiro encontro, assim que a dupla for formada.
+
+
+
+
+  Assunto: Vamos começar a nossa mentoria!
+
+  [Nome], seja muito bem-vindo(a) à mentoria!
+
+  Muito prazer, meu nome é [seu nome] e vou ser seu(sua) mentor(a) ao longo dos próximos seis meses. Estou
+  animado(a) com essa jornada e espero que a gente faça um bom trabalho junto.
+
+  Para o nosso primeiro encontro, preciso de três coisas:
+
+  1. Os nomes e contatos de pelo menos três amigos e três familiares (e três colegas de trabalho, se você
+  estiver trabalhando). Vou enviar a eles duas perguntas rápidas sobre você. Avise essas pessoas de que vou
+  entrar em contato.
+
+  2. Um resumo da sua história de vida, pessoal e profissional. Sugiro listar em ordem cronológica os fatos que
+  foram importantes para você, formando uma linha do tempo. Não precisa me enviar: guarde para
+  conversarmos no encontro.
+
+  3. A sua Roda da Vida preenchida, com uma reflexão sobre as áreas que você mais gostaria de melhorar.
+
+  Faça as tarefas em um lugar tranquilo, que permita refletir com calma. Tudo o que você compartilhar comigo
+  é confidencial e fica entre nós, como será em todo o processo.
+
+  Qualquer dúvida, é só me chamar. Até logo!
+
+
+
+
+                                                            Guia do Mentor de Desenvolvimento Pessoal e Profissional   54
+                                                                                           Programa de Mentoria Social
+
+
+
+
+3. Mensagem às pessoas indicadas
+
+
+Envie às pessoas que o(a) jovem indicou, com cópia oculta entre elas.
+
+
+
+
+  Assunto: Sua contribuição para a mentoria de [nome do(a) jovem]
+
+  Prezado(a) [nome],
+
+  Meu nome é [seu nome]. [Nome do(a) jovem] está participando do Programa de Mentoria Social do Instituto
+  Realiza.vc e eu sou o(a) mentor(a) que vai acompanhá-lo(a) nessa jornada.
+
+  Para ajudar nesse trabalho, peço a sua colaboração respondendo a duas perguntas rápidas. Basta responder
+  a este e-mail até [data].
+
+  O seu nome foi indicado pelo(a) próprio(a) [nome do(a) jovem]. Não há obrigação de responder, mas a sua
+  contribuição ajuda muito.
+
+  As respostas serão lidas apenas por mim. Ao comentá-las com [nome do(a) jovem], não indicarei quem disse
+  o quê e vou evitar expressões que possam identificar quem respondeu. Fique à vontade para responder com
+  sinceridade.
+
+  1. O que você considera pontos fortes de [nome], na vida pessoal e profissional? Por favor, explique.
+
+  2. Em quais aspectos ele(a) precisaria melhorar para obter mais resultados na vida e no trabalho? Por favor,
+  explique.
+
+
+
+
+4. Consolidação da avaliação por terceiros
+
+
+Organize as respostas recebidas antes do segundo encontro, agrupando o que se repete e retirando
+qualquer marca que identifique quem respondeu.
+
+
+
+
+ Pontos fortes apontados                                 Pontos de melhoria apontados
+
+
+
+
+                                                           Guia do Mentor de Desenvolvimento Pessoal e Profissional   55
+                                                                                           Programa de Mentoria Social
+
+
+
+
+5. Instrumento: Construindo a sua Visão
+
+
+Entregue ao(à) jovem ao final do primeiro encontro. A tarefa é individual e deve ser feita em um
+momento tranquilo, sem interrupções.
+
+
+
+
+  Antes de responder
+
+  Acomode-se com conforto e respire fundo algumas vezes, até se sentir tranquilo(a). Agora imagine um filme
+  em que você é o personagem principal, vivendo a situação ideal que sonha para a sua vida pessoal e
+  profissional. Você está sentindo o mais alto nível de realização que já experimentou, com orgulho e alegria
+  por ter chegado até ali. Visualize as cenas do dia a dia dessa vida.
+
+
+
+
+ • Descreva o que está acontecendo com você nessa situação ideal. Narre as cenas desse filme.
+
+ • Quais são os aspectos mais significativos dessa situação ideal?
+
+ • Nessa situação, o que você está conseguindo ser ou fazer e que tanto desejava?
+
+ • O que você deixou de fazer, ou o que não está mais acontecendo, e que tanto lhe
+    desagradava?
+
+ • O que você mais valoriza nessa situação ideal?
+
+ • Agora escreva a sua Declaração de Visão: uma frase que resuma o que você deseja ser,
+    alcançar ou conquistar. Comece por um verbo no futuro (“Serei”, “Alcançarei”, “Conquistarei”) e
+    inclua um prazo.
+
+
+
+
+6. Plano de Desenvolvimento do Mentorado (PDM)
+
+
+O PDM é o documento central da mentoria. Ele fica com a dupla, fora da plataforma. Estruture-o em
+duas partes: a visão com as metas e o mapa de desdobramento em submetas.
+
+
+
+
+Parte 1: visão e metas
+
+ Campo                                   Preencher
+
+
+ Declaração de Visão
+
+
+ Meta 1
+
+
+ Indicador de sucesso (IS)
+
+
+
+
+                                                           Guia do Mentor de Desenvolvimento Pessoal e Profissional   56
+                                                                                     Programa de Mentoria Social
+
+
+
+
+ Campo                                 Preencher
+
+
+ Prazo (P)
+
+
+ Meta 2
+
+
+ Indicador de sucesso (IS)
+
+
+ Prazo (P)
+
+
+ Meta 3
+
+
+ Indicador de sucesso (IS)
+
+
+ Prazo (P)
+
+
+
+
+Parte 2: mapa de submetas
+
+Para cada meta, pergunte “o que eu preciso fazer para conseguir isso?”. As respostas são as submetas
+de nível A. Repita a pergunta para cada submeta, criando os níveis B, C e seguintes, até chegar a
+algo realizável de imediato. Acrescente indicador de sucesso e prazo em todas.
+
+
+
+
+ Meta                        Submetas nível A      Submetas nível B                Submetas nível C
+
+
+
+
+7. Mensagem de encaminhamento entre encontros
+
+
+Uma mensagem curta depois de cada encontro mantém o vínculo vivo e deixa a tarefa clara.
+
+
+
+
+                                                     Guia do Mentor de Desenvolvimento Pessoal e Profissional   57
+                                                                                             Programa de Mentoria Social
+
+
+
+
+  Assunto: Sobre o nosso encontro
+
+  [Nome],
+
+  Gostei muito da nossa conversa de hoje. A sua abertura vai fazer diferença no nosso trabalho.
+
+  Sempre que a conversa gerar alguma reflexão, anote e traga no próximo encontro. Se for algo urgente, me
+  chame antes.
+
+  Próxima tarefa: [descrever]. Prazo: [data].
+
+  Nosso próximo encontro: [data e horário], já agendado na plataforma.
+
+  Abraço!
+
+
+
+
+8. Roda da Vida: roteiro de aplicação
+
+
+A aplicação acontece em três momentos, a partir do 5º mês:
+
+ 1. Ao final de um encontro, reserve de 10 a 15 minutos para explicar a ferramenta e como
+    preenchê-la. Peça que ele(a) preencha em casa com calma, nomeie como “Roda da Vida hoje”,
+    reflita sobre as áreas prioritárias e crie pelo menos uma meta SMART para cada uma das 16
+    áreas.
+
+ 2. No encontro seguinte, discutam quadrante por quadrante os motivos de cada nota, ajudando a
+    perceber notas subestimadas ou superestimadas. Revisem as metas criadas e elejam juntos as
+    áreas prioritárias a detalhar. Como tarefa, peça o desdobramento dessas metas em submetas.
+
+ 3. No encontro seguinte, valide o mapa de metas e submetas, ajustando prazos e indicadores de
+    sucesso.
+
+
+
+
+  Estimule o(a) jovem a procurar projetos sociais da sua região nas áreas de esporte, lazer e cultura. Participar
+  de um grupo social qualificado costuma melhorar várias áreas da roda ao mesmo tempo.
+
+
+
+
+9. Autoavaliação do mentor
+
+
+Ao encerrar o ciclo, refaça o Checklist de competências e reserve alguns minutos para responder:
+
+ • O que eu fiz nesta mentoria que funcionou bem e quero repetir?
+
+ • Em que momentos eu falei mais do que escutei?
+
+ • Que competência do checklist evoluiu ao longo do ciclo? Qual ainda preciso desenvolver?
+
+ • O que aprendi com este(a) jovem?
+
+ • O que eu faria diferente em um próximo ciclo?
+
+
+                                                             Guia do Mentor de Desenvolvimento Pessoal e Profissional   58
+                                                                                      Programa de Mentoria Social
+
+
+
+
+Registre também na Avaliação 360º a sua disponibilidade para o próximo ciclo e quantos jovens você pode
+acompanhar.
+
+
+
+
+                                                      Guia do Mentor de Desenvolvimento Pessoal e Profissional   59
+                                                                                         Programa de Mentoria Social
+
+
+
+
+  15 Considerações finais
+
+
+
+O Programa de Mentoria Social do Instituto Realiza.vc, em sua modalidade de Mentoria de
+Desenvolvimento Pessoal e Profissional, foi concebido para promover vínculos transformadores entre
+jovens e profissionais voluntários. Mais do que a transferência de conhecimentos técnicos, a proposta
+central é criar um espaço de escuta, acolhimento e orientação que possibilite ao(à) jovem desenvolver
+sua autonomia e ampliar suas perspectivas de vida e carreira.
+
+A metodologia valoriza a troca de experiências, a escuta ativa e o respeito à identidade do(a)
+mentorado(a), reconhecendo que a aprendizagem é um processo mútuo. Ao longo de seis meses e
+dezesseis encontros, o(a) mentor(a) exerce nove funções essenciais, organizadas nas dimensões de
+trabalho e carreira, apoio socioemocional e função modelar, e conduz o(a) jovem da construção da
+visão de futuro à consolidação de um plano de vida próprio.
+
+Para assegurar qualidade e consistência, o programa conta com mecanismos de supervisão e
+avaliação. Supervisores de Relacionamento estão disponíveis para apoiar tanto mentores quanto
+mentorados em situações de dificuldade, fortalecendo a rede de suporte. Os processos de avaliação
+periódica contribuem para o aprimoramento contínuo do programa e para a valorização da experiência
+de todos os envolvidos.
+
+Em síntese, a mentoria proposta pelo Instituto Realiza.vc busca inspirar e preparar jovens em situação
+de vulnerabilidade para novos caminhos, sem impor expectativas externas, mas estimulando-os a
+assumir o protagonismo de suas trajetórias. Trata-se de um trabalho colaborativo, que depende da
+dedicação de cada mentor(a) voluntário(a) e da abertura de cada jovem para transformar desafios
+em oportunidades.
+
+
+
+
+  Obrigado por dedicar o seu tempo, a sua escuta e a sua experiência a essa jornada. O que você constrói
+  com um(a) jovem em seis meses pode reverberar por muitos anos.
+
+
+
+
+                                                        Guia do Mentor de Desenvolvimento Pessoal e Profissional   60
+                                                                                         Programa de Mentoria Social
+
+
+
+
+FORMAÇÃO EaD OPCIONAL E GRATUITA
+
+Garanta uma certificação gratuita e vá além!
+
+
+Além dos dois encontros de formação, o Instituto Realiza.vc oferece uma trilha EaD extra, gratuita e
+opcional na plataforma ead.realiza.vc. Cadastre-se como voluntário(a) e faça o curso de Mentor de
+Desenvolvimento Pessoal e Profissional no seu ritmo, com certificado ao final.
+
+Já tem certificação pela Erlich Mentoring? Nesse caso, basta realizar o curso complementar, que cobre
+apenas as especificidades do programa do Instituto Realiza.vc.
+
+Acesse ead.realiza.vc · a participação é voluntária e não substitui os encontros de formação.
+
+
+
+
+                                                         Guia do Mentor de Desenvolvimento Pessoal e Profissional   61
+                                                                                 Programa de Mentoria Social
+
+
+
+
+Programa de Mentoria Social
+
+mentoria@realiza.vc
+
+realiza.vc
+
+ead.realiza.vc · formação EaD gratuita
+
+
+
+
+                                         APOIO
+
+
+
+
+                      Obrigado por caminhar com a nossa juventude.
+
+                                                 Guia do Mentor de Desenvolvimento Pessoal e Profissional   62
+

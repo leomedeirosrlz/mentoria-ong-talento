@@ -3,13 +3,28 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { ArrowUpRight, Buildings, EnvelopeSimple, HandHeart, LinkedinLogo, WhatsappLogo } from "@phosphor-icons/react/dist/ssr";
 import { getMe, getPessoaPerfil } from "@/lib/queries";
+import { getAnamneseMentorado } from "@/lib/forms/queries";
+import { getSupervisoesDaPessoa } from "@/lib/queries-supervisao";
+import { getResumoFormacao } from "@/lib/queries-presenca";
 import { avatarPublicUrl, gravatarUrl } from "@/lib/avatar";
-import { formatDate, linkSeguro, papelLabel, waLink } from "@/lib/ciclo";
+import {
+  disponibilidadeTexto,
+  ESCOLARIDADE_LABELS,
+  formatDate,
+  GENERO_LABELS,
+  idade,
+  linkSeguro,
+  papelLabel,
+  PREF_GENERO_LABELS,
+  waLink,
+} from "@/lib/ciclo";
+import { AnamneseMentoradoChip } from "@/components/anamnese-mentorado";
 import { Avatar } from "@/components/avatar";
 import { Badge } from "@/components/ui/badge";
 import { DuplaAvatares } from "@/components/dupla-avatares";
 import { DuplaNomes } from "@/components/dupla-nomes";
 import { PessoaMural, type MuralNota } from "@/components/pessoa-mural";
+import { SupervisoesSection } from "@/components/supervisoes-section";
 import { VoltarLink } from "@/components/voltar-link";
 
 export const metadata: Metadata = { title: "Perfil" };
@@ -17,8 +32,22 @@ export const metadata: Metadata = { title: "Perfil" };
 const STATUS_DUPLA: Record<string, string> = {
   ativa: "ativa",
   pausada: "pausada",
+  concluida: "concluída",
   encerrada: "encerrada",
 };
+
+/** Linha "rótulo: valor" da ficha — some quando o valor é vazio, exceto pra
+ *  coordenação (que precisa distinguir "não preenchido" de "sem permissão":
+ *  pros demais papéis os sensíveis nem chegam — vêm null do grant). */
+function Linha({ rotulo, valor, sempre }: { rotulo: string; valor: string | null | undefined; sempre?: boolean }) {
+  if (!valor && !sempre) return null;
+  return (
+    <div className="flex gap-2">
+      <dt className="w-32 shrink-0 text-muted-foreground">{rotulo}</dt>
+      <dd className="min-w-0 flex-1 whitespace-pre-wrap">{valor || "—"}</dd>
+    </div>
+  );
+}
 
 export default async function PessoaPerfilPage({
   params,
@@ -36,6 +65,17 @@ export default async function PessoaPerfilPage({
   if (perfil.tipo === "profile" && perfil.pessoa.id === me.id) redirect("/perfil");
   if (!ehStaff && perfil.tipo === "profile") notFound();
   // mentorado: o RLS já barrou quem não tem vínculo (query voltou null)
+
+  // sessões de supervisão (0041): conduzidas (ficha de supervisor) ou
+  // recebidas (ficha de mentor). A RLS escopa o que cada papel lê — mentorado
+  // e coordenação não têm sessões, a query nem roda pra eles
+  const papelPessoa = perfil.tipo === "profile" ? perfil.pessoa.role : null;
+  const supervisoes =
+    papelPessoa === "supervisor" ||
+    papelPessoa === "mentor_dpp" ||
+    papelPessoa === "mentor_especialista"
+      ? await getSupervisoesDaPessoa(id)
+      : [];
 
   const p = perfil.pessoa;
   const souCoord = me.role === "coordenacao";
@@ -62,6 +102,44 @@ export default async function PessoaPerfilPage({
       : null;
   const temPerfilPro = !!perfilPro && Boolean(
     perfilPro.bio || perfilPro.linkedin || perfilPro.areas.length || perfilPro.voluntariado
+  );
+
+  // ---------- ficha de cadastro/matching (0034) ----------
+  // Públicas (grant de coluna) preenchem pra quem alcança a página; os 4
+  // sensíveis só vêm preenchidos pra coordenação (view *_pessoal) — pros
+  // demais chegam null e a linha some. Pra coord a linha fica com "—" pra
+  // distinguir "não preenchido" de "sem permissão".
+  const local = [p.cidade, p.uf].filter(Boolean).join(" · ") || null;
+  const anos = idade(p.data_nascimento);
+  const nascimentoTxt = p.data_nascimento
+    ? `${formatDate(p.data_nascimento)}${anos != null ? ` (${anos} anos)` : ""}`
+    : null;
+  const interesses = p.interesses ?? [];
+  // refs já estreitadas por tipo — cargo/empresa só existem em profile,
+  // escolaridade/objetivos só em mentorado
+  const prof = perfil.tipo === "profile" ? perfil.pessoa : null;
+  const ment = perfil.tipo === "mentorado" ? perfil.pessoa : null;
+  const mp = perfil.tipo === "profile" ? perfil.mentorProfile : null;
+  // supervisor só lê presença de mentor que supervisiona (RLS via duplas,
+  // 0040) — fora desse escopo a linha mostraria um "0 de 2" falso; coordenação
+  // vê sempre. perfil.duplas já vem escopado pelo RLS, então basta o vínculo
+  const podeVerFormacao =
+    souCoord || perfil.duplas.some((d) => d.mentor?.id === p.id);
+  // presença nos encontros de formação do ciclo — derivado de presencas;
+  // complementa o checklist: formacao_ok segue valendo (pode ser exceção manual)
+  const resumoFormacao =
+    mp && podeVerFormacao ? await getResumoFormacao(p.id) : null;
+  const dispTxt = disponibilidadeTexto(mp?.disponibilidade);
+  const dispMentoradoTxt = disponibilidadeTexto(ment?.disponibilidade);
+  // anamnese oficial do mentorado (0042) — escopo coord; null quando a
+  // migração ainda não rodou, então a página segue igual antes dela
+  const anamnese =
+    ehMentorado && souCoord ? await getAnamneseMentorado(p.id) : null;
+  const temFicha = Boolean(
+    p.nome_social || local || interesses.length || p.origem ||
+    nascimentoTxt || p.genero || p.motivacao || p.pref_genero_par ||
+    (prof && (prof.cargo || prof.empresa || mp)) ||
+    (ment && (ment.escolaridade || ment.objetivos || dispMentoradoTxt))
   );
 
   // RLS devolve só as minhas notas — o feed não precisa de autor
@@ -151,6 +229,134 @@ export default async function PessoaPerfilPage({
         </section>
 
         <aside className="space-y-4">
+          {/* ficha de cadastro/matching (0034) — os sensíveis (nascimento,
+              gênero, motivação, pref. de par) só chegam preenchidos pra
+              coordenação via view; `sempre` deixa o "—" explícito pra ela */}
+          {(temFicha || souCoord) && (
+            <section className="rounded-xl bg-card p-4 text-sm shadow-[var(--shadow-border)]">
+              <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                Ficha
+              </h2>
+              {temFicha ? (
+                <dl className="mt-2 space-y-2">
+                  <Linha rotulo="Nome social" valor={p.nome_social} sempre={souCoord} />
+                  <Linha rotulo="Nascimento" valor={nascimentoTxt} sempre={souCoord} />
+                  {anos != null && anos < 18 && (
+                    <p className="rounded-lg bg-amber-50 px-2.5 py-1.5 text-xs text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+                      Menor de idade — a autorização do responsável precisa estar
+                      assinada (seção Assinaturas abaixo).
+                    </p>
+                  )}
+                  <Linha
+                    rotulo="Gênero"
+                    valor={p.genero ? GENERO_LABELS[p.genero] : null}
+                    sempre={souCoord}
+                  />
+                  <Linha rotulo="Cidade/UF" valor={local} sempre={souCoord} />
+                  {prof && (
+                    <>
+                      <Linha rotulo="Cargo" valor={prof.cargo} />
+                      <Linha rotulo="Empresa" valor={prof.empresa} />
+                    </>
+                  )}
+                  {ment && (
+                    <Linha
+                      rotulo="Escolaridade"
+                      valor={ment.escolaridade ? ESCOLARIDADE_LABELS[ment.escolaridade] : null}
+                      sempre={souCoord}
+                    />
+                  )}
+                  <Linha rotulo="Origem" valor={p.origem} sempre={souCoord} />
+                  {ment && (
+                    <Linha rotulo="Objetivos" valor={ment.objetivos} sempre={souCoord} />
+                  )}
+                  {ment && (
+                    <Linha rotulo="Disponível" valor={dispMentoradoTxt} sempre={souCoord} />
+                  )}
+                  <Linha rotulo="Motivação" valor={p.motivacao} sempre={souCoord} />
+                  <Linha
+                    rotulo="Pref. de par"
+                    valor={p.pref_genero_par ? PREF_GENERO_LABELS[p.pref_genero_par] : null}
+                    sempre={souCoord}
+                  />
+                  {/* consent_lgpd_em só existe em profiles — mentorado é
+                      coberto pela autorização do responsável (documento) */}
+                  {prof && (prof.consent_lgpd_em != null || souCoord) && (
+                    <Linha
+                      rotulo="LGPD"
+                      valor={
+                        prof.consent_lgpd_em
+                          ? `Consentimento em ${formatDate(prof.consent_lgpd_em)}`
+                          : "Sem consentimento registrado"
+                      }
+                    />
+                  )}
+                </dl>
+              ) : (
+                <p className="mt-2 text-muted-foreground">
+                  Nada preenchido ainda — edite o cadastro ou peça pra pessoa completar o perfil.
+                </p>
+              )}
+              {interesses.length > 0 && (
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  {interesses.map((i) => (
+                    <Badge key={i} variant="secondary" className="font-normal">
+                      {i}
+                    </Badge>
+                  ))}
+                </div>
+              )}
+
+              {/* Anamnese Social (0042) — o form oficial respondido pelo(a)
+                  jovem sem login; coord envia/reenvia o link daqui */}
+              {anamnese && (
+                <AnamneseMentoradoChip
+                  mentoradoId={p.id}
+                  nome={p.nome}
+                  whatsapp={p.whatsapp}
+                  anamnese={anamnese}
+                />
+              )}
+
+              {/* ficha de mentor — mentor_profiles é legível por autenticado;
+                  a página de profile em si já é restrita a staff */}
+              {mp && (
+                <div className="mt-4 border-t border-border pt-3">
+                  <h3 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                    Mentoria ({mp.tipo === "dpp" ? "DPP" : "especialista"})
+                  </h3>
+                  <dl className="mt-2 space-y-2">
+                    <Linha rotulo="Capacidade" valor={`${mp.capacidade} ${mp.capacidade === 1 ? "dupla" : "duplas"}`} sempre />
+                    <Linha rotulo="Disponível" valor={dispTxt} sempre={souCoord} />
+                    <Linha rotulo="Experiência" valor={mp.experiencia_previa} sempre={souCoord} />
+                    <Linha rotulo="Formação" valor={mp.formacao_externa} sempre={souCoord} />
+                    <Linha
+                      rotulo="Checklist"
+                      valor={[
+                        mp.termo_ok ? "termo assinado" : "termo pendente",
+                        mp.formacao_ok ? "formação concluída" : "formação pendente",
+                      ].join(" · ")}
+                      sempre
+                    />
+                    {/* presença na formação do ciclo (chamada da agenda) — sem
+                        encontro de formação no ciclo a linha nem renderiza;
+                        podeVerFormacao evita o "0 de M" fora do escopo do
+                        supervisor */}
+                    {resumoFormacao && resumoFormacao.total > 0 && (
+                      <Linha
+                        rotulo="Formação inicial"
+                        valor={`${resumoFormacao.presentes} de ${resumoFormacao.total} ${
+                          resumoFormacao.total === 1 ? "encontro" : "encontros"
+                        }`}
+                        sempre
+                      />
+                    )}
+                  </dl>
+                </div>
+              )}
+            </section>
+          )}
+
           {/* vitrine profissional (0030) — bio corrida, LinkedIn externo,
               áreas como chips e voluntariado numa linha discreta */}
           {perfilPro && temPerfilPro && (
@@ -241,6 +447,16 @@ export default async function PessoaPerfilPage({
               </ul>
             )}
           </section>
+
+          {/* supervisão (0041) — na ficha do supervisor, as sessões que ele
+              conduziu; na do mentor, as que recebeu. Vazia = seção some */}
+          {supervisoes.length > 0 && (
+            <SupervisoesSection
+              itens={supervisoes}
+              visao={papelPessoa === "supervisor" ? "supervisor" : "mentor"}
+              podeExcluir={souCoord}
+            />
+          )}
 
           {/* anamnese do mentorado — dado de cadastro, não do mural */}
           {ehMentorado && "notas" in p && p.notas && (

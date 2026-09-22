@@ -128,11 +128,13 @@ export function TrilhaJornada({
   const caption =
     statusDupla === "pausada"
       ? "Jornada pausada — ela retoma de onde a dupla parou."
-      : statusDupla === "encerrada"
-        ? "Dupla encerrada — a jornada guarda o que aconteceu."
-        : jornada.completa
-          ? `Jornada concluída — ${jornada.total} encontros realizados.`
-          : null;
+      : statusDupla === "concluida"
+        ? "Jornada concluída — a dupla fechou o ciclo."
+        : statusDupla === "encerrada"
+          ? "Dupla encerrada — a jornada guarda o que aconteceu."
+          : jornada.completa
+            ? `Jornada concluída — ${jornada.total} encontros realizados.`
+            : null;
 
   return (
     <section aria-label="Jornada da dupla">

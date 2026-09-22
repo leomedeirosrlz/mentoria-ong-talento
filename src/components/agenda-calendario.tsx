@@ -30,6 +30,7 @@ import {
   VideoCamera,
 } from "@phosphor-icons/react";
 import { DuplaNomes } from "@/components/dupla-nomes";
+import { ChamadaFormacao } from "@/components/chamada-formacao";
 import { NotaEncontro } from "@/components/nota-encontro";
 import { AgendarEncontroDialog } from "@/components/agendar-encontro-dialog";
 import { RegistrarRetroativoDialog } from "@/components/registrar-retroativo-dialog";
@@ -56,6 +57,7 @@ import {
   toDateStr,
   type PassoGuia,
 } from "@/lib/ciclo";
+import type { MentorChamada } from "@/lib/queries-presenca";
 import type {
   AppRole,
   CicloEvento,
@@ -92,6 +94,11 @@ const MESES_CURTOS = [
   "dez",
 ];
 const TZ = "America/Sao_Paulo";
+
+/** Prop estável pra evento de formação sem nenhuma presença marcada — um
+ *  `{}` inline novo a cada render dispararia o efeito de reconciliação dos
+ *  overrides otimistas da chamada. */
+const SEM_PRESENCAS: Record<string, boolean> = {};
 
 const fmtMesAno = new Intl.DateTimeFormat("pt-BR", {
   month: "long",
@@ -357,6 +364,8 @@ export function AgendaCalendario({
   diaInicial,
   duplas,
   role,
+  mentores = [],
+  presencas = {},
 }: {
   eventos: CicloEvento[];
   /** Passos da trilha especialista — resolve a "sugestão do guia" das duplas
@@ -371,9 +380,16 @@ export function AgendaCalendario({
   diaInicial: string | null;
   duplas: Dupla[];
   role: AppRole | null;
+  /** Mentores ativos do ciclo — a lista da chamada de formação. Só vem
+   *  preenchida pra coordenação (a page nem busca pros demais papéis). */
+  mentores?: MentorChamada[];
+  /** Presenças marcadas: ciclo_evento_id → profile_id → presente. Idem —
+   *  coordenação only; ausência de row = não marcado (não "ausente"). */
+  presencas?: Record<string, Record<string, boolean>>;
 }) {
   const ehMentor = role === "mentor_dpp" || role === "mentor_especialista";
   const ehCoordSup = role === "coordenacao" || role === "supervisor";
+  const ehCoord = role === "coordenacao";
   const router = useRouter();
 
   // mapa dia → eventos do dia; recesso (e qualquer evento com data_fim) cobre o intervalo todo
@@ -1178,6 +1194,16 @@ export function AgendaCalendario({
                           ))}
                         </ul>
                       </div>
+                    )}
+                    {/* chamada do encontro de formação — ritual de presença
+                        do guia; só a coordenação vê/marca (escopo: formacao,
+                        não marco) */}
+                    {ehCoord && e.tipo === "formacao" && (
+                      <ChamadaFormacao
+                        eventoId={e.id}
+                        mentores={mentores}
+                        presentes={presencas[e.id] ?? SEM_PRESENCAS}
+                      />
                     )}
                     {/* cobertura do encontro oficial entre as duplas — só coord/supervisor */}
                     {ehCoordSup &&

@@ -1,5 +1,11 @@
-import { DEMO_MSG, DEMO_ROLE_COOKIE, papelDemoValido } from "./shared";
+import { DEMO_MSG, demoRoleClient } from "./shared";
 import { getDemoData } from "./data";
+import {
+  demoAssinaturaCompletaPorToken,
+  demoAssinaturaPorToken,
+  demoFormularioPorToken,
+} from "./queries";
+import { getDemoFormularios } from "./forms-data";
 import { normaliza } from "../utils";
 import type { AppRole } from "../types";
 
@@ -18,18 +24,6 @@ type ErroDemo = { message: string; code: string };
 type Resultado = { data: unknown; error: ErroDemo | null; count: number | null };
 
 const ERRO_DEMO: ErroDemo = { message: DEMO_MSG, code: "DEMO" };
-
-/** Papel do cookie — sem cookie válido este stub nem é alcançado
- *  (client.ts só desvia pra cá quando papelDemoValido confirma). */
-function papelDoCookie(): AppRole | null {
-  if (typeof document === "undefined") return null;
-  const raw = document.cookie
-    .split("; ")
-    .find((c) => c.startsWith(`${DEMO_ROLE_COOKIE}=`));
-  return papelDemoValido(
-    decodeURIComponent(raw?.slice(raw.indexOf("=") + 1) ?? "")
-  );
-}
 
 function campo(l: Linha, col: string): unknown {
   return col
@@ -104,6 +98,24 @@ function linhas(tabela: string, papel: AppRole | null): Linha[] {
         whatsapp: p.whatsapp,
         documento_path: p.documento_path ?? null,
       }));
+    case "profiles_pessoal":
+      // view coord-only dos sensíveis (0034) — no real só a coordenação
+      // recebe linhas; aqui o dataset serve direto (mesma linha do contato)
+      return d.profiles.map((p) => ({
+        id: p.id,
+        data_nascimento: p.data_nascimento ?? null,
+        genero: p.genero ?? null,
+        pref_genero_par: p.pref_genero_par ?? null,
+        motivacao: p.motivacao ?? null,
+      }));
+    case "mentorados_pessoal":
+      return d.mentorados.map((m) => ({
+        id: m.id,
+        data_nascimento: m.data_nascimento ?? null,
+        genero: m.genero ?? null,
+        pref_genero_par: m.pref_genero_par ?? null,
+        motivacao: m.motivacao ?? null,
+      }));
     case "mentorados":
       return d.mentorados as unknown as Linha[];
     case "mentor_profiles":
@@ -170,6 +182,34 @@ function linhas(tabela: string, papel: AppRole | null): Linha[] {
         mentorado_nome:
           d.mentorados.find((m) => m.id === s.mentorado_id)?.nome ?? null,
       }));
+    case "documento_templates":
+      return d.documentoTemplates as unknown as Linha[];
+    case "assinaturas":
+      // o embed `template` já vem montado nas linhas; quando um select pede
+      // `template:documento_templates(...)` e a linha não o tem, o fallback
+      // por `template_id` (alias_id) resolve contra a tabela acima
+      return d.assinaturas as unknown as Linha[];
+    case "presencas":
+      return d.presencas as unknown as Linha[];
+    case "supervisoes":
+      // supervisor/mentor/dupla já vêm embutidos nas linhas da fixture —
+      // o resolveEmbed devolve `jaTem` ou resolve pela coluna _id
+      return d.supervisoes as unknown as Linha[];
+    case "formularios":
+      return getDemoFormularios().formularios as unknown as Linha[];
+    case "formulario_links":
+      // `resposta` não resolve por FK nem por <origem>_id — a resposta
+      // aponta pro link (link_id). Já sai embutida, como o embed do select
+      // real devolveria (to-one por unique(link_id)).
+      return getDemoFormularios().links.map((l) => ({
+        ...(l as unknown as Linha),
+        resposta:
+          (getDemoFormularios().respostas.find(
+            (r) => r.link_id === l.id
+          ) as unknown as Linha | undefined) ?? null,
+      }));
+    case "formulario_respostas":
+      return getDemoFormularios().respostas as unknown as Linha[];
     default:
       return [];
   }
@@ -564,16 +604,49 @@ function canalDemo() {
   return canal;
 }
 
+/** RPCs do stub: só as leituras públicas por token resolvem de verdade
+ *  (as páginas /assinar/<token> e /f/<token> as usam sem sessão — mesmo
+ *  contrato das funções security definer do 0033/0042). Toda RPC de escrita
+ *  — assinar_termo, assinar_com_token, revogar_assinatura,
+ *  regenerar_token_assinatura, submeter_resposta_formulario e as demais
+ *  (aceitar_solicitacao...) — cai no default: a demo não grava. */
+async function rpcDemo(
+  fn: string,
+  params?: Record<string, unknown>
+): Promise<Resultado> {
+  const token = String(params?.p_token ?? "");
+  switch (fn) {
+    // jsonb ou null — null quando o token não existe
+    case "assinatura_por_token":
+      return { data: demoAssinaturaPorToken(token), error: null, count: null };
+    // setof assinaturas — a row só aparece depois de assinada; pendente/
+    // revogada/expirada devolve array vazio, como a função real
+    case "assinatura_completa_por_token": {
+      const row = demoAssinaturaCompletaPorToken(token);
+      return { data: row ? [row] : [], error: null, count: null };
+    }
+    // jsonb ou null — a definição pública do form + status do link (0042)
+    case "formulario_por_token":
+      return { data: demoFormularioPorToken(token), error: null, count: null };
+    // escrita explícita: a RPC real gravaria resposta + carimbo do
+    // checklist + notificação — na demo é só a mensagem, nada persiste
+    case "submeter_resposta_formulario":
+      return { data: null, error: ERRO_DEMO, count: null };
+    default:
+      return { data: null, error: ERRO_DEMO, count: null };
+  }
+}
+
 /** createClient() do browser quando demo_role está ativo — o cast pra
  *  SupabaseClient acontece no caller (supabase/client.ts). */
 export function createDemoClient() {
-  const papel = papelDoCookie();
+  const papel = demoRoleClient();
   const client = {
     from: (tabela: string) =>
       new ConsultaDemo(linhas(tabela, papel), tabela, papel),
     storage: { from: bucketDemo },
     auth: authDemo(papel),
-    rpc: async () => ({ data: null, error: ERRO_DEMO }),
+    rpc: rpcDemo,
     channel: canalDemo,
     removeChannel: async () => "ok" as const,
     getChannels: () => [] as unknown[],

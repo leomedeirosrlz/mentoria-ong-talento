@@ -14,8 +14,9 @@ import {
   type DuplaSaude,
   type Semaforo,
 } from "@/lib/ciclo";
-import type { CicloEvento, Comunicado, Dupla, SolicitacaoEspecialista } from "@/lib/types";
+import type { CicloEvento, Comunicado, Dupla, SolicitacaoEspecialista, Supervisao } from "@/lib/types";
 import type { Interacao } from "@/lib/interacoes";
+import type { SupervisaoAlvo } from "@/lib/queries-supervisao";
 import { AvaliacaoBadge, SemaforoDot } from "@/components/semaforo";
 import { DuplaAvatares } from "@/components/dupla-avatares";
 import { SetupChecklist } from "@/components/setup-checklist";
@@ -24,6 +25,8 @@ import { CopiarResumoButton } from "@/components/copiar-resumo-button";
 import { DuplaNomes } from "@/components/dupla-nomes";
 import { AvisosSection } from "@/components/avisos-section";
 import { SolicitacoesCoordCard } from "@/components/solicitacoes-coord-card";
+import { SupervisaoDialog } from "@/components/supervisao-dialog";
+import { SupervisoesSection } from "@/components/supervisoes-section";
 import { TrajetoriaAvaliacoes } from "@/components/trajetoria-avaliacoes";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -64,6 +67,8 @@ export function DashboardCoordenacao({
   avisos = [],
   solicitacoes = [],
   filtro,
+  supervisaoItens = [],
+  supervisaoAlvos = [],
 }: {
   duplas: Dupla[];
   eventos: CicloEvento[];
@@ -83,6 +88,10 @@ export function DashboardCoordenacao({
   solicitacoes?: SolicitacaoEspecialista[];
   /** valor cru de ?filtro= — validado contra FILTROS; desconhecido = visão cheia. */
   filtro?: string;
+  /** sessões de supervisão recentes + mentores elegíveis — só a home do
+   *  supervisor passa (o ritual supervisor ↔ mentor do guia, 0041). */
+  supervisaoItens?: Supervisao[];
+  supervisaoAlvos?: SupervisaoAlvo[];
 }) {
   const hoje = new Date(agora);
   const evento = eventoDaSemana(eventos, hoje);
@@ -249,6 +258,22 @@ export function DashboardCoordenacao({
       {/* mural de demandas entre mentores — a coordenação observa e gerencia;
           o fluxo em si é DPP → especialista, sem coordenação no caminho */}
       {!supervisor && <SolicitacoesCoordCard solicitacoes={solicitacoes} />}
+
+      {/* ritual supervisor ↔ mentor do guia (0041): registrar a conversa e
+          reler as últimas. Sem dupla supervisionada nem sessão no histórico,
+          o cartão some — a lista de duplas vazia já carrega a explicação */}
+      {supervisor && (supervisaoItens.length > 0 || supervisaoAlvos.length > 0) && (
+        <SupervisoesSection
+          itens={supervisaoItens}
+          visao="supervisor"
+          descricao="As conversas de supervisão com seus mentores — o ritual de acompanhamento do guia."
+          acao={
+            supervisaoAlvos.length > 0 ? (
+              <SupervisaoDialog alvos={supervisaoAlvos} />
+            ) : undefined
+          }
+        />
+      )}
 
       <section className="space-y-3">
         {filtroAtivo && saude.length > 0 && visiveis.length > 0 && (

@@ -7,7 +7,17 @@ import { toast } from "sonner";
 import { deleteMentorado, updateMentorado } from "@/lib/actions";
 import { avatarPublicUrl } from "@/lib/avatar";
 import { FotoField } from "@/components/foto-field";
-import type { Mentorado } from "@/lib/types";
+import {
+  CampoDisponibilidade,
+  CampoEscolaridade,
+  CampoGenero,
+  CampoInteresses,
+  CampoNascimento,
+  CampoPrefGenero,
+  CampoUf,
+  SecaoFicha,
+} from "@/components/campos-pessoais";
+import type { Disponibilidade, Mentorado } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
@@ -18,6 +28,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
 import { DocumentoPessoa } from "@/components/documento-pessoa";
+import { AssinaturasPessoa } from "@/components/assinaturas-pessoa";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -25,9 +36,11 @@ import { Textarea } from "@/components/ui/textarea";
 export function MentoradoActions({ mentorado, temDupla }: { mentorado: Mentorado; temDupla: boolean }) {
   const [editOpen, setEditOpen] = useState(false);
   const [delOpen, setDelOpen] = useState(false);
+  const [interesses, setInteresses] = useState<string[]>(mentorado.interesses ?? []);
+  const [disponibilidade, setDisponibilidade] = useState<Disponibilidade | null>(mentorado.disponibilidade ?? null);
   const [pending, start] = useTransition();
   const router = useRouter();
-  const primeiroNome = mentorado.nome.split(" ")[0];
+  const primeiroNome = (mentorado.nome_social || mentorado.nome).split(" ")[0];
 
   function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -77,15 +90,35 @@ export function MentoradoActions({ mentorado, temDupla }: { mentorado: Mentorado
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <Dialog open={editOpen} onOpenChange={setEditOpen}>
-        <DialogContent className="sm:max-w-md">
+      <Dialog
+        open={editOpen}
+        onOpenChange={(o) => {
+          setEditOpen(o);
+          if (o) {
+            setInteresses(mentorado.interesses ?? []);
+            setDisponibilidade(mentorado.disponibilidade ?? null);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Editar {primeiroNome}</DialogTitle>
           </DialogHeader>
           <form onSubmit={submit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="em_nome">Nome</Label>
-              <Input id="em_nome" name="nome" required defaultValue={mentorado.nome} />
+            <SecaoFicha>Identificação e contato</SecaoFicha>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="em_nome">Nome civil</Label>
+                <Input id="em_nome" name="nome" required defaultValue={mentorado.nome} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="em_social">Nome social</Label>
+                <Input
+                  id="em_social" name="nome_social" maxLength={150}
+                  defaultValue={mentorado.nome_social ?? ""}
+                  placeholder="Nome de uso, se diferente"
+                />
+              </div>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
@@ -97,14 +130,63 @@ export function MentoradoActions({ mentorado, temDupla }: { mentorado: Mentorado
                 />
               </div>
               <div className="space-y-2">
+                <Label htmlFor="em_email">E-mail</Label>
+                <Input id="em_email" name="email" type="email" defaultValue={mentorado.email ?? ""} />
+              </div>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <CampoNascimento id="em_nasc" defaultValue={mentorado.data_nascimento ?? ""} />
+              <CampoGenero defaultValue={mentorado.genero ?? ""} />
+            </div>
+
+            <SecaoFicha>Onde vive e origem</SecaoFicha>
+            <div className="grid gap-4 sm:grid-cols-3">
+              <div className="space-y-2 sm:col-span-2">
+                <Label htmlFor="em_cidade">Cidade</Label>
+                <Input id="em_cidade" name="cidade" maxLength={100} defaultValue={mentorado.cidade ?? ""} />
+              </div>
+              <CampoUf defaultValue={mentorado.uf ?? ""} />
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
                 <Label htmlFor="em_ong">ONG de origem</Label>
                 <Input id="em_ong" name="ong_origem" defaultValue={mentorado.ong_origem ?? ""} />
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="em_origem">Como chegou ao programa</Label>
+                <Input
+                  id="em_origem" name="origem" maxLength={300}
+                  defaultValue={mentorado.origem ?? ""}
+                  placeholder="Escola, ONG, indicação…"
+                />
+              </div>
+            </div>
+            <CampoEscolaridade defaultValue={mentorado.escolaridade ?? ""} />
+
+            <SecaoFicha>Interesses e objetivos</SecaoFicha>
+            <CampoInteresses value={interesses} onChange={setInteresses} />
+            <div className="space-y-2">
+              <Label htmlFor="em_objetivos">Objetivos com a mentoria</Label>
+              <Textarea
+                id="em_objetivos" name="objetivos" rows={2} maxLength={2000}
+                defaultValue={mentorado.objetivos ?? ""}
+                placeholder="O que o jovem quer alcançar no programa"
+              />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="em_email">E-mail</Label>
-              <Input id="em_email" name="email" type="email" defaultValue={mentorado.email ?? ""} />
+              <Label htmlFor="em_motivacao">Motivação</Label>
+              <Textarea
+                id="em_motivacao" name="motivacao" rows={2} maxLength={2000}
+                defaultValue={mentorado.motivacao ?? ""}
+                placeholder="O que motiva a participação"
+              />
             </div>
+            <CampoPrefGenero defaultValue={mentorado.pref_genero_par ?? ""} />
+
+            <SecaoFicha>Disponibilidade semanal</SecaoFicha>
+            <CampoDisponibilidade value={disponibilidade} onChange={setDisponibilidade} />
+
+            <SecaoFicha>Anamnese e arquivos</SecaoFicha>
             <div className="space-y-2">
               <Label htmlFor="em_notas">Notas / referência da anamnese</Label>
               <Textarea id="em_notas" name="notas" rows={2} defaultValue={mentorado.notas ?? ""} />
@@ -118,9 +200,17 @@ export function MentoradoActions({ mentorado, temDupla }: { mentorado: Mentorado
               id={mentorado.id}
               documentoPath={mentorado.documento_path}
             />
+            <AssinaturasPessoa
+              tipo="mentorado"
+              id={mentorado.id}
+              nome={mentorado.nome}
+            />
             <Button type="submit" className="w-full" disabled={pending}>
               {pending ? "Salvando…" : "Salvar"}
             </Button>
+            <p className="text-xs text-muted-foreground">
+              Nascimento, gênero, motivação e preferência de par ficam visíveis só pra coordenação.
+            </p>
           </form>
         </DialogContent>
       </Dialog>

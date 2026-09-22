@@ -84,7 +84,9 @@ export function RegistroCard({
                     (
                     {dupla.status === "pausada"
                       ? "dupla pausada"
-                      : "dupla encerrada"}
+                      : dupla.status === "concluida"
+                        ? "dupla concluída"
+                        : "dupla encerrada"}
                     )
                   </span>
                 )}

@@ -132,29 +132,29 @@ Planos em `.devin/plan-mural-perfil.md` + `.devin/plan-agenda-zero-friccao.md`. 
 
 - [x] ~~**Encaminhamento editável/apagável**~~ — menu ⋯ por item (Editar em dialog / Excluir com confirm). Só o mentor edita/apaga; coord mantém o toggle feito/pendente (correção operacional, não reescrita do acordo).
 - [x] ~~**"Meu perfil"**~~ — `/perfil` com foto (upload → Gravatar do e-mail → iniciais), nome/WhatsApp self-edit e troca de senha. `0014`: `profiles.avatar_path` + bucket público `avatares` (pasta `<profile_id>/`). Avatar aparece no shell (sidebar/topbar) e no header da dupla. ✅ sprint perfis: avatar nas rows de /pessoas, `mentorados.avatar_path` + foto opcional no cadastro/edição.
-- [ ] **`duplas.ciclo` com default fixo**: seletor de ciclo ou default por config (vida útil até 2027.1).
+- [x] ~~**`duplas.ciclo` com default fixo**~~ — seletor nos dois dialogs (`cicloVigente`/`ciclosOpcoes` em ciclo.ts, default = vigente).
 - [x] ~~**Desativar mentor com dupla ativa**~~ — o confirm nomeia o impacto ("tem N dupla(s) ativa(s) — vão ficar sem mentor") com label "Desativar" no botão.
 - [ ] **"Sem papel" em pessoa com dupla**: dupla continua listando ela como mentor — aviso. (Mitigado: `setPessoaRole` trava papel de quem tem dupla ativa/pausada; resta o caso do papel já removido antes do guard.)
-- [ ] **Statuses mortos**: `remarcado`/`cancelado`/`atrasado` — implementar ou remover do enum. `duracao_min` nunca coletado (sempre 60).
+- [ ] **Statuses mortos**: `remarcado`/`cancelado`/`atrasado` — implementar ou remover do enum. `duracao_min` ✅ persistido (whitelist no `salvarRegistro` + prefill na edição).
 - [x] ~~**`materiais.ordem`**~~ — persistida no `editarMaterial` (edição de metadados implementada no MaterialActions).
 - [x] ~~**Ordenação case-insensitive**~~ — `localeCompare pt-BR` em pessoas e nos selects de parear.
-- [ ] **Trigger no banco**: bloquear transição `realizado`→outro status (defesa além da action — TOCTOU residual).
+- [x] ~~**Trigger no banco**~~ — `0043`: `encontros_status_guard` barra saída de `realizado` (TOCTOU fechado).
 - [x] ~~**Supervisor em `/duplas`**~~ — usa `getMinhasDuplas()` (RLS no banco, não filtro JS).
-- [ ] **`queries.ts`**: `as unknown as Dupla[]` → `supabase gen types`.
+- [~] **`queries.ts`**: `as unknown as Dupla[]` → `supabase gen types`. `src/lib/database.types.ts` gerado do remoto (2256 linhas, schema vivo); adoção gradual nos casts — os tipos locais são hand-narrowed com embeds.
 - [ ] **Kit UI residual**: `material-actions.tsx` (1 uso) → inline. (Resto removido; `skeleton.tsx` agora usado pelo `loading.tsx`.)
-- [ ] **`sonner` `richColors`** usa paleta default, não tokens da marca.
-- [ ] **`importar-csv-dialog`**: `file.text()` sem catch + input file não reseta.
-- [ ] **`NovaDuplaDialog`/`EditarDuplaDialog`**: fetch sem estado de erro/loading; dados podiam vir por props.
+- [x] ~~**`sonner` `richColors`**~~ — verificado: `sonner.tsx` já mapeia `--success/--error/--warning` pros tokens `--ok`/`--warn`/`--danger`. Nada a fazer.
+- [x] ~~**`importar-csv-dialog`**~~ — input reseta (`value=""`), leitura `arrayBuffer()` com fallback UTF-8→Win-1252 + catch pt-BR.
+- [x] ~~**`NovaDuplaDialog`/`EditarDuplaDialog`**~~ — skeleton no 1º load, erro honesto com retry, refetch falho → toast sem bloquear.
 - [ ] **Padronizar import de `cn`** (`@/lib/utils` vs `cn` direto em ui/*).
-- [ ] **Pessoas com só dupla encerrada**: aparecem "sem dupla" → botão excluir habilita mas `deletePessoa`/`deleteMentorado` bloqueia por vínculo histórico → erro no toast em vez de disabled explicado.
+- [x] ~~**Pessoas com só dupla encerrada**~~ — `temQualquerDupla` desabilita o excluir com nota explicativa; "Sem dupla ativa" com menção ao histórico.
 - [ ] **wa.me diretos na página da dupla** ("Falar com mentorado", "Enviar combinados") não passam por `/api/nudge` → não logam em `interacoes`. Decidir se contato do mentor entra no log (hoje só nudges de coord/supervisor via NudgeButton).
-- [ ] **`me()` em actions.ts não falha sem sessão**: RLS cobre a autorização (42501→erroAmigavel), mas um early-return `{error:"Sessão expirada."}` seria mais explícito que propagar `me:null`.
+- [x] ~~**`me()` em actions.ts**~~ — 58 call sites com early-return "Sessão expirada" (auditoria completa).
 - [ ] **Refactor de complexidade** (react-doctor): `duplas/[id]/page.tsx` e `registro-form.tsx` estão grandes — candidatos a split quando a próxima feature tocar neles.
-- [x] ~~**Anexos**: teste E2E~~ — RLS provado contra o remoto (coord INSERT 403, mentor INSERT 201, coord DELETE ok). Falta só clicar o upload no browser.
+- [x] ~~**Anexos**: teste E2E~~ — RLS provado contra o remoto; **e** `deleteDupla` remove os objetos do bucket antes da row (sem órfãos em `registro-anexos`).
 
 ## Decisões de produto — maiores
 
-- [ ] **Trilha especialista**: `trilha` em `duplas` + `ciclo_eventos` (5 encontros). **Bloqueada na entrada** — `createDupla`/`updateDupla` rejeitam mentor especialista e os selects marcam "trilha especialista (em breve)", porque criar jogava a dupla no calendário DPP de 16 com semáforo fantasma. Falta: conteúdo dos 5 encontros (guia do especialista) + modelar `trilha` (o agente mapeou os ~12 pontos que assumem 16: `ciclo.ts` inteiro, `trajetoria-avaliacoes`, `materiaisPorNumero`, rail da agenda, caps `maxNum` nas actions).
+- [x] ~~**Trilha especialista — restos**~~ — `0037`: encerramento antecipado, prazo de 3 meses (chip urgente/vencido) e devolutiva notificando o mentor DPP.
 - [x] ~~Materiais de verdade~~ — `0010`: `materiais.path` + bucket privado `materiais` (policies de storage espelham a audiência — coord lê tudo, trilha só a própria, supervisor só "todos"); upload no `NovoMaterialDialog` (toggle arquivo/link, 20MB, PDF/imagem) e "Anexar arquivo" no `MaterialActions`; `/api/material/[id]` → signed URL 300s; card de encontro na página da dupla abre o arquivo.
 - [ ] **PDM da dupla**: `duplas.pdm_url` (link Drive/Docs) ou storage por dupla.
 
@@ -162,15 +162,15 @@ Planos em `.devin/plan-mural-perfil.md` + `.devin/plan-agenda-zero-friccao.md`. 
 
 - [ ] **SMTP do magic link — trocar sender provisório → realiza.vc.** Situação: rate limit do SMTP embutido do Supabase contornado com Resend SMTP (`smtp.resend.com:465`, user `resend`) — sender provisório `@thisux.tech` (domínio pessoal verificado, sa-east-1), API key `realiza-smtp-supabase` (sending_access, scopada ao domínio, id `e4f8d7c4`). Passo final: `realiza.vc` está registrado **numa outra conta Resend** (id `9707ed4e`, `not_started`) — entrar naquela conta no resend.com, deletar o domínio pra liberar, recriar aqui (`create-domain` → DNS → `verify-domain`) → nova API key scopada → trocar sender pra `no-reply@realiza.vc` no Supabase Auth → SMTP + `SITE_URL`/redirects de prod.
 - [x] ~~Remover login por senha~~ — virou feature: primeiro acesso via magic link cai em `/auth/definir-senha` (flag `user_metadata.senha_em`), depois a pessoa entra por senha **ou** link. Resta só garantir que contas de teste não fiquem com senha fraca compartilhada (`senha123`).
-- [ ] Signup aberto → convite/allowlist (confirmação de e-mail protege hoje, mas convém fechar).
+- [x] ~~Signup aberto → convite/allowlist~~ — `0045`: trigger em `auth.users` exige e-mail pré-cadastrado em `profiles` (signup público E `admin.createUser` — dentro do GoTrue são indistinguíveis; SQL direto/migrações bypassam). **Coordenação precisa pré-cadastrar antes de convidar** — magic link de e-mail novo falha com mensagem pt-BR.
 - [x] ~~Deploy Vercel~~ — `https://realizavc.vercel.app` no ar (projeto `thisux1s-projects/realiza.vc`, repo `thisux1/realiza.vc` conectado — push na main já dispara redeploy). Envs de prod: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_SITE_URL` (todas Config/exposed). **Falta no dashboard Supabase** (não dá via MCP): Auth → URL Configuration — Site URL `https://realizavc.vercel.app` + Redirect URLs `https://realizavc.vercel.app/**` (sem isso o magic link de prod não confirma) e o SMTP da tarefa acima.
 - [ ] E-mail pra coordenação quando `precisa_apoio = true` (após Resend).
-- [ ] Export CSV de pessoas/mentorados.
+- [x] ~~Export CSV de pessoas/mentorados~~ — `/api/export?tipo=pessoas` coord-only, agora com bloco sensível (nascimento/gênero/pref/motivação) via views `*_pessoal`.
 - [x] ~~`middleware`→`proxy`~~ — feito (build reconhece `ƒ Proxy`).
 
 ## Qualidade
 
-- [ ] Vitest: `saudadeDaDupla`, `parseCsv`, `normWhatsapp`, `mapRole`, `erroAmigavel`, `primeiroEncontroFaltante` — a suíte de QA em `/tmp/qa` (~90 casos) é o ponto de partida.
+- [x] ~~Vitest~~ — `vitest@5.0.0`, `pnpm test`: **136 testes** cobrindo `saudadeDaDupla`, agendamento, jornada, formatação, `parseCsv`/`normWhatsapp`/`mapRole`, encerramento, forms schema, documentos. `vitest.config.mts` com `TZ=America/Sao_Paulo` fixo. Bônus: `erroAmigavel` desduplicado (6 cópias → `utils.ts`) e `emailValido` agora aceita domínio multi-label (`@empresa.com.br`).
 
 ## Notificações in-app + avisos (feito)
 
@@ -213,11 +213,13 @@ anexos lazy-fetch (`registro_anexos` via RLS de select), `ResolverApoioButton`
 pra coord, "Abrir na ficha" no rodapé. `RegistroView` extraído da ficha —
 display do registro vive num componente só.
 
-**Dupla especialista bloqueada** — `createDupla`/`updateDupla` rejeitam
-`mentor_especialista` e os selects de mentor marcam "trilha especialista (em
+**Dupla especialista bloqueada** — `createDupla`/`updateDupla` rejeitavam
+`mentor_especialista` e os selects de mentor marcavam "trilha especialista (em
 breve)": criar produzia calendário/semáforo errados silenciosos (trilha de 5
 encontros não modelada). `setPessoaRole` também trava: trocar papel de quem
 tem dupla ativa/pausada deixava escrita indevida via `mentor_id` nas policies.
+*(Superado — a trilha foi modelada na `0027`+ e o bloqueio caiu: `createDupla`
+deriva `trilha` do papel do mentor. O que resta está na seção Pendências.)*
 
 **Auditoria pós-diff — abertos (decisão):**
 - Policies `*_mentor_write` de `encontros`/`registros`/`encaminhamentos`/

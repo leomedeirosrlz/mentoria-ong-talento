@@ -11,11 +11,17 @@ import {
 import Link from "next/link";
 import {
   Bell,
+  ChatsCircle,
   Check,
   CheckCircle,
+  ClipboardText,
+  FlagCheckered,
   HandHeart,
   Megaphone,
+  UserCheck,
+  UserPlus,
   UsersThree,
+  XCircle,
 } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import {
@@ -195,6 +201,13 @@ const ICONE: Record<Notificacao["tipo"], typeof Bell> = {
   pedido_apoio: HandHeart,
   apoio_resolvido: CheckCircle,
   dupla_formada: UsersThree,
+  demanda_especialista: UserPlus,
+  solicitacao_registrada: ClipboardText,
+  especialista_aceitou: UserCheck,
+  solicitacao_cancelada: XCircle,
+  trilha_encerrada: FlagCheckered,
+  supervisao_registrada: ChatsCircle,
+  formulario_respondido: ClipboardText,
 };
 
 export function NotificacoesBell({

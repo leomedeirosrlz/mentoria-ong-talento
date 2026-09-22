@@ -11,8 +11,8 @@ export function SiteFooter({ className }: { className?: string }) {
           Privacidade e LGPD
         </Link>
         <span aria-hidden className="text-border">·</span>
-        <a href="mailto:contato@realiza.vc" className="underline-offset-2 transition-colors hover:text-foreground hover:underline">
-          contato@realiza.vc
+        <a href="mailto:mentoria@realiza.vc" className="underline-offset-2 transition-colors hover:text-foreground hover:underline">
+          mentoria@realiza.vc
         </a>
       </div>
     </footer>
