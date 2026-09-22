@@ -394,7 +394,7 @@ function CampoRenderer({ campo }: { campo: FormularioCampo }) {
       return (
         <label
           className={cn(
-            "flex cursor-pointer items-start gap-3 rounded-xl border border-border bg-muted/40 p-4 text-sm leading-relaxed transition-colors has-checked:border-primary/60 has-checked:bg-primary/5 has-focus-visible:ring-3 has-focus-visible:ring-ring/50"
+            "flex cursor-pointer items-start gap-3 rounded-xl border border-input bg-muted/40 p-4 text-sm leading-relaxed transition-colors has-checked:border-primary/60 has-checked:bg-primary/5 has-focus-visible:ring-3 has-focus-visible:ring-ring/50"
           )}
         >
           <input

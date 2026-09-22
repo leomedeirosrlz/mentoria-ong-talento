@@ -122,7 +122,7 @@ export function AssinaturaForm({
 
       <DadosCivisFields />
 
-      <label className="flex items-start gap-3 rounded-xl border border-border bg-muted/40 p-4 text-sm leading-relaxed">
+      <label className="flex items-start gap-3 rounded-xl border border-input bg-muted/40 p-4 text-sm leading-relaxed">
         <input
           type="checkbox"
           name="aceite"
