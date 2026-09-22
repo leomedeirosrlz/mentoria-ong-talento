@@ -18,9 +18,10 @@ import {
   listarAssinaturasPessoa,
   reenviarAssinatura,
   revogarAssinatura,
-  solicitarAutorizacao,
+  solicitarAssinaturaMentorado,
   subirContraAssinatura,
 } from "@/lib/actions-assinaturas";
+import { TEMPLATES_MENTORADO } from "@/lib/documentos/texto";
 import type { Assinatura, AssinaturaStatus } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -253,11 +254,11 @@ export function AssinaturasPessoa({
     };
   }, [tipo, id]);
 
-  /** Emite a autorização do responsável e já deixa o link na mão. */
-  function solicitar() {
+  /** Emite o documento escolhido e já deixa o link na mão. */
+  function solicitar(slug: string) {
     startSolicitar(async () => {
       try {
-        const res = await solicitarAutorizacao(id);
+        const res = await solicitarAssinaturaMentorado(id, slug);
         if ("error" in res) {
           toast.error(res.error);
           return;
@@ -300,7 +301,15 @@ export function AssinaturasPessoa({
     return res;
   }
 
-  const temPendente = itens?.some((a) => a.status === "pendente") ?? false;
+  // um link por template: só oferece emitir o que ainda não está pendente
+  const pendentesPorSlug = new Set(
+    (itens ?? [])
+      .filter((a) => a.status === "pendente")
+      .map((a) => a.template?.slug)
+  );
+  const emissiveis = TEMPLATES_MENTORADO.filter(
+    (t) => !pendentesPorSlug.has(t.slug)
+  );
 
   return (
     <div className="space-y-2">
@@ -311,22 +320,27 @@ export function AssinaturasPessoa({
         {tipo === "profile" && <ContraAssinaturaDialog />}
       </div>
 
-      {tipo === "mentorado" && itens !== null && !temPendente && (
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={solicitando}
-          aria-busy={solicitando}
-          onClick={solicitar}
-        >
-          {solicitando ? (
-            <CircleNotch size={14} className="animate-spin" />
-          ) : (
-            <PaperPlaneTilt size={14} />
-          )}
-          {solicitando ? "Gerando link…" : "Solicitar autorização do responsável"}
-        </Button>
+      {tipo === "mentorado" && itens !== null && emissiveis.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {emissiveis.map((t) => (
+            <Button
+              key={t.slug}
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={solicitando}
+              aria-busy={solicitando}
+              onClick={() => solicitar(t.slug)}
+            >
+              {solicitando ? (
+                <CircleNotch size={14} className="animate-spin" />
+              ) : (
+                <PaperPlaneTilt size={14} />
+              )}
+              {solicitando ? "Gerando link…" : `Enviar: ${t.rotulo}`}
+            </Button>
+          ))}
+        </div>
       )}
 
       {itens === null && !falhou && (

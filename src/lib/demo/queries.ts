@@ -6,6 +6,7 @@ import type {
   Assinatura,
   CicloEvento,
   Comunicado,
+  DadosCivis,
   Dupla,
   DuplaResumo,
   EspecialistaEvento,
@@ -126,6 +127,8 @@ const CAMPOS_PESSOAIS = [
   "genero",
   "pref_genero_par",
   "motivacao",
+  "dados_civis",
+  "responsavel",
 ] as const;
 
 function semPessoal<P>(p: P): P {
@@ -270,6 +273,8 @@ export function demoPessoalMap(
       genero: p.genero ?? null,
       pref_genero_par: p.pref_genero_par ?? null,
       motivacao: p.motivacao ?? null,
+      dados_civis: p.dados_civis ?? null,
+      responsavel: "responsavel" in p ? (p.responsavel ?? null) : null,
     });
   }
   return mapa;
@@ -649,6 +654,26 @@ export function demoMinhaAssinaturaTermo(role: AppRole): Assinatura | null {
   );
 }
 
+/** Espelha meus_dados_civis() (0046): civis da persona + nome/nascimento da
+ *  ficha quando o jsonb não os repete. null pra papel sem profile (não há). */
+export function demoMeusDadosCivis(role: AppRole): DadosCivis | null {
+  const data = getDemoData();
+  const eu = data.personas[role];
+  const p = data.profiles.find((x) => x.id === eu.id);
+  if (!p) return null;
+  const base = p.dados_civis ?? null;
+  return {
+    nome_civil: base?.nome_civil || p.nome,
+    rg: base?.rg ?? "",
+    cpf: base?.cpf ?? "",
+    data_nascimento: base?.data_nascimento ?? p.data_nascimento ?? null,
+    endereco: base?.endereco ?? {
+      logradouro: "", numero: "", complemento: null,
+      bairro: "", cidade: "", uf: "", cep: "",
+    },
+  };
+}
+
 /** Uma assinatura por id — escopo da policy: dono ou coordenação. */
 export function demoAssinatura(role: AppRole, id: string): Assinatura | null {
   const data = getDemoData();
@@ -678,15 +703,27 @@ export function demoAssinaturaPorToken(token: string) {
   const a = getDemoData().assinaturas.find((x) => x.token === token);
   if (!a) return null;
   const data = getDemoData();
-  const nome = a.profile_id
-    ? data.profiles.find((p) => p.id === a.profile_id)?.nome
-    : data.mentorados.find((m) => m.id === a.mentorado_id)?.nome;
+  const profile = a.profile_id
+    ? data.profiles.find((p) => p.id === a.profile_id)
+    : null;
+  const mentorado = a.mentorado_id
+    ? data.mentorados.find((m) => m.id === a.mentorado_id)
+    : null;
+  const nome = profile?.nome ?? mentorado?.nome;
+  // espelha a RPC 0046: a sugestão de prefill muda por template —
+  // autorização lê o responsável do jovem, os demais os civis do alvo
+  const slug = a.template?.slug ?? "";
+  const civis =
+    slug === "autorizacao-responsavel"
+      ? mentorado?.responsavel ?? null
+      : profile?.dados_civis ?? mentorado?.dados_civis ?? null;
   return {
     id: a.id,
     status: a.status,
     assinado_em: a.assinado_em,
     template: a.template ?? { slug: "", titulo: "", versao: 1 },
     alvo: { nome: nome ?? "" },
+    civis,
   };
 }
 

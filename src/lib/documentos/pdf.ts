@@ -16,14 +16,18 @@ import {
   ANEXO_I_TITULO,
   AUTORIZACAO_TITULO,
   CLAUSULAS_AUTORIZACAO,
+  CLAUSULAS_MENTORANDO,
   CLAUSULAS_TERMO,
   CONTRA_SIGNATARIO,
   dadosAutorizacaoDe,
   dadosCivisDe,
   dataPorExtenso,
   FECHO_AUTORIZACAO,
+  FECHO_MENTORANDO,
   FECHO_TERMO,
+  MENTORANDO_TITULO,
   preambuloAutorizacao,
+  preambuloMentorando,
   preambuloTermo,
   TERMO_TITULO,
 } from "./texto";
@@ -406,6 +410,45 @@ function renderAutorizacao(
   });
 }
 
+/** Termo do jovem (0046): mesmo esqueleto do termo do voluntário — dois
+ *  blocos de assinatura (mentorando eletrônico + instituto com a
+ *  contra-assinatura), sem Anexo de lei. */
+function renderMentorando(
+  p: Fluxo,
+  dados: DadosCivis,
+  texto: string,
+  em: string,
+  contraAssinatura: PDFImage | null
+) {
+  p.paragrafo(MENTORANDO_TITULO, {
+    font: p.f.bold,
+    size: 13,
+    centro: true,
+    depois: 18,
+  });
+  for (const par of preambuloMentorando(dados)) {
+    p.paragrafo(par, { size: 11, depois: 10 });
+  }
+  corpoClausulas(p, CLAUSULAS_MENTORANDO);
+
+  p.paragrafo(FECHO_MENTORANDO, { size: 11, antes: 4, depois: 16 });
+  p.paragrafo(dataPorExtenso(em), { size: 11, depois: 30 });
+
+  blocoAssinatura(p, {
+    nomeDigitado: texto,
+    legenda: [
+      "MENTORANDO(A) — Nome completo e assinatura",
+      `assinado eletronicamente em ${dataHoraFmt(em)}`,
+    ],
+  });
+  blocoAssinatura(p, {
+    imagem: contraAssinatura,
+    legenda: ["INSTITUTO REALIZA.VC", "Representante legal"],
+    legendaSize: 10.5,
+    legendaColor: PRETO,
+  });
+}
+
 // ---------- página de evidências ----------
 
 function paginaEvidencias(
@@ -502,7 +545,11 @@ export async function renderDocumentoAssinado(
   if (!tpl) {
     throw new Error("assinatura sem template");
   }
-  if (tpl.slug !== "termo-voluntario" && tpl.slug !== "autorizacao-responsavel") {
+  if (
+    tpl.slug !== "termo-voluntario" &&
+    tpl.slug !== "autorizacao-responsavel" &&
+    tpl.slug !== "termo-mentorando"
+  ) {
     throw new Error("template desconhecido");
   }
   const em = a.assinado_em;
@@ -519,13 +566,17 @@ export async function renderDocumentoAssinado(
   };
   const p = new Fluxo(doc, f);
 
-  if (tpl.slug === "termo-voluntario") {
+  if (tpl.slug === "termo-voluntario" || tpl.slug === "termo-mentorando") {
     const dados = dadosCivisDe(a);
     if (!dados) throw new Error("snapshot não corresponde ao termo");
     const img = contraAssinaturaPng
       ? await doc.embedPng(contraAssinaturaPng)
       : null;
-    renderTermo(p, dados, texto, em, img);
+    if (tpl.slug === "termo-voluntario") {
+      renderTermo(p, dados, texto, em, img);
+    } else {
+      renderMentorando(p, dados, texto, em, img);
+    }
   } else {
     const dados = dadosAutorizacaoDe(a);
     if (!dados) throw new Error("snapshot não corresponde à autorização");

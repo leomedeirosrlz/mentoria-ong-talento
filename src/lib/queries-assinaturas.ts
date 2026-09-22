@@ -4,9 +4,10 @@ import { demoRole } from "./demo/mode";
 import {
   demoAssinatura,
   demoAssinaturasPessoa,
+  demoMeusDadosCivis,
   demoMinhaAssinaturaTermo,
 } from "./demo/queries";
-import type { Assinatura, DocumentoTemplate } from "./types";
+import type { Assinatura, DadosCivis, DocumentoTemplate } from "./types";
 
 // Leituras de assinaturas (0033). O escopo é o da policy assinaturas_select:
 // o signatário lê as próprias (profile_id = eu), a coordenação lê tudo —
@@ -58,6 +59,17 @@ export const getAssinatura = cache(async (id: string): Promise<Assinatura | null
     .maybeSingle();
   if (error) throw error;
   return data ? normAssinatura(data as unknown as Assinatura) : null;
+});
+
+/** Dados civis do próprio usuário (0046) — prefill do /assinar. A RPC
+ *  devolve só a coluna da própria linha; a ficha segue coord-only. */
+export const getMeusDadosCivis = cache(async (): Promise<DadosCivis | null> => {
+  const demo = await demoRole();
+  if (demo) return demoMeusDadosCivis(demo);
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("meus_dados_civis");
+  if (error) return null;
+  return (data as DadosCivis | null) ?? null;
 });
 
 /** Histórico de assinaturas de uma pessoa — seção da ficha (coord-only). */

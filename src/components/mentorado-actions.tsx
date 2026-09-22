@@ -29,6 +29,7 @@ import {
 import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
 import { DocumentoPessoa } from "@/components/documento-pessoa";
 import { AssinaturasPessoa } from "@/components/assinaturas-pessoa";
+import { DadosCivisFields } from "@/components/assinatura-form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -185,6 +186,29 @@ export function MentoradoActions({ mentorado, temDupla }: { mentorado: Mentorado
 
             <SecaoFicha>Disponibilidade semanal</SecaoFicha>
             <CampoDisponibilidade value={disponibilidade} onChange={setDisponibilidade} />
+
+            <SecaoFicha>Documentos do(a) jovem (termo de participação)</SecaoFicha>
+            <DadosCivisFields
+              prefix="civis_"
+              opcional
+              compacto
+              defaults={mentorado.dados_civis}
+            />
+
+            <SecaoFicha>Responsável legal (autorização de menor)</SecaoFicha>
+            <div className="space-y-2">
+              <Label htmlFor="em_parentesco">Parentesco com o(a) jovem</Label>
+              <Input
+                id="em_parentesco" name="resp_parentesco" maxLength={60}
+                defaultValue={mentorado.responsavel?.parentesco ?? ""}
+                placeholder="mãe, pai, avó, tio…"
+              />
+            </div>
+            <DadosCivisFields
+              prefix="resp_"
+              opcional
+              defaults={mentorado.responsavel}
+            />
 
             <SecaoFicha>Anamnese e arquivos</SecaoFicha>
             <div className="space-y-2">

@@ -15,9 +15,10 @@ import {
   maxEncontros,
   parseDisponibilidade,
 } from "@/lib/ciclo";
-import { erroAmigavel } from "@/lib/utils";
-import type { Disponibilidade, Escolaridade, Genero, Notificacao, PrefGeneroPar, Trilha } from "@/lib/types";
+import { cpfValido, erroAmigavel } from "@/lib/utils";
+import type { DadosCivis, Disponibilidade, Endereco, Escolaridade, Genero, Notificacao, PrefGeneroPar, ResponsavelCivis, Trilha } from "@/lib/types";
 import {
+  civisImportado,
   emailValido,
   mapEscolaridade,
   mapGenero,
@@ -239,7 +240,58 @@ type CamposFicha = Partial<{
   objetivos: string | null;
   escolaridade: Escolaridade | null;
   disponibilidade: Disponibilidade | null;
+  dados_civis: DadosCivis | null;
+  responsavel: ResponsavelCivis | null;
 }>;
+
+/** Dados civis (0046) → jsonb na ficha. `prefix` isola o bloco do
+ *  responsável ("resp_"); `deFicha` junta nome/nascimento/cidade/UF dos
+ *  campos que a ficha já tem (modo compacto do DadosCivisFields). Tudo
+ *  vazio → null (não grava esqueleto); CPF/CEP preenchidos mas inválidos
+ *  viram erro — dado errado entraria no termo sem ninguém perceber. */
+function parseCivis(
+  formData: FormData,
+  opts: { prefix?: string; deFicha?: boolean } = {}
+): DadosCivis | { error: string } | null {
+  const { prefix = "", deFicha = false } = opts;
+  const c = (k: string) => String(formData.get(`${prefix}${k}`) ?? "").trim();
+  const endereco: Endereco = {
+    logradouro: c("logradouro"),
+    numero: c("numero"),
+    complemento: c("complemento") || null,
+    bairro: c("bairro"),
+    cidade: deFicha ? String(formData.get("cidade") ?? "").trim() : c("cidade"),
+    uf: (deFicha ? String(formData.get("uf") ?? "") : c("uf")).trim().toUpperCase(),
+    cep: c("cep").replace(/\D/g, ""),
+  };
+  const dados: DadosCivis = {
+    nome_civil: deFicha
+      ? String(formData.get("nome") ?? "").trim()
+      : c("nome_civil"),
+    rg: c("rg"),
+    cpf: c("cpf").replace(/\D/g, ""),
+    data_nascimento:
+      (deFicha
+        ? String(formData.get("data_nascimento") ?? "")
+        : c("data_nascimento")
+      ).trim() || null,
+    endereco,
+  };
+  const temAlgo =
+    dados.rg ||
+    dados.cpf ||
+    endereco.logradouro ||
+    endereco.cep ||
+    endereco.bairro ||
+    endereco.numero ||
+    (!deFicha && (dados.nome_civil || endereco.cidade || dados.data_nascimento));
+  if (!temAlgo) return null;
+  if (dados.cpf && !cpfValido(dados.cpf))
+    return { error: `CPF inválido${prefix ? " (responsável)" : ""} — confira os dígitos.` };
+  if (endereco.cep && endereco.cep.length !== 8)
+    return { error: `CEP inválido${prefix ? " (responsável)" : ""}.` };
+  return dados;
+}
 
 /** Ficha pessoal/matching comum a profiles e mentorados (0034). `de` liga os
  *  campos exclusivos de cada tabela (cargo/empresa só em profiles; objetivos/
@@ -336,6 +388,22 @@ function camposFicha(
     const disp = parseDisponibilidade(String(formData.get("disponibilidade") ?? ""));
     if (disp && "error" in disp) return { error: disp.error };
     out.disponibilidade = disp;
+  }
+
+  // dados civis (0046) — só quando o form renderiza o bloco; o wizard de
+  // onboarding e a edição de perfil não carregam esses campos, então o
+  // tem() protege gravações acidentais em updates parciais
+  if (tem("civis_rg")) {
+    const civis = parseCivis(formData, { prefix: "civis_", deFicha: true });
+    if (civis && "error" in civis) return { error: civis.error };
+    out.dados_civis = civis;
+  }
+  if (de === "mentorado" && tem("resp_nome_civil")) {
+    const resp = parseCivis(formData, { prefix: "resp_" });
+    if (resp && "error" in resp) return { error: resp.error };
+    out.responsavel = resp
+      ? { ...resp, parentesco: String(formData.get("resp_parentesco") ?? "").trim() }
+      : null;
   }
 
   return out;
@@ -451,7 +519,22 @@ function fichaLinha(
     if (String(l.escolaridade ?? "").trim() && !esc)
       return { error: "escolaridade não reconhecida" };
     out.escolaridade = esc;
+
+    const resp = civisImportado(l, "resp_");
+    const parentesco = normNome(String(l.resp_parentesco ?? ""));
+    if (resp) out.responsavel = { ...resp, parentesco };
   }
+
+  // dados civis (0046) — as colunas de documento/endereço viram o jsonb que
+  // preenche os termos; nome/nascimento/cidade/UF vêm da própria ficha
+  const civis = civisImportado(l, "", {
+    nome_civil: normNome(l.nome),
+    data_nascimento: out.data_nascimento as string | null,
+    cidade: (out.cidade as string | null) ?? "",
+    uf: (out.uf as string | null) ?? "",
+  });
+  if (civis) out.dados_civis = civis;
+
   return out;
 }
 

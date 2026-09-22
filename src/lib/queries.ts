@@ -25,7 +25,7 @@ import {
   demoPessoas,
   demoRegistros,
 } from "./demo/queries";
-import type { AvaliacaoJovem, CicloEvento, Comunicado, Dupla, DuplaResumo, DuplaStatus, EncontroStatus, EspecialistaEvento, Genero, Material, Mentorado, MentorProfile, Notificacao, PessoaNota, PrefGeneroPar, Profile, Registro, Trilha } from "./types";
+import type { AvaliacaoJovem, CicloEvento, Comunicado, DadosCivis, Dupla, DuplaResumo, DuplaStatus, EncontroStatus, EspecialistaEvento, Genero, Material, Mentorado, MentorProfile, Notificacao, PessoaNota, PrefGeneroPar, Profile, Registro, ResponsavelCivis, Trilha } from "./types";
 
 /** mentor_profiles — re-export do tipo canônico (types.ts): os callers da
  *  página de pessoas/board importam daqui historicamente. */
@@ -50,14 +50,17 @@ const PROFILE_COLS_PUBLICAS =
 const MENTORADO_COLS_PUBLICAS =
   "id, nome, email, whatsapp, ong_origem, notas, avatar_path, documento_path, created_at, nome_social, cidade, uf, interesses, objetivos, escolaridade, origem, disponibilidade";
 
-/** Os 4 sensíveis da 0034, idênticos em profiles e mentorados — fora do
- *  grant de coluna; só a coordenação os lê, pelas views *_pessoal. Exportado
- *  como tipo: a camada demo espelha o mesmo shape sem depender de runtime. */
+/** Os 4 sensíveis da 0034 + dados civis da 0046, idênticos em profiles e
+ *  mentorados — fora do grant de coluna; só a coordenação os lê, pelas
+ *  views *_pessoal. `responsavel` só existe em mentorados (null em
+ *  profiles). Exportado como tipo: a camada demo espelha o mesmo shape. */
 export type DadosPessoais = {
   data_nascimento: string | null;
   genero: Genero | null;
   pref_genero_par: PrefGeneroPar | null;
   motivacao: string | null;
+  dados_civis: DadosCivis | null;
+  responsavel: ResponsavelCivis | null;
 };
 
 /** id → dados sensíveis, como devolvido pelas views profiles_pessoal /
@@ -77,15 +80,20 @@ export const getPessoalMap = cache(
     const me = await getMe();
     if (me?.role !== "coordenacao") return new Map();
     const supabase = await createClient();
-    const { data, error } = await supabase
-      .from(tabela)
-      .select("id, data_nascimento, genero, pref_genero_par, motivacao");
+    // responsavel só existe em mentorados — a select é por tabela pra não
+    // pedir coluna que a view profiles_pessoal não expõe
+    const cols =
+      "id, data_nascimento, genero, pref_genero_par, motivacao, dados_civis" +
+      (tabela === "mentorados_pessoal" ? ", responsavel" : "");
+    const { data, error } = await supabase.from(tabela).select(cols);
     if (error) {
       console.error(`getPessoalMap(${tabela}):`, error);
       return new Map();
     }
     return new Map(
-      (data ?? []).map((r: { id: string } & DadosPessoais) => [r.id, r])
+      ((data ?? []) as unknown as ({ id: string } & DadosPessoais)[]).map(
+        (r) => [r.id, { ...r, responsavel: r.responsavel ?? null }]
+      )
     );
   }
 );
@@ -104,6 +112,8 @@ function comPessoal<P extends { id: string }>(
     genero: d?.genero ?? null,
     pref_genero_par: d?.pref_genero_par ?? null,
     motivacao: d?.motivacao ?? null,
+    dados_civis: d?.dados_civis ?? null,
+    responsavel: d?.responsavel ?? null,
   };
 }
 
@@ -330,7 +340,7 @@ export const getPessoas = cache(async (): Promise<Profile[]> => {
   // Os sensíveis (nascimento/gênero/pref./motivação) só preenchem pra coord.
   return ((data ?? []) as { id: string; nome: string }[])
     .map((p) => comPessoal(comContato(p, contatos), pessoal))
-    .sort(porNome) as Profile[];
+    .sort(porNome) as unknown as Profile[];
 });
 
 export const getMentorados = cache(async (): Promise<Mentorado[]> => {
@@ -344,7 +354,7 @@ export const getMentorados = cache(async (): Promise<Mentorado[]> => {
   if (error) throw error;
   return ((data ?? []) as { id: string; nome: string }[])
     .map((m) => comPessoal(m, pessoal))
-    .sort(porNome) as Mentorado[];
+    .sort(porNome) as unknown as Mentorado[];
 });
 
 /** Card de dupla na página de perfil — nomes e status, sem a árvore de encontros. */

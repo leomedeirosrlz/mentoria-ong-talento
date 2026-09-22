@@ -16,12 +16,17 @@ import { buttonVariants } from "@/components/ui/button";
 import { formatDateTime } from "@/lib/ciclo";
 import {
   AUTORIZACAO_TITULO,
+  civisPreview,
   CLAUSULAS_AUTORIZACAO,
+  CLAUSULAS_MENTORANDO,
   dataPorExtenso,
   FECHO_AUTORIZACAO,
+  FECHO_MENTORANDO,
+  MENTORANDO_TITULO,
   preambuloAutorizacao,
+  preambuloMentorando,
 } from "@/lib/documentos/texto";
-import type { DadosAutorizacao } from "@/lib/types";
+import type { DadosAutorizacao, DadosCivis, ResponsavelCivis } from "@/lib/types";
 
 export const metadata: Metadata = {
   title: "Assinatura de documento",
@@ -130,26 +135,14 @@ export default async function AssinarTokenPage({
     );
   }
 
-  // pendente: preview do documento com os dados do responsável em branco —
-  // eles só entram no snapshot no ato da assinatura (o form abaixo alimenta)
+  // pendente: preview do documento já com o que está na ficha (0046 — a
+  // RPC devolve `civis` como sugestão; o que faltar fica em branco e o form
+  // abaixo completa/corrige — o snapshot registra o que foi assinado)
+  const ehAutorizacao = info.template.slug === "autorizacao-responsavel";
+  const civis = info.civis as (DadosCivis & { parentesco?: string }) | null;
   const dadosPreview: DadosAutorizacao = {
     mentorado_nome: info.alvo.nome,
-    responsavel: {
-      nome_civil: "______",
-      rg: "______",
-      cpf: "______",
-      data_nascimento: null,
-      parentesco: "______",
-      endereco: {
-        logradouro: "______",
-        numero: "______",
-        complemento: null,
-        bairro: "______",
-        cidade: "______",
-        uf: "______",
-        cep: "______",
-      },
-    },
+    responsavel: { ...civisPreview(civis), parentesco: civis?.parentesco ?? "______" },
   };
 
   return (
@@ -165,50 +158,77 @@ export default async function AssinarTokenPage({
           {info.template.titulo}
         </h1>
         <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-          Você recebeu este link como responsável por{" "}
-          <strong className="font-semibold text-foreground">
-            {info.alvo.nome}
-          </strong>
-          . Leia o documento abaixo e assine com seus dados civis — a assinatura
-          eletrônica tem a mesma validade de uma assinatura em papel.
+          {ehAutorizacao ? (
+            <>
+              Você recebeu este link como responsável por{" "}
+              <strong className="font-semibold text-foreground">
+                {info.alvo.nome}
+              </strong>
+              . Leia o documento abaixo e assine com seus dados civis — a
+              assinatura eletrônica tem a mesma validade de uma assinatura em
+              papel.
+            </>
+          ) : (
+            <>
+              Você recebeu este link para a assinatura do termo de{" "}
+              <strong className="font-semibold text-foreground">
+                {info.alvo.nome}
+              </strong>
+              . Leia o documento abaixo, confira os dados e assine — a
+              assinatura eletrônica tem a mesma validade de uma assinatura em
+              papel.
+            </>
+          )}
         </p>
 
         {/* o documento como será emitido — o texto é o mesmo que entra no PDF
             (src/lib/documentos/texto.ts é a fonte única dos dois) */}
         <section className="mt-8 rounded-xl bg-card p-6 shadow-[var(--shadow-border)] sm:p-8">
           <h2 className="text-center text-sm font-semibold uppercase tracking-[0.06em]">
-            {AUTORIZACAO_TITULO}
+            {ehAutorizacao ? AUTORIZACAO_TITULO : MENTORANDO_TITULO}
           </h2>
           <div className="mt-5 space-y-3 text-sm leading-relaxed">
-            {preambuloAutorizacao(dadosPreview).map((p, i) => (
+            {(ehAutorizacao
+              ? preambuloAutorizacao(dadosPreview)
+              : preambuloMentorando(civisPreview(civis))
+            ).map((p, i) => (
               <p key={i}>{p}</p>
             ))}
-            {CLAUSULAS_AUTORIZACAO.map(([titulo, paragrafos]) => (
-              <div key={titulo} className="pt-1">
-                <h3 className="font-semibold">{titulo}</h3>
-                {paragrafos.map((p) => (
-                  <p key={p} className="mt-1.5">
-                    {p}
-                  </p>
-                ))}
-              </div>
-            ))}
-            <p>{FECHO_AUTORIZACAO}</p>
+            {(ehAutorizacao ? CLAUSULAS_AUTORIZACAO : CLAUSULAS_MENTORANDO).map(
+              ([titulo, paragrafos]) => (
+                <div key={titulo} className="pt-1">
+                  <h3 className="font-semibold">{titulo}</h3>
+                  {paragrafos.map((p) => (
+                    <p key={p} className="mt-1.5">
+                      {p}
+                    </p>
+                  ))}
+                </div>
+              )
+            )}
+            <p>{ehAutorizacao ? FECHO_AUTORIZACAO : FECHO_MENTORANDO}</p>
             <p>{dataPorExtenso(new Date())}</p>
           </div>
         </section>
 
         <section className="mt-6 rounded-xl bg-card p-6 shadow-[var(--shadow-border)] sm:p-8">
-          <h2 className="text-base font-semibold">Seus dados para assinar</h2>
+          <h2 className="text-base font-semibold">
+            {ehAutorizacao ? "Seus dados para assinar" : "Dados do(a) jovem e assinatura"}
+          </h2>
           <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-            Preencha como consta no seu documento oficial — as informações entram
-            na autorização e a assinatura registra data, hora e endereço de rede.
+            {civis
+              ? "Os dados já vêm do cadastro — confira, corrija se preciso e assine. A assinatura registra data, hora e endereço de rede."
+              : "Preencha como consta no documento oficial — as informações entram no documento e a assinatura registra data, hora e endereço de rede."}
           </p>
           <div className="mt-6">
             <AssinaturaForm
-              modo="autorizacao"
+              modo={ehAutorizacao ? "autorizacao" : "termo"}
               alvoNome={info.alvo.nome}
               acao={assinarComToken.bind(null, token)}
+              dados={civis}
+              parentesco={
+                ehAutorizacao ? (civis as ResponsavelCivis | null)?.parentesco : undefined
+              }
             />
           </div>
         </section>

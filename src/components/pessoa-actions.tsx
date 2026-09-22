@@ -32,6 +32,7 @@ import {
 import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
 import { DocumentoPessoa } from "@/components/documento-pessoa";
 import { AssinaturasPessoa } from "@/components/assinaturas-pessoa";
+import { DadosCivisFields } from "@/components/assinatura-form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -367,6 +368,17 @@ export function PessoaActions({ pessoa, podeExcluir }: { pessoa: Profile; podeEx
                 </div>
               </>
             )}
+
+            <SecaoFicha>Documentos (termo de adesão)</SecaoFicha>
+            <DadosCivisFields
+              prefix="civis_"
+              opcional
+              compacto
+              defaults={pessoa.dados_civis}
+            />
+            <p className="text-xs text-muted-foreground">
+              Preenchem o termo de adesão automaticamente — a pessoa só confere e assina.
+            </p>
 
             <SecaoFicha>Arquivos e consentimento</SecaoFicha>
             <FotoField

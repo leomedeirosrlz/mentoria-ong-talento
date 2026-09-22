@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import { demoAtivo, demoRole } from "./demo/mode";
 import { demoAssinaturaPorToken } from "./demo/queries";
 import { getAssinaturasPessoa } from "./queries-assinaturas";
+import { TEMPLATES_MENTORADO } from "./documentos/texto";
 import { DEMO_MSG } from "./demo/shared";
 import { cpfValido } from "./utils";
 import type { DadosAutorizacao, DadosCivis, Endereco } from "./types";
@@ -110,22 +111,27 @@ function parseTextoAssinatura(f: FormData): string | { error: string } {
 
 // ---------- coordenação ----------
 
-/** Coord emite a autorização do responsável pela ficha do mentorado —
- *  devolve o link tokenizado pra mandar por WhatsApp/e-mail. */
-export async function solicitarAutorizacao(mentoradoId: string) {
+/** Coord emite um documento de mentorado pela ficha — devolve o link
+ *  tokenizado pra mandar por WhatsApp/e-mail. */
+export async function solicitarAssinaturaMentorado(
+  mentoradoId: string,
+  slug: string
+) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada — entre de novo." };
   if (eu.role !== "coordenacao")
-    return { error: "Só a coordenação solicita autorização." };
+    return { error: "Só a coordenação solicita assinatura." };
+  if (!TEMPLATES_MENTORADO.some((t) => t.slug === slug))
+    return { error: "Documento desconhecido." };
 
   const { data: tpl } = await supabase
     .from("documento_templates")
     .select("id")
-    .eq("slug", "autorizacao-responsavel")
+    .eq("slug", slug)
     .eq("ativo", true)
     .single();
-  if (!tpl) return { error: "Template de autorização não configurado." };
+  if (!tpl) return { error: "Template de documento não configurado." };
 
   // uma pendente por mentorado por template — reenvio regenera o token
   const { data: pendente } = await supabase
@@ -254,7 +260,9 @@ export async function assinarTermo(formData: FormData) {
 
 // ---------- signatário por token (autorização do responsável) ----------
 
-/** Página pública /assinar/<token>: lê a pendência sem sessão. */
+/** Página pública /assinar/<token>: lê a pendência sem sessão. `civis` é a
+ *  sugestão de prefill vinda da ficha (0046) — DadosCivis pro termo do
+ *  jovem, ResponsavelCivis pra autorização. */
 export async function assinaturaPorToken(token: string) {
   const demo = await demoRole();
   if (demo) return demoAssinaturaPorToken(token);
@@ -269,6 +277,7 @@ export async function assinaturaPorToken(token: string) {
     assinado_em: string | null;
     template: { slug: string; titulo: string; versao: number };
     alvo: { nome: string };
+    civis: (DadosCivis & { parentesco?: string }) | null;
   } | null;
 }
 
@@ -284,17 +293,24 @@ export async function assinarComToken(token: string, formData: FormData) {
 
   const dados = parseDadosCivis(formData);
   if ("error" in dados) return dados;
-  const parentesco = campo(formData, "parentesco");
-  if (!parentesco) return { error: "Informe o parentesco com o jovem." };
   const texto = parseTextoAssinatura(formData);
   if (typeof texto !== "string") return texto;
   if (campo(formData, "aceite") !== "on")
     return { error: "É preciso ler e aceitar pra assinar." };
 
-  const snapshot: DadosAutorizacao = {
-    mentorado_nome: info.alvo.nome,
-    responsavel: { ...dados, parentesco },
-  };
+  // o snapshot muda de forma por template: autorização embrulha o jovem +
+  // responsável (parentesco exigido); os demais guardam o DadosCivis direto
+  let snapshot: DadosAutorizacao | DadosCivis;
+  if (info.template.slug === "autorizacao-responsavel") {
+    const parentesco = campo(formData, "parentesco");
+    if (!parentesco) return { error: "Informe o parentesco com o jovem." };
+    snapshot = {
+      mentorado_nome: info.alvo.nome,
+      responsavel: { ...dados, parentesco },
+    };
+  } else {
+    snapshot = dados;
+  }
   const { ip, ua } = await ipUa();
   const hash = hashDocumento({
     slug: info.template.slug,

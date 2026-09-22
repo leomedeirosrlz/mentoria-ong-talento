@@ -131,10 +131,10 @@ async function exportPessoas(supabase: Awaited<ReturnType<typeof createClient>>)
     supabase.from("mentor_profiles").select("profile_id,capacidade"),
     supabase
       .from("profiles_pessoal")
-      .select("id,data_nascimento,genero,pref_genero_par,motivacao"),
+      .select("id,data_nascimento,genero,pref_genero_par,motivacao,dados_civis"),
     supabase
       .from("mentorados_pessoal")
-      .select("id,data_nascimento,genero,pref_genero_par,motivacao"),
+      .select("id,data_nascimento,genero,pref_genero_par,motivacao,dados_civis,responsavel"),
   ]);
   if (eP || eC || eM || eMP || ePP || ePM) {
     return NextResponse.json(
@@ -144,7 +144,9 @@ async function exportPessoas(supabase: Awaited<ReturnType<typeof createClient>>)
   }
   const capacidades = new Map((mps ?? []).map((m) => [m.profile_id, m.capacidade]));
   const contatoPorId = new Map((contatos ?? []).map((c) => [c.id, c]));
-  const pessoalPorId = new Map((pessoalP ?? []).map((p) => [p.id, p]));
+  const pessoalPorId = new Map(
+    (pessoalP ?? []).map((p) => [p.id, { responsavel: null, ...p }])
+  );
   const pessoalMentoradoPorId = new Map((pessoalM ?? []).map((m) => [m.id, m]));
 
   return csvResponse(

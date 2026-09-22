@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Plus, UserPlus } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { createMentorado, createPessoa } from "@/lib/actions";
+import { DadosCivisFields } from "@/components/assinatura-form";
 import { FotoField } from "@/components/foto-field";
 import {
   CampoConsentimento,
@@ -189,6 +190,12 @@ export function NovaPessoaDialog() {
             </>
           )}
 
+          <SecaoFicha>Documentos (termo de adesão)</SecaoFicha>
+          <DadosCivisFields prefix="civis_" opcional compacto />
+          <p className="text-xs text-muted-foreground">
+            RG, CPF e endereço preenchem o termo de adesão automaticamente — a pessoa só confere e assina.
+          </p>
+
           <SecaoFicha>Foto e consentimento</SecaoFicha>
           <FotoField id="foto" />
           <CampoConsentimento />
@@ -291,6 +298,19 @@ export function NovoMentoradoDialog() {
 
           <SecaoFicha>Disponibilidade semanal</SecaoFicha>
           <CampoDisponibilidade value={disponibilidade} onChange={setDisponibilidade} />
+
+          <SecaoFicha>Documentos do(a) jovem (termo de participação)</SecaoFicha>
+          <DadosCivisFields prefix="civis_" opcional compacto />
+          <p className="text-xs text-muted-foreground">
+            Preenchem o termo de participação — o(a) jovem assina por link, sem precisar de conta.
+          </p>
+
+          <SecaoFicha>Responsável legal (autorização de menor)</SecaoFicha>
+          <div className="space-y-2">
+            <Label htmlFor="m_parentesco">Parentesco com o(a) jovem</Label>
+            <Input id="m_parentesco" name="resp_parentesco" maxLength={60} placeholder="mãe, pai, avó, tio…" />
+          </div>
+          <DadosCivisFields prefix="resp_" opcional />
 
           <SecaoFicha>Anamnese e foto</SecaoFicha>
           <div className="space-y-2">

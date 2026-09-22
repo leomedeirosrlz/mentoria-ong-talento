@@ -246,6 +246,50 @@ describe("mapGenero / mapPrefGenero / mapEscolaridade", () => {
     expect(mapPrefGenero("")).toBeNull();
   });
 
+  it("dados civis (0046) — documentos e endereço próprios e do responsável", () => {
+    const csv = [
+      "nome;email;rg;cpf;cep;logradouro;numero;complemento;bairro;resp_nome;resp_parentesco;resp_cpf",
+      "Ana;a@x.com;12.345.678-9;123.456.789-09;01234-567;Rua A;10;ap 2;Centro;Cleusa Silva;Mãe;987.654.321-00",
+    ].join("\n");
+    const r = parseCsv(csv);
+    expect(r.linhas[0]).toMatchObject({
+      rg: "12.345.678-9",
+      cpf: "123.456.789-09",
+      cep: "01234-567",
+      logradouro: "Rua A",
+      numero: "10",
+      complemento: "ap 2",
+      bairro: "Centro",
+      resp_nome: "Cleusa Silva",
+      resp_parentesco: "Mãe",
+      resp_cpf: "987.654.321-00",
+    });
+  });
+
+  it("dados civis — headers por extenso e do responsável", () => {
+    const r = parseCsv(
+      [
+        "nome;endereço;nº;identidade;cidade do responsável;parentesco;telefone do responsável",
+        "Ana;Av. B;55;33.444.555-6;São Paulo;Tia;11999990000",
+      ].join("\n")
+    );
+    expect(r.linhas[0]).toMatchObject({
+      logradouro: "Av. B",
+      numero: "55",
+      rg: "33.444.555-6",
+      resp_cidade: "São Paulo",
+      resp_parentesco: "Tia",
+    });
+    // telefone do responsável não entra no bloco civil nem vira nome
+    expect(r.linhas[0].resp_nome).toBe("");
+  });
+
+  it("dados civis — 'número de telefone' não é endereço", () => {
+    const r = parseCsv("nome;número de telefone\nAna;11988887777");
+    expect(r.linhas[0].whatsapp).toBe("11988887777");
+    expect(r.linhas[0].numero).toBe("");
+  });
+
   it("escolaridade — 'incompleto' antes de 'superior'", () => {
     expect(mapEscolaridade("Ensino fundamental")).toBe("fundamental");
     expect(mapEscolaridade("ensino médio")).toBe("medio");

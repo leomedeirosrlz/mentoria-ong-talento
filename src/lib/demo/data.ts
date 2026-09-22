@@ -607,6 +607,12 @@ function build(): DemoData {
     pref_genero_par: "indiferente",
     cargo: "Coordenadora de programas", empresa: "Instituto Realiza",
     origem: "Equipe fundadora", consent_lgpd_em: haDias(400),
+    // sync-back da assinatura (0046): quem assinou tem a ficha preenchida
+    dados_civis: {
+      nome_civil: "Marina Duarte Ferreira", rg: "34.567.890-1",
+      cpf: "123.456.789-09", data_nascimento: "1988-03-15",
+      endereco: { logradouro: "Rua Vergueiro", numero: "1200", complemento: null, bairro: "Liberdade", cidade: "São Paulo", uf: "SP", cep: "01504001" },
+    },
   };
   const paulo: Profile = {
     id: uid(P.paulo), user_id: uid(0xf002), nome: "Paulo Serra",
@@ -635,6 +641,13 @@ function build(): DemoData {
     pref_genero_par: "indiferente",
     cargo: "Product manager", empresa: "Fintech",
     origem: "Post no LinkedIn", consent_lgpd_em: haDias(45),
+    // cadastro trouxe os civis — o /assinar dele chega preenchido e a demo
+    // mostra o prefill sem precisar digitar nada além do aceite
+    dados_civis: {
+      nome_civil: "Ricardo Tavares Lima", rg: "41.208.776-5",
+      cpf: "286.947.510-63", data_nascimento: "1990-01-18",
+      endereco: { logradouro: "Rua Augusta", numero: "2210", complemento: "ap 71", bairro: "Consolação", cidade: "São Paulo", uf: "SP", cep: "01412100" },
+    },
   };
   const sofia: Profile = {
     id: uid(P.sofia), user_id: uid(0xf004), nome: "Sofia Nogueira",
@@ -907,6 +920,12 @@ function build(): DemoData {
     objetivos: "Passar no ENEM pra pedagogia e montar um plano de estudos que eu consiga seguir.",
     escolaridade: "medio", origem: "Oficina de projetos da ONG Horizonte",
     disponibilidade: { dias: ["ter", "qui"], periodos: ["noite"] },
+    // sync-back da autorização assinada — a mãe dela ficou na ficha (0046)
+    responsavel: {
+      nome_civil: "Cleusa Maria Silva", rg: "22.334.556-7",
+      cpf: "321.654.987-11", data_nascimento: "1979-06-30", parentesco: "Mãe",
+      endereco: { logradouro: "Rua das Flores", numero: "88", complemento: null, bairro: "Jardim Brasil", cidade: "São Paulo", uf: "SP", cep: "08410250" },
+    },
   };
   const caio: Mentorado = {
     id: uid(M.caio), nome: "Caio Henrique Oliveira",
@@ -979,6 +998,18 @@ function build(): DemoData {
     objetivos: "Conseguir o primeiro emprego e montar um plano realista pra microempresa da família.",
     escolaridade: "medio", origem: "Projeto Semente",
     disponibilidade: { dias: ["ter", "qui"], periodos: ["noite"] },
+    // ficha do responsável veio da planilha da ONG — a autorização pendente
+    // dele (token 0x3404) já abre o link preenchido, só falta a mãe assinar
+    responsavel: {
+      nome_civil: "Sandra Regina Rodrigues", rg: "35.882.014-2",
+      cpf: "418.662.730-95", data_nascimento: "1984-02-11", parentesco: "Mãe",
+      endereco: { logradouro: "Rua do Bosque", numero: "147", complemento: null, bairro: "Vila Esperança", cidade: "São Paulo", uf: "SP", cep: "03345020" },
+    },
+    dados_civis: {
+      nome_civil: "Kauã Rodrigues de Jesus", rg: "58.201.447-3",
+      cpf: "", data_nascimento: "2008-07-19",
+      endereco: { logradouro: "Rua do Bosque", numero: "147", complemento: null, bairro: "Vila Esperança", cidade: "São Paulo", uf: "SP", cep: "03345020" },
+    },
   };
   const laura: Mentorado = {
     id: uid(M.laura), nome: "Laura Mendes",
@@ -1794,6 +1825,7 @@ function build(): DemoData {
   const documentoTemplates: DocumentoTemplate[] = [
     { id: uid(0x3301), slug: "termo-voluntario", titulo: "Termo de Adesão ao Trabalho Voluntário", versao: 1, signatario: "profile", ativo: true, created_at: haDias(400) },
     { id: uid(0x3302), slug: "autorizacao-responsavel", titulo: "Autorização do Responsável", versao: 1, signatario: "mentorado", ativo: true, created_at: haDias(400) },
+    { id: uid(0x3303), slug: "termo-mentorando", titulo: "Termo de Adesão e Participação no Programa de Mentoria Social", versao: 1, signatario: "mentorado", ativo: true, created_at: haDias(5) },
   ];
 
   const tplTermo = { slug: "termo-voluntario", titulo: "Termo de Adesão ao Trabalho Voluntário", versao: 1 };

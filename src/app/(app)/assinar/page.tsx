@@ -7,40 +7,25 @@ import {
 } from "@phosphor-icons/react/dist/ssr";
 import { assinarTermo } from "@/lib/actions-assinaturas";
 import { getMe } from "@/lib/queries";
-import { getMinhaAssinaturaTermo } from "@/lib/queries-assinaturas";
+import {
+  getMeusDadosCivis,
+  getMinhaAssinaturaTermo,
+} from "@/lib/queries-assinaturas";
 import { formatDateTime } from "@/lib/ciclo";
 import {
   ANEXO_I_PARAGRAFOS,
   ANEXO_I_TITULO,
+  civisPreview,
   CLAUSULAS_TERMO,
   FECHO_TERMO,
   TERMO_TITULO,
   preambuloTermo,
 } from "@/lib/documentos/texto";
-import type { DadosCivis } from "@/lib/types";
 import { AssinaturaForm } from "@/components/assinatura-form";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 
 export const metadata: Metadata = { title: "Termo de adesão" };
-
-/** Campos civis em branco no preview — o que a pessoa lê aqui é o molde;
- *  o termo preenchido sai só no PDF depois de assinar. */
-const DADOS_EM_BRANCO: DadosCivis = {
-  nome_civil: "______________________________________________",
-  rg: "__________________",
-  cpf: "___.___.___-__",
-  data_nascimento: null,
-  endereco: {
-    logradouro: "________________________",
-    numero: "______",
-    complemento: null,
-    bairro: "________________",
-    cidade: "________________",
-    uf: "____",
-    cep: "_____-___",
-  },
-};
 
 // Fluxo do signatário logado (0033): o voluntário lê o termo integral e
 // assina com os dados civis + nome digitado — a sessão prova a identidade,
@@ -48,7 +33,10 @@ const DADOS_EM_BRANCO: DadosCivis = {
 export default async function AssinarPage() {
   const me = await getMe();
   if (!me) redirect("/login"); // o layout já barra — convenção das páginas
-  const a = await getMinhaAssinaturaTermo();
+  const [a, civis] = await Promise.all([
+    getMinhaAssinaturaTermo(),
+    getMeusDadosCivis(),
+  ]);
 
   if (a?.status === "assinado") {
     return (
@@ -127,7 +115,7 @@ export default async function AssinarPage() {
             <h2 className="text-center font-bold uppercase tracking-wide">
               {TERMO_TITULO}
             </h2>
-            {preambuloTermo(DADOS_EM_BRANCO).map((p, i) => (
+            {preambuloTermo(civisPreview(civis)).map((p, i) => (
               <p key={i} className="text-justify">
                 {p}
               </p>
@@ -162,11 +150,12 @@ export default async function AssinarPage() {
           <div>
             <h2 className="text-base font-semibold">Seus dados e assinatura</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Preencha como no seu documento de identidade — entram no termo
-              exatamente como digitados.
+              {civis
+                ? "Já temos seus dados do cadastro — confira, corrija se preciso e assine."
+                : "Preencha como no seu documento de identidade — entram no termo exatamente como digitados."}
             </p>
           </div>
-          <AssinaturaForm modo="termo" acao={assinarTermo} />
+          <AssinaturaForm modo="termo" acao={assinarTermo} dados={civis} />
         </CardContent>
       </Card>
     </div>

@@ -7,61 +7,159 @@ import { CircleNotch, Signature } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import type { DadosCivis } from "@/lib/types";
 
 type Resultado = { error?: string; ok?: boolean };
 
+const cpfMask = (v: string) =>
+  v.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
+const cepMask = (v: string) =>
+  v.replace(/(\d{5})(\d{3})/, "$1-$2");
+
 /** Campos civis do signatário — compartilhados pelo termo do voluntário
- *  (logado) e pela autorização do responsável (token). Os nomes dos inputs
- *  são o contrato com parseDadosCivis em actions-assinaturas.ts. */
-export function DadosCivisFields() {
+ *  (logado), pela autorização do responsável (token) e pela ficha de
+ *  cadastro (0046 — `opcional` porque a coordenação pode não ter tudo na
+ *  mão ainda; a exigência real acontece no ato da assinatura). Os nomes
+ *  dos inputs são o contrato com parseDadosCivis em actions-assinaturas.ts
+ *  — `prefix` distingue o bloco do responsável na ficha do mentorado.
+ *  `defaults` preenche com o que já está na ficha (prefill de 0046).
+ *  `compacto` (cadastro) omite nome civil/nascimento/cidade/UF — a ficha
+ *  já pede esses, o parser do action junta tudo no jsonb. */
+export function DadosCivisFields({
+  defaults,
+  opcional,
+  prefix = "",
+  compacto,
+}: {
+  defaults?: DadosCivis | null;
+  opcional?: boolean;
+  prefix?: string;
+  compacto?: boolean;
+}) {
+  const req = opcional ? undefined : true;
+  const n = (k: string) => `${prefix}${k}`;
+  const e = defaults?.endereco;
   return (
     <div className="grid gap-4 sm:grid-cols-2">
-      <div className="sm:col-span-2">
-        <Label htmlFor="nome_civil">Nome civil completo</Label>
-        <Input id="nome_civil" name="nome_civil" required autoComplete="name" />
+      {!compacto && (
+        <div className="sm:col-span-2">
+          <Label htmlFor={n("nome_civil")}>Nome civil completo</Label>
+          <Input
+            id={n("nome_civil")}
+            name={n("nome_civil")}
+            required={req}
+            autoComplete="name"
+            defaultValue={defaults?.nome_civil ?? ""}
+          />
+        </div>
+      )}
+      <div>
+        <Label htmlFor={n("rg")}>RG</Label>
+        <Input
+          id={n("rg")}
+          name={n("rg")}
+          required={req}
+          placeholder="12.345.678-9"
+          defaultValue={defaults?.rg ?? ""}
+        />
       </div>
       <div>
-        <Label htmlFor="rg">RG</Label>
-        <Input id="rg" name="rg" required placeholder="12.345.678-9" />
+        <Label htmlFor={n("cpf")}>CPF</Label>
+        <Input
+          id={n("cpf")}
+          name={n("cpf")}
+          required={req}
+          inputMode="numeric"
+          placeholder="000.000.000-00"
+          defaultValue={defaults?.cpf ? cpfMask(defaults.cpf) : ""}
+        />
       </div>
+      {!compacto && (
+        <div>
+          <Label htmlFor={n("data_nascimento")}>Data de nascimento</Label>
+          <Input
+            id={n("data_nascimento")}
+            name={n("data_nascimento")}
+            type="date"
+            defaultValue={defaults?.data_nascimento ?? ""}
+          />
+        </div>
+      )}
       <div>
-        <Label htmlFor="cpf">CPF</Label>
-        <Input id="cpf" name="cpf" required inputMode="numeric" placeholder="000.000.000-00" />
-      </div>
-      <div>
-        <Label htmlFor="data_nascimento">Data de nascimento</Label>
-        <Input id="data_nascimento" name="data_nascimento" type="date" />
-      </div>
-      <div>
-        <Label htmlFor="cep">CEP</Label>
-        <Input id="cep" name="cep" required inputMode="numeric" placeholder="00000-000" />
+        <Label htmlFor={n("cep")}>CEP</Label>
+        <Input
+          id={n("cep")}
+          name={n("cep")}
+          required={req}
+          inputMode="numeric"
+          placeholder="00000-000"
+          defaultValue={e?.cep ? cepMask(e.cep) : ""}
+        />
       </div>
       <div className="sm:col-span-2 grid grid-cols-[1fr_100px] gap-4">
         <div>
-          <Label htmlFor="logradouro">Logradouro</Label>
-          <Input id="logradouro" name="logradouro" required placeholder="Rua, avenida…" />
+          <Label htmlFor={n("logradouro")}>Logradouro</Label>
+          <Input
+            id={n("logradouro")}
+            name={n("logradouro")}
+            required={req}
+            placeholder="Rua, avenida…"
+            defaultValue={e?.logradouro ?? ""}
+          />
         </div>
         <div>
-          <Label htmlFor="numero">Número</Label>
-          <Input id="numero" name="numero" required />
+          <Label htmlFor={n("numero")}>Número</Label>
+          <Input
+            id={n("numero")}
+            name={n("numero")}
+            required={req}
+            defaultValue={e?.numero ?? ""}
+          />
         </div>
       </div>
       <div>
-        <Label htmlFor="complemento">Complemento</Label>
-        <Input id="complemento" name="complemento" placeholder="Opcional" />
+        <Label htmlFor={n("complemento")}>Complemento</Label>
+        <Input
+          id={n("complemento")}
+          name={n("complemento")}
+          placeholder="Opcional"
+          defaultValue={e?.complemento ?? ""}
+        />
       </div>
       <div>
-        <Label htmlFor="bairro">Bairro</Label>
-        <Input id="bairro" name="bairro" required />
+        <Label htmlFor={n("bairro")}>Bairro</Label>
+        <Input
+          id={n("bairro")}
+          name={n("bairro")}
+          required={req}
+          defaultValue={e?.bairro ?? ""}
+        />
       </div>
-      <div>
-        <Label htmlFor="cidade">Cidade</Label>
-        <Input id="cidade" name="cidade" required />
-      </div>
-      <div>
-        <Label htmlFor="uf">UF</Label>
-        <Input id="uf" name="uf" required maxLength={2} placeholder="SP" className="uppercase" />
-      </div>
+      {!compacto && (
+        <>
+          <div>
+            <Label htmlFor={n("cidade")}>Cidade</Label>
+            <Input
+              id={n("cidade")}
+              name={n("cidade")}
+              required={req}
+              defaultValue={e?.cidade ?? ""}
+            />
+          </div>
+          <div>
+            <Label htmlFor={n("uf")}>UF</Label>
+            <Input
+              id={n("uf")}
+              name={n("uf")}
+              required={req}
+              maxLength={2}
+              placeholder="SP"
+              className="uppercase"
+              defaultValue={e?.uf ?? ""}
+            />
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -73,11 +171,18 @@ export function AssinaturaForm({
   modo,
   alvoNome,
   acao,
+  dados,
+  parentesco,
 }: {
   modo: "termo" | "autorizacao";
   /** nome do jovem (autorização) — read-only, vem do servidor */
   alvoNome?: string;
   acao: (formData: FormData) => Promise<Resultado>;
+  /** dados civis já na ficha (0046) — o form nasce preenchido, a pessoa só
+   *  confere/corrige e digita o nome */
+  dados?: DadosCivis | null;
+  /** parentesco já cadastrado (autorização) */
+  parentesco?: string;
 }) {
   const [pending, start] = useTransition();
   const [erro, setErro] = useState<string | null>(null);
@@ -115,12 +220,13 @@ export function AssinaturaForm({
               name="parentesco"
               required
               placeholder="Mãe, pai, avó, tio…"
+              defaultValue={parentesco ?? ""}
             />
           </div>
         </>
       )}
 
-      <DadosCivisFields />
+      <DadosCivisFields defaults={dados} />
 
       <label className="flex items-start gap-3 rounded-xl border border-input bg-muted/40 p-4 text-sm leading-relaxed">
         <input

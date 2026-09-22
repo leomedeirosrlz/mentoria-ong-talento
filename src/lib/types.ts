@@ -89,6 +89,11 @@ export type Profile = {
   origem?: string | null;
   /** Carimbo do consentimento LGPD no cadastro. */
   consent_lgpd_em?: string | null;
+  /** Dados civis pra documentos (0046): RG/CPF/endereço extraídos uma vez —
+   *  planilha ou cadastro — e o termo preenche sozinho. Sensível: fora do
+   *  grant de SELECT — coordenação lê/edita por profiles_pessoal, o próprio
+   *  signatário lê via RPC meus_dados_civis. */
+  dados_civis?: DadosCivis | null;
 };
 
 export type Mentorado = {
@@ -123,6 +128,12 @@ export type Mentorado = {
   /** Grade semanal {dias,periodos} (0038) — insumo do matching, mesma forma
    *  da de mentor_profiles. */
   disponibilidade?: Disponibilidade | null;
+  /** Dados civis do(a) jovem pro termo de participação (0046). Sensível —
+   *  coordenação via mentorados_pessoal; signatário via token RPC. */
+  dados_civis?: DadosCivis | null;
+  /** Responsável legal do(a) menor — quem assina a autorização (0046).
+   *  Sensível, mesma regra de dados_civis. */
+  responsavel?: ResponsavelCivis | null;
 };
 
 /** mentor_profiles — ficha do mentor que alimenta o board de matching
@@ -470,10 +481,14 @@ export type DadosCivis = {
   endereco: Endereco;
 };
 
+/** Responsável legal no cadastro do mentorado (0046) — mesmo shape que o
+ *  snapshot da autorização guarda. */
+export type ResponsavelCivis = DadosCivis & { parentesco: string };
+
 /** Snapshot da autorização: quem é o jovem + dados civis do responsável. */
 export type DadosAutorizacao = {
   mentorado_nome: string;
-  responsavel: DadosCivis & { parentesco: string };
+  responsavel: ResponsavelCivis;
 };
 
 export type Assinatura = {

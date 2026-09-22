@@ -1,4 +1,4 @@
-import type { AppRole, Escolaridade, Genero, PrefGeneroPar } from "./types";
+import type { AppRole, DadosCivis, Escolaridade, Genero, PrefGeneroPar } from "./types";
 
 /** Linha normalizada da planilha — união dos campos de pessoas (profiles +
  *  mentor_profiles) e de mentorados. Campos que não se aplicam ao tipo são
@@ -25,6 +25,25 @@ export type LinhaImportada = {
   escolaridade: string;
   experiencia_previa: string;
   formacao_externa: string;
+  rg: string;
+  cpf: string;
+  cep: string;
+  logradouro: string;
+  numero: string;
+  complemento: string;
+  bairro: string;
+  resp_nome: string;
+  resp_parentesco: string;
+  resp_rg: string;
+  resp_cpf: string;
+  resp_nascimento: string;
+  resp_cidade: string;
+  resp_uf: string;
+  resp_cep: string;
+  resp_logradouro: string;
+  resp_numero: string;
+  resp_complemento: string;
+  resp_bairro: string;
 };
 
 const VAZIA: LinhaImportada = {
@@ -49,6 +68,25 @@ const VAZIA: LinhaImportada = {
   escolaridade: "",
   experiencia_previa: "",
   formacao_externa: "",
+  rg: "",
+  cpf: "",
+  cep: "",
+  logradouro: "",
+  numero: "",
+  complemento: "",
+  bairro: "",
+  resp_nome: "",
+  resp_parentesco: "",
+  resp_rg: "",
+  resp_cpf: "",
+  resp_nascimento: "",
+  resp_cidade: "",
+  resp_uf: "",
+  resp_cep: "",
+  resp_logradouro: "",
+  resp_numero: "",
+  resp_complemento: "",
+  resp_bairro: "",
 };
 
 function semAcento(s: string): string {
@@ -62,6 +100,39 @@ function semAcento(s: string): string {
  *  vêm antes dos genéricos (nome, genero) pra não serem engolidos. */
 function canonHeader(h: string): keyof LinhaImportada | null {
   const n = semAcento(h);
+  // responsável do menor primeiro — "nome do responsável" não pode cair no
+  // "nome" genérico; qualquer campo civil seguido de "responsável" é dele.
+  // `\bresp[_. ]` cobre os headers crus do modelo CSV (resp_nome, resp_cpf).
+  if (/\brespons|\bresp[_. ]/.test(n)) {
+    // dentro do bloco os \b não valem: "resp_cpf" tem "_" antes de "cpf" —
+    // como a entrada já garante que é campo do responsável, casa substring
+    if (/parentesco|grau/.test(n)) return "resp_parentesco";
+    if (/\brg\b|_rg\b|registro|identidade/.test(n)) return "resp_rg";
+    if (/cpf/.test(n)) return "resp_cpf";
+    if (/nascimento|aniversario/.test(n)) return "resp_nascimento";
+    if (/cep/.test(n)) return "resp_cep";
+    if (/bairro/.test(n)) return "resp_bairro";
+    if (/complemento|apto?|bloco/.test(n)) return "resp_complemento";
+    if (/cidade|municipio|localidade/.test(n)) return "resp_cidade";
+    if (/uf|estado/.test(n)) return "resp_uf";
+    if (/endereco|logradouro|rua|avenida/.test(n)) return "resp_logradouro";
+    // telefone/e-mail do responsável não entram no bloco civil — não vira nome
+    if (/whats|telefone|celular|fone|phone|e-?mail/.test(n)) return null;
+    // "resp_nome" não é número: o "no" precisa ser token próprio
+    if (/numero|_n[ºo°](_|$)/.test(n)) return "resp_numero";
+    return "resp_nome";
+  }
+  // "parentesco" sozinho também é campo do responsável
+  if (/\bparentesco/.test(n)) return "resp_parentesco";
+  // dados civis (0046) — documentos e endereço que preenchem os termos
+  if (/\brg\b|registro geral|\bidentidade/.test(n)) return "rg";
+  if (/\bcpf\b/.test(n)) return "cpf";
+  if (/\bcep\b/.test(n)) return "cep";
+  if (/\bbairro/.test(n)) return "bairro";
+  if (/\bcomplemento|\bapto?\b|\bbloco/.test(n)) return "complemento";
+  // "nº" não tem \b depois do símbolo — o lookahead cobre fim de linha
+  if ((/\bnumero|\bn[ºo°](?=\s|$)/.test(n)) && !/telefone|celular|whats/.test(n)) return "numero";
+  if (/\b(endereco|logradouro)/.test(n)) return "logradouro";
   if (/\b(e-?mail|correio)/.test(n)) return "email";
   if (/\b(whats|telefone|celular|fone|phone)/.test(n)) return "whatsapp";
   if (/\b(nome social|nome_social)/.test(n)) return "nome_social";
@@ -258,4 +329,49 @@ export function mapEscolaridade(s: string): Escolaridade | null {
   if (/incompleto|cursando|inacabado/.test(n)) return "superior_incompleto";
   if (/superior|graduac|faculdade|bacharel|licenciat/.test(n)) return "superior";
   return null;
+}
+
+// ---------- dados civis (0046) ----------
+
+/** Colunas civis da linha → jsonb pra dados_civis / responsavel. `prefix`
+ *  "" lê o bloco da própria pessoa, "resp_" o do responsável. `fixos`
+ *  injeta o que a ficha já tem (nome/nascimento/cidade/UF) — a planilha só
+ *  precisa trazer documento e endereço. Tudo vazio → null (não grava
+ *  esqueleto); CPF de planilha não é validado aqui — o termo exige de
+ *  novo na hora de assinar, e bloquear a linha inteira por um campo
+ *  opcional perderia o cadastro. */
+export function civisImportado(
+  l: LinhaImportada,
+  prefix: "" | "resp_" = "",
+  fixos: Partial<Pick<DadosCivis, "nome_civil" | "data_nascimento">> & {
+    cidade?: string;
+    uf?: string | null;
+  } = {}
+): DadosCivis | null {
+  const g = (k: string) =>
+    normNome(String(l[`${prefix}${k}` as keyof LinhaImportada] ?? ""));
+  const dados: DadosCivis = {
+    nome_civil: fixos.nome_civil ?? g("nome"),
+    rg: g("rg"),
+    cpf: g("cpf").replace(/\D/g, ""),
+    data_nascimento: fixos.data_nascimento ?? normData(g("nascimento")),
+    endereco: {
+      logradouro: g("logradouro"),
+      numero: g("numero"),
+      complemento: g("complemento") || null,
+      bairro: g("bairro"),
+      cidade: fixos.cidade ?? g("cidade"),
+      uf: (fixos.uf ?? normUf(g("uf"))) ?? "",
+      cep: g("cep").replace(/\D/g, ""),
+    },
+  };
+  const temAlgo =
+    dados.rg ||
+    dados.cpf ||
+    dados.endereco.logradouro ||
+    dados.endereco.bairro ||
+    dados.endereco.cep ||
+    dados.endereco.numero ||
+    (!fixos.nome_civil && dados.nome_civil);
+  return temAlgo ? dados : null;
 }

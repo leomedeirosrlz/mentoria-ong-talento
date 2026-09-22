@@ -40,24 +40,29 @@ const TIPO_LABEL: Record<Tipo, string> = {
 
 const DICAS: Record<Tipo, string> = {
   equipe:
-    "Colunas: nome, email, whatsapp, papel (mentor dpp / especialista / supervisor / coordenação — em branco vira mentor DPP) e a ficha opcional: nome_social, data_nascimento (dd/mm/aaaa), genero, cidade, uf, cargo, empresa, interesses (separados por vírgula), motivacao, pref_genero_par, origem, experiencia_previa e formacao_externa (estas duas gravam na ficha de mentor).",
+    "Colunas: nome, email, whatsapp, papel (mentor dpp / especialista / supervisor / coordenação — em branco vira mentor DPP) e a ficha opcional: nome_social, data_nascimento (dd/mm/aaaa), genero, cidade, uf, cargo, empresa, interesses (separados por vírgula), motivacao, pref_genero_par, origem, experiencia_previa e formacao_externa (estas duas gravam na ficha de mentor). Documentos pro termo: rg, cpf, cep, logradouro, numero, complemento, bairro.",
   mentorados:
-    "Colunas: nome, whatsapp, email, ong, notas e a ficha opcional: nome_social, data_nascimento (dd/mm/aaaa), genero, cidade, uf, escolaridade, interesses (por vírgula), objetivos, motivacao, pref_genero_par, origem. Só o nome é obrigatório.",
+    "Colunas: nome, whatsapp, email, ong, notas e a ficha opcional: nome_social, data_nascimento (dd/mm/aaaa), genero, cidade, uf, escolaridade, interesses (por vírgula), objetivos, motivacao, pref_genero_par, origem. Só o nome é obrigatório. Documentos pro termo: rg, cpf, cep, logradouro, numero, complemento, bairro; e do responsável: resp_nome, resp_parentesco, resp_rg, resp_cpf, resp_nascimento, resp_cidade, resp_uf, resp_cep, resp_logradouro, resp_numero, resp_complemento, resp_bairro.",
 };
 
 const MODELO: Record<Tipo, string> = {
   equipe:
-    "nome;email;whatsapp;papel;nome_social;data_nascimento;genero;cidade;uf;cargo;empresa;interesses;motivacao;pref_genero_par;origem;experiencia_previa;formacao_externa",
+    "nome;email;whatsapp;papel;nome_social;data_nascimento;genero;cidade;uf;cargo;empresa;interesses;motivacao;pref_genero_par;origem;experiencia_previa;formacao_externa;rg;cpf;cep;logradouro;numero;complemento;bairro",
   mentorados:
-    "nome;whatsapp;email;ong;notas;nome_social;data_nascimento;genero;cidade;uf;escolaridade;interesses;objetivos;motivacao;pref_genero_par;origem",
+    "nome;whatsapp;email;ong;notas;nome_social;data_nascimento;genero;cidade;uf;escolaridade;interesses;objetivos;motivacao;pref_genero_par;origem;rg;cpf;cep;logradouro;numero;complemento;bairro;resp_nome;resp_parentesco;resp_rg;resp_cpf;resp_nascimento;resp_cidade;resp_uf;resp_cep;resp_logradouro;resp_numero;resp_complemento;resp_bairro",
 };
 
-/** Campos da ficha (0034) reconhecidos na linha — pro resumo da prévia. */
+/** Campos da ficha (0034) + civis (0046) reconhecidos na linha — pro resumo
+ *  da prévia. */
 function extrasDaLinha(r: LinhaImportada): number {
   return [
     r.nome_social, r.data_nascimento, r.genero, r.cidade, r.uf, r.interesses,
     r.motivacao, r.pref_genero_par, r.cargo, r.empresa, r.origem, r.objetivos,
     r.escolaridade, r.experiencia_previa, r.formacao_externa,
+    r.rg, r.cpf, r.cep, r.logradouro, r.numero, r.complemento, r.bairro,
+    r.resp_nome, r.resp_parentesco, r.resp_rg, r.resp_cpf, r.resp_nascimento,
+    r.resp_cidade, r.resp_uf, r.resp_cep, r.resp_logradouro, r.resp_numero,
+    r.resp_complemento, r.resp_bairro,
   ].filter((v) => v.trim()).length;
 }
 
