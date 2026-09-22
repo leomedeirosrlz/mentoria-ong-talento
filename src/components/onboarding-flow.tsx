@@ -363,7 +363,7 @@ export function OnboardingFlow({ me }: { me: Profile }) {
       case 1:
         return "O que você pode fazer aqui";
       case 2:
-        return "Uma foto ajuda a dupla a te reconhecer";
+        return "Uma foto ajuda as pessoas a te reconhecer";
       case 3:
         return "Conte sua trajetória em poucas linhas";
       case 4:
