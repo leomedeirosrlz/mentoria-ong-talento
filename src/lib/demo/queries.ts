@@ -166,6 +166,20 @@ export function demoMe(role: AppRole, onboarded: boolean): Profile {
   return semPessoal(base);
 }
 
+/** Sensíveis do PRÓPRIO cadastro (espelha a RPC meus_dados_pessoais — a
+ *  persona é o "eu" do papel, então a leitura self-scoped volta cheia). */
+export function demoMeusDadosPessoais(
+  role: AppRole
+): Pick<DadosPessoais, "data_nascimento" | "genero" | "pref_genero_par" | "motivacao"> {
+  const p = getDemoData().personas[role];
+  return {
+    data_nascimento: p.data_nascimento ?? null,
+    genero: p.genero ?? null,
+    pref_genero_par: p.pref_genero_par ?? null,
+    motivacao: p.motivacao ?? null,
+  };
+}
+
 // ---------- catálogo — igual pra todos os papéis ----------
 
 export function demoCicloEventos(): CicloEvento[] {

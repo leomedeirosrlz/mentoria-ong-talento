@@ -18,6 +18,7 @@ import {
   demoMentorados,
   demoMentorProfiles,
   demoMeuMentorProfile,
+  demoMeusDadosPessoais,
   demoMinhasDuplas,
   demoNotificacoes,
   demoPessoalMap,
@@ -496,6 +497,26 @@ export const getMeuMentorProfile = cache(
       return null;
     }
     return (data as MentorProfile | null) ?? null;
+  }
+);
+
+/** Os 4 sensíveis do PRÓPRIO cadastro (RPC meus_dados_pessoais, 0048) —
+ *  alimenta o prefill do onboarding/perfil. A RPC é self-scoped por
+ *  my_profile_id(): terceiros nunca entram na resposta. */
+export const getMeusDadosPessoais = cache(
+  async (): Promise<Pick<
+    DadosPessoais,
+    "data_nascimento" | "genero" | "pref_genero_par" | "motivacao"
+  > | null> => {
+    const demo = await demoRole();
+    if (demo) return demoMeusDadosPessoais(demo);
+    const supabase = await createClient();
+    const { data, error } = await supabase.rpc("meus_dados_pessoais");
+    if (error) {
+      console.error("getMeusDadosPessoais:", error);
+      return null;
+    }
+    return data;
   }
 );
 

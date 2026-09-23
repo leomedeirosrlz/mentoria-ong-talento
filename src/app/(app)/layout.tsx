@@ -5,7 +5,7 @@ import { signOut } from "@/lib/actions";
 import { getDemoData } from "@/lib/demo/data";
 import { demoRole } from "@/lib/demo/mode";
 import { DEMO_ROLES } from "@/lib/demo/shared";
-import { getMe, getNotificacoes } from "@/lib/queries";
+import { getMe, getMeuMentorProfile, getMeusDadosPessoais, getNotificacoes } from "@/lib/queries";
 import { avatarPublicUrl, gravatarUrl } from "@/lib/avatar";
 import type { AppRole } from "@/lib/types";
 
@@ -87,11 +87,17 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // onboarding pendente (0031): o wizard substitui o shell inteiro, como as
   // telas bloqueadas acima — concluirOnboarding + router.refresh() devolve o app
   if (!me.onboarded_em) {
+    // prefill: a importação da coordenação já pode ter trazido a ficha —
+    // sensíveis via RPC self-scoped (0048), ficha de mentor via grant próprio
+    const [pessoal, mentorProfile] = await Promise.all([
+      getMeusDadosPessoais(),
+      getMeuMentorProfile(),
+    ]);
     // DemoBar depois do wizard: mesma z-50, ordem de paint decide — ela precisa
     // ficar clicável por cima do onboarding pra trocar de papel / sair da demo
     return (
       <>
-        <OnboardingFlow me={me} />
+        <OnboardingFlow me={me} pessoal={pessoal} mentorProfile={mentorProfile} />
         {demoBar}
       </>
     );

@@ -39,7 +39,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import type { AppRole, Disponibilidade, Profile } from "@/lib/types";
+import type { DadosPessoais } from "@/lib/queries";
+import type { AppRole, Disponibilidade, MentorProfile, Profile } from "@/lib/types";
 
 /** Um form por passo — o botão do footer fixo submete via atributo `form`. */
 const FORM_ID = "onboarding-passo";
@@ -86,7 +87,22 @@ const PASSO_DISPONIBILIDADE = 8;
  *  do perfil por vez (salvarOnboarding com patch parcial: só o que o passo
  *  mandou é escrito). O gate mora no layout: onboarded_em null renderiza isto
  *  no lugar do shell. */
-export function OnboardingFlow({ me }: { me: Profile }) {
+export function OnboardingFlow({
+  me,
+  pessoal,
+  mentorProfile,
+}: {
+  me: Profile;
+  /** sensíveis do próprio cadastro (RPC self-scoped, 0048) — preenchem o
+   *  passo "Sobre você" quando a importação da coordenação já os trouxe. */
+  pessoal?: Pick<
+    DadosPessoais,
+    "data_nascimento" | "genero" | "pref_genero_par" | "motivacao"
+  > | null;
+  /** ficha de mentor (mentor_profiles é legível pelo dono) — preenche os
+   *  passos de pareamento e disponibilidade. */
+  mentorProfile?: MentorProfile | null;
+}) {
   const router = useRouter();
   const ehMentor = me.role === "mentor_dpp" || me.role === "mentor_especialista";
   // coord/supervisor: boas-vindas + recursos + ficha pessoal + fechamento (4);
@@ -107,25 +123,29 @@ export function OnboardingFlow({ me }: { me: Profile }) {
   const [linkedin, setLinkedin] = useState(me.linkedin ?? "");
   const [voluntariado, setVoluntariado] = useState(me.voluntariado ?? "");
 
-  // ficha pessoal (0034) — os sensíveis (nascimento/gênero/motivação) são
-  // write-only aqui: getMe não os devolve, então sempre começam em branco
+  // ficha pessoal (0034) — os sensíveis chegam por `pessoal` (RPC self-
+  // scoped 0048): se a importação da coordenação já os trouxe, vêm
+  // preenchidos e a pessoa só confere
   const [nomeSocial, setNomeSocial] = useState(me.nome_social ?? "");
-  const [nascimento, setNascimento] = useState("");
-  const [genero, setGenero] = useState("");
+  const [nascimento, setNascimento] = useState(pessoal?.data_nascimento ?? "");
+  const [genero, setGenero] = useState(pessoal?.genero ?? "");
   const [cidade, setCidade] = useState(me.cidade ?? "");
   const [uf, setUf] = useState(me.uf ?? "");
   const [cargo, setCargo] = useState(me.cargo ?? "");
   const [empresa, setEmpresa] = useState(me.empresa ?? "");
   const [origem, setOrigem] = useState(me.origem ?? "");
   const [interesses, setInteresses] = useState<string[]>(me.interesses ?? []);
-  const [motivacao, setMotivacao] = useState("");
+  const [motivacao, setMotivacao] = useState(pessoal?.motivacao ?? "");
   const [consent, setConsent] = useState(false);
 
-  // ficha de mentor (0034) — pareamento + grade semanal
-  const [prefGenero, setPrefGenero] = useState("");
-  const [experiencia, setExperiencia] = useState("");
-  const [formacao, setFormacao] = useState("");
-  const [disponibilidade, setDisponibilidade] = useState<Disponibilidade | null>(null);
+  // ficha de mentor (0034) — pareamento + grade semanal, já preenchidos se
+  // a coordenação importou (mentor_profiles é legível pelo dono)
+  const [prefGenero, setPrefGenero] = useState(pessoal?.pref_genero_par ?? "");
+  const [experiencia, setExperiencia] = useState(mentorProfile?.experiencia_previa ?? "");
+  const [formacao, setFormacao] = useState(mentorProfile?.formacao_externa ?? "");
+  const [disponibilidade, setDisponibilidade] = useState<Disponibilidade | null>(
+    mentorProfile?.disponibilidade ?? null
+  );
 
   const fileRef = useRef<HTMLInputElement>(null);
   const objUrl = useRef<string | null>(null);
@@ -211,8 +231,8 @@ export function OnboardingFlow({ me }: { me: Profile }) {
   }
 
   /** Passo "Sobre você" (0034) — a ficha pessoal que alimenta o cadastro e o
-   *  matching. Os sensíveis são gravados, não lidos de volta: fora da
-   *  coordenação ninguém os vê depois (grant de coluna no banco). */
+   *  matching. Os sensíveis voltam preenchidos via `pessoal` (self-scoped);
+   *  depois do cadastro, fora da coordenação ninguém mais os lê. */
   const passoSobreVoce = (
     <div className="space-y-4">
       <div className="grid gap-4 sm:grid-cols-2">
