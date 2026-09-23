@@ -39,7 +39,7 @@ Plataforma operacional do Programa de Mentoria — vertical slice funcionando co
 - `encontros` são agendados pela dupla (`unique(dupla_id, numero)`); `registros` = follow-up pós-encontro com os campos do form semanal de mentores (`atividades`, `avaliacao`, `dificuldade`, `proximo_passo`) + tema/instrumento do guia.
 - Semáforo: pedido de apoio, avaliação baixa **+** dificuldade, ou ≥2 encontros atrasados → `risco`; 1 atraso, avaliação baixa, dificuldade identificada, registro pendente ou encaminhamento vencido → `atencao`.
 - RLS inteiro via `my_role()` / `my_profile_id()`; mentor escreve só na própria dupla, supervisor lê as supervisionadas, coordenação tudo.
-- Auth: magic link; profiles pré-cadastrados pela coordenação e o trigger `handle_new_user` vincula `user_id` no 1º login (sem papel → tela "cadastro recebido"). Login por senha existe só pra teste.
+- Auth: magic link **implícito** — `createOtpClient` (supabase-js solto, `flowType: "implicit"`, sem persist) manda o link sem PKCE porque o client ssr força pkce e o verifier morria no browser que pediu; o link cai em `/login#access_token` e o LoginForm grava via `setSession` — abre em qualquer navegador/dispositivo. `/auth/confirm` só atende `token_hash` e links pkce antigos. Profiles pré-cadastrados pela coordenação e o trigger `handle_new_user` vincula `user_id` no 1º login (sem papel → tela "cadastro recebido"). Login por senha existe só pra teste.
 
 ## Modo demo (`/demo`)
 

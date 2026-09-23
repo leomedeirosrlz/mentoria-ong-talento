@@ -562,6 +562,9 @@ function authDemo(papel: AppRole | null) {
         email: persona.email,
         aud: "authenticated",
         role: "authenticated",
+        // senha_em presente = pula o onboarding de senha do login — personas
+        // são contas estabelecidas, não primeiro acesso
+        user_metadata: { senha_em: "demo" },
       }
     : null;
   const session = user

@@ -20,6 +20,10 @@ export async function GET(request: NextRequest) {
       ),
     );
 
+  // links novos não passam por aqui: o magic link implícito cai direto em
+  // /login com #access_token (resolvido via setSession no client). Esta rota
+  // fica pra token_hash (template com {{ .TokenHash }}) e os links pkce já
+  // enviados antes da mudança — o ?code= deles só troca no mesmo navegador.
   const code = searchParams.get("code");
   if (code) {
     const { data, error } = await supabase.auth.exchangeCodeForSession(code);

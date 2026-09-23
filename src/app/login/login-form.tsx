@@ -2,9 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { type Session } from "@supabase/supabase-js";
 import { motion, AnimatePresence } from "motion/react";
-import { CircleNotch, EnvelopeSimple, Key } from "@phosphor-icons/react";
-import { createClient } from "@/lib/supabase/client";
+import { CircleNotch, EnvelopeSimple, Key, WarningCircle } from "@phosphor-icons/react";
+import { createClient, createOtpClient } from "@/lib/supabase/client";
 import { SiteFooter } from "@/components/site-footer";
 import { fade, T } from "@/components/motion";
 import { Button } from "@/components/ui/button";
@@ -23,6 +24,9 @@ function mensagemErro(error: { message: string; code?: string }, modo: "link" | 
   if (texto.includes("email_not_confirmed") || texto.includes("email not confirmed")) {
     return "Confirme seu e-mail antes de entrar.";
   }
+  if (texto.includes("otp_disabled") || texto.includes("signups not allowed")) {
+    return "E-mail não cadastrado — fale com a coordenação pra liberar seu acesso.";
+  }
   return modo === "link"
     ? "Não foi possível enviar o link. Confira o e-mail ou tente de novo em alguns minutos."
     : "Não foi possível entrar. Tente de novo em alguns minutos.";
@@ -39,6 +43,9 @@ export function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
   const supabase = useMemo(() => createClient(), []);
+  // client implícito só pro pedido do link — o ssr força pkce, que prende o
+  // acesso ao browser que pediu (ver createOtpClient)
+  const otp = useMemo(() => createOtpClient(), []);
   // o painel "enviado" monta só depois do exit do form (mode="wait") — um
   // useEffect([enviado]) dispararia com o ref ainda null e perderia o foco;
   // ref callback foca quando o nó existe de verdade
@@ -51,8 +58,15 @@ export function LoginForm() {
   // expirado não é âncora da app e não pode vazar pro destino
   const destinoFinal = useCallback(() => {
     const next = params.get("next");
-    const hash = location.hash.startsWith("#error=") ? "" : location.hash;
+    // só a âncora da app é repassada — #error=/#access_token= do GoTrue não
+    const hash = location.hash.startsWith("#registrar-") ? location.hash : "";
     return (pathInterno(next) ?? "/") + hash;
+  }, [params]);
+
+  // url do estado "link inválido" — a mesma que o /auth/confirm produz
+  const urlErroLink = useCallback(() => {
+    const next = params.get("next");
+    return `/login?erro=link-invalido${next ? `&next=${encodeURIComponent(next)}` : ""}`;
   }, [params]);
 
   // verify falhou (otp expirado/usado): o supabase despeja #error=… na raiz,
@@ -60,11 +74,62 @@ export function LoginForm() {
   // estado ?erro=link-invalido que o /auth/confirm já produz
   useEffect(() => {
     if (!location.hash.startsWith("#error=")) return;
-    const next = params.get("next");
-    router.replace(
-      `/login?erro=link-invalido${next ? `&next=${encodeURIComponent(next)}` : ""}`
-    );
-  }, [params, router]);
+    router.replace(urlErroLink());
+  }, [router, urlErroLink]);
+
+  // destino pós-login com sessão: quem nunca definiu senha passa pelo
+  // onboarding de senha primeiro (o desvio que o /auth/confirm fazia no
+  // fluxo pkce — sem isso o landing implícito o pularia)
+  const entrar = useCallback(
+    (session: Session | null) => {
+      const destino = destinoFinal();
+      const temSenha = !!session?.user?.user_metadata?.senha_em;
+      router.push(
+        temSenha ? destino : `/auth/definir-senha?next=${encodeURIComponent(destino)}`
+      );
+    },
+    [router, destinoFinal]
+  );
+
+  // sessão ativa ao abrir a página: quem já está logado não fica preso no
+  // /login, e o magic link implícito cai AQUI com #access_token — o client
+  // ssr (pkce) recusaria o hash, então os tokens são trocados via setSession
+  // e a URL limpa. O efeito de `enviado` abaixo cuida da aba que aguarda;
+  // este cobre a aba nova que recebe o link
+  useEffect(() => {
+    let entrou = false;
+    const ir = (session: Session | null) => {
+      if (entrou || !session) return;
+      entrou = true;
+      entrar(session);
+    };
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "SIGNED_IN") ir(session);
+    });
+
+    const frag = new URLSearchParams(location.hash.slice(1));
+    const access_token = frag.get("access_token");
+    const refresh_token = frag.get("refresh_token");
+    if (access_token && refresh_token) {
+      // tokens fora da barra/histórico antes de qualquer await
+      history.replaceState(null, "", location.pathname + location.search);
+      void supabase.auth
+        .setSession({ access_token, refresh_token })
+        .then(async ({ error }) => {
+          if (error) {
+            router.replace(urlErroLink());
+            return;
+          }
+          const { data } = await supabase.auth.getSession();
+          ir(data.session);
+        });
+    } else {
+      void supabase.auth.getSession().then(({ data }) => ir(data.session));
+    }
+    return () => subscription.unsubscribe();
+  }, [supabase, entrar, router, urlErroLink]);
 
   // countdown do reenvio — tick de 1s até zerar
   useEffect(() => {
@@ -79,19 +144,19 @@ export function LoginForm() {
   useEffect(() => {
     if (!enviado) return;
     let entrou = false;
-    const entrar = () => {
-      if (entrou) return;
+    const ir = (session: Session | null) => {
+      if (entrou || !session) return;
       entrou = true;
-      router.push(destinoFinal());
+      entrar(session);
     };
     const checar = async () => {
       const { data } = await supabase.auth.getSession();
-      if (data.session) entrar();
+      ir(data.session);
     };
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "SIGNED_IN") entrar();
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "SIGNED_IN") ir(session);
     });
     const intervalo = setInterval(checar, 2500);
     const aoVoltar = () => {
@@ -105,17 +170,22 @@ export function LoginForm() {
       document.removeEventListener("visibilitychange", aoVoltar);
       window.removeEventListener("focus", aoVoltar);
     };
-  }, [enviado, params, router, supabase, destinoFinal]);
+  }, [enviado, supabase, entrar]);
 
   async function pedirLink() {
     setLoading(true);
     setErro(null);
     try {
       const destino = destinoFinal();
-      const { error } = await supabase.auth.signInWithOtp({
+      const { error } = await otp.auth.signInWithOtp({
         email: email.trim().toLowerCase(),
         options: {
-          emailRedirectTo: `${location.origin}/auth/confirm?next=${encodeURIComponent(destino)}`,
+          // signup por OTP é bloqueado no banco (0045) — declarar aqui evita
+          // o 500 "Database error saving new user" do GoTrue
+          shouldCreateUser: false,
+          // implicit: a sessão chega no hash (#access_token) — o destino
+          // precisa ser uma página de client, rota de servidor não vê hash
+          emailRedirectTo: `${location.origin}/login?next=${encodeURIComponent(destino)}`,
         },
       });
       if (error) {
@@ -158,6 +228,9 @@ export function LoginForm() {
   }
 
   const mmss = `${Math.floor(cooldown / 60)}:${String(cooldown % 60).padStart(2, "0")}`;
+  // link expirado/usado chega como ?erro=link-invalido (de /auth/confirm ou
+  // do normalizador de #error=) — merece tela própria, não o form com um aviso
+  const erroLink = params.get("erro") != null;
 
   return (
     // flex + m-auto (não place-items-center): com o teclado virtual
@@ -176,7 +249,37 @@ export function LoginForm() {
             mesmo espaço em vez de corte seco (§2); ref/tabIndex de foco migram
             pro motion.div entrante */}
         <AnimatePresence mode="wait" initial={false}>
-          {enviado ? (
+          {erroLink ? (
+            <motion.div
+              key="erro-link"
+              ref={focoEnviado}
+              tabIndex={-1}
+              {...fade}
+              transition={T.enter}
+              className="rounded-xl bg-card shadow-[var(--shadow-border)] p-6 outline-none"
+            >
+              <div className="grid size-10 place-items-center rounded-full bg-destructive/10 text-destructive">
+                <WarningCircle size={20} weight="bold" aria-hidden="true" />
+              </div>
+              <p className="mt-4 font-medium">Link inválido ou expirado</p>
+              <p className="text-sm text-muted-foreground mt-2 leading-relaxed">
+                Ele pode já ter sido usado ou ter passado do prazo — peça um
+                novo pra entrar.
+              </p>
+              <Button
+                type="button"
+                className="mt-5 w-full"
+                onClick={() => {
+                  const next = params.get("next");
+                  router.replace(
+                    `/login${next ? `?next=${encodeURIComponent(next)}` : ""}`
+                  );
+                }}
+              >
+                Pedir novo link
+              </Button>
+            </motion.div>
+          ) : enviado ? (
             <motion.div
               key="enviado"
               ref={focoEnviado}
@@ -340,9 +443,9 @@ export function LoginForm() {
                   )}
                 </AnimatePresence>
 
-                {(erro || params.get("erro")) && (
+                {erro && (
                   <p role="alert" className="text-sm text-destructive">
-                    {erro ?? "Link inválido ou expirado — peça um novo link e abra no mesmo navegador."}
+                    {erro}
                   </p>
                 )}
 
