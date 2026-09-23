@@ -324,6 +324,50 @@ function MarcadorTipo({ tipo, nome }: { tipo: CicloEvento["tipo"]; nome: string 
   }
 }
 
+/** Cores dos segmentos da barra-resumo — mesma semântica dos dots/legenda;
+ *  "agendado" é o anel vazio do dot virado segmento claro. */
+const COR_SEGMENTO_ENCONTRO = {
+  ok: "bg-[var(--ok)]",
+  warn: "bg-[var(--warn)]",
+  agendado: "bg-muted-foreground/30",
+  apagado: "bg-muted-foreground/50",
+} as const;
+
+/** Barra segmentada por status + total — o resumo escalável dos encontros de
+ *  dupla do dia: com dezenas de duplas os dots individuais não cabem nem
+ *  comunicam composição (o detalhe por dupla continua no painel do dia). */
+function ResumoEncontrosDupla({ itens }: { itens: ItemDupla[] }) {
+  const cont = { ok: 0, warn: 0, agendado: 0, apagado: 0 };
+  for (const { encontro } of itens) {
+    if (encontro.status === "realizado")
+      cont[encontro.registro ? "ok" : "warn"]++;
+    else if (encontro.status === "agendado" || encontro.status === "remarcado")
+      cont.agendado++;
+    else cont.apagado++;
+  }
+  return (
+    <>
+      {/* flex-1: a barra estica no espaço que sobra depois dos marcadores
+          oficiais do dia (dias vazios = barra cheia da célula) */}
+      <span className="flex h-1.5 min-w-4 flex-1 overflow-hidden rounded-full">
+        {(Object.keys(cont) as (keyof typeof cont)[]).map(
+          (k) =>
+            cont[k] > 0 && (
+              <span
+                key={k}
+                className={COR_SEGMENTO_ENCONTRO[k]}
+                style={{ width: `${(cont[k] / itens.length) * 100}%` }}
+              />
+            )
+        )}
+      </span>
+      <span className="text-[11px] font-medium leading-none tabular-nums text-muted-foreground">
+        {itens.length}
+      </span>
+    </>
+  );
+}
+
 /** Mini-chave dos dots de status dos encontros de dupla (realizado / registro
  *  pendente / agendado) — usada no rodapé do calendário e no detalhe do dia,
  *  sempre junto de onde os dots aparecem (PV-2). */
@@ -1009,20 +1053,21 @@ export function AgendaCalendario({
                               );
                             return null; // recesso = hatch + label, sem marcador
                           })}
-                          {/* dots de status dos encontros de dupla — cap em 3, "+N" além */}
-                          {duplasDoDia.slice(0, 3).map(({ encontro }) => (
-                            <span
-                              key={encontro.id}
-                              className={cn(
-                                "size-2 shrink-0 rounded-full",
-                                corDotEncontro(encontro)
-                              )}
-                            />
-                          ))}
-                          {duplasDoDia.length > 3 && (
-                            <span className="text-[11px] font-medium leading-none text-muted-foreground">
-                              +{duplasDoDia.length - 3}
-                            </span>
+                          {/* dots individuais até 3 encontros; além disso a
+                              barra segmentada + contagem mostra a composição
+                              ("••• +15" não diria quantas realizaram) */}
+                          {duplasDoDia.length <= 3 ? (
+                            duplasDoDia.map(({ encontro }) => (
+                              <span
+                                key={encontro.id}
+                                className={cn(
+                                  "size-2 shrink-0 rounded-full",
+                                  corDotEncontro(encontro)
+                                )}
+                              />
+                            ))
+                          ) : (
+                            <ResumoEncontrosDupla itens={duplasDoDia} />
                           )}
                         </span>
                       </button>
