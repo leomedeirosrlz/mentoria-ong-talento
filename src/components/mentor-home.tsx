@@ -14,7 +14,6 @@ import {
 } from "@/lib/ciclo";
 import type {
   CicloEvento,
-  Comunicado,
   Dupla,
   EspecialistaEvento,
   Profile,
@@ -26,14 +25,12 @@ import { DuplaNomes } from "@/components/dupla-nomes";
 import { RegistrarRetroativoDialog } from "@/components/registrar-retroativo-dialog";
 import { TrilhaJornada } from "@/components/trilha-jornada";
 import { MarcoNotifier } from "@/components/marco-notifier";
-import { AvisosSection } from "@/components/avisos-section";
 
 export function MentorHome({
   duplas,
   eventos,
   espEventos = [],
   me,
-  avisos = [],
 }: {
   duplas: Dupla[];
   /** Calendário oficial DPP — a trilha especialista não o usa. */
@@ -41,7 +38,6 @@ export function MentorHome({
   /** Passos da trilha especialista — alimenta a jornada das duplas dela. */
   espEventos?: EspecialistaEvento[];
   me: Profile;
-  avisos?: Comunicado[];
 }) {
   const hoje = new Date();
   const eventoSemana = eventoDaSemana(eventos, hoje);
@@ -294,7 +290,7 @@ export function MentorHome({
                         trigger={
                           <button
                             type="button"
-                            className="rounded-sm underline underline-offset-2 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            className="inline-flex min-h-11 items-center rounded-sm underline underline-offset-2 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-0"
                           >
                             Registre aqui.
                           </button>
@@ -385,8 +381,6 @@ export function MentorHome({
           </Card>
         );
       })}
-
-      <AvisosSection avisos={avisos} souCoord={false} />
     </div>
   );
 }

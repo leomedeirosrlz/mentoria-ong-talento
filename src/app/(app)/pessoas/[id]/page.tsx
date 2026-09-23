@@ -23,6 +23,8 @@ import { Avatar } from "@/components/avatar";
 import { Badge } from "@/components/ui/badge";
 import { DuplaAvatares } from "@/components/dupla-avatares";
 import { DuplaNomes } from "@/components/dupla-nomes";
+import { MentoradoActions } from "@/components/mentorado-actions";
+import { PessoaActions } from "@/components/pessoa-actions";
 import { PessoaMural, type MuralNota } from "@/components/pessoa-mural";
 import { SupervisoesSection } from "@/components/supervisoes-section";
 import { VoltarLink } from "@/components/voltar-link";
@@ -44,7 +46,7 @@ function Linha({ rotulo, valor, sempre }: { rotulo: string; valor: string | null
   return (
     <div className="flex gap-2">
       <dt className="w-32 shrink-0 text-muted-foreground">{rotulo}</dt>
-      <dd className="min-w-0 flex-1 whitespace-pre-wrap">{valor || "—"}</dd>
+      <dd className="min-w-0 flex-1 whitespace-pre-wrap [overflow-wrap:anywhere]">{valor || "—"}</dd>
     </div>
   );
 }
@@ -214,21 +216,33 @@ export default async function PessoaPerfilPage({
             </div>
           )}
         </div>
+        {/* o mesmo ⋮ da lista — editar aqui poupa voltar à /pessoas e achar a
+            pessoa de novo; guardas idênticas (qualquer dupla bloqueia excluir,
+            temDupla trava a do mentorado) */}
+        {souCoord && (
+          <div className="ml-auto self-start">
+            {perfil.tipo === "profile" ? (
+              <PessoaActions
+                pessoa={perfil.pessoa}
+                podeExcluir={!perfil.pessoa.user_id && perfil.duplas.length === 0}
+              />
+            ) : (
+              <MentoradoActions
+                mentorado={perfil.pessoa}
+                temDupla={perfil.duplas.length > 0}
+              />
+            )}
+          </div>
+        )}
       </header>
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
-        <section className="rounded-xl bg-card p-4 shadow-[var(--shadow-border)] sm:p-5">
-          <h2 className="mb-3 text-sm font-semibold">Notas</h2>
-          <PessoaMural
-            pessoaId={p.id}
-            tipo={perfil.tipo}
-            notas={notas}
-            podeAnotar={podeAnotar}
-            nomePessoa={p.nome}
-          />
-        </section>
-
-        <aside className="space-y-4">
+      {/* minmax(0,1fr) + min-w-0 nos filhos: sem eles o min-content da seção
+          "Duplas" subia pelo grid e estourava a página (+66px a 390px).
+          aside vem antes no DOM: no mobile a ficha cadastral é o conteúdo
+          primário (o mural descia ~600px); no lg o rail volta pra direita
+          via order e o foco segue a mesma ordem da leitura mobile */}
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+        <aside className="min-w-0 space-y-4 lg:order-2">
           {/* ficha de cadastro/matching (0034) — os sensíveis (nascimento,
               gênero, motivação, pref. de par) só chegam preenchidos pra
               coordenação via view; `sempre` deixa o "—" explícito pra ela */}
@@ -469,6 +483,17 @@ export default async function PessoaPerfilPage({
             </section>
           )}
         </aside>
+
+        <section className="min-w-0 rounded-xl bg-card p-4 shadow-[var(--shadow-border)] sm:p-5 lg:order-1">
+          <h2 className="mb-3 text-sm font-semibold">Notas</h2>
+          <PessoaMural
+            pessoaId={p.id}
+            tipo={perfil.tipo}
+            notas={notas}
+            podeAnotar={podeAnotar}
+            nomePessoa={p.nome}
+          />
+        </section>
       </div>
     </div>
   );

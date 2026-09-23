@@ -375,7 +375,7 @@ function CampoRenderer({ campo }: { campo: FormularioCampo }) {
           <ul className="mt-1.5 space-y-1">
             {(campo.opcoes ?? []).map((o) => (
               <li key={o}>
-                <label className="flex min-h-10 cursor-pointer items-center gap-3 rounded-lg px-2 text-sm transition-colors select-none hover:bg-muted has-focus-visible:ring-3 has-focus-visible:ring-ring/50">
+                <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-lg px-2 text-sm transition-colors select-none hover:bg-muted has-focus-visible:ring-3 has-focus-visible:ring-ring/50">
                   <input
                     type="checkbox"
                     name={campo.id}

@@ -54,8 +54,8 @@ export function DuplasLista({
 
   return (
     <>
-      <div className="flex items-center gap-2">
-        <div className="relative min-w-0 flex-1 sm:max-w-sm">
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative min-w-0 flex-1 basis-full sm:basis-0 sm:max-w-sm">
           <MagnifyingGlass
             aria-hidden
             size={16}
@@ -145,19 +145,19 @@ export function DuplasLista({
               key={d.id}
               href={`/duplas/${d.id}`}
               style={{ "--i": Math.min(i, 10) } as CSSProperties}
-              className="animate-enter flex items-center gap-4 px-5 py-4 transition-colors hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+              className="animate-enter flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-4 transition-colors hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
             >
               <SemaforoDot nivel={nivel} />
               {/* o par de discos é a identidade da dupla — reforça quem são
                   antes do nome (o link inteiro já leva à ficha) */}
               <DuplaAvatares mentor={d.mentor} mentorado={d.mentorado} size={36} />
               <div className="min-w-0 flex-1">
-                <p className="font-semibold truncate flex items-center gap-1.5">
-                  <DuplaNomes mentor={d.mentor.nome} mentorado={d.mentorado.nome} />
+                <p className="flex min-w-0 items-center gap-1 font-semibold">
+                  <DuplaNomes truncar mentor={d.mentor.nome} mentorado={d.mentorado.nome} />
                   {/* especialista é a exceção à escala /16 — a marca evita
                       ler "2/5" como erro de dado */}
                   {d.trilha === "especialista" && (
-                    <span className="rounded-full bg-muted px-1.5 py-px text-[10px] font-medium text-muted-foreground">
+                    <span className="shrink-0 rounded-full bg-muted px-1.5 py-px text-[10px] font-medium text-muted-foreground">
                       {TRILHA_LABEL[d.trilha]}
                     </span>
                   )}
@@ -166,8 +166,10 @@ export function DuplasLista({
                   <p className="text-xs text-muted-foreground mt-0.5">{sub}</p>
                 )}
               </div>
-              {/* uma zona de meta só: n/N + barra + status empilham à direita */}
-              <div className="flex w-16 shrink-0 flex-col items-end gap-1 sm:w-20">
+              {/* uma zona de meta só: n/N + barra + status empilham à direita;
+                  no mobile caem pra linha própria sob os nomes (pl-20 ≈ dot
+                  10 + gap 16 + avatar 36 + gap 16 = 78px) */}
+              <div className="flex w-16 shrink-0 flex-col items-end gap-1 max-sm:order-4 max-sm:basis-full max-sm:w-full max-sm:flex-row max-sm:items-center max-sm:gap-2 max-sm:pl-20 sm:w-20">
                 <span className="font-mono text-xs text-muted-foreground tabular-nums">
                   {feitos}/{totalDaDupla}
                 </span>

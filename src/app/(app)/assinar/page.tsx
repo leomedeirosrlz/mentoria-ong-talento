@@ -110,7 +110,10 @@ export default async function AssinarPage() {
         aria-label="Texto completo do termo"
         className="rounded-xl bg-card shadow-[var(--shadow-border)]"
       >
-        <div className="max-h-[26rem] overflow-y-auto px-5 py-6 sm:px-8">
+        {/* documento integral inline — o que se lê é o que se assina (mesmo
+            padrão da rota pública /assinar/[token]); nada de scroll interno
+            cortando cláusula no meio */}
+        <div className="px-5 py-6 sm:px-8">
           <div className="space-y-4 font-serif text-[15px] leading-relaxed">
             <h2 className="text-center font-bold uppercase tracking-wide">
               {TERMO_TITULO}

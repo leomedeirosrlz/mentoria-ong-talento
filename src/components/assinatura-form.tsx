@@ -208,7 +208,8 @@ export function AssinaturaForm({
       {modo === "autorizacao" && (
         <>
           <div>
-            <Label>Jovem autorizado(a)</Label>
+            {/* rotula um <p> read-only — <p> em vez de <Label> órfão */}
+            <p className="text-sm font-medium">Jovem autorizado(a)</p>
             <p className="mt-1.5 rounded-lg bg-muted px-3 py-2.5 text-sm font-medium">
               {alvoNome}
             </p>

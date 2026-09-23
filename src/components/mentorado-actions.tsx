@@ -230,12 +230,16 @@ export function MentoradoActions({ mentorado, temDupla }: { mentorado: Mentorado
               nome={mentorado.nome}
               whatsapp={mentorado.whatsapp}
             />
-            <Button type="submit" className="w-full" disabled={pending}>
-              {pending ? "Salvando…" : "Salvar"}
-            </Button>
             <p className="text-xs text-muted-foreground">
               Nascimento, gênero, motivação e preferência de par ficam visíveis só pra coordenação.
             </p>
+            {/* barra sticky (padrão do registro-form) — o Salvar ficava
+                soterrado no fim do scroll interno do dialog */}
+            <div className="sticky bottom-0 -mx-4 -mb-4 border-t bg-popover px-4 py-3">
+              <Button type="submit" className="w-full" disabled={pending}>
+                {pending ? "Salvando…" : "Salvar"}
+              </Button>
+            </div>
           </form>
         </DialogContent>
       </Dialog>

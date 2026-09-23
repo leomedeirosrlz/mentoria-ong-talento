@@ -18,10 +18,10 @@ export function SupervisaoDeleteButton({ id }: { id: string }) {
         <Button
           variant="ghost"
           size="icon"
-          className="size-7 text-muted-foreground hover:text-destructive"
+          className="text-muted-foreground hover:text-destructive"
           aria-label="Excluir sessão de supervisão"
         >
-          <Trash size={13} />
+          <Trash size={15} />
         </Button>
       }
     />

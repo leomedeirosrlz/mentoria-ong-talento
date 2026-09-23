@@ -105,16 +105,22 @@ export function TrilhaJornada({
   const refAtual = useRef<HTMLLIElement | null>(null);
 
   // strip rola horizontal no mobile (16 nós ≈ 470px > 375px) — sem o scroll
-  // o passo atual sairia da tela; mesmo padrão do rail da agenda
+  // o passo atual sairia da tela; mesmo padrão do rail da agenda. Rola o ol
+  // direto (nunca o documento): scrollIntoView agiria no scrollport mais
+  // próximo, que é a página inteira — ela descia até o nó ao carregar
   useEffect(() => {
     const el = refAtual.current;
-    if (!el) return;
+    const strip = el?.closest("ol");
+    if (!el || !strip) return;
+    // o li inclui o conector flex-1 — centraliza no disco (o link), não na linha
+    const disco = el.querySelector<HTMLElement>("a") ?? el;
     const reduz = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    el.scrollIntoView({
-      inline: "center",
-      block: "nearest",
-      behavior: reduz ? "instant" : "smooth",
-    });
+    const alvo =
+      strip.scrollLeft +
+      disco.getBoundingClientRect().left -
+      strip.getBoundingClientRect().left -
+      (strip.clientWidth - disco.clientWidth) / 2;
+    strip.scrollTo({ left: alvo, behavior: reduz ? "auto" : "smooth" });
   }, []);
 
   if (jornada.nos.length < 2) return null;
@@ -174,8 +180,9 @@ export function TrilhaJornada({
                   )}
                 />
               )}
-                {/* size-9 = hit area de 36px em volta do disco de 24–28px —
-                    tocar o passo abre o card dele na ficha */}
+                {/* size-11→sm:size-9 = hit area de 44px (mobile) / 36px (sm+)
+                    em volta do disco de 24–28px — tocar o passo abre o card
+                    dele na ficha */}
                 <Link
                   href={
                     no.encontro
@@ -185,7 +192,7 @@ export function TrilhaJornada({
                   aria-label={rotulo}
                   title={rotulo}
                   aria-current={atual ? "step" : undefined}
-                  className="group grid size-9 place-items-center rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="group grid size-11 place-items-center rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring sm:size-9"
                 >
                   <span className="relative">
                     {atual && (

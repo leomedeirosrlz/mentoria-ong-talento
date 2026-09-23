@@ -2,11 +2,18 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, UserPlus } from "@phosphor-icons/react";
+import {
+  DownloadSimple,
+  DotsThree,
+  FileArrowUp,
+  Plus,
+  UserPlus,
+} from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { createMentorado, createPessoa } from "@/lib/actions";
 import { DadosCivisFields } from "@/components/assinatura-form";
 import { FotoField } from "@/components/foto-field";
+import { ImportarCsvDialog } from "@/components/importar-csv-dialog";
 import {
   CampoConsentimento,
   CampoDisponibilidade,
@@ -23,6 +30,9 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -63,6 +73,41 @@ function useSubmit(
     });
   };
   return { submit, pending };
+}
+
+/** "Mais ações" do header de /pessoas — importação e backups ficam recolhidos
+ *  pra criação (Nova pessoa / Novo mentorado) ser a primária visível. Os
+ *  exports são <a> de verdade dentro do menu (href real, download direto). */
+export function PessoasMaisAcoes() {
+  const [importarOpen, setImportarOpen] = useState(false);
+  return (
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          render={
+            <Button size="sm" variant="outline">
+              <DotsThree size={16} weight="bold" /> Mais ações
+            </Button>
+          }
+        />
+        <DropdownMenuContent align="end" className="w-56">
+          <DropdownMenuItem onClick={() => setImportarOpen(true)}>
+            <FileArrowUp /> Importar CSV
+          </DropdownMenuItem>
+          <DropdownMenuItem render={<a href="/api/export?tipo=pessoas" />}>
+            <DownloadSimple /> Exportar CSV
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            render={<a href="/api/export?tipo=assinaturas" />}
+            title="Backup das assinaturas — status, evidências e dados assinados"
+          >
+            <DownloadSimple /> Assinaturas (backup)
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <ImportarCsvDialog open={importarOpen} onOpenChange={setImportarOpen} />
+    </>
+  );
 }
 
 export function NovaPessoaDialog() {
@@ -200,13 +245,17 @@ export function NovaPessoaDialog() {
           <FotoField id="foto" />
           <CampoConsentimento />
 
-          <Button type="submit" className="w-full" disabled={pending}>
-            {pending ? "Salvando…" : "Cadastrar"}
-          </Button>
           <p className="text-xs text-muted-foreground">
             A pessoa entra com o e-mail por link de acesso; o papel define o que ela vê e pode ser alterado depois na lista.
             Nascimento, gênero, motivação e preferência de par ficam visíveis só pra coordenação.
           </p>
+          {/* barra sticky — o Cadastrar ficava no fim do scroll interno do
+              dialog; colada ao rodapé fica à mão com o form rolado ao meio */}
+          <div className="sticky bottom-0 -mx-4 -mb-4 border-t bg-popover px-4 py-3">
+            <Button type="submit" className="w-full" disabled={pending}>
+              {pending ? "Salvando…" : "Cadastrar"}
+            </Button>
+          </div>
         </form>
       </DialogContent>
     </Dialog>
@@ -319,12 +368,15 @@ export function NovoMentoradoDialog() {
           </div>
           <FotoField id="m_foto" />
 
-          <Button type="submit" className="w-full" disabled={pending}>
-            {pending ? "Salvando…" : "Cadastrar"}
-          </Button>
           <p className="text-xs text-muted-foreground">
             Nascimento, gênero, motivação e preferência de par ficam visíveis só pra coordenação.
           </p>
+          {/* mesma barra sticky do cadastro de pessoa */}
+          <div className="sticky bottom-0 -mx-4 -mb-4 border-t bg-popover px-4 py-3">
+            <Button type="submit" className="w-full" disabled={pending}>
+              {pending ? "Salvando…" : "Cadastrar"}
+            </Button>
+          </div>
         </form>
       </DialogContent>
     </Dialog>

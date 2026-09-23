@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import {
   ArrowsCounterClockwise,
   Binoculars,
+  CaretDown,
   CaretUp,
   Check,
   Flask,
@@ -14,7 +15,7 @@ import {
   UsersThree,
   type Icon,
 } from "@phosphor-icons/react";
-import { papelLabel } from "@/lib/ciclo";
+import { papelCurto, papelLabel } from "@/lib/ciclo";
 import {
   reverOnboardingDemo,
   sairDaDemo,
@@ -38,18 +39,25 @@ const PAPEL_ICON: Record<AppRole, Icon> = {
   mentor_especialista: Handshake,
 };
 
-/** Pill fixa do modo demo — montada pelo layout do (app) quando o cookie
+/** Pill do modo demo — montada pelo layout do (app) quando o cookie
  *  demo_role está ativo, inclusive por cima do OnboardingFlow. As actions já
- *  navegam (redirect na server action); aqui só fecha o popover e toasta erro. */
+ *  navegam (redirect na server action); aqui só fecha o popover e toasta erro.
+ *  variant="float": pill fixa no canto (só desktop — o layout embrulha em
+ *  hidden md:block). variant="dock": pill compacta que vive dockada no
+ *  header mobile / no header do wizard — não cobre conteúdo nem colide com
+ *  toast, e substitui o span de papel que truncava. */
 export function DemoBar({
   papel,
   personas,
+  variant = "float",
 }: {
   papel: AppRole;
   personas: Record<AppRole, string>;
+  variant?: "dock" | "float";
 }) {
   const [aberto, setAberto] = useState(false);
   const [pending, start] = useTransition();
+  const dock = variant === "dock";
 
   function executar(acao: () => Promise<{ error: string } | void>) {
     start(async () => {
@@ -59,34 +67,59 @@ export function DemoBar({
     });
   }
 
+  const trigger = (
+    /* inversão de marca (ink sobre lime) = "modo alternativo", não chrome do app */
+    <PopoverTrigger
+      aria-label={
+        dock
+          ? `Modo demonstração — ${papelLabel(papel)}. Abrir controles`
+          : "Controles da demonstração"
+      }
+      className={cn(
+        "flex items-center rounded-full bg-[var(--brand-ink)] font-semibold text-[var(--brand-lime)] ring-1 ring-foreground/10 outline-none transition-transform hover:scale-[1.03] focus-visible:ring-2 focus-visible:ring-[var(--brand-lime)] active:scale-[0.97]",
+        dock
+          ? "min-h-11 gap-1.5 px-3 text-xs"
+          : "gap-2 px-4 py-2.5 text-sm shadow-lg"
+      )}
+    >
+      <Flask size={dock ? 14 : 15} weight="fill" aria-hidden />
+      {/* nowrap: no header mobile o flex espremeria a pill em 2 linhas */}
+      <span className="whitespace-nowrap">Demo · {dock ? papelCurto(papel) : papelLabel(papel)}</span>
+      {dock ? (
+        <CaretDown
+          size={12}
+          weight="bold"
+          aria-hidden
+          className={cn("transition-transform duration-200", aberto && "rotate-180")}
+        />
+      ) : (
+        <CaretUp
+          size={13}
+          weight="bold"
+          aria-hidden
+          className={cn("transition-transform duration-200", aberto && "rotate-180")}
+        />
+      )}
+    </PopoverTrigger>
+  );
+
   return (
-    // acima do bottom nav mobile (z-40) e do footer fixo do onboarding —
-    // a pill não pode ficar escondida em nenhum estado da demo
-    <div className="fixed right-4 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-50 md:bottom-6">
-      <Popover open={aberto} onOpenChange={setAberto}>
-        {/* inversão de marca (ink sobre lime) = "modo alternativo", não chrome do app */}
-        <PopoverTrigger
-          aria-label="Controles da demonstração"
-          className="flex items-center gap-2 rounded-full bg-[var(--brand-ink)] px-4 py-2.5 text-sm font-semibold text-[var(--brand-lime)] shadow-lg ring-1 ring-foreground/10 outline-none transition-transform hover:scale-[1.03] focus-visible:ring-2 focus-visible:ring-[var(--brand-lime)] active:scale-[0.97]"
-        >
-          <Flask size={15} weight="fill" aria-hidden />
-          Demo · {papelLabel(papel)}
-          <CaretUp
-            size={13}
-            weight="bold"
-            aria-hidden
-            className={cn(
-              "transition-transform duration-200",
-              aberto && "rotate-180"
-            )}
-          />
-        </PopoverTrigger>
-        <PopoverContent
-          side="top"
-          align="end"
-          sideOffset={8}
-          className="w-72 max-w-[calc(100vw-2rem)] p-0"
-        >
+    <Popover open={aberto} onOpenChange={setAberto}>
+      {/* acima do bottom nav mobile (z-40) e do footer fixo do onboarding —
+          a pill não pode ficar escondida em nenhum estado da demo */}
+      {dock ? (
+        trigger
+      ) : (
+        <div className="fixed right-4 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-50 md:bottom-6">
+          {trigger}
+        </div>
+      )}
+      <PopoverContent
+        side={dock ? "bottom" : "top"}
+        align={dock ? "start" : "end"}
+        sideOffset={8}
+        className="w-72 max-w-[calc(100vw-2rem)] p-0"
+      >
           <div className="border-b border-border px-4 py-3">
             <PopoverTitle className="text-sm font-semibold">
               Modo demonstração
@@ -160,8 +193,7 @@ export function DemoBar({
               Sair da demonstração
             </button>
           </div>
-        </PopoverContent>
-      </Popover>
-    </div>
+      </PopoverContent>
+    </Popover>
   );
 }

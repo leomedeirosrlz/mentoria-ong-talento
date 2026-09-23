@@ -165,7 +165,7 @@ export default async function RegistrosPage({
             <Link
               href="/registros"
               scroll={false}
-              className="font-medium text-foreground underline underline-offset-4 transition-colors hover:text-muted-foreground"
+              className="-my-1.5 py-1.5 font-medium text-foreground underline underline-offset-4 transition-colors hover:text-muted-foreground"
             >
               {total} {total === 1 ? "registro" : "registros"}
             </Link>
@@ -182,7 +182,7 @@ export default async function RegistrosPage({
                 href="/registros?apoio=1"
                 scroll={false}
                 aria-current={filtros.apoio ? "true" : undefined}
-                className="font-medium text-[var(--danger)] underline underline-offset-4 transition-colors hover:text-[var(--danger)]/80"
+                className="-my-1.5 py-1.5 font-medium text-[var(--danger)] underline underline-offset-4 transition-colors hover:text-[var(--danger)]/80"
               >
                 {alertas.apoio}{" "}
                 {alertas.apoio === 1 ? "apoio em aberto" : "apoios em aberto"}
@@ -196,7 +196,7 @@ export default async function RegistrosPage({
                 href="/registros?tardio=1"
                 scroll={false}
                 aria-current={filtros.tardio ? "true" : undefined}
-                className="font-medium text-[var(--warn-text)] underline underline-offset-4 transition-colors hover:text-[var(--warn-text)]/80"
+                className="-my-1.5 py-1.5 font-medium text-[var(--warn-text)] underline underline-offset-4 transition-colors hover:text-[var(--warn-text)]/80"
               >
                 {alertas.tardios}{" "}
                 {alertas.tardios === 1 ? "registro tardio" : "registros tardios"}

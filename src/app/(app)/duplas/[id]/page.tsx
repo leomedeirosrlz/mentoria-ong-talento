@@ -393,8 +393,8 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
         <MarcoNotifier duplaId={dupla.id} feitos={jornada.feitos} total={jornada.total} />
       )}
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
-        <section className="space-y-3">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <section className="min-w-0 space-y-3">
           <div className="flex items-center justify-between gap-2">
             {/* rótulo de seção de lista → overline padrão (§3), igual ao
                 "Todos os eventos" da agenda. O sufixo carrega o "sugerido"
@@ -436,7 +436,7 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
           )}
         </section>
 
-        <aside className="space-y-6">
+        <aside className="min-w-0 space-y-6">
           {/* o porquê da mentoria especialista — contexto pro especialista
               antes do 1º encontro e pra coordenação acompanhar */}
           {ehEsp && (
@@ -837,7 +837,7 @@ function EncontroRow({
       {/* anotações/plano do encontro — o mentor prepara aqui; pra quem não
           edita (coord/sup, dupla inativa) a nota existente vira leitura */}
       {(podeEditar || nota) && (
-        <div className="border-t px-4 py-2.5">
+        <div className="border-t px-4 py-3">
           <NotaEncontro
             duplaId={duplaId}
             numero={passo.numero}

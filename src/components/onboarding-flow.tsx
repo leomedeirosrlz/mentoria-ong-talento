@@ -91,6 +91,7 @@ export function OnboardingFlow({
   me,
   pessoal,
   mentorProfile,
+  demo,
 }: {
   me: Profile;
   /** sensíveis do próprio cadastro (RPC self-scoped, 0048) — preenchem o
@@ -102,6 +103,9 @@ export function OnboardingFlow({
   /** ficha de mentor (mentor_profiles é legível pelo dono) — preenche os
    *  passos de pareamento e disponibilidade. */
   mentorProfile?: MentorProfile | null;
+  /** pill da DemoBar dockada no header do wizard (demo ativa) — clicável em
+   *  todos os passos sem cobrir campo nenhum */
+  demo?: React.ReactNode;
 }) {
   const router = useRouter();
   const ehMentor = me.role === "mentor_dpp" || me.role === "mentor_especialista";
@@ -323,7 +327,7 @@ export function OnboardingFlow({
           name="consent_lgpd"
           checked={consent}
           onChange={(e) => setConsent(e.target.checked)}
-          className="mt-0.5 accent-primary"
+          className="mt-0.5 size-4 shrink-0 accent-primary"
         />
         <span>
           Autorizo o uso dos meus dados do cadastro no programa (LGPD).
@@ -497,7 +501,9 @@ export function OnboardingFlow({
       case 4:
         return (
           <div className="space-y-2">
-            <Label>Áreas de atuação</Label>
+            {/* rótulo de grupo, não de controle — o input livre do TagInput
+                tem aria-label próprio, então <p> em vez de <Label> órfão */}
+            <p className="text-sm font-medium">Áreas de atuação</p>
             <TagInput
               name="areas"
               sugestoes={AREAS_SUGESTOES}
@@ -548,8 +554,9 @@ export function OnboardingFlow({
 
   return (
     <div className="min-h-[100dvh] bg-background">
-      {/* header fixo: voltar circular + progresso + contador */}
-      <header className="fixed inset-x-0 top-0 z-40 border-b border-border/60 bg-background/85 backdrop-blur">
+      {/* header fixo: voltar circular + progresso + contador (+ pill demo);
+          pt safe-area tira o header de sob o notch em standalone */}
+      <header className="fixed inset-x-0 top-0 z-40 border-b border-border/60 bg-background/85 pt-[env(safe-area-inset-top)] backdrop-blur">
         <div className="mx-auto flex h-14 w-full max-w-xl items-center gap-3 px-4 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))]">
           <button
             type="button"
@@ -576,6 +583,7 @@ export function OnboardingFlow({
           <span className="shrink-0 text-xs font-medium tabular-nums text-muted-foreground">
             {step + 1}/{total}
           </span>
+          {demo}
         </div>
       </header>
 

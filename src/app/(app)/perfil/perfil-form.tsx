@@ -21,7 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { AREAS_SUGESTOES, papelLabel } from "@/lib/ciclo";
+import { AREAS_SUGESTOES, formatWhatsApp, papelLabel } from "@/lib/ciclo";
 import type { Disponibilidade, MentorProfile, Profile } from "@/lib/types";
 
 export function PerfilForm({
@@ -225,12 +225,14 @@ export function PerfilForm({
           </div>
           <div className="space-y-2">
             <Label htmlFor="whatsapp">WhatsApp</Label>
+            {/* máscara só na exibição — normWhatsapp re-normaliza no save,
+                então salvar sem editar não corrompe o número */}
             <Input
               id="whatsapp"
               name="whatsapp"
               type="tel"
               inputMode="tel"
-              defaultValue={me.whatsapp ?? ""}
+              defaultValue={formatWhatsApp(me.whatsapp)}
               placeholder="(11) 99999-9999"
               autoComplete="tel"
             />
@@ -324,7 +326,7 @@ export function PerfilForm({
           <div className="space-y-2">
             {/* o hidden do TagInput manda JSON — camposApresentacao aceita
                 JSON ou vírgula, então forms antigos continuam valendo */}
-            <Label>Áreas de atuação</Label>
+            <p className="text-sm font-medium">Áreas de atuação</p>
             <TagInput
               name="areas"
               sugestoes={AREAS_SUGESTOES}

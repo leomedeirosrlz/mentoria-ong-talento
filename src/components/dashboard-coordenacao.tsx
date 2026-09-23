@@ -242,7 +242,7 @@ export function DashboardCoordenacao({
             )}
             <Link
               href={`/registros?encontro=${resumo.evento.numero}`}
-              className="ml-auto text-xs font-medium underline underline-offset-2 transition-colors hover:text-foreground"
+              className="-my-1 ml-auto inline-flex min-h-11 items-center rounded-md px-1.5 text-xs font-medium underline underline-offset-2 transition-colors hover:text-foreground md:min-h-7"
             >
               Ver registros →
             </Link>
@@ -502,11 +502,11 @@ function DuplaCard({
       />
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <div className="flex items-center gap-2.5">
+          <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
             <SemaforoDot nivel={saude.semaforo} />
             <DuplaAvatares mentor={dupla.mentor} mentorado={dupla.mentorado} size={32} />
-            <p className="font-semibold truncate">
-              <DuplaNomes mentor={dupla.mentor.nome} mentorado={dupla.mentorado.nome} />
+            <p className="flex min-w-0 flex-1 items-center gap-1 font-semibold">
+              <DuplaNomes truncar mentor={dupla.mentor.nome} mentorado={dupla.mentorado.nome} />
             </p>
             {dupla.trilha === "especialista" && (
               <Badge variant="secondary" className="font-normal shrink-0">
@@ -542,26 +542,27 @@ function DuplaCard({
             />
           </div>
           {ultimoReg?.avaliacao && <AvaliacaoBadge avaliacao={ultimoReg.avaliacao} />}
-          {/* a ação (WhatsApp) não é o destino do card (ficha) — divider
-              delimita a zona do lembrete dentro da coluna de dados da dupla;
-              a anotação "último lembrete" mora junto da ação (GG-3) */}
-          <div className="mt-0.5 flex w-full items-center justify-between gap-3 border-t border-border pt-2.5">
-            <span className="text-xs text-muted-foreground">
-              {ultimoNudge && (
-                <>
-                  Último lembrete {formatDiaMes(ultimoNudge.created_at)}
-                  {ultimoNudge.autor?.nome ? ` por ${ultimoNudge.autor.nome}` : ""}
-                </>
-              )}
-            </span>
-            <NudgeButton
-              telefone={dupla.mentor.whatsapp}
-              mensagem={msg}
-              label="Chamar no WhatsApp"
-              duplaId={dupla.id}
-            />
-          </div>
         </div>
+      </div>
+      {/* a ação (WhatsApp) não é o destino do card (ficha) — divider delimita
+          a zona do lembrete na base do card; a anotação "último lembrete"
+          mora junto da ação (GG-3). relative: o Link stretched cobre o card
+          inteiro — sem ele o botão ficava sob a camada de clique */}
+      <div className="relative mt-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 border-t border-border pt-2.5">
+        <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
+          {ultimoNudge && (
+            <>
+              Último lembrete {formatDiaMes(ultimoNudge.created_at)}
+              {ultimoNudge.autor?.nome ? ` por ${ultimoNudge.autor.nome}` : ""}
+            </>
+          )}
+        </span>
+        <NudgeButton
+          telefone={dupla.mentor.whatsapp}
+          mensagem={msg}
+          label="Chamar no WhatsApp"
+          duplaId={dupla.id}
+        />
       </div>
     </div>
   );

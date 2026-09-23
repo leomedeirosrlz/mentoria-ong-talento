@@ -1006,6 +1006,21 @@ export function papelLabel(role: string | null | undefined) {
   }
 }
 
+/** Versão curta do papel — cabe nos ~80-140px da pill do header mobile e da
+ *  DemoBar ("Supervisor de relacionamento" truncaria ali). */
+export function papelCurto(role: string | null | undefined) {
+  switch (role) {
+    case "coordenacao": return "Coordenação";
+    case "supervisor": return "Supervisor";
+    case "mentor_dpp": return "Mentor DPP";
+    case "mentor_especialista": return "Especialista";
+    case null:
+    case undefined:
+    case "": return "";
+    default: return papelLabel(role);
+  }
+}
+
 export function waLink(phone: string | null | undefined, mensagem: string): string | null {
   if (!phone) return null;
   const digits = phone.replace(/\D/g, "");
@@ -1013,6 +1028,21 @@ export function waLink(phone: string | null | undefined, mensagem: string): stri
   // — wa.me/ vazio abre a página de erro do WhatsApp, então falha aqui
   if (!digits.length) return null;
   return `https://wa.me/${digits}?text=${encodeURIComponent(mensagem)}`;
+}
+
+/** WhatsApp cru (`5511987654003`) → exibição `(11) 98765-4003`. Só mascara
+ *  BR ("55" + 10/11 dígitos) — número estrangeiro volta cru, máscara errada
+ *  é pior que nenhuma. Round-trip garantido: normWhatsapp re-normaliza. */
+export function formatWhatsApp(d: string | null | undefined): string {
+  if (!d) return "";
+  const digits = d.replace(/\D/g, "");
+  if (digits.startsWith("55") && (digits.length === 12 || digits.length === 13)) {
+    const dd = digits.slice(2, 4);
+    const rest = digits.slice(4);
+    const split = rest.length === 9 ? 5 : 4;
+    return `(${dd}) ${rest.slice(0, split)}-${rest.slice(split)}`;
+  }
+  return d;
 }
 
 /** href seguro: só http(s). O CHECK do banco (0023) barra a escrita; este

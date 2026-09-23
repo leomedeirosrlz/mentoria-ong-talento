@@ -303,7 +303,7 @@ export function EnviarFormularioDialog({
                   <li key={d.k}>
                     <label
                       className={cn(
-                        "flex min-h-10 items-center gap-3 rounded-lg px-2 text-sm transition-colors",
+                        "flex min-h-11 items-center gap-3 rounded-lg px-2 text-sm transition-colors sm:min-h-10",
                         "cursor-pointer hover:bg-muted"
                       )}
                     >
@@ -352,9 +352,10 @@ export function EnviarFormularioDialog({
               </Select>
             </div>
 
-            <div className="flex justify-end">
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
               <Button
                 type="button"
+                className="w-full sm:w-auto"
                 onClick={gerar}
                 disabled={pending || !formId || nDestinos === 0}
               >

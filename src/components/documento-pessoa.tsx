@@ -130,7 +130,7 @@ export function DocumentoPessoa({
             href={`/api/documento/${id}?tipo=${tipoUrl}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 text-sm underline underline-offset-2 hover:text-foreground"
+            className="-my-2 inline-flex min-h-11 items-center gap-1.5 text-sm underline underline-offset-2 hover:text-foreground sm:my-0 sm:min-h-0"
           >
             <FileText size={14} className="shrink-0 text-muted-foreground" />
             Ver documento

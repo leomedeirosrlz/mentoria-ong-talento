@@ -90,7 +90,7 @@ export function AnamneseMentoradoChip({
           Respondida em {formatDiaMes(anamnese.respondida_em)} ·{" "}
           <Link
             href={`/formularios/${anamnese.formularioId}`}
-            className="underline underline-offset-2 transition-colors hover:text-foreground"
+            className="-my-2 inline-flex min-h-11 items-center underline underline-offset-2 transition-colors hover:text-foreground sm:my-0 sm:min-h-0"
           >
             ver respostas
           </Link>

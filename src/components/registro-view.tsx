@@ -63,13 +63,13 @@ export function RegistroView({
         </div>
       )}
       {reg.atividades.length > 0 && (
-        <p>
+        <p className="break-words">
           <span className="text-muted-foreground">Realizado: </span>
           {reg.atividades.join(", ")}
         </p>
       )}
       {reg.tema && (
-        <p>
+        <p className="break-words">
           <span className="text-muted-foreground">Tema: </span>
           {reg.tema}
           {reg.ferramenta && (
@@ -77,9 +77,9 @@ export function RegistroView({
           )}
         </p>
       )}
-      {reg.reflexoes && <p className="leading-relaxed">{reg.reflexoes}</p>}
+      {reg.reflexoes && <p className="break-words leading-relaxed">{reg.reflexoes}</p>}
       {reg.proximo_passo && (
-        <p>
+        <p className="break-words">
           <span className="text-muted-foreground">Próximo passo: </span>
           {reg.proximo_passo === "outro" && reg.proximo_passo_detalhe
             ? reg.proximo_passo_detalhe
@@ -87,7 +87,7 @@ export function RegistroView({
         </p>
       )}
       {reg.observacoes && (
-        <p className="text-muted-foreground leading-relaxed">
+        <p className="break-words text-muted-foreground leading-relaxed">
           Obs: {reg.observacoes}
         </p>
       )}

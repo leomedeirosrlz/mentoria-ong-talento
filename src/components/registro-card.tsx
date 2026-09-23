@@ -72,6 +72,7 @@ export function RegistroCard({
                       size={32}
                     />
                     <DuplaNomes
+                      truncar
                       mentor={dupla.mentor.nome}
                       mentorado={dupla.mentorado.nome}
                     />

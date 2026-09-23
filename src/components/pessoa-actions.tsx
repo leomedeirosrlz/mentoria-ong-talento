@@ -399,9 +399,13 @@ export function PessoaActions({ pessoa, podeExcluir }: { pessoa: Profile; podeEx
             />
             <CampoConsentimento carimbadoEm={pessoa.consent_lgpd_em} />
 
-            <Button type="submit" className="w-full" disabled={pending}>
-              {pending ? "Salvando…" : "Salvar"}
-            </Button>
+            {/* barra sticky (padrão do registro-form) — form de 8 seções
+                escondia o Salvar no fim do scroll interno do dialog */}
+            <div className="sticky bottom-0 -mx-4 -mb-4 border-t bg-popover px-4 py-3">
+              <Button type="submit" className="w-full" disabled={pending}>
+                {pending ? "Salvando…" : "Salvar"}
+              </Button>
+            </div>
           </form>
         </DialogContent>
       </Dialog>

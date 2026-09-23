@@ -5,7 +5,6 @@ import { CaretDown } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { salvarNotaEncontro } from "@/lib/actions";
 import { Textarea } from "@/components/ui/textarea";
-import { cn } from "@/lib/utils";
 
 const fmtHora = new Intl.DateTimeFormat("pt-BR", {
   hour: "2-digit",
@@ -88,7 +87,7 @@ export function NotaEncontro({
         <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
           Anotações{rotulo ? ` · ${rotulo}` : ""}
         </p>
-        <p className="mt-1 whitespace-pre-wrap text-sm">{inicial}</p>
+        <p className="mt-1 whitespace-pre-wrap break-words text-sm">{inicial}</p>
       </div>
     );
   }
@@ -97,22 +96,19 @@ export function NotaEncontro({
 
   return (
     <details className="group">
-      <summary className="flex min-h-9 cursor-pointer list-none items-center gap-1.5 rounded-md py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
-        <span className="shrink-0 font-medium text-foreground/80">
+      <summary className="grid min-h-11 cursor-pointer list-none grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-1.5 rounded-md py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:min-h-9 [&::-webkit-details-marker]:hidden">
+        <span className="font-medium text-foreground/80">
           Anotações{rotulo ? ` · ${rotulo}` : ""}
         </span>
         {preview && (
-          <span className="min-w-0 flex-1 truncate text-muted-foreground">
+          <span className="min-w-0 truncate text-muted-foreground">
             — {preview}
           </span>
         )}
         <CaretDown
           size={14}
           aria-hidden
-          className={cn(
-            "shrink-0 text-muted-foreground transition-transform group-open:rotate-180",
-            !preview && "ml-auto"
-          )}
+          className="col-start-3 justify-self-end text-muted-foreground transition-transform group-open:rotate-180"
         />
       </summary>
       <div className="pb-1 pl-0.5">

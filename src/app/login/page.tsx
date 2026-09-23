@@ -17,7 +17,7 @@ export default function LoginPage() {
           quina nunca colide com o card nem com o SiteFooter */}
       <Link
         href="/demo"
-        className="fixed right-4 bottom-[calc(1rem+env(safe-area-inset-bottom))] z-10 text-sm text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline"
+        className="fixed right-4 bottom-[calc(1rem+env(safe-area-inset-bottom))] z-10 flex min-h-11 items-center rounded-lg px-3 text-sm text-muted-foreground underline-offset-4 outline-none transition-colors hover:text-foreground hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
       >
         Ver a demonstração
       </Link>

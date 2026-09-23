@@ -732,14 +732,14 @@ export function RegistroForm({
               </Button>
             </div>
             {encaminhamentos.map((t) => (
-              <div key={t.id} className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_130px_150px_36px]">
+              <div key={t.id} className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_130px_150px_36px]">
                 <Input
                   placeholder="O que fica combinado"
                   aria-label="Descrição do combinado"
                   value={t.descricao}
                   onChange={(e) => setEncaminhamentos(encaminhamentos.map((x) => (x.id === t.id ? { ...x, descricao: e.target.value } : x)))}
                 />
-                <div className="grid grid-cols-[1fr_9rem_2.75rem] gap-2 sm:contents">
+                <div className="grid grid-cols-[minmax(0,1fr)_9rem_2.75rem] gap-2 sm:contents">
                   <Select
                     value={t.responsavel}
                     items={RESPONSAVEL_OPCOES}
@@ -790,7 +790,8 @@ export function RegistroForm({
       </div>
 
       {/* rodapé do wizard — sticky pra Avançar/Salvar ficarem à mão no mobile
-          (num host com overflow:hidden ele só fica no fim do form, sem prejuízo) */}
+          (o painel inline usa overflow:clip — sem scrollport, o sticky segue
+          valendo pro documento) */}
       <div
         className={cn(
           "sticky bottom-0 flex items-center gap-2 border-t py-3",

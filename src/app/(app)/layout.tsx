@@ -16,8 +16,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // middleware e viraria loop — tela bloqueada com saída, como os casos abaixo
   if (!me) {
     return (
-      <div className="min-h-[100dvh] grid place-items-center px-4">
-        <div className="max-w-sm rounded-xl bg-card p-6 text-center shadow-[var(--shadow-border)]">
+      // flex + m-auto (não place-items-center): se o conteúdo exceder o
+      // viewport o topo continua rolável — centraliza só quando há espaço
+      <div className="flex min-h-[100dvh] flex-col px-4">
+        <div className="m-auto max-w-sm rounded-xl bg-card p-6 text-center shadow-[var(--shadow-border)]">
           <p className="font-semibold">Cadastro não encontrado</p>
           <p className="text-sm text-muted-foreground mt-2 leading-relaxed">
             Sua conta não está vinculada a um cadastro. Se você entrou com o
@@ -35,8 +37,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   if (!me.ativo) {
     return (
-      <div className="min-h-[100dvh] grid place-items-center px-4">
-        <div className="max-w-sm rounded-xl bg-card p-6 text-center shadow-[var(--shadow-border)]">
+      <div className="flex min-h-[100dvh] flex-col px-4">
+        <div className="m-auto max-w-sm rounded-xl bg-card p-6 text-center shadow-[var(--shadow-border)]">
           <p className="font-semibold">Acesso desativado</p>
           <p className="text-sm text-muted-foreground mt-2 leading-relaxed">
             Seu cadastro foi desativado pela coordenação. Se acha que isso é um
@@ -54,8 +56,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   if (!me.role) {
     return (
-      <div className="min-h-[100dvh] grid place-items-center px-4">
-        <div className="max-w-sm rounded-xl bg-card p-6 text-center shadow-[var(--shadow-border)]">
+      <div className="flex min-h-[100dvh] flex-col px-4">
+        <div className="m-auto max-w-sm rounded-xl bg-card p-6 text-center shadow-[var(--shadow-border)]">
           <p className="font-semibold">Cadastro recebido</p>
           <p className="text-sm text-muted-foreground mt-2 leading-relaxed">
             Seu acesso foi criado, mas a coordenação ainda não definiu o seu papel
@@ -80,8 +82,17 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         DEMO_ROLES.map((r) => [r, getDemoData().personas[r].nome.split(" ")[0]])
       ) as Record<AppRole, string>)
     : null;
-  const demoBar = demo && demoPersonas && (
-    <DemoBar papel={demo} personas={demoPersonas} />
+  // dock: pill compacta dockada no header mobile (AppShell) e no header do
+  // wizard (OnboardingFlow) — badge sempre visível, zero overlay de conteúdo.
+  // float: pill fixa do desktop; display:none no mobile remove trigger e
+  // popover (o dock já cobre esse breakpoint).
+  const demoDock = demo && demoPersonas && (
+    <DemoBar variant="dock" papel={demo} personas={demoPersonas} />
+  );
+  const demoFloat = demo && demoPersonas && (
+    <div className="hidden md:block">
+      <DemoBar variant="float" papel={demo} personas={demoPersonas} />
+    </div>
   );
 
   // onboarding pendente (0031): o wizard substitui o shell inteiro, como as
@@ -93,12 +104,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       getMeusDadosPessoais(),
       getMeuMentorProfile(),
     ]);
-    // DemoBar depois do wizard: mesma z-50, ordem de paint decide — ela precisa
-    // ficar clicável por cima do onboarding pra trocar de papel / sair da demo
+    // o dock vai dentro do header do wizard (prop demo) — clicável em todos
+    // os passos pra trocar de papel / rever a apresentação / sair da demo
     return (
       <>
-        <OnboardingFlow me={me} pessoal={pessoal} mentorProfile={mentorProfile} />
-        {demoBar}
+        <OnboardingFlow me={me} pessoal={pessoal} mentorProfile={mentorProfile} demo={demoDock} />
+        {demoFloat}
       </>
     );
   }
@@ -110,9 +121,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       avatarUrl={me.avatar_path ? avatarPublicUrl(me.avatar_path) : null}
       gravatarUrl={gravatarUrl(me.email)}
       notificacoes={notificacoes}
+      demo={demoDock}
     >
       {children}
-      {demoBar}
+      {demoFloat}
     </AppShell>
   );
 }

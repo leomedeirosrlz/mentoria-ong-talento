@@ -59,8 +59,11 @@ export default async function FormularioTokenPage({
 
   return (
     <div className="flex min-h-[100dvh] flex-col">
-      <main className="grid flex-1 place-items-center px-4 py-10">
-        <div className="w-full max-w-xl">
+      {/* flex + m-auto (não place-items-center): forms longos não clipam o
+          topo em telas baixas — centraliza só quando há espaço. flex, não
+          grid: em grid o w-full do filho resolve contra o padding box */}
+      <main className="flex flex-1 flex-col px-4 py-10">
+        <div className="m-auto w-full max-w-xl">
           <header className="mb-6">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/logo-realiza.png" alt="Realiza.vc" className="h-7 w-auto" />

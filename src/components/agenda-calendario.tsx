@@ -795,7 +795,12 @@ export function AgendaCalendario({
             aria-live="polite"
             className="min-w-0 flex-1 truncate px-2.5 text-lg font-semibold tracking-tight"
           >
-            {capitalizar(rotuloMes)}
+            {/* a 390px "Setembro de 2026" truncava o ano — mobile lê o
+                formato curto ("set 2026"), sm+ mantém o longo + fase */}
+            <span className="sm:hidden">
+              {MESES_CURTOS[mesNum]} {ano}
+            </span>
+            <span className="hidden sm:inline">{capitalizar(rotuloMes)}</span>
             {faseDoMes && (
               <span className="hidden text-sm font-normal tracking-normal text-muted-foreground sm:inline">
                 {" · "}
@@ -841,7 +846,7 @@ export function AgendaCalendario({
                         pedirRolarSePonteiro(ev, e.data);
                         moverPara(e.data);
                       }}
-                      className="grid size-9 shrink-0 place-items-center rounded-full font-mono text-[11px] font-semibold leading-none tabular-nums transition-[color,background-color,box-shadow] hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      className="grid size-11 shrink-0 place-items-center rounded-full font-mono text-[11px] font-semibold leading-none tabular-nums transition-[color,background-color,box-shadow] hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:size-9"
                     >
                       <span
                         className={cn(

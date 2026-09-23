@@ -38,8 +38,8 @@ export default function Loading() {
         </div>
       </section>
 
-      {/* cards de dupla — dot + nomes + motivo à esquerda; contador,
-          barra de progresso, badge e botão à direita */}
+      {/* cards de dupla — dot + nomes + motivo à esquerda; contador, barra e
+          badge à direita; rodapé full-width com lembrete + ação */}
       <section className="space-y-3">
         {Array.from({ length: 3 }, (_, i) => (
           <div
@@ -48,8 +48,12 @@ export default function Loading() {
           >
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2.5">
+                <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
                   <Skeleton className="size-2.5 shrink-0 rounded-full" />
+                  <span className="inline-flex shrink-0">
+                    <Skeleton className="size-8 rounded-full ring-2 ring-card" />
+                    <Skeleton className="-ml-2 size-8 rounded-full ring-2 ring-card" />
+                  </span>
                   <Skeleton className="h-4 w-52 max-w-full" />
                 </div>
                 <Skeleton className="mt-2 h-3.5 w-72 max-w-full" />
@@ -59,8 +63,11 @@ export default function Loading() {
                 <Skeleton className="h-3 w-16" />
                 <Skeleton className="h-1 w-16 rounded-full sm:w-20" />
                 <Skeleton className="h-5 w-14 rounded-4xl" />
-                <Skeleton className="h-11 w-24 rounded-lg md:h-7" />
               </div>
+            </div>
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 border-t border-border pt-2.5">
+              <Skeleton className="h-3 w-40" />
+              <Skeleton className="h-11 w-24 rounded-lg md:h-7" />
             </div>
           </div>
         ))}

@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Mitr, JetBrains_Mono } from "next/font/google";
 import { MotionConfig } from "motion/react";
 import { Toaster } from "@/components/ui/sonner";
+import { demoRole } from "@/lib/demo/mode";
 import "./globals.css";
 
 const mitr = Mitr({
@@ -30,12 +31,15 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: "#a2ca44",
+  // ativa os env(safe-area-inset-*) já escritos no código (sem isto valem 0)
+  viewportFit: "cover",
   // teclado virtual encolhe o layout em vez de cobrir dialogs/footers
   // sticky (Chrome/Android; iOS Safari ignora, limitação conhecida)
   interactiveWidget: "resizes-content",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  const demo = await demoRole();
   return (
     <html
       lang="pt-BR"
@@ -45,7 +49,14 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         {/* reducedMotion="user": o guard CSS de prefers-reduced-motion não cobre
             animação JS — aqui transform/layout viram instantâneos (fades ficam) */}
         <MotionConfig reducedMotion="user">{children}</MotionConfig>
-        <Toaster richColors position="bottom-right" mobileOffset={{ bottom: "5.5rem" }} />
+        {/* mobileOffset acima da bottom nav (~57px) e do footer do wizard
+            (~68px); em demo no desktop o offset descola da pill float */}
+        <Toaster
+          richColors
+          position="bottom-right"
+          mobileOffset={{ bottom: "calc(4.5rem + env(safe-area-inset-bottom))" }}
+          offset={demo ? { bottom: "4.75rem" } : undefined}
+        />
       </body>
     </html>
   );

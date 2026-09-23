@@ -227,7 +227,7 @@ export function FormularioLinks({
                               <li key={key}>
                                 <label
                                   className={cn(
-                                    "flex min-h-10 items-center gap-3 rounded-lg px-2 text-sm transition-colors",
+                                    "flex min-h-11 items-center gap-3 rounded-lg px-2 text-sm transition-colors sm:min-h-10",
                                     vigente
                                       ? "cursor-default text-muted-foreground"
                                       : "cursor-pointer hover:bg-muted"
@@ -331,9 +331,13 @@ export function FormularioLinks({
             const status = linkStatus(l);
             return (
               <li key={l.id} className="px-4 py-3 sm:px-5">
+                {/* a 390px o wrap jogava nome, badge e ações em 3 linhas
+                    desalinhadas — agora são 2 linhas deliberadas: nome+badge
+                    (token/meta abaixo) e as ações encostadas à direita; a
+                    partir de sm: volta à linha única */}
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
+                  <div className="min-w-0 flex-1 basis-full sm:basis-auto">
+                    <div className="flex min-w-0 items-center gap-2">
                       <span className="truncate text-sm font-medium">
                         {l.dest_nome ?? "Link genérico"}
                       </span>
@@ -346,6 +350,7 @@ export function FormularioLinks({
                               : "outline"
                         }
                         className={cn(
+                          "shrink-0",
                           status === "respondido" &&
                             "bg-[var(--ok)]/15 text-[var(--ok-text)]",
                           status === "expirado" &&
@@ -386,7 +391,7 @@ export function FormularioLinks({
                       )}
                     </p>
                   </div>
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex basis-full items-center justify-end gap-1.5 sm:basis-auto">
                     <CopiarLink token={l.token} />
                     {status === "pendente" && (
                       <NudgeButton

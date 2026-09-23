@@ -100,7 +100,9 @@ export function RespostasSection({
                   aria-hidden
                   className="shrink-0 text-muted-foreground/60"
                 />
-                <span className="min-w-0 flex-1 truncate text-sm font-medium">
+                {/* nomes longos quebram em 2 linhas em vez de perder pro
+                    timestamp shrink-0 — o clamp mantém a ellipsis no excesso */}
+                <span className="line-clamp-2 min-w-0 flex-1 text-sm font-medium">
                   {l.dest_nome ?? "Link genérico"}
                 </span>
                 <span className="shrink-0 text-xs tabular-nums text-muted-foreground">

@@ -122,7 +122,9 @@ export function RegistroInlinePanel({
           animate={{ height: "auto", opacity: 1 }}
           exit={{ height: 0, opacity: 0 }}
           transition={T.panel}
-          style={{ overflow: "hidden" }}
+          // clip recorta a animação sem criar scrollport — deixa o sticky
+          // do rodapé do form valer (com hidden o botão sumia no scroll)
+          style={{ overflow: "clip" }}
         >
           {children}
         </motion.div>

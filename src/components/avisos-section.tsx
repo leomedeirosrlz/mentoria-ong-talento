@@ -49,8 +49,13 @@ export function AvisosSection({
             {avisos.map((a) => (
               <article key={a.id} className="flex items-start gap-3 px-4 py-3.5">
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-baseline gap-2">
-                    <p className="truncate text-sm font-medium">{a.titulo}</p>
+                  <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                    {/* a 390px título + badge de audiência + data disputavam
+                        ~300px — o título truncava em ~10 caracteres. Linha
+                        própria no mobile; sm+ volta a dividir a linha */}
+                    <p className="min-w-0 basis-full truncate text-sm font-medium sm:basis-auto">
+                      {a.titulo}
+                    </p>
                     {a.audiencia !== "todos" && (
                       <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                         {AUDIENCIA_LABEL[a.audiencia]}

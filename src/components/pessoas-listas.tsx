@@ -474,8 +474,11 @@ function PessoaRow({
             onAlternar={() => setDetalhesAbertos((v) => !v)}
           />
         )}
-        <div className="flex items-center gap-2 ml-auto">
-          <div className="w-40">
+        {/* a 390px o cluster cai pra linha própria — w-full deixa o select de
+            papel ocupar a linha toda (alvo generoso) com o ⋮ na direita;
+            sm+ volta a ser o cluster compacto colado à direita */}
+        <div className="flex w-full items-center justify-between gap-2 sm:ml-auto sm:w-auto">
+          <div className="w-full sm:w-40">
             <RoleSelect profileId={p.id} role={p.role} nome={p.nome} />
           </div>
           <PessoaActions

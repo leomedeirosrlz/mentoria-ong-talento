@@ -445,7 +445,7 @@ export function AssinaturasPessoa({
                             href={url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex h-6 items-center gap-1.5 rounded-[min(var(--radius-md),10px)] px-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                            className="-my-2 inline-flex min-h-11 items-center gap-1.5 rounded-[min(var(--radius-md),10px)] px-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:my-0 sm:min-h-6"
                           >
                             <WhatsappLogo size={13} />
                             WhatsApp
@@ -474,7 +474,7 @@ export function AssinaturasPessoa({
                       href={`/api/assinatura/${a.id}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex h-6 items-center gap-1.5 rounded-[min(var(--radius-md),10px)] px-2 text-xs text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline"
+                      className="-my-2 inline-flex min-h-11 items-center gap-1.5 rounded-[min(var(--radius-md),10px)] px-2 text-xs text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline sm:my-0 sm:min-h-6"
                     >
                       <FilePdf size={13} />
                       Baixar PDF

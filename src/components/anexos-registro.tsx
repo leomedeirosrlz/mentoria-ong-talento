@@ -137,18 +137,40 @@ export function AnexosRegistro({
       {anexos.length > 0 && (
         <ul className="space-y-1.5">
           {anexos.map((a) => (
-            <li key={a.id} className="flex min-w-0 items-center gap-1.5 text-xs">
-              <Paperclip size={12} className="shrink-0 text-muted-foreground" />
-              <a
-                href={`/api/anexo/${a.id}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                title={a.nome}
-                className="truncate underline underline-offset-2 hover:text-foreground"
-              >
-                {a.nome}
-              </a>
-              <span className="shrink-0 text-muted-foreground">
+            <li key={a.id} className="text-xs">
+              <span className="flex min-w-0 items-center gap-1.5">
+                <Paperclip size={12} className="shrink-0 text-muted-foreground" />
+                <a
+                  href={`/api/anexo/${a.id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title={a.nome}
+                  className="min-w-0 flex-1 truncate underline underline-offset-2 hover:text-foreground"
+                >
+                  {a.nome}
+                </a>
+                {podeRemover && (
+                  <ConfirmDeleteButton
+                    titulo={`Remover "${a.nome}"?`}
+                    descricao="A evidência sai do registro e o arquivo é apagado."
+                    sucesso={`Anexo "${a.nome}" removido.`}
+                    onConfirm={() => removerAnexo(a)}
+                    trigger={
+                      <Button
+                        variant="ghost"
+                        size="icon-xs"
+                        aria-label="Remover anexo"
+                        className="text-muted-foreground"
+                      >
+                        <Trash size={13} />
+                      </Button>
+                    }
+                  />
+                )}
+              </span>
+              {/* meta na linha 2 — nome fica com a largura total (o recuo
+                  alinha com o texto, depois do clipe de 12px + gap 6px) */}
+              <span className="block pl-4.5 text-muted-foreground">
                 {[
                   a.tamanho != null ? formatTamanho(a.tamanho) : null,
                   a.autor?.nome ? `por ${a.autor.nome}` : null,
@@ -157,24 +179,6 @@ export function AnexosRegistro({
                   .filter(Boolean)
                   .join(" · ")}
               </span>
-              {podeRemover && (
-                <ConfirmDeleteButton
-                  titulo={`Remover "${a.nome}"?`}
-                  descricao="A evidência sai do registro e o arquivo é apagado."
-                  sucesso={`Anexo "${a.nome}" removido.`}
-                  onConfirm={() => removerAnexo(a)}
-                  trigger={
-                    <Button
-                      variant="ghost"
-                      size="icon-xs"
-                      aria-label="Remover anexo"
-                      className="text-muted-foreground"
-                    >
-                      <Trash size={13} />
-                    </Button>
-                  }
-                />
-              )}
             </li>
           ))}
         </ul>

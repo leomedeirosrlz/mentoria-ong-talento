@@ -187,7 +187,7 @@ function LinhaEncontro({ e, duplaId }: { e: Encontro; duplaId: string }) {
           href={link}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-[var(--ok)]/40 bg-[var(--ok)]/10 px-2.5 text-xs font-medium text-[var(--ok-text)] transition-colors hover:bg-[var(--ok)]/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-[var(--ok)]/40 bg-[var(--ok)]/10 px-2.5 text-xs font-medium text-[var(--ok-text)] transition-colors hover:bg-[var(--ok)]/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-9"
         >
           <VideoCamera size={14} aria-hidden />
           Chamada
@@ -196,7 +196,7 @@ function LinhaEncontro({ e, duplaId }: { e: Encontro; duplaId: string }) {
       <Link
         href={`/duplas/${duplaId}`}
         aria-label="Abrir a dupla"
-        className="grid size-9 shrink-0 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className="grid size-11 shrink-0 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:size-9"
       >
         <ArrowUpRight size={15} aria-hidden />
       </Link>

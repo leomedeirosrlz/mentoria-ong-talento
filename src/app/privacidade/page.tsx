@@ -164,10 +164,18 @@ export default function PrivacidadePage() {
   return (
     <div className="flex min-h-[100dvh] flex-col bg-background">
       <header className="border-b border-border">
-        <div className="mx-auto flex max-w-3xl items-center px-4 py-4 sm:px-6">
-          <Link href="/">
+        <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-4 sm:px-6">
+          {/* convenção logo→home (cai no /login pra anônimo) */}
+          <Link href="/" className="inline-flex min-h-11 items-center outline-none focus-visible:ring-3 focus-visible:ring-ring/50">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/logo-realiza.png" alt="Realiza.vc" className="h-5 w-auto" />
+          </Link>
+          {/* caminho óbvio de volta pra quem chegou pela assinatura pública */}
+          <Link
+            href="/login"
+            className="inline-flex min-h-11 items-center rounded-lg px-3 text-sm text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
+          >
+            Entrar
           </Link>
         </div>
       </header>

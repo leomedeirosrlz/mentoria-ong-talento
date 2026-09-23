@@ -27,9 +27,9 @@ export default function Loading() {
         </div>
       </header>
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
         {/* ===== timeline de encontros ===== */}
-        <section className="space-y-3">
+        <section className="min-w-0 space-y-3">
           <div className="flex items-center justify-between gap-2">
             <Skeleton className="h-4 w-20" />
             <Skeleton className="h-11 w-32 rounded-lg md:h-7" />
@@ -80,7 +80,7 @@ export default function Loading() {
         </section>
 
         {/* ===== aside ===== */}
-        <aside className="space-y-6">
+        <aside className="min-w-0 space-y-6">
           {/* encaminhamentos */}
           <section className="rounded-xl bg-card p-4 shadow-[var(--shadow-border)]">
             <div className="mb-2 flex items-center justify-between gap-2">

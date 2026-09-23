@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "motion/react";
@@ -7,6 +8,7 @@ import {
   CalendarDots,
   ChartLineUp,
   ClipboardText,
+  DotsThree,
   FolderOpen,
   ListChecks,
   SignOut,
@@ -14,11 +16,16 @@ import {
   UsersThree,
 } from "@phosphor-icons/react";
 import { signOut } from "@/lib/actions";
-import { papelLabel } from "@/lib/ciclo";
+import { papelCurto, papelLabel } from "@/lib/ciclo";
 import { Avatar } from "@/components/avatar";
 import { T } from "@/components/motion";
 import { NotificacoesBell, NotificacoesProvider } from "@/components/notificacoes";
 import { SiteFooter } from "@/components/site-footer";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import type { Notificacao, Profile } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -37,16 +44,37 @@ export function AppShell({
   avatarUrl,
   gravatarUrl,
   notificacoes,
+  demo,
   children,
 }: {
   me: Profile;
   avatarUrl: string | null;
   gravatarUrl: string;
   notificacoes: { itens: Notificacao[]; naoLidas: number };
+  /** pill compacta da DemoBar dockada no header mobile (substitui o span de
+   *  papel — sempre visível e sem cobrir conteúdo) */
+  demo?: React.ReactNode;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
   const items = NAV.filter((i) => !i.roles || (me.role && (i.roles as readonly string[]).includes(me.role)));
+  const [abertoMais, setAbertoMais] = useState(false);
+
+  // nav mobile com no máx. 5 cells — só a coordenação passa disso (7 itens).
+  // Primárias = rotina diária da operação (Início/Duplas/Registros/Agenda);
+  // gestão menos diária (Materiais/Formulários/Pessoas) fica a 1 toque no
+  // "Mais". Alternativa defensável: Pessoas primária e Registros no Mais.
+  const visiveis = items.length > 5 ? items.slice(0, 4) : items;
+  const overflow = items.slice(visiveis.length);
+  const maisAtivo = overflow.some((i) => pathname.startsWith(i.href));
+
+  // navegar pelo popover (ou por fora) fecha o Mais — ajuste durante o
+  // render (padrão "props mudaram", igual ao provider de notificações)
+  const [ultimoPath, setUltimoPath] = useState(pathname);
+  if (pathname !== ultimoPath) {
+    setUltimoPath(pathname);
+    setAbertoMais(false);
+  }
 
   return (
     <NotificacoesProvider inicial={notificacoes}>
@@ -60,17 +88,20 @@ export function AppShell({
         Pular pro conteúdo
       </a>
 
-      {/* top bar — só mobile */}
-      <header className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border-border bg-background/95 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] backdrop-blur md:hidden">
-        <div className="flex items-center gap-3">
+      {/* top bar — só mobile; min-h + safe-area: com viewportFit=cover o
+          sticky top-0 ficaria sob o notch em standalone */}
+      <header className="sticky top-0 z-40 flex min-h-14 items-center justify-between border-b border-border bg-background/95 pt-[env(safe-area-inset-top)] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] backdrop-blur md:hidden">
+        <div className="flex min-w-0 items-center gap-3">
           {/* convenção logo→home; min-h-11 garante os 44px de toque */}
-          <Link href="/" className="flex min-h-11 items-center">
+          <Link href="/" className="flex min-h-11 shrink-0 items-center">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/logo-realiza.png" alt="Realiza.vc" className="h-5 w-auto" />
           </Link>
-          <span className="text-xs text-muted-foreground truncate max-w-44" title={papelCurto(me.role)}>
-            {papelCurto(me.role)}
-          </span>
+          {demo ?? (
+            <span className="text-xs text-muted-foreground truncate max-w-44" title={papelCurto(me.role)}>
+              {papelCurto(me.role)}
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-1">
           <NotificacoesBell side="bottom" align="end" />
@@ -78,19 +109,23 @@ export function AppShell({
             href="/perfil"
             aria-label="Meu perfil"
             aria-current={pathname === "/perfil" ? "page" : undefined}
-            className="grid size-11 place-items-center rounded-lg transition-colors hover:bg-muted"
+            className="grid size-11 place-items-center rounded-lg transition-colors outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50"
           >
             <Avatar nome={me.nome} src={avatarUrl} fallbackSrc={gravatarUrl} size={28} />
           </Link>
-          <form action={signOut}>
-            <button
-              type="submit"
-              aria-label="Sair"
-              className="grid size-11 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-            >
-              <SignOut size={20} aria-hidden />
-            </button>
-          </form>
+          {/* em demo o "Sair" sai do header (a DemoBar tem "Sair da
+              demonstração") — logo+pill+sino+avatar já quase enchem 390px */}
+          {!demo && (
+            <form action={signOut}>
+              <button
+                type="submit"
+                aria-label="Sair"
+                className="grid size-11 place-items-center rounded-lg text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
+              >
+                <SignOut size={20} aria-hidden />
+              </button>
+            </form>
+          )}
         </div>
       </header>
 
@@ -142,7 +177,7 @@ export function AppShell({
             <Link
               href="/perfil"
               aria-current={pathname === "/perfil" ? "page" : undefined}
-              className="flex min-w-0 flex-1 items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+              className="flex min-w-0 flex-1 items-center gap-3 rounded-lg px-2 py-2 transition-colors outline-none hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
             >
               <Avatar nome={me.nome} src={avatarUrl} fallbackSrc={gravatarUrl} size={32} />
               <div className="min-w-0">
@@ -155,7 +190,7 @@ export function AppShell({
             <NotificacoesBell side="right" align="end" />
           </div>
           <form action={signOut}>
-            <button type="submit" className="mt-2 flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors">
+            <button type="submit" className="mt-2 flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground outline-none transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-3 focus-visible:ring-ring/50">
               <SignOut size={18} aria-hidden />
               Sair
             </button>
@@ -184,7 +219,7 @@ export function AppShell({
       {/* bottom nav — só mobile */}
       <nav aria-label="Navegação principal" className="fixed inset-x-0 bottom-0 z-40 border-t border-sidebar-border bg-sidebar pb-[env(safe-area-inset-bottom)] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] md:hidden">
         <div className="flex">
-          {items.map((item) => {
+          {visiveis.map((item) => {
             const ativo = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
             return (
               <Link
@@ -192,7 +227,7 @@ export function AppShell({
                 href={item.href}
                 aria-current={ativo ? "page" : undefined}
                 className={cn(
-                  "relative flex flex-1 flex-col items-center gap-1 py-2.5 text-[11px] transition-colors",
+                  "relative flex flex-1 flex-col items-center gap-1 py-2.5 text-[11px] transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:ring-inset",
                   ativo ? "font-semibold text-[var(--brand-ink)]" : "font-medium text-sidebar-foreground/75 active:text-sidebar-foreground"
                 )}
               >
@@ -211,20 +246,62 @@ export function AppShell({
               </Link>
             );
           })}
+          {overflow.length > 0 && (
+            <Popover open={abertoMais} onOpenChange={setAbertoMais}>
+              <PopoverTrigger
+                aria-label={maisAtivo ? `Mais seções — seção atual em ${overflow.find((i) => pathname.startsWith(i.href))?.label}` : "Mais seções"}
+                className={cn(
+                  "relative flex flex-1 flex-col items-center gap-1 py-2.5 text-[11px] transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:ring-inset",
+                  maisAtivo ? "font-semibold text-[var(--brand-ink)]" : "font-medium text-sidebar-foreground/75 active:text-sidebar-foreground"
+                )}
+              >
+                {/* a rota atual mora no overflow → o indicador viaja pra cell
+                    Mais e ela veste o estilo ativo */}
+                {maisAtivo && (
+                  <motion.span
+                    layoutId="nav-bottom"
+                    transition={T.pill}
+                    aria-hidden
+                    className="absolute top-0 h-0.5 w-8 rounded-full bg-[var(--brand-lime)]"
+                  />
+                )}
+                <DotsThree size={20} weight={maisAtivo ? "bold" : "regular"} aria-hidden />
+                Mais
+              </PopoverTrigger>
+              <PopoverContent
+                side="top"
+                align="end"
+                sideOffset={8}
+                className="w-56 p-1.5"
+              >
+                <ul>
+                  {overflow.map((item) => {
+                    const ativo = pathname.startsWith(item.href);
+                    return (
+                      <li key={item.href}>
+                        <Link
+                          href={item.href}
+                          aria-current={ativo ? "page" : undefined}
+                          className={cn(
+                            "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors outline-none focus-visible:bg-muted",
+                            ativo
+                              ? "font-semibold text-[var(--brand-ink)]"
+                              : "text-foreground/80 hover:bg-muted"
+                          )}
+                        >
+                          <item.icon size={18} weight={ativo ? "fill" : "regular"} aria-hidden />
+                          {item.label}
+                        </Link>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </PopoverContent>
+            </Popover>
+          )}
         </div>
       </nav>
     </div>
     </NotificacoesProvider>
   );
-}
-
-
-
-function papelCurto(role: string | null) {
-  switch (role) {
-    case "supervisor": return "Supervisor";
-    case null:
-    case "": return "";
-    default: return papelLabel(role);
-  }
 }

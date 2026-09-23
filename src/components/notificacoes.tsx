@@ -236,7 +236,7 @@ export function NotificacoesBell({
             ? `Notificações, ${naoLidas} não ${naoLidas === 1 ? "lida" : "lidas"}`
             : "Notificações"
         }
-        className="relative grid size-11 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        className="relative grid size-11 place-items-center rounded-lg text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
       >
         <Bell size={20} weight={naoLidas > 0 ? "fill" : "regular"} aria-hidden />
         {/* lime, não danger — contagem não-lida não é alerta; o vermelho
@@ -262,7 +262,7 @@ export function NotificacoesBell({
             <button
               type="button"
               onClick={marcarTodas}
-              className="-my-2 rounded-md px-3 py-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground min-h-11 sm:min-h-0 sm:py-2"
+              className="-my-2 rounded-md px-3 py-2.5 text-xs font-medium text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 min-h-11 sm:min-h-0 sm:py-2"
             >
               Marcar todas como lidas
             </button>
@@ -291,13 +291,13 @@ export function NotificacoesBell({
                         </span>
                         <span className="min-w-0 flex-1">
                           {!lida && <span className="sr-only">Não lida · </span>}
-                          <span className="flex items-baseline gap-2">
-                            <span className={cn("truncate text-sm", !lida && "font-medium")}>
-                              {n.titulo}
-                            </span>
-                            <span className="ml-auto shrink-0 text-[11px] text-muted-foreground">
-                              {tempoRelativo(n.created_at)}
-                            </span>
+                          {/* título em 2 linhas + horário na linha própria —
+                              o par truncate+shrink-0 comia títulos longos */}
+                          <span className={cn("line-clamp-2 text-sm leading-snug", !lida && "font-medium")}>
+                            {n.titulo}
+                          </span>
+                          <span className="mt-0.5 block text-[11px] text-muted-foreground">
+                            {tempoRelativo(n.created_at)}
                           </span>
                           {n.corpo && (
                             <span className="mt-0.5 block truncate text-xs text-muted-foreground">
@@ -308,7 +308,7 @@ export function NotificacoesBell({
                       </>
                     );
                     const classe =
-                      "flex min-w-0 flex-1 items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/60";
+                      "flex min-w-0 flex-1 items-start gap-3 px-4 py-3 text-left transition-colors outline-none hover:bg-muted/60 focus-visible:bg-muted/60";
                     const aoClicar = () => {
                       if (!lida) marcar(n.id);
                       setAberto(false);
@@ -329,7 +329,7 @@ export function NotificacoesBell({
                       onClick={() => marcar(n.id)}
                       aria-label="Marcar como lida"
                       title="Marcar como lida"
-                      className="grid w-11 shrink-0 place-items-center text-muted-foreground transition-colors hover:text-foreground"
+                      className="grid w-11 shrink-0 place-items-center text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:bg-muted/60 focus-visible:ring-3 focus-visible:ring-inset focus-visible:ring-ring/50"
                     >
                       <Check size={14} aria-hidden />
                     </button>

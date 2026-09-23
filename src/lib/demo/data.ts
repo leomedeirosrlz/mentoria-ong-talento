@@ -1742,7 +1742,9 @@ function build(): DemoData {
         tipo: "formulario_respondido",
         titulo: "Resposta de formulário",
         corpo: 'Ana Beatriz Silva respondeu "Anamnese Social"',
-        href: "/formularios/de000000-0000-4000-8000-000000004004",
+        // uid(0x4004) = Anamnese Social oficial (forms-data) — id decimal,
+        // não o hex cru
+        href: `/formularios/${uid(0x4004)}`,
         lida_em: haDias(31, "09:00"),
         created_at: haDias(33, "19:12"),
       },

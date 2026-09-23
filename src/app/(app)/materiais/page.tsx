@@ -153,7 +153,7 @@ function MaterialRow({ m, ehCoord, maxEncontro }: { m: Material; ehCoord: boolea
       <Icone size={18} className="shrink-0 text-muted-foreground" aria-hidden />
       <div className="min-w-0 flex-1">
         <p className="text-sm font-medium">{m.titulo}</p>
-        {m.descricao && <p className="text-xs text-muted-foreground mt-0.5">{m.descricao}</p>}
+        {m.descricao && <p className="line-clamp-2 text-xs text-muted-foreground mt-0.5">{m.descricao}</p>}
         {/* equivalente textual dos ícones de tipo/destino — pro tipo "link" a
             palavra já cobre o destino, sem "link externo" repetido */}
         <span className="sr-only">
@@ -161,7 +161,10 @@ function MaterialRow({ m, ehCoord, maxEncontro }: { m: Material; ehCoord: boolea
           {m.path ? " — arquivo" : m.url && m.tipo !== "link" ? " — link externo" : ""}
         </span>
       </div>
-      <div className="flex items-center gap-2 shrink-0">
+      {/* a 390px o shrink-0 (badge de audiência ~150px + ícone) deixava
+          60-110px pro título — uma palavra por linha. basis-full manda o
+          cluster pra linha de baixo no mobile; sm+ volta ao shrink-0 de sempre */}
+      <div className="flex basis-full items-center gap-2 sm:basis-auto sm:shrink-0">
         {m.audiencia !== "todos" && (
           <Badge variant="outline" className="text-xs">{AUDIENCIA_LABEL[m.audiencia]}</Badge>
         )}
@@ -181,20 +184,27 @@ function MaterialRow({ m, ehCoord, maxEncontro }: { m: Material; ehCoord: boolea
     </>
   );
   return (
-    <div className={cn("flex items-center pr-2 transition-colors", href && "hover:bg-muted/50")}>
+    <div className={cn("flex flex-wrap items-center pr-2 transition-colors", href && "hover:bg-muted/50")}>
       {href ? (
         <a
           href={href}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex min-w-0 flex-1 items-center gap-4 px-5 py-3.5 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+          className="flex min-w-0 flex-1 basis-full flex-wrap items-center gap-x-4 gap-y-1.5 px-5 py-3.5 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset sm:basis-auto"
         >
           {inner}
         </a>
       ) : (
-        <div className="flex min-w-0 flex-1 items-center gap-4 px-5 py-3.5">{inner}</div>
+        <div className="flex min-w-0 flex-1 basis-full flex-wrap items-center gap-x-4 gap-y-1.5 px-5 py-3.5 sm:basis-auto">{inner}</div>
       )}
-      {ehCoord && <MaterialActions material={m} maxEncontro={maxEncontro} />}
+      {/* os 3 botões size-11 (132px) disputavam a linha com o título a 390px —
+          no mobile o link toma a linha toda e as ações caem na linha de baixo,
+          encostadas à direita; sm+ volta a dividir a mesma linha */}
+      {ehCoord && (
+        <div className="flex basis-full justify-end sm:basis-auto">
+          <MaterialActions material={m} maxEncontro={maxEncontro} />
+        </div>
+      )}
     </div>
   );
 }

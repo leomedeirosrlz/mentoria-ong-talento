@@ -50,8 +50,11 @@ function EstadoLink({
   children: React.ReactNode;
 }) {
   return (
-    <div className="grid min-h-[100dvh] place-items-center bg-background px-4 py-10">
-      <div className="w-full max-w-sm animate-rise text-center">
+    // flex + m-auto (não place-items-center): em telas baixas o topo do card
+    // continua rolável — centraliza só quando há espaço. flex, não grid: em
+    // grid o w-full do filho resolve contra o padding box e vaza os px-4
+    <div className="flex min-h-[100dvh] flex-col bg-background px-4 py-10">
+      <div className="m-auto w-full max-w-sm animate-rise text-center">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/logo-realiza.png" alt="Realiza.vc" className="mx-auto h-6 w-auto" />
         <div className="mt-8 rounded-xl bg-card p-6 shadow-[var(--shadow-border)]">
@@ -106,6 +109,7 @@ export default async function AssinarTokenPage({
           >
             <FileArrowDown size={15} aria-hidden />
             Baixar a via do documento
+            <span className="sr-only"> (abre em nova aba)</span>
           </a>
         </p>
       </EstadoLink>

@@ -11,11 +11,12 @@ import {
 } from "@/lib/queries";
 import { getAssinaturasResumo } from "@/lib/queries-assinaturas";
 import type { DocsPessoa } from "@/components/pessoas-listas";
-import { DownloadSimple } from "@phosphor-icons/react/dist/ssr";
-import { NovaPessoaDialog, NovoMentoradoDialog } from "@/components/pessoas-dialogs";
-import { ImportarCsvDialog } from "@/components/importar-csv-dialog";
+import {
+  NovaPessoaDialog,
+  NovoMentoradoDialog,
+  PessoasMaisAcoes,
+} from "@/components/pessoas-dialogs";
 import { PessoasListas } from "@/components/pessoas-listas";
-import { buttonVariants } from "@/components/ui/button";
 
 export const metadata: Metadata = {
   title: "Pessoas",
@@ -79,25 +80,12 @@ export default async function PessoasPage() {
             Mentores, supervisores e equipe com acesso à plataforma
           </p>
         </div>
+        {/* criação é o caminho primário e fica visível; importação e backups
+            vão pro "Mais ações" — 5 CTAs de mesmo peso viravam pilha a 390px */}
         <div className="flex flex-wrap gap-2">
-          <ImportarCsvDialog />
-          <a
-            href="/api/export?tipo=pessoas"
-            className={buttonVariants({ variant: "outline", size: "sm" })}
-          >
-            <DownloadSimple />
-            Exportar CSV
-          </a>
-          <a
-            href="/api/export?tipo=assinaturas"
-            className={buttonVariants({ variant: "outline", size: "sm" })}
-            title="Backup das assinaturas — status, evidências e dados assinados"
-          >
-            <DownloadSimple />
-            Assinaturas
-          </a>
           <NovoMentoradoDialog />
           <NovaPessoaDialog />
+          <PessoasMaisAcoes />
         </div>
       </header>
 

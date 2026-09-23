@@ -122,12 +122,14 @@ export default async function FormularioPage({
             </p>
             <ol className="space-y-2">
               {f.campos.map((c, i) => (
-                <li key={c.id} className="flex items-baseline gap-2 text-sm">
+                // meta na linha de baixo no mobile — o "Texto longo ·
+                // obrigatória" shrink-0 esmagava o enunciado
+                <li key={c.id} className="flex flex-wrap items-baseline gap-x-2 text-sm">
                   <span className="shrink-0 tabular-nums text-muted-foreground">
                     {i + 1}.
                   </span>
                   <span className="min-w-0 flex-1">{c.label}</span>
-                  <span className="shrink-0 text-xs text-muted-foreground">
+                  <span className="shrink-0 basis-full order-3 text-xs text-muted-foreground sm:basis-auto sm:order-none">
                     {CAMPO_TIPO_LABEL[c.tipo]}
                     {c.obrigatorio && " · obrigatória"}
                   </span>

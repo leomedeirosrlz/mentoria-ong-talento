@@ -77,7 +77,7 @@ export function EncaminhamentosList({
           // interativo (só phrasing content é válido ali) e do div read-only
           const texto = (
             <span className="block min-w-0 flex-1">
-              <span className={cn("block text-sm", t.status === "feito" && "line-through text-muted-foreground")}>
+              <span className={cn("block break-words text-sm", t.status === "feito" && "line-through text-muted-foreground")}>
                 {t.descricao}
               </span>
               <span className="block text-xs text-muted-foreground mt-0.5">

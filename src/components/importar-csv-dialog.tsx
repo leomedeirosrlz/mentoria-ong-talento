@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { FileArrowDown, FileArrowUp, UploadSimple } from "@phosphor-icons/react";
+import { CaretDown, FileArrowDown, FileArrowUp, UploadSimple } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { importMentorados, importPessoas } from "@/lib/actions";
 import {
@@ -86,8 +86,24 @@ function linhaValida(tipo: Tipo, r: LinhaImportada): string | null {
   return null;
 }
 
-export function ImportarCsvDialog({ tipoInicial = "equipe" }: { tipoInicial?: Tipo }) {
-  const [open, setOpen] = useState(false);
+export function ImportarCsvDialog({
+  tipoInicial = "equipe",
+  open,
+  onOpenChange,
+}: {
+  tipoInicial?: Tipo;
+  /** modo controlado — quem abre de um menu ("Mais ações") não tem trigger
+   *  próprio; sem `open` o dialog segue autônomo com o botão de sempre */
+  open?: boolean;
+  onOpenChange?: (o: boolean) => void;
+}) {
+  const [openInterno, setOpenInterno] = useState(false);
+  const aberto = open ?? openInterno;
+  const aoMudar = (o: boolean) => {
+    if (open === undefined) setOpenInterno(o);
+    onOpenChange?.(o);
+    if (!o) reset();
+  };
   const [tipo, setTipo] = useState<Tipo>(tipoInicial);
   const [texto, setTexto] = useState("");
   const [linhas, setLinhas] = useState<LinhaImportada[] | null>(null);
@@ -178,14 +194,16 @@ export function ImportarCsvDialog({ tipoInicial = "equipe" }: { tipoInicial?: Ti
   const validas = (linhas?.length ?? 0) - comErro.length;
 
   return (
-    <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) reset(); }}>
-      <DialogTrigger
-        render={
-          <Button size="sm" variant="outline">
-            <FileArrowUp size={16} /> Importar CSV
-          </Button>
-        }
-      />
+    <Dialog open={aberto} onOpenChange={aoMudar}>
+      {open === undefined && (
+        <DialogTrigger
+          render={
+            <Button size="sm" variant="outline">
+              <FileArrowUp size={16} /> Importar CSV
+            </Button>
+          }
+        />
+      )}
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>Importar de planilha</DialogTitle>
@@ -206,7 +224,7 @@ export function ImportarCsvDialog({ tipoInicial = "equipe" }: { tipoInicial?: Ti
                 ))}
               </ul>
             )}
-            <Button className="w-full" onClick={() => setOpen(false)}>Fechar</Button>
+            <Button className="w-full" onClick={() => aoMudar(false)}>Fechar</Button>
           </div>
         ) : linhas ? (
           // ref callback leva o foco pra nova etapa — o botão que disparou
@@ -218,7 +236,9 @@ export function ImportarCsvDialog({ tipoInicial = "equipe" }: { tipoInicial?: Ti
               {comErro.length > 0 &&
                 ` · ${comErro.length} ${comErro.length === 1 ? "com problema (será pulada)" : "com problemas (serão puladas)"}`}
             </p>
-            <div className="max-h-72 overflow-auto rounded-lg border">
+            {/* a tabela da prévia rola na horizontal (min-w-640px) — a barra
+                fina deixa a pista de scroll visível em vez de cortar colunas */}
+            <div className="scroll-fina max-h-72 overflow-auto rounded-lg border">
               <table className="w-full min-w-[640px] text-sm">
                 <thead className="sticky top-0 bg-card">
                   <tr className="border-b text-left text-xs text-muted-foreground">
@@ -288,7 +308,26 @@ export function ImportarCsvDialog({ tipoInicial = "equipe" }: { tipoInicial?: Ti
                   ))}
                 </SelectContent>
               </Select>
-              <p className="text-xs text-muted-foreground">{DICAS[tipo]}</p>
+              <p className="text-xs text-muted-foreground">
+                {tipo === "equipe"
+                  ? "Obrigatórias: nome e e-mail — o resto da ficha é opcional."
+                  : "Obrigatória: nome — o resto da ficha é opcional."}
+              </p>
+              {/* parede de colunas recolhida — quem precisa do detalhe abre;
+                  <details> nativo mantém teclado/leitor de tela de graça */}
+              <details className="group">
+                <summary className="inline-flex min-h-11 cursor-pointer list-none items-center gap-1.5 rounded-lg text-xs font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:min-h-8 [&::-webkit-details-marker]:hidden">
+                  Colunas aceitas no CSV
+                  <CaretDown
+                    size={13}
+                    aria-hidden
+                    className="transition-transform group-open:rotate-180"
+                  />
+                </summary>
+                <p className="pb-1 text-xs leading-relaxed text-muted-foreground">
+                  {DICAS[tipo]}
+                </p>
+              </details>
             </div>
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-2">

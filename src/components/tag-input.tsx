@@ -91,7 +91,8 @@ export function TagInput({
               disabled={cheio && !ativa}
               onClick={() => alternar(tag)}
               className={cn(
-                "rounded-full border px-3 py-1.5 text-sm transition-all outline-none active:scale-[0.97] focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-45",
+                // ≥44px de alvo no mobile; desktop volta à densidade compacta
+                "min-h-11 rounded-full border px-3 text-sm transition-all outline-none active:scale-[0.97] focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-45 md:min-h-0 md:py-1.5",
                 ativa
                   ? "border-primary bg-primary text-primary-foreground"
                   : "border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -117,14 +118,14 @@ export function TagInput({
           disabled={cheio}
           placeholder={placeholder}
           aria-label={inputLabel ?? placeholder}
-          className="min-w-0 flex-1 rounded-full border border-input bg-transparent px-4 py-2 text-sm outline-none transition-[border-color,box-shadow] duration-150 ease-snappy placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50"
+          className="min-h-11 min-w-0 flex-1 rounded-full border border-input bg-transparent px-4 text-sm outline-none transition-[border-color,box-shadow] duration-150 ease-snappy placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50"
         />
         <button
           type="button"
           onClick={adicionar}
           disabled={cheio || !draft.trim()}
           aria-label="Adicionar"
-          className="grid size-9 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground transition-all outline-none hover:bg-primary/80 active:scale-[0.97] focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-50"
+          className="grid size-11 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground transition-all outline-none hover:bg-primary/80 active:scale-[0.97] focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-50 md:size-9"
         >
           <Plus size={16} weight="bold" aria-hidden />
         </button>

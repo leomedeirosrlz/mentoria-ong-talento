@@ -187,7 +187,7 @@ export function EncontroDetalheDialog({
               <p className="text-xs font-medium text-muted-foreground">
                 Plano do mentor
               </p>
-              <p className="mt-0.5 whitespace-pre-wrap">{nota}</p>
+              <p className="mt-0.5 whitespace-pre-wrap break-words">{nota}</p>
             </div>
           )}
 
@@ -203,24 +203,23 @@ export function EncontroDetalheDialog({
               {anexos && anexos.length > 0 && (
                 <ul className="space-y-1.5 pt-1">
                   {anexos.map((a) => (
-                    <li
-                      key={a.id}
-                      className="flex min-w-0 items-center gap-1.5 text-xs"
-                    >
-                      <Paperclip
-                        size={12}
-                        className="shrink-0 text-muted-foreground"
-                      />
-                      <a
-                        href={`/api/anexo/${a.id}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        title={a.nome}
-                        className="truncate underline underline-offset-2 hover:text-foreground"
-                      >
-                        {a.nome}
-                      </a>
-                      <span className="shrink-0 text-muted-foreground">
+                    <li key={a.id} className="text-xs">
+                      <span className="flex min-w-0 items-center gap-1.5">
+                        <Paperclip
+                          size={12}
+                          className="shrink-0 text-muted-foreground"
+                        />
+                        <a
+                          href={`/api/anexo/${a.id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title={a.nome}
+                          className="min-w-0 flex-1 truncate underline underline-offset-2 hover:text-foreground"
+                        >
+                          {a.nome}
+                        </a>
+                      </span>
+                      <span className="block pl-4.5 text-muted-foreground">
                         {[
                           a.tamanho != null ? formatTamanho(a.tamanho) : null,
                           a.autor?.nome ? `por ${a.autor.nome}` : null,

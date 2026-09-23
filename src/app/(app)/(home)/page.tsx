@@ -16,6 +16,7 @@ import { DashboardCoordenacao } from "@/components/dashboard-coordenacao";
 import { DemandasEspecialista } from "@/components/demandas-especialista";
 import { MentorHome } from "@/components/mentor-home";
 import { TermoBanner } from "@/components/termo-banner";
+import { AvisosSection } from "@/components/avisos-section";
 
 export default async function HomePage({
   searchParams,
@@ -102,16 +103,18 @@ export default async function HomePage({
           a query acima só rodou pros papéis de voluntário */}
       {(me?.role === "mentor_dpp" || me?.role === "mentor_especialista") &&
         assinatura?.status !== "assinado" && <TermoBanner />}
-      {me?.role === "mentor_especialista" && (
-        <DemandasEspecialista solicitacoes={solicitacoes} meuId={me.id} />
-      )}
+      {/* contexto próprio → fila de pedidos → avisos: a saudação abre a
+          página; o mural do especialista vem antes dos comunicados */}
       <MentorHome
         duplas={duplas}
         eventos={eventos}
         espEventos={espEventos}
         me={me!}
-        avisos={avisos}
       />
+      {me?.role === "mentor_especialista" && (
+        <DemandasEspecialista solicitacoes={solicitacoes} meuId={me.id} />
+      )}
+      <AvisosSection avisos={avisos} souCoord={false} />
     </div>
   );
 }
