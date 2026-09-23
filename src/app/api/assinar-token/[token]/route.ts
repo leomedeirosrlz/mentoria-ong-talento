@@ -3,8 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { demoRole } from "@/lib/demo/mode";
 import { demoAssinaturaCompletaPorToken } from "@/lib/demo/queries";
 import { renderDocumentoAssinado } from "@/lib/documentos/pdf";
-import { dadosAutorizacaoDe } from "@/lib/documentos/texto";
-import { normaliza } from "@/lib/utils";
+import { nomeArquivoVia } from "@/lib/documentos/texto";
 import type { Assinatura } from "@/lib/types";
 
 // Via assinada do documento, por token — o "download" do fluxo sem login.
@@ -13,18 +12,6 @@ import type { Assinatura } from "@/lib/types";
 // pendência nunca vaza dados civis por aqui).
 
 const TOKEN_RE = /^[0-9a-f-]{36}$/;
-
-/** `autorizacao-<primeiro-nome-do-responsável>.pdf` — mesma convenção de
- *  /api/assinatura/[id] (o signatário é quem baixa a via; header em ASCII). */
-function nomeArquivo(a: Assinatura): string {
-  const nome =
-    dadosAutorizacaoDe(a)?.responsavel.nome_civil ?? a.assinatura_texto ?? "";
-  const primeiro = normaliza(nome.trim().split(/\s+/)[0]).replace(
-    /[^a-z0-9]+/g,
-    ""
-  );
-  return primeiro ? `autorizacao-${primeiro}.pdf` : "autorizacao.pdf";
-}
 
 function pdfResponse(pdf: Uint8Array, arquivo: string) {
   return new NextResponse(new Uint8Array(pdf), {
@@ -54,7 +41,7 @@ export async function GET(
         status: 404,
       });
     }
-    return pdfResponse(await renderDocumentoAssinado(a, null), nomeArquivo(a));
+    return pdfResponse(await renderDocumentoAssinado(a, null), nomeArquivoVia(a));
   }
 
   const supabase = await createClient();
@@ -84,6 +71,6 @@ export async function GET(
 
   return pdfResponse(
     await renderDocumentoAssinado(assinatura, contra),
-    nomeArquivo(assinatura)
+    nomeArquivoVia(assinatura)
   );
 }

@@ -4,7 +4,7 @@ import { demoRole } from "@/lib/demo/mode";
 import { demoAssinatura } from "@/lib/demo/queries";
 import { getAssinatura } from "@/lib/queries-assinaturas";
 import { renderDocumentoAssinado } from "@/lib/documentos/pdf";
-import { dadosAutorizacaoDe, dadosCivisDe } from "@/lib/documentos/texto";
+import { nomeArquivoVia } from "@/lib/documentos/texto";
 import type { Assinatura } from "@/lib/types";
 
 // Download da via assinada (termo do voluntário, autorização do responsável):
@@ -12,26 +12,6 @@ import type { Assinatura } from "@/lib/types";
 // template — não guardamos bytes, guardamos a evidência (0033). A leitura da
 // row passa pela RLS (dono ou coordenação); a checagem de dono abaixo é só
 // defesa em profundidade dentro do handler.
-
-/** Nome do arquivo: termo-adesao-marina.pdf / autorizacao-cleusa.pdf — o
- *  primeiro nome do signatário em ASCII (header não gosta de acento). */
-function nomeArquivo(a: Assinatura): string {
-  const base =
-    a.template?.slug === "autorizacao-responsavel"
-      ? "autorizacao"
-      : "termo-adesao";
-  const nome =
-    dadosCivisDe(a)?.nome_civil ??
-    dadosAutorizacaoDe(a)?.responsavel.nome_civil ??
-    a.assinatura_texto ??
-    "";
-  const primeiro = (nome.trim().split(/\s+/)[0] ?? "")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "");
-  return primeiro ? `${base}-${primeiro}.pdf` : `${base}.pdf`;
-}
 
 /** O renderer lança em snapshot ausente/incompatível — aqui vira null e a
  *  rota responde 500 (uma row 'assinado' sem snapshot é bug, não 404). */
@@ -68,7 +48,7 @@ export async function GET(
     return new NextResponse(new Uint8Array(pdf), {
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": `inline; filename="${nomeArquivo(a)}"`,
+        "Content-Disposition": `inline; filename="${nomeArquivoVia(a)}"`,
       },
     });
   }
@@ -114,7 +94,7 @@ export async function GET(
   return new NextResponse(new Uint8Array(pdf), {
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": `inline; filename="${nomeArquivo(a)}"`,
+      "Content-Disposition": `inline; filename="${nomeArquivoVia(a)}"`,
     },
   });
 }

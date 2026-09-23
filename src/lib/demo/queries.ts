@@ -353,8 +353,9 @@ export function demoPessoaPerfil(
       .filter((d) => d.mentorado?.id === id)
       .sort(desc)
       .map((d) => duplaPerfil(d, contatos));
-    // mentor sem vínculo ao mentorado: a RLS responderia vazio → notFound
-    if (!ehStaff && duplas.length === 0) return null;
+    // mentor/supervisor sem vínculo ao mentorado: a RLS responderia vazio →
+    // notFound (supervisor só lê mentorados de duplas que supervisiona — 0023)
+    if (role !== "coordenacao" && duplas.length === 0) return null;
     return {
       tipo: "mentorado",
       pessoa: role === "coordenacao" ? m : semPessoal(m),

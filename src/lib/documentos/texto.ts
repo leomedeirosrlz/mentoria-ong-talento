@@ -8,6 +8,7 @@
 // `versao` do template em documento_templates.
 
 import type { Assinatura, DadosAutorizacao, DadosCivis, Endereco } from "../types";
+import { normaliza } from "../utils";
 
 const MESES = [
   "janeiro", "fevereiro", "março", "abril", "maio", "junho",
@@ -248,4 +249,22 @@ export function dadosAutorizacaoDe(a: Assinatura): DadosAutorizacao | null {
   const s = a.dados_snapshot;
   if (!s || typeof s !== "object" || !("responsavel" in s)) return null;
   return s as DadosAutorizacao;
+}
+
+/** Nome do arquivo da via assinada: `termo-adesao-marina.pdf` /
+ *  `autorizacao-cleusa.pdf` — primeiro nome do signatário em ASCII (header
+ *  HTTP não gosta de acento). Única fonte pras duas rotas de download. */
+export function nomeArquivoVia(a: Assinatura): string {
+  const base =
+    a.template?.slug === "autorizacao-responsavel" ? "autorizacao" : "termo-adesao";
+  const nome =
+    dadosCivisDe(a)?.nome_civil ??
+    dadosAutorizacaoDe(a)?.responsavel.nome_civil ??
+    a.assinatura_texto ??
+    "";
+  const primeiro = normaliza(nome.trim().split(/\s+/)[0]).replace(
+    /[^a-z0-9]+/g,
+    ""
+  );
+  return primeiro ? `${base}-${primeiro}.pdf` : `${base}.pdf`;
 }

@@ -19,7 +19,13 @@ export async function GET(
   const demo = await demoRole();
   if (demo) {
     const m = getDemoData().materiais.find((x) => x.id === id);
-    if (!m?.path) {
+    // mesma régua da policy materiais_storage_select (0010): audiência filtra
+    const autorizado =
+      m?.audiencia === "todos" ||
+      demo === "coordenacao" ||
+      (m?.audiencia === "dpp" && demo === "mentor_dpp") ||
+      (m?.audiencia === "especialista" && demo === "mentor_especialista");
+    if (!m?.path || !autorizado) {
       return new NextResponse("Material não encontrado.", { status: 404 });
     }
     const pdf = demoPdf(m.titulo, m.descricao ?? undefined);
