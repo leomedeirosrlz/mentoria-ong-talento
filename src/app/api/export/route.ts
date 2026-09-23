@@ -31,6 +31,16 @@ export async function GET(request: NextRequest) {
       );
     }
     const d = getDemoData();
+    if (tipo === "assinaturas") {
+      const nomes = new Map(
+        [...d.profiles, ...d.mentorados].map((p) => [p.id, p.nome] as const)
+      );
+      const papeis = new Map(d.profiles.map((p) => [p.id, p.role] as const));
+      return csvResponse(
+        csvAssinaturas(d.assinaturas, nomes, papeis),
+        nomeCsvAssinaturas()
+      );
+    }
     if (tipo === "pessoas") {
       // no dataset demo contato e capacidade já moram nas próprias linhas; os
       // sensíveis passam pelo mesmo funil coord-only da real (demoPessoalMap
@@ -81,6 +91,10 @@ export async function GET(request: NextRequest) {
       { error: "Só a coordenação pode exportar o relatório do programa." },
       { status: 403 }
     );
+  }
+
+  if (tipo === "assinaturas") {
+    return exportAssinaturas(supabase);
   }
 
   if (tipo === "pessoas") {
@@ -159,6 +173,48 @@ async function exportPessoas(supabase: Awaited<ReturnType<typeof createClient>>)
       pessoalMentoradoPorId
     ),
     nomeCsvPessoas()
+  );
+}
+
+// tipo=assinaturas — backup dos contratos: quem assinou o quê, quando, com
+// as evidências (IP/UA/hash) e o snapshot dos dados civis que constam no
+// documento. O PDF em si é renderizado sob demanda do snapshot, então este
+// CSV + a tabela são o backup completo.
+async function exportAssinaturas(
+  supabase: Awaited<ReturnType<typeof createClient>>
+) {
+  const [
+    { data: rows, error: eA },
+    { data: pessoas, error: eP },
+    { data: jovens, error: eM },
+  ] = await Promise.all([
+    supabase
+      .from("assinaturas")
+      .select(
+        `id, profile_id, mentorado_id, status, dados_snapshot,
+        assinatura_texto, assinado_em, ip, user_agent, hash_documento,
+        token_expira_em, created_at,
+        template:documento_templates(titulo, slug, versao)`
+      )
+      .order("created_at"),
+    supabase.from("profiles").select("id, nome, role"),
+    supabase.from("mentorados").select("id, nome"),
+  ]);
+  if (eA || eP || eM) {
+    return NextResponse.json(
+      { error: "Não foi possível gerar o relatório — tente de novo." },
+      { status: 500 }
+    );
+  }
+  const nomes = new Map(
+    [...(pessoas ?? []), ...(jovens ?? [])].map((p) => [p.id, p.nome] as const)
+  );
+  const papeis = new Map(
+    (pessoas ?? []).map((p) => [p.id, p.role] as const)
+  );
+  return csvResponse(
+    csvAssinaturas(rows ?? [], nomes, papeis),
+    nomeCsvAssinaturas()
   );
 }
 
@@ -266,6 +322,66 @@ function csvPessoas(
   );
 }
 
+/** ?tipo=assinaturas — uma linha por documento emitido/assinado. A coluna
+ *  snapshot_json é o conteúdo civil assinado (CPF/RG/endereço) — sensível,
+ *  mas o export inteiro já é coord-only e é isso que prova o contrato. */
+type LinhaAssinatura = {
+  profile_id: string | null;
+  mentorado_id: string | null;
+  status: string;
+  dados_snapshot: unknown;
+  assinatura_texto: string | null;
+  assinado_em: string | null;
+  ip: string | null;
+  user_agent: string | null;
+  hash_documento: string | null;
+  token_expira_em: string | null;
+  created_at: string;
+  template?:
+    | { slug: string; titulo: string; versao: number }
+    | { slug: string; titulo: string; versao: number }[]
+    | null;
+};
+
+function csvAssinaturas(
+  rows: LinhaAssinatura[],
+  nomes: Map<string, string>,
+  papeis: Map<string, Profile["role"]>
+): string {
+  const linhas = rows.map((a) => {
+    const tpl = Array.isArray(a.template) ? a.template[0] : a.template;
+    const alvo = a.profile_id ?? a.mentorado_id ?? "";
+    return {
+      nome: nomes.get(alvo) ?? "",
+      resto: [
+        a.profile_id ? papelLabel(papeis.get(alvo) ?? null) : "Mentorado",
+        tpl?.titulo ?? "",
+        tpl ? `v${tpl.versao}` : "",
+        a.status,
+        dataHora(a.created_at),
+        dia(a.token_expira_em),
+        dataHora(a.assinado_em),
+        a.assinatura_texto ?? "",
+        a.ip ?? "",
+        a.user_agent ?? "",
+        a.hash_documento ?? "",
+        a.dados_snapshot ? JSON.stringify(a.dados_snapshot) : "",
+      ],
+    };
+  });
+
+  return (
+    "\uFEFF" +
+    [
+      "nome;tipo;documento;versao;status;solicitado_em;expira_em;assinado_em;nome_assinado;ip;user_agent;sha256;snapshot_json",
+      ...linhas
+        .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"))
+        .map((l) => [l.nome, ...l.resto].map(celula).join(";")),
+    ].join("\r\n") +
+    "\r\n"
+  );
+}
+
 /** CSV como attachment — os dois relatórios saem no mesmo formato. */
 function csvResponse(csv: string, filename: string) {
   return new NextResponse(csv, {
@@ -280,6 +396,7 @@ function csvResponse(csv: string, filename: string) {
 // sobrepõem na pasta de downloads
 const nomeCsvCiclo = () => `encontros-${toDateStr(new Date()).slice(0, 7)}.csv`;
 const nomeCsvPessoas = () => `pessoas-${toDateStr(new Date())}.csv`;
+const nomeCsvAssinaturas = () => `assinaturas-${toDateStr(new Date())}.csv`;
 
 function celula(v: string | null | undefined): string {
   let s = v ?? "";

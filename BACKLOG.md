@@ -157,6 +157,8 @@ Planos em `.devin/plan-mural-perfil.md` + `.devin/plan-agenda-zero-friccao.md`. 
 - [x] ~~**Trilha especialista — restos**~~ — `0037`: encerramento antecipado, prazo de 3 meses (chip urgente/vencido) e devolutiva notificando o mentor DPP.
 - [x] ~~Materiais de verdade~~ — `0010`: `materiais.path` + bucket privado `materiais` (policies de storage espelham a audiência — coord lê tudo, trilha só a própria, supervisor só "todos"); upload no `NovoMaterialDialog` (toggle arquivo/link, 20MB, PDF/imagem) e "Anexar arquivo" no `MaterialActions`; `/api/material/[id]` → signed URL 300s; card de encontro na página da dupla abre o arquivo.
 - [ ] **PDM da dupla**: `duplas.pdm_url` (link Drive/Docs) ou storage por dupla.
+- [ ] **Termos da equipe executiva** (coordenação/supervisores): todo mundo que entra na plataforma deveria assinar, mas hoje só mentores (`termo-voluntario`) e mentorados (`termo-mentorando`/`autorizacao-responsavel`) têm documento. Quando o jurídico definir o modelo da equipe, vira mais um slug em `documento_templates` + renderer em `src/lib/documentos/` — a infra de assinatura/evidência/link já é genérica.
+- [ ] **Contra-assinatura do presidente**: subir o PNG em qualquer ficha → seção Assinaturas → engrenagem (ou `documentos/sistema/contra-assinatura.png` no storage). Os PDFs do termo já saem assinados pelo instituto quando a imagem existe.
 
 ## Produção
 

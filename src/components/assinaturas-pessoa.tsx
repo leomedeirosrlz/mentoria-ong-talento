@@ -11,9 +11,11 @@ import {
   Signature,
   Timer,
   UploadSimple,
+  WhatsappLogo,
   type Icon,
 } from "@phosphor-icons/react";
 import { toast } from "sonner";
+import { waLink } from "@/lib/ciclo";
 import {
   listarAssinaturasPessoa,
   reenviarAssinatura,
@@ -198,6 +200,18 @@ function ContraAssinaturaDialog() {
   );
 }
 
+/** Texto do wa.me que a coordenação dispara pro contato do jovem — o link
+ *  tokenizado é o fator de posse, então vai por WhatsApp comum mesmo. */
+function msgLinkAssinatura(
+  slug: string | undefined,
+  nomeJovem: string,
+  link: string
+) {
+  return slug === "autorizacao-responsavel"
+    ? `Olá! Aqui é a coordenação do Realiza.vc. Para a participação de ${nomeJovem} no Programa de Mentoria Social, precisamos que o responsável assine a autorização neste link (leva ~1 minuto): ${link}`
+    : `Olá! Aqui é a coordenação do Realiza.vc. O termo de participação de ${nomeJovem} no Programa de Mentoria Social está pronto pra assinar neste link (leva ~1 minuto): ${link}`;
+}
+
 /** Seção "Assinaturas" da ficha — irmã do DocumentoPessoa dentro dos dialogs
  *  de edição de /pessoas (que só a coordenação abre). O dialog desmonta o
  *  conteúdo ao fechar, então carregar no mount = recarregar a cada abertura. */
@@ -205,11 +219,15 @@ export function AssinaturasPessoa({
   tipo,
   id,
   nome,
+  whatsapp,
 }: {
   tipo: "profile" | "mentorado";
   id: string;
   /** nome da pessoa — entra no texto de confirmação da revogação */
   nome: string;
+  /** contato pra onde vai o link (jovem/responsável) — sem ele o botão
+   *  WhatsApp não aparece e resta o "Copiar link" */
+  whatsapp?: string | null;
 }) {
   const [itens, setItens] = useState<Assinatura[] | null>(null);
   const [falhou, setFalhou] = useState(false);
@@ -265,7 +283,9 @@ export function AssinaturasPessoa({
         }
         await copiar(
           `${window.location.origin}${res.link}`,
-          "Link copiado — envie ao responsável."
+          whatsapp
+            ? "Link copiado — ou envie direto pelo botão WhatsApp abaixo."
+            : "Link copiado — envie ao responsável."
         );
         await carregar();
       } catch {
@@ -411,6 +431,27 @@ export function AssinaturasPessoa({
                         <Copy size={13} />
                         Copiar link
                       </Button>
+                      {(() => {
+                        const url = waLink(
+                          whatsapp,
+                          msgLinkAssinatura(
+                            a.template?.slug,
+                            primeiroNome,
+                            `${window.location.origin}/assinar/${a.token}`
+                          )
+                        );
+                        return url ? (
+                          <a
+                            href={url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex h-6 items-center gap-1.5 rounded-[min(var(--radius-md),10px)] px-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                          >
+                            <WhatsappLogo size={13} />
+                            WhatsApp
+                          </a>
+                        ) : null;
+                      })()}
                       <Button
                         type="button"
                         variant="ghost"

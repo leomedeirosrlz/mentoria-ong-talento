@@ -391,7 +391,12 @@ export function PessoaActions({ pessoa, podeExcluir }: { pessoa: Profile; podeEx
               id={pessoa.id}
               documentoPath={pessoa.documento_path}
             />
-            <AssinaturasPessoa tipo="profile" id={pessoa.id} nome={pessoa.nome} />
+            <AssinaturasPessoa
+              tipo="profile"
+              id={pessoa.id}
+              nome={pessoa.nome}
+              whatsapp={pessoa.whatsapp}
+            />
             <CampoConsentimento carimbadoEm={pessoa.consent_lgpd_em} />
 
             <Button type="submit" className="w-full" disabled={pending}>

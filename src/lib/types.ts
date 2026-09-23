@@ -510,3 +510,13 @@ export type Assinatura = {
   // embed quando selecionado:
   template?: Pick<DocumentoTemplate, "slug" | "titulo" | "versao"> | null;
 };
+
+/** Resumo leve de uma assinatura — status por documento/pessoa pra aba
+ *  /pessoas (quem assinou vs. quem não) sem carregar snapshot nem token. */
+export type AssinaturaResumo = {
+  profile_id: string | null;
+  mentorado_id: string | null;
+  status: AssinaturaStatus;
+  assinado_em: string | null;
+  slug: string;
+};

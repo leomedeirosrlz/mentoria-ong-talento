@@ -32,6 +32,24 @@ import { Input } from "@/components/ui/input";
 const ehMentor = (p: Profile) =>
   p.role === "mentor_dpp" || p.role === "mentor_especialista";
 
+/** Status de assinatura de uma pessoa, montado na page a partir do resumo:
+ *  `assinado` = slug → ISO da assinatura; `pendente` = slugs com link vivo. */
+export type DocsPessoa = {
+  assinado: Record<string, string>;
+  pendente: string[];
+};
+
+const DOCS_VAZIO: DocsPessoa = { assinado: {}, pendente: [] };
+
+/** "dd/mm/aaaa" — data da assinatura no detalhe da linha. */
+const fmtDia = (iso: string) =>
+  new Intl.DateTimeFormat("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    timeZone: "America/Sao_Paulo",
+  }).format(new Date(iso));
+
 /** "5511999998888" -> "+55 (11) 99999-8888"; fora do padrão BR mostra como veio. */
 function formatarWhatsApp(wa: string): string {
   const d = wa.replace(/\D/g, "");
@@ -51,6 +69,7 @@ export function PessoasListas({
   comQualquerDupla,
   mentorProfiles,
   contagemPorMentor,
+  assinaturas,
 }: {
   pessoas: Profile[];
   mentorados: Mentorado[];
@@ -59,6 +78,8 @@ export function PessoasListas({
   comQualquerDupla: string[];
   mentorProfiles: Record<string, MentorProfile>;
   contagemPorMentor: Record<string, number>;
+  /** id da pessoa → documentos assinados/pendentes (badge "assinou vs. não"). */
+  assinaturas: Record<string, DocsPessoa>;
 }) {
   const [busca, setBusca] = useState("");
   const [semDupla, setSemDupla] = useState(false);
@@ -194,6 +215,7 @@ export function PessoasListas({
               podeExcluir={!p.user_id && !temQualquerDupla.has(p.id)}
               mentorProfile={mentorProfiles[p.id]}
               vagas={contagemPorMentor[p.id] ?? 0}
+              docs={assinaturas[p.id]}
             />
           ))}
         </div>
@@ -254,6 +276,7 @@ export function PessoasListas({
               indice={i}
               emDupla={emDupla.has(m.id)}
               temDupla={temQualquerDupla.has(m.id)}
+              docs={assinaturas[m.id]}
             />
           ))}
         </div>
@@ -370,6 +393,7 @@ function PessoaRow({
   podeExcluir,
   mentorProfile: mp,
   vagas,
+  docs: docsProp,
 }: {
   p: Profile;
   indice: number;
@@ -380,12 +404,15 @@ function PessoaRow({
   podeExcluir: boolean;
   mentorProfile: MentorProfile | undefined;
   vagas: number;
+  docs: DocsPessoa | undefined;
 }) {
   const [detalhesAbertos, setDetalhesAbertos] = useState(false);
   // mentor sem linha em mentor_profiles vale capacidade 1 (mesma regra do createDupla)
   const capacidade = mp?.capacidade ?? 1;
   const detalhesId = `detalhes-${p.id}`;
   const temPendencia = ehMentor(p) && (!mp?.termo_ok || !mp?.formacao_ok);
+  const docs = docsProp ?? DOCS_VAZIO;
+  const assinadoTermo = docs.assinado["termo-voluntario"];
   return (
     <div
       className="animate-enter px-4 py-3.5 sm:px-5"
@@ -428,6 +455,14 @@ function PessoaRow({
         {emDupla && !(ehMentor(p) && vagas > 0) && (
           <Badge variant="outline" className="text-xs shrink-0">em dupla</Badge>
         )}
+        {ehMentor(p) && !mp?.termo_ok && (
+          <Badge
+            variant="outline"
+            className="text-xs shrink-0 border-[var(--warn)]/60 text-[var(--warn-text)]"
+          >
+            termo pendente
+          </Badge>
+        )}
         {/* vagas e pendências do mentor saíram da linha — ficam em "Detalhes".
             Sem badge "especialista": o seletor de papel na mesma linha já diz
             "mentor especialista" (mp.tipo é derivado de role) */}
@@ -459,9 +494,15 @@ function PessoaRow({
                 : `Ainda sem dupla — ${capacidade === 1 ? "vaga para 1" : `vagas para ${capacidade}`}`
               : `Cuida de ${vagas} de ${capacidade} ${capacidade === 1 ? "dupla" : "duplas"}`}
           </ItemDetalhe>
-          {!mp?.termo_ok && (
+          {mp?.termo_ok ? (
+            <ItemDetalhe icone={FileText}>
+              {assinadoTermo !== undefined
+                ? `Termo de adesão assinado${assinadoTermo ? ` em ${fmtDia(assinadoTermo)}` : ""}`
+                : "Termo de adesão no arquivo"}
+            </ItemDetalhe>
+          ) : (
             <ItemDetalhe icone={FileText} warn>
-              Termo de responsabilidade pendente
+              Termo de adesão pendente de assinatura
             </ItemDetalhe>
           )}
           {!mp?.formacao_ok && (
@@ -482,17 +523,30 @@ function MentoradoRow({
   indice,
   emDupla,
   temDupla,
+  docs: docsProp,
 }: {
   m: Mentorado;
   indice: number;
   emDupla: boolean;
   temDupla: boolean;
+  docs: DocsPessoa | undefined;
 }) {
   const [detalhesAbertos, setDetalhesAbertos] = useState(false);
   const detalhesId = `detalhes-${m.id}`;
-  // LGPD: parear menor sem a autorização do responsável no arquivo é
-  // pendência jurídica — mesmo tratamento do "termo" do mentor
-  const semAutorizacao = !m.documento_path;
+  // LGPD: parear menor sem a autorização do responsável é pendência jurídica.
+  // Vale tanto o upload manual (documento_path) quanto a assinatura por link.
+  const docs = docsProp ?? DOCS_VAZIO;
+  const autData = docs.assinado["autorizacao-responsavel"];
+  const termoData = docs.assinado["termo-mentorando"];
+  const autorizacaoOk = Boolean(m.documento_path) || autData !== undefined;
+  const termoOk = termoData !== undefined;
+  const autEnviada = docs.pendente.includes("autorizacao-responsavel");
+  const termoEnviado = docs.pendente.includes("termo-mentorando");
+  const temPendencia = !autorizacaoOk || !termoOk;
+  const temDocs =
+    temPendencia ||
+    Object.keys(docs.assinado).length > 0 ||
+    docs.pendente.length > 0;
   return (
     <div
       className="animate-enter px-4 py-3.5 sm:px-5"
@@ -528,11 +582,35 @@ function MentoradoRow({
         {emDupla && (
           <Badge variant="outline" className="text-xs shrink-0">em dupla</Badge>
         )}
-        {semAutorizacao && (
+        {!autorizacaoOk && (
+          <Badge
+            variant="outline"
+            className={cn(
+              "text-xs shrink-0",
+              !autEnviada &&
+                "border-[var(--warn)]/60 text-[var(--warn-text)]"
+            )}
+          >
+            {autEnviada ? "autorização enviada" : "autorização pendente"}
+          </Badge>
+        )}
+        {!termoOk && (
+          <Badge
+            variant="outline"
+            className={cn(
+              "text-xs shrink-0",
+              !termoEnviado &&
+                "border-[var(--warn)]/60 text-[var(--warn-text)]"
+            )}
+          >
+            {termoEnviado ? "termo enviado" : "termo pendente"}
+          </Badge>
+        )}
+        {temDocs && (
           <DetalhesTrigger
             aberto={detalhesAbertos}
             controlsId={detalhesId}
-            temPendencia
+            temPendencia={temPendencia}
             onAlternar={() => setDetalhesAbertos((v) => !v)}
           />
         )}
@@ -540,10 +618,23 @@ function MentoradoRow({
           <MentoradoActions mentorado={m} temDupla={temDupla} />
         </div>
       </div>
-      {semAutorizacao && (
+      {temDocs && (
         <DetalhesRegiao id={detalhesId} nome={m.nome} aberto={detalhesAbertos}>
-          <ItemDetalhe icone={FileText} warn>
-            Autorização do responsável ainda não enviada
+          <ItemDetalhe icone={FileText} warn={!autorizacaoOk}>
+            {autorizacaoOk
+              ? autData !== undefined
+                ? `Autorização do responsável assinada${autData ? ` em ${fmtDia(autData)}` : ""}`
+                : "Autorização do responsável no arquivo"
+              : autEnviada
+                ? "Autorização enviada — aguardando a assinatura do responsável"
+                : "Autorização do responsável ainda não enviada"}
+          </ItemDetalhe>
+          <ItemDetalhe icone={FileText} warn={!termoOk}>
+            {termoOk
+              ? `Termo de participação assinado${termoData ? ` em ${fmtDia(termoData)}` : ""}`
+              : termoEnviado
+                ? "Termo de participação enviado — aguardando assinatura"
+                : "Termo de participação ainda não enviado"}
           </ItemDetalhe>
         </DetalhesRegiao>
       )}

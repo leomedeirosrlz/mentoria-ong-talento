@@ -9,6 +9,8 @@ import {
   getPessoas,
   type MentorProfile,
 } from "@/lib/queries";
+import { getAssinaturasResumo } from "@/lib/queries-assinaturas";
+import type { DocsPessoa } from "@/components/pessoas-listas";
 import { DownloadSimple } from "@phosphor-icons/react/dist/ssr";
 import { NovaPessoaDialog, NovoMentoradoDialog } from "@/components/pessoas-dialogs";
 import { ImportarCsvDialog } from "@/components/importar-csv-dialog";
@@ -23,13 +25,15 @@ export default async function PessoasPage() {
   const me = await getMe();
   if (me?.role !== "coordenacao") redirect("/");
 
-  const [pessoas, mentorados, duplas, todasDuplas, perfisMentor] = await Promise.all([
-    getPessoas(),
-    getMentorados(),
-    getDuplasResumo(),
-    getDuplasResumoTodas(),
-    getMentorProfiles(),
-  ]);
+  const [pessoas, mentorados, duplas, todasDuplas, perfisMentor, resumoAss] =
+    await Promise.all([
+      getPessoas(),
+      getMentorados(),
+      getDuplasResumo(),
+      getDuplasResumoTodas(),
+      getMentorProfiles(),
+      getAssinaturasResumo(),
+    ]);
 
   const comDupla = new Set(
     duplas
@@ -55,6 +59,17 @@ export default async function PessoasPage() {
     mentorProfiles[mp.profile_id] = mp;
   }
 
+  // status de assinatura por pessoa — os badges "assinou vs. não" da lista
+  const docsPorPessoa: Record<string, DocsPessoa> = {};
+  for (const a of resumoAss) {
+    const pid = a.profile_id ?? a.mentorado_id;
+    if (!pid) continue;
+    const d = (docsPorPessoa[pid] ??= { assinado: {}, pendente: [] });
+    if (a.status === "assinado") d.assinado[a.slug] = a.assinado_em ?? "";
+    else if (a.status === "pendente" && !d.pendente.includes(a.slug))
+      d.pendente.push(a.slug);
+  }
+
   return (
     <div className="space-y-8">
       <header className="flex flex-wrap items-center justify-between gap-3">
@@ -73,6 +88,14 @@ export default async function PessoasPage() {
             <DownloadSimple />
             Exportar CSV
           </a>
+          <a
+            href="/api/export?tipo=assinaturas"
+            className={buttonVariants({ variant: "outline", size: "sm" })}
+            title="Backup das assinaturas — status, evidências e dados assinados"
+          >
+            <DownloadSimple />
+            Assinaturas
+          </a>
           <NovoMentoradoDialog />
           <NovaPessoaDialog />
         </div>
@@ -85,6 +108,7 @@ export default async function PessoasPage() {
         comQualquerDupla={[...comQualquerDupla]}
         mentorProfiles={mentorProfiles}
         contagemPorMentor={contagemPorMentor}
+        assinaturas={docsPorPessoa}
       />
     </div>
   );

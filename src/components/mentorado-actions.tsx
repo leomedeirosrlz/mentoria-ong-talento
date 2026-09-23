@@ -228,6 +228,7 @@ export function MentoradoActions({ mentorado, temDupla }: { mentorado: Mentorado
               tipo="mentorado"
               id={mentorado.id}
               nome={mentorado.nome}
+              whatsapp={mentorado.whatsapp}
             />
             <Button type="submit" className="w-full" disabled={pending}>
               {pending ? "Salvando…" : "Salvar"}

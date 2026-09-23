@@ -4,6 +4,7 @@ import { normaliza } from "../utils";
 import type {
   AppRole,
   Assinatura,
+  AssinaturaResumo,
   CicloEvento,
   Comunicado,
   DadosCivis,
@@ -682,6 +683,22 @@ export function demoAssinatura(role: AppRole, id: string): Assinatura | null {
   const eu = data.personas[role];
   if (a.profile_id === eu.id || role === "coordenacao") return a;
   return null;
+}
+
+/** Resumo por pessoa pra aba /pessoas — mesmo escopo da policy (coord vê
+ *  tudo; signatário só as próprias linhas). */
+export function demoAssinaturasResumo(role: AppRole): AssinaturaResumo[] {
+  const data = getDemoData();
+  const eu = data.personas[role];
+  return data.assinaturas
+    .filter((a) => role === "coordenacao" || a.profile_id === eu.id)
+    .map((a) => ({
+      profile_id: a.profile_id,
+      mentorado_id: a.mentorado_id,
+      status: a.status,
+      assinado_em: a.assinado_em,
+      slug: a.template?.slug ?? "",
+    }));
 }
 
 /** Histórico da ficha — só a coordenação abre fichas de terceiros. */

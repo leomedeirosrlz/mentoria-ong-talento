@@ -4,10 +4,16 @@ import { demoRole } from "./demo/mode";
 import {
   demoAssinatura,
   demoAssinaturasPessoa,
+  demoAssinaturasResumo,
   demoMeusDadosCivis,
   demoMinhaAssinaturaTermo,
 } from "./demo/queries";
-import type { Assinatura, DadosCivis, DocumentoTemplate } from "./types";
+import type {
+  Assinatura,
+  AssinaturaResumo,
+  DadosCivis,
+  DocumentoTemplate,
+} from "./types";
 
 // Leituras de assinaturas (0033). O escopo é o da policy assinaturas_select:
 // o signatário lê as próprias (profile_id = eu), a coordenação lê tudo —
@@ -71,6 +77,32 @@ export const getMeusDadosCivis = cache(async (): Promise<DadosCivis | null> => {
   if (error) return null;
   return (data as DadosCivis | null) ?? null;
 });
+
+/** Status de assinatura de todo mundo, sem snapshot/token — a aba /pessoas
+ *  (coord-only) monta os badges "assinou vs. não" a partir daqui. O escopo
+ *  é o da policy: fora da coordenação só voltam as próprias linhas. */
+export const getAssinaturasResumo = cache(
+  async (): Promise<AssinaturaResumo[]> => {
+    const demo = await demoRole();
+    if (demo) return demoAssinaturasResumo(demo);
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("assinaturas")
+      .select(
+        "profile_id, mentorado_id, status, assinado_em, template:documento_templates(slug)"
+      );
+    if (error) throw error;
+    return ((data ?? []) as unknown as (Omit<AssinaturaResumo, "slug"> & {
+      template: { slug: string } | { slug: string }[] | null;
+    })[]).map((r) => ({
+      profile_id: r.profile_id,
+      mentorado_id: r.mentorado_id,
+      status: r.status,
+      assinado_em: r.assinado_em,
+      slug: norm(r.template)?.slug ?? "",
+    }));
+  }
+);
 
 /** Histórico de assinaturas de uma pessoa — seção da ficha (coord-only). */
 export async function getAssinaturasPessoa(
