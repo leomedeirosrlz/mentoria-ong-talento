@@ -1,20 +1,32 @@
 import { Skeleton } from "@/components/ui/skeleton";
 
-// Espelho da página de perfil: header (avatar + nome/papel) + card do form
-// (campos em 2 colunas) + card de segurança.
+// Espelho da página de perfil: header + card da foto + card do perfil
+// público (campos abertos) + linhas de disclosure (cadastro/mentoria/senha).
 export default function Loading() {
   return (
     <div role="status" aria-label="Carregando" className="max-w-lg space-y-6">
-      <header className="flex items-center gap-4">
-        <Skeleton className="size-16 shrink-0 rounded-full" />
-        <div>
-          <Skeleton className="h-7 w-44" />
-          <Skeleton className="mt-2 h-4 w-28" />
-        </div>
-      </header>
+      <div>
+        <Skeleton className="h-7 w-36" />
+        <Skeleton className="mt-2 h-4 w-28" />
+      </div>
 
-      <div className="rounded-xl bg-card p-4 shadow-[var(--shadow-border)] sm:p-5">
-        <div className="grid gap-4 sm:grid-cols-2">
+      {/* foto */}
+      <div className="rounded-xl bg-card p-6 shadow-[var(--shadow-border)]">
+        <Skeleton className="h-5 w-12" />
+        <div className="mt-4 flex items-center gap-4">
+          <Skeleton className="size-[72px] shrink-0 rounded-full" />
+          <div className="space-y-2">
+            <Skeleton className="h-8 w-28 rounded-lg" />
+            <Skeleton className="h-3 w-56 max-w-full" />
+          </div>
+        </div>
+      </div>
+
+      {/* perfil público — campos abertos em 2 colunas */}
+      <div className="rounded-xl bg-card p-6 shadow-[var(--shadow-border)]">
+        <Skeleton className="h-5 w-28" />
+        <Skeleton className="mt-2 h-3 w-64 max-w-full" />
+        <div className="mt-4 grid gap-4 sm:grid-cols-2">
           {[0, 1, 2, 3].map((i) => (
             <div key={i} className="space-y-2">
               <Skeleton className="h-4 w-20" />
@@ -22,14 +34,19 @@ export default function Loading() {
             </div>
           ))}
         </div>
-        <Skeleton className="mt-5 h-9 w-28 rounded-lg" />
+        <Skeleton className="mt-5 h-9 w-24 rounded-lg" />
       </div>
 
-      <div className="rounded-xl bg-card p-4 shadow-[var(--shadow-border)] sm:p-5">
-        <Skeleton className="h-5 w-24" />
-        <Skeleton className="mt-3 h-4 w-64 max-w-full" />
-        <Skeleton className="mt-4 h-9 w-40 rounded-lg" />
-      </div>
+      {/* disclosures fechados — uma linha cada */}
+      {[0, 1, 2].map((i) => (
+        <div
+          key={i}
+          className="flex items-center gap-2.5 rounded-xl bg-card px-6 py-4 shadow-[var(--shadow-border)]"
+        >
+          <Skeleton className="h-5 w-32" />
+          <Skeleton className="ml-auto size-4 rounded-full" />
+        </div>
+      ))}
     </div>
   );
 }

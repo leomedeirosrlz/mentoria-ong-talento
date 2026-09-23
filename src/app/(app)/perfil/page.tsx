@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
-import { getMe, getMeuMentorProfile, getPessoalMap } from "@/lib/queries";
+import { getMe, getMeuMentorProfile, getMeusDadosPessoais } from "@/lib/queries";
 import { avatarPublicUrl, gravatarUrl } from "@/lib/avatar";
 import { PerfilForm } from "./perfil-form";
 
@@ -9,16 +9,17 @@ export const metadata: Metadata = {
 };
 
 export default async function PerfilPage() {
-  const [me, mentorProfile] = await Promise.all([getMe(), getMeuMentorProfile()]);
+  const [me, mentorProfile, pessoal] = await Promise.all([
+    getMe(),
+    getMeuMentorProfile(),
+    // os 4 sensíveis da 0034 ficam fora do grant de coluna — nem o próprio
+    // usuário os recebe via getMe. A RPC meus_dados_pessoais (0048) é
+    // self-scoped e devolve pra qualquer papel, então os inputs sensíveis
+    // nascem pré-preenchidos pra todo mundo e a detecção
+    // pendente×preenchido do form reflete o cadastro de verdade.
+    getMeusDadosPessoais(),
+  ]);
   if (!me) redirect("/login");
-  // os 4 sensíveis da 0034 ficam fora do grant de coluna — nem a própria
-  // coordenação os recebe via getMe. Pra ela o form vem pré-preenchido pela
-  // view (branco = limpar no action); pros demais papéis os inputs nascem
-  // vazios e "em branco" significa "manter o que já está cadastrado".
-  const pessoal =
-    me.role === "coordenacao"
-      ? (await getPessoalMap("profiles_pessoal")).get(me.id)
-      : undefined;
   const perfil = pessoal ? { ...me, ...pessoal } : me;
   return (
     <PerfilForm
