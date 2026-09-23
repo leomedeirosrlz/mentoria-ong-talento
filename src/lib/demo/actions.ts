@@ -41,5 +41,5 @@ export async function reverOnboardingDemo() {
 
 export async function sairDaDemo() {
   await limparDemo();
-  redirect("/demo");
+  redirect("/login");
 }

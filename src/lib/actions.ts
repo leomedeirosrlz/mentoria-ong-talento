@@ -2538,10 +2538,10 @@ export async function concluirOnboarding() {
 // ---------- auth ----------
 
 export async function signOut() {
-  // a "sessão" da demo é só cookie — limpa e volta pra seleção de papel
+  // a "sessão" da demo é só cookie — limpa e cai no login, como o signOut real
   if (await demoAtivo()) {
     await limparDemo();
-    redirect("/demo");
+    redirect("/login");
   }
   const supabase = await createClient();
   await supabase.auth.signOut();
