@@ -334,7 +334,7 @@ function primeiroEncontroFaltante(
 
 /** Bounds "YYYY-MM-DD" da semana calendário (seg–dom) que contém `hoje`.
  *  Âncora no meio-dia pra o dia da semana não depender do fuso do servidor. */
-function semanaBounds(hoje: Date): { seg: string; dom: string } {
+export function semanaBounds(hoje: Date): { seg: string; dom: string } {
   const hojeData = new Date(`${toDateStr(hoje)}T12:00:00`);
   const dow = (hojeData.getDay() + 6) % 7; // seg=0 … dom=6
   const seg = new Date(hojeData);
@@ -376,15 +376,18 @@ export type ResumoSemana = {
   reposicao: number;
 };
 
-/** Conta-gotas da semana pra faixa do dashboard — só duplas ativas entram na conta.
- *  Null quando não há evento da semana (fora de janela) ou o evento não tem número. */
-export function resumoSemana(
+/** O mesmo recorte do resumoSemana ancorado num evento específico — é o que o
+ *  board da agenda usa pra semanas que não são a corrente. `semana` ({seg,
+ *  dom}) define a janela da reposição; default = a semana calendário da data
+ *  oficial do próprio evento. Null quando o evento não tem número. */
+export function resumoSemanaDe(
   duplas: Dupla[],
-  eventos: CicloEvento[],
-  agora: Date
+  evento: CicloEvento,
+  semana?: { seg: string; dom: string }
 ): ResumoSemana | null {
-  const evento = eventoDaSemana(eventos, agora);
-  if (!evento || evento.numero == null) return null;
+  if (evento.numero == null) return null;
+  const { seg, dom } =
+    semana ?? semanaBounds(new Date(`${evento.data}T12:00:00`));
   // semana oficial é métrica da trilha DPP — duplas de especialista não seguem
   // o calendário de terças e ficariam sempre "sem encontro esta semana"
   const ativas = duplas.filter(
@@ -395,10 +398,9 @@ export function resumoSemana(
   const feitos = ativas.map(oficialRealizado).filter((e): e is Encontro => !!e);
   const comRegistro = feitos.filter((e) => e.registro).length;
   // reposição: sem `realizado` do numero oficial, mas com algum encontro
-  // realizado dentro da semana calendário corrente — ex.: a dupla pulou a
-  // semana do encontro 2 e repôs na semana do 3. Ela SE encontrou; contar como
+  // realizado dentro da semana calendário — ex.: a dupla pulou a semana do
+  // encontro 2 e repôs na semana do 3. Ela SE encontrou; contar como
   // "sem encontro" mentiria na faixa.
-  const { seg, dom } = semanaBounds(agora);
   const rolouNaSemana = (e: Encontro) => {
     if (e.status !== "realizado") return false;
     const quando = e.realizado_em ?? e.data_hora;
@@ -418,6 +420,87 @@ export function resumoSemana(
     naoAconteceram: ativas.length - feitos.length,
     reposicao,
   };
+}
+
+/** Conta-gotas da semana pra faixa do dashboard — só duplas ativas entram na conta.
+ *  Null quando não há evento da semana (fora de janela) ou o evento não tem número. */
+export function resumoSemana(
+  duplas: Dupla[],
+  eventos: CicloEvento[],
+  agora: Date
+): ResumoSemana | null {
+  const evento = eventoDaSemana(eventos, agora);
+  if (!evento) return null;
+  return resumoSemanaDe(duplas, evento, semanaBounds(agora));
+}
+
+/** Par encontro↔dupla achatado — a unidade que os boards/buckets da agenda
+ *  consomem (um encontro pertence a uma dupla, mas a leitura é por encontro). */
+export type ItemEncontroDupla = { encontro: Encontro; dupla: Dupla };
+
+/** "Limbo": agendado cuja data já passou e ainda não tem registro — pode ter
+ *  rolado ou não; a ambiguidade exige ação do mentor (registrar, remarcar ou
+ *  marcar não-aconteceu), então conta como pendência de registro, não atraso.
+ *  Única definição — semáforo, trilha e agenda liam a mesma regra duplicada. */
+export function emLimbo(e: Encontro, agoraMs: number): boolean {
+  return (
+    e.status === "agendado" &&
+    !e.registro &&
+    e.data_hora != null &&
+    new Date(e.data_hora).getTime() < agoraMs
+  );
+}
+
+export type BucketsEncontro = {
+  /** realizado sem registro + agendado vencido (limbo) — o que pede ação. */
+  pendentes: ItemEncontroDupla[];
+  /** agendados/remarcados ainda por vir. */
+  agendados: ItemEncontroDupla[];
+  /** realizados com registro entregue — fechados. */
+  realizados: ItemEncontroDupla[];
+  /** nao_aconteceu/cancelado — fechados sem encontro. */
+  naoAconteceram: ItemEncontroDupla[];
+};
+
+/** Distribui os itens nos 4 buckets de status acionável — a mesma leitura da
+ *  célula do mês (pendente = realizado sem registro OU limbo). */
+export function bucketsDoEncontro(
+  itens: ItemEncontroDupla[],
+  agoraMs: number
+): BucketsEncontro {
+  const b: BucketsEncontro = {
+    pendentes: [],
+    agendados: [],
+    realizados: [],
+    naoAconteceram: [],
+  };
+  for (const item of itens) {
+    const e = item.encontro;
+    if (e.status === "realizado")
+      (e.registro ? b.realizados : b.pendentes).push(item);
+    else if (e.status === "agendado" || e.status === "remarcado")
+      (emLimbo(e, agoraMs) ? b.pendentes : b.agendados).push(item);
+    else b.naoAconteceram.push(item);
+  }
+  return b;
+}
+
+/** A "coorte invisível" do encontro oficial: duplas ativas da trilha DPP cuja
+ *  janela já alcançou a data oficial (`iniciada_em` ausente ou <= dataOficial)
+ *  e que não têm nenhuma row do número — qualquer row (agendada, realizada,
+ *  cancelada) já cobre o encontro, mesmo critério do preventivo do semáforo. */
+export function duplasSemEncontroDoNumero(
+  duplas: Dupla[],
+  numero: number,
+  dataOficial: string
+): Dupla[] {
+  return duplas.filter(
+    (d) =>
+      d.status === "ativa" &&
+      d.trilha !== "especialista" &&
+      (!d.iniciada_em || d.iniciada_em <= dataOficial) &&
+      !d.encontros.some((e) => e.numero === numero)
+  );
 }
 
 /** Texto da faixa "Esta semana" pronto pra WhatsApp da equipe.
@@ -442,15 +525,11 @@ export function saudadeDaDupla(dupla: Dupla, eventos: CicloEvento[], hoje = new 
   // apoio, avaliação/dificuldade, registro pendente, agendado vencido,
   // combinado vencido). "Esperado = feitos" mantém o atraso zerado.
   const ehEspecialista = dupla.trilha === "especialista";
-  // "limbo": agendado cuja data já passou e ainda não tem registro — pode ter
-  // rolado ou não; a ambiguidade exige ação do mentor (registrar, remarcar ou
-  // marcar não-aconteceu), então conta como pendência de registro, não atraso
-  const emLimbo = (e: Encontro) =>
-    e.status === "agendado" &&
-    !e.registro &&
-    e.data_hora != null &&
-    new Date(e.data_hora).getTime() < hoje.getTime();
-  const limbo = new Set(dupla.encontros.filter(emLimbo).map((e) => e.numero));
+  // limbo (agendado vencido sem registro) cobre o evento esperado do seu
+  // número — sai da conta de atraso enquanto a pendência estiver aberta
+  const limbo = new Set(
+    dupla.encontros.filter((e) => emLimbo(e, hoje.getTime())).map((e) => e.numero)
+  );
   const feitos = dupla.encontros.filter((e) => e.status === "realizado").length;
   // um encontro em limbo cobre o evento esperado do seu número — sai da conta
   // de atraso enquanto a pendência estiver aberta
@@ -487,7 +566,7 @@ export function saudadeDaDupla(dupla: Dupla, eventos: CicloEvento[], hoje = new 
           !e.registro &&
           ((e.status === "realizado" &&
             hoje.getTime() - new Date(e.data_hora ?? 0).getTime() > 24 * 3600 * 1000) ||
-            emLimbo(e))
+            emLimbo(e, hoje.getTime()))
       )
       .sort((a, b) => a.numero - b.numero)[0] ?? null;
   const registroPendente = pendencia != null;
@@ -744,12 +823,7 @@ export function jornadaDaDupla(
     if (!encontro) estado = "futuro";
     else if (encontro.status === "realizado")
       estado = encontro.registro ? "realizado_completo" : "pendente_registro";
-    else if (
-      encontro.status === "agendado" &&
-      !encontro.registro &&
-      encontro.data_hora != null &&
-      new Date(encontro.data_hora).getTime() < hoje.getTime()
-    )
+    else if (emLimbo(encontro, hoje.getTime()))
       estado = "limbo";
     else if (encontro.status === "agendado" || encontro.status === "remarcado")
       estado = "agendado";

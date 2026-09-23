@@ -21,6 +21,16 @@ export default function Loading() {
       <div className="space-y-4 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(300px,340px)] lg:items-start lg:gap-5 lg:space-y-0">
         {/* ===== calendário mensal ===== */}
         <div className="overflow-hidden rounded-xl bg-card shadow-[var(--shadow-border)] lg:col-start-1 lg:row-start-1">
+          {/* seletor de visão — Semana | Mês | Lista (coord/sup); mentor não
+              tem a row e o card começa direto no chrome */}
+          <div className="flex gap-1 border-b p-1.5">
+            {[0, 1, 2].map((i) => (
+              <Skeleton
+                key={i}
+                className="h-11 flex-1 rounded-lg md:h-9 md:w-24 md:flex-none"
+              />
+            ))}
+          </div>
           {/* chrome: carets + "Hoje" + título do mês */}
           <div className="flex items-center gap-1 border-b px-2 py-1.5 sm:px-3">
             <Skeleton className="size-11 rounded-lg md:size-9" />
