@@ -54,7 +54,7 @@ export const CLAUSULAS_TERMO: readonly (readonly [string, string[]])[] = [
   ["2. CONDIÇÕES DA PRESTAÇÃO DO TRABALHO VOLUNTÁRIO", [
     "2.1. O Trabalho a ser prestado pelo(a) VOLUNTÁRIO(A) previsto no presente TERMO ocorrerá de forma gratuita (sem remuneração), para finalidades sociais, sendo de livre e espontânea vontade a sua prestação.",
     "2.2. O Trabalho Voluntário ora ajustado não cria vínculo de emprego entre as partes e tampouco gera obrigações trabalhistas, previdenciárias, tributárias e/ou afins, incluindo, sem se limitar, a eventuais horas extras a seu empregador, caso o serviço de voluntariado seja prestado durante o seu horário de trabalho.",
-    "2.3. Na hipótese de o desempenho das atividades voluntárias acarretarem danos à INSTITUIÇÃO e/ou terceiros, decorrentes de dolo ou culpa do(a) VOLUNTÁRIO(A) se sujeitará a arcar com os consequentes prejuízos.",
+    "2.3. Na hipótese de o desempenho das atividades voluntárias acarretarem danos à INSTITUIÇÃO e/ou terceiros, decorrentes de dolo ou culpa do(a) VOLUNTÁRIO(A), o(a) VOLUNTÁRIO(A) se sujeitará a arcar com os consequentes prejuízos.",
   ]],
   ["3. MATERIAIS NECESSÁRIOS E REEMBOLSO DE DESPESAS", [
     "3.2. Eventuais despesas com alimentação, deslocamento, equipamentos/recursos de tecnologia e outros são de inteira responsabilidade do(a) VOLUNTÁRIO(A).",
@@ -75,6 +75,7 @@ export const ANEXO_I_TITULO = "Anexo I — LEI Nº 9.608, DE 18 DE FEVEREIRO DE 
 
 export const ANEXO_I_PARAGRAFOS: readonly string[] = [
   "Dispõe sobre o serviço voluntário e dá outras providências.",
+  "O PRESIDENTE DA REPÚBLICA Faço saber que o Congresso Nacional decreta e eu sanciono a seguinte Lei:",
   "Art. 1º Considera-se serviço voluntário, para fins desta Lei, a atividade não remunerada, prestada por pessoa física a entidade pública de qualquer natureza, ou a instituição privada de fins não lucrativos, que tenha objetivos cívicos, culturais, educacionais, científicos, recreativos ou de assistência social, inclusive mutualidade.",
   "Parágrafo único. O serviço voluntário não gera vínculo empregatício, nem obrigação de natureza trabalhista previdenciária ou afim.",
   "Art. 2º O serviço voluntário será exercido mediante a celebração de termo de adesão entre a entidade, pública ou privada, e o prestador do serviço voluntário, dele devendo constar o objeto e as condições de seu exercício.",
@@ -82,6 +83,9 @@ export const ANEXO_I_PARAGRAFOS: readonly string[] = [
   "Parágrafo único. As despesas a serem ressarcidas deverão estar expressamente autorizadas pela entidade a que for prestado o serviço voluntário.",
   "Art. 4º Esta Lei entra em vigor na data de sua publicação.",
   "Art. 5º Revogam-se as disposições em contrário.",
+  "Brasília, 18 de fevereiro de 1998; 177º da Independência e 110º da República.",
+  "FERNANDO HENRIQUE CARDOSO",
+  "Paulo Paiva",
 ];
 
 export const CONTRA_SIGNATARIO = {
