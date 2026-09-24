@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { type Session } from "@supabase/supabase-js";
 import { motion, AnimatePresence } from "motion/react";
@@ -47,6 +47,11 @@ export function LoginForm() {
   // client implícito só pro pedido do link — o ssr força pkce, que prende o
   // acesso ao browser que pediu (ver createOtpClient)
   const otp = useMemo(() => createOtpClient(), []);
+  // nonce do handoff: viaja no link (?h=) — a aba que abre devolve os tokens
+  // pro servidor, e esta aba os resgata no poll (login_handoffs, 0049). É o
+  // que faz a sessão chegar na aba que pediu mesmo se o link abrir em outro
+  // navegador/app de e-mail — cookies não atravessam, a RPC atravessa.
+  const handoffRef = useRef<string | null>(null);
   // o painel "enviado" monta só depois do exit do form (mode="wait") — um
   // useEffect([enviado]) dispararia com o ref ainda null e perderia o foco;
   // ref callback foca quando o nó existe de verdade
@@ -94,10 +99,10 @@ export function LoginForm() {
   );
 
   // sessão ativa ao abrir a página: quem já está logado não fica preso no
-  // /login. O magic link implícito cai AQUI com #access_token — esta aba só
-  // confirma ("pode fechar"); quem entra de verdade é a aba que pediu o
-  // link, detectando a sessão compartilhada (cookies) via o efeito de
-  // `enviado` abaixo
+  // /login. O magic link implícito cai AQUI com #access_token — com o nonce
+  // (?h=) esta aba só devolve os tokens pra aba que pediu (o link "autentica
+  // a outra sessão" mesmo em outro navegador) e mostra a confirmação; sem
+  // nonce (links antigos) entra de verdade nesta aba
   useEffect(() => {
     let entrou = false;
     const ir = (session: Session | null) => {
@@ -105,37 +110,57 @@ export function LoginForm() {
       entrou = true;
       entrar(session);
     };
+    const frag = new URLSearchParams(location.hash.slice(1));
+    const access_token = frag.get("access_token");
+    const refresh_token = frag.get("refresh_token");
+    const handoff = params.get("h");
+    const entrarAqui = () =>
+      supabase.auth
+        .setSession({ access_token: access_token!, refresh_token: refresh_token! })
+        .then(async ({ error }) => {
+          if (error) {
+            router.replace(urlErroLink());
+            return;
+          }
+          const { data } = await supabase.auth.getSession();
+          ir(data.session);
+        });
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === "SIGNED_IN") ir(session);
     });
-
-    const frag = new URLSearchParams(location.hash.slice(1));
-    const access_token = frag.get("access_token");
-    const refresh_token = frag.get("refresh_token");
     if (access_token && refresh_token) {
-      // aba do e-mail: entrou=true desde já — o SIGNED_IN do setSession não
-      // pode desviar esta aba pro app; o destino dela é só a confirmação
-      entrou = true;
       // tokens fora da barra/histórico antes de qualquer await
       history.replaceState(null, "", location.pathname + location.search);
-      void supabase.auth
-        .setSession({ access_token, refresh_token })
-        .then(({ error }) => {
-          if (error) {
-            router.replace(urlErroLink());
-          } else {
+      if (handoff) {
+        // aba do e-mail: não grava nada (o refresh_token é de uso único e
+        // pertence à aba original) — publica e confirma. Se a RPC falhar,
+        // entra aqui mesmo: melhor sessão nesta aba do que nenhuma
+        entrou = true;
+        void supabase
+          .rpc("registrar_login_handoff", {
+            p_nonce: handoff,
+            p_access: access_token,
+            p_refresh: refresh_token,
+          })
+          .then(({ error }) => {
+            if (error) {
+              void entrarAqui();
+              return;
+            }
             router.replace(
               `/auth/confirmado?next=${encodeURIComponent(destinoFinal())}`
             );
-          }
-        });
+          });
+      } else {
+        void entrarAqui();
+      }
     } else {
       void supabase.auth.getSession().then(({ data }) => ir(data.session));
     }
     return () => subscription.unsubscribe();
-  }, [supabase, entrar, router, urlErroLink, destinoFinal]);
+  }, [supabase, entrar, router, urlErroLink, params, destinoFinal]);
 
   // countdown do reenvio — tick de 1s até zerar
   useEffect(() => {
@@ -157,7 +182,27 @@ export function LoginForm() {
     };
     const checar = async () => {
       const { data } = await supabase.auth.getSession();
-      ir(data.session);
+      if (data.session) {
+        ir(data.session);
+        return;
+      }
+      // link aberto em outro navegador/app: a aba do e-mail depositou os
+      // tokens no handoff — resgata aqui (uso único) e assina nesta aba
+      const nonce = handoffRef.current;
+      if (!nonce) return;
+      const { data: h } = await supabase.rpc("pegar_login_handoff", {
+        p_nonce: nonce,
+      });
+      const tokens = h as { access_token?: string; refresh_token?: string } | null;
+      if (!tokens?.access_token || !tokens.refresh_token) return;
+      const { error } = await supabase.auth.setSession({
+        access_token: tokens.access_token,
+        refresh_token: tokens.refresh_token,
+      });
+      if (!error) {
+        const { data: s } = await supabase.auth.getSession();
+        ir(s.session);
+      }
     };
     const {
       data: { subscription },
@@ -183,6 +228,7 @@ export function LoginForm() {
     setErro(null);
     try {
       const destino = destinoFinal();
+      const handoff = crypto.randomUUID();
       const { error } = await otp.auth.signInWithOtp({
         email: email.trim().toLowerCase(),
         options: {
@@ -190,10 +236,12 @@ export function LoginForm() {
           // o 500 "Database error saving new user" do GoTrue
           shouldCreateUser: false,
           // implicit: a sessão chega no hash (#access_token) — o destino
-          // precisa ser uma página de client, rota de servidor não vê hash
-          emailRedirectTo: `${location.origin}/login?next=${encodeURIComponent(destino)}`,
+          // precisa ser uma página de client, rota de servidor não vê hash.
+          // ?h= é o nonce do handoff (0049)
+          emailRedirectTo: `${location.origin}/login?next=${encodeURIComponent(destino)}&h=${handoff}`,
         },
       });
+      handoffRef.current = handoff;
       if (error) {
         // 429 = um link acabou de sair — honesto mostrar o painel com o
         // cooldown real ("after N seconds") em vez de um erro

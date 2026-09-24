@@ -9,33 +9,41 @@ export async function GET(request: NextRequest) {
   const next = pathInterno(searchParams.get("next")) ?? "/";
   const supabase = await createClient();
 
-  // sucesso → a aba do e-mail só confirma e se fecha; quem entra de verdade
-  // (e decide o onboarding de senha) é a sessão que pediu o link — o poll
-  // do painel "link enviado" detecta a sessão compartilhada e desvia pra
-  // /auth/definir-senha quando precisa
-  const confirmado = () =>
+  // sucesso → a sessão já está nos cookies DESTE navegador — entra direto:
+  // primeiro acesso passa pelo onboarding de senha, senão vai pro destino.
+  // (A aba que pediu o link entra junto pelo poll quando é o mesmo browser;
+  // "só confirmar" não funciona entre navegadores — cookie não atravessa.)
+  const destino = (resolveuSenha: boolean) =>
     NextResponse.redirect(
-      new URL(`/auth/confirmado?next=${encodeURIComponent(next)}`, request.url),
+      new URL(
+        resolveuSenha
+          ? next
+          : `/auth/definir-senha?next=${encodeURIComponent(next)}`,
+        request.url,
+      ),
     );
 
   // links novos não passam por aqui: o magic link implícito cai direto em
   // /login com #access_token (resolvido via setSession no client). Esta rota
   // fica pra token_hash (template com {{ .TokenHash }}) e os links pkce já
   // enviados antes da mudança — o ?code= deles só troca no mesmo navegador.
+  const resolveuSenha = (u: { user_metadata?: Record<string, unknown> } | null) =>
+    !!(u?.user_metadata?.senha_em || u?.user_metadata?.senha_dispensada);
+
   const code = searchParams.get("code");
   if (code) {
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
+    const { data, error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error) {
-      return confirmado();
+      return destino(resolveuSenha(data.user));
     }
   }
 
   const token_hash = searchParams.get("token_hash");
   const type = searchParams.get("type") as EmailOtpType | null;
   if (token_hash && type) {
-    const { error } = await supabase.auth.verifyOtp({ type, token_hash });
+    const { data, error } = await supabase.auth.verifyOtp({ type, token_hash });
     if (!error) {
-      return confirmado();
+      return destino(resolveuSenha(data.user));
     }
   }
 
