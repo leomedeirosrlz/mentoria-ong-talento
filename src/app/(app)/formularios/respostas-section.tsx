@@ -54,12 +54,15 @@ function Contagem({
         />
       </span>
       {/* visual "12 · 40%"; leitor de tela ouve "12 de 30" — a fração é a
-          informação que o % abstrai */}
-      <span
-        className="min-w-16 shrink-0 text-right tabular-nums whitespace-nowrap text-muted-foreground"
-        aria-label={`${n} de ${total}`}
-      >
-        {n} · {pct}%
+          informação que o % abstrai (aria-label em span genérico não é
+          anunciado de forma confiável — vai texto sr-only) */}
+      <span className="min-w-16 shrink-0 text-right tabular-nums whitespace-nowrap text-muted-foreground">
+        <span aria-hidden>
+          {n} · {pct}%
+        </span>
+        <span className="sr-only">
+          {n} de {total}
+        </span>
       </span>
     </li>
   );

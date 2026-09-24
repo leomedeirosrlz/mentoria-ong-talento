@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useRef, useState, useTransition } from "react";
+import { Fragment, useEffect, useId, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -106,12 +106,18 @@ export function FormularioBuilder({
 }) {
   const [titulo, setTitulo] = useState(formulario?.titulo ?? "");
   const [descricao, setDescricao] = useState(formulario?.descricao ?? "");
-  const [campos, setCampos] = useState<DraftCampo[]>(
-    formulario?.campos.length ? formulario.campos.map(paraDraft) : [novoCampo()]
+  // useId semeia o id do 1º campo em /novo — randomUUID aqui geraria ids
+  // diferentes no SSR e na hidratação (mismatch em todo atributo derivado)
+  const seedId = useId();
+  const [campos, setCampos] = useState<DraftCampo[]>(() =>
+    formulario?.campos.length
+      ? formulario.campos.map(paraDraft)
+      : [{ ...novoCampo(), id: `c_${seedId.replace(/[^a-zA-Z0-9]/g, "")}` }]
   );
   /** erros de validação client-side por campo (espelho de validaCampos) —
    *  ancorados no card; erro de action/rede vai por toast. */
   const [erros, setErros] = useState<Record<string, string>>({});
+  const [erroTitulo, setErroTitulo] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
   const [preview, setPreview] = useState(false);
   const [pending, start] = useTransition();
@@ -319,6 +325,15 @@ export function FormularioBuilder({
   }
 
   function salvar() {
+    // mesma regra do servidor (3–140) — marcada no campo, não em toast
+    if (titulo.trim().length < 3) {
+      setErroTitulo("O título precisa de pelo menos 3 letras.");
+      const el = document.getElementById("form-titulo");
+      el?.scrollIntoView({ block: "center" });
+      el?.focus({ preventScroll: true });
+      return;
+    }
+    setErroTitulo(null);
     const mapa = validaRascunho();
     if (Object.keys(mapa).length) {
       setErros(mapa);
@@ -406,10 +421,21 @@ export function FormularioBuilder({
               onChange={(e) => {
                 setTitulo(e.target.value);
                 setDirty(true);
+                if (erroTitulo) setErroTitulo(null);
               }}
               maxLength={140}
               placeholder="Ex.: Avaliação do encontro"
+              aria-invalid={erroTitulo ? true : undefined}
+              aria-describedby={erroTitulo ? "form-titulo-erro" : undefined}
             />
+            {erroTitulo && (
+              <p
+                id="form-titulo-erro"
+                className="text-sm leading-snug text-destructive"
+              >
+                {erroTitulo}
+              </p>
+            )}
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="form-descricao">
