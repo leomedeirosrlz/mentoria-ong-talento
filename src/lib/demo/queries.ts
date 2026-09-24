@@ -5,6 +5,7 @@ import type {
   AppRole,
   Assinatura,
   AssinaturaResumo,
+  AssinaturaVia,
   CicloEvento,
   Comunicado,
   DadosCivis,
@@ -742,11 +743,16 @@ export function demoAssinaturaPorToken(token: string) {
     ? data.mentorados.find((m) => m.id === a.mentorado_id)
     : null;
   const nome = profile?.nome ?? mentorado?.nome;
-  // espelha a RPC 0046: a sugestão de prefill muda por template —
-  // autorização lê o responsável do jovem, os demais os civis do alvo
+  // espelha a RPC (0046+0053): o prefill muda por template E só existe
+  // enquanto o link está assinável — depois de assinado/expirado/revogado
+  // a PII não sai mais
   const slug = a.template?.slug ?? "";
-  const civis =
-    slug === "autorizacao-responsavel"
+  const assinavel =
+    a.status === "pendente" &&
+    (!a.token_expira_em || a.token_expira_em > new Date().toISOString());
+  const civis = !assinavel
+    ? null
+    : slug === "autorizacao-responsavel"
       ? mentorado?.responsavel ?? null
       : profile?.dados_civis ?? mentorado?.dados_civis ?? null;
   return {
@@ -759,13 +765,25 @@ export function demoAssinaturaPorToken(token: string) {
   };
 }
 
-/** Via assinada por token (demo) — a row só aparece depois de assinada,
- *  como a RPC assinatura_completa_por_token. */
-export function demoAssinaturaCompletaPorToken(token: string): Assinatura | null {
+/** Via assinada por token (demo) — só aparece depois de assinada e com o
+ *  mesmo recorte da RPC (0053): evidência + template, sem token nem ids
+ *  internos. */
+export function demoAssinaturaCompletaPorToken(token: string): AssinaturaVia | null {
   const a = getDemoData().assinaturas.find(
     (x) => x.token === token && x.status === "assinado"
   );
-  return a ?? null;
+  if (!a) return null;
+  return {
+    id: a.id,
+    status: a.status,
+    dados_snapshot: a.dados_snapshot,
+    assinatura_texto: a.assinatura_texto,
+    assinado_em: a.assinado_em,
+    ip: a.ip,
+    user_agent: a.user_agent,
+    hash_documento: a.hash_documento,
+    template: a.template,
+  };
 }
 
 // ---------- presenças na formação (0040) ----------

@@ -15,6 +15,8 @@ const COOKIE_OPTS = {
   path: "/",
   maxAge: 60 * 60 * 24 * 30,
   sameSite: "lax",
+  // dev local é http — Secure só em produção (https)
+  secure: process.env.NODE_ENV === "production",
 } as const;
 
 /** Papel ativo da demo — null = sessão normal (autenticada ou não). */

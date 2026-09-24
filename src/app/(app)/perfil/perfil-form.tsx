@@ -1,9 +1,11 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+import { type Session } from "@supabase/supabase-js";
 import { Camera, CaretDown } from "@phosphor-icons/react";
 import { createClient } from "@/lib/supabase/client";
+import { DEMO_MSG } from "@/lib/demo/shared";
 import { setAvatarPath, updateMeuPerfil } from "@/lib/actions";
 import { avatarPublicUrl, AVATAR_ACCEPT, AVATAR_MAX_BYTES } from "@/lib/avatar";
 import { Avatar } from "@/components/avatar";
@@ -29,6 +31,25 @@ import type { Disponibilidade, MentorProfile, Profile } from "@/lib/types";
  *  parcial, mas salvar dois ao mesmo tempo misturaria toasts/estados. */
 type FormId = "publico" | "cadastro" | "mentoria";
 
+// troca de credencial sem senha atual pra conferir (quem nunca definiu) só
+// vale com autenticação recente — sessão velha não pode virar senha nova
+const SESSAO_FRESCA_MS = 15 * 60 * 1000;
+
+function sessaoFresca(session: Session | null): boolean {
+  if (!session) return false;
+  const login = Date.parse(session.user.last_sign_in_at ?? "");
+  if (!Number.isNaN(login)) return Date.now() - login < SESSAO_FRESCA_MS;
+  // fallback: iat do próprio access_token
+  try {
+    const payload = JSON.parse(
+      atob(session.access_token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/"))
+    );
+    return typeof payload.iat === "number" && Date.now() - payload.iat * 1000 < SESSAO_FRESCA_MS;
+  } catch {
+    return false;
+  }
+}
+
 export function PerfilForm({
   me,
   mentorProfile,
@@ -47,7 +68,12 @@ export function PerfilForm({
   const [salvando, setSalvando] = useState<FormId | null>(null);
   const [salvandoSenha, setSalvandoSenha] = useState(false);
   const [senha, setSenha] = useState("");
+  const [senhaAtual, setSenhaAtual] = useState("");
   const [confirmacao, setConfirmacao] = useState("");
+  // quem tem senha prova a posse com ela antes de trocar; quem dispensou no
+  // onboarding não tem o que conferir — o gate vira sessão fresca. Default
+  // true: quando não dá pra saber, exige a senha atual
+  const [temSenha, setTemSenha] = useState(true);
   const [bioLen, setBioLen] = useState(me.bio?.length ?? 0);
   const [volLen, setVolLen] = useState(me.voluntariado?.length ?? 0);
   const [areas, setAreas] = useState<string[]>(me.areas ?? []);
@@ -55,6 +81,15 @@ export function PerfilForm({
   const [disponibilidade, setDisponibilidade] = useState<Disponibilidade | null>(
     mentorProfile?.disponibilidade ?? null
   );
+
+  // quem dispensou a senha no onboarding (senha_dispensada sem senha_em) não
+  // tem "senha atual" pra conferir — o campo some e o gate vira sessão fresca
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      const meta = data.user?.user_metadata;
+      if (meta?.senha_dispensada && !meta?.senha_em) setTemSenha(false);
+    });
+  }, [supabase]);
 
   // ---------- pendência × preenchido ----------
   // Os sensíveis (nascimento/gênero/motivação/pref. de par) chegam
@@ -232,6 +267,35 @@ export function PerfilForm({
     }
     setSalvandoSenha(true);
     try {
+      if (temSenha) {
+        // reautenticação: trocar credencial exige prova recente — a senha
+        // atual é a prova (e o sign-in já renova a sessão pro updateUser)
+        const { error: erroLogin } = await supabase.auth.signInWithPassword({
+          email: me.email,
+          password: senhaAtual,
+        });
+        if (erroLogin) {
+          toast.error(
+            erroLogin.message === DEMO_MSG
+              ? DEMO_MSG
+              : erroLogin.code === "invalid_credentials" ||
+                  /invalid (login )?credentials/i.test(erroLogin.message)
+                ? "Senha atual incorreta."
+                : "Não foi possível confirmar a senha atual. Tente de novo."
+          );
+          return;
+        }
+      } else {
+        // sem senha pra conferir: só uma sessão recém-saída do magic link
+        // pode criar uma — sessão velha pede reentrada
+        const { data } = await supabase.auth.getSession();
+        if (!sessaoFresca(data.session)) {
+          toast.error(
+            "Por segurança, entre de novo pelo link de e-mail e crie a senha logo em seguida."
+          );
+          return;
+        }
+      }
       const { error } = await supabase.auth.updateUser({
         password: senha,
         data: { senha_em: new Date().toISOString() },
@@ -244,7 +308,9 @@ export function PerfilForm({
         );
       } else {
         setSenha("");
+        setSenhaAtual("");
         setConfirmacao("");
+        setTemSenha(true);
         toast.success("Senha atualizada.");
       }
     } catch {
@@ -548,7 +614,8 @@ export function PerfilForm({
         </details>
       )}
 
-      {/* senha — updateUser direto; a flag senha_em é o que pula o onboarding */}
+      {/* senha — reautentica antes do updateUser (senha atual ou sessão
+          fresca do magic link); a flag senha_em é o que pula o onboarding */}
       <details className="group/senha rounded-xl bg-card shadow-[var(--shadow-border)]">
         <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2.5 rounded-xl px-6 py-4 transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring group-open/senha:rounded-b-none [&::-webkit-details-marker]:hidden">
           <span className="text-sm font-semibold">Senha</span>
@@ -560,6 +627,24 @@ export function PerfilForm({
         </summary>
         <div className="border-t border-border px-6 pb-6 pt-5">
           <form onSubmit={salvarSenha} className="space-y-4">
+            {temSenha ? (
+              <div className="space-y-2">
+                <Label htmlFor="senha-atual">Senha atual</Label>
+                <Input
+                  id="senha-atual"
+                  type="password"
+                  required
+                  autoComplete="current-password"
+                  value={senhaAtual}
+                  onChange={(e) => setSenhaAtual(e.target.value)}
+                />
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Você entra pelo link de e-mail — por segurança, a sessão
+                precisa ser recente pra criar uma senha.
+              </p>
+            )}
             <div className="space-y-2">
               <Label htmlFor="nova-senha">Nova senha</Label>
               <Input

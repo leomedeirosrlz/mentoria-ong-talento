@@ -1819,12 +1819,10 @@ export async function salvarRegistro(formData: FormData) {
     proximo_passo: proximoPasso,
     proximo_passo_detalhe: String(formData.get("proximo_passo_detalhe") ?? "").trim() || null,
   };
-  const { data: registro, error } = regExistente
-    ? await supabase.from("registros").update(payload).eq("id", regExistente.id).select("id").single()
-    : await supabase
-        .from("registros").insert({ ...payload, encontro_id, created_by: eu.id }).select("id").single();
-  if (error) return { error: erroAmigavel(error) };
-
+  // o encontro vira "realizado" ANTES do registro — a policy
+  // registros_mentor_insert (0053) exige o encontro realizado pra aceitar o
+  // insert. Se o registro falhar depois, o semáforo mostra "registro
+  // pendente" e a tentativa seguinte passa — falha melhor que a inversa.
   // realizado_em = quando aconteceu de fato; preserva data informada no
   // registro retroativo e cai em data_hora no fluxo normal agendado→realizado
   const { data: encOk, error: encErr } = await supabase
@@ -1839,6 +1837,12 @@ export async function salvarRegistro(formData: FormData) {
   if (!encOk?.length) {
     return { error: "Não foi possível concluir. Recarregue a página e tente de novo." };
   }
+
+  const { data: registro, error } = regExistente
+    ? await supabase.from("registros").update(payload).eq("id", regExistente.id).select("id").single()
+    : await supabase
+        .from("registros").insert({ ...payload, encontro_id, created_by: eu.id }).select("id").single();
+  if (error) return { error: erroAmigavel(error) };
 
   // encaminhamentos vêm como JSON por linha (descrição pode ter qualquer caractere)
   const enc = formData

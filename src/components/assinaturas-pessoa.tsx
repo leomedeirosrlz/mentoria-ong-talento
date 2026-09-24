@@ -16,6 +16,7 @@ import {
 } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { waLink } from "@/lib/ciclo";
+import { useOrigem } from "@/components/forms/link-shared";
 import {
   listarAssinaturasPessoa,
   reenviarAssinatura,
@@ -234,6 +235,9 @@ export function AssinaturasPessoa({
   const [reenviando, setReenviando] = useState<string | null>(null);
   const [solicitando, startSolicitar] = useTransition();
   const primeiroNome = nome.split(" ")[0];
+  // window.location.origin SSR-safe — no render o servidor não conhece a
+  // origem do deploy (mesmo padrão dos links de /f, link-shared.ts)
+  const origem = useOrigem();
 
   /** Releitura depois das mutações — a lista é estado local do client,
    *  router.refresh() não a alcança. */
@@ -282,7 +286,7 @@ export function AssinaturasPessoa({
           return;
         }
         await copiar(
-          `${window.location.origin}${res.link}`,
+          `${origem}${res.link}`,
           whatsapp
             ? "Link copiado — ou envie direto pelo botão WhatsApp abaixo."
             : "Link copiado — envie ao responsável."
@@ -304,7 +308,7 @@ export function AssinaturasPessoa({
         return;
       }
       await copiar(
-        `${window.location.origin}${res.link}`,
+        `${origem}${res.link}`,
         "Novo link copiado — o anterior foi desativado."
       );
       await carregar();
@@ -423,7 +427,7 @@ export function AssinaturasPessoa({
                         size="xs"
                         onClick={() =>
                           copiar(
-                            `${window.location.origin}/assinar/${a.token}`,
+                            `${origem}/assinar/${a.token}`,
                             "Link copiado — envie ao responsável."
                           )
                         }
@@ -437,7 +441,7 @@ export function AssinaturasPessoa({
                           msgLinkAssinatura(
                             a.template?.slug,
                             primeiroNome,
-                            `${window.location.origin}/assinar/${a.token}`
+                            `${origem}/assinar/${a.token}`
                           )
                         );
                         return url ? (

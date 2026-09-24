@@ -8,6 +8,10 @@ import { demoPdf } from "@/lib/demo/pdf";
 // row — a autorização de audiência mora na policy do storage.objects, que só
 // assina URL de arquivo cujo material o usuário pode ver (invisível -> 404).
 // O arquivo sai do bucket privado via signed URL de 5 min.
+
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -35,6 +39,11 @@ export async function GET(
         "Content-Disposition": 'inline; filename="demo-material.pdf"',
       },
     });
+  }
+
+  // id cru no eq() — string malformada vira erro PostgREST (500); uuid ruim é 404
+  if (!UUID_RE.test(id)) {
+    return new NextResponse("Material não encontrado.", { status: 404 });
   }
 
   const supabase = await createClient();

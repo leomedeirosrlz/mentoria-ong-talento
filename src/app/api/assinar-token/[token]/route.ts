@@ -4,12 +4,13 @@ import { demoRole } from "@/lib/demo/mode";
 import { demoAssinaturaCompletaPorToken } from "@/lib/demo/queries";
 import { renderDocumentoAssinado } from "@/lib/documentos/pdf";
 import { nomeArquivoVia } from "@/lib/documentos/texto";
-import type { Assinatura } from "@/lib/types";
+import type { AssinaturaVia } from "@/lib/types";
 
 // Via assinada do documento, por token — o "download" do fluxo sem login.
 // Depois de assinada, a própria URL /assinar/<token> aponta pra cá; o token é
 // o fator de posse (o RPC só devolve a row com status='assinado', então uma
-// pendência nunca vaza dados civis por aqui).
+// pendência nunca vaza dados civis por aqui). Desde 0053 a RPC devolve só o
+// recorte AssinaturaVia — sem token, ids internos nem created_by.
 
 const TOKEN_RE = /^[0-9a-f-]{36}$/;
 
@@ -54,8 +55,9 @@ export async function GET(
       status: 500,
     });
   }
-  // 0051: a RPC devolve o objeto único (row + template embutido) ou null
-  const assinatura = (data ?? null) as Assinatura | null;
+  // 0051: a RPC devolve o objeto único ou null; 0053: o objeto é o recorte
+  // AssinaturaVia (evidência + template), não a row inteira
+  const assinatura = (data ?? null) as AssinaturaVia | null;
   if (!assinatura) {
     return new NextResponse("Documento não encontrado — a assinatura ainda não foi concluída.", {
       status: 404,

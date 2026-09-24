@@ -623,11 +623,11 @@ async function rpcDemo(
     // jsonb ou null — null quando o token não existe
     case "assinatura_por_token":
       return { data: demoAssinaturaPorToken(token), error: null, count: null };
-    // setof assinaturas — a row só aparece depois de assinada; pendente/
-    // revogada/expirada devolve array vazio, como a função real
+    // objeto único ou null (0051+0053): o recorte AssinaturaVia só existe
+    // depois de assinada; pendente/revogada/expirada devolve null
     case "assinatura_completa_por_token": {
       const row = demoAssinaturaCompletaPorToken(token);
-      return { data: row ? [row] : [], error: null, count: null };
+      return { data: row, error: null, count: null };
     }
     // jsonb ou null — a definição pública do form + status do link (0042)
     case "formulario_por_token":

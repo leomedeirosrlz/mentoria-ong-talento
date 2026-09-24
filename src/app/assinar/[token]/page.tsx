@@ -32,6 +32,8 @@ export const metadata: Metadata = {
   title: "Assinatura de documento",
   description:
     "Assinatura eletrônica de documento do Programa de Mentoria Social — Realiza.vc.",
+  // link individual por WhatsApp — não é página de indexação (igual a /f)
+  robots: { index: false, follow: false },
 };
 
 // uuid do token na URL — formato errado nem vai ao banco (e a RPC espera uuid,

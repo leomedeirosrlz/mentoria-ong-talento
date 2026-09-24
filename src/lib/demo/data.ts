@@ -1830,8 +1830,8 @@ function build(): DemoData {
     { id: uid(0x3303), slug: "termo-mentorando", titulo: "Termo de Adesão e Participação no Programa de Mentoria Social", versao: 1, signatario: "mentorado", ativo: true, created_at: haDias(5) },
   ];
 
-  const tplTermo = { slug: "termo-voluntario", titulo: "Termo de Adesão ao Trabalho Voluntário", versao: 1 };
-  const tplAutorizacao = { slug: "autorizacao-responsavel", titulo: "Autorização do Responsável", versao: 1 };
+  const tplTermo = { slug: "termo-voluntario", titulo: "Termo de Adesão ao Trabalho Voluntário", versao: 1, signatario: "profile" as const };
+  const tplAutorizacao = { slug: "autorizacao-responsavel", titulo: "Autorização do Responsável", versao: 1, signatario: "mentorado" as const };
 
   const dadosMarina = {
     nome_civil: "Marina Duarte Ferreira",

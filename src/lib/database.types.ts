@@ -2055,7 +2055,6 @@ export type Database = {
       assinar_com_token: {
         Args: {
           p_dados: Json
-          p_hash: string
           p_ip: string
           p_texto: string
           p_token: string
@@ -2064,13 +2063,7 @@ export type Database = {
         Returns: string
       }
       assinar_termo: {
-        Args: {
-          p_dados: Json
-          p_hash: string
-          p_ip: string
-          p_texto: string
-          p_ua: string
-        }
+        Args: { p_dados: Json; p_ip: string; p_texto: string; p_ua: string }
         Returns: string
       }
       assinatura_completa_por_token: {
@@ -2078,6 +2071,10 @@ export type Database = {
         Returns: Json
       }
       assinatura_por_token: { Args: { p_token: string }; Returns: Json }
+      dados_civis_ok: {
+        Args: { com_parentesco?: boolean; d: Json }
+        Returns: boolean
+      }
       definir_pdm_url: {
         Args: { p_dupla: string; p_url: string }
         Returns: undefined

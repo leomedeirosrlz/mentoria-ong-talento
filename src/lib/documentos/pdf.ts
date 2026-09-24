@@ -10,7 +10,7 @@
 
 import { PageSizes, PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import type { PDFFont, PDFImage, PDFPage, RGB } from "pdf-lib";
-import type { Assinatura, DadosAutorizacao, DadosCivis } from "../types";
+import type { AssinaturaVia, DadosAutorizacao, DadosCivis } from "../types";
 import {
   ANEXO_I_PARAGRAFOS,
   ANEXO_I_TITULO,
@@ -453,8 +453,8 @@ function renderMentorando(
 
 function paginaEvidencias(
   p: Fluxo,
-  a: Assinatura,
-  tpl: NonNullable<Assinatura["template"]>,
+  a: AssinaturaVia,
+  tpl: NonNullable<AssinaturaVia["template"]>,
   texto: string,
   em: string
 ) {
@@ -470,12 +470,14 @@ function paginaEvidencias(
     { size: 8.5, centro: true, color: CINZA, depois: 20 }
   );
 
-  // mentorado_id → signatário sem conta, prova é o link tokenizado; senão
-  // a sessão (magic link) é o fator — o created_by do coord só existe no
-  // fluxo de token
-  const metodo = a.mentorado_id
-    ? "link de assinatura tokenizado (enviado por e-mail/WhatsApp)"
-    : "sessão autenticada (magic link)";
+  // o método vem do signatário declarado no template — mentorado assina
+  // pelo link tokenizado (não tem conta), profile assina logado. O
+  // mentorado_id não sai do banco na via pública (0053), então a decisão
+  // não pode mais depender da row
+  const metodo =
+    tpl.signatario === "mentorado"
+      ? "link de assinatura tokenizado (enviado por e-mail/WhatsApp)"
+      : "sessão autenticada (magic link)";
 
   const linhas: [string, string][] = [
     ["Documento", `${tpl.titulo} — versão ${tpl.versao}`],
@@ -535,7 +537,7 @@ function paginaEvidencias(
  *  é a assinatura manuscrita do presidente (só o termo usa); null desenha
  *  só a linha. Lança Error em status errado/snapshot ausente — a rota trata. */
 export async function renderDocumentoAssinado(
-  a: Assinatura,
+  a: AssinaturaVia,
   contraAssinaturaPng: Uint8Array | null
 ): Promise<Uint8Array> {
   if (a.status !== "assinado") {

@@ -18,6 +18,8 @@ import type { AppRole } from "@/lib/types";
 
 export const metadata: Metadata = {
   title: "Demonstração",
+  // ambiente interno de alinhamento — não é página de indexação
+  robots: { index: false, follow: false },
 };
 
 /** Um card por papel — a descrição diz o que aquela visão enxerga. */

@@ -508,8 +508,26 @@ export type Assinatura = {
   created_by: string | null;
   created_at: string;
   // embed quando selecionado:
-  template?: Pick<DocumentoTemplate, "slug" | "titulo" | "versao"> | null;
+  template?: Pick<
+    DocumentoTemplate,
+    "slug" | "titulo" | "versao" | "signatario"
+  > | null;
 };
+
+/** Via pública por token — a RPC assinatura_completa_por_token (0053)
+ *  devolve só este recorte da row: o que o PDF de evidências renderiza.
+ *  Token, ids internos e created_by não saem do banco. */
+export type AssinaturaVia = Pick<
+  Assinatura,
+  | "id"
+  | "status"
+  | "dados_snapshot"
+  | "assinatura_texto"
+  | "assinado_em"
+  | "ip"
+  | "user_agent"
+  | "hash_documento"
+> & { template?: Assinatura["template"] };
 
 /** Resumo leve de uma assinatura — status por documento/pessoa pra aba
  *  /pessoas (quem assinou vs. quem não) sem carregar snapshot nem token. */

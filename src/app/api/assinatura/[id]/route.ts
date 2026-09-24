@@ -13,6 +13,22 @@ import type { Assinatura } from "@/lib/types";
 // row passa pela RLS (dono ou coordenação); a checagem de dono abaixo é só
 // defesa em profundidade dentro do handler.
 
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function pdfResponse(pdf: Uint8Array, arquivo: string) {
+  return new NextResponse(new Uint8Array(pdf), {
+    headers: {
+      "Content-Type": "application/pdf",
+      // inline: abre no navegador (o leigo confere antes de salvar)
+      "Content-Disposition": `inline; filename="${arquivo}"`,
+      // a via carrega dados civis (RG/CPF/endereço) + evidência — sem cache
+      // de disco/heurístico; mesma régua do /api/assinar-token público
+      "Cache-Control": "private, no-store",
+    },
+  });
+}
+
 /** O renderer lança em snapshot ausente/incompatível — aqui vira null e a
  *  rota responde 500 (uma row 'assinado' sem snapshot é bug, não 404). */
 async function renderSeguro(
@@ -45,12 +61,12 @@ export async function GET(
     if (!pdf) {
       return new NextResponse("Não foi possível gerar o documento.", { status: 500 });
     }
-    return new NextResponse(new Uint8Array(pdf), {
-      headers: {
-        "Content-Type": "application/pdf",
-        "Content-Disposition": `inline; filename="${nomeArquivoVia(a)}"`,
-      },
-    });
+    return pdfResponse(pdf, nomeArquivoVia(a));
+  }
+
+  // id cru no eq() — string malformada vira erro PostgREST (500); uuid ruim é 404
+  if (!UUID_RE.test(id)) {
+    return new NextResponse("Documento não encontrado.", { status: 404 });
   }
 
   const supabase = await createClient();
@@ -63,7 +79,14 @@ export async function GET(
     return new NextResponse("Sessão expirada — entre de novo.", { status: 401 });
   }
 
-  const a = await getAssinatura(id);
+  let a: Assinatura | null;
+  try {
+    a = await getAssinatura(id);
+  } catch {
+    return new NextResponse("Não foi possível abrir o documento — tente de novo.", {
+      status: 500,
+    });
+  }
   if (!a || a.status !== "assinado") {
     return new NextResponse("Documento não encontrado.", { status: 404 });
   }
@@ -91,10 +114,5 @@ export async function GET(
   if (!pdf) {
     return new NextResponse("Não foi possível gerar o documento.", { status: 500 });
   }
-  return new NextResponse(new Uint8Array(pdf), {
-    headers: {
-      "Content-Type": "application/pdf",
-      "Content-Disposition": `inline; filename="${nomeArquivoVia(a)}"`,
-    },
-  });
+  return pdfResponse(pdf, nomeArquivoVia(a));
 }

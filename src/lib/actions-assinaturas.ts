@@ -1,6 +1,5 @@
 "use server";
 
-import { createHash } from "crypto";
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
@@ -10,7 +9,7 @@ import { getAssinaturasPessoa } from "./queries-assinaturas";
 import { TEMPLATES_MENTORADO } from "./documentos/texto";
 import { DEMO_MSG } from "./demo/shared";
 import { cpfValido } from "./utils";
-import type { DadosAutorizacao, DadosCivis, Endereco } from "./types";
+import type { DadosCivis, Endereco, ResponsavelCivis } from "./types";
 
 // Actions do fluxo de assinatura eletrônica (0033). Toda escrita vai por RPC
 // security definer — a RLS de `assinaturas` não tem update: as transições de
@@ -19,7 +18,13 @@ import type { DadosAutorizacao, DadosCivis, Endereco } from "./types";
 // Dois caminhos:
 //   · assinarTermo — mentor/voluntário logado (sessão prova a identidade)
 //   · assinarComToken — responsável pelo mentorado, sem conta (token na URL
-//     é o fator de posse; ip/ua/hash registram a evidência)
+//     é o fator de posse)
+//
+// Desde 0053 a evidência é selada no banco: p_hash saiu — o sha256 do
+// documento é computado dentro da RPC sobre exatamente o que é gravado, e
+// p_dados passa pela validação `dados_civis_ok` antes de ir pro snapshot e
+// de voltar pra ficha. ip/ua seguem lidos do request aqui (o PostgREST
+// enxergaria o servidor Next, não o browser do signatário).
 //
 // Nada aqui gera PDF: o documento é renderizado sob demanda a partir de
 // dados_snapshot + template.versao (src/lib/documentos/) — o hash cobre o
@@ -27,7 +32,9 @@ import type { DadosAutorizacao, DadosCivis, Endereco } from "./types";
 
 const LINK_BASE = "/assinar/";
 
-/** Evidência: IP e UA só vêm do servidor — nunca confiar em campo de form. */
+/** Evidência: IP e UA só vêm do servidor — nunca confiar em campo de form.
+ *  São repassados à RPC como parâmetros: o hash no banco cobre exatamente
+ *  o par que for gravado junto (0053). */
 async function ipUa(): Promise<{ ip: string | null; ua: string | null }> {
   const h = await headers();
   const fwd = h.get("x-forwarded-for")?.split(",")[0]?.trim();
@@ -35,12 +42,6 @@ async function ipUa(): Promise<{ ip: string | null; ua: string | null }> {
     ip: fwd || h.get("x-real-ip") || null,
     ua: h.get("user-agent"),
   };
-}
-
-/** sha256 do payload canônico (template + snapshot + texto + ip + ua) —
- *  recomputável pra verificação posterior. O timestamp fica na row. */
-function hashDocumento(payload: unknown): string {
-  return createHash("sha256").update(JSON.stringify(payload)).digest("hex");
 }
 
 async function me() {
@@ -239,19 +240,13 @@ export async function assinarTermo(formData: FormData) {
     return { error: "É preciso ler e aceitar o termo pra assinar." };
 
   const { ip, ua } = await ipUa();
-  const hash = hashDocumento({
-    slug: "termo-voluntario",
-    dados,
-    texto,
-    ip,
-    ua,
-  });
+  // o hash_documento é computado dentro da RPC (0053) — a action não
+  // fabrica evidência, só repassa o que o request trouxe
   const { data, error } = await supabase.rpc("assinar_termo", {
     p_dados: dados,
     p_texto: texto,
     p_ip: ip,
     p_ua: ua,
-    p_hash: hash,
   });
   if (error) return { error: "Não foi possível registrar a assinatura — tente de novo." };
   revalidatePath("/", "layout");
@@ -285,8 +280,8 @@ export async function assinarComToken(token: string, formData: FormData) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const supabase = await createClient();
 
-  // o nome do mentorado entra no snapshot pelo servidor — o client não pode
-  // forjar pra quem o documento vale
+  // a RPC decide o contrato do snapshot pelo template da row — aqui só
+  // checamos se o link existe/está assinável pra falhar rápido na UX
   const info = await assinaturaPorToken(token);
   if (!info || info.status !== "pendente")
     return { error: "Este link não está mais disponível." };
@@ -298,35 +293,23 @@ export async function assinarComToken(token: string, formData: FormData) {
   if (campo(formData, "aceite") !== "on")
     return { error: "É preciso ler e aceitar pra assinar." };
 
-  // o snapshot muda de forma por template: autorização embrulha o jovem +
-  // responsável (parentesco exigido); os demais guardam o DadosCivis direto
-  let snapshot: DadosAutorizacao | DadosCivis;
+  // autorização: o client manda só os civis do RESPONSÁVEL + parentesco —
+  // o banco embrulha com o mentorado_nome vindo da ficha (o client não pode
+  // mais dizer pra quem o documento vale). Demais templates: DadosCivis
+  // direto. dados_civis_ok revalida tudo lá dentro.
+  let pDados: DadosCivis | ResponsavelCivis = dados;
   if (info.template.slug === "autorizacao-responsavel") {
     const parentesco = campo(formData, "parentesco");
     if (!parentesco) return { error: "Informe o parentesco com o jovem." };
-    snapshot = {
-      mentorado_nome: info.alvo.nome,
-      responsavel: { ...dados, parentesco },
-    };
-  } else {
-    snapshot = dados;
+    pDados = { ...dados, parentesco };
   }
   const { ip, ua } = await ipUa();
-  const hash = hashDocumento({
-    slug: info.template.slug,
-    versao: info.template.versao,
-    dados: snapshot,
-    texto,
-    ip,
-    ua,
-  });
   const { error } = await supabase.rpc("assinar_com_token", {
     p_token: token,
-    p_dados: snapshot,
+    p_dados: pDados,
     p_texto: texto,
     p_ip: ip,
     p_ua: ua,
-    p_hash: hash,
   });
   if (error) return { error: "Não foi possível registrar a assinatura — tente de novo." };
   return { ok: true };

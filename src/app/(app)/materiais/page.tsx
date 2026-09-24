@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import type { CSSProperties } from "react";
 import Link from "next/link";
 import { getCicloEventos, getMateriais, getMe } from "@/lib/queries";
-import { totalEncontros } from "@/lib/ciclo";
+import { linkSeguro, totalEncontros } from "@/lib/ciclo";
 import { ArrowSquareOut, File, FileText, FolderOpen, LinkSimple, BookOpen, PuzzlePiece } from "@phosphor-icons/react/dist/ssr";
 import { Badge } from "@/components/ui/badge";
 import { NovoMaterialDialog } from "@/components/novo-material-dialog";
@@ -146,8 +146,11 @@ function agrupar(materiais: Material[]): [string, Material[]][] {
 
 function MaterialRow({ m, ehCoord, maxEncontro }: { m: Material; ehCoord: boolean; maxEncontro: number }) {
   const Icone = TIPO_ICONE[m.tipo];
-  // arquivo oficial ganha da url externa; sem os dois, o material ainda não chegou
-  const href = m.path ? `/api/material/${m.id}` : m.url;
+  // arquivo oficial ganha da url externa; sem os dois, o material ainda não
+  // chegou. linkSeguro: o CHECK do banco exige http(s), este guard cobre
+  // escrita fora do app — url insegura cai no estado "sem destino"
+  const urlOk = linkSeguro(m.url);
+  const href = m.path ? `/api/material/${m.id}` : urlOk;
   const inner = (
     <>
       <Icone size={18} className="shrink-0 text-muted-foreground" aria-hidden />
@@ -158,7 +161,7 @@ function MaterialRow({ m, ehCoord, maxEncontro }: { m: Material; ehCoord: boolea
             palavra já cobre o destino, sem "link externo" repetido */}
         <span className="sr-only">
           {TIPO_LABEL[m.tipo]}
-          {m.path ? " — arquivo" : m.url && m.tipo !== "link" ? " — link externo" : ""}
+          {m.path ? " — arquivo" : urlOk && m.tipo !== "link" ? " — link externo" : ""}
         </span>
       </div>
       {/* a 390px o shrink-0 (badge de audiência ~150px + ícone) deixava
@@ -171,7 +174,7 @@ function MaterialRow({ m, ehCoord, maxEncontro }: { m: Material; ehCoord: boolea
         {m.path ? (
           // path aceita imagem além de PDF — ícone genérico de arquivo
           <File size={15} className="text-muted-foreground" aria-hidden />
-        ) : m.url ? (
+        ) : urlOk ? (
           <ArrowSquareOut size={15} className="text-muted-foreground" aria-hidden />
         ) : (
           // sem destino: estado legítimo "a caminho" — badge estático, a row

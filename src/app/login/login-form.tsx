@@ -52,6 +52,10 @@ export function LoginForm() {
   // que faz a sessão chegar na aba que pediu mesmo se o link abrir em outro
   // navegador/app de e-mail — cookies não atravessam, a RPC atravessa.
   const handoffRef = useRef<string | null>(null);
+  // e-mail do pedido que gerou o nonce — os tokens resgatados são bearer:
+  // a sessão só entra se o e-mail bater (fixação via depósito de tokens
+  // alheios morre na checagem do poll)
+  const emailPedidoRef = useRef<string | null>(null);
   // o painel "enviado" monta só depois do exit do form (mode="wait") — um
   // useEffect([enviado]) dispararia com o ref ainda null e perderia o foco;
   // ref callback foca quando o nó existe de verdade
@@ -99,10 +103,11 @@ export function LoginForm() {
   );
 
   // sessão ativa ao abrir a página: quem já está logado não fica preso no
-  // /login. O magic link implícito cai AQUI com #access_token — com o nonce
-  // (?h=) esta aba só devolve os tokens pra aba que pediu (o link "autentica
-  // a outra sessão" mesmo em outro navegador) e mostra a confirmação; sem
-  // nonce (links antigos) entra de verdade nesta aba
+  // /login. O magic link implícito cai AQUI com #access_token quando o link
+  // é antigo — esta aba NUNCA cria sessão com ele: sem o nonce (?h=) o link
+  // não prova que veio do pedido feito aqui (um redirect_to adulterado
+  // plantaria a conta de outra pessoa neste navegador). Com nonce ela só
+  // devolve os tokens pra aba que pediu e mostra a confirmação
   useEffect(() => {
     let entrou = false;
     const ir = (session: Session | null) => {
@@ -115,30 +120,21 @@ export function LoginForm() {
     const refresh_token = frag.get("refresh_token");
     // location.search, não useSearchParams — ver /auth/link
     const handoff = new URLSearchParams(location.search).get("h");
-    const entrarAqui = () =>
-      supabase.auth
-        .setSession({ access_token: access_token!, refresh_token: refresh_token! })
-        .then(async ({ error }) => {
-          if (error) {
-            router.replace(urlErroLink());
-            return;
-          }
-          const { data } = await supabase.auth.getSession();
-          ir(data.session);
-        });
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === "SIGNED_IN") ir(session);
     });
     if (access_token && refresh_token) {
-      // tokens fora da barra/histórico antes de qualquer await
-      history.replaceState(null, "", location.pathname + location.search);
-      if (handoff) {
+      // tokens E nonce fora da barra/histórico antes de qualquer await
+      history.replaceState(null, "", location.pathname);
+      entrou = true;
+      if (!handoff) {
+        router.replace(urlErroLink());
+      } else {
         // aba do e-mail: não grava nada (o refresh_token é de uso único e
-        // pertence à aba original) — publica e confirma. Se a RPC falhar,
-        // entra aqui mesmo: melhor sessão nesta aba do que nenhuma
-        entrou = true;
+        // pertence à aba original) — publica e confirma. Se a RPC falhar o
+        // nonce morre marcado: nunca entra aqui
         void supabase
           .rpc("registrar_login_handoff", {
             p_nonce: handoff,
@@ -147,15 +143,16 @@ export function LoginForm() {
           })
           .then(({ error }) => {
             if (error) {
-              void entrarAqui();
+              void supabase
+                .rpc("falhar_login_handoff", { p_nonce: handoff })
+                .then(() => {}, () => {});
+              router.replace(urlErroLink());
               return;
             }
             router.replace(
               `/auth/confirmado?next=${encodeURIComponent(destinoFinal())}`
             );
           });
-      } else {
-        void entrarAqui();
       }
     } else {
       void supabase.auth.getSession().then(({ data }) => ir(data.session));
@@ -176,6 +173,9 @@ export function LoginForm() {
   useEffect(() => {
     if (!enviado) return;
     let entrou = false;
+    // o SIGNED_IN do próprio setSession do handoff não pode entrar antes da
+    // checagem de e-mail — o evento dispara durante o await e correria o ir
+    let conferindo = false;
     const ir = (session: Session | null) => {
       if (entrou || !session) return;
       entrou = true;
@@ -209,19 +209,38 @@ export function LoginForm() {
         return;
       }
       if (!tokens?.access_token || !tokens.refresh_token) return;
-      const { error } = await supabase.auth.setSession({
+      conferindo = true;
+      const { data: s, error } = await supabase.auth.setSession({
         access_token: tokens.access_token,
         refresh_token: tokens.refresh_token,
       });
-      if (!error) {
-        const { data: s } = await supabase.auth.getSession();
-        ir(s.session);
+      // tokens rejeitados = nonce envenenado/morto — parar o poll e avisar;
+      // esperar num nonce consumido não resolve nada
+      if (error || !s.session) {
+        entrou = true;
+        setEnviado(false);
+        router.replace(urlErroLink());
+        return;
       }
+      // o nonce é bearer: quem conhece o h pode depositar tokens de OUTRA
+      // conta (fixação). A sessão só vale se o e-mail bater com o que pediu
+      // o link — mismatch derruba a sessão plantada na hora
+      const { data: u } = await supabase.auth.getUser();
+      const emailSessao = (u.user?.email ?? s.session.user.email)?.toLowerCase();
+      if (emailSessao !== emailPedidoRef.current) {
+        entrou = true;
+        await supabase.auth.signOut();
+        setEnviado(false);
+        setErro("Este link não corresponde a este e-mail — peça um novo.");
+        return;
+      }
+      entrou = true;
+      entrar(s.session);
     };
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === "SIGNED_IN") ir(session);
+      if (event === "SIGNED_IN" && !conferindo) ir(session);
     });
     const intervalo = setInterval(checar, 2500);
     const aoVoltar = () => {
@@ -257,7 +276,6 @@ export function LoginForm() {
           emailRedirectTo: `${location.origin}/auth/link?next=${encodeURIComponent(destino)}&h=${handoff}`,
         },
       });
-      handoffRef.current = handoff;
       if (error) {
         // 429 = um link acabou de sair — honesto mostrar o painel com o
         // cooldown real ("after N seconds") em vez de um erro
@@ -269,6 +287,11 @@ export function LoginForm() {
           setErro(mensagemErro(error, "link"));
         }
       } else {
+        // o nonce só vale pro link que saiu de verdade — num 429 nenhum
+        // e-mail novo carrega este h, e sobrescrever o ref orfanaria o
+        // nonce do link anterior que ainda pode ser clicado
+        handoffRef.current = handoff;
+        emailPedidoRef.current = email.trim().toLowerCase();
         setEnviado(true);
         setCooldown(COOLDOWN);
       }

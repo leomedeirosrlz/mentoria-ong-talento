@@ -20,7 +20,7 @@ import type {
 // linhas de mentorado só existem pra coord (mentorado não tem login).
 
 const COLS =
-  "id, template_id, profile_id, mentorado_id, status, dados_snapshot, token, token_expira_em, assinatura_texto, assinado_em, ip, user_agent, hash_documento, created_by, created_at, template:documento_templates(slug, titulo, versao)";
+  "id, template_id, profile_id, mentorado_id, status, dados_snapshot, token, token_expira_em, assinatura_texto, assinado_em, ip, user_agent, hash_documento, created_by, created_at, template:documento_templates(slug, titulo, versao, signatario)";
 
 // o embed to-one volta como array no client não-tipado — mesma norm() de queries.ts
 const norm = <T,>(v: T | T[] | null): T | null =>

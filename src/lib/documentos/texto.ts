@@ -7,7 +7,7 @@
 // ato da assinatura. Se o jurídico alterar o termo, muda aqui e sobe a
 // `versao` do template em documento_templates.
 
-import type { Assinatura, DadosAutorizacao, DadosCivis, Endereco } from "../types";
+import type { AssinaturaVia, DadosAutorizacao, DadosCivis, Endereco } from "../types";
 import { normaliza } from "../utils";
 
 const MESES = [
@@ -239,13 +239,15 @@ export const TEMPLATES_MENTORADO = [
   { slug: "autorizacao-responsavel", rotulo: "Autorização do responsável" },
 ] as const;
 
-export function dadosCivisDe(a: Assinatura): DadosCivis | null {
+// Os helpers tomam AssinaturaVia (o recorte público de 0053): a row
+// completa (Assinatura) segue atribuível — campos a mais não atrapalham.
+export function dadosCivisDe(a: AssinaturaVia): DadosCivis | null {
   const s = a.dados_snapshot;
   if (!s || typeof s !== "object" || !("nome_civil" in s)) return null;
   return s as DadosCivis;
 }
 
-export function dadosAutorizacaoDe(a: Assinatura): DadosAutorizacao | null {
+export function dadosAutorizacaoDe(a: AssinaturaVia): DadosAutorizacao | null {
   const s = a.dados_snapshot;
   if (!s || typeof s !== "object" || !("responsavel" in s)) return null;
   return s as DadosAutorizacao;
@@ -254,7 +256,7 @@ export function dadosAutorizacaoDe(a: Assinatura): DadosAutorizacao | null {
 /** Nome do arquivo da via assinada: `termo-adesao-marina.pdf` /
  *  `autorizacao-cleusa.pdf` — primeiro nome do signatário em ASCII (header
  *  HTTP não gosta de acento). Única fonte pras duas rotas de download. */
-export function nomeArquivoVia(a: Assinatura): string {
+export function nomeArquivoVia(a: AssinaturaVia): string {
   const base =
     a.template?.slug === "autorizacao-responsavel" ? "autorizacao" : "termo-adesao";
   const nome =

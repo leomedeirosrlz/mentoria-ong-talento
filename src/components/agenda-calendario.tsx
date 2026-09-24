@@ -2483,8 +2483,11 @@ const MATERIAL_TIPO_LABEL = {
  *  carrega badge de audiência e ações de coordenação que não pertencem aqui. */
 function MaterialDoEncontro({ m }: { m: Material }) {
   const Icone = MATERIAL_ICONE[m.tipo];
-  // arquivo oficial ganha da url externa; sem os dois, o material ainda não chegou
-  const href = m.path ? `/api/material/${m.id}` : m.url;
+  // arquivo oficial ganha da url externa; sem os dois, o material ainda não
+  // chegou. linkSeguro: o CHECK do banco exige http(s), este guard cobre
+  // escrita fora do app — url insegura cai no estado "sem destino"
+  const urlOk = linkSeguro(m.url);
+  const href = m.path ? `/api/material/${m.id}` : urlOk;
   const inner = (
     <>
       <Icone size={16} className="shrink-0 text-muted-foreground" aria-hidden />
@@ -2497,14 +2500,14 @@ function MaterialDoEncontro({ m }: { m: Material }) {
         )}
         <span className="sr-only">
           {MATERIAL_TIPO_LABEL[m.tipo]}
-          {m.path ? " — arquivo" : m.url && m.tipo !== "link" ? " — link externo" : ""}
+          {m.path ? " — arquivo" : urlOk && m.tipo !== "link" ? " — link externo" : ""}
           {href ? " (abre em nova aba)" : ""}
         </span>
       </span>
       {m.path ? (
         // path aceita imagem além de PDF — ícone genérico de arquivo
         <File size={14} className="shrink-0 text-muted-foreground" aria-hidden />
-      ) : m.url ? (
+      ) : urlOk ? (
         <ArrowSquareOut size={14} className="shrink-0 text-muted-foreground" aria-hidden />
       ) : (
         // sem destino: "a caminho" é estado legítimo — a row não vira link

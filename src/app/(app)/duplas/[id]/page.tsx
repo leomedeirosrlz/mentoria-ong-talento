@@ -682,7 +682,7 @@ function EncontroRow({
   const material = materiais.find((m) => m.path || m.url) ?? materiais[0] ?? null;
   const materialHref = material?.path
     ? `/api/material/${material.id}`
-    : material?.url;
+    : linkSeguro(material?.url);
   // a chamada é a ação nº1 na janela do encontro (15 min antes a 2h depois do
   // início) — vira CTA primário; fora da janela fica chip de apoio comum
   const msAteInicio = encontro?.data_hora

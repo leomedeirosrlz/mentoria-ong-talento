@@ -16,6 +16,9 @@ export async function updateSession(request: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
+      // o default do ssr não marca Secure — produção é https de ponta a ponta
+      // (localhost é exceção do spec e aceita Secure em http)
+      cookieOptions: { secure: true, sameSite: "lax" },
       cookies: {
         getAll() {
           return request.cookies.getAll();
