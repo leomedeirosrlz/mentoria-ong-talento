@@ -5,6 +5,7 @@ import {
   respostaFormatada,
   validaCampos,
   type FormularioCampo,
+  type RespostaComAutor,
 } from "@/lib/forms/schema";
 
 const campo = (over: Partial<FormularioCampo> = {}): FormularioCampo => ({
@@ -133,17 +134,40 @@ describe("agregaRespostas", () => {
     campo({ id: "sn", tipo: "sim_nao" }),
     campo({ id: "sel", tipo: "select", opcoes: ["a", "b"] }),
     campo({ id: "multi", tipo: "multi_select", opcoes: ["x", "y"] }),
+    campo({ id: "check", tipo: "checkbox" }),
     campo({ id: "txt", tipo: "texto" }),
+    campo({ id: "longo", tipo: "texto_longo" }),
+    campo({ id: "nasc", tipo: "data" }),
   ];
-  const respostas = [
-    { nota: 5, sn: "sim", sel: "a", multi: ["x", "y"], txt: "oi" },
-    { nota: 3, sn: "nao", sel: "b", multi: ["x"], txt: "tchau" },
-    { nota: 4, sn: "sim", sel: "opção removida", multi: [], txt: "..." },
+  const respostas: RespostaComAutor[] = [
+    {
+      autor: "Ana",
+      respostas: {
+        nota: 5, sn: "sim", sel: "a", multi: ["x", "y"], check: true,
+        txt: "oi", longo: "texto da Ana", nasc: "2009-04-17",
+      },
+    },
+    {
+      autor: "Beto",
+      respostas: {
+        nota: 3, sn: "nao", sel: "b", multi: ["x"], check: false,
+        txt: "tchau", longo: "   ", nasc: "2010-01-02",
+      },
+    },
+    {
+      autor: "Caio",
+      respostas: {
+        nota: 4, sn: "sim", sel: "opção removida", multi: [], check: true,
+        txt: "...",
+      },
+    },
   ];
 
-  it("agrega por tipo e pula campos de leitura individual", () => {
+  it("agrega todos os tipos — fechados viram contagem, abertos viram lista", () => {
     const ag = agregaRespostas(campos, respostas);
-    expect(ag.map((a) => a.campo.id)).toEqual(["nota", "sn", "sel", "multi"]);
+    expect(ag.map((a) => a.campo.id)).toEqual([
+      "nota", "sn", "sel", "multi", "check", "txt", "longo", "nasc",
+    ]);
 
     const nota = ag[0];
     expect(nota.media).toBe(4); // (5+3+4)/3
@@ -172,5 +196,39 @@ describe("agregaRespostas", () => {
       { rotulo: "y", n: 1 },
     ]);
     expect(ag[3].respondidas).toBe(3); // [] conta como respondida
+  });
+
+  it("checkbox vira Sim × Não marcado", () => {
+    const ag = agregaRespostas(campos, respostas);
+    const check = ag.find((a) => a.campo.id === "check")!;
+    expect(check.contagens).toEqual([
+      { rotulo: "Sim", n: 2 },
+      { rotulo: "Não marcado", n: 1 },
+    ]);
+    expect(check.respondidas).toBe(3);
+  });
+
+  it("texto/data viram lista com autoria — branco e ausente não entram", () => {
+    const ag = agregaRespostas(campos, respostas);
+    const txt = ag.find((a) => a.campo.id === "txt")!;
+    expect(txt.itens).toEqual([
+      { autor: "Ana", valor: "oi" },
+      { autor: "Beto", valor: "tchau" },
+      { autor: "Caio", valor: "..." },
+    ]);
+    expect(txt.contagens).toEqual([]);
+
+    // resposta em branco (opcional) não entra na lista nem na contagem
+    const longo = ag.find((a) => a.campo.id === "longo")!;
+    expect(longo.itens).toEqual([{ autor: "Ana", valor: "texto da Ana" }]);
+    expect(longo.respondidas).toBe(1);
+
+    // data sai formatada dd/mm/aaaa
+    const nasc = ag.find((a) => a.campo.id === "nasc")!;
+    expect(nasc.itens).toEqual([
+      { autor: "Ana", valor: "17/04/2009" },
+      { autor: "Beto", valor: "02/01/2010" },
+    ]);
+    expect(nasc.respondidas).toBe(2);
   });
 });

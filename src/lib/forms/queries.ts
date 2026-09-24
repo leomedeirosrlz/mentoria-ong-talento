@@ -30,6 +30,8 @@ export type FormularioListaItem = Formulario & {
   respondidos: number;
   /** links vivos ainda não respondidos — o número acionável ("quem falta?") */
   pendentes: number;
+  /** max(usado_em) — a meta da lista mostra "última resposta em" quando há */
+  ultimaResposta: string | null;
 };
 
 /** Link com o destinatário resolvido pra UI (nome, WhatsApp, dupla) e a
@@ -84,12 +86,25 @@ export const getFormularios = cache(async (): Promise<FormularioListaItem[]> => 
   if (error) throw error;
   if (e2) throw e2;
   const agora = Date.now();
-  const cont = new Map<string, { total: number; resp: number; pend: number }>();
+  const cont = new Map<
+    string,
+    { total: number; resp: number; pend: number; ultima: string | null }
+  >();
   for (const l of links ?? []) {
-    const c = cont.get(l.formulario_id) ?? { total: 0, resp: 0, pend: 0 };
+    const c = cont.get(l.formulario_id) ?? {
+      total: 0,
+      resp: 0,
+      pend: 0,
+      ultima: null,
+    };
     c.total++;
-    if (l.usado_em) c.resp++;
-    else if (!l.expira_em || new Date(l.expira_em).getTime() > agora) c.pend++;
+    if (l.usado_em) {
+      c.resp++;
+      // ISO 8601 compara lexicograficamente — max(usado_em) sem Date
+      if (!c.ultima || l.usado_em > c.ultima) c.ultima = l.usado_em;
+    } else if (!l.expira_em || new Date(l.expira_em).getTime() > agora) {
+      c.pend++;
+    }
     cont.set(l.formulario_id, c);
   }
   return ((forms ?? []) as Formulario[]).map((f) => ({
@@ -98,6 +113,7 @@ export const getFormularios = cache(async (): Promise<FormularioListaItem[]> => 
     linksTotal: cont.get(f.id)?.total ?? 0,
     respondidos: cont.get(f.id)?.resp ?? 0,
     pendentes: cont.get(f.id)?.pend ?? 0,
+    ultimaResposta: cont.get(f.id)?.ultima ?? null,
   }));
 });
 
@@ -306,6 +322,11 @@ function demoLista(role: AppRole): FormularioListaItem[] {
           !l.usado_em &&
           (!l.expira_em || new Date(l.expira_em).getTime() > agora)
       ).length,
+      ultimaResposta: doForm.reduce<string | null>(
+        (max, l) =>
+          l.usado_em && (!max || l.usado_em > max) ? l.usado_em : max,
+        null
+      ),
     };
   });
 }

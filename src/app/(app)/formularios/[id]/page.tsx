@@ -9,7 +9,7 @@ import {
   SISTEMA_LABEL,
   type LinkStatus,
 } from "@/lib/forms/schema";
-import { formatDate, papelLabel } from "@/lib/ciclo";
+import { formatDate } from "@/lib/ciclo";
 import { Badge } from "@/components/ui/badge";
 import { VoltarLink } from "@/components/voltar-link";
 import { FormularioAcoes, FormularioExcluir } from "../formulario-acoes";
@@ -18,10 +18,25 @@ import { FormularioLinks, type DestinoOpcao } from "../formulario-links";
 import { FormularioPreview } from "../formulario-preview";
 import { RespostasSection } from "../respostas-section";
 
-export const metadata: Metadata = { title: "Formulário" };
-
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}): Promise<Metadata> {
+  const { id } = await params;
+  if (!UUID_RE.test(id)) return { title: "Formulário" };
+  try {
+    // cache() divide a leitura com a página — sem query dupla; RLS coord-only
+    // faz não-coord cair no título genérico em vez de vazar o nome do form
+    const detalhe = await getFormulario(id);
+    return { title: detalhe?.formulario.titulo ?? "Formulário" };
+  } catch {
+    return { title: "Formulário" };
+  }
+}
 
 export default async function FormularioPage({
   params,
@@ -43,7 +58,9 @@ export default async function FormularioPage({
   const { formulario: f, links } = detalhe;
 
   // elegíveis = todo mundo ativo menos a própria coordenação (ela opera o
-  // form, nunca responde). O papel alimenta o agrupamento do dialog.
+  // form, nunca responde). O papel alimenta o agrupamento do dialog — por
+  // isso não se repete no detalhe da linha: profile mostra nada além do
+  // título do grupo; mentorado traz a ONG, que o grupo não diz.
   const destinatarios: DestinoOpcao[] = [
     ...pessoas
       .filter((p) => p.ativo && p.role !== "coordenacao")
@@ -53,7 +70,7 @@ export default async function FormularioPage({
         nome: p.nome,
         whatsapp: p.whatsapp,
         papel: p.role,
-        detalhe: papelLabel(p.role),
+        detalhe: null,
       })),
     ...mentorados.map((m) => ({
       tipo: "mentorado" as const,
@@ -61,7 +78,7 @@ export default async function FormularioPage({
       nome: m.nome,
       whatsapp: m.whatsapp,
       papel: "mentorado" as const,
-      detalhe: m.ong_origem ? `Mentorado · ${m.ong_origem}` : "Mentorado",
+      detalhe: m.ong_origem ?? null,
     })),
   ];
 
@@ -126,27 +143,60 @@ export default async function FormularioPage({
         </div>
       </header>
 
-      {/* faixa de status dos links — o número acionável ("quem falta?")
-          em warn logo sob o header */}
-      {links.length > 0 && (
-        <p className="text-sm text-muted-foreground">
-          <span
-            className={
-              status.pendente > 0
-                ? "font-medium text-[var(--warn-text)]"
-                : undefined
-            }
+      {/* faixa de status dos links — completude primeiro ("2 de 5
+          responderam"), depois o que falta; o pendente fica em warn só
+          enquanto o form coleta (encerrado o torna inacionável). Abaixo,
+          âncoras pras três seções — a página é longa e a coord entra aqui
+          pra resolver uma coisa só */}
+      <div className="space-y-1.5">
+        {links.length > 0 && (
+          <p className="text-sm text-muted-foreground">
+            <span className="font-medium text-foreground">
+              {status.respondido} de {links.length}{" "}
+              {status.respondido === 1 ? "respondeu" : "responderam"}
+            </span>
+            {" · "}
+            <span
+              className={
+                status.pendente > 0 && f.ativo
+                  ? "font-medium text-[var(--warn-text)]"
+                  : undefined
+              }
+            >
+              {status.pendente}{" "}
+              {status.pendente === 1 ? "pendente" : "pendentes"}
+            </span>
+            {" · "}
+            {status.expirado}{" "}
+            {status.expirado === 1 ? "expirado" : "expirados"}
+          </p>
+        )}
+        <nav
+          aria-label="Seções do formulário"
+          className="text-sm text-muted-foreground"
+        >
+          <a
+            href="#sec-perguntas"
+            className="underline underline-offset-2 transition-colors hover:text-foreground"
           >
-            {status.pendente}{" "}
-            {status.pendente === 1 ? "pendente" : "pendentes"}
-          </span>
+            Perguntas
+          </a>
           {" · "}
-          {status.respondido}{" "}
-          {status.respondido === 1 ? "respondido" : "respondidos"}
+          <a
+            href="#sec-links"
+            className="underline underline-offset-2 transition-colors hover:text-foreground"
+          >
+            Links ({links.length})
+          </a>
           {" · "}
-          {status.expirado} {status.expirado === 1 ? "expirado" : "expirados"}
-        </p>
-      )}
+          <a
+            href="#sec-respostas"
+            className="underline underline-offset-2 transition-colors hover:text-foreground"
+          >
+            Respostas ({respondidos})
+          </a>
+        </nav>
+      </div>
 
       <section aria-labelledby="sec-perguntas">
         <h2
@@ -194,7 +244,7 @@ export default async function FormularioPage({
         {!f.sistema && (
           <details className="group">
             <summary className="flex min-h-11 cursor-pointer list-none items-center gap-1.5 rounded-lg py-3 text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
-              Editar perguntas
+              Editar formulário
               <CaretDown
                 size={14}
                 aria-hidden
@@ -222,8 +272,8 @@ export default async function FormularioPage({
           Links de resposta
         </h2>
         <p className="mb-3 text-sm text-muted-foreground">
-          Cada link é único e de uso único — a pessoa responde sem login pelo
-          endereço /f/&lt;token&gt;.
+          Cada link é único e de uso único — a pessoa responde sem login, num
+          endereço só dela.
         </p>
         <FormularioLinks
           formularioId={f.id}

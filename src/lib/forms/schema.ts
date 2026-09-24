@@ -216,34 +216,68 @@ export function respostaFormatada(
 
 export type AgregadoCampo = {
   campo: FormularioCampo;
+  /** quantas das respostas recebidas cobrem este campo (opcionais podem
+   *  ter menos que o total — o resumo exibe "N de M responderam") */
   respondidas: number;
   /** escala_1_5: média com 1 casa; demais: null */
   media: number | null;
-  /** sim_nao: {sim, nao} · select/multi_select: contagem por opção */
+  /** escala_1_5: notas 1–5 · sim_nao: {Sim, Não} · checkbox: {Sim, Não
+   *  marcado} · select/multi_select: contagem por opção. Vazio nos tipos
+   *  de leitura individual (itens carrega a resposta). */
   contagens: { rotulo: string; n: number }[];
+  /** texto/texto_longo/data: cada resposta formatada com a autoria — a
+   *  vista "por pergunta" dentro do resumo (o domínio precisa de quem
+   *  escreveu, ex.: pedido de apoio). Vazio nos tipos agregados. */
+  itens: { autor: string; valor: string }[];
 };
 
-/** Agrega as respostas de um form por campo — escala vira média, sim_nao e
- *  opções viram contagens; texto/data ficam fora (leitura individual). */
+/** Tipos cujo resumo é a lista de respostas individuais, não contagem. */
+export const TIPOS_LISTA_RESPOSTA: readonly FormularioCampoTipo[] = [
+  "texto",
+  "texto_longo",
+  "data",
+];
+
+/** Entrada da agregação: o mapa de respostas + quem respondeu (o resumo
+ *  por pergunta mostra a autoria ao lado de cada texto). */
+export type RespostaComAutor = {
+  autor: string;
+  respostas: Record<string, RespostaValor>;
+};
+
+/** Agrega as respostas de um form por campo — todos os tipos entram:
+ *  escala vira média + distribuição, sim_nao/checkbox/opções viram
+ *  contagens, texto/data viram lista com autor (na ordem recebida). */
 export function agregaRespostas(
   campos: FormularioCampo[],
-  respostas: Record<string, RespostaValor>[]
+  respostas: RespostaComAutor[]
 ): AgregadoCampo[] {
   const agregados: AgregadoCampo[] = [];
   for (const campo of campos) {
-    if (!["escala_1_5", "sim_nao", "select", "multi_select"].includes(campo.tipo))
-      continue;
-    const valores = respostas
-      .map((r) => r[campo.id])
-      .filter((v): v is RespostaValor => v != null);
+    const entradas = respostas
+      .filter((r) => r.respostas[campo.id] != null)
+      .map((r) => ({ autor: r.autor, valor: r.respostas[campo.id] }));
     const ag: AgregadoCampo = {
       campo,
-      respondidas: valores.length,
+      respondidas: entradas.length,
       media: null,
       contagens: [],
+      itens: [],
     };
-    if (campo.tipo === "escala_1_5") {
-      const nums = valores.filter((v): v is number => typeof v === "number");
+    if (TIPOS_LISTA_RESPOSTA.includes(campo.tipo)) {
+      // lista individual: data sai dd/mm/aaaa via respostaFormatada;
+      // resposta em branco (opcional) não entra na lista nem na contagem
+      ag.itens = entradas
+        .map((e) => ({
+          autor: e.autor,
+          valor: respostaFormatada(campo, e.valor),
+        }))
+        .filter((e) => e.valor.trim().length > 0);
+      ag.respondidas = ag.itens.length;
+    } else if (campo.tipo === "escala_1_5") {
+      const nums = entradas
+        .map((e) => e.valor)
+        .filter((v): v is number => typeof v === "number");
       if (nums.length)
         ag.media =
           Math.round((nums.reduce((a, b) => a + b, 0) / nums.length) * 10) / 10;
@@ -252,16 +286,26 @@ export function agregaRespostas(
         n: nums.filter((v) => v === n).length,
       }));
     } else if (campo.tipo === "sim_nao") {
+      const valores = entradas.map((e) => e.valor);
       ag.contagens = [
         { rotulo: "Sim", n: valores.filter((v) => v === "sim").length },
         { rotulo: "Não", n: valores.filter((v) => v === "nao").length },
+      ];
+    } else if (campo.tipo === "checkbox") {
+      const valores = entradas.map((e) => e.valor);
+      ag.contagens = [
+        { rotulo: "Sim", n: valores.filter((v) => v === true).length },
+        // qualquer valor presente que não seja `true` conta como não
+        // marcado (a RPC saneia pra boolean — `false` cai aqui)
+        { rotulo: "Não marcado", n: valores.filter((v) => v !== true).length },
       ];
     } else {
       // select / multi_select: conta cada opção declarada (+ exóticas de
       // respostas a versões antigas, agrupadas como "outros")
       const cont = new Map<string, number>();
       let outros = 0;
-      for (const v of valores) {
+      for (const e of entradas) {
+        const v = e.valor;
         const itens = Array.isArray(v) ? v : [v];
         for (const item of itens) {
           const s = String(item);

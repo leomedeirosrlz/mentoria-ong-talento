@@ -99,7 +99,7 @@ export default async function FormularioTokenPage({
       {/* flex + m-auto (não place-items-center): forms longos não clipam o
           topo em telas baixas — centraliza só quando há espaço. flex, não
           grid: em grid o w-full do filho resolve contra o padding box */}
-      <main className="flex flex-1 flex-col px-4 py-10">
+      <main className="flex flex-1 flex-col px-4 py-10 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))]">
         <div className="m-auto w-full max-w-xl">
           <header className="mb-6">
             {/* width/height naturais reservam a proporção — sem CLS */}

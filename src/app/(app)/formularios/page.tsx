@@ -97,29 +97,50 @@ export default async function FormulariosPage() {
                     className="mt-1 shrink-0 text-muted-foreground/60"
                   />
                 </div>
+                {/* meta sem contagens zeradas — zero não informa nada e
+                    "nenhum link" ganha warn porque é o próximo passo */}
                 <p className="mt-2 text-xs text-muted-foreground">
                   {f.campos.length}{" "}
                   {f.campos.length === 1 ? "pergunta" : "perguntas"}
                   {" · "}
-                  {f.linksTotal} {f.linksTotal === 1 ? "link" : "links"}
+                  {f.linksTotal === 0 ? (
+                    <span className="font-medium text-[var(--warn-text)]">
+                      nenhum link gerado ainda
+                    </span>
+                  ) : (
+                    <>
+                      {f.linksTotal} {f.linksTotal === 1 ? "link" : "links"}
+                    </>
+                  )}
+                  {/* encerrado torna o pendente inacionável — sem warn */}
+                  {f.pendentes > 0 && (
+                    <>
+                      {" · "}
+                      <span
+                        className={
+                          f.ativo
+                            ? "font-medium text-[var(--warn-text)]"
+                            : undefined
+                        }
+                      >
+                        {f.pendentes}{" "}
+                        {f.pendentes === 1 ? "pendente" : "pendentes"}
+                      </span>
+                    </>
+                  )}
+                  {f.respondidos > 0 && (
+                    <>
+                      {" · "}
+                      <span className="font-medium text-[var(--ok-text)]">
+                        {f.respondidos}{" "}
+                        {f.respondidos === 1 ? "resposta" : "respostas"}
+                      </span>
+                    </>
+                  )}
                   {" · "}
-                  <span
-                    className={
-                      f.pendentes > 0
-                        ? "font-medium text-[var(--warn-text)]"
-                        : undefined
-                    }
-                  >
-                    {f.pendentes}{" "}
-                    {f.pendentes === 1 ? "pendente" : "pendentes"}
-                  </span>
-                  {" · "}
-                  <span className={f.respondidos ? "font-medium text-[var(--ok-text)]" : undefined}>
-                    {f.respondidos}{" "}
-                    {f.respondidos === 1 ? "resposta" : "respostas"}
-                  </span>
-                  {" · criado em "}
-                  {formatDate(f.created_at)}
+                  {f.ultimaResposta
+                    ? `última resposta em ${formatDate(f.ultimaResposta)}`
+                    : `criado em ${formatDate(f.created_at)}`}
                   {f.versao > 1 && ` · v${f.versao}`}
                 </p>
               </Link>

@@ -5,12 +5,14 @@ import { useCallback, useRef, useState, useTransition } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { CaretDown, CheckCircle, CircleNotch, PaperPlaneRight } from "@phosphor-icons/react";
 import { submeterRespostaFormulario } from "@/lib/forms/actions";
-import type {
-  FormularioCampo,
-  FormularioSistema,
-  RespostaValor,
+import {
+  SISTEMA_LABEL,
+  type FormularioCampo,
+  type FormularioSistema,
+  type RespostaValor,
 } from "@/lib/forms/schema";
 import { fade, T } from "@/components/motion";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -23,6 +25,11 @@ const TIPOS_COM_ENTER: readonly FormularioCampo["tipo"][] = [
   "texto_longo",
   "data",
 ];
+
+/** Banner de validação client-side — em constante pra distinguir de erro de
+ *  servidor/rede: o banner de validação some assim que o último campo
+ *  marcado é corrigido; o de servidor só sai no próximo submit. */
+const ERRO_VALIDACAO = "Revise os campos marcados antes de enviar.";
 
 /** Formulário público /f/<token> — renderiza a definição vinda da RPC e
  *  envia payload tipado pra submeterRespostaFormulario (o banco revalida
@@ -53,9 +60,12 @@ export function FormularioPublico({
   const [pending, start] = useTransition();
   const formRef = useRef<HTMLFormElement>(null);
 
-  // foco migra pro painel de sucesso quando ele monta (o form sai do DOM)
+  // foco migra pro painel de sucesso quando ele monta (o form sai do DOM) —
+  // scrollIntoView antes: a página pode estar rolada lá embaixo no submit
   const focoSucesso = useCallback((el: HTMLDivElement | null) => {
-    el?.focus();
+    if (!el) return;
+    el.scrollIntoView({ block: "center" });
+    el.focus({ preventScroll: true });
   }, []);
 
   /** O campo tem valor no form — usado pelo progresso e pra limpar erro
@@ -119,13 +129,15 @@ export function FormularioPublico({
     setRespondidos(
       campos.reduce((n, c) => n + (respondido(c, fd) ? 1 : 0), 0)
     );
-    setErros((prev) => {
-      if (!Object.keys(prev).length) return prev;
-      const next = { ...prev };
-      for (const c of campos)
-        if (next[c.id] && respondido(c, fd)) delete next[c.id];
-      return next;
-    });
+    if (!Object.keys(erros).length) return;
+    const next = { ...erros };
+    for (const c of campos)
+      if (next[c.id] && respondido(c, fd)) delete next[c.id];
+    setErros(next);
+    // quando o último campo marcado é corrigido, o banner global de validação
+    // sai junto — erro de servidor/rede (outra string) não é afetado aqui
+    if (!Object.keys(next).length)
+      setErro((prev) => (prev === ERRO_VALIDACAO ? null : prev));
   }
 
   function onSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -136,7 +148,7 @@ export function FormularioPublico({
     const mapa = valida(respostas);
     if (Object.keys(mapa).length) {
       setErros(mapa);
-      setErro("Revise os campos marcados antes de enviar.");
+      setErro(ERRO_VALIDACAO);
       const primeiro = campos.find((c) => mapa[c.id]);
       const alvo =
         primeiro &&
@@ -182,6 +194,9 @@ export function FormularioPublico({
 
   const total = campos.length;
   const minutos = Math.max(1, Math.round((total * 15) / 60));
+  // a linha que ensina a convenção "(opcional)" só aparece se houver o que
+  // pular — num form todo obrigatório ela seria ruído
+  const temOpcional = campos.some((c) => !c.obrigatorio);
   const ultimoComEnter = [...campos]
     .reverse()
     .find((c) => TIPOS_COM_ENTER.includes(c.tipo))?.id;
@@ -212,111 +227,135 @@ export function FormularioPublico({
           key="form"
           {...fade}
           transition={T.enter}
-          className="rounded-xl bg-card shadow-[var(--shadow-border)]"
+          className="space-y-3"
         >
-          {/* progresso fino e sticky (padrão do onboarding): acompanha o
-              scroll de forms longos sem disputar atenção */}
-          <div className="sticky top-0 z-10 rounded-t-xl bg-card/90 px-5 pt-4 pb-2.5 backdrop-blur-sm sm:px-7">
-            <div className="flex items-center gap-3">
+          {/* progresso fora dos cards: pill sticky que acompanha o scroll de
+              forms longos (safe-area no top, padrão do onboarding) */}
+          <div className="sticky top-[max(0.5rem,env(safe-area-inset-top))] z-10 flex items-center gap-3 rounded-full bg-card/90 px-4 py-2.5 shadow-[var(--shadow-border)] backdrop-blur">
+            <div
+              role="progressbar"
+              aria-valuenow={respondidos}
+              aria-valuemin={0}
+              aria-valuemax={total}
+              aria-label="Progresso do formulário"
+              aria-valuetext={`${respondidos} de ${total} perguntas respondidas`}
+              className="h-1 flex-1 overflow-hidden rounded-full bg-muted"
+            >
               <div
-                role="progressbar"
-                aria-valuenow={respondidos}
-                aria-valuemin={0}
-                aria-valuemax={total}
-                aria-label="Progresso do formulário"
-                aria-valuetext={`${respondidos} de ${total} perguntas respondidas`}
-                className="h-1 flex-1 overflow-hidden rounded-full bg-muted"
-              >
-                <div
-                  className="h-full rounded-full bg-[var(--brand-lime)] transition-[width] duration-500"
-                  style={{
-                    width: `${(respondidos / Math.max(total, 1)) * 100}%`,
-                  }}
-                />
-              </div>
-              <span className="shrink-0 text-xs font-medium tabular-nums text-muted-foreground">
-                {respondidos} de {total}
-              </span>
+                className="h-full rounded-full bg-[var(--brand-lime)] transition-[width] duration-500"
+                style={{
+                  width: `${(respondidos / Math.max(total, 1)) * 100}%`,
+                }}
+              />
+            </div>
+            <span className="shrink-0 text-xs font-medium tabular-nums text-muted-foreground">
+              {respondidos} de {total}
+            </span>
+          </div>
+
+          {/* card de título — a faixa lime na borda superior ecoa o
+              themeColor (overflow-hidden pra faixa respeitar o radius) */}
+          <div className="overflow-hidden rounded-xl bg-card shadow-[var(--shadow-border)]">
+            <div aria-hidden className="h-1.5 bg-[var(--brand-lime)]" />
+            <div className="p-5 sm:p-7">
+              {primeiroNome && (
+                <p className="text-sm font-medium text-[var(--ok-text)]">
+                  Olá, {primeiroNome}!
+                </p>
+              )}
+              <h1 className="mt-1 text-xl font-semibold tracking-tight">
+                {titulo}
+              </h1>
+              <p className="mt-1 text-xs whitespace-nowrap text-muted-foreground">
+                {total} {total === 1 ? "pergunta" : "perguntas"} · leva ~
+                {minutos} min
+              </p>
+              {sistema && (
+                <Badge
+                  variant="outline"
+                  className="mt-2 border-[var(--brand-lime)]/60 bg-[var(--brand-lime)]/10"
+                >
+                  Instrumento oficial · {SISTEMA_LABEL[sistema]}
+                </Badge>
+              )}
+              {temOpcional && (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Você pode pular as perguntas marcadas (opcional).
+                </p>
+              )}
+              {descricao && (
+                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                  {descricao}
+                </p>
+              )}
+              <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+                Suas respostas são lidas apenas pela equipe do Realiza.vc —{" "}
+                <Link
+                  href="/privacidade"
+                  className="underline underline-offset-2 transition-colors hover:text-foreground"
+                >
+                  privacidade
+                </Link>
+                .
+              </p>
             </div>
           </div>
 
-          <div className="px-5 pt-3 pb-5 sm:px-7 sm:pb-7">
-            {primeiroNome && (
-              <p className="text-sm font-medium text-[var(--ok-text)]">
-                Olá, {primeiroNome}!
-              </p>
-            )}
-            <h1 className="mt-1 text-xl font-semibold tracking-tight">
-              {titulo}
-            </h1>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {total} {total === 1 ? "pergunta" : "perguntas"} · leva ~{minutos}{" "}
-              min
-              {sistema && " · Instrumento oficial do Programa de Mentoria"}
-            </p>
-            {descricao && (
-              <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-                {descricao}
-              </p>
-            )}
-            <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-              Suas respostas são lidas apenas pela equipe do Realiza.vc —{" "}
-              <Link
-                href="/privacidade"
-                className="underline underline-offset-2 transition-colors hover:text-foreground"
-              >
-                privacidade
-              </Link>
-              .
-            </p>
+          <form
+            ref={formRef}
+            onSubmit={onSubmit}
+            onChange={onFormChange}
+            noValidate
+            className="space-y-3"
+          >
+            {campos.map((c, i) => (
+              <CampoRenderer
+                key={c.id}
+                campo={c}
+                n={i + 1}
+                erro={erros[c.id]}
+                enterKeyHint={c.id === ultimoComEnter ? "send" : "next"}
+              />
+            ))}
 
-            <form
-              ref={formRef}
-              onSubmit={onSubmit}
-              onChange={onFormChange}
-              noValidate
-              className="mt-6 space-y-6"
+            {/* honeypot anti-spam: invisível pra humanos, bots preenchem —
+                o servidor finge sucesso e não grava nada. Depois dos cards
+                pro space-y não criar gap extra antes da 1ª pergunta */}
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute -left-[9999px] h-0 w-0 overflow-hidden"
             >
-              {/* honeypot anti-spam: invisível pra humanos, bots preenchem —
-                  o servidor finge sucesso e não grava nada */}
-              <div
-                aria-hidden="true"
-                className="pointer-events-none absolute -left-[9999px] h-0 w-0 overflow-hidden"
-              >
-                <label>
-                  Site
-                  <input
-                    type="text"
-                    name="website"
-                    tabIndex={-1}
-                    autoComplete="off"
-                  />
-                </label>
-              </div>
-
-              {campos.map((c, i) => (
-                <CampoRenderer
-                  key={c.id}
-                  campo={c}
-                  n={i + 1}
-                  erro={erros[c.id]}
-                  enterKeyHint={c.id === ultimoComEnter ? "send" : "next"}
+              <label>
+                Site
+                <input
+                  type="text"
+                  name="website"
+                  tabIndex={-1}
+                  autoComplete="off"
                 />
-              ))}
+              </label>
+            </div>
 
-              {/* região estável no DOM: o texto entra e sai sem remontar, pro
-                  leitor de tela anunciar sempre */}
-              <p
-                role="alert"
-                className={cn(
-                  "rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive",
-                  !erro && "sr-only"
-                )}
+            {/* região estável no DOM: o texto entra e sai sem remontar, pro
+                leitor de tela anunciar sempre */}
+            <p
+              role="alert"
+              className={cn(
+                "rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive",
+                !erro && "sr-only"
+              )}
+            >
+              {erro}
+            </p>
+
+            {/* title no wrapper: button disabled tem pointer-events-none e o
+                hint "envio desligado" nunca apareceria sobre ele */}
+            <div title={preview ? "Envio desligado na prévia" : undefined}>
+              <Button
+                type="submit"
+                className="h-11 w-full md:h-10"
+                disabled={pending || preview}
               >
-                {erro}
-              </p>
-
-              <Button type="submit" className="w-full" disabled={pending}>
                 {pending ? (
                   <CircleNotch size={16} className="animate-spin" aria-hidden />
                 ) : (
@@ -324,8 +363,8 @@ export function FormularioPublico({
                 )}
                 {pending ? "Enviando…" : "Enviar resposta"}
               </Button>
-            </form>
-          </div>
+            </div>
+          </form>
         </motion.div>
       )}
     </AnimatePresence>
@@ -354,11 +393,16 @@ function Rotulo({
   );
   // fora de fieldset: <label> com for; dentro de grupos o caller usa <legend>
   return htmlFor ? (
-    <label htmlFor={htmlFor} className="block text-sm font-medium">
+    <label
+      htmlFor={htmlFor}
+      className="block text-[15px] font-medium leading-snug sm:text-base"
+    >
       {inner}
     </label>
   ) : (
-    <span className="block text-sm font-medium">{inner}</span>
+    <span className="block text-[15px] font-medium leading-snug sm:text-base">
+      {inner}
+    </span>
   );
 }
 
@@ -386,15 +430,24 @@ function CampoRenderer({
 }) {
   const id = `f-${campo.id}`;
   const erroId = `${id}-erro`;
+  // nos grupos (radio/checkbox) vai uma vez só no <fieldset> — não em cada
+  // opção, senão o leitor de tela repete "inválido" N vezes
   const a11y = {
     "aria-invalid": erro ? true : undefined,
     "aria-describedby": erro ? erroId : undefined,
   };
+  /* um card por pergunta (paradigma GForms): data-campo no card pro
+     scrollIntoView do submit e o erro é o contorno do card inteiro — sem
+     rings/borders internos divergentes */
+  const cartao = cn(
+    "rounded-xl bg-card p-4 shadow-[var(--shadow-border)] sm:p-5",
+    erro && "ring-2 ring-destructive/60"
+  );
 
   switch (campo.tipo) {
     case "texto":
       return (
-        <div className="space-y-1.5" data-campo={campo.id}>
+        <div className={cn(cartao, "space-y-1.5")} data-campo={campo.id}>
           <Rotulo campo={campo} n={n} htmlFor={id} />
           <Input
             id={id}
@@ -410,7 +463,7 @@ function CampoRenderer({
 
     case "texto_longo":
       return (
-        <div className="space-y-1.5" data-campo={campo.id}>
+        <div className={cn(cartao, "space-y-1.5")} data-campo={campo.id}>
           <Rotulo campo={campo} n={n} htmlFor={id} />
           <Textarea
             id={id}
@@ -427,7 +480,7 @@ function CampoRenderer({
 
     case "data":
       return (
-        <div className="space-y-1.5" data-campo={campo.id}>
+        <div className={cn(cartao, "space-y-1.5")} data-campo={campo.id}>
           <Rotulo campo={campo} n={n} htmlFor={id} />
           <Input
             id={id}
@@ -446,7 +499,7 @@ function CampoRenderer({
       // select nativo: picker do SO no celular (o público aqui é mentorado no
       // WhatsApp) e required/FormData de graça
       return (
-        <div className="space-y-1.5" data-campo={campo.id}>
+        <div className={cn(cartao, "space-y-1.5")} data-campo={campo.id}>
           <Rotulo campo={campo} n={n} htmlFor={id} />
           <div className="relative">
             <select
@@ -478,16 +531,11 @@ function CampoRenderer({
 
     case "sim_nao":
       return (
-        <fieldset data-campo={campo.id}>
-          <legend className="block text-sm font-medium">
+        <fieldset className={cartao} data-campo={campo.id} {...a11y}>
+          <legend>
             <Rotulo campo={campo} n={n} />
           </legend>
-          <div
-            className={cn(
-              "mt-1.5 grid grid-cols-2 gap-1 rounded-xl bg-muted p-1",
-              erro && "ring-2 ring-destructive/40"
-            )}
-          >
+          <div className="mt-1.5 grid grid-cols-2 gap-1 rounded-xl bg-muted p-1">
             {(
               [
                 { v: "sim", l: "Sim" },
@@ -496,7 +544,7 @@ function CampoRenderer({
             ).map((o) => (
               <label
                 key={o.v}
-                className="flex h-11 cursor-pointer items-center justify-center rounded-lg text-sm font-medium text-muted-foreground transition-colors select-none has-checked:bg-card has-checked:text-foreground has-checked:shadow-[var(--shadow-border)] has-checked:ring-2 has-checked:ring-ring has-focus-visible:ring-3 has-focus-visible:ring-ring/50 md:h-10"
+                className="flex h-11 cursor-pointer items-center justify-center rounded-lg text-sm font-medium text-muted-foreground transition-colors select-none has-checked:bg-primary has-checked:text-primary-foreground has-focus-visible:ring-3 has-focus-visible:ring-ring/50 md:h-10"
               >
                 <input
                   type="radio"
@@ -504,7 +552,6 @@ function CampoRenderer({
                   value={o.v}
                   required={campo.obrigatorio}
                   className="sr-only"
-                  {...a11y}
                 />
                 {o.l}
               </label>
@@ -516,20 +563,15 @@ function CampoRenderer({
 
     case "escala_1_5":
       return (
-        <fieldset data-campo={campo.id}>
-          <legend className="block text-sm font-medium">
+        <fieldset className={cartao} data-campo={campo.id} {...a11y}>
+          <legend>
             <Rotulo campo={campo} n={n} />
           </legend>
-          <div
-            className={cn(
-              "mt-1.5 grid grid-cols-5 gap-1 rounded-xl bg-muted p-1",
-              erro && "ring-2 ring-destructive/40"
-            )}
-          >
+          <div className="mt-1.5 grid grid-cols-5 gap-1 rounded-xl bg-muted p-1">
             {[1, 2, 3, 4, 5].map((num) => (
               <label
                 key={num}
-                className="flex h-11 cursor-pointer items-center justify-center rounded-lg text-sm font-semibold tabular-nums text-muted-foreground transition-colors select-none has-checked:bg-card has-checked:text-foreground has-checked:shadow-[var(--shadow-border)] has-checked:ring-2 has-checked:ring-ring has-focus-visible:ring-3 has-focus-visible:ring-ring/50 md:h-10"
+                className="flex h-11 cursor-pointer items-center justify-center rounded-lg text-sm font-semibold tabular-nums text-muted-foreground transition-colors select-none has-checked:bg-primary has-checked:text-primary-foreground has-focus-visible:ring-3 has-focus-visible:ring-ring/50 md:h-10"
               >
                 <input
                   type="radio"
@@ -538,24 +580,21 @@ function CampoRenderer({
                   required={campo.obrigatorio}
                   className="sr-only"
                   aria-label={`Nota ${num}`}
-                  {...a11y}
                 />
                 <span aria-hidden>{num}</span>
               </label>
             ))}
           </div>
-          <div className="mt-1 flex justify-between text-xs text-muted-foreground">
-            <span>Muito ruim</span>
-            <span>Muito bom</span>
-          </div>
+          {/* sem pontas "Muito ruim"/"Muito bom": semanticamente erradas pra
+              metade das perguntas — os números 1–5 já comunicam */}
           <ErroCampo id={erroId} msg={erro} />
         </fieldset>
       );
 
     case "multi_select":
       return (
-        <fieldset data-campo={campo.id}>
-          <legend className="block text-sm font-medium">
+        <fieldset className={cartao} data-campo={campo.id} {...a11y}>
+          <legend>
             <Rotulo campo={campo} n={n} />
             <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
               {campo.obrigatorio
@@ -563,21 +602,15 @@ function CampoRenderer({
                 : "Marque quantas fizerem sentido"}
             </span>
           </legend>
-          <ul
-            className={cn(
-              "mt-1.5 space-y-1",
-              erro && "rounded-xl p-2 ring-2 ring-destructive/40"
-            )}
-          >
+          <ul className="mt-1.5 space-y-1">
             {(campo.opcoes ?? []).map((o) => (
               <li key={o}>
-                <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-lg px-2 text-sm transition-colors select-none hover:bg-muted has-focus-visible:ring-3 has-focus-visible:ring-ring/50">
+                <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-lg px-2 text-sm transition-colors select-none hover:bg-muted active:bg-muted has-focus-visible:ring-3 has-focus-visible:ring-ring/50">
                   <input
                     type="checkbox"
                     name={campo.id}
                     value={o}
-                    className="size-4 shrink-0 accent-primary"
-                    {...a11y}
+                    className="size-5 shrink-0 rounded accent-primary"
                   />
                   {o}
                 </label>
@@ -590,13 +623,12 @@ function CampoRenderer({
 
     case "checkbox":
       return (
-        <div data-campo={campo.id}>
-          <label
-            className={cn(
-              "flex cursor-pointer items-start gap-3 rounded-xl border border-input bg-muted/40 p-4 text-sm leading-relaxed transition-colors has-checked:border-primary/60 has-checked:bg-primary/5 has-focus-visible:ring-3 has-focus-visible:ring-ring/50",
-              erro && "border-destructive/60"
-            )}
-          >
+        <div className={cartao} data-campo={campo.id}>
+          {/* o card inteiro é o label: a margem negativa estica o alvo do
+              clique sobre o padding do card — área de toque máxima no
+              mobile. O ErroCampo fica fora do label (clique nele não
+              alternaria a caixa) */}
+          <label className="-m-4 flex cursor-pointer items-start gap-3 rounded-xl p-4 text-[15px] leading-relaxed transition-colors select-none has-checked:bg-primary/5 has-focus-visible:ring-3 has-focus-visible:ring-ring/50 sm:-m-5 sm:p-5 sm:text-base">
             <input
               type="checkbox"
               name={campo.id}

@@ -3,6 +3,13 @@ import { createClient } from "@/lib/supabase/server";
 import { demoRole } from "@/lib/demo/mode";
 import { getDemoData } from "@/lib/demo/data";
 import { demoPessoalMap } from "@/lib/demo/queries";
+import { getDemoFormularios } from "@/lib/demo/forms-data";
+import {
+  respostaFormatada,
+  type FormularioCampo,
+  type RespostaValor,
+} from "@/lib/forms/schema";
+import { normaliza } from "@/lib/utils";
 import {
   AVALIACAO_LABEL,
   GENERO_LABELS,
@@ -65,6 +72,12 @@ export async function GET(request: NextRequest) {
         nomeCsvPessoas()
       );
     }
+    if (tipo === "respostas") {
+      return exportRespostasDemo(
+        request.nextUrl.searchParams.get("id"),
+        d
+      );
+    }
     return csvResponse(csvCiclo(d.duplas), nomeCsvCiclo());
   }
 
@@ -99,6 +112,10 @@ export async function GET(request: NextRequest) {
 
   if (tipo === "pessoas") {
     return exportPessoas(supabase);
+  }
+
+  if (tipo === "respostas") {
+    return exportRespostas(supabase, request.nextUrl.searchParams.get("id"));
   }
 
   const { data, error } = await supabase
@@ -216,6 +233,146 @@ async function exportAssinaturas(
     csvAssinaturas(rows ?? [], nomes, papeis),
     nomeCsvAssinaturas()
   );
+}
+
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// embed to-one pode vir array no client não-tipado — mesma norm() de
+// forms/queries.ts
+const norm = <T,>(v: T | T[] | null): T | null =>
+  Array.isArray(v) ? (v[0] ?? null) : v;
+
+/** Linha pronta pro CSV de respostas — destino/papel/dupla já resolvidos
+ *  (real e demo convergem pra este shape antes de csvRespostas). */
+type LinhaRespostaCsv = {
+  destinatario: string;
+  tipo: string;
+  dupla: string;
+  /** ISO — sai dd/mm/aaaa hh:mm via dataHora() na montagem */
+  respondido_em: string;
+  respostas: Record<string, RespostaValor>;
+};
+
+const respJson = (status: number, error: string) =>
+  NextResponse.json({ error }, { status });
+
+// tipo=respostas — backup das respostas de um formulário: uma linha por
+// link respondido, uma coluna por pergunta (o label vira header). O embed
+// é o mesmo da ficha (forms/queries.ts), repetido porque a leitura dela é
+// cache() de RSC — route handler fica autocontido como os outros exports.
+async function exportRespostas(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  id: string | null
+) {
+  if (!id || !UUID_RE.test(id))
+    return respJson(400, "Informe o formulário a exportar (?id=<uuid>).");
+
+  const { data: f, error: eF } = await supabase
+    .from("formularios")
+    .select("id, titulo, campos")
+    .eq("id", id)
+    .maybeSingle();
+  if (eF) return respJson(500, "Não foi possível gerar o relatório — tente de novo.");
+  if (!f) return respJson(404, "Formulário não encontrado.");
+
+  const { data: links, error: eL } = await supabase
+    .from("formulario_links")
+    .select(
+      `id,
+      resposta:formulario_respostas(respostas, respondido_em),
+      dest_profile:profiles!formulario_links_dest_profile_id_fkey(nome, role),
+      dest_mentorado:mentorados!formulario_links_dest_mentorado_id_fkey(nome),
+      dupla:duplas!formulario_links_dupla_id_fkey(
+        mentor:profiles!duplas_mentor_id_fkey(nome),
+        mentorado:mentorados!duplas_mentorado_id_fkey(nome)
+      )`
+    )
+    .eq("formulario_id", id);
+  if (eL) return respJson(500, "Não foi possível gerar o relatório — tente de novo.");
+
+  type LinkRaw = {
+    resposta:
+      | { respostas: Record<string, RespostaValor>; respondido_em: string }
+      | { respostas: Record<string, RespostaValor>; respondido_em: string }[]
+      | null;
+    dest_profile:
+      | { nome: string; role: string | null }
+      | { nome: string; role: string | null }[]
+      | null;
+    dest_mentorado: { nome: string } | { nome: string }[] | null;
+    dupla:
+      | {
+          mentor: { nome: string } | { nome: string }[] | null;
+          mentorado: { nome: string } | { nome: string }[] | null;
+        }
+      | {
+          mentor: { nome: string } | { nome: string }[] | null;
+          mentorado: { nome: string } | { nome: string }[] | null;
+        }[]
+      | null;
+  };
+
+  const linhas = ((links ?? []) as unknown as LinkRaw[])
+    .map((l): LinhaRespostaCsv | null => {
+      const r = norm(l.resposta);
+      if (!r) return null; // link sem resposta não vira linha
+      const p = norm(l.dest_profile);
+      const m = norm(l.dest_mentorado);
+      const dupla = norm(l.dupla);
+      return {
+        destinatario: p?.nome ?? m?.nome ?? "Link genérico",
+        tipo: p ? papelLabel(p.role) : m ? "Mentorado" : "Link genérico",
+        dupla: dupla
+          ? `${norm(dupla.mentor)?.nome ?? ""} ↔ ${norm(dupla.mentorado)?.nome ?? ""}`
+          : "",
+        respondido_em: r.respondido_em,
+        respostas: r.respostas ?? {},
+      };
+    })
+    .filter((l): l is LinhaRespostaCsv => l !== null);
+
+  const campos = (f.campos as unknown as FormularioCampo[]) ?? [];
+  return csvResponse(csvRespostas(campos, linhas), nomeCsvRespostas(f.titulo));
+}
+
+/** Versão demo do export de respostas — resolve nomes/dupla no dataset em
+ *  memória (as policies das tabelas são coord-only, idem a real). */
+function exportRespostasDemo(
+  id: string | null,
+  d: ReturnType<typeof getDemoData>
+) {
+  if (!id || !UUID_RE.test(id))
+    return respJson(400, "Informe o formulário a exportar (?id=<uuid>).");
+  const { formularios, links, respostas } = getDemoFormularios();
+  const f = formularios.find((x) => x.id === id);
+  if (!f) return respJson(404, "Formulário não encontrado.");
+
+  const linhas: LinhaRespostaCsv[] = [];
+  for (const l of links) {
+    if (l.formulario_id !== f.id) continue;
+    const r = respostas.find((x) => x.link_id === l.id);
+    if (!r) continue;
+    const p = l.dest_profile_id
+      ? d.profiles.find((x) => x.id === l.dest_profile_id)
+      : null;
+    const m = l.dest_mentorado_id
+      ? d.mentorados.find((x) => x.id === l.dest_mentorado_id)
+      : null;
+    const dupla = l.dupla_id
+      ? d.duplas.find((x) => x.id === l.dupla_id)
+      : null;
+    linhas.push({
+      destinatario: p?.nome ?? m?.nome ?? "Link genérico",
+      tipo: p ? papelLabel(p.role) : m ? "Mentorado" : "Link genérico",
+      dupla: dupla
+        ? `${dupla.mentor?.nome ?? ""} ↔ ${dupla.mentorado?.nome ?? ""}`
+        : "",
+      respondido_em: r.respondido_em,
+      respostas: r.respostas,
+    });
+  }
+  return csvResponse(csvRespostas(f.campos, linhas), nomeCsvRespostas(f.titulo));
 }
 
 // ===== CSV =====
@@ -382,6 +539,69 @@ function csvAssinaturas(
   );
 }
 
+/** ?tipo=respostas — uma linha por link respondido; as perguntas viram
+ *  colunas com o label como header (por isso o header passa por celula() —
+ *  label livre pode conter `;` ou `"`). Resposta de pergunta removida do
+ *  form (resposta a versão antiga) entra no fim com o id cru — um backup
+ *  não pode perder dado. */
+function csvRespostas(
+  campos: FormularioCampo[],
+  linhas: LinhaRespostaCsv[]
+): string {
+  const declarados = new Set(campos.map((c) => c.id));
+  const orfas: string[] = [];
+  for (const l of linhas)
+    for (const k of Object.keys(l.respostas))
+      if (!declarados.has(k) && !orfas.includes(k)) orfas.push(k);
+
+  const header = [
+    "destinatario",
+    "tipo",
+    "dupla",
+    "respondido_em",
+    ...campos.map((c) => c.label),
+    ...orfas,
+  ];
+
+  return (
+    "\uFEFF" +
+    [
+      header.map(celula).join(";"),
+      // mais recente primeiro — mesma leitura da aba Respostas
+      ...linhas
+        .sort((a, b) => b.respondido_em.localeCompare(a.respondido_em))
+        .map((l) =>
+          [
+            l.destinatario,
+            l.tipo,
+            l.dupla,
+            dataHora(l.respondido_em),
+            ...campos.map((c) => celulaResposta(c, l.respostas[c.id])),
+            ...orfas.map((k) => celulaResposta(undefined, l.respostas[k])),
+          ]
+            .map(celula)
+            .join(";")
+        ),
+    ].join("\r\n") +
+    "\r\n"
+  );
+}
+
+/** Resposta -> texto de célula: multi_select junta com " | ", booleano
+ *  vira Sim/Não, data dd/mm/aaaa, escala sai como número cru. */
+function celulaResposta(
+  campo: FormularioCampo | undefined,
+  valor: RespostaValor | undefined
+): string {
+  if (valor == null) return "";
+  if (Array.isArray(valor)) return valor.join(" | ");
+  if (typeof valor === "boolean") return valor ? "Sim" : "Não";
+  if (campo?.tipo === "sim_nao")
+    return valor === "sim" ? "Sim" : valor === "nao" ? "Não" : String(valor);
+  if (campo?.tipo === "data") return respostaFormatada(campo, valor);
+  return String(valor);
+}
+
 /** CSV como attachment — os dois relatórios saem no mesmo formato. */
 function csvResponse(csv: string, filename: string) {
   return new NextResponse(csv, {
@@ -397,6 +617,16 @@ function csvResponse(csv: string, filename: string) {
 const nomeCsvCiclo = () => `encontros-${toDateStr(new Date()).slice(0, 7)}.csv`;
 const nomeCsvPessoas = () => `pessoas-${toDateStr(new Date())}.csv`;
 const nomeCsvAssinaturas = () => `assinaturas-${toDateStr(new Date())}.csv`;
+
+// título do form entra no nome do arquivo (ascii kebab) — exports de forms
+// diferentes não se sobrepõem na pasta de downloads
+const slugCsv = (s: string) =>
+  normaliza(s)
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 40) || "formulario";
+const nomeCsvRespostas = (titulo: string) =>
+  `respostas-${slugCsv(titulo)}-${toDateStr(new Date())}.csv`;
 
 function celula(v: string | null | undefined): string {
   let s = v ?? "";

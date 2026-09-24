@@ -1,11 +1,17 @@
-import { CaretDown, ChatCenteredText } from "@phosphor-icons/react/dist/ssr";
+import {
+  CaretDown,
+  ChatCenteredText,
+  DownloadSimple,
+} from "@phosphor-icons/react/dist/ssr";
 import {
   agregaRespostas,
   respostaFormatada,
+  TIPOS_LISTA_RESPOSTA,
   type FormularioCampo,
 } from "@/lib/forms/schema";
 import type { LinkResolvido } from "@/lib/forms/queries";
 import { formatDateTime } from "@/lib/ciclo";
+import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 // Seção "Respostas" da ficha do formulário — server component: a expansão
@@ -47,11 +53,23 @@ function Contagem({
           style={{ width: `${pct}%` }}
         />
       </span>
-      <span className="w-10 shrink-0 text-right tabular-nums text-muted-foreground">
-        {n}
+      {/* visual "12 · 40%"; leitor de tela ouve "12 de 30" — a fração é a
+          informação que o % abstrai */}
+      <span
+        className="min-w-16 shrink-0 text-right tabular-nums whitespace-nowrap text-muted-foreground"
+        aria-label={`${n} de ${total}`}
+      >
+        {n} · {pct}%
       </span>
     </li>
   );
+}
+
+/** Média de escala tem faixa de leitura — 1,8/5 não pode vestir verde. */
+function corMedia(media: number): string {
+  if (media >= 4) return "text-[var(--ok-text)]";
+  if (media < 2.5) return "text-[var(--warn-text)]";
+  return "text-foreground";
 }
 
 export function RespostasSection({
@@ -61,40 +79,84 @@ export function RespostasSection({
   campos: FormularioCampo[];
   links: LinkResolvido[];
 }) {
-  const respondidos = links.filter((l) => l.resposta);
+  // mais recente primeiro — o retorno quente fica no topo dos accordions
+  const respondidos = links
+    .filter((l) => l.resposta)
+    .sort((a, b) =>
+      b.resposta!.respondido_em.localeCompare(a.resposta!.respondido_em)
+    );
   const agregados = agregaRespostas(
     campos,
-    respondidos.map((l) => l.resposta!.respostas)
+    respondidos.map((l) => ({
+      autor: l.dest_nome ?? "Link genérico",
+      respostas: l.resposta!.respostas,
+    }))
+  );
+  // fechadas (barras/média) primeiro; abertas (lista com autoria) depois
+  const numericos = agregados.filter(
+    (ag) => !TIPOS_LISTA_RESPOSTA.includes(ag.campo.tipo)
+  );
+  const listas = agregados.filter(
+    (ag) => TIPOS_LISTA_RESPOSTA.includes(ag.campo.tipo) && ag.itens.length > 0
   );
   const campoPorId = new Map(campos.map((c) => [c.id, c]));
+  // posição do campo no form — respostas exibidas na ordem das perguntas;
+  // órfãs (pergunta removida) caem por último
+  const ordemCampos = new Map(campos.map((c, i) => [c.id, i]));
 
   if (respondidos.length === 0) {
     return (
-      <p className="text-xs italic text-muted-foreground">
-        Nenhuma resposta ainda — elas aparecem aqui conforme os links forem
-        respondidos.
+      <p className="rounded-lg border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
+        Nenhuma resposta ainda —{" "}
+        <a href="#sec-links" className="underline underline-offset-2">
+          gere links na seção acima
+        </a>{" "}
+        e elas aparecem aqui conforme forem respondidas.
       </p>
     );
   }
 
   return (
     <div className="space-y-5">
-      {/* agregado simples: escala vira média + distribuição, sim_não e
-          opções viram contagens */}
-      {agregados.length > 0 && (
+      {/* export fica no topo da seção — a ficha é coord-only, o CSV segue a
+          mesma regra no handler */}
+      <div className="flex justify-end">
+        <a
+          href={`/api/export?tipo=respostas&id=${respondidos[0].formulario_id}`}
+          className={buttonVariants({ variant: "outline", size: "sm" })}
+        >
+          <DownloadSimple aria-hidden />
+          Exportar CSV
+        </a>
+      </div>
+
+      {/* resumo por pergunta: escala vira média + distribuição, sim_não/
+          checkbox/opções viram contagens, texto/data viram lista com autor */}
+      {(numericos.length > 0 || listas.length > 0) && (
         <div className="space-y-4 rounded-xl bg-card p-4 shadow-[var(--shadow-border)] sm:p-5">
-          {agregados.map((ag) => (
+          {numericos.map((ag) => (
             <div key={ag.campo.id}>
               <div className="flex flex-wrap items-baseline justify-between gap-2">
                 <p className="text-sm font-medium">{ag.campo.label}</p>
-                {ag.media != null && (
-                  <p className="text-sm">
-                    <span className="font-semibold tabular-nums text-[var(--ok-text)]">
-                      {ag.media.toLocaleString("pt-BR")}
-                    </span>
-                    <span className="text-muted-foreground">/5 em média</span>
-                  </p>
-                )}
+                <p className="text-sm text-muted-foreground">
+                  {ag.media != null && (
+                    <>
+                      <span
+                        className={cn(
+                          "font-semibold tabular-nums",
+                          corMedia(ag.media)
+                        )}
+                      >
+                        {ag.media.toLocaleString("pt-BR")}
+                      </span>
+                      <span>/5 em média · </span>
+                    </>
+                  )}
+                  <span className="tabular-nums">
+                    {ag.respondidas} de {respondidos.length}{" "}
+                    {ag.respondidas === 1 ? "respondeu" : "responderam"}
+                  </span>
+                </p>
               </div>
               <ul className="mt-2 space-y-1.5">
                 {ag.contagens.map((c) => (
@@ -104,13 +166,49 @@ export function RespostasSection({
                     n={c.n}
                     total={ag.respondidas}
                     positivo={
-                      ag.campo.tipo === "sim_nao" && c.rotulo === "Sim"
+                      (ag.campo.tipo === "sim_nao" ||
+                        ag.campo.tipo === "checkbox") &&
+                      c.rotulo === "Sim"
                     }
                   />
                 ))}
               </ul>
             </div>
           ))}
+          {listas.length > 0 && (
+            <div
+              className={cn(
+                "space-y-4",
+                numericos.length > 0 && "border-t border-border pt-4"
+              )}
+            >
+              {listas.map((ag) => (
+                <div key={ag.campo.id}>
+                  <div className="flex flex-wrap items-baseline justify-between gap-2">
+                    <p className="text-sm font-medium">{ag.campo.label}</p>
+                    <p className="text-xs tabular-nums text-muted-foreground">
+                      {ag.itens.length}{" "}
+                      {ag.itens.length === 1 ? "resposta" : "respostas"}
+                    </p>
+                  </div>
+                  <ul className="mt-2 space-y-2">
+                    {ag.itens.map((it, i) => (
+                      <li key={i}>
+                        <blockquote className="border-l-2 border-border pl-3">
+                          <p className="whitespace-pre-wrap text-sm leading-relaxed">
+                            {it.valor}
+                          </p>
+                          <footer className="mt-0.5 text-xs text-muted-foreground">
+                            {it.autor}
+                          </footer>
+                        </blockquote>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -140,23 +238,29 @@ export function RespostasSection({
                 />
               </summary>
               <dl className="space-y-3 border-t border-border px-4 py-3 sm:px-5">
-                {Object.entries(l.resposta!.respostas).map(([campoId, valor]) => {
-                  const campo = campoPorId.get(campoId);
-                  return (
-                    <div key={campoId}>
-                      <dt className="text-xs font-medium text-muted-foreground">
-                        {campo?.label ?? (
-                          <span className="italic">
-                            pergunta removida do formulário
-                          </span>
-                        )}
-                      </dt>
-                      <dd className="mt-0.5 text-sm leading-relaxed whitespace-pre-wrap">
-                        {respostaFormatada(campo, valor)}
-                      </dd>
-                    </div>
-                  );
-                })}
+                {Object.entries(l.resposta!.respostas)
+                  .sort(
+                    ([a], [b]) =>
+                      (ordemCampos.get(a) ?? Number.MAX_SAFE_INTEGER) -
+                      (ordemCampos.get(b) ?? Number.MAX_SAFE_INTEGER)
+                  )
+                  .map(([campoId, valor]) => {
+                    const campo = campoPorId.get(campoId);
+                    return (
+                      <div key={campoId}>
+                        <dt className="text-xs font-medium text-muted-foreground">
+                          {campo?.label ?? (
+                            <span className="italic">
+                              pergunta removida do formulário
+                            </span>
+                          )}
+                        </dt>
+                        <dd className="mt-0.5 text-sm leading-relaxed whitespace-pre-wrap">
+                          {respostaFormatada(campo, valor)}
+                        </dd>
+                      </div>
+                    );
+                  })}
               </dl>
             </details>
           </li>

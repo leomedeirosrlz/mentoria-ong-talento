@@ -24,6 +24,7 @@ import {
   linkStatus,
   LINK_STATUS_LABEL,
   type FormularioSistema,
+  type LinkStatus,
 } from "@/lib/forms/schema";
 import type { LinkResolvido } from "@/lib/forms/queries";
 import type { AppRole } from "@/lib/types";
@@ -115,6 +116,14 @@ const DATA_CURTA = {
 
 const dataCurta = (iso: string) =>
   new Date(iso).toLocaleDateString("pt-BR", DATA_CURTA);
+
+/** Ordem da lista de links: o acionável (pendente) primeiro, o que pede
+ *  decisão (expirado → reemitir?) no meio, o encerrado (respondido) no fim. */
+const ORDEM_STATUS: Record<LinkStatus, number> = {
+  pendente: 0,
+  expirado: 1,
+  respondido: 2,
+};
 
 /** Reemissão inline de link expirado — mesmo destino, token novo (a action
  *  devolve o token e ele já cai no clipboard). */
@@ -210,12 +219,35 @@ export function FormularioLinks({
     return s;
   }, [links]);
 
+  // quem já respondeu ganha o chip "já respondeu" — gerar de novo criaria um
+  // segundo link pra quem já cumpriu (uso único é por link, não por pessoa)
+  const comResposta = useMemo(() => {
+    const s = new Set<string>();
+    for (const l of links) {
+      if (linkStatus(l) !== "respondido") continue;
+      if (l.dest_profile_id) s.add(`p:${l.dest_profile_id}`);
+      if (l.dest_mentorado_id) s.add(`m:${l.dest_mentorado_id}`);
+    }
+    return s;
+  }, [links]);
+
+  // form encerrado + pendente = ação morta — o hint da seção explica por que
+  // os botões de envio somem das rows
+  const temPendente = useMemo(
+    () => links.some((l) => linkStatus(l) === "pendente"),
+    [links]
+  );
+
   const filtrados = useMemo(() => {
     const n = normaliza(busca.trim());
     if (!n) return destinatarios;
     return destinatarios.filter(
       (d) =>
-        normaliza(d.nome).includes(n) || normaliza(d.detalhe).includes(n)
+        normaliza(d.nome).includes(n) ||
+        normaliza(d.detalhe).includes(n) ||
+        // o papel não aparece mais na linha (é o título do grupo) — segue
+        // buscável cru ("dpp" acha mentor_dpp)
+        normaliza(d.papel).includes(n)
     );
   }, [destinatarios, busca]);
 
@@ -226,13 +258,12 @@ export function FormularioLinks({
     [filtrados]
   );
 
-  // pendentes primeiro — respondidos e expirados fecham a lista
+  // pendente → expirado → respondido (sort estável mantém created_at dentro
+  // de cada grupo)
   const linksOrdenados = useMemo(
     () =>
       [...links].sort(
-        (a, b) =>
-          Number(linkStatus(a) !== "pendente") -
-          Number(linkStatus(b) !== "pendente")
+        (a, b) => ORDEM_STATUS[linkStatus(a)] - ORDEM_STATUS[linkStatus(b)]
       ),
     [links]
   );
@@ -448,22 +479,37 @@ export function FormularioLinks({
                               {g.titulo}
                             </span>
                             <span className="ml-auto basis-full pl-7 text-xs text-muted-foreground sm:basis-auto sm:pl-0">
-                              Selecionar todos ·{" "}
-                              <span className="tabular-nums">
-                                {selNoGrupo} de {g.itens.length} selecionados
-                              </span>
+                              Selecionar todos
+                              {/* "0 de N" é ruído — o contador só aparece
+                                  quando há seleção de fato */}
+                              {selNoGrupo > 0 && (
+                                <>
+                                  {" · "}
+                                  <span className="tabular-nums">
+                                    {selNoGrupo} de {g.itens.length}{" "}
+                                    selecionados
+                                  </span>
+                                </>
+                              )}
                             </span>
                           </label>
                           <ul className="mt-0.5 space-y-0.5">
                             {g.itens.map((d) => {
                               const key = keyDe(d);
                               const vigente = comLinkVigente.has(key);
+                              const jaRespondeu = comResposta.has(key);
                               return (
                                 <li key={key}>
                                   <DestinoCheckRow
                                     nome={d.nome}
+                                    // vigente ganha: "já tem link" explica a
+                                    // reutilização do token na geração
                                     detalhe={
-                                      vigente ? "já tem link" : d.detalhe
+                                      vigente
+                                        ? "já tem link"
+                                        : jaRespondeu
+                                          ? "já respondeu"
+                                          : d.detalhe
                                     }
                                     checked={selecionados.has(key)}
                                     onToggle={() => toggle(key)}
@@ -528,9 +574,24 @@ export function FormularioLinks({
           ) : (
             <PaperPlaneTilt aria-hidden />
           )}
-          Link genérico
+          Copiar link genérico
         </Button>
       </div>
+
+      {/* o genérico não resolve destinatário — quem responde por ele cai
+          anônimo; o hint fica visível pra escolha ser consciente */}
+      <p className="text-xs text-muted-foreground">
+        O link genérico não identifica quem respondeu — use pra divulgação
+        aberta.
+      </p>
+
+      {/* pendente em form encerrado é ação morta — as rows escondem
+          Copiar/WhatsApp e este aviso diz por quê */}
+      {!formularioAtivo && temPendente && (
+        <p className="rounded-lg bg-[var(--warn)]/10 px-3 py-2 text-xs text-[var(--warn-text)]">
+          Formulário encerrado — reative pra voltar a coletar respostas.
+        </p>
+      )}
 
       {links.length === 0 ? (
         <p className="rounded-lg border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
@@ -608,21 +669,26 @@ export function FormularioLinks({
                     </p>
                   </div>
                   <div className="flex basis-full items-center justify-end gap-1.5 sm:basis-auto">
-                    {/* Copiar/WhatsApp só em link vivo — respondido copia link
-                        morto e expirado ganha Reemitir (token novo) */}
-                    {status === "pendente" && (
+                    {/* Copiar/WhatsApp só em link vivo de form ativo —
+                        respondido copia link morto, expirado ganha Reemitir
+                        (token novo) e form encerrado não coleta. O genérico
+                        não tem destinatário — NudgeButton diria "sem
+                        WhatsApp", razão falsa */}
+                    {status === "pendente" && formularioAtivo && (
                       <>
                         <CopiarLink token={l.token} />
-                        <NudgeButton
-                          telefone={l.dest_whatsapp}
-                          mensagem={msgLinkWhatsApp(
-                            formularioTitulo,
-                            l.dest_nome,
-                            l.token,
-                            origem
-                          )}
-                          label="WhatsApp"
-                        />
+                        {l.dest_tipo !== "generico" && (
+                          <NudgeButton
+                            telefone={l.dest_whatsapp}
+                            mensagem={msgLinkWhatsApp(
+                              formularioTitulo,
+                              l.dest_nome,
+                              l.token,
+                              origem
+                            )}
+                            label="WhatsApp"
+                          />
+                        )}
                       </>
                     )}
                     {status === "expirado" && (
