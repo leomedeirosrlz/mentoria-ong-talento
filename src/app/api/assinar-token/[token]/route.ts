@@ -54,7 +54,8 @@ export async function GET(
       status: 500,
     });
   }
-  const assinatura = ((data ?? [])[0] ?? null) as Assinatura | null;
+  // 0051: a RPC devolve o objeto único (row + template embutido) ou null
+  const assinatura = (data ?? null) as Assinatura | null;
   if (!assinatura) {
     return new NextResponse("Documento não encontrado — a assinatura ainda não foi concluída.", {
       status: 404,

@@ -923,6 +923,30 @@ export type Database = {
           },
         ]
       }
+      login_handoffs: {
+        Row: {
+          access_token: string
+          expires_at: string
+          failed: boolean
+          nonce: string
+          refresh_token: string
+        }
+        Insert: {
+          access_token: string
+          expires_at?: string
+          failed?: boolean
+          nonce: string
+          refresh_token: string
+        }
+        Update: {
+          access_token?: string
+          expires_at?: string
+          failed?: boolean
+          nonce?: string
+          refresh_token?: string
+        }
+        Relationships: []
+      }
       materiais: {
         Row: {
           audiencia: string
@@ -1025,6 +1049,7 @@ export type Database = {
           avatar_path: string | null
           cidade: string | null
           created_at: string
+          dados_civis: Json | null
           data_nascimento: string | null
           disponibilidade: Json | null
           documento_path: string | null
@@ -1041,6 +1066,7 @@ export type Database = {
           ong_origem: string | null
           origem: string | null
           pref_genero_par: string | null
+          responsavel: Json | null
           uf: string | null
           whatsapp: string | null
         }
@@ -1048,6 +1074,7 @@ export type Database = {
           avatar_path?: string | null
           cidade?: string | null
           created_at?: string
+          dados_civis?: Json | null
           data_nascimento?: string | null
           disponibilidade?: Json | null
           documento_path?: string | null
@@ -1064,6 +1091,7 @@ export type Database = {
           ong_origem?: string | null
           origem?: string | null
           pref_genero_par?: string | null
+          responsavel?: Json | null
           uf?: string | null
           whatsapp?: string | null
         }
@@ -1071,6 +1099,7 @@ export type Database = {
           avatar_path?: string | null
           cidade?: string | null
           created_at?: string
+          dados_civis?: Json | null
           data_nascimento?: string | null
           disponibilidade?: Json | null
           documento_path?: string | null
@@ -1087,6 +1116,7 @@ export type Database = {
           ong_origem?: string | null
           origem?: string | null
           pref_genero_par?: string | null
+          responsavel?: Json | null
           uf?: string | null
           whatsapp?: string | null
         }
@@ -1352,6 +1382,7 @@ export type Database = {
           cidade: string | null
           consent_lgpd_em: string | null
           created_at: string
+          dados_civis: Json | null
           data_nascimento: string | null
           documento_path: string | null
           email: string
@@ -1381,6 +1412,7 @@ export type Database = {
           cidade?: string | null
           consent_lgpd_em?: string | null
           created_at?: string
+          dados_civis?: Json | null
           data_nascimento?: string | null
           documento_path?: string | null
           email: string
@@ -1410,6 +1442,7 @@ export type Database = {
           cidade?: string | null
           consent_lgpd_em?: string | null
           created_at?: string
+          dados_civis?: Json | null
           data_nascimento?: string | null
           documento_path?: string | null
           email?: string
@@ -1822,28 +1855,34 @@ export type Database = {
     Views: {
       mentorados_pessoal: {
         Row: {
+          dados_civis: Json | null
           data_nascimento: string | null
           genero: string | null
           id: string | null
           motivacao: string | null
           nome: string | null
           pref_genero_par: string | null
+          responsavel: Json | null
         }
         Insert: {
+          dados_civis?: Json | null
           data_nascimento?: string | null
           genero?: string | null
           id?: string | null
           motivacao?: string | null
           nome?: string | null
           pref_genero_par?: string | null
+          responsavel?: Json | null
         }
         Update: {
+          dados_civis?: Json | null
           data_nascimento?: string | null
           genero?: string | null
           id?: string | null
           motivacao?: string | null
           nome?: string | null
           pref_genero_par?: string | null
+          responsavel?: Json | null
         }
         Relationships: []
       }
@@ -1870,6 +1909,7 @@ export type Database = {
       }
       profiles_pessoal: {
         Row: {
+          dados_civis: Json | null
           data_nascimento: string | null
           genero: string | null
           id: string | null
@@ -1878,6 +1918,7 @@ export type Database = {
           pref_genero_par: string | null
         }
         Insert: {
+          dados_civis?: Json | null
           data_nascimento?: string | null
           genero?: string | null
           id?: string | null
@@ -1886,6 +1927,7 @@ export type Database = {
           pref_genero_par?: string | null
         }
         Update: {
+          dados_civis?: Json | null
           data_nascimento?: string | null
           genero?: string | null
           id?: string | null
@@ -2033,29 +2075,7 @@ export type Database = {
       }
       assinatura_completa_por_token: {
         Args: { p_token: string }
-        Returns: {
-          assinado_em: string | null
-          assinatura_texto: string | null
-          created_at: string
-          created_by: string | null
-          dados_snapshot: Json | null
-          hash_documento: string | null
-          id: string
-          ip: string | null
-          mentorado_id: string | null
-          profile_id: string | null
-          status: string
-          template_id: string
-          token: string
-          token_expira_em: string | null
-          user_agent: string | null
-        }[]
-        SetofOptions: {
-          from: "*"
-          to: "assinaturas"
-          isOneToOne: false
-          isSetofReturn: true
-        }
+        Returns: Json
       }
       assinatura_por_token: { Args: { p_token: string }; Returns: Json }
       definir_pdm_url: {
@@ -2073,15 +2093,23 @@ export type Database = {
         }
         Returns: undefined
       }
+      falhar_login_handoff: { Args: { p_nonce: string }; Returns: undefined }
       formulario_por_token: { Args: { p_token: string }; Returns: Json }
       formularios_limpa_respostas: {
         Args: { p_campos: Json; p_respostas: Json }
         Returns: Json
       }
       interesses_ok: { Args: { interesses: string[] }; Returns: boolean }
+      meus_dados_civis: { Args: never; Returns: Json }
+      meus_dados_pessoais: { Args: never; Returns: Json }
       my_profile_id: { Args: never; Returns: string }
       my_role: { Args: never; Returns: Database["public"]["Enums"]["app_role"] }
+      pegar_login_handoff: { Args: { p_nonce: string }; Returns: Json }
       regenerar_token_assinatura: { Args: { p_id: string }; Returns: string }
+      registrar_login_handoff: {
+        Args: { p_access: string; p_nonce: string; p_refresh: string }
+        Returns: undefined
+      }
       revogar_assinatura: { Args: { p_id: string }; Returns: undefined }
       salvar_autoavaliacao: {
         Args: { p_disponivel: boolean; p_dupla: string; p_texto: string }
