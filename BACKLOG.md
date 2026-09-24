@@ -126,6 +126,17 @@ Planos em `.devin/plan-mural-perfil.md` + `.devin/plan-agenda-zero-friccao.md`. 
 
 **Pendente**: teste ao vivo como mentor (senha de teste do thixaraujo ≠ senha123) — fluxo de mentor verificado por leitura + coord confirmou ausência de CTAs.
 
+## Sprint forms UX — auditoria → frentes → validação (set/2026) ✅ executada
+
+Spec em **`.devin/formularios-ux.md`** (3 auditores: lado coord, lado respondente, consistência/slop; 3 implementadores em frentes disjuntas; validação visual desktop+mobile + react-doctor). Entregue:
+
+- **Geração em massa**: dialog agrupa destinatários por papel (DPP/especialista/supervisor/mentorado — coord fora) com checkbox-mãe indeterminate, busca, "N de M selecionados", "já tem link" marcado; pós-gerar vira painel "links prontos" com copiar/WhatsApp por pessoa; genérico reutiliza o pendente (não duplica mais por clique); `gerarLinksFormulario` deduplica payload, checa erro nas leituras e devolve `links[]` emitidos
+- **Ficha operacional**: faixa "N pendentes · respondidos · expirados" sob o header (warn nos pendentes), leitura das perguntas por padrão com editor atrás de `<details>`, `FormularioPreview` renderiza o `FormularioPublico` real (`preview` desliga o submit), excluir sai do header pra zona de perigo, lista mostra `pendentes` (links vivos não respondidos — o "quem falta?"), `reemitirLinkFormulario` rotaciona token de expirado com trava `.is("usado_em", null)` contra resposta concorrente
+- **Público `/f/[token]`**: validação por campo (`noValidate` + mapa de erros, inline + `aria-describedby`/`aria-invalid` + scroll/focus no primeiro), barra de progresso sticky `role="progressbar"` + "N de M", perguntas numeradas, "(opcional)" no lugar de `*`, erro de rede separado de token inválido (card "Tentar de novo"), `mailto:` nos becos, `generateMetadata` com título real (preview do WhatsApp), linha de privacidade, `enterKeyHint`, segmentos com `has-checked:ring-2`
+- **Dívida paga**: miolo extraído pra `src/components/forms/` (CopiarLink/urlPublica/ValidadeLinks/DestinoCheckRow/LinksProntos — as cópias nos dois dialogs já divergiam); `useOrigem` via `useSyncExternalStore` corrige `window.location.origin` no render que **quebrava a SSR da ficha** (latente — mesmo padrão segue em `assinaturas-pessoa.tsx:435`); Selects crus (`escala_1_5`/`0` visíveis) ganham `items`
+
+**Fica de fora (próximas waves)**: rascunho localStorage do form público (privacidade — avaliar), tipo `secao`/`rotulo_min`/`ajuda` por campo (schema), export CSV de respostas, filtros na lista, "expandir todas", forced-colors pass, autosave do builder, `assinaturas-pessoa` com o mesmo fix de SSR.
+
 # Pendências
 
 ## Gestão/domínio — pequenos, alto retorno
