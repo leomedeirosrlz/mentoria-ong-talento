@@ -12,7 +12,7 @@ export function Confirmado({ next }: { next: string }) {
     // window.close só fecha janelas abertas por script — o clique no e-mail
     // abre uma aba comum e o browser bloqueia na maioria dos casos; se falhar,
     // a página fica com a instrução e o link de continuar
-    const t = setTimeout(() => window.close(), 1800);
+    const t = setTimeout(() => window.close(), 5000);
     return () => clearTimeout(t);
   }, []);
 
@@ -34,7 +34,8 @@ export function Confirmado({ next }: { next: string }) {
           </svg>
           <p className="mt-4 font-semibold">E-mail confirmado</p>
           <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
-            Pode fechar esta aba — o acesso continua na aba onde você pediu o link.
+            Já pode voltar pra aba onde você pediu o link — esta aqui fecha
+            sozinha.
           </p>
         </div>
         <a
