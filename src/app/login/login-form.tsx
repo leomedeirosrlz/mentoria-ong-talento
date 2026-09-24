@@ -10,6 +10,7 @@ import { SiteFooter } from "@/components/site-footer";
 import { fade, T } from "@/components/motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { cn, pathInterno } from "@/lib/utils";
 
@@ -77,25 +78,26 @@ export function LoginForm() {
     router.replace(urlErroLink());
   }, [router, urlErroLink]);
 
-  // destino pós-login com sessão: quem nunca definiu senha passa pelo
-  // onboarding de senha primeiro (o desvio que o /auth/confirm fazia no
-  // fluxo pkce — sem isso o landing implícito o pularia)
+  // destino pós-login com sessão: quem nunca definiu senha (nem dispensou o
+  // onboarding) passa por ele primeiro — o desvio que o /auth/confirm fazia
+  // no fluxo pkce, agora aplicado na aba que AGUARDA o link
   const entrar = useCallback(
     (session: Session | null) => {
       const destino = destinoFinal();
-      const temSenha = !!session?.user?.user_metadata?.senha_em;
+      const meta = session?.user?.user_metadata;
+      const resolveuSenha = !!meta?.senha_em || !!meta?.senha_dispensada;
       router.push(
-        temSenha ? destino : `/auth/definir-senha?next=${encodeURIComponent(destino)}`
+        resolveuSenha ? destino : `/auth/definir-senha?next=${encodeURIComponent(destino)}`
       );
     },
     [router, destinoFinal]
   );
 
   // sessão ativa ao abrir a página: quem já está logado não fica preso no
-  // /login, e o magic link implícito cai AQUI com #access_token — o client
-  // ssr (pkce) recusaria o hash, então os tokens são trocados via setSession
-  // e a URL limpa. O efeito de `enviado` abaixo cuida da aba que aguarda;
-  // este cobre a aba nova que recebe o link
+  // /login. O magic link implícito cai AQUI com #access_token — esta aba só
+  // confirma ("pode fechar"); quem entra de verdade é a aba que pediu o
+  // link, detectando a sessão compartilhada (cookies) via o efeito de
+  // `enviado` abaixo
   useEffect(() => {
     let entrou = false;
     const ir = (session: Session | null) => {
@@ -113,23 +115,27 @@ export function LoginForm() {
     const access_token = frag.get("access_token");
     const refresh_token = frag.get("refresh_token");
     if (access_token && refresh_token) {
+      // aba do e-mail: entrou=true desde já — o SIGNED_IN do setSession não
+      // pode desviar esta aba pro app; o destino dela é só a confirmação
+      entrou = true;
       // tokens fora da barra/histórico antes de qualquer await
       history.replaceState(null, "", location.pathname + location.search);
       void supabase.auth
         .setSession({ access_token, refresh_token })
-        .then(async ({ error }) => {
+        .then(({ error }) => {
           if (error) {
             router.replace(urlErroLink());
-            return;
+          } else {
+            router.replace(
+              `/auth/confirmado?next=${encodeURIComponent(destinoFinal())}`
+            );
           }
-          const { data } = await supabase.auth.getSession();
-          ir(data.session);
         });
     } else {
       void supabase.auth.getSession().then(({ data }) => ir(data.session));
     }
     return () => subscription.unsubscribe();
-  }, [supabase, entrar, router, urlErroLink]);
+  }, [supabase, entrar, router, urlErroLink, destinoFinal]);
 
   // countdown do reenvio — tick de 1s até zerar
   useEffect(() => {
@@ -263,8 +269,7 @@ export function LoginForm() {
               </div>
               <p className="mt-4 font-medium">Link inválido ou expirado</p>
               <p className="text-sm text-muted-foreground mt-2 leading-relaxed">
-                Ele pode já ter sido usado ou ter passado do prazo — peça um
-                novo pra entrar.
+                Peça um novo link pra entrar.
               </p>
               <Button
                 type="button"
@@ -294,12 +299,12 @@ export function LoginForm() {
               <p className="mt-4 font-medium">Link enviado</p>
               <p className="text-sm text-muted-foreground mt-2 leading-relaxed">
                 Enviamos um link para{" "}
-                <span className="font-medium text-foreground">{email}</span> — ele
-                pode levar alguns minutos. Confira a caixa de entrada e o spam.
+                <span className="font-medium text-foreground">{email}</span>. Se
+                não chegar em alguns minutos, confira o spam.
               </p>
               <p className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
                 <CircleNotch size={13} className="animate-spin shrink-0" aria-hidden="true" />
-                Aguardando a confirmação — ao abrir o link, esta página entra sozinha.
+                Esta página entra sozinha quando você abrir o link.
               </p>
               <div className="mt-5 space-y-2">
                 {/* falha do reenvio — o form está desmontado, o erro mora aqui */}
@@ -406,15 +411,12 @@ export function LoginForm() {
                     required
                     autoFocus
                     autoComplete="email"
+                    autoCapitalize="none"
+                    spellCheck={false}
                     placeholder="seu@email.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                   />
-                  {modo === "link" && (
-                    <p className="text-xs text-muted-foreground">
-                      O e-mail precisa ter sido cadastrado pela coordenação.
-                    </p>
-                  )}
                 </div>
 
                 {/* continuidade: o campo cresce e empurra o submit — a altura
@@ -430,9 +432,8 @@ export function LoginForm() {
                     >
                       <div className="space-y-2">
                         <Label htmlFor="senha">Senha</Label>
-                        <Input
+                        <PasswordInput
                           id="senha"
-                          type="password"
                           required
                           autoComplete="current-password"
                           value={senha}

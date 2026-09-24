@@ -587,6 +587,7 @@ function authDemo(papel: AppRole | null) {
     signInWithPassword: falha,
     signInWithOAuth: falha,
     verifyOtp: falha,
+    setSession: falha,
     exchangeCodeForSession: falha,
     resetPasswordForEmail: falha,
     onAuthStateChange: (cb: (event: string, s: unknown) => void) => {

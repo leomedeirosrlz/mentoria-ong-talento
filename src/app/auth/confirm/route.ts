@@ -9,15 +9,13 @@ export async function GET(request: NextRequest) {
   const next = pathInterno(searchParams.get("next")) ?? "/";
   const supabase = await createClient();
 
-  // sucesso → quem nunca definiu senha cai no onboarding de senha; quem já
-  // tem vê "confirmado" e a aba se fecha — em ambos, a aba original do login
-  // detecta a sessão e entra sozinha no destino
-  const confirmado = (temSenha: boolean) =>
+  // sucesso → a aba do e-mail só confirma e se fecha; quem entra de verdade
+  // (e decide o onboarding de senha) é a sessão que pediu o link — o poll
+  // do painel "link enviado" detecta a sessão compartilhada e desvia pra
+  // /auth/definir-senha quando precisa
+  const confirmado = () =>
     NextResponse.redirect(
-      new URL(
-        `${temSenha ? "/auth/confirmado" : "/auth/definir-senha"}?next=${encodeURIComponent(next)}`,
-        request.url,
-      ),
+      new URL(`/auth/confirmado?next=${encodeURIComponent(next)}`, request.url),
     );
 
   // links novos não passam por aqui: o magic link implícito cai direto em
@@ -26,18 +24,18 @@ export async function GET(request: NextRequest) {
   // enviados antes da mudança — o ?code= deles só troca no mesmo navegador.
   const code = searchParams.get("code");
   if (code) {
-    const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+    const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error) {
-      return confirmado(!!data.user?.user_metadata?.senha_em);
+      return confirmado();
     }
   }
 
   const token_hash = searchParams.get("token_hash");
   const type = searchParams.get("type") as EmailOtpType | null;
   if (token_hash && type) {
-    const { data, error } = await supabase.auth.verifyOtp({ type, token_hash });
+    const { error } = await supabase.auth.verifyOtp({ type, token_hash });
     if (!error) {
-      return confirmado(!!data.user?.user_metadata?.senha_em);
+      return confirmado();
     }
   }
 
