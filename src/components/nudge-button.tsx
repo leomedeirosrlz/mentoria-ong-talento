@@ -3,10 +3,13 @@
 import { useEffect, useRef, useState } from "react";
 import { CircleNotch, WhatsappLogo } from "@phosphor-icons/react";
 import { waLink } from "@/lib/ciclo";
+import { buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
-// min-h-11 = alvo de toque ≥44px no mobile; desktop compacta (mesma gramática size-11 → md:h-8)
-const CLASSES =
-  "inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset md:min-h-8";
+// mesma gramática do Button (outline/sm) — o nudge senta na mesma linha de
+// botões reais sem criar uma terceira altura; o que segue próprio dele é o
+// hover lime e o estado desabilitado tracejado
+const BASE = buttonVariants({ variant: "outline", size: "sm" });
 
 export function NudgeButton({
   telefone,
@@ -56,7 +59,10 @@ export function NudgeButton({
           aria-disabled="true"
           tabIndex={0}
           title="Sem WhatsApp cadastrado"
-          className={`${CLASSES} cursor-not-allowed border-dashed text-muted-foreground/50`}
+          className={cn(
+            BASE,
+            "cursor-not-allowed border-dashed text-muted-foreground/50 hover:bg-background hover:text-muted-foreground/50"
+          )}
         >
           <WhatsappLogo size={15} aria-hidden />
           {label}
@@ -71,7 +77,10 @@ export function NudgeButton({
       target="_blank"
       rel="noopener noreferrer"
       onClick={onClick}
-      className={`${CLASSES} text-muted-foreground hover:bg-[var(--brand-lime)]/15 hover:text-foreground hover:border-[var(--brand-lime)]/60`}
+      className={cn(
+        BASE,
+        "text-muted-foreground hover:bg-[var(--brand-lime)]/15 hover:text-foreground hover:border-[var(--brand-lime)]/60"
+      )}
     >
       {abrindo ? (
         <CircleNotch size={15} className="animate-spin" aria-hidden />

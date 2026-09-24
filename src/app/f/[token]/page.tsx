@@ -6,41 +6,78 @@ import {
   Flask,
   LinkBreak,
   PauseCircle,
+  WifiSlash,
 } from "@phosphor-icons/react/dist/ssr";
 import type { Icon } from "@phosphor-icons/react";
 import { demoRole } from "@/lib/demo/mode";
 import { formularioPorToken } from "@/lib/forms/queries";
 import { formatDateTime } from "@/lib/ciclo";
+import { cn } from "@/lib/utils";
 import { SiteFooter } from "@/components/site-footer";
 import { buttonVariants } from "@/components/ui/button";
 import { FormularioPublico } from "./formulario-publico";
 
-export const metadata: Metadata = {
-  title: "Formulário",
-  // link individual por WhatsApp/e-mail — não é página de indexação
-  robots: { index: false, follow: false },
-};
-
 const TOKEN_RE = /^[A-Za-z0-9_-]{20,128}$/;
+
+// o título real do form é o que o WhatsApp mostra no preview do link
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ token: string }>;
+}): Promise<Metadata> {
+  const [{ token }, demo] = await Promise.all([params, demoRole()]);
+  const r =
+    !demo && TOKEN_RE.test(token) ? await formularioPorToken(token) : null;
+  const titulo = r?.kind === "ok" ? r.info.formulario.titulo : "Formulário";
+  return {
+    title: titulo,
+    openGraph: { title: `${titulo} — Realiza.vc` },
+    // link individual por WhatsApp/e-mail — não é página de indexação
+    robots: { index: false, follow: false },
+  };
+}
 
 function EstadoCard({
   icon: Icon,
   titulo,
+  acao,
+  ok,
   children,
 }: {
   icon: Icon;
   titulo: string;
+  /** saída do beco — mailto pra equipe ou retry do mesmo link */
+  acao?: { href: string; label: string };
+  /** tom de sucesso — círculo lime pro estado "já respondida" */
+  ok?: boolean;
   children: React.ReactNode;
 }) {
   return (
     <div className="rounded-xl bg-card p-6 text-center shadow-[var(--shadow-border)] sm:p-8">
-      <div className="mx-auto grid size-12 place-items-center rounded-full bg-muted text-muted-foreground">
-        <Icon size={24} aria-hidden />
+      <div
+        className={cn(
+          "mx-auto grid size-12 place-items-center rounded-full",
+          ok
+            ? "bg-[var(--brand-lime)] text-[var(--brand-ink)]"
+            : "bg-muted text-muted-foreground"
+        )}
+      >
+        <Icon size={24} weight={ok ? "bold" : "regular"} aria-hidden />
       </div>
       <h1 className="mt-4 text-lg font-semibold">{titulo}</h1>
       <div className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-muted-foreground">
         {children}
       </div>
+      {acao && (
+        <p className="mt-5">
+          <a
+            href={acao.href}
+            className={buttonVariants({ variant: "outline", size: "sm" })}
+          >
+            {acao.label}
+          </a>
+        </p>
+      )}
     </div>
   );
 }
@@ -50,12 +87,12 @@ export default async function FormularioTokenPage({
 }: {
   params: Promise<{ token: string }>;
 }) {
-  const { token } = await params;
-  const demo = await demoRole();
+  const [{ token }, demo] = await Promise.all([params, demoRole()]);
 
   // na demo, /f/<token> não roda — os links existem só pra coord ver na ficha
-  const info =
+  const res =
     !demo && TOKEN_RE.test(token) ? await formularioPorToken(token) : null;
+  const info = res?.kind === "ok" ? res.info : null;
 
   return (
     <div className="flex min-h-[100dvh] flex-col">
@@ -65,8 +102,15 @@ export default async function FormularioTokenPage({
       <main className="flex flex-1 flex-col px-4 py-10">
         <div className="m-auto w-full max-w-xl">
           <header className="mb-6">
+            {/* width/height naturais reservam a proporção — sem CLS */}
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo-realiza.png" alt="Realiza.vc" className="h-7 w-auto" />
+            <img
+              src="/logo-realiza.png"
+              alt="Realiza.vc"
+              width={1920}
+              height={262}
+              className="h-7 w-auto"
+            />
             <p className="mt-1.5 text-xs text-muted-foreground">
               Programa de Mentoria Social
             </p>
@@ -94,15 +138,33 @@ export default async function FormularioTokenPage({
                 </Link>
               </p>
             </EstadoCard>
+          ) : res?.kind === "erro" ? (
+            <EstadoCard
+              icon={WifiSlash}
+              titulo="Não foi possível carregar"
+              acao={{ href: `/f/${token}`, label: "Tentar de novo" }}
+            >
+              <p>
+                A conexão falhou no caminho — não é problema com o seu link.
+                Confira a internet e tente de novo.
+              </p>
+            </EstadoCard>
           ) : !info ? (
-            <EstadoCard icon={LinkBreak} titulo="Link não encontrado">
+            <EstadoCard
+              icon={LinkBreak}
+              titulo="Link não encontrado"
+              acao={{
+                href: "mailto:mentoria@realiza.vc",
+                label: "Pedir um novo link",
+              }}
+            >
               <p>
                 Este link não existe ou foi digitado errado. Se você recebeu
                 da equipe Realiza.vc, peça um novo.
               </p>
             </EstadoCard>
           ) : info.status === "respondido" ? (
-            <EstadoCard icon={CheckCircle} titulo="Resposta já registrada">
+            <EstadoCard icon={CheckCircle} titulo="Resposta já registrada" ok>
               <p>
                 Você já respondeu{" "}
                 <span className="font-medium text-foreground">
@@ -115,7 +177,14 @@ export default async function FormularioTokenPage({
               </p>
             </EstadoCard>
           ) : info.status === "expirado" ? (
-            <EstadoCard icon={Clock} titulo="Este link expirou">
+            <EstadoCard
+              icon={Clock}
+              titulo="Este link expirou"
+              acao={{
+                href: "mailto:mentoria@realiza.vc",
+                label: "Pedir um novo link",
+              }}
+            >
               <p>
                 O prazo pra responder{" "}
                 <span className="font-medium text-foreground">
@@ -127,7 +196,14 @@ export default async function FormularioTokenPage({
               </p>
             </EstadoCard>
           ) : info.status === "inativo" ? (
-            <EstadoCard icon={PauseCircle} titulo="Formulário encerrado">
+            <EstadoCard
+              icon={PauseCircle}
+              titulo="Formulário encerrado"
+              acao={{
+                href: "mailto:mentoria@realiza.vc",
+                label: "Falar com a equipe",
+              }}
+            >
               <p>
                 <span className="font-medium text-foreground">
                   {info.formulario.titulo}

@@ -3,23 +3,31 @@
 import Link from "next/link";
 import { useId, useMemo, useState, useTransition } from "react";
 import type { ReactElement } from "react";
-import {
-  Check,
-  CircleNotch,
-  CopySimple,
-  PaperPlaneTilt,
-} from "@phosphor-icons/react";
+import { CircleNotch, PaperPlaneTilt } from "@phosphor-icons/react";
 import { toast } from "sonner";
+import { AnimatePresence, motion } from "motion/react";
 import {
   gerarLinksParaDupla,
   type LinkPronto,
 } from "@/lib/actions-formularios";
-import { NudgeButton } from "@/components/nudge-button";
+import { DestinoCheckRow } from "@/components/forms/destino-check-row";
+import {
+  LinksProntos,
+  type LinkProntoItem,
+} from "@/components/forms/links-prontos";
+import { ValidadeLinks } from "@/components/forms/validade-links";
+import {
+  msgLinkWhatsApp,
+  useOrigem,
+} from "@/components/forms/link-shared";
+import { fade, T } from "@/components/motion";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -32,7 +40,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { cn, normaliza } from "@/lib/utils";
+import { normaliza } from "@/lib/utils";
 import { SISTEMA_LABEL, type FormularioSistema } from "@/lib/forms/schema";
 
 export type FormularioOpcao = {
@@ -47,49 +55,6 @@ export type PessoaDestino = {
   nome: string;
   whatsapp: string | null;
 };
-
-const VALIDADE_OPCOES = [
-  { v: "0", l: "Sem validade" },
-  { v: "7", l: "Expira em 7 dias" },
-  { v: "15", l: "Expira em 15 dias" },
-  { v: "30", l: "Expira em 30 dias" },
-  { v: "60", l: "Expira em 60 dias" },
-] as const;
-
-const primeiroNome = (n: string) => n.split(" ")[0];
-
-/** URL absoluta do link público — montada no client porque o servidor não
- *  sabe a origem de deploy (mesmo padrão de formulario-links). */
-function urlPublica(token: string): string {
-  return `${window.location.origin}/f/${token}`;
-}
-
-function CopiarLink({ token }: { token: string }) {
-  const [copiado, setCopiado] = useState(false);
-  return (
-    <Button
-      type="button"
-      variant="outline"
-      size="sm"
-      onClick={async () => {
-        try {
-          await navigator.clipboard.writeText(urlPublica(token));
-          setCopiado(true);
-          setTimeout(() => setCopiado(false), 2000);
-        } catch {
-          toast.error("Não consegui copiar — selecione o link manualmente.");
-        }
-      }}
-    >
-      {copiado ? (
-        <Check aria-hidden className="text-[var(--ok)]" />
-      ) : (
-        <CopySimple aria-hidden />
-      )}
-      {copiado ? "Copiado" : "Copiar"}
-    </Button>
-  );
-}
 
 /** Dialog "Enviar formulário" da ficha da dupla — escolhe o form entre os
  *  ativos, marca mentor e/ou mentorado como destinatários e devolve os links
@@ -118,7 +83,6 @@ export function EnviarFormularioDialog({
   // ids únicos por instância — o dialog aparece 2x na ficha (header + 360º)
   const uid = useId();
   const formLabelId = `${uid}-form`;
-  const validadeLabelId = `${uid}-validade`;
   const ordenados = useMemo(() => {
     if (!sugestao) return formularios;
     const n = normaliza(sugestao);
@@ -134,9 +98,41 @@ export function EnviarFormularioDialog({
   const [validade, setValidade] = useState("0");
   const [links, setLinks] = useState<LinkPronto[] | null>(null);
   const [pending, start] = useTransition();
+  // origem do deploy depois do mount — SSR/hidratação emitem o texto do
+  // WhatsApp com URL relativa e o absoluto entra na re-render seguinte
+  const origem = useOrigem();
 
   const formSel = formularios.find((f) => f.id === formId) ?? null;
   const nDestinos = Number(para.mentor) + Number(para.mentorado);
+
+  const itensProntos = useMemo<LinkProntoItem[]>(
+    () =>
+      (links ?? []).map((l) => {
+        const p = l.tipo === "profile" ? mentor : mentorado;
+        return {
+          key: l.token,
+          nome: p.nome,
+          token: l.token,
+          whatsapp: p.whatsapp,
+          mensagem: msgLinkWhatsApp(
+            formSel?.titulo ?? "o formulário",
+            p.nome,
+            l.token,
+            origem
+          ),
+          validade: l.expira_em
+            ? `até ${new Date(l.expira_em).toLocaleDateString("pt-BR", {
+                day: "2-digit",
+                month: "short",
+                timeZone: "America/Sao_Paulo",
+              })}`
+            : null,
+          duplaId,
+          t: "contato",
+        };
+      }),
+    [links, mentor, mentorado, formSel, duplaId, origem]
+  );
 
   function aoAbrir(o: boolean) {
     setOpen(o);
@@ -180,9 +176,6 @@ export function EnviarFormularioDialog({
     });
   }
 
-  const msgWhatsApp = (p: PessoaDestino, token: string) =>
-    `Olá, ${primeiroNome(p.nome)}! A equipe Realiza.vc te convida pra responder "${formSel?.titulo ?? "o formulário"}" — leva poucos minutos: ${urlPublica(token)}`;
-
   return (
     <Dialog open={open} onOpenChange={aoAbrir}>
       <DialogTrigger
@@ -204,171 +197,115 @@ export function EnviarFormularioDialog({
           </DialogDescription>
         </DialogHeader>
 
-        {links ? (
-          <div className="space-y-3">
-            <ul className="space-y-2">
-              {links.map((l) => {
-                const pessoa = l.tipo === "profile" ? mentor : mentorado;
-                return (
-                  <li
-                    key={l.token}
-                    className="rounded-lg border border-input px-3 py-2.5"
-                  >
-                    <div className="flex items-center gap-2">
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium">
-                          {pessoa.nome}
-                        </p>
-                        <p className="truncate font-mono text-xs text-muted-foreground">
-                          /f/{l.token.slice(0, 14)}…
-                        </p>
-                      </div>
-                      <CopiarLink token={l.token} />
-                    </div>
-                    <div className="mt-2">
-                      <NudgeButton
-                        telefone={pessoa.whatsapp}
-                        mensagem={msgWhatsApp(pessoa, l.token)}
-                        duplaId={duplaId}
-                        t="contato"
-                        label="Enviar no WhatsApp"
-                      />
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-            <div className="flex justify-end gap-2">
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => setLinks(null)}
+        <AnimatePresence mode="wait" initial={false}>
+          {links ? (
+            <motion.div key="prontos" {...fade} transition={T.enter}>
+              <LinksProntos
+                itens={itensProntos}
+                onOutros={() => setLinks(null)}
+              />
+            </motion.div>
+          ) : formularios.length === 0 ? (
+            <motion.p
+              key="vazio"
+              {...fade}
+              transition={T.enter}
+              className="text-sm text-muted-foreground"
+            >
+              Nenhum formulário ativo — crie um em{" "}
+              <Link
+                href="/formularios"
+                className="underline underline-offset-2"
               >
-                Gerar outros links
-              </Button>
-            </div>
-          </div>
-        ) : formularios.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            Nenhum formulário ativo — crie um em{" "}
-            <Link href="/formularios" className="underline underline-offset-2">
-              Formulários
-            </Link>{" "}
-            e volte pra enviar daqui.
-          </p>
-        ) : (
-          <div className="space-y-4">
-            <div className="space-y-1.5">
-              <Label id={formLabelId}>Formulário</Label>
-              <Select
-                value={formId}
-                onValueChange={(v) => setFormId(v ?? "")}
-                items={Object.fromEntries(
-                  ordenados.map((f) => [f.id, f.titulo])
-                )}
-              >
-                <SelectTrigger
-                  aria-labelledby={formLabelId}
-                  className="w-full"
+                Formulários
+              </Link>{" "}
+              e volte pra enviar daqui.
+            </motion.p>
+          ) : (
+            <motion.div
+              key="form"
+              {...fade}
+              transition={T.enter}
+              className="space-y-4"
+            >
+              <div className="space-y-1.5">
+                <Label id={formLabelId}>Formulário</Label>
+                <Select
+                  value={formId}
+                  onValueChange={(v) => setFormId(v ?? "")}
+                  items={Object.fromEntries(
+                    ordenados.map((f) => [f.id, f.titulo])
+                  )}
                 >
-                  <SelectValue placeholder="Escolha o formulário" />
-                </SelectTrigger>
-                <SelectContent>
-                  {ordenados.map((f) => (
-                    <SelectItem key={f.id} value={f.id}>
-                      {f.titulo}
-                      {f.sistema && (
-                        <span className="ml-1.5 rounded-full bg-[var(--brand-lime)]/20 px-1.5 py-0.5 text-[10px] font-medium text-foreground">
-                          oficial · {SISTEMA_LABEL[f.sistema]}
-                        </span>
-                      )}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+                  <SelectTrigger
+                    aria-labelledby={formLabelId}
+                    className="w-full"
+                  >
+                    <SelectValue placeholder="Escolha o formulário" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ordenados.map((f) => (
+                      <SelectItem key={f.id} value={f.id}>
+                        {f.titulo}
+                        {f.sistema && (
+                          <Badge
+                            variant="outline"
+                            className="ml-1.5 border-[var(--brand-lime)]/60 bg-[var(--brand-lime)]/10"
+                          >
+                            oficial · {SISTEMA_LABEL[f.sistema]}
+                          </Badge>
+                        )}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-            <fieldset>
-              <legend className="mb-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                Destinatários
-              </legend>
-              <ul className="space-y-0.5">
-                {(
-                  [
-                    { k: "mentorado", p: mentorado, rotulo: "Mentorado" },
-                    { k: "mentor", p: mentor, rotulo: "Mentor" },
-                  ] as const
-                ).map((d) => (
-                  <li key={d.k}>
-                    <label
-                      className={cn(
-                        "flex min-h-11 items-center gap-3 rounded-lg px-2 text-sm transition-colors sm:min-h-10",
-                        "cursor-pointer hover:bg-muted"
-                      )}
-                    >
-                      <input
-                        type="checkbox"
+              <fieldset>
+                <legend className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                  Destinatários
+                </legend>
+                <ul className="space-y-0.5">
+                  {(
+                    [
+                      { k: "mentorado", p: mentorado, rotulo: "Mentorado" },
+                      { k: "mentor", p: mentor, rotulo: "Mentor" },
+                    ] as const
+                  ).map((d) => (
+                    <li key={d.k}>
+                      <DestinoCheckRow
+                        nome={d.p.nome}
+                        detalhe={d.rotulo}
                         checked={para[d.k]}
-                        onChange={() =>
+                        onToggle={() =>
                           setPara((s) => ({ ...s, [d.k]: !s[d.k] }))
                         }
-                        className="size-4 shrink-0 accent-primary"
                       />
-                      <span className="min-w-0 flex-1 truncate">
-                        {d.p.nome}
-                      </span>
-                      <span className="text-xs text-muted-foreground">
-                        {d.rotulo}
-                      </span>
-                    </label>
-                  </li>
-                ))}
-              </ul>
-            </fieldset>
-
-            <div className="space-y-1.5">
-              <Label id={validadeLabelId}>Validade dos links</Label>
-              <Select
-                value={validade}
-                onValueChange={(v) => setValidade(v ?? "0")}
-                items={Object.fromEntries(
-                  VALIDADE_OPCOES.map((o) => [o.v, o.l])
-                )}
-              >
-                <SelectTrigger
-                  aria-labelledby={validadeLabelId}
-                  className="w-full"
-                >
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {VALIDADE_OPCOES.map((o) => (
-                    <SelectItem key={o.v} value={o.v}>
-                      {o.l}
-                    </SelectItem>
+                    </li>
                   ))}
-                </SelectContent>
-              </Select>
-            </div>
+                </ul>
+              </fieldset>
 
-            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-              <Button
-                type="button"
-                className="w-full sm:w-auto"
-                onClick={gerar}
-                disabled={pending || !formId || nDestinos === 0}
-              >
-                {pending && (
-                  <CircleNotch className="animate-spin" aria-hidden />
-                )}
-                {nDestinos
-                  ? `Gerar ${nDestinos} ${nDestinos === 1 ? "link" : "links"}`
-                  : "Escolha os destinatários"}
-              </Button>
-            </div>
-          </div>
-        )}
+              <ValidadeLinks value={validade} onChange={setValidade} />
+
+              <DialogFooter>
+                <Button
+                  type="button"
+                  className="w-full sm:w-auto"
+                  onClick={gerar}
+                  disabled={pending || !formId || nDestinos === 0}
+                >
+                  {pending && (
+                    <CircleNotch className="animate-spin" aria-hidden />
+                  )}
+                  {nDestinos
+                    ? `Gerar ${nDestinos} ${nDestinos === 1 ? "link" : "links"}`
+                    : "Escolha os destinatários"}
+                </Button>
+              </DialogFooter>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </DialogContent>
     </Dialog>
   );

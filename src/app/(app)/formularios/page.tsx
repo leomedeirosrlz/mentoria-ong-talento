@@ -7,6 +7,7 @@ import { getMe } from "@/lib/queries";
 import { getFormularios } from "@/lib/forms/queries";
 import { SISTEMA_LABEL } from "@/lib/forms/schema";
 import { formatDate } from "@/lib/ciclo";
+import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 
@@ -62,7 +63,11 @@ export default async function FormulariosPage() {
             >
               <Link
                 href={`/formularios/${f.id}`}
-                className="block rounded-xl bg-card px-4 py-3.5 shadow-[var(--shadow-border)] transition-shadow hover:shadow-[var(--shadow-border-hover)] sm:px-5"
+                className={cn(
+                  "block rounded-xl bg-card px-4 py-3.5 shadow-[var(--shadow-border)] transition-shadow hover:shadow-[var(--shadow-border-hover)] sm:px-5",
+                  // encerrado é histórico — sai do foco visual sem sumir
+                  !f.ativo && "opacity-60"
+                )}
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
@@ -97,6 +102,17 @@ export default async function FormulariosPage() {
                   {f.campos.length === 1 ? "pergunta" : "perguntas"}
                   {" · "}
                   {f.linksTotal} {f.linksTotal === 1 ? "link" : "links"}
+                  {" · "}
+                  <span
+                    className={
+                      f.pendentes > 0
+                        ? "font-medium text-[var(--warn-text)]"
+                        : undefined
+                    }
+                  >
+                    {f.pendentes}{" "}
+                    {f.pendentes === 1 ? "pendente" : "pendentes"}
+                  </span>
                   {" · "}
                   <span className={f.respondidos ? "font-medium text-[var(--ok-text)]" : undefined}>
                     {f.respondidos}{" "}

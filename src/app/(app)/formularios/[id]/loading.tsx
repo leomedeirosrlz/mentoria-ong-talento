@@ -1,7 +1,7 @@
 import { Skeleton } from "@/components/ui/skeleton";
 
-// Espelho da ficha: header com badges/ações + seções (perguntas, links,
-// respostas) empilhadas.
+// Espelho da ficha: header com badges/ações + faixa de status + seções
+// (perguntas em leitura, links, respostas) empilhadas.
 export default function Loading() {
   return (
     <div role="status" aria-label="Carregando" className="mx-auto max-w-3xl space-y-8">
@@ -13,19 +13,16 @@ export default function Loading() {
             <Skeleton className="mt-2 h-4 w-96 max-w-full" />
             <Skeleton className="mt-2 h-3 w-40" />
           </div>
-          <Skeleton className="h-8 w-40 rounded-lg" />
+          <Skeleton className="h-7 w-56 rounded-lg" />
         </div>
       </header>
+      <Skeleton className="h-4 w-72" />
       <div>
         <Skeleton className="mb-3 h-4 w-24" />
-        <div className="rounded-xl bg-card p-5 shadow-[var(--shadow-border)]">
-          <Skeleton className="h-8 w-full" />
-          <Skeleton className="mt-3 h-16 w-full" />
-        </div>
-        <div className="mt-3 rounded-xl bg-card p-5 shadow-[var(--shadow-border)]">
-          <Skeleton className="h-4 w-28" />
-          <Skeleton className="mt-3 h-8 w-full" />
-          <Skeleton className="mt-3 h-8 w-52" />
+        <div className="space-y-2.5 rounded-xl bg-card p-4 shadow-[var(--shadow-border)] sm:p-5">
+          <Skeleton className="h-4 w-4/5" />
+          <Skeleton className="h-4 w-3/5" />
+          <Skeleton className="h-4 w-2/3" />
         </div>
       </div>
       <div>

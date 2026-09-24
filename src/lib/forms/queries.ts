@@ -28,6 +28,8 @@ import type {
 export type FormularioListaItem = Formulario & {
   linksTotal: number;
   respondidos: number;
+  /** links vivos ainda não respondidos — o número acionável ("quem falta?") */
+  pendentes: number;
 };
 
 /** Link com o destinatário resolvido pra UI (nome, WhatsApp, dupla) e a
@@ -75,15 +77,19 @@ export const getFormularios = cache(async (): Promise<FormularioListaItem[]> => 
       .from("formularios")
       .select("*")
       .order("created_at", { ascending: false }),
-    supabase.from("formulario_links").select("formulario_id, usado_em"),
+    supabase
+      .from("formulario_links")
+      .select("formulario_id, usado_em, expira_em"),
   ]);
   if (error) throw error;
   if (e2) throw e2;
-  const cont = new Map<string, { total: number; resp: number }>();
+  const agora = Date.now();
+  const cont = new Map<string, { total: number; resp: number; pend: number }>();
   for (const l of links ?? []) {
-    const c = cont.get(l.formulario_id) ?? { total: 0, resp: 0 };
+    const c = cont.get(l.formulario_id) ?? { total: 0, resp: 0, pend: 0 };
     c.total++;
     if (l.usado_em) c.resp++;
+    else if (!l.expira_em || new Date(l.expira_em).getTime() > agora) c.pend++;
     cont.set(l.formulario_id, c);
   }
   return ((forms ?? []) as Formulario[]).map((f) => ({
@@ -91,6 +97,7 @@ export const getFormularios = cache(async (): Promise<FormularioListaItem[]> => 
     campos: (f.campos as unknown as FormularioCampo[]) ?? [],
     linksTotal: cont.get(f.id)?.total ?? 0,
     respondidos: cont.get(f.id)?.resp ?? 0,
+    pendentes: cont.get(f.id)?.pend ?? 0,
   }));
 });
 
@@ -255,34 +262,50 @@ export const getAnamneseMentorado = cache(
 
 // ---------- público (/f/<token>) ----------
 
+/** Resultado da leitura pública — "não encontrado" (token inválido, a RPC
+ *  devolveu null) e "erro" (falha de rede/RPC) são estados diferentes na
+ *  tela: um é terminal, o outro pede retry. */
+export type FormularioTokenResult =
+  | { kind: "ok"; info: FormularioPublico }
+  | { kind: "nao_encontrado" }
+  | { kind: "erro" };
+
 /** Definição do form + estado do link pra página pública — RPC security
  *  definer (anon não tem grant de tabela). Sem sessão funciona igual: o
- *  createClient cai no papel anon e o grant de execute cobre. */
-export async function formularioPorToken(
-  token: string
-): Promise<FormularioPublico | null> {
-  const supabase = await createClient();
-  const { data, error } = await supabase.rpc("formulario_por_token", {
-    p_token: token,
-  });
-  if (error) {
-    console.error("formularioPorToken:", error);
-    return null;
+ *  createClient cai no papel anon e o grant de execute cobre. cache():
+ *  generateMetadata e a página dividem a mesma chamada no request. */
+export const formularioPorToken = cache(
+  async (token: string): Promise<FormularioTokenResult> => {
+    const supabase = await createClient();
+    const { data, error } = await supabase.rpc("formulario_por_token", {
+      p_token: token,
+    });
+    if (error) {
+      console.error("formularioPorToken:", error);
+      return { kind: "erro" };
+    }
+    if (!data) return { kind: "nao_encontrado" };
+    return { kind: "ok", info: data as FormularioPublico };
   }
-  return (data as FormularioPublico | null) ?? null;
-}
+);
 
 // ---------- demo (coord-only, como a página) ----------
 
 function demoLista(role: AppRole): FormularioListaItem[] {
   if (role !== "coordenacao") return [];
   const { formularios, links } = getDemoFormularios();
+  const agora = Date.now();
   return formularios.map((f) => {
     const doForm = links.filter((l) => l.formulario_id === f.id);
     return {
       ...f,
       linksTotal: doForm.length,
       respondidos: doForm.filter((l) => l.usado_em).length,
+      pendentes: doForm.filter(
+        (l) =>
+          !l.usado_em &&
+          (!l.expira_em || new Date(l.expira_em).getTime() > agora)
+      ).length,
     };
   });
 }

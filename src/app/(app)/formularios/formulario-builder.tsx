@@ -175,7 +175,7 @@ export function FormularioBuilder({
             className="rounded-xl bg-card p-4 shadow-[var(--shadow-border)] sm:p-5"
           >
             <div className="mb-3 flex items-center gap-1">
-              <span className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
                 Pergunta {i + 1}
               </span>
               <div className="ml-auto flex items-center">
@@ -225,6 +225,7 @@ export function FormularioBuilder({
                 <div className="min-w-44">
                   <Select
                     value={c.tipo}
+                    items={CAMPO_TIPO_LABEL}
                     onValueChange={(v) =>
                       update(i, { tipo: v as FormularioCampoTipo })
                     }
@@ -262,7 +263,6 @@ export function FormularioBuilder({
                     onChange={(e) => update(i, { opcoes: e.target.value })}
                     rows={3}
                     placeholder={"Opção A\nOpção B\nOpção C"}
-                    className="font-mono text-[0.8rem]"
                   />
                 </div>
               )}

@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { enviarAnamneseMentorado } from "@/lib/actions-formularios";
 import { formatDiaMes } from "@/lib/ciclo";
 import { NudgeButton } from "@/components/nudge-button";
+import { urlPublica } from "@/components/forms/link-shared";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -23,12 +24,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import type { AnamneseMentorado } from "@/lib/forms/queries";
-
-/** URL absoluta do link público — montada no client porque o servidor não
- *  sabe a origem de deploy (mesmo padrão de enviar-formulario-dialog). */
-function urlPublica(token: string): string {
-  return `${window.location.origin}/f/${token}`;
-}
 
 /** Bloco "Anamnese Social" da ficha do mentorado — instrumento oficial
  *  (sistema='anamnese', 0042) que o(a) jovem responde sem login pelo link
