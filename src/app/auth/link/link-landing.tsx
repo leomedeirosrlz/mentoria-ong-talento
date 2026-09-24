@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { type Session } from "@supabase/supabase-js";
-import { CircleNotch } from "@phosphor-icons/react";
+import { CircleNotch, WarningCircle } from "@phosphor-icons/react";
 import { createClient } from "@/lib/supabase/client";
 import { pathInterno } from "@/lib/utils";
 
@@ -12,27 +12,37 @@ import { pathInterno } from "@/lib/utils";
 // carregar e o #access_token morreria no caminho (o handoff nunca rodava).
 export function LinkLanding() {
   const router = useRouter();
-  const params = useSearchParams();
   const supabase = useMemo(() => createClient(), []);
+  const [falhou, setFalhou] = useState(false);
 
   useEffect(() => {
-    const next = params.get("next");
+    // location.search, não useSearchParams: em página estática os params do
+    // Next podem hidratar depois do efeito — o h= sairia null e o aviso de
+    // falha nunca chegaria na aba que pediu
+    const q = new URLSearchParams(location.search);
+    const next = q.get("next");
     const destino = () => pathInterno(next) ?? "/";
-    const urlErro = `/login?erro=link-invalido${next ? `&next=${encodeURIComponent(next)}` : ""}`;
+    const handoff = q.get("h");
 
-    // verify falhou (otp expirado/usado) → despeja #error= aqui; vai pro card
-    // dedicado do login em vez de cair num beco
-    if (location.hash.startsWith("#error=")) {
-      router.replace(urlErro);
-      return;
-    }
+    // link queimado/expirado: com ?h= avisa a aba que pediu (ela para de
+    // esperar e mostra o estado certo); sem ?h= só informa aqui — "pedir
+    // novo link" aqui abriria o login no dispositivo errado
+    const falhar = () => {
+      if (handoff) {
+        // .then() dispara o request — o builder do postgrest é lazy, void
+        // sozinho não envia nada
+        void supabase
+          .rpc("falhar_login_handoff", { p_nonce: handoff })
+          .then(() => {});
+      }
+      setFalhou(true);
+    };
 
     const frag = new URLSearchParams(location.hash.slice(1));
     const access_token = frag.get("access_token");
     const refresh_token = frag.get("refresh_token");
-    const handoff = params.get("h");
-    if (!access_token || !refresh_token) {
-      router.replace("/login");
+    if (location.hash.startsWith("#error=") || !access_token || !refresh_token) {
+      falhar();
       return;
     }
 
@@ -51,7 +61,7 @@ export function LinkLanding() {
         .setSession({ access_token, refresh_token })
         .then(async ({ error }) => {
           if (error) {
-            router.replace(urlErro);
+            falhar();
             return;
           }
           const { data } = await supabase.auth.getSession();
@@ -78,7 +88,26 @@ export function LinkLanding() {
     } else {
       void entrarAqui();
     }
-  }, [supabase, params, router]);
+  }, [supabase, router]);
+
+  if (falhou) {
+    return (
+      <div className="min-h-[100dvh] grid place-items-center bg-background px-4">
+        <div className="max-w-xs text-center">
+          <div
+            role="alert"
+            className="mx-auto grid size-10 place-items-center rounded-full bg-destructive/10 text-destructive"
+          >
+            <WarningCircle size={20} weight="bold" aria-hidden="true" />
+          </div>
+          <p className="mt-4 font-semibold">Link inválido ou expirado</p>
+          <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
+            Peça um novo link na página onde você pediu.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-[100dvh] grid place-items-center bg-background px-4">

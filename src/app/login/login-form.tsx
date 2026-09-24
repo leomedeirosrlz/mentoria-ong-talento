@@ -113,7 +113,8 @@ export function LoginForm() {
     const frag = new URLSearchParams(location.hash.slice(1));
     const access_token = frag.get("access_token");
     const refresh_token = frag.get("refresh_token");
-    const handoff = params.get("h");
+    // location.search, não useSearchParams — ver /auth/link
+    const handoff = new URLSearchParams(location.search).get("h");
     const entrarAqui = () =>
       supabase.auth
         .setSession({ access_token: access_token!, refresh_token: refresh_token! })
@@ -193,7 +194,20 @@ export function LoginForm() {
       const { data: h } = await supabase.rpc("pegar_login_handoff", {
         p_nonce: nonce,
       });
-      const tokens = h as { access_token?: string; refresh_token?: string } | null;
+      const tokens = h as {
+        access_token?: string;
+        refresh_token?: string;
+        failed?: boolean;
+      } | null;
+      // a aba do e-mail achou o link queimado/expirado — para de esperar e
+      // mostra o mesmo card de link inválido (aqui o "pedir novo link" faz
+      // sentido: é o mesmo navegador)
+      if (tokens?.failed) {
+        entrou = true;
+        setEnviado(false);
+        router.replace(urlErroLink());
+        return;
+      }
       if (!tokens?.access_token || !tokens.refresh_token) return;
       const { error } = await supabase.auth.setSession({
         access_token: tokens.access_token,
@@ -221,7 +235,7 @@ export function LoginForm() {
       document.removeEventListener("visibilitychange", aoVoltar);
       window.removeEventListener("focus", aoVoltar);
     };
-  }, [enviado, supabase, entrar]);
+  }, [enviado, supabase, entrar, router, urlErroLink]);
 
   async function pedirLink() {
     setLoading(true);
