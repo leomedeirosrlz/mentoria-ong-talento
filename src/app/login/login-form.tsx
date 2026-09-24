@@ -237,8 +237,10 @@ export function LoginForm() {
           shouldCreateUser: false,
           // implicit: a sessão chega no hash (#access_token) — o destino
           // precisa ser uma página de client, rota de servidor não vê hash.
-          // ?h= é o nonce do handoff (0049)
-          emailRedirectTo: `${location.origin}/login?next=${encodeURIComponent(destino)}&h=${handoff}`,
+          // /auth/link, não /login: lá o middleware desvia usuário já logado
+          // (browser do e-mail com sessão antiga) antes da página rodar, e o
+          // hash morreria no redirect. ?h= é o nonce do handoff (0049)
+          emailRedirectTo: `${location.origin}/auth/link?next=${encodeURIComponent(destino)}&h=${handoff}`,
         },
       });
       handoffRef.current = handoff;
