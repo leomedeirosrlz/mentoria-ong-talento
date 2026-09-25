@@ -66,8 +66,15 @@ export default async function PessoasPage() {
     const pid = a.profile_id ?? a.mentorado_id;
     if (!pid) continue;
     const d = (docsPorPessoa[pid] ??= { assinado: {}, pendente: [] });
-    if (a.status === "assinado") d.assinado[a.slug] = a.assinado_em ?? "";
-    else if (a.status === "pendente" && !d.pendente.includes(a.slug))
+    if (a.status === "assinado")
+      d.assinado[a.slug] = { id: a.id, em: a.assinado_em };
+    else if (
+      a.status === "pendente" &&
+      // link com prazo vencido está morto — conta como não-enviado (warn),
+      // não como "enviada"; o status expirado do banco é lazy (0033)
+      !(a.token_expira_em && new Date(a.token_expira_em) < new Date()) &&
+      !d.pendente.includes(a.slug)
+    )
       d.pendente.push(a.slug);
   }
 

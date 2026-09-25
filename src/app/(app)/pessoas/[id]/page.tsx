@@ -2,12 +2,13 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { ArrowUpRight, Buildings, EnvelopeSimple, HandHeart, LinkedinLogo, WhatsappLogo } from "@phosphor-icons/react/dist/ssr";
-import { getMe, getPessoaPerfil } from "@/lib/queries";
+import { getDocumentosPessoa, getMe, getPessoaPerfil } from "@/lib/queries";
 import { getAnamneseMentorado } from "@/lib/forms/queries";
 import { getSupervisoesDaPessoa } from "@/lib/queries-supervisao";
 import { getResumoFormacao } from "@/lib/queries-presenca";
 import { avatarPublicUrl, gravatarUrl } from "@/lib/avatar";
 import {
+  COR_RACA_LABELS,
   disponibilidadeTexto,
   ESCOLARIDADE_LABELS,
   formatDate,
@@ -19,6 +20,8 @@ import {
   waLink,
 } from "@/lib/ciclo";
 import { AnamneseMentoradoChip } from "@/components/anamnese-mentorado";
+import { DocumentosPessoa } from "@/components/documentos-pessoa";
+import { AssinaturasPessoa } from "@/components/assinaturas-pessoa";
 import { Avatar } from "@/components/avatar";
 import { Badge } from "@/components/ui/badge";
 import { DuplaAvatares } from "@/components/dupla-avatares";
@@ -137,9 +140,13 @@ export default async function PessoaPerfilPage({
   // migração ainda não rodou, então a página segue igual antes dela
   const anamnese =
     ehMentorado && souCoord ? await getAnamneseMentorado(p.id) : null;
+  // documentos do intake (0054) — coord-only; pra outro papel nem dispara
+  const documentos = souCoord
+    ? await getDocumentosPessoa(perfil.tipo, p.id)
+    : [];
   const temFicha = Boolean(
     p.nome_social || local || interesses.length || p.origem ||
-    nascimentoTxt || p.genero || p.motivacao || p.pref_genero_par ||
+    nascimentoTxt || p.genero || p.cor_raca || p.motivacao || p.pref_genero_par ||
     (prof && (prof.cargo || prof.empresa || mp)) ||
     (ment && (ment.escolaridade || ment.objetivos || dispMentoradoTxt))
   );
@@ -266,6 +273,11 @@ export default async function PessoaPerfilPage({
                     valor={p.genero ? GENERO_LABELS[p.genero] : null}
                     sempre={souCoord}
                   />
+                  <Linha
+                    rotulo="Cor/raça"
+                    valor={p.cor_raca ? COR_RACA_LABELS[p.cor_raca] : null}
+                    sempre={souCoord}
+                  />
                   <Linha rotulo="Cidade/UF" valor={local} sempre={souCoord} />
                   {prof && (
                     <>
@@ -366,6 +378,31 @@ export default async function PessoaPerfilPage({
                       />
                     )}
                   </dl>
+                </div>
+              )}
+
+              {/* anexos do form de inscrição (0054) — RG, comprovante,
+                  currículo; coord-only ponta a ponta */}
+              {souCoord && (
+                <div className="mt-4 border-t border-border pt-3">
+                  <DocumentosPessoa
+                    tipo={ehMentorado ? "mentorado" : "profile"}
+                    pessoaId={p.id}
+                    documentos={documentos}
+                  />
+                </div>
+              )}
+
+              {/* termos assinados/pendentes — até aqui só existia dentro do
+                  dialog de edição; a ficha é o lugar natural de conferir */}
+              {souCoord && (
+                <div className="mt-4 border-t border-border pt-3">
+                  <AssinaturasPessoa
+                    tipo={ehMentorado ? "mentorado" : "profile"}
+                    id={p.id}
+                    nome={p.nome}
+                    whatsapp={p.whatsapp}
+                  />
                 </div>
               )}
             </section>

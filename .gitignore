@@ -6,3 +6,6 @@ node_modules
 supabase/.branches
 supabase/.temp
 .env*
+
+# saída do intake real — dados pessoais, nunca commitar
+intake-out/

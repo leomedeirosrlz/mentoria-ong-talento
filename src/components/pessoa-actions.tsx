@@ -12,6 +12,7 @@ import { TagInput } from "@/components/tag-input";
 import {
   CampoConsentimento,
   CampoDisponibilidade,
+  CampoCorRaca,
   CampoGenero,
   CampoInteresses,
   CampoNascimento,
@@ -228,6 +229,7 @@ export function PessoaActions({ pessoa, podeExcluir }: { pessoa: Profile; podeEx
               <CampoNascimento id="e_nasc" defaultValue={pessoa.data_nascimento ?? ""} />
               <CampoGenero defaultValue={pessoa.genero ?? ""} />
             </div>
+            <CampoCorRaca defaultValue={pessoa.cor_raca ?? ""} />
 
             <SecaoFicha>Localização e interesses</SecaoFicha>
             <div className="grid gap-4 sm:grid-cols-3">

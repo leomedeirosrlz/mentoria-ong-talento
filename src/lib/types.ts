@@ -37,6 +37,16 @@ export type Escolaridade =
   | "superior_incompleto"
   | "superior"
   | "pos";
+/** Autodeclaração de cor/raça (0054) — vocabulário do CHECK cor_raca_check.
+ *  Sensível: coord-only via *_pessoal, fora do grant de authenticated. */
+export type CorRaca =
+  | "branca"
+  | "negra"
+  | "parda"
+  | "amarela"
+  | "indigena"
+  | "outro"
+  | "prefiro_nao_dizer";
 export type DiaSemana = "seg" | "ter" | "qua" | "qui" | "sex" | "sab" | "dom";
 export type Periodo = "manha" | "tarde" | "noite";
 
@@ -94,6 +104,12 @@ export type Profile = {
    *  grant de SELECT — coordenação lê/edita por profiles_pessoal, o próprio
    *  signatário lê via RPC meus_dados_civis. */
   dados_civis?: DadosCivis | null;
+  /** Autodeclaração de cor/raça do intake (0054). Sensível (profiles_pessoal). */
+  cor_raca?: CorRaca | null;
+  /** Payload integral da resposta do form de inscrição (0054) — arquivo
+   *  morto do intake; nem o dono edita (guard_profiles_self_columns).
+   *  Sensível (profiles_pessoal). */
+  form_bruto?: Record<string, unknown> | null;
 };
 
 export type Mentorado = {
@@ -134,6 +150,11 @@ export type Mentorado = {
   /** Responsável legal do(a) menor — quem assina a autorização (0046).
    *  Sensível, mesma regra de dados_civis. */
   responsavel?: ResponsavelCivis | null;
+  /** Autodeclaração de cor/raça do intake (0054). Sensível (mentorados_pessoal). */
+  cor_raca?: CorRaca | null;
+  /** Payload integral da resposta do form de inscrição (0054).
+   *  Sensível (mentorados_pessoal). */
+  form_bruto?: Record<string, unknown> | null;
 };
 
 /** mentor_profiles — ficha do mentor que alimenta o board de matching
@@ -532,9 +553,33 @@ export type AssinaturaVia = Pick<
 /** Resumo leve de uma assinatura — status por documento/pessoa pra aba
  *  /pessoas (quem assinou vs. quem não) sem carregar snapshot nem token. */
 export type AssinaturaResumo = {
+  id: string;
   profile_id: string | null;
   mentorado_id: string | null;
   status: AssinaturaStatus;
   assinado_em: string | null;
+  /** prazo do link pendente — sem ele "enviada" pode ser link morto */
+  token_expira_em: string | null;
   slug: string;
+};
+
+/** Documento do intake (RG, comprovante, currículo...) — documentos_pessoa
+ *  (0054): N por pessoa, arquivo no bucket privado `documentos`, coord-only
+ *  ponta a ponta (RLS + policy de storage pelo path). */
+export type DocumentoPessoa = {
+  id: string;
+  profile_id: string | null;
+  mentorado_id: string | null;
+  tipo:
+    | "rg"
+    | "cpf"
+    | "comprovante_residencia"
+    | "comprovante_bancario"
+    | "curriculo"
+    | "outro";
+  path: string;
+  /** Nome original do arquivo no upload. */
+  nome: string | null;
+  created_by: string | null;
+  created_at: string;
 };

@@ -9,6 +9,7 @@ import { avatarPublicUrl } from "@/lib/avatar";
 import { FotoField } from "@/components/foto-field";
 import {
   CampoDisponibilidade,
+  CampoCorRaca,
   CampoEscolaridade,
   CampoGenero,
   CampoInteresses,
@@ -139,6 +140,7 @@ export function MentoradoActions({ mentorado, temDupla }: { mentorado: Mentorado
               <CampoNascimento id="em_nasc" defaultValue={mentorado.data_nascimento ?? ""} />
               <CampoGenero defaultValue={mentorado.genero ?? ""} />
             </div>
+            <CampoCorRaca defaultValue={mentorado.cor_raca ?? ""} />
 
             <SecaoFicha>Onde vive e origem</SecaoFicha>
             <div className="grid gap-4 sm:grid-cols-3">
@@ -231,7 +233,7 @@ export function MentoradoActions({ mentorado, temDupla }: { mentorado: Mentorado
               whatsapp={mentorado.whatsapp}
             />
             <p className="text-xs text-muted-foreground">
-              Nascimento, gênero, motivação e preferência de par ficam visíveis só pra coordenação.
+              Nascimento, gênero, cor/raça, motivação e preferência de par ficam visíveis só pra coordenação.
             </p>
             {/* barra sticky (padrão do registro-form) — o Salvar ficava
                 soterrado no fim do scroll interno do dialog */}

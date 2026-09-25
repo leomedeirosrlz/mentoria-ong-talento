@@ -99,9 +99,9 @@ export function PessoasMaisAcoes() {
           </DropdownMenuItem>
           <DropdownMenuItem
             render={<a href="/api/export?tipo=assinaturas" />}
-            title="Backup das assinaturas — status, evidências e dados assinados"
+            title="Planilha das assinaturas — status, evidências e link do PDF. Aceita ?status= e ?documento= na URL"
           >
-            <DownloadSimple /> Assinaturas (backup)
+            <DownloadSimple /> Exportar assinaturas (CSV)
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -247,7 +247,7 @@ export function NovaPessoaDialog() {
 
           <p className="text-xs text-muted-foreground">
             A pessoa entra com o e-mail por link de acesso; o papel define o que ela vê e pode ser alterado depois na lista.
-            Nascimento, gênero, motivação e preferência de par ficam visíveis só pra coordenação.
+            Nascimento, gênero, cor/raça, motivação e preferência de par ficam visíveis só pra coordenação.
           </p>
           {/* barra sticky — o Cadastrar ficava no fim do scroll interno do
               dialog; colada ao rodapé fica à mão com o form rolado ao meio */}
@@ -369,7 +369,7 @@ export function NovoMentoradoDialog() {
           <FotoField id="m_foto" />
 
           <p className="text-xs text-muted-foreground">
-            Nascimento, gênero, motivação e preferência de par ficam visíveis só pra coordenação.
+            Nascimento, gênero, cor/raça, motivação e preferência de par ficam visíveis só pra coordenação.
           </p>
           {/* mesma barra sticky do cadastro de pessoa */}
           <div className="sticky bottom-0 -mx-4 -mb-4 border-t bg-popover px-4 py-3">

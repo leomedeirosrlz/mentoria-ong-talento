@@ -1,8 +1,10 @@
 import type {
   CicloEvento,
+  CorRaca,
   DiaSemana,
   Dificuldade,
   Disponibilidade,
+  DocumentoPessoa,
   Dupla,
   Encontro,
   Escolaridade,
@@ -142,6 +144,10 @@ export const PREF_GENEROS = ["feminino", "masculino", "indiferente"] as const sa
 export const ESCOLARIDADES = [
   "fundamental", "medio", "tecnico", "superior_incompleto", "superior", "pos",
 ] as const satisfies readonly Escolaridade[];
+export const COR_RACAS = [
+  "branca", "negra", "parda", "amarela", "indigena", "outro",
+  "prefiro_nao_dizer",
+] as const satisfies readonly CorRaca[];
 export const DIAS_SEMANA = ["seg", "ter", "qua", "qui", "sex", "sab", "dom"] as const satisfies readonly DiaSemana[];
 export const PERIODOS = ["manha", "tarde", "noite"] as const satisfies readonly Periodo[];
 
@@ -167,6 +173,31 @@ export const ESCOLARIDADE_LABELS: Record<Escolaridade, string> = {
   superior_incompleto: "Superior incompleto",
   superior: "Superior completo",
   pos: "Pós-graduação",
+};
+
+export const COR_RACA_LABELS: Record<CorRaca, string> = {
+  branca: "Branca",
+  negra: "Negra",
+  parda: "Parda",
+  amarela: "Amarela",
+  indigena: "Indígena",
+  outro: "Outro",
+  prefiro_nao_dizer: "Prefiro não dizer",
+};
+
+/** Tipos de documento do intake (documentos_pessoa, 0054). */
+export const DOCUMENTO_PESSOA_TIPOS = [
+  "rg", "cpf", "comprovante_residencia", "comprovante_bancario",
+  "curriculo", "outro",
+] as const satisfies readonly DocumentoPessoa["tipo"][];
+
+export const DOCUMENTO_PESSOA_TIPO_LABELS: Record<DocumentoPessoa["tipo"], string> = {
+  rg: "RG / CNH",
+  cpf: "CPF",
+  comprovante_residencia: "Comprovante de residência",
+  comprovante_bancario: "Comprovante bancário",
+  curriculo: "Currículo",
+  outro: "Outro",
 };
 
 /** Grade de disponibilidade (mentor_profiles.disponibilidade) — dias na

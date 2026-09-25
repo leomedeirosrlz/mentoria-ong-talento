@@ -4,17 +4,19 @@ import { demoRole } from "@/lib/demo/mode";
 import { getDemoData } from "@/lib/demo/data";
 import { demoPdf } from "@/lib/demo/pdf";
 
-// Download de documento oficial (termo do mentor, autorização do mentorado):
-// a autorização mora na policy do storage.objects — só a coordenação lê objeto
-// do bucket `documentos`, então só ela consegue assinar URL (outros -> 404).
-// O arquivo sai do bucket privado via signed URL de 5 min.
+// Download de documento: oficial (tipo=pessoa|mentorado — termo do mentor,
+// autorização do mentorado) ou do intake (tipo=doc — row de documentos_pessoa,
+// 0054). A autorização mora na policy do storage.objects + RLS da tabela —
+// só a coordenação lê objeto do bucket `documentos`, então só ela consegue
+// assinar URL (outros -> 404). O arquivo sai do bucket privado via signed
+// URL de 5 min.
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
   const tipo = new URL(request.url).searchParams.get("tipo");
-  if (tipo !== "pessoa" && tipo !== "mentorado") {
+  if (tipo !== "pessoa" && tipo !== "mentorado" && tipo !== "doc") {
     return new NextResponse("Documento não encontrado.", { status: 404 });
   }
 
@@ -55,24 +57,34 @@ export async function GET(
     return new NextResponse("Sessão expirada — entre de novo.", { status: 401 });
   }
 
-  // documento_path de profiles está fora do grant de coluna (0026) — a view
-  // profiles_contato só devolve o campo pra coordenação; pros demais vem
-  // null (ou nem a linha) e cai no 404, como a policy do storage já faria
-  const { data: pessoa, error } = await supabase
-    .from(tipo === "mentorado" ? "mentorados" : "profiles_contato")
-    .select("id, documento_path")
-    .eq("id", id)
-    .maybeSingle();
+  // tipo=doc: documento do intake — documentos_pessoa é coord-only pela RLS,
+  // então a row só volta pra coordenação; pros demais cai no 404. O storage
+  // repete o gate (a policy do bucket exige o path registrado em alguém).
+  const { data: doc, error } = tipo === "doc"
+    ? await supabase
+        .from("documentos_pessoa")
+        .select("id, path")
+        .eq("id", id)
+        .maybeSingle()
+    // documento_path de profiles está fora do grant de coluna (0026) — a view
+    // profiles_contato só devolve o campo pra coordenação; pros demais vem
+    // null (ou nem a linha) e cai no 404, como a policy do storage já faria
+    : await supabase
+        .from(tipo === "mentorado" ? "mentorados" : "profiles_contato")
+        .select("id, documento_path")
+        .eq("id", id)
+        .maybeSingle();
   if (error) {
     return new NextResponse("Não foi possível abrir o documento — tente de novo.", { status: 500 });
   }
-  if (!pessoa?.documento_path) {
+  const path = doc == null ? null : "path" in doc ? doc.path : doc.documento_path;
+  if (!path) {
     return new NextResponse("Documento não encontrado.", { status: 404 });
   }
 
   const { data: signed, error: signError } = await supabase.storage
     .from("documentos")
-    .createSignedUrl(pessoa.documento_path, 300);
+    .createSignedUrl(path, 300);
   if (signError || !signed?.signedUrl) {
     return new NextResponse("Não foi possível abrir o documento.", { status: 404 });
   }

@@ -1,4 +1,8 @@
-import type { AppRole, DadosCivis, Escolaridade, Genero, PrefGeneroPar } from "./types";
+import type { AppRole, CorRaca, DadosCivis, Escolaridade, Genero, PrefGeneroPar } from "./types";
+import { UFS, parseDisponibilidade } from "./ciclo";
+
+export const MAX_INTERESSES = 20;
+export const INTERESSE_MAX_CHARS = 60;
 
 /** Linha normalizada da planilha — união dos campos de pessoas (profiles +
  *  mentor_profiles) e de mentorados. Campos que não se aplicam ao tipo são
@@ -44,6 +48,16 @@ export type LinhaImportada = {
   resp_numero: string;
   resp_complemento: string;
   resp_bairro: string;
+  // ---------- intake real (0054) ----------
+  cor_raca: string;
+  linkedin: string;
+  bio: string;
+  /** JSON {"dias":["seg"],"periodos":["noite"]} — grade semanal. */
+  disponibilidade: string;
+  /** JSON objeto — payload integral do form de origem. */
+  form_bruto: string;
+  /** ISO datetime — carimbo do consentimento LGPD (só profiles). */
+  consent_lgpd_em: string;
 };
 
 const VAZIA: LinhaImportada = {
@@ -87,19 +101,88 @@ const VAZIA: LinhaImportada = {
   resp_numero: "",
   resp_complemento: "",
   resp_bairro: "",
+  cor_raca: "",
+  linkedin: "",
+  bio: "",
+  disponibilidade: "",
+  form_bruto: "",
+  consent_lgpd_em: "",
 };
 
-function semAcento(s: string): string {
+export function semAcento(s: string): string {
   return s.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase().trim();
 }
+
+/** Normaliza header pra casar com o alias exato: sem acento, pontuação
+ *  interna vira espaço e a pontuação final do Google Forms ("...:", "...?")
+ *  some — "E-mail:" e "E-mail" são a mesma coluna. */
+function normHeader(h: string): string {
+  return semAcento(h)
+    .replace(/[,.;:!?()[\]]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** Headers reais dos Google Forms do intake (matching mentores/mentorados,
+ *  cadastro Brasil Participativo) — exatos, conferidos antes do fuzzy pra
+ *  não caírem em padrão genérico ("documento de identidade oficial" no nome
+ *  civil pegaria `rg`; "foto de perfil" pegaria `papel`). null = coluna
+ *  ignorada de propósito (anexo, carimbo, pergunta sim/não auxiliar). */
+const ALIAS_EXATO: Record<string, keyof LinhaImportada | null> = {
+  // headers canônicos com "_" — \b não dispara depois de underscore (é \w),
+  // então "cor_raca" caía em null e perdia o campo inteiro na importação
+  cor_raca: "cor_raca",
+  consent_lgpd_em: "consent_lgpd_em",
+  "carimbo de data/hora": null,
+  "nome completo civil como esta no seu documento de identidade oficial": "nome",
+  "nome completo": "nome",
+  "nome social": "nome_social",
+  "nome social se houver": "nome_social",
+  "data de nascimento": "data_nascimento",
+  "como voce se identifica em relacao a genero": "genero",
+  "como voce se identifica em relacao a cor/raca": "cor_raca",
+  "autodeclaracao marque todas as opcoes que se aplicam": "cor_raca",
+  "estado/municipio de residencia": "cidade",
+  "uf estado": "uf",
+  "voce tem preferencia de ser mentor para mentorado homem ou mulher": "pref_genero_par",
+  "voce tem preferencia de ser mentorando por um mentor homem ou mulher": "pref_genero_par",
+  "perfil no linkedin": "linkedin",
+  "perfil no linkedin opcional": "linkedin",
+  // "empresa/instituição" pegaria `ong` (instituicao) antes de empresa
+  "empresa/instituicao": "empresa",
+  // S/N auxiliar — a descrição que vale é a coluna seguinte
+  "possui experiencia previa no trabalho como mentor": null,
+  "caso possua experiencia previa como mentor por favor descreva-a": "experiencia_previa",
+  "possui a formacao no metodo mentoring autentico dada pela erlich mentoring": "formacao_externa",
+  "autorizacao de uso dos dados lgpd": "consent_lgpd_em",
+  // bio = a descrição em 1º pessoa; a 3ª pessoa (esposa/amigos) fica no form_bruto
+  "por favor faca uma descricao de voce mesmo em um paragrafo inserindo suas caracteristicas mais marcantes": "bio",
+  "se a sua esposa ou seu marido ou seu companheiro a fossem fazer uma breve descricao de voce como eles lhe descreveriam": null,
+  "se seus amigos/familiares fossem fazer uma breve descricao de voce como eles lhe descreveriam": null,
+  // Brasil Participativo cru: "Tipo de conta bancária" casaria `tipo`->papel
+  // e pulava a linha ("papel não reconhecido"); "CPF - documento" é upload
+  // (link Drive) e escaparia do guard de anexo por não dizer "anexo"
+  "tipo de conta bancaria": null,
+  "cpf - documento": null,
+};
 
 /** header da planilha -> campo canônico (colunas desconhecidas são ignoradas).
  *  \b só no início da palavra: aceita plurais ("notas", "organizações")
  *  sem sequestrar substrings ("longo" não é ong, "sobrenome" não é nome).
- *  Ordem importa: padrões mais específicos (nome_social, pref_genero_par)
- *  vêm antes dos genéricos (nome, genero) pra não serem engolidos. */
+ *  Ordem importa: alias exato do intake primeiro; depois anexos (uma coluna
+ *  de upload nunca é campo de texto); padrões mais específicos (nome_social,
+ *  pref_genero_par) vêm antes dos genéricos (nome, genero). */
 function canonHeader(h: string): keyof LinhaImportada | null {
+  const exato = normHeader(h);
+  if (exato in ALIAS_EXATO) return ALIAS_EXATO[exato];
   const n = semAcento(h);
+  // coluna de arquivo (link do Drive) nunca é campo de texto — "Anexo do RG"
+  // pegaria rg, "CPF - documento" pegaria cpf, "foto de perfil" pegaria papel
+  if (/\banex|\barquivo|upload|\bfoto\b|curriculo|comprovante|frente e verso|adicione/.test(n))
+    return null;
+  // grade de horários do form ("disponibilidade de agenda: [09h às 10h]")
+  // são N colunas — o transform funde num JSON só; aqui ignora, não quebra
+  if (/disponibilidade.*\d{1,2}h/.test(n)) return null;
   // responsável do menor primeiro — "nome do responsável" não pode cair no
   // "nome" genérico; qualquer campo civil seguido de "responsável" é dele.
   // `\bresp[_. ]` cobre os headers crus do modelo CSV (resp_nome, resp_cpf).
@@ -137,7 +220,8 @@ function canonHeader(h: string): keyof LinhaImportada | null {
   if (/\b(whats|telefone|celular|fone|phone)/.test(n)) return "whatsapp";
   if (/\b(nome social|nome_social)/.test(n)) return "nome_social";
   if (/\b(papel|role|funcao|perfil|tipo)\b/.test(n) && !/genero/.test(n)) return "papel";
-  if (/\bpref.*genero|\bgenero.*pref/.test(n)) return "pref_genero_par";
+  if (/\bpref.*genero|\bgenero.*pref|\bpreferencia.*(homem|mulher|mentor)/.test(n)) return "pref_genero_par";
+  if (/\braca|\betnia|autodeclar/.test(n)) return "cor_raca";
   if (/\bgenero|sexo\b/.test(n)) return "genero";
   if (/\b(nascimento|aniversario|data_nascimento)/.test(n)) return "data_nascimento";
   if (/\bcidade|municipio|localidade/.test(n)) return "cidade";
@@ -152,6 +236,11 @@ function canonHeader(h: string): keyof LinhaImportada | null {
   if (/\bformacao externa|formacao_externa/.test(n)) return "formacao_externa";
   if (/\bcargo|profissao|ocupacao/.test(n)) return "cargo";
   if (/\bempresa|companhia|\btrabalha em\b/.test(n)) return "empresa";
+  if (/linkedin/.test(n)) return "linkedin";
+  if (/\bbio\b|descricao de voce|autodescri/.test(n)) return "bio";
+  if (/\bdisponibilidade/.test(n)) return "disponibilidade";
+  if (/\bform_bruto|\bpayload|\bresposta bruta/.test(n)) return "form_bruto";
+  if (/\blgpd|consentimento|autorizacao.*dados|uso dos dados/.test(n)) return "consent_lgpd_em";
   if (/\borigem|como conheceu|como chegou/.test(n)) return "origem";
   if (/\b(nome|name)/.test(n)) return "nome";
   return null;
@@ -243,8 +332,14 @@ export const emailValido = (s: string) =>
   /^[^\s@.][^\s@]*@([^\s@.]+\.)+[^\s@.]{2,}$/.test(s) && !s.includes("..");
 
 /** whatsapp -> só dígitos; completa 55 quando vem DD+número BR (0800/curto não é whatsapp).
- *  Com "+" no input o número já vem com DDI — nunca prefixar 55. */
+ *  Com "+" no input o número já vem com DDI — nunca prefixar 55.
+ *  Planilha corrompe número em notação científica ("1.1984788783E10") —
+ *  expande antes de extrair os dígitos, senão o "E10" vira dígito extra. */
 export function normWhatsapp(s: string): string | null {
+  const v = s.trim();
+  if (/^\d+(\.\d+)?[eE]\+?\d+$/.test(v)) {
+    s = Number(v).toFixed(0);
+  }
   const d = s.replace(/\D/g, "");
   if (d.length < 10 || d.startsWith("0")) return null;
   if (s.includes("+")) return d;
@@ -266,17 +361,24 @@ export function mapRole(s: string): AppRole | null {
 // mesmos CHECKs do banco, validados aqui pra linha inválida virar skip
 // com motivo em pt-BR em vez de erro de banco no meio do import.
 
-/** "dd/mm/aaaa", "dd-mm-aaaa" ou ISO "aaaa-mm-dd" -> ISO; null = inválida/vazia. */
+/** "dd/mm/aaaa", "dd-mm-aaaa", ISO "aaaa-mm-dd" ou serial de planilha
+ *  ("30762" — o Excel/Google Forms exporta data como número de dias desde
+ *  1899-12-30; 5 dígitos cobre 1927–2127, suficiente pra nascimento)
+ *  -> ISO; null = inválida/vazia. */
 export function normData(s: string): string | null {
   const v = s.trim();
   if (!v) return null;
+  const serialM = /^(\d{5})(\.\d+)?$/.exec(v);
   const isoM = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v);
   const brM = /^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{4})$/.exec(v);
-  const iso = isoM
-    ? `${isoM[1]}-${isoM[2]}-${isoM[3]}`
-    : brM
-      ? `${brM[3]}-${brM[2].padStart(2, "0")}-${brM[1].padStart(2, "0")}`
-      : null;
+  const iso = serialM
+    ? new Date(Date.UTC(1899, 11, 30) + Math.floor(Number(serialM[1])) * 86400000)
+        .toISOString().slice(0, 10)
+    : isoM
+      ? `${isoM[1]}-${isoM[2]}-${isoM[3]}`
+      : brM
+        ? `${brM[3]}-${brM[2].padStart(2, "0")}-${brM[1].padStart(2, "0")}`
+        : null;
   if (!iso) return null;
   const d = new Date(`${iso}T12:00:00`);
   // rejeita 31/02, 30/02 etc. — Date normaliza em vez de falhar
@@ -302,10 +404,12 @@ export function normLista(s: string): string[] {
 export function mapGenero(s: string): Genero | null {
   const n = semAcento(s);
   if (!n) return null;
-  if (/^fem|mulher/.test(n)) return "feminino";
-  if (/^masc|homem/.test(n)) return "masculino";
-  if (/nao.?bin|nb\b/.test(n)) return "nao_binario";
+  // ordem importa: "prefiro não dizer" e "não binário" antes dos binários,
+  // e cis/transgênero resolve pelo núcleo ("cisgênero feminino" -> feminino)
   if (/prefiro/.test(n)) return "prefiro_nao_dizer";
+  if (/nao.?bin|nb\b/.test(n)) return "nao_binario";
+  if (/fem|mulher/.test(n)) return "feminino";
+  if (/masc|homem/.test(n)) return "masculino";
   if (/outro/.test(n)) return "outro";
   return null;
 }
@@ -313,7 +417,7 @@ export function mapGenero(s: string): Genero | null {
 export function mapPrefGenero(s: string): PrefGeneroPar | null {
   const n = semAcento(s);
   if (!n) return null;
-  if (/indiferente|tanto faz|qualquer|sem pref/.test(n)) return "indiferente";
+  if (/indiferente|tanto faz|qualquer|sem pref|nao tenho pref/.test(n)) return "indiferente";
   if (/fem|mulher/.test(n)) return "feminino";
   if (/masc|homem/.test(n)) return "masculino";
   return null;
@@ -329,6 +433,56 @@ export function mapEscolaridade(s: string): Escolaridade | null {
   if (/incompleto|cursando|inacabado/.test(n)) return "superior_incompleto";
   if (/superior|graduac|faculdade|bacharel|licenciat/.test(n)) return "superior";
   return null;
+}
+
+// ---------- intake real (0054) ----------
+
+/** Autodeclaração de cor/raça -> vocabulário do CHECK. Campo de texto livre
+ *  no form (gente coloca sobrenome, resposta torta) — não reconhecido vira
+ *  null e o valor cru fica preservado no form_bruto, nunca derruba a linha. */
+export function mapCorRaca(s: string): CorRaca | null {
+  const n = semAcento(s);
+  if (!n) return null;
+  if (/prefiro/.test(n)) return "prefiro_nao_dizer";
+  if (/branc/.test(n)) return "branca";
+  if (/negr|pret/.test(n)) return "negra";
+  if (/pard/.test(n)) return "parda";
+  if (/amarel/.test(n)) return "amarela";
+  if (/indig/.test(n)) return "indigena";
+  if (/outro/.test(n)) return "outro";
+  return null;
+}
+
+/** LinkedIn -> URL http(s) (CHECK profiles_linkedin_http). Sem scheme ganha
+ *  https://; o que não virar URL com domínio volta null — texto solto
+ *  ("não tenho") não derruba a linha, fica só no form_bruto. */
+export function normLinkedin(s: string): string | null {
+  const v = s.trim();
+  if (!v) return null;
+  const com = /^https?:\/\//i.test(v) ? v : `https://${v.replace(/^\/+/, "")}`;
+  try {
+    const u = new URL(com);
+    return u.hostname.includes(".") ? com.slice(0, 300) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Campo de documento/endereço corrompido pela planilha: notação científica
+ *  ("2.2849975893E10" -> "22849975893") e float de número de casa ("207.0"
+ *  -> "207"). Texto misto ("4075010-8 /SEDS/AL") passa intacto — órgão
+ *  emissor junto do RG é informação, não ruído. */
+function numDoc(s: string): string {
+  const v = s.trim();
+  if (/^\d+(\.\d+)?[eE]\+?\d+$/.test(v)) return Number(v).toFixed(0);
+  const m = /^(\d+)\.0+$/.exec(v);
+  return m ? m[1] : v;
+}
+
+/** Papel que declara "sem papel na plataforma" (cadastro Brasil Participativo
+ *  importado como registro, não como usuário) — role null, não linha pulada. */
+export function papelNulo(s: string): boolean {
+  return /^(nenhum|sem papel|voluntari[oa]s?|cadastro)$/i.test(semAcento(s));
 }
 
 // ---------- dados civis (0046) ----------
@@ -352,17 +506,17 @@ export function civisImportado(
     normNome(String(l[`${prefix}${k}` as keyof LinhaImportada] ?? ""));
   const dados: DadosCivis = {
     nome_civil: fixos.nome_civil ?? g("nome"),
-    rg: g("rg"),
-    cpf: g("cpf").replace(/\D/g, ""),
+    rg: numDoc(g("rg")),
+    cpf: numDoc(g("cpf")).replace(/\D/g, ""),
     data_nascimento: fixos.data_nascimento ?? normData(g("nascimento")),
     endereco: {
       logradouro: g("logradouro"),
-      numero: g("numero"),
+      numero: numDoc(g("numero")),
       complemento: g("complemento") || null,
       bairro: g("bairro"),
       cidade: fixos.cidade ?? g("cidade"),
       uf: (fixos.uf ?? normUf(g("uf"))) ?? "",
-      cep: g("cep").replace(/\D/g, ""),
+      cep: numDoc(g("cep")).replace(/\D/g, ""),
     },
   };
   const temAlgo =
@@ -374,4 +528,120 @@ export function civisImportado(
     dados.endereco.numero ||
     (!fixos.nome_civil && dados.nome_civil);
   return temAlgo ? dados : null;
+}
+
+/** Mesma validação da ficha, mas sobre uma linha da planilha — valor bruto
+ *  preenchido e irreconhecível devolve motivo pra pular a linha (em vez de
+ *  gravar null ou estourar no CHECK do insert em lote). Vive aqui (e não em
+ *  actions.ts) porque o script de import real (scripts/importar-intake.ts)
+ *  roda fora do Next e precisa montar o mesmo registro. */
+export function fichaLinha(
+  l: LinhaImportada,
+  de: "pessoa" | "mentorado"
+): Record<string, unknown> | { error: string } {
+  const out: Record<string, unknown> = {};
+  const texto = (campo: keyof LinhaImportada, col: string, max: number, rotulo: string) => {
+    const v = normNome(String(l[campo] ?? ""));
+    if (v.length > max) return `${rotulo} passa de ${max} caracteres`;
+    out[col] = v || null;
+    return null;
+  };
+  const specs: [keyof LinhaImportada, string, number, string][] = [
+    ["nome_social", "nome_social", 150, "nome social"],
+    ["cidade", "cidade", 100, "cidade"],
+    ["origem", "origem", 300, "origem"],
+    ["motivacao", "motivacao", 2000, "motivação"],
+    ...(de === "pessoa"
+      ? [["cargo", "cargo", 120, "cargo"], ["empresa", "empresa", 150, "empresa"]] as [keyof LinhaImportada, string, number, string][]
+      : [["objetivos", "objetivos", 2000, "objetivos"]] as [keyof LinhaImportada, string, number, string][]),
+  ];
+  for (const [campo, col, max, rotulo] of specs) {
+    const erro = texto(campo, col, max, rotulo);
+    if (erro) return { error: erro };
+  }
+
+  const nasc = normData(String(l.data_nascimento ?? ""));
+  if (String(l.data_nascimento ?? "").trim() && !nasc)
+    return { error: "data de nascimento inválida (use dd/mm/aaaa)" };
+  out.data_nascimento = nasc;
+
+  const genero = mapGenero(String(l.genero ?? ""));
+  if (String(l.genero ?? "").trim() && !genero) return { error: "gênero não reconhecido" };
+  out.genero = genero;
+
+  const uf = normUf(String(l.uf ?? ""));
+  if (String(l.uf ?? "").trim() && (!uf || !(UFS as readonly string[]).includes(uf)))
+    return { error: "UF inválida (use a sigla, ex.: SP)" };
+  out.uf = uf;
+
+  const interesses = normLista(String(l.interesses ?? ""));
+  if (interesses.length > MAX_INTERESSES) return { error: `mais de ${MAX_INTERESSES} interesses` };
+  if (interesses.some((t) => t.length > INTERESSE_MAX_CHARS))
+    return { error: `interesse com mais de ${INTERESSE_MAX_CHARS} caracteres` };
+  out.interesses = interesses;
+
+  const pref = mapPrefGenero(String(l.pref_genero_par ?? ""));
+  if (String(l.pref_genero_par ?? "").trim() && !pref)
+    return { error: "preferência de gênero do par não reconhecida" };
+  out.pref_genero_par = pref;
+
+  // cor/raça é texto livre no form de intake — irreconhecível vira null
+  // (o cru fica preservado no form_bruto), não derruba a linha
+  out.cor_raca = mapCorRaca(String(l.cor_raca ?? ""));
+
+  // payload integral do form (0054) — objeto JSON, teto de 32 KB
+  const fb = String(l.form_bruto ?? "").trim();
+  if (fb) {
+    if (fb.length > 32_768) return { error: "form_bruto passa de 32 KB" };
+    try {
+      const obj: unknown = JSON.parse(fb);
+      if (!obj || typeof obj !== "object" || Array.isArray(obj))
+        return { error: "form_bruto deve ser um objeto JSON" };
+      out.form_bruto = obj;
+    } catch {
+      return { error: "form_bruto não é JSON válido" };
+    }
+  }
+
+  if (de === "pessoa") {
+    // linkedin/bio são colunas de profiles (0030); texto que não vira URL
+    // e cor/raça torta não derrubam a linha — o cru fica no form_bruto
+    out.linkedin = normLinkedin(String(l.linkedin ?? ""));
+    const bio = String(l.bio ?? "").trim();
+    if (bio.length > 1000) return { error: "bio passa de 1.000 caracteres" };
+    out.bio = bio || null;
+    const lgpd = String(l.consent_lgpd_em ?? "").trim();
+    if (lgpd) {
+      const t = new Date(lgpd);
+      out.consent_lgpd_em = isNaN(t.getTime()) ? null : t.toISOString();
+    }
+  }
+
+  if (de === "mentorado") {
+    const esc = mapEscolaridade(String(l.escolaridade ?? ""));
+    if (String(l.escolaridade ?? "").trim() && !esc)
+      return { error: "escolaridade não reconhecida" };
+    out.escolaridade = esc;
+
+    // grade semanal do jovem (0038) — JSON {"dias":[],"periodos":[]}
+    const disp = parseDisponibilidade(String(l.disponibilidade ?? ""));
+    if (disp && "error" in disp) return { error: disp.error };
+    out.disponibilidade = disp;
+
+    const resp = civisImportado(l, "resp_");
+    const parentesco = normNome(String(l.resp_parentesco ?? ""));
+    if (resp) out.responsavel = { ...resp, parentesco };
+  }
+
+  // dados civis (0046) — as colunas de documento/endereço viram o jsonb que
+  // preenche os termos; nome/nascimento/cidade/UF vêm da própria ficha
+  const civis = civisImportado(l, "", {
+    nome_civil: normNome(l.nome),
+    data_nascimento: out.data_nascimento as string | null,
+    cidade: (out.cidade as string | null) ?? "",
+    uf: (out.uf as string | null) ?? "",
+  });
+  if (civis) out.dados_civis = civis;
+
+  return out;
 }

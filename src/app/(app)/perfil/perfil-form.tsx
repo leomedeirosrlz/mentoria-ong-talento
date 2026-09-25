@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { type Session } from "@supabase/supabase-js";
-import { Camera, CaretDown } from "@phosphor-icons/react";
+import { Camera, CaretDown, FileArrowDown, Signature } from "@phosphor-icons/react";
 import { createClient } from "@/lib/supabase/client";
 import { DEMO_MSG } from "@/lib/demo/shared";
 import { setAvatarPath, updateMeuPerfil } from "@/lib/actions";
@@ -25,7 +25,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { AREAS_SUGESTOES, formatWhatsApp, papelLabel } from "@/lib/ciclo";
-import type { Disponibilidade, MentorProfile, Profile } from "@/lib/types";
+import type { Assinatura, Disponibilidade, MentorProfile, Profile } from "@/lib/types";
+import Link from "next/link";
 
 /** Qual form está salvando — três forms chamam a mesma action e o patch é
  *  parcial, mas salvar dois ao mesmo tempo misturaria toasts/estados. */
@@ -55,11 +56,15 @@ export function PerfilForm({
   mentorProfile,
   avatarUrl,
   gravatarUrl,
+  assinaturaTermo,
 }: {
   me: Profile;
   mentorProfile: MentorProfile | null;
   avatarUrl: string | null;
   gravatarUrl: string;
+  /** Termo de voluntariado do próprio usuário — pendência do cadastro que
+   *  não é campo de form (a assinatura é outra página, /assinar). */
+  assinaturaTermo: Assinatura | null;
 }) {
   const supabase = useMemo(() => createClient(), []);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -181,6 +186,10 @@ export function PerfilForm({
   ];
   const cadPendentes = camposCadastro.filter((c) => !c.ok);
   const cadPreenchidos = camposCadastro.filter((c) => c.ok);
+  // o termo de voluntariado entra na conta de pendências da gaveta mesmo
+  // não sendo campo — cadastro completo = dados + assinatura
+  const termoOk = assinaturaTermo?.status === "assinado";
+  const pendentesTotal = cadPendentes.length + (termoOk ? 0 : 1);
 
   // ficha de mentor: disponibilidade sem nenhum dia conta como pendente
   // (é o dado que o matching cruza), igual os textos vazios
@@ -478,16 +487,16 @@ export function PerfilForm({
           avisa no summary; completo fica a um gesto de distância */}
       <details
         className="group/cadastro rounded-xl bg-card shadow-[var(--shadow-border)]"
-        open={cadPendentes.length > 0}
+        open={pendentesTotal > 0}
       >
         <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2.5 rounded-xl px-6 py-4 transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring group-open/cadastro:rounded-b-none [&::-webkit-details-marker]:hidden">
           <span className="text-sm font-semibold">Dados de cadastro</span>
-          {cadPendentes.length > 0 ? (
+          {pendentesTotal > 0 ? (
             <Badge
               variant="outline"
               className="border-[var(--warn)]/60 font-normal text-[var(--warn-text)]"
             >
-              {cadPendentes.length} {cadPendentes.length === 1 ? "pendente" : "pendentes"}
+              {pendentesTotal} {pendentesTotal === 1 ? "pendente" : "pendentes"}
             </Badge>
           ) : (
             <span className="text-xs text-[var(--ok-text)]">completo</span>
@@ -556,6 +565,50 @@ export function PerfilForm({
               {salvando === "cadastro" ? "Salvando…" : "Salvar"}
             </Button>
           </form>
+          {/* o termo não é campo do form — a assinatura mora em /assinar;
+              a gaveta só anuncia o estado e manda pra lá */}
+          <div className="mt-5 flex items-center gap-3 rounded-lg border border-border px-3.5 py-3">
+            <Signature
+              size={18}
+              aria-hidden
+              className={
+                termoOk
+                  ? "shrink-0 text-[var(--ok-text)]"
+                  : "shrink-0 text-[var(--warn-text)]"
+              }
+            />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium">
+                Termo de Adesão ao Trabalho Voluntário
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {termoOk
+                  ? `Assinado em ${new Date(assinaturaTermo!.assinado_em!).toLocaleDateString("pt-BR")}.`
+                  : assinaturaTermo
+                    ? "Emitido — aguardando sua assinatura."
+                    : "Ainda não assinado — vale pra toda a equipe."}
+              </p>
+            </div>
+            {termoOk ? (
+              <a
+                href={`/api/assinatura/${assinaturaTermo!.id}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-lg px-2 text-xs text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline"
+              >
+                <FileArrowDown size={14} aria-hidden />
+                Ver PDF
+                <span className="sr-only"> (abre em nova aba)</span>
+              </a>
+            ) : (
+              <Link
+                href="/assinar"
+                className="inline-flex min-h-9 shrink-0 items-center rounded-lg px-2 text-xs font-medium text-primary underline-offset-4 transition-colors hover:underline"
+              >
+                Ler e assinar
+              </Link>
+            )}
+          </div>
         </div>
       </details>
 

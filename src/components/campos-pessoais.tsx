@@ -3,6 +3,7 @@
 import { useId } from "react";
 import { cn } from "cn";
 import {
+  COR_RACA_LABELS,
   DIAS_SEMANA,
   DIAS_SEMANA_LABELS,
   ESCOLARIDADE_LABELS,
@@ -121,6 +122,10 @@ export function CampoNascimento({
  *  banco (CHECKs da 0034). */
 export function CampoGenero(props: Omit<Parameters<typeof SelectOpcional>[0], "name" | "label" | "opcoes">) {
   return <SelectOpcional {...props} name="genero" label="Gênero" opcoes={GENERO_LABELS} />;
+}
+
+export function CampoCorRaca(props: Omit<Parameters<typeof SelectOpcional>[0], "name" | "label" | "opcoes">) {
+  return <SelectOpcional {...props} name="cor_raca" label="Cor/raça (autodeclaração)" opcoes={COR_RACA_LABELS} />;
 }
 
 export function CampoPrefGenero(props: Omit<Parameters<typeof SelectOpcional>[0], "name" | "label" | "opcoes" | "vazioLabel">) {

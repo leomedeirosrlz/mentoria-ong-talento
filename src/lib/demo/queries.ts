@@ -127,10 +127,12 @@ function comContato<P extends { id: string }>(
 const CAMPOS_PESSOAIS = [
   "data_nascimento",
   "genero",
+  "cor_raca",
   "pref_genero_par",
   "motivacao",
   "dados_civis",
   "responsavel",
+  "form_bruto",
 ] as const;
 
 function semPessoal<P>(p: P): P {
@@ -287,10 +289,12 @@ export function demoPessoalMap(
     mapa.set(p.id, {
       data_nascimento: p.data_nascimento ?? null,
       genero: p.genero ?? null,
+      cor_raca: p.cor_raca ?? null,
       pref_genero_par: p.pref_genero_par ?? null,
       motivacao: p.motivacao ?? null,
       dados_civis: p.dados_civis ?? null,
       responsavel: "responsavel" in p ? (p.responsavel ?? null) : null,
+      form_bruto: p.form_bruto ?? null,
     });
   }
   return mapa;
@@ -709,10 +713,12 @@ export function demoAssinaturasResumo(role: AppRole): AssinaturaResumo[] {
   return data.assinaturas
     .filter((a) => role === "coordenacao" || a.profile_id === eu.id)
     .map((a) => ({
+      id: a.id,
       profile_id: a.profile_id,
       mentorado_id: a.mentorado_id,
       status: a.status,
       assinado_em: a.assinado_em,
+      token_expira_em: a.token_expira_em,
       slug: a.template?.slug ?? "",
     }));
 }

@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { getMe, getMeuMentorProfile, getMeusDadosPessoais } from "@/lib/queries";
+import { getMinhaAssinaturaTermo } from "@/lib/queries-assinaturas";
 import { avatarPublicUrl, gravatarUrl } from "@/lib/avatar";
 import { PerfilForm } from "./perfil-form";
 
@@ -9,7 +10,7 @@ export const metadata: Metadata = {
 };
 
 export default async function PerfilPage() {
-  const [me, mentorProfile, pessoal] = await Promise.all([
+  const [me, mentorProfile, pessoal, assinaturaTermo] = await Promise.all([
     getMe(),
     getMeuMentorProfile(),
     // os 4 sensíveis da 0034 ficam fora do grant de coluna — nem o próprio
@@ -18,6 +19,7 @@ export default async function PerfilPage() {
     // nascem pré-preenchidos pra todo mundo e a detecção
     // pendente×preenchido do form reflete o cadastro de verdade.
     getMeusDadosPessoais(),
+    getMinhaAssinaturaTermo(),
   ]);
   if (!me) redirect("/login");
   const perfil = pessoal ? { ...me, ...pessoal } : me;
@@ -27,6 +29,7 @@ export default async function PerfilPage() {
       mentorProfile={mentorProfile}
       avatarUrl={me.avatar_path ? avatarPublicUrl(me.avatar_path) : null}
       gravatarUrl={gravatarUrl(me.email)}
+      assinaturaTermo={assinaturaTermo}
     />
   );
 }

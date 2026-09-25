@@ -400,7 +400,18 @@ export function AssinaturasPessoa({
       {itens !== null && itens.length > 0 && (
         <ul className="space-y-3">
           {itens.map((a) => {
-            const st = STATUS[a.status];
+            // o status "expirado" só grava quando o token é tocado (0033) —
+            // um pendente com prazo vencido JÁ está morto; renderiza como
+            // expirado em vez de prometer link que não funciona
+            const vencido =
+              a.status === "pendente" &&
+              a.token_expira_em != null &&
+              new Date(a.token_expira_em) < new Date();
+            const st = STATUS[vencido ? "expirado" : a.status];
+            const terminal =
+              a.status === "expirado" ||
+              a.status === "revogado" ||
+              vencido;
             return (
               <li key={a.id}>
                 <div className="flex items-center gap-2">
@@ -415,11 +426,27 @@ export function AssinaturasPessoa({
                 <p className="pl-6 text-xs text-muted-foreground">
                   {a.status === "assinado" && a.assinado_em
                     ? `assinado em ${fmtDia.format(new Date(a.assinado_em))}`
-                    : `solicitado em ${fmtDia.format(new Date(a.created_at))}`}
+                    : `emitido em ${fmtDia.format(new Date(a.created_at))}`}
+                  {a.status === "pendente" && a.token_expira_em
+                    ? ` · ${vencido ? "expirou" : "expira"} em ${fmtDia.format(new Date(a.token_expira_em))}`
+                    : ""}
                   {a.assinatura_texto ? ` — ${a.assinatura_texto}` : ""}
                 </p>
                 <div className="flex flex-wrap items-center gap-x-1 pl-4">
-                  {a.status === "pendente" && (
+                  {terminal && tipo === "mentorado" && a.template?.slug && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="xs"
+                      disabled={solicitando}
+                      aria-busy={solicitando}
+                      onClick={() => solicitar(a.template!.slug)}
+                    >
+                      <PaperPlaneTilt size={13} />
+                      Reemitir
+                    </Button>
+                  )}
+                  {a.status === "pendente" && !vencido && (
                     <>
                       <Button
                         type="button"
@@ -481,28 +508,32 @@ export function AssinaturasPessoa({
                       className="-my-2 inline-flex min-h-11 items-center gap-1.5 rounded-[min(var(--radius-md),10px)] px-2 text-xs text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline sm:my-0 sm:min-h-6"
                     >
                       <FilePdf size={13} />
-                      Baixar PDF
+                      Ver PDF
                     </a>
                   )}
-                  <ConfirmDeleteButton
-                    titulo={`Revogar a assinatura de ${primeiroNome}?`}
-                    descricao={`"${a.template?.titulo ?? "Documento"}" fica marcada como revogada — ${
-                      tipo === "mentorado" ? "o responsável" : "a pessoa"
-                    } precisa assinar de novo pra regularizar.`}
-                    sucesso="Assinatura revogada."
-                    acao="Revogar"
-                    onConfirm={() => revogar(a)}
-                    trigger={
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="xs"
-                        className="text-muted-foreground"
-                      >
-                        Revogar
-                      </Button>
-                    }
-                  />
+                  {/* revogar só tem efeito em doc vivo — em linha terminal a
+                      ação útil é reemitir (acima), não revogar de novo */}
+                  {!terminal && (
+                    <ConfirmDeleteButton
+                      titulo={`Revogar a assinatura de ${primeiroNome}?`}
+                      descricao={`"${a.template?.titulo ?? "Documento"}" fica marcada como revogada — ${
+                        tipo === "mentorado" ? "o responsável" : "a pessoa"
+                      } precisa assinar de novo pra regularizar.`}
+                      sucesso="Assinatura revogada."
+                      acao="Revogar"
+                      onConfirm={() => revogar(a)}
+                      trigger={
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="xs"
+                          className="text-muted-foreground"
+                        >
+                          Revogar
+                        </Button>
+                      }
+                    />
+                  )}
                 </div>
               </li>
             );

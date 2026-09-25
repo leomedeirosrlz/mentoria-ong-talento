@@ -26,7 +26,7 @@ import {
   demoPessoas,
   demoRegistros,
 } from "./demo/queries";
-import type { AvaliacaoJovem, CicloEvento, Comunicado, DadosCivis, Dupla, DuplaResumo, DuplaStatus, EncontroStatus, EspecialistaEvento, Genero, Material, Mentorado, MentorProfile, Notificacao, PessoaNota, PrefGeneroPar, Profile, Registro, ResponsavelCivis, Trilha } from "./types";
+import type { AvaliacaoJovem, CicloEvento, Comunicado, CorRaca, DadosCivis, DocumentoPessoa, Dupla, DuplaResumo, DuplaStatus, EncontroStatus, EspecialistaEvento, Genero, Material, Mentorado, MentorProfile, Notificacao, PessoaNota, PrefGeneroPar, Profile, Registro, ResponsavelCivis, Trilha } from "./types";
 
 /** mentor_profiles — re-export do tipo canônico (types.ts): os callers da
  *  página de pessoas/board importam daqui historicamente. */
@@ -58,10 +58,12 @@ const MENTORADO_COLS_PUBLICAS =
 export type DadosPessoais = {
   data_nascimento: string | null;
   genero: Genero | null;
+  cor_raca: CorRaca | null;
   pref_genero_par: PrefGeneroPar | null;
   motivacao: string | null;
   dados_civis: DadosCivis | null;
   responsavel: ResponsavelCivis | null;
+  form_bruto: Record<string, unknown> | null;
 };
 
 /** id → dados sensíveis, como devolvido pelas views profiles_pessoal /
@@ -84,7 +86,7 @@ export const getPessoalMap = cache(
     // responsavel só existe em mentorados — a select é por tabela pra não
     // pedir coluna que a view profiles_pessoal não expõe
     const cols =
-      "id, data_nascimento, genero, pref_genero_par, motivacao, dados_civis" +
+      "id, data_nascimento, genero, cor_raca, pref_genero_par, motivacao, dados_civis, form_bruto" +
       (tabela === "mentorados_pessoal" ? ", responsavel" : "");
     const { data, error } = await supabase.from(tabela).select(cols);
     if (error) {
@@ -111,10 +113,12 @@ function comPessoal<P extends { id: string }>(
     ...p,
     data_nascimento: d?.data_nascimento ?? null,
     genero: d?.genero ?? null,
+    cor_raca: d?.cor_raca ?? null,
     pref_genero_par: d?.pref_genero_par ?? null,
     motivacao: d?.motivacao ?? null,
     dados_civis: d?.dados_civis ?? null,
     responsavel: d?.responsavel ?? null,
+    form_bruto: d?.form_bruto ?? null,
   };
 }
 
@@ -164,6 +168,32 @@ function comContato<P extends { id: string }>(
     documento_path: c?.documento_path ?? null,
   };
 }
+
+/** Documentos do intake da pessoa (documentos_pessoa, 0054) — RLS coord-only;
+ *  pra qualquer outro papel a query nem dispara. Falha degrada pra [] com
+ *  log — a ficha segue sem a lista. */
+export const getDocumentosPessoa = cache(
+  async (
+    tipo: "profile" | "mentorado",
+    id: string
+  ): Promise<DocumentoPessoa[]> => {
+    // modo demo: documento civil sensível não entra no dataset — vazio mesmo pra coord
+    if (await demoRole()) return [];
+    const me = await getMe();
+    if (me?.role !== "coordenacao") return [];
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("documentos_pessoa")
+      .select("id, profile_id, mentorado_id, tipo, path, nome, created_by, created_at")
+      .eq(tipo === "mentorado" ? "mentorado_id" : "profile_id", id)
+      .order("created_at", { ascending: true });
+    if (error) {
+      console.error("getDocumentosPessoa:", error);
+      return [];
+    }
+    return (data ?? []) as DocumentoPessoa[];
+  }
+);
 
 // getClaims valida o JWT localmente (sem round-trip); RLS segue valendo no banco.
 export const getMe = cache(async (): Promise<Profile | null> => {

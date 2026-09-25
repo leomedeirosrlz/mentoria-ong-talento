@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import {
+  COR_RACAS,
+  DOCUMENTO_PESSOA_TIPOS,
   ESCOLARIDADES,
   GENEROS,
   MOTIVOS_REAGENDAMENTO,
@@ -16,20 +18,19 @@ import {
   parseDisponibilidade,
 } from "@/lib/ciclo";
 import { cpfValido, erroAmigavel } from "@/lib/utils";
-import type { DadosCivis, Disponibilidade, Endereco, Escolaridade, Genero, Notificacao, PrefGeneroPar, ResponsavelCivis, Trilha } from "@/lib/types";
+import type { CorRaca, DadosCivis, Disponibilidade, DocumentoPessoa, Endereco, Escolaridade, Genero, Notificacao, PrefGeneroPar, ResponsavelCivis, Trilha } from "@/lib/types";
 import {
-  civisImportado,
   emailValido,
-  mapEscolaridade,
-  mapGenero,
-  mapPrefGenero,
+  fichaLinha,
+  INTERESSE_MAX_CHARS,
+  MAX_INTERESSES,
   mapRole,
   normData,
   normEmail,
   normLista,
   normNome,
-  normUf,
   normWhatsapp,
+  papelNulo,
   type LinhaImportada,
 } from "@/lib/importar";
 import { notificar } from "./notificar";
@@ -185,8 +186,6 @@ function camposApresentacao(
 // 23514 do banco. `parcial` (onboarding): só as chaves presentes no FormData
 // voltam no patch — o passo do wizard não toca no que não mandou.
 
-const MAX_INTERESSES = 20;
-const INTERESSE_MAX_CHARS = 60;
 
 /** Interesses do TagInput (JSON) ou campo texto (CSV/`;`) — trim, dedupe
  *  case-insensitive, teto e cap por tag = CHECK interesses_ok (0034). */
@@ -229,6 +228,7 @@ type CamposFicha = Partial<{
   nome_social: string | null;
   data_nascimento: string | null;
   genero: Genero | null;
+  cor_raca: CorRaca | null;
   cidade: string | null;
   uf: string | null;
   interesses: string[];
@@ -360,6 +360,14 @@ function camposFicha(
     } else out.pref_genero_par = v as PrefGeneroPar;
   }
 
+  if (tem("cor_raca")) {
+    const v = enumOu("cor_raca");
+    if (!v) out.cor_raca = null;
+    else if (!(COR_RACAS as readonly string[]).includes(v)) {
+      return { error: "Escolha uma opção de cor/raça válida." };
+    } else out.cor_raca = v as CorRaca;
+  }
+
   if (tem("uf")) {
     const v = enumOu("uf").toUpperCase();
     if (!v) out.uf = null;
@@ -459,83 +467,6 @@ function consentPatch(
   return formData.get("consent_lgpd") === "on" && !atual
     ? { consent_lgpd_em: new Date().toISOString() }
     : {};
-}
-
-/** Mesma validação da ficha, mas sobre uma linha da planilha — valor bruto
- *  preenchido e irreconhecível devolve motivo pra pular a linha (em vez de
- *  gravar null ou estourar no CHECK do insert em lote). */
-function fichaLinha(
-  l: LinhaImportada,
-  de: "pessoa" | "mentorado"
-): Record<string, unknown> | { error: string } {
-  const out: Record<string, unknown> = {};
-  const texto = (campo: keyof LinhaImportada, col: string, max: number, rotulo: string) => {
-    const v = normNome(String(l[campo] ?? ""));
-    if (v.length > max) return `${rotulo} passa de ${max} caracteres`;
-    out[col] = v || null;
-    return null;
-  };
-  const specs: [keyof LinhaImportada, string, number, string][] = [
-    ["nome_social", "nome_social", 150, "nome social"],
-    ["cidade", "cidade", 100, "cidade"],
-    ["origem", "origem", 300, "origem"],
-    ["motivacao", "motivacao", 2000, "motivação"],
-    ...(de === "pessoa"
-      ? [["cargo", "cargo", 120, "cargo"], ["empresa", "empresa", 150, "empresa"]] as [keyof LinhaImportada, string, number, string][]
-      : [["objetivos", "objetivos", 2000, "objetivos"]] as [keyof LinhaImportada, string, number, string][]),
-  ];
-  for (const [campo, col, max, rotulo] of specs) {
-    const erro = texto(campo, col, max, rotulo);
-    if (erro) return { error: erro };
-  }
-
-  const nasc = normData(String(l.data_nascimento ?? ""));
-  if (String(l.data_nascimento ?? "").trim() && !nasc)
-    return { error: "data de nascimento inválida (use dd/mm/aaaa)" };
-  out.data_nascimento = nasc;
-
-  const genero = mapGenero(String(l.genero ?? ""));
-  if (String(l.genero ?? "").trim() && !genero) return { error: "gênero não reconhecido" };
-  out.genero = genero;
-
-  const uf = normUf(String(l.uf ?? ""));
-  if (String(l.uf ?? "").trim() && (!uf || !(UFS as readonly string[]).includes(uf)))
-    return { error: "UF inválida (use a sigla, ex.: SP)" };
-  out.uf = uf;
-
-  const interesses = normLista(String(l.interesses ?? ""));
-  if (interesses.length > MAX_INTERESSES) return { error: `mais de ${MAX_INTERESSES} interesses` };
-  if (interesses.some((t) => t.length > INTERESSE_MAX_CHARS))
-    return { error: `interesse com mais de ${INTERESSE_MAX_CHARS} caracteres` };
-  out.interesses = interesses;
-
-  const pref = mapPrefGenero(String(l.pref_genero_par ?? ""));
-  if (String(l.pref_genero_par ?? "").trim() && !pref)
-    return { error: "preferência de gênero do par não reconhecida" };
-  out.pref_genero_par = pref;
-
-  if (de === "mentorado") {
-    const esc = mapEscolaridade(String(l.escolaridade ?? ""));
-    if (String(l.escolaridade ?? "").trim() && !esc)
-      return { error: "escolaridade não reconhecida" };
-    out.escolaridade = esc;
-
-    const resp = civisImportado(l, "resp_");
-    const parentesco = normNome(String(l.resp_parentesco ?? ""));
-    if (resp) out.responsavel = { ...resp, parentesco };
-  }
-
-  // dados civis (0046) — as colunas de documento/endereço viram o jsonb que
-  // preenche os termos; nome/nascimento/cidade/UF vêm da própria ficha
-  const civis = civisImportado(l, "", {
-    nome_civil: normNome(l.nome),
-    data_nascimento: out.data_nascimento as string | null,
-    cidade: (out.cidade as string | null) ?? "",
-    uf: (out.uf as string | null) ?? "",
-  });
-  if (civis) out.dados_civis = civis;
-
-  return out;
 }
 
 export async function createPessoa(formData: FormData) {
@@ -968,6 +899,15 @@ export async function deletePessoa(profileId: string) {
   if (contato?.documento_path) {
     await supabase.storage.from("documentos").remove([contato.documento_path]);
   }
+  // idem pros anexos do intake (0054): a cascade apaga as rows, mas o objeto
+  // no bucket é arquivo morto sensível — sem a row nem a coordenação baixa
+  // mais (o exists da policy falha), então remove agora
+  const { data: docsPessoa } = await supabase
+    .from("documentos_pessoa").select("path").eq("profile_id", profileId);
+  const pathsDocs = (docsPessoa ?? []).map((d) => d.path);
+  if (pathsDocs.length) {
+    await supabase.storage.from("documentos").remove(pathsDocs);
+  }
   const { data, error } = await supabase
     .from("profiles").delete().eq("id", profileId).select("id");
   if (error) return { error: erroAmigavel(error) };
@@ -1039,6 +979,12 @@ export async function deleteMentorado(id: string) {
   // mesmo cuidado do delete de pessoa: remove o objeto do bucket antes da row
   if (m?.documento_path) {
     await supabase.storage.from("documentos").remove([m.documento_path]);
+  }
+  const { data: docsMentorado } = await supabase
+    .from("documentos_pessoa").select("path").eq("mentorado_id", id);
+  const pathsDocsM = (docsMentorado ?? []).map((d) => d.path);
+  if (pathsDocsM.length) {
+    await supabase.storage.from("documentos").remove(pathsDocsM);
   }
   const { data, error } = await supabase
     .from("mentorados").delete().eq("id", id).select("id");
@@ -1384,27 +1330,39 @@ export async function importPessoas(rows: LinhaImportada[]) {
     const nome = normNome(r.nome);
     const email = normEmail(r.email);
     const whatsapp = normWhatsapp(r.whatsapp);
-    // papel em branco cai no default mentor_dpp; preenchido mas irreconhecível pula a linha
+    // papel em branco cai no default mentor_dpp; "nenhum"/"voluntário" é
+    // cadastro sem papel (BP — vira registro, não usuário); preenchido mas
+    // irreconhecível pula a linha
     const papelPreenchido = String(r.papel ?? "").trim() !== "";
-    const role = papelPreenchido ? mapRole(r.papel) : ("mentor_dpp" as const);
+    const semPapel = papelPreenchido && papelNulo(r.papel);
+    const role = semPapel
+      ? null
+      : papelPreenchido
+        ? mapRole(r.papel)
+        : ("mentor_dpp" as const);
     if (!nome || !emailValido(email)) { puladas.push(`${r.nome || r.email || "?"}: nome vazio ou e-mail inválido`); continue; }
     // whatsapp preenchido mas ilegível pula a linha — antes caía como null silenciosamente
     if (r.whatsapp.trim() && !whatsapp) { puladas.push(`${nome}: whatsapp inválido (use DDD + número)`); continue; }
-    if (role === null) { puladas.push(`${nome}: papel não reconhecido`); continue; }
+    if (!semPapel && role === null) { puladas.push(`${nome}: papel não reconhecido`); continue; }
     const ficha = fichaLinha(r, "pessoa");
     if ("error" in ficha) { puladas.push(`${nome}: ${ficha.error}`); continue; }
-    // experiência/formação só fazem sentido em linha de mentor — valida antes
-    // de entrar na fila, senão a linha "pulada" seria inserida mesmo assim
+    // experiência/formação/disponibilidade só fazem sentido em linha de
+    // mentor — valida antes de entrar na fila, senão a linha "pulada"
+    // seria inserida mesmo assim
     const exp = normNome(String(r.experiencia_previa ?? ""));
     const form = normNome(String(r.formacao_externa ?? ""));
     if (exp.length > 2000 || form.length > 2000) { puladas.push(`${nome}: experiência/formação passa de 2.000 caracteres`); continue; }
+    const eMentor = role === "mentor_dpp" || role === "mentor_especialista";
+    const disp = eMentor ? parseDisponibilidade(String(r.disponibilidade ?? "")) : null;
+    if (disp && "error" in disp) { puladas.push(`${nome}: ${disp.error}`); continue; }
     if (noBanco.has(email) || vistos.has(email)) { puladas.push(`${email}: já existe`); continue; }
     vistos.add(email);
     validas.push({ nome, email, whatsapp, role, ...ficha });
-    if (exp || form) {
+    if (exp || form || disp) {
       fichaMentorPorEmail.set(email, {
         experiencia_previa: exp || null,
         formacao_externa: form || null,
+        ...(disp ? { disponibilidade: disp } : {}),
       });
     }
   }
@@ -2355,6 +2313,69 @@ export async function removerDocumentoPessoa(
   return { ok: true };
 }
 
+// ---------- documentos do intake (0054) ----------
+
+/** Registra um documento do intake (RG, comprovante, currículo) na pessoa.
+ *  A row entra ANTES do upload — a policy de INSERT do storage só aceita
+ *  objeto cujo name já é path de documentos_pessoa. Se o upload falhar o
+ *  client chama excluirDocumentoPessoa pra desfazer. Coord-only (a RLS já
+ *  barra — a checagem devolve erro claro). */
+export async function registrarDocumentoPessoa(
+  tipo: "profile" | "mentorado",
+  pessoaId: string,
+  docTipo: DocumentoPessoa["tipo"],
+  path: string,
+  nome: string
+) {
+  if (await demoAtivo()) return { error: DEMO_MSG };
+  const { supabase, me: eu } = await me();
+  if (!eu) return { error: "Sessão expirada — entre de novo." };
+  if (eu.role !== "coordenacao") {
+    return { error: "Só a coordenação gerencia documentos." };
+  }
+  if (!(DOCUMENTO_PESSOA_TIPOS as readonly string[]).includes(docTipo)) {
+    return { error: "Tipo de documento inválido." };
+  }
+  if (!DOCUMENTO_PATH_RE.test(path)) {
+    return { error: "Revise os campos — um dos valores não é válido." };
+  }
+  const { data, error } = await supabase
+    .from("documentos_pessoa")
+    .insert({
+      [tipo === "mentorado" ? "mentorado_id" : "profile_id"]: pessoaId,
+      tipo: docTipo,
+      path,
+      nome: nome.slice(0, 300) || null,
+      created_by: eu.id,
+    })
+    .select("id");
+  if (error) return { error: erroAmigavel(error) };
+  if (!data?.length) {
+    return { error: "Não foi possível concluir. Recarregue a página e tente de novo." };
+  }
+  revalidatePath(`/pessoas/${pessoaId}`);
+  return { ok: true, id: data[0].id };
+}
+
+/** Remove a row do documento — o objeto no storage é apagado pelo client
+ *  ANTES de chamar (a policy de DELETE do bucket é bucket+coord, não exige
+ *  path registrado). */
+export async function excluirDocumentoPessoa(docId: string, pessoaId: string) {
+  if (await demoAtivo()) return { error: DEMO_MSG };
+  const { supabase, me: eu } = await me();
+  if (!eu) return { error: "Sessão expirada — entre de novo." };
+  if (eu.role !== "coordenacao") {
+    return { error: "Só a coordenação gerencia documentos." };
+  }
+  const { error } = await supabase
+    .from("documentos_pessoa")
+    .delete()
+    .eq("id", docId);
+  if (error) return { error: erroAmigavel(error) };
+  revalidatePath(`/pessoas/${pessoaId}`);
+  return { ok: true };
+}
+
 // ---------- meu perfil (self-service) ----------
 
 export async function updateMeuPerfil(formData: FormData) {
@@ -2390,7 +2411,7 @@ export async function updateMeuPerfil(formData: FormData) {
   // /perfil zeraria nascimento/gênero/preferência/motivação já gravados.
   // Pra coordenação os inputs vêm pré-preenchidos — branco = limpar, ok.
   if (eu.role !== "coordenacao") {
-    for (const k of ["data_nascimento", "genero", "pref_genero_par", "motivacao"] as const) {
+    for (const k of ["data_nascimento", "genero", "cor_raca", "pref_genero_par", "motivacao"] as const) {
       if (ficha[k] == null) delete ficha[k];
     }
   }

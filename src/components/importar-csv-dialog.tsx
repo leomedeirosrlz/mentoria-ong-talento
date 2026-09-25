@@ -7,17 +7,12 @@ import { toast } from "sonner";
 import { importMentorados, importPessoas } from "@/lib/actions";
 import {
   emailValido,
-  mapEscolaridade,
-  mapGenero,
-  mapPrefGenero,
-  normData,
+  fichaLinha,
   normNome,
-  normUf,
   normWhatsapp,
   parseCsv,
   type LinhaImportada,
 } from "@/lib/importar";
-import { UFS } from "@/lib/ciclo";
 import { Button } from "@/components/ui/button";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
@@ -40,25 +35,26 @@ const TIPO_LABEL: Record<Tipo, string> = {
 
 const DICAS: Record<Tipo, string> = {
   equipe:
-    "Colunas: nome, email, whatsapp, papel (mentor dpp / especialista / supervisor / coordenação — em branco vira mentor DPP) e a ficha opcional: nome_social, data_nascimento (dd/mm/aaaa), genero, cidade, uf, cargo, empresa, interesses (separados por vírgula), motivacao, pref_genero_par, origem, experiencia_previa e formacao_externa (estas duas gravam na ficha de mentor). Documentos pro termo: rg, cpf, cep, logradouro, numero, complemento, bairro.",
+    "Colunas: nome, email, whatsapp, papel (mentor dpp / especialista / supervisor / coordenação — em branco vira mentor DPP; \"nenhum\" cadastra sem papel) e a ficha opcional: nome_social, data_nascimento (dd/mm/aaaa), genero, cor_raca, cidade, uf, cargo, empresa, bio, linkedin, interesses (separados por vírgula), motivacao, pref_genero_par, origem, experiencia_previa, formacao_externa e disponibilidade (JSON {dias,periodos}) — estas três gravam na ficha de mentor. consent_lgpd_em carimba o consentimento (ISO). form_bruto (JSON) guarda a resposta original. Documentos pro termo: rg, cpf, cep, logradouro, numero, complemento, bairro. Os CSVs crus dos Google Forms de intake também entram — as colunas conhecidas são mapeadas e o resto é ignorado.",
   mentorados:
-    "Colunas: nome, whatsapp, email, ong, notas e a ficha opcional: nome_social, data_nascimento (dd/mm/aaaa), genero, cidade, uf, escolaridade, interesses (por vírgula), objetivos, motivacao, pref_genero_par, origem. Só o nome é obrigatório. Documentos pro termo: rg, cpf, cep, logradouro, numero, complemento, bairro; e do responsável: resp_nome, resp_parentesco, resp_rg, resp_cpf, resp_nascimento, resp_cidade, resp_uf, resp_cep, resp_logradouro, resp_numero, resp_complemento, resp_bairro.",
+    "Colunas: nome, whatsapp, email, ong, notas e a ficha opcional: nome_social, data_nascimento (dd/mm/aaaa), genero, cor_raca, cidade, uf, escolaridade, interesses (por vírgula), objetivos, motivacao, pref_genero_par, origem, disponibilidade (JSON {dias,periodos}) e form_bruto (JSON). Só o nome é obrigatório. Documentos pro termo: rg, cpf, cep, logradouro, numero, complemento, bairro; e do responsável: resp_nome, resp_parentesco, resp_rg, resp_cpf, resp_nascimento, resp_cidade, resp_uf, resp_cep, resp_logradouro, resp_numero, resp_complemento, resp_bairro.",
 };
 
 const MODELO: Record<Tipo, string> = {
   equipe:
-    "nome;email;whatsapp;papel;nome_social;data_nascimento;genero;cidade;uf;cargo;empresa;interesses;motivacao;pref_genero_par;origem;experiencia_previa;formacao_externa;rg;cpf;cep;logradouro;numero;complemento;bairro",
+    "nome;email;whatsapp;papel;nome_social;data_nascimento;genero;cor_raca;cidade;uf;cargo;empresa;bio;linkedin;interesses;motivacao;pref_genero_par;origem;experiencia_previa;formacao_externa;disponibilidade;consent_lgpd_em;form_bruto;rg;cpf;cep;logradouro;numero;complemento;bairro",
   mentorados:
-    "nome;whatsapp;email;ong;notas;nome_social;data_nascimento;genero;cidade;uf;escolaridade;interesses;objetivos;motivacao;pref_genero_par;origem;rg;cpf;cep;logradouro;numero;complemento;bairro;resp_nome;resp_parentesco;resp_rg;resp_cpf;resp_nascimento;resp_cidade;resp_uf;resp_cep;resp_logradouro;resp_numero;resp_complemento;resp_bairro",
+    "nome;whatsapp;email;ong;notas;nome_social;data_nascimento;genero;cor_raca;cidade;uf;escolaridade;interesses;objetivos;motivacao;pref_genero_par;origem;disponibilidade;form_bruto;rg;cpf;cep;logradouro;numero;complemento;bairro;resp_nome;resp_parentesco;resp_rg;resp_cpf;resp_nascimento;resp_cidade;resp_uf;resp_cep;resp_logradouro;resp_numero;resp_complemento;resp_bairro",
 };
 
 /** Campos da ficha (0034) + civis (0046) reconhecidos na linha — pro resumo
  *  da prévia. */
 function extrasDaLinha(r: LinhaImportada): number {
   return [
-    r.nome_social, r.data_nascimento, r.genero, r.cidade, r.uf, r.interesses,
-    r.motivacao, r.pref_genero_par, r.cargo, r.empresa, r.origem, r.objetivos,
-    r.escolaridade, r.experiencia_previa, r.formacao_externa,
+    r.nome_social, r.data_nascimento, r.genero, r.cor_raca, r.cidade, r.uf,
+    r.interesses, r.motivacao, r.pref_genero_par, r.cargo, r.empresa, r.origem,
+    r.objetivos, r.escolaridade, r.experiencia_previa, r.formacao_externa,
+    r.bio, r.linkedin, r.disponibilidade, r.form_bruto, r.consent_lgpd_em,
     r.rg, r.cpf, r.cep, r.logradouro, r.numero, r.complemento, r.bairro,
     r.resp_nome, r.resp_parentesco, r.resp_rg, r.resp_cpf, r.resp_nascimento,
     r.resp_cidade, r.resp_uf, r.resp_cep, r.resp_logradouro, r.resp_numero,
@@ -72,18 +68,12 @@ function linhaValida(tipo: Tipo, r: LinhaImportada): string | null {
   if (tipo === "mentorados" && r.email.trim() && !emailValido(r.email)) return "e-mail inválido";
   // whatsapp preenchido mas ilegível — a action pula a linha; o preview já avisa
   if (r.whatsapp.trim() && !normWhatsapp(r.whatsapp)) return "whatsapp inválido";
-  // ficha (0034) — mesmas checagens do fichaLinha no server: campo preenchido
-  // mas irreconhecível marca a linha aqui em vez de falhar no import
-  if (r.data_nascimento.trim() && !normData(r.data_nascimento)) return "nascimento inválido (dd/mm/aaaa)";
-  if (r.genero.trim() && !mapGenero(r.genero)) return "gênero não reconhecido";
-  if (r.uf.trim()) {
-    const uf = normUf(r.uf);
-    if (!uf || !(UFS as readonly string[]).includes(uf)) return "UF inválida";
-  }
-  if (r.pref_genero_par.trim() && !mapPrefGenero(r.pref_genero_par)) return "pref. de par inválida";
-  if (tipo === "mentorados" && r.escolaridade.trim() && !mapEscolaridade(r.escolaridade))
-    return "escolaridade não reconhecida";
-  return null;
+  // ficha é a mesma função do server (importar.ts) — caps de texto, enums,
+  // datas, form_bruto e grade saem idênticos; preview nunca promete "Ok" pra
+  // linha que o import pularia
+  const ficha = fichaLinha(r, tipo === "equipe" ? "pessoa" : "mentorado");
+  const erro = "error" in ficha ? ficha.error : null;
+  return typeof erro === "string" ? erro : null;
 }
 
 export function ImportarCsvDialog({

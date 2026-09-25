@@ -12,6 +12,7 @@ import {
 import { normaliza } from "@/lib/utils";
 import {
   AVALIACAO_LABEL,
+  COR_RACA_LABELS,
   GENERO_LABELS,
   papelLabel,
   PREF_GENERO_LABELS,
@@ -44,7 +45,7 @@ export async function GET(request: NextRequest) {
       );
       const papeis = new Map(d.profiles.map((p) => [p.id, p.role] as const));
       return csvResponse(
-        csvAssinaturas(d.assinaturas, nomes, papeis),
+        csvAssinaturas(d.assinaturas, nomes, papeis, request.nextUrl.origin),
         nomeCsvAssinaturas()
       );
     }
@@ -107,7 +108,11 @@ export async function GET(request: NextRequest) {
   }
 
   if (tipo === "assinaturas") {
-    return exportAssinaturas(supabase);
+    return exportAssinaturas(
+      supabase,
+      request.nextUrl.searchParams,
+      request.nextUrl.origin
+    );
   }
 
   if (tipo === "pessoas") {
@@ -162,10 +167,10 @@ async function exportPessoas(supabase: Awaited<ReturnType<typeof createClient>>)
     supabase.from("mentor_profiles").select("profile_id,capacidade"),
     supabase
       .from("profiles_pessoal")
-      .select("id,data_nascimento,genero,pref_genero_par,motivacao,dados_civis"),
+      .select("id,data_nascimento,genero,cor_raca,pref_genero_par,motivacao"),
     supabase
       .from("mentorados_pessoal")
-      .select("id,data_nascimento,genero,pref_genero_par,motivacao,dados_civis,responsavel"),
+      .select("id,data_nascimento,genero,cor_raca,pref_genero_par,motivacao"),
   ]);
   if (eP || eC || eM || eMP || ePP || ePM) {
     return NextResponse.json(
@@ -198,22 +203,32 @@ async function exportPessoas(supabase: Awaited<ReturnType<typeof createClient>>)
 // documento. O PDF em si é renderizado sob demanda do snapshot, então este
 // CSV + a tabela são o backup completo.
 async function exportAssinaturas(
-  supabase: Awaited<ReturnType<typeof createClient>>
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  params: URLSearchParams,
+  origin: string
 ) {
+  const status = params.get("status");
+  const documento = params.get("documento");
+  // !inner quando filtra por slug — sem ele o embed viria mas não filtraria
+  const embed = documento
+    ? "template:documento_templates!inner(titulo, slug, versao)"
+    : "template:documento_templates(titulo, slug, versao)";
+  let q = supabase
+    .from("assinaturas")
+    .select(
+      `id, profile_id, mentorado_id, status, dados_snapshot,
+      assinatura_texto, assinado_em, ip, user_agent, hash_documento,
+      token_expira_em, created_at, created_by, ${embed}`
+    )
+    .order("created_at");
+  if (status) q = q.eq("status", status);
+  if (documento) q = q.eq("template.slug", documento);
   const [
     { data: rows, error: eA },
     { data: pessoas, error: eP },
     { data: jovens, error: eM },
   ] = await Promise.all([
-    supabase
-      .from("assinaturas")
-      .select(
-        `id, profile_id, mentorado_id, status, dados_snapshot,
-        assinatura_texto, assinado_em, ip, user_agent, hash_documento,
-        token_expira_em, created_at,
-        template:documento_templates(titulo, slug, versao)`
-      )
-      .order("created_at"),
+    q,
     supabase.from("profiles").select("id, nome, role"),
     supabase.from("mentorados").select("id, nome"),
   ]);
@@ -230,7 +245,7 @@ async function exportAssinaturas(
     (pessoas ?? []).map((p) => [p.id, p.role] as const)
   );
   return csvResponse(
-    csvAssinaturas(rows ?? [], nomes, papeis),
+    csvAssinaturas(rows ?? [], nomes, papeis, origin),
     nomeCsvAssinaturas()
   );
 }
@@ -421,19 +436,27 @@ function csvCiclo(duplas: Dupla[]): string {
   );
 }
 
+/** Recorte dos sensíveis que o CSV de pessoas exporta — form_bruto fica de
+ *  fora de propósito (arquivo morto, não campo de relatório). */
+type SensPessoa = Pick<
+  DadosPessoais,
+  "data_nascimento" | "genero" | "cor_raca" | "pref_genero_par" | "motivacao"
+>;
+
 function csvPessoas(
   pessoas: Pick<Profile, "id" | "nome" | "role" | "ativo">[],
   contatos: Map<string, { email: string | null; whatsapp: string | null }>,
   mentorados: Pick<Mentorado, "id" | "nome" | "email" | "whatsapp" | "ong_origem">[],
   capacidades: Map<string, number | null>,
-  pessoalP: Map<string, DadosPessoais>,
-  pessoalM: Map<string, DadosPessoais>
+  pessoalP: Map<string, SensPessoa>,
+  pessoalM: Map<string, SensPessoa>
 ): string {
   // sensíveis no fim, agrupados — quem abre a planilha vê de cara o bloco
   // que exige o cuidado LGPD
-  const sens = (s: DadosPessoais | undefined): string[] => [
+  const sens = (s: SensPessoa | undefined): string[] => [
     s?.data_nascimento ? dia(s.data_nascimento) : "",
     s?.genero ? (GENERO_LABELS[s.genero] ?? s.genero) : "",
+    s?.cor_raca ? (COR_RACA_LABELS[s.cor_raca] ?? s.cor_raca) : "",
     s?.pref_genero_par
       ? (PREF_GENERO_LABELS[s.pref_genero_par] ?? s.pref_genero_par)
       : "",
@@ -470,7 +493,7 @@ function csvPessoas(
   return (
     "\uFEFF" +
     [
-      "nome;tipo;email;whatsapp;capacidade;ong_origem;status;data_nascimento;genero;pref_genero_par;motivacao",
+      "nome;tipo;email;whatsapp;capacidade;ong_origem;status;data_nascimento;genero;cor_raca;pref_genero_par;motivacao",
       ...linhas
         .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"))
         .map((l) => [l.nome, ...l.resto].map(celula).join(";")),
@@ -483,6 +506,7 @@ function csvPessoas(
  *  snapshot_json é o conteúdo civil assinado (CPF/RG/endereço) — sensível,
  *  mas o export inteiro já é coord-only e é isso que prova o contrato. */
 type LinhaAssinatura = {
+  id: string;
   profile_id: string | null;
   mentorado_id: string | null;
   status: string;
@@ -493,6 +517,7 @@ type LinhaAssinatura = {
   user_agent: string | null;
   hash_documento: string | null;
   token_expira_em: string | null;
+  created_by: string | null;
   created_at: string;
   template?:
     | { slug: string; titulo: string; versao: number }
@@ -503,25 +528,42 @@ type LinhaAssinatura = {
 function csvAssinaturas(
   rows: LinhaAssinatura[],
   nomes: Map<string, string>,
-  papeis: Map<string, Profile["role"]>
+  papeis: Map<string, Profile["role"]>,
+  origin: string
 ): string {
   const linhas = rows.map((a) => {
     const tpl = Array.isArray(a.template) ? a.template[0] : a.template;
     const alvo = a.profile_id ?? a.mentorado_id ?? "";
+    // snapshot civil achatado: na autorização os dados são do responsável
+    // (objeto aninhado), nos termos são da própria pessoa (topo)
+    const snap = a.dados_snapshot as Record<string, unknown> | null;
+    const civ =
+      (snap?.responsavel as Record<string, unknown> | undefined) ??
+      snap ??
+      {};
+    const txt = (k: string) =>
+      typeof civ[k] === "string" ? (civ[k] as string) : "";
     return {
       nome: nomes.get(alvo) ?? "",
       resto: [
+        a.id,
         a.profile_id ? papelLabel(papeis.get(alvo) ?? null) : "Mentorado",
         tpl?.titulo ?? "",
         tpl ? `v${tpl.versao}` : "",
         a.status,
         dataHora(a.created_at),
+        a.created_by ? (nomes.get(a.created_by) ?? "") : "",
         dia(a.token_expira_em),
         dataHora(a.assinado_em),
         a.assinatura_texto ?? "",
+        txt("nome_civil"),
+        txt("cpf"),
+        txt("rg"),
+        txt("parentesco"),
         a.ip ?? "",
         a.user_agent ?? "",
         a.hash_documento ?? "",
+        `${origin}/api/assinatura/${a.id}`,
         a.dados_snapshot ? JSON.stringify(a.dados_snapshot) : "",
       ],
     };
@@ -530,7 +572,7 @@ function csvAssinaturas(
   return (
     "\uFEFF" +
     [
-      "nome;tipo;documento;versao;status;solicitado_em;expira_em;assinado_em;nome_assinado;ip;user_agent;sha256;snapshot_json",
+      "nome;id;tipo;documento;versao;status;emitido_em;emitido_por;expira_em;assinado_em;nome_assinado;signatario_civil;cpf;rg;parentesco;ip;user_agent;sha256;url_pdf;snapshot_json",
       ...linhas
         .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"))
         .map((l) => [l.nome, ...l.resto].map(celula).join(";")),

@@ -17,6 +17,7 @@ import {
 import type { Mentorado, Profile } from "@/lib/types";
 import type { MentorProfile } from "@/lib/queries";
 import { cn, normaliza } from "@/lib/utils";
+import { idade } from "@/lib/ciclo";
 import { avatarPublicUrl } from "@/lib/avatar";
 import { Avatar } from "@/components/avatar";
 import { PessoaActions } from "@/components/pessoa-actions";
@@ -35,7 +36,8 @@ const ehMentor = (p: Profile) =>
 /** Status de assinatura de uma pessoa, montado na page a partir do resumo:
  *  `assinado` = slug → ISO da assinatura; `pendente` = slugs com link vivo. */
 export type DocsPessoa = {
-  assinado: Record<string, string>;
+  /** slug → {id, em} — o id alimenta o link "ver PDF" (/api/assinatura/<id>) */
+  assinado: Record<string, { id: string; em: string | null }>;
   pendente: string[];
 };
 
@@ -355,6 +357,23 @@ function ItemDetalhe({
   );
 }
 
+/** "assinado em dd/mm" clicável — abre o PDF com a página de evidências
+ *  (/api/assinatura/<id>, sessão coord). Antes era texto morto: ver o
+ *  documento exigia abrir o dialog de edição da pessoa. */
+function LinkAssinatura({ id, children }: { id: string; children: ReactNode }) {
+  return (
+    <a
+      href={`/api/assinatura/${id}`}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="rounded-sm text-foreground underline decoration-muted-foreground/40 underline-offset-2 transition-colors hover:decoration-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    >
+      {children}
+      <span className="sr-only"> (abre o PDF assinado em nova aba)</span>
+    </a>
+  );
+}
+
 /** Região colapsável de detalhes — sempre montada com `hidden` pra que
  *  aria-controls resolva também fechada; largura cheia abaixo da linha, segura
  *  em 390px. */
@@ -413,6 +432,12 @@ function PessoaRow({
   const temPendencia = ehMentor(p) && (!mp?.termo_ok || !mp?.formacao_ok);
   const docs = docsProp ?? DOCS_VAZIO;
   const assinadoTermo = docs.assinado["termo-voluntario"];
+  // o termo de voluntariado vale pra equipe inteira — mentor via termo_ok
+  // (que também cobre o upload em papel), demais papéis pela assinatura
+  // ou pelo documento_path direto
+  const termoOk = ehMentor(p)
+    ? Boolean(mp?.termo_ok)
+    : assinadoTermo !== undefined || Boolean(p.documento_path);
   return (
     <div
       className="animate-enter px-4 py-3.5 sm:px-5"
@@ -455,7 +480,7 @@ function PessoaRow({
         {emDupla && !(ehMentor(p) && vagas > 0) && (
           <Badge variant="outline" className="text-xs shrink-0">em dupla</Badge>
         )}
-        {ehMentor(p) && !mp?.termo_ok && (
+        {!termoOk && (
           <Badge
             variant="outline"
             className="text-xs shrink-0 border-[var(--warn)]/60 text-[var(--warn-text)]"
@@ -499,9 +524,13 @@ function PessoaRow({
           </ItemDetalhe>
           {mp?.termo_ok ? (
             <ItemDetalhe icone={FileText}>
-              {assinadoTermo !== undefined
-                ? `Termo de adesão assinado${assinadoTermo ? ` em ${fmtDia(assinadoTermo)}` : ""}`
-                : "Termo de adesão no arquivo"}
+              {assinadoTermo !== undefined ? (
+                <LinkAssinatura id={assinadoTermo.id}>
+                  {`Termo de adesão assinado${assinadoTermo.em ? ` em ${fmtDia(assinadoTermo.em)}` : ""}`}
+                </LinkAssinatura>
+              ) : (
+                "Termo de adesão no arquivo"
+              )}
             </ItemDetalhe>
           ) : (
             <ItemDetalhe icone={FileText} warn>
@@ -539,13 +568,20 @@ function MentoradoRow({
   // LGPD: parear menor sem a autorização do responsável é pendência jurídica.
   // Vale tanto o upload manual (documento_path) quanto a assinatura por link.
   const docs = docsProp ?? DOCS_VAZIO;
+  // 0046: quem assina o termo de participação é o próprio jovem — pra menor
+  // de idade a coordenação emite a autorização do responsável NO LUGAR dele.
+  // Exigir os dois pra todos marcava adulto como "autorização pendente".
+  const anos = idade(m.data_nascimento);
+  const menor = anos != null && anos < 18;
   const autData = docs.assinado["autorizacao-responsavel"];
   const termoData = docs.assinado["termo-mentorando"];
   const autorizacaoOk = Boolean(m.documento_path) || autData !== undefined;
   const termoOk = termoData !== undefined;
   const autEnviada = docs.pendente.includes("autorizacao-responsavel");
   const termoEnviado = docs.pendente.includes("termo-mentorando");
-  const temPendencia = !autorizacaoOk || !termoOk;
+  const docOk = menor ? autorizacaoOk : termoOk;
+  const docEnviado = menor ? autEnviada : termoEnviado;
+  const temPendencia = !docOk;
   const temDocs =
     temPendencia ||
     Object.keys(docs.assinado).length > 0 ||
@@ -585,28 +621,22 @@ function MentoradoRow({
         {emDupla && (
           <Badge variant="outline" className="text-xs shrink-0">em dupla</Badge>
         )}
-        {!autorizacaoOk && (
+        {!docOk && (
           <Badge
             variant="outline"
             className={cn(
               "text-xs shrink-0",
-              !autEnviada &&
+              !docEnviado &&
                 "border-[var(--warn)]/60 text-[var(--warn-text)]"
             )}
           >
-            {autEnviada ? "autorização enviada" : "autorização pendente"}
-          </Badge>
-        )}
-        {!termoOk && (
-          <Badge
-            variant="outline"
-            className={cn(
-              "text-xs shrink-0",
-              !termoEnviado &&
-                "border-[var(--warn)]/60 text-[var(--warn-text)]"
-            )}
-          >
-            {termoEnviado ? "termo enviado" : "termo pendente"}
+            {docEnviado
+              ? menor
+                ? "autorização enviada"
+                : "termo enviado"
+              : menor
+                ? "autorização pendente"
+                : "termo pendente"}
           </Badge>
         )}
         {temDocs && (
@@ -623,22 +653,36 @@ function MentoradoRow({
       </div>
       {temDocs && (
         <DetalhesRegiao id={detalhesId} nome={m.nome} aberto={detalhesAbertos}>
-          <ItemDetalhe icone={FileText} warn={!autorizacaoOk}>
-            {autorizacaoOk
-              ? autData !== undefined
-                ? `Autorização do responsável assinada${autData ? ` em ${fmtDia(autData)}` : ""}`
-                : "Autorização do responsável no arquivo"
-              : autEnviada
-                ? "Autorização enviada — aguardando a assinatura do responsável"
-                : "Autorização do responsável ainda não enviada"}
-          </ItemDetalhe>
-          <ItemDetalhe icone={FileText} warn={!termoOk}>
-            {termoOk
-              ? `Termo de participação assinado${termoData ? ` em ${fmtDia(termoData)}` : ""}`
-              : termoEnviado
-                ? "Termo de participação enviado — aguardando assinatura"
-                : "Termo de participação ainda não enviado"}
-          </ItemDetalhe>
+          {menor && (
+            <ItemDetalhe icone={FileText} warn={!autorizacaoOk}>
+              {autorizacaoOk ? (
+                autData !== undefined ? (
+                  <LinkAssinatura id={autData.id}>
+                    {`Autorização do responsável assinada${autData.em ? ` em ${fmtDia(autData.em)}` : ""}`}
+                  </LinkAssinatura>
+                ) : (
+                  "Autorização do responsável no arquivo"
+                )
+              ) : autEnviada ? (
+                "Autorização enviada — aguardando a assinatura do responsável"
+              ) : (
+                "Autorização do responsável ainda não enviada"
+              )}
+            </ItemDetalhe>
+          )}
+          {!menor && (
+            <ItemDetalhe icone={FileText} warn={!termoOk}>
+              {termoOk ? (
+                <LinkAssinatura id={termoData!.id}>
+                  {`Termo de participação assinado${termoData!.em ? ` em ${fmtDia(termoData!.em)}` : ""}`}
+                </LinkAssinatura>
+              ) : termoEnviado ? (
+                "Termo de participação enviado — aguardando assinatura"
+              ) : (
+                "Termo de participação ainda não enviado"
+              )}
+            </ItemDetalhe>
+          )}
         </DetalhesRegiao>
       )}
     </div>

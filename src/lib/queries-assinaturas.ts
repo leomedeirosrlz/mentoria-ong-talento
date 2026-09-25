@@ -89,16 +89,18 @@ export const getAssinaturasResumo = cache(
     const { data, error } = await supabase
       .from("assinaturas")
       .select(
-        "profile_id, mentorado_id, status, assinado_em, template:documento_templates(slug)"
+        "id, profile_id, mentorado_id, status, assinado_em, token_expira_em, template:documento_templates(slug)"
       );
     if (error) throw error;
     return ((data ?? []) as unknown as (Omit<AssinaturaResumo, "slug"> & {
       template: { slug: string } | { slug: string }[] | null;
     })[]).map((r) => ({
+      id: r.id,
       profile_id: r.profile_id,
       mentorado_id: r.mentorado_id,
       status: r.status,
       assinado_em: r.assinado_em,
+      token_expira_em: r.token_expira_em,
       slug: norm(r.template)?.slug ?? "",
     }));
   }
