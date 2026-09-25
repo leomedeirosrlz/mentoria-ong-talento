@@ -16,7 +16,8 @@ import {
   CampoNascimento,
   CampoPrefGenero,
   CampoUf,
-  SecaoFicha,
+  WizardFicha,
+  type PassoFicha,
 } from "@/components/campos-pessoais";
 import type { Disponibilidade, Mentorado } from "@/lib/types";
 import { Button } from "@/components/ui/button";
@@ -57,10 +58,175 @@ export function MentoradoActions({ mentorado, temDupla }: { mentorado: Mentorado
           router.refresh();
         }
       } catch {
-        toast.error("Sem conexão — tente de novo.");
+        toast.error("Sem conexão. Tente de novo.");
       }
     });
   }
+
+  // um passo por SecaoFicha — 7 seções seguidas de scroll viravam parede
+  // de campos (docs do jovem e do responsável ficam perto do fim)
+  const passos: PassoFicha[] = [
+    {
+      titulo: "Identificação e contato",
+      conteudo: (
+        <>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="em_nome">Nome civil</Label>
+              <Input id="em_nome" name="nome" required defaultValue={mentorado.nome} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="em_social">Nome social</Label>
+              <Input
+                id="em_social" name="nome_social" maxLength={150}
+                defaultValue={mentorado.nome_social ?? ""}
+                placeholder="Nome de uso, se diferente"
+              />
+            </div>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="em_whatsapp">WhatsApp</Label>
+              <Input
+                id="em_whatsapp" name="whatsapp"
+                type="tel" inputMode="tel" autoComplete="tel"
+                defaultValue={mentorado.whatsapp ?? ""}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="em_email">E-mail</Label>
+              <Input id="em_email" name="email" type="email" defaultValue={mentorado.email ?? ""} />
+            </div>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <CampoNascimento id="em_nasc" defaultValue={mentorado.data_nascimento ?? ""} />
+            <CampoGenero defaultValue={mentorado.genero ?? ""} />
+          </div>
+          <CampoCorRaca defaultValue={mentorado.cor_raca ?? ""} />
+        </>
+      ),
+    },
+    {
+      titulo: "Onde vive e origem",
+      conteudo: (
+        <>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div className="space-y-2 sm:col-span-2">
+              <Label htmlFor="em_cidade">Cidade</Label>
+              <Input id="em_cidade" name="cidade" maxLength={100} defaultValue={mentorado.cidade ?? ""} />
+            </div>
+            <CampoUf defaultValue={mentorado.uf ?? ""} />
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="em_ong">ONG de origem</Label>
+              <Input id="em_ong" name="ong_origem" defaultValue={mentorado.ong_origem ?? ""} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="em_origem">Como chegou ao programa</Label>
+              <Input
+                id="em_origem" name="origem" maxLength={300}
+                defaultValue={mentorado.origem ?? ""}
+                placeholder="Escola, ONG, indicação…"
+              />
+            </div>
+          </div>
+          <CampoEscolaridade defaultValue={mentorado.escolaridade ?? ""} />
+        </>
+      ),
+    },
+    {
+      titulo: "Interesses e objetivos",
+      conteudo: (
+        <>
+          <CampoInteresses value={interesses} onChange={setInteresses} />
+          <div className="space-y-2">
+            <Label htmlFor="em_objetivos">Objetivos com a mentoria</Label>
+            <Textarea
+              id="em_objetivos" name="objetivos" rows={2} maxLength={2000}
+              defaultValue={mentorado.objetivos ?? ""}
+              placeholder="O que o jovem quer alcançar no programa"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="em_motivacao">Motivação</Label>
+            <Textarea
+              id="em_motivacao" name="motivacao" rows={2} maxLength={2000}
+              defaultValue={mentorado.motivacao ?? ""}
+              placeholder="O que motiva a participação"
+            />
+          </div>
+          <CampoPrefGenero defaultValue={mentorado.pref_genero_par ?? ""} />
+        </>
+      ),
+    },
+    {
+      titulo: "Disponibilidade semanal",
+      conteudo: (
+        <CampoDisponibilidade value={disponibilidade} onChange={setDisponibilidade} />
+      ),
+    },
+    {
+      titulo: "Documentos do(a) jovem (termo de participação)",
+      conteudo: (
+        <DadosCivisFields
+          prefix="civis_"
+          opcional
+          compacto
+          defaults={mentorado.dados_civis}
+        />
+      ),
+    },
+    {
+      titulo: "Responsável legal (autorização de menor)",
+      conteudo: (
+        <>
+          <div className="space-y-2">
+            <Label htmlFor="em_parentesco">Parentesco com o(a) jovem</Label>
+            <Input
+              id="em_parentesco" name="resp_parentesco" maxLength={60}
+              defaultValue={mentorado.responsavel?.parentesco ?? ""}
+              placeholder="mãe, pai, avó, tio…"
+            />
+          </div>
+          <DadosCivisFields
+            prefix="resp_"
+            opcional
+            defaults={mentorado.responsavel}
+          />
+        </>
+      ),
+    },
+    {
+      titulo: "Anamnese e arquivos",
+      conteudo: (
+        <>
+          <div className="space-y-2">
+            <Label htmlFor="em_notas">Notas / referência da anamnese</Label>
+            <Textarea id="em_notas" name="notas" rows={2} defaultValue={mentorado.notas ?? ""} />
+          </div>
+          <FotoField
+            id="em_foto"
+            defaultUrl={mentorado.avatar_path ? avatarPublicUrl(mentorado.avatar_path) : null}
+          />
+          <DocumentoPessoa
+            tipo="mentorado"
+            id={mentorado.id}
+            documentoPath={mentorado.documento_path}
+          />
+          <AssinaturasPessoa
+            tipo="mentorado"
+            id={mentorado.id}
+            nome={mentorado.nome}
+            whatsapp={mentorado.whatsapp}
+          />
+          <p className="text-xs text-muted-foreground">
+            Nascimento, gênero, cor/raça, motivação e preferência de par ficam visíveis só pra coordenação.
+          </p>
+        </>
+      ),
+    },
+  ];
 
   return (
     <>
@@ -86,7 +252,7 @@ export function MentoradoActions({ mentorado, temDupla }: { mentorado: Mentorado
           </DropdownMenuItem>
           {temDupla && (
             <p className="px-2 pb-1 text-[11px] leading-snug text-muted-foreground">
-              Tem dupla no histórico — cadastro vinculado a uma dupla (mesmo encerrada) não pode ser excluído.
+              Tem dupla no histórico: cadastro vinculado a uma dupla, mesmo encerrada, não pode ser excluído.
             </p>
           )}
         </DropdownMenuContent>
@@ -106,143 +272,12 @@ export function MentoradoActions({ mentorado, temDupla }: { mentorado: Mentorado
           <DialogHeader>
             <DialogTitle>Editar {primeiroNome}</DialogTitle>
           </DialogHeader>
-          <form onSubmit={submit} className="space-y-4">
-            <SecaoFicha>Identificação e contato</SecaoFicha>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="em_nome">Nome civil</Label>
-                <Input id="em_nome" name="nome" required defaultValue={mentorado.nome} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="em_social">Nome social</Label>
-                <Input
-                  id="em_social" name="nome_social" maxLength={150}
-                  defaultValue={mentorado.nome_social ?? ""}
-                  placeholder="Nome de uso, se diferente"
-                />
-              </div>
-            </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="em_whatsapp">WhatsApp</Label>
-                <Input
-                  id="em_whatsapp" name="whatsapp"
-                  type="tel" inputMode="tel" autoComplete="tel"
-                  defaultValue={mentorado.whatsapp ?? ""}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="em_email">E-mail</Label>
-                <Input id="em_email" name="email" type="email" defaultValue={mentorado.email ?? ""} />
-              </div>
-            </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <CampoNascimento id="em_nasc" defaultValue={mentorado.data_nascimento ?? ""} />
-              <CampoGenero defaultValue={mentorado.genero ?? ""} />
-            </div>
-            <CampoCorRaca defaultValue={mentorado.cor_raca ?? ""} />
-
-            <SecaoFicha>Onde vive e origem</SecaoFicha>
-            <div className="grid gap-4 sm:grid-cols-3">
-              <div className="space-y-2 sm:col-span-2">
-                <Label htmlFor="em_cidade">Cidade</Label>
-                <Input id="em_cidade" name="cidade" maxLength={100} defaultValue={mentorado.cidade ?? ""} />
-              </div>
-              <CampoUf defaultValue={mentorado.uf ?? ""} />
-            </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="em_ong">ONG de origem</Label>
-                <Input id="em_ong" name="ong_origem" defaultValue={mentorado.ong_origem ?? ""} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="em_origem">Como chegou ao programa</Label>
-                <Input
-                  id="em_origem" name="origem" maxLength={300}
-                  defaultValue={mentorado.origem ?? ""}
-                  placeholder="Escola, ONG, indicação…"
-                />
-              </div>
-            </div>
-            <CampoEscolaridade defaultValue={mentorado.escolaridade ?? ""} />
-
-            <SecaoFicha>Interesses e objetivos</SecaoFicha>
-            <CampoInteresses value={interesses} onChange={setInteresses} />
-            <div className="space-y-2">
-              <Label htmlFor="em_objetivos">Objetivos com a mentoria</Label>
-              <Textarea
-                id="em_objetivos" name="objetivos" rows={2} maxLength={2000}
-                defaultValue={mentorado.objetivos ?? ""}
-                placeholder="O que o jovem quer alcançar no programa"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="em_motivacao">Motivação</Label>
-              <Textarea
-                id="em_motivacao" name="motivacao" rows={2} maxLength={2000}
-                defaultValue={mentorado.motivacao ?? ""}
-                placeholder="O que motiva a participação"
-              />
-            </div>
-            <CampoPrefGenero defaultValue={mentorado.pref_genero_par ?? ""} />
-
-            <SecaoFicha>Disponibilidade semanal</SecaoFicha>
-            <CampoDisponibilidade value={disponibilidade} onChange={setDisponibilidade} />
-
-            <SecaoFicha>Documentos do(a) jovem (termo de participação)</SecaoFicha>
-            <DadosCivisFields
-              prefix="civis_"
-              opcional
-              compacto
-              defaults={mentorado.dados_civis}
-            />
-
-            <SecaoFicha>Responsável legal (autorização de menor)</SecaoFicha>
-            <div className="space-y-2">
-              <Label htmlFor="em_parentesco">Parentesco com o(a) jovem</Label>
-              <Input
-                id="em_parentesco" name="resp_parentesco" maxLength={60}
-                defaultValue={mentorado.responsavel?.parentesco ?? ""}
-                placeholder="mãe, pai, avó, tio…"
-              />
-            </div>
-            <DadosCivisFields
-              prefix="resp_"
-              opcional
-              defaults={mentorado.responsavel}
-            />
-
-            <SecaoFicha>Anamnese e arquivos</SecaoFicha>
-            <div className="space-y-2">
-              <Label htmlFor="em_notas">Notas / referência da anamnese</Label>
-              <Textarea id="em_notas" name="notas" rows={2} defaultValue={mentorado.notas ?? ""} />
-            </div>
-            <FotoField
-              id="em_foto"
-              defaultUrl={mentorado.avatar_path ? avatarPublicUrl(mentorado.avatar_path) : null}
-            />
-            <DocumentoPessoa
-              tipo="mentorado"
-              id={mentorado.id}
-              documentoPath={mentorado.documento_path}
-            />
-            <AssinaturasPessoa
-              tipo="mentorado"
-              id={mentorado.id}
-              nome={mentorado.nome}
-              whatsapp={mentorado.whatsapp}
-            />
-            <p className="text-xs text-muted-foreground">
-              Nascimento, gênero, cor/raça, motivação e preferência de par ficam visíveis só pra coordenação.
-            </p>
-            {/* barra sticky (padrão do registro-form) — o Salvar ficava
-                soterrado no fim do scroll interno do dialog */}
-            <div className="sticky bottom-0 -mx-4 -mb-4 border-t bg-popover px-4 py-3">
-              <Button type="submit" className="w-full" disabled={pending}>
-                {pending ? "Salvando…" : "Salvar"}
-              </Button>
-            </div>
-          </form>
+          <WizardFicha
+            passos={passos}
+            pending={pending}
+            submitLabel="Salvar"
+            onSubmit={submit}
+          />
         </DialogContent>
       </Dialog>
 
@@ -250,7 +285,7 @@ export function MentoradoActions({ mentorado, temDupla }: { mentorado: Mentorado
         open={delOpen}
         onOpenChange={setDelOpen}
         titulo={`Excluir ${mentorado.nome}?`}
-        descricao="Remove o cadastro do mentorado. Só é possível excluir quem nunca teve dupla — o vínculo fica no histórico mesmo depois de encerrada."
+        descricao="Remove o cadastro do mentorado. Só é possível excluir quem nunca teve dupla: o vínculo fica no histórico mesmo depois de encerrada."
         sucesso={`Cadastro de ${mentorado.nome} excluído.`}
         onConfirm={() => deleteMentorado(mentorado.id)}
       />

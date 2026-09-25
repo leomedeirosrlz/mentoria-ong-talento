@@ -90,8 +90,8 @@ export function ConfirmarAqui({
         <p className="mt-4 font-semibold">Entrar neste navegador?</p>
         <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
           Ao continuar, a sessão é criada aqui. Se você pediu este link em
-          outro navegador ou app de e-mail, volte pra página que fez o pedido
-          — ela entra sozinha.
+          outro navegador ou app de e-mail, volte pra página que fez o pedido.
+          Ela entra sozinha.
         </p>
         <Button
           type="button"

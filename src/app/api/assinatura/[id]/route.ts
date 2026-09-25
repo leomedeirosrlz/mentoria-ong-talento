@@ -76,14 +76,14 @@ export async function GET(
   const { data: claims } = await supabase.auth.getClaims();
   const sub = claims?.claims?.sub;
   if (!sub) {
-    return new NextResponse("Sessão expirada — entre de novo.", { status: 401 });
+    return new NextResponse("Sessão expirada. Entre de novo.", { status: 401 });
   }
 
   let a: Assinatura | null;
   try {
     a = await getAssinatura(id);
   } catch {
-    return new NextResponse("Não foi possível abrir o documento — tente de novo.", {
+    return new NextResponse("Não foi possível abrir o documento. Tente de novo.", {
       status: 500,
     });
   }

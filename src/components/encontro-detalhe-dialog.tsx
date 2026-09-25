@@ -140,7 +140,7 @@ export function EncontroDetalheDialog({
               size={32}
             />
             <span>
-              {encontro.numero}º encontro —{" "}
+              {encontro.numero}º encontro ·{" "}
               <DuplaNomes
                 mentor={dupla.mentor.nome}
                 mentorado={dupla.mentorado.nome}
@@ -196,7 +196,7 @@ export function EncontroDetalheDialog({
               <RegistroView reg={reg} tardio={tardio} />
               {erroAnexos && (
                 <p className="pt-1 text-xs text-muted-foreground">
-                  Não foi possível carregar as evidências — elas estão na ficha
+                  Não foi possível carregar as evidências. Elas estão na ficha
                   da dupla.
                 </p>
               )}
@@ -241,7 +241,7 @@ export function EncontroDetalheDialog({
           ) : (
             encontro.status === "realizado" && (
               <p className="rounded-lg border border-dashed border-[var(--warn)]/60 bg-[var(--warn)]/5 px-3.5 py-2.5 text-xs text-[var(--warn-text)]">
-                Sem registro — o mentor ainda não contou como foi.
+                Sem registro: o mentor ainda não contou como foi.
               </p>
             )
           )}

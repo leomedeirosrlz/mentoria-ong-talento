@@ -59,7 +59,7 @@ export function AnamneseMentoradoChip({
         // link pendente agora existe — o chip passa a dizer isso no refresh
         router.refresh();
       } catch {
-        toast.error("Sem conexão — tente de novo.");
+        toast.error("Sem conexão. Tente de novo.");
       }
     });
   }
@@ -70,7 +70,7 @@ export function AnamneseMentoradoChip({
       await navigator.clipboard.writeText(urlPublica(token));
       toast.success("Link copiado.");
     } catch {
-      toast.error("Não consegui copiar — selecione o link manualmente.");
+      toast.error("Não consegui copiar. Selecione o link manualmente.");
     }
   }
 
@@ -101,7 +101,7 @@ export function AnamneseMentoradoChip({
       </h3>
       <p className="mt-2 text-xs text-muted-foreground">
         {anamnese.linkPendente
-          ? "Já existe um link válido esperando resposta — o botão devolve o mesmo."
+          ? "Já existe um link válido esperando resposta. O botão devolve o mesmo."
           : "A ficha de conhecimento do(a) jovem ainda não foi enviada."}
       </p>
       <Button
@@ -126,8 +126,8 @@ export function AnamneseMentoradoChip({
             <DialogTitle>Anamnese pra {primeiroNome}</DialogTitle>
             <DialogDescription>
               {reutilizado
-                ? "Esse link já estava gerado — segue válido, é só reenviar."
-                : "Link único e de uso único — a resposta fica vinculada a essa ficha."}
+                ? "Esse link já estava gerado. Segue válido, é só reenviar."
+                : "Link único e de uso único. A resposta fica vinculada a essa ficha."}
             </DialogDescription>
           </DialogHeader>
           {token && (
@@ -144,7 +144,7 @@ export function AnamneseMentoradoChip({
               </div>
               <NudgeButton
                 telefone={whatsapp}
-                mensagem={`Olá, ${primeiroNome}! A equipe Realiza.vc te convida pra responder a Anamnese Social — leva poucos minutos e ajuda a gente a te conhecer antes da mentoria: ${urlPublica(token)}`}
+                mensagem={`Olá, ${primeiroNome}! A equipe Realiza.vc te convida pra responder a Anamnese Social. Leva poucos minutos e ajuda a gente a te conhecer antes da mentoria: ${urlPublica(token)}`}
                 label="Enviar no WhatsApp"
               />
             </div>

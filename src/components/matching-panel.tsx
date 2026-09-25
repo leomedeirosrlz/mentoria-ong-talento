@@ -47,8 +47,8 @@ export function MatchingPanel({
           {mentorados.length === 0 && mentores.length === 0
             ? "Ninguém livre pra parear agora."
             : mentorados.length === 0
-              ? "Sem mentorado livre — todos já estão em dupla."
-              : "Sem mentor livre — todos já estão em dupla."}
+              ? "Sem mentorado livre. Todos já estão em dupla."
+              : "Sem mentor livre. Todos já estão em dupla."}
         </p>
       ) : (
         <>
@@ -83,7 +83,7 @@ export function MatchingPanel({
                   mentores.map((m) => [
                     m.id,
                     m.role === "mentor_especialista"
-                      ? `${m.nome} — especialista`
+                      ? `${m.nome} · especialista`
                       : m.nome,
                   ])
                 )}
@@ -100,7 +100,7 @@ export function MatchingPanel({
                     <SelectItem key={m.id} value={m.id}>
                       {m.nome}
                       {m.role === "mentor_especialista"
-                        ? " — especialista"
+                        ? " · especialista"
                         : ""}
                     </SelectItem>
                   ))}

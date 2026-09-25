@@ -27,7 +27,6 @@ import { AvisosSection } from "@/components/avisos-section";
 import { SolicitacoesCoordCard } from "@/components/solicitacoes-coord-card";
 import { SupervisaoDialog } from "@/components/supervisao-dialog";
 import { SupervisoesSection } from "@/components/supervisoes-section";
-import { TrajetoriaAvaliacoes } from "@/components/trajetoria-avaliacoes";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -124,9 +123,7 @@ export function DashboardCoordenacao({
   return (
     <div className="space-y-8">
       <header>
-        <h1 className="text-2xl font-semibold tracking-tight">
-          {supervisor ? "Suas duplas" : "Visão geral"}
-        </h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Visão geral</h1>
         {evento && (
           <p className="text-sm text-muted-foreground mt-1 flex items-center gap-1.5">
             <span aria-hidden className="size-2 shrink-0 rounded-full bg-[var(--brand-lime)]" />
@@ -134,7 +131,7 @@ export function DashboardCoordenacao({
               <span className="font-medium text-foreground">
                 Semana do {evento.numero}º encontro
               </span>
-              {evento.fase ? ` — ${evento.fase}` : ""} · {evento.titulo}
+              {evento.fase ? ` · ${evento.fase}` : ""} · {evento.titulo}
             </span>
           </p>
         )}
@@ -191,106 +188,32 @@ export function DashboardCoordenacao({
         </div>
       )}
 
-      {resumo && (
-        <section
-          aria-label="Resumo da semana"
-          className="rounded-xl bg-card px-4 py-3 text-sm shadow-[var(--shadow-border)]"
-        >
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
-            {/* o nº do encontro já está no cabeçalho ("Semana do Nº encontro") —
-                aqui a data é o fato novo */}
-            <span className="font-medium">
-              Esta semana — {formatDiaMes(resumo.evento.data)}
-            </span>
-            <span className="text-muted-foreground">
-              <Num>{resumo.realizaram}</Num> de <Num>{resumo.total}</Num>{" "}
-              {resumo.total === 1 ? "dupla já realizou" : "duplas já realizaram"}
-            </span>
-            {/* ninguém realizou → os dois contadores de registro são zero
-                forçado; exibi-los é ruído */}
-            {resumo.realizaram > 0 && (
-              <>
-                <span className="text-muted-foreground">
-                  <Num>{resumo.comRegistro}</Num>{" "}
-                  {resumo.comRegistro === 1 ? "registro entregue" : "registros entregues"}
-                </span>
-                <span className="text-muted-foreground">
-                  <Num>{resumo.aguardandoRegistro}</Num> aguardando registro
-                </span>
-              </>
-            )}
-            <span className="text-muted-foreground">
-              <Num>{resumo.naoAconteceram - resumo.reposicao}</Num>{" "}
-              {resumo.naoAconteceram - resumo.reposicao === 1
-                ? "ainda não aconteceu"
-                : "ainda não aconteceram"}
-            </span>
-            {resumo.reposicao > 0 && (
-              // o significado de "em reposição" fica visível — tooltip/title
-              // não existe no toque
-              <span className="inline-flex flex-wrap items-center gap-x-1.5 gap-y-1 text-muted-foreground">
-                <Badge variant="outline" className="text-muted-foreground">
-                  <ArrowCounterClockwise data-icon="inline-start" />
-                  <span className="font-mono">{resumo.reposicao}</span> em reposição
-                </Badge>
-                <span className="text-xs">
-                  {resumo.reposicao === 1
-                    ? "encontro de outra semana feito nesta"
-                    : "encontros de outras semanas feitos nesta"}
-                </span>
-              </span>
-            )}
-            <Link
-              href={`/registros?encontro=${resumo.evento.numero}`}
-              className="-my-1 ml-auto inline-flex min-h-11 items-center rounded-md px-1.5 text-xs font-medium underline underline-offset-2 transition-colors hover:text-foreground md:min-h-7"
-            >
-              Ver registros →
-            </Link>
-            <CopiarResumoButton
-              texto={textoResumoSemana(resumo, emRisco)}
-            />
-          </div>
-        </section>
-      )}
-
-      <AvisosSection avisos={avisos} souCoord={!supervisor} />
-
-      {/* mural de demandas entre mentores — a coordenação observa e gerencia;
-          o fluxo em si é DPP → especialista, sem coordenação no caminho */}
-      {!supervisor && <SolicitacoesCoordCard solicitacoes={solicitacoes} />}
-
-      {/* ritual supervisor ↔ mentor do guia (0041): registrar a conversa e
-          reler as últimas. Sem dupla supervisionada nem sessão no histórico,
-          o cartão some — a lista de duplas vazia já carrega a explicação */}
-      {supervisor && (supervisaoItens.length > 0 || supervisaoAlvos.length > 0) && (
-        <SupervisoesSection
-          itens={supervisaoItens}
-          visao="supervisor"
-          descricao="As conversas de supervisão com seus mentores — o ritual de acompanhamento do guia."
-          acao={
-            supervisaoAlvos.length > 0 ? (
-              <SupervisaoDialog alvos={supervisaoAlvos} />
-            ) : undefined
-          }
-        />
-      )}
-
-      <section className="space-y-3">
-        {filtroAtivo && saude.length > 0 && visiveis.length > 0 && (
-          <p className="text-sm text-muted-foreground">
-            Mostrando só{" "}
-            {visiveis.length === 1
-              ? "1 dupla"
-              : `${visiveis.length} duplas`}{" "}
-            {FILTROS[filtroAtivo].rotulo} ·{" "}
-            <Link
-              href="/"
-              className="font-medium text-foreground underline underline-offset-2"
-            >
-              Ver todas
-            </Link>
-          </p>
-        )}
+      {/* radar primeiro: a lista de duplas é o bloco de trabalho — vem antes
+          do resumo da semana, das solicitações e dos avisos */}
+      <section className="space-y-3" aria-labelledby="duplas-radar-titulo">
+        <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+          <h2
+            id="duplas-radar-titulo"
+            className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground"
+          >
+            {supervisor ? "Suas duplas" : "Duplas"}
+          </h2>
+          {filtroAtivo && saude.length > 0 && visiveis.length > 0 && (
+            <p className="text-xs text-muted-foreground">
+              Mostrando só{" "}
+              {visiveis.length === 1
+                ? "1 dupla"
+                : `${visiveis.length} duplas`}{" "}
+              {FILTROS[filtroAtivo].rotulo} ·{" "}
+              <Link
+                href="/"
+                className="font-medium text-foreground underline underline-offset-2"
+              >
+                Ver todas
+              </Link>
+            </p>
+          )}
+        </div>
 
         {saude.length === 0 && (
           <Card>
@@ -360,6 +283,100 @@ export function DashboardCoordenacao({
           />
         ))}
       </section>
+
+      {/* ritual supervisor ↔ mentor do guia (0041): registrar a conversa e
+          reler as últimas. Sem dupla supervisionada nem sessão no histórico,
+          o cartão some — a lista de duplas vazia já carrega a explicação */}
+      {supervisor && (supervisaoItens.length > 0 || supervisaoAlvos.length > 0) && (
+        <SupervisoesSection
+          itens={supervisaoItens}
+          visao="supervisor"
+          descricao="As conversas de supervisão com seus mentores: o ritual de acompanhamento do guia."
+          acao={
+            supervisaoAlvos.length > 0 ? (
+              <SupervisaoDialog alvos={supervisaoAlvos} />
+            ) : undefined
+          }
+        />
+      )}
+
+      {/* contexto depois da tarefa: o fechamento da semana em números
+          rotulados, com as ações (registros, copiar) no cabeçalho do bloco */}
+      {resumo && (
+        <section
+          aria-labelledby="resumo-semana-titulo"
+          className="rounded-xl bg-card px-4 py-3 text-sm shadow-[var(--shadow-border)]"
+        >
+          <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
+            {/* o nº do encontro já está no cabeçalho ("Semana do Nº encontro") —
+                aqui a data é o fato novo */}
+            <h2 id="resumo-semana-titulo" className="font-semibold">
+              Esta semana · {formatDiaMes(resumo.evento.data)}
+            </h2>
+            <div className="flex items-center gap-2">
+              <Link
+                href={`/registros?encontro=${resumo.evento.numero}`}
+                className="inline-flex min-h-11 items-center rounded-md px-1.5 text-xs font-medium underline underline-offset-2 transition-colors hover:text-foreground md:min-h-8"
+              >
+                Ver registros →
+              </Link>
+              <CopiarResumoButton
+                texto={textoResumoSemana(resumo, emRisco)}
+              />
+            </div>
+          </div>
+          <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3 border-t border-border/60 pt-3 sm:grid-cols-4">
+            <div>
+              <dt className="text-xs text-muted-foreground">Realizaram o encontro</dt>
+              <dd className="mt-0.5 font-mono text-xl font-semibold tabular-nums">
+                {resumo.realizaram}
+                <span className="font-normal text-muted-foreground">
+                  /{resumo.total}
+                </span>
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs text-muted-foreground">Registros entregues</dt>
+              <dd className="mt-0.5 font-mono text-xl font-semibold tabular-nums">
+                {resumo.comRegistro}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs text-muted-foreground">Aguardando registro</dt>
+              <dd className="mt-0.5 font-mono text-xl font-semibold tabular-nums">
+                {resumo.aguardandoRegistro}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs text-muted-foreground">Sem encontro</dt>
+              <dd className="mt-0.5 font-mono text-xl font-semibold tabular-nums">
+                {resumo.naoAconteceram - resumo.reposicao}
+              </dd>
+            </div>
+          </dl>
+          {resumo.reposicao > 0 && (
+            // o significado de "em reposição" fica visível — tooltip/title
+            // não existe no toque
+            <p className="mt-3 flex flex-wrap items-center gap-x-1.5 gap-y-1 border-t border-border/60 pt-2.5 text-xs text-muted-foreground">
+              <Badge variant="outline" className="text-muted-foreground">
+                <ArrowCounterClockwise data-icon="inline-start" />
+                <span className="font-mono">{resumo.reposicao}</span> em reposição
+              </Badge>
+              <span>
+                {resumo.reposicao === 1
+                  ? "encontro de outra semana feito nesta"
+                  : "encontros de outras semanas feitos nesta"}
+              </span>
+            </p>
+          )}
+        </section>
+      )}
+
+      {/* mural de demandas entre mentores — a coordenação observa e gerencia;
+          o fluxo em si é DPP → especialista, sem coordenação no caminho */}
+      {!supervisor && <SolicitacoesCoordCard solicitacoes={solicitacoes} />}
+
+      <AvisosSection avisos={avisos} souCoord={!supervisor} />
     </div>
   );
 }
@@ -371,12 +388,6 @@ function motivoCurto(s: DuplaSaude): string {
   const atraso = s.esperado - s.feitos;
   if (atraso >= 2) return `${atraso} atrasos`;
   return "avaliação baixa + dificuldade";
-}
-
-/** Número dentro de frase — Mitr medium (não mono): mono fica só pra
- *  contadores alinhados (N/M, stats, chips). */
-function Num({ children }: { children: number }) {
-  return <span className="font-medium text-foreground">{children}</span>;
 }
 
 /** Stat = número-resumo + link-filtro: o clique mostra na lista só as duplas
@@ -467,7 +478,7 @@ function DuplaCard({
   const caso = saude.pediuApoio
     ? "Vi seu pedido de apoio no registro. O que está rolando? Pode contar comigo."
     : pendente?.status === "agendado"
-      ? `O ${pendente.numero}º encontro estava agendado e já passou — rolou? Se rolou, o registro é por aqui: ${linkRegistro}`
+      ? `O ${pendente.numero}º encontro estava agendado e já passou. Rolou? Se rolou, o registro é por aqui: ${linkRegistro}`
       : saude.registroPendente
         ? `Vi que o último encontro rolou, mas ainda falta o registro. Consegue preencher hoje?${linkRegistro ? ` É direto por aqui: ${linkRegistro}` : ""}`
         : atraso > 0
@@ -513,13 +524,12 @@ function DuplaCard({
                 {TRILHA_LABEL[dupla.trilha]}
               </Badge>
             )}
-            <TrajetoriaAvaliacoes encontros={dupla.encontros} total={total} />
           </div>
           <p className="mt-1.5 text-sm text-muted-foreground">
             {saude.motivo}
             {dupla.status === "pausada" && saude.pediuApoio && " · dupla pausada"}
             {saude.proximo && saude.semaforo !== "ok" && (
-              <> — próximo: {formatDateTime(saude.proximo.data_hora)}</>
+              <> · próximo: {formatDateTime(saude.proximo.data_hora)}</>
             )}
           </p>
         </div>

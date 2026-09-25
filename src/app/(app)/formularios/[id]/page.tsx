@@ -212,7 +212,7 @@ export default async function FormularioPage({
             // instrumento oficial — a definição é catálogo (imutável via
             // trigger, 0042)
             <p className="mb-3 text-xs text-muted-foreground">
-              Formulário oficial do programa — as perguntas vêm do guia e não
+              Formulário oficial do programa. As perguntas vêm do guia e não
               são editáveis. Pra mudar o instrumento, a definição passa por
               migração.
             </p>
@@ -272,7 +272,7 @@ export default async function FormularioPage({
           Links de resposta
         </h2>
         <p className="mb-3 text-sm text-muted-foreground">
-          Cada link é único e de uso único — a pessoa responde sem login, num
+          Cada link é único e de uso único. A pessoa responde sem login, num
           endereço só dela.
         </p>
         <FormularioLinks
@@ -300,7 +300,7 @@ export default async function FormularioPage({
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-6">
           <p className="max-w-md text-xs leading-relaxed text-muted-foreground">
             Excluir apaga o formulário junto com todos os links e todas as
-            respostas recebidas — não dá pra desfazer.
+            respostas recebidas. Não dá pra desfazer.
           </p>
           <FormularioExcluir id={f.id} titulo={f.titulo} />
         </div>

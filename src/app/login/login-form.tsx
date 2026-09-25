@@ -20,13 +20,13 @@ const COOLDOWN = 60;
 function mensagemErro(error: { message: string; code?: string }, modo: "link" | "senha"): string {
   const texto = `${error.code ?? ""} ${error.message}`.toLowerCase();
   if (texto.includes("invalid_credentials") || texto.includes("invalid login credentials")) {
-    return "E-mail ou senha incorretos — confira e tente de novo.";
+    return "E-mail ou senha incorretos. Confira e tente de novo.";
   }
   if (texto.includes("email_not_confirmed") || texto.includes("email not confirmed")) {
     return "Confirme seu e-mail antes de entrar.";
   }
   if (texto.includes("otp_disabled") || texto.includes("signups not allowed")) {
-    return "E-mail não cadastrado — fale com a coordenação pra liberar seu acesso.";
+    return "E-mail não cadastrado. Fale com a coordenação pra liberar seu acesso.";
   }
   return modo === "link"
     ? "Não foi possível enviar o link. Confira o e-mail ou tente de novo em alguns minutos."
@@ -231,7 +231,7 @@ export function LoginForm() {
         entrou = true;
         await supabase.auth.signOut();
         setEnviado(false);
-        setErro("Este link não corresponde a este e-mail — peça um novo.");
+        setErro("Este link não corresponde a este e-mail. Peça um novo.");
         return;
       }
       entrou = true;
@@ -296,7 +296,7 @@ export function LoginForm() {
         setCooldown(COOLDOWN);
       }
     } catch {
-      setErro("Sem conexão — tente de novo.");
+      setErro("Sem conexão. Tente de novo.");
     } finally {
       setLoading(false);
     }
@@ -314,7 +314,7 @@ export function LoginForm() {
       if (error) setErro(mensagemErro(error, "senha"));
       else router.push(destinoFinal());
     } catch {
-      setErro("Sem conexão — tente de novo.");
+      setErro("Sem conexão. Tente de novo.");
     } finally {
       setLoading(false);
     }

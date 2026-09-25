@@ -50,5 +50,5 @@ export function msgLinkWhatsApp(
   origem?: string | null
 ): string {
   const p = primeiroNome(nome);
-  return `Olá${p ? `, ${p}` : ""}! A equipe Realiza.vc te convida pra responder "${formularioTitulo}" — leva poucos minutos: ${urlPublica(token, origem)}`;
+  return `Olá${p ? `, ${p}` : ""}! A equipe Realiza.vc te convida pra responder "${formularioTitulo}". Leva poucos minutos: ${urlPublica(token, origem)}`;
 }

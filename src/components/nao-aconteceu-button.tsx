@@ -52,7 +52,7 @@ export function NaoAconteceuButton({
                     router.refresh();
                   }
                 } catch {
-                  toast.error("Sem conexão — tente de novo.");
+                  toast.error("Sem conexão. Tente de novo.");
                 }
               })
             }
@@ -107,7 +107,7 @@ export function DesfazerNaoAconteceuButton({
                     router.refresh();
                   }
                 } catch {
-                  toast.error("Sem conexão — tente de novo.");
+                  toast.error("Sem conexão. Tente de novo.");
                 }
               })
             }

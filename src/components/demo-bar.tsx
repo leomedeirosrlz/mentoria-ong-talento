@@ -72,7 +72,7 @@ export function DemoBar({
     <PopoverTrigger
       aria-label={
         dock
-          ? `Modo demonstração — ${papelLabel(papel)}. Abrir controles`
+          ? `Modo demonstração · ${papelLabel(papel)}. Abrir controles`
           : "Controles da demonstração"
       }
       className={cn(
@@ -125,7 +125,7 @@ export function DemoBar({
               Modo demonstração
             </PopoverTitle>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              Dados fictícios — nada é gravado.
+              Dados fictícios · nada é gravado.
             </p>
           </div>
 

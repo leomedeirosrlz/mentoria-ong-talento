@@ -229,7 +229,7 @@ describe("resumoSemana + textoResumoSemana", () => {
     const texto = textoResumoSemana(r, ["Ana & João (2 atrasos)"]);
     expect(texto).toBe(
       [
-        "Semana do 2º encontro (14/10) — Mentoria Social",
+        "Semana do 2º encontro (14/10) · Mentoria Social",
         "✔ 2 de 4 duplas já realizaram",
         "✎ 1 registro entregue · 1 aguardando",
         "⚠ 1 dupla sem encontro esta semana · ↺ 1 em reposição",

@@ -250,13 +250,13 @@ export default async function PessoaPerfilPage({
           via order e o foco segue a mesma ordem da leitura mobile */}
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
         <aside className="min-w-0 space-y-4 lg:order-2">
-          {/* ficha de cadastro/matching (0034) — os sensíveis (nascimento,
-              gênero, motivação, pref. de par) só chegam preenchidos pra
-              coordenação via view; `sempre` deixa o "—" explícito pra ela */}
+          {/* cadastro/matching (0034) — os sensíveis (nascimento, gênero,
+              motivação, pref. de par) só chegam preenchidos pra coordenação
+              via view; `sempre` deixa o "—" explícito pra ela */}
           {(temFicha || souCoord) && (
             <section className="rounded-xl bg-card p-4 text-sm shadow-[var(--shadow-border)]">
               <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                Ficha
+                Cadastro
               </h2>
               {temFicha ? (
                 <dl className="mt-2 space-y-2">
@@ -264,8 +264,9 @@ export default async function PessoaPerfilPage({
                   <Linha rotulo="Nascimento" valor={nascimentoTxt} sempre={souCoord} />
                   {anos != null && anos < 18 && (
                     <p className="rounded-lg bg-amber-50 px-2.5 py-1.5 text-xs text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
-                      Menor de idade — a autorização do responsável precisa estar
-                      assinada (seção Assinaturas abaixo).
+                      Menor de idade: a autorização do responsável precisa estar
+                      assinada.
+                      {souCoord && " Confira o card Documentos e assinaturas."}
                     </p>
                   )}
                   <Linha
@@ -320,7 +321,7 @@ export default async function PessoaPerfilPage({
                 </dl>
               ) : (
                 <p className="mt-2 text-muted-foreground">
-                  Nada preenchido ainda — edite o cadastro ou peça pra pessoa completar o perfil.
+                  Nada preenchido ainda. Edite o cadastro ou peça pra pessoa completar o perfil.
                 </p>
               )}
               {interesses.length > 0 && (
@@ -332,7 +333,69 @@ export default async function PessoaPerfilPage({
                   ))}
                 </div>
               )}
+            </section>
+          )}
 
+          {/* ficha de mentor — mentor_profiles é legível por autenticado; a
+              página de profile em si já é restrita a staff */}
+          {mp && (
+            <section className="rounded-xl bg-card p-4 text-sm shadow-[var(--shadow-border)]">
+              <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                Mentoria ({mp.tipo === "dpp" ? "DPP" : "especialista"})
+              </h2>
+              <dl className="mt-2 space-y-2">
+                <Linha rotulo="Capacidade" valor={`${mp.capacidade} ${mp.capacidade === 1 ? "dupla" : "duplas"}`} sempre />
+                <Linha rotulo="Disponível" valor={dispTxt} sempre={souCoord} />
+                <Linha rotulo="Experiência" valor={mp.experiencia_previa} sempre={souCoord} />
+                <Linha rotulo="Formação" valor={mp.formacao_externa} sempre={souCoord} />
+                <Linha
+                  rotulo="Checklist"
+                  valor={[
+                    mp.termo_ok ? "termo assinado" : "termo pendente",
+                    mp.formacao_ok ? "formação concluída" : "formação pendente",
+                  ].join(" · ")}
+                  sempre
+                />
+                {/* presença na formação do ciclo (chamada da agenda) — sem
+                    encontro de formação no ciclo a linha nem renderiza;
+                    podeVerFormacao evita o "0 de M" fora do escopo do
+                    supervisor */}
+                {resumoFormacao && resumoFormacao.total > 0 && (
+                  <Linha
+                    rotulo="Formação inicial"
+                    valor={`${resumoFormacao.presentes} de ${resumoFormacao.total} ${
+                      resumoFormacao.total === 1 ? "encontro" : "encontros"
+                    }`}
+                    sempre
+                  />
+                )}
+              </dl>
+            </section>
+          )}
+
+          {/* documentos + termos + anamnese — coord-only ponta a ponta; até
+              aqui isso só existia dentro do dialog de edição */}
+          {souCoord && (
+            <section className="rounded-xl bg-card p-4 text-sm shadow-[var(--shadow-border)]">
+              <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                Documentos e assinaturas
+              </h2>
+              {/* anexos do form de inscrição (0054) — RG, comprovante, currículo */}
+              <div className="mt-3">
+                <DocumentosPessoa
+                  tipo={ehMentorado ? "mentorado" : "profile"}
+                  pessoaId={p.id}
+                  documentos={documentos}
+                />
+              </div>
+              <div className="mt-4 border-t border-border pt-3">
+                <AssinaturasPessoa
+                  tipo={ehMentorado ? "mentorado" : "profile"}
+                  id={p.id}
+                  nome={p.nome}
+                  whatsapp={p.whatsapp}
+                />
+              </div>
               {/* Anamnese Social (0042) — o form oficial respondido pelo(a)
                   jovem sem login; coord envia/reenvia o link daqui */}
               {anamnese && (
@@ -342,68 +405,6 @@ export default async function PessoaPerfilPage({
                   whatsapp={p.whatsapp}
                   anamnese={anamnese}
                 />
-              )}
-
-              {/* ficha de mentor — mentor_profiles é legível por autenticado;
-                  a página de profile em si já é restrita a staff */}
-              {mp && (
-                <div className="mt-4 border-t border-border pt-3">
-                  <h3 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                    Mentoria ({mp.tipo === "dpp" ? "DPP" : "especialista"})
-                  </h3>
-                  <dl className="mt-2 space-y-2">
-                    <Linha rotulo="Capacidade" valor={`${mp.capacidade} ${mp.capacidade === 1 ? "dupla" : "duplas"}`} sempre />
-                    <Linha rotulo="Disponível" valor={dispTxt} sempre={souCoord} />
-                    <Linha rotulo="Experiência" valor={mp.experiencia_previa} sempre={souCoord} />
-                    <Linha rotulo="Formação" valor={mp.formacao_externa} sempre={souCoord} />
-                    <Linha
-                      rotulo="Checklist"
-                      valor={[
-                        mp.termo_ok ? "termo assinado" : "termo pendente",
-                        mp.formacao_ok ? "formação concluída" : "formação pendente",
-                      ].join(" · ")}
-                      sempre
-                    />
-                    {/* presença na formação do ciclo (chamada da agenda) — sem
-                        encontro de formação no ciclo a linha nem renderiza;
-                        podeVerFormacao evita o "0 de M" fora do escopo do
-                        supervisor */}
-                    {resumoFormacao && resumoFormacao.total > 0 && (
-                      <Linha
-                        rotulo="Formação inicial"
-                        valor={`${resumoFormacao.presentes} de ${resumoFormacao.total} ${
-                          resumoFormacao.total === 1 ? "encontro" : "encontros"
-                        }`}
-                        sempre
-                      />
-                    )}
-                  </dl>
-                </div>
-              )}
-
-              {/* anexos do form de inscrição (0054) — RG, comprovante,
-                  currículo; coord-only ponta a ponta */}
-              {souCoord && (
-                <div className="mt-4 border-t border-border pt-3">
-                  <DocumentosPessoa
-                    tipo={ehMentorado ? "mentorado" : "profile"}
-                    pessoaId={p.id}
-                    documentos={documentos}
-                  />
-                </div>
-              )}
-
-              {/* termos assinados/pendentes — até aqui só existia dentro do
-                  dialog de edição; a ficha é o lugar natural de conferir */}
-              {souCoord && (
-                <div className="mt-4 border-t border-border pt-3">
-                  <AssinaturasPessoa
-                    tipo={ehMentorado ? "mentorado" : "profile"}
-                    id={p.id}
-                    nome={p.nome}
-                    whatsapp={p.whatsapp}
-                  />
-                </div>
               )}
             </section>
           )}

@@ -36,7 +36,7 @@ export async function GET(
       return new NextResponse("Documento não encontrado.", { status: 404 });
     }
     const pdf = demoPdf(
-      `Documento oficial — ${
+      `Documento oficial · ${
         tipo === "mentorado" ? "autorização do mentorado" : "termo do mentor"
       }`
     );
@@ -54,7 +54,7 @@ export async function GET(
   // passa pelo layout (e redirect de login pra API não ajuda ninguém)
   const { data: claims } = await supabase.auth.getClaims();
   if (!claims?.claims?.sub) {
-    return new NextResponse("Sessão expirada — entre de novo.", { status: 401 });
+    return new NextResponse("Sessão expirada. Entre de novo.", { status: 401 });
   }
 
   // tipo=doc: documento do intake — documentos_pessoa é coord-only pela RLS,
@@ -75,7 +75,7 @@ export async function GET(
         .eq("id", id)
         .maybeSingle();
   if (error) {
-    return new NextResponse("Não foi possível abrir o documento — tente de novo.", { status: 500 });
+    return new NextResponse("Não foi possível abrir o documento. Tente de novo.", { status: 500 });
   }
   const path = doc == null ? null : "path" in doc ? doc.path : doc.documento_path;
   if (!path) {

@@ -39,14 +39,14 @@ export function LinksProntos({
   // pessoa acha o seu endereço pelo nome
   async function copiarTodos() {
     const texto = itens
-      .map((l) => `${l.nome} — ${urlPublica(l.token)}`)
+      .map((l) => `${l.nome}: ${urlPublica(l.token)}`)
       .join("\n");
     try {
       await navigator.clipboard.writeText(texto);
       setCopiouTodos(true);
       setTimeout(() => setCopiouTodos(false), 2000);
     } catch {
-      toast.error("Não consegui copiar — copie os links um a um.");
+      toast.error("Não consegui copiar. Copie os links um a um.");
     }
   }
 
@@ -61,10 +61,13 @@ export function LinksProntos({
             <div className="flex items-center gap-2">
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium">{l.nome}</p>
-                <p className="truncate font-mono text-xs text-muted-foreground">
-                  /f/{l.token.slice(0, 14)}…
-                  {l.validade && <span className="font-sans"> · {l.validade}</span>}
-                </p>
+                {/* sem fragmento de token — o CopiarLink do lado já entrega
+                    a URL pronta; o que ajuda a reconhecer é a validade */}
+                {l.validade && (
+                  <p className="truncate text-xs text-muted-foreground">
+                    válido {l.validade}
+                  </p>
+                )}
               </div>
               <CopiarLink token={l.token} />
             </div>

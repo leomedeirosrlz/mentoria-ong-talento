@@ -82,7 +82,7 @@ export function getDemoFormularios(): DemoFormularios {
     id: uid(0x4001),
     titulo: "Avaliação do encontro",
     descricao:
-      "Conte pra gente como foi o encontro desta semana — leva menos de 2 minutos e ajuda a coordenação a acompanhar a dupla.",
+      "Conte pra gente como foi o encontro desta semana. Leva menos de 2 minutos e ajuda a coordenação a acompanhar a dupla.",
     campos: [
       { id: "nota", tipo: "escala_1_5", label: "Numa escala de 1 a 5, como foi o encontro?", obrigatorio: true },
       { id: "participou", tipo: "sim_nao", label: "O mentorado participou ativamente?", obrigatorio: true },
@@ -108,7 +108,7 @@ export function getDemoFormularios(): DemoFormularios {
   // ---------- 2. anamnese social (ativa, resposta parcial) ----------
   const fAnamnese: Formulario = {
     id: uid(0x4002),
-    titulo: "Anamnese social — família e contexto",
+    titulo: "Anamnese social · família e contexto",
     descricao:
       "Ficha de conhecimento do contexto do jovem, preenchida com a família no início do acompanhamento.",
     campos: [
@@ -142,7 +142,7 @@ export function getDemoFormularios(): DemoFormularios {
   // ---------- 3. inscrição (encerrada — cobre o estado inativo) ----------
   const fInscricao: Formulario = {
     id: uid(0x4003),
-    titulo: "Inscrição — ciclo 2026/2027",
+    titulo: "Inscrição · ciclo 2026/2027",
     descricao: "Formulário de inscrição de jovens pro ciclo 2026/2027 do programa.",
     campos: [
       { id: "nome", tipo: "texto", label: "Nome completo", obrigatorio: true },
@@ -168,7 +168,7 @@ export function getDemoFormularios(): DemoFormularios {
     id: uid(0x4004),
     titulo: "Anamnese Social",
     descricao:
-      "Ficha de conhecimento do(a) jovem, respondida antes do início da mentoria — quem você é, como é sua vida e o que espera do programa. Ajuda a coordenação no pareamento e orienta o trabalho do(a) mentor(a).",
+      "Ficha de conhecimento do(a) jovem, respondida antes do início da mentoria: quem você é, como é sua vida e o que espera do programa. Ajuda a coordenação no pareamento e orienta o trabalho do(a) mentor(a).",
     sistema: "anamnese",
     campos: [
       { id: "quem_mora", tipo: "texto_longo", label: "Quem mora com você? Como é a convivência em casa?", obrigatorio: true },

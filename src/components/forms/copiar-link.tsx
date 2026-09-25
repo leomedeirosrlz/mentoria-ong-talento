@@ -21,7 +21,7 @@ export function CopiarLink({ token }: { token: string }) {
           setCopiado(true);
           setTimeout(() => setCopiado(false), 2000);
         } catch {
-          toast.error("Não consegui copiar — selecione o link manualmente.");
+          toast.error("Não consegui copiar. Selecione o link manualmente.");
         }
       }}
     >

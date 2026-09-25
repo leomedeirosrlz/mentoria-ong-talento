@@ -93,7 +93,11 @@ export default async function RegistrosPage({
 
   const eventos = await getCicloEventos();
   const maxEncontro = totalEncontros(eventos);
-  const filtros = parseFiltros(await searchParams, maxEncontro);
+  const params = await searchParams;
+  const filtros = parseFiltros(params, maxEncontro);
+  // triagem por scoreAlerta dentro da fatia carregada — a paginação é
+  // cumulativa, então "prioridade" cobre tudo que já foi buscado
+  const porPrioridade = primeiro(params.ordem) === "prioridade";
 
   const [{ itens, total }, duplas, alertas, espEventos] = await Promise.all([
     getRegistros(filtros),
@@ -116,13 +120,23 @@ export default async function RegistrosPage({
       : (tituloDpp.get(r.encontro?.numero ?? 0) ?? null);
 
   // o banco já ordena por realizado_em; o sort estável acerta a fatia
-  // carregada e empurra quem pede atenção pra cima dentro do mesmo dia
+  // carregada e empurra quem pede atenção pra cima dentro do mesmo dia.
+  // No modo prioridade o scoreAlerta vira a chave global e a data desempata.
   const ordenados = [...itens].sort(
-    (a, b) =>
-      aconteceuEmDe(b).localeCompare(aconteceuEmDe(a)) ||
-      scoreAlerta(b) - scoreAlerta(a) ||
-      b.created_at.localeCompare(a.created_at)
+    porPrioridade
+      ? (a, b) =>
+          scoreAlerta(b) - scoreAlerta(a) ||
+          aconteceuEmDe(b).localeCompare(aconteceuEmDe(a)) ||
+          b.created_at.localeCompare(a.created_at)
+      : (a, b) =>
+          aconteceuEmDe(b).localeCompare(aconteceuEmDe(a)) ||
+          scoreAlerta(b) - scoreAlerta(a) ||
+          b.created_at.localeCompare(a.created_at)
   );
+  // com prioridade ligada, os que pedem olho sobem como bloco próprio
+  const atencao = porPrioridade ? ordenados.filter((r) => scoreAlerta(r) > 0) : [];
+  const demais = porPrioridade ? ordenados.filter((r) => scoreAlerta(r) === 0) : [];
+  const agrupado = porPrioridade && atencao.length > 0 && demais.length > 0;
 
   const temFiltro = !!(
     filtros.encontro ||
@@ -133,7 +147,7 @@ export default async function RegistrosPage({
     filtros.dupla ||
     filtros.q
   );
-  const hrefPagina = (pagina: number) => {
+  const hrefCom = (patch: Record<string, string | null>) => {
     const p = new URLSearchParams();
     if (filtros.encontro) p.set("encontro", String(filtros.encontro));
     if (filtros.avaliacao) p.set("avaliacao", filtros.avaliacao);
@@ -142,9 +156,64 @@ export default async function RegistrosPage({
     if (filtros.dificuldade) p.set("dificuldade", filtros.dificuldade);
     if (filtros.dupla) p.set("dupla", filtros.dupla);
     if (filtros.q) p.set("q", filtros.q);
-    p.set("pagina", String(pagina));
-    return `/registros?${p}`;
+    if (porPrioridade) p.set("ordem", "prioridade");
+    if (filtros.pagina > 1) p.set("pagina", String(filtros.pagina));
+    for (const [k, v] of Object.entries(patch)) {
+      if (v === null) p.delete(k);
+      else p.set(k, v);
+    }
+    const qs = p.toString();
+    return `/registros${qs ? `?${qs}` : ""}`;
   };
+  const hrefPagina = (pagina: number) => hrefCom({ pagina: String(pagina) });
+
+  /** Um item da timeline — extraído porque no modo prioridade a lista
+   *  vira duas ("Precisam de olho" / "Sem sinais de atenção"). */
+  function linhaRegistro(r: RegistroResumo, i: number, ultimo: boolean) {
+    const aconteceuEm = aconteceuEmDe(r);
+    const tardio = registroTardio(r, r.encontro);
+    return (
+      <li
+        key={r.id}
+        className="animate-enter flex gap-3 sm:gap-4"
+        style={{ "--i": Math.min(i, 10) } as CSSProperties}
+      >
+        <div
+          aria-hidden
+          className="flex w-10 shrink-0 flex-col items-center sm:w-12"
+        >
+          <p className="pt-4 text-center leading-none">
+            <span className="block text-sm font-semibold tabular-nums">
+              {formatDiaNum(aconteceuEm)}
+            </span>
+            <span className="mt-1 block text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+              {formatMesAbrev(aconteceuEm)}
+            </span>
+          </p>
+          {/* precedência do nó: apoio > tardio > ok — a cor é sinal
+              secundário; os badges no card carregam a informação */}
+          <span
+            className={cn(
+              "mt-2 size-2 shrink-0 rounded-full",
+              r.precisa_apoio
+                ? "bg-[var(--danger)]"
+                : tardio
+                  ? "bg-[var(--warn)]"
+                  : "bg-[var(--ok)]"
+            )}
+          />
+          {!ultimo && <span className="mt-1.5 w-px flex-1 bg-border" />}
+        </div>
+        <div className={cn("min-w-0 flex-1", !ultimo && "pb-5")}>
+          <RegistroCard
+            r={r}
+            tituloEncontro={tituloEncontro(r)}
+            souCoord={souCoord}
+          />
+        </div>
+      </li>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -152,8 +221,8 @@ export default async function RegistrosPage({
         <h1 className="text-2xl font-semibold tracking-tight">Registros</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           {souCoord
-            ? "O que os mentores reportaram em cada encontro — todas as duplas"
-            : "O que os mentores reportaram em cada encontro — suas duplas"}
+            ? "O que os mentores reportaram em cada encontro · todas as duplas"
+            : "O que os mentores reportaram em cada encontro · suas duplas"}
         </p>
       </header>
 
@@ -203,10 +272,28 @@ export default async function RegistrosPage({
               </Link>
             </>
           )}
+          {ordenados.length > 1 && (
+            <>
+              {" · "}
+              <Link
+                href={hrefCom({ ordem: porPrioridade ? null : "prioridade" })}
+                scroll={false}
+                aria-current={porPrioridade ? "true" : undefined}
+                className="-my-1.5 py-1.5 font-medium text-foreground underline underline-offset-4 transition-colors hover:text-muted-foreground"
+              >
+                {porPrioridade ? "voltar à ordem por data" : "ordenar por prioridade"}
+              </Link>
+            </>
+          )}
         </p>
       )}
 
-      <RegistrosFiltros filtros={filtros} duplas={duplas} maxEncontro={maxEncontro} />
+      <RegistrosFiltros
+        filtros={filtros}
+        duplas={duplas}
+        maxEncontro={maxEncontro}
+        porPrioridade={porPrioridade}
+      />
 
       {ordenados.length === 0 ? (
         <div className="flex flex-col items-center rounded-xl bg-card px-6 py-10 text-center shadow-[var(--shadow-border)]">
@@ -244,56 +331,32 @@ export default async function RegistrosPage({
           {/* timeline: o rail mostra o dia em que o encontro aconteceu e a
               linha conecta os nós — a página conta a sequência, não uma
               coleção genérica de cards */}
-          <ol>
-            {ordenados.map((r, i) => {
-              const aconteceuEm = aconteceuEmDe(r);
-              const ultimo = i === ordenados.length - 1;
-              const tardio = registroTardio(r, r.encontro);
-              return (
-                <li
-                  key={r.id}
-                  className="animate-enter flex gap-3 sm:gap-4"
-                  style={{ "--i": Math.min(i, 10) } as CSSProperties}
-                >
-                  <div
-                    aria-hidden
-                    className="flex w-10 shrink-0 flex-col items-center sm:w-12"
-                  >
-                    <p className="pt-4 text-center leading-none">
-                      <span className="block text-sm font-semibold tabular-nums">
-                        {formatDiaNum(aconteceuEm)}
-                      </span>
-                      <span className="mt-1 block text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                        {formatMesAbrev(aconteceuEm)}
-                      </span>
-                    </p>
-                    {/* precedência do nó: apoio > tardio > ok — a cor é sinal
-                        secundário; os badges no card carregam a informação */}
-                    <span
-                      className={cn(
-                        "mt-2 size-2 shrink-0 rounded-full",
-                        r.precisa_apoio
-                          ? "bg-[var(--danger)]"
-                          : tardio
-                            ? "bg-[var(--warn)]"
-                            : "bg-[var(--ok)]"
-                      )}
-                    />
-                    {!ultimo && (
-                      <span className="mt-1.5 w-px flex-1 bg-border" />
-                    )}
-                  </div>
-                  <div className={cn("min-w-0 flex-1", !ultimo && "pb-5")}>
-                    <RegistroCard
-                      r={r}
-                      tituloEncontro={tituloEncontro(r)}
-                      souCoord={souCoord}
-                    />
-                  </div>
-                </li>
-              );
-            })}
-          </ol>
+          {agrupado ? (
+            <>
+              <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                Precisam de olho ({atencao.length})
+              </h2>
+              <ol>
+                {atencao.map((r, i) =>
+                  linhaRegistro(r, i, i === atencao.length - 1)
+                )}
+              </ol>
+              <h2 className="pt-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                Sem sinais de atenção
+              </h2>
+              <ol>
+                {demais.map((r, i) =>
+                  linhaRegistro(r, i, i === demais.length - 1)
+                )}
+              </ol>
+            </>
+          ) : (
+            <ol>
+              {ordenados.map((r, i) =>
+                linhaRegistro(r, i, i === ordenados.length - 1)
+              )}
+            </ol>
+          )}
           {itens.length < total && (
             <div className="flex justify-center pt-1">
               <Link

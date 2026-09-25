@@ -36,14 +36,14 @@ export function PdmUrlDialog({
         else {
           toast.success(
             url.trim()
-              ? "Link do PDM salvo — vira o botão “Abrir PDM” na ficha e na sua home."
+              ? "Link do PDM salvo. Vira o botão “Abrir PDM” na ficha e na sua home."
               : "Link do PDM removido."
           );
           setOpen(false);
           router.refresh();
         }
       } catch {
-        toast.error("Sem conexão — tente de novo.");
+        toast.error("Sem conexão. Tente de novo.");
       }
     });
   }

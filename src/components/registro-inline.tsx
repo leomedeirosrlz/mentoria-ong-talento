@@ -132,3 +132,52 @@ export function RegistroInlinePanel({
     </AnimatePresence>
   );
 }
+
+/** Registro salvo na ficha da dupla: `<details>` com a linha-resumo sempre
+ *  visível e o corpo sob disclosure (a página abre por padrão só os mais
+ *  recentes). O hash `#registrar-{id}` abre o corpo — mesmo alvo dos deep
+ *  links de /registros e dos nudges; a escolha local vale até o próximo
+ *  hashchange (espelha o RegistroInline). */
+export function RegistroDetails({
+  encontroId,
+  aberto = false,
+  className,
+  children,
+}: {
+  encontroId: string;
+  /** Nasce aberto — os registros mais recentes da lista (SSR manda o atributo). */
+  aberto?: boolean;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  const alvo = `#registrar-${encontroId}`;
+  // null = segue hash/default · true/false = escolha local até o hash mudar
+  const [forcado, setForcado] = useState<boolean | null>(null);
+  const [hashBate, setHashBate] = useState(false);
+
+  useEffect(() => {
+    const sync = () => {
+      setHashBate(window.location.hash === alvo);
+      setForcado(null);
+    };
+    sync();
+    window.addEventListener("hashchange", sync);
+    window.addEventListener("popstate", sync);
+    window.addEventListener("realiza:hash", sync);
+    return () => {
+      window.removeEventListener("hashchange", sync);
+      window.removeEventListener("popstate", sync);
+      window.removeEventListener("realiza:hash", sync);
+    };
+  }, [alvo]);
+
+  return (
+    <details
+      open={forcado ?? (hashBate || aberto)}
+      onToggle={(e) => setForcado(e.currentTarget.open)}
+      className={className}
+    >
+      {children}
+    </details>
+  );
+}

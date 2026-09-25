@@ -52,7 +52,7 @@ export async function GET(
   // passa pelo layout (e redirect de login pra API não ajuda ninguém)
   const { data: claims } = await supabase.auth.getClaims();
   if (!claims?.claims?.sub) {
-    return new NextResponse("Sessão expirada — entre de novo.", { status: 401 });
+    return new NextResponse("Sessão expirada. Entre de novo.", { status: 401 });
   }
 
   const { data: material, error } = await supabase
@@ -61,7 +61,7 @@ export async function GET(
     .eq("id", id)
     .maybeSingle();
   if (error) {
-    return new NextResponse("Não foi possível abrir o material — tente de novo.", { status: 500 });
+    return new NextResponse("Não foi possível abrir o material. Tente de novo.", { status: 500 });
   }
   if (!material?.path) {
     return new NextResponse("Material não encontrado.", { status: 404 });

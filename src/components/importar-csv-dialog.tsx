@@ -35,7 +35,7 @@ const TIPO_LABEL: Record<Tipo, string> = {
 
 const DICAS: Record<Tipo, string> = {
   equipe:
-    "Colunas: nome, email, whatsapp, papel (mentor dpp / especialista / supervisor / coordenação — em branco vira mentor DPP; \"nenhum\" cadastra sem papel) e a ficha opcional: nome_social, data_nascimento (dd/mm/aaaa), genero, cor_raca, cidade, uf, cargo, empresa, bio, linkedin, interesses (separados por vírgula), motivacao, pref_genero_par, origem, experiencia_previa, formacao_externa e disponibilidade (JSON {dias,periodos}) — estas três gravam na ficha de mentor. consent_lgpd_em carimba o consentimento (ISO). form_bruto (JSON) guarda a resposta original. Documentos pro termo: rg, cpf, cep, logradouro, numero, complemento, bairro. Os CSVs crus dos Google Forms de intake também entram — as colunas conhecidas são mapeadas e o resto é ignorado.",
+    "Colunas: nome, email, whatsapp, papel (mentor dpp / especialista / supervisor / coordenação, em branco vira mentor DPP; \"nenhum\" cadastra sem papel) e a ficha opcional: nome_social, data_nascimento (dd/mm/aaaa), genero, cor_raca, cidade, uf, cargo, empresa, bio, linkedin, interesses (separados por vírgula), motivacao, pref_genero_par, origem, experiencia_previa, formacao_externa e disponibilidade (JSON {dias,periodos}): estas três gravam na ficha de mentor. consent_lgpd_em carimba o consentimento (ISO). form_bruto (JSON) guarda a resposta original. Documentos pro termo: rg, cpf, cep, logradouro, numero, complemento, bairro. Os CSVs crus dos Google Forms de intake também entram. As colunas conhecidas são mapeadas e o resto é ignorado.",
   mentorados:
     "Colunas: nome, whatsapp, email, ong, notas e a ficha opcional: nome_social, data_nascimento (dd/mm/aaaa), genero, cor_raca, cidade, uf, escolaridade, interesses (por vírgula), objetivos, motivacao, pref_genero_par, origem, disponibilidade (JSON {dias,periodos}) e form_bruto (JSON). Só o nome é obrigatório. Documentos pro termo: rg, cpf, cep, logradouro, numero, complemento, bairro; e do responsável: resp_nome, resp_parentesco, resp_rg, resp_cpf, resp_nascimento, resp_cidade, resp_uf, resp_cep, resp_logradouro, resp_numero, resp_complemento, resp_bairro.",
 };
@@ -129,7 +129,7 @@ export function ImportarCsvDialog({
         // arquivo escolhido já cai na prévia — sem passo morto entre "quero" e "feito"
         preVisualizar(t);
       })
-      .catch(() => toast.error("Não foi possível ler o arquivo — tente de novo."));
+      .catch(() => toast.error("Não foi possível ler o arquivo. Tente de novo."));
   }
 
   // modelo com o cabeçalho que o parseCsv reconhece — gerado no client, sem arquivo estático
@@ -275,7 +275,7 @@ export function ImportarCsvDialog({
             </div>
             <p className="text-xs text-muted-foreground">
               A coluna Ficha conta os campos de matching reconhecidos (nascimento, gênero,
-              cidade/UF, interesses, motivação, pref. de par e afins) — nascimento, gênero,
+              cidade/UF, interesses, motivação, pref. de par e afins). Nascimento, gênero,
               motivação e preferência de par ficam visíveis só pra coordenação.
             </p>
             <div className="flex gap-2">
@@ -300,8 +300,8 @@ export function ImportarCsvDialog({
               </Select>
               <p className="text-xs text-muted-foreground">
                 {tipo === "equipe"
-                  ? "Obrigatórias: nome e e-mail — o resto da ficha é opcional."
-                  : "Obrigatória: nome — o resto da ficha é opcional."}
+                  ? "Obrigatórias: nome e e-mail. O resto da ficha é opcional."
+                  : "Obrigatória: nome. O resto da ficha é opcional."}
               </p>
               {/* parede de colunas recolhida — quem precisa do detalhe abre;
                   <details> nativo mantém teclado/leitor de tela de graça */}

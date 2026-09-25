@@ -55,8 +55,15 @@ export function FotoField({
           onChange={(e) => {
             const f = e.target.files?.[0];
             if (!f) return;
+            // accept é consultivo — "Todos os arquivos" no picker passa por
+            // cima; o type check cobre o caso (o do onboarding já valida)
+            if (!f.type.startsWith("image/")) {
+              toast.error("Use uma imagem: PNG, JPG ou WebP.");
+              e.target.value = "";
+              return;
+            }
             if (f.size > AVATAR_MAX_BYTES) {
-              toast.error("Imagem grande demais — use uma de até 2 MB.");
+              toast.error("Imagem grande demais. Use uma de até 2 MB.");
               e.target.value = "";
               return;
             }

@@ -43,7 +43,7 @@ async function meCoord(): Promise<
 > {
   const { supabase, me: eu } = await me();
   if (!eu)
-    return { supabase, eu: null, error: "Sessão expirada — entre de novo." };
+    return { supabase, eu: null, error: "Sessão expirada. Entre de novo." };
   if (eu.role !== "coordenacao")
     return { supabase, eu: null, error: "Só a coordenação gerencia formulários." };
   return { supabase, eu, error: null };
@@ -330,10 +330,10 @@ export async function reemitirLinkFormulario(linkId: string, formularioId: strin
   if (getErr) return { error: erroAmigavel(getErr) };
   if (!link) return { error: "Link não encontrado." };
   if (link.usado_em)
-    return { error: "Esse link já foi respondido — não dá pra reemitir." };
+    return { error: "Esse link já foi respondido. Não dá pra reemitir." };
   const agora = Date.now();
   if (!link.expira_em || new Date(link.expira_em).getTime() > agora)
-    return { error: "Só dá pra reemitir link expirado — este ainda vale." };
+    return { error: "Só dá pra reemitir link expirado. Este ainda vale." };
 
   const expira_em = new Date(
     agora +
@@ -351,7 +351,7 @@ export async function reemitirLinkFormulario(linkId: string, formularioId: strin
     .select("id");
   if (upErr) return { error: erroAmigavel(upErr) };
   if (!atualizado?.length)
-    return { error: "Esse link acabou de ser respondido — não dá pra reemitir." };
+    return { error: "Esse link acabou de ser respondido. Não dá pra reemitir." };
   revalidatePath(`/formularios/${formularioId}`);
   return { ok: true, token };
 }
@@ -371,7 +371,7 @@ export async function excluirLinkFormulario(linkId: string, formularioId: string
     .select("id");
   if (delErr) return { error: erroAmigavel(delErr) };
   if (!data?.length)
-    return { error: "Esse link já foi respondido — a resposta iria junto." };
+    return { error: "Esse link já foi respondido. A resposta iria junto." };
   revalidatePath(`/formularios/${formularioId}`);
   return { ok: true };
 }
@@ -383,9 +383,9 @@ export async function excluirLinkFormulario(linkId: string, formularioId: string
  *  genérica (não vaza detalhe de infra). */
 function traduzErroSubmit(message: string): string {
   if (/link inválido/i.test(message))
-    return "Este link não é válido — confira o endereço ou peça um novo à equipe Realiza.vc.";
+    return "Este link não é válido. Confira o endereço ou peça um novo à equipe Realiza.vc.";
   if (/link expirado/i.test(message))
-    return "Este link expirou — peça um novo à equipe Realiza.vc.";
+    return "Este link expirou. Peça um novo à equipe Realiza.vc.";
   if (/formulário encerrado/i.test(message))
     return "Este formulário não está recebendo respostas no momento.";
   if (
@@ -394,7 +394,7 @@ function traduzErroSubmit(message: string): string {
     )
   )
     return message;
-  return "Não foi possível enviar sua resposta — tente de novo.";
+  return "Não foi possível enviar sua resposta. Tente de novo.";
 }
 
 export async function submeterRespostaFormulario(
@@ -417,7 +417,7 @@ export async function submeterRespostaFormulario(
     return { error: "Respostas inválidas." };
   }
   if (serializado.length > 200_000)
-    return { error: "Sua resposta ficou grande demais — resuma os textos." };
+    return { error: "Sua resposta ficou grande demais. Resuma os textos." };
 
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("submeter_resposta_formulario", {
@@ -425,6 +425,6 @@ export async function submeterRespostaFormulario(
     p_respostas: respostas,
   });
   if (error) return { error: traduzErroSubmit(error.message) };
-  if (!data) return { error: "Não foi possível enviar — tente de novo." };
+  if (!data) return { error: "Não foi possível enviar. Tente de novo." };
   return { ok: true };
 }

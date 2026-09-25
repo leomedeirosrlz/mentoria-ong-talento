@@ -61,11 +61,28 @@ export function AppShell({
   const [abertoMais, setAbertoMais] = useState(false);
 
   // nav mobile com no máx. 5 cells — só a coordenação passa disso (7 itens).
-  // Primárias = rotina diária da operação (Início/Duplas/Registros/Agenda);
-  // gestão menos diária (Materiais/Formulários/Pessoas) fica a 1 toque no
-  // "Mais". Alternativa defensável: Pessoas primária e Registros no Mais.
-  const visiveis = items.length > 5 ? items.slice(0, 4) : items;
-  const overflow = items.slice(visiveis.length);
+  // Primárias = rotina diária da operação (Início/Duplas/Pessoas/Agenda);
+  // leitura consolidada (Registros) e gestão menos diária (Materiais/
+  // Formulários) ficam a 1 toque no "Mais". A ordem da sidebar desktop não
+  // muda — a prioridade mobile é só do bottom nav.
+  const MOBILE_PRIMEIRO = [
+    "/",
+    "/duplas",
+    "/pessoas",
+    "/agenda",
+    "/registros",
+    "/materiais",
+    "/formularios",
+  ];
+  const itemsMobile =
+    items.length > 5
+      ? [...items].sort(
+          (a, b) =>
+            MOBILE_PRIMEIRO.indexOf(a.href) - MOBILE_PRIMEIRO.indexOf(b.href)
+        )
+      : items;
+  const visiveis = items.length > 5 ? itemsMobile.slice(0, 4) : items;
+  const overflow = items.length > 5 ? itemsMobile.slice(4) : [];
   const maisAtivo = overflow.some((i) => pathname.startsWith(i.href));
 
   // navegar pelo popover (ou por fora) fecha o Mais — ajuste durante o
@@ -113,19 +130,6 @@ export function AppShell({
           >
             <Avatar nome={me.nome} src={avatarUrl} fallbackSrc={gravatarUrl} size={28} />
           </Link>
-          {/* em demo o "Sair" sai do header (a DemoBar tem "Sair da
-              demonstração") — logo+pill+sino+avatar já quase enchem 390px */}
-          {!demo && (
-            <form action={signOut}>
-              <button
-                type="submit"
-                aria-label="Sair"
-                className="grid size-11 place-items-center rounded-lg text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
-              >
-                <SignOut size={20} aria-hidden />
-              </button>
-            </form>
-          )}
         </div>
       </header>
 
@@ -249,7 +253,7 @@ export function AppShell({
           {overflow.length > 0 && (
             <Popover open={abertoMais} onOpenChange={setAbertoMais}>
               <PopoverTrigger
-                aria-label={maisAtivo ? `Mais seções — seção atual em ${overflow.find((i) => pathname.startsWith(i.href))?.label}` : "Mais seções"}
+                aria-label={maisAtivo ? `Mais seções, seção atual em ${overflow.find((i) => pathname.startsWith(i.href))?.label}` : "Mais seções"}
                 className={cn(
                   "relative flex flex-1 flex-col items-center gap-1 py-2.5 text-[11px] transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:ring-inset",
                   maisAtivo ? "font-semibold text-[var(--brand-ink)]" : "font-medium text-sidebar-foreground/75 active:text-sidebar-foreground"

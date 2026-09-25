@@ -1719,7 +1719,7 @@ function build(): DemoData {
       {
         id: uid(0x3002),
         tipo: "pedido_apoio",
-        titulo: "Pedido de apoio — Fernanda & Dandara",
+        titulo: "Pedido de apoio · Fernanda & Dandara",
         corpo:
           "Fernanda marcou 'preciso de apoio' no registro do 2º encontro: participação da mentorada caiu e ela não consegue contato.",
         href: `/duplas/${uid(D.risco)}`,
@@ -1729,7 +1729,7 @@ function build(): DemoData {
       {
         id: uid(0x3003),
         tipo: "dupla_formada",
-        titulo: "Dupla de especialista formada — Helena & Dandara",
+        titulo: "Dupla de especialista formada · Helena & Dandara",
         corpo: "Helena Prado aceitou a solicitação da dupla Fernanda & Dandara.",
         href: `/duplas/${uid(D.esp2)}`,
         lida_em: haDias(19, "08:00"),
@@ -1753,7 +1753,7 @@ function build(): DemoData {
       {
         id: uid(0x3010),
         tipo: "apoio_resolvido",
-        titulo: "Pedido de apoio resolvido — Fernanda & Dandara",
+        titulo: "Pedido de apoio resolvido · Fernanda & Dandara",
         corpo: "A coordenação encaminhou o caso e marcou o pedido de apoio como resolvido.",
         href: `/duplas/${uid(D.risco)}`,
         lida_em: null,
@@ -1782,7 +1782,7 @@ function build(): DemoData {
       {
         id: uid(0x3021),
         tipo: "dupla_formada",
-        titulo: "Dupla de especialista formada — Sofia & Ana Beatriz",
+        titulo: "Dupla de especialista formada · Sofia & Ana Beatriz",
         corpo: "Sofia Nogueira aceitou a sua solicitação de especialista.",
         href: `/duplas/${uid(D.esp1)}`,
         lida_em: haDias(13, "07:00"),
@@ -1794,7 +1794,7 @@ function build(): DemoData {
         id: uid(0x3022),
         tipo: "supervisao_registrada",
         titulo: "Sessão de supervisão registrada",
-        corpo: `Paulo Serra registrou a supervisão de ${ymd(addDias(HOJE, -13)).split("-").reverse().join("/")} sobre a dupla com Ana Beatriz Silva — o resumo está na ficha da dupla.`,
+        corpo: `Paulo Serra registrou a supervisão de ${ymd(addDias(HOJE, -13)).split("-").reverse().join("/")} sobre a dupla com Ana Beatriz Silva. O resumo está na ficha da dupla.`,
         href: `/duplas/${uid(D.ok)}`,
         lida_em: haDias(12, "08:00"),
         created_at: haDias(13, "18:40"),
@@ -1814,7 +1814,7 @@ function build(): DemoData {
         id: uid(0x3031),
         tipo: "dupla_formada",
         titulo: "Você agora é mentora de Ana Beatriz",
-        corpo: "Sua trilha de especialista com a Ana Beatriz foi formada — o primeiro encontro já pode ser agendado.",
+        corpo: "Sua trilha de especialista com a Ana Beatriz foi formada. O primeiro encontro já pode ser agendado.",
         href: `/duplas/${uid(D.esp1)}`,
         lida_em: haDias(13, "10:00"),
         created_at: haDias(14, "09:35"),

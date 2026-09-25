@@ -73,7 +73,7 @@ export function ConfirmDeleteButton({
                     router.refresh();
                   }
                 } catch {
-                  toast.error("Sem conexão — tente de novo.");
+                  toast.error("Sem conexão. Tente de novo.");
                 }
               })
             }

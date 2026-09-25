@@ -48,7 +48,7 @@ export async function registrarEncerramento(
 ) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
-  if (!eu) return { error: "Sessão expirada — entre de novo." };
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
   if (eu.role !== "coordenacao") {
     return { error: "Só a coordenação registra o encerramento." };
   }
@@ -77,7 +77,7 @@ export async function registrarEncerramento(
   if (!duplaRow) return { error: "Dupla não encontrada." };
   if (duplaRow.trilha !== "dpp") {
     return {
-      error: "A trilha de especialista encerra pelo próprio fluxo — motivo e devolutiva pro PDM.",
+      error: "A trilha de especialista encerra pelo próprio fluxo: motivo e devolutiva pro PDM.",
     };
   }
   if (duplaRow.status !== "ativa" && duplaRow.status !== "pausada") {
@@ -177,7 +177,7 @@ export async function registrarEncerramento(
             ? "Sua dupla concluiu a jornada"
             : "Sua dupla foi encerrada",
         corpo: nomeMd
-          ? `A jornada com ${nomeMd} foi registrada — o resumo está na ficha da dupla.`
+          ? `A jornada com ${nomeMd} foi registrada. O resumo está na ficha da dupla.`
           : "O encerramento foi registrado na ficha da dupla.",
         href: `/duplas/${duplaId}`,
       },
@@ -190,7 +190,7 @@ export async function registrarEncerramento(
                 ? "Dupla supervisionada concluída"
                 : "Dupla supervisionada encerrada",
             corpo: nomeMd
-              ? `A dupla com ${nomeMd} — a coordenação registrou o encerramento.`
+              ? `A dupla com ${nomeMd}: a coordenação registrou o encerramento.`
               : "A coordenação registrou o encerramento.",
             href: `/duplas/${duplaId}`,
           }
@@ -214,7 +214,7 @@ export async function salvarAutoavaliacao(
 ) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
-  if (!eu) return { error: "Sessão expirada — entre de novo." };
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
 
   const texto = String(formData.get("autoavaliacao") ?? "").trim();
   const disponivel = formData.get("disponivel_proximo_ciclo") === "on";
@@ -244,7 +244,7 @@ export async function encerrarTrilhaEspecialista(
 ) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
-  if (!eu) return { error: "Sessão expirada — entre de novo." };
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
 
   const tipo = String(formData.get("tipo") ?? "");
   const motivo = String(formData.get("motivo") ?? "").trim();
@@ -305,8 +305,8 @@ export async function encerrarTrilhaEspecialista(
             tipo: "trilha_encerrada",
             titulo,
             corpo: nomeMd
-              ? `${eu.nome} fechou a mentoria de ${nomeMd} — a devolutiva pro PDM está na ficha da dupla.`
-              : `${eu.nome} fechou a trilha — a devolutiva pro PDM está na ficha da dupla.`,
+              ? `${eu.nome} fechou a mentoria de ${nomeMd}. A devolutiva pro PDM está na ficha da dupla.`
+              : `${eu.nome} fechou a trilha. A devolutiva pro PDM está na ficha da dupla.`,
             href: `/duplas/${s.dupla_dpp_id}`,
           }
         : null,
@@ -317,7 +317,7 @@ export async function encerrarTrilhaEspecialista(
           tipo: "trilha_encerrada",
           titulo,
           corpo: nomeMd
-            ? `${eu.nome} fechou a trilha de ${nomeMd} — motivo e devolutiva na ficha.`
+            ? `${eu.nome} fechou a trilha de ${nomeMd}: motivo e devolutiva na ficha.`
             : `${eu.nome} fechou a trilha de especialista.`,
           href: `/duplas/${duplaId}`,
         })),

@@ -42,7 +42,7 @@ export function FormularioPreview({
         <DialogHeader>
           <DialogTitle>Pré-visualização</DialogTitle>
           <DialogDescription>
-            É assim que a página aparece pra quem recebe o link — os campos
+            É assim que a página aparece pra quem recebe o link. Os campos
             respondem, mas o envio fica desligado nesta prévia.
           </DialogDescription>
         </DialogHeader>

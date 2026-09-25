@@ -2,10 +2,10 @@
 
 import { type CSSProperties, useState } from "react";
 import Link from "next/link";
-import { MagnifyingGlass, Users } from "@phosphor-icons/react";
+import { Funnel, MagnifyingGlass, Users } from "@phosphor-icons/react";
 import { maxEncontros, saudadeDaDupla, TRILHA_LABEL } from "@/lib/ciclo";
 import type { CicloEvento, Dupla } from "@/lib/types";
-import { normaliza } from "@/lib/utils";
+import { cn, normaliza } from "@/lib/utils";
 import { DuplaAvatares } from "@/components/dupla-avatares";
 import { DuplaNomes } from "@/components/dupla-nomes";
 import { SemaforoDot } from "@/components/semaforo";
@@ -19,6 +19,34 @@ const STATUS_LABEL: Record<string, string> = {
   concluida: "Concluída",
   encerrada: "Encerrada",
 };
+
+type Filtro = "todas" | "risco" | "atencao" | "pausada" | "andamento";
+
+const CHIPS: { id: Filtro; label: string; dot: string | null }[] = [
+  { id: "todas", label: "Todas", dot: null },
+  { id: "risco", label: "Risco", dot: "bg-[var(--danger)]" },
+  { id: "atencao", label: "Atenção", dot: "bg-[var(--warn)]" },
+  { id: "pausada", label: "Pausadas", dot: "bg-muted-foreground/40" },
+  { id: "andamento", label: "Em andamento", dot: "bg-[var(--ok)]" },
+];
+
+function chipBate(f: Filtro, d: Dupla, semaforo: string): boolean {
+  switch (f) {
+    case "todas":
+      return true;
+    case "risco":
+      return semaforo === "risco";
+    case "atencao":
+      return semaforo === "atencao";
+    case "pausada":
+      return d.status === "pausada";
+    case "andamento":
+      return d.status === "ativa" && semaforo === "ok";
+  }
+}
+
+const ORDEM_SEMAFORO = { risco: 0, atencao: 1, ok: 2 } as const;
+const ORDEM_STATUS = { ativa: 0, pausada: 1, concluida: 2, encerrada: 3 } as const;
 
 export function DuplasLista({
   lista,
@@ -41,16 +69,36 @@ export function DuplasLista({
   paraMentor?: boolean;
 }) {
   const [busca, setBusca] = useState("");
+  const [filtro, setFiltro] = useState<Filtro>("todas");
   const hoje = new Date(agora);
 
+  // saúde calculada uma vez por dupla — ordenação, chips e a linha leem daqui
+  const saudePorId = new Map(lista.map((d) => [d.id, saudadeDaDupla(d, eventos, hoje)]));
+  // pra coordenação a ordem default é pendências primeiro (risco → atenção →
+  // em dia; ativas antes de pausadas/encerradas) — a lista dela é radar
+  const ordenadas = podeCriar
+    ? [...lista].sort(
+        (a, b) =>
+          ORDEM_SEMAFORO[saudePorId.get(a.id)!.semaforo] -
+            ORDEM_SEMAFORO[saudePorId.get(b.id)!.semaforo] ||
+          (ORDEM_STATUS[a.status] ?? 4) - (ORDEM_STATUS[b.status] ?? 4)
+      )
+    : lista;
+
   const q = normaliza(busca.trim());
-  const filtradas = q
-    ? lista.filter(
+  const base = q
+    ? ordenadas.filter(
         (d) =>
           normaliza(d.mentor.nome).includes(q) ||
           normaliza(d.mentorado.nome).includes(q)
       )
-    : lista;
+    : ordenadas;
+  // o chip filtra sobre o mesmo universo da busca — e o contador dele é o
+  // "quantas do que estou vendo entram nesse estado"
+  const exibidas = base.filter((d) =>
+    chipBate(filtro, d, saudePorId.get(d.id)!.semaforo)
+  );
+  const mostrarChips = !paraMentor && lista.length > 1;
 
   return (
     <>
@@ -73,7 +121,51 @@ export function DuplasLista({
         {podeCriar && <NovaDuplaDialog />}
       </div>
 
-      <div className="rounded-xl bg-card divide-y divide-border overflow-hidden shadow-[var(--shadow-border)]">
+      {/* semáforo/status como chips — um toque filtra, um toque no ativo volta;
+          contagens sobre o mesmo universo da busca */}
+      {mostrarChips && (
+        <div
+          role="group"
+          aria-label="Filtrar por situação"
+          className="mt-2 flex flex-wrap items-center gap-1.5"
+        >
+          {CHIPS.map((c) => {
+            const n = base.filter((d) =>
+              chipBate(c.id, d, saudePorId.get(d.id)!.semaforo)
+            ).length;
+            const ativo = filtro === c.id;
+            return (
+              <button
+                key={c.id}
+                type="button"
+                aria-pressed={ativo}
+                onClick={() => setFiltro(ativo ? "todas" : c.id)}
+                className={cn(
+                  "flex min-h-9 items-center gap-1.5 rounded-full px-3 text-sm transition-colors",
+                  ativo
+                    ? "bg-foreground text-background"
+                    : "bg-muted text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {c.dot && (
+                  <span aria-hidden className={cn("size-1.5 rounded-full", c.dot)} />
+                )}
+                {c.label}
+                <span
+                  className={cn(
+                    "text-[11px]",
+                    ativo ? "text-background/70" : "text-muted-foreground/70"
+                  )}
+                >
+                  {n}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      <div className="mt-4 rounded-xl bg-card divide-y divide-border overflow-hidden shadow-[var(--shadow-border)]">
         {lista.length === 0 && (
           <div className="px-5 py-12 text-center">
             <Users
@@ -86,7 +178,7 @@ export function DuplasLista({
             <p className="mt-1 text-sm text-muted-foreground">
               {podeCriar
                 ? "Monte a primeira dupla do programa escolhendo mentor e mentorado."
-                : "A coordenação monta as duplas — elas aparecem aqui."}
+                : "A coordenação monta as duplas; elas aparecem aqui."}
             </p>
             {/* vazio não é beco: o CTA real mora aqui, não só no topo da página */}
             {podeCriar && (
@@ -96,7 +188,7 @@ export function DuplasLista({
             )}
           </div>
         )}
-        {lista.length > 0 && filtradas.length === 0 && (
+        {lista.length > 0 && base.length === 0 && (
           <div className="px-5 py-12 text-center">
             <MagnifyingGlass
               aria-hidden
@@ -119,8 +211,29 @@ export function DuplasLista({
             </Button>
           </div>
         )}
-        {filtradas.map((d, i) => {
-          const saude = saudadeDaDupla(d, eventos, hoje);
+        {lista.length > 0 && base.length > 0 && exibidas.length === 0 && (
+          <div className="px-5 py-12 text-center">
+            <Funnel
+              aria-hidden
+              size={32}
+              weight="regular"
+              className="mx-auto text-muted-foreground"
+            />
+            <p className="mt-3 font-medium text-foreground">
+              Nenhuma dupla nessa situação.
+            </p>
+            <Button
+              variant="outline"
+              size="sm"
+              className="mt-4"
+              onClick={() => setFiltro("todas")}
+            >
+              Limpar filtro
+            </Button>
+          </div>
+        )}
+        {exibidas.map((d, i) => {
+          const saude = saudePorId.get(d.id)!;
           const feitos = d.encontros.filter((e) => e.status === "realizado").length;
           // denominador da trilha da dupla — 16 no DPP, 5 no especialista
           const totalDaDupla = maxEncontros(d.trilha);

@@ -169,7 +169,7 @@ export function PessoasListas({
               <UsersThree aria-hidden size={32} className="text-muted-foreground" />
               <p className="text-sm font-medium">Ninguém cadastrado ainda</p>
               <p className="text-sm text-muted-foreground max-w-sm">
-                Quem tem acesso à plataforma — mentores, supervisores e coordenação —
+                Quem tem acesso à plataforma (mentores, supervisores e coordenação)
                 entra por aqui, um a um ou de uma planilha.
               </p>
               <div className="mt-3 flex flex-wrap justify-center gap-2">
@@ -233,7 +233,7 @@ export function PessoasListas({
               <Student aria-hidden size={32} className="text-muted-foreground" />
               <p className="text-sm font-medium">Nenhum mentorado cadastrado ainda</p>
               <p className="text-sm text-muted-foreground max-w-sm">
-                Quem recebe a mentoria entra por aqui — um a um ou trazendo a
+                Quem recebe a mentoria entra por aqui: um a um ou trazendo a
                 lista inteira de uma planilha.
               </p>
               <div className="mt-3 flex flex-wrap justify-center gap-2">
@@ -518,8 +518,8 @@ function PessoaRow({
           <ItemDetalhe icone={Users}>
             {vagas === 0
               ? temHistorico
-                ? "Sem dupla ativa — histórico de dupla encerrada fica na ficha"
-                : `Ainda sem dupla — ${capacidade === 1 ? "vaga para 1" : `vagas para ${capacidade}`}`
+                ? "Sem dupla ativa. Histórico de dupla encerrada fica na ficha"
+                : `Ainda sem dupla · ${capacidade === 1 ? "vaga para 1" : `vagas para ${capacidade}`}`
               : `Cuida de ${vagas} de ${capacidade} ${capacidade === 1 ? "dupla" : "duplas"}`}
           </ItemDetalhe>
           {mp?.termo_ok ? (
@@ -664,7 +664,7 @@ function MentoradoRow({
                   "Autorização do responsável no arquivo"
                 )
               ) : autEnviada ? (
-                "Autorização enviada — aguardando a assinatura do responsável"
+                "Autorização enviada, aguardando a assinatura do responsável"
               ) : (
                 "Autorização do responsável ainda não enviada"
               )}
@@ -677,7 +677,7 @@ function MentoradoRow({
                   {`Termo de participação assinado${termoData!.em ? ` em ${fmtDia(termoData!.em)}` : ""}`}
                 </LinkAssinatura>
               ) : termoEnviado ? (
-                "Termo de participação enviado — aguardando assinatura"
+                "Termo de participação enviado, aguardando assinatura"
               ) : (
                 "Termo de participação ainda não enviado"
               )}

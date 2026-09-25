@@ -43,7 +43,7 @@ export function TrilhaPrazoBadge({
         className="border-[var(--warn)]/60 text-[var(--warn-text)]"
       >
         <HourglassMedium size={12} aria-hidden />
-        {prazo.diasRestantes}d pra fechar — até {formatDate(prazo.fim)}
+        {prazo.diasRestantes}d pra fechar · até {formatDate(prazo.fim)}
       </Badge>
     );
   }

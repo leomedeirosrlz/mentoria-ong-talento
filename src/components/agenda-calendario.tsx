@@ -2500,7 +2500,7 @@ function MaterialDoEncontro({ m }: { m: Material }) {
         )}
         <span className="sr-only">
           {MATERIAL_TIPO_LABEL[m.tipo]}
-          {m.path ? " — arquivo" : urlOk && m.tipo !== "link" ? " — link externo" : ""}
+          {m.path ? " · arquivo" : urlOk && m.tipo !== "link" ? " · link externo" : ""}
           {href ? " (abre em nova aba)" : ""}
         </span>
       </span>
@@ -2647,7 +2647,7 @@ function LinhaSemEncontro({ dupla, numero }: { dupla: Dupla; numero: number }) {
       </Link>
       <NudgeButton
         telefone={dupla.mentor.whatsapp}
-        mensagem={`Oi ${primeiroNome(dupla.mentor.nome)}! Passando pra lembrar de marcar o ${numero}º encontro de vocês com ${primeiroNome(dupla.mentorado.nome)} — a semana oficial já está aberta. Qualquer coisa me chama :)`}
+        mensagem={`Oi ${primeiroNome(dupla.mentor.nome)}! Passando pra lembrar de marcar o ${numero}º encontro de vocês com ${primeiroNome(dupla.mentorado.nome)}. A semana oficial já está aberta. Qualquer coisa me chama :)`}
         duplaId={dupla.id}
         label="Lembrar"
       />

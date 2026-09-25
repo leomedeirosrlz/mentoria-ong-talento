@@ -43,10 +43,10 @@ export function DemandasEspecialista({
           setAceitando(null);
           return;
         }
-        toast.success("Pedido aceito — a dupla foi criada.");
+        toast.success("Pedido aceito. A dupla foi criada.");
         router.push(`/duplas/${res.duplaId}`);
       } catch {
-        toast.error("Sem conexão — tente de novo.");
+        toast.error("Sem conexão. Tente de novo.");
         setAceitando(null);
       }
     });

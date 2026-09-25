@@ -87,21 +87,21 @@ function bloco(
  *  storage; aqui sai um placeholder válido com título, subtítulo e aviso. */
 export function demoPdf(
   titulo: string,
-  subtitulo = "Documento de demonstração — conteúdo fictício gerado pela plataforma."
+  subtitulo = "Documento de demonstração · conteúdo fictício gerado pela plataforma."
 ): Uint8Array {
   // A4 = 595.28 x 841.89 pt, margem de ~2cm; T* desce `leading`, então o y do
   // subtítulo depende de quantas linhas o título ocupou
   const tituloLinhas = quebra(titulo, 46);
   const subLinhas = quebra(subtitulo, 80);
   const rodape = quebra(
-    "Este arquivo é um placeholder do modo demo — o documento oficial é servido via storage.",
+    "Este arquivo é um placeholder do modo demo. O documento oficial é servido via storage.",
     95
   );
 
   const conteudo = bytes(
     "q\n",
     "0.4 g\n",
-    ...bloco("F1", 9, 12, 56, 802, ["Realiza.vc — demonstração"]),
+    ...bloco("F1", 9, 12, 56, 802, ["Realiza.vc · demonstração"]),
     "0.75 G 0.75 w 56 790 m 539.28 790 l S\n",
     "0 g\n",
     ...bloco("F2", 18, 23, 56, 748, tituloLinhas),

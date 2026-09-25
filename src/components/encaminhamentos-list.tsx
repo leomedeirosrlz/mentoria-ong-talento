@@ -58,7 +58,7 @@ export function EncaminhamentosList({
     // não há ação solta aqui porque criar encaminhamento é parte do follow-up
     return (
       <p className="text-sm text-muted-foreground py-4">
-        Nenhum combinado por aqui ainda — eles saem do registro de cada encontro.
+        Nenhum combinado por aqui ainda: eles saem do registro de cada encontro.
       </p>
     );
 
@@ -145,7 +145,7 @@ export function EncaminhamentosList({
                           if (res?.error) toast.error(res.error);
                           else router.refresh();
                         } catch {
-                          toast.error("Sem conexão — tente de novo.");
+                          toast.error("Sem conexão. Tente de novo.");
                         } finally {
                           setPendingId(null);
                         }
@@ -216,7 +216,7 @@ export function EncaminhamentosList({
                       router.refresh();
                     }
                   } catch {
-                    toast.error("Sem conexão — tente de novo.");
+                    toast.error("Sem conexão. Tente de novo.");
                   }
                 });
               }}

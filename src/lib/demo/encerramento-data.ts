@@ -51,7 +51,7 @@ export function demoEncerramentoDaDupla(
       "O que funcionou: as metas pequenas da Isabela — cada semana com uma vitória visível manteve o ritmo. Eu falei demais nos primeiros encontros; quando passei a perguntar antes de sugerir, ela se abriu. Competência que evoluiu: escuta ativa. A desenvolver: pedir feedback do jovem com mais frequência. O que aprendi com a Isa: persistência silenciosa vence talento com pressa.",
     disponivel_proximo_ciclo: true,
     resumo_jornada: [
-      "Resumo da jornada — Luiza Campos e Isabela Freitas",
+      "Resumo da jornada · Luiza Campos e Isabela Freitas",
       "Trilha DPP · 16 encontros realizados de 16",
       "Avaliação média do jovem: 3,4/4 (boa)",
       "Combinados cumpridos: 3 de 3",

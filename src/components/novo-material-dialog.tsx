@@ -68,16 +68,16 @@ export function NovoMaterialDialog({ maxEncontro }: { maxEncontro: number }) {
     const file = destino === "arquivo" ? fileRef.current?.files?.[0] : undefined;
 
     if (destino === "arquivo" && !file) {
-      toast.error("Escolha o arquivo (PDF ou imagem) — ou mude o destino para link.");
+      toast.error("Escolha o arquivo (PDF ou imagem). Ou mude o destino para link.");
       return;
     }
     if (file) {
       if (!TIPOS_ACEITOS.includes(file.type)) {
-        toast.error("Formato não aceito — use PDF, PNG, JPG ou WebP.");
+        toast.error("Formato não aceito. Use PDF, PNG, JPG ou WebP.");
         return;
       }
       if (file.size > LIMITE_BYTES) {
-        toast.error("O arquivo passa de 20 MB — envie uma versão menor.");
+        toast.error("O arquivo passa de 20 MB. Envie uma versão menor.");
         return;
       }
       // path antes do submit: a row de materiais precisa nascer com ele — a
@@ -101,7 +101,7 @@ export function NovoMaterialDialog({ maxEncontro }: { maxEncontro: number }) {
           if (upError) {
             // sem o arquivo a row ficaria com um path morto — desfaz
             if (res?.id) await deleteMaterial(res.id);
-            toast.error("Falha ao enviar o arquivo — o material não foi salvo.");
+            toast.error("Falha ao enviar o arquivo. O material não foi salvo.");
             return;
           }
         }
@@ -112,7 +112,7 @@ export function NovoMaterialDialog({ maxEncontro }: { maxEncontro: number }) {
         if (fileRef.current) fileRef.current.value = "";
         router.refresh();
       } catch {
-        toast.error("Sem conexão — tente de novo.");
+        toast.error("Sem conexão. Tente de novo.");
       }
     });
   }
@@ -204,7 +204,7 @@ export function NovoMaterialDialog({ maxEncontro }: { maxEncontro: number }) {
                   className="h-auto cursor-pointer py-2 text-xs file:mr-3 file:rounded-md file:border-0 file:bg-muted file:px-2.5 file:py-1.5 file:text-xs file:font-medium"
                 />
                 <p className="text-xs text-muted-foreground">
-                  PDF ou imagem, até 20 MB. O arquivo é servido por link temporário — só quem tem acesso ao material abre.
+                  PDF ou imagem, até 20 MB. O arquivo é servido por link temporário. Só quem tem acesso ao material abre.
                 </p>
               </>
             ) : (
@@ -215,7 +215,7 @@ export function NovoMaterialDialog({ maxEncontro }: { maxEncontro: number }) {
             <Label htmlFor="encontro_num">Encontro relacionado</Label>
             <Input id="encontro_num" name="encontro_num" type="number" min={1} max={maxEncontroSel} inputMode="numeric" placeholder="-" />
             <p className="text-xs text-muted-foreground">
-              Opcional — agrupa o material na seção daquele encontro na biblioteca
+              Opcional: agrupa o material na seção daquele encontro na biblioteca
               {audiencia === "especialista" ? " (5 encontros)" : ""}.
             </p>
           </div>

@@ -146,14 +146,14 @@ function ReemitirLinkButton({
         start(async () => {
           const r = await reemitirLinkFormulario(linkId, formularioId);
           if (r.error || !r.token) {
-            toast.error(r.error ?? "Não consegui reemitir — tente de novo.");
+            toast.error(r.error ?? "Não consegui reemitir. Tente de novo.");
             return;
           }
           try {
             await navigator.clipboard.writeText(urlPublica(r.token));
             toast.success("Link reemitido e copiado.");
           } catch {
-            toast.success("Link reemitido — copie o novo endereço na lista.");
+            toast.success("Link reemitido. Copie o novo endereço na lista.");
           }
           router.refresh();
         })
@@ -193,6 +193,10 @@ export function FormularioLinks({
   const [prontos, setProntos] = useState<LinkEmitido[] | null>(null);
   // linha recém-emitida pisca na lista (link genérico)
   const [destaqueId, setDestaqueId] = useState<string | null>(null);
+  // filtro local da lista — chips de status + busca por nome (cliente,
+  // sem round-trip: a lista inteira já está na página)
+  const [filtroStatus, setFiltroStatus] = useState<LinkStatus | "todos">("todos");
+  const [buscaLink, setBuscaLink] = useState("");
   const [pending, start] = useTransition();
   const router = useRouter();
   const destaqueTimer = useRef<ReturnType<typeof setTimeout>>(null);
@@ -267,6 +271,28 @@ export function FormularioLinks({
       ),
     [links]
   );
+
+  // contagem por status alimenta os chips — o número junto do chip é a
+  // própria explicação de por que filtrar
+  const contagens = useMemo(() => {
+    const c: Record<LinkStatus, number> = {
+      pendente: 0,
+      expirado: 0,
+      respondido: 0,
+    };
+    for (const l of links) c[linkStatus(l)]++;
+    return c;
+  }, [links]);
+
+  const linksVisiveis = useMemo(() => {
+    const n = normaliza(buscaLink.trim());
+    return linksOrdenados.filter((l) => {
+      if (filtroStatus !== "todos" && linkStatus(l) !== filtroStatus)
+        return false;
+      if (!n) return true;
+      return normaliza(l.dest_nome ?? "Link genérico").includes(n);
+    });
+  }, [linksOrdenados, filtroStatus, buscaLink]);
 
   const itensProntos = useMemo<LinkProntoItem[]>(
     () =>
@@ -378,10 +404,10 @@ export function FormularioLinks({
           toast.success(
             r.criados
               ? "Link genérico copiado."
-              : "O genérico já existia — link copiado de novo."
+              : "O genérico já existia. Link copiado de novo."
           );
         } catch {
-          toast.success("Link genérico gerado — copie na lista abaixo.");
+          toast.success("Link genérico gerado. Copie na lista abaixo.");
         }
         if (destaqueTimer.current) clearTimeout(destaqueTimer.current);
         setDestaqueId(link.id);
@@ -405,7 +431,7 @@ export function FormularioLinks({
             <DialogHeader>
               <DialogTitle>Gerar links de resposta</DialogTitle>
               <DialogDescription>
-                Cada pessoa recebe um link único — a resposta fica vinculada a
+                Cada pessoa recebe um link único: a resposta fica vinculada a
                 ela (e à dupla, quando houver).
               </DialogDescription>
             </DialogHeader>
@@ -427,7 +453,7 @@ export function FormularioLinks({
                 >
                   {!formularioAtivo && (
                     <p className="rounded-lg bg-[var(--warn)]/10 px-3 py-2 text-xs text-[var(--warn-text)]">
-                      O formulário está encerrado — os links gerados só
+                      O formulário está encerrado: os links gerados só
                       aceitam resposta depois que você reativar.
                     </p>
                   )}
@@ -472,7 +498,7 @@ export function FormularioLinks({
                                 if (el) el.indeterminate = alguns;
                               }}
                               onChange={() => toggleGrupo(g.itens, !todos)}
-                              aria-label={`Selecionar todos — ${g.titulo}`}
+                              aria-label={`Selecionar todos: ${g.titulo}`}
                               className="size-4 shrink-0 accent-primary"
                             />
                             <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
@@ -528,7 +554,7 @@ export function FormularioLinks({
                     )}
                     {destinatarios.length === 0 && (
                       <p className="text-sm text-muted-foreground">
-                        Nenhuma pessoa cadastrada — cadastre em{" "}
+                        Nenhuma pessoa cadastrada. Cadastre em{" "}
                         <Link
                           href="/pessoas"
                           className="underline underline-offset-2"
@@ -561,46 +587,108 @@ export function FormularioLinks({
             </AnimatePresence>
           </DialogContent>
         </Dialog>
-
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={pending}
-          onClick={gerarGenerico}
-        >
-          {pending ? (
-            <CircleNotch className="animate-spin" aria-hidden />
-          ) : (
-            <PaperPlaneTilt aria-hidden />
-          )}
-          Copiar link genérico
-        </Button>
       </div>
 
-      {/* o genérico não resolve destinatário — quem responde por ele cai
-          anônimo; o hint fica visível pra escolha ser consciente */}
-      <p className="text-xs text-muted-foreground">
-        O link genérico não identifica quem respondeu — use pra divulgação
-        aberta.
-      </p>
+      {/* o genérico é caminho terciário — não resolve destinatário e quem
+          responde por ele cai anônimo; a ação fica colada na advertência
+          pra escolha ser consciente, longe do botão primário */}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-dashed border-border px-3.5 py-2">
+        <p className="min-w-0 flex-1 text-xs text-muted-foreground">
+          O link genérico não identifica quem respondeu. Use pra divulgação aberta:
+        </p>
+        <button
+          type="button"
+          disabled={pending}
+          onClick={gerarGenerico}
+          className="inline-flex min-h-9 items-center gap-1.5 rounded-lg px-1.5 text-xs font-medium text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+        >
+          {pending ? (
+            <CircleNotch size={14} className="animate-spin" aria-hidden />
+          ) : (
+            <PaperPlaneTilt size={14} aria-hidden />
+          )}
+          Copiar link genérico
+        </button>
+      </div>
 
       {/* pendente em form encerrado é ação morta — as rows escondem
           Copiar/WhatsApp e este aviso diz por quê */}
       {!formularioAtivo && temPendente && (
         <p className="rounded-lg bg-[var(--warn)]/10 px-3 py-2 text-xs text-[var(--warn-text)]">
-          Formulário encerrado — reative pra voltar a coletar respostas.
+          Formulário encerrado: reative pra voltar a coletar respostas.
         </p>
+      )}
+
+      {links.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          {/* chips de status — um gesto filtra a lista sem sair da página;
+              a contagem junto do chip já diz se vale o clique */}
+          <ul className="flex flex-wrap items-center gap-1.5" aria-label="Filtrar links por status">
+            <li>
+              <button
+                type="button"
+                aria-pressed={filtroStatus === "todos"}
+                onClick={() => setFiltroStatus("todos")}
+                className={cn(
+                  "inline-flex min-h-11 items-center rounded-full border px-3 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)] sm:min-h-7",
+                  filtroStatus === "todos"
+                    ? "border-foreground bg-foreground text-background"
+                    : "bg-card hover:bg-muted"
+                )}
+              >
+                Todos · {links.length}
+              </button>
+            </li>
+            {(["pendente", "expirado", "respondido"] as const).map((s) => (
+              <li key={s}>
+                <button
+                  type="button"
+                  aria-pressed={filtroStatus === s}
+                  onClick={() =>
+                    setFiltroStatus(filtroStatus === s ? "todos" : s)
+                  }
+                  className={cn(
+                    "inline-flex min-h-11 items-center rounded-full border px-3 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)] sm:min-h-7",
+                    filtroStatus === s
+                      ? "border-foreground bg-foreground text-background"
+                      : "bg-card hover:bg-muted"
+                  )}
+                >
+                  {LINK_STATUS_LABEL[s]} · {contagens[s]}
+                </button>
+              </li>
+            ))}
+          </ul>
+          <div className="relative min-w-40 flex-1 sm:max-w-56">
+            <MagnifyingGlass
+              size={14}
+              aria-hidden
+              className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground"
+            />
+            <Input
+              type="search"
+              aria-label="Buscar link por nome"
+              placeholder="Buscar por nome"
+              value={buscaLink}
+              onChange={(e) => setBuscaLink(e.target.value)}
+              className="h-8 pl-8 text-xs"
+            />
+          </div>
+        </div>
       )}
 
       {links.length === 0 ? (
         <p className="rounded-lg border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
-          Nenhum link gerado ainda — gere links individuais ou um genérico pra
+          Nenhum link gerado ainda. Gere links individuais ou um genérico pra
           divulgar.
+        </p>
+      ) : linksVisiveis.length === 0 ? (
+        <p className="rounded-lg border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
+          Nenhum link com esse filtro.
         </p>
       ) : (
         <ul className="divide-y divide-border overflow-hidden rounded-xl bg-card shadow-[var(--shadow-border)]">
-          {linksOrdenados.map((l) => {
+          {linksVisiveis.map((l) => {
             const status = linkStatus(l);
             return (
               <li
@@ -639,34 +727,27 @@ export function FormularioLinks({
                         {LINK_STATUS_LABEL[status]}
                       </Badge>
                     </div>
-                    <p className="mt-0.5 truncate font-mono text-xs text-muted-foreground">
-                      /f/{l.token.slice(0, 14)}…
-                      {l.dupla && (
-                        <span className="font-sans">
-                          {" · "}
-                          {primeiroNome(l.dupla.mentor_nome)} ↔{" "}
-                          {primeiroNome(l.dupla.mentorado_nome)}
-                        </span>
-                      )}
-                      {status === "pendente" && l.expira_em && (
-                        <span className="font-sans">
-                          {" · até "}
-                          {dataCurta(l.expira_em)}
-                        </span>
-                      )}
-                      {status === "expirado" && l.expira_em && (
-                        <span className="font-sans">
-                          {" · expirou "}
-                          {dataCurta(l.expira_em)}
-                        </span>
-                      )}
-                      {status === "respondido" && l.usado_em && (
-                        <span className="font-sans">
-                          {" · "}
-                          {dataCurta(l.usado_em)}
-                        </span>
-                      )}
-                    </p>
+                    {/* sem fragmento de token na linha — era ruído técnico
+                        que parecia ID copiável; a meta que sobra (dupla,
+                        validade, uso) é o que ajuda a reconhecer o link */}
+                    {(() => {
+                      const meta: string[] = [];
+                      if (l.dupla)
+                        meta.push(
+                          `${primeiroNome(l.dupla.mentor_nome)} ↔ ${primeiroNome(l.dupla.mentorado_nome)}`
+                        );
+                      if (status === "pendente" && l.expira_em)
+                        meta.push(`até ${dataCurta(l.expira_em)}`);
+                      if (status === "expirado" && l.expira_em)
+                        meta.push(`expirou ${dataCurta(l.expira_em)}`);
+                      if (status === "respondido" && l.usado_em)
+                        meta.push(dataCurta(l.usado_em));
+                      return meta.length > 0 ? (
+                        <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                          {meta.join(" · ")}
+                        </p>
+                      ) : null;
+                    })()}
                   </div>
                   <div className="flex basis-full items-center justify-end gap-1.5 sm:basis-auto">
                     {/* Copiar/WhatsApp só em link vivo de form ativo —

@@ -11,7 +11,7 @@ export function SupervisaoDeleteButton({ id }: { id: string }) {
   return (
     <ConfirmDeleteButton
       titulo="Excluir sessão de supervisão?"
-      descricao="Apaga o registro da sessão. Essa ação não tem volta — pra corrigir um detalhe, exclua e registre de novo."
+      descricao="Apaga o registro da sessão. Essa ação não tem volta. Pra corrigir um detalhe, exclua e registre de novo."
       sucesso="Sessão de supervisão excluída."
       onConfirm={() => excluirSupervisao(id)}
       trigger={

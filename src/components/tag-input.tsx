@@ -133,7 +133,7 @@ export function TagInput({
       {/* contador vira o aviso de teto — aria-live anuncia a virada */}
       <p aria-live="polite" className="text-xs tabular-nums text-muted-foreground">
         {cheio
-          ? `Máximo de ${max} — remova uma para trocar.`
+          ? `Máximo de ${max}. Remova uma para trocar.`
           : `${value.length}/${max}`}
       </p>
     </div>

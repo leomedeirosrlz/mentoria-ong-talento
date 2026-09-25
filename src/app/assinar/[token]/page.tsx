@@ -31,7 +31,7 @@ import type { DadosAutorizacao, DadosCivis, ResponsavelCivis } from "@/lib/types
 export const metadata: Metadata = {
   title: "Assinatura de documento",
   description:
-    "Assinatura eletrônica de documento do Programa de Mentoria Social — Realiza.vc.",
+    "Assinatura eletrônica de documento do Programa de Mentoria Social · Realiza.vc.",
   // link individual por WhatsApp — não é página de indexação (igual a /f)
   robots: { index: false, follow: false },
 };
@@ -67,7 +67,7 @@ function EstadoLink({
           </div>
         </div>
         <p className="mt-8 text-xs text-muted-foreground">
-          Realiza.vc — Programa de Mentoria
+          Realiza.vc · Programa de Mentoria
         </p>
       </div>
     </div>
@@ -86,7 +86,7 @@ export default async function AssinarTokenPage({
     return (
       <EstadoLink icon={LinkBreak} titulo="Link inválido">
         <p>
-          Este link de assinatura não é válido — ele pode ter sido copiado
+          Este link de assinatura não é válido. Ele pode ter sido copiado
           incompleto ou substituído por um mais recente. Peça um novo link à
           coordenação do programa.
         </p>
@@ -135,7 +135,7 @@ export default async function AssinarTokenPage({
       <EstadoLink icon={ClockCountdown} titulo="Link expirado">
         <p>
           O prazo deste link de assinatura terminou. Peça um novo link à
-          coordenação do programa — a assinatura leva poucos minutos.
+          coordenação do programa; a assinatura leva poucos minutos.
         </p>
       </EstadoLink>
     );
@@ -170,7 +170,7 @@ export default async function AssinarTokenPage({
               <strong className="font-semibold text-foreground">
                 {info.alvo.nome}
               </strong>
-              . Leia o documento abaixo e assine com seus dados civis — a
+              . Leia o documento abaixo e assine com seus dados civis. A
               assinatura eletrônica tem a mesma validade de uma assinatura em
               papel.
             </>
@@ -180,16 +180,49 @@ export default async function AssinarTokenPage({
               <strong className="font-semibold text-foreground">
                 {info.alvo.nome}
               </strong>
-              . Leia o documento abaixo, confira os dados e assine — a
+              . Leia o documento abaixo, confira os dados e assine. A
               assinatura eletrônica tem a mesma validade de uma assinatura em
               papel.
             </>
           )}
         </p>
+        {/* índice da tarefa — mesmo passo a passo da página logada: cada
+            âncora aponta pra seção que resolve aquele passo */}
+        <nav aria-label="Etapas da assinatura" className="mt-4">
+          <ol className="flex flex-wrap gap-x-5 gap-y-1.5 text-sm">
+            <li>
+              <a
+                href="#termo"
+                className="font-medium text-primary underline-offset-4 hover:underline"
+              >
+                1 · Leia o documento
+              </a>
+            </li>
+            <li>
+              <a
+                href="#dados"
+                className="font-medium text-primary underline-offset-4 hover:underline"
+              >
+                2 · Confira os dados
+              </a>
+            </li>
+            <li>
+              <a
+                href="#assinar"
+                className="font-medium text-primary underline-offset-4 hover:underline"
+              >
+                3 · Assine
+              </a>
+            </li>
+          </ol>
+        </nav>
 
         {/* o documento como será emitido — o texto é o mesmo que entra no PDF
             (src/lib/documentos/texto.ts é a fonte única dos dois) */}
-        <section className="mt-8 rounded-xl bg-card p-6 shadow-[var(--shadow-border)] sm:p-8">
+        <section
+          id="termo"
+          className="mt-8 scroll-mt-4 rounded-xl bg-card p-6 shadow-[var(--shadow-border)] sm:p-8"
+        >
           <h2 className="text-center text-sm font-semibold uppercase tracking-[0.06em]">
             {ehAutorizacao ? AUTORIZACAO_TITULO : MENTORANDO_TITULO}
           </h2>
@@ -215,16 +248,29 @@ export default async function AssinarTokenPage({
             <p>{ehAutorizacao ? FECHO_AUTORIZACAO : FECHO_MENTORANDO}</p>
             <p>{dataPorExtenso(new Date())}</p>
           </div>
+          <p className="mt-6 border-t border-border pt-5 text-center">
+            <a
+              href="#dados"
+              className="inline-flex min-h-11 items-center rounded-lg px-3 text-sm font-medium text-primary underline-offset-4 transition-colors hover:underline"
+            >
+              Continuar para seus dados ↓
+            </a>
+          </p>
         </section>
 
-        <section className="mt-6 rounded-xl bg-card p-6 shadow-[var(--shadow-border)] sm:p-8">
+        <section
+          id="dados"
+          className="mt-6 scroll-mt-4 rounded-xl bg-card p-6 shadow-[var(--shadow-border)] sm:p-8"
+        >
           <h2 className="text-base font-semibold">
-            {ehAutorizacao ? "Seus dados para assinar" : "Dados do(a) jovem e assinatura"}
+            {ehAutorizacao
+              ? "2 · Seus dados para assinar"
+              : "2 · Dados do(a) jovem e assinatura"}
           </h2>
           <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
             {civis
-              ? "Os dados já vêm do cadastro — confira, corrija se preciso e assine. A assinatura registra data, hora e endereço de rede."
-              : "Preencha como consta no documento oficial — as informações entram no documento e a assinatura registra data, hora e endereço de rede."}
+              ? "Os dados já vêm do cadastro. Confira, corrija se preciso e assine. A assinatura registra data, hora e endereço de rede."
+              : "Preencha como consta no documento oficial. As informações entram no documento e a assinatura registra data, hora e endereço de rede."}
           </p>
           <div className="mt-6">
             <AssinaturaForm
@@ -235,6 +281,7 @@ export default async function AssinarTokenPage({
               parentesco={
                 ehAutorizacao ? (civis as ResponsavelCivis | null)?.parentesco : undefined
               }
+              etapas
             />
           </div>
         </section>

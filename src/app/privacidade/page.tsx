@@ -17,7 +17,7 @@ const SECOES: { titulo: string; corpo: React.ReactNode }[] = [
         política descreve como coletamos, usamos, armazenamos e protegemos as
         informações pessoais tratadas na plataforma do Programa de Mentoria
         Social, em conformidade com a Lei Geral de Proteção de Dados (Lei
-        nº 13.709/2018 — LGPD).
+        nº 13.709/2018, LGPD).
       </p>
     ),
   },
@@ -189,7 +189,7 @@ export default function PrivacidadePage() {
         </h1>
         <p className="mt-3 text-base leading-relaxed text-muted-foreground">
           Política de privacidade da plataforma do Programa de Mentoria Social,
-          em conformidade com a LGPD — Lei Geral de Proteção de Dados.
+          em conformidade com a LGPD (Lei Geral de Proteção de Dados).
         </p>
 
         {/* long-form: medida ~70ch e corpo 16px — legibilidade antes de

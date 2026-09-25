@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { CaretDown, CheckCircle, CircleNotch, PaperPlaneRight } from "@phosphor-icons/react";
 import { submeterRespostaFormulario } from "@/lib/forms/actions";
@@ -59,6 +59,11 @@ export function FormularioPublico({
   const [respondidos, setRespondidos] = useState(0);
   const [pending, start] = useTransition();
   const formRef = useRef<HTMLFormElement>(null);
+
+  // rascunho por token+pergunta: o mentorado responde no celular e texto
+  // longo não pode morrer num reload (rede caindo, troca de app). Um JSON
+  // por token cujo mapa interno é por campo — some quando a resposta sai.
+  const chaveRascunho = preview ? null : `rascunho:/f/${token}`;
 
   // foco migra pro painel de sucesso quando ele monta (o form sai do DOM) —
   // scrollIntoView antes: a página pode estar rolada lá embaixo no submit
@@ -124,11 +129,64 @@ export function FormularioPublico({
     return mapa;
   }
 
+  // restaura o rascunho depois do mount: cada campo ganha de volta o que
+  // foi digitado e o progresso recalcula — localStorage nunca é lido no
+  // render (SSR/privado) nem na prévia da coordenação
+  useEffect(() => {
+    if (!chaveRascunho) return;
+    try {
+      const raw = localStorage.getItem(chaveRascunho);
+      if (!raw) return;
+      const rascunho = JSON.parse(raw) as Record<string, RespostaValor>;
+      const form = formRef.current;
+      if (!form) return;
+      const nome = (id: string) => CSS.escape(id);
+      for (const c of campos) {
+        const v = rascunho[c.id];
+        if (v == null) continue;
+        if (c.tipo === "multi_select" && Array.isArray(v)) {
+          for (const inp of form.querySelectorAll<HTMLInputElement>(
+            `input[name="${nome(c.id)}"]`
+          )) {
+            inp.checked = v.includes(inp.value);
+          }
+        } else if (c.tipo === "checkbox") {
+          const inp = form.querySelector<HTMLInputElement>(
+            `input[name="${nome(c.id)}"]`
+          );
+          if (inp) inp.checked = v === true;
+        } else if (c.tipo === "sim_nao" || c.tipo === "escala_1_5") {
+          const inp = form.querySelector<HTMLInputElement>(
+            `input[name="${nome(c.id)}"][value="${nome(String(v))}"]`
+          );
+          if (inp) inp.checked = true;
+        } else {
+          const inp = form.querySelector<
+            HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
+          >(`[name="${nome(c.id)}"]`);
+          if (inp) inp.value = String(v);
+        }
+      }
+      const fd = new FormData(form);
+      setRespondidos(campos.reduce((n, c) => n + (respondido(c, fd) ? 1 : 0), 0));
+    } catch {
+      // storage indisponível ou rascunho corrompido — o form segue vazio
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- restaura uma vez no mount; respondido/campos são estáveis por render
+  }, [chaveRascunho]);
+
   function onFormChange(e: React.FormEvent<HTMLFormElement>) {
     const fd = new FormData(e.currentTarget);
     setRespondidos(
       campos.reduce((n, c) => n + (respondido(c, fd) ? 1 : 0), 0)
     );
+    if (chaveRascunho) {
+      try {
+        localStorage.setItem(chaveRascunho, JSON.stringify(coleta(fd)));
+      } catch {
+        // quota/storage desligado — o rascunho é conveniência, não requisito
+      }
+    }
     if (!Object.keys(erros).length) return;
     const next = { ...erros };
     for (const c of campos)
@@ -176,9 +234,17 @@ export function FormularioPublico({
           setErro(r.error);
           return;
         }
+        // resposta no servidor — o rascunho cumpriu o papel e sai junto
+        if (chaveRascunho) {
+          try {
+            localStorage.removeItem(chaveRascunho);
+          } catch {
+            /* idem a escrita — conveniência */
+          }
+        }
         setEnviado(true);
       } catch {
-        setErro("Sem conexão — confira a internet e tente de novo.");
+        setErro("Sem conexão. Confira a internet e tente de novo.");
       }
     });
   }
@@ -217,7 +283,7 @@ export function FormularioPublico({
           </div>
           <h1 className="mt-4 text-lg font-semibold">Resposta enviada!</h1>
           <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-muted-foreground">
-            Obrigado{primeiroNome ? `, ${primeiroNome}` : ""} — sua resposta
+            Obrigado{primeiroNome ? `, ${primeiroNome}` : ""}. Sua resposta
             pra “{titulo}” foi registrada e já está com a equipe do
             Realiza.vc. Pode fechar esta página.
           </p>
@@ -289,7 +355,7 @@ export function FormularioPublico({
                 </p>
               )}
               <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-                Suas respostas são lidas apenas pela equipe do Realiza.vc —{" "}
+                Suas respostas são lidas apenas pela equipe do Realiza.vc.{" "}
                 <Link
                   href="/privacidade"
                   className="underline underline-offset-2 transition-colors hover:text-foreground"

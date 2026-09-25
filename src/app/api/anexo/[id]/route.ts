@@ -23,7 +23,7 @@ export async function GET(
     }
     const pdf = demoPdf(
       a.nome,
-      "Evidência de exemplo — registro de encontro (dados fictícios)."
+      "Evidência de exemplo · registro de encontro (dados fictícios)."
     );
     return new NextResponse(new Uint8Array(pdf), {
       headers: {
@@ -43,7 +43,7 @@ export async function GET(
   // passa pelo layout (e redirect de login pra API não ajuda ninguém)
   const { data: claims } = await supabase.auth.getClaims();
   if (!claims?.claims?.sub) {
-    return new NextResponse("Sessão expirada — entre de novo.", { status: 401 });
+    return new NextResponse("Sessão expirada. Entre de novo.", { status: 401 });
   }
 
   const { data: anexo, error } = await supabase
@@ -52,7 +52,7 @@ export async function GET(
     .eq("id", id)
     .maybeSingle();
   if (error) {
-    return new NextResponse("Não foi possível abrir o anexo — tente de novo.", { status: 500 });
+    return new NextResponse("Não foi possível abrir o anexo. Tente de novo.", { status: 500 });
   }
   if (!anexo) {
     return new NextResponse("Anexo não encontrado.", { status: 404 });

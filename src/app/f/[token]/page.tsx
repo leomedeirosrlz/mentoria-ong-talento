@@ -31,7 +31,7 @@ export async function generateMetadata({
   const titulo = r?.kind === "ok" ? r.info.formulario.titulo : "Formulário";
   return {
     title: titulo,
-    openGraph: { title: `${titulo} — Realiza.vc` },
+    openGraph: { title: `${titulo} · Realiza.vc` },
     // link individual por WhatsApp/e-mail — não é página de indexação
     robots: { index: false, follow: false },
   };
@@ -119,7 +119,7 @@ export default async function FormularioTokenPage({
           {demo ? (
             <EstadoCard icon={Flask} titulo="Você está na demonstração">
               <p>
-                Os links públicos de formulário não funcionam no modo demo —
+                Os links públicos de formulário não funcionam no modo demo:
                 eles existem pra quem recebe por WhatsApp ou e-mail.
               </p>
               <p className="mt-2">
@@ -145,7 +145,7 @@ export default async function FormularioTokenPage({
               acao={{ href: `/f/${token}`, label: "Tentar de novo" }}
             >
               <p>
-                A conexão falhou no caminho — não é problema com o seu link.
+                A conexão falhou no caminho. Não é problema com o seu link.
                 Confira a internet e tente de novo.
               </p>
             </EstadoCard>

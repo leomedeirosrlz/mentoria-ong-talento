@@ -64,11 +64,11 @@ export function AnexosRegistro({
     if (!file) return;
 
     if (!TIPOS_ACEITOS.includes(file.type)) {
-      toast.error("Formato não aceito — use PDF, PNG, JPG ou WebP.");
+      toast.error("Formato não aceito: use PDF, PNG, JPG ou WebP.");
       return;
     }
     if (file.size > LIMITE_BYTES) {
-      toast.error("O arquivo passa de 10 MB — envie uma versão menor.");
+      toast.error("O arquivo passa de 10 MB. Envie uma versão menor.");
       return;
     }
 
@@ -92,7 +92,7 @@ export function AnexosRegistro({
           .select("id")
           .single();
         if (rowError || !row) {
-          toast.error("Não foi possível registrar o anexo — tente de novo.");
+          toast.error("Não foi possível registrar o anexo. Tente de novo.");
           return;
         }
 
@@ -103,14 +103,14 @@ export function AnexosRegistro({
         if (upError) {
           // sem o arquivo a row não vale (e seguraria o path pra sempre)
           await supabase.from("registro_anexos").delete().eq("id", row.id);
-          toast.error("Falha ao enviar o arquivo — tente de novo.");
+          toast.error("Falha ao enviar o arquivo. Tente de novo.");
           return;
         }
 
         toast.success("Evidência anexada.");
         router.refresh();
       } catch {
-        toast.error("Sem conexão — tente de novo.");
+        toast.error("Sem conexão. Tente de novo.");
       }
     });
   }
@@ -125,7 +125,7 @@ export function AnexosRegistro({
       .delete()
       .eq("id", a.id);
     if (rowError)
-      return { error: "O arquivo saiu, mas a referência ficou — atualize a página." };
+      return { error: "O arquivo saiu, mas a referência ficou. Atualize a página." };
     return { ok: true };
   }
 

@@ -1,6 +1,7 @@
 "use client";
 
-import { useId } from "react";
+import { useEffect, useId, useRef, useState, type CSSProperties } from "react";
+import { CaretLeft, CaretRight } from "@phosphor-icons/react";
 import { cn } from "cn";
 import {
   COR_RACA_LABELS,
@@ -16,6 +17,7 @@ import {
 } from "@/lib/ciclo";
 import type { DiaSemana, Disponibilidade, Periodo } from "@/lib/types";
 import { TagInput } from "@/components/tag-input";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -280,9 +282,179 @@ export function CampoConsentimento({
         className="mt-0.5 accent-primary"
       />
       <span>
-        A pessoa consentiu com o uso dos dados do cadastro no programa (LGPD) —
+        A pessoa consentiu com o uso dos dados do cadastro no programa (LGPD):
         o carimbo registra a data de hoje.
       </span>
     </label>
+  );
+}
+
+/** Um passo do wizard de ficha — `conteudo` fica montado o tempo todo (o
+ *  passo inativo leva `hidden`, então os inputs seguem no FormData e nos
+ *  defaults; desmontar perderia os valores não-controlados). */
+export type PassoFicha = {
+  /** título da seção — o mesmo que a SecaoFicha exibia dentro do form */
+  titulo: string;
+  conteudo: React.ReactNode;
+};
+
+/** Wizard de etapas pros dialogs de cadastro/edição de pessoa — o mesmo
+ *  padrão do registro-form: cabeçalho "Passo N de M · título", barras de
+ *  progresso, todos os passos montados (`hidden` nos inativos) e rodapé
+ *  sticky com Voltar/Avançar/Salvar. O form fica aqui dentro: `onSubmit` só
+ *  é chamado no último passo — Enter antes dele avança, não salva. */
+export function WizardFicha({
+  passos,
+  pending,
+  submitLabel,
+  pendingLabel = "Salvando…",
+  onSubmit,
+}: {
+  passos: PassoFicha[];
+  pending: boolean;
+  submitLabel: string;
+  pendingLabel?: string;
+  onSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
+}) {
+  const [etapa, setEtapa] = useState(0);
+  // direção da última troca de etapa — alimenta o --dir do .animate-enter-x
+  const [direcao, setDirecao] = useState<1 | -1>(1);
+  const tituloEtapaRef = useRef<HTMLHeadingElement>(null);
+  const passosRef = useRef<(HTMLDivElement | null)[]>([]);
+  // foco pedido junto com a troca de etapa — o efeito roda depois do commit,
+  // quando o `hidden` da seção alvo já saiu da árvore renderizada
+  const focoPendente = useRef(false);
+  const ultima = passos.length - 1;
+
+  // passo condicional pode sumir (papel trocado, ficha async ainda não
+  // chegou) — o índice nunca aponta pra fora da lista; o Math.min cobre o
+  // render em que o clamp ainda não foi commitado
+  if (etapa > ultima) setEtapa(ultima);
+  const etapaAtual = Math.min(etapa, ultima);
+
+  // o heading novo anuncia onde a pessoa está — mesmo padrão do registro-form
+  useEffect(() => {
+    if (!focoPendente.current) return;
+    focoPendente.current = false;
+    tituloEtapaRef.current?.focus();
+  });
+
+  function irPara(proxima: number) {
+    focoPendente.current = true;
+    setDirecao(proxima > etapa ? 1 : -1);
+    setEtapa(proxima);
+  }
+
+  /** Os campos do passo visível precisam valer antes de avançar. Input
+   *  `required` num passo `hidden` falha calado no Chrome (controle
+   *  infocável), então a checagem roda aqui com o campo ainda visível —
+   *  assim o reportValidity tem onde aparecer. */
+  function passoValido(): boolean {
+    const passo = passosRef.current[etapa];
+    if (!passo) return true;
+    for (const c of passo.querySelectorAll("input, select, textarea")) {
+      if (
+        (c instanceof HTMLInputElement ||
+          c instanceof HTMLSelectElement ||
+          c instanceof HTMLTextAreaElement) &&
+        !c.checkValidity()
+      ) {
+        c.reportValidity();
+        return false;
+      }
+    }
+    return true;
+  }
+
+  function avancar() {
+    if (!passoValido()) return;
+    irPara(etapa + 1);
+  }
+
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    // Enter/submit antes do último passo avança, não salva — o submit
+    // implícito do browser chega aqui por qualquer campo de texto
+    if (etapa < ultima) {
+      e.preventDefault();
+      avancar();
+      return;
+    }
+    onSubmit(e);
+  }
+
+  function onEnterKey(e: React.KeyboardEvent<HTMLFormElement>) {
+    // Enter num input avança etapa; botões/links/textareas não entram e o
+    // Enter próprio do TagInput já vem preventDefault — respeitar
+    if (
+      e.key !== "Enter" ||
+      e.defaultPrevented ||
+      etapa >= ultima ||
+      !(e.target instanceof HTMLInputElement) ||
+      e.target.type === "hidden" ||
+      e.target.type === "file"
+    ) {
+      return;
+    }
+    e.preventDefault();
+    avancar();
+  }
+
+  return (
+    <form onSubmit={handleSubmit} onKeyDown={onEnterKey} className="space-y-4">
+      {/* cabeçalho do wizard — barras finas, uma por seção (SecaoFicha vira
+          passo); os nomes ficam no sr-only e no título falado */}
+      <div className="space-y-2">
+        <h3 ref={tituloEtapaRef} tabIndex={-1} className="text-sm font-medium outline-none">
+          Passo {etapaAtual + 1} de {passos.length} · {passos[etapaAtual].titulo}
+        </h3>
+        <ol className="flex gap-1" aria-label="Etapas">
+          {passos.map((p, i) => (
+            <li
+              key={p.titulo}
+              aria-current={i === etapa ? "step" : undefined}
+              className={cn(
+                "h-1.5 flex-1 rounded-full transition-colors",
+                i <= etapa ? "bg-primary" : "bg-muted"
+              )}
+            >
+              <span className="sr-only">{p.titulo}</span>
+            </li>
+          ))}
+        </ol>
+      </div>
+
+      {passos.map((p, i) => (
+        <div
+          key={p.titulo}
+          ref={(el) => {
+            passosRef.current[i] = el;
+          }}
+          hidden={i !== etapa}
+          className="animate-enter-x"
+          style={{ "--dir": `${direcao * 8}px` } as CSSProperties}
+        >
+          <div className="space-y-4">{p.conteudo}</div>
+        </div>
+      ))}
+
+      {/* rodapé do wizard — sticky pra Avançar/Salvar ficarem à mão com o
+          form rolado ao meio (o DialogContent é o scrollport) */}
+      <div className="sticky bottom-0 -mx-4 -mb-4 flex items-center gap-2 border-t bg-popover px-4 py-3">
+        {etapa > 0 && (
+          <Button type="button" variant="ghost" onClick={() => irPara(etapa - 1)}>
+            <CaretLeft size={14} /> Voltar
+          </Button>
+        )}
+        {etapa < ultima ? (
+          <Button type="button" className="flex-1" onClick={avancar}>
+            Avançar <CaretRight size={14} />
+          </Button>
+        ) : (
+          <Button type="submit" className="flex-1" disabled={pending}>
+            {pending ? pendingLabel : submitLabel}
+          </Button>
+        )}
+      </div>
+    </form>
   );
 }

@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { type Session } from "@supabase/supabase-js";
-import { Camera, CaretDown, FileArrowDown, Signature } from "@phosphor-icons/react";
+import { Camera, CaretDown, FileArrowDown, Signature, SignOut } from "@phosphor-icons/react";
 import { createClient } from "@/lib/supabase/client";
 import { DEMO_MSG } from "@/lib/demo/shared";
-import { setAvatarPath, updateMeuPerfil } from "@/lib/actions";
+import { setAvatarPath, signOut, updateMeuPerfil } from "@/lib/actions";
 import { avatarPublicUrl, AVATAR_ACCEPT, AVATAR_MAX_BYTES } from "@/lib/avatar";
 import { Avatar } from "@/components/avatar";
 import { TagInput } from "@/components/tag-input";
@@ -18,6 +19,7 @@ import {
   CampoNascimento,
   CampoPrefGenero,
   CampoUf,
+  SENTINEL_VAZIO,
 } from "@/components/campos-pessoais";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -28,9 +30,21 @@ import { AREAS_SUGESTOES, formatWhatsApp, papelLabel } from "@/lib/ciclo";
 import type { Assinatura, Disponibilidade, MentorProfile, Profile } from "@/lib/types";
 import Link from "next/link";
 
-/** Qual form está salvando — três forms chamam a mesma action e o patch é
- *  parcial, mas salvar dois ao mesmo tempo misturaria toasts/estados. */
-type FormId = "publico" | "cadastro" | "mentoria";
+/** Comparação de lista pra detecção de alteração — ordem não conta
+ *  (TagInput só adiciona/remove; a posição não é edição). */
+const mesmaLista = (a: string[], b: string[]) =>
+  JSON.stringify([...a].sort()) === JSON.stringify([...b].sort());
+
+/** Grade semanal normalizada — mesma lista em qualquer ordem = mesmo valor. */
+const mesmaDisp = (a: Disponibilidade | null, b: Disponibilidade | null) =>
+  JSON.stringify({
+    dias: [...(a?.dias ?? [])].sort(),
+    periodos: [...(a?.periodos ?? [])].sort(),
+  }) ===
+  JSON.stringify({
+    dias: [...(b?.dias ?? [])].sort(),
+    periodos: [...(b?.periodos ?? [])].sort(),
+  });
 
 // troca de credencial sem senha atual pra conferir (quem nunca definiu) só
 // vale com autenticação recente — sessão velha não pode virar senha nova
@@ -67,10 +81,11 @@ export function PerfilForm({
   assinaturaTermo: Assinatura | null;
 }) {
   const supabase = useMemo(() => createClient(), []);
+  const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
   const [src, setSrc] = useState<string | null>(avatarUrl);
   const [uploading, setUploading] = useState(false);
-  const [salvando, setSalvando] = useState<FormId | null>(null);
+  const [salvando, setSalvando] = useState(false);
   const [salvandoSenha, setSalvandoSenha] = useState(false);
   const [senha, setSenha] = useState("");
   const [senhaAtual, setSenhaAtual] = useState("");
@@ -86,6 +101,50 @@ export function PerfilForm({
   const [disponibilidade, setDisponibilidade] = useState<Disponibilidade | null>(
     mentorProfile?.disponibilidade ?? null
   );
+  // os Selects da ficha ficam controlados: é o único jeito de medir
+  // alteração (o hidden do Select não dispara evento nativo)
+  const [genero, setGenero] = useState<string>(me.genero ?? "");
+  const [prefGenero, setPrefGenero] = useState<string>(me.pref_genero_par ?? "");
+  const [uf, setUf] = useState<string>(me.uf ?? "");
+
+  // campos tocados — alimenta o contador da barra e o guard de saída.
+  // nome do input como chave: voltar ao valor original tira da contagem
+  const [alterados, setAlterados] = useState<ReadonlySet<string>>(new Set());
+  function marca(campo: string, mudou = true) {
+    setAlterados((s) => {
+      if (mudou === s.has(campo)) return s;
+      const out = new Set(s);
+      if (mudou) out.add(campo);
+      else out.delete(campo);
+      return out;
+    });
+  }
+
+  // delegação pros campos nativos (texto/data/checkbox): compara com o
+  // defaultValue do próprio input — reverter a edição desmarca sozinho.
+  // Campos controlados (Selects, TagInputs, grade) marcam no próprio setter
+  function onFormChange(e: React.ChangeEvent<HTMLFormElement>) {
+    const el = e.target;
+    if (!(el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement))
+      return;
+    if (!el.name || el.type === "hidden") return;
+    if (
+      el instanceof HTMLInputElement &&
+      (el.type === "checkbox" || el.type === "radio")
+    ) {
+      marca(el.name, el.checked !== el.defaultChecked);
+      return;
+    }
+    marca(el.name, el.value !== el.defaultValue);
+  }
+
+  // edições não salvas pedem confirmação do browser ao recarregar/fechar
+  useEffect(() => {
+    if (alterados.size === 0) return;
+    const aviso = (e: BeforeUnloadEvent) => e.preventDefault();
+    window.addEventListener("beforeunload", aviso);
+    return () => window.removeEventListener("beforeunload", aviso);
+  }, [alterados.size]);
 
   // quem dispensou a senha no onboarding (senha_dispensada sem senha_em) não
   // tem "senha atual" pra conferir — o campo some e o gate vira sessão fresca
@@ -141,7 +200,16 @@ export function PerfilForm({
     {
       key: "genero",
       ok: Boolean(me.genero),
-      node: <CampoGenero defaultValue={me.genero ?? ""} />,
+      node: (
+        <CampoGenero
+          value={genero}
+          onChange={(v) => {
+            const nv = v === SENTINEL_VAZIO ? "" : v;
+            setGenero(nv);
+            marca("genero", nv !== (me.genero ?? ""));
+          }}
+        />
+      ),
     },
     {
       key: "origem",
@@ -160,7 +228,16 @@ export function PerfilForm({
     {
       key: "pref_genero_par",
       ok: Boolean(me.pref_genero_par),
-      node: <CampoPrefGenero defaultValue={me.pref_genero_par ?? ""} />,
+      node: (
+        <CampoPrefGenero
+          value={prefGenero}
+          onChange={(v) => {
+            const nv = v === SENTINEL_VAZIO ? "" : v;
+            setPrefGenero(nv);
+            marca("pref_genero_par", nv !== (me.pref_genero_par ?? ""));
+          }}
+        />
+      ),
     },
     {
       key: "motivacao",
@@ -185,7 +262,6 @@ export function PerfilForm({
     },
   ];
   const cadPendentes = camposCadastro.filter((c) => !c.ok);
-  const cadPreenchidos = camposCadastro.filter((c) => c.ok);
   // o termo de voluntariado entra na conta de pendências da gaveta mesmo
   // não sendo campo — cadastro completo = dados + assinatura
   const termoOk = assinaturaTermo?.status === "assinado";
@@ -203,7 +279,7 @@ export function PerfilForm({
 
   async function trocarFoto(file: File) {
     if (file.size > AVATAR_MAX_BYTES) {
-      toast.error("Imagem grande demais — use uma de até 2 MB.");
+      toast.error("Imagem grande demais: use uma de até 2 MB.");
       return;
     }
     setUploading(true);
@@ -225,7 +301,7 @@ export function PerfilForm({
       setSrc(avatarPublicUrl(path));
       toast.success("Foto atualizada.");
     } catch {
-      toast.error("Sem conexão — tente de novo.");
+      toast.error("Sem conexão. Tente de novo.");
     } finally {
       setUploading(false);
       if (fileRef.current) fileRef.current.value = "";
@@ -242,26 +318,32 @@ export function PerfilForm({
         toast.success("Foto removida.");
       }
     } catch {
-      toast.error("Sem conexão — tente de novo.");
+      toast.error("Sem conexão. Tente de novo.");
     } finally {
       setUploading(false);
     }
   }
 
-  function salvarDados(form: FormId) {
-    return async (e: React.FormEvent<HTMLFormElement>) => {
-      e.preventDefault();
-      setSalvando(form);
-      try {
-        const res = await updateMeuPerfil(new FormData(e.currentTarget));
-        if ("error" in res) toast.error(res.error);
-        else toast.success("Dados salvos.");
-      } catch {
-        toast.error("Sem conexão — tente de novo.");
-      } finally {
-        setSalvando(null);
+  // um form só: a barra no fim salva todas as seções de uma vez — o action
+  // recebe o FormData completo e grava o patch parcial por chave presente
+  async function salvarTudo(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setSalvando(true);
+    try {
+      const res = await updateMeuPerfil(new FormData(e.currentTarget));
+      if ("error" in res) {
+        toast.error(res.error);
+        return;
       }
-    };
+      toast.success("Alterações salvas.");
+      setAlterados(new Set());
+      // relê o profile: os badges "pendente" saem dos campos preenchidos
+      router.refresh();
+    } catch {
+      toast.error("Sem conexão. Tente de novo.");
+    } finally {
+      setSalvando(false);
+    }
   }
 
   async function salvarSenha(e: React.FormEvent) {
@@ -312,7 +394,7 @@ export function PerfilForm({
       if (error) {
         toast.error(
           error.code === "weak_password"
-            ? "Senha fraca — combine letras e números."
+            ? "Senha fraca: combine letras e números."
             : "Não foi possível trocar a senha. Tente de novo."
         );
       } else {
@@ -323,7 +405,7 @@ export function PerfilForm({
         toast.success("Senha atualizada.");
       }
     } catch {
-      toast.error("Sem conexão — tente de novo.");
+      toast.error("Sem conexão. Tente de novo.");
     } finally {
       setSalvandoSenha(false);
     }
@@ -379,14 +461,30 @@ export function PerfilForm({
         </div>
       </section>
 
+      {/* um form só pra todas as seções de dados — antes eram três botões
+          "Salvar" com escopo invisível (a pessoa salvava uma parte e achava
+          que tinha salvo tudo). O patch parcial do action cobre o envio
+          unificado: cada chave presente é gravada, o resto não é tocado */}
+      <form
+        onSubmit={salvarTudo}
+        onChange={onFormChange}
+        // onInvalid: campo inválido dentro de um <details> fechado bloqueia
+        // o submit em silêncio (controle não focável) — abrir o ancestral
+        // deixa o bubble do browser ancorar no campo
+        onInvalid={(e) => {
+          const d = (e.target as HTMLElement).closest("details");
+          if (d) d.open = true;
+        }}
+        className="space-y-6"
+      >
       {/* perfil público — os campos que a ficha em /pessoas/[id] mostra a
           quem alcança a página (pra profile: coordenação e supervisão) */}
       <section className="rounded-xl bg-card p-6 shadow-[var(--shadow-border)]">
         <h2 className="text-sm font-semibold">Perfil público</h2>
         <p className="mt-1 text-xs text-muted-foreground">
-          É o que aparece na sua página em Pessoas — visível pra coordenação e supervisão.
+          É o que aparece na sua página em Pessoas, visível pra coordenação e supervisão.
         </p>
-        <form onSubmit={salvarDados("publico")} className="mt-4 space-y-4">
+        <div className="mt-4 space-y-4">
           <div className="space-y-2">
             <Label htmlFor="nome_social">Nome social</Label>
             <Input
@@ -435,7 +533,10 @@ export function PerfilForm({
               name="areas"
               sugestoes={AREAS_SUGESTOES}
               value={areas}
-              onChange={setAreas}
+              onChange={(v) => {
+                setAreas(v);
+                marca("areas", !mesmaLista(v, me.areas ?? []));
+              }}
               placeholder="ex.: psicologia, idiomas…"
               inputLabel="Digite uma área e pressione Enter"
             />
@@ -443,13 +544,26 @@ export function PerfilForm({
               Toque pra selecionar ou digite uma nova área.
             </p>
           </div>
-          <CampoInteresses value={interesses} onChange={setInteresses} />
+          <CampoInteresses
+            value={interesses}
+            onChange={(v) => {
+              setInteresses(v);
+              marca("interesses", !mesmaLista(v, me.interesses ?? []));
+            }}
+          />
           <div className="grid gap-4 sm:grid-cols-3">
             <div className="space-y-2 sm:col-span-2">
               <Label htmlFor="cidade">Cidade</Label>
               <Input id="cidade" name="cidade" maxLength={100} defaultValue={me.cidade ?? ""} />
             </div>
-            <CampoUf defaultValue={me.uf ?? ""} />
+            <CampoUf
+              value={uf}
+              onChange={(v) => {
+                const nv = v === SENTINEL_VAZIO ? "" : v;
+                setUf(nv);
+                marca("uf", nv !== (me.uf ?? ""));
+              }}
+            />
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
@@ -477,10 +591,7 @@ export function PerfilForm({
               placeholder="ex.: 2 anos como voluntário no Projeto X"
             />
           </div>
-          <Button type="submit" disabled={salvando !== null}>
-            {salvando === "publico" ? "Salvando…" : "Salvar"}
-          </Button>
-        </form>
+        </div>
       </section>
 
       {/* dados de cadastro — o burocrático recolhido: com buracos abre e
@@ -508,63 +619,37 @@ export function PerfilForm({
           />
         </summary>
         <div className="border-t border-border px-6 pb-6 pt-5">
-          {/* onInvalid: campo inválido dentro do <details> "Já cadastrados"
-              fechado bloqueava o submit em silêncio (controle não focável) —
-              abrir o ancestral deixa o bubble do browser ancorar no campo */}
-          <form
-            onSubmit={salvarDados("cadastro")}
-            onInvalid={(e) => {
-              const d = (e.target as HTMLElement).closest("details");
-              if (d) d.open = true;
-            }}
-            className="space-y-4"
-          >
+          <div className="space-y-4">
             {/* e-mail é a credencial, só a coord troca — sempre preenchido,
-                então fica fora da conta de pendentes e fora do split */}
+                então fica fora da conta de pendentes */}
             <div className="space-y-2">
               <Label htmlFor="email">E-mail</Label>
               <Input id="email" value={me.email} disabled />
               <p className="text-xs text-muted-foreground">
-                O e-mail é sua credencial de acesso — para trocar, fale com a coordenação.
+                O e-mail é sua credencial de acesso. Para trocar, fale com a coordenação.
               </p>
             </div>
-            {cadPendentes.length > 0 && (
-              <div className="grid gap-4 sm:grid-cols-2">
-                {cadPendentes.map((c) => (
-                  <div key={c.key} className={c.wide ? "sm:col-span-2" : undefined}>
-                    {c.node}
+            {/* ordem fixa, tudo visível: o que falta ganha badge "pendente"
+                inline em vez de mudar de lugar (o split "pendentes × já
+                cadastrados" fazia o campo sumir depois do save) */}
+            <div className="grid gap-4 sm:grid-cols-2">
+              {camposCadastro.map((c) => (
+                <div key={c.key} className={c.wide ? "sm:col-span-2" : undefined}>
+                  <div className="flex items-start gap-3">
+                    <div className="min-w-0 flex-1">{c.node}</div>
+                    {!c.ok && (
+                      <Badge
+                        variant="outline"
+                        className="mt-0.5 shrink-0 border-[var(--warn)]/60 font-normal text-[var(--warn-text)]"
+                      >
+                        pendente
+                      </Badge>
+                    )}
                   </div>
-                ))}
-              </div>
-            )}
-            {cadPreenchidos.length > 0 && (
-              <details
-                className={
-                  "group/cadastrados" +
-                  (cadPendentes.length > 0 ? " border-t border-border pt-3" : "")
-                }
-              >
-                <summary className="flex min-h-11 cursor-pointer list-none items-center gap-1.5 rounded-lg text-xs font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:min-h-9 [&::-webkit-details-marker]:hidden">
-                  Já cadastrados ({cadPreenchidos.length})
-                  <CaretDown
-                    size={13}
-                    aria-hidden
-                    className="ml-auto transition-transform group-open/cadastrados:rotate-180"
-                  />
-                </summary>
-                <div className="grid gap-4 pb-1 sm:grid-cols-2">
-                  {cadPreenchidos.map((c) => (
-                    <div key={c.key} className={c.wide ? "sm:col-span-2" : undefined}>
-                      {c.node}
-                    </div>
-                  ))}
                 </div>
-              </details>
-            )}
-            <Button type="submit" disabled={salvando !== null}>
-              {salvando === "cadastro" ? "Salvando…" : "Salvar"}
-            </Button>
-          </form>
+              ))}
+            </div>
+          </div>
           {/* o termo não é campo do form — a assinatura mora em /assinar;
               a gaveta só anuncia o estado e manda pra lá */}
           <div className="mt-5 flex items-center gap-3 rounded-lg border border-border px-3.5 py-3">
@@ -585,8 +670,8 @@ export function PerfilForm({
                 {termoOk
                   ? `Assinado em ${new Date(assinaturaTermo!.assinado_em!).toLocaleDateString("pt-BR")}.`
                   : assinaturaTermo
-                    ? "Emitido — aguardando sua assinatura."
-                    : "Ainda não assinado — vale pra toda a equipe."}
+                    ? "Emitido, aguardando sua assinatura."
+                    : "Ainda não assinado. Vale pra toda a equipe."}
               </p>
             </div>
             {termoOk ? (
@@ -638,8 +723,17 @@ export function PerfilForm({
             />
           </summary>
           <div className="border-t border-border px-6 pb-6 pt-5">
-            <form onSubmit={salvarDados("mentoria")} className="space-y-4">
-              <CampoDisponibilidade value={disponibilidade} onChange={setDisponibilidade} />
+            <div className="space-y-4">
+              <CampoDisponibilidade
+                value={disponibilidade}
+                onChange={(v) => {
+                  setDisponibilidade(v);
+                  marca(
+                    "disponibilidade",
+                    !mesmaDisp(v, mentorProfile.disponibilidade ?? null)
+                  );
+                }}
+              />
               <div className="space-y-2">
                 <Label htmlFor="experiencia_previa">Experiência prévia como mentor</Label>
                 <Textarea
@@ -659,13 +753,28 @@ export function PerfilForm({
               <p className="text-xs text-muted-foreground">
                 A coordenação cruza sua disponibilidade com a do mentorado na hora de formar a dupla.
               </p>
-              <Button type="submit" disabled={salvando !== null}>
-                {salvando === "mentoria" ? "Salvando…" : "Salvar"}
-              </Button>
-            </form>
+            </div>
           </div>
         </details>
       )}
+
+      {/* barra única de save — sticky pra acompanhar o scroll em tela
+          cheia de campos; o contador sai junto com o estado salvo.
+          no mobile o offset pula a bottom nav fixa (~3.5rem + safe-area) */}
+      <div className="sticky bottom-[calc(4rem+env(safe-area-inset-bottom))] z-10 flex items-center gap-3 rounded-xl border border-border bg-card/95 px-4 py-3 shadow-[var(--shadow-border)] backdrop-blur-sm md:bottom-3">
+        <p
+          aria-live="polite"
+          className="min-w-0 flex-1 text-xs tabular-nums text-muted-foreground"
+        >
+          {alterados.size === 0
+            ? "Nenhum campo alterado"
+            : `${alterados.size} ${alterados.size === 1 ? "campo alterado" : "campos alterados"}`}
+        </p>
+        <Button type="submit" disabled={salvando || alterados.size === 0}>
+          {salvando ? "Salvando…" : "Salvar alterações"}
+        </Button>
+      </div>
+      </form>
 
       {/* senha — reautentica antes do updateUser (senha atual ou sessão
           fresca do magic link); a flag senha_em é o que pula o onboarding */}
@@ -694,7 +803,7 @@ export function PerfilForm({
               </div>
             ) : (
               <p className="text-xs text-muted-foreground leading-relaxed">
-                Você entra pelo link de e-mail — por segurança, a sessão
+                Você entra pelo link de e-mail. Por segurança, a sessão
                 precisa ser recente pra criar uma senha.
               </p>
             )}
@@ -728,6 +837,25 @@ export function PerfilForm({
           </form>
         </div>
       </details>
+
+      {/* saída — o "Sair" morava no header do app; na conta da pessoa faz
+          mais sentido junto das outras credenciais */}
+      <section className="rounded-xl bg-card p-6 shadow-[var(--shadow-border)]">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-semibold">Sessão</h2>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Encerra o acesso da sua conta neste dispositivo.
+            </p>
+          </div>
+          <form action={signOut}>
+            <Button type="submit" variant="outline" size="sm">
+              <SignOut size={15} aria-hidden />
+              Sair
+            </Button>
+          </form>
+        </div>
+      </section>
     </div>
   );
 }

@@ -23,7 +23,8 @@ import {
   CampoNascimento,
   CampoPrefGenero,
   CampoUf,
-  SecaoFicha,
+  WizardFicha,
+  type PassoFicha,
 } from "@/components/campos-pessoais";
 import type { Disponibilidade } from "@/lib/types";
 import { Button } from "@/components/ui/button";
@@ -61,14 +62,18 @@ function useSubmit(
     const fd = new FormData(e.currentTarget);
     const nome = String(fd.get("nome") ?? "").trim().split(" ")[0];
     start(async () => {
-      const res = await action(fd);
-      if (res?.error) toast.error(res.error);
-      else {
-        toast.success(okMsg(nome));
-        // cadastro salvo mas a foto não subiu → aviso separado, não erro
-        if (res?.aviso) toast.warning(res.aviso);
-        close();
-        router.refresh();
+      try {
+        const res = await action(fd);
+        if (res?.error) toast.error(res.error);
+        else {
+          toast.success(okMsg(nome));
+          // cadastro salvo mas a foto não subiu → aviso separado, não erro
+          if (res?.aviso) toast.warning(res.aviso);
+          close();
+          router.refresh();
+        }
+      } catch {
+        toast.error("Sem conexão. Tente de novo.");
       }
     });
   };
@@ -99,7 +104,7 @@ export function PessoasMaisAcoes() {
           </DropdownMenuItem>
           <DropdownMenuItem
             render={<a href="/api/export?tipo=assinaturas" />}
-            title="Planilha das assinaturas — status, evidências e link do PDF. Aceita ?status= e ?documento= na URL"
+            title="Planilha das assinaturas: status, evidências e link do PDF. Aceita ?status= e ?documento= na URL"
           >
             <DownloadSimple /> Exportar assinaturas (CSV)
           </DropdownMenuItem>
@@ -118,27 +123,13 @@ export function NovaPessoaDialog() {
   const { submit, pending } = useSubmit(createPessoa, (n) => `Cadastro de ${n} salvo.`, () => setOpen(false));
   const ehMentor = role === "mentor_dpp" || role === "mentor_especialista";
 
-  return (
-    <Dialog
-      open={open}
-      // os controlados (chips/grade/papel) sobrevivem ao fechar — reabrir
-      // mostraria o cadastro anterior; reseta sempre que o dialog abre
-      onOpenChange={(o) => {
-        setOpen(o);
-        if (o) {
-          setRole("mentor_dpp");
-          setInteresses([]);
-          setDisponibilidade(null);
-        }
-      }}
-    >
-      <DialogTrigger render={<Button size="sm"><UserPlus size={16} /> Nova pessoa</Button>} />
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>Cadastrar pessoa</DialogTitle>
-        </DialogHeader>
-        <form onSubmit={submit} className="space-y-4">
-          <SecaoFicha>Identificação</SecaoFicha>
+  // um passo por SecaoFicha — a parede de campos virava um scroll só; a
+  // "Ficha de mentor" entra/sai com o papel escolhido no passo 1
+  const passos: PassoFicha[] = [
+    {
+      titulo: "Identificação",
+      conteudo: (
+        <>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="nome">Nome civil</Label>
@@ -180,8 +171,13 @@ export function NovaPessoaDialog() {
               </Select>
             </div>
           </div>
-
-          <SecaoFicha>Localização e perfil</SecaoFicha>
+        </>
+      ),
+    },
+    {
+      titulo: "Localização e perfil",
+      conteudo: (
+        <>
           <div className="grid gap-4 sm:grid-cols-3">
             <div className="space-y-2 sm:col-span-2">
               <Label htmlFor="n_cidade">Cidade</Label>
@@ -190,8 +186,13 @@ export function NovaPessoaDialog() {
             <CampoUf />
           </div>
           <CampoInteresses value={interesses} onChange={setInteresses} />
-
-          <SecaoFicha>Trabalho e origem</SecaoFicha>
+        </>
+      ),
+    },
+    {
+      titulo: "Trabalho e origem",
+      conteudo: (
+        <>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="n_cargo">Cargo</Label>
@@ -206,17 +207,26 @@ export function NovaPessoaDialog() {
             <Label htmlFor="n_origem">Como chegou ao programa</Label>
             <Input id="n_origem" name="origem" maxLength={300} placeholder="Indicação, ONG parceira, rede social…" />
           </div>
-
-          <SecaoFicha>Motivação e pareamento</SecaoFicha>
+        </>
+      ),
+    },
+    {
+      titulo: "Motivação e pareamento",
+      conteudo: (
+        <>
           <div className="space-y-2">
             <Label htmlFor="n_motivacao">Motivação</Label>
             <Textarea id="n_motivacao" name="motivacao" rows={2} maxLength={2000} placeholder="O que traz a pessoa ao programa" />
           </div>
           <CampoPrefGenero />
-
-          {ehMentor && (
+        </>
+      ),
+    },
+    ...(ehMentor
+      ? [{
+          titulo: "Ficha de mentor",
+          conteudo: (
             <>
-              <SecaoFicha>Ficha de mentor</SecaoFicha>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="n_cap">Capacidade (duplas)</Label>
@@ -233,30 +243,60 @@ export function NovaPessoaDialog() {
                 <Textarea id="n_form" name="formacao_externa" rows={2} maxLength={2000} placeholder="Cursos e certificações relevantes" />
               </div>
             </>
-          )}
-
-          <SecaoFicha>Documentos (termo de adesão)</SecaoFicha>
+          ),
+        }]
+      : []),
+    {
+      titulo: "Documentos (termo de adesão)",
+      conteudo: (
+        <>
           <DadosCivisFields prefix="civis_" opcional compacto />
           <p className="text-xs text-muted-foreground">
-            RG, CPF e endereço preenchem o termo de adesão automaticamente — a pessoa só confere e assina.
+            RG, CPF e endereço preenchem o termo de adesão automaticamente: a pessoa só confere e assina.
           </p>
-
-          <SecaoFicha>Foto e consentimento</SecaoFicha>
+        </>
+      ),
+    },
+    {
+      titulo: "Foto e consentimento",
+      conteudo: (
+        <>
           <FotoField id="foto" />
           <CampoConsentimento />
-
           <p className="text-xs text-muted-foreground">
             A pessoa entra com o e-mail por link de acesso; o papel define o que ela vê e pode ser alterado depois na lista.
             Nascimento, gênero, cor/raça, motivação e preferência de par ficam visíveis só pra coordenação.
           </p>
-          {/* barra sticky — o Cadastrar ficava no fim do scroll interno do
-              dialog; colada ao rodapé fica à mão com o form rolado ao meio */}
-          <div className="sticky bottom-0 -mx-4 -mb-4 border-t bg-popover px-4 py-3">
-            <Button type="submit" className="w-full" disabled={pending}>
-              {pending ? "Salvando…" : "Cadastrar"}
-            </Button>
-          </div>
-        </form>
+        </>
+      ),
+    },
+  ];
+
+  return (
+    <Dialog
+      open={open}
+      // os controlados (chips/grade/papel) sobrevivem ao fechar — reabrir
+      // mostraria o cadastro anterior; reseta sempre que o dialog abre
+      onOpenChange={(o) => {
+        setOpen(o);
+        if (o) {
+          setRole("mentor_dpp");
+          setInteresses([]);
+          setDisponibilidade(null);
+        }
+      }}
+    >
+      <DialogTrigger render={<Button size="sm"><UserPlus size={16} /> Nova pessoa</Button>} />
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Cadastrar pessoa</DialogTitle>
+        </DialogHeader>
+        <WizardFicha
+          passos={passos}
+          pending={pending}
+          submitLabel="Cadastrar"
+          onSubmit={submit}
+        />
       </DialogContent>
     </Dialog>
   );
@@ -268,26 +308,12 @@ export function NovoMentoradoDialog() {
   const [disponibilidade, setDisponibilidade] = useState<Disponibilidade | null>(null);
   const { submit, pending } = useSubmit(createMentorado, (n) => `Cadastro de ${n} salvo.`, () => setOpen(false));
 
-  return (
-    <Dialog
-      open={open}
-      // mesma razão do NovaPessoaDialog: as chips de interesses são
-      // controladas e não podem vazar pro próximo cadastro
-      onOpenChange={(o) => {
-        setOpen(o);
-        if (o) {
-          setInteresses([]);
-          setDisponibilidade(null);
-        }
-      }}
-    >
-      <DialogTrigger render={<Button size="sm" variant="outline"><Plus size={16} /> Novo mentorado</Button>} />
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>Cadastrar mentorado</DialogTitle>
-        </DialogHeader>
-        <form onSubmit={submit} className="space-y-4">
-          <SecaoFicha>Identificação</SecaoFicha>
+  // um passo por SecaoFicha — o form tinha 9 seções seguidas de scroll
+  const passos: PassoFicha[] = [
+    {
+      titulo: "Identificação",
+      conteudo: (
+        <>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="m_nome">Nome civil</Label>
@@ -312,8 +338,13 @@ export function NovoMentoradoDialog() {
             <CampoNascimento id="m_nasc" />
             <CampoGenero />
           </div>
-
-          <SecaoFicha>Onde vive e origem</SecaoFicha>
+        </>
+      ),
+    },
+    {
+      titulo: "Onde vive e origem",
+      conteudo: (
+        <>
           <div className="grid gap-4 sm:grid-cols-3">
             <div className="space-y-2 sm:col-span-2">
               <Label htmlFor="m_cidade">Cidade</Label>
@@ -332,8 +363,13 @@ export function NovoMentoradoDialog() {
             </div>
           </div>
           <CampoEscolaridade />
-
-          <SecaoFicha>Interesses e objetivos</SecaoFicha>
+        </>
+      ),
+    },
+    {
+      titulo: "Interesses e objetivos",
+      conteudo: (
+        <>
           <CampoInteresses value={interesses} onChange={setInteresses} />
           <div className="space-y-2">
             <Label htmlFor="m_objetivos">Objetivos com a mentoria</Label>
@@ -344,40 +380,79 @@ export function NovoMentoradoDialog() {
             <Textarea id="m_motivacao" name="motivacao" rows={2} maxLength={2000} placeholder="O que motiva a participação" />
           </div>
           <CampoPrefGenero />
-
-          <SecaoFicha>Disponibilidade semanal</SecaoFicha>
-          <CampoDisponibilidade value={disponibilidade} onChange={setDisponibilidade} />
-
-          <SecaoFicha>Documentos do(a) jovem (termo de participação)</SecaoFicha>
+        </>
+      ),
+    },
+    {
+      titulo: "Disponibilidade semanal",
+      conteudo: (
+        <CampoDisponibilidade value={disponibilidade} onChange={setDisponibilidade} />
+      ),
+    },
+    {
+      titulo: "Documentos do(a) jovem (termo de participação)",
+      conteudo: (
+        <>
           <DadosCivisFields prefix="civis_" opcional compacto />
           <p className="text-xs text-muted-foreground">
-            Preenchem o termo de participação — o(a) jovem assina por link, sem precisar de conta.
+            Preenchem o termo de participação: o(a) jovem assina por link, sem precisar de conta.
           </p>
-
-          <SecaoFicha>Responsável legal (autorização de menor)</SecaoFicha>
+        </>
+      ),
+    },
+    {
+      titulo: "Responsável legal (autorização de menor)",
+      conteudo: (
+        <>
           <div className="space-y-2">
             <Label htmlFor="m_parentesco">Parentesco com o(a) jovem</Label>
             <Input id="m_parentesco" name="resp_parentesco" maxLength={60} placeholder="mãe, pai, avó, tio…" />
           </div>
           <DadosCivisFields prefix="resp_" opcional />
-
-          <SecaoFicha>Anamnese e foto</SecaoFicha>
+        </>
+      ),
+    },
+    {
+      titulo: "Anamnese e foto",
+      conteudo: (
+        <>
           <div className="space-y-2">
             <Label htmlFor="m_notas">Notas / referência da anamnese</Label>
             <Textarea id="m_notas" name="notas" rows={2} />
           </div>
           <FotoField id="m_foto" />
-
           <p className="text-xs text-muted-foreground">
             Nascimento, gênero, cor/raça, motivação e preferência de par ficam visíveis só pra coordenação.
           </p>
-          {/* mesma barra sticky do cadastro de pessoa */}
-          <div className="sticky bottom-0 -mx-4 -mb-4 border-t bg-popover px-4 py-3">
-            <Button type="submit" className="w-full" disabled={pending}>
-              {pending ? "Salvando…" : "Cadastrar"}
-            </Button>
-          </div>
-        </form>
+        </>
+      ),
+    },
+  ];
+
+  return (
+    <Dialog
+      open={open}
+      // mesma razão do NovaPessoaDialog: as chips de interesses são
+      // controladas e não podem vazar pro próximo cadastro
+      onOpenChange={(o) => {
+        setOpen(o);
+        if (o) {
+          setInteresses([]);
+          setDisponibilidade(null);
+        }
+      }}
+    >
+      <DialogTrigger render={<Button size="sm" variant="outline"><Plus size={16} /> Novo mentorado</Button>} />
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Cadastrar mentorado</DialogTitle>
+        </DialogHeader>
+        <WizardFicha
+          passos={passos}
+          pending={pending}
+          submitLabel="Cadastrar"
+          onSubmit={submit}
+        />
       </DialogContent>
     </Dialog>
   );

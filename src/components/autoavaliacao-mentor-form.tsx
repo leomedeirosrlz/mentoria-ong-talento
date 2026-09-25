@@ -39,11 +39,11 @@ export function AutoavaliacaoMentorForm({
           toast.error(res.error);
           return;
         }
-        toast.success("Autoavaliação registrada — a coordenação já vê.");
+        toast.success("Autoavaliação registrada. A coordenação já vê.");
         setEditando(false);
         router.refresh();
       } catch {
-        toast.error("Sem conexão — tente de novo.");
+        toast.error("Sem conexão. Tente de novo.");
       }
     });
   }
@@ -104,8 +104,8 @@ export function AutoavaliacaoMentorForm({
           placeholder="O que funcionou e o que você faria diferente? O que aprendeu com o jovem?"
         />
         <p className="text-xs text-muted-foreground">
-          Vale o que funcionou, o que você mudaria e o que o jovem te ensinou —
-          entra no fechamento do ciclo junto da avaliação 360º.
+          Vale o que funcionou, o que você mudaria e o que o jovem te ensinou.
+          Entra no fechamento do ciclo junto da avaliação 360º.
         </p>
       </div>
       <label className="flex cursor-pointer items-start gap-2.5 rounded-lg bg-muted/40 px-3 py-2.5 text-sm transition-colors hover:bg-muted/70">

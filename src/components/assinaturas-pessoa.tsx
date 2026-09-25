@@ -81,14 +81,14 @@ const STATUS: Record<
 /** Mesma guarda do CopiarResumoButton — clipboard API some em http/insecure. */
 async function copiar(texto: string, sucesso: string) {
   if (!navigator.clipboard?.writeText) {
-    toast.error("Não foi possível copiar — selecione e copie manualmente.");
+    toast.error("Não foi possível copiar. Selecione e copie manualmente.");
     return;
   }
   try {
     await navigator.clipboard.writeText(texto);
     toast.success(sucesso);
   } catch {
-    toast.error("Não foi possível copiar — selecione e copie manualmente.");
+    toast.error("Não foi possível copiar. Selecione e copie manualmente.");
   }
 }
 
@@ -128,10 +128,10 @@ function ContraAssinaturaDialog() {
           toast.error(res.error);
           return;
         }
-        toast.success("Contra-assinatura atualizada — vale nos próximos PDFs.");
+        toast.success("Contra-assinatura atualizada. Vale nos próximos PDFs.");
         setOpen(false);
       } catch {
-        toast.error("Sem conexão — tente de novo.");
+        toast.error("Sem conexão. Tente de novo.");
       }
     });
   }
@@ -163,7 +163,7 @@ function ContraAssinaturaDialog() {
           <DialogTitle>Contra-assinatura do presidente</DialogTitle>
           <DialogDescription className="leading-relaxed">
             A imagem sai em todos os termos de voluntário assinados. Subir de
-            novo substitui a atual — os PDFs já gerados continuam válidos.
+            novo substitui a atual. Os PDFs já gerados continuam válidos.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={submit} className="space-y-4">
@@ -288,12 +288,12 @@ export function AssinaturasPessoa({
         await copiar(
           `${origem}${res.link}`,
           whatsapp
-            ? "Link copiado — ou envie direto pelo botão WhatsApp abaixo."
-            : "Link copiado — envie ao responsável."
+            ? "Link copiado. Envie direto pelo botão WhatsApp abaixo."
+            : "Link copiado. Envie ao responsável."
         );
         await carregar();
       } catch {
-        toast.error("Sem conexão — tente de novo.");
+        toast.error("Sem conexão. Tente de novo.");
       }
     });
   }
@@ -309,11 +309,11 @@ export function AssinaturasPessoa({
       }
       await copiar(
         `${origem}${res.link}`,
-        "Novo link copiado — o anterior foi desativado."
+        "Novo link copiado. O anterior foi desativado."
       );
       await carregar();
     } catch {
-      toast.error("Sem conexão — tente de novo.");
+      toast.error("Sem conexão. Tente de novo.");
     } finally {
       setReenviando(null);
     }
@@ -430,7 +430,7 @@ export function AssinaturasPessoa({
                   {a.status === "pendente" && a.token_expira_em
                     ? ` · ${vencido ? "expirou" : "expira"} em ${fmtDia.format(new Date(a.token_expira_em))}`
                     : ""}
-                  {a.assinatura_texto ? ` — ${a.assinatura_texto}` : ""}
+                  {a.assinatura_texto ? ` · ${a.assinatura_texto}` : ""}
                 </p>
                 <div className="flex flex-wrap items-center gap-x-1 pl-4">
                   {terminal && tipo === "mentorado" && a.template?.slug && (
@@ -455,7 +455,7 @@ export function AssinaturasPessoa({
                         onClick={() =>
                           copiar(
                             `${origem}/assinar/${a.token}`,
-                            "Link copiado — envie ao responsável."
+                            "Link copiado. Envie ao responsável."
                           )
                         }
                       >
@@ -516,8 +516,8 @@ export function AssinaturasPessoa({
                   {!terminal && (
                     <ConfirmDeleteButton
                       titulo={`Revogar a assinatura de ${primeiroNome}?`}
-                      descricao={`"${a.template?.titulo ?? "Documento"}" fica marcada como revogada — ${
-                        tipo === "mentorado" ? "o responsável" : "a pessoa"
+                      descricao={`"${a.template?.titulo ?? "Documento"}" fica marcada como revogada. ${
+                        tipo === "mentorado" ? "O responsável" : "A pessoa"
                       } precisa assinar de novo pra regularizar.`}
                       sucesso="Assinatura revogada."
                       acao="Revogar"

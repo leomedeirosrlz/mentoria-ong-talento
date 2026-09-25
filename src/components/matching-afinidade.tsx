@@ -69,7 +69,7 @@ function alertaGenero(
   if (!g || g === "prefiro_nao_dizer") {
     return {
       nivel: "info",
-      texto: `${nomeQuem} prefere ${rotulo} — ${nomeOutro} ${
+      texto: `${nomeQuem} prefere ${rotulo}. ${nomeOutro} ${
         g === "prefiro_nao_dizer"
           ? "preferiu não informar o gênero"
           : "não informou o gênero"
@@ -79,7 +79,7 @@ function alertaGenero(
   if (g !== pref) {
     return {
       nivel: "alerta",
-      texto: `${nomeQuem} prefere ${rotulo} — ${nomeOutro} se cadastrou com gênero “${GENERO_LABELS[g].toLocaleLowerCase("pt-BR")}”.`,
+      texto: `${nomeQuem} prefere ${rotulo}. ${nomeOutro} se cadastrou com gênero “${GENERO_LABELS[g].toLocaleLowerCase("pt-BR")}”.`,
     };
   }
   return null;
@@ -132,7 +132,7 @@ export function AfinidadePar({
     anos != null && anos < 18
       ? {
           nivel: "alerta" as const,
-          texto: `${primeiroNome(mentorado.nome)} tem ${anos} anos — menor: a autorização do responsável precisa estar assinada.`,
+          texto: `${primeiroNome(mentorado.nome)} tem ${anos} anos. Menor: a autorização do responsável precisa estar assinada.`,
         }
       : null,
   ].filter((a): a is Alerta => a !== null);
@@ -197,8 +197,8 @@ export function AfinidadePar({
           <p className="text-[11px] font-medium text-muted-foreground">
             Interesses
             {comuns.size
-              ? ` — ${comuns.size} em comum`
-              : " — nenhum em comum"}
+              ? ` · ${comuns.size} em comum`
+              : " · nenhum em comum"}
           </p>
           <div className="space-y-1">
             {(
@@ -239,7 +239,7 @@ export function AfinidadePar({
           <p>Mentor: {agendaTxt}</p>
         ) : (
           <p className="text-muted-foreground">
-            Agenda do mentor não informada — confirme antes de formar.
+            Agenda do mentor não informada. Confirme antes de formar.
           </p>
         )}
         {mentor.trilha === "dpp" && agendaTxt ? (
@@ -251,7 +251,7 @@ export function AfinidadePar({
           ) : (
             <p className="flex items-start gap-1.5 text-[var(--warn-text)]">
               <Warning size={12} aria-hidden className="mt-0.5 shrink-0" />
-              Grade sem terça — os encontros do DPP são às terças.
+              Grade sem terça. Os encontros do DPP são às terças.
             </p>
           )
         ) : null}
@@ -269,7 +269,7 @@ export function AfinidadePar({
                   <Check size={12} weight="bold" aria-hidden />
                   Coincidem em{" "}
                   {diasComuns.map((d) => DIAS_SEMANA_LABELS[d]).join(", ")}{" "}
-                  —{" "}
+                  ·{" "}
                   {periodosComuns
                     .map((p) => PERIODOS_LABELS[p])
                     .join(", ")}
@@ -278,14 +278,14 @@ export function AfinidadePar({
               ) : (
                 <p className="flex items-start gap-1.5 text-[var(--warn-text)]">
                   <Warning size={12} aria-hidden className="mt-0.5 shrink-0" />
-                  Sem sobreposição de dia e período — confirme a agenda dos
+                  Sem sobreposição de dia e período. Confirme a agenda dos
                   dois antes de formar.
                 </p>
               ))}
           </>
         ) : (
           <p className="text-muted-foreground">
-            Agenda do jovem não informada — a grade dele pode ser preenchida
+            Agenda do jovem não informada. A grade dele pode ser preenchida
             na ficha do mentorado.
           </p>
         )}
@@ -296,7 +296,7 @@ export function AfinidadePar({
           {mentorado.motivacao && (
             <div>
               <dt className="font-medium text-muted-foreground">
-                Motivação — {primeiroNome(mentorado.nome)}
+                Motivação · {primeiroNome(mentorado.nome)}
               </dt>
               <dd
                 className="mt-0.5 line-clamp-4 text-muted-foreground"
@@ -320,7 +320,7 @@ export function AfinidadePar({
           {mentor.motivacao && (
             <div>
               <dt className="font-medium text-muted-foreground">
-                Motivação — {primeiroNome(mentor.nome)}
+                Motivação · {primeiroNome(mentor.nome)}
               </dt>
               <dd
                 className="mt-0.5 line-clamp-4 text-muted-foreground"

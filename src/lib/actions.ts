@@ -65,17 +65,17 @@ async function subirFoto(
   const foto = formData.get("foto");
   if (!(foto instanceof File) || foto.size === 0) return {};
   if (!FOTO_TIPOS.includes(foto.type)) {
-    return { aviso: "A foto não entrou — use PNG, JPG ou WebP." };
+    return { aviso: "A foto não entrou. Use PNG, JPG ou WebP." };
   }
   if (foto.size > FOTO_MAX) {
-    return { aviso: "A foto não entrou — use uma imagem de até 2 MB." };
+    return { aviso: "A foto não entrou. Use uma imagem de até 2 MB." };
   }
   const ext = foto.name.split(".").pop()?.toLowerCase() ?? "png";
   const path = `${pasta}/${crypto.randomUUID()}.${ext}`;
   const { error } = await supabase.storage
     .from("avatares")
     .upload(path, foto, { contentType: foto.type });
-  if (error) return { aviso: "Cadastro salvo, mas a foto não subiu — tente na edição." };
+  if (error) return { aviso: "Cadastro salvo, mas a foto não subiu. Tente na edição." };
   return { path };
 }
 
@@ -140,7 +140,7 @@ function camposApresentacao(
     const linkedin = String(formData.get("linkedin") ?? "").trim() || null;
     // case-sensitive de propósito — o CHECK profiles_linkedin_http (0030) é `~`
     if (linkedin && !/^https?:\/\//.test(linkedin)) {
-      return { error: "Confira o link do LinkedIn — precisa começar com http:// ou https://." };
+      return { error: "Confira o link do LinkedIn: precisa começar com http:// ou https://." };
     }
     out.linkedin = linkedin;
   }
@@ -287,7 +287,7 @@ function parseCivis(
     (!deFicha && (dados.nome_civil || endereco.cidade || dados.data_nascimento));
   if (!temAlgo) return null;
   if (dados.cpf && !cpfValido(dados.cpf))
-    return { error: `CPF inválido${prefix ? " (responsável)" : ""} — confira os dígitos.` };
+    return { error: `CPF inválido${prefix ? " (responsável)" : ""}. Confira os dígitos.` };
   if (endereco.cep && endereco.cep.length !== 8)
     return { error: `CEP inválido${prefix ? " (responsável)" : ""}.` };
   return dados;
@@ -472,7 +472,7 @@ function consentPatch(
 export async function createPessoa(formData: FormData) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
-  if (!eu) return { error: "Sessão expirada — entre de novo." };
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
   const role = String(formData.get("role") ?? "");
   const nome = String(formData.get("nome") ?? "").trim();
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
@@ -480,7 +480,7 @@ export async function createPessoa(formData: FormData) {
   const whatsapp = normWhatsapp(whatsappRaw);
   if (!nome || !email) return { error: "Nome e e-mail são obrigatórios." };
   if (!emailValido(email)) return { error: "Confira o e-mail." };
-  if (whatsappRaw.trim() && !whatsapp) return { error: "Confira o WhatsApp — use DDD e o número completo." };
+  if (whatsappRaw.trim() && !whatsapp) return { error: "Confira o WhatsApp: use DDD e o número completo." };
   if (!(ROLES as readonly string[]).includes(role)) return { error: "Escolha um papel válido." };
   const ficha = camposFicha(formData, { de: "pessoa" });
   if ("error" in ficha) return { error: ficha.error };
@@ -507,7 +507,7 @@ export async function createPessoa(formData: FormData) {
   if (foto.path) {
     const { error: avErr } = await supabase
       .from("profiles").update({ avatar_path: foto.path }).eq("id", profile.id);
-    if (avErr) aviso = "Cadastro salvo, mas a foto não subiu — tente na edição.";
+    if (avErr) aviso = "Cadastro salvo, mas a foto não subiu. Tente na edição.";
   } else {
     aviso = foto.aviso;
   }
@@ -535,7 +535,7 @@ export async function createPessoa(formData: FormData) {
 export async function createMentorado(formData: FormData) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
-  if (!eu) return { error: "Sessão expirada — entre de novo." };
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
   const nome = normNome(String(formData.get("nome") ?? ""));
   if (!nome) return { error: "Nome é obrigatório." };
   const email = normEmail(String(formData.get("email") ?? ""));
@@ -543,7 +543,7 @@ export async function createMentorado(formData: FormData) {
   // lixo digitado não pode zerar o campo silenciosamente
   const whatsappRaw = String(formData.get("whatsapp") ?? "");
   const whatsapp = normWhatsapp(whatsappRaw);
-  if (whatsappRaw.trim() && !whatsapp) return { error: "Confira o WhatsApp — use DDD e o número completo." };
+  if (whatsappRaw.trim() && !whatsapp) return { error: "Confira o WhatsApp: use DDD e o número completo." };
   const ficha = camposFicha(formData, { de: "mentorado" });
   if ("error" in ficha) return { error: ficha.error };
   const { data: mentorado, error } = await supabase.from("mentorados").insert({
@@ -561,7 +561,7 @@ export async function createMentorado(formData: FormData) {
   if (foto.path) {
     const { error: avErr } = await supabase
       .from("mentorados").update({ avatar_path: foto.path }).eq("id", mentorado.id);
-    if (avErr) aviso = "Cadastro salvo, mas a foto não subiu — tente na edição.";
+    if (avErr) aviso = "Cadastro salvo, mas a foto não subiu. Tente na edição.";
   } else {
     aviso = foto.aviso;
   }
@@ -586,7 +586,7 @@ async function dadosCiclos(supabase: Supa) {
 export async function createDupla(formData: FormData) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
-  if (!eu) return { error: "Sessão expirada — entre de novo." };
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
   const mentor_id = String(formData.get("mentor_id") ?? "");
   const mentorado_id = String(formData.get("mentorado_id") ?? "");
   const supervisor_id = String(formData.get("supervisor_id") || "") || null;
@@ -689,14 +689,14 @@ export async function createDupla(formData: FormData) {
       profile_id: mentor_id,
       tipo: "dupla_formada",
       titulo: "Sua dupla foi formada",
-      corpo: md?.nome ? `Você e ${md.nome} — combinem o 1º encontro.` : null,
+      corpo: md?.nome ? `Você e ${md.nome}: combinem o 1º encontro.` : null,
       href: hrefDupla,
     },
     {
       profile_id: supervisorFinal,
       tipo: "dupla_formada",
       titulo: "Nova dupla sob sua supervisão",
-      corpo: md?.nome ? `${md.nome} — acompanhe a ficha da dupla.` : null,
+      corpo: md?.nome ? `${md.nome}: acompanhe a ficha da dupla.` : null,
       href: hrefDupla,
     },
   ], eu.id);
@@ -708,7 +708,7 @@ export async function createDupla(formData: FormData) {
 export async function setPessoaRole(profileId: string, role: string | null) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
-  if (!eu) return { error: "Sessão expirada — entre de novo." };
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
   if (profileId === eu.id) {
     return { error: "Não é possível alterar o próprio cadastro." };
   }
@@ -725,7 +725,7 @@ export async function setPessoaRole(profileId: string, role: string | null) {
   if (vinculos?.length) {
     return {
       error:
-        "A pessoa está em uma dupla ativa ou pausada — pause, encerre ou reatribua a dupla antes de mudar o papel.",
+        "A pessoa está em uma dupla ativa ou pausada. Pause, encerre ou reatribua a dupla antes de mudar o papel.",
     };
   }
   const { data, error } = await supabase
@@ -761,14 +761,14 @@ export async function setPessoaRole(profileId: string, role: string | null) {
 export async function updatePessoa(profileId: string, formData: FormData) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
-  if (!eu) return { error: "Sessão expirada — entre de novo." };
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
   const nome = normNome(String(formData.get("nome") ?? ""));
   const whatsappRaw = String(formData.get("whatsapp") ?? "");
   const whatsapp = normWhatsapp(whatsappRaw);
   const email = normEmail(String(formData.get("email") ?? ""));
   if (!nome) return { error: "Nome é obrigatório." };
   // lixo digitado não pode zerar o campo silenciosamente
-  if (whatsappRaw.trim() && !whatsapp) return { error: "Confira o WhatsApp — use DDD e o número completo." };
+  if (whatsappRaw.trim() && !whatsapp) return { error: "Confira o WhatsApp: use DDD e o número completo." };
   if (email && !emailValido(email)) return { error: "Confira o e-mail." };
   // valida antes de qualquer escrita — "abc" virava NaN e 0 gravava;
   // campo presente mas apagado não pode virar 1 silenciosamente
@@ -820,7 +820,7 @@ export async function updatePessoa(profileId: string, formData: FormData) {
     const { error: avErr } = await supabase
       .from("profiles").update({ avatar_path: foto.path }).eq("id", profileId);
     if (avErr) {
-      aviso = "Dados salvos, mas a foto não subiu — tente de novo.";
+      aviso = "Dados salvos, mas a foto não subiu. Tente de novo.";
     } else if (atualAv?.avatar_path) {
       await supabase.storage.from("avatares").remove([atualAv.avatar_path]);
     }
@@ -852,7 +852,7 @@ export async function updatePessoa(profileId: string, formData: FormData) {
 export async function setPessoaAtivo(profileId: string, ativo: boolean, forcar = false) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
-  if (!eu) return { error: "Sessão expirada — entre de novo." };
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
   if (profileId === eu.id) {
     return { error: "Não é possível alterar o próprio cadastro." };
   }
@@ -880,7 +880,7 @@ export async function setPessoaAtivo(profileId: string, ativo: boolean, forcar =
 export async function deletePessoa(profileId: string) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
-  if (!eu) return { error: "Sessão expirada — entre de novo." };
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
   const { data: duplas } = await supabase
     .from("duplas").select("id")
     .or(`mentor_id.eq.${profileId},supervisor_id.eq.${profileId}`).limit(1);
@@ -921,7 +921,7 @@ export async function deletePessoa(profileId: string) {
 export async function updateMentorado(id: string, formData: FormData) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
-  if (!eu) return { error: "Sessão expirada — entre de novo." };
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
   const nome = normNome(String(formData.get("nome") ?? ""));
   const email = normEmail(String(formData.get("email") ?? ""));
   if (!nome) return { error: "Nome é obrigatório." };
@@ -929,7 +929,7 @@ export async function updateMentorado(id: string, formData: FormData) {
   // lixo digitado não pode zerar o campo silenciosamente
   const whatsappRaw = String(formData.get("whatsapp") ?? "");
   const whatsapp = normWhatsapp(whatsappRaw);
-  if (whatsappRaw.trim() && !whatsapp) return { error: "Confira o WhatsApp — use DDD e o número completo." };
+  if (whatsappRaw.trim() && !whatsapp) return { error: "Confira o WhatsApp: use DDD e o número completo." };
   const ficha = camposFicha(formData, { de: "mentorado" });
   if ("error" in ficha) return { error: ficha.error };
   const { data, error } = await supabase.from("mentorados").update({
@@ -954,7 +954,7 @@ export async function updateMentorado(id: string, formData: FormData) {
     const { error: avErr } = await supabase
       .from("mentorados").update({ avatar_path: foto.path }).eq("id", id);
     if (avErr) {
-      aviso = "Dados salvos, mas a foto não subiu — tente de novo.";
+      aviso = "Dados salvos, mas a foto não subiu. Tente de novo.";
     } else if (atual?.avatar_path) {
       await supabase.storage.from("avatares").remove([atual.avatar_path]);
     }
@@ -969,7 +969,7 @@ export async function updateMentorado(id: string, formData: FormData) {
 export async function deleteMentorado(id: string) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
-  if (!eu) return { error: "Sessão expirada — entre de novo." };
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
   const { data: duplas } = await supabase
     .from("duplas").select("id").eq("mentorado_id", id).limit(1);
   if (duplas?.length)
@@ -999,7 +999,7 @@ export async function deleteMentorado(id: string) {
 export async function updateDupla(duplaId: string, formData: FormData) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
-  if (!eu) return { error: "Sessão expirada — entre de novo." };
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
   const mentor_id = String(formData.get("mentor_id") ?? "");
   const mentorado_id = String(formData.get("mentorado_id") ?? "");
   const supervisor_id = String(formData.get("supervisor_id") || "") || null;
@@ -1053,7 +1053,7 @@ export async function updateDupla(duplaId: string, formData: FormData) {
       .select("id", { count: "exact", head: true })
       .eq("dupla_id", duplaId);
     if ((count ?? 0) > 0) {
-      return { error: "O tipo de mentoria não pode mudar — a dupla já tem encontros." };
+      return { error: "O tipo de mentoria não pode mudar: a dupla já tem encontros." };
     }
   }
   // dupla de especialista não tem supervisor — null forçado, nunca confia no form
@@ -1142,14 +1142,14 @@ export async function updateDupla(duplaId: string, formData: FormData) {
         profile_id: mentor_id,
         tipo: "dupla_formada",
         titulo: "Você assumiu uma dupla",
-        corpo: nomeMd ? `Você e ${nomeMd} — vejam onde a jornada está.` : null,
+        corpo: nomeMd ? `Você e ${nomeMd}: vejam onde a jornada está.` : null,
         href: `/duplas/${duplaId}`,
       } : null,
       supervisorFinal && supervisorFinal !== atualDupla.supervisor_id ? {
         profile_id: supervisorFinal,
         tipo: "dupla_formada",
         titulo: "Nova dupla sob sua supervisão",
-        corpo: nomeMd ? `${nomeMd} — acompanhe a ficha da dupla.` : null,
+        corpo: nomeMd ? `${nomeMd}: acompanhe a ficha da dupla.` : null,
         href: `/duplas/${duplaId}`,
       } : null,
       // quem sai não enxerga mais a ficha (RLS) — link cai na home, não no 404
@@ -1158,7 +1158,7 @@ export async function updateDupla(duplaId: string, formData: FormData) {
         tipo: "dupla_formada",
         titulo: "Sua dupla mudou de mentor",
         corpo: nomeMd
-          ? `A dupla com ${nomeMd} segue com outro mentor — a coordenação reorganizou as duplas.`
+          ? `A dupla com ${nomeMd} segue com outro mentor. A coordenação reorganizou as duplas.`
           : "A coordenação reorganizou as duplas.",
         href: "/",
       } : null,
@@ -1180,7 +1180,7 @@ export async function updateDupla(duplaId: string, formData: FormData) {
             : status === "concluida"
               ? "Sua dupla concluiu a jornada"
               : "Sua dupla foi encerrada",
-        corpo: "A coordenação atualizou a sua dupla — fale com ela se tiver dúvidas.",
+        corpo: "A coordenação atualizou a sua dupla. Fale com ela se tiver dúvidas.",
         href: `/duplas/${duplaId}`,
       } : null,
       mudouStatus && supervisorFinal ? {
@@ -1192,7 +1192,7 @@ export async function updateDupla(duplaId: string, formData: FormData) {
             : status === "concluida"
               ? "Dupla supervisionada concluída"
               : "Dupla supervisionada encerrada",
-        corpo: nomeMd ? `A dupla com ${nomeMd} — a coordenação fez a alteração.` : null,
+        corpo: nomeMd ? `A dupla com ${nomeMd}: a coordenação fez a alteração.` : null,
         href: `/duplas/${duplaId}`,
       } : null,
     ].filter((r): r is NonNullable<typeof r> => r !== null), eu.id);
@@ -1206,7 +1206,7 @@ export async function updateDupla(duplaId: string, formData: FormData) {
 export async function deleteDupla(duplaId: string) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
-  if (!eu) return { error: "Sessão expirada — entre de novo." };
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
   // a cascata leva encontros→registros→registro_anexos (rows), mas os OBJETOS
   // do bucket não seguem o cascade — e a policy de delete do storage exige a
   // row do anexo existir, então a ordem é arquivo primeiro, row depois.
@@ -1226,7 +1226,7 @@ export async function deleteDupla(duplaId: string) {
   // deixaria objetos órfãos no bucket
   if (encErr || regErr || anxErr) {
     return {
-      error: "Não foi possível localizar os anexos da dupla — nada foi excluído. Tente de novo.",
+      error: "Não foi possível localizar os anexos da dupla. Nada foi excluído. Tente de novo.",
     };
   }
   const paths = (anx ?? []).map((a) => a.path).filter(Boolean);
@@ -1236,7 +1236,7 @@ export async function deleteDupla(duplaId: string) {
     if (stErr) {
       return {
         error:
-          "Não foi possível remover os anexos de evidência da dupla — nada foi excluído. Tente de novo.",
+          "Não foi possível remover os anexos de evidência da dupla. Nada foi excluído. Tente de novo.",
       };
     }
   }
@@ -1259,7 +1259,7 @@ export async function deleteDupla(duplaId: string) {
 export async function definirPdmUrl(duplaId: string, url: string) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
-  if (!eu) return { error: "Sessão expirada — entre de novo." };
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
   const u = (url ?? "").trim();
   if (u && !/^https:\/\/\S+$/i.test(u)) {
     return { error: "O link do PDM precisa ser um endereço completo (https://…)." };
@@ -1289,7 +1289,7 @@ export async function definirPdmUrl(duplaId: string, url: string) {
 export async function deleteMaterial(id: string) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
-  if (!eu) return { error: "Sessão expirada — entre de novo." };
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
   const { data, error } = await supabase
     .from("materiais").delete().eq("id", id).select("id");
   if (error) return { error: erroAmigavel(error) };
@@ -1309,10 +1309,10 @@ const MAX_IMPORT = 500;
 export async function importPessoas(rows: LinhaImportada[]) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
-  if (!eu) return { error: "Sessão expirada — entre de novo." };
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
   if (eu.role !== "coordenacao") return { error: "Só a coordenação importa cadastros." };
   if (rows.length > MAX_IMPORT) {
-    return { error: `O arquivo tem ${rows.length} linhas — importe em lotes de até ${MAX_IMPORT}.` };
+    return { error: `O arquivo tem ${rows.length} linhas. Importe em lotes de até ${MAX_IMPORT}.` };
   }
   // email saiu do grant de coluna de profiles (0026) — a view profiles_contato
   // devolve todas as linhas pra coordenação, que é quem chega até aqui
@@ -1410,10 +1410,10 @@ export async function importPessoas(rows: LinhaImportada[]) {
 export async function importMentorados(rows: LinhaImportada[]) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
-  if (!eu) return { error: "Sessão expirada — entre de novo." };
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
   if (eu.role !== "coordenacao") return { error: "Só a coordenação importa cadastros." };
   if (rows.length > MAX_IMPORT) {
-    return { error: `O arquivo tem ${rows.length} linhas — importe em lotes de até ${MAX_IMPORT}.` };
+    return { error: `O arquivo tem ${rows.length} linhas. Importe em lotes de até ${MAX_IMPORT}.` };
   }
   const { data: existentes } = await supabase.from("mentorados").select("nome, whatsapp");
   const nomes = new Set((existentes ?? []).map((m) => normNome(m.nome).toLowerCase()));
@@ -1480,11 +1480,11 @@ function parseDataHora(s: string): Date | null {
 export async function agendarEncontro(formData: FormData) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
-  if (!eu) return { error: "Sessão expirada — entre de novo." };
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
   // a regra "a dupla agenda" mora na action, não só na UI — a RLS deixaria
   // a coord escrever (policy larga pra correções), então o contrato é aqui
   if (eu.role === "coordenacao") {
-    return { error: "Quem agenda é a dupla — a coordenação acompanha o andamento." };
+    return { error: "Quem agenda é a dupla. A coordenação acompanha o andamento." };
   }
   const dupla_id = String(formData.get("dupla_id") ?? "");
   const numero = Number(formData.get("numero"));
@@ -1512,11 +1512,11 @@ export async function agendarEncontro(formData: FormData) {
   if (quando.getTime() <= Date.now()) {
     return {
       error: existente
-        ? "Essa data já passou — se o encontro aconteceu, registre como foi ou marque 'não aconteceu' na ficha da dupla."
-        : "Essa data já passou — use 'Registrar encontro já realizado' na ficha da dupla ou na agenda do dia.",
+        ? "Essa data já passou. Se o encontro aconteceu, registre como foi ou marque 'não aconteceu' na ficha da dupla."
+        : "Essa data já passou. Use 'Registrar encontro já realizado' na ficha da dupla ou na agenda do dia.",
     };
   }
-  if (link && !urlOk(link)) return { error: "Confira o link — precisa ser um endereço completo (https://…)." };
+  if (link && !urlOk(link)) return { error: "Confira o link: precisa ser um endereço completo (https://…)." };
   if (!(ORIGENS as readonly string[]).includes(origem)) return { error: "Não foi possível identificar a origem. Recarregue a página." };
 
   // teto de nº por trilha — especialista tem 5 passos próprios, sem ciclo_eventos
@@ -1577,7 +1577,7 @@ export async function agendarEncontro(formData: FormData) {
 export async function marcarNaoAconteceu(encontroId: string, duplaId: string) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
-  if (!eu) return { error: "Sessão expirada — entre de novo." };
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
   // só encontro já passado de dupla ativa — UI esconde o botão, a action garante
   const { data: enc } = await supabase
     .from("encontros").select("data_hora, duplas(status)").eq("id", encontroId).single();
@@ -1604,7 +1604,7 @@ export async function marcarNaoAconteceu(encontroId: string, duplaId: string) {
 export async function desfazerNaoAconteceu(encontroId: string, duplaId: string) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
-  if (!eu) return { error: "Sessão expirada — entre de novo." };
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
   const { data, error } = await supabase
     .from("encontros")
     .update({ status: "agendado" })
@@ -1632,9 +1632,9 @@ export async function registrarEncontroRetroativo(
 ): Promise<{ error?: string; ok?: boolean; encontroId?: string }> {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
-  if (!eu) return { error: "Sessão expirada — entre de novo." };
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
   if (eu.role === "coordenacao") {
-    return { error: "O registro é do mentor — a coordenação acompanha o andamento." };
+    return { error: "O registro é do mentor. A coordenação acompanha o andamento." };
   }
   if (!duplaId || !numero || !dataHora) return { error: "Encontro e data são obrigatórios." };
 
@@ -1709,9 +1709,9 @@ const DURACOES_MIN = [30, 45, 60, 90, 120] as const;
 export async function salvarRegistro(formData: FormData) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
-  if (!eu) return { error: "Sessão expirada — entre de novo." };
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
   if (eu.role === "coordenacao") {
-    return { error: "O registro é do mentor — a coordenação acompanha o andamento." };
+    return { error: "O registro é do mentor. A coordenação acompanha o andamento." };
   }
   const encontro_id = String(formData.get("encontro_id") ?? "");
   const dupla_id = String(formData.get("dupla_id") ?? "");
@@ -1724,7 +1724,7 @@ export async function salvarRegistro(formData: FormData) {
   if ((avaliacao && !(AVALIACOES as readonly string[]).includes(avaliacao)) ||
       (dificuldade && !(DIFICULDADES as readonly string[]).includes(dificuldade)) ||
       (proximoPasso && !(PROXIMOS_PASSOS as readonly string[]).includes(proximoPasso))) {
-    return { error: "Revise os campos — um dos valores não é válido." };
+    return { error: "Revise os campos: um dos valores não é válido." };
   }
 
   // duração real do encontro — o form manda sempre; grava junto com o
@@ -1732,7 +1732,7 @@ export async function salvarRegistro(formData: FormData) {
   const duracaoRaw = String(formData.get("duracao_min") ?? "").trim();
   const duracaoMin = Number(duracaoRaw);
   if (duracaoRaw && !(DURACOES_MIN as readonly number[]).includes(duracaoMin)) {
-    return { error: "Revise os campos — um dos valores não é válido." };
+    return { error: "Revise os campos: um dos valores não é válido." };
   }
 
   const { data: d } = await supabase.from("duplas").select("status").eq("id", dupla_id).single();
@@ -1883,7 +1883,7 @@ export async function salvarRegistro(formData: FormData) {
       profile_id: pid,
       tipo: "pedido_apoio",
       titulo: "Pedido de apoio",
-      corpo: `${eu.nome} sinalizou no registro do ${encDb.numero}º encontro${nomeMd ? ` — dupla com ${nomeMd}` : ""}.`,
+      corpo: `${eu.nome} sinalizou no registro do ${encDb.numero}º encontro${nomeMd ? ` · dupla com ${nomeMd}` : ""}.`,
       // deep-link direto no card do registro que pediu apoio
       href: `/duplas/${dupla_id}#registrar-${encontro_id}`,
     })), eu.id);
@@ -1905,7 +1905,7 @@ export async function salvarRegistro(formData: FormData) {
 export async function salvarNotaEncontro(duplaId: string, numero: number, texto: string) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
-  if (!eu) return { error: "Sessão expirada — entre de novo." };
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
   // a nota é o plano de aula do mentor — nem a coord escreve nela
   if (eu.role !== "mentor_dpp" && eu.role !== "mentor_especialista") {
     return { error: "A nota do encontro é do mentor da dupla." };
@@ -1964,7 +1964,7 @@ export async function addPessoaNota({
 }) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
-  if (!eu) return { error: "Sessão expirada — entre de novo." };
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
   const limpo = texto.trim();
   if (!limpo) return { error: "Escreva algo antes de publicar." };
   if (limpo.length > 10000) return { error: "Nota muito longa (máx. 10.000 caracteres)." };
@@ -1991,7 +1991,7 @@ export async function addPessoaNota({
 export async function deletePessoaNota(notaId: string, pessoaId: string) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
-  if (!eu) return { error: "Sessão expirada — entre de novo." };
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
   const { data, error } = await supabase
     .from("pessoa_notas").delete().eq("id", notaId).select("id");
   if (error) return { error: erroAmigavel(error) };
@@ -2005,7 +2005,7 @@ export async function deletePessoaNota(notaId: string, pessoaId: string) {
 export async function toggleEncaminhamento(id: string, feito: boolean, duplaId: string) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
-  if (!eu) return { error: "Sessão expirada — entre de novo." };
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
   const { data, error } = await supabase
     .from("encaminhamentos")
     .update({ status: feito ? "feito" : "pendente" })
@@ -2024,10 +2024,10 @@ export async function toggleEncaminhamento(id: string, feito: boolean, duplaId: 
 export async function editarEncaminhamento(id: string, duplaId: string, formData: FormData) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
-  if (!eu) return { error: "Sessão expirada — entre de novo." };
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
   // o texto do acordo é da dupla — a coord só marca feito (toggleEncaminhamento)
   if (eu.role === "coordenacao") {
-    return { error: "O combinado é da dupla — a coordenação só pode marcar como feito." };
+    return { error: "O combinado é da dupla. A coordenação só pode marcar como feito." };
   }
   const descricao = String(formData.get("descricao") ?? "").trim();
   const responsavel = String(formData.get("responsavel") ?? "mentorado");
@@ -2058,9 +2058,9 @@ export async function editarEncaminhamento(id: string, duplaId: string, formData
 export async function excluirEncaminhamento(id: string, duplaId: string) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
-  if (!eu) return { error: "Sessão expirada — entre de novo." };
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
   if (eu.role === "coordenacao") {
-    return { error: "O combinado é da dupla — a coordenação só pode marcar como feito." };
+    return { error: "O combinado é da dupla. A coordenação só pode marcar como feito." };
   }
   const { data, error } = await supabase
     .from("encaminhamentos").delete().eq("id", id).select("id");
@@ -2076,7 +2076,7 @@ export async function excluirEncaminhamento(id: string, duplaId: string) {
 export async function resolverApoio(registroId: string, duplaId: string) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
-  if (!eu) return { error: "Sessão expirada — entre de novo." };
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
   const { data, error } = await supabase
     .from("registros")
     .update({ precisa_apoio: false })
@@ -2114,22 +2114,22 @@ const MATERIAL_PATH_RE = /^materiais\/[0-9a-f-]{36}-[a-zA-Z0-9._-]+$/;
 export async function salvarMaterial(formData: FormData) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
-  if (!eu) return { error: "Sessão expirada — entre de novo." };
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
   const titulo = String(formData.get("titulo") ?? "").trim();
   if (!titulo) return { error: "Título é obrigatório." };
   const tipo = String(formData.get("tipo") || "link");
   const audiencia = String(formData.get("audiencia") || "todos");
   if (!(TIPOS_MATERIAL as readonly string[]).includes(tipo) ||
       !(AUDIENCIAS_MATERIAL as readonly string[]).includes(audiencia)) {
-    return { error: "Revise os campos — um dos valores não é válido." };
+    return { error: "Revise os campos: um dos valores não é válido." };
   }
   const url = String(formData.get("url") ?? "").trim() || null;
-  if (url && !urlOk(url)) return { error: "Confira o link — precisa ser um endereço completo (https://…)." };
+  if (url && !urlOk(url)) return { error: "Confira o link: precisa ser um endereço completo (https://…)." };
   // a row precisa nascer já com path: a policy de INSERT do storage exige a row
   // com path = name. Com path, o arquivo é o destino (a url fica de lado).
   const path = String(formData.get("path") ?? "").trim() || null;
   if (path && !MATERIAL_PATH_RE.test(path)) {
-    return { error: "Revise os campos — um dos valores não é válido." };
+    return { error: "Revise os campos: um dos valores não é válido." };
   }
   const encontroRaw = String(formData.get("encontro_num") ?? "").trim();
   const encontroNum = encontroRaw ? Number(encontroRaw) : null;
@@ -2170,17 +2170,17 @@ export async function salvarMaterial(formData: FormData) {
 export async function editarMaterial(id: string, formData: FormData) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
-  if (!eu) return { error: "Sessão expirada — entre de novo." };
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
   const titulo = String(formData.get("titulo") ?? "").trim();
   if (!titulo) return { error: "Título é obrigatório." };
   const tipo = String(formData.get("tipo") || "link");
   const audiencia = String(formData.get("audiencia") || "todos");
   if (!(TIPOS_MATERIAL as readonly string[]).includes(tipo) ||
       !(AUDIENCIAS_MATERIAL as readonly string[]).includes(audiencia)) {
-    return { error: "Revise os campos — um dos valores não é válido." };
+    return { error: "Revise os campos: um dos valores não é válido." };
   }
   const url = String(formData.get("url") ?? "").trim() || null;
-  if (url && !urlOk(url)) return { error: "Confira o link — precisa ser um endereço completo (https://…)." };
+  if (url && !urlOk(url)) return { error: "Confira o link: precisa ser um endereço completo (https://…)." };
   const encontroRaw = String(formData.get("encontro_num") ?? "").trim();
   const encontroNum = encontroRaw ? Number(encontroRaw) : null;
   const { data: maxEv } = await supabase
@@ -2221,9 +2221,9 @@ export async function editarMaterial(id: string, formData: FormData) {
 export async function anexarArquivoMaterial(id: string, path: string) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
-  if (!eu) return { error: "Sessão expirada — entre de novo." };
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
   if (!MATERIAL_PATH_RE.test(path)) {
-    return { error: "Revise os campos — um dos valores não é válido." };
+    return { error: "Revise os campos: um dos valores não é válido." };
   }
   const { data, error } = await supabase
     .from("materiais").update({ path }).eq("id", id).select("id");
@@ -2240,7 +2240,7 @@ export async function anexarArquivoMaterial(id: string, path: string) {
 export async function removerArquivoMaterial(id: string) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
-  if (!eu) return { error: "Sessão expirada — entre de novo." };
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
   const { data, error } = await supabase
     .from("materiais").update({ path: null }).eq("id", id).select("id");
   if (error) return { error: erroAmigavel(error) };
@@ -2268,12 +2268,12 @@ export async function definirDocumentoPessoa(
 ) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
-  if (!eu) return { error: "Sessão expirada — entre de novo." };
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
   if (eu.role !== "coordenacao") {
     return { error: "Só a coordenação gerencia documentos." };
   }
   if (!DOCUMENTO_PATH_RE.test(path)) {
-    return { error: "Revise os campos — um dos valores não é válido." };
+    return { error: "Revise os campos: um dos valores não é válido." };
   }
   const { data, error } = await supabase
     .from(tipo === "mentorado" ? "mentorados" : "profiles")
@@ -2296,7 +2296,7 @@ export async function removerDocumentoPessoa(
 ) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
-  if (!eu) return { error: "Sessão expirada — entre de novo." };
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
   if (eu.role !== "coordenacao") {
     return { error: "Só a coordenação gerencia documentos." };
   }
@@ -2329,7 +2329,7 @@ export async function registrarDocumentoPessoa(
 ) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
-  if (!eu) return { error: "Sessão expirada — entre de novo." };
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
   if (eu.role !== "coordenacao") {
     return { error: "Só a coordenação gerencia documentos." };
   }
@@ -2337,7 +2337,7 @@ export async function registrarDocumentoPessoa(
     return { error: "Tipo de documento inválido." };
   }
   if (!DOCUMENTO_PATH_RE.test(path)) {
-    return { error: "Revise os campos — um dos valores não é válido." };
+    return { error: "Revise os campos: um dos valores não é válido." };
   }
   const { data, error } = await supabase
     .from("documentos_pessoa")
@@ -2363,7 +2363,7 @@ export async function registrarDocumentoPessoa(
 export async function excluirDocumentoPessoa(docId: string, pessoaId: string) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
-  if (!eu) return { error: "Sessão expirada — entre de novo." };
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
   if (eu.role !== "coordenacao") {
     return { error: "Só a coordenação gerencia documentos." };
   }
@@ -2381,7 +2381,7 @@ export async function excluirDocumentoPessoa(docId: string, pessoaId: string) {
 export async function updateMeuPerfil(formData: FormData) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
-  if (!eu) return { error: "Sessão expirada — entre de novo." };
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
   // patch parcial: /perfil tem um form de "Dados" e outro só da ficha de
   // mentor — cada um manda as próprias chaves e o que não veio não é tocado
   // (senão o save da mentoria apagaria nome/whatsapp/bio).
@@ -2395,7 +2395,7 @@ export async function updateMeuPerfil(formData: FormData) {
     const whatsappRaw = String(formData.get("whatsapp") ?? "");
     const whatsapp = normWhatsapp(whatsappRaw);
     // lixo digitado não pode zerar o campo silenciosamente
-    if (whatsappRaw.trim() && !whatsapp) return { error: "Confira o WhatsApp — use DDD e o número completo." };
+    if (whatsappRaw.trim() && !whatsapp) return { error: "Confira o WhatsApp: use DDD e o número completo." };
     patch.whatsapp = whatsapp || null;
   }
   const apresentacao = camposApresentacao(formData, { parcial: true });
@@ -2450,7 +2450,7 @@ export async function updateMeuPerfil(formData: FormData) {
 export async function setAvatarPath(path: string | null) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
-  if (!eu) return { error: "Sessão expirada — entre de novo." };
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
   if (path != null && !path.startsWith(`${eu.id}/`)) {
     return { error: "Não foi possível usar esse arquivo." };
   }
@@ -2485,7 +2485,7 @@ export async function salvarOnboarding(formData: FormData) {
   // o wizard do demo avança sem gravar — os campos do perfil não persistem
   if (await demoAtivo()) return { ok: true };
   const { supabase, me: eu } = await me();
-  if (!eu) return { error: "Sessão expirada — entre de novo." };
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
 
   const apresentacao = camposApresentacao(formData, { parcial: true });
   if ("error" in apresentacao) return { error: apresentacao.error };
@@ -2525,7 +2525,7 @@ export async function salvarOnboarding(formData: FormData) {
     const { error: avErr } = await supabase
       .from("profiles").update({ avatar_path: foto.path }).eq("id", eu.id);
     if (avErr) {
-      aviso = "Dados salvos, mas a foto não subiu — tente de novo.";
+      aviso = "Dados salvos, mas a foto não subiu. Tente de novo.";
     } else if (atualAv?.avatar_path) {
       await supabase.storage.from("avatares").remove([atualAv.avatar_path]);
     }
@@ -2550,7 +2550,7 @@ export async function concluirOnboarding() {
     return { ok: true };
   }
   const { supabase, me: eu } = await me();
-  if (!eu) return { error: "Sessão expirada — entre de novo." };
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
   const { error } = await supabase
     .from("profiles")
     .update({ onboarded_em: new Date().toISOString() })
@@ -2593,7 +2593,7 @@ const ROLES_POR_AUDIENCIA: Record<string, string[]> = {
 export async function publicarComunicado(formData: FormData) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
-  if (!eu) return { error: "Sessão expirada — entre de novo." };
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
   if (eu.role !== "coordenacao") return { error: "Só a coordenação publica avisos." };
   const titulo = String(formData.get("titulo") ?? "").trim();
   const corpo = String(formData.get("corpo") ?? "").trim();
@@ -2634,7 +2634,7 @@ export async function publicarComunicado(formData: FormData) {
 export async function excluirComunicado(id: string) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
-  if (!eu) return { error: "Sessão expirada — entre de novo." };
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
   if (eu.role !== "coordenacao") return { error: "Só a coordenação exclui avisos." };
   const { data, error } = await supabase
     .from("comunicados").delete().eq("id", id).select("id");
@@ -2656,7 +2656,7 @@ export async function listarNotificacoes() {
     return { ok: true, itens: itens.slice(0, 15), naoLidas: itens.filter((n: Notificacao) => !n.lida_em).length };
   }
   const { supabase, me: eu } = await me();
-  if (!eu) return { error: "Sessão expirada — entre de novo." };
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
   const [{ data, error: errItens }, { count, error: errCount }] = await Promise.all([
     supabase
       .from("notificacoes")
@@ -2681,7 +2681,7 @@ export async function marcarNotificacaoLida(id: string) {
   // no-op silencioso na demo — a UI já marcou otimista; erro dispararia toast
   if (await demoAtivo()) return { ok: true };
   const { supabase, me: eu } = await me();
-  if (!eu) return { error: "Sessão expirada — entre de novo." };
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
   const { error } = await supabase
     .from("notificacoes")
     .update({ lida_em: new Date().toISOString() })
@@ -2695,7 +2695,7 @@ export async function marcarNotificacaoLida(id: string) {
 export async function marcarTodasNotificacoesLidas() {
   if (await demoAtivo()) return { ok: true };
   const { supabase, me: eu } = await me();
-  if (!eu) return { error: "Sessão expirada — entre de novo." };
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
   const { error } = await supabase
     .from("notificacoes")
     .update({ lida_em: new Date().toISOString() })

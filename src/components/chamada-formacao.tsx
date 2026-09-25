@@ -71,7 +71,7 @@ export function ChamadaFormacao({
           delete c[m.id];
           return c;
         });
-        toast.error("Sem conexão — tente de novo.");
+        toast.error("Sem conexão. Tente de novo.");
       } finally {
         setPendingId(null);
       }
@@ -97,7 +97,7 @@ export function ChamadaFormacao({
         }
       } catch {
         setOverrides({});
-        toast.error("Sem conexão — tente de novo.");
+        toast.error("Sem conexão. Tente de novo.");
       }
     });
   }

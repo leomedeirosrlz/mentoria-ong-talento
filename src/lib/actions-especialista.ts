@@ -38,7 +38,7 @@ function resumo(texto: string, max = 200): string {
 export async function criarSolicitacao(formData: FormData) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
-  if (!eu) return { error: "Sessão expirada — entre de novo." };
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
 
   const dupla_dpp_id = String(formData.get("dupla_dpp_id") ?? "");
   const demanda = String(formData.get("demanda") ?? "").trim();
@@ -144,7 +144,7 @@ export async function criarSolicitacao(formData: FormData) {
 export async function aceitarSolicitacao(solicitacaoId: string) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
-  if (!eu) return { error: "Sessão expirada — entre de novo." };
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
 
   // o RPC faz aceite + criação da dupla numa transação só — imune à corrida
   // de dois especialistas aceitando a mesma demanda
@@ -185,7 +185,7 @@ export async function aceitarSolicitacao(solicitacaoId: string) {
           profile_id: c.id,
           tipo: "especialista_aceitou",
           titulo: "Pedido de especialista aceito",
-          corpo: `${eu.nome} assumiu — a dupla foi criada.`,
+          corpo: `${eu.nome} assumiu. A dupla foi criada.`,
           href: `/duplas/${duplaId}`,
         })),
     ],
@@ -199,7 +199,7 @@ export async function aceitarSolicitacao(solicitacaoId: string) {
 export async function cancelarSolicitacao(solicitacaoId: string) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
-  if (!eu) return { error: "Sessão expirada — entre de novo." };
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
 
   const { data: s } = await supabase
     .from("solicitacoes_especialista")

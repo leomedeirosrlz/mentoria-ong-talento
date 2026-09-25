@@ -29,7 +29,7 @@ const QUALQUER = "qualquer";
 /** "Ana Souza — finanças, carreira": as áreas (0030) ajudam a escolher pra
  *  quem direcionar — sem áreas cadastradas fica só o nome. */
 function rotuloEspecialista(e: { nome: string; areas: string[] | null }) {
-  return e.areas?.length ? `${e.nome} — ${e.areas.join(", ")}` : e.nome;
+  return e.areas?.length ? `${e.nome} · ${e.areas.join(", ")}` : e.nome;
 }
 
 /** Botão + dialog "Solicitar mentor especialista" — fica na ficha da dupla
@@ -68,7 +68,7 @@ export function SolicitarEspecialistaDialog({
         setOpen(false);
         router.refresh();
       } catch {
-        toast.error("Sem conexão — tente de novo.");
+        toast.error("Sem conexão. Tente de novo.");
       }
     });
   }
@@ -98,7 +98,7 @@ export function SolicitarEspecialistaDialog({
         <DialogHeader>
           <DialogTitle>Solicitar mentor especialista</DialogTitle>
           <DialogDescription>
-            O pedido aparece na lista dos especialistas — quem aceitar vira uma
+            O pedido aparece na lista dos especialistas. Quem aceitar vira uma
             dupla de até 5 encontros com o jovem.
           </DialogDescription>
         </DialogHeader>
@@ -124,7 +124,7 @@ export function SolicitarEspecialistaDialog({
               placeholder="ex.: o jovem precisa de inglês pra entrevista de emprego"
             />
             <p className="text-xs text-muted-foreground">
-              Descreva a necessidade do jovem — ex.: inglês pra entrevista,
+              Descreva a necessidade do jovem (ex.: inglês pra entrevista,
               finanças pessoais, decisão de carreira. Mínimo de 10 caracteres.
             </p>
           </div>

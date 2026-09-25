@@ -169,14 +169,14 @@ describe("textoResumoJornada", () => {
 
   it("snapshot completo com nomes, datas e contagens", () => {
     const t = textoResumoJornada(resumo);
-    expect(t).toContain("Resumo da jornada — Maria Silva e João Souza");
+    expect(t).toContain("Resumo da jornada · Maria Silva e João Souza");
     expect(t).toContain("Trilha DPP · início 30 de set.");
     expect(t).toContain("em andamento");
     expect(t).toContain("Encontros realizados: 1 de 16 (esperados pelo calendário: 2)");
     expect(t).toContain("Avaliação média do jovem: 4.0/4 (excelente)");
     expect(t).toContain("Combinados cumpridos: 1 de 1");
     expect(t).toContain("Últimos registros:");
-    expect(t).toContain("· 2º encontro (14 de out.) — Roda da Vida · avaliação excelente");
+    expect(t).toContain("· 2º encontro (14 de out.) · Roda da Vida · avaliação excelente");
   });
 
   it("jornada fechada sem fim registrado lê 'jornada fechada'; especialista não cita calendário", () => {

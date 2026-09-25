@@ -18,7 +18,7 @@ export default async function NovoFormularioPage() {
           Novo formulário
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Monte as perguntas — depois de salvar, você gera um link por pessoa
+          Monte as perguntas. Depois de salvar, você gera um link por pessoa
           pra enviar por WhatsApp ou e-mail.
         </p>
       </header>

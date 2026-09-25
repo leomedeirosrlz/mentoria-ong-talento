@@ -32,7 +32,8 @@ function corta(texto: string, max = 110): string {
 
 /** Card do dashboard da coordenação: demandas de especialista esperando
  *  aceite — contagem, as 3 mais recentes e cancelamento com confirmação. A
- *  lista chega por prop (RLS do papel já filtrada pela query). */
+ *  lista chega por prop (RLS do papel já filtrada pela query). Sem pedido
+ *  aberto não há o que dizer: o card não renderiza (empty state honesto). */
 export function SolicitacoesCoordCard({
   solicitacoes,
 }: {
@@ -40,55 +41,49 @@ export function SolicitacoesCoordCard({
 }) {
   const abertas = solicitacoes.filter((s) => s.status === "aberta");
   const visiveis = abertas.slice(0, 3);
+  if (abertas.length === 0) return null;
 
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           Pedidos de especialista
-          {abertas.length > 0 && (
-            <Badge variant="secondary">{abertas.length}</Badge>
-          )}
+          <Badge variant="secondary">{abertas.length}</Badge>
         </CardTitle>
       </CardHeader>
       <CardContent>
-        {abertas.length === 0 ? (
-          <p className="py-2 text-sm text-muted-foreground">
-            Nenhum pedido aberto no momento.
-          </p>
-        ) : (
-          <ul className="divide-y divide-border/60">
-            {visiveis.map((s) => (
-              <li key={s.id} className="flex items-start gap-3 py-3 first:pt-0 last:pb-0">
-                <div className="min-w-0 flex-1 space-y-0.5">
-                  <p className="text-sm font-medium">
-                    {/* nome vem sempre — a view solicitacoes_mural dá
-                        mentorado_nome no escopo do papel */}
-                    {s.mentorado?.nome}
-                  </p>
-                  <p className="text-sm text-muted-foreground">{corta(s.demanda)}</p>
-                  <p className="text-xs text-muted-foreground">
-                    por {s.solicitante?.nome ?? "—"} · {tempoRelativo(s.created_at)}
-                    {s.especialista_desejado_id ? " · direcionada" : ""}
-                  </p>
-                </div>
-                <ConfirmDeleteButton
-                  titulo="Cancelar solicitação?"
-                  descricao={`O pedido${s.mentorado?.nome ? ` de ${s.mentorado.nome}` : ""} sai da lista dos especialistas. Quem pediu é avisado.`}
-                  acao="Cancelar"
-                  sucesso="Solicitação cancelada."
-                  onConfirm={() => cancelarSolicitacao(s.id)}
-                  trigger={
-                    <Button variant="ghost" size="sm" className="shrink-0 text-muted-foreground">
-                      <XCircle size={15} />
-                      Cancelar
-                    </Button>
-                  }
-                />
-              </li>
-            ))}
-          </ul>
-        )}
+        <ul className="divide-y divide-border/60">
+          {visiveis.map((s) => (
+            <li key={s.id} className="flex items-start gap-3 py-3 first:pt-0 last:pb-0">
+              <div className="min-w-0 flex-1 space-y-0.5">
+                <p className="text-sm font-medium">
+                  {/* nome vem sempre — a view solicitacoes_mural dá
+                      mentorado_nome no escopo do papel */}
+                  {s.mentorado?.nome}
+                </p>
+                <p className="text-sm text-muted-foreground">{corta(s.demanda)}</p>
+                <p className="text-xs text-muted-foreground">
+                  {s.solicitante?.nome ? `por ${s.solicitante.nome} · ` : ""}
+                  {tempoRelativo(s.created_at)}
+                  {s.especialista_desejado_id ? " · direcionada" : ""}
+                </p>
+              </div>
+              <ConfirmDeleteButton
+                titulo="Cancelar solicitação?"
+                descricao={`O pedido${s.mentorado?.nome ? ` de ${s.mentorado.nome}` : ""} sai da lista dos especialistas. Quem pediu é avisado.`}
+                acao="Cancelar"
+                sucesso="Solicitação cancelada."
+                onConfirm={() => cancelarSolicitacao(s.id)}
+                trigger={
+                  <Button variant="ghost" size="sm" className="shrink-0 text-muted-foreground">
+                    <XCircle size={15} />
+                    Cancelar
+                  </Button>
+                }
+              />
+            </li>
+          ))}
+        </ul>
         {abertas.length > visiveis.length && (
           <p className="pt-3 text-xs text-muted-foreground">
             e mais {abertas.length - visiveis.length}{" "}

@@ -60,7 +60,7 @@ export default async function AgendaPage({
           <header>
             <h1 className="text-2xl font-semibold tracking-tight">Agenda</h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Mentoria especializada · até 5 encontros de 1h em até 3 meses — as
+              Mentoria especializada · até 5 encontros de 1h em até 3 meses. As
               datas são combinadas por vocês, sem terça oficial.
             </p>
           </header>

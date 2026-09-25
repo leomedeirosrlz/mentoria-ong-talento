@@ -25,7 +25,7 @@ export function CopiarResumoButton({
 
   async function copiar() {
     if (!navigator.clipboard?.writeText) {
-      toast.error("Não foi possível copiar — selecione e copie manualmente.");
+      toast.error("Não foi possível copiar. Selecione e copie manualmente.");
       return;
     }
     try {
@@ -34,7 +34,7 @@ export function CopiarResumoButton({
       if (timer.current) clearTimeout(timer.current);
       timer.current = setTimeout(() => setCopiado(false), 1600);
     } catch {
-      toast.error("Não foi possível copiar — selecione e copie manualmente.");
+      toast.error("Não foi possível copiar. Selecione e copie manualmente.");
     }
   }
 

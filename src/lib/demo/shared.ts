@@ -12,7 +12,7 @@ export const demoObCookie = (role: AppRole) => `demo_onboarded_${role}`;
 
 /** Toast único das mutations bloqueadas — actions retornam `{ error: DEMO_MSG }`. */
 export const DEMO_MSG =
-  "Modo demonstração — nada é gravado de verdade.";
+  "Modo demonstração. Nada é gravado de verdade.";
 
 export const DEMO_ROLES: readonly AppRole[] = [
   "coordenacao",

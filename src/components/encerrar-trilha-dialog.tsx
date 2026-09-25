@@ -48,13 +48,13 @@ export function EncerrarTrilhaDialog({
         }
         toast.success(
           tipo === "concluida"
-            ? "Trilha concluída — a devolutiva chegou ao PDM."
-            : "Trilha encerrada — a devolutiva chegou ao PDM."
+            ? "Trilha concluída. A devolutiva chegou ao PDM."
+            : "Trilha encerrada. A devolutiva chegou ao PDM."
         );
         setOpen(false);
         router.refresh();
       } catch {
-        toast.error("Sem conexão — tente de novo.");
+        toast.error("Sem conexão. Tente de novo.");
       }
     });
   }
@@ -75,7 +75,7 @@ export function EncerrarTrilhaDialog({
         <DialogHeader>
           <DialogTitle>Encerrar a trilha de especialista</DialogTitle>
           <DialogDescription>
-            Fecha a mentoria especializada e devolve pro PDM o que segue —
+            Fecha a mentoria especializada e devolve pro PDM o que segue:
             metas alcançadas, encaminhamentos em aberto e recomendações. O
             mentor DPP lê a devolutiva na ficha da dupla dele.
           </DialogDescription>
@@ -95,7 +95,7 @@ export function EncerrarTrilhaDialog({
               <span>
                 <span className="font-medium">Concluir a trilha</span>
                 <span className="block text-xs text-muted-foreground">
-                  Os objetivos foram alcançados — pode ser antes do 5º
+                  Os objetivos foram alcançados. Pode ser antes do 5º
                   encontro, como manda o guia.
                 </span>
               </span>
@@ -112,7 +112,7 @@ export function EncerrarTrilhaDialog({
               <span>
                 <span className="font-medium">Encerrar antes de concluir</span>
                 <span className="block text-xs text-muted-foreground">
-                  A trilha termina sem os objetivos completos — a devolutiva
+                  A trilha termina sem os objetivos completos. A devolutiva
                   registra o que ficou em aberto.
                 </span>
               </span>

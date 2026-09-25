@@ -25,7 +25,7 @@ export default async function FormulariosPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Formulários</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Avaliações, pesquisas e fichas respondidas por link — sem login
+            Avaliações, pesquisas e fichas respondidas por link, sem login
           </p>
         </div>
         <Link
@@ -42,7 +42,7 @@ export default async function FormulariosPage() {
           <ListChecks size={32} aria-hidden className="text-muted-foreground/50" />
           <p className="mt-3 font-medium">Nenhum formulário ainda.</p>
           <p className="mt-1 max-w-sm text-sm text-muted-foreground">
-            Crie avaliações de encontro, anamneses ou inscrições — cada pessoa
+            Crie avaliações de encontro, anamneses ou inscrições. Cada pessoa
             responde por um link próprio, sem precisar de conta.
           </p>
           <Link

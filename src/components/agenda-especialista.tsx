@@ -42,7 +42,7 @@ export function AgendaEspecialista({
       <header>
         <h1 className="text-2xl font-semibold tracking-tight">Agenda</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Mentoria especializada · até 5 encontros de 1h em até 3 meses — as
+          Mentoria especializada · até 5 encontros de 1h em até 3 meses. As
           datas são combinadas por vocês, sem terça oficial.
         </p>
       </header>
@@ -151,8 +151,8 @@ export function AgendaEspecialista({
                 <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-4">
                   <p className="text-sm text-muted-foreground">
                     {dupla.encerrada_em
-                      ? "Trilha fechada — a devolutiva já seguiu pro PDM."
-                      : "Os 5 encontros foram realizados — falta o fechamento com a devolutiva pro PDM."}
+                      ? "Trilha fechada. A devolutiva já seguiu pro PDM."
+                      : "Os 5 encontros foram realizados. Falta o fechamento com a devolutiva pro PDM."}
                   </p>
                   {!dupla.encerrada_em && (
                     <EncerrarTrilhaDialog duplaId={dupla.id} />

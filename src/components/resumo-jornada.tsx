@@ -97,7 +97,7 @@ export function ResumoJornadaSection({
             <li key={u.numero} className="flex flex-wrap items-baseline gap-x-2">
               <span className="font-mono tabular-nums">{u.numero}º</span>
               <span>{formatDate(u.data)}</span>
-              {u.tema && <span className="min-w-0 flex-1">— {u.tema}</span>}
+              {u.tema && <span className="min-w-0 flex-1">· {u.tema}</span>}
               {u.avaliacao && (
                 <span>· avaliação {AVALIACAO_LABEL[u.avaliacao].toLowerCase()}</span>
               )}
@@ -108,8 +108,8 @@ export function ResumoJornadaSection({
 
       <p className="mt-3 text-xs text-muted-foreground">
         {encerramento?.tipo
-          ? `Encerramento registrado por ${encerramento.decidido?.nome ?? "a coordenação"} em ${formatDate(encerramento.created_at)} — este resumo foi gerado dos dados da jornada.`
-          : "Gerado dos dados da jornada — serve de base pro relatório final do ciclo."}
+          ? `Encerramento registrado por ${encerramento.decidido?.nome ?? "a coordenação"} em ${formatDate(encerramento.created_at)}. Este resumo foi gerado dos dados da jornada.`
+          : "Gerado dos dados da jornada. Serve de base pro relatório final do ciclo."}
       </p>
     </section>
   );

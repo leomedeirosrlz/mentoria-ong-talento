@@ -74,7 +74,7 @@ function parseEndereco(f: FormData): Endereco | { error: string } {
     cep: apenasDigitos(campo(f, "cep")),
   };
   if (!e.logradouro || !e.numero || !e.bairro || !e.cidade || e.uf.length !== 2)
-    return { error: "Endereço incompleto — revise logradouro, número, bairro, cidade e UF." };
+    return { error: "Endereço incompleto: revise logradouro, número, bairro, cidade e UF." };
   if (e.cep.length !== 8) return { error: "CEP inválido." };
   return e;
 }
@@ -89,7 +89,7 @@ function parseDadosCivis(f: FormData): DadosCivis | { error: string } {
   if (nome_civil.split(/\s+/).filter(Boolean).length < 2)
     return { error: "Informe o nome civil completo (como no documento)." };
   if (!rg) return { error: "Informe o RG." };
-  if (!cpfValido(cpf)) return { error: "CPF inválido — confira os dígitos." };
+  if (!cpfValido(cpf)) return { error: "CPF inválido. Confira os dígitos." };
   if (nasc && Number.isNaN(Date.parse(nasc)))
     return { error: "Data de nascimento inválida." };
   return {
@@ -120,7 +120,7 @@ export async function solicitarAssinaturaMentorado(
 ) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
-  if (!eu) return { error: "Sessão expirada — entre de novo." };
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
   if (eu.role !== "coordenacao")
     return { error: "Só a coordenação solicita assinatura." };
   if (!TEMPLATES_MENTORADO.some((t) => t.slug === slug))
@@ -165,13 +165,13 @@ export async function solicitarAssinaturaMentorado(
 export async function reenviarAssinatura(id: string) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
-  if (!eu) return { error: "Sessão expirada — entre de novo." };
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
   if (eu.role !== "coordenacao")
     return { error: "Só a coordenação reenvia." };
   const { data, error } = await supabase.rpc("regenerar_token_assinatura", {
     p_id: id,
   });
-  if (error || !data) return { error: "Não foi possível reenviar — já foi assinado?" };
+  if (error || !data) return { error: "Não foi possível reenviar. Já foi assinado?" };
   revalidatePath("/pessoas");
   return { ok: true, link: `${LINK_BASE}${data}` };
 }
@@ -184,7 +184,7 @@ export async function listarAssinaturasPessoa(
 ) {
   const { me: eu } = await me();
   if (!eu && !(await demoAtivo()))
-    return { error: "Sessão expirada — entre de novo." };
+    return { error: "Sessão expirada. Entre de novo." };
   const itens = await getAssinaturasPessoa(tipo, id);
   return { ok: true, itens };
 }
@@ -192,7 +192,7 @@ export async function listarAssinaturasPessoa(
 export async function revogarAssinatura(id: string) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
-  if (!eu) return { error: "Sessão expirada — entre de novo." };
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
   if (eu.role !== "coordenacao")
     return { error: "Só a coordenação revoga." };
   const { error } = await supabase.rpc("revogar_assinatura", { p_id: id });
@@ -207,7 +207,7 @@ export async function revogarAssinatura(id: string) {
 export async function subirContraAssinatura(formData: FormData) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
-  if (!eu) return { error: "Sessão expirada — entre de novo." };
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
   if (eu.role !== "coordenacao")
     return { error: "Só a coordenação gerencia a contra-assinatura." };
   const file = formData.get("arquivo");
@@ -230,7 +230,7 @@ export async function subirContraAssinatura(formData: FormData) {
 export async function assinarTermo(formData: FormData) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
-  if (!eu) return { error: "Sessão expirada — entre de novo." };
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
 
   const dados = parseDadosCivis(formData);
   if ("error" in dados) return dados;
@@ -248,7 +248,7 @@ export async function assinarTermo(formData: FormData) {
     p_ip: ip,
     p_ua: ua,
   });
-  if (error) return { error: "Não foi possível registrar a assinatura — tente de novo." };
+  if (error) return { error: "Não foi possível registrar a assinatura. Tente de novo." };
   revalidatePath("/", "layout");
   return { ok: true, id: data };
 }
@@ -311,6 +311,6 @@ export async function assinarComToken(token: string, formData: FormData) {
     p_ip: ip,
     p_ua: ua,
   });
-  if (error) return { error: "Não foi possível registrar a assinatura — tente de novo." };
+  if (error) return { error: "Não foi possível registrar a assinatura. Tente de novo." };
   return { ok: true };
 }

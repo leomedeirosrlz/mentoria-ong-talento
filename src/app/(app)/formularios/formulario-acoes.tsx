@@ -35,7 +35,7 @@ export function FormularioAcoes({
           }
           toast.success(
             ativo
-              ? "Formulário encerrado — links existentes param de aceitar resposta."
+              ? "Formulário encerrado. Links existentes param de aceitar resposta."
               : "Formulário reativado."
           );
           router.refresh();

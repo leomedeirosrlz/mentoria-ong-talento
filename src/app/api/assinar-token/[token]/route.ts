@@ -38,7 +38,7 @@ export async function GET(
   if (await demoRole()) {
     const a = demoAssinaturaCompletaPorToken(token);
     if (!a) {
-      return new NextResponse("Documento não encontrado — a assinatura ainda não foi concluída.", {
+      return new NextResponse("Documento não encontrado. A assinatura ainda não foi concluída.", {
         status: 404,
       });
     }
@@ -51,7 +51,7 @@ export async function GET(
     p_token: token,
   });
   if (error) {
-    return new NextResponse("Não foi possível abrir o documento — tente de novo.", {
+    return new NextResponse("Não foi possível abrir o documento. Tente de novo.", {
       status: 500,
     });
   }
@@ -59,7 +59,7 @@ export async function GET(
   // AssinaturaVia (evidência + template), não a row inteira
   const assinatura = (data ?? null) as AssinaturaVia | null;
   if (!assinatura) {
-    return new NextResponse("Documento não encontrado — a assinatura ainda não foi concluída.", {
+    return new NextResponse("Documento não encontrado. A assinatura ainda não foi concluída.", {
       status: 404,
     });
   }

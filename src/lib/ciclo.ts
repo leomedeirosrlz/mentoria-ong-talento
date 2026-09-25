@@ -539,7 +539,7 @@ export function duplasSemEncontroDoNumero(
 export function textoResumoSemana(resumo: ResumoSemana, emRisco: string[] = []): string {
   const semEncontro = resumo.naoAconteceram - resumo.reposicao;
   const linhas = [
-    `Semana do ${resumo.evento.numero}º encontro (${formatDiaMes(resumo.evento.data)}) — Mentoria Social`,
+    `Semana do ${resumo.evento.numero}º encontro (${formatDiaMes(resumo.evento.data)}) · Mentoria Social`,
     `✔ ${resumo.realizaram} de ${resumo.total} ${resumo.total === 1 ? "dupla" : "duplas"} já realizaram`,
     `✎ ${resumo.comRegistro} ${resumo.comRegistro === 1 ? "registro entregue" : "registros entregues"} · ${resumo.aguardandoRegistro} aguardando`,
     `⚠ ${semEncontro} ${semEncontro === 1 ? "dupla" : "duplas"} sem encontro esta semana` +
@@ -681,7 +681,7 @@ export function saudadeDaDupla(dupla: Dupla, eventos: CicloEvento[], hoje = new 
       semaforo: "atencao",
       motivo:
         pendencia.status === "agendado"
-          ? `${pendencia.numero}º encontro agendado já passou — falta o registro`
+          ? `${pendencia.numero}º encontro agendado já passou: falta o registro`
           : "Encontro realizado sem registro",
       esperado, feitos, proximo, registroPendente, pediuApoio,
     };

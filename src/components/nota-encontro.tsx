@@ -52,15 +52,21 @@ export function NotaEncontro({
     if (t.trim() === salvo.trim()) return;
     const minha = ++seq.current;
     setStatus("salvando");
-    const r = await salvarNotaEncontro(duplaId, numero, t);
-    if (minha !== seq.current) return; // uma save mais nova já saiu — ela decide o estado
-    if (r.error) {
+    try {
+      const r = await salvarNotaEncontro(duplaId, numero, t);
+      if (minha !== seq.current) return; // uma save mais nova já saiu — ela decide o estado
+      if (r.error) {
+        setStatus("erro");
+        toast.error(r.error);
+      } else {
+        setSalvo(t);
+        setSalvoEm(new Date());
+        setStatus("salvo");
+      }
+    } catch {
+      if (minha !== seq.current) return;
       setStatus("erro");
-      toast.error(r.error);
-    } else {
-      setSalvo(t);
-      setSalvoEm(new Date());
-      setStatus("salvo");
+      toast.error("Sem conexão. Tente de novo.");
     }
   }
 
@@ -102,7 +108,7 @@ export function NotaEncontro({
         </span>
         {preview && (
           <span className="min-w-0 truncate text-muted-foreground">
-            — {preview}
+            · {preview}
           </span>
         )}
         <CaretDown
@@ -125,7 +131,7 @@ export function NotaEncontro({
           {status === "salvando" && "Salvando…"}
           {status === "salvo" && salvoEm && `Salvo às ${fmtHora.format(salvoEm)}`}
           {status === "erro" && (
-            <span className="text-[var(--danger)]">Não salvou — saia e volte no campo para tentar de novo.</span>
+            <span className="text-[var(--danger)]">Não salvou. Saia e volte no campo para tentar de novo.</span>
           )}
         </p>
       </div>

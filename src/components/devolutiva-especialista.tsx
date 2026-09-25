@@ -27,8 +27,8 @@ export function DevolutivaEspecialista({
       <p className="text-xs text-muted-foreground">
         {solicitacao.especialista?.nome ?? "O especialista"} fechou a trilha
         {solicitacao.trilha_encerrada_em &&
-          ` em ${formatDate(solicitacao.trilha_encerrada_em)}`}{" "}
-        — é o que segue pro PDM de {solicitacao.mentorado?.nome ?? "o jovem"}:
+          ` em ${formatDate(solicitacao.trilha_encerrada_em)}`}
+        . É o que segue pro PDM de {solicitacao.mentorado?.nome ?? "o jovem"}:
       </p>
       <blockquote className="rounded-lg border-l-2 border-[var(--brand-lime)] bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
         <p className="whitespace-pre-line">{solicitacao.devolutiva_pdm}</p>

@@ -90,7 +90,7 @@ export async function GET(request: NextRequest) {
   const sub = claims?.claims?.sub;
   if (!sub) {
     return NextResponse.json(
-      { error: "Sessão expirada — entre de novo." },
+      { error: "Sessão expirada. Entre de novo." },
       { status: 401 }
     );
   }
@@ -134,7 +134,7 @@ export async function GET(request: NextRequest) {
     );
   if (error) {
     return NextResponse.json(
-      { error: "Não foi possível gerar o relatório — tente de novo." },
+      { error: "Não foi possível gerar o relatório. Tente de novo." },
       { status: 500 }
     );
   }
@@ -174,7 +174,7 @@ async function exportPessoas(supabase: Awaited<ReturnType<typeof createClient>>)
   ]);
   if (eP || eC || eM || eMP || ePP || ePM) {
     return NextResponse.json(
-      { error: "Não foi possível gerar o relatório — tente de novo." },
+      { error: "Não foi possível gerar o relatório. Tente de novo." },
       { status: 500 }
     );
   }
@@ -234,7 +234,7 @@ async function exportAssinaturas(
   ]);
   if (eA || eP || eM) {
     return NextResponse.json(
-      { error: "Não foi possível gerar o relatório — tente de novo." },
+      { error: "Não foi possível gerar o relatório. Tente de novo." },
       { status: 500 }
     );
   }
@@ -288,7 +288,7 @@ async function exportRespostas(
     .select("id, titulo, campos")
     .eq("id", id)
     .maybeSingle();
-  if (eF) return respJson(500, "Não foi possível gerar o relatório — tente de novo.");
+  if (eF) return respJson(500, "Não foi possível gerar o relatório. Tente de novo.");
   if (!f) return respJson(404, "Formulário não encontrado.");
 
   const { data: links, error: eL } = await supabase
@@ -304,7 +304,7 @@ async function exportRespostas(
       )`
     )
     .eq("formulario_id", id);
-  if (eL) return respJson(500, "Não foi possível gerar o relatório — tente de novo.");
+  if (eL) return respJson(500, "Não foi possível gerar o relatório. Tente de novo.");
 
   type LinkRaw = {
     resposta:

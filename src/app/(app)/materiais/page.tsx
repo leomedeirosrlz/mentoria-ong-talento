@@ -67,7 +67,7 @@ export default async function MateriaisPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Materiais</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            A biblioteca oficial do programa — a coordenação publica conforme a jornada avança
+            A biblioteca oficial do programa. A coordenação publica conforme a jornada avança
           </p>
         </div>
         {/* biblioteca vazia: o CTA mora dentro do card de estado vazio, não aqui */}
@@ -161,7 +161,7 @@ function MaterialRow({ m, ehCoord, maxEncontro }: { m: Material; ehCoord: boolea
             palavra já cobre o destino, sem "link externo" repetido */}
         <span className="sr-only">
           {TIPO_LABEL[m.tipo]}
-          {m.path ? " — arquivo" : urlOk && m.tipo !== "link" ? " — link externo" : ""}
+          {m.path ? " · arquivo" : urlOk && m.tipo !== "link" ? " · link externo" : ""}
         </span>
       </div>
       {/* a 390px o shrink-0 (badge de audiência ~150px + ícone) deixava

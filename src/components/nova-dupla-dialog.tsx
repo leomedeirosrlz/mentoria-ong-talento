@@ -167,7 +167,7 @@ export function NovaDuplaDialog() {
         if (cancelado) return;
         if (carregou.current) {
           toast.error(
-            "Não foi possível atualizar as opções — as carregadas antes continuam valendo."
+            "Não foi possível atualizar as opções. As carregadas antes continuam valendo."
           );
         } else {
           setFalha(true);
@@ -256,7 +256,7 @@ export function NovaDuplaDialog() {
           router.refresh();
         }
       } catch {
-        toast.error("Sem conexão — tente de novo.");
+        toast.error("Sem conexão. Tente de novo.");
       }
     });
   }
@@ -329,8 +329,8 @@ export function NovaDuplaDialog() {
               items={Object.fromEntries(mentoresOrd.map((m) => [
                 m.id,
                 m.role === "mentor_especialista"
-                  ? `${m.nome} — ${emUso[m.id] ?? 0}/${capacidade[m.id] ?? 1} · especialista`
-                  : `${m.nome} — ${emUso[m.id] ?? 0}/${capacidade[m.id] ?? 1}`,
+                  ? `${m.nome} · ${emUso[m.id] ?? 0}/${capacidade[m.id] ?? 1} · especialista`
+                  : `${m.nome} · ${emUso[m.id] ?? 0}/${capacidade[m.id] ?? 1}`,
               ]))}
               onValueChange={(v) => setMentorSel(v ? String(v) : null)}
             >
@@ -345,7 +345,7 @@ export function NovaDuplaDialog() {
                   const esp = m.role === "mentor_especialista";
                   return (
                     <SelectItem key={m.id} value={m.id} disabled={usadas >= total}>
-                      {m.nome} — {usadas}/{total}{esp ? " · especialista" : ""}
+                      {m.nome} · {usadas}/{total}{esp ? " · especialista" : ""}
                     </SelectItem>
                   );
                 })}
@@ -353,7 +353,7 @@ export function NovaDuplaDialog() {
             </Select>
             {ehEsp && (
               <p className="text-xs text-muted-foreground">
-                Mentoria especializada — até 5 encontros de 1h em até 3 meses,
+                Mentoria especializada: até 5 encontros de 1h em até 3 meses,
                 com datas combinadas pela dupla (sem calendário fixo).
               </p>
             )}
@@ -459,7 +459,7 @@ export function NovaDuplaDialog() {
                 id="demanda"
                 name="demanda"
                 rows={3}
-                placeholder="Por que essa mentoria existe — o que o mentorado precisa trabalhar com o especialista"
+                placeholder="Por que essa mentoria existe: o que o mentorado precisa trabalhar com o especialista"
               />
               <p className="text-xs text-muted-foreground">
                 O contexto aparece na ficha da dupla pro especialista.
@@ -490,7 +490,7 @@ export function NovaDuplaDialog() {
             <Input id="iniciada_em" name="iniciada_em" type="date" />
             <p className="text-xs text-muted-foreground">
               {ehEsp
-                ? "Deixe em branco se a mentoria está começando agora — a dupla nasce hoje."
+                ? "Deixe em branco se a mentoria está começando agora. A dupla nasce hoje."
                 : "Deixe em branco se a dupla já existia desde o início do programa. Se ela está começando agora, use a data de hoje."}
             </p>
           </div>

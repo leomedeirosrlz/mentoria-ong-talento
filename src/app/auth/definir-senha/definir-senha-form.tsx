@@ -78,14 +78,14 @@ export function DefinirSenhaForm() {
       if (error) {
         setErro(
           error.code === "weak_password"
-            ? "Senha fraca — combine letras e números."
+            ? "Senha fraca: combine letras e números."
             : "Não foi possível salvar a senha. Tente de novo."
         );
       } else {
         router.push(destino);
       }
     } catch {
-      setErro("Sem conexão — tente de novo.");
+      setErro("Sem conexão. Tente de novo.");
     } finally {
       setLoading(false);
     }
@@ -157,7 +157,7 @@ export function DefinirSenhaForm() {
                   onChange={(e) => setSenha(e.target.value)}
                 />
                 <p id="senha-hint" className="text-xs text-muted-foreground">
-                  Mínimo 8 caracteres — o link por e-mail continua valendo.
+                  Mínimo 8 caracteres · o link por e-mail continua valendo.
                 </p>
               </div>
               <div className="space-y-2">

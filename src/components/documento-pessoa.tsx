@@ -54,11 +54,11 @@ export function DocumentoPessoa({
     if (!file) return;
 
     if (!TIPOS_ACEITOS.includes(file.type)) {
-      toast.error("Formato não aceito — use PDF, PNG, JPG ou WebP.");
+      toast.error("Formato não aceito. Use PDF, PNG, JPG ou WebP.");
       return;
     }
     if (file.size > LIMITE_BYTES) {
-      toast.error("O arquivo passa de 20 MB — envie uma versão menor.");
+      toast.error("O arquivo passa de 20 MB. Envie uma versão menor.");
       return;
     }
 
@@ -82,7 +82,7 @@ export function DocumentoPessoa({
         if (upError) {
           // volta documento_path pra null — sem o objeto a referência ficaria morta
           await removerDocumentoPessoa(tipo, id);
-          toast.error("Falha ao enviar o arquivo — tente de novo.");
+          toast.error("Falha ao enviar o arquivo. Tente de novo.");
           return;
         }
 
@@ -95,7 +95,7 @@ export function DocumentoPessoa({
         toast.success("Documento anexado.");
         router.refresh();
       } catch {
-        toast.error("Sem conexão — tente de novo.");
+        toast.error("Sem conexão. Tente de novo.");
       }
     });
   }
@@ -172,7 +172,7 @@ export function DocumentoPessoa({
             {pending ? "Enviando…" : "Anexar documento"}
           </Button>
           <p className="text-xs text-muted-foreground">
-            {`Nenhum documento — anexe ${fem ? "a" : "o"} ${nomeDoc} (PDF ou imagem, até 20 MB).`}
+            {`Nenhum documento: anexe ${fem ? "a" : "o"} ${nomeDoc} (PDF ou imagem, até 20 MB).`}
           </p>
         </div>
       )}

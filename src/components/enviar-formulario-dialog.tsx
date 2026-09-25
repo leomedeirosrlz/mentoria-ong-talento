@@ -157,7 +157,7 @@ export function EnviarFormularioDialog({
           diasValidade: validade === "0" ? null : Number(validade),
         });
       } catch {
-        toast.error("Sem conexão — tente de novo.");
+        toast.error("Sem conexão. Tente de novo.");
         return;
       }
       if ("error" in r) {
@@ -192,7 +192,7 @@ export function EnviarFormularioDialog({
         <DialogHeader>
           <DialogTitle>Enviar formulário</DialogTitle>
           <DialogDescription>
-            Cada destinatário recebe um link único e de uso único — a resposta
+            Cada destinatário recebe um link único e de uso único. A resposta
             fica vinculada a essa dupla.
           </DialogDescription>
         </DialogHeader>
@@ -212,7 +212,7 @@ export function EnviarFormularioDialog({
               transition={T.enter}
               className="text-sm text-muted-foreground"
             >
-              Nenhum formulário ativo — crie um em{" "}
+              Nenhum formulário ativo. Crie um em{" "}
               <Link
                 href="/formularios"
                 className="underline underline-offset-2"

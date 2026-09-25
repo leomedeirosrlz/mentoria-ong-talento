@@ -10,10 +10,10 @@ import { erroAmigavel as erroAmigavelBase } from "./utils";
  *  é insert-only); o resto segue a tradução comum de utils. */
 function erroAmigavel(e: { message: string; code?: string }): string {
   if (e.code === "23505" || /duplicate key/i.test(e.message)) {
-    return "Presença já registrada — recarregue a página.";
+    return "Presença já registrada. Recarregue a página.";
   }
   if (e.code === "23503" || /foreign key/i.test(e.message)) {
-    return "Evento ou pessoa não encontrados — recarregue a página.";
+    return "Evento ou pessoa não encontrados. Recarregue a página.";
   }
   return erroAmigavelBase(e);
 }
@@ -51,7 +51,7 @@ export async function marcarPresenca(
 ) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
-  if (!eu) return { error: "Sessão expirada — entre de novo." };
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
   if (eu.role !== "coordenacao") return { error: "Só a coordenação faz a chamada." };
   if (!(await ehEventoFormacao(supabase, cicloEventoId)))
     return { error: "A chamada só existe nos encontros de formação." };
@@ -77,7 +77,7 @@ export async function marcarPresencas(
 ) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
-  if (!eu) return { error: "Sessão expirada — entre de novo." };
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
   if (eu.role !== "coordenacao") return { error: "Só a coordenação faz a chamada." };
   if (itens.length === 0) return { ok: true };
   if (!(await ehEventoFormacao(supabase, cicloEventoId)))

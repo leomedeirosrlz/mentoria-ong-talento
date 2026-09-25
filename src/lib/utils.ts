@@ -34,10 +34,10 @@ export function erroAmigavel(e: { message: string; code?: string }): string {
     return "Você não tem permissão para essa ação.";
   }
   if (e.code === "23514" || /check constraint|invalid input value/i.test(e.message)) {
-    return "Revise os campos — um dos valores não é válido.";
+    return "Revise os campos: um dos valores não é válido.";
   }
   if (e.code === "23503" || /foreign key/i.test(e.message)) {
-    return "Esse cadastro está vinculado a outros dados — remova os vínculos antes de excluir.";
+    return "Esse cadastro está vinculado a outros dados. Remova os vínculos antes de excluir.";
   }
   // triggers de domínio (0023/0025/0041) levantam P0001 com mensagem própria
   if (/capacidade do mentor excedida/i.test(e.message)) {

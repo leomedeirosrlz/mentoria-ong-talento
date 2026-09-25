@@ -31,7 +31,7 @@ function textoMarco(marco: MarcoJornada, feitos: number, total: number) {
     case "completo":
       return {
         titulo: "Jornada completa",
-        descricao: `${total} encontros realizados — jornada concluída.`,
+        descricao: `${total} encontros realizados · jornada concluída.`,
       };
   }
 }

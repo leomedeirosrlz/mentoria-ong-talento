@@ -182,10 +182,14 @@ export function RegistrosFiltros({
   filtros,
   duplas,
   maxEncontro,
+  porPrioridade = false,
 }: {
   filtros: FiltrosRegistro;
   duplas: DuplaOpcao[];
   maxEncontro: number;
+  /** `?ordem=prioridade` não faz parte de FiltrosRegistro; o hidden input
+   *  mantém o modo ligado quando a coord aplica/limpa um filtro. */
+  porPrioridade?: boolean;
 }) {
   const router = useRouter();
   const [q, setQ] = useState(filtros.q ?? "");
@@ -193,8 +197,10 @@ export function RegistrosFiltros({
   // filtros da prop congelam no render que armou o timer — o debounce leria
   // valores velhos e reverteria um filtro aplicado dentro dos 350ms
   const filtrosRef = useRef(filtros);
+  const ordemRef = useRef(porPrioridade);
   useEffect(() => {
     filtrosRef.current = filtros;
+    ordemRef.current = porPrioridade;
   });
 
   const [aberto, setAberto] = useState(false);
@@ -228,6 +234,7 @@ export function RegistrosFiltros({
       dificuldade: f.dificuldade,
       dupla: f.dupla,
       q: f.q,
+      ordem: ordemRef.current ? "prioridade" : undefined,
       ...patch,
     };
     for (const [k, v] of Object.entries(atual)) if (v) p.set(k, v);
@@ -270,6 +277,7 @@ export function RegistrosFiltros({
     if (draft.apoio) p.set("apoio", "1");
     if (draft.tardio) p.set("tardio", "1");
     if (filtrosRef.current.q) p.set("q", filtrosRef.current.q);
+    if (ordemRef.current) p.set("ordem", "prioridade");
     const qs = p.toString();
     router.replace(`/registros${qs ? `?${qs}` : ""}`, { scroll: false });
     setAberto(false);
@@ -286,6 +294,7 @@ export function RegistrosFiltros({
       dificuldade: filtros.dificuldade,
       dupla: filtros.dupla,
       q: filtros.q,
+      ordem: porPrioridade ? "prioridade" : undefined,
     };
     delete atual[k];
     for (const [chave, v] of Object.entries(atual)) if (v) p.set(chave, v);
@@ -355,7 +364,7 @@ export function RegistrosFiltros({
               setAberto(true);
             }}
             aria-label={
-              ativos > 0 ? `Filtros — ${ativos} ativos` : "Filtros"
+              ativos > 0 ? `Filtros, ${ativos} ativos` : "Filtros"
             }
           >
             <Funnel size={16} aria-hidden />
@@ -388,7 +397,7 @@ export function RegistrosFiltros({
             ))}
             <li>
               <Link
-                href="/registros"
+                href={porPrioridade ? "/registros?ordem=prioridade" : "/registros"}
                 scroll={false}
                 className="inline-flex min-h-11 items-center px-2 text-xs text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline sm:min-h-7"
               >

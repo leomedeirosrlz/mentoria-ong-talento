@@ -112,7 +112,7 @@ export function AgendarEncontroDialog({
             toast.error(res.error);
             return;
           }
-          toast.success("Encontro registrado — agora complete o registro.");
+          toast.success("Encontro registrado. Agora complete o registro.");
           setOpen(false);
           if (res.encontroId) {
             if (onCreated) {
@@ -139,7 +139,7 @@ export function AgendarEncontroDialog({
           router.refresh();
         }
       } catch {
-        toast.error("Sem conexão — tente de novo.");
+        toast.error("Sem conexão. Tente de novo.");
       }
     });
   }
@@ -185,7 +185,7 @@ export function AgendarEncontroDialog({
             />
             {!atual && (
               <p className="text-xs text-muted-foreground">
-                Se o encontro já aconteceu, escolha a data real — ele entra como realizado.
+                Se o encontro já aconteceu, escolha a data real. Ele entra como realizado.
               </p>
             )}
           </div>

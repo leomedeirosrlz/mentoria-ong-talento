@@ -209,7 +209,7 @@ export function EncerramentoDupla({
                 </blockquote>
               ) : (
                 <p className="text-xs text-muted-foreground">
-                  A autoavaliação do mentor ainda não chegou — ele preenche
+                  A autoavaliação do mentor ainda não chegou. Ele preenche
                   aqui na ficha.
                 </p>
               )}
@@ -218,7 +218,7 @@ export function EncerramentoDupla({
           )}
           {!souMentor && !souCoord && (
             <p className="text-xs text-muted-foreground">
-              A coordenação registra o fechamento no fim da jornada — o que já
+              A coordenação registra o fechamento no fim da jornada. O que já
               chegou aparece marcado acima.
             </p>
           )}

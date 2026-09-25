@@ -19,7 +19,7 @@ export function TermoBanner() {
         <span className="font-medium">Termo de adesão pendente</span>
         <span className="text-muted-foreground">
           {" "}
-          — leia e assine pra completar seu cadastro.
+          · leia e assine pra completar seu cadastro.
         </span>
       </span>
       <ArrowRight

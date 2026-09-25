@@ -134,7 +134,7 @@ class Fluxo {
 
   nova() {
     this.page = this.doc.addPage([PAGE_W, PAGE_H]);
-    this.page.drawText("Realiza.vc — Programa de Mentoria", {
+    this.page.drawText("Realiza.vc · Programa de Mentoria", {
       x: MARGIN,
       y: PAGE_H - 40,
       size: 8,
@@ -363,7 +363,7 @@ function renderTermo(
 
   blocoAssinatura(p, {
     nomeDigitado: texto,
-    legenda: [`VOLUNTÁRIO(A) — assinado eletronicamente em ${dataHoraFmt(em)}`],
+    legenda: [`VOLUNTÁRIO(A) · assinado eletronicamente em ${dataHoraFmt(em)}`],
   });
   blocoAssinatura(p, {
     imagem: contraAssinatura,
@@ -406,7 +406,7 @@ function renderAutorizacao(
 
   blocoAssinatura(p, {
     nomeDigitado: texto,
-    legenda: [`RESPONSÁVEL — assinado eletronicamente em ${dataHoraFmt(em)}`],
+    legenda: [`RESPONSÁVEL · assinado eletronicamente em ${dataHoraFmt(em)}`],
   });
 }
 
@@ -437,7 +437,7 @@ function renderMentorando(
   blocoAssinatura(p, {
     nomeDigitado: texto,
     legenda: [
-      "MENTORANDO(A) — Nome completo e assinatura",
+      "MENTORANDO(A) · Nome completo e assinatura",
       `assinado eletronicamente em ${dataHoraFmt(em)}`,
     ],
   });
@@ -480,7 +480,7 @@ function paginaEvidencias(
       : "sessão autenticada (magic link)";
 
   const linhas: [string, string][] = [
-    ["Documento", `${tpl.titulo} — versão ${tpl.versao}`],
+    ["Documento", `${tpl.titulo} · versão ${tpl.versao}`],
     ["ID da assinatura", a.id],
     ["Signatário", texto],
     ["Data/hora", `${em} (${dataHoraFmt(em)}, horário de São Paulo)`],
@@ -602,7 +602,7 @@ export async function renderDocumentoAssinado(
 
   doc.setTitle(tpl.titulo);
   doc.setAuthor(texto);
-  doc.setCreator("Realiza.vc — Programa de Mentoria");
+  doc.setCreator("Realiza.vc · Programa de Mentoria");
   doc.setProducer("Realiza.vc");
   doc.setCreationDate(new Date(em));
 

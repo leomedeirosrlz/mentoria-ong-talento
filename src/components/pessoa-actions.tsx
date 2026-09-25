@@ -18,7 +18,8 @@ import {
   CampoNascimento,
   CampoPrefGenero,
   CampoUf,
-  SecaoFicha,
+  WizardFicha,
+  type PassoFicha,
 } from "@/components/campos-pessoais";
 import { AREAS_SUGESTOES } from "@/lib/ciclo";
 import type { Disponibilidade, Profile } from "@/lib/types";
@@ -99,10 +100,267 @@ export function PessoaActions({ pessoa, podeExcluir }: { pessoa: Profile; podeEx
           router.refresh();
         }
       } catch {
-        toast.error("Sem conexão — tente de novo.");
+        toast.error("Sem conexão. Tente de novo.");
       }
     });
   }
+
+  // um passo por SecaoFicha — 8 seções seguidas de scroll viravam parede
+  // de campos; a "Ficha de mentor" entra quando o mentor_profiles carrega
+  // (salvar antes disso não zera nada: a action só toca o que veio no FormData)
+  const passos: PassoFicha[] = [
+    {
+      titulo: "Identificação e contato",
+      conteudo: (
+        <>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="e_nome">Nome civil</Label>
+              <Input id="e_nome" name="nome" required defaultValue={pessoa.nome} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="e_social">Nome social</Label>
+              <Input
+                id="e_social" name="nome_social" maxLength={150}
+                defaultValue={pessoa.nome_social ?? ""}
+                placeholder="Nome de uso, se diferente"
+              />
+            </div>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="e_whatsapp">WhatsApp</Label>
+              <Input
+                id="e_whatsapp" name="whatsapp"
+                type="tel" inputMode="tel" autoComplete="tel"
+                defaultValue={pessoa.whatsapp ?? ""}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="e_email">E-mail</Label>
+              <Input
+                id="e_email"
+                name="email"
+                type="email"
+                defaultValue={pessoa.email}
+                disabled={!!pessoa.user_id}
+              />
+            </div>
+          </div>
+          {pessoa.user_id && (
+            <p className="text-xs text-muted-foreground -mt-2">
+              O e-mail é a identidade do link de acesso e não pode mais ser alterado após o primeiro acesso.
+            </p>
+          )}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <CampoNascimento id="e_nasc" defaultValue={pessoa.data_nascimento ?? ""} />
+            <CampoGenero defaultValue={pessoa.genero ?? ""} />
+          </div>
+          <CampoCorRaca defaultValue={pessoa.cor_raca ?? ""} />
+        </>
+      ),
+    },
+    {
+      titulo: "Localização e interesses",
+      conteudo: (
+        <>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div className="space-y-2 sm:col-span-2">
+              <Label htmlFor="e_cidade">Cidade</Label>
+              <Input id="e_cidade" name="cidade" maxLength={100} defaultValue={pessoa.cidade ?? ""} />
+            </div>
+            <CampoUf defaultValue={pessoa.uf ?? ""} />
+          </div>
+          <CampoInteresses value={interesses} onChange={setInteresses} />
+        </>
+      ),
+    },
+    {
+      titulo: "Trabalho e origem",
+      conteudo: (
+        <>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="e_cargo">Cargo</Label>
+              <Input id="e_cargo" name="cargo" maxLength={120} defaultValue={pessoa.cargo ?? ""} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="e_empresa">Empresa</Label>
+              <Input id="e_empresa" name="empresa" maxLength={150} defaultValue={pessoa.empresa ?? ""} />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="e_origem">Como chegou ao programa</Label>
+            <Input id="e_origem" name="origem" maxLength={300} defaultValue={pessoa.origem ?? ""} />
+          </div>
+        </>
+      ),
+    },
+    {
+      titulo: "Motivação e pareamento",
+      conteudo: (
+        <>
+          <div className="space-y-2">
+            <Label htmlFor="e_motivacao">Motivação</Label>
+            <Textarea
+              id="e_motivacao" name="motivacao" rows={2} maxLength={2000}
+              defaultValue={pessoa.motivacao ?? ""}
+              placeholder="O que traz a pessoa ao programa"
+            />
+          </div>
+          <CampoPrefGenero defaultValue={pessoa.pref_genero_par ?? ""} />
+        </>
+      ),
+    },
+    {
+      // apresentação profissional (0030) — mesmos campos do /perfil; o
+      // `areas` do mentor_profile já existe, então o do perfil vai como
+      // `areas_perfil` pra não colidir no FormData
+      titulo: "Apresentação pública",
+      conteudo: (
+        <>
+          <div className="space-y-2">
+            <div className="flex items-baseline justify-between gap-2">
+              <Label htmlFor="e_bio">Biografia</Label>
+              <span aria-hidden className="text-xs tabular-nums text-muted-foreground">
+                {bioLen}/1.000
+              </span>
+            </div>
+            <Textarea
+              id="e_bio" name="bio" rows={3} maxLength={1000}
+              defaultValue={pessoa.bio ?? ""}
+              onChange={(e) => setBioLen(e.target.value.length)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="e_linkedin">LinkedIn</Label>
+            <Input
+              id="e_linkedin" name="linkedin" type="url" inputMode="url"
+              defaultValue={pessoa.linkedin ?? ""}
+              placeholder="https://linkedin.com/in/..."
+            />
+          </div>
+          {/* o hidden do TagInput manda JSON — camposApresentacao aceita
+              JSON ou vírgula, então os dois formatos continuam valendo */}
+          <div className="space-y-2">
+            <Label>Áreas de atuação</Label>
+            <TagInput
+              name="areas_perfil"
+              sugestoes={AREAS_SUGESTOES}
+              value={areasPerfil}
+              onChange={setAreasPerfil}
+              inputLabel="Digite uma área e pressione Enter"
+            />
+          </div>
+          <div className="space-y-2">
+            <div className="flex items-baseline justify-between gap-2">
+              <Label htmlFor="e_voluntariado">Experiência com voluntariado</Label>
+              <span aria-hidden className="text-xs tabular-nums text-muted-foreground">
+                {volLen}/300
+              </span>
+            </div>
+            <Input
+              id="e_voluntariado" name="voluntariado" maxLength={300}
+              defaultValue={pessoa.voluntariado ?? ""}
+              onChange={(e) => setVolLen(e.target.value.length)}
+              placeholder="ex.: 2 anos como voluntário no Projeto X"
+            />
+          </div>
+        </>
+      ),
+    },
+    ...(ehMentor && mp !== undefined
+      ? [{
+          titulo: "Ficha de mentor",
+          conteudo: (
+            <div className="space-y-4 rounded-lg bg-muted/40 p-3.5">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="e_cap">Capacidade (duplas)</Label>
+                  <Input
+                    id="e_cap" name="capacidade" type="number" min={1} max={10}
+                    required
+                    defaultValue={mp?.capacidade ?? 1}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="e_areas">Áreas (separadas por vírgula)</Label>
+                  <Input
+                    id="e_areas" name="areas"
+                    defaultValue={(mp?.areas ?? []).join(", ")}
+                    placeholder="tecnologia, finanças"
+                  />
+                </div>
+              </div>
+              <CampoDisponibilidade value={disponibilidade} onChange={setDisponibilidade} />
+              <div className="space-y-2">
+                <Label htmlFor="e_exp">Experiência prévia como mentor</Label>
+                <Textarea
+                  id="e_exp" name="experiencia_previa" rows={2} maxLength={2000}
+                  defaultValue={mp?.experiencia_previa ?? ""}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="e_form">Formação e certificações externas</Label>
+                <Textarea
+                  id="e_form" name="formacao_externa" rows={2} maxLength={2000}
+                  defaultValue={mp?.formacao_externa ?? ""}
+                />
+              </div>
+              <div className="flex gap-6">
+                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                  <input type="checkbox" name="termo_ok" defaultChecked={mp?.termo_ok} className="accent-primary" />
+                  Termo assinado
+                </label>
+                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                  <input type="checkbox" name="formacao_ok" defaultChecked={mp?.formacao_ok} className="accent-primary" />
+                  Formação concluída
+                </label>
+              </div>
+            </div>
+          ),
+        }]
+      : []),
+    {
+      titulo: "Documentos (termo de adesão)",
+      conteudo: (
+        <>
+          <DadosCivisFields
+            prefix="civis_"
+            opcional
+            compacto
+            defaults={pessoa.dados_civis}
+          />
+          <p className="text-xs text-muted-foreground">
+            Preenchem o termo de adesão automaticamente: a pessoa só confere e assina.
+          </p>
+        </>
+      ),
+    },
+    {
+      titulo: "Arquivos e consentimento",
+      conteudo: (
+        <>
+          <FotoField
+            id="e_foto"
+            defaultUrl={pessoa.avatar_path ? avatarPublicUrl(pessoa.avatar_path) : null}
+          />
+          <DocumentoPessoa
+            tipo="profile"
+            id={pessoa.id}
+            documentoPath={pessoa.documento_path}
+          />
+          <AssinaturasPessoa
+            tipo="profile"
+            id={pessoa.id}
+            nome={pessoa.nome}
+            whatsapp={pessoa.whatsapp}
+          />
+          <CampoConsentimento carimbadoEm={pessoa.consent_lgpd_em} />
+        </>
+      ),
+    },
+  ];
 
   return (
     <>
@@ -129,13 +387,13 @@ export function PessoaActions({ pessoa, podeExcluir }: { pessoa: Profile; podeEx
                   else {
                     toast.success(
                       pessoa.ativo
-                        ? `Cadastro de ${primeiroNome} desativado — acesso cortado na hora.`
-                        : `Cadastro de ${primeiroNome} reativado — acesso liberado na hora.`
+                        ? `Cadastro de ${primeiroNome} desativado. Acesso cortado na hora.`
+                        : `Cadastro de ${primeiroNome} reativado. Acesso liberado na hora.`
                     );
                     router.refresh();
                   }
                 } catch {
-                  toast.error("Sem conexão — tente de novo.");
+                  toast.error("Sem conexão. Tente de novo.");
                 }
               })
             }
@@ -184,231 +442,12 @@ export function PessoaActions({ pessoa, podeExcluir }: { pessoa: Profile; podeEx
           <DialogHeader>
             <DialogTitle>Editar {primeiroNome}</DialogTitle>
           </DialogHeader>
-          <form onSubmit={submit} className="space-y-4">
-            <SecaoFicha>Identificação e contato</SecaoFicha>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="e_nome">Nome civil</Label>
-                <Input id="e_nome" name="nome" required defaultValue={pessoa.nome} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="e_social">Nome social</Label>
-                <Input
-                  id="e_social" name="nome_social" maxLength={150}
-                  defaultValue={pessoa.nome_social ?? ""}
-                  placeholder="Nome de uso, se diferente"
-                />
-              </div>
-            </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="e_whatsapp">WhatsApp</Label>
-                <Input
-                  id="e_whatsapp" name="whatsapp"
-                  type="tel" inputMode="tel" autoComplete="tel"
-                  defaultValue={pessoa.whatsapp ?? ""}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="e_email">E-mail</Label>
-                <Input
-                  id="e_email"
-                  name="email"
-                  type="email"
-                  defaultValue={pessoa.email}
-                  disabled={!!pessoa.user_id}
-                />
-              </div>
-            </div>
-            {pessoa.user_id && (
-              <p className="text-xs text-muted-foreground -mt-2">
-                O e-mail é a identidade do link de acesso e não pode mais ser alterado após o primeiro acesso.
-              </p>
-            )}
-            <div className="grid gap-4 sm:grid-cols-2">
-              <CampoNascimento id="e_nasc" defaultValue={pessoa.data_nascimento ?? ""} />
-              <CampoGenero defaultValue={pessoa.genero ?? ""} />
-            </div>
-            <CampoCorRaca defaultValue={pessoa.cor_raca ?? ""} />
-
-            <SecaoFicha>Localização e interesses</SecaoFicha>
-            <div className="grid gap-4 sm:grid-cols-3">
-              <div className="space-y-2 sm:col-span-2">
-                <Label htmlFor="e_cidade">Cidade</Label>
-                <Input id="e_cidade" name="cidade" maxLength={100} defaultValue={pessoa.cidade ?? ""} />
-              </div>
-              <CampoUf defaultValue={pessoa.uf ?? ""} />
-            </div>
-            <CampoInteresses value={interesses} onChange={setInteresses} />
-
-            <SecaoFicha>Trabalho e origem</SecaoFicha>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="e_cargo">Cargo</Label>
-                <Input id="e_cargo" name="cargo" maxLength={120} defaultValue={pessoa.cargo ?? ""} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="e_empresa">Empresa</Label>
-                <Input id="e_empresa" name="empresa" maxLength={150} defaultValue={pessoa.empresa ?? ""} />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="e_origem">Como chegou ao programa</Label>
-              <Input id="e_origem" name="origem" maxLength={300} defaultValue={pessoa.origem ?? ""} />
-            </div>
-
-            <SecaoFicha>Motivação e pareamento</SecaoFicha>
-            <div className="space-y-2">
-              <Label htmlFor="e_motivacao">Motivação</Label>
-              <Textarea
-                id="e_motivacao" name="motivacao" rows={2} maxLength={2000}
-                defaultValue={pessoa.motivacao ?? ""}
-                placeholder="O que traz a pessoa ao programa"
-              />
-            </div>
-            <CampoPrefGenero defaultValue={pessoa.pref_genero_par ?? ""} />
-
-            {/* apresentação profissional (0030) — mesmos campos do /perfil;
-                o `areas` do mentor_profile já existe, então o do perfil vai
-                como `areas_perfil` pra não colidir no FormData */}
-            <SecaoFicha>Apresentação pública</SecaoFicha>
-            <div className="space-y-2">
-              <div className="flex items-baseline justify-between gap-2">
-                <Label htmlFor="e_bio">Biografia</Label>
-                <span aria-hidden className="text-xs tabular-nums text-muted-foreground">
-                  {bioLen}/1.000
-                </span>
-              </div>
-              <Textarea
-                id="e_bio" name="bio" rows={3} maxLength={1000}
-                defaultValue={pessoa.bio ?? ""}
-                onChange={(e) => setBioLen(e.target.value.length)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="e_linkedin">LinkedIn</Label>
-              <Input
-                id="e_linkedin" name="linkedin" type="url" inputMode="url"
-                defaultValue={pessoa.linkedin ?? ""}
-                placeholder="https://linkedin.com/in/..."
-              />
-            </div>
-            {/* o hidden do TagInput manda JSON — camposApresentacao aceita
-                JSON ou vírgula, então os dois formatos continuam valendo */}
-            <div className="space-y-2">
-              <Label>Áreas de atuação</Label>
-              <TagInput
-                name="areas_perfil"
-                sugestoes={AREAS_SUGESTOES}
-                value={areasPerfil}
-                onChange={setAreasPerfil}
-                inputLabel="Digite uma área e pressione Enter"
-              />
-            </div>
-            <div className="space-y-2">
-              <div className="flex items-baseline justify-between gap-2">
-                <Label htmlFor="e_voluntariado">Experiência com voluntariado</Label>
-                <span aria-hidden className="text-xs tabular-nums text-muted-foreground">
-                  {volLen}/300
-                </span>
-              </div>
-              <Input
-                id="e_voluntariado" name="voluntariado" maxLength={300}
-                defaultValue={pessoa.voluntariado ?? ""}
-                onChange={(e) => setVolLen(e.target.value.length)}
-                placeholder="ex.: 2 anos como voluntário no Projeto X"
-              />
-            </div>
-
-            {ehMentor && mp !== undefined && (
-              <>
-                <SecaoFicha>Ficha de mentor</SecaoFicha>
-                <div className="space-y-4 rounded-lg bg-muted/40 p-3.5">
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label htmlFor="e_cap">Capacidade (duplas)</Label>
-                      <Input
-                        id="e_cap" name="capacidade" type="number" min={1} max={10}
-                        required
-                        defaultValue={mp?.capacidade ?? 1}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="e_areas">Áreas (separadas por vírgula)</Label>
-                      <Input
-                        id="e_areas" name="areas"
-                        defaultValue={(mp?.areas ?? []).join(", ")}
-                        placeholder="tecnologia, finanças"
-                      />
-                    </div>
-                  </div>
-                  <CampoDisponibilidade value={disponibilidade} onChange={setDisponibilidade} />
-                  <div className="space-y-2">
-                    <Label htmlFor="e_exp">Experiência prévia como mentor</Label>
-                    <Textarea
-                      id="e_exp" name="experiencia_previa" rows={2} maxLength={2000}
-                      defaultValue={mp?.experiencia_previa ?? ""}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="e_form">Formação e certificações externas</Label>
-                    <Textarea
-                      id="e_form" name="formacao_externa" rows={2} maxLength={2000}
-                      defaultValue={mp?.formacao_externa ?? ""}
-                    />
-                  </div>
-                  <div className="flex gap-6">
-                    <label className="flex items-center gap-2 text-sm cursor-pointer">
-                      <input type="checkbox" name="termo_ok" defaultChecked={mp?.termo_ok} className="accent-primary" />
-                      Termo assinado
-                    </label>
-                    <label className="flex items-center gap-2 text-sm cursor-pointer">
-                      <input type="checkbox" name="formacao_ok" defaultChecked={mp?.formacao_ok} className="accent-primary" />
-                      Formação concluída
-                    </label>
-                  </div>
-                </div>
-              </>
-            )}
-
-            <SecaoFicha>Documentos (termo de adesão)</SecaoFicha>
-            <DadosCivisFields
-              prefix="civis_"
-              opcional
-              compacto
-              defaults={pessoa.dados_civis}
-            />
-            <p className="text-xs text-muted-foreground">
-              Preenchem o termo de adesão automaticamente — a pessoa só confere e assina.
-            </p>
-
-            <SecaoFicha>Arquivos e consentimento</SecaoFicha>
-            <FotoField
-              id="e_foto"
-              defaultUrl={pessoa.avatar_path ? avatarPublicUrl(pessoa.avatar_path) : null}
-            />
-
-            <DocumentoPessoa
-              tipo="profile"
-              id={pessoa.id}
-              documentoPath={pessoa.documento_path}
-            />
-            <AssinaturasPessoa
-              tipo="profile"
-              id={pessoa.id}
-              nome={pessoa.nome}
-              whatsapp={pessoa.whatsapp}
-            />
-            <CampoConsentimento carimbadoEm={pessoa.consent_lgpd_em} />
-
-            {/* barra sticky (padrão do registro-form) — form de 8 seções
-                escondia o Salvar no fim do scroll interno do dialog */}
-            <div className="sticky bottom-0 -mx-4 -mb-4 border-t bg-popover px-4 py-3">
-              <Button type="submit" className="w-full" disabled={pending}>
-                {pending ? "Salvando…" : "Salvar"}
-              </Button>
-            </div>
-          </form>
+          <WizardFicha
+            passos={passos}
+            pending={pending}
+            submitLabel="Salvar"
+            onSubmit={submit}
+          />
         </DialogContent>
       </Dialog>
 
@@ -427,7 +466,7 @@ export function PessoaActions({ pessoa, podeExcluir }: { pessoa: Profile; podeEx
         open={duplasEmCurso > 0}
         onOpenChange={(o) => !o && setDuplasEmCurso(0)}
         titulo={`Desativar ${pessoa.nome}?`}
-        descricao={`${primeiroNome} está em ${duplasEmCurso} ${duplasEmCurso === 1 ? "dupla" : "duplas"} em andamento — desativar corta o acesso e a dupla fica sem o responsável até o remanejo. O histórico e os encontros ficam salvos.`}
+        descricao={`${primeiroNome} está em ${duplasEmCurso} ${duplasEmCurso === 1 ? "dupla" : "duplas"} em andamento. Desativar corta o acesso e a dupla fica sem o responsável até o remanejo. O histórico e os encontros ficam salvos.`}
         sucesso={`Cadastro de ${primeiroNome} desativado.`}
         acao="Desativar"
         onConfirm={async () => {

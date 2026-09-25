@@ -82,7 +82,7 @@ describe("erroAmigavel — tradução de erros do Postgres pra UI", () => {
   });
 
   it("23514 / check constraint / invalid input → revise os campos", () => {
-    const msg = "Revise os campos — um dos valores não é válido.";
+    const msg = "Revise os campos: um dos valores não é válido.";
     expect(erroAmigavel({ code: "23514", message: "x" })).toBe(msg);
     expect(erroAmigavel({ message: "violates check constraint" })).toBe(msg);
     expect(erroAmigavel({ message: 'invalid input value for enum' })).toBe(msg);
@@ -90,7 +90,7 @@ describe("erroAmigavel — tradução de erros do Postgres pra UI", () => {
 
   it("23503 / foreign key → vinculado a outros dados", () => {
     const msg =
-      "Esse cadastro está vinculado a outros dados — remova os vínculos antes de excluir.";
+      "Esse cadastro está vinculado a outros dados. Remova os vínculos antes de excluir.";
     expect(erroAmigavel({ code: "23503", message: "x" })).toBe(msg);
     expect(erroAmigavel({ message: "violates foreign key constraint" })).toBe(msg);
   });

@@ -173,6 +173,7 @@ export function AssinaturaForm({
   acao,
   dados,
   parentesco,
+  etapas,
 }: {
   modo: "termo" | "autorizacao";
   /** nome do jovem (autorização) — read-only, vem do servidor */
@@ -183,6 +184,9 @@ export function AssinaturaForm({
   dados?: DadosCivis | null;
   /** parentesco já cadastrado (autorização) */
   parentesco?: string;
+  /** passo a passo numerado da página — quando ativo, o bloco final ganha
+   *  o título "3 · Assine" com a âncora que o índice de etapas aponta */
+  etapas?: boolean;
 }) {
   const [pending, start] = useTransition();
   const [erro, setErro] = useState<string | null>(null);
@@ -229,6 +233,15 @@ export function AssinaturaForm({
 
       <DadosCivisFields defaults={dados} />
 
+      {etapas && (
+        <h3
+          id="assinar"
+          className="scroll-mt-4 border-t border-border pt-5 text-sm font-semibold"
+        >
+          3 · Assine
+        </h3>
+      )}
+
       <label className="flex items-start gap-3 rounded-xl border border-input bg-muted/40 p-4 text-sm leading-relaxed">
         <input
           type="checkbox"
@@ -244,7 +257,7 @@ export function AssinaturaForm({
       </label>
 
       <div>
-        <Label htmlFor="assinatura_texto">Assinatura — digite seu nome completo</Label>
+        <Label htmlFor="assinatura_texto">Assinatura: digite seu nome completo</Label>
         <Input
           id="assinatura_texto"
           name="assinatura_texto"

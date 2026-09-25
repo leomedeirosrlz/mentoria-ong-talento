@@ -82,7 +82,7 @@ export function SupervisaoDialog({
         setResumoLen(0);
         router.refresh();
       } catch {
-        toast.error("Sem conexão — tente de novo.");
+        toast.error("Sem conexão. Tente de novo.");
       }
     });
   }
@@ -115,14 +115,14 @@ export function SupervisaoDialog({
         <DialogHeader>
           <DialogTitle>Registrar supervisão</DialogTitle>
           <DialogDescription>
-            A conversa de acompanhamento com o mentor — o que foi trabalhado,
+            A conversa de acompanhamento com o mentor: o que foi trabalhado,
             combinados e pontos de atenção. O mentor lê data e resumo depois.
           </DialogDescription>
         </DialogHeader>
         {mentores.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            Nenhum mentor em dupla ativa ou pausada supervisionada por você —
-            quando a coordenação atribuir duplas, os mentores aparecem aqui.
+            Nenhum mentor em dupla ativa ou pausada supervisionada por você.
+            Quando a coordenação atribuir duplas, os mentores aparecem aqui.
           </p>
         ) : (
           <form onSubmit={submit} className="space-y-4">
@@ -220,7 +220,7 @@ export function SupervisaoDialog({
                 placeholder="O que foi trabalhado na sessão, combinados e pontos de atenção"
               />
               <p className="text-xs text-muted-foreground">
-                O mentor lê esse resumo — escreva no tom da conversa, como um
+                O mentor lê esse resumo. Escreva no tom da conversa, como um
                 registro do que vocês construíram juntos.
               </p>
             </div>

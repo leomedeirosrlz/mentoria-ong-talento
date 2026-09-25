@@ -40,6 +40,49 @@ const DISCO: Record<EstadoNoJornada, string> = {
   futuro: "bg-muted text-muted-foreground",
 };
 
+/** Mini-chave da legenda — mesmo código visual do DISCO, em ponto de 8px.
+ *  Só entram na legenda os estados presentes na jornada (a chave explica o
+ *  que existe naquela trilha, não o universo possível). */
+const CHAVE_ORDEM: EstadoNoJornada[] = [
+  "realizado_completo",
+  "pendente_registro",
+  "limbo",
+  "agendado",
+  "nao_aconteceu",
+  "futuro",
+];
+
+const CHAVE_LABEL: Record<EstadoNoJornada, string> = {
+  realizado_completo: "com registro",
+  pendente_registro: "registro pendente",
+  limbo: "a confirmar",
+  agendado: "agendado",
+  nao_aconteceu: "não aconteceu",
+  futuro: "a caminho",
+};
+
+function chaveDot(estado: EstadoNoJornada): React.ReactNode {
+  switch (estado) {
+    case "realizado_completo":
+      return <span aria-hidden className="size-2 rounded-full bg-[var(--brand-lime)]" />;
+    case "pendente_registro":
+      return <span aria-hidden className="size-2 rounded-full bg-[var(--warn)]" />;
+    case "limbo":
+      return <span aria-hidden className="size-2 rounded-full ring-1 ring-inset ring-[var(--warn)]/70" />;
+    case "agendado":
+      return <span aria-hidden className="size-2 rounded-full ring-1 ring-inset ring-muted-foreground/60" />;
+    case "nao_aconteceu":
+      // disco apagado e riscado, como o nó na trilha
+      return (
+        <span aria-hidden className="relative size-2 rounded-full bg-muted">
+          <span className="absolute inset-x-[-1px] top-1/2 h-px -translate-y-1/2 -rotate-45 bg-muted-foreground/70" />
+        </span>
+      );
+    case "futuro":
+      return <span aria-hidden className="size-2 rounded-full bg-muted" />;
+  }
+}
+
 /** Label falado do passo — o número sozinho não carrega a situação. */
 function rotuloNo(no: NoJornada, atual: boolean): string {
   const n = `${no.numero}º encontro`;
@@ -53,7 +96,7 @@ function rotuloNo(no: NoJornada, atual: boolean): string {
       base = `${n}, realizado em ${formatDate(quandoReal)}, registro pendente`;
       break;
     case "limbo":
-      base = `${n}, agendado para ${formatDate(no.encontro?.data_hora)}, já passou — falta confirmar`;
+      base = `${n}, agendado para ${formatDate(no.encontro?.data_hora)}, já passou, falta confirmar`;
       break;
     case "agendado":
       base = `${n}, agendado para ${formatDate(no.encontro?.data_hora)}`;
@@ -63,11 +106,11 @@ function rotuloNo(no: NoJornada, atual: boolean): string {
       break;
     case "futuro":
       base = no.evento.data
-        ? `${n}, a realizar — sugerido ${formatDate(no.evento.data)}`
-        : `${n}, a realizar — data a combinar`;
+        ? `${n}, a realizar, sugerido ${formatDate(no.evento.data)}`
+        : `${n}, a realizar, data a combinar`;
       break;
   }
-  if (atual) base += " — próximo passo";
+  if (atual) base += " · próximo passo";
   if (no.marco) base += ` · marco: ${MARCO_SR[no.marco]}`;
   return base;
 }
@@ -77,14 +120,14 @@ function rotuloNo(no: NoJornada, atual: boolean): string {
 function textoProximo(no: NoJornada | undefined): string | null {
   if (!no) return null;
   if (no.estado === "limbo")
-    return `Próximo: ${no.numero}º — agendado ${formatDate(no.encontro?.data_hora)}, falta confirmar`;
+    return `Próximo: ${no.numero}º · agendado ${formatDate(no.encontro?.data_hora)}, falta confirmar`;
   if (no.estado === "agendado")
-    return `Próximo: ${no.numero}º — agendado ${formatDateTime(no.encontro?.data_hora)}`;
+    return `Próximo: ${no.numero}º · agendado ${formatDateTime(no.encontro?.data_hora)}`;
   if (no.estado === "nao_aconteceu")
-    return `Próximo: ${no.numero}º — não aconteceu, remarcar`;
+    return `Próximo: ${no.numero}º · não aconteceu, remarcar`;
   return no.evento.data
-    ? `Próximo: ${no.numero}º — sugerido ${formatDate(no.evento.data)}`
-    : `Próximo: ${no.numero}º — data a combinar`;
+    ? `Próximo: ${no.numero}º · sugerido ${formatDate(no.evento.data)}`
+    : `Próximo: ${no.numero}º · data a combinar`;
 }
 
 /** Mapa do ciclo da dupla: os encontros oficiais da janela como trilha de
@@ -126,6 +169,7 @@ export function TrilhaJornada({
   if (jornada.nos.length < 2) return null;
 
   const noAtual = jornada.nos.find((n) => n.numero === jornada.proximoNumero);
+  const estadosPresentes = new Set(jornada.nos.map((n) => n.estado));
   const percorrido = (n: NoJornada) =>
     n.estado === "realizado_completo" ||
     n.estado === "pendente_registro" ||
@@ -133,13 +177,13 @@ export function TrilhaJornada({
 
   const caption =
     statusDupla === "pausada"
-      ? "Jornada pausada — ela retoma de onde a dupla parou."
+      ? "Jornada pausada. Ela retoma de onde a dupla parou."
       : statusDupla === "concluida"
-        ? "Jornada concluída — a dupla fechou o ciclo."
+        ? "Jornada concluída. A dupla fechou o ciclo."
         : statusDupla === "encerrada"
-          ? "Dupla encerrada — a jornada guarda o que aconteceu."
+          ? "Dupla encerrada. A jornada guarda o que aconteceu."
           : jornada.completa
-            ? `Jornada concluída — ${jornada.total} encontros realizados.`
+            ? `Jornada concluída: ${jornada.total} encontros realizados.`
             : null;
 
   return (
@@ -237,7 +281,7 @@ export function TrilhaJornada({
           <>
             {jornada.faseAtual && (
               <>
-                Fase {jornada.faseAtual.indice} de {jornada.faseAtual.total} —{" "}
+                Fase {jornada.faseAtual.indice} de {jornada.faseAtual.total}:{" "}
                 {jornada.faseAtual.nome} ·{" "}
               </>
             )}
@@ -253,23 +297,16 @@ export function TrilhaJornada({
         )}
       </p>
 
-      {/* mini-chave junto dos dots que explica — mesma ideia de ChaveDotsDupla */}
+      {/* mini-chave junto dos dots — só os estados presentes na jornada:
+          trilha no início não fala de pendência, trilha limpa não fala de
+          "não aconteceu" (chave explica o que existe, não o universo) */}
       <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-        <span className="flex items-center gap-1.5">
-          <span aria-hidden className="size-2 rounded-full bg-[var(--brand-lime)]" />
-          com registro
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span aria-hidden className="size-2 rounded-full bg-[var(--warn)]" />
-          registro pendente
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span
-            aria-hidden
-            className="size-2 rounded-full ring-1 ring-inset ring-muted-foreground/60"
-          />
-          a caminho
-        </span>
+        {CHAVE_ORDEM.filter((e) => estadosPresentes.has(e)).map((e) => (
+          <span key={e} className="flex items-center gap-1.5">
+            {chaveDot(e)}
+            {CHAVE_LABEL[e]}
+          </span>
+        ))}
       </p>
     </section>
   );

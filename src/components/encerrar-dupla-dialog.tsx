@@ -51,13 +51,13 @@ export function EncerrarDuplaDialog({
         }
         toast.success(
           tipo === "concluida"
-            ? "Jornada concluída — encerramento registrado."
-            : "Dupla encerrada — encerramento registrado."
+            ? "Jornada concluída. Encerramento registrado."
+            : "Dupla encerrada. Encerramento registrado."
         );
         setOpen(false);
         router.refresh();
       } catch {
-        toast.error("Sem conexão — tente de novo.");
+        toast.error("Sem conexão. Tente de novo.");
       }
     });
   }
@@ -79,7 +79,7 @@ export function EncerrarDuplaDialog({
           <DialogTitle>Registrar encerramento</DialogTitle>
           <DialogDescription>
             O fechamento do ciclo do guia: o que foi feito, a decisão da
-            coordenação e o resumo da jornada — gerado na hora, pra base do
+            coordenação e o resumo da jornada, gerado na hora pra base do
             relatório final.
           </DialogDescription>
         </DialogHeader>
@@ -108,8 +108,8 @@ export function EncerrarDuplaDialog({
                   <span>
                     {item.label}
                     {autoavaliacaoRecebida
-                      ? " — já está aqui embaixo"
-                      : " — ainda não chegou"}
+                      ? " · já está aqui embaixo"
+                      : " · ainda não chegou"}
                   </span>
                 </p>
               ) : (
@@ -162,8 +162,8 @@ export function EncerrarDuplaDialog({
               <span>
                 <span className="font-medium">Concluir a jornada</span>
                 <span className="block text-xs text-muted-foreground">
-                  A dupla percorreu o ciclo até o encontro de encerramento —
-                  checklist completo obrigatório.
+                  A dupla percorreu o ciclo até o encontro de encerramento.
+                  Checklist completo obrigatório.
                 </span>
               </span>
             </label>
@@ -181,7 +181,7 @@ export function EncerrarDuplaDialog({
               <span>
                 <span className="font-medium">Encerrar antes do fim</span>
                 <span className="block text-xs text-muted-foreground">
-                  A jornada termina antecipada — o que ficou marcado no
+                  A jornada termina antecipada. O que ficou marcado no
                   checklist entra no registro.
                 </span>
               </span>

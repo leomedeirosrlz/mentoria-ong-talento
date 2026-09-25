@@ -361,11 +361,11 @@ export function FormularioBuilder({
           toast.success("Formulário atualizado.");
           router.refresh();
         } else {
-          toast.success("Formulário criado — agora gere os links.");
+          toast.success("Formulário criado. Agora gere os links.");
           router.push(`/formularios/${r.id}`);
         }
       } catch {
-        toast.error("Sem conexão — confira a internet e tente de novo.");
+        toast.error("Sem conexão. Confira a internet e tente de novo.");
       }
     });
   }
@@ -381,7 +381,7 @@ export function FormularioBuilder({
       <div className="space-y-4">
         <div className="flex items-center justify-between gap-3 rounded-xl border border-dashed border-border px-3 py-2">
           <p className="text-sm text-muted-foreground">
-            Pré-visualização do rascunho — é assim que a pessoa vê; envio
+            Pré-visualização do rascunho: é assim que a pessoa vê. Envio
             desligado.
           </p>
           <Button
@@ -646,26 +646,40 @@ export function FormularioBuilder({
         {resumoErro}
       </p>
 
-      <div className="flex items-center gap-3">
-        <Button type="button" onClick={salvar} disabled={pending}>
-          {pending && <CircleNotch className="animate-spin" aria-hidden />}
-          {pending
-            ? "Salvando…"
-            : edicao
-              ? "Salvar alterações"
-              : "Criar formulário"}
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => setPreview(true)}
+      {/* barra persistente — o contador segue o scroll: "N perguntas · ~M
+          min" com a mesma régua de 15s/pergunta que a página pública
+          anuncia, então o número que a coord vê aqui é o que a pessoa lê
+          lá no link */}
+      <div className="sticky bottom-[calc(4rem+env(safe-area-inset-bottom))] z-10 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-border bg-card/95 px-4 py-3 shadow-[var(--shadow-border)] backdrop-blur-sm md:bottom-3">
+        <p
+          aria-live="polite"
+          className="text-xs tabular-nums text-muted-foreground"
         >
-          <Eye aria-hidden />
-          Pré-visualizar
-        </Button>
+          {campos.length} {campos.length === 1 ? "pergunta" : "perguntas"}
+          {" · ~"}
+          {Math.max(1, Math.round((campos.length * 15) / 60))} min
+        </p>
+        <div className="flex flex-1 flex-wrap items-center justify-end gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setPreview(true)}
+          >
+            <Eye aria-hidden />
+            Pré-visualizar
+          </Button>
+          <Button type="button" onClick={salvar} disabled={pending}>
+            {pending && <CircleNotch className="animate-spin" aria-hidden />}
+            {pending
+              ? "Salvando…"
+              : edicao
+                ? "Salvar alterações"
+                : "Criar formulário"}
+          </Button>
+        </div>
         {edicao && (
-          <p className="text-xs text-muted-foreground">
-            Mudar as perguntas não apaga respostas já recebidas — o formulário
+          <p className="basis-full text-xs text-muted-foreground">
+            Mudar as perguntas não apaga respostas já recebidas. O formulário
             sobe pra versão {formulario!.versao + 1}.
           </p>
         )}

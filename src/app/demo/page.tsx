@@ -72,8 +72,8 @@ export default async function DemoPage() {
           A plataforma do Programa de Mentoria, com dados fictícios
         </h1>
         <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-          Sem login e sem senha. Escolha um papel pra explorar todas as telas —
-          nada do que você fizer é gravado. Ao entrar, você passa pela
+          Sem login e sem senha. Escolha um papel pra explorar todas as telas.
+          Nada do que você fizer é gravado. Ao entrar, você passa pela
           apresentação de primeiro acesso, como um usuário real.
         </p>
 
@@ -112,7 +112,7 @@ export default async function DemoPage() {
         </div>
 
         <div className="mt-6 border-t border-border pt-4 text-center text-xs leading-relaxed text-muted-foreground">
-          <p>Uso interno pra alinhamento — pessoas e dados são fictícios.</p>
+          <p>Uso interno pra alinhamento · pessoas e dados são fictícios.</p>
           <p className="mt-1.5">
             Já tem cadastro?{" "}
             <Link

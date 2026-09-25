@@ -151,7 +151,7 @@ export function EditarDuplaDialog({ dupla }: { dupla: Dupla }) {
         if (cancelado) return;
         if (carregou.current) {
           toast.error(
-            "Não foi possível atualizar as opções — as carregadas antes continuam valendo."
+            "Não foi possível atualizar as opções. As carregadas antes continuam valendo."
           );
         } else {
           setFalha(true);
@@ -241,7 +241,7 @@ export function EditarDuplaDialog({ dupla }: { dupla: Dupla }) {
           router.refresh();
         }
       } catch {
-        toast.error("Sem conexão — tente de novo.");
+        toast.error("Sem conexão. Tente de novo.");
       }
     });
   }
@@ -311,8 +311,8 @@ export function EditarDuplaDialog({ dupla }: { dupla: Dupla }) {
               <p className="text-xs text-muted-foreground">
                 Definido pelo papel do mentor
                 {temEncontros
-                  ? " — não muda mais, a dupla já tem encontros."
-                  : " — trocar o mentor por outro papel muda o tipo."}
+                  ? ". Não muda mais, a dupla já tem encontros."
+                  : ". Trocar o mentor por outro papel muda o tipo."}
               </p>
             </div>
             <div className="space-y-2">
@@ -343,8 +343,8 @@ export function EditarDuplaDialog({ dupla }: { dupla: Dupla }) {
                 items={Object.fromEntries(mentoresOrd.map((m) => [
                   m.id,
                   m.role === "mentor_especialista"
-                    ? `${m.nome} — ${emUso[m.id] ?? 0}/${capacidade[m.id] ?? 1} · especialista`
-                    : `${m.nome} — ${emUso[m.id] ?? 0}/${capacidade[m.id] ?? 1}`,
+                    ? `${m.nome} · ${emUso[m.id] ?? 0}/${capacidade[m.id] ?? 1} · especialista`
+                    : `${m.nome} · ${emUso[m.id] ?? 0}/${capacidade[m.id] ?? 1}`,
                 ]))}
                 onValueChange={(v) => setMentorSel(v ?? dupla.mentor.id)}
               >
@@ -360,7 +360,7 @@ export function EditarDuplaDialog({ dupla }: { dupla: Dupla }) {
                         value={m.id}
                         disabled={(m.id !== dupla.mentor.id && usadas >= total) || trilhaBloqueada(m)}
                       >
-                        {m.nome} — {usadas}/{total}
+                        {m.nome} · {usadas}/{total}
                         {esp ? " · especialista" : ""}
                         {trilhaBloqueada(m) ? " · outro tipo" : ""}
                       </SelectItem>
@@ -451,19 +451,19 @@ export function EditarDuplaDialog({ dupla }: { dupla: Dupla }) {
                 {/* alto impacto mas reversível: declara o efeito antes de salvar */}
                 {statusSel === "pausada" && (
                   <p className="text-xs text-muted-foreground">
-                    Pausada sai do acompanhamento até voltar pra Ativa —
-                    pedido de apoio continua visível.
+                    Pausada sai do acompanhamento até voltar pra Ativa.
+                    Pedido de apoio continua visível.
                   </p>
                 )}
                 {statusSel === "concluida" && (
                   <p className="text-xs text-muted-foreground">
-                    Concluída é o fechamento formal — registrado na seção
+                    Concluída é o fechamento formal. Registrado na seção
                     Encerramento, com checklist e resumo da jornada.
                   </p>
                 )}
                 {statusSel === "encerrada" && (
                   <p className="text-xs text-muted-foreground">
-                    Encerrada sai do acompanhamento — nem pedido de apoio
+                    Encerrada sai do acompanhamento. Nem pedido de apoio
                     reaparece. O histórico fica salvo; pra desfazer, reabra a edição.
                   </p>
                 )}
@@ -477,7 +477,7 @@ export function EditarDuplaDialog({ dupla }: { dupla: Dupla }) {
                   name="demanda"
                   rows={3}
                   defaultValue={dupla.demanda ?? ""}
-                  placeholder="Por que essa mentoria existe — o que o mentorado precisa trabalhar com o especialista"
+                  placeholder="Por que essa mentoria existe: o que o mentorado precisa trabalhar com o especialista"
                 />
                 <p className="text-xs text-muted-foreground">
                   O contexto aparece na ficha da dupla pro especialista.
@@ -500,7 +500,7 @@ export function EditarDuplaDialog({ dupla }: { dupla: Dupla }) {
                 placeholder="https://…"
               />
               <p className="text-xs text-muted-foreground">
-                Plano de desenvolvimento do mentorado — preenchido vira o botão
+                Plano de desenvolvimento do mentorado. Preenchido vira o botão
                 “Abrir PDM” na ficha e na home do mentor.
               </p>
             </div>

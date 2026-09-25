@@ -2,7 +2,7 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Realiza.vc — Mentoria Social",
+    name: "Realiza.vc · Mentoria Social",
     short_name: "Realiza.vc",
     description:
       "Acompanhamento operacional do Programa de Mentoria Social do Instituto Realiza.vc",

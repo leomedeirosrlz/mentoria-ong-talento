@@ -39,7 +39,7 @@ export function AvisosSection({
       {avisos.length === 0 ? (
         <Card>
           <CardContent className="py-6 text-center text-sm text-muted-foreground">
-            Nenhum aviso publicado — o primeiro chega a quem você escolher no
+            Nenhum aviso publicado. O primeiro chega a quem você escolher no
             campo Quem recebe.
           </CardContent>
         </Card>

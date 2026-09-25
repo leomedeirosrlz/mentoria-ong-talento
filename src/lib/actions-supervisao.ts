@@ -35,7 +35,7 @@ async function me() {
 export async function registrarSupervisao(formData: FormData) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
-  if (!eu) return { error: "Sessão expirada — entre de novo." };
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
   if (eu.role !== "supervisor") {
     return { error: "Só o supervisor registra sessões de supervisão." };
   }
@@ -111,8 +111,8 @@ export async function registrarSupervisao(formData: FormData) {
         tipo: "supervisao_registrada",
         titulo: "Sessão de supervisão registrada",
         corpo: mentoradoNome
-          ? `${eu.nome} registrou a supervisão de ${dataBr} sobre a dupla com ${mentoradoNome} — o resumo está na ficha da dupla.`
-          : `${eu.nome} registrou a supervisão de ${dataBr} — sessão geral.`,
+          ? `${eu.nome} registrou a supervisão de ${dataBr} sobre a dupla com ${mentoradoNome}. O resumo está na ficha da dupla.`
+          : `${eu.nome} registrou a supervisão de ${dataBr} · sessão geral.`,
         href: duplaId ? `/duplas/${duplaId}` : null,
       },
     ],
@@ -130,7 +130,7 @@ export async function registrarSupervisao(formData: FormData) {
 export async function excluirSupervisao(id: string) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
-  if (!eu) return { error: "Sessão expirada — entre de novo." };
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
   if (eu.role !== "coordenacao") {
     return { error: "Só a coordenação pode excluir uma sessão de supervisão." };
   }

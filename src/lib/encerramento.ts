@@ -28,7 +28,7 @@ export const CHECKLIST_ENCERRAMENTO: {
 }[] = [
   {
     key: "feedback_final",
-    label: "Encontro de encerramento realizado — celebração e fechamento",
+    label: "Encontro de encerramento realizado: celebração e fechamento",
   },
   {
     key: "feedback_mutuo",
@@ -36,7 +36,7 @@ export const CHECKLIST_ENCERRAMENTO: {
   },
   {
     key: "revisao_pdm",
-    label: "PDM e Roda da Vida revisados — avanços e o que segue em aberto",
+    label: "PDM e Roda da Vida revisados: avanços e o que segue em aberto",
   },
   {
     key: "avaliacao_360_enviada",
@@ -187,7 +187,7 @@ export function mediaAvaliacaoLabel(media: number): string {
  *  do relatório final do guia. Gerado dos dados; não é campo livre. */
 export function textoResumoJornada(r: ResumoJornada): string {
   const linhas = [
-    `Resumo da jornada — ${r.mentorNome} e ${r.mentoradoNome}`,
+    `Resumo da jornada · ${r.mentorNome} e ${r.mentoradoNome}`,
     `Trilha ${TRILHA_LABEL[r.trilha]} · início ${formatDate(r.inicio)}` +
       (r.fim
         ? ` · encerramento ${formatDate(r.fim)}`
@@ -206,7 +206,7 @@ export function textoResumoJornada(r: ResumoJornada): string {
     for (const u of r.ultimosRegistros) {
       linhas.push(
         `· ${u.numero}º encontro (${formatDate(u.data)})` +
-          `${u.tema ? ` — ${u.tema}` : ""}` +
+          `${u.tema ? ` · ${u.tema}` : ""}` +
           `${u.avaliacao ? ` · avaliação ${AVALIACAO_LABEL[u.avaliacao].toLowerCase()}` : ""}`
       );
     }

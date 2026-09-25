@@ -3,13 +3,19 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import {
   BookOpen,
+  CalendarPlus,
   CaretDown,
   ChatsCircle,
   ClockCounterClockwise,
+  DotsThree,
+  FlagCheckered,
   HandHeart,
+  PaperPlaneTilt,
+  UserPlus,
   VideoCamera,
-
+  WhatsappLogo,
 } from "@phosphor-icons/react/dist/ssr";
+import { Menu as MenuPrimitive } from "@base-ui/react/menu";
 import {
   getCicloEventos,
   getDupla,
@@ -43,9 +49,10 @@ import {
   saudadeDaDupla,
   toDateStr,
   TRILHA_LABEL,
+  waLink,
   type PassoGuia,
 } from "@/lib/ciclo";
-import { SemaforoBadge, SemaforoDot } from "@/components/semaforo";
+import { AvaliacaoBadge, SemaforoBadge, SemaforoDot } from "@/components/semaforo";
 import { NudgeButton } from "@/components/nudge-button";
 import { NotaEncontro } from "@/components/nota-encontro";
 import { AgendarEncontroDialog } from "@/components/agendar-encontro-dialog";
@@ -54,6 +61,7 @@ import { EditarDuplaDialog } from "@/components/editar-dupla-dialog";
 import { NaoAconteceuButton, DesfazerNaoAconteceuButton } from "@/components/nao-aconteceu-button";
 import { RegistroForm } from "@/components/registro-form";
 import {
+  RegistroDetails,
   RegistroInline,
   RegistroInlinePanel,
   RegistroInlineTrigger,
@@ -81,8 +89,20 @@ import { AnexosRegistro } from "@/components/anexos-registro";
 import { RegistroView } from "@/components/registro-view";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import type { Encaminhamento, Encontro, Material, RegistroAnexo } from "@/lib/types";
 import { cn } from "@/lib/utils";
+
+// mesma pele do DropdownMenuContent (ui/dropdown-menu), composta à mão aqui:
+// o overflow "Mais" precisa de Portal keepMounted — os itens do menu são os
+// próprios triggers dos dialogs, e o unmount do popup ao fechar derrubaria
+// qualquer dialog aberto a partir dele
+const MENU_POPUP =
+  "z-50 max-h-(--available-height) w-56 min-w-32 origin-(--transform-origin) overflow-x-hidden overflow-y-auto rounded-lg bg-popover p-1 text-popover-foreground shadow-md ring-1 ring-foreground/10 duration-150 ease-[cubic-bezier(0.2,0,0,1)] outline-none data-[side=bottom]:slide-in-from-top-1 data-[side=bottom]:slide-out-to-top-1 data-[side=left]:slide-in-from-right-1 data-[side=left]:slide-out-to-right-1 data-[side=right]:slide-in-from-left-1 data-[side=right]:slide-out-to-left-1 data-[side=top]:slide-in-from-bottom-1 data-[side=top]:slide-out-to-bottom-1 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:overflow-hidden data-closed:fade-out-0 data-closed:zoom-out-95";
 
 export async function generateMetadata({
   params,
@@ -175,7 +195,7 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
     combinadosPendentes
       .map((t, i) => `${i + 1}) ${t.descricao}${t.prazo ? ` (até ${formatDate(t.prazo)})` : ""}`)
       .join(" ") +
-    ` — ${primeiroNomeMentor}`;
+    `. ${primeiroNomeMentor}`;
 
   // material de apoio por nº de encontro (guia/template daquele encontro) —
   // a audiência segue a trilha: material DPP nunca cai na trilha especialista
@@ -244,6 +264,127 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
     (ev) => !futurosComPendencia.includes(ev)
   );
 
+  // os 2 registros mais recentes nascem abertos; os demais viram linha-resumo
+  // sob disclosure — a pendência nunca é registro salvo (ela segue visível
+  // via RegistroInline/deep link)
+  const registrosRecentes = new Set(
+    dupla.encontros
+      .filter((e) => e.registro)
+      .map((e) => e.numero)
+      .sort((a, b) => b - a)
+      .slice(0, 2)
+  );
+
+  // ações do header: 1 primária contextual por papel + o resto no overflow
+  // "Mais". Mentor registra a pendência (senão agenda); coord chama no
+  // WhatsApp (o Editar fica quieto ao lado e vira a ação principal quando o
+  // mentor não tem número)
+  const pendenteRegistro =
+    dupla.encontros
+      .filter(temPendencia)
+      .sort((a, b) => a.numero - b.numero)[0] ?? null;
+  const podeAgendar =
+    souMentor && saude.feitos < total && dupla.status === "ativa";
+  // âncora pra /api/nudge — mesmo log do NudgeButton (registra o contato e
+  // redireciona pro wa.me), aqui com peso de CTA primário
+  const waMentor = waLink(
+    dupla.mentor.whatsapp,
+    `Oi ${primeiroNomeMentor}, tudo bem? Passando pra acompanhar a mentoria com ${primeiroNomeMentorado}. Como estão as coisas?`
+  );
+  const nudgeMentor = waMentor
+    ? `/api/nudge?d=${encodeURIComponent(dupla.id)}&to=${encodeURIComponent(waMentor)}&t=nudge`
+    : null;
+  const waMentorado = waLink(
+    dupla.mentorado.whatsapp,
+    `Oi ${primeiroNomeMentorado}, tudo bem? Aqui é ${me.nome.split(" ")[0]}, da equipe do Realiza.vc. Como está indo a mentoria?`
+  );
+  const nudgeMentorado = waMentorado
+    ? `/api/nudge?d=${encodeURIComponent(dupla.id)}&to=${encodeURIComponent(waMentorado)}&t=contato`
+    : null;
+
+  // overflow — os dialogs entram pelo trigger custom (Menu.Item é o
+  // Dialog.Trigger de fato); o keepMounted do Portal segura o dialog montado
+  // quando o menu fecha no clique
+  const maisItens: React.ReactNode[] = [];
+  if (pendenteRegistro && podeAgendar) {
+    maisItens.push(
+      <AgendarEncontroDialog
+        key="agendar"
+        duplaId={dupla.id}
+        numero={proximoNumero}
+        atual={encontroAlvo}
+        sugerido={sugeridoProximo}
+        piso={dupla.iniciada_em ?? undefined}
+        trigger={
+          <DropdownMenuItem>
+            <CalendarPlus aria-hidden /> Agendar encontro
+          </DropdownMenuItem>
+        }
+      />
+    );
+  }
+  if (souCoord) {
+    maisItens.push(
+      <EnviarFormularioDialog
+        key="form"
+        formularios={formulariosAtivos}
+        duplaId={dupla.id}
+        mentor={{
+          id: dupla.mentor.id,
+          nome: dupla.mentor.nome,
+          whatsapp: dupla.mentor.whatsapp,
+        }}
+        mentorado={{
+          id: dupla.mentorado.id,
+          nome: dupla.mentorado.nome,
+          whatsapp: dupla.mentorado.whatsapp,
+        }}
+        trigger={
+          <DropdownMenuItem>
+            <PaperPlaneTilt aria-hidden /> Enviar formulário
+          </DropdownMenuItem>
+        }
+      />
+    );
+  }
+  if (podeSolicitar) {
+    maisItens.push(
+      <SolicitarEspecialistaDialog
+        key="esp"
+        duplaId={dupla.id}
+        especialistas={especialistas}
+        trigger={
+          <DropdownMenuItem>
+            <UserPlus aria-hidden /> Solicitar mentor especialista
+          </DropdownMenuItem>
+        }
+      />
+    );
+  }
+  if (podeEncerrarTrilha) {
+    maisItens.push(
+      <EncerrarTrilhaDialog
+        key="trilha"
+        duplaId={dupla.id}
+        trigger={
+          <DropdownMenuItem>
+            <FlagCheckered aria-hidden /> Encerrar trilha
+          </DropdownMenuItem>
+        }
+      />
+    );
+  }
+  if (souCoord && nudgeMentorado) {
+    maisItens.push(
+      <DropdownMenuItem
+        key="wa-mentorado"
+        render={<a href={nudgeMentorado} target="_blank" rel="noopener noreferrer" />}
+      >
+        <WhatsappLogo aria-hidden /> Falar com mentorado
+      </DropdownMenuItem>
+    );
+  }
+
   const renderEncontro = (passo: PassoGuia) => {
     const enc = dupla.encontros.find((e) => e.numero === passo.numero);
     return (
@@ -264,6 +405,7 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
         materiais={materiaisPorNumero.get(passo.numero) ?? []}
         combinadosPendentes={combinadosPendentes}
         nota={dupla.notas?.find((n) => n.numero === passo.numero)?.texto ?? null}
+        registroAberto={registrosRecentes.has(passo.numero)}
       />
     );
   };
@@ -327,36 +469,18 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {souCoord && <EditarDuplaDialog dupla={dupla} />}
-          {/* envia form ativo pra mentor e/ou mentorado — link único com
-              copiar/WhatsApp, sem sair da ficha */}
-          {souCoord && (
-            <EnviarFormularioDialog
-              formularios={formulariosAtivos}
-              duplaId={dupla.id}
-              mentor={{
-                id: dupla.mentor.id,
-                nome: dupla.mentor.nome,
-                whatsapp: dupla.mentor.whatsapp,
-              }}
-              mentorado={{
-                id: dupla.mentorado.id,
-                nome: dupla.mentorado.nome,
-                whatsapp: dupla.mentorado.whatsapp,
-              }}
-            />
+          {/* a primária é o "o que fazer agora" do papel — o resto mora no
+              Mais ou no quieto (Editar, a segunda ação da coordenação) */}
+          {souMentor && dupla.status === "ativa" && pendenteRegistro && (
+            <a
+              href={`#registrar-${pendenteRegistro.id}`}
+              className={buttonVariants({ variant: "default", size: "sm" })}
+            >
+              Registrar encontro
+            </a>
           )}
-          {/* nudge é papel de coordenação/supervisão — pro próprio mentor o
-              botão abriria conversa consigo mesmo e logaria contato falso */}
-          {!souMentor && (
-            <NudgeButton
-              telefone={dupla.mentor.whatsapp}
-              mensagem={`Oi ${dupla.mentor.nome.split(" ")[0]}, tudo bem? Passando pra acompanhar a mentoria com ${dupla.mentorado.nome.split(" ")[0]}. Como estão as coisas?`}
-              duplaId={dupla.id}
-            />
-          )}
-          {/* quem agenda é a dupla · coordenação monitora e faz nudge */}
-          {souMentor && saude.feitos < total && dupla.status === "ativa" && (
+          {souMentor && !pendenteRegistro && podeAgendar && (
+            // quem agenda é a dupla · coordenação monitora e faz nudge
             <AgendarEncontroDialog
               duplaId={dupla.id}
               numero={proximoNumero}
@@ -365,17 +489,57 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
               piso={dupla.iniciada_em ?? undefined}
             />
           )}
-          {/* pedir especialista é decisão do mentor DPP (guia) — a coordenação
-              também registra demanda, mas quem aceita e agenda é o especialista */}
-          {podeSolicitar && (
-            <SolicitarEspecialistaDialog
+          {/* nudge é papel de coordenação/supervisão — pro próprio mentor o
+              botão abriria conversa consigo mesmo e logaria contato falso.
+              Sem número o NudgeButton mostra a razão e o Editar é quem sobra */}
+          {souCoord &&
+            (nudgeMentor ? (
+              <a
+                href={nudgeMentor}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={buttonVariants({ variant: "default", size: "sm" })}
+              >
+                <WhatsappLogo />
+                Chamar no WhatsApp
+              </a>
+            ) : (
+              <NudgeButton
+                telefone={dupla.mentor.whatsapp}
+                mensagem={`Oi ${primeiroNomeMentor}, tudo bem? Passando pra acompanhar a mentoria com ${primeiroNomeMentorado}. Como estão as coisas?`}
+                duplaId={dupla.id}
+              />
+            ))}
+          {!souMentor && !souCoord && (
+            <NudgeButton
+              telefone={dupla.mentor.whatsapp}
+              mensagem={`Oi ${primeiroNomeMentor}, tudo bem? Passando pra acompanhar a mentoria com ${primeiroNomeMentorado}. Como estão as coisas?`}
               duplaId={dupla.id}
-              especialistas={especialistas}
             />
           )}
-          {/* fechar a trilha curta é do especialista dono ou da coordenação —
-              exige motivo e devolve o resultado pro PDM do jovem */}
-          {podeEncerrarTrilha && <EncerrarTrilhaDialog duplaId={dupla.id} />}
+          {souCoord && <EditarDuplaDialog dupla={dupla} />}
+          {maisItens.length > 0 && (
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                render={
+                  <Button variant="outline" size="sm">
+                    <DotsThree size={16} weight="bold" /> Mais
+                  </Button>
+                }
+              />
+              <MenuPrimitive.Portal keepMounted>
+                <MenuPrimitive.Positioner
+                  className="isolate z-50 outline-none"
+                  align="end"
+                  sideOffset={4}
+                >
+                  <MenuPrimitive.Popup className={MENU_POPUP}>
+                    {maisItens}
+                  </MenuPrimitive.Popup>
+                </MenuPrimitive.Positioner>
+              </MenuPrimitive.Portal>
+            </DropdownMenu>
+          )}
         </div>
       </header>
 
@@ -394,49 +558,11 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
       )}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <section className="min-w-0 space-y-3">
-          <div className="flex items-center justify-between gap-2">
-            {/* rótulo de seção de lista → overline padrão (§3), igual ao
-                "Todos os eventos" da agenda. O sufixo carrega o "sugerido"
-                uma vez só: as datas das linhas são as do guia do ciclo —
-                a dupla confirma ou remarca (a real aparece como "agendado
-                {data}" na própria linha) */}
-            <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-              Encontros
-              <span className="font-normal normal-case tracking-normal">
-                {" "}
-                ·{" "}
-                {ehEsp
-                  ? "datas combinadas pela dupla"
-                  : "datas sugeridas pelo guia"}
-              </span>
-            </h2>
-            {podeRetroativo && (
-              <RegistrarRetroativoDialog
-                duplaId={dupla.id}
-                faltantes={faltantes}
-                trigger={
-                  <Button variant="ghost" size="sm" className="-my-1 text-muted-foreground">
-                    <ClockCounterClockwise size={14} />
-                    Registrar encontro já realizado
-                  </Button>
-                }
-              />
-            )}
-          </div>
-          {encontrosVisiveis.concat(futurosComPendencia).map(renderEncontro)}
-          {encontrosColapsados.length > 0 && (
-            <details className="group">
-              <summary className="flex min-h-11 cursor-pointer list-none items-center gap-1.5 rounded-lg py-3 text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
-                Próximos {encontrosColapsados.length} encontros
-                <CaretDown size={14} aria-hidden className="transition-transform group-open:rotate-180" />
-              </summary>
-              <div className="space-y-3">{encontrosColapsados.map(renderEncontro)}</div>
-            </details>
-          )}
-        </section>
-
-        <aside className="min-w-0 space-y-6">
+        {/* o rail vem antes no DOM: no mobile os combinados e o contexto são o
+            conteúdo primário (a lista de encontros é o histórico longo); no lg
+            o order devolve a coluna pra direita — mesmo padrão da ficha de
+            pessoa, o foco segue a ordem da leitura mobile */}
+        <aside className="min-w-0 space-y-6 lg:order-2">
           {/* o porquê da mentoria especialista — contexto pro especialista
               antes do 1º encontro e pra coordenação acompanhar */}
           {ehEsp && (
@@ -451,7 +577,7 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
               ) : (
                 <p className="text-xs italic text-muted-foreground">
                   {souCoord
-                    ? "Sem contexto registrado — edite a dupla pra adicionar."
+                    ? "Sem contexto registrado. Edite a dupla pra adicionar."
                     : "Sem contexto registrado."}
                 </p>
               )}
@@ -482,7 +608,7 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
             </div>
             <p className="mb-2 text-xs text-muted-foreground">
               Tarefas que a dupla combinou nos encontros
-              {(souMentor || souCoord) && " — marque quando forem feitas"}.
+              {(souMentor || souCoord) && ". Marque quando forem feitas"}.
             </p>
             <EncaminhamentosList
               itens={dupla.encaminhamentos}
@@ -623,6 +749,48 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
             />
           )}
         </aside>
+
+        <section className="min-w-0 space-y-3">
+          <div className="flex items-center justify-between gap-2">
+            {/* rótulo de seção de lista → overline padrão (§3), igual ao
+                "Todos os eventos" da agenda. O sufixo carrega o "sugerido"
+                uma vez só: as datas das linhas são as do guia do ciclo —
+                a dupla confirma ou remarca (a real aparece como "agendado
+                {data}" na própria linha) */}
+            <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+              Encontros
+              <span className="font-normal normal-case tracking-normal">
+                {" "}
+                ·{" "}
+                {ehEsp
+                  ? "datas combinadas pela dupla"
+                  : "datas sugeridas pelo guia"}
+              </span>
+            </h2>
+            {podeRetroativo && (
+              <RegistrarRetroativoDialog
+                duplaId={dupla.id}
+                faltantes={faltantes}
+                trigger={
+                  <Button variant="ghost" size="sm" className="-my-1 text-muted-foreground">
+                    <ClockCounterClockwise size={14} />
+                    Registrar encontro já realizado
+                  </Button>
+                }
+              />
+            )}
+          </div>
+          {encontrosVisiveis.concat(futurosComPendencia).map(renderEncontro)}
+          {encontrosColapsados.length > 0 && (
+            <details className="group">
+              <summary className="flex min-h-11 cursor-pointer list-none items-center gap-1.5 rounded-lg py-3 text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
+                Próximos {encontrosColapsados.length} encontros
+                <CaretDown size={14} aria-hidden className="transition-transform group-open:rotate-180" />
+              </summary>
+              <div className="space-y-3">{encontrosColapsados.map(renderEncontro)}</div>
+            </details>
+          )}
+        </section>
       </div>
 
       {/* resumo gerado da jornada — base do relatório final do guia; no
@@ -649,6 +817,7 @@ function EncontroRow({
   materiais,
   combinadosPendentes,
   nota,
+  registroAberto,
 }: {
   /** Passo do guia da trilha (data sugerida no DPP; sem data no especialista). */
   passo: PassoGuia;
@@ -667,6 +836,9 @@ function EncontroRow({
   combinadosPendentes: Encaminhamento[];
   /** Anotação/plano do mentor pra esse nº do ciclo — null = sem nota. */
   nota: string | null;
+  /** Registro entre os mais recentes da dupla — nasce expandido; os demais
+   *  viram linha-resumo sob disclosure (o deep link `#registrar-{id}` abre). */
+  registroAberto: boolean;
 }) {
   const feito = encontro?.status === "realizado";
   const naoAconteceu = encontro?.status === "nao_aconteceu";
@@ -712,24 +884,41 @@ function EncontroRow({
     (encontro?.status === "agendado" && podeMarcar && !!encontro.data_hora) ||
     (naoAconteceu && podeMarcar) ||
     !!reg?.precisa_apoio;
-  // a 1ª cláusula é a data do guia, nua — o "sugerido" mora uma vez no
-  // rótulo da seção, não em cada linha. Depois de realizado sem divergência
-  // a data oficial é ruído e a meta abre direto no "realizado {data}" (§4).
-  // Join com " · " evita separador órfão quando a primeira cláusula some
-  const metaEncontro = [
+  // linha 1 (data + situação): a 1ª cláusula é a data do guia, nua — o
+  // "sugerido" mora uma vez no rótulo da seção, não em cada linha. Depois de
+  // realizado sem divergência a data oficial é ruído e a linha abre direto
+  // no "realizado {data}" (§4). Join com " · " evita separador órfão
+  const linha1 = [
     !(feito && !diverge) && passo.data && formatDate(passo.data),
     encontro?.data_hora &&
       `${feito && !diverge ? "realizado" : "agendado"} ${formatDateTime(encontro.data_hora)}`,
-    diverge && `realizado em ${formatDate(encontro?.realizado_em)}`,
-    encontro?.origem === "externo" && "marcado fora da plataforma",
     naoAconteceu && "não aconteceu",
-    !materialHref &&
-      material &&
-      `${material.titulo}${materiais.length > 1 ? ` +${materiais.length - 1}` : ""}`,
-    encontro?.motivo_reagendamento && `remarcado: ${encontro.motivo_reagendamento}`,
   ]
     .filter(Boolean)
     .join(" · ");
+  // linha 2 (secundários — só quando existe): contexto que não é o estado do
+  // encontro — divergência de data, origem externa, motivo da remarcação,
+  // material sem destino e o foco do passo (trilha especialista)
+  const linha2 = [
+    diverge && `de fato em ${formatDate(encontro?.realizado_em)}`,
+    encontro?.origem === "externo" && "marcado fora da plataforma",
+    encontro?.motivo_reagendamento && `remarcado: ${encontro.motivo_reagendamento}`,
+    !materialHref &&
+      material &&
+      `${material.titulo}${materiais.length > 1 ? ` +${materiais.length - 1}` : ""}`,
+    passo.foco,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  // resumo do registro na linha colapsada: tema (com ferramenta) é a leitura
+  // mais rápida; atividades ou reflexões cobrem registro sem tema
+  const regPreview = reg
+    ? (reg.tema
+        ? `${reg.tema}${reg.ferramenta ? ` · ${reg.ferramenta}` : ""}`
+        : null) ??
+      (reg.atividades.length > 0 ? reg.atividades.join(", ") : null) ??
+      reg.reflexoes
+    : null;
 
   const card = (
     <div
@@ -765,9 +954,13 @@ function EncontroRow({
           <div className="min-w-0 flex-1">
             <p className="text-sm font-medium line-clamp-2">{passo.titulo}</p>
             <p className="text-xs text-muted-foreground">
-              {[metaEncontro, passo.foco].filter(Boolean).join(" · ") ||
-                "Data a combinar"}
+              {linha1 || "Data a combinar"}
             </p>
+            {linha2 && (
+              <p className="mt-0.5 text-xs text-muted-foreground/75 line-clamp-2">
+                {linha2}
+              </p>
+            )}
             {(linkSeguro(encontro?.link) || materialHref) && (
               <div className="mt-2 flex flex-wrap gap-2">
                 {linkSeguro(encontro?.link) && (
@@ -847,33 +1040,65 @@ function EncontroRow({
         </div>
       )}
 
-      {reg && (
-        <div className="border-t bg-muted/40 px-4 py-3.5 text-sm space-y-2">
-          <RegistroView
-            reg={reg}
-            tardio={tardio}
-            anexos={
-              <AnexosRegistro
-                registroId={reg.id}
-                duplaId={duplaId}
-                autorId={autorId}
-                podeAnexar={podeAnexar}
-                podeRemover={podeRemoverAnexos}
-                anexos={anexos}
+      {/* registro salvo = histórico: linha-resumo (apoio, avaliação, tema) +
+          disclosure pro corpo completo. Só os mais recentes nascem abertos;
+          o deep link #registrar-{id} continua abrindo o bloco */}
+      {reg && encontro && (
+        <RegistroDetails
+          encontroId={encontro.id}
+          aberto={registroAberto}
+          className="group/reg border-t bg-muted/40"
+        >
+          <summary className="flex cursor-pointer list-none items-center gap-2.5 px-4 py-2.5 transition-colors hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
+            <span className="shrink-0 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+              Registro
+            </span>
+            {reg.precisa_apoio && (
+              <HandHeart
+                size={13}
+                aria-label="Apoio solicitado"
+                className="shrink-0 text-[var(--danger)]"
               />
-            }
-          />
-          {podeEditar && encontro && (
-            <div className="pt-1">
-              <EditarRegistro
-                encontroId={encontro.id}
-                duplaId={duplaId}
-                evento={passo}
-                registro={reg}
-              />
-            </div>
-          )}
-        </div>
+            )}
+            {reg.avaliacao && <AvaliacaoBadge avaliacao={reg.avaliacao} />}
+            {regPreview && (
+              <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
+                {regPreview}
+              </span>
+            )}
+            <CaretDown
+              size={13}
+              aria-hidden
+              className="ml-auto shrink-0 text-muted-foreground transition-transform group-open/reg:rotate-180"
+            />
+          </summary>
+          <div className="space-y-2 px-4 pb-3.5 pt-1 text-sm">
+            <RegistroView
+              reg={reg}
+              tardio={tardio}
+              anexos={
+                <AnexosRegistro
+                  registroId={reg.id}
+                  duplaId={duplaId}
+                  autorId={autorId}
+                  podeAnexar={podeAnexar}
+                  podeRemover={podeRemoverAnexos}
+                  anexos={anexos}
+                />
+              }
+            />
+            {podeEditar && (
+              <div className="pt-1">
+                <EditarRegistro
+                  encontroId={encontro.id}
+                  duplaId={duplaId}
+                  evento={passo}
+                  registro={reg}
+                />
+              </div>
+            )}
+          </div>
+        </RegistroDetails>
       )}
 
       {encontro && !reg && podeEditar &&

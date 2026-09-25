@@ -62,7 +62,7 @@ export async function gerarLinksParaDupla(input: {
     .select("id, role")
     .eq("user_id", (claimsData?.claims?.sub as string) ?? "")
     .maybeSingle();
-  if (!eu) return { error: "Sessão expirada — entre de novo." };
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
   if (eu.role !== "coordenacao")
     return { error: "Só a coordenação envia formulários." };
 
@@ -175,7 +175,7 @@ export async function enviarAnamneseMentorado(
     .select("id, role")
     .eq("user_id", (claimsData?.claims?.sub as string) ?? "")
     .maybeSingle();
-  if (!eu) return { error: "Sessão expirada — entre de novo." };
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
   if (eu.role !== "coordenacao")
     return { error: "Só a coordenação envia formulários." };
 
@@ -188,7 +188,7 @@ export async function enviarAnamneseMentorado(
   if (!form)
     return { error: "A anamnese oficial ainda não está cadastrada no banco." };
   if (!form.ativo)
-    return { error: "A anamnese oficial está encerrada — reative-a em Formulários." };
+    return { error: "A anamnese oficial está encerrada. Reative-a em Formulários." };
 
   const { data: alvo } = await supabase
     .from("mentorados")
@@ -220,7 +220,7 @@ export async function enviarAnamneseMentorado(
     .maybeSingle();
   if (eLink) return { error: erroAmigavel(eLink) };
   if (!link?.token)
-    return { error: "Link gerado, mas o token não apareceu — abra a ficha do formulário." };
+    return { error: "Link gerado, mas o token não apareceu. Abra a ficha do formulário." };
 
   return {
     ok: true,

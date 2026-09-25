@@ -105,7 +105,7 @@ export function RegistrarRetroativoDialog({
         const res = await registrarEncontroRetroativo(duplaId, Number(numero), local);
         if (res?.error) toast.error(res.error);
         else {
-          toast.success("Encontro registrado — agora complete o registro.");
+          toast.success("Encontro registrado. Agora complete o registro.");
           setOpen(false);
           setNumero(null);
           setQuando("");
@@ -126,7 +126,7 @@ export function RegistrarRetroativoDialog({
           router.refresh();
         }
       } catch {
-        toast.error("Sem conexão — tente de novo.");
+        toast.error("Sem conexão. Tente de novo.");
       }
     });
   }

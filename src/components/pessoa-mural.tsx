@@ -57,22 +57,28 @@ export function PessoaMural({
 
   function publicar(agora?: string) {
     const valor = (agora ?? textoRef.current).trim();
-    if (!valor || pendingRef.current) return;
+    // na demo não há escrita — o rascunho fica como texto ilustrativo no
+    // campo, sem action (addPessoaNota devolveria DEMO_MSG como toast erro)
+    if (!valor || pendingRef.current || demo) return;
     start(async () => {
-      const res = await addPessoaNota({
-        profileId: tipo === "profile" ? pessoaId : undefined,
-        mentoradoId: tipo === "mentorado" ? pessoaId : undefined,
-        texto: valor,
-      });
-      if (res?.error) {
-        toast.error(res.error);
-        return; // rascunho segue no campo e no localStorage
+      try {
+        const res = await addPessoaNota({
+          profileId: tipo === "profile" ? pessoaId : undefined,
+          mentoradoId: tipo === "mentorado" ? pessoaId : undefined,
+          texto: valor,
+        });
+        if (res?.error) {
+          toast.error(res.error);
+          return; // rascunho segue no campo e no localStorage
+        }
+        localStorage.removeItem(draftKey);
+        // só limpa se o campo ainda tem o que foi publicado — o que a pessoa
+        // digitou durante o voo da action não se perde
+        setTexto((cur) => (cur.trim() === valor ? "" : cur));
+        router.refresh();
+      } catch {
+        toast.error("Sem conexão. Tente de novo.");
       }
-      localStorage.removeItem(draftKey);
-      // só limpa se o campo ainda tem o que foi publicado — o que a pessoa
-      // digitou durante o voo da action não se perde
-      setTexto((cur) => (cur.trim() === valor ? "" : cur));
-      router.refresh();
     });
   }
 
@@ -84,11 +90,13 @@ export function PessoaMural({
 
   function apagar(notaId: string) {
     setApagando(notaId);
-    deletePessoaNota(notaId, pessoaId).then((res) => {
-      if (res?.error) toast.error(res.error);
-      else router.refresh();
-      setApagando(null);
-    });
+    deletePessoaNota(notaId, pessoaId)
+      .then((res) => {
+        if (res?.error) toast.error(res.error);
+        else router.refresh();
+      })
+      .catch(() => toast.error("Sem conexão. Tente de novo."))
+      .finally(() => setApagando(null));
   }
 
   return (
@@ -119,12 +127,14 @@ export function PessoaMural({
             enterKeyHint="send"
             maxLength={10000}
             rows={3}
-            placeholder={`Escreva uma nota sobre ${nomePessoa.split(" ")[0]} — observação, combinado, contexto…`}
+            placeholder={`Escreva uma nota sobre ${nomePessoa.split(" ")[0]}: observação, combinado, contexto…`}
             aria-label="Nova nota"
             aria-describedby="mural-hint"
           />
           <p id="mural-hint" className="text-xs text-muted-foreground" aria-live="polite">
-            {pending ? "Publicando…" : "Só você vê suas notas aqui"}
+            {pending
+              ? "Publicando…"
+              : "Só você vê suas notas · Enter ou sair do campo publica"}
           </p>
         </div>
       )}
@@ -132,7 +142,7 @@ export function PessoaMural({
       {notas.length === 0 ? (
         <p className="py-4 text-center text-sm text-muted-foreground">
           Nenhuma nota sua ainda.
-          {podeAnotar && " Observações e combinados sobre a pessoa ficam aqui — só você lê."}
+          {podeAnotar && " Observações e combinados sobre a pessoa ficam aqui. Só você lê."}
         </p>
       ) : (
         <ul className="space-y-3">

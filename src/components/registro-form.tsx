@@ -403,7 +403,7 @@ export function RegistroForm({
           router.refresh();
         }
       } catch {
-        toast.error("Sem conexão — tente de novo.");
+        toast.error("Sem conexão. Tente de novo.");
       }
     });
   }
@@ -478,7 +478,7 @@ export function RegistroForm({
         <div className="space-y-5">
           {combinadosPendentes && combinadosPendentes.length > 0 && (
             <fieldset className="min-w-0 space-y-2">
-              <legend className="text-sm font-medium">Da última vez — marcar como feito?</legend>
+              <legend className="text-sm font-medium">Da última vez: marcar como feito?</legend>
               {combinadosPendentes.map((c) => {
                 const vencido = c.prazo != null && c.prazo < hojeStr;
                 return (
@@ -794,10 +794,13 @@ export function RegistroForm({
           valendo pro documento) */}
       <div
         className={cn(
-          "sticky bottom-0 flex items-center gap-2 border-t py-3",
+          "sticky flex items-center gap-2 border-t py-3",
           embutido
-            ? "-mx-4 -mb-4 bg-popover px-4"
-            : "-mx-5 -mb-5 rounded-b-xl bg-card px-5"
+            ? // no dialog o bottom-0 é do scrollport do popup — a bottom nav
+              // da página fica sob o overlay e não interfere
+              "bottom-0 -mx-4 -mb-4 bg-popover px-4"
+            : // inline (ficha da dupla): no mobile pula a bottom nav fixa
+              "bottom-[calc(4rem+env(safe-area-inset-bottom))] -mx-5 -mb-5 rounded-b-xl bg-card px-5 md:bottom-0"
         )}
       >
         {etapa > 0 && (

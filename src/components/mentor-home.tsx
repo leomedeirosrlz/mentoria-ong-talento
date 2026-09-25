@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowUpRight, BookOpen, ClipboardText, HandHeart, Users, VideoCamera, Warning } from "@phosphor-icons/react/dist/ssr";
+import { ArrowUpRight, BookOpen, CalendarPlus, ClipboardText, HandHeart, Users, VideoCamera } from "@phosphor-icons/react/dist/ssr";
 import {
   alvoAgendamento,
   eventoDaSemana,
@@ -19,7 +19,8 @@ import type {
   Profile,
 } from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { buttonVariants } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { AgendarEncontroDialog } from "@/components/agendar-encontro-dialog";
 import { DuplaNomes } from "@/components/dupla-nomes";
 import { RegistrarRetroativoDialog } from "@/components/registrar-retroativo-dialog";
@@ -117,6 +118,50 @@ export function MentorHome({
         const pendentes = dupla.encaminhamentos.filter((t) => t.status === "pendente");
         const hojeStr = toDateStr(hoje);
 
+        // máquina de estados do painel "O que fazer agora" — um primário por
+        // dupla: pendência de registro vem antes de qualquer agendamento (a
+        // dupla resolve o passado, depois o futuro). saude.proximo só cobre
+        // "agendado" futuro; uma row "remarcado" com data futura é o mesmo
+        // caso na prática e trata como agendado aqui.
+        const agendado =
+          proximoAgendado ??
+          (encontroAlvo?.data_hora && new Date(encontroAlvo.data_hora) > hoje
+            ? encontroAlvo
+            : null);
+        // "Agendar próximo" no estado quieto: primeiro número livre depois
+        // do agendado — livre = sem row realizada/agendada/remarcada
+        // (nao_aconteceu e cancelado voltam a ser agendáveis; o dialog
+        // recebe a row em `atual` e edita em vez de criar duplicata)
+        const numerosOcupados = new Set(
+          dupla.encontros
+            .filter(
+              (e) =>
+                e.status === "realizado" ||
+                e.status === "agendado" ||
+                e.status === "remarcado"
+            )
+            .map((e) => e.numero)
+        );
+        let seguinteNumero: number | null = null;
+        if (agendado) {
+          for (let n = agendado.numero + 1; n <= totalDupla; n++) {
+            if (!numerosOcupados.has(n)) {
+              seguinteNumero = n;
+              break;
+            }
+          }
+        }
+        const encontroSeguinte =
+          seguinteNumero != null
+            ? (dupla.encontros.find((e) => e.numero === seguinteNumero) ?? null)
+            : null;
+        const sugeridoSeguinte =
+          seguinteNumero != null && !ehEsp
+            ? eventos.find(
+                (e) => e.tipo === "encontro" && e.numero === seguinteNumero
+              )?.data
+            : undefined;
+
         return (
           <Card key={dupla.id} className="animate-enter overflow-hidden">
             {/* -mt cobre o py do Card — o banner ink encosta no topo;
@@ -176,8 +221,8 @@ export function MentorHome({
                     className="mt-0.5 shrink-0 text-[var(--warn-text)]"
                   />
                   <span>
-                    <span className="font-medium">Apoio solicitado</span> — a
-                    coordenação já foi avisada e vai entrar em contato com você.
+                    <span className="font-medium">Apoio solicitado.</span>{" "}
+                    A coordenação já foi avisada e vai entrar em contato com você.
                   </span>
                 </p>
               )}
@@ -190,29 +235,18 @@ export function MentorHome({
                 duplaId={dupla.id}
               />
               <MarcoNotifier duplaId={dupla.id} feitos={jornada.feitos} total={jornada.total} />
-              {semRegistro && ativa && (
-                <Link
-                  href={`/duplas/${dupla.id}#registrar-${semRegistro.id}`}
-                  className="flex items-center gap-3 rounded-lg border border-[var(--warn)]/50 bg-[var(--warn)]/8 px-4 py-3 text-sm transition-colors hover:bg-[var(--warn)]/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
-                >
-                  <Warning size={18} aria-hidden className="text-[var(--warn-text)] shrink-0" />
-                  {semRegistro.status === "agendado" ? (
-                    <span>
-                      O {semRegistro.numero}º encontro estava agendado — aconteceu?{" "}
-                      <span className="font-medium underline">Registre como foi</span>
-                    </span>
-                  ) : (
-                    <span>
-                      O {semRegistro.numero}º encontro aconteceu e ainda não tem registro.{" "}
-                      <span className="font-medium underline">Registrar agora</span>
-                    </span>
-                  )}
-                </Link>
-              )}
-
               <div className="grid gap-4 sm:grid-cols-2">
-                <div className="rounded-lg bg-muted/40 p-4">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-1">Próximo encontro</p>
+                {/* um primário por dupla — a máquina de estados acima decide
+                    qual é o próximo passo; o resto fica quieto ou some */}
+                <div
+                  className={cn(
+                    "rounded-lg p-4",
+                    semRegistro && ativa
+                      ? "border border-[var(--warn)]/50 bg-[var(--warn)]/8"
+                      : "bg-muted/40"
+                  )}
+                >
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-1">O que fazer agora</p>
                   {!ativa ? (
                     <p className="font-medium text-muted-foreground">
                       {dupla.status === "pausada"
@@ -221,67 +255,125 @@ export function MentorHome({
                           ? "Jornada concluída. Agradecemos pelo ciclo!"
                           : "Dupla encerrada. Agradecemos pela jornada!"}
                     </p>
+                  ) : semRegistro ? (
+                    <>
+                      <p className="font-medium">
+                        {semRegistro.status === "agendado"
+                          ? `O ${semRegistro.numero}º encontro estava agendado e já passou.`
+                          : `O ${semRegistro.numero}º encontro aconteceu.`}
+                      </p>
+                      <p className="text-sm text-muted-foreground mt-0.5">
+                        {semRegistro.status === "agendado"
+                          ? "Se rolou, conte como foi."
+                          : "Falta só o registro de como foi."}
+                      </p>
+                      <div className="mt-3">
+                        <Link
+                          href={`/duplas/${dupla.id}#registrar-${semRegistro.id}`}
+                          className={buttonVariants({ size: "sm" })}
+                        >
+                          <ClipboardText size={16} />
+                          Registrar como foi
+                        </Link>
+                      </div>
+                    </>
                   ) : cicloCompleto ? (
                     <p className="font-medium">
                       {totalDupla} encontros concluídos.
                     </p>
-                  ) : proximoAgendado ? (
+                  ) : agendado ? (
                     <>
                       <p className="font-medium">
-                        {proximoAgendado.numero}º · {formatDateTime(proximoAgendado.data_hora)}
+                        {agendado.numero}º encontro agendado
                       </p>
-                      {/* na hora do encontro o link da chamada é a ação nº1 —
-                          chip próprio, não texto corrido (mesmo fix do CC-1) */}
-                      {linkSeguro(proximoAgendado.link) && (
-                        <a
-                          href={linkSeguro(proximoAgendado.link)!}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="mt-2 inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-[var(--ok)]/40 bg-[var(--ok)]/10 px-2.5 text-sm font-medium text-[var(--ok-text)] transition-colors hover:bg-[var(--ok)]/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:min-h-7"
-                        >
-                          <VideoCamera size={16} aria-hidden />
-                          Entrar na chamada
-                          <span className="sr-only"> (abre em nova aba)</span>
-                        </a>
-                      )}
+                      <p className="text-sm text-muted-foreground mt-0.5">
+                        {formatDateTime(agendado.data_hora)}
+                      </p>
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                        {/* na hora do encontro o link da chamada é a ação nº1 —
+                            chip próprio, não texto corrido (mesmo fix do CC-1) */}
+                        {linkSeguro(agendado.link) && (
+                          <a
+                            href={linkSeguro(agendado.link)!}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-[var(--ok)]/40 bg-[var(--ok)]/10 px-2.5 text-sm font-medium text-[var(--ok-text)] transition-colors hover:bg-[var(--ok)]/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:min-h-7"
+                          >
+                            <VideoCamera size={16} aria-hidden />
+                            Entrar na chamada
+                            <span className="sr-only"> (abre em nova aba)</span>
+                          </a>
+                        )}
+                        {seguinteNumero != null && (
+                          <AgendarEncontroDialog
+                            duplaId={dupla.id}
+                            numero={seguinteNumero}
+                            atual={encontroSeguinte}
+                            sugerido={sugeridoSeguinte}
+                            piso={dupla.iniciada_em ?? undefined}
+                            trigger={
+                              <Button variant="outline" size="sm">
+                                <CalendarPlus size={16} />
+                                Agendar próximo
+                              </Button>
+                            }
+                          />
+                        )}
+                      </div>
                     </>
                   ) : encontroAlvo ? (
                     // a row existe mas o horário já passou ou não aconteceu —
                     // nunca "ainda não agendado"
                     <>
                       <p className="font-medium">
-                        {encontroAlvo.numero}º · {formatDateTime(encontroAlvo.data_hora)}
+                        {encontroAlvo.numero}º encontro{" "}
+                        {encontroAlvo.status === "nao_aconteceu" ||
+                        encontroAlvo.status === "cancelado"
+                          ? "não aconteceu."
+                          : "já passou."}
                       </p>
                       <p className="text-sm text-muted-foreground mt-0.5">
-                        {encontroAlvo.status === "nao_aconteceu"
-                          ? "não aconteceu — remarque quando puder"
-                          : "já passou — registre como foi ou remarque"}
+                        {encontroAlvo.status === "nao_aconteceu" ||
+                        encontroAlvo.status === "cancelado"
+                          ? "Remarque quando puder."
+                          : "Se rolou, registre na ficha da dupla; se não, remarque."}
                       </p>
+                      <div className="mt-3">
+                        <AgendarEncontroDialog
+                          duplaId={dupla.id}
+                          numero={proximoNumero}
+                          atual={encontroAlvo}
+                          sugerido={sugeridoProximo}
+                          piso={dupla.iniciada_em ?? undefined}
+                          trigger={
+                            <Button size="sm">
+                              <CalendarPlus size={16} />
+                              Remarcar
+                            </Button>
+                          }
+                        />
+                      </div>
                     </>
                   ) : (
                     <>
-                      {/* "encontro" não repete — o rótulo do bloco já é
-                          "Próximo encontro" (mesma elipse do "nº · data") */}
-                      <p className="font-medium">{proximoNumero}º ainda não agendado</p>
+                      <p className="font-medium">{proximoNumero}º encontro ainda não agendado</p>
                       <p className="text-sm text-muted-foreground mt-0.5">
                         {sugeridoProximo
-                          ? `sugerido: ${formatDate(sugeridoProximo)}`
-                          : "data a combinar"}
+                          ? `Sugerido: ${formatDate(sugeridoProximo)}`
+                          : "Data a combinar"}
                       </p>
+                      <div className="mt-3">
+                        <AgendarEncontroDialog
+                          duplaId={dupla.id}
+                          numero={proximoNumero}
+                          atual={encontroAlvo}
+                          sugerido={sugeridoProximo}
+                          piso={dupla.iniciada_em ?? undefined}
+                        />
+                      </div>
                     </>
                   )}
-                  {ativa && !cicloCompleto && (
-                    <div className="mt-3">
-                      <AgendarEncontroDialog
-                        duplaId={dupla.id}
-                        numero={proximoNumero}
-                        atual={encontroAlvo}
-                        sugerido={sugeridoProximo}
-                        piso={dupla.iniciada_em ?? undefined}
-                      />
-                    </div>
-                  )}
-                  {ativa && faltantes.length > 0 && (
+                  {ativa && !cicloCompleto && faltantes.length > 0 && (
                     <p className="mt-3 text-xs text-muted-foreground">
                       Encontraram-se sem agendar?{" "}
                       <RegistrarRetroativoDialog
@@ -343,7 +435,7 @@ export function MentorHome({
                             className="flex min-h-11 items-center gap-2 rounded-md text-sm font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:min-h-8"
                           >
                             <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-muted-foreground/40" />
-                            +{pendentes.length - 4} mais — ver todos
+                            +{pendentes.length - 4} mais · ver todos
                           </Link>
                         </li>
                       )}
@@ -352,20 +444,12 @@ export function MentorHome({
                 </div>
               </div>
 
-              {/* navegação secundária — fecha o fluxo de leitura sem disputar
-                  o lime com o próximo passo (agendar / registrar / chamada) */}
-              <div className="flex flex-wrap items-center gap-3">
-                <Link
-                  href={`/duplas/${dupla.id}`}
-                  className={buttonVariants({ variant: "outline", size: "sm" })}
-                >
-                  <ClipboardText size={16} />
-                  Ver histórico da dupla
-                </Link>
-                {/* PDM preenchido na dupla vira saída direta — o mentor edita
-                    o link na ficha (RPC definir_pdm_url) ou a coordenação no
-                    dialog de edição */}
-                {linkSeguro(dupla.pdm_url) && (
+              {/* um caminho nomeado pra ficha por card: "Abrir dupla" já mora
+                  no header — aqui só saidas que a ficha não dá (o PDM é link
+                  externo preenchido na dupla; o mentor edita na ficha via RPC
+                  definir_pdm_url ou a coordenação no dialog de edição) */}
+              {linkSeguro(dupla.pdm_url) && (
+                <div className="flex flex-wrap items-center gap-3">
                   <a
                     href={linkSeguro(dupla.pdm_url)!}
                     target="_blank"
@@ -375,8 +459,8 @@ export function MentorHome({
                     <BookOpen size={16} />
                     Abrir PDM
                   </a>
-                )}
-              </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         );

@@ -50,7 +50,7 @@ type Recurso = { icon: Icon; texto: string };
 /** "O que você pode fazer aqui" — os 4-5 pontos que mudam a rotina de cada papel. */
 const RECURSOS: Record<AppRole, Recurso[]> = {
   coordenacao: [
-    { icon: TrafficSignal, texto: "O andamento das duplas em tempo real — quem precisa de atenção aparece destacado." },
+    { icon: TrafficSignal, texto: "O andamento das duplas em tempo real: quem precisa de atenção aparece destacado." },
     { icon: HandHeart, texto: "Pedidos de apoio e de mentoria especializada chegam pra você." },
     { icon: UsersThree, texto: "Formar duplas e gerenciar os cadastros da equipe e dos mentorados." },
     { icon: Megaphone, texto: "Comunicados pra equipe e pra cada grupo de mentores." },
@@ -59,7 +59,7 @@ const RECURSOS: Record<AppRole, Recurso[]> = {
   supervisor: [
     { icon: UsersThree, texto: "As duplas sob sua supervisão num lugar só." },
     { icon: NotePencil, texto: "Notas de acompanhamento na ficha de cada dupla." },
-    { icon: TrafficSignal, texto: "O andamento de cada dupla — quem vai bem e quem precisa de atenção." },
+    { icon: TrafficSignal, texto: "O andamento de cada dupla: quem vai bem e quem precisa de atenção." },
     { icon: FolderOpen, texto: "Os materiais oficiais do programa." },
   ],
   mentor_dpp: [
@@ -77,11 +77,14 @@ const RECURSOS: Record<AppRole, Recurso[]> = {
   ],
 };
 
-// índices dos passos por papel — mentores seguem pros passos de ficha/perfil
-// (0034 + 0030) antes do fechamento; coord/supervisor param no "Sobre você"
+// índices dos passos por papel — o "Sobre você" virou 3 sub-passos
+// (identidade, profissional, interesses/motivação/consentimento) porque 11
+// campos num balão só era a parede que a galera pulava; mentores seguem
+// pros passos de ficha/perfil (0034 + 0030) antes do fechamento
 const PASSO_SOBRE = (ehMentor: boolean) => (ehMentor ? 6 : 2);
-const PASSO_PAREAMENTO = 7;
-const PASSO_DISPONIBILIDADE = 8;
+const SUBPASSOS_SOBRE = 3;
+const PASSO_PAREAMENTO = 9;
+const PASSO_DISPONIBILIDADE = 10;
 
 /** Wizard de primeiro acesso — balão de pergunta por passo, salvando um pedaço
  *  do perfil por vez (salvarOnboarding com patch parcial: só o que o passo
@@ -109,9 +112,10 @@ export function OnboardingFlow({
 }) {
   const router = useRouter();
   const ehMentor = me.role === "mentor_dpp" || me.role === "mentor_especialista";
-  // coord/supervisor: boas-vindas + recursos + ficha pessoal + fechamento (4);
-  // mentores: + foto, apresentação, pareamento e disponibilidade (10)
-  const total = ehMentor ? 10 : 4;
+  // coord/supervisor: boas-vindas + recursos + ficha pessoal em 3 sub-passos
+  // + fechamento (6); mentores: + foto, apresentação, pareamento e
+  // disponibilidade (12)
+  const total = ehMentor ? 12 : 6;
   const [step, setStep] = useState(0);
   const [pending, start] = useTransition();
   const tituloRef = useRef<HTMLHeadingElement>(null);
@@ -169,11 +173,14 @@ export function OnboardingFlow({
 
   const primeiroNome = me.nome.trim().split(/\s+/)[0] || me.nome;
   const ultimo = step === total - 1;
-  // passos de ficha/perfil são opcionais — ganham o ghost "Agora não"
+  // passos de ficha/perfil são opcionais — ganham o ghost "Agora não" e a
+  // saída "Pular tudo e começar"; faixa contínua do primeiro passo de ficha
+  // até a disponibilidade (mentor) ou o fim dos sub-passos (coord/superv.)
   const passoSobre = PASSO_SOBRE(ehMentor);
-  const passoComCampos =
-    step === passoSobre ||
-    (ehMentor && step >= 2 && step <= PASSO_DISPONIBILIDADE);
+  const ultimoComCampos = ehMentor
+    ? PASSO_DISPONIBILIDADE
+    : passoSobre + SUBPASSOS_SOBRE - 1;
+  const passoComCampos = step >= 2 && step <= ultimoComCampos;
 
   function avancar() {
     setStep((s) => Math.min(s + 1, total - 1));
@@ -194,7 +201,7 @@ export function OnboardingFlow({
         if (res.aviso) toast.warning(res.aviso);
         avancar();
       } catch {
-        toast.error("Sem conexão — tente de novo.");
+        toast.error("Sem conexão. Tente de novo.");
       }
     });
   }
@@ -210,7 +217,7 @@ export function OnboardingFlow({
         // o layout relê getMe — onboarded_em setado devolve o shell do app
         router.refresh();
       } catch {
-        toast.error("Sem conexão — tente de novo.");
+        toast.error("Sem conexão. Tente de novo.");
       }
     });
   }
@@ -221,11 +228,11 @@ export function OnboardingFlow({
     e.target.value = "";
     if (!f) return;
     if (!["image/png", "image/jpeg", "image/webp"].includes(f.type)) {
-      toast.error("A foto não entrou — use PNG, JPG ou WebP.");
+      toast.error("A foto não entrou: use PNG, JPG ou WebP.");
       return;
     }
     if (f.size > AVATAR_MAX_BYTES) {
-      toast.error("Imagem grande demais — use uma de até 2 MB.");
+      toast.error("Imagem grande demais: use uma de até 2 MB.");
       return;
     }
     if (objUrl.current) URL.revokeObjectURL(objUrl.current);
@@ -234,10 +241,12 @@ export function OnboardingFlow({
     setFotoUrl(objUrl.current);
   }
 
-  /** Passo "Sobre você" (0034) — a ficha pessoal que alimenta o cadastro e o
-   *  matching. Os sensíveis voltam preenchidos via `pessoal` (self-scoped);
-   *  depois do cadastro, fora da coordenação ninguém mais os lê. */
-  const passoSobreVoce = (
+  /** "Sobre você" em 3 sub-passos (0034) — a ficha pessoal que alimenta o
+   *  cadastro e o matching, fatiada por assunto: identidade, profissional,
+   *  interesses/motivação/consentimento. Os sensíveis voltam preenchidos
+   *  via `pessoal` (self-scoped); depois do cadastro, fora da coordenação
+   *  ninguém mais os lê. Cada sub-passo salva seu pedaço (patch parcial). */
+  const passoSobreIdentidade = (
     <div className="space-y-4">
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
@@ -269,12 +278,17 @@ export function OnboardingFlow({
           />
         </div>
       </div>
-      <div className="grid gap-4 sm:grid-cols-3">
-        <CampoUf
-          value={uf}
-          onChange={(v) => setUf(v === SENTINEL_VAZIO ? "" : v)}
-        />
-        <div className="space-y-2 sm:col-span-1">
+      <CampoUf
+        value={uf}
+        onChange={(v) => setUf(v === SENTINEL_VAZIO ? "" : v)}
+      />
+    </div>
+  );
+
+  const passoSobreProfissional = (
+    <div className="space-y-4">
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="space-y-2">
           <Label htmlFor="ob-cargo">Cargo</Label>
           <Input
             id="ob-cargo"
@@ -284,7 +298,7 @@ export function OnboardingFlow({
             onChange={(e) => setCargo(e.target.value)}
           />
         </div>
-        <div className="space-y-2 sm:col-span-1">
+        <div className="space-y-2">
           <Label htmlFor="ob-empresa">Empresa</Label>
           <Input
             id="ob-empresa"
@@ -306,6 +320,11 @@ export function OnboardingFlow({
           placeholder="Indicação, ONG parceira, rede social…"
         />
       </div>
+    </div>
+  );
+
+  const passoSobreMotivacao = (
+    <div className="space-y-4">
       <CampoInteresses value={interesses} onChange={setInteresses} />
       <div className="space-y-2">
         <Label htmlFor="ob-motivacao">O que te traz ao programa</Label>
@@ -335,6 +354,8 @@ export function OnboardingFlow({
       </label>
     </div>
   );
+
+  const PASSOS_SOBRE = [passoSobreIdentidade, passoSobreProfissional, passoSobreMotivacao];
 
   /** Passo "Pareamento" (mentor, 0034) — o que ajuda a coordenação a escolher
    *  a dupla: preferência de gênero do par + a bagagem que entra na ficha. */
@@ -378,7 +399,9 @@ export function OnboardingFlow({
   );
 
   const titulo = (() => {
-    if (step === passoSobre) return "Sobre você";
+    if (step === passoSobre) return "Sobre você: quem você é";
+    if (step === passoSobre + 1) return "Sobre você: seu trabalho";
+    if (step === passoSobre + 2) return "Sobre você: o que te move";
     if (ehMentor && step === PASSO_PAREAMENTO) return "O que ajuda a formar sua dupla";
     if (ehMentor && step === PASSO_DISPONIBILIDADE) return "Quando você pode encontrar sua dupla";
     switch (step) {
@@ -401,31 +424,36 @@ export function OnboardingFlow({
 
   const hint = (() => {
     if (step === passoSobre)
-      return "Esses dados completam seu cadastro — nascimento, gênero e motivação ficam visíveis só pra coordenação.";
+      return "Como você se apresenta e onde vive. Nascimento e gênero ficam visíveis só pra coordenação.";
+    if (step === passoSobre + 1)
+      return "Cargo, empresa e como você chegou: contexto rápido pra equipe te conhecer.";
+    if (step === passoSobre + 2)
+      return "Interesses e motivação alimentam o matching e ficam só com a coordenação. O consentimento fecha a ficha.";
     if (ehMentor && step === PASSO_PAREAMENTO)
-      return "A coordenação usa isso pra escolher a dupla — tudo opcional, dá pra completar depois no Perfil.";
+      return "A coordenação usa isso pra escolher a dupla: tudo opcional, dá pra completar depois no Perfil.";
     if (ehMentor && step === PASSO_DISPONIBILIDADE)
-      return "Toque nos dias e períodos em que você costuma ter agenda livre — a coordenação cruza com a do mentorado.";
+      return "Toque nos dias e períodos em que você costuma ter agenda livre. A coordenação cruza com a do mentorado.";
     switch (step) {
       case 0:
-        return "A plataforma do Programa de Mentoria Social — a jornada da sua dupla, os registros e os materiais oficiais num lugar só.";
+        return "A plataforma do Programa de Mentoria Social: a jornada da sua dupla, os registros e os materiais oficiais num lugar só.";
       case 1:
         return "O essencial da sua rotina no programa cabe nesta tela.";
       case 2:
-        return "PNG, JPG ou WebP até 2 MB — aparece no seu perfil e nas duplas.";
+        return "PNG, JPG ou WebP até 2 MB. Aparece no seu perfil e nas duplas.";
       case 3:
-        return "O que você faz, o que estudou, o que te trouxe ao programa — aparece no seu perfil pra equipe e pros mentorados.";
+        return "O que você faz, o que estudou, o que te trouxe ao programa. Aparece no seu perfil pra equipe e pros mentorados.";
       case 4:
-        return "Toque pra selecionar ou digite uma nova — dá pra mudar depois no seu perfil.";
+        return "Toque pra selecionar ou digite uma nova. Dá pra mudar depois no seu perfil.";
       case 5:
-        return "Os dois são opcionais — ajudam a equipe e os mentorados a te conhecerem melhor.";
+        return "Os dois são opcionais e ajudam a equipe e os mentorados a te conhecerem melhor.";
       default:
-        return "Seu perfil já está visível pra equipe — dá pra completar ou mudar tudo depois em Perfil.";
+        return "Seu perfil já está visível pra equipe. Dá pra completar ou mudar tudo depois em Perfil.";
     }
   })();
 
   const corpo = (() => {
-    if (step === passoSobre) return passoSobreVoce;
+    if (step >= passoSobre && step < passoSobre + SUBPASSOS_SOBRE)
+      return PASSOS_SOBRE[step - passoSobre];
     if (ehMentor && step === PASSO_PAREAMENTO) return passoPareamento;
     if (ehMentor && step === PASSO_DISPONIBILIDADE) return passoDisponibilidade;
     switch (step) {
@@ -616,15 +644,27 @@ export function OnboardingFlow({
       <footer className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/85 backdrop-blur">
         <div className="mx-auto flex w-full max-w-xl items-center gap-3 px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] sm:px-6">
           {passoComCampos && (
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={avancar}
-              disabled={pending}
-              className="shrink-0"
-            >
-              Agora não
-            </Button>
+            <div className="flex shrink-0 flex-col items-start">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={avancar}
+                disabled={pending}
+              >
+                Agora não
+              </Button>
+              {/* saída honesta pros passos opcionais acumulados: conclui o
+                  onboarding direto (mesmo concluirOnboarding do último
+                  passo) — a ficha pode ser completada depois no Perfil */}
+              <button
+                type="button"
+                onClick={concluir}
+                disabled={pending}
+                className="min-h-9 px-4 text-xs text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline disabled:opacity-50"
+              >
+                Pular tudo e começar
+              </button>
+            </div>
           )}
           {/* sempre type=button + requestSubmit explícito: um botão que vira
               submit no MESMO clique dispara o form do passo seguinte — o

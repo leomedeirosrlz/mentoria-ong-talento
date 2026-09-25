@@ -68,6 +68,19 @@ function Contagem({
   );
 }
 
+/** Uma resposta aberta no resumo — mesmo blockquote nos 3 visíveis e nos
+ *  que abrem no <details> "ver todas". */
+function ItemResposta({ autor, valor }: { autor: string; valor: string }) {
+  return (
+    <li>
+      <blockquote className="border-l-2 border-border pl-3">
+        <p className="whitespace-pre-wrap text-sm leading-relaxed">{valor}</p>
+        <footer className="mt-0.5 text-xs text-muted-foreground">{autor}</footer>
+      </blockquote>
+    </li>
+  );
+}
+
 /** Média de escala tem faixa de leitura — 1,8/5 não pode vestir verde. */
 function corMedia(media: number): string {
   if (media >= 4) return "text-[var(--ok-text)]";
@@ -110,7 +123,7 @@ export function RespostasSection({
   if (respondidos.length === 0) {
     return (
       <p className="rounded-lg border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
-        Nenhuma resposta ainda —{" "}
+        Nenhuma resposta ainda.{" "}
         <a href="#sec-links" className="underline underline-offset-2">
           gere links na seção acima
         </a>{" "}
@@ -194,20 +207,34 @@ export function RespostasSection({
                       {ag.itens.length === 1 ? "resposta" : "respostas"}
                     </p>
                   </div>
+                  {/* amostra de 3 — a parede de texto integral vive no
+                      acordeão por pessoa abaixo; o resto abre sob demanda */}
                   <ul className="mt-2 space-y-2">
-                    {ag.itens.map((it, i) => (
-                      <li key={i}>
-                        <blockquote className="border-l-2 border-border pl-3">
-                          <p className="whitespace-pre-wrap text-sm leading-relaxed">
-                            {it.valor}
-                          </p>
-                          <footer className="mt-0.5 text-xs text-muted-foreground">
-                            {it.autor}
-                          </footer>
-                        </blockquote>
-                      </li>
+                    {ag.itens.slice(0, 3).map((it, i) => (
+                      <ItemResposta key={i} autor={it.autor} valor={it.valor} />
                     ))}
                   </ul>
+                  {ag.itens.length > 3 && (
+                    <details className="group/mais mt-2">
+                      <summary className="flex min-h-11 cursor-pointer list-none items-center gap-1.5 rounded-lg text-xs font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-9 [&::-webkit-details-marker]:hidden">
+                        <CaretDown
+                          size={13}
+                          aria-hidden
+                          className="transition-transform group-open/mais:rotate-180"
+                        />
+                        Ver todas as {ag.itens.length} respostas
+                      </summary>
+                      <ul className="mt-2 space-y-2">
+                        {ag.itens.slice(3).map((it, i) => (
+                          <ItemResposta
+                            key={i + 3}
+                            autor={it.autor}
+                            valor={it.valor}
+                          />
+                        ))}
+                      </ul>
+                    </details>
+                  )}
                 </div>
               ))}
             </div>
