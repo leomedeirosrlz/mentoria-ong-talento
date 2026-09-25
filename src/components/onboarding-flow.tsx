@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -23,9 +24,12 @@ import {
   type Icon,
 } from "@phosphor-icons/react";
 import { concluirOnboarding, salvarOnboarding } from "@/lib/actions";
+import { assinarTermo } from "@/lib/actions-assinaturas";
 import { AREAS_SUGESTOES } from "@/lib/ciclo";
 import { avatarPublicUrl, AVATAR_ACCEPT, AVATAR_MAX_BYTES } from "@/lib/avatar";
+import { AssinaturaForm } from "@/components/assinatura-form";
 import { TagInput } from "@/components/tag-input";
+import { TermoVoluntarioDoc } from "@/components/termo-doc";
 import {
   CampoDisponibilidade,
   CampoGenero,
@@ -40,7 +44,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import type { DadosPessoais } from "@/lib/queries";
-import type { AppRole, Disponibilidade, MentorProfile, Profile } from "@/lib/types";
+import type {
+  AppRole,
+  Assinatura,
+  DadosCivis,
+  Disponibilidade,
+  MentorProfile,
+  Profile,
+} from "@/lib/types";
 
 /** Um form por passo — o botão do footer fixo submete via atributo `form`. */
 const FORM_ID = "onboarding-passo";
@@ -80,7 +91,9 @@ const RECURSOS: Record<AppRole, Recurso[]> = {
 // índices dos passos por papel — o "Sobre você" virou 3 sub-passos
 // (identidade, profissional, interesses/motivação/consentimento) porque 11
 // campos num balão só era a parede que a galera pulava; mentores seguem
-// pros passos de ficha/perfil (0034 + 0030) antes do fechamento
+// pros passos de ficha/perfil (0034 + 0030) antes do fechamento. O termo de
+// voluntariado (0033) entra penúltimo — sempre `total - 2` quando a
+// assinatura ainda está pendente, pra qualquer papel
 const PASSO_SOBRE = (ehMentor: boolean) => (ehMentor ? 6 : 2);
 const SUBPASSOS_SOBRE = 3;
 const PASSO_PAREAMENTO = 9;
@@ -94,6 +107,8 @@ export function OnboardingFlow({
   me,
   pessoal,
   mentorProfile,
+  civis,
+  assinaturaTermo,
   demo,
 }: {
   me: Profile;
@@ -106,17 +121,29 @@ export function OnboardingFlow({
   /** ficha de mentor (mentor_profiles é legível pelo dono) — preenche os
    *  passos de pareamento e disponibilidade. */
   mentorProfile?: MentorProfile | null;
+  /** dados civis do próprio usuário (RPC self-scoped, 0046) — prefill do
+   *  form do termo; null mostra o documento com blanks e o form vazio */
+  civis?: DadosCivis | null;
+  /** assinatura mais recente do termo de voluntariado — status "assinado"
+   *  tira o passo do termo do wizard (não há o que reassinar) */
+  assinaturaTermo?: Assinatura | null;
   /** pill da DemoBar dockada no header do wizard (demo ativa) — clicável em
    *  todos os passos sem cobrir campo nenhum */
   demo?: React.ReactNode;
 }) {
   const router = useRouter();
   const ehMentor = me.role === "mentor_dpp" || me.role === "mentor_especialista";
+  // passo do termo existe só enquanto a assinatura estiver pendente — e é
+  // CONGELADO no mount: assinar no próprio wizard dispara router.refresh() e
+  // a prop voltaria "assinado", encolhendo `total` com o usuário já sentado
+  // no último passo
+  const [temTermo] = useState(() => assinaturaTermo?.status !== "assinado");
   // coord/supervisor: boas-vindas + recursos + ficha pessoal em 3 sub-passos
   // + fechamento (6); mentores: + foto, apresentação, pareamento e
-  // disponibilidade (12)
-  const total = ehMentor ? 12 : 6;
+  // disponibilidade (12); termo pendente adiciona 1 passo pra todo papel
+  const total = (ehMentor ? 12 : 6) + (temTermo ? 1 : 0);
   const [step, setStep] = useState(0);
+  const [termoOk, setTermoOk] = useState(false);
   const [pending, start] = useTransition();
   const tituloRef = useRef<HTMLHeadingElement>(null);
 
@@ -181,6 +208,11 @@ export function OnboardingFlow({
     ? PASSO_DISPONIBILIDADE
     : passoSobre + SUBPASSOS_SOBRE - 1;
   const passoComCampos = step >= 2 && step <= ultimoComCampos;
+  // o termo é penúltimo (antes do "Tudo certo") e fica FORA do <form>
+  // compartilhado: o AssinaturaForm tem form e submit próprios. -1 quando a
+  // assinatura já existe (assinado) — o passo some do wizard inteiro
+  const passoTermo = temTermo ? total - 2 : -1;
+  const ehPassoTermo = step === passoTermo;
 
   function avancar() {
     setStep((s) => Math.min(s + 1, total - 1));
@@ -404,6 +436,7 @@ export function OnboardingFlow({
     if (step === passoSobre + 2) return "Sobre você: o que te move";
     if (ehMentor && step === PASSO_PAREAMENTO) return "O que ajuda a formar sua dupla";
     if (ehMentor && step === PASSO_DISPONIBILIDADE) return "Quando você pode encontrar sua dupla";
+    if (ehPassoTermo) return "Termo de adesão ao trabalho voluntário";
     switch (step) {
       case 0:
         return `Bem-vindo(a) ao Realiza.vc, ${primeiroNome}!`;
@@ -416,7 +449,9 @@ export function OnboardingFlow({
       case 4:
         return "No que você pode ajudar?";
       case 5:
-        return "Pra fechar: LinkedIn e voluntariado";
+        // case 5 é passo de mentor — pra coord/supervisor o índice 5 é o
+        // fechamento ("Tudo certo"), não os campos de LinkedIn
+        return ehMentor ? "Pra fechar: LinkedIn e voluntariado" : `Tudo certo, ${primeiroNome}!`;
       default:
         return `Tudo certo, ${primeiroNome}!`;
     }
@@ -433,6 +468,10 @@ export function OnboardingFlow({
       return "A coordenação usa isso pra escolher a dupla: tudo opcional, dá pra completar depois no Perfil.";
     if (ehMentor && step === PASSO_DISPONIBILIDADE)
       return "Toque nos dias e períodos em que você costuma ter agenda livre. A coordenação cruza com a do mentorado.";
+    if (ehPassoTermo)
+      return demo
+        ? "O documento que formaliza o voluntariado de toda a equipe no programa. Na demonstração ele é só leitura."
+        : "O documento que formaliza o voluntariado de toda a equipe no programa, com a mesma validade de uma assinatura em papel. Leia e, se quiser, já assine; dá pra deixar pra depois também.";
     switch (step) {
       case 0:
         return "A plataforma do Programa de Mentoria Social: a jornada da sua dupla, os registros e os materiais oficiais num lugar só.";
@@ -445,17 +484,81 @@ export function OnboardingFlow({
       case 4:
         return "Toque pra selecionar ou digite uma nova. Dá pra mudar depois no seu perfil.";
       case 5:
-        return "Os dois são opcionais e ajudam a equipe e os mentorados a te conhecerem melhor.";
+        return ehMentor
+          ? "Os dois são opcionais e ajudam a equipe e os mentorados a te conhecerem melhor."
+          : "Seu perfil já está visível pra equipe. Dá pra completar ou mudar tudo depois em Perfil.";
       default:
         return "Seu perfil já está visível pra equipe. Dá pra completar ou mudar tudo depois em Perfil.";
     }
   })();
+
+  // fechamento: quem pulou o termo sai do wizard com o lembrete de onde ele
+  // fica — pendência permanece (ausência de row), resolvida pelo banner da
+  // home, pela linha do /perfil ou direto em /assinar
+  const corpoFechamento =
+    temTermo && !termoOk ? (
+      <p className="rounded-2xl border border-border bg-card px-4 py-3 text-sm leading-relaxed text-muted-foreground">
+        Falta só o termo de adesão ao voluntariado: assine quando puder pelo
+        banner da sua home ou em{" "}
+        <Link
+          href="/assinar"
+          className="font-medium text-primary underline-offset-4 hover:underline"
+        >
+          Assinar
+        </Link>
+        .
+      </p>
+    ) : null;
 
   const corpo = (() => {
     if (step >= passoSobre && step < passoSobre + SUBPASSOS_SOBRE)
       return PASSOS_SOBRE[step - passoSobre];
     if (ehMentor && step === PASSO_PAREAMENTO) return passoPareamento;
     if (ehMentor && step === PASSO_DISPONIBILIDADE) return passoDisponibilidade;
+    // o termo tem form próprio (AssinaturaForm) — intercepta antes do switch
+    // porque o índice colide com o case 5 (linkedin) pra coord/supervisor
+    if (ehPassoTermo) {
+      // demo: só leitura — botão de assinar que sempre falha é má UX
+      if (demo) {
+        return (
+          <div className="space-y-4">
+            <TermoVoluntarioDoc civis={civis} />
+            <p className="rounded-xl border border-border bg-muted/40 px-4 py-3 text-sm leading-relaxed text-muted-foreground">
+              Na demonstração a assinatura não é gravada. No cadastro real é
+              aqui que você confere os dados civis e assina.
+            </p>
+          </div>
+        );
+      }
+      return (
+        <div className="space-y-4">
+          <TermoVoluntarioDoc
+            civis={civis}
+            continuar={{
+              href: "#ob-termo-dados",
+              rotulo: "Continuar para seus dados ↓",
+            }}
+          />
+          <div id="ob-termo-dados" className="scroll-mt-24 space-y-2">
+            <h2 className="text-base font-semibold">Seus dados para assinar</h2>
+            <p className="text-sm leading-relaxed text-muted-foreground">
+              {civis
+                ? "Já temos seus dados do cadastro: confira, corrija se preciso e assine."
+                : "Pra assinar precisamos dos seus dados civis: preencha como no documento de identidade. Eles entram no termo exatamente como digitados."}
+            </p>
+          </div>
+          <AssinaturaForm
+            modo="termo"
+            acao={assinarTermo}
+            dados={civis}
+            onSucesso={() => {
+              setTermoOk(true);
+              avancar();
+            }}
+          />
+        </div>
+      );
+    }
     switch (step) {
       case 1:
         return (
@@ -542,6 +645,9 @@ export function OnboardingFlow({
           </div>
         );
       case 5:
+        // passo de mentor — pra coord/supervisor o índice 5 já é o
+        // fechamento; cair aqui renderizaria campos fora do <form>
+        if (!ehMentor) return corpoFechamento;
         return (
           <div className="space-y-4">
             <div className="space-y-2">
@@ -576,7 +682,7 @@ export function OnboardingFlow({
           </div>
         );
       default:
-        return null;
+        return corpoFechamento;
     }
   })();
 
@@ -643,16 +749,21 @@ export function OnboardingFlow({
       {/* footer fixo: "Agora não" nos passos opcionais + primário */}
       <footer className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/85 backdrop-blur">
         <div className="mx-auto flex w-full max-w-xl items-center gap-3 px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] sm:px-6">
-          {passoComCampos && (
+          {(passoComCampos || ehPassoTermo) && (
             <div className="flex shrink-0 flex-col items-start">
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={avancar}
-                disabled={pending}
-              >
-                Agora não
-              </Button>
+              {/* no termo o ghost é "Assinar depois": avança sem gravar —
+                  a pendência segue como ausência de assinatura. Na demo o
+                  Continuar primário já cobre o pulo, sem ghost duplicado */}
+              {(passoComCampos || !demo) && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={avancar}
+                  disabled={pending}
+                >
+                  {ehPassoTermo ? "Assinar depois" : "Agora não"}
+                </Button>
+              )}
               {/* saída honesta pros passos opcionais acumulados: conclui o
                   onboarding direto (mesmo concluirOnboarding do último
                   passo) — a ficha pode ser completada depois no Perfil */}
@@ -669,32 +780,37 @@ export function OnboardingFlow({
           {/* sempre type=button + requestSubmit explícito: um botão que vira
               submit no MESMO clique dispara o form do passo seguinte — o
               default action do clique é avaliado depois do re-render, então
-              "Continuar" avançava 2 passos (pulava a foto) */}
-          <Button
-            type="button"
-            onClick={() => {
-              if (passoComCampos) {
-                (
-                  document.getElementById(FORM_ID) as HTMLFormElement | null
-                )?.requestSubmit();
-              } else if (ultimo) {
-                concluir();
-              } else {
-                avancar();
-              }
-            }}
-            disabled={pending}
-            className="h-11 flex-1 font-semibold"
-          >
-            {pending
-              ? ultimo
-                ? "Entrando…"
-                : "Salvando…"
-              : ultimo
-                ? "Começar"
-                : "Continuar"}
-            {!pending && (ultimo ? <Check weight="bold" aria-hidden /> : <ArrowRight aria-hidden />)}
-          </Button>
+              "Continuar" avançava 2 passos (pulava a foto).
+              No passo do termo o primário some: o submit mora dentro do
+              AssinaturaForm e um "Continuar" ao lado de "Assinar depois"
+              seria ambíguo; na demo (só leitura) ele volta */}
+          {(!ehPassoTermo || demo) && (
+            <Button
+              type="button"
+              onClick={() => {
+                if (passoComCampos) {
+                  (
+                    document.getElementById(FORM_ID) as HTMLFormElement | null
+                  )?.requestSubmit();
+                } else if (ultimo) {
+                  concluir();
+                } else {
+                  avancar();
+                }
+              }}
+              disabled={pending}
+              className="h-11 flex-1 font-semibold"
+            >
+              {pending
+                ? ultimo || ehPassoTermo
+                  ? "Entrando…"
+                  : "Salvando…"
+                : ultimo
+                  ? "Começar"
+                  : "Continuar"}
+              {!pending && (ultimo ? <Check weight="bold" aria-hidden /> : <ArrowRight aria-hidden />)}
+            </Button>
+          )}
         </div>
       </footer>
     </div>

@@ -15,9 +15,14 @@ export function VoltarLink({ fallback }: { fallback: string }) {
         if (document.referrer.startsWith(window.location.origin)) router.back();
         else router.push(fallback);
       }}
-      className="inline-flex min-h-11 items-center gap-1.5 rounded-md text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:min-h-0"
+      className="group inline-flex min-h-11 items-center gap-1.5 rounded-md text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:min-h-0"
     >
-      <ArrowLeft size={14} aria-hidden /> Voltar
+      <ArrowLeft
+        size={14}
+        aria-hidden
+        className="transition-transform group-hover:-translate-x-0.5"
+      />
+      Voltar
     </button>
   );
 }

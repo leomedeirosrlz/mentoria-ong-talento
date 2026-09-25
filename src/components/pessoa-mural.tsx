@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { CircleNotch, Trash } from "@phosphor-icons/react";
+import { CircleNotch, Notebook, Trash } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { addPessoaNota, deletePessoaNota } from "@/lib/actions";
 import { demoAtivoClient } from "@/lib/demo/shared";
@@ -140,10 +140,15 @@ export function PessoaMural({
       )}
 
       {notas.length === 0 ? (
-        <p className="py-4 text-center text-sm text-muted-foreground">
-          Nenhuma nota sua ainda.
-          {podeAnotar && " Observações e combinados sobre a pessoa ficam aqui. Só você lê."}
-        </p>
+        <div className="flex flex-col items-center gap-2 py-6 text-center">
+          <span className="grid size-11 place-items-center rounded-full bg-muted text-muted-foreground">
+            <Notebook size={18} aria-hidden />
+          </span>
+          <p className="text-sm text-muted-foreground">
+            Nenhuma nota sua ainda.
+            {podeAnotar && " Observações e combinados sobre a pessoa ficam aqui. Só você lê."}
+          </p>
+        </div>
       ) : (
         <ul className="space-y-3">
           {notas.map((n) => (

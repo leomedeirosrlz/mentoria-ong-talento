@@ -33,7 +33,7 @@ import {
 import { DuplaNomes } from "@/components/dupla-nomes";
 import { ChamadaFormacao } from "@/components/chamada-formacao";
 import { NotaEncontro } from "@/components/nota-encontro";
-import { NudgeButton } from "@/components/nudge-button";
+import { WhatsAppRapido, type DestinoWA } from "@/components/whatsapp-rapido";
 import { AgendarEncontroDialog } from "@/components/agendar-encontro-dialog";
 import { RegistrarRetroativoDialog } from "@/components/registrar-retroativo-dialog";
 import { RegistroForm } from "@/components/registro-form";
@@ -42,6 +42,7 @@ import { RevelarApos } from "@/components/revelar-apos";
 import { fade, T } from "@/components/motion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { filterChipCls } from "@/components/ui/filter-chip";
 import {
   Dialog,
   DialogContent,
@@ -76,6 +77,7 @@ import type {
   EspecialistaEvento,
   Material,
 } from "@/lib/types";
+import { msgsContato } from "@/lib/whatsapp-msgs";
 import { cn, normaliza } from "@/lib/utils";
 
 const DIAS_SEMANA = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
@@ -1016,11 +1018,12 @@ export function AgendaCalendario({
         {/* seletor de visão — só coord/sup; a unidade de trabalho delas é a
             semana (encontros são terças). O mentor vai direto pro mês. */}
         {ehCoordSup && (
-          <div
-            role="group"
-            aria-label="Visão da agenda"
-            className="flex items-center gap-1 border-b px-2 py-1.5 sm:px-3"
-          >
+          // escolha exclusiva → radio nativo (padrão OpcaoPilula): setas do
+          // teclado e "selecionado" na leitura de tela saem de graça; a
+          // pill ativa veste a língua do filter-chip (bg-foreground) em vez
+          // do bg-muted que sumia na barra
+          <fieldset className="flex items-center gap-1 border-b px-2 py-1.5 sm:px-3">
+            <legend className="sr-only">Visão da agenda</legend>
             {(
               [
                 ["semana", "Semana"],
@@ -1028,22 +1031,28 @@ export function AgendaCalendario({
                 ["lista", "Lista"],
               ] as const
             ).map(([v, rotulo]) => (
-              <button
+              <label
                 key={v}
-                type="button"
-                aria-pressed={visao === v}
-                onClick={() => setVisao(v)}
                 className={cn(
-                  "min-h-11 flex-1 rounded-full px-4 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:flex-none md:min-h-9",
-                  visao === v
-                    ? "bg-muted text-foreground"
-                    : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                  filterChipCls(visao === v),
+                  // o foco cai no input sr-only — o anel via has-focus-visible
+                  // é o equivalente do focus-visible do chip
+                  "flex-1 cursor-pointer justify-center sm:flex-none",
+                  "has-focus-visible:ring-2 has-focus-visible:ring-ring"
                 )}
               >
+                <input
+                  type="radio"
+                  name="agenda-visao"
+                  value={v}
+                  checked={visao === v}
+                  onChange={() => setVisao(v)}
+                  className="sr-only"
+                />
                 {rotulo}
-              </button>
+              </label>
             ))}
-          </div>
+          </fieldset>
         )}
 
         {/* chrome de navegação — por-visão: meses no "mes", semanas na
@@ -1830,7 +1839,9 @@ export function AgendaCalendario({
             {(itensDupla.length > 0 || faltantesDoDia.length > 0) && (
               <div
                 className={cn(
-                  "rounded-xl bg-muted/40 p-3",
+                  // poço inset — afunda na superfície do painel pra separar
+                  // "seu" (linhas + ações) do oficial do ciclo
+                  "rounded-xl bg-muted/50 p-3 shadow-[var(--shadow-inset)]",
                   eventosSelecionados.length > 0 ? "mt-4" : "mt-3"
                 )}
               >
@@ -2286,6 +2297,31 @@ function EncontroDuplaRow({
   const limbo = emLimbo(encontro, agora);
   const registroPendente =
     !encontro.registro && (encontro.status === "realizado" || limbo);
+  // nudge da coord/sup sobre a pendência — os dois lados da dupla; limbo
+  // pergunta "rolou?", realizado cobra o registro (tipos nudge/contato
+  // coexistem no dedupe de 60s do /api/nudge)
+  const waPendentes = useMemo<DestinoWA[]>(() => {
+    if (!registroPendente) return [];
+    const msgs = msgsContato(limbo ? "limbo" : "registro_pendente", {
+      mentorNome: dupla.mentor.nome,
+      mentoradoNome: dupla.mentorado.nome,
+      extra: `${encontro.numero}º`,
+    });
+    return [
+      {
+        rotulo: "Chamar mentor",
+        telefone: dupla.mentor.whatsapp,
+        mensagem: msgs.mentor ?? "",
+        t: "nudge",
+      },
+      {
+        rotulo: "Chamar mentorado",
+        telefone: dupla.mentorado.whatsapp,
+        mensagem: msgs.mentorado ?? "",
+        t: "contato",
+      },
+    ];
+  }, [registroPendente, limbo, dupla, encontro.numero]);
   // mentor com registro pendente cai direto no card do encontro na página da
   // dupla — lá a âncora abre o RegistroInline; aqui o caminho curto é o CTA.
   // (só usado no ramo ehMentor — coord/sup abrem o detalhe em modal)
@@ -2376,39 +2412,49 @@ function EncontroDuplaRow({
         </Link>
       ) : (
         // coord/sup não escrevem no encontro — a linha abre o detalhe do dia
-        // (registro, plano do mentor, evidências) num modal
-        <button
-          type="button"
-          aria-haspopup="dialog"
-          onClick={() => setDetalheAberto(true)}
-          className="group flex min-h-11 w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left transition-colors hover:bg-muted/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        >
-          <span
-            aria-hidden
-            className={cn("size-2 shrink-0 rounded-full", corDotEncontro(encontro))}
-          />
-          <span className="min-w-0 flex-1">
-            <span className="block truncate text-sm font-medium">
-              <DuplaNomes mentor={dupla.mentor.nome} mentorado={dupla.mentorado.nome} />
+        // (registro, plano do mentor, evidências) num modal. Com pendência
+        // de registro a linha também carrega o menu de nudge dos dois lados
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            aria-haspopup="dialog"
+            onClick={() => setDetalheAberto(true)}
+            className="group flex min-h-11 min-w-0 flex-1 items-center gap-2.5 rounded-lg px-2 py-2 text-left transition-colors hover:bg-muted/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <span
+              aria-hidden
+              className={cn("size-2 shrink-0 rounded-full", corDotEncontro(encontro))}
+            />
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-sm font-medium">
+                <DuplaNomes mentor={dupla.mentor.nome} mentorado={dupla.mentorado.nome} />
+              </span>
+              <span className="block truncate text-xs text-muted-foreground">
+                {encontro.numero}º encontro · {STATUS_ENCONTRO_LABEL[encontro.status].toLowerCase()}
+                {iso
+                  ? `, ${mesmoDia ? `às ${fmtHora.format(new Date(iso))}` : formatDateTime(iso)}`
+                  : ", data a definir"}
+                {encontro.status === "realizado" &&
+                  (encontro.registro ? (
+                    <span className="text-[var(--ok-text)]">, registro entregue</span>
+                  ) : (
+                    <span className="text-[var(--warn-text)]">, registro pendente</span>
+                  ))}
+              </span>
             </span>
-            <span className="block truncate text-xs text-muted-foreground">
-              {encontro.numero}º encontro · {STATUS_ENCONTRO_LABEL[encontro.status].toLowerCase()}
-              {iso
-                ? `, ${mesmoDia ? `às ${fmtHora.format(new Date(iso))}` : formatDateTime(iso)}`
-                : ", data a definir"}
-              {encontro.status === "realizado" &&
-                (encontro.registro ? (
-                  <span className="text-[var(--ok-text)]">, registro entregue</span>
-                ) : (
-                  <span className="text-[var(--warn-text)]">, registro pendente</span>
-                ))}
+            <span className="inline-flex shrink-0 items-center gap-0.5 text-xs font-medium text-muted-foreground transition-colors group-hover:text-foreground">
+              <span className="hidden sm:inline">Ver detalhes</span>
+              <ArrowUpRight aria-hidden size={13} />
             </span>
-          </span>
-          <span className="inline-flex shrink-0 items-center gap-0.5 text-xs font-medium text-muted-foreground transition-colors group-hover:text-foreground">
-            <span className="hidden sm:inline">Ver detalhes</span>
-            <ArrowUpRight aria-hidden size={13} />
-          </span>
-        </button>
+          </button>
+          {waPendentes.length > 0 && (
+            <WhatsAppRapido
+              compacto
+              duplaId={dupla.id}
+              destinos={waPendentes}
+            />
+          )}
+        </div>
       )}
       {!ehMentor && (
         <EncontroDetalheDialog
@@ -2626,13 +2672,31 @@ function BucketEncontros({
 
 /* =========================== coorte sem encontro =========================== */
 
-const primeiroNome = (nome: string) => nome.trim().split(/\s+/)[0] ?? nome;
-
 /** Linha da coorte invisível: dupla ativa que ainda não marcou o encontro
- *  oficial do recorte. Ferramenta de nudge — o link leva à ficha e o WhatsApp
- *  abre a conversa com o mentor já sugerindo marcar. Sem cor de alarme: não
- *  marcar ainda é estado normal, não falha. */
+ *  oficial do recorte. Ferramenta de nudge — o link leva à ficha e o menu
+ *  "WhatsApp" abre a conversa dos dois lados (mentor agenda; o mentorado é
+ *  canal quando a dupla some). Sem cor de alarme: não marcar ainda é estado
+ *  normal, não falha. */
 function LinhaSemEncontro({ dupla, numero }: { dupla: Dupla; numero: number }) {
+  const msgs = msgsContato("sem_encontro", {
+    mentorNome: dupla.mentor.nome,
+    mentoradoNome: dupla.mentorado.nome,
+    extra: `${numero}º`,
+  });
+  const destinos: DestinoWA[] = [
+    {
+      rotulo: "Chamar mentor",
+      telefone: dupla.mentor.whatsapp,
+      mensagem: msgs.mentor ?? "",
+      t: "nudge",
+    },
+    {
+      rotulo: "Chamar mentorado",
+      telefone: dupla.mentorado.whatsapp,
+      mensagem: msgs.mentorado ?? "",
+      t: "contato",
+    },
+  ];
   return (
     <li className="flex items-center gap-1 rounded-lg py-1 pr-1 pl-3 transition-colors hover:bg-muted/50 sm:pl-4">
       <Link
@@ -2645,12 +2709,7 @@ function LinhaSemEncontro({ dupla, numero }: { dupla: Dupla; numero: number }) {
           truncar
         />
       </Link>
-      <NudgeButton
-        telefone={dupla.mentor.whatsapp}
-        mensagem={`Oi ${primeiroNome(dupla.mentor.nome)}! Passando pra lembrar de marcar o ${numero}º encontro de vocês com ${primeiroNome(dupla.mentorado.nome)}. A semana oficial já está aberta. Qualquer coisa me chama :)`}
-        duplaId={dupla.id}
-        label="Lembrar"
-      />
+      <WhatsAppRapido compacto duplaId={dupla.id} destinos={destinos} />
     </li>
   );
 }

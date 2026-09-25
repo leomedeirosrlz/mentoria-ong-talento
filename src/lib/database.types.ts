@@ -200,6 +200,8 @@ export type Database = {
           created_at: string
           created_by: string | null
           id: string
+          prioridade: string
+          prioridade_ord: number | null
           titulo: string
         }
         Insert: {
@@ -208,6 +210,8 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
+          prioridade?: string
+          prioridade_ord?: number | null
           titulo: string
         }
         Update: {
@@ -216,6 +220,8 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
+          prioridade?: string
+          prioridade_ord?: number | null
           titulo?: string
         }
         Relationships: [
@@ -271,6 +277,96 @@ export type Database = {
           versao?: number
         }
         Relationships: []
+      }
+      documentos_pessoa: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          mentorado_id: string | null
+          nome: string | null
+          path: string
+          profile_id: string | null
+          tipo: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          mentorado_id?: string | null
+          nome?: string | null
+          path: string
+          profile_id?: string | null
+          tipo: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          mentorado_id?: string | null
+          nome?: string | null
+          path?: string
+          profile_id?: string | null
+          tipo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "documentos_pessoa_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "documentos_pessoa_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles_contato"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "documentos_pessoa_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles_pessoal"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "documentos_pessoa_mentorado_id_fkey"
+            columns: ["mentorado_id"]
+            isOneToOne: false
+            referencedRelation: "mentorados"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "documentos_pessoa_mentorado_id_fkey"
+            columns: ["mentorado_id"]
+            isOneToOne: false
+            referencedRelation: "mentorados_pessoal"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "documentos_pessoa_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "documentos_pessoa_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_contato"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "documentos_pessoa_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_pessoal"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       duplas: {
         Row: {
@@ -1048,6 +1144,7 @@ export type Database = {
         Row: {
           avatar_path: string | null
           cidade: string | null
+          cor_raca: string | null
           created_at: string
           dados_civis: Json | null
           data_nascimento: string | null
@@ -1055,6 +1152,7 @@ export type Database = {
           documento_path: string | null
           email: string | null
           escolaridade: string | null
+          form_bruto: Json | null
           genero: string | null
           id: string
           interesses: string[]
@@ -1073,6 +1171,7 @@ export type Database = {
         Insert: {
           avatar_path?: string | null
           cidade?: string | null
+          cor_raca?: string | null
           created_at?: string
           dados_civis?: Json | null
           data_nascimento?: string | null
@@ -1080,6 +1179,7 @@ export type Database = {
           documento_path?: string | null
           email?: string | null
           escolaridade?: string | null
+          form_bruto?: Json | null
           genero?: string | null
           id?: string
           interesses?: string[]
@@ -1098,6 +1198,7 @@ export type Database = {
         Update: {
           avatar_path?: string | null
           cidade?: string | null
+          cor_raca?: string | null
           created_at?: string
           dados_civis?: Json | null
           data_nascimento?: string | null
@@ -1105,6 +1206,7 @@ export type Database = {
           documento_path?: string | null
           email?: string | null
           escolaridade?: string | null
+          form_bruto?: Json | null
           genero?: string | null
           id?: string
           interesses?: string[]
@@ -1381,12 +1483,14 @@ export type Database = {
           cargo: string | null
           cidade: string | null
           consent_lgpd_em: string | null
+          cor_raca: string | null
           created_at: string
           dados_civis: Json | null
           data_nascimento: string | null
           documento_path: string | null
           email: string
           empresa: string | null
+          form_bruto: Json | null
           genero: string | null
           id: string
           interesses: string[]
@@ -1411,12 +1515,14 @@ export type Database = {
           cargo?: string | null
           cidade?: string | null
           consent_lgpd_em?: string | null
+          cor_raca?: string | null
           created_at?: string
           dados_civis?: Json | null
           data_nascimento?: string | null
           documento_path?: string | null
           email: string
           empresa?: string | null
+          form_bruto?: Json | null
           genero?: string | null
           id?: string
           interesses?: string[]
@@ -1441,12 +1547,14 @@ export type Database = {
           cargo?: string | null
           cidade?: string | null
           consent_lgpd_em?: string | null
+          cor_raca?: string | null
           created_at?: string
           dados_civis?: Json | null
           data_nascimento?: string | null
           documento_path?: string | null
           email?: string
           empresa?: string | null
+          form_bruto?: Json | null
           genero?: string | null
           id?: string
           interesses?: string[]
@@ -1855,8 +1963,10 @@ export type Database = {
     Views: {
       mentorados_pessoal: {
         Row: {
+          cor_raca: string | null
           dados_civis: Json | null
           data_nascimento: string | null
+          form_bruto: Json | null
           genero: string | null
           id: string | null
           motivacao: string | null
@@ -1865,8 +1975,10 @@ export type Database = {
           responsavel: Json | null
         }
         Insert: {
+          cor_raca?: string | null
           dados_civis?: Json | null
           data_nascimento?: string | null
+          form_bruto?: Json | null
           genero?: string | null
           id?: string | null
           motivacao?: string | null
@@ -1875,8 +1987,10 @@ export type Database = {
           responsavel?: Json | null
         }
         Update: {
+          cor_raca?: string | null
           dados_civis?: Json | null
           data_nascimento?: string | null
+          form_bruto?: Json | null
           genero?: string | null
           id?: string | null
           motivacao?: string | null
@@ -1909,8 +2023,10 @@ export type Database = {
       }
       profiles_pessoal: {
         Row: {
+          cor_raca: string | null
           dados_civis: Json | null
           data_nascimento: string | null
+          form_bruto: Json | null
           genero: string | null
           id: string | null
           motivacao: string | null
@@ -1918,8 +2034,10 @@ export type Database = {
           pref_genero_par: string | null
         }
         Insert: {
+          cor_raca?: string | null
           dados_civis?: Json | null
           data_nascimento?: string | null
+          form_bruto?: Json | null
           genero?: string | null
           id?: string | null
           motivacao?: string | null
@@ -1927,8 +2045,10 @@ export type Database = {
           pref_genero_par?: string | null
         }
         Update: {
+          cor_raca?: string | null
           dados_civis?: Json | null
           data_nascimento?: string | null
+          form_bruto?: Json | null
           genero?: string | null
           id?: string | null
           motivacao?: string | null

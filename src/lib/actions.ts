@@ -18,7 +18,7 @@ import {
   parseDisponibilidade,
 } from "@/lib/ciclo";
 import { cpfValido, erroAmigavel } from "@/lib/utils";
-import type { CorRaca, DadosCivis, Disponibilidade, DocumentoPessoa, Endereco, Escolaridade, Genero, Notificacao, PrefGeneroPar, ResponsavelCivis, Trilha } from "@/lib/types";
+import type { ComunicadoPrioridade, CorRaca, DadosCivis, Disponibilidade, DocumentoPessoa, Endereco, Escolaridade, Genero, Notificacao, PrefGeneroPar, ResponsavelCivis, Trilha } from "@/lib/types";
 import {
   emailValido,
   fichaLinha,
@@ -2580,6 +2580,8 @@ export async function signOut() {
 const AUDIENCIAS_COMUNICADO = [
   "todos", "dpp", "especialista", "coordenacao", "equipe",
 ] as const;
+// CHECK comunicados_prioridade_check (0055)
+const PRIORIDADES_COMUNICADO = ["normal", "importante", "urgente"] as const;
 const ROLES_POR_AUDIENCIA: Record<string, string[]> = {
   todos: ["coordenacao", "supervisor", "mentor_dpp", "mentor_especialista"],
   dpp: ["mentor_dpp"],
@@ -2598,6 +2600,14 @@ export async function publicarComunicado(formData: FormData) {
   const titulo = String(formData.get("titulo") ?? "").trim();
   const corpo = String(formData.get("corpo") ?? "").trim();
   const audiencia = String(formData.get("audiencia") ?? "todos");
+  // ausente/fora da whitelist cai em 'normal' — o radio sempre manda um
+  // valor, mas o form não é a única porta de entrada da action
+  const prioridadeRaw = String(formData.get("prioridade") ?? "normal");
+  const prioridade: ComunicadoPrioridade = (
+    PRIORIDADES_COMUNICADO as readonly string[]
+  ).includes(prioridadeRaw)
+    ? (prioridadeRaw as ComunicadoPrioridade)
+    : "normal";
   if (titulo.length < 2 || titulo.length > 140) {
     return { error: "O título precisa de 2 a 140 caracteres." };
   }
@@ -2610,7 +2620,7 @@ export async function publicarComunicado(formData: FormData) {
 
   const { data: aviso, error } = await supabase
     .from("comunicados")
-    .insert({ titulo, corpo, audiencia, created_by: eu.id })
+    .insert({ titulo, corpo, audiencia, prioridade, created_by: eu.id })
     .select("id").single();
   if (error) return { error: erroAmigavel(error) };
 

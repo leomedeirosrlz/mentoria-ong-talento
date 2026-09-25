@@ -16,7 +16,7 @@ import {
 } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { waLink } from "@/lib/ciclo";
-import { useOrigem } from "@/components/forms/link-shared";
+import { useOrigem } from "@/components/forms/use-origem";
 import {
   listarAssinaturasPessoa,
   reenviarAssinatura,

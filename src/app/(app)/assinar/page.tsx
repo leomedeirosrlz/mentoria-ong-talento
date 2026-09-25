@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import {
-  CaretDown,
   CheckCircle,
   FileArrowDown,
   Warning,
@@ -13,16 +12,8 @@ import {
   getMinhaAssinaturaTermo,
 } from "@/lib/queries-assinaturas";
 import { formatDateTime } from "@/lib/ciclo";
-import {
-  ANEXO_I_PARAGRAFOS,
-  ANEXO_I_TITULO,
-  civisPreview,
-  CLAUSULAS_TERMO,
-  FECHO_TERMO,
-  TERMO_TITULO,
-  preambuloTermo,
-} from "@/lib/documentos/texto";
 import { AssinaturaForm } from "@/components/assinatura-form";
+import { TermoVoluntarioDoc } from "@/components/termo-doc";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 
@@ -138,69 +129,11 @@ export default async function AssinarPage() {
 
       {/* texto integral do termo — mesma fonte (documentos/texto) que o PDF
           renderiza, então o que se lê é exatamente o que se assina */}
-      <section
+      <TermoVoluntarioDoc
+        civis={civis}
         id="termo"
-        aria-label="Texto completo do termo"
-        className="scroll-mt-4 rounded-xl bg-card shadow-[var(--shadow-border)]"
-      >
-        {/* documento integral inline — o que se lê é o que se assina (mesmo
-            padrão da rota pública /assinar/[token]); nada de scroll interno
-            cortando cláusula no meio */}
-        <div className="px-5 py-6 sm:px-8">
-          <div className="space-y-4 font-serif text-[15px] leading-relaxed">
-            <h2 className="text-center font-bold uppercase tracking-wide">
-              {TERMO_TITULO}
-            </h2>
-            {preambuloTermo(civisPreview(civis)).map((p, i) => (
-              <p key={i} className="text-justify">
-                {p}
-              </p>
-            ))}
-            {CLAUSULAS_TERMO.map(([titulo, paragrafos]) => (
-              <div key={titulo} className="space-y-2">
-                <h3 className="font-bold uppercase">{titulo}</h3>
-                {paragrafos.map((p, i) => (
-                  <p key={i} className="text-justify">
-                    {p}
-                  </p>
-                ))}
-              </div>
-            ))}
-            <p className="text-justify">{FECHO_TERMO}</p>
-            {/* o anexo é transcrição legal de apoio — <details> nativo tira
-                meia página de lei do caminho sem esconder que ela existe;
-                título e parágrafos seguem verbatim a fonte oficial */}
-            <details className="group/anexo border-t border-border pt-4">
-              <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2.5 rounded-lg text-sm font-medium transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
-                <CaretDown
-                  size={16}
-                  aria-hidden
-                  className="shrink-0 text-muted-foreground transition-transform group-open/anexo:rotate-180"
-                />
-                Anexo I · transcrição integral da Lei nº 9.608/1998
-              </summary>
-              <div className="mt-3 space-y-3">
-                <h3 className="text-center font-bold uppercase">
-                  {ANEXO_I_TITULO}
-                </h3>
-                {ANEXO_I_PARAGRAFOS.map((p, i) => (
-                  <p key={i} className="text-justify">
-                    {p}
-                  </p>
-                ))}
-              </div>
-            </details>
-          </div>
-          <p className="mt-6 border-t border-border pt-5 text-center font-sans">
-            <a
-              href="#dados"
-              className="inline-flex min-h-11 items-center rounded-lg px-3 text-sm font-medium text-primary underline-offset-4 transition-colors hover:underline"
-            >
-              Continuar para seus dados ↓
-            </a>
-          </p>
-        </div>
-      </section>
+        continuar={{ href: "#dados", rotulo: "Continuar para seus dados ↓" }}
+      />
 
       <Card id="dados" className="animate-enter scroll-mt-4">
         <CardContent className="space-y-5">

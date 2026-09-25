@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { type Session } from "@supabase/supabase-js";
-import { Camera, CaretDown, FileArrowDown, Signature, SignOut } from "@phosphor-icons/react";
+import { Camera, CaretDown, FileArrowDown, PencilSimple, Signature, SignOut } from "@phosphor-icons/react";
 import { createClient } from "@/lib/supabase/client";
 import { DEMO_MSG } from "@/lib/demo/shared";
 import { setAvatarPath, signOut, updateMeuPerfil } from "@/lib/actions";
@@ -26,7 +26,18 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { AREAS_SUGESTOES, formatWhatsApp, papelLabel } from "@/lib/ciclo";
+import {
+  AREAS_SUGESTOES,
+  disponibilidadeTexto,
+  formatDate,
+  formatWhatsApp,
+  GENERO_LABELS,
+  idade,
+  linkSeguro,
+  papelLabel,
+  PREF_GENERO_LABELS,
+} from "@/lib/ciclo";
+import { cn } from "@/lib/utils";
 import type { Assinatura, Disponibilidade, MentorProfile, Profile } from "@/lib/types";
 import Link from "next/link";
 
@@ -65,6 +76,111 @@ function sessaoFresca(session: Session | null): boolean {
   }
 }
 
+/** Chip "pendente" — o mesmo nos dois modos; a contagem do summary é a
+ *  soma destes badges (completude não depende do modo). */
+function BadgePendente() {
+  return (
+    <Badge
+      variant="outline"
+      className="mt-0.5 shrink-0 border-[var(--warn)]/60 font-normal text-[var(--warn-text)]"
+    >
+      pendente
+    </Badge>
+  );
+}
+
+/** Linha "rótulo · valor" do modo leitura — o mesmo padrão da ficha em
+ *  /pessoas/[id] (rótulo fixo e meio-tom, valor com wrap). Só entra em <dl>. */
+function Linha({
+  rotulo,
+  valor,
+  pendente,
+  className,
+}: {
+  rotulo: string;
+  valor: React.ReactNode;
+  pendente?: boolean;
+  className?: string;
+}) {
+  return (
+    <div className={cn("flex items-start gap-3", className)}>
+      <div className="flex min-w-0 flex-1 gap-2 text-sm">
+        <dt className="w-32 shrink-0 text-muted-foreground">{rotulo}</dt>
+        <dd className="min-w-0 flex-1 whitespace-pre-wrap [overflow-wrap:anywhere]">
+          {valor}
+        </dd>
+      </div>
+      {pendente && <BadgePendente />}
+    </div>
+  );
+}
+
+/** Tags estilo TagInput no modo leitura — mesmas pílulas, sem o gesto. */
+function ChipsTags({ itens }: { itens: string[] }) {
+  return (
+    <span className="flex flex-wrap gap-1.5">
+      {itens.map((i) => (
+        <Badge key={i} variant="secondary" className="font-normal">
+          {i}
+        </Badge>
+      ))}
+    </span>
+  );
+}
+
+/** Leitura de um campo do cadastro no preview — texto já formatado ou
+ *  chips; vazio cai no "—" (o chip pendente vem de `pendente`). */
+type ValorSpec = {
+  rotulo: string;
+  texto?: string | null;
+  chips?: string[];
+};
+
+function Valor({ campo, pendente }: { campo: ValorSpec; pendente?: boolean }) {
+  return (
+    <Linha
+      rotulo={campo.rotulo}
+      pendente={pendente}
+      valor={
+        campo.chips?.length ? (
+          <ChipsTags itens={campo.chips} />
+        ) : (
+          campo.texto?.trim() || "—"
+        )
+      }
+    />
+  );
+}
+
+/** Campo de renderização dupla: em edição devolve `children` (o input),
+ *  em preview vira Linha dentro da <dl> da seção. `className` vale pros
+ *  dois modos — o grid de cidade/UF e cargo/empresa depende dele. */
+function CampoOuValor({
+  rotulo,
+  editando,
+  valor,
+  pendente,
+  className,
+  children,
+}: {
+  rotulo: string;
+  editando: boolean;
+  valor: React.ReactNode;
+  pendente?: boolean;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  if (editando) return <div className={className}>{children}</div>;
+  return (
+    <Linha
+      rotulo={rotulo}
+      valor={valor}
+      pendente={pendente}
+      className={className}
+    />
+  );
+}
+
 export function PerfilForm({
   me,
   mentorProfile,
@@ -85,6 +201,9 @@ export function PerfilForm({
   const fileRef = useRef<HTMLInputElement>(null);
   const [src, setSrc] = useState<string | null>(avatarUrl);
   const [uploading, setUploading] = useState(false);
+  // preview primeiro: a ficha abre em leitura; "Editar" liga o modo edição
+  // (o key do form remonta os não-controlados de graça a cada troca)
+  const [editando, setEditando] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [salvandoSenha, setSalvandoSenha] = useState(false);
   const [senha, setSenha] = useState("");
@@ -138,6 +257,21 @@ export function PerfilForm({
     marca(el.name, el.value !== el.defaultValue);
   }
 
+  /** Sai do modo edição descartando tudo: os controlados voltam aos
+   *  valores do profile e o remount por key zera os não-controlados. */
+  function cancelar() {
+    setAlterados(new Set());
+    setAreas(me.areas ?? []);
+    setInteresses(me.interesses ?? []);
+    setGenero(me.genero ?? "");
+    setPrefGenero(me.pref_genero_par ?? "");
+    setUf(me.uf ?? "");
+    setDisponibilidade(mentorProfile?.disponibilidade ?? null);
+    setBioLen(me.bio?.length ?? 0);
+    setVolLen(me.voluntariado?.length ?? 0);
+    setEditando(false);
+  }
+
   // edições não salvas pedem confirmação do browser ao recarregar/fechar
   useEffect(() => {
     if (alterados.size === 0) return;
@@ -161,10 +295,20 @@ export function PerfilForm({
   // meus_dados_pessoais (0048) por cima do getMe. Conta simples: vazio/null
   // = pendente; e-mail não entra (credencial, sempre presente).
   const tem = (v: string | null | undefined) => Boolean(v?.trim());
-  const camposCadastro: { key: string; ok: boolean; wide?: boolean; node: React.ReactNode }[] = [
+  const anosNasc = idade(me.data_nascimento);
+  // `valor` é a leitura do campo no modo preview (Linha da ficha); `node`
+  // é o input — a renderização dupla acontece no map lá embaixo
+  const camposCadastro: {
+    key: string;
+    ok: boolean;
+    wide?: boolean;
+    valor: ValorSpec;
+    node: React.ReactNode;
+  }[] = [
     {
       key: "nome",
       ok: tem(me.nome),
+      valor: { rotulo: "Nome civil", texto: me.nome },
       node: (
         <div className="space-y-2">
           <Label htmlFor="nome">Nome civil</Label>
@@ -175,6 +319,7 @@ export function PerfilForm({
     {
       key: "whatsapp",
       ok: tem(me.whatsapp),
+      valor: { rotulo: "WhatsApp", texto: formatWhatsApp(me.whatsapp) },
       node: (
         <div className="space-y-2">
           <Label htmlFor="whatsapp">WhatsApp</Label>
@@ -195,11 +340,21 @@ export function PerfilForm({
     {
       key: "nascimento",
       ok: tem(me.data_nascimento),
+      valor: {
+        rotulo: "Nascimento",
+        texto: me.data_nascimento
+          ? `${formatDate(me.data_nascimento)}${anosNasc != null ? ` (${anosNasc} anos)` : ""}`
+          : null,
+      },
       node: <CampoNascimento id="nasc" defaultValue={me.data_nascimento ?? ""} />,
     },
     {
       key: "genero",
       ok: Boolean(me.genero),
+      valor: {
+        rotulo: "Gênero",
+        texto: me.genero ? GENERO_LABELS[me.genero] : null,
+      },
       node: (
         <CampoGenero
           value={genero}
@@ -214,6 +369,7 @@ export function PerfilForm({
     {
       key: "origem",
       ok: tem(me.origem),
+      valor: { rotulo: "Origem", texto: me.origem },
       node: (
         <div className="space-y-2">
           <Label htmlFor="origem">Como você chegou ao programa</Label>
@@ -228,6 +384,10 @@ export function PerfilForm({
     {
       key: "pref_genero_par",
       ok: Boolean(me.pref_genero_par),
+      valor: {
+        rotulo: "Pref. de par",
+        texto: me.pref_genero_par ? PREF_GENERO_LABELS[me.pref_genero_par] : null,
+      },
       node: (
         <CampoPrefGenero
           value={prefGenero}
@@ -243,6 +403,7 @@ export function PerfilForm({
       key: "motivacao",
       ok: tem(me.motivacao),
       wide: true,
+      valor: { rotulo: "Motivação", texto: me.motivacao },
       node: (
         <div className="space-y-2">
           <Label htmlFor="motivacao">O que te traz ao programa</Label>
@@ -258,6 +419,12 @@ export function PerfilForm({
       key: "consent_lgpd",
       ok: Boolean(me.consent_lgpd_em),
       wide: true,
+      valor: {
+        rotulo: "LGPD",
+        texto: me.consent_lgpd_em
+          ? `Consentimento em ${formatDate(me.consent_lgpd_em)}`
+          : null,
+      },
       node: <CampoConsentimento carimbadoEm={me.consent_lgpd_em} />,
     },
   ];
@@ -269,13 +436,31 @@ export function PerfilForm({
 
   // ficha de mentor: disponibilidade sem nenhum dia conta como pendente
   // (é o dado que o matching cruza), igual os textos vazios
+  const dispOk = (mentorProfile?.disponibilidade?.dias?.length ?? 0) > 0;
+  const experienciaOk = tem(mentorProfile?.experiencia_previa);
+  const formacaoOk = tem(mentorProfile?.formacao_externa);
   const mentPendentes = mentorProfile
-    ? [
-        !(mentorProfile.disponibilidade?.dias?.length ?? 0),
-        !tem(mentorProfile.experiencia_previa),
-        !tem(mentorProfile.formacao_externa),
-      ].filter(Boolean).length
+    ? [!dispOk, !experienciaOk, !formacaoOk].filter(Boolean).length
     : 0;
+
+  // LinkedIn vira link quieto quando a URL é http(s) — texto cru senão
+  const linkedinUrl = linkSeguro(me.linkedin);
+  const linkedinPreview = me.linkedin?.trim() ? (
+    linkedinUrl ? (
+      <a
+        href={linkedinUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-muted-foreground underline underline-offset-4 transition-colors hover:text-foreground"
+      >
+        {me.linkedin}
+      </a>
+    ) : (
+      me.linkedin
+    )
+  ) : (
+    "—"
+  );
 
   async function trocarFoto(file: File) {
     if (file.size > AVATAR_MAX_BYTES) {
@@ -337,8 +522,10 @@ export function PerfilForm({
       }
       toast.success("Alterações salvas.");
       setAlterados(new Set());
-      // relê o profile: os badges "pendente" saem dos campos preenchidos
+      // relê o profile (badges "pendente" saem dos campos preenchidos) e só
+      // então volta pro preview — a <dl> já renderiza os valores novos
       router.refresh();
+      setEditando(false);
     } catch {
       toast.error("Sem conexão. Tente de novo.");
     } finally {
@@ -413,51 +600,77 @@ export function PerfilForm({
 
   return (
     <div className="space-y-6 max-w-lg">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Meu perfil</h1>
-        <p className="mt-1 text-sm text-muted-foreground">{papelLabel(me.role)}</p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Meu perfil</h1>
+          <p className="mt-1 text-sm text-muted-foreground">{papelLabel(me.role)}</p>
+        </div>
+        {editando ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={cancelar}
+          >
+            Cancelar
+          </Button>
+        ) : (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setEditando(true)}
+          >
+            <PencilSimple size={15} aria-hidden />
+            Editar
+          </Button>
+        )}
       </div>
 
-      {/* foto — upload próprio; sem foto cai no Gravatar do e-mail, depois iniciais */}
+      {/* foto — upload próprio; sem foto cai no Gravatar do e-mail, depois
+          iniciais. Em preview fica só o avatar: trocar/remover é gesto do
+          modo edição (ação instantânea, fora do save) */}
       <section className="rounded-xl bg-card p-6 shadow-[var(--shadow-border)]">
-        <h2 className="text-sm font-semibold">Foto</h2>
+        <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Foto</h2>
         <div className="mt-4 flex items-center gap-4">
           <Avatar nome={me.nome} src={src} fallbackSrc={gravatarUrl} size={72} />
-          <div className="space-y-2">
-            <input
-              ref={fileRef}
-              type="file"
-              accept={AVATAR_ACCEPT}
-              className="hidden"
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (f) void trocarFoto(f);
-              }}
-            />
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={uploading}
-              onClick={() => fileRef.current?.click()}
-            >
-              <Camera size={15} aria-hidden />
-              {uploading ? "Enviando…" : src ? "Trocar foto" : "Enviar foto"}
-            </Button>
-            {src && (
-              <button
+          {editando && (
+            <div className="space-y-2">
+              <input
+                ref={fileRef}
+                type="file"
+                accept={AVATAR_ACCEPT}
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) void trocarFoto(f);
+                }}
+              />
+              <Button
                 type="button"
+                variant="outline"
+                size="sm"
                 disabled={uploading}
-                onClick={removerFoto}
-                className="flex min-h-11 items-center text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+                onClick={() => fileRef.current?.click()}
               >
-                Remover foto
-              </button>
-            )}
-            <p className="text-xs text-muted-foreground">
-              PNG, JPG ou WebP até 2 MB. Sem foto, usamos a do seu e-mail.
-            </p>
-          </div>
+                <Camera size={15} aria-hidden />
+                {uploading ? "Enviando…" : src ? "Trocar foto" : "Enviar foto"}
+              </Button>
+              {src && (
+                <button
+                  type="button"
+                  disabled={uploading}
+                  onClick={removerFoto}
+                  className="flex min-h-11 items-center text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+                >
+                  Remover foto
+                </button>
+              )}
+              <p className="text-xs text-muted-foreground">
+                PNG, JPG ou WebP até 2 MB. Sem foto, usamos a do seu e-mail.
+              </p>
+            </div>
+          )}
         </div>
       </section>
 
@@ -466,6 +679,10 @@ export function PerfilForm({
           que tinha salvo tudo). O patch parcial do action cobre o envio
           unificado: cada chave presente é gravada, o resto não é tocado */}
       <form
+        // a troca de modo remonta o form inteiro: os não-controlados
+        // (Input/Textarea/Select) voltam aos defaults do profile — descarte
+        // de graça no Cancelar e estado fresco no Editar
+        key={editando ? "e" : "v"}
         onSubmit={salvarTudo}
         onChange={onFormChange}
         // onInvalid: campo inválido dentro de um <details> fechado bloqueia
@@ -478,120 +695,201 @@ export function PerfilForm({
         className="space-y-6"
       >
       {/* perfil público — os campos que a ficha em /pessoas/[id] mostra a
-          quem alcança a página (pra profile: coordenação e supervisão) */}
+          quem alcança a página (pra profile: coordenação e supervisão).
+          Cada CampoOuValor decide sozinho entre input e Linha; o wrapper
+          troca (div em edição, dl semântico em preview — nunca input
+          readOnly) */}
       <section className="rounded-xl bg-card p-6 shadow-[var(--shadow-border)]">
-        <h2 className="text-sm font-semibold">Perfil público</h2>
+        <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Perfil público</h2>
         <p className="mt-1 text-xs text-muted-foreground">
           É o que aparece na sua página em Pessoas, visível pra coordenação e supervisão.
         </p>
-        <div className="mt-4 space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="nome_social">Nome social</Label>
-            <Input
-              id="nome_social"
-              name="nome_social"
-              maxLength={150}
-              defaultValue={me.nome_social ?? ""}
-              placeholder="Nome de uso, se diferente"
-            />
-          </div>
-          <div className="space-y-2">
-            <div className="flex items-baseline justify-between gap-2">
-              <Label htmlFor="bio">Biografia</Label>
-              <span aria-hidden className="text-xs tabular-nums text-muted-foreground">
-                {bioLen}/1.000
-              </span>
-            </div>
-            {/* apresentação profissional (0030) — alimenta também as áreas do
-                select de especialista */}
-            <Textarea
-              id="bio"
-              name="bio"
-              rows={4}
-              maxLength={1000}
-              defaultValue={me.bio ?? ""}
-              onChange={(e) => setBioLen(e.target.value.length)}
-              placeholder="O que você faz, o que estudou, o que te trouxe ao programa."
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="linkedin">LinkedIn</Label>
-            <Input
-              id="linkedin"
-              name="linkedin"
-              type="url"
-              inputMode="url"
-              defaultValue={me.linkedin ?? ""}
-              placeholder="https://linkedin.com/in/..."
-            />
-          </div>
-          <div className="space-y-2">
-            {/* o hidden do TagInput manda JSON — camposApresentacao aceita
-                JSON ou vírgula, então forms antigos continuam valendo */}
-            <p className="text-sm font-medium">Áreas de atuação</p>
-            <TagInput
-              name="areas"
-              sugestoes={AREAS_SUGESTOES}
-              value={areas}
-              onChange={(v) => {
-                setAreas(v);
-                marca("areas", !mesmaLista(v, me.areas ?? []));
-              }}
-              placeholder="ex.: psicologia, idiomas…"
-              inputLabel="Digite uma área e pressione Enter"
-            />
-            <p className="text-xs text-muted-foreground">
-              Toque pra selecionar ou digite uma nova área.
-            </p>
-          </div>
-          <CampoInteresses
-            value={interesses}
-            onChange={(v) => {
-              setInteresses(v);
-              marca("interesses", !mesmaLista(v, me.interesses ?? []));
-            }}
-          />
-          <div className="grid gap-4 sm:grid-cols-3">
-            <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="cidade">Cidade</Label>
-              <Input id="cidade" name="cidade" maxLength={100} defaultValue={me.cidade ?? ""} />
-            </div>
-            <CampoUf
-              value={uf}
-              onChange={(v) => {
-                const nv = v === SENTINEL_VAZIO ? "" : v;
-                setUf(nv);
-                marca("uf", nv !== (me.uf ?? ""));
-              }}
-            />
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="cargo">Cargo</Label>
-              <Input id="cargo" name="cargo" maxLength={120} defaultValue={me.cargo ?? ""} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="empresa">Empresa</Label>
-              <Input id="empresa" name="empresa" maxLength={150} defaultValue={me.empresa ?? ""} />
-            </div>
-          </div>
-          <div className="space-y-2">
-            <div className="flex items-baseline justify-between gap-2">
-              <Label htmlFor="voluntariado">Experiência com voluntariado</Label>
-              <span aria-hidden className="text-xs tabular-nums text-muted-foreground">
-                {volLen}/300
-              </span>
-            </div>
-            <Input
-              id="voluntariado"
-              name="voluntariado"
-              maxLength={300}
-              defaultValue={me.voluntariado ?? ""}
-              onChange={(e) => setVolLen(e.target.value.length)}
-              placeholder="ex.: 2 anos como voluntário no Projeto X"
-            />
-          </div>
-        </div>
+        {(() => {
+          const campos = (
+            <>
+              <CampoOuValor
+                rotulo="Nome social"
+                editando={editando}
+                valor={me.nome_social?.trim() || "—"}
+              >
+                <div className="space-y-2">
+                  <Label htmlFor="nome_social">Nome social</Label>
+                  <Input
+                    id="nome_social"
+                    name="nome_social"
+                    maxLength={150}
+                    defaultValue={me.nome_social ?? ""}
+                    placeholder="Nome de uso, se diferente"
+                  />
+                </div>
+              </CampoOuValor>
+              <CampoOuValor
+                rotulo="Biografia"
+                editando={editando}
+                valor={me.bio?.trim() || "—"}
+              >
+                <div className="space-y-2">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <Label htmlFor="bio">Biografia</Label>
+                    <span aria-hidden className="text-xs tabular-nums text-muted-foreground">
+                      {bioLen}/1.000
+                    </span>
+                  </div>
+                  {/* apresentação profissional (0030) — alimenta também as
+                      áreas do select de especialista */}
+                  <Textarea
+                    id="bio"
+                    name="bio"
+                    rows={4}
+                    maxLength={1000}
+                    defaultValue={me.bio ?? ""}
+                    onChange={(e) => setBioLen(e.target.value.length)}
+                    placeholder="O que você faz, o que estudou, o que te trouxe ao programa."
+                  />
+                </div>
+              </CampoOuValor>
+              <CampoOuValor
+                rotulo="LinkedIn"
+                editando={editando}
+                valor={linkedinPreview}
+              >
+                <div className="space-y-2">
+                  <Label htmlFor="linkedin">LinkedIn</Label>
+                  <Input
+                    id="linkedin"
+                    name="linkedin"
+                    type="url"
+                    inputMode="url"
+                    defaultValue={me.linkedin ?? ""}
+                    placeholder="https://linkedin.com/in/..."
+                  />
+                </div>
+              </CampoOuValor>
+              <CampoOuValor
+                rotulo="Áreas de atuação"
+                editando={editando}
+                valor={
+                  me.areas?.length ? <ChipsTags itens={me.areas} /> : "—"
+                }
+              >
+                <div className="space-y-2">
+                  {/* o hidden do TagInput manda JSON — camposApresentacao aceita
+                      JSON ou vírgula, então forms antigos continuam valendo */}
+                  <p className="text-sm font-medium">Áreas de atuação</p>
+                  <TagInput
+                    name="areas"
+                    sugestoes={AREAS_SUGESTOES}
+                    value={areas}
+                    onChange={(v) => {
+                      setAreas(v);
+                      marca("areas", !mesmaLista(v, me.areas ?? []));
+                    }}
+                    placeholder="ex.: psicologia, idiomas…"
+                    inputLabel="Digite uma área e pressione Enter"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Toque pra selecionar ou digite uma nova área.
+                  </p>
+                </div>
+              </CampoOuValor>
+              <CampoOuValor
+                rotulo="Interesses"
+                editando={editando}
+                valor={
+                  me.interesses?.length ? (
+                    <ChipsTags itens={me.interesses} />
+                  ) : (
+                    "—"
+                  )
+                }
+              >
+                <CampoInteresses
+                  value={interesses}
+                  onChange={(v) => {
+                    setInteresses(v);
+                    marca("interesses", !mesmaLista(v, me.interesses ?? []));
+                  }}
+                />
+              </CampoOuValor>
+              <div className="grid gap-4 sm:grid-cols-3">
+                <CampoOuValor
+                  rotulo="Cidade"
+                  editando={editando}
+                  valor={me.cidade?.trim() || "—"}
+                  className="sm:col-span-2"
+                >
+                  <div className="space-y-2">
+                    <Label htmlFor="cidade">Cidade</Label>
+                    <Input id="cidade" name="cidade" maxLength={100} defaultValue={me.cidade ?? ""} />
+                  </div>
+                </CampoOuValor>
+                <CampoOuValor
+                  rotulo="UF"
+                  editando={editando}
+                  valor={me.uf?.trim() || "—"}
+                >
+                  <CampoUf
+                    value={uf}
+                    onChange={(v) => {
+                      const nv = v === SENTINEL_VAZIO ? "" : v;
+                      setUf(nv);
+                      marca("uf", nv !== (me.uf ?? ""));
+                    }}
+                  />
+                </CampoOuValor>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <CampoOuValor
+                  rotulo="Cargo"
+                  editando={editando}
+                  valor={me.cargo?.trim() || "—"}
+                >
+                  <div className="space-y-2">
+                    <Label htmlFor="cargo">Cargo</Label>
+                    <Input id="cargo" name="cargo" maxLength={120} defaultValue={me.cargo ?? ""} />
+                  </div>
+                </CampoOuValor>
+                <CampoOuValor
+                  rotulo="Empresa"
+                  editando={editando}
+                  valor={me.empresa?.trim() || "—"}
+                >
+                  <div className="space-y-2">
+                    <Label htmlFor="empresa">Empresa</Label>
+                    <Input id="empresa" name="empresa" maxLength={150} defaultValue={me.empresa ?? ""} />
+                  </div>
+                </CampoOuValor>
+              </div>
+              <CampoOuValor
+                rotulo="Voluntariado"
+                editando={editando}
+                valor={me.voluntariado?.trim() || "—"}
+              >
+                <div className="space-y-2">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <Label htmlFor="voluntariado">Experiência com voluntariado</Label>
+                    <span aria-hidden className="text-xs tabular-nums text-muted-foreground">
+                      {volLen}/300
+                    </span>
+                  </div>
+                  <Input
+                    id="voluntariado"
+                    name="voluntariado"
+                    maxLength={300}
+                    defaultValue={me.voluntariado ?? ""}
+                    onChange={(e) => setVolLen(e.target.value.length)}
+                    placeholder="ex.: 2 anos como voluntário no Projeto X"
+                  />
+                </div>
+              </CampoOuValor>
+            </>
+          );
+          return editando ? (
+            <div className="mt-4 space-y-4">{campos}</div>
+          ) : (
+            <dl className="mt-4 space-y-4">{campos}</dl>
+          );
+        })()}
       </section>
 
       {/* dados de cadastro — o burocrático recolhido: com buracos abre e
@@ -619,37 +917,46 @@ export function PerfilForm({
           />
         </summary>
         <div className="border-t border-border px-6 pb-6 pt-5">
-          <div className="space-y-4">
-            {/* e-mail é a credencial, só a coord troca — sempre preenchido,
-                então fica fora da conta de pendentes */}
-            <div className="space-y-2">
-              <Label htmlFor="email">E-mail</Label>
-              <Input id="email" value={me.email} disabled />
-              <p className="text-xs text-muted-foreground">
-                O e-mail é sua credencial de acesso. Para trocar, fale com a coordenação.
-              </p>
-            </div>
-            {/* ordem fixa, tudo visível: o que falta ganha badge "pendente"
-                inline em vez de mudar de lugar (o split "pendentes × já
-                cadastrados" fazia o campo sumir depois do save) */}
-            <div className="grid gap-4 sm:grid-cols-2">
-              {camposCadastro.map((c) => (
-                <div key={c.key} className={c.wide ? "sm:col-span-2" : undefined}>
-                  <div className="flex items-start gap-3">
-                    <div className="min-w-0 flex-1">{c.node}</div>
-                    {!c.ok && (
-                      <Badge
-                        variant="outline"
-                        className="mt-0.5 shrink-0 border-[var(--warn)]/60 font-normal text-[var(--warn-text)]"
-                      >
-                        pendente
-                      </Badge>
+          {(() => {
+            // ordem fixa nos dois modos: o que falta ganha badge "pendente"
+            // inline em vez de mudar de lugar (o split "pendentes × já
+            // cadastrados" fazia o campo sumir depois do save)
+            const gridCadastro = (
+              <div className="grid gap-4 sm:grid-cols-2">
+                {camposCadastro.map((c) => (
+                  <div key={c.key} className={c.wide ? "sm:col-span-2" : undefined}>
+                    {editando ? (
+                      <div className="flex items-start gap-3">
+                        <div className="min-w-0 flex-1">{c.node}</div>
+                        {!c.ok && <BadgePendente />}
+                      </div>
+                    ) : (
+                      <Valor campo={c.valor} pendente={!c.ok} />
                     )}
                   </div>
+                ))}
+              </div>
+            );
+            return editando ? (
+              <div className="space-y-4">
+                {/* e-mail é a credencial, só a coord troca — sempre
+                    preenchido, então fica fora da conta de pendentes */}
+                <div className="space-y-2">
+                  <Label htmlFor="email">E-mail</Label>
+                  <Input id="email" value={me.email} disabled />
+                  <p className="text-xs text-muted-foreground">
+                    O e-mail é sua credencial de acesso. Para trocar, fale com a coordenação.
+                  </p>
                 </div>
-              ))}
-            </div>
-          </div>
+                {gridCadastro}
+              </div>
+            ) : (
+              <dl className="space-y-4">
+                <Linha rotulo="E-mail" valor={me.email} />
+                {gridCadastro}
+              </dl>
+            );
+          })()}
           {/* o termo não é campo do form — a assinatura mora em /assinar;
               a gaveta só anuncia o estado e manda pra lá */}
           <div className="mt-5 flex items-center gap-3 rounded-lg border border-border px-3.5 py-3">
@@ -723,57 +1030,79 @@ export function PerfilForm({
             />
           </summary>
           <div className="border-t border-border px-6 pb-6 pt-5">
-            <div className="space-y-4">
-              <CampoDisponibilidade
-                value={disponibilidade}
-                onChange={(v) => {
-                  setDisponibilidade(v);
-                  marca(
-                    "disponibilidade",
-                    !mesmaDisp(v, mentorProfile.disponibilidade ?? null)
-                  );
-                }}
-              />
-              <div className="space-y-2">
-                <Label htmlFor="experiencia_previa">Experiência prévia como mentor</Label>
-                <Textarea
-                  id="experiencia_previa" name="experiencia_previa" rows={3} maxLength={2000}
-                  defaultValue={mentorProfile.experiencia_previa ?? ""}
-                  placeholder="Mentorias anteriores, mediação, ensino…"
+            {editando ? (
+              <div className="space-y-4">
+                <CampoDisponibilidade
+                  value={disponibilidade}
+                  onChange={(v) => {
+                    setDisponibilidade(v);
+                    marca(
+                      "disponibilidade",
+                      !mesmaDisp(v, mentorProfile.disponibilidade ?? null)
+                    );
+                  }}
                 />
+                <div className="space-y-2">
+                  <Label htmlFor="experiencia_previa">Experiência prévia como mentor</Label>
+                  <Textarea
+                    id="experiencia_previa" name="experiencia_previa" rows={3} maxLength={2000}
+                    defaultValue={mentorProfile.experiencia_previa ?? ""}
+                    placeholder="Mentorias anteriores, mediação, ensino…"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="formacao_externa">Formação e certificações</Label>
+                  <Textarea
+                    id="formacao_externa" name="formacao_externa" rows={3} maxLength={2000}
+                    defaultValue={mentorProfile.formacao_externa ?? ""}
+                    placeholder="Cursos e certificações relevantes pra mentoria"
+                  />
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="formacao_externa">Formação e certificações</Label>
-                <Textarea
-                  id="formacao_externa" name="formacao_externa" rows={3} maxLength={2000}
-                  defaultValue={mentorProfile.formacao_externa ?? ""}
-                  placeholder="Cursos e certificações relevantes pra mentoria"
+            ) : (
+              <dl className="space-y-4">
+                <Linha
+                  rotulo="Disponível"
+                  valor={disponibilidadeTexto(mentorProfile.disponibilidade) ?? "—"}
+                  pendente={!dispOk}
                 />
-              </div>
-              <p className="text-xs text-muted-foreground">
-                A coordenação cruza sua disponibilidade com a do mentorado na hora de formar a dupla.
-              </p>
-            </div>
+                <Linha
+                  rotulo="Experiência"
+                  valor={mentorProfile.experiencia_previa?.trim() || "—"}
+                  pendente={!experienciaOk}
+                />
+                <Linha
+                  rotulo="Formação"
+                  valor={mentorProfile.formacao_externa?.trim() || "—"}
+                  pendente={!formacaoOk}
+                />
+              </dl>
+            )}
+            <p className="mt-4 text-xs text-muted-foreground">
+              A coordenação cruza sua disponibilidade com a do mentorado na hora de formar a dupla.
+            </p>
           </div>
         </details>
       )}
 
-      {/* barra única de save — sticky pra acompanhar o scroll em tela
-          cheia de campos; o contador sai junto com o estado salvo.
-          no mobile o offset pula a bottom nav fixa (~3.5rem + safe-area) */}
-      <div className="sticky bottom-[calc(4rem+env(safe-area-inset-bottom))] z-10 flex items-center gap-3 rounded-xl border border-border bg-card/95 px-4 py-3 shadow-[var(--shadow-border)] backdrop-blur-sm md:bottom-3">
-        <p
-          aria-live="polite"
-          className="min-w-0 flex-1 text-xs tabular-nums text-muted-foreground"
-        >
-          {alterados.size === 0
-            ? "Nenhum campo alterado"
-            : `${alterados.size} ${alterados.size === 1 ? "campo alterado" : "campos alterados"}`}
-        </p>
-        <Button type="submit" disabled={salvando || alterados.size === 0}>
-          {salvando ? "Salvando…" : "Salvar alterações"}
-        </Button>
-      </div>
+      {/* barra única de save — só no modo edição: sticky pra acompanhar o
+          scroll em tela cheia de campos; o contador sai junto com o estado
+          salvo. no mobile o offset pula a bottom nav fixa (~3.5rem + safe) */}
+      {editando && (
+        <div className="sticky bottom-[calc(4rem+env(safe-area-inset-bottom))] z-10 flex items-center gap-3 rounded-xl border border-border bg-card/95 px-4 py-3 shadow-[var(--shadow-overlay)] backdrop-blur-sm md:bottom-3">
+          <p
+            aria-live="polite"
+            className="min-w-0 flex-1 text-xs tabular-nums text-muted-foreground"
+          >
+            {alterados.size === 0
+              ? "Nenhum campo alterado"
+              : `${alterados.size} ${alterados.size === 1 ? "campo alterado" : "campos alterados"}`}
+          </p>
+          <Button type="submit" disabled={salvando || alterados.size === 0}>
+            {salvando ? "Salvando…" : "Salvar alterações"}
+          </Button>
+        </div>
+      )}
       </form>
 
       {/* senha — reautentica antes do updateUser (senha atual ou sessão
@@ -843,7 +1172,7 @@ export function PerfilForm({
       <section className="rounded-xl bg-card p-6 shadow-[var(--shadow-border)]">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h2 className="text-sm font-semibold">Sessão</h2>
+            <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Sessão</h2>
             <p className="mt-1 text-xs text-muted-foreground">
               Encerra o acesso da sua conta neste dispositivo.
             </p>

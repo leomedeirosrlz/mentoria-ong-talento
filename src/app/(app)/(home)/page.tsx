@@ -59,6 +59,7 @@ export default async function HomePage({
           avisos={avisos}
           filtro={filtro}
           solicitacoes={solicitacoes}
+          meuNome={me?.nome.split(" ")[0]}
         />
       </div>
     );
@@ -85,6 +86,7 @@ export default async function HomePage({
           filtro={filtro}
           supervisaoItens={supervisoes}
           supervisaoAlvos={supervisaoAlvos}
+          meuNome={me?.nome.split(" ")[0]}
         />
       </div>
     );

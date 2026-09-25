@@ -1536,6 +1536,7 @@ function build(): DemoData {
       corpo:
         "Equipe: reunião de supervisão quinta às 19h, no Meet de sempre. Vamos passar pelos casos de atenção da semana — tragam o que estiverem vendo nas duplas.",
       audiencia: "equipe",
+      prioridade: "importante",
       created_by: marina.id,
       created_at: haDias(1, "09:00"),
       autor: { nome: marina.nome },
@@ -1546,16 +1547,18 @@ function build(): DemoData {
       corpo:
         "Especialistas: o mural tem duas demandas abertas esperando aceite — uma delas direcionada. Quem tiver disponibilidade, dê uma olhada na plataforma.",
       audiencia: "especialista",
+      prioridade: "normal",
       created_by: marina.id,
       created_at: haDias(2, "14:00"),
       autor: { nome: marina.nome },
     },
     {
       id: uid(0x2203),
-      titulo: "Lembrete: registro do encontro até sexta",
+      titulo: "Registro do encontro fecha na sexta",
       corpo:
-        "Mentores DPP: o registro semanal do encontro fica aberto na plataforma — quanto mais fresco, melhor. Se o encontro não aconteceu, marquem como 'não aconteceu' pra gente não contar como atraso.",
+        "Mentores DPP: o registro do encontro da semana fecha na sexta. Sem ele, o encontro conta como atraso no semáforo da dupla. Se não aconteceu, marquem 'não aconteceu' em vez de deixar pendente.",
       audiencia: "dpp",
+      prioridade: "urgente",
       created_by: marina.id,
       created_at: haDias(3, "10:00"),
       autor: { nome: marina.nome },
@@ -1566,6 +1569,7 @@ function build(): DemoData {
       corpo:
         "Vou consolidar o relatório mensal do programa pro board até sexta — revisem os dados das suas áreas na plataforma e me chamem se algo estiver estranho.",
       audiencia: "coordenacao",
+      prioridade: "normal",
       created_by: marina.id,
       created_at: haDias(5, "16:00"),
       autor: { nome: marina.nome },
@@ -1576,6 +1580,7 @@ function build(): DemoData {
       corpo:
         "A gravação dos dois dias de formação de mentores já está na biblioteca de materiais. Quem faltou ou quer revisar um trecho, é só acessar pela plataforma.",
       audiencia: "todos",
+      prioridade: "normal",
       created_by: marina.id,
       created_at: haDias(10, "11:00"),
       autor: { nome: marina.nome },

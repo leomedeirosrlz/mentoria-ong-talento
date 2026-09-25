@@ -1,5 +1,6 @@
+import type { CSSProperties } from "react";
 import Link from "next/link";
-import { ArrowUpRight, BookOpen, CalendarPlus, ClipboardText, HandHeart, Users, VideoCamera } from "@phosphor-icons/react/dist/ssr";
+import { ArrowUpRight, BookOpen, CalendarPlus, ClipboardText, HandHeart, VideoCamera } from "@phosphor-icons/react/dist/ssr";
 import {
   alvoAgendamento,
   eventoDaSemana,
@@ -50,8 +51,12 @@ export function MentorHome({
     duplas.every((d) => d.trilha === "especialista");
 
   return (
-    <div className="space-y-8">
-      <header>
+    // >1 dupla: em xl os cards abrem 2 colunas — a 1280px o card cheio deixa
+    // os sub-painéis internos (sm:grid-cols-2) largos demais pra leitura.
+    // gap-8 no lugar de space-y-8 mantém o ritmo vertical idêntico; header e
+    // empty state cravam col-span-2 pra continuar full-width no xl
+    <div className={cn("grid gap-8", duplas.length > 1 && "xl:grid-cols-2")}>
+      <header className={duplas.length > 1 ? "xl:col-span-2" : undefined}>
         <h1 className="text-2xl font-semibold tracking-tight">Olá, {me.nome.split(" ")[0]}</h1>
         {eventoSemana && !soEspecialista && (
           <p className="text-sm text-muted-foreground mt-1 flex items-center gap-1.5">
@@ -69,12 +74,12 @@ export function MentorHome({
       {duplas.length === 0 && (
         <Card>
           <CardContent className="py-10 text-center">
-            <Users
-              aria-hidden
-              size={32}
-              weight="regular"
-              className="mx-auto text-muted-foreground"
-            />
+            {/* glifo da marca no lugar do ícone genérico: os dois discos
+                sobrepostos da dupla (precedente DuplaAvatares) */}
+            <span aria-hidden className="mx-auto inline-flex">
+              <span className="size-8 rounded-full bg-[var(--brand-lime)] ring-2 ring-card" />
+              <span className="-ml-2.5 size-8 rounded-full bg-[var(--role-mentorado)] ring-2 ring-card" />
+            </span>
             <p className="mt-3 font-medium text-foreground">
               Você ainda não está em nenhuma dupla.
             </p>
@@ -85,7 +90,7 @@ export function MentorHome({
         </Card>
       )}
 
-      {duplas.map((dupla) => {
+      {duplas.map((dupla, i) => {
         const ativa = dupla.status === "ativa";
         const ehEsp = dupla.trilha === "especialista";
         // saude.proximo já vem ordenado por data_hora — o find sem sort podia
@@ -163,11 +168,15 @@ export function MentorHome({
             : undefined;
 
         return (
-          <Card key={dupla.id} className="animate-enter overflow-hidden">
+          <Card
+            key={dupla.id}
+            style={{ "--i": Math.min(i, 10) } as CSSProperties}
+            className="animate-enter overflow-hidden"
+          >
             {/* -mt cobre o py do Card — o banner ink encosta no topo;
-                pt devolve o respiro interno que o -mt tirou;
-                overflow-hidden + rounded-t-xl já clipam os cantos */}
-            <CardHeader className="-mt-(--card-spacing) border-b bg-[var(--brand-ink)] pt-(--card-spacing) text-white">
+                pt/pb devolvem o respiro interno; a keyline lime na base é
+                a única faixa de marca da tela (uma por tela) */}
+            <CardHeader className="-mt-(--card-spacing) border-b-2 border-[var(--brand-lime)] bg-[var(--brand-ink)] pb-(--card-spacing) pt-(--card-spacing) text-white">
               <div className="flex items-center justify-between gap-4">
                 <div>
                   <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-white/50">Sua dupla</p>
@@ -201,10 +210,14 @@ export function MentorHome({
                       affordance própria, visível mesmo sem pendência */}
                   <Link
                     href={`/duplas/${dupla.id}`}
-                    className="inline-flex min-h-11 items-center gap-1 rounded-lg px-2 text-xs font-medium text-white/70 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-lime)] md:min-h-7"
+                    className="group inline-flex min-h-11 items-center gap-1 rounded-lg px-2 text-xs font-medium text-white/70 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-lime)] md:min-h-7"
                   >
                     Abrir dupla
-                    <ArrowUpRight size={13} aria-hidden />
+                    <ArrowUpRight
+                      size={13}
+                      aria-hidden
+                      className="transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5"
+                    />
                   </Link>
                 </div>
               </div>
@@ -243,7 +256,7 @@ export function MentorHome({
                     "rounded-lg p-4",
                     semRegistro && ativa
                       ? "border border-[var(--warn)]/50 bg-[var(--warn)]/8"
-                      : "bg-muted/40"
+                      : "bg-muted/50 shadow-[var(--shadow-inset)]"
                   )}
                 >
                   <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-1">O que fazer agora</p>
@@ -392,7 +405,7 @@ export function MentorHome({
                   )}
                 </div>
 
-                <div className="rounded-lg bg-muted/40 p-4">
+                <div className="rounded-lg bg-muted/50 p-4 shadow-[var(--shadow-inset)]">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">Combinados abertos</p>
                   {pendentes.length === 0 ? (
                     <p className="text-sm text-muted-foreground">Nenhum pendente.</p>

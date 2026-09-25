@@ -1,9 +1,9 @@
-import { useSyncExternalStore } from "react";
-
 // Miolo compartilhado dos fluxos de link de formulário — o dialog em massa
 // (app/(app)/formularios/formulario-links) e o da ficha da dupla
 // (components/enviar-formulario-dialog) usavam cópias que já tinham
 // divergido; a fonte única mora aqui.
+// Módulo PURO (sem hooks/imports de React): Server Components como
+// respostas-section também importam daqui — useOrigem mora em use-origem.ts.
 
 export const VALIDADE_OPCOES = [
   { v: "0", l: "Sem validade" },
@@ -15,19 +15,6 @@ export const VALIDADE_OPCOES = [
 
 export function primeiroNome(nome: string | null | undefined): string {
   return nome?.split(" ")[0] ?? "";
-}
-
-/** Origem do deploy (window.location.origin) — "" no SSR e no primeiro
- *  render do client (getServerSnapshot), o absoluto entra na re-render que
- *  o useSyncExternalStore dispara depois da hidratação. SSR e hidratação
- *  produzem a mesma mensagem/href sem setState em effect. */
-export function useOrigem(): string {
-  return useSyncExternalStore(
-    // a origem nunca muda em runtime — subscribe é no-op de propósito
-    () => () => {},
-    () => window.location.origin,
-    () => ""
-  );
 }
 
 /** URL do link público — montada no client porque o servidor não sabe a

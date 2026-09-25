@@ -146,6 +146,31 @@ export function TrilhaJornada({
   duplaId: string;
 }) {
   const refAtual = useRef<HTMLLIElement | null>(null);
+  const refStrip = useRef<HTMLOListElement | null>(null);
+
+  // fade de 16px nas bordas do scroll horizontal — só quando há overflow de
+  // fato; trilha que cabe inteira (desktop largo, os 5 nós da especialista)
+  // não pode esmaecer os nós das pontas
+  useEffect(() => {
+    const el = refStrip.current;
+    if (!el) return;
+    const MASCARA =
+      "linear-gradient(to right, transparent, black 16px, black calc(100% - 16px), transparent)";
+    const aplicar = () => {
+      const rola = el.scrollWidth > el.clientWidth + 1;
+      if (rola) {
+        el.style.setProperty("-webkit-mask-image", MASCARA);
+        el.style.setProperty("mask-image", MASCARA);
+      } else {
+        el.style.removeProperty("-webkit-mask-image");
+        el.style.removeProperty("mask-image");
+      }
+    };
+    aplicar();
+    const ro = new ResizeObserver(aplicar);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   // strip rola horizontal no mobile (16 nós ≈ 470px > 375px) — sem o scroll
   // o passo atual sairia da tela; mesmo padrão do rail da agenda. Rola o ol
@@ -198,7 +223,10 @@ export function TrilhaJornada({
       </div>
 
       {/* pt-2.5 abre espaço pro marcador de marco que flutua acima do disco */}
-      <ol className="scroll-fina mt-1 flex items-center overflow-x-auto pt-2.5 pb-1">
+      <ol
+        ref={refStrip}
+        className="scroll-fina mt-1 flex items-center overflow-x-auto pt-2.5 pb-1"
+      >
         {jornada.nos.map((no, i) => {
           const atual = no.numero === jornada.proximoNumero;
           const viradaFase = i > 0 && no.evento.fase !== jornada.nos[i - 1].evento.fase;

@@ -6,6 +6,7 @@ import { getDemoData } from "@/lib/demo/data";
 import { demoRole } from "@/lib/demo/mode";
 import { DEMO_ROLES } from "@/lib/demo/shared";
 import { getMe, getMeuMentorProfile, getMeusDadosPessoais, getNotificacoes } from "@/lib/queries";
+import { getMeusDadosCivis, getMinhaAssinaturaTermo } from "@/lib/queries-assinaturas";
 import { avatarPublicUrl, gravatarUrl } from "@/lib/avatar";
 import type { AppRole } from "@/lib/types";
 
@@ -99,16 +100,27 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // telas bloqueadas acima — concluirOnboarding + router.refresh() devolve o app
   if (!me.onboarded_em) {
     // prefill: a importação da coordenação já pode ter trazido a ficha —
-    // sensíveis via RPC self-scoped (0048), ficha de mentor via grant próprio
-    const [pessoal, mentorProfile] = await Promise.all([
+    // sensíveis via RPC self-scoped (0048), ficha de mentor via grant próprio.
+    // civis + assinatura do termo alimentam o passo opcional de assinatura:
+    // "assinado" tira o passo do wizard, pendência mostra o termo pra ler/assinar
+    const [pessoal, mentorProfile, civis, assinaturaTermo] = await Promise.all([
       getMeusDadosPessoais(),
       getMeuMentorProfile(),
+      getMeusDadosCivis(),
+      getMinhaAssinaturaTermo(),
     ]);
     // o dock vai dentro do header do wizard (prop demo) — clicável em todos
     // os passos pra trocar de papel / rever a apresentação / sair da demo
     return (
       <>
-        <OnboardingFlow me={me} pessoal={pessoal} mentorProfile={mentorProfile} demo={demoDock} />
+        <OnboardingFlow
+          me={me}
+          pessoal={pessoal}
+          mentorProfile={mentorProfile}
+          civis={civis}
+          assinaturaTermo={assinaturaTermo}
+          demo={demoDock}
+        />
         {demoFloat}
       </>
     );

@@ -24,6 +24,7 @@ import { DocumentosPessoa } from "@/components/documentos-pessoa";
 import { AssinaturasPessoa } from "@/components/assinaturas-pessoa";
 import { Avatar } from "@/components/avatar";
 import { Badge } from "@/components/ui/badge";
+import { PageHeader } from "@/components/page-header";
 import { DuplaAvatares } from "@/components/dupla-avatares";
 import { DuplaNomes } from "@/components/dupla-nomes";
 import { MentoradoActions } from "@/components/mentorado-actions";
@@ -47,8 +48,8 @@ const STATUS_DUPLA: Record<string, string> = {
 function Linha({ rotulo, valor, sempre }: { rotulo: string; valor: string | null | undefined; sempre?: boolean }) {
   if (!valor && !sempre) return null;
   return (
-    <div className="flex gap-2">
-      <dt className="w-32 shrink-0 text-muted-foreground">{rotulo}</dt>
+    <div className="flex gap-2 py-2.5">
+      <dt className="w-32 shrink-0 text-muted-foreground/80">{rotulo}</dt>
       <dd className="min-w-0 flex-1 whitespace-pre-wrap [overflow-wrap:anywhere]">{valor || "—"}</dd>
     </div>
   );
@@ -160,22 +161,21 @@ export default async function PessoaPerfilPage({
 
   return (
     <div className="space-y-6">
-      <div>
-        {/* coord volta pra /pessoas; mentor/supervisor voltam pra de onde vieram */}
-        <VoltarLink fallback={souCoord ? "/pessoas" : "/"} />
-      </div>
-
-      <header className="flex flex-wrap items-center gap-4">
-        <Avatar
-          nome={p.nome}
-          src={avatarSrc}
-          fallbackSrc={gravatar}
-          papel={ehMentorado ? "mentorado" : undefined}
-          size={72}
-        />
-        <div className="min-w-0">
-          <h1 className="text-2xl font-semibold tracking-tight text-balance">{p.nome}</h1>
-          <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
+      {/* coord volta pra /pessoas; mentor/supervisor voltam pra de onde vieram */}
+      <PageHeader
+        kicker={<VoltarLink fallback={souCoord ? "/pessoas" : "/"} />}
+        media={
+          <Avatar
+            nome={p.nome}
+            src={avatarSrc}
+            fallbackSrc={gravatar}
+            papel={ehMentorado ? "mentorado" : undefined}
+            size={72}
+          />
+        }
+        title={p.nome}
+        meta={
+          <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
             {ehMentorado ? (
               <>
                 <span aria-hidden className="size-1.5 rounded-full bg-[var(--role-mentorado)]" />
@@ -196,52 +196,50 @@ export default async function PessoaPerfilPage({
               </>
             )}
           </p>
-          {/* contato — chip real, não texto corrido (mesma gramática dos chips da ficha) */}
-          {(wa || ("email" in p && p.email)) && (
-            <div className="mt-3 flex flex-wrap gap-2">
-              {wa && (
-                <a
-                  href={wa}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-border px-3 text-sm transition-colors hover:bg-[var(--brand-lime)]/15 hover:border-[var(--brand-lime)]/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:min-h-8"
-                >
-                  <WhatsappLogo size={15} aria-hidden />
-                  WhatsApp
-                  <span className="sr-only"> (abre em nova aba)</span>
-                </a>
-              )}
-              {"email" in p && p.email && (
-                <a
-                  href={`mailto:${p.email}`}
-                  className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-border px-3 text-sm text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:min-h-8"
-                >
-                  <EnvelopeSimple size={15} aria-hidden />
-                  {p.email}
-                </a>
-              )}
-            </div>
-          )}
-        </div>
-        {/* o mesmo ⋮ da lista — editar aqui poupa voltar à /pessoas e achar a
-            pessoa de novo; guardas idênticas (qualquer dupla bloqueia excluir,
-            temDupla trava a do mentorado) */}
-        {souCoord && (
-          <div className="ml-auto self-start">
-            {perfil.tipo === "profile" ? (
-              <PessoaActions
-                pessoa={perfil.pessoa}
-                podeExcluir={!perfil.pessoa.user_id && perfil.duplas.length === 0}
-              />
-            ) : (
-              <MentoradoActions
-                mentorado={perfil.pessoa}
-                temDupla={perfil.duplas.length > 0}
-              />
+        }
+        actions={
+          souCoord
+            ? perfil.tipo === "profile" ? (
+                <PessoaActions
+                  pessoa={perfil.pessoa}
+                  podeExcluir={!perfil.pessoa.user_id && perfil.duplas.length === 0}
+                />
+              ) : (
+                <MentoradoActions
+                  mentorado={perfil.pessoa}
+                  temDupla={perfil.duplas.length > 0}
+                />
+              )
+            : undefined
+        }
+      >
+        {/* contato — chip real, não texto corrido (mesma gramática dos chips da ficha) */}
+        {(wa || ("email" in p && p.email)) && (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {wa && (
+              <a
+                href={wa}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-border px-3 text-sm transition-colors hover:bg-[var(--brand-lime)]/15 hover:border-[var(--brand-lime)]/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:min-h-8"
+              >
+                <WhatsappLogo size={15} aria-hidden />
+                WhatsApp
+                <span className="sr-only"> (abre em nova aba)</span>
+              </a>
+            )}
+            {"email" in p && p.email && (
+              <a
+                href={`mailto:${p.email}`}
+                className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-border px-3 text-sm text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:min-h-8"
+              >
+                <EnvelopeSimple size={15} aria-hidden />
+                {p.email}
+              </a>
             )}
           </div>
         )}
-      </header>
+      </PageHeader>
 
       {/* minmax(0,1fr) + min-w-0 nos filhos: sem eles o min-content da seção
           "Duplas" subia pelo grid e estourava a página (+66px a 390px).
@@ -259,11 +257,11 @@ export default async function PessoaPerfilPage({
                 Cadastro
               </h2>
               {temFicha ? (
-                <dl className="mt-2 space-y-2">
+                <dl className="mt-2 divide-y divide-border/60">
                   <Linha rotulo="Nome social" valor={p.nome_social} sempre={souCoord} />
                   <Linha rotulo="Nascimento" valor={nascimentoTxt} sempre={souCoord} />
                   {anos != null && anos < 18 && (
-                    <p className="rounded-lg bg-amber-50 px-2.5 py-1.5 text-xs text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+                    <p className="my-2.5 rounded-lg bg-amber-50 px-2.5 py-1.5 text-xs text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
                       Menor de idade: a autorização do responsável precisa estar
                       assinada.
                       {souCoord && " Confira o card Documentos e assinaturas."}
@@ -343,7 +341,7 @@ export default async function PessoaPerfilPage({
               <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
                 Mentoria ({mp.tipo === "dpp" ? "DPP" : "especialista"})
               </h2>
-              <dl className="mt-2 space-y-2">
+              <dl className="mt-2 divide-y divide-border/60">
                 <Linha rotulo="Capacidade" valor={`${mp.capacidade} ${mp.capacidade === 1 ? "dupla" : "duplas"}`} sempre />
                 <Linha rotulo="Disponível" valor={dispTxt} sempre={souCoord} />
                 <Linha rotulo="Experiência" valor={mp.experiencia_previa} sempre={souCoord} />
@@ -491,7 +489,7 @@ export default async function PessoaPerfilPage({
                       <ArrowUpRight
                         size={13}
                         aria-hidden
-                        className="shrink-0 text-muted-foreground transition-colors group-hover:text-foreground"
+                        className="shrink-0 text-muted-foreground transition-[color,transform] group-hover:translate-x-0.5 group-hover:text-foreground"
                       />
                     </Link>
                   </li>

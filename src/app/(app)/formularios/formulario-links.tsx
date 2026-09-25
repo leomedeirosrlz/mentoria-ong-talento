@@ -41,11 +41,12 @@ import {
   msgLinkWhatsApp,
   primeiroNome,
   urlPublica,
-  useOrigem,
 } from "@/components/forms/link-shared";
+import { useOrigem } from "@/components/forms/use-origem";
 import { fade, T } from "@/components/motion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { filterChipCls } from "@/components/ui/filter-chip";
 import {
   Dialog,
   DialogContent,
@@ -629,12 +630,7 @@ export function FormularioLinks({
                 type="button"
                 aria-pressed={filtroStatus === "todos"}
                 onClick={() => setFiltroStatus("todos")}
-                className={cn(
-                  "inline-flex min-h-11 items-center rounded-full border px-3 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)] sm:min-h-7",
-                  filtroStatus === "todos"
-                    ? "border-foreground bg-foreground text-background"
-                    : "bg-card hover:bg-muted"
-                )}
+                className={filterChipCls(filtroStatus === "todos")}
               >
                 Todos · {links.length}
               </button>
@@ -647,12 +643,7 @@ export function FormularioLinks({
                   onClick={() =>
                     setFiltroStatus(filtroStatus === s ? "todos" : s)
                   }
-                  className={cn(
-                    "inline-flex min-h-11 items-center rounded-full border px-3 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)] sm:min-h-7",
-                    filtroStatus === s
-                      ? "border-foreground bg-foreground text-background"
-                      : "bg-card hover:bg-muted"
-                  )}
+                  className={filterChipCls(filtroStatus === s)}
                 >
                   {LINK_STATUS_LABEL[s]} · {contagens[s]}
                 </button>

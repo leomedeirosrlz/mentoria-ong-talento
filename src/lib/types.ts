@@ -339,11 +339,15 @@ export type ComunicadoAudiencia =
   | "coordenacao"
   | "equipe";
 
+export type ComunicadoPrioridade = "normal" | "importante" | "urgente";
+
 export type Comunicado = {
   id: string;
   titulo: string;
   corpo: string;
   audiencia: ComunicadoAudiencia;
+  /** 'normal' some na lista; 'importante'/'urgente' ganham rail, ícone e badge. */
+  prioridade: ComunicadoPrioridade;
   created_by: string;
   created_at: string;
   autor?: { nome: string } | null;

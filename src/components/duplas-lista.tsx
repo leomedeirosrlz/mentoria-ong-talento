@@ -2,7 +2,7 @@
 
 import { type CSSProperties, useState } from "react";
 import Link from "next/link";
-import { Funnel, MagnifyingGlass, Users } from "@phosphor-icons/react";
+import { ArrowRight, Funnel, MagnifyingGlass } from "@phosphor-icons/react";
 import { maxEncontros, saudadeDaDupla, TRILHA_LABEL } from "@/lib/ciclo";
 import type { CicloEvento, Dupla } from "@/lib/types";
 import { cn, normaliza } from "@/lib/utils";
@@ -11,6 +11,7 @@ import { DuplaNomes } from "@/components/dupla-nomes";
 import { SemaforoDot } from "@/components/semaforo";
 import { NovaDuplaDialog } from "@/components/nova-dupla-dialog";
 import { Button } from "@/components/ui/button";
+import { filterChipCls } from "@/components/ui/filter-chip";
 import { Input } from "@/components/ui/input";
 
 const STATUS_LABEL: Record<string, string> = {
@@ -140,12 +141,7 @@ export function DuplasLista({
                 type="button"
                 aria-pressed={ativo}
                 onClick={() => setFiltro(ativo ? "todas" : c.id)}
-                className={cn(
-                  "flex min-h-9 items-center gap-1.5 rounded-full px-3 text-sm transition-colors",
-                  ativo
-                    ? "bg-foreground text-background"
-                    : "bg-muted text-muted-foreground hover:text-foreground"
-                )}
+                className={filterChipCls(ativo)}
               >
                 {c.dot && (
                   <span aria-hidden className={cn("size-1.5 rounded-full", c.dot)} />
@@ -153,7 +149,7 @@ export function DuplasLista({
                 {c.label}
                 <span
                   className={cn(
-                    "text-[11px]",
+                    "text-[11px] tabular-nums",
                     ativo ? "text-background/70" : "text-muted-foreground/70"
                   )}
                 >
@@ -165,15 +161,15 @@ export function DuplasLista({
         </div>
       )}
 
-      <div className="mt-4 rounded-xl bg-card divide-y divide-border overflow-hidden shadow-[var(--shadow-border)]">
+      <div className="mt-4 rounded-xl bg-card divide-y divide-border/60 overflow-hidden shadow-[var(--shadow-border)]">
         {lista.length === 0 && (
           <div className="px-5 py-12 text-center">
-            <Users
-              aria-hidden
-              size={32}
-              weight="regular"
-              className="mx-auto text-muted-foreground"
-            />
+            {/* a dupla vazia usa o próprio símbolo: os dois discos sobrepostos
+                (mentor em lime à frente, mentorado atrás) */}
+            <div aria-hidden className="flex justify-center">
+              <span className="size-8 rounded-full bg-[var(--brand-lime)]" />
+              <span className="-ml-2.5 size-8 rounded-full bg-[var(--role-mentorado)]" />
+            </div>
             <p className="mt-3 font-medium text-foreground">Nenhuma dupla formada ainda.</p>
             <p className="mt-1 text-sm text-muted-foreground">
               {podeCriar
@@ -190,12 +186,9 @@ export function DuplasLista({
         )}
         {lista.length > 0 && base.length === 0 && (
           <div className="px-5 py-12 text-center">
-            <MagnifyingGlass
-              aria-hidden
-              size={32}
-              weight="regular"
-              className="mx-auto text-muted-foreground"
-            />
+            <span className="mx-auto grid size-11 place-items-center rounded-full bg-muted text-muted-foreground">
+              <MagnifyingGlass aria-hidden size={18} weight="regular" />
+            </span>
             <p className="mt-3 font-medium text-foreground">
               Nenhum resultado para “{busca.trim()}”.
             </p>
@@ -213,12 +206,9 @@ export function DuplasLista({
         )}
         {lista.length > 0 && base.length > 0 && exibidas.length === 0 && (
           <div className="px-5 py-12 text-center">
-            <Funnel
-              aria-hidden
-              size={32}
-              weight="regular"
-              className="mx-auto text-muted-foreground"
-            />
+            <span className="mx-auto grid size-11 place-items-center rounded-full bg-muted text-muted-foreground">
+              <Funnel aria-hidden size={18} weight="regular" />
+            </span>
             <p className="mt-3 font-medium text-foreground">
               Nenhuma dupla nessa situação.
             </p>
@@ -258,7 +248,7 @@ export function DuplasLista({
               key={d.id}
               href={`/duplas/${d.id}`}
               style={{ "--i": Math.min(i, 10) } as CSSProperties}
-              className="animate-enter flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-4 transition-colors hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+              className="group animate-enter flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-4 transition-colors hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
             >
               <SemaforoDot nivel={nivel} />
               {/* o par de discos é a identidade da dupla — reforça quem são
@@ -295,7 +285,7 @@ export function DuplasLista({
                   className="h-1 w-full overflow-hidden rounded-full bg-muted"
                 >
                   <div
-                    className="h-full rounded-full bg-[var(--brand-lime)]"
+                    className="fill-grow h-full rounded-full bg-[var(--brand-lime)]"
                     style={{ width: `${progresso * 100}%` }}
                   />
                 </div>
@@ -303,6 +293,12 @@ export function DuplasLista({
                   {STATUS_LABEL[d.status] ?? d.status}
                 </span>
               </div>
+              {/* affordance de navegação — nudge sutil no hover da linha */}
+              <ArrowRight
+                size={15}
+                aria-hidden
+                className="shrink-0 text-muted-foreground/60 transition-transform group-hover:translate-x-0.5"
+              />
             </Link>
           );
         })}

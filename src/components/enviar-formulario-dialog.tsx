@@ -16,10 +16,8 @@ import {
   type LinkProntoItem,
 } from "@/components/forms/links-prontos";
 import { ValidadeLinks } from "@/components/forms/validade-links";
-import {
-  msgLinkWhatsApp,
-  useOrigem,
-} from "@/components/forms/link-shared";
+import { msgLinkWhatsApp } from "@/components/forms/link-shared";
+import { useOrigem } from "@/components/forms/use-origem";
 import { fade, T } from "@/components/motion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";

@@ -123,6 +123,20 @@
     0 0 0 1px hsl(0 0% 0% / 0.09),
     0 1px 2px -1px hsl(0 0% 0% / 0.09),
     0 4px 8px -2px hsl(0 0% 0% / 0.07);
+  /* nível 2 — overlays transitórios (menus, popovers, selects, barras
+     flutuantes). A 1ª camada já funciona como ring — dispensa ring-1. */
+  --shadow-overlay:
+    0 0 0 1px hsl(0 0% 0% / 0.06),
+    0 4px 12px -2px hsl(0 0% 0% / 0.08),
+    0 16px 32px -12px hsl(0 0% 0% / 0.14);
+  /* nível 3 — modal/sheet: topo da pilha de superfícies */
+  --shadow-modal:
+    0 0 0 1px hsl(0 0% 0% / 0.08),
+    0 8px 24px -8px hsl(0 0% 0% / 0.12),
+    0 32px 64px -24px hsl(0 0% 0% / 0.20);
+  /* poço — região inset que afunda na superfície do cartão
+     (usar com bg-muted/50; nunca combinar com shadow-border) */
+  --shadow-inset: inset 0 1px 2px 0 hsl(0 0% 0% / 0.05);
 }
 
 /* stagger de entrada de listas: .animate-enter + --i inline (0, 1, 2…).
@@ -155,6 +169,19 @@
 }
 .animate-enter-x {
   animation: enter-x 200ms var(--ease-snappy) both;
+}
+
+/* barras de progresso: preenchem uma vez na primeira pintura (scaleX evita
+   reflow de width). --i faz leve stagger; o guard de reduced-motion zera. */
+@keyframes fill-grow {
+  from {
+    transform: scaleX(0);
+  }
+}
+.fill-grow {
+  transform-origin: left;
+  animation: fill-grow 500ms var(--ease-snappy) both;
+  animation-delay: calc(var(--i, 0) * 35ms + 150ms);
 }
 
 /* entrada do "balão de pergunta" do onboarding — um rise por passo (o wrapper

@@ -34,12 +34,21 @@ export type FormularioListaItem = Formulario & {
   ultimaResposta: string | null;
 };
 
-/** Link com o destinatário resolvido pra UI (nome, WhatsApp, dupla) e a
- *  resposta embutida quando existe. */
+/** Link com o destinatário resolvido pra UI (nome, WhatsApp, avatar, papel,
+ *  dupla) e a resposta embutida quando existe. */
 export type LinkResolvido = FormularioLink & {
   dest_tipo: "profile" | "mentorado" | "generico";
   dest_nome: string | null;
   dest_whatsapp: string | null;
+  /** role do profile destinatário ("mentorado" quando o link aponta pra
+   *  jovem) — meta do card de resposta. null no genérico e em profile sem
+   *  papel definido. */
+  dest_papel: string | null;
+  /** avatar_path do destinatário — o grant de coluna já existe pros dois
+   *  tipos; null sem foto e no genérico. */
+  dest_avatar: string | null;
+  /** ficha da pessoa em /pessoas — null no link genérico (não há quem abrir). */
+  dest_url: string | null;
   dupla: { id: string; mentor_nome: string; mentorado_nome: string } | null;
   resposta: FormularioResposta | null;
 };
@@ -135,8 +144,8 @@ export const getFormulario = cache(
       .select(
         `*,
         resposta:formulario_respostas(id, link_id, respostas, respondido_em),
-        dest_profile:profiles!formulario_links_dest_profile_id_fkey(id, nome),
-        dest_mentorado:mentorados!formulario_links_dest_mentorado_id_fkey(id, nome, whatsapp),
+        dest_profile:profiles!formulario_links_dest_profile_id_fkey(id, nome, role, avatar_path),
+        dest_mentorado:mentorados!formulario_links_dest_mentorado_id_fkey(id, nome, whatsapp, avatar_path),
         dupla:duplas!formulario_links_dupla_id_fkey(
           id,
           mentor:profiles!duplas_mentor_id_fkey(nome),
@@ -164,10 +173,13 @@ export const getFormulario = cache(
 
     type LinkRaw = FormularioLink & {
       resposta: FormularioResposta | FormularioResposta[] | null;
-      dest_profile: { id: string; nome: string }[] | { id: string; nome: string } | null;
+      dest_profile:
+        | { id: string; nome: string; role: string | null; avatar_path: string | null }
+        | { id: string; nome: string; role: string | null; avatar_path: string | null }[]
+        | null;
       dest_mentorado:
-        | { id: string; nome: string; whatsapp: string | null }
-        | { id: string; nome: string; whatsapp: string | null }[]
+        | { id: string; nome: string; whatsapp: string | null; avatar_path: string | null }
+        | { id: string; nome: string; whatsapp: string | null; avatar_path: string | null }[]
         | null;
       dupla:
         | {
@@ -194,6 +206,9 @@ export const getFormulario = cache(
           dest_tipo: p ? "profile" : m ? "mentorado" : "generico",
           dest_nome: p?.nome ?? m?.nome ?? null,
           dest_whatsapp: m?.whatsapp ?? (p ? (contatos.get(p.id) ?? null) : null),
+          dest_papel: p?.role ?? (m ? "mentorado" : null),
+          dest_avatar: p?.avatar_path ?? m?.avatar_path ?? null,
+          dest_url: p ? `/pessoas/${p.id}` : m ? `/pessoas/${m.id}` : null,
           dupla: dupla
             ? {
                 id: dupla.id,
@@ -356,6 +371,9 @@ function demoDetalhe(role: AppRole, id: string): FormularioDetalhe | null {
         dest_tipo: p ? "profile" : m ? "mentorado" : "generico",
         dest_nome: p?.nome ?? m?.nome ?? null,
         dest_whatsapp: p?.whatsapp ?? m?.whatsapp ?? null,
+        dest_papel: p?.role ?? (m ? "mentorado" : null),
+        dest_avatar: p?.avatar_path ?? m?.avatar_path ?? null,
+        dest_url: p ? `/pessoas/${p.id}` : m ? `/pessoas/${m.id}` : null,
         dupla: dupla
           ? {
               id: dupla.id,

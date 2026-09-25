@@ -61,8 +61,13 @@ export function DemandasEspecialista({
 
       {abertas.length === 0 ? (
         <Card>
-          <CardContent className="py-8 text-center text-sm text-muted-foreground">
-            Nenhum pedido aberto no momento.
+          <CardContent className="flex flex-col items-center gap-2 py-8 text-center">
+            <span className="grid size-11 place-items-center rounded-full bg-muted text-muted-foreground">
+              <HandHeart aria-hidden size={18} />
+            </span>
+            <p className="text-sm text-muted-foreground">
+              Nenhum pedido aberto no momento.
+            </p>
           </CardContent>
         </Card>
       ) : (

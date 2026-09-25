@@ -174,6 +174,7 @@ export function AssinaturaForm({
   dados,
   parentesco,
   etapas,
+  onSucesso,
 }: {
   modo: "termo" | "autorizacao";
   /** nome do jovem (autorização) — read-only, vem do servidor */
@@ -187,6 +188,10 @@ export function AssinaturaForm({
   /** passo a passo numerado da página — quando ativo, o bloco final ganha
    *  o título "3 · Assine" com a âncora que o índice de etapas aponta */
   etapas?: boolean;
+  /** chamada depois do ok da action — o passo de termo do onboarding usa
+   *  pra avançar pro fechamento (o router.refresh() interno continua; a
+   *  instância do wizard sobrevive ao refresh e preserva o step) */
+  onSucesso?: () => void;
 }) {
   const [pending, start] = useTransition();
   const [erro, setErro] = useState<string | null>(null);
@@ -204,6 +209,7 @@ export function AssinaturaForm({
       }
       toast.success("Documento assinado.");
       router.refresh();
+      onSucesso?.();
     });
   }
 

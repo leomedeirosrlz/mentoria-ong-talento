@@ -585,7 +585,11 @@ export const getComunicados = cache(async (): Promise<Comunicado[]> => {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("comunicados")
-    .select("id, titulo, corpo, audiencia, created_by, created_at, autor:profiles!created_by(nome)")
+    .select("id, titulo, corpo, audiencia, prioridade, created_by, created_at, autor:profiles!created_by(nome)")
+    // prioridade antes de recência: um urgente antigo ainda ganha o top-5
+    // de um informativo novo. prioridade_ord é coluna gerada (0055) — o
+    // PostgREST ordena por ela mesmo fora do select
+    .order("prioridade_ord")
     .order("created_at", { ascending: false })
     .limit(5);
   // idem: avisos somem em vez de quebrar a home — com log

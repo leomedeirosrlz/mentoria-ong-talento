@@ -13,7 +13,6 @@ import {
   PaperPlaneTilt,
   UserPlus,
   VideoCamera,
-  WhatsappLogo,
 } from "@phosphor-icons/react/dist/ssr";
 import { Menu as MenuPrimitive } from "@base-ui/react/menu";
 import {
@@ -49,11 +48,12 @@ import {
   saudadeDaDupla,
   toDateStr,
   TRILHA_LABEL,
-  waLink,
   type PassoGuia,
 } from "@/lib/ciclo";
+import { msgsContato } from "@/lib/whatsapp-msgs";
 import { AvaliacaoBadge, SemaforoBadge, SemaforoDot } from "@/components/semaforo";
 import { NudgeButton } from "@/components/nudge-button";
+import { WhatsAppRapido, type DestinoWA } from "@/components/whatsapp-rapido";
 import { NotaEncontro } from "@/components/nota-encontro";
 import { AgendarEncontroDialog } from "@/components/agendar-encontro-dialog";
 import { RegistrarRetroativoDialog } from "@/components/registrar-retroativo-dialog";
@@ -102,7 +102,7 @@ import { cn } from "@/lib/utils";
 // próprios triggers dos dialogs, e o unmount do popup ao fechar derrubaria
 // qualquer dialog aberto a partir dele
 const MENU_POPUP =
-  "z-50 max-h-(--available-height) w-56 min-w-32 origin-(--transform-origin) overflow-x-hidden overflow-y-auto rounded-lg bg-popover p-1 text-popover-foreground shadow-md ring-1 ring-foreground/10 duration-150 ease-[cubic-bezier(0.2,0,0,1)] outline-none data-[side=bottom]:slide-in-from-top-1 data-[side=bottom]:slide-out-to-top-1 data-[side=left]:slide-in-from-right-1 data-[side=left]:slide-out-to-right-1 data-[side=right]:slide-in-from-left-1 data-[side=right]:slide-out-to-left-1 data-[side=top]:slide-in-from-bottom-1 data-[side=top]:slide-out-to-bottom-1 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:overflow-hidden data-closed:fade-out-0 data-closed:zoom-out-95";
+  "z-50 max-h-(--available-height) w-56 min-w-32 origin-(--transform-origin) overflow-x-hidden overflow-y-auto rounded-lg bg-popover p-1 text-popover-foreground shadow-[var(--shadow-overlay)] duration-150 ease-[cubic-bezier(0.2,0,0,1)] outline-none data-[side=bottom]:slide-in-from-top-1 data-[side=bottom]:slide-out-to-top-1 data-[side=left]:slide-in-from-right-1 data-[side=left]:slide-out-to-right-1 data-[side=right]:slide-in-from-left-1 data-[side=right]:slide-out-to-left-1 data-[side=top]:slide-in-from-bottom-1 data-[side=top]:slide-out-to-bottom-1 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:overflow-hidden data-closed:fade-out-0 data-closed:zoom-out-95";
 
 export async function generateMetadata({
   params,
@@ -197,6 +197,31 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
       .join(" ") +
     `. ${primeiroNomeMentor}`;
 
+  // catálogo whatsapp-msgs — check-in neutro do header ("mentoria com X");
+  // msgs específicas de anomalia vivem junto de cada bloco que as usa
+  const msgsGenerico = msgsContato("generico", {
+    mentorNome: dupla.mentor.nome,
+    mentoradoNome: dupla.mentorado.nome,
+    autorNome: me.nome,
+  });
+  // nudge do pedido de apoio: só o mentor recebe — o pedido partiu dele e o
+  // mentorado não é canal de resposta (vazio pro mentor = nunca renderiza)
+  const apoioDestinos: DestinoWA[] = souMentor
+    ? []
+    : [
+        {
+          rotulo: "Chamar mentor",
+          telefone: dupla.mentor.whatsapp,
+          mensagem:
+            msgsContato("apoio", {
+              mentorNome: dupla.mentor.nome,
+              mentoradoNome: dupla.mentorado.nome,
+              autorNome: me.nome,
+            }).mentor ?? "",
+          t: "apoio",
+        },
+      ];
+
   // material de apoio por nº de encontro (guia/template daquele encontro) —
   // a audiência segue a trilha: material DPP nunca cai na trilha especialista
   // (pra coordenação, que enxerga tudo, o número coincidiria errado)
@@ -285,22 +310,6 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
       .sort((a, b) => a.numero - b.numero)[0] ?? null;
   const podeAgendar =
     souMentor && saude.feitos < total && dupla.status === "ativa";
-  // âncora pra /api/nudge — mesmo log do NudgeButton (registra o contato e
-  // redireciona pro wa.me), aqui com peso de CTA primário
-  const waMentor = waLink(
-    dupla.mentor.whatsapp,
-    `Oi ${primeiroNomeMentor}, tudo bem? Passando pra acompanhar a mentoria com ${primeiroNomeMentorado}. Como estão as coisas?`
-  );
-  const nudgeMentor = waMentor
-    ? `/api/nudge?d=${encodeURIComponent(dupla.id)}&to=${encodeURIComponent(waMentor)}&t=nudge`
-    : null;
-  const waMentorado = waLink(
-    dupla.mentorado.whatsapp,
-    `Oi ${primeiroNomeMentorado}, tudo bem? Aqui é ${me.nome.split(" ")[0]}, da equipe do Realiza.vc. Como está indo a mentoria?`
-  );
-  const nudgeMentorado = waMentorado
-    ? `/api/nudge?d=${encodeURIComponent(dupla.id)}&to=${encodeURIComponent(waMentorado)}&t=contato`
-    : null;
 
   // overflow — os dialogs entram pelo trigger custom (Menu.Item é o
   // Dialog.Trigger de fato); o keepMounted do Portal segura o dialog montado
@@ -374,17 +383,6 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
       />
     );
   }
-  if (souCoord && nudgeMentorado) {
-    maisItens.push(
-      <DropdownMenuItem
-        key="wa-mentorado"
-        render={<a href={nudgeMentorado} target="_blank" rel="noopener noreferrer" />}
-      >
-        <WhatsappLogo aria-hidden /> Falar com mentorado
-      </DropdownMenuItem>
-    );
-  }
-
   const renderEncontro = (passo: PassoGuia) => {
     const enc = dupla.encontros.find((e) => e.numero === passo.numero);
     return (
@@ -406,6 +404,7 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
         combinadosPendentes={combinadosPendentes}
         nota={dupla.notas?.find((n) => n.numero === passo.numero)?.texto ?? null}
         registroAberto={registrosRecentes.has(passo.numero)}
+        apoioDestinos={apoioDestinos}
       />
     );
   };
@@ -491,30 +490,26 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
           )}
           {/* nudge é papel de coordenação/supervisão — pro próprio mentor o
               botão abriria conversa consigo mesmo e logaria contato falso.
-              Sem número o NudgeButton mostra a razão e o Editar é quem sobra */}
-          {souCoord &&
-            (nudgeMentor ? (
-              <a
-                href={nudgeMentor}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={buttonVariants({ variant: "default", size: "sm" })}
-              >
-                <WhatsappLogo />
-                Chamar no WhatsApp
-              </a>
-            ) : (
-              <NudgeButton
-                telefone={dupla.mentor.whatsapp}
-                mensagem={`Oi ${primeiroNomeMentor}, tudo bem? Passando pra acompanhar a mentoria com ${primeiroNomeMentorado}. Como estão as coisas?`}
-                duplaId={dupla.id}
-              />
-            ))}
-          {!souMentor && !souCoord && (
-            <NudgeButton
-              telefone={dupla.mentor.whatsapp}
-              mensagem={`Oi ${primeiroNomeMentor}, tudo bem? Passando pra acompanhar a mentoria com ${primeiroNomeMentorado}. Como estão as coisas?`}
+              Os dois lados da dupla lado a lado; tipos "nudge"/"contato"
+              distintos coexistem no dedupe de 60s do /api/nudge. Sem número
+              o item mostra a razão e o Editar é quem sobra de ação */}
+          {!souMentor && (
+            <WhatsAppRapido
               duplaId={dupla.id}
+              destinos={[
+                {
+                  rotulo: "Chamar mentor",
+                  telefone: dupla.mentor.whatsapp,
+                  mensagem: msgsGenerico.mentor ?? "",
+                  t: "nudge",
+                },
+                {
+                  rotulo: "Chamar mentorado",
+                  telefone: dupla.mentorado.whatsapp,
+                  mensagem: msgsGenerico.mentorado ?? "",
+                  t: "contato",
+                },
+              ]}
             />
           )}
           {souCoord && <EditarDuplaDialog dupla={dupla} />}
@@ -657,16 +652,19 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
               )
             )}
             {(souMentor || souCoord || me.role === "supervisor") && (
-              <NudgeButton
-                telefone={dupla.mentorado.whatsapp}
-                mensagem={
-                  souMentor
-                    ? `Olá ${primeiroNomeMentorado}! Aqui é ${primeiroNomeMentor}, seu mentor no Programa de Mentoria Social.`
-                    : `Oi ${primeiroNomeMentorado}, tudo bem? Aqui é ${me.nome.split(" ")[0]}, da equipe do Realiza.vc. Como está indo a mentoria?`
-                }
-                label="Falar com mentorado"
+              <WhatsAppRapido
                 duplaId={dupla.id}
-                t="contato"
+                destinos={[
+                  {
+                    rotulo: "Falar com mentorado",
+                    telefone: dupla.mentorado.whatsapp,
+                    // o mentor fala como mentor, não como equipe — msg própria
+                    mensagem: souMentor
+                      ? `Olá ${primeiroNomeMentorado}! Aqui é ${primeiroNomeMentor}, seu mentor no Programa de Mentoria Social.`
+                      : (msgsGenerico.mentorado ?? ""),
+                    t: "contato",
+                  },
+                ]}
               />
             )}
             {/* PDM do mentorado — o link é mantido pelo mentor da dupla (RPC
@@ -818,6 +816,7 @@ function EncontroRow({
   combinadosPendentes,
   nota,
   registroAberto,
+  apoioDestinos,
 }: {
   /** Passo do guia da trilha (data sugerida no DPP; sem data no especialista). */
   passo: PassoGuia;
@@ -839,6 +838,9 @@ function EncontroRow({
   /** Registro entre os mais recentes da dupla — nasce expandido; os demais
    *  viram linha-resumo sob disclosure (o deep link `#registrar-{id}` abre). */
   registroAberto: boolean;
+  /** Destinos do nudge do pedido de apoio (só o mentor — o pedido é dele).
+   *  Vazio pro próprio mentor: WhatsAppRapido some sozinho. */
+  apoioDestinos: DestinoWA[];
 }) {
   const feito = encontro?.status === "realizado";
   const naoAconteceu = encontro?.status === "nao_aconteceu";
@@ -1023,6 +1025,11 @@ function EncontroRow({
                 <HandHeart size={13} /> apoio solicitado
               </Badge>
             )}
+            {/* o pedido partiu do mentor — a resposta de coord/sup é chamar
+                ele direto, junto do resolver/badge */}
+            {reg?.precisa_apoio && (
+              <WhatsAppRapido duplaId={duplaId} destinos={apoioDestinos} />
+            )}
           </div>
         )}
       </div>
@@ -1030,7 +1037,7 @@ function EncontroRow({
       {/* anotações/plano do encontro — o mentor prepara aqui; pra quem não
           edita (coord/sup, dupla inativa) a nota existente vira leitura */}
       {(podeEditar || nota) && (
-        <div className="border-t px-4 py-3">
+        <div className="border-t border-border/60 px-4 py-3">
           <NotaEncontro
             duplaId={duplaId}
             numero={passo.numero}
@@ -1047,7 +1054,7 @@ function EncontroRow({
         <RegistroDetails
           encontroId={encontro.id}
           aberto={registroAberto}
-          className="group/reg border-t bg-muted/40"
+          className="group/reg border-t border-border/60 bg-muted/50 shadow-[var(--shadow-inset)]"
         >
           <summary className="flex cursor-pointer list-none items-center gap-2.5 px-4 py-2.5 transition-colors hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
             <span className="shrink-0 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
@@ -1106,10 +1113,11 @@ function EncontroRow({
           <RegistroInlinePanel
             encontroId={encontro.id}
             className={cn(
-              // região inset do card — mesma gramática do bloco de reg acima;
-              // em registro pendente, a lavagem warn da linha continua aqui
-              "border-t px-4 py-4",
-              registroPendente ? "bg-[var(--warn)]/5" : "bg-muted/40"
+              // região inset do card — poço afundado na superfície, mesma
+              // gramática do bloco de reg acima; em registro pendente, a
+              // lavagem warn da linha continua aqui
+              "border-t border-border/60 px-4 py-4 shadow-[var(--shadow-inset)]",
+              registroPendente ? "bg-[var(--warn)]/5" : "bg-muted/50"
             )}
           >
             <RegistroForm

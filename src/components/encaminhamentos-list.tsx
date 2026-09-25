@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { DotsThree, PencilSimple, Trash } from "@phosphor-icons/react";
+import { DotsThree, ListChecks, PencilSimple, Trash } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import {
   editarEncaminhamento,
@@ -57,7 +57,10 @@ export function EncaminhamentosList({
     // vazio explica de onde os combinados nascem (o registro do encontro) —
     // não há ação solta aqui porque criar encaminhamento é parte do follow-up
     return (
-      <p className="text-sm text-muted-foreground py-4">
+      <p className="flex items-center gap-3 py-4 text-sm text-muted-foreground">
+        <span className="grid size-11 shrink-0 place-items-center rounded-full bg-muted text-muted-foreground">
+          <ListChecks size={18} aria-hidden />
+        </span>
         Nenhum combinado por aqui ainda: eles saem do registro de cada encontro.
       </p>
     );
@@ -69,7 +72,7 @@ export function EncaminhamentosList({
 
   return (
     <>
-      <ul className="divide-y divide-border">
+      <ul className="divide-y divide-border/60">
         {ordenados.map((t) => {
           const vencido = t.status === "pendente" && t.prazo && t.prazo < hoje;
           const criadoNo = t.registro_id ? encontroNumeroPorRegistroId?.[t.registro_id] : undefined;

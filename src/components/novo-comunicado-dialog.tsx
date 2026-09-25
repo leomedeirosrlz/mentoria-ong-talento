@@ -15,6 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import { cn } from "@/lib/utils";
 
 // mesma matriz de audiência dos materiais + 'equipe' (coord + supervisores —
 // aviso interno sem pingar mentores)
@@ -25,6 +26,14 @@ const AUDIENCIA_LABEL = {
   equipe: "Coordenação e supervisores",
   coordenacao: "Só a coordenação",
 } as const;
+
+// a descrição curta de cada opção ancora o critério — sem ela "urgente"
+// vira botão de ênfase e banaliza
+const PRIORIDADE_OPCOES = [
+  { valor: "normal", rotulo: "Normal", descricao: "informativo" },
+  { valor: "importante", rotulo: "Importante", descricao: "pede atenção ou ação" },
+  { valor: "urgente", rotulo: "Urgente", descricao: "crítico ou com prazo" },
+] as const;
 
 export function NovoComunicadoDialog() {
   const [open, setOpen] = useState(false);
@@ -112,6 +121,38 @@ export function NovoComunicadoDialog() {
               </SelectContent>
             </Select>
           </div>
+          {/* radio nativo (padrão OpcaoPilula de registros-filtros): o input
+              sr-only entra no FormData, setas do teclado e leitor de tela
+              vêm de graça; o label estiliza via has-checked */}
+          <fieldset className="space-y-1.5">
+            <legend className="text-sm font-medium leading-none select-none">
+              Prioridade
+            </legend>
+            <div className="grid gap-1.5 sm:grid-cols-3">
+              {PRIORIDADE_OPCOES.map((p) => (
+                <label
+                  key={p.valor}
+                  className={cn(
+                    "flex min-h-11 cursor-pointer flex-col items-center justify-center rounded-lg border px-2.5 py-1.5 text-center text-sm transition-colors",
+                    "hover:bg-muted has-checked:border-foreground has-checked:bg-foreground has-checked:font-medium has-checked:text-background",
+                    "has-focus-visible:ring-2 has-focus-visible:ring-ring has-focus-visible:ring-offset-2 has-focus-visible:ring-offset-background"
+                  )}
+                >
+                  <input
+                    type="radio"
+                    name="prioridade"
+                    value={p.valor}
+                    defaultChecked={p.valor === "normal"}
+                    className="sr-only"
+                  />
+                  {p.rotulo}
+                  <span className="text-[11px] leading-tight font-normal opacity-70">
+                    {p.descricao}
+                  </span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
           <DialogFooter>
             <Button type="submit" disabled={pending}>
               {pending ? "Publicando…" : "Publicar aviso"}

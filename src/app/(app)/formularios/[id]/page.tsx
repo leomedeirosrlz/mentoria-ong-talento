@@ -11,6 +11,7 @@ import {
 } from "@/lib/forms/schema";
 import { formatDate } from "@/lib/ciclo";
 import { Badge } from "@/components/ui/badge";
+import { PageHeader } from "@/components/page-header";
 import { VoltarLink } from "@/components/voltar-link";
 import { FormularioAcoes, FormularioExcluir } from "../formulario-acoes";
 import { FormularioBuilder } from "../formulario-builder";
@@ -92,46 +93,46 @@ export default async function FormularioPage({
 
   return (
     <div className="mx-auto max-w-3xl space-y-8">
-      <header>
-        <VoltarLink fallback="/formularios" />
-        <div className="mt-2 flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-2xl font-semibold tracking-tight">
-                {f.titulo}
-              </h1>
-              {f.ativo ? (
-                <Badge className="bg-[var(--ok)]/15 text-[var(--ok-text)]">
-                  Ativo
-                </Badge>
-              ) : (
-                <Badge variant="secondary">Encerrado</Badge>
-              )}
-              {f.sistema && (
-                <Badge
-                  variant="outline"
-                  className="border-[var(--brand-lime)]/60 bg-[var(--brand-lime)]/10"
-                >
-                  oficial · {SISTEMA_LABEL[f.sistema]}
-                </Badge>
-              )}
-              {f.versao > 1 && (
-                <Badge variant="outline">v{f.versao}</Badge>
-              )}
-            </div>
-            {f.descricao && (
-              <p className="mt-1.5 max-w-xl text-sm leading-relaxed text-muted-foreground">
-                {f.descricao}
-              </p>
+      <PageHeader
+        kicker={<VoltarLink fallback="/formularios" />}
+        title={
+          <>
+            {f.titulo}
+            {f.ativo ? (
+              <Badge className="bg-[var(--ok)]/15 text-[var(--ok-text)]">
+                Ativo
+              </Badge>
+            ) : (
+              <Badge variant="secondary">Encerrado</Badge>
             )}
-            <p className="mt-1.5 text-xs text-muted-foreground">
+            {f.sistema && (
+              <Badge
+                variant="outline"
+                className="border-[var(--brand-lime)]/60 bg-[var(--brand-lime)]/10"
+              >
+                oficial · {SISTEMA_LABEL[f.sistema]}
+              </Badge>
+            )}
+            {f.versao > 1 && (
+              <Badge variant="outline">v{f.versao}</Badge>
+            )}
+          </>
+        }
+        meta={
+          <>
+            {f.descricao && (
+              <p className="max-w-xl leading-relaxed">{f.descricao}</p>
+            )}
+            <p className="mt-1.5 text-xs">
               Criado em {formatDate(f.created_at)}
               {" · "}
               {f.campos.length}{" "}
               {f.campos.length === 1 ? "pergunta" : "perguntas"}
             </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
+          </>
+        }
+        actions={
+          <>
             <FormularioPreview
               titulo={f.titulo}
               descricao={f.descricao}
@@ -139,9 +140,9 @@ export default async function FormularioPage({
               sistema={f.sistema}
             />
             <FormularioAcoes id={f.id} ativo={f.ativo} />
-          </div>
-        </div>
-      </header>
+          </>
+        }
+      />
 
       {/* faixa de status dos links — completude primeiro ("2 de 5
           responderam"), depois o que falta; o pendente fica em warn só

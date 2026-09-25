@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
 import Link from "next/link";
-import { ArrowCounterClockwise, Users } from "@phosphor-icons/react/dist/ssr";
+import { ArrowCounterClockwise, ArrowRight } from "@phosphor-icons/react/dist/ssr";
 import {
   eventoDaSemana,
   formatDiaMes,
@@ -27,6 +27,8 @@ import { AvisosSection } from "@/components/avisos-section";
 import { SolicitacoesCoordCard } from "@/components/solicitacoes-coord-card";
 import { SupervisaoDialog } from "@/components/supervisao-dialog";
 import { SupervisoesSection } from "@/components/supervisoes-section";
+import { WhatsAppRapido, type DestinoWA } from "@/components/whatsapp-rapido";
+import { msgsContato } from "@/lib/whatsapp-msgs";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -68,6 +70,7 @@ export function DashboardCoordenacao({
   filtro,
   supervisaoItens = [],
   supervisaoAlvos = [],
+  meuNome,
 }: {
   duplas: Dupla[];
   eventos: CicloEvento[];
@@ -80,6 +83,9 @@ export function DashboardCoordenacao({
   /** profiles + mentorados — primeiro passo do checklist de setup (só coordenação passa). */
   pessoas?: number;
   supervisor?: boolean;
+  /** Primeiro nome de quem está logado — assina a mensagem pro mentorado
+   *  no WhatsApp rápido do card ("Aqui é Fulana, da equipe…"). */
+  meuNome?: string;
   /** avisos da coordenação já filtrados por audiência (RLS). */
   avisos?: Comunicado[];
   /** demandas de especialista visíveis ao papel — só a coordenação monitora
@@ -120,6 +126,12 @@ export function DashboardCoordenacao({
         `${primeiroNome(dupla.mentor.nome)} & ${primeiroNome(dupla.mentorado.nome)} (${motivoCurto(saude)})`
     );
 
+  // rail vazio some junto com a coluna: pra coordenação o card de avisos
+  // sempre existe (o convite de publicar), pro supervisor o rail só nasce
+  // se houver resumo ou aviso — sem o guard o template xl reservava ~340px
+  // de faixa morta
+  const temRail = !supervisor || resumo != null || avisos.length > 0;
+
   return (
     <div className="space-y-8">
       <header>
@@ -146,237 +158,266 @@ export function DashboardCoordenacao({
         />
       )}
 
+      {/* xl+: trabalho na coluna principal (stats + radar), contexto no rail
+          da direita — mesmo modelo do aside da ficha de dupla. O rail vem
+          depois no DOM: no mobile a leitura segue stats → radar → contexto
+          sem precisar de order-* */}
       <div
-        role="group"
-        aria-label="Filtrar lista de duplas"
-        className="grid grid-cols-2 gap-3 sm:grid-cols-4"
+        className={cn(
+          "grid gap-8",
+          temRail && "xl:grid-cols-[minmax(0,1fr)_minmax(300px,340px)]"
+        )}
       >
-        <Stat label="Duplas ativas" valor={ativas} href="/" ativo={!filtroAtivo} />
-        <Stat
-          label="Em risco"
-          valor={risco}
-          destaque={risco > 0 ? "danger" : undefined}
-          href="/?filtro=risco"
-          ativo={filtroAtivo === "risco"}
-        />
-        <Stat
-          label="Em atenção"
-          valor={atencao}
-          destaque={atencao > 0 ? "warn" : undefined}
-          href="/?filtro=atencao"
-          ativo={filtroAtivo === "atencao"}
-        />
-        <Stat
-          label="Registros pendentes"
-          valor={semRegistro}
-          destaque={semRegistro > 0 ? "warn" : undefined}
-          href="/?filtro=pendentes"
-          ativo={filtroAtivo === "pendentes"}
-        />
-      </div>
-
-      {pedidosApoio > 0 && (
-        <div className="rounded-xl border border-[var(--danger)]/40 bg-[var(--danger)]/5 px-4 py-3 text-sm">
-          <span className="font-medium">
-            {pedidosApoio} {pedidosApoio === 1 ? "pedido" : "pedidos"} de apoio
-          </span>
-          <span className="text-muted-foreground">
-            {pedidosApoio === 1
-              ? " sinalizado por um mentor no registro."
-              : " sinalizados por mentores nos registros."}
-          </span>
-        </div>
-      )}
-
-      {/* radar primeiro: a lista de duplas é o bloco de trabalho — vem antes
-          do resumo da semana, das solicitações e dos avisos */}
-      <section className="space-y-3" aria-labelledby="duplas-radar-titulo">
-        <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-          <h2
-            id="duplas-radar-titulo"
-            className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground"
+        <div className="min-w-0 space-y-8">
+          <div
+            role="group"
+            aria-label="Filtrar lista de duplas"
+            className="grid grid-cols-2 gap-3 xl:grid-cols-4"
           >
-            {supervisor ? "Suas duplas" : "Duplas"}
-          </h2>
-          {filtroAtivo && saude.length > 0 && visiveis.length > 0 && (
-            <p className="text-xs text-muted-foreground">
-              Mostrando só{" "}
-              {visiveis.length === 1
-                ? "1 dupla"
-                : `${visiveis.length} duplas`}{" "}
-              {FILTROS[filtroAtivo].rotulo} ·{" "}
-              <Link
-                href="/"
-                className="font-medium text-foreground underline underline-offset-2"
+            <Stat i={0} label="Duplas ativas" valor={ativas} href="/" ativo={!filtroAtivo} />
+            <Stat
+              i={1}
+              label="Em risco"
+              valor={risco}
+              destaque={risco > 0 ? "danger" : undefined}
+              href="/?filtro=risco"
+              ativo={filtroAtivo === "risco"}
+            />
+            <Stat
+              i={2}
+              label="Em atenção"
+              valor={atencao}
+              destaque={atencao > 0 ? "warn" : undefined}
+              href="/?filtro=atencao"
+              ativo={filtroAtivo === "atencao"}
+            />
+            <Stat
+              i={3}
+              label="Registros pendentes"
+              valor={semRegistro}
+              destaque={semRegistro > 0 ? "warn" : undefined}
+              href="/?filtro=pendentes"
+              ativo={filtroAtivo === "pendentes"}
+            />
+          </div>
+
+          {pedidosApoio > 0 && (
+            <div className="rounded-xl border border-[var(--danger)]/40 bg-[var(--danger)]/5 px-4 py-3 text-sm">
+              <span className="font-medium">
+                {pedidosApoio} {pedidosApoio === 1 ? "pedido" : "pedidos"} de apoio
+              </span>
+              <span className="text-muted-foreground">
+                {pedidosApoio === 1
+                  ? " sinalizado por um mentor no registro."
+                  : " sinalizados por mentores nos registros."}
+              </span>
+            </div>
+          )}
+
+          {/* radar primeiro: a lista de duplas é o bloco de trabalho — vem
+              antes do resumo da semana, das solicitações e dos avisos */}
+          <section className="space-y-3" aria-labelledby="duplas-radar-titulo">
+            <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+              <h2
+                id="duplas-radar-titulo"
+                className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground"
               >
-                Ver todas
-              </Link>
-            </p>
+                {supervisor ? "Suas duplas" : "Duplas"}
+              </h2>
+              {filtroAtivo && saude.length > 0 && visiveis.length > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  Mostrando só{" "}
+                  {visiveis.length === 1
+                    ? "1 dupla"
+                    : `${visiveis.length} duplas`}{" "}
+                  {FILTROS[filtroAtivo].rotulo} ·{" "}
+                  <Link
+                    href="/"
+                    className="font-medium text-foreground underline underline-offset-2"
+                  >
+                    Ver todas
+                  </Link>
+                </p>
+              )}
+            </div>
+
+            {saude.length === 0 && (
+              <Card>
+                <CardContent className="py-10 text-center">
+                  {/* glifo da marca no lugar do ícone genérico: os dois discos
+                      sobrepostos da dupla (precedente DuplaAvatares) */}
+                  <span aria-hidden className="mx-auto inline-flex">
+                    <span className="size-8 rounded-full bg-[var(--brand-lime)] ring-2 ring-card" />
+                    <span className="-ml-2.5 size-8 rounded-full bg-[var(--role-mentorado)] ring-2 ring-card" />
+                  </span>
+                  <p className="mt-3 font-medium text-foreground">
+                    {supervisor
+                      ? "Nenhuma dupla atribuída a você ainda."
+                      : "Nenhuma dupla ativa ainda."}
+                  </p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {supervisor ? (
+                      "Quando a coordenação atribuir duplas, elas aparecem aqui."
+                    ) : (
+                      <>
+                        <Link href="/pessoas" className="underline underline-offset-2">
+                          Cadastre pessoas
+                        </Link>{" "}
+                        e{" "}
+                        <Link href="/duplas" className="underline underline-offset-2">
+                          monte as duplas
+                        </Link>{" "}
+                        do programa.
+                      </>
+                    )}
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+
+            {saude.length > 0 && filtroAtivo && visiveis.length === 0 && (
+              <Card>
+                <CardContent className="py-10 text-center">
+                  <span aria-hidden className="mx-auto inline-flex">
+                    <span className="size-8 rounded-full bg-[var(--brand-lime)] ring-2 ring-card" />
+                    <span className="-ml-2.5 size-8 rounded-full bg-[var(--role-mentorado)] ring-2 ring-card" />
+                  </span>
+                  <p className="mt-3 font-medium text-foreground">
+                    Nenhuma dupla {FILTROS[filtroAtivo].rotulo}.
+                  </p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    <Link href="/" className="underline underline-offset-2">
+                      Ver todas as duplas
+                    </Link>
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* entrada escalonada — o stagger revela a ordem risco→ok (spec §2) */}
+            {visiveis.map(({ dupla, saude }, i) => (
+              <DuplaCard
+                key={dupla.id}
+                dupla={dupla}
+                saude={saude}
+                origem={origem}
+                interacoes={interacoes}
+                hoje={hoje}
+                i={i}
+                meuNome={meuNome}
+              />
+            ))}
+          </section>
+
+          {/* ritual supervisor ↔ mentor do guia (0041): registrar a conversa e
+              reler as últimas. Sem dupla supervisionada nem sessão no histórico,
+              o cartão some — a lista de duplas vazia já carrega a explicação */}
+          {supervisor && (supervisaoItens.length > 0 || supervisaoAlvos.length > 0) && (
+            <SupervisoesSection
+              itens={supervisaoItens}
+              visao="supervisor"
+              descricao="As conversas de supervisão com seus mentores: o ritual de acompanhamento do guia."
+              acao={
+                supervisaoAlvos.length > 0 ? (
+                  <SupervisaoDialog alvos={supervisaoAlvos} />
+                ) : undefined
+              }
+            />
           )}
         </div>
 
-        {saude.length === 0 && (
-          <Card>
-            <CardContent className="py-10 text-center">
-              <Users
-                aria-hidden
-                size={32}
-                weight="regular"
-                className="mx-auto text-muted-foreground"
-              />
-              <p className="mt-3 font-medium text-foreground">
-                {supervisor
-                  ? "Nenhuma dupla atribuída a você ainda."
-                  : "Nenhuma dupla ativa ainda."}
-              </p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {supervisor ? (
-                  "Quando a coordenação atribuir duplas, elas aparecem aqui."
-                ) : (
-                  <>
-                    <Link href="/pessoas" className="underline underline-offset-2">
-                      Cadastre pessoas
-                    </Link>{" "}
-                    e{" "}
-                    <Link href="/duplas" className="underline underline-offset-2">
-                      monte as duplas
-                    </Link>{" "}
-                    do programa.
-                  </>
-                )}
-              </p>
-            </CardContent>
-          </Card>
-        )}
+        {temRail && (
+          // coluna lateral de contexto: animate-enter-x é a entrada pensada
+          // pra rails (globals.css); dentro, o resumo entra uma camada
+          // depois dos stats (--i:4) pra montar a página em níveis
+          <aside className="animate-enter-x min-w-0 space-y-8">
+            <AvisosSection avisos={avisos} souCoord={!supervisor} />
 
-        {saude.length > 0 && filtroAtivo && visiveis.length === 0 && (
-          <Card>
-            <CardContent className="py-10 text-center">
-              <Users
-                aria-hidden
-                size={32}
-                weight="regular"
-                className="mx-auto text-muted-foreground"
-              />
-              <p className="mt-3 font-medium text-foreground">
-                Nenhuma dupla {FILTROS[filtroAtivo].rotulo}.
-              </p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                <Link href="/" className="underline underline-offset-2">
-                  Ver todas as duplas
-                </Link>
-              </p>
-            </CardContent>
-          </Card>
-        )}
+            {/* mural de demandas entre mentores — a coordenação observa e
+                gerencia; o fluxo em si é DPP → especialista, sem coordenação
+                no caminho */}
+            {!supervisor && <SolicitacoesCoordCard solicitacoes={solicitacoes} />}
 
-        {/* entrada escalonada — o stagger revela a ordem risco→ok (spec §2) */}
-        {visiveis.map(({ dupla, saude }, i) => (
-          <DuplaCard
-            key={dupla.id}
-            dupla={dupla}
-            saude={saude}
-            origem={origem}
-            interacoes={interacoes}
-            hoje={hoje}
-            i={i}
-          />
-        ))}
-      </section>
-
-      {/* ritual supervisor ↔ mentor do guia (0041): registrar a conversa e
-          reler as últimas. Sem dupla supervisionada nem sessão no histórico,
-          o cartão some — a lista de duplas vazia já carrega a explicação */}
-      {supervisor && (supervisaoItens.length > 0 || supervisaoAlvos.length > 0) && (
-        <SupervisoesSection
-          itens={supervisaoItens}
-          visao="supervisor"
-          descricao="As conversas de supervisão com seus mentores: o ritual de acompanhamento do guia."
-          acao={
-            supervisaoAlvos.length > 0 ? (
-              <SupervisaoDialog alvos={supervisaoAlvos} />
-            ) : undefined
-          }
-        />
-      )}
-
-      {/* contexto depois da tarefa: o fechamento da semana em números
-          rotulados, com as ações (registros, copiar) no cabeçalho do bloco */}
-      {resumo && (
-        <section
-          aria-labelledby="resumo-semana-titulo"
-          className="rounded-xl bg-card px-4 py-3 text-sm shadow-[var(--shadow-border)]"
-        >
-          <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
-            {/* o nº do encontro já está no cabeçalho ("Semana do Nº encontro") —
-                aqui a data é o fato novo */}
-            <h2 id="resumo-semana-titulo" className="font-semibold">
-              Esta semana · {formatDiaMes(resumo.evento.data)}
-            </h2>
-            <div className="flex items-center gap-2">
-              <Link
-                href={`/registros?encontro=${resumo.evento.numero}`}
-                className="inline-flex min-h-11 items-center rounded-md px-1.5 text-xs font-medium underline underline-offset-2 transition-colors hover:text-foreground md:min-h-8"
+            {/* contexto depois da tarefa: o fechamento da semana em números
+                rotulados, com as ações (registros, copiar) no cabeçalho do bloco */}
+            {resumo && (
+              <section
+                aria-labelledby="resumo-semana-titulo"
+                style={{ "--i": 4 } as CSSProperties}
+                className="animate-enter rounded-xl bg-card px-4 py-3 text-sm shadow-[var(--shadow-border)]"
               >
-                Ver registros →
-              </Link>
-              <CopiarResumoButton
-                texto={textoResumoSemana(resumo, emRisco)}
-              />
-            </div>
-          </div>
-          <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3 border-t border-border/60 pt-3 sm:grid-cols-4">
-            <div>
-              <dt className="text-xs text-muted-foreground">Realizaram o encontro</dt>
-              <dd className="mt-0.5 font-mono text-xl font-semibold tabular-nums">
-                {resumo.realizaram}
-                <span className="font-normal text-muted-foreground">
-                  /{resumo.total}
-                </span>
-              </dd>
-            </div>
-            <div>
-              <dt className="text-xs text-muted-foreground">Registros entregues</dt>
-              <dd className="mt-0.5 font-mono text-xl font-semibold tabular-nums">
-                {resumo.comRegistro}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-xs text-muted-foreground">Aguardando registro</dt>
-              <dd className="mt-0.5 font-mono text-xl font-semibold tabular-nums">
-                {resumo.aguardandoRegistro}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-xs text-muted-foreground">Sem encontro</dt>
-              <dd className="mt-0.5 font-mono text-xl font-semibold tabular-nums">
-                {resumo.naoAconteceram - resumo.reposicao}
-              </dd>
-            </div>
-          </dl>
-          {resumo.reposicao > 0 && (
-            // o significado de "em reposição" fica visível — tooltip/title
-            // não existe no toque
-            <p className="mt-3 flex flex-wrap items-center gap-x-1.5 gap-y-1 border-t border-border/60 pt-2.5 text-xs text-muted-foreground">
-              <Badge variant="outline" className="text-muted-foreground">
-                <ArrowCounterClockwise data-icon="inline-start" />
-                <span className="font-mono">{resumo.reposicao}</span> em reposição
-              </Badge>
-              <span>
-                {resumo.reposicao === 1
-                  ? "encontro de outra semana feito nesta"
-                  : "encontros de outras semanas feitos nesta"}
-              </span>
-            </p>
-          )}
-        </section>
-      )}
-
-      {/* mural de demandas entre mentores — a coordenação observa e gerencia;
-          o fluxo em si é DPP → especialista, sem coordenação no caminho */}
-      {!supervisor && <SolicitacoesCoordCard solicitacoes={solicitacoes} />}
-
-      <AvisosSection avisos={avisos} souCoord={!supervisor} />
+                <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
+                  {/* o nº do encontro já está no cabeçalho ("Semana do Nº encontro") —
+                      aqui a data é o fato novo */}
+                  <h2 id="resumo-semana-titulo" className="font-semibold">
+                    Esta semana · {formatDiaMes(resumo.evento.data)}
+                  </h2>
+                  <div className="flex items-center gap-2">
+                    <Link
+                      href={`/registros?encontro=${resumo.evento.numero}`}
+                      className="group inline-flex min-h-11 items-center gap-1 rounded-md px-1.5 text-xs font-medium underline underline-offset-2 transition-colors hover:text-foreground md:min-h-8"
+                    >
+                      Ver registros
+                      <ArrowRight
+                        size={13}
+                        aria-hidden
+                        className="transition-transform group-hover:translate-x-0.5"
+                      />
+                    </Link>
+                    <CopiarResumoButton
+                      texto={textoResumoSemana(resumo, emRisco)}
+                    />
+                  </div>
+                </div>
+                <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3 border-t border-border/60 pt-3">
+                  <div>
+                    <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Realizaram o encontro</dt>
+                    <dd className="mt-0.5 font-mono text-xl font-semibold tabular-nums">
+                      {resumo.realizaram}
+                      <span className="font-normal text-muted-foreground">
+                        /{resumo.total}
+                      </span>
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Registros entregues</dt>
+                    <dd className="mt-0.5 font-mono text-xl font-semibold tabular-nums">
+                      {resumo.comRegistro}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Aguardando registro</dt>
+                    <dd className="mt-0.5 font-mono text-xl font-semibold tabular-nums">
+                      {resumo.aguardandoRegistro}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Sem encontro</dt>
+                    <dd className="mt-0.5 font-mono text-xl font-semibold tabular-nums">
+                      {resumo.naoAconteceram - resumo.reposicao}
+                    </dd>
+                  </div>
+                </dl>
+                {resumo.reposicao > 0 && (
+                  // o significado de "em reposição" fica visível — tooltip/title
+                  // não existe no toque
+                  <p className="mt-3 flex flex-wrap items-center gap-x-1.5 gap-y-1 border-t border-border/60 pt-2.5 text-xs text-muted-foreground">
+                    <Badge variant="outline" className="text-muted-foreground">
+                      <ArrowCounterClockwise data-icon="inline-start" />
+                      <span className="font-mono">{resumo.reposicao}</span> em reposição
+                    </Badge>
+                    <span>
+                      {resumo.reposicao === 1
+                        ? "encontro de outra semana feito nesta"
+                        : "encontros de outras semanas feitos nesta"}
+                    </span>
+                  </p>
+                )}
+              </section>
+            )}
+          </aside>
+        )}
+      </div>
     </div>
   );
 }
@@ -395,12 +436,15 @@ function motivoCurto(s: DuplaSaude): string {
  *  aria-current; superfície e hover seguem a gramática dos cards clicáveis —
  *  mesma cara, mesmo comportamento. */
 function Stat({
+  i,
   label,
   valor,
   destaque,
   href,
   ativo,
 }: {
+  /** posição no grupo — alimenta o stagger do animate-enter */
+  i: number;
   label: string;
   valor: number;
   destaque?: "warn" | "danger";
@@ -411,13 +455,14 @@ function Stat({
     <Link
       href={href}
       aria-current={ativo ? "true" : undefined}
+      style={{ "--i": i } as CSSProperties}
       className={cn(
-        "rounded-xl border bg-card px-4 py-3 shadow-[var(--shadow-border)] transition-[border-color,box-shadow] ease-snappy",
-        "hover:border-[var(--brand-lime)]/60 hover:shadow-[var(--shadow-border-hover)] focus-visible:ring-2 focus-visible:ring-ring",
+        "animate-enter rounded-xl border bg-card px-4 py-3 shadow-[var(--shadow-border)] transition-[border-color,box-shadow,translate] ease-snappy",
+        "hover:-translate-y-px hover:border-[var(--brand-lime)]/60 hover:shadow-[var(--shadow-border-hover)] focus-visible:ring-2 focus-visible:ring-ring",
         ativo ? "border-[var(--brand-lime)]" : "border-transparent"
       )}
     >
-      <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+      <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
         {destaque && (
           <span
             aria-hidden
@@ -448,6 +493,7 @@ function DuplaCard({
   interacoes,
   hoje,
   i,
+  meuNome,
 }: {
   dupla: Dupla;
   saude: ReturnType<typeof saudadeDaDupla>;
@@ -456,6 +502,8 @@ function DuplaCard({
   hoje: Date;
   /** posição na lista — alimenta o stagger do animate-enter (cap 10) */
   i: number;
+  /** primeiro nome de quem envia — assina a msg pro mentorado */
+  meuNome?: string;
 }) {
   // denominador e saúde seguem a trilha da dupla — 16 no DPP, 5 no especialista
   const total = maxEncontros(dupla.trilha);
@@ -486,7 +534,33 @@ function DuplaCard({
           : saude.semaforo !== "ok"
             ? "Vi que o último encontro teve pontos de atenção. Posso ajudar em algo?"
             : "Como estão os próximos encontros?";
-  const msg = `Oi ${primeiroNome(dupla.mentor.nome)}, tudo bem? Passando pra acompanhar a mentoria com ${primeiroNome(dupla.mentorado.nome)}. ${caso}`;
+  // msgs prontas pras duas pontas: o mentor recebe o caso contextual; o
+  // mentorado recebe um check-in gentil assinado por quem envia — os dois
+  // destinos aparecem juntos no WhatsApp rápido quando o semáforo pede
+  const msgs = msgsContato(
+    {
+      eu: meuNome,
+      mentorNome: primeiroNome(dupla.mentor.nome),
+      mentoradoNome: primeiroNome(dupla.mentorado.nome),
+    },
+    { casoMentor: caso }
+  );
+  const msg = msgs.mentor ?? "";
+  const msgMentorado = msgs.mentorado ?? "";
+  const destinosWa: DestinoWA[] = [
+    {
+      rotulo: `Mentor · ${primeiroNome(dupla.mentor.nome)}`,
+      telefone: dupla.mentor.whatsapp,
+      mensagem: msg,
+      t: "nudge",
+    },
+    {
+      rotulo: `Mentorado · ${primeiroNome(dupla.mentorado.nome)}`,
+      telefone: dupla.mentorado.whatsapp,
+      mensagem: msgMentorado,
+      t: "contato",
+    },
+  ];
   const ultimoNudge = interacoes[dupla.id];
   const progresso = total > 0 ? Math.min(encontroAtual / total, 1) : 0;
   // superfície carrega o semáforo: o card inteiro sinaliza risco/atenção,
@@ -502,7 +576,7 @@ function DuplaCard({
     <div
       style={{ "--i": Math.min(i, 10) } as CSSProperties}
       className={cn(
-        "animate-enter relative rounded-xl border p-4 shadow-[var(--shadow-border)] transition-[border-color,box-shadow] ease-snappy hover:border-[var(--brand-lime)]/60 hover:shadow-[var(--shadow-border-hover)]",
+        "animate-enter relative rounded-xl border p-4 shadow-[var(--shadow-border)] transition-[border-color,box-shadow,translate] ease-snappy hover:-translate-y-px hover:border-[var(--brand-lime)]/60 hover:shadow-[var(--shadow-border-hover)]",
         superficie
       )}
     >
@@ -546,19 +620,22 @@ function DuplaCard({
             aria-label={`${encontroAtual} de ${total} encontros`}
             className="h-1 w-full overflow-hidden rounded-full bg-muted"
           >
-            <div
-              className="h-full rounded-full bg-[var(--brand-lime)]"
+            {/* fill-grow lê o --i herdado do card: a barra enche uma vez,
+                logo depois da entrada do card, sem reflow de width */}
+            <span
+              className="fill-grow block h-full rounded-full bg-[var(--brand-lime)]"
               style={{ width: `${progresso * 100}%` }}
             />
           </div>
           {ultimoReg?.avaliacao && <AvaliacaoBadge avaliacao={ultimoReg.avaliacao} />}
         </div>
       </div>
-      {/* a ação (WhatsApp) não é o destino do card (ficha) — divider delimita
-          a zona do lembrete na base do card; a anotação "último lembrete"
-          mora junto da ação (GG-3). relative: o Link stretched cobre o card
-          inteiro — sem ele o botão ficava sob a camada de clique */}
-      <div className="relative mt-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 border-t border-border pt-2.5">
+      {/* a ação (WhatsApp) não é o destino do card (ficha) — a zona do
+          lembrete é um poço na base do card, mesma gramática do CardFooter
+          (-m cobre o p-4, inset muted + divisor /60); a anotação "último
+          lembrete" mora junto da ação (GG-3). relative: o Link stretched
+          cobre o card inteiro — sem ele o botão ficava sob a camada de clique */}
+      <div className="relative -mx-4 -mb-4 mt-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 rounded-b-xl border-t border-border/60 bg-muted/50 px-4 pb-3 pt-2.5">
         <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
           {ultimoNudge && (
             <>
@@ -567,12 +644,18 @@ function DuplaCard({
             </>
           )}
         </span>
-        <NudgeButton
-          telefone={dupla.mentor.whatsapp}
-          mensagem={msg}
-          label="Chamar no WhatsApp"
-          duplaId={dupla.id}
-        />
+        {/* fora do verde a coordenação escolhe a ponta: nudge pro mentor ou
+            check-in direto com o mentorado; no ok segue o nudge de rotina */}
+        {saude.semaforo !== "ok" ? (
+          <WhatsAppRapido duplaId={dupla.id} destinos={destinosWa} compacto />
+        ) : (
+          <NudgeButton
+            telefone={dupla.mentor.whatsapp}
+            mensagem={msg}
+            label="Chamar no WhatsApp"
+            duplaId={dupla.id}
+          />
+        )}
       </div>
     </div>
   );

@@ -424,9 +424,20 @@ export function demoComunicados(role: AppRole): Comunicado[] {
     (c.audiencia === "dpp" && role === "mentor_dpp") ||
     (c.audiencia === "especialista" && role === "mentor_especialista") ||
     (c.audiencia === "equipe" && role === "supervisor");
+  // espelha prioridade_ord da coluna gerada (0055): prioridade antes de
+  // recência, urgente antigo ganha o top-5 de informativo novo
+  const ord: Record<Comunicado["prioridade"], number> = {
+    urgente: 0,
+    importante: 1,
+    normal: 2,
+  };
   return getDemoData()
     .comunicados.filter(visivel)
-    .sort((a, b) => b.created_at.localeCompare(a.created_at))
+    .sort(
+      (a, b) =>
+        ord[a.prioridade] - ord[b.prioridade] ||
+        b.created_at.localeCompare(a.created_at)
+    )
     .slice(0, 5);
 }
 

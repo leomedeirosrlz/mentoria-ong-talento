@@ -28,6 +28,7 @@ import { MatchingPanel } from "@/components/matching-panel";
 import { NovaPessoaDialog, NovoMentoradoDialog } from "@/components/pessoas-dialogs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { filterChipCls } from "@/components/ui/filter-chip";
 import { Input } from "@/components/ui/input";
 
 const ehMentor = (p: Profile) =>
@@ -137,15 +138,17 @@ export function PessoasListas({
           type="button"
           aria-pressed={semDupla}
           onClick={() => setSemDupla((v) => !v)}
-          className={
-            "inline-flex min-h-11 md:min-h-8 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm transition-colors focus-visible:ring-2 focus-visible:ring-ring " +
-            (semDupla
-              ? "border-[var(--brand-lime)]/60 bg-[var(--brand-lime)]/15 text-foreground"
-              : "border-border text-muted-foreground hover:text-foreground")
-          }
+          className={filterChipCls(semDupla)}
         >
           Livres para dupla
-          <span className="font-mono text-[11px]">{livres}</span>
+          <span
+            className={cn(
+              "font-mono text-[11px] tabular-nums",
+              semDupla ? "text-background/70" : "text-muted-foreground/70"
+            )}
+          >
+            {livres}
+          </span>
         </button>
       </div>
 
@@ -160,13 +163,15 @@ export function PessoasListas({
       )}
 
       <section className="space-y-2">
-        <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+        <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground tabular-nums">
           Com acesso ({filtrando ? `${pessoasFiltradas.length} de ${pessoas.length}` : pessoas.length})
         </h2>
-        <div className="rounded-xl bg-card shadow-[var(--shadow-border)] divide-y divide-border overflow-hidden">
+        <div className="rounded-xl bg-card shadow-[var(--shadow-border)] divide-y divide-border/60 overflow-hidden">
           {pessoas.length === 0 && (
             <div className="flex flex-col items-center gap-1.5 py-10 text-center">
-              <UsersThree aria-hidden size={32} className="text-muted-foreground" />
+              <span className="grid size-11 place-items-center rounded-full bg-muted text-muted-foreground">
+                <UsersThree aria-hidden size={18} />
+              </span>
               <p className="text-sm font-medium">Ninguém cadastrado ainda</p>
               <p className="text-sm text-muted-foreground max-w-sm">
                 Quem tem acesso à plataforma (mentores, supervisores e coordenação)
@@ -182,7 +187,9 @@ export function PessoasListas({
             <div className="flex flex-col items-center gap-1.5 py-10 text-center">
               {q ? (
                 <>
-                  <MagnifyingGlass aria-hidden size={32} className="text-muted-foreground" />
+                  <span className="grid size-11 place-items-center rounded-full bg-muted text-muted-foreground">
+                    <MagnifyingGlass aria-hidden size={18} />
+                  </span>
                   <p className="text-sm font-medium">Nenhum resultado para “{busca.trim()}”</p>
                   <p className="text-sm text-muted-foreground">Tente outro nome ou e-mail.</p>
                   <Button
@@ -194,7 +201,9 @@ export function PessoasListas({
                 </>
               ) : (
                 <>
-                  <LinkBreak aria-hidden size={32} className="text-muted-foreground" />
+                  <span className="grid size-11 place-items-center rounded-full bg-muted text-muted-foreground">
+                    <LinkBreak aria-hidden size={18} />
+                  </span>
                   <p className="text-sm font-medium">Ninguém livre no momento</p>
                   <p className="text-sm text-muted-foreground">Todos os mentores já estão em dupla.</p>
                   <Button
@@ -224,13 +233,15 @@ export function PessoasListas({
       </section>
 
       <section className="space-y-2">
-        <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+        <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground tabular-nums">
           Mentorados ({filtrando ? `${mentoradosFiltrados.length} de ${mentorados.length}` : mentorados.length})
         </h2>
-        <div className="rounded-xl bg-card shadow-[var(--shadow-border)] divide-y divide-border overflow-hidden">
+        <div className="rounded-xl bg-card shadow-[var(--shadow-border)] divide-y divide-border/60 overflow-hidden">
           {mentorados.length === 0 && (
             <div className="flex flex-col items-center gap-1.5 py-10 text-center">
-              <Student aria-hidden size={32} className="text-muted-foreground" />
+              <span className="grid size-11 place-items-center rounded-full bg-muted text-muted-foreground">
+                <Student aria-hidden size={18} />
+              </span>
               <p className="text-sm font-medium">Nenhum mentorado cadastrado ainda</p>
               <p className="text-sm text-muted-foreground max-w-sm">
                 Quem recebe a mentoria entra por aqui: um a um ou trazendo a
@@ -246,7 +257,9 @@ export function PessoasListas({
             <div className="flex flex-col items-center gap-1.5 py-10 text-center">
               {q ? (
                 <>
-                  <MagnifyingGlass aria-hidden size={32} className="text-muted-foreground" />
+                  <span className="grid size-11 place-items-center rounded-full bg-muted text-muted-foreground">
+                    <MagnifyingGlass aria-hidden size={18} />
+                  </span>
                   <p className="text-sm font-medium">Nenhum resultado para “{busca.trim()}”</p>
                   <p className="text-sm text-muted-foreground">Tente outro nome ou ONG.</p>
                   <Button
@@ -258,7 +271,9 @@ export function PessoasListas({
                 </>
               ) : (
                 <>
-                  <LinkBreak aria-hidden size={32} className="text-muted-foreground" />
+                  <span className="grid size-11 place-items-center rounded-full bg-muted text-muted-foreground">
+                    <LinkBreak aria-hidden size={18} />
+                  </span>
                   <p className="text-sm font-medium">Nenhum mentorado livre no momento</p>
                   <p className="text-sm text-muted-foreground">Todos os mentorados já estão em dupla.</p>
                   <Button
@@ -395,7 +410,7 @@ function DetalhesRegiao({
       role="region"
       aria-label={`Detalhes de ${nome}`}
       hidden={!aberto}
-      className="mt-2.5 rounded-lg bg-muted/40 px-3 py-2.5"
+      className="mt-2.5 rounded-lg bg-muted/50 px-3 py-2.5 shadow-[var(--shadow-inset)]"
     >
       <ul className="space-y-1.5">{children}</ul>
     </div>

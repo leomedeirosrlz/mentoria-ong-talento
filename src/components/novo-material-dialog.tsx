@@ -17,6 +17,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import { cn } from "@/lib/utils";
 
 // labels registradas nos Selects — sem elas o trigger fechado mostra o valor
 // cru do enum ("dpp", "coordenacao")
@@ -35,6 +36,14 @@ const AUDIENCIA_LABEL = {
 
 const LIMITE_BYTES = 20 * 1024 * 1024;
 const BUCKET = "materiais";
+// pílula de escolha exclusiva (arquivo × link): radio nativo sr-only dentro
+// do label — setas do teclado e leitor de tela de graça. Ativo = pill
+// escuro, mesmo idioma de OpcaoPilula em registros-filtros
+const PILULA_CLS = cn(
+  "flex min-h-11 cursor-pointer items-center justify-center rounded-lg border px-2.5 text-sm transition-colors sm:min-h-9",
+  "hover:bg-muted has-checked:border-foreground has-checked:bg-foreground has-checked:font-medium has-checked:text-background",
+  "has-focus-visible:ring-2 has-focus-visible:ring-ring has-focus-visible:ring-offset-2 has-focus-visible:ring-offset-background"
+);
 // allowlist explícita — image/* admitiria SVG (conteúdo ativo) e HEIC (não renderiza)
 const TIPOS_ACEITOS = ["application/pdf", "image/png", "image/jpeg", "image/webp"];
 const ACCEPT = TIPOS_ACEITOS.join(",");
@@ -175,22 +184,28 @@ export function NovoMaterialDialog({ maxEncontro }: { maxEncontro: number }) {
           <fieldset className="space-y-2">
             <legend className="text-sm font-medium leading-none">Como publicar</legend>
             <div className="grid grid-cols-2 gap-2">
-              <Button
-                type="button"
-                variant={destino === "arquivo" ? "secondary" : "outline"}
-                aria-pressed={destino === "arquivo"}
-                onClick={() => setDestino("arquivo")}
-              >
+              <label className={PILULA_CLS}>
+                <input
+                  type="radio"
+                  name="destino"
+                  value="arquivo"
+                  checked={destino === "arquivo"}
+                  onChange={() => setDestino("arquivo")}
+                  className="sr-only"
+                />
                 Arquivo
-              </Button>
-              <Button
-                type="button"
-                variant={destino === "link" ? "secondary" : "outline"}
-                aria-pressed={destino === "link"}
-                onClick={() => setDestino("link")}
-              >
+              </label>
+              <label className={PILULA_CLS}>
+                <input
+                  type="radio"
+                  name="destino"
+                  value="link"
+                  checked={destino === "link"}
+                  onChange={() => setDestino("link")}
+                  className="sr-only"
+                />
                 Link externo
-              </Button>
+              </label>
             </div>
             {destino === "arquivo" ? (
               <>

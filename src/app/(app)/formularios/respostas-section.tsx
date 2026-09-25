@@ -1,7 +1,8 @@
+import Link from "next/link";
 import {
   CaretDown,
-  ChatCenteredText,
   DownloadSimple,
+  User,
 } from "@phosphor-icons/react/dist/ssr";
 import {
   agregaRespostas,
@@ -10,7 +11,10 @@ import {
   type FormularioCampo,
 } from "@/lib/forms/schema";
 import type { LinkResolvido } from "@/lib/forms/queries";
-import { formatDateTime } from "@/lib/ciclo";
+import { formatDateTime, papelCurto } from "@/lib/ciclo";
+import { avatarPublicUrl } from "@/lib/avatar";
+import { Avatar } from "@/components/avatar";
+import { primeiroNome } from "@/components/forms/link-shared";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -47,7 +51,7 @@ function Contagem({
       <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
         <span
           className={cn(
-            "block h-full rounded-full",
+            "fill-grow block h-full rounded-full",
             positivo ? "bg-[var(--brand-lime)]" : "bg-muted-foreground/40"
           )}
           style={{ width: `${pct}%` }}
@@ -88,6 +92,43 @@ function corMedia(media: number): string {
   return "text-foreground";
 }
 
+/** Papel do destinatário em texto curto ("Mentor DPP", "Mentorado") —
+ *  "" pra profile sem papel e pro link genérico (que não tem papel). */
+function papelDoLink(l: LinkResolvido): string {
+  if (l.dest_tipo === "mentorado") return "Mentorado";
+  if (l.dest_tipo === "profile") return papelCurto(l.dest_papel);
+  return "";
+}
+
+/** Autoria pra agregação e pro cabeçalho — identidade vem do link, nunca
+ *  do conteúdo da resposta: genérico é "Anônimo" e ponto. */
+function autorDoLink(l: LinkResolvido): string {
+  if (!l.dest_nome) return "Anônimo";
+  const papel = papelDoLink(l);
+  return papel ? `${l.dest_nome} · ${papel}` : l.dest_nome;
+}
+
+/** Linha secundária do card — quem respondeu em contexto: papel, dupla do
+ *  outro lado e o encontro do ciclo quando o link foi gerado pra um. */
+function metaDoLink(l: LinkResolvido): string {
+  if (l.dest_tipo === "generico") return "link genérico · sem identificação";
+  const partes: string[] = [];
+  const papel = papelDoLink(l);
+  if (papel) partes.push(papel);
+  if (l.dupla) {
+    const outro =
+      l.dest_tipo === "mentorado"
+        ? l.dupla.mentor_nome
+        : l.dupla.mentorado_nome;
+    partes.push(`dupla com ${primeiroNome(outro)}`);
+  }
+  const enc = l.contexto?.encontro;
+  if (typeof enc === "number") partes.push(`encontro ${enc}`);
+  else if (typeof enc === "string" && enc.trim())
+    partes.push(`encontro ${enc.trim()}`);
+  return partes.join(" · ");
+}
+
 export function RespostasSection({
   campos,
   links,
@@ -104,7 +145,7 @@ export function RespostasSection({
   const agregados = agregaRespostas(
     campos,
     respondidos.map((l) => ({
-      autor: l.dest_nome ?? "Link genérico",
+      autor: autorDoLink(l),
       respostas: l.resposta!.respostas,
     }))
   );
@@ -242,21 +283,42 @@ export function RespostasSection({
         </div>
       )}
 
-      {/* uma resposta por linha — <details> nativo expande sem JS */}
+      {/* uma resposta por linha — <details> nativo expande sem JS. O
+          summary carrega a identidade do link (avatar, nome, contexto);
+          no genérico, "Resposta anônima" — nunca inventar identidade */}
       <ol className="space-y-2">
         {respondidos.map((l) => (
           <li key={l.id}>
             <details className="group rounded-xl bg-card shadow-[var(--shadow-border)]">
               <summary className="flex cursor-pointer list-none items-center gap-3 rounded-xl px-4 py-3 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring group-open:rounded-b-none sm:px-5 [&::-webkit-details-marker]:hidden">
-                <ChatCenteredText
-                  size={16}
-                  aria-hidden
-                  className="shrink-0 text-muted-foreground/60"
-                />
-                {/* nomes longos quebram em 2 linhas em vez de perder pro
-                    timestamp shrink-0 — o clamp mantém a ellipsis no excesso */}
-                <span className="line-clamp-2 min-w-0 flex-1 text-sm font-medium">
-                  {l.dest_nome ?? "Link genérico"}
+                {l.dest_tipo === "generico" ? (
+                  <span
+                    aria-hidden
+                    className="grid size-8 shrink-0 place-items-center rounded-full bg-muted text-muted-foreground"
+                  >
+                    <User size={15} />
+                  </span>
+                ) : (
+                  <Avatar
+                    nome={l.dest_nome ?? ""}
+                    src={
+                      l.dest_avatar ? avatarPublicUrl(l.dest_avatar) : null
+                    }
+                    papel={
+                      l.dest_tipo === "mentorado" ? "mentorado" : undefined
+                    }
+                    size={32}
+                  />
+                )}
+                {/* truncate nos dois níveis: nome e meta cedem pro timestamp
+                    shrink-0 — o corpo expandido mostra a resposta inteira */}
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-medium">
+                    {l.dest_nome ?? "Resposta anônima"}
+                  </span>
+                  <span className="block truncate text-xs text-muted-foreground">
+                    {metaDoLink(l)}
+                  </span>
                 </span>
                 <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
                   {formatDateTime(l.resposta!.respondido_em)}
@@ -292,6 +354,18 @@ export function RespostasSection({
                     );
                   })}
               </dl>
+              {/* a ficha abre fora do summary (link dentro de summary é
+                  duplo acionamento) — rodapé quieto, só quando há pessoa */}
+              {l.dest_url && l.dest_nome && (
+                <div className="border-t border-border/60 px-4 py-2.5 sm:px-5">
+                  <Link
+                    href={l.dest_url}
+                    className="text-xs text-muted-foreground underline underline-offset-4 transition-colors hover:text-foreground"
+                  >
+                    Abrir ficha de {primeiroNome(l.dest_nome)}
+                  </Link>
+                </div>
+              )}
             </details>
           </li>
         ))}

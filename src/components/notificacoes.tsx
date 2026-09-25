@@ -270,7 +270,9 @@ export function NotificacoesBell({
         </div>
         {itens.length === 0 ? (
           <div className="flex flex-col items-center gap-2 px-4 py-10 text-center">
-            <Bell size={24} className="text-muted-foreground/50" aria-hidden />
+            <span className="grid size-11 place-items-center rounded-full bg-muted text-muted-foreground">
+              <Bell size={18} aria-hidden />
+            </span>
             <p className="text-sm text-muted-foreground">Nenhuma notificação ainda.</p>
           </div>
         ) : (

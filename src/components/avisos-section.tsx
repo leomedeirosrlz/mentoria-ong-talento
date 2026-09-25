@@ -1,10 +1,12 @@
-import { Megaphone, Trash } from "@phosphor-icons/react/dist/ssr";
+import { Flag, Megaphone, Siren, Trash } from "@phosphor-icons/react/dist/ssr";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { excluirComunicado } from "@/lib/actions";
 import { formatDiaMes } from "@/lib/ciclo";
 import { Card, CardContent } from "@/components/ui/card";
 import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
 import { NovoComunicadoDialog } from "@/components/novo-comunicado-dialog";
+import { cn } from "@/lib/utils";
 import type { Comunicado } from "@/lib/types";
 
 const AUDIENCIA_LABEL = {
@@ -13,6 +15,25 @@ const AUDIENCIA_LABEL = {
   especialista: "Mentores especialistas",
   equipe: "Equipe",
   coordenacao: "Só a coordenação",
+} as const;
+
+/** Três canais pra urgência, cor nunca sozinha: rail à esquerda do article +
+ *  ícone antes do título + badge com texto. 'normal' é null — some sem
+ *  ruído. Lime fica fora da escala: é marca/navegação, não urgência. */
+const PRIORIDADE = {
+  urgente: {
+    rail: "border-[var(--danger)]",
+    icone: Siren,
+    texto: "Urgente",
+    cls: "border-[var(--danger)]/50 text-[var(--danger)]",
+  },
+  importante: {
+    rail: "border-[var(--warn)]",
+    icone: Flag,
+    texto: "Importante",
+    cls: "border-[var(--warn)]/50 text-[var(--warn-text)]",
+  },
+  normal: null,
 } as const;
 
 /** Avisos gerais da coordenação — seção compartilhada da home. O /#avisos do
@@ -38,24 +59,55 @@ export function AvisosSection({
       </div>
       {avisos.length === 0 ? (
         <Card>
-          <CardContent className="py-6 text-center text-sm text-muted-foreground">
-            Nenhum aviso publicado. O primeiro chega a quem você escolher no
-            campo Quem recebe.
+          <CardContent className="flex flex-col items-center gap-2.5 py-6 text-center text-sm text-muted-foreground">
+            <span className="grid size-11 place-items-center rounded-full bg-muted text-muted-foreground">
+              <Megaphone size={18} aria-hidden />
+            </span>
+            <p>
+              Nenhum aviso publicado. O primeiro chega a quem você escolher no
+              campo Quem recebe.
+            </p>
           </CardContent>
         </Card>
       ) : (
         <Card>
           <CardContent className="divide-y divide-border/60 p-0">
-            {avisos.map((a) => (
-              <article key={a.id} className="flex items-start gap-3 px-4 py-3.5">
+            {avisos.map((a) => {
+              const prio = PRIORIDADE[a.prioridade];
+              const Icone = prio?.icone;
+              return (
+              <article
+                key={a.id}
+                className={cn(
+                  "flex items-start gap-3 px-4 py-3 sm:px-5",
+                  prio && `border-l-2 ${prio.rail}`
+                )}
+              >
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-                    {/* a 390px título + badge de audiência + data disputavam
-                        ~300px — o título truncava em ~10 caracteres. Linha
-                        própria no mobile; sm+ volta a dividir a linha */}
+                    {/* a 390px título + badges + data disputavam ~300px — o
+                        título truncava em ~10 caracteres. Linha própria no
+                        mobile; sm+ volta a dividir a linha */}
                     <p className="min-w-0 basis-full truncate text-sm font-medium sm:basis-auto">
+                      {Icone && (
+                        // inline-flex + nudge: senta na linha do título sem
+                        // mexer na baseline do <p> (a linha segue
+                        // items-baseline). cls no span: a border-color é
+                        // inerte, o svg herda o text-* via currentColor
+                        <span
+                          aria-hidden
+                          className={cn("mr-1.5 inline-flex align-[-2px]", prio?.cls)}
+                        >
+                          <Icone size={15} />
+                        </span>
+                      )}
                       {a.titulo}
                     </p>
+                    {prio && (
+                      <Badge variant="outline" className={prio.cls}>
+                        {prio.texto}
+                      </Badge>
+                    )}
                     {a.audiencia !== "todos" && (
                       <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                         {AUDIENCIA_LABEL[a.audiencia]}
@@ -89,7 +141,8 @@ export function AvisosSection({
                   />
                 )}
               </article>
-            ))}
+              );
+            })}
           </CardContent>
         </Card>
       )}

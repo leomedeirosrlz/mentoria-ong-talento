@@ -209,14 +209,16 @@ export function AppShell({
         {/* tabIndex=-1: o skip-link consegue mover o foco pro main, não só rolar;
             flex-1 empurra o footer pro rodapé quando a página é curta */}
         <main id="conteudo" tabIndex={-1} className="flex-1">
-          <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6 md:py-8">
+          {/* medida de scan: 5xl até xl, abre um degrau por breakpoint —
+              7xl é o teto absoluto (linha longa demais quebra a leitura) */}
+          <div className="mx-auto w-full max-w-5xl px-4 py-6 sm:px-6 md:py-8 xl:max-w-6xl 2xl:max-w-7xl">
             {children}
           </div>
         </main>
         {/* footer fora do <main> — dentro ele não expõe o landmark contentinfo;
             o padding-bottom mantém distância do bottom nav no mobile */}
-        <div className="mx-auto w-full max-w-5xl px-4 pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:px-6 md:pb-8">
-          <SiteFooter className="mt-2 border-t border-border pt-5" />
+        <div className="mx-auto w-full max-w-5xl px-4 pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:px-6 md:pb-8 xl:max-w-6xl 2xl:max-w-7xl">
+          <SiteFooter className="mt-2 border-t border-border/60 pt-5" />
         </div>
       </div>
 
