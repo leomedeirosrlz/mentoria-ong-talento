@@ -1,5 +1,5 @@
 <div align="center">
-  <a href="#root"><img src="./docs/banner.svg?v=3" alt="realiza.vc · painel operacional do Programa de Mentoria Social" width="100%"/></a>
+  <a href="#root"><img src="./docs/banner.svg?v=4" alt="realiza.vc · painel operacional do Programa de Mentoria Social" width="100%"/></a>
 </div>
 
 > 🇺🇸 [English version](docs/README.en.md) · plataforma, interface e dados em pt-BR por definição.
