@@ -34,6 +34,11 @@ import {
   type LinhaImportada,
 } from "@/lib/importar";
 import { notificar } from "./notificar";
+import { ROLES_POR_AUDIENCIA } from "@/lib/email";
+import {
+  dispararComunicadoEmail,
+  dispararMaterialEmail,
+} from "./actions-email";
 import { demoAtivo, demoRole, limparDemo, marcarOnboardingDemo } from "./demo/mode";
 import { DEMO_MSG } from "./demo/shared";
 import { getDemoData } from "./demo/data";
@@ -2151,9 +2156,10 @@ export async function salvarMaterial(formData: FormData) {
   // material criado à mão entra depois dos oficiais — ordem era sempre 0
   const { data: maxOrd } = await supabase
     .from("materiais").select("ordem").order("ordem", { ascending: false }).limit(1).maybeSingle();
+  const descricao = String(formData.get("descricao") ?? "").trim() || null;
   const { data: novo, error } = await supabase.from("materiais").insert({
     titulo,
-    descricao: String(formData.get("descricao") ?? "").trim() || null,
+    descricao,
     tipo,
     url,
     path,
@@ -2162,9 +2168,17 @@ export async function salvarMaterial(formData: FormData) {
     ordem: (maxOrd?.ordem ?? 0) + 1,
   }).select("id").single();
   if (error) return { error: erroAmigavel(error) };
+  // aviso por e-mail pra audiência do material — complemento: falha de
+  // envio não derruba o material já gravado
+  const email = await dispararMaterialEmail({
+    supabase,
+    material: { id: novo.id as string, titulo, descricao, tipo, url, path },
+    audiencias: [audiencia],
+    autorId: eu.id,
+  });
   revalidatePath("/materiais");
   // id volta pro client poder desfazer a row se o upload do arquivo falhar
-  return { ok: true, id: novo.id as string };
+  return { ok: true, id: novo.id as string, emailFalhas: email.falhas };
 }
 
 export async function editarMaterial(id: string, formData: FormData) {
@@ -2582,13 +2596,8 @@ const AUDIENCIAS_COMUNICADO = [
 ] as const;
 // CHECK comunicados_prioridade_check (0055)
 const PRIORIDADES_COMUNICADO = ["normal", "importante", "urgente"] as const;
-const ROLES_POR_AUDIENCIA: Record<string, string[]> = {
-  todos: ["coordenacao", "supervisor", "mentor_dpp", "mentor_especialista"],
-  dpp: ["mentor_dpp"],
-  especialista: ["mentor_especialista"],
-  coordenacao: ["coordenacao"],
-  equipe: ["coordenacao", "supervisor"],
-};
+// ROLES_POR_AUDIENCIA mora em @/lib/email — mesma régua pras notificações
+// in-app e pro fan-out de e-mail (dispararParaRoles).
 
 /** Aviso geral da coordenação — grava o comunicado e cria a notificação de
  *  cada destinatário da audiência (o autor não se notifica do próprio aviso). */
@@ -2637,8 +2646,17 @@ export async function publicarComunicado(formData: FormData) {
     comunicado_id: aviso?.id,
   })), eu.id);
 
+  // o aviso também sai por e-mail pra mesma audiência — complemento da
+  // publicação: falha de envio não derruba o aviso já gravado; o resumo
+  // volta como nota opcional (emailFalhas) que o caller pode ignorar
+  const email = await dispararComunicadoEmail({
+    supabase,
+    aviso: { id: aviso?.id as string, titulo, corpo, prioridade, audiencia },
+    autorId: eu.id,
+  });
+
   revalidatePath("/");
-  return { ok: true };
+  return { ok: true, emailFalhas: email.falhas };
 }
 
 export async function excluirComunicado(id: string) {

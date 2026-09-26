@@ -493,6 +493,67 @@ export type Database = {
           },
         ]
       }
+      emails_enviados: {
+        Row: {
+          assunto: string
+          audiencia: string[]
+          autor_id: string | null
+          created_at: string
+          destinatarios: number
+          enviados: number
+          falhas: string[] | null
+          id: string
+          ref_id: string | null
+          tipo: string
+        }
+        Insert: {
+          assunto: string
+          audiencia?: string[]
+          autor_id?: string | null
+          created_at?: string
+          destinatarios?: number
+          enviados?: number
+          falhas?: string[] | null
+          id?: string
+          ref_id?: string | null
+          tipo: string
+        }
+        Update: {
+          assunto?: string
+          audiencia?: string[]
+          autor_id?: string | null
+          created_at?: string
+          destinatarios?: number
+          enviados?: number
+          falhas?: string[] | null
+          id?: string
+          ref_id?: string | null
+          tipo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "emails_enviados_autor_id_fkey"
+            columns: ["autor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "emails_enviados_autor_id_fkey"
+            columns: ["autor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_contato"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "emails_enviados_autor_id_fkey"
+            columns: ["autor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_pessoal"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       encaminhamentos: {
         Row: {
           created_at: string

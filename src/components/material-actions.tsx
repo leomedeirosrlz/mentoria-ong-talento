@@ -2,7 +2,7 @@
 
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { CircleNotch, Paperclip, PencilSimple } from "@phosphor-icons/react";
+import { CircleNotch, EnvelopeSimple, Paperclip, PencilSimple } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import {
   anexarArquivoMaterial,
@@ -15,6 +15,7 @@ import { createClient } from "@/lib/supabase/client";
 import type { Material } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
+import { EnviarEmailDialog } from "@/components/enviar-email-dialog";
 import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
@@ -57,6 +58,7 @@ const AUDIENCIA_LABEL = {
 export function MaterialActions({ material, maxEncontro }: { material: Material; maxEncontro?: number }) {
   const [pending, start] = useTransition();
   const [editOpen, setEditOpen] = useState(false);
+  const [emailOpen, setEmailOpen] = useState(false);
   // audiência controlada — o teto de "encontro" segue a trilha dela
   const [audiencia, setAudiencia] = useState(material.audiencia);
   const maxEncontroSel =
@@ -170,6 +172,16 @@ export function MaterialActions({ material, maxEncontro }: { material: Material;
       >
         {pending ? <CircleNotch size={15} className="animate-spin" /> : <Paperclip size={15} />}
       </Button>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        aria-label={`Enviar "${material.titulo}" por e-mail`}
+        title="Enviar por e-mail"
+        onClick={() => setEmailOpen(true)}
+      >
+        <EnvelopeSimple size={15} />
+      </Button>
       <ConfirmDeleteButton
         titulo={`Excluir "${material.titulo}"?`}
         descricao={
@@ -269,6 +281,16 @@ export function MaterialActions({ material, maxEncontro }: { material: Material;
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* envio manual por e-mail — a audiência natural do material vem
+          marcada; MaterialActions só renderiza pra coordenação */}
+      <EnviarEmailDialog
+        materialId={material.id}
+        tituloMaterial={material.titulo}
+        audienciaPadrao={material.audiencia}
+        open={emailOpen}
+        onOpenChange={setEmailOpen}
+      />
     </div>
   );
 }

@@ -5,6 +5,7 @@ import { excluirComunicado } from "@/lib/actions";
 import { formatDiaMes } from "@/lib/ciclo";
 import { Card, CardContent } from "@/components/ui/card";
 import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
+import { ReenviarComunicadoEmailButton } from "@/components/enviar-email-dialog";
 import { NovoComunicadoDialog } from "@/components/novo-comunicado-dialog";
 import { cn } from "@/lib/utils";
 import type { Comunicado } from "@/lib/types";
@@ -124,23 +125,28 @@ export function AvisosSection({
                   </p>
                 </div>
                 {souCoord && (
-                  // .bind gera a server reference serializável — closure
-                  // inline quebra a serialização no payload do router.refresh()
-                  <ConfirmDeleteButton
-                    titulo={`Excluir "${a.titulo}"?`}
-                    descricao="O aviso sai da home de todo mundo e as notificações dele são removidas. Para corrigir, publique um novo."
-                    sucesso="Aviso excluído."
-                    onConfirm={excluirComunicado.bind(null, a.id)}
-                    trigger={
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        aria-label={`Excluir aviso "${a.titulo}"`}
-                      >
-                        <Trash size={15} />
-                      </Button>
-                    }
-                  />
+                  <div className="flex shrink-0 flex-col items-end gap-0.5">
+                    {/* sutil: o aviso já sai por e-mail na publicação — aqui é
+                        reenvio manual (quem entrou depois, caixa perdida) */}
+                    <ReenviarComunicadoEmailButton comunicadoId={a.id} />
+                    {/* .bind gera a server reference serializável — closure
+                        inline quebra a serialização no payload do router.refresh() */}
+                    <ConfirmDeleteButton
+                      titulo={`Excluir "${a.titulo}"?`}
+                      descricao="O aviso sai da home de todo mundo e as notificações dele são removidas. Para corrigir, publique um novo."
+                      sucesso="Aviso excluído."
+                      onConfirm={excluirComunicado.bind(null, a.id)}
+                      trigger={
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          aria-label={`Excluir aviso "${a.titulo}"`}
+                        >
+                          <Trash size={15} />
+                        </Button>
+                      }
+                    />
+                  </div>
                 )}
               </article>
               );

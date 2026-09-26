@@ -41,16 +41,83 @@ export function WhatsAppRapido({
   duplaId,
   destinos,
   compacto = false,
+  icone = false,
 }: {
   /** Com duplaId os itens passam por /api/nudge (log por tipo `t`). */
   duplaId?: string;
   destinos: DestinoWA[];
   /** Um botão "WhatsApp" abrindo o menu de destinos. */
   compacto?: boolean;
+  /** Só o glifo — pra rails apertados onde o nome da dupla precisa de espaço.
+   *  1 destino = link direto; >1 = dropdown com trigger de ícone. */
+  icone?: boolean;
 }) {
   const validos = destinos.filter(
     (d) => waLink(d.telefone, d.mensagem) != null
   );
+
+  if (icone) {
+    if (validos.length === 0) {
+      return (
+        <span
+          aria-disabled="true"
+          title="Sem WhatsApp cadastrado"
+          className="grid size-8 shrink-0 cursor-not-allowed place-items-center rounded-md text-muted-foreground/40"
+        >
+          <WhatsappLogo size={16} aria-hidden />
+        </span>
+      );
+    }
+    if (validos.length === 1) {
+      const d = validos[0];
+      return (
+        <a
+          href={hrefDestino(d, duplaId)!}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label={d.rotulo}
+          title={d.rotulo}
+          className="grid size-8 shrink-0 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-[var(--brand-lime)]/15 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <WhatsappLogo size={16} aria-hidden />
+        </a>
+      );
+    }
+    return (
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          aria-label="WhatsApp"
+          className="grid size-8 shrink-0 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-[var(--brand-lime)]/15 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <WhatsappLogo size={16} aria-hidden />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-auto min-w-56">
+          {destinos.map((d) => {
+            const href = hrefDestino(d, duplaId);
+            return (
+              <DropdownMenuItem
+                key={d.rotulo}
+                disabled={!href}
+                render={
+                  href ? (
+                    <a href={href} target="_blank" rel="noopener noreferrer" />
+                  ) : undefined
+                }
+              >
+                <WhatsappLogo aria-hidden />
+                {d.rotulo}
+                {!href && (
+                  <span className="ml-auto pl-3 text-xs text-muted-foreground">
+                    sem WhatsApp cadastrado
+                  </span>
+                )}
+              </DropdownMenuItem>
+            );
+          })}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    );
+  }
   if (!compacto || validos.length <= 1) {
     return (
       <span className="inline-flex flex-wrap items-center gap-2">

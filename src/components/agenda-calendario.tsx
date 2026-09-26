@@ -2499,13 +2499,13 @@ function EncontroDuplaRow({
               </span>
             </span>
             <span className="inline-flex shrink-0 items-center gap-0.5 text-xs font-medium text-muted-foreground transition-colors group-hover:text-foreground">
-              <span className="hidden sm:inline">Ver detalhes</span>
+              <span className="hidden sm:inline">Detalhes</span>
               <ArrowUpRight aria-hidden size={13} />
             </span>
           </button>
           {waPendentes.length > 0 && (
             <WhatsAppRapido
-              compacto
+              icone
               duplaId={dupla.id}
               destinos={waPendentes}
             />
@@ -2765,7 +2765,7 @@ function LinhaSemEncontro({ dupla, numero }: { dupla: Dupla; numero: number }) {
           truncar
         />
       </Link>
-      <WhatsAppRapido compacto duplaId={dupla.id} destinos={destinos} />
+      <WhatsAppRapido icone duplaId={dupla.id} destinos={destinos} />
     </li>
   );
 }

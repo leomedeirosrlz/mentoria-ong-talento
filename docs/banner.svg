@@ -1,77 +1,73 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 320" width="1100" height="320">
-  <defs>
-    <pattern id="rz-dots" width="26" height="26" patternUnits="userSpaceOnUse">
-      <circle cx="1.5" cy="1.5" r="1" fill="#262626" opacity="0.06"/>
-    </pattern>
-    <path id="rz-loop" d="M 525 84 m -68 0 a 68 68 0 1 1 136 0 a 68 68 0 1 1 -136 0" fill="none"/>
-  </defs>
-  <rect width="1100" height="320" fill="#f1f2ec"/>
-  <rect width="1100" height="320" fill="url(#rz-dots)"/>
-  <rect x="0.5" y="0.5" width="1099" height="319" fill="none" stroke="#262626" stroke-opacity="0.3" stroke-width="1.5"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 320" width="880" height="320">
+  <rect width="880" height="320" fill="#f1f2ec" />
+  <rect x="10" y="10" width="860" height="300" rx="10" fill="none" stroke="#262626" stroke-opacity="0.16" stroke-width="1.25" />
 
-  <!-- left: identity -->
-  <text x="56" y="112" font-family="ui-monospace,'Fira Code',monospace" font-weight="bold" font-size="56" fill="#262626">realiza<tspan fill="#a2ca44">.vc</tspan></text>
-  <text x="58" y="146" font-family="Georgia,serif" font-size="17" font-style="italic" fill="#4a4a42">o painel operacional da mentoria</text>
-  <line x1="58" y1="172" x2="330" y2="172" stroke="#262626" stroke-opacity="0.25"/>
-  <g font-family="ui-monospace,monospace" font-size="13" fill="#4a4a42">
-    <text x="58" y="198">dupla = mentor ↔ mentorado</text>
-    <text x="58" y="222">rls por papel · escopo por rota</text>
-    <text x="58" y="246">demo pública em /demo</text>
-  </g>
-  <text x="58" y="292" font-family="ui-monospace,monospace" font-size="11.5" fill="#7a7a6e">next.js 16 · react 19 · supabase · vitest 156</text>
+  <!-- ===== cabeçalho: marca + legenda do semáforo ===== -->
+  <text x="46" y="76" font-family="'Mitr','Segoe UI',system-ui,sans-serif" font-weight="700" font-size="49" fill="#262626">realiza<tspan fill="#ffd531">.</tspan><tspan fill="#a2ca44">vc</tspan></text>
+  <text x="47" y="104" font-family="'Mitr','Segoe UI',system-ui,sans-serif" font-size="18" fill="#3a3c36">painel operacional do Programa de Mentoria Social</text>
 
-  <!-- center: the operational loop -->
-  <circle cx="525" cy="152" r="68" fill="none" stroke="#262626" stroke-opacity="0.2" stroke-width="1.5" stroke-dasharray="4 6"/>
-  <circle r="5" fill="#a2ca44" stroke="#262626" stroke-width="1">
-    <animateMotion dur="6s" repeatCount="indefinite" path="M 525 84 m -68 0 a 68 68 0 1 1 136 0 a 68 68 0 1 1 -136 0"/>
-  </circle>
-  <text x="525" y="148" font-family="Georgia,serif" font-size="15" font-style="italic" fill="#4a4a42" text-anchor="middle">ciclo da</text>
-  <text x="525" y="166" font-family="Georgia,serif" font-size="15" font-style="italic" fill="#4a4a42" text-anchor="middle">dupla</text>
-
-  <g font-family="ui-monospace,monospace" font-size="12.5" font-weight="bold">
-    <g>
-      <circle cx="525" cy="84" r="17" fill="#262626"/>
-      <text x="525" y="89" fill="#f1f2ec" text-anchor="middle">1</text>
-      <text x="525" y="58" fill="#262626" text-anchor="middle">agenda</text>
-    </g>
-    <g>
-      <circle cx="590" cy="131" r="17" fill="#a2ca44"/>
-      <text x="590" y="136" fill="#262626" text-anchor="middle">2</text>
-      <text x="618" y="135" fill="#262626">encontro</text>
-    </g>
-    <g>
-      <circle cx="565" cy="207" r="17" fill="#a2ca44"/>
-      <text x="565" y="212" fill="#262626" text-anchor="middle">3</text>
-      <text x="588" y="238" fill="#262626">registro</text>
-    </g>
-    <g>
-      <circle cx="485" cy="207" r="17" fill="#ffd531"/>
-      <text x="485" y="212" fill="#262626" text-anchor="middle">4</text>
-      <text x="462" y="238" fill="#262626" text-anchor="end">semáforo</text>
-    </g>
-    <g>
-      <circle cx="460" cy="131" r="17" fill="#e04f3f"/>
-      <text x="460" y="136" fill="#f1f2ec" text-anchor="middle">5</text>
-      <text x="430" y="135" fill="#262626" text-anchor="end">nudge</text>
-    </g>
+  <g font-family="'JetBrains Mono','Fira Code',monospace" font-size="14" font-weight="600" fill="#262626">
+    <circle cx="590" cy="65" r="5" fill="#779929" />
+    <text x="600" y="70">em dia</text>
+    <circle cx="672" cy="65" r="5" fill="#db9e06" />
+    <text x="682" y="70">aten&#231;&#227;o</text>
+    <circle cx="762" cy="65" r="5" fill="#dc1818" />
+    <text x="772" y="70">risco</text>
+    <!-- ping único de atenção no risco — uma vez só, como no app (ping-once) -->
+    <circle cx="762" cy="65" r="5" fill="none" stroke="#dc1818" stroke-width="1.5" opacity="0">
+      <animate attributeName="r" values="5;14" dur="1.4s" begin="0.8s" fill="freeze" />
+      <animate attributeName="opacity" values="0;0.55;0" keyTimes="0;0.25;1" dur="1.4s" begin="0.8s" fill="freeze" />
+    </circle>
   </g>
 
-  <!-- right: feature surfaces -->
+  <line x1="46" y1="124" x2="830" y2="124" stroke="#262626" stroke-opacity="0.15" stroke-width="1" />
+
+  <!-- ===== trilha: matching -> 16 encontros -> encerramento ===== -->
+  <text x="46" y="150" font-family="'JetBrains Mono','Fira Code',monospace" font-size="13" letter-spacing="1" fill="#565950">a jornada da dupla</text>
+
+  <!-- a dupla: disco lime (mentor) + ponto amarelo (mentorado) -->
+  <circle cx="62" cy="186" r="9.5" fill="#a2ca44" />
+  <circle cx="78" cy="186" r="7" fill="#ffd531" />
+
+  <line x1="92" y1="186" x2="816" y2="186" stroke="#262626" stroke-opacity="0.12" stroke-width="1.25" />
+  <line x1="92" y1="186" x2="124" y2="186" stroke="#262626" stroke-opacity="0.3" stroke-width="1.5" />
+  <line x1="794" y1="186" x2="818" y2="186" stroke="#262626" stroke-opacity="0.3" stroke-width="1.5" />
+
+  <!-- 16 encontros: realizado+registro lime, sem registro amarelo, limbo tracejado, agendado vazado forte, futuro vazado -->
   <g>
-    <rect x="700" y="62" width="344" height="196" rx="10" fill="#fbfaf5" stroke="#262626" stroke-opacity="0.3"/>
-    <text x="722" y="92" font-family="ui-monospace,monospace" font-size="12" letter-spacing="2" fill="#7a7a6e">SUPERFÍCIES PÚBLICAS</text>
-    <line x1="722" y1="104" x2="1022" y2="104" stroke="#262626" stroke-opacity="0.15"/>
-    <g font-family="ui-monospace,monospace" font-size="13.5">
-      <text x="722" y="130" fill="#262626" font-weight="bold">/f/[token]</text>
-      <text x="900" y="130" fill="#4a4a42">formulário sem login</text>
-      <text x="722" y="158" fill="#262626" font-weight="bold">/assinar/[token]</text>
-      <text x="900" y="158" fill="#4a4a42">termo do responsável</text>
-      <text x="722" y="186" fill="#262626" font-weight="bold">/demo</text>
-      <text x="900" y="186" fill="#4a4a42">app inteira, sem conta</text>
-      <text x="722" y="214" fill="#262626" font-weight="bold">/privacidade</text>
-      <text x="900" y="214" fill="#4a4a42">aviso lgpd</text>
-    </g>
-    <line x1="722" y1="230" x2="1022" y2="230" stroke="#262626" stroke-opacity="0.15"/>
-    <text x="722" y="248" font-family="ui-monospace,monospace" font-size="11" fill="#7a7a6e">semáforo: apoio · avaliação baixa · ≥2 atrasos → risco</text>
+    <circle cx="132" cy="186" r="6.5" fill="#a2ca44" />
+    <circle cx="175.6" cy="186" r="6.5" fill="#a2ca44" />
+    <circle cx="219.2" cy="186" r="6.5" fill="#a2ca44" />
+    <circle cx="262.8" cy="186" r="6.5" fill="#a2ca44" />
+    <circle cx="306.4" cy="186" r="6.5" fill="#a2ca44" />
+    <circle cx="350" cy="186" r="6.5" fill="#a2ca44" />
+    <circle cx="393.6" cy="186" r="6.5" fill="#ffd531" />
+    <circle cx="437.2" cy="186" r="6.5" fill="none" stroke="#565950" stroke-width="1.2" stroke-dasharray="2 2" />
+    <circle cx="480.8" cy="186" r="6.5" fill="none" stroke="#262626" stroke-opacity="0.55" stroke-width="1.3" />
+    <circle cx="524.4" cy="186" r="6.5" fill="none" stroke="#262626" stroke-opacity="0.28" stroke-width="1" />
+    <circle cx="568" cy="186" r="6.5" fill="none" stroke="#262626" stroke-opacity="0.28" stroke-width="1" />
+    <circle cx="611.6" cy="186" r="6.5" fill="none" stroke="#262626" stroke-opacity="0.28" stroke-width="1" />
+    <circle cx="655.2" cy="186" r="6.5" fill="none" stroke="#262626" stroke-opacity="0.28" stroke-width="1" />
+    <circle cx="698.8" cy="186" r="6.5" fill="none" stroke="#262626" stroke-opacity="0.28" stroke-width="1" />
+    <circle cx="742.4" cy="186" r="6.5" fill="none" stroke="#262626" stroke-opacity="0.28" stroke-width="1" />
+    <circle cx="786" cy="186" r="6.5" fill="none" stroke="#262626" stroke-opacity="0.28" stroke-width="1" />
   </g>
+  <circle cx="832" cy="186" r="7" fill="none" stroke="#262626" stroke-opacity="0.55" stroke-width="1.5" />
+
+  <!-- a dupla percorre a trilha -->
+  <circle r="4.5" fill="#4e6318">
+    <animateMotion dur="10s" repeatCount="indefinite" path="M92 186 L832 186" />
+  </circle>
+
+  <text x="46" y="216" font-family="'Mitr','Segoe UI',system-ui,sans-serif" font-weight="700" font-size="16" fill="#262626">matching</text>
+  <text x="457" y="216" text-anchor="middle" font-family="'JetBrains Mono','Fira Code',monospace" font-size="14" fill="#3a3c36">16 encontros oficiais, ter&#231;as — a dupla agenda cada um</text>
+  <text x="830" y="216" text-anchor="end" font-family="'Mitr','Segoe UI',system-ui,sans-serif" font-weight="700" font-size="16" fill="#262626">encerramento</text>
+
+  <!-- ===== o que a coordenação vê ===== -->
+  <text x="457" y="252" text-anchor="middle" font-family="'JetBrains Mono','Fira Code',monospace" font-size="14" fill="#262626">o mentor registra cada encontro; o sem&#225;foro recalcula a cada leitura</text>
+  <text x="457" y="276" text-anchor="middle" font-family="'JetBrains Mono','Fira Code',monospace" font-size="13" fill="#565950">apoio, avalia&#231;&#227;o baixa ou 2+ atrasos acendem risco &#8594; nudge via wa.me</text>
+
+  <line x1="46" y1="288" x2="830" y2="288" stroke="#262626" stroke-opacity="0.1" stroke-width="1" />
+  <text x="46" y="304" font-family="'JetBrains Mono','Fira Code',monospace" font-size="13" fill="#565950">sem login: /demo &#183; /f/[token] &#183; /assinar/[token]</text>
+  <text x="830" y="304" text-anchor="end" font-family="'JetBrains Mono','Fira Code',monospace" font-size="13" fill="#565950">escopo por papel via rls</text>
 </svg>
