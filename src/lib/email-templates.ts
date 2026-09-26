@@ -38,18 +38,27 @@ function paragrafos(texto: string): string {
 
 /** Casca única dos e-mails do sistema — header ink com os dois discos da
  *  marca + keyline lime (a mesma do footer do app), corpo branco 600px,
- *  rodapé papel. Só tabelas + CSS inline: o que o Gmail/Outlook respeitam. */
+ *  rodapé papel. Só tabelas + CSS inline: o que o Gmail/Outlook respeitam.
+ *  `tagline` troca a linha sob "Realiza.vc" pelo contexto do e-mail
+ *  ("Aviso da coordenação"), `selo` é o carimbo tracejado do rodapé e
+ *  `preheader` é o texto de prévia que a caixa de entrada mostra. */
 export function emailLayout({
   titulo,
   conteudoHtml,
   ctaLabel,
   ctaHref,
+  tagline = "Programa de Mentoria Social",
+  selo,
+  preheader,
   rodapeExtra,
 }: {
   titulo: string;
   conteudoHtml: string;
   ctaLabel?: string;
   ctaHref?: string;
+  tagline?: string;
+  selo?: string;
+  preheader?: string;
   rodapeExtra?: string;
 }): string {
   const cta =
@@ -68,6 +77,11 @@ export function emailLayout({
 <html lang="pt-BR">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(titulo)}</title></head>
 <body style="margin:0;padding:0;background:${PAPEL};font-family:${FONT};">
+${
+  preheader
+    ? `<div style="display:none;font-size:1px;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;mso-hide:all;">${esc(preheader)}</div>`
+    : ""
+}
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${PAPEL};">
 <tr><td align="center" style="padding:28px 12px;">
   <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width:600px;max-width:100%;background:#ffffff;border-radius:12px;border:1px solid ${BORDA};">
@@ -80,7 +94,7 @@ export function emailLayout({
           </td>
           <td style="vertical-align:middle;">
             <div style="font-size:18px;font-weight:700;color:#ffffff;line-height:1.2;">Realiza.vc</div>
-            <div style="font-size:12px;color:rgba(255,255,255,0.6);line-height:1.3;">Programa de Mentoria Social</div>
+            <div style="font-size:12px;color:rgba(255,255,255,0.6);line-height:1.3;">${esc(tagline)}</div>
           </td>
         </tr></table>
       </td>
@@ -99,6 +113,11 @@ export function emailLayout({
     <!-- rodapé -->
     <tr>
       <td style="background:${PAPEL};padding:16px 28px;border-radius:0 0 12px 12px;border-top:1px solid ${BORDA};">
+        ${
+          selo
+            ? `<p style="margin:0 0 8px;"><span style="display:inline-block;padding:3px 10px;border:1.5px dashed ${LIME};border-radius:7px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.09em;color:${MUTED};">${esc(selo)}</span></p>`
+            : ""
+        }
         <p style="margin:0;font-size:12px;line-height:1.5;color:${MUTED};">
           Realiza.vc &middot; Programa de Mentoria Social
           &middot; <a href="${esc(SITE_URL)}" style="color:${MUTED};text-decoration:underline;">${esc(SITE_URL.replace(/^https?:\/\//, ""))}</a>
@@ -151,6 +170,11 @@ export function emailAviso({
     conteudoHtml: `${faixa}${paragrafos(corpo)}`,
     ctaLabel: "Abrir avisos",
     ctaHref: ctaHref ?? `${SITE_URL}/#avisos`,
+    tagline: "Aviso da coordenação",
+    selo: tema ? `Aviso · ${tema.texto}` : "Aviso",
+    preheader: `${tema ? `${tema.texto}: ` : ""}${titulo} — ${corpo.slice(0, 90)}`,
+    rodapeExtra:
+      "Este aviso também está na plataforma, na aba inicial — você pode conferir por lá a qualquer momento.",
   });
 }
 
@@ -185,5 +209,10 @@ export function emailMaterial({
     conteudoHtml: `<p style="margin:0 0 14px;font-size:16px;line-height:1.6;color:${INK};">Um novo material entrou na biblioteca:</p>${card}`,
     ctaLabel: "Abrir material",
     ctaHref,
+    tagline: "Biblioteca de materiais",
+    selo: "Material novo",
+    preheader: `Novo material: ${titulo}${descricao ? ` — ${descricao.slice(0, 80)}` : ""}`,
+    rodapeExtra:
+      "O material fica disponível na aba Materiais da plataforma — este e-mail é só o aviso de que ele chegou.",
   });
 }
