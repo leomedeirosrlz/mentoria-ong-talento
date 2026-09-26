@@ -243,10 +243,11 @@ export default async function PessoaPerfilPage({
 
       {/* minmax(0,1fr) + min-w-0 nos filhos: sem eles o min-content da seção
           "Duplas" subia pelo grid e estourava a página (+66px a 390px).
+          items-start impede o card de Notas de esticar até a altura da rail.
           aside vem antes no DOM: no mobile a ficha cadastral é o conteúdo
           primário (o mural descia ~600px); no lg o rail volta pra direita
           via order e o foco segue a mesma ordem da leitura mobile */}
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
         <aside className="min-w-0 space-y-4 lg:order-2">
           {/* cadastro/matching (0034) — os sensíveis (nascimento, gênero,
               motivação, pref. de par) só chegam preenchidos pra coordenação
@@ -452,6 +453,22 @@ export default async function PessoaPerfilPage({
             </section>
           )}
 
+        </aside>
+
+        {/* coluna principal — conteúdo de linha do tempo: mural de notas
+            (a parte viva da ficha), histórico de duplas e supervisões */}
+        <div className="min-w-0 space-y-4 lg:order-1">
+          <section className="rounded-xl bg-card p-4 shadow-[var(--shadow-border)] sm:p-5">
+            <h2 className="mb-3 text-sm font-semibold">Notas</h2>
+            <PessoaMural
+              pessoaId={p.id}
+              tipo={perfil.tipo}
+              notas={notas}
+              podeAnotar={podeAnotar}
+              nomePessoa={p.nome}
+            />
+          </section>
+
           <section className="rounded-xl bg-card p-4 text-sm shadow-[var(--shadow-border)]">
             <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
               Duplas
@@ -508,7 +525,8 @@ export default async function PessoaPerfilPage({
             />
           )}
 
-          {/* anamnese do mentorado — dado de cadastro, não do mural */}
+          {/* anamnese do mentorado — contexto da jornada, fica com o
+              histórico na coluna principal */}
           {ehMentorado && "notas" in p && p.notas && (
             <section className="rounded-xl bg-card p-4 text-sm shadow-[var(--shadow-border)]">
               <h2 className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
@@ -518,18 +536,7 @@ export default async function PessoaPerfilPage({
               <p className="mt-2 whitespace-pre-wrap text-muted-foreground">{p.notas}</p>
             </section>
           )}
-        </aside>
-
-        <section className="min-w-0 rounded-xl bg-card p-4 shadow-[var(--shadow-border)] sm:p-5 lg:order-1">
-          <h2 className="mb-3 text-sm font-semibold">Notas</h2>
-          <PessoaMural
-            pessoaId={p.id}
-            tipo={perfil.tipo}
-            notas={notas}
-            podeAnotar={podeAnotar}
-            nomePessoa={p.nome}
-          />
-        </section>
+        </div>
       </div>
     </div>
   );
