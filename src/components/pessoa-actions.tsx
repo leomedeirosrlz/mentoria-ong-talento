@@ -51,7 +51,17 @@ type MentorProfile = {
   disponibilidade: Disponibilidade | null;
 } | null;
 
-export function PessoaActions({ pessoa, podeExcluir }: { pessoa: Profile; podeExcluir: boolean }) {
+export function PessoaActions({
+  pessoa,
+  podeExcluir,
+  botaoEditar = false,
+}: {
+  pessoa: Profile;
+  podeExcluir: boolean;
+  /** ficha de pessoa: um "Editar" outline visível ao lado do ⋮ — abre o
+   *  mesmo wizard do item do menu */
+  botaoEditar?: boolean;
+}) {
   const [editOpen, setEditOpen] = useState(false);
   const [delOpen, setDelOpen] = useState(false);
   // desativar com duplas em andamento pede confirmação — o server devolve a
@@ -364,6 +374,17 @@ export function PessoaActions({ pessoa, podeExcluir }: { pessoa: Profile; podeEx
 
   return (
     <>
+      {botaoEditar && (
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => setEditOpen(true)}
+        >
+          <PencilSimple />
+          Editar
+        </Button>
+      )}
       <DropdownMenu>
         <DropdownMenuTrigger
           render={

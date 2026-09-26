@@ -1,7 +1,20 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ArrowUpRight, Buildings, EnvelopeSimple, HandHeart, LinkedinLogo, WhatsappLogo } from "@phosphor-icons/react/dist/ssr";
+import { Collapsible } from "@base-ui/react/collapsible";
+import {
+  ArrowUpRight,
+  Buildings,
+  CaretRight,
+  CheckCircle,
+  EnvelopeSimple,
+  HandHeart,
+  LinkedinLogo,
+  LockSimple,
+  Warning,
+  WhatsappLogo,
+} from "@phosphor-icons/react/dist/ssr";
+import { cn } from "cn";
 import { getDocumentosPessoa, getMe, getPessoaPerfil } from "@/lib/queries";
 import { getAnamneseMentorado } from "@/lib/forms/queries";
 import { getSupervisoesDaPessoa } from "@/lib/queries-supervisao";
@@ -19,6 +32,7 @@ import {
   PREF_GENERO_LABELS,
   waLink,
 } from "@/lib/ciclo";
+import type { DadosCivis } from "@/lib/types";
 import { AnamneseMentoradoChip } from "@/components/anamnese-mentorado";
 import { DocumentosPessoa } from "@/components/documentos-pessoa";
 import { AssinaturasPessoa } from "@/components/assinaturas-pessoa";
@@ -44,17 +58,92 @@ const STATUS_DUPLA: Record<string, string> = {
 /** Linha "rótulo: valor" da ficha — some quando o valor é vazio, exceto pra
  *  coordenação (que precisa distinguir "não preenchido" de "sem permissão":
  *  pros demais papéis os sensíveis nem chegam — vêm null do grant). */
-function Linha({ rotulo, valor, sempre }: { rotulo: string; valor: string | null | undefined; sempre?: boolean }) {
+function Linha({
+  rotulo,
+  valor,
+  sempre,
+  className,
+}: {
+  rotulo: string;
+  valor: string | null | undefined;
+  sempre?: boolean;
+  className?: string;
+}) {
   if (!valor && !sempre) return null;
   // os <dl> da ficha mostram rótulo sobre o valor — leitura de rede social e
   // sobrevive a qualquer largura; a borda vive na linha (não no divide do dl)
   // porque o dl vira grid de 2 colunas a partir de sm
   return (
-    <div className="border-b border-border/60 py-2.5">
-      <dt className="text-xs text-muted-foreground/80">{rotulo}</dt>
-      <dd className="mt-0.5 whitespace-pre-wrap [overflow-wrap:anywhere]">{valor || "—"}</dd>
+    <div className={cn("border-b border-border/60 py-2.5", className)}>
+      <dt className="text-xs text-muted-foreground">{rotulo}</dt>
+      <dd className="mt-0.5 whitespace-pre-wrap [overflow-wrap:anywhere]">
+        {valor || <span className="text-muted-foreground">Não informado</span>}
+      </dd>
     </div>
   );
+}
+
+/** Chips de informação secundária (áreas, interesses) — fundo neutro claro,
+ *  sem o peso do badge secondary. */
+function Chips({ itens }: { itens: string[] }) {
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {itens.map((i) => (
+        <Badge key={i} variant="outline" className="bg-muted font-normal">
+          {i}
+        </Badge>
+      ))}
+    </div>
+  );
+}
+
+/** Stat do resumo de mentoria — valor com estado: "ok" verde com check,
+ *  "pendente" amber com Warning (o que pede ação do coordenação). */
+function Stat({
+  rotulo,
+  valor,
+  estado = "neutro",
+  acao,
+}: {
+  rotulo: string;
+  valor: string;
+  estado?: "ok" | "pendente" | "neutro";
+  acao?: React.ReactNode;
+}) {
+  return (
+    <div>
+      <dt className="text-xs text-muted-foreground">{rotulo}</dt>
+      <dd
+        className={cn(
+          "mt-1 flex items-center gap-1.5 font-medium",
+          estado === "ok" && "text-[var(--ok-text)]",
+          estado === "pendente" && "text-[var(--warn-text)]"
+        )}
+      >
+        {estado === "ok" && (
+          <CheckCircle size={14} weight="fill" aria-hidden className="shrink-0" />
+        )}
+        {estado === "pendente" && (
+          <Warning size={14} weight="fill" aria-hidden className="shrink-0" />
+        )}
+        <span className="min-w-0">{valor}</span>
+      </dd>
+      {acao}
+    </div>
+  );
+}
+
+/** Endereço em linha única — "Rua X, 12 · ap 71 · Bairro · Cidade/UF · CEP". */
+function enderecoTxt(e: DadosCivis["endereco"] | null | undefined): string | null {
+  if (!e) return null;
+  const partes = [
+    [e.logradouro, e.numero].filter(Boolean).join(", ") || null,
+    e.complemento,
+    e.bairro,
+    [e.cidade, e.uf].filter(Boolean).join("/") || null,
+    e.cep ? `CEP ${e.cep}` : null,
+  ].filter(Boolean);
+  return partes.length ? partes.join(" · ") : null;
 }
 
 export default async function PessoaPerfilPage({
@@ -115,8 +204,8 @@ export default async function PessoaPerfilPage({
   // ---------- ficha de cadastro/matching (0034) ----------
   // Públicas (grant de coluna) preenchem pra quem alcança a página; os 4
   // sensíveis só vêm preenchidos pra coordenação (view *_pessoal) — pros
-  // demais chegam null e a linha some. Pra coord a linha fica com "—" pra
-  // distinguir "não preenchido" de "sem permissão".
+  // demais chegam null e a linha some. Pra coord a linha diz "Não
+  // informado" pra distinguir "não preenchido" de "sem permissão".
   const local = [p.cidade, p.uf].filter(Boolean).join(" · ") || null;
   const anos = idade(p.data_nascimento);
   const nascimentoTxt = p.data_nascimento
@@ -128,6 +217,8 @@ export default async function PessoaPerfilPage({
   const prof = perfil.tipo === "profile" ? perfil.pessoa : null;
   const ment = perfil.tipo === "mentorado" ? perfil.pessoa : null;
   const mp = perfil.tipo === "profile" ? perfil.mentorProfile : null;
+  const cargoEmpresa =
+    prof && [prof.cargo, prof.empresa].filter(Boolean).join(" · ") || null;
   // supervisor só lê presença de mentor que supervisiona (RLS via duplas,
   // 0040) — fora desse escopo a linha mostraria um "0 de 2" falso; coordenação
   // vê sempre. perfil.duplas já vem escopado pelo RLS, então basta o vínculo
@@ -147,12 +238,33 @@ export default async function PessoaPerfilPage({
   const documentos = souCoord
     ? await getDocumentosPessoa(perfil.tipo, p.id)
     : [];
+  // dados civis + responsável (0046) — chegam null fora da coordenação
+  // (view *_pessoal); renderizam fechados num Collapsible no fim do Cadastro
+  const civis = p.dados_civis ?? null;
+  const resp = ment?.responsavel ?? null;
   const temFicha = Boolean(
     p.nome_social || local || interesses.length || p.origem ||
     nascimentoTxt || p.genero || p.cor_raca || p.motivacao || p.pref_genero_par ||
     (prof && (prof.cargo || prof.empresa || mp)) ||
     (ment && (ment.escolaridade || ment.objetivos || dispMentoradoTxt))
   );
+
+  // presença nos encontros de formação do ciclo vs. checklist — os dois
+  // sinais num stat só ("formação" aparece uma vez, consolidada)
+  const formacaoTxt = !resumoFormacao
+    ? "—"
+    : resumoFormacao.total === 0
+      ? mp?.formacao_ok
+        ? "Concluída"
+        : "Pendente"
+      : `${resumoFormacao.presentes} de ${resumoFormacao.total} ${
+          resumoFormacao.total === 1 ? "encontro" : "encontros"
+        }`;
+  const formacaoPendente =
+    !mp?.formacao_ok ||
+    (resumoFormacao != null &&
+      resumoFormacao.total > 0 &&
+      resumoFormacao.presentes < resumoFormacao.total);
 
   // RLS devolve só as minhas notas — o feed não precisa de autor
   const notas: MuralNota[] = perfil.notas.map((n) => ({
@@ -162,113 +274,157 @@ export default async function PessoaPerfilPage({
   }));
 
   return (
-    <div className="space-y-6">
-      {/* coord volta pra /pessoas; mentor/supervisor voltam pra de onde vieram.
-          As ações (coord) ficam na mesma linha, à direita */}
-      <div className="flex items-center justify-between gap-3">
-        <VoltarLink fallback={souCoord ? "/pessoas" : "/"} />
-        {souCoord &&
-          (perfil.tipo === "profile" ? (
-            <PessoaActions
-              pessoa={perfil.pessoa}
-              podeExcluir={!perfil.pessoa.user_id && perfil.duplas.length === 0}
-            />
-          ) : (
-            <MentoradoActions
-              mentorado={perfil.pessoa}
-              temDupla={perfil.duplas.length > 0}
-            />
-          ))}
-      </div>
+    <div className="space-y-4">
+      {/* coord volta pra /pessoas; mentor/supervisor voltam pra de onde vieram */}
+      <VoltarLink fallback={souCoord ? "/pessoas" : "/"} />
 
-      {/* capa estilo rede social — a mesma gramática do /perfil: banner ink
-          com brilho lime, avatar sobreposto, nome como h1, meta de papel e
-          chips de contato. Sem modo edição aqui: é a ficha de outra pessoa */}
+      {/* header compacto — a capa-perfil do /perfil reduzida a uma faixa de
+          marca; a linha abaixo carrega avatar, nome, meta e à direita os
+          contatos + ações. A ficha é operacional: cadastro cede o holofote
+          pro acompanhamento */}
       <header className="overflow-hidden rounded-xl bg-card shadow-[var(--shadow-border)]">
-        <div aria-hidden className="capa-perfil h-24 sm:h-28" />
-        <div className="px-4 pb-5 sm:px-6 sm:pb-6">
-          <div className="-mt-10 sm:-mt-12">
-            {/* size-20!/sm:size-24! sobem por cima do style inline que o
-                Avatar fixa via prop (a prop segue ditando o fontSize) */}
-            <Avatar
-              nome={p.nome}
-              src={avatarSrc}
-              fallbackSrc={gravatar}
-              papel={ehMentorado ? "mentorado" : undefined}
-              size={80}
-              className="size-20! ring-4 ring-card sm:size-24!"
-            />
-          </div>
-          <h1 className="mt-3 text-xl font-semibold tracking-tight sm:text-2xl">
-            {p.nome}
-          </h1>
-          <div className="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1.5 text-sm text-muted-foreground">
-            {ehMentorado ? (
-              <>
-                <span aria-hidden className="size-1.5 rounded-full bg-[var(--role-mentorado)]" />
-                Mentorado
-                {"ong_origem" in p && p.ong_origem && ` · ${p.ong_origem}`}
-              </>
-            ) : (
-              <>
-                <Badge variant="outline" className="font-normal">
-                  {papelLabel("role" in p ? p.role : null)}
-                </Badge>
-                {"ativo" in p && !p.ativo && (
-                  <Badge variant="outline" className="border-[var(--danger)]/50 text-[var(--danger)]">
-                    inativa
+        <div aria-hidden className="capa-perfil h-3" />
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-3 p-4 sm:p-5">
+          <Avatar
+            nome={p.nome}
+            src={avatarSrc}
+            fallbackSrc={gravatar}
+            papel={ehMentorado ? "mentorado" : undefined}
+            size={64}
+          />
+          <div className="min-w-0 flex-1 basis-56">
+            <h1 className="text-xl font-semibold tracking-tight">{p.nome}</h1>
+            <div className="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1.5 text-sm text-muted-foreground">
+              {ehMentorado ? (
+                <>
+                  <span aria-hidden className="size-1.5 rounded-full bg-[var(--role-mentorado)]" />
+                  <span>
+                    Mentorado
+                    {"ong_origem" in p && p.ong_origem ? ` · ${p.ong_origem}` : ""}
+                  </span>
+                </>
+              ) : (
+                <>
+                  <Badge variant="outline" className="font-normal">
+                    {papelLabel("role" in p ? p.role : null)}
                   </Badge>
-                )}
-                {"user_id" in p && !p.user_id && p.ativo && (
-                  <Badge variant="outline">ainda não entrou</Badge>
-                )}
-              </>
-            )}
-          </div>
-          {/* contato — chip real, não texto corrido */}
-          {(wa || ("email" in p && p.email)) && (
-            <div className="mt-3 flex flex-wrap gap-2">
-              {wa && (
-                <a
-                  href={wa}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-border px-3 text-sm transition-colors hover:bg-[var(--brand-lime)]/15 hover:border-[var(--brand-lime)]/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:min-h-8"
-                >
-                  <WhatsappLogo size={15} aria-hidden />
-                  WhatsApp
-                  <span className="sr-only"> (abre em nova aba)</span>
-                </a>
+                  {"ativo" in p && !p.ativo && (
+                    <Badge variant="outline" className="border-[var(--danger)]/50 text-[var(--danger)]">
+                      inativa
+                    </Badge>
+                  )}
+                  {"user_id" in p && !p.user_id && p.ativo && (
+                    <Badge variant="outline" className="font-normal text-muted-foreground">
+                      Nunca acessou a plataforma
+                    </Badge>
+                  )}
+                </>
               )}
-              {"email" in p && p.email && (
-                <a
-                  href={`mailto:${p.email}`}
-                  className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-border px-3 text-sm text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:min-h-8"
-                >
-                  <EnvelopeSimple size={15} aria-hidden />
-                  {p.email}
-                </a>
-              )}
+              {cargoEmpresa && <span>{cargoEmpresa}</span>}
+              {local && <span>{local}</span>}
             </div>
-          )}
+          </div>
+          {/* contato + ações — chips menores e secundários; o dropdown de
+              ações (coord) ganha um Editar visível ao lado */}
+          <div className="flex flex-wrap items-center gap-1.5">
+            {wa && (
+              <a
+                href={wa}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-border px-2.5 text-xs text-muted-foreground transition-colors hover:border-[var(--brand-lime)]/60 hover:bg-[var(--brand-lime)]/15 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <WhatsappLogo size={14} aria-hidden />
+                WhatsApp
+                <span className="sr-only"> (abre em nova aba)</span>
+              </a>
+            )}
+            {"email" in p && p.email && (
+              <a
+                href={`mailto:${p.email}`}
+                className="inline-flex min-h-9 max-w-56 items-center gap-1.5 rounded-lg border border-border px-2.5 text-xs text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <EnvelopeSimple size={14} aria-hidden className="shrink-0" />
+                <span className="truncate">{p.email}</span>
+              </a>
+            )}
+            {souCoord &&
+              (perfil.tipo === "profile" ? (
+                <PessoaActions
+                  pessoa={perfil.pessoa}
+                  podeExcluir={!perfil.pessoa.user_id && perfil.duplas.length === 0}
+                  botaoEditar
+                />
+              ) : (
+                <MentoradoActions
+                  mentorado={perfil.pessoa}
+                  temDupla={perfil.duplas.length > 0}
+                  botaoEditar
+                />
+              ))}
+          </div>
         </div>
       </header>
 
-      {/* minmax(0,1fr) + min-w-0 nos filhos: sem eles o min-content da seção
-          "Duplas" subia pelo grid e estourava a página (+66px a 390px).
-          items-start impede os cards de esticar até a altura do vizinho.
-          A coluna principal vem primeiro no DOM (cadastro é o conteúdo
-          primário no mobile); no lg o rail estreito cai à direita por ser
-          o segundo filho do grid */}
-      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+      {/* resumo da mentoria — faixa inteira logo abaixo do header: o estado
+          operacional do mentor antes do cadastro. Capacidade, formação
+          (presenças + checklist consolidados num stat só), termo e
+          disponibilidade; experiência e formação externa vão como linhas
+          secundárias */}
+      {mp && (
+        <section className="rounded-xl bg-card p-4 text-sm shadow-[var(--shadow-border)] sm:p-5">
+          <h2 className="text-sm font-semibold">
+            {mp.tipo === "dpp" ? "Mentoria DPP" : "Mentoria especialista"}
+          </h2>
+          <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-4 sm:grid-cols-4">
+            <Stat
+              rotulo="Capacidade"
+              valor={`${mp.capacidade} ${mp.capacidade === 1 ? "dupla" : "duplas"}`}
+            />
+            <Stat
+              rotulo="Formação inicial"
+              valor={formacaoTxt}
+              estado={formacaoPendente ? "pendente" : "neutro"}
+            />
+            <Stat
+              rotulo="Termo"
+              valor={mp.termo_ok ? "Assinado" : "Pendente"}
+              estado={mp.termo_ok ? "ok" : "pendente"}
+              acao={
+                souCoord && !mp.termo_ok ? (
+                  <a
+                    href="#assinaturas"
+                    className="mt-0.5 inline-block text-xs font-normal text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline"
+                  >
+                    ver assinaturas
+                  </a>
+                ) : undefined
+              }
+            />
+            <Stat rotulo="Disponibilidade" valor={dispTxt ?? "—"} />
+          </dl>
+          {(souCoord || mp.experiencia_previa || mp.formacao_externa) && (
+            <dl className="mt-3 border-t border-border/60 text-[13px] sm:grid sm:grid-cols-2 sm:gap-x-6">
+              <Linha rotulo="Experiência" valor={mp.experiencia_previa} sempre={souCoord} />
+              <Linha rotulo="Formação externa" valor={mp.formacao_externa} sempre={souCoord} />
+            </dl>
+          )}
+        </section>
+      )}
+
+      {/* minmax(0,1fr) + min-w-0 nos filhos: sem eles o min-content das
+          seções subia pelo grid e estourava a página. items-start impede os
+          cards de esticar até a altura do vizinho. No mobile a coluna
+          principal vem primeiro no DOM (cadastro é o conteúdo primário);
+          no lg o rail estreito cai à direita por ser o segundo filho */}
+      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
         <div className="min-w-0 space-y-4">
           {/* vitrine profissional (0030) vira o "Sobre" — bio, LinkedIn,
-              áreas e voluntariado logo abaixo da capa, como nas redes */}
+              áreas, voluntariado e interesses logo abaixo do resumo, como
+              nas redes */}
           {perfilPro && temPerfilPro && (
             <section className="rounded-xl bg-card p-4 text-sm shadow-[var(--shadow-border)] sm:p-5">
-              <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                Sobre
-              </h2>
+              <h2 className="text-sm font-semibold">Sobre</h2>
               {perfilPro.bio && (
                 <p className="mt-2 whitespace-pre-wrap text-muted-foreground">
                   {perfilPro.bio}
@@ -279,20 +435,19 @@ export default async function PessoaPerfilPage({
                   href={perfilPro.linkedin}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="mt-3 inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-border px-3 text-sm transition-colors hover:bg-muted/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:min-h-8"
+                  className="mt-3 inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-border px-2.5 text-xs text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
-                  <LinkedinLogo size={15} aria-hidden />
+                  <LinkedinLogo size={14} aria-hidden />
                   LinkedIn
                   <span className="sr-only"> (abre em nova aba)</span>
                 </a>
               )}
               {perfilPro.areas.length > 0 && (
-                <div className="mt-3 flex flex-wrap gap-1.5">
-                  {perfilPro.areas.map((a) => (
-                    <Badge key={a} variant="secondary" className="font-normal">
-                      {a}
-                    </Badge>
-                  ))}
+                <div className="mt-3">
+                  <p className="text-xs text-muted-foreground">Áreas de atuação</p>
+                  <div className="mt-1.5">
+                    <Chips itens={perfilPro.areas} />
+                  </div>
                 </div>
               )}
               {perfilPro.voluntariado && (
@@ -304,19 +459,25 @@ export default async function PessoaPerfilPage({
                   </span>
                 </p>
               )}
+              {interesses.length > 0 && (
+                <div className="mt-3">
+                  <p className="text-xs text-muted-foreground">Interesses</p>
+                  <div className="mt-1.5">
+                    <Chips itens={interesses} />
+                  </div>
+                </div>
+              )}
             </section>
           )}
 
           {/* cadastro/matching (0034) — os sensíveis (nascimento, gênero,
               motivação, pref. de par) só chegam preenchidos pra coordenação
-              via view; `sempre` deixa o "—" explícito pra ela */}
+              via view; `sempre` deixa o "Não informado" explícito pra ela */}
           {(temFicha || souCoord) && (
-            <section className="rounded-xl bg-card p-4 text-sm shadow-[var(--shadow-border)]">
-              <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                Cadastro
-              </h2>
+            <section className="rounded-xl bg-card p-4 text-sm shadow-[var(--shadow-border)] sm:p-5">
+              <h2 className="text-sm font-semibold">Cadastro</h2>
               {temFicha ? (
-                <dl className="mt-2 sm:grid sm:grid-cols-2 sm:gap-x-6">
+                <dl className="mt-1 sm:grid sm:grid-cols-2 sm:gap-x-6">
                   <Linha rotulo="Nome social" valor={p.nome_social} sempre={souCoord} />
                   <Linha rotulo="Nascimento" valor={nascimentoTxt} sempre={souCoord} />
                   {anos != null && anos < 18 && (
@@ -352,12 +513,22 @@ export default async function PessoaPerfilPage({
                   )}
                   <Linha rotulo="Origem" valor={p.origem} sempre={souCoord} />
                   {ment && (
-                    <Linha rotulo="Objetivos" valor={ment.objetivos} sempre={souCoord} />
+                    <Linha
+                      rotulo="Objetivos"
+                      valor={ment.objetivos}
+                      sempre={souCoord}
+                      className="sm:col-span-2"
+                    />
                   )}
                   {ment && (
                     <Linha rotulo="Disponível" valor={dispMentoradoTxt} sempre={souCoord} />
                   )}
-                  <Linha rotulo="Motivação" valor={p.motivacao} sempre={souCoord} />
+                  <Linha
+                    rotulo="Motivação"
+                    valor={p.motivacao}
+                    sempre={souCoord}
+                    className="sm:col-span-2"
+                  />
                   <Linha
                     rotulo="Pref. de par"
                     valor={p.pref_genero_par ? PREF_GENERO_LABELS[p.pref_genero_par] : null}
@@ -381,119 +552,104 @@ export default async function PessoaPerfilPage({
                   Nada preenchido ainda. Edite o cadastro ou peça pra pessoa completar o perfil.
                 </p>
               )}
-              {interesses.length > 0 && (
-                <div className="mt-3 flex flex-wrap gap-1.5">
-                  {interesses.map((i) => (
-                    <Badge key={i} variant="secondary" className="font-normal">
-                      {i}
-                    </Badge>
-                  ))}
+              {/* interesses ficam no Cadastro só quando não há card Sobre
+                  (mentorado e profiles sem apresentação pública) */}
+              {interesses.length > 0 && !temPerfilPro && (
+                <div className="mt-3">
+                  <p className="text-xs text-muted-foreground">Interesses</p>
+                  <div className="mt-1.5">
+                    <Chips itens={interesses} />
+                  </div>
                 </div>
+              )}
+
+              {/* dados civis (0046) — coord-only, fechados por padrão: o que
+                  o termo de adesão precisa, sem pesar a ficha */}
+              {souCoord && (civis || resp) && (
+                <Collapsible.Root>
+                  <Collapsible.Trigger className="group flex min-h-9 w-full items-center gap-1.5 rounded-lg py-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                    <LockSimple size={14} aria-hidden className="shrink-0" />
+                    {resp ? "Dados civis e responsável" : "Dados civis"}
+                    <CaretRight
+                      size={13}
+                      aria-hidden
+                      className="ml-auto shrink-0 transition-transform duration-150 group-data-[panel-open]:rotate-90"
+                    />
+                  </Collapsible.Trigger>
+                  <Collapsible.Panel className="h-[var(--collapsible-panel-height)] overflow-hidden transition-[height] duration-150 data-ending-style:h-0 data-starting-style:h-0 [&[hidden]:not([hidden='until-found'])]:hidden">
+                    <dl className="pt-1 sm:grid sm:grid-cols-2 sm:gap-x-6">
+                      <Linha rotulo="Nome civil" valor={civis?.nome_civil} sempre />
+                      <Linha rotulo="RG" valor={civis?.rg} sempre />
+                      <Linha rotulo="CPF" valor={civis?.cpf} sempre />
+                      <Linha
+                        rotulo="Nascimento"
+                        valor={civis?.data_nascimento ? formatDate(civis.data_nascimento) : null}
+                        sempre
+                      />
+                      <Linha
+                        rotulo="Endereço"
+                        valor={enderecoTxt(civis?.endereco)}
+                        sempre
+                        className="sm:col-span-2"
+                      />
+                    </dl>
+                    {resp && (
+                      <>
+                        <p className="mt-1 border-t border-border/60 pt-2.5 text-xs font-medium text-muted-foreground">
+                          Responsável legal{resp.parentesco ? ` · ${resp.parentesco}` : ""}
+                        </p>
+                        <dl className="sm:grid sm:grid-cols-2 sm:gap-x-6">
+                          <Linha rotulo="Nome civil" valor={resp.nome_civil} sempre />
+                          <Linha rotulo="RG" valor={resp.rg} sempre />
+                          <Linha rotulo="CPF" valor={resp.cpf} sempre />
+                          <Linha
+                            rotulo="Nascimento"
+                            valor={resp.data_nascimento ? formatDate(resp.data_nascimento) : null}
+                            sempre
+                          />
+                          <Linha
+                            rotulo="Endereço"
+                            valor={enderecoTxt(resp.endereco)}
+                            sempre
+                            className="sm:col-span-2"
+                          />
+                        </dl>
+                      </>
+                    )}
+                  </Collapsible.Panel>
+                </Collapsible.Root>
               )}
             </section>
           )}
 
-          {/* ficha de mentor — mentor_profiles é legível por autenticado; a
-              página de profile em si já é restrita a staff */}
-          {mp && (
-            <section className="rounded-xl bg-card p-4 text-sm shadow-[var(--shadow-border)]">
-              <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                Mentoria ({mp.tipo === "dpp" ? "DPP" : "especialista"})
+          {/* supervisão (0041) — na ficha do supervisor, as sessões que ele
+              conduziu; na do mentor, as que recebeu. Vazia = seção some */}
+          {supervisoes.length > 0 && (
+            <SupervisoesSection
+              itens={supervisoes}
+              visao={papelPessoa === "supervisor" ? "supervisor" : "mentor"}
+              podeExcluir={souCoord}
+            />
+          )}
+
+          {/* anamnese do mentorado — contexto da jornada, fica com o
+              histórico na coluna principal */}
+          {ehMentorado && "notas" in p && p.notas && (
+            <section className="rounded-xl bg-card p-4 text-sm shadow-[var(--shadow-border)] sm:p-5">
+              <h2 className="flex items-center gap-1.5 text-sm font-semibold">
+                <Buildings size={14} aria-hidden />
+                Referência da anamnese
               </h2>
-              <dl className="mt-2 sm:grid sm:grid-cols-2 sm:gap-x-6">
-                <Linha rotulo="Capacidade" valor={`${mp.capacidade} ${mp.capacidade === 1 ? "dupla" : "duplas"}`} sempre />
-                <Linha rotulo="Disponível" valor={dispTxt} sempre={souCoord} />
-                <Linha rotulo="Experiência" valor={mp.experiencia_previa} sempre={souCoord} />
-                <Linha rotulo="Formação" valor={mp.formacao_externa} sempre={souCoord} />
-                <Linha
-                  rotulo="Checklist"
-                  valor={[
-                    mp.termo_ok ? "termo assinado" : "termo pendente",
-                    mp.formacao_ok ? "formação concluída" : "formação pendente",
-                  ].join(" · ")}
-                  sempre
-                />
-                {/* presença na formação do ciclo (chamada da agenda) — sem
-                    encontro de formação no ciclo a linha nem renderiza;
-                    podeVerFormacao evita o "0 de M" fora do escopo do
-                    supervisor */}
-                {resumoFormacao && resumoFormacao.total > 0 && (
-                  <Linha
-                    rotulo="Formação inicial"
-                    valor={`${resumoFormacao.presentes} de ${resumoFormacao.total} ${
-                      resumoFormacao.total === 1 ? "encontro" : "encontros"
-                    }`}
-                    sempre
-                  />
-                )}
-              </dl>
+              <p className="mt-2 whitespace-pre-wrap text-muted-foreground">{p.notas}</p>
             </section>
           )}
         </div>
 
-        {/* o grid tem 3 filhos de propósito: o auto-placement manda o rail
-            (este aside) pra coluna 2 na linha 1 e a coluna de linha do tempo
-            (próxima div) continua na coluna 1, linha 2 — esquerda carrega
-            cadastro+mural, direita fica só com referência operacional */}
+        {/* rail direito — referência operacional: vínculos, documentos
+            (coord) e o caderno privado de notas */}
         <aside className="min-w-0 space-y-4">
-          {/* documentos + termos + anamnese — coord-only ponta a ponta; até
-              aqui isso só existia dentro do dialog de edição */}
-          {souCoord && (
-            <section className="rounded-xl bg-card p-4 text-sm shadow-[var(--shadow-border)]">
-              <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                Documentos e assinaturas
-              </h2>
-              {/* anexos do form de inscrição (0054) — RG, comprovante, currículo */}
-              <div className="mt-3">
-                <DocumentosPessoa
-                  tipo={ehMentorado ? "mentorado" : "profile"}
-                  pessoaId={p.id}
-                  documentos={documentos}
-                />
-              </div>
-              <div className="mt-4 border-t border-border pt-3">
-                <AssinaturasPessoa
-                  tipo={ehMentorado ? "mentorado" : "profile"}
-                  id={p.id}
-                  nome={p.nome}
-                  whatsapp={p.whatsapp}
-                />
-              </div>
-              {/* Anamnese Social (0042) — o form oficial respondido pelo(a)
-                  jovem sem login; coord envia/reenvia o link daqui */}
-              {anamnese && (
-                <AnamneseMentoradoChip
-                  mentoradoId={p.id}
-                  nome={p.nome}
-                  whatsapp={p.whatsapp}
-                  anamnese={anamnese}
-                />
-              )}
-            </section>
-          )}
-
-          {/* mural de notas — espaço modesto basta; fica no rail junto da
-              referência operacional em vez de ocupar a coluna principal */}
-          <section className="rounded-xl bg-card p-4 shadow-[var(--shadow-border)]">
-            <h2 className="mb-3 text-sm font-semibold">Notas</h2>
-            <PessoaMural
-              pessoaId={p.id}
-              tipo={perfil.tipo}
-              notas={notas}
-              podeAnotar={podeAnotar}
-              nomePessoa={p.nome}
-            />
-          </section>
-
-        </aside>
-
-        {/* coluna de linha do tempo — histórico de duplas, supervisões e
-            referência; no lg cai na coluna 1 linha 2 pelo auto-placement */}
-        <div className="min-w-0 space-y-4">
-          <section className="rounded-xl bg-card p-4 text-sm shadow-[var(--shadow-border)]">
-            <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-              Duplas
-            </h2>
+          <section className="rounded-xl bg-card p-4 text-sm shadow-[var(--shadow-border)] sm:p-5">
+            <h2 className="text-sm font-semibold">Duplas</h2>
             {perfil.duplas.length === 0 ? (
               <p className="mt-2 text-muted-foreground">Nenhuma dupla no histórico.</p>
             ) : (
@@ -536,28 +692,57 @@ export default async function PessoaPerfilPage({
             )}
           </section>
 
-          {/* supervisão (0041) — na ficha do supervisor, as sessões que ele
-              conduziu; na do mentor, as que recebeu. Vazia = seção some */}
-          {supervisoes.length > 0 && (
-            <SupervisoesSection
-              itens={supervisoes}
-              visao={papelPessoa === "supervisor" ? "supervisor" : "mentor"}
-              podeExcluir={souCoord}
-            />
-          )}
-
-          {/* anamnese do mentorado — contexto da jornada, fica com o
-              histórico na coluna principal */}
-          {ehMentorado && "notas" in p && p.notas && (
-            <section className="rounded-xl bg-card p-4 text-sm shadow-[var(--shadow-border)]">
-              <h2 className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                <Buildings size={13} aria-hidden />
-                Referência da anamnese
-              </h2>
-              <p className="mt-2 whitespace-pre-wrap text-muted-foreground">{p.notas}</p>
+          {/* documentos + termos + anamnese — coord-only ponta a ponta; até
+              aqui isso só existia dentro do dialog de edição. id próprio:
+              o stat "Termo" pendente aponta pra cá */}
+          {souCoord && (
+            <section
+              id="assinaturas"
+              className="scroll-mt-20 rounded-xl bg-card p-4 text-sm shadow-[var(--shadow-border)] sm:p-5"
+            >
+              <h2 className="text-sm font-semibold">Documentos e assinaturas</h2>
+              {/* anexos do form de inscrição (0054) — RG, comprovante, currículo */}
+              <div className="mt-3">
+                <DocumentosPessoa
+                  tipo={ehMentorado ? "mentorado" : "profile"}
+                  pessoaId={p.id}
+                  documentos={documentos}
+                />
+              </div>
+              <div className="mt-4 border-t border-border pt-3">
+                <AssinaturasPessoa
+                  tipo={ehMentorado ? "mentorado" : "profile"}
+                  id={p.id}
+                  nome={p.nome}
+                  whatsapp={p.whatsapp}
+                />
+              </div>
+              {/* Anamnese Social (0042) — o form oficial respondido pelo(a)
+                  jovem sem login; coord envia/reenvia o link daqui */}
+              {anamnese && (
+                <AnamneseMentoradoChip
+                  mentoradoId={p.id}
+                  nome={p.nome}
+                  whatsapp={p.whatsapp}
+                  anamnese={anamnese}
+                />
+              )}
             </section>
           )}
-        </div>
+
+          {/* mural de notas — espaço modesto basta; fica no rail junto da
+              referência operacional em vez de ocupar a coluna principal */}
+          <section className="rounded-xl bg-card p-4 shadow-[var(--shadow-border)] sm:p-5">
+            <h2 className="mb-3 text-sm font-semibold">Notas</h2>
+            <PessoaMural
+              pessoaId={p.id}
+              tipo={perfil.tipo}
+              notas={notas}
+              podeAnotar={podeAnotar}
+              nomePessoa={p.nome}
+            />
+          </section>
+        </aside>
       </div>
     </div>
   );

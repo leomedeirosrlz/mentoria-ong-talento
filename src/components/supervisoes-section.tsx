@@ -30,9 +30,9 @@ export function SupervisoesSection({
   podeExcluir?: boolean;
 }) {
   return (
-    <section className="rounded-xl bg-card p-4 text-sm shadow-[var(--shadow-border)]">
+    <section className="rounded-xl bg-card p-4 text-sm shadow-[var(--shadow-border)] sm:p-5">
       <div className="mb-1 flex items-center justify-between gap-2">
-        <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+        <h2 className="text-sm font-semibold">
           {titulo}
         </h2>
         {acao}

@@ -36,7 +36,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
-export function MentoradoActions({ mentorado, temDupla }: { mentorado: Mentorado; temDupla: boolean }) {
+export function MentoradoActions({
+  mentorado,
+  temDupla,
+  botaoEditar = false,
+}: {
+  mentorado: Mentorado;
+  temDupla: boolean;
+  /** ficha de pessoa: um "Editar" outline visível ao lado do ⋮ — abre o
+   *  mesmo wizard do item do menu */
+  botaoEditar?: boolean;
+}) {
   const [editOpen, setEditOpen] = useState(false);
   const [delOpen, setDelOpen] = useState(false);
   const [interesses, setInteresses] = useState<string[]>(mentorado.interesses ?? []);
@@ -230,6 +240,17 @@ export function MentoradoActions({ mentorado, temDupla }: { mentorado: Mentorado
 
   return (
     <>
+      {botaoEditar && (
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => setEditOpen(true)}
+        >
+          <PencilSimple />
+          Editar
+        </Button>
+      )}
       <DropdownMenu>
         <DropdownMenuTrigger
           render={

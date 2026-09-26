@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { CircleNotch, Notebook, Trash } from "@phosphor-icons/react";
+import { CircleNotch, LockSimple, Trash } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { addPessoaNota, deletePessoaNota } from "@/lib/actions";
 import { demoAtivoClient } from "@/lib/demo/shared";
@@ -17,8 +17,9 @@ export type MuralNota = {
 
 /** Mural de notas do perfil — caderneta PRIVADA do autor (RLS: só
  *  `created_by` lê e apaga). Composer sem botão: o rascunho mora no
- *  localStorage e publica sozinho no Enter/blur/unmount — "sair do campo"
- *  é o envio. Feed = data + texto + apagar (toda nota visível é sua). */
+ *  localStorage e publica sozinho no blur/unmount — "sair do campo" é o
+ *  envio (Ctrl+Enter publica sem sair; Enter quebra linha, Esc limpa).
+ *  Feed = data + texto + apagar (toda nota visível é sua). */
 export function PessoaMural({
   pessoaId,
   tipo,
@@ -114,8 +115,9 @@ export function PessoaMural({
             }}
             onBlur={() => publicar()}
             onKeyDown={(e) => {
-              // convenção de chat: Enter envia, Shift+Enter quebra linha, Esc limpa
-              if (e.key === "Enter" && !e.shiftKey) {
+              // Enter quebra linha — a nota é texto livre; Ctrl/Cmd+Enter
+              // publica sem sair do campo, Esc limpa o rascunho
+              if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
                 e.preventDefault();
                 publicar();
               } else if (e.key === "Escape") {
@@ -124,31 +126,29 @@ export function PessoaMural({
                 e.currentTarget.blur();
               }
             }}
-            enterKeyHint="send"
             maxLength={10000}
             rows={3}
             placeholder={`Escreva uma nota sobre ${nomePessoa.split(" ")[0]}: observação, combinado, contexto…`}
             aria-label="Nova nota"
             aria-describedby="mural-hint"
           />
-          <p id="mural-hint" className="text-xs text-muted-foreground" aria-live="polite">
-            {pending
-              ? "Publicando…"
-              : "Só você vê suas notas · Enter ou sair do campo publica"}
-          </p>
+          <div id="mural-hint" className="space-y-0.5 text-xs text-muted-foreground" aria-live="polite">
+            <p className="flex items-center gap-1">
+              <LockSimple size={12} aria-hidden className="shrink-0" />
+              Notas privadas · visíveis apenas para você
+            </p>
+            <p className="text-muted-foreground/80">
+              {pending ? "Publicando…" : "Salva automaticamente ao sair do campo"}
+            </p>
+          </div>
         </div>
       )}
 
       {notas.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 py-6 text-center">
-          <span className="grid size-11 place-items-center rounded-full bg-muted text-muted-foreground">
-            <Notebook size={18} aria-hidden />
-          </span>
-          <p className="text-sm text-muted-foreground">
-            Nenhuma nota sua ainda.
-            {podeAnotar && " Observações e combinados sobre a pessoa ficam aqui. Só você lê."}
-          </p>
-        </div>
+        <p className="text-sm text-muted-foreground">
+          Nenhuma nota sua ainda.
+          {podeAnotar && " Observações e combinados sobre a pessoa ficam aqui."}
+        </p>
       ) : (
         <ul className="space-y-3">
           {notas.map((n) => (
