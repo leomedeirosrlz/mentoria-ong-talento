@@ -47,10 +47,12 @@ const STATUS_DUPLA: Record<string, string> = {
  *  pros demais papéis os sensíveis nem chegam — vêm null do grant). */
 function Linha({ rotulo, valor, sempre }: { rotulo: string; valor: string | null | undefined; sempre?: boolean }) {
   if (!valor && !sempre) return null;
+  // os <dl> da ficha moram num rail de ~290px — rótulo sobre o valor
+  // (o dt de largura fixa esmagava a linha em telas estreitas)
   return (
-    <div className="flex gap-2 py-2.5">
-      <dt className="w-32 shrink-0 text-muted-foreground/80">{rotulo}</dt>
-      <dd className="min-w-0 flex-1 whitespace-pre-wrap [overflow-wrap:anywhere]">{valor || "—"}</dd>
+    <div className="py-2.5">
+      <dt className="text-xs text-muted-foreground/80">{rotulo}</dt>
+      <dd className="mt-0.5 whitespace-pre-wrap [overflow-wrap:anywhere]">{valor || "—"}</dd>
     </div>
   );
 }
