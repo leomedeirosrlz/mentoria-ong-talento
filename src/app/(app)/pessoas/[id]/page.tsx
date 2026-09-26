@@ -47,10 +47,11 @@ const STATUS_DUPLA: Record<string, string> = {
  *  pros demais papéis os sensíveis nem chegam — vêm null do grant). */
 function Linha({ rotulo, valor, sempre }: { rotulo: string; valor: string | null | undefined; sempre?: boolean }) {
   if (!valor && !sempre) return null;
-  // os <dl> da ficha moram num rail de ~290px — rótulo sobre o valor
-  // (o dt de largura fixa esmagava a linha em telas estreitas)
+  // os <dl> da ficha mostram rótulo sobre o valor — leitura de rede social e
+  // sobrevive a qualquer largura; a borda vive na linha (não no divide do dl)
+  // porque o dl vira grid de 2 colunas a partir de sm
   return (
-    <div className="py-2.5">
+    <div className="border-b border-border/60 py-2.5">
       <dt className="text-xs text-muted-foreground/80">{rotulo}</dt>
       <dd className="mt-0.5 whitespace-pre-wrap [overflow-wrap:anywhere]">{valor || "—"}</dd>
     </div>
@@ -245,12 +246,12 @@ export default async function PessoaPerfilPage({
 
       {/* minmax(0,1fr) + min-w-0 nos filhos: sem eles o min-content da seção
           "Duplas" subia pelo grid e estourava a página (+66px a 390px).
-          items-start impede o card de Notas de esticar até a altura da rail.
-          aside vem antes no DOM: no mobile a ficha cadastral é o conteúdo
-          primário (o mural descia ~600px); no lg o rail volta pra direita
-          via order e o foco segue a mesma ordem da leitura mobile */}
+          items-start impede os cards de esticar até a altura do vizinho.
+          A coluna principal vem primeiro no DOM (cadastro é o conteúdo
+          primário no mobile); no lg o rail estreito cai à direita por ser
+          o segundo filho do grid */}
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
-        <aside className="min-w-0 space-y-4 lg:order-2">
+        <div className="min-w-0 space-y-4">
           {/* cadastro/matching (0034) — os sensíveis (nascimento, gênero,
               motivação, pref. de par) só chegam preenchidos pra coordenação
               via view; `sempre` deixa o "—" explícito pra ela */}
@@ -260,11 +261,11 @@ export default async function PessoaPerfilPage({
                 Cadastro
               </h2>
               {temFicha ? (
-                <dl className="mt-2 divide-y divide-border/60">
+                <dl className="mt-2 sm:grid sm:grid-cols-2 sm:gap-x-6">
                   <Linha rotulo="Nome social" valor={p.nome_social} sempre={souCoord} />
                   <Linha rotulo="Nascimento" valor={nascimentoTxt} sempre={souCoord} />
                   {anos != null && anos < 18 && (
-                    <p className="my-2.5 rounded-lg bg-amber-50 px-2.5 py-1.5 text-xs text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+                    <p className="my-2.5 rounded-lg bg-amber-50 px-2.5 py-1.5 text-xs text-amber-900 sm:col-span-2 dark:bg-amber-950/40 dark:text-amber-200">
                       Menor de idade: a autorização do responsável precisa estar
                       assinada.
                       {souCoord && " Confira o card Documentos e assinaturas."}
@@ -344,7 +345,7 @@ export default async function PessoaPerfilPage({
               <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
                 Mentoria ({mp.tipo === "dpp" ? "DPP" : "especialista"})
               </h2>
-              <dl className="mt-2 divide-y divide-border/60">
+              <dl className="mt-2 sm:grid sm:grid-cols-2 sm:gap-x-6">
                 <Linha rotulo="Capacidade" valor={`${mp.capacidade} ${mp.capacidade === 1 ? "dupla" : "duplas"}`} sempre />
                 <Linha rotulo="Disponível" valor={dispTxt} sempre={souCoord} />
                 <Linha rotulo="Experiência" valor={mp.experiencia_previa} sempre={souCoord} />
@@ -373,7 +374,13 @@ export default async function PessoaPerfilPage({
               </dl>
             </section>
           )}
+        </div>
 
+        {/* o grid tem 3 filhos de propósito: o auto-placement manda o rail
+            (este aside) pra coluna 2 na linha 1 e a coluna de linha do tempo
+            (próxima div) continua na coluna 1, linha 2 — esquerda carrega
+            cadastro+mural, direita fica só com referência operacional */}
+        <aside className="min-w-0 space-y-4">
           {/* documentos + termos + anamnese — coord-only ponta a ponta; até
               aqui isso só existia dentro do dialog de edição */}
           {souCoord && (
@@ -457,9 +464,10 @@ export default async function PessoaPerfilPage({
 
         </aside>
 
-        {/* coluna principal — conteúdo de linha do tempo: mural de notas
-            (a parte viva da ficha), histórico de duplas e supervisões */}
-        <div className="min-w-0 space-y-4 lg:order-1">
+        {/* coluna de linha do tempo — mural de notas (a parte viva da
+            ficha), histórico de duplas e supervisões; no lg cai na coluna 1
+            linha 2 pelo auto-placement do grid */}
+        <div className="min-w-0 space-y-4">
           <section className="rounded-xl bg-card p-4 shadow-[var(--shadow-border)] sm:p-5">
             <h2 className="mb-3 text-sm font-semibold">Notas</h2>
             <PessoaMural
