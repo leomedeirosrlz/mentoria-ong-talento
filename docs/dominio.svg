@@ -1,0 +1,102 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 470" width="1100" height="470">
+  <defs>
+    <marker id="arr-k" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0L8 4L0 8" fill="none" stroke="#262626" stroke-width="1.2" />
+    </marker>
+    <style>
+      .bx { fill: #ffffff; stroke: #262626; stroke-opacity: 0.22; stroke-width: 1.25; }
+      .t1 { font-family: 'Mitr','Segoe UI',system-ui,-apple-system,sans-serif; font-size: 13px; font-weight: 700; fill: #262626; }
+      .t2 { font-family: 'JetBrains Mono','Fira Code',monospace; font-size: 10px; fill: #262626; fill-opacity: 0.55; }
+      .lb { font-family: 'JetBrains Mono','Fira Code',monospace; font-size: 9.5px; fill: #262626; fill-opacity: 0.5; }
+      .hd { font-family: 'JetBrains Mono','Fira Code',monospace; font-size: 11px; fill: #5d7722; }
+    </style>
+  </defs>
+
+  <rect width="1100" height="470" fill="#f1f2ec" />
+  <rect x="14" y="14" width="1072" height="442" rx="10" fill="none" stroke="#262626" stroke-opacity="0.16" stroke-width="1.25" />
+
+  <text x="56" y="46" class="hd">// domínio — ciclo de mentoria</text>
+  <text x="1044" y="46" text-anchor="end" class="lb">dados sensíveis *_pessoal / dados_civis: coord-only</text>
+
+  <!-- arestas do fluxo principal -->
+  <path d="M238 111 L286 111" fill="none" stroke="#262626" stroke-opacity="0.45" stroke-width="1.25" marker-end="url(#arr-k)" />
+  <path d="M496 111 L554 111" fill="none" stroke="#262626" stroke-opacity="0.45" stroke-width="1.25" marker-end="url(#arr-k)" />
+  <path d="M760 111 L818 111" fill="none" stroke="#262626" stroke-opacity="0.45" stroke-width="1.25" marker-end="url(#arr-k)" />
+  <text x="262" y="100" text-anchor="middle" class="lb">agenda</text>
+  <text x="525" y="100" text-anchor="middle" class="lb">pós-encontro</text>
+  <text x="789" y="100" text-anchor="middle" class="lb">reavalia</text>
+
+  <!-- pulsos -->
+  <circle r="3.5" fill="#5d7722"><animateMotion dur="2.4s" repeatCount="indefinite" path="M238 111 L286 111" /></circle>
+  <circle r="3.5" fill="#5d7722"><animateMotion dur="2.6s" begin="0.8s" repeatCount="indefinite" path="M496 111 L554 111" /></circle>
+  <circle r="3.5" fill="#5d7722"><animateMotion dur="2.8s" begin="1.6s" repeatCount="indefinite" path="M760 111 L818 111" /></circle>
+
+  <!-- dupla -->
+  <rect x="56" y="64" width="182" height="94" rx="8" class="bx" />
+  <text x="72" y="90" class="t1">dupla</text>
+  <circle cx="196" cy="84" r="9" fill="#a2ca44" />
+  <circle cx="211" cy="90" r="9" fill="#ffd531" fill-opacity="0.92" />
+  <text x="72" y="114" class="t2">mentor ↔ mentorado</text>
+  <text x="72" y="130" class="t2">formada no matching</text>
+
+  <!-- ciclo -->
+  <rect x="288" y="64" width="208" height="94" rx="8" class="bx" />
+  <text x="304" y="90" class="t1">ciclo_eventos</text>
+  <text x="304" y="114" class="t2">16 encontros · terças</text>
+  <text x="304" y="130" class="t2">esperados × realizados</text>
+
+  <!-- registros -->
+  <rect x="556" y="64" width="204" height="94" rx="8" class="bx" />
+  <text x="572" y="90" class="t1">registros</text>
+  <text x="572" y="110" class="t2">follow-up do mentor</text>
+  <text x="572" y="125" class="t2">avaliação · dificuldade</text>
+  <text x="572" y="140" class="t2">próx. passo + combinados</text>
+
+  <!-- semáforo -->
+  <rect x="820" y="64" width="220" height="94" rx="8" class="bx" />
+  <text x="836" y="90" class="t1">saúde da dupla</text>
+  <circle cx="854" cy="120" r="7" fill="#779929" />
+  <circle cx="878" cy="120" r="7" fill="#d99e06" />
+  <circle cx="902" cy="120" r="7" fill="#dc2626" />
+  <text x="836" y="145" class="t2">ok · atenção · risco (derivada)</text>
+
+  <!-- matching board -> dupla -->
+  <path d="M147 206 L147 160" fill="none" stroke="#262626" stroke-opacity="0.45" stroke-width="1.25" marker-end="url(#arr-k)" />
+  <text x="159" y="186" class="lb">monta</text>
+  <rect x="56" y="206" width="182" height="100" rx="8" class="bx" />
+  <text x="72" y="232" class="t1">matching board</text>
+  <text x="72" y="256" class="t2">grade de disponibilidade</text>
+  <text x="72" y="272" class="t2">afinidade · aviso &lt;18</text>
+
+  <!-- registros -> nudges -->
+  <path d="M650 158 C 600 196, 500 196, 442 206" fill="none" stroke="#262626" stroke-opacity="0.4" stroke-width="1.25" marker-end="url(#arr-k)" />
+  <text x="540" y="192" text-anchor="middle" class="lb">follow-up pendente</text>
+  <rect x="288" y="206" width="208" height="100" rx="8" class="bx" />
+  <text x="304" y="232" class="t1">nudges</text>
+  <text x="304" y="256" class="t2">wa.me deep link</text>
+  <text x="304" y="272" class="t2">lembretes da coordenação</text>
+
+  <!-- regras -> semáforo -->
+  <path d="M930 206 L930 160" fill="none" stroke="#262626" stroke-opacity="0.45" stroke-width="1.25" marker-end="url(#arr-k)" />
+  <text x="942" y="186" class="lb">aplica</text>
+  <rect x="556" y="206" width="484" height="100" rx="8" class="bx" />
+  <text x="572" y="232" class="t1">quando o semáforo acende</text>
+  <circle cx="579" cy="252" r="5" fill="#dc2626" />
+  <text x="592" y="256" class="t2" fill-opacity="0.8">risco: pedido de apoio · avaliação baixa + dificuldade · ≥2 atrasos</text>
+  <circle cx="579" cy="276" r="5" fill="#d99e06" />
+  <text x="592" y="280" class="t2" fill-opacity="0.8">atenção: 1 atraso · avaliação baixa · registro/encaminhamento pendente</text>
+
+  <!-- escopo RLS por papel -->
+  <rect x="56" y="348" width="984" height="88" rx="8" fill="none" stroke="#262626" stroke-opacity="0.3" stroke-width="1.25" stroke-dasharray="8 5" />
+  <text x="76" y="374" class="hd">rls · escopo por papel via my_role()</text>
+  <g font-family="'JetBrains Mono','Fira Code',monospace" font-size="10.5">
+    <rect x="76" y="388" width="228" height="32" rx="6" fill="#ffffff" stroke="#262626" stroke-opacity="0.2" />
+    <text x="92" y="408"><tspan font-weight="700" fill="#262626">coordenação</tspan><tspan fill="#262626" fill-opacity="0.55"> → tudo</tspan></text>
+    <rect x="318" y="388" width="228" height="32" rx="6" fill="#ffffff" stroke="#262626" stroke-opacity="0.2" />
+    <text x="334" y="408"><tspan font-weight="700" fill="#262626">supervisor</tspan><tspan fill="#262626" fill-opacity="0.55"> → supervisionadas</tspan></text>
+    <rect x="560" y="388" width="228" height="32" rx="6" fill="#ffffff" stroke="#262626" stroke-opacity="0.2" />
+    <text x="576" y="408"><tspan font-weight="700" fill="#262626">mentor</tspan><tspan fill="#262626" fill-opacity="0.55"> → própria dupla</tspan></text>
+    <rect x="802" y="388" width="222" height="32" rx="6" fill="#ffffff" stroke="#262626" stroke-opacity="0.2" />
+    <text x="818" y="408"><tspan font-weight="700" fill="#262626">especialista</tspan><tspan fill="#262626" fill-opacity="0.55"> → trilha</tspan></text>
+  </g>
+</svg>
