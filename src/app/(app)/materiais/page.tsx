@@ -154,8 +154,9 @@ function MaterialRow({ m, ehCoord, maxEncontro }: { m: Material; ehCoord: boolea
   const urlOk = linkSeguro(m.url);
   const href = m.path ? `/api/material/${m.id}` : urlOk;
   // o link cobre só ícone + título: a zona trailing inteira vive no container
-  // (um cluster só) e cai pra linha de baixo à direita no mobile; sm+ volta
-  // pra linha única. Sem wrap dentro do link — ele desalinhava o cluster
+  // (um cluster só) e cai pra linha de baixo à direita até lg; lg+ o head
+  // cresce (basis-0 + grow) e garante linha única determinística — o título
+  // quebra internamente e a descrição já tem line-clamp
   const head = (
     <>
       <Icone size={18} className="shrink-0 text-muted-foreground" aria-hidden />
@@ -171,7 +172,7 @@ function MaterialRow({ m, ehCoord, maxEncontro }: { m: Material; ehCoord: boolea
       </div>
     </>
   );
-  const headCls = "flex min-w-0 flex-1 basis-full items-center gap-x-4 px-5 py-3.5 sm:basis-auto";
+  const headCls = "flex min-w-0 flex-1 basis-full items-center gap-x-4 px-5 py-3.5 lg:basis-0";
   return (
     <div className={cn("flex flex-wrap items-center pr-2 transition-colors", href && "hover:bg-muted/50")}>
       {href ? (
@@ -187,9 +188,11 @@ function MaterialRow({ m, ehCoord, maxEncontro }: { m: Material; ehCoord: boolea
         <div className={headCls}>{head}</div>
       )}
       {/* zona trailing: uma peça só (badge de audiência + ícone de destino +
-          ações). <sm cai inteira pra linha 2 encostada à direita — nada cai
-          à esquerda nem disputa largura com o título */}
-      <div className="flex basis-full items-center justify-end gap-2 px-5 pb-3 sm:basis-auto sm:px-0 sm:pb-0">
+          ações). <lg cai inteira pra linha 2 encostada à direita — nada cai
+          à esquerda nem disputa largura com o título; flex-wrap deixa os
+          badges descerem pra sub-linha à direita em vez de clipar em telas
+          estreitas */}
+      <div className="flex basis-full min-w-0 flex-wrap items-center justify-end gap-2 px-5 pb-3 lg:basis-auto lg:px-0 lg:pb-0">
         {m.audiencia !== "todos" && (
           <Badge variant="outline" className="text-xs">{AUDIENCIA_LABEL[m.audiencia]}</Badge>
         )}

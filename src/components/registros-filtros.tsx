@@ -24,6 +24,9 @@ import { cn } from "@/lib/utils";
 
 const TODAS = "todas";
 
+/** Ordenação da timeline — "recentes" é o default e não viaja na URL. */
+export type OrdemRegistros = "recentes" | "prioridade" | "antigas";
+
 /** Estado rascunho do modal — aplica tudo de uma vez no "Aplicar". */
 type Draft = {
   encontro: string;
@@ -32,9 +35,10 @@ type Draft = {
   dupla: string;
   apoio: boolean;
   tardio: boolean;
+  ordem: OrdemRegistros;
 };
 
-function draftDe(f: FiltrosRegistro): Draft {
+function draftDe(f: FiltrosRegistro, ordem: OrdemRegistros): Draft {
   return {
     encontro: f.encontro ? String(f.encontro) : TODAS,
     avaliacao: f.avaliacao ?? TODAS,
@@ -42,6 +46,7 @@ function draftDe(f: FiltrosRegistro): Draft {
     dupla: f.dupla ?? TODAS,
     apoio: !!f.apoio,
     tardio: !!f.tardio,
+    ordem,
   };
 }
 
@@ -182,14 +187,14 @@ export function RegistrosFiltros({
   filtros,
   duplas,
   maxEncontro,
-  porPrioridade = false,
+  ordem = "recentes",
 }: {
   filtros: FiltrosRegistro;
   duplas: DuplaOpcao[];
   maxEncontro: number;
-  /** `?ordem=prioridade` não faz parte de FiltrosRegistro; o hidden input
-   *  mantém o modo ligado quando a coord aplica/limpa um filtro. */
-  porPrioridade?: boolean;
+  /** `?ordem=` não faz parte de FiltrosRegistro; a prop mantém o modo
+   *  ligado quando a coord aplica/limpa um filtro. */
+  ordem?: OrdemRegistros;
 }) {
   const router = useRouter();
   const [q, setQ] = useState(filtros.q ?? "");
@@ -197,14 +202,14 @@ export function RegistrosFiltros({
   // filtros da prop congelam no render que armou o timer — o debounce leria
   // valores velhos e reverteria um filtro aplicado dentro dos 350ms
   const filtrosRef = useRef(filtros);
-  const ordemRef = useRef(porPrioridade);
+  const ordemRef = useRef(ordem);
   useEffect(() => {
     filtrosRef.current = filtros;
-    ordemRef.current = porPrioridade;
+    ordemRef.current = ordem;
   });
 
   const [aberto, setAberto] = useState(false);
-  const [draft, setDraft] = useState<Draft>(() => draftDe(filtros));
+  const [draft, setDraft] = useState<Draft>(() => draftDe(filtros, ordem));
 
   // qualquer mudança de filtro (modal, chip de triagem, limpar, debounce)
   // resincroniza o estado local — draft re-semeia na próxima abertura
@@ -234,7 +239,7 @@ export function RegistrosFiltros({
       dificuldade: f.dificuldade,
       dupla: f.dupla,
       q: f.q,
-      ordem: ordemRef.current ? "prioridade" : undefined,
+      ordem: ordemRef.current !== "recentes" ? ordemRef.current : undefined,
       ...patch,
     };
     for (const [k, v] of Object.entries(atual)) if (v) p.set(k, v);
@@ -277,7 +282,7 @@ export function RegistrosFiltros({
     if (draft.apoio) p.set("apoio", "1");
     if (draft.tardio) p.set("tardio", "1");
     if (filtrosRef.current.q) p.set("q", filtrosRef.current.q);
-    if (ordemRef.current) p.set("ordem", "prioridade");
+    if (draft.ordem !== "recentes") p.set("ordem", draft.ordem);
     const qs = p.toString();
     router.replace(`/registros${qs ? `?${qs}` : ""}`, { scroll: false });
     setAberto(false);
@@ -294,7 +299,7 @@ export function RegistrosFiltros({
       dificuldade: filtros.dificuldade,
       dupla: filtros.dupla,
       q: filtros.q,
-      ordem: porPrioridade ? "prioridade" : undefined,
+      ordem: ordem !== "recentes" ? ordem : undefined,
     };
     delete atual[k];
     for (const [chave, v] of Object.entries(atual)) if (v) p.set(chave, v);
@@ -358,9 +363,9 @@ export function RegistrosFiltros({
           </div>
           <Button
             type="button"
-            variant={ativos > 0 ? "default" : "outline"}
+            variant="default"
             onClick={() => {
-              setDraft(draftDe(filtrosRef.current));
+              setDraft(draftDe(filtrosRef.current, ordemRef.current));
               setAberto(true);
             }}
             aria-label={
@@ -369,10 +374,12 @@ export function RegistrosFiltros({
           >
             <Funnel size={16} aria-hidden />
             Filtros
+            {/* disco ink sobre lime — mesma gramática do indicador da
+                bottom-nav; lime-sobre-lime apagaria o contador */}
             {ativos > 0 && (
               <span
                 aria-hidden
-                className="grid size-5 place-items-center rounded-full bg-[var(--brand-lime)] text-[11px] font-bold text-[var(--brand-ink)]"
+                className="grid size-5 place-items-center rounded-full bg-[var(--brand-ink)] text-[11px] font-bold text-[var(--brand-lime)]"
               >
                 {ativos}
               </span>
@@ -397,7 +404,7 @@ export function RegistrosFiltros({
             ))}
             <li>
               <Link
-                href={porPrioridade ? "/registros?ordem=prioridade" : "/registros"}
+                href={ordem !== "recentes" ? `/registros?ordem=${ordem}` : "/registros"}
                 scroll={false}
                 className="inline-flex min-h-11 items-center px-2 text-xs text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline sm:min-h-7"
               >
@@ -546,6 +553,38 @@ export function RegistrosFiltros({
                 ))}
               </div>
             </fieldset>
+
+            {/* ordenar não é filtro — não entra no contador de ativos nem
+                é desfeito pelo "Limpar" */}
+            <fieldset>
+              <legend className={OVERLINE}>Ordenar</legend>
+              <div className="mt-1.5 grid grid-cols-3 gap-1.5">
+                <OpcaoPilula
+                  nome="flt-ordem"
+                  valor="recentes"
+                  atual={draft.ordem}
+                  onSelect={sel("ordem")}
+                >
+                  Mais recentes
+                </OpcaoPilula>
+                <OpcaoPilula
+                  nome="flt-ordem"
+                  valor="prioridade"
+                  atual={draft.ordem}
+                  onSelect={sel("ordem")}
+                >
+                  Prioridade
+                </OpcaoPilula>
+                <OpcaoPilula
+                  nome="flt-ordem"
+                  valor="antigas"
+                  atual={draft.ordem}
+                  onSelect={sel("ordem")}
+                >
+                  Mais antigas
+                </OpcaoPilula>
+              </div>
+            </fieldset>
           </div>
 
           <DialogFooter>
@@ -555,14 +594,16 @@ export function RegistrosFiltros({
               className="sm:me-auto"
               disabled={draftAtivos === 0}
               onClick={() =>
-                setDraft({
+                setDraft((d) => ({
                   encontro: TODAS,
                   avaliacao: TODAS,
                   dificuldade: TODAS,
                   dupla: TODAS,
                   apoio: false,
                   tardio: false,
-                })
+                  // ordenar não é filtro — o Limpar preserva a escolha
+                  ordem: d.ordem,
+                }))
               }
             >
               Limpar

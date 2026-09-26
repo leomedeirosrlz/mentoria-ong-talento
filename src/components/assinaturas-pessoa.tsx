@@ -233,7 +233,7 @@ export function AssinaturasPessoa({
   const [itens, setItens] = useState<Assinatura[] | null>(null);
   const [falhou, setFalhou] = useState(false);
   const [reenviando, setReenviando] = useState<string | null>(null);
-  const [solicitando, startSolicitar] = useTransition();
+  const [solicitandoSlug, setSolicitandoSlug] = useState<string | null>(null);
   const primeiroNome = nome.split(" ")[0];
   // window.location.origin SSR-safe — no render o servidor não conhece a
   // origem do deploy (mesmo padrão dos links de /f, link-shared.ts)
@@ -276,26 +276,29 @@ export function AssinaturasPessoa({
     };
   }, [tipo, id]);
 
-  /** Emite o documento escolhido e já deixa o link na mão. */
-  function solicitar(slug: string) {
-    startSolicitar(async () => {
-      try {
-        const res = await solicitarAssinaturaMentorado(id, slug);
-        if ("error" in res) {
-          toast.error(res.error);
-          return;
-        }
-        await copiar(
-          `${origem}${res.link}`,
-          whatsapp
-            ? "Link copiado. Envie direto pelo botão WhatsApp abaixo."
-            : "Link copiado. Envie ao responsável."
-        );
-        await carregar();
-      } catch {
-        toast.error("Sem conexão. Tente de novo.");
+  /** Emite o documento escolhido e já deixa o link na mão. Pending por
+   *  slug — com 2 templates o rótulo "Gerando link…" não pode mentir no
+   *  botão que não foi clicado. */
+  async function solicitar(slug: string) {
+    setSolicitandoSlug(slug);
+    try {
+      const res = await solicitarAssinaturaMentorado(id, slug);
+      if ("error" in res) {
+        toast.error(res.error);
+        return;
       }
-    });
+      await copiar(
+        `${origem}${res.link}`,
+        whatsapp
+          ? "Link copiado. Envie direto pelo botão WhatsApp abaixo."
+          : "Link copiado. Envie ao responsável."
+      );
+      await carregar();
+    } catch {
+      toast.error("Sem conexão. Tente de novo.");
+    } finally {
+      setSolicitandoSlug(null);
+    }
   }
 
   /** Reenvio = token novo (o anterior morre na RPC) — o link novo já copia. */
@@ -352,16 +355,17 @@ export function AssinaturasPessoa({
               type="button"
               variant="outline"
               size="sm"
-              disabled={solicitando}
-              aria-busy={solicitando}
+              className="h-auto min-h-8 max-w-full whitespace-normal py-1 text-left"
+              disabled={solicitandoSlug !== null}
+              aria-busy={solicitandoSlug === t.slug}
               onClick={() => solicitar(t.slug)}
             >
-              {solicitando ? (
+              {solicitandoSlug === t.slug ? (
                 <CircleNotch size={14} className="animate-spin" />
               ) : (
                 <PaperPlaneTilt size={14} />
               )}
-              {solicitando ? "Gerando link…" : `Enviar: ${t.rotulo}`}
+              {solicitandoSlug === t.slug ? "Gerando link…" : `Enviar: ${t.rotulo}`}
             </Button>
           ))}
         </div>
@@ -415,7 +419,7 @@ export function AssinaturasPessoa({
             return (
               <li key={a.id}>
                 <div className="flex items-center gap-2">
-                  <st.Icone size={15} className={cn("shrink-0", st.icone)} />
+                  <st.Icone size={15} aria-hidden className={cn("shrink-0", st.icone)} />
                   <span className="min-w-0 flex-1 truncate text-sm">
                     {a.template?.titulo ?? "Documento"}
                   </span>
@@ -438,8 +442,8 @@ export function AssinaturasPessoa({
                       type="button"
                       variant="ghost"
                       size="xs"
-                      disabled={solicitando}
-                      aria-busy={solicitando}
+                      disabled={solicitandoSlug !== null}
+                      aria-busy={solicitandoSlug === a.template!.slug}
                       onClick={() => solicitar(a.template!.slug)}
                     >
                       <PaperPlaneTilt size={13} />

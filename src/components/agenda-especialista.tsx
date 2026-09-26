@@ -17,6 +17,7 @@ import { RegistrarRetroativoDialog } from "@/components/registrar-retroativo-dia
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { VideoCamera } from "@phosphor-icons/react/dist/ssr";
+import { cn } from "@/lib/utils";
 
 const STATUS_LABEL: Record<Encontro["status"], string> = {
   agendado: "agendado",
@@ -38,8 +39,10 @@ export function AgendaEspecialista({
 }) {
   const agora = new Date();
   return (
-    <div className="space-y-6">
-      <header>
+    // >1 dupla: em xl os cards abrem 2 colunas, como na home do mentor — o
+    // header crava col-span-2 pra seguir full-width
+    <div className={cn("grid gap-6", duplas.length > 1 && "xl:grid-cols-2")}>
+      <header className={duplas.length > 1 ? "xl:col-span-2" : undefined}>
         <h1 className="text-2xl font-semibold tracking-tight">Agenda</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Mentoria especializada · até 5 encontros de 1h em até 3 meses. As

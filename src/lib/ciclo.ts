@@ -1033,6 +1033,16 @@ export function formatMesAbrev(iso: string | null | undefined): string {
     .replace(/\.$/, "");
 }
 
+/** "set de 2025" — mês abreviado sem ponto + ano ("no programa desde…"). */
+export function formatMesAno(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const d = paraData(iso);
+  if (isNaN(d.getTime())) return "";
+  return d
+    .toLocaleDateString("pt-BR", { month: "short", year: "numeric", timeZone: TZ })
+    .replace(/\./, "");
+}
+
 const TRES_DIAS_MS = 3 * 86400000;
 
 /** Registro tardio: entregue mais de 3 dias depois de o encontro acontecer.
@@ -1154,4 +1164,37 @@ export function formatWhatsApp(d: string | null | undefined): string {
  *  guard cobre dado pré-constraint e qualquer escrita fora do app. */
 export function linkSeguro(url: string | null | undefined): string | null {
   return url != null && /^https?:\/\//i.test(url) ? url : null;
+}
+
+/** nomes pt-BR — cedilha/acento na ordem alfabética certa, case-insensitive.
+ *  Mesma régua pra listas server e client (a collation do Postgres põe
+ *  acentos depois de Z, então a ordenação final é sempre no app). */
+export const comparaNome = (a: string, b: string) =>
+  a.localeCompare(b, "pt-BR", { sensitivity: "base" });
+
+/** Ordenação por urgência do semáforo — risco → atenção → ok. */
+export const ORDEM_SEMAFORO: Record<Semaforo, number> = {
+  risco: 0,
+  atencao: 1,
+  ok: 2,
+} as const;
+
+/** "há N min/h/d" — `agoraMs` vem congelado do chamador (useState(() =>
+ *  Date.now()) no client ou Date.now() no server) pra não divergir entre
+ *  SSR e hidratação. */
+export function tempoRelativo(iso: string, agoraMs: number): string {
+  const diff = agoraMs - new Date(iso).getTime();
+  const min = Math.floor(diff / 60_000);
+  if (min < 1) return "agora";
+  if (min < 60) return `há ${min} min`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return `há ${h} h`;
+  const d = Math.floor(h / 24);
+  if (d === 1) return "ontem";
+  if (d < 7) return `há ${d} d`;
+  return new Date(iso).toLocaleDateString("pt-BR", {
+    day: "numeric",
+    month: "short",
+    timeZone: TZ,
+  });
 }

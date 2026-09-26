@@ -26,6 +26,7 @@ import { AgendarEncontroDialog } from "@/components/agendar-encontro-dialog";
 import { DuplaNomes } from "@/components/dupla-nomes";
 import { RegistrarRetroativoDialog } from "@/components/registrar-retroativo-dialog";
 import { TrilhaJornada } from "@/components/trilha-jornada";
+import { TrilhaPrazoBadge } from "@/components/trilha-prazo-badge";
 import { MarcoNotifier } from "@/components/marco-notifier";
 
 export function MentorHome({
@@ -49,6 +50,20 @@ export function MentorHome({
   const soEspecialista =
     me.role === "mentor_especialista" &&
     duplas.every((d) => d.trilha === "especialista");
+
+  // com N duplas (mentor_especialista pode carregar várias trilhas) a mais
+  // acionável vem primeiro — o semáforo da saúde já destila pedido de apoio,
+  // registro pendente e atraso; a ordenação é estável, então duplas no mesmo
+  // estado mantêm a ordem em que vieram
+  const saudes = new Map(
+    duplas.map((d) => [d.id, saudadeDaDupla(d, eventos, hoje)])
+  );
+  const rankSemaforo = { risco: 0, atencao: 1, ok: 2 } as const;
+  const duplasOrdenadas = [...duplas].sort(
+    (a, b) =>
+      rankSemaforo[saudes.get(a.id)!.semaforo] -
+      rankSemaforo[saudes.get(b.id)!.semaforo]
+  );
 
   return (
     // >1 dupla: em xl os cards abrem 2 colunas — a 1280px o card cheio deixa
@@ -90,12 +105,12 @@ export function MentorHome({
         </Card>
       )}
 
-      {duplas.map((dupla, i) => {
+      {duplasOrdenadas.map((dupla, i) => {
         const ativa = dupla.status === "ativa";
         const ehEsp = dupla.trilha === "especialista";
         // saude.proximo já vem ordenado por data_hora — o find sem sort podia
         // pegar um encontro agendado mais distante que outro agendado antes
-        const saude = saudadeDaDupla(dupla, eventos, hoje);
+        const saude = saudes.get(dupla.id)!;
         const feitos = saude.feitos;
         const totalDupla = maxEncontros(dupla.trilha);
         const proximoAgendado = saude.proximo;
@@ -179,13 +194,27 @@ export function MentorHome({
             <CardHeader className="-mt-(--card-spacing) border-b-2 border-[var(--brand-lime)] bg-[var(--brand-ink)] pb-(--card-spacing) pt-(--card-spacing) text-white">
               <div className="flex items-center justify-between gap-4">
                 <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-white/50">Sua dupla</p>
+                  {/* "Sua dupla" vira redundante com várias — o nome do
+                      mentorado é o que distingue um card do outro */}
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-white/50">
+                    {duplas.length > 1
+                      ? `Dupla · ${dupla.mentorado.nome}`
+                      : "Sua dupla"}
+                  </p>
                   <CardTitle className="text-lg font-semibold mt-1">
                     <DuplaNomes mentor="Você" mentorado={dupla.mentorado.nome} onDark />
                   </CardTitle>
                   <p className="mt-1 text-xs text-white/60">
                     Vocês marcam o encontro; depois registram aqui como foi.
                   </p>
+                  {/* prazo de 3 meses da trilha — o diferenciador entre duplas
+                      especialistas concorrentes; a retintada adapta o badge
+                      outline ao banner ink (o componente é superfície clara) */}
+                  {ehEsp && (
+                    <div className="mt-2 [&>span]:border-white/25 [&>span]:text-white/70">
+                      <TrilhaPrazoBadge dupla={dupla} />
+                    </div>
+                  )}
                 </div>
                 <div className="flex flex-col items-end gap-0.5 text-right">
                   <span className="text-sm text-[var(--brand-lime)]">

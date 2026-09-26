@@ -12,7 +12,7 @@ import {
   TRILHA_LABEL,
   ultimoRegistro,
   type DuplaSaude,
-  type Semaforo,
+  ORDEM_SEMAFORO,
 } from "@/lib/ciclo";
 import type { CicloEvento, Comunicado, Dupla, SolicitacaoEspecialista, Supervisao } from "@/lib/types";
 import type { Interacao } from "@/lib/interacoes";
@@ -33,7 +33,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
-const ORDEM: Record<Semaforo, number> = { risco: 0, atencao: 1, ok: 2 };
+
 
 type LinhaSaude = { dupla: Dupla; saude: DuplaSaude };
 
@@ -106,7 +106,7 @@ export function DashboardCoordenacao({
     .map((d) => ({ dupla: d, saude: saudadeDaDupla(d, eventos, hoje) }))
     // pedido de apoio fura o congelamento da pausada/encerrada — não pode sumir do radar
     .filter(({ dupla, saude }) => dupla.status === "ativa" || saude.pediuApoio)
-    .sort((a, b) => ORDEM[a.saude.semaforo] - ORDEM[b.saude.semaforo]);
+    .sort((a, b) => ORDEM_SEMAFORO[a.saude.semaforo] - ORDEM_SEMAFORO[b.saude.semaforo]);
 
   const filtroAtivo: FiltroPainel | null =
     filtro === "risco" || filtro === "atencao" || filtro === "pendentes"
@@ -128,9 +128,9 @@ export function DashboardCoordenacao({
 
   // rail vazio some junto com a coluna: pra coordenação o card de avisos
   // sempre existe (o convite de publicar), pro supervisor o rail só nasce
-  // se houver resumo ou aviso — sem o guard o template xl reservava ~340px
-  // de faixa morta
-  const temRail = !supervisor || resumo != null || avisos.length > 0;
+  // se houver aviso — sem o guard o template xl reservava ~340px de faixa
+  // morta. O resumo não conta: agora é faixa larga acima dos stats.
+  const temRail = !supervisor || avisos.length > 0;
 
   return (
     <div className="space-y-8">
@@ -156,6 +156,85 @@ export function DashboardCoordenacao({
           encontros={duplas.reduce((n, d) => n + d.encontros.length, 0)}
           registros={duplas.reduce((n, d) => n + d.encontros.filter((e) => e.registro).length, 0)}
         />
+      )}
+
+      {/* faixa larga acima dos stats: o fechamento da semana em números
+          rotulados, com as ações (registros, copiar) no cabeçalho do bloco.
+          Fora do grid xl — era o último item do rail e sumia espremido em
+          340px; o dl abre em linha a partir de sm */}
+      {resumo && (
+        <section
+          aria-labelledby="resumo-semana-titulo"
+          className="animate-enter rounded-xl bg-card px-4 py-3 text-sm shadow-[var(--shadow-border)] sm:px-5"
+        >
+          <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
+            {/* o nº do encontro já está no cabeçalho ("Semana do Nº encontro") —
+                aqui a data é o fato novo */}
+            <h2 id="resumo-semana-titulo" className="font-semibold">
+              Esta semana · {formatDiaMes(resumo.evento.data)}
+            </h2>
+            <div className="flex items-center gap-2">
+              <Link
+                href={`/registros?encontro=${resumo.evento.numero}`}
+                className="group inline-flex min-h-11 items-center gap-1 rounded-md px-1.5 text-xs font-medium underline underline-offset-2 transition-colors hover:text-foreground md:min-h-8"
+              >
+                Ver registros
+                <ArrowRight
+                  size={13}
+                  aria-hidden
+                  className="transition-transform group-hover:translate-x-0.5"
+                />
+              </Link>
+              <CopiarResumoButton
+                texto={textoResumoSemana(resumo, emRisco)}
+              />
+            </div>
+          </div>
+          <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3 border-t border-border/60 pt-3 sm:grid-cols-4">
+            <div>
+              <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Realizaram o encontro</dt>
+              <dd className="mt-0.5 font-mono text-xl font-semibold tabular-nums">
+                {resumo.realizaram}
+                <span className="font-normal text-muted-foreground">
+                  /{resumo.total}
+                </span>
+              </dd>
+            </div>
+            <div>
+              <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Registros entregues</dt>
+              <dd className="mt-0.5 font-mono text-xl font-semibold tabular-nums">
+                {resumo.comRegistro}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Aguardando registro</dt>
+              <dd className="mt-0.5 font-mono text-xl font-semibold tabular-nums">
+                {resumo.aguardandoRegistro}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Sem encontro</dt>
+              <dd className="mt-0.5 font-mono text-xl font-semibold tabular-nums">
+                {resumo.naoAconteceram - resumo.reposicao}
+              </dd>
+            </div>
+          </dl>
+          {resumo.reposicao > 0 && (
+            // o significado de "em reposição" fica visível — tooltip/title
+            // não existe no toque
+            <p className="mt-3 flex flex-wrap items-center gap-x-1.5 gap-y-1 border-t border-border/60 pt-2.5 text-xs text-muted-foreground">
+              <Badge variant="outline" className="text-muted-foreground">
+                <ArrowCounterClockwise data-icon="inline-start" />
+                <span className="font-mono">{resumo.reposicao}</span> em reposição
+              </Badge>
+              <span>
+                {resumo.reposicao === 1
+                  ? "encontro de outra semana feito nesta"
+                  : "encontros de outras semanas feitos nesta"}
+              </span>
+            </p>
+          )}
+        </section>
       )}
 
       {/* xl+: trabalho na coluna principal (stats + radar), contexto no rail
@@ -214,8 +293,9 @@ export function DashboardCoordenacao({
             </div>
           )}
 
-          {/* radar primeiro: a lista de duplas é o bloco de trabalho — vem
-              antes do resumo da semana, das solicitações e dos avisos */}
+          {/* radar depois do pulso: resumo da semana e stats vêm acima; a
+              lista de duplas é o bloco de trabalho — solicitações e avisos
+              ficam no rail */}
           <section className="space-y-3" aria-labelledby="duplas-radar-titulo">
             <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
               <h2
@@ -328,8 +408,7 @@ export function DashboardCoordenacao({
 
         {temRail && (
           // coluna lateral de contexto: animate-enter-x é a entrada pensada
-          // pra rails (globals.css); dentro, o resumo entra uma camada
-          // depois dos stats (--i:4) pra montar a página em níveis
+          // pra rails (globals.css)
           <aside className="animate-enter-x min-w-0 space-y-8">
             <AvisosSection avisos={avisos} souCoord={!supervisor} />
 
@@ -337,84 +416,6 @@ export function DashboardCoordenacao({
                 gerencia; o fluxo em si é DPP → especialista, sem coordenação
                 no caminho */}
             {!supervisor && <SolicitacoesCoordCard solicitacoes={solicitacoes} />}
-
-            {/* contexto depois da tarefa: o fechamento da semana em números
-                rotulados, com as ações (registros, copiar) no cabeçalho do bloco */}
-            {resumo && (
-              <section
-                aria-labelledby="resumo-semana-titulo"
-                style={{ "--i": 4 } as CSSProperties}
-                className="animate-enter rounded-xl bg-card px-4 py-3 text-sm shadow-[var(--shadow-border)]"
-              >
-                <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
-                  {/* o nº do encontro já está no cabeçalho ("Semana do Nº encontro") —
-                      aqui a data é o fato novo */}
-                  <h2 id="resumo-semana-titulo" className="font-semibold">
-                    Esta semana · {formatDiaMes(resumo.evento.data)}
-                  </h2>
-                  <div className="flex items-center gap-2">
-                    <Link
-                      href={`/registros?encontro=${resumo.evento.numero}`}
-                      className="group inline-flex min-h-11 items-center gap-1 rounded-md px-1.5 text-xs font-medium underline underline-offset-2 transition-colors hover:text-foreground md:min-h-8"
-                    >
-                      Ver registros
-                      <ArrowRight
-                        size={13}
-                        aria-hidden
-                        className="transition-transform group-hover:translate-x-0.5"
-                      />
-                    </Link>
-                    <CopiarResumoButton
-                      texto={textoResumoSemana(resumo, emRisco)}
-                    />
-                  </div>
-                </div>
-                <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3 border-t border-border/60 pt-3">
-                  <div>
-                    <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Realizaram o encontro</dt>
-                    <dd className="mt-0.5 font-mono text-xl font-semibold tabular-nums">
-                      {resumo.realizaram}
-                      <span className="font-normal text-muted-foreground">
-                        /{resumo.total}
-                      </span>
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Registros entregues</dt>
-                    <dd className="mt-0.5 font-mono text-xl font-semibold tabular-nums">
-                      {resumo.comRegistro}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Aguardando registro</dt>
-                    <dd className="mt-0.5 font-mono text-xl font-semibold tabular-nums">
-                      {resumo.aguardandoRegistro}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Sem encontro</dt>
-                    <dd className="mt-0.5 font-mono text-xl font-semibold tabular-nums">
-                      {resumo.naoAconteceram - resumo.reposicao}
-                    </dd>
-                  </div>
-                </dl>
-                {resumo.reposicao > 0 && (
-                  // o significado de "em reposição" fica visível — tooltip/title
-                  // não existe no toque
-                  <p className="mt-3 flex flex-wrap items-center gap-x-1.5 gap-y-1 border-t border-border/60 pt-2.5 text-xs text-muted-foreground">
-                    <Badge variant="outline" className="text-muted-foreground">
-                      <ArrowCounterClockwise data-icon="inline-start" />
-                      <span className="font-mono">{resumo.reposicao}</span> em reposição
-                    </Badge>
-                    <span>
-                      {resumo.reposicao === 1
-                        ? "encontro de outra semana feito nesta"
-                        : "encontros de outras semanas feitos nesta"}
-                    </span>
-                  </p>
-                )}
-              </section>
-            )}
           </aside>
         )}
       </div>

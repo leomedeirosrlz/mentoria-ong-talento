@@ -215,11 +215,12 @@ export function AppShell({
             {children}
           </div>
         </main>
-        {/* footer fora do <main> — dentro ele não expõe o landmark contentinfo;
-            o padding-bottom mantém distância do bottom nav no mobile */}
-        <div className="mx-auto w-full max-w-5xl px-4 pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:px-6 md:pb-8 xl:max-w-6xl 2xl:max-w-7xl">
-          <SiteFooter className="mt-2 border-t border-border/60 pt-5" />
-        </div>
+        {/* footer ink full-bleed, último filho da coluna: fora do <main> —
+            dentro ele não expõe o landmark contentinfo — e fora do wrapper
+            max-w-5xl pra faixa escura ir de md:ml-56 até a borda direita;
+            o padding-bottom mobile mora dentro do bloco (encosta na
+            bottom-nav) */}
+        <SiteFooter tone="ink" />
       </div>
 
       {/* bottom nav — só mobile */}

@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { XCircle } from "@phosphor-icons/react";
 import { cancelarSolicitacao } from "@/lib/actions-especialista";
 import type { SolicitacaoEspecialista } from "@/lib/types";
@@ -7,24 +8,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
+import { tempoRelativo } from "@/lib/ciclo";
 
-/** "agora" → "há X min/h/d" → data — mesmo formato do sino de notificações. */
-function tempoRelativo(iso: string) {
-  const diff = Date.now() - new Date(iso).getTime();
-  const min = Math.floor(diff / 60_000);
-  if (min < 1) return "agora";
-  if (min < 60) return `há ${min} min`;
-  const h = Math.floor(min / 60);
-  if (h < 24) return `há ${h} h`;
-  const d = Math.floor(h / 24);
-  if (d === 1) return "ontem";
-  if (d < 7) return `há ${d} d`;
-  return new Date(iso).toLocaleDateString("pt-BR", {
-    day: "numeric",
-    month: "short",
-    timeZone: "America/Sao_Paulo",
-  });
-}
+
 
 function corta(texto: string, max = 110): string {
   return texto.length > max ? `${texto.slice(0, max).trimEnd()}…` : texto;
@@ -39,6 +25,7 @@ export function SolicitacoesCoordCard({
 }: {
   solicitacoes: SolicitacaoEspecialista[];
 }) {
+  const [agoraMs] = useState(() => Date.now());
   const abertas = solicitacoes.filter((s) => s.status === "aberta");
   const visiveis = abertas.slice(0, 3);
   if (abertas.length === 0) return null;
@@ -64,7 +51,7 @@ export function SolicitacoesCoordCard({
                 <p className="text-sm text-muted-foreground">{corta(s.demanda)}</p>
                 <p className="text-xs text-muted-foreground">
                   {s.solicitante?.nome ? `por ${s.solicitante.nome} · ` : ""}
-                  {tempoRelativo(s.created_at)}
+                  {tempoRelativo(s.created_at, agoraMs)}
                   {s.especialista_desejado_id ? " · direcionada" : ""}
                 </p>
               </div>

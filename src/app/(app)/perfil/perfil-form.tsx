@@ -30,6 +30,7 @@ import {
   AREAS_SUGESTOES,
   disponibilidadeTexto,
   formatDate,
+  formatMesAno,
   formatWhatsApp,
   GENERO_LABELS,
   idade,
@@ -462,6 +463,21 @@ export function PerfilForm({
     "—"
   );
 
+  // ---------- capa ----------
+  // o h1 da página é o nome de uso — social quando existe, civil senão
+  const nomeExibicao = me.nome_social?.trim() || me.nome;
+  // mentores ganham o dot lime no chip de papel — "quem age" na dupla,
+  // mesma convenção do board de matching e da lista de pessoas
+  const isMentor = me.role === "mentor_dpp" || me.role === "mentor_especialista";
+  // linha meta do header: cada segmento só entra com dado — created_at é
+  // opcional no tipo (selects parciais podem omitir), então "no programa
+  // desde" é condicional
+  const metaItens = [
+    [me.cargo?.trim(), me.empresa?.trim()].filter(Boolean).join(" · ") || null,
+    [me.cidade?.trim(), me.uf?.trim()].filter(Boolean).join(" · ") || null,
+    me.created_at ? `no programa desde ${formatMesAno(me.created_at)}` : null,
+  ].filter((s): s is string => Boolean(s));
+
   async function trocarFoto(file: File) {
     if (file.size > AVATAR_MAX_BYTES) {
       toast.error("Imagem grande demais: use uma de até 2 MB.");
@@ -599,80 +615,118 @@ export function PerfilForm({
   }
 
   return (
-    <div className="space-y-6 max-w-lg">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Meu perfil</h1>
-          <p className="mt-1 text-sm text-muted-foreground">{papelLabel(me.role)}</p>
-        </div>
-        {editando ? (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={cancelar}
-          >
-            Cancelar
-          </Button>
-        ) : (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => setEditando(true)}
-          >
-            <PencilSimple size={15} aria-hidden />
-            Editar
-          </Button>
-        )}
-      </div>
-
-      {/* foto — upload próprio; sem foto cai no Gravatar do e-mail, depois
-          iniciais. Em preview fica só o avatar: trocar/remover é gesto do
-          modo edição (ação instantânea, fora do save) */}
-      <section className="rounded-xl bg-card p-6 shadow-[var(--shadow-border)]">
-        <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Foto</h2>
-        <div className="mt-4 flex items-center gap-4">
-          <Avatar nome={me.nome} src={src} fallbackSrc={gravatarUrl} size={72} />
-          {editando && (
-            <div className="space-y-2">
-              <input
-                ref={fileRef}
-                type="file"
-                accept={AVATAR_ACCEPT}
-                className="hidden"
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (f) void trocarFoto(f);
-                }}
+    <div className="mx-auto w-full max-w-5xl space-y-6">
+      {/* capa estilo rede social: banner ink com brilho lime + avatar
+          sobreposto, nome como h1 e linha meta (papel, trabalho, cidade,
+          entrada no programa). A troca de foto segue gesto instantâneo do
+          modo edição — upload direto, fora do form e da barra de save */}
+      <header className="overflow-hidden rounded-xl bg-card shadow-[var(--shadow-border)]">
+        <div aria-hidden className="capa-perfil h-24 sm:h-28" />
+        <div className="px-4 pb-5 sm:px-6 sm:pb-6">
+          <div className="flex items-end justify-between gap-3">
+            <div className="relative -mt-10 shrink-0 sm:-mt-12">
+              {/* size-20!/sm:size-24! sobem por cima do style inline que o
+                  Avatar fixa via prop (width/height) — a prop segue ditando
+                  fontSize e o fallback de 80px abaixo de sm */}
+              <Avatar
+                nome={me.nome}
+                src={src}
+                fallbackSrc={gravatarUrl}
+                size={80}
+                className="size-20! ring-4 ring-card sm:size-24!"
               />
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={uploading}
-                onClick={() => fileRef.current?.click()}
-              >
-                <Camera size={15} aria-hidden />
-                {uploading ? "Enviando…" : src ? "Trocar foto" : "Enviar foto"}
-              </Button>
-              {src && (
-                <button
+              {editando && (
+                <>
+                  <input
+                    ref={fileRef}
+                    type="file"
+                    accept={AVATAR_ACCEPT}
+                    className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) void trocarFoto(f);
+                    }}
+                  />
+                  <button
+                    type="button"
+                    aria-label="Trocar foto"
+                    disabled={uploading}
+                    onClick={() => fileRef.current?.click()}
+                    className="absolute -right-0.5 -bottom-0.5 grid size-8 place-items-center rounded-full bg-card text-foreground shadow-[var(--shadow-border)] transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+                  >
+                    <Camera size={15} aria-hidden />
+                  </button>
+                </>
+              )}
+            </div>
+            <div className="flex flex-wrap items-center justify-end gap-1.5">
+              {editando && src && (
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="sm"
                   disabled={uploading}
                   onClick={removerFoto}
-                  className="flex min-h-11 items-center text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
                 >
                   Remover foto
-                </button>
+                </Button>
               )}
-              <p className="text-xs text-muted-foreground">
-                PNG, JPG ou WebP até 2 MB. Sem foto, usamos a do seu e-mail.
-              </p>
+              {editando ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={cancelar}
+                >
+                  Cancelar
+                </Button>
+              ) : (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setEditando(true)}
+                >
+                  <PencilSimple size={15} aria-hidden />
+                  Editar
+                </Button>
+              )}
             </div>
+          </div>
+          <h1 className="mt-3 text-xl font-semibold tracking-tight sm:text-2xl">
+            {nomeExibicao}
+          </h1>
+          <div className="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1.5 text-sm text-muted-foreground">
+            <Badge variant="outline" className="gap-1.5 font-normal">
+              {isMentor && (
+                <span
+                  aria-hidden
+                  className="size-1.5 rounded-full bg-[var(--role-mentor)]"
+                />
+              )}
+              {papelLabel(me.role)}
+            </Badge>
+            {metaItens.length > 0 && <span>{metaItens.join(" · ")}</span>}
+          </div>
+          {/* chip-âncora pro cadastro — some no modo edição (a gaveta já está
+              à mão) e quando não há o que apontar */}
+          {!editando && pendentesTotal > 0 && (
+            <Badge
+              variant="outline"
+              render={<a href="#cadastro" />}
+              className="mt-3 border-[var(--warn)]/60 font-normal text-[var(--warn-text)]"
+            >
+              {pendentesTotal}{" "}
+              {pendentesTotal === 1 ? "pendência" : "pendências"} no cadastro
+            </Badge>
+          )}
+          {editando && (
+            <p className="mt-3 text-xs text-muted-foreground">
+              PNG, JPG ou WebP até 2 MB. Sem foto, usamos a do seu e-mail.
+            </p>
           )}
         </div>
-      </section>
+      </header>
 
       {/* um form só pra todas as seções de dados — antes eram três botões
           "Salvar" com escopo invisível (a pessoa salvava uma parte e achava
@@ -694,497 +748,528 @@ export function PerfilForm({
         }}
         className="space-y-6"
       >
-      {/* perfil público — os campos que a ficha em /pessoas/[id] mostra a
-          quem alcança a página (pra profile: coordenação e supervisão).
-          Cada CampoOuValor decide sozinho entre input e Linha; o wrapper
-          troca (div em edição, dl semântico em preview — nunca input
-          readOnly) */}
-      <section className="rounded-xl bg-card p-6 shadow-[var(--shadow-border)]">
-        <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Perfil público</h2>
-        <p className="mt-1 text-xs text-muted-foreground">
-          É o que aparece na sua página em Pessoas, visível pra coordenação e supervisão.
-        </p>
-        {(() => {
-          const campos = (
-            <>
-              <CampoOuValor
-                rotulo="Nome social"
-                editando={editando}
-                valor={me.nome_social?.trim() || "—"}
-              >
-                <div className="space-y-2">
-                  <Label htmlFor="nome_social">Nome social</Label>
-                  <Input
-                    id="nome_social"
-                    name="nome_social"
-                    maxLength={150}
-                    defaultValue={me.nome_social ?? ""}
-                    placeholder="Nome de uso, se diferente"
-                  />
-                </div>
-              </CampoOuValor>
-              <CampoOuValor
-                rotulo="Biografia"
-                editando={editando}
-                valor={me.bio?.trim() || "—"}
-              >
-                <div className="space-y-2">
-                  <div className="flex items-baseline justify-between gap-2">
-                    <Label htmlFor="bio">Biografia</Label>
-                    <span aria-hidden className="text-xs tabular-nums text-muted-foreground">
-                      {bioLen}/1.000
-                    </span>
-                  </div>
-                  {/* apresentação profissional (0030) — alimenta também as
-                      áreas do select de especialista */}
-                  <Textarea
-                    id="bio"
-                    name="bio"
-                    rows={4}
-                    maxLength={1000}
-                    defaultValue={me.bio ?? ""}
-                    onChange={(e) => setBioLen(e.target.value.length)}
-                    placeholder="O que você faz, o que estudou, o que te trouxe ao programa."
-                  />
-                </div>
-              </CampoOuValor>
-              <CampoOuValor
-                rotulo="LinkedIn"
-                editando={editando}
-                valor={linkedinPreview}
-              >
-                <div className="space-y-2">
-                  <Label htmlFor="linkedin">LinkedIn</Label>
-                  <Input
-                    id="linkedin"
-                    name="linkedin"
-                    type="url"
-                    inputMode="url"
-                    defaultValue={me.linkedin ?? ""}
-                    placeholder="https://linkedin.com/in/..."
-                  />
-                </div>
-              </CampoOuValor>
-              <CampoOuValor
-                rotulo="Áreas de atuação"
-                editando={editando}
-                valor={
-                  me.areas?.length ? <ChipsTags itens={me.areas} /> : "—"
-                }
-              >
-                <div className="space-y-2">
-                  {/* o hidden do TagInput manda JSON — camposApresentacao aceita
-                      JSON ou vírgula, então forms antigos continuam valendo */}
-                  <p className="text-sm font-medium">Áreas de atuação</p>
-                  <TagInput
-                    name="areas"
-                    sugestoes={AREAS_SUGESTOES}
-                    value={areas}
-                    onChange={(v) => {
-                      setAreas(v);
-                      marca("areas", !mesmaLista(v, me.areas ?? []));
-                    }}
-                    placeholder="ex.: psicologia, idiomas…"
-                    inputLabel="Digite uma área e pressione Enter"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Toque pra selecionar ou digite uma nova área.
-                  </p>
-                </div>
-              </CampoOuValor>
-              <CampoOuValor
-                rotulo="Interesses"
-                editando={editando}
-                valor={
-                  me.interesses?.length ? (
-                    <ChipsTags itens={me.interesses} />
-                  ) : (
-                    "—"
-                  )
-                }
-              >
-                <CampoInteresses
-                  value={interesses}
-                  onChange={(v) => {
-                    setInteresses(v);
-                    marca("interesses", !mesmaLista(v, me.interesses ?? []));
-                  }}
-                />
-              </CampoOuValor>
-              <div className="grid gap-4 sm:grid-cols-3">
-                <CampoOuValor
-                  rotulo="Cidade"
-                  editando={editando}
-                  valor={me.cidade?.trim() || "—"}
-                  className="sm:col-span-2"
-                >
-                  <div className="space-y-2">
-                    <Label htmlFor="cidade">Cidade</Label>
-                    <Input id="cidade" name="cidade" maxLength={100} defaultValue={me.cidade ?? ""} />
-                  </div>
-                </CampoOuValor>
-                <CampoOuValor
-                  rotulo="UF"
-                  editando={editando}
-                  valor={me.uf?.trim() || "—"}
-                >
-                  <CampoUf
-                    value={uf}
-                    onChange={(v) => {
-                      const nv = v === SENTINEL_VAZIO ? "" : v;
-                      setUf(nv);
-                      marca("uf", nv !== (me.uf ?? ""));
-                    }}
-                  />
-                </CampoOuValor>
-              </div>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <CampoOuValor
-                  rotulo="Cargo"
-                  editando={editando}
-                  valor={me.cargo?.trim() || "—"}
-                >
-                  <div className="space-y-2">
-                    <Label htmlFor="cargo">Cargo</Label>
-                    <Input id="cargo" name="cargo" maxLength={120} defaultValue={me.cargo ?? ""} />
-                  </div>
-                </CampoOuValor>
-                <CampoOuValor
-                  rotulo="Empresa"
-                  editando={editando}
-                  valor={me.empresa?.trim() || "—"}
-                >
-                  <div className="space-y-2">
-                    <Label htmlFor="empresa">Empresa</Label>
-                    <Input id="empresa" name="empresa" maxLength={150} defaultValue={me.empresa ?? ""} />
-                  </div>
-                </CampoOuValor>
-              </div>
-              <CampoOuValor
-                rotulo="Voluntariado"
-                editando={editando}
-                valor={me.voluntariado?.trim() || "—"}
-              >
-                <div className="space-y-2">
-                  <div className="flex items-baseline justify-between gap-2">
-                    <Label htmlFor="voluntariado">Experiência com voluntariado</Label>
-                    <span aria-hidden className="text-xs tabular-nums text-muted-foreground">
-                      {volLen}/300
-                    </span>
-                  </div>
-                  <Input
-                    id="voluntariado"
-                    name="voluntariado"
-                    maxLength={300}
-                    defaultValue={me.voluntariado ?? ""}
-                    onChange={(e) => setVolLen(e.target.value.length)}
-                    placeholder="ex.: 2 anos como voluntário no Projeto X"
-                  />
-                </div>
-              </CampoOuValor>
-            </>
-          );
-          return editando ? (
-            <div className="mt-4 space-y-4">{campos}</div>
-          ) : (
-            <dl className="mt-4 space-y-4">{campos}</dl>
-          );
-        })()}
-      </section>
-
-      {/* dados de cadastro — o burocrático recolhido: com buracos abre e
-          avisa no summary; completo fica a um gesto de distância */}
-      <details
-        className="group/cadastro rounded-xl bg-card shadow-[var(--shadow-border)]"
-        open={pendentesTotal > 0}
-      >
-        <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2.5 rounded-xl px-6 py-4 transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring group-open/cadastro:rounded-b-none [&::-webkit-details-marker]:hidden">
-          <span className="text-sm font-semibold">Dados de cadastro</span>
-          {pendentesTotal > 0 ? (
-            <Badge
-              variant="outline"
-              className="border-[var(--warn)]/60 font-normal text-[var(--warn-text)]"
-            >
-              {pendentesTotal} {pendentesTotal === 1 ? "pendente" : "pendentes"}
-            </Badge>
-          ) : (
-            <span className="text-xs text-[var(--ok-text)]">completo</span>
-          )}
-          <CaretDown
-            size={15}
-            aria-hidden
-            className="ml-auto shrink-0 text-muted-foreground transition-transform group-open/cadastro:rotate-180"
-          />
-        </summary>
-        <div className="border-t border-border px-6 pb-6 pt-5">
-          {(() => {
-            // ordem fixa nos dois modos: o que falta ganha badge "pendente"
-            // inline em vez de mudar de lugar (o split "pendentes × já
-            // cadastrados" fazia o campo sumir depois do save)
-            const gridCadastro = (
-              <div className="grid gap-4 sm:grid-cols-2">
-                {camposCadastro.map((c) => (
-                  <div key={c.key} className={c.wide ? "sm:col-span-2" : undefined}>
-                    {editando ? (
-                      <div className="flex items-start gap-3">
-                        <div className="min-w-0 flex-1">{c.node}</div>
-                        {!c.ok && <BadgePendente />}
+        {/* xl e não lg: a 1024px o rail deixaria a ficha com ~390px e
+            esmagaria os dt — a quebra só vale quando a coluna respira */}
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
+          {/* coluna principal — antes do rail no DOM: no mobile a ficha
+              pública empilha primeiro, logo abaixo da capa */}
+          <div className="min-w-0 space-y-6">
+            {/* perfil público — os campos que a ficha em /pessoas/[id] mostra a
+                quem alcança a página (pra profile: coordenação e supervisão).
+                Cada CampoOuValor decide sozinho entre input e Linha; o wrapper
+                troca (div em edição, dl semântico em preview — nunca input
+                readOnly) */}
+            <section className="rounded-xl bg-card p-6 shadow-[var(--shadow-border)]">
+              <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Perfil público</h2>
+              <p className="mt-1 text-xs text-muted-foreground">
+                É o que aparece na sua página em Pessoas, visível pra coordenação e supervisão.
+              </p>
+              {(() => {
+                const campos = (
+                  <>
+                    <CampoOuValor
+                      rotulo="Nome social"
+                      editando={editando}
+                      valor={me.nome_social?.trim() || "—"}
+                    >
+                      <div className="space-y-2">
+                        <Label htmlFor="nome_social">Nome social</Label>
+                        <Input
+                          id="nome_social"
+                          name="nome_social"
+                          maxLength={150}
+                          defaultValue={me.nome_social ?? ""}
+                          placeholder="Nome de uso, se diferente"
+                        />
                       </div>
-                    ) : (
-                      <Valor campo={c.valor} pendente={!c.ok} />
-                    )}
-                  </div>
-                ))}
-              </div>
-            );
-            return editando ? (
-              <div className="space-y-4">
-                {/* e-mail é a credencial, só a coord troca — sempre
-                    preenchido, então fica fora da conta de pendentes */}
-                <div className="space-y-2">
-                  <Label htmlFor="email">E-mail</Label>
-                  <Input id="email" value={me.email} disabled />
-                  <p className="text-xs text-muted-foreground">
-                    O e-mail é sua credencial de acesso. Para trocar, fale com a coordenação.
+                    </CampoOuValor>
+                    <CampoOuValor
+                      rotulo="Biografia"
+                      editando={editando}
+                      valor={me.bio?.trim() || "—"}
+                    >
+                      <div className="space-y-2">
+                        <div className="flex items-baseline justify-between gap-2">
+                          <Label htmlFor="bio">Biografia</Label>
+                          <span aria-hidden className="text-xs tabular-nums text-muted-foreground">
+                            {bioLen}/1.000
+                          </span>
+                        </div>
+                        {/* apresentação profissional (0030) — alimenta também as
+                            áreas do select de especialista */}
+                        <Textarea
+                          id="bio"
+                          name="bio"
+                          rows={4}
+                          maxLength={1000}
+                          defaultValue={me.bio ?? ""}
+                          onChange={(e) => setBioLen(e.target.value.length)}
+                          placeholder="O que você faz, o que estudou, o que te trouxe ao programa."
+                        />
+                      </div>
+                    </CampoOuValor>
+                    <CampoOuValor
+                      rotulo="LinkedIn"
+                      editando={editando}
+                      valor={linkedinPreview}
+                    >
+                      <div className="space-y-2">
+                        <Label htmlFor="linkedin">LinkedIn</Label>
+                        <Input
+                          id="linkedin"
+                          name="linkedin"
+                          type="url"
+                          inputMode="url"
+                          defaultValue={me.linkedin ?? ""}
+                          placeholder="https://linkedin.com/in/..."
+                        />
+                      </div>
+                    </CampoOuValor>
+                    <CampoOuValor
+                      rotulo="Áreas de atuação"
+                      editando={editando}
+                      valor={
+                        me.areas?.length ? <ChipsTags itens={me.areas} /> : "—"
+                      }
+                    >
+                      <div className="space-y-2">
+                        {/* o hidden do TagInput manda JSON — camposApresentacao aceita
+                            JSON ou vírgula, então forms antigos continuam valendo */}
+                        <p className="text-sm font-medium">Áreas de atuação</p>
+                        <TagInput
+                          name="areas"
+                          sugestoes={AREAS_SUGESTOES}
+                          value={areas}
+                          onChange={(v) => {
+                            setAreas(v);
+                            marca("areas", !mesmaLista(v, me.areas ?? []));
+                          }}
+                          placeholder="ex.: psicologia, idiomas…"
+                          inputLabel="Digite uma área e pressione Enter"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Toque pra selecionar ou digite uma nova área.
+                        </p>
+                      </div>
+                    </CampoOuValor>
+                    <CampoOuValor
+                      rotulo="Interesses"
+                      editando={editando}
+                      valor={
+                        me.interesses?.length ? (
+                          <ChipsTags itens={me.interesses} />
+                        ) : (
+                          "—"
+                        )
+                      }
+                    >
+                      <CampoInteresses
+                        value={interesses}
+                        onChange={(v) => {
+                          setInteresses(v);
+                          marca("interesses", !mesmaLista(v, me.interesses ?? []));
+                        }}
+                      />
+                    </CampoOuValor>
+                    <div className="grid gap-4 sm:grid-cols-3">
+                      <CampoOuValor
+                        rotulo="Cidade"
+                        editando={editando}
+                        valor={me.cidade?.trim() || "—"}
+                        className="sm:col-span-2"
+                      >
+                        <div className="space-y-2">
+                          <Label htmlFor="cidade">Cidade</Label>
+                          <Input id="cidade" name="cidade" maxLength={100} defaultValue={me.cidade ?? ""} />
+                        </div>
+                      </CampoOuValor>
+                      <CampoOuValor
+                        rotulo="UF"
+                        editando={editando}
+                        valor={me.uf?.trim() || "—"}
+                      >
+                        <CampoUf
+                          value={uf}
+                          onChange={(v) => {
+                            const nv = v === SENTINEL_VAZIO ? "" : v;
+                            setUf(nv);
+                            marca("uf", nv !== (me.uf ?? ""));
+                          }}
+                        />
+                      </CampoOuValor>
+                    </div>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <CampoOuValor
+                        rotulo="Cargo"
+                        editando={editando}
+                        valor={me.cargo?.trim() || "—"}
+                      >
+                        <div className="space-y-2">
+                          <Label htmlFor="cargo">Cargo</Label>
+                          <Input id="cargo" name="cargo" maxLength={120} defaultValue={me.cargo ?? ""} />
+                        </div>
+                      </CampoOuValor>
+                      <CampoOuValor
+                        rotulo="Empresa"
+                        editando={editando}
+                        valor={me.empresa?.trim() || "—"}
+                      >
+                        <div className="space-y-2">
+                          <Label htmlFor="empresa">Empresa</Label>
+                          <Input id="empresa" name="empresa" maxLength={150} defaultValue={me.empresa ?? ""} />
+                        </div>
+                      </CampoOuValor>
+                    </div>
+                    <CampoOuValor
+                      rotulo="Voluntariado"
+                      editando={editando}
+                      valor={me.voluntariado?.trim() || "—"}
+                    >
+                      <div className="space-y-2">
+                        <div className="flex items-baseline justify-between gap-2">
+                          <Label htmlFor="voluntariado">Experiência com voluntariado</Label>
+                          <span aria-hidden className="text-xs tabular-nums text-muted-foreground">
+                            {volLen}/300
+                          </span>
+                        </div>
+                        <Input
+                          id="voluntariado"
+                          name="voluntariado"
+                          maxLength={300}
+                          defaultValue={me.voluntariado ?? ""}
+                          onChange={(e) => setVolLen(e.target.value.length)}
+                          placeholder="ex.: 2 anos como voluntário no Projeto X"
+                        />
+                      </div>
+                    </CampoOuValor>
+                  </>
+                );
+                return editando ? (
+                  <div className="mt-4 space-y-4">{campos}</div>
+                ) : (
+                  <dl className="mt-4 space-y-4">{campos}</dl>
+                );
+              })()}
+            </section>
+
+            {/* ficha de mentor (0034) — self-update cobre experiência/formação/
+                disponibilidade; capacidade/tipo/validações seguem só com a coord */}
+            {mentorProfile && (
+              <details
+                className="group/mentoria rounded-xl bg-card shadow-[var(--shadow-border)]"
+                open={mentPendentes > 0}
+              >
+                <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2.5 rounded-xl px-6 py-4 transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring group-open/mentoria:rounded-b-none [&::-webkit-details-marker]:hidden">
+                  <span className="text-sm font-semibold">Mentoria</span>
+                  {mentPendentes > 0 ? (
+                    <Badge
+                      variant="outline"
+                      className="border-[var(--warn)]/60 font-normal text-[var(--warn-text)]"
+                    >
+                      {mentPendentes} {mentPendentes === 1 ? "pendente" : "pendentes"}
+                    </Badge>
+                  ) : (
+                    <span className="text-xs text-[var(--ok-text)]">completo</span>
+                  )}
+                  <CaretDown
+                    size={15}
+                    aria-hidden
+                    className="ml-auto shrink-0 text-muted-foreground transition-transform group-open/mentoria:rotate-180"
+                  />
+                </summary>
+                <div className="border-t border-border px-6 pb-6 pt-5">
+                  {editando ? (
+                    <div className="space-y-4">
+                      <CampoDisponibilidade
+                        value={disponibilidade}
+                        onChange={(v) => {
+                          setDisponibilidade(v);
+                          marca(
+                            "disponibilidade",
+                            !mesmaDisp(v, mentorProfile.disponibilidade ?? null)
+                          );
+                        }}
+                      />
+                      <div className="space-y-2">
+                        <Label htmlFor="experiencia_previa">Experiência prévia como mentor</Label>
+                        <Textarea
+                          id="experiencia_previa" name="experiencia_previa" rows={3} maxLength={2000}
+                          defaultValue={mentorProfile.experiencia_previa ?? ""}
+                          placeholder="Mentorias anteriores, mediação, ensino…"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="formacao_externa">Formação e certificações</Label>
+                        <Textarea
+                          id="formacao_externa" name="formacao_externa" rows={3} maxLength={2000}
+                          defaultValue={mentorProfile.formacao_externa ?? ""}
+                          placeholder="Cursos e certificações relevantes pra mentoria"
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <dl className="space-y-4">
+                      <Linha
+                        rotulo="Disponível"
+                        valor={disponibilidadeTexto(mentorProfile.disponibilidade) ?? "—"}
+                        pendente={!dispOk}
+                      />
+                      <Linha
+                        rotulo="Experiência"
+                        valor={mentorProfile.experiencia_previa?.trim() || "—"}
+                        pendente={!experienciaOk}
+                      />
+                      <Linha
+                        rotulo="Formação"
+                        valor={mentorProfile.formacao_externa?.trim() || "—"}
+                        pendente={!formacaoOk}
+                      />
+                    </dl>
+                  )}
+                  <p className="mt-4 text-xs text-muted-foreground">
+                    A coordenação cruza sua disponibilidade com a do mentorado na hora de formar a dupla.
                   </p>
                 </div>
-                {gridCadastro}
-              </div>
-            ) : (
-              <dl className="space-y-4">
-                <Linha rotulo="E-mail" valor={me.email} />
-                {gridCadastro}
-              </dl>
-            );
-          })()}
-          {/* o termo não é campo do form — a assinatura mora em /assinar;
-              a gaveta só anuncia o estado e manda pra lá */}
-          <div className="mt-5 flex items-center gap-3 rounded-lg border border-border px-3.5 py-3">
-            <Signature
-              size={18}
-              aria-hidden
-              className={
-                termoOk
-                  ? "shrink-0 text-[var(--ok-text)]"
-                  : "shrink-0 text-[var(--warn-text)]"
-              }
-            />
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium">
-                Termo de Adesão ao Trabalho Voluntário
-              </p>
-              <p className="text-xs text-muted-foreground">
-                {termoOk
-                  ? `Assinado em ${new Date(assinaturaTermo!.assinado_em!).toLocaleDateString("pt-BR")}.`
-                  : assinaturaTermo
-                    ? "Emitido, aguardando sua assinatura."
-                    : "Ainda não assinado. Vale pra toda a equipe."}
-              </p>
-            </div>
-            {termoOk ? (
-              <a
-                href={`/api/assinatura/${assinaturaTermo!.id}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-lg px-2 text-xs text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline"
-              >
-                <FileArrowDown size={14} aria-hidden />
-                Ver PDF
-                <span className="sr-only"> (abre em nova aba)</span>
-              </a>
-            ) : (
-              <Link
-                href="/assinar"
-                className="inline-flex min-h-9 shrink-0 items-center rounded-lg px-2 text-xs font-medium text-primary underline-offset-4 transition-colors hover:underline"
-              >
-                Ler e assinar
-              </Link>
+              </details>
             )}
           </div>
-        </div>
-      </details>
 
-      {/* ficha de mentor (0034) — self-update cobre experiência/formação/
-          disponibilidade; capacidade/tipo/validações seguem só com a coord */}
-      {mentorProfile && (
-        <details
-          className="group/mentoria rounded-xl bg-card shadow-[var(--shadow-border)]"
-          open={mentPendentes > 0}
-        >
-          <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2.5 rounded-xl px-6 py-4 transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring group-open/mentoria:rounded-b-none [&::-webkit-details-marker]:hidden">
-            <span className="text-sm font-semibold">Mentoria</span>
-            {mentPendentes > 0 ? (
-              <Badge
-                variant="outline"
-                className="border-[var(--warn)]/60 font-normal text-[var(--warn-text)]"
-              >
-                {mentPendentes} {mentPendentes === 1 ? "pendente" : "pendentes"}
-              </Badge>
-            ) : (
-              <span className="text-xs text-[var(--ok-text)]">completo</span>
-            )}
-            <CaretDown
-              size={15}
-              aria-hidden
-              className="ml-auto shrink-0 text-muted-foreground transition-transform group-open/mentoria:rotate-180"
-            />
-          </summary>
-          <div className="border-t border-border px-6 pb-6 pt-5">
-            {editando ? (
-              <div className="space-y-4">
-                <CampoDisponibilidade
-                  value={disponibilidade}
-                  onChange={(v) => {
-                    setDisponibilidade(v);
-                    marca(
-                      "disponibilidade",
-                      !mesmaDisp(v, mentorProfile.disponibilidade ?? null)
-                    );
-                  }}
+          {/* rail — o burocrático (cadastro + termo) e a conta */}
+          <div className="min-w-0 space-y-6">
+            {/* dados de cadastro — o burocrático recolhido: com buracos abre e
+                avisa no summary; completo fica a um gesto de distância. O chip
+                da capa ancora aqui (scroll-mt respeita o header) */}
+            <details
+              id="cadastro"
+              className="group/cadastro scroll-mt-20 rounded-xl bg-card shadow-[var(--shadow-border)]"
+              open={pendentesTotal > 0}
+            >
+              <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2.5 rounded-xl px-6 py-4 transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring group-open/cadastro:rounded-b-none [&::-webkit-details-marker]:hidden">
+                <span className="text-sm font-semibold">Dados de cadastro</span>
+                {pendentesTotal > 0 ? (
+                  <Badge
+                    variant="outline"
+                    className="border-[var(--warn)]/60 font-normal text-[var(--warn-text)]"
+                  >
+                    {pendentesTotal} {pendentesTotal === 1 ? "pendente" : "pendentes"}
+                  </Badge>
+                ) : (
+                  <span className="text-xs text-[var(--ok-text)]">completo</span>
+                )}
+                <CaretDown
+                  size={15}
+                  aria-hidden
+                  className="ml-auto shrink-0 text-muted-foreground transition-transform group-open/cadastro:rotate-180"
                 />
-                <div className="space-y-2">
-                  <Label htmlFor="experiencia_previa">Experiência prévia como mentor</Label>
-                  <Textarea
-                    id="experiencia_previa" name="experiencia_previa" rows={3} maxLength={2000}
-                    defaultValue={mentorProfile.experiencia_previa ?? ""}
-                    placeholder="Mentorias anteriores, mediação, ensino…"
+              </summary>
+              <div className="border-t border-border px-6 pb-6 pt-5">
+                {(() => {
+                  // ordem fixa nos dois modos: o que falta ganha badge "pendente"
+                  // inline em vez de mudar de lugar (o split "pendentes × já
+                  // cadastrados" fazia o campo sumir depois do save)
+                  const gridCadastro = (
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      {camposCadastro.map((c) => (
+                        <div key={c.key} className={c.wide ? "sm:col-span-2" : undefined}>
+                          {editando ? (
+                            <div className="flex items-start gap-3">
+                              <div className="min-w-0 flex-1">{c.node}</div>
+                              {!c.ok && <BadgePendente />}
+                            </div>
+                          ) : (
+                            <Valor campo={c.valor} pendente={!c.ok} />
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  );
+                  return editando ? (
+                    <div className="space-y-4">
+                      {/* e-mail é a credencial, só a coord troca — sempre
+                          preenchido, então fica fora da conta de pendentes */}
+                      <div className="space-y-2">
+                        <Label htmlFor="email">E-mail</Label>
+                        <Input id="email" value={me.email} disabled />
+                        <p className="text-xs text-muted-foreground">
+                          O e-mail é sua credencial de acesso. Para trocar, fale com a coordenação.
+                        </p>
+                      </div>
+                      {gridCadastro}
+                    </div>
+                  ) : (
+                    <dl className="space-y-4">
+                      <Linha rotulo="E-mail" valor={me.email} />
+                      {gridCadastro}
+                    </dl>
+                  );
+                })()}
+                {/* o termo não é campo do form — a assinatura mora em /assinar;
+                    a gaveta só anuncia o estado e manda pra lá */}
+                <div className="mt-5 flex items-center gap-3 rounded-lg border border-border px-3.5 py-3">
+                  <Signature
+                    size={18}
+                    aria-hidden
+                    className={
+                      termoOk
+                        ? "shrink-0 text-[var(--ok-text)]"
+                        : "shrink-0 text-[var(--warn-text)]"
+                    }
                   />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="formacao_externa">Formação e certificações</Label>
-                  <Textarea
-                    id="formacao_externa" name="formacao_externa" rows={3} maxLength={2000}
-                    defaultValue={mentorProfile.formacao_externa ?? ""}
-                    placeholder="Cursos e certificações relevantes pra mentoria"
-                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium">
+                      Termo de Adesão ao Trabalho Voluntário
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {termoOk
+                        ? `Assinado em ${new Date(assinaturaTermo!.assinado_em!).toLocaleDateString("pt-BR")}.`
+                        : assinaturaTermo
+                          ? "Emitido, aguardando sua assinatura."
+                          : "Ainda não assinado. Vale pra toda a equipe."}
+                    </p>
+                  </div>
+                  {termoOk ? (
+                    <a
+                      href={`/api/assinatura/${assinaturaTermo!.id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-lg px-2 text-xs text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline"
+                    >
+                      <FileArrowDown size={14} aria-hidden />
+                      Ver PDF
+                      <span className="sr-only"> (abre em nova aba)</span>
+                    </a>
+                  ) : (
+                    <Link
+                      href="/assinar"
+                      className="inline-flex min-h-9 shrink-0 items-center rounded-lg px-2 text-xs font-medium text-primary underline-offset-4 transition-colors hover:underline"
+                    >
+                      Ler e assinar
+                    </Link>
+                  )}
                 </div>
               </div>
-            ) : (
-              <dl className="space-y-4">
-                <Linha
-                  rotulo="Disponível"
-                  valor={disponibilidadeTexto(mentorProfile.disponibilidade) ?? "—"}
-                  pendente={!dispOk}
-                />
-                <Linha
-                  rotulo="Experiência"
-                  valor={mentorProfile.experiencia_previa?.trim() || "—"}
-                  pendente={!experienciaOk}
-                />
-                <Linha
-                  rotulo="Formação"
-                  valor={mentorProfile.formacao_externa?.trim() || "—"}
-                  pendente={!formacaoOk}
-                />
-              </dl>
-            )}
-            <p className="mt-4 text-xs text-muted-foreground">
-              A coordenação cruza sua disponibilidade com a do mentorado na hora de formar a dupla.
+            </details>
+
+            {/* conta — senha e saída no mesmo card: credenciais são o mesmo
+                assunto. Os forms reais ficam FORA do form de perfil (HTML
+                proíbe <form> aninhado); os campos e botões se ligam a eles
+                pelo atributo form=, então validação e Enter seguem nativos */}
+            <section className="rounded-xl bg-card shadow-[var(--shadow-border)]">
+              <h2 className="px-6 pt-5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                Conta
+              </h2>
+              {/* senha — disclosure sem card próprio dentro do card; reautentica
+                  antes do updateUser (senha atual ou sessão fresca do magic
+                  link); a flag senha_em é o que pula o onboarding */}
+              <details className="group/senha">
+                <summary className="mt-1 flex min-h-11 cursor-pointer list-none items-center gap-2.5 px-6 py-3 transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
+                  <span className="text-sm font-medium">Senha</span>
+                  <CaretDown
+                    size={15}
+                    aria-hidden
+                    className="ml-auto shrink-0 text-muted-foreground transition-transform group-open/senha:rotate-180"
+                  />
+                </summary>
+                <div className="space-y-4 px-6 pb-6 pt-2">
+                  {temSenha ? (
+                    <div className="space-y-2">
+                      <Label htmlFor="senha-atual">Senha atual</Label>
+                      <Input
+                        id="senha-atual"
+                        form="form-senha"
+                        type="password"
+                        required
+                        autoComplete="current-password"
+                        value={senhaAtual}
+                        onChange={(e) => setSenhaAtual(e.target.value)}
+                      />
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      Você entra pelo link de e-mail. Por segurança, a sessão
+                      precisa ser recente pra criar uma senha.
+                    </p>
+                  )}
+                  <div className="space-y-2">
+                    <Label htmlFor="nova-senha">Nova senha</Label>
+                    <Input
+                      id="nova-senha"
+                      form="form-senha"
+                      type="password"
+                      required
+                      minLength={8}
+                      autoComplete="new-password"
+                      value={senha}
+                      onChange={(e) => setSenha(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="confirma-senha">Confirmar nova senha</Label>
+                    <Input
+                      id="confirma-senha"
+                      form="form-senha"
+                      type="password"
+                      required
+                      minLength={8}
+                      autoComplete="new-password"
+                      value={confirmacao}
+                      onChange={(e) => setConfirmacao(e.target.value)}
+                    />
+                  </div>
+                  <Button type="submit" form="form-senha" disabled={salvandoSenha}>
+                    {salvandoSenha ? "Salvando…" : "Trocar senha"}
+                  </Button>
+                </div>
+              </details>
+              {/* saída — o "Sair" morava no header do app; na conta da pessoa
+                  faz mais sentido junto das outras credenciais */}
+              <div className="border-t border-border/60 px-6 py-5">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-medium">Sessão</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      Encerra o acesso da sua conta neste dispositivo.
+                    </p>
+                  </div>
+                  <Button
+                    type="submit"
+                    form="form-sair"
+                    variant="outline"
+                    size="sm"
+                  >
+                    <SignOut size={15} aria-hidden />
+                    Sair
+                  </Button>
+                </div>
+              </div>
+            </section>
+          </div>
+        </div>
+
+        {/* barra única de save — só no modo edição: sticky pra acompanhar o
+            scroll em tela cheia de campos; o contador sai junto com o estado
+            salvo. no mobile o offset pula a bottom nav fixa (~3.5rem + safe) */}
+        {editando && (
+          <div className="sticky bottom-[calc(4rem+env(safe-area-inset-bottom))] z-10 flex items-center gap-3 rounded-xl border border-border bg-card/95 px-4 py-3 shadow-[var(--shadow-overlay)] backdrop-blur-sm md:bottom-3">
+            <p
+              aria-live="polite"
+              className="min-w-0 flex-1 text-xs tabular-nums text-muted-foreground"
+            >
+              {alterados.size === 0
+                ? "Nenhum campo alterado"
+                : `${alterados.size} ${alterados.size === 1 ? "campo alterado" : "campos alterados"}`}
             </p>
+            <Button type="submit" disabled={salvando || alterados.size === 0}>
+              {salvando ? "Salvando…" : "Salvar alterações"}
+            </Button>
           </div>
-        </details>
-      )}
-
-      {/* barra única de save — só no modo edição: sticky pra acompanhar o
-          scroll em tela cheia de campos; o contador sai junto com o estado
-          salvo. no mobile o offset pula a bottom nav fixa (~3.5rem + safe) */}
-      {editando && (
-        <div className="sticky bottom-[calc(4rem+env(safe-area-inset-bottom))] z-10 flex items-center gap-3 rounded-xl border border-border bg-card/95 px-4 py-3 shadow-[var(--shadow-overlay)] backdrop-blur-sm md:bottom-3">
-          <p
-            aria-live="polite"
-            className="min-w-0 flex-1 text-xs tabular-nums text-muted-foreground"
-          >
-            {alterados.size === 0
-              ? "Nenhum campo alterado"
-              : `${alterados.size} ${alterados.size === 1 ? "campo alterado" : "campos alterados"}`}
-          </p>
-          <Button type="submit" disabled={salvando || alterados.size === 0}>
-            {salvando ? "Salvando…" : "Salvar alterações"}
-          </Button>
-        </div>
-      )}
+        )}
       </form>
 
-      {/* senha — reautentica antes do updateUser (senha atual ou sessão
-          fresca do magic link); a flag senha_em é o que pula o onboarding */}
-      <details className="group/senha rounded-xl bg-card shadow-[var(--shadow-border)]">
-        <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2.5 rounded-xl px-6 py-4 transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring group-open/senha:rounded-b-none [&::-webkit-details-marker]:hidden">
-          <span className="text-sm font-semibold">Senha</span>
-          <CaretDown
-            size={15}
-            aria-hidden
-            className="ml-auto shrink-0 text-muted-foreground transition-transform group-open/senha:rotate-180"
-          />
-        </summary>
-        <div className="border-t border-border px-6 pb-6 pt-5">
-          <form onSubmit={salvarSenha} className="space-y-4">
-            {temSenha ? (
-              <div className="space-y-2">
-                <Label htmlFor="senha-atual">Senha atual</Label>
-                <Input
-                  id="senha-atual"
-                  type="password"
-                  required
-                  autoComplete="current-password"
-                  value={senhaAtual}
-                  onChange={(e) => setSenhaAtual(e.target.value)}
-                />
-              </div>
-            ) : (
-              <p className="text-xs text-muted-foreground leading-relaxed">
-                Você entra pelo link de e-mail. Por segurança, a sessão
-                precisa ser recente pra criar uma senha.
-              </p>
-            )}
-            <div className="space-y-2">
-              <Label htmlFor="nova-senha">Nova senha</Label>
-              <Input
-                id="nova-senha"
-                type="password"
-                required
-                minLength={8}
-                autoComplete="new-password"
-                value={senha}
-                onChange={(e) => setSenha(e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="confirma-senha">Confirmar nova senha</Label>
-              <Input
-                id="confirma-senha"
-                type="password"
-                required
-                minLength={8}
-                autoComplete="new-password"
-                value={confirmacao}
-                onChange={(e) => setConfirmacao(e.target.value)}
-              />
-            </div>
-            <Button type="submit" disabled={salvandoSenha}>
-              {salvandoSenha ? "Salvando…" : "Trocar senha"}
-            </Button>
-          </form>
-        </div>
-      </details>
-
-      {/* saída — o "Sair" morava no header do app; na conta da pessoa faz
-          mais sentido junto das outras credenciais */}
-      <section className="rounded-xl bg-card p-6 shadow-[var(--shadow-border)]">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Sessão</h2>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Encerra o acesso da sua conta neste dispositivo.
-            </p>
-          </div>
-          <form action={signOut}>
-            <Button type="submit" variant="outline" size="sm">
-              <SignOut size={15} aria-hidden />
-              Sair
-            </Button>
-          </form>
-        </div>
-      </section>
+      {/* forms reais da senha e do Sair — sem filhos, só existem pra receber
+          o submit dos campos/botões ligados por form= lá no card Conta */}
+      <form id="form-senha" onSubmit={salvarSenha} className="hidden" />
+      <form id="form-sair" action={signOut} className="hidden" />
     </div>
   );
 }

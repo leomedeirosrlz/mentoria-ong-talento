@@ -290,6 +290,16 @@
     }
   }
 }
+/* faixa de capa do /perfil — ink com dois discos lime difusos no canto
+   superior direito (radial-gradient puro, sem asset). Eco do ponto do logo:
+   identidade de marca, não textura. */
+.capa-perfil {
+  background-color: var(--brand-ink);
+  background-image:
+    radial-gradient(circle at 88% -40%, hsl(78 56% 53% / 0.22) 0 88px, transparent 89px),
+    radial-gradient(circle at 97% 130%, hsl(78 56% 53% / 0.13) 0 120px, transparent 121px);
+}
+
 /* trilhas e rails horizontais — a barra nativa ocupa ~12px de faixa; fina e
    discreta, some de graça onde o scroll já é overlay (macOS/iOS) */
 .scroll-fina {

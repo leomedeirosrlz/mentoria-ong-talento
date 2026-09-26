@@ -17,7 +17,7 @@ import {
 import type { Mentorado, Profile } from "@/lib/types";
 import type { MentorProfile } from "@/lib/queries";
 import { cn, normaliza } from "@/lib/utils";
-import { idade } from "@/lib/ciclo";
+import { comparaNome, idade } from "@/lib/ciclo";
 import { avatarPublicUrl } from "@/lib/avatar";
 import { Avatar } from "@/components/avatar";
 import { PessoaActions } from "@/components/pessoa-actions";
@@ -30,6 +30,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { filterChipCls } from "@/components/ui/filter-chip";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const ehMentor = (p: Profile) =>
   p.role === "mentor_dpp" || p.role === "mentor_especialista";
@@ -43,6 +50,54 @@ export type DocsPessoa = {
 };
 
 const DOCS_VAZIO: DocsPessoa = { assinado: {}, pendente: [] };
+
+type OrdemPessoas = "nome" | "pendencias";
+
+const ORDEM_PESSOAS_LABEL: Record<OrdemPessoas, string> = {
+  nome: "Nome A–Z",
+  pendencias: "Pendências primeiro",
+};
+
+/** Conta pendências do cadastro — mesmas regras dos badges e da região
+ *  "Detalhes" da linha: termo, formação do mentor, "ainda não entrou" e
+ *  livre pra dupla. Alimenta o sort "Pendências primeiro". */
+function pendenciasPessoa(
+  p: Profile,
+  mp: MentorProfile | undefined,
+  livre: boolean,
+  docs: DocsPessoa | undefined
+): number {
+  const d = docs ?? DOCS_VAZIO;
+  const termoOk = ehMentor(p)
+    ? Boolean(mp?.termo_ok)
+    : d.assinado["termo-voluntario"] !== undefined || Boolean(p.documento_path);
+  let n = 0;
+  if (!termoOk) n++;
+  if (ehMentor(p) && !mp?.formacao_ok) n++;
+  if (p.ativo && !p.user_id) n++;
+  if (livre) n++;
+  return n;
+}
+
+/** Idem pros mentorados — o documento certo depende da idade (autorização
+ *  do responsável pra menor, termo de participação pra maior). */
+function pendenciasMentorado(
+  m: Mentorado,
+  livre: boolean,
+  docs: DocsPessoa | undefined
+): number {
+  const d = docs ?? DOCS_VAZIO;
+  const anos = idade(m.data_nascimento);
+  const menor = anos != null && anos < 18;
+  const docOk = menor
+    ? Boolean(m.documento_path) ||
+      d.assinado["autorizacao-responsavel"] !== undefined
+    : d.assinado["termo-mentorando"] !== undefined;
+  let n = 0;
+  if (!docOk) n++;
+  if (livre) n++;
+  return n;
+}
 
 /** "dd/mm/aaaa" — data da assinatura no detalhe da linha. */
 const fmtDia = (iso: string) =>
@@ -86,6 +141,7 @@ export function PessoasListas({
 }) {
   const [busca, setBusca] = useState("");
   const [semDupla, setSemDupla] = useState(false);
+  const [ordem, setOrdem] = useState<OrdemPessoas>("nome");
   const emDupla = useMemo(() => new Set(comDupla), [comDupla]);
   const temQualquerDupla = useMemo(() => new Set(comQualquerDupla), [comQualquerDupla]);
 
@@ -115,6 +171,32 @@ export function PessoasListas({
     mentoradosFiltrados = mentoradosFiltrados.filter((m) => !emDupla.has(m.id));
   }
   const filtrando = Boolean(q) || semDupla;
+
+  // uma ordenação pras duas seções — "pendências primeiro" usa a mesma
+  // régua dos badges da linha (termo, formação, não-entrou, sem dupla)
+  const pessoasExibidas = [...pessoasFiltradas].sort((a, b) =>
+    ordem === "pendencias"
+      ? pendenciasPessoa(
+            b,
+            mentorProfiles[b.id],
+            ehMentor(b) && !emDupla.has(b.id),
+            assinaturas[b.id]
+          ) -
+          pendenciasPessoa(
+            a,
+            mentorProfiles[a.id],
+            ehMentor(a) && !emDupla.has(a.id),
+            assinaturas[a.id]
+          ) || comparaNome(a.nome, b.nome)
+      : comparaNome(a.nome, b.nome)
+  );
+  const mentoradosExibidos = [...mentoradosFiltrados].sort((a, b) =>
+    ordem === "pendencias"
+      ? pendenciasMentorado(b, !emDupla.has(b.id), assinaturas[b.id]) -
+          pendenciasMentorado(a, !emDupla.has(a.id), assinaturas[a.id]) ||
+        comparaNome(a.nome, b.nome)
+      : comparaNome(a.nome, b.nome)
+  );
 
   return (
     <>
@@ -150,6 +232,30 @@ export function PessoasListas({
             {livres}
           </span>
         </button>
+        {/* vale pras duas seções (Com acesso + Mentorados) — pendências
+            primeiro é a ordem de trabalho da coordenação */}
+        <Select
+          value={ordem}
+          onValueChange={(v) => setOrdem(v as OrdemPessoas)}
+          items={ORDEM_PESSOAS_LABEL}
+        >
+          <SelectTrigger
+            size="sm"
+            aria-label="Ordenar"
+            className="ml-auto w-auto sm:w-48"
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent alignItemWithTrigger={false}>
+            {(
+              Object.entries(ORDEM_PESSOAS_LABEL) as [OrdemPessoas, string][]
+            ).map(([v, l]) => (
+              <SelectItem key={v} value={v}>
+                {l}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       {/* board de pareamento — comparação de afinidade mentorado × mentor
@@ -164,7 +270,7 @@ export function PessoasListas({
 
       <section className="space-y-2">
         <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground tabular-nums">
-          Com acesso ({filtrando ? `${pessoasFiltradas.length} de ${pessoas.length}` : pessoas.length})
+          Com acesso ({filtrando ? `${pessoasExibidas.length} de ${pessoas.length}` : pessoas.length})
         </h2>
         <div className="rounded-xl bg-card shadow-[var(--shadow-border)] divide-y divide-border/60 overflow-hidden">
           {pessoas.length === 0 && (
@@ -183,7 +289,7 @@ export function PessoasListas({
               </div>
             </div>
           )}
-          {pessoas.length > 0 && pessoasFiltradas.length === 0 && (
+          {pessoas.length > 0 && pessoasExibidas.length === 0 && (
             <div className="flex flex-col items-center gap-1.5 py-10 text-center">
               {q ? (
                 <>
@@ -216,7 +322,7 @@ export function PessoasListas({
               )}
             </div>
           )}
-          {pessoasFiltradas.map((p, i) => (
+          {pessoasExibidas.map((p, i) => (
             <PessoaRow
               key={p.id}
               p={p}
@@ -234,7 +340,7 @@ export function PessoasListas({
 
       <section className="space-y-2">
         <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground tabular-nums">
-          Mentorados ({filtrando ? `${mentoradosFiltrados.length} de ${mentorados.length}` : mentorados.length})
+          Mentorados ({filtrando ? `${mentoradosExibidos.length} de ${mentorados.length}` : mentorados.length})
         </h2>
         <div className="rounded-xl bg-card shadow-[var(--shadow-border)] divide-y divide-border/60 overflow-hidden">
           {mentorados.length === 0 && (
@@ -253,7 +359,7 @@ export function PessoasListas({
               </div>
             </div>
           )}
-          {mentorados.length > 0 && mentoradosFiltrados.length === 0 && (
+          {mentorados.length > 0 && mentoradosExibidos.length === 0 && (
             <div className="flex flex-col items-center gap-1.5 py-10 text-center">
               {q ? (
                 <>
@@ -286,7 +392,7 @@ export function PessoasListas({
               )}
             </div>
           )}
-          {mentoradosFiltrados.map((m, i) => (
+          {mentoradosExibidos.map((m, i) => (
             <MentoradoRow
               key={m.id}
               m={m}

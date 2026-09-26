@@ -601,7 +601,7 @@ export function AgendaCalendario({
       maxSemana: max ? semanaBounds(parseDia(max)).seg : "9999-12-31",
     };
   }, [eventos]);
-  const segHoje = semanaBounds(parseDia(hoje)).seg;
+  const { seg: segHoje, dom: domHoje } = semanaBounds(parseDia(hoje));
   // init: semana de hoje com clamp pros bounds do ciclo
   const [semanaIso, setSemanaIso] = useState(() =>
     segHoje < minSemana ? minSemana : segHoje > maxSemana ? maxSemana : segHoje
@@ -877,6 +877,27 @@ export function AgendaCalendario({
   const ehSemanaAtual = segSel === segHoje;
   const segHojeClamped =
     segHoje < minSemana ? minSemana : segHoje > maxSemana ? maxSemana : segHoje;
+
+  // eventoDaSemana tem dois fallbacks fora da semana real: recesso/gap aponta
+  // o PRÓXIMO encontro, ciclo encerrado aponta o ÚLTIMO. A marca (banda lime
+  // na linha da semana, anel no disco, rótulo) segue o evento em todos os
+  // casos, mas o texto nunca diz "esta semana" quando não é — traduz a
+  // posição relativa do evento à semana corrente
+  const eventoSemana = semanaId
+    ? (eventos.find((e) => e.id === semanaId) ?? null)
+    : null;
+  const marcaSemana =
+    eventoSemana == null
+      ? null
+      : eventoSemana.data >= segHoje && eventoSemana.data <= domHoje
+        ? "esta semana"
+        : eventoSemana.data > domHoje
+          ? "próximo encontro"
+          : "último encontro";
+  // forma falada pra aria-labels — "encontro desta semana" lê melhor que o
+  // rótulo visual solto no meio do resumo do dia
+  const marcaSemanaA11y =
+    marcaSemana === "esta semana" ? "encontro desta semana" : marcaSemana;
 
   // encontro oficial da semana exibida — critério estrito do eventoDaSemana
   // (a data cai em seg–dom), sem o fallback "próximo" dele: o board só fala
@@ -1261,6 +1282,11 @@ export function AgendaCalendario({
                     (doDia.length > 0
                       ? `${doDia.map(descricaoEvento).join(" e ")}, ${fmtCompleta.format(parseDia(iso))}`
                       : `${fmtCompleta.format(parseDia(iso))}, sem eventos oficiais`) +
+                    // o anel lime no disco é cor — a marca temporal precisa
+                    // entrar no nome falado do dia ("encontro desta semana")
+                    (doDia.some((e) => e.id === semanaId) && marcaSemanaA11y
+                      ? `, ${marcaSemanaA11y}`
+                      : "") +
                     (duplasDoDia.length > 0
                       ? `, ${resumoEncontrosDupla(duplasDoDia, agoraMs)}`
                       : "");
@@ -1324,7 +1350,13 @@ export function AgendaCalendario({
                               return (
                                 <span
                                   key={e.id}
-                                  className="grid size-5 place-items-center rounded-full bg-[var(--brand-lime)] text-[11px] font-semibold leading-none tabular-nums text-[var(--brand-ink)]"
+                                  className={cn(
+                                    "grid size-5 place-items-center rounded-full bg-[var(--brand-lime)] text-[11px] font-semibold leading-none tabular-nums text-[var(--brand-ink)]",
+                                    // encontro da semana corrente: anel lime
+                                    // (mesma gramática do nó "atual" do rail)
+                                    e.id === semanaId &&
+                                      "ring-2 ring-[var(--brand-lime)]/60 ring-offset-1 ring-offset-card"
+                                  )}
                                 >
                                   {e.numero ?? "•"}
                                 </span>
@@ -1446,7 +1478,11 @@ export function AgendaCalendario({
                     : `Semana de ${rotuloSemanaIso}`}
                 </h2>
                 {ehSemanaAtual && (
-                  <span className="text-xs font-semibold text-[var(--ok-text)]">
+                  <span className="inline-flex items-center gap-1.5 text-xs font-semibold">
+                    <span
+                      aria-hidden
+                      className="size-1.5 rounded-full bg-[var(--brand-lime)]"
+                    />
                     esta semana
                   </span>
                 )}
@@ -1603,7 +1639,12 @@ export function AgendaCalendario({
                           irParaSemana(semanaBounds(parseDia(e.data)).seg);
                           setVisao("semana");
                         }}
-                        className="flex w-full flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-3 text-left transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:px-5"
+                        className={cn(
+                          "flex w-full flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-3 text-left transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:px-5",
+                          // a linha do encontro da semana corrente ganha o
+                          // fundo lime — mesma faixa da linha de semana no mês
+                          e.id === semanaId && "bg-[var(--brand-lime)]/8"
+                        )}
                       >
                         <span className="w-20 shrink-0 whitespace-nowrap text-sm tabular-nums text-muted-foreground">
                           {diaCompacto(e.data)}
@@ -1655,6 +1696,17 @@ export function AgendaCalendario({
                           </span>
                         )}
                         <MarcadorTipo tipo={e.tipo} nome={nomeEvento} />
+                        {/* marca do encontro da semana corrente — texto
+                            completo entra no nome acessível da linha */}
+                        {e.id === semanaId && marcaSemana && (
+                          <span className="inline-flex shrink-0 items-center gap-1.5 text-xs font-semibold">
+                            <span
+                              aria-hidden
+                              className="size-1.5 rounded-full bg-[var(--brand-lime)]"
+                            />
+                            {marcaSemana}
+                          </span>
+                        )}
                       </button>
                     </li>
                   );
@@ -1748,9 +1800,13 @@ export function AgendaCalendario({
                       <h2 className="text-base font-semibold tracking-tight sm:text-lg">
                         {nomeEvento}
                       </h2>
-                      {e.id === semanaId && (
-                        <span className="text-xs font-semibold text-[var(--ok-text)]">
-                          esta semana
+                      {e.id === semanaId && marcaSemana && (
+                        <span className="inline-flex items-center gap-1.5 text-xs font-semibold">
+                          <span
+                            aria-hidden
+                            className="size-1.5 rounded-full bg-[var(--brand-lime)]"
+                          />
+                          {marcaSemana}
                         </span>
                       )}
                     </div>
@@ -1979,8 +2035,8 @@ export function AgendaCalendario({
                 )}
               >
                 {rotuloSemana(s)}
-                {semanaEhAtual(s) && (
-                  <span className="text-[var(--ok-text)]"> · esta semana</span>
+                {semanaEhAtual(s) && marcaSemana && (
+                  <span className="text-[var(--ok-text)]"> · {marcaSemana}</span>
                 )}
               </p>
               {evs.map((e) => {

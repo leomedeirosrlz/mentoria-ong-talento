@@ -22,7 +22,7 @@ import {
   registroTardio,
   totalEncontros,
 } from "@/lib/ciclo";
-import { RegistrosFiltros } from "@/components/registros-filtros";
+import { RegistrosFiltros, type OrdemRegistros } from "@/components/registros-filtros";
 import { buttonVariants } from "@/components/ui/button";
 import { RegistroCard } from "@/components/registro-card";
 import { cn } from "@/lib/utils";
@@ -97,7 +97,12 @@ export default async function RegistrosPage({
   const filtros = parseFiltros(params, maxEncontro);
   // triagem por scoreAlerta dentro da fatia carregada — a paginação é
   // cumulativa, então "prioridade" cobre tudo que já foi buscado
-  const porPrioridade = primeiro(params.ordem) === "prioridade";
+  const ordemParam = primeiro(params.ordem);
+  const ordem: OrdemRegistros =
+    ordemParam === "prioridade" || ordemParam === "antigas"
+      ? ordemParam
+      : "recentes";
+  const porPrioridade = ordem === "prioridade";
 
   const [{ itens, total }, duplas, alertas, espEventos] = await Promise.all([
     getRegistros(filtros),
@@ -121,17 +126,22 @@ export default async function RegistrosPage({
 
   // o banco já ordena por realizado_em; o sort estável acerta a fatia
   // carregada e empurra quem pede atenção pra cima dentro do mesmo dia.
-  // No modo prioridade o scoreAlerta vira a chave global e a data desempata.
+  // No modo prioridade o scoreAlerta vira a chave global e a data desempata;
+  // "antigas" inverte a linha do tempo (ordem cronológica de leitura).
   const ordenados = [...itens].sort(
-    porPrioridade
+    ordem === "prioridade"
       ? (a, b) =>
           scoreAlerta(b) - scoreAlerta(a) ||
           aconteceuEmDe(b).localeCompare(aconteceuEmDe(a)) ||
           b.created_at.localeCompare(a.created_at)
-      : (a, b) =>
-          aconteceuEmDe(b).localeCompare(aconteceuEmDe(a)) ||
-          scoreAlerta(b) - scoreAlerta(a) ||
-          b.created_at.localeCompare(a.created_at)
+      : ordem === "antigas"
+        ? (a, b) =>
+            aconteceuEmDe(a).localeCompare(aconteceuEmDe(b)) ||
+            a.created_at.localeCompare(b.created_at)
+        : (a, b) =>
+            aconteceuEmDe(b).localeCompare(aconteceuEmDe(a)) ||
+            scoreAlerta(b) - scoreAlerta(a) ||
+            b.created_at.localeCompare(a.created_at)
   );
   // com prioridade ligada, os que pedem olho sobem como bloco próprio
   const atencao = porPrioridade ? ordenados.filter((r) => scoreAlerta(r) > 0) : [];
@@ -156,7 +166,7 @@ export default async function RegistrosPage({
     if (filtros.dificuldade) p.set("dificuldade", filtros.dificuldade);
     if (filtros.dupla) p.set("dupla", filtros.dupla);
     if (filtros.q) p.set("q", filtros.q);
-    if (porPrioridade) p.set("ordem", "prioridade");
+    if (ordem !== "recentes") p.set("ordem", ordem);
     if (filtros.pagina > 1) p.set("pagina", String(filtros.pagina));
     for (const [k, v] of Object.entries(patch)) {
       if (v === null) p.delete(k);
@@ -272,16 +282,18 @@ export default async function RegistrosPage({
               </Link>
             </>
           )}
+          {/* atalho de triagem: um clique liga a prioridade (ou volta pras
+              recentes de qualquer ordem alternativa); a escolha completa
+              mora no modal de filtros */}
           {ordenados.length > 1 && (
             <>
               {" · "}
               <Link
-                href={hrefCom({ ordem: porPrioridade ? null : "prioridade" })}
+                href={hrefCom({ ordem: ordem === "recentes" ? "prioridade" : null })}
                 scroll={false}
-                aria-current={porPrioridade ? "true" : undefined}
                 className="-my-1.5 py-1.5 font-medium text-foreground underline underline-offset-4 transition-colors hover:text-muted-foreground"
               >
-                {porPrioridade ? "voltar à ordem por data" : "ordenar por prioridade"}
+                {ordem !== "recentes" ? "voltar a mais recentes" : "ordenar por prioridade"}
               </Link>
             </>
           )}
@@ -292,7 +304,7 @@ export default async function RegistrosPage({
         filtros={filtros}
         duplas={duplas}
         maxEncontro={maxEncontro}
-        porPrioridade={porPrioridade}
+        ordem={ordem}
       />
 
       {ordenados.length === 0 ? (

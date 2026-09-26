@@ -13,8 +13,8 @@
  * deslocado pra que o 5º encontro caia na terça da semana corrente, e todos
  * os timestamps derivam de `new Date()`. Abrir a demo daqui a meses continua
  * contando a mesma história: semana 5 do ciclo, dupla saudável, uma com
- * registro pendente, uma em risco, uma com atraso e uma encerrada do ciclo
- * anterior.
+ * registro pendente, uma em risco, uma com atraso, uma encerrada do ciclo
+ * anterior e três trilhas de especialista (duas na mesma mentora — a Sofia).
  */
 
 import type {
@@ -115,9 +115,10 @@ const D = {
   fim: 0x0605,
   esp1: 0x0606,
   esp2: 0x0607,
+  esp3: 0x0608,
 } as const;
 
-const S = { aceita1: 0x2401, aceita2: 0x2402, direcionada: 0x2403, livre: 0x2404, cancelada: 0x2405 } as const;
+const S = { aceita1: 0x2401, aceita2: 0x2402, direcionada: 0x2403, livre: 0x2404, cancelada: 0x2405, aceita3: 0x2406 } as const;
 
 const MEET = "https://meet.google.com/demo-realiza";
 
@@ -591,6 +592,8 @@ function build(): DemoData {
 
   // ---------- pessoas ----------
 
+  // created_at alimenta o "no programa desde" do /perfil
+
   // Personas: perfil profissional vazio de propósito — o onboarding da demo
   // pergunta bio/áreas/voluntariado, e `onboarded_em` é sempre null (a camada
   // de queries injeta o valor do cookie demo_onboarded por cima).
@@ -598,6 +601,7 @@ function build(): DemoData {
     id: uid(P.marina), user_id: uid(0xf001), nome: "Marina Duarte",
     email: "marina.duarte@realiza.vc", whatsapp: "5511987654001",
     role: "coordenacao", ativo: true, avatar_path: null,
+    created_at: haDias(400),
     documento_path: "documentos/termo-marina-duarte.pdf",
     bio: null, linkedin: null, areas: null, voluntariado: null, onboarded_em: null,
     nome_social: null, data_nascimento: "1988-03-15", genero: "feminino",
@@ -618,6 +622,7 @@ function build(): DemoData {
     id: uid(P.paulo), user_id: uid(0xf002), nome: "Paulo Serra",
     email: "paulo.serra@realiza.vc", whatsapp: "5511987654002",
     role: "supervisor", ativo: true, avatar_path: null,
+    created_at: haDias(400),
     documento_path: "documentos/termo-paulo-serra.pdf",
     bio: null, linkedin: null, areas: null, voluntariado: null, onboarded_em: null,
     nome_social: null, data_nascimento: "1979-06-22", genero: "masculino",
@@ -632,6 +637,7 @@ function build(): DemoData {
     id: uid(P.ricardo), user_id: uid(0xf003), nome: "Ricardo Tavares",
     email: "ricardo.tavares@realiza.vc", whatsapp: "5511987654003",
     role: "mentor_dpp", ativo: true, avatar_path: null,
+    created_at: haDias(45),
     documento_path: "documentos/termo-ricardo-tavares.pdf",
     bio: null, linkedin: null, areas: null, voluntariado: null, onboarded_em: null,
     nome_social: null, data_nascimento: "1990-01-18", genero: "masculino",
@@ -653,6 +659,7 @@ function build(): DemoData {
     id: uid(P.sofia), user_id: uid(0xf004), nome: "Sofia Nogueira",
     email: "sofia.nogueira@realiza.vc", whatsapp: "5511987654004",
     role: "mentor_especialista", ativo: true, avatar_path: null,
+    created_at: haDias(55),
     documento_path: "documentos/termo-sofia-nogueira.pdf",
     bio: null, linkedin: null, areas: null, voluntariado: null, onboarded_em: null,
     nome_social: null, data_nascimento: "1992-09-05", genero: "feminino",
@@ -1080,6 +1087,23 @@ function build(): DemoData {
       especialista: { nome: helena.nome },
     },
     {
+      id: uid(S.aceita3),
+      mentorado_id: eduardo.id,
+      dupla_dpp_id: uid(D.atraso),
+      demanda:
+        "O Eduardo trava em matemática básica (frações e razão) e isso derruba o resto das notas do 1º ano — a Sofia é professora de exatas e topou pegar uma segunda trilha.",
+      especialista_desejado_id: sofia.id,
+      especialista_id: sofia.id,
+      dupla_id: uid(D.esp3),
+      status: "aceita",
+      created_by: joaoPedro.id,
+      created_at: haDias(12, "20:30"),
+      respondida_em: haDias(9, "09:00"),
+      mentorado: { nome: eduardo.nome },
+      solicitante: { nome: joaoPedro.nome },
+      especialista: { nome: sofia.nome },
+    },
+    {
       id: uid(S.aceita1),
       mentorado_id: ana.id,
       dupla_dpp_id: uid(D.ok),
@@ -1498,7 +1522,47 @@ function build(): DemoData {
     notas: [],
   };
 
-  const duplas = [duplaOk, duplaPend, duplaRisco, duplaAtraso, duplaFim, duplaEsp1, duplaEsp2];
+  // d-esp3 · Sofia × Eduardo — a segunda trilha da mesma especialista (o
+  // mentor_especialista carrega N duplas). Estado distinto da esp1 de
+  // propósito: o 1º encontro rolou e segue sem registro — pendência que o
+  // semáforo marca "atenção" e joga esta dupla no topo da home dela
+  const encD8: Encontro[] = [
+    realizado(uid(D.esp3), 1, addDias(HOJE, -6), { hora: "19:30", duracao: 60 }),
+    agendado(uid(D.esp3), 2, addDias(HOJE, 3), { hora: "19:30" }),
+  ];
+
+  const duplaEsp3: Dupla = {
+    id: uid(D.esp3),
+    ciclo: "2026/2027",
+    status: "ativa",
+    trilha: "especialista",
+    iniciada_em: ymd(addDias(HOJE, -9)),
+    demanda: "Reforço de matemática básica — frações e razão pra destravar o 1º ano.",
+    solicitacao_id: uid(S.aceita3),
+    mentor: sofia,
+    mentorado: eduardo,
+    supervisor: beatriz, // mesma supervisora da dupla DPP do Eduardo
+    encontros: encD8,
+    encaminhamentos: [
+      encaminhamento(uid(D.esp3), null,
+        "Trazer o caderno de exercícios da escola pro diagnóstico",
+        "mentorado", addDias(HOJE, 3), "pendente"),
+    ],
+    notas: [
+      {
+        id: uid(0x1400 + ++seqNota),
+        dupla_id: uid(D.esp3),
+        numero: 2,
+        texto:
+          "Preparar uma progressão de frações com exemplos visuais — o Eduardo responde melhor a desenho do que a conta abstrata.",
+        created_by: sofia.id,
+        created_at: haDias(4, "20:00"),
+        updated_at: haDias(4, "20:00"),
+      },
+    ],
+  };
+
+  const duplas = [duplaOk, duplaPend, duplaRisco, duplaAtraso, duplaFim, duplaEsp1, duplaEsp2, duplaEsp3];
 
   // ---------- anexos de evidência ----------
 
@@ -1823,6 +1887,15 @@ function build(): DemoData {
         href: `/duplas/${uid(D.esp1)}`,
         lida_em: haDias(13, "10:00"),
         created_at: haDias(14, "09:35"),
+      },
+      {
+        id: uid(0x3032),
+        tipo: "dupla_formada",
+        titulo: "Você agora é mentora de Eduardo",
+        corpo: "Sua segunda trilha de especialista foi formada — desta vez com o Eduardo Lima. O primeiro encontro já pode ser agendado.",
+        href: `/duplas/${uid(D.esp3)}`,
+        lida_em: null,
+        created_at: haDias(9, "09:05"),
       },
     ],
   };

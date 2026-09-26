@@ -30,6 +30,7 @@ import {
   marcarTodasNotificacoesLidas,
 } from "@/lib/actions";
 import { Popover, PopoverContent, PopoverTitle, PopoverTrigger } from "@/components/ui/popover";
+import { tempoRelativo } from "@/lib/ciclo";
 import { cn, pathInterno } from "@/lib/utils";
 import type { Notificacao } from "@/lib/types";
 
@@ -219,6 +220,7 @@ export function NotificacoesBell({
 }) {
   const ctx = useContext(NotificacoesCtx);
   const [aberto, setAberto] = useState(false);
+  const [agoraMs, setAgoraMs] = useState(() => Date.now());
   if (!ctx) return null;
   const { itens, naoLidas, marcar, marcarTodas, recarregar } = ctx;
 
@@ -227,7 +229,10 @@ export function NotificacoesBell({
       open={aberto}
       onOpenChange={(o) => {
         setAberto(o);
-        if (o) recarregar();
+        if (o) {
+          setAgoraMs(Date.now());
+          recarregar();
+        }
       }}
     >
       <PopoverTrigger
@@ -299,7 +304,7 @@ export function NotificacoesBell({
                             {n.titulo}
                           </span>
                           <span className="mt-0.5 block text-[11px] text-muted-foreground">
-                            {tempoRelativo(n.created_at)}
+                            {tempoRelativo(n.created_at, agoraMs)}
                           </span>
                           {n.corpo && (
                             <span className="mt-0.5 block truncate text-xs text-muted-foreground">
@@ -346,19 +351,4 @@ export function NotificacoesBell({
   );
 }
 
-function tempoRelativo(iso: string) {
-  const diff = Date.now() - new Date(iso).getTime();
-  const min = Math.floor(diff / 60_000);
-  if (min < 1) return "agora";
-  if (min < 60) return `há ${min} min`;
-  const h = Math.floor(min / 60);
-  if (h < 24) return `há ${h} h`;
-  const d = Math.floor(h / 24);
-  if (d === 1) return "ontem";
-  if (d < 7) return `há ${d} d`;
-  return new Date(iso).toLocaleDateString("pt-BR", {
-    day: "numeric",
-    month: "short",
-    timeZone: "America/Sao_Paulo",
-  });
-}
+

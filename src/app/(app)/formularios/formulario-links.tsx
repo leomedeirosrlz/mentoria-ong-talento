@@ -27,6 +27,7 @@ import {
   type LinkStatus,
 } from "@/lib/forms/schema";
 import type { LinkResolvido } from "@/lib/forms/queries";
+import { comparaNome } from "@/lib/ciclo";
 import type { AppRole } from "@/lib/types";
 import { NudgeButton } from "@/components/nudge-button";
 import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
@@ -47,6 +48,13 @@ import { fade, T } from "@/components/motion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { filterChipCls } from "@/components/ui/filter-chip";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -126,6 +134,21 @@ const ORDEM_STATUS: Record<LinkStatus, number> = {
   respondido: 2,
 };
 
+type OrdemLinks = "status" | "nome" | "recentes" | "expira";
+
+const ORDEM_LINKS_LABEL: Record<OrdemLinks, string> = {
+  status: "Status",
+  nome: "Nome A–Z",
+  recentes: "Mais recentes",
+  expira: "Expira antes",
+};
+
+/** "quem responde" ou o genérico — o nome que a linha mostra e o sort usa */
+const nomeDe = (l: LinkResolvido) => l.dest_nome ?? "Link genérico";
+
+// link sem validade não expira — "Expira antes" os manda pro fim
+const SEM_EXPIRA = "9999-12-31";
+
 /** Reemissão inline de link expirado — mesmo destino, token novo (a action
  *  devolve o token e ele já cai no clipboard). */
 function ReemitirLinkButton({
@@ -198,6 +221,7 @@ export function FormularioLinks({
   // sem round-trip: a lista inteira já está na página)
   const [filtroStatus, setFiltroStatus] = useState<LinkStatus | "todos">("todos");
   const [buscaLink, setBuscaLink] = useState("");
+  const [ordemLinks, setOrdemLinks] = useState<OrdemLinks>("status");
   const [pending, start] = useTransition();
   const router = useRouter();
   const destaqueTimer = useRef<ReturnType<typeof setTimeout>>(null);
@@ -263,15 +287,27 @@ export function FormularioLinks({
     [filtrados]
   );
 
-  // pendente → expirado → respondido (sort estável mantém created_at dentro
-  // de cada grupo)
-  const linksOrdenados = useMemo(
-    () =>
-      [...links].sort(
-        (a, b) => ORDEM_STATUS[linkStatus(a)] - ORDEM_STATUS[linkStatus(b)]
-      ),
-    [links]
-  );
+  // default: pendente → expirado → respondido (sort estável mantém
+  // created_at dentro de cada grupo); as demais ordens trocam a chave
+  // principal e desempatam por status/nome
+  const linksOrdenados = useMemo(() => {
+    const porStatus = (a: LinkResolvido, b: LinkResolvido) =>
+      ORDEM_STATUS[linkStatus(a)] - ORDEM_STATUS[linkStatus(b)];
+    const porNome = (a: LinkResolvido, b: LinkResolvido) =>
+      comparaNome(nomeDe(a), nomeDe(b));
+    return [...links].sort(
+      ordemLinks === "nome"
+        ? (a, b) => porNome(a, b) || porStatus(a, b)
+        : ordemLinks === "recentes"
+          ? (a, b) => b.created_at.localeCompare(a.created_at)
+          : ordemLinks === "expira"
+            ? (a, b) =>
+                (a.expira_em ?? SEM_EXPIRA).localeCompare(
+                  b.expira_em ?? SEM_EXPIRA
+                ) || porStatus(a, b) || porNome(a, b)
+            : porStatus
+    );
+  }, [links, ordemLinks]);
 
   // contagem por status alimenta os chips — o número junto do chip é a
   // própria explicação de por que filtrar
@@ -291,7 +327,7 @@ export function FormularioLinks({
       if (filtroStatus !== "todos" && linkStatus(l) !== filtroStatus)
         return false;
       if (!n) return true;
-      return normaliza(l.dest_nome ?? "Link genérico").includes(n);
+      return normaliza(nomeDe(l)).includes(n);
     });
   }, [linksOrdenados, filtroStatus, buscaLink]);
 
@@ -665,6 +701,30 @@ export function FormularioLinks({
               className="h-8 pl-8 text-xs"
             />
           </div>
+          {/* ordenar convive com o filtro de status — primeiro o que a
+              coord quer ver (chips), depois a ordem em que desfila */}
+          <Select
+            value={ordemLinks}
+            onValueChange={(v) => setOrdemLinks(v as OrdemLinks)}
+            items={ORDEM_LINKS_LABEL}
+          >
+            <SelectTrigger
+              size="sm"
+              aria-label="Ordenar"
+              className="w-auto sm:w-44"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent alignItemWithTrigger={false}>
+              {(
+                Object.entries(ORDEM_LINKS_LABEL) as [OrdemLinks, string][]
+              ).map(([v, l]) => (
+                <SelectItem key={v} value={v}>
+                  {l}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       )}
 

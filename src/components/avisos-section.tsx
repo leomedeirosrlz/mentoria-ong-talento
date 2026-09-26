@@ -17,18 +17,19 @@ const AUDIENCIA_LABEL = {
   coordenacao: "Só a coordenação",
 } as const;
 
-/** Três canais pra urgência, cor nunca sozinha: rail à esquerda do article +
- *  ícone antes do título + badge com texto. 'normal' é null — some sem
- *  ruído. Lime fica fora da escala: é marca/navegação, não urgência. */
+/** Três canais pra urgência, cor nunca sozinha: fundo tingido do article +
+ *  ícone antes do título + badge com texto — a mesma gramática de superfície
+ *  do DuplaCard. 'normal' é null — some sem ruído. Lime fica fora da escala:
+ *  é marca/navegação, não urgência. */
 const PRIORIDADE = {
   urgente: {
-    rail: "border-[var(--danger)]",
+    tinte: "bg-[var(--danger)]/5",
     icone: Siren,
     texto: "Urgente",
     cls: "border-[var(--danger)]/50 text-[var(--danger)]",
   },
   importante: {
-    rail: "border-[var(--warn)]",
+    tinte: "bg-[var(--warn)]/8",
     icone: Flag,
     texto: "Importante",
     cls: "border-[var(--warn)]/50 text-[var(--warn-text)]",
@@ -80,7 +81,8 @@ export function AvisosSection({
                 key={a.id}
                 className={cn(
                   "flex items-start gap-3 px-4 py-3 sm:px-5",
-                  prio && `border-l-2 ${prio.rail}`
+                  // o overflow-hidden do Card apara o tinte no rounded-xl
+                  prio?.tinte
                 )}
               >
                 <div className="min-w-0 flex-1">

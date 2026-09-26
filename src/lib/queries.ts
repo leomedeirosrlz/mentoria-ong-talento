@@ -1,6 +1,6 @@
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
-import { registroTardio } from "./ciclo";
+import { comparaNome, registroTardio } from "./ciclo";
 import { demoOnboarded, demoRole } from "./demo/mode";
 import {
   demoAlertasRegistros,
@@ -352,9 +352,9 @@ export const getContagemPessoas = cache(async (): Promise<number> => {
 });
 
 // a collation do banco ordena acentos depois de Z (Álvaro no fim da lista) —
-// a ordenação final é sempre pt-BR no app
+// a ordenação final é sempre pt-BR no app, mesma régua das listas client
 const porNome = (a: { nome: string }, b: { nome: string }) =>
-  a.nome.localeCompare(b.nome, "pt-BR");
+  comparaNome(a.nome, b.nome);
 
 export const getPessoas = cache(async (): Promise<Profile[]> => {
   const demo = await demoRole();

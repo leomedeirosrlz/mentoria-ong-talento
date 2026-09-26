@@ -62,6 +62,9 @@ export type Profile = {
   whatsapp: string | null;
   role: AppRole | null;
   ativo: boolean;
+  /** Carimbo de criação do cadastro — vem em PROFILE_COLS_PUBLICAS; opcional
+   *  porque fontes sem a coluna existem (personas demo, selects parciais). */
+  created_at?: string;
   /** Foto no bucket público `avatares` (<profile_id>/<arquivo>.<ext>) — fallback de exibição: Gravatar do e-mail → iniciais. */
   avatar_path?: string | null;
   /** Documento oficial no bucket `documentos` (termo de responsabilidade) — só a coordenação vê e gerencia. */

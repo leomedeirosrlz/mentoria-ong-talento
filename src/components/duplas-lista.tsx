@@ -3,7 +3,7 @@
 import { type CSSProperties, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, Funnel, MagnifyingGlass } from "@phosphor-icons/react";
-import { maxEncontros, saudadeDaDupla, TRILHA_LABEL } from "@/lib/ciclo";
+import { comparaNome, maxEncontros, ORDEM_SEMAFORO, saudadeDaDupla, TRILHA_LABEL } from "@/lib/ciclo";
 import type { CicloEvento, Dupla } from "@/lib/types";
 import { cn, normaliza } from "@/lib/utils";
 import { DuplaAvatares } from "@/components/dupla-avatares";
@@ -13,6 +13,13 @@ import { NovaDuplaDialog } from "@/components/nova-dupla-dialog";
 import { Button } from "@/components/ui/button";
 import { filterChipCls } from "@/components/ui/filter-chip";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const STATUS_LABEL: Record<string, string> = {
   ativa: "Ativa",
@@ -46,8 +53,24 @@ function chipBate(f: Filtro, d: Dupla, semaforo: string): boolean {
   }
 }
 
-const ORDEM_SEMAFORO = { risco: 0, atencao: 1, ok: 2 } as const;
+
 const ORDEM_STATUS = { ativa: 0, pausada: 1, concluida: 2, encerrada: 3 } as const;
+
+type Ordem = "prioridade" | "mentor" | "mentorado" | "progresso";
+
+const ORDEM_LABEL: Record<Ordem, string> = {
+  prioridade: "Prioridade",
+  mentor: "Mentor A–Z",
+  mentorado: "Mentorado A–Z",
+  progresso: "Progresso",
+};
+
+/** progresso = encontros realizados / total da trilha da dupla */
+function progressoDe(d: Dupla): number {
+  const total = maxEncontros(d.trilha);
+  if (total <= 0) return 0;
+  return d.encontros.filter((e) => e.status === "realizado").length / total;
+}
 
 export function DuplasLista({
   lista,
@@ -71,20 +94,34 @@ export function DuplasLista({
 }) {
   const [busca, setBusca] = useState("");
   const [filtro, setFiltro] = useState<Filtro>("todas");
+  const [ordem, setOrdem] = useState<Ordem>("prioridade");
   const hoje = new Date(agora);
 
   // saúde calculada uma vez por dupla — ordenação, chips e a linha leem daqui
   const saudePorId = new Map(lista.map((d) => [d.id, saudadeDaDupla(d, eventos, hoje)]));
-  // pra coordenação a ordem default é pendências primeiro (risco → atenção →
-  // em dia; ativas antes de pausadas/encerradas) — a lista dela é radar
-  const ordenadas = podeCriar
-    ? [...lista].sort(
-        (a, b) =>
-          ORDEM_SEMAFORO[saudePorId.get(a.id)!.semaforo] -
-            ORDEM_SEMAFORO[saudePorId.get(b.id)!.semaforo] ||
-          (ORDEM_STATUS[a.status] ?? 4) - (ORDEM_STATUS[b.status] ?? 4)
-      )
-    : lista;
+  // o nível que a linha mostra: pro mentor, o próprio pedido de apoio vira
+  // "solicitado" (atenção), não risco — a prioridade ordena pelo que se vê
+  const nivelDe = (d: Dupla) => {
+    const s = saudePorId.get(d.id)!;
+    return paraMentor && s.pediuApoio ? "atencao" : s.semaforo;
+  };
+  // a ordem default é pendências primeiro (risco → atenção → em dia; ativas
+  // antes de pausadas/encerradas) — a lista é radar; as demais ordens
+  // desempatam por ela pra não parecerem aleatórias
+  const porPrioridade = (a: Dupla, b: Dupla) =>
+    ORDEM_SEMAFORO[nivelDe(a)] - ORDEM_SEMAFORO[nivelDe(b)] ||
+    (ORDEM_STATUS[a.status] ?? 4) - (ORDEM_STATUS[b.status] ?? 4) ||
+    comparaNome(a.mentor.nome, b.mentor.nome) ||
+    comparaNome(a.mentorado.nome, b.mentorado.nome);
+  const ordenadas = [...lista].sort(
+    ordem === "mentor"
+      ? (a, b) => comparaNome(a.mentor.nome, b.mentor.nome) || porPrioridade(a, b)
+      : ordem === "mentorado"
+        ? (a, b) => comparaNome(a.mentorado.nome, b.mentorado.nome) || porPrioridade(a, b)
+        : ordem === "progresso"
+          ? (a, b) => progressoDe(b) - progressoDe(a) || porPrioridade(a, b)
+          : porPrioridade
+  );
 
   const q = normaliza(busca.trim());
   const base = q
@@ -119,6 +156,32 @@ export function DuplasLista({
             className="pl-8"
           />
         </div>
+        {/* ordenar é de toda a lista — visível pra coord/supervisor/mentor,
+            escondido só quando não há o que ordenar */}
+        {lista.length > 1 && (
+          <Select
+            value={ordem}
+            onValueChange={(v) => setOrdem(v as Ordem)}
+            items={ORDEM_LABEL}
+          >
+            <SelectTrigger
+              size="sm"
+              aria-label="Ordenar"
+              className="w-auto sm:w-40"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent alignItemWithTrigger={false}>
+              {(Object.entries(ORDEM_LABEL) as [Ordem, string][]).map(
+                ([v, l]) => (
+                  <SelectItem key={v} value={v}>
+                    {l}
+                  </SelectItem>
+                )
+              )}
+            </SelectContent>
+          </Select>
+        )}
         {podeCriar && <NovaDuplaDialog />}
       </div>
 
@@ -234,8 +297,9 @@ export function DuplasLista({
           const motivo =
             d.status !== "ativa" && saude.semaforo === "ok" ? null : saude.motivo;
           // pedido de apoio do próprio mentor: apoio solicitado, não alarme
+          // (mesma regra do nivelDe usado na ordenação por prioridade)
           const apoioProprio = paraMentor && saude.pediuApoio;
-          const nivel = apoioProprio ? "atencao" : saude.semaforo;
+          const nivel = nivelDe(d);
           const motivoExibido = apoioProprio ? "Apoio solicitado" : motivo;
           const sub = [
             mostrarSupervisor && d.supervisor ? `Supervisor: ${d.supervisor.nome}` : null,
