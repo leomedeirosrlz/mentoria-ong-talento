@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 export function ConfirmDeleteButton({
   titulo,
@@ -18,6 +19,7 @@ export function ConfirmDeleteButton({
   onOpenChange,
   sucesso = "Excluído.",
   acao = "Excluir",
+  dica,
 }: {
   titulo: string;
   descricao: string;
@@ -30,6 +32,9 @@ export function ConfirmDeleteButton({
   sucesso?: string;
   /** verbo do botão de confirmação — "Desativar", "Excluir" (default)… */
   acao?: string;
+  /** tooltip no gatilho — só quando o trigger é o botão-ícone padrão ou um
+   *  trigger próprio simples (não funciona com gatilhos compostos) */
+  dica?: string;
 }) {
   const [interno, setInterno] = useState(false);
   const [pending, start] = useTransition();
@@ -37,16 +42,19 @@ export function ConfirmDeleteButton({
   const isOpen = open ?? interno;
   const setOpen = onOpenChange ?? setInterno;
 
+  const gatilho = trigger ?? (
+    <Button variant="ghost" size="icon" aria-label="Excluir">
+      <Trash size={15} />
+    </Button>
+  );
+
   return (
-    <Dialog open={isOpen} onOpenChange={setOpen}>
+    <Tooltip>
+      <Dialog open={isOpen} onOpenChange={setOpen}>
       {open === undefined && (
         <DialogTrigger
           render={
-            trigger ?? (
-              <Button variant="ghost" size="icon" aria-label="Excluir">
-                <Trash size={15} />
-              </Button>
-            )
+            dica ? <TooltipTrigger render={gatilho} /> : gatilho
           }
         />
       )}
@@ -83,6 +91,8 @@ export function ConfirmDeleteButton({
           </Button>
         </DialogFooter>
       </DialogContent>
-    </Dialog>
+      </Dialog>
+      {dica && <TooltipContent>{dica}</TooltipContent>}
+    </Tooltip>
   );
 }

@@ -159,7 +159,9 @@ function MaterialRow({ m, ehCoord, maxEncontro }: { m: Material; ehCoord: boolea
   // quebra internamente e a descrição já tem line-clamp
   const head = (
     <>
-      <Icone size={18} className="shrink-0 text-muted-foreground" aria-hidden />
+      <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-muted/70 text-muted-foreground">
+        <Icone size={17} aria-hidden />
+      </span>
       <div className="min-w-0 flex-1">
         <p className="text-sm font-medium">{m.titulo}</p>
         {m.descricao && <p className="line-clamp-2 text-xs text-muted-foreground mt-0.5">{m.descricao}</p>}

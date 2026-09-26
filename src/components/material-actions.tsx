@@ -25,6 +25,9 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import {
+  Tooltip, TooltipContent, TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 const LIMITE_BYTES = 20 * 1024 * 1024;
 const BUCKET = "materiais";
@@ -146,43 +149,66 @@ export function MaterialActions({ material, maxEncontro }: { material: Material;
         aria-hidden="true"
         onChange={onPick}
       />
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        aria-label={`Editar "${material.titulo}"`}
-        onClick={() => setEditOpen(true)}
-      >
-        <PencilSimple size={15} />
-      </Button>
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        aria-label={
-          pending
-            ? "Enviando arquivo"
-            : material.path
-              ? "Trocar arquivo"
-              : "Anexar arquivo"
-        }
-        aria-busy={pending}
-        disabled={pending}
-        onClick={() => fileRef.current?.click()}
-      >
-        {pending ? <CircleNotch size={15} className="animate-spin" /> : <Paperclip size={15} />}
-      </Button>
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        aria-label={`Enviar "${material.titulo}" por e-mail`}
-        title="Enviar por e-mail"
-        onClick={() => setEmailOpen(true)}
-      >
-        <EnvelopeSimple size={15} />
-      </Button>
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              aria-label={`Editar "${material.titulo}"`}
+              onClick={() => setEditOpen(true)}
+            >
+              <PencilSimple size={15} />
+            </Button>
+          }
+        />
+        <TooltipContent>Editar material</TooltipContent>
+      </Tooltip>
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              aria-label={
+                pending
+                  ? "Enviando arquivo"
+                  : material.path
+                    ? "Trocar arquivo"
+                    : "Anexar arquivo"
+              }
+              aria-busy={pending}
+              disabled={pending}
+              onClick={() => fileRef.current?.click()}
+            >
+              {pending ? <CircleNotch size={15} className="animate-spin" /> : <Paperclip size={15} />}
+            </Button>
+          }
+        />
+        <TooltipContent>
+          {material.path ? "Trocar arquivo" : "Anexar arquivo"}
+        </TooltipContent>
+      </Tooltip>
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              aria-label={`Enviar "${material.titulo}" por e-mail`}
+              onClick={() => setEmailOpen(true)}
+            >
+              <EnvelopeSimple size={15} />
+            </Button>
+          }
+        />
+        <TooltipContent>Enviar por e-mail</TooltipContent>
+      </Tooltip>
       <ConfirmDeleteButton
+        dica="Excluir material"
         titulo={`Excluir "${material.titulo}"?`}
         descricao={
           material.path
@@ -288,6 +314,7 @@ export function MaterialActions({ material, maxEncontro }: { material: Material;
         materialId={material.id}
         tituloMaterial={material.titulo}
         audienciaPadrao={material.audiencia}
+        tipoMaterial={material.tipo}
         open={emailOpen}
         onOpenChange={setEmailOpen}
       />
