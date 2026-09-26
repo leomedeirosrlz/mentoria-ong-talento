@@ -24,7 +24,6 @@ import { DocumentosPessoa } from "@/components/documentos-pessoa";
 import { AssinaturasPessoa } from "@/components/assinaturas-pessoa";
 import { Avatar } from "@/components/avatar";
 import { Badge } from "@/components/ui/badge";
-import { PageHeader } from "@/components/page-header";
 import { DuplaAvatares } from "@/components/dupla-avatares";
 import { DuplaNomes } from "@/components/dupla-nomes";
 import { MentoradoActions } from "@/components/mentorado-actions";
@@ -164,21 +163,46 @@ export default async function PessoaPerfilPage({
 
   return (
     <div className="space-y-6">
-      {/* coord volta pra /pessoas; mentor/supervisor voltam pra de onde vieram */}
-      <PageHeader
-        kicker={<VoltarLink fallback={souCoord ? "/pessoas" : "/"} />}
-        media={
-          <Avatar
-            nome={p.nome}
-            src={avatarSrc}
-            fallbackSrc={gravatar}
-            papel={ehMentorado ? "mentorado" : undefined}
-            size={72}
-          />
-        }
-        title={p.nome}
-        meta={
-          <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
+      {/* coord volta pra /pessoas; mentor/supervisor voltam pra de onde vieram.
+          As ações (coord) ficam na mesma linha, à direita */}
+      <div className="flex items-center justify-between gap-3">
+        <VoltarLink fallback={souCoord ? "/pessoas" : "/"} />
+        {souCoord &&
+          (perfil.tipo === "profile" ? (
+            <PessoaActions
+              pessoa={perfil.pessoa}
+              podeExcluir={!perfil.pessoa.user_id && perfil.duplas.length === 0}
+            />
+          ) : (
+            <MentoradoActions
+              mentorado={perfil.pessoa}
+              temDupla={perfil.duplas.length > 0}
+            />
+          ))}
+      </div>
+
+      {/* capa estilo rede social — a mesma gramática do /perfil: banner ink
+          com brilho lime, avatar sobreposto, nome como h1, meta de papel e
+          chips de contato. Sem modo edição aqui: é a ficha de outra pessoa */}
+      <header className="overflow-hidden rounded-xl bg-card shadow-[var(--shadow-border)]">
+        <div aria-hidden className="capa-perfil h-24 sm:h-28" />
+        <div className="px-4 pb-5 sm:px-6 sm:pb-6">
+          <div className="-mt-10 sm:-mt-12">
+            {/* size-20!/sm:size-24! sobem por cima do style inline que o
+                Avatar fixa via prop (a prop segue ditando o fontSize) */}
+            <Avatar
+              nome={p.nome}
+              src={avatarSrc}
+              fallbackSrc={gravatar}
+              papel={ehMentorado ? "mentorado" : undefined}
+              size={80}
+              className="size-20! ring-4 ring-card sm:size-24!"
+            />
+          </div>
+          <h1 className="mt-3 text-xl font-semibold tracking-tight sm:text-2xl">
+            {p.nome}
+          </h1>
+          <div className="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1.5 text-sm text-muted-foreground">
             {ehMentorado ? (
               <>
                 <span aria-hidden className="size-1.5 rounded-full bg-[var(--role-mentorado)]" />
@@ -187,7 +211,9 @@ export default async function PessoaPerfilPage({
               </>
             ) : (
               <>
-                {papelLabel("role" in p ? p.role : null)}
+                <Badge variant="outline" className="font-normal">
+                  {papelLabel("role" in p ? p.role : null)}
+                </Badge>
                 {"ativo" in p && !p.ativo && (
                   <Badge variant="outline" className="border-[var(--danger)]/50 text-[var(--danger)]">
                     inativa
@@ -198,51 +224,35 @@ export default async function PessoaPerfilPage({
                 )}
               </>
             )}
-          </p>
-        }
-        actions={
-          souCoord
-            ? perfil.tipo === "profile" ? (
-                <PessoaActions
-                  pessoa={perfil.pessoa}
-                  podeExcluir={!perfil.pessoa.user_id && perfil.duplas.length === 0}
-                />
-              ) : (
-                <MentoradoActions
-                  mentorado={perfil.pessoa}
-                  temDupla={perfil.duplas.length > 0}
-                />
-              )
-            : undefined
-        }
-      >
-        {/* contato — chip real, não texto corrido (mesma gramática dos chips da ficha) */}
-        {(wa || ("email" in p && p.email)) && (
-          <div className="mt-3 flex flex-wrap gap-2">
-            {wa && (
-              <a
-                href={wa}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-border px-3 text-sm transition-colors hover:bg-[var(--brand-lime)]/15 hover:border-[var(--brand-lime)]/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:min-h-8"
-              >
-                <WhatsappLogo size={15} aria-hidden />
-                WhatsApp
-                <span className="sr-only"> (abre em nova aba)</span>
-              </a>
-            )}
-            {"email" in p && p.email && (
-              <a
-                href={`mailto:${p.email}`}
-                className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-border px-3 text-sm text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:min-h-8"
-              >
-                <EnvelopeSimple size={15} aria-hidden />
-                {p.email}
-              </a>
-            )}
           </div>
-        )}
-      </PageHeader>
+          {/* contato — chip real, não texto corrido */}
+          {(wa || ("email" in p && p.email)) && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {wa && (
+                <a
+                  href={wa}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-border px-3 text-sm transition-colors hover:bg-[var(--brand-lime)]/15 hover:border-[var(--brand-lime)]/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:min-h-8"
+                >
+                  <WhatsappLogo size={15} aria-hidden />
+                  WhatsApp
+                  <span className="sr-only"> (abre em nova aba)</span>
+                </a>
+              )}
+              {"email" in p && p.email && (
+                <a
+                  href={`mailto:${p.email}`}
+                  className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-border px-3 text-sm text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:min-h-8"
+                >
+                  <EnvelopeSimple size={15} aria-hidden />
+                  {p.email}
+                </a>
+              )}
+            </div>
+          )}
+        </div>
+      </header>
 
       {/* minmax(0,1fr) + min-w-0 nos filhos: sem eles o min-content da seção
           "Duplas" subia pelo grid e estourava a página (+66px a 390px).
@@ -252,6 +262,51 @@ export default async function PessoaPerfilPage({
           o segundo filho do grid */}
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
         <div className="min-w-0 space-y-4">
+          {/* vitrine profissional (0030) vira o "Sobre" — bio, LinkedIn,
+              áreas e voluntariado logo abaixo da capa, como nas redes */}
+          {perfilPro && temPerfilPro && (
+            <section className="rounded-xl bg-card p-4 text-sm shadow-[var(--shadow-border)] sm:p-5">
+              <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                Sobre
+              </h2>
+              {perfilPro.bio && (
+                <p className="mt-2 whitespace-pre-wrap text-muted-foreground">
+                  {perfilPro.bio}
+                </p>
+              )}
+              {perfilPro.linkedin && (
+                <a
+                  href={perfilPro.linkedin}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-3 inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-border px-3 text-sm transition-colors hover:bg-muted/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:min-h-8"
+                >
+                  <LinkedinLogo size={15} aria-hidden />
+                  LinkedIn
+                  <span className="sr-only"> (abre em nova aba)</span>
+                </a>
+              )}
+              {perfilPro.areas.length > 0 && (
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  {perfilPro.areas.map((a) => (
+                    <Badge key={a} variant="secondary" className="font-normal">
+                      {a}
+                    </Badge>
+                  ))}
+                </div>
+              )}
+              {perfilPro.voluntariado && (
+                <p className="mt-3 flex items-start gap-1.5 text-xs text-muted-foreground">
+                  <HandHeart size={13} aria-hidden className="mt-0.5 shrink-0" />
+                  <span>
+                    <span className="font-medium">Voluntariado:</span>{" "}
+                    {perfilPro.voluntariado}
+                  </span>
+                </p>
+              )}
+            </section>
+          )}
+
           {/* cadastro/matching (0034) — os sensíveis (nascimento, gênero,
               motivação, pref. de par) só chegam preenchidos pra coordenação
               via view; `sempre` deixa o "—" explícito pra ela */}
@@ -417,58 +472,9 @@ export default async function PessoaPerfilPage({
             </section>
           )}
 
-          {/* vitrine profissional (0030) — bio corrida, LinkedIn externo,
-              áreas como chips e voluntariado numa linha discreta */}
-          {perfilPro && temPerfilPro && (
-            <section className="rounded-xl bg-card p-4 text-sm shadow-[var(--shadow-border)]">
-              <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                Perfil profissional
-              </h2>
-              {perfilPro.bio && (
-                <p className="mt-2 whitespace-pre-wrap text-muted-foreground">
-                  {perfilPro.bio}
-                </p>
-              )}
-              {perfilPro.linkedin && (
-                <a
-                  href={perfilPro.linkedin}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="mt-3 inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-border px-3 text-sm transition-colors hover:bg-muted/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:min-h-8"
-                >
-                  <LinkedinLogo size={15} aria-hidden />
-                  LinkedIn
-                  <span className="sr-only"> (abre em nova aba)</span>
-                </a>
-              )}
-              {perfilPro.areas.length > 0 && (
-                <div className="mt-3 flex flex-wrap gap-1.5">
-                  {perfilPro.areas.map((a) => (
-                    <Badge key={a} variant="secondary" className="font-normal">
-                      {a}
-                    </Badge>
-                  ))}
-                </div>
-              )}
-              {perfilPro.voluntariado && (
-                <p className="mt-3 flex items-start gap-1.5 text-xs text-muted-foreground">
-                  <HandHeart size={13} aria-hidden className="mt-0.5 shrink-0" />
-                  <span>
-                    <span className="font-medium">Voluntariado:</span>{" "}
-                    {perfilPro.voluntariado}
-                  </span>
-                </p>
-              )}
-            </section>
-          )}
-
-        </aside>
-
-        {/* coluna de linha do tempo — mural de notas (a parte viva da
-            ficha), histórico de duplas e supervisões; no lg cai na coluna 1
-            linha 2 pelo auto-placement do grid */}
-        <div className="min-w-0 space-y-4">
-          <section className="rounded-xl bg-card p-4 shadow-[var(--shadow-border)] sm:p-5">
+          {/* mural de notas — espaço modesto basta; fica no rail junto da
+              referência operacional em vez de ocupar a coluna principal */}
+          <section className="rounded-xl bg-card p-4 shadow-[var(--shadow-border)]">
             <h2 className="mb-3 text-sm font-semibold">Notas</h2>
             <PessoaMural
               pessoaId={p.id}
@@ -479,6 +485,11 @@ export default async function PessoaPerfilPage({
             />
           </section>
 
+        </aside>
+
+        {/* coluna de linha do tempo — histórico de duplas, supervisões e
+            referência; no lg cai na coluna 1 linha 2 pelo auto-placement */}
+        <div className="min-w-0 space-y-4">
           <section className="rounded-xl bg-card p-4 text-sm shadow-[var(--shadow-border)]">
             <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
               Duplas
