@@ -64,13 +64,13 @@ export function emailLayout({
   preheader?: string;
   rodapeExtra?: string;
 }): string {
-  const cta =
+  const ctaRender =
     ctaLabel && ctaHref
-      ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:22px 0 4px;">
+      ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:26px 0 4px;">
   <tr>
-    <td bgcolor="${LIME}" style="border-radius:8px;">
+    <td bgcolor="${LIME}" style="border-radius:999px;">
       <a href="${esc(ctaHref)}" target="_blank"
-         style="display:inline-block;padding:12px 26px;font-family:${FONT};font-size:15px;font-weight:700;color:${INK};text-decoration:none;border-radius:8px;">${esc(ctaLabel)}</a>
+         style="display:inline-block;padding:13px 30px;font-family:${FONT};font-size:15px;font-weight:700;color:${INK};text-decoration:none;border-radius:999px;">${esc(ctaLabel)}&nbsp;&rarr;</a>
     </td>
   </tr>
 </table>`
@@ -86,39 +86,46 @@ ${
     : ""
 }
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${PAPEL};">
-<tr><td align="center" style="padding:28px 12px;">
-  <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width:600px;max-width:100%;background:#ffffff;border-radius:12px;border:1px solid ${BORDA};">
-    <!-- header ink + wordmark em texto (REALIZA branco, . amarelo, VC lime) -->
+<tr><td align="center" style="padding:36px 14px 44px;">
+  <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width:600px;max-width:100%;background:#ffffff;border-radius:16px;border:1px solid ${BORDA};box-shadow:0 10px 30px rgba(38,38,38,0.08);">
+    <!-- header ink + wordmark em texto (REALIZA branco, . amarelo, VC lime — tracking fechado igual ao logo) -->
     <tr>
-      <td style="background:${INK};padding:20px 28px;border-radius:12px 12px 0 0;">
-        <div style="font-family:'Arial Black',Arial,Helvetica,sans-serif;font-size:22px;font-weight:900;font-style:italic;letter-spacing:0.5px;line-height:1;color:#ffffff;">REALIZA<span style="color:${AMARELO};">.</span><span style="color:${LIME};">VC</span></div>
-        <div style="margin-top:7px;font-size:12px;color:rgba(255,255,255,0.6);line-height:1.3;">${esc(tagline)}</div>
+      <td style="background:${INK};padding:26px 30px;border-radius:16px 16px 0 0;">
+        <div style="font-family:'Arial Black',Arial,Helvetica,sans-serif;font-size:30px;font-weight:900;font-style:italic;letter-spacing:-1px;line-height:1;color:#ffffff;">REALIZA<span style="color:${AMARELO};letter-spacing:-6px;">.</span><span style="color:${LIME};">VC</span></div>
+        <div style="margin-top:9px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1.6px;color:rgba(255,255,255,0.55);line-height:1.3;">${esc(tagline)}</div>
       </td>
     </tr>
     <!-- keyline lime -->
-    <tr><td style="height:2px;line-height:2px;font-size:0;background:${LIME};">&nbsp;</td></tr>
+    <tr><td style="height:3px;line-height:3px;font-size:0;background:${LIME};">&nbsp;</td></tr>
     <!-- corpo -->
     <tr>
-      <td style="padding:26px 28px 8px;font-size:16px;line-height:1.6;color:${INK};">
-        <h1 style="margin:0 0 18px;font-size:20px;line-height:1.35;font-weight:700;color:${INK};">${esc(titulo)}</h1>
+      <td style="padding:30px 30px 10px;font-size:16px;line-height:1.65;color:${INK};">
+        <h1 style="margin:0 0 20px;font-size:23px;line-height:1.32;font-weight:800;letter-spacing:-0.3px;color:${INK};">${esc(titulo)}</h1>
         ${conteudoHtml}
-        ${cta}
-        <div style="height:20px;line-height:20px;font-size:0;">&nbsp;</div>
+        ${ctaRender}
+        <div style="height:22px;line-height:22px;font-size:0;">&nbsp;</div>
       </td>
     </tr>
     <!-- rodapé -->
     <tr>
-      <td style="background:${PAPEL};padding:16px 28px;border-radius:0 0 12px 12px;border-top:1px solid ${BORDA};">
-        ${
-          selo
-            ? `<p style="margin:0 0 8px;"><span style="display:inline-block;padding:3px 10px;border:1.5px dashed ${LIME};border-radius:7px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.09em;color:${MUTED};">${esc(selo)}</span></p>`
-            : ""
-        }
-        <p style="margin:0;font-size:12px;line-height:1.5;color:${MUTED};">
-          Realiza.vc &middot; Programa de Mentoria Social
-          &middot; <a href="${esc(SITE_URL)}" style="color:${MUTED};text-decoration:underline;">${esc(SITE_URL.replace(/^https?:\/\//, ""))}</a>
-          ${rodapeExtra ? `<br>${rodapeExtra}` : ""}
-        </p>
+      <td style="background:${PAPEL};padding:18px 30px;border-radius:0 0 16px 16px;border-top:1px solid ${BORDA};">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+          <td style="vertical-align:top;width:26px;padding-right:10px;">
+            <div style="width:26px;height:26px;border-radius:7px;background:${LIME};color:${INK};font-family:'Arial Black',Arial,sans-serif;font-size:15px;font-weight:900;font-style:italic;line-height:26px;text-align:center;">R</div>
+          </td>
+          <td style="vertical-align:top;">
+            ${
+              selo
+                ? `<p style="margin:0 0 8px;"><span style="display:inline-block;padding:3px 10px;border:1.5px dashed ${LIME};border-radius:7px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.09em;color:${MUTED};">${esc(selo)}</span></p>`
+                : ""
+            }
+            <p style="margin:0;font-size:12px;line-height:1.55;color:${MUTED};">
+              Realiza.vc &middot; Programa de Mentoria Social
+              &middot; <a href="${esc(SITE_URL)}" style="color:${MUTED};text-decoration:underline;">${esc(SITE_URL.replace(/^https?:\/\//, ""))}</a>
+              ${rodapeExtra ? `<br>${rodapeExtra}` : ""}
+            </p>
+          </td>
+        </tr></table>
       </td>
     </tr>
   </table>
@@ -152,11 +159,11 @@ export function emailAviso({
 }): string {
   const tema = PRIORIDADE_TEMA[prioridade] ?? null;
   const faixa = tema
-    ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 18px;">
+    ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 20px;">
   <tr>
-    <td style="width:4px;background:${tema.cor};border-radius:2px;">&nbsp;</td>
-    <td style="padding:10px 14px;background:${tema.fundo};border-radius:0 8px 8px 0;">
-      <span style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:${tema.cor};">${tema.texto}</span>
+    <td style="width:5px;background:${tema.cor};border-radius:3px;">&nbsp;</td>
+    <td style="padding:11px 16px;background:${tema.fundo};border-radius:0 10px 10px 0;">
+      <span style="font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;color:${tema.cor};">${tema.texto}</span>
     </td>
   </tr>
 </table>`
@@ -189,7 +196,7 @@ export function emailMaterial({
 }): string {
   const card = `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 6px;">
   <tr>
-    <td style="padding:14px 16px;border:1px solid ${BORDA};border-left:4px solid ${LIME};border-radius:8px;">
+    <td style="padding:16px 18px;border:1px solid ${BORDA};border-left:4px solid ${LIME};border-radius:10px;background:#fcfbf7;">
       <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:${MUTED};">${esc(tipoLabel)}</span>
       <div style="margin-top:4px;font-size:16px;font-weight:700;line-height:1.4;color:${INK};">${esc(titulo)}</div>
       ${
