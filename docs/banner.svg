@@ -1,99 +1,77 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 300" width="1100" height="300">
-  <rect width="1100" height="300" fill="#f1f2ec" />
-  <rect x="14" y="14" width="1072" height="272" rx="10" fill="none" stroke="#262626" stroke-opacity="0.16" stroke-width="1.25" />
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 320" width="1100" height="320">
+  <defs>
+    <pattern id="rz-dots" width="26" height="26" patternUnits="userSpaceOnUse">
+      <circle cx="1.5" cy="1.5" r="1" fill="#262626" opacity="0.06"/>
+    </pattern>
+    <path id="rz-loop" d="M 525 84 m -68 0 a 68 68 0 1 1 136 0 a 68 68 0 1 1 -136 0" fill="none"/>
+  </defs>
+  <rect width="1100" height="320" fill="#f1f2ec"/>
+  <rect width="1100" height="320" fill="url(#rz-dots)"/>
+  <rect x="0.5" y="0.5" width="1099" height="319" fill="none" stroke="#262626" stroke-opacity="0.3" stroke-width="1.5"/>
 
-  <!-- meta topo -->
-  <text x="1044" y="44" text-anchor="end" font-family="'JetBrains Mono','Fira Code',monospace" font-size="10.5" letter-spacing="1.4" fill="#565950">INSTITUTO REALIZA.VC &#183; MENTORIA SOCIAL</text>
-
-  <!-- esquerda: marca -->
-  <text x="56" y="114" font-family="'Mitr','Segoe UI',system-ui,-apple-system,sans-serif" font-size="46" font-weight="700" letter-spacing="0.5" fill="#262626">realiza<tspan fill="#a2ca44">.vc</tspan></text>
-  <text x="56" y="142" font-family="'Mitr','Segoe UI',system-ui,-apple-system,sans-serif" font-size="14.5" fill="#262626" fill-opacity="0.85">painel operacional da mentoria social</text>
-
-  <!-- glifo da dupla -->
-  <circle cx="70" cy="184" r="13" fill="#a2ca44" />
-  <circle cx="92" cy="184" r="13" fill="#ffd531" fill-opacity="0.92" />
-  <text x="116" y="180" font-family="'JetBrains Mono','Fira Code',monospace" font-size="10.5" fill="#565950">uma dupla por ciclo:</text>
-  <text x="116" y="196" font-family="'JetBrains Mono','Fira Code',monospace" font-size="12" fill="#262626">mentor &#8596; mentorado</text>
-
-  <text x="56" y="226" font-family="'JetBrains Mono','Fira Code',monospace" font-size="11" fill="#565950">a dupla agenda os encontros;</text>
-  <text x="56" y="242" font-family="'JetBrains Mono','Fira Code',monospace" font-size="11" fill="#565950">a coordena&#231;&#227;o acompanha.</text>
-
-  <!-- centro: jornada de 16 encontros -->
-  <text x="392" y="104" font-family="'JetBrains Mono','Fira Code',monospace" font-size="11" fill="#565950">jornada &#183; 16 encontros oficiais &#224;s ter&#231;as</text>
-  <line x1="392" y1="162" x2="842" y2="162" stroke="#262626" stroke-opacity="0.22" stroke-width="1.5" />
-
-  <!-- nós: base + preenchimento lime escalonado -->
-  <g stroke="#262626" stroke-opacity="0.4" stroke-width="1.25" fill="#ffffff">
-    <circle cx="392" cy="162" r="13.5" /><circle cx="422" cy="162" r="13.5" /><circle cx="452" cy="162" r="13.5" /><circle cx="482" cy="162" r="13.5" />
-    <circle cx="512" cy="162" r="13.5" /><circle cx="542" cy="162" r="13.5" /><circle cx="572" cy="162" r="13.5" /><circle cx="602" cy="162" r="13.5" />
-    <circle cx="632" cy="162" r="13.5" /><circle cx="662" cy="162" r="13.5" /><circle cx="692" cy="162" r="13.5" /><circle cx="722" cy="162" r="13.5" />
-    <circle cx="752" cy="162" r="13.5" /><circle cx="782" cy="162" r="13.5" /><circle cx="812" cy="162" r="13.5" /><circle cx="842" cy="162" r="13.5" />
+  <!-- left: identity -->
+  <text x="56" y="112" font-family="ui-monospace,'Fira Code',monospace" font-weight="bold" font-size="56" fill="#262626">realiza<tspan fill="#a2ca44">.vc</tspan></text>
+  <text x="58" y="146" font-family="Georgia,serif" font-size="17" font-style="italic" fill="#4a4a42">o painel operacional da mentoria</text>
+  <line x1="58" y1="172" x2="330" y2="172" stroke="#262626" stroke-opacity="0.25"/>
+  <g font-family="ui-monospace,monospace" font-size="13" fill="#4a4a42">
+    <text x="58" y="198">dupla = mentor ↔ mentorado</text>
+    <text x="58" y="222">rls por papel · escopo por rota</text>
+    <text x="58" y="246">demo pública em /demo</text>
   </g>
-  <g fill="#a2ca44">
-    <circle cx="392" cy="162" r="13.5" opacity="0"><animate attributeName="opacity" values="0;1" dur="0.45s" begin="0.35s" fill="freeze" /></circle>
-    <circle cx="422" cy="162" r="13.5" opacity="0"><animate attributeName="opacity" values="0;1" dur="0.45s" begin="0.53s" fill="freeze" /></circle>
-    <circle cx="452" cy="162" r="13.5" opacity="0"><animate attributeName="opacity" values="0;1" dur="0.45s" begin="0.71s" fill="freeze" /></circle>
-    <circle cx="482" cy="162" r="13.5" opacity="0"><animate attributeName="opacity" values="0;1" dur="0.45s" begin="0.89s" fill="freeze" /></circle>
-    <circle cx="512" cy="162" r="13.5" opacity="0"><animate attributeName="opacity" values="0;1" dur="0.45s" begin="1.07s" fill="freeze" /></circle>
-    <circle cx="542" cy="162" r="13.5" opacity="0"><animate attributeName="opacity" values="0;1" dur="0.45s" begin="1.25s" fill="freeze" /></circle>
-    <circle cx="572" cy="162" r="13.5" opacity="0"><animate attributeName="opacity" values="0;1" dur="0.45s" begin="1.43s" fill="freeze" /></circle>
-    <circle cx="602" cy="162" r="13.5" opacity="0"><animate attributeName="opacity" values="0;1" dur="0.45s" begin="1.61s" fill="freeze" /></circle>
-    <circle cx="632" cy="162" r="13.5" opacity="0"><animate attributeName="opacity" values="0;1" dur="0.45s" begin="1.79s" fill="freeze" /></circle>
-    <circle cx="662" cy="162" r="13.5" opacity="0"><animate attributeName="opacity" values="0;1" dur="0.45s" begin="1.97s" fill="freeze" /></circle>
-    <circle cx="692" cy="162" r="13.5" opacity="0"><animate attributeName="opacity" values="0;1" dur="0.45s" begin="2.15s" fill="freeze" /></circle>
-    <circle cx="722" cy="162" r="13.5" opacity="0"><animate attributeName="opacity" values="0;1" dur="0.45s" begin="2.33s" fill="freeze" /></circle>
-    <circle cx="752" cy="162" r="13.5" opacity="0"><animate attributeName="opacity" values="0;1" dur="0.45s" begin="2.51s" fill="freeze" /></circle>
-    <circle cx="782" cy="162" r="13.5" opacity="0"><animate attributeName="opacity" values="0;1" dur="0.45s" begin="2.69s" fill="freeze" /></circle>
-    <circle cx="812" cy="162" r="13.5" opacity="0"><animate attributeName="opacity" values="0;1" dur="0.45s" begin="2.87s" fill="freeze" /></circle>
-    <circle cx="842" cy="162" r="13.5" opacity="0"><animate attributeName="opacity" values="0;1" dur="0.45s" begin="3.05s" fill="freeze" /></circle>
-  </g>
-  <g font-family="'JetBrains Mono','Fira Code',monospace" font-size="10.5" fill="#262626" text-anchor="middle">
-    <text x="392.8" y="166">01</text><text x="422.8" y="166">02</text><text x="452.8" y="166">03</text><text x="482.8" y="166">04</text>
-    <text x="512.8" y="166">05</text><text x="542.8" y="166">06</text><text x="572.8" y="166">07</text><text x="602.8" y="166">08</text>
-    <text x="632.8" y="166">09</text><text x="662.8" y="166">10</text><text x="692.8" y="166">11</text><text x="722.8" y="166">12</text>
-    <text x="752.8" y="166">13</text><text x="782.8" y="166">14</text><text x="812.8" y="166">15</text><text x="842.8" y="166">16</text>
-  </g>
-  <!-- marcos da jornada -->
-  <g font-family="'JetBrains Mono','Fira Code',monospace" font-size="9.5" fill="#565950" text-anchor="middle">
-    <text x="392" y="196">in&#237;cio</text>
-    <text x="602" y="196">metade</text>
-    <text x="752" y="196">reta final</text>
-    <text x="842" y="196">fim</text>
-  </g>
-  <!-- pulso viajando pelos nós -->
-  <circle r="6" fill="#a2ca44" stroke="#262626" stroke-width="1.5">
-    <animateMotion dur="5.5s" repeatCount="indefinite" path="M392 162 L842 162" />
+  <text x="58" y="292" font-family="ui-monospace,monospace" font-size="11.5" fill="#7a7a6e">next.js 16 · react 19 · supabase · vitest 156</text>
+
+  <!-- center: the operational loop -->
+  <circle cx="525" cy="152" r="68" fill="none" stroke="#262626" stroke-opacity="0.2" stroke-width="1.5" stroke-dasharray="4 6"/>
+  <circle r="5" fill="#a2ca44" stroke="#262626" stroke-width="1">
+    <animateMotion dur="6s" repeatCount="indefinite" path="M 525 84 m -68 0 a 68 68 0 1 1 136 0 a 68 68 0 1 1 -136 0"/>
   </circle>
+  <text x="525" y="148" font-family="Georgia,serif" font-size="15" font-style="italic" fill="#4a4a42" text-anchor="middle">ciclo da</text>
+  <text x="525" y="166" font-family="Georgia,serif" font-size="15" font-style="italic" fill="#4a4a42" text-anchor="middle">dupla</text>
 
-  <!-- direita: card do semáforo -->
-  <rect x="868" y="62" width="184" height="174" rx="12" fill="#ffffff" stroke="#262626" stroke-opacity="0.22" stroke-width="1.25" />
-  <text x="884" y="90" font-family="'Mitr','Segoe UI',system-ui,-apple-system,sans-serif" font-size="14.5" font-weight="700" fill="#262626">sa&#250;de da dupla</text>
-  <text x="884" y="104" font-family="'JetBrains Mono','Fira Code',monospace" font-size="9.5" fill="#565950">saudadeDaDupla()</text>
-
-  <!-- indicador que pisca entre estados -->
-  <rect x="876" y="118" width="5" height="24" rx="2.5" fill="#262626">
-    <animateTransform attributeName="transform" type="translate" values="0 0;0 36;0 72" keyTimes="0;0.34;0.67" calcMode="discrete" dur="7.2s" repeatCount="indefinite" />
-    <animate attributeName="opacity" values="1;0.35;1" dur="1.1s" repeatCount="indefinite" />
-  </rect>
-
-  <circle cx="902" cy="130" r="13.5" fill="#a2ca44" />
-  <circle cx="902" cy="166" r="13.5" fill="#ffd531" />
-  <circle cx="902" cy="202" r="13.5" fill="#e04f3f" />
-
-  <g font-family="'Mitr','Segoe UI',system-ui,-apple-system,sans-serif" font-size="13" fill="#262626">
-    <text x="926" y="135">ok</text>
-    <text x="926" y="171">aten&#231;&#227;o</text>
-    <text x="926" y="207">risco</text>
+  <g font-family="ui-monospace,monospace" font-size="12.5" font-weight="bold">
+    <g>
+      <circle cx="525" cy="84" r="17" fill="#262626"/>
+      <text x="525" y="89" fill="#f1f2ec" text-anchor="middle">1</text>
+      <text x="525" y="58" fill="#262626" text-anchor="middle">agenda</text>
+    </g>
+    <g>
+      <circle cx="590" cy="131" r="17" fill="#a2ca44"/>
+      <text x="590" y="136" fill="#262626" text-anchor="middle">2</text>
+      <text x="618" y="135" fill="#262626">encontro</text>
+    </g>
+    <g>
+      <circle cx="565" cy="207" r="17" fill="#a2ca44"/>
+      <text x="565" y="212" fill="#262626" text-anchor="middle">3</text>
+      <text x="588" y="238" fill="#262626">registro</text>
+    </g>
+    <g>
+      <circle cx="485" cy="207" r="17" fill="#ffd531"/>
+      <text x="485" y="212" fill="#262626" text-anchor="middle">4</text>
+      <text x="462" y="238" fill="#262626" text-anchor="end">semáforo</text>
+    </g>
+    <g>
+      <circle cx="460" cy="131" r="17" fill="#e04f3f"/>
+      <text x="460" y="136" fill="#f1f2ec" text-anchor="middle">5</text>
+      <text x="430" y="135" fill="#262626" text-anchor="end">nudge</text>
+    </g>
   </g>
-  <g font-family="'JetBrains Mono','Fira Code',monospace" font-size="9" fill="#565950" text-anchor="end">
-    <text x="1040" y="135">em dia</text>
-    <text x="1040" y="171">pede olhar</text>
-    <text x="1040" y="207">agir agora</text>
-  </g>
-  <text x="884" y="226" font-family="'JetBrains Mono','Fira Code',monospace" font-size="9.5" fill="#565950">derivada dos sinais</text>
 
-  <!-- rodapé -->
-  <line x1="56" y1="252" x2="1044" y2="252" stroke="#262626" stroke-opacity="0.12" stroke-width="1" />
-  <text x="56" y="272" font-family="'JetBrains Mono','Fira Code',monospace" font-size="10.5" fill="#565950">next.js 16 &#183; react 19 &#183; supabase rls &#183; 54 migrations</text>
-  <text x="1044" y="272" text-anchor="end" font-family="'JetBrains Mono','Fira Code',monospace" font-size="10.5" fill="#565950">demo p&#250;blica em /demo &#183; vitest: 156 testes</text>
+  <!-- right: feature surfaces -->
+  <g>
+    <rect x="700" y="62" width="344" height="196" rx="10" fill="#fbfaf5" stroke="#262626" stroke-opacity="0.3"/>
+    <text x="722" y="92" font-family="ui-monospace,monospace" font-size="12" letter-spacing="2" fill="#7a7a6e">SUPERFÍCIES PÚBLICAS</text>
+    <line x1="722" y1="104" x2="1022" y2="104" stroke="#262626" stroke-opacity="0.15"/>
+    <g font-family="ui-monospace,monospace" font-size="13.5">
+      <text x="722" y="130" fill="#262626" font-weight="bold">/f/[token]</text>
+      <text x="900" y="130" fill="#4a4a42">formulário sem login</text>
+      <text x="722" y="158" fill="#262626" font-weight="bold">/assinar/[token]</text>
+      <text x="900" y="158" fill="#4a4a42">termo do responsável</text>
+      <text x="722" y="186" fill="#262626" font-weight="bold">/demo</text>
+      <text x="900" y="186" fill="#4a4a42">app inteira, sem conta</text>
+      <text x="722" y="214" fill="#262626" font-weight="bold">/privacidade</text>
+      <text x="900" y="214" fill="#4a4a42">aviso lgpd</text>
+    </g>
+    <line x1="722" y1="230" x2="1022" y2="230" stroke="#262626" stroke-opacity="0.15"/>
+    <text x="722" y="248" font-family="ui-monospace,monospace" font-size="11" fill="#7a7a6e">semáforo: apoio · avaliação baixa · ≥2 atrasos → risco</text>
+  </g>
 </svg>
