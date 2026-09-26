@@ -35,13 +35,11 @@ function paragrafos(texto: string): string {
     .join("");
 }
 
-/** Wordmark da marca — variante branca hospedada no bucket público
- *  `avatares` (URL estável em qualquer ambiente; o asset local
- *  `public/logo-realiza-email.png` é o espelho/fallback). */
-const LOGO_URL = `${process.env.NEXT_PUBLIC_SUPABASE_URL ?? ""}/storage/v1/object/public/avatares/sistema/logo-realiza-email.png`;
+const AMARELO = "#ffd633"; // ponto do wordmark / --role-mentorado
 
-/** Casca única dos e-mails do sistema — header ink com o wordmark real da
- *  marca (`logo-realiza-email.png`, variante branca) + keyline lime (a
+/** Casca única dos e-mails do sistema — header ink com o wordmark da marca
+ *  em texto puro (REALIZA branco + "." amarelo + "VC" lime; sem imagem,
+ *  nada fica bloqueado) + keyline lime (a
  *  mesma do footer do app), corpo branco 600px, rodapé papel. Só tabelas +
  *  CSS inline: o que o Gmail/Outlook respeitam.
  *  `tagline` troca a linha sob o logo pelo contexto do e-mail
@@ -90,12 +88,11 @@ ${
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${PAPEL};">
 <tr><td align="center" style="padding:28px 12px;">
   <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width:600px;max-width:100%;background:#ffffff;border-radius:12px;border:1px solid ${BORDA};">
-    <!-- header ink + wordmark real (variante branca do logo) -->
+    <!-- header ink + wordmark em texto (REALIZA branco, . amarelo, VC lime) -->
     <tr>
       <td style="background:${INK};padding:20px 28px;border-radius:12px 12px 0 0;">
-        <img src="${process.env.NEXT_PUBLIC_SUPABASE_URL ? LOGO_URL : `${SITE_URL}/logo-realiza-email.png`}" width="152" height="21" alt="Realiza.vc"
-             style="display:block;border:0;outline:none;color:#ffffff;font-size:18px;font-weight:800;font-style:italic;">
-        <div style="margin-top:6px;font-size:12px;color:rgba(255,255,255,0.6);line-height:1.3;">${esc(tagline)}</div>
+        <div style="font-family:'Arial Black',Arial,Helvetica,sans-serif;font-size:22px;font-weight:900;font-style:italic;letter-spacing:0.5px;line-height:1;color:#ffffff;">REALIZA<span style="color:${AMARELO};">.</span><span style="color:${LIME};">VC</span></div>
+        <div style="margin-top:7px;font-size:12px;color:rgba(255,255,255,0.6);line-height:1.3;">${esc(tagline)}</div>
       </td>
     </tr>
     <!-- keyline lime -->
