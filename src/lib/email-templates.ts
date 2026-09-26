@@ -5,7 +5,6 @@ import type { ComunicadoPrioridade } from "@/lib/types";
 // tokens, e cliente de e-mail só garante inline CSS
 const INK = "#262626"; // --brand-ink hsl(0 0% 15%)
 const LIME = "#a2ca44"; // --brand-lime hsl(78 56% 53%)
-const AMARELO = "#ffd633"; // --role-mentorado hsl(48 100% 60%)
 const PAPEL = "#f6f4ee"; // fundo papel quente
 const MUTED = "#6f6a5f";
 const BORDA = "#e8e4d8";
@@ -36,10 +35,16 @@ function paragrafos(texto: string): string {
     .join("");
 }
 
-/** Casca única dos e-mails do sistema — header ink com os dois discos da
- *  marca + keyline lime (a mesma do footer do app), corpo branco 600px,
- *  rodapé papel. Só tabelas + CSS inline: o que o Gmail/Outlook respeitam.
- *  `tagline` troca a linha sob "Realiza.vc" pelo contexto do e-mail
+/** Wordmark da marca — variante branca hospedada no bucket público
+ *  `avatares` (URL estável em qualquer ambiente; o asset local
+ *  `public/logo-realiza-email.png` é o espelho/fallback). */
+const LOGO_URL = `${process.env.NEXT_PUBLIC_SUPABASE_URL ?? ""}/storage/v1/object/public/avatares/sistema/logo-realiza-email.png`;
+
+/** Casca única dos e-mails do sistema — header ink com o wordmark real da
+ *  marca (`logo-realiza-email.png`, variante branca) + keyline lime (a
+ *  mesma do footer do app), corpo branco 600px, rodapé papel. Só tabelas +
+ *  CSS inline: o que o Gmail/Outlook respeitam.
+ *  `tagline` troca a linha sob o logo pelo contexto do e-mail
  *  ("Aviso da coordenação"), `selo` é o carimbo tracejado do rodapé e
  *  `preheader` é o texto de prévia que a caixa de entrada mostra. */
 export function emailLayout({
@@ -85,18 +90,12 @@ ${
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${PAPEL};">
 <tr><td align="center" style="padding:28px 12px;">
   <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width:600px;max-width:100%;background:#ffffff;border-radius:12px;border:1px solid ${BORDA};">
-    <!-- header ink + marca -->
+    <!-- header ink + wordmark real (variante branca do logo) -->
     <tr>
       <td style="background:${INK};padding:20px 28px;border-radius:12px 12px 0 0;">
-        <table role="presentation" cellpadding="0" cellspacing="0"><tr>
-          <td style="padding-right:12px;vertical-align:middle;">
-            <span style="display:inline-block;width:16px;height:16px;border-radius:50%;background:${LIME};"></span><span style="display:inline-block;width:16px;height:16px;border-radius:50%;background:${AMARELO};margin-left:-7px;"></span>
-          </td>
-          <td style="vertical-align:middle;">
-            <div style="font-size:18px;font-weight:700;color:#ffffff;line-height:1.2;">Realiza.vc</div>
-            <div style="font-size:12px;color:rgba(255,255,255,0.6);line-height:1.3;">${esc(tagline)}</div>
-          </td>
-        </tr></table>
+        <img src="${process.env.NEXT_PUBLIC_SUPABASE_URL ? LOGO_URL : `${SITE_URL}/logo-realiza-email.png`}" width="152" height="21" alt="Realiza.vc"
+             style="display:block;border:0;outline:none;color:#ffffff;font-size:18px;font-weight:800;font-style:italic;">
+        <div style="margin-top:6px;font-size:12px;color:rgba(255,255,255,0.6);line-height:1.3;">${esc(tagline)}</div>
       </td>
     </tr>
     <!-- keyline lime -->

@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
+import { writeFileSync } from "node:fs";
 import { emailAviso, emailMaterial } from "@/lib/email-templates";
+
+// EMAIL_PREVIEW=1 pnpm vitest run … → grava os HTMLs em /tmp pra olhar no browser
+const dump = (nome: string, html: string) => {
+  if (process.env.EMAIL_PREVIEW) writeFileSync(`/tmp/${nome}.html`, html);
+};
 
 describe("templates de e-mail", () => {
   it("aviso urgente: tagline, selo, preheader e faixa de prioridade", () => {
@@ -8,6 +14,7 @@ describe("templates de e-mail", () => {
       corpo: "Lembrem de registrar <até> sexta.",
       prioridade: "urgente",
     });
+    dump("email-aviso", html);
     expect(html).toContain("Aviso da coordenação");
     expect(html).toContain("Aviso · Urgente");
     expect(html).toContain("mso-hide:all");
@@ -23,6 +30,7 @@ describe("templates de e-mail", () => {
       tipoLabel: "Guia",
       ctaHref: "https://realizavc.vercel.app/materiais",
     });
+    dump("email-material", html);
     expect(html).toContain("Biblioteca de materiais");
     expect(html).toContain("Material novo");
     expect(html).toContain("Abrir material");
