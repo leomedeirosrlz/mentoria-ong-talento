@@ -1,5 +1,5 @@
 <div align="center">
-  <a href="#root"><img src="./banner.svg?v=2" alt="realiza.vc · operating panel for a social mentoring program" width="100%"/></a>
+  <a href="#root"><img src="./banner.svg?v=3" alt="realiza.vc · operating panel for a social mentoring program" width="100%"/></a>
 </div>
 
 > 🇧🇷 [Versão em Português](../README.md) · the product, UI and data are pt-BR; this file is in English for reach.

@@ -23,11 +23,12 @@
   <line x1="46" y1="124" x2="830" y2="124" stroke="#262626" stroke-opacity="0.15" stroke-width="1" />
 
   <!-- ===== trilha: matching -> 16 encontros -> encerramento ===== -->
-  <text x="46" y="150" font-family="'JetBrains Mono','Fira Code',monospace" font-size="13" letter-spacing="1" fill="#565950">a jornada da dupla</text>
+  <rect x="46" y="142" width="7" height="7" fill="#a2ca44" />
+  <text x="60" y="150" font-family="'JetBrains Mono','Fira Code',monospace" font-size="13" letter-spacing="1" fill="#565950">a jornada da dupla</text>
 
   <!-- a dupla: disco lime (mentor) + ponto amarelo (mentorado) -->
-  <circle cx="62" cy="186" r="9.5" fill="#a2ca44" />
-  <circle cx="78" cy="186" r="7" fill="#ffd531" />
+  <circle cx="60" cy="186" r="10" fill="#a2ca44" />
+  <circle cx="77" cy="186" r="7.5" fill="#ffd531" />
 
   <line x1="92" y1="186" x2="816" y2="186" stroke="#262626" stroke-opacity="0.12" stroke-width="1.25" />
   <line x1="92" y1="186" x2="124" y2="186" stroke="#262626" stroke-opacity="0.3" stroke-width="1.5" />
@@ -55,7 +56,7 @@
   <circle cx="832" cy="186" r="7" fill="none" stroke="#262626" stroke-opacity="0.55" stroke-width="1.5" />
 
   <!-- a dupla percorre a trilha -->
-  <circle r="4.5" fill="#4e6318">
+  <circle r="5" fill="#4e6318" stroke="#f1f2ec" stroke-width="1.4">
     <animateMotion dur="10s" repeatCount="indefinite" path="M92 186 L832 186" />
   </circle>
 
@@ -67,7 +68,6 @@
   <text x="457" y="252" text-anchor="middle" font-family="'JetBrains Mono','Fira Code',monospace" font-size="14" fill="#262626">o mentor registra cada encontro; o sem&#225;foro recalcula a cada leitura</text>
   <text x="457" y="276" text-anchor="middle" font-family="'JetBrains Mono','Fira Code',monospace" font-size="13" fill="#565950">apoio, avalia&#231;&#227;o baixa ou 2+ atrasos acendem risco &#8594; nudge via wa.me</text>
 
-  <line x1="46" y1="288" x2="830" y2="288" stroke="#262626" stroke-opacity="0.1" stroke-width="1" />
   <text x="46" y="304" font-family="'JetBrains Mono','Fira Code',monospace" font-size="13" fill="#565950">sem login: /demo &#183; /f/[token] &#183; /assinar/[token]</text>
   <text x="830" y="304" text-anchor="end" font-family="'JetBrains Mono','Fira Code',monospace" font-size="13" fill="#565950">escopo por papel via rls</text>
 </svg>

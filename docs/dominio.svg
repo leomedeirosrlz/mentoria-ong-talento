@@ -1,154 +1,155 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 560" width="1100" height="560">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 560" width="1240" height="560">
   <defs>
     <marker id="darr" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto">
       <path d="M0 0L8 4L0 8" fill="none" stroke="#262626" stroke-width="1.3" />
     </marker>
   </defs>
 
-  <rect width="1100" height="560" fill="#f1f2ec" />
-  <rect x="14" y="14" width="1072" height="532" rx="10" fill="none" stroke="#262626" stroke-opacity="0.16" stroke-width="1.25" />
+  <rect width="1240" height="560" fill="#f1f2ec" />
+  <rect x="14" y="14" width="1212" height="532" rx="10" fill="none" stroke="#262626" stroke-opacity="0.16" stroke-width="1.25" />
 
   <!-- header -->
-  <text x="48" y="56" font-family="'Mitr','Segoe UI',system-ui,-apple-system,sans-serif" font-size="20" font-weight="700" fill="#262626">Mapa do sistema</text>
-  <text x="1052" y="56" text-anchor="end" font-family="'JetBrains Mono','Fira Code',monospace" font-size="10" fill="#565950">rls via my_role() / my_profile_id()</text>
+  <text x="48" y="58" font-family="'Mitr','Segoe UI',system-ui,sans-serif" font-size="22" font-weight="700" fill="#262626">Mapa do sistema</text>
+  <text x="1192" y="58" text-anchor="end" font-family="'JetBrains Mono','Fira Code',monospace" font-size="13" fill="#565950">rls via my_role() / my_profile_id()</text>
 
   <!-- ===== pipeline da dupla ===== -->
   <g fill="none" stroke="#262626" stroke-opacity="0.45" stroke-width="1.25">
-    <path d="M198 127 L234 127" marker-end="url(#darr)" />
-    <path d="M384 127 L420 127" marker-end="url(#darr)" />
-    <path d="M570 127 L606 127" marker-end="url(#darr)" />
-    <path d="M866 127 L902 127" marker-end="url(#darr)" />
+    <path d="M230 134 L258 134" marker-end="url(#darr)" />
+    <path d="M448 134 L476 134" marker-end="url(#darr)" />
+    <path d="M671 134 L699 134" marker-end="url(#darr)" />
+    <path d="M989 134 L1017 134" marker-end="url(#darr)" />
   </g>
-  <circle r="3" fill="#4e6318"><animateMotion dur="1.9s" repeatCount="indefinite" path="M198 127 L234 127" /></circle>
-  <circle r="3" fill="#4e6318"><animateMotion dur="1.9s" begin="0.5s" repeatCount="indefinite" path="M384 127 L420 127" /></circle>
-  <circle r="3" fill="#4e6318"><animateMotion dur="1.9s" begin="1s" repeatCount="indefinite" path="M570 127 L606 127" /></circle>
-  <circle r="3" fill="#4e6318"><animateMotion dur="1.9s" begin="1.5s" repeatCount="indefinite" path="M866 127 L902 127" /></circle>
+  <circle r="3" fill="#4e6318"><animateMotion dur="1.9s" repeatCount="indefinite" path="M230 134 L258 134" /></circle>
+  <circle r="3" fill="#4e6318"><animateMotion dur="1.9s" begin="0.5s" repeatCount="indefinite" path="M448 134 L476 134" /></circle>
+  <circle r="3" fill="#4e6318"><animateMotion dur="1.9s" begin="1s" repeatCount="indefinite" path="M671 134 L699 134" /></circle>
+  <circle r="3" fill="#4e6318"><animateMotion dur="1.9s" begin="1.5s" repeatCount="indefinite" path="M989 134 L1017 134" /></circle>
 
-  <g font-family="'JetBrains Mono','Fira Code',monospace" font-size="10" fill="#565950">
+  <g font-family="'JetBrains Mono','Fira Code',monospace" font-size="13" fill="#3a3c36">
     <!-- 1 intake -->
-    <rect x="48" y="78" width="150" height="98" rx="8" fill="#ffffff" stroke="#262626" stroke-opacity="0.22" stroke-width="1.25" />
-    <text x="64" y="106" font-family="'Mitr','Segoe UI',system-ui,sans-serif" font-size="13" font-weight="700" fill="#262626">1 &#183; intake</text>
-    <text x="64" y="130">coord cadastra</text>
-    <text x="64" y="145">as pessoas antes;</text>
-    <text x="64" y="160">login por allowlist</text>
+    <rect x="48" y="82" width="182" height="104" rx="8" fill="#ffffff" stroke="#262626" stroke-opacity="0.22" stroke-width="1.25" />
+    <text x="64" y="110" font-family="'Mitr','Segoe UI',system-ui,sans-serif" font-size="15" font-weight="700" fill="#262626">1 &#183; intake</text>
+    <text x="64" y="140">coord cadastra</text>
+    <text x="64" y="158">as pessoas antes;</text>
+    <text x="64" y="176">login por allowlist</text>
 
     <!-- 2 matching -->
-    <rect x="234" y="78" width="150" height="98" rx="8" fill="#ffffff" stroke="#262626" stroke-opacity="0.22" stroke-width="1.25" />
-    <text x="250" y="106" font-family="'Mitr','Segoe UI',system-ui,sans-serif" font-size="13" font-weight="700" fill="#262626">2 &#183; matching</text>
-    <text x="250" y="130">grade de hor&#225;rios</text>
-    <text x="250" y="145">afinidade dos 2 lados</text>
-    <text x="250" y="160">&lt;18 avisa o respons&#225;vel</text>
+    <rect x="258" y="82" width="190" height="104" rx="8" fill="#ffffff" stroke="#262626" stroke-opacity="0.22" stroke-width="1.25" />
+    <text x="274" y="110" font-family="'Mitr','Segoe UI',system-ui,sans-serif" font-size="15" font-weight="700" fill="#262626">2 &#183; matching</text>
+    <text x="274" y="140">grade de hor&#225;rios</text>
+    <text x="274" y="158">afinidade dos lados</text>
+    <text x="274" y="176">&lt;18 pede respons&#225;vel</text>
 
     <!-- 3 dupla -->
-    <rect x="420" y="78" width="150" height="98" rx="8" fill="#ffffff" stroke="#262626" stroke-opacity="0.22" stroke-width="1.25" />
-    <text x="436" y="106" font-family="'Mitr','Segoe UI',system-ui,sans-serif" font-size="13" font-weight="700" fill="#262626">3 &#183; dupla</text>
-    <circle cx="444" cy="128" r="8" fill="#a2ca44" />
-    <circle cx="458" cy="128" r="8" fill="#ffd531" fill-opacity="0.92" />
-    <text x="472" y="132">mentor + mentorado</text>
-    <text x="436" y="150">ativa &#183; pausada</text>
-    <text x="436" y="165">conclu&#237;da &#183; encerrada</text>
+    <rect x="476" y="82" width="195" height="104" rx="8" fill="#ffffff" stroke="#262626" stroke-opacity="0.22" stroke-width="1.25" />
+    <text x="492" y="110" font-family="'Mitr','Segoe UI',system-ui,sans-serif" font-size="15" font-weight="700" fill="#262626">3 &#183; dupla</text>
+    <circle cx="500" cy="136" r="8" fill="#a2ca44" />
+    <circle cx="514" cy="136" r="8" fill="#ffd531" fill-opacity="0.92" />
+    <text x="528" y="140">mentor+mentorado</text>
+    <text x="492" y="162">ativa &#183; pausada</text>
+    <text x="492" y="180">conclu&#237;da/encerrada</text>
 
     <!-- 4 jornada -->
-    <rect x="606" y="78" width="260" height="98" rx="8" fill="#ffffff" stroke="#262626" stroke-opacity="0.22" stroke-width="1.25" />
-    <text x="622" y="106" font-family="'Mitr','Segoe UI',system-ui,sans-serif" font-size="13" font-weight="700" fill="#262626">4 &#183; jornada</text>
-    <text x="622" y="124" fill-opacity="0.8">16 encontros oficiais &#183; ter&#231;as</text>
+    <rect x="699" y="82" width="290" height="104" rx="8" fill="#ffffff" stroke="#262626" stroke-opacity="0.22" stroke-width="1.25" />
+    <text x="715" y="110" font-family="'Mitr','Segoe UI',system-ui,sans-serif" font-size="15" font-weight="700" fill="#262626">4 &#183; jornada</text>
+    <text x="715" y="134">16 encontros oficiais &#183; ter&#231;as</text>
     <g>
-      <line x1="626" y1="140" x2="846" y2="140" stroke="#262626" stroke-opacity="0.2" stroke-width="1" />
-      <circle cx="626" cy="140" r="4" fill="#a2ca44" /><circle cx="641" cy="140" r="4" fill="#a2ca44" /><circle cx="656" cy="140" r="4" fill="#a2ca44" />
-      <circle cx="671" cy="140" r="4" fill="#a2ca44" /><circle cx="686" cy="140" r="4" fill="#a2ca44" /><circle cx="701" cy="140" r="4" fill="#a2ca44" />
-      <circle cx="716" cy="140" r="4" fill="#a2ca44" /><circle cx="731" cy="140" r="4" fill="#a2ca44" />
-      <circle cx="746" cy="140" r="4" fill="#ffd531" /><circle cx="761" cy="140" r="4" fill="#ffd531" />
-      <circle cx="776" cy="140" r="4" fill="none" stroke="#565950" stroke-width="1" stroke-dasharray="2 2" />
-      <circle cx="791" cy="140" r="4" fill="none" stroke="#262626" stroke-opacity="0.55" stroke-width="1.2" />
-      <circle cx="806" cy="140" r="4" fill="none" stroke="#262626" stroke-opacity="0.28" stroke-width="1" />
-      <circle cx="821" cy="140" r="4" fill="none" stroke="#262626" stroke-opacity="0.28" stroke-width="1" />
-      <circle cx="836" cy="140" r="4" fill="none" stroke="#262626" stroke-opacity="0.28" stroke-width="1" />
+      <line x1="719" y1="150" x2="951" y2="150" stroke="#262626" stroke-opacity="0.2" stroke-width="1" />
+      <circle cx="719" cy="150" r="4.5" fill="#a2ca44" /><circle cx="734.5" cy="150" r="4.5" fill="#a2ca44" /><circle cx="750" cy="150" r="4.5" fill="#a2ca44" />
+      <circle cx="765.5" cy="150" r="4.5" fill="#a2ca44" /><circle cx="781" cy="150" r="4.5" fill="#a2ca44" /><circle cx="796.5" cy="150" r="4.5" fill="#a2ca44" />
+      <circle cx="812" cy="150" r="4.5" fill="#a2ca44" /><circle cx="827.5" cy="150" r="4.5" fill="#a2ca44" />
+      <circle cx="843" cy="150" r="4.5" fill="#ffd531" /><circle cx="858.5" cy="150" r="4.5" fill="#ffd531" />
+      <circle cx="874" cy="150" r="4.5" fill="none" stroke="#565950" stroke-width="1" stroke-dasharray="2 2" />
+      <circle cx="889.5" cy="150" r="4.5" fill="none" stroke="#262626" stroke-opacity="0.55" stroke-width="1.2" />
+      <circle cx="905" cy="150" r="4.5" fill="none" stroke="#262626" stroke-opacity="0.28" stroke-width="1" />
+      <circle cx="920.5" cy="150" r="4.5" fill="none" stroke="#262626" stroke-opacity="0.28" stroke-width="1" />
+      <circle cx="936" cy="150" r="4.5" fill="none" stroke="#262626" stroke-opacity="0.28" stroke-width="1" />
+      <circle cx="951" cy="150" r="4.5" fill="none" stroke="#262626" stroke-opacity="0.28" stroke-width="1" />
     </g>
-    <text x="622" y="164">realizado &#8594; registro do mentor</text>
+    <text x="715" y="176">realizado &#8594; registro do mentor</text>
 
     <!-- 5 encerramento -->
-    <rect x="902" y="78" width="150" height="98" rx="8" fill="#ffffff" stroke="#262626" stroke-opacity="0.22" stroke-width="1.25" />
-    <text x="918" y="106" font-family="'Mitr','Segoe UI',system-ui,sans-serif" font-size="13" font-weight="700" fill="#262626">5 &#183; fechamento</text>
-    <text x="918" y="130">checklist do rito</text>
-    <text x="918" y="145">autoavalia&#231;&#227;o via rpc</text>
-    <text x="918" y="160">resumo da jornada</text>
+    <rect x="1017" y="82" width="172" height="104" rx="8" fill="#ffffff" stroke="#262626" stroke-opacity="0.22" stroke-width="1.25" />
+    <text x="1033" y="110" font-family="'Mitr','Segoe UI',system-ui,sans-serif" font-size="15" font-weight="700" fill="#262626">5 &#183; fechamento</text>
+    <text x="1033" y="140">checklist do rito</text>
+    <text x="1033" y="158">autoavalia&#231;&#227;o rpc</text>
+    <text x="1033" y="176">resumo da jornada</text>
   </g>
 
   <!-- ===== semáforo ===== -->
-  <rect x="48" y="200" width="628" height="168" rx="8" fill="#ffffff" stroke="#262626" stroke-opacity="0.22" stroke-width="1.25" />
-  <text x="64" y="228" font-family="'Mitr','Segoe UI',system-ui,sans-serif" font-size="13.5" font-weight="700" fill="#262626">Sem&#225;foro: sa&#250;de da dupla</text>
-  <text x="660" y="228" text-anchor="end" font-family="'JetBrains Mono','Fira Code',monospace" font-size="9.5" fill="#565950">saudadeDaDupla() &#183; o 1&#186; sinal que bate vence</text>
+  <rect x="48" y="206" width="628" height="176" rx="8" fill="#ffffff" stroke="#262626" stroke-opacity="0.22" stroke-width="1.25" />
+  <text x="64" y="234" font-family="'Mitr','Segoe UI',system-ui,sans-serif" font-size="15" font-weight="700" fill="#262626">Sem&#225;foro: sa&#250;de da dupla</text>
+  <text x="660" y="234" text-anchor="end" font-family="'JetBrains Mono','Fira Code',monospace" font-size="13" fill="#565950">saudadeDaDupla() &#183; o 1&#186; sinal que bate vence</text>
 
-  <circle cx="74" cy="252" r="7" fill="#e04f3f" />
-  <text x="90" y="256" font-family="'Mitr','Segoe UI',system-ui,sans-serif" font-size="11.5" font-weight="700" fill="#262626">risco</text>
-  <g font-family="'JetBrains Mono','Fira Code',monospace" font-size="10" fill="#3a3c36">
-    <circle cx="94" cy="274" r="2.5" fill="#e04f3f" />
-    <text x="104" y="278">pedido de apoio no registro</text>
-    <circle cx="94" cy="294" r="2.5" fill="#e04f3f" />
-    <text x="104" y="298">avalia&#231;&#227;o baixa + dificuldade</text>
-    <circle cx="94" cy="314" r="2.5" fill="#e04f3f" />
-    <text x="104" y="318">2+ encontros atrasados</text>
+  <circle cx="74" cy="260" r="7" fill="#dc1818" />
+  <text x="90" y="265" font-family="'Mitr','Segoe UI',system-ui,sans-serif" font-size="15" font-weight="700" fill="#262626">risco</text>
+  <g font-family="'JetBrains Mono','Fira Code',monospace" font-size="13" fill="#3a3c36">
+    <circle cx="94" cy="279" r="2.5" fill="#dc1818" />
+    <text x="106" y="283">pedido de apoio no registro</text>
+    <circle cx="94" cy="299" r="2.5" fill="#dc1818" />
+    <text x="106" y="303">avalia&#231;&#227;o baixa + dificuldade</text>
+    <circle cx="94" cy="319" r="2.5" fill="#dc1818" />
+    <text x="106" y="323">2+ encontros atrasados</text>
   </g>
 
-  <circle cx="370" cy="252" r="7" fill="#ffd531" />
-  <text x="386" y="256" font-family="'Mitr','Segoe UI',system-ui,sans-serif" font-size="11.5" font-weight="700" fill="#262626">aten&#231;&#227;o</text>
-  <g font-family="'JetBrains Mono','Fira Code',monospace" font-size="10" fill="#3a3c36">
-    <circle cx="390" cy="274" r="2.5" fill="#d9a800" />
-    <text x="400" y="278">1 atraso &#183; baixa ou dificuldade s&#243;s</text>
-    <circle cx="390" cy="292" r="2.5" fill="#d9a800" />
-    <text x="400" y="296">oficial da semana &#8804;5d sem agendar</text>
-    <circle cx="390" cy="310" r="2.5" fill="#d9a800" />
-    <text x="400" y="314">registro pendente (&gt;24h ou limbo)</text>
-    <circle cx="390" cy="328" r="2.5" fill="#d9a800" />
-    <text x="400" y="332">combinado com prazo vencido</text>
+  <circle cx="370" cy="260" r="7" fill="#db9e06" />
+  <text x="386" y="265" font-family="'Mitr','Segoe UI',system-ui,sans-serif" font-size="15" font-weight="700" fill="#262626">aten&#231;&#227;o</text>
+  <g font-family="'JetBrains Mono','Fira Code',monospace" font-size="13" fill="#3a3c36">
+    <circle cx="396" cy="279" r="2.5" fill="#d9a800" />
+    <text x="408" y="283">1 atraso ou baixa/dificuldade</text>
+    <circle cx="396" cy="299" r="2.5" fill="#d9a800" />
+    <text x="408" y="303">&#8804;5d p/ oficial sem agendar</text>
+    <circle cx="396" cy="319" r="2.5" fill="#d9a800" />
+    <text x="408" y="323">registro pendente &gt;24h ou limbo</text>
+    <circle cx="396" cy="339" r="2.5" fill="#d9a800" />
+    <text x="408" y="343">combinado com prazo vencido</text>
   </g>
 
-  <text x="64" y="352" font-family="'JetBrains Mono','Fira Code',monospace" font-size="9.5" fill="#565950">sem sinal &#8594; ok &#183; pausada/conclu&#237;da/encerrada congela &#183; trilha especialista n&#227;o atrasa</text>
+  <text x="64" y="368" font-family="'JetBrains Mono','Fira Code',monospace" font-size="13" fill="#565950">sem sinal &#8594; ok &#183; pausada ou conclu&#237;da congela &#183; especialista n&#227;o atrasa</text>
 
   <!-- ===== estados do encontro ===== -->
-  <rect x="700" y="200" width="352" height="168" rx="8" fill="#ffffff" stroke="#262626" stroke-opacity="0.22" stroke-width="1.25" />
-  <text x="716" y="228" font-family="'Mitr','Segoe UI',system-ui,sans-serif" font-size="13.5" font-weight="700" fill="#262626">Estados de um encontro</text>
-  <g font-family="'JetBrains Mono','Fira Code',monospace" font-size="10" fill="#3a3c36">
-    <circle cx="726" cy="249" r="5.5" fill="#a2ca44" />
-    <text x="742" y="253">realizado + registro</text>
-    <circle cx="726" cy="269" r="5.5" fill="#ffd531" />
-    <text x="742" y="273">realizado, falta o registro</text>
-    <circle cx="726" cy="289" r="5.5" fill="none" stroke="#565950" stroke-width="1.2" stroke-dasharray="2 2" />
-    <text x="742" y="293">limbo: agendado e j&#225; passou</text>
-    <circle cx="726" cy="309" r="5.5" fill="none" stroke="#262626" stroke-opacity="0.55" stroke-width="1.2" />
-    <text x="742" y="313">agendado</text>
-    <circle cx="726" cy="329" r="5.5" fill="#565950" fill-opacity="0.3" />
-    <text x="742" y="333">n&#227;o aconteceu / cancelado</text>
-    <circle cx="726" cy="349" r="5.5" fill="none" stroke="#262626" stroke-opacity="0.28" stroke-width="1" />
-    <text x="742" y="353">futuro</text>
+  <rect x="700" y="206" width="492" height="176" rx="8" fill="#ffffff" stroke="#262626" stroke-opacity="0.22" stroke-width="1.25" />
+  <text x="716" y="234" font-family="'Mitr','Segoe UI',system-ui,sans-serif" font-size="15" font-weight="700" fill="#262626">Estados de um encontro</text>
+  <g font-family="'JetBrains Mono','Fira Code',monospace" font-size="13" fill="#3a3c36">
+    <circle cx="728" cy="256" r="6" fill="#a2ca44" />
+    <text x="744" y="260">realizado + registro</text>
+    <circle cx="728" cy="278" r="6" fill="#ffd531" />
+    <text x="744" y="282">realizado, falta o registro</text>
+    <circle cx="728" cy="300" r="6" fill="none" stroke="#565950" stroke-width="1.2" stroke-dasharray="2 2" />
+    <text x="744" y="304">limbo: agendado e j&#225; passou</text>
+    <circle cx="728" cy="322" r="6" fill="none" stroke="#262626" stroke-opacity="0.55" stroke-width="1.2" />
+    <text x="744" y="326">agendado</text>
+    <circle cx="728" cy="344" r="6" fill="#565950" fill-opacity="0.3" />
+    <text x="744" y="348">n&#227;o aconteceu / cancelado</text>
+    <circle cx="728" cy="366" r="6" fill="none" stroke="#262626" stroke-opacity="0.28" stroke-width="1" />
+    <text x="744" y="370">futuro</text>
   </g>
 
   <!-- ===== escopo RLS ===== -->
-  <rect x="48" y="392" width="1004" height="100" rx="8" fill="none" stroke="#262626" stroke-opacity="0.3" stroke-width="1.25" stroke-dasharray="8 5" />
-  <text x="68" y="418" font-family="'JetBrains Mono','Fira Code',monospace" font-size="11" letter-spacing="2" fill="#4e6318">RLS &#183; ESCOPO POR PAPEL</text>
+  <rect x="48" y="404" width="1144" height="96" rx="8" fill="none" stroke="#262626" stroke-opacity="0.3" stroke-width="1.25" stroke-dasharray="8 5" />
+  <text x="68" y="430" font-family="'JetBrains Mono','Fira Code',monospace" font-size="14" letter-spacing="2" fill="#4e6318">RLS &#183; ESCOPO POR PAPEL</text>
   <g font-family="'JetBrains Mono','Fira Code',monospace">
-    <rect x="68" y="430" width="186" height="44" rx="6" fill="#ffffff" stroke="#262626" stroke-opacity="0.2" />
-    <text x="82" y="448" font-size="11" font-weight="700" fill="#262626">coordena&#231;&#227;o</text>
-    <text x="82" y="464" font-size="9.5" fill="#565950">acesso total</text>
+    <rect x="68" y="444" width="205" height="44" rx="6" fill="#ffffff" stroke="#262626" stroke-opacity="0.2" />
+    <text x="82" y="464" font-size="14" font-weight="700" fill="#262626">coordena&#231;&#227;o</text>
+    <text x="82" y="481" font-size="13" fill="#565950">acesso total</text>
 
-    <rect x="266" y="430" width="186" height="44" rx="6" fill="#ffffff" stroke="#262626" stroke-opacity="0.2" />
-    <text x="280" y="448" font-size="11" font-weight="700" fill="#262626">supervisor</text>
-    <text x="280" y="464" font-size="9.5" fill="#565950">duplas supervisionadas</text>
+    <rect x="293" y="444" width="205" height="44" rx="6" fill="#ffffff" stroke="#262626" stroke-opacity="0.2" />
+    <text x="307" y="464" font-size="14" font-weight="700" fill="#262626">supervisor</text>
+    <text x="307" y="481" font-size="13" fill="#565950">duplas supervisionadas</text>
 
-    <rect x="464" y="430" width="186" height="44" rx="6" fill="#ffffff" stroke="#262626" stroke-opacity="0.2" />
-    <text x="478" y="448" font-size="11" font-weight="700" fill="#262626">mentor_dpp</text>
-    <text x="478" y="464" font-size="9.5" fill="#565950">s&#243; a pr&#243;pria dupla</text>
+    <rect x="518" y="444" width="205" height="44" rx="6" fill="#ffffff" stroke="#262626" stroke-opacity="0.2" />
+    <text x="532" y="464" font-size="14" font-weight="700" fill="#262626">mentor_dpp</text>
+    <text x="532" y="481" font-size="13" fill="#565950">s&#243; a pr&#243;pria dupla</text>
 
-    <rect x="662" y="430" width="186" height="44" rx="6" fill="#ffffff" stroke="#262626" stroke-opacity="0.2" />
-    <text x="676" y="448" font-size="11" font-weight="700" fill="#262626">especialista</text>
-    <text x="676" y="464" font-size="9.5" fill="#565950">trilha de 5 encontros</text>
+    <rect x="743" y="444" width="205" height="44" rx="6" fill="#ffffff" stroke="#262626" stroke-opacity="0.2" />
+    <text x="757" y="464" font-size="14" font-weight="700" fill="#262626">especialista</text>
+    <text x="757" y="481" font-size="13" fill="#565950">trilha de 5 encontros</text>
 
-    <rect x="860" y="430" width="186" height="44" rx="6" fill="#ffffff" stroke="#262626" stroke-opacity="0.2" />
-    <text x="874" y="448" font-size="11" font-weight="700" fill="#262626">p&#250;blico</text>
-    <text x="874" y="464" font-size="9.5" fill="#565950">/demo &#183; /f/* &#183; /assinar/*</text>
+    <rect x="968" y="444" width="205" height="44" rx="6" fill="#ffffff" stroke="#262626" stroke-opacity="0.2" />
+    <text x="982" y="464" font-size="14" font-weight="700" fill="#262626">p&#250;blico</text>
+    <text x="982" y="481" font-size="13" fill="#565950">demo &#183; forms &#183; assinar</text>
   </g>
 
   <!-- rodapé -->
-  <text x="48" y="524" font-family="'JetBrains Mono','Fira Code',monospace" font-size="10" fill="#565950">vocabul&#225;rio dos guias do programa: dupla &#183; encontro &#183; registro &#183; encaminhamento</text>
-  <text x="1052" y="524" text-anchor="end" font-family="'JetBrains Mono','Fira Code',monospace" font-size="10" fill="#565950">postgres + auth + storage &#183; 54 migrations</text>
+  <text x="48" y="532" font-family="'JetBrains Mono','Fira Code',monospace" font-size="13" fill="#565950">vocabul&#225;rio dos guias do programa: dupla &#183; encontro &#183; registro &#183; encaminhamento</text>
+  <text x="1192" y="532" text-anchor="end" font-family="'JetBrains Mono','Fira Code',monospace" font-size="13" fill="#565950">postgres + auth + storage &#183; 54 migrations</text>
 </svg>
