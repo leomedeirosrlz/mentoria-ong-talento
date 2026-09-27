@@ -140,7 +140,7 @@ describe("disponibilidadeTexto / parseDisponibilidade", () => {
     );
     expect(
       disponibilidadeTexto({ dias: ["seg", "qua", "sex"], periodos: ["manha", "tarde"] })
-    ).toBe("Segunda, Quarta e Sexta às manhã e tarde");
+    ).toBe("Segunda, Quarta e Sexta às manhãs e tardes");
     expect(disponibilidadeTexto({ dias: ["sab"], periodos: [] })).toBe("Sábado");
     expect(disponibilidadeTexto({ dias: [], periodos: ["manha"] })).toBe("à manhã");
   });

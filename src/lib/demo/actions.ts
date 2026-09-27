@@ -22,7 +22,8 @@ export async function entrarNaDemo(papel: AppRole) {
 }
 
 /** Troca de papel no meio da demo — vai pra home porque a página atual pode
- *  não existir no escopo do novo papel (ex.: /pessoas é só da coordenação).
+ *  não existir no escopo do novo papel (ex.: /formularios é só da
+ *  coordenação; /registros não abre pra mentor).
  *  Não toca nos cookies de onboarding: o gate decide — persona nunca vista
  *  passa pelo wizard, já vista cai direto no app. */
 export async function trocarPapelDemo(papel: AppRole) {

@@ -14,11 +14,11 @@ import {
 } from "@/components/ui/select";
 
 const ROLE_LABEL: Record<string, string> = {
-  sem_papel: "sem papel",
-  mentor_dpp: "mentor DPP",
-  mentor_especialista: "mentor especialista",
-  supervisor: "supervisor",
-  coordenacao: "coordenação",
+  sem_papel: "Sem papel",
+  mentor_dpp: "Mentor DPP",
+  mentor_especialista: "Mentor especialista",
+  supervisor: "Supervisor",
+  coordenacao: "Coordenação",
 };
 
 export function RoleSelect({ profileId, role, nome }: { profileId: string; role: string | null; nome?: string }) {

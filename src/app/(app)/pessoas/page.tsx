@@ -24,16 +24,21 @@ export const metadata: Metadata = {
 
 export default async function PessoasPage() {
   const me = await getMe();
-  if (me?.role !== "coordenacao") redirect("/");
+  // o layout já garante papel definido — guard defensivo pra query direta
+  if (!me?.role) redirect("/");
+  const souCoord = me.role === "coordenacao";
 
+  // fora da coordenação a página é um diretório de colegas: os resumos
+  // operacionais (vínculos de dupla, fichas de mentor, assinaturas) viriam
+  // escopados pelo RLS e renderizariam badges falsos — nem dispara
   const [pessoas, mentorados, duplas, todasDuplas, perfisMentor, resumoAss] =
     await Promise.all([
       getPessoas(),
       getMentorados(),
-      getDuplasResumo(),
-      getDuplasResumoTodas(),
-      getMentorProfiles(),
-      getAssinaturasResumo(),
+      souCoord ? getDuplasResumo() : Promise.resolve([]),
+      souCoord ? getDuplasResumoTodas() : Promise.resolve([]),
+      souCoord ? getMentorProfiles() : Promise.resolve([]),
+      souCoord ? getAssinaturasResumo() : Promise.resolve([]),
     ]);
 
   const comDupla = new Set(
@@ -84,26 +89,35 @@ export default async function PessoasPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Pessoas</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Mentores, supervisores e equipe com acesso à plataforma
+            {souCoord
+              ? "Mentores, supervisores e equipe com acesso à plataforma"
+              : "Conheça quem faz o programa"}
           </p>
         </div>
         {/* criação é o caminho primário e fica visível; importação e backups
-            vão pro "Mais ações" — 5 CTAs de mesmo peso viravam pilha a 390px */}
-        <div className="flex flex-wrap gap-2">
-          <NovoMentoradoDialog />
-          <NovaPessoaDialog />
-          <PessoasMaisAcoes />
-        </div>
+            vão pro "Mais ações" — 5 CTAs de mesmo peso viravam pilha a 390px.
+            Só a coordenação gerencia cadastros — pros demais é diretório */}
+        {souCoord && (
+          <div className="flex flex-wrap gap-2">
+            <NovoMentoradoDialog />
+            <NovaPessoaDialog />
+            <PessoasMaisAcoes />
+          </div>
+        )}
       </header>
 
+      {/* pré-cadastros sem papel nem entram no payload de não-coord —
+          diretório é de colegas, e a existência do pré-cadastro já é
+          informação operacional */}
       <PessoasListas
-        pessoas={pessoas}
+        pessoas={souCoord ? pessoas : pessoas.filter((p) => p.role != null)}
         mentorados={mentorados}
         comDupla={[...comDupla]}
         comQualquerDupla={[...comQualquerDupla]}
         mentorProfiles={mentorProfiles}
         contagemPorMentor={contagemPorMentor}
         assinaturas={docsPorPessoa}
+        souCoord={souCoord}
       />
     </div>
   );

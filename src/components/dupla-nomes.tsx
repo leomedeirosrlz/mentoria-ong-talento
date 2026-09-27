@@ -18,7 +18,17 @@ export function DuplaNomes({
 }) {
   return (
     <>
-      <span className={truncar ? "min-w-0 truncate" : undefined}>{mentor}</span>{" "}
+      {/* truncar em pai block precisa de inline-block + max-w (min-w-0 só
+          faz efeito em flex item); em pai flex o max-w vira o teto justo */}
+      <span
+        className={
+          truncar
+            ? "inline-block max-w-[55%] min-w-0 truncate align-bottom"
+            : undefined
+        }
+      >
+        {mentor}
+      </span>{" "}
       {/* o lockup "e • mentorado" é uma caixa só: o conector nunca quebra
           órfão no início de linha e, com truncar, corta junto ao nome */}
       <span

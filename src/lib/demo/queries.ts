@@ -253,8 +253,9 @@ export function demoContagemPessoas(): number {
   return data.profiles.length + data.mentorados.length;
 }
 
-/** /pessoas é coord-only — o mapa de contato dela cobre todos os profiles;
- *  os sensíveis (profiles_pessoal) só entram pra coordenação, como na real. */
+/** /pessoas lista os profiles pra qualquer papel (profiles_select, 0026) —
+ *  o contato vem do mapa escopado por papel e os sensíveis
+ *  (profiles_pessoal) só entram pra coordenação, como na real. */
 export function demoPessoas(role: AppRole): Profile[] {
   const contatos = demoContatosMap(role);
   return getDemoData()
@@ -266,10 +267,20 @@ export function demoPessoas(role: AppRole): Profile[] {
 }
 
 export function demoMentorados(role: AppRole): Mentorado[] {
-  const lista = [...getDemoData().mentorados].sort(porNome);
+  const data = getDemoData();
+  // mentorados_select (0023): coordenação lê todos; mentor e supervisor só
+  // os mentorados das duplas em que são parte — o vínculo vale em qualquer
+  // status (dupla concluída/encerrada mantém o histórico legível)
+  const vinculados =
+    role === "coordenacao"
+      ? null
+      : new Set(duplasDoPapel(data, role).map((d) => d.mentorado.id));
   // grant por coluna da 0034: nascimento/gênero/pref./motivação ficam de fora
   // pra qualquer papel ≠ coordenação (a real lê pela view mentorados_pessoal)
-  return role === "coordenacao" ? lista : lista.map(semPessoal);
+  return data.mentorados
+    .filter((m) => !vinculados || vinculados.has(m.id))
+    .map((m) => (role === "coordenacao" ? m : semPessoal(m)))
+    .sort(porNome);
 }
 
 /** Mapa id → sensíveis, espelhando o WHERE das views profiles_pessoal /
@@ -329,11 +340,11 @@ function duplaPerfil(
 }
 
 /** Perfil público interno (/pessoas/[id]) — resolve profile OU mentorado.
- *  Espelha a real + o guard da página: profile de terceiro não abre pra
- *  mentor (a page redireciona o próprio pra /perfil e dá notFound nos demais);
- *  mentorado aparece pra staff sempre (RLS de mentorados libera coord/sup) e
- *  pro mentor só se estiver numa dupla dele. Notas são privadas do autor
- *  (0017) — só as da persona voltam. */
+ *  Profile abre pra qualquer papel (a ficha do colega é o diretório interno;
+ *  a page redireciona a própria pra /perfil). Mentorado aparece pra staff
+ *  sempre (RLS de mentorados libera coord/sup) e pro mentor só se estiver
+ *  numa dupla dele — a lista vem do escopo, igual à RLS. Notas são privadas
+ *  do autor (0017) — só as da persona voltam. */
 export function demoPessoaPerfil(
   role: AppRole,
   id: string
@@ -342,7 +353,6 @@ export function demoPessoaPerfil(
   const eu = data.personas[role];
   const contatos = demoContatosMap(role);
   const escopo = duplasDoPapel(data, role);
-  const ehStaff = role === "coordenacao" || role === "supervisor";
   const desc = (a: Dupla, b: Dupla) => criadoEm(b).localeCompare(criadoEm(a));
   const notasDe = (campo: "profile_id" | "mentorado_id") =>
     data.pessoaNotas
@@ -351,7 +361,6 @@ export function demoPessoaPerfil(
 
   const p = data.profiles.find((x) => x.id === id);
   if (p) {
-    if (!ehStaff && id !== eu.id) return null;
     const ehMentor = p.role === "mentor_dpp" || p.role === "mentor_especialista";
     return {
       tipo: "profile",
@@ -734,7 +743,8 @@ export function demoAssinaturasResumo(role: AppRole): AssinaturaResumo[] {
     }));
 }
 
-/** Histórico da ficha — só a coordenação abre fichas de terceiros. */
+/** Histórico de assinaturas da ficha — dado coord-only: pros demais papéis
+ *  a página nem dispara (o card "Documentos e assinaturas" não renderiza). */
 export function demoAssinaturasPessoa(
   role: AppRole,
   tipo: "profile" | "mentorado",

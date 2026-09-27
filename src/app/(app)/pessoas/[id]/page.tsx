@@ -4,21 +4,38 @@ import { notFound, redirect } from "next/navigation";
 import { Collapsible } from "@base-ui/react/collapsible";
 import {
   ArrowUpRight,
+  Briefcase,
   Buildings,
+  Cake,
   CaretRight,
+  Certificate,
   CheckCircle,
+  CircleHalf,
+  Clock,
   EnvelopeSimple,
+  GenderIntersex,
+  GraduationCap,
   HandHeart,
+  Heart,
+  IdentificationCard,
   LinkedinLogo,
   LockSimple,
+  MapPin,
+  Path,
+  ShieldCheck,
+  Signpost,
+  Sparkle,
+  Target,
+  Users,
   Warning,
   WhatsappLogo,
 } from "@phosphor-icons/react/dist/ssr";
-import { cn } from "cn";
+import { cn } from "@/lib/utils";
 import { getDocumentosPessoa, getMe, getPessoaPerfil } from "@/lib/queries";
 import { getAnamneseMentorado } from "@/lib/forms/queries";
 import { getSupervisoesDaPessoa } from "@/lib/queries-supervisao";
 import { getResumoFormacao } from "@/lib/queries-presenca";
+import { getAssinaturasResumo } from "@/lib/queries-assinaturas";
 import { avatarPublicUrl, gravatarUrl } from "@/lib/avatar";
 import {
   COR_RACA_LABELS,
@@ -42,11 +59,20 @@ import { DuplaAvatares } from "@/components/dupla-avatares";
 import { DuplaNomes } from "@/components/dupla-nomes";
 import { MentoradoActions } from "@/components/mentorado-actions";
 import { PessoaActions } from "@/components/pessoa-actions";
+import { PessoaBanner } from "@/components/pessoa-banner";
 import { PessoaMural, type MuralNota } from "@/components/pessoa-mural";
 import { SupervisoesSection } from "@/components/supervisoes-section";
 import { VoltarLink } from "@/components/voltar-link";
 
-export const metadata: Metadata = { title: "Perfil" };
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}): Promise<Metadata> {
+  const { id } = await params;
+  const perfil = await getPessoaPerfil(id);
+  return { title: perfil ? perfil.pessoa.nome : "Pessoa" };
+}
 
 const STATUS_DUPLA: Record<string, string> = {
   ativa: "ativa",
@@ -55,31 +81,52 @@ const STATUS_DUPLA: Record<string, string> = {
   encerrada: "encerrada",
 };
 
-/** Linha "rótulo: valor" da ficha — some quando o valor é vazio, exceto pra
- *  coordenação (que precisa distinguir "não preenchido" de "sem permissão":
- *  pros demais papéis os sensíveis nem chegam — vêm null do grant). */
+/** Campo da ficha — ícone de escaneio + rótulo uppercase pequeno sobre o
+ *  valor: leitura de perfil, não de resposta de formulário. Some quando o
+ *  valor é vazio, exceto pra coordenação (`sempre` → "Não informado"
+ *  distingue "não preenchido" de "sem permissão": pros demais os sensíveis
+ *  nem chegam — vêm null do grant). O ícone é opcional: blocos documentais
+ *  (dados civis) não o usam. */
 function Linha({
+  icone,
   rotulo,
   valor,
   sempre,
   className,
 }: {
+  icone?: React.ReactNode;
   rotulo: string;
   valor: string | null | undefined;
   sempre?: boolean;
   className?: string;
 }) {
   if (!valor && !sempre) return null;
-  // os <dl> da ficha mostram rótulo sobre o valor — leitura de rede social e
-  // sobrevive a qualquer largura; a borda vive na linha (não no divide do dl)
-  // porque o dl vira grid de 2 colunas a partir de sm
   return (
-    <div className={cn("border-b border-border/60 py-2.5", className)}>
-      <dt className="text-xs text-muted-foreground">{rotulo}</dt>
-      <dd className="mt-0.5 whitespace-pre-wrap [overflow-wrap:anywhere]">
-        {valor || <span className="text-muted-foreground">Não informado</span>}
-      </dd>
+    <div className={cn("flex items-start gap-2.5 py-3", className)}>
+      {icone && (
+        <span aria-hidden className="mt-0.5 shrink-0 text-muted-foreground/70">
+          {icone}
+        </span>
+      )}
+      <div className="min-w-0">
+        <dt className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
+          {rotulo}
+        </dt>
+        <dd className="mt-1 whitespace-pre-wrap text-sm [overflow-wrap:anywhere]">
+          {valor || <span className="text-muted-foreground">Não informado</span>}
+        </dd>
+      </div>
     </div>
+  );
+}
+
+/** Título de subseção do cadastro — foreground + xs: um degrau real acima
+ *  dos rótulos de campo (11px muted), abaixo do h2 do card. */
+function SubFicha({ titulo }: { titulo: string }) {
+  return (
+    <h3 className="text-xs font-semibold uppercase tracking-[0.08em] text-foreground/85">
+      {titulo}
+    </h3>
   );
 }
 
@@ -98,7 +145,7 @@ function Chips({ itens }: { itens: string[] }) {
 }
 
 /** Stat do resumo de mentoria — valor com estado: "ok" verde com check,
- *  "pendente" amber com Warning (o que pede ação do coordenação). */
+ *  "pendente" amber com Warning (o que pede ação da coordenação). */
 function Stat({
   rotulo,
   valor,
@@ -115,7 +162,7 @@ function Stat({
       <dt className="text-xs text-muted-foreground">{rotulo}</dt>
       <dd
         className={cn(
-          "mt-1 flex items-center gap-1.5 font-medium",
+          "mt-0.5 flex items-center gap-1.5 text-sm font-semibold",
           estado === "ok" && "text-[var(--ok-text)]",
           estado === "pendente" && "text-[var(--warn-text)]"
         )}
@@ -155,13 +202,14 @@ export default async function PessoaPerfilPage({
   const [perfil, me] = await Promise.all([getPessoaPerfil(id), getMe()]);
   if (!perfil || !me) notFound();
 
-  // mentor que abre o próprio cadastro cai no /perfil (lá ele edita);
-  // perfil de outro staff/mentor não é aberto pra ele
+  // o próprio cadastro cai no /perfil (lá se edita). A ficha de colega é
+  // interna mas aberta — o que cada papel enxerga nela é decidido seção a
+  // seção abaixo, espelhando os grants do banco (sensíveis só chegam
+  // preenchidos pra coordenação, contato só pra quem tem vínculo)
   const ehMentor = me.role === "mentor_dpp" || me.role === "mentor_especialista";
   const ehStaff = me.role === "coordenacao" || me.role === "supervisor";
   if (perfil.tipo === "profile" && perfil.pessoa.id === me.id) redirect("/perfil");
-  if (!ehStaff && perfil.tipo === "profile") notFound();
-  // mentorado: o RLS já barrou quem não tem vínculo (query voltou null)
+  // mentorado fora de vínculo: o RLS já barrou quem não alcança (query voltou null)
 
   // sessões de supervisão (0041): conduzidas (ficha de supervisor) ou
   // recebidas (ficha de mentor). A RLS escopa o que cada papel lê — mentorado
@@ -234,20 +282,60 @@ export default async function PessoaPerfilPage({
   // migração ainda não rodou, então a página segue igual antes dela
   const anamnese =
     ehMentorado && souCoord ? await getAnamneseMentorado(p.id) : null;
-  // documentos do intake (0054) — coord-only; pra outro papel nem dispara
-  const documentos = souCoord
-    ? await getDocumentosPessoa(perfil.tipo, p.id)
-    : [];
+  // documentos do intake (0054) + contagem de assinaturas pro cabeçalho da
+  // gaveta — coord-only; pra outro papel nenhuma das queries dispara
+  const [documentos, resumoAss] = souCoord
+    ? await Promise.all([
+        getDocumentosPessoa(perfil.tipo, p.id),
+        getAssinaturasResumo(),
+      ])
+    : [[], []];
+  const nAssinaturas = resumoAss.filter(
+    (a) => a.profile_id === p.id || a.mentorado_id === p.id
+  ).length;
+  const contagemDocs = [
+    documentos.length
+      ? `${documentos.length} ${documentos.length === 1 ? "documento" : "documentos"}`
+      : null,
+    nAssinaturas
+      ? `${nAssinaturas} ${nAssinaturas === 1 ? "assinatura" : "assinaturas"}`
+      : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
   // dados civis + responsável (0046) — chegam null fora da coordenação
   // (view *_pessoal); renderizam fechados num Collapsible no fim do Cadastro
   const civis = p.dados_civis ?? null;
   const resp = ment?.responsavel ?? null;
+  const anamneseRef = ehMentorado && "notas" in p ? p.notas : null;
   const temFicha = Boolean(
     p.nome_social || local || interesses.length || p.origem ||
     nascimentoTxt || p.genero || p.cor_raca || p.motivacao || p.pref_genero_par ||
     (prof && (prof.cargo || prof.empresa || mp)) ||
-    (ment && (ment.escolaridade || ment.objetivos || dispMentoradoTxt))
+    (ment && (ment.escolaridade || ment.objetivos || dispMentoradoTxt)) ||
+    anamneseRef
   );
+  // grupos do cadastro — o cabeçalho da subseção só aparece quando há pelo
+  // menos um campo visível dentro dele (pra coord `sempre` garante isso)
+  const temPessoal = Boolean(
+    p.nome_social || nascimentoTxt || p.genero || p.cor_raca || local ||
+    (ment && ment.escolaridade)
+  );
+  const temProf = Boolean(prof && (prof.cargo || prof.empresa));
+  const lgpdVisivel = Boolean(
+    prof && ehStaff && (prof.consent_lgpd_em != null || souCoord)
+  );
+  const temPrograma = Boolean(
+    p.origem || p.motivacao || p.pref_genero_par ||
+    (ment && (ment.objetivos || dispMentoradoTxt)) ||
+    lgpdVisivel ||
+    (interesses.length > 0 && !temPerfilPro)
+  );
+
+  // banner generativo — campo = papel; a linha de dados leva até 3 áreas de
+  // atuação (fallback: as do mentor_profile; mentorado mostra interesses)
+  const areasBanner =
+    (prof?.areas?.length ? prof.areas : mp?.areas?.length ? mp.areas : interesses);
 
   // presença nos encontros de formação do ciclo vs. checklist — os dois
   // sinais num stat só ("formação" aparece uma vez, consolidada)
@@ -272,111 +360,128 @@ export default async function PessoaPerfilPage({
     texto: n.texto,
     created_at: n.created_at,
   }));
+  // o rail de 340px só existe quando tem conteúdo — na ficha de colega
+  // (sem duplas visíveis, documentos nem notas) ele ficaria um vão morto
+  const temRail =
+    souCoord || perfil.duplas.length > 0 || podeAnotar || notas.length > 0;
 
   return (
     <div className="space-y-4">
-      {/* coord volta pra /pessoas; mentor/supervisor voltam pra de onde vieram */}
-      <VoltarLink fallback={souCoord ? "/pessoas" : "/"} />
+      {/* todos os papéis têm a aba /pessoas — voltar pra lá; perfil sem
+          papel (acesso pendente) cai na home */}
+      <VoltarLink fallback={me.role ? "/pessoas" : "/"} />
 
-      {/* header compacto — a capa-perfil do /perfil reduzida a uma faixa de
-          marca; a linha abaixo carrega avatar, nome, meta e à direita os
-          contatos + ações. A ficha é operacional: cadastro cede o holofote
-          pro acompanhamento */}
+      {/* capa estilo rede social — banner generativo diz papel + cidade +
+          áreas antes de qualquer leitura; avatar sobreposto, nome como h1,
+          meta e chips de contato (gesto do /perfil, sem modo edição aqui:
+          é a ficha de outra pessoa) */}
       <header className="overflow-hidden rounded-xl bg-card shadow-[var(--shadow-border)]">
-        <div aria-hidden className="capa-perfil h-3" />
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-3 p-4 sm:p-5">
-          <Avatar
-            nome={p.nome}
-            src={avatarSrc}
-            fallbackSrc={gravatar}
-            papel={ehMentorado ? "mentorado" : undefined}
-            size={64}
-          />
-          <div className="min-w-0 flex-1 basis-56">
-            <h1 className="text-xl font-semibold tracking-tight">{p.nome}</h1>
-            <div className="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1.5 text-sm text-muted-foreground">
-              {ehMentorado ? (
-                <>
-                  <span aria-hidden className="size-1.5 rounded-full bg-[var(--role-mentorado)]" />
-                  <span>
-                    Mentorado
-                    {"ong_origem" in p && p.ong_origem ? ` · ${p.ong_origem}` : ""}
-                  </span>
-                </>
-              ) : (
-                <>
-                  <Badge variant="outline" className="font-normal">
-                    {papelLabel("role" in p ? p.role : null)}
-                  </Badge>
-                  {"ativo" in p && !p.ativo && (
-                    <Badge variant="outline" className="border-[var(--danger)]/50 text-[var(--danger)]">
-                      inativa
-                    </Badge>
-                  )}
-                  {"user_id" in p && !p.user_id && p.ativo && (
-                    <Badge variant="outline" className="font-normal text-muted-foreground">
-                      Nunca acessou a plataforma
-                    </Badge>
-                  )}
-                </>
+        <PessoaBanner
+          papel={ehMentorado ? "mentorado" : (prof?.role ?? null)}
+          cidade={p.cidade}
+          uf={p.uf}
+          areas={areasBanner}
+          seed={p.id}
+        />
+        <div className="px-4 pb-4 sm:px-6 sm:pb-5">
+          <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
+            {/* size-20!/sm:size-24! sobem por cima do style inline que o
+                Avatar fixa via prop (a prop segue ditando o fontSize) */}
+            <Avatar
+              nome={p.nome}
+              src={avatarSrc}
+              fallbackSrc={gravatar}
+              papel={ehMentorado ? "mentorado" : undefined}
+              size={80}
+              className="size-20! -mt-10 ring-4 ring-card sm:size-24! sm:-mt-12"
+            />
+            {/* contato + ações — chips secundários; edição mora no ⋮ */}
+            <div className="flex flex-wrap items-center gap-1.5">
+              {wa && (
+                <a
+                  href={wa}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-border px-2.5 text-xs text-muted-foreground transition-colors hover:border-[var(--brand-lime)]/60 hover:bg-[var(--brand-lime)]/15 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <WhatsappLogo size={14} aria-hidden />
+                  WhatsApp
+                  <span className="sr-only"> (abre em nova aba)</span>
+                </a>
               )}
-              {cargoEmpresa && <span>{cargoEmpresa}</span>}
-              {local && <span>{local}</span>}
+              {"email" in p && p.email && (
+                <a
+                  href={`mailto:${p.email}`}
+                  className="inline-flex min-h-9 max-w-56 items-center gap-1.5 rounded-lg border border-border px-2.5 text-xs text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <EnvelopeSimple size={14} aria-hidden className="shrink-0" />
+                  <span className="truncate">{p.email}</span>
+                </a>
+              )}
+              {souCoord &&
+                (perfil.tipo === "profile" ? (
+                  <PessoaActions
+                    pessoa={perfil.pessoa}
+                    podeExcluir={!perfil.pessoa.user_id && perfil.duplas.length === 0}
+                  />
+                ) : (
+                  <MentoradoActions
+                    mentorado={perfil.pessoa}
+                    temDupla={perfil.duplas.length > 0}
+                  />
+                ))}
             </div>
           </div>
-          {/* contato + ações — chips menores e secundários; o dropdown de
-              ações (coord) ganha um Editar visível ao lado */}
-          <div className="flex flex-wrap items-center gap-1.5">
-            {wa && (
-              <a
-                href={wa}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-border px-2.5 text-xs text-muted-foreground transition-colors hover:border-[var(--brand-lime)]/60 hover:bg-[var(--brand-lime)]/15 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                <WhatsappLogo size={14} aria-hidden />
-                WhatsApp
-                <span className="sr-only"> (abre em nova aba)</span>
-              </a>
+          <h1 className="mt-2.5 text-xl font-semibold tracking-tight sm:text-2xl">
+            {p.nome}
+          </h1>
+          <div className="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1.5 text-sm text-muted-foreground">
+            {ehMentorado ? (
+              <>
+                <Badge variant="outline" className="gap-1.5 font-normal">
+                  <span aria-hidden className="size-1.5 rounded-full bg-[var(--role-mentorado)]" />
+                  Mentorado
+                </Badge>
+                {"ong_origem" in p && p.ong_origem && <span>{p.ong_origem}</span>}
+              </>
+            ) : (
+              <>
+                <Badge variant="outline" className="font-normal">
+                  {papelLabel("role" in p ? p.role : null)}
+                </Badge>
+                {/* estado operacional do cadastro é coisa de staff — colega
+                    não precisa saber se a conta está ativa */}
+                {ehStaff && "ativo" in p && !p.ativo && (
+                  <Badge variant="outline" className="border-[var(--danger)]/50 text-[var(--danger)]">
+                    inativa
+                  </Badge>
+                )}
+                {ehStaff && "user_id" in p && !p.user_id && p.ativo && (
+                  <Badge variant="outline" className="font-normal text-muted-foreground">
+                    Nunca acessou a plataforma
+                  </Badge>
+                )}
+              </>
             )}
-            {"email" in p && p.email && (
-              <a
-                href={`mailto:${p.email}`}
-                className="inline-flex min-h-9 max-w-56 items-center gap-1.5 rounded-lg border border-border px-2.5 text-xs text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                <EnvelopeSimple size={14} aria-hidden className="shrink-0" />
-                <span className="truncate">{p.email}</span>
-              </a>
+            {/* grupos de meta numa linha só, separados por · — sem o
+                separador dois spans colados liam como uma frase só */}
+            {(cargoEmpresa || local) && (
+              <span>{[cargoEmpresa, local].filter(Boolean).join(" · ")}</span>
             )}
-            {souCoord &&
-              (perfil.tipo === "profile" ? (
-                <PessoaActions
-                  pessoa={perfil.pessoa}
-                  podeExcluir={!perfil.pessoa.user_id && perfil.duplas.length === 0}
-                  botaoEditar
-                />
-              ) : (
-                <MentoradoActions
-                  mentorado={perfil.pessoa}
-                  temDupla={perfil.duplas.length > 0}
-                  botaoEditar
-                />
-              ))}
           </div>
         </div>
       </header>
 
-      {/* resumo da mentoria — faixa inteira logo abaixo do header: o estado
-          operacional do mentor antes do cadastro. Capacidade, formação
-          (presenças + checklist consolidados num stat só), termo e
-          disponibilidade; experiência e formação externa vão como linhas
-          secundárias */}
-      {mp && (
-        <section className="rounded-xl bg-card p-4 text-sm shadow-[var(--shadow-border)] sm:p-5">
-          <h2 className="text-sm font-semibold">
+      {/* resumo da mentoria — faixa leve logo abaixo do header: o estado
+          operacional do mentor pra quem opera o programa (capacidade,
+          formação consolidada num stat só, termo, disponibilidade);
+          experiência e formação externa vão como linhas secundárias */}
+      {mp && ehStaff && (
+        <section className="rounded-xl bg-card px-4 py-4 shadow-[var(--shadow-border)] sm:px-5">
+          <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
             {mp.tipo === "dpp" ? "Mentoria DPP" : "Mentoria especialista"}
           </h2>
-          <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-4 sm:grid-cols-4">
+          <dl className="mt-2.5 grid grid-cols-2 gap-x-4 gap-y-3.5 sm:grid-cols-4">
             <Stat
               rotulo="Capacidade"
               valor={`${mp.capacidade} ${mp.capacidade === 1 ? "dupla" : "duplas"}`}
@@ -404,9 +509,19 @@ export default async function PessoaPerfilPage({
             <Stat rotulo="Disponibilidade" valor={dispTxt ?? "—"} />
           </dl>
           {(souCoord || mp.experiencia_previa || mp.formacao_externa) && (
-            <dl className="mt-3 border-t border-border/60 text-[13px] sm:grid sm:grid-cols-2 sm:gap-x-6">
-              <Linha rotulo="Experiência" valor={mp.experiencia_previa} sempre={souCoord} />
-              <Linha rotulo="Formação externa" valor={mp.formacao_externa} sempre={souCoord} />
+            <dl className="mt-1 border-t border-border/60 text-[13px] sm:grid sm:grid-cols-2 sm:gap-x-8">
+              <Linha
+                icone={<Path size={15} />}
+                rotulo="Experiência"
+                valor={mp.experiencia_previa}
+                sempre={souCoord}
+              />
+              <Linha
+                icone={<Certificate size={15} />}
+                rotulo="Formação externa"
+                valor={mp.formacao_externa}
+                sempre={souCoord}
+              />
             </dl>
           )}
         </section>
@@ -416,8 +531,15 @@ export default async function PessoaPerfilPage({
           seções subia pelo grid e estourava a página. items-start impede os
           cards de esticar até a altura do vizinho. No mobile a coluna
           principal vem primeiro no DOM (cadastro é o conteúdo primário);
-          no lg o rail estreito cai à direita por ser o segundo filho */}
-      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
+          no lg o rail estreito cai à direita por ser o segundo filho —
+          e só existe quando tem conteúdo (ficha de colega fica em coluna
+          única, sem a faixa vazia de 340px) */}
+      <div
+        className={cn(
+          "grid items-start gap-4",
+          temRail && "lg:grid-cols-[minmax(0,1fr)_340px]"
+        )}
+      >
         <div className="min-w-0 space-y-4">
           {/* vitrine profissional (0030) vira o "Sobre" — bio, LinkedIn,
               áreas, voluntariado e interesses logo abaixo do resumo, como
@@ -472,152 +594,235 @@ export default async function PessoaPerfilPage({
 
           {/* cadastro/matching (0034) — os sensíveis (nascimento, gênero,
               motivação, pref. de par) só chegam preenchidos pra coordenação
-              via view; `sempre` deixa o "Não informado" explícito pra ela */}
+              via view; `sempre` deixa o "Não informado" explícito pra ela.
+              Subseções com título miúdo + um ícone por campo: leitura de
+              perfil (escaneável), não resposta de formulário */}
           {(temFicha || souCoord) && (
-            <section className="rounded-xl bg-card p-4 text-sm shadow-[var(--shadow-border)] sm:p-5">
+            <section className="rounded-xl bg-card p-5 text-sm shadow-[var(--shadow-border)] sm:p-6">
               <h2 className="text-sm font-semibold">Cadastro</h2>
               {temFicha ? (
-                <dl className="mt-1 sm:grid sm:grid-cols-2 sm:gap-x-6">
-                  <Linha rotulo="Nome social" valor={p.nome_social} sempre={souCoord} />
-                  <Linha rotulo="Nascimento" valor={nascimentoTxt} sempre={souCoord} />
-                  {anos != null && anos < 18 && (
-                    <p className="my-2.5 rounded-lg bg-amber-50 px-2.5 py-1.5 text-xs text-amber-900 sm:col-span-2 dark:bg-amber-950/40 dark:text-amber-200">
-                      Menor de idade: a autorização do responsável precisa estar
-                      assinada.
-                      {souCoord && " Confira o card Documentos e assinaturas."}
-                    </p>
+                <>
+                  {(temPessoal || souCoord) && (
+                    <div className="mt-4">
+                      <SubFicha titulo="Pessoal" />
+                      <dl className="mt-1 sm:grid sm:grid-cols-2 sm:gap-x-8">
+                        <Linha
+                          icone={<IdentificationCard size={15} />}
+                          rotulo="Nome social"
+                          valor={p.nome_social}
+                          sempre={souCoord}
+                        />
+                        <Linha
+                          icone={<Cake size={15} />}
+                          rotulo="Nascimento"
+                          valor={nascimentoTxt}
+                          sempre={souCoord}
+                        />
+                        <Linha
+                          icone={<GenderIntersex size={15} />}
+                          rotulo="Gênero"
+                          valor={p.genero ? GENERO_LABELS[p.genero] : null}
+                          sempre={souCoord}
+                        />
+                        <Linha
+                          icone={<CircleHalf size={15} />}
+                          rotulo="Cor/raça"
+                          valor={p.cor_raca ? COR_RACA_LABELS[p.cor_raca] : null}
+                          sempre={souCoord}
+                        />
+                        <Linha
+                          icone={<MapPin size={15} />}
+                          rotulo="Cidade/UF"
+                          valor={local}
+                          sempre={souCoord}
+                        />
+                        {ment && (
+                          <Linha
+                            icone={<GraduationCap size={15} />}
+                            rotulo="Escolaridade"
+                            valor={ment.escolaridade ? ESCOLARIDADE_LABELS[ment.escolaridade] : null}
+                            sempre={souCoord}
+                          />
+                        )}
+                      </dl>
+                      {anos != null && anos < 18 && (
+                        <p className="mt-1 rounded-lg bg-amber-50 px-2.5 py-1.5 text-xs text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+                          Menor de idade: a autorização do responsável precisa
+                          estar assinada.
+                          {souCoord && " Confira Documentos e assinaturas no painel lateral."}
+                        </p>
+                      )}
+                    </div>
                   )}
-                  <Linha
-                    rotulo="Gênero"
-                    valor={p.genero ? GENERO_LABELS[p.genero] : null}
-                    sempre={souCoord}
-                  />
-                  <Linha
-                    rotulo="Cor/raça"
-                    valor={p.cor_raca ? COR_RACA_LABELS[p.cor_raca] : null}
-                    sempre={souCoord}
-                  />
-                  <Linha rotulo="Cidade/UF" valor={local} sempre={souCoord} />
-                  {prof && (
-                    <>
-                      <Linha rotulo="Cargo" valor={prof.cargo} />
-                      <Linha rotulo="Empresa" valor={prof.empresa} />
-                    </>
+
+                  {temProf && prof && (
+                    <div className="mt-5 border-t border-border/60 pt-5">
+                      <SubFicha titulo="Profissional" />
+                      <dl className="mt-1 sm:grid sm:grid-cols-2 sm:gap-x-8">
+                        <Linha
+                          icone={<Briefcase size={15} />}
+                          rotulo="Cargo"
+                          valor={prof.cargo}
+                        />
+                        <Linha
+                          icone={<Buildings size={15} />}
+                          rotulo="Empresa"
+                          valor={prof.empresa}
+                        />
+                      </dl>
+                    </div>
                   )}
-                  {ment && (
-                    <Linha
-                      rotulo="Escolaridade"
-                      valor={ment.escolaridade ? ESCOLARIDADE_LABELS[ment.escolaridade] : null}
-                      sempre={souCoord}
-                    />
+
+                  {(temPrograma || souCoord) && (
+                    <div className="mt-5 border-t border-border/60 pt-5">
+                      <SubFicha titulo="No programa" />
+                      <dl className="mt-1 sm:grid sm:grid-cols-2 sm:gap-x-8">
+                        <Linha
+                          icone={<Signpost size={15} />}
+                          rotulo="Origem"
+                          valor={p.origem}
+                          sempre={souCoord}
+                        />
+                        {ment && (
+                          <Linha
+                            icone={<Target size={15} />}
+                            rotulo="Objetivos"
+                            valor={ment.objetivos}
+                            sempre={souCoord}
+                            className="sm:col-span-2"
+                          />
+                        )}
+                        {ment && (
+                          <Linha
+                            icone={<Clock size={15} />}
+                            rotulo="Disponível"
+                            valor={dispMentoradoTxt}
+                            sempre={souCoord}
+                          />
+                        )}
+                        <Linha
+                          icone={<Heart size={15} />}
+                          rotulo="Motivação"
+                          valor={p.motivacao}
+                          sempre={souCoord}
+                          className="sm:col-span-2"
+                        />
+                        <Linha
+                          icone={<Users size={15} />}
+                          rotulo="Pref. de par"
+                          valor={p.pref_genero_par ? PREF_GENERO_LABELS[p.pref_genero_par] : null}
+                          sempre={souCoord}
+                        />
+                        {/* consent_lgpd_em só existe em profiles — mentorado é
+                            coberto pela autorização do responsável. Trilha de
+                            compliance, não perfil: fora da visão de colega */}
+                        {prof && lgpdVisivel && (
+                          <Linha
+                            icone={<ShieldCheck size={15} />}
+                            rotulo="LGPD"
+                            valor={
+                              prof.consent_lgpd_em
+                                ? `Consentimento em ${formatDate(prof.consent_lgpd_em)}`
+                                : "Sem consentimento registrado"
+                            }
+                            sempre={souCoord}
+                          />
+                        )}
+                        {/* interesses ficam no Cadastro só quando não há card
+                            Sobre (mentorado e profiles sem apresentação) */}
+                        {interesses.length > 0 && !temPerfilPro && (
+                          <div className="flex items-start gap-2.5 py-3 sm:col-span-2">
+                            <span aria-hidden className="mt-0.5 shrink-0 text-muted-foreground/70">
+                              <Sparkle size={15} />
+                            </span>
+                            <div className="min-w-0">
+                              <dt className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
+                                Interesses
+                              </dt>
+                              <dd className="mt-1.5">
+                                <Chips itens={interesses} />
+                              </dd>
+                            </div>
+                          </div>
+                        )}
+                      </dl>
+                    </div>
                   )}
-                  <Linha rotulo="Origem" valor={p.origem} sempre={souCoord} />
-                  {ment && (
-                    <Linha
-                      rotulo="Objetivos"
-                      valor={ment.objetivos}
-                      sempre={souCoord}
-                      className="sm:col-span-2"
-                    />
+
+                  {/* referência da anamnese (campo notas do intake) —
+                      contexto da jornada, mora como subseção do cadastro */}
+                  {anamneseRef && (
+                    <div className="mt-5 border-t border-border/60 pt-5">
+                      <SubFicha titulo="Referência da anamnese" />
+                      <p className="mt-2 whitespace-pre-wrap text-muted-foreground">
+                        {anamneseRef}
+                      </p>
+                    </div>
                   )}
-                  {ment && (
-                    <Linha rotulo="Disponível" valor={dispMentoradoTxt} sempre={souCoord} />
-                  )}
-                  <Linha
-                    rotulo="Motivação"
-                    valor={p.motivacao}
-                    sempre={souCoord}
-                    className="sm:col-span-2"
-                  />
-                  <Linha
-                    rotulo="Pref. de par"
-                    valor={p.pref_genero_par ? PREF_GENERO_LABELS[p.pref_genero_par] : null}
-                    sempre={souCoord}
-                  />
-                  {/* consent_lgpd_em só existe em profiles — mentorado é
-                      coberto pela autorização do responsável (documento) */}
-                  {prof && (prof.consent_lgpd_em != null || souCoord) && (
-                    <Linha
-                      rotulo="LGPD"
-                      valor={
-                        prof.consent_lgpd_em
-                          ? `Consentimento em ${formatDate(prof.consent_lgpd_em)}`
-                          : "Sem consentimento registrado"
-                      }
-                    />
-                  )}
-                </dl>
+                </>
               ) : (
                 <p className="mt-2 text-muted-foreground">
                   Nada preenchido ainda. Edite o cadastro ou peça pra pessoa completar o perfil.
                 </p>
               )}
-              {/* interesses ficam no Cadastro só quando não há card Sobre
-                  (mentorado e profiles sem apresentação pública) */}
-              {interesses.length > 0 && !temPerfilPro && (
-                <div className="mt-3">
-                  <p className="text-xs text-muted-foreground">Interesses</p>
-                  <div className="mt-1.5">
-                    <Chips itens={interesses} />
-                  </div>
-                </div>
-              )}
 
               {/* dados civis (0046) — coord-only, fechados por padrão: o que
                   o termo de adesão precisa, sem pesar a ficha */}
               {souCoord && (civis || resp) && (
-                <Collapsible.Root>
-                  <Collapsible.Trigger className="group flex min-h-9 w-full items-center gap-1.5 rounded-lg py-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                    <LockSimple size={14} aria-hidden className="shrink-0" />
-                    {resp ? "Dados civis e responsável" : "Dados civis"}
-                    <CaretRight
-                      size={13}
-                      aria-hidden
-                      className="ml-auto shrink-0 transition-transform duration-150 group-data-[panel-open]:rotate-90"
-                    />
-                  </Collapsible.Trigger>
-                  <Collapsible.Panel className="h-[var(--collapsible-panel-height)] overflow-hidden transition-[height] duration-150 data-ending-style:h-0 data-starting-style:h-0 [&[hidden]:not([hidden='until-found'])]:hidden">
-                    <dl className="pt-1 sm:grid sm:grid-cols-2 sm:gap-x-6">
-                      <Linha rotulo="Nome civil" valor={civis?.nome_civil} sempre />
-                      <Linha rotulo="RG" valor={civis?.rg} sempre />
-                      <Linha rotulo="CPF" valor={civis?.cpf} sempre />
-                      <Linha
-                        rotulo="Nascimento"
-                        valor={civis?.data_nascimento ? formatDate(civis.data_nascimento) : null}
-                        sempre
+                <div className="mt-5 border-t border-border/60 pt-1">
+                  <Collapsible.Root>
+                    <Collapsible.Trigger className="group flex min-h-9 w-full items-center gap-1.5 rounded-lg py-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                      <LockSimple size={14} aria-hidden className="shrink-0" />
+                      {resp ? "Dados civis e responsável" : "Dados civis"}
+                      <CaretRight
+                        size={13}
+                        aria-hidden
+                        className="ml-auto shrink-0 transition-transform duration-150 group-data-[panel-open]:rotate-90"
                       />
-                      <Linha
-                        rotulo="Endereço"
-                        valor={enderecoTxt(civis?.endereco)}
-                        sempre
-                        className="sm:col-span-2"
-                      />
-                    </dl>
-                    {resp && (
-                      <>
-                        <p className="mt-1 border-t border-border/60 pt-2.5 text-xs font-medium text-muted-foreground">
-                          Responsável legal{resp.parentesco ? ` · ${resp.parentesco}` : ""}
-                        </p>
-                        <dl className="sm:grid sm:grid-cols-2 sm:gap-x-6">
-                          <Linha rotulo="Nome civil" valor={resp.nome_civil} sempre />
-                          <Linha rotulo="RG" valor={resp.rg} sempre />
-                          <Linha rotulo="CPF" valor={resp.cpf} sempre />
-                          <Linha
-                            rotulo="Nascimento"
-                            valor={resp.data_nascimento ? formatDate(resp.data_nascimento) : null}
-                            sempre
-                          />
-                          <Linha
-                            rotulo="Endereço"
-                            valor={enderecoTxt(resp.endereco)}
-                            sempre
-                            className="sm:col-span-2"
-                          />
-                        </dl>
-                      </>
-                    )}
-                  </Collapsible.Panel>
-                </Collapsible.Root>
+                    </Collapsible.Trigger>
+                    <Collapsible.Panel className="h-[var(--collapsible-panel-height)] overflow-hidden transition-[height] duration-150 data-ending-style:h-0 data-starting-style:h-0 [&[hidden]:not([hidden='until-found'])]:hidden">
+                      <dl className="pt-1 sm:grid sm:grid-cols-2 sm:gap-x-8">
+                        <Linha rotulo="Nome civil" valor={civis?.nome_civil} sempre />
+                        <Linha rotulo="RG" valor={civis?.rg} sempre />
+                        <Linha rotulo="CPF" valor={civis?.cpf} sempre />
+                        <Linha
+                          rotulo="Nascimento"
+                          valor={civis?.data_nascimento ? formatDate(civis.data_nascimento) : null}
+                          sempre
+                        />
+                        <Linha
+                          rotulo="Endereço"
+                          valor={enderecoTxt(civis?.endereco)}
+                          sempre
+                          className="sm:col-span-2"
+                        />
+                      </dl>
+                      {resp && (
+                        <>
+                          <p className="mt-1 border-t border-border/60 pt-2.5 text-xs font-medium text-muted-foreground">
+                            Responsável legal{resp.parentesco ? ` · ${resp.parentesco}` : ""}
+                          </p>
+                          <dl className="sm:grid sm:grid-cols-2 sm:gap-x-8">
+                            <Linha rotulo="Nome civil" valor={resp.nome_civil} sempre />
+                            <Linha rotulo="RG" valor={resp.rg} sempre />
+                            <Linha rotulo="CPF" valor={resp.cpf} sempre />
+                            <Linha
+                              rotulo="Nascimento"
+                              valor={resp.data_nascimento ? formatDate(resp.data_nascimento) : null}
+                              sempre
+                            />
+                            <Linha
+                              rotulo="Endereço"
+                              valor={enderecoTxt(resp.endereco)}
+                              sempre
+                              className="sm:col-span-2"
+                            />
+                          </dl>
+                        </>
+                      )}
+                    </Collapsible.Panel>
+                  </Collapsible.Root>
+                </div>
               )}
             </section>
           )}
@@ -631,118 +836,141 @@ export default async function PessoaPerfilPage({
               podeExcluir={souCoord}
             />
           )}
-
-          {/* anamnese do mentorado — contexto da jornada, fica com o
-              histórico na coluna principal */}
-          {ehMentorado && "notas" in p && p.notas && (
-            <section className="rounded-xl bg-card p-4 text-sm shadow-[var(--shadow-border)] sm:p-5">
-              <h2 className="flex items-center gap-1.5 text-sm font-semibold">
-                <Buildings size={14} aria-hidden />
-                Referência da anamnese
-              </h2>
-              <p className="mt-2 whitespace-pre-wrap text-muted-foreground">{p.notas}</p>
-            </section>
-          )}
         </div>
 
         {/* rail direito — referência operacional: vínculos, documentos
             (coord) e o caderno privado de notas */}
+        {temRail && (
         <aside className="min-w-0 space-y-4">
-          <section className="rounded-xl bg-card p-4 text-sm shadow-[var(--shadow-border)] sm:p-5">
-            <h2 className="text-sm font-semibold">Duplas</h2>
-            {perfil.duplas.length === 0 ? (
-              <p className="mt-2 text-muted-foreground">Nenhuma dupla no histórico.</p>
-            ) : (
-              <ul className="mt-2 space-y-1">
-                {perfil.duplas.map((d) => (
-                  <li key={d.id}>
-                    <Link
-                      href={`/duplas/${d.id}`}
-                      className="group flex min-h-11 items-center gap-2 rounded-lg px-2 py-2 transition-colors hover:bg-muted/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    >
-                      {d.mentor && d.mentorado && (
-                        <DuplaAvatares
-                          mentor={d.mentor}
-                          mentorado={d.mentorado}
-                          size={32}
+          {/* Duplas — pra quem não é coord a RLS devolve só os vínculos do
+              espectador: lista vazia diria "não tem dupla" e seria mentira
+              (Fernanda tem dupla supervisionada por outra pessoa). Então só
+              a coord vê o estado vazio; staff/colega vê o card só quando há
+              o que mostrar */}
+          {(souCoord || perfil.duplas.length > 0) && (
+            <section className="rounded-xl bg-card p-4 text-sm shadow-[var(--shadow-border)] sm:p-5">
+              <h2 className="text-sm font-semibold">Duplas</h2>
+              {perfil.duplas.length === 0 ? (
+                <p className="mt-2 text-muted-foreground">Nenhuma dupla no histórico.</p>
+              ) : (
+                <ul className="mt-2 space-y-1">
+                  {perfil.duplas.map((d) => (
+                    <li key={d.id}>
+                      <Link
+                        href={`/duplas/${d.id}`}
+                        className="group flex min-h-11 items-center gap-2 rounded-lg px-2 py-2 transition-colors hover:bg-muted/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      >
+                        {d.mentor && d.mentorado && (
+                          <DuplaAvatares
+                            mentor={d.mentor}
+                            mentorado={d.mentorado}
+                            size={32}
+                          />
+                        )}
+                        <span className="min-w-0 flex-1">
+                          {/* flex + min-w-0: em block o ellipsis do pai
+                              suprimia o lockup inteiro e o mentorado
+                              sumia; como flex item cada nome corta com
+                              "…" próprio */}
+                          <span className="flex min-w-0 items-center gap-1 text-sm font-medium">
+                            {d.mentor && d.mentorado ? (
+                              <DuplaNomes mentor={d.mentor.nome} mentorado={d.mentorado.nome} truncar />
+                            ) : (
+                              "Dupla"
+                            )}
+                          </span>
+                          <span className="block text-xs text-muted-foreground">
+                            {STATUS_DUPLA[d.status]}
+                            {d.iniciada_em ? ` · desde ${formatDate(d.iniciada_em)}` : ""}
+                          </span>
+                        </span>
+                        <ArrowUpRight
+                          size={13}
+                          aria-hidden
+                          className="shrink-0 text-muted-foreground transition-[color,transform] group-hover:translate-x-0.5 group-hover:text-foreground"
                         />
-                      )}
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-medium">
-                          {d.mentor && d.mentorado ? (
-                            <DuplaNomes mentor={d.mentor.nome} mentorado={d.mentorado.nome} />
-                          ) : (
-                            "Dupla"
-                          )}
-                        </span>
-                        <span className="block text-xs text-muted-foreground">
-                          {STATUS_DUPLA[d.status]}
-                          {d.iniciada_em ? ` · desde ${formatDate(d.iniciada_em)}` : ""}
-                        </span>
-                      </span>
-                      <ArrowUpRight
-                        size={13}
-                        aria-hidden
-                        className="shrink-0 text-muted-foreground transition-[color,transform] group-hover:translate-x-0.5 group-hover:text-foreground"
-                      />
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-
-          {/* documentos + termos + anamnese — coord-only ponta a ponta; até
-              aqui isso só existia dentro do dialog de edição. id próprio:
-              o stat "Termo" pendente aponta pra cá */}
-          {souCoord && (
-            <section
-              id="assinaturas"
-              className="scroll-mt-20 rounded-xl bg-card p-4 text-sm shadow-[var(--shadow-border)] sm:p-5"
-            >
-              <h2 className="text-sm font-semibold">Documentos e assinaturas</h2>
-              {/* anexos do form de inscrição (0054) — RG, comprovante, currículo */}
-              <div className="mt-3">
-                <DocumentosPessoa
-                  tipo={ehMentorado ? "mentorado" : "profile"}
-                  pessoaId={p.id}
-                  documentos={documentos}
-                />
-              </div>
-              <div className="mt-4 border-t border-border pt-3">
-                <AssinaturasPessoa
-                  tipo={ehMentorado ? "mentorado" : "profile"}
-                  id={p.id}
-                  nome={p.nome}
-                  whatsapp={p.whatsapp}
-                />
-              </div>
-              {/* Anamnese Social (0042) — o form oficial respondido pelo(a)
-                  jovem sem login; coord envia/reenvia o link daqui */}
-              {anamnese && (
-                <AnamneseMentoradoChip
-                  mentoradoId={p.id}
-                  nome={p.nome}
-                  whatsapp={p.whatsapp}
-                  anamnese={anamnese}
-                />
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
               )}
             </section>
           )}
 
-          {/* mural de notas — espaço modesto basta; fica no rail junto da
-              referência operacional em vez de ocupar a coluna principal */}
-          <section className="rounded-xl bg-card p-4 shadow-[var(--shadow-border)] sm:p-5">
-            <h2 className="mb-3 text-sm font-semibold">Notas</h2>
-            <PessoaMural
-              pessoaId={p.id}
-              tipo={perfil.tipo}
-              notas={notas}
-              podeAnotar={podeAnotar}
-              nomePessoa={p.nome}
-            />
-          </section>
+          {/* documentos + termos + anamnese — coord-only ponta a ponta. A
+              gaveta nasce fechada: o cabeçalho com a contagem já diz o que
+              tem dentro e a ficha fica leve; id próprio porque o stat
+              "Termo" pendente aponta pra cá */}
+          {souCoord && (
+            <section
+              id="assinaturas"
+              className="scroll-mt-20 rounded-xl bg-card text-sm shadow-[var(--shadow-border)]"
+            >
+              <Collapsible.Root>
+                <Collapsible.Trigger className="group flex min-h-12 w-full items-center gap-2 rounded-xl px-4 text-left transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:px-5">
+                  <span className="text-sm font-semibold">
+                    Documentos e assinaturas
+                  </span>
+                  {contagemDocs && (
+                    <span className="text-xs text-muted-foreground">
+                      · {contagemDocs}
+                    </span>
+                  )}
+                  <CaretRight
+                    size={13}
+                    aria-hidden
+                    className="ml-auto shrink-0 text-muted-foreground transition-transform duration-150 group-data-[panel-open]:rotate-90"
+                  />
+                </Collapsible.Trigger>
+                <Collapsible.Panel className="h-[var(--collapsible-panel-height)] overflow-hidden transition-[height] duration-150 data-ending-style:h-0 data-starting-style:h-0 [&[hidden]:not([hidden='until-found'])]:hidden">
+                  <div className="border-t border-border/60 px-4 pb-4 pt-3 sm:px-5 sm:pb-5">
+                    {/* anexos do form de inscrição (0054) — RG, comprovante,
+                        currículo */}
+                    <DocumentosPessoa
+                      tipo={ehMentorado ? "mentorado" : "profile"}
+                      pessoaId={p.id}
+                      documentos={documentos}
+                    />
+                    <div className="mt-4 border-t border-border pt-3">
+                      <AssinaturasPessoa
+                        tipo={ehMentorado ? "mentorado" : "profile"}
+                        id={p.id}
+                        nome={p.nome}
+                        whatsapp={p.whatsapp}
+                      />
+                    </div>
+                    {/* Anamnese Social (0042) — o form oficial respondido
+                        pelo(a) jovem sem login; coord envia/reenvia daqui */}
+                    {anamnese && (
+                      <AnamneseMentoradoChip
+                        mentoradoId={p.id}
+                        nome={p.nome}
+                        whatsapp={p.whatsapp}
+                        anamnese={anamnese}
+                      />
+                    )}
+                  </div>
+                </Collapsible.Panel>
+              </Collapsible.Root>
+            </section>
+          )}
+
+          {/* mural de notas — espaço modesto basta; some quando não há nada
+              pra ler nem permissão pra escrever (ficha de colega) */}
+          {(podeAnotar || notas.length > 0) && (
+            <section className="rounded-xl bg-card p-4 shadow-[var(--shadow-border)] sm:p-5">
+              <h2 className="mb-3 text-sm font-semibold">Notas</h2>
+              <PessoaMural
+                pessoaId={p.id}
+                tipo={perfil.tipo}
+                notas={notas}
+                podeAnotar={podeAnotar}
+                nomePessoa={p.nome}
+              />
+            </section>
+          )}
         </aside>
+        )}
       </div>
     </div>
   );

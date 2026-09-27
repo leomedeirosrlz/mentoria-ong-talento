@@ -36,7 +36,7 @@ const NAV = [
   { href: "/agenda", label: "Agenda", curto: "Agenda", icon: CalendarDots, roles: null },
   { href: "/materiais", label: "Materiais", curto: "Materiais", icon: FolderOpen, roles: null },
   { href: "/formularios", label: "Formulários", curto: "Forms", icon: ListChecks, roles: ["coordenacao"] },
-  { href: "/pessoas", label: "Pessoas", curto: "Pessoas", icon: UsersThree, roles: ["coordenacao"] },
+  { href: "/pessoas", label: "Pessoas", curto: "Pessoas", icon: UsersThree, roles: ["coordenacao", "supervisor", "mentor_dpp", "mentor_especialista"] },
 ] as const;
 
 export function AppShell({
@@ -60,7 +60,8 @@ export function AppShell({
   const items = NAV.filter((i) => !i.roles || (me.role && (i.roles as readonly string[]).includes(me.role)));
   const [abertoMais, setAbertoMais] = useState(false);
 
-  // nav mobile com no máx. 5 cells — só a coordenação passa disso (7 itens).
+  // nav mobile com no máx. 5 cells — coordenação (7) e supervisor (6) passam
+  // disso; mentor chega a 5 e o "Mais" nem aparece.
   // Primárias = rotina diária da operação (Início/Duplas/Pessoas/Agenda);
   // leitura consolidada (Registros) e gestão menos diária (Materiais/
   // Formulários) ficam a 1 toque no "Mais". A ordem da sidebar desktop não

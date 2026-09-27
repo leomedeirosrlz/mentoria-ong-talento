@@ -17,6 +17,7 @@ import { DEMO_MSG } from "@/lib/demo/shared";
 import { setAvatarPath, signOut, updateMeuPerfil } from "@/lib/actions";
 import { avatarPublicUrl, AVATAR_ACCEPT, AVATAR_MAX_BYTES } from "@/lib/avatar";
 import { Avatar } from "@/components/avatar";
+import { PessoaBanner } from "@/components/pessoa-banner";
 import { TagInput } from "@/components/tag-input";
 import {
   CampoConsentimento,
@@ -268,7 +269,8 @@ function FormSecao({
 }
 
 /** Corpo do Dialog "Perfil público" — os campos que a ficha em
- *  /pessoas/[id] mostra a quem alcança a página (coordenação e supervisão).
+ *  /pessoas/[id] mostra a quem alcança a página (hoje qualquer papel — a
+ *  ficha do colega é o diretório interno).
  *  Monta a cada abertura do modal: os defaultValues vêm sempre do profile
  *  mais recente e os controlados (tags/grade) recomeçam limpos — fechar sem
  *  salvar descarta o rascunho sozinho. */
@@ -873,7 +875,21 @@ export function PerfilForm({
           o overlay de câmera fica sempre à vista e o upload é direto,
           sem modo edição nem botão de save */}
       <header className="overflow-hidden rounded-xl bg-card shadow-[var(--shadow-border)]">
-        <div aria-hidden className="capa-perfil h-24 sm:h-28" />
+        {/* o mesmo banner generativo da ficha — a identidade da pessoa não
+            muda entre "eu me vejo" e "colegas me veem" */}
+        <PessoaBanner
+          papel={me.role}
+          cidade={me.cidade}
+          uf={me.uf}
+          areas={
+            (me.areas?.length
+              ? me.areas
+              : mentorProfile?.areas?.length
+                ? mentorProfile.areas
+                : me.interesses) ?? []
+          }
+          seed={me.id}
+        />
         <div className="px-4 pb-5 sm:px-6 sm:pb-6">
           <div className="flex items-end justify-between gap-3">
             <div className="relative -mt-10 shrink-0 sm:-mt-12">

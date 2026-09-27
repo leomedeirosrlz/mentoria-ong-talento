@@ -282,9 +282,19 @@ export function disponibilidadeTexto(d: Disponibilidade | null | undefined): str
   );
   const junta = (l: string[]) =>
     l.length <= 1 ? (l[0] ?? "") : `${l.slice(0, -1).join(", ")} e ${l.at(-1)}`;
+  // plural de cada período: "às tardes e noites" (não "às tarde e noite")
+  const PERIODO_PLURAL: Record<string, string> = {
+    manhã: "manhãs",
+    tarde: "tardes",
+    noite: "noites",
+  };
   const partes = [
     dias.length ? junta(dias) : null,
-    periodos.length ? `à${periodos.length > 1 ? "s" : ""} ${junta(periodos)}` : null,
+    periodos.length === 1
+      ? `à ${periodos[0]}`
+      : periodos.length
+        ? `às ${junta(periodos.map((x) => PERIODO_PLURAL[x] ?? x))}`
+        : null,
   ].filter(Boolean);
   return partes.length ? partes.join(" ") : null;
 }

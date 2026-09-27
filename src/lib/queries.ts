@@ -366,8 +366,10 @@ export const getPessoas = cache(async (): Promise<Profile[]> => {
     getPessoalMap("profiles_pessoal"),
   ]);
   if (error) throw error;
-  // a tela (/pessoas) é da coordenação — a view devolve email/whatsapp/
-  // documento_path de todos; pra outro papel só a própria linha teria contato.
+  // /pessoas é diretório pra todos os papéis — o contato vem da view
+  // escopada: coordenação recebe email/whatsapp/documento_path de todos,
+  // supervisor só dos mentores que supervisiona, mentor só a própria linha
+  // (o resto fica ""/null e os chips nem renderizam).
   // Os sensíveis (nascimento/gênero/pref./motivação) só preenchem pra coord.
   return ((data ?? []) as { id: string; nome: string }[])
     .map((p) => comPessoal(comContato(p, contatos), pessoal))

@@ -17,7 +17,7 @@ import {
 import type { Mentorado, Profile } from "@/lib/types";
 import type { MentorProfile } from "@/lib/queries";
 import { cn, normaliza } from "@/lib/utils";
-import { comparaNome, idade } from "@/lib/ciclo";
+import { comparaNome, idade, papelLabel } from "@/lib/ciclo";
 import { avatarPublicUrl } from "@/lib/avatar";
 import { Avatar } from "@/components/avatar";
 import { PessoaActions } from "@/components/pessoa-actions";
@@ -128,6 +128,7 @@ export function PessoasListas({
   mentorProfiles,
   contagemPorMentor,
   assinaturas,
+  souCoord,
 }: {
   pessoas: Profile[];
   mentorados: Mentorado[];
@@ -138,6 +139,10 @@ export function PessoasListas({
   contagemPorMentor: Record<string, number>;
   /** id da pessoa → documentos assinados/pendentes (badge "assinou vs. não"). */
   assinaturas: Record<string, DocsPessoa>;
+  /** false = diretório de colegas (supervisor/mentores): mesma lista, sem
+   *  badges operacionais, filtros de gestão nem ações — os mapas acima já
+   *  chegam vazios da página e nem são consultados nesse modo. */
+  souCoord: boolean;
 }) {
   const [busca, setBusca] = useState("");
   const [semDupla, setSemDupla] = useState(false);
@@ -146,16 +151,27 @@ export function PessoasListas({
   const temQualquerDupla = useMemo(() => new Set(comQualquerDupla), [comQualquerDupla]);
 
   const q = normaliza(busca.trim());
+  // diretório de colegas: sem papel ainda não é colega — pré-cadastro que
+  // só a coordenação precisa enxergar (pro staff eles carregam estado
+  // operacional: inativa, nunca acessou). A base filtrada também é o
+  // denominador do contador — mostrar o total cru mentiria
+  const basePessoas = souCoord ? pessoas : pessoas.filter((p) => p.role != null);
+  // pra não-coord o e-mail não chega (view profiles_contato só devolve o
+  // escopo do papel) — a busca é por nome (+ nome social, que é público)
   let pessoasFiltradas = q
-    ? pessoas.filter(
-        (p) => normaliza(p.nome).includes(q) || normaliza(p.email).includes(q)
+    ? basePessoas.filter(
+        (p) =>
+          normaliza(p.nome).includes(q) ||
+          normaliza(p.nome_social ?? "").includes(q) ||
+          (souCoord && normaliza(p.email).includes(q))
       )
-    : pessoas;
+    : basePessoas;
   let mentoradosFiltrados = q
     ? mentorados.filter(
         (m) =>
           normaliza(m.nome).includes(q) ||
-          normaliza(m.email).includes(q) ||
+          normaliza(m.nome_social ?? "").includes(q) ||
+          normaliza(m.email ?? "").includes(q) ||
           normaliza(m.ong_origem).includes(q)
       )
     : mentorados;
@@ -210,57 +226,63 @@ export function PessoasListas({
           <Input
             type="search"
             aria-label="Buscar pessoa"
-            placeholder="Buscar por nome ou e-mail"
+            placeholder={
+              souCoord ? "Buscar por nome ou e-mail" : "Buscar por nome"
+            }
             value={busca}
             onChange={(e) => setBusca(e.target.value)}
             className="pl-8"
           />
         </div>
-        <button
-          type="button"
-          aria-pressed={semDupla}
-          onClick={() => setSemDupla((v) => !v)}
-          className={filterChipCls(semDupla)}
-        >
-          Livres para dupla
-          <span
-            className={cn(
-              "font-mono text-[11px] tabular-nums",
-              semDupla ? "text-background/70" : "text-muted-foreground/70"
-            )}
-          >
-            {livres}
-          </span>
-        </button>
-        {/* vale pras duas seções (Com acesso + Mentorados) — pendências
-            primeiro é a ordem de trabalho da coordenação */}
-        <Select
-          value={ordem}
-          onValueChange={(v) => setOrdem(v as OrdemPessoas)}
-          items={ORDEM_PESSOAS_LABEL}
-        >
-          <SelectTrigger
-            size="sm"
-            aria-label="Ordenar"
-            className="ml-auto w-auto sm:w-48"
-          >
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent alignItemWithTrigger={false}>
-            {(
-              Object.entries(ORDEM_PESSOAS_LABEL) as [OrdemPessoas, string][]
-            ).map(([v, l]) => (
-              <SelectItem key={v} value={v}>
-                {l}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {souCoord && (
+          <>
+            <button
+              type="button"
+              aria-pressed={semDupla}
+              onClick={() => setSemDupla((v) => !v)}
+              className={filterChipCls(semDupla)}
+            >
+              Livres para dupla
+              <span
+                className={cn(
+                  "font-mono text-[11px] tabular-nums",
+                  semDupla ? "text-background/70" : "text-muted-foreground/70"
+                )}
+              >
+                {livres}
+              </span>
+            </button>
+            {/* vale pras duas seções (Com acesso + Mentorados) — pendências
+                primeiro é a ordem de trabalho da coordenação */}
+            <Select
+              value={ordem}
+              onValueChange={(v) => setOrdem(v as OrdemPessoas)}
+              items={ORDEM_PESSOAS_LABEL}
+            >
+              <SelectTrigger
+                size="sm"
+                aria-label="Ordenar"
+                className="ml-auto w-auto sm:w-48"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent alignItemWithTrigger={false}>
+                {(
+                  Object.entries(ORDEM_PESSOAS_LABEL) as [OrdemPessoas, string][]
+                ).map(([v, l]) => (
+                  <SelectItem key={v} value={v}>
+                    {l}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </>
+        )}
       </div>
 
       {/* board de pareamento — comparação de afinidade mentorado × mentor
-          só faz sentido com o filtro de livres ligado */}
-      {semDupla && (
+          só faz sentido com o filtro de livres ligado (visão da coordenação) */}
+      {souCoord && semDupla && (
         <MatchingPanel
           mentores={mentoresLivres}
           mentorados={mentoradosLivres}
@@ -270,23 +292,27 @@ export function PessoasListas({
 
       <section className="space-y-2">
         <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground tabular-nums">
-          Com acesso ({filtrando ? `${pessoasExibidas.length} de ${pessoas.length}` : pessoas.length})
+          {souCoord ? "Com acesso" : "Mentores e equipe"} ({filtrando ? `${pessoasExibidas.length} de ${basePessoas.length}` : basePessoas.length})
         </h2>
         <div className="rounded-xl bg-card shadow-[var(--shadow-border)] divide-y divide-border/60 overflow-hidden">
-          {pessoas.length === 0 && (
+          {basePessoas.length === 0 && (
             <div className="flex flex-col items-center gap-1.5 py-10 text-center">
               <span className="grid size-11 place-items-center rounded-full bg-muted text-muted-foreground">
                 <UsersThree aria-hidden size={18} />
               </span>
               <p className="text-sm font-medium">Ninguém cadastrado ainda</p>
-              <p className="text-sm text-muted-foreground max-w-sm">
-                Quem tem acesso à plataforma (mentores, supervisores e coordenação)
-                entra por aqui, um a um ou de uma planilha.
-              </p>
-              <div className="mt-3 flex flex-wrap justify-center gap-2">
-                <ImportarCsvDialog />
-                <NovaPessoaDialog />
-              </div>
+              {souCoord && (
+                <>
+                  <p className="text-sm text-muted-foreground max-w-sm">
+                    Quem tem acesso à plataforma (mentores, supervisores e coordenação)
+                    entra por aqui, um a um ou de uma planilha.
+                  </p>
+                  <div className="mt-3 flex flex-wrap justify-center gap-2">
+                    <ImportarCsvDialog />
+                    <NovaPessoaDialog />
+                  </div>
+                </>
+              )}
             </div>
           )}
           {pessoas.length > 0 && pessoasExibidas.length === 0 && (
@@ -297,7 +323,9 @@ export function PessoasListas({
                     <MagnifyingGlass aria-hidden size={18} />
                   </span>
                   <p className="text-sm font-medium">Nenhum resultado para “{busca.trim()}”</p>
-                  <p className="text-sm text-muted-foreground">Tente outro nome ou e-mail.</p>
+                  <p className="text-sm text-muted-foreground">
+                    {souCoord ? "Tente outro nome ou e-mail." : "Tente outro nome."}
+                  </p>
                   <Button
                     variant="outline" size="sm" className="mt-2"
                     onClick={() => setBusca("")}
@@ -333,32 +361,41 @@ export function PessoasListas({
               mentorProfile={mentorProfiles[p.id]}
               vagas={contagemPorMentor[p.id] ?? 0}
               docs={assinaturas[p.id]}
+              souCoord={souCoord}
             />
           ))}
         </div>
       </section>
 
+      {/* fora da coordenação a lista já vem escopada pelo RLS (os
+          mentorados das próprias duplas) — vazia, a seção se resume a uma
+          linha discreta em vez do empty state de cadastro */}
       <section className="space-y-2">
         <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground tabular-nums">
           Mentorados ({filtrando ? `${mentoradosExibidos.length} de ${mentorados.length}` : mentorados.length})
         </h2>
         <div className="rounded-xl bg-card shadow-[var(--shadow-border)] divide-y divide-border/60 overflow-hidden">
-          {mentorados.length === 0 && (
-            <div className="flex flex-col items-center gap-1.5 py-10 text-center">
-              <span className="grid size-11 place-items-center rounded-full bg-muted text-muted-foreground">
-                <Student aria-hidden size={18} />
-              </span>
-              <p className="text-sm font-medium">Nenhum mentorado cadastrado ainda</p>
-              <p className="text-sm text-muted-foreground max-w-sm">
-                Quem recebe a mentoria entra por aqui: um a um ou trazendo a
-                lista inteira de uma planilha.
-              </p>
-              <div className="mt-3 flex flex-wrap justify-center gap-2">
-                <ImportarCsvDialog tipoInicial="mentorados" />
-                <NovoMentoradoDialog />
+          {mentorados.length === 0 &&
+            (souCoord ? (
+              <div className="flex flex-col items-center gap-1.5 py-10 text-center">
+                <span className="grid size-11 place-items-center rounded-full bg-muted text-muted-foreground">
+                  <Student aria-hidden size={18} />
+                </span>
+                <p className="text-sm font-medium">Nenhum mentorado cadastrado ainda</p>
+                <p className="text-sm text-muted-foreground max-w-sm">
+                  Quem recebe a mentoria entra por aqui: um a um ou trazendo a
+                  lista inteira de uma planilha.
+                </p>
+                <div className="mt-3 flex flex-wrap justify-center gap-2">
+                  <ImportarCsvDialog tipoInicial="mentorados" />
+                  <NovoMentoradoDialog />
+                </div>
               </div>
-            </div>
-          )}
+            ) : (
+              <p className="px-4 py-6 text-center text-sm text-muted-foreground">
+                Nenhum mentorado vinculado a você ainda.
+              </p>
+            ))}
           {mentorados.length > 0 && mentoradosExibidos.length === 0 && (
             <div className="flex flex-col items-center gap-1.5 py-10 text-center">
               {q ? (
@@ -400,6 +437,7 @@ export function PessoasListas({
               emDupla={emDupla.has(m.id)}
               temDupla={temQualquerDupla.has(m.id)}
               docs={assinaturas[m.id]}
+              souCoord={souCoord}
             />
           ))}
         </div>
@@ -523,8 +561,11 @@ function DetalhesRegiao({
   );
 }
 
-/** Linha de pessoa com acesso — avatar, nome e contexto essencial na linha;
- *  vagas e pendências do mentor ficam na região "Detalhes" colapsável. */
+/** Linha de pessoa — pra coordenação: avatar, nome e contexto essencial,
+ *  com vagas/pendências do mentor na região "Detalhes" colapsável. Pros
+ *  demais papéis é uma linha de diretório: papel como badge estático e
+ *  cargo/empresa (ou cidade/UF) + áreas/interesses no lugar do contato —
+ *  o suficiente pra "ter ideia do perfil do colega". */
 function PessoaRow({
   p,
   indice,
@@ -534,6 +575,7 @@ function PessoaRow({
   mentorProfile: mp,
   vagas,
   docs: docsProp,
+  souCoord,
 }: {
   p: Profile;
   indice: number;
@@ -545,6 +587,7 @@ function PessoaRow({
   mentorProfile: MentorProfile | undefined;
   vagas: number;
   docs: DocsPessoa | undefined;
+  souCoord: boolean;
 }) {
   const [detalhesAbertos, setDetalhesAbertos] = useState(false);
   // mentor sem linha em mentor_profiles vale capacidade 1 (mesma regra do createDupla)
@@ -559,6 +602,14 @@ function PessoaRow({
   const termoOk = ehMentor(p)
     ? Boolean(mp?.termo_ok)
     : assinadoTermo !== undefined || Boolean(p.documento_path);
+  // diretório: subtítulo de contexto profissional (cargo · empresa, senão
+  // cidade · UF) + chips do que a pessoa oferece/curte — áreas pra mentor,
+  // interesses pro resto; tudo coluna pública do grant (0026/0034)
+  const subtitulo =
+    [p.cargo, p.empresa].filter(Boolean).join(" · ") ||
+    [p.cidade, p.uf].filter(Boolean).join(" · ");
+  const chipsPerfil = ehMentor(p) ? (p.areas ?? []) : (p.interesses ?? []);
+  const CHIPS_MAX = 4;
   return (
     <div
       className="animate-enter px-4 py-3.5 sm:px-5"
@@ -581,27 +632,62 @@ function PessoaRow({
           <span className="min-w-0">
             <span className="block truncate text-sm font-medium underline-offset-4 transition-colors group-hover:underline">
               {p.nome}
+              {!souCoord && p.nome_social && (
+                <span className="font-normal text-muted-foreground">
+                  {" "}
+                  ({p.nome_social})
+                </span>
+              )}
             </span>
             <span className="block truncate text-xs text-muted-foreground">
-              {p.email}
-              {p.whatsapp ? ` · ${formatarWhatsApp(p.whatsapp)}` : ""}
+              {souCoord ? (
+                <>
+                  {p.email}
+                  {p.whatsapp ? ` · ${formatarWhatsApp(p.whatsapp)}` : ""}
+                </>
+              ) : (
+                subtitulo || "\u00A0"
+              )}
             </span>
+            {!souCoord && chipsPerfil.length > 0 && (
+              <span className="mt-1 flex flex-wrap gap-1">
+                {chipsPerfil.slice(0, CHIPS_MAX).map((c) => (
+                  <Badge
+                    key={c}
+                    variant="outline"
+                    className="bg-muted font-normal text-muted-foreground"
+                  >
+                    {c}
+                  </Badge>
+                ))}
+                {chipsPerfil.length > CHIPS_MAX && (
+                  <span className="self-center text-[11px] text-muted-foreground">
+                    +{chipsPerfil.length - CHIPS_MAX}
+                  </span>
+                )}
+              </span>
+            )}
           </span>
         </Link>
-        {!p.ativo && (
+        {!souCoord && p.role && (
+          <Badge variant="outline" className="ml-auto shrink-0 text-xs font-normal">
+            {papelLabel(p.role)}
+          </Badge>
+        )}
+        {souCoord && !p.ativo && (
           <Badge variant="outline" className="text-xs shrink-0 border-[var(--danger)]/50 text-[var(--danger)]">
             inativa
           </Badge>
         )}
-        {p.ativo && !p.user_id && (
+        {souCoord && p.ativo && !p.user_id && (
           <Badge variant="outline" className="text-xs shrink-0">ainda não entrou</Badge>
         )}
         {/* pra mentor a linha "Cuida de X de Y" em Detalhes já diz "em dupla" —
             o badge só aparece quando ela não cobriria (vagas 0) */}
-        {emDupla && !(ehMentor(p) && vagas > 0) && (
+        {souCoord && emDupla && !(ehMentor(p) && vagas > 0) && (
           <Badge variant="outline" className="text-xs shrink-0">em dupla</Badge>
         )}
-        {!termoOk && (
+        {souCoord && !termoOk && (
           <Badge
             variant="outline"
             className="text-xs shrink-0 border-[var(--warn)]/60 text-[var(--warn-text)]"
@@ -612,7 +698,7 @@ function PessoaRow({
         {/* vagas e pendências do mentor saíram da linha — ficam em "Detalhes".
             Sem badge "especialista": o seletor de papel na mesma linha já diz
             "mentor especialista" (mp.tipo é derivado de role) */}
-        {ehMentor(p) && (
+        {souCoord && ehMentor(p) && (
           <DetalhesTrigger
             aberto={detalhesAbertos}
             controlsId={detalhesId}
@@ -623,18 +709,20 @@ function PessoaRow({
         {/* a 390px o cluster cai pra linha própria — w-full deixa o select de
             papel ocupar a linha toda (alvo generoso) com o ⋮ na direita;
             sm+ volta a ser o cluster compacto colado à direita */}
-        <div className="flex w-full items-center justify-between gap-2 sm:ml-auto sm:w-auto">
-          <div className="w-full sm:w-40">
-            <RoleSelect profileId={p.id} role={p.role} nome={p.nome} />
+        {souCoord && (
+          <div className="flex w-full items-center justify-between gap-2 sm:ml-auto sm:w-auto">
+            <div className="w-full sm:w-40">
+              <RoleSelect profileId={p.id} role={p.role} nome={p.nome} />
+            </div>
+            <PessoaActions
+              pessoa={p}
+              // mesma guarda do server: qualquer dupla (até encerrada) bloqueia excluir
+              podeExcluir={podeExcluir}
+            />
           </div>
-          <PessoaActions
-            pessoa={p}
-            // mesma guarda do server: qualquer dupla (até encerrada) bloqueia excluir
-            podeExcluir={podeExcluir}
-          />
-        </div>
+        )}
       </div>
-      {ehMentor(p) && (
+      {souCoord && ehMentor(p) && (
         <DetalhesRegiao id={detalhesId} nome={p.nome} aberto={detalhesAbertos}>
           <ItemDetalhe icone={Users}>
             {vagas === 0
@@ -670,19 +758,23 @@ function PessoaRow({
 }
 
 /** Linha de mentorado — mesma gramática da de pessoa; a autorização do
- *  responsável (LGPD) vira frase completa em "Detalhes", não badge de jargão. */
+ *  responsável (LGPD) vira frase completa em "Detalhes", não badge de jargão.
+ *  Pros demais papéis é só diretório (nome + ONG + contato já escopado pelo
+ *  RLS): sem badges de pendência nem ações. */
 function MentoradoRow({
   m,
   indice,
   emDupla,
   temDupla,
   docs: docsProp,
+  souCoord,
 }: {
   m: Mentorado;
   indice: number;
   emDupla: boolean;
   temDupla: boolean;
   docs: DocsPessoa | undefined;
+  souCoord: boolean;
 }) {
   const [detalhesAbertos, setDetalhesAbertos] = useState(false);
   const detalhesId = `detalhes-${m.id}`;
@@ -739,10 +831,10 @@ function MentoradoRow({
             </span>
           </span>
         </Link>
-        {emDupla && (
+        {souCoord && emDupla && (
           <Badge variant="outline" className="text-xs shrink-0">em dupla</Badge>
         )}
-        {!docOk && (
+        {souCoord && !docOk && (
           <Badge
             variant="outline"
             className={cn(
@@ -760,7 +852,7 @@ function MentoradoRow({
                 : "termo pendente"}
           </Badge>
         )}
-        {temDocs && (
+        {souCoord && temDocs && (
           <DetalhesTrigger
             aberto={detalhesAbertos}
             controlsId={detalhesId}
@@ -768,11 +860,13 @@ function MentoradoRow({
             onAlternar={() => setDetalhesAbertos((v) => !v)}
           />
         )}
-        <div className="flex items-center gap-2 ml-auto">
-          <MentoradoActions mentorado={m} temDupla={temDupla} />
-        </div>
+        {souCoord && (
+          <div className="flex items-center gap-2 ml-auto">
+            <MentoradoActions mentorado={m} temDupla={temDupla} />
+          </div>
+        )}
       </div>
-      {temDocs && (
+      {souCoord && temDocs && (
         <DetalhesRegiao id={detalhesId} nome={m.nome} aberto={detalhesAbertos}>
           {menor && (
             <ItemDetalhe icone={FileText} warn={!autorizacaoOk}>

@@ -15,10 +15,10 @@ import {
 } from "@/components/ui/select";
 
 /** Painel do board de matching — aparece quando "Livres para dupla" está
- *  ligado em /pessoas (página coord-only). A coordenação escolhe um
- *  mentorado e um mentor livres e compara a afinidade antes de abrir o
- *  dialog de criação. Os sensíveis já vêm mergeados nos props (views
- *  *_pessoal só devolvem pra coordenação). */
+ *  ligado em /pessoas (o chip só existe na visão da coordenação). A
+ *  coordenação escolhe um mentorado e um mentor livres e compara a afinidade
+ *  antes de abrir o dialog de criação. Os sensíveis já vêm mergeados nos
+ *  props (views *_pessoal só devolvem pra coordenação). */
 export function MatchingPanel({
   mentores,
   mentorados,

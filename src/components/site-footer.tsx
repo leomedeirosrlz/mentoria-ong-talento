@@ -23,16 +23,15 @@ export function SiteFooter({
       >
         <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center justify-between gap-x-6 gap-y-2 px-4 pb-[calc(5.5rem+env(safe-area-inset-bottom))] pt-4 sm:px-6 md:pb-6 xl:max-w-6xl 2xl:max-w-7xl">
           <p className="flex items-center gap-2.5">
-            {/* glifo da marca: os dois discos sobrepostos da dupla
-                (precedente DuplaAvatares) */}
-            <span aria-hidden className="inline-flex">
-              <span className="size-2.5 rounded-full bg-[var(--brand-lime)]" />
-              <span className="-ml-1 size-2.5 rounded-full bg-[var(--role-mentorado)]" />
+            {/* wordmark em texto puro — a mesma construção do header dos
+                e-mails e do /logo-realiza.png da sidebar (REALIZA claro +
+                ponto amarelo + VC lime) */}
+            <span className="text-sm font-black italic tracking-tight">
+              <span className="text-white">REALIZA</span>
+              <span className="text-[var(--role-mentorado)]">.</span>
+              <span className="text-[var(--brand-lime)]">VC</span>
             </span>
-            <span className="text-sm font-semibold tracking-tight text-white">
-              Realiza.vc
-            </span>
-            <span className="text-xs text-white/50">
+            <span className="text-xs not-italic text-white/50">
               Programa de Mentoria Social
             </span>
           </p>

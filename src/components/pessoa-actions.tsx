@@ -54,13 +54,9 @@ type MentorProfile = {
 export function PessoaActions({
   pessoa,
   podeExcluir,
-  botaoEditar = false,
 }: {
   pessoa: Profile;
   podeExcluir: boolean;
-  /** ficha de pessoa: um "Editar" outline visível ao lado do ⋮ — abre o
-   *  mesmo wizard do item do menu */
-  botaoEditar?: boolean;
 }) {
   const [editOpen, setEditOpen] = useState(false);
   const [delOpen, setDelOpen] = useState(false);
@@ -374,17 +370,6 @@ export function PessoaActions({
 
   return (
     <>
-      {botaoEditar && (
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={() => setEditOpen(true)}
-        >
-          <PencilSimple />
-          Editar
-        </Button>
-      )}
       <DropdownMenu>
         <DropdownMenuTrigger
           render={
