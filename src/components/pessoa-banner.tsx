@@ -9,33 +9,20 @@ const INK = "var(--brand-ink)";
 const LIME = "var(--brand-lime)";
 const AMARELO = "var(--role-mentorado)";
 
-/** Campo × tinta × texto por papel — o banner diz o papel antes de qualquer
- *  leitura: ink pros papéis internos (coordenação, supervisão), lime pros
- *  mentores, amarelo pro mentorado (as cores do logo, trocando quem é campo
- *  e quem é marca). `tinta` é a cor dos relevos e do ghost — a "gravura" do
- *  campo; `texto` é a linha de dados. */
+/** Campo × tinta × texto por papel — campo ink pra todo mundo (o banner é
+ *  a faixa escura da marca); o papel mora na marca do canto e no matiz
+ *  sutil da `tinta`, que colore os relevos e o nome fantasma. `texto` é a
+ *  linha de dados. */
 const CAMPO: Record<
   NonNullable<PapelBanner> | "none",
   { bg: string; tinta: string; texto: string }
 > = {
   coordenacao: { bg: INK, tinta: LIME, texto: "hsl(0 0% 100% / 0.9)" },
-  supervisor: {
-    bg: INK,
-    tinta: "hsl(0 0% 100%)",
-    texto: "hsl(0 0% 100% / 0.9)",
-  },
-  mentor_dpp: { bg: LIME, tinta: INK, texto: "hsl(0 0% 15% / 0.9)" },
-  mentor_especialista: {
-    bg: LIME,
-    tinta: INK,
-    texto: "hsl(0 0% 15% / 0.9)",
-  },
-  mentorado: { bg: AMARELO, tinta: INK, texto: "hsl(0 0% 15% / 0.9)" },
-  none: {
-    bg: "var(--muted)",
-    tinta: "var(--muted-foreground)",
-    texto: "var(--muted-foreground)",
-  },
+  supervisor: { bg: INK, tinta: "hsl(0 0% 100%)", texto: "hsl(0 0% 100% / 0.9)" },
+  mentor_dpp: { bg: INK, tinta: LIME, texto: "hsl(0 0% 100% / 0.9)" },
+  mentor_especialista: { bg: INK, tinta: LIME, texto: "hsl(0 0% 100% / 0.9)" },
+  mentorado: { bg: INK, tinta: AMARELO, texto: "hsl(0 0% 100% / 0.9)" },
+  none: { bg: INK, tinta: "hsl(0 0% 100%)", texto: "hsl(0 0% 100% / 0.9)" },
 };
 
 /** A marca de papel — mesma composição pra todo mundo do papel (é o
@@ -71,17 +58,17 @@ function MarcaPapel({ papel }: { papel: PapelBanner }) {
         </>
       );
     case "mentor_dpp":
-      // disco ink + ponto amarelo ~30% de overlap — o próprio logo
+      // disco lime + ponto amarelo ~30% de overlap — o próprio logo
       return (
         <>
-          <circle cx={682} cy={44} r={58} fill={INK} />
+          <circle cx={682} cy={44} r={58} fill={LIME} />
           <circle cx={733} cy={85} r={17} fill={AMARELO} />
         </>
       );
     case "mentor_especialista":
       // 5 barras ascendentes — a trilha de 5 passos do especialista
       return (
-        <g fill={INK} opacity={0.25}>
+        <g fill={LIME} opacity={0.3}>
           {[36, 58, 80, 102, 124].map((h, i) => (
             <rect key={i} x={642 + i * 29} y={164 - h} width={17} height={h} />
           ))}
@@ -96,8 +83,8 @@ function MarcaPapel({ papel }: { papel: PapelBanner }) {
             cy={58}
             r={76}
             fill="none"
-            stroke={INK}
-            strokeOpacity={0.5}
+            stroke={AMARELO}
+            strokeOpacity={0.6}
             strokeWidth={1.5}
             strokeDasharray="2 7"
             strokeLinecap="round"
@@ -110,14 +97,15 @@ function MarcaPapel({ papel }: { papel: PapelBanner }) {
   }
 }
 
-/** Banner generativo da ficha — decorativo (aria-hidden): papel, cidade e
- *  áreas já aparecem como texto real no header. Três camadas:
+/** Banner generativo da ficha — decorativo (aria-hidden): papel, nome e
+ *  cidade já aparecem como texto real no header. Três camadas sobre o
+ *  campo ink:
  *
- *  - campo: a cor do papel;
  *  - relevo: arcos concêntricos com centro e raios seedados pelo id — a
- *    impressão digital estável da pessoa, só traço a 13%;
- *  - território: a cidade em ghost outline gigante, baseline sangrando na
- *    borda inferior;
+ *    impressão digital estável da pessoa, traço a 13% na cor do papel;
+ *  - nome fantasma: o primeiro nome gigante a 10%, baseline sangrando na
+ *    borda inferior — a marca d'água pessoal;
+ *  - marca de papel: glifo no canto superior direito nas cores do papel;
  *  - linha de dados: mono uppercase no canto superior esquerdo (o canto
  *    inferior esquerdo é do avatar que sobrepõe o banner).
  *
@@ -125,12 +113,15 @@ function MarcaPapel({ papel }: { papel: PapelBanner }) {
  *  espremer — por isso a linha de dados é HTML por cima, não texto do SVG. */
 export function PessoaBanner({
   papel,
+  nome,
   cidade,
   uf,
   areas,
   seed,
 }: {
   papel: PapelBanner;
+  /** nome completo — o ghost usa só o primeiro. */
+  nome: string;
   cidade?: string | null;
   uf?: string | null;
   /** áreas de atuação (ou interesses) — entram até 3 na linha de dados. */
@@ -152,11 +143,12 @@ export function PessoaBanner({
     raio += 22 + r() * 28;
   }
 
-  // território — a fonte encolhe conforme o comprimento pra sempre sangrar
-  // as duas laterais (ou quase); baseline abaixo do viewBox = letra cortada
-  const cidadeUp = cidade?.toUpperCase() ?? null;
-  const ghostSize = cidadeUp
-    ? Math.max(40, Math.min(152, Math.round(860 / (cidadeUp.length * 0.62))))
+  // nome fantasma — só o primeiro, gigante; a fonte encolhe conforme o
+  // comprimento pra sempre sangrar as laterais; baseline abaixo do viewBox
+  // = letra cortada
+  const nomeUp = nome.split(" ")[0]?.toUpperCase() ?? null;
+  const ghostSize = nomeUp
+    ? Math.max(48, Math.min(170, Math.round(860 / (nomeUp.length * 0.62))))
     : 0;
 
   const dados = [cidade, uf, ...(areas ?? []).slice(0, 3)]
@@ -177,9 +169,9 @@ export function PessoaBanner({
             <circle key={raio} cx={cx} cy={cy} r={raio} />
           ))}
         </g>
-        {cidadeUp && (
-          // ghost = texto PREENCHIDO de baixa opacidade (marca d'água) —
-          // stroke-only em corpo gigante renderizava caixas ocas quebradas
+        {nomeUp && (
+          // nome fantasma — texto preenchido de baixa opacidade na cor do
+          // papel (marca d'água pessoal)
           <text
             x={400}
             y={168}
@@ -189,9 +181,9 @@ export function PessoaBanner({
             fontSize={ghostSize}
             letterSpacing="-0.02em"
             fill={cfg.tinta}
-            fillOpacity={0.1}
+            fillOpacity={0.12}
           >
-            {cidadeUp}
+            {nomeUp}
           </text>
         )}
         <MarcaPapel papel={papel} />

@@ -879,6 +879,7 @@ export function PerfilForm({
             muda entre "eu me vejo" e "colegas me veem" */}
         <PessoaBanner
           papel={me.role}
+          nome={me.nome}
           cidade={me.cidade}
           uf={me.uf}
           areas={

@@ -381,6 +381,7 @@ export default async function PessoaPerfilPage({
       <header className="overflow-hidden rounded-xl bg-card shadow-[var(--shadow-border)]">
         <PessoaBanner
           papel={ehMentorado ? "mentorado" : (prof?.role ?? null)}
+          nome={p.nome}
           cidade={p.cidade}
           uf={p.uf}
           areas={areasBanner}
