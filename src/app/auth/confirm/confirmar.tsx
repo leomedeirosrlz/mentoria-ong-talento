@@ -9,7 +9,9 @@ import { Button } from "@/components/ui/button";
 
 // /auth/confirm sem ?h=: o link não prova que foi pedido nesta aba, então o
 // token só é consumido depois do gesto explícito — um GET que já plantasse a
-// sessão deixaria um link alheio logar a vítima no navegador dela (fixação)
+// sessão deixaria um link alheio logar a vítima no navegador dela (fixação).
+// O mesmo gesto serve pro link de troca de e-mail (type=email_change): o
+// verifyOtp aplica a mudança e cria a sessão aqui — a copy acompanha
 export function ConfirmarAqui({
   code,
   tokenHash,
@@ -25,6 +27,7 @@ export function ConfirmarAqui({
   const supabase = useMemo(() => createClient(), []);
   const [entrando, setEntrando] = useState(false);
   const [falhou, setFalhou] = useState(false);
+  const trocaEmail = type === "email_change";
 
   async function entrar() {
     setEntrando(true);
@@ -87,11 +90,13 @@ export function ConfirmarAqui({
         <div className="mx-auto grid size-10 place-items-center rounded-full bg-muted text-foreground">
           <SignIn size={20} weight="bold" aria-hidden="true" />
         </div>
-        <p className="mt-4 font-semibold">Entrar neste navegador?</p>
+        <p className="mt-4 font-semibold">
+          {trocaEmail ? "Confirmar novo e-mail" : "Entrar neste navegador?"}
+        </p>
         <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
-          Ao continuar, a sessão é criada aqui. Se você pediu este link em
-          outro navegador ou app de e-mail, volte pra página que fez o pedido.
-          Ela entra sozinha.
+          {trocaEmail
+            ? "Ao continuar, o e-mail da sua conta passa a ser o novo endereço e a sessão é criada neste navegador."
+            : "Ao continuar, a sessão é criada aqui. Se você pediu este link em outro navegador ou app de e-mail, volte pra página que fez o pedido. Ela entra sozinha."}
         </p>
         <Button
           type="button"
@@ -104,6 +109,8 @@ export function ConfirmarAqui({
               <CircleNotch size={15} className="animate-spin" aria-hidden="true" />
               Entrando…
             </span>
+          ) : trocaEmail ? (
+            "Confirmar troca de e-mail"
           ) : (
             "Entrar neste navegador"
           )}

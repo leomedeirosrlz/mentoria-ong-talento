@@ -2,41 +2,23 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { type Session } from "@supabase/supabase-js";
 import { motion, AnimatePresence } from "motion/react";
 import { CircleNotch, WarningCircle } from "@phosphor-icons/react";
 import { createClient } from "@/lib/supabase/client";
-import { pathInterno } from "@/lib/utils";
+import { pathInterno, sessaoFresca } from "@/lib/utils";
 import { fade, T } from "@/components/motion";
 import { Button } from "@/components/ui/button";
 import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
-
-// credencial só se define com autenticação recente — o fluxo legítimo chega
-// aqui segundos depois do magic link; uma sessão velha (esquecida aberta ou
-// roubada) não pode virar senha persistente
-const SESSAO_FRESCA_MS = 15 * 60 * 1000;
-
-function sessaoFresca(session: Session | null): boolean {
-  if (!session) return false;
-  const login = Date.parse(session.user.last_sign_in_at ?? "");
-  if (!Number.isNaN(login)) return Date.now() - login < SESSAO_FRESCA_MS;
-  // fallback: iat do próprio access_token
-  try {
-    const payload = JSON.parse(
-      atob(session.access_token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/"))
-    );
-    return typeof payload.iat === "number" && Date.now() - payload.iat * 1000 < SESSAO_FRESCA_MS;
-  } catch {
-    return false;
-  }
-}
 
 export function DefinirSenhaForm() {
   const [senha, setSenha] = useState("");
   const [confirmacao, setConfirmacao] = useState("");
   const [erro, setErro] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  // recovery = veio do link "esqueci a senha" (#type=recovery): muda o
+  // título e some o "pular" — quem pediu reset quer a senha, não onboarding
+  const [recovery, setRecovery] = useState(false);
   const [fase, setFase] = useState<"carregando" | "ok" | "expirada">("carregando");
   const router = useRouter();
   const params = useSearchParams();
@@ -46,13 +28,46 @@ export function DefinirSenhaForm() {
   const destino = pathInterno(next) ?? "/";
 
   // /auth/* é rota pública pro middleware — a página só faz sentido com a
-  // sessão que o link acabou de criar; sem ela, volta pro login. Sessão
-  // antiga demais também não vale: credencial exige reautenticação recente
+  // sessão que o link acabou de criar. Dois caminhos chegam aqui: o magic
+  // link (sessão já depositada pelo handoff) e o recovery do "esqueci a
+  // senha" (link implícito traz #access_token no hash — consome antes de
+  // medir frescor; o iat do token mintado no clique passa no gate). Sem
+  // sessão, volta pro login; sessão velha demais não vira credencial nova.
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
+    async function entrar() {
+      const hash = window.location.hash;
+      if (hash.length > 1) {
+        const p = new URLSearchParams(hash.slice(1));
+        const accessToken = p.get("access_token");
+        const refreshToken = p.get("refresh_token");
+        const linkQueimado = p.get("error") ?? p.get("error_code");
+        setRecovery(p.get("type") === "recovery");
+        // tira os tokens da barra de endereço em qualquer desfecho
+        window.history.replaceState(
+          null,
+          "",
+          window.location.pathname + window.location.search
+        );
+        if (linkQueimado) {
+          setFase("expirada");
+          return;
+        }
+        if (accessToken && refreshToken) {
+          const { error } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          });
+          if (error) {
+            setFase("expirada");
+            return;
+          }
+        }
+      }
+      const { data } = await supabase.auth.getSession();
       if (!data.session) router.replace("/login");
       else setFase(sessaoFresca(data.session) ? "ok" : "expirada");
-    });
+    }
+    void entrar();
   }, [supabase, router]);
 
   async function salvar(e: React.FormEvent) {
@@ -91,7 +106,8 @@ export function DefinirSenhaForm() {
     }
   }
 
-  // pular: marca pra não cobrar de novo — a senha continua definível no perfil
+  // pular: marca pra não cobrar de novo — a senha continua definível no
+  // perfil. No recovery o botão não existe (quem pediu reset não pula)
   async function pular() {
     try {
       await supabase.auth.updateUser({ data: { senha_dispensada: true } });
@@ -108,7 +124,7 @@ export function DefinirSenhaForm() {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo-realiza.png" alt="Realiza.vc" className="h-8 w-auto" />
           <h1 className="text-lg font-semibold tracking-tight mt-3">
-            Crie sua senha
+            {recovery ? "Redefina sua senha" : "Crie sua senha"}
           </h1>
         </div>
 
@@ -123,10 +139,13 @@ export function DefinirSenhaForm() {
               <div className="grid size-10 place-items-center rounded-full bg-destructive/10 text-destructive">
                 <WarningCircle size={20} weight="bold" aria-hidden="true" />
               </div>
-              <p className="mt-4 font-medium">Peça um novo link</p>
+              <p className="mt-4 font-medium">
+                {recovery ? "Link expirado" : "Peça um novo link"}
+              </p>
               <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
-                Por segurança, peça um novo link de acesso e defina a senha
-                logo em seguida.
+                {recovery
+                  ? "O link de redefinição expira e só vale uma vez. Peça um novo em Perfil → Senha → Esqueci minha senha."
+                  : "Por segurança, peça um novo link de acesso e defina a senha logo em seguida."}
               </p>
               <Button
                 type="button"
@@ -145,7 +164,9 @@ export function DefinirSenhaForm() {
               className="rounded-xl bg-card shadow-[var(--shadow-border)] p-6 space-y-4"
             >
               <div className="space-y-2">
-                <Label htmlFor="senha">Senha</Label>
+                <Label htmlFor="senha">
+                  {recovery ? "Nova senha" : "Senha"}
+                </Label>
                 <PasswordInput
                   id="senha"
                   required
@@ -181,13 +202,15 @@ export function DefinirSenhaForm() {
               <Button type="submit" className="w-full" disabled={loading}>
                 {loading ? "Salvando…" : "Salvar senha e entrar"}
               </Button>
-              <button
-                type="button"
-                onClick={() => void pular()}
-                className="w-full min-h-11 text-xs text-muted-foreground hover:text-foreground transition-colors"
-              >
-                Prefiro entrar só pelo link
-              </button>
+              {!recovery && (
+                <button
+                  type="button"
+                  onClick={() => void pular()}
+                  className="w-full min-h-11 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Prefiro entrar só pelo link
+                </button>
+              )}
             </motion.form>
           ) : (
             <motion.div

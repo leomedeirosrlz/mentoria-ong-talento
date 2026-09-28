@@ -85,6 +85,29 @@ export function maskWhatsApp(v: string): string {
   return `(${dd}) ${p1}${p2 ? `-${p2}` : ""}`;
 }
 
+export const SESSAO_FRESCA_MS = 15 * 60 * 1000;
+
+/** Credencial só se define com autenticação recente — o fluxo legítimo chega
+ *  segundos depois do magic link; uma sessão velha (esquecida aberta ou
+ *  roubada) não pode virar senha persistente. last_sign_in_at primeiro; o
+ *  iat do próprio access_token cobre o caso de o campo vir vazio. */
+export function sessaoFresca(session: {
+  access_token: string;
+  user: { last_sign_in_at?: string };
+} | null): boolean {
+  if (!session) return false;
+  const login = Date.parse(session.user.last_sign_in_at ?? "");
+  if (!Number.isNaN(login)) return Date.now() - login < SESSAO_FRESCA_MS;
+  try {
+    const payload = JSON.parse(
+      atob(session.access_token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/"))
+    );
+    return typeof payload.iat === "number" && Date.now() - payload.iat * 1000 < SESSAO_FRESCA_MS;
+  } catch {
+    return false;
+  }
+}
+
 /** Só paths internos: "/" sozinho ou "/" + algo que não seja "/" nem "\" —
  *  "//host" e "/\host" normalizam pra externo no URL parser (open redirect). */
 export function pathInterno(p: string | null | undefined): string | null {

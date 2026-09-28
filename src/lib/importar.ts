@@ -394,12 +394,200 @@ export function normUf(s: string): string | null {
   return m ? m[1].toUpperCase() : null;
 }
 
-/** Lista separada por ; | ou , -> array limpo (interesses na planilha). */
+/** Lista -> array limpo (interesses na planilha). A resposta do form de
+ *  intake chega em formatos livres — lista numerada ("1. Ler\n2. Viajar"),
+ *  rótulos ("Música: sou baterista"), bullets, prosa com vírgulas
+ *  ("restaurantes, cafés e lugares") e separadores ; | & / — o splitter
+ *  antigo (só [;|,]) triturava frases no meio e colava itens com o número
+ *  da lista dentro ("cafés e lugares 2. Brincar com pets").
+ *
+ *  Regras:
+ *  - quebra em \n e ANTES de marcador de lista colado ("…)2. Arte" —
+ *    o form_bruto já perdeu a quebra de linha original);
+ *  - linha que abre com numeração/bullet é UM item: a vírgula dentro dela
+ *    faz parte do interesse ("1. Conhecer restaurantes, cafés e lugares");
+ *  - linha solta: divide em ; | & " / " , e ponto+maiúscula ("Música. Leitura");
+ *  - cada pedaço perde numeração/bullet inicial, rótulo curto antes de
+ *    ":"/"–" ("Tênis: jogo toda semana" -> "Tênis"), parênteses,
+ *    "e"/"ou" pendurados, advérbio de abertura ("principalmente") e
+ *    pontuação final;
+ *  - fragmento que é só conector ("e", "etc") ou começa como continuação
+ *    de prosa ("embora…", "que…") cai fora; dedupe case-insensitive. */
+const LISTA_CONECTOR =
+  /^(?:e|ou|etc|ae|tipo|sim|mas|porém|então|contudo|todavia|verdade|certeza|nenhum|nenhuma|nrnhum|escuto|assisto|acompanho|ouço|tranquilo|praticar|assistir|jogar|fazer|coisas)\.?$/i;
+// advérbios/muletas de abertura, em sequência ("hoje em dia só estou…"):
+// "hoje" mora aqui e não na prosa porque "hoje em dia só estou praticando
+// musculação" carrega a atividade ATUAL — não pode ser descartada
+const LISTA_ADVERBIO =
+  /^(?:(?:principalmente|sobretudo|especialmente|basicamente|geralmente|normalmente|atualmente|ultimamente|recentemente|também|somente|apenas|só|lá|aqui|me|eu|hoje(?:\s+em\s+dia)?)(?!\p{L})\s*)+/iu;
+const LISTA_PROSA_INICIO =
+  /^(?:embora|mas|porque|pois|que|sempre|nunca|além|apesar|quando|sendo|contudo|todavia|ainda|não|nao|nada|já|depois|durante|meu[s]?|minha[s]?|sou|tenho|fui|sinto|para|é|dois|duas|ambos|ambas)(?!\p{L})/iu;
+// "estou X" cai fora só quando X não é atividade — "estou vivendo uma fase
+// de adaptação" é prosa, mas "estou praticando musculação" é o interesse
+// mais atual que existe
+const LISTA_PROSA_ESTADO =
+  /^est(?:ou|ava|amos)(?!\p{L})\s+(?!(?:praticando|fazendo|aprendendo|jogando|tocando|estudando|treinando|começando)(?!\p{L}))/iu;
+// "estou praticando X" -> "X" — gerúndio de atividade é invólucro
+const LISTA_GERUNDIO =
+  /^(?:estou|estava|estamos|ando|venho)\s+(?:praticando|fazendo|aprendendo|jogando|tocando|estudando|treinando|começando)(?!\p{L})\s*/iu;
+// pedaço que sobrou só como sequência de verbos de atividade com conector
+// ("praticar e assistir" é continuação de "gosto de praticar e assistir X"
+// — o objeto ficou noutro pedaço). Verbo nu NÃO cai: "ler" é interesse.
+const LISTA_SO_VERBOS =
+  /^(?:praticar|assistir|jogar|fazer|ver|acompanhar|ouvir|ler|estudar)(?:\s*(?:e|ou|,|&)\s*(?:praticar|assistir|jogar|fazer|ver|acompanhar|ouvir|ler|estudar))+\.?$/i;
+/** "Gosto de X", "pratico X" — o interesse é o objeto; o verbo de 1ª pessoa
+ *  é invólucro de formulário. Só verbos seguros (sem "sou"/"tenho": "sou
+ *  viciado" viraria "viciado" e mente). Inclui pretérito ("eu adorava
+ *  criar poesia" -> "criar poesia"). As fronteiras são (?!\p{L}) porque
+ *  \b é ASCII-only e fura depois de "á"/"ó"; a da cauda impede que "a"
+ *  morda "aprender". */
+const LISTA_VERBO =
+  /^(?:eu\s+)?(?:gosto|adoro|amo|curto|pratico|jogo|faço|adorava|amava|gostava|curtia|praticava|jogava|fazia)(?!\p{L})(?:\s+(?:de|do|da|dos|das|em|no|na|com|o|a|os|as|um|uma|muito|bastante|somente|apenas|só|também)(?!\p{L}))*\s*/iu;
+/** Verbo de gosto no MEIO da frase — "nas minhas horas vagas gosto muito de
+ *  pintar" -> "pintar"; "as coisas que mais gosto são ouvir música" ->
+ *  "ouvir música". O lazy `.*?` para no primeiro verbo e a cauda exige
+ *  preposição/cópula depois dele — "a comida que gosto" (verbo no fim) não
+ *  casa e fica intacto. */
+const LISTA_VERBO_MEIO =
+  /^.*?\b(?:gosto|adoro|amo|curto|gostava|adorava|amava|curtia)\s+(?:(?:muito|bastante)\s+)?(?:de|do|da|dos|das|são|é)\s+/i;
+
+function limpaItemLista(x: string): string {
+  let v = x
+    .trim()
+    .replace(/^[-–—•*·]\s+/, "")
+    .replace(/^\d{1,2}[.)]\s*/, "")
+    .replace(/\([^)]*\)/g, " ")
+    .trim();
+  // parêntese sem par (o split protege o par balanceado; texto cortado na
+  // origem pode chegar com "(" aberto ou ")" solto) — some só o char
+  if (!v.includes("(")) v = v.replace(/\)/g, " ");
+  if (!v.includes(")")) v = v.replace(/\(/g, " ");
+  v = v.trim();
+  // "Música: sou baterista" / "Leitura – especialmente livros" -> "Música"
+  const rotulo = /^(.{1,28}?)\s*[:–—]\s+\S/.exec(v);
+  if (rotulo && rotulo[1].trim().split(/\s+/).length <= 3) v = rotulo[1].trim();
+  return v
+    // conjunção de abertura antes do verbo: "mas adoro vôlei" precisa chegar
+    // no strip de verbo como "adoro vôlei" pra render só "vôlei"
+    .replace(/^(?:(?:e|ou|sim|mas|porém|então|contudo|todavia)[\s!,.;]+)+/i, "")
+    // advérbio ANTES do verbo: "só pratico natação" precisa virar "pratico
+    // natação" pro strip de verbo render "natação" ("lá eu faço" idem)
+    .replace(LISTA_ADVERBIO, "")
+    .replace(LISTA_VERBO, "")
+    .replace(LISTA_VERBO_MEIO, "")
+    .replace(LISTA_GERUNDIO, "")
+    // infinitivo de ação puro é invólucro: "fazer yoga" == "yoga" (dedupa),
+    // "jogar basket" == "basket". Verbos de assistir/ler ficam — a
+    // distinção ver×fazer é honesta pro matching
+    .replace(/^(?:fazer|praticar|jogar)(?!\p{L})\s+/iu, "")
+    .replace(/^(?:(?:e|ou)[\s!,.;]+)+/i, "")
+    // "de fotografar" é continuação de "gosto de X" de um item anterior —
+    // a preposição sozinha não é o interesse; idem artigo solto ("a leitura",
+    // "o João Gomes" -> "leitura", "João Gomes")
+    .replace(/^(?:de|do|da|dos|das|em|no|na|com|o|a|os|as)\s+/i, "")
+    .replace(/\s+(?:e|ou)$/i, "")
+    // oração subordinada pendurada não é parte do interesse:
+    // "handball quando estava na escola" -> "handball"
+    .replace(/\s+(?:quando|enquanto|porque|pois|embora|desde|apesar\s+de)\s+.+$/i, "")
+    .replace(/[.,;:!?–—-]+$/, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** Split de linha solta — separa em ; | & , " / " e sentença terminada
+ *  ("texto. Maiúscula" / "texto! Maiúscula"). Consciência de parênteses:
+ *  "(RPG, tabuleiro, cartas)" é UM item — vírgula dentro de ( ) não corta. */
+function splitListaLinha(linha: string): string[] {
+  const out: string[] = [];
+  let cur = "";
+  let depth = 0;
+  for (let i = 0; i < linha.length; i++) {
+    const ch = linha[i];
+    if (ch === "(") depth++;
+    else if (ch === ")") depth = Math.max(0, depth - 1);
+    if (depth === 0) {
+      if (";|&,".includes(ch)) {
+        out.push(cur);
+        cur = "";
+        continue;
+      }
+      if (
+        ch === "/" &&
+        /\s/.test(linha[i - 1] ?? "") &&
+        /\s/.test(linha[i + 1] ?? "")
+      ) {
+        out.push(cur);
+        cur = "";
+        continue;
+      }
+      if ((ch === "." || ch === "!" || ch === "?") && depth === 0) {
+        const proximo = linha.slice(i + 1).replace(/^\s+/, "").charAt(0);
+        if (/[\p{Lu}]/u.test(proximo)) {
+          out.push(cur);
+          cur = "";
+          continue;
+        }
+      }
+    }
+    cur += ch;
+  }
+  out.push(cur);
+  return out;
+}
+
 export function normLista(s: string): string[] {
-  return s
-    .split(/[;|,]/)
-    .map((x) => x.trim().replace(/\s+/g, " "))
-    .filter(Boolean);
+  const linhas = s
+    .replace(/\r/g, "\n")
+    // "relações humanas)2. Arte" — numeração sem quebra vira quebra; o
+    // lookbehind não morde "2.5" nem "13.709" (dígito/ponto antes)
+    .replace(/(?<![\d.])(\d{1,2}[.)])(?=\s*\S)/g, "\n$1")
+    .split("\n");
+
+  const itens: string[] = [];
+  for (const linha of linhas) {
+    const numerada = /^\s*(?:\d{1,2}[.)]|[-–—•*·])\s+\S/.test(linha);
+    const pedacos = numerada
+      ? linha.split(/[;|&]/)
+      : splitListaLinha(linha);
+    for (const ped of pedacos) {
+      // a negação decide no pedaço cru: tira só conjunções de continuação
+      // antes do teste — "mas não gosto" tem que bater no "não", não virar
+      // "gosto" (strip de negação como prefixo mentiria)
+      const cru = ped
+        .trim()
+        .replace(/^(?:(?:e|ou|sim|mas|porém|então|contudo|todavia)[\s!,.;]+)+/i, "");
+      if (!cru || LISTA_PROSA_INICIO.test(cru) || LISTA_PROSA_ESTADO.test(cru))
+        continue;
+      const v = limpaItemLista(ped);
+      if (
+        !v ||
+        LISTA_CONECTOR.test(v) ||
+        LISTA_PROSA_INICIO.test(v) ||
+        LISTA_PROSA_ESTADO.test(v) ||
+        LISTA_SO_VERBOS.test(v)
+      )
+        continue;
+      itens.push(capitalizaItemLista(v));
+    }
+  }
+
+  const vistos = new Set<string>();
+  return itens.filter((i) => {
+    const k = i.toLowerCase();
+    if (vistos.has(k)) return false;
+    vistos.add(k);
+    return true;
+  });
+}
+
+/** Caixa do badge: GRITADO (≥4 letras, sem minúscula) vira title case;
+ *  inicial minúscula sobe ("fazer cursos de Teatro" -> "Fazer …"); sigla
+ *  curta ("RPG", "F1") e misto sem letra minúscula inicial ficam. */
+export function capitalizaItemLista(v: string): string {
+  const letras = v.replace(/\P{L}/gu, "");
+  if (letras.length >= 4 && v === v.toUpperCase()) return nomeProprio(v);
+  if (/^\p{Ll}/u.test(v)) return v.charAt(0).toUpperCase() + v.slice(1);
+  return v;
 }
 
 export function mapGenero(s: string): Genero | null {

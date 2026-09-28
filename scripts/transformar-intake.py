@@ -244,17 +244,232 @@ def linha(**kw: str) -> dict[str, str]:
     }
 
 
+# ---------- interesses: espelho de normLista em src/lib/importar.ts ----------
+# O intake chega em formato livre (lista numerada, "Rótulo: descrição",
+# prosa com vírgulas); o split antigo só em [;|,] triturava frases e
+# colava itens ("cafés e lugares 2. Brincar com pets"). Manter em par.
+
+LISTA_CONECTOR = re.compile(
+    r"^(?:e|ou|etc|ae|tipo|sim|mas|porém|então|contudo|todavia|verdade|"
+    r"certeza|nenhum|nenhuma|nrnhum|escuto|assisto|acompanho|ouço|"
+    r"tranquilo|praticar|assistir|jogar|fazer|coisas)\.?$",
+    re.I,
+)
+# advérbios/muletas de abertura em sequência ("hoje em dia só estou…");
+# "hoje" mora aqui e não na prosa porque "hoje em dia só estou praticando
+# musculação" carrega a atividade ATUAL — não pode ser descartada
+LISTA_ADVERBIO = re.compile(
+    r"^(?:(?:principalmente|sobretudo|especialmente|basicamente|geralmente|"
+    r"normalmente|atualmente|ultimamente|recentemente|também|somente|"
+    r"apenas|só|lá|aqui|me|eu|hoje(?:\s+em\s+dia)?)\b\s*)+",
+    re.I,
+)
+LISTA_PROSA_INICIO = re.compile(
+    r"^(?:embora|mas|porque|pois|que|sempre|nunca|além|apesar|quando|"
+    r"sendo|contudo|todavia|ainda|não|nao|nada|já|depois|durante|meu[s]?|"
+    r"minha[s]?|sou|tenho|fui|sinto|para|é|dois|duas|ambos|ambas)\b",
+    re.I,
+)
+# "estou X" cai fora só quando X não é atividade — "estou vivendo uma fase"
+# é prosa; "estou praticando musculação" é o interesse mais atual
+LISTA_PROSA_ESTADO = re.compile(
+    r"^est(?:ou|ava|amos)\b\s+(?!(?:praticando|fazendo|aprendendo|jogando|"
+    r"tocando|estudando|treinando|começando)\b)",
+    re.I,
+)
+# "estou praticando X" -> "X" — gerúndio de atividade é invólucro
+LISTA_GERUNDIO = re.compile(
+    r"^(?:estou|estava|estamos|ando|venho)\s+(?:praticando|fazendo|"
+    r"aprendendo|jogando|tocando|estudando|treinando|começando)\b\s*",
+    re.I,
+)
+# pedaço só de verbos de atividade com conector ("praticar e assistir" é
+# continuação — o objeto ficou noutro pedaço). Verbo nu NÃO cai: "ler" é
+# interesse
+LISTA_SO_VERBOS = re.compile(
+    r"^(?:praticar|assistir|jogar|fazer|ver|acompanhar|ouvir|ler|estudar)"
+    r"(?:\s*(?:e|ou|,|&)\s*(?:praticar|assistir|jogar|fazer|ver|acompanhar|"
+    r"ouvir|ler|estudar))+\.?$",
+    re.I,
+)
+# "gosto de X" -> "X" — só verbos seguros ("sou viciado" viraria "viciado");
+# inclui pretérito ("eu adorava criar poesia" -> "criar poesia")
+LISTA_VERBO = re.compile(
+    r"^(?:eu\s+)?(?:gosto|adoro|amo|curto|pratico|jogo|faço|adorava|amava|"
+    r"gostava|curtia|praticava|jogava|fazia)\b"
+    r"(?:\s+(?:de|do|da|dos|das|em|no|na|com|o|a|os|as|um|uma|muito|"
+    r"bastante|somente|apenas|só|também)\b)*\s*",
+    re.I,
+)
+# verbo de gosto no MEIO da frase — "nas minhas horas vagas gosto muito de
+# pintar" -> "pintar"; `.*?` para no primeiro verbo e a cauda exige
+# preposição/cópula — "a comida que gosto" (verbo no fim) não casa
+LISTA_VERBO_MEIO = re.compile(
+    r"^.*?\b(?:gosto|adoro|amo|curto|gostava|adorava|amava|curtia)\s+"
+    r"(?:(?:muito|bastante)\s+)?(?:de|do|da|dos|das|são|é)\s+",
+    re.I,
+)
+_PARTICULAS = {"de", "da", "do", "das", "dos", "e"}
+
+
+def _title_pt(v: str) -> str:
+    ws = v.lower().split(" ")
+    if not ws:
+        return v
+    return " ".join(
+        [ws[0].title()] + [w if w in _PARTICULAS else w.title() for w in ws[1:]]
+    )
+
+
+def _capitaliza_item(v: str) -> str:
+    letras = sum(c.isalpha() for c in v)
+    if letras >= 4 and v == v.upper():
+        return _title_pt(v)
+    if v[:1].islower():
+        return v[:1].upper() + v[1:]
+    return v
+
+
+def _limpa_item(x: str) -> str:
+    v = re.sub(r"^[-–—•*·]\s+", "", x.strip())
+    v = re.sub(r"^\d{1,2}[.)]\s*", "", v)
+    v = re.sub(r"\([^)]*\)", " ", v).strip()
+    # parêntese sem par — some só o char ("jogos (RPG" -> "jogos")
+    if "(" not in v:
+        v = v.replace(")", " ")
+    if ")" not in v:
+        v = v.replace("(", " ")
+    v = v.strip()
+    m = re.match(r"^(.{1,28}?)\s*[:–—]\s+\S", v)
+    if m and len(m.group(1).strip().split()) <= 3:
+        v = m.group(1).strip()
+    # conjunção de abertura antes do verbo ("mas adoro vôlei" -> "vôlei");
+    # negação fica de fora — quem começa com "não" cai no teste do cru
+    v = re.sub(
+        r"^(?:(?:e|ou|sim|mas|porém|então|contudo|todavia)[\s!,.;]+)+",
+        "",
+        v,
+        flags=re.I,
+    )
+    # advérbio ANTES do verbo ("só pratico natação" -> "natação")
+    v = LISTA_ADVERBIO.sub("", v)
+    v = LISTA_VERBO.sub("", v)
+    v = LISTA_VERBO_MEIO.sub("", v)
+    v = LISTA_GERUNDIO.sub("", v)
+    # infinitivo de ação puro é invólucro: "fazer yoga" == "yoga" (dedupa).
+    # Verbos de assistir/ler ficam — ver×fazer é distinção honesta
+    v = re.sub(r"^(?:fazer|praticar|jogar)\b\s+", "", v, flags=re.I)
+    v = re.sub(r"^(?:(?:e|ou)[\s!,.;]+)+", "", v, flags=re.I)
+    # "de fotografar" é continuação de "gosto de X" — a preposição não é
+    # item; idem artigo solto ("a leitura", "o João Gomes")
+    v = re.sub(
+        r"^(?:de|do|da|dos|das|em|no|na|com|o|a|os|as)\s+",
+        "",
+        v,
+        flags=re.I,
+    )
+    v = re.sub(r"\s+(?:e|ou)$", "", v)
+    # oração subordinada pendurada ("handball quando estava na escola")
+    v = re.sub(
+        r"\s+(?:quando|enquanto|porque|pois|embora|desde|apesar\s+de)\s+.+$",
+        "",
+        v,
+        flags=re.I,
+    )
+    v = re.sub(r"[.,;:!?–—-]+$", "", v)
+    return re.sub(r"\s+", " ", v).strip()
+
+
+def _split_linha(linha: str) -> list[str]:
+    """Split de linha solta em ; | & , " / " e sentença terminada
+    (". Maiúscula"/"! Maiúscula") — consciente de parênteses: vírgula
+    dentro de ( ) não corta ("jogos (RPG, tabuleiro)" é um item)."""
+    out: list[str] = []
+    cur = ""
+    depth = 0
+    for i, ch in enumerate(linha):
+        if ch == "(":
+            depth += 1
+        elif ch == ")":
+            depth = max(0, depth - 1)
+        if depth == 0:
+            if ch in ";|&,":
+                out.append(cur)
+                cur = ""
+                continue
+            if (
+                ch == "/"
+                and 0 < i < len(linha) - 1
+                and linha[i - 1].isspace()
+                and linha[i + 1].isspace()
+            ):
+                out.append(cur)
+                cur = ""
+                continue
+            if ch in ".!?" and re.match(
+                r"^\s*[A-ZÀ-Ú]", linha[i + 1 :]
+            ):
+                out.append(cur)
+                cur = ""
+                continue
+        cur += ch
+    out.append(cur)
+    return out
+
+
+def norm_lista(s: str) -> list[str]:
+    # numeração colada vira quebra ("…)2. Arte"); lookbehind poupa "2.5"
+    linhas = re.sub(
+        r"(?<![\d.])(\d{1,2}[.)])(?=\s*\S)", r"\n\1", s.replace("\r", "\n")
+    )
+    itens: list[str] = []
+    for linha in linhas.split("\n"):
+        numerada = re.match(r"^\s*(?:\d{1,2}[.)]|[-–—•*·])\s+\S", linha)
+        pedacos = (
+            re.split(r"[;|&]", linha) if numerada else _split_linha(linha)
+        )
+        for ped in pedacos:
+            # negação decide no cru — conjunções saem antes do teste, então
+            # "mas não gosto" bate no "não"; strip da negação mentiria
+            cru = re.sub(
+                r"^(?:(?:e|ou|sim|mas|porém|então|contudo|todavia)[\s!,.;]+)+",
+                "",
+                ped.strip(),
+                flags=re.I,
+            )
+            if (
+                not cru
+                or LISTA_PROSA_INICIO.match(cru)
+                or LISTA_PROSA_ESTADO.match(cru)
+            ):
+                continue
+            v = _limpa_item(ped)
+            if (
+                not v
+                or LISTA_CONECTOR.match(v)
+                or LISTA_PROSA_INICIO.match(v)
+                or LISTA_PROSA_ESTADO.match(v)
+                or LISTA_SO_VERBOS.match(v)
+            ):
+                continue
+            itens.append(_capitaliza_item(v))
+    vistos: set[str] = set()
+    out: list[str] = []
+    for i in itens:
+        k = i.lower()
+        if k in vistos:
+            continue
+        vistos.add(k)
+        out.append(i)
+    return out
+
+
 def monta_interesses(celulas: list[str], avisos: list[str], quem: str) -> str:
     """interesses é lista de tags (≤20 itens, ≤60 chars cada — mesmos CHECKs
     do fichaLinha). Hobbies/esportes são listáveis; inspirações, valores e
     realizações são prosa — ficam só no form_bruto. O que passar do teto é
     cortado aqui com aviso (o cru não se perde: está no form_bruto)."""
-    itens = [
-        re.sub(r"\s+", " ", x).strip()
-        for c in celulas
-        for x in re.split(r"[;|,]", c)
-        if x.strip()
-    ]
+    itens = [i for c in celulas for i in norm_lista(c)]
     curtos = [x for x in itens if len(x) <= 60]
     drop = len(itens) - len(curtos)
     if drop:

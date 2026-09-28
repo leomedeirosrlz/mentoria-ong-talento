@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { type Session } from "@supabase/supabase-js";
 import {
   Camera,
   CaretDown,
@@ -12,7 +11,8 @@ import {
   Signature,
   SignOut,
 } from "@phosphor-icons/react";
-import { createClient } from "@/lib/supabase/client";
+import { createClient, createOtpClient } from "@/lib/supabase/client";
+import { emailValido, normEmail } from "@/lib/importar";
 import { DEMO_MSG } from "@/lib/demo/shared";
 import { setAvatarPath, signOut, updateMeuPerfil } from "@/lib/actions";
 import { avatarPublicUrl, AVATAR_ACCEPT, AVATAR_MAX_BYTES } from "@/lib/avatar";
@@ -39,6 +39,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -53,28 +54,9 @@ import {
   papelLabel,
   PREF_GENERO_LABELS,
 } from "@/lib/ciclo";
-import { cn, maskWhatsApp } from "@/lib/utils";
+import { cn, maskWhatsApp, sessaoFresca } from "@/lib/utils";
 import type { Assinatura, Disponibilidade, MentorProfile, Profile } from "@/lib/types";
 import Link from "next/link";
-
-// troca de credencial sem senha atual pra conferir (quem nunca definiu) só
-// vale com autenticação recente — sessão velha não pode virar senha nova
-const SESSAO_FRESCA_MS = 15 * 60 * 1000;
-
-function sessaoFresca(session: Session | null): boolean {
-  if (!session) return false;
-  const login = Date.parse(session.user.last_sign_in_at ?? "");
-  if (!Number.isNaN(login)) return Date.now() - login < SESSAO_FRESCA_MS;
-  // fallback: iat do próprio access_token
-  try {
-    const payload = JSON.parse(
-      atob(session.access_token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/"))
-    );
-    return typeof payload.iat === "number" && Date.now() - payload.iat * 1000 < SESSAO_FRESCA_MS;
-  } catch {
-    return false;
-  }
-}
 
 /** Chip "pendente" nas linhas do preview — a contagem do summary é a soma
  *  destes badges (completude se lê nos dados, não no modo). */
@@ -416,7 +398,8 @@ function FormCadastro({
         <Label htmlFor="email">E-mail</Label>
         <Input id="email" value={me.email} disabled />
         <p className="text-xs text-muted-foreground">
-          O e-mail é sua credencial de acesso. Para trocar, fale com a coordenação.
+          O e-mail é sua credencial de acesso — a troca é na seção Conta,
+          mais abaixo.
         </p>
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
@@ -555,6 +538,409 @@ function DialogoMentoria({ mentorProfile }: { mentorProfile: MentorProfile }) {
   );
 }
 
+/** Uma linha de credencial na seção Conta — rótulo + descrição à esquerda,
+ *  ação à direita; o padrão de settings que o <details> improvisava antes. */
+function ContaLinha({
+  titulo,
+  descricao,
+  acao,
+  borda = false,
+}: {
+  titulo: string;
+  descricao: React.ReactNode;
+  acao: React.ReactNode;
+  borda?: boolean;
+}) {
+  return (
+    <div
+      className={cn(
+        "flex flex-wrap items-center justify-between gap-3 px-6 py-5",
+        borda && "border-t border-border/60"
+      )}
+    >
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-medium">{titulo}</p>
+        <p className="mt-0.5 text-xs text-muted-foreground [overflow-wrap:anywhere]">
+          {descricao}
+        </p>
+      </div>
+      {acao}
+    </div>
+  );
+}
+
+/** Troca de senha em Dialog — form de verdade no lugar do <form> escondido.
+ *  Quem tem senha prova a posse com ela (o sign-in já renova a sessão pro
+ *  updateUser); quem dispensou no onboarding usa sessão fresca. "Esqueci"
+ *  dispara o recovery implícito — o link pousa em /auth/definir-senha com
+ *  a sessão criada no navegador que abrir o e-mail (é o dono da caixa,
+ *  então qualquer navegador serve). */
+function DialogoSenha({ email }: { email: string }) {
+  const supabase = useMemo(() => createClient(), []);
+  const otp = useMemo(() => createOtpClient(), []);
+  const [open, setOpen] = useState(false);
+  // quem dispensou a senha no onboarding não tem "senha atual" pra conferir
+  // — o gate vira sessão fresca. Default true: na dúvida, exige a senha
+  const [temSenha, setTemSenha] = useState(true);
+  const [senhaAtual, setSenhaAtual] = useState("");
+  const [senha, setSenha] = useState("");
+  const [confirmacao, setConfirmacao] = useState("");
+  const [salvando, setSalvando] = useState(false);
+  const [resetEnviado, setResetEnviado] = useState(false);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      const meta = data.user?.user_metadata;
+      if (meta?.senha_dispensada && !meta?.senha_em) setTemSenha(false);
+    });
+  }, [supabase]);
+
+  function aoAbrir(v: boolean) {
+    setOpen(v);
+    if (!v) {
+      setSenhaAtual("");
+      setSenha("");
+      setConfirmacao("");
+      setResetEnviado(false);
+    }
+  }
+
+  async function salvar(e: React.FormEvent) {
+    e.preventDefault();
+    if (senha.length < 8) {
+      toast.error("Use pelo menos 8 caracteres.");
+      return;
+    }
+    if (senha !== confirmacao) {
+      toast.error("As senhas não coincidem.");
+      return;
+    }
+    setSalvando(true);
+    try {
+      if (temSenha) {
+        // reautenticação: trocar credencial exige prova recente — a senha
+        // atual é a prova (e o sign-in já renova a sessão pro updateUser)
+        const { error: erroLogin } = await supabase.auth.signInWithPassword({
+          email,
+          password: senhaAtual,
+        });
+        if (erroLogin) {
+          toast.error(
+            erroLogin.message === DEMO_MSG
+              ? DEMO_MSG
+              : erroLogin.code === "invalid_credentials" ||
+                  /invalid (login )?credentials/i.test(erroLogin.message)
+                ? "Senha atual incorreta."
+                : "Não foi possível confirmar a senha atual. Tente de novo."
+          );
+          return;
+        }
+      } else {
+        // sem senha pra conferir: só uma sessão recém-saída do magic link
+        // pode criar uma — sessão velha pede reentrada
+        const { data } = await supabase.auth.getSession();
+        if (!sessaoFresca(data.session)) {
+          toast.error(
+            "Por segurança, entre de novo pelo link de e-mail e crie a senha logo em seguida."
+          );
+          return;
+        }
+      }
+      const { error } = await supabase.auth.updateUser({
+        password: senha,
+        data: { senha_em: new Date().toISOString() },
+      });
+      if (error) {
+        toast.error(
+          error.message === DEMO_MSG
+            ? DEMO_MSG
+            : error.code === "weak_password"
+              ? "Senha fraca: combine letras e números."
+              : "Não foi possível trocar a senha. Tente de novo."
+        );
+      } else {
+        setTemSenha(true);
+        aoAbrir(false);
+        toast.success("Senha atualizada.");
+      }
+    } catch {
+      toast.error("Sem conexão. Tente de novo.");
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  async function esqueci() {
+    setSalvando(true);
+    try {
+      // recovery implícito (mesmo client do magic link): sem pkce o link
+      // abre a sessão em qualquer navegador — é o dono da caixa de e-mail
+      const { error } = await otp.auth.resetPasswordForEmail(email, {
+        redirectTo: `${location.origin}/auth/definir-senha`,
+      });
+      if (error) {
+        toast.error(
+          error.message === DEMO_MSG
+            ? DEMO_MSG
+            : "Não foi possível enviar o link. Tente de novo."
+        );
+        return;
+      }
+      setResetEnviado(true);
+    } catch {
+      toast.error("Sem conexão. Tente de novo.");
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={aoAbrir}>
+      <DialogTrigger
+        render={
+          <Button variant="outline" size="sm" type="button">
+            {temSenha ? "Trocar senha" : "Criar senha"}
+          </Button>
+        }
+      />
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>{temSenha ? "Trocar senha" : "Criar senha"}</DialogTitle>
+          <DialogDescription>
+            Mínimo 8 caracteres. O link por e-mail continua valendo mesmo com
+            senha definida.
+          </DialogDescription>
+        </DialogHeader>
+        {resetEnviado ? (
+          <div className="rounded-lg border border-border px-4 py-3">
+            <p className="text-sm font-medium">Link enviado</p>
+            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+              Confira {email} — o link abre a página de senha direto, sem
+              precisar da senha atual.
+            </p>
+          </div>
+        ) : (
+          <form onSubmit={salvar} className="space-y-4">
+            {temSenha ? (
+              <div className="space-y-2">
+                <Label htmlFor="senha-atual">Senha atual</Label>
+                <PasswordInput
+                  id="senha-atual"
+                  required
+                  autoComplete="current-password"
+                  value={senhaAtual}
+                  onChange={(e) => setSenhaAtual(e.target.value)}
+                />
+              </div>
+            ) : (
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                Você entra pelo link de e-mail. Por segurança, a sessão
+                precisa ser recente pra criar uma senha.
+              </p>
+            )}
+            <div className="space-y-2">
+              <Label htmlFor="nova-senha">Nova senha</Label>
+              <PasswordInput
+                id="nova-senha"
+                required
+                minLength={8}
+                autoComplete="new-password"
+                value={senha}
+                onChange={(e) => setSenha(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="confirma-senha">Confirmar nova senha</Label>
+              <PasswordInput
+                id="confirma-senha"
+                required
+                minLength={8}
+                autoComplete="new-password"
+                value={confirmacao}
+                onChange={(e) => setConfirmacao(e.target.value)}
+              />
+            </div>
+            <Button type="submit" className="w-full" disabled={salvando}>
+              {salvando ? "Salvando…" : "Salvar senha"}
+            </Button>
+            {temSenha && (
+              <button
+                type="button"
+                onClick={() => void esqueci()}
+                disabled={salvando}
+                className="w-full min-h-11 text-xs text-muted-foreground transition-colors hover:text-foreground"
+              >
+                Esqueci minha senha — enviar link por e-mail
+              </button>
+            )}
+          </form>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/** Troca de e-mail — o padrão da indústria: o novo endereço prova a posse
+ *  com um link de confirmação (updateUser + emailRedirectTo), e a conta
+ *  segue entrando pelo e-mail antigo até lá. O RPC email_disponivel (0060)
+ *  barra cedo um endereço que já mora em outro cadastro; o trigger
+ *  sync_profile_email espelha a mudança em profiles quando confirmada. */
+function DialogoEmail({ email }: { email: string }) {
+  const supabase = useMemo(() => createClient(), []);
+  // o updateUser sai pelo client implícito: no pkce o link de confirmação
+  // nasce ?code= e só troca no navegador que pediu (verifier local) — quem
+  // confirma o e-mail novo no celular teria o link morto. Com token_hash o
+  // verifyOtp de /auth/confirm resolve em qualquer lugar
+  const otp = useMemo(() => createOtpClient(), []);
+  const [open, setOpen] = useState(false);
+  const [novo, setNovo] = useState("");
+  const [enviando, setEnviando] = useState(false);
+  // new_email do auth.users — troca já pedida esperando o clique do link
+  const [aguardando, setAguardando] = useState<string | null>(null);
+
+  // toda abertura resincroniza — a confirmação pode ter acontecido desde a
+  // última vez que o dialog esteve aberto
+  function aoAbrir(v: boolean) {
+    setOpen(v);
+    if (v) {
+      setNovo("");
+      supabase.auth.getUser().then(({ data }) => {
+        setAguardando(data.user?.new_email ?? null);
+      });
+    }
+  }
+
+  async function enviar(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const emailNovo = normEmail(novo);
+    if (!emailValido(emailNovo)) {
+      toast.error("Confira o e-mail.");
+      return;
+    }
+    if (emailNovo === email.toLowerCase()) {
+      toast.error("Esse já é o seu e-mail.");
+      return;
+    }
+    setEnviando(true);
+    try {
+      const { data: livre, error: erroRpc } = await supabase.rpc(
+        "email_disponivel",
+        { p_email: emailNovo }
+      );
+      if (erroRpc) {
+        toast.error(
+          erroRpc.message === DEMO_MSG
+            ? DEMO_MSG
+            : "Não foi possível verificar o e-mail. Tente de novo."
+        );
+        return;
+      }
+      if (!livre) {
+        toast.error("Esse e-mail já está em outro cadastro do programa.");
+        return;
+      }
+      // updateUser precisa da sessão — o client otp não persiste nada, então
+      // a sessão do browser é injetada só pra esta chamada
+      const { data: sessao } = await supabase.auth.getSession();
+      if (!sessao.session) {
+        toast.error("Sessão expirada. Entre de novo pelo link de e-mail.");
+        return;
+      }
+      const { error: erroSessao } = await otp.auth.setSession({
+        access_token: sessao.session.access_token,
+        refresh_token: sessao.session.refresh_token,
+      });
+      if (erroSessao) {
+        toast.error(
+          erroSessao.message === DEMO_MSG
+            ? DEMO_MSG
+            : "Sessão expirada. Entre de novo pelo link de e-mail."
+        );
+        return;
+      }
+      const { error } = await otp.auth.updateUser(
+        { email: emailNovo },
+        {
+          emailRedirectTo: `${location.origin}/auth/confirm?next=${encodeURIComponent("/perfil")}`,
+        }
+      );
+      if (error) {
+        toast.error(
+          error.message === DEMO_MSG
+            ? DEMO_MSG
+            : "Não foi possível enviar a confirmação. Tente de novo."
+        );
+        return;
+      }
+      setAguardando(emailNovo);
+      setNovo("");
+      toast.success("Link de confirmação enviado — confira os dois endereços.");
+    } catch {
+      toast.error("Sem conexão. Tente de novo.");
+    } finally {
+      setEnviando(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={aoAbrir}>
+      <DialogTrigger
+        render={
+          <Button variant="outline" size="sm" type="button">
+            Trocar e-mail
+          </Button>
+        }
+      />
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Trocar e-mail</DialogTitle>
+          <DialogDescription>
+            Os dois endereços recebem um link de confirmação — a troca só
+            vale depois de confirmar nos dois. Até lá, o e-mail atual
+            continua sendo seu acesso.
+          </DialogDescription>
+        </DialogHeader>
+        {aguardando ? (
+          <div className="rounded-lg border border-[var(--warn)]/60 bg-[var(--warn)]/5 px-4 py-3">
+            <p className="text-sm font-medium">Confirmação pendente</p>
+            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+              Enviamos um link pra {aguardando} — e outro pro e-mail atual.
+              A troca só vale depois de confirmar nos dois. Se não achou,
+              reenvie abaixo.
+            </p>
+          </div>
+        ) : null}
+        <form onSubmit={enviar} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="email-atual">E-mail atual</Label>
+            <Input id="email-atual" value={email} disabled />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="email-novo">Novo e-mail</Label>
+            <Input
+              id="email-novo"
+              type="email"
+              inputMode="email"
+              autoComplete="email"
+              required
+              value={novo}
+              onChange={(e) => setNovo(e.target.value)}
+              placeholder="novo@exemplo.com"
+            />
+          </div>
+          <Button type="submit" className="w-full" disabled={enviando}>
+            {enviando
+              ? "Enviando…"
+              : aguardando
+                ? "Reenviar confirmação"
+                : "Enviar link de confirmação"}
+          </Button>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export function PerfilForm({
   me,
   mentorProfile,
@@ -574,21 +960,13 @@ export function PerfilForm({
   const fileRef = useRef<HTMLInputElement>(null);
   const [src, setSrc] = useState<string | null>(avatarUrl);
   const [uploading, setUploading] = useState(false);
-  const [salvandoSenha, setSalvandoSenha] = useState(false);
-  const [senha, setSenha] = useState("");
-  const [senhaAtual, setSenhaAtual] = useState("");
-  const [confirmacao, setConfirmacao] = useState("");
-  // quem tem senha prova a posse com ela antes de trocar; quem dispensou no
-  // onboarding não tem o que conferir — o gate vira sessão fresca. Default
-  // true: quando não dá pra saber, exige a senha atual
-  const [temSenha, setTemSenha] = useState(true);
+  // troca de e-mail já pedida, esperando o clique no link — o profile da
+  // página segue com o e-mail antigo até a confirmação (comportamento certo)
+  const [emailPendente, setEmailPendente] = useState<string | null>(null);
 
-  // quem dispensou a senha no onboarding (senha_dispensada sem senha_em) não
-  // tem "senha atual" pra conferir — o campo some e o gate vira sessão fresca
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
-      const meta = data.user?.user_metadata;
-      if (meta?.senha_dispensada && !meta?.senha_em) setTemSenha(false);
+      setEmailPendente(data.user?.new_email ?? null);
     });
   }, [supabase]);
 
@@ -802,71 +1180,6 @@ export function PerfilForm({
       toast.error("Sem conexão. Tente de novo.");
     } finally {
       setUploading(false);
-    }
-  }
-
-  async function salvarSenha(e: React.FormEvent) {
-    e.preventDefault();
-    if (senha.length < 8) {
-      toast.error("Use pelo menos 8 caracteres.");
-      return;
-    }
-    if (senha !== confirmacao) {
-      toast.error("As senhas não coincidem.");
-      return;
-    }
-    setSalvandoSenha(true);
-    try {
-      if (temSenha) {
-        // reautenticação: trocar credencial exige prova recente — a senha
-        // atual é a prova (e o sign-in já renova a sessão pro updateUser)
-        const { error: erroLogin } = await supabase.auth.signInWithPassword({
-          email: me.email,
-          password: senhaAtual,
-        });
-        if (erroLogin) {
-          toast.error(
-            erroLogin.message === DEMO_MSG
-              ? DEMO_MSG
-              : erroLogin.code === "invalid_credentials" ||
-                  /invalid (login )?credentials/i.test(erroLogin.message)
-                ? "Senha atual incorreta."
-                : "Não foi possível confirmar a senha atual. Tente de novo."
-          );
-          return;
-        }
-      } else {
-        // sem senha pra conferir: só uma sessão recém-saída do magic link
-        // pode criar uma — sessão velha pede reentrada
-        const { data } = await supabase.auth.getSession();
-        if (!sessaoFresca(data.session)) {
-          toast.error(
-            "Por segurança, entre de novo pelo link de e-mail e crie a senha logo em seguida."
-          );
-          return;
-        }
-      }
-      const { error } = await supabase.auth.updateUser({
-        password: senha,
-        data: { senha_em: new Date().toISOString() },
-      });
-      if (error) {
-        toast.error(
-          error.code === "weak_password"
-            ? "Senha fraca: combine letras e números."
-            : "Não foi possível trocar a senha. Tente de novo."
-        );
-      } else {
-        setSenha("");
-        setSenhaAtual("");
-        setConfirmacao("");
-        setTemSenha(true);
-        toast.success("Senha atualizada.");
-      }
-    } catch {
-      toast.error("Sem conexão. Tente de novo.");
-    } finally {
-      setSalvandoSenha(false);
     }
   }
 
@@ -1182,87 +1495,37 @@ export function PerfilForm({
             </div>
           </details>
 
-          {/* conta — senha e saída no mesmo card: credenciais são o mesmo
-              assunto. Os forms reais ficam no fim da página; os campos e
-              botões se ligam a eles pelo atributo form=, então validação e
-              Enter seguem nativos */}
+          {/* conta — credenciais no mesmo card: e-mail, senha e saída são
+              o mesmo assunto. Cada linha abre um Dialog com o form real */}
           <section className="rounded-xl bg-card shadow-[var(--shadow-border)]">
             <h2 className="px-6 pt-5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
               Conta
             </h2>
-            {/* senha — disclosure sem card próprio dentro do card; reautentica
-                antes do updateUser (senha atual ou sessão fresca do magic
-                link); a flag senha_em é o que pula o onboarding */}
-            <details className="group/senha">
-              <summary className="mt-1 flex min-h-11 cursor-pointer list-none items-center gap-2.5 px-6 py-3 transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
-                <span className="text-sm font-medium">Senha</span>
-                <CaretDown
-                  size={15}
-                  aria-hidden
-                  className="ml-auto shrink-0 text-muted-foreground transition-transform group-open/senha:rotate-180"
-                />
-              </summary>
-              <div className="space-y-4 px-6 pb-6 pt-2">
-                {temSenha ? (
-                  <div className="space-y-2">
-                    <Label htmlFor="senha-atual">Senha atual</Label>
-                    <Input
-                      id="senha-atual"
-                      form="form-senha"
-                      type="password"
-                      required
-                      autoComplete="current-password"
-                      value={senhaAtual}
-                      onChange={(e) => setSenhaAtual(e.target.value)}
-                    />
-                  </div>
+            <ContaLinha
+              titulo="E-mail"
+              descricao={
+                emailPendente ? (
+                  <>
+                    {me.email} — confirmação pendente em{" "}
+                    <span className="text-[var(--warn-text)]">{emailPendente}</span>
+                  </>
                 ) : (
-                  <p className="text-xs text-muted-foreground leading-relaxed">
-                    Você entra pelo link de e-mail. Por segurança, a sessão
-                    precisa ser recente pra criar uma senha.
-                  </p>
-                )}
-                <div className="space-y-2">
-                  <Label htmlFor="nova-senha">Nova senha</Label>
-                  <Input
-                    id="nova-senha"
-                    form="form-senha"
-                    type="password"
-                    required
-                    minLength={8}
-                    autoComplete="new-password"
-                    value={senha}
-                    onChange={(e) => setSenha(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="confirma-senha">Confirmar nova senha</Label>
-                  <Input
-                    id="confirma-senha"
-                    form="form-senha"
-                    type="password"
-                    required
-                    minLength={8}
-                    autoComplete="new-password"
-                    value={confirmacao}
-                    onChange={(e) => setConfirmacao(e.target.value)}
-                  />
-                </div>
-                <Button type="submit" form="form-senha" disabled={salvandoSenha}>
-                  {salvandoSenha ? "Salvando…" : "Trocar senha"}
-                </Button>
-              </div>
-            </details>
-            {/* saída — o "Sair" morava no header do app; na conta da pessoa
-                faz mais sentido junto das outras credenciais */}
-            <div className="border-t border-border/60 px-6 py-5">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <p className="text-sm font-medium">Sessão</p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    Encerra o acesso da sua conta neste dispositivo.
-                  </p>
-                </div>
+                  me.email
+                )
+              }
+              acao={<DialogoEmail email={me.email} />}
+            />
+            <ContaLinha
+              titulo="Senha"
+              descricao="O link de e-mail continua valendo mesmo com senha definida."
+              acao={<DialogoSenha email={me.email} />}
+              borda
+            />
+            {/* saída — junto das outras credenciais */}
+            <ContaLinha
+              titulo="Sessão"
+              descricao="Encerra o acesso da sua conta neste dispositivo."
+              acao={
                 <Button
                   type="submit"
                   form="form-sair"
@@ -1272,15 +1535,15 @@ export function PerfilForm({
                   <SignOut size={15} aria-hidden />
                   Sair
                 </Button>
-              </div>
-            </div>
+              }
+              borda
+            />
           </section>
         </div>
       </div>
 
-      {/* forms reais da senha e do Sair — sem filhos, só existem pra receber
-          o submit dos campos/botões ligados por form= lá no card Conta */}
-      <form id="form-senha" onSubmit={salvarSenha} className="hidden" />
+      {/* o Sair usa um form real com server action; o botão se liga por
+          form= pra não precisar de estado */}
       <form id="form-sair" action={signOut} className="hidden" />
     </div>
   );

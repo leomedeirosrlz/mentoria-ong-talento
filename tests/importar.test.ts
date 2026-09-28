@@ -213,13 +213,59 @@ describe("normData / normUf / normLista", () => {
 
   it("listas separam por ; | ou , e limpam espaços", () => {
     expect(normLista("esportes; música | leitura, jogos")).toEqual([
-      "esportes",
-      "música",
-      "leitura",
-      "jogos",
+      "Esportes",
+      "Música",
+      "Leitura",
+      "Jogos",
     ]);
-    expect(normLista("  muita   coisa  ")).toEqual(["muita coisa"]);
+    expect(normLista("  muita   coisa  ")).toEqual(["Muita coisa"]);
     expect(normLista("")).toEqual([]);
+  });
+
+  it("numeração colada vira itens e vírgula dentro do item é preservada", () => {
+    expect(
+      normLista("1. Conhecer novos restaurantes, cafés e lugares2. Brincar com pets3. Viajar"),
+    ).toEqual([
+      "Conhecer novos restaurantes, cafés e lugares",
+      "Brincar com pets",
+      "Viajar",
+    ]);
+    expect(
+      normLista("1. Adoro ler (distopias, poemas, crônicas)2. Arte (pintura, escrita)3. Jardinagem"),
+    ).toEqual(["Ler", "Arte", "Jardinagem"]);
+  });
+
+  it("invólucros de formulário saem; objeto do interesse fica", () => {
+    expect(normLista("Gosto de praticar yoga, corrida e musculação.")).toEqual([
+      "Yoga",
+      "Corrida e musculação",
+    ]);
+    expect(normLista("Sim! Corrida")).toEqual(["Corrida"]);
+    expect(normLista("gosto de aprender")).toEqual(["Aprender"]);
+    expect(
+      normLista("nas minhas horas vagas gosto muito de pintar, também gosto muito de cozinhar"),
+    ).toEqual(["Pintar", "Cozinhar"]);
+    expect(normLista("Eu adorava criar poesia")).toEqual(["Criar poesia"]);
+    expect(normLista("hoje em dia só estou praticando musculação")).toEqual([
+      "Musculação",
+    ]);
+  });
+
+  it("negação e prosa não viram badge", () => {
+    expect(normLista("não gosto de assistir esportes")).toEqual([]);
+    expect(normLista("mas não acompanho e nem pratico.")).toEqual([]);
+    expect(normLista("estou vivendo uma fase de adaptação")).toEqual([]);
+    expect(normLista("fui diagnosticada com TDAH")).toEqual([]);
+    expect(normLista("Nrnhum")).toEqual([]);
+  });
+
+  it("dedup por invólucro e vírgula dentro de parênteses não corta", () => {
+    expect(normLista("Yoga, Fazer yoga")).toEqual(["Yoga"]);
+    expect(
+      normLista("Gosto de jogos (RPG, tabuleiro, cartas), séries, música"),
+    ).toEqual(["Jogos", "Séries", "Música"]);
+    expect(normLista("ler")).toEqual(["Ler"]);
+    expect(normLista("LER")).toEqual(["LER"]);
   });
 });
 
