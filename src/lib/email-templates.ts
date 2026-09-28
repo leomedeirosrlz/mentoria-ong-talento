@@ -219,3 +219,38 @@ export function emailMaterial({
       "O material fica disponível na aba Materiais da plataforma — este e-mail é só o aviso de que ele chegou.",
   });
 }
+
+/** Link individual de assinatura (coord dispara no lote da /pessoas) — um
+ *  e-mail por pessoa porque o link é o fator de posse. `nomePessoa` é o alvo
+ *  do documento quando quem recebe não é o signatário (autorização do
+ *  responsável → nome do(a) jovem); null = o doc é do próprio destinatário. */
+export function emailDocumentoAssinatura({
+  docTitulo,
+  nomePessoa,
+  primeiroNome,
+  link,
+}: {
+  docTitulo: string;
+  nomePessoa?: string | null;
+  primeiroNome: string;
+  link: string;
+}): string {
+  const saudacao = primeiroNome ? `Olá, ${primeiroNome}!` : "Olá!";
+  const objeto = nomePessoa
+    ? `O documento “${esc(docTitulo)}” de ${esc(nomePessoa)}`
+    : `Seu documento “${esc(docTitulo)}”`;
+  const conteudoHtml =
+    `<p style="margin:0 0 14px;font-size:16px;line-height:1.6;color:${INK};">${esc(saudacao)}</p>` +
+    `<p style="margin:0 0 14px;font-size:16px;line-height:1.6;color:${INK};">${objeto} está pronto pra assinatura eletrônica no Realiza.vc.</p>` +
+    `<p style="margin:0 0 14px;font-size:16px;line-height:1.6;color:${INK};">Os dados já vêm preenchidos do cadastro — é só conferir, completar o que faltar e assinar com o nome completo. Leva cerca de 1 minuto.</p>`;
+  return emailLayout({
+    titulo: docTitulo,
+    conteudoHtml,
+    ctaLabel: "Ler e assinar o documento",
+    ctaHref: link,
+    tagline: "Documento para assinar",
+    selo: "Assinatura eletrônica",
+    preheader: `${docTitulo}: link pra assinar — leva ~1 minuto`,
+    rodapeExtra: `Se o botão não abrir, copie este endereço no navegador:<br><span style="word-break:break-all;">${esc(link)}</span><br>Este link é pessoal. Se ele expirar, peça um novo à coordenação.`,
+  });
+}

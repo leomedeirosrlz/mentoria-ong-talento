@@ -10,12 +10,14 @@ import {
   type MentorProfile,
 } from "@/lib/queries";
 import { getAssinaturasResumo } from "@/lib/queries-assinaturas";
+import { faltantesDocumento } from "@/lib/documentos/texto";
 import type { DocsPessoa } from "@/components/pessoas-listas";
 import {
   NovaPessoaDialog,
   NovoMentoradoDialog,
   PessoasMaisAcoes,
 } from "@/components/pessoas-dialogs";
+import { EnviarTermosDialog } from "@/components/enviar-termos-dialog";
 import { PessoasListas } from "@/components/pessoas-listas";
 
 export const metadata: Metadata = {
@@ -83,6 +85,28 @@ export default async function PessoasPage() {
       d.pendente.push(a.slug);
   }
 
+  // faltantes civis por pessoa×documento — LABELS, nunca valores: o mapa
+  // cruza a fronteira pro client do dialog de emissão. Os dados já vieram
+  // no merge de *_pessoal (só preenchem pra coord — fora dela fica {} e o
+  // dialog nem renderiza)
+  const faltantesPorPessoa: Record<string, Record<string, string[]>> = {};
+  if (souCoord) {
+    for (const p of pessoas) {
+      faltantesPorPessoa[p.id] = {
+        "termo-voluntario": faltantesDocumento("termo-voluntario", p),
+      };
+    }
+    for (const m of mentorados) {
+      faltantesPorPessoa[m.id] = {
+        "termo-mentorando": faltantesDocumento("termo-mentorando", m),
+        "autorizacao-responsavel": faltantesDocumento(
+          "autorizacao-responsavel",
+          m
+        ),
+      };
+    }
+  }
+
   return (
     <div className="space-y-8">
       <header className="flex flex-wrap items-center justify-between gap-3">
@@ -101,6 +125,27 @@ export default async function PessoasPage() {
           <div className="flex flex-wrap gap-2">
             <NovoMentoradoDialog />
             <NovaPessoaDialog />
+            {/* inativa não entra no pool de emissão — link pra quem saiu
+                do programa não faz sentido (a ficha dela segue com o
+                histórico, e reemitir manual continua possível) */}
+            <EnviarTermosDialog
+              pessoas={pessoas
+                .filter((p) => p.ativo)
+                .map((p) => ({
+                  id: p.id,
+                  nome: p.nome,
+                  email: p.email || null,
+                  whatsapp: p.whatsapp,
+                }))}
+              mentorados={mentorados.map((m) => ({
+                id: m.id,
+                nome: m.nome,
+                email: m.email || null,
+                whatsapp: m.whatsapp,
+              }))}
+              docs={docsPorPessoa}
+              faltantes={faltantesPorPessoa}
+            />
             <PessoasMaisAcoes />
           </div>
         )}
@@ -117,6 +162,7 @@ export default async function PessoasPage() {
         mentorProfiles={mentorProfiles}
         contagemPorMentor={contagemPorMentor}
         assinaturas={docsPorPessoa}
+        faltantes={faltantesPorPessoa}
         souCoord={souCoord}
       />
     </div>

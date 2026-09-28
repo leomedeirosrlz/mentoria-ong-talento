@@ -12,6 +12,7 @@ import type { Icon } from "@phosphor-icons/react";
 import { assinarComToken, assinaturaPorToken } from "@/lib/actions-assinaturas";
 import { AssinaturaForm } from "@/components/assinatura-form";
 import { SiteFooter } from "@/components/site-footer";
+import { TermoVoluntarioDoc } from "@/components/termo-doc";
 import { buttonVariants } from "@/components/ui/button";
 import { formatDateTime } from "@/lib/ciclo";
 import {
@@ -144,7 +145,9 @@ export default async function AssinarTokenPage({
   // pendente: preview do documento já com o que está na ficha (0046 — a
   // RPC devolve `civis` como sugestão; o que faltar fica em branco e o form
   // abaixo completa/corrige — o snapshot registra o que foi assinado)
-  const ehAutorizacao = info.template.slug === "autorizacao-responsavel";
+  const slug = info.template.slug;
+  const ehAutorizacao = slug === "autorizacao-responsavel";
+  const ehVoluntario = slug === "termo-voluntario";
   const civis = info.civis as (DadosCivis & { parentesco?: string }) | null;
   const dadosPreview: DadosAutorizacao = {
     mentorado_nome: info.alvo.nome,
@@ -173,6 +176,13 @@ export default async function AssinarTokenPage({
               . Leia o documento abaixo e assine com seus dados civis. A
               assinatura eletrônica tem a mesma validade de uma assinatura em
               papel.
+            </>
+          ) : ehVoluntario ? (
+            <>
+              Você recebeu este link para assinar o seu termo de adesão ao
+              trabalho voluntário. Leia o documento abaixo, confira seus
+              dados e assine. A assinatura eletrônica tem a mesma validade de
+              uma assinatura em papel.
             </>
           ) : (
             <>
@@ -203,7 +213,7 @@ export default async function AssinarTokenPage({
                 href="#dados"
                 className="font-medium text-primary underline-offset-4 hover:underline"
               >
-                2 · Confira os dados
+                {ehVoluntario ? "2 · Confira seus dados" : "2 · Confira os dados"}
               </a>
             </li>
             <li>
@@ -218,45 +228,60 @@ export default async function AssinarTokenPage({
         </nav>
 
         {/* o documento como será emitido — o texto é o mesmo que entra no PDF
-            (src/lib/documentos/texto.ts é a fonte única dos dois) */}
-        <section
-          id="termo"
-          className="mt-8 scroll-mt-4 rounded-xl bg-card p-6 shadow-[var(--shadow-border)] sm:p-8"
-        >
-          <h2 className="text-center text-sm font-semibold uppercase tracking-[0.06em]">
-            {ehAutorizacao ? AUTORIZACAO_TITULO : MENTORANDO_TITULO}
-          </h2>
-          <div className="mt-5 space-y-3 text-sm leading-relaxed">
-            {(ehAutorizacao
-              ? preambuloAutorizacao(dadosPreview)
-              : preambuloMentorando(civisPreview(civis))
-            ).map((p, i) => (
-              <p key={i}>{p}</p>
-            ))}
-            {(ehAutorizacao ? CLAUSULAS_AUTORIZACAO : CLAUSULAS_MENTORANDO).map(
-              ([titulo, paragrafos]) => (
-                <div key={titulo} className="pt-1">
-                  <h3 className="font-semibold">{titulo}</h3>
-                  {paragrafos.map((p) => (
-                    <p key={p} className="mt-1.5">
-                      {p}
-                    </p>
-                  ))}
-                </div>
-              )
-            )}
-            <p>{ehAutorizacao ? FECHO_AUTORIZACAO : FECHO_MENTORANDO}</p>
-            <p>{dataPorExtenso(new Date())}</p>
+            (src/lib/documentos/texto.ts é a fonte única dos dois). O termo do
+            voluntário renderiza pelo mesmo TermoVoluntarioDoc da página
+            logada — um doc só, duas portas de entrada */}
+        {ehVoluntario ? (
+          <div className="mt-8">
+            <TermoVoluntarioDoc
+              civis={civis}
+              id="termo"
+              continuar={{
+                href: "#dados",
+                rotulo: "Continuar para seus dados ↓",
+              }}
+            />
           </div>
-          <p className="mt-6 border-t border-border pt-5 text-center">
-            <a
-              href="#dados"
-              className="inline-flex min-h-11 items-center rounded-lg px-3 text-sm font-medium text-primary underline-offset-4 transition-colors hover:underline"
-            >
-              Continuar para seus dados ↓
-            </a>
-          </p>
-        </section>
+        ) : (
+          <section
+            id="termo"
+            className="mt-8 scroll-mt-4 rounded-xl bg-card p-6 shadow-[var(--shadow-border)] sm:p-8"
+          >
+            <h2 className="text-center text-sm font-semibold uppercase tracking-[0.06em]">
+              {ehAutorizacao ? AUTORIZACAO_TITULO : MENTORANDO_TITULO}
+            </h2>
+            <div className="mt-5 space-y-3 text-sm leading-relaxed">
+              {(ehAutorizacao
+                ? preambuloAutorizacao(dadosPreview)
+                : preambuloMentorando(civisPreview(civis))
+              ).map((p, i) => (
+                <p key={i}>{p}</p>
+              ))}
+              {(ehAutorizacao ? CLAUSULAS_AUTORIZACAO : CLAUSULAS_MENTORANDO).map(
+                ([titulo, paragrafos]) => (
+                  <div key={titulo} className="pt-1">
+                    <h3 className="font-semibold">{titulo}</h3>
+                    {paragrafos.map((p) => (
+                      <p key={p} className="mt-1.5">
+                        {p}
+                      </p>
+                    ))}
+                  </div>
+                )
+              )}
+              <p>{ehAutorizacao ? FECHO_AUTORIZACAO : FECHO_MENTORANDO}</p>
+              <p>{dataPorExtenso(new Date())}</p>
+            </div>
+            <p className="mt-6 border-t border-border pt-5 text-center">
+              <a
+                href="#dados"
+                className="inline-flex min-h-11 items-center rounded-lg px-3 text-sm font-medium text-primary underline-offset-4 transition-colors hover:underline"
+              >
+                Continuar para seus dados ↓
+              </a>
+            </p>
+          </section>
+        )}
 
         <section
           id="dados"
@@ -265,7 +290,9 @@ export default async function AssinarTokenPage({
           <h2 className="text-base font-semibold">
             {ehAutorizacao
               ? "2 · Seus dados para assinar"
-              : "2 · Dados do(a) jovem e assinatura"}
+              : ehVoluntario
+                ? "2 · Confira seus dados e assine"
+                : "2 · Dados do(a) jovem e assinatura"}
           </h2>
           <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
             {civis

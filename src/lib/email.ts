@@ -87,3 +87,56 @@ export async function enviarEmailsLote({
   }
   return { enviados, falhas };
 }
+
+/** Idem enviarEmailsLote, mas cada mensagem leva assunto e HTML próprios —
+ *  links de assinatura são individuais por contrato (o token identifica a
+ *  pessoa), então não existe "mesmo e-mail pra todos" nesse fluxo. */
+export async function enviarEmailsIndividuais({
+  mensagens,
+  replyTo,
+}: {
+  mensagens: { to: string; subject: string; html: string }[];
+  replyTo?: string;
+}): Promise<EnvioLoteResult> {
+  const destinos = mensagens.map((m) => m.to);
+  if (!process.env.RESEND_API_KEY) {
+    return {
+      enviados: 0,
+      falhas: destinos,
+      error: "E-mail não configurado no servidor.",
+    };
+  }
+  if (!mensagens.length) return { enviados: 0, falhas: [] };
+
+  const resend = new Resend(process.env.RESEND_API_KEY);
+  const falhas: string[] = [];
+  let enviados = 0;
+
+  for (let i = 0; i < mensagens.length; i += LOTE_MAX) {
+    const lote = mensagens.slice(i, i + LOTE_MAX);
+    try {
+      const { data, error } = await resend.batch.send(
+        lote.map((m) => ({
+          from: FROM,
+          to: m.to,
+          subject: m.subject,
+          html: m.html,
+          ...(replyTo ? { replyTo } : {}),
+        })),
+        { batchValidation: "permissive" }
+      );
+      if (error || !data) {
+        falhas.push(...lote.map((m) => m.to));
+        continue;
+      }
+      enviados += data.data.length;
+      for (const f of data.errors ?? []) {
+        const addr = lote[f.index]?.to;
+        if (addr) falhas.push(addr);
+      }
+    } catch {
+      falhas.push(...lote.map((m) => m.to));
+    }
+  }
+  return { enviados, falhas };
+}

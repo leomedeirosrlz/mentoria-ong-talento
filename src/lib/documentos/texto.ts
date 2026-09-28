@@ -7,8 +7,8 @@
 // ato da assinatura. Se o jurídico alterar o termo, muda aqui e sobe a
 // `versao` do template em documento_templates.
 
-import type { AssinaturaVia, DadosAutorizacao, DadosCivis, Endereco } from "../types";
-import { normaliza } from "../utils";
+import type { AssinaturaVia, DadosAutorizacao, DadosCivis, Endereco, ResponsavelCivis } from "../types";
+import { cpfValido, normaliza } from "../utils";
 
 const MESES = [
   "janeiro", "fevereiro", "março", "abril", "maio", "junho",
@@ -238,6 +238,88 @@ export const TEMPLATES_MENTORADO = [
   { slug: "termo-mentorando", rotulo: "Termo de participação (o(a) jovem assina)" },
   { slug: "autorizacao-responsavel", rotulo: "Autorização do responsável" },
 ] as const;
+
+/** Templates que a coordenação emite pra uma pessoa com login (a emissão em
+ *  lote e o botão da ficha cobrem o voluntário que ainda não assinou pelo
+ *  /assinar logado). */
+export const TEMPLATES_PROFILE = [
+  { slug: "termo-voluntario", rotulo: "Termo de adesão do voluntário" },
+] as const;
+
+/** slug → pool de alvo — a emissão valida que cada destinatário é do tipo
+ *  que o documento espera (profiles só recebem termo-voluntario etc.). */
+export const TEMPLATES_POR_TIPO = {
+  profile: TEMPLATES_PROFILE,
+  mentorado: TEMPLATES_MENTORADO,
+} as const;
+
+export type TipoAlvoAssinatura = keyof typeof TEMPLATES_POR_TIPO;
+
+/** O que falta no cadastro pra o documento sair completo — labels amigáveis
+ *  ("RG", "endereço"), nunca valores: a lista pode ir pro client da
+ *  coordenação e pro toast sem carregar PII. Não bloqueia a emissão — quem
+ *  assina completa no ato; o alerta ajuda a coord a decidir se preenche a
+ *  ficha antes (menos trabalho pra quem assina).
+ *  `comResponsavel`: `dados` é a ficha do responsável legal (autorização) —
+ *  exige também parentesco; ficha inteira ausente vira um rótulo só
+ *  ("responsável") em vez de 5 campos soltos. */
+export function faltantesCivis(
+  dados: DadosCivis | null | undefined,
+  { comResponsavel = false }: { comResponsavel?: boolean } = {}
+): string[] {
+  if (comResponsavel && dados == null) return ["responsável"];
+  const f: string[] = [];
+  if ((dados?.nome_civil ?? "").trim().split(/\s+/).filter(Boolean).length < 2)
+    f.push("nome civil");
+  if (!dados?.rg?.trim()) f.push("RG");
+  // CPF com DV — um número mal-digitado na ficha entra no termo como válido
+  if (!cpfValido(dados?.cpf ?? "")) f.push("CPF");
+  const e = dados?.endereco;
+  const endOk =
+    !!e?.logradouro?.trim() &&
+    !!e.numero?.trim() &&
+    !!e.bairro?.trim() &&
+    !!e.cidade?.trim() &&
+    e.uf?.trim().length === 2 &&
+    (e.cep ?? "").replace(/\D/g, "").length === 8;
+  if (!endOk) f.push("endereço");
+  if (!dados?.data_nascimento) f.push("data de nascimento");
+  if (comResponsavel && !(dados as ResponsavelCivis)?.parentesco?.trim())
+    f.push("parentesco");
+  return f;
+}
+
+/** Faltantes por documento: os dois termos olham os civis do alvo; a
+ *  autorização olha a ficha do responsável (0046). `alvo` é a linha de
+ *  profiles/mentorados já com o merge dos *_pessoal (coord-only). */
+export function faltantesDocumento(
+  slug: string,
+  alvo: {
+    dados_civis?: DadosCivis | null;
+    responsavel?: ResponsavelCivis | null;
+  }
+): string[] {
+  if (slug === "autorizacao-responsavel")
+    return faltantesCivis(alvo.responsavel, { comResponsavel: true });
+  return faltantesCivis(alvo.dados_civis);
+}
+
+/** Texto do wa.me que a coordenação dispara com o link de assinatura — o
+ *  token é o fator de posse, então vai por WhatsApp comum. Por slug: o termo
+ *  do voluntário é da própria pessoa; o de participação é do(a) jovem; a
+ *  autorização é pro responsável do(a) jovem. */
+export function msgLinkAssinatura(
+  slug: string | undefined,
+  nome: string,
+  link: string
+): string {
+  const primeiro = nome.trim().split(/\s+/)[0] ?? "";
+  if (slug === "autorizacao-responsavel")
+    return `Olá! Aqui é a coordenação do Realiza.vc. Para a participação de ${nome} no Programa de Mentoria Social, precisamos que o responsável assine a autorização neste link (leva ~1 minuto): ${link}`;
+  if (slug === "termo-voluntario")
+    return `Olá${primeiro ? `, ${primeiro}` : ""}! Aqui é a coordenação do Realiza.vc. Seu termo de adesão ao trabalho voluntário está pronto pra assinar neste link (leva ~1 minuto): ${link}`;
+  return `Olá! Aqui é a coordenação do Realiza.vc. O termo de participação de ${nome} no Programa de Mentoria Social está pronto pra assinar neste link (leva ~1 minuto): ${link}`;
+}
 
 // Os helpers tomam AssinaturaVia (o recorte público de 0053): a row
 // completa (Assinatura) segue atribuível — campos a mais não atrapalham.

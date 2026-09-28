@@ -128,6 +128,7 @@ export function PessoasListas({
   mentorProfiles,
   contagemPorMentor,
   assinaturas,
+  faltantes,
   souCoord,
 }: {
   pessoas: Profile[];
@@ -139,6 +140,10 @@ export function PessoasListas({
   contagemPorMentor: Record<string, number>;
   /** id da pessoa → documentos assinados/pendentes (badge "assinou vs. não"). */
   assinaturas: Record<string, DocsPessoa>;
+  /** id → slug → labels de faltante civil (coord-only, calculado na page) —
+   *  alimenta o "civis incompletos" do Detalhes quando o doc ainda não saiu
+   *  assinado. Labels, nunca valores. */
+  faltantes?: Record<string, Record<string, string[]>>;
   /** false = diretório de colegas (supervisor/mentores): mesma lista, sem
    *  badges operacionais, filtros de gestão nem ações — os mapas acima já
    *  chegam vazios da página e nem são consultados nesse modo. */
@@ -361,6 +366,7 @@ export function PessoasListas({
               mentorProfile={mentorProfiles[p.id]}
               vagas={contagemPorMentor[p.id] ?? 0}
               docs={assinaturas[p.id]}
+              faltantesTermo={faltantes?.[p.id]?.["termo-voluntario"] ?? []}
               souCoord={souCoord}
             />
           ))}
@@ -437,6 +443,7 @@ export function PessoasListas({
               emDupla={emDupla.has(m.id)}
               temDupla={temQualquerDupla.has(m.id)}
               docs={assinaturas[m.id]}
+              faltantes={faltantes?.[m.id]}
               souCoord={souCoord}
             />
           ))}
@@ -575,6 +582,7 @@ function PessoaRow({
   mentorProfile: mp,
   vagas,
   docs: docsProp,
+  faltantesTermo = [],
   souCoord,
 }: {
   p: Profile;
@@ -587,6 +595,8 @@ function PessoaRow({
   mentorProfile: MentorProfile | undefined;
   vagas: number;
   docs: DocsPessoa | undefined;
+  /** labels do que falta na ficha pro termo do voluntário — coord-only */
+  faltantesTermo?: string[];
   souCoord: boolean;
 }) {
   const [detalhesAbertos, setDetalhesAbertos] = useState(false);
@@ -751,6 +761,14 @@ function PessoaRow({
               Formação inicial pendente
             </ItemDetalhe>
           )}
+          {/* lacuna na ficha importa pro link de assinatura — não bloqueia
+              (quem assina completa no ato), mas a coord pode preferir
+              completar antes de mandar */}
+          {!termoOk && faltantesTermo.length > 0 && (
+            <ItemDetalhe icone={FileText} warn>
+              {`Civis incompletos pro termo (falta: ${faltantesTermo.join(" · ")}) — quem assina completa na hora`}
+            </ItemDetalhe>
+          )}
         </DetalhesRegiao>
       )}
     </div>
@@ -767,6 +785,7 @@ function MentoradoRow({
   emDupla,
   temDupla,
   docs: docsProp,
+  faltantes,
   souCoord,
 }: {
   m: Mentorado;
@@ -774,6 +793,8 @@ function MentoradoRow({
   emDupla: boolean;
   temDupla: boolean;
   docs: DocsPessoa | undefined;
+  /** slug → labels de faltante civil da ficha (coord-only, labels só) */
+  faltantes?: Record<string, string[]>;
   souCoord: boolean;
 }) {
   const [detalhesAbertos, setDetalhesAbertos] = useState(false);
@@ -795,6 +816,10 @@ function MentoradoRow({
   const docOk = menor ? autorizacaoOk : termoOk;
   const docEnviado = menor ? autEnviada : termoEnviado;
   const temPendencia = !docOk;
+  // lacuna civil do documento que vale pra essa pessoa (autorização olha a
+  // ficha do responsável; o termo olha a do jovem)
+  const faltantesDoc =
+    faltantes?.[menor ? "autorizacao-responsavel" : "termo-mentorando"] ?? [];
   const temDocs =
     temPendencia ||
     Object.keys(docs.assinado).length > 0 ||
@@ -896,6 +921,11 @@ function MentoradoRow({
               ) : (
                 "Termo de participação ainda não enviado"
               )}
+            </ItemDetalhe>
+          )}
+          {!docOk && faltantesDoc.length > 0 && (
+            <ItemDetalhe icone={FileText} warn>
+              {`Civis incompletos pro documento (falta: ${faltantesDoc.join(" · ")}) — quem assina completa na hora`}
             </ItemDetalhe>
           )}
         </DetalhesRegiao>

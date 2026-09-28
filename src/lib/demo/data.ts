@@ -1910,6 +1910,7 @@ function build(): DemoData {
 
   const tplTermo = { slug: "termo-voluntario", titulo: "Termo de Adesão ao Trabalho Voluntário", versao: 1, signatario: "profile" as const };
   const tplAutorizacao = { slug: "autorizacao-responsavel", titulo: "Autorização do Responsável", versao: 1, signatario: "mentorado" as const };
+  const tplTermoMentorando = { slug: "termo-mentorando", titulo: "Termo de Adesão e Participação no Programa de Mentoria Social", versao: 1, signatario: "mentorado" as const };
 
   const dadosMarina = {
     nome_civil: "Marina Duarte Ferreira",
@@ -1961,8 +1962,25 @@ function build(): DemoData {
       assinatura_texto: null, assinado_em: null, ip: null, user_agent: null,
       hash_documento: null, created_by: marina.id, created_at: haDias(200),
       template: tplTermo },
-    // Ricardo (persona mentor_dpp) NÃO tem assinatura — o banner "termo
-    // pendente" aparece pra ele e demonstra o fluxo novo
+    // Ricardo (persona mentor_dpp): a coord emitiu o link do termo por
+    // e-mail — pendente. O token 0x3406 abre /assinar/<token> com o termo
+    // de voluntário; a ficha dele não tem dados_civis → o badge "falta:"
+    // da emissão em lote aparece, e quem assina completa no ato
+    { id: uid(0x3206), template_id: uid(0x3301), profile_id: ricardo.id, mentorado_id: null,
+      status: "pendente", dados_snapshot: null, token: uid(0x3406),
+      token_expira_em: haDias(-28),
+      assinatura_texto: null, assinado_em: null, ip: null, user_agent: null,
+      hash_documento: null, created_by: marina.id, created_at: haDias(2, "11:30"),
+      template: tplTermo },
+    // Isabela: é maior de idade — o doc dela é o termo de participação,
+    // emitido em lote junto com a autorização do Kauã (0x3404). Sem
+    // dados_civis na ficha → pendência com "falta:" no checklist
+    { id: uid(0x3207), template_id: uid(0x3303), profile_id: null, mentorado_id: isabela.id,
+      status: "pendente", dados_snapshot: null, token: uid(0x3407),
+      token_expira_em: haDias(-28),
+      assinatura_texto: null, assinado_em: null, ip: null, user_agent: null,
+      hash_documento: null, created_by: marina.id, created_at: haDias(2, "11:31"),
+      template: tplTermoMentorando },
   ];
 
   // ---------- presenças na formação (0040) ----------

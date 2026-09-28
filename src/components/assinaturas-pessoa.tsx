@@ -21,10 +21,13 @@ import {
   listarAssinaturasPessoa,
   reenviarAssinatura,
   revogarAssinatura,
-  solicitarAssinaturaMentorado,
+  solicitarAssinatura,
   subirContraAssinatura,
 } from "@/lib/actions-assinaturas";
-import { TEMPLATES_MENTORADO } from "@/lib/documentos/texto";
+import {
+  msgLinkAssinatura,
+  TEMPLATES_POR_TIPO,
+} from "@/lib/documentos/texto";
 import type { Assinatura, AssinaturaStatus } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -201,17 +204,8 @@ function ContraAssinaturaDialog() {
   );
 }
 
-/** Texto do wa.me que a coordenação dispara pro contato do jovem — o link
- *  tokenizado é o fator de posse, então vai por WhatsApp comum mesmo. */
-function msgLinkAssinatura(
-  slug: string | undefined,
-  nomeJovem: string,
-  link: string
-) {
-  return slug === "autorizacao-responsavel"
-    ? `Olá! Aqui é a coordenação do Realiza.vc. Para a participação de ${nomeJovem} no Programa de Mentoria Social, precisamos que o responsável assine a autorização neste link (leva ~1 minuto): ${link}`
-    : `Olá! Aqui é a coordenação do Realiza.vc. O termo de participação de ${nomeJovem} no Programa de Mentoria Social está pronto pra assinar neste link (leva ~1 minuto): ${link}`;
-}
+// texto do wa.me vem de documentos/texto.ts (msgLinkAssinatura) — o termo
+// do voluntário fala com a própria pessoa, o do jovem com a família
 
 /** Seção "Assinaturas" da ficha — irmã do DocumentoPessoa dentro dos dialogs
  *  de edição de /pessoas (que só a coordenação abre). O dialog desmonta o
@@ -282,7 +276,7 @@ export function AssinaturasPessoa({
   async function solicitar(slug: string) {
     setSolicitandoSlug(slug);
     try {
-      const res = await solicitarAssinaturaMentorado(id, slug);
+      const res = await solicitarAssinatura({ tipo, id, slug });
       if ("error" in res) {
         toast.error(res.error);
         return;
@@ -291,8 +285,17 @@ export function AssinaturasPessoa({
         `${origem}${res.link}`,
         whatsapp
           ? "Link copiado. Envie direto pelo botão WhatsApp abaixo."
-          : "Link copiado. Envie ao responsável."
+          : "Link copiado. Envie por WhatsApp ou e-mail."
       );
+      // faltante não bloqueia — quem assina completa no ato — mas a coord
+      // precisa saber que o doc saiu com lacuna (pode valer preencher a
+      // ficha antes de a pessoa abrir)
+      if (res.faltantes?.length) {
+        toast.warning(
+          `Ficha incompleta: falta ${res.faltantes.join(" · ")}. ` +
+            "Quem assina pode completar na hora — ou edite a ficha antes."
+        );
+      }
       await carregar();
     } catch {
       toast.error("Sem conexão. Tente de novo.");
@@ -328,13 +331,15 @@ export function AssinaturasPessoa({
     return res;
   }
 
-  // um link por template: só oferece emitir o que ainda não está pendente
+  // um link por template: só oferece emitir o que ainda não está pendente.
+  // O pool depende do tipo de ficha (profile → termo do voluntário,
+  // mentorado → os dois documentos do jovem)
   const pendentesPorSlug = new Set(
     (itens ?? [])
       .filter((a) => a.status === "pendente")
       .map((a) => a.template?.slug)
   );
-  const emissiveis = TEMPLATES_MENTORADO.filter(
+  const emissiveis = TEMPLATES_POR_TIPO[tipo].filter(
     (t) => !pendentesPorSlug.has(t.slug)
   );
 
@@ -347,7 +352,7 @@ export function AssinaturasPessoa({
         {tipo === "profile" && <ContraAssinaturaDialog />}
       </div>
 
-      {tipo === "mentorado" && itens !== null && emissiveis.length > 0 && (
+      {itens !== null && emissiveis.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
           {emissiveis.map((t) => (
             <Button
@@ -437,7 +442,7 @@ export function AssinaturasPessoa({
                   {a.assinatura_texto ? ` · ${a.assinatura_texto}` : ""}
                 </p>
                 <div className="flex flex-wrap items-center gap-x-1 pl-4">
-                  {terminal && tipo === "mentorado" && a.template?.slug && (
+                  {terminal && a.template?.slug && (
                     <Button
                       type="button"
                       variant="ghost"
@@ -471,7 +476,7 @@ export function AssinaturasPessoa({
                           whatsapp,
                           msgLinkAssinatura(
                             a.template?.slug,
-                            primeiroNome,
+                            nome,
                             `${origem}/assinar/${a.token}`
                           )
                         );

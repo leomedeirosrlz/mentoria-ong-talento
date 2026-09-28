@@ -20,11 +20,16 @@ export function primeiroNome(nome: string | null | undefined): string {
 /** URL do link público — montada no client porque o servidor não sabe a
  *  origem de deploy. Regra: quem chama NO RENDER passa `origem` (de
  *  useOrigem) pra SSR não quebrar (window não existe lá); em handler
- *  (click/copiar) pode omitir — window já está disponível. */
-export function urlPublica(token: string, origem?: string | null): string {
+ *  (click/copiar) pode omitir — window já está disponível.
+ *  `caminho` deixa servir outros links públicos ("/assinar" pros termos). */
+export function urlPublica(
+  token: string,
+  origem?: string | null,
+  caminho = "/f"
+): string {
   const base =
     origem ?? (typeof window === "undefined" ? "" : window.location.origin);
-  return `${base}/f/${token}`;
+  return `${base}${caminho}/${token}`;
 }
 
 /** Convite único pros dois pontos de envio — o WhatsApp abre com o mesmo
