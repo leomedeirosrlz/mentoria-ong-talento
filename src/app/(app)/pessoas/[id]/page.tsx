@@ -245,7 +245,7 @@ export default async function PessoaPerfilPage({
         }
       : null;
   const temPerfilPro = !!perfilPro && Boolean(
-    perfilPro.bio || perfilPro.linkedin || perfilPro.areas.length || perfilPro.voluntariado
+    perfilPro.bio || perfilPro.areas.length || perfilPro.voluntariado
   );
 
   // ---------- ficha de cadastro/matching (0034) ----------
@@ -408,6 +408,20 @@ export default async function PessoaPerfilPage({
                   <span className="truncate">{p.email}</span>
                 </a>
               )}
+              {/* LinkedIn mora junto dos contatos — links de perfil são
+                  contato, não conteúdo do Sobre */}
+              {perfilPro?.linkedin && (
+                <a
+                  href={perfilPro.linkedin}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-border px-2.5 text-xs text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <LinkedinLogo size={14} aria-hidden />
+                  LinkedIn
+                  <span className="sr-only"> (abre em nova aba)</span>
+                </a>
+              )}
               {souCoord &&
                 (perfil.tipo === "profile" ? (
                   <PessoaActions
@@ -531,28 +545,16 @@ export default async function PessoaPerfilPage({
         )}
       >
         <div className="min-w-0 space-y-4">
-          {/* vitrine profissional (0030) vira o "Sobre" — bio, LinkedIn,
-              áreas, voluntariado e interesses logo abaixo do resumo, como
-              nas redes */}
+          {/* vitrine profissional (0030) vira o "Sobre" — bio, áreas,
+              voluntariado e interesses logo abaixo do resumo, como nas
+              redes; o link de LinkedIn subiu pros chips de contato */}
           {perfilPro && temPerfilPro && (
             <section className="rounded-xl bg-card p-4 text-sm shadow-[var(--shadow-border)] sm:p-5">
               <h2 className="text-sm font-semibold">Sobre</h2>
               {perfilPro.bio && (
-                <p className="mt-2 whitespace-pre-wrap text-muted-foreground">
+                <p className="mt-2 whitespace-pre-wrap">
                   {perfilPro.bio}
                 </p>
-              )}
-              {perfilPro.linkedin && (
-                <a
-                  href={perfilPro.linkedin}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="mt-3 inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-border px-2.5 text-xs text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                  <LinkedinLogo size={14} aria-hidden />
-                  LinkedIn
-                  <span className="sr-only"> (abre em nova aba)</span>
-                </a>
               )}
               {perfilPro.areas.length > 0 && (
                 <div className="mt-3">
@@ -582,238 +584,253 @@ export default async function PessoaPerfilPage({
             </section>
           )}
 
-          {/* cadastro/matching (0034) — os sensíveis (nascimento, gênero,
-              motivação, pref. de par) só chegam preenchidos pra coordenação
-              via view; `sempre` deixa o "Não informado" explícito pra ela.
-              Subseções com título miúdo + um ícone por campo: leitura de
-              perfil (escaneável), não resposta de formulário */}
+          {/* cadastro/matching (0034) — mesma gaveta da seção de
+              documentos: o fôlego inteiro fecha pra não competir com o
+              acompanhamento; um clique abre tudo. Os sensíveis
+              (nascimento, gênero, motivação, pref. de par) só chegam
+              preenchidos pra coordenação via view; `sempre` deixa o "Não
+              informado" explícito pra ela. Subseções com título miúdo +
+              um ícone por campo: leitura de perfil, não formulário */}
           {(temFicha || souCoord) && (
-            <section className="rounded-xl bg-card p-5 text-sm shadow-[var(--shadow-border)] sm:p-6">
-              <h2 className="text-sm font-semibold">Cadastro</h2>
-              {temFicha ? (
-                <>
-                  {(temPessoal || souCoord) && (
-                    <div className="mt-4">
-                      <SubFicha titulo="Pessoal" />
-                      <dl className="mt-1 sm:grid sm:grid-cols-2 sm:gap-x-8">
-                        <Linha
-                          icone={<IdentificationCard size={15} />}
-                          rotulo="Nome social"
-                          valor={p.nome_social}
-                          sempre={souCoord}
-                        />
-                        <Linha
-                          icone={<Cake size={15} />}
-                          rotulo="Nascimento"
-                          valor={nascimentoTxt}
-                          sempre={souCoord}
-                        />
-                        <Linha
-                          icone={<GenderIntersex size={15} />}
-                          rotulo="Gênero"
-                          valor={p.genero ? GENERO_LABELS[p.genero] : null}
-                          sempre={souCoord}
-                        />
-                        <Linha
-                          icone={<CircleHalf size={15} />}
-                          rotulo="Cor/raça"
-                          valor={p.cor_raca ? COR_RACA_LABELS[p.cor_raca] : null}
-                          sempre={souCoord}
-                        />
-                        <Linha
-                          icone={<MapPin size={15} />}
-                          rotulo="Cidade/UF"
-                          valor={local}
-                          sempre={souCoord}
-                        />
-                        {ment && (
-                          <Linha
-                            icone={<GraduationCap size={15} />}
-                            rotulo="Escolaridade"
-                            valor={ment.escolaridade ? ESCOLARIDADE_LABELS[ment.escolaridade] : null}
-                            sempre={souCoord}
-                          />
-                        )}
-                      </dl>
-                      {anos != null && anos < 18 && (
-                        <p className="mt-1 rounded-lg bg-amber-50 px-2.5 py-1.5 text-xs text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
-                          Menor de idade: a autorização do responsável precisa
-                          estar assinada.
-                          {souCoord && " Confira Documentos e assinaturas no painel lateral."}
-                        </p>
-                      )}
-                    </div>
-                  )}
-
-                  {temProf && prof && (
-                    <div className="mt-5 border-t border-border/60 pt-5">
-                      <SubFicha titulo="Profissional" />
-                      <dl className="mt-1 sm:grid sm:grid-cols-2 sm:gap-x-8">
-                        <Linha
-                          icone={<Briefcase size={15} />}
-                          rotulo="Cargo"
-                          valor={prof.cargo}
-                        />
-                        <Linha
-                          icone={<Buildings size={15} />}
-                          rotulo="Empresa"
-                          valor={prof.empresa}
-                        />
-                      </dl>
-                    </div>
-                  )}
-
-                  {(temPrograma || souCoord) && (
-                    <div className="mt-5 border-t border-border/60 pt-5">
-                      <SubFicha titulo="No programa" />
-                      <dl className="mt-1 sm:grid sm:grid-cols-2 sm:gap-x-8">
-                        <Linha
-                          icone={<Signpost size={15} />}
-                          rotulo="Origem"
-                          valor={p.origem}
-                          sempre={souCoord}
-                        />
-                        {ment && (
-                          <Linha
-                            icone={<Target size={15} />}
-                            rotulo="Objetivos"
-                            valor={ment.objetivos}
-                            sempre={souCoord}
-                            className="sm:col-span-2"
-                          />
-                        )}
-                        {ment && (
-                          <Linha
-                            icone={<Clock size={15} />}
-                            rotulo="Disponível"
-                            valor={dispMentoradoTxt}
-                            sempre={souCoord}
-                          />
-                        )}
-                        <Linha
-                          icone={<Heart size={15} />}
-                          rotulo="Motivação"
-                          valor={p.motivacao}
-                          sempre={souCoord}
-                          className="sm:col-span-2"
-                        />
-                        <Linha
-                          icone={<Users size={15} />}
-                          rotulo="Pref. de par"
-                          valor={p.pref_genero_par ? PREF_GENERO_LABELS[p.pref_genero_par] : null}
-                          sempre={souCoord}
-                        />
-                        {/* consent_lgpd_em só existe em profiles — mentorado é
-                            coberto pela autorização do responsável. Trilha de
-                            compliance, não perfil: fora da visão de colega */}
-                        {prof && lgpdVisivel && (
-                          <Linha
-                            icone={<ShieldCheck size={15} />}
-                            rotulo="LGPD"
-                            valor={
-                              prof.consent_lgpd_em
-                                ? `Consentimento em ${formatDate(prof.consent_lgpd_em)}`
-                                : "Sem consentimento registrado"
-                            }
-                            sempre={souCoord}
-                          />
-                        )}
-                        {/* interesses ficam no Cadastro só quando não há card
-                            Sobre (mentorado e profiles sem apresentação) */}
-                        {interesses.length > 0 && !temPerfilPro && (
-                          <div className="flex items-start gap-2.5 py-3 sm:col-span-2">
-                            <span aria-hidden className="mt-0.5 shrink-0 text-muted-foreground/70">
-                              <Sparkle size={15} />
-                            </span>
-                            <div className="min-w-0">
-                              <dt className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
-                                Interesses
-                              </dt>
-                              <dd className="mt-1.5">
-                                <Chips itens={interesses} />
-                              </dd>
-                            </div>
+            <section className="rounded-xl bg-card text-sm shadow-[var(--shadow-border)]">
+              <Collapsible.Root>
+                <Collapsible.Trigger className="group flex min-h-12 w-full items-center gap-2 rounded-xl px-4 text-left transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:px-5">
+                  <span className="text-sm font-semibold">Cadastro</span>
+                  <CaretRight
+                    size={13}
+                    aria-hidden
+                    className="ml-auto shrink-0 text-muted-foreground transition-transform duration-150 group-data-[panel-open]:rotate-90"
+                  />
+                </Collapsible.Trigger>
+                <Collapsible.Panel className="h-[var(--collapsible-panel-height)] overflow-hidden transition-[height] duration-150 data-ending-style:h-0 data-starting-style:h-0 [&[hidden]:not([hidden='until-found'])]:hidden">
+                  <div className="border-t border-border/60 px-4 pb-4 pt-1 sm:px-5 sm:pb-5">
+                    {temFicha ? (
+                      <>
+                        {(temPessoal || souCoord) && (
+                          <div className="mt-4">
+                            <SubFicha titulo="Pessoal" />
+                            <dl className="mt-1 sm:grid sm:grid-cols-2 sm:gap-x-8">
+                              <Linha
+                                icone={<IdentificationCard size={15} />}
+                                rotulo="Nome social"
+                                valor={p.nome_social}
+                                sempre={souCoord}
+                              />
+                              <Linha
+                                icone={<Cake size={15} />}
+                                rotulo="Nascimento"
+                                valor={nascimentoTxt}
+                                sempre={souCoord}
+                              />
+                              <Linha
+                                icone={<GenderIntersex size={15} />}
+                                rotulo="Gênero"
+                                valor={p.genero ? GENERO_LABELS[p.genero] : null}
+                                sempre={souCoord}
+                              />
+                              <Linha
+                                icone={<CircleHalf size={15} />}
+                                rotulo="Cor/raça"
+                                valor={p.cor_raca ? COR_RACA_LABELS[p.cor_raca] : null}
+                                sempre={souCoord}
+                              />
+                              <Linha
+                                icone={<MapPin size={15} />}
+                                rotulo="Cidade/UF"
+                                valor={local}
+                                sempre={souCoord}
+                              />
+                              {ment && (
+                                <Linha
+                                  icone={<GraduationCap size={15} />}
+                                  rotulo="Escolaridade"
+                                  valor={ment.escolaridade ? ESCOLARIDADE_LABELS[ment.escolaridade] : null}
+                                  sempre={souCoord}
+                                />
+                              )}
+                            </dl>
+                            {anos != null && anos < 18 && (
+                              <p className="mt-1 rounded-lg bg-amber-50 px-2.5 py-1.5 text-xs text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+                                Menor de idade: a autorização do responsável precisa
+                                estar assinada.
+                                {souCoord && " Confira Documentos e assinaturas no painel lateral."}
+                              </p>
+                            )}
                           </div>
                         )}
-                      </dl>
-                    </div>
-                  )}
 
-                  {/* referência da anamnese (campo notas do intake) —
-                      contexto da jornada, mora como subseção do cadastro */}
-                  {anamneseRef && (
-                    <div className="mt-5 border-t border-border/60 pt-5">
-                      <SubFicha titulo="Referência da anamnese" />
-                      <p className="mt-2 whitespace-pre-wrap text-muted-foreground">
-                        {anamneseRef}
+                        {temProf && prof && (
+                          <div className="mt-5 border-t border-border/60 pt-5">
+                            <SubFicha titulo="Profissional" />
+                            <dl className="mt-1 sm:grid sm:grid-cols-2 sm:gap-x-8">
+                              <Linha
+                                icone={<Briefcase size={15} />}
+                                rotulo="Cargo"
+                                valor={prof.cargo}
+                              />
+                              <Linha
+                                icone={<Buildings size={15} />}
+                                rotulo="Empresa"
+                                valor={prof.empresa}
+                              />
+                            </dl>
+                          </div>
+                        )}
+
+                        {(temPrograma || souCoord) && (
+                          <div className="mt-5 border-t border-border/60 pt-5">
+                            <SubFicha titulo="No programa" />
+                            <dl className="mt-1 sm:grid sm:grid-cols-2 sm:gap-x-8">
+                              <Linha
+                                icone={<Signpost size={15} />}
+                                rotulo="Origem"
+                                valor={p.origem}
+                                sempre={souCoord}
+                              />
+                              {ment && (
+                                <Linha
+                                  icone={<Target size={15} />}
+                                  rotulo="Objetivos"
+                                  valor={ment.objetivos}
+                                  sempre={souCoord}
+                                  className="sm:col-span-2"
+                                />
+                              )}
+                              {ment && (
+                                <Linha
+                                  icone={<Clock size={15} />}
+                                  rotulo="Disponível"
+                                  valor={dispMentoradoTxt}
+                                  sempre={souCoord}
+                                />
+                              )}
+                              <Linha
+                                icone={<Heart size={15} />}
+                                rotulo="Motivação"
+                                valor={p.motivacao}
+                                sempre={souCoord}
+                                className="sm:col-span-2"
+                              />
+                              <Linha
+                                icone={<Users size={15} />}
+                                rotulo="Pref. de par"
+                                valor={p.pref_genero_par ? PREF_GENERO_LABELS[p.pref_genero_par] : null}
+                                sempre={souCoord}
+                              />
+                              {/* consent_lgpd_em só existe em profiles — mentorado é
+                                  coberto pela autorização do responsável. Trilha de
+                                  compliance, não perfil: fora da visão de colega */}
+                              {prof && lgpdVisivel && (
+                                <Linha
+                                  icone={<ShieldCheck size={15} />}
+                                  rotulo="LGPD"
+                                  valor={
+                                    prof.consent_lgpd_em
+                                      ? `Consentimento em ${formatDate(prof.consent_lgpd_em)}`
+                                      : "Sem consentimento registrado"
+                                  }
+                                  sempre={souCoord}
+                                />
+                              )}
+                              {/* interesses ficam no Cadastro só quando não há card
+                                  Sobre (mentorado e profiles sem apresentação) */}
+                              {interesses.length > 0 && !temPerfilPro && (
+                                <div className="flex items-start gap-2.5 py-3 sm:col-span-2">
+                                  <span aria-hidden className="mt-0.5 shrink-0 text-muted-foreground/70">
+                                    <Sparkle size={15} />
+                                  </span>
+                                  <div className="min-w-0">
+                                    <dt className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
+                                      Interesses
+                                    </dt>
+                                    <dd className="mt-1.5">
+                                      <Chips itens={interesses} />
+                                    </dd>
+                                  </div>
+                                </div>
+                              )}
+                            </dl>
+                          </div>
+                        )}
+
+                        {/* referência da anamnese (campo notas do intake) —
+                            contexto da jornada, mora como subseção do cadastro */}
+                        {anamneseRef && (
+                          <div className="mt-5 border-t border-border/60 pt-5">
+                            <SubFicha titulo="Referência da anamnese" />
+                            <p className="mt-2 whitespace-pre-wrap text-muted-foreground">
+                              {anamneseRef}
+                            </p>
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <p className="mt-2 text-muted-foreground">
+                        Nada preenchido ainda. Edite o cadastro ou peça pra pessoa completar o perfil.
                       </p>
-                    </div>
-                  )}
-                </>
-              ) : (
-                <p className="mt-2 text-muted-foreground">
-                  Nada preenchido ainda. Edite o cadastro ou peça pra pessoa completar o perfil.
-                </p>
-              )}
+                    )}
 
-              {/* dados civis (0046) — coord-only, fechados por padrão: o que
-                  o termo de adesão precisa, sem pesar a ficha */}
-              {souCoord && (civis || resp) && (
-                <div className="mt-5 border-t border-border/60 pt-1">
-                  <Collapsible.Root>
-                    <Collapsible.Trigger className="group flex min-h-9 w-full items-center gap-1.5 rounded-lg py-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                      <LockSimple size={14} aria-hidden className="shrink-0" />
-                      {resp ? "Dados civis e responsável" : "Dados civis"}
-                      <CaretRight
-                        size={13}
-                        aria-hidden
-                        className="ml-auto shrink-0 transition-transform duration-150 group-data-[panel-open]:rotate-90"
-                      />
-                    </Collapsible.Trigger>
-                    <Collapsible.Panel className="h-[var(--collapsible-panel-height)] overflow-hidden transition-[height] duration-150 data-ending-style:h-0 data-starting-style:h-0 [&[hidden]:not([hidden='until-found'])]:hidden">
-                      <dl className="pt-1 sm:grid sm:grid-cols-2 sm:gap-x-8">
-                        <Linha rotulo="Nome civil" valor={civis?.nome_civil} sempre />
-                        <Linha rotulo="RG" valor={civis?.rg} sempre />
-                        <Linha rotulo="CPF" valor={civis?.cpf} sempre />
-                        <Linha
-                          rotulo="Nascimento"
-                          valor={civis?.data_nascimento ? formatDate(civis.data_nascimento) : null}
-                          sempre
-                        />
-                        <Linha
-                          rotulo="Endereço"
-                          valor={enderecoTxt(civis?.endereco)}
-                          sempre
-                          className="sm:col-span-2"
-                        />
-                      </dl>
-                      {resp && (
-                        <>
-                          <p className="mt-1 border-t border-border/60 pt-2.5 text-xs font-medium text-muted-foreground">
-                            Responsável legal{resp.parentesco ? ` · ${resp.parentesco}` : ""}
-                          </p>
-                          <dl className="sm:grid sm:grid-cols-2 sm:gap-x-8">
-                            <Linha rotulo="Nome civil" valor={resp.nome_civil} sempre />
-                            <Linha rotulo="RG" valor={resp.rg} sempre />
-                            <Linha rotulo="CPF" valor={resp.cpf} sempre />
-                            <Linha
-                              rotulo="Nascimento"
-                              valor={resp.data_nascimento ? formatDate(resp.data_nascimento) : null}
-                              sempre
+                    {/* dados civis (0046) — coord-only, fechados por padrão: o que
+                        o termo de adesão precisa, sem pesar a ficha */}
+                    {souCoord && (civis || resp) && (
+                      <div className="mt-5 border-t border-border/60 pt-1">
+                        <Collapsible.Root>
+                          <Collapsible.Trigger className="group flex min-h-9 w-full items-center gap-1.5 rounded-lg py-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                            <LockSimple size={14} aria-hidden className="shrink-0" />
+                            {resp ? "Dados civis e responsável" : "Dados civis"}
+                            <CaretRight
+                              size={13}
+                              aria-hidden
+                              className="ml-auto shrink-0 transition-transform duration-150 group-data-[panel-open]:rotate-90"
                             />
-                            <Linha
-                              rotulo="Endereço"
-                              valor={enderecoTxt(resp.endereco)}
-                              sempre
-                              className="sm:col-span-2"
-                            />
-                          </dl>
-                        </>
-                      )}
-                    </Collapsible.Panel>
-                  </Collapsible.Root>
-                </div>
-              )}
+                          </Collapsible.Trigger>
+                          <Collapsible.Panel className="h-[var(--collapsible-panel-height)] overflow-hidden transition-[height] duration-150 data-ending-style:h-0 data-starting-style:h-0 [&[hidden]:not([hidden='until-found'])]:hidden">
+                            <dl className="pt-1 sm:grid sm:grid-cols-2 sm:gap-x-8">
+                              <Linha rotulo="Nome civil" valor={civis?.nome_civil} sempre />
+                              <Linha rotulo="RG" valor={civis?.rg} sempre />
+                              <Linha rotulo="CPF" valor={civis?.cpf} sempre />
+                              <Linha
+                                rotulo="Nascimento"
+                                valor={civis?.data_nascimento ? formatDate(civis.data_nascimento) : null}
+                                sempre
+                              />
+                              <Linha
+                                rotulo="Endereço"
+                                valor={enderecoTxt(civis?.endereco)}
+                                sempre
+                                className="sm:col-span-2"
+                              />
+                            </dl>
+                            {resp && (
+                              <>
+                                <p className="mt-1 border-t border-border/60 pt-2.5 text-xs font-medium text-muted-foreground">
+                                  Responsável legal{resp.parentesco ? ` · ${resp.parentesco}` : ""}
+                                </p>
+                                <dl className="sm:grid sm:grid-cols-2 sm:gap-x-8">
+                                  <Linha rotulo="Nome civil" valor={resp.nome_civil} sempre />
+                                  <Linha rotulo="RG" valor={resp.rg} sempre />
+                                  <Linha rotulo="CPF" valor={resp.cpf} sempre />
+                                  <Linha
+                                    rotulo="Nascimento"
+                                    valor={resp.data_nascimento ? formatDate(resp.data_nascimento) : null}
+                                    sempre
+                                  />
+                                  <Linha
+                                    rotulo="Endereço"
+                                    valor={enderecoTxt(resp.endereco)}
+                                    sempre
+                                    className="sm:col-span-2"
+                                  />
+                                </dl>
+                              </>
+                            )}
+                          </Collapsible.Panel>
+                        </Collapsible.Root>
+                      </div>
+                    )}
+                  </div>
+                </Collapsible.Panel>
+              </Collapsible.Root>
             </section>
           )}
 
