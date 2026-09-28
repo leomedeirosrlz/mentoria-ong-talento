@@ -19,6 +19,8 @@ import {
   WizardFicha,
   type PassoFicha,
 } from "@/components/campos-pessoais";
+import { formatWhatsApp } from "@/lib/ciclo";
+import { maskWhatsApp } from "@/lib/utils";
 import type { Disponibilidade, Mentorado } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import {
@@ -79,12 +81,13 @@ export function MentoradoActions({
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="em_nome">Nome civil</Label>
-              <Input id="em_nome" name="nome" required defaultValue={mentorado.nome} />
+              <Input id="em_nome" name="nome" required autoCapitalize="words" defaultValue={mentorado.nome} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="em_social">Nome social</Label>
               <Input
                 id="em_social" name="nome_social" maxLength={150}
+                autoCapitalize="words"
                 defaultValue={mentorado.nome_social ?? ""}
                 placeholder="Nome de uso, se diferente"
               />
@@ -96,7 +99,9 @@ export function MentoradoActions({
               <Input
                 id="em_whatsapp" name="whatsapp"
                 type="tel" inputMode="tel" autoComplete="tel"
-                defaultValue={mentorado.whatsapp ?? ""}
+                maxLength={15} placeholder="(11) 99999-9999"
+                onInput={(e) => { e.currentTarget.value = maskWhatsApp(e.currentTarget.value); }}
+                defaultValue={formatWhatsApp(mentorado.whatsapp)}
               />
             </div>
             <div className="space-y-2">
@@ -191,8 +196,8 @@ export function MentoradoActions({
             <Label htmlFor="em_parentesco">Parentesco com o(a) jovem</Label>
             <Input
               id="em_parentesco" name="resp_parentesco" maxLength={60}
+              autoCapitalize="sentences" placeholder="Mãe, pai, avó, tio…"
               defaultValue={mentorado.responsavel?.parentesco ?? ""}
-              placeholder="mãe, pai, avó, tio…"
             />
           </div>
           <DadosCivisFields

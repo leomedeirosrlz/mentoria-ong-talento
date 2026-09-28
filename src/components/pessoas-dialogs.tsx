@@ -27,6 +27,7 @@ import {
   type PassoFicha,
 } from "@/components/campos-pessoais";
 import type { Disponibilidade } from "@/lib/types";
+import { maskWhatsApp } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
@@ -133,21 +134,25 @@ export function NovaPessoaDialog() {
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="nome">Nome civil</Label>
-              <Input id="nome" name="nome" required />
+              <Input id="nome" name="nome" required autoComplete="off" autoCapitalize="words" />
             </div>
             <div className="space-y-2">
               <Label htmlFor="n_social">Nome social</Label>
-              <Input id="n_social" name="nome_social" maxLength={150} placeholder="Nome de uso, se diferente" />
+              <Input id="n_social" name="nome_social" maxLength={150} autoCapitalize="words" placeholder="Nome de uso, se diferente" />
             </div>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="email">E-mail</Label>
-              <Input id="email" name="email" type="email" required />
+              <Input id="email" name="email" type="email" required autoComplete="email" autoCapitalize="none" />
             </div>
             <div className="space-y-2">
               <Label htmlFor="whatsapp">WhatsApp</Label>
-              <Input id="whatsapp" name="whatsapp" type="tel" inputMode="tel" autoComplete="tel" placeholder="5511…" />
+              <Input
+                id="whatsapp" name="whatsapp" type="tel" inputMode="tel"
+                autoComplete="tel" maxLength={15} placeholder="(11) 99999-9999"
+                onInput={(e) => { e.currentTarget.value = maskWhatsApp(e.currentTarget.value); }}
+              />
             </div>
           </div>
           <div className="grid gap-4 sm:grid-cols-3">
@@ -317,21 +322,25 @@ export function NovoMentoradoDialog() {
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="m_nome">Nome civil</Label>
-              <Input id="m_nome" name="nome" required />
+              <Input id="m_nome" name="nome" required autoComplete="off" autoCapitalize="words" />
             </div>
             <div className="space-y-2">
               <Label htmlFor="m_social">Nome social</Label>
-              <Input id="m_social" name="nome_social" maxLength={150} placeholder="Nome de uso, se diferente" />
+              <Input id="m_social" name="nome_social" maxLength={150} autoCapitalize="words" placeholder="Nome de uso, se diferente" />
             </div>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="m_whatsapp">WhatsApp</Label>
-              <Input id="m_whatsapp" name="whatsapp" type="tel" inputMode="tel" autoComplete="tel" placeholder="5511…" />
+              <Input
+                id="m_whatsapp" name="whatsapp" type="tel" inputMode="tel"
+                autoComplete="tel" maxLength={15} placeholder="(11) 99999-9999"
+                onInput={(e) => { e.currentTarget.value = maskWhatsApp(e.currentTarget.value); }}
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="m_email">E-mail (opcional)</Label>
-              <Input id="m_email" name="email" type="email" />
+              <Input id="m_email" name="email" type="email" autoComplete="email" autoCapitalize="none" />
             </div>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
@@ -406,7 +415,7 @@ export function NovoMentoradoDialog() {
         <>
           <div className="space-y-2">
             <Label htmlFor="m_parentesco">Parentesco com o(a) jovem</Label>
-            <Input id="m_parentesco" name="resp_parentesco" maxLength={60} placeholder="mãe, pai, avó, tio…" />
+            <Input id="m_parentesco" name="resp_parentesco" maxLength={60} autoCapitalize="sentences" placeholder="Mãe, pai, avó, tio…" />
           </div>
           <DadosCivisFields prefix="resp_" opcional />
         </>

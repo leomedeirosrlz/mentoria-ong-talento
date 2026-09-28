@@ -306,7 +306,7 @@ export default async function AssinarTokenPage({
               acao={assinarComToken.bind(null, token)}
               dados={civis}
               parentesco={
-                ehAutorizacao ? (civis as ResponsavelCivis | null)?.parentesco : undefined
+                ehAutorizacao ? ((civis as ResponsavelCivis | null)?.parentesco ?? undefined) : undefined
               }
               etapas
             />

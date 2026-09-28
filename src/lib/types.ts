@@ -490,28 +490,29 @@ export type DocumentoTemplate = {
 };
 
 export type Endereco = {
-  logradouro: string;
-  numero: string;
+  logradouro: string | null;
+  numero: string | null;
   complemento: string | null;
-  bairro: string;
-  cidade: string;
-  uf: string;
-  cep: string;
+  bairro: string | null;
+  cidade: string | null;
+  uf: string | null;
+  cep: string | null;
 };
 
 /** Dados civis capturados no ato da assinatura — imutável, vive no snapshot
- *  (não em profiles, que é legível por qualquer autenticado). */
+ *  (não em profiles, que é legível por qualquer autenticado). No prefill da
+ *  ficha os campos podem ser null — o que falta é exigido na assinatura. */
 export type DadosCivis = {
-  nome_civil: string;
-  rg: string;
-  cpf: string;
+  nome_civil: string | null;
+  rg: string | null;
+  cpf: string | null;
   data_nascimento: string | null;
   endereco: Endereco;
 };
 
 /** Responsável legal no cadastro do mentorado (0046) — mesmo shape que o
  *  snapshot da autorização guarda. */
-export type ResponsavelCivis = DadosCivis & { parentesco: string };
+export type ResponsavelCivis = DadosCivis & { parentesco: string | null };
 
 /** Snapshot da autorização: quem é o jovem + dados civis do responsável. */
 export type DadosAutorizacao = {

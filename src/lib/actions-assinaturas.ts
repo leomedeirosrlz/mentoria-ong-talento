@@ -14,7 +14,7 @@ import {
 import { enviarEmailsIndividuais, SITE_URL } from "./email";
 import { emailDocumentoAssinatura } from "./email-templates";
 import { DEMO_MSG } from "./demo/shared";
-import { cpfValido } from "./utils";
+import { capitalizar, cpfValido, nomeProprio } from "./utils";
 import type { DadosCivis, Endereco, ResponsavelCivis } from "./types";
 
 // Actions do fluxo de assinatura eletrônica (0033). Toda escrita vai por RPC
@@ -73,24 +73,24 @@ function campo(f: FormData, nome: string): string {
 
 function parseEndereco(f: FormData): Endereco | { error: string } {
   const e: Endereco = {
-    logradouro: campo(f, "logradouro"),
+    logradouro: nomeProprio(campo(f, "logradouro")),
     numero: campo(f, "numero"),
     complemento: campo(f, "complemento") || null,
-    bairro: campo(f, "bairro"),
-    cidade: campo(f, "cidade"),
+    bairro: nomeProprio(campo(f, "bairro")),
+    cidade: nomeProprio(campo(f, "cidade")),
     uf: campo(f, "uf").toUpperCase(),
     cep: apenasDigitos(campo(f, "cep")),
   };
-  if (!e.logradouro || !e.numero || !e.bairro || !e.cidade || e.uf.length !== 2)
+  if (!e.logradouro || !e.numero || !e.bairro || !e.cidade || (e.uf ?? "").length !== 2)
     return { error: "Endereço incompleto: revise logradouro, número, bairro, cidade e UF." };
-  if (e.cep.length !== 8) return { error: "CEP inválido." };
+  if ((e.cep ?? "").length !== 8) return { error: "CEP inválido." };
   return e;
 }
 
 function parseDadosCivis(f: FormData): DadosCivis | { error: string } {
   const endereco = parseEndereco(f);
   if ("error" in endereco) return endereco;
-  const nome_civil = campo(f, "nome_civil");
+  const nome_civil = nomeProprio(campo(f, "nome_civil"));
   const rg = campo(f, "rg");
   const cpf = apenasDigitos(campo(f, "cpf"));
   const nasc = campo(f, "data_nascimento");
@@ -524,13 +524,17 @@ export async function enviarLinksAssinatura({
 
   // saneamento mínimo do payload do client: e-mail plausível + link no
   // formato do fluxo — lixo aqui inflaria o log com falhas evitáveis
-  const limpos = (Array.isArray(envios) ? envios : []).filter(
-    (e) =>
-      typeof e?.para === "string" &&
-      typeof e?.nome === "string" &&
-      /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e.para) &&
-      /^\/assinar\/[0-9a-f-]{36}$/.test(e.link)
-  );
+  const limpos = (Array.isArray(envios) ? envios : [])
+    .map((e) => ({
+      ...e,
+      para: typeof e?.para === "string" ? e.para.trim().toLowerCase() : "",
+    }))
+    .filter(
+      (e) =>
+        typeof e?.nome === "string" &&
+        /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e.para) &&
+        /^\/assinar\/[0-9a-f-]{36}$/.test(e.link)
+    );
   if (!limpos.length)
     return { error: "Nenhum destinatário com e-mail cadastrado." };
 
@@ -718,7 +722,7 @@ export async function assinarComToken(token: string, formData: FormData) {
   // direto. dados_civis_ok revalida tudo lá dentro.
   let pDados: DadosCivis | ResponsavelCivis = dados;
   if (info.template.slug === "autorizacao-responsavel") {
-    const parentesco = campo(formData, "parentesco");
+    const parentesco = capitalizar(campo(formData, "parentesco"));
     if (!parentesco) return { error: "Informe o parentesco com o jovem." };
     pDados = { ...dados, parentesco };
   }

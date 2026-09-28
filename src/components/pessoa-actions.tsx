@@ -21,7 +21,8 @@ import {
   WizardFicha,
   type PassoFicha,
 } from "@/components/campos-pessoais";
-import { AREAS_SUGESTOES } from "@/lib/ciclo";
+import { AREAS_SUGESTOES, formatWhatsApp } from "@/lib/ciclo";
+import { maskWhatsApp } from "@/lib/utils";
 import type { Disponibilidade, Profile } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import {
@@ -122,12 +123,13 @@ export function PessoaActions({
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="e_nome">Nome civil</Label>
-              <Input id="e_nome" name="nome" required defaultValue={pessoa.nome} />
+              <Input id="e_nome" name="nome" required autoCapitalize="words" defaultValue={pessoa.nome} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="e_social">Nome social</Label>
               <Input
                 id="e_social" name="nome_social" maxLength={150}
+                autoCapitalize="words"
                 defaultValue={pessoa.nome_social ?? ""}
                 placeholder="Nome de uso, se diferente"
               />
@@ -139,7 +141,9 @@ export function PessoaActions({
               <Input
                 id="e_whatsapp" name="whatsapp"
                 type="tel" inputMode="tel" autoComplete="tel"
-                defaultValue={pessoa.whatsapp ?? ""}
+                maxLength={15} placeholder="(11) 99999-9999"
+                onInput={(e) => { e.currentTarget.value = maskWhatsApp(e.currentTarget.value); }}
+                defaultValue={formatWhatsApp(pessoa.whatsapp)}
               />
             </div>
             <div className="space-y-2">

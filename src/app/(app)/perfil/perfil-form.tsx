@@ -53,7 +53,7 @@ import {
   papelLabel,
   PREF_GENERO_LABELS,
 } from "@/lib/ciclo";
-import { cn } from "@/lib/utils";
+import { cn, maskWhatsApp } from "@/lib/utils";
 import type { Assinatura, Disponibilidade, MentorProfile, Profile } from "@/lib/types";
 import Link from "next/link";
 
@@ -294,6 +294,7 @@ function FormPerfilPublico({
           id="nome_social"
           name="nome_social"
           maxLength={150}
+          autoCapitalize="words"
           defaultValue={me.nome_social ?? ""}
           placeholder="Nome de uso, se diferente"
         />
@@ -608,7 +609,7 @@ export function PerfilForm({
       node: (
         <div className="space-y-2">
           <Label htmlFor="nome">Nome civil</Label>
-          <Input id="nome" name="nome" required defaultValue={me.nome} autoComplete="name" />
+          <Input id="nome" name="nome" required defaultValue={me.nome} autoComplete="name" autoCapitalize="words" />
         </div>
       ),
     },
@@ -626,7 +627,9 @@ export function PerfilForm({
             name="whatsapp"
             type="tel"
             inputMode="tel"
+            maxLength={15}
             defaultValue={formatWhatsApp(me.whatsapp)}
+            onInput={(e) => { e.currentTarget.value = maskWhatsApp(e.currentTarget.value); }}
             placeholder="(11) 99999-9999"
             autoComplete="tel"
           />

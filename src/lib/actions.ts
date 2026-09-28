@@ -17,7 +17,7 @@ import {
   maxEncontros,
   parseDisponibilidade,
 } from "@/lib/ciclo";
-import { cpfValido, erroAmigavel } from "@/lib/utils";
+import { capitalizar, cpfValido, erroAmigavel, nomeProprio } from "@/lib/utils";
 import type { ComunicadoPrioridade, CorRaca, DadosCivis, Disponibilidade, DocumentoPessoa, Endereco, Escolaridade, Genero, Notificacao, PrefGeneroPar, ResponsavelCivis, Trilha } from "@/lib/types";
 import {
   emailValido,
@@ -260,21 +260,31 @@ function parseCivis(
 ): DadosCivis | { error: string } | null {
   const { prefix = "", deFicha = false } = opts;
   const c = (k: string) => String(formData.get(`${prefix}${k}`) ?? "").trim();
+  const vazio = (s: string) => s || null;
   const endereco: Endereco = {
-    logradouro: c("logradouro"),
-    numero: c("numero"),
+    logradouro: vazio(nomeProprio(c("logradouro"))),
+    numero: vazio(c("numero")),
     complemento: c("complemento") || null,
-    bairro: c("bairro"),
-    cidade: deFicha ? String(formData.get("cidade") ?? "").trim() : c("cidade"),
-    uf: (deFicha ? String(formData.get("uf") ?? "") : c("uf")).trim().toUpperCase(),
-    cep: c("cep").replace(/\D/g, ""),
+    bairro: vazio(nomeProprio(c("bairro"))),
+    cidade: vazio(
+      nomeProprio(
+        deFicha ? String(formData.get("cidade") ?? "") : c("cidade")
+      )
+    ),
+    uf:
+      vazio(
+        (deFicha ? String(formData.get("uf") ?? "") : c("uf")).trim().toUpperCase()
+      ) ?? null,
+    cep: vazio(c("cep").replace(/\D/g, "")),
   };
   const dados: DadosCivis = {
-    nome_civil: deFicha
-      ? String(formData.get("nome") ?? "").trim()
-      : c("nome_civil"),
-    rg: c("rg"),
-    cpf: c("cpf").replace(/\D/g, ""),
+    nome_civil: vazio(
+      nomeProprio(
+        deFicha ? String(formData.get("nome") ?? "") : c("nome_civil")
+      )
+    ),
+    rg: vazio(c("rg")),
+    cpf: vazio(c("cpf").replace(/\D/g, "")),
     data_nascimento:
       (deFicha
         ? String(formData.get("data_nascimento") ?? "")
@@ -322,7 +332,10 @@ function camposFicha(
   ];
   for (const [key, max, rotulo] of textos) {
     if (!tem(key)) continue;
-    const v = String(formData.get(key) ?? "").trim() || null;
+    const raw = String(formData.get(key) ?? "");
+    // nome próprio e cidade: title case pt; demais campos de texto: trim só
+    const v =
+      (key === "nome_social" || key === "cidade" ? nomeProprio(raw) : raw.trim()) || null;
     if (v && v.length > max) {
       return { error: `O campo "${rotulo}" aceita até ${max} caracteres.` };
     }
@@ -415,7 +428,10 @@ function camposFicha(
     const resp = parseCivis(formData, { prefix: "resp_" });
     if (resp && "error" in resp) return { error: resp.error };
     out.responsavel = resp
-      ? { ...resp, parentesco: String(formData.get("resp_parentesco") ?? "").trim() }
+      ? {
+          ...resp,
+          parentesco: capitalizar(String(formData.get("resp_parentesco") ?? "")) || null,
+        }
       : null;
   }
 
@@ -541,7 +557,7 @@ export async function createMentorado(formData: FormData) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada. Entre de novo." };
-  const nome = normNome(String(formData.get("nome") ?? ""));
+  const nome = nomeProprio(String(formData.get("nome") ?? ""));
   if (!nome) return { error: "Nome é obrigatório." };
   const email = normEmail(String(formData.get("email") ?? ""));
   if (email && !emailValido(email)) return { error: "Confira o e-mail." };
@@ -767,7 +783,7 @@ export async function updatePessoa(profileId: string, formData: FormData) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada. Entre de novo." };
-  const nome = normNome(String(formData.get("nome") ?? ""));
+  const nome = nomeProprio(String(formData.get("nome") ?? ""));
   const whatsappRaw = String(formData.get("whatsapp") ?? "");
   const whatsapp = normWhatsapp(whatsappRaw);
   const email = normEmail(String(formData.get("email") ?? ""));
@@ -927,7 +943,7 @@ export async function updateMentorado(id: string, formData: FormData) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada. Entre de novo." };
-  const nome = normNome(String(formData.get("nome") ?? ""));
+  const nome = nomeProprio(String(formData.get("nome") ?? ""));
   const email = normEmail(String(formData.get("email") ?? ""));
   if (!nome) return { error: "Nome é obrigatório." };
   if (email && !emailValido(email)) return { error: "Confira o e-mail." };
@@ -1332,7 +1348,7 @@ export async function importPessoas(rows: LinhaImportada[]) {
   const puladas: string[] = [];
 
   for (const r of rows) {
-    const nome = normNome(r.nome);
+    const nome = nomeProprio(r.nome);
     const email = normEmail(r.email);
     const whatsapp = normWhatsapp(r.whatsapp);
     // papel em branco cai no default mentor_dpp; "nenhum"/"voluntário" é
@@ -1431,7 +1447,7 @@ export async function importMentorados(rows: LinhaImportada[]) {
   const puladas: string[] = [];
 
   for (const r of rows) {
-    const nome = normNome(r.nome);
+    const nome = nomeProprio(r.nome);
     const whatsapp = normWhatsapp(r.whatsapp);
     const email = normEmail(r.email);
     if (!nome) { puladas.push("linha sem nome"); continue; }
@@ -2401,7 +2417,7 @@ export async function updateMeuPerfil(formData: FormData) {
   // (senão o save da mentoria apagaria nome/whatsapp/bio).
   const patch: Record<string, unknown> = {};
   if (formData.has("nome")) {
-    const nome = normNome(String(formData.get("nome") ?? ""));
+    const nome = nomeProprio(String(formData.get("nome") ?? ""));
     if (!nome) return { error: "Informe seu nome." };
     patch.nome = nome;
   }

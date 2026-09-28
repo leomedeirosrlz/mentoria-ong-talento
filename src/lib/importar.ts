@@ -1,5 +1,6 @@
 import type { AppRole, CorRaca, DadosCivis, Escolaridade, Genero, PrefGeneroPar } from "./types";
 import { UFS, parseDisponibilidade } from "./ciclo";
+import { capitalizar, nomeProprio } from "./utils";
 
 export const MAX_INTERESSES = 20;
 export const INTERESSE_MAX_CHARS = 60;
@@ -504,19 +505,20 @@ export function civisImportado(
 ): DadosCivis | null {
   const g = (k: string) =>
     normNome(String(l[`${prefix}${k}` as keyof LinhaImportada] ?? ""));
+  const vazio = (s: string) => s || null;
   const dados: DadosCivis = {
-    nome_civil: fixos.nome_civil ?? g("nome"),
-    rg: numDoc(g("rg")),
-    cpf: numDoc(g("cpf")).replace(/\D/g, ""),
+    nome_civil: vazio(fixos.nome_civil ?? "") ?? vazio(nomeProprio(g("nome"))),
+    rg: vazio(numDoc(g("rg"))),
+    cpf: vazio(numDoc(g("cpf")).replace(/\D/g, "")),
     data_nascimento: fixos.data_nascimento ?? normData(g("nascimento")),
     endereco: {
-      logradouro: g("logradouro"),
-      numero: numDoc(g("numero")),
+      logradouro: vazio(nomeProprio(g("logradouro"))),
+      numero: vazio(numDoc(g("numero"))),
       complemento: g("complemento") || null,
-      bairro: g("bairro"),
-      cidade: fixos.cidade ?? g("cidade"),
-      uf: (fixos.uf ?? normUf(g("uf"))) ?? "",
-      cep: numDoc(g("cep")).replace(/\D/g, ""),
+      bairro: vazio(nomeProprio(g("bairro"))),
+      cidade: vazio(fixos.cidade ?? "") ?? vazio(nomeProprio(g("cidade"))),
+      uf: vazio(fixos.uf ?? "") ?? normUf(g("uf")),
+      cep: vazio(numDoc(g("cep")).replace(/\D/g, "")),
     },
   };
   const temAlgo =
@@ -629,14 +631,14 @@ export function fichaLinha(
     out.disponibilidade = disp;
 
     const resp = civisImportado(l, "resp_");
-    const parentesco = normNome(String(l.resp_parentesco ?? ""));
-    if (resp) out.responsavel = { ...resp, parentesco };
+    const parentesco = capitalizar(String(l.resp_parentesco ?? ""));
+    if (resp) out.responsavel = { ...resp, parentesco: parentesco || null };
   }
 
   // dados civis (0046) — as colunas de documento/endereço viram o jsonb que
   // preenche os termos; nome/nascimento/cidade/UF vêm da própria ficha
   const civis = civisImportado(l, "", {
-    nome_civil: normNome(l.nome),
+    nome_civil: nomeProprio(l.nome),
     data_nascimento: out.data_nascimento as string | null,
     cidade: (out.cidade as string | null) ?? "",
     uf: (out.uf as string | null) ?? "",

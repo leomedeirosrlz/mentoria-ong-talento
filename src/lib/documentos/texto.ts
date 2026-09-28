@@ -8,7 +8,7 @@
 // `versao` do template em documento_templates.
 
 import type { AssinaturaVia, DadosAutorizacao, DadosCivis, Endereco, ResponsavelCivis } from "../types";
-import { cpfValido, normaliza } from "../utils";
+import { cpfValido, maskCpf, normaliza } from "../utils";
 
 const MESES = [
   "janeiro", "fevereiro", "março", "abril", "maio", "junho",
@@ -24,13 +24,15 @@ export function dataPorExtenso(iso: string | Date): string {
 
 const caixaAlta = (s: string) => s.toUpperCase();
 
-const cpfFmt = (cpf: string) =>
-  cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
+const cpfFmt = (cpf: string | null) => (cpf ? maskCpf(cpf) : "");
 
 export function enderecoLinha(e: Endereco): string {
   const comp = e.complemento ? ` ${e.complemento}` : "";
-  const cep = e.cep.replace(/(\d{5})(\d{3})/, "$1-$2");
-  return `${e.logradouro} ${e.numero}${comp} - ${e.bairro} - ${e.cidade} - ${e.uf} - CEP ${cep}`;
+  const linha = `${e.logradouro ?? ""} ${e.numero ?? ""}${comp}`.trim();
+  const cep = (e.cep ?? "").replace(/(\d{5})(\d{3})/, "$1-$2");
+  return [linha, e.bairro, e.cidade, e.uf, cep ? `CEP ${cep}` : null]
+    .filter(Boolean)
+    .join(" - ");
 }
 
 // ---------- Termo de Adesão ao Trabalho Voluntário ----------
@@ -42,7 +44,7 @@ export const TERMO_TITULO = "TERMO DE ADESÃO AO TRABALHO VOLUNTÁRIO";
 export function preambuloTermo(d: DadosCivis): string[] {
   return [
     "Pelo presente instrumento particular e na melhor forma de direito, de um lado, o Instituto Realiza Você, estabelecido na Rua dos Pinheiros n. 706 Casa 6 andar 2, inscrita no CNPJ/ME sob o nº 53.034.217/0001-89, denominado simplesmente Realiza.vc.",
-    `E, de outro lado, ${caixaAlta(d.nome_civil)}, portador(a) da Cédula de Identidade RG nº ${d.rg} e inscrito(a) no CPF/ME sob o nº ${cpfFmt(d.cpf)}, domiciliado(a) na ${enderecoLinha(d.endereco)}, doravante denominada simplesmente “VOLUNTÁRIO(A)”; RESOLVEM FIRMAR entre si o presente Termo de Adesão ao Trabalho Voluntário (“Termo”), que se regerá pelas cláusulas seguintes e pelas condições a seguir descritas.`,
+    `E, de outro lado, ${caixaAlta(d.nome_civil ?? "")}, portador(a) da Cédula de Identidade RG nº ${d.rg ?? ""} e inscrito(a) no CPF/ME sob o nº ${cpfFmt(d.cpf)}, domiciliado(a) na ${enderecoLinha(d.endereco)}, doravante denominada simplesmente “VOLUNTÁRIO(A)”; RESOLVEM FIRMAR entre si o presente Termo de Adesão ao Trabalho Voluntário (“Termo”), que se regerá pelas cláusulas seguintes e pelas condições a seguir descritas.`,
   ];
 }
 
@@ -104,7 +106,7 @@ export const AUTORIZACAO_TITULO = "AUTORIZAÇÃO DO RESPONSÁVEL LEGAL";
 export function preambuloAutorizacao(d: DadosAutorizacao): string[] {
   const r = d.responsavel;
   return [
-    `Eu, ${caixaAlta(r.nome_civil)}, portador(a) da Cédula de Identidade RG nº ${r.rg} e inscrito(a) no CPF/ME sob o nº ${cpfFmt(r.cpf)}, domiciliado(a) na ${enderecoLinha(r.endereco)}, na qualidade de ${r.parentesco} do(a) jovem ${caixaAlta(d.mentorado_nome)}, doravante denominado(a) RESPONSÁVEL,`,
+    `Eu, ${caixaAlta(r.nome_civil ?? "")}, portador(a) da Cédula de Identidade RG nº ${r.rg ?? ""} e inscrito(a) no CPF/ME sob o nº ${cpfFmt(r.cpf)}, domiciliado(a) na ${enderecoLinha(r.endereco)}, na qualidade de ${r.parentesco ?? ""} do(a) jovem ${caixaAlta(d.mentorado_nome)}, doravante denominado(a) RESPONSÁVEL,`,
     "AUTORIZO, por meio do presente instrumento, a participação do(a) jovem acima identificado(a) no programa de mentoria social do Instituto Realiza Você (Realiza.vc), nas condições seguintes:",
   ];
 }
@@ -139,7 +141,7 @@ export const MENTORANDO_TITULO =
 export function preambuloMentorando(d: DadosCivis): string[] {
   return [
     "Pelo presente instrumento, de um lado, o Instituto Realiza Você, estabelecido na Rua dos Pinheiros n. 706, Casa 6, andar 2, inscrito no CNPJ/ME sob o nº 53.034.217/0001-89, denominado simplesmente “Realiza.vc”.",
-    `E, de outro lado, ${caixaAlta(d.nome_civil)}, portador(a) do RG nº ${d.rg} e inscrito(a) no CPF/ME sob o nº ${cpfFmt(d.cpf)}, domiciliado(a) em ${enderecoLinha(d.endereco)}, doravante denominado(a) simplesmente “MENTORANDO(A)”,`,
+    `E, de outro lado, ${caixaAlta(d.nome_civil ?? "")}, portador(a) do RG nº ${d.rg ?? ""} e inscrito(a) no CPF/ME sob o nº ${cpfFmt(d.cpf)}, domiciliado(a) em ${enderecoLinha(d.endereco)}, doravante denominado(a) simplesmente “MENTORANDO(A)”,`,
     "RESOLVEM formalizar a participação no Programa de Mentoria Social do Realiza.vc, mediante as cláusulas e condições a seguir descritas.",
   ];
 }
@@ -210,7 +212,7 @@ export const CIVIS_EM_BRANCO: DadosCivis = {
 export function civisPreview(c: Partial<DadosCivis> | null | undefined): DadosCivis {
   if (!c) return CIVIS_EM_BRANCO;
   const e = c.endereco;
-  const ou = (v: string | null | undefined, blank: string) =>
+  const ou = (v: string | null | undefined, blank: string | null) =>
     v && v.trim() ? v : blank;
   return {
     nome_civil: ou(c.nome_civil, CIVIS_EM_BRANCO.nome_civil),

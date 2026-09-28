@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
+  capitalizar,
   cpfValido,
   erroAmigavel,
+  maskCep,
+  maskCpf,
+  maskWhatsApp,
+  nomeProprio,
   normaliza,
   pathInterno,
 } from "@/lib/utils";
@@ -117,5 +122,80 @@ describe("cpfValido", () => {
     expect(cpfValido("123.456.789-00")).toBe(false);
     expect(cpfValido("123456789")).toBe(false);
     expect(cpfValido("")).toBe(false);
+  });
+});
+
+describe("nomeProprio — storage canônico de nomes", () => {
+  it("title-case com partículas pt minúsculas", () => {
+    expect(nomeProprio("MARIA DE SOUZA")).toBe("Maria de Souza");
+    expect(nomeProprio("ana paula dos santos")).toBe("Ana Paula dos Santos");
+    expect(nomeProprio("JOÃO DA SILVA E SOUZA")).toBe("João da Silva e Souza");
+  });
+
+  it("trim + colapso de espaços internos", () => {
+    expect(nomeProprio("  ricardo   tavares  ")).toBe("Ricardo Tavares");
+  });
+
+  it("numerais romanos preservados (nomes e logradouros)", () => {
+    expect(nomeProprio("rua xv de novembro")).toBe("Rua XV de Novembro");
+    expect(nomeProprio("dom pedro ii")).toBe("Dom Pedro II");
+  });
+
+  it("apelidos curtos que parecem romano não viram maiúsculo", () => {
+    expect(nomeProprio("vi ramos")).toBe("Vi Ramos");
+    expect(nomeProprio("li chen")).toBe("Li Chen");
+    expect(nomeProprio("di oliveira")).toBe("Di Oliveira");
+  });
+
+  it("hífen e apóstrofo capitalizam os dois lados", () => {
+    expect(nomeProprio("ana-lucia santos")).toBe("Ana-Lucia Santos");
+    expect(nomeProprio("maria d'angelo")).toBe("Maria D'Angelo");
+    expect(nomeProprio("ANA-LÚCIA SANTOS")).toBe("Ana-Lúcia Santos");
+  });
+
+  it("idempotente — nome já certo volta igual", () => {
+    expect(nomeProprio("Maria de Souza")).toBe("Maria de Souza");
+  });
+
+  it("vazio/null → vazio", () => {
+    expect(nomeProprio("")).toBe("");
+    expect(nomeProprio(null)).toBe("");
+    expect(nomeProprio(undefined)).toBe("");
+  });
+});
+
+describe("capitalizar — primeira letra só", () => {
+  it("parentesco e campos de uma palavra", () => {
+    expect(capitalizar("mae")).toBe("Mae");
+    expect(capitalizar("  avó  ")).toBe("Avó");
+    expect(capitalizar("tio de criação")).toBe("Tio de criação");
+    expect(capitalizar("")).toBe("");
+  });
+});
+
+describe("maskCpf / maskCep — máscara progressiva de input", () => {
+  it("formata enquanto digita e trava no tamanho", () => {
+    expect(maskCpf("1")).toBe("1");
+    expect(maskCpf("1234")).toBe("123.4");
+    expect(maskCpf("1234567")).toBe("123.456.7");
+    expect(maskCpf("12345678909")).toBe("123.456.789-09");
+    expect(maskCpf("12345678909999")).toBe("123.456.789-09");
+    expect(maskCpf("123.456.789-09")).toBe("123.456.789-09");
+  });
+  it("cep idem", () => {
+    expect(maskCep("01412")).toBe("01412");
+    expect(maskCep("014121")).toBe("01412-1");
+    expect(maskCep("01412100")).toBe("01412-100");
+    expect(maskCep("01412-100")).toBe("01412-100");
+  });
+});
+
+describe("maskWhatsApp — '(11) 98765-4003' enquanto digita", () => {
+  it("progressiva, com e sem o 55", () => {
+    expect(maskWhatsApp("11987654003")).toBe("(11) 98765-4003");
+    expect(maskWhatsApp("5511987654003")).toBe("(11) 98765-4003");
+    expect(maskWhatsApp("1198765400")).toBe("(11) 9876-5400");
+    expect(maskWhatsApp("119")).toBe("(11) 9");
+    expect(maskWhatsApp("")).toBe("");
   });
 });

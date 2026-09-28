@@ -35,7 +35,7 @@ import {
   Warning,
   WhatsappLogo,
 } from "@phosphor-icons/react/dist/ssr";
-import { cn } from "@/lib/utils";
+import { cn, maskCep, maskCpf } from "@/lib/utils";
 import { getDocumentosPessoa, getMe, getPessoaPerfil } from "@/lib/queries";
 import { getAnamneseMentorado } from "@/lib/forms/queries";
 import { getSupervisoesDaPessoa } from "@/lib/queries-supervisao";
@@ -203,7 +203,7 @@ function enderecoTxt(e: DadosCivis["endereco"] | null | undefined): string | nul
     e.complemento,
     e.bairro,
     [e.cidade, e.uf].filter(Boolean).join("/") || null,
-    e.cep ? `CEP ${e.cep}` : null,
+    e.cep ? `CEP ${maskCep(e.cep)}` : null,
   ].filter(Boolean);
   return partes.length ? partes.join(" · ") : null;
 }
@@ -809,7 +809,7 @@ export default async function PessoaPerfilPage({
                             <dl className="pt-1 sm:grid sm:grid-cols-2 sm:gap-x-8">
                               <Linha rotulo="Nome civil" valor={civis?.nome_civil} sempre />
                               <Linha rotulo="RG" valor={civis?.rg} sempre />
-                              <Linha rotulo="CPF" valor={civis?.cpf} sempre />
+                              <Linha rotulo="CPF" valor={civis?.cpf ? maskCpf(civis.cpf) : null} sempre />
                               <Linha
                                 rotulo="Nascimento"
                                 valor={civis?.data_nascimento ? formatDate(civis.data_nascimento) : null}
@@ -830,7 +830,7 @@ export default async function PessoaPerfilPage({
                                 <dl className="sm:grid sm:grid-cols-2 sm:gap-x-8">
                                   <Linha rotulo="Nome civil" valor={resp.nome_civil} sempre />
                                   <Linha rotulo="RG" valor={resp.rg} sempre />
-                                  <Linha rotulo="CPF" valor={resp.cpf} sempre />
+                                  <Linha rotulo="CPF" valor={resp.cpf ? maskCpf(resp.cpf) : null} sempre />
                                   <Linha
                                     rotulo="Nascimento"
                                     valor={resp.data_nascimento ? formatDate(resp.data_nascimento) : null}

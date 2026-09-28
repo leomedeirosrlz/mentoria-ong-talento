@@ -7,14 +7,17 @@ import { CircleNotch, Signature } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { maskCep, maskCpf } from "@/lib/utils";
 import type { DadosCivis } from "@/lib/types";
 
 type Resultado = { error?: string; ok?: boolean };
 
-const cpfMask = (v: string) =>
-  v.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
-const cepMask = (v: string) =>
-  v.replace(/(\d{5})(\d{3})/, "$1-$2");
+/** máscara live no input uncontrolled — reformat a cada tecla */
+const onInputMask = (mask: (v: string) => string) => (e: React.FormEvent<HTMLInputElement>) => {
+  e.currentTarget.value = mask(e.currentTarget.value);
+};
+const cpfMask = maskCpf;
+const cepMask = maskCep;
 
 /** Campos civis do signatário — compartilhados pelo termo do voluntário
  *  (logado), pela autorização do responsável (token) e pela ficha de
@@ -49,6 +52,7 @@ export function DadosCivisFields({
             name={n("nome_civil")}
             required={req}
             autoComplete="name"
+            autoCapitalize="words"
             defaultValue={defaults?.nome_civil ?? ""}
           />
         </div>
@@ -60,6 +64,7 @@ export function DadosCivisFields({
           name={n("rg")}
           required={req}
           placeholder="12.345.678-9"
+          autoComplete="off"
           defaultValue={defaults?.rg ?? ""}
         />
       </div>
@@ -70,7 +75,10 @@ export function DadosCivisFields({
           name={n("cpf")}
           required={req}
           inputMode="numeric"
+          autoComplete="off"
+          maxLength={14}
           placeholder="000.000.000-00"
+          onInput={onInputMask(maskCpf)}
           defaultValue={defaults?.cpf ? cpfMask(defaults.cpf) : ""}
         />
       </div>
@@ -81,6 +89,7 @@ export function DadosCivisFields({
             id={n("data_nascimento")}
             name={n("data_nascimento")}
             type="date"
+            autoComplete="bday"
             defaultValue={defaults?.data_nascimento ?? ""}
           />
         </div>
@@ -92,7 +101,10 @@ export function DadosCivisFields({
           name={n("cep")}
           required={req}
           inputMode="numeric"
+          autoComplete="postal-code"
+          maxLength={9}
           placeholder="00000-000"
+          onInput={onInputMask(maskCep)}
           defaultValue={e?.cep ? cepMask(e.cep) : ""}
         />
       </div>
@@ -104,6 +116,8 @@ export function DadosCivisFields({
             name={n("logradouro")}
             required={req}
             placeholder="Rua, avenida…"
+            autoComplete="street-address"
+            autoCapitalize="words"
             defaultValue={e?.logradouro ?? ""}
           />
         </div>
@@ -132,6 +146,8 @@ export function DadosCivisFields({
           id={n("bairro")}
           name={n("bairro")}
           required={req}
+          autoComplete="address-level3"
+          autoCapitalize="words"
           defaultValue={e?.bairro ?? ""}
         />
       </div>
@@ -143,6 +159,8 @@ export function DadosCivisFields({
               id={n("cidade")}
               name={n("cidade")}
               required={req}
+              autoComplete="address-level2"
+              autoCapitalize="words"
               defaultValue={e?.cidade ?? ""}
             />
           </div>
@@ -154,7 +172,11 @@ export function DadosCivisFields({
               required={req}
               maxLength={2}
               placeholder="SP"
+              autoComplete="address-level1"
               className="uppercase"
+              onInput={(e) => {
+                e.currentTarget.value = e.currentTarget.value.toUpperCase();
+              }}
               defaultValue={e?.uf ?? ""}
             />
           </div>
@@ -231,6 +253,7 @@ export function AssinaturaForm({
               name="parentesco"
               required
               placeholder="Mãe, pai, avó, tio…"
+              autoCapitalize="sentences"
               defaultValue={parentesco ?? ""}
             />
           </div>
@@ -269,6 +292,7 @@ export function AssinaturaForm({
           name="assinatura_texto"
           required
           autoComplete="name"
+          autoCapitalize="words"
           placeholder="Como consta no documento"
           className="font-medium italic"
         />

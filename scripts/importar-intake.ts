@@ -28,6 +28,7 @@ import {
   parseCsv,
   type LinhaImportada,
 } from "../src/lib/importar";
+import { nomeProprio } from "../src/lib/utils";
 import { parseDisponibilidade } from "../src/lib/ciclo";
 
 const APPLY = process.argv.includes("--apply");
@@ -93,7 +94,7 @@ async function importaEquipe(linhas: LinhaImportada[]) {
   const fichaMentor: Record<string, Record<string, unknown>> = {};
 
   for (const r of linhas) {
-    const nome = normNome(r.nome);
+    const nome = nomeProprio(r.nome);
     const email = normEmail(r.email);
     const whatsapp = normWhatsapp(r.whatsapp);
     const papelPreenchido = String(r.papel ?? "").trim() !== "";
@@ -202,7 +203,7 @@ async function importaMentorados(linhas: LinhaImportada[]) {
   const validas: Record<string, unknown>[] = [];
 
   for (const r of linhas) {
-    const nome = normNome(r.nome);
+    const nome = nomeProprio(r.nome);
     const whatsapp = normWhatsapp(r.whatsapp);
     const email = normEmail(r.email);
     if (!nome) {

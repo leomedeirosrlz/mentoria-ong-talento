@@ -287,6 +287,7 @@ export function OnboardingFlow({
             id="ob-social"
             name="nome_social"
             maxLength={150}
+            autoCapitalize="words"
             value={nomeSocial}
             onChange={(e) => setNomeSocial(e.target.value)}
             placeholder="Como você prefere ser chamado(a)"
@@ -305,6 +306,7 @@ export function OnboardingFlow({
             id="ob-cidade"
             name="cidade"
             maxLength={100}
+            autoCapitalize="words"
             value={cidade}
             onChange={(e) => setCidade(e.target.value)}
           />

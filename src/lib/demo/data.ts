@@ -614,7 +614,7 @@ function build(): DemoData {
     // sync-back da assinatura (0046): quem assinou tem a ficha preenchida
     dados_civis: {
       nome_civil: "Marina Duarte Ferreira", rg: "34.567.890-1",
-      cpf: "123.456.789-09", data_nascimento: "1988-03-15",
+      cpf: "12345678909", data_nascimento: "1988-03-15",
       endereco: { logradouro: "Rua Vergueiro", numero: "1200", complemento: null, bairro: "Liberdade", cidade: "São Paulo", uf: "SP", cep: "01504001" },
     },
   };
@@ -651,7 +651,7 @@ function build(): DemoData {
     // mostra o prefill sem precisar digitar nada além do aceite
     dados_civis: {
       nome_civil: "Ricardo Tavares Lima", rg: "41.208.776-5",
-      cpf: "286.947.510-11", data_nascimento: "1990-01-18",
+      cpf: "28694751011", data_nascimento: "1990-01-18",
       endereco: { logradouro: "Rua Augusta", numero: "2210", complemento: "ap 71", bairro: "Consolação", cidade: "São Paulo", uf: "SP", cep: "01412100" },
     },
   };
@@ -930,7 +930,7 @@ function build(): DemoData {
     // sync-back da autorização assinada — a mãe dela ficou na ficha (0046)
     responsavel: {
       nome_civil: "Cleusa Maria Silva", rg: "22.334.556-7",
-      cpf: "321.654.987-91", data_nascimento: "1979-06-30", parentesco: "Mãe",
+      cpf: "32165498791", data_nascimento: "1979-06-30", parentesco: "Mãe",
       endereco: { logradouro: "Rua das Flores", numero: "88", complemento: null, bairro: "Jardim Brasil", cidade: "São Paulo", uf: "SP", cep: "08410250" },
     },
   };
@@ -1009,12 +1009,12 @@ function build(): DemoData {
     // dele (token 0x3404) já abre o link preenchido, só falta a mãe assinar
     responsavel: {
       nome_civil: "Sandra Regina Rodrigues", rg: "35.882.014-2",
-      cpf: "418.662.730-43", data_nascimento: "1984-02-11", parentesco: "Mãe",
+      cpf: "41866273043", data_nascimento: "1984-02-11", parentesco: "Mãe",
       endereco: { logradouro: "Rua do Bosque", numero: "147", complemento: null, bairro: "Vila Esperança", cidade: "São Paulo", uf: "SP", cep: "03345020" },
     },
     dados_civis: {
       nome_civil: "Kauã Rodrigues de Jesus", rg: "58.201.447-3",
-      cpf: "", data_nascimento: "2008-07-19",
+      cpf: null, data_nascimento: "2008-07-19",
       endereco: { logradouro: "Rua do Bosque", numero: "147", complemento: null, bairro: "Vila Esperança", cidade: "São Paulo", uf: "SP", cep: "03345020" },
     },
   };
@@ -1914,12 +1914,12 @@ function build(): DemoData {
 
   const dadosMarina = {
     nome_civil: "Marina Duarte Ferreira",
-    rg: "34.567.890-1", cpf: "123.456.789-09", data_nascimento: "1988-03-15",
+    rg: "34.567.890-1", cpf: "12345678909", data_nascimento: "1988-03-15",
     endereco: { logradouro: "Rua Vergueiro", numero: "1200", complemento: null, bairro: "Liberdade", cidade: "São Paulo", uf: "SP", cep: "01504001" },
   };
   const dadosCarlos = {
     nome_civil: "Carlos Eduardo Menezes",
-    rg: "28.765.432-0", cpf: "987.654.321-00", data_nascimento: "1985-11-02",
+    rg: "28.765.432-0", cpf: "98765432100", data_nascimento: "1985-11-02",
     endereco: { logradouro: "Av. Paulista", numero: "900", complemento: "cj 42", bairro: "Bela Vista", cidade: "São Paulo", uf: "SP", cep: "01310100" },
   };
 
@@ -1942,7 +1942,7 @@ function build(): DemoData {
       status: "assinado",
       dados_snapshot: {
         mentorado_nome: ana.nome,
-        responsavel: { nome_civil: "Cleusa Maria Silva", rg: "22.334.556-7", cpf: "321.654.987-91", data_nascimento: "1979-06-30", parentesco: "Mãe", endereco: { logradouro: "Rua das Flores", numero: "88", complemento: null, bairro: "Jardim Brasil", cidade: "São Paulo", uf: "SP", cep: "08410250" } },
+        responsavel: { nome_civil: "Cleusa Maria Silva", rg: "22.334.556-7", cpf: "32165498791", data_nascimento: "1979-06-30", parentesco: "Mãe", endereco: { logradouro: "Rua das Flores", numero: "88", complemento: null, bairro: "Jardim Brasil", cidade: "São Paulo", uf: "SP", cep: "08410250" } },
       },
       token: uid(0x3403), token_expira_em: haDias(-35 + 30), // expirou depois de assinada — não importa
       assinatura_texto: "Cleusa Maria Silva", assinado_em: haDias(35, "19:02"),
