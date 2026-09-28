@@ -35,7 +35,6 @@ import { getDocumentosPessoa, getMe, getPessoaPerfil } from "@/lib/queries";
 import { getAnamneseMentorado } from "@/lib/forms/queries";
 import { getSupervisoesDaPessoa } from "@/lib/queries-supervisao";
 import { getResumoFormacao } from "@/lib/queries-presenca";
-import { getAssinaturasResumo } from "@/lib/queries-assinaturas";
 import { avatarPublicUrl, gravatarUrl } from "@/lib/avatar";
 import {
   COR_RACA_LABELS,
@@ -282,27 +281,11 @@ export default async function PessoaPerfilPage({
   // migração ainda não rodou, então a página segue igual antes dela
   const anamnese =
     ehMentorado && souCoord ? await getAnamneseMentorado(p.id) : null;
-  // documentos do intake (0054) + contagem de assinaturas pro cabeçalho da
-  // gaveta — coord-only; pra outro papel nenhuma das queries dispara
-  const [documentos, resumoAss] = souCoord
-    ? await Promise.all([
-        getDocumentosPessoa(perfil.tipo, p.id),
-        getAssinaturasResumo(),
-      ])
-    : [[], []];
-  const nAssinaturas = resumoAss.filter(
-    (a) => a.profile_id === p.id || a.mentorado_id === p.id
-  ).length;
-  const contagemDocs = [
-    documentos.length
-      ? `${documentos.length} ${documentos.length === 1 ? "documento" : "documentos"}`
-      : null,
-    nAssinaturas
-      ? `${nAssinaturas} ${nAssinaturas === 1 ? "assinatura" : "assinaturas"}`
-      : null,
-  ]
-    .filter(Boolean)
-    .join(" · ");
+  // documentos do intake (0054) — coord-only; pra outro papel a query
+  // nem dispara
+  const documentos = souCoord
+    ? await getDocumentosPessoa(perfil.tipo, p.id)
+    : [];
   // dados civis + responsável (0046) — chegam null fora da coordenação
   // (view *_pessoal); renderizam fechados num Collapsible no fim do Cadastro
   const civis = p.dados_civis ?? null;
@@ -918,11 +901,6 @@ export default async function PessoaPerfilPage({
                   <span className="text-sm font-semibold">
                     Documentos e assinaturas
                   </span>
-                  {contagemDocs && (
-                    <span className="text-xs text-muted-foreground">
-                      · {contagemDocs}
-                    </span>
-                  )}
                   <CaretRight
                     size={13}
                     aria-hidden
@@ -962,11 +940,20 @@ export default async function PessoaPerfilPage({
             </section>
           )}
 
-          {/* mural de notas — espaço modesto basta; some quando não há nada
-              pra ler nem permissão pra escrever (ficha de colega) */}
+          {/* mural de notas — o cadeado no título carrega sozinho o sinal
+              de privacidade; some quando não há nada pra ler nem permissão
+              pra escrever (ficha de colega) */}
           {(podeAnotar || notas.length > 0) && (
             <section className="rounded-xl bg-card p-4 shadow-[var(--shadow-border)] sm:p-5">
-              <h2 className="mb-3 text-sm font-semibold">Notas</h2>
+              <h2 className="mb-3 flex items-center gap-1.5 text-sm font-semibold">
+                Notas
+                <LockSimple
+                  size={13}
+                  role="img"
+                  aria-label="Privadas — só você vê"
+                  className="text-muted-foreground"
+                />
+              </h2>
               <PessoaMural
                 pessoaId={p.id}
                 tipo={perfil.tipo}

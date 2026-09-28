@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { CircleNotch, LockSimple, Trash } from "@phosphor-icons/react";
+import { CircleNotch, Trash } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { addPessoaNota, deletePessoaNota } from "@/lib/actions";
 import { demoAtivoClient } from "@/lib/demo/shared";
@@ -130,17 +130,14 @@ export function PessoaMural({
             rows={3}
             placeholder={`Escreva uma nota sobre ${nomePessoa.split(" ")[0]}: observação, combinado, contexto…`}
             aria-label="Nova nota"
-            aria-describedby="mural-hint"
           />
-          <div id="mural-hint" className="space-y-0.5 text-xs text-muted-foreground" aria-live="polite">
-            <p className="flex items-center gap-1">
-              <LockSimple size={12} aria-hidden className="shrink-0" />
-              Notas privadas · visíveis apenas para você
+          {/* sinal de vida só enquanto publica — o auto-save em si não
+              precisa de legenda */}
+          {pending && (
+            <p className="text-xs text-muted-foreground" aria-live="polite">
+              Publicando…
             </p>
-            <p className="text-muted-foreground/80">
-              {pending ? "Publicando…" : "Salva automaticamente ao sair do campo"}
-            </p>
-          </div>
+          )}
         </div>
       )}
 
