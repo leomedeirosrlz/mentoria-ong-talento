@@ -11,21 +11,26 @@ import {
   Certificate,
   CheckCircle,
   CircleHalf,
+  ClipboardText,
   Clock,
   EnvelopeSimple,
+  FileText,
   GenderIntersex,
   GraduationCap,
   HandHeart,
+  Handshake,
   Heart,
   IdentificationCard,
   LinkedinLogo,
   LockSimple,
   MapPin,
+  NotePencil,
   Path,
   ShieldCheck,
   Signpost,
   Sparkle,
   Target,
+  User,
   Users,
   Warning,
   WhatsappLogo,
@@ -140,6 +145,17 @@ function Chips({ itens }: { itens: string[] }) {
         </Badge>
       ))}
     </div>
+  );
+}
+
+/** Lockup da dupla em miniatura — círculo lime (mentor) + círculo amarelo
+ *  (mentorado) sobrepostos, o "e •" do logo. Título do card Duplas. */
+function DuplaIcone() {
+  return (
+    <svg width={15} height={15} viewBox="0 0 16 16" aria-hidden className="shrink-0">
+      <circle cx={5.8} cy={8} r={4.4} fill="var(--brand-lime)" />
+      <circle cx={10.8} cy={8} r={3} fill="var(--role-mentorado)" />
+    </svg>
   );
 }
 
@@ -482,7 +498,8 @@ export default async function PessoaPerfilPage({
           experiência e formação externa vão como linhas secundárias */}
       {mp && ehStaff && (
         <section className="rounded-xl bg-card px-4 py-4 shadow-[var(--shadow-border)] sm:px-5">
-          <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+          <h2 className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+            <Handshake size={15} aria-hidden className="shrink-0" />
             {mp.tipo === "dpp" ? "Mentoria DPP" : "Mentoria especialista"}
           </h2>
           <dl className="mt-2.5 grid grid-cols-2 gap-x-4 gap-y-3.5 sm:grid-cols-4">
@@ -550,7 +567,10 @@ export default async function PessoaPerfilPage({
               redes; o link de LinkedIn subiu pros chips de contato */}
           {perfilPro && temPerfilPro && (
             <section className="rounded-xl bg-card p-4 text-sm shadow-[var(--shadow-border)] sm:p-5">
-              <h2 className="text-sm font-semibold">Sobre</h2>
+              <h2 className="flex items-center gap-1.5 text-sm font-semibold">
+                <User size={15} aria-hidden className="shrink-0 text-muted-foreground" />
+                Sobre
+              </h2>
               {perfilPro.bio && (
                 <p className="mt-2 whitespace-pre-wrap">
                   {perfilPro.bio}
@@ -595,6 +615,7 @@ export default async function PessoaPerfilPage({
             <section className="rounded-xl bg-card text-sm shadow-[var(--shadow-border)]">
               <Collapsible.Root>
                 <Collapsible.Trigger className="group flex min-h-12 w-full items-center gap-2 rounded-xl px-4 text-left transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:px-5">
+                  <ClipboardText size={15} aria-hidden className="shrink-0 text-muted-foreground" />
                   <span className="text-sm font-semibold">Cadastro</span>
                   <CaretRight
                     size={13}
@@ -856,7 +877,10 @@ export default async function PessoaPerfilPage({
               o que mostrar */}
           {(souCoord || perfil.duplas.length > 0) && (
             <section className="rounded-xl bg-card p-4 text-sm shadow-[var(--shadow-border)] sm:p-5">
-              <h2 className="text-sm font-semibold">Duplas</h2>
+              <h2 className="flex items-center gap-1.5 text-sm font-semibold">
+                <DuplaIcone />
+                Duplas
+              </h2>
               {perfil.duplas.length === 0 ? (
                 <p className="mt-2 text-muted-foreground">Nenhuma dupla no histórico.</p>
               ) : (
@@ -915,6 +939,7 @@ export default async function PessoaPerfilPage({
             >
               <Collapsible.Root>
                 <Collapsible.Trigger className="group flex min-h-12 w-full items-center gap-2 rounded-xl px-4 text-left transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:px-5">
+                  <FileText size={15} aria-hidden className="shrink-0 text-muted-foreground" />
                   <span className="text-sm font-semibold">
                     Documentos e assinaturas
                   </span>
@@ -963,6 +988,7 @@ export default async function PessoaPerfilPage({
           {(podeAnotar || notas.length > 0) && (
             <section className="rounded-xl bg-card p-4 shadow-[var(--shadow-border)] sm:p-5">
               <h2 className="mb-3 flex items-center gap-1.5 text-sm font-semibold">
+                <NotePencil size={15} aria-hidden className="shrink-0 text-muted-foreground" />
                 Notas
                 <LockSimple
                   size={13}

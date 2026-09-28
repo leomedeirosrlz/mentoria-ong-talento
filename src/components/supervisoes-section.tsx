@@ -1,3 +1,4 @@
+import { Binoculars } from "@phosphor-icons/react/dist/ssr";
 import { formatDate } from "@/lib/ciclo";
 import type { Supervisao } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
@@ -32,7 +33,8 @@ export function SupervisoesSection({
   return (
     <section className="rounded-xl bg-card p-4 text-sm shadow-[var(--shadow-border)] sm:p-5">
       <div className="mb-1 flex items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold">
+        <h2 className="flex items-center gap-1.5 text-sm font-semibold">
+          <Binoculars size={15} aria-hidden className="shrink-0 text-muted-foreground" />
           {titulo}
         </h2>
         {acao}
