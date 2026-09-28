@@ -17,7 +17,11 @@ import {
   enviarLinksAssinatura,
   type ItemEmissao,
 } from "@/lib/actions-assinaturas";
-import { msgLinkAssinatura, type TipoAlvoAssinatura } from "@/lib/documentos/texto";
+import {
+  msgLinkAssinatura,
+  TEMPLATES_POR_TIPO,
+  type TipoAlvoAssinatura,
+} from "@/lib/documentos/texto";
 import type { DocsPessoa } from "@/components/pessoas-listas";
 import { useOrigem } from "@/components/forms/use-origem";
 import { CopiarLink } from "@/components/forms/copiar-link";
@@ -54,26 +58,13 @@ export type PessoaAlvo = {
   whatsapp: string | null;
 };
 
-/** Os três documentos do fluxo de link — o select filtra por pool: termo do
- *  voluntário vai pra profiles, os dois do jovem pra mentorados. `rotulo` é
- *  o mesmo do botão de emissão da ficha. */
-const DOCS: { slug: string; rotulo: string; tipo: TipoAlvoAssinatura }[] = [
-  {
-    slug: "termo-voluntario",
-    rotulo: "Termo de adesão do voluntário",
-    tipo: "profile",
-  },
-  {
-    slug: "termo-mentorando",
-    rotulo: "Termo de participação (o(a) jovem assina)",
-    tipo: "mentorado",
-  },
-  {
-    slug: "autorizacao-responsavel",
-    rotulo: "Autorização do responsável",
-    tipo: "mentorado",
-  },
-];
+/** Os documentos do fluxo de link derivam de TEMPLATES_POR_TIPO (fonte
+ *  única em documentos/texto.ts) — o select filtra por pool: termo do
+ *  voluntário vai pra profiles, os dois do jovem pra mentorados. */
+const DOCS: { slug: string; rotulo: string; tipo: TipoAlvoAssinatura }[] =
+  (Object.keys(TEMPLATES_POR_TIPO) as TipoAlvoAssinatura[]).flatMap((tipo) =>
+    TEMPLATES_POR_TIPO[tipo].map((t) => ({ slug: t.slug, rotulo: t.rotulo, tipo }))
+  );
 
 /** "dd/mm/aaaa" — "emitido em…" da tela de resultado. */
 const fmtDia = (iso: string) =>
@@ -109,56 +100,59 @@ function TermoCheckRow({
   return (
     <div
       className={cn(
-        "flex min-h-11 items-center gap-3 rounded-lg px-2 text-sm transition-colors sm:min-h-10",
+        "min-h-11 rounded-lg px-2 py-1.5 text-sm transition-colors sm:min-h-10",
         disabled
           ? "text-muted-foreground"
           : "cursor-pointer hover:bg-muted"
       )}
     >
-      <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 data-[disabled]:cursor-default">
-        <input
-          type="checkbox"
-          checked={checked}
-          disabled={disabled}
-          onChange={onToggle}
-          className="size-4 shrink-0 accent-primary"
-        />
-        <span className="min-w-0 flex-1 truncate">{nome}</span>
-      </label>
-      <span className="flex shrink-0 items-center gap-1.5">
-        {faltantes.length > 0 && (
+      <div className="flex items-center gap-3">
+        <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 data-[disabled]:cursor-default">
+          <input
+            type="checkbox"
+            checked={checked}
+            disabled={disabled}
+            onChange={onToggle}
+            className="size-4 shrink-0 accent-primary"
+          />
+          <span className="min-w-0 flex-1 truncate">{nome}</span>
+        </label>
+        <span className="flex shrink-0 items-center gap-1.5">
           <Badge
             variant="outline"
-            title={`Falta: ${faltantes.join(" · ")} — quem assina completa na hora`}
-            className="max-w-44 truncate border-[var(--warn)]/60 text-[var(--warn-text)]"
+            className={cn(
+              status === "assinado" &&
+                "border-[var(--ok)]/60 text-[var(--ok-text)]",
+              status === "pendente" &&
+                "border-[var(--warn)]/60 text-[var(--warn-text)]",
+              status === "emitir" && "text-muted-foreground"
+            )}
           >
-            falta: {faltantes.join(" · ")}
+            {status === "assinado"
+              ? "assinado"
+              : status === "pendente"
+                ? "link emitido"
+                : "emitir"}
           </Badge>
-        )}
-        <Badge
-          variant="outline"
-          className={cn(
-            status === "assinado" &&
-              "border-[var(--ok)]/60 text-[var(--ok-text)]",
-            status === "pendente" &&
-              "border-[var(--warn)]/60 text-[var(--warn-text)]",
-            status === "emitir" && "text-muted-foreground"
-          )}
+          <Link
+            href={fichaHref}
+            title="Abrir a ficha pra completar os dados"
+            className="inline-flex min-h-8 items-center rounded-md px-1.5 text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline"
+          >
+            <span className="text-xs">ficha</span>
+          </Link>
+        </span>
+      </div>
+      {/* lacuna da ficha vira linha própria — na linha do nome ela
+          competia por espaço e escondia quem é a pessoa */}
+      {status !== "assinado" && faltantes.length > 0 && (
+        <p
+          title={`Falta: ${faltantes.join(" · ")} — quem assina completa na hora`}
+          className="mt-0.5 truncate pl-7 text-xs text-[var(--warn-text)]"
         >
-          {status === "assinado"
-            ? "assinado"
-            : status === "pendente"
-              ? "link emitido"
-              : "emitir"}
-        </Badge>
-        <Link
-          href={fichaHref}
-          title="Abrir a ficha pra completar os dados"
-          className="inline-flex min-h-8 items-center rounded-md px-1.5 text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline"
-        >
-          <span className="text-xs">ficha</span>
-        </Link>
-      </span>
+          falta: {faltantes.join(" · ")}
+        </p>
+      )}
     </div>
   );
 }
@@ -284,7 +278,8 @@ export function EnviarTermosDialog({
       if (novos) partes.push(`${novos} ${novos === 1 ? "link gerado" : "links gerados"}`);
       if (reusos)
         partes.push(`${reusos} ${reusos === 1 ? "reuso" : "reusos"} de link já emitido`);
-      toast.success(partes.join(" · ") + "." || "Nada pra emitir.");
+      if (partes.length) toast.success(partes.join(" · ") + ".");
+      else toast.error("Nenhum link emitido — veja cada item na lista.");
     });
   }
 
@@ -302,6 +297,7 @@ export function EnviarTermosDialog({
           para: i.email as string,
           nome: i.nome,
           link: i.link as string,
+          destinatario: i.destinatario,
         })),
       });
       if ("error" in r) {
@@ -363,7 +359,7 @@ export function EnviarTermosDialog({
               key="prontos"
               {...fade}
               transition={T.enter}
-              className="space-y-3"
+              className="min-w-0 space-y-3"
             >
               <p className="text-sm font-medium">
                 {resultado.docTitulo} — links prontos
@@ -493,7 +489,7 @@ export function EnviarTermosDialog({
               key="form"
               {...fade}
               transition={T.enter}
-              className="space-y-4"
+              className="min-w-0 space-y-4"
             >
               <div className="space-y-1.5">
                 <Label id={docLabelId}>Documento</Label>
@@ -517,7 +513,7 @@ export function EnviarTermosDialog({
                 </Select>
               </div>
 
-              <fieldset>
+              <fieldset className="min-w-0">
                 <legend className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
                   {docSel?.tipo === "profile" ? "Pessoas" : "Jovens"}
                 </legend>

@@ -37,6 +37,8 @@ import type { DadosCivis, Endereco, ResponsavelCivis } from "./types";
 // conteúdo assinado, não bytes.
 
 const LINK_BASE = "/assinar/";
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** Evidência: IP e UA só vêm do servidor — nunca confiar em campo de form.
  *  São repassados à RPC como parâmetros: o hash no banco cobre exatamente
@@ -55,7 +57,7 @@ async function me() {
   const { data: claimsData } = await supabase.auth.getClaims();
   const { data } = await supabase
     .from("profiles")
-    .select("id, role, nome")
+    .select("id, role, nome, ativo")
     .eq("user_id", (claimsData?.claims?.sub as string) ?? "")
     .single();
   return { supabase, me: data };
@@ -133,21 +135,35 @@ async function faltantesDoAlvo(
   slug: string
 ): Promise<string[]> {
   if (tipo === "profile") {
-    const { data } = await supabase
-      .from("profiles_pessoal")
-      .select("dados_civis")
-      .eq("id", id)
-      .maybeSingle();
+    const [{ data: pes }, { data }] = await Promise.all([
+      supabase.from("profiles").select("nome").eq("id", id).maybeSingle(),
+      supabase
+        .from("profiles_pessoal")
+        .select("dados_civis, data_nascimento")
+        .eq("id", id)
+        .maybeSingle(),
+    ]);
     return faltantesDocumento(slug, {
+      nome: pes?.nome,
+      data_nascimento: data?.data_nascimento,
       dados_civis: (data?.dados_civis ?? null) as DadosCivis | null,
     });
   }
-  const { data } = await supabase
-    .from("mentorados_pessoal")
-    .select("dados_civis, responsavel")
-    .eq("id", id)
-    .maybeSingle();
+  const [{ data: base }, { data }] = await Promise.all([
+    supabase
+      .from("mentorados")
+      .select("nome")
+      .eq("id", id)
+      .maybeSingle(),
+    supabase
+      .from("mentorados_pessoal")
+      .select("dados_civis, data_nascimento, responsavel")
+      .eq("id", id)
+      .maybeSingle(),
+  ]);
   return faltantesDocumento(slug, {
+    nome: base?.nome,
+    data_nascimento: data?.data_nascimento,
     dados_civis: (data?.dados_civis ?? null) as DadosCivis | null,
     responsavel: (data?.responsavel ?? null) as ResponsavelCivis | null,
   });
@@ -189,7 +205,10 @@ async function emitirUm(
       "regenerar_token_assinatura",
       { p_id: viva.id }
     );
-    if (errRegen || !novoToken) return null;
+    if (errRegen || !novoToken) {
+      console.error("emitirUm: regen", errRegen);
+      return null;
+    }
     return { token: novoToken, existente: true, criado_em: viva.created_at };
   }
 
@@ -216,7 +235,9 @@ async function emitirUm(
     return { token: data.token, existente: false, criado_em: data.created_at };
 
   // perdeu a corrida da unique (dois cliques/emissões simultâneas) — a viva
-  // existe e é única; re-seleciona e devolve o que há
+  // existe e é única; re-seleciona e devolve o que há. Antes, loga: sem
+  // isso um erro de RLS/FK é indistinguível de corrida e some em silêncio.
+  if (error) console.error("emitirUm: insert", error);
   const { data: retry } = await selViva();
   if (retry?.status === "assinado") return "assinado";
   if (retry) return { token: retry.token, existente: true, criado_em: retry.created_at };
@@ -242,6 +263,7 @@ export async function solicitarAssinatura({
     return { error: "Só a coordenação solicita assinatura." };
   if (!TEMPLATES_POR_TIPO[tipo]?.some((t) => t.slug === slug))
     return { error: "Este documento não existe pra esse cadastro." };
+  if (!UUID_RE.test(id)) return { error: "Cadastro inválido." };
 
   const { data: tpl } = await supabase
     .from("documento_templates")
@@ -288,6 +310,10 @@ export type ItemEmissao = {
   /** created_at da row — "emitido em dd/mm" na tela de resultado. */
   criado_em: string | null;
   faltantes: string[];
+  /** Quem recebe o link quando não é o alvo do documento — a autorização
+   *  vai pra caixa da família e a saudação usa o nome do responsável
+   *  (mentorados_pessoal). null = o próprio alvo recebe/assina. */
+  destinatario: string | null;
 };
 
 /** Emissão em massa do dialog "Enviar termos" — uma passada por alvo sobre
@@ -316,7 +342,11 @@ export async function emitirAssinaturasEmLote({
   if (!tipo) return { error: "Documento desconhecido." };
   // o pool do documento é fechado — alvo de outro tipo é ignorado, não erro
   const ids = [
-    ...new Set(alvos.filter((a) => a.tipo === tipo).map((a) => a.id)),
+    ...new Set(
+      (Array.isArray(alvos) ? alvos : [])
+        .filter((a) => a?.tipo === tipo && UUID_RE.test(a?.id ?? ""))
+        .map((a) => a.id)
+    ),
   ];
   if (!ids.length) return { error: "Escolha ao menos uma pessoa." };
 
@@ -334,7 +364,13 @@ export async function emitirAssinaturasEmLote({
   // própria tabela (grant de coluna público).
   const info = new Map<
     string,
-    { nome: string; email: string | null; whatsapp: string | null; faltantes: string[] }
+    {
+      nome: string;
+      email: string | null;
+      whatsapp: string | null;
+      faltantes: string[];
+      destinatario: string | null;
+    }
   >();
   if (tipo === "profile") {
     const [{ data: ps }, { data: contatos }, { data: pessoal }] =
@@ -346,7 +382,7 @@ export async function emitirAssinaturasEmLote({
           .in("id", ids),
         supabase
           .from("profiles_pessoal")
-          .select("id, dados_civis")
+          .select("id, dados_civis, data_nascimento")
           .in("id", ids),
       ]);
     const contatoPorId = new Map(
@@ -358,20 +394,26 @@ export async function emitirAssinaturasEmLote({
       )
     );
     const pessoalPorId = new Map(
-      (pessoal ?? []).map((p: { id: string; dados_civis: unknown }) => [
-        p.id,
-        p.dados_civis,
-      ])
+      (pessoal ?? []).map(
+        (p: { id: string; dados_civis: unknown; data_nascimento: string | null }) => [
+          p.id,
+          p,
+        ]
+      )
     );
     for (const p of (ps ?? []) as { id: string; nome: string }[]) {
       const c = contatoPorId.get(p.id);
+      const d = pessoalPorId.get(p.id);
       info.set(p.id, {
         nome: p.nome,
         email: c?.email ?? null,
         whatsapp: c?.whatsapp ?? null,
         faltantes: faltantesDocumento(slug, {
-          dados_civis: (pessoalPorId.get(p.id) ?? null) as DadosCivis | null,
+          nome: p.nome,
+          data_nascimento: d?.data_nascimento,
+          dados_civis: (d?.dados_civis ?? null) as DadosCivis | null,
         }),
+        destinatario: null,
       });
     }
   } else {
@@ -382,15 +424,17 @@ export async function emitirAssinaturasEmLote({
         .in("id", ids),
       supabase
         .from("mentorados_pessoal")
-        .select("id, dados_civis, responsavel")
+        .select("id, dados_civis, data_nascimento, responsavel")
         .in("id", ids),
     ]);
     const pessoalPorId = new Map(
       (pessoal ?? []).map(
-        (p: { id: string; dados_civis: unknown; responsavel: unknown }) => [
-          p.id,
-          p,
-        ]
+        (p: {
+          id: string;
+          dados_civis: unknown;
+          data_nascimento: string | null;
+          responsavel: unknown;
+        }) => [p.id, p]
       )
     );
     for (const m of (ms ?? []) as {
@@ -400,14 +444,23 @@ export async function emitirAssinaturasEmLote({
       whatsapp: string | null;
     }[]) {
       const d = pessoalPorId.get(m.id);
+      const resp = (d?.responsavel ?? null) as ResponsavelCivis | null;
       info.set(m.id, {
         nome: m.nome,
         email: m.email ?? null,
         whatsapp: m.whatsapp ?? null,
         faltantes: faltantesDocumento(slug, {
+          nome: m.nome,
+          data_nascimento: d?.data_nascimento,
           dados_civis: (d?.dados_civis ?? null) as DadosCivis | null,
-          responsavel: (d?.responsavel ?? null) as ResponsavelCivis | null,
+          responsavel: resp,
         }),
+        // quem abre o link da autorização é o responsável — o e-mail e o
+        // WhatsApp saúdam ele, não o(a) jovem (alvo do documento)
+        destinatario:
+          slug === "autorizacao-responsavel"
+            ? (resp?.nome_civil?.trim() || null)
+            : null,
       });
     }
   }
@@ -450,25 +503,31 @@ export async function enviarLinksAssinatura({
   envios,
 }: {
   slug: string;
-  envios: { para: string; nome: string; link: string }[];
+  envios: { para: string; nome: string; link: string; destinatario?: string | null }[];
 }) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada. Entre de novo." };
-  if (eu.role !== "coordenacao")
+  // gate explícito de ativo: esta é a única action privilegiada que não
+  // bate no banco antes do side-effect (Resend) — sem ela, uma sessão de
+  // coord desativada ainda dispararia e-mail, e o log falharia quieto
+  if (eu.role !== "coordenacao" || !eu.ativo)
     return { error: "Só a coordenação dispara e-mails." };
 
   const { data: tpl } = await supabase
     .from("documento_templates")
     .select("id, titulo")
     .eq("slug", slug)
+    .eq("ativo", true)
     .maybeSingle();
   const docTitulo = (tpl?.titulo as string | undefined) ?? "Documento";
 
   // saneamento mínimo do payload do client: e-mail plausível + link no
   // formato do fluxo — lixo aqui inflaria o log com falhas evitáveis
-  const limpos = envios.filter(
+  const limpos = (Array.isArray(envios) ? envios : []).filter(
     (e) =>
+      typeof e?.para === "string" &&
+      typeof e?.nome === "string" &&
       /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e.para) &&
       /^\/assinar\/[0-9a-f-]{36}$/.test(e.link)
   );
@@ -477,16 +536,25 @@ export async function enviarLinksAssinatura({
 
   const assunto = `${docTitulo} — link pra assinar`;
   const { enviados, falhas, error } = await enviarEmailsIndividuais({
-    mensagens: limpos.map((e) => ({
-      to: e.para,
-      subject: assunto,
-      html: emailDocumentoAssinatura({
-        docTitulo,
-        nomePessoa: e.nome,
-        primeiroNome: e.nome.trim().split(/\s+/)[0] ?? "",
-        link: `${SITE_URL}${e.link}`,
-      }),
-    })),
+    mensagens: limpos.map((e) => {
+      // a autorização sai da caixa da família: saúda o responsável
+      // (destinatario) falando do documento do(a) jovem (nome); nos demais
+      // docs o alvo é o próprio signatário → "Seu documento…"
+      const destinatario =
+        typeof e.destinatario === "string" && e.destinatario.trim()
+          ? e.destinatario.trim()
+          : e.nome;
+      return {
+        to: e.para,
+        subject: assunto,
+        html: emailDocumentoAssinatura({
+          docTitulo,
+          nomePessoa: slug === "autorizacao-responsavel" ? e.nome : null,
+          primeiroNome: destinatario.split(/\s+/)[0] ?? "",
+          link: `${SITE_URL}${e.link}`,
+        }),
+      };
+    }),
   });
 
   // o log é a memória do disparo — falha nele não desfaz o que saiu
@@ -503,7 +571,12 @@ export async function enviarLinksAssinatura({
   if (errLog) console.error("enviarLinksAssinatura: log", errLog);
 
   if (error) return { error };
-  if (!enviados) return { error: "Não foi possível enviar. Tente de novo." };
+  if (!enviados)
+    return {
+      error: falhas.length
+        ? `Falha ao enviar pra ${falhas.join(", ")}.`
+        : "Não foi possível enviar. Tente de novo.",
+    };
   return { ok: true, enviados, destinatarios: limpos.length, falhas };
 }
 

@@ -777,11 +777,23 @@ export function demoAssinaturaPorToken(token: string) {
   const assinavel =
     a.status === "pendente" &&
     (!a.token_expira_em || a.token_expira_em > new Date().toISOString());
-  const civis = !assinavel
+  let civis = !assinavel
     ? null
     : slug === "autorizacao-responsavel"
       ? mentorado?.responsavel ?? null
       : profile?.dados_civis ?? mentorado?.dados_civis ?? null;
+  // mesmo fallback da RPC (0053): nome/nascimento da ficha caem no prefill
+  // quando o civis não trouxe — o form não abre 100% vazio
+  if (assinavel && slug !== "autorizacao-responsavel") {
+    const entidade = profile ?? mentorado;
+    if (entidade) {
+      const d = { ...(civis ?? {}) } as Record<string, unknown>;
+      if (!d.nome_civil) d.nome_civil = entidade.nome;
+      if (!d.data_nascimento && entidade.data_nascimento)
+        d.data_nascimento = entidade.data_nascimento;
+      civis = d as typeof civis;
+    }
+  }
   return {
     id: a.id,
     status: a.status,

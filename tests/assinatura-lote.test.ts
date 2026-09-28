@@ -99,6 +99,33 @@ describe("faltantesDocumento", () => {
     ).toContain("RG");
   });
 
+  it("nome/nascimento da ficha suprem o civis vazio (prefill da RPC 0053)", () => {
+    // sem dados_civis mas com ficha nomeada — o link já chega com os dois
+    // campos preenchidos, então não são "falta"
+    expect(
+      faltantesDocumento("termo-voluntario", {
+        nome: "Ricardo Tavares Lima",
+        data_nascimento: "1990-01-18",
+        dados_civis: null,
+      })
+    ).toEqual(["RG", "CPF", "endereço"]);
+    // nome de um termo só não satisfaz nome civil — o alerta segue certo
+    expect(
+      faltantesDocumento("termo-voluntario", {
+        nome: "Ricardo",
+        dados_civis: null,
+      })
+    ).toContain("nome civil");
+    // civis explícito vence o fallback: "Rick" na ficha não mascara o
+    // nome civil real já cadastrado
+    expect(
+      faltantesDocumento("termo-voluntario", {
+        nome: "Rick",
+        dados_civis: CIVIS_OK,
+      })
+    ).toEqual([]);
+  });
+
   it("pool de templates: profile só tem o termo do voluntário", () => {
     expect(TEMPLATES_POR_TIPO.profile.map((t) => t.slug)).toEqual([
       "termo-voluntario",

@@ -651,7 +651,7 @@ function build(): DemoData {
     // mostra o prefill sem precisar digitar nada além do aceite
     dados_civis: {
       nome_civil: "Ricardo Tavares Lima", rg: "41.208.776-5",
-      cpf: "286.947.510-63", data_nascimento: "1990-01-18",
+      cpf: "286.947.510-11", data_nascimento: "1990-01-18",
       endereco: { logradouro: "Rua Augusta", numero: "2210", complemento: "ap 71", bairro: "Consolação", cidade: "São Paulo", uf: "SP", cep: "01412100" },
     },
   };
@@ -930,7 +930,7 @@ function build(): DemoData {
     // sync-back da autorização assinada — a mãe dela ficou na ficha (0046)
     responsavel: {
       nome_civil: "Cleusa Maria Silva", rg: "22.334.556-7",
-      cpf: "321.654.987-11", data_nascimento: "1979-06-30", parentesco: "Mãe",
+      cpf: "321.654.987-91", data_nascimento: "1979-06-30", parentesco: "Mãe",
       endereco: { logradouro: "Rua das Flores", numero: "88", complemento: null, bairro: "Jardim Brasil", cidade: "São Paulo", uf: "SP", cep: "08410250" },
     },
   };
@@ -1009,7 +1009,7 @@ function build(): DemoData {
     // dele (token 0x3404) já abre o link preenchido, só falta a mãe assinar
     responsavel: {
       nome_civil: "Sandra Regina Rodrigues", rg: "35.882.014-2",
-      cpf: "418.662.730-95", data_nascimento: "1984-02-11", parentesco: "Mãe",
+      cpf: "418.662.730-43", data_nascimento: "1984-02-11", parentesco: "Mãe",
       endereco: { logradouro: "Rua do Bosque", numero: "147", complemento: null, bairro: "Vila Esperança", cidade: "São Paulo", uf: "SP", cep: "03345020" },
     },
     dados_civis: {
@@ -1942,7 +1942,7 @@ function build(): DemoData {
       status: "assinado",
       dados_snapshot: {
         mentorado_nome: ana.nome,
-        responsavel: { nome_civil: "Cleusa Maria Silva", rg: "22.334.556-7", cpf: "321.654.987-11", data_nascimento: "1979-06-30", parentesco: "Mãe", endereco: { logradouro: "Rua das Flores", numero: "88", complemento: null, bairro: "Jardim Brasil", cidade: "São Paulo", uf: "SP", cep: "08410250" } },
+        responsavel: { nome_civil: "Cleusa Maria Silva", rg: "22.334.556-7", cpf: "321.654.987-91", data_nascimento: "1979-06-30", parentesco: "Mãe", endereco: { logradouro: "Rua das Flores", numero: "88", complemento: null, bairro: "Jardim Brasil", cidade: "São Paulo", uf: "SP", cep: "08410250" } },
       },
       token: uid(0x3403), token_expira_em: haDias(-35 + 30), // expirou depois de assinada — não importa
       assinatura_texto: "Cleusa Maria Silva", assinado_em: haDias(35, "19:02"),
@@ -1964,8 +1964,8 @@ function build(): DemoData {
       template: tplTermo },
     // Ricardo (persona mentor_dpp): a coord emitiu o link do termo por
     // e-mail — pendente. O token 0x3406 abre /assinar/<token> com o termo
-    // de voluntário; a ficha dele não tem dados_civis → o badge "falta:"
-    // da emissão em lote aparece, e quem assina completa no ato
+    // de voluntário já preenchido (a ficha dele tem dados_civis do
+    // cadastro — badge "falta:" segue aparecendo pra quem não tem)
     { id: uid(0x3206), template_id: uid(0x3301), profile_id: ricardo.id, mentorado_id: null,
       status: "pendente", dados_snapshot: null, token: uid(0x3406),
       token_expira_em: haDias(-28),

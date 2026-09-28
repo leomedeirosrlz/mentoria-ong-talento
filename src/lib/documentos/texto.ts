@@ -291,17 +291,27 @@ export function faltantesCivis(
 
 /** Faltantes por documento: os dois termos olham os civis do alvo; a
  *  autorização olha a ficha do responsável (0046). `alvo` é a linha de
- *  profiles/mentorados já com o merge dos *_pessoal (coord-only). */
+ *  profiles/mentorados já com o merge dos *_pessoal (coord-only).
+ *  nome/data_nascimento caem no civis efetivo porque a RPC
+ *  `assinatura_por_token` já os herda da ficha no prefill (0053) — cobrar
+ *  como falta o que o link entrega preenchido seria falso alarme. */
 export function faltantesDocumento(
   slug: string,
   alvo: {
+    nome?: string | null;
+    data_nascimento?: string | null;
     dados_civis?: DadosCivis | null;
     responsavel?: ResponsavelCivis | null;
   }
 ): string[] {
   if (slug === "autorizacao-responsavel")
     return faltantesCivis(alvo.responsavel, { comResponsavel: true });
-  return faltantesCivis(alvo.dados_civis);
+  const civis = { ...(alvo.dados_civis ?? {}) } as DadosCivis;
+  if (!civis.nome_civil?.trim() && alvo.nome?.trim())
+    civis.nome_civil = alvo.nome;
+  if (!civis.data_nascimento && alvo.data_nascimento)
+    civis.data_nascimento = alvo.data_nascimento;
+  return faltantesCivis(civis);
 }
 
 /** Texto do wa.me que a coordenação dispara com o link de assinatura — o
