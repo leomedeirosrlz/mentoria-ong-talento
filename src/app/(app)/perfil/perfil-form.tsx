@@ -882,11 +882,12 @@ export function PerfilForm({
           cidade={me.cidade}
           uf={me.uf}
           areas={
-            (me.areas?.length
+            // mesma precedência da ficha: só áreas PROFISSIONAIS — sem
+            // nenhuma, a linha mono fica só cidade·uf (interesses são
+            // hobbies, não atuação)
+            me.areas?.length
               ? me.areas
-              : mentorProfile?.areas?.length
-                ? mentorProfile.areas
-                : me.interesses) ?? []
+              : (mentorProfile?.areas ?? [])
           }
           seed={me.id}
         />
@@ -901,7 +902,7 @@ export function PerfilForm({
                 src={src}
                 fallbackSrc={gravatarUrl}
                 size={80}
-                className="size-20! ring-4 ring-card sm:size-24!"
+                className="size-20! ring-4 ring-card outline outline-1 outline-[var(--brand-ink)]/15 sm:size-24!"
               />
               <input
                 ref={fileRef}

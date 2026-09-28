@@ -333,9 +333,12 @@ export default async function PessoaPerfilPage({
   );
 
   // banner generativo — campo = papel; a linha de dados leva até 3 áreas de
-  // atuação (fallback: as do mentor_profile; mentorado mostra interesses)
-  const areasBanner =
-    (prof?.areas?.length ? prof.areas : mp?.areas?.length ? mp.areas : interesses);
+  // atuação PROFISSIONAIS (profile.areas → mentor_profile.areas). Mentor sem
+  // áreas fica só com cidade·uf — interesses são hobbies, só entram no
+  // banner do mentorado (que não tem área profissional)
+  const areasBanner = ehMentorado
+    ? interesses
+    : (prof?.areas?.length ? prof.areas : (mp?.areas ?? []));
 
   // presença nos encontros de formação do ciclo vs. checklist — os dois
   // sinais num stat só ("formação" aparece uma vez, consolidada)
@@ -393,7 +396,7 @@ export default async function PessoaPerfilPage({
               fallbackSrc={gravatar}
               papel={ehMentorado ? "mentorado" : undefined}
               size={80}
-              className="size-20! -mt-10 ring-4 ring-card sm:size-24! sm:-mt-12"
+              className="size-20! -mt-10 ring-4 ring-card outline outline-1 outline-[var(--brand-ink)]/15 sm:size-24! sm:-mt-12"
             />
             {/* contato + ações — chips secundários; edição mora no ⋮ */}
             <div className="flex flex-wrap items-center gap-1.5">

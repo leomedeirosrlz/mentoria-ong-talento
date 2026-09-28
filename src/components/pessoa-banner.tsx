@@ -178,6 +178,8 @@ export function PessoaBanner({
           ))}
         </g>
         {cidadeUp && (
+          // ghost = texto PREENCHIDO de baixa opacidade (marca d'água) —
+          // stroke-only em corpo gigante renderizava caixas ocas quebradas
           <text
             x={400}
             y={168}
@@ -186,11 +188,8 @@ export function PessoaBanner({
             fontWeight={700}
             fontSize={ghostSize}
             letterSpacing="-0.02em"
-            fill="none"
-            stroke={cfg.tinta}
-            strokeOpacity={0.28}
-            strokeWidth={1.5}
-            strokeLinejoin="round"
+            fill={cfg.tinta}
+            fillOpacity={0.1}
           >
             {cidadeUp}
           </text>
