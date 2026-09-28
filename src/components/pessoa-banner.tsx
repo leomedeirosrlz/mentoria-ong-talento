@@ -26,71 +26,99 @@ const CAMPO: Record<
 };
 
 /** A marca de papel — mesma composição pra todo mundo do papel (é o
- *  "brasão", estável); a variação por pessoa fica no relevo seedado. Tudo
- *  encosta na borda direita: a marca sangra pra fora do banner. */
+ *  "brasão", estável); a variação por pessoa fica no relevo seedado. Uma
+ *  gramática só pra todos: motivo de traço fino + um ponto pequeno cheio
+ *  (eco do "." amarelo do logo), nunca discos sólidos grandes — traço lê
+ *  como selo, bola lê como ornamento solto. A âncora é a borda direita:
+ *  o slice do viewBox corta topo/base conforme a largura, mas a direita
+ *  está sempre à vista, então cada motivo sangra por ela e mantém o
+ *  miolo na faixa vertical central. */
 function MarcaPapel({ papel }: { papel: PapelBanner }) {
   switch (papel) {
     case "coordenacao":
-      // disco lime sólido sangrando no canto superior direito — o ponto do
-      // logo ampliado (coordenação é a origem do programa)
-      return <circle cx={738} cy={-14} r={96} fill={LIME} />;
-    case "supervisor":
-      // dois anéis vazados sobrepostos — supervisão é órbita: quem acompanha
-      // sem estar dentro da dupla
+      // alvo no canto — coordenação é a origem, o ponto de onde o programa
+      // parte: anéis concêntricos + ponto cheio no centro
       return (
-        <>
+        <g opacity={0.85}>
           <circle
-            cx={708}
-            cy={32}
-            r={56}
+            cx={770}
+            cy={72}
+            r={54}
             fill="none"
             stroke={LIME}
             strokeWidth={2}
+            strokeOpacity={0.45}
           />
           <circle
-            cx={778}
-            cy={88}
-            r={42}
+            cx={770}
+            cy={72}
+            r={35}
             fill="none"
-            stroke={AMARELO}
-            strokeWidth={2}
+            stroke={LIME}
+            strokeWidth={2.5}
           />
-        </>
+          <circle cx={770} cy={72} r={7} fill={LIME} />
+        </g>
+      );
+    case "supervisor":
+      // duas órbitas encadeadas — supervisão acompanha a dupla de fora:
+      // um anel lime maior cruzado por um anel amarelo menor
+      return (
+        <g fill="none" strokeWidth={2} opacity={0.85}>
+          <circle cx={712} cy={52} r={46} stroke={LIME} />
+          <circle cx={776} cy={90} r={34} stroke={AMARELO} />
+        </g>
       );
     case "mentor_dpp":
-      // disco lime + ponto amarelo ~30% de overlap — o próprio logo
+      // o próprio logo em traço — anel lime + o "." amarelo pousado no
+      // traço: a dupla é o encontro dos dois
       return (
-        <>
-          <circle cx={682} cy={44} r={58} fill={LIME} />
-          <circle cx={733} cy={85} r={17} fill={AMARELO} />
-        </>
+        <g opacity={0.85}>
+          <circle
+            cx={764}
+            cy={74}
+            r={50}
+            fill="none"
+            stroke={LIME}
+            strokeWidth={2.5}
+          />
+          <circle cx={729} cy={109} r={8} fill={AMARELO} />
+        </g>
       );
     case "mentor_especialista":
-      // 5 barras ascendentes — a trilha de 5 passos do especialista
+      // 5 barras ascendentes — a trilha de 5 passos do especialista,
+      // enraizadas na borda inferior
       return (
-        <g fill={LIME} opacity={0.3}>
-          {[36, 58, 80, 102, 124].map((h, i) => (
-            <rect key={i} x={642 + i * 29} y={164 - h} width={17} height={h} />
+        <g fill={LIME} opacity={0.5}>
+          {[34, 56, 78, 100, 122].map((h, i) => (
+            <rect
+              key={i}
+              x={682 + i * 28}
+              y={162 - h}
+              width={14}
+              height={h}
+              rx={2}
+            />
           ))}
         </g>
       );
     case "mentorado":
-      // arco tracejado + ponto lime — caminho aberto, a trilha que se desenha
+      // arco tracejado + ponto lime — a trilha aberta que a dupla desenha;
+      // o ponto do mentor marca o caminho
       return (
-        <>
+        <g opacity={0.8}>
           <circle
-            cx={700}
-            cy={58}
-            r={76}
+            cx={748}
+            cy={64}
+            r={56}
             fill="none"
             stroke={AMARELO}
-            strokeOpacity={0.6}
-            strokeWidth={1.5}
-            strokeDasharray="2 7"
+            strokeWidth={2}
+            strokeDasharray="3 9"
             strokeLinecap="round"
           />
-          <circle cx={736} cy={125} r={9} fill={LIME} />
-        </>
+          <circle cx={708} cy={104} r={7} fill={LIME} />
+        </g>
       );
     default:
       return null;

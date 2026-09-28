@@ -390,14 +390,17 @@ export default async function PessoaPerfilPage({
         <div className="px-4 pb-4 sm:px-6 sm:pb-5">
           <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
             {/* size-20!/sm:size-24! sobem por cima do style inline que o
-                Avatar fixa via prop (a prop segue ditando o fontSize) */}
+                Avatar fixa via prop (a prop segue ditando o fontSize).
+                relative z-10 é obrigatório: sem posição própria o span do
+                Avatar pinta na camada in-flow e o banner (div relative)
+                cobre a metade que deveria sobrepor a capa */}
             <Avatar
               nome={p.nome}
               src={avatarSrc}
               fallbackSrc={gravatar}
               papel={ehMentorado ? "mentorado" : undefined}
               size={80}
-              className="size-20! -mt-10 ring-4 ring-card outline outline-1 outline-[var(--brand-ink)]/15 sm:size-24! sm:-mt-12"
+              className="relative z-10 size-20! -mt-10 ring-4 ring-card outline outline-1 outline-[var(--brand-ink)]/15 sm:size-24! sm:-mt-12"
             />
             {/* contato + ações — chips secundários; edição mora no ⋮ */}
             <div className="flex flex-wrap items-center gap-1.5">

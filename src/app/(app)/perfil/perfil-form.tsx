@@ -894,7 +894,10 @@ export function PerfilForm({
         />
         <div className="px-4 pb-5 sm:px-6 sm:pb-6">
           <div className="flex items-end justify-between gap-3">
-            <div className="relative -mt-10 shrink-0 sm:-mt-12">
+            {/* relative z-10: o wrapper posicionado já ganhava a pintura do
+                banner; o z explícito segura a sobreposição se o banner um
+                dia ganhar camada própria */}
+            <div className="relative z-10 -mt-10 shrink-0 sm:-mt-12">
               {/* size-20!/sm:size-24! sobem por cima do style inline que o
                   Avatar fixa via prop (width/height) — a prop segue ditando
                   fontSize e o fallback de 80px abaixo de sm */}
