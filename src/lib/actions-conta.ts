@@ -6,6 +6,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { demoAtivo } from "./demo/mode";
 import { DEMO_MSG } from "./demo/shared";
 import { emailValido, normEmail } from "./importar";
+import { enviarEmailsIndividuais } from "./email";
+import { emailEmailAlterado, emailSenhaAlterada } from "./email-templates";
 
 /** Troca de e-mail verificada por credencial — o padrão da indústria: quem
  *  tem senha prova a posse com ela (verificada server-side num client
@@ -81,6 +83,44 @@ export async function trocarEmail(input: {
       return { error: "Esse e-mail já está em outro cadastro do programa." };
     }
     return { error: "Não foi possível trocar o e-mail. Tente de novo." };
+  }
+
+  // notificação pro endereço ANTIGO — é onde quem perdeu a conta descobre.
+  // await porque serverless mata promise solta ao responder; a função nunca
+  // lança, então falha de envio não trava a troca (que já aconteceu)
+  await enviarEmailsIndividuais({
+    mensagens: [
+      {
+        to: user.email,
+        subject: "Seu e-mail de acesso mudou — Realiza.vc",
+        html: emailEmailAlterado({ antigo: user.email, novo }),
+      },
+    ],
+  });
+  return { ok: true };
+}
+
+/** Aviso "senha alterada" pro endereço da conta — chamado pelo client após
+ *  o updateUser de senha dar certo (perfil, recovery e primeiro acesso).
+ *  O GoTrue local tem secure_password_change desligado, então a
+ *  notificação é responsabilidade do app. Nunca lança: se o envio falhar,
+ *  a senha continua trocada e ninguém fica sabendo por aqui. */
+export async function avisarSenhaAlterada(): Promise<{ ok: true }> {
+  if (await demoAtivo()) return { ok: true };
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (user?.email) {
+    await enviarEmailsIndividuais({
+      mensagens: [
+        {
+          to: user.email,
+          subject: "Sua senha foi alterada — Realiza.vc",
+          html: emailSenhaAlterada({ email: user.email }),
+        },
+      ],
+    });
   }
   return { ok: true };
 }

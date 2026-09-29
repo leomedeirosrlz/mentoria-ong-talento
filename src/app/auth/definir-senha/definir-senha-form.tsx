@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "motion/react";
 import { CircleNotch, WarningCircle } from "@phosphor-icons/react";
 import { createClient } from "@/lib/supabase/client";
+import { avisarSenhaAlterada } from "@/lib/actions-conta";
 import { pathInterno, sessaoFresca } from "@/lib/utils";
 import { fade, T } from "@/components/motion";
 import { Button } from "@/components/ui/button";
@@ -97,6 +98,9 @@ export function DefinirSenhaForm() {
             : "Não foi possível salvar a senha. Tente de novo."
         );
       } else {
+        // aviso "senha alterada" pro e-mail da conta — await porque o push
+        // abortaria um POST solto; a action nunca lança
+        await avisarSenhaAlterada();
         router.push(destino);
       }
     } catch {

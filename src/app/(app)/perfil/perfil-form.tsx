@@ -15,7 +15,7 @@ import { createClient, createOtpClient } from "@/lib/supabase/client";
 import { emailValido, normEmail } from "@/lib/importar";
 import { DEMO_MSG } from "@/lib/demo/shared";
 import { setAvatarPath, signOut, updateMeuPerfil } from "@/lib/actions";
-import { trocarEmail } from "@/lib/actions-conta";
+import { avisarSenhaAlterada, trocarEmail } from "@/lib/actions-conta";
 import { avatarPublicUrl, AVATAR_ACCEPT, AVATAR_MAX_BYTES } from "@/lib/avatar";
 import { Avatar } from "@/components/avatar";
 import { PessoaBanner } from "@/components/pessoa-banner";
@@ -663,6 +663,8 @@ function DialogoSenha({ email }: { email: string }) {
         setTemSenha(true);
         aoAbrir(false);
         toast.success("Senha atualizada.");
+        // aviso de segurança pro e-mail da conta — a action nunca lança
+        await avisarSenhaAlterada();
       }
     } catch {
       toast.error("Sem conexão. Tente de novo.");
