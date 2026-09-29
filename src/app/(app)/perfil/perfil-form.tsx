@@ -15,6 +15,7 @@ import { createClient, createOtpClient } from "@/lib/supabase/client";
 import { emailValido, normEmail } from "@/lib/importar";
 import { DEMO_MSG } from "@/lib/demo/shared";
 import { setAvatarPath, signOut, updateMeuPerfil } from "@/lib/actions";
+import { trocarEmail } from "@/lib/actions-conta";
 import { avatarPublicUrl, AVATAR_ACCEPT, AVATAR_MAX_BYTES } from "@/lib/avatar";
 import { Avatar } from "@/components/avatar";
 import { PessoaBanner } from "@/components/pessoa-banner";
@@ -780,33 +781,34 @@ function DialogoSenha({ email }: { email: string }) {
   );
 }
 
-/** Troca de e-mail — o padrão da indústria: o novo endereço prova a posse
- *  com um link de confirmação (updateUser + emailRedirectTo), e a conta
- *  segue entrando pelo e-mail antigo até lá. O RPC email_disponivel (0060)
- *  barra cedo um endereço que já mora em outro cadastro; o trigger
- *  sync_profile_email espelha a mudança em profiles quando confirmada. */
+/** Troca de e-mail por credencial — o padrão da indústria: prova a posse
+ *  com a senha (ou com a sessão ativa pra quem é só-magic-link) e a
+ *  mudança aplica na hora, sem link. A server action trocarEmail
+ *  revalida a senha no servidor e chama auth.admin.updateUserById;
+ *  o trigger sync_profile_email (0060) espelha em profiles. */
 function DialogoEmail({ email }: { email: string }) {
   const supabase = useMemo(() => createClient(), []);
-  // o updateUser sai pelo client implícito: no pkce o link de confirmação
-  // nasce ?code= e só troca no navegador que pediu (verifier local) — quem
-  // confirma o e-mail novo no celular teria o link morto. Com token_hash o
-  // verifyOtp de /auth/confirm resolve em qualquer lugar
-  const otp = useMemo(() => createOtpClient(), []);
+  const router = useRouter();
   const [open, setOpen] = useState(false);
+  // quem dispensou a senha no onboarding confirma com a sessão ativa;
+  // default true: na dúvida, pede a senha
+  const [temSenha, setTemSenha] = useState(true);
   const [novo, setNovo] = useState("");
+  const [senha, setSenha] = useState("");
   const [enviando, setEnviando] = useState(false);
-  // new_email do auth.users — troca já pedida esperando o clique do link
-  const [aguardando, setAguardando] = useState<string | null>(null);
 
-  // toda abertura resincroniza — a confirmação pode ter acontecido desde a
-  // última vez que o dialog esteve aberto
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      const meta = data.user?.user_metadata;
+      if (meta?.senha_dispensada && !meta?.senha_em) setTemSenha(false);
+    });
+  }, [supabase]);
+
   function aoAbrir(v: boolean) {
     setOpen(v);
-    if (v) {
+    if (!v) {
       setNovo("");
-      supabase.auth.getUser().then(({ data }) => {
-        setAguardando(data.user?.new_email ?? null);
-      });
+      setSenha("");
     }
   }
 
@@ -823,58 +825,17 @@ function DialogoEmail({ email }: { email: string }) {
     }
     setEnviando(true);
     try {
-      const { data: livre, error: erroRpc } = await supabase.rpc(
-        "email_disponivel",
-        { p_email: emailNovo }
-      );
-      if (erroRpc) {
-        toast.error(
-          erroRpc.message === DEMO_MSG
-            ? DEMO_MSG
-            : "Não foi possível verificar o e-mail. Tente de novo."
-        );
-        return;
-      }
-      if (!livre) {
-        toast.error("Esse e-mail já está em outro cadastro do programa.");
-        return;
-      }
-      // updateUser precisa da sessão — o client otp não persiste nada, então
-      // a sessão do browser é injetada só pra esta chamada
-      const { data: sessao } = await supabase.auth.getSession();
-      if (!sessao.session) {
-        toast.error("Sessão expirada. Entre de novo pelo link de e-mail.");
-        return;
-      }
-      const { error: erroSessao } = await otp.auth.setSession({
-        access_token: sessao.session.access_token,
-        refresh_token: sessao.session.refresh_token,
+      const res = await trocarEmail({
+        email: emailNovo,
+        senha: temSenha ? senha : undefined,
       });
-      if (erroSessao) {
-        toast.error(
-          erroSessao.message === DEMO_MSG
-            ? DEMO_MSG
-            : "Sessão expirada. Entre de novo pelo link de e-mail."
-        );
+      if ("error" in res) {
+        toast.error(res.error);
         return;
       }
-      const { error } = await otp.auth.updateUser(
-        { email: emailNovo },
-        {
-          emailRedirectTo: `${location.origin}/auth/confirm?next=${encodeURIComponent("/perfil")}`,
-        }
-      );
-      if (error) {
-        toast.error(
-          error.message === DEMO_MSG
-            ? DEMO_MSG
-            : "Não foi possível enviar a confirmação. Tente de novo."
-        );
-        return;
-      }
-      setAguardando(emailNovo);
-      setNovo("");
-      toast.success(`Link de confirmação enviado pra ${emailNovo}.`);
+      aoAbrir(false);
+      toast.success("E-mail atualizado. Você já pode entrar com ele.");
+      router.refresh();
     } catch {
       toast.error("Sem conexão. Tente de novo.");
     } finally {
@@ -895,19 +856,11 @@ function DialogoEmail({ email }: { email: string }) {
         <DialogHeader>
           <DialogTitle>Trocar e-mail</DialogTitle>
           <DialogDescription>
-            O novo endereço recebe um link de confirmação — a troca só vale
-            depois do clique. Até lá, o e-mail atual continua sendo seu acesso.
+            {temSenha
+              ? "Confirme sua senha pra trocar na hora — o próximo acesso já é pelo endereço novo."
+              : "Sua sessão ativa confirma a posse — a troca aplica na hora e o próximo acesso já é pelo endereço novo."}
           </DialogDescription>
         </DialogHeader>
-        {aguardando ? (
-          <div className="rounded-lg border border-[var(--warn)]/60 bg-[var(--warn)]/5 px-4 py-3">
-            <p className="text-sm font-medium">Confirmação pendente</p>
-            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-              Enviamos um link pra {aguardando} — a troca só vale depois da
-              confirmação. Se não achou o e-mail, reenvie abaixo.
-            </p>
-          </div>
-        ) : null}
         <form onSubmit={enviar} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="email-atual">E-mail atual</Label>
@@ -926,12 +879,20 @@ function DialogoEmail({ email }: { email: string }) {
               placeholder="novo@exemplo.com"
             />
           </div>
+          {temSenha && (
+            <div className="space-y-2">
+              <Label htmlFor="senha-email">Senha atual</Label>
+              <PasswordInput
+                id="senha-email"
+                required
+                autoComplete="current-password"
+                value={senha}
+                onChange={(e) => setSenha(e.target.value)}
+              />
+            </div>
+          )}
           <Button type="submit" className="w-full" disabled={enviando}>
-            {enviando
-              ? "Enviando…"
-              : aguardando
-                ? "Reenviar confirmação"
-                : "Enviar link de confirmação"}
+            {enviando ? "Trocando…" : "Trocar e-mail"}
           </Button>
         </form>
       </DialogContent>
