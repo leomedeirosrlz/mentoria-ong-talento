@@ -874,7 +874,7 @@ function DialogoEmail({ email }: { email: string }) {
       }
       setAguardando(emailNovo);
       setNovo("");
-      toast.success("Link de confirmação enviado — confira os dois endereços.");
+      toast.success(`Link de confirmação enviado pra ${emailNovo}.`);
     } catch {
       toast.error("Sem conexão. Tente de novo.");
     } finally {
@@ -895,18 +895,16 @@ function DialogoEmail({ email }: { email: string }) {
         <DialogHeader>
           <DialogTitle>Trocar e-mail</DialogTitle>
           <DialogDescription>
-            Os dois endereços recebem um link de confirmação — a troca só
-            vale depois de confirmar nos dois. Até lá, o e-mail atual
-            continua sendo seu acesso.
+            O novo endereço recebe um link de confirmação — a troca só vale
+            depois do clique. Até lá, o e-mail atual continua sendo seu acesso.
           </DialogDescription>
         </DialogHeader>
         {aguardando ? (
           <div className="rounded-lg border border-[var(--warn)]/60 bg-[var(--warn)]/5 px-4 py-3">
             <p className="text-sm font-medium">Confirmação pendente</p>
             <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-              Enviamos um link pra {aguardando} — e outro pro e-mail atual.
-              A troca só vale depois de confirmar nos dois. Se não achou,
-              reenvie abaixo.
+              Enviamos um link pra {aguardando} — a troca só vale depois da
+              confirmação. Se não achou o e-mail, reenvie abaixo.
             </p>
           </div>
         ) : null}
