@@ -1484,7 +1484,6 @@ export async function importMentorados(rows: LinhaImportada[]) {
 
 // ---------- encontros (mentor da dupla) ----------
 
-const ORIGENS = ["plataforma", "externo"] as const;
 
 /** URL só http/https — javascript:/data: armazenável renderiza <a href> direto. */
 function urlOk(s: string): boolean {
@@ -1512,7 +1511,6 @@ export async function agendarEncontro(formData: FormData) {
   const numero = Number(formData.get("numero"));
   const data_hora = String(formData.get("data_hora") ?? "");
   const link = String(formData.get("link") ?? "").trim() || null;
-  const origem = String(formData.get("origem") || "plataforma");
   const motivo = String(formData.get("motivo") ?? "").trim();
   const motivoOutro = String(formData.get("motivo_outro") ?? "").trim();
   if (!dupla_id || !numero || !data_hora) return { error: "Data e horário são obrigatórios." };
@@ -1539,7 +1537,6 @@ export async function agendarEncontro(formData: FormData) {
     };
   }
   if (link && !urlOk(link)) return { error: "Confira o link: precisa ser um endereço completo (https://…)." };
-  if (!(ORIGENS as readonly string[]).includes(origem)) return { error: "Não foi possível identificar a origem. Recarregue a página." };
 
   // teto de nº por trilha — especialista tem 5 passos próprios, sem ciclo_eventos
   const maxNum = d?.trilha === "especialista"
@@ -1581,7 +1578,6 @@ export async function agendarEncontro(formData: FormData) {
   const payload = {
     data_hora: quando.toISOString(),
     link,
-    origem,
     status: "agendado" as const,
     ...(motivoReagendamento ? { motivo_reagendamento: motivoReagendamento } : {}),
   };

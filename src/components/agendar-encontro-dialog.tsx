@@ -224,29 +224,13 @@ export function AgendarEncontroDialog({
               />
             </div>
           )}
-          {/* origem/link não se aplicam a encontro que já aconteceu — nasce
-              "externo" e sem link de chamada. Esconder evita campo mentiroso. */}
+          {/* link não se aplica a encontro que já aconteceu — nasce "externo"
+              e sem link de chamada. Esconder evita campo mentiroso. */}
           {!ehRetroativo && (
-            <>
-              <div className="space-y-2">
-                <Label id="origem-label">Onde foi marcado</Label>
-                <Select
-                  name="origem"
-                  defaultValue={atual?.origem ?? "plataforma"}
-                  items={{ plataforma: "Aqui na plataforma", externo: "Na plataforma oficial (Top2You) ou WhatsApp" }}
-                >
-                  <SelectTrigger id="origem-select" aria-labelledby="origem-label origem-select"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="plataforma">Aqui na plataforma</SelectItem>
-                    <SelectItem value="externo">Na plataforma oficial (Top2You) ou WhatsApp</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="link">Link da chamada (opcional)</Label>
-                <Input id="link" name="link" type="url" placeholder="https://meet.google.com/…" defaultValue={atual?.link ?? ""} />
-              </div>
-            </>
+            <div className="space-y-2">
+              <Label htmlFor="link">Link da chamada (opcional)</Label>
+              <Input id="link" name="link" type="url" placeholder="https://meet.google.com/…" defaultValue={atual?.link ?? ""} />
+            </div>
           )}
           <Button type="submit" className="w-full" disabled={pending}>
             {pending ? "Salvando…" : ehRetroativo ? "Registrar encontro" : atual ? "Confirmar remarcação" : "Confirmar agendamento"}
