@@ -8,6 +8,7 @@ import {
   demoRole,
   desmarcarOnboardingDemo,
   limparDemo,
+  limparDemoLidas,
   resetarOnboardingDemo,
 } from "./mode";
 
@@ -18,6 +19,7 @@ export async function entrarNaDemo(papel: AppRole) {
   if (!papelDemoValido(papel)) redirect("/demo");
   await definirPapelDemo(papel);
   await resetarOnboardingDemo();
+  await limparDemoLidas();
   redirect("/");
 }
 
@@ -30,6 +32,15 @@ export async function trocarPapelDemo(papel: AppRole) {
   if (!papelDemoValido(papel)) return { error: "Papel inválido." };
   await definirPapelDemo(papel);
   redirect("/");
+}
+
+/** Voltar do passo 0 do onboarding na demo: sai da demo e cai na seleção de
+ *  papel — equivale a "sair e entrar de novo". limparDemo zera papel + os
+ *  "já vi" de todas as personas; sem cookie a /demo deixa de redirecionar
+ *  pra home e mostra os cards de novo. */
+export async function recomecarDemo() {
+  await limparDemo();
+  redirect("/demo");
 }
 
 /** O wizard depende de me.onboarded_em — desmarcar o cookie DA PERSONA ATIVA

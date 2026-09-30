@@ -1,4 +1,3 @@
-import Link from "next/link";
 import type { Metadata } from "next";
 import {
   CheckCircle,
@@ -25,9 +24,8 @@ export async function generateMetadata({
 }: {
   params: Promise<{ token: string }>;
 }): Promise<Metadata> {
-  const [{ token }, demo] = await Promise.all([params, demoRole()]);
-  const r =
-    !demo && TOKEN_RE.test(token) ? await formularioPorToken(token) : null;
+  const { token } = await params;
+  const r = TOKEN_RE.test(token) ? await formularioPorToken(token) : null;
   const titulo = r?.kind === "ok" ? r.info.formulario.titulo : "Formulário";
   return {
     title: titulo,
@@ -89,9 +87,10 @@ export default async function FormularioTokenPage({
 }) {
   const [{ token }, demo] = await Promise.all([params, demoRole()]);
 
-  // na demo, /f/<token> não roda — os links existem só pra coord ver na ficha
-  const res =
-    !demo && TOKEN_RE.test(token) ? await formularioPorToken(token) : null;
+  // demo: a página abre em leitura sobre os links do fixture — os estados
+  // (respondido/expirado/encerrado) ficam todos demonstráveis e o submit
+  // cai no DEMO_MSG da action, como toda escrita da demo
+  const res = TOKEN_RE.test(token) ? await formularioPorToken(token) : null;
   const info = res?.kind === "ok" ? res.info : null;
 
   return (
@@ -116,29 +115,7 @@ export default async function FormularioTokenPage({
             </p>
           </header>
 
-          {demo ? (
-            <EstadoCard icon={Flask} titulo="Você está na demonstração">
-              <p>
-                Os links públicos de formulário não funcionam no modo demo:
-                eles existem pra quem recebe por WhatsApp ou e-mail.
-              </p>
-              <p className="mt-2">
-                Pra ver o fluxo, abra um formulário em{" "}
-                <Link href="/formularios" className="underline underline-offset-2 hover:text-foreground">
-                  Formulários
-                </Link>{" "}
-                e confira a aba de respostas.
-              </p>
-              <p className="mt-4">
-                <Link
-                  href="/"
-                  className={buttonVariants({ variant: "outline", size: "sm" })}
-                >
-                  Voltar pra demonstração
-                </Link>
-              </p>
-            </EstadoCard>
-          ) : res?.kind === "erro" ? (
+          {res?.kind === "erro" ? (
             <EstadoCard
               icon={WifiSlash}
               titulo="Não foi possível carregar"
@@ -213,14 +190,24 @@ export default async function FormularioTokenPage({
               </p>
             </EstadoCard>
           ) : (
-            <FormularioPublico
-              token={token}
-              titulo={info.formulario.titulo}
-              descricao={info.formulario.descricao}
-              campos={info.formulario.campos}
-              destinatario={info.destinatario}
-              sistema={info.formulario.sistema}
-            />
+            <>
+              {/* a página pública não tem DemoBar — a faixa diz que é
+                  visualização antes do visitante descobrir no submit */}
+              {demo && (
+                <p className="mb-4 flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
+                  <Flask size={13} aria-hidden />
+                  Modo demonstração — respostas não são gravadas.
+                </p>
+              )}
+              <FormularioPublico
+                token={token}
+                titulo={info.formulario.titulo}
+                descricao={info.formulario.descricao}
+                campos={info.formulario.campos}
+                destinatario={info.destinatario}
+                sistema={info.formulario.sistema}
+              />
+            </>
           )}
 
           <SiteFooter className="mt-8" />

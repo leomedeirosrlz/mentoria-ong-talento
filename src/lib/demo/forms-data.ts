@@ -47,11 +47,13 @@ export const DEMO_TOKENS = {
   eduardoAnamnese: "demo-tok-anamnese-eduardo1",
   isabelaAnamnese: "demo-tok-anamnese-isabela1",
   genericoInscricao: "demo-tok-inscric-generico",
+  genericoInscricaoVivo: "demo-tok-inscric-vivo-000",
   // instrumentos oficiais (0042)
   anaAnamneseOficial: "demo-tok-anamnese-ana-ofic",
   eduardoAnamneseOficial: "demo-tok-anamnese-edu-ofic",
   luizaAvaliacao360: "demo-tok-360-luiza-oficial1",
   isabelaAvaliacao360: "demo-tok-360-isabela-oficia",
+  ricardoAvaliacao360: "demo-tok-360-ricardo-ofici",
   luizaAutoavaliacao: "demo-tok-autoav-luiza-ofici",
 } as const;
 
@@ -296,11 +298,19 @@ export function getDemoFormularios(): DemoFormularios {
       dupla_id: duplaDe("Luiza", "Isabela"), contexto: {},
       usado_em: null, expira_em: null, created_by: marina, created_at: haDias(6),
     },
-    // inscrição: um genérico respondido antes do encerramento
+    // inscrição: um genérico respondido antes do encerramento + um pendente
+    // — link vivo num form inativo mostra o estado "Formulário encerrado"
+    // no /f/<token>
     {
       id: uid(0x4209), formulario_id: fInscricao.id, token: DEMO_TOKENS.genericoInscricao,
       dest_profile_id: null, dest_mentorado_id: null, dupla_id: null,
       contexto: {}, usado_em: haDias(70, "14:05"), expira_em: null,
+      created_by: marina, created_at: haDias(75),
+    },
+    {
+      id: uid(0x4215), formulario_id: fInscricao.id, token: DEMO_TOKENS.genericoInscricaoVivo,
+      dest_profile_id: null, dest_mentorado_id: null, dupla_id: null,
+      contexto: {}, usado_em: null, expira_em: null,
       created_by: marina, created_at: haDias(75),
     },
     // anamnese oficial (0042): a Ana respondeu ao entrar (a notificação
@@ -341,6 +351,14 @@ export function getDemoFormularios(): DemoFormularios {
       dest_profile_id: porNome("Luiza"), dest_mentorado_id: null,
       dupla_id: duplaDe("Luiza", "Isabela"), contexto: { origem: "ficha" },
       usado_em: haDias(235, "21:40"), expira_em: null, created_by: marina, created_at: haDias(238),
+    },
+    // 360º do encerramento em andamento (d-ok): o Ricardo respondeu — é o
+    // que carimba checklist.avaliacao_360_enviada na fixture parcial
+    {
+      id: uid(0x4216), formulario_id: fAvaliacao360.id, token: DEMO_TOKENS.ricardoAvaliacao360,
+      dest_profile_id: porNome("Ricardo"), dest_mentorado_id: null,
+      dupla_id: duplaDe("Ricardo", "Ana"), contexto: { origem: "ficha" },
+      usado_em: haDias(3, "21:05"), expira_em: null, created_by: marina, created_at: haDias(6),
     },
   ];
 
@@ -434,6 +452,24 @@ export function getDemoFormularios(): DemoFormularios {
         faria_diferente: "Começaria o PDM já no primeiro encontro e revisaria a Roda da Vida a cada mês, não só no meio do ciclo.",
       },
       respondido_em: haDias(235, "21:40"),
+    },
+    // 360º do Ricardo — encerramento em andamento da d-ok (checklist
+    // parcial: a autoavaliação e a decisão ainda não chegaram)
+    {
+      id: uid(0x4408), link_id: uid(0x4216),
+      respostas: {
+        vinculo: 4,
+        evolucao_jovem: 4,
+        pdm_roda: 3,
+        regularidade: "sim",
+        experiencia_programa: 5,
+        apoio_coordenacao: 5,
+        o_que_leva: "A Ana chegou travada com matemática e hoje monta o próprio cronograma. Levo a disciplina de metas pequenas — funciona com cliente também.",
+        melhorar: "O registro semanal podia lembrar de responder as perguntas do encontro anterior — às vezes eu esqueço um combinado.",
+        disponivel_proximo_ciclo: "sim",
+        capacidade_proximo_ciclo: "1 jovem",
+      },
+      respondido_em: haDias(3, "21:05"),
     },
   ];
 

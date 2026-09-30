@@ -1,13 +1,14 @@
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { comparaNome, registroTardio } from "./ciclo";
-import { demoOnboarded, demoRole } from "./demo/mode";
+import { demoLidas, demoOnboarded, demoRole } from "./demo/mode";
 import {
   demoAlertasRegistros,
   demoCicloEventos,
   demoComunicados,
   demoContagemPessoas,
   demoContatosMap,
+  demoDocumentosPessoa,
   demoDupla,
   demoDuplas,
   demoDuplasOpcoes,
@@ -177,8 +178,9 @@ export const getDocumentosPessoa = cache(
     tipo: "profile" | "mentorado",
     id: string
   ): Promise<DocumentoPessoa[]> => {
-    // modo demo: documento civil sensível não entra no dataset — vazio mesmo pra coord
-    if (await demoRole()) return [];
+    // modo demo: documentos do intake existem no dataset — coord-only, como a RLS
+    const demo = await demoRole();
+    if (demo) return demoDocumentosPessoa(demo, tipo, id);
     const me = await getMe();
     if (me?.role !== "coordenacao") return [];
     const supabase = await createClient();
@@ -557,7 +559,7 @@ export const getMeusDadosPessoais = cache(
 export const getNotificacoes = cache(
   async (): Promise<{ itens: Notificacao[]; naoLidas: number }> => {
     const demo = await demoRole();
-    if (demo) return demoNotificacoes(demo);
+    if (demo) return demoNotificacoes(demo, await demoLidas());
     const supabase = await createClient();
     const [{ data, error }, { count, error: e2 }] = await Promise.all([
       supabase

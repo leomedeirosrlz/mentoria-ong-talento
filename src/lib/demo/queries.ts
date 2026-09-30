@@ -9,6 +9,7 @@ import type {
   CicloEvento,
   Comunicado,
   DadosCivis,
+  DocumentoPessoa,
   Dupla,
   DuplaResumo,
   EspecialistaEvento,
@@ -409,14 +410,22 @@ export function demoMeuMentorProfile(role: AppRole): MentorProfile | null {
 // ---------- avisos e notificações ----------
 
 /** As 15 mais recentes do papel + contagem de não-lidas (o badge pode passar
- *  de 15 mesmo com a lista paginada). */
-export function demoNotificacoes(role: AppRole): {
+ *  de 15 mesmo com a lista paginada). `lidas` são os ids que o visitante
+ *  marcou nesta sessão (cookie demo_lidas) — viram lida_em derivado, porque
+ *  o dataset em si não muda. */
+export function demoNotificacoes(
+  role: AppRole,
+  lidas: ReadonlySet<string> = new Set()
+): {
   itens: Notificacao[];
   naoLidas: number;
 } {
-  const lista = [...(getDemoData().notificacoes[role] ?? [])].sort((a, b) =>
-    b.created_at.localeCompare(a.created_at)
-  );
+  const agora = new Date().toISOString();
+  const lista = [...(getDemoData().notificacoes[role] ?? [])]
+    .map((n) =>
+      n.lida_em == null && lidas.has(n.id) ? { ...n, lida_em: agora } : n
+    )
+    .sort((a, b) => b.created_at.localeCompare(a.created_at));
   return {
     itens: lista.slice(0, 15),
     naoLidas: lista.filter((n) => n.lida_em == null).length,
@@ -774,8 +783,16 @@ export function demoAssinaturaPorToken(token: string) {
   // enquanto o link está assinável — depois de assinado/expirado/revogado
   // a PII não sai mais
   const slug = a.template?.slug ?? "";
-  const assinavel =
+  // flip lazy da RPC (0033/0053): pendente com prazo vencido responde
+  // 'expirado' — na demo o dataset é imutável, então o flip é derivado
+  const status =
     a.status === "pendente" &&
+    a.token_expira_em !== null &&
+    a.token_expira_em <= new Date().toISOString()
+      ? "expirado"
+      : a.status;
+  const assinavel =
+    status === "pendente" &&
     (!a.token_expira_em || a.token_expira_em > new Date().toISOString());
   let civis = !assinavel
     ? null
@@ -796,7 +813,7 @@ export function demoAssinaturaPorToken(token: string) {
   }
   return {
     id: a.id,
-    status: a.status,
+    status,
     assinado_em: a.assinado_em,
     template: a.template ?? { slug: "", titulo: "", versao: 1 },
     alvo: { nome: nome ?? "" },
@@ -932,6 +949,20 @@ export function demoSupervisoesDaPessoa(
     .filter((s) => s.supervisor_id === profileId || s.mentor_id === profileId)
     .sort((a, b) => b.data.localeCompare(a.data))
     .slice(0, 30);
+}
+
+/** Documentos do intake da pessoa — coord-only como a real (a página da
+ *  ficha já não monta a seção pra outros papéis; o [] aqui é o mesmo
+ *  resultado que a RLS daria). */
+export function demoDocumentosPessoa(
+  role: AppRole,
+  tipo: "profile" | "mentorado",
+  id: string
+): DocumentoPessoa[] {
+  if (role !== "coordenacao") return [];
+  return getDemoData().documentosPessoa.filter(
+    (d) => (tipo === "mentorado" ? d.mentorado_id : d.profile_id) === id
+  );
 }
 
 // ---------- formulários: leitura pública por token (0036/0042) ----------

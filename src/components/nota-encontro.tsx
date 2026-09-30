@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { CaretDown } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { salvarNotaEncontro } from "@/lib/actions";
+import { demoAtivoClient } from "@/lib/demo/shared";
 import { Textarea } from "@/components/ui/textarea";
 
 const fmtHora = new Intl.DateTimeFormat("pt-BR", {
@@ -38,6 +39,9 @@ export function NotaEncontro({
   const [salvoEm, setSalvoEm] = useState<Date | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout>>(null);
   const seq = useRef(0);
+  // demo: autosave não dispara a action (seria toast DEMO_MSG por cada
+  // digitação) — o texto fica no campo, sem status de "salvo" (não salvou)
+  const [demo] = useState(demoAtivoClient);
 
   // prop mudou no servidor (outra sessão salvou): adota se não está editando;
   // dirty preserva o texto local — o blur/debounce leva ele por último
@@ -49,6 +53,7 @@ export function NotaEncontro({
   }
 
   async function save(t: string) {
+    if (demo) return;
     if (t.trim() === salvo.trim()) return;
     const minha = ++seq.current;
     setStatus("salvando");

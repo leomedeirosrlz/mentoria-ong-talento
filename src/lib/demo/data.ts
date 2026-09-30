@@ -23,6 +23,7 @@ import type {
   AvaliacaoJovem,
   CicloEvento,
   Comunicado,
+  DocumentoPessoa,
   DocumentoTemplate,
   Dupla,
   Encaminhamento,
@@ -62,6 +63,7 @@ export type DemoData = {
   assinaturas: Assinatura[];
   presencas: Presenca[];
   supervisoes: Supervisao[];
+  documentosPessoa: DocumentoPessoa[];
 };
 
 // ---------- ids ----------
@@ -77,8 +79,9 @@ const uid = (n: number): string =>
 // anexos: 16xx · ciclo_eventos: 18xx · materiais: 20xx · comunicados: 22xx ·
 // solicitacoes: 24xx · pessoa_notas: 26xx · interacoes: 28xx ·
 // notificacoes: 30xx · assinaturas: 32xx · doc_templates: 33xx · tokens de
-// assinatura: 34xx · presencas: 36xx · supervisoes: 38xx. user_id fake:
-// f0xx. especialista_eventos não tem id.
+// assinatura: 34xx · presencas: 36xx · supervisoes: 38xx ·
+// documentos_pessoa: 46xx. user_id fake: f0xx. especialista_eventos não tem
+// id.
 const P = {
   marina: 0x0001, // persona coordenação
   paulo: 0x0002, // persona supervisor
@@ -116,6 +119,7 @@ const D = {
   esp1: 0x0606,
   esp2: 0x0607,
   esp3: 0x0608,
+  pausa: 0x0609,
 } as const;
 
 const S = { aceita1: 0x2401, aceita2: 0x2402, direcionada: 0x2403, livre: 0x2404, cancelada: 0x2405, aceita3: 0x2406 } as const;
@@ -600,7 +604,7 @@ function build(): DemoData {
   const marina: Profile = {
     id: uid(P.marina), user_id: uid(0xf001), nome: "Marina Duarte",
     email: "marina.duarte@realiza.vc", whatsapp: "5511987654001",
-    role: "coordenacao", ativo: true, avatar_path: null,
+    role: "coordenacao", ativo: true, avatar_path: "demo/avatars/marina.svg",
     created_at: haDias(400),
     documento_path: "documentos/termo-marina-duarte.pdf",
     bio: null, linkedin: null, areas: null, voluntariado: null, onboarded_em: null,
@@ -621,7 +625,7 @@ function build(): DemoData {
   const paulo: Profile = {
     id: uid(P.paulo), user_id: uid(0xf002), nome: "Paulo Serra",
     email: "paulo.serra@realiza.vc", whatsapp: "5511987654002",
-    role: "supervisor", ativo: true, avatar_path: null,
+    role: "supervisor", ativo: true, avatar_path: "demo/avatars/paulo.svg",
     created_at: haDias(400),
     documento_path: "documentos/termo-paulo-serra.pdf",
     bio: null, linkedin: null, areas: null, voluntariado: null, onboarded_em: null,
@@ -636,7 +640,7 @@ function build(): DemoData {
   const ricardo: Profile = {
     id: uid(P.ricardo), user_id: uid(0xf003), nome: "Ricardo Tavares",
     email: "ricardo.tavares@realiza.vc", whatsapp: "5511987654003",
-    role: "mentor_dpp", ativo: true, avatar_path: null,
+    role: "mentor_dpp", ativo: true, avatar_path: "demo/avatars/ricardo.svg",
     created_at: haDias(45),
     documento_path: "documentos/termo-ricardo-tavares.pdf",
     bio: null, linkedin: null, areas: null, voluntariado: null, onboarded_em: null,
@@ -658,7 +662,7 @@ function build(): DemoData {
   const sofia: Profile = {
     id: uid(P.sofia), user_id: uid(0xf004), nome: "Sofia Nogueira",
     email: "sofia.nogueira@realiza.vc", whatsapp: "5511987654004",
-    role: "mentor_especialista", ativo: true, avatar_path: null,
+    role: "mentor_especialista", ativo: true, avatar_path: "demo/avatars/sofia.svg",
     created_at: haDias(55),
     documento_path: "documentos/termo-sofia-nogueira.pdf",
     bio: null, linkedin: null, areas: null, voluntariado: null, onboarded_em: null,
@@ -674,7 +678,7 @@ function build(): DemoData {
   const beatriz: Profile = {
     id: uid(P.beatriz), user_id: uid(0xf005), nome: "Beatriz Lins",
     email: "beatriz.lins@realiza.vc", whatsapp: "5511987654005",
-    role: "supervisor", ativo: true, avatar_path: null,
+    role: "supervisor", ativo: true, avatar_path: "demo/avatars/beatriz.svg",
     documento_path: "documentos/termo-beatriz-lins.pdf",
     bio: "Psicóloga organizacional, 12 anos em programas de desenvolvimento de jovens.",
     linkedin: "https://linkedin.com/in/beatriz-lins",
@@ -692,7 +696,7 @@ function build(): DemoData {
   const carlos: Profile = {
     id: uid(P.carlos), user_id: uid(0xf006), nome: "Carlos Menezes",
     email: "carlos.menezes@realiza.vc", whatsapp: "5511987654006",
-    role: "mentor_dpp", ativo: true, avatar_path: null,
+    role: "mentor_dpp", ativo: true, avatar_path: "demo/avatars/carlos.svg",
     documento_path: "documentos/termo-carlos-menezes.pdf",
     bio: "Engenheiro de software há 15 anos, hoje líder técnico em fintech.",
     linkedin: "https://linkedin.com/in/carlosmenezes",
@@ -710,7 +714,7 @@ function build(): DemoData {
   const fernanda: Profile = {
     id: uid(P.fernanda), user_id: uid(0xf007), nome: "Fernanda Alves",
     email: "fernanda.alves@realiza.vc", whatsapp: "5511987654007",
-    role: "mentor_dpp", ativo: true, avatar_path: null,
+    role: "mentor_dpp", ativo: true, avatar_path: "demo/avatars/fernanda.svg",
     documento_path: "documentos/termo-fernanda-alves.pdf",
     bio: "Pedagoga, coordena projetos de reforço escolar na rede pública.",
     linkedin: "https://linkedin.com/in/fernanda-alves",
@@ -728,7 +732,7 @@ function build(): DemoData {
   const joaoPedro: Profile = {
     id: uid(P.joaoPedro), user_id: uid(0xf008), nome: "João Pedro Vital",
     email: "joaopedro.vital@realiza.vc", whatsapp: "5511987654008",
-    role: "mentor_dpp", ativo: true, avatar_path: null,
+    role: "mentor_dpp", ativo: true, avatar_path: "demo/avatars/joaoPedro.svg",
     documento_path: "documentos/termo-joao-pedro-vital.pdf",
     bio: "Analista de dados recém-formado, primeiro emprego em banco.",
     linkedin: "https://linkedin.com/in/joaopedrovital",
@@ -746,7 +750,7 @@ function build(): DemoData {
   const luiza: Profile = {
     id: uid(P.luiza), user_id: uid(0xf009), nome: "Luiza Campos",
     email: "luiza.campos@realiza.vc", whatsapp: "5511987654009",
-    role: "mentor_dpp", ativo: true, avatar_path: null,
+    role: "mentor_dpp", ativo: true, avatar_path: "demo/avatars/luiza.svg",
     documento_path: "documentos/termo-luiza-campos.pdf",
     bio: "Designer de produto, passou por agências e hoje é freelancer.",
     linkedin: "https://linkedin.com/in/luizacampos",
@@ -764,12 +768,12 @@ function build(): DemoData {
   const andre: Profile = {
     id: uid(P.andre), user_id: uid(0xf00a), nome: "André Rocha",
     email: "andre.rocha@realiza.vc", whatsapp: "5511987654010",
-    role: "mentor_dpp", ativo: true, avatar_path: null,
+    role: "mentor_dpp", ativo: true, avatar_path: "demo/avatars/andre.svg",
     documento_path: "documentos/termo-andre-rocha.pdf",
     bio: "Empreendedor, fundou duas pequenas empresas de serviço.",
     linkedin: "https://linkedin.com/in/andrerocha",
     areas: ["empreendedorismo", "finanças", "vendas"],
-    voluntariado: "Quer assumir uma dupla — fez a formação e aguarda matching.",
+    voluntariado: "Mentor do Pedro — a dupla pausou a pedido da família; retorno combinado pro próximo mês.",
     onboarded_em: haDias(30),
     nome_social: null, data_nascimento: "1987-05-16", genero: "masculino",
     cidade: "Osasco", uf: "SP",
@@ -782,7 +786,7 @@ function build(): DemoData {
   const helena: Profile = {
     id: uid(P.helena), user_id: uid(0xf00b), nome: "Helena Prado",
     email: "helena.prado@realiza.vc", whatsapp: "5511987654011",
-    role: "mentor_especialista", ativo: true, avatar_path: null,
+    role: "mentor_especialista", ativo: true, avatar_path: "demo/avatars/helena.svg",
     documento_path: "documentos/termo-helena-prado.pdf",
     bio: "Head de comunicação em varejo; especialista em apresentação e entrevistas.",
     linkedin: "https://linkedin.com/in/helenaprado",
@@ -800,7 +804,7 @@ function build(): DemoData {
   const marcos: Profile = {
     id: uid(P.marcos), user_id: uid(0xf00c), nome: "Marcos Vinícius",
     email: "marcos.vinicius@realiza.vc", whatsapp: "5511987654012",
-    role: "mentor_especialista", ativo: true, avatar_path: null,
+    role: "mentor_especialista", ativo: true, avatar_path: "demo/avatars/marcos.svg",
     documento_path: "documentos/termo-marcos-vinicius.pdf",
     bio: "Engenheiro de dados, professor em curso técnico aos sábados.",
     linkedin: "https://linkedin.com/in/marcosvinicius",
@@ -820,7 +824,7 @@ function build(): DemoData {
   const renata: Profile = {
     id: uid(P.renata), user_id: null, nome: "Renata Costa",
     email: "renata.costa@realiza.vc", whatsapp: "5511987654013",
-    role: null, ativo: true, avatar_path: null,
+    role: null, ativo: true, avatar_path: "demo/avatars/renata.svg",
     documento_path: "documentos/termo-renata-costa.pdf",
     bio: null, linkedin: null, areas: null, voluntariado: null, onboarded_em: null,
     // cadastro prévio pela coordenação — ficha de matching quase vazia e
@@ -834,7 +838,7 @@ function build(): DemoData {
   const patricia: Profile = {
     id: uid(P.patricia), user_id: uid(0xf00e), nome: "Patrícia Gomes",
     email: "patricia.gomes@realiza.vc", whatsapp: "5511987654014",
-    role: "mentor_dpp", ativo: false, avatar_path: null,
+    role: "mentor_dpp", ativo: false, avatar_path: "demo/avatars/patricia.svg",
     documento_path: "documentos/termo-patricia-gomes.pdf",
     bio: "Gerente de RH, foi mentora em ciclos anteriores.",
     linkedin: "https://linkedin.com/in/patriciagomes",
@@ -888,7 +892,7 @@ function build(): DemoData {
       formacao_externa: "Workshops de portfólio pra estudantes de design.",
       disponibilidade: { dias: ["qua", "sex"], periodos: ["tarde"] } },
     { profile_id: andre.id, tipo: "dpp", areas: ["empreendedorismo", "finanças"], capacidade: 2, termo_ok: true, formacao_ok: true,
-      experiencia_previa: "Empreende há 8 anos; concluiu a formação e aguarda a primeira dupla.",
+      experiencia_previa: "Empreende há 8 anos; concluiu a formação e abriu a primeira dupla — pausada a pedido da família.",
       formacao_externa: "Mentorias do Sebrae pra pequenos negócios.",
       disponibilidade: { dias: ["seg", "ter", "qua", "qui", "sex"], periodos: ["manha", "tarde"] } },
     { profile_id: sofia.id, tipo: "especialista", areas: ["educação", "dados"], capacidade: 1, termo_ok: true, formacao_ok: true,
@@ -918,7 +922,7 @@ function build(): DemoData {
     email: "anabeatriz.silva@gmail.com", whatsapp: "5511976123001",
     ong_origem: "ONG Horizonte",
     notas: "3º ano do ensino médio. Quer prestar ENEM pra pedagogia; mora com a mãe e dois irmãos. Veio pela oficina de projetos da ONG.",
-    avatar_path: null, documento_path: "documentos/autorizacao-ana-beatriz.pdf",
+    avatar_path: "demo/avatars/ana.svg", documento_path: "documentos/autorizacao-ana-beatriz.pdf",
     nome_social: "Bia", data_nascimento: "2008-04-12", genero: "feminino",
     cidade: "São Paulo", uf: "SP",
     interesses: ["pedagogia", "ENEM", "leitura"],
@@ -939,7 +943,7 @@ function build(): DemoData {
     email: "caiohenrique.oliveira@gmail.com", whatsapp: "5511976123002",
     ong_origem: "Projeto Semente",
     notas: "1º ano. Interesse em tecnologia e intercâmbio; tímido no primeiro contato, engajado depois que pega confiança.",
-    avatar_path: null, documento_path: "documentos/autorizacao-caio.pdf",
+    avatar_path: "demo/avatars/caio.svg", documento_path: "documentos/autorizacao-caio.pdf",
     nome_social: null, data_nascimento: "2009-08-30", genero: "masculino",
     cidade: "São Paulo", uf: "SP",
     interesses: ["tecnologia", "inglês", "intercâmbio"],
@@ -954,7 +958,7 @@ function build(): DemoData {
     email: "dandara.souza@gmail.com", whatsapp: "5511976123003",
     ong_origem: "Casa do Saber",
     notas: "2º ano. Voltou a trabalhar fins de semana — agenda apertada. Sonha com vaga de jovem aprendiz.",
-    avatar_path: null, documento_path: "documentos/autorizacao-dandara.pdf",
+    avatar_path: "demo/avatars/dandara.svg", documento_path: "documentos/autorizacao-dandara.pdf",
     nome_social: null, data_nascimento: "2008-12-03", genero: "feminino",
     cidade: "São Paulo", uf: "SP",
     interesses: ["jovem aprendiz", "comunicação", "redação"],
@@ -968,7 +972,7 @@ function build(): DemoData {
     id: uid(M.eduardo), nome: "Eduardo Lima",
     email: null, whatsapp: "5511976123004",
     ong_origem: "ONG Horizonte",
-    notas: null, avatar_path: null, documento_path: null,
+    notas: null, avatar_path: "demo/avatars/eduardo.svg", documento_path: null,
     // ficha mínima — cadastro antigo, a coordenação ainda não enriqueceu
     nome_social: null, data_nascimento: "2009-01-20", genero: "masculino",
     cidade: "São Paulo", uf: "SP", interesses: [],
@@ -981,7 +985,7 @@ function build(): DemoData {
     email: "isabela.ferreira@gmail.com", whatsapp: "5511976123005",
     ong_origem: "Instituto Alavanca",
     notas: "Ciclo 2025/2026 concluído — fechou o PDM inteiro e entrou no curso técnico que planejava.",
-    avatar_path: null, documento_path: "documentos/autorizacao-isabela.pdf",
+    avatar_path: "demo/avatars/isabela.svg", documento_path: "documentos/autorizacao-isabela.pdf",
     nome_social: null, data_nascimento: "2007-02-14", genero: "feminino",
     cidade: "São Paulo", uf: "SP",
     interesses: ["curso técnico", "administração"],
@@ -996,7 +1000,7 @@ function build(): DemoData {
     email: "kaua.rodrigues@gmail.com", whatsapp: "5511976123006",
     ong_origem: "Projeto Semente",
     notas: "3º ano. Sem dupla ainda — interesse em empreendedorismo e primeiros empregos.",
-    avatar_path: null, documento_path: "documentos/autorizacao-kaua.pdf",
+    avatar_path: "demo/avatars/kaua.svg", documento_path: "documentos/autorizacao-kaua.pdf",
     nome_social: null, data_nascimento: "2008-07-19", genero: "masculino",
     cidade: "São Paulo", uf: "SP",
     interesses: ["empreendedorismo", "primeiro emprego", "vendas"],
@@ -1023,7 +1027,7 @@ function build(): DemoData {
     email: null, whatsapp: "5511976123007",
     ong_origem: "Casa do Saber",
     notas: "1º ano. Aguarda matching — família pediu reforço em rotina de estudos.",
-    avatar_path: null, documento_path: null,
+    avatar_path: "demo/avatars/laura.svg", documento_path: null,
     nome_social: null, data_nascimento: "2009-11-25", genero: "feminino",
     cidade: "São Paulo", uf: "SP",
     interesses: ["rotina de estudos", "vestibular"],
@@ -1037,7 +1041,7 @@ function build(): DemoData {
     id: uid(M.pedro), nome: "Pedro Henrique Almeida",
     email: null, whatsapp: "5511976123008",
     ong_origem: "ONG Horizonte",
-    notas: null, avatar_path: null, documento_path: null,
+    notas: null, avatar_path: "demo/avatars/pedro.svg", documento_path: null,
     // ficha mínima, como a do Eduardo
     nome_social: null, data_nascimento: "2008-05-08", genero: "masculino",
     cidade: "São Paulo", uf: "SP", interesses: [],
@@ -1383,6 +1387,49 @@ function build(): DemoData {
     notas: [],
   };
 
+  // d-pausa · André × Pedro — a dupla pausada: engatou nos 2 primeiros
+  // encontros, aí a família pediu pausa (a mãe do Pedro adoeceu e ele assumiu
+  // o cuidado do irmão). O 3º ficou agendado no passado e o semáforo congela
+  // em "Dupla pausada" — sai das cobranças sem virar risco.
+  const encDPausa: Encontro[] = [
+    comRegistro(
+      realizado(uid(D.pausa), 1, diaEncontro(1), { duracao: 60 }),
+      andre, "Pedro", "dpp"
+    ),
+    comRegistro(
+      realizado(uid(D.pausa), 2, diaEncontro(2), { duracao: 60, origem: "externo" }),
+      andre, "Pedro", "dpp",
+      {
+        avaliacao: "regular",
+        dificuldade: "outro",
+        dificuldade_detalhe:
+          "Contexto familiar: a mãe do Pedro adoeceu e ele assumiu o irmão menor depois da escola — a rotina apertou de repente.",
+        proximo_passo: "acompanhar_de_perto",
+      }
+    ),
+    agendado(uid(D.pausa), 3, diaEncontro(3), {}),
+  ];
+
+  const duplaPausa: Dupla = {
+    id: uid(D.pausa),
+    ciclo: "2026/2027",
+    status: "pausada",
+    iniciada_em: inicioCiclo,
+    trilha: "dpp",
+    demanda: null,
+    solicitacao_id: null,
+    mentor: andre,
+    mentorado: pedro,
+    supervisor: beatriz,
+    encontros: encDPausa,
+    encaminhamentos: [
+      encaminhamento(uid(D.pausa), encDPausa[1].registro!.id,
+        "Ligar pra família no dia 10 pra combinar a retomada",
+        "mentor", addDias(HOJE, 10), "pendente"),
+    ],
+    notas: [],
+  };
+
   // d-fim · Luiza × Isabela — ciclo anterior completo: 16 encontros semanais
   // com registro, avaliação subindo ao longo da jornada. Serve pra trajetória
   // completa na ficha e pro export CSV.
@@ -1562,7 +1609,7 @@ function build(): DemoData {
     ],
   };
 
-  const duplas = [duplaOk, duplaPend, duplaRisco, duplaAtraso, duplaFim, duplaEsp1, duplaEsp2, duplaEsp3];
+  const duplas = [duplaOk, duplaPend, duplaRisco, duplaAtraso, duplaFim, duplaEsp1, duplaEsp2, duplaEsp3, duplaPausa];
 
   // ---------- anexos de evidência ----------
 
@@ -1981,6 +2028,43 @@ function build(): DemoData {
       assinatura_texto: null, assinado_em: null, ip: null, user_agent: null,
       hash_documento: null, created_by: marina.id, created_at: haDias(2, "11:31"),
       template: tplTermoMentorando },
+    // Laura: a autorização foi emitida na mesma leva, mas a família nunca
+    // abriu — o prazo venceu e o link morreu. Pendente com expira_em no
+    // passado: a RPC faz o flip lazy pra 'expirado' no primeiro acesso e a
+    // ficha já mostra o badge expirado (reemissão fica a um clique)
+    { id: uid(0x3208), template_id: uid(0x3302), profile_id: null, mentorado_id: laura.id,
+      status: "pendente", dados_snapshot: null, token: uid(0x3408),
+      token_expira_em: haDias(10), // emitido há 40 dias, validade 30 → venceu há 10
+      assinatura_texto: null, assinado_em: null, ip: null, user_agent: null,
+      hash_documento: null, created_by: marina.id, created_at: haDias(40, "11:33"),
+      template: tplAutorizacao },
+  ];
+
+  // ---------- documentos do intake (0054) ----------
+  // RG/comprovante/currículo anexados pela coordenação na ficha da pessoa —
+  // coord-only ponta a ponta (RLS + bucket). O path é simbólico: o download
+  // em /api/documento?tipo=doc devolve o PDF placeholder da demo.
+  const documentosPessoa: DocumentoPessoa[] = [
+    { id: uid(0x4601), profile_id: marina.id, mentorado_id: null, tipo: "rg",
+      path: "documentos/demo-rg-marina.pdf", nome: "rg-marina.pdf",
+      created_by: marina.id, created_at: haDias(37, "09:05") },
+    { id: uid(0x4602), profile_id: marina.id, mentorado_id: null, tipo: "comprovante_residencia",
+      path: "documentos/demo-comprovante-marina.pdf", nome: "comprovante-marina.pdf",
+      created_by: marina.id, created_at: haDias(37, "09:07") },
+    { id: uid(0x4603), profile_id: ricardo.id, mentorado_id: null, tipo: "rg",
+      path: "documentos/demo-rg-ricardo.pdf", nome: "rg-ricardo.pdf",
+      created_by: marina.id, created_at: haDias(40, "14:22") },
+    { id: uid(0x4604), profile_id: ricardo.id, mentorado_id: null, tipo: "curriculo",
+      path: "documentos/demo-curriculo-ricardo.pdf", nome: "curriculo-ricardo.pdf",
+      created_by: marina.id, created_at: haDias(40, "14:25") },
+    { id: uid(0x4605), profile_id: null, mentorado_id: ana.id, tipo: "rg",
+      path: "documentos/demo-rg-ana.pdf", nome: "rg-ana.pdf",
+      created_by: marina.id, created_at: haDias(36, "10:40") },
+    // Eduardo: o intake tem só o comprovante — combina com a autorização do
+    // responsável ainda pendente (documento oficial, campo à parte)
+    { id: uid(0x4606), profile_id: null, mentorado_id: eduardo.id, tipo: "comprovante_residencia",
+      path: "documentos/demo-comprovante-eduardo.pdf", nome: "comprovante-eduardo.pdf",
+      created_by: marina.id, created_at: haDias(6, "11:15") },
   ];
 
   // ---------- presenças na formação (0040) ----------
@@ -2077,6 +2161,7 @@ function build(): DemoData {
     assinaturas,
     presencas,
     supervisoes,
+    documentosPessoa,
   };
 }
 

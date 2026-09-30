@@ -2,16 +2,18 @@ import { getDemoData } from "./data";
 import type { AppRole, Encerramento } from "../types";
 
 // Dados do fechamento de ciclo no modo demo — arquivo próprio pra não tocar
-// em data.ts. O encerramento vive na dupla d-fim (Luiza × Isabela, ciclo
-// anterior completo): mostra o estado final da ficha — checklist cheio,
-// autoavaliação recebida, resumo gerado. A row diz 'concluida' mesmo com a
-// dupla 'encerrada' no dataset: a 0037 ainda não rodou no banco da demo e a
-// fixture conta a história do estado final.
+// em data.ts. Dois encerramentos: o da d-fim (Luiza × Isabela, ciclo anterior
+// completo) mostra o estado final — checklist cheio, autoavaliação recebida,
+// resumo gerado; o da d-ok (Ricardo × Ana) está em andamento — rito aberto
+// com checklist parcial. A row da d-fim diz 'concluida' mesmo com a dupla
+// 'encerrada' no dataset: a 0037 ainda não rodou no banco da demo e a fixture
+// conta a história do estado final.
 
 const uid = (n: number): string =>
   `de000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 
 const D_FIM = uid(0x0605);
+const D_OK = uid(0x0601);
 const S_ACEITA1 = uid(0x2401); // Sofia × Bia — a solicitacao aceita da d-ok
 
 const haDias = (n: number) =>
@@ -31,12 +33,12 @@ function noEscopo(role: AppRole, duplaId: string): boolean {
   );
 }
 
-export function demoEncerramentoDaDupla(
-  role: AppRole,
-  duplaId: string
-): Encerramento | null {
-  if (!noEscopo(role, duplaId) || duplaId !== D_FIM) return null;
-  return {
+// um encerramento por dupla (unique(dupla_id)): a d-fim mostra o rito
+// completo e decidido; a d-ok está em andamento — checklist parcial (360º
+// carimbada pela resposta do Ricardo, revisão do PDM marcada), autoavaliação
+// do mentor e decisão ainda pendentes — a ficha mostra o rito vivo
+const ENCERRAMENTOS: Record<string, Encerramento> = {
+  [D_FIM]: {
     id: uid(0x3201),
     dupla_id: D_FIM,
     tipo: "concluida",
@@ -59,7 +61,30 @@ export function demoEncerramentoDaDupla(
     decidido_por: uid(0x0001),
     created_at: haDias(233),
     decidido: { nome: "Marina Duarte" },
-  };
+  },
+  [D_OK]: {
+    id: uid(0x4801),
+    dupla_id: D_OK,
+    tipo: null, // decisão pendente
+    checklist: {
+      revisao_pdm: true,
+      avaliacao_360_enviada: true,
+    },
+    autoavaliacao_mentor: null,
+    disponivel_proximo_ciclo: null,
+    resumo_jornada: null,
+    decidido_por: null,
+    created_at: haDias(6),
+    decidido: null,
+  },
+};
+
+export function demoEncerramentoDaDupla(
+  role: AppRole,
+  duplaId: string
+): Encerramento | null {
+  if (!noEscopo(role, duplaId)) return null;
+  return ENCERRAMENTOS[duplaId] ?? null;
 }
 
 /** Fechamento da trilha de especialista na solicitação aceita da d-ok — a

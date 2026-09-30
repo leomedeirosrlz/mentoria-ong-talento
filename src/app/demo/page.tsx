@@ -10,6 +10,7 @@ import {
 // import type não emite runtime — o barrel principal usa createContext e
 // quebraria a página (server component) se viesse como import de valor
 import type { Icon } from "@phosphor-icons/react";
+import { DemoEnterButton } from "@/components/demo-enter-button";
 import { papelLabel } from "@/lib/ciclo";
 import { entrarNaDemo } from "@/lib/demo/actions";
 import { getDemoData } from "@/lib/demo/data";
@@ -82,31 +83,12 @@ export default async function DemoPage() {
         <div className="mt-5 grid gap-3 min-[360px]:grid-cols-2">
           {PAPEIS.map(({ role, icon: Icone, descricao }) => (
             <form key={role} action={entrarNaDemo.bind(null, role)} className="min-w-0">
-              {/* o card visual mora dentro do botão: group-hover acerta a área
-                  toda e o focus-visible cai no elemento focável de verdade */}
-              <button
-                type="submit"
-                className="group w-full rounded-xl text-left outline-none transition-transform focus-visible:ring-3 focus-visible:ring-ring/50 active:scale-[0.98]"
-              >
-                <div className="flex h-full flex-col rounded-xl border border-transparent bg-card p-4 shadow-[var(--shadow-border)] transition-[border-color,box-shadow] ease-snappy group-hover:border-[var(--brand-lime)]/60 group-hover:shadow-[var(--shadow-border-hover)]">
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-                    <span className="grid size-10 shrink-0 place-items-center rounded-full bg-[var(--brand-lime)] text-[var(--brand-ink)]">
-                      <Icone size={18} weight="fill" aria-hidden />
-                    </span>
-                    <div className="min-w-0">
-                      <p className="font-semibold leading-tight">
-                        {papelLabel(role)}
-                      </p>
-                      <p className="truncate text-xs text-muted-foreground">
-                        {personas[role].nome}
-                      </p>
-                    </div>
-                  </div>
-                  <p className="mt-3 text-sm leading-snug text-muted-foreground">
-                    {descricao}
-                  </p>
-                </div>
-              </button>
+              <DemoEnterButton
+                icon={<Icone size={18} weight="fill" aria-hidden />}
+                titulo={papelLabel(role)}
+                persona={personas[role].nome}
+                descricao={descricao}
+              />
             </form>
           ))}
         </div>

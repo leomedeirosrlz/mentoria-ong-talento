@@ -39,9 +39,10 @@ import {
   dispararComunicadoEmail,
   dispararMaterialEmail,
 } from "./actions-email";
-import { demoAtivo, demoRole, limparDemo, marcarOnboardingDemo } from "./demo/mode";
+import { demoAtivo, demoLidas, demoRole, limparDemo, marcarDemoLidas, marcarOnboardingDemo } from "./demo/mode";
 import { DEMO_MSG } from "./demo/shared";
 import { getDemoData } from "./demo/data";
+import { demoNotificacoes } from "./demo/queries";
 
 async function me() {
   const supabase = await createClient();
@@ -2693,11 +2694,12 @@ export async function excluirComunicado(id: string) {
 /** Poll do sino — mesma leitura de getNotificacoes, mas como action pra rodar
  *  no intervalo do client sem navegação. */
 export async function listarNotificacoes() {
-  // leitura — o sino faz poll mesmo na demo; devolve o dataset do papel ativo
+  // leitura — o sino faz poll mesmo na demo; devolve o dataset do papel
+  // ativo com as "lidas" da sessão aplicadas (cookie demo_lidas)
   const demo = await demoRole();
   if (demo) {
-    const itens = getDemoData().notificacoes[demo] ?? [];
-    return { ok: true, itens: itens.slice(0, 15), naoLidas: itens.filter((n: Notificacao) => !n.lida_em).length };
+    const { itens, naoLidas } = demoNotificacoes(demo, await demoLidas());
+    return { ok: true, itens, naoLidas };
   }
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada. Entre de novo." };
@@ -2722,8 +2724,12 @@ export async function listarNotificacoes() {
 }
 
 export async function marcarNotificacaoLida(id: string) {
-  // no-op silencioso na demo — a UI já marcou otimista; erro dispararia toast
-  if (await demoAtivo()) return { ok: true };
+  // demo: grava o id no cookie da sessão — sobrevive a reload sem tocar no
+  // dataset compartilhado
+  if (await demoAtivo()) {
+    await marcarDemoLidas([id]);
+    return { ok: true };
+  }
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada. Entre de novo." };
   const { error } = await supabase
@@ -2737,7 +2743,16 @@ export async function marcarNotificacaoLida(id: string) {
 }
 
 export async function marcarTodasNotificacoesLidas() {
-  if (await demoAtivo()) return { ok: true };
+  const demo = await demoRole();
+  if (demo) {
+    // grava todas as não-lidas do papel ativo — ids são por persona, então
+    // trocar de papel não estraga o cookie
+    const ids = (getDemoData().notificacoes[demo] ?? [])
+      .filter((n: Notificacao) => !n.lida_em)
+      .map((n: Notificacao) => n.id);
+    await marcarDemoLidas(ids);
+    return { ok: true };
+  }
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada. Entre de novo." };
   const { error } = await supabase

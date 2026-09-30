@@ -2,6 +2,7 @@ import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { demoRole } from "../demo/mode";
 import { getDemoData } from "../demo/data";
+import { demoFormularioPorToken } from "../demo/queries";
 import {
   demoAnamneseMentorado,
   getDemoFormularios,
@@ -307,6 +308,13 @@ export type FormularioTokenResult =
  *  generateMetadata e a página dividem a mesma chamada no request. */
 export const formularioPorToken = cache(
   async (token: string): Promise<FormularioTokenResult> => {
+    // demo: o /f/<token> abre em leitura sobre os links do fixture — todos
+    // os estados (pendente/respondido/expirado/inativo) são demonstráveis;
+    // o submit segue barrado por DEMO_MSG na action
+    if (await demoRole()) {
+      const info = demoFormularioPorToken(token);
+      return info ? { kind: "ok", info } : { kind: "nao_encontrado" };
+    }
     const supabase = await createClient();
     const { data, error } = await supabase.rpc("formulario_por_token", {
       p_token: token,

@@ -3,8 +3,10 @@ import { createHash } from "node:crypto";
 export const AVATAR_ACCEPT = ".png,.jpg,.jpeg,.webp";
 export const AVATAR_MAX_BYTES = 2 * 1024 * 1024;
 
-/** URL pública do bucket `avatares` — path novo a cada upload, sem cache-bust. */
+/** URL pública do bucket `avatares` — path novo a cada upload, sem cache-bust.
+ *  Paths "demo/*" são os retratos locais do modo demo (public/demo/*). */
 export function avatarPublicUrl(path: string): string {
+  if (path.startsWith("demo/")) return `/${path}`;
   return `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/avatares/${path}`;
 }
 

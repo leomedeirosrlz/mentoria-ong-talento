@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { demoRole } from "@/lib/demo/mode";
 import { getDemoData } from "@/lib/demo/data";
 import { demoPdf } from "@/lib/demo/pdf";
+import { DOCUMENTO_PESSOA_TIPO_LABELS } from "@/lib/ciclo";
 
 // Download de documento: oficial (tipo=pessoa|mentorado — termo do mentor,
 // autorização do mentorado) ou do intake (tipo=doc — row de documentos_pessoa,
@@ -28,18 +29,31 @@ export async function GET(
       return new NextResponse("Documento não encontrado.", { status: 404 });
     }
     const d = getDemoData();
+    // tipo=doc olha documentos_pessoa; os demais apontam pro documento_path
+    // oficial (termo do mentor / autorização do mentorado)
+    const intake =
+      tipo === "doc"
+        ? d.documentosPessoa.find((x) => x.id === id) ?? null
+        : null;
     const doc =
-      tipo === "mentorado"
-        ? d.mentorados.find((x) => x.id === id)?.documento_path
-        : d.profiles.find((x) => x.id === id)?.documento_path;
+      tipo === "doc"
+        ? intake?.path
+        : tipo === "mentorado"
+          ? d.mentorados.find((x) => x.id === id)?.documento_path
+          : d.profiles.find((x) => x.id === id)?.documento_path;
     if (!doc) {
       return new NextResponse("Documento não encontrado.", { status: 404 });
     }
-    const pdf = demoPdf(
-      `Documento oficial · ${
-        tipo === "mentorado" ? "autorização do mentorado" : "termo do mentor"
-      }`
-    );
+    const pdf = intake
+      ? demoPdf(
+          `Documento do intake · ${DOCUMENTO_PESSOA_TIPO_LABELS[intake.tipo]}`,
+          `Arquivo ${intake.nome ?? "anexado"} — o oficial sai do bucket privado documentos.`
+        )
+      : demoPdf(
+          `Documento oficial · ${
+            tipo === "mentorado" ? "autorização do mentorado" : "termo do mentor"
+          }`
+        );
     return new NextResponse(new Uint8Array(pdf), {
       headers: {
         "Content-Type": "application/pdf",

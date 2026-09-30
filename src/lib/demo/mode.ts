@@ -56,8 +56,43 @@ export async function resetarOnboardingDemo() {
   for (const papel of DEMO_ROLES) store.delete(demoObCookie(papel));
 }
 
+/** Notificações marcadas como lidas nesta sessão demo — cookie com os ids
+ *  (dataset compartilhado é imutável; o "lida" é estado do navegador, não
+ *  do dado). Zera junto com o resto no sair/entrar. */
+const DEMO_LIDAS_COOKIE = "demo_lidas";
+// teto folgado: uuid+aspa ≈ 39B/id, 4KB de cookie cobre ~100 — a demo não
+// chega perto; o slice é só proteção contra crescimento sem fim
+const DEMO_LIDAS_MAX = 90;
+
+export async function demoLidas(): Promise<Set<string>> {
+  const raw = (await cookies()).get(DEMO_LIDAS_COOKIE)?.value;
+  if (!raw) return new Set();
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return new Set(Array.isArray(parsed) ? parsed.filter((x): x is string => typeof x === "string") : []);
+  } catch {
+    return new Set();
+  }
+}
+
+export async function marcarDemoLidas(ids: string[]) {
+  const lidas = await demoLidas();
+  for (const id of ids) lidas.add(id);
+  (await cookies()).set(
+    DEMO_LIDAS_COOKIE,
+    JSON.stringify([...lidas].slice(-DEMO_LIDAS_MAX)),
+    COOKIE_OPTS
+  );
+}
+
+/** "Lidas" é estado da sessão — entrar na demo de novo recomeça zerado. */
+export async function limparDemoLidas() {
+  (await cookies()).delete(DEMO_LIDAS_COOKIE);
+}
+
 export async function limparDemo() {
   const store = await cookies();
   store.delete(DEMO_ROLE_COOKIE);
+  store.delete(DEMO_LIDAS_COOKIE);
   await resetarOnboardingDemo();
 }

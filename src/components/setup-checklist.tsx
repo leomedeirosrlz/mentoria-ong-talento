@@ -40,7 +40,7 @@ export function SetupChecklist({
     {
       texto: "Primeiro encontro agendado",
       feito: encontros > 0,
-      dica: "A dupla agenda pelo WhatsApp ou aqui",
+      dica: "Quem agenda é a própria dupla",
     },
     {
       texto: "Primeiro registro",

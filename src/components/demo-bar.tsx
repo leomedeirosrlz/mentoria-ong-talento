@@ -8,6 +8,7 @@ import {
   CaretDown,
   CaretUp,
   Check,
+  CircleNotch,
   Flask,
   Handshake,
   MapTrifold,
@@ -82,7 +83,13 @@ export function DemoBar({
           : "gap-2 px-4 py-2.5 text-sm shadow-lg"
       )}
     >
-      <Flask size={dock ? 14 : 15} weight="fill" aria-hidden />
+      {/* o popover fecha no clique, então o "trabalhando" mora na pill — sem
+          ele a troca de papel parece não pegar enquanto a action+redirect roda */}
+      {pending ? (
+        <CircleNotch size={dock ? 14 : 15} className="animate-spin" aria-hidden />
+      ) : (
+        <Flask size={dock ? 14 : 15} weight="fill" aria-hidden />
+      )}
       {/* nowrap: no header mobile o flex espremeria a pill em 2 linhas */}
       <span className="whitespace-nowrap">Demo · {dock ? papelCurto(papel) : papelLabel(papel)}</span>
       {dock ? (

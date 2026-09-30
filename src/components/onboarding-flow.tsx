@@ -11,6 +11,7 @@ import {
   Camera,
   ChartLineUp,
   Check,
+  CircleNotch,
   ClipboardText,
   FolderOpen,
   HandHeart,
@@ -24,6 +25,7 @@ import {
   type Icon,
 } from "@phosphor-icons/react";
 import { concluirOnboarding, salvarOnboarding } from "@/lib/actions";
+import { recomecarDemo } from "@/lib/demo/actions";
 import { assinarTermo } from "@/lib/actions-assinaturas";
 import { AREAS_SUGESTOES } from "@/lib/ciclo";
 import { avatarPublicUrl, AVATAR_ACCEPT, AVATAR_MAX_BYTES } from "@/lib/avatar";
@@ -696,12 +698,30 @@ export function OnboardingFlow({
         <div className="mx-auto flex h-14 w-full max-w-xl items-center gap-3 px-4 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))]">
           <button
             type="button"
-            onClick={() => setStep((s) => Math.max(s - 1, 0))}
-            disabled={step === 0 || pending}
-            aria-label="Voltar um passo"
+            onClick={() => {
+              // demo no passo 0: voltar sai da demo e devolve a seleção de
+              // papel — troca de visão sem precisar abrir a pill
+              if (step === 0) {
+                start(async () => {
+                  await recomecarDemo();
+                });
+                return;
+              }
+              setStep((s) => s - 1);
+            }}
+            disabled={(step === 0 && !demo) || pending}
+            aria-label={
+              step === 0 && demo ? "Escolher outro papel" : "Voltar um passo"
+            }
+            title={step === 0 && demo ? "Escolher outro papel" : undefined}
             className="grid size-11 shrink-0 place-items-center rounded-full border border-border bg-card text-foreground transition-colors outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-40 md:size-9"
           >
-            <ArrowLeft size={17} aria-hidden />
+            {/* pending no passo 0 só pode ser o recomecarDemo — spinner enquanto sai */}
+            {pending && step === 0 ? (
+              <CircleNotch size={17} className="animate-spin" aria-hidden />
+            ) : (
+              <ArrowLeft size={17} aria-hidden />
+            )}
           </button>
           <div
             role="progressbar"
