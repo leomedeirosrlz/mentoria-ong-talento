@@ -14,3 +14,6 @@ intake-out/
 brag-output/
 videos/
 __pycache__/
+
+# clones de referência soltos no root — não são do app
+openwa/

@@ -25,7 +25,14 @@ function mensagemErro(error: { message: string; code?: string }, modo: "link" | 
   if (texto.includes("email_not_confirmed") || texto.includes("email not confirmed")) {
     return "Confirme seu e-mail antes de entrar.";
   }
-  if (texto.includes("otp_disabled") || texto.includes("signups not allowed")) {
+  // e-mail fora da allowlist: o trigger 0045 aborta o insert e o GoTrue
+  // devolve um 500 genérico; otp_disabled cobre signup desligado no painel
+  if (
+    texto.includes("otp_disabled") ||
+    texto.includes("signups not allowed") ||
+    texto.includes("database error saving new user") ||
+    texto.includes("cadastrados do programa")
+  ) {
     return "E-mail não cadastrado. Fale com a coordenação pra liberar seu acesso.";
   }
   return modo === "link"
@@ -265,9 +272,13 @@ export function LoginForm() {
       const { error } = await otp.auth.signInWithOtp({
         email: email.trim().toLowerCase(),
         options: {
-          // signup por OTP é bloqueado no banco (0045) — declarar aqui evita
-          // o 500 "Database error saving new user" do GoTrue
-          shouldCreateUser: false,
+          // precisa ser true: pré-cadastrado existe em profiles mas ainda
+          // não tem row em auth.users (o vínculo é no 1º login, via
+          // handle_new_user). Com false o GoTrue não manda link nenhum pra
+          // quem nunca entrou. Quem NÃO está na allowlist é barrado pelo
+          // trigger 0045 — o 500 volta e vira "e-mail não cadastrado" no
+          // mapeamento de erro
+          shouldCreateUser: true,
           // implicit: a sessão chega no hash (#access_token) — o destino
           // precisa ser uma página de client, rota de servidor não vê hash.
           // /auth/link, não /login: lá o middleware desvia usuário já logado
