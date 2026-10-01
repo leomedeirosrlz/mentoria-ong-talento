@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { demoRole } from "./demo/mode";
 import {
   demoEspecialistas,
-  demoSolicitacaoDaDupla,
+  demoSolicitacoesDaDupla,
   demoSolicitacoesVisiveis,
 } from "./demo/queries";
 import { demoTrilhaFechamento } from "./demo/encerramento-data";
@@ -44,35 +44,43 @@ function normalize(row: Record<string, unknown>): SolicitacaoEspecialista {
   };
 }
 
-/** Última solicitação da dupla DPP (qualquer status) — alimenta o chip do
- *  header da ficha. Cancelada também volta: o chip decide não renderizar, mas
- *  o caller pode usar a informação (ex.: esconder o botão de solicitar). */
-export const getSolicitacaoDaDupla = cache(
-  async (duplaDppId: string): Promise<SolicitacaoEspecialista | null> => {
+/** Todas as solicitações da dupla DPP, mais recentes primeiro — um jovem pode
+ *  passar por várias trilhas de especialista no ciclo, e cada fechamento
+ *  devolve uma devolutiva pro PDM. O chip do header usa a primeira; a seção
+ *  de devolutivas lista todas. */
+export const getSolicitacoesDaDupla = cache(
+  async (duplaDppId: string): Promise<SolicitacaoEspecialista[]> => {
     // modo demo: a dupla precisa estar no escopo do papel (sol_select, 0027)
     const demo = await demoRole();
     if (demo) {
-      const s = demoSolicitacaoDaDupla(demo, duplaDppId);
-      if (!s) return null;
       // a devolutiva do encerramento da trilha mora num dataset à parte
       // (0037 — encerramento-data.ts), mergeada aqui como a view faria
-      const f = demoTrilhaFechamento(s.id);
-      return f ? { ...s, ...f } : s;
+      return demoSolicitacoesDaDupla(demo, duplaDppId).map((s) => {
+        const f = demoTrilhaFechamento(s.id);
+        return f ? { ...s, ...f } : s;
+      });
     }
     const supabase = await createClient();
     const { data, error } = await supabase
       .from("solicitacoes_mural")
       .select(SOLICITACAO_SELECT)
       .eq("dupla_dpp_id", duplaDppId)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    // chip é complemento do header — falha degrada pra "sem chip", com log
+      .order("created_at", { ascending: false });
+    // complemento da ficha — falha degrada pra vazio, com log
     if (error) {
-      console.error("getSolicitacaoDaDupla:", error);
-      return null;
+      console.error("getSolicitacoesDaDupla:", error);
+      return [];
     }
-    return data ? normalize(data) : null;
+    return (data ?? []).map((r) => normalize(r));
+  }
+);
+
+/** Última solicitação da dupla DPP (qualquer status) — alimenta o chip do
+ *  header da ficha. Cancelada também volta: o chip decide não renderizar, mas
+ *  o caller pode usar a informação (ex.: esconder o botão de solicitar). */
+export const getSolicitacaoDaDupla = cache(
+  async (duplaDppId: string): Promise<SolicitacaoEspecialista | null> => {
+    return (await getSolicitacoesDaDupla(duplaDppId))[0] ?? null;
   }
 );
 

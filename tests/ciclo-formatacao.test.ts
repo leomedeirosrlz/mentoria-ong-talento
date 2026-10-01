@@ -37,19 +37,19 @@ describe("toDateStr / diffDias", () => {
 });
 
 describe("format* (pt-BR, fuso America/Sao_Paulo)", () => {
-  it("formatDate: 'DD de mmm' — 'a definir' sem data ou com data inválida", () => {
-    expect(formatDate("2025-10-14")).toBe("14 de out.");
-    expect(formatDate("2025-10-14T19:00:00-03:00")).toBe("14 de out.");
+  it("formatDate: 'DD de mmm de AAAA' — 'a definir' sem data ou com data inválida", () => {
+    expect(formatDate("2025-10-14")).toBe("14 de out. de 2025");
+    expect(formatDate("2025-10-14T19:00:00-03:00")).toBe("14 de out. de 2025");
     expect(formatDate(null)).toBe("a definir");
     expect(formatDate("lixo")).toBe("a definir");
   });
 
   it("formatDateTime inclui hora", () => {
-    expect(formatDateTime("2025-10-14T19:30:00-03:00")).toBe("14 de out., 19:30");
+    expect(formatDateTime("2025-10-14T19:30:00-03:00")).toBe("14 de out. de 2025, 19:30");
   });
 
-  it("formatDiaMes: 'DD/MM'; formatDiaNum: só o dia; formatMesAbrev sem ponto", () => {
-    expect(formatDiaMes("2025-10-14")).toBe("14/10");
+  it("formatDiaMes: 'DD/MM/AAAA'; formatDiaNum: só o dia; formatMesAbrev sem ponto", () => {
+    expect(formatDiaMes("2025-10-14")).toBe("14/10/2025");
     expect(formatDiaNum("2025-10-14")).toBe("14");
     expect(formatMesAbrev("2025-10-14")).toBe("out");
     expect(formatMesAbrev(null)).toBe("");
@@ -57,7 +57,7 @@ describe("format* (pt-BR, fuso America/Sao_Paulo)", () => {
 
   it("formatDiaSemana por extenso e formatDiaSemanaMes com fallback", () => {
     expect(formatDiaSemana("2025-10-14")).toBe("terça-feira");
-    expect(formatDiaSemanaMes("2025-10-14")).toBe("terça-feira (14/10)");
+    expect(formatDiaSemanaMes("2025-10-14")).toBe("terça-feira (14/10/2025)");
     expect(formatDiaSemanaMes("lixo")).toBe("a definir");
     expect(formatDiaSemana(null)).toBe("");
   });

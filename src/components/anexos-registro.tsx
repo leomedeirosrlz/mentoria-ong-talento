@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { CircleNotch, Paperclip, Trash } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
-import { formatDiaMes } from "@/lib/ciclo";
+import { formatDiaMes, formatTamanho } from "@/lib/ciclo";
 import type { RegistroAnexo } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
@@ -15,15 +15,6 @@ const BUCKET = "registro-anexos";
 // allowlist explícita — image/* admitiria SVG (conteúdo ativo) e HEIC (não renderiza)
 const TIPOS_ACEITOS = ["application/pdf", "image/png", "image/jpeg", "image/webp"];
 const ACCEPT = TIPOS_ACEITOS.join(",");
-
-/** "3,4 MB" / "218 KB" — pt-BR com vírgula decimal. */
-export function formatTamanho(bytes: number): string {
-  if (bytes >= 1024 * 1024) {
-    const mb = bytes / (1024 * 1024);
-    return `${mb >= 10 ? Math.round(mb) : mb.toFixed(1).replace(".", ",")} MB`;
-  }
-  return `${Math.max(1, Math.round(bytes / 1024))} KB`;
-}
 
 /** Nome do arquivo entra no path do storage — fica em ASCII seguro. */
 function saneiaNome(nome: string): string {
@@ -184,7 +175,7 @@ export function AnexosRegistro({
         </ul>
       )}
       {podeAnexar && (
-        <div>
+        <div className="space-y-1">
           <input
             ref={fileRef}
             type="file"
@@ -205,6 +196,10 @@ export function AnexosRegistro({
             {pending ? <CircleNotch size={14} className="animate-spin" /> : <Paperclip size={14} />}
             {pending ? "Enviando…" : "Anexar evidência"}
           </Button>
+          <p className="text-xs text-muted-foreground">
+            Foto ou arquivo que ajude a contar o encontro (PDF, PNG, JPG ou
+            WebP) — fica salvo no registro e aparece em “Arquivos da dupla”.
+          </p>
         </div>
       )}
     </div>

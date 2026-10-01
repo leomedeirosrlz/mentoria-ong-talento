@@ -87,18 +87,29 @@ export function demoEncerramentoDaDupla(
   return ENCERRAMENTOS[duplaId] ?? null;
 }
 
-/** Fechamento da trilha de especialista na solicitação aceita da d-ok — a
- *  devolutiva chega ao mentor DPP pela view do mural (0037). No dataset a
- *  dupla esp1 segue 'ativa' (data.ts é estável): a ficha dela continua
- *  mostrando a trilha aberta — a demo conta a devolutiva do lado de quem
- *  pediu, que é onde a feature mora. */
+/** Fechamento da trilha de especialista atrelada a uma solicitação — a
+ *  devolutiva chega ao mentor DPP pela view do mural (0037). Caminho comum:
+ *  solicitação → dupla de especialista → devolutiva gravada no encerramento.
+ *  A esp1 é exceção narrativa: no dataset ela segue 'ativa' (data.ts é
+ *  estável) enquanto a devolutiva já aparece pra quem pediu — o caso que a
+ *  feature precisa demonstrar. */
 export function demoTrilhaFechamento(
   solicitacaoId: string
 ): { devolutiva_pdm: string; trilha_encerrada_em: string } | null {
-  if (solicitacaoId !== S_ACEITA1) return null;
+  if (solicitacaoId === S_ACEITA1) {
+    return {
+      devolutiva_pdm:
+        "Base de frações e funções destravada — a Bia fecha exercícios sozinha quando começa pelo gráfico. Pro PDM: manter a lista semanal de 10 exercícios e partir pra geometria básica no próximo ciclo; ela responde melhor a metas curtas do que a revisões longas.",
+      trilha_encerrada_em: haDias(3),
+    };
+  }
+  const sol = getDemoData().solicitacoes.find((s) => s.id === solicitacaoId);
+  const dupla = sol?.dupla_id
+    ? getDemoData().duplas.find((d) => d.id === sol.dupla_id)
+    : null;
+  if (!dupla?.devolutiva_pdm || !dupla.encerrada_em) return null;
   return {
-    devolutiva_pdm:
-      "Base de frações e funções destravada — a Bia fecha exercícios sozinha quando começa pelo gráfico. Pro PDM: manter a lista semanal de 10 exercícios e partir pra geometria básica no próximo ciclo; ela responde melhor a metas curtas do que a revisões longas.",
-    trilha_encerrada_em: haDias(3),
+    devolutiva_pdm: dupla.devolutiva_pdm,
+    trilha_encerrada_em: dupla.encerrada_em,
   };
 }

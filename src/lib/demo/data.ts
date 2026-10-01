@@ -120,9 +120,10 @@ const D = {
   esp2: 0x0607,
   esp3: 0x0608,
   pausa: 0x0609,
+  esp4: 0x060a,
 } as const;
 
-const S = { aceita1: 0x2401, aceita2: 0x2402, direcionada: 0x2403, livre: 0x2404, cancelada: 0x2405, aceita3: 0x2406 } as const;
+const S = { aceita1: 0x2401, aceita2: 0x2402, direcionada: 0x2403, livre: 0x2404, cancelada: 0x2405, aceita3: 0x2406, aceita4: 0x2407 } as const;
 
 const MEET = "https://meet.google.com/demo-realiza";
 
@@ -1108,6 +1109,26 @@ function build(): DemoData {
       especialista: { nome: sofia.nome },
     },
     {
+      // a Bia já fechou uma trilha antes da de matemática — oratória com a
+      // Helena, pra apresentação do projeto dela. É a segunda devolutiva que
+      // chega ao PDM da d-ok (a seção agrega todas as trilhas do jovem)
+      id: uid(S.aceita4),
+      mentorado_id: ana.id,
+      dupla_dpp_id: uid(D.ok),
+      demanda:
+        "A Bia vai apresentar o projeto dela num evento da ONG e trava pra falar em público — uma trilha de oratória com a Helena destrava a meta do PDM.",
+      especialista_desejado_id: helena.id,
+      especialista_id: helena.id,
+      dupla_id: uid(D.esp4),
+      status: "aceita",
+      created_by: ricardo.id,
+      created_at: haDias(33, "20:30"),
+      respondida_em: haDias(31, "09:00"),
+      mentorado: { nome: ana.nome },
+      solicitante: { nome: ricardo.nome },
+      especialista: { nome: helena.nome },
+    },
+    {
       id: uid(S.aceita1),
       mentorado_id: ana.id,
       dupla_dpp_id: uid(D.ok),
@@ -1609,7 +1630,75 @@ function build(): DemoData {
     ],
   };
 
-  const duplas = [duplaOk, duplaPend, duplaRisco, duplaAtraso, duplaFim, duplaEsp1, duplaEsp2, duplaEsp3, duplaPausa];
+  // d-esp4 · Helena × Ana — trilha de especialista CONCLUÍDA (os 5 encontros
+  // rodaram e a devolutiva já foi pro PDM). É a segunda trilha da Bia: a de
+  // matemática (esp1) segue aberta; esta, de oratória, fechou — o mentor DPP
+  // vê as duas devolutivas na ficha, e a Helena vê a trilha concluída na
+  // home dela
+  const encD9: Encontro[] = [
+    comRegistro(
+      realizado(uid(D.esp4), 1, addDias(HOJE, -28), { hora: "19:00", duracao: 60 }),
+      helena, "Bia", "especialista",
+      {
+        observacoes:
+          "Diagnóstico de oratória: ela decora o texto e trava se esquece uma frase — vamos trabalhar estrutura no lugar de script.",
+      }
+    ),
+    comRegistro(
+      realizado(uid(D.esp4), 2, addDias(HOJE, -22), { hora: "19:00", duracao: 60 }),
+      helena, "Bia", "especialista",
+      {
+        reflexoes:
+          "Exercício de fala livre sobre o projeto: 2 minutos sem notas. Travou no meio, mas se recuperou sozinha — boa base.",
+      }
+    ),
+    comRegistro(
+      realizado(uid(D.esp4), 3, addDias(HOJE, -16), { hora: "19:00", duracao: 60 }),
+      helena, "Bia", "especialista"
+    ),
+    comRegistro(
+      realizado(uid(D.esp4), 4, addDias(HOJE, -10), { hora: "19:00", duracao: 75 }),
+      helena, "Bia", "especialista",
+      {
+        observacoes:
+          "Ensaio geral com plateia simulada (mãe + irmã assistindo). Postura e pausas saíram; falta só responder pergunta de improviso.",
+      }
+    ),
+    comRegistro(
+      realizado(uid(D.esp4), 5, addDias(HOJE, -6), { hora: "19:00", duracao: 75 }),
+      helena, "Bia", "especialista",
+      {
+        reflexoes:
+          "Apresentação completa pro grupo de 20 pessoas da ONG — respondeu as três perguntas finais de improviso, sem notas.",
+        observacoes:
+          "Trilha batida: a meta da solicitação (destravar a apresentação do projeto) foi cumprida.",
+      }
+    ),
+  ];
+
+  const duplaEsp4: Dupla = {
+    id: uid(D.esp4),
+    ciclo: "2026/2027",
+    status: "concluida",
+    trilha: "especialista",
+    iniciada_em: ymd(addDias(HOJE, -30)),
+    demanda:
+      "Oratória pra apresentação do projeto da Bia no evento da ONG.",
+    solicitacao_id: uid(S.aceita4),
+    mentor: helena,
+    mentorado: ana,
+    supervisor: paulo, // o mesmo supervisor da dupla DPP da Bia
+    encontros: encD9,
+    encaminhamentos: [],
+    notas: [],
+    encerrada_em: ymd(addDias(HOJE, -5)),
+    motivo_encerramento:
+      "Trilha concluída — os 5 encontros aconteceram e a meta da solicitação foi batida.",
+    devolutiva_pdm:
+      "A Bia apresentou o projeto dela pra uma plateia de 20 pessoas na última sessão — saiu do texto decorado e respondeu as três perguntas finais de improviso, sem notas. Pro PDM: vale colocar ela pra apresentar os próprios resultados nos encontros da dupla — exposição curta e frequente consolidou mais do que treino longo.",
+  };
+
+  const duplas = [duplaOk, duplaPend, duplaRisco, duplaAtraso, duplaFim, duplaEsp1, duplaEsp2, duplaEsp3, duplaEsp4, duplaPausa];
 
   // ---------- anexos de evidência ----------
 
@@ -1634,6 +1723,19 @@ function build(): DemoData {
       mime: "application/pdf",
       created_by: ricardo.id,
       created_at: depoisDe(regD1E1.created_at, 1.5),
+      autor: { nome: ricardo.nome },
+    },
+    {
+      // encontro 4: um segundo registro com anexo — a seção "Arquivos da
+      // dupla" mostra a agregação cruzando encontros
+      id: uid(0x1603),
+      registro_id: regD1E4.id,
+      path: `${regD1E4.id}/${uid(0x1603)}-cronograma-enem.png`,
+      nome: "cronograma-enem.png",
+      tamanho: 921_600,
+      mime: "image/png",
+      created_by: ricardo.id,
+      created_at: depoisDe(regD1E4.created_at, 1),
       autor: { nome: ricardo.nome },
     },
   ];

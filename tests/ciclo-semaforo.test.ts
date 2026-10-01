@@ -259,7 +259,7 @@ describe("saudadeDaDupla — preventivo (oficial da semana sem agenda)", () => {
     const s = saudadeDaDupla(dupla, CICLO_16, dt("2025-10-13"));
     expect(s.semaforo).toBe("atencao");
     expect(s.motivo).toBe(
-      "O 2º encontro é terça-feira (14/10) e ainda não foi agendado"
+      "O 2º encontro é terça-feira (14/10/2025) e ainda não foi agendado"
     );
   });
 
@@ -301,7 +301,7 @@ describe("saudadeDaDupla — preventivo (oficial da semana sem agenda)", () => {
     const s = saudadeDaDupla(dupla, eventos, dt("2025-10-23"));
     expect(s.semaforo).toBe("atencao");
     expect(s.motivo).toBe(
-      "O 2º encontro é terça-feira (28/10) e ainda não foi agendado"
+      "O 2º encontro é terça-feira (28/10/2025) e ainda não foi agendado"
     );
   });
 });
@@ -337,7 +337,7 @@ describe("saudadeDaDupla — combinado vencido e ok", () => {
     });
     const s = saudadeDaDupla(dupla, CICLO_16, dt("2025-10-08"));
     expect(s.semaforo).toBe("ok");
-    expect(s.motivo).toBe("Próximo encontro 14 de out.");
+    expect(s.motivo).toBe("Próximo encontro 14 de out. de 2025");
     expect(s.proximo?.numero).toBe(2);
   });
 });

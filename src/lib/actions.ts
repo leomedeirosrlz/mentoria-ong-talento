@@ -2121,6 +2121,59 @@ export async function resolverApoio(registroId: string, duplaId: string) {
   return { ok: true };
 }
 
+/** Pedido de apoio fora do registro — o mentor não precisa esperar o
+ *  follow-up pra sinalizar. A notificação É o registro do pedido: o
+ *  notificacoes_insert (0041) permite não-coord → staff só nesse tipo, e a
+ *  fila de pendentes é o sino da coordenação (não-lida = não atendida). */
+export async function pedirApoio(duplaId: string, mensagem: string) {
+  if (await demoAtivo()) return { error: DEMO_MSG };
+  const { supabase, me: eu } = await me();
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
+
+  const { data: d, error: dErr } = await supabase
+    .from("duplas")
+    .select("mentor_id, status, supervisor_id, mentorado:mentorados!mentorado_id(nome)")
+    .eq("id", duplaId)
+    .maybeSingle();
+  if (dErr) return { error: erroAmigavel(dErr) };
+  if (!d || d.mentor_id !== eu.id) {
+    return { error: "O pedido de apoio é do mentor da dupla." };
+  }
+  if (d.status !== "ativa" && d.status !== "pausada") {
+    return { error: "Essa dupla não está em curso." };
+  }
+
+  const texto = mensagem.trim().slice(0, 500) || null;
+  const { data: equipe } = await supabase
+    .from("profiles")
+    .select("id")
+    .eq("role", "coordenacao")
+    .eq("ativo", true);
+  const mdJoin = d.mentorado as unknown;
+  const nomeMd = Array.isArray(mdJoin)
+    ? (mdJoin[0] as { nome?: string } | undefined)?.nome
+    : (mdJoin as { nome?: string } | null | undefined)?.nome;
+  const destinos = new Set(
+    [...(equipe ?? []).map((p) => p.id), d.supervisor_id].filter(
+      (pid): pid is string => Boolean(pid) && pid !== eu.id
+    )
+  );
+  await notificar(
+    supabase,
+    [...destinos].map((pid) => ({
+      profile_id: pid,
+      tipo: "pedido_apoio",
+      titulo: "Pedido de apoio",
+      corpo:
+        `${eu.nome} pediu apoio${nomeMd ? ` · dupla com ${nomeMd}` : ""}` +
+        (texto ? `: "${texto}"` : "."),
+      href: `/duplas/${duplaId}`,
+    })),
+    eu.id
+  );
+  return { ok: true };
+}
+
 // ---------- materiais ----------
 
 const TIPOS_MATERIAL = ["guia", "template", "conteudo", "link"] as const;

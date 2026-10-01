@@ -21,7 +21,7 @@ import { DuplaNomes } from "@/components/dupla-nomes";
 import { buttonVariants } from "@/components/ui/button";
 import { RegistroView } from "@/components/registro-view";
 import { ResolverApoioButton } from "@/components/resolver-apoio-button";
-import { formatTamanho } from "@/components/anexos-registro";
+import { formatTamanho } from "@/lib/ciclo";
 import { createClient } from "@/lib/supabase/client";
 import {
   formatDate,

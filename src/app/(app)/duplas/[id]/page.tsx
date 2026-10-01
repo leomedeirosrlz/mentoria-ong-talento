@@ -24,7 +24,7 @@ import {
 } from "@/lib/queries";
 import {
   getEspecialistas,
-  getSolicitacaoDaDupla,
+  getSolicitacoesDaDupla,
 } from "@/lib/queries-especialista";
 import { getEncerramentoDaDupla, getAvaliacao360DaDupla } from "@/lib/queries-encerramento";
 import { getSupervisoesDaDupla } from "@/lib/queries-supervisao";
@@ -69,6 +69,8 @@ import {
 import { EditarRegistro } from "@/components/editar-registro";
 import { EncaminhamentosList } from "@/components/encaminhamentos-list";
 import { RevelarApos } from "@/components/revelar-apos";
+import { ArquivosDupla } from "@/components/arquivos-dupla";
+import { PedirApoioDialog } from "@/components/pedir-apoio-dialog";
 import { ResolverApoioButton } from "@/components/resolver-apoio-button";
 import { TrajetoriaAvaliacoes } from "@/components/trajetoria-avaliacoes";
 import { SolicitacaoStatusChip } from "@/components/solicitacao-status-chip";
@@ -164,7 +166,8 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
   // fluxo entre mentores do guia: a demanda de especialista nasce na dupla
   // DPP. O chip conta o estado a quem olha a ficha; o botão some enquanto uma
   // solicitação está aberta (re-pedir é pra quando a anterior se resolveu)
-  const solicitacao = !ehEsp ? await getSolicitacaoDaDupla(id) : null;
+  const solicitacoes = !ehEsp ? await getSolicitacoesDaDupla(id) : [];
+  const solicitacao = solicitacoes[0] ?? null;
   const podeSolicitar =
     !ehEsp &&
     dupla.status === "ativa" &&
@@ -189,6 +192,16 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
   const encontroNumeroPorRegistroId = Object.fromEntries(
     dupla.encontros.flatMap((e) => (e.registro ? [[e.registro.id, e.numero]] : []))
   );
+  // todos os anexos dos registros da dupla, mais novos primeiro — a seção
+  // "Arquivos" agrega o que hoje só existe espalhado encontro a encontro
+  const arquivosDaDupla = dupla.encontros
+    .flatMap((e) =>
+      (e.registro ? (anexosPorRegistro[e.registro.id] ?? []) : []).map((a) => ({
+        ...a,
+        encontroNumero: e.numero,
+      }))
+    )
+    .sort((a, b) => b.created_at.localeCompare(a.created_at));
 
   const msgCombinados =
     `Olá ${primeiroNomeMentorado}! Combinados do nosso último encontro: ` +
@@ -488,6 +501,20 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
               piso={dupla.iniciada_em ?? undefined}
             />
           )}
+          {/* pedido de apoio direto — o checkbox "preciso de apoio" dentro do
+              registro exige um encontro feito; a vida aperta entre encontros
+              também. Visível pra quem pode pedir (o mentor da dupla) */}
+          {souMentor &&
+            (dupla.status === "ativa" || dupla.status === "pausada") && (
+              <PedirApoioDialog
+                duplaId={dupla.id}
+                trigger={
+                  <Button variant="outline" size="sm">
+                    <HandHeart aria-hidden /> Pedir apoio
+                  </Button>
+                }
+              />
+            )}
           {/* nudge é papel de coordenação/supervisão — pro próprio mentor o
               botão abriria conversa consigo mesmo e logaria contato falso.
               Os dois lados da dupla lado a lado; tipos "nudge"/"contato"
@@ -615,6 +642,8 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
             />
           </section>
 
+          <ArquivosDupla arquivos={arquivosDaDupla} />
+
           <section className="rounded-xl bg-card p-4 text-sm space-y-2 shadow-[var(--shadow-border)]">
             <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
               Mentorado
@@ -732,7 +761,7 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
 
           {/* a trilha de especialista devolve o resultado pro PDM — chega ao
               mentor DPP pela solicitação que ele abriu */}
-          {!ehEsp && <DevolutivaEspecialista solicitacao={solicitacao} />}
+          {!ehEsp && <DevolutivaEspecialista solicitacoes={solicitacoes} />}
 
           {/* o rito de fechamento do ciclo DPP: checklist da coordenação +
               decisão; a autoavaliação é a parte do mentor */}

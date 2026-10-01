@@ -997,11 +997,19 @@ function paraData(iso: string): Date {
   return /^\d{4}-\d{2}-\d{2}$/.test(iso) ? new Date(`${iso}T12:00:00`) : new Date(iso);
 }
 
+// o ciclo cruza a virada do ano ("2026/2027" = out→jun) — "15 de jan." sem
+// ano é ambíguo em registro e log, então os formatos de prosa levam ano
+// sempre; os compactos de grid/trilha (diaCompacto, formatDiaNum) ficam sem
 export function formatDate(iso: string | null | undefined): string {
   if (!iso) return "a definir";
   const d = paraData(iso);
   if (isNaN(d.getTime())) return "a definir";
-  return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "short", timeZone: TZ });
+  return d.toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    timeZone: TZ,
+  });
 }
 
 export function formatDateTime(iso: string | null | undefined): string {
@@ -1011,18 +1019,33 @@ export function formatDateTime(iso: string | null | undefined): string {
   return d.toLocaleString("pt-BR", {
     day: "2-digit",
     month: "short",
+    year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
     timeZone: TZ,
   });
 }
 
-/** "06/10" — dia e mês numerados. */
+/** "06/10/2026" — dia, mês e ano numerados. */
 export function formatDiaMes(iso: string | null | undefined): string {
   if (!iso) return "a definir";
   const d = paraData(iso);
   if (isNaN(d.getTime())) return "a definir";
-  return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", timeZone: TZ });
+  return d.toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    timeZone: TZ,
+  });
+}
+
+/** "3,4 MB" / "218 KB" — pt-BR com vírgula decimal. */
+export function formatTamanho(bytes: number): string {
+  if (bytes >= 1024 * 1024) {
+    const mb = bytes / (1024 * 1024);
+    return `${mb >= 10 ? Math.round(mb) : mb.toFixed(1).replace(".", ",")} MB`;
+  }
+  return `${Math.max(1, Math.round(bytes / 1024))} KB`;
 }
 
 /** "15" — só o dia, pro nó da timeline de /registros. */
@@ -1202,9 +1225,5 @@ export function tempoRelativo(iso: string, agoraMs: number): string {
   const d = Math.floor(h / 24);
   if (d === 1) return "ontem";
   if (d < 7) return `há ${d} d`;
-  return new Date(iso).toLocaleDateString("pt-BR", {
-    day: "numeric",
-    month: "short",
-    timeZone: TZ,
-  });
+  return formatDate(iso);
 }

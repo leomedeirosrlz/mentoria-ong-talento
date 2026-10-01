@@ -10,6 +10,7 @@ supabase/.temp
 # saída do intake real — dados pessoais, nunca commitar
 intake-out/
 
-# artefatos gerados (vídeos brag, cache python)
+# artefatos gerados (vídeos brag/hyperframes, cache python)
 brag-output/
+videos/
 __pycache__/

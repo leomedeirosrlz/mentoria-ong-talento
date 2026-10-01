@@ -597,20 +597,28 @@ export function demoDuplasOpcoes(role: AppRole): DuplaOpcao[] {
 
 // ---------- trilha de especialista (0027) ----------
 
-/** Última solicitação da dupla DPP (qualquer status) — só se a dupla estiver
- *  no escopo do papel (sol_select: mentor/supervisor da dupla de origem). */
+/** Todas as solicitações da dupla DPP, mais recentes primeiro — só se a dupla
+ *  estiver no escopo do papel (sol_select: mentor/supervisor da dupla de
+ *  origem). Um jovem pode ter várias trilhas no ciclo — a seção de
+ *  devolutivas lista todas, o chip usa a primeira. */
+export function demoSolicitacoesDaDupla(
+  role: AppRole,
+  duplaDppId: string
+): SolicitacaoEspecialista[] {
+  const data = getDemoData();
+  const noEscopo = duplasDoPapel(data, role).some((d) => d.id === duplaDppId);
+  if (!noEscopo) return [];
+  return data.solicitacoes
+    .filter((s) => s.dupla_dpp_id === duplaDppId)
+    .sort((a, b) => b.created_at.localeCompare(a.created_at));
+}
+
+/** Última solicitação da dupla DPP (qualquer status). */
 export function demoSolicitacaoDaDupla(
   role: AppRole,
   duplaDppId: string
 ): SolicitacaoEspecialista | null {
-  const data = getDemoData();
-  const noEscopo = duplasDoPapel(data, role).some((d) => d.id === duplaDppId);
-  if (!noEscopo) return null;
-  return (
-    data.solicitacoes
-      .filter((s) => s.dupla_dpp_id === duplaDppId)
-      .sort((a, b) => b.created_at.localeCompare(a.created_at))[0] ?? null
-  );
+  return demoSolicitacoesDaDupla(role, duplaDppId)[0] ?? null;
 }
 
 /** O que o papel vê no mural (sol_select, 0027): coord tudo; especialista as
