@@ -222,6 +222,10 @@ export function ReenviarComunicadoEmailButton({
       className="text-muted-foreground"
       disabled={pending}
       aria-busy={pending}
+      // a linha de aviso abaixo de sm não tem espaço pro label — vira botão
+      // de ícone; o aria-label fixo cobre os dois modos (precedente da
+      // agenda: "Abrir dupla" usa hidden sm:inline)
+      aria-label="Reenviar por e-mail"
       onClick={() =>
         start(async () => {
           try {
@@ -241,7 +245,7 @@ export function ReenviarComunicadoEmailButton({
       ) : (
         <EnvelopeSimple size={14} />
       )}
-      Reenviar por e-mail
+      <span className="hidden sm:inline">Reenviar por e-mail</span>
     </Button>
   );
 }

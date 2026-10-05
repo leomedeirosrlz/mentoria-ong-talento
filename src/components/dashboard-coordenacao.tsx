@@ -1,4 +1,4 @@
-import type { CSSProperties } from "react";
+import { Fragment, type CSSProperties } from "react";
 import Link from "next/link";
 import { ArrowCounterClockwise, ArrowRight } from "@phosphor-icons/react/dist/ssr";
 import {
@@ -6,6 +6,7 @@ import {
   eventoDaSemana,
   eventosDoCronograma,
   formatDiaMes,
+  formatDiaSemana,
   formatDateTime,
   resumoSemanaDe,
   rotuloCronograma,
@@ -16,6 +17,7 @@ import {
   TRILHA_LABEL,
   ultimoRegistro,
   type DuplaSaude,
+  type Semaforo,
   ORDEM_SEMAFORO,
 } from "@/lib/ciclo";
 import type { CicloEvento, Comunicado, Cronograma, Dupla, SolicitacaoEspecialista, Supervisao } from "@/lib/types";
@@ -35,14 +37,15 @@ import { WhatsAppRapido, type DestinoWA } from "@/components/whatsapp-rapido";
 import { msgsContato } from "@/lib/whatsapp-msgs";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { filterChipCls } from "@/components/ui/filter-chip";
 import { cn } from "@/lib/utils";
 
 
 
 type LinhaSaude = { dupla: Dupla; saude: DuplaSaude };
 
-/** Filtros dos stat-cards — cada stat filtra a lista pra mostrar só as duplas
- *  que o seu número resume (resumo → itens). "Duplas ativas" é a visão cheia
+/** Filtros dos chips do card-saúde — cada chip filtra a lista pra mostrar só
+ *  as duplas que o número resume (resumo → itens). "Todas" é a visão cheia
  *  do radar; os demais alternam a lente (risco, atenção, registro pendente). */
 const FILTROS = {
   risco: {
@@ -60,6 +63,15 @@ const FILTROS = {
 } as const;
 
 type FiltroPainel = keyof typeof FILTROS;
+
+/** Rótulos dos grupos do radar — os headers que separam as faixas do semáforo
+ *  quando a lista está sem filtro. Com filtro ativo a lista é homogênea e o
+ *  "Mostrando só N…" do topo já cobre o contexto. */
+const GRUPO_SEMAFORO: Record<Semaforo, string> = {
+  risco: "Em risco",
+  atencao: "Em atenção",
+  ok: "Em dia",
+};
 
 export function DashboardCoordenacao({
   duplas,
@@ -143,6 +155,7 @@ export function DashboardCoordenacao({
   const ativas = saude.filter((s) => s.dupla.status === "ativa").length;
   const risco = saude.filter((s) => s.saude.semaforo === "risco").length;
   const atencao = saude.filter((s) => s.saude.semaforo === "atencao").length;
+  const emDia = saude.filter((s) => s.saude.semaforo === "ok").length;
   const semRegistro = saude.filter((s) => s.saude.registroPendente).length;
   const pedidosApoio = saude.filter((s) => s.saude.pediuApoio).length;
   const emRisco = saude
@@ -154,49 +167,18 @@ export function DashboardCoordenacao({
 
   // rail vazio some junto com a coluna: pra coordenação o card de avisos
   // sempre existe (o convite de publicar), pro supervisor o rail só nasce
-  // se houver aviso — sem o guard o template xl reservava ~340px de faixa
-  // morta. O resumo não conta: agora é faixa larga acima dos stats.
+  // se houver aviso — sem o guard o template lg reservava ~340px de faixa
+  // morta. O resumo não conta: é faixa larga acima do grid.
   const temRail = !supervisor || avisos.length > 0;
 
   return (
     <div className="space-y-8">
+      {/* saudação, igual à home do mentor — o contexto da semana mora no
+          card-resumo abaixo, não em linhas auxiliares do header */}
       <header>
-        <h1 className="text-2xl font-semibold tracking-tight">Visão geral</h1>
-        {resumos.length === 1 && (
-          <p className="text-sm text-muted-foreground mt-1 flex items-center gap-1.5">
-            <span aria-hidden className="size-2 shrink-0 rounded-full bg-[var(--brand-lime)]" />
-            <span>
-              <span className="font-medium text-foreground">
-                Semana do {resumos[0].resumo.evento.numero}º encontro
-              </span>
-              {resumos[0].resumo.evento.fase
-                ? ` · ${resumos[0].resumo.evento.fase}`
-                : ""}{" "}
-              · {resumos[0].resumo.evento.titulo}
-            </span>
-          </p>
-        )}
-        {/* com turmas paralelas o cabeçalho não resume num número só — uma
-            linha por cronograma, cada uma rotulada pela turma */}
-        {multiplos &&
-          resumos.map(({ cronograma, resumo }) => (
-            <p
-              key={cronograma?.id ?? "todos"}
-              className="text-sm text-muted-foreground mt-1 flex items-center gap-1.5"
-            >
-              <span aria-hidden className="size-2 shrink-0 rounded-full bg-[var(--brand-lime)]" />
-              <span>
-                {cronograma && (
-                  <span className="font-medium text-foreground">
-                    {rotuloCronograma(cronograma)} —{" "}
-                  </span>
-                )}
-                Semana do {resumo.evento.numero}º encontro
-                {resumo.evento.fase ? ` · ${resumo.evento.fase}` : ""} ·{" "}
-                {resumo.evento.titulo}
-              </span>
-            </p>
-          ))}
+        <h1 className="text-2xl font-semibold tracking-tight">
+          {meuNome ? `Olá, ${meuNome}` : "Visão geral"}
+        </h1>
       </header>
 
       {!supervisor && (
@@ -208,141 +190,137 @@ export function DashboardCoordenacao({
         />
       )}
 
-      {/* faixa larga acima dos stats: o fechamento da semana em números
-          rotulados, com as ações (registros, copiar) no cabeçalho do bloco.
-          Fora do grid xl — era o último item do rail e sumia espremido em
-          340px; o dl abre em linha a partir de sm */}
-      {resumos.map(({ cronograma, resumo }) => (
-        <section
-          key={cronograma?.id ?? "todos"}
-          aria-label={`Semana do ${resumo.evento.numero}º encontro${cronograma ? ` — ${rotuloCronograma(cronograma)}` : ""}`}
-          className="animate-enter rounded-xl bg-card px-4 py-3 text-sm shadow-[var(--shadow-border)] sm:px-5"
-        >
-          <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
-            {/* o nº do encontro já está no cabeçalho ("Semana do Nº encontro") —
-                aqui a data é o fato novo; com cronogramas paralelos o rótulo
-                da turma diferencia os cartões */}
-            <h2 className="font-semibold flex items-center gap-2">
-              Esta semana · {formatDiaMes(resumo.evento.data)}
-              {multiplos && cronograma && (
-                <Badge variant="secondary" className="font-normal">
-                  {rotuloCronograma(cronograma)}
-                </Badge>
-              )}
-            </h2>
-            <div className="flex items-center gap-2">
-              <Link
-                href={`/registros?encontro=${resumo.evento.numero}`}
-                className="group inline-flex min-h-11 items-center gap-1 rounded-md px-1.5 text-xs font-medium underline underline-offset-2 transition-colors hover:text-foreground md:min-h-8"
-              >
-                Ver registros
-                <ArrowRight
-                  size={13}
-                  aria-hidden
-                  className="transition-transform group-hover:translate-x-0.5"
+      {/* faixa larga acima do grid — uma por cronograma ativo, sempre
+          empilhada. O fechamento da semana virou frase-fato + barra
+          segmentada (a gramática do ResumoEncontrosDupla da agenda): cor →
+          significado → número na legenda nomeada, sem dl de números crus */}
+      {resumos.map(({ cronograma, resumo }) => {
+        // "sem encontro" desconta quem repôs outro encontro na mesma semana
+        // — ela se encontrou, só não o oficial (mesma conta do resumo antigo)
+        const semEncontro = resumo.naoAconteceram - resumo.reposicao;
+        return (
+          <section
+            key={cronograma?.id ?? "todos"}
+            aria-label={`Semana do ${resumo.evento.numero}º encontro${cronograma ? ` — ${cronograma.turma}` : ""}`}
+            className="animate-enter rounded-xl bg-card px-4 py-4 shadow-[var(--shadow-border)] sm:px-5"
+          >
+            {/* turma é contexto tipográfico (overline), não pill — e só faz
+                falta quando há mais de um cronograma disputando o olhar;
+                o valor é o mesmo do seletor "Turma" da agenda */}
+            {multiplos && cronograma && (
+              <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                {cronograma.turma}
+              </p>
+            )}
+            <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1.5">
+              <h2 className="text-base font-semibold tracking-tight sm:text-lg">
+                Semana do {resumo.evento.numero}º encontro
+              </h2>
+              <div className="flex items-center gap-2">
+                <Link
+                  href={`/registros?encontro=${resumo.evento.numero}`}
+                  className="group inline-flex min-h-11 items-center gap-1 rounded-md px-1.5 text-xs font-medium underline underline-offset-2 transition-colors hover:text-foreground md:min-h-8"
+                >
+                  Ver registros
+                  <ArrowRight
+                    size={13}
+                    aria-hidden
+                    className="transition-transform group-hover:translate-x-0.5"
+                  />
+                </Link>
+                <CopiarResumoButton
+                  texto={textoResumoSemana(
+                    resumo,
+                    emRisco,
+                    multiplos && cronograma
+                      ? rotuloCronograma(cronograma)
+                      : undefined
+                  )}
                 />
-              </Link>
-              <CopiarResumoButton
-                texto={textoResumoSemana(
-                  resumo,
-                  emRisco,
-                  multiplos && cronograma
-                    ? rotuloCronograma(cronograma)
-                    : undefined
-                )}
-              />
+              </div>
             </div>
-          </div>
-          <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3 border-t border-border/60 pt-3 sm:grid-cols-4">
-            <div>
-              <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Realizaram o encontro</dt>
-              <dd className="mt-0.5 font-mono text-xl font-semibold tabular-nums">
-                {resumo.realizaram}
-                <span className="font-normal text-muted-foreground">
-                  /{resumo.total}
-                </span>
-              </dd>
-            </div>
-            <div>
-              <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Registros entregues</dt>
-              <dd className="mt-0.5 font-mono text-xl font-semibold tabular-nums">
-                {resumo.comRegistro}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Aguardando registro</dt>
-              <dd className="mt-0.5 font-mono text-xl font-semibold tabular-nums">
-                {resumo.aguardandoRegistro}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Sem encontro</dt>
-              <dd className="mt-0.5 font-mono text-xl font-semibold tabular-nums">
-                {resumo.naoAconteceram - resumo.reposicao}
-              </dd>
-            </div>
-          </dl>
-          {resumo.reposicao > 0 && (
-            // o significado de "em reposição" fica visível — tooltip/title
-            // não existe no toque
-            <p className="mt-3 flex flex-wrap items-center gap-x-1.5 gap-y-1 border-t border-border/60 pt-2.5 text-xs text-muted-foreground">
-              <Badge variant="outline" className="text-muted-foreground">
-                <ArrowCounterClockwise data-icon="inline-start" />
-                <span className="font-mono">{resumo.reposicao}</span> em reposição
-              </Badge>
-              <span>
-                {resumo.reposicao === 1
-                  ? "encontro de outra semana feito nesta"
-                  : "encontros de outras semanas feitos nesta"}
-              </span>
+            <p className="mt-0.5 text-sm text-muted-foreground">
+              {resumo.evento.titulo}
+              {resumo.evento.fase ? ` · ${resumo.evento.fase}` : ""} ·{" "}
+              {formatDiaSemana(resumo.evento.data)},{" "}
+              {formatDiaMes(resumo.evento.data)}
             </p>
-          )}
-        </section>
-      ))}
+            <p className="mt-3 text-sm text-muted-foreground">
+              <span className="font-medium text-foreground">
+                {resumo.realizaram} de {resumo.total}
+              </span>{" "}
+              duplas realizaram
+              {resumo.comRegistro > 0 &&
+                ` · ${resumo.comRegistro} ${resumo.comRegistro === 1 ? "registro entregue" : "registros entregues"}`}
+            </p>
+            <div
+              role="img"
+              aria-label={`${resumo.comRegistro} com registro, ${resumo.aguardandoRegistro} aguardando registro, ${resumo.reposicao} em reposição, ${semEncontro} sem encontro`}
+              className="mt-2 flex h-2.5 w-full overflow-hidden rounded-full bg-muted"
+            >
+              <Seg n={resumo.comRegistro} total={resumo.total} cls="bg-[var(--ok)]" />
+              <Seg n={resumo.aguardandoRegistro} total={resumo.total} cls="bg-[var(--warn)]" />
+              <Seg n={resumo.reposicao} total={resumo.total} cls="bg-[var(--brand-lime)]" />
+              <Seg n={semEncontro} total={resumo.total} cls="bg-muted-foreground/40" />
+            </div>
+            {resumo.total > 0 && (
+              <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                {resumo.comRegistro > 0 && (
+                  <span className="inline-flex items-center gap-1">
+                    <span aria-hidden className="size-2 rounded-full bg-[var(--ok)]" />
+                    {resumo.comRegistro} com registro
+                  </span>
+                )}
+                {resumo.aguardandoRegistro > 0 && (
+                  <span className="inline-flex items-center gap-1">
+                    <span aria-hidden className="size-2 rounded-full bg-[var(--warn)]" />
+                    {resumo.aguardandoRegistro} aguardando registro
+                  </span>
+                )}
+                {resumo.reposicao > 0 && (
+                  <span className="inline-flex items-center gap-1">
+                    <span aria-hidden className="size-2 rounded-full bg-[var(--brand-lime)]" />
+                    {resumo.reposicao} em reposição
+                  </span>
+                )}
+                {semEncontro > 0 && (
+                  <span className="inline-flex items-center gap-1">
+                    <span aria-hidden className="size-2 rounded-full bg-muted-foreground/40" />
+                    {semEncontro} sem encontro
+                  </span>
+                )}
+              </p>
+            )}
+            {resumo.reposicao > 0 && (
+              // o significado de "em reposição" fica visível — tooltip/title
+              // não existe no toque
+              <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
+                <ArrowCounterClockwise size={12} aria-hidden />
+                {resumo.reposicao} em reposição —{" "}
+                {resumo.reposicao === 1
+                  ? "encontro de outra semana feito nesta."
+                  : "encontros de outras semanas feitos nesta."}
+              </p>
+            )}
+          </section>
+        );
+      })}
 
-      {/* xl+: trabalho na coluna principal (stats + radar), contexto no rail
-          da direita — mesmo modelo do aside da ficha de dupla. O rail vem
-          depois no DOM: no mobile a leitura segue stats → radar → contexto
-          sem precisar de order-* */}
+      {/* lg+: coluna principal de trabalho (banner → saúde → radar →
+          supervisões) + rail lateral de contexto (avisos → solicitações).
+          Nested columns: cada lado flui independente — nenhum gap quando o
+          rail é mais alto que os primeiros blocos da main. No mobile a
+          leitura é a ordem do DOM: avisos e solicitações voltam pra depois
+          do radar (o radar é o driver diário; avisos pra coord são posts
+          dela mesma). Rail abre em lg, mesma régua da agenda */}
       <div
         className={cn(
-          "grid gap-8",
-          temRail && "xl:grid-cols-[minmax(0,1fr)_minmax(300px,340px)]"
+          "space-y-8",
+          temRail &&
+            "lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(300px,340px)] lg:items-start lg:gap-8 lg:space-y-0"
         )}
       >
         <div className="min-w-0 space-y-8">
-          <div
-            role="group"
-            aria-label="Filtrar lista de duplas"
-            className="grid grid-cols-2 gap-3 xl:grid-cols-4"
-          >
-            <Stat i={0} label="Duplas ativas" valor={ativas} href="/" ativo={!filtroAtivo} />
-            <Stat
-              i={1}
-              label="Em risco"
-              valor={risco}
-              destaque={risco > 0 ? "danger" : undefined}
-              href="/?filtro=risco"
-              ativo={filtroAtivo === "risco"}
-            />
-            <Stat
-              i={2}
-              label="Em atenção"
-              valor={atencao}
-              destaque={atencao > 0 ? "warn" : undefined}
-              href="/?filtro=atencao"
-              ativo={filtroAtivo === "atencao"}
-            />
-            <Stat
-              i={3}
-              label="Registros pendentes"
-              valor={semRegistro}
-              destaque={semRegistro > 0 ? "warn" : undefined}
-              href="/?filtro=pendentes"
-              ativo={filtroAtivo === "pendentes"}
-            />
-          </div>
-
           {pedidosApoio > 0 && (
             <div className="rounded-xl border border-[var(--danger)]/40 bg-[var(--danger)]/5 px-4 py-3 text-sm">
               <span className="font-medium">
@@ -356,8 +334,96 @@ export function DashboardCoordenacao({
             </div>
           )}
 
-          {/* radar depois do pulso: resumo da semana e stats vêm acima; a
-              lista de duplas é o bloco de trabalho — solicitações e avisos
+          {/* saúde das duplas — o headline + a proporção do semáforo numa
+              barra segmentada + os filtros como chips (mesma idiom de
+              filterChipCls): substitui os 4 stat-cards de peso idêntico */}
+          <section
+            aria-label="Saúde das duplas"
+            className="animate-enter rounded-xl bg-card px-4 py-4 shadow-[var(--shadow-border)] sm:px-5"
+          >
+            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+              <h2 className="text-base font-semibold tracking-tight">
+                Duplas ativas
+              </h2>
+              <p className="font-mono text-3xl font-semibold leading-none tabular-nums">
+                {ativas}
+              </p>
+            </div>
+            <div
+              role="img"
+              aria-label={`${emDia} em dia, ${atencao} em atenção, ${risco} em risco`}
+              className="mt-3 flex h-2.5 overflow-hidden rounded-full bg-muted"
+            >
+              <Seg n={emDia} total={saude.length} cls="bg-[var(--ok)]" />
+              <Seg n={atencao} total={saude.length} cls="bg-[var(--warn)]" />
+              <Seg n={risco} total={saude.length} cls="bg-[var(--danger)]" />
+            </div>
+            {saude.length > 0 && (
+              <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                {emDia > 0 && (
+                  <span className="inline-flex items-center gap-1">
+                    <span aria-hidden className="size-2 rounded-full bg-[var(--ok)]" />
+                    {emDia} em dia
+                  </span>
+                )}
+                {atencao > 0 && (
+                  <span className="inline-flex items-center gap-1">
+                    <span aria-hidden className="size-2 rounded-full bg-[var(--warn)]" />
+                    {atencao} em atenção
+                  </span>
+                )}
+                {risco > 0 && (
+                  <span className="inline-flex items-center gap-1">
+                    <span aria-hidden className="size-2 rounded-full bg-[var(--danger)]" />
+                    {risco} em risco
+                  </span>
+                )}
+              </p>
+            )}
+            {/* chips são links de verdade — Cmd+click, back/forward e
+                aria-current de graça; o dot interno fala a língua do
+                semáforo (pendente é oco: "falta algo") */}
+            <div
+              role="group"
+              aria-label="Filtrar lista de duplas"
+              className="mt-3 flex flex-wrap gap-2"
+            >
+              <Link
+                href="/"
+                className={filterChipCls(!filtroAtivo)}
+                aria-current={!filtroAtivo ? "page" : undefined}
+              >
+                Todas
+              </Link>
+              <Link
+                href="/?filtro=risco"
+                className={filterChipCls(filtroAtivo === "risco")}
+                aria-current={filtroAtivo === "risco" ? "page" : undefined}
+              >
+                <span aria-hidden className="size-2 rounded-full bg-[var(--danger)]" />
+                Em risco <span className="tabular-nums">{risco}</span>
+              </Link>
+              <Link
+                href="/?filtro=atencao"
+                className={filterChipCls(filtroAtivo === "atencao")}
+                aria-current={filtroAtivo === "atencao" ? "page" : undefined}
+              >
+                <span aria-hidden className="size-2 rounded-full bg-[var(--warn)]" />
+                Em atenção <span className="tabular-nums">{atencao}</span>
+              </Link>
+              <Link
+                href="/?filtro=pendentes"
+                className={filterChipCls(filtroAtivo === "pendentes")}
+                aria-current={filtroAtivo === "pendentes" ? "page" : undefined}
+              >
+                <span aria-hidden className="size-2 rounded-full ring-1 ring-[var(--warn)]" />
+                Registro pendente <span className="tabular-nums">{semRegistro}</span>
+              </Link>
+            </div>
+          </section>
+
+          {/* radar depois do pulso: resumo da semana e saúde vêm acima; a
+              lista de duplas é o bloco de trabalho — avisos e solicitações
               ficam no rail */}
           <section className="space-y-3" aria-labelledby="duplas-radar-titulo">
             <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
@@ -437,37 +503,59 @@ export function DashboardCoordenacao({
               </Card>
             )}
 
-            {/* entrada escalonada — o stagger revela a ordem risco→ok (spec §2) */}
-            {visiveis.map(({ dupla, saude }, i) => (
-              <DuplaCard
-                key={dupla.id}
-                dupla={dupla}
-                saude={saude}
-                eventos={eventos}
-                origem={origem}
-                interacoes={interacoes}
-                hoje={hoje}
-                i={i}
-                meuNome={meuNome}
-              />
-            ))}
+            {/* entrada escalonada — o stagger revela a ordem risco→ok. Sem
+                filtro, um overline de grupo marca a virada de faixa do
+                semáforo (dot + nome + count); com filtro a lista é
+                homogênea e o "Mostrando só N…" acima já cobre o contexto */}
+            {visiveis.map(({ dupla, saude }, i) => {
+              const anterior = i > 0 ? visiveis[i - 1].saude.semaforo : null;
+              const novoGrupo = !filtroAtivo && saude.semaforo !== anterior;
+              return (
+                <Fragment key={dupla.id}>
+                  {novoGrupo && (
+                    <h3 className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                      <SemaforoDot nivel={saude.semaforo} />
+                      {GRUPO_SEMAFORO[saude.semaforo]}{" "}
+                      <span className="tabular-nums">
+                        {saude.semaforo === "risco"
+                          ? risco
+                          : saude.semaforo === "atencao"
+                            ? atencao
+                            : emDia}
+                      </span>
+                    </h3>
+                  )}
+                  <DuplaCard
+                    dupla={dupla}
+                    saude={saude}
+                    eventos={eventos}
+                    origem={origem}
+                    interacoes={interacoes}
+                    hoje={hoje}
+                    i={i}
+                    meuNome={meuNome}
+                  />
+                </Fragment>
+              );
+            })}
           </section>
 
           {/* ritual supervisor ↔ mentor do guia (0041): registrar a conversa e
               reler as últimas. Sem dupla supervisionada nem sessão no histórico,
               o cartão some — a lista de duplas vazia já carrega a explicação */}
-          {supervisor && (supervisaoItens.length > 0 || supervisaoAlvos.length > 0) && (
-            <SupervisoesSection
-              itens={supervisaoItens}
-              visao="supervisor"
-              descricao="As conversas de supervisão com seus mentores: o ritual de acompanhamento do guia."
-              acao={
-                supervisaoAlvos.length > 0 ? (
-                  <SupervisaoDialog alvos={supervisaoAlvos} />
-                ) : undefined
-              }
-            />
-          )}
+          {supervisor &&
+            (supervisaoItens.length > 0 || supervisaoAlvos.length > 0) && (
+              <SupervisoesSection
+                itens={supervisaoItens}
+                visao="supervisor"
+                descricao="As conversas de supervisão com seus mentores: o ritual de acompanhamento do guia."
+                acao={
+                  supervisaoAlvos.length > 0 ? (
+                    <SupervisaoDialog alvos={supervisaoAlvos} />
+                  ) : undefined
+                }
+              />
+            )}
         </div>
 
         {temRail && (
@@ -496,59 +584,13 @@ function motivoCurto(s: DuplaSaude): string {
   return "avaliação baixa + dificuldade";
 }
 
-/** Stat = número-resumo + link-filtro: o clique mostra na lista só as duplas
- *  que o número resume. Ativo ganha borda lime (mesmo "ativo" da nav) +
- *  aria-current; superfície e hover seguem a gramática dos cards clicáveis —
- *  mesma cara, mesmo comportamento. */
-function Stat({
-  i,
-  label,
-  valor,
-  destaque,
-  href,
-  ativo,
-}: {
-  /** posição no grupo — alimenta o stagger do animate-enter */
-  i: number;
-  label: string;
-  valor: number;
-  destaque?: "warn" | "danger";
-  href: string;
-  ativo?: boolean;
-}) {
-  return (
-    <Link
-      href={href}
-      aria-current={ativo ? "true" : undefined}
-      style={{ "--i": i } as CSSProperties}
-      className={cn(
-        "animate-enter rounded-xl border bg-card px-4 py-3 shadow-[var(--shadow-border)] transition-[border-color,box-shadow,translate] ease-snappy",
-        "hover:-translate-y-px hover:border-[var(--brand-lime)]/60 hover:shadow-[var(--shadow-border-hover)] focus-visible:ring-2 focus-visible:ring-ring",
-        ativo ? "border-[var(--brand-lime)]" : "border-transparent"
-      )}
-    >
-      <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-        {destaque && (
-          <span
-            aria-hidden
-            className={cn(
-              "size-2 rounded-full",
-              destaque === "danger" ? "bg-[var(--danger)]" : "bg-[var(--warn)]"
-            )}
-          />
-        )}
-        {label}
-      </p>
-      <p
-        className={
-          "mt-1 font-mono text-3xl font-semibold tracking-tight tabular-nums " +
-          (destaque === "danger" ? "text-[var(--danger)]" : destaque === "warn" ? "text-[var(--warn-text)]" : "")
-        }
-      >
-        {valor}
-      </p>
-    </Link>
-  );
+/** Segmento proporcional das barras-resumo (semana e saúde das duplas) —
+ *  some quando zero (a legenda nomeada também omite zeros); denominador 0
+ *  deixa a faixa só no track muted. Gramática do ResumoEncontrosDupla da
+ *  agenda: width percentual, sem rótulo interno — o número mora na legenda. */
+function Seg({ n, total, cls }: { n: number; total: number; cls: string }) {
+  if (n <= 0 || total <= 0) return null;
+  return <span className={cls} style={{ width: `${(n / total) * 100}%` }} />;
 }
 
 function DuplaCard({
@@ -679,7 +721,10 @@ function DuplaCard({
             )}
           </p>
         </div>
-        <div className="relative flex shrink-0 flex-col items-end gap-2">
+        {/* coluna de progresso com largura estável — w-full dentro de
+            items-end herdava a largura do filho mais largo (~90px
+            acidentais); trilha merece presença fixa */}
+        <div className="relative flex w-20 shrink-0 flex-col items-end gap-2 sm:w-24">
           <span className="text-xs text-muted-foreground">
             <span className="font-mono tabular-nums">{encontroAtual}/{total}</span>{" "}
             encontros

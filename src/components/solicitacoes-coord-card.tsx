@@ -19,11 +19,15 @@ function corta(texto: string, max = 110): string {
 /** Card do dashboard da coordenação: demandas de especialista esperando
  *  aceite — contagem, as 3 mais recentes e cancelamento com confirmação. A
  *  lista chega por prop (RLS do papel já filtrada pela query). Sem pedido
- *  aberto não há o que dizer: o card não renderiza (empty state honesto). */
+ *  aberto não há o que dizer: o card não renderiza (empty state honesto).
+ *  `className` recebe o placement do grid da home (rail, sob os avisos). */
 export function SolicitacoesCoordCard({
   solicitacoes,
+  className,
 }: {
   solicitacoes: SolicitacaoEspecialista[];
+  /** placement no grid da home — merge no <Card> raiz */
+  className?: string;
 }) {
   const [agoraMs] = useState(() => Date.now());
   const abertas = solicitacoes.filter((s) => s.status === "aberta");
@@ -31,7 +35,7 @@ export function SolicitacoesCoordCard({
   if (abertas.length === 0) return null;
 
   return (
-    <Card>
+    <Card className={className}>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           Pedidos de especialista
