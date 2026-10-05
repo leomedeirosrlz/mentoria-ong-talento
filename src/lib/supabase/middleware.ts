@@ -19,11 +19,13 @@ export async function updateSession(request: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
-      // o default do ssr não marca Secure — produção é https de ponta a ponta;
-      // em dev o http+IP/hostname (Tailscale, LAN) descarta cookie Secure e a
-      // sessão nunca persiste
+      // Secure segue o scheme do request, não o build env: cobre dev em http
+      // (IP/Tailscale descartaria Secure e a sessão nunca persistiria) E um
+      // `next start` servido em http+LAN — que sob NODE_ENV sairia Secure
+      // mesmo em http. Cookie sem Secure funciona em https também, então
+      // errar pro lado do scheme só degrada a flag, nunca o transporte.
       cookieOptions: {
-        secure: process.env.NODE_ENV === "production",
+        secure: request.nextUrl.protocol === "https:",
         sameSite: "lax",
       },
       cookies: {
