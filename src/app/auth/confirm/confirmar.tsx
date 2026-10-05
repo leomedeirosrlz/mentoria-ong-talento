@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { type EmailOtpType } from "@supabase/supabase-js";
 import { CircleNotch, SignIn, WarningCircle } from "@phosphor-icons/react";
-import { createClient } from "@/lib/supabase/client";
+import { createAuthClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 
 // /auth/confirm sem ?h=: o link não prova que foi pedido nesta aba, então o
@@ -24,7 +24,7 @@ export function ConfirmarAqui({
   next: string;
 }) {
   const router = useRouter();
-  const supabase = useMemo(() => createClient(), []);
+  const supabase = useMemo(() => createAuthClient(), []);
   const [entrando, setEntrando] = useState(false);
   const [falhou, setFalhou] = useState(false);
   const trocaEmail = type === "email_change";

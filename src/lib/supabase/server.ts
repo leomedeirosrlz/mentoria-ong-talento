@@ -3,7 +3,12 @@ import { cookies } from "next/headers";
 
 // o default do ssr não marca Secure — sem ele um cookie escrito em http
 // ficaria solto; em produção tudo é https mesmo (localhost é exceção do spec)
-const COOKIE_OPTS = { secure: true, sameSite: "lax" } as const;
+// — mas em dev http+IP/hostname (Tailscale, LAN) o Secure seria descartado
+// e a sessão nunca persistiria
+const COOKIE_OPTS = {
+  secure: process.env.NODE_ENV === "production",
+  sameSite: "lax",
+} as const;
 
 export async function createClient() {
   const cookieStore = await cookies();

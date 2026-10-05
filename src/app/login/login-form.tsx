@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { type Session } from "@supabase/supabase-js";
 import { motion, AnimatePresence } from "motion/react";
 import { CircleNotch, EnvelopeSimple, Key, WarningCircle } from "@phosphor-icons/react";
-import { createClient, createOtpClient } from "@/lib/supabase/client";
+import { createAuthClient, createOtpClient } from "@/lib/supabase/client";
 import { SiteFooter } from "@/components/site-footer";
 import { fade, T } from "@/components/motion";
 import { Button } from "@/components/ui/button";
@@ -50,7 +50,7 @@ export function LoginForm() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const params = useSearchParams();
-  const supabase = useMemo(() => createClient(), []);
+  const supabase = useMemo(() => createAuthClient(), []);
   // client implícito só pro pedido do link — o ssr força pkce, que prende o
   // acesso ao browser que pediu (ver createOtpClient)
   const otp = useMemo(() => createOtpClient(), []);
