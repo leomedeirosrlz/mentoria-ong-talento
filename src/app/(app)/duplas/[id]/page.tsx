@@ -357,7 +357,7 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
         sugerido={sugeridoProximo}
         piso={dupla.iniciada_em ?? undefined}
         trigger={
-          <DropdownMenuItem>
+          <DropdownMenuItem render={<button type="button" />} nativeButton>
             <CalendarPlus aria-hidden /> Agendar encontro
           </DropdownMenuItem>
         }
@@ -381,7 +381,7 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
           whatsapp: dupla.mentorado.whatsapp,
         }}
         trigger={
-          <DropdownMenuItem>
+          <DropdownMenuItem render={<button type="button" />} nativeButton>
             <PaperPlaneTilt aria-hidden /> Enviar formulário
           </DropdownMenuItem>
         }
@@ -395,7 +395,7 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
         duplaId={dupla.id}
         especialistas={especialistas}
         trigger={
-          <DropdownMenuItem>
+          <DropdownMenuItem render={<button type="button" />} nativeButton>
             <UserPlus aria-hidden /> Solicitar mentor especialista
           </DropdownMenuItem>
         }
@@ -408,7 +408,7 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
         key="trilha"
         duplaId={dupla.id}
         trigger={
-          <DropdownMenuItem>
+          <DropdownMenuItem render={<button type="button" />} nativeButton>
             <FlagCheckered aria-hidden /> Encerrar trilha
           </DropdownMenuItem>
         }
