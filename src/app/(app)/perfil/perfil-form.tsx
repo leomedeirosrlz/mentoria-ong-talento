@@ -13,7 +13,7 @@ import {
 } from "@phosphor-icons/react";
 import { createClient, createOtpClient } from "@/lib/supabase/client";
 import { emailValido, normEmail } from "@/lib/importar";
-import { DEMO_MSG } from "@/lib/demo/shared";
+import { DEMO_MSG, demoAtivoClient } from "@/lib/demo/shared";
 import { setAvatarPath, signOut, updateMeuPerfil } from "@/lib/actions";
 import { avisarSenhaAlterada, trocarEmail } from "@/lib/actions-conta";
 import { avatarPublicUrl, AVATAR_ACCEPT, AVATAR_MAX_BYTES } from "@/lib/avatar";
@@ -676,6 +676,12 @@ function DialogoSenha({ email }: { email: string }) {
   async function esqueci() {
     setSalvando(true);
     try {
+      // o client de recovery é sempre real (não desvia pro stub) — na demo
+      // dispararia um e-mail de verdade pro domínio realiza.vc
+      if (demoAtivoClient()) {
+        toast.error(DEMO_MSG);
+        return;
+      }
       // recovery implícito (mesmo client do magic link): sem pkce o link
       // abre a sessão em qualquer navegador — é o dono da caixa de e-mail
       const { error } = await otp.auth.resetPasswordForEmail(email, {

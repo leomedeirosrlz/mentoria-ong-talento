@@ -34,9 +34,20 @@ export function createClient() {
 
 /** Client de fluxos de autenticação — NUNCA desvia pra demo: quem está em
  *  /login ou /auth/* quer sessão de verdade, mesmo com o cookie demo_role
- *  ativo (o middleware limpa o cookie demo quando a sessão real valida). */
+ *  ativo (quem sai da demo é o limparCookiesDemo no sucesso do login).
+ *  detectSessionInUrl desligado: todas as rotas de auth leem o hash na mão —
+ *  com o default true o client podia consumir #access_token/#refresh_token
+ *  antes do useEffect da página, queimando o refresh de uso único antes do
+ *  handoff publicar os tokens. */
 export function createAuthClient() {
-  return realClient();
+  return createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookieOptions: { secure: SECURE, sameSite: "lax" },
+      auth: { detectSessionInUrl: false },
+    }
+  );
 }
 
 /** Client dedicado ao pedido de magic link. O client ssr força flowType

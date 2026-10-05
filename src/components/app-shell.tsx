@@ -197,7 +197,9 @@ export function AppShell({
           <form action={signOut}>
             <button type="submit" className="mt-2 flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground outline-none transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-3 focus-visible:ring-ring/50">
               <SignOut size={18} aria-hidden />
-              Sair
+              {/* em demo o signOut sai da demonstração — a sessão real dormente
+                  continua e o middleware devolve pro app logado */}
+              {demo ? "Sair da demonstração" : "Sair"}
             </button>
           </form>
         </div>
