@@ -18,7 +18,8 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { TRILHA_LABEL, ciclosOpcoes } from "@/lib/ciclo";
+import { TRILHA_LABEL, rotuloCronograma } from "@/lib/ciclo";
+import type { Cronograma } from "@/lib/types";
 
 type Opt = { id: string; nome: string; role?: string | null };
 const NENHUM = "__nenhum";
@@ -45,9 +46,9 @@ export function EditarDuplaDialog({ dupla }: { dupla: Dupla }) {
   const [ocupacao, setOcupacao] = useState<Map<string, Set<string>>>(new Map());
   // carga de supervisão: quantas duplas ativas/pausadas cada supervisor já tem
   const [emSup, setEmSup] = useState<Record<string, number>>({});
-  // ciclos do select — calendário oficial + os já usados em duplas; o atual
-  // entra por último caso falte (dupla de ciclo sem eventos no calendário)
-  const [ciclos, setCiclos] = useState<string[]>([dupla.ciclo]);
+  // cronogramas do select (0061) — o vínculo da dupla é o calendário oficial
+  // que ela segue; mudar troca datas e semáforo
+  const [cronogramas, setCronogramas] = useState<Cronograma[]>([]);
   // os Selects só montam com os items carregados — antes disso o trigger
   // exibiria o UUID cru do defaultValue
   const [pronto, setPronto] = useState(false);
@@ -71,7 +72,7 @@ export function EditarDuplaDialog({ dupla }: { dupla: Dupla }) {
     let cancelado = false;
     (async () => {
       try {
-        const [perfis, ments, ds, mps, evsCiclo] = await Promise.all([
+        const [perfis, ments, ds, mps, crons] = await Promise.all([
           supabase
             .from("profiles")
             .select("id, nome, role")
@@ -79,17 +80,16 @@ export function EditarDuplaDialog({ dupla }: { dupla: Dupla }) {
             .eq("ativo", true)
             .order("nome"),
           supabase.from("mentorados").select("id, nome").order("nome"),
-          // sem filtro de status: a ocupação filtra em JS, e o histórico
-          // completo alimenta as opções de ciclo. A própria dupla sai pelo
-          // .neq — senão o mentor atual apareceria lotado por causa dela
+          // sem filtro de status: a ocupação filtra em JS. A própria dupla
+          // sai pelo .neq — senão o mentor atual apareceria lotado por ela
           supabase
             .from("duplas")
-            .select("mentor_id, mentorado_id, supervisor_id, trilha, status, ciclo")
+            .select("mentor_id, mentorado_id, supervisor_id, trilha, status")
             .neq("id", dupla.id),
           supabase.from("mentor_profiles").select("profile_id, capacidade"),
-          supabase.from("ciclo_eventos").select("ciclo"),
+          supabase.from("cronogramas").select("*").order("turma").order("nome"),
         ]);
-        const erro = [perfis, ments, ds, mps, evsCiclo].find((r) => r.error)?.error;
+        const erro = [perfis, ments, ds, mps, crons].find((r) => r.error)?.error;
         if (erro) throw erro;
         if (cancelado) return;
         const lista = (perfis.data ?? []) as Opt[];
@@ -139,12 +139,7 @@ export function EditarDuplaDialog({ dupla }: { dupla: Dupla }) {
         const porMentor: Record<string, number> = {};
         for (const mp of mps.data ?? []) porMentor[mp.profile_id] = mp.capacidade;
         setCapacidade(porMentor);
-        setCiclos(
-          ciclosOpcoes(evsCiclo.data ?? [], [
-            ...(ds.data ?? []).map((d) => d.ciclo),
-            dupla.ciclo,
-          ])
-        );
+        setCronogramas((crons.data ?? []) as Cronograma[]);
         carregou.current = true;
         setPronto(true);
       } catch {
@@ -216,6 +211,10 @@ export function EditarDuplaDialog({ dupla }: { dupla: Dupla }) {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
     if (fd.get("supervisor_id") === NENHUM) fd.set("supervisor_id", "");
+    if (fd.get("cronograma_id") === NENHUM) fd.set("cronograma_id", "");
+    // especialista não tem cronograma — manda vazio explícito (o server
+    // força null de qualquer jeito)
+    if (ehEsp) fd.set("cronograma_id", "");
     start(async () => {
       try {
         const res = await updateDupla(dupla.id, fd);
@@ -315,21 +314,50 @@ export function EditarDuplaDialog({ dupla }: { dupla: Dupla }) {
                   : ". Trocar o mentor por outro papel muda o tipo."}
               </p>
             </div>
-            <div className="space-y-2">
-              <Label id="edit-ciclo-label">Ciclo</Label>
-              <Select
-                name="ciclo"
-                defaultValue={dupla.ciclo}
-                items={Object.fromEntries(ciclos.map((c) => [c, c]))}
-              >
-                <SelectTrigger id="edit-ciclo-select" aria-labelledby="edit-ciclo-label edit-ciclo-select"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {ciclos.map((c) => (
-                    <SelectItem key={c} value={c}>{c}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            {/* cronograma só existe na trilha DPP — a especialista não tem
+                calendário oficial (o server força null nela, independente
+                do que chegar) */}
+            {!ehEsp ? (
+              <div className="space-y-2">
+                <Label id="edit-cronograma-label">Cronograma</Label>
+                <Select
+                  name="cronograma_id"
+                  defaultValue={dupla.cronograma_id ?? NENHUM}
+                  items={{
+                    [NENHUM]: "Sem vínculo",
+                    ...Object.fromEntries(
+                      cronogramas.map((c) => [c.id, rotuloCronograma(c)])
+                    ),
+                  }}
+                >
+                  <SelectTrigger id="edit-cronograma-select" aria-labelledby="edit-cronograma-label edit-cronograma-select"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NENHUM}>Sem vínculo</SelectItem>
+                    {cronogramas.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {rotuloCronograma(c)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {/* ativa/pausada sem vínculo não pode ficar assim — o server
+                    resolve pro vigente ou recusa com erro claro; a nota avisa */}
+                {!dupla.cronograma_id &&
+                  (dupla.status === "ativa" || dupla.status === "pausada") && (
+                    <p className="text-xs text-[var(--danger)]">
+                      Dupla ativa sem cronograma — escolha um pra destravar
+                      agenda e semáforo.
+                    </p>
+                  )}
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Label id="edit-cronograma-label">Cronograma</Label>
+                <p className="flex h-11 items-center rounded-lg bg-muted/40 px-2.5 text-sm text-muted-foreground md:h-8">
+                  Não se aplica à mentoria especializada
+                </p>
+              </div>
+            )}
             <div className="space-y-2">
               <Label id="edit-mentor-label">
                 {/* dot de papel — distinção não-cromática é o texto; a cor é redundância */}

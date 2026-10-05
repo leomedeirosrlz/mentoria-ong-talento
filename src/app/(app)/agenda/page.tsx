@@ -1,13 +1,20 @@
 import type { Metadata } from "next";
 import {
   getCicloEventos,
+  getCronogramas,
   getDuplas,
   getEspecialistaEventos,
   getMateriais,
   getMe,
 } from "@/lib/queries";
 import { getMentoresChamada, getPresencas } from "@/lib/queries-presenca";
-import { eventoDaSemana, toDateStr, totalEncontros } from "@/lib/ciclo";
+import {
+  cronogramaVigente,
+  eventoDaSemana,
+  eventosDoCronograma,
+  toDateStr,
+  totalEncontros,
+} from "@/lib/ciclo";
 import { AgendaCalendario } from "@/components/agenda-calendario";
 import { AgendaEspecialista } from "@/components/agenda-especialista";
 
@@ -23,11 +30,12 @@ export default async function AgendaPage({
   const diaInicial = dia && /^\d{4}-\d{2}-\d{2}$/.test(dia) ? dia : null;
 
   // getDuplas vem no escopo do RLS: mentor→a própria, supervisor→supervisionadas, coord→todas
-  const [eventos, me, duplas, materiais] = await Promise.all([
+  const [eventos, me, duplas, materiais, cronogramas] = await Promise.all([
     getCicloEventos(),
     getMe(),
     getDuplas(),
     getMateriais(),
+    getCronogramas(),
   ]);
   // audiência = mesma regra de /materiais: "todos" pra todo mundo, "dpp" e
   // "especialista" pro papel correspondente, coordenação vê tudo
@@ -40,7 +48,13 @@ export default async function AgendaPage({
   });
   const agora = new Date();
   const hoje = toDateStr(agora);
-  const semana = eventoDaSemana(eventos, agora);
+  // "semana do encontro" do cabeçalho é do cronograma vigente (o default da
+  // tela) — na união dos calendários, semana de T1 e T2 se embaralhariam
+  const vigente = cronogramaVigente(cronogramas, agora);
+  const eventosVigente = vigente
+    ? eventosDoCronograma(eventos, vigente.id)
+    : eventos;
+  const semana = eventoDaSemana(eventosVigente, agora);
   const temEspecialista = duplas.some((d) => d.trilha === "especialista");
   const espEventos = temEspecialista ? await getEspecialistaEventos() : [];
   // mentor cuja única trilha é a especialista não tem calendário de terças —
@@ -95,7 +109,7 @@ export default async function AgendaPage({
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Agenda</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            {totalEncontros(eventos)} encontros semanais, sempre às terças
+            {totalEncontros(eventosVigente)} encontros semanais, sempre às terças
           </p>
         </div>
         {semana?.numero != null && (
@@ -118,6 +132,7 @@ export default async function AgendaPage({
       ) : (
         <AgendaCalendario
           eventos={eventos}
+          cronogramas={cronogramas}
           espEventos={espEventos}
           materiais={materiaisVisiveis}
           hoje={hoje}

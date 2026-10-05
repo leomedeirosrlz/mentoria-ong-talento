@@ -64,7 +64,7 @@ describe("eventoDaSemana", () => {
     expect(eventoDaSemana([], dt("2025-10-15"))).toBeNull();
     expect(
       eventoDaSemana(
-        [{ id: "f", tipo: "formacao", numero: null, data: "2025-10-14", data_fim: null, titulo: "F", fase: null, instrumentos: [] }],
+        [{ id: "f", cronograma_id: "c1", tipo: "formacao", numero: null, data: "2025-10-14", data_fim: null, titulo: "F", fase: null, instrumentos: [] }],
         dt("2025-10-15")
       )
     ).toBeNull();

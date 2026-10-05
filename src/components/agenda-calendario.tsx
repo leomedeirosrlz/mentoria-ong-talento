@@ -49,18 +49,30 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   alvoAgendamento,
   bucketsDoEncontro,
+  cronogramaVigente,
+  cronogramasOpcoes,
   diffDias,
   duplasSemEncontroDoNumero,
   emLimbo,
+  eventosDoCronograma,
   formatDate,
   formatDateTime,
   formatDiaSemana,
   linkSeguro,
   passosDaTrilha,
   resumoSemanaDe,
+  rotuloCronograma,
   semanaBounds,
   toDateStr,
   type BucketsEncontro,
@@ -71,6 +83,7 @@ import type { MentorChamada } from "@/lib/queries-presenca";
 import type {
   AppRole,
   CicloEvento,
+  Cronograma,
   Dupla,
   Encontro,
   EncontroStatus,
@@ -429,6 +442,7 @@ function ChaveDotsDupla({ className }: { className?: string }) {
 
 export function AgendaCalendario({
   eventos,
+  cronogramas = [],
   espEventos = [],
   materiais = [],
   hoje,
@@ -440,6 +454,10 @@ export function AgendaCalendario({
   presencas = {},
 }: {
   eventos: CicloEvento[];
+  /** Cronogramas do programa (0061) — cada um é um calendário oficial por
+   *  turma. Com mais de um aplicável, a tela ganha o seletor e nunca mistura
+   *  "encontro nº N" de turmas diferentes no mesmo board. */
+  cronogramas?: Cronograma[];
   /** Passos da trilha especialista — resolve a "sugestão do guia" das duplas
    *  dela (o nº 1–5 não bate com nenhum evento do ciclo DPP). */
   espEventos?: EspecialistaEvento[];
@@ -464,17 +482,52 @@ export function AgendaCalendario({
   const ehCoord = role === "coordenacao";
   const router = useRouter();
 
+  // ===== cronograma selecionado (0061) =====
+  // Opções por papel: coord/sup veem todos os cronogramas; o mentor vê os das
+  // próprias duplas DPP (sem dupla, o vigente — o calendário "do programa"
+  // que ele já veria). Um cronograma só = sem seletor, a tela segue direta.
+  const opcoesCron = useMemo(() => {
+    const ordenados = cronogramasOpcoes(cronogramas);
+    if (!ehMentor) return ordenados;
+    const meus = new Set(
+      duplas
+        .filter((d) => d.trilha !== "especialista")
+        .map((d) => d.cronograma_id)
+    );
+    const dasDuplas = ordenados.filter((c) => meus.has(c.id));
+    return dasDuplas.length ? dasDuplas : ordenados;
+  }, [cronogramas, duplas, ehMentor]);
+  // deep-link de encontro (o card "semana do encontro" da home) vence o
+  // vigente: se o evento é de outra turma, a agenda já abre nela
+  const [cronogramaSel, setCronogramaSel] = useState<string | null>(() => {
+    const deLink = semanaId
+      ? eventos.find((e) => e.id === semanaId)?.cronograma_id
+      : null;
+    if (deLink && opcoesCron.some((c) => c.id === deLink)) return deLink;
+    return cronogramaVigente(opcoesCron)?.id ?? opcoesCron[0]?.id ?? null;
+  });
+  // O calendário oficial da tela é SÓ o do cronograma selecionado — a união
+  // dos dois faria o "encontro 5" de T1 e T2 colidirem em número. Sem
+  // cronograma nenhum (estado pré-0061) cai no comportamento antigo.
+  const eventosSel = useMemo(
+    () =>
+      cronogramaSel != null
+        ? eventosDoCronograma(eventos, cronogramaSel)
+        : eventos,
+    [eventos, cronogramaSel]
+  );
+
   // mapa dia → eventos do dia; recesso (e qualquer evento com data_fim) cobre o intervalo todo
   const porDia = useMemo(() => {
     const mapa = new Map<string, CicloEvento[]>();
-    for (const e of eventos) {
+    for (const e of eventosSel) {
       const fim = e.data_fim ?? e.data;
       for (let d = e.data; d <= fim; d = proximoDia(d)) {
         mapa.set(d, [...(mapa.get(d) ?? []), e]);
       }
     }
     return mapa;
-  }, [eventos]);
+  }, [eventosSel]);
 
   // mapa dia → encontros das duplas; cada dia em ordem cronológica pro detalhe
   // ler o dia como ele acontece. Só duplas ativas: agendado futuro de dupla
@@ -501,10 +554,10 @@ export function AgendaCalendario({
   // trilha do ciclo: só os encontros oficiais (1–16), em ordem — alimenta o rail
   const encontrosRail = useMemo(
     () =>
-      eventos
+      eventosSel
         .filter((e) => e.tipo === "encontro" && e.numero != null)
         .sort((a, b) => (a.numero ?? 0) - (b.numero ?? 0)),
-    [eventos]
+    [eventosSel]
   );
 
   // nº do encontro → materiais que o guia pede pra ele (na ordem da biblioteca,
@@ -518,13 +571,23 @@ export function AgendaCalendario({
   }, [materiais]);
 
   // nº → passo do guia por trilha — a "sugestão do guia" do form de registro
-  // e do detalhe. Especialista (1–5) não bate com nenhum evento do ciclo DPP:
-  // o lookup certo depende da trilha da dupla, não só do número
-  const passosDppPorNumero = useMemo(
-    () =>
-      new Map(passosDaTrilha("dpp", eventos, []).map((p) => [p.numero, p])),
-    [eventos]
-  );
+  // e do detalhe. Dois níveis de chave: a identidade do passo DPP é
+  // (cronograma, nº) — o "encontro 5" de T1 e T2 têm título/data próprios.
+  // Especialista (1–5) não bate com nenhum evento de cronograma: lookup só
+  // por número, na trilha própria
+  const passosDppPorCron = useMemo(() => {
+    const grupos = new Map<string, CicloEvento[]>();
+    for (const e of eventos)
+      if (e.tipo === "encontro")
+        grupos.set(e.cronograma_id, [...(grupos.get(e.cronograma_id) ?? []), e]);
+    const mapa = new Map<string, Map<number, PassoGuia>>();
+    for (const [cron, evs] of grupos)
+      mapa.set(
+        cron,
+        new Map(passosDaTrilha("dpp", evs, []).map((p) => [p.numero, p]))
+      );
+    return mapa;
+  }, [eventos]);
   const passosEspPorNumero = useMemo(
     () =>
       new Map(
@@ -535,12 +598,27 @@ export function AgendaCalendario({
       ),
     [espEventos]
   );
-  /** Passo do guia do nº pra esta dupla — DPP sai do ciclo; especialista sai
-   *  dos 5 passos próprios (sem data). */
+  /** Passo do guia do nº pra esta dupla — DPP sai do cronograma DELA;
+   *  especialista sai dos 5 passos próprios (sem data). */
   const passoDe = (dupla: Dupla, numero: number): PassoGuia | null =>
     dupla.trilha === "especialista"
       ? (passosEspPorNumero.get(numero) ?? null)
-      : (passosDppPorNumero.get(numero) ?? null);
+      : (passosDppPorCron.get(dupla.cronograma_id ?? "")?.get(numero) ?? null);
+
+  // nºs oficiais por cronograma — o selo "fora do dia oficial" de um encontro
+  // compara contra o calendário DA DUPLA dele, não o da tela (mentor com
+  // dupla em outra turma não ganharia selo errado)
+  const oficiaisPorCron = useMemo(() => {
+    const mapa = new Map<string, Set<number>>();
+    for (const e of eventos)
+      if (e.tipo === "encontro" && e.numero != null) {
+        if (!mapa.has(e.cronograma_id)) mapa.set(e.cronograma_id, new Set());
+        mapa.get(e.cronograma_id)!.add(e.numero);
+      }
+    return mapa;
+  }, [eventos]);
+  const numerosOficiaisDe = (dupla: Dupla): Set<number> =>
+    oficiaisPorCron.get(dupla.cronograma_id ?? "") ?? new Set();
 
   const mesesComEventos = useMemo(() => {
     const set = new Set<number>();
@@ -565,7 +643,7 @@ export function AgendaCalendario({
   // seleção inicial: ?dia=, senão o dia do evento da semana, senão hoje —
   // sempre dentro do mês visível (se cair fora, seleciona o 1º dia exibido)
   const [selecionado, setSelecionado] = useState(() => {
-    const daSemana = semanaId ? eventos.find((e) => e.id === semanaId) : null;
+    const daSemana = semanaId ? eventosSel.find((e) => e.id === semanaId) : null;
     const candidato = diaInicial ?? daSemana?.data ?? hoje;
     return mesIndice(candidato) === mesInicial
       ? candidato
@@ -587,12 +665,12 @@ export function AgendaCalendario({
   // pureza e deixaria cada leitura com um "agora" diferente)
   const [agoraMs] = useState(() => Date.now());
 
-  // janela de semanas navegáveis: da semana do 1º evento do ciclo à do último
-  // (mesmo recorte dos minMes/maxMes do modo mensal)
+  // janela de semanas navegáveis: da semana do 1º evento do cronograma à do
+  // último (mesmo recorte dos minMes/maxMes do modo mensal)
   const { minSemana, maxSemana } = useMemo(() => {
     let min = "",
       max = "";
-    for (const e of eventos) {
+    for (const e of eventosSel) {
       if (!min || e.data < min) min = e.data;
       if (e.data > max) max = e.data;
     }
@@ -600,7 +678,7 @@ export function AgendaCalendario({
       minSemana: min ? semanaBounds(parseDia(min)).seg : "",
       maxSemana: max ? semanaBounds(parseDia(max)).seg : "9999-12-31",
     };
-  }, [eventos]);
+  }, [eventosSel]);
   const { seg: segHoje, dom: domHoje } = semanaBounds(parseDia(hoje));
   // init: semana de hoje com clamp pros bounds do ciclo
   const [semanaIso, setSemanaIso] = useState(() =>
@@ -611,6 +689,37 @@ export function AgendaCalendario({
   // por vez (abrir um fecha o outro). Trocar o dia selecionado fecha: o painel
   // remonta a cada dia e um id vivo reapareceria aberto ao voltar — lê como bug
   const [registroAberto, setRegistroAberto] = useState<string | null>(null);
+
+  // troca de cronograma = reabrir a agenda noutra janela do tempo: reclampa
+  // mês/semana/dia pros bounds do calendário novo. É o padrão "ajustar estado
+  // na renderização" do React — não effect: setState aqui re-renderiza antes
+  // do commit (os useState de navegação nasceram com o cronograma inicial)
+  const [cronAnterior, setCronAnterior] = useState(cronogramaSel);
+  if (cronAnterior !== cronogramaSel) {
+    setCronAnterior(cronogramaSel);
+    const meses = new Set<number>();
+    let min = "",
+      max = "";
+    for (const e of eventosSel) {
+      if (!min || e.data < min) min = e.data;
+      if (e.data > max) max = e.data;
+      const fim = e.data_fim ?? e.data;
+      for (let d = e.data; d <= fim; d = proximoDia(d)) meses.add(mesIndice(d));
+    }
+    if (meses.size) {
+      const ord = [...meses].sort((a, b) => a - b);
+      const mesAlvo = meses.has(mesIndice(hoje)) ? mesIndice(hoje) : ord[0];
+      const minS = semanaBounds(parseDia(min)).seg;
+      const maxS = semanaBounds(parseDia(max)).seg;
+      setDirecao(1);
+      setMes(mesAlvo);
+      setSemanaIso(segHoje < minS ? minS : segHoje > maxS ? maxS : segHoje);
+      setSelecionado(
+        mesIndice(hoje) === mesAlvo ? hoje : faixaDoMes(mesAlvo)[0]
+      );
+    }
+    setRegistroAberto(null);
+  }
 
   // roving tabindex: refs dos botões de dia + foco pedido pelo teclado
   const refsDias = useRef(new Map<string, HTMLButtonElement>());
@@ -765,7 +874,7 @@ export function AgendaCalendario({
     moverPara(paraISO(alvo));
   }
 
-  const eventosDoMes = eventos.filter(
+  const eventosDoMes = eventosSel.filter(
     (e) => e.data <= ultimoIso && (e.data_fim ?? e.data) >= primeiroIso
   );
 
@@ -786,9 +895,14 @@ export function AgendaCalendario({
       ? [
           ...duplasDoDia,
           ...duplas
-            // numero-match só vale na trilha do calendário: o nº da
-            // especialista (1–5) coincide com eventos DPP por acidente
-            .filter((dupla) => dupla.status === "ativa" && dupla.trilha !== "especialista")
+            // numero-match só vale na trilha do calendário e no cronograma
+            // exibido: o nº da especialista (1–5) coincide por acidente, e o
+            // encontro 5 de outra turma não é o encontro 5 deste dia
+            .filter((dupla) =>
+              dupla.status === "ativa" &&
+              dupla.trilha !== "especialista" &&
+              (dupla.cronograma_id == null || dupla.cronograma_id === cronogramaSel)
+            )
             .flatMap((dupla) =>
               dupla.encontros
                 .filter((e) => numerosOficiais.has(e.numero) && !idsNoDia.has(e.id))
@@ -884,7 +998,7 @@ export function AgendaCalendario({
   // casos, mas o texto nunca diz "esta semana" quando não é — traduz a
   // posição relativa do evento à semana corrente
   const eventoSemana = semanaId
-    ? (eventos.find((e) => e.id === semanaId) ?? null)
+    ? (eventosSel.find((e) => e.id === semanaId) ?? null)
     : null;
   const marcaSemana =
     eventoSemana == null
@@ -903,7 +1017,7 @@ export function AgendaCalendario({
   // (a data cai em seg–dom), sem o fallback "próximo" dele: o board só fala
   // da semana real
   const oficialSemana =
-    eventos
+    eventosSel
       .filter(
         (e) =>
           e.tipo === "encontro" &&
@@ -915,7 +1029,7 @@ export function AgendaCalendario({
 
   // formação/recesso/marco que tocam a semana — linha-meta informativa, fora
   // dos agregados de encontro
-  const outrosDaSemana = eventos.filter(
+  const outrosDaSemana = eventosSel.filter(
     (e) =>
       !(e.tipo === "encontro" && e.numero != null) &&
       e.data <= domSel &&
@@ -923,11 +1037,20 @@ export function AgendaCalendario({
   );
 
   // itens encontro↔dupla por número oficial — a unidade do board e da lista.
-  // Só trilha DPP: o nº 1–5 da especialista colidiria com os oficiais DPP
+  // Só trilha DPP e só do cronograma selecionado: o nº 1–5 da especialista
+  // colidiria com os oficiais, e o encontro 5 de outra turma não é o desta.
+  // Dupla DPP sem cronograma (dado inválido pré-0061) entra em qualquer
+  // recorte — invisível pra coordenação seria pior que duplicada
   const itensPorNumero = useMemo(() => {
     const mapa = new Map<number, ItemDupla[]>();
     for (const dupla of duplas) {
       if (dupla.status !== "ativa" || dupla.trilha === "especialista") continue;
+      if (
+        dupla.cronograma_id != null &&
+        cronogramaSel != null &&
+        dupla.cronograma_id !== cronogramaSel
+      )
+        continue;
       for (const encontro of dupla.encontros) {
         const arr = mapa.get(encontro.numero) ?? [];
         arr.push({ encontro, dupla });
@@ -942,26 +1065,35 @@ export function AgendaCalendario({
           (instanteDoEncontro(b.encontro)?.getTime() ?? Number.POSITIVE_INFINITY)
       );
     return mapa;
-  }, [duplas]);
+  }, [duplas, cronogramaSel]);
 
   // sem encontro oficial a leitura é por DATA (o que cai na semana, qualquer
-  // número); com oficial, por NÚMERO (o que cada dupla deve pra esse encontro)
+  // número); com oficial, por NÚMERO (o que cada dupla deve pra esse encontro).
+  // Recorte por data segue o cronograma selecionado: encontro de outra turma
+  // na mesma semana não é cobertura desta
   const itensDaSemana = useMemo(() => {
     const itens: ItemDupla[] = [];
     for (let d = segSel; d <= domSel; d = proximoDia(d))
       for (const item of duplasPorDia.get(d) ?? [])
-        if (item.dupla.trilha !== "especialista") itens.push(item);
+        if (
+          item.dupla.trilha !== "especialista" &&
+          (item.dupla.cronograma_id == null ||
+            item.dupla.cronograma_id === cronogramaSel)
+        )
+          itens.push(item);
     return itens;
-  }, [duplasPorDia, segSel, domSel]);
+  }, [duplasPorDia, segSel, domSel, cronogramaSel]);
   const itensBoard = oficialSemana?.numero != null
     ? (itensPorNumero.get(oficialSemana.numero) ?? [])
     : itensDaSemana;
   const bucketsSemana = bucketsDoEncontro(itensBoard, agoraMs);
 
   // a coorte invisível: duplas ativas DPP sem nenhuma row do número oficial
+  // (o helper filtra por evento.cronograma_id internamente — mesmo número em
+  // outra turma não entra na conta)
   const semEncontroSemana =
     oficialSemana?.numero != null
-      ? duplasSemEncontroDoNumero(duplas, oficialSemana.numero, oficialSemana.data)
+      ? duplasSemEncontroDoNumero(duplas, oficialSemana)
       : [];
   const resumoOficial = oficialSemana
     ? resumoSemanaDe(duplas, oficialSemana, { seg: segSel, dom: domSel })
@@ -981,7 +1113,7 @@ export function AgendaCalendario({
     ) ?? null;
   const faltantesDoDia =
     ehCoordSup && oficialDoDia?.numero != null
-      ? duplasSemEncontroDoNumero(duplas, oficialDoDia.numero, oficialDoDia.data)
+      ? duplasSemEncontroDoNumero(duplas, oficialDoDia)
       : [];
   const bucketsDoDia = bucketsDoEncontro(itensDupla, agoraMs);
 
@@ -1022,7 +1154,7 @@ export function AgendaCalendario({
   }
   const rotuloSemanaIso = rangeSemana(segSel, domSel);
 
-  if (eventos.length === 0) return null;
+  if (eventosSel.length === 0) return null;
 
   return (
     <div
@@ -1074,6 +1206,41 @@ export function AgendaCalendario({
               </label>
             ))}
           </fieldset>
+        )}
+
+        {/* seletor de cronograma (0061) — com duas turmas ativas, cada uma tem
+            seu calendário oficial: a agenda mostra uma por vez, nunca a união.
+            Vale pra coord/sup e pro mentor com duplas em turmas diferentes */}
+        {opcoesCron.length > 1 && (
+          <div className="flex items-center gap-2.5 border-b px-3 py-1.5 sm:px-4">
+            <Label
+              htmlFor="agenda-cronograma"
+              className="shrink-0 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground"
+            >
+              Cronograma
+            </Label>
+            <Select
+              value={cronogramaSel ?? undefined}
+              onValueChange={(v) => setCronogramaSel(v)}
+              items={Object.fromEntries(
+                opcoesCron.map((c) => [c.id, rotuloCronograma(c)])
+              )}
+            >
+              <SelectTrigger
+                id="agenda-cronograma"
+                className="h-8 min-w-0 flex-1 sm:max-w-64"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {opcoesCron.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    {rotuloCronograma(c)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         )}
 
         {/* chrome de navegação — por-visão: meses no "mes", semanas na
@@ -1612,7 +1779,7 @@ export function AgendaCalendario({
               Cobertura do ciclo
             </p>
             <ul className="divide-y divide-border/60 pb-1">
-              {[...eventos]
+              {[...eventosSel]
                 .sort((a, b) => a.data.localeCompare(b.data))
                 .map((e) => {
                   const ehEncontro = e.tipo === "encontro" && e.numero != null;
@@ -1930,11 +2097,12 @@ export function AgendaCalendario({
                 {ehMentor &&
                   itensDupla
                     // na trilha especialista o nº nunca tem "dia oficial" — a
-                    // nota mora sempre sob a linha do encontro dela
+                    // nota mora sempre sob a linha do encontro dela. DPP
+                    // compara com os oficiais do cronograma DA DUPLA
                     .filter(
                       (i) =>
                         i.dupla.trilha === "especialista" ||
-                        !numerosOficiais.has(i.encontro.numero)
+                        !numerosOficiaisDe(i.dupla).has(i.encontro.numero)
                     )
                     .map((i) => (
                       <div key={i.encontro.id} className="px-2">
@@ -2180,12 +2348,18 @@ function AcaoDiaMentor({
   const diaPassou = selecionado < hoje;
   // encontro oficial do dia — no máximo 1 (encontros são terças semanais).
   // Na trilha especialista não existe oficial: o CTA cai sempre no ramo
-  // "próximo encontro pendente", sem importar o nº do calendário DPP
+  // "próximo encontro pendente", sem importar o nº do calendário DPP. E o
+  // oficial precisa ser do cronograma DA DUPLA — com duas turmas, o encontro
+  // 5 do dia na tela pode ser de outro cronograma que o dela
   const oficial =
     dupla.trilha === "especialista"
       ? null
-      : (eventosDoDia.find((e) => e.tipo === "encontro" && e.numero != null) ??
-        null);
+      : (eventosDoDia.find(
+          (e) =>
+            e.tipo === "encontro" &&
+            e.numero != null &&
+            e.cronograma_id === dupla.cronograma_id
+        ) ?? null);
   const rowOficial = oficial
     ? (dupla.encontros.find((e) => e.numero === oficial.numero) ?? null)
     : null;

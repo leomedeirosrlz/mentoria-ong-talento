@@ -39,6 +39,7 @@ import { VoltarLink } from "@/components/voltar-link";
 import {
   alvoAgendamento,
   eventoDaSemana,
+  eventosDoCronograma,
   formatDate,
   formatDateTime,
   jornadaDaDupla,
@@ -174,7 +175,12 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
     solicitacao?.status !== "aberta" &&
     (souMentor || souCoord);
   const especialistas = podeSolicitar ? await getEspecialistas() : [];
-  const passos = passosDaTrilha(dupla.trilha, eventos, espEventos);
+  // calendário oficial DA DUPLA (0061): só os eventos do cronograma dela.
+  // Especialista e dupla histórica sem vínculo caem em [] — especialista
+  // usa os 5 passos próprios; histórica vive do que está gravado (fallback
+  // abaixo), nunca de um calendário alheio
+  const eventosDaDupla = eventosDoCronograma(eventos, dupla.cronograma_id);
+  const passos = passosDaTrilha(dupla.trilha, eventosDaDupla, espEventos);
   const saude = saudadeDaDupla(dupla, eventos);
   const total = passos.length;
   const { proximoNumero, encontroAlvo, sugeridoProximo, faltantes } =
@@ -264,7 +270,7 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
   const resumoJornada = dadosResumoJornada(
     dupla,
     passos,
-    eventos,
+    eventosDaDupla,
     encerramento?.created_at ?? dupla.encerrada_em ?? null
   );
   // bloco só vale a pena com história — dupla zerada mostra a trilha, não um
@@ -279,11 +285,24 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
   // ficam sempre abertos.
   const numeroSemana = ehEsp
     ? null
-    : (eventoDaSemana(eventos, new Date())?.numero ?? null);
-  const encontrosVisiveis = passos.filter(
+    : (eventoDaSemana(eventosDaDupla, new Date())?.numero ?? null);
+  // dupla sem cronograma (histórica, ou cadastro ainda sem vínculo): não há
+  // trilha pra montar, mas os encontros registrados são fato — a lista cai
+  // pro que está gravado em vez de sumir
+  const passosLista: PassoGuia[] = passos.length
+    ? passos
+    : dupla.encontros.map((enc) => ({
+        id: `leg-${enc.numero}`,
+        numero: enc.numero,
+        titulo: `Encontro ${enc.numero}`,
+        data: null,
+        fase: null,
+        instrumentos: [],
+      }));
+  const encontrosVisiveis = passosLista.filter(
     (ev) => numeroSemana == null || ev.numero <= numeroSemana
   );
-  const encontrosFuturos = passos.filter(
+  const encontrosFuturos = passosLista.filter(
     (ev) => numeroSemana != null && ev.numero > numeroSemana
   );
   // pendência de registro (realizado sem registro ou agendado já vencido) —
@@ -807,6 +826,13 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
               />
             )}
           </div>
+          {/* DPP sem cronograma é estado inválido pra dupla ativa (0061) —
+              a nota explica o caminho em vez de deixar a trilha sumir */}
+          {!ehEsp && !dupla.cronograma_id && souCoord && (
+            <p className="mb-2 text-xs italic text-muted-foreground">
+              Dupla sem cronograma vinculado — escolha um na edição da dupla.
+            </p>
+          )}
           {encontrosVisiveis.concat(futurosComPendencia).map(renderEncontro)}
           {encontrosColapsados.length > 0 && (
             <details className="group">

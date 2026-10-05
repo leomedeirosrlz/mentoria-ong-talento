@@ -3,6 +3,7 @@ import {
   getCicloEventos,
   getComunicados,
   getContagemPessoas,
+  getCronogramas,
   getDuplas,
   getEspecialistaEventos,
   getMe,
@@ -23,9 +24,10 @@ export default async function HomePage({
 }: {
   searchParams: Promise<{ filtro?: string | string[] }>;
 }) {
-  const [me, eventos, h, params, avisos, assinatura] = await Promise.all([
+  const [me, eventos, cronogramas, h, params, avisos, assinatura] = await Promise.all([
     getMe(),
     getCicloEventos(),
+    getCronogramas(),
     headers(),
     searchParams,
     getComunicados(),
@@ -52,6 +54,7 @@ export default async function HomePage({
         <DashboardCoordenacao
           duplas={duplas}
           eventos={eventos}
+          cronogramas={cronogramas}
           agora={agora}
           origem={origem}
           interacoes={interacoes}
@@ -78,6 +81,7 @@ export default async function HomePage({
         <DashboardCoordenacao
           duplas={duplas}
           eventos={eventos}
+          cronogramas={cronogramas}
           agora={agora}
           origem={origem}
           interacoes={interacoes}
@@ -114,6 +118,7 @@ export default async function HomePage({
         duplas={duplas}
         eventos={eventos}
         espEventos={espEventos}
+        cronogramas={cronogramas}
         me={me!}
       />
       {me?.role === "mentor_especialista" && (

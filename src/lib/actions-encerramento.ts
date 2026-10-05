@@ -58,12 +58,13 @@ export async function registrarEncerramento(
     return { error: "Escolha entre concluir e encerrar a jornada." };
   }
 
-  // dupla + tudo que o resumo da jornada precisa
+  // dupla + tudo que o resumo da jornada precisa; o calendário oficial é o do
+  // cronograma DELA (0061) — a união global misturaria passos de duas turmas
   const [{ data: duplaRow }, { data: eventos }] = await Promise.all([
     supabase
       .from("duplas")
       .select(
-        `id, status, trilha, iniciada_em, mentor_id, supervisor_id,
+        `id, status, trilha, iniciada_em, mentor_id, supervisor_id, cronograma_id,
          mentor:profiles!duplas_mentor_id_fkey(nome),
          mentorado:mentorados!duplas_mentorado_id_fkey(nome),
          encontros(numero, status, data_hora, realizado_em,
@@ -135,13 +136,15 @@ export async function registrarEncerramento(
     })) as Encontro[],
     encaminhamentos: duplaRow.encaminhamentos ?? [],
   };
-  const passos = passosDaTrilha(
-    "dpp",
-    (eventos as CicloEvento[]) ?? []
+  // passos e datas esperadas do cronograma da dupla — fora dele é outra
+  // turma (dupla sem cronograma resume só pelo que ela mesma fez)
+  const evsDaDupla = ((eventos as CicloEvento[]) ?? []).filter(
+    (e) => e.cronograma_id === duplaRow.cronograma_id
   );
+  const passos = passosDaTrilha("dpp", evsDaDupla);
   const agora = new Date();
   const resumoJornada = textoResumoJornada(
-    dadosResumoJornada(duplaParaResumo, passos, eventos ?? [], agora.toISOString(), agora)
+    dadosResumoJornada(duplaParaResumo, passos, evsDaDupla, agora.toISOString(), agora)
   );
 
   const { error: errEnc } = await supabase.from("encerramentos").upsert(

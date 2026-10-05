@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import type { CSSProperties } from "react";
 import Link from "next/link";
 import { getCicloEventos, getMateriais, getMe } from "@/lib/queries";
-import { linkSeguro, totalEncontros } from "@/lib/ciclo";
+import { linkSeguro, maxNumeroEncontro } from "@/lib/ciclo";
 import { ArrowSquareOut, File, FileText, FolderOpen, LinkSimple, BookOpen, PuzzlePiece } from "@phosphor-icons/react/dist/ssr";
 import { Badge } from "@/components/ui/badge";
 import { NovoMaterialDialog } from "@/components/novo-material-dialog";
@@ -60,6 +60,9 @@ export default async function MateriaisPage() {
 
   const ehCoord = me?.role === "coordenacao";
   const grupos = agrupar(visiveis);
+  // encontro_num do material é por programa (o guia do 5º vale pras duas
+  // turmas) — o teto do seletor é o maior nº que existe, não a soma das linhas
+  const maxEncontro = maxNumeroEncontro(eventos);
 
   return (
     <div className="space-y-6">
@@ -72,7 +75,7 @@ export default async function MateriaisPage() {
         </div>
         {/* biblioteca vazia: o CTA mora dentro do card de estado vazio, não aqui */}
         {ehCoord && grupos.length > 0 && (
-          <NovoMaterialDialog maxEncontro={totalEncontros(eventos)} />
+          <NovoMaterialDialog maxEncontro={maxEncontro} />
         )}
       </header>
 
@@ -91,7 +94,7 @@ export default async function MateriaisPage() {
           </p>
           <div className="mt-3">
             {ehCoord ? (
-              <NovoMaterialDialog maxEncontro={totalEncontros(eventos)} />
+              <NovoMaterialDialog maxEncontro={maxEncontro} />
             ) : (
               <Link
                 href="/agenda"
@@ -114,7 +117,7 @@ export default async function MateriaisPage() {
             </h2>
             <div className="rounded-xl bg-card shadow-[var(--shadow-border)] divide-y divide-border/60 overflow-hidden">
               {itens.map((m) => (
-                <MaterialRow key={m.id} m={m} ehCoord={ehCoord} maxEncontro={totalEncontros(eventos)} />
+                <MaterialRow key={m.id} m={m} ehCoord={ehCoord} maxEncontro={maxEncontro} />
               ))}
             </div>
           </section>

@@ -79,7 +79,11 @@ export async function GET(request: NextRequest) {
         d
       );
     }
-    return csvResponse(csvCiclo(d.duplas), nomeCsvCiclo());
+    const cronDemo = new Map(d.cronogramas.map((c) => [c.id, c.nome]));
+    return csvResponse(
+      csvCiclo(filtraCsvCiclo(d.duplas, request.nextUrl.searchParams), cronDemo),
+      nomeCsvCiclo()
+    );
   }
 
   const supabase = await createClient();
@@ -126,7 +130,7 @@ export async function GET(request: NextRequest) {
   const { data, error } = await supabase
     .from("duplas")
     .select(
-      `trilha,
+      `trilha, turma, cronograma_id,
       mentor:profiles!duplas_mentor_id_fkey(nome),
       mentorado:mentorados(nome),
       supervisor:profiles!duplas_supervisor_id_fkey(nome),
@@ -138,9 +142,30 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     );
   }
-  const duplas = (data as unknown as Dupla[]) ?? [];
+  const { data: crons } = await supabase
+    .from("cronogramas")
+    .select("id, nome");
+  const cronogramas = new Map(
+    (crons ?? []).map((c) => [c.id, c.nome] as const)
+  );
+  const duplas = filtraCsvCiclo(
+    (data as unknown as Dupla[]) ?? [],
+    request.nextUrl.searchParams
+  );
 
-  return csvResponse(csvCiclo(duplas), nomeCsvCiclo());
+  return csvResponse(csvCiclo(duplas, cronogramas), nomeCsvCiclo());
+}
+
+/** ?turma= e ?cronograma= recortam a prestação de contas — com turmas em
+ *  paralelo, o relatório misto pode servir de recibo por turma. */
+function filtraCsvCiclo(duplas: Dupla[], p: URLSearchParams): Dupla[] {
+  const turma = p.get("turma")?.trim();
+  const cronograma = p.get("cronograma")?.trim();
+  return duplas.filter(
+    (d) =>
+      (!turma || d.turma === turma) &&
+      (!cronograma || d.cronograma_id === cronograma)
+  );
 }
 
 // tipo=pessoas — cadastro único: equipe (papel, status) + mentorados (ONG de
@@ -395,8 +420,9 @@ function exportRespostasDemo(
 // import usa o mesmo); `""` escapa aspas internas. BOM no início pro Excel
 // abrir os acentos como UTF-8 (File.text() do import descarta BOM).
 
-/** ?tipo=ciclo — uma linha por encontro, a prestação de contas. */
-function csvCiclo(duplas: Dupla[]): string {
+/** ?tipo=ciclo — uma linha por encontro, a prestação de contas.
+ *  `cronogramas` resolve id → nome pra coluna que desambigua o nº (0061). */
+function csvCiclo(duplas: Dupla[], cronogramas: Map<string, string>): string {
   const linhas = duplas
     .sort((a, b) => a.mentor.nome.localeCompare(b.mentor.nome, "pt-BR"))
     .flatMap((d) =>
@@ -411,6 +437,10 @@ function csvCiclo(duplas: Dupla[]): string {
             // sem a trilha, encontro de dupla de especialista (5 passos)
             // lê como DPP — "Especialista" desambigua na planilha
             TRILHA_LABEL[d.trilha] ?? d.trilha,
+            // nº do encontro só identifica dentro do cronograma (0061) —
+            // sem turma+cronograma, "encontro 5" de duas turmas lê como o mesmo
+            d.turma ?? "",
+            d.cronograma_id ? (cronogramas.get(d.cronograma_id) ?? "") : "",
             String(e.numero),
             dataHora(e.data_hora),
             dia(e.realizado_em),
@@ -429,7 +459,7 @@ function csvCiclo(duplas: Dupla[]): string {
   return (
     "\uFEFF" +
     [
-      "dupla_mentor;dupla_mentorado;supervisor;trilha;encontro_num;data_agendada;realizado_em;status;motivo_reagendamento;registro_em;registro_avaliacao;registro_atividades;precisa_apoio",
+      "dupla_mentor;dupla_mentorado;supervisor;trilha;turma;cronograma;encontro_num;data_agendada;realizado_em;status;motivo_reagendamento;registro_em;registro_avaliacao;registro_atividades;precisa_apoio",
       ...linhas,
     ].join("\r\n") +
     "\r\n"

@@ -2,19 +2,23 @@ import type { CSSProperties } from "react";
 import Link from "next/link";
 import { ArrowCounterClockwise, ArrowRight } from "@phosphor-icons/react/dist/ssr";
 import {
+  cronogramaVigente,
   eventoDaSemana,
+  eventosDoCronograma,
   formatDiaMes,
   formatDateTime,
-  maxEncontros,
-  resumoSemana,
+  resumoSemanaDe,
+  rotuloCronograma,
   saudadeDaDupla,
+  semanaBounds,
   textoResumoSemana,
+  totalDaTrilha,
   TRILHA_LABEL,
   ultimoRegistro,
   type DuplaSaude,
   ORDEM_SEMAFORO,
 } from "@/lib/ciclo";
-import type { CicloEvento, Comunicado, Dupla, SolicitacaoEspecialista, Supervisao } from "@/lib/types";
+import type { CicloEvento, Comunicado, Cronograma, Dupla, SolicitacaoEspecialista, Supervisao } from "@/lib/types";
 import type { Interacao } from "@/lib/interacoes";
 import type { SupervisaoAlvo } from "@/lib/queries-supervisao";
 import { AvaliacaoBadge, SemaforoDot } from "@/components/semaforo";
@@ -60,6 +64,7 @@ type FiltroPainel = keyof typeof FILTROS;
 export function DashboardCoordenacao({
   duplas,
   eventos,
+  cronogramas = [],
   agora,
   origem,
   interacoes,
@@ -74,6 +79,9 @@ export function DashboardCoordenacao({
 }: {
   duplas: Dupla[];
   eventos: CicloEvento[];
+  /** Cronogramas (0061) — a faixa "Semana do Nº" ancora no vigente; sem eles
+   *  o painel cairia na união de calendários e misturaria turmas. */
+  cronogramas?: Cronograma[];
   /** ISO timestamp vindo do server — o mesmo instante pra toda a página. */
   agora: string;
   /** origem pública do app (proto://host) — monta o link direto do nudge. */
@@ -99,8 +107,26 @@ export function DashboardCoordenacao({
   supervisaoAlvos?: SupervisaoAlvo[];
 }) {
   const hoje = new Date(agora);
-  const evento = eventoDaSemana(eventos, hoje);
-  const resumo = resumoSemana(duplas, eventos, hoje);
+  // um resumo por cronograma ATIVO que tem encontro — com duas turmas, uma
+  // faixa só misturaria os dois calendários nos dois sentidos (spec F1).
+  // Sem ativo cai no vigente (encerrado mais recente); sem cronograma
+  // nenhum (base pré-0061) mede a lista inteira, como antes.
+  const ativos = cronogramas.filter((c) => c.status === "ativo");
+  const alvosResumo: (Cronograma | null)[] = ativos.length
+    ? ativos
+    : cronogramas.length
+      ? [cronogramaVigente(cronogramas, hoje)]
+      : [null];
+  const resumos = alvosResumo.flatMap((c) => {
+    const evento = eventoDaSemana(
+      c ? eventosDoCronograma(eventos, c.id) : eventos,
+      hoje
+    );
+    if (!evento) return [];
+    const resumo = resumoSemanaDe(duplas, evento, semanaBounds(hoje));
+    return resumo ? [{ cronograma: c, resumo }] : [];
+  });
+  const multiplos = resumos.length > 1;
 
   const saude = duplas
     .map((d) => ({ dupla: d, saude: saudadeDaDupla(d, eventos, hoje) }))
@@ -136,17 +162,41 @@ export function DashboardCoordenacao({
     <div className="space-y-8">
       <header>
         <h1 className="text-2xl font-semibold tracking-tight">Visão geral</h1>
-        {evento && (
+        {resumos.length === 1 && (
           <p className="text-sm text-muted-foreground mt-1 flex items-center gap-1.5">
             <span aria-hidden className="size-2 shrink-0 rounded-full bg-[var(--brand-lime)]" />
             <span>
               <span className="font-medium text-foreground">
-                Semana do {evento.numero}º encontro
+                Semana do {resumos[0].resumo.evento.numero}º encontro
               </span>
-              {evento.fase ? ` · ${evento.fase}` : ""} · {evento.titulo}
+              {resumos[0].resumo.evento.fase
+                ? ` · ${resumos[0].resumo.evento.fase}`
+                : ""}{" "}
+              · {resumos[0].resumo.evento.titulo}
             </span>
           </p>
         )}
+        {/* com turmas paralelas o cabeçalho não resume num número só — uma
+            linha por cronograma, cada uma rotulada pela turma */}
+        {multiplos &&
+          resumos.map(({ cronograma, resumo }) => (
+            <p
+              key={cronograma?.id ?? "todos"}
+              className="text-sm text-muted-foreground mt-1 flex items-center gap-1.5"
+            >
+              <span aria-hidden className="size-2 shrink-0 rounded-full bg-[var(--brand-lime)]" />
+              <span>
+                {cronograma && (
+                  <span className="font-medium text-foreground">
+                    {rotuloCronograma(cronograma)} —{" "}
+                  </span>
+                )}
+                Semana do {resumo.evento.numero}º encontro
+                {resumo.evento.fase ? ` · ${resumo.evento.fase}` : ""} ·{" "}
+                {resumo.evento.titulo}
+              </span>
+            </p>
+          ))}
       </header>
 
       {!supervisor && (
@@ -162,16 +212,23 @@ export function DashboardCoordenacao({
           rotulados, com as ações (registros, copiar) no cabeçalho do bloco.
           Fora do grid xl — era o último item do rail e sumia espremido em
           340px; o dl abre em linha a partir de sm */}
-      {resumo && (
+      {resumos.map(({ cronograma, resumo }) => (
         <section
-          aria-labelledby="resumo-semana-titulo"
+          key={cronograma?.id ?? "todos"}
+          aria-label={`Semana do ${resumo.evento.numero}º encontro${cronograma ? ` — ${rotuloCronograma(cronograma)}` : ""}`}
           className="animate-enter rounded-xl bg-card px-4 py-3 text-sm shadow-[var(--shadow-border)] sm:px-5"
         >
           <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
             {/* o nº do encontro já está no cabeçalho ("Semana do Nº encontro") —
-                aqui a data é o fato novo */}
-            <h2 id="resumo-semana-titulo" className="font-semibold">
+                aqui a data é o fato novo; com cronogramas paralelos o rótulo
+                da turma diferencia os cartões */}
+            <h2 className="font-semibold flex items-center gap-2">
               Esta semana · {formatDiaMes(resumo.evento.data)}
+              {multiplos && cronograma && (
+                <Badge variant="secondary" className="font-normal">
+                  {rotuloCronograma(cronograma)}
+                </Badge>
+              )}
             </h2>
             <div className="flex items-center gap-2">
               <Link
@@ -186,7 +243,13 @@ export function DashboardCoordenacao({
                 />
               </Link>
               <CopiarResumoButton
-                texto={textoResumoSemana(resumo, emRisco)}
+                texto={textoResumoSemana(
+                  resumo,
+                  emRisco,
+                  multiplos && cronograma
+                    ? rotuloCronograma(cronograma)
+                    : undefined
+                )}
               />
             </div>
           </div>
@@ -235,7 +298,7 @@ export function DashboardCoordenacao({
             </p>
           )}
         </section>
-      )}
+      ))}
 
       {/* xl+: trabalho na coluna principal (stats + radar), contexto no rail
           da direita — mesmo modelo do aside da ficha de dupla. O rail vem
@@ -380,6 +443,7 @@ export function DashboardCoordenacao({
                 key={dupla.id}
                 dupla={dupla}
                 saude={saude}
+                eventos={eventos}
                 origem={origem}
                 interacoes={interacoes}
                 hoje={hoje}
@@ -490,6 +554,7 @@ function Stat({
 function DuplaCard({
   dupla,
   saude,
+  eventos,
   origem,
   interacoes,
   hoje,
@@ -498,6 +563,8 @@ function DuplaCard({
 }: {
   dupla: Dupla;
   saude: ReturnType<typeof saudadeDaDupla>;
+  /** calendário global — o denominador sai do recorte do cronograma da dupla */
+  eventos: CicloEvento[];
   origem: string;
   interacoes: Record<string, Interacao>;
   hoje: Date;
@@ -506,8 +573,12 @@ function DuplaCard({
   /** primeiro nome de quem envia — assina a msg pro mentorado */
   meuNome?: string;
 }) {
-  // denominador e saúde seguem a trilha da dupla — 16 no DPP, 5 no especialista
-  const total = maxEncontros(dupla.trilha);
+  // denominador = nº de encontros do cronograma da dupla (duas turmas podem
+  // ter totais diferentes); especialista e sem-vínculo caem no teto canônico
+  const total = totalDaTrilha(
+    dupla.trilha,
+    eventosDoCronograma(eventos, dupla.cronograma_id)
+  );
   const encontroAtual = dupla.encontros.filter((e) => e.status === "realizado").length;
   const ultimoReg = ultimoRegistro(dupla);
   // pendência de registro mais antiga — realizado sem registro ou agendado

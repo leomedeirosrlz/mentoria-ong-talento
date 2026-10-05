@@ -121,30 +121,56 @@ describe("duplasSemEncontroDoNumero", () => {
       encontros: [encAgendado(2, "2025-10-14")],
     });
     expect(
-      duplasSemEncontroDoNumero([sem, com], 2, "2025-10-14").map((x) => x.id)
+      duplasSemEncontroDoNumero([sem, com], mkEvento(2, "2025-10-14")).map(
+        (x) => x.id
+      )
     ).toEqual(["d-sem"]);
   });
 
   it("iniciada_em depois da data oficial tira a dupla da coorte", () => {
     const nova = mkDupla({ iniciada_em: "2025-10-21" }); // nasceu na semana do enc 3
     // o encontro 2 (14/10) é anterior à janela dela — não é falta
-    expect(duplasSemEncontroDoNumero([nova], 2, "2025-10-14")).toHaveLength(0);
+    expect(
+      duplasSemEncontroDoNumero([nova], mkEvento(2, "2025-10-14"))
+    ).toHaveLength(0);
     // dentro da janela, conta
-    expect(duplasSemEncontroDoNumero([nova], 3, "2025-10-21")).toHaveLength(1);
+    expect(
+      duplasSemEncontroDoNumero([nova], mkEvento(3, "2025-10-21"))
+    ).toHaveLength(1);
   });
 
   it("exclui especialista e duplas não-ativas", () => {
-    const esp = mkDupla({ trilha: "especialista" });
+    const esp = mkDupla({ trilha: "especialista", cronograma_id: null });
     const pausada = mkDupla({ status: "pausada" });
     const concluida = mkDupla({ status: "concluida" });
     expect(
-      duplasSemEncontroDoNumero([esp, pausada, concluida], 2, "2025-10-14")
+      duplasSemEncontroDoNumero(
+        [esp, pausada, concluida],
+        mkEvento(2, "2025-10-14")
+      )
     ).toHaveLength(0);
   });
 
   it("qualquer row do número já cobre o encontro — até cancelada", () => {
     const d = mkDupla({ encontros: [mkEncontro(2, { status: "cancelado" })] });
-    expect(duplasSemEncontroDoNumero([d], 2, "2025-10-14")).toHaveLength(0);
+    expect(
+      duplasSemEncontroDoNumero([d], mkEvento(2, "2025-10-14"))
+    ).toHaveLength(0);
+  });
+
+  it("dupla de outro cronograma não entra na coorte do evento", () => {
+    // encontro 2 existe nas duas turmas (0061) — a dupla da T2 sem row do nº
+    // é falta no calendário DELA, não no da T1
+    const daT2 = mkDupla({ id: "d-t2", cronograma_id: "cron-t2", turma: "T2" });
+    expect(
+      duplasSemEncontroDoNumero([daT2], mkEvento(2, "2025-10-14"))
+    ).toHaveLength(0);
+    expect(
+      duplasSemEncontroDoNumero(
+        [daT2],
+        mkEvento(2, "2025-10-21", { cronograma_id: "cron-t2" })
+      )
+    ).toEqual([daT2]);
   });
 });
 

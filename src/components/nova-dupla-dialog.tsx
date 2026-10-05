@@ -7,7 +7,7 @@ import { Plus } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import { createDupla } from "@/lib/actions";
-import { cicloVigente, ciclosOpcoes } from "@/lib/ciclo";
+import { cronogramaVigente, rotuloCronograma } from "@/lib/ciclo";
 import { AfinidadePar } from "@/components/matching-afinidade";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,6 +20,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import type {
+  Cronograma,
   Disponibilidade,
   Escolaridade,
   Genero,
@@ -74,9 +75,9 @@ export function NovaDuplaDialog() {
   >(new Map());
   const [pessoalMentor, setPessoalMentor] = useState<Map<string, Pessoal>>(new Map());
   const [pessoalMentorado, setPessoalMentorado] = useState<Map<string, Pessoal>>(new Map());
-  // ciclos do select — distinct do calendário oficial + os já usados em duplas
-  const [ciclos, setCiclos] = useState<string[]>([]);
-  const [vigente, setVigente] = useState<string | null>(null);
+  // cronogramas do select (0061) — cada um é um calendário oficial por turma;
+  // a dupla DPP nasce vinculada ao escolhido (o vigente é o default)
+  const [cronogramas, setCronogramas] = useState<Cronograma[]>([]);
   // mentor escolhido — a trilha da dupla nasce do papel dele
   const [mentorSel, setMentorSel] = useState<string | null>(null);
   const [mentoradoSel, setMentoradoSel] = useState<string | null>(null);
@@ -97,7 +98,7 @@ export function NovaDuplaDialog() {
     let cancelado = false;
     (async () => {
       try {
-        const [perfis, ments, duplasRes, mps, evsCiclo] = await Promise.all([
+        const [perfis, ments, duplasRes, mps, cronsRes] = await Promise.all([
           supabase
             .from("profiles")
             .select("id, nome, role, interesses, cidade, uf")
@@ -108,18 +109,17 @@ export function NovaDuplaDialog() {
             .from("mentorados")
             .select("id, nome, interesses, objetivos, escolaridade, cidade, uf, disponibilidade")
             .order("nome"),
-          // sem filtro de status: a ocupação filtra em JS, e o histórico
-          // completo alimenta as opções de ciclo (ciclo encerrado continua
-          // escolhível)
+          // sem filtro de status: a ocupação filtra em JS sobre o histórico
+          // completo
           supabase
             .from("duplas")
-            .select("mentor_id, mentorado_id, supervisor_id, trilha, status, ciclo"),
+            .select("mentor_id, mentorado_id, supervisor_id, trilha, status"),
           supabase
             .from("mentor_profiles")
             .select("profile_id, capacidade, disponibilidade, areas"),
-          supabase.from("ciclo_eventos").select("ciclo, data"),
+          supabase.from("cronogramas").select("*").order("turma").order("nome"),
         ]);
-        const erro = [perfis, ments, duplasRes, mps, evsCiclo].find((r) => r.error)?.error;
+        const erro = [perfis, ments, duplasRes, mps, cronsRes].find((r) => r.error)?.error;
         if (erro) throw erro;
         if (cancelado) return;
         setMentores((perfis.data ?? []).filter((p) => p.role !== "supervisor"));
@@ -154,13 +154,7 @@ export function NovaDuplaDialog() {
         }
         setCapacidade(porMentor);
         setFichaMentor(fichas);
-        setCiclos(
-          ciclosOpcoes(
-            evsCiclo.data ?? [],
-            (duplasRes.data ?? []).map((d) => d.ciclo)
-          )
-        );
-        setVigente(cicloVigente(evsCiclo.data ?? []));
+        setCronogramas((cronsRes.data ?? []) as Cronograma[]);
         carregou.current = true;
         setPronto(true);
       } catch {
@@ -466,23 +460,29 @@ export function NovaDuplaDialog() {
               </p>
             </div>
           )}
-          {/* ciclo só aparece com opções carregadas — sem calendário o banco
-              aplica o default da coluna, e um select sem itens fingiria erro */}
-          {ciclos.length > 0 && (
+          {/* cronograma só existe na trilha DPP (a especialista não tem
+              calendário) — some junto com o supervisor. Sem opções o campo
+              não finge erro: some e o server decide */}
+          {!ehEsp && cronogramas.length > 0 && (
             <div className="space-y-2">
-              <Label id="ciclo-label">Ciclo</Label>
+              <Label id="cronograma-label">Cronograma</Label>
               <Select
-                name="ciclo"
-                defaultValue={vigente ?? ciclos[ciclos.length - 1]}
-                items={Object.fromEntries(ciclos.map((c) => [c, c]))}
+                name="cronograma_id"
+                defaultValue={cronogramaVigente(cronogramas)?.id ?? cronogramas[cronogramas.length - 1]?.id}
+                items={Object.fromEntries(
+                  cronogramas.map((c) => [c.id, rotuloCronograma(c)])
+                )}
               >
-                <SelectTrigger id="ciclo" aria-labelledby="ciclo-label ciclo"><SelectValue /></SelectTrigger>
+                <SelectTrigger id="cronograma" aria-labelledby="cronograma-label cronograma"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {ciclos.map((c) => (
-                    <SelectItem key={c} value={c}>{c}</SelectItem>
+                  {cronogramas.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>{rotuloCronograma(c)}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+              <p className="text-xs text-muted-foreground">
+                O calendário oficial que a dupla segue — datas e o semáforo saem dele.
+              </p>
             </div>
           )}
           <div className="space-y-2">

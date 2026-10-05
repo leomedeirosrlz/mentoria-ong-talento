@@ -8,13 +8,15 @@
  * por isso este módulo não pode importar nada server-only (next/*, react,
  * @/lib/supabase/*): só `import type`, apagado no build.
  *
- * Evergreen: nenhuma data é fixa. O calendário oficial do ciclo (16 encontros
- * de terça-feira, formação, recesso, marco — cópia fiel do seed.sql) é
- * deslocado pra que o 5º encontro caia na terça da semana corrente, e todos
- * os timestamps derivam de `new Date()`. Abrir a demo daqui a meses continua
- * contando a mesma história: semana 5 do ciclo, dupla saudável, uma com
- * registro pendente, uma em risco, uma com atraso, uma encerrada do ciclo
- * anterior e três trilhas de especialista (duas na mesma mentora — a Sofia).
+ * Evergreen: nenhuma data é fixa. Os calendários oficiais (16 encontros de
+ * terça-feira, formação, recesso, marco — cópia fiel do seed.sql) vivem em
+ * `cronogramas` (0061): a T1 é deslocada pra que o 5º encontro caia na terça
+ * da semana corrente e a T2 começa 4 semanas depois dela, com as 3 quintas
+ * de sessão dupla do plano real. Todos os timestamps derivam de `new Date()`.
+ * Abrir a demo daqui a meses continua contando a mesma história: semana 5
+ * da T1 e semana 1 da T2, dupla saudável, uma com registro pendente, uma em
+ * risco, uma com atraso, uma encerrada do ciclo anterior e três trilhas de
+ * especialista (duas na mesma mentora — a Sofia).
  */
 
 import type {
@@ -23,6 +25,7 @@ import type {
   AvaliacaoJovem,
   CicloEvento,
   Comunicado,
+  Cronograma,
   DocumentoPessoa,
   DocumentoTemplate,
   Dupla,
@@ -51,6 +54,7 @@ export type DemoData = {
   mentorProfiles: MentorProfile[];
   duplas: Dupla[];
   anexos: RegistroAnexo[];
+  cronogramas: Cronograma[];
   cicloEventos: CicloEvento[];
   especialistaEventos: EspecialistaEvento[];
   materiais: Material[];
@@ -80,8 +84,8 @@ const uid = (n: number): string =>
 // solicitacoes: 24xx · pessoa_notas: 26xx · interacoes: 28xx ·
 // notificacoes: 30xx · assinaturas: 32xx · doc_templates: 33xx · tokens de
 // assinatura: 34xx · presencas: 36xx · supervisoes: 38xx ·
-// documentos_pessoa: 46xx. user_id fake: f0xx. especialista_eventos não tem
-// id.
+// documentos_pessoa: 46xx · cronogramas: 50xx. user_id fake: f0xx.
+// especialista_eventos não tem id.
 const P = {
   marina: 0x0001, // persona coordenação
   paulo: 0x0002, // persona supervisor
@@ -108,6 +112,7 @@ const M = {
   kaua: 0x0406,
   laura: 0x0407,
   pedro: 0x0408,
+  rafael: 0x0409, // intake da T2, aguarda matching
 } as const;
 
 const D = {
@@ -121,7 +126,12 @@ const D = {
   esp3: 0x0608,
   pausa: 0x0609,
   esp4: 0x060a,
+  t2a: 0x060b,
+  t2b: 0x060c,
 } as const;
+
+// cronogramas (0061) — um por turma; a T2 é a turma que começou um mês depois
+const CRON = { t1: 0x5001, t2: 0x5002 } as const;
 
 const S = { aceita1: 0x2401, aceita2: 0x2402, direcionada: 0x2403, livre: 0x2404, cancelada: 0x2405, aceita3: 0x2406, aceita4: 0x2407 } as const;
 
@@ -176,11 +186,39 @@ function diaEncontro(n: number): Date {
   return addDias(TERCA_ENCONTRO_5, 98); // 15 + 7d
 }
 
+/** Encontros da T2 — a turma que começa ~1 mês depois (o 1º encontro dela é
+ *  a terça da semana corrente, mesma data do 5º da T1) e corre às terças,
+ *  exceto nas 3 semanas de sessão dupla do plano real: depois dos encontros
+ *  5, 10 e 12 de terça, o seguinte cai na quinta (+2d) e a semana fica com
+ *  os dois — é o que comprime o calendário pra T2 terminar junto da T1.
+ *  Sem a folga de 15 dias do 8º→9º da T1 e com o mesmo recesso de ~3 semanas
+ *  entre o 14º e o 15º — a conta fecha e o 16º das duas turmas cai na mesma
+ *  semana, como no calendário real. */
+const QUINTA_DUPLA_T2 = new Set([6, 11, 13]); // nºs que caem na quinta
+
+const diaEncontroT2 = (n: number): Date => {
+  // 1º encontro da T2 = 5º da T1 (a terça-âncora da semana corrente)
+  let d = diaEncontro(5);
+  for (let i = 2; i <= n; i++) {
+    // +2 = a quinta da sessão dupla; +5 = a terça da semana seguinte a ela;
+    // +21 = recesso de fim de ano entre o 14º e o 15º; senão semanal
+    d = addDias(
+      d,
+      i === 15 ? 21 : QUINTA_DUPLA_T2.has(i) ? 2 : QUINTA_DUPLA_T2.has(i - 1) ? 5 : 7
+    );
+  }
+  return d;
+};
+
 // ---------- calendário oficial (conteúdo do seed.sql, datas deslocadas) ----------
 
-function buildCicloEventos(): CicloEvento[] {
+/** Monta os eventos dos dois cronogramas — cada evento carrega o
+ *  `cronograma_id` do dono (0061): a identidade do encontro oficial é
+ *  (cronograma, numero), numero solto não identifica mais nada. */
+function buildCicloEventos(cronogramaT1: string, cronogramaT2: string): CicloEvento[] {
   let i = 0;
   const ev = (
+    cronogramaId: string,
     tipo: CicloEvento["tipo"],
     numero: number | null,
     data: Date,
@@ -190,6 +228,7 @@ function buildCicloEventos(): CicloEvento[] {
     dataFim: Date | null = null
   ): CicloEvento => ({
     id: uid(0x1800 + ++i),
+    cronograma_id: cronogramaId,
     tipo,
     numero,
     data: ymd(data),
@@ -206,37 +245,45 @@ function buildCicloEventos(): CicloEvento[] {
   const F5 = "Roda da Vida";
   const F6 = "Encerrar e celebrar";
 
-  return [
+  /** As 24 linhas do calendário oficial, parametrizadas por `dia` — T1 e T2
+   *  rodam a mesma trilha DPP (títulos/fases/instrumentos iguais), cada uma
+   *  no seu cronograma: a formação é por turma, então a T2 repete os dois
+   *  encontros de formação nas datas dela. */
+  const turma = (cronogramaId: string, dia: (n: number) => Date): CicloEvento[] => [
     // pré-ciclo no cronograma oficial: inscrições -40→-20d, triagem -19→-14d,
     // matching -13→-6d, formação -5/-4 e abertura -4 (tudo antes do encontro 1)
-    ev("marco", null, addDias(diaEncontro(1), -40), "Inscrições e seleção", null, [], addDias(diaEncontro(1), -20)),
-    ev("marco", null, addDias(diaEncontro(1), -19), "Triagem e preparação do matching", null, [], addDias(diaEncontro(1), -14)),
-    ev("marco", null, addDias(diaEncontro(1), -13), "Matching das duplas", null, [], addDias(diaEncontro(1), -6)),
-    ev("formacao", null, addDias(diaEncontro(1), -5), "Encontro inicial de formação de mentores"),
-    ev("formacao", null, addDias(diaEncontro(1), -4), "Encontro final de formação de mentores"),
-    ev("marco", null, addDias(diaEncontro(1), -4), "Encontro de abertura com a coordenação"),
-    ev("encontro", 1, diaEncontro(1), "Boas-vindas, histórias de vida e abertura", F1, ["Perguntas Eficazes", "Escuta Ativa", "PDM", "Roda da Vida (leitura inicial)"]),
-    ev("encontro", 2, diaEncontro(2), "Avaliação por terceiros e visão de futuro", F1, ["PDM", "Construindo a sua Visão"]),
-    ev("encontro", 3, diaEncontro(3), "Declaração de Visão e metas SMART", F1, ["PDM", "Modelo SMART"]),
-    ev("encontro", 4, diaEncontro(4), "Fechamento da construção do PDM", F1, ["PDM", "Perguntas Eficazes"]),
-    ev("encontro", 5, diaEncontro(5), "Acompanhamento das primeiras submetas", F2, ["PDM", "Feedback Construtivo"]),
-    ev("encontro", 6, diaEncontro(6), "Superação de obstáculos", F2, ["PDM", "Feedback Construtivo"]),
-    ev("encontro", 7, diaEncontro(7), "Ajustes de prazos e desdobramentos", F2, ["PDM", "Feedback Construtivo"]),
+    ev(cronogramaId, "marco", null, addDias(dia(1), -40), "Inscrições e seleção", null, [], addDias(dia(1), -20)),
+    ev(cronogramaId, "marco", null, addDias(dia(1), -19), "Triagem e preparação do matching", null, [], addDias(dia(1), -14)),
+    ev(cronogramaId, "marco", null, addDias(dia(1), -13), "Matching das duplas", null, [], addDias(dia(1), -6)),
+    ev(cronogramaId, "formacao", null, addDias(dia(1), -5), "Encontro inicial de formação de mentores"),
+    ev(cronogramaId, "formacao", null, addDias(dia(1), -4), "Encontro final de formação de mentores"),
+    ev(cronogramaId, "marco", null, addDias(dia(1), -4), "Encontro de abertura com a coordenação"),
+    ev(cronogramaId, "encontro", 1, dia(1), "Boas-vindas, histórias de vida e abertura", F1, ["Perguntas Eficazes", "Escuta Ativa", "PDM", "Roda da Vida (leitura inicial)"]),
+    ev(cronogramaId, "encontro", 2, dia(2), "Avaliação por terceiros e visão de futuro", F1, ["PDM", "Construindo a sua Visão"]),
+    ev(cronogramaId, "encontro", 3, dia(3), "Declaração de Visão e metas SMART", F1, ["PDM", "Modelo SMART"]),
+    ev(cronogramaId, "encontro", 4, dia(4), "Fechamento da construção do PDM", F1, ["PDM", "Perguntas Eficazes"]),
+    ev(cronogramaId, "encontro", 5, dia(5), "Acompanhamento das primeiras submetas", F2, ["PDM", "Feedback Construtivo"]),
+    ev(cronogramaId, "encontro", 6, dia(6), "Superação de obstáculos", F2, ["PDM", "Feedback Construtivo"]),
+    ev(cronogramaId, "encontro", 7, dia(7), "Ajustes de prazos e desdobramentos", F2, ["PDM", "Feedback Construtivo"]),
     // títulos/fases/instrumentos 8–16 = a correção da 0035 (guia DPP oficial):
     // 8 monitora e já transfere a condução; 9 é a revisão de meio de percurso
-    ev("encontro", 8, diaEncontro(8), "Monitoramento e responsabilidade", F3, ["PDM", "Escuta Ativa"]),
-    ev("encontro", 9, diaEncontro(9), "Revisão de meio de percurso", F3, ["PDM", "Escuta Ativa"]),
-    ev("encontro", 10, diaEncontro(10), "O mentor como espelho", F4, ["Papel de modelo", "Escuta Ativa"]),
-    ev("encontro", 11, diaEncontro(11), "Rede de apoio e novos espaços", F4, ["Papel de modelo", "Escuta Ativa"]),
-    ev("encontro", 12, diaEncontro(12), "Aplicação e leitura da Roda da Vida", F5, ["Roda da Vida", "Modelo SMART"]),
-    ev("encontro", 13, diaEncontro(13), "Metas das áreas prioritárias", F5, ["Roda da Vida", "Modelo SMART"]),
-    ev("encontro", 14, diaEncontro(14), "Desdobramento e plano de continuidade", F5, ["Roda da Vida", "Modelo SMART"]),
-    ev("recesso", null, addDias(diaEncontro(14), 1), "Recesso de fim de ano", null, [], addDias(diaEncontro(14), 18)),
-    ev("encontro", 15, diaEncontro(15), "Reflexão e reconhecimento", F6, ["PDM", "Roda da Vida"]),
-    ev("encontro", 16, diaEncontro(16), "Encerramento e celebração", F6, ["Avaliação 360º", "Autoavaliação do mentor"]),
-    // evento de encerramento: 15/01 no cronograma (+3d após o 16º encontro)
-    ev("marco", null, addDias(diaEncontro(16), 3), "Evento de encerramento do programa"),
+    ev(cronogramaId, "encontro", 8, dia(8), "Monitoramento e responsabilidade", F3, ["PDM", "Escuta Ativa"]),
+    ev(cronogramaId, "encontro", 9, dia(9), "Revisão de meio de percurso", F3, ["PDM", "Escuta Ativa"]),
+    ev(cronogramaId, "encontro", 10, dia(10), "O mentor como espelho", F4, ["Papel de modelo", "Escuta Ativa"]),
+    ev(cronogramaId, "encontro", 11, dia(11), "Rede de apoio e novos espaços", F4, ["Papel de modelo", "Escuta Ativa"]),
+    ev(cronogramaId, "encontro", 12, dia(12), "Aplicação e leitura da Roda da Vida", F5, ["Roda da Vida", "Modelo SMART"]),
+    ev(cronogramaId, "encontro", 13, dia(13), "Metas das áreas prioritárias", F5, ["Roda da Vida", "Modelo SMART"]),
+    ev(cronogramaId, "encontro", 14, dia(14), "Desdobramento e plano de continuidade", F5, ["Roda da Vida", "Modelo SMART"]),
+    ev(cronogramaId, "recesso", null, addDias(dia(14), 1), "Recesso de fim de ano", null, [], addDias(dia(14), 18)),
+    ev(cronogramaId, "encontro", 15, dia(15), "Reflexão e reconhecimento", F6, ["PDM", "Roda da Vida"]),
+    ev(cronogramaId, "encontro", 16, dia(16), "Encerramento e celebração", F6, ["Avaliação 360º", "Autoavaliação do mentor"]),
+    // evento de encerramento compartilhável pelas turmas — cada cronograma
+    // guarda a própria row (cronograma_id é NOT NULL): 15/01 no real, +3d
+    // após o 16º encontro de cada uma
+    ev(cronogramaId, "marco", null, addDias(dia(16), 3), "Evento de encerramento do programa"),
   ];
+
+  return [...turma(cronogramaT1, diaEncontro), ...turma(cronogramaT2, diaEncontroT2)];
 }
 
 // ---------- textos de registro ----------
@@ -1000,7 +1047,7 @@ function build(): DemoData {
     id: uid(M.kaua), nome: "Kauã Rodrigues",
     email: "kaua.rodrigues@gmail.com", whatsapp: "5511976123006",
     ong_origem: "Projeto Semente",
-    notas: "3º ano. Sem dupla ainda — interesse em empreendedorismo e primeiros empregos.",
+    notas: "3º ano. Entrou na T2 (a turma que começou agora) — o match com o André fechou no empreendedorismo. Interesse em primeiros empregos e no negócio da família.",
     avatar_path: "demo/avatars/kaua.svg", documento_path: "documentos/autorizacao-kaua.pdf",
     nome_social: null, data_nascimento: "2008-07-19", genero: "masculino",
     cidade: "São Paulo", uf: "SP",
@@ -1027,7 +1074,7 @@ function build(): DemoData {
     id: uid(M.laura), nome: "Laura Mendes",
     email: null, whatsapp: "5511976123007",
     ong_origem: "Casa do Saber",
-    notas: "1º ano. Aguarda matching — família pediu reforço em rotina de estudos.",
+    notas: "1º ano. Entrou na T2 com a Luiza — a família pediu reforço em rotina de estudos.",
     avatar_path: "demo/avatars/laura.svg", documento_path: null,
     nome_social: null, data_nascimento: "2009-11-25", genero: "feminino",
     cidade: "São Paulo", uf: "SP",
@@ -1050,7 +1097,22 @@ function build(): DemoData {
     escolaridade: "medio", origem: null, disponibilidade: null,
   };
 
-  const mentorados = [ana, caio, dandara, eduardo, isabela, kaua, laura, pedro];
+  // ficha mínima da leva da T2: veio pela ONG parceira da turma nova e
+  // aguarda matching — mantém o board com um mentorado sem dupla
+  const rafael: Mentorado = {
+    id: uid(M.rafael), nome: "Rafael Nunes",
+    email: null, whatsapp: "5511976123009",
+    ong_origem: "Cidadão Pró-Mundo",
+    notas: "2º ano. Chegou na leva da T2 (parceria Cidadão Pró-Mundo) — aguarda o pareamento.",
+    avatar_path: "demo/avatars/rafael.svg", documento_path: null,
+    nome_social: null, data_nascimento: "2009-02-11", genero: "masculino",
+    cidade: "São Paulo", uf: "SP", interesses: [],
+    motivacao: null, pref_genero_par: null, objetivos: null,
+    escolaridade: "medio", origem: "ONG Cidadão Pró-Mundo",
+    disponibilidade: null,
+  };
+
+  const mentorados = [ana, caio, dandara, eduardo, isabela, kaua, laura, pedro, rafael];
 
   // ---------- solicitações de especialista ----------
   // (montadas antes das duplas: as duplas de especialista referenciam a
@@ -1181,9 +1243,53 @@ function build(): DemoData {
     },
   ];
 
+  // ---------- cronogramas (0061) ----------
+
+  // Dois calendários oficiais ativos, um por turma: a T1 corre a semana 5 do
+  // ciclo e a T2 acabou de começar — a turma que entra ~1 mês depois e
+  // comprime o calendário com as 3 quintas de sessão dupla pra terminar
+  // junto (ver diaEncontroT2). inicio/fim/esperados derivam dos eventos —
+  // mesma conta do backfill da 0061 (min(data), max(data|data_fim), count
+  // dos 'encontro').
+  const cronogramaT1 = uid(CRON.t1);
+  const cronogramaT2 = uid(CRON.t2);
+  const cicloEventos = buildCicloEventos(cronogramaT1, cronogramaT2);
+
+  const cronogramaDe = (
+    id: string,
+    nome: string,
+    turma: string,
+    criadoDias: number
+  ): Cronograma => {
+    const evs = cicloEventos.filter((e) => e.cronograma_id === id);
+    return {
+      id,
+      nome,
+      turma,
+      trilha: "dpp",
+      inicio_em: evs.map((e) => e.data).reduce((a, b) => (a < b ? a : b)),
+      fim_em: evs
+        .map((e) => e.data_fim ?? e.data)
+        .reduce((a, b) => (a > b ? a : b)),
+      encontros_esperados: evs.filter((e) => e.tipo === "encontro").length,
+      status: "ativo",
+      created_by: marina.id,
+      created_at: haDias(criadoDias),
+    };
+  };
+
+  const cronogramas: Cronograma[] = [
+    cronogramaDe(cronogramaT1, "Calendário oficial · T1", "T1 · 2026/2027", 60),
+    cronogramaDe(cronogramaT2, "Calendário oficial · T2", "T2 · 2026/2027", 32),
+  ];
+
   // ---------- duplas ----------
 
   const inicioCiclo = ymd(addDias(diaEncontro(1), -7));
+  // a T2 começou agora: o 1º encontro oficial dela é a terça desta semana
+  const inicioCicloT2 = ymd(addDias(diaEncontroT2(1), -7));
+  const diaE1T2 = diaEncontroT2(1);
+  const e1T2Passou = diaE1T2.getTime() < HOJE.getTime();
 
   // d-ok · Ricardo × Ana Beatriz — a dupla saudável: 4 encontros no calendário
   // oficial com registro bom, 5º agendado pra terça corrente
@@ -1213,7 +1319,8 @@ function build(): DemoData {
 
   const duplaOk: Dupla = {
     id: uid(D.ok),
-    ciclo: "2026/2027",
+    turma: "T1 · 2026/2027",
+    cronograma_id: cronogramaT1,
     status: "ativa",
     iniciada_em: inicioCiclo,
     trilha: "dpp",
@@ -1282,7 +1389,8 @@ function build(): DemoData {
 
   const duplaPend: Dupla = {
     id: uid(D.pend),
-    ciclo: "2026/2027",
+    turma: "T1 · 2026/2027",
+    cronograma_id: cronogramaT1,
     status: "ativa",
     iniciada_em: inicioCiclo,
     trilha: "dpp",
@@ -1332,7 +1440,8 @@ function build(): DemoData {
 
   const duplaRisco: Dupla = {
     id: uid(D.risco),
-    ciclo: "2026/2027",
+    turma: "T1 · 2026/2027",
+    cronograma_id: cronogramaT1,
     status: "ativa",
     iniciada_em: inicioCiclo,
     trilha: "dpp",
@@ -1390,7 +1499,8 @@ function build(): DemoData {
 
   const duplaAtraso: Dupla = {
     id: uid(D.atraso),
-    ciclo: "2026/2027",
+    turma: "T1 · 2026/2027",
+    cronograma_id: cronogramaT1,
     status: "ativa",
     iniciada_em: inicioCiclo,
     trilha: "dpp",
@@ -1433,7 +1543,8 @@ function build(): DemoData {
 
   const duplaPausa: Dupla = {
     id: uid(D.pausa),
-    ciclo: "2026/2027",
+    turma: "T1 · 2026/2027",
+    cronograma_id: cronogramaT1,
     status: "pausada",
     iniciada_em: inicioCiclo,
     trilha: "dpp",
@@ -1480,7 +1591,10 @@ function build(): DemoData {
 
   const duplaFim: Dupla = {
     id: uid(D.fim),
-    ciclo: "2025/2026",
+    // histórica do ciclo anterior: turma é só o label — cronograma_id null
+    // exercita o fallback da ficha (a trilha renderiza pelos encontros reais)
+    turma: "2025/2026",
+    cronograma_id: null,
     status: "concluida",
     iniciada_em: ymd(addDias(FIM_CICLO_ANTERIOR, -15 * 7 - 7)),
     trilha: "dpp",
@@ -1530,7 +1644,9 @@ function build(): DemoData {
 
   const duplaEsp1: Dupla = {
     id: uid(D.esp1),
-    ciclo: "2026/2027",
+    // especialista não tem cronograma (trilha livre) — carrega só a turma
+    turma: "T1 · 2026/2027",
+    cronograma_id: null,
     status: "ativa",
     trilha: "especialista",
     iniciada_em: ymd(addDias(HOJE, -14)),
@@ -1576,7 +1692,8 @@ function build(): DemoData {
 
   const duplaEsp2: Dupla = {
     id: uid(D.esp2),
-    ciclo: "2026/2027",
+    turma: "T1 · 2026/2027",
+    cronograma_id: null,
     status: "ativa",
     iniciada_em: ymd(addDias(HOJE, -20)),
     trilha: "especialista",
@@ -1601,7 +1718,8 @@ function build(): DemoData {
 
   const duplaEsp3: Dupla = {
     id: uid(D.esp3),
-    ciclo: "2026/2027",
+    turma: "T1 · 2026/2027",
+    cronograma_id: null,
     status: "ativa",
     trilha: "especialista",
     iniciada_em: ymd(addDias(HOJE, -9)),
@@ -1678,7 +1796,8 @@ function build(): DemoData {
 
   const duplaEsp4: Dupla = {
     id: uid(D.esp4),
-    ciclo: "2026/2027",
+    turma: "T1 · 2026/2027",
+    cronograma_id: null,
     status: "concluida",
     trilha: "especialista",
     iniciada_em: ymd(addDias(HOJE, -30)),
@@ -1698,7 +1817,81 @@ function build(): DemoData {
       "A Bia apresentou o projeto dela pra uma plateia de 20 pessoas na última sessão — saiu do texto decorado e respondeu as três perguntas finais de improviso, sem notas. Pro PDM: vale colocar ela pra apresentar os próprios resultados nos encontros da dupla — exposição curta e frequente consolidou mais do que treino longo.",
   };
 
-  const duplas = [duplaOk, duplaPend, duplaRisco, duplaAtraso, duplaFim, duplaEsp1, duplaEsp2, duplaEsp3, duplaEsp4, duplaPausa];
+  // ---------- duplas da T2 (turma que começou 1 mês depois da T1) ----------
+  // O 1º encontro oficial da T2 é a terça da semana corrente — as duplas
+  // estão começando agora. É o caso que exercita o isolamento do semáforo:
+  // medidas contra o calendário da T1 elas pareceriam atrasadas; contra o
+  // próprio cronograma, estão saudáveis.
+
+  // d-t2a · André × Kauã — o André tem capacidade 2 no mentor_profiles: com a
+  // dupla do Pedro pausada, assumiu o Kauã na T2 (o encaixe de
+  // empreendedorismo era bom demais pra esperar)
+  const encT2a: Encontro[] = [
+    // a terça já passou, o encontro rolou e tem registro; senão fica
+    // agendado — a demo conta a mesma história em qualquer dia da semana
+    e1T2Passou
+      ? comRegistro(
+          realizado(uid(D.t2a), 1, diaE1T2, { duracao: 75 }),
+          andre, "Kauã", "dpp",
+          {
+            reflexoes:
+              "Primeiro encontro da T2 — o Kauã chegou tímido mas se soltou quando o assunto foi a produção de doces da família. Leitura inicial da Roda da Vida feita; ele já enxerga o negócio como meta.",
+            observacoes:
+              "Combinado: o Kauã lista as pessoas pra avaliação por terceiros e pensa numa primeira meta pro negócio da família.",
+          }
+        )
+      : agendado(uid(D.t2a), 1, diaE1T2, { link: MEET }),
+    agendado(uid(D.t2a), 2, diaEncontroT2(2), {}),
+  ];
+
+  const duplaT2a: Dupla = {
+    id: uid(D.t2a),
+    turma: "T2 · 2026/2027",
+    cronograma_id: cronogramaT2,
+    status: "ativa",
+    iniciada_em: inicioCicloT2,
+    trilha: "dpp",
+    demanda: null,
+    solicitacao_id: null,
+    mentor: andre,
+    mentorado: kaua,
+    supervisor: beatriz,
+    encontros: encT2a,
+    encaminhamentos: e1T2Passou
+      ? [
+          encaminhamento(uid(D.t2a), encT2a[0].registro!.id,
+            "Listar 3 pessoas pra avaliação por terceiros e enviar o questionário",
+            "mentorado", diaEncontroT2(2), "pendente"),
+        ]
+      : [],
+    notas: [],
+  };
+
+  // d-t2b · Luiza × Laura — o "segundo ciclo" que a bio dela anuncia: depois
+  // de concluir a jornada com a Isabela, voltou mentora na turma nova
+  const encT2b: Encontro[] = [
+    agendado(uid(D.t2b), 1, diaE1T2, { link: MEET }),
+    agendado(uid(D.t2b), 2, diaEncontroT2(2), {}),
+  ];
+
+  const duplaT2b: Dupla = {
+    id: uid(D.t2b),
+    turma: "T2 · 2026/2027",
+    cronograma_id: cronogramaT2,
+    status: "ativa",
+    iniciada_em: inicioCicloT2,
+    trilha: "dpp",
+    demanda: null,
+    solicitacao_id: null,
+    mentor: luiza,
+    mentorado: laura,
+    supervisor: paulo,
+    encontros: encT2b,
+    encaminhamentos: [],
+    notas: [],
+  };
+
+  const duplas = [duplaOk, duplaPend, duplaRisco, duplaAtraso, duplaFim, duplaEsp1, duplaEsp2, duplaEsp3, duplaEsp4, duplaPausa, duplaT2a, duplaT2b];
 
   // ---------- anexos de evidência ----------
 
@@ -1889,8 +2082,8 @@ function build(): DemoData {
   ];
 
   // ---------- catálogos ----------
-
-  const cicloEventos = buildCicloEventos();
+  // (cicloEventos foi montado na seção de cronogramas — as duplas já
+  //  precisavam dos ids lá em cima)
 
   // os 5 encontros do guia do especialista — verbatim da migration 0027
   const especialistaEventos: EspecialistaEvento[] = [
@@ -2171,27 +2364,46 @@ function build(): DemoData {
 
   // ---------- presenças na formação (0040) ----------
 
-  // Os dois encontros 'formacao' do calendário já passaram (semana pré-ciclo).
+  // A formação é por TURMA (0061) — cada cronograma tem seus próprios
+  // eventos 'formacao' e a chamada de um não cobre o outro. Quem responde a
+  // cada chamada: os mentores com dupla naquele cronograma + os
+  // especialistas — a trilha deles não tem cronograma próprio, então eles
+  // formam junto de cada turma (DPP e especialista formam juntos).
   // História: chamada completa no 1º dia; no 2º o João Pedro faltou —
   // presente=false é a ausência explícita que explica o formacao_ok=false
   // dele no mentor_profiles (a sync do 0040 só acende a flag com cobertura
-  // total). Os demais mentores ativos (dpp + especialista) foram nos dois.
-  const formacaoEvts = cicloEventos.filter((e) => e.tipo === "formacao");
+  // total). Os demais mentores ativos (dpp + especialista) foram nos dois
+  // dias da turma deles.
   const mentoresAtivos = profiles.filter(
     (p) =>
       p.ativo && (p.role === "mentor_dpp" || p.role === "mentor_especialista")
   );
+  const ehEspecialista = (profileId: string) =>
+    mentorProfiles.find((mp) => mp.profile_id === profileId)?.tipo ===
+    "especialista";
+  const chamadaDe = (cronogramaId: string): Profile[] =>
+    mentoresAtivos.filter(
+      (p) =>
+        duplas.some(
+          (d) => d.cronograma_id === cronogramaId && d.mentor?.id === p.id
+        ) || ehEspecialista(p.id)
+    );
   let seqPres = 0;
-  const presencas: Presenca[] = formacaoEvts.flatMap((ev, diaIdx) =>
-    mentoresAtivos.map((p) => ({
-      id: uid(0x3600 + ++seqPres),
-      ciclo_evento_id: ev.id,
-      profile_id: p.id,
-      presente: !(diaIdx === 1 && p.id === joaoPedro.id),
-      marcado_por: marina.id, // a chamada é da coordenação
-      // carimbo da noite do evento — como o trigger stamp_presenca faria
-      marcado_em: em(new Date(`${ev.data}T12:00:00`), "20:30"),
-    }))
+  const presencas: Presenca[] = [cronogramaT1, cronogramaT2].flatMap((cid) =>
+    cicloEventos
+      .filter((e) => e.tipo === "formacao" && e.cronograma_id === cid)
+      .flatMap((ev, diaIdx) =>
+        chamadaDe(cid).map((p) => ({
+          id: uid(0x3600 + ++seqPres),
+          ciclo_evento_id: ev.id,
+          profile_id: p.id,
+          // a ausência do João Pedro é no 2º dia da T1 (a dupla dele é lá)
+          presente: !(cid === cronogramaT1 && diaIdx === 1 && p.id === joaoPedro.id),
+          marcado_por: marina.id, // a chamada é da coordenação
+          // carimbo da noite do evento — como o trigger stamp_presenca faria
+          marcado_em: em(new Date(`${ev.data}T12:00:00`), "20:30"),
+        }))
+      )
   );
 
   // ---------- sessões de supervisão (0041) ----------
@@ -2251,6 +2463,7 @@ function build(): DemoData {
     mentorProfiles,
     duplas,
     anexos,
+    cronogramas,
     cicloEventos,
     especialistaEventos,
     materiais,

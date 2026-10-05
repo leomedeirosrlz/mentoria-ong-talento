@@ -19,8 +19,8 @@ import {
   DIFICULDADE_LABEL,
   formatDiaNum,
   formatMesAbrev,
+  maxNumeroEncontro,
   registroTardio,
-  totalEncontros,
 } from "@/lib/ciclo";
 import { RegistrosFiltros, type OrdemRegistros } from "@/components/registros-filtros";
 import { buttonVariants } from "@/components/ui/button";
@@ -92,7 +92,9 @@ export default async function RegistrosPage({
   const souCoord = me.role === "coordenacao";
 
   const eventos = await getCicloEventos();
-  const maxEncontro = totalEncontros(eventos);
+  // teto do filtro por nº = o maior número entre os cronogramas — contar
+  // linhas com duas turmas daria o dobro do que existe de fato
+  const maxEncontro = maxNumeroEncontro(eventos);
   const params = await searchParams;
   const filtros = parseFiltros(params, maxEncontro);
   // triagem por scoreAlerta dentro da fatia carregada — a paginação é
@@ -111,18 +113,21 @@ export default async function RegistrosPage({
     getEspecialistaEventos(),
   ]);
 
-  // título do encontro por nº — por trilha: o nº 3 DPP e o nº 3 especialista
-  // são eventos diferentes (ciclo_eventos vs especialista_eventos)
+  // título do encontro por (cronograma, nº) — por trilha: o nº 3 DPP e o nº 3
+  // especialista são eventos diferentes (ciclo_eventos vs especialista_eventos),
+  // e o nº 3 da T1 e o da T2 também (0061 — numero solto não identifica)
   const tituloDpp = new Map(
     eventos
       .filter((e) => e.tipo === "encontro" && e.numero != null)
-      .map((e) => [e.numero!, e.titulo])
+      .map((e) => [`${e.cronograma_id}:${e.numero}`, e.titulo])
   );
   const tituloEsp = new Map(espEventos.map((e) => [e.numero, e.titulo]));
   const tituloEncontro = (r: RegistroResumo) =>
     r.encontro?.dupla?.trilha === "especialista"
       ? (tituloEsp.get(r.encontro.numero) ?? null)
-      : (tituloDpp.get(r.encontro?.numero ?? 0) ?? null);
+      : (tituloDpp.get(
+          `${r.encontro?.dupla?.cronograma_id}:${r.encontro?.numero}`
+        ) ?? null);
 
   // o banco já ordena por realizado_em; o sort estável acerta a fatia
   // carregada e empurra quem pede atenção pra cima dentro do mesmo dia.

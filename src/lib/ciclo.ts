@@ -1,6 +1,7 @@
 import type {
   CicloEvento,
   CorRaca,
+  Cronograma,
   DiaSemana,
   Dificuldade,
   Disponibilidade,
@@ -338,6 +339,89 @@ export function totalEncontros(eventos: CicloEvento[]): number {
   return eventos.filter((e) => e.tipo === "encontro").length;
 }
 
+/** Maior nº de encontro entre os cronogramas (0061): `totalEncontros` conta
+ *  LINHAS — com duas turmas daria 32; o teto de um seletor/filtro por nº é o
+ *  maior numero existente, não a soma das listas. */
+export function maxNumeroEncontro(eventos: CicloEvento[]): number {
+  return eventos.reduce(
+    (m, e) => (e.tipo === "encontro" && e.numero != null ? Math.max(m, e.numero) : m),
+    0
+  );
+}
+
+/** Teto da dupla pelo calendário DELA (0061): o nº de encontros do cronograma
+ *  vinculado — duas turmas podem ter totais diferentes. `eventos` deve ser o
+ *  recorte já feito por `eventosDoCronograma`; lista vazia (especialista ou
+ *  DPP legada sem vínculo) cai no teto canônico da trilha. */
+export function totalDaTrilha(
+  trilha: Trilha | null | undefined,
+  eventos: CicloEvento[]
+): number {
+  if (trilha === "especialista") return TRILHA_LEN.especialista;
+  return totalEncontros(eventos) || TRILHA_LEN.dpp;
+}
+
+// ---------- cronogramas (0061) ----------
+// O calendário oficial é POR cronograma: duas turmas com datas diferentes não
+// podem se misturar no semáforo, na agenda ou na trilha. A identidade de um
+// encontro oficial é (cronograma_id, numero) — numero solto não identifica.
+
+/** Recorte do calendário oficial de uma dupla. Sem cronograma (especialista,
+ *  histórica antiga) devolve [] — trilha livre, nada vence "por data". */
+export function eventosDoCronograma(
+  eventos: CicloEvento[],
+  cronogramaId: string | null | undefined
+): CicloEvento[] {
+  if (!cronogramaId) return [];
+  return eventos.filter((e) => e.cronograma_id === cronogramaId);
+}
+
+/** Cronograma vigente pra abrir telas: ativo cuja faixa cobre hoje (dois
+ *  ativos sobrepostos desempatam pelo início mais antigo, depois created_at,
+ *  depois nome — determinístico); sem cobertura, o próximo a começar; sem
+ *  futuro, o encerrado mais recente. Null sem cronogramas. */
+export function cronogramaVigente(
+  cronogramas: Cronograma[],
+  hoje = new Date()
+): Cronograma | null {
+  if (!cronogramas.length) return null;
+  const hojeStr = toDateStr(hoje);
+  const porInicio = (a: Cronograma, b: Cronograma) =>
+    (a.inicio_em ?? "").localeCompare(b.inicio_em ?? "") ||
+    a.created_at.localeCompare(b.created_at) ||
+    a.nome.localeCompare(b.nome, "pt-BR");
+  const cobrindo = cronogramas
+    .filter(
+      (c) =>
+        c.status === "ativo" &&
+        (c.inicio_em == null || c.inicio_em <= hojeStr) &&
+        (c.fim_em == null || c.fim_em >= hojeStr)
+    )
+    .sort(porInicio);
+  if (cobrindo.length) return cobrindo[0];
+  const futuros = cronogramas
+    .filter((c) => c.inicio_em != null && c.inicio_em > hojeStr)
+    .sort(porInicio);
+  if (futuros.length) return futuros[0];
+  return [...cronogramas].sort(
+    (a, b) => (b.fim_em ?? "").localeCompare(a.fim_em ?? "") || porInicio(a, b)
+  )[0];
+}
+
+/** Opções do seletor de cronograma — ordenadas por turma e nome. */
+export function cronogramasOpcoes(cronogramas: Cronograma[]): Cronograma[] {
+  return [...cronogramas].sort(
+    (a, b) =>
+      a.turma.localeCompare(b.turma, "pt-BR") ||
+      a.nome.localeCompare(b.nome, "pt-BR")
+  );
+}
+
+/** Label curto do seletor: "2026/2027 · Calendário oficial". */
+export function rotuloCronograma(c: Cronograma): string {
+  return `${c.turma} · ${c.nome}`;
+}
+
 /** Encontros esperados = datas de encontro já passadas (ou hoje) desde o início da dupla. */
 export function encontroEsperado(eventos: CicloEvento[], hoje: Date, desde?: string | null): number {
   const hojeStr = toDateStr(hoje);
@@ -430,9 +514,14 @@ export function resumoSemanaDe(
   const { seg, dom } =
     semana ?? semanaBounds(new Date(`${evento.data}T12:00:00`));
   // semana oficial é métrica da trilha DPP — duplas de especialista não seguem
-  // o calendário de terças e ficariam sempre "sem encontro esta semana"
+  // o calendário de terças e ficariam sempre "sem encontro esta semana". O
+  // denominador é SÓ do cronograma do evento (0061): com duas turmas ativas,
+  // a semana de uma não conta as duplas da outra.
   const ativas = duplas.filter(
-    (d) => d.status === "ativa" && d.trilha !== "especialista"
+    (d) =>
+      d.status === "ativa" &&
+      d.trilha !== "especialista" &&
+      d.cronograma_id === evento.cronograma_id
   );
   const oficialRealizado = (d: Dupla) =>
     d.encontros.find((e) => e.numero === evento.numero && e.status === "realizado");
@@ -526,30 +615,39 @@ export function bucketsDoEncontro(
   return b;
 }
 
-/** A "coorte invisível" do encontro oficial: duplas ativas da trilha DPP cuja
- *  janela já alcançou a data oficial (`iniciada_em` ausente ou <= dataOficial)
- *  e que não têm nenhuma row do número — qualquer row (agendada, realizada,
- *  cancelada) já cobre o encontro, mesmo critério do preventivo do semáforo. */
+/** A "coorte invisível" do encontro oficial: duplas ativas da trilha DPP **do
+ *  cronograma do evento** cuja janela já alcançou a data oficial
+ *  (`iniciada_em` ausente ou <= data oficial) e que não têm nenhuma row do
+ *  número — qualquer row (agendada, realizada, cancelada) já cobre o
+ *  encontro, mesmo critério do preventivo do semáforo. */
 export function duplasSemEncontroDoNumero(
   duplas: Dupla[],
-  numero: number,
-  dataOficial: string
+  evento: CicloEvento
 ): Dupla[] {
+  if (evento.numero == null) return [];
+  const numero = evento.numero;
   return duplas.filter(
     (d) =>
       d.status === "ativa" &&
       d.trilha !== "especialista" &&
-      (!d.iniciada_em || d.iniciada_em <= dataOficial) &&
+      d.cronograma_id === evento.cronograma_id &&
+      (!d.iniciada_em || d.iniciada_em <= evento.data) &&
       !d.encontros.some((e) => e.numero === numero)
   );
 }
 
 /** Texto da faixa "Esta semana" pronto pra WhatsApp da equipe.
- *  `emRisco` recebe strings prontas tipo "Ana & João (2 atrasos)". */
-export function textoResumoSemana(resumo: ResumoSemana, emRisco: string[] = []): string {
+ *  `emRisco` recebe strings prontas tipo "Ana & João (2 atrasos)"; `etiqueta`
+ *  é o rótulo do cronograma — com duas turmas o número sozinho é ambíguo. */
+export function textoResumoSemana(
+  resumo: ResumoSemana,
+  emRisco: string[] = [],
+  etiqueta?: string
+): string {
   const semEncontro = resumo.naoAconteceram - resumo.reposicao;
   const linhas = [
-    `Semana do ${resumo.evento.numero}º encontro (${formatDiaMes(resumo.evento.data)}) · Mentoria Social`,
+    `Semana do ${resumo.evento.numero}º encontro (${formatDiaMes(resumo.evento.data)}) · Mentoria Social` +
+      (etiqueta ? ` · ${etiqueta}` : ""),
     `✔ ${resumo.realizaram} de ${resumo.total} ${resumo.total === 1 ? "dupla" : "duplas"} já realizaram`,
     `✎ ${resumo.comRegistro} ${resumo.comRegistro === 1 ? "registro entregue" : "registros entregues"} · ${resumo.aguardandoRegistro} aguardando`,
     `⚠ ${semEncontro} ${semEncontro === 1 ? "dupla" : "duplas"} sem encontro esta semana` +
@@ -560,6 +658,9 @@ export function textoResumoSemana(resumo: ResumoSemana, emRisco: string[] = []):
 }
 
 export function saudadeDaDupla(dupla: Dupla, eventos: CicloEvento[], hoje = new Date()): DuplaSaude {
+  // a dupla corre contra o calendário DELA (0061) — caller pode passar a lista
+  // global que aqui vira o recorte do cronograma dela (especialista → [])
+  eventos = eventosDoCronograma(eventos, dupla.cronograma_id);
   const hojeStr = toDateStr(hoje);
   // trilha especialista não tem calendário oficial: nada vence "por data", o
   // semáforo dela é feito só dos sinais que a própria dupla emite (pedido de
@@ -730,11 +831,20 @@ export function alvoAgendamento(
   eventos: CicloEvento[],
   hoje = new Date()
 ): AlvoAgendamento {
+  // mesmo recorte do semáforo — os faltantes/sugestões saem do calendário dela
+  eventos = eventosDoCronograma(eventos, dupla.cronograma_id);
   const saude = saudadeDaDupla(dupla, eventos, hoje);
   const ehEspecialista = dupla.trilha === "especialista";
   const encontroEventos = eventos.filter((e) => e.tipo === "encontro");
-  // DPP mede contra os encontros do ciclo; a especialista tem o teto próprio
-  const total = ehEspecialista ? TRILHA_LEN.especialista : totalEncontros(eventos);
+  // DPP mede contra os encontros do ciclo; a especialista tem o teto próprio.
+  // DPP sem cronograma (estado inválido — o CHECK do banco barra, mas dado
+  // legado pode chegar): total 0 marcaria cicloCompleto e apagaria os CTAs;
+  // o fallback pro teto canônico mantém a dupla agendável até a correção.
+  const total = ehEspecialista
+    ? TRILHA_LEN.especialista
+    : encontroEventos.length
+      ? encontroEventos.length
+      : TRILHA_LEN.dpp;
   // primeiro número ainda não realizado — reposição deixa buracos na sequência
   // (ex.: fez o 4º antes do 3º), então "feitos + 1" podia cair num realizado
   const numerosFeitos = new Set(
@@ -929,50 +1039,7 @@ export function inicioDefaultDupla(
   return toDateStr(d);
 }
 
-/** Ciclo vigente = o ciclo cujo calendário oficial cobre hoje; sem cobertura,
- *  o próximo a começar; sem data futura, o mais recente. Os eventos carregam
- *  `ciclo` na coluna própria (não no tipo CicloEvento — o dataset demo não
- *  preenche), então a entrada aceita a forma parcial. `null` sem eventos. */
-export function cicloVigente(
-  eventos: { ciclo?: string | null; data: string }[],
-  hoje = new Date()
-): string | null {
-  const faixas = new Map<string, { min: string; max: string }>();
-  for (const e of eventos) {
-    if (!e.ciclo) continue;
-    const f = faixas.get(e.ciclo);
-    if (!f) faixas.set(e.ciclo, { min: e.data, max: e.data });
-    else {
-      if (e.data < f.min) f.min = e.data;
-      if (e.data > f.max) f.max = e.data;
-    }
-  }
-  const hojeStr = toDateStr(hoje);
-  for (const [ciclo, f] of faixas) {
-    if (f.min <= hojeStr && hojeStr <= f.max) return ciclo;
-  }
-  // nenhum cobre hoje → o próximo a começar; sem futuro, o mais recente
-  const futuros = [...faixas]
-    .filter(([, f]) => f.min > hojeStr)
-    .sort((a, b) => a[1].min.localeCompare(b[1].min));
-  if (futuros.length) return futuros[0][0];
-  const passados = [...faixas].sort((a, b) => b[1].max.localeCompare(a[1].max));
-  return passados[0]?.[0] ?? null;
-}
 
-/** Opções do select de ciclo: distinct do calendário oficial + ciclos que só
- *  existem em duplas (histórico de um ciclo sem eventos continua escolhível).
- *  Ordem alfabética — os ciclos do programa são 'AAAA/AAAA', alfabeto =
- *  cronologia. */
-export function ciclosOpcoes(
-  eventos: { ciclo?: string | null }[],
-  emUso: (string | null | undefined)[]
-): string[] {
-  const set = new Set<string>();
-  for (const e of eventos) if (e.ciclo) set.add(e.ciclo);
-  for (const c of emUso) if (c) set.add(c);
-  return [...set].sort((a, b) => a.localeCompare(b));
-}
 
 const TZ = "America/Sao_Paulo";
 

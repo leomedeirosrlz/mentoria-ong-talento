@@ -166,6 +166,8 @@ function linhas(tabela: string, papel: AppRole | null): Linha[] {
       return d.comunicados as unknown as Linha[];
     case "notificacoes":
       return papel ? ((d.notificacoes[papel] ?? []) as unknown as Linha[]) : [];
+    case "cronogramas":
+      return d.cronogramas as unknown as Linha[];
     case "ciclo_eventos":
       return d.cicloEventos as unknown as Linha[];
     case "especialista_eventos":

@@ -3,6 +3,7 @@ import { saudadeDaDupla } from "@/lib/ciclo";
 import type { CicloEvento } from "@/lib/types";
 import {
   CICLO_16,
+  CRON_T1,
   dt,
   encAgendado,
   encRealizado,
@@ -291,8 +292,8 @@ describe("saudadeDaDupla — preventivo (oficial da semana sem agenda)", () => {
   it("oficial a mais de 5 dias não dispara — e a 5 exatos dispara", () => {
     // calendário com semana de gap: encontros em 07/10 e 28/10
     const eventos: CicloEvento[] = [
-      { id: "a", tipo: "encontro", numero: 1, data: "2025-10-07", data_fim: null, titulo: "E1", fase: null, instrumentos: [] },
-      { id: "b", tipo: "encontro", numero: 2, data: "2025-10-28", data_fim: null, titulo: "E2", fase: null, instrumentos: [] },
+      { id: "a", cronograma_id: CRON_T1, tipo: "encontro", numero: 1, data: "2025-10-07", data_fim: null, titulo: "E1", fase: null, instrumentos: [] },
+      { id: "b", cronograma_id: CRON_T1, tipo: "encontro", numero: 2, data: "2025-10-28", data_fim: null, titulo: "E2", fase: null, instrumentos: [] },
     ];
     const dupla = mkDupla({ encontros: [encRealizado(1, "2025-10-07")] });
     // qua 15/10: semana sem encontro; oficial é 28/10, a 13 dias → ok
