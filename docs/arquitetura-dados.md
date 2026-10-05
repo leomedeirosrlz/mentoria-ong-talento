@@ -130,6 +130,88 @@ Toda leitura/escrita passa por `my_role()` e `my_profile_id()`:
 - **mentorado** → não tem login; tokens com escopo próprio
 - **deleção** de encontros/registros → coord-only (guard 0047)
 
+## Diagrama — arquitetura ATUAL (o que existe no banco)
+
+```
+                         ┌─────────────────────────────────────┐
+                         │  ciclo_eventos (lista plana)        │
+                         │  16 encontros + formações           │
+                         │  chave: ciclo = "2026/2027" (texto) │
+                         └───────────────┬─────────────────────┘
+                                         │ numero ↔ data esperada
+   profiles (com login)                  │             mentorados (sem login)
+   ┌──────────────────────────┐          │             ┌──────────────────┐
+   │ role (app_role):         │          │             │ criado pela coord│
+   │  coordenacao ────────────┼──────────┼─── vê tudo  │ responde por link│
+   │  supervisor  ← auxiliar  │          │             │ tokenizado       │
+   │    executivo (rename     │          │             └────────┬─────────┘
+   │    pendente REALIZA-41)  │          │                      │
+   │  mentor_dpp              │          │                      │
+   │  mentor_especialista     │          │                      │
+   └────────────┬─────────────┘          │                      │
+                │       duplas ◄─────────┼──────────────────────┘
+                │  ┌──────────────────────────────────────────┐
+                └──┤ mentor_id      → profiles (o mentor)     │
+                   │ mentorado_id   → mentorados              │
+                   │ supervisor_id  → profiles (auxiliar exec)│
+                   │ ciclo          → "2026/2027" (texto)     │
+                   │ trilha         → dpp | especialista      │
+                   │ status         → ativa|pausada|encerrada │
+                   └──────────────┬───────────────────────────┘
+              ┌───────────┬──────┼──────┬───────────┬─────────┐
+          encontros   registros  encam-  encerra-  interacoes/ │
+          (1..16,    (semanal,   inhamentos  mentos  notas/    │
+          mentor     follow-up)  (com      (check-  anexos     │
+          agenda)               prazo)     list)               │
+                                                               │
+   supervisoes ◄──── supervisor (mentor experiente) × mentor    │
+   solicitacoes_especialista → mural → aceite → dupla especial.│
+   presencas (formação) · formularios+links · assinaturas ·    │
+   materiais · comunicados · notificacoes · interacoes         │
+```
+
+**O "grupo" do modelo dela existe, mas é virtual:** não é tabela — é *o conjunto de duplas com o mesmo `supervisor_id`*. O "líder do grupo" que ela desenhou é exatamente o auxiliar executivo.
+
+## Diagrama — arquitetura PLANEJADA (modelo final)
+
+```
+   programas ──────────────────────────────────────────────┐
+     (REALIZA-47; hoje é só um conceito)                    │
+        │ 1:N                                               │
+        ▼                                                   │
+   turmas ──────────────── unidade de pertença/vaga         │
+     (ex.: "1 · AGO/2026", "2 · SET/2026")                  │
+        │ 1:N                                               │
+        ▼                                                   │
+   cronogramas ──────────── o calendário oficial            │
+     (REALIZA-15; nº encontros, datas, instrumentos,        │
+      eventos de formação → ciclo_eventos pendurados aqui)  │
+        ▲                                                   │
+        │ pertence a                                        │
+   duplas (turma_id + cronograma_id)  ◄─────────────────────┘
+     ├ mentor_id      → profiles
+     ├ mentorado_id   → mentorados
+     ├ supervisor_id  → auxiliar executivo
+     │                  escopo: POR TURMA (REALIZA-32) ou
+     │                  por conjunto de duplas — a decidir
+     ├ trilha         → dpp | especialista
+     └ encontros / registros / encaminhamentos / encerramento
+        (iguais ao modelo atual)
+
+   papel por contexto (REALIZA-48/43): a mesma pessoa pode ser
+   coord num programa e mentor noutro → role vira por contexto,
+   não global no profile.
+```
+
+## Respostas às perguntas anotadas no modelo dela
+
+| Pergunta dela | Resposta |
+|---|---|
+| **"Coordenador ao grupo ou à turma?"** | Hoje a nenhum: `coordenacao` é **global** — vê tudo, sempre. Operacionalmente quem cola à turma é o **auxiliar executivo**, não o coordenador. Com papel-por-contexto (REALIZA-43), coord poderá ser escopada por programa — mas por programa, não por grupo. |
+| **"Mentor especialista está associado ao grupo?"** | Não ao grupo — à **dupla DPP** (e ao mentorado). Ele vê o mural de solicitações, aceita, e nasce uma dupla `trilha='especialista'` linkada à DPP de origem. Herda turma indiretamente via `dupla_dpp_id`. |
+| **"Supervisor está associado ao grupo?"** | São dois "supervisores" diferentes: (a) o papel `supervisor` do banco = **auxiliar executivo** → sim, associado a um conjunto de duplas via `duplas.supervisor_id` — **é o líder do grupo dela**; (b) supervisor = mentor experiente → associado a **mentores** via `supervisoes`, não a grupos. O rename REALIZA-41 separa os dois nomes. |
+| **"Grupo só faz sentido se houver líder"** | Correto — e por isso grupo **não é tabela**: o líder já existe (`supervisor_id` na dupla). O grupo = `{duplas do mesmo auxiliar}`. Se a decisão REALIZA-32 escolher auxiliar-por-turma, a **turma passa a ser o grupo** — não precisa entidade intermediária. |
+
 ## O que não existe ainda (e já tá no backlog)
 
 - Entidades `programas`, `turmas`, `cronogramas` (REALIZA-15/47) — hoje tudo é o texto `ciclo`
