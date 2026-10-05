@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { type EmailOtpType } from "@supabase/supabase-js";
 import { CircleNotch, SignIn, WarningCircle } from "@phosphor-icons/react";
 import { createAuthClient } from "@/lib/supabase/client";
+import { limparCookiesDemo } from "@/lib/demo/shared";
 import { Button } from "@/components/ui/button";
 
 // /auth/confirm sem ?h=: o link não prova que foi pedido nesta aba, então o
@@ -45,6 +46,7 @@ export function ConfirmarAqui({
         setFalhou(true);
         return;
       }
+      limparCookiesDemo();
       // primeiro acesso passa pelo onboarding de senha, senão vai pro destino
       const meta = data.session.user.user_metadata;
       const resolveuSenha = !!meta?.senha_em || !!meta?.senha_dispensada;

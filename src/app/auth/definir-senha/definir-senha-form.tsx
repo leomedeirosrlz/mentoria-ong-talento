@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "motion/react";
 import { CircleNotch, WarningCircle } from "@phosphor-icons/react";
 import { createAuthClient } from "@/lib/supabase/client";
+import { limparCookiesDemo } from "@/lib/demo/shared";
 import { avisarSenhaAlterada } from "@/lib/actions-conta";
 import { pathInterno, sessaoFresca } from "@/lib/utils";
 import { fade, T } from "@/components/motion";
@@ -66,7 +67,11 @@ export function DefinirSenhaForm() {
       }
       const { data } = await supabase.auth.getSession();
       if (!data.session) router.replace("/login");
-      else setFase(sessaoFresca(data.session) ? "ok" : "expirada");
+      else {
+        // sessão real confirmada — sai da demo
+        limparCookiesDemo();
+        setFase(sessaoFresca(data.session) ? "ok" : "expirada");
+      }
     }
     void entrar();
   }, [supabase, router]);

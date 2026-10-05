@@ -6,6 +6,7 @@ import { type Session } from "@supabase/supabase-js";
 import { motion, AnimatePresence } from "motion/react";
 import { CircleNotch, EnvelopeSimple, Key, WarningCircle } from "@phosphor-icons/react";
 import { createAuthClient, createOtpClient } from "@/lib/supabase/client";
+import { limparCookiesDemo } from "@/lib/demo/shared";
 import { SiteFooter } from "@/components/site-footer";
 import { fade, T } from "@/components/motion";
 import { Button } from "@/components/ui/button";
@@ -99,6 +100,8 @@ export function LoginForm() {
   // no fluxo pkce, agora aplicado na aba que AGUARDA o link
   const entrar = useCallback(
     (session: Session | null) => {
+      // login real venceu — a demo (se estava ativa) morre junto
+      limparCookiesDemo();
       const destino = destinoFinal();
       const meta = session?.user?.user_metadata;
       const resolveuSenha = !!meta?.senha_em || !!meta?.senha_dispensada;
@@ -323,7 +326,11 @@ export function LoginForm() {
         password: senha,
       });
       if (error) setErro(mensagemErro(error, "senha"));
-      else router.push(destinoFinal());
+      else {
+        // login real venceu — sai da demo antes de entrar
+        limparCookiesDemo();
+        router.push(destinoFinal());
+      }
     } catch {
       setErro("Sem conexão. Tente de novo.");
     } finally {

@@ -43,3 +43,21 @@ export function demoRoleClient(): AppRole | null {
 export function demoAtivoClient(): boolean {
   return demoRoleClient() != null;
 }
+
+// par client do mesmo nome em mode.ts (módulo server — não importa aqui)
+const DEMO_LIDAS_COOKIE = "demo_lidas";
+
+/** Login real venceu: sai do modo demo apagando no browser o papel, os
+ *  "já vi" das personas e o mural-lidas local. Sem isso o cookie demo_role
+ *  (30 dias) seguiria desviando a navegação e todo createClient() do app
+ *  continuaria preso no stub mesmo autenticado. */
+export function limparCookiesDemo() {
+  if (typeof document === "undefined") return;
+  for (const nome of [
+    DEMO_ROLE_COOKIE,
+    DEMO_LIDAS_COOKIE,
+    ...DEMO_ROLES.map(demoObCookie),
+  ]) {
+    document.cookie = `${nome}=;path=/;max-age=0`;
+  }
+}

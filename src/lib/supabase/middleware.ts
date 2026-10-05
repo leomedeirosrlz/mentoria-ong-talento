@@ -1,25 +1,15 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { pathInterno } from "@/lib/utils";
-import {
-  DEMO_ROLE_COOKIE,
-  DEMO_ROLES,
-  demoObCookie,
-  papelDemoValido,
-} from "@/lib/demo/shared";
-
-const DEMO_LIDAS_COOKIE = "demo_lidas";
+import { DEMO_ROLE_COOKIE, papelDemoValido } from "@/lib/demo/shared";
 
 export async function updateSession(request: NextRequest) {
   // modo demo: o cookie demo_role dispensa sessão de verdade — a navegação
   // inteira (inclusive /login e /demo) passa sem auth nem refresh de token.
-  // Exceção: um cookie sb-*-auth-token presente indica login real tentado
-  // sem sair da demo — segue o fluxo normal (a sessão pode estar viva)
-  const papelDemo = papelDemoValido(request.cookies.get(DEMO_ROLE_COOKIE)?.value);
-  const temCookieAuth = request.cookies
-    .getAll()
-    .some((c) => c.name.startsWith("sb-") && c.name.includes("-auth-token"));
-  if (papelDemo && !temCookieAuth) {
+  // Quem sai da demo é o sucesso de um login real: o client de auth apaga
+  // os cookies demo no browser (limparCookiesDemo em lib/demo/shared) — até
+  // lá a demo convive com a sessão e vence.
+  if (papelDemoValido(request.cookies.get(DEMO_ROLE_COOKIE)?.value)) {
     return NextResponse.next({ request });
   }
 
@@ -82,27 +72,11 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // login real feito com demo_role ativo: a sessão vence e o modo demo morre
-  // aqui — sem isso o usuário seguiria preso no stub mesmo autenticado
-  const sairDaDemo = (res: NextResponse) => {
-    if (!papelDemo || !user) return res;
-    for (const nome of [
-      DEMO_ROLE_COOKIE,
-      DEMO_LIDAS_COOKIE,
-      ...DEMO_ROLES.map(demoObCookie),
-    ]) {
-      res.cookies.delete(nome);
-    }
-    return res;
-  };
-
   if (user && request.nextUrl.pathname === "/login") {
     const next = request.nextUrl.searchParams.get("next");
     const destino = pathInterno(next) ?? "/";
-    return sairDaDemo(
-      NextResponse.redirect(new URL(destino, request.url))
-    );
+    return NextResponse.redirect(new URL(destino, request.url));
   }
 
-  return sairDaDemo(supabaseResponse);
+  return supabaseResponse;
 }

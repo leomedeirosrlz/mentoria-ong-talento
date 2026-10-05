@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createAuthClient } from "@/lib/supabase/client";
+import { limparCookiesDemo } from "@/lib/demo/shared";
 
 export function Confirmado({ next }: { next: string }) {
   const statusRef = useRef<HTMLDivElement>(null);
@@ -21,6 +22,8 @@ export function Confirmado({ next }: { next: string }) {
     // a página fica com a instrução e o link de continuar
     const t = setTimeout(() => window.close(), 5000);
     supabase.auth.getSession().then(({ data }) => {
+      // sessão nesta aba = login real venceu — sai da demo
+      if (data.session) limparCookiesDemo();
       setTemSessao(Boolean(data.session));
     });
     return () => clearTimeout(t);
