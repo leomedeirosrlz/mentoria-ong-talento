@@ -126,7 +126,9 @@ function SelectItem({
       </SelectPrimitive.ItemText>
       <SelectPrimitive.ItemIndicator
         render={
-          <span className="pointer-events-none absolute right-2 flex size-4 items-center justify-center" />
+          // top-1/2 -translate-y-1/2: sem o centro fixo o check colava no topo
+          // de itens de duas linhas (seletor de turma da agenda)
+          <span className="pointer-events-none absolute right-2 top-1/2 flex size-4 -translate-y-1/2 items-center justify-center" />
         }
       >
         <Check className="pointer-events-none" />

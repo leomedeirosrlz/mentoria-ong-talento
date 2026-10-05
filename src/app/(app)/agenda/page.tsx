@@ -13,7 +13,6 @@ import {
   eventoDaSemana,
   eventosDoCronograma,
   toDateStr,
-  totalEncontros,
 } from "@/lib/ciclo";
 import { AgendaCalendario } from "@/components/agenda-calendario";
 import { AgendaEspecialista } from "@/components/agenda-especialista";
@@ -48,8 +47,10 @@ export default async function AgendaPage({
   });
   const agora = new Date();
   const hoje = toDateStr(agora);
-  // "semana do encontro" do cabeçalho é do cronograma vigente (o default da
-  // tela) — na união dos calendários, semana de T1 e T2 se embaralhariam
+  // "semana do encontro" é do cronograma vigente (o default da tela) — na
+  // união dos calendários, semana de T1 e T2 se embaralhariam. Ela alimenta
+  // só a inicialização/deep-link do calendário: dentro dele o "atual" é
+  // recomputado do cronograma selecionado
   const vigente = cronogramaVigente(cronogramas, agora);
   const eventosVigente = vigente
     ? eventosDoCronograma(eventos, vigente.id)
@@ -105,22 +106,15 @@ export default async function AgendaPage({
 
   return (
     <div className="space-y-6">
-      <header className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Agenda</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {totalEncontros(eventosVigente)} encontros semanais, sempre às terças
-          </p>
-        </div>
-        {semana?.numero != null && (
-          <p className="mt-1.5 flex items-center gap-2 text-sm font-medium">
-            <span
-              aria-hidden
-              className="size-2 rounded-full bg-[var(--brand-lime)]"
-            />
-            Semana do {semana.numero}º encontro
-          </p>
-        )}
+      <header>
+        <h1 className="text-2xl font-semibold tracking-tight">Agenda</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {/* contexto estático por papel — a semana vigente vive no rail e no
+              título do board, que acompanham o cronograma selecionado */}
+          {me?.role === "coordenacao" || me?.role === "supervisor"
+            ? "O calendário oficial do ciclo e o que cada dupla marcou."
+            : "Os encontros do ciclo e os que você marcou com sua dupla."}
+        </p>
       </header>
 
       {eventos.length === 0 ? (

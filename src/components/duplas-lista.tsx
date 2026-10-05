@@ -193,20 +193,28 @@ export function DuplasLista({
       </div>
 
       {/* turmas em paralelo: o recorte por turma é dimensão própria — semáforo
-          filtra dentro dela (ex.: "em risco da T2") */}
+          filtra dentro dela (ex.: "em risco da T2"). Os dois grupos levam
+          rótulo visível ("Turma" / "Situação") — duas fileiras de chips
+          idênticas sem nome eram indistinguíveis */}
       {turmas.length > 1 && (
         <div
           role="group"
-          aria-label="Filtrar por turma"
+          aria-labelledby="flt-turma"
           className="mt-2 flex flex-wrap items-center gap-1.5"
         >
+          <span
+            id="flt-turma"
+            className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground"
+          >
+            Turma
+          </span>
           <button
             type="button"
             aria-pressed={turmaSel === null}
             onClick={() => setTurmaSel(null)}
             className={filterChipCls(turmaSel === null)}
           >
-            Todas as turmas
+            Todas
           </button>
           {turmas.map((t) => (
             <button
@@ -237,9 +245,15 @@ export function DuplasLista({
       {mostrarChips && (
         <div
           role="group"
-          aria-label="Filtrar por situação"
+          aria-labelledby="flt-situacao"
           className="mt-2 flex flex-wrap items-center gap-1.5"
         >
+          <span
+            id="flt-situacao"
+            className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground"
+          >
+            Situação
+          </span>
           {CHIPS.map((c) => {
             const n = base.filter((d) =>
               chipBate(c.id, d, saudePorId.get(d.id)!.semaforo)
@@ -379,11 +393,12 @@ export function DuplasLista({
                       {TRILHA_LABEL[d.trilha]}
                     </span>
                   )}
-                  {/* com turmas em paralelo a etiqueta da turma diferencia
-                      "2/16 da T1" de "2/16 da T2" sem abrir a ficha */}
+                  {/* com turmas em paralelo a turma diferencia "2/16 da T1"
+                      de "2/16 da T2" sem abrir a ficha — contexto tipográfico
+                      (sufixo muted), não pill: pill é só pra flag (trilha) */}
                   {turmas.length > 1 && d.turma && (
-                    <span className="shrink-0 rounded-full bg-muted px-1.5 py-px text-[10px] font-medium text-muted-foreground">
-                      {d.turma}
+                    <span className="min-w-0 truncate text-xs font-normal text-muted-foreground">
+                      · {d.turma}
                     </span>
                   )}
                 </p>

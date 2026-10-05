@@ -6,30 +6,28 @@ import { Skeleton } from "@/components/ui/skeleton";
 export default function Loading() {
   return (
     <div role="status" aria-label="Carregando" className="space-y-6">
-      {/* header — título/subtítulo + marcador "Semana do Nº encontro" */}
-      <header className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <Skeleton className="h-8 w-44" />
-          <Skeleton className="mt-2 h-4 w-72 max-w-full" />
-        </div>
-        <div className="mt-1.5 flex items-center gap-2">
-          <Skeleton className="size-2 shrink-0 rounded-full" />
-          <Skeleton className="h-4 w-40" />
-        </div>
+      {/* header — título + subtítulo estático */}
+      <header>
+        <Skeleton className="h-8 w-44" />
+        <Skeleton className="mt-2 h-4 w-72 max-w-full" />
       </header>
 
       <div className="space-y-4 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(300px,340px)] lg:items-start lg:gap-5 lg:space-y-0">
         {/* ===== calendário mensal ===== */}
         <div className="overflow-hidden rounded-xl bg-card shadow-[var(--shadow-border)] lg:col-start-1 lg:row-start-1">
-          {/* seletor de visão — Semana | Mês | Lista (coord/sup); mentor não
-              tem a row e o card começa direto no chrome */}
-          <div className="flex gap-1 border-b p-1.5">
-            {[0, 1, 2].map((i) => (
-              <Skeleton
-                key={i}
-                className="h-11 flex-1 rounded-lg md:h-9 md:w-24 md:flex-none"
-              />
-            ))}
+          {/* faixa de chrome fundida — abas de visão (Semana | Mês | Lista,
+              coord/sup) + seletor Turma à direita; mentor com um cronograma
+              não tem a faixa e o card começa direto na nav */}
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-b px-2 py-1.5 sm:px-3">
+            <div className="flex items-center gap-1">
+              {[0, 1, 2].map((i) => (
+                <Skeleton
+                  key={i}
+                  className="h-11 w-20 rounded-full sm:h-8"
+                />
+              ))}
+            </div>
+            <Skeleton className="ms-auto h-8 w-36 rounded-lg" />
           </div>
           {/* chrome: carets + "Hoje" + título do mês */}
           <div className="flex items-center gap-1 border-b px-2 py-1.5 sm:px-3">
@@ -41,7 +39,8 @@ export default function Loading() {
             </div>
           </div>
 
-          {/* rail do ciclo — 16 discos com conectores, clipa no mobile como o real */}
+          {/* rail do ciclo — 16 discos com conectores, clipa no mobile como o
+              real, com a legenda de 3 estados embaixo */}
           <div className="border-b px-3 pb-1.5 pt-2 sm:px-4">
             <div className="flex items-center overflow-hidden pb-1">
               {Array.from({ length: 16 }, (_, i) => (
@@ -51,6 +50,14 @@ export default function Loading() {
                   )}
                   <Skeleton className="size-6 shrink-0 rounded-full sm:size-7" />
                 </Fragment>
+              ))}
+            </div>
+            <div className="flex items-center gap-x-3 py-1">
+              {["w-16", "w-14", "w-10"].map((w, i) => (
+                <div key={i} className="flex items-center gap-1.5">
+                  <Skeleton className="size-3 rounded-full" />
+                  <Skeleton className={`h-2.5 ${w}`} />
+                </div>
               ))}
             </div>
           </div>
