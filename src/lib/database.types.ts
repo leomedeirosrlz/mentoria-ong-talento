@@ -159,7 +159,7 @@ export type Database = {
       }
       ciclo_eventos: {
         Row: {
-          ciclo: string
+          cronograma_id: string
           data: string
           data_fim: string | null
           fase: string | null
@@ -170,7 +170,7 @@ export type Database = {
           titulo: string
         }
         Insert: {
-          ciclo?: string
+          cronograma_id: string
           data: string
           data_fim?: string | null
           fase?: string | null
@@ -181,7 +181,7 @@ export type Database = {
           titulo: string
         }
         Update: {
-          ciclo?: string
+          cronograma_id?: string
           data?: string
           data_fim?: string | null
           fase?: string | null
@@ -191,7 +191,15 @@ export type Database = {
           tipo?: string
           titulo?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "ciclo_eventos_cronograma_id_fkey"
+            columns: ["cronograma_id"]
+            isOneToOne: false
+            referencedRelation: "cronogramas"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       comunicados: {
         Row: {
@@ -241,6 +249,67 @@ export type Database = {
           },
           {
             foreignKeyName: "comunicados_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles_pessoal"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cronogramas: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          encontros_esperados: number | null
+          fim_em: string | null
+          id: string
+          inicio_em: string | null
+          nome: string
+          status: string
+          trilha: string
+          turma: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          encontros_esperados?: number | null
+          fim_em?: string | null
+          id?: string
+          inicio_em?: string | null
+          nome: string
+          status?: string
+          trilha?: string
+          turma: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          encontros_esperados?: number | null
+          fim_em?: string | null
+          id?: string
+          inicio_em?: string | null
+          nome?: string
+          status?: string
+          trilha?: string
+          turma?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cronogramas_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cronogramas_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles_contato"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cronogramas_created_by_fkey"
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "profiles_pessoal"
@@ -370,8 +439,8 @@ export type Database = {
       }
       duplas: {
         Row: {
-          ciclo: string
           created_at: string
+          cronograma_id: string | null
           demanda: string | null
           devolutiva_pdm: string | null
           encerrada_em: string | null
@@ -385,10 +454,11 @@ export type Database = {
           status: Database["public"]["Enums"]["dupla_status"]
           supervisor_id: string | null
           trilha: string
+          turma: string
         }
         Insert: {
-          ciclo?: string
           created_at?: string
+          cronograma_id?: string | null
           demanda?: string | null
           devolutiva_pdm?: string | null
           encerrada_em?: string | null
@@ -402,10 +472,11 @@ export type Database = {
           status?: Database["public"]["Enums"]["dupla_status"]
           supervisor_id?: string | null
           trilha?: string
+          turma: string
         }
         Update: {
-          ciclo?: string
           created_at?: string
+          cronograma_id?: string | null
           demanda?: string | null
           devolutiva_pdm?: string | null
           encerrada_em?: string | null
@@ -419,8 +490,16 @@ export type Database = {
           status?: Database["public"]["Enums"]["dupla_status"]
           supervisor_id?: string | null
           trilha?: string
+          turma?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "duplas_cronograma_id_fkey"
+            columns: ["cronograma_id"]
+            isOneToOne: false
+            referencedRelation: "cronogramas"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "duplas_mentor_id_fkey"
             columns: ["mentor_id"]

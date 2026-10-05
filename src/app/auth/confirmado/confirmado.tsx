@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { createAuthClient } from "@/lib/supabase/client";
 
 export function Confirmado({ next }: { next: string }) {
   const statusRef = useRef<HTMLDivElement>(null);
-  const supabase = useMemo(() => createClient(), []);
+  const supabase = useMemo(() => createAuthClient(), []);
   // "Continuar para o app" só aparece quando a aba TEM sessão — no handoff
   // entre navegadores a aba do e-mail fica sem sessão de propósito (o login
   // acontece na aba que pediu o link), e mostrar o link ali mandaria a

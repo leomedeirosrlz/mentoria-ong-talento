@@ -11,14 +11,13 @@ import {
   MOTIVOS_REAGENDAMENTO,
   PREF_GENEROS,
   UFS,
-  cicloVigente,
-  ciclosOpcoes,
+  cronogramaVigente,
   inicioDefaultDupla,
   maxEncontros,
   parseDisponibilidade,
 } from "@/lib/ciclo";
 import { capitalizar, cpfValido, erroAmigavel, nomeProprio } from "@/lib/utils";
-import type { ComunicadoPrioridade, CorRaca, DadosCivis, Disponibilidade, DocumentoPessoa, Endereco, Escolaridade, Genero, Notificacao, PrefGeneroPar, ResponsavelCivis, Trilha } from "@/lib/types";
+import type { ComunicadoPrioridade, CorRaca, Cronograma, DadosCivis, Disponibilidade, DocumentoPessoa, Endereco, Escolaridade, Genero, Notificacao, PrefGeneroPar, ResponsavelCivis, Trilha } from "@/lib/types";
 import {
   emailValido,
   fichaLinha,
@@ -592,16 +591,17 @@ export async function createMentorado(formData: FormData) {
   return { ok: true, aviso };
 }
 
-/** Ciclos conhecidos do programa + o calendário oficial (o caller reusa pra
- *  derivar o vigente e o 1º encontro do ciclo escolhido, sem segunda query). */
-async function dadosCiclos(supabase: Supa) {
-  const [{ data: evs }, { data: dps }] = await Promise.all([
-    supabase.from("ciclo_eventos").select("ciclo, tipo, data"),
-    supabase.from("duplas").select("ciclo"),
+/** Cronogramas do programa + o calendário oficial (o caller reusa pra
+ *  derivar o vigente e o 1º encontro do cronograma escolhido, sem segunda
+ *  query). */
+async function dadosCronogramas(supabase: Supa) {
+  const [{ data: crons }, { data: evs }] = await Promise.all([
+    supabase.from("cronogramas").select("*"),
+    supabase.from("ciclo_eventos").select("cronograma_id, tipo, data"),
   ]);
   return {
-    evs: (evs ?? []) as { ciclo: string | null; tipo: string; data: string }[],
-    ciclos: ciclosOpcoes(evs ?? [], (dps ?? []).map((d) => d.ciclo)),
+    cronogramas: (crons ?? []) as Cronograma[],
+    evs: (evs ?? []) as { cronograma_id: string; tipo: string; data: string }[],
   };
 }
 
@@ -613,14 +613,16 @@ export async function createDupla(formData: FormData) {
   const mentorado_id = String(formData.get("mentorado_id") ?? "");
   const supervisor_id = String(formData.get("supervisor_id") || "") || null;
   if (!mentor_id || !mentorado_id) return { error: "Escolha o mentor e o mentorado." };
-  // ciclo vem do select do dialog; vazio cai no vigente do calendário. Um
-  // valor fora da lista conhecida é recusado antes de qualquer escrita.
-  const cicloRaw = String(formData.get("ciclo") ?? "").trim();
-  const { evs: evsCiclo, ciclos: ciclosConhecidos } = await dadosCiclos(supabase);
-  if (cicloRaw && !ciclosConhecidos.includes(cicloRaw)) {
-    return { error: "Escolha um ciclo da lista." };
+  // cronograma vem do select do dialog (uuid); vazio cai no vigente. Um id
+  // fora da lista conhecida é recusado antes de qualquer escrita.
+  const cronogramaRaw = String(formData.get("cronograma_id") ?? "").trim();
+  const { cronogramas, evs: evsCron } = await dadosCronogramas(supabase);
+  const cronogramaSel = cronogramaRaw
+    ? (cronogramas.find((c) => c.id === cronogramaRaw) ?? null)
+    : undefined;
+  if (cronogramaSel === null) {
+    return { error: "Escolha um cronograma da lista." };
   }
-  const ciclo = cicloRaw || cicloVigente(evsCiclo) || undefined;
   const { data: mentor } = await supabase
     .from("profiles").select("role").eq("id", mentor_id).single();
   if (mentor?.role !== "mentor_dpp" && mentor?.role !== "mentor_especialista") {
@@ -638,8 +640,8 @@ export async function createDupla(formData: FormData) {
       return { error: "A pessoa escolhida como supervisor não tem esse papel." };
     }
   }
-  // um mentorado ocupa uma vaga POR trilha — a dupla de especialista convive
-  // com a DPP em paralelo (índice único do 0027 é ciclo+mentorado+trilha)
+  // um mentorado ocupa uma vaga POR trilha, em qualquer turma — a dupla de
+  // especialista convive com a DPP em paralelo (índice global da 0061)
   const { data: emDupla } = await supabase
     .from("duplas").select("id")
     .eq("mentorado_id", mentorado_id)
@@ -664,22 +666,47 @@ export async function createDupla(formData: FormData) {
   if ((doMentor?.length ?? 0) >= (mp?.capacidade ?? 1)) {
     return { error: "Esse mentor já atingiu o número máximo de duplas." };
   }
+  // DPP corre contra um cronograma — sem ele não há semáforo nem trilha;
+  // recusa explícita, nunca fallback silencioso. A especialista não tem
+  // calendário: a turma vem da DPP do mentorado (ela nasce dentro da mesma
+  // turma) e, sem DPP, da vigente.
+  let cronograma_id: string | null = null;
+  let turma: string | null = null;
+  if (trilha === "dpp") {
+    const c = cronogramaSel ?? cronogramaVigente(cronogramas);
+    if (!c) return { error: "Não há cronograma cadastrado pra vincular a dupla." };
+    cronograma_id = c.id;
+    turma = c.turma;
+  } else {
+    const { data: dpp } = await supabase
+      .from("duplas")
+      .select("turma")
+      .eq("mentorado_id", mentorado_id)
+      .eq("trilha", "dpp")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    turma = dpp?.turma ?? cronogramaVigente(cronogramas)?.turma ?? null;
+    if (!turma) {
+      return { error: "Não consegui derivar a turma da dupla de especialista." };
+    }
+  }
   const iniciadaRaw = String(formData.get("iniciada_em") || "").trim();
   if (iniciadaRaw && !/^\d{4}-\d{2}-\d{2}$/.test(iniciadaRaw)) {
     return { error: "Confira a data de início." };
   }
   // sem data informada, a dupla DPP nasce uma semana antes do 1º encontro
-  // oficial do ciclo — coord cadastra a dupla depois dela existir de fato, e
-  // "hoje" apagaria os encontros já passados do semáforo. A especialista não
-  // tem calendário a ancorar: sem data informada, cai direto em hoje.
+  // oficial do cronograma — coord cadastra a dupla depois dela existir de
+  // fato, e "hoje" apagaria os encontros já passados do semáforo. A
+  // especialista não tem calendário a ancorar: sem data informada, cai em hoje.
   let iniciada_em = iniciadaRaw;
   if (!iniciada_em) {
     if (trilha === "especialista") {
       iniciada_em = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date());
     } else {
-      // 1º encontro DO ciclo escolhido — evsCiclo já tem o calendário inteiro
-      const primeiroEv = evsCiclo
-        .filter((e) => e.tipo === "encontro" && (!ciclo || e.ciclo === ciclo))
+      // 1º encontro DO cronograma escolhido — evsCron já tem o calendário todo
+      const primeiroEv = evsCron
+        .filter((e) => e.tipo === "encontro" && e.cronograma_id === cronograma_id)
         .sort((a, b) => a.data.localeCompare(b.data))[0];
       iniciada_em = primeiroEv
         ? inicioDefaultDupla([{ tipo: "encontro", data: primeiroEv.data }])!
@@ -698,8 +725,8 @@ export async function createDupla(formData: FormData) {
     iniciada_em,
     trilha,
     demanda,
-    // sem ciclo válido resolvido a coluna aplica o default da migration
-    ...(ciclo ? { ciclo } : {}),
+    cronograma_id,
+    turma,
   }).select("id").single();
   if (error) return { error: erroAmigavel(error) };
   // avisa o mentor — o pareamento é a notícia que muda a rotina dele
@@ -1034,16 +1061,21 @@ export async function updateDupla(duplaId: string, formData: FormData) {
   if (iniciada_em && !/^\d{4}-\d{2}-\d{2}$/.test(iniciada_em)) {
     return { error: "Confira a data de início." };
   }
-  // ciclo só muda quando o campo veio no form (dialog sem o campo não mexe);
-  // o valor precisa ser um dos ciclos conhecidos — mesmo critério da criação
-  let cicloNovo: string | undefined;
-  if (formData.has("ciclo")) {
-    const cicloRaw = String(formData.get("ciclo") ?? "").trim();
-    const { ciclos: conhecidos } = await dadosCiclos(supabase);
-    if (!cicloRaw || !conhecidos.includes(cicloRaw)) {
-      return { error: "Escolha um ciclo da lista." };
+  // cronograma só muda quando o campo veio no form (dialog sem o campo não
+  // mexe). undefined = campo não veio; null = "Sem vínculo" explícito (válido
+  // pra histórica/encerrada); id desconhecido é recusado antes de escrever.
+  // A lista vem sempre: a migração de trilha abaixo também resolve por ela.
+  const { cronogramas } = await dadosCronogramas(supabase);
+  let cronogramaNovo: Cronograma | null | undefined;
+  if (formData.has("cronograma_id")) {
+    const raw = String(formData.get("cronograma_id") ?? "").trim();
+    if (!raw) {
+      cronogramaNovo = null;
+    } else {
+      const c = cronogramas.find((x) => x.id === raw) ?? null;
+      if (!c) return { error: "Escolha um cronograma da lista." };
+      cronogramaNovo = c;
     }
-    cicloNovo = cicloRaw;
   }
   // link do PDM (0044): campo presente no form → grava; vazio limpa. A coluna
   // tem CHECK https — valida aqui pra mensagem clara em vez do 23514
@@ -1068,7 +1100,7 @@ export async function updateDupla(duplaId: string, formData: FormData) {
   // então só valida quando o novo status volta a contar. A própria dupla sai da
   // conta (.neq) pra edição simples não brigar com ela mesma
   const { data: atualDupla } = await supabase
-    .from("duplas").select("mentor_id, mentorado_id, supervisor_id, status, trilha").eq("id", duplaId).single();
+    .from("duplas").select("mentor_id, mentorado_id, supervisor_id, status, trilha, cronograma_id").eq("id", duplaId).single();
   if (atualDupla && trilhaNova !== atualDupla.trilha) {
     const { count } = await supabase
       .from("encontros")
@@ -1139,8 +1171,39 @@ export async function updateDupla(duplaId: string, formData: FormData) {
       ? { encerrada_em: null, motivo_encerramento: null, devolutiva_pdm: null }
       : {}),
   };
+  // cronograma: troca explícita do dialog move a dupla E o label da turma;
+  // "Sem vínculo" desvincula (histórica/encerrada ficam sem calendário);
+  // migração DPP→especialista solta o vínculo (a trilha não tem calendário);
+  // DPP ocupando vaga sem cronograma (migração ou dado pré-0061) resolve pelo
+  // vigente e falha claro quando não há — o CHECK do banco é o último muro.
+  if (trilhaNova === "especialista") {
+    // a trilha livre nunca carrega cronograma — nem por migração, nem por
+    // campo injetado no form
+    patch.cronograma_id = null;
+  } else {
+    if (cronogramaNovo !== undefined) {
+      patch.cronograma_id = cronogramaNovo?.id ?? null;
+      if (cronogramaNovo) patch.turma = cronogramaNovo.turma;
+    }
+    if (status === "ativa" || status === "pausada") {
+      const efetivo =
+        patch.cronograma_id !== undefined
+          ? (patch.cronograma_id as string | null)
+          : (atualDupla?.cronograma_id ?? null);
+      if (!efetivo) {
+        const vigente = cronogramaVigente(cronogramas);
+        if (!vigente) {
+          return {
+            error:
+              "A dupla DPP precisa de um cronograma pra ficar ativa — cadastre um antes.",
+          };
+        }
+        patch.cronograma_id = vigente.id;
+        patch.turma = vigente.turma;
+      }
+    }
+  }
   if (iniciada_em) patch.iniciada_em = iniciada_em;
-  if (cicloNovo) patch.ciclo = cicloNovo;
   if (pdmNovo !== undefined) patch.pdm_url = pdmNovo;
   const { data, error } = await supabase.from("duplas").update(patch).eq("id", duplaId).select("id");
   if (error) return { error: erroAmigavel(error) };
@@ -1514,8 +1577,14 @@ export async function agendarEncontro(formData: FormData) {
   const motivo = String(formData.get("motivo") ?? "").trim();
   const motivoOutro = String(formData.get("motivo_outro") ?? "").trim();
   if (!dupla_id || !numero || !data_hora) return { error: "Data e horário são obrigatórios." };
-  const { data: d } = await supabase.from("duplas").select("status, trilha").eq("id", dupla_id).single();
+  const { data: d } = await supabase.from("duplas").select("status, trilha, cronograma_id").eq("id", dupla_id).single();
   if (d && d.status !== "ativa") return { error: "Essa dupla não está ativa." };
+  // DPP sem cronograma é dado inválido (o CHECK da 0061 impede criar, mas uma
+  // dupla antiga pode chegar aqui) — sem calendário o teto de número seria
+  // uma mentira; aponta a correção em vez de agendar contra nada
+  if (d && d.trilha !== "especialista" && !d.cronograma_id) {
+    return { error: "Essa dupla está sem cronograma — a coordenação vincula um na edição da dupla." };
+  }
   const quando = parseDataHora(data_hora);
   if (!quando) return { error: "Confira a data." };
 
@@ -1538,13 +1607,16 @@ export async function agendarEncontro(formData: FormData) {
   }
   if (link && !urlOk(link)) return { error: "Confira o link: precisa ser um endereço completo (https://…)." };
 
-  // teto de nº por trilha — especialista tem 5 passos próprios, sem ciclo_eventos
+  // teto de nº por trilha — especialista tem 5 passos próprios; DPP mede
+  // contra o calendário DA DUPLA (0061), nunca o global
   const maxNum = d?.trilha === "especialista"
     ? maxEncontros("especialista")
     : (
         await supabase
           .from("ciclo_eventos").select("numero")
-          .eq("tipo", "encontro").order("numero", { ascending: false }).limit(1).maybeSingle()
+          .eq("tipo", "encontro")
+          .eq("cronograma_id", d!.cronograma_id!)
+          .order("numero", { ascending: false }).limit(1).maybeSingle()
       ).data?.numero ?? 16;
   if (!Number.isInteger(numero) || numero < 1 || numero > maxNum) {
     return { error: "Escolha um encontro da lista." };
@@ -1657,11 +1729,16 @@ export async function registrarEncontroRetroativo(
   if (!duplaId || !numero || !dataHora) return { error: "Encontro e data são obrigatórios." };
 
   const { data: d } = await supabase
-    .from("duplas").select("status, iniciada_em, trilha").eq("id", duplaId).single();
+    .from("duplas").select("status, iniciada_em, trilha, cronograma_id").eq("id", duplaId).single();
   if (!d) return { error: "Dupla não encontrada." };
   // fechada (encerrada/concluída) não ganha encontro novo — a jornada acabou
   if (d.status === "encerrada" || d.status === "concluida") {
     return { error: "Essa dupla já está encerrada." };
+  }
+  // DPP sem cronograma não tem calendário pra medir teto/piso — aponta a
+  // correção em vez de registrar contra nada
+  if (d.trilha !== "especialista" && !d.cronograma_id) {
+    return { error: "Essa dupla está sem cronograma — a coordenação vincula um na edição da dupla." };
   }
 
   const quando = parseDataHora(dataHora);
@@ -1671,13 +1748,16 @@ export async function registrarEncontroRetroativo(
   }
 
   // teto de nº e piso de data por trilha — na especialista não existe
-  // ciclo_eventos próprio: o teto é o da trilha e o piso é só o início da dupla
+  // ciclo_eventos próprio: o teto é o da trilha e o piso é só o início da
+  // dupla. DPP mede contra o cronograma dela (0061).
   const ehEspecialista = d.trilha === "especialista";
   const { data: evs } = ehEspecialista
     ? { data: null }
     : await supabase
         .from("ciclo_eventos").select("numero, data")
-        .eq("tipo", "encontro").order("numero", { ascending: true });
+        .eq("tipo", "encontro")
+        .eq("cronograma_id", d.cronograma_id!)
+        .order("numero", { ascending: true });
   const maxNum = ehEspecialista ? maxEncontros("especialista") : evs?.at(-1)?.numero ?? 16;
   if (!Number.isInteger(numero) || numero < 1 || numero > maxNum) {
     return { error: "Escolha um encontro da lista." };
@@ -1929,16 +2009,22 @@ export async function salvarNotaEncontro(duplaId: string, numero: number, texto:
     return { error: "A nota do encontro é do mentor da dupla." };
   }
 
-  const { data: d } = await supabase.from("duplas").select("status, trilha").eq("id", duplaId).single();
+  const { data: d } = await supabase.from("duplas").select("status, trilha, cronograma_id").eq("id", duplaId).single();
   if (d && d.status !== "ativa") return { error: "Essa dupla não está ativa." };
+  if (d && d.trilha !== "especialista" && !d.cronograma_id) {
+    return { error: "Essa dupla está sem cronograma — a coordenação vincula um na edição da dupla." };
+  }
 
-  // teto de nº por trilha — a nota segue o passo do guia (16 DPP / 5 especialista)
+  // teto de nº por trilha — a nota segue o passo do guia (16 DPP / 5
+  // especialista); no DPP o teto é do cronograma dela, não do calendário global
   const maxNum = d?.trilha === "especialista"
     ? maxEncontros("especialista")
     : (
         await supabase
           .from("ciclo_eventos").select("numero")
-          .eq("tipo", "encontro").order("numero", { ascending: false }).limit(1).maybeSingle()
+          .eq("tipo", "encontro")
+          .eq("cronograma_id", d!.cronograma_id!)
+          .order("numero", { ascending: false }).limit(1).maybeSingle()
       ).data?.numero ?? 16;
   if (!Number.isInteger(numero) || numero < 1 || numero > maxNum) {
     return { error: "Escolha um encontro da lista." };
@@ -2208,7 +2294,9 @@ export async function salvarMaterial(formData: FormData) {
     .from("ciclo_eventos").select("numero")
     .eq("tipo", "encontro").order("numero", { ascending: false }).limit(1).maybeSingle();
   // encontro_num segue a trilha da audiência: material de especialista
-  // numera dentro dos 5 passos dela, o resto dentro do ciclo DPP
+  // numera dentro dos 5 passos dela, o resto dentro do ciclo DPP. O teto é
+  // o maior nº entre TODOS os cronogramas (material não é por turma — a 0061
+  // deixa o número solto até uma decisão de escopo própria)
   const maxNumMat =
     audiencia === "especialista"
       ? maxEncontros("especialista")

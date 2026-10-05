@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "motion/react";
 import { CircleNotch, WarningCircle } from "@phosphor-icons/react";
-import { createClient } from "@/lib/supabase/client";
+import { createAuthClient } from "@/lib/supabase/client";
 import { avisarSenhaAlterada } from "@/lib/actions-conta";
 import { pathInterno, sessaoFresca } from "@/lib/utils";
 import { fade, T } from "@/components/motion";
@@ -23,7 +23,7 @@ export function DefinirSenhaForm() {
   const [fase, setFase] = useState<"carregando" | "ok" | "expirada">("carregando");
   const router = useRouter();
   const params = useSearchParams();
-  const supabase = useMemo(() => createClient(), []);
+  const supabase = useMemo(() => createAuthClient(), []);
 
   const next = params.get("next");
   const destino = pathInterno(next) ?? "/";

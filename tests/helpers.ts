@@ -5,6 +5,7 @@
 
 import type {
   CicloEvento,
+  Cronograma,
   Dupla,
   Encaminhamento,
   Encontro,
@@ -51,6 +52,30 @@ export function mkMentorado(over: Partial<Mentorado> = {}): Mentorado {
   };
 }
 
+/** Cronograma de referência dos fixtures — os eventos do CICLO_16 pertencem
+ *  a ele (0061: identidade do encontro oficial é (cronograma_id, numero)). */
+export const CRON_T1 = "cron-t1";
+
+/** Segundo cronograma (a "T2" deslocada) — pros testes de isolamento entre
+ *  cronogramas concorrentes da 0061. */
+export const CRON_T2 = "cron-t2";
+
+export function mkCronograma(over: Partial<Cronograma> = {}): Cronograma {
+  return {
+    id: CRON_T1,
+    nome: "Calendário oficial",
+    turma: "2025/2026",
+    trilha: "dpp",
+    inicio_em: "2025-10-01",
+    fim_em: "2026-01-31",
+    encontros_esperados: 16,
+    status: "ativo",
+    created_by: null,
+    created_at: "2025-09-01T00:00:00-03:00",
+    ...over,
+  };
+}
+
 export function mkEvento(
   numero: number,
   data: string,
@@ -58,6 +83,7 @@ export function mkEvento(
 ): CicloEvento {
   return {
     id: `ev-${numero}`,
+    cronograma_id: CRON_T1,
     tipo: "encontro",
     numero,
     data,
@@ -77,6 +103,7 @@ export const CICLO_16: CicloEvento[] = [
   mkEvento(3, "2025-10-21"),
   {
     id: "ev-form",
+    cronograma_id: CRON_T1,
     tipo: "formacao",
     numero: null,
     data: "2025-10-22",
@@ -96,6 +123,7 @@ export const CICLO_16: CicloEvento[] = [
   mkEvento(12, "2025-12-23"),
   {
     id: "ev-recesso",
+    cronograma_id: CRON_T1,
     tipo: "recesso",
     numero: null,
     data: "2025-12-25",
@@ -195,7 +223,8 @@ export function mkEncaminhamento(over: Partial<Encaminhamento> = {}): Encaminham
 export function mkDupla(over: Partial<Dupla> = {}): Dupla {
   return {
     id: "d-1",
-    ciclo: "2025.2",
+    turma: "2025/2026",
+    cronograma_id: CRON_T1,
     status: "ativa",
     iniciada_em: null,
     trilha: "dpp",

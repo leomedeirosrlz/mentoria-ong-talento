@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CircleNotch, WarningCircle } from "@phosphor-icons/react";
-import { createClient } from "@/lib/supabase/client";
+import { createAuthClient } from "@/lib/supabase/client";
 import { pathInterno } from "@/lib/utils";
 
 // pouso do magic link implícito — rota própria, não /login: usuário logado no
@@ -14,7 +14,7 @@ import { pathInterno } from "@/lib/utils";
 // conta neste navegador (fixação). Quem entra é sempre a aba que pediu.
 export function LinkLanding() {
   const router = useRouter();
-  const supabase = useMemo(() => createClient(), []);
+  const supabase = useMemo(() => createAuthClient(), []);
   const [falhou, setFalhou] = useState(false);
   // StrictMode remonta o efeito em dev — o link é de uso único, roda uma vez
   const rodou = useRef(false);

@@ -4,7 +4,15 @@
 -- semana com 16 encontros às terças — semanal em 13 dos 15 intervalos, com 15
 -- dias entre o 8º e o 9º encontro (tempo de prática das submetas) — e o recesso
 -- de fim de ano na virada da Fase 5 (Roda da Vida) para a Fase 6 (Encerrar).
-insert into public.ciclo_eventos (tipo, numero, data, titulo, fase, instrumentos, data_fim) values
+with cron as (
+  insert into public.cronogramas (nome, turma, inicio_em, fim_em, encontros_esperados)
+  values ('Calendário oficial', '2026/2027', '2026-07-30', '2027-01-15', 16)
+  returning id
+)
+insert into public.ciclo_eventos (cronograma_id, tipo, numero, data, titulo, fase, instrumentos, data_fim)
+select cron.id, v.tipo, v.numero::smallint, v.data::date, v.titulo, v.fase,
+       v.instrumentos::text[], v.data_fim::date
+  from cron cross join (values
   ('marco',    null, '2026-07-30', 'Inscrições e seleção', null, '{}', '2026-08-19'),
   ('marco',    null, '2026-08-20', 'Triagem e preparação do matching', null, '{}', '2026-08-25'),
   ('marco',    null, '2026-08-26', 'Matching das duplas', null, '{}', '2026-09-02'),
@@ -28,7 +36,8 @@ insert into public.ciclo_eventos (tipo, numero, data, titulo, fase, instrumentos
   ('recesso',  null, '2026-12-16', 'Recesso de fim de ano', null, '{}', '2027-01-04'),
   ('encontro', 15, '2027-01-05', 'Reflexão e reconhecimento', 'Encerrar e celebrar', '{PDM,Roda da Vida}', null),
   ('encontro', 16, '2027-01-12', 'Encerramento e celebração', 'Encerrar e celebrar', '{Avaliação 360º,Autoavaliação do mentor}', null),
-  ('marco',    null, '2027-01-15', 'Evento de encerramento do programa', null, '{}', null);
+  ('marco',    null, '2027-01-15', 'Evento de encerramento do programa', null, '{}', null)
+) v(tipo, numero, data, titulo, fase, instrumentos, data_fim);
 
 -- ===== materiais =====
 insert into public.materiais (titulo, descricao, tipo, url, audiencia, encontro_num, ordem) values

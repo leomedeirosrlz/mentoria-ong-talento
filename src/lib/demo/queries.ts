@@ -8,6 +8,7 @@ import type {
   AssinaturaVia,
   CicloEvento,
   Comunicado,
+  Cronograma,
   DadosCivis,
   DocumentoPessoa,
   Dupla,
@@ -187,8 +188,20 @@ export function demoMeusDadosPessoais(
 // ---------- catálogo — igual pra todos os papéis ----------
 
 export function demoCicloEventos(): CicloEvento[] {
+  // todos os eventos, dos dois cronogramas — quem consome filtra pelo
+  // cronograma_id do recorte (a real devolve a tabela inteira igual)
   return [...getDemoData().cicloEventos].sort((a, b) =>
     a.data.localeCompare(b.data)
+  );
+}
+
+/** Idem getCronogramas (0061) — leitura livre pra todo papel, ordenada por
+ *  turma e nome como o .order("turma").order("nome") da real. */
+export function demoCronogramas(): Cronograma[] {
+  return [...getDemoData().cronogramas].sort(
+    (a, b) =>
+      a.turma.localeCompare(b.turma, "pt-BR") ||
+      a.nome.localeCompare(b.nome, "pt-BR")
   );
 }
 
@@ -491,6 +504,7 @@ export function demoRegistros(
             id: d.id,
             status: d.status,
             trilha: d.trilha,
+            cronograma_id: d.cronograma_id,
             mentor: d.mentor
               ? {
                   id: d.mentor.id,
@@ -587,6 +601,7 @@ export function demoDuplasOpcoes(role: AppRole): DuplaOpcao[] {
   return duplasDoPapel(getDemoData(), role)
     .map((d) => ({
       id: d.id,
+      cronograma_id: d.cronograma_id,
       mentor: d.mentor ? { nome: d.mentor.nome } : null,
       mentorado: d.mentorado ? { nome: d.mentorado.nome } : null,
     }))
@@ -875,17 +890,35 @@ export function demoPresencas(role: AppRole, eventoIds: string[]): Presenca[] {
   );
 }
 
-/** "N de M encontros de formação" da ficha — idem getResumoFormacao. O
- *  dataset demo tem um único ciclo de formação, então o recorte "ciclo
- *  vigente" da real é a lista inteira de eventos 'formacao'. Fora do escopo
- *  de leitura o count zera — como a RLS devolveria. */
+/** "N de M encontros de formação" da ficha — idem getResumoFormacao (0061):
+ *  formação é da TURMA. O denominador são os eventos 'formacao' dos
+ *  cronogramas da turma do mentor — a turma dos cronogramas das duplas dele
+ *  (a mais recente quando ele tem dupla nas duas); mentor sem dupla cai na
+ *  turma da formação mais recente publicada. Fora do escopo de leitura o
+ *  count zera — como a RLS devolveria. */
 export function demoResumoFormacao(
   role: AppRole,
   profileId: string
 ): ResumoFormacao {
   const data = getDemoData();
-  const ids = data.cicloEventos
+  const evs = data.cicloEventos
     .filter((e) => e.tipo === "formacao")
+    .sort((a, b) => a.data.localeCompare(b.data));
+  const turmaPorCron = new Map(data.cronogramas.map((c) => [c.id, c.turma]));
+  // turma do mentor: a do cronograma mais recente dentre as suas duplas
+  const cronsDoMentor = new Set(
+    data.duplas
+      .filter((d) => d.mentor?.id === profileId && d.cronograma_id != null)
+      .map((d) => d.cronograma_id as string)
+  );
+  const maisRecente = data.cronogramas
+    .filter((c) => cronsDoMentor.has(c.id))
+    .sort((a, b) => (b.inicio_em ?? "").localeCompare(a.inicio_em ?? ""))[0];
+  const vigente =
+    maisRecente?.turma ??
+    turmaPorCron.get(evs.at(-1)?.cronograma_id ?? "");
+  const ids = evs
+    .filter((e) => turmaPorCron.get(e.cronograma_id) === vigente)
     .map((e) => e.id);
   const presentes = data.presencas.filter(
     (p) =>

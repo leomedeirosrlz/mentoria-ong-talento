@@ -5,6 +5,7 @@ import { demoLidas, demoOnboarded, demoRole } from "./demo/mode";
 import {
   demoAlertasRegistros,
   demoCicloEventos,
+  demoCronogramas,
   demoComunicados,
   demoContagemPessoas,
   demoContatosMap,
@@ -27,7 +28,7 @@ import {
   demoPessoas,
   demoRegistros,
 } from "./demo/queries";
-import type { AvaliacaoJovem, CicloEvento, Comunicado, CorRaca, DadosCivis, DocumentoPessoa, Dupla, DuplaResumo, DuplaStatus, EncontroStatus, EspecialistaEvento, Genero, Material, Mentorado, MentorProfile, Notificacao, PessoaNota, PrefGeneroPar, Profile, Registro, ResponsavelCivis, Trilha } from "./types";
+import type { AvaliacaoJovem, CicloEvento, Comunicado, CorRaca, Cronograma, DadosCivis, DocumentoPessoa, Dupla, DuplaResumo, DuplaStatus, EncontroStatus, EspecialistaEvento, Genero, Material, Mentorado, MentorProfile, Notificacao, PessoaNota, PrefGeneroPar, Profile, Registro, ResponsavelCivis, Trilha } from "./types";
 
 /** mentor_profiles — re-export do tipo canônico (types.ts): os callers da
  *  página de pessoas/board importam daqui historicamente. */
@@ -229,6 +230,21 @@ export const getCicloEventos = cache(async (): Promise<CicloEvento[]> => {
     .from("ciclo_eventos")
     .select("*")
     .order("data", { ascending: true });
+  if (error) throw error;
+  return data ?? [];
+});
+
+/** Todos os cronogramas (0061) — leitura livre pra qualquer papel, como os
+ *  eventos: o seletor de turma/calendário é a régua que escopa o recorte. */
+export const getCronogramas = cache(async (): Promise<Cronograma[]> => {
+  const demo = await demoRole();
+  if (demo) return demoCronogramas();
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("cronogramas")
+    .select("*")
+    .order("turma")
+    .order("nome");
   if (error) throw error;
   return data ?? [];
 });
@@ -621,6 +637,7 @@ export type RegistroResumo = Registro & {
       id: string;
       status: DuplaStatus;
       trilha: Trilha;
+      cronograma_id: string | null;
       mentor: { id: string; nome: string; email: string | null; avatar_path: string | null } | null;
       mentorado: { id: string; nome: string; avatar_path: string | null } | null;
     } | null;
@@ -657,7 +674,7 @@ const REGISTRO_RESUMO_SELECT = `
   encontro:encontros!registros_encontro_id_fkey!inner(
     id, numero, data_hora, realizado_em, status,
     dupla:duplas!encontros_dupla_id_fkey(
-      id, status, trilha,
+      id, status, trilha, cronograma_id,
       mentor:profiles!duplas_mentor_id_fkey(id, nome, avatar_path),
       mentorado:mentorados!duplas_mentorado_id_fkey(id, nome, avatar_path)
     )
@@ -766,9 +783,12 @@ export async function getAlertasRegistros(): Promise<{
   };
 }
 
-/** Opções do filtro de dupla — RLS devolve só o escopo do papel. */
+/** Opções do filtro de dupla — RLS devolve só o escopo do papel.
+ *  `cronograma_id` precisa vir junto: o filtro "encontro nº N" de /registros
+ *  resolve o máximo no cronograma da dupla escolhida (0061). */
 export type DuplaOpcao = {
   id: string;
+  cronograma_id: string | null;
   mentor: { nome: string } | null;
   mentorado: { nome: string } | null;
 };
@@ -780,7 +800,7 @@ export const getDuplasOpcoes = cache(async (): Promise<DuplaOpcao[]> => {
   const { data, error } = await supabase
     .from("duplas")
     .select(
-      "id, mentor:profiles!duplas_mentor_id_fkey(nome), mentorado:mentorados!duplas_mentorado_id_fkey(nome)"
+      "id, cronograma_id, mentor:profiles!duplas_mentor_id_fkey(nome), mentorado:mentorados!duplas_mentorado_id_fkey(nome)"
     )
     .order("created_at", { ascending: true });
   if (error) throw error;

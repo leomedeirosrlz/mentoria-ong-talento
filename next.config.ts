@@ -27,6 +27,15 @@ const CSP = [
 const nextConfig: NextConfig = {
   // sem "X-Powered-By: Next.js" — banner de stack não ajuda ninguém
   poweredByHeader: false,
+  // acesso ao dev server a partir de outros dispositivos (celular via LAN
+  // ou Tailscale): sem a origem aqui o Next bloqueia os endpoints de dev —
+  // o HMR falha, a hydration nunca roda e a página renderiza morta (SSR
+  // ok, zero interatividade). Casa por hostname: IP e MagicDNS da máquina.
+  allowedDevOrigins: [
+    "192.168.15.6",
+    "100.113.24.100",
+    "thixmachine2.tailf3e87b.ts.net",
+  ],
   async headers() {
     return [
       {

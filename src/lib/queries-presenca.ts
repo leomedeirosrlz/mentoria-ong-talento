@@ -64,34 +64,58 @@ export const getPresencas = cache(
 );
 
 export type ResumoFormacao = {
-  /** encontros de formação do ciclo vigente com presença marcada */
+  /** encontros de formação da turma do mentor com presença marcada */
   presentes: number;
-  /** encontros de formação no ciclo vigente */
+  /** encontros de formação na turma */
   total: number;
 };
 
 /** "N de M encontros de formação" do mentor pra ficha (/pessoas/[id]) —
- *  derivado de presencas. O denominador é o ciclo vigente = o ciclo do evento
- *  de formação mais recente do calendário (evento anterior de outro ciclo não
- *  infla a conta). RLS: coord lê a de todos; supervisor, a dos supervisionados. */
+ *  derivado de presencas. Formação é da TURMA (0061): o denominador são os
+ *  eventos 'formacao' dos cronogramas da turma do mentor (a das duplas dele
+ *  — publicar a formação da T2 não pode zerar a conta de quem é da T1).
+ *  Mentor em duas turmas fica com a mais recente; sem dupla, com a formação
+ *  mais recente publicada. RLS: coord lê a de todos; supervisor, a dos
+ *  supervisionados. */
 export const getResumoFormacao = cache(
   async (profileId: string): Promise<ResumoFormacao> => {
     const demo = await demoRole();
-    // demo: conta sobre a fixture — a agenda cobre o calendário inteiro,
-    // então o "ciclo vigente" da real equivale a todos os eventos formacao
     if (demo) return demoResumoFormacao(demo, profileId);
     const supabase = await createClient();
-    const { data: evs, error } = await supabase
-      .from("ciclo_eventos")
-      .select("id, ciclo, data")
-      .eq("tipo", "formacao")
-      .order("data", { ascending: true });
-    if (error) {
-      console.error("getResumoFormacao:", error);
+    const [evsRes, cronsRes, duplasRes] = await Promise.all([
+      supabase
+        .from("ciclo_eventos")
+        .select("id, data, cronograma_id")
+        .eq("tipo", "formacao")
+        .order("data", { ascending: true }),
+      supabase.from("cronogramas").select("id, turma, inicio_em"),
+      supabase
+        .from("duplas")
+        .select("cronograma_id")
+        .eq("mentor_id", profileId)
+        .not("cronograma_id", "is", null),
+    ]);
+    if (evsRes.error) {
+      console.error("getResumoFormacao:", evsRes.error);
       return { presentes: 0, total: 0 };
     }
-    const vigente = evs?.at(-1)?.ciclo ?? null;
-    const ids = (evs ?? []).filter((e) => e.ciclo === vigente).map((e) => e.id);
+    const evs = evsRes.data ?? [];
+    const turmaPorCron = new Map(
+      (cronsRes.data ?? []).map((c) => [c.id, c.turma])
+    );
+    // turma do mentor: a do cronograma mais recente dentre as suas duplas
+    const cronsDoMentor = new Set(
+      (duplasRes.data ?? []).map((d) => d.cronograma_id as string)
+    );
+    const maisRecente = (cronsRes.data ?? [])
+      .filter((c) => cronsDoMentor.has(c.id))
+      .sort((a, b) => (b.inicio_em ?? "").localeCompare(a.inicio_em ?? ""))[0];
+    const vigente =
+      maisRecente?.turma ??
+      turmaPorCron.get(evs.at(-1)?.cronograma_id ?? "");
+    const ids = evs
+      .filter((e) => turmaPorCron.get(e.cronograma_id) === vigente)
+      .map((e) => e.id);
     if (ids.length === 0) return { presentes: 0, total: 0 };
     const { data: prs, error: e2 } = await supabase
       .from("presencas")

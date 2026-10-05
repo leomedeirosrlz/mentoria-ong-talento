@@ -3,18 +3,21 @@ import Link from "next/link";
 import { ArrowUpRight, BookOpen, CalendarPlus, ClipboardText, HandHeart, VideoCamera } from "@phosphor-icons/react/dist/ssr";
 import {
   alvoAgendamento,
+  cronogramaVigente,
   eventoDaSemana,
+  eventosDoCronograma,
   formatDate,
   formatDateTime,
   jornadaDaDupla,
   linkSeguro,
-  maxEncontros,
   passosDaTrilha,
   saudadeDaDupla,
   toDateStr,
+  totalDaTrilha,
 } from "@/lib/ciclo";
 import type {
   CicloEvento,
+  Cronograma,
   Dupla,
   EspecialistaEvento,
   Profile,
@@ -33,6 +36,7 @@ export function MentorHome({
   duplas,
   eventos,
   espEventos = [],
+  cronogramas = [],
   me,
 }: {
   duplas: Dupla[];
@@ -40,10 +44,25 @@ export function MentorHome({
   eventos: CicloEvento[];
   /** Passos da trilha especialista — alimenta a jornada das duplas dela. */
   espEventos?: EspecialistaEvento[];
+  /** Cronogramas ativos/encerrados — resolve o vigente quando o mentor ainda
+   *  não tem dupla DPP (o banner da semana continua fazendo sentido pra ele). */
+  cronogramas?: Cronograma[];
   me: Profile;
 }) {
   const hoje = new Date();
-  const eventoSemana = eventoDaSemana(eventos, hoje);
+  // "Semana do Nº" é do cronograma da dupla DPP do mentor (0061) — mentor com
+  // duplas em duas turmas vê a da primeira ativa; sem dupla DPP, o vigente
+  // global segue valendo como contexto
+  const cronDaHome =
+    duplas.find((d) => d.trilha !== "especialista" && d.status === "ativa")
+      ?.cronograma_id ??
+    duplas.find((d) => d.trilha !== "especialista")?.cronograma_id ??
+    cronogramaVigente(cronogramas, hoje)?.id ??
+    null;
+  const eventoSemana = eventoDaSemana(
+    eventosDoCronograma(eventos, cronDaHome),
+    hoje
+  );
   // "Semana do Nº encontro" é o calendário DPP — pra especialista a faixa é
   // um dado alheio, tenha ele dupla ou não (every em [] = true cobre o caso
   // de ainda não pareado; um DPP sem dupla segue vendo a semana do ciclo)
@@ -112,14 +131,20 @@ export function MentorHome({
         // pegar um encontro agendado mais distante que outro agendado antes
         const saude = saudes.get(dupla.id)!;
         const feitos = saude.feitos;
-        const totalDupla = maxEncontros(dupla.trilha);
+        // calendário da dupla (0061) — teto, trilha e sugestões saem do
+        // cronograma dela, nunca da união das turmas
+        const eventosDaDupla = eventosDoCronograma(
+          eventos,
+          dupla.cronograma_id
+        );
+        const totalDupla = totalDaTrilha(dupla.trilha, eventosDaDupla);
         const proximoAgendado = saude.proximo;
         const {
           proximoNumero, encontroAlvo, sugeridoProximo, faltantes, cicloCompleto,
         } = alvoAgendamento(dupla, eventos, hoje);
         const jornada = jornadaDaDupla(
           dupla,
-          passosDaTrilha(dupla.trilha, eventos, espEventos),
+          passosDaTrilha(dupla.trilha, eventosDaDupla, espEventos),
           hoje
         );
         // pendência de registro mais antiga — realizado sem registro ou
@@ -177,7 +202,7 @@ export function MentorHome({
             : null;
         const sugeridoSeguinte =
           seguinteNumero != null && !ehEsp
-            ? eventos.find(
+            ? eventosDaDupla.find(
                 (e) => e.tipo === "encontro" && e.numero === seguinteNumero
               )?.data
             : undefined;

@@ -39,6 +39,7 @@ import { VoltarLink } from "@/components/voltar-link";
 import {
   alvoAgendamento,
   eventoDaSemana,
+  eventosDoCronograma,
   formatDate,
   formatDateTime,
   jornadaDaDupla,
@@ -53,6 +54,7 @@ import {
 import { msgsContato } from "@/lib/whatsapp-msgs";
 import { AvaliacaoBadge, SemaforoBadge, SemaforoDot } from "@/components/semaforo";
 import { NudgeButton } from "@/components/nudge-button";
+import { CopiarChamada } from "@/components/copiar-chamada";
 import { WhatsAppRapido, type DestinoWA } from "@/components/whatsapp-rapido";
 import { NotaEncontro } from "@/components/nota-encontro";
 import { AgendarEncontroDialog } from "@/components/agendar-encontro-dialog";
@@ -174,7 +176,12 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
     solicitacao?.status !== "aberta" &&
     (souMentor || souCoord);
   const especialistas = podeSolicitar ? await getEspecialistas() : [];
-  const passos = passosDaTrilha(dupla.trilha, eventos, espEventos);
+  // calendário oficial DA DUPLA (0061): só os eventos do cronograma dela.
+  // Especialista e dupla histórica sem vínculo caem em [] — especialista
+  // usa os 5 passos próprios; histórica vive do que está gravado (fallback
+  // abaixo), nunca de um calendário alheio
+  const eventosDaDupla = eventosDoCronograma(eventos, dupla.cronograma_id);
+  const passos = passosDaTrilha(dupla.trilha, eventosDaDupla, espEventos);
   const saude = saudadeDaDupla(dupla, eventos);
   const total = passos.length;
   const { proximoNumero, encontroAlvo, sugeridoProximo, faltantes } =
@@ -264,7 +271,7 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
   const resumoJornada = dadosResumoJornada(
     dupla,
     passos,
-    eventos,
+    eventosDaDupla,
     encerramento?.created_at ?? dupla.encerrada_em ?? null
   );
   // bloco só vale a pena com história — dupla zerada mostra a trilha, não um
@@ -279,11 +286,24 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
   // ficam sempre abertos.
   const numeroSemana = ehEsp
     ? null
-    : (eventoDaSemana(eventos, new Date())?.numero ?? null);
-  const encontrosVisiveis = passos.filter(
+    : (eventoDaSemana(eventosDaDupla, new Date())?.numero ?? null);
+  // dupla sem cronograma (histórica, ou cadastro ainda sem vínculo): não há
+  // trilha pra montar, mas os encontros registrados são fato — a lista cai
+  // pro que está gravado em vez de sumir
+  const passosLista: PassoGuia[] = passos.length
+    ? passos
+    : dupla.encontros.map((enc) => ({
+        id: `leg-${enc.numero}`,
+        numero: enc.numero,
+        titulo: `Encontro ${enc.numero}`,
+        data: null,
+        fase: null,
+        instrumentos: [],
+      }));
+  const encontrosVisiveis = passosLista.filter(
     (ev) => numeroSemana == null || ev.numero <= numeroSemana
   );
-  const encontrosFuturos = passos.filter(
+  const encontrosFuturos = passosLista.filter(
     (ev) => numeroSemana != null && ev.numero > numeroSemana
   );
   // pendência de registro (realizado sem registro ou agendado já vencido) —
@@ -338,7 +358,7 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
         sugerido={sugeridoProximo}
         piso={dupla.iniciada_em ?? undefined}
         trigger={
-          <DropdownMenuItem>
+          <DropdownMenuItem render={<button type="button" />} nativeButton>
             <CalendarPlus aria-hidden /> Agendar encontro
           </DropdownMenuItem>
         }
@@ -362,7 +382,7 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
           whatsapp: dupla.mentorado.whatsapp,
         }}
         trigger={
-          <DropdownMenuItem>
+          <DropdownMenuItem render={<button type="button" />} nativeButton>
             <PaperPlaneTilt aria-hidden /> Enviar formulário
           </DropdownMenuItem>
         }
@@ -376,7 +396,7 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
         duplaId={dupla.id}
         especialistas={especialistas}
         trigger={
-          <DropdownMenuItem>
+          <DropdownMenuItem render={<button type="button" />} nativeButton>
             <UserPlus aria-hidden /> Solicitar mentor especialista
           </DropdownMenuItem>
         }
@@ -389,7 +409,7 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
         key="trilha"
         duplaId={dupla.id}
         trigger={
-          <DropdownMenuItem>
+          <DropdownMenuItem render={<button type="button" />} nativeButton>
             <FlagCheckered aria-hidden /> Encerrar trilha
           </DropdownMenuItem>
         }
@@ -404,6 +424,7 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
         passo={passo}
         encontro={enc ?? null}
         duplaId={dupla.id}
+        souMentor={souMentor}
         podeEditar={souMentor && dupla.status === "ativa"}
         podeMarcar={souMentor || souCoord}
         ativa={dupla.status === "ativa"}
@@ -807,6 +828,13 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
               />
             )}
           </div>
+          {/* DPP sem cronograma é estado inválido pra dupla ativa (0061) —
+              a nota explica o caminho em vez de deixar a trilha sumir */}
+          {!ehEsp && !dupla.cronograma_id && souCoord && (
+            <p className="mb-2 text-xs italic text-muted-foreground">
+              Dupla sem cronograma vinculado — escolha um na edição da dupla.
+            </p>
+          )}
           {encontrosVisiveis.concat(futurosComPendencia).map(renderEncontro)}
           {encontrosColapsados.length > 0 && (
             <details className="group">
@@ -833,6 +861,7 @@ function EncontroRow({
   passo,
   encontro,
   duplaId,
+  souMentor,
   podeEditar,
   podeMarcar,
   ativa,
@@ -851,6 +880,10 @@ function EncontroRow({
   passo: PassoGuia;
   encontro: Encontro | null;
   duplaId: string;
+  /** O visitante é o mentor da dupla — o "entrar na chamada" é gesto dele;
+   *  coord/sup (e qualquer outro) copiam o link. Distinto de podeEditar:
+   *  dupla pausada não edita mas o mentor dela ainda entra na call. */
+  souMentor: boolean;
   podeEditar: boolean;
   podeMarcar: boolean;
   /** Dupla ativa — badge "sem registro" só aparece quando alguém ainda pode agir. */
@@ -993,21 +1026,26 @@ function EncontroRow({
               </p>
             )}
             {(linkSeguro(encontro?.link) || materialHref) && (
-              <div className="mt-2 flex flex-wrap gap-2">
-                {linkSeguro(encontro?.link) && (
-                  <a
-                    href={linkSeguro(encontro?.link)!}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={buttonVariants({
-                      variant: chamadaAgora ? "default" : "outline",
-                      size: "sm",
-                    })}
-                  >
-                    <VideoCamera />
-                    Entrar na chamada
-                  </a>
-                )}
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                {linkSeguro(encontro?.link) &&
+                  // entrar é da dupla (e pode virar CTA primário na janela do
+                  // encontro); quem monitora copia pra repassar — nunca primário
+                  (souMentor ? (
+                    <a
+                      href={linkSeguro(encontro?.link)!}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={buttonVariants({
+                        variant: chamadaAgora ? "default" : "outline",
+                        size: "sm",
+                      })}
+                    >
+                      <VideoCamera />
+                      Entrar na chamada
+                    </a>
+                  ) : (
+                    <CopiarChamada url={linkSeguro(encontro?.link)!} />
+                  ))}
                 {materialHref && (
                   <a
                     href={materialHref}

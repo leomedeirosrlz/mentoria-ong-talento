@@ -187,10 +187,27 @@ export type PessoaNota = {
   autor?: { id: string; nome: string; avatar_path?: string | null; email?: string | null } | null;
 };
 
+/** Cronograma — o calendário oficial de uma turma (0061). Antes era o texto
+ *  `ciclo` solto: com duas turmas ao mesmo tempo, o semáforo misturava os
+ *  calendários. A identidade de um encontro oficial é (cronograma_id, numero). */
+export type Cronograma = {
+  id: string;
+  nome: string;
+  /** Label da turma ("2026/2027" até a entidade turma chegar na F3). */
+  turma: string;
+  trilha: "dpp";
+  inicio_em: string | null;
+  fim_em: string | null;
+  encontros_esperados: number | null;
+  status: "rascunho" | "ativo" | "encerrado";
+  created_by: string | null;
+  created_at: string;
+};
+
 export type CicloEvento = {
   id: string;
-  /** Ciclo do evento (coluna real; o dataset demo não preenche). */
-  ciclo?: string;
+  /** FK pro cronograma dono do evento (0061) — substitui o texto `ciclo`. */
+  cronograma_id: string;
   tipo: "encontro" | "formacao" | "recesso" | "marco";
   numero: number | null;
   data: string;
@@ -287,7 +304,12 @@ export type EncontroNota = {
 
 export type Dupla = {
   id: string;
-  ciclo: string;
+  /** Label da turma (ex-coluna `ciclo`, renomeada na 0061) — derivada do
+   *  cronograma no cadastro; mantida na row pra leitura barata e legado. */
+  turma: string;
+  /** O calendário oficial contra o qual a dupla corre (0061). Null =
+   *  especialista (trilha livre, sem calendário) ou histórica antiga. */
+  cronograma_id: string | null;
   status: DuplaStatus;
   iniciada_em: string | null;
   /** "dpp" = trilha de 16 encontros; "especialista" = trilha de 5 (sem datas fixas). */

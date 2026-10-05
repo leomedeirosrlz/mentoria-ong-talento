@@ -7,7 +7,6 @@ import {
   CheckCircle,
   Circle,
   Paperclip,
-  VideoCamera,
 } from "@phosphor-icons/react";
 import {
   Dialog,
@@ -18,7 +17,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { DuplaAvatares } from "@/components/dupla-avatares";
 import { DuplaNomes } from "@/components/dupla-nomes";
-import { buttonVariants } from "@/components/ui/button";
+import { CopiarChamada } from "@/components/copiar-chamada";
 import { RegistroView } from "@/components/registro-view";
 import { ResolverApoioButton } from "@/components/resolver-apoio-button";
 import { formatTamanho } from "@/lib/ciclo";
@@ -162,15 +161,10 @@ export function EncontroDetalheDialog({
           </div>
           {meta && <p className="text-xs text-muted-foreground">{meta}</p>}
 
+          {/* "entrar" é gesto da dupla — este dialog só abre pra coord/sup,
+              que copiam o link pra repassar */}
           {encontro.status === "agendado" && linkSeguro(encontro.link) && (
-            <a
-              href={linkSeguro(encontro.link)!}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={buttonVariants({ variant: "outline", size: "sm" })}
-            >
-              <VideoCamera /> Entrar na chamada
-            </a>
+            <CopiarChamada url={linkSeguro(encontro.link)!} />
           )}
 
           {evento && (
