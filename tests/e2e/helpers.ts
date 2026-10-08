@@ -91,7 +91,9 @@ export async function loginComSenha(
   await page
     .locator("label", { has: page.locator('input[name="modo-login"][value="senha"]') })
     .click();
-  await page.getByLabel("E-mail").fill(email);
+  // #email, não getByLabel — a página tem mais de um controle com label
+  // "E-mail" (strict mode violation)
+  await page.locator("#email").fill(email);
   await page.locator("#senha").fill(senha);
   await page.getByRole("button", { name: "Entrar" }).click();
   await page.waitForURL((url) => !url.pathname.startsWith("/login"), {
