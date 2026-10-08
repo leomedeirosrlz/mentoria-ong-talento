@@ -37,17 +37,33 @@ jobs:
           pnpm exec supabase status -o env \
             | grep -E '^\w+=".*"$' \
             | sed -E 's/^(\w+)="(.*)"$/\1=\2/' >> "$GITHUB_ENV"
-      # gate de freshness: types commitado precisa bater com o schema das
-      # migrations. --schema é ignorado com --local (config.toml expõe
-      # graphql_public também) — via --db-url o filtro funciona e o diff
-      # compara só o schema public.
+      # gate de freshness: o bloco `public` do types commitado precisa bater
+      # com o que as migrations produzem. gen types emite os schemas que o
+      # stack local expõe (graphql_public etc.) — --schema não filtra — então
+      # compara-se só o bloco public (o mesmo que o contract check lê).
       - name: types atualizados vs migrations
         run: |
-          pnpm exec supabase gen types typescript \
-            --db-url "$DB_URL" --schema public > /tmp/dbtypes.ts
-          if ! diff -q /tmp/dbtypes.ts src/lib/database.types.ts >/dev/null; then
+          pnpm exec supabase gen types typescript --db-url "$DB_URL" \
+            > /tmp/dbtypes.ts
+          node -e '
+            const fs = require("fs");
+            const pub = (f) => {
+              const s = fs.readFileSync(f, "utf8");
+              const i = s.indexOf("  public: {");
+              if (i < 0) { console.error("bloco public não achado em " + f); process.exit(2); }
+              let d = 0; const j = s.indexOf("{", i);
+              for (let k = j; k < s.length; k++) {
+                if (s[k] === "{") d++;
+                else if (s[k] === "}" && !--d) return s.slice(j, k + 1);
+              }
+              process.exit(2);
+            };
+            fs.writeFileSync("/tmp/pub-new.ts", pub("/tmp/dbtypes.ts"));
+            fs.writeFileSync("/tmp/pub-old.ts", pub("src/lib/database.types.ts"));
+          '
+          if ! diff -q /tmp/pub-new.ts /tmp/pub-old.ts >/dev/null; then
             echo "::error::database.types.ts diverge das migrations — regenere: supabase gen types typescript --linked"
-            diff /tmp/dbtypes.ts src/lib/database.types.ts | head -40
+            diff /tmp/pub-new.ts /tmp/pub-old.ts | head -40
             exit 1
           fi
       - name: build + start
