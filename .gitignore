@@ -21,3 +21,7 @@ openwa/
 
 # config local da CLI Devin (pode ter credenciais) — não versionar
 .devin/
+
+# playwright e2e
+/test-results/
+/playwright-report/

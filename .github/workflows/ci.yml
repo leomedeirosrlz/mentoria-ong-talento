@@ -1,0 +1,44 @@
+name: ci
+
+# roda em todo push (branch ou main) e em PR — o e2e do preview é um workflow
+# à parte (e2e-preview.yml), disparado pelo deployment_status do Vercel.
+on:
+  push:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  gates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: npx tsc --noEmit
+      - run: npx eslint src/
+      - run: pnpm test
+
+  # código não pode mergear pedindo coluna que o remoto não tem — a 0061/0062
+  # foi exatamente esse caso. Falha até a migration ser aplicada (gate humano).
+  schema-contract:
+    runs-on: ubuntu-latest
+    # produção — é o schema que o deploy usa; E2E_* é staging e não vale aqui
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: checa tipos × schema remoto
+        if: env.SUPABASE_URL != '' && env.SUPABASE_SERVICE_ROLE_KEY != ''
+        run: node scripts/check-schema-contract.mjs
+      - name: secrets ausentes — probe pulado
+        if: env.SUPABASE_URL == '' || env.SUPABASE_SERVICE_ROLE_KEY == ''
+        run: echo "::notice::secrets SUPABASE_URL/SERVICE_ROLE ausentes; probe pulado"

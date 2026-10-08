@@ -47,6 +47,14 @@ Plataforma operacional do Programa de Mentoria — vertical slice funcionando co
 - `src/lib/demo/`: `data.ts` (dataset evergreen — datas derivam de `new Date()`, encontro 5 = terça da semana corrente), `queries.ts` (replica o escopo RLS por papel), `client-stub.ts` (supabase-js falso pro browser; `supabase/client.ts` desvia com cookie), `mode.ts`/`actions.ts`/`shared.ts`, `pdf.ts` (PDF placeholder pras rotas de download).
 - Queries reais checam `demoRole()` antes de criar o client; actions retornam `{ error: DEMO_MSG }` (onboarding funciona via cookie; `signOut` sai da demo). IDs mock são `de000000-…-<decimal>`.
 
+## CI & e2e (automação)
+
+- `.github/workflows/ci.yml` — todo push/PR: `tsc --noEmit` + `eslint src/` + `vitest` + **schema-contract** (`scripts/check-schema-contract.mjs` compara `database.types.ts` com o OpenAPI do PostgREST remoto — falha se o código declara coluna que o remoto não tem; é o guard contra "migration não aplicada").
+- `e2e-preview.yml` — `deployment_status` do Vercel (state=success, env=Preview) → Playwright contra a `target_url`. Secrets: `VERCEL_AUTOMATION_BYPASS` (previews têm SSO; token em Vercel → Settings → Deployment Protection) + `E2E_*` (credenciais do Supabase de staging).
+- `e2e-nightly.yml` — cron 09:00 BRT: spec `demo` contra produção (público, sem secrets).
+- Playwright: `pnpm test:e2e` / `:demo` / `:app`; `E2E_BASE_URL` aponta o alvo (default localhost). Specs `tests/e2e/demo` são seguras em qualquer ambiente (não escrevem); `tests/e2e/app` fazem login real por senha + writes — **só contra staging**, pulam sozinhas sem os secrets `E2E_*`.
+- Staging de e2e: projeto Supabase separado (`supabase projects create` + `db push`) apontado nas envs **Preview** do Vercel; fixtures em `scripts/seed-e2e-staging.mjs` (`pnpm seed:e2e`, idempotente, IDs `e2e00000-*`).
+
 ## Pendências conhecidas
 
 Backlog completo e priorizado em **`BACKLOG.md`**. Resumo do que mais dói:

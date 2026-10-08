@@ -1,0 +1,43 @@
+name: e2e-preview
+
+# O Vercel emite deployment_status a cada deploy — state=success no ambiente
+# "Preview" carrega a target_url exata do preview daquele push. Sem polling.
+on:
+  deployment_status:
+
+permissions:
+  contents: read
+  deployments: read
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    if: >-
+      github.event.deployment_status.state == 'success' &&
+      github.event.deployment.environment == 'Preview'
+    env:
+      E2E_BASE_URL: ${{ github.event.deployment_status.target_url }}
+      VERCEL_AUTOMATION_BYPASS: ${{ secrets.VERCEL_AUTOMATION_BYPASS }}
+      E2E_MENTOR_EMAIL: ${{ secrets.E2E_MENTOR_EMAIL }}
+      E2E_MENTOR_PASSWORD: ${{ secrets.E2E_MENTOR_PASSWORD }}
+      E2E_DUPLA_ID: ${{ secrets.E2E_DUPLA_ID }}
+      E2E_SUPABASE_URL: ${{ secrets.E2E_SUPABASE_URL }}
+      E2E_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.E2E_SUPABASE_SERVICE_ROLE_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      # demo = superfície pública/stubada; app = login real + write em staging
+      # (specs "app" pulam sozinhos se os secrets E2E_* não existirem ainda)
+      - run: pnpm test:e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
