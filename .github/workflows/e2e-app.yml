@@ -38,11 +38,13 @@ jobs:
             | grep -E '^\w+=".*"$' \
             | sed -E 's/^(\w+)="(.*)"$/\1=\2/' >> "$GITHUB_ENV"
       # gate de freshness: types commitado precisa bater com o schema das
-      # migrations — hand-patch desatualizado vira erro, não aviso
+      # migrations. --schema é ignorado com --local (config.toml expõe
+      # graphql_public também) — via --db-url o filtro funciona e o diff
+      # compara só o schema public.
       - name: types atualizados vs migrations
         run: |
-          pnpm exec supabase gen types typescript --local --schema public \
-            > /tmp/dbtypes.ts
+          pnpm exec supabase gen types typescript \
+            --db-url "$DB_URL" --schema public > /tmp/dbtypes.ts
           if ! diff -q /tmp/dbtypes.ts src/lib/database.types.ts >/dev/null; then
             echo "::error::database.types.ts diverge das migrations — regenere: supabase gen types typescript --linked"
             diff /tmp/dbtypes.ts src/lib/database.types.ts | head -40
