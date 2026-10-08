@@ -25,6 +25,11 @@
 begin;
 
 -- ============ 1) tipo: marco sai, entram etapa_preparacao + evento_encerramento
+-- O CHECK antigo sai ANTES da reclassificação — ele só aceita os tipos velhos
+-- e bloquearia o update pra 'evento_encerramento'.
+alter table public.ciclo_eventos
+  drop constraint if exists ciclo_eventos_tipo_check;
+
 -- Reclassificação antes do CHECK novo: o remoto tem exatamente 1 marco
 -- (verificado) — "Evento de encerramento do programa", que o PDF lista na
 -- seção de encerramento.
@@ -41,8 +46,6 @@ update public.ciclo_eventos
    set tipo = 'etapa_preparacao'
  where tipo = 'marco';
 
-alter table public.ciclo_eventos
-  drop constraint if exists ciclo_eventos_tipo_check;
 alter table public.ciclo_eventos
   add constraint ciclo_eventos_tipo_check
   check (tipo in ('etapa_preparacao', 'encontro', 'recesso',
