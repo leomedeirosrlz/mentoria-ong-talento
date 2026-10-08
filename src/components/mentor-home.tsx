@@ -202,9 +202,9 @@ export function MentorHome({
             : null;
         const sugeridoSeguinte =
           seguinteNumero != null && !ehEsp
-            ? eventosDaDupla.find(
+            ? (eventosDaDupla.find(
                 (e) => e.tipo === "encontro" && e.numero === seguinteNumero
-              )?.data
+              )?.data ?? undefined)
             : undefined;
 
         return (

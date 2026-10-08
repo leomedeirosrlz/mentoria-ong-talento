@@ -21,7 +21,7 @@ export type Semaforo = "ok" | "atencao" | "risco";
 
 // ---------- trilhas (0027) ----------
 
-/** Encontros por trilha: DPP = 16 (calendário oficial de terças), especialista
+/** Encontros por trilha: DPP = 16 (calendário oficial), especialista
  *  = 5 (até 3 meses, sem datas fixas — o especialista agenda). */
 export const TRILHA_LEN: Record<Trilha, number> = { dpp: 16, especialista: 5 };
 
@@ -51,6 +51,8 @@ export type PassoGuia = {
   instrumentos: string[];
   /** Foco do encontro (trilha especialista) — complementa a sugestão do guia. */
   foco?: string | null;
+  /** Nota operacional do cronograma oficial (0062) — só DPP tem. */
+  observacao?: string | null;
 };
 
 /** Normaliza os passos da trilha: DPP vem de `ciclo_eventos` (encontros
@@ -84,6 +86,7 @@ export function passosDaTrilha(
       data: e.data,
       fase: e.fase,
       instrumentos: e.instrumentos,
+      observacao: e.observacao,
     }));
 }
 
@@ -366,14 +369,32 @@ export function totalDaTrilha(
 // podem se misturar no semáforo, na agenda ou na trilha. A identidade de um
 // encontro oficial é (cronograma_id, numero) — numero solto não identifica.
 
-/** Recorte do calendário oficial de uma dupla. Sem cronograma (especialista,
- *  histórica antiga) devolve [] — trilha livre, nada vence "por data". */
+/** Recorte do calendário oficial de uma dupla, na ordem do PDF (0062):
+ *  `ordem` é a chave — etapas de preparação concluídas sem data vêm antes
+ *  dos encontros, onde `data nulls last` as jogaria depois do encerramento.
+ *  Sem cronograma (especialista, histórica antiga) devolve [] — trilha
+ *  livre, nada vence "por data". */
 export function eventosDoCronograma(
   eventos: CicloEvento[],
   cronogramaId: string | null | undefined
 ): CicloEvento[] {
   if (!cronogramaId) return [];
-  return eventos.filter((e) => e.cronograma_id === cronogramaId);
+  return eventos
+    .filter((e) => e.cronograma_id === cronogramaId)
+    .sort((a, b) => a.ordem - b.ordem);
+}
+
+/** Encontro oficial com data garantida — o CHECK do banco exige data em todo
+ *  tipo ≠ etapa_preparacao-concluída, então o filtro `data != null` refina o
+ *  tipo sem custo. É o retorno dos helpers de semana: quem consome não
+ *  precisa re-guardar `data`. */
+export type EventoDatado = CicloEvento & { data: string };
+
+/** Guard de tipo compartilhado: encontro oficial COM data. Etapas sem data,
+ *  recessos, formações e o encerramento ficam fora de qualquer conta de
+ *  encontro — o denominador do ciclo é só `tipo = 'encontro'`. */
+function encontroDatado(e: CicloEvento): e is EventoDatado {
+  return e.tipo === "encontro" && e.data != null;
 }
 
 /** Cronograma vigente pra abrir telas: ativo cuja faixa cobre hoje (dois
@@ -426,7 +447,7 @@ export function rotuloCronograma(c: Cronograma): string {
 export function encontroEsperado(eventos: CicloEvento[], hoje: Date, desde?: string | null): number {
   const hojeStr = toDateStr(hoje);
   return eventos.filter(
-    (e) => e.tipo === "encontro" && e.data <= hojeStr && (!desde || e.data >= desde)
+    (e) => encontroDatado(e) && e.data <= hojeStr && (!desde || e.data >= desde)
   ).length;
 }
 
@@ -446,8 +467,8 @@ function primeiroEncontroFaltante(
   );
   const faltante = eventos
     .filter(
-      (e) =>
-        e.tipo === "encontro" &&
+      (e): e is EventoDatado =>
+        encontroDatado(e) &&
         e.numero != null &&
         e.data <= hojeStr &&
         (!dupla.iniciada_em || e.data >= dupla.iniciada_em)
@@ -469,15 +490,36 @@ export function semanaBounds(hoje: Date): { seg: string; dom: string } {
   return { seg: toDateStr(seg), dom: toDateStr(dom) };
 }
 
-export function eventoDaSemana(eventos: CicloEvento[], hoje: Date): CicloEvento | null {
+/** TODOS os encontros oficiais cuja data cai na semana calendário (seg–dom)
+ *  de `hoje`, ordenados por numero — a semana pode ter dois (a quinta de
+ *  encontro duplo da T2, 0062). Eventos sem data e de outros tipos nunca
+ *  entram: etapa concluída, recesso, formação e encerramento não são
+ *  encontro. */
+export function encontrosDaSemana(
+  eventos: CicloEvento[],
+  hoje: Date
+): EventoDatado[] {
+  const { seg, dom } = semanaBounds(hoje);
+  return eventos
+    .filter(
+      (e): e is EventoDatado =>
+        encontroDatado(e) && e.data >= seg && e.data <= dom
+    )
+    .sort((a, b) => (a.numero ?? 0) - (b.numero ?? 0));
+}
+
+/** O encontro oficial da semana (singular) — com dois na mesma semana é o de
+ *  MENOR numero: a regra é numero, não a coincidência data asc ≡ numero asc
+ *  (0062). `encontrosDaSemana` devolve a lista completa pro board. */
+export function eventoDaSemana(eventos: CicloEvento[], hoje: Date): EventoDatado | null {
   const ordenados = eventos
-    .filter((e) => e.tipo === "encontro")
+    .filter(encontroDatado)
     .sort((a, b) => a.data.localeCompare(b.data));
   // "semana do encontro N" = a semana calendário (seg–dom) que contém a data do
-  // encontro — encontros são terças, então qui–dom ainda é a semana do encontro
+  // encontro — depois do dia do encontro (terça ou quinta) ainda é a semana
   // que rolou (janela de registro), não da próxima.
-  const { seg, dom } = semanaBounds(hoje);
-  const daSemana = ordenados.find((e) => e.data >= seg && e.data <= dom);
+  const { dom } = semanaBounds(hoje);
+  const daSemana = encontrosDaSemana(eventos, hoje)[0];
   if (daSemana) return daSemana;
   // semana sem encontro (recesso/gap): aponta o próximo; depois do ciclo, o último
   return ordenados.find((e) => e.data > dom) ?? ordenados.at(-1) ?? null;
@@ -511,10 +553,13 @@ export function resumoSemanaDe(
   semana?: { seg: string; dom: string }
 ): ResumoSemana | null {
   if (evento.numero == null) return null;
+  // sem `semana` explícita a janela deriva da data oficial — evento sem data
+  // (etapa concluída) não tem semana pra medir
+  if (evento.data == null && semana == null) return null;
   const { seg, dom } =
     semana ?? semanaBounds(new Date(`${evento.data}T12:00:00`));
   // semana oficial é métrica da trilha DPP — duplas de especialista não seguem
-  // o calendário de terças e ficariam sempre "sem encontro esta semana". O
+  // o calendário oficial e ficariam sempre "sem encontro esta semana". O
   // denominador é SÓ do cronograma do evento (0061): com duas turmas ativas,
   // a semana de uma não conta as duplas da outra.
   const ativas = duplas.filter(
@@ -624,14 +669,15 @@ export function duplasSemEncontroDoNumero(
   duplas: Dupla[],
   evento: CicloEvento
 ): Dupla[] {
-  if (evento.numero == null) return [];
+  if (evento.numero == null || evento.data == null) return [];
   const numero = evento.numero;
+  const dataOficial = evento.data;
   return duplas.filter(
     (d) =>
       d.status === "ativa" &&
       d.trilha !== "especialista" &&
       d.cronograma_id === evento.cronograma_id &&
-      (!d.iniciada_em || d.iniciada_em <= evento.data) &&
+      (!d.iniciada_em || d.iniciada_em <= dataOficial) &&
       !d.encontros.some((e) => e.numero === numero)
   );
 }
@@ -681,7 +727,7 @@ export function saudadeDaDupla(dupla: Dupla, eventos: CicloEvento[], hoje = new 
         eventos
           .filter(
             (e) =>
-              e.tipo === "encontro" &&
+              encontroDatado(e) &&
               e.numero != null &&
               e.data <= hojeStr &&
               (!dupla.iniciada_em || e.data >= dupla.iniciada_em)
@@ -767,7 +813,7 @@ export function saudadeDaDupla(dupla: Dupla, eventos: CicloEvento[], hoje = new 
     };
   // preventivo: encontro oficial da semana bate em ≤5 dias e a dupla ainda não marcou nada
   // (qualquer row com esse numero — agendada, realizada, cancelada — já cobre o encontro).
-  // Só DPP: a especialista não tem terça oficial — "ainda não agendou" não é sinal.
+  // Só DPP: a especialista não tem data oficial — "ainda não agendou" não é sinal.
   if (!ehEspecialista) {
     const oficial = eventoDaSemana(eventos, hoje);
     const diasAteOficial = oficial ? diffDias(oficial.data, toDateStr(hoje)) : null;
@@ -835,7 +881,7 @@ export function alvoAgendamento(
   eventos = eventosDoCronograma(eventos, dupla.cronograma_id);
   const saude = saudadeDaDupla(dupla, eventos, hoje);
   const ehEspecialista = dupla.trilha === "especialista";
-  const encontroEventos = eventos.filter((e) => e.tipo === "encontro");
+  const encontroEventos = eventos.filter(encontroDatado);
   // DPP mede contra os encontros do ciclo; a especialista tem o teto próprio.
   // DPP sem cronograma (estado inválido — o CHECK do banco barra, mas dado
   // legado pode chegar): total 0 marcaria cicloCompleto e apagaria os CTAs;
@@ -856,10 +902,12 @@ export function alvoAgendamento(
   // a row real desse número é o que o dialog edita; saude.proximo só cobre
   // agendados futuros
   const encontroAlvo = dupla.encontros.find((e) => e.numero === proximoNumero) ?? null;
-  // sem calendário oficial não há data a sugerir — o dialog abre em branco
+  // sem calendário oficial não há data a sugerir — o dialog abre em branco.
+  // A data oficial é a do PDF como ela é — quinta-feira numa semana de
+  // encontro duplo sugere quinta, não terça.
   const sugeridoProximo = ehEspecialista
     ? undefined
-    : encontroEventos.find((e) => e.numero === proximoNumero)?.data;
+    : encontroEventos.find((e) => e.numero === proximoNumero)?.data ?? undefined;
 
   const hojeStr = toDateStr(hoje);
   const comEncontro = new Set(dupla.encontros.map((e) => e.numero));
@@ -1031,7 +1079,10 @@ export function inicioDefaultDupla(
   eventos: Pick<CicloEvento, "tipo" | "data">[]
 ): string | null {
   const primeiro = eventos
-    .filter((e) => e.tipo === "encontro")
+    .filter(
+      (e): e is Pick<CicloEvento, "tipo"> & { data: string } =>
+        e.tipo === "encontro" && e.data != null
+    )
     .sort((a, b) => a.data.localeCompare(b.data))[0];
   if (!primeiro) return null;
   const d = new Date(`${primeiro.data}T12:00:00`);

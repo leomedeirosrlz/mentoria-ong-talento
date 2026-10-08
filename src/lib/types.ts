@@ -204,14 +204,31 @@ export type Cronograma = {
   created_at: string;
 };
 
+/** Evento do cronograma oficial (0062) — não é mais "só data": o PDF tem 4
+ *  seções (preparação, mentoria ativa, encerramento, observações) e a ordem
+ *  canônica é `ordem`, não a data. `data` nullable: etapa de preparação
+ *  entregue pela ONG parceira é "Concluída", sem dia (CHECK no banco só
+ *  permite data null pra etapa_preparacao concluída). */
 export type CicloEvento = {
   id: string;
   /** FK pro cronograma dono do evento (0061) — substitui o texto `ciclo`. */
   cronograma_id: string;
-  tipo: "encontro" | "formacao" | "recesso" | "marco";
+  tipo:
+    | "etapa_preparacao"
+    | "encontro"
+    | "recesso"
+    | "evento_encerramento"
+    | "formacao";
   numero: number | null;
-  data: string;
+  /** "YYYY-MM-DD" ou null — só etapa_preparacao concluída fica sem data. */
+  data: string | null;
   data_fim: string | null;
+  /** Semântica viva só em etapa_preparacao; demais tipos ficam 'pendente'. */
+  status: "pendente" | "concluida";
+  /** Nota operacional do PDF ("Reposição na mesma semana", "Encontro duplo"). */
+  observacao: string | null;
+  /** Chave de ordenação única do cronograma — sequência do PDF, não da data. */
+  ordem: number;
   titulo: string;
   fase: string | null;
   instrumentos: string[];

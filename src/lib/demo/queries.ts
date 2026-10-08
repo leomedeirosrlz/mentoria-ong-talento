@@ -189,10 +189,9 @@ export function demoMeusDadosPessoais(
 
 export function demoCicloEventos(): CicloEvento[] {
   // todos os eventos, dos dois cronogramas — quem consome filtra pelo
-  // cronograma_id do recorte (a real devolve a tabela inteira igual)
-  return [...getDemoData().cicloEventos].sort((a, b) =>
-    a.data.localeCompare(b.data)
-  );
+  // cronograma_id do recorte (a real devolve a tabela inteira igual).
+  // A ordenação é `ordem` (0062), igual à real — data é nullable.
+  return [...getDemoData().cicloEventos].sort((a, b) => a.ordem - b.ordem);
 }
 
 /** Idem getCronogramas (0061) — leitura livre pra todo papel, ordenada por
@@ -903,7 +902,7 @@ export function demoResumoFormacao(
   const data = getDemoData();
   const evs = data.cicloEventos
     .filter((e) => e.tipo === "formacao")
-    .sort((a, b) => a.data.localeCompare(b.data));
+    .sort((a, b) => (a.data ?? "").localeCompare(b.data ?? ""));
   const turmaPorCron = new Map(data.cronogramas.map((c) => [c.id, c.turma]));
   // turma do mentor: a do cronograma mais recente dentre as suas duplas
   const cronsDoMentor = new Set(

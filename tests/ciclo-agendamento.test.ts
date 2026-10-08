@@ -64,7 +64,7 @@ describe("eventoDaSemana", () => {
     expect(eventoDaSemana([], dt("2025-10-15"))).toBeNull();
     expect(
       eventoDaSemana(
-        [{ id: "f", cronograma_id: "c1", tipo: "formacao", numero: null, data: "2025-10-14", data_fim: null, titulo: "F", fase: null, instrumentos: [] }],
+        [{ id: "f", cronograma_id: "c1", tipo: "formacao", numero: null, data: "2025-10-14", data_fim: null, status: "pendente", observacao: null, ordem: 1, titulo: "F", fase: null, instrumentos: [] }],
         dt("2025-10-15")
       )
     ).toBeNull();
@@ -149,7 +149,7 @@ describe("alvoAgendamento", () => {
   it("ciclo completo: 16 realizados → proximoNumero no teto e CTA desligado", () => {
     const dupla = mkDupla({
       encontros: CICLO_16.filter((e) => e.tipo === "encontro").map((e) =>
-        encRealizado(e.numero!, e.data)
+        encRealizado(e.numero!, e.data!)
       ),
     });
     const a = alvoAgendamento(dupla, CICLO_16, dt("2026-02-01"));
