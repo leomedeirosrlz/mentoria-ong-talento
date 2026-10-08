@@ -31,10 +31,17 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - id: bypass
+        run: echo "ok=${{ secrets.VERCEL_AUTOMATION_BYPASS != '' }}" >> "$GITHUB_OUTPUT"
+      - name: sem bypass — pula (crie o token em Vercel → Deployment Protection)
+        if: steps.bypass.outputs.ok != 'true'
+        run: echo "::notice::VERCEL_AUTOMATION_BYPASS ausente — e2e de preview pulado"
       - run: pnpm exec playwright install --with-deps chromium
+        if: steps.bypass.outputs.ok == 'true'
       # demo = superfície pública/stubada; app = login real + write em staging
       # (specs "app" pulam sozinhos se os secrets E2E_* não existirem ainda)
       - run: pnpm test:e2e
+        if: steps.bypass.outputs.ok == 'true'
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
