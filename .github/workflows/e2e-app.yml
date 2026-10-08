@@ -1,0 +1,89 @@
+name: e2e-app
+
+# Backend real, zero toque na produção: `supabase start` no runner (o Docker
+# quebrado é só o local do Thiago — no CI ele funciona) aplica TODAS as
+# migrations + seed do domínio, e os specs "app" fazem login por senha e
+# escrevem de verdade. Bônus: uma migration quebrada falha aqui antes de
+# qualquer apply remoto.
+on:
+  push:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  e2e-app:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: supabase start
+      - name: envs do supabase local → GITHUB_ENV
+        run: supabase status -o env >> "$GITHUB_ENV"
+
+      - name: build contra o supabase local
+        run: |
+          NEXT_PUBLIC_SUPABASE_URL="$API_URL" \
+          NEXT_PUBLIC_SUPABASE_ANON_KEY="$ANON_KEY" \
+          NEXT_PUBLIC_SITE_URL="http://localhost:3000" \
+          RESEND_API_KEY="re_e2e_placeholder" \
+          EMAIL_FROM="e2e@localhost" \
+          SUPABASE_SERVICE_ROLE_KEY="$SERVICE_ROLE_KEY" \
+          pnpm build
+
+      - name: sobe o app em background
+        run: |
+          NEXT_PUBLIC_SUPABASE_URL="$API_URL" \
+          NEXT_PUBLIC_SUPABASE_ANON_KEY="$ANON_KEY" \
+          NEXT_PUBLIC_SITE_URL="http://localhost:3000" \
+          RESEND_API_KEY="re_e2e_placeholder" \
+          EMAIL_FROM="e2e@localhost" \
+          SUPABASE_SERVICE_ROLE_KEY="$SERVICE_ROLE_KEY" \
+          nohup pnpm start > /tmp/app.log 2>&1 &
+      - name: espera o app responder
+        run: |
+          for i in $(seq 1 60); do
+            curl -sf http://localhost:3000/login > /dev/null && exit 0
+            sleep 2
+          done
+          echo "app não subiu"; tail -40 /tmp/app.log; exit 1
+
+      - name: fixtures e2e (mentor + dupla com senha)
+        run: |
+          E2E_SUPABASE_URL="$API_URL" \
+          E2E_SUPABASE_SERVICE_ROLE_KEY="$SERVICE_ROLE_KEY" \
+          E2E_MENTOR_PASSWORD="e2e-senha-teste" \
+          node scripts/seed-e2e-staging.mjs
+
+      - run: pnpm exec playwright install --with-deps chromium
+
+      # demo + app — todos os specs rodam: demo é stub/cookie e app tem
+      # backend real local (E2E_* exportados acima via GITHUB_ENV)
+      - run: |
+          E2E_BASE_URL="http://localhost:3000" \
+          E2E_SUPABASE_URL="$API_URL" \
+          E2E_SUPABASE_SERVICE_ROLE_KEY="$SERVICE_ROLE_KEY" \
+          E2E_MENTOR_EMAIL="e2e-mentor@realiza.test" \
+          E2E_MENTOR_PASSWORD="e2e-senha-teste" \
+          E2E_DUPLA_ID="e2e00000-0000-4000-8000-000000000030" \
+          pnpm test:e2e
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report-app
+          path: playwright-report/
+          retention-days: 7
+      - name: log do app (em falha)
+        if: failure()
+        run: tail -60 /tmp/app.log

@@ -1,11 +1,11 @@
 #!/usr/bin/env node
-// seed-e2e-staging — fixtures mínimas pro e2e de app (backend real) no
-// Supabase de STAGING. Idempotente: re-rodar só confere/repara.
+// seed-e2e-staging — fixtures mínimas pro e2e de app (backend real) num
+// Supabase de TESTE descartável: o stack local do CI (`supabase start` no
+// runner — e2e-app.yml) ou um projeto staging remoto. Idempotente.
 //
-// Uso (depois de `supabase db push` no projeto de staging, que já aplica
-// todas as migrations + seed.sql do domínio):
+// Uso (depois das migrations + seed.sql do domínio estarem aplicados):
 //
-//   E2E_SUPABASE_URL=https://<staging>.supabase.co \
+//   E2E_SUPABASE_URL=http://127.0.0.1:54321 \  # ou https://<staging>.supabase.co
 //   E2E_SUPABASE_SERVICE_ROLE_KEY=… \
 //   E2E_MENTOR_PASSWORD=<senha-de-teste> \
 //   node scripts/seed-e2e-staging.mjs
