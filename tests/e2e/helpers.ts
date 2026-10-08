@@ -86,7 +86,11 @@ export async function loginComSenha(
   senha: string
 ) {
   await page.goto("/login");
-  await page.getByRole("radio", { name: "Senha" }).click();
+  // o input radio é sr-only — clicar nele falha (span do pill intercepta).
+  // O label pai é clicável e ativa o input nativamente.
+  await page
+    .locator("label", { has: page.locator('input[name="modo-login"][value="senha"]') })
+    .click();
   await page.getByLabel("E-mail").fill(email);
   await page.locator("#senha").fill(senha);
   await page.getByRole("button", { name: "Entrar" }).click();
