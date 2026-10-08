@@ -9,17 +9,20 @@ name: e2e-preview
 on:
   deployment_status:
 
+# a Vercel emite DOIS deployments por commit ("Preview – realiza.vc" e o
+# alias "Preview – realiza") — agrupar por SHA cancela o duplicado.
 concurrency:
-  group: e2e-preview-${{ github.event.deployment.id }}
+  group: e2e-preview-${{ github.event.deployment.sha }}
   cancel-in-progress: true
 
 jobs:
   e2e:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # environment vem como "Preview – realiza.vc", não "Preview" literal
     if: >-
       github.event.deployment_status.state == 'success' &&
-      github.event.deployment.environment == 'Preview'
+      startsWith(github.event.deployment.environment, 'Preview')
     steps:
       # guard primeiro: sem o bypass não adianta checkout/install (~1min)
       - name: bypass de proteção configurado?
