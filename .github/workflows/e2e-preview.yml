@@ -1,0 +1,76 @@
+name: e2e-preview
+
+# E2E no preview do Vercel assim que o deploy fica Ready.
+# Specs demo sempre rodam (superfície pública, writes stubados). Specs "app"
+# (login real + writes) rodam quando os secrets E2E_* existem — e precisam
+# apontar pro projeto SUPABASE DE STAGING, nunca prod: o app do preview usa
+# as env vars do escopo Preview, que apontam pra staging. helpers.ts tem um
+# hard-stop que recusa rodar se a URL contiver o ref de produção.
+on:
+  deployment_status:
+
+concurrency:
+  group: e2e-preview-${{ github.event.deployment.id }}
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: >-
+      github.event.deployment_status.state == 'success' &&
+      github.event.deployment.environment == 'Preview'
+    steps:
+      # guard primeiro: sem o bypass não adianta checkout/install (~1min)
+      - name: bypass de proteção configurado?
+        id: check
+        env:
+          B: ${{ secrets.VERCEL_AUTOMATION_BYPASS }}
+        run: |
+          if [ -z "$B" ]; then
+            echo "::notice::VERCEL_AUTOMATION_BYPASS ausente — e2e de preview pulado."
+            echo "skip=1" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.check.outputs.skip != '1'
+        uses: actions/checkout@v4
+      - if: steps.check.outputs.skip != '1'
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - if: steps.check.outputs.skip != '1'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - if: steps.check.outputs.skip != '1'
+        run: pnpm install --frozen-lockfile
+      - if: steps.check.outputs.skip != '1'
+        run: pnpm exec playwright install --with-deps chromium
+      # fixtures no staging (idempotente — limpa e recria os ids e2e00000-*)
+      - if: steps.check.outputs.skip != '1'
+        name: fixtures e2e no staging
+        run: |
+          if [ -z "$E2E_SUPABASE_URL" ]; then
+            echo "::notice::secrets E2E_* ausentes — specs app pulam (demo roda)"
+          else
+            node scripts/seed-e2e-staging.mjs
+          fi
+        env:
+          E2E_SUPABASE_URL: ${{ secrets.E2E_SUPABASE_URL }}
+          E2E_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.E2E_SUPABASE_SERVICE_ROLE_KEY }}
+      - if: steps.check.outputs.skip != '1'
+        name: playwright (demo + app)
+        run: pnpm test:e2e
+        env:
+          E2E_BASE_URL: ${{ github.event.deployment_status.target_url }}
+          VERCEL_AUTOMATION_BYPASS: ${{ secrets.VERCEL_AUTOMATION_BYPASS }}
+          E2E_SUPABASE_URL: ${{ secrets.E2E_SUPABASE_URL }}
+          E2E_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.E2E_SUPABASE_SERVICE_ROLE_KEY }}
+          E2E_MENTOR_EMAIL: e2e-mentor@realiza.test
+          E2E_MENTOR_PASSWORD: e2e-senha-teste
+          E2E_DUPLA_ID: e2e00000-0000-4000-8000-000000000030
+      - if: failure() && steps.check.outputs.skip != '1'
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/

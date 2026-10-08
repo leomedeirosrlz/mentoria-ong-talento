@@ -1,0 +1,32 @@
+name: e2e-nightly
+
+# Demo smoke contra PRODUÇÃO — /demo é pública e não escreve nada; pega
+# regressão mesmo em dia sem push. Sem secrets.
+on:
+  schedule:
+    - cron: "0 12 * * *" # 09:00 BRT
+  workflow_dispatch:
+
+concurrency:
+  group: e2e-nightly
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  demo-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      E2E_BASE_URL: https://realizavc.vercel.app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm test:e2e:demo

@@ -601,7 +601,8 @@ async function dadosCronogramas(supabase: Supa) {
   ]);
   return {
     cronogramas: (crons ?? []) as Cronograma[],
-    evs: (evs ?? []) as { cronograma_id: string; tipo: string; data: string }[],
+    // data nullable desde a 0062 (etapa de preparação concluída pode não ter)
+    evs: (evs ?? []) as { cronograma_id: string; tipo: string; data: string | null }[],
   };
 }
 
@@ -704,9 +705,16 @@ export async function createDupla(formData: FormData) {
     if (trilha === "especialista") {
       iniciada_em = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date());
     } else {
-      // 1º encontro DO cronograma escolhido — evsCron já tem o calendário todo
+      // 1º encontro DO cronograma escolhido — evsCron já tem o calendário
+      // todo; etapa concluída sem data (0062) ficaria fora pelo tipo, mas o
+      // guard data != null é a régua pra qualquer tipo novo sem data
       const primeiroEv = evsCron
-        .filter((e) => e.tipo === "encontro" && e.cronograma_id === cronograma_id)
+        .filter(
+          (e): e is typeof e & { data: string } =>
+            e.tipo === "encontro" &&
+            e.cronograma_id === cronograma_id &&
+            e.data != null
+        )
         .sort((a, b) => a.data.localeCompare(b.data))[0];
       iniciada_em = primeiroEv
         ? inicioDefaultDupla([{ tipo: "encontro", data: primeiroEv.data }])!

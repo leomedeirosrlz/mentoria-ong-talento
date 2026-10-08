@@ -229,7 +229,9 @@ export const getCicloEventos = cache(async (): Promise<CicloEvento[]> => {
   const { data, error } = await supabase
     .from("ciclo_eventos")
     .select("*")
-    .order("data", { ascending: true });
+    // a ordem canônica é `ordem` (0062) — data nullable jogaria etapas
+    // concluídas pro fim da lista; quem precisa de data refiltra por tipo
+    .order("ordem", { ascending: true });
   if (error) throw error;
   return data ?? [];
 });

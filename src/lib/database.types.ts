@@ -160,34 +160,43 @@ export type Database = {
       ciclo_eventos: {
         Row: {
           cronograma_id: string
-          data: string
+          data: string | null
           data_fim: string | null
           fase: string | null
           id: string
           instrumentos: string[]
           numero: number | null
+          observacao: string | null
+          ordem: number
+          status: string
           tipo: string
           titulo: string
         }
         Insert: {
           cronograma_id: string
-          data: string
+          data?: string | null
           data_fim?: string | null
           fase?: string | null
           id?: string
           instrumentos?: string[]
           numero?: number | null
+          observacao?: string | null
+          ordem: number
+          status?: string
           tipo: string
           titulo: string
         }
         Update: {
           cronograma_id?: string
-          data?: string
+          data?: string | null
           data_fim?: string | null
           fase?: string | null
           id?: string
           instrumentos?: string[]
           numero?: number | null
+          observacao?: string | null
+          ordem?: number
+          status?: string
           tipo?: string
           titulo?: string
         }
@@ -2331,6 +2340,7 @@ export type Database = {
         Returns: Json
       }
       assinatura_por_token: { Args: { p_token: string }; Returns: Json }
+      civis_btrim: { Args: { d: Json }; Returns: Json }
       dados_civis_ok: {
         Args: { com_parentesco?: boolean; d: Json }
         Returns: boolean
@@ -2340,6 +2350,7 @@ export type Database = {
         Returns: undefined
       }
       disponibilidade_ok: { Args: { d: Json }; Returns: boolean }
+      email_disponivel: { Args: { p_email: string }; Returns: boolean }
       encerramento_checklist_ok: { Args: { c: Json }; Returns: boolean }
       encerrar_trilha_especialista: {
         Args: {
@@ -2361,6 +2372,7 @@ export type Database = {
       meus_dados_pessoais: { Args: never; Returns: Json }
       my_profile_id: { Args: never; Returns: string }
       my_role: { Args: never; Returns: Database["public"]["Enums"]["app_role"] }
+      nome_proprio: { Args: { p: string }; Returns: string }
       pegar_login_handoff: { Args: { p_nonce: string }; Returns: Json }
       regenerar_token_assinatura: { Args: { p_id: string }; Returns: string }
       registrar_login_handoff: {

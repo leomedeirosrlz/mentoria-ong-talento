@@ -89,7 +89,7 @@ describe("jornadaDaDupla", () => {
   it("trilha completa: proximoNumero null e marco no último nó", () => {
     const dupla = mkDupla({
       encontros: CICLO_16.filter((e) => e.tipo === "encontro").map((e) =>
-        encRealizado(e.numero!, e.data)
+        encRealizado(e.numero!, e.data!)
       ),
     });
     const j = jornadaDaDupla(dupla, PASSOS, dt("2026-02-01"));

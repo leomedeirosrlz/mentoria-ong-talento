@@ -212,31 +212,92 @@ const diaEncontroT2 = (n: number): Date => {
 
 // ---------- calendário oficial (conteúdo do seed.sql, datas deslocadas) ----------
 
+// As 4 seções do cronograma oficial (0062): preparação (etapas — datadas ou
+// "Concluída" sem data), mentoria ativa (16 encontros + recesso), encerramento
+// (evento) e observações operacionais (observacao). `ordem` é explícita — a
+// sequência do PDF, não a da data (etapa concluída sem data vem antes dos
+// encontros; `data nulls last` a jogaria depois do encerramento).
+
+type EtapaSpec = {
+  titulo: string;
+  /** null = etapa concluída sem data (entregue pela ONG parceira). */
+  data: Date | null;
+  dataFim?: Date | null;
+  observacao?: string | null;
+};
+
+/** Preparação da T1 — tudo pela coordenação, tudo datado e já concluído (o
+ *  ciclo dela está na semana do 5º encontro). */
+const etapasT1 = (dia: (n: number) => Date): EtapaSpec[] => [
+  { titulo: "Inscrições", data: addDias(dia(1), -40), dataFim: addDias(dia(1), -20) },
+  { titulo: "Triagem e matching", data: addDias(dia(1), -19), dataFim: addDias(dia(1), -6) },
+  { titulo: "Onboarding de mentores", data: addDias(dia(1), -5), dataFim: addDias(dia(1), -4) },
+  {
+    titulo: "Onboarding de mentorados",
+    data: addDias(dia(1), -4),
+    observacao: "Encontro de abertura com a coordenação",
+  },
+  { titulo: "Início", data: dia(1) },
+];
+
+/** Preparação da T2 — a ONG parceira Cidadão Pró-Mundo entregou inscrições e
+ *  triagem/matching prontos: são "Concluída" sem data, com a proveniência na
+ *  observação (o que o PDF marca como "Concluídos"). */
+const etapasT2 = (dia: (n: number) => Date): EtapaSpec[] => [
+  {
+    titulo: "Inscrições",
+    data: null,
+    observacao: "Inscrição e indicação pela ONG parceira Cidadão Pró-Mundo",
+  },
+  {
+    titulo: "Triagem e matching",
+    data: null,
+    observacao: "Entregue concluída pela ONG parceira Cidadão Pró-Mundo",
+  },
+  { titulo: "Onboarding de mentores", data: addDias(dia(1), -5), dataFim: addDias(dia(1), -4) },
+  {
+    titulo: "Onboarding de mentorados",
+    data: addDias(dia(1), -4),
+    observacao: "Encontro de abertura com a coordenação",
+  },
+  { titulo: "Início", data: dia(1) },
+];
+
 /** Monta os eventos dos dois cronogramas — cada evento carrega o
  *  `cronograma_id` do dono (0061): a identidade do encontro oficial é
  *  (cronograma, numero), numero solto não identifica mais nada. */
 function buildCicloEventos(cronogramaT1: string, cronogramaT2: string): CicloEvento[] {
   let i = 0;
+  // ordem é por cronograma: o contador reinicia a cada turma (sequência do PDF)
+  const seq = new Map<string, number>();
   const ev = (
     cronogramaId: string,
     tipo: CicloEvento["tipo"],
     numero: number | null,
-    data: Date,
+    data: Date | null,
     titulo: string,
     fase: string | null = null,
     instrumentos: string[] = [],
-    dataFim: Date | null = null
-  ): CicloEvento => ({
-    id: uid(0x1800 + ++i),
-    cronograma_id: cronogramaId,
-    tipo,
-    numero,
-    data: ymd(data),
-    data_fim: dataFim ? ymd(dataFim) : null,
-    titulo,
-    fase,
-    instrumentos,
-  });
+    dataFim: Date | null = null,
+    extra: { status?: CicloEvento["status"]; observacao?: string | null } = {}
+  ): CicloEvento => {
+    const ordem = (seq.get(cronogramaId) ?? 0) + 1;
+    seq.set(cronogramaId, ordem);
+    return {
+      id: uid(0x1800 + ++i),
+      cronograma_id: cronogramaId,
+      tipo,
+      numero,
+      data: data ? ymd(data) : null,
+      data_fim: dataFim ? ymd(dataFim) : null,
+      status: extra.status ?? "pendente",
+      observacao: extra.observacao ?? null,
+      ordem,
+      titulo,
+      fase,
+      instrumentos,
+    };
+  };
 
   const F1 = "Criar vínculo e construir o PDM";
   const F2 = "Colocar o plano em prática";
@@ -245,45 +306,74 @@ function buildCicloEventos(cronogramaT1: string, cronogramaT2: string): CicloEve
   const F5 = "Roda da Vida";
   const F6 = "Encerrar e celebrar";
 
-  /** As 24 linhas do calendário oficial, parametrizadas por `dia` — T1 e T2
-   *  rodam a mesma trilha DPP (títulos/fases/instrumentos iguais), cada uma
-   *  no seu cronograma: a formação é por turma, então a T2 repete os dois
-   *  encontros de formação nas datas dela. */
-  const turma = (cronogramaId: string, dia: (n: number) => Date): CicloEvento[] => [
-    // pré-ciclo no cronograma oficial: inscrições -40→-20d, triagem -19→-14d,
-    // matching -13→-6d, formação -5/-4 e abertura -4 (tudo antes do encontro 1)
-    ev(cronogramaId, "marco", null, addDias(dia(1), -40), "Inscrições e seleção", null, [], addDias(dia(1), -20)),
-    ev(cronogramaId, "marco", null, addDias(dia(1), -19), "Triagem e preparação do matching", null, [], addDias(dia(1), -14)),
-    ev(cronogramaId, "marco", null, addDias(dia(1), -13), "Matching das duplas", null, [], addDias(dia(1), -6)),
+  /** As linhas do calendário oficial na ordem do PDF (`ordem`), parametrizadas
+   *  por `dia` — T1 e T2 rodam a mesma trilha DPP (títulos/fases/instrumentos
+   *  iguais), cada uma no seu cronograma: a formação é por turma, então a T2
+   *  repete os dois encontros de formação nas datas dela. `quintasDuplas` =
+   *  os nºs de encontro que caem na quinta da semana dupla (só T2 — ver
+   *  diaEncontroT2); a terça e a quinta da mesma semana carregam nºs
+   *  consecutivos. */
+  const turma = (
+    cronogramaId: string,
+    dia: (n: number) => Date,
+    etapas: EtapaSpec[],
+    quintasDuplas: ReadonlySet<number> = new Set()
+  ): CicloEvento[] => [
+    // seção 1 — preparação: as 5 etapas do PDF. `status: 'concluida'` nos
+    // dois cronogramas — as duas turmas já estão em mentoria ativa. A
+    // formação é sessão com chamada (tipo 'formacao'): na `ordem` ela cai
+    // dentro da janela da etapa "onboarding de mentores" que a embrulha.
+    ...etapas.slice(0, 3).map((e) =>
+      ev(cronogramaId, "etapa_preparacao", null, e.data, e.titulo, null, [],
+        e.dataFim ?? null, { status: "concluida", observacao: e.observacao })
+    ),
     ev(cronogramaId, "formacao", null, addDias(dia(1), -5), "Encontro inicial de formação de mentores"),
     ev(cronogramaId, "formacao", null, addDias(dia(1), -4), "Encontro final de formação de mentores"),
-    ev(cronogramaId, "marco", null, addDias(dia(1), -4), "Encontro de abertura com a coordenação"),
-    ev(cronogramaId, "encontro", 1, dia(1), "Boas-vindas, histórias de vida e abertura", F1, ["Perguntas Eficazes", "Escuta Ativa", "PDM", "Roda da Vida (leitura inicial)"]),
+    ...etapas.slice(3).map((e) =>
+      ev(cronogramaId, "etapa_preparacao", null, e.data, e.titulo, null, [],
+        e.dataFim ?? null, { status: "concluida", observacao: e.observacao })
+    ),
+    // seção 2 — mentoria ativa. Encontro 1 documenta a regra de reposição;
+    // a quinta dupla e o gap 8º→9º vão na observação, como no PDF.
+    ev(cronogramaId, "encontro", 1, dia(1), "Boas-vindas, histórias de vida e abertura", F1, ["Perguntas Eficazes", "Escuta Ativa", "PDM", "Roda da Vida (leitura inicial)"], null,
+      { observacao: "Reposição na mesma semana" }),
     ev(cronogramaId, "encontro", 2, dia(2), "Avaliação por terceiros e visão de futuro", F1, ["PDM", "Construindo a sua Visão"]),
     ev(cronogramaId, "encontro", 3, dia(3), "Declaração de Visão e metas SMART", F1, ["PDM", "Modelo SMART"]),
     ev(cronogramaId, "encontro", 4, dia(4), "Fechamento da construção do PDM", F1, ["PDM", "Perguntas Eficazes"]),
     ev(cronogramaId, "encontro", 5, dia(5), "Acompanhamento das primeiras submetas", F2, ["PDM", "Feedback Construtivo"]),
-    ev(cronogramaId, "encontro", 6, dia(6), "Superação de obstáculos", F2, ["PDM", "Feedback Construtivo"]),
+    ev(cronogramaId, "encontro", 6, dia(6), "Superação de obstáculos", F2, ["PDM", "Feedback Construtivo"], null,
+      quintasDuplas.has(6) ? { observacao: "Encontro duplo" } : {}),
     ev(cronogramaId, "encontro", 7, dia(7), "Ajustes de prazos e desdobramentos", F2, ["PDM", "Feedback Construtivo"]),
     // títulos/fases/instrumentos 8–16 = a correção da 0035 (guia DPP oficial):
     // 8 monitora e já transfere a condução; 9 é a revisão de meio de percurso
     ev(cronogramaId, "encontro", 8, dia(8), "Monitoramento e responsabilidade", F3, ["PDM", "Escuta Ativa"]),
-    ev(cronogramaId, "encontro", 9, dia(9), "Revisão de meio de percurso", F3, ["PDM", "Escuta Ativa"]),
+    ev(cronogramaId, "encontro", 9, dia(9), "Revisão de meio de percurso", F3, ["PDM", "Escuta Ativa"], null,
+      // o gap 8º→9º existe na T1; na T2 os encontros são comprimidos — a nota
+      // só entra quando o intervalo real é maior que uma semana
+      (dia(9).getTime() - dia(8).getTime()) / DIA_MS > 7
+        ? { observacao: "15 dias desde o 8º encontro — tempo de prática das submetas" }
+        : {}),
     ev(cronogramaId, "encontro", 10, dia(10), "O mentor como espelho", F4, ["Papel de modelo", "Escuta Ativa"]),
-    ev(cronogramaId, "encontro", 11, dia(11), "Rede de apoio e novos espaços", F4, ["Papel de modelo", "Escuta Ativa"]),
+    ev(cronogramaId, "encontro", 11, dia(11), "Rede de apoio e novos espaços", F4, ["Papel de modelo", "Escuta Ativa"], null,
+      quintasDuplas.has(11) ? { observacao: "Encontro duplo" } : {}),
     ev(cronogramaId, "encontro", 12, dia(12), "Aplicação e leitura da Roda da Vida", F5, ["Roda da Vida", "Modelo SMART"]),
-    ev(cronogramaId, "encontro", 13, dia(13), "Metas das áreas prioritárias", F5, ["Roda da Vida", "Modelo SMART"]),
+    ev(cronogramaId, "encontro", 13, dia(13), "Metas das áreas prioritárias", F5, ["Roda da Vida", "Modelo SMART"], null,
+      quintasDuplas.has(13) ? { observacao: "Encontro duplo" } : {}),
     ev(cronogramaId, "encontro", 14, dia(14), "Desdobramento e plano de continuidade", F5, ["Roda da Vida", "Modelo SMART"]),
-    ev(cronogramaId, "recesso", null, addDias(dia(14), 1), "Recesso de fim de ano", null, [], addDias(dia(14), 18)),
+    ev(cronogramaId, "recesso", null, addDias(dia(14), 1), "Recesso de fim de ano", null, [], addDias(dia(14), 18),
+      { observacao: "Sem encontros — retomada na 1ª semana de janeiro" }),
     ev(cronogramaId, "encontro", 15, dia(15), "Reflexão e reconhecimento", F6, ["PDM", "Roda da Vida"]),
     ev(cronogramaId, "encontro", 16, dia(16), "Encerramento e celebração", F6, ["Avaliação 360º", "Autoavaliação do mentor"]),
-    // evento de encerramento compartilhável pelas turmas — cada cronograma
-    // guarda a própria row (cronograma_id é NOT NULL): 15/01 no real, +3d
-    // após o 16º encontro de cada uma
-    ev(cronogramaId, "marco", null, addDias(dia(16), 3), "Evento de encerramento do programa"),
+    // seção 3 — encerramento: evento compartilhável pelas turmas, mas cada
+    // cronograma guarda a própria row (cronograma_id é NOT NULL): 15/01 no
+    // real, +3d após o 16º encontro de cada uma
+    ev(cronogramaId, "evento_encerramento", null, addDias(dia(16), 3), "Evento de encerramento do programa"),
   ];
 
-  return [...turma(cronogramaT1, diaEncontro), ...turma(cronogramaT2, diaEncontroT2)];
+  return [
+    ...turma(cronogramaT1, diaEncontro, etapasT1(diaEncontro)),
+    ...turma(cronogramaT2, diaEncontroT2, etapasT2(diaEncontroT2), QUINTA_DUPLA_T2),
+  ];
 }
 
 // ---------- textos de registro ----------
@@ -1262,15 +1352,19 @@ function build(): DemoData {
     criadoDias: number
   ): Cronograma => {
     const evs = cicloEventos.filter((e) => e.cronograma_id === id);
+    // data nullable (0062): etapas concluídas sem data ficam fora do min/max
+    const datas = evs.flatMap((e) => (e.data ? [e.data] : []));
+    const fins = evs.flatMap((e) => {
+      const f = e.data_fim ?? e.data;
+      return f ? [f] : [];
+    });
     return {
       id,
       nome,
       turma,
       trilha: "dpp",
-      inicio_em: evs.map((e) => e.data).reduce((a, b) => (a < b ? a : b)),
-      fim_em: evs
-        .map((e) => e.data_fim ?? e.data)
-        .reduce((a, b) => (a > b ? a : b)),
+      inicio_em: datas.length ? datas.reduce((a, b) => (a < b ? a : b)) : null,
+      fim_em: fins.length ? fins.reduce((a, b) => (a > b ? a : b)) : null,
       encontros_esperados: evs.filter((e) => e.tipo === "encontro").length,
       status: "ativo",
       created_by: marina.id,

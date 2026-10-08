@@ -129,6 +129,7 @@ export function dadosResumoJornada(
       : eventos.filter(
           (e) =>
             e.tipo === "encontro" &&
+            e.data != null &&
             e.data <= toDateStr(hoje) &&
             (!dupla.iniciada_em || e.data >= dupla.iniciada_em)
         ).length;

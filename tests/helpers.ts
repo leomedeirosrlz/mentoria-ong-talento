@@ -88,6 +88,11 @@ export function mkEvento(
     numero,
     data,
     data_fim: null,
+    status: "pendente",
+    observacao: null,
+    // ordem ×10 deixa folga pra eventos não-encontro entre dois oficiais
+    // (0062: a sequência do PDF é por `ordem`, não por data)
+    ordem: numero * 10,
     titulo: `Encontro ${numero}`,
     fase: numero <= 8 ? "Fase 1" : "Fase 2",
     instrumentos: [],
@@ -108,6 +113,9 @@ export const CICLO_16: CicloEvento[] = [
     numero: null,
     data: "2025-10-22",
     data_fim: null,
+    status: "pendente",
+    observacao: null,
+    ordem: 35, // entre o encontro 3 (30) e o 4 (40) — sequência do PDF
     titulo: "Formação",
     fase: null,
     instrumentos: [],
@@ -128,6 +136,9 @@ export const CICLO_16: CicloEvento[] = [
     numero: null,
     data: "2025-12-25",
     data_fim: "2026-01-04",
+    status: "pendente",
+    observacao: null,
+    ordem: 125, // entre o encontro 12 (120) e o 13 (130)
     titulo: "Recesso",
     fase: null,
     instrumentos: [],

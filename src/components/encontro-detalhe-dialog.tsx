@@ -175,6 +175,13 @@ export function EncontroDetalheDialog({
               {evento.foco ? ` · ${evento.foco}` : ""}
             </p>
           )}
+          {/* nota operacional do cronograma oficial (0062) — "reposição na
+              mesma semana", feriado municipal, encontro duplo */}
+          {evento?.observacao && (
+            <p className="text-xs text-muted-foreground">
+              Cronograma oficial: {evento.observacao}
+            </p>
+          )}
 
           {nota && (
             <div className="rounded-lg bg-muted/40 px-3.5 py-2.5">

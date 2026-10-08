@@ -20,6 +20,7 @@ import {
   CaretDown,
   CaretLeft,
   CaretRight,
+  CheckCircle,
   ClockCounterClockwise,
   File,
   FileText,
@@ -77,6 +78,7 @@ import {
   semanaBounds,
   toDateStr,
   type BucketsEncontro,
+  type EventoDatado,
   type ItemEncontroDupla,
   type PassoGuia,
 } from "@/lib/ciclo";
@@ -302,10 +304,11 @@ function coberturaEncontro(
 }
 
 const TIPO_PALAVRA: Record<CicloEvento["tipo"], string> = {
+  etapa_preparacao: "etapa de preparação",
   encontro: "encontro",
-  formacao: "formação",
   recesso: "recesso",
-  marco: "marco",
+  evento_encerramento: "encerramento",
+  formacao: "formação",
 };
 
 /** O nome do evento já diz o tipo? ("2º encontro · …", "Recesso de fim de ano",
@@ -344,10 +347,18 @@ function MarcadorTipo({ tipo, nome }: { tipo: CicloEvento["tipo"]; nome: string 
           {palavra}
         </span>
       );
-    case "marco":
+    case "etapa_preparacao":
+      // discreto: a etapa é contexto operacional, não o protagonista do dia
       return (
         <span className={cls}>
-          <Flag aria-hidden size={13} weight="bold" className="text-[var(--ok-text)]" />
+          <CheckCircle aria-hidden size={13} weight="bold" />
+          {palavra}
+        </span>
+      );
+    case "evento_encerramento":
+      return (
+        <span className={cls}>
+          <Flag aria-hidden size={13} weight="fill" className="text-[var(--ok-text)]" />
           {palavra}
         </span>
       );
@@ -622,10 +633,13 @@ export function AgendaCalendario({
     [eventosSel, hoje]
   );
 
-  // mapa dia → eventos do dia; recesso (e qualquer evento com data_fim) cobre o intervalo todo
+  // mapa dia → eventos do dia; recesso (e qualquer evento com data_fim) cobre
+  // o intervalo todo. Etapa concluída sem data (0062) não entra no grid —
+  // ela mora no painel "Etapas de preparação"
   const porDia = useMemo(() => {
     const mapa = new Map<string, CicloEvento[]>();
     for (const e of eventosSel) {
+      if (e.data == null) continue;
       const fim = e.data_fim ?? e.data;
       for (let d = e.data; d <= fim; d = proximoDia(d)) {
         mapa.set(d, [...(mapa.get(d) ?? []), e]);
@@ -656,11 +670,16 @@ export function AgendaCalendario({
     return mapa;
   }, [duplas]);
 
-  // trilha do ciclo: só os encontros oficiais (1–16), em ordem — alimenta o rail
+  // trilha do ciclo: só os encontros oficiais (1–16), em ordem — alimenta o
+  // rail. O guard de data refina pro tipo datado (o CHECK exige data em
+  // encontro, mas o tipo declara null por causa da etapa concluída)
   const encontrosRail = useMemo(
     () =>
       eventosSel
-        .filter((e) => e.tipo === "encontro" && e.numero != null)
+        .filter(
+          (e): e is EventoDatado =>
+            e.tipo === "encontro" && e.numero != null && e.data != null
+        )
         .sort((a, b) => (a.numero ?? 0) - (b.numero ?? 0)),
     [eventosSel]
   );
@@ -771,13 +790,17 @@ export function AgendaCalendario({
   const [agoraMs] = useState(() => Date.now());
 
   // janela de semanas navegáveis: da semana do 1º evento do cronograma à do
-  // último (mesmo recorte dos minMes/maxMes do modo mensal)
+  // último (mesmo recorte dos minMes/maxMes do modo mensal). Evento sem data
+  // (etapa concluída, 0062) não abre janela — e data_fim estende o fim, pra
+  // recesso/etapa multi-dia não cortar na semana de início
   const { minSemana, maxSemana } = useMemo(() => {
     let min = "",
       max = "";
     for (const e of eventosSel) {
+      if (e.data == null) continue;
       if (!min || e.data < min) min = e.data;
-      if (e.data > max) max = e.data;
+      const fim = e.data_fim ?? e.data;
+      if (fim > max) max = fim;
     }
     return {
       minSemana: min ? semanaBounds(parseDia(min)).seg : "",
@@ -806,9 +829,10 @@ export function AgendaCalendario({
     let min = "",
       max = "";
     for (const e of eventosSel) {
+      if (e.data == null) continue; // etapa sem data não abre mês/semana
       if (!min || e.data < min) min = e.data;
-      if (e.data > max) max = e.data;
       const fim = e.data_fim ?? e.data;
+      if (fim > max) max = fim;
       for (let d = e.data; d <= fim; d = proximoDia(d)) meses.add(mesIndice(d));
     }
     if (meses.size) {
@@ -980,7 +1004,10 @@ export function AgendaCalendario({
   }
 
   const eventosDoMes = eventosSel.filter(
-    (e) => e.data <= ultimoIso && (e.data_fim ?? e.data) >= primeiroIso
+    (e): e is EventoDatado =>
+      e.data != null &&
+      e.data <= ultimoIso &&
+      (e.data_fim ?? e.data) >= primeiroIso
   );
 
   const eventosSelecionados = porDia.get(selecionado) ?? [];
@@ -1051,14 +1078,24 @@ export function AgendaCalendario({
   };
   const rotuloSemana = (s: number): string => {
     const evs = eventosDaSemana(s);
-    const enc = evs.find((e) => e.tipo === "encontro" && e.numero != null);
-    if (enc) return `Semana do ${enc.numero}º encontro`;
+    // a semana pode ter DOIS encontros oficiais (quinta dupla da T2, 0062) —
+    // o rótulo nomeia todos; o âncora dos agregados segue o menor nº
+    const nums = evs
+      .filter((e) => e.tipo === "encontro" && e.numero != null)
+      .map((e) => e.numero!)
+      .sort((a, b) => a - b);
+    if (nums.length === 1) return `Semana do ${nums[0]}º encontro`;
+    if (nums.length > 1)
+      return `Semana dos encontros ${nums.slice(0, -1).join(", ")} e ${nums.at(-1)}`;
+    if (evs.some((e) => e.tipo === "evento_encerramento"))
+      return "Semana de encerramento";
     if (evs.some((e) => e.tipo === "recesso")) return "Semana de recesso";
     if (evs.some((e) => e.tipo === "formacao")) return "Semana de formação";
-    if (evs.some((e) => e.tipo === "marco")) return "Semana do marco";
+    if (evs.some((e) => e.tipo === "etapa_preparacao"))
+      return "Semana de preparação";
     return "Semana sem eventos";
   };
-  const gruposDoMes = new Map<number, CicloEvento[]>();
+  const gruposDoMes = new Map<number, EventoDatado[]>();
   for (const e of eventosDoMes) {
     // evento que começou antes do mês ancora no 1º dia visível dele
     const s = semanaPorData.get(e.data < primeiroIso ? primeiroIso : e.data);
@@ -1117,25 +1154,40 @@ export function AgendaCalendario({
   const marcaSemanaA11y =
     marcaSemana === "esta semana" ? "encontro desta semana" : marcaSemana;
 
-  // encontro oficial da semana exibida — critério estrito do eventoDaSemana
-  // (a data cai em seg–dom), sem o fallback "próximo" dele: o board só fala
-  // da semana real
-  const oficialSemana =
-    eventosSel
-      .filter(
-        (e) =>
-          e.tipo === "encontro" &&
-          e.numero != null &&
-          e.data >= segSel &&
-          e.data <= domSel
-      )
-      .sort((a, b) => a.data.localeCompare(b.data))[0] ?? null;
+  // encontros oficiais da semana exibida — critério estrito do
+  // encontrosDaSemana (a data cai em seg–dom), sem o fallback "próximo" do
+  // eventoDaSemana: o board só fala da semana real. A semana pode ter DOIS
+  // (quinta de encontro duplo da T2, 0062) — ordenados por numero, o âncora
+  // dos agregados é o menor nº.
+  const oficiaisSemana = eventosSel
+    .filter(
+      (e): e is EventoDatado =>
+        e.tipo === "encontro" &&
+        e.numero != null &&
+        e.data != null &&
+        e.data >= segSel &&
+        e.data <= domSel
+    )
+    .sort((a, b) => (a.numero ?? 0) - (b.numero ?? 0));
+  const oficialSemana = oficiaisSemana[0] ?? null;
 
-  // formação/recesso/marco que tocam a semana — linha-meta informativa, fora
-  // dos agregados de encontro
+  // seção 1 do cronograma oficial (0062): as etapas de preparação em `ordem`.
+  // As sem data (entregues "Concluída" pela ONG parceira) não entram na
+  // grade — este painel é a única superfície delas na agenda.
+  const etapasPreparacao = eventosSel
+    .filter((e) => e.tipo === "etapa_preparacao")
+    .sort((a, b) => a.ordem - b.ordem);
+  const etapasConcluidas = etapasPreparacao.filter(
+    (e) => e.status === "concluida"
+  ).length;
+
+  // formação/recesso/etapa/encerramento que tocam a semana — linha-meta
+  // informativa, fora dos agregados de encontro. Etapa concluída sem data
+  // (0062) não toca semana nenhuma — mora no painel "Etapas de preparação".
   const outrosDaSemana = eventosSel.filter(
-    (e) =>
+    (e): e is EventoDatado =>
       !(e.tipo === "encontro" && e.numero != null) &&
+      e.data != null &&
       e.data <= domSel &&
       (e.data_fim ?? e.data) >= segSel
   );
@@ -1202,7 +1254,7 @@ export function AgendaCalendario({
   const resumoOficial = oficialSemana
     ? resumoSemanaDe(duplas, oficialSemana, { seg: segSel, dom: domSel })
     : null;
-  // antes da terça oficial "X de Y realizaram" ainda não é a pergunta — o
+  // antes do encontro oficial "X de Y realizaram" ainda não é a pergunta — o
   // denominador útil é quem já marcou
   const oficialPassou = oficialSemana != null && oficialSemana.data <= hoje;
   const espAtivas = duplas.filter(
@@ -1272,6 +1324,61 @@ export function AgendaCalendario({
     >
       {/* ===== calendário / board da semana / lista do ciclo ===== */}
       <div className="overflow-hidden rounded-xl bg-card shadow-[var(--shadow-border)] lg:col-start-1 lg:row-start-1">
+        {/* etapas de preparação (0062) — contexto do cronograma, não
+            protagonista: colapsável no topo, com status. As concluídas sem
+            data (ONG parceira) só existem aqui — fora da grade e da semana */}
+        {etapasPreparacao.length > 0 && (
+          <details className="group border-b">
+            <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-2.5 text-sm text-muted-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:px-5 [&::-webkit-details-marker]:hidden">
+              <CaretDown
+                aria-hidden
+                size={14}
+                className="transition-transform group-open:rotate-180"
+              />
+              <span className="font-medium">Etapas de preparação</span>
+              <span className="text-xs tabular-nums">
+                {etapasConcluidas} de {etapasPreparacao.length} concluídas
+              </span>
+            </summary>
+            <ul className="divide-y divide-border/60 border-t px-4 sm:px-5">
+              {etapasPreparacao.map((e) => (
+                <li
+                  key={e.id}
+                  className="flex items-baseline gap-x-3 py-2 text-sm"
+                >
+                  <span className="w-24 shrink-0 text-xs tabular-nums text-muted-foreground">
+                    {e.data
+                      ? e.data_fim
+                        ? `${diaCompacto(e.data)}–${diaCompacto(e.data_fim)}`
+                        : diaCompacto(e.data)
+                      : "—"}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    {e.titulo}
+                    {e.observacao && (
+                      <span className="block truncate text-xs text-muted-foreground">
+                        {e.observacao}
+                      </span>
+                    )}
+                  </span>
+                  <span
+                    className={cn(
+                      "inline-flex shrink-0 items-center gap-1.5 text-xs font-medium",
+                      e.status === "concluida"
+                        ? "text-[var(--ok-text)]"
+                        : "text-muted-foreground"
+                    )}
+                  >
+                    {e.status === "concluida" && (
+                      <CheckCircle aria-hidden size={13} weight="bold" />
+                    )}
+                    {e.status === "concluida" ? "Concluída" : "Pendente"}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </details>
+        )}
         {/* chrome do card, uma faixa só: "como olhar" à esquerda (visão,
             só coord/sup — a unidade de trabalho delas é a semana) + "o que
             olhar" à direita (turma, quando há mais de um cronograma
@@ -1707,12 +1814,23 @@ export function AgendaCalendario({
                                   className="text-[var(--warn-text)]"
                                 />
                               );
-                            if (e.tipo === "marco")
+                            if (e.tipo === "etapa_preparacao")
+                              // discreto: contexto operacional, não o
+                              // protagonista do dia (espelha MarcadorTipo)
+                              return (
+                                <CheckCircle
+                                  key={e.id}
+                                  size={13}
+                                  weight="bold"
+                                  className="text-muted-foreground"
+                                />
+                              );
+                            if (e.tipo === "evento_encerramento")
                               return (
                                 <Flag
                                   key={e.id}
                                   size={14}
-                                  weight="bold"
+                                  weight="fill"
                                   className="text-[var(--ok-text)]"
                                 />
                               );
@@ -1813,15 +1931,28 @@ export function AgendaCalendario({
                   {/* o título é só a pergunta da semana — o tema desce pro
                       meta; sem encontro oficial, o tipo dominante nomeia a
                       semana (espelha rotuloSemana) */}
-                  {oficialSemana?.numero != null
-                    ? `Semana do ${oficialSemana.numero}º encontro`
-                    : outrosDaSemana.some((e) => e.tipo === "recesso")
-                      ? "Semana de recesso"
-                      : outrosDaSemana.some((e) => e.tipo === "formacao")
-                        ? "Semana de formação"
-                        : outrosDaSemana.some((e) => e.tipo === "marco")
-                          ? "Semana do marco"
-                          : `Semana de ${rotuloSemanaIso}`}
+                  {oficiaisSemana.length > 1
+                    ? // semana de encontro duplo (T2): a manchete nomeia os
+                      // dois — espelha rotuloSemana
+                      `Semana dos encontros ${oficiaisSemana
+                        .slice(0, -1)
+                        .map((e) => e.numero)
+                        .join(", ")} e ${oficiaisSemana.at(-1)!.numero}`
+                    : oficialSemana?.numero != null
+                      ? `Semana do ${oficialSemana.numero}º encontro`
+                      : outrosDaSemana.some(
+                            (e) => e.tipo === "evento_encerramento"
+                          )
+                        ? "Semana de encerramento"
+                        : outrosDaSemana.some((e) => e.tipo === "recesso")
+                          ? "Semana de recesso"
+                          : outrosDaSemana.some((e) => e.tipo === "formacao")
+                            ? "Semana de formação"
+                            : outrosDaSemana.some(
+                                  (e) => e.tipo === "etapa_preparacao"
+                                )
+                              ? "Semana de preparação"
+                              : `Semana de ${rotuloSemanaIso}`}
                 </h2>
                 {ehSemanaAtual && (
                   <span className="inline-flex items-center gap-1.5 text-xs font-semibold">
@@ -1840,6 +1971,16 @@ export function AgendaCalendario({
                   {oficialSemana.titulo} · {diaCompacto(oficialSemana.data)}
                 </p>
               )}
+              {/* semana dupla: o 2º encontro ganha linha-meta própria — os
+                  agregados seguem ancorados no 1º (menor nº) */}
+              {oficiaisSemana.slice(1).map((e) => (
+                <p
+                  key={e.id}
+                  className="mt-0.5 text-sm text-muted-foreground"
+                >
+                  {e.numero}º encontro · {e.titulo} · {diaCompacto(e.data)}
+                </p>
+              ))}
               {/* eventos do ciclo que tocam a semana e não são o encontro
                   oficial — linha-meta informativa, fora dos agregados */}
               {outrosDaSemana.length > 0 && (
@@ -1948,14 +2089,16 @@ export function AgendaCalendario({
             </p>
             <ul className="divide-y divide-border/60 pb-1">
               {[...eventosSel]
-                .sort((a, b) => a.data.localeCompare(b.data))
+                // a sequência do PDF é `ordem` (0062), não a data — etapa
+                // concluída sem data ficaria depois do encerramento
+                .sort((a, b) => a.ordem - b.ordem)
                 .map((e) => {
                   const ehEncontro = e.tipo === "encontro" && e.numero != null;
                   const itensN = ehEncontro
                     ? (itensPorNumero.get(e.numero!) ?? [])
                     : [];
                   const resumoN = ehEncontro ? resumoSemanaDe(duplas, e) : null;
-                  const passouN = e.data <= hoje;
+                  const passouN = e.data != null && e.data <= hoje;
                   // "com encontro marcado" = tem row que não seja
                   // não-aconteceu/cancelado — a fração honesta da semana futura
                   const marcaramN =
@@ -1968,14 +2111,19 @@ export function AgendaCalendario({
                     <li key={e.id}>
                       <button
                         type="button"
+                        // etapa concluída sem data (0062) não tem semana pra
+                        // saltar — a linha vira leitura, não navegação
+                        disabled={e.data == null}
                         onClick={() => {
+                          if (e.data == null) return;
                           // a linha inteira salta pra semana do evento — a
                           // visão "semana" é onde a cobertura se trabalha
                           irParaSemana(semanaBounds(parseDia(e.data)).seg);
                           setVisao("semana");
                         }}
                         className={cn(
-                          "flex w-full flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-3 text-left transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:px-5",
+                          "flex w-full flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:px-5",
+                          e.data != null && "hover:bg-muted/50",
                           // a linha do encontro da semana corrente ganha o
                           // fundo lime — mesma faixa da linha de semana no mês
                           e.id === eventoSemanaSel?.id &&
@@ -1983,7 +2131,9 @@ export function AgendaCalendario({
                         )}
                       >
                         <span className="w-20 shrink-0 whitespace-nowrap text-sm tabular-nums text-muted-foreground">
-                          {diaCompacto(e.data)}
+                          {/* etapa entregue pela ONG sem data: o status é a
+                              informação, não o dia */}
+                          {e.data ? diaCompacto(e.data) : "Concluída"}
                         </span>
                         <span className="min-w-0 flex-1">
                           <span className="block truncate text-sm font-medium">
@@ -2052,7 +2202,7 @@ export function AgendaCalendario({
         )}
 
         {/* trilha especialista: fora de todos os agregados por-cronograma (os
-            encontros dela não são terças do ciclo) — nota de rodapé no card,
+            encontros dela não seguem o calendário oficial) — nota de rodapé no card,
             visível nas três visões; a saída é a lista de duplas, não um
             número aqui */}
         {espAtivas > 0 && (
@@ -2062,7 +2212,7 @@ export function AgendaCalendario({
               className="inline-flex items-center gap-1 rounded-md py-0.5 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               {espAtivas} {espAtivas === 1 ? "dupla" : "duplas"} em trilha
-              especialista — fora do calendário de terças
+              especialista — fora do calendário oficial
               <ArrowUpRight aria-hidden size={12} />
             </Link>
           </p>
@@ -2173,9 +2323,16 @@ export function AgendaCalendario({
                         )}
                       </p>
                     )}
-                    {e.data_fim && (
+                    {e.data != null && e.data_fim && (
                       <p className="text-sm text-muted-foreground">
                         de {diaCompacto(e.data)} a {diaCompacto(e.data_fim)}
+                      </p>
+                    )}
+                    {/* nota operacional do cronograma (0062) — "Reposição na
+                        mesma semana", feriado, encontro duplo */}
+                    {e.observacao && (
+                      <p className="text-sm text-muted-foreground">
+                        {e.observacao}
                       </p>
                     )}
                     {e.instrumentos.length > 0 && (
@@ -2532,7 +2689,8 @@ function AcaoDiaMentor({
 }) {
   const alvo = alvoAgendamento(dupla, eventos, parseDia(hoje));
   const diaPassou = selecionado < hoje;
-  // encontro oficial do dia — no máximo 1 (encontros são terças semanais).
+  // encontro oficial do dia — no máximo 1 por cronograma (a semana dupla da
+  // T2 é terça+quinta, dois dias; e aqui o recorte é o cronograma da dupla).
   // Na trilha especialista não existe oficial: o CTA cai sempre no ramo
   // "próximo encontro pendente", sem importar o nº do calendário DPP. E o
   // oficial precisa ser do cronograma DA DUPLA — com duas turmas, o encontro
@@ -2541,9 +2699,10 @@ function AcaoDiaMentor({
     dupla.trilha === "especialista"
       ? null
       : (eventosDoDia.find(
-          (e) =>
+          (e): e is EventoDatado =>
             e.tipo === "encontro" &&
             e.numero != null &&
+            e.data != null &&
             e.cronograma_id === dupla.cronograma_id
         ) ?? null);
   const rowOficial = oficial

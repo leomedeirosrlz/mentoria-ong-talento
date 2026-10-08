@@ -47,6 +47,15 @@ Plataforma operacional do Programa de Mentoria — vertical slice funcionando co
 - `src/lib/demo/`: `data.ts` (dataset evergreen — datas derivam de `new Date()`, encontro 5 = terça da semana corrente), `queries.ts` (replica o escopo RLS por papel), `client-stub.ts` (supabase-js falso pro browser; `supabase/client.ts` desvia com cookie), `mode.ts`/`actions.ts`/`shared.ts`, `pdf.ts` (PDF placeholder pras rotas de download).
 - Queries reais checam `demoRole()` antes de criar o client; actions retornam `{ error: DEMO_MSG }` (onboarding funciona via cookie; `signOut` sai da demo). IDs mock são `de000000-…-<decimal>`.
 
+## CI & e2e (automação)
+
+- `.github/workflows/ci.yml` — todo push/PR: `tsc --noEmit` + `eslint src/` + `vitest` + **schema-contract** (`scripts/check-schema-contract.mjs` compara `database.types.ts` com o OpenAPI do PostgREST remoto — falha se o código declara coluna que o remoto não tem; é o guard contra "migration não aplicada"). Secrets: `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` (produção).
+- `e2e-app.yml` — push/PR: `supabase start` no runner (Docker funciona lá) aplica todas as migrations + seed, `pnpm build`+`start` contra o stack local, fixtures via `scripts/seed-e2e-staging.mjs` e Playwright roda demo+app com backend real — sem nenhum secret externo.
+- `e2e-preview.yml` — `deployment_status` do Vercel (state=success, env=Preview) → Playwright contra a `target_url`. Secret: `VERCEL_AUTOMATION_BYPASS` (previews têm SSO; token em Vercel → Settings → Deployment Protection). Job pula com notice até o secret existir.
+- `e2e-nightly.yml` — cron 09:00 BRT: spec `demo` contra produção (público, sem secrets).
+- Playwright: `pnpm test:e2e` / `:demo` / `:app`; `E2E_BASE_URL` aponta o alvo (default localhost). Specs `tests/e2e/demo` são seguras em qualquer ambiente (não escrevem); `tests/e2e/app` fazem login real por senha + writes — rodam contra o stack local do CI, pulam sozinhas sem os envs `E2E_*`.
+- Fixtures e2e: `scripts/seed-e2e-staging.mjs` (`pnpm seed:e2e`, idempotente, IDs `e2e00000-*`) — funciona contra `supabase start` local ou um projeto staging remoto, se um dia houver.
+
 ## Pendências conhecidas
 
 Backlog completo e priorizado em **`BACKLOG.md`**. Resumo do que mais dói:
