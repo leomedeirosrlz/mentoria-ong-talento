@@ -5,7 +5,8 @@ import { test as base, expect, type Page } from "@playwright/test";
 // browser→supabase do login, vazando o bypass pra edge logs. A route só
 // injeta o header quando a origem bate a do baseURL.
 export const test = base.extend({
-  page: async ({ page }, use) => {
+  // (provide = `use` do playwright renomeado — eslint lê `use(` como hook React)
+  page: async ({ page }, provide) => {
     const bypass = process.env.VERCEL_AUTOMATION_BYPASS;
     if (bypass) {
       const origin = new URL(process.env.E2E_BASE_URL ?? "http://localhost:3000")
@@ -19,7 +20,7 @@ export const test = base.extend({
         })
       );
     }
-    await use(page);
+    await provide(page);
   },
 });
 export { expect };
@@ -94,25 +95,33 @@ export async function loginComSenha(
   });
 }
 
-/** Envs do backend real (staging). Specs "app" usam `exigeAppEnv()` —
- *  sem credenciais configuradas o spec inteiro pula, não falha: o CI de
- *  preview pode existir antes do staging. */
+// Hard-stop: specs "app" escrevem — E2E_* apontando pra prod é config
+// errada, não ambiente válido. appEnvOk recusa e o spec pula; o cleanup
+// confere de novo (belt & suspenders: service role nunca encosta em prod).
+const PROD_REF = "yhjzmxleotahijinjepl";
+const supabaseUrl = process.env.E2E_SUPABASE_URL ?? "";
+
+/** Envs do backend real (staging ou supabase local do CI). Sem credenciais
+ *  o spec inteiro pula, não falha — o CI de preview pode existir sem staging. */
 export function appEnvOk() {
   return !!(
     process.env.E2E_MENTOR_EMAIL &&
     process.env.E2E_MENTOR_PASSWORD &&
-    process.env.E2E_SUPABASE_URL &&
+    supabaseUrl &&
+    !supabaseUrl.includes(PROD_REF) &&
     process.env.E2E_SUPABASE_SERVICE_ROLE_KEY
   );
 }
 
-/** DELETE via service role — limpeza do que o spec criou no staging.
+/** DELETE via service role — limpeza do que o spec criou no backend de teste.
  *  `filtro` é a query do PostgREST (ex.: "dupla_id=eq.X&numero=eq.1"). */
 export async function limparViaServiceRole(
   tabela: string,
   filtro: string
 ): Promise<void> {
-  const url = `${process.env.E2E_SUPABASE_URL}/rest/v1/${tabela}?${filtro}`;
+  if (supabaseUrl.includes(PROD_REF))
+    throw new Error("E2E_SUPABASE_URL aponta pra produção — cleanup abortado");
+  const url = `${supabaseUrl}/rest/v1/${tabela}?${filtro}`;
   const key = process.env.E2E_SUPABASE_SERVICE_ROLE_KEY!;
   const res = await fetch(url, {
     method: "DELETE",
