@@ -84,6 +84,7 @@ jobs:
         env:
           E2E_SUPABASE_URL: ${{ env.API_URL }}
           E2E_SUPABASE_SERVICE_ROLE_KEY: ${{ env.SERVICE_ROLE_KEY }}
+          E2E_MENTOR_PASSWORD: e2e-senha-teste
       - name: playwright (demo + app)
         run: pnpm test:e2e
         env:
