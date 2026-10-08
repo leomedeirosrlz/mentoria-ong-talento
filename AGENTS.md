@@ -51,10 +51,11 @@ Plataforma operacional do Programa de Mentoria — vertical slice funcionando co
 
 - `.github/workflows/ci.yml` — todo push/PR: `tsc --noEmit` + `eslint src/` + `vitest` + **schema-contract** (`scripts/check-schema-contract.mjs` compara `database.types.ts` com o OpenAPI do PostgREST remoto — falha se o código declara coluna que o remoto não tem; é o guard contra "migration não aplicada"). Secrets: `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` (produção).
 - `e2e-app.yml` — push/PR: `supabase start` no runner (Docker funciona lá) aplica todas as migrations + seed, `pnpm build`+`start` contra o stack local, fixtures via `scripts/seed-e2e-staging.mjs` e Playwright roda demo+app com backend real — sem nenhum secret externo.
-- `e2e-preview.yml` — `deployment_status` do Vercel (state=success, env=Preview) → Playwright contra a `target_url`. Secret: `VERCEL_AUTOMATION_BYPASS` (previews têm SSO; token em Vercel → Settings → Deployment Protection). Job pula com notice até o secret existir.
+- `e2e-preview.yml` — `deployment_status` do Vercel (state=success, env=Preview) → re-seeda fixtures no staging e roda a suite inteira contra a `target_url`. Secrets: `VERCEL_AUTOMATION_BYPASS` (previews têm SSO) + `E2E_*` apontando pro staging. Pula com notice se o bypass faltar.
 - `e2e-nightly.yml` — cron 09:00 BRT: spec `demo` contra produção (público, sem secrets).
-- Playwright: `pnpm test:e2e` / `:demo` / `:app`; `E2E_BASE_URL` aponta o alvo (default localhost). Specs `tests/e2e/demo` são seguras em qualquer ambiente (não escrevem); `tests/e2e/app` fazem login real por senha + writes — rodam contra o stack local do CI, pulam sozinhas sem os envs `E2E_*`.
-- Fixtures e2e: `scripts/seed-e2e-staging.mjs` (`pnpm seed:e2e`, idempotente, IDs `e2e00000-*`) — funciona contra `supabase start` local ou um projeto staging remoto, se um dia houver.
+- Playwright: `pnpm test:e2e` / `:demo` / `:app`; `E2E_BASE_URL` aponta o alvo (default localhost). Specs `tests/e2e/demo` são seguras em qualquer ambiente (não escrevem); `tests/e2e/app` fazem login real por senha + writes — rodam no stack local do CI e nos previews; hard-stop se `E2E_SUPABASE_URL` contiver o ref de prod.
+- **Supabase staging**: projeto `realiza-staging` (ref `onkosatlcvircdrfgyzq`, org realiza.vc) — os previews do Vercel falam com ele (vars do escopo Preview apontam pra lá, incluindo `SUPABASE_SERVICE_ROLE_KEY`). Dados descartáveis: `db push --db-url` + `pnpm seed:e2e` reaplicam tudo. Nunca re-seedar prod.
+- Fixtures e2e: `scripts/seed-e2e-staging.mjs` (`pnpm seed:e2e`, idempotente, IDs `e2e00000-*`) — roda contra `supabase start` local, staging remoto ou o staging real; credenciais locais em `.env.staging` (gitignored).
 
 ## Pendências conhecidas
 
