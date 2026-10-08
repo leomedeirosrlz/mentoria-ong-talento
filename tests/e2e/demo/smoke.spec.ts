@@ -1,5 +1,4 @@
-import { expect, test } from "@playwright/test";
-import { entrarNaDemo, pularOnboarding } from "../helpers";
+import { entrarNaDemo, expect, pularOnboarding, test } from "../helpers";
 
 // Superfície demo — pública, sem login, writes stubados. Vale como smoke de
 // qualquer deploy (preview e produção) E como regressão das features que a

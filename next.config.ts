@@ -15,8 +15,15 @@ const CSP = [
   // supabase.co = avatares (bucket público), gravatar = fallback por e-mail,
   // blob: = preview de avatar via createObjectURL, data: = ícone embutido
   "img-src 'self' data: blob: https://*.supabase.co https://*.gravatar.com",
-  // supabase-js no browser: REST/Auth por https, Realtime por wss
-  "connect-src 'self' https://*.supabase.co wss://*.supabase.co",
+  // supabase-js no browser: REST/Auth por https, Realtime por wss.
+  // e2e/app roda contra o supabase local do CI (http://127.0.0.1:54321) —
+  // inclui a origem quando o projeto não é *.supabase.co (loopback é seguro).
+  `connect-src 'self' https://*.supabase.co wss://*.supabase.co${
+    process.env.NEXT_PUBLIC_SUPABASE_URL &&
+    !process.env.NEXT_PUBLIC_SUPABASE_URL.endsWith(".supabase.co")
+      ? ` ${new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).origin}`
+      : ""
+  }`,
   "font-src 'self'",
   "object-src 'none'",
   "base-uri 'self'",

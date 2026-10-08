@@ -7,12 +7,17 @@ on:
     - cron: "0 12 * * *" # 09:00 BRT
   workflow_dispatch:
 
+concurrency:
+  group: e2e-nightly
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
 jobs:
   demo-smoke:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     env:
       E2E_BASE_URL: https://realizavc.vercel.app
     steps:

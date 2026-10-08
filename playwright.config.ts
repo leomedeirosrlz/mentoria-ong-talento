@@ -6,20 +6,20 @@ import { defineConfig } from "@playwright/test";
 //   projeto no Vercel — previews têm SSO ligado; sem o header vira redirect
 //   pro vercel.com/sso-api. Em produção/local pode ficar vazio.
 const baseURL = process.env.E2E_BASE_URL ?? "http://localhost:3000";
-const bypass = process.env.VERCEL_AUTOMATION_BYPASS;
 
 export default defineConfig({
   testDir: "tests/e2e",
   timeout: 30_000,
   retries: process.env.CI ? 1 : 0,
   workers: process.env.CI ? 1 : undefined,
+  forbidOnly: !!process.env.CI,
   reporter: process.env.CI ? [["github"], ["html", { open: "never" }]] : "list",
   use: {
     baseURL,
     locale: "pt-BR",
-    extraHTTPHeaders: bypass
-      ? { "x-vercel-protection-bypass": bypass }
-      : {},
+    // debugável em CI: trace no retry, screenshot sempre que falhar
+    trace: "on-first-retry",
+    screenshot: "only-on-failure",
   },
   projects: [
     // demo = superfície pública/stubada — roda contra qualquer ambiente,

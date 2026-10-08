@@ -1,4 +1,28 @@
-import type { Page } from "@playwright/test";
+import { test as base, expect, type Page } from "@playwright/test";
+
+// --- test fixture: bypass do Vercel escopado à origem sob teste ---
+// extraHTTPHeaders mandaria o token em TODA request — inclusive chamadas
+// browser→supabase do login, vazando o bypass pra edge logs. A route só
+// injeta o header quando a origem bate a do baseURL.
+export const test = base.extend({
+  page: async ({ page }, use) => {
+    const bypass = process.env.VERCEL_AUTOMATION_BYPASS;
+    if (bypass) {
+      const origin = new URL(process.env.E2E_BASE_URL ?? "http://localhost:3000")
+        .origin;
+      await page.route(`${origin}/**`, (route) =>
+        route.continue({
+          headers: {
+            ...route.request().headers(),
+            "x-vercel-protection-bypass": bypass,
+          },
+        })
+      );
+    }
+    await use(page);
+  },
+});
+export { expect };
 
 // --- helpers compartilhados ---
 

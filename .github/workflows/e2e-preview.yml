@@ -1,50 +1,59 @@
 name: e2e-preview
 
-# O Vercel emite deployment_status a cada deploy — state=success no ambiente
-# "Preview" carrega a target_url exata do preview daquele push. Sem polling.
+# Roda os specs DEMO no preview que acabou de ficar Ready — superfície
+# pública, writes stubados, zero risco contra o banco de prod que o preview
+# usa. Os specs "app" ficam de fora de propósito: o preview não tem backend
+# de staging, e secrets E2E_* aqui rodariam contra o supabase deployado
+# junto (prod). deployment_status herda o checkout do commit deployado —
+# manter o job sem secrets limita o blast radius de código não-confiável.
 on:
   deployment_status:
 
-permissions:
-  contents: read
-  deployments: read
+concurrency:
+  group: e2e-preview-${{ github.event.deployment.id }}
+  cancel-in-progress: true
 
 jobs:
   e2e:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     if: >-
       github.event.deployment_status.state == 'success' &&
       github.event.deployment.environment == 'Preview'
-    env:
-      E2E_BASE_URL: ${{ github.event.deployment_status.target_url }}
-      VERCEL_AUTOMATION_BYPASS: ${{ secrets.VERCEL_AUTOMATION_BYPASS }}
-      E2E_MENTOR_EMAIL: ${{ secrets.E2E_MENTOR_EMAIL }}
-      E2E_MENTOR_PASSWORD: ${{ secrets.E2E_MENTOR_PASSWORD }}
-      E2E_DUPLA_ID: ${{ secrets.E2E_DUPLA_ID }}
-      E2E_SUPABASE_URL: ${{ secrets.E2E_SUPABASE_URL }}
-      E2E_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.E2E_SUPABASE_SERVICE_ROLE_KEY }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      # guard primeiro: sem o bypass não adianta checkout/install (~1min)
+      - name: bypass de proteção configurado?
+        id: check
+        env:
+          B: ${{ secrets.VERCEL_AUTOMATION_BYPASS }}
+        run: |
+          if [ -z "$B" ]; then
+            echo "::notice::VERCEL_AUTOMATION_BYPASS ausente — e2e de preview pulado."
+            echo "skip=1" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.check.outputs.skip != '1'
+        uses: actions/checkout@v4
+      - if: steps.check.outputs.skip != '1'
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - if: steps.check.outputs.skip != '1'
+        uses: actions/setup-node@v4
         with:
           node-version: 24
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - id: bypass
-        run: echo "ok=${{ secrets.VERCEL_AUTOMATION_BYPASS != '' }}" >> "$GITHUB_OUTPUT"
-      - name: sem bypass — pula (crie o token em Vercel → Deployment Protection)
-        if: steps.bypass.outputs.ok != 'true'
-        run: echo "::notice::VERCEL_AUTOMATION_BYPASS ausente — e2e de preview pulado"
-      - run: pnpm exec playwright install --with-deps chromium
-        if: steps.bypass.outputs.ok == 'true'
-      # demo = superfície pública/stubada; app = login real + write em staging
-      # (specs "app" pulam sozinhos se os secrets E2E_* não existirem ainda)
-      - run: pnpm test:e2e
-        if: steps.bypass.outputs.ok == 'true'
-      - uses: actions/upload-artifact@v4
-        if: failure()
+      - if: steps.check.outputs.skip != '1'
+        run: pnpm install --frozen-lockfile
+      - if: steps.check.outputs.skip != '1'
+        run: pnpm exec playwright install --with-deps chromium
+      - if: steps.check.outputs.skip != '1'
+        name: playwright demo
+        run: pnpm test:e2e:demo
+        env:
+          E2E_BASE_URL: ${{ github.event.deployment_status.target_url }}
+          VERCEL_AUTOMATION_BYPASS: ${{ secrets.VERCEL_AUTOMATION_BYPASS }}
+      - if: failure() && steps.check.outputs.skip != '1'
+        uses: actions/upload-artifact@v4
         with:
           name: playwright-report
           path: playwright-report/
-          retention-days: 7
