@@ -459,6 +459,7 @@ export type Database = {
           mentorado_id: string
           motivo_encerramento: string | null
           pdm_url: string | null
+          remanejada_de: string | null
           solicitacao_id: string | null
           status: Database["public"]["Enums"]["dupla_status"]
           supervisor_id: string | null
@@ -477,6 +478,7 @@ export type Database = {
           mentorado_id: string
           motivo_encerramento?: string | null
           pdm_url?: string | null
+          remanejada_de?: string | null
           solicitacao_id?: string | null
           status?: Database["public"]["Enums"]["dupla_status"]
           supervisor_id?: string | null
@@ -495,6 +497,7 @@ export type Database = {
           mentorado_id?: string
           motivo_encerramento?: string | null
           pdm_url?: string | null
+          remanejada_de?: string | null
           solicitacao_id?: string | null
           status?: Database["public"]["Enums"]["dupla_status"]
           supervisor_id?: string | null
@@ -542,6 +545,13 @@ export type Database = {
             columns: ["mentorado_id"]
             isOneToOne: false
             referencedRelation: "mentorados_pessoal"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "duplas_remanejada_de_fkey"
+            columns: ["remanejada_de"]
+            isOneToOne: false
+            referencedRelation: "duplas"
             referencedColumns: ["id"]
           },
           {
@@ -2378,6 +2388,16 @@ export type Database = {
       registrar_login_handoff: {
         Args: { p_access: string; p_nonce: string; p_refresh: string }
         Returns: undefined
+      }
+      rematch_dupla: {
+        Args: {
+          p_dupla_id: string
+          p_lado: string
+          p_motivo?: string
+          p_novo_id: string
+          p_registrar_nota?: boolean
+        }
+        Returns: string
       }
       revogar_assinatura: { Args: { p_id: string }; Returns: undefined }
       salvar_autoavaliacao: {

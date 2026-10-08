@@ -37,6 +37,22 @@ export type MsgsContato = {
   mentorado?: string;
 };
 
+/** Check-in da fila "Aguardando par" (REALIZA-101) — quem se inscreveu e
+ *  ainda não tem par. O catálogo acima é por dupla (as mensagens falam "da
+ *  mentoria com fulano"); aqui a pessoa está sozinha — jovem recebe
+ *  acolhida com promessa de retorno, mentor da reserva recebe uma
+ *  confirmação de disponibilidade. `autorNome` assina como no catálogo. */
+export function msgAguardandoPar(
+  lado: "mentor" | "mentorado",
+  nome: string,
+  autorNome?: string
+): string {
+  const oi = pn(nome) ? `Oi ${pn(nome)}` : "Oi";
+  return lado === "mentorado"
+    ? `${oi}, tudo bem? ${autoria(autorNome)}. Sua inscrição no Programa de Mentoria já está com a gente — estamos cuidando do seu pareamento e te aviso assim que fechar. Precisa de algo por aí?`
+    : `${oi}, tudo bem? ${autoria(autorNome)}. Passando pra confirmar: você segue na reserva de mentores pra próxima dupla. A disponibilidade continua a mesma?`;
+}
+
 /** Forma alternativa de chamada (saudação neutra + caso em texto livre por
  *  ponta) — cobre o que o catálogo ainda não expressa, como fecho com link
  *  direto pro registro embutido na mensagem. Preferir o catálogo por

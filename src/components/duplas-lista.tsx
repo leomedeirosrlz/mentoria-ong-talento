@@ -10,6 +10,7 @@ import { DuplaAvatares } from "@/components/dupla-avatares";
 import { DuplaNomes } from "@/components/dupla-nomes";
 import { SemaforoDot } from "@/components/semaforo";
 import { NovaDuplaDialog } from "@/components/nova-dupla-dialog";
+import { ImportarCsvDialog } from "@/components/importar-csv-dialog";
 import { Button } from "@/components/ui/button";
 import { filterChipCls } from "@/components/ui/filter-chip";
 import { Input } from "@/components/ui/input";
@@ -189,7 +190,14 @@ export function DuplasLista({
             </SelectContent>
           </Select>
         )}
-        {podeCriar && <NovaDuplaDialog />}
+        {podeCriar && (
+          <>
+            {/* pareamento em lote: o CSV de mentor×mentorado entra por aqui,
+                no mesmo dialog de importação de pessoas */}
+            <ImportarCsvDialog tipoInicial="duplas" />
+            <NovaDuplaDialog />
+          </>
+        )}
       </div>
 
       {/* turmas em paralelo: o recorte por turma é dimensão própria — semáforo

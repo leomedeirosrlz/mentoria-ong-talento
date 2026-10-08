@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { toDateStr } from "./ciclo";
+import { podeSupervisionar, toDateStr } from "./ciclo";
 import { notificar } from "./notificar";
 import { demoAtivo } from "./demo/mode";
 import { DEMO_MSG } from "./demo/shared";
@@ -36,7 +36,10 @@ export async function registrarSupervisao(formData: FormData) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada. Entre de novo." };
-  if (eu.role !== "supervisor") {
+  // quem supervisiona registra — supervisor OU coordenação, que pode ser o
+  // supervisor_id da dupla (a policy de insert já a isenta desde o 0053;
+  // a régua de escopo abaixo segue valendo: só dupla que EU supervisiono)
+  if (!podeSupervisionar(eu.role)) {
     return { error: "Só o supervisor registra sessões de supervisão." };
   }
 

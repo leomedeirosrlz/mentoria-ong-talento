@@ -18,9 +18,12 @@ import { Menu as MenuPrimitive } from "@base-ui/react/menu";
 import {
   getCicloEventos,
   getDupla,
+  getDuplaSucessora,
+  getDuplaVinculo,
   getEspecialistaEventos,
   getMateriais,
   getMe,
+  type DuplaVinculo,
 } from "@/lib/queries";
 import {
   getEspecialistas,
@@ -60,6 +63,7 @@ import { NotaEncontro } from "@/components/nota-encontro";
 import { AgendarEncontroDialog } from "@/components/agendar-encontro-dialog";
 import { RegistrarRetroativoDialog } from "@/components/registrar-retroativo-dialog";
 import { EditarDuplaDialog } from "@/components/editar-dupla-dialog";
+import { RemanejarDuplaDialog } from "@/components/remanejar-dupla-dialog";
 import { NaoAconteceuButton, DesfazerNaoAconteceuButton } from "@/components/nao-aconteceu-button";
 import { RegistroForm } from "@/components/registro-form";
 import {
@@ -148,6 +152,16 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
 
   const souMentor = dupla.mentor.id === me.id;
   const souCoord = me.role === "coordenacao";
+  // linhagem do remanejo (0063): a ficha nova aponta a origem, a encerrada
+  // aponta a sucessora. As queries voltam null quando a outra ponta está
+  // fora do escopo do papel (RLS — quem saiu não enxerga a ficha nova) e a
+  // linha discreta simplesmente não renderiza
+  const [origem, sucessora] = await Promise.all([
+    dupla.remanejada_de ? getDuplaVinculo(dupla.remanejada_de) : null,
+    dupla.status === "encerrada" ? getDuplaSucessora(dupla.id) : null,
+  ]);
+  const nomeVinculo = (v: DuplaVinculo) =>
+    `${v.mentor?.nome ?? "—"} e ${v.mentorado?.nome ?? "—"}`;
   // o supervisor da dupla registra a sessão daqui mesmo — alvo único, sem
   // query extra (o dialog ganha mentor+dupla já resolvidos)
   const podeRegistrarSupervisao =
@@ -500,6 +514,37 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
               <span className="text-xs">Supervisor: {dupla.supervisor.nome}</span>
             )}
           </div>
+          {/* linhagem do remanejo — linha discreta, quieta: é navegação de
+              contexto, não alerta (a sucessora carrega a nota de que o
+              histórico ficou aqui) */}
+          {(origem || sucessora) && (
+            <p className="mt-1.5 text-xs text-muted-foreground">
+              {origem && (
+                <>
+                  Originada de{" "}
+                  <Link
+                    href={`/duplas/${origem.id}`}
+                    className="rounded-sm font-medium text-foreground underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    {nomeVinculo(origem)}
+                  </Link>
+                  .
+                </>
+              )}
+              {sucessora && (
+                <>
+                  Substituída por{" "}
+                  <Link
+                    href={`/duplas/${sucessora.id}`}
+                    className="rounded-sm font-medium text-foreground underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    {nomeVinculo(sucessora)}
+                  </Link>{" "}
+                  — encontros e registros ficam aqui.
+                </>
+              )}
+            </p>
+          )}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {/* a primária é o "o que fazer agora" do papel — o resto mora no
@@ -561,6 +606,12 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
             />
           )}
           {souCoord && <EditarDuplaDialog dupla={dupla} />}
+          {/* remanejo troca um lado sem costurar encerra-e-cria na mão —
+              só faz sentido com a dupla viva (o RPC também barra o resto) */}
+          {souCoord &&
+            (dupla.status === "ativa" || dupla.status === "pausada") && (
+              <RemanejarDuplaDialog dupla={dupla} />
+            )}
           {maisItens.length > 0 && (
             <DropdownMenu>
               <DropdownMenuTrigger

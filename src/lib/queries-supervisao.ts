@@ -1,5 +1,6 @@
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
+import { podeSupervisionar } from "./ciclo";
 import { demoRole } from "./demo/mode";
 import {
   demoMinhasDuplas,
@@ -52,14 +53,14 @@ function normSupervisao(row: Record<string, unknown>): Supervisao {
 }
 
 /** Duplas ativas/pausadas supervisionadas por mim — os selects do dialog.
- *  Só supervisor tem alvos: a policy de insert é dele; pros demais papéis
- *  volta [] e o botão nem aparece. */
+ *  Quem supervisiona tem alvos: supervisor ou coordenação atribuída como
+ *  supervisor_id; pros demais papéis volta [] e o botão nem aparece. */
 export const getSupervisaoAlvos = cache(async (): Promise<SupervisaoAlvo[]> => {
   // modo demo: deriva das duplas mockadas da persona — o dialog abre e
   // mostra as opções de verdade (o submit cai no DEMO_MSG da action)
   const demo = await demoRole();
   if (demo) {
-    if (demo !== "supervisor") return [];
+    if (!podeSupervisionar(demo)) return [];
     return demoMinhasDuplas(demo)
       .filter((d) => d.status === "ativa" || d.status === "pausada")
       .map((d) => ({
@@ -70,7 +71,7 @@ export const getSupervisaoAlvos = cache(async (): Promise<SupervisaoAlvo[]> => {
       }));
   }
   const me = await getMe();
-  if (me?.role !== "supervisor") return [];
+  if (!me || !podeSupervisionar(me.role)) return [];
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("duplas")

@@ -50,6 +50,7 @@ import {
   idade,
   linkSeguro,
   papelLabel,
+  podeSupervisionar,
   PREF_GENERO_LABELS,
   waLink,
 } from "@/lib/ciclo";
@@ -226,12 +227,13 @@ export default async function PessoaPerfilPage({
   if (perfil.tipo === "profile" && perfil.pessoa.id === me.id) redirect("/perfil");
   // mentorado fora de vínculo: o RLS já barrou quem não alcança (query voltou null)
 
-  // sessões de supervisão (0041): conduzidas (ficha de supervisor) ou
+  // sessões de supervisão (0041): conduzidas (ficha de quem supervisiona —
+  // supervisor ou coordenação, que pode ser supervisor_id de dupla) ou
   // recebidas (ficha de mentor). A RLS escopa o que cada papel lê — mentorado
-  // e coordenação não têm sessões, a query nem roda pra eles
+  // não tem sessão, a query nem roda pra ele
   const papelPessoa = perfil.tipo === "profile" ? perfil.pessoa.role : null;
   const supervisoes =
-    papelPessoa === "supervisor" ||
+    podeSupervisionar(papelPessoa) ||
     papelPessoa === "mentor_dpp" ||
     papelPessoa === "mentor_especialista"
       ? await getSupervisoesDaPessoa(id)
@@ -860,7 +862,7 @@ export default async function PessoaPerfilPage({
           {supervisoes.length > 0 && (
             <SupervisoesSection
               itens={supervisoes}
-              visao={papelPessoa === "supervisor" ? "supervisor" : "mentor"}
+              visao={podeSupervisionar(papelPessoa) ? "supervisor" : "mentor"}
               podeExcluir={souCoord}
             />
           )}

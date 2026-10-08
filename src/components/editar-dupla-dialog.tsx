@@ -18,7 +18,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { TRILHA_LABEL, rotuloCronograma } from "@/lib/ciclo";
+import { TRILHA_LABEL, podeSupervisionar, rotuloCronograma } from "@/lib/ciclo";
 import type { Cronograma } from "@/lib/types";
 
 type Opt = { id: string; nome: string; role?: string | null };
@@ -76,7 +76,7 @@ export function EditarDuplaDialog({ dupla }: { dupla: Dupla }) {
           supabase
             .from("profiles")
             .select("id, nome, role")
-            .in("role", ["mentor_dpp", "mentor_especialista", "supervisor"])
+            .in("role", ["mentor_dpp", "mentor_especialista", "supervisor", "coordenacao"])
             .eq("ativo", true)
             .order("nome"),
           supabase.from("mentorados").select("id, nome").order("nome"),
@@ -93,8 +93,12 @@ export function EditarDuplaDialog({ dupla }: { dupla: Dupla }) {
         if (erro) throw erro;
         if (cancelado) return;
         const lista = (perfis.data ?? []) as Opt[];
-        const ms: Opt[] = lista.filter((p) => p.role !== "supervisor");
-        const ss: Opt[] = lista.filter((p) => p.role === "supervisor");
+        // idem nova-dupla: coordenação veio no fetch só como supervisora
+        // possível — mentor é papel explícito, nunca a equipe
+        const ms: Opt[] = lista.filter((p) =>
+          p.role === "mentor_dpp" || p.role === "mentor_especialista"
+        );
+        const ss: Opt[] = lista.filter((p) => podeSupervisionar(p.role));
         if (!ms.some((m) => m.id === dupla.mentor.id)) {
           ms.unshift({
             id: dupla.mentor.id,

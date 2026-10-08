@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { CaretDown, FileArrowDown, FileArrowUp, UploadSimple } from "@phosphor-icons/react";
 import { toast } from "sonner";
-import { importMentorados, importPessoas } from "@/lib/actions";
+import { importDuplas, importMentorados, importPessoas, previewDuplas } from "@/lib/actions";
 import {
   emailValido,
   fichaLinha,
@@ -13,6 +13,8 @@ import {
   parseCsv,
   type LinhaImportada,
 } from "@/lib/importar";
+import { parseCsvPares, type LinhaPar, type PreviewPar } from "@/lib/importar-duplas";
+import { formatDate } from "@/lib/ciclo";
 import { Button } from "@/components/ui/button";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
@@ -24,13 +26,14 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 
-type Tipo = "equipe" | "mentorados";
+type Tipo = "equipe" | "mentorados" | "duplas";
 type Resultado = { criados: number; puladas: string[] };
 
 // labels registradas no Select — sem elas o trigger fechado mostra o valor cru
 const TIPO_LABEL: Record<Tipo, string> = {
   equipe: "Equipe (mentores, supervisores, coordenação)",
   mentorados: "Mentorados",
+  duplas: "Pareamento (duplas)",
 };
 
 const DICAS: Record<Tipo, string> = {
@@ -38,6 +41,8 @@ const DICAS: Record<Tipo, string> = {
     "Colunas: nome, email, whatsapp, papel (mentor dpp / especialista / supervisor / coordenação, em branco vira mentor DPP; \"nenhum\" cadastra sem papel) e a ficha opcional: nome_social, data_nascimento (dd/mm/aaaa), genero, cor_raca, cidade, uf, cargo, empresa, bio, linkedin, interesses (separados por vírgula), motivacao, pref_genero_par, origem, experiencia_previa, formacao_externa e disponibilidade (JSON {dias,periodos}): estas três gravam na ficha de mentor. consent_lgpd_em carimba o consentimento (ISO). form_bruto (JSON) guarda a resposta original. Documentos pro termo: rg, cpf, cep, logradouro, numero, complemento, bairro. Os CSVs crus dos Google Forms de intake também entram. As colunas conhecidas são mapeadas e o resto é ignorado.",
   mentorados:
     "Colunas: nome, whatsapp, email, ong, notas e a ficha opcional: nome_social, data_nascimento (dd/mm/aaaa), genero, cor_raca, cidade, uf, escolaridade, interesses (por vírgula), objetivos, motivacao, pref_genero_par, origem, disponibilidade (JSON {dias,periodos}) e form_bruto (JSON). Só o nome é obrigatório. Documentos pro termo: rg, cpf, cep, logradouro, numero, complemento, bairro; e do responsável: resp_nome, resp_parentesco, resp_rg, resp_cpf, resp_nascimento, resp_cidade, resp_uf, resp_cep, resp_logradouro, resp_numero, resp_complemento, resp_bairro.",
+  duplas:
+    "Uma linha = uma dupla. Obrigatórias: mentor e mentorado (nome ou e-mail — nome resolve sem acento e aceita o nome de exibição, ex.: \"Juliana Novaes\" acha \"Juliana Novaes de Oliveira\"; apelido que não é pedaço do nome não resolve — prefira o e-mail). Opcionais: supervisor (nome ou e-mail — informado e não achado falha a linha), turma (label exato, ex.: \"T2 · 2026/2027\"; em branco só vale quando existe um único cronograma ativo), demanda/eixo e iniciada_em (dd/mm/aaaa ou aaaa-mm-dd). Cada linha vira uma dupla ativa: a trilha sai do papel do mentor, a demanda vai pro campo demanda e, sem iniciada_em, a dupla DPP nasce uma semana antes do 1º encontro do cronograma. Par já existente (ativo ou pausado), mentor sem vaga e nome ambíguo pulam a linha — nada é gravado antes da prévia.",
 };
 
 const MODELO: Record<Tipo, string> = {
@@ -45,6 +50,8 @@ const MODELO: Record<Tipo, string> = {
     "nome;email;whatsapp;papel;nome_social;data_nascimento;genero;cor_raca;cidade;uf;cargo;empresa;bio;linkedin;interesses;motivacao;pref_genero_par;origem;experiencia_previa;formacao_externa;disponibilidade;consent_lgpd_em;form_bruto;rg;cpf;cep;logradouro;numero;complemento;bairro",
   mentorados:
     "nome;whatsapp;email;ong;notas;nome_social;data_nascimento;genero;cor_raca;cidade;uf;escolaridade;interesses;objetivos;motivacao;pref_genero_par;origem;disponibilidade;form_bruto;rg;cpf;cep;logradouro;numero;complemento;bairro;resp_nome;resp_parentesco;resp_rg;resp_cpf;resp_nascimento;resp_cidade;resp_uf;resp_cep;resp_logradouro;resp_numero;resp_complemento;resp_bairro",
+  duplas:
+    "mentor;mentorado;supervisor;turma;demanda;iniciada_em",
 };
 
 /** Campos da ficha (0034) + civis (0046) reconhecidos na linha — pro resumo
@@ -97,6 +104,10 @@ export function ImportarCsvDialog({
   const [tipo, setTipo] = useState<Tipo>(tipoInicial);
   const [texto, setTexto] = useState("");
   const [linhas, setLinhas] = useState<LinhaImportada[] | null>(null);
+  // pareamento: a linha é par (não ficha) e a prévia é server-side — quem
+  // resolve nome/e-mail contra o banco é o previewDuplas, não o client
+  const [linhasPar, setLinhasPar] = useState<LinhaPar[] | null>(null);
+  const [previa, setPrevia] = useState<PreviewPar[] | null>(null);
   const [resultado, setResultado] = useState<Resultado | null>(null);
   const [pending, start] = useTransition();
   const router = useRouter();
@@ -104,6 +115,8 @@ export function ImportarCsvDialog({
   function reset() {
     setTexto("");
     setLinhas(null);
+    setLinhasPar(null);
+    setPrevia(null);
     setResultado(null);
     setTipo(tipoInicial);
   }
@@ -146,6 +159,29 @@ export function ImportarCsvDialog({
   }
 
   function preVisualizar(conteudo = texto) {
+    // pareamento: o parse é local, mas a resolução (quem é quem, par já
+    // existe, mentor sem vaga) só o server sabe — a prévia chama a action
+    if (tipo === "duplas") {
+      const { linhas: pares, ignoradas } = parseCsvPares(conteudo);
+      if (!pares.length) {
+        toast.error("Nenhuma linha válida. Confira o cabeçalho (mentor;mentorado;…).");
+        return;
+      }
+      if (ignoradas)
+        toast.warning(
+          `${ignoradas} ${ignoradas === 1 ? "linha ignorada" : "linhas ignoradas"}: sem mentor nem mentorado.`
+        );
+      start(async () => {
+        const res = await previewDuplas(pares);
+        if ("error" in res && res.error) {
+          toast.error(res.error);
+          return;
+        }
+        setLinhasPar(pares);
+        setPrevia(res.resolucoes ?? []);
+      });
+      return;
+    }
     const { linhas, ignoradas } = parseCsv(conteudo);
     setLinhas(linhas);
     if (!linhas.length) toast.error("Nenhuma linha válida. Confira o cabeçalho.");
@@ -156,6 +192,25 @@ export function ImportarCsvDialog({
   }
 
   function importar() {
+    if (tipo === "duplas") {
+      if (!linhasPar) return;
+      start(async () => {
+        const res = await importDuplas(linhasPar);
+        if ("error" in res && res.error) toast.error(res.error);
+        else {
+          const r = res as { ok: boolean; criadas: number; puladas: string[] };
+          setResultado({ criados: r.criadas, puladas: r.puladas ?? [] });
+          toast.success(
+            `${r.criadas} ${r.criadas === 1 ? "dupla criada" : "duplas criadas"}.` +
+              (r.puladas?.length
+                ? ` ${r.puladas.length} ${r.puladas.length === 1 ? "linha pulada" : "linhas puladas"}.`
+                : "")
+          );
+          router.refresh();
+        }
+      });
+      return;
+    }
     if (!linhas) return;
     const invalidas = linhas.flatMap((r) => {
       const erro = linhaValida(tipo, r);
@@ -182,6 +237,13 @@ export function ImportarCsvDialog({
 
   const comErro = linhas?.filter((r) => linhaValida(tipo, r)) ?? [];
   const validas = (linhas?.length ?? 0) - comErro.length;
+  const prontas = previa?.filter((r) => r.status === "ok") ?? [];
+  // o resumo do fim fala "dupla criada" no pareamento — mesmo padrão do
+  // "cadastro criado" dos outros tipos
+  const rotuloCriados =
+    tipo === "duplas"
+      ? { s: "dupla criada", p: "duplas criadas" }
+      : { s: "cadastro criado", p: "cadastros criados" };
 
   return (
     <Dialog open={aberto} onOpenChange={aoMudar}>
@@ -203,7 +265,7 @@ export function ImportarCsvDialog({
           <div ref={(el) => el?.focus()} tabIndex={-1} className="space-y-3 outline-none">
             <p className="text-sm">
               <span className="font-medium">{resultado.criados}</span>{" "}
-              {resultado.criados === 1 ? "cadastro criado" : "cadastros criados"}.
+              {resultado.criados === 1 ? rotuloCriados.s : rotuloCriados.p}.
               {resultado.puladas.length > 0 &&
                 ` ${resultado.puladas.length} ${resultado.puladas.length === 1 ? "linha pulada" : "linhas puladas"}:`}
             </p>
@@ -215,6 +277,87 @@ export function ImportarCsvDialog({
               </ul>
             )}
             <Button className="w-full" onClick={() => aoMudar(false)}>Fechar</Button>
+          </div>
+        ) : previa && linhasPar ? (
+          // prévia do pareamento — quem é quem, o que já existe e o que vai
+          // falhar, tudo antes de escrever. A gravação re-resolve no server.
+          <div ref={(el) => el?.focus()} tabIndex={-1} className="space-y-3 min-w-0 outline-none">
+            <p className="text-sm text-muted-foreground">
+              <span className="text-foreground font-medium">{prontas.length}</span>{" "}
+              {prontas.length === 1 ? "dupla pronta" : "duplas prontas"}
+              {previa.length - prontas.length > 0 &&
+                ` · ${previa.length - prontas.length} ${previa.length - prontas.length === 1 ? "será pulada" : "serão puladas"}`}
+            </p>
+            <div className="scroll-fina max-h-72 overflow-auto rounded-lg border">
+              <table className="w-full min-w-[640px] text-sm">
+                <thead className="sticky top-0 bg-card">
+                  <tr className="border-b text-left text-xs text-muted-foreground">
+                    <th className="px-3 py-2 font-medium">Mentor</th>
+                    <th className="px-3 py-2 font-medium">Mentorado(a)</th>
+                    <th className="px-3 py-2 font-medium">Turma</th>
+                    <th className="px-3 py-2 font-medium">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {previa.map((r) => {
+                    const entrada = linhasPar.find((l) => l.n === r.n);
+                    return (
+                      <tr key={r.n} className={cn(r.status !== "ok" && "text-muted-foreground/60")}>
+                        <td className="px-3 py-1.5">
+                          {r.mentorNome ?? entrada?.mentor ?? "—"}
+                          {r.mentorNome && r.mentorNome !== entrada?.mentor && (
+                            <span className="block text-xs text-muted-foreground">
+                              no CSV: {entrada?.mentor}
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-3 py-1.5">
+                          {r.mentoradoNome ?? entrada?.mentorado ?? "—"}
+                          {r.mentoradoNome && r.mentoradoNome !== entrada?.mentorado && (
+                            <span className="block text-xs text-muted-foreground">
+                              no CSV: {entrada?.mentorado}
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-3 py-1.5 text-xs">
+                          {r.turmaLabel ?? "—"}
+                          {r.iniciadaEm ? (
+                            <span className="block text-muted-foreground">
+                              início {formatDate(r.iniciadaEm)}
+                            </span>
+                          ) : null}
+                        </td>
+                        <td className="px-3 py-1.5 text-xs">
+                          {r.status === "ok" ? (
+                            <span className="text-[var(--ok-text)]">
+                              Pronta
+                              {r.trilha === "especialista" ? " · especialista" : ""}
+                              {r.supervisorNome ? ` · sup. ${r.supervisorNome}` : ""}
+                            </span>
+                          ) : r.status === "existe" ? (
+                            <span className="text-[var(--warn-text)]">{r.motivo}</span>
+                          ) : (
+                            <span className="text-[var(--danger)]">{r.motivo}</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Mentor e mentorado resolvem por e-mail ou nome (sem acento, com nome
+              de exibição). Linha com problema não é criada — as prontas entram
+              mesmo se houver puladas. Mentores e supervisores são avisados.
+            </p>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => { setPrevia(null); setLinhasPar(null); }}>Voltar</Button>
+              <Button className="flex-1" disabled={pending || prontas.length === 0} onClick={importar}>
+                <UploadSimple size={15} />
+                {pending ? "Importando…" : `Criar ${prontas.length} ${prontas.length === 1 ? "dupla" : "duplas"}`}
+              </Button>
+            </div>
           </div>
         ) : linhas ? (
           // ref callback leva o foco pra nova etapa — o botão que disparou
@@ -301,7 +444,9 @@ export function ImportarCsvDialog({
               <p className="text-xs text-muted-foreground">
                 {tipo === "equipe"
                   ? "Obrigatórias: nome e e-mail. O resto da ficha é opcional."
-                  : "Obrigatória: nome. O resto da ficha é opcional."}
+                  : tipo === "duplas"
+                    ? "Obrigatórias: mentor e mentorado (nome ou e-mail). O resto é opcional."
+                    : "Obrigatória: nome. O resto da ficha é opcional."}
               </p>
               {/* parede de colunas recolhida — quem precisa do detalhe abre;
                   <details> nativo mantém teclado/leitor de tela de graça */}
@@ -340,14 +485,16 @@ export function ImportarCsvDialog({
               <Label htmlFor="csv_text">Ou cole o conteúdo</Label>
               <Textarea
                 id="csv_text" rows={7}
-                placeholder={"nome;email;whatsapp;papel;cidade;uf;interesses\nMaria Silva;maria@email.com;11999998888;mentor dpp;São Paulo;SP;tecnologia, carreira"}
+                placeholder={tipo === "duplas"
+                  ? "mentor;mentorado;supervisor;turma;demanda;iniciada_em\nStéphanie Santos;Yaleh Nóbrega;;T2 · 2026/2027;Transição para tecnologia;06/10/2026"
+                  : "nome;email;whatsapp;papel;cidade;uf;interesses\nMaria Silva;maria@email.com;11999998888;mentor dpp;São Paulo;SP;tecnologia, carreira"}
                 value={texto}
                 onChange={(e) => setTexto(e.target.value)}
                 className="font-mono text-xs"
               />
             </div>
-            <Button className="w-full" disabled={!texto.trim()} onClick={() => preVisualizar()}>
-              Pré-visualizar
+            <Button className="w-full" disabled={!texto.trim() || pending} onClick={() => preVisualizar()}>
+              {pending && tipo === "duplas" ? "Resolvendo pareamento…" : "Pré-visualizar"}
             </Button>
           </div>
         )}

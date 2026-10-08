@@ -163,6 +163,7 @@ export default async function PessoasPage() {
         contagemPorMentor={contagemPorMentor}
         assinaturas={docsPorPessoa}
         faltantes={faltantesPorPessoa}
+        euNome={me.nome}
         souCoord={souCoord}
       />
     </div>

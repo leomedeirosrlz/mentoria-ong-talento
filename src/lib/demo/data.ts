@@ -15,8 +15,10 @@
  * de sessão dupla do plano real. Todos os timestamps derivam de `new Date()`.
  * Abrir a demo daqui a meses continua contando a mesma história: semana 5
  * da T1 e semana 1 da T2, dupla saudável, uma com registro pendente, uma em
- * risco, uma com atraso, uma encerrada do ciclo anterior e três trilhas de
- * especialista (duas na mesma mentora — a Sofia).
+ * risco, uma com atraso, uma encerrada do ciclo anterior, três trilhas de
+ * especialista (duas na mesma mentora — a Sofia) e a fila "Aguardando par"
+ * com dois mentorados inscritos (Rafael e Wendel) e um especialista de
+ * reserva com vagas (o Marcos).
  */
 
 import type {
@@ -113,6 +115,7 @@ const M = {
   laura: 0x0407,
   pedro: 0x0408,
   rafael: 0x0409, // intake da T2, aguarda matching
+  wendel: 0x040a, // veio pelo formulário, aguarda matching (fila)
 } as const;
 
 const D = {
@@ -159,6 +162,11 @@ const em = (d: Date, hhmm: string): string =>
 /** Há n dias (ou daqui a n, com n negativo), num horário plausível. */
 const haDias = (n: number, hhmm = "10:00"): string =>
   em(addDias(HOJE, -n), hhmm);
+
+/** Serial do "Carimbo de data/hora" do Google Forms (época 1899-12-30) —
+ *  o formato cru que a planilha exporta e o form_bruto guarda. */
+const serialExcel = (iso: string): string =>
+  ((new Date(iso).getTime() - Date.UTC(1899, 11, 30)) / DIA_MS).toFixed(7);
 
 /** created_at de registro: algumas horas depois de o encontro acontecer. */
 const depoisDe = (iso: string, horas: number): string =>
@@ -817,6 +825,7 @@ function build(): DemoData {
     id: uid(P.beatriz), user_id: uid(0xf005), nome: "Beatriz Lins",
     email: "beatriz.lins@realiza.vc", whatsapp: "5511987654005",
     role: "supervisor", ativo: true, avatar_path: "demo/avatars/beatriz.svg",
+    created_at: haDias(95),
     documento_path: "documentos/termo-beatriz-lins.pdf",
     bio: "Psicóloga organizacional, 12 anos em programas de desenvolvimento de jovens.",
     linkedin: "https://linkedin.com/in/beatriz-lins",
@@ -835,6 +844,7 @@ function build(): DemoData {
     id: uid(P.carlos), user_id: uid(0xf006), nome: "Carlos Menezes",
     email: "carlos.menezes@realiza.vc", whatsapp: "5511987654006",
     role: "mentor_dpp", ativo: true, avatar_path: "demo/avatars/carlos.svg",
+    created_at: haDias(70),
     documento_path: "documentos/termo-carlos-menezes.pdf",
     bio: "Engenheiro de software há 15 anos, hoje líder técnico em fintech.",
     linkedin: "https://linkedin.com/in/carlosmenezes",
@@ -853,6 +863,7 @@ function build(): DemoData {
     id: uid(P.fernanda), user_id: uid(0xf007), nome: "Fernanda Alves",
     email: "fernanda.alves@realiza.vc", whatsapp: "5511987654007",
     role: "mentor_dpp", ativo: true, avatar_path: "demo/avatars/fernanda.svg",
+    created_at: haDias(70),
     documento_path: "documentos/termo-fernanda-alves.pdf",
     bio: "Pedagoga, coordena projetos de reforço escolar na rede pública.",
     linkedin: "https://linkedin.com/in/fernanda-alves",
@@ -871,6 +882,7 @@ function build(): DemoData {
     id: uid(P.joaoPedro), user_id: uid(0xf008), nome: "João Pedro Vital",
     email: "joaopedro.vital@realiza.vc", whatsapp: "5511987654008",
     role: "mentor_dpp", ativo: true, avatar_path: "demo/avatars/joaoPedro.svg",
+    created_at: haDias(45),
     documento_path: "documentos/termo-joao-pedro-vital.pdf",
     bio: "Analista de dados recém-formado, primeiro emprego em banco.",
     linkedin: "https://linkedin.com/in/joaopedrovital",
@@ -889,6 +901,7 @@ function build(): DemoData {
     id: uid(P.luiza), user_id: uid(0xf009), nome: "Luiza Campos",
     email: "luiza.campos@realiza.vc", whatsapp: "5511987654009",
     role: "mentor_dpp", ativo: true, avatar_path: "demo/avatars/luiza.svg",
+    created_at: haDias(210),
     documento_path: "documentos/termo-luiza-campos.pdf",
     bio: "Designer de produto, passou por agências e hoje é freelancer.",
     linkedin: "https://linkedin.com/in/luizacampos",
@@ -907,6 +920,7 @@ function build(): DemoData {
     id: uid(P.andre), user_id: uid(0xf00a), nome: "André Rocha",
     email: "andre.rocha@realiza.vc", whatsapp: "5511987654010",
     role: "mentor_dpp", ativo: true, avatar_path: "demo/avatars/andre.svg",
+    created_at: haDias(35),
     documento_path: "documentos/termo-andre-rocha.pdf",
     bio: "Empreendedor, fundou duas pequenas empresas de serviço.",
     linkedin: "https://linkedin.com/in/andrerocha",
@@ -925,6 +939,7 @@ function build(): DemoData {
     id: uid(P.helena), user_id: uid(0xf00b), nome: "Helena Prado",
     email: "helena.prado@realiza.vc", whatsapp: "5511987654011",
     role: "mentor_especialista", ativo: true, avatar_path: "demo/avatars/helena.svg",
+    created_at: haDias(52),
     documento_path: "documentos/termo-helena-prado.pdf",
     bio: "Head de comunicação em varejo; especialista em apresentação e entrevistas.",
     linkedin: "https://linkedin.com/in/helenaprado",
@@ -943,6 +958,7 @@ function build(): DemoData {
     id: uid(P.marcos), user_id: uid(0xf00c), nome: "Marcos Vinícius",
     email: "marcos.vinicius@realiza.vc", whatsapp: "5511987654012",
     role: "mentor_especialista", ativo: true, avatar_path: "demo/avatars/marcos.svg",
+    created_at: haDias(28),
     documento_path: "documentos/termo-marcos-vinicius.pdf",
     bio: "Engenheiro de dados, professor em curso técnico aos sábados.",
     linkedin: "https://linkedin.com/in/marcosvinicius",
@@ -963,6 +979,7 @@ function build(): DemoData {
     id: uid(P.renata), user_id: null, nome: "Renata Costa",
     email: "renata.costa@realiza.vc", whatsapp: "5511987654013",
     role: null, ativo: true, avatar_path: "demo/avatars/renata.svg",
+    created_at: haDias(3),
     documento_path: "documentos/termo-renata-costa.pdf",
     bio: null, linkedin: null, areas: null, voluntariado: null, onboarded_em: null,
     // cadastro prévio pela coordenação — ficha de matching quase vazia e
@@ -977,6 +994,7 @@ function build(): DemoData {
     id: uid(P.patricia), user_id: uid(0xf00e), nome: "Patrícia Gomes",
     email: "patricia.gomes@realiza.vc", whatsapp: "5511987654014",
     role: "mentor_dpp", ativo: false, avatar_path: "demo/avatars/patricia.svg",
+    created_at: haDias(300),
     documento_path: "documentos/termo-patricia-gomes.pdf",
     bio: "Gerente de RH, foi mentora em ciclos anteriores.",
     linkedin: "https://linkedin.com/in/patriciagomes",
@@ -1069,6 +1087,7 @@ function build(): DemoData {
     objetivos: "Passar no ENEM pra pedagogia e montar um plano de estudos que eu consiga seguir.",
     escolaridade: "medio", origem: "Oficina de projetos da ONG Horizonte",
     disponibilidade: { dias: ["ter", "qui"], periodos: ["noite"] },
+    created_at: haDias(60),
     // sync-back da autorização assinada — a mãe dela ficou na ficha (0046)
     responsavel: {
       nome_civil: "Cleusa Maria Silva", rg: "22.334.556-7",
@@ -1090,6 +1109,7 @@ function build(): DemoData {
     objetivos: "Conquistar a bolsa de intercâmbio da escola e destravar o inglês instrumental.",
     escolaridade: "medio", origem: "Projeto Semente",
     disponibilidade: { dias: ["sab"], periodos: ["manha"] },
+    created_at: haDias(60),
   };
   const dandara: Mentorado = {
     id: uid(M.dandara), nome: "Dandara Souza",
@@ -1105,6 +1125,7 @@ function build(): DemoData {
     objetivos: "Conseguir a vaga de jovem aprendiz e melhorar a redação pro ENEM.",
     escolaridade: "medio", origem: "Casa do Saber",
     disponibilidade: { dias: ["ter", "qua"], periodos: ["noite"] },
+    created_at: haDias(60),
   };
   const eduardo: Mentorado = {
     id: uid(M.eduardo), nome: "Eduardo Lima",
@@ -1117,6 +1138,7 @@ function build(): DemoData {
     motivacao: null, pref_genero_par: null, objetivos: null,
     escolaridade: "medio", origem: null,
     disponibilidade: null,
+    created_at: haDias(58),
   };
   const isabela: Mentorado = {
     id: uid(M.isabela), nome: "Isabela Ferreira",
@@ -1132,6 +1154,7 @@ function build(): DemoData {
     objetivos: "Concluir o técnico em administração e conseguir estágio na área.",
     escolaridade: "tecnico", origem: "Instituto Alavanca",
     disponibilidade: { dias: ["seg", "qua"], periodos: ["tarde"] },
+    created_at: haDias(400),
   };
   const kaua: Mentorado = {
     id: uid(M.kaua), nome: "Kauã Rodrigues",
@@ -1159,6 +1182,7 @@ function build(): DemoData {
       cpf: null, data_nascimento: "2008-07-19",
       endereco: { logradouro: "Rua do Bosque", numero: "147", complemento: null, bairro: "Vila Esperança", cidade: "São Paulo", uf: "SP", cep: "03345020" },
     },
+    created_at: haDias(32),
   };
   const laura: Mentorado = {
     id: uid(M.laura), nome: "Laura Mendes",
@@ -1174,6 +1198,7 @@ function build(): DemoData {
     objetivos: "Organizar a rotina de estudos e subir as notas de exatas.",
     escolaridade: "medio", origem: "Casa do Saber",
     disponibilidade: { dias: ["ter", "qui"], periodos: ["tarde", "noite"] },
+    created_at: haDias(32),
   };
   const pedro: Mentorado = {
     id: uid(M.pedro), nome: "Pedro Henrique Almeida",
@@ -1185,10 +1210,13 @@ function build(): DemoData {
     cidade: "São Paulo", uf: "SP", interesses: [],
     motivacao: null, pref_genero_par: null, objetivos: null,
     escolaridade: "medio", origem: null, disponibilidade: null,
+    created_at: haDias(58),
   };
 
   // ficha mínima da leva da T2: veio pela ONG parceira da turma nova e
-  // aguarda matching — mantém o board com um mentorado sem dupla
+  // aguarda matching — mantém o board com um mentorado sem dupla. O
+  // carimbo cru do form (serial Excel, como a planilha exporta) mostra a
+  // fonte real da "espera" da fila — mais antiga que o created_at do cadastro
   const rafael: Mentorado = {
     id: uid(M.rafael), nome: "Rafael Nunes",
     email: null, whatsapp: "5511976123009",
@@ -1200,9 +1228,29 @@ function build(): DemoData {
     motivacao: null, pref_genero_par: null, objetivos: null,
     escolaridade: "medio", origem: "ONG Cidadão Pró-Mundo",
     disponibilidade: null,
+    created_at: haDias(16),
+    form_bruto: { "Carimbo de data/hora": serialExcel(haDias(22, "14:30")) },
+  };
+  // o caso real da fila (Vinícius/Wendel entraram pelo formulário e ficaram
+  // invisíveis): inscrição direta, sem ONG no meio, carimbo recente
+  const wendel: Mentorado = {
+    id: uid(M.wendel), nome: "Wendel Ferreira",
+    email: null, whatsapp: "5511976123010",
+    ong_origem: "Cidadão Pró-Mundo",
+    notas: "1º ano. Inscreveu pelo formulário de matching — a ONG parceira encaminhou a ficha completa.",
+    avatar_path: null, documento_path: null,
+    nome_social: null, data_nascimento: "2009-09-02", genero: "masculino",
+    cidade: "São Paulo", uf: "SP", interesses: ["futebol", "música"],
+    motivacao: "Quero um emprego melhor que o da minha mãe — ela se mata em dois turnos.",
+    pref_genero_par: "masculino",
+    objetivos: "Organizar os estudos e descobrir uma profissão que eu goste.",
+    escolaridade: "medio", origem: "Formulário de matching",
+    disponibilidade: { dias: ["ter", "qui"], periodos: ["noite"] },
+    created_at: haDias(4),
+    form_bruto: { "Carimbo de data/hora": serialExcel(haDias(6, "20:15")) },
   };
 
-  const mentorados = [ana, caio, dandara, eduardo, isabela, kaua, laura, pedro, rafael];
+  const mentorados = [ana, caio, dandara, eduardo, isabela, kaua, laura, pedro, rafael, wendel];
 
   // ---------- solicitações de especialista ----------
   // (montadas antes das duplas: as duplas de especialista referenciam a

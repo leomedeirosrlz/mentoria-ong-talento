@@ -136,6 +136,54 @@ export const MOTIVOS_REAGENDAMENTO = [
   { value: "outro", label: "Outro motivo" },
 ] as const;
 
+// ---------- remanejamento de dupla (0063/0064) ----------
+
+/** Lado da dupla que sai no remanejo — o mesmo vocabulário do RPC
+ *  rematch_dupla (0064). A action valida antes de chamar. */
+export type LadoRemanejo = "mentor" | "mentorado";
+
+/** Categorias de motivo do select do dialog — "outro" exige o detalhe
+ *  (uma categoria vazia não diz nada na ficha de quem sai). O texto que vai
+ *  pro banco é composto por `motivoRemanejo`, não pelo value. */
+export const MOTIVOS_REMANEJO = [
+  { value: "desistencia", label: "Desistência" },
+  { value: "remanejo", label: "Remanejo pra outra dupla" },
+  { value: "realinhamento", label: "Realinhamento do programa" },
+  { value: "outro", label: "Outro motivo" },
+] as const;
+
+/** Texto do motivo gravado na nota de saída (o RPC prefixa data +
+ *  "remanejamento"). Categoria conhecida vira "Rótulo — detalhe" (ou só o
+ *  rótulo sem detalhe); "outro" e categoria desconhecida mandam o texto
+ *  livre — vazio devolve null, que o dialog/action tratam como "falta o
+ *  porquê". */
+export function motivoRemanejo(
+  categoria: string,
+  detalhe: string
+): string | null {
+  const texto = detalhe.trim();
+  const cat = MOTIVOS_REMANEJO.find((m) => m.value === categoria);
+  if (!cat || cat.value === "outro") return texto || null;
+  return texto ? `${cat.label} — ${texto}` : cat.label;
+}
+
+/** Resumo do que o remanejo faz — "Ana + Bia → Ana + Célia" — exibido no
+ *  dialog ANTES de confirmar (a troca é irreversível: a dupla antiga
+ *  encerra). Null até o novo membro estar escolhido. */
+export function resumoRemanejo(
+  nomes: { mentor: string; mentorado: string },
+  lado: LadoRemanejo,
+  novoNome: string | null | undefined
+): { antes: string; depois: string } | null {
+  if (!novoNome) return null;
+  const antes = `${nomes.mentor} + ${nomes.mentorado}`;
+  const depois =
+    lado === "mentor"
+      ? `${novoNome} + ${nomes.mentorado}`
+      : `${nomes.mentor} + ${novoNome}`;
+  return { antes, depois };
+}
+
 // ---------- matching/cadastro (0034) ----------
 // labels dos enums novos — espelham os CHECKs da migration 0034
 
@@ -1285,6 +1333,14 @@ export function papelCurto(role: string | null | undefined) {
     case "": return "";
     default: return papelLabel(role);
   }
+}
+
+/** Quem pode ser `supervisor_id` de uma dupla: o papel supervisor e a
+ *  coordenação — na operação real os supervisores ativos são da equipe
+ *  executiva. Uma régua só pros selects de dupla e pras actions; o banco
+ *  não olha papel (as policies trabalham com o vínculo supervisor_id). */
+export function podeSupervisionar(role: string | null | undefined): boolean {
+  return role === "supervisor" || role === "coordenacao";
 }
 
 export function waLink(phone: string | null | undefined, mensagem: string): string | null {

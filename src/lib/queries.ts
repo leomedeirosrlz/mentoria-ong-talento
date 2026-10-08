@@ -327,6 +327,69 @@ export const getMinhasDuplas = cache(async (): Promise<Dupla[]> => {
   return mergeContatoDuplas((data as unknown as Dupla[]) ?? [], contatos);
 });
 
+/** Mínimo de uma dupla da linhagem de remanejo (0063) — id + nomes pro link
+ *  discreto da ficha. */
+export type DuplaVinculo = {
+  id: string;
+  mentor: { nome: string } | null;
+  mentorado: { nome: string } | null;
+};
+
+const DUPLA_VINCULO_SELECT = `
+  id,
+  mentor:profiles!duplas_mentor_id_fkey(nome),
+  mentorado:mentorados(nome)
+`;
+
+const vinculoDe = (d: Dupla | null | undefined): DuplaVinculo | null =>
+  d
+    ? {
+        id: d.id,
+        mentor: d.mentor ? { nome: d.mentor.nome } : null,
+        mentorado: d.mentorado ? { nome: d.mentorado.nome } : null,
+      }
+    : null;
+
+/** A dupla de origem de um remanejo (ou qualquer dupla por id, nos mesmos
+ *  moldes). maybeSingle: a antiga pode estar fora do escopo do papel (RLS —
+ *  quem saiu não enxerga a ficha) e a linha discreta simplesmente não
+ *  renderiza. */
+export const getDuplaVinculo = cache(
+  async (id: string): Promise<DuplaVinculo | null> => {
+    const demo = await demoRole();
+    if (demo) return vinculoDe(demoDupla(demo, id));
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("duplas")
+      .select(DUPLA_VINCULO_SELECT)
+      .eq("id", id)
+      .maybeSingle();
+    if (error) throw error;
+    return (data as unknown as DuplaVinculo) ?? null;
+  }
+);
+
+/** A dupla que nasceu do remanejo desta (`remanejada_de` aponta pra ela) —
+ *  a encerrada mostra "Substituída por…". No máximo uma: o RPC só deixa
+ *  remanejar dupla ativa/pausada, então a origem trava depois do 1º uso. */
+export const getDuplaSucessora = cache(
+  async (id: string): Promise<DuplaVinculo | null> => {
+    const demo = await demoRole();
+    if (demo)
+      return vinculoDe(
+        demoDuplas(demo).find((d) => d.remanejada_de === id) ?? null
+      );
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("duplas")
+      .select(DUPLA_VINCULO_SELECT)
+      .eq("remanejada_de", id)
+      .maybeSingle();
+    if (error) throw error;
+    return (data as unknown as DuplaVinculo) ?? null;
+  }
+);
+
 /** Só os vínculos — pra checar "está em dupla" sem arrastar encontros/registros. */
 export const getDuplasResumo = cache(async (): Promise<DuplaResumo[]> => {
   const demo = await demoRole();

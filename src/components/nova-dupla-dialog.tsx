@@ -7,7 +7,7 @@ import { Plus } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import { createDupla } from "@/lib/actions";
-import { cronogramaVigente, rotuloCronograma } from "@/lib/ciclo";
+import { cronogramaVigente, podeSupervisionar, rotuloCronograma } from "@/lib/ciclo";
 import { AfinidadePar } from "@/components/matching-afinidade";
 import { Button } from "@/components/ui/button";
 import {
@@ -102,7 +102,7 @@ export function NovaDuplaDialog() {
           supabase
             .from("profiles")
             .select("id, nome, role, interesses, cidade, uf")
-            .in("role", ["mentor_dpp", "mentor_especialista", "supervisor"])
+            .in("role", ["mentor_dpp", "mentor_especialista", "supervisor", "coordenacao"])
             .eq("ativo", true)
             .order("nome"),
           supabase
@@ -122,8 +122,13 @@ export function NovaDuplaDialog() {
         const erro = [perfis, ments, duplasRes, mps, cronsRes].find((r) => r.error)?.error;
         if (erro) throw erro;
         if (cancelado) return;
-        setMentores((perfis.data ?? []).filter((p) => p.role !== "supervisor"));
-        setSupervisores((perfis.data ?? []).filter((p) => p.role === "supervisor"));
+        // mentor é papel explícito — a coordenação veio no fetch só porque
+        // pode supervisionar (a equipe executiva supervisiona de fato);
+        // nunca vira opção de mentor
+        setMentores((perfis.data ?? []).filter((p) =>
+          p.role === "mentor_dpp" || p.role === "mentor_especialista"
+        ));
+        setSupervisores((perfis.data ?? []).filter((p) => podeSupervisionar(p.role)));
         setMentorados((ments.data ?? []) as MentoradoOpt[]);
         const contagem: Record<string, number> = {};
         const ocup = new Map<string, Set<string>>();

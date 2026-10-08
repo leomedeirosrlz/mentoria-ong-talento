@@ -135,3 +135,46 @@ export async function limparViaServiceRole(
   });
   if (!res.ok) throw new Error(`cleanup ${tabela} falhou: ${res.status}`);
 }
+
+/** GET via service role — leitura auxiliar pra cleanup/verificação que a UI
+ *  não expõe diretamente (ex.: id da row criada, turma da dupla fixture).
+ *  Mesmo hard-stop do delete: spec app nunca fala com prod. */
+export async function buscarViaServiceRole<T = Record<string, unknown>[]>(
+  tabela: string,
+  filtro: string
+): Promise<T> {
+  if (supabaseUrl.includes(PROD_REF))
+    throw new Error("E2E_SUPABASE_URL aponta pra produção — leitura abortada");
+  const url = `${supabaseUrl}/rest/v1/${tabela}?${filtro}`;
+  const key = process.env.E2E_SUPABASE_SERVICE_ROLE_KEY!;
+  const res = await fetch(url, {
+    headers: { apikey: key, Authorization: `Bearer ${key}` },
+  });
+  if (!res.ok) throw new Error(`read ${tabela} falhou: ${res.status}`);
+  return (await res.json()) as T;
+}
+
+/** PATCH via service role — restaura fixture que o spec alterou de propósito
+ *  (ex.: a dupla que o remanejo encerrou volta a "ativa"). `filtro` é a query
+ *  do PostgREST; `patch` é o corpo do update. */
+export async function atualizarViaServiceRole(
+  tabela: string,
+  filtro: string,
+  patch: Record<string, unknown>
+): Promise<void> {
+  if (supabaseUrl.includes(PROD_REF))
+    throw new Error("E2E_SUPABASE_URL aponta pra produção — cleanup abortado");
+  const url = `${supabaseUrl}/rest/v1/${tabela}?${filtro}`;
+  const key = process.env.E2E_SUPABASE_SERVICE_ROLE_KEY!;
+  const res = await fetch(url, {
+    method: "PATCH",
+    headers: {
+      apikey: key,
+      Authorization: `Bearer ${key}`,
+      "Content-Type": "application/json",
+      Prefer: "return=minimal",
+    },
+    body: JSON.stringify(patch),
+  });
+  if (!res.ok) throw new Error(`patch ${tabela} falhou: ${res.status}`);
+}

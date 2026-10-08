@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { motion } from "motion/react";
 import {
   CalendarDots,
+  ChalkboardTeacher,
   ChartLineUp,
   ClipboardText,
   DotsThree,
@@ -36,6 +37,7 @@ const NAV = [
   { href: "/agenda", label: "Agenda", curto: "Agenda", icon: CalendarDots, roles: null },
   { href: "/materiais", label: "Materiais", curto: "Materiais", icon: FolderOpen, roles: null },
   { href: "/formularios", label: "Formulários", curto: "Forms", icon: ListChecks, roles: ["coordenacao"] },
+  { href: "/turmas", label: "Turmas", curto: "Turmas", icon: ChalkboardTeacher, roles: ["coordenacao"] },
   { href: "/pessoas", label: "Pessoas", curto: "Pessoas", icon: UsersThree, roles: ["coordenacao", "supervisor", "mentor_dpp", "mentor_especialista"] },
 ] as const;
 

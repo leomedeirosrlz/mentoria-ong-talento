@@ -14,6 +14,7 @@ import {
   linkSeguro,
   papelLabel,
   parseDisponibilidade,
+  podeSupervisionar,
   registroTardio,
   toDateStr,
   ultimoRegistro,
@@ -196,5 +197,16 @@ describe("papelLabel", () => {
     expect(papelLabel("mentor_dpp")).toBe("Mentor DPP");
     expect(papelLabel("mentor_especialista")).toBe("Mentor especialista");
     expect(papelLabel(null)).toBe("Sem papel definido");
+  });
+});
+
+describe("podeSupervisionar", () => {
+  it("supervisor e coordenação podem ser supervisor_id de dupla", () => {
+    expect(podeSupervisionar("supervisor")).toBe(true);
+    expect(podeSupervisionar("coordenacao")).toBe(true);
+    expect(podeSupervisionar("mentor_dpp")).toBe(false);
+    expect(podeSupervisionar("mentor_especialista")).toBe(false);
+    expect(podeSupervisionar(null)).toBe(false);
+    expect(podeSupervisionar(undefined)).toBe(false);
   });
 });

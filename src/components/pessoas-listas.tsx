@@ -16,6 +16,7 @@ import {
 } from "@phosphor-icons/react";
 import type { Mentorado, Profile } from "@/lib/types";
 import type { MentorProfile } from "@/lib/queries";
+import { filaMentorados, filaMentores } from "@/lib/fila";
 import { cn, normaliza } from "@/lib/utils";
 import { comparaNome, idade, papelLabel } from "@/lib/ciclo";
 import { avatarPublicUrl } from "@/lib/avatar";
@@ -24,6 +25,7 @@ import { PessoaActions } from "@/components/pessoa-actions";
 import { MentoradoActions } from "@/components/mentorado-actions";
 import { RoleSelect } from "@/components/role-select";
 import { ImportarCsvDialog } from "@/components/importar-csv-dialog";
+import { FilaEspera } from "@/components/fila-espera";
 import { MatchingPanel } from "@/components/matching-panel";
 import { NovaPessoaDialog, NovoMentoradoDialog } from "@/components/pessoas-dialogs";
 import { Badge } from "@/components/ui/badge";
@@ -129,6 +131,7 @@ export function PessoasListas({
   contagemPorMentor,
   assinaturas,
   faltantes,
+  euNome,
   souCoord,
 }: {
   pessoas: Profile[];
@@ -144,6 +147,8 @@ export function PessoasListas({
    *  alimenta o "civis incompletos" do Detalhes quando o doc ainda não saiu
    *  assinado. Labels, nunca valores. */
   faltantes?: Record<string, Record<string, string[]>>;
+  /** Nome de quem opera — assina a mensagem pronta de WhatsApp na fila. */
+  euNome?: string | null;
   /** false = diretório de colegas (supervisor/mentores): mesma lista, sem
    *  badges operacionais, filtros de gestão nem ações — os mapas acima já
    *  chegam vazios da página e nem são consultados nesse modo. */
@@ -180,6 +185,17 @@ export function PessoasListas({
           normaliza(m.ong_origem).includes(q)
       )
     : mentorados;
+
+  // fila "Aguardando par" (REALIZA-101): mentorados que NUNCA tiveram dupla
+  // + mentores ativos com vaga livre — derivação pura em @/lib/fila
+  const filaMds = useMemo(
+    () => (souCoord ? filaMentorados(mentorados, emDupla, temQualquerDupla) : []),
+    [souCoord, mentorados, emDupla, temQualquerDupla]
+  );
+  const filaMts = useMemo(
+    () => (souCoord ? filaMentores(pessoas, mentorProfiles, contagemPorMentor) : []),
+    [souCoord, pessoas, mentorProfiles, contagemPorMentor]
+  );
 
   // matching board: "Livres para dupla" deixa só mentores e mentorados livres pra parear
   const mentoresLivres = pessoas.filter((p) => ehMentor(p) && !emDupla.has(p.id));
@@ -284,6 +300,19 @@ export function PessoasListas({
           </>
         )}
       </div>
+
+      {/* fila de espera — sempre visível pra coordenação: é o contexto
+          (tempo de espera, origem, contato) que alimenta a decisão do
+          board; escondê-la atrás do chip era o que deixava inscrito novo
+          invisível */}
+      {souCoord && (
+        <FilaEspera
+          mentorados={filaMds}
+          mentores={filaMts}
+          euNome={euNome}
+          onParear={semDupla ? undefined : () => setSemDupla(true)}
+        />
+      )}
 
       {/* board de pareamento — comparação de afinidade mentorado × mentor
           só faz sentido com o filtro de livres ligado (visão da coordenação) */}

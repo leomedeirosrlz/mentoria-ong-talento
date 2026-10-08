@@ -60,6 +60,8 @@ jobs:
           E2E_SUPABASE_URL: ${{ secrets.E2E_SUPABASE_URL }}
           E2E_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.E2E_SUPABASE_SERVICE_ROLE_KEY }}
           E2E_MENTOR_PASSWORD: e2e-senha-teste
+          # secret criado uma vez no repo — sem ele cai na senha de teste
+          E2E_COORD_PASSWORD: ${{ secrets.E2E_COORD_PASSWORD || 'e2e-senha-teste' }}
       - if: steps.check.outputs.skip != '1'
         name: playwright (demo + app)
         run: pnpm test:e2e
@@ -71,6 +73,9 @@ jobs:
           E2E_MENTOR_EMAIL: e2e-mentor@realiza.test
           E2E_MENTOR_PASSWORD: e2e-senha-teste
           E2E_DUPLA_ID: e2e00000-0000-4000-8000-000000000030
+          E2E_COORD_EMAIL: e2e-coord@realiza.test
+          E2E_COORD_PASSWORD: ${{ secrets.E2E_COORD_PASSWORD || 'e2e-senha-teste' }}
+          E2E_DUPLA2_ID: e2e00000-0000-4000-8000-000000000070
       - if: failure() && steps.check.outputs.skip != '1'
         uses: actions/upload-artifact@v4
         with:

@@ -116,8 +116,9 @@ export function semAcento(s: string): string {
 
 /** Normaliza header pra casar com o alias exato: sem acento, pontuação
  *  interna vira espaço e a pontuação final do Google Forms ("...:", "...?")
- *  some — "E-mail:" e "E-mail" são a mesma coluna. */
-function normHeader(h: string): string {
+ *  some — "E-mail:" e "E-mail" são a mesma coluna. Exportada pro parser de
+ *  pareamento (importar-duplas.ts) falar o mesmo dialeto de cabeçalho. */
+export function normHeader(h: string): string {
   return semAcento(h)
     .replace(/[,.;:!?()[\]]+/g, " ")
     .replace(/\s+/g, " ")
@@ -300,8 +301,18 @@ function contaDelim(linha: string, delim: string): number {
   return n;
 }
 
-/** CSV/TSV com cabeçalho na 1ª linha; detecta ; (Excel BR), , ou tab. */
-export function parseCsv(text: string): { linhas: LinhaImportada[]; ignoradas: number } {
+/** Núcleo do parser de planilha — o vocabulário de colunas vem do chamador
+ *  (`canon`), o resto é sempre o mesmo: delimitador por heurística do header,
+ *  aspas com escape duplo, quebra de linha dentro de campo, linha de outro
+ *  separador ignorada. `exigidas` precisa aparecer no cabeçalho — sem elas o
+ *  arquivo inteiro é descartado como ignoradas (mesmo critério do "sem
+ *  coluna nome"). `temDado` decide o que conta como linha de dado. */
+export function parseCsvCom<K extends string>(
+  text: string,
+  canon: (h: string) => K | null,
+  exigidas: readonly K[],
+  temDado: (row: Record<K, string>) => boolean
+): { linhas: Record<K, string>[]; ignoradas: number } {
   const registros = splitRegistros(text);
   if (registros.length < 2) return { linhas: [], ignoradas: 0 };
 
@@ -309,22 +320,34 @@ export function parseCsv(text: string): { linhas: LinhaImportada[]; ignoradas: n
   const delim = [";", ",", "\t"].reduce((a, b) =>
     contaDelim(header, b) > contaDelim(header, a) ? b : a
   );
-  const mapa = splitLinha(header, delim).map(canonHeader);
-  if (!mapa.includes("nome")) return { linhas: [], ignoradas: registros.length };
+  const mapa = splitLinha(header, delim).map(canon);
+  if (!exigidas.every((e) => mapa.includes(e)))
+    return { linhas: [], ignoradas: registros.length };
 
   let ignoradas = 0;
   const parsed = registros.slice(1).flatMap((l) => {
     const celulas = splitLinha(l, delim);
     // header multi-coluna mas a linha veio sem o delimitador (outro separador) — não é dado válido
     if (mapa.length > 1 && celulas.length === 1) { ignoradas++; return []; }
-    const row = { ...VAZIA };
+    const row = {} as Record<K, string>;
     mapa.forEach((campo, i) => {
       if (campo && !row[campo]) row[campo] = celulas[i] ?? "";
     });
-    if (!row.nome.trim()) { ignoradas++; return []; }
+    if (!temDado(row)) { ignoradas++; return []; }
     return [row];
   });
   return { linhas: parsed, ignoradas };
+}
+
+/** CSV/TSV com cabeçalho na 1ª linha; detecta ; (Excel BR), , ou tab. */
+export function parseCsv(text: string): { linhas: LinhaImportada[]; ignoradas: number } {
+  const { linhas, ignoradas } = parseCsvCom(
+    text,
+    canonHeader,
+    ["nome"],
+    (r) => !!(r.nome ?? "").trim()
+  );
+  return { linhas: linhas.map((l) => ({ ...VAZIA, ...l })), ignoradas };
 }
 
 export const normNome = (s: string) => s.trim().replace(/\s+/g, " ");
