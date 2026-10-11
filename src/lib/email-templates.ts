@@ -282,3 +282,46 @@ export function emailEmailAlterado({
       "Você está recebendo este e-mail porque o endereço de acesso da sua conta no Instituto Realiza.vc foi alterado.",
   });
 }
+
+/** Pedido de ajuda marcado pelo JOVEM na avaliação do encontro (0071) — o
+ *  sino pode passar despercebido, então coord + supervisor da dupla levam
+ *  o mesmo alerta por e-mail. É canal de segurança de menor: o texto leva
+ *  o combinado do programa (responder em 1 dia útil) e o comentário que o
+ *  jovem escreveu — nunca o nome do mentor no corpo: comentário livre pode
+ *  citá-lo e o e-mail também vai pro supervisor, que já tem acesso pela
+ *  RLS, mas a menos dados redundantes melhor pra não virar segunda via do
+ *  formulário. */
+export function emailApoioJovem({
+  jovemNome,
+  encontroNumero,
+  estrelas,
+  comentario,
+  duplaId,
+}: {
+  jovemNome: string;
+  encontroNumero: number;
+  estrelas: number;
+  comentario: string | null;
+  duplaId: string;
+}): string {
+  const estrelasTxt =
+    "★".repeat(estrelas) + "☆".repeat(Math.max(0, 5 - estrelas));
+  return emailLayout({
+    titulo: "Um jovem pediu ajuda",
+    tagline: "Canal de segurança",
+    conteudoHtml:
+      `<p style="margin:0 0 14px;font-size:15px;line-height:1.55;color:${INK};"><strong>${esc(jovemNome)}</strong> avaliou o encontro ${encontroNumero} e marcou <strong>“preciso de ajuda”</strong>.</p>` +
+      `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 14px;background:${DANGER_BG};border-radius:10px;"><tr><td style="padding:14px 16px;font-size:15px;line-height:1.55;color:${INK};">` +
+      `<span style="font-size:17px;letter-spacing:1px;color:${DANGER};">${estrelasTxt}</span>` +
+      (comentario
+        ? `<p style="margin:8px 0 0;font-size:14px;line-height:1.55;color:${INK};">“${esc(comentario)}”</p>`
+        : "") +
+      `</td></tr></table>` +
+      `<p style="margin:0 0 14px;font-size:15px;line-height:1.55;color:${INK};">Combinado do programa: <strong>responder em 1 dia útil</strong>. A ficha da dupla tem a avaliação completa e o botão pra marcar o pedido como atendido.</p>`,
+    ctaLabel: "Abrir ficha da dupla",
+    ctaHref: `${SITE_URL}/duplas/${duplaId}`,
+    preheader: `${jovemNome} marcou "preciso de ajuda" na avaliação do encontro ${encontroNumero}.`,
+    rodapeExtra:
+      "Você está recebendo este e-mail porque acompanha a coordenação ou a supervisão do programa.",
+  });
+}

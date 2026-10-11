@@ -30,6 +30,11 @@ import {
   getSolicitacoesDaDupla,
 } from "@/lib/queries-especialista";
 import { getEncerramentoDaDupla, getAvaliacao360DaDupla } from "@/lib/queries-encerramento";
+import {
+  getAvaliacaoLinks,
+  getAvaliacaoMediaDpp,
+  getEspecialistaAvaliacoes,
+} from "@/lib/queries-avaliacao";
 import { getSupervisoesDaDupla } from "@/lib/queries-supervisao";
 import { getFormularios } from "@/lib/forms/queries";
 import { dadosResumoJornada } from "@/lib/encerramento";
@@ -60,6 +65,13 @@ import { NudgeButton } from "@/components/nudge-button";
 import { CopiarChamada } from "@/components/copiar-chamada";
 import { WhatsAppRapido, type DestinoWA } from "@/components/whatsapp-rapido";
 import { NotaEncontro } from "@/components/nota-encontro";
+import {
+  AvaliacaoJovemCard,
+  AvaliacaoPendenteLinha,
+  EstrelaEspecialistaChip,
+  VozDoJovemCard,
+  VozDoJovemEspecialista,
+} from "@/components/avaliacao-jovem";
 import { AgendarEncontroDialog } from "@/components/agendar-encontro-dialog";
 import { RegistrarRetroativoDialog } from "@/components/registrar-retroativo-dialog";
 import { EditarDuplaDialog } from "@/components/editar-dupla-dialog";
@@ -102,7 +114,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import type { Encaminhamento, Encontro, Material, RegistroAnexo } from "@/lib/types";
+import type { AvaliacaoLink, Encaminhamento, Encontro, Material, RegistroAnexo } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 // mesma pele do DropdownMenuContent (ui/dropdown-menu), composta à mão aqui:
@@ -184,6 +196,30 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
   // solicitação está aberta (re-pedir é pra quando a anterior se resolveu)
   const solicitacoes = !ehEsp ? await getSolicitacoesDaDupla(id) : [];
   const solicitacao = solicitacoes[0] ?? null;
+  // avaliação estrela do jovem (0071): links tokenizados são coord-only
+  // (policy), a média agregada só faz sentido pro mentor DPP e as estrelas
+  // da trilha especialista vêm da view definer — cada leitura no seu papel
+  const [avaliacaoLinks, mediaJovem, espAvaliacoes] = await Promise.all([
+    souCoord ? getAvaliacaoLinks(id) : Promise.resolve([]),
+    souMentor && !ehEsp ? getAvaliacaoMediaDpp(id) : Promise.resolve(null),
+    souMentor && ehEsp ? getEspecialistaAvaliacoes(id) : Promise.resolve([]),
+  ]);
+  const linkAvalPorEncontro = new Map(
+    avaliacaoLinks.map((l) => [l.encontro_id, l])
+  );
+  const estrelaEspPorEncontro = new Map(
+    espAvaliacoes.map((a) => [a.encontro_id, a.estrelas])
+  );
+  // embed RLS já devolveu o que o papel pode ler — pro rail: coord/sup
+  // recebem todas, o mentor DPP só as que o jovem liberou
+  const avaliacoesDaDupla = dupla.encontros.flatMap((e) =>
+    e.avaliacao_jovem ? [e.avaliacao_jovem] : []
+  );
+  const realizadosCount = dupla.encontros.filter(
+    (e) => e.status === "realizado"
+  ).length;
+  const siteUrl =
+    process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
   const podeSolicitar =
     !ehEsp &&
     dupla.status === "ativa" &&
@@ -453,6 +489,15 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
         nota={dupla.notas?.find((n) => n.numero === passo.numero)?.texto ?? null}
         registroAberto={registrosRecentes.has(passo.numero)}
         apoioDestinos={apoioDestinos}
+        linkAvaliacao={
+          enc ? (linkAvalPorEncontro.get(enc.id) ?? null) : null
+        }
+        estrelaJovem={
+          enc ? (estrelaEspPorEncontro.get(enc.id) ?? null) : null
+        }
+        urlBase={siteUrl}
+        jovemNome={primeiroNomeMentorado}
+        jovemWhatsapp={dupla.mentorado.whatsapp}
       />
     );
   };
@@ -794,6 +839,27 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
             )}
           </section>
 
+          {/* voz do jovem (0071) — o recorte que cada papel pode ler:
+              coord/sup o rollup completo, o mentor DPP a média quantizada,
+              o especialista a lista de estrelas por sessão. Na trilha esp
+              as linhas de estrela também moram nos cards dos encontros */}
+          {(souCoord || me.role === "supervisor" || souMentor) &&
+            (ehEsp ? (
+              souMentor && <VozDoJovemEspecialista itens={espAvaliacoes} />
+            ) : (
+              <VozDoJovemCard
+                avaliacoes={avaliacoesDaDupla}
+                pendentes={
+                  souCoord || me.role === "supervisor"
+                    ? saude.avaliacaoJovemPendente
+                    : 0
+                }
+                media={souMentor ? mediaJovem : null}
+                papel={souMentor ? "mentor" : (me.role as "coordenacao" | "supervisor")}
+                realizados={realizadosCount}
+              />
+            ))}
+
           {/* supervisão (0041) — sessões da dupla + as gerais do mentor; a
               seção fica visível pra coord/supervisor/mentor (o mentor lê o
               resumo — transparência). Vazia só aparece pra quem pode
@@ -926,6 +992,11 @@ function EncontroRow({
   nota,
   registroAberto,
   apoioDestinos,
+  linkAvaliacao,
+  estrelaJovem,
+  urlBase,
+  jovemNome,
+  jovemWhatsapp,
 }: {
   /** Passo do guia da trilha (data sugerida no DPP; sem data no especialista). */
   passo: PassoGuia;
@@ -954,6 +1025,16 @@ function EncontroRow({
   /** Destinos do nudge do pedido de apoio (só o mentor — o pedido é dele).
    *  Vazio pro próprio mentor: WhatsAppRapido some sozinho. */
   apoioDestinos: DestinoWA[];
+  /** Link tokenizado deste encontro (0071) — só a coordenação recebe a
+   *  lista (policy coord-only); pros demais chega null. */
+  linkAvaliacao: AvaliacaoLink | null;
+  /** Estrela que o jovem deu nesta sessão de especialista — da view
+   *  definer (só o número); null pra qualquer outro papel. */
+  estrelaJovem: number | null;
+  /** Origem pública (NEXT_PUBLIC_SITE_URL) — monta o /avaliar/<token>. */
+  urlBase: string;
+  jovemNome: string;
+  jovemWhatsapp: string | null;
 }) {
   const feito = encontro?.status === "realizado";
   const naoAconteceu = encontro?.status === "nao_aconteceu";
@@ -1224,6 +1305,41 @@ function EncontroRow({
             )}
           </div>
         </RegistroDetails>
+      )}
+
+      {/* avaliação estrela do jovem (0071) — canal paralelo ao registro do
+          mentor: coord/sup leem a linha que a RLS entregou, o mentor DPP só
+          a que o jovem liberou ("meu mentor pode ler esta"), e na trilha
+          especialista só sobra a estrela da view definer */}
+      {feito && encontro?.avaliacao_jovem && (
+        <AvaliacaoJovemCard
+          avaliacao={encontro.avaliacao_jovem}
+          duplaId={duplaId}
+          souCoord={souCoord}
+          liberadaProMentor={souMentor}
+        />
+      )}
+      {/* pendência do jovem — fato operacional pra coord/sup (o mentor não
+          vê: saber que "a do encontro 4 não chegou" o convida a cobrar, e
+          a pressão corrói o anonimato que a média protege) */}
+      {feito &&
+        !encontro?.avaliacao_jovem &&
+        !souMentor &&
+        estrelaJovem == null && (
+          <AvaliacaoPendenteLinha
+            link={linkAvaliacao}
+            urlBase={urlBase}
+            jovemNome={jovemNome}
+            jovemWhatsapp={jovemWhatsapp}
+            numero={passo.numero}
+            souCoord={souCoord}
+          />
+        )}
+      {/* especialista: só a estrela — a view definer é o recorte inteiro */}
+      {feito && estrelaJovem != null && (
+        <div className="border-t border-border/60 px-4 py-2.5">
+          <EstrelaEspecialistaChip estrelas={estrelaJovem} />
+        </div>
       )}
 
       {encontro && !reg && podeEditar &&

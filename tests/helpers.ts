@@ -4,6 +4,7 @@
 // cálculo de dia deslizar no fuso.
 
 import type {
+  AvaliacaoEncontro,
   CicloEvento,
   Cronograma,
   Dupla,
@@ -228,6 +229,25 @@ export function mkEncaminhamento(over: Partial<Encaminhamento> = {}): Encaminham
     prazo: null,
     status: "pendente",
     created_at: "2025-01-01T00:00:00Z",
+    ...over,
+  };
+}
+
+/** Avaliação estrela do jovem (0071) — o canal paralelo ao registro. */
+export function mkAvaliacao(over: Partial<AvaliacaoEncontro> = {}): AvaliacaoEncontro {
+  return {
+    id: "av-1",
+    dupla_id: "d-1",
+    encontro_id: "e-1",
+    estrelas: 4,
+    sentimento: "bem",
+    avancei: "sim",
+    temas: null,
+    comentario: null,
+    pedir_apoio: false,
+    avaliacao_visivel_mentor: false,
+    respondido_por_profile_id: null,
+    created_at: "2025-10-08T10:00:00-03:00",
     ...over,
   };
 }

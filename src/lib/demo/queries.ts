@@ -6,6 +6,7 @@ import type {
   Assinatura,
   AssinaturaResumo,
   AssinaturaVia,
+  AvaliacaoLink,
   CicloEvento,
   Comunicado,
   Cronograma,
@@ -13,6 +14,7 @@ import type {
   DocumentoPessoa,
   Dupla,
   DuplaResumo,
+  EspecialistaAvaliacao,
   EspecialistaEvento,
   JovemAssinatura,
   JovemContato,
@@ -42,6 +44,11 @@ import type {
 } from "../queries";
 import type { ResumoFormacao } from "../queries-presenca";
 import type { JovemEncontro } from "../queries-jovem";
+import type {
+  AvaliacaoMediaDpp,
+  AvaliacaoTokenInfo,
+  JovemAvaliacao,
+} from "../queries-avaliacao";
 import type { FormularioPublico } from "../forms/queries";
 import { getDemoFormularios } from "./forms-data";
 import type { Interacao } from "../interacoes";
@@ -235,8 +242,12 @@ export function demoMateriais(role: AppRole): Material[] {
 export function demoDuplas(role: AppRole): Dupla[] {
   const data = getDemoData();
   return comContatoDuplas(
-    [...duplasDoPapel(data, role)].sort((a, b) =>
-      criadoEm(a).localeCompare(criadoEm(b))
+    comAvaliacaoJovem(
+      [...duplasDoPapel(data, role)].sort((a, b) =>
+        criadoEm(a).localeCompare(criadoEm(b))
+      ),
+      role,
+      data
     ),
     demoContatosMap(role)
   );
@@ -257,7 +268,11 @@ export function demoMinhasDuplas(role: AppRole): Dupla[] {
     (d) => d.mentor?.id === eu.id || d.supervisor?.id === eu.id
   );
   return comContatoDuplas(
-    [...minhas].sort((a, b) => criadoEm(a).localeCompare(criadoEm(b))),
+    comAvaliacaoJovem(
+      [...minhas].sort((a, b) => criadoEm(a).localeCompare(criadoEm(b))),
+      role,
+      data
+    ),
     demoContatosMap(role)
   );
 }
@@ -1256,4 +1271,191 @@ export function demoFormularioPorToken(
       sistema: f.sistema ?? null,
     },
   };
+}
+
+// ---------- avaliação estrela do jovem (0071) ----------
+// Replica a mesma fronteira do RLS real — a demo precisa mostrar os três
+// cortes de privacidade pra vender a decisão do produto:
+//   · embed avaliacao_jovem na dupla → coord/sup tudo; mentor DPP só as
+//     linhas que o jovem liberou; especialista nada (a view dele é outra)
+//   · média DPP → mesma regra de lote/quantização da RPC
+//   · especialista → só estrelas das próprias sessões
+//   · jovem → as próprias linhas; links → só coordenação
+
+/** Embed `avaliacao_jovem` por papel — idem avaliacoes_select (0071).
+ *  Aplicada depois do escopo de duplasDoPapel: pro supervisor, "as
+ *  supervisionadas" já veio no filtro de cima — aqui dentro vale tudo. */
+function comAvaliacaoJovem(
+  duplas: Dupla[],
+  role: AppRole,
+  data: DemoData
+): Dupla[] {
+  const eu = data.personas[role];
+  const porEncontro = new Map(
+    data.avaliacoes.map((a) => [a.encontro_id, a])
+  );
+  return duplas.map((d) => ({
+    ...d,
+    encontros: (d.encontros ?? []).map((e) => {
+      const a = porEncontro.get(e.id) ?? null;
+      const visivel =
+        role === "coordenacao" ||
+        role === "supervisor" ||
+        (role === "mentor_dpp" && !!a?.avaliacao_visivel_mentor) ||
+        // jovem lê as próprias — branch exists(jovem_duplas) da policy;
+        // a ficha guarda o profile_id do login dela (0066)
+        (role === "mentorado" && d.mentorado?.profile_id === eu.id);
+      return { ...e, avaliacao_jovem: visivel ? a : null };
+    }),
+  }));
+}
+
+/** O que avaliacao_por_token devolve — sem sessão na demo, identidade é
+ *  sempre 'anon' (o ramo 'outra_pessoa' não existe sem login concorrente).
+ *  Expiração lazy: pendente vencido conta como expirado, igual à RPC. */
+export function demoAvaliacaoPorToken(
+  token: string
+): AvaliacaoTokenInfo | null {
+  const data = getDemoData();
+  const l = data.avaliacaoLinks.find((x) => x.token === token);
+  if (!l) return null;
+  const status: AvaliacaoTokenInfo["status"] =
+    l.status === "pendente" && new Date(l.expira_em) < new Date()
+      ? "expirado"
+      : l.status;
+  const d = data.duplas.find((x) => x.id === l.dupla_id);
+  const enc = d?.encontros?.find((e) => e.id === l.encontro_id);
+  return {
+    status,
+    identidade: "anon",
+    respondida: data.avaliacoes.some((a) => a.encontro_id === l.encontro_id),
+    encontro: enc
+      ? {
+          numero: enc.numero,
+          data_hora: enc.data_hora,
+          realizado_em: enc.realizado_em,
+        }
+      : undefined,
+    mentor: d?.mentor
+      ? { nome: d.mentor.nome.split(/\s+/)[0] ?? "" }
+      : undefined,
+    alvo: { jovem_nome: d?.mentorado?.nome ?? "" },
+  };
+}
+
+/** Idem linkAvaliacaoMeta real — a trilha resolve se o toggle "mentor pode
+ *  ler" aparece no form público (na especialista ele seria inerte). */
+export function demoAvaliacaoLinkMeta(
+  token: string
+): { encontro_id: string; dupla_id: string; trilha: string } | null {
+  const data = getDemoData();
+  const l = data.avaliacaoLinks.find((x) => x.token === token);
+  if (!l) return null;
+  const d = data.duplas.find((x) => x.id === l.dupla_id);
+  return {
+    encontro_id: l.encontro_id,
+    dupla_id: l.dupla_id,
+    trilha: d?.trilha ?? "dpp",
+  };
+}
+
+/** As avaliações que a persona mentorada enviou — branch exists(jovem_duplas)
+ *  da policy; histórico (dupla concluída) incluído, como a real. */
+export function demoJovemAvaliacoes(role: AppRole): JovemAvaliacao[] {
+  if (role !== "mentorado") return [];
+  const data = getDemoData();
+  const m = mentoradoDaPersona(data, role);
+  if (!m) return [];
+  const duplaIds = new Set(
+    data.duplas.filter((d) => d.mentorado?.id === m.id).map((d) => d.id)
+  );
+  const encPorId = new Map(
+    data.duplas.flatMap((d) => (d.encontros ?? []).map((e) => [e.id, e]))
+  );
+  return data.avaliacoes
+    .filter((a) => duplaIds.has(a.dupla_id))
+    .map((a) => {
+      const enc = encPorId.get(a.encontro_id);
+      return {
+        ...a,
+        encontro: enc
+          ? { numero: enc.numero, realizado_em: enc.realizado_em }
+          : null,
+      };
+    })
+    .sort((a, b) => b.created_at.localeCompare(a.created_at));
+}
+
+/** Links da dupla — policy avaliacao_links_select é coord-only; [] pro
+ *  resto, igual à tabela invisível da real. */
+export function demoAvaliacaoLinks(
+  role: AppRole,
+  duplaId: string
+): AvaliacaoLink[] {
+  if (role !== "coordenacao") return [];
+  return getDemoData()
+    .avaliacaoLinks.filter((l) => l.dupla_id === duplaId)
+    .sort((a, b) => a.created_at.localeCompare(b.created_at));
+}
+
+/** Média quantizada do DPP — mesmo desenho da RPC: lote de ≥3 (snapshot
+ *  das k primeiras por created_at) + round(avg*2)/2. Fora do papel a RPC
+ *  levanta exceção; aqui null fecha o mesmo "sem dados" da página. */
+export function demoMediaDpp(
+  role: AppRole,
+  duplaId: string
+): AvaliacaoMediaDpp | null {
+  const data = getDemoData();
+  const eu = data.personas[role];
+  const d = data.duplas.find((x) => x.id === duplaId);
+  if (
+    role !== "mentor_dpp" ||
+    !d ||
+    d.trilha !== "dpp" ||
+    d.mentor?.id !== eu.id
+  )
+    return null;
+  const avaliacoes = data.avaliacoes
+    .filter((a) => a.dupla_id === duplaId)
+    .sort((a, b) => a.created_at.localeCompare(b.created_at));
+  const n = avaliacoes.length;
+  const k = Math.floor(n / 3) * 3;
+  if (k < 3) return { n, liberado: false };
+  const media =
+    Math.round(
+      (avaliacoes.slice(0, k).reduce((s, a) => s + a.estrelas, 0) / k) * 2
+    ) / 2;
+  return { n, liberado: true, media, base: k };
+}
+
+/** Linhas da view especialista_avaliacoes (0071) — SÓ estrelas das
+ *  sessões da própria trilha de especialista; qualquer campo a mais
+ *  identificaria o único avaliador possível. */
+export function demoEspecialistaAvaliacoes(
+  role: AppRole,
+  duplaId: string
+): EspecialistaAvaliacao[] {
+  const data = getDemoData();
+  const eu = data.personas[role];
+  const d = data.duplas.find((x) => x.id === duplaId);
+  if (
+    role !== "mentor_especialista" ||
+    !d ||
+    d.trilha !== "especialista" ||
+    d.mentor?.id !== eu.id
+  )
+    return [];
+  const encPorId = new Map((d.encontros ?? []).map((e) => [e.id, e]));
+  return data.avaliacoes
+    .filter((a) => a.dupla_id === duplaId)
+    .map((a) => ({
+      id: a.id,
+      dupla_id: a.dupla_id,
+      encontro_id: a.encontro_id,
+      estrelas: a.estrelas,
+      numero: encPorId.get(a.encontro_id)?.numero ?? 0,
+      realizado_em: encPorId.get(a.encontro_id)?.realizado_em ?? null,
+      created_at: a.created_at,
+    }))
+    .sort((a, b) => a.numero - b.numero);
 }
