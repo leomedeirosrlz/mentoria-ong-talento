@@ -2797,6 +2797,148 @@ export async function pedirAjudaJovem(mensagem: string) {
   return { ok: true };
 }
 
+// ---------- agenda livre (REALIZA-110, migration 0072) ----------
+// As quatro RPCs definer devolvem jsonb {error} em pt-BR pronto pro toast
+// ou {ok:true}/lista — a action só saneia o payload e repassa o domínio.
+// desmarcar_encontro e conflito_encontro são BILATERAIS: servem o jovem
+// (agenda /jovem), o mentor (dialog Remarcar→Desmarcar) e a coordenação.
+// O sino do outro lado é o trigger encontros_agenda_notify — nada aqui
+// notifica.
+
+/** Conflito de horário que conflito_encontro devolve: encontro agendado do
+ *  mesmo mentorado em OUTRA dupla a menos de 1h — warning, nunca bloqueio. */
+export type ConflitoEncontro = {
+  numero: number;
+  data_hora: string;
+  trilha: "dpp" | "especialista";
+};
+
+function retornoRpc(data: unknown): { error?: string; ok?: boolean } {
+  return (data ?? {}) as { error?: string; ok?: boolean };
+}
+
+/** O jovem agenda (ou remarca) encontro da própria dupla DPP — upsert por
+ *  (dupla,numero) na RPC. `dataHora` chega naïve do datetime-local; a RPC
+ *  revalida tudo (dupla ativa dele, teto do cronograma, futuro, link,
+ *  motivo quando a data muda). */
+export async function agendarEncontroJovem(
+  duplaId: string,
+  numero: number,
+  dataHora: string,
+  link: string | null,
+  motivo: string | null
+) {
+  if (await demoAtivo()) return { error: DEMO_MSG };
+  const { supabase, me: eu } = await me();
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
+  if (!duplaId || !numero || !dataHora) {
+    return { error: "Encontro e data são obrigatórios." };
+  }
+  const quando = parseDataHora(dataHora);
+  if (!quando) return { error: "Confira a data." };
+  const { data, error } = await supabase.rpc("agendar_encontro_mentorado", {
+    p_dupla: duplaId,
+    p_numero: numero,
+    p_data_hora: quando.toISOString(),
+    p_link: link?.trim() || null,
+    p_motivo: motivo?.trim() || null,
+  });
+  if (error) return { error: erroAmigavel(error) };
+  const ret = retornoRpc(data);
+  if (ret.error) return { error: ret.error };
+  // o outro lado lê a mesma agenda — "/" é a home do mentor, /agenda e a
+  // ficha da dupla mostram o mesmo row que acabou de mudar
+  revalidatePath("/jovem");
+  revalidatePath("/jovem/agenda");
+  revalidatePath("/");
+  revalidatePath("/agenda");
+  revalidatePath("/duplas");
+  revalidatePath(`/duplas/${duplaId}`);
+  return { ok: true };
+}
+
+/** "Não aconteceu" do jovem — encontro agendado já passado de dupla ativa
+ *  dele, qualquer trilha (a especialista resolve o refund da sessão). */
+export async function marcarNaoAconteceuJovem(encontroId: string) {
+  if (await demoAtivo()) return { error: DEMO_MSG };
+  const { supabase, me: eu } = await me();
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
+  // a dupla sai antes do update só pra revalidar a ficha dela — a RPC não
+  // devolve o id
+  const { data: enc } = await supabase
+    .from("encontros")
+    .select("dupla_id")
+    .eq("id", encontroId)
+    .maybeSingle();
+  const { data, error } = await supabase.rpc("marcar_nao_aconteceu_mentorado", {
+    p_encontro: encontroId,
+  });
+  if (error) return { error: erroAmigavel(error) };
+  const ret = retornoRpc(data);
+  if (ret.error) return { error: ret.error };
+  revalidatePath("/jovem");
+  revalidatePath("/jovem/agenda");
+  revalidatePath("/");
+  revalidatePath("/agenda");
+  revalidatePath("/duplas");
+  if (enc?.dupla_id) revalidatePath(`/duplas/${enc.dupla_id}`);
+  return { ok: true };
+}
+
+/** Desmarcar = DELETE do agendado FUTURO — bilateral (jovem, mentor da
+ *  dupla, coord). Passado não se apaga: a RPC aponta o 'nao_aconteceu'. */
+export async function desmarcarEncontro(encontroId: string) {
+  if (await demoAtivo()) return { error: DEMO_MSG };
+  const { supabase, me: eu } = await me();
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
+  const { data: enc } = await supabase
+    .from("encontros")
+    .select("dupla_id")
+    .eq("id", encontroId)
+    .maybeSingle();
+  const { data, error } = await supabase.rpc("desmarcar_encontro", {
+    p_encontro: encontroId,
+  });
+  if (error) return { error: erroAmigavel(error) };
+  const ret = retornoRpc(data);
+  if (ret.error) return { error: ret.error };
+  revalidatePath("/jovem");
+  revalidatePath("/jovem/agenda");
+  revalidatePath("/");
+  revalidatePath("/agenda");
+  revalidatePath("/duplas");
+  if (enc?.dupla_id) revalidatePath(`/duplas/${enc.dupla_id}`);
+  return { ok: true };
+}
+
+/** Warning de overlap nos dialogs de agendar — o RPC olha as OUTRAS duplas
+ *  do mesmo mentorado (o mentor DPP não lê a trilha especialista pela RLS;
+ *  por isso é definer). Leitura e best-effort: qualquer falha vira lista
+ *  vazia, nunca um erro que assuste num campo opcional. */
+export async function conflitoEncontro(
+  duplaId: string,
+  dataHora: string
+): Promise<{ ok: true; conflitos: ConflitoEncontro[] }> {
+  const vazio = { ok: true as const, conflitos: [] as ConflitoEncontro[] };
+  if (await demoAtivo()) return vazio; // leitura — demo não emite DEMO_MSG
+  const { supabase, me: eu } = await me();
+  if (!eu) return vazio;
+  const quando = parseDataHora(dataHora);
+  if (!duplaId || !quando) return vazio;
+  const { data, error } = await supabase.rpc("conflito_encontro", {
+    p_dupla: duplaId,
+    p_data_hora: quando.toISOString(),
+  });
+  if (error) {
+    console.error("conflitoEncontro:", error);
+    return vazio;
+  }
+  return {
+    ok: true,
+    conflitos: (Array.isArray(data) ? data : []) as ConflitoEncontro[],
+  };
+}
+
 // ---------- materiais ----------
 
 const TIPOS_MATERIAL = ["guia", "template", "conteudo", "link"] as const;
