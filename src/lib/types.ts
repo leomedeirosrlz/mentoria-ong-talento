@@ -480,7 +480,8 @@ export type Notificacao = {
   /** Os 4 originais (0018) + os 4 do fluxo de especialista (0028) +
    *  trilha_encerrada (0037) + supervisao_registrada (0041) +
    *  formulario_respondido (0042, inserido pela RPC de submit) +
-   *  avaliacao_pendente/apoio_jovem (0071, trigger + RPC de avaliação) —
+   *  avaliacao_pendente/apoio_jovem (0071, trigger + RPC de avaliação) +
+   *  os 3 de agenda bilateral (0072, trigger encontros_agenda_notify) —
    *  espelha o CHECK notificacoes_tipo_check. */
   tipo:
     | "comunicado"
@@ -495,7 +496,10 @@ export type Notificacao = {
     | "supervisao_registrada"
     | "formulario_respondido"
     | "avaliacao_pendente"
-    | "apoio_jovem";
+    | "apoio_jovem"
+    | "encontro_marcado"
+    | "encontro_alterado"
+    | "encontro_desfeito";
   titulo: string;
   corpo: string | null;
   href: string | null;
