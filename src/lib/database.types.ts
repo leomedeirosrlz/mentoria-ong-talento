@@ -1,3 +1,5 @@
+npm notice run realiza.vc@0.1.0 npx
+npm notice run 'supabase' gen types typescript --project-id yhjzmxleotahijinjepl
 export type Json =
   | string
   | number
@@ -11,6 +13,31 @@ export type Database = {
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "14.5"
+  }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
   }
   public: {
     Tables: {
@@ -1114,6 +1141,107 @@ export type Database = {
         }
         Relationships: []
       }
+      especialista_excecoes: {
+        Row: {
+          created_at: string
+          data: string
+          hora_fim: string
+          hora_inicio: string
+          id: string
+          profile_id: string
+          tipo: string
+        }
+        Insert: {
+          created_at?: string
+          data: string
+          hora_fim: string
+          hora_inicio: string
+          id?: string
+          profile_id: string
+          tipo: string
+        }
+        Update: {
+          created_at?: string
+          data?: string
+          hora_fim?: string
+          hora_inicio?: string
+          id?: string
+          profile_id?: string
+          tipo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "especialista_excecoes_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "especialista_excecoes_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_contato"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "especialista_excecoes_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_pessoal"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      especialista_grade: {
+        Row: {
+          created_at: string
+          dia_semana: number
+          hora_fim: string
+          hora_inicio: string
+          id: string
+          profile_id: string
+        }
+        Insert: {
+          created_at?: string
+          dia_semana: number
+          hora_fim: string
+          hora_inicio: string
+          id?: string
+          profile_id: string
+        }
+        Update: {
+          created_at?: string
+          dia_semana?: number
+          hora_fim?: string
+          hora_inicio?: string
+          id?: string
+          profile_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "especialista_grade_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "especialista_grade_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_contato"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "especialista_grade_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_pessoal"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       formulario_links: {
         Row: {
           contexto: Json
@@ -1488,6 +1616,7 @@ export type Database = {
         Row: {
           areas: string[]
           capacidade: number
+          capacidade_especialista: number
           disponibilidade: Json | null
           experiencia_previa: string | null
           formacao_externa: string | null
@@ -1499,6 +1628,7 @@ export type Database = {
         Insert: {
           areas?: string[]
           capacidade?: number
+          capacidade_especialista?: number
           disponibilidade?: Json | null
           experiencia_previa?: string | null
           formacao_externa?: string | null
@@ -1510,6 +1640,7 @@ export type Database = {
         Update: {
           areas?: string[]
           capacidade?: number
+          capacidade_especialista?: number
           disponibilidade?: Json | null
           experiencia_previa?: string | null
           formacao_externa?: string | null
@@ -2167,6 +2298,7 @@ export type Database = {
           id: string
           mentorado_id: string
           respondida_em: string | null
+          slot_proposto: string | null
           status: string
         }
         Insert: {
@@ -2180,6 +2312,7 @@ export type Database = {
           id?: string
           mentorado_id: string
           respondida_em?: string | null
+          slot_proposto?: string | null
           status?: string
         }
         Update: {
@@ -2193,6 +2326,7 @@ export type Database = {
           id?: string
           mentorado_id?: string
           respondida_em?: string | null
+          slot_proposto?: string | null
           status?: string
         }
         Relationships: [
@@ -2976,6 +3110,16 @@ export type Database = {
         }
         Returns: undefined
       }
+      especialista_slot_livre: {
+        Args: { p_especialista: string; p_inicio: string }
+        Returns: boolean
+      }
+      especialista_slots_livres: {
+        Args: { p_ate?: string; p_desde?: string; p_especialista: string }
+        Returns: {
+          inicio: string
+        }[]
+      }
       falhar_login_handoff: { Args: { p_nonce: string }; Returns: undefined }
       formulario_por_token: { Args: { p_token: string }; Returns: Json }
       formularios_limpa_respostas: {
@@ -3188,6 +3332,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       app_role: [
@@ -3209,3 +3356,5 @@ export const Constants = {
     },
   },
 } as const
+A new version of Supabase CLI is available: v2.120.0 (currently installed v2.117.0)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
