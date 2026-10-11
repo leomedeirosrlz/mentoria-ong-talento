@@ -7,7 +7,14 @@ import {
   linkSeguro,
   passosDaTrilha,
 } from "@/lib/ciclo";
-import type { Dupla, Encontro, EspecialistaEvento } from "@/lib/types";
+import type {
+  Dupla,
+  Encontro,
+  EspecialistaEvento,
+  ExcecaoEspecialista,
+  GradeJanela,
+} from "@/lib/types";
+import { AgendaDisponibilidade } from "@/components/agenda-disponibilidade";
 import { DuplaNomes } from "@/components/dupla-nomes";
 import { TrilhaJornada } from "@/components/trilha-jornada";
 import { TrilhaPrazoBadge } from "@/components/trilha-prazo-badge";
@@ -28,19 +35,26 @@ const STATUS_LABEL: Record<Encontro["status"], string> = {
 };
 
 /** Agenda da trilha especialista: sem calendário oficial — os encontros são
- *  combinados pela dupla dentro dos ~3 meses. O que a página mostra é a fila
- *  real da dupla (agendados e realizados) + o próximo passo da trilha. */
+ *  combinados pela dupla dentro dos ~3 meses. O que a página mostra é a
+ *  disponibilidade que o especialista oferece (0073) + a fila real da dupla
+ *  (agendados e realizados) + o próximo passo da trilha. */
 export function AgendaEspecialista({
   duplas,
   espEventos,
+  grade,
+  excecoes,
+  slots,
 }: {
   duplas: Dupla[];
   espEventos: EspecialistaEvento[];
+  grade: GradeJanela[];
+  excecoes: ExcecaoEspecialista[];
+  slots: string[];
 }) {
   const agora = new Date();
   return (
     // >1 dupla: em xl os cards abrem 2 colunas, como na home do mentor — o
-    // header crava col-span-2 pra seguir full-width
+    // header e o card de disponibilidade cravam col-span-2 pra seguir full-width
     <div className={cn("grid gap-6", duplas.length > 1 && "xl:grid-cols-2")}>
       <header className={duplas.length > 1 ? "xl:col-span-2" : undefined}>
         <h1 className="text-2xl font-semibold tracking-tight">Agenda</h1>
@@ -49,6 +63,14 @@ export function AgendaEspecialista({
           datas são combinadas por vocês, sem terça oficial.
         </p>
       </header>
+
+      <div className={duplas.length > 1 ? "xl:col-span-2" : undefined}>
+        <AgendaDisponibilidade
+          grade={grade}
+          excecoes={excecoes}
+          slots={slots}
+        />
+      </div>
 
       {duplas.map((dupla) => {
         const jornada = jornadaDaDupla(
@@ -86,8 +108,8 @@ export function AgendaEspecialista({
                   </CardTitle>
                 </div>
                 <span className="flex flex-wrap items-center justify-end gap-2">
-                  {/* prazo de 3 meses da trilha — o relógio corre pro
-                      especialista; urgência vira warn na quinzena final */}
+                  {/* marco de 3 meses do guia — indicador, não prazo: ao
+                      completar vira warn sugerindo o fechamento */}
                   <TrilhaPrazoBadge dupla={dupla} />
                   <span className="font-mono text-sm tabular-nums text-muted-foreground">
                     {jornada.feitos}/{jornada.total} encontros

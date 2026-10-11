@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { notificar } from "@/lib/notificar";
+import { toDateStr } from "./ciclo";
 import { demoAtivo } from "./demo/mode";
 import { DEMO_MSG } from "./demo/shared";
 import { erroAmigavel as erroAmigavelBase } from "./utils";
@@ -253,5 +254,127 @@ export async function cancelarSolicitacao(solicitacaoId: string) {
 
   revalidatePath(`/duplas/${s.dupla_dpp_id}`);
   revalidatePath("/");
+  return { ok: true };
+}
+
+// ---------- agenda real do especialista (0073) ----------
+// Grade semanal + exceções datadas. RLS restringe a escrita ao dono da
+// agenda (mentor_especialista) e à coordenação — os checks de papel aqui
+// são UX honesta (o banco segura o resto). `profile_id` é sempre o da
+// sessão: ninguém edita agenda alheia pelo app.
+
+/** "HH:mm" do input time → `time` do Postgres (segundos entram como :00). */
+const HORA_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
+const DATA_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+function erroAgenda(e: { message: string; code?: string }): string {
+  // unique(profile_id, dia_semana, hora_inicio) — a janela repetida
+  if (/especialista_grade_profile_id_dia_semana_hora_inicio_key/i.test(e.message)) {
+    return "Já existe uma janela começando nesse horário nesse dia.";
+  }
+  return erroAmigavel(e);
+}
+
+function revalidarAgenda() {
+  revalidatePath("/agenda");
+  // os slots aparecem pro jovem com dupla de especialista ativa
+  revalidatePath("/jovem/agenda");
+}
+
+export async function adicionarJanela(formData: FormData) {
+  if (await demoAtivo()) return { error: DEMO_MSG };
+  const { supabase, me: eu } = await me();
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
+
+  const diaSemana = Number(formData.get("dia_semana"));
+  const horaInicio = String(formData.get("hora_inicio") ?? "");
+  const horaFim = String(formData.get("hora_fim") ?? "");
+  if (!Number.isInteger(diaSemana) || diaSemana < 0 || diaSemana > 6) {
+    return { error: "Escolha o dia da semana." };
+  }
+  if (!HORA_RE.test(horaInicio) || !HORA_RE.test(horaFim)) {
+    return { error: "Confira os horários da janela." };
+  }
+  if (horaFim <= horaInicio) {
+    return { error: "O fim da janela precisa ser depois do início." };
+  }
+
+  const { error } = await supabase.from("especialista_grade").insert({
+    profile_id: eu.id,
+    dia_semana: diaSemana,
+    hora_inicio: horaInicio,
+    hora_fim: horaFim,
+  });
+  if (error) return { error: erroAgenda(error) };
+  revalidarAgenda();
+  return { ok: true };
+}
+
+export async function removerJanela(id: string) {
+  if (await demoAtivo()) return { error: DEMO_MSG };
+  const { supabase, me: eu } = await me();
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
+  if (!id) return { error: "Janela não informada." };
+
+  const { error } = await supabase
+    .from("especialista_grade")
+    .delete()
+    .eq("id", id)
+    .eq("profile_id", eu.id);
+  if (error) return { error: erroAgenda(error) };
+  revalidarAgenda();
+  return { ok: true };
+}
+
+export async function adicionarExcecao(formData: FormData) {
+  if (await demoAtivo()) return { error: DEMO_MSG };
+  const { supabase, me: eu } = await me();
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
+
+  const data = String(formData.get("data") ?? "");
+  const tipo = String(formData.get("tipo") ?? "");
+  const horaInicio = String(formData.get("hora_inicio") ?? "");
+  const horaFim = String(formData.get("hora_fim") ?? "");
+  if (!DATA_RE.test(data)) return { error: "Escolha a data da exceção." };
+  if (tipo !== "bloqueio" && tipo !== "extra") {
+    return { error: "Escolha o tipo da exceção." };
+  }
+  if (!HORA_RE.test(horaInicio) || !HORA_RE.test(horaFim)) {
+    return { error: "Confira os horários da exceção." };
+  }
+  if (horaFim <= horaInicio) {
+    return { error: "O fim precisa ser depois do início." };
+  }
+  // exceção passada não muda a projeção e não apareceria na lista — erro
+  // honesto em vez de sumir com o que a pessoa acabou de cadastrar
+  if (data < toDateStr(new Date())) {
+    return { error: "Escolha uma data de hoje em diante." };
+  }
+
+  const { error } = await supabase.from("especialista_excecoes").insert({
+    profile_id: eu.id,
+    data,
+    tipo,
+    hora_inicio: horaInicio,
+    hora_fim: horaFim,
+  });
+  if (error) return { error: erroAgenda(error) };
+  revalidarAgenda();
+  return { ok: true };
+}
+
+export async function removerExcecao(id: string) {
+  if (await demoAtivo()) return { error: DEMO_MSG };
+  const { supabase, me: eu } = await me();
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
+  if (!id) return { error: "Exceção não informada." };
+
+  const { error } = await supabase
+    .from("especialista_excecoes")
+    .delete()
+    .eq("id", id)
+    .eq("profile_id", eu.id);
+  if (error) return { error: erroAgenda(error) };
+  revalidarAgenda();
   return { ok: true };
 }

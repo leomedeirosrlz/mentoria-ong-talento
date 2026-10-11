@@ -1,13 +1,22 @@
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
+import { toDateStr } from "./ciclo";
 import { demoRole } from "./demo/mode";
 import {
   demoEspecialistas,
+  demoMinhaGrade,
+  demoMinhasExcecoes,
+  demoSlotsLivres,
   demoSolicitacoesDaDupla,
   demoSolicitacoesVisiveis,
 } from "./demo/queries";
 import { demoTrilhaFechamento } from "./demo/encerramento-data";
-import type { SolicitacaoEspecialista } from "./types";
+import { getMe } from "./queries";
+import type {
+  ExcecaoEspecialista,
+  GradeJanela,
+  SolicitacaoEspecialista,
+} from "./types";
 
 /** A leitura é da view `solicitacoes_mural` (0030): as mesmas colunas da
  *  tabela + `mentorado_nome` — o nome do jovem vem escopado por papel na
@@ -129,5 +138,77 @@ export const getEspecialistas = cache(
     return (
       (data ?? []) as { id: string; nome: string; areas: string[] | null }[]
     ).sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+  }
+);
+
+// ---------- agenda real do especialista (0073) ----------
+
+/** Grade semanal do especialista logado — a policy da tabela já escopa ao
+ *  dono/coord, mas o eq deixa o recorte explícito (a única consumidora é a
+ *  própria /agenda; um coord que precisar da grade de outro monta select
+ *  próprio, como faz em toda tabela admin-only). */
+export const getMinhaGrade = cache(async (): Promise<GradeJanela[]> => {
+  const demo = await demoRole();
+  if (demo) return demoMinhaGrade(demo);
+  const me = await getMe();
+  if (!me) return [];
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("especialista_grade")
+    .select("id, dia_semana, hora_inicio, hora_fim")
+    .eq("profile_id", me.id)
+    .order("dia_semana")
+    .order("hora_inicio");
+  if (error) {
+    console.error("getMinhaGrade:", error);
+    return [];
+  }
+  return (data ?? []) as GradeJanela[];
+});
+
+/** Exceções datadas do especialista logado — só as de hoje em diante: uma
+ *  exceção passada não muda mais a projeção e a lista ficaria infinita. */
+export const getMinhasExcecoes = cache(
+  async (): Promise<ExcecaoEspecialista[]> => {
+    const demo = await demoRole();
+    if (demo) return demoMinhasExcecoes(demo);
+    const me = await getMe();
+    if (!me) return [];
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("especialista_excecoes")
+      .select("id, data, hora_inicio, hora_fim, tipo")
+      .eq("profile_id", me.id)
+      .gte("data", toDateStr(new Date()))
+      .order("data")
+      .order("hora_inicio");
+    if (error) {
+      console.error("getMinhasExcecoes:", error);
+      return [];
+    }
+    return (data ?? []) as ExcecaoEspecialista[];
+  }
+);
+
+/** Slots de início livres de um especialista — a RPC é definer e aberta a
+ *  autenticado (é a oferta pública do catálogo): o especialista pré-visualiza
+ *  a própria agenda e o jovem vê a do especialista da dupla ativa dele.
+ *  `dias` = horizonte da projeção (a RPC usa [desde, ate] inclusivos). */
+export const getSlotsLivres = cache(
+  async (profileId: string, dias = 21): Promise<string[]> => {
+    const demo = await demoRole();
+    if (demo) return demoSlotsLivres(profileId, dias);
+    const supabase = await createClient();
+    const hoje = new Date();
+    const { data, error } = await supabase.rpc("especialista_slots_livres", {
+      p_especialista: profileId,
+      p_desde: toDateStr(hoje),
+      p_ate: toDateStr(new Date(hoje.getTime() + dias * 86400000)),
+    });
+    if (error) {
+      console.error("getSlotsLivres:", error);
+      return [];
+    }
+    return (data ?? []).map((r: { inicio: string }) => r.inicio);
   }
 );
