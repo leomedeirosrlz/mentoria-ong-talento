@@ -5,6 +5,7 @@ import {
   Flask,
   LinkBreak,
   PauseCircle,
+  UserSwitch,
   WifiSlash,
 } from "@phosphor-icons/react/dist/ssr";
 import type { Icon } from "@phosphor-icons/react";
@@ -26,7 +27,8 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { token } = await params;
   const r = TOKEN_RE.test(token) ? await formularioPorToken(token) : null;
-  const titulo = r?.kind === "ok" ? r.info.formulario.titulo : "Formulário";
+  const titulo =
+    r?.kind === "ok" ? (r.info.formulario?.titulo ?? "Formulário") : "Formulário";
   return {
     title: titulo,
     openGraph: { title: `${titulo} · Realiza.vc` },
@@ -145,7 +147,7 @@ export default async function FormularioTokenPage({
               <p>
                 Você já respondeu{" "}
                 <span className="font-medium text-foreground">
-                  {info.formulario.titulo}
+                  {info.formulario?.titulo}
                 </span>
                 {info.respondido_em && (
                   <> em {formatDateTime(info.respondido_em)}</>
@@ -165,11 +167,26 @@ export default async function FormularioTokenPage({
               <p>
                 O prazo pra responder{" "}
                 <span className="font-medium text-foreground">
-                  {info.formulario.titulo}
+                  {info.formulario?.titulo}
                 </span>{" "}
                 terminou
                 {info.expira_em && <> em {formatDateTime(info.expira_em)}</>}.
                 Peça um novo link à equipe Realiza.vc.
+              </p>
+            </EstadoCard>
+          ) : info.status === "outra_pessoa" ? (
+            <EstadoCard icon={UserSwitch} titulo="Este link é de outra pessoa">
+              <p>
+                Você está conectado com uma conta que não é a de{" "}
+                {info.destinatario ? (
+                  <strong className="font-semibold text-foreground">
+                    {info.destinatario}
+                  </strong>
+                ) : (
+                  "quem recebeu este link"
+                )}
+                . Saia da conta atual e abra o link de novo, ou peça um link
+                só seu à equipe Realiza.vc.
               </p>
             </EstadoCard>
           ) : info.status === "inativo" ? (
@@ -183,10 +200,21 @@ export default async function FormularioTokenPage({
             >
               <p>
                 <span className="font-medium text-foreground">
-                  {info.formulario.titulo}
+                  {info.formulario?.titulo}
                 </span>{" "}
                 não está recebendo respostas no momento. Se acha que isso é um
                 engano, fale com a equipe Realiza.vc.
+              </p>
+            </EstadoCard>
+          ) : !info.formulario ? (
+            <EstadoCard
+              icon={WifiSlash}
+              titulo="Não foi possível carregar"
+              acao={{ href: `/f/${token}`, label: "Tentar de novo" }}
+            >
+              <p>
+                A conexão falhou no caminho. Não é problema com o seu link.
+                Confira a internet e tente de novo.
               </p>
             </EstadoCard>
           ) : (

@@ -10,9 +10,12 @@ on:
   deployment_status:
 
 # a Vercel emite DOIS deployments por commit ("Preview – realiza.vc" e o
-# alias "Preview – realiza") — agrupar por SHA cancela o duplicado.
+# órfão "Preview – realiza") — agrupar só por SHA deixava o deployment do
+# projeto órfão cancelar o run real (cancel-in-progress). O environment no
+# grupo separa os dois: cada um tem sua fila e o do órfão só pula no `if`.
 concurrency:
-  group: e2e-preview-${{ github.event.deployment.sha }}
+  group: >-
+    e2e-preview-${{ github.event.deployment.sha }}-${{ github.event.deployment.environment }}
   cancel-in-progress: true
 
 jobs:
@@ -78,6 +81,8 @@ jobs:
           E2E_COORD_EMAIL: e2e-coord@realiza.test
           E2E_COORD_PASSWORD: ${{ secrets.E2E_COORD_PASSWORD || 'e2e-senha-teste' }}
           E2E_DUPLA2_ID: e2e00000-0000-4000-8000-000000000070
+          # jovem usa a mesma senha do mentor — um secret a menos
+          E2E_JOVEM_EMAIL: jovem-e2e@realiza.test
       - if: failure() && steps.check.outputs.skip != '1'
         uses: actions/upload-artifact@v4
         with:

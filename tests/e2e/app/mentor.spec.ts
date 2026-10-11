@@ -11,6 +11,12 @@ test.skip(!appEnvOk(), "sem credenciais de teste (E2E_*) — pula specs de app")
 
 test.describe("mentor DPP — fluxos reais", () => {
   test.beforeEach(async ({ page }) => {
+    // o piso cobre o encontro que a fixture do shell /jovem semeia na MESMA
+    // dupla (id e2e…00d1): se ele pendura (run morto entre arquivos ou spec
+    // rodado solto), a home mostraria "encontro agendado" e o CTA "Agendar
+    // encontro" do teste abaixo sumiria — a limpeza prévia parte do zero
+    if (DUPLA_ID)
+      await limparViaServiceRole("encontros", `dupla_id=eq.${DUPLA_ID}`);
     await loginComSenha(page, EMAIL, SENHA);
   });
 

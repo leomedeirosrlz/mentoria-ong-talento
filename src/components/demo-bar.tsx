@@ -13,6 +13,7 @@ import {
   Handshake,
   MapTrifold,
   SignOut,
+  Student,
   UsersThree,
   type Icon,
 } from "@phosphor-icons/react";
@@ -38,6 +39,9 @@ const PAPEL_ICON: Record<AppRole, Icon> = {
   supervisor: UsersThree,
   mentor_dpp: MapTrifold,
   mentor_especialista: Handshake,
+  // a mentorada não tem card na demo ainda (ver shared.ts) — o ícone existe
+  // porque o Record exige todos os papéis e o recurso está a caminho
+  mentorado: Student,
 };
 
 /** Pill do modo demo — montada pelo layout do (app) quando o cookie

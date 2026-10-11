@@ -7,30 +7,10 @@ export type Json =
   | Json[]
 
 export type Database = {
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "14.5"
   }
   public: {
     Tables: {
@@ -978,6 +958,7 @@ export type Database = {
           expira_em: string | null
           formulario_id: string
           id: string
+          respondido_por_profile_id: string | null
           token: string
           usado_em: string | null
         }
@@ -991,6 +972,7 @@ export type Database = {
           expira_em?: string | null
           formulario_id: string
           id?: string
+          respondido_por_profile_id?: string | null
           token: string
           usado_em?: string | null
         }
@@ -1004,6 +986,7 @@ export type Database = {
           expira_em?: string | null
           formulario_id?: string
           id?: string
+          respondido_por_profile_id?: string | null
           token?: string
           usado_em?: string | null
         }
@@ -1090,6 +1073,27 @@ export type Database = {
             columns: ["formulario_id"]
             isOneToOne: false
             referencedRelation: "formularios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "formulario_links_respondido_por_profile_id_fkey"
+            columns: ["respondido_por_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "formulario_links_respondido_por_profile_id_fkey"
+            columns: ["respondido_por_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_contato"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "formulario_links_respondido_por_profile_id_fkey"
+            columns: ["respondido_por_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_pessoal"
             referencedColumns: ["id"]
           },
         ]
@@ -2257,22 +2261,12 @@ export type Database = {
           assinado_em: string | null
           created_at: string | null
           id: string | null
+          slug: string | null
           status: string | null
           template_id: string | null
-        }
-        Insert: {
-          assinado_em?: string | null
-          created_at?: string | null
-          id?: string | null
-          status?: string | null
-          template_id?: string | null
-        }
-        Update: {
-          assinado_em?: string | null
-          created_at?: string | null
-          id?: string | null
-          status?: string | null
-          template_id?: string | null
+          titulo: string | null
+          token: string | null
+          token_expira_em: string | null
         }
         Relationships: [
           {
@@ -2367,6 +2361,48 @@ export type Database = {
             columns: ["supervisor_id"]
             isOneToOne: false
             referencedRelation: "profiles_pessoal"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      jovem_encaminhamentos: {
+        Row: {
+          created_at: string | null
+          descricao: string | null
+          dupla_id: string | null
+          id: string | null
+          prazo: string | null
+          status: Database["public"]["Enums"]["encaminhamento_status"] | null
+        }
+        Insert: {
+          created_at?: string | null
+          descricao?: string | null
+          dupla_id?: string | null
+          id?: string | null
+          prazo?: string | null
+          status?: Database["public"]["Enums"]["encaminhamento_status"] | null
+        }
+        Update: {
+          created_at?: string | null
+          descricao?: string | null
+          dupla_id?: string | null
+          id?: string | null
+          prazo?: string | null
+          status?: Database["public"]["Enums"]["encaminhamento_status"] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "encaminhamentos_dupla_id_fkey"
+            columns: ["dupla_id"]
+            isOneToOne: false
+            referencedRelation: "duplas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "encaminhamentos_dupla_id_fkey"
+            columns: ["dupla_id"]
+            isOneToOne: false
+            referencedRelation: "jovem_duplas"
             referencedColumns: ["id"]
           },
         ]
@@ -2725,6 +2761,10 @@ export type Database = {
         Returns: Json
       }
       interesses_ok: { Args: { interesses: string[] }; Returns: boolean }
+      marcar_combinado: {
+        Args: { p_feito: boolean; p_id: string }
+        Returns: undefined
+      }
       meus_dados_civis: { Args: never; Returns: Json }
       meus_dados_pessoais: { Args: never; Returns: Json }
       my_mentorado_id: { Args: never; Returns: string }
@@ -2897,9 +2937,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {
       app_role: [
@@ -2921,4 +2958,3 @@ export const Constants = {
     },
   },
 } as const
-

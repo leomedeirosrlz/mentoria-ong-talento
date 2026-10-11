@@ -14,8 +14,11 @@
 // mentorado e dupla DPP ativa no 1º cronograma; profile coordenacao + auth
 // user (mesmo esquema de senha); um mentor reserva com a 2ª dupla; um
 // mentorado livre (fila "Aguardando par" + alvo do remanejo) e um par livre
-// pra importação CSV. IDs fixos e2e00000-*, que o workflow usa pra cleanup
-// determinístico.
+// pra importação CSV. E a fixture do shell /jovem (REALIZA-108): profile
+// mentorado + auth user com a ficha da mentorada da dupla …0030 vinculada,
+// combinado pendente (+ um do mentor, checagem negativa), encontro futuro
+// e as duas assinaturas pendentes. IDs fixos e2e00000-*, que o workflow usa
+// pra cleanup determinístico.
 
 const URL_ = process.env.E2E_SUPABASE_URL;
 const KEY = process.env.E2E_SUPABASE_SERVICE_ROLE_KEY;
@@ -48,9 +51,21 @@ const IDS = {
   mentoradoLivre: "e2e00000-0000-4000-8000-000000000080",
   mentorImport: "e2e00000-0000-4000-8000-000000000090",
   mentoradoImport: "e2e00000-0000-4000-8000-0000000000a0",
+  // fixture do shell /jovem — ids convergem com a fixture manual que já
+  // existe no staging (profile 00b0, combinados c1/c2, assinaturas a1/a2)
+  jovemProfile: "e2e00000-0000-4000-8000-0000000000b0",
+  combinadoJovem: "e2e00000-0000-4000-8000-0000000000c1",
+  combinadoMentor: "e2e00000-0000-4000-8000-0000000000c2",
+  encontroJovem: "e2e00000-0000-4000-8000-0000000000d1",
+  assinaturaTermo: "e2e00000-0000-4000-8000-0000000000a1",
+  assinaturaAutoriz: "e2e00000-0000-4000-8000-0000000000a2",
 };
 const EMAIL = "e2e-mentor@realiza.test";
 const COORD_EMAIL = "e2e-coord@realiza.test";
+const JOVEM_EMAIL = "jovem-e2e@realiza.test";
+// assinaturas.token é uuid — os tokens fixos da fixture manual do staging
+const TOKEN_TERMO_JOVEM = "e2e00000-0000-4000-8000-0000000000aa";
+const TOKEN_AUTORIZ_JOVEM = "e2e00000-0000-4000-8000-0000000000ab";
 // turma que o spec de cronograma cria pelo builder — prefixo único pro
 // cleanup não depender de id conhecido
 const TURMA_E2E_PREFIX = "E2E ";
@@ -82,13 +97,22 @@ console.log(`cronograma: ${cron.id} (${cron.turma})`);
   await del(`duplas?mentor_id=eq.${IDS.mentorImport}`); // par do import CSV
   await del(`duplas?mentorado_id=eq.${IDS.mentoradoLivre}`); // qualquer vínculo do livre
   await patch(`duplas?id=eq.${IDS.dupla2}`, { status: "ativa" });
-  const e2eProfiles = [IDS.mentorProfile, IDS.coordProfile, IDS.mentorReserva, IDS.mentorImport].join(",");
+  const e2eProfiles = [IDS.mentorProfile, IDS.coordProfile, IDS.mentorReserva, IDS.mentorImport, IDS.jovemProfile].join(",");
   const e2eMentorados = [IDS.mentorado, IDS.mentorado2, IDS.mentoradoLivre, IDS.mentoradoImport].join(",");
   // nota de saída do remanejo + notificações "dupla_formada" dos specs
   await del(
     `pessoa_notas?texto=like.*remanejamento*&or=(profile_id.in.(${e2eProfiles}),mentorado_id.in.(${e2eMentorados}))`
   );
   await del(`notificacoes?profile_id=in.(${e2eProfiles})`);
+  // pedidos de ajuda do spec /jovem: o filtro por destinatário acima cobre
+  // só as fixtures de staff — created_by alcança qualquer coord real do
+  // staging que o jovem tenha notificado de verdade
+  await del(`notificacoes?created_by=eq.${IDS.jovemProfile}`);
+  // encontros pendurados de runs mortos nas duplas e2e — menos a fixture do
+  // jovem, que o bloco de seed abaixo re-carimba (a data é sempre now+3d)
+  await del(
+    `encontros?dupla_id=in.(${IDS.dupla},${IDS.dupla2})&id=neq.${IDS.encontroJovem}`
+  );
   // cronogramas criados pelo spec de turmas — eventos primeiro: a FK
   // ciclo_eventos.cronograma_id (0061) não tem ON DELETE CASCADE
   const crons = await rest(`cronogramas?select=id&turma=like.${encodeURIComponent(TURMA_E2E_PREFIX)}*`);
@@ -240,6 +264,187 @@ for (const d of DUPLAS) {
   }
 }
 
+// ---- jovem (mentorado) — fixtures do shell /jovem (REALIZA-108) ----
+// Mesmo esquema do mentor: profile ANTES do auth user pro handle_new_user
+// vincular. onboarded_em carimbado — os specs caem na home, não na tela de
+// boas-vindas; a convergência cobre a fixture manual do staging, que nasceu
+// sem o carimbo (e qualquer drift de papel/ativo).
+let [jovem] = await rest(
+  `profiles?select=id,user_id,role,ativo,onboarded_em&email=eq.${JOVEM_EMAIL}`
+);
+if (!jovem) {
+  [jovem] = await rest("profiles", {
+    method: "POST",
+    body: JSON.stringify({
+      id: IDS.jovemProfile,
+      email: JOVEM_EMAIL,
+      nome: "Jovem E2E",
+      role: "mentorado",
+      ativo: true,
+      onboarded_em: new Date().toISOString(),
+    }),
+  });
+  console.log("profile jovem criado");
+} else {
+  const fixes = {};
+  if (jovem.role !== "mentorado") fixes.role = "mentorado";
+  if (!jovem.ativo) fixes.ativo = true;
+  if (!jovem.onboarded_em) fixes.onboarded_em = new Date().toISOString();
+  if (Object.keys(fixes).length) {
+    await patch(`profiles?id=eq.${jovem.id}`, fixes);
+    console.log(`profile jovem convergido (${Object.keys(fixes).join(", ")})`);
+  } else {
+    console.log("profile jovem já existe");
+  }
+}
+if (!jovem.user_id) {
+  await garantirAuthUser(JOVEM_EMAIL, SENHA, jovem);
+} else {
+  console.log(`auth user jovem já vinculado: ${jovem.user_id}`);
+}
+
+// a ficha do jovem é a mentorada da dupla fixture — sem profile_id aqui as
+// views jovem_* (my_mentorado_id) ficam vazias e o shell inteiro esvazia
+{
+  const [ficha] = await rest(
+    `mentorados?select=id,profile_id&id=eq.${IDS.mentorado}`
+  );
+  if (ficha && ficha.profile_id !== jovem.id) {
+    await patch(`mentorados?id=eq.${IDS.mentorado}`, { profile_id: jovem.id });
+    console.log("ficha da mentorada vinculada ao jovem");
+  } else {
+    console.log("ficha da mentorada já vinculada ao jovem");
+  }
+}
+
+// combinados: um do jovem (a lista dele na home) e um do mentor — este é a
+// checagem negativa do spec (a view jovem_encaminhamentos filtra
+// responsavel='mentorado'). Descrições iguais às da fixture manual do
+// staging pros dois ambientes convergirem.
+const prazoFuturo = new Date(Date.now() + 10 * 86400e3)
+  .toISOString()
+  .slice(0, 10);
+const [combJovem] = await rest(
+  `encaminhamentos?select=id,status,prazo&id=eq.${IDS.combinadoJovem}`
+);
+if (!combJovem) {
+  await rest("encaminhamentos", {
+    method: "POST",
+    body: JSON.stringify({
+      id: IDS.combinadoJovem,
+      dupla_id: IDS.dupla,
+      descricao: "Ler o capítulo 3 do guia até o próximo encontro",
+      responsavel: "mentorado",
+      prazo: prazoFuturo,
+      status: "pendente",
+    }),
+  });
+  console.log("combinado do jovem criado");
+} else {
+  // o spec marca como feito — o seed devolve a pendente; e o prazo precisa
+  // continuar no futuro (vencido renderiza "passou do prazo" na home)
+  const fixes = {};
+  if (combJovem.status !== "pendente") fixes.status = "pendente";
+  if (combJovem.prazo !== prazoFuturo) fixes.prazo = prazoFuturo;
+  if (Object.keys(fixes).length) {
+    await patch(`encaminhamentos?id=eq.${IDS.combinadoJovem}`, fixes);
+    console.log("combinado do jovem re-convergido");
+  } else {
+    console.log("combinado do jovem já existe");
+  }
+}
+const [combMentor] = await rest(
+  `encaminhamentos?select=id&id=eq.${IDS.combinadoMentor}`
+);
+if (!combMentor) {
+  await rest("encaminhamentos", {
+    method: "POST",
+    body: JSON.stringify({
+      id: IDS.combinadoMentor,
+      dupla_id: IDS.dupla,
+      descricao: "Mentor prepara material de revisão",
+      responsavel: "mentor",
+      prazo: prazoFuturo,
+      status: "pendente",
+    }),
+  });
+  console.log("combinado do mentor criado");
+} else {
+  console.log("combinado do mentor já existe");
+}
+
+// encontro futuro — alimenta o card "Encontros" da home e a agenda. A data
+// é sempre now+3d: um run velho deixaria o agendado no passado e esvaziaria
+// os blocos, então todo run re-carimba (status agendado→agendado não dispara
+// o guard 0043 — o WHEN só olha mudança de status).
+const dataEncontro = new Date(Date.now() + 3 * 86400e3).toISOString();
+const [encJovem] = await rest(
+  `encontros?select=id&id=eq.${IDS.encontroJovem}`
+);
+if (!encJovem) {
+  await rest("encontros", {
+    method: "POST",
+    body: JSON.stringify({
+      id: IDS.encontroJovem,
+      dupla_id: IDS.dupla,
+      numero: 8,
+      data_hora: dataEncontro,
+      status: "agendado",
+    }),
+  });
+  console.log("encontro futuro do jovem criado");
+} else {
+  await patch(`encontros?id=eq.${IDS.encontroJovem}`, {
+    data_hora: dataEncontro,
+    status: "agendado",
+  });
+  console.log("encontro futuro do jovem renovado");
+}
+
+// documentos do jovem — a seção "Documentos" da home: termo dele (Assinar)
+// + autorização do responsável (Encaminhar). Templates vêm do banco por
+// slug; a fixture manual do staging já usa esses ids/tokens.
+const [tplTermo] = await rest(
+  "documento_templates?select=id&slug=eq.termo-mentorando&ativo=eq.true&limit=1"
+);
+const [tplAutoriz] = await rest(
+  "documento_templates?select=id&slug=eq.autorizacao-responsavel&ativo=eq.true&limit=1"
+);
+if (!tplTermo || !tplAutoriz) {
+  console.error(
+    "templates termo-mentorando/autorizacao-responsavel ausentes — rode `db push` antes"
+  );
+  process.exit(1);
+}
+const ASSINATURAS_JOVEM = [
+  { id: IDS.assinaturaTermo, template_id: tplTermo.id, token: TOKEN_TERMO_JOVEM },
+  { id: IDS.assinaturaAutoriz, template_id: tplAutoriz.id, token: TOKEN_AUTORIZ_JOVEM },
+];
+for (const a of ASSINATURAS_JOVEM) {
+  const [existe] = await rest(`assinaturas?select=id,status&id=eq.${a.id}`);
+  if (!existe) {
+    await rest("assinaturas", {
+      method: "POST",
+      body: JSON.stringify({
+        id: a.id,
+        template_id: a.template_id,
+        mentorado_id: IDS.mentorado,
+        token: a.token,
+        token_expira_em: null,
+        status: "pendente",
+      }),
+    });
+    console.log(`assinatura do jovem criada: ${a.id}`);
+  } else if (existe.status !== "pendente") {
+    // ninguém assina em spec — um assinado/revogado aqui é dedo manual no
+    // staging; a home do jovem testa o estado pendente
+    await patch(`assinaturas?id=eq.${a.id}`, { status: "pendente" });
+    console.log(`assinatura ${a.id} re-convergida pra pendente`);
+  } else {
+    console.log(`assinatura ${a.id} já existe`);
+  }
+}
+
 console.log("\nseed e2e ok. Secrets/envs pro CI:");
 console.log(`  E2E_MENTOR_EMAIL=${EMAIL}`);
 console.log("  E2E_MENTOR_PASSWORD=<a que você passou>");
@@ -247,4 +452,5 @@ console.log(`  E2E_DUPLA_ID=${IDS.dupla}`);
 console.log(`  E2E_COORD_EMAIL=${COORD_EMAIL}`);
 console.log("  E2E_COORD_PASSWORD=<a que você passou, ou a do mentor>");
 console.log(`  E2E_DUPLA2_ID=${IDS.dupla2}`);
+console.log(`  E2E_JOVEM_EMAIL=${JOVEM_EMAIL}`);
 console.log("  E2E_SUPABASE_URL / E2E_SUPABASE_SERVICE_ROLE_KEY = do staging");

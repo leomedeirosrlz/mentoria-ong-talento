@@ -693,6 +693,11 @@ export async function assinaturaPorToken(token: string) {
     id: string;
     status: string;
     assinado_em: string | null;
+    /** 0070 — sessão autenticada conferida contra o destinatário do link:
+     *  'outra_pessoa' (link de outro), 'signatario_externo' (autorização é
+     *  do responsável), 'ok'/'anon' (segue o fluxo). Ausente em versões
+     *  antigas da RPC — tratar como 'ok'. */
+    identidade?: "outra_pessoa" | "signatario_externo" | "ok" | "anon";
     template: { slug: string; titulo: string; versao: number };
     alvo: { nome: string };
     civis: (DadosCivis & { parentesco?: string }) | null;
@@ -708,6 +713,14 @@ export async function assinarComToken(token: string, formData: FormData) {
   const info = await assinaturaPorToken(token);
   if (!info || info.status !== "pendente")
     return { error: "Este link não está mais disponível." };
+  // 0070 — a RPC também barra na gravação; aqui o erro chega específico
+  if (info.identidade === "outra_pessoa")
+    return { error: "Este link de assinatura é de outra pessoa." };
+  if (info.identidade === "signatario_externo")
+    return {
+      error:
+        "Este documento é assinado pelo responsável — encaminhe o link para ele.",
+    };
 
   const dados = parseDadosCivis(formData);
   if ("error" in dados) return dados;
@@ -734,6 +747,12 @@ export async function assinarComToken(token: string, formData: FormData) {
     p_ip: ip,
     p_ua: ua,
   });
-  if (error) return { error: "Não foi possível registrar a assinatura. Tente de novo." };
+  if (error)
+    return {
+      // mensagens de domínio da RPC (pt-BR) passam direto; infra vira genérica
+      error: /outra pessoa|pelo responsável/i.test(error.message)
+        ? error.message
+        : "Não foi possível registrar a assinatura. Tente de novo.",
+    };
   return { ok: true };
 }
