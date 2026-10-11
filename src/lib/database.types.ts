@@ -1,5 +1,3 @@
-Already up to date
-Done in 373ms using pnpm v11.3.0
 export type Json =
   | string
   | number
