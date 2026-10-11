@@ -778,6 +778,16 @@ export async function setPessoaRole(profileId: string, role: string | null) {
   if (profileId === eu.id) {
     return { error: "Não é possível alterar o próprio cadastro." };
   }
+  // 'mentorado' não entra por aqui: o papel vem do vínculo
+  // mentorados.profile_id (a coordenação vincula no cadastro/convite do
+  // jovem), nunca do select de papéis de staff — sem o vínculo ele veria um
+  // /jovem vazio e sem vínculo antigo desfeito ele guardaria o acesso
+  if (role === "mentorado") {
+    return {
+      error:
+        "O papel de mentorado vem do vínculo com o cadastro do jovem — não é concedido por aqui.",
+    };
+  }
   const novoRole = role && (ROLES as readonly string[]).includes(role) ? role : null;
   // trocar papel de quem está em dupla ativa/pausada deixa a dupla apontando
   // pra quem não é mais mentor/supervisor — e como as policies de escrita
@@ -793,6 +803,29 @@ export async function setPessoaRole(profileId: string, role: string | null) {
       error:
         "A pessoa está em uma dupla ativa ou pausada. Pause, encerre ou reatribua a dupla antes de mudar o papel.",
     };
+  }
+  // o mesmo check pelo lado do jovem (D1): se o profile é o login de um
+  // mentorado em dupla em curso (mentorados.profile_id → duplas.mentorado_id),
+  // tirar/trocar o papel deixa a dupla com um jovem sem acesso — ou pior:
+  // vira mentor adulto continuando na dupla em que é o mentorado
+  const { data: comoMentorado } = await supabase
+    .from("mentorados")
+    .select("id")
+    .eq("profile_id", profileId);
+  const mentoradoIds = (comoMentorado ?? []).map((m) => m.id);
+  if (mentoradoIds.length) {
+    const { data: duplasDoJovem } = await supabase
+      .from("duplas")
+      .select("id")
+      .in("mentorado_id", mentoradoIds)
+      .in("status", ["ativa", "pausada"])
+      .limit(1);
+    if (duplasDoJovem?.length) {
+      return {
+        error:
+          "Essa pessoa é o mentorado de uma dupla ativa ou pausada. Pause, encerre ou reatribua a dupla antes de mudar o papel.",
+      };
+    }
   }
   const { data, error } = await supabase
     .from("profiles")
@@ -2681,6 +2714,86 @@ export async function pedirApoio(duplaId: string, mensagem: string) {
     })),
     eu.id
   );
+  return { ok: true };
+}
+
+// ---------- /jovem (REALIZA-108) ----------
+// Escritas do jovem: combinados passam SÓ pela RPC definer marcar_combinado
+// (0070 — valida vínculo + responsavel='mentorado' + transição pendente↔feito);
+// o pedido de ajuda usa o ramo mentorado da notificacoes_insert (0069), que
+// limita o destinatário aos adultos da jovem_contatos. Nenhuma action aqui
+// escreve em tabela operacional direto.
+
+/** O jovem marca o próprio combinado como feito/desfeito. A RPC devolve a
+ *  razão já em pt-BR (P0001) — repassa; o resto vai pela tradução comum. */
+export async function marcarCombinadoFeito(id: string, feito: boolean) {
+  if (await demoAtivo()) return { error: DEMO_MSG };
+  const { supabase, me: eu } = await me();
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
+  if (eu.role !== "mentorado") {
+    return { error: "Só o mentorado marca os próprios combinados." };
+  }
+  const { error } = await supabase.rpc("marcar_combinado", {
+    p_id: id,
+    p_feito: feito,
+  });
+  if (error) {
+    return {
+      error:
+        error.code === "P0001" && error.message
+          ? error.message
+          : erroAmigavel(error),
+    };
+  }
+  revalidatePath("/jovem");
+  return { ok: true };
+}
+
+/** "Preciso de ajuda" do jovem — standalone, sem depender de encontro nem
+ *  avaliação. A notificação É o registro (mesmo desenho do pedido de apoio
+ *  do mentor): vai pra coordenação e pros adultos das próprias duplas — a
+ *  policy (0069) valida cada destinatário contra a view jovem_contatos, que
+ *  é a mesma fonte lida aqui. Sem dupla ativa, a coordenação segue na lista. */
+export async function pedirAjudaJovem(mensagem: string) {
+  if (await demoAtivo()) return { error: DEMO_MSG };
+  const { supabase, me: eu } = await me();
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
+  if (eu.role !== "mentorado") {
+    return { error: "Essa ação é do mentorado." };
+  }
+  // destinatários = os adultos que o jovem vê (coord + mentor/supervisor das
+  // duplas dele); a ficha /pessoas/[mentorado.id] é o destino útil do lado de
+  // quem atende — o id vem da própria view, nunca de uma base-table
+  const [{ data: contatos, error: cErr }, { data: perfil, error: pErr }] =
+    await Promise.all([
+      supabase.from("jovem_contatos").select("id, papel"),
+      supabase.from("jovem_perfil").select("id").maybeSingle(),
+    ]);
+  if (cErr) return { error: erroAmigavel(cErr) };
+  if (pErr) return { error: erroAmigavel(pErr) };
+  const destinos = [...new Set((contatos ?? []).map((c) => c.id))].filter(
+    (pid): pid is string => Boolean(pid) && pid !== eu.id
+  );
+  if (!destinos.length) {
+    return {
+      error:
+        "Ainda não encontramos a equipe pra avisar. Se for urgente, chame a coordenação pelo WhatsApp.",
+    };
+  }
+  const texto = mensagem.trim().slice(0, 500) || null;
+  const { error } = await supabase.from("notificacoes").insert(
+    destinos.map((pid) => ({
+      profile_id: pid,
+      tipo: "pedido_apoio",
+      titulo: "Pedido de ajuda",
+      corpo: `${eu.nome} (mentorado) pediu ajuda${texto ? `: "${texto}"` : "."}`,
+      // href staff-side: a ficha do jovem em /pessoas — quem atende (coord
+      // e supervisor) tem acesso a ela; /jovem seria do próprio jovem
+      href: perfil?.id ? `/pessoas/${perfil.id}` : null,
+      created_by: eu.id,
+    }))
+  );
+  if (error) return { error: erroAmigavel(error) };
   return { ok: true };
 }
 

@@ -19,6 +19,10 @@ const ROLE_LABEL: Record<string, string> = {
   mentor_especialista: "Mentor especialista",
   supervisor: "Supervisor",
   coordenacao: "Coordenação",
+  // só pro trigger fechado quando a row já é mentorado (login do jovem,
+  // 0066) — não é SelectItem: o papel vem do vínculo mentorados.profile_id,
+  // setPessoaRole recusa atribuí-lo por aqui
+  mentorado: "Mentorado",
 };
 
 export function RoleSelect({ profileId, role, nome }: { profileId: string; role: string | null; nome?: string }) {
