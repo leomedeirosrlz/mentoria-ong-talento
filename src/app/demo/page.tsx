@@ -5,6 +5,7 @@ import {
   Binoculars,
   Handshake,
   MapTrifold,
+  Student,
   UsersThree,
 } from "@phosphor-icons/react/dist/ssr";
 // import type não emite runtime — o barrel principal usa createContext e
@@ -45,6 +46,12 @@ const PAPEIS: readonly { role: AppRole; icon: Icon; descricao: string }[] = [
     role: "mentor_especialista",
     icon: Handshake,
     descricao: "Mural de demandas e a trilha de 5 encontros.",
+  },
+  {
+    role: "mentorado",
+    icon: Student,
+    descricao:
+      "O lado do jovem: dupla, encontros, combinados e documentos.",
   },
 ];
 

@@ -14,6 +14,11 @@ import type {
   Dupla,
   DuplaResumo,
   EspecialistaEvento,
+  JovemAssinatura,
+  JovemContato,
+  JovemDupla,
+  JovemEncaminhamento,
+  JovemPerfil,
   Material,
   Mentorado,
   Notificacao,
@@ -36,6 +41,7 @@ import type {
   RegistroResumo,
 } from "../queries";
 import type { ResumoFormacao } from "../queries-presenca";
+import type { JovemEncontro } from "../queries-jovem";
 import type { FormularioPublico } from "../forms/queries";
 import { getDemoFormularios } from "./forms-data";
 import type { Interacao } from "../interacoes";
@@ -210,8 +216,18 @@ export function demoEspecialistaEventos(): EspecialistaEvento[] {
   );
 }
 
-export function demoMateriais(): Material[] {
-  return [...getDemoData().materiais].sort((a, b) => a.ordem - b.ordem);
+/** Policy materiais_select (0065): 'todos' alcança qualquer papel — inclusive
+ *  o mentorado; 'dpp'/'especialista' só o papel homônimo; coordenação vê tudo. */
+export function demoMateriais(role: AppRole): Material[] {
+  return getDemoData()
+    .materiais.filter(
+      (m) =>
+        m.audiencia === "todos" ||
+        role === "coordenacao" ||
+        (m.audiencia === "dpp" && role === "mentor_dpp") ||
+        (m.audiencia === "especialista" && role === "mentor_especialista")
+    )
+    .sort((a, b) => a.ordem - b.ordem);
 }
 
 // ---------- duplas ----------
@@ -469,6 +485,199 @@ export function demoComunicados(role: AppRole): Comunicado[] {
         b.created_at.localeCompare(a.created_at)
     )
     .slice(0, 5);
+}
+
+// ---------- /jovem — as views jovem_* do definer (0067 + 0070) ----------
+// O escopo real é security definer filtrado por my_mentorado_id() — aqui o
+// "eu" é a ficha mentorados vinculada ao profile da persona. Cada função
+// projeta SÓ as colunas da view correspondente: o que a view não expõe
+// (notas, documento_path, form_bruto, registro_id, evidências de assinatura)
+// não atravessa a fronteira nem na demo.
+
+/** Ficha mentorados da persona jovem — o my_mentorado_id() da demo. Fora
+ *  do papel mentorado (ou sem vínculo profile→ficha) devolve null, como a
+ *  view faz com o WHERE my_role()='mentorado'. */
+function mentoradoDaPersona(data: DemoData, role: AppRole): Mentorado | null {
+  if (role !== "mentorado") return null;
+  const eu = data.personas[role];
+  return data.mentorados.find((m) => m.profile_id === eu.id) ?? null;
+}
+
+/** jovem_perfil (0067): a própria ficha — inclui os sensíveis DELA (a view é
+ *  definer e self-scoped), mas nunca notas/documento_path/form_bruto. */
+export function demoJovemPerfil(role: AppRole): JovemPerfil | null {
+  const m = mentoradoDaPersona(getDemoData(), role);
+  if (!m) return null;
+  return {
+    id: m.id,
+    nome: m.nome,
+    nome_social: m.nome_social ?? null,
+    email: m.email,
+    whatsapp: m.whatsapp,
+    avatar_path: m.avatar_path ?? null,
+    data_nascimento: m.data_nascimento ?? null,
+    genero: m.genero ?? null,
+    cidade: m.cidade ?? null,
+    uf: m.uf ?? null,
+    interesses: m.interesses ?? null,
+    motivacao: m.motivacao ?? null,
+    objetivos: m.objetivos ?? null,
+    escolaridade: m.escolaridade ?? null,
+    origem: m.origem ?? null,
+    ong_origem: m.ong_origem,
+    pref_genero_par: m.pref_genero_par ?? null,
+    disponibilidade: m.disponibilidade ?? null,
+    dados_civis: m.dados_civis ?? null,
+    responsavel: m.responsavel ?? null,
+    cor_raca: m.cor_raca ?? null,
+    created_at: m.created_at ?? null,
+  };
+}
+
+/** jovem_duplas (0067): as duplas DELA com mentor/supervisor planeados —
+ *  sem solicitacao_id/remanejada_de/devolutiva_pdm. Ordenação da query
+ *  real: iniciada_em desc. */
+export function demoJovemDuplas(role: AppRole): JovemDupla[] {
+  const data = getDemoData();
+  const m = mentoradoDaPersona(data, role);
+  if (!m) return [];
+  return data.duplas
+    .filter((d) => d.mentorado?.id === m.id)
+    .map((d) => ({
+      id: d.id,
+      trilha: d.trilha,
+      status: d.status,
+      turma: d.turma,
+      cronograma_id: d.cronograma_id,
+      iniciada_em: d.iniciada_em,
+      encerrada_em: d.encerrada_em ?? null,
+      motivo_encerramento: d.motivo_encerramento ?? null,
+      pdm_url: d.pdm_url ?? null,
+      demanda: d.demanda,
+      mentor_id: d.mentor?.id ?? null,
+      mentor_nome: d.mentor?.nome ?? null,
+      mentor_nome_social: d.mentor?.nome_social ?? null,
+      mentor_avatar_path: d.mentor?.avatar_path ?? null,
+      supervisor_id: d.supervisor?.id ?? null,
+      supervisor_nome: d.supervisor?.nome ?? null,
+      supervisor_nome_social: d.supervisor?.nome_social ?? null,
+      supervisor_avatar_path: d.supervisor?.avatar_path ?? null,
+    }))
+    .sort((a, b) => (b.iniciada_em ?? "").localeCompare(a.iniciada_em ?? ""));
+}
+
+/** jovem_contatos (0067): mentor + supervisor de CADA dupla dela (union all —
+ *  o mesmo adulto repete por dupla, como a view faz) + coordenação ativa com
+ *  dupla_id null. Nome, contato e foto — nada de dados civis. */
+export function demoJovemContatos(role: AppRole): JovemContato[] {
+  const data = getDemoData();
+  const m = mentoradoDaPersona(data, role);
+  if (!m) return [];
+  const contato = (
+    dupla_id: string | null,
+    papel: string,
+    p: Profile | null | undefined
+  ): JovemContato | null =>
+    p && p.ativo
+      ? {
+          dupla_id,
+          papel,
+          id: p.id,
+          nome: p.nome,
+          nome_social: p.nome_social ?? null,
+          avatar_path: p.avatar_path ?? null,
+          whatsapp: p.whatsapp ?? null,
+          email: p.email ?? null,
+          role: p.role,
+        }
+      : null;
+  const dela = data.duplas.filter((d) => d.mentorado?.id === m.id);
+  return [
+    ...dela.map((d) => contato(d.id, "mentor", d.mentor)),
+    ...dela.map((d) => contato(d.id, "supervisor", d.supervisor)),
+    ...data.profiles
+      .filter((p) => p.role === "coordenacao")
+      .map((p) => contato(null, "coordenacao", p)),
+  ].filter((c): c is JovemContato => c !== null);
+}
+
+/** jovem_encaminhamentos (0070): só os combinados DELA (responsavel =
+ *  'mentorado'), sem registro_id. Ordenação da query real: status asc,
+ *  prazo asc (nulls por último), created_at desc. */
+export function demoJovemEncaminhamentos(role: AppRole): JovemEncaminhamento[] {
+  const data = getDemoData();
+  const m = mentoradoDaPersona(data, role);
+  if (!m) return [];
+  return data.duplas
+    .filter((d) => d.mentorado?.id === m.id)
+    .flatMap((d) => d.encaminhamentos ?? [])
+    .filter((e) => e.responsavel === "mentorado")
+    .map((e) => ({
+      id: e.id,
+      dupla_id: e.dupla_id,
+      descricao: e.descricao,
+      prazo: e.prazo,
+      status: e.status,
+      created_at: e.created_at,
+    }))
+    .sort(
+      (a, b) =>
+        a.status.localeCompare(b.status) ||
+        Number(a.prazo == null) - Number(b.prazo == null) ||
+        (a.prazo ?? "").localeCompare(b.prazo ?? "") ||
+        b.created_at.localeCompare(a.created_at)
+    );
+}
+
+/** jovem_assinaturas (0070): id/template + slug/título por join + estado do
+ *  link — sem dados_snapshot, IP, user agent nem hash (evidência fica de
+ *  fora da view). Ordenação da query real: created_at desc. */
+export function demoJovemAssinaturas(role: AppRole): JovemAssinatura[] {
+  const data = getDemoData();
+  const m = mentoradoDaPersona(data, role);
+  if (!m) return [];
+  return data.assinaturas
+    .filter((a) => a.mentorado_id === m.id)
+    .map((a) => ({
+      id: a.id,
+      template_id: a.template_id,
+      slug: a.template?.slug ?? null,
+      titulo: a.template?.titulo ?? null,
+      status: a.status,
+      token: a.token,
+      token_expira_em: a.token_expira_em,
+      assinado_em: a.assinado_em,
+      created_at: a.created_at,
+    }))
+    .sort((a, b) => b.created_at.localeCompare(a.created_at));
+}
+
+/** Encontros das duplas dela — a query real lê a tabela encontros com a
+ *  projeção explícita de 9 colunas (sem registro/anexo/encaminhamento).
+ *  Ordenação: data_hora asc, nulls por último (pendentes de agendar). */
+export function demoJovemEncontros(role: AppRole): JovemEncontro[] {
+  const data = getDemoData();
+  const m = mentoradoDaPersona(data, role);
+  if (!m) return [];
+  return data.duplas
+    .filter((d) => d.mentorado?.id === m.id)
+    .flatMap((d) => d.encontros ?? [])
+    .map((e) => ({
+      id: e.id,
+      dupla_id: e.dupla_id,
+      numero: e.numero,
+      data_hora: e.data_hora,
+      realizado_em: e.realizado_em,
+      duracao_min: e.duracao_min,
+      status: e.status,
+      link: e.link,
+      motivo_reagendamento: e.motivo_reagendamento,
+    }))
+    .sort(
+      (a, b) =>
+        Number(a.data_hora == null) - Number(b.data_hora == null) ||
+        (a.data_hora ?? "").localeCompare(b.data_hora ?? "")
+    );
 }
 
 // ---------- /registros — conteúdo do form semanal (coord/sup) ----------
