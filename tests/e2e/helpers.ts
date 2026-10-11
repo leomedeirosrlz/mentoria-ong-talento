@@ -141,6 +141,27 @@ export async function limparViaServiceRole(
   if (!res.ok) throw new Error(`cleanup ${tabela} falhou: ${res.status}`);
 }
 
+/** DELETE de encontros de uma dupla com os filhos da 0071 antes do pai —
+ *  encontro 'realizado' minta avaliacao_links (e pode ter avaliacoes_encontro),
+ *  ambos com FK NO ACTION: apagar o encontro direto dá 409. */
+export async function limparEncontrosDaDupla(duplaId: string): Promise<void> {
+  const encs = await buscarViaServiceRole<{ id: string }[]>(
+    "encontros",
+    `select=id&dupla_id=eq.${duplaId}`
+  );
+  if (encs.length === 0) return;
+  const lista = encs.map((e) => e.id).join(",");
+  await limparViaServiceRole(
+    "avaliacoes_encontro",
+    `encontro_id=in.(${lista})`
+  );
+  await limparViaServiceRole(
+    "avaliacao_links",
+    `encontro_id=in.(${lista})`
+  );
+  await limparViaServiceRole("encontros", `id=in.(${lista})`);
+}
+
 /** GET via service role — leitura auxiliar pra cleanup/verificação que a UI
  *  não expõe diretamente (ex.: id da row criada, turma da dupla fixture).
  *  Mesmo hard-stop do delete: spec app nunca fala com prod. */

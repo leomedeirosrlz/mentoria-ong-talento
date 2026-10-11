@@ -61,6 +61,17 @@ test.describe("mentorado — shell /jovem", () => {
     // a home do mentor olha a MESMA dupla: um agendado fixture pendurado
     // trocaria o CTA "Agendar encontro" por "Agendar próximo" e quebraria o
     // spec dele — os encontros da dupla voltam a zero (o seed recria o d1)
+    // Filhos da 0071 primeiro: se o d1 passou por 'realizado' o trigger
+    // mintou avaliacao_links (e o spec pode ter avaliado) — apagar o pai
+    // direto dá 409 na FK.
+    await limparViaServiceRole(
+      "avaliacoes_encontro",
+      `encontro_id=eq.${IDS.encontro}`
+    );
+    await limparViaServiceRole(
+      "avaliacao_links",
+      `encontro_id=eq.${IDS.encontro}`
+    );
     await limparViaServiceRole("encontros", `id=eq.${IDS.encontro}`);
     await atualizarViaServiceRole(
       "encaminhamentos",

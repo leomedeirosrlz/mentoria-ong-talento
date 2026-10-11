@@ -1,4 +1,4 @@
-import { appEnvOk, expect, limparViaServiceRole, loginComSenha, test } from "../helpers";
+import { appEnvOk, expect, limparEncontrosDaDupla, loginComSenha, test } from "../helpers";
 
 // Backend real (staging ou supabase local do CI): a fixture vem de
 // scripts/seed-e2e-staging.mjs — mentor com dupla DPP ativa e senha. Specs
@@ -16,7 +16,7 @@ test.describe("mentor DPP — fluxos reais", () => {
     // rodado solto), a home mostraria "encontro agendado" e o CTA "Agendar
     // encontro" do teste abaixo sumiria — a limpeza prévia parte do zero
     if (DUPLA_ID)
-      await limparViaServiceRole("encontros", `dupla_id=eq.${DUPLA_ID}`);
+      await limparEncontrosDaDupla(DUPLA_ID);
     await loginComSenha(page, EMAIL, SENHA);
   });
 
@@ -25,7 +25,7 @@ test.describe("mentor DPP — fluxos reais", () => {
     // assert ter passado ou não (um leftover "realizado" apaga o CTA "Agendar
     // encontro" da home e quebra o próximo run em cascata)
     if (DUPLA_ID)
-      await limparViaServiceRole("encontros", `dupla_id=eq.${DUPLA_ID}`);
+      await limparEncontrosDaDupla(DUPLA_ID);
   });
 
   test("login cai na home do mentor, não no onboarding", async ({ page }) => {
