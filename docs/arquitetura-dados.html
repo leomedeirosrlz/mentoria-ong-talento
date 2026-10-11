@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Arquitetura de dados · Realiza.vc</title>
+<style>
+  @page {
+    size: A4;
+    margin: 16mm 17mm 18mm 17mm;
+    @bottom-center {
+      content: "Realiza.vc · arquitetura de dados · outubro de 2026 · " counter(page) " / " counter(pages);
+      font: 7.5pt "Noto Sans"; color: #8a887f;
+    }
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font: 9.5pt/1.5 "Noto Sans", sans-serif;
+    color: #2b2a26;
+  }
+  h1 { font-size: 19pt; font-weight: 700; letter-spacing: -0.02em; color: #1f1e1a; }
+  .sub { font-size: 9.5pt; color: #6b6a60; margin-top: 2mm; }
+  h2 {
+    font-size: 12.5pt; font-weight: 700; color: #1f1e1a;
+    margin: 8mm 0 2.5mm 0; padding-bottom: 1.5mm;
+    border-bottom: 2px solid hsl(78 56% 53%);
+    break-after: avoid;
+  }
+  h3 { font-size: 10pt; font-weight: 700; margin: 4mm 0 1.5mm; break-after: avoid; }
+  p { margin-bottom: 2.2mm; }
+  .lead { font-size: 10.5pt; line-height: 1.55; }
+  code, .mono { font-family: "DejaVu Sans Mono", monospace; font-size: 8.5pt; color: #4a5b12; }
+  table { width: 100%; border-collapse: collapse; margin: 2mm 0 4mm; font-size: 8.8pt; }
+  th {
+    text-align: left; font-weight: 700; font-size: 8pt; text-transform: uppercase;
+    letter-spacing: 0.04em; color: #6b6a60;
+    padding: 1.6mm 2.5mm; border-bottom: 1.5px solid #3a392f;
+  }
+  td { padding: 1.8mm 2.5mm; border-bottom: 0.6px solid #d9d7cc; vertical-align: top; }
+  tr:nth-child(even) td { background: #f8f7f2; }
+  .fig { margin: 3mm 0 1.5mm; break-inside: avoid; }
+  .fig svg { width: 100%; height: auto; display: block; }
+  .cap { font-size: 8pt; color: #6b6a60; margin-top: 1mm; }
+  ul { margin: 1mm 0 3mm 4.5mm; }
+  li { margin-bottom: 1.2mm; }
+  .note {
+    background: #f6f5ee; border-left: 3px solid hsl(78 56% 53%);
+    padding: 2.5mm 4mm; margin: 3mm 0; font-size: 9pt;
+  }
+  .kicker {
+    font-size: 7.5pt; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.12em; color: hsl(78 58% 38%); margin-bottom: 1mm;
+  }
+  .flow {
+    font-family: "DejaVu Sans Mono", monospace; font-size: 8pt; line-height: 1.55;
+    background: #f6f5ee; border: 0.6px solid #d9d7cc; border-radius: 3px;
+    padding: 3mm 4mm; margin: 2mm 0 3mm; white-space: pre; overflow: hidden;
+  }
+  .pagebreak { break-before: page; }
+</style>
+</head>
+<body>
+
+<div class="kicker">Realiza.vc · plataforma do Programa de Mentoria</div>
+<h1>Como os dados da plataforma ficam organizados</h1>
+<p class="sub">Documento para leitura de negócio. Descreve o <strong>modelo final planejado</strong>: parte já está no banco, parte é decisão tomada no backlog — o que falta aparece no fim. Outubro de 2026.</p>
+
+<h2>A forma do modelo</h2>
+
+<p class="lead">O programa funciona em ciclos com turmas. Cada turma segue um cronograma oficial que marca as datas das formações e dos dezesseis encontros esperados. O centro da operação é a <strong>dupla</strong>: um mentor e um mentorado. Tudo o que acontece na jornada fica registrado pendurado nessa dupla: encontros agendados, registros semanais, encaminhamentos com prazo e o encerramento do ciclo.</p>
+
+<p>O modelo separa três conceitos de propósito: <strong>programa</strong> é a iniciativa (Mentoria Profissional, DPP…), <strong>turma</strong> é a coorte (a quem a vaga do mentorado pertence) e <strong>cronograma</strong> é o calendário (quantos encontros, em que datas, com quais instrumentos). Uma turma pode ter mais de um cronograma, e DPP versus especialista é trilha da dupla, não calendário diferente.</p>
+
+<p>A regra de fronteira está gravada no próprio modelo: <strong>a dupla agenda os encontros; a coordenação monitora e faz a cobrança</strong>. Por isso a escrita dos encontros pertence ao mentor, e a coordenação e os auxiliares leem e acompanham.</p>
+
+<h2>Duas listas de pessoas</h2>
+
+<p>Quem tem conta na plataforma vive na tabela <code>profiles</code>: coordenação, auxiliares executivos e mentores, todos entrando por magic link. O mentorado mora numa tabela própria, <code>mentorados</code>, e não tem login. Ele é cadastrado pela coordenação e interage por links enviados no WhatsApp ou e-mail: formulários, atividades, assinatura de termo.</p>
+
+<p>Separação útil por dois motivos. Primeiro, fricção: o mentorado responde no celular sem criar conta. Segundo, privacidade: os dados sensíveis ficam em áreas que só a coordenação lê, e a regra está no banco, não na convenção. Se um dia o mentorado ganhar conta, tudo que foi coletado via link já está ligado à identidade dele e migra junto.</p>
+
+<h2>Os papéis — por contexto, não globais</h2>
+
+<p>No modelo final o papel não é uma propriedade única da pessoa: <code>profile_roles</code> amarra pessoa × programa/turma a um papel. A mesma pessoa pode ser coordenação num programa e mentor noutro.</p>
+
+<table>
+  <tr><th style="width:22%">Papel</th><th style="width:33%">Quem é</th><th>O que vê e o que faz</th></tr>
+  <tr>
+    <td class="mono">coordenacao</td>
+    <td>Equipe do programa</td>
+    <td>Vê e administra tudo dentro do programa: cadastra pessoas, monta duplas, acompanha o semáforo, modera o mural de especialistas.</td>
+  </tr>
+  <tr>
+    <td class="mono">auxiliar_executivo</td>
+    <td>Responsável direto por um conjunto de duplas</td>
+    <td>Acompanha as duplas que lhe cabem e faz cobrança. O escopo pode ser por turma (a turma vira o "grupo") ou por lista de duplas — decisão em aberto.</td>
+  </tr>
+  <tr>
+    <td class="mono">mentor_dpp</td>
+    <td>Mentor da trilha principal</td>
+    <td>Vê e escreve apenas na própria dupla: agenda encontros e preenche o registro semanal.</td>
+  </tr>
+  <tr>
+    <td class="mono">mentor_especialista</td>
+    <td>Mentor experiente por tema</td>
+    <td>Vê o mural de solicitações e, ao aceitar uma, passa a ter uma dupla curta com o mentorado.</td>
+  </tr>
+</table>
+
+<p>Duas homonímias que o modelo resolve. A primeira: hoje o papel do auxiliar aparece como <code>supervisor</code> no banco; vira <code>auxiliar_executivo</code>. A segunda: existe outra figura chamada supervisor no dia a dia, o <strong>mentor experiente que supervisiona a prática do mentor</strong>. Esse não é papel nem vínculo fixo — são sessões registradas na tabela <code>supervisoes</code>, leve de propósito porque muda sob demanda. O mentor lê as sessões sobre ele; a coordenação modera.</p>
+
+<div class="fig">
+<svg viewBox="0 0 720 560" xmlns="http://www.w3.org/2000/svg" font-family="Noto Sans">
+  <defs>
+    <marker id="ar2" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+      <path d="M0,0 L8,4 L0,8 z" fill="#7a7a70"/>
+    </marker>
+  </defs>
+
+  <!-- hierarchy chain -->
+  <rect x="24" y="16" width="200" height="48" rx="4" fill="#faf9f4" stroke="#a8a698" stroke-width="1" stroke-dasharray="5 3"/>
+  <text x="124" y="37" text-anchor="middle" font-family="DejaVu Sans Mono" font-size="11" font-weight="bold" fill="#2b2a26">programas</text>
+  <text x="124" y="52" text-anchor="middle" font-size="8" fill="#8a887f">Mentoria Profissional, DPP…</text>
+  <line x1="124" y1="66" x2="124" y2="96" stroke="#7a7a70" stroke-width="1.1" marker-end="url(#ar2)"/>
+  <rect x="24" y="100" width="200" height="48" rx="4" fill="#ffffff" stroke="#3a392f" stroke-width="1.2"/>
+  <text x="124" y="121" text-anchor="middle" font-family="DejaVu Sans Mono" font-size="11" font-weight="bold" fill="#2b2a26">turmas</text>
+  <text x="124" y="136" text-anchor="middle" font-size="8" fill="#8a887f">1 · AGO/2026, 2 · SET/2026</text>
+  <line x1="124" y1="150" x2="124" y2="180" stroke="#7a7a70" stroke-width="1.1" marker-end="url(#ar2)"/>
+  <rect x="24" y="184" width="200" height="52" rx="4" fill="hsl(78 56% 53% / 0.12)" stroke="hsl(78 58% 38%)" stroke-width="1.6"/>
+  <text x="124" y="205" text-anchor="middle" font-family="DejaVu Sans Mono" font-size="11" font-weight="bold" fill="#2b2a26">cronogramas</text>
+  <text x="124" y="220" text-anchor="middle" font-size="8" fill="#5c5b52">nº encontros, datas, instrumentos</text>
+  <line x1="124" y1="238" x2="124" y2="268" stroke="#7a7a70" stroke-width="1.1" marker-end="url(#ar2)"/>
+  <rect x="24" y="272" width="200" height="44" rx="4" fill="#faf9f4" stroke="#a8a698" stroke-width="1"/>
+  <text x="124" y="290" text-anchor="middle" font-family="DejaVu Sans Mono" font-size="10" font-weight="bold" fill="#2b2a26">ciclo_eventos</text>
+  <text x="124" y="304" text-anchor="middle" font-size="7.5" fill="#8a887f">datas passam a pertencer ao cronograma</text>
+
+  <!-- duplas -->
+  <rect x="310" y="120" width="240" height="216" rx="4" fill="hsl(78 56% 53% / 0.10)" stroke="hsl(78 58% 38%)" stroke-width="1.6"/>
+  <text x="430" y="140" text-anchor="middle" font-family="DejaVu Sans Mono" font-size="11.5" font-weight="bold" fill="#2b2a26">duplas</text>
+  <text x="430" y="154" text-anchor="middle" font-size="8.5" fill="#5c5b52">pertence à turma e segue um cronograma</text>
+  <line x1="322" y1="162" x2="538" y2="162" stroke="#c4c2b2"/>
+  <text x="322" y="177" font-family="DejaVu Sans Mono" font-size="8.5" fill="#2b2a26">turma_id</text><text x="538" y="177" text-anchor="end" font-size="8" fill="#6b6a60">→ turmas</text>
+  <text x="322" y="200" font-family="DejaVu Sans Mono" font-size="8.5" fill="#2b2a26">cronograma_id</text><text x="538" y="200" text-anchor="end" font-size="8" fill="#6b6a60">→ cronogramas</text>
+  <text x="322" y="223" font-family="DejaVu Sans Mono" font-size="8.5" fill="#2b2a26">mentor_id</text><text x="538" y="223" text-anchor="end" font-size="8" fill="#6b6a60">→ profiles</text>
+  <text x="322" y="246" font-family="DejaVu Sans Mono" font-size="8.5" fill="#2b2a26">mentorado_id</text><text x="538" y="246" text-anchor="end" font-size="8" fill="#6b6a60">→ mentorados</text>
+  <text x="322" y="269" font-family="DejaVu Sans Mono" font-size="8.5" fill="#2b2a26">supervisor_id</text><text x="538" y="269" text-anchor="end" font-size="8" fill="#6b6a60">→ auxiliar executivo</text>
+  <text x="322" y="292" font-family="DejaVu Sans Mono" font-size="8.5" fill="#2b2a26">trilha</text><text x="538" y="292" text-anchor="end" font-size="8" fill="#6b6a60">dpp | especialista</text>
+  <text x="322" y="315" font-family="DejaVu Sans Mono" font-size="8.5" fill="#2b2a26">status</text><text x="538" y="315" text-anchor="end" font-size="8" fill="#6b6a60">ativa | pausada | encerrada</text>
+
+  <!-- elbow connectors duplas -> hierarchy -->
+  <polyline points="310,170 260,170 260,124 228,124" fill="none" stroke="#7a7a70" stroke-width="1.1" marker-end="url(#ar2)"/>
+  <polyline points="310,190 278,190 278,210 228,210" fill="none" stroke="#7a7a70" stroke-width="1.1" marker-end="url(#ar2)"/>
+
+  <!-- profiles / mentorados -->
+  <rect x="586" y="60" width="120" height="128" rx="4" fill="#ffffff" stroke="#3a392f" stroke-width="1.2"/>
+  <text x="646" y="80" text-anchor="middle" font-family="DejaVu Sans Mono" font-size="10.5" font-weight="bold" fill="#2b2a26">profiles</text>
+  <text x="646" y="93" text-anchor="middle" font-size="8" fill="#8a887f">com login</text>
+  <line x1="596" y1="100" x2="696" y2="100" stroke="#d9d7cc"/>
+  <text x="646" y="118" text-anchor="middle" font-size="8" fill="#4a493f">coordenacao</text>
+  <text x="646" y="136" text-anchor="middle" font-size="8" fill="#4a493f">auxiliar executivo</text>
+  <text x="646" y="154" text-anchor="middle" font-size="8" fill="#4a493f">mentor_dpp</text>
+  <text x="646" y="172" text-anchor="middle" font-size="8" fill="#4a493f">mentor_especialista</text>
+  <rect x="586" y="216" width="120" height="76" rx="4" fill="#ffffff" stroke="#3a392f" stroke-width="1.2"/>
+  <text x="646" y="236" text-anchor="middle" font-family="DejaVu Sans Mono" font-size="10.5" font-weight="bold" fill="#2b2a26">mentorados</text>
+  <text x="646" y="249" text-anchor="middle" font-size="8" fill="#8a887f">sem login</text>
+  <text x="646" y="268" text-anchor="middle" font-size="8" fill="#4a493f">links tokenizados</text>
+
+  <polyline points="586,120 560,120 560,215 554,215" fill="none" stroke="#7a7a70" stroke-width="1.1" marker-end="url(#ar2)"/>
+  <polyline points="586,150 570,150 570,262 554,262" fill="none" stroke="#7a7a70" stroke-width="1.1" marker-end="url(#ar2)"/>
+  <line x1="586" y1="254" x2="554" y2="245" stroke="#7a7a70" stroke-width="1.1" marker-end="url(#ar2)"/>
+
+  <!-- papel por contexto note -->
+  <rect x="24" y="356" width="200" height="60" rx="4" fill="#f6f5ee" stroke="#b9b7a8"/>
+  <text x="124" y="376" text-anchor="middle" font-size="9" font-weight="bold" fill="#2b2a26">papel por contexto</text>
+  <text x="124" y="391" text-anchor="middle" font-size="7.5" fill="#6b6a60">a mesma pessoa pode ser coord</text>
+  <text x="124" y="403" text-anchor="middle" font-size="7.5" fill="#6b6a60">num programa e mentor noutro</text>
+
+  <!-- grupo derivado note -->
+  <rect x="310" y="356" width="240" height="60" rx="4" fill="#f6f5ee" stroke="#b9b7a8"/>
+  <text x="430" y="376" text-anchor="middle" font-size="9" font-weight="bold" fill="#2b2a26">"grupo" = conjunto derivado</text>
+  <text x="430" y="391" text-anchor="middle" font-size="7.5" fill="#6b6a60">duplas sob o mesmo auxiliar executivo;</text>
+  <text x="430" y="403" text-anchor="middle" font-size="7.5" fill="#6b6a60">não é tabela — líder já existe</text>
+
+  <!-- children -->
+  <rect x="24" y="470" width="128" height="50" rx="4" fill="#f6f5ee" stroke="#b9b7a8"/>
+  <text x="88" y="490" text-anchor="middle" font-family="DejaVu Sans Mono" font-size="9.5" fill="#2b2a26">encontros</text>
+  <rect x="164" y="470" width="128" height="50" rx="4" fill="#f6f5ee" stroke="#b9b7a8"/>
+  <text x="228" y="490" text-anchor="middle" font-family="DejaVu Sans Mono" font-size="9.5" fill="#2b2a26">registros</text>
+  <rect x="304" y="470" width="128" height="50" rx="4" fill="#f6f5ee" stroke="#b9b7a8"/>
+  <text x="368" y="490" text-anchor="middle" font-family="DejaVu Sans Mono" font-size="9.5" fill="#2b2a26">encaminham.</text>
+  <rect x="444" y="470" width="128" height="50" rx="4" fill="#f6f5ee" stroke="#b9b7a8"/>
+  <text x="508" y="490" text-anchor="middle" font-family="DejaVu Sans Mono" font-size="9.5" fill="#2b2a26">encerramentos</text>
+  <rect x="584" y="470" width="122" height="50" rx="4" fill="#f6f5ee" stroke="#b9b7a8"/>
+  <text x="645" y="490" text-anchor="middle" font-family="DejaVu Sans Mono" font-size="9.5" fill="#2b2a26">notas e anexos</text>
+
+  <line x1="360" y1="338" x2="92" y2="466" stroke="#b9b7a8" stroke-width="1" marker-end="url(#ar2)"/>
+  <line x1="392" y1="338" x2="230" y2="466" stroke="#b9b7a8" stroke-width="1" marker-end="url(#ar2)"/>
+  <line x1="420" y1="338" x2="368" y2="466" stroke="#b9b7a8" stroke-width="1" marker-end="url(#ar2)"/>
+  <line x1="452" y1="338" x2="506" y2="466" stroke="#b9b7a8" stroke-width="1" marker-end="url(#ar2)"/>
+  <line x1="484" y1="338" x2="642" y2="466" stroke="#b9b7a8" stroke-width="1" marker-end="url(#ar2)"/>
+</svg>
+</div>
+<p class="cap">Modelo final. Programa, turma e cronograma são registros próprios; a dupla diz a qual turma pertence e qual calendário segue.</p>
+
+<div class="pagebreak"></div>
+
+<h2>A dupla, unidade central</h2>
+
+<div class="flow">duplas
+├── mentor_id       → profiles (mentor_dpp ou mentor_especialista)
+├── mentorado_id    → mentorados
+├── supervisor_id   → auxiliar executivo que acompanha ESTA dupla
+├── turma_id        → turmas          (a coorte)
+├── cronograma_id   → cronogramas     (o calendário que ela segue)
+├── trilha          → 'dpp' | 'especialista'
+├── status          → ativa | pausada | encerrada | concluida
+└── solicitacao_id  → se nasceu de uma solicitação de especialista</div>
+
+<p>O <strong>mentor principal</strong> do mentorado é a dupla da trilha DPP. O banco garante no máximo uma dupla ativa de cada trilha por mentorado.</p>
+
+<h2>As duas trilhas</h2>
+
+<p>A trilha DPP é o programa principal: dezesseis encontros no cronograma oficial, semáforo acompanhando. A trilha de especialista é curta e paralela, <strong>filha da DPP</strong>, criada para uma necessidade pontual:</p>
+
+<ul>
+  <li>A dupla DPP pede apoio e descreve a demanda.</li>
+  <li>O pedido vai a um mural visível para os mentores especialistas.</li>
+  <li>Um especialista aceita e nasce uma dupla curta com o mentorado — já ligada à DPP de origem e <strong>herdando a turma por esse vínculo</strong> (não tem como divergir).</li>
+  <li>Não carrega cronograma próprio: a trilha é livre, cinco passos com prazo de três meses, guia e telas próprios.</li>
+  <li>A devolutiva final chega ao mentor DPP.</li>
+</ul>
+
+<p>Se a trilha de especialista for acompanhada, pode ser por <strong>outro</strong> auxiliar: cada dupla guarda quem a acompanha, então o assistente do especialista não precisa ser o mesmo da DPP.</p>
+
+<h2>O cronograma: eventos ricos</h2>
+
+<p>O calendário não é só "dezesseis datas". Cada evento do cronograma tem <strong>tipo</strong> (etapa de preparação, encontro numerado de 1 a 16, recesso, encerramento, formação), <strong>fase metodológica</strong> (de onde derivam os instrumentos), <strong>dia da semana variável</strong> — a Turma 2 tem quintas de encontro duplo, nada assume terça — e <strong>observações e regras</strong> ("reposição na mesma semana", feriado municipal, nota da ONG parceira).</p>
+
+<p>Etapas de preparação podem existir <strong>só como status</strong>, sem data: a triagem e o matching feitos pela ONG parceira aparecem como "concluídos", não como evento marcado.</p>
+
+<h2>O "grupo" — conjunto derivado, não tabela</h2>
+
+<p>Grupo não é uma entidade: é <strong>o conjunto de duplas sob o mesmo auxiliar executivo</strong>. A pergunta certa é "quem é o líder", e o líder já existe — é o auxiliar. A tabela <code>grupos</code> entra só quando o grupo tiver dado próprio (nome, capacidade, local físico, divisão por maturidade dos participantes). Se a decisão pendente escolher auxiliar-por-turma, a própria turma passa a ser o grupo, sem camada intermediária.</p>
+
+<h2>A vida da dupla</h2>
+
+<div class="flow">matching (coord monta com grade de disponibilidade + afinidade)
+  → dupla ativa
+  → encontros 1..16 agendados pela dupla (histórico de remarcações)
+  → registros semanais (campos do form oficial de mentores)
+  → SEMÁFORO derivado na leitura + memória temporal
+  → nudges coord/auxiliar
+  → encerramento com checklist do rito + resumo da jornada</div>
+
+<h2>Instrumentos e interações do mentorado</h2>
+
+<table>
+  <tr><th style="width:32%">Estrutura</th><th>O que é</th></tr>
+  <tr><td class="mono">formularios + links + respostas</td><td>Forms engine nativa: a coordenação cria formulários, gera link por token e o público responde sem login. Forms oficiais do sistema são imutáveis.</td></tr>
+  <tr><td class="mono">atividade_links</td><td>Link tokenizado multi-sessão (formulário, PDF, roda, PDM) com rascunho — o mentorado continua depois sem perder o que escreveu.</td></tr>
+  <tr><td class="mono">pdm</td><td>Plano de Desenvolvimento como documento vivo: metas SMART desdobradas em submetas recursivas.</td></tr>
+  <tr><td class="mono">roda_vida</td><td>Roda da Vida interativa: 16 eixos, radar, overlay antes/depois.</td></tr>
+  <tr><td>Avaliações por encontro</td><td>Mentor e mentorado avaliam cada sessão; agrega na avaliação 360.</td></tr>
+  <tr><td class="mono">assinaturas</td><td>Termo eletrônico com evidências (hash, IP, versão do documento); token pro responsável de menor.</td></tr>
+  <tr><td class="mono">materiais · presencas · supervisoes</td><td>Biblioteca por encontro e audiência; chamada de formação; supervisão de prática.</td></tr>
+  <tr><td class="mono">encaminhamentos · notas · anexos</td><td>Ações com prazo (vencido vira sinal no semáforo), timeline de contatos, contexto e evidências.</td></tr>
+</table>
+
+<h2>Relatórios e inteligência</h2>
+
+<p>Exports CSV por tipo, hub de relatórios com dashboards operacionais filtráveis, e snapshot do semáforo em série temporal — hoje o risco é calculado na hora, sem memória. A camada de IA vem por cima de agregados sem dados pessoais: score determinístico mais narrativa, sob a revisão de privacidade.</p>
+
+<h2>Perguntas levantadas no grupo</h2>
+
+<table>
+  <tr><th style="width:34%">Pergunta</th><th>Como o modelo responde</th></tr>
+  <tr><td>O coordenador se liga ao grupo ou à turma?</td><td>Por <strong>programa</strong> (papel por contexto). Quem cola na turma na operação é o auxiliar executivo.</td></tr>
+  <tr><td>O mentor especialista se associa ao grupo?</td><td>Não — à dupla DPP de origem. É uma dupla filha, que nasce do aceite da solicitação e herda a turma por esse vínculo.</td></tr>
+  <tr><td>O supervisor se associa ao grupo?</td><td>O auxiliar executivo sim (conjunto de duplas, ou turma). O supervisor de prática não — são sessões registradas com o mentor.</td></tr>
+  <tr><td>Grupo só existe se houver um líder?</td><td>Correto — por isso é conjunto derivado, não tabela. O líder é o auxiliar executivo.</td></tr>
+  <tr><td>A tabela profiles é a pessoa ou só o nome?</td><td>A pessoa com login. Mentor é um papel da pessoa, não tabela separada — dados de mentor ficam em <code>mentor_profiles</code>.</td></tr>
+  <tr><td>Mesmo mentorado com DPP e especialista?</td><td>Sim — no máximo uma dupla ativa de cada trilha, garantido no banco. "Mentor principal" é a dupla DPP.</td></tr>
+  <tr><td>Especialista com as mesmas telas do DPP?</td><td>Não — agenda própria com cinco passos, guia próprio, mural de solicitações.</td></tr>
+  <tr><td>Um supervisor por trilha?</td><td>Cada dupla tem seu próprio auxiliar executivo — pode ser o mesmo da DPP ou outro.</td></tr>
+</table>
+
+<h2>Já está no banco × ainda falta</h2>
+
+<p><strong>Já existe:</strong> pessoas com e sem login, duplas com trilha, encontros, registros, encaminhamentos, encerramentos, supervisões, presenças de formação, forms engine, assinaturas, materiais, comunicados e notificações — e o cronograma como entidade escopando cada turma (que chegou essa semana).</p>
+
+<p><strong>Ainda falta:</strong> turmas e programas como entidades plenas, papel por contexto, escopo do auxiliar por turma, o rename supervisor→auxiliar executivo, PDM e Roda da Vida como estruturas, links de atividade multi-sessão, histórico de remarcações, avaliação por encontro, memória temporal do semáforo e o perfil rico da pessoa.</p>
+
+</body>
+</html>

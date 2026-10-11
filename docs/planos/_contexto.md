@@ -127,3 +127,57 @@ Os 2 PDFs oficiais mostram o formato real — bem mais rico que `ciclo_eventos` 
 - **Turma 2** (17 duplas, parceria ONG Cidadão Pró-Mundo): início **06/10/2026**, terças + **3 quintas de encontro duplo** (05/11, 03/12, 10/12) pra alinhar o fim com a T1; **duplas chegam pré-formadas pela ONG** (matching externo — nem toda turma usa o matching interno); triagem/matching aparece como etapa "concluída", não data.
 - **Encerramento compartilhado:** evento único 15/01/2027 pras duas turmas (30 duplas simultâneas no pico nov–dez).
 - **Implicação:** `ciclo_eventos` precisa de tipo de evento (etapa/encontro/evento), dia-da-semana variável, fase metodológica por encontro (instrumento deriva da fase), e observações/regras. O semáforo por dupla precisa do `cronograma_id` dela — caso contrário T1 e T2 corrompem um ao outro.
+
+## Decisões — rodada modelo de dados (Kelyng × Thiago, 07–08/out/2026)
+
+Discussão no grupo sobre `arquitetura-dados` + DER. Kelyng = analista de negócios senior, revisou o modelo ponto a ponto.
+
+**Decidido:**
+
+- **Grupo não é tabela** — conjunto derivado das duplas do auxiliar executivo (`duplas.supervisor_id`). Vira entidade só quando ganhar dado próprio (local físico, capacidade, maturidade). Kelyng chegou à mesma regra sozinha.
+- **Supervisor de relacionamento** (mentor experiente que supervisiona) fica **fora** da estrutura — muda sob demanda; só as sessões viram registro (`supervisoes`).
+- **Especialista é filha da DPP** — já implementado via `duplas.solicitacao_id` → solicitação → `dupla_dpp_id`; herda turma no aceite, sem cronograma próprio (trilha livre, 5 encontros/3 meses). Melhoria registrada como REALIZA-98: `duplas.dupla_dpp_id` direto (higiene, ~1 migration).
+- **Campos de turma moram na turma** — Kelyng: dupla não carrega cronograma nem campos de turma, só `turma_id`, e deriva o resto. Hoje `duplas.turma` (texto) + `cronograma_id` podem divergir — resolve na -47 (turma entidade): ou dupla deriva via turma, ou regra de coerência.
+- **Onboarding por papel** — cadastro base comum + dados por cargo. Destino: estrutural→tabela de extensão 1:1 (padrão `mentor_profiles`), questionário→forms engine. Gaps registrados na -36 (audiencia + mapping resposta→canônico) e -72 (escopo ampliado).
+- **Pessoa única = modelo-alvo** — `pessoas` (identidade) + tabelas de papel. `mentorados` já é a "tabela de mentorado" dela; falta a camada de identidade compartilhada. Merge total NÃO é prioridade (T2 ao vivo, instrumentos na fila). Degraus: -16 (mentorado→conta), -48 (profile_roles). Caminho barato se adiar: `profiles.mentorado_id` link. Detalhe: dupla aponta `pessoas.id`; pra forçar papel, FK pode mirar `mentor_profiles(profile_id)`.
+- **Papel de mentor é multi-valor na realidade** — evidência: form "Modelo Inscrição de Mentores" (`Atuação desejada, marque todas que se apliquem`) → **5/24 mentores marcaram DPP+Especialista** (incl. Kelyng), 4 só Especialista; Base Atados `Nome da função` → 20 DPP + 7 Especialistas. Modelo atual (`profiles.role` + `mentor_profiles.tipo`, valor único global) **não representa isso** — papel é identidade, não capacidade. Consequência: -48 (`profile_roles` pessoa×turma) vira requisito de import fiel, não só elegância. Pro import da -31: decidir modelagem mínima do dual-role (ex.: flag em `mentor_profiles`) vs. esperar refactor.
+
+**Pendente (aguardando confirmação da Kelyng):**
+
+- **Auxiliar executivo por turma × por dupla** — rodada 2 decidiu *por turma*, mas Kelyng argumentou *por dupla* (o Leo pode trocar o assistente de uma dupla só, sem mexer no resto; Leo confirmou "cada assistente acompanha um conjunto de duplas"). Ela disse "turma" na primeira frase mas o raciocínio todo sustenta dupla — Thiago vai confirmar. Trava REALIZA-32. Se fechar por dupla: o schema atual já é isso, a issue vira escopo de leitura/RLS.
+
+**Abertas sem dono:** campos de turma no DER (o segundo que ela não lembrou — provável `programa`/`agendamento`); tabela por papel só quando tiver campo real pra guardar.
+
+## Decisões — mentorado na plataforma (reunião Leo + alinhamento Thiago, 08–09/out/2026)
+
+Jovem ganha **login real** (não portal por token). Identidade em `profiles`, `mentorados` vira extensão de papel (simétrico a `mentor_profiles`); `papel='mentorado'` nasce em `profile_roles` (-105). Token continua pra transações pontuais (form, assinatura).
+
+**Avaliação do encontro pelo jovem** — nova tabela (por encontro, casada com `realizado`):
+`estrelas 1-5` + `sentimento` (chips) + `avancei` (sim/um pouco/não) + `temas` (chips[]) + `comentario` + `pedir_apoio` (→ notificação coord+sup). Visibilidade: **especialista vê a estrela das suas sessões; DPP vê só a média agregada** dos próprios encontros (nada específico — privacidade: com 1 jovem, nota identifica); coord+supervisor veem tudo. Opção "mostrar ao mentor" existe mas **desabilitada por padrão**. Vai além do "5★+comentário" do Leo — 3 chips opcionais de 1 toque pra retrospectiva (avisar). Disparo: WhatsApp quando encontro vira `realizado`. Não-resposta é sinal pro semáforo. Migra respostas existentes (autoavaliação semanal descontinuada — template desativado, dados migram; 360º fica como instrumento de fim de ciclo).
+
+**Agendamento DPP = edição livre com notificação** — corrigido 09/out após crítica. Modelo escolhido pelo Thiago (não simétrico, não assimétrico): **qualquer lado marca ou altera o encontro; o outro é notificado e pode reverter.** Sem portão de aceite — `registrarEncontroRetroativo` deixaria de ser brecha porque não há portão. Obrigatório: notificação em toda mutação de `data_hora`/`link` (trigger, não action) + tipos novos `encontro_marcado`/`_alterado`/`_desfeito`. Jovem ganha write em `encontros` via RPC. Proposta→aceite só existe pra especialista (D5).
+
+**Especialista: novo modelo (jovem-iniciado)**
+- Jovem vê catálogo de especialistas (aba Pessoas filtrada: especialistas + colegas da turma; whatsapp/socials OK, **dados sigilosos não** — sem dados civis/documentos)
+- Especialista marca disponibilidade na agenda; jovem só pede em slot livre; cruza conflitos entre todos os jovens do especialista
+- Pedido = motivo + slot → especialista recebe notificação (perfil do jovem + razão) → **aceita / recusa c/ justificativa em caixas / contra-propõe horário** → volta pro jovem aceitar ou contra-propor; botão de fallback "negociar no WhatsApp". Aceite cria a dupla especialista (como hoje). Fluxo antigo (mentor/coord pedem) **coexiste**
+- **Jovem pode pedir especialista sem ter dupla DPP** → `solicitacoes_especialista.dupla_dpp_id` vira nullable
+- **Múltiplos especialistas simultâneos** → `unique(ciclo, mentorado_id, trilha)` relaxa (chave por especialista)
+- **Budget 5 sessões por PAR (jovem × especialista) por ciclo** — corrigido 09/out: jovem pode ter 5 com cada especialista; baixa na aceitação; recusa/cancelamento/`nao_aconteceu` devolve via RPC (delete é coord-only). Count cruza TODAS as duplas do par na mesma turma (anti-reset)
+- **Prazo de 3 meses = sinal mole, não removido** — corrigido 09/out: badge/countdown/bloqueio morrem, mas trilha ativa 90d+ sem sessão nova → `atenção` no semáforo. Guia prescreve "contrato de até 3 meses"; sem sinal, trilha zumbi segura vaga e renderiza "Em dia" eternamente
+- Duração livre dentro da whitelist 30-120min (default 60)
+- Mentor pode ser DPP+especialista ao mesmo tempo → depende de -105 (views por trilha)
+- **Pedido sem DPP exige ack da coord** — adulto de referência = coordenação; `solicitacao.turma` setada na triagem
+
+**/jovem escopo:** home (minha dupla + dados do mentor DPP), agenda própria (ver + agendar), materiais (view centralizada de atividades), combinados (marca como feito — `encaminhamentos` já existe, só RLS), avaliações, catálogo. **Não vê** `registros`/`encontro_notas`/`interacoes` (instrumento do mentor). Aba Pessoas: especialistas + colegas de turma + **mentor DPP + coordenação**; whatsapp/socials de **adultos** visíveis, **colegas = opt-in** (`contato_compartilhado` default off — contato menor↔menor é superfície nova); civis/documentos nunca. Audiência `'todos'` inclui jovem (decisão mantida — exige auditoria one-off do conteúdo histórico antes do rollout). Assinatura/forms **híbrido**: token funciona logado ou não; notificação in-app abre o link; sessão×destinatário divergente = recusa + `respondido_por_profile_id`. Avatar = iniciais na v1 (CDN pública sem moderação, sem consentimento de imagem). Cibely precisa de remanejo; 3 mentores novos entraram.
+
+**Disponibilidade do especialista:** grade semanal recorrente + **exceções datadas** (bloqueio/extra — modelo "working hours"). Grade dia×período atual é hint, não enforcement — modelo novo com slots reais. **Conflito checado dos DOIS lados** no aceite: overlap contra todas as duplas do especialista E do mentorado (zero checagem de overlap existe no schema hoje).
+
+**Ajustes pós-revisão rodada 3 (09/out, Thiago):**
+- **Jovem marca `nao_aconteceu`** — DPP e especialista. Reaproveita o sistema de marcar existente: flexível, sem burocracia, **auditável** (notificação ao outro lado carimba o ator). `realizado` segue exclusivo do mentor. Resolve o "especialista fantasma" (jovem marca → refund dispara, sem fila da coord) e dá voz de disputa ao jovem.
+- **`motivo_reagendamento` no whitelist** do RPC do jovem — edição livre sem canal de "porquê" vira ping-pong mudo.
+- **Máquina de estados da solicitação via RPCs definer**, não em `sol_update` (policy vira máquina de estados em SQL = frágil; padrão `realiza.sol_aceite` GUC já existe).
+- **`contato_compartilhado`: o próprio jovem liga/desliga** via RPC (privacidade dele; coord pode pré-setar no intake com consentimento do responsável).
+- **E-mail = pré-requisito de login aceito** ("todo mundo precisa de e-mail hoje") — adoção não é o risco, retenção é. **WhatsApp bot como canal = fora de escopo atual**, nota de futuro.
+- **Sem infra de feature-flag** — ausência do papel `mentorado` é o flag; as 3 mudanças de superfície compartilhada (migration A, trigger em `encontros`, mural) mitigadas por staging + `create or replace` instantâneo.
+- Piloto: 1-2 jovens + 1 mentor engajado antes do geral; auditoria `'todos'` + inventário de e-mails antes do piloto.
