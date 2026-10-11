@@ -1,0 +1,83 @@
+<svg viewBox="0 0 720 540" xmlns="http://www.w3.org/2000/svg" font-family="Noto Sans">
+  <defs>
+    <marker id="ar" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+      <path d="M0,0 L8,4 L0,8 z" fill="#7a7a70"/>
+    </marker>
+  </defs>
+
+  <!-- ciclo_eventos -->
+  <rect x="235" y="12" width="250" height="66" rx="4" fill="#faf9f4" stroke="#a8a698" stroke-width="1" stroke-dasharray="5 3"/>
+  <text x="360" y="34" text-anchor="middle" font-family="DejaVu Sans Mono" font-size="11.5" font-weight="bold" fill="#2b2a26">ciclo_eventos</text>
+  <text x="360" y="50" text-anchor="middle" font-size="9" fill="#4a493f">16 encontros + formações oficiais</text>
+  <text x="360" y="64" text-anchor="middle" font-size="8.5" fill="#8a887f">chave de texto: ciclo = "2026/2027"</text>
+
+  <!-- profiles -->
+  <rect x="14" y="150" width="212" height="196" rx="4" fill="#ffffff" stroke="#3a392f" stroke-width="1.2"/>
+  <text x="120" y="170" text-anchor="middle" font-family="DejaVu Sans Mono" font-size="11.5" font-weight="bold" fill="#2b2a26">profiles</text>
+  <text x="120" y="184" text-anchor="middle" font-size="8.5" fill="#8a887f">pessoas com login</text>
+  <line x1="26" y1="192" x2="214" y2="192" stroke="#d9d7cc"/>
+  <text x="26" y="207" font-family="DejaVu Sans Mono" font-size="9" fill="#4a5b12">coordenacao</text>
+  <text x="26" y="219" font-size="8" fill="#6b6a60">vê e administra tudo</text>
+  <text x="26" y="240" font-family="DejaVu Sans Mono" font-size="9" fill="#4a5b12">supervisor</text>
+  <text x="26" y="252" font-size="8" fill="#6b6a60">auxiliar executivo: conjunto de duplas</text>
+  <text x="26" y="273" font-family="DejaVu Sans Mono" font-size="9" fill="#4a5b12">mentor_dpp</text>
+  <text x="26" y="285" font-size="8" fill="#6b6a60">escreve só na própria dupla</text>
+  <text x="26" y="306" font-family="DejaVu Sans Mono" font-size="9" fill="#4a5b12">mentor_especialista</text>
+  <text x="26" y="318" font-size="8" fill="#6b6a60">trilha curta por solicitação</text>
+
+  <!-- mentorados -->
+  <rect x="500" y="150" width="206" height="92" rx="4" fill="#ffffff" stroke="#3a392f" stroke-width="1.2"/>
+  <text x="603" y="170" text-anchor="middle" font-family="DejaVu Sans Mono" font-size="11.5" font-weight="bold" fill="#2b2a26">mentorados</text>
+  <text x="603" y="184" text-anchor="middle" font-size="8.5" fill="#8a887f">sem login</text>
+  <line x1="512" y1="192" x2="694" y2="192" stroke="#d9d7cc"/>
+  <text x="512" y="208" font-size="8.5" fill="#4a493f">cadastrado pela coordenação</text>
+  <text x="512" y="224" font-size="8.5" fill="#4a493f">interage por links tokenizados</text>
+
+  <!-- duplas -->
+  <rect x="250" y="150" width="226" height="196" rx="4" fill="hsl(78 56% 53% / 0.10)" stroke="hsl(78 58% 38%)" stroke-width="1.6"/>
+  <text x="363" y="170" text-anchor="middle" font-family="DejaVu Sans Mono" font-size="11.5" font-weight="bold" fill="#2b2a26">duplas</text>
+  <text x="363" y="184" text-anchor="middle" font-size="8.5" fill="#5c5b52">unidade central da operação</text>
+  <line x1="262" y1="192" x2="464" y2="192" stroke="#c4c2b2"/>
+  <text x="262" y="207" font-family="DejaVu Sans Mono" font-size="8.5" fill="#2b2a26">mentor_id</text><text x="462" y="207" text-anchor="end" font-size="8" fill="#6b6a60">→ profiles</text>
+  <text x="262" y="230" font-family="DejaVu Sans Mono" font-size="8.5" fill="#2b2a26">mentorado_id</text><text x="462" y="230" text-anchor="end" font-size="8" fill="#6b6a60">→ mentorados</text>
+  <text x="262" y="253" font-family="DejaVu Sans Mono" font-size="8.5" fill="#2b2a26">supervisor_id</text><text x="462" y="253" text-anchor="end" font-size="8" fill="#6b6a60">→ auxiliar executivo</text>
+  <text x="262" y="276" font-family="DejaVu Sans Mono" font-size="8.5" fill="#2b2a26">ciclo</text><text x="462" y="276" text-anchor="end" font-size="8" fill="#6b6a60">→ "2026/2027" (texto)</text>
+  <text x="262" y="299" font-family="DejaVu Sans Mono" font-size="8.5" fill="#2b2a26">trilha</text><text x="462" y="299" text-anchor="end" font-size="8" fill="#6b6a60">dpp | especialista</text>
+  <text x="262" y="322" font-family="DejaVu Sans Mono" font-size="8.5" fill="#2b2a26">status</text><text x="462" y="322" text-anchor="end" font-size="8" fill="#6b6a60">ativa | pausada | encerrada</text>
+
+  <!-- connectors -->
+  <line x1="226" y1="205" x2="246" y2="205" stroke="#7a7a70" stroke-width="1.1" marker-end="url(#ar)"/>
+  <line x1="226" y1="245" x2="246" y2="251" stroke="#7a7a70" stroke-width="1.1" marker-end="url(#ar)"/>
+  <line x1="500" y1="200" x2="480" y2="222" stroke="#7a7a70" stroke-width="1.1" marker-end="url(#ar)"/>
+  <line x1="363" y1="80" x2="363" y2="146" stroke="#7a7a70" stroke-width="1.1" stroke-dasharray="4 3" marker-end="url(#ar)"/>
+  <text x="372" y="112" font-size="8" fill="#8a887f">dupla.ciclo aponta para o texto, não para uma entidade</text>
+
+  <!-- child tables -->
+  <rect x="14" y="412" width="128" height="54" rx="4" fill="#f6f5ee" stroke="#b9b7a8"/>
+  <text x="78" y="433" text-anchor="middle" font-family="DejaVu Sans Mono" font-size="9.5" fill="#2b2a26">encontros</text>
+  <text x="78" y="447" text-anchor="middle" font-size="7.5" fill="#6b6a60">16 por dupla, mentor agenda</text>
+  <rect x="152" y="412" width="128" height="54" rx="4" fill="#f6f5ee" stroke="#b9b7a8"/>
+  <text x="216" y="433" text-anchor="middle" font-family="DejaVu Sans Mono" font-size="9.5" fill="#2b2a26">registros</text>
+  <text x="216" y="447" text-anchor="middle" font-size="7.5" fill="#6b6a60">follow-up semanal</text>
+  <rect x="290" y="412" width="128" height="54" rx="4" fill="#f6f5ee" stroke="#b9b7a8"/>
+  <text x="354" y="433" text-anchor="middle" font-family="DejaVu Sans Mono" font-size="9.5" fill="#2b2a26">encaminhamentos</text>
+  <text x="354" y="447" text-anchor="middle" font-size="7.5" fill="#6b6a60">ações com prazo</text>
+  <rect x="428" y="412" width="128" height="54" rx="4" fill="#f6f5ee" stroke="#b9b7a8"/>
+  <text x="492" y="433" text-anchor="middle" font-family="DejaVu Sans Mono" font-size="9.5" fill="#2b2a26">encerramentos</text>
+  <text x="492" y="447" text-anchor="middle" font-size="7.5" fill="#6b6a60">checklist do rito</text>
+  <rect x="566" y="412" width="140" height="54" rx="4" fill="#f6f5ee" stroke="#b9b7a8"/>
+  <text x="636" y="433" text-anchor="middle" font-family="DejaVu Sans Mono" font-size="9.5" fill="#2b2a26">notas e anexos</text>
+  <text x="636" y="447" text-anchor="middle" font-size="7.5" fill="#6b6a60">contexto e evidências</text>
+
+  <line x1="320" y1="348" x2="88" y2="408" stroke="#b9b7a8" stroke-width="1" marker-end="url(#ar)"/>
+  <line x1="345" y1="348" x2="224" y2="408" stroke="#b9b7a8" stroke-width="1" marker-end="url(#ar)"/>
+  <line x1="363" y1="348" x2="356" y2="408" stroke="#b9b7a8" stroke-width="1" marker-end="url(#ar)"/>
+  <line x1="385" y1="348" x2="488" y2="408" stroke="#b9b7a8" stroke-width="1" marker-end="url(#ar)"/>
+  <line x1="405" y1="348" x2="624" y2="408" stroke="#b9b7a8" stroke-width="1" marker-end="url(#ar)"/>
+
+  <!-- support strip -->
+  <rect x="14" y="490" width="692" height="42" rx="4" fill="#ffffff" stroke="#d9d7cc"/>
+  <text x="24" y="508" font-size="8" fill="#6b6a60">apoio:</text>
+  <text x="60" y="508" font-family="DejaVu Sans Mono" font-size="8.5" fill="#4a493f">supervisoes · solicitacoes_especialista → mural → aceite · presencas · formularios + links · assinaturas · materiais · comunicados · notificacoes</text>
+  <text x="60" y="522" font-size="8" fill="#8a887f">supervisao de prática: mentor experiente × mentor · trilha especialista: solicitação da dupla DPP → dupla curta</text>
+</svg>

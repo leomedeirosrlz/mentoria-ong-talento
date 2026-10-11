@@ -1,0 +1,405 @@
+// DER do modelo ATUAL (gerado de database.types.ts, 60 migrations aplicadas)
+// Colar em https://dbdiagram.io para navegar interativo
+Project realiza_atual {
+  database_type: 'PostgreSQL'
+  Note: 'Plataforma de Mentoria - estado em producao'
+}
+
+Table assinaturas {
+  Note: 'Termo com CPF+DV, IP/UA, hash SHA-256. Reemitivel; cobre responsavel de menor.'
+  assinado_em timestamptz
+  assinatura_texto text
+  created_at timestamptz
+  created_by uuid [ref: > profiles.id]
+  dados_snapshot jsonb
+  hash_documento text
+  id uuid [pk]
+  ip text
+  mentorado_id uuid [ref: > mentorados.id]
+  profile_id uuid [ref: > profiles.id]
+  status text
+  template_id uuid [ref: > documento_templates.id]
+  token text
+  token_expira_em timestamptz
+  user_agent text
+}
+
+Table ciclo_eventos {
+  Note: 'Lista plana de eventos oficiais por ciclo (texto). Vira filha de cronogramas.'
+  ciclo text
+  data date
+  data_fim text
+  fase text
+  id uuid [pk]
+  instrumentos text[]
+  numero text
+  tipo text
+  titulo text
+}
+
+Table comunicados {
+  Note: 'Comunicados da coordenacao (mural).'
+  audiencia text
+  corpo text
+  created_at timestamptz
+  created_by uuid [ref: > profiles.id]
+  id uuid [pk]
+  prioridade text
+  prioridade_ord text
+  titulo text
+}
+
+Table documento_templates {
+  Note: 'Templates de termo/contrato versionados.'
+  ativo text
+  created_at timestamptz
+  id uuid [pk]
+  signatario text
+  slug text
+  titulo text
+  versao int
+}
+
+Table documentos_pessoa {
+  Note: 'Documentos gerados por pessoa (termo assinado etc).'
+  created_at timestamptz
+  created_by uuid [ref: > profiles.id]
+  id uuid [pk]
+  mentorado_id uuid [ref: > mentorados.id]
+  nome text
+  path text
+  profile_id uuid [ref: > profiles.id]
+  tipo text
+}
+
+Table duplas {
+  Note: 'Unidade central. ciclo e texto solto hoje (sem entidade). trilha: dpp | especialista.'
+  ciclo text
+  created_at timestamptz
+  demanda text
+  devolutiva_pdm text
+  encerrada_em timestamptz
+  id uuid [pk]
+  iniciada_em timestamptz
+  mentor_id uuid [ref: > profiles.id]
+  mentorado_id uuid [ref: > mentorados.id]
+  motivo_encerramento text
+  pdm_url text
+  solicitacao_id uuid [ref: > solicitacoes_especialista.id]
+  status Enums
+  supervisor_id uuid [ref: > profiles.id]
+  trilha text
+}
+
+Table emails_enviados {
+  Note: 'Log de envio Resend.'
+  assunto text
+  audiencia text[]
+  autor_id uuid [ref: > profiles.id]
+  created_at timestamptz
+  destinatarios int
+  enviados int
+  falhas text
+  id uuid [pk]
+  ref_id uuid
+  tipo text
+}
+
+Table encaminhamentos {
+  Note: 'Encaminhamentos com prazo (acao com vencimento).'
+  created_at timestamptz
+  descricao text
+  dupla_id uuid [ref: > duplas.id]
+  id uuid [pk]
+  prazo text
+  registro_id uuid [ref: > registros.id]
+  responsavel text
+  status Enums
+}
+
+Table encerramentos {
+  Note: 'Rito de fim de ciclo por dupla. Checklist + decisao concluida/encerrada.'
+  autoavaliacao_mentor text
+  checklist jsonb
+  created_at timestamptz
+  decidido_por uuid [ref: > profiles.id]
+  disponivel_proximo_ciclo text
+  dupla_id uuid [ref: - duplas.id]
+  id uuid [pk]
+  resumo_jornada text
+  tipo text
+}
+
+Table encontro_notas {
+  Note: 'Notas livres por encontro.'
+  created_at timestamptz
+  created_by uuid [ref: > profiles.id]
+  dupla_id uuid [ref: > duplas.id]
+  id uuid [pk]
+  numero int
+  texto text
+  updated_at timestamptz
+}
+
+Table encontros {
+  Note: 'Agendados pela dupla. unique(dupla_id, numero). realizado = imutavel.'
+  created_at timestamptz
+  created_by uuid [ref: > profiles.id]
+  data_hora timestamptz
+  dupla_id uuid [ref: > duplas.id]
+  duracao_min int
+  id uuid [pk]
+  link text
+  motivo_reagendamento text
+  numero int
+  origem text
+  realizado_em timestamptz
+  status Enums
+}
+
+Table especialista_eventos {
+  Note: 'Catalogo dos 5 passos da trilha especialista (numero/titulo/foco).'
+  foco text
+  numero int
+  titulo text
+}
+
+Table formulario_links {
+  Note: 'Token por destinatario. Canal do mentorado sem login (avaliacao, 360, anamnese).'
+  contexto jsonb
+  created_at timestamptz
+  created_by uuid [ref: > profiles.id]
+  dest_mentorado_id uuid [ref: > mentorados.id]
+  dest_profile_id uuid [ref: > profiles.id]
+  dupla_id uuid [ref: > duplas.id]
+  expira_em timestamptz
+  formulario_id uuid [ref: > formularios.id]
+  id uuid [pk]
+  token text
+  usado_em timestamptz
+}
+
+Table formulario_respostas {
+  Note: 'Respostas por link token.'
+  id uuid [pk]
+  link_id uuid [ref: - formulario_links.id]
+  respondido_em timestamptz
+  respostas jsonb
+}
+
+Table formularios {
+  Note: 'Builder nativo. sistema=true -> oficial imutavel.'
+  ativo text
+  campos jsonb
+  created_at timestamptz
+  created_by uuid [ref: > profiles.id]
+  descricao text
+  id uuid [pk]
+  sistema text
+  titulo text
+  updated_at timestamptz
+  versao int
+}
+
+Table interacoes {
+  Note: 'Timeline de interacoes da dupla.'
+  autor_id uuid [ref: > profiles.id]
+  canal text
+  created_at timestamptz
+  dupla_id uuid [ref: > duplas.id]
+  id uuid [pk]
+  nota text
+  tipo text
+}
+
+Table login_handoffs {
+  Note: 'Handoff do magic link entre abas (nonce, uso unico, TTL 10min).'
+  access_token text
+  expires_at timestamptz
+  failed text
+  nonce text
+  refresh_token text
+}
+
+Table materiais {
+  Note: 'Documentos oficiais. path -> bucket privado com signed URL.'
+  audiencia text
+  created_at timestamptz
+  descricao text
+  encontro_num text
+  id uuid [pk]
+  ordem int
+  path text
+  tipo text
+  titulo text
+  url text
+}
+
+Table mentor_profiles {
+  Note: 'Ficha do mentor: formacao_ok, bio, disponibilidade.'
+  areas text[]
+  capacidade int
+  disponibilidade jsonb
+  experiencia_previa text
+  formacao_externa text
+  formacao_ok text
+  profile_id uuid [ref: - profiles.id]
+  termo_ok text
+  tipo text
+}
+
+Table mentorados {
+  Note: 'Sem login. Interage por links com token. Dados sensiveis em mentorados_pessoal (view coord-only).'
+  avatar_path text
+  cidade text
+  cor_raca text
+  created_at timestamptz
+  dados_civis jsonb
+  data_nascimento timestamptz
+  disponibilidade jsonb
+  documento_path text
+  email text
+  escolaridade text
+  form_bruto jsonb
+  genero text
+  id uuid [pk]
+  interesses text[]
+  motivacao text
+  nome text
+  nome_social text
+  notas text
+  objetivos text
+  ong_origem text
+  origem text
+  pref_genero_par text
+  responsavel jsonb
+  uf text
+  whatsapp text
+}
+
+Table notificacoes {
+  Note: 'Notificacoes in-app.'
+  comunicado_id uuid [ref: > comunicados.id]
+  corpo text
+  created_at timestamptz
+  created_by uuid [ref: > profiles.id]
+  href text
+  id uuid [pk]
+  lida_em timestamptz
+  profile_id uuid [ref: > profiles.id]
+  tipo text
+  titulo text
+}
+
+Table pessoa_notas {
+  Note: 'Notas coord-only sobre pessoas.'
+  created_at timestamptz
+  created_by uuid [ref: > profiles.id]
+  id uuid [pk]
+  mentorado_id uuid [ref: > mentorados.id]
+  profile_id uuid [ref: > profiles.id]
+  texto text
+}
+
+Table presencas {
+  Note: 'Chamada de formacao por evento. mentor_profiles.formacao_ok deriva dela.'
+  ciclo_evento_id uuid [ref: > ciclo_eventos.id]
+  id uuid [pk]
+  marcado_em timestamptz
+  marcado_por uuid [ref: > profiles.id]
+  presente text
+  profile_id uuid [ref: > profiles.id]
+}
+
+Table profiles {
+  Note: 'Pessoas com login. Papel global em app_role.'
+  areas text
+  ativo text
+  avatar_path text
+  bio text
+  cargo text
+  cidade text
+  consent_lgpd_em timestamptz
+  cor_raca text
+  created_at timestamptz
+  dados_civis jsonb
+  data_nascimento timestamptz
+  documento_path text
+  email text
+  empresa text
+  form_bruto jsonb
+  genero text
+  id uuid [pk]
+  interesses text[]
+  linkedin text
+  motivacao text
+  nome text
+  nome_social text
+  onboarded_em timestamptz
+  origem text
+  pref_genero_par text
+  role Enums
+  uf text
+  user_id uuid
+  voluntariado text
+  whatsapp text
+}
+
+Table registro_anexos {
+  Note: 'Evidencias anexadas a registros.'
+  created_at timestamptz
+  created_by uuid [ref: > profiles.id]
+  id uuid [pk]
+  mime text
+  nome text
+  path text
+  registro_id uuid [ref: > registros.id]
+  tamanho text
+}
+
+Table registros {
+  Note: 'Follow-up do mentor pos-encontro. Campos do form semanal oficial.'
+  atividades text[]
+  avaliacao text
+  created_at timestamptz
+  created_by uuid [ref: > profiles.id]
+  dificuldade text
+  dificuldade_detalhe text
+  encontro_id uuid [ref: - encontros.id]
+  ferramenta text
+  id uuid [pk]
+  observacoes text
+  precisa_apoio text
+  proximo_passo text
+  proximo_passo_detalhe text
+  reflexoes text
+  tema text
+  updated_at timestamptz
+}
+
+Table solicitacoes_especialista {
+  Note: 'Pedido da dupla DPP -> mural -> aceite -> nasce dupla de trilha especialista.'
+  created_at timestamptz
+  created_by uuid [ref: > profiles.id]
+  demanda text
+  dupla_dpp_id uuid [ref: > duplas.id]
+  dupla_id uuid [ref: > duplas.id]
+  especialista_desejado_id uuid [ref: > profiles.id]
+  especialista_id uuid [ref: > profiles.id]
+  id uuid [pk]
+  mentorado_id uuid [ref: > mentorados.id]
+  respondida_em timestamptz
+  status text
+}
+
+Table supervisoes {
+  Note: 'Sessao do mentor experiente SOBRE o mentor (nao sobre a dupla). Mentor ve o que foi registrado.'
+  created_at timestamptz
+  created_by uuid [ref: > profiles.id]
+  data date
+  dupla_id uuid [ref: > duplas.id]
+  id uuid [pk]
+  mentor_id uuid [ref: > profiles.id]
+  resumo text
+  supervisor_id uuid [ref: > profiles.id]
+}
