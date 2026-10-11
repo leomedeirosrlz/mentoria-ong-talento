@@ -8,8 +8,17 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
+import {
+  AvaliarPendenteButton,
+  VerAvaliacaoButton,
+  type AvaliacaoFeita,
+  type AvaliacaoPendente,
+} from "@/components/jovem-avaliacoes";
+import { Estrelas } from "@/components/estrelas";
 import { formatDateTime, linkSeguro } from "@/lib/ciclo";
-import { getJovemEncontros } from "@/lib/queries-jovem";
+import { getJovemDuplas, getJovemEncontros } from "@/lib/queries-jovem";
+import { getMe } from "@/lib/queries";
+import { getJovemAvaliacoes } from "@/lib/queries-avaliacao";
 import type { JovemEncontro } from "@/lib/queries-jovem";
 import { cn } from "@/lib/utils";
 
@@ -38,8 +47,41 @@ const STATUS = {
 } as const;
 
 export default async function JovemAgenda() {
-  const encontros = await getJovemEncontros();
+  const [encontros, avaliacoes, me, duplas] = await Promise.all([
+    getJovemEncontros(),
+    getJovemAvaliacoes(),
+    getMe(),
+    getJovemDuplas(),
+  ]);
   const agora = new Date().getTime();
+  const primeiroNome = (me?.nome_social || me?.nome || "").split(" ")[0];
+
+  // avaliação estrela (0071) por encontro — a linha realizado ganha o CTA
+  // "Avaliar" (pendente) ou a estrela que já foi dada (ver resposta). A
+  // trilha vem da view jovem_duplas — a tabela `duplas` não é legível pro
+  // papel mentorado.
+  const trilhaPorDupla = new Map(duplas.map((d) => [d.id, d.trilha ?? "dpp"]));
+  const avalPorEncontro = new Map(avaliacoes.map((a) => [a.encontro_id, a]));
+  const avalDe = (
+    e: JovemEncontro
+  ): { pendente: AvaliacaoPendente | null; feita: AvaliacaoFeita | null } => {
+    if (e.status !== "realizado") return { pendente: null, feita: null };
+    const a = avalPorEncontro.get(e.id);
+    if (a)
+      return {
+        pendente: null,
+        feita: { ...a, trilha: trilhaPorDupla.get(a.dupla_id) ?? "dpp" },
+      };
+    return {
+      pendente: {
+        encontroId: e.id,
+        numero: e.numero,
+        realizado_em: e.realizado_em,
+        trilha: trilhaPorDupla.get(e.dupla_id) ?? "dpp",
+      },
+      feita: null,
+    };
+  };
 
   // futuros = agendado/remarcado com data pra frente; o resto é histórico
   // (inclui agendado já passado — "estava marcado e não rolou" é histórico,
@@ -109,7 +151,12 @@ export default async function JovemAgenda() {
               <Card>
                 <CardContent className="divide-y divide-border/60 p-0">
                   {passados.map((e) => (
-                    <EncontroLinha key={e.id} e={e} />
+                    <EncontroLinha
+                      key={e.id}
+                      e={e}
+                      aval={avalDe(e)}
+                      primeiroNome={primeiroNome}
+                    />
                   ))}
                 </CardContent>
               </Card>
@@ -121,7 +168,17 @@ export default async function JovemAgenda() {
   );
 }
 
-function EncontroLinha({ e, futuro = false }: { e: JovemEncontro; futuro?: boolean }) {
+function EncontroLinha({
+  e,
+  futuro = false,
+  aval,
+  primeiroNome,
+}: {
+  e: JovemEncontro;
+  futuro?: boolean;
+  aval?: { pendente: AvaliacaoPendente | null; feita: AvaliacaoFeita | null };
+  primeiroNome?: string;
+}) {
   const st = STATUS[e.status];
   const quando = e.status === "realizado" && e.realizado_em ? e.realizado_em : e.data_hora;
   return (
@@ -170,6 +227,19 @@ function EncontroLinha({ e, futuro = false }: { e: JovemEncontro; futuro?: boole
             Entrar
             <span className="sr-only"> na chamada (abre em nova aba)</span>
           </a>
+        )}
+        {aval?.pendente && (
+          <AvaliarPendenteButton
+            pendente={aval.pendente}
+            primeiroNome={primeiroNome ?? ""}
+            variant="outline"
+          />
+        )}
+        {aval?.feita && (
+          <VerAvaliacaoButton
+            avaliacao={aval.feita}
+            label={<Estrelas n={aval.feita.estrelas} size={13} />}
+          />
         )}
         <Badge variant="outline" className={st.cls}>
           {st.rotulo}
