@@ -1469,7 +1469,9 @@ function build(): DemoData {
   const e1T2Passou = diaE1T2.getTime() < HOJE.getTime();
 
   // d-ok · Ricardo × Ana Beatriz — a dupla saudável: 4 encontros no calendário
-  // oficial com registro bom, 5º agendado pra terça corrente
+  // oficial com registro bom, 5º agendado pra terça corrente e o 6º já
+  // marcado pra semana seguinte (agenda livre: sempre há um agendado futuro
+  // DPP na mão da persona jovem — remarcar/desmarcar renderizam na /jovem)
   const encD1: Encontro[] = [
     comRegistro(
       realizado(uid(D.ok), 1, diaEncontro(1), { duracao: 75, origem: "externo" }),
@@ -1488,6 +1490,7 @@ function build(): DemoData {
       ricardo, "Ana", "dpp"
     ),
     agendado(uid(D.ok), 5, diaEncontro(5), { link: MEET }),
+    agendado(uid(D.ok), 6, diaEncontro(6), { link: MEET }),
   ];
 
   const regD1E1 = encD1[0].registro!;
