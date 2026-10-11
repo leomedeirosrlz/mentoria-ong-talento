@@ -103,6 +103,9 @@ const P = {
   marcos: 0x000c,
   renata: 0x000d, // cadastro novo, sem papel
   patricia: 0x000e, // inativa
+  // login da Ana (mentorada) — a persona existe no dataset mesmo sem card na
+  // /demo: /pessoas mostra "Mentorado" e o vínculo com a ficha dela fecha
+  anaLogin: 0x000f,
 } as const;
 
 const M = {
@@ -1010,9 +1013,29 @@ function build(): DemoData {
     origem: "Ciclos anteriores", consent_lgpd_em: haDias(300),
   };
 
+  // login da Ana — o profile do jovem é a identidade de acesso (role
+  // 'mentorado'); os dados de programa ficam na ficha dela em `mentorados`,
+  // que aponta de volta por profile_id (0066). Sem card na /demo ainda.
+  const anaLogin: Profile = {
+    id: uid(P.anaLogin), user_id: uid(0xf00f), nome: "Ana Beatriz Silva",
+    email: "anabeatriz.silva@gmail.com", whatsapp: "5511976123001",
+    role: "mentorado", ativo: true, avatar_path: "demo/avatars/ana.svg",
+    created_at: haDias(45),
+    documento_path: null,
+    bio: null, linkedin: null, areas: null, voluntariado: null,
+    onboarded_em: haDias(40),
+    nome_social: "Bia", data_nascimento: "2008-04-12", genero: "feminino",
+    cidade: "São Paulo", uf: "SP",
+    interesses: ["pedagogia", "ENEM", "leitura"],
+    motivacao: null, pref_genero_par: null,
+    cargo: null, empresa: null,
+    origem: "Oficina de projetos da ONG Horizonte",
+    consent_lgpd_em: haDias(45),
+  };
+
   const profiles: Profile[] = [
     marina, paulo, ricardo, sofia, beatriz, carlos, fernanda, joaoPedro,
-    luiza, andre, helena, marcos, renata, patricia,
+    luiza, andre, helena, marcos, renata, patricia, anaLogin,
   ];
 
   const personas: Record<AppRole, Profile> = {
@@ -1020,6 +1043,7 @@ function build(): DemoData {
     supervisor: paulo,
     mentor_dpp: ricardo,
     mentor_especialista: sofia,
+    mentorado: anaLogin,
   };
 
   const mentorProfiles: MentorProfile[] = [
@@ -1076,6 +1100,7 @@ function build(): DemoData {
   const ana: Mentorado = {
     id: uid(M.ana), nome: "Ana Beatriz Silva",
     email: "anabeatriz.silva@gmail.com", whatsapp: "5511976123001",
+    profile_id: uid(P.anaLogin), // login próprio da jovem (0066)
     ong_origem: "ONG Horizonte",
     notas: "3º ano do ensino médio. Quer prestar ENEM pra pedagogia; mora com a mãe e dois irmãos. Veio pela oficina de projetos da ONG.",
     avatar_path: "demo/avatars/ana.svg", documento_path: "documentos/autorizacao-ana-beatriz.pdf",
@@ -2380,6 +2405,20 @@ function build(): DemoData {
         href: `/duplas/${uid(D.esp3)}`,
         lida_em: null,
         created_at: haDias(9, "09:05"),
+      },
+    ],
+    // a persona mentorada não tem card na /demo ainda, mas a entrada existe
+    // porque o Record exige todos os papéis — e mantém o dataset pronto pra
+    // quando o /jovem virar demonstrável
+    mentorado: [
+      {
+        id: uid(0x3040),
+        tipo: "comunicado",
+        titulo: "Encontro de formação dos jovens no sábado",
+        corpo: "Turma: a formação dos mentorados é sábado às 10h, no Meet de sempre.",
+        href: "/#avisos",
+        lida_em: null,
+        created_at: haDias(2, "18:00"),
       },
     ],
   };

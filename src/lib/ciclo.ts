@@ -1316,6 +1316,7 @@ export function papelLabel(role: string | null | undefined) {
     case "supervisor": return "Supervisor de relacionamento";
     case "mentor_dpp": return "Mentor DPP";
     case "mentor_especialista": return "Mentor especialista";
+    case "mentorado": return "Mentorado";
     default: return "Sem papel definido";
   }
 }
@@ -1328,6 +1329,7 @@ export function papelCurto(role: string | null | undefined) {
     case "supervisor": return "Supervisor";
     case "mentor_dpp": return "Mentor DPP";
     case "mentor_especialista": return "Especialista";
+    case "mentorado": return "Mentorado";
     case null:
     case undefined:
     case "": return "";

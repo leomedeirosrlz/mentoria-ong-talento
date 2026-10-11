@@ -15,7 +15,10 @@ export const SITE_URL =
  *  de notificações — se divergir, destinatário recebe e-mail de aviso que a
  *  RLS não deixa abrir. Fonte única importada por actions.ts e actions-email. */
 export const ROLES_POR_AUDIENCIA: Record<string, string[]> = {
-  todos: ["coordenacao", "supervisor", "mentor_dpp", "mentor_especialista"],
+  // 'todos' inclui o mentorado (REALIZA-108): o aviso geral e o e-mail de
+  // publicação chegam aos jovens com login — mesma régua dos comunicados
+  // in-app e da leitura audiencia='todos' na RLS
+  todos: ["coordenacao", "supervisor", "mentor_dpp", "mentor_especialista", "mentorado"],
   dpp: ["mentor_dpp"],
   especialista: ["mentor_especialista"],
   coordenacao: ["coordenacao"],

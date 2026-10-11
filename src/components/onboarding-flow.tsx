@@ -16,6 +16,7 @@ import {
   FolderOpen,
   HandHeart,
   Handshake,
+  ListChecks,
   MapTrifold,
   Megaphone,
   NotePencil,
@@ -86,6 +87,14 @@ const RECURSOS: Record<AppRole, Recurso[]> = {
     { icon: ClipboardText, texto: "Uma lista de pedidos que combinam com o seu perfil." },
     { icon: Handshake, texto: "Aceitar um pedido e conduzir até 5 encontros." },
     { icon: NotePencil, texto: "Registrar cada encontro realizado." },
+    { icon: FolderOpen, texto: "Os materiais oficiais do programa." },
+  ],
+  // o jovem não passa por este wizard (a boas-vindas do /jovem é uma tela
+  // única) — a entrada existe porque o Record pede todos os papéis e as
+  // demos/queries compartilham a lista
+  mentorado: [
+    { icon: CalendarCheck, texto: "Sua agenda de encontros com o mentor." },
+    { icon: ListChecks, texto: "Os combinados que ficaram pra você." },
     { icon: FolderOpen, texto: "Os materiais oficiais do programa." },
   ],
 };
