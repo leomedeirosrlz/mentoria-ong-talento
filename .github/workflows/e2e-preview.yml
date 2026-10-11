@@ -81,6 +81,8 @@ jobs:
           E2E_COORD_EMAIL: e2e-coord@realiza.test
           E2E_COORD_PASSWORD: ${{ secrets.E2E_COORD_PASSWORD || 'e2e-senha-teste' }}
           E2E_DUPLA2_ID: e2e00000-0000-4000-8000-000000000070
+          # jovem usa a mesma senha do mentor — um secret a menos
+          E2E_JOVEM_EMAIL: jovem-e2e@realiza.test
       - if: failure() && steps.check.outputs.skip != '1'
         uses: actions/upload-artifact@v4
         with:
