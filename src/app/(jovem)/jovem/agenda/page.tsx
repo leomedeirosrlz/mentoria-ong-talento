@@ -1,33 +1,40 @@
 import type { Metadata } from "next";
 import {
   CalendarBlank,
+  CalendarDots,
   CheckCircle,
   VideoCamera,
   XCircle,
 } from "@phosphor-icons/react/dist/ssr";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { buttonVariants } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
   AvaliarPendenteButton,
   VerAvaliacaoButton,
   type AvaliacaoFeita,
   type AvaliacaoPendente,
 } from "@/components/jovem-avaliacoes";
+import { JovemAgendarDialog } from "@/components/jovem-agendar-dialog";
+import {
+  DesmarcarEncontroJovem,
+  NaoAconteceuJovem,
+} from "@/components/jovem-encontro-acoes";
 import { Estrelas } from "@/components/estrelas";
-import { formatDateTime, linkSeguro } from "@/lib/ciclo";
+import { formatDateTime, linkSeguro, maxEncontros } from "@/lib/ciclo";
 import { getJovemDuplas, getJovemEncontros } from "@/lib/queries-jovem";
-import { getMe } from "@/lib/queries";
+import { getCicloEventos, getMe } from "@/lib/queries";
 import { getJovemAvaliacoes } from "@/lib/queries-avaliacao";
 import type { JovemEncontro } from "@/lib/queries-jovem";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Agenda" };
 
-/** Agenda do jovem (REALIZA-108) — a agenda DELE: os encontros das duplas
- *  dele, lidos por projeção explícita (RLS escopa; registros/notas do mentor
- *  nunca entram). v1 é leitura: agendar pelo app é D3 — hoje o combinado de
- *  data continua saindo do papo com o mentor. */
+/** Agenda do jovem (REALIZA-108 + 110) — a agenda DELE: os encontros das
+ *  duplas dele, lidos por projeção explícita (RLS escopa; registros/notas
+ *  do mentor nunca entram). A agenda livre é o D3: agendar/remarcar DPP e
+ *  desmarcar/"não aconteceu" em qualquer trilha passam pelas RPCs definer
+ *  da 0072 — nenhum write do jovem é policy. */
 
 const STATUS = {
   agendado: { rotulo: "Agendado", cls: "border-border text-muted-foreground" },
@@ -47,11 +54,12 @@ const STATUS = {
 } as const;
 
 export default async function JovemAgenda() {
-  const [encontros, avaliacoes, me, duplas] = await Promise.all([
+  const [encontros, avaliacoes, me, duplas, eventos] = await Promise.all([
     getJovemEncontros(),
     getJovemAvaliacoes(),
     getMe(),
     getJovemDuplas(),
+    getCicloEventos(),
   ]);
   const agora = new Date().getTime();
   const primeiroNome = (me?.nome_social || me?.nome || "").split(" ")[0];
@@ -61,6 +69,7 @@ export default async function JovemAgenda() {
   // trilha vem da view jovem_duplas — a tabela `duplas` não é legível pro
   // papel mentorado.
   const trilhaPorDupla = new Map(duplas.map((d) => [d.id, d.trilha ?? "dpp"]));
+  const ativaPorDupla = new Map(duplas.map((d) => [d.id, d.status === "ativa"]));
   const avalPorEncontro = new Map(avaliacoes.map((a) => [a.encontro_id, a]));
   const avalDe = (
     e: JovemEncontro
@@ -82,6 +91,33 @@ export default async function JovemAgenda() {
       feita: null,
     };
   };
+
+  // CTA "Agendar encontro" — só a dupla DPP ativa entra (a RPC recusa a
+  // trilha especialista). Os números livres são os sem row ainda: a data
+  // oficial sai como hint quando o calendário é legível — pro papel
+  // mentorado ciclo_eventos é filtrado a vazio pela RLS (0065) e o Select
+  // lista só o nº; a RPC mede o teto real contra o cronograma da dupla.
+  const duplaDpp =
+    duplas.find((d) => d.status === "ativa" && d.trilha !== "especialista") ??
+    null;
+  const oficialPorNumero = new Map(
+    eventos
+      .filter(
+        (ev) =>
+          ev.tipo === "encontro" &&
+          ev.numero != null &&
+          ev.cronograma_id === duplaDpp?.cronograma_id
+      )
+      .map((ev) => [ev.numero!, ev.data] as const)
+  );
+  const ocupados = new Set(
+    encontros.filter((e) => e.dupla_id === duplaDpp?.id).map((e) => e.numero)
+  );
+  const numerosLivres = duplaDpp
+    ? Array.from({ length: maxEncontros("dpp") }, (_, i) => i + 1)
+        .filter((n) => !ocupados.has(n))
+        .map((n) => ({ numero: n, data: oficialPorNumero.get(n) ?? null }))
+    : [];
 
   // futuros = agendado/remarcado com data pra frente; o resto é histórico
   // (inclui agendado já passado — "estava marcado e não rolou" é histórico,
@@ -107,12 +143,20 @@ export default async function JovemAgenda() {
 
   return (
     <div className="space-y-6">
-      <header>
-        <h1 className="text-2xl font-semibold tracking-tight">Agenda</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Os encontros das suas mentorias — você e seu mentor combinam as
-          datas juntos.
-        </p>
+      <header className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Agenda</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Os encontros das suas mentorias — vocês combinam as datas juntos.
+          </p>
+        </div>
+        {duplaDpp?.id && numerosLivres.length > 0 && (
+          <JovemAgendarDialog
+            duplaId={duplaDpp.id}
+            numeros={numerosLivres}
+            atual={null}
+          />
+        )}
       </header>
 
       {encontros.length === 0 ? (
@@ -137,7 +181,13 @@ export default async function JovemAgenda() {
               <Card>
                 <CardContent className="divide-y divide-border/60 p-0">
                   {futuros.map((e) => (
-                    <EncontroLinha key={e.id} e={e} futuro />
+                    <EncontroLinha
+                      key={e.id}
+                      e={e}
+                      futuro
+                      agora={agora}
+                      duplaAtiva={ativaPorDupla.get(e.dupla_id) ?? false}
+                    />
                   ))}
                 </CardContent>
               </Card>
@@ -156,6 +206,8 @@ export default async function JovemAgenda() {
                       e={e}
                       aval={avalDe(e)}
                       primeiroNome={primeiroNome}
+                      agora={agora}
+                      duplaAtiva={ativaPorDupla.get(e.dupla_id) ?? false}
                     />
                   ))}
                 </CardContent>
@@ -173,14 +225,35 @@ function EncontroLinha({
   futuro = false,
   aval,
   primeiroNome,
+  agora,
+  duplaAtiva = false,
 }: {
   e: JovemEncontro;
   futuro?: boolean;
   aval?: { pendente: AvaliacaoPendente | null; feita: AvaliacaoFeita | null };
   primeiroNome?: string;
+  /** ms do render da página — o "futuro" do gesto é o da listagem, não o do
+   *  clique; a RPC reavalia o instante real de qualquer jeito */
+  agora: number;
+  /** A RPC de agendar/não-aconteceu exige dupla ativa; desmarcar não checa,
+   *  mas um gesto numa dupla encerrada seria ruído — os botões seguem ela. */
+  duplaAtiva?: boolean;
 }) {
   const st = STATUS[e.status];
   const quando = e.status === "realizado" && e.realizado_em ? e.realizado_em : e.data_hora;
+  // agendado futuro = remarcar/desmarcar (0072); já passado = "não aconteceu".
+  // Só status 'agendado' — é o único que as RPCs movem (remarcado/legado não
+  // ganha botão: a RPC recusaria de qualquer jeito)
+  const agendadoFuturo =
+    e.status === "agendado" &&
+    duplaAtiva &&
+    e.data_hora != null &&
+    new Date(e.data_hora).getTime() > agora;
+  const agendadoPassado =
+    e.status === "agendado" &&
+    duplaAtiva &&
+    e.data_hora != null &&
+    new Date(e.data_hora).getTime() <= agora;
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-5 py-3.5">
       <span
@@ -228,6 +301,23 @@ function EncontroLinha({
             <span className="sr-only"> na chamada (abre em nova aba)</span>
           </a>
         )}
+        {agendadoFuturo && (
+          <>
+            <JovemAgendarDialog
+              duplaId={e.dupla_id}
+              numero={e.numero}
+              atual={e}
+              trigger={
+                <Button variant="outline" size="sm">
+                  <CalendarDots size={15} aria-hidden />
+                  Remarcar
+                </Button>
+              }
+            />
+            <DesmarcarEncontroJovem encontroId={e.id} />
+          </>
+        )}
+        {agendadoPassado && <NaoAconteceuJovem encontroId={e.id} />}
         {aval?.pendente && (
           <AvaliarPendenteButton
             pendente={aval.pendente}

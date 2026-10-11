@@ -1286,6 +1286,25 @@ export function formatDateTime(iso: string | null | undefined): string {
   });
 }
 
+/** "15/10 às 19:00" — compacto sem ano; é o formato do corpo das
+ *  notificações de agenda (0072) e do aviso de encontro sobreposto. */
+export function formatDiaHora(iso: string | null | undefined): string {
+  if (!iso) return "a definir";
+  const d = paraData(iso);
+  if (isNaN(d.getTime())) return "a definir";
+  const dia = d.toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    timeZone: TZ,
+  });
+  const hora = d.toLocaleTimeString("pt-BR", {
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: TZ,
+  });
+  return `${dia} às ${hora}`;
+}
+
 /** "06/10/2026" — dia, mês e ano numerados. */
 export function formatDiaMes(iso: string | null | undefined): string {
   if (!iso) return "a definir";

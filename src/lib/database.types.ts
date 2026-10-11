@@ -2914,6 +2914,16 @@ export type Database = {
     }
     Functions: {
       aceitar_solicitacao: { Args: { p_id: string }; Returns: string }
+      agendar_encontro_mentorado: {
+        Args: {
+          p_data_hora: string
+          p_dupla: string
+          p_link?: string
+          p_motivo?: string
+          p_numero: number
+        }
+        Returns: Json
+      }
       areas_perfil_ok: { Args: { areas: string[] }; Returns: boolean }
       assinar_com_token: {
         Args: {
@@ -2937,6 +2947,10 @@ export type Database = {
       avaliacao_media_dpp: { Args: { p_dupla_id: string }; Returns: Json }
       avaliacao_por_token: { Args: { p_token: string }; Returns: Json }
       civis_btrim: { Args: { d: Json }; Returns: Json }
+      conflito_encontro: {
+        Args: { p_data_hora: string; p_dupla: string }
+        Returns: Json
+      }
       dados_civis_ok: {
         Args: { com_parentesco?: boolean; d: Json }
         Returns: boolean
@@ -2949,6 +2963,7 @@ export type Database = {
         Args: { p_id: string; p_visivel: boolean }
         Returns: Json
       }
+      desmarcar_encontro: { Args: { p_encontro: string }; Returns: Json }
       disponibilidade_ok: { Args: { d: Json }; Returns: boolean }
       email_disponivel: { Args: { p_email: string }; Returns: boolean }
       encerramento_checklist_ok: { Args: { c: Json }; Returns: boolean }
@@ -2972,12 +2987,17 @@ export type Database = {
         Args: { p_feito: boolean; p_id: string }
         Returns: undefined
       }
+      marcar_nao_aconteceu_mentorado: {
+        Args: { p_encontro: string }
+        Returns: Json
+      }
       meus_dados_civis: { Args: never; Returns: Json }
       meus_dados_pessoais: { Args: never; Returns: Json }
       my_mentorado_id: { Args: never; Returns: string }
       my_profile_id: { Args: never; Returns: string }
       my_role: { Args: never; Returns: Database["public"]["Enums"]["app_role"] }
       nome_proprio: { Args: { p: string }; Returns: string }
+      par_de_mim: { Args: { p_profile: string }; Returns: boolean }
       pegar_login_handoff: { Args: { p_nonce: string }; Returns: Json }
       regenerar_token_assinatura: { Args: { p_id: string }; Returns: string }
       registrar_email_apoio_avaliacao: {

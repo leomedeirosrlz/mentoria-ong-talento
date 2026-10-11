@@ -407,6 +407,7 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
         atual={encontroAlvo}
         sugerido={sugeridoProximo}
         piso={dupla.iniciada_em ?? undefined}
+        jovemNome={primeiroNomeMentorado}
         trigger={
           <DropdownMenuItem render={<button type="button" />} nativeButton>
             <CalendarPlus aria-hidden /> Agendar encontro
@@ -610,6 +611,7 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
               atual={encontroAlvo}
               sugerido={sugeridoProximo}
               piso={dupla.iniciada_em ?? undefined}
+              jovemNome={primeiroNomeMentorado}
             />
           )}
           {/* pedido de apoio direto — o checkbox "preciso de apoio" dentro do

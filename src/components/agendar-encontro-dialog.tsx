@@ -2,11 +2,18 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { CalendarPlus } from "@phosphor-icons/react";
+import { CalendarPlus, Warning } from "@phosphor-icons/react";
 import { toast } from "sonner";
-import { agendarEncontro, registrarEncontroRetroativo } from "@/lib/actions";
-import { MOTIVOS_REAGENDAMENTO } from "@/lib/ciclo";
+import {
+  agendarEncontro,
+  conflitoEncontro,
+  desmarcarEncontro,
+  registrarEncontroRetroativo,
+  type ConflitoEncontro,
+} from "@/lib/actions";
+import { formatDiaHora, MOTIVOS_REAGENDAMENTO } from "@/lib/ciclo";
 import type { Encontro } from "@/lib/types";
+import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
 import { Button } from "@/components/ui/button";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
@@ -35,6 +42,7 @@ export function AgendarEncontroDialog({
   atual,
   sugerido,
   piso,
+  jovemNome,
   trigger,
   onCreated,
 }: {
@@ -46,6 +54,8 @@ export function AgendarEncontroDialog({
   /** YYYY-MM-DD do início da dupla — a sugestão nunca cai antes dele (o
    *  retroativo rejeitaria a data oficial de um encontro pré-dupla). */
   piso?: string;
+  /** Primeiro nome do mentorado — sai no aviso de horário sobreposto. */
+  jovemNome?: string;
   /** Elemento do trigger — default é o botão padrão da casa. */
   trigger?: React.ReactElement;
   /** Só no ramo retroativo (data passada): recebe (id do encontro criado,
@@ -63,6 +73,14 @@ export function AgendarEncontroDialog({
   // valor vivo do campo — decide se o submit agenda ou registra (modo dual)
   const [valorData, setValorData] = useState("");
   const [motivoLen, setMotivoLen] = useState(0);
+  // overlap com sessão da OUTRA dupla do mesmo jovem — warning, não bloqueio.
+  // Guardado com a data consultada: resposta atrasada de data que já mudou
+  // não vira aviso mentiroso
+  const [conflito, setConflito] = useState<{
+    para: string;
+    lista: ConflitoEncontro[];
+  } | null>(null);
+  const timerConflito = useRef<ReturnType<typeof setTimeout> | null>(null);
   // id do card recém-criado — scroll quando o refresh terminar (o card não
   // existia no DOM velho, então o hash sozinho não rola)
   const scrollTarget = useRef<string | null>(null);
@@ -95,6 +113,24 @@ export function AgendarEncontroDialog({
     scrollTarget.current = null;
     document.getElementById(alvo)?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [pending]);
+
+  // warning de overlap (0072): debounce na data — a RPC olha as outras
+  // duplas do mesmo jovem (a de especialista o mentor não lê pela RLS);
+  // falha vira lista vazia — é aviso, nunca bloqueio do submit
+  useEffect(() => {
+    if (timerConflito.current) clearTimeout(timerConflito.current);
+    if (!open || !valorData) return;
+    const v = valorData;
+    timerConflito.current = setTimeout(() => {
+      conflitoEncontro(duplaId, v)
+        .then((res) => setConflito({ para: v, lista: res.conflitos ?? [] }))
+        .catch(() => setConflito({ para: v, lista: [] }));
+    }, 400);
+    return () => {
+      if (timerConflito.current) clearTimeout(timerConflito.current);
+    };
+  }, [valorData, duplaId, open]);
+  const conflitos = conflito?.para === valorData && open ? conflito.lista : [];
 
   function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -188,6 +224,18 @@ export function AgendarEncontroDialog({
                 Se o encontro já aconteceu, escolha a data real. Ele entra como realizado.
               </p>
             )}
+            {conflitos.length > 0 && (
+              <p className="flex items-start gap-1.5 text-xs leading-relaxed text-[var(--warn-text)]">
+                <Warning size={13} aria-hidden className="mt-0.5 shrink-0" />
+                {jovemNome ?? "O mentorado"} tem{" "}
+                {conflitos[0].trilha === "especialista"
+                  ? "sessão de especialista"
+                  : "encontro de mentoria"}{" "}
+                marcada pra {formatDiaHora(conflitos[0].data_hora)}
+                {conflitos.length > 1 && ` (e mais ${conflitos.length - 1})`} —
+                confirme antes de seguir.
+              </p>
+            )}
           </div>
           {atual && (
             <div className="space-y-2">
@@ -235,6 +283,34 @@ export function AgendarEncontroDialog({
           <Button type="submit" className="w-full" disabled={pending}>
             {pending ? "Salvando…" : ehRetroativo ? "Registrar encontro" : atual ? "Confirmar remarcação" : "Confirmar agendamento"}
           </Button>
+          {/* desmarcar é a saída honesta pra um agendado futuro que não vai
+              rolar (0072 — RPC bilateral; passado vai pro "não aconteceu").
+              O mentor não tem delete por RLS (0047 coord-only) — a RPC é o
+              caminho dos dois lados. */}
+          {atual?.status === "agendado" &&
+            atual.data_hora != null &&
+            new Date(atual.data_hora) > new Date() && (
+            <ConfirmDeleteButton
+              titulo={`Desmarcar o ${numero}º encontro?`}
+              descricao="O encontro sai da agenda — vocês podem marcar de novo quando combinarem."
+              acao="Desmarcar"
+              sucesso="Encontro desmarcado."
+              onConfirm={async () => {
+                const res = await desmarcarEncontro(atual.id);
+                if (!res?.error) setOpen(false);
+                return res;
+              }}
+              trigger={
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full text-muted-foreground"
+                >
+                  Desmarcar encontro
+                </Button>
+              }
+            />
+          )}
         </form>
       </DialogContent>
     </Dialog>
