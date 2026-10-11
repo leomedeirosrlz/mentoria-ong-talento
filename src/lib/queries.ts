@@ -583,7 +583,7 @@ export const getMateriais = cache(async (): Promise<Material[]> => {
  *  completa inclui a ficha de matching da 0034 (disponibilidade jsonb,
  *  experiência prévia, formação externa); o tipo canônico é o de types.ts. */
 const MENTOR_PROFILE_COLS =
-  "profile_id, tipo, areas, capacidade, termo_ok, formacao_ok, experiencia_previa, formacao_externa, disponibilidade";
+  "profile_id, tipo, areas, capacidade, capacidade_especialista, termo_ok, formacao_ok, experiencia_previa, formacao_externa, disponibilidade";
 
 export const getMentorProfiles = cache(async (): Promise<MentorProfile[]> => {
   const demo = await demoRole();

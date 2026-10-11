@@ -234,7 +234,11 @@ export function NovaPessoaDialog() {
             <>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="n_cap">Capacidade (duplas)</Label>
+                  <Label htmlFor="n_cap">
+                    {role === "mentor_especialista"
+                      ? "Capacidade (trilhas de especialista)"
+                      : "Capacidade (duplas DPP)"}
+                  </Label>
                   <Input id="n_cap" name="capacidade" type="number" min={1} max={10} defaultValue={1} required />
                 </div>
               </div>

@@ -116,7 +116,7 @@ export function NovaDuplaDialog() {
             .select("mentor_id, mentorado_id, supervisor_id, trilha, status"),
           supabase
             .from("mentor_profiles")
-            .select("profile_id, capacidade, disponibilidade, areas"),
+            .select("profile_id, tipo, capacidade, capacidade_especialista, disponibilidade, areas"),
           supabase.from("cronogramas").select("*").order("turma").order("nome"),
         ]);
         const erro = [perfis, ments, duplasRes, mps, cronsRes].find((r) => r.error)?.error;
@@ -151,7 +151,12 @@ export function NovaDuplaDialog() {
           { disponibilidade: Disponibilidade | null; areas: string[] | null }
         >();
         for (const mp of mps.data ?? []) {
-          porMentor[mp.profile_id] = mp.capacidade;
+          // o teto exibido é o da trilha do papel (0073) — mentor tem um
+          // papel só, então todas as duplas dele já contam na mesma pool
+          porMentor[mp.profile_id] =
+            mp.tipo === "especialista"
+              ? (mp.capacidade_especialista ?? 1)
+              : mp.capacidade;
           fichas.set(mp.profile_id, {
             disponibilidade: (mp.disponibilidade as Disponibilidade | null) ?? null,
             areas: (mp.areas as string[] | null) ?? null,
