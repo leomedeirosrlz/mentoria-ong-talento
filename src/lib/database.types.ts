@@ -112,6 +112,13 @@ export type Database = {
             foreignKeyName: "assinaturas_mentorado_id_fkey"
             columns: ["mentorado_id"]
             isOneToOne: false
+            referencedRelation: "jovem_perfil"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assinaturas_mentorado_id_fkey"
+            columns: ["mentorado_id"]
+            isOneToOne: false
             referencedRelation: "mentorados"
             referencedColumns: ["id"]
           },
@@ -408,6 +415,13 @@ export type Database = {
             foreignKeyName: "documentos_pessoa_mentorado_id_fkey"
             columns: ["mentorado_id"]
             isOneToOne: false
+            referencedRelation: "jovem_perfil"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "documentos_pessoa_mentorado_id_fkey"
+            columns: ["mentorado_id"]
+            isOneToOne: false
             referencedRelation: "mentorados"
             referencedColumns: ["id"]
           },
@@ -532,6 +546,13 @@ export type Database = {
             foreignKeyName: "duplas_mentorado_id_fkey"
             columns: ["mentorado_id"]
             isOneToOne: false
+            referencedRelation: "jovem_perfil"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "duplas_mentorado_id_fkey"
+            columns: ["mentorado_id"]
+            isOneToOne: false
             referencedRelation: "mentorados"
             referencedColumns: ["id"]
           },
@@ -547,6 +568,13 @@ export type Database = {
             columns: ["remanejada_de"]
             isOneToOne: false
             referencedRelation: "duplas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "duplas_remanejada_de_fkey"
+            columns: ["remanejada_de"]
+            isOneToOne: false
+            referencedRelation: "jovem_duplas"
             referencedColumns: ["id"]
           },
           {
@@ -687,6 +715,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "encaminhamentos_dupla_id_fkey"
+            columns: ["dupla_id"]
+            isOneToOne: false
+            referencedRelation: "jovem_duplas"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "encaminhamentos_registro_id_fkey"
             columns: ["registro_id"]
             isOneToOne: false
@@ -758,6 +793,13 @@ export type Database = {
             referencedRelation: "duplas"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "encerramentos_dupla_id_fkey"
+            columns: ["dupla_id"]
+            isOneToOne: true
+            referencedRelation: "jovem_duplas"
+            referencedColumns: ["id"]
+          },
         ]
       }
       encontro_notas: {
@@ -815,6 +857,13 @@ export type Database = {
             columns: ["dupla_id"]
             isOneToOne: false
             referencedRelation: "duplas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "encontro_notas_dupla_id_fkey"
+            columns: ["dupla_id"]
+            isOneToOne: false
+            referencedRelation: "jovem_duplas"
             referencedColumns: ["id"]
           },
         ]
@@ -889,6 +938,13 @@ export type Database = {
             columns: ["dupla_id"]
             isOneToOne: false
             referencedRelation: "duplas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "encontros_dupla_id_fkey"
+            columns: ["dupla_id"]
+            isOneToOne: false
+            referencedRelation: "jovem_duplas"
             referencedColumns: ["id"]
           },
         ]
@@ -977,6 +1033,13 @@ export type Database = {
             foreignKeyName: "formulario_links_dest_mentorado_id_fkey"
             columns: ["dest_mentorado_id"]
             isOneToOne: false
+            referencedRelation: "jovem_perfil"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "formulario_links_dest_mentorado_id_fkey"
+            columns: ["dest_mentorado_id"]
+            isOneToOne: false
             referencedRelation: "mentorados"
             referencedColumns: ["id"]
           },
@@ -1013,6 +1076,13 @@ export type Database = {
             columns: ["dupla_id"]
             isOneToOne: false
             referencedRelation: "duplas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "formulario_links_dupla_id_fkey"
+            columns: ["dupla_id"]
+            isOneToOne: false
+            referencedRelation: "jovem_duplas"
             referencedColumns: ["id"]
           },
           {
@@ -1169,6 +1239,13 @@ export type Database = {
             columns: ["dupla_id"]
             isOneToOne: false
             referencedRelation: "duplas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "interacoes_dupla_id_fkey"
+            columns: ["dupla_id"]
+            isOneToOne: false
+            referencedRelation: "jovem_duplas"
             referencedColumns: ["id"]
           },
         ]
@@ -1537,6 +1614,13 @@ export type Database = {
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "profiles_pessoal"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pessoa_notas_mentorado_id_fkey"
+            columns: ["mentorado_id"]
+            isOneToOne: false
+            referencedRelation: "jovem_perfil"
             referencedColumns: ["id"]
           },
           {
@@ -1970,6 +2054,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "solicitacoes_especialista_dupla_dpp_id_fkey"
+            columns: ["dupla_dpp_id"]
+            isOneToOne: false
+            referencedRelation: "jovem_duplas"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "solicitacoes_especialista_dupla_id_fkey"
             columns: ["dupla_id"]
             isOneToOne: false
@@ -1977,6 +2068,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "solicitacoes_especialista_dupla_id_fkey"
+            columns: ["dupla_id"]
+            isOneToOne: false
+            referencedRelation: "jovem_duplas"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "solicitacoes_especialista_especialista_desejado_id_fkey"
             columns: ["especialista_desejado_id"]
             isOneToOne: false
@@ -2016,6 +2114,13 @@ export type Database = {
             columns: ["especialista_id"]
             isOneToOne: false
             referencedRelation: "profiles_pessoal"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "solicitacoes_especialista_mentorado_id_fkey"
+            columns: ["mentorado_id"]
+            isOneToOne: false
+            referencedRelation: "jovem_perfil"
             referencedColumns: ["id"]
           },
           {
@@ -2095,6 +2200,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "supervisoes_dupla_id_fkey"
+            columns: ["dupla_id"]
+            isOneToOne: false
+            referencedRelation: "jovem_duplas"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "supervisoes_mentor_id_fkey"
             columns: ["mentor_id"]
             isOneToOne: false
@@ -2140,6 +2252,200 @@ export type Database = {
       }
     }
     Views: {
+      jovem_assinaturas: {
+        Row: {
+          assinado_em: string | null
+          created_at: string | null
+          id: string | null
+          status: string | null
+          template_id: string | null
+        }
+        Insert: {
+          assinado_em?: string | null
+          created_at?: string | null
+          id?: string | null
+          status?: string | null
+          template_id?: string | null
+        }
+        Update: {
+          assinado_em?: string | null
+          created_at?: string | null
+          id?: string | null
+          status?: string | null
+          template_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assinaturas_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "documento_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      jovem_contatos: {
+        Row: {
+          avatar_path: string | null
+          dupla_id: string | null
+          email: string | null
+          id: string | null
+          nome: string | null
+          nome_social: string | null
+          papel: string | null
+          role: Database["public"]["Enums"]["app_role"] | null
+          whatsapp: string | null
+        }
+        Relationships: []
+      }
+      jovem_duplas: {
+        Row: {
+          cronograma_id: string | null
+          demanda: string | null
+          encerrada_em: string | null
+          id: string | null
+          iniciada_em: string | null
+          mentor_avatar_path: string | null
+          mentor_id: string | null
+          mentor_nome: string | null
+          mentor_nome_social: string | null
+          motivo_encerramento: string | null
+          pdm_url: string | null
+          status: Database["public"]["Enums"]["dupla_status"] | null
+          supervisor_avatar_path: string | null
+          supervisor_id: string | null
+          supervisor_nome: string | null
+          supervisor_nome_social: string | null
+          trilha: string | null
+          turma: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "duplas_cronograma_id_fkey"
+            columns: ["cronograma_id"]
+            isOneToOne: false
+            referencedRelation: "cronogramas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "duplas_mentor_id_fkey"
+            columns: ["mentor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "duplas_mentor_id_fkey"
+            columns: ["mentor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_contato"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "duplas_mentor_id_fkey"
+            columns: ["mentor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_pessoal"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "duplas_supervisor_id_fkey"
+            columns: ["supervisor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "duplas_supervisor_id_fkey"
+            columns: ["supervisor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_contato"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "duplas_supervisor_id_fkey"
+            columns: ["supervisor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_pessoal"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      jovem_perfil: {
+        Row: {
+          avatar_path: string | null
+          cidade: string | null
+          cor_raca: string | null
+          created_at: string | null
+          dados_civis: Json | null
+          data_nascimento: string | null
+          disponibilidade: Json | null
+          email: string | null
+          escolaridade: string | null
+          genero: string | null
+          id: string | null
+          interesses: string[] | null
+          motivacao: string | null
+          nome: string | null
+          nome_social: string | null
+          objetivos: string | null
+          ong_origem: string | null
+          origem: string | null
+          pref_genero_par: string | null
+          responsavel: Json | null
+          uf: string | null
+          whatsapp: string | null
+        }
+        Insert: {
+          avatar_path?: string | null
+          cidade?: string | null
+          cor_raca?: string | null
+          created_at?: string | null
+          dados_civis?: Json | null
+          data_nascimento?: string | null
+          disponibilidade?: Json | null
+          email?: string | null
+          escolaridade?: string | null
+          genero?: string | null
+          id?: string | null
+          interesses?: string[] | null
+          motivacao?: string | null
+          nome?: string | null
+          nome_social?: string | null
+          objetivos?: string | null
+          ong_origem?: string | null
+          origem?: string | null
+          pref_genero_par?: string | null
+          responsavel?: Json | null
+          uf?: string | null
+          whatsapp?: string | null
+        }
+        Update: {
+          avatar_path?: string | null
+          cidade?: string | null
+          cor_raca?: string | null
+          created_at?: string | null
+          dados_civis?: Json | null
+          data_nascimento?: string | null
+          disponibilidade?: Json | null
+          email?: string | null
+          escolaridade?: string | null
+          genero?: string | null
+          id?: string | null
+          interesses?: string[] | null
+          motivacao?: string | null
+          nome?: string | null
+          nome_social?: string | null
+          objetivos?: string | null
+          ong_origem?: string | null
+          origem?: string | null
+          pref_genero_par?: string | null
+          responsavel?: Json | null
+          uf?: string | null
+          whatsapp?: string | null
+        }
+        Relationships: []
+      }
       mentorados_pessoal: {
         Row: {
           cor_raca: string | null
@@ -2283,6 +2589,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "solicitacoes_especialista_dupla_dpp_id_fkey"
+            columns: ["dupla_dpp_id"]
+            isOneToOne: false
+            referencedRelation: "jovem_duplas"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "solicitacoes_especialista_dupla_id_fkey"
             columns: ["dupla_id"]
             isOneToOne: false
@@ -2290,6 +2603,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "solicitacoes_especialista_dupla_id_fkey"
+            columns: ["dupla_id"]
+            isOneToOne: false
+            referencedRelation: "jovem_duplas"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "solicitacoes_especialista_especialista_desejado_id_fkey"
             columns: ["especialista_desejado_id"]
             isOneToOne: false
@@ -2329,6 +2649,13 @@ export type Database = {
             columns: ["especialista_id"]
             isOneToOne: false
             referencedRelation: "profiles_pessoal"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "solicitacoes_especialista_mentorado_id_fkey"
+            columns: ["mentorado_id"]
+            isOneToOne: false
+            referencedRelation: "jovem_perfil"
             referencedColumns: ["id"]
           },
           {
