@@ -1,4 +1,9 @@
-export type AppRole = "coordenacao" | "supervisor" | "mentor_dpp" | "mentor_especialista";
+export type AppRole =
+  | "coordenacao"
+  | "supervisor"
+  | "mentor_dpp"
+  | "mentor_especialista"
+  | "mentorado";
 /** 'concluida' (0037) = jornada percorrida até o fim; 'encerrada' = fechamento
  *  antecipado. Ambas liberam a vaga e congelam a trilha como a encerrada. */
 export type DuplaStatus = "ativa" | "pausada" | "concluida" | "encerrada";
@@ -162,6 +167,9 @@ export type Mentorado = {
    *  opcional como o de Profile (selects parciais/personas demo podem
    *  não trazer). Base da "espera" da fila quando o intake não tem carimbo. */
   created_at?: string;
+  /** Vínculo com o login do jovem (0066) — `profiles.id` da conta com
+   *  role='mentorado'. null = participante sem acesso à plataforma. */
+  profile_id?: string | null;
 };
 
 /** mentor_profiles — ficha do mentor que alimenta o board de matching
@@ -637,3 +645,37 @@ export type DocumentoPessoa = {
   created_by: string | null;
   created_at: string;
 };
+
+// ---------- /jovem (REALIZA-107/108) ----------
+// Rows das views definer do jovem (0067/0070) — as únicas leituras de
+// domínio que o papel mentorado faz fora de tabelas abertas (encontros,
+// materiais, comunicados, notificacoes). Espelho 1:1 das colunas geradas
+// em database.types.ts: todas nullable porque a view não declara NOT NULL.
+
+import type { Database } from "./database.types";
+
+/** Ficha do próprio jovem (view `jovem_perfil`) — mentorados.* do registro
+ *  dele: programa (objetivos/escolaridade/ong) e contato do cadastro. Pessoa
+ *  canônica segue em profiles; dados sensíveis (dados_civis/responsavel)
+ *  chegam por aqui porque a view é definer e self-scoped. */
+export type JovemPerfil = Database["public"]["Views"]["jovem_perfil"]["Row"];
+
+/** Dupla do jovem (view `jovem_duplas`) — sem devolutiva_pdm nem nada de
+ *  staff; mentor/supervisor vêm denormalizados (nome/social/avatar). */
+export type JovemDupla = Database["public"]["Views"]["jovem_duplas"]["Row"];
+
+/** Adulto de contato do jovem (view `jovem_contatos`) — mentor/supervisor
+ *  das próprias duplas + coordenação. `papel` é o rótulo de exibição. */
+export type JovemContato = Database["public"]["Views"]["jovem_contatos"]["Row"];
+
+/** Combinado do jovem (view `jovem_encaminhamentos`, 0070) — o
+ *  encaminhamento onde ele é o responsável; escrita só via
+ *  marcar_combinado (pendente↔feito). */
+export type JovemEncaminhamento =
+  Database["public"]["Views"]["jovem_encaminhamentos"]["Row"];
+
+/** Documento do jovem pra assinar/encaminhar (view `jovem_assinaturas`,
+ *  0070) — token só pra formar o link /assinar/[token]; evidências
+ *  (ip/ua/hash/snapshot) ficam fora da view. */
+export type JovemAssinatura =
+  Database["public"]["Views"]["jovem_assinaturas"]["Row"];
