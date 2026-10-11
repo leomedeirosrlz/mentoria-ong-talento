@@ -10,9 +10,12 @@ on:
   deployment_status:
 
 # a Vercel emite DOIS deployments por commit ("Preview – realiza.vc" e o
-# alias "Preview – realiza") — agrupar por SHA cancela o duplicado.
+# órfão "Preview – realiza") — agrupar só por SHA deixava o deployment do
+# projeto órfão cancelar o run real (cancel-in-progress). O environment no
+# grupo separa os dois: cada um tem sua fila e o do órfão só pula no `if`.
 concurrency:
-  group: e2e-preview-${{ github.event.deployment.sha }}
+  group: >-
+    e2e-preview-${{ github.event.deployment.sha }}-${{ github.event.deployment.environment }}
   cancel-in-progress: true
 
 jobs:
