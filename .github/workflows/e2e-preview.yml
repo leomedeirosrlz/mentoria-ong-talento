@@ -22,12 +22,15 @@ jobs:
   e2e:
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    # DOIS projetos Vercel deployam o repo ("realiza" é órfão — sem o bypass
-    # token, que é por projeto). startsWith aceitaria os dois e a race entre
-    # deployments decidiria o alvo: pinado no "realiza.vc" (o projeto real).
+    # O environment muda com o nº de projetos Vercel no repo: com dois era
+    # 'Preview – realiza.vc' (o órfão 'realiza' foi deletado); com um só,
+    # Vercel reporta 'Preview' a seco. Aceita os dois — se um segundo
+    # projeto voltar a conectar, o nome com sufixo continua casando e o
+    # filtro por nome do projeto segue protegendo do órfão.
     if: >-
       github.event.deployment_status.state == 'success' &&
-      github.event.deployment.environment == 'Preview – realiza.vc'
+      (github.event.deployment.environment == 'Preview' ||
+       github.event.deployment.environment == 'Preview – realiza.vc')
     steps:
       # guard primeiro: sem o bypass não adianta checkout/install (~1min)
       - name: bypass de proteção configurado?
