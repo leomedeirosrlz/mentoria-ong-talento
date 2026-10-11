@@ -139,6 +139,173 @@ export type Database = {
           },
         ]
       }
+      avaliacao_links: {
+        Row: {
+          created_at: string
+          dupla_id: string
+          encontro_id: string
+          expira_em: string
+          id: string
+          respondido_em: string | null
+          respondido_por_profile_id: string | null
+          status: string
+          token: string
+        }
+        Insert: {
+          created_at?: string
+          dupla_id: string
+          encontro_id: string
+          expira_em: string
+          id?: string
+          respondido_em?: string | null
+          respondido_por_profile_id?: string | null
+          status?: string
+          token: string
+        }
+        Update: {
+          created_at?: string
+          dupla_id?: string
+          encontro_id?: string
+          expira_em?: string
+          id?: string
+          respondido_em?: string | null
+          respondido_por_profile_id?: string | null
+          status?: string
+          token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "avaliacao_links_dupla_id_fkey"
+            columns: ["dupla_id"]
+            isOneToOne: false
+            referencedRelation: "duplas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "avaliacao_links_dupla_id_fkey"
+            columns: ["dupla_id"]
+            isOneToOne: false
+            referencedRelation: "jovem_duplas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "avaliacao_links_encontro_id_fkey"
+            columns: ["encontro_id"]
+            isOneToOne: true
+            referencedRelation: "encontros"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "avaliacao_links_respondido_por_profile_id_fkey"
+            columns: ["respondido_por_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "avaliacao_links_respondido_por_profile_id_fkey"
+            columns: ["respondido_por_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_contato"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "avaliacao_links_respondido_por_profile_id_fkey"
+            columns: ["respondido_por_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_pessoal"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      avaliacoes_encontro: {
+        Row: {
+          avaliacao_visivel_mentor: boolean
+          avancei: string | null
+          comentario: string | null
+          created_at: string
+          dupla_id: string
+          encontro_id: string
+          estrelas: number
+          id: string
+          pedir_apoio: boolean
+          respondido_por_profile_id: string | null
+          sentimento: string | null
+          temas: string[] | null
+        }
+        Insert: {
+          avaliacao_visivel_mentor?: boolean
+          avancei?: string | null
+          comentario?: string | null
+          created_at?: string
+          dupla_id: string
+          encontro_id: string
+          estrelas: number
+          id?: string
+          pedir_apoio?: boolean
+          respondido_por_profile_id?: string | null
+          sentimento?: string | null
+          temas?: string[] | null
+        }
+        Update: {
+          avaliacao_visivel_mentor?: boolean
+          avancei?: string | null
+          comentario?: string | null
+          created_at?: string
+          dupla_id?: string
+          encontro_id?: string
+          estrelas?: number
+          id?: string
+          pedir_apoio?: boolean
+          respondido_por_profile_id?: string | null
+          sentimento?: string | null
+          temas?: string[] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "avaliacoes_encontro_dupla_id_fkey"
+            columns: ["dupla_id"]
+            isOneToOne: false
+            referencedRelation: "duplas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "avaliacoes_encontro_dupla_id_fkey"
+            columns: ["dupla_id"]
+            isOneToOne: false
+            referencedRelation: "jovem_duplas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "avaliacoes_encontro_encontro_id_fkey"
+            columns: ["encontro_id"]
+            isOneToOne: true
+            referencedRelation: "encontros"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "avaliacoes_encontro_respondido_por_profile_id_fkey"
+            columns: ["respondido_por_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "avaliacoes_encontro_respondido_por_profile_id_fkey"
+            columns: ["respondido_por_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_contato"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "avaliacoes_encontro_respondido_por_profile_id_fkey"
+            columns: ["respondido_por_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_pessoal"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ciclo_eventos: {
         Row: {
           cronograma_id: string
@@ -2256,6 +2423,40 @@ export type Database = {
       }
     }
     Views: {
+      especialista_avaliacoes: {
+        Row: {
+          created_at: string | null
+          dupla_id: string | null
+          encontro_id: string | null
+          estrelas: number | null
+          id: string | null
+          numero: number | null
+          realizado_em: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "avaliacoes_encontro_dupla_id_fkey"
+            columns: ["dupla_id"]
+            isOneToOne: false
+            referencedRelation: "duplas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "avaliacoes_encontro_dupla_id_fkey"
+            columns: ["dupla_id"]
+            isOneToOne: false
+            referencedRelation: "jovem_duplas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "avaliacoes_encontro_encontro_id_fkey"
+            columns: ["encontro_id"]
+            isOneToOne: true
+            referencedRelation: "encontros"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       jovem_assinaturas: {
         Row: {
           assinado_em: string | null
@@ -2733,6 +2934,8 @@ export type Database = {
         Returns: Json
       }
       assinatura_por_token: { Args: { p_token: string }; Returns: Json }
+      avaliacao_media_dpp: { Args: { p_dupla_id: string }; Returns: Json }
+      avaliacao_por_token: { Args: { p_token: string }; Returns: Json }
       civis_btrim: { Args: { d: Json }; Returns: Json }
       dados_civis_ok: {
         Args: { com_parentesco?: boolean; d: Json }
@@ -2741,6 +2944,10 @@ export type Database = {
       definir_pdm_url: {
         Args: { p_dupla: string; p_url: string }
         Returns: undefined
+      }
+      definir_visibilidade_avaliacao: {
+        Args: { p_id: string; p_visivel: boolean }
+        Returns: Json
       }
       disponibilidade_ok: { Args: { d: Json }; Returns: boolean }
       email_disponivel: { Args: { p_email: string }; Returns: boolean }
@@ -2773,6 +2980,16 @@ export type Database = {
       nome_proprio: { Args: { p: string }; Returns: string }
       pegar_login_handoff: { Args: { p_nonce: string }; Returns: Json }
       regenerar_token_assinatura: { Args: { p_id: string }; Returns: string }
+      registrar_email_apoio_avaliacao: {
+        Args: {
+          p_assunto: string
+          p_avaliacao_id: string
+          p_destinatarios: number
+          p_enviados: number
+          p_falhas?: string[]
+        }
+        Returns: Json
+      }
       registrar_login_handoff: {
         Args: { p_access: string; p_nonce: string; p_refresh: string }
         Returns: undefined
@@ -2791,6 +3008,20 @@ export type Database = {
       salvar_autoavaliacao: {
         Args: { p_disponivel: boolean; p_dupla: string; p_texto: string }
         Returns: undefined
+      }
+      submeter_avaliacao: {
+        Args: {
+          p_avancei?: string
+          p_comentario?: string
+          p_encontro_id: string
+          p_estrelas: number
+          p_pedir_apoio?: boolean
+          p_sentimento?: string
+          p_temas?: string[]
+          p_token: string
+          p_visivel_mentor?: boolean
+        }
+        Returns: Json
       }
       submeter_resposta_formulario: {
         Args: { p_respostas: Json; p_token: string }

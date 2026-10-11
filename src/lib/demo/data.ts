@@ -24,7 +24,9 @@
 import type {
   AppRole,
   Assinatura,
+  AvaliacaoEncontro,
   AvaliacaoJovem,
+  AvaliacaoLink,
   CicloEvento,
   Comunicado,
   Cronograma,
@@ -70,6 +72,8 @@ export type DemoData = {
   presencas: Presenca[];
   supervisoes: Supervisao[];
   documentosPessoa: DocumentoPessoa[];
+  avaliacoes: AvaliacaoEncontro[];
+  avaliacaoLinks: AvaliacaoLink[];
 };
 
 // ---------- ids ----------
@@ -86,6 +90,7 @@ const uid = (n: number): string =>
 // solicitacoes: 24xx · pessoa_notas: 26xx · interacoes: 28xx ·
 // notificacoes: 30xx · assinaturas: 32xx · doc_templates: 33xx · tokens de
 // assinatura: 34xx · presencas: 36xx · supervisoes: 38xx ·
+// avaliacao_links: 42xx · avaliacoes_encontro: 44xx ·
 // documentos_pessoa: 46xx · cronogramas: 50xx. user_id fake: f0xx.
 // especialista_eventos não tem id.
 const P = {
@@ -2331,6 +2336,19 @@ function build(): DemoData {
         lida_em: haDias(31, "09:00"),
         created_at: haDias(33, "19:12"),
       },
+      {
+        // canal de segurança do jovem (0071) — separado do pedido_apoio
+        // do mentor: a notificação própria não deixa o caso do Caio se
+        // perder na fila dos registros
+        id: uid(0x3005),
+        tipo: "apoio_jovem",
+        titulo: "Pedido de ajuda · Caio marcou na avaliação",
+        corpo:
+          "Caio avaliou o 4º encontro com 2 estrelas e marcou 'preciso de ajuda'. Combinado do programa: responder em 1 dia útil.",
+        href: `/duplas/${uid(D.pend)}`,
+        lida_em: null,
+        created_at: depoisDe(encD2[3].realizado_em!, 6),
+      },
     ],
     supervisor: [
       {
@@ -2350,6 +2368,18 @@ function build(): DemoData {
         href: "/#avisos",
         lida_em: haDias(9, "12:00"),
         created_at: haDias(10, "11:00"),
+      },
+      {
+        // o supervisor do Carlos acompanha o apoio do jovem igual acompanha
+        // o do mentor — leitura completa pela RLS das supervisionadas
+        id: uid(0x3012),
+        tipo: "apoio_jovem",
+        titulo: "Pedido de ajuda do jovem · Carlos & Caio",
+        corpo:
+          "Caio marcou 'preciso de ajuda' na avaliação do 4º encontro. A coordenação foi notificada e encaminha o caso.",
+        href: `/duplas/${uid(D.pend)}`,
+        lida_em: null,
+        created_at: depoisDe(encD2[3].realizado_em!, 6),
       },
     ],
     mentor_dpp: [
@@ -2424,6 +2454,17 @@ function build(): DemoData {
         href: "/#avisos",
         lida_em: null,
         created_at: haDias(2, "18:00"),
+      },
+      {
+        // o trigger que minta o link avisa o jovem logado (0071) — o href
+        // aponta direto pro formulário público, igual à notificação real
+        id: uid(0x3041),
+        tipo: "avaliacao_pendente",
+        titulo: "Como foi seu encontro?",
+        corpo: "Conte em 1 minuto como foi. Pro seu mentor, a nota só aparece na média.",
+        href: `/avaliar/demo-aval-${encD6[1].id.slice(-12)}`,
+        lida_em: null,
+        created_at: haDias(4, "21:00"),
       },
     ],
   };
@@ -2652,6 +2693,119 @@ function build(): DemoData {
     },
   ];
 
+  // ---------- avaliação do encontro FEITA PELO JOVEM (0071) ----------
+  // Três canais distintos dos registros do mentor — a RLS real é replicada
+  // nas queries demo: coord/sup leem tudo, o jovem as próprias, o mentor
+  // DPP só a média em lote (e a avaliação solta quando a jovem libera), o
+  // especialista só as estrelas das próprias sessões.
+  //
+  // História contada:
+  // · duplaOk (Ricardo × Ana): 4 avaliações → média liberada em lote de 3
+  //   (4,5★) com a 4ª esperando o próximo lote — a Ana liberou a 1ª pro
+  //   Ricardo ler na íntegra. A 4ª veio pelo token (respondido_por null).
+  // · duplaEsp1 (Sofia × Ana): enc 1 avaliado → a Sofia vê só a estrela.
+  //   enc 2 SEM avaliação → pendência da persona mentorada no /jovem e o
+  //   link pendente que a coord compartilha no WhatsApp.
+  // · duplaPend (Carlos × Caio): 2★ com "preciso de ajuda" — a avaliação
+  //   contesta o encontro (registro do mentor diz que rolou; a jovem diz
+  //   que não). É o canal de disputa desenhado no D4 e empurra a dupla
+  //   pro semáforo de risco por outro caminho.
+  const avaliacoes: AvaliacaoEncontro[] = [
+    {
+      id: uid(0x4401), dupla_id: duplaOk.id, encontro_id: encD1[0].id,
+      estrelas: 5, sentimento: "muito_bem", avancei: "sim",
+      temas: ["pdm", "carreira"],
+      comentario:
+        "O Ricardo me ajudou a destravar o PDM — saí do encontro sabendo exatamente o próximo passo.",
+      pedir_apoio: false, avaliacao_visivel_mentor: true,
+      respondido_por_profile_id: anaLogin.id,
+      created_at: depoisDe(encD1[0].realizado_em!, 3),
+    },
+    {
+      id: uid(0x4402), dupla_id: duplaOk.id, encontro_id: encD1[1].id,
+      estrelas: 4, sentimento: "bem", avancei: "sim",
+      temas: ["estudos"], comentario: null,
+      pedir_apoio: false, avaliacao_visivel_mentor: false,
+      respondido_por_profile_id: anaLogin.id,
+      created_at: depoisDe(encD1[1].realizado_em!, 2),
+    },
+    {
+      id: uid(0x4403), dupla_id: duplaOk.id, encontro_id: encD1[2].id,
+      estrelas: 5, sentimento: "muito_bem", avancei: "um_pouco",
+      temas: ["pdm", "familia"],
+      comentario:
+        "Conversamos sobre encaixar as metas na rotina da casa. Ficou mais leve do que eu imaginava.",
+      pedir_apoio: false, avaliacao_visivel_mentor: false,
+      respondido_por_profile_id: anaLogin.id,
+      created_at: depoisDe(encD1[2].realizado_em!, 4),
+    },
+    {
+      // respondida pelo link do WhatsApp — respondido_por null, que é o
+      // dado que diferencia "jovem logada" de "jovem sem login" pra coord
+      id: uid(0x4404), dupla_id: duplaOk.id, encontro_id: encD1[3].id,
+      estrelas: 4, sentimento: "bem", avancei: "sim",
+      temas: ["carreira"], comentario: null,
+      pedir_apoio: false, avaliacao_visivel_mentor: false,
+      respondido_por_profile_id: null,
+      created_at: depoisDe(encD1[3].realizado_em!, 30),
+    },
+    {
+      id: uid(0x4405), dupla_id: duplaEsp1.id, encontro_id: encD6[0].id,
+      estrelas: 5, sentimento: "muito_bem", avancei: "sim",
+      temas: ["estudos"], comentario: null,
+      pedir_apoio: false, avaliacao_visivel_mentor: false,
+      respondido_por_profile_id: anaLogin.id,
+      created_at: depoisDe(encD6[0].realizado_em!, 5),
+    },
+    {
+      // O pedido de ajuda DO JOVEM — distinto do "preciso de apoio" que o
+      // mentor marca no registro: chega por notificação própria, resolve
+      // só na coordenação e empurra a dupla pro risco por caminho próprio
+      id: uid(0x4406), dupla_id: duplaPend.id, encontro_id: encD2[3].id,
+      estrelas: 2, sentimento: "desconfortavel", avancei: "nao",
+      temas: ["familia"],
+      comentario:
+        "O encontro não rolou direito — a gente trocou o tema na hora e eu saí sem saber o que fazer da semana.",
+      pedir_apoio: true, avaliacao_visivel_mentor: false,
+      respondido_por_profile_id: null, // Caio não tem login — veio pelo token
+      created_at: depoisDe(encD2[3].realizado_em!, 6),
+    },
+  ];
+
+  // O trigger real minta um link por encontro realizado — a demo replica:
+  // respondido onde existe avaliação, pendente enquanto válido (o link do
+  // enc 2 da trilha da Sofia é o que a coord manda pra Ana) e expirado
+  // nos realizados antigos sem resposta (a dupla concluída do ciclo
+  // passado mostra o estado natural do funil).
+  let seqLink = 0;
+  const avaliacaoLinks: AvaliacaoLink[] = duplas.flatMap((d) =>
+    (d.encontros ?? [])
+      .filter((e) => e.status === "realizado")
+      .map((e) => {
+        const aval = avaliacoes.find((a) => a.encontro_id === e.id);
+        const mintado = e.realizado_em ?? e.data_hora ?? "";
+        const expiraEm = depoisDe(mintado, 60 * 24); // trigger: now()+60d
+        return {
+          id: uid(0x4200 + ++seqLink),
+          // ≥20 chars alfanum+_-, no formato que a página pública valida
+          token: `demo-aval-${e.id.slice(-12)}`,
+          encontro_id: e.id,
+          dupla_id: d.id,
+          status: aval
+            ? "respondido"
+            : new Date(expiraEm) < new Date()
+              ? "expirado"
+              : "pendente",
+          expira_em: expiraEm,
+          respondido_em: aval?.created_at ?? null,
+          // respondida logada carrega o profile; por token, null
+          respondido_por_profile_id:
+            (aval && aval.respondido_por_profile_id) ?? null,
+          created_at: mintado,
+        };
+      })
+  );
+
   return {
     personas,
     profiles,
@@ -2673,6 +2827,8 @@ function build(): DemoData {
     presencas,
     supervisoes,
     documentosPessoa,
+    avaliacoes,
+    avaliacaoLinks,
   };
 }
 

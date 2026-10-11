@@ -62,6 +62,10 @@ export async function updateSession(request: NextRequest) {
     // formulários públicos por token (/f/<token>) — o destinatário responde
     // sem login; a segurança é a RPC (anon não tem grant de tabela, 0034)
     p.startsWith("/f/") ||
+    // avaliação estrela do jovem por token (/avaliar/<token>) — mesmo
+    // desenho: bearer token + RPC definer, logado fora do dono é recusado
+    // pela própria RPC (híbrido 0070)
+    p.startsWith("/avaliar/") ||
     p === "/privacidade";
 
   if (!user && !isPublic) {

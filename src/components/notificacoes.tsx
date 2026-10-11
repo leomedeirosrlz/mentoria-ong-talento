@@ -18,6 +18,7 @@ import {
   FlagCheckered,
   HandHeart,
   Megaphone,
+  Star,
   UserCheck,
   UserPlus,
   UsersThree,
@@ -209,6 +210,10 @@ const ICONE: Record<Notificacao["tipo"], typeof Bell> = {
   trilha_encerrada: FlagCheckered,
   supervisao_registrada: ChatsCircle,
   formulario_respondido: ClipboardText,
+  // 0071 — a estrela é o prompt do encontro pro jovem; o apoio dele é o
+  // canal de segurança (mesmo ícone do pedido do mentor, origem diferente)
+  avaliacao_pendente: Star,
+  apoio_jovem: HandHeart,
 };
 
 export function NotificacoesBell({

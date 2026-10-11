@@ -18,10 +18,12 @@ import {
   PuzzlePiece,
   ShareNetwork,
   Siren,
+  Star,
   VideoCamera,
   WhatsappLogo,
 } from "@phosphor-icons/react/dist/ssr";
 import { Avatar } from "@/components/avatar";
+import { JovemAvaliacoes } from "@/components/jovem-avaliacoes";
 import { JovemCombinados } from "@/components/jovem-combinados";
 import { PedirAjudaDialog } from "@/components/jovem-pedir-ajuda";
 import { Badge } from "@/components/ui/badge";
@@ -44,6 +46,7 @@ import {
   getJovemEncontros,
   getJovemPerfil,
 } from "@/lib/queries-jovem";
+import { getJovemAvaliacoes } from "@/lib/queries-avaliacao";
 import { getComunicados, getMateriais, getMe } from "@/lib/queries";
 import type { JovemContato } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -75,7 +78,7 @@ const TIPO_ICONE_MATERIAL = {
 } as const;
 
 export default async function JovemHome() {
-  const [me, perfil, duplas, contatos, encaminhamentos, assinaturas, encontros, avisos, materiais] =
+  const [me, perfil, duplas, contatos, encaminhamentos, assinaturas, encontros, avisos, materiais, avaliacoes] =
     await Promise.all([
       getMe(),
       getJovemPerfil(),
@@ -86,6 +89,7 @@ export default async function JovemHome() {
       getJovemEncontros(),
       getComunicados(),
       getMateriais(),
+      getJovemAvaliacoes(),
     ]);
   if (!me) return null; // o layout já barra — convenção das páginas
 
@@ -125,6 +129,24 @@ export default async function JovemHome() {
     );
   const proximo = futuros[0] ?? null;
   const feitos = encontros.filter((e) => e.status === "realizado").length;
+
+  // avaliação estrela (0071): pendente = realizado sem linha dele; a trilha
+  // resolve por dupla (a view jovem_duplas entrega — a tabela `duplas` não
+  // é legível pro papel e o join acontece com o que ele já pode ver)
+  const trilhaPorDupla = new Map(duplas.map((d) => [d.id, d.trilha ?? "dpp"]));
+  const avaliados = new Set(avaliacoes.map((a) => a.encontro_id));
+  const avaliacoesPendentes = encontros
+    .filter((e) => e.status === "realizado" && !avaliados.has(e.id))
+    .map((e) => ({
+      encontroId: e.id,
+      numero: e.numero,
+      realizado_em: e.realizado_em,
+      trilha: trilhaPorDupla.get(e.dupla_id) ?? "dpp",
+    }));
+  const avaliacoesFeitas = avaliacoes.map((a) => ({
+    ...a,
+    trilha: trilhaPorDupla.get(a.dupla_id) ?? "dpp",
+  }));
 
   // documentos: pendente com token vencido conta como expirado na UI (a
   // expiração é lazy no banco — quem abre o link carimba, a lista já avisa)
@@ -356,6 +378,26 @@ export default async function JovemHome() {
           </CardContent>
         </Card>
       </section>
+
+      {/* Suas avaliações (0071) — pendência com CTA + histórico do que já
+          foi dito; o toggle "meu mentor lê" mora no detalhe de cada uma */}
+      {(avaliacoesPendentes.length > 0 || avaliacoesFeitas.length > 0) && (
+        <section aria-labelledby="avaliacoes-titulo">
+          <h2 id="avaliacoes-titulo" className="mb-3 flex items-center gap-2 font-semibold">
+            <Star size={18} className="text-muted-foreground" aria-hidden />
+            Suas avaliações
+          </h2>
+          <Card className="animate-enter">
+            <CardContent className="p-0">
+              <JovemAvaliacoes
+                pendentes={avaliacoesPendentes}
+                feitas={avaliacoesFeitas}
+                primeiroNome={primeiroNome}
+              />
+            </CardContent>
+          </Card>
+        </section>
+      )}
 
       {/* Combinados — a lista que o jovem controla */}
       <section aria-labelledby="combinados-titulo">

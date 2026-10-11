@@ -141,6 +141,27 @@ export async function limparViaServiceRole(
   if (!res.ok) throw new Error(`cleanup ${tabela} falhou: ${res.status}`);
 }
 
+/** DELETE de encontros de uma dupla com os filhos da 0071 antes do pai —
+ *  encontro 'realizado' minta avaliacao_links (e pode ter avaliacoes_encontro),
+ *  ambos com FK NO ACTION: apagar o encontro direto dá 409. */
+export async function limparEncontrosDaDupla(duplaId: string): Promise<void> {
+  const encs = await buscarViaServiceRole<{ id: string }[]>(
+    "encontros",
+    `select=id&dupla_id=eq.${duplaId}`
+  );
+  if (encs.length === 0) return;
+  const lista = encs.map((e) => e.id).join(",");
+  await limparViaServiceRole(
+    "avaliacoes_encontro",
+    `encontro_id=in.(${lista})`
+  );
+  await limparViaServiceRole(
+    "avaliacao_links",
+    `encontro_id=in.(${lista})`
+  );
+  await limparViaServiceRole("encontros", `id=in.(${lista})`);
+}
+
 /** GET via service role — leitura auxiliar pra cleanup/verificação que a UI
  *  não expõe diretamente (ex.: id da row criada, turma da dupla fixture).
  *  Mesmo hard-stop do delete: spec app nunca fala com prod. */
@@ -157,6 +178,34 @@ export async function buscarViaServiceRole<T = Record<string, unknown>[]>(
   });
   if (!res.ok) throw new Error(`read ${tabela} falhou: ${res.status}`);
   return (await res.json()) as T;
+}
+
+/** POST via service role — cria estado que o spec precisa existir (ex.: um
+ *  encontro já 'realizado' pra exercitar a avaliação do jovem — o trigger
+ *  minta o avaliacao_links no insert). Devolve a row criada. Mesmo
+ *  hard-stop: spec app nunca fala com prod. */
+export async function inserirViaServiceRole(
+  tabela: string,
+  corpo: Record<string, unknown>
+): Promise<Record<string, unknown>> {
+  if (supabaseUrl.includes(PROD_REF))
+    throw new Error("E2E_SUPABASE_URL aponta pra produção — insert abortado");
+  const url = `${supabaseUrl}/rest/v1/${tabela}`;
+  const key = process.env.E2E_SUPABASE_SERVICE_ROLE_KEY!;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      apikey: key,
+      Authorization: `Bearer ${key}`,
+      "Content-Type": "application/json",
+      Prefer: "return=representation",
+    },
+    body: JSON.stringify(corpo),
+  });
+  if (!res.ok)
+    throw new Error(`insert ${tabela} falhou: ${res.status} ${await res.text()}`);
+  const rows = (await res.json()) as Record<string, unknown>[];
+  return rows[0];
 }
 
 /** PATCH via service role — restaura fixture que o spec alterou de propósito

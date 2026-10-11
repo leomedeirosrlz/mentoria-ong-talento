@@ -126,6 +126,58 @@ export const PROXIMO_PASSO_LABEL: Record<string, string> = {
   outro: "Outro",
 };
 
+// ---------- avaliação estrela do jovem (0071 / D4) ----------
+// Vocabulário do app — o banco guarda chaves estáveis (avancei tem CHECK;
+// sentimento/temas são texto livre lá, mas a única escritora é a action,
+// então fechar o léxico aqui mantém leitura e agregados consistentes).
+// NÃO misturar com registros.avaliacao (4-pt do mentor) nem avaliacao_360.
+
+/** "Como você se sentiu no encontro?" — escala de conforto, não de nota:
+ *  a estrela já cobre o julgamento; aqui o jovem nomeia a sensação. */
+export const SENTIMENTO_AVALIACAO = [
+  { value: "muito_bem", label: "Muito bem" },
+  { value: "bem", label: "Bem" },
+  { value: "mais_ou_menos", label: "Mais ou menos" },
+  { value: "desconfortavel", label: "Desconfortável" },
+  { value: "mal", label: "Mal" },
+] as const;
+
+export const SENTIMENTO_AVALIACAO_LABEL: Record<string, string> =
+  Object.fromEntries(SENTIMENTO_AVALIACAO.map((o) => [o.value, o.label]));
+
+/** "Você sente que avançou no que combinou?" — os 3 valores são o CHECK
+ *  avancei do banco (0071). */
+export const AVANCEI_AVALIACAO = [
+  { value: "sim", label: "Sim, avancei" },
+  { value: "um_pouco", label: "Um pouco" },
+  { value: "nao", label: "Ainda não" },
+] as const;
+
+export const AVANCEI_AVALIACAO_LABEL: Record<string, string> =
+  Object.fromEntries(AVANCEI_AVALIACAO.map((o) => [o.value, o.label]));
+
+/** "Sobre o que vocês conversaram?" — multiescolha dos temas do PDM e do
+ *  cotidiano. `outro` cobre o que a lista não prevê (o comentário detalha). */
+export const TEMAS_AVALIACAO = [
+  { value: "pdm", label: "Projeto de vida (PDM)" },
+  { value: "estudos", label: "Escola e estudos" },
+  { value: "carreira", label: "Carreira e futuro" },
+  { value: "familia", label: "Família" },
+  { value: "relacionamentos", label: "Amizades e relacionamentos" },
+  { value: "bem_estar", label: "Saúde e bem-estar" },
+  { value: "dinheiro", label: "Dinheiro" },
+  { value: "hobbies", label: "Tempo livre e hobbies" },
+  { value: "outro", label: "Outro assunto" },
+] as const;
+
+export const TEMA_AVALIACAO_LABEL: Record<string, string> =
+  Object.fromEntries(TEMAS_AVALIACAO.map((o) => [o.value, o.label]));
+
+/** Texto curto da nota em estrelas — aria-label e resumo pra quem lê a
+ *  avaliação (coord, jovem, especialista). "3 de 5 estrelas". */
+export const estrelasTexto = (n: number): string =>
+  `${n} de 5 ${n === 1 ? "estrela" : "estrelas"}`;
+
 /** Motivos de remarcação — `value` é a chave estável do form; `label` é o texto
  *  canônico gravado em encontros.motivo_reagendamento (auditável, sem enum no banco). */
 export const MOTIVOS_REAGENDAMENTO = [
@@ -382,7 +434,17 @@ export type DuplaSaude = {
   feitos: number;
   proximo: Encontro | null;
   registroPendente: boolean;
+  /** Pedido de apoio do MENTOR, marcado no registro do encontro. */
   pediuApoio: boolean;
+  /** Pedido de ajuda do JOVEM, marcado na avaliação estrela (0071) — canal
+   *  de segurança que pode ser sobre o próprio mentor: a resposta certa é
+   *  chamar o jovem, nunca o mentor. Sinal separado de propósito. */
+  apoioJovem: boolean;
+  /** Realizados ainda sem a avaliação do jovem. Só significa algo pra
+   *  coordenação/supervisão — o mentor DPP enxerga só as avaliações que o
+   *  jovem autorizou, então pra ele este número mente (contaria invisíveis
+   *  como "pendentes"). Nunca exibir fora do radar da equipe. */
+  avaliacaoJovemPendente: number;
 };
 
 /** Total de encontros do ciclo — trilha DPP tem 16, especialista terá menos. */
@@ -793,6 +855,17 @@ export function saudadeDaDupla(dupla: Dupla, eventos: CicloEvento[], hoje = new 
     null;
 
   const pediuApoio = dupla.encontros.some((e) => e.registro?.precisa_apoio);
+  // o "preciso de ajuda" da avaliação estrela (0071) é o outro canal de
+  // segurança — vem do JOVEM e pode ser sobre o próprio mentor: nunca
+  // fundir com pediuApoio (quem responde e pra quem é diferente)
+  const apoioJovem = dupla.encontros.some(
+    (e) => e.avaliacao_jovem?.pedir_apoio
+  );
+  // realizado sem a estrela do jovem — o link já nasce mintado pelo
+  // trigger; a pendência é dele, não do mentor (não é registro pendente)
+  const avaliacaoJovemPendente = dupla.encontros.filter(
+    (e) => e.status === "realizado" && !e.avaliacao_jovem
+  ).length;
   // pendência de registro: realizado há >24h sem registro, ou agendado em
   // limbo — a de menor número vira o motivo e o alvo dos deep links
   const pendencia =
@@ -813,11 +886,24 @@ export function saudadeDaDupla(dupla: Dupla, eventos: CicloEvento[], hoje = new 
   const ultimoReg = ultimoRegistro(dupla);
   const avaliacaoBaixa = ultimoReg?.avaliacao === "baixa";
   const comDificuldade = !!ultimoReg?.dificuldade && ultimoReg.dificuldade !== "nenhuma";
+  // campos comuns a todo retorno — os sinais novos (apoio do jovem,
+  // avaliações pendentes) acompanham o objeto em qualquer faixa
+  const base = { esperado, feitos, proximo, registroPendente, apoioJovem, avaliacaoJovemPendente };
 
-  if (pediuApoio && (dupla.status === "ativa" || dupla.status === "pausada"))
+  if ((pediuApoio || apoioJovem) && (dupla.status === "ativa" || dupla.status === "pausada"))
     // motivo em locução nominal — quem lê pode ser o próprio mentor ("Mentor
     // pediu apoio" em 3ª pessoa lê como se fosse sobre outra pessoa)
-    return { semaforo: "risco", motivo: "Pedido de apoio", esperado, feitos, proximo, registroPendente, pediuApoio };
+    return {
+      semaforo: "risco",
+      motivo:
+        pediuApoio && apoioJovem
+          ? "Pedidos de apoio em aberto"
+          : apoioJovem
+            ? "Pedido de ajuda do mentorado"
+            : "Pedido de apoio",
+      ...base,
+      pediuApoio,
+    };
   // pedido de apoio fura o congelamento da pausada, mas não do fechamento —
   // dupla concluída ou encerrada é capítulo encerrado
   if (dupla.status !== "ativa")
@@ -829,35 +915,40 @@ export function saudadeDaDupla(dupla: Dupla, eventos: CicloEvento[], hoje = new 
           : dupla.status === "concluida"
             ? "Jornada concluída"
             : "Dupla encerrada",
-      esperado, feitos, proximo, registroPendente,
+      ...base,
       pediuApoio: dupla.status === "pausada" && pediuApoio,
+      apoioJovem: dupla.status === "pausada" && apoioJovem,
     };
   if (avaliacaoBaixa && comDificuldade)
     return {
       semaforo: "risco",
       motivo: `Avaliação baixa e dificuldade de ${DIFICULDADE_LABEL[ultimoReg!.dificuldade!] ?? ultimoReg!.dificuldade} no último encontro`,
-      esperado, feitos, proximo, registroPendente, pediuApoio,
+      ...base,
+      pediuApoio,
     };
   // atraso só existe contra um calendário — na especialista esperado = feitos
   if (!ehEspecialista && atraso >= 2)
-    return { semaforo: "risco", motivo: `${atraso} encontros em atraso`, esperado, feitos, proximo, registroPendente, pediuApoio };
+    return { semaforo: "risco", motivo: `${atraso} encontros em atraso`, ...base, pediuApoio };
   if (!ehEspecialista && atraso === 1)
     return {
       semaforo: "atencao",
       motivo: `Encontro ${primeiroEncontroFaltante(dupla, eventos, hoje, limbo) ?? esperado} ainda não aconteceu (reposição na mesma semana)`,
-      esperado, feitos, proximo, registroPendente, pediuApoio,
+      ...base,
+      pediuApoio,
     };
   if (avaliacaoBaixa)
     return {
       semaforo: "atencao",
       motivo: "Avaliação baixa no último encontro",
-      esperado, feitos, proximo, registroPendente, pediuApoio,
+      ...base,
+      pediuApoio,
     };
   if (comDificuldade)
     return {
       semaforo: "atencao",
       motivo: `Dificuldade de ${DIFICULDADE_LABEL[ultimoReg!.dificuldade!] ?? ultimoReg!.dificuldade} identificada`,
-      esperado, feitos, proximo, registroPendente, pediuApoio,
+      ...base,
+      pediuApoio,
     };
   // preventivo: encontro oficial da semana bate em ≤5 dias e a dupla ainda não marcou nada
   // (qualquer row com esse numero — agendada, realizada, cancelada — já cobre o encontro).
@@ -878,7 +969,8 @@ export function saudadeDaDupla(dupla: Dupla, eventos: CicloEvento[], hoje = new 
       return {
         semaforo: "atencao",
         motivo: `O ${oficial.numero}º encontro é ${formatDiaSemanaMes(oficial.data)} e ainda não foi agendado`,
-        esperado, feitos, proximo, registroPendente, pediuApoio,
+        ...base,
+        pediuApoio,
       };
   }
   if (pendencia)
@@ -888,14 +980,16 @@ export function saudadeDaDupla(dupla: Dupla, eventos: CicloEvento[], hoje = new 
         pendencia.status === "agendado"
           ? `${pendencia.numero}º encontro agendado já passou: falta o registro`
           : "Encontro realizado sem registro",
-      esperado, feitos, proximo, registroPendente, pediuApoio,
+      ...base,
+      pediuApoio,
     };
   if (encaminhamentoVencido)
-    return { semaforo: "atencao", motivo: "Combinado com prazo vencido", esperado, feitos, proximo, registroPendente, pediuApoio };
+    return { semaforo: "atencao", motivo: "Combinado com prazo vencido", ...base, pediuApoio };
   return {
     semaforo: "ok",
     motivo: proximo ? `Próximo encontro ${formatDate(proximo.data_hora)}` : "Em dia",
-    esperado, feitos, proximo, registroPendente, pediuApoio,
+    ...base,
+    pediuApoio,
   };
 }
 
