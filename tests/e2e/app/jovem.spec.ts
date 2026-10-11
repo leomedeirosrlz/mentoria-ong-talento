@@ -126,7 +126,10 @@ test.describe("mentorado — shell /jovem", () => {
     const encontros = page.locator(
       'section[aria-labelledby="encontros-titulo"]'
     );
-    await expect(encontros.getByText("8º encontro")).toBeVisible();
+    // a home mostra só o PRÓXIMO encontro (futuros[0]) — em run paralelo a
+    // trilha esp ou outro spec pode pôr um mais perto; o assert é "o card de
+    // próximo existe", não "é o nº 8"
+    await expect(encontros.getByText(/\d+º encontro/)).toBeVisible();
 
     const docs = page.locator('section[aria-labelledby="docs-titulo"]');
     await expect(
@@ -198,7 +201,9 @@ test.describe("mentorado — shell /jovem", () => {
     ).toBeVisible();
     const proximos = page.locator('section[aria-labelledby="agenda-proximos"]');
     await expect(proximos.getByText("8º encontro")).toBeVisible();
-    await expect(proximos.getByText("Agendado")).toBeVisible();
+    // .first: a trilha esp (e specs paralelos) põe outro "Agendado" na
+    // mesma lista — o assert é "o encontro existe com o badge", não "1 só"
+    await expect(proximos.getByText("Agendado").first()).toBeVisible();
   });
 
   test("materiais abre a biblioteca — conteúdo ou estado vazio honesto", async ({

@@ -151,11 +151,15 @@ describe("filaMentorados", () => {
 });
 
 describe("filaMentores", () => {
-  const mp = (capacidade: number): MentorProfile => ({
+  const mp = (
+    capacidade: number,
+    capacidade_especialista?: number
+  ): MentorProfile => ({
     profile_id: "x",
     tipo: "dpp",
     areas: [],
     capacidade,
+    capacidade_especialista,
     termo_ok: true,
     formacao_ok: true,
   });
@@ -169,12 +173,28 @@ describe("filaMentores", () => {
     });
     const fila = filaMentores(
       [marcos],
-      { "p-marcos": { ...mp(2), profile_id: "p-marcos" } },
+      { "p-marcos": { ...mp(1, 2), profile_id: "p-marcos", tipo: "especialista" } },
       {}
     );
     expect(fila).toHaveLength(1);
     expect(fila[0].vagas).toBe(2);
     expect(fila[0].trilha).toBe("especialista");
+  });
+
+  it("especialista mede contra capacidade_especialista, não contra a DPP", () => {
+    const esp = mkProfile({ id: "p-esp", role: "mentor_especialista" });
+    // pool separada (0073): capacidade DPP 1 já cheia não bloqueia a trilha
+    // dele — 1 trilha em curso de 2 vagas-esp ainda deixa 1 livre
+    const ficha = {
+      "p-esp": { ...mp(1, 2), profile_id: "p-esp", tipo: "especialista" as const },
+    };
+    expect(filaMentores([esp], ficha, { "p-esp": 1 })[0].vagas).toBe(1);
+    expect(filaMentores([esp], ficha, { "p-esp": 2 })).toHaveLength(0);
+    // sem capacidade_especialista na ficha vale 1 — mesma régua do createDupla
+    expect(
+      filaMentores([esp], { "p-esp": { ...mp(3), profile_id: "p-esp" } }, {})
+        [0].vagas
+    ).toBe(1);
   });
 
   it("desconta duplas ativas/pausadas da capacidade", () => {

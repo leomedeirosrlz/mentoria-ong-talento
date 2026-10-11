@@ -9,12 +9,18 @@ import {
 } from "@/lib/queries";
 import { getMentoresChamada, getPresencas } from "@/lib/queries-presenca";
 import {
+  getMinhaGrade,
+  getMinhasExcecoes,
+  getSlotsLivres,
+} from "@/lib/queries-especialista";
+import {
   cronogramaVigente,
   eventoDaSemana,
   eventosDoCronograma,
   toDateStr,
 } from "@/lib/ciclo";
 import { AgendaCalendario } from "@/components/agenda-calendario";
+import { AgendaDisponibilidade } from "@/components/agenda-disponibilidade";
 import { AgendaEspecialista } from "@/components/agenda-especialista";
 
 export const metadata: Metadata = { title: "Agenda" };
@@ -67,8 +73,16 @@ export default async function AgendaPage({
     duplas.every((d) => d.trilha === "especialista");
 
   if (soEspecialista) {
-    // sem dupla ainda: só o cabeçalho da trilha + o estado vazio — a grade de
-    // terças DPP não se aplica a ele
+    // agenda real do especialista (0073): grade semanal + exceções + a
+    // projeção de slots que os jovens veem — buscadas sempre, mesmo sem
+    // dupla (configurar a oferta é justamente o estado vazio ideal)
+    const [grade, excecoes, slots] = await Promise.all([
+      getMinhaGrade(),
+      getMinhasExcecoes(),
+      getSlotsLivres(me!.id),
+    ]);
+    // sem dupla ainda: cabeçalho + a agenda editável + o estado vazio — a
+    // grade de terças DPP não se aplica a ele
     if (duplas.length === 0) {
       return (
         <div className="space-y-6">
@@ -79,6 +93,11 @@ export default async function AgendaPage({
               datas são combinadas por vocês, sem terça oficial.
             </p>
           </header>
+          <AgendaDisponibilidade
+            grade={grade}
+            excecoes={excecoes}
+            slots={slots}
+          />
           <div className="rounded-xl bg-card px-5 py-10 text-center shadow-[var(--shadow-border)]">
             <p className="text-sm text-muted-foreground">
               Você ainda não está em nenhuma dupla. Quando a coordenação formar
@@ -88,7 +107,15 @@ export default async function AgendaPage({
         </div>
       );
     }
-    return <AgendaEspecialista duplas={duplas} espEventos={espEventos} />;
+    return (
+      <AgendaEspecialista
+        duplas={duplas}
+        espEventos={espEventos}
+        grade={grade}
+        excecoes={excecoes}
+        slots={slots}
+      />
+    );
   }
 
   // chamada dos encontros de formação — só a coordenação marca; pros demais

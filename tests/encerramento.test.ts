@@ -198,26 +198,27 @@ describe("textoResumoJornada", () => {
 });
 
 describe("prazoTrilhaEspecialista", () => {
-  it("sem início registrado não há prazo", () => {
+  it("sem início registrado não há marco", () => {
     expect(prazoTrilhaEspecialista(null, HOJE)).toBeNull();
     expect(prazoTrilhaEspecialista(undefined, HOJE)).toBeNull();
     expect(prazoTrilhaEspecialista("lixo", HOJE)).toBeNull();
   });
 
-  it("fim = início + 3 meses; estado por dias restantes", () => {
+  it("marco = início + 3 meses; indica tempo decorrido, nunca bloqueia", () => {
     const inicio = "2025-10-07";
-    // 91 dias restantes → ok
     expect(prazoTrilhaEspecialista(inicio, dt("2025-10-08"))).toEqual({
       fim: "2026-01-07",
+      diasDecorridos: 1,
       diasRestantes: 91,
       estado: "ok",
     });
-    // 13 dias → urgente (<14)
-    expect(prazoTrilhaEspecialista(inicio, dt("2025-12-25"))?.estado).toBe("urgente");
-    // passou → vencido
-    const vencido = prazoTrilhaEspecialista(inicio, dt("2026-01-08"));
-    expect(vencido?.estado).toBe("vencido");
-    expect(vencido?.diasRestantes).toBe(-1);
+    // no dia do marco ainda é "ok" — completa ao fim dele
+    expect(prazoTrilhaEspecialista(inicio, dt("2026-01-07"))?.estado).toBe("ok");
+    // passou o marco → "passou": o guia sugere fechar, nada trava
+    const passou = prazoTrilhaEspecialista(inicio, dt("2026-01-08"));
+    expect(passou?.estado).toBe("passou");
+    expect(passou?.diasRestantes).toBe(-1);
+    expect(passou?.diasDecorridos).toBe(93);
   });
 
   it("meses curtos transbordam no setMonth (30/11 + 3m → 02/03)", () => {

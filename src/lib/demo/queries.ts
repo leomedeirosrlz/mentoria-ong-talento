@@ -1,5 +1,6 @@
 import { getDemoData, type DemoData } from "./data";
-import { registroTardio } from "../ciclo";
+import { registroTardio, toDateStr } from "../ciclo";
+import { slotsLivresEspecialista } from "./agenda";
 import { normaliza } from "../utils";
 import type {
   AppRole,
@@ -16,6 +17,8 @@ import type {
   DuplaResumo,
   EspecialistaAvaliacao,
   EspecialistaEvento,
+  ExcecaoEspecialista,
+  GradeJanela,
   JovemAssinatura,
   JovemContato,
   JovemDupla,
@@ -221,6 +224,77 @@ export function demoEspecialistaEventos(): EspecialistaEvento[] {
   return [...getDemoData().especialistaEventos].sort(
     (a, b) => a.numero - b.numero
   );
+}
+
+// ---------- agenda do especialista (0073) ----------
+
+/** especialista_grade da persona — o select real filtra por profile_id da
+ *  sessão (a policy devolveria só o dono mesmo sem o eq). */
+export function demoMinhaGrade(role: AppRole): GradeJanela[] {
+  const eu = getDemoData().personas[role];
+  return getDemoData()
+    .especialistaGrade.filter((g) => g.profile_id === eu.id)
+    // tira profile_id — GradeJanela é a projeção do select real
+    .map((g) => ({
+      id: g.id,
+      dia_semana: g.dia_semana,
+      hora_inicio: g.hora_inicio,
+      hora_fim: g.hora_fim,
+    }))
+    .sort(
+      (a, b) =>
+        a.dia_semana - b.dia_semana || a.hora_inicio.localeCompare(b.hora_inicio)
+    );
+}
+
+/** Exceções atuais/futuras da persona — o real filtra data >= hoje. */
+export function demoMinhasExcecoes(role: AppRole): ExcecaoEspecialista[] {
+  const eu = getDemoData().personas[role];
+  const hoje = toDateStr(new Date());
+  return getDemoData()
+    .especialistaExcecoes.filter(
+      (x) => x.profile_id === eu.id && x.data >= hoje
+    )
+    // tira profile_id — ExcecaoEspecialista é a projeção do select real
+    .map((x) => ({
+      id: x.id,
+      data: x.data,
+      hora_inicio: x.hora_inicio,
+      hora_fim: x.hora_fim,
+      tipo: x.tipo,
+    }))
+    .sort(
+      (a, b) => a.data.localeCompare(b.data) || a.hora_inicio.localeCompare(b.hora_inicio)
+    );
+}
+
+/** Projeção demo da RPC especialista_slots_livres — mesma regra do SQL
+ *  (demo/agenda.ts), alimentada pelo dataset. Qualquer autenticado consulta
+ *  os slots de qualquer especialista — é a oferta pública do catálogo. */
+export function demoSlotsLivres(profileId: string, dias = 21): string[] {
+  const data = getDemoData();
+  const ocupados = data.duplas
+    .filter((d) => d.mentor?.id === profileId)
+    .flatMap((d) => d.encontros)
+    .filter(
+      (e) =>
+        (e.status === "agendado" || e.status === "remarcado") &&
+        e.data_hora != null
+    )
+    .map((e) => {
+      const inicio = new Date(e.data_hora!).getTime();
+      return { inicio, fim: inicio + (e.duracao_min ?? 60) * 60 * 1000 };
+    });
+  const hoje = new Date();
+  return slotsLivresEspecialista({
+    grade: data.especialistaGrade.filter((g) => g.profile_id === profileId),
+    excecoes: data.especialistaExcecoes.filter(
+      (x) => x.profile_id === profileId
+    ),
+    ocupados,
+    desde: hoje,
+    ate: new Date(hoje.getTime() + dias * 86400000),
+  });
 }
 
 /** Policy materiais_select (0065): 'todos' alcança qualquer papel — inclusive

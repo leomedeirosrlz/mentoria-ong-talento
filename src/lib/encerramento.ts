@@ -215,20 +215,25 @@ export function textoResumoJornada(r: ResumoJornada): string {
   return linhas.join("\n");
 }
 
-// ---------- prazo da trilha especialista (3 meses do aceite) ----------
+// ---------- marco de 3 meses da trilha especialista (0027 → indicador na 0073) ----------
 
 export type PrazoTrilha = {
-  /** "YYYY-MM-DD" — início + 3 meses (duração máxima do guia). */
+  /** "YYYY-MM-DD" — início + 3 meses (o rito do guia). */
   fim: string;
-  /** Dias restantes até o fim — negativo = prazo estourado. */
+  /** Dias desde o início (>= 0) — alimenta o "Nº mês de 3" do badge. */
+  diasDecorridos: number;
+  /** Dias restantes até o marco — negativo = os 3 meses já se completaram. */
   diasRestantes: number;
-  /** urgente = <2 semanas pro fim (ainda dentro); vencido = já passou. */
-  estado: "ok" | "urgente" | "vencido";
+  /** passou = o marco de 3 meses chegou; sinal pra fechar, não bloqueio. */
+  estado: "ok" | "passou";
 };
 
-/** Prazo da trilha de especialista: 3 meses a partir do início da dupla
- *  (duplas.iniciada_em, carimbada no aceite — aceitar_solicitacao grava
- *  current_date). Sem início registrado não há prazo a mostrar. */
+/** Indicador de tempo da trilha de especialista: o guia prevê ~3 meses a
+ *  partir do início da dupla (duplas.iniciada_em, carimbada no aceite —
+ *  aceitar_solicitacao grava current_date). NÃO é prazo de execução:
+ *  completar 3 meses não trava agenda nem encerra a trilha — a estagnação
+ *  real (90 dias sem sessão nova nem futura) acende no `saudadeDaDupla`.
+ *  Sem início registrado não há marco a mostrar. */
 export function prazoTrilhaEspecialista(
   iniciadaEm: string | null | undefined,
   hoje = new Date()
@@ -239,10 +244,12 @@ export function prazoTrilhaEspecialista(
   const fimData = new Date(inicio);
   fimData.setMonth(fimData.getMonth() + 3);
   const fim = toDateStr(fimData);
-  const diasRestantes = diffDias(fim, toDateStr(hoje));
+  const hojeStr = toDateStr(hoje);
+  const diasRestantes = diffDias(fim, hojeStr);
   return {
     fim,
+    diasDecorridos: Math.max(0, diffDias(hojeStr, iniciadaEm)),
     diasRestantes,
-    estado: diasRestantes < 0 ? "vencido" : diasRestantes < 14 ? "urgente" : "ok",
+    estado: diasRestantes < 0 ? "passou" : "ok",
   };
 }

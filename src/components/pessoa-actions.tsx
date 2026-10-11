@@ -41,9 +41,11 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
 // subset do mentor_profile que a coordenação edita — inclui a ficha de
-// matching da 0034 (experiência/formação/disponibilidade)
+// matching da 0034 (experiência/formação/disponibilidade) e os dois pools
+// de capacidade da 0073 (a UI mostra só a da trilha do papel)
 type MentorProfile = {
   capacidade: number;
+  capacidade_especialista: number | null;
   areas: string[];
   termo_ok: boolean;
   formacao_ok: boolean;
@@ -79,7 +81,7 @@ export function PessoaActions({
     if (!editOpen || !ehMentor) return;
     createClient()
       .from("mentor_profiles")
-      .select("capacidade, areas, termo_ok, formacao_ok, experiencia_previa, formacao_externa, disponibilidade")
+      .select("capacidade, capacidade_especialista, areas, termo_ok, formacao_ok, experiencia_previa, formacao_externa, disponibilidade")
       .eq("profile_id", pessoa.id)
       .maybeSingle()
       .then(({ data, error }) => {
@@ -286,11 +288,19 @@ export function PessoaActions({
             <div className="space-y-4 rounded-lg bg-muted/40 p-3.5">
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="e_cap">Capacidade (duplas)</Label>
+                  <Label htmlFor="e_cap">
+                    {pessoa.role === "mentor_especialista"
+                      ? "Capacidade (trilhas de especialista)"
+                      : "Capacidade (duplas DPP)"}
+                  </Label>
                   <Input
                     id="e_cap" name="capacidade" type="number" min={1} max={10}
                     required
-                    defaultValue={mp?.capacidade ?? 1}
+                    defaultValue={
+                      (pessoa.role === "mentor_especialista"
+                        ? mp?.capacidade_especialista
+                        : mp?.capacidade) ?? 1
+                    }
                   />
                 </div>
                 <div className="space-y-2">

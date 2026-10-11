@@ -458,4 +458,117 @@ describe("saudadeDaDupla — trilha de especialista (sem calendário)", () => {
       "Avaliação baixa e dificuldade de outra no último encontro"
     );
   });
+
+  // estagnação (0073): 90+ dias de trilha aberta sem sessão recente nem
+  // agendada futura é o nudge pra revisar o fit — "prazo vencido" não
+  // existe, o sinal é comportamental
+  it("90+ dias sem sessão nova nem agendada → atenção de estagnação", () => {
+    const s = saudadeDaDupla(
+      mkDupla({
+        trilha: "especialista",
+        iniciada_em: "2025-07-01",
+        encontros: [],
+      }),
+      CICLO_16,
+      dt("2025-10-15") // 106 dias de trilha
+    );
+    expect(s.semaforo).toBe("atencao");
+    expect(s.motivo).toBe(
+      "Trilha com 3 meses sem sessão nova — checar se segue fazendo sentido"
+    );
+  });
+
+  it("sessão realizada há mais de 90 dias não tira a estagnação", () => {
+    const s = saudadeDaDupla(
+      mkDupla({
+        trilha: "especialista",
+        iniciada_em: "2025-07-01",
+        encontros: [encRealizado(1, "2025-07-10")],
+      }),
+      CICLO_16,
+      dt("2025-10-15")
+    );
+    expect(s.semaforo).toBe("atencao");
+    expect(s.motivo).toContain("3 meses sem sessão nova");
+  });
+
+  it("sessão recente ou agendada futura desliga a estagnação", () => {
+    const recente = saudadeDaDupla(
+      mkDupla({
+        trilha: "especialista",
+        iniciada_em: "2025-07-01",
+        encontros: [encRealizado(1, "2025-10-10")],
+      }),
+      CICLO_16,
+      dt("2025-10-15")
+    );
+    expect(recente.semaforo).toBe("ok");
+
+    const futura = saudadeDaDupla(
+      mkDupla({
+        trilha: "especialista",
+        iniciada_em: "2025-07-01",
+        encontros: [encAgendado(1, "2025-10-20")],
+      }),
+      CICLO_16,
+      dt("2025-10-15")
+    );
+    expect(futura.semaforo).toBe("ok");
+  });
+
+  it("menos de 90 dias de trilha não estagna (a janela do guia ainda corre)", () => {
+    // margens folgadas: iniciada_em parseia em hora LOCAL e o teste roda em
+    // qualquer fuso — 89 dias nunca acende, 91 sempre acende (régua >= 90)
+    const quase = saudadeDaDupla(
+      mkDupla({
+        trilha: "especialista",
+        iniciada_em: "2025-07-18", // ~89 dias
+        encontros: [],
+      }),
+      CICLO_16,
+      dt("2025-10-15")
+    );
+    expect(quase.semaforo).toBe("ok");
+    const passou = saudadeDaDupla(
+      mkDupla({
+        trilha: "especialista",
+        iniciada_em: "2025-07-16", // ~91 dias
+        encontros: [],
+      }),
+      CICLO_16,
+      dt("2025-10-15")
+    );
+    expect(passou.motivo).toContain("3 meses sem sessão nova");
+  });
+
+  it("sinais operacionais têm prioridade sobre a estagnação", () => {
+    // agendado vencido sem registro (limbo) fala antes do nudge de fit
+    const s = saudadeDaDupla(
+      mkDupla({
+        trilha: "especialista",
+        iniciada_em: "2025-07-01",
+        encontros: [encAgendado(1, "2025-10-10")],
+      }),
+      CICLO_16,
+      dt("2025-10-15")
+    );
+    expect(s.semaforo).toBe("atencao");
+    expect(s.motivo).toBe("1º encontro agendado já passou: falta o registro");
+  });
+
+  it("estagnação não se aplica a DPP nem a trilha sem início registrado", () => {
+    // mesmo padrão numa dupla DPP sem encontros vence por atraso, não por fit
+    const dpp = saudadeDaDupla(
+      mkDupla({ iniciada_em: "2025-07-01", encontros: [] }),
+      CICLO_16,
+      dt("2025-10-15")
+    );
+    expect(dpp.motivo).not.toContain("3 meses sem sessão nova");
+    const semInicio = saudadeDaDupla(
+      mkDupla({ trilha: "especialista", iniciada_em: null, encontros: [] }),
+      CICLO_16,
+      dt("2025-10-15")
+    );
+    expect(semInicio.semaforo).toBe("ok");
+  });
 });
