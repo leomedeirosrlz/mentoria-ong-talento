@@ -11,6 +11,9 @@ import {
 import Link from "next/link";
 import {
   Bell,
+  CalendarDots,
+  CalendarPlus,
+  CalendarX,
   ChatsCircle,
   Check,
   CheckCircle,
@@ -214,6 +217,10 @@ const ICONE: Record<Notificacao["tipo"], typeof Bell> = {
   // canal de segurança (mesmo ícone do pedido do mentor, origem diferente)
   avaliacao_pendente: Star,
   apoio_jovem: HandHeart,
+  // 0072 — agenda bilateral: marcou/alterou/desfez, o trigger credita quem agiu
+  encontro_marcado: CalendarPlus,
+  encontro_alterado: CalendarDots,
+  encontro_desfeito: CalendarX,
 };
 
 export function NotificacoesBell({
