@@ -837,6 +837,8 @@ export function demoAssinaturaPorToken(token: string) {
     id: a.id,
     status,
     assinado_em: a.assinado_em,
+    // 0070 — demo não tem sessão autenticada: o link sempre segue o fluxo
+    identidade: "anon" as const,
     template: a.template ?? { slug: "", titulo: "", versao: 1 },
     alvo: { nome: nome ?? "" },
     civis,

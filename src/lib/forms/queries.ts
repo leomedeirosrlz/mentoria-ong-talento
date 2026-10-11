@@ -61,11 +61,13 @@ export type FormularioDetalhe = {
 
 /** Payload público do /f/<token> — o que formulario_por_token devolve. */
 export type FormularioPublico = {
-  status: "pendente" | "respondido" | "expirado" | "inativo";
+  /** 0070 — 'outra_pessoa' quando uma sessão autenticada abre o link de
+   *  outro destinatário: a RPC omite `formulario` e `campos` nesse caso. */
+  status: "pendente" | "respondido" | "expirado" | "inativo" | "outra_pessoa";
   expira_em: string | null;
   respondido_em: string | null;
   destinatario: string | null;
-  formulario: {
+  formulario?: {
     id: string;
     titulo: string;
     descricao: string | null;

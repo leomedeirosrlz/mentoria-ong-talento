@@ -5,6 +5,8 @@ import {
   FileArrowDown,
   FileX,
   LinkBreak,
+  ShareNetwork,
+  UserSwitch,
 } from "@phosphor-icons/react/dist/ssr";
 // import type não emite runtime — o barrel principal usa createContext e
 // quebraria a página (server component) se viesse como import de valor
@@ -15,6 +17,7 @@ import { SiteFooter } from "@/components/site-footer";
 import { TermoVoluntarioDoc } from "@/components/termo-doc";
 import { buttonVariants } from "@/components/ui/button";
 import { formatDateTime } from "@/lib/ciclo";
+import { SITE_URL } from "@/lib/email";
 import {
   AUTORIZACAO_TITULO,
   civisPreview,
@@ -137,6 +140,57 @@ export default async function AssinarTokenPage({
         <p>
           O prazo deste link de assinatura terminou. Peça um novo link à
           coordenação do programa; a assinatura leva poucos minutos.
+        </p>
+      </EstadoLink>
+    );
+  }
+
+  // 0070 — sessão autenticada conferida contra o destinatário do link (a
+  // RPC já omite `civis` nesses dois casos — nada de dado civil vaza no
+  // card de bloqueio)
+  if (info.identidade === "outra_pessoa") {
+    return (
+      <EstadoLink icon={UserSwitch} titulo="Este link é de outra pessoa">
+        <p>
+          Você está conectado com uma conta que não é a de{" "}
+          <strong className="font-semibold text-foreground">
+            {info.alvo.nome}
+          </strong>
+          , para quem este documento foi emitido. Saia da conta atual e abra o
+          link de novo, ou peça um link só seu à coordenação.
+        </p>
+      </EstadoLink>
+    );
+  }
+
+  if (info.identidade === "signatario_externo") {
+    return (
+      <EstadoLink
+        icon={ShareNetwork}
+        titulo="Quem assina é o responsável"
+      >
+        <p>
+          A autorização de{" "}
+          <strong className="font-semibold text-foreground">
+            {info.alvo.nome}
+          </strong>{" "}
+          precisa ser assinada pelo responsável legal — ele não tem conta na
+          plataforma. Encaminhe este link para a pessoa responsável abrir no
+          celular dela.
+        </p>
+        <p className="mt-4">
+          <a
+            href={`https://wa.me/?text=${encodeURIComponent(
+              `Olá! A Realiza.vc precisa da sua assinatura no documento "${info.template.titulo}". Abra este link no seu celular: ${SITE_URL}/assinar/${token}`,
+            )}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={buttonVariants({ variant: "outline", size: "sm" })}
+          >
+            <ShareNetwork size={15} aria-hidden />
+            Encaminhar pelo WhatsApp
+            <span className="sr-only"> (abre em nova aba)</span>
+          </a>
         </p>
       </EstadoLink>
     );
