@@ -7,11 +7,6 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: "14.5"
-  }
   graphql_public: {
     Tables: {
       [_ in never]: never
@@ -1323,6 +1318,7 @@ export type Database = {
           ong_origem: string | null
           origem: string | null
           pref_genero_par: string | null
+          profile_id: string | null
           responsavel: Json | null
           uf: string | null
           whatsapp: string | null
@@ -1350,6 +1346,7 @@ export type Database = {
           ong_origem?: string | null
           origem?: string | null
           pref_genero_par?: string | null
+          profile_id?: string | null
           responsavel?: Json | null
           uf?: string | null
           whatsapp?: string | null
@@ -1377,11 +1374,34 @@ export type Database = {
           ong_origem?: string | null
           origem?: string | null
           pref_genero_par?: string | null
+          profile_id?: string | null
           responsavel?: Json | null
           uf?: string | null
           whatsapp?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "mentorados_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mentorados_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: true
+            referencedRelation: "profiles_contato"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mentorados_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: true
+            referencedRelation: "profiles_pessoal"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       notificacoes: {
         Row: {
@@ -2380,6 +2400,7 @@ export type Database = {
       interesses_ok: { Args: { interesses: string[] }; Returns: boolean }
       meus_dados_civis: { Args: never; Returns: Json }
       meus_dados_pessoais: { Args: never; Returns: Json }
+      my_mentorado_id: { Args: never; Returns: string }
       my_profile_id: { Args: never; Returns: string }
       my_role: { Args: never; Returns: Database["public"]["Enums"]["app_role"] }
       nome_proprio: { Args: { p: string }; Returns: string }
@@ -2415,6 +2436,7 @@ export type Database = {
         | "supervisor"
         | "mentor_dpp"
         | "mentor_especialista"
+        | "mentorado"
       dupla_status: "ativa" | "pausada" | "encerrada" | "concluida"
       encaminhamento_status: "pendente" | "feito" | "atrasado"
       encontro_status:
@@ -2558,6 +2580,7 @@ export const Constants = {
         "supervisor",
         "mentor_dpp",
         "mentor_especialista",
+        "mentorado",
       ],
       dupla_status: ["ativa", "pausada", "encerrada", "concluida"],
       encaminhamento_status: ["pendente", "feito", "atrasado"],
@@ -2571,3 +2594,4 @@ export const Constants = {
     },
   },
 } as const
+
