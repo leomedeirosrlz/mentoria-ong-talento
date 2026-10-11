@@ -7,6 +7,7 @@ import {
   dt,
   encAgendado,
   encRealizado,
+  mkAvaliacao,
   mkDupla,
   mkEncaminhamento,
   mkEncontro,
@@ -340,6 +341,90 @@ describe("saudadeDaDupla — combinado vencido e ok", () => {
     expect(s.semaforo).toBe("ok");
     expect(s.motivo).toBe("Próximo encontro 14 de out. de 2025");
     expect(s.proximo?.numero).toBe(2);
+  });
+});
+
+describe("saudadeDaDupla — sinais da avaliação do jovem (0071)", () => {
+  it("pedir_apoio do jovem é risco com motivo próprio — nunca funde no do mentor", () => {
+    const dupla = mkDupla({
+      encontros: [
+        {
+          ...encRealizado(1, "2025-10-07"),
+          avaliacao_jovem: mkAvaliacao({ pedir_apoio: true }),
+        },
+      ],
+    });
+    const s = saudadeDaDupla(dupla, CICLO_16, dt("2025-10-08"));
+    expect(s.semaforo).toBe("risco");
+    expect(s.motivo).toBe("Pedido de ajuda do mentorado");
+    expect(s.apoioJovem).toBe(true);
+    // os dois canais ficam separados — o do mentor continua false
+    expect(s.pediuApoio).toBe(false);
+  });
+
+  it("pedidos dos dois lados viram o motivo plural", () => {
+    const dupla = mkDupla({
+      encontros: [
+        encRealizado(1, "2025-10-07", mkRegistro({ precisa_apoio: true })),
+        {
+          ...encRealizado(2, "2025-10-14"),
+          avaliacao_jovem: mkAvaliacao({ pedir_apoio: true }),
+        },
+      ],
+    });
+    const s = saudadeDaDupla(dupla, CICLO_16, dt("2025-10-15"));
+    expect(s.semaforo).toBe("risco");
+    expect(s.motivo).toBe("Pedidos de apoio em aberto");
+    expect(s.pediuApoio).toBe(true);
+    expect(s.apoioJovem).toBe(true);
+  });
+
+  it("apoio do jovem fura o congelamento da pausada, mas não da encerrada", () => {
+    const enc = {
+      ...encRealizado(1, "2025-10-07"),
+      avaliacao_jovem: mkAvaliacao({ pedir_apoio: true }),
+    };
+    const pausada = saudadeDaDupla(
+      mkDupla({ status: "pausada", encontros: [enc] }),
+      CICLO_16,
+      dt("2025-10-15")
+    );
+    expect(pausada.semaforo).toBe("risco");
+    expect(pausada.apoioJovem).toBe(true);
+
+    const encerrada = saudadeDaDupla(
+      mkDupla({ status: "encerrada", encontros: [enc] }),
+      CICLO_16,
+      dt("2025-10-15")
+    );
+    expect(encerrada.semaforo).toBe("ok");
+    expect(encerrada.apoioJovem).toBe(false);
+  });
+
+  it("realizado sem avaliação conta a pendência do jovem — sem virar motivo", () => {
+    const dupla = mkDupla({
+      encontros: [
+        // e1 avaliado, e2 realizado sem a estrela dele
+        { ...encRealizado(1, "2025-10-07"), avaliacao_jovem: mkAvaliacao() },
+        encRealizado(2, "2025-10-14"),
+      ],
+    });
+    const s = saudadeDaDupla(dupla, CICLO_16, dt("2025-10-15"));
+    expect(s.avaliacaoJovemPendente).toBe(1);
+    // pendência de resposta do jovem não soa alarme — é varredura do filtro
+    expect(s.semaforo).toBe("ok");
+  });
+
+  it("encontro não realizado nunca conta como pendente", () => {
+    const dupla = mkDupla({
+      encontros: [
+        { ...encRealizado(1, "2025-10-07"), avaliacao_jovem: mkAvaliacao() },
+        encAgendado(2, "2025-10-21"),
+        mkEncontro(3, { status: "nao_aconteceu" }),
+      ],
+    });
+    const s = saudadeDaDupla(dupla, CICLO_16, dt("2025-10-15"));
+    expect(s.avaliacaoJovemPendente).toBe(0);
   });
 });
 

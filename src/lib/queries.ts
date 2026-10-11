@@ -256,10 +256,15 @@ const DUPLA_SELECT = `
   mentor:profiles!duplas_mentor_id_fkey(${PROFILE_COLS_PUBLICAS}),
   mentorado:mentorados(${MENTORADO_COLS_PUBLICAS}),
   supervisor:profiles!duplas_supervisor_id_fkey(${PROFILE_COLS_PUBLICAS}),
-  encontros(*, registro:registros(*, autor:profiles!registros_created_by_fkey(nome))),
+  encontros(*, registro:registros(*, autor:profiles!registros_created_by_fkey(nome)),
+    avaliacao_jovem:avaliacoes_encontro(*)),
   encaminhamentos(*),
   notas:encontro_notas(*)
 `;
+// avaliacao_jovem (0071): embed to-one (encontro_id é unique lá). O RLS da
+// tabela faz o recorte por papel SOZINHO — coord/sup recebem todas as
+// avaliações da dupla, mentor_dpp só as com avaliacao_visivel_mentor,
+// mentor_especialista nenhuma (a estrela dele vem da view própria).
 
 /** Contato da view mergeado em mentor/supervisor de cada dupla — o nudge por
  *  WhatsApp (coord/supervisor) e o Gravatar do mentor dependem disso. Quem o

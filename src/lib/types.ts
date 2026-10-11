@@ -290,6 +290,66 @@ export type Registro = {
   autor?: { nome: string } | null;
 };
 
+// ---------- avaliação do encontro FEITA PELO JOVEM (0071 / D4) ----------
+// Não confundir: `registros.avaliacao` (4-pt, do mentor), `avaliacao_360`
+// (forms engine) e esta (estrelas 1-5, do jovem) são três escalas que não
+// se misturam — AvaliacaoJovem já era o nome da escala do mentor.
+
+/** "Você sente que avançou?" — o CHECK do banco fecha o vocabulário. */
+export type AvanceiAvaliacao = "sim" | "um_pouco" | "nao";
+
+/** Linha de `avaliacoes_encontro` — a nota do jovem por encontro realizado.
+ *  O que cada papel recebe é a RLS (0071): coord/sup lêem tudo da dupla,
+ *  o jovem as próprias, o mentor DPP só as que ele autorizou ver. */
+export type AvaliacaoEncontro = {
+  id: string;
+  dupla_id: string;
+  encontro_id: string;
+  estrelas: number;
+  /** Chave do SENTIMENTO_AVALIACAO (ou texto legado) — opcional no form. */
+  sentimento: string | null;
+  avancei: AvanceiAvaliacao | null;
+  /** Chaves do TEMA_AVALIACAO — o que a dupla conversou. */
+  temas: string[] | null;
+  comentario: string | null;
+  /** Canal de segurança: coord+sup são notificados e só a coord resolve. */
+  pedir_apoio: boolean;
+  /** O jovem liberou o mentor DPP ler esta avaliação específica. */
+  avaliacao_visivel_mentor: boolean;
+  /** null = resposta anônima por token (jovem sem login). */
+  respondido_por_profile_id: string | null;
+  created_at: string;
+};
+
+/** Link tokenizado do encontro — o canal do jovem sem login (WhatsApp via
+ *  coord). A RLS expõe a tabela só pra coordenação. */
+export type AvaliacaoLink = {
+  id: string;
+  token: string;
+  encontro_id: string;
+  dupla_id: string;
+  status: "pendente" | "respondido" | "expirado";
+  expira_em: string;
+  respondido_em: string | null;
+  /** Profile que respondeu por este link (null = jovem sem login — o
+   *  token sozinho é a identidade). Trilha de auditoria da RPC. */
+  respondido_por_profile_id: string | null;
+  created_at: string;
+};
+
+/** Linha da view `especialista_avaliacoes` (0071): o especialista vê SÓ as
+ *  estrelas das próprias sessões — nada de comentário/sentimento/temas
+ *  (com 1 avaliador, conteúdo identifica → autocensura + retaliação). */
+export type EspecialistaAvaliacao = {
+  id: string;
+  dupla_id: string;
+  encontro_id: string;
+  estrelas: number;
+  numero: number;
+  realizado_em: string | null;
+  created_at: string;
+};
+
 /** Evidência anexada a um registro (foto do PDM, Roda da Vida) — arquivo no bucket `registro-anexos`. */
 export type RegistroAnexo = {
   id: string;
@@ -318,6 +378,10 @@ export type Encontro = {
   /** Por que a dupla remarcou (label do preset ou texto livre) — só escrito quando a data muda. */
   motivo_reagendamento: string | null;
   registro?: Registro | null;
+  /** Estrela do JOVEM sobre este encontro (0071) — embed to-one no select da
+   *  dupla. O RLS decide quem a vê: coord/sup sempre, mentor DPP só quando o
+   *  jovem autorizou, especialista nunca por aqui (a view dele é estrelas). */
+  avaliacao_jovem?: AvaliacaoEncontro | null;
 };
 
 /** Anotação/plano de aula do mentor — chave (dupla_id, numero), não FK de
@@ -415,8 +479,9 @@ export type Notificacao = {
   id: string;
   /** Os 4 originais (0018) + os 4 do fluxo de especialista (0028) +
    *  trilha_encerrada (0037) + supervisao_registrada (0041) +
-   *  formulario_respondido (0042, inserido pela RPC de submit) — espelha o
-   *  CHECK notificacoes_tipo_check. */
+   *  formulario_respondido (0042, inserido pela RPC de submit) +
+   *  avaliacao_pendente/apoio_jovem (0071, trigger + RPC de avaliação) —
+   *  espelha o CHECK notificacoes_tipo_check. */
   tipo:
     | "comunicado"
     | "pedido_apoio"
@@ -428,7 +493,9 @@ export type Notificacao = {
     | "solicitacao_cancelada"
     | "trilha_encerrada"
     | "supervisao_registrada"
-    | "formulario_respondido";
+    | "formulario_respondido"
+    | "avaliacao_pendente"
+    | "apoio_jovem";
   titulo: string;
   corpo: string | null;
   href: string | null;
