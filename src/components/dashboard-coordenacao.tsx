@@ -60,6 +60,10 @@ const FILTROS = {
     rotulo: "com registro pendente",
     teste: (s: LinhaSaude) => s.saude.registroPendente,
   },
+  avaliacao: {
+    rotulo: "com avaliação do jovem pendente",
+    teste: (s: LinhaSaude) => s.saude.avaliacaoJovemPendente > 0,
+  },
 } as const;
 
 type FiltroPainel = keyof typeof FILTROS;
@@ -142,12 +146,19 @@ export function DashboardCoordenacao({
 
   const saude = duplas
     .map((d) => ({ dupla: d, saude: saudadeDaDupla(d, eventos, hoje) }))
-    // pedido de apoio fura o congelamento da pausada/encerrada — não pode sumir do radar
-    .filter(({ dupla, saude }) => dupla.status === "ativa" || saude.pediuApoio)
+    // pedido de apoio fura o congelamento da pausada/encerrada — não pode
+    // sumir do radar; o do JOVEM (0071) segue a mesma regra
+    .filter(
+      ({ dupla, saude }) =>
+        dupla.status === "ativa" || saude.pediuApoio || saude.apoioJovem
+    )
     .sort((a, b) => ORDEM_SEMAFORO[a.saude.semaforo] - ORDEM_SEMAFORO[b.saude.semaforo]);
 
   const filtroAtivo: FiltroPainel | null =
-    filtro === "risco" || filtro === "atencao" || filtro === "pendentes"
+    filtro === "risco" ||
+    filtro === "atencao" ||
+    filtro === "pendentes" ||
+    filtro === "avaliacao"
       ? filtro
       : null;
   const visiveis = filtroAtivo ? saude.filter(FILTROS[filtroAtivo].teste) : saude;
@@ -157,7 +168,13 @@ export function DashboardCoordenacao({
   const atencao = saude.filter((s) => s.saude.semaforo === "atencao").length;
   const emDia = saude.filter((s) => s.saude.semaforo === "ok").length;
   const semRegistro = saude.filter((s) => s.saude.registroPendente).length;
+  const avalPendentes = saude.filter(
+    (s) => s.saude.avaliacaoJovemPendente > 0
+  ).length;
   const pedidosApoio = saude.filter((s) => s.saude.pediuApoio).length;
+  // pedido de ajuda do JOVEM (0071) — canal separado do apoio do mentor:
+  // é sobre o próprio mentor às vezes, nunca se funde no mesmo banner
+  const pedidosApoioJovem = saude.filter((s) => s.saude.apoioJovem).length;
   const emRisco = saude
     .filter((s) => s.saude.semaforo === "risco")
     .map(
@@ -333,6 +350,24 @@ export function DashboardCoordenacao({
               </span>
             </div>
           )}
+          {/* o "preciso de ajuda" chega pela avaliação estrela do jovem —
+              banner próprio porque quem responde e pra quem é diferente
+              (o mentor pode ser o motivo; nunca é o canal de resposta) */}
+          {pedidosApoioJovem > 0 && (
+            <div className="rounded-xl border border-[var(--danger)]/40 bg-[var(--danger)]/5 px-4 py-3 text-sm">
+              <span className="font-medium">
+                {pedidosApoioJovem}{" "}
+                {pedidosApoioJovem === 1
+                  ? "jovem pediu ajuda"
+                  : "jovens pediram ajuda"}
+              </span>
+              <span className="text-muted-foreground">
+                {pedidosApoioJovem === 1
+                  ? " na avaliação do encontro — a ficha da dupla tem o detalhe."
+                  : " nas avaliações dos encontros — a ficha de cada dupla tem o detalhe."}
+              </span>
+            </div>
+          )}
 
           {/* saúde das duplas — o headline + a proporção do semáforo numa
               barra segmentada + os filtros como chips (mesma idiom de
@@ -418,6 +453,16 @@ export function DashboardCoordenacao({
               >
                 <span aria-hidden className="size-2 rounded-full ring-1 ring-[var(--warn)]" />
                 Registro pendente <span className="tabular-nums">{semRegistro}</span>
+              </Link>
+              {/* varredura de fim de semana: quais duplas ainda devem a
+                  estrela do jovem (o link já está mintado — falta a resposta) */}
+              <Link
+                href="/?filtro=avaliacao"
+                className={filterChipCls(filtroAtivo === "avaliacao")}
+                aria-current={filtroAtivo === "avaliacao" ? "page" : undefined}
+              >
+                <span aria-hidden className="size-2 rounded-full ring-1 ring-muted-foreground/50" />
+                Avaliação pendente <span className="tabular-nums">{avalPendentes}</span>
               </Link>
             </div>
           </section>
@@ -576,8 +621,11 @@ export function DashboardCoordenacao({
 }
 
 /** Versão curta do motivo — usada na linha "Em risco" do resumo copiável.
- *  Risco só vem de: pedido de apoio, ≥2 atrasos, avaliação baixa + dificuldade. */
+ *  Risco só vem de: pedido de ajuda (jovem ou mentor), ≥2 atrasos,
+ *  avaliação baixa + dificuldade. O do jovem vem primeiro: um menor
+ *  pedindo ajuda é o sinal mais grave do radar. */
 function motivoCurto(s: DuplaSaude): string {
+  if (s.apoioJovem) return "jovem pediu ajuda";
   if (s.pediuApoio) return "pediu apoio";
   const atraso = s.esperado - s.feitos;
   if (atraso >= 2) return `${atraso} atrasos`;
