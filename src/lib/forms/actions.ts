@@ -388,6 +388,8 @@ function traduzErroSubmit(message: string): string {
     return "Este link expirou. Peça um novo à equipe Realiza.vc.";
   if (/formulário encerrado/i.test(message))
     return "Este formulário não está recebendo respostas no momento.";
+  if (/outra pessoa/i.test(message))
+    return "Este link é de outra pessoa. Saia da conta atual e abra o link de novo.";
   if (
     /^(Responda|Escolha|Marque|Opção inválida|Formato inválido|Use uma data)/i.test(
       message
