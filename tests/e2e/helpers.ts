@@ -159,6 +159,34 @@ export async function buscarViaServiceRole<T = Record<string, unknown>[]>(
   return (await res.json()) as T;
 }
 
+/** POST via service role — cria estado que o spec precisa existir (ex.: um
+ *  encontro já 'realizado' pra exercitar a avaliação do jovem — o trigger
+ *  minta o avaliacao_links no insert). Devolve a row criada. Mesmo
+ *  hard-stop: spec app nunca fala com prod. */
+export async function inserirViaServiceRole(
+  tabela: string,
+  corpo: Record<string, unknown>
+): Promise<Record<string, unknown>> {
+  if (supabaseUrl.includes(PROD_REF))
+    throw new Error("E2E_SUPABASE_URL aponta pra produção — insert abortado");
+  const url = `${supabaseUrl}/rest/v1/${tabela}`;
+  const key = process.env.E2E_SUPABASE_SERVICE_ROLE_KEY!;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      apikey: key,
+      Authorization: `Bearer ${key}`,
+      "Content-Type": "application/json",
+      Prefer: "return=representation",
+    },
+    body: JSON.stringify(corpo),
+  });
+  if (!res.ok)
+    throw new Error(`insert ${tabela} falhou: ${res.status} ${await res.text()}`);
+  const rows = (await res.json()) as Record<string, unknown>[];
+  return rows[0];
+}
+
 /** PATCH via service role — restaura fixture que o spec alterou de propósito
  *  (ex.: a dupla que o remanejo encerrou volta a "ativa"). `filtro` é a query
  *  do PostgREST; `patch` é o corpo do update. */

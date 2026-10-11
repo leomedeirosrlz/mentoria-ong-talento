@@ -17,8 +17,10 @@
 // pra importação CSV. E a fixture do shell /jovem (REALIZA-108): profile
 // mentorado + auth user com a ficha da mentorada da dupla …0030 vinculada,
 // combinado pendente (+ um do mentor, checagem negativa), encontro futuro
-// e as duas assinaturas pendentes. IDs fixos e2e00000-*, que o workflow usa
-// pra cleanup determinístico.
+// e as duas assinaturas pendentes. E a fixture da avaliação estrela
+// (REALIZA-109): um encontro realizado sem avaliação — o trigger minta o
+// link /avaliar e a pendência do "Suas avaliações". IDs fixos e2e00000-*,
+// que o workflow usa pra cleanup determinístico.
 
 const URL_ = process.env.E2E_SUPABASE_URL;
 const KEY = process.env.E2E_SUPABASE_SERVICE_ROLE_KEY;
@@ -57,6 +59,11 @@ const IDS = {
   combinadoJovem: "e2e00000-0000-4000-8000-0000000000c1",
   combinadoMentor: "e2e00000-0000-4000-8000-0000000000c2",
   encontroJovem: "e2e00000-0000-4000-8000-0000000000d1",
+  // REALIZA-109: encontro realizado SEM avaliação — o trigger minta o link
+  // /avaliar e a pendência do "Suas avaliações". numero 16 fica fora do
+  // ciclo esperado (as datas oficiais já passadas são as baixas), não come
+  // um faltante do semáforo nem disputa o proximoNumero dos specs de agenda.
+  encontroAvaliacao: "e2e00000-0000-4000-8000-0000000000d2",
   assinaturaTermo: "e2e00000-0000-4000-8000-0000000000a1",
   assinaturaAutoriz: "e2e00000-0000-4000-8000-0000000000a2",
 };
@@ -93,9 +100,54 @@ console.log(`cronograma: ${cron.id} (${cron.turma})`);
 // meio — sem ele, um remanejo/cronograma/import pendurado quebrava o run
 // seguinte em cascata (dupla2 encerrada, "par já existe", turma duplicada).
 {
-  await del(`duplas?remanejada_de=eq.${IDS.dupla2}`); // sucessoras de remanejo
-  await del(`duplas?mentor_id=eq.${IDS.mentorImport}`); // par do import CSV
-  await del(`duplas?mentorado_id=eq.${IDS.mentoradoLivre}`); // qualquer vínculo do livre
+  // filhos da 0071 primeiro: avaliacoes_encontro e avaliacao_links têm FK
+  // pra encontros E pra duplas com NO ACTION — qualquer delete de dupla ou
+  // de encontro abaixo bate em 409 se sobrar avaliação/link pendurado (e
+  // o run manual do Thiago deixou vários). Abrange as fixtures E as duplas
+  // que a limpeza apaga (sucessoras de remanejo, par do import, vínculos
+  // do mentorado livre e QUALQUER outra dupla do mentorado do jovem — uma
+  // leftover da trilha especialista no staging roubava o "dupla atual" do
+  // /jovem e ainda poluía o histórico de avaliações). O log de e-mail de
+  // apoio sobrevive à avaliação — ref_id é solto de propósito.
+  const morrem = await rest(
+    `duplas?select=id&or=(id.in.(${IDS.dupla},${IDS.dupla2}),remanejada_de.eq.${IDS.dupla2},mentor_id.eq.${IDS.mentorImport},mentorado_id.eq.${IDS.mentoradoLivre},and(mentorado_id.eq.${IDS.mentorado},id.not.eq.${IDS.dupla}))`
+  );
+  const morremIds = (morrem ?? []).map((d) => d.id);
+  if (morremIds.length) {
+    await del(`emails_enviados?tipo=eq.apoio_jovem`);
+    await del(`avaliacoes_encontro?dupla_id=in.(${morremIds.join(",")})`);
+    await del(`avaliacao_links?dupla_id=in.(${morremIds.join(",")})`);
+    // apoio_jovem aponta pra ficha — pra qualquer coord real do staging,
+    // não só as fixtures (o sweep por profile_id abaixo não os alcança)
+    for (const dId of morremIds)
+      await del(`notificacoes?tipo=eq.apoio_jovem&href=eq./duplas/${dId}`);
+  }
+  // as condenadas de verdade — a dupla do jovem fica (é a fixture) e a
+  // dupla2 só volta a 'ativa'. Filhos NO ACTION primeiro: especialista_,
+  // formulario_, supervisoes e encerramentos referenciam duplas sem
+  // cascade; encontros carrega registros/notas/interações em cascade, mas
+  // as avaliações/links só saíram acima por causa do dupla_id espelhado.
+  const condenadas = morremIds.filter((d) => d !== IDS.dupla && d !== IDS.dupla2);
+  if (condenadas.length) {
+    const ids = condenadas.join(",");
+    // dupla↔solicitação de especialista é FK circular (0027/0028): zera a
+    // aresta na dupla antes de varrer a solicitação e seus eventos
+    await patch(`duplas?id=in.(${ids})`, { solicitacao_id: null });
+    const sols = await rest(
+      `solicitacoes_especialista?select=id&or=(dupla_dpp_id.in.(${ids}),dupla_id.in.(${ids}))`
+    );
+    const solIds = (sols ?? []).map((s) => s.id);
+    if (solIds.length) {
+      await del(`especialista_eventos?solicitacao_id=in.(${solIds.join(",")})`);
+      await del(`solicitacoes_especialista?id=in.(${solIds.join(",")})`);
+    }
+    await del(`formulario_links?dupla_id=in.(${ids})`);
+    await del(`supervisoes?dupla_id=in.(${ids})`);
+    await del(`encerramentos?dupla_id=in.(${ids})`);
+    await del(`encontros?dupla_id=in.(${ids})`);
+    await del(`duplas?id=in.(${ids})`);
+    console.log(`limpeza: ${condenadas.length} dupla(s) pendurada(s) removidas`);
+  }
   await patch(`duplas?id=eq.${IDS.dupla2}`, { status: "ativa" });
   const e2eProfiles = [IDS.mentorProfile, IDS.coordProfile, IDS.mentorReserva, IDS.mentorImport, IDS.jovemProfile].join(",");
   const e2eMentorados = [IDS.mentorado, IDS.mentorado2, IDS.mentoradoLivre, IDS.mentoradoImport].join(",");
@@ -108,10 +160,15 @@ console.log(`cronograma: ${cron.id} (${cron.turma})`);
   // só as fixtures de staff — created_by alcança qualquer coord real do
   // staging que o jovem tenha notificado de verdade
   await del(`notificacoes?created_by=eq.${IDS.jovemProfile}`);
-  // encontros pendurados de runs mortos nas duplas e2e — menos a fixture do
-  // jovem, que o bloco de seed abaixo re-carimba (a data é sempre now+3d)
+  // prompts de avaliação endereçados ao jovem (o trigger 0071 minta com
+  // created_by nulo sob service role — o filtro é pelo destinatário)
   await del(
-    `encontros?dupla_id=in.(${IDS.dupla},${IDS.dupla2})&id=neq.${IDS.encontroJovem}`
+    `notificacoes?profile_id=eq.${IDS.jovemProfile}&tipo=eq.avaliacao_pendente`
+  );
+  // encontros pendurados de runs mortos nas duplas e2e — menos as fixtures
+  // do jovem, que os blocos de seed abaixo re-carimbam/re-convergem.
+  await del(
+    `encontros?dupla_id=in.(${IDS.dupla},${IDS.dupla2})&id=not.in.(${IDS.encontroJovem},${IDS.encontroAvaliacao})`
   );
   // cronogramas criados pelo spec de turmas — eventos primeiro: a FK
   // ciclo_eventos.cronograma_id (0061) não tem ON DELETE CASCADE
@@ -399,6 +456,66 @@ if (!encJovem) {
     status: "agendado",
   });
   console.log("encontro futuro do jovem renovado");
+}
+
+// encontro REALIZADO sem avaliação (REALIZA-109): o trigger em
+// encontros→'realizado' minta o avaliacao_links e notifica o jovem — é a
+// pendência que o /jovem ("Suas avaliações") e a ficha da dupla ("voz do
+// jovem") exibem. numero 16 fica fora do ciclo esperado (o semáforo conta
+// as datas oficiais já passadas — hoje os números baixos), então não come
+// um faltante e não disputa proximoNumero com os specs de agendamento.
+const dataRealizado = new Date(Date.now() - 2 * 86400e3).toISOString();
+const [encAval] = await rest(
+  `encontros?select=id,status&id=eq.${IDS.encontroAvaliacao}`
+);
+if (!encAval) {
+  await rest("encontros", {
+    method: "POST",
+    body: JSON.stringify({
+      id: IDS.encontroAvaliacao,
+      dupla_id: IDS.dupla,
+      numero: 16,
+      data_hora: dataRealizado,
+      realizado_em: dataRealizado,
+      status: "realizado",
+    }),
+  });
+  console.log("encontro realizado (avaliação pendente) criado");
+} else {
+  // re-carimba a data (um run velho deixaria o realizado meses atrás) e
+  // reconverge a pendência: o spec submete a avaliação de verdade — o seed
+  // devolve o encontro "sem estrela" pro próximo run. O guard 0043 só
+  // trava mudança DE status; update de data em realizado passa.
+  await del(`avaliacoes_encontro?encontro_id=eq.${IDS.encontroAvaliacao}`);
+  await patch(`encontros?id=eq.${IDS.encontroAvaliacao}`, {
+    data_hora: dataRealizado,
+    realizado_em: dataRealizado,
+  });
+  console.log("encontro de avaliação re-convergido");
+}
+// o link é mintado pelo trigger no insert; se a row existir sem link (run
+// morto entre os deletes), recria na mão — token precisa de ≥20 chars
+const [linkAval] = await rest(
+  `avaliacao_links?select=token,status&encontro_id=eq.${IDS.encontroAvaliacao}`
+);
+if (!linkAval) {
+  await rest("avaliacao_links", {
+    method: "POST",
+    body: JSON.stringify({
+      token: crypto.randomUUID(),
+      encontro_id: IDS.encontroAvaliacao,
+      dupla_id: IDS.dupla,
+      expira_em: new Date(Date.now() + 60 * 86400e3).toISOString(),
+    }),
+  });
+  console.log("link de avaliação recriado (faltava)");
+} else if (linkAval.status !== "pendente") {
+  await patch(`avaliacao_links?encontro_id=eq.${IDS.encontroAvaliacao}`, {
+    status: "pendente",
+    respondido_em: null,
+    respondido_por_profile_id: null,
+  });
+  console.log("link de avaliação re-convergido pra pendente");
 }
 
 // documentos do jovem — a seção "Documentos" da home: termo dele (Assinar)
