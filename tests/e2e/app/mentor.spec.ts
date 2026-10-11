@@ -58,8 +58,10 @@ test.describe("mentor DPP — fluxos reais", () => {
       .getByRole("button", { name: "Confirmar agendamento" })
       .click();
 
-    // toast de sucesso e o dialog fecha — o refresh traz o card novo
-    await expect(page.getByText(/encontro agendado/i)).toBeVisible();
+    // toast de sucesso e o dialog fecha — o refresh traz o card novo.
+    // O card da home também diz "Nº encontro agendado" (sem ponto) — o \.
+    // ancora a regex no toast ("agendado.") pra não resolver 2 elementos.
+    await expect(page.getByText(/encontro agendado\./i)).toBeVisible();
     await expect(dialog).not.toBeVisible();
   });
 });
