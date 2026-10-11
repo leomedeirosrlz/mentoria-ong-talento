@@ -378,6 +378,7 @@ export function MentorHome({
                             atual={encontroSeguinte}
                             sugerido={sugeridoSeguinte}
                             piso={dupla.iniciada_em ?? undefined}
+                            jovemNome={dupla.mentorado.nome.split(" ")[0]}
                             trigger={
                               <Button variant="outline" size="sm">
                                 <CalendarPlus size={16} />
@@ -412,6 +413,7 @@ export function MentorHome({
                           atual={encontroAlvo}
                           sugerido={sugeridoProximo}
                           piso={dupla.iniciada_em ?? undefined}
+                          jovemNome={dupla.mentorado.nome.split(" ")[0]}
                           trigger={
                             <Button size="sm">
                               <CalendarPlus size={16} />
@@ -436,6 +438,7 @@ export function MentorHome({
                           atual={encontroAlvo}
                           sugerido={sugeridoProximo}
                           piso={dupla.iniciada_em ?? undefined}
+                          jovemNome={dupla.mentorado.nome.split(" ")[0]}
                         />
                       </div>
                     </>

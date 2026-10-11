@@ -136,6 +136,7 @@ export function AgendaEspecialista({
                     numero={proximoNumero}
                     atual={encontroAlvo}
                     piso={dupla.iniciada_em ?? undefined}
+                    jovemNome={dupla.mentorado.nome.split(" ")[0]}
                   />
                   {faltantes.length > 0 && (
                     <RegistrarRetroativoDialog

@@ -2720,6 +2720,7 @@ function AcaoDiaMentor({
             atual={null}
             sugerido={oficial.data}
             piso={dupla.iniciada_em ?? undefined}
+            jovemNome={dupla.mentorado.nome.split(" ")[0]}
             onCreated={onEncontroCriado}
           />
         );
@@ -2761,6 +2762,7 @@ function AcaoDiaMentor({
           duplaId={dupla.id}
           numero={oficial.numero}
           atual={rowOficial}
+          jovemNome={dupla.mentorado.nome.split(" ")[0]}
           onCreated={onEncontroCriado}
         />
       );
@@ -2776,6 +2778,7 @@ function AcaoDiaMentor({
           atual={alvo.encontroAlvo}
           sugerido={selecionado}
           piso={dupla.iniciada_em ?? undefined}
+          jovemNome={dupla.mentorado.nome.split(" ")[0]}
           onCreated={onEncontroCriado}
         />
       );
