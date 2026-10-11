@@ -168,6 +168,14 @@ E. Encontros/notificações/avaliações (trigger + `avaliacoes_encontro` + RPCs
 
 Jira: **Epic REALIZA-106** + filhas por slice — REALIZA-107 (auth, absorve -16) · 108 (shell /jovem) · 109 (avaliação estrela) · 110 (agenda livre DPP) · 111 (disponibilidade) · 112 (especialista jovem-iniciado, migration atômica) · 113 (diretório). Links: -105 (profile_roles), -98 (dupla_dpp_id), -99 (supervisor=coord), -16 (identidade).
 
+**Status de implementação (10/out/2026):**
+
+- ✅ **REALIZA-107 concluída** — A (`0065`, PR #3): auto-grants de `profiles`/`mentor_profiles`/`ciclo_eventos`/`especialista_eventos`/`cronogramas` com lista explícita dos 4 papéis; `materiais`+storage ganharam o gate `my_role() is not null` que nunca tiveram (bug pré-existente: qualquer autenticado lia `'todos'`). B (`0066`, PR #4): enum `mentorado` + `mentorados.profile_id` + `my_mentorado_id()` (herda `and ativo` via `my_profile_id()`). C (`0067`–`0069`, PR #5): camada de leitura — views definer `jovem_perfil`/`jovem_duplas`/`jovem_contatos`/`jovem_assinaturas`, branch `exists(jovem_duplas)` em `encontros_select`, branch `pedido_apoio`→`jovem_contatos` em `notificacoes_insert`. Tudo aplicado em staging+prod, persona test no staging (14 cenários, JWT real) — escopo exato, regressão zero.
+- **Lição de RLS que fica (descoberta do persona test):** subquery dentro de policy avalia sob o RLS do invoker na tabela referenciada — `exists(duplas)` falhava pro jovem (sem SELECT em `duplas`, `exists`=false). Oracle de pertencimento pra papel sem SELECT na base = view/função definer. Documentado nas migrations 0068/0069.
+- **Decisões de projeção:** `profiles_select` sem branch mentorado (row-access vazaria `dados_civis` do mentor — `jovem_contatos` cobre nome/avatar/whatsapp/e-mail dos adultos); `jovem_duplas` sem `devolutiva_pdm`; `encontros` = colunas todas seguras → branch de policy, não view.
+- **Papel inerte:** ninguém tem `mentorado` ainda — rollback operacional = não conceder. `/jovem` (108) tem tudo que precisa pra renderizar.
+- **Fix de CI no PR #5:** e2e-preview pinado em `environment == 'Preview – realiza.vc'` — a race entre os dois projetos Vercel que deployam o repo deixava o órfão `realiza` (sem bypass token) vencer e os testes caíam no SSO wall.
+
 ## Aberto (menor)
 
 - Teto de 2 especialistas simultâneos por jovem (sugestão do crítico — confirmar)
