@@ -629,8 +629,12 @@ function PessoaRow({
   souCoord: boolean;
 }) {
   const [detalhesAbertos, setDetalhesAbertos] = useState(false);
-  // mentor sem linha em mentor_profiles vale capacidade 1 (mesma regra do createDupla)
-  const capacidade = mp?.capacidade ?? 1;
+  // mentor sem linha em mentor_profiles vale capacidade 1 (mesma regra do
+  // createDupla) — na pool da própria trilha (0073)
+  const capacidade =
+    (p.role === "mentor_especialista"
+      ? mp?.capacidade_especialista
+      : mp?.capacidade) ?? 1;
   const detalhesId = `detalhes-${p.id}`;
   const temPendencia = ehMentor(p) && (!mp?.termo_ok || !mp?.formacao_ok);
   const docs = docsProp ?? DOCS_VAZIO;

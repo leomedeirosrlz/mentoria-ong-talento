@@ -133,8 +133,11 @@ export type DiretorioPar = {
    *  especialista olha o histórico; os checks de vaga filtram ativa/pausada. */
   duplas: DuplaRef[];
   cronogramas: Cronograma[];
-  /** profile_id -> capacidade; mentor sem linha em mentor_profiles vale 1. */
+  /** profile_id -> teto DPP (mentor_profiles.capacidade); sem linha vale 1. */
   capacidades: Map<string, number>;
+  /** profile_id -> teto de trilhas de especialista — pool separado da 0073
+   *  (mentor_profiles.capacidade_especialista); sem linha vale 1. */
+  capacidadesEsp: Map<string, number>;
   /** Eventos de todos os cronogramas — base do iniciada_em default da DPP. */
   eventos: {
     cronograma_id: string;
@@ -315,9 +318,12 @@ export function resolverPares(
   const vagaOcupada = new Set(
     emCurso.map((d) => `${d.mentorado_id}|${d.trilha}`)
   );
+  // vagas do mentor contam por trilha (0073) — a trilha especialista tem o
+  // pool próprio e não consome a capacidade DPP, nem o contrário
   const duplasDoMentor = new Map<string, number>();
   for (const d of emCurso) {
-    duplasDoMentor.set(d.mentor_id, (duplasDoMentor.get(d.mentor_id) ?? 0) + 1);
+    const k = `${d.mentor_id}|${d.trilha === "especialista" ? "especialista" : "dpp"}`;
+    duplasDoMentor.set(k, (duplasDoMentor.get(k) ?? 0) + 1);
   }
 
   return linhas.map((linha) => {
@@ -398,9 +404,13 @@ export function resolverPares(
       );
     }
     // capacidade do mentor — o trigger do banco é a trava final; aqui é a
-    // mensagem amigável contando o que o próprio lote já reservou
-    const capacidade = dir.capacidades.get(mentor.id) ?? 1;
-    const emUso = duplasDoMentor.get(mentor.id) ?? 0;
+    // mensagem amigável contando o que o próprio lote já reservou, no pool
+    // da trilha (DPP em `capacidades`, especialista em `capacidadesEsp`)
+    const capacidade =
+      trilha === "especialista"
+        ? (dir.capacidadesEsp.get(mentor.id) ?? 1)
+        : (dir.capacidades.get(mentor.id) ?? 1);
+    const emUso = duplasDoMentor.get(`${mentor.id}|${trilha}`) ?? 0;
     if (emUso >= capacidade) {
       return falha(
         `${mentor.nome}: sem vaga (${emUso}/${capacidade} ${capacidade === 1 ? "dupla" : "duplas"} em curso)`
@@ -454,7 +464,7 @@ export function resolverPares(
     // reserva a vaga dentro do lote — a linha seguinte já a vê ocupada
     parVivo.add(`${mentor.id}|${mentorado.id}`);
     vagaOcupada.add(`${mentorado.id}|${trilha}`);
-    duplasDoMentor.set(mentor.id, emUso + 1);
+    duplasDoMentor.set(`${mentor.id}|${trilha}`, emUso + 1);
 
     return {
       ...r,

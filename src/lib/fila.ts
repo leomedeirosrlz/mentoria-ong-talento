@@ -146,14 +146,20 @@ export function filaMentores(
   mentorProfiles: Record<string, MentorProfile>,
   contagem: Record<string, number>
 ): FilaItem[] {
+  // o teto é o da trilha do papel (0073) — especialista conta contra
+  // capacidade_especialista, DPP contra capacidade. Como cada mentor tem um
+  // papel só, `contagem` (todas as duplas dele) já é o uso da própria trilha.
+  const teto = (p: Profile, mp: MentorProfile | undefined) =>
+    p.role === "mentor_especialista"
+      ? (mp?.capacidade_especialista ?? 1)
+      : (mp?.capacidade ?? 1);
   return pessoas
     .filter((p) => {
       if (!ehMentor(p) || !p.ativo) return false;
-      const capacidade = mentorProfiles[p.id]?.capacidade ?? 1;
-      return capacidade - (contagem[p.id] ?? 0) > 0;
+      return teto(p, mentorProfiles[p.id]) - (contagem[p.id] ?? 0) > 0;
     })
     .map((p) => {
-      const capacidade = mentorProfiles[p.id]?.capacidade ?? 1;
+      const capacidade = teto(p, mentorProfiles[p.id]);
       return {
         id: p.id,
         nome: p.nome,

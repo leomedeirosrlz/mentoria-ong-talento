@@ -282,6 +282,11 @@ export default async function PessoaPerfilPage({
   const prof = perfil.tipo === "profile" ? perfil.pessoa : null;
   const ment = perfil.tipo === "mentorado" ? perfil.pessoa : null;
   const mp = perfil.tipo === "profile" ? perfil.mentorProfile : null;
+  // a pool de vagas mostrada é a da trilha do papel (0073)
+  const capacidadeMentor =
+    mp?.tipo === "especialista"
+      ? (mp.capacidade_especialista ?? 1)
+      : (mp?.capacidade ?? 1);
   const cargoEmpresa =
     prof && [prof.cargo, prof.empresa].filter(Boolean).join(" · ") || null;
   // supervisor só lê presença de mentor que supervisiona (RLS via duplas,
@@ -505,9 +510,10 @@ export default async function PessoaPerfilPage({
             {mp.tipo === "dpp" ? "Mentoria DPP" : "Mentoria especialista"}
           </h2>
           <dl className="mt-2.5 grid grid-cols-2 gap-x-4 gap-y-3.5 sm:grid-cols-4">
+            {/* a pool mostrada é a da trilha do papel (0073) */}
             <Stat
               rotulo="Capacidade"
-              valor={`${mp.capacidade} ${mp.capacidade === 1 ? "dupla" : "duplas"}`}
+              valor={`${capacidadeMentor} ${capacidadeMentor === 1 ? "dupla" : "duplas"}`}
             />
             <Stat
               rotulo="Formação inicial"

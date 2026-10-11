@@ -821,7 +821,8 @@ export function saudadeDaDupla(dupla: Dupla, eventos: CicloEvento[], hoje = new 
   // trilha especialista não tem calendário oficial: nada vence "por data", o
   // semáforo dela é feito só dos sinais que a própria dupla emite (pedido de
   // apoio, avaliação/dificuldade, registro pendente, agendado vencido,
-  // combinado vencido). "Esperado = feitos" mantém o atraso zerado.
+  // combinado vencido, estagnação de 90 dias). "Esperado = feitos" mantém o
+  // atraso zerado.
   const ehEspecialista = dupla.trilha === "especialista";
   // limbo (agendado vencido sem registro) cobre o evento esperado do seu
   // número — sai da conta de atraso enquanto a pendência estiver aberta
@@ -985,6 +986,35 @@ export function saudadeDaDupla(dupla: Dupla, eventos: CicloEvento[], hoje = new 
     };
   if (encaminhamentoVencido)
     return { semaforo: "atencao", motivo: "Combinado com prazo vencido", ...base, pediuApoio };
+  // estagnação da trilha especialista (0073): sem calendário oficial, o
+  // "parou no tempo" não aparece em atraso — 90 dias de trilha aberta sem
+  // sessão recente nem agendada é o nudge do guia pra revisar o fit.
+  const NOVENTA_DIAS = 90 * 86400000;
+  if (
+    ehEspecialista &&
+    dupla.iniciada_em &&
+    hoje.getTime() - new Date(`${dupla.iniciada_em}T12:00:00`).getTime() >= NOVENTA_DIAS &&
+    !dupla.encontros.some((e) => {
+      const quando = e.realizado_em ?? e.data_hora;
+      return (
+        e.status === "realizado" &&
+        quando != null &&
+        hoje.getTime() - new Date(quando).getTime() < NOVENTA_DIAS
+      );
+    }) &&
+    !dupla.encontros.some(
+      (e) =>
+        (e.status === "agendado" || e.status === "remarcado") &&
+        e.data_hora != null &&
+        new Date(e.data_hora).getTime() >= hoje.getTime()
+    )
+  )
+    return {
+      semaforo: "atencao",
+      motivo: "Trilha com 3 meses sem sessão nova — checar se segue fazendo sentido",
+      ...base,
+      pediuApoio,
+    };
   return {
     semaforo: "ok",
     motivo: proximo ? `Próximo encontro ${formatDate(proximo.data_hora)}` : "Em dia",

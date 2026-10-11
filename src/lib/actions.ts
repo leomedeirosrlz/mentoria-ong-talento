@@ -547,12 +547,14 @@ export async function createPessoa(formData: FormData) {
     if (!Number.isInteger(capacidade) || capacidade < 1) {
       return { error: "Informe uma capacidade de pelo menos 1." };
     }
-    // o profile já foi gravado — se isso falhar, o mentor fica sem perfil de
-    // mentor e o erro precisa aparecer (não engolir como antes)
+    // a pool é a da trilha do papel (0073) — a coluna da outra fica no
+    // default 1, inerte porque ninguém lê capacidade fora da própria trilha
     const { error: mpErr } = await supabase.from("mentor_profiles").insert({
       profile_id: profile.id,
       tipo: role === "mentor_dpp" ? "dpp" : "especialista",
-      capacidade,
+      ...(role === "mentor_especialista"
+        ? { capacidade_especialista: capacidade }
+        : { capacidade }),
       ...mentorCampos,
     });
     if (mpErr) return { error: erroAmigavel(mpErr) };
@@ -666,15 +668,27 @@ export async function createDupla(formData: FormData) {
           : "Esse mentorado já está em uma dupla ativa.",
     };
   }
-  // mentor sem linha em mentor_profiles vale capacidade 1
+  // capacidade é por trilha (0073): o especialista tem o próprio pool e uma
+  // trilha dele não consome a vaga DPP — e vice-versa. Mentor sem linha em
+  // mentor_profiles vale 1 na trilha.
   const [{ data: doMentor }, { data: mp }] = await Promise.all([
     supabase.from("duplas").select("id")
-      .eq("mentor_id", mentor_id).in("status", ["ativa", "pausada"]),
-    supabase.from("mentor_profiles").select("capacidade")
+      .eq("mentor_id", mentor_id).eq("trilha", trilha)
+      .in("status", ["ativa", "pausada"]),
+    supabase.from("mentor_profiles").select("capacidade, capacidade_especialista")
       .eq("profile_id", mentor_id).maybeSingle(),
   ]);
-  if ((doMentor?.length ?? 0) >= (mp?.capacidade ?? 1)) {
-    return { error: "Esse mentor já atingiu o número máximo de duplas." };
+  const tetoMentor =
+    trilha === "especialista"
+      ? (mp?.capacidade_especialista ?? 1)
+      : (mp?.capacidade ?? 1);
+  if ((doMentor?.length ?? 0) >= tetoMentor) {
+    return {
+      error:
+        trilha === "especialista"
+          ? "Esse especialista já atingiu o número máximo de duplas."
+          : "Esse mentor já atingiu o número máximo de duplas.",
+    };
   }
   // DPP corre contra um cronograma — sem ele não há semáforo nem trilha;
   // recusa explícita, nunca fallback silencioso. A especialista não tem
@@ -932,10 +946,13 @@ export async function updatePessoa(profileId: string, formData: FormData) {
   if ((atual?.role === "mentor_dpp" || atual?.role === "mentor_especialista") && formData.has("capacidade")) {
     const areas = String(formData.get("areas") ?? "")
       .split(",").map((s) => s.trim()).filter(Boolean);
+    const ehEsp = atual.role === "mentor_especialista";
     const { error: mpErr } = await supabase.from("mentor_profiles").upsert({
       profile_id: profileId,
-      tipo: atual.role === "mentor_dpp" ? "dpp" : "especialista",
-      capacidade,
+      tipo: ehEsp ? "especialista" : "dpp",
+      // a pool editada é a da trilha do papel (0073) — a outra coluna fica
+      // como está, sem ser zerada pelo upsert
+      ...(ehEsp ? { capacidade_especialista: capacidade } : { capacidade }),
       areas,
       termo_ok: formData.get("termo_ok") === "on",
       formacao_ok: formData.get("formacao_ok") === "on",
@@ -1189,16 +1206,28 @@ export async function updateDupla(duplaId: string, formData: FormData) {
       }
     }
     if (voltando || mentor_id !== atualDupla.mentor_id) {
+      // vagas do mentor são por trilha (0073) — a dupla nova conta só no
+      // próprio pool
       const [{ data: doMentor }, { data: mp }] = await Promise.all([
         supabase.from("duplas").select("id")
           .eq("mentor_id", mentor_id)
+          .eq("trilha", trilhaNova)
           .in("status", ["ativa", "pausada"])
           .neq("id", duplaId),
-        supabase.from("mentor_profiles").select("capacidade")
+        supabase.from("mentor_profiles").select("capacidade, capacidade_especialista")
           .eq("profile_id", mentor_id).maybeSingle(),
       ]);
-      if ((doMentor?.length ?? 0) >= (mp?.capacidade ?? 1)) {
-        return { error: "Esse mentor já atingiu o número máximo de duplas." };
+      const teto =
+        trilhaNova === "especialista"
+          ? (mp?.capacidade_especialista ?? 1)
+          : (mp?.capacidade ?? 1);
+      if ((doMentor?.length ?? 0) >= teto) {
+        return {
+          error:
+            trilhaNova === "especialista"
+              ? "Esse especialista já atingiu o número máximo de duplas."
+              : "Esse mentor já atingiu o número máximo de duplas.",
+        };
       }
     }
   }
@@ -1825,7 +1854,9 @@ async function diretorioPareamento(supabase: Supa): Promise<DiretorioPar> {
     supabase
       .from("cronogramas")
       .select("id, nome, turma, status, inicio_em, fim_em, created_at"),
-    supabase.from("mentor_profiles").select("profile_id, capacidade"),
+    supabase
+      .from("mentor_profiles")
+      .select("profile_id, capacidade, capacidade_especialista"),
     supabase.from("ciclo_eventos").select("cronograma_id, tipo, data"),
   ]);
   const emailPorId = new Map((contatos ?? []).map((c) => [c.id, c.email]));
@@ -1838,6 +1869,9 @@ async function diretorioPareamento(supabase: Supa): Promise<DiretorioPar> {
     duplas: dups ?? [],
     cronogramas: (crons ?? []) as Cronograma[],
     capacidades: new Map((mps ?? []).map((m) => [m.profile_id, m.capacidade])),
+    capacidadesEsp: new Map(
+      (mps ?? []).map((m) => [m.profile_id, m.capacidade_especialista])
+    ),
     eventos: evs ?? [],
   };
 }
@@ -1873,6 +1907,12 @@ function diretorioPareamentoDemo(): DiretorioPar {
     cronogramas: d.cronogramas,
     capacidades: new Map(
       d.mentorProfiles.map((m) => [m.profile_id, m.capacidade])
+    ),
+    capacidadesEsp: new Map(
+      d.mentorProfiles.map((m) => [
+        m.profile_id,
+        m.capacidade_especialista ?? 1,
+      ])
     ),
     eventos: d.cicloEventos.map((e) => ({
       cronograma_id: e.cronograma_id,

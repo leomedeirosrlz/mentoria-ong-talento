@@ -36,6 +36,8 @@ import type {
   Encaminhamento,
   Encontro,
   EspecialistaEvento,
+  ExcecaoEspecialista,
+  GradeJanela,
   Material,
   Mentorado,
   MentorProfile,
@@ -61,6 +63,11 @@ export type DemoData = {
   cronogramas: Cronograma[];
   cicloEventos: CicloEvento[];
   especialistaEventos: EspecialistaEvento[];
+  /** Agenda real do especialista (0073) — grade semanal + exceções datadas,
+   *  por profile_id (a policy escopa a leitura da tabela crua ao dono/coord;
+   *  pro jovem só chegam os slots derivados). */
+  especialistaGrade: (GradeJanela & { profile_id: string })[];
+  especialistaExcecoes: (ExcecaoEspecialista & { profile_id: string })[];
   materiais: Material[];
   comunicados: Comunicado[];
   solicitacoes: SolicitacaoEspecialista[];
@@ -91,7 +98,8 @@ const uid = (n: number): string =>
 // notificacoes: 30xx · assinaturas: 32xx · doc_templates: 33xx · tokens de
 // assinatura: 34xx · presencas: 36xx · supervisoes: 38xx ·
 // avaliacao_links: 42xx · avaliacoes_encontro: 44xx ·
-// documentos_pessoa: 46xx · cronogramas: 50xx. user_id fake: f0xx.
+// documentos_pessoa: 46xx · cronogramas: 50xx · especialista_grade: 52xx ·
+// especialista_excecoes: 54xx. user_id fake: f0xx.
 // especialista_eventos não tem id.
 const P = {
   marina: 0x0001, // persona coordenação
@@ -1085,15 +1093,18 @@ function build(): DemoData {
       experiencia_previa: "Empreende há 8 anos; concluiu a formação e abriu a primeira dupla — pausada a pedido da família.",
       formacao_externa: "Mentorias do Sebrae pra pequenos negócios.",
       disponibilidade: { dias: ["seg", "ter", "qua", "qui", "sex"], periodos: ["manha", "tarde"] } },
-    { profile_id: sofia.id, tipo: "especialista", areas: ["educação", "dados"], capacidade: 1, termo_ok: true, formacao_ok: true,
+    // Sofia carrega 2 trilhas ativas (Bia + Eduardo) — pool de especialista
+    // separado do DPP desde a 0073; o DPP fica no default informativo
+    { profile_id: sofia.id, tipo: "especialista", areas: ["educação", "dados"], capacidade: 1, capacidade_especialista: 2, termo_ok: true, formacao_ok: true,
       experiencia_previa: "Professora de matemática há 10 anos, com aulas particulares focadas em ENEM.",
       formacao_externa: "Especialização em avaliação educacional.",
       disponibilidade: { dias: ["sab", "dom"], periodos: ["manha", "tarde"] } },
-    { profile_id: helena.id, tipo: "especialista", areas: ["comunicação", "carreira"], capacidade: 1, termo_ok: true, formacao_ok: true,
+    { profile_id: helena.id, tipo: "especialista", areas: ["comunicação", "carreira"], capacidade: 1, capacidade_especialista: 1, termo_ok: true, formacao_ok: true,
       experiencia_previa: "Treina equipes e executivos em apresentações e entrevistas.",
       formacao_externa: "Formação em coaching de oratória.",
       disponibilidade: { dias: ["ter", "qui"], periodos: ["manha", "noite"] } },
-    { profile_id: marcos.id, tipo: "especialista", areas: ["tecnologia", "dados"], capacidade: 2, termo_ok: true, formacao_ok: true,
+    // Marcos é o especialista de reserva com vagas — 2 no pool, nenhuma em uso
+    { profile_id: marcos.id, tipo: "especialista", areas: ["tecnologia", "dados"], capacidade: 2, capacidade_especialista: 2, termo_ok: true, formacao_ok: true,
       experiencia_previa: "Professor de curso técnico aos sábados; engenheiro de dados durante a semana.",
       formacao_externa: null,
       disponibilidade: { dias: ["seg", "qua", "sab"], periodos: ["manha", "noite"] } },
@@ -1103,6 +1114,29 @@ function build(): DemoData {
       experiencia_previa: "Mentora em dois ciclos anteriores.",
       formacao_externa: null,
       disponibilidade: null },
+  ];
+
+  // ---------- agenda real do especialista (0073) ----------
+  // Grade semanal da Sofia: noites de ter/qui (onde as sessões dela caem —
+  // 18:30 com a Bia, 19:30 com o Eduardo) + manhã de sábado. A Helena tem a
+  // dela; o Marcos ainda não preencheu — o editor dele abre no empty state.
+  const especialistaGrade: (GradeJanela & { profile_id: string })[] = [
+    { id: uid(0x5201), profile_id: sofia.id, dia_semana: 2, hora_inicio: "18:00", hora_fim: "21:00" },
+    { id: uid(0x5202), profile_id: sofia.id, dia_semana: 4, hora_inicio: "18:00", hora_fim: "21:00" },
+    { id: uid(0x5203), profile_id: sofia.id, dia_semana: 6, hora_inicio: "09:00", hora_fim: "12:00" },
+    { id: uid(0x5204), profile_id: helena.id, dia_semana: 2, hora_inicio: "19:00", hora_fim: "21:00" },
+    { id: uid(0x5205), profile_id: helena.id, dia_semana: 4, hora_inicio: "19:00", hora_fim: "21:00" },
+  ];
+
+  // Exceções datadas — sempre dentro da janela de ~3 semanas da projeção:
+  // um bloqueio na próxima terça (semana de provas na escola, a noite inteira
+  // da grade cai) e um horário extra no próximo domingo (abre manhã fora da
+  // grade). `|| 7` empurra pro ciclo seguinte quando hoje já é o dia.
+  const proximaTerca = addDias(HOJE, ((2 - HOJE.getDay()) + 7) % 7 || 7);
+  const proximoDomingo = addDias(HOJE, ((7 - HOJE.getDay()) + 7) % 7 || 7);
+  const especialistaExcecoes: (ExcecaoEspecialista & { profile_id: string })[] = [
+    { id: uid(0x5401), profile_id: sofia.id, data: ymd(proximaTerca), hora_inicio: "18:00", hora_fim: "21:00", tipo: "bloqueio" },
+    { id: uid(0x5402), profile_id: sofia.id, data: ymd(proximoDomingo), hora_inicio: "10:00", hora_fim: "12:00", tipo: "extra" },
   ];
 
   // ---------- mentorados ----------
@@ -2819,6 +2853,8 @@ function build(): DemoData {
     cronogramas,
     cicloEventos,
     especialistaEventos,
+    especialistaGrade,
+    especialistaExcecoes,
     materiais,
     comunicados,
     solicitacoes,

@@ -61,12 +61,18 @@ export async function GET(request: NextRequest) {
       const capacidades = new Map(
         d.mentorProfiles.map((m) => [m.profile_id, m.capacidade] as const)
       );
+      const capacidadesEsp = new Map(
+        d.mentorProfiles.map(
+          (m) => [m.profile_id, m.capacidade_especialista ?? 1] as const
+        )
+      );
       return csvResponse(
         csvPessoas(
           d.profiles,
           contatos,
           d.mentorados,
           capacidades,
+          capacidadesEsp,
           demoPessoalMap(demo, "profiles_pessoal"),
           demoPessoalMap(demo, "mentorados_pessoal")
         ),
@@ -189,7 +195,9 @@ async function exportPessoas(supabase: Awaited<ReturnType<typeof createClient>>)
     supabase.from("profiles").select("id,nome,role,ativo"),
     supabase.from("profiles_contato").select("id,email,whatsapp"),
     supabase.from("mentorados").select("id,nome,email,whatsapp,ong_origem"),
-    supabase.from("mentor_profiles").select("profile_id,capacidade"),
+    supabase
+      .from("mentor_profiles")
+      .select("profile_id,capacidade,capacidade_especialista"),
     supabase
       .from("profiles_pessoal")
       .select("id,data_nascimento,genero,cor_raca,pref_genero_par,motivacao"),
@@ -204,6 +212,9 @@ async function exportPessoas(supabase: Awaited<ReturnType<typeof createClient>>)
     );
   }
   const capacidades = new Map((mps ?? []).map((m) => [m.profile_id, m.capacidade]));
+  const capacidadesEsp = new Map(
+    (mps ?? []).map((m) => [m.profile_id, m.capacidade_especialista])
+  );
   const contatoPorId = new Map((contatos ?? []).map((c) => [c.id, c]));
   const pessoalPorId = new Map(
     (pessoalP ?? []).map((p) => [p.id, { responsavel: null, ...p }])
@@ -216,6 +227,7 @@ async function exportPessoas(supabase: Awaited<ReturnType<typeof createClient>>)
       contatoPorId,
       mentorados ?? [],
       capacidades,
+      capacidadesEsp,
       pessoalPorId,
       pessoalMentoradoPorId
     ),
@@ -478,6 +490,7 @@ function csvPessoas(
   contatos: Map<string, { email: string | null; whatsapp: string | null }>,
   mentorados: Pick<Mentorado, "id" | "nome" | "email" | "whatsapp" | "ong_origem">[],
   capacidades: Map<string, number | null>,
+  capacidadesEsp: Map<string, number | null>,
   pessoalP: Map<string, SensPessoa>,
   pessoalM: Map<string, SensPessoa>
 ): string {
@@ -500,7 +513,14 @@ function csvPessoas(
         p.role ? papelLabel(p.role) : "Sem papel",
         contatos.get(p.id)?.email ?? "",
         contatos.get(p.id)?.whatsapp ?? "",
-        p.role?.startsWith("mentor") ? String(capacidades.get(p.id) ?? "") : "",
+        // a coluna capacidade mostra a pool da trilha do papel (0073)
+        p.role?.startsWith("mentor")
+          ? String(
+              (p.role === "mentor_especialista"
+                ? capacidadesEsp.get(p.id)
+                : capacidades.get(p.id)) ?? ""
+            )
+          : "",
         "",
         p.ativo ? "ativo" : "inativo",
         ...sens(pessoalP.get(p.id)),

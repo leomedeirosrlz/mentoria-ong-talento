@@ -86,7 +86,9 @@ export function EditarDuplaDialog({ dupla }: { dupla: Dupla }) {
             .from("duplas")
             .select("mentor_id, mentorado_id, supervisor_id, trilha, status")
             .neq("id", dupla.id),
-          supabase.from("mentor_profiles").select("profile_id, capacidade"),
+          supabase
+            .from("mentor_profiles")
+            .select("profile_id, tipo, capacidade, capacidade_especialista"),
           supabase.from("cronogramas").select("*").order("turma").order("nome"),
         ]);
         const erro = [perfis, ments, ds, mps, crons].find((r) => r.error)?.error;
@@ -141,7 +143,14 @@ export function EditarDuplaDialog({ dupla }: { dupla: Dupla }) {
         setOcupacao(ocup);
         setEmSup(sup);
         const porMentor: Record<string, number> = {};
-        for (const mp of mps.data ?? []) porMentor[mp.profile_id] = mp.capacidade;
+        for (const mp of mps.data ?? []) {
+          // o teto exibido é o da trilha do papel (0073) — cada mentor só
+          // tem duplas da própria trilha, então o uso já é por pool
+          porMentor[mp.profile_id] =
+            mp.tipo === "especialista"
+              ? (mp.capacidade_especialista ?? 1)
+              : mp.capacidade;
+        }
         setCapacidade(porMentor);
         setCronogramas((crons.data ?? []) as Cronograma[]);
         carregou.current = true;

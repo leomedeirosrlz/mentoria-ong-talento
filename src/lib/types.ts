@@ -178,7 +178,10 @@ export type MentorProfile = {
   profile_id: string;
   tipo: "dpp" | "especialista";
   areas: string[];
+  /** Pool da trilha DPP (0073 — antes era a única capacidade). */
   capacidade: number;
+  /** Pool da trilha especialista — separado do DPP (0073). */
+  capacidade_especialista?: number;
   termo_ok: boolean;
   formacao_ok: boolean;
   // ---------- matching (0034) — opcionais: o select do board ainda não
@@ -542,6 +545,29 @@ export type SolicitacaoEspecialista = {
   devolutiva_pdm?: string | null;
   /** Quando a trilha de especialista fechou (dupla.encerrada_em). */
   trilha_encerrada_em?: string | null;
+};
+
+// ---------- agenda real do especialista (0073) ----------
+
+/** Janela semanal recorrente da agenda do especialista — `dia_semana` é o
+ *  dow do Postgres (0=domingo … 6=sábado) e as horas são `time` de
+ *  Brasília ("HH:mm:ss" como o PostgREST devolve). */
+export type GradeJanela = {
+  id: string;
+  dia_semana: number;
+  hora_inicio: string;
+  hora_fim: string;
+};
+
+/** Exceção datada da grade: `bloqueio` rasga a disponibilidade no dia
+ *  (viagem, prova), `extra` abre uma janela fora dela (sábado avulso). */
+export type ExcecaoEspecialista = {
+  id: string;
+  /** "YYYY-MM-DD" — dia de Brasília a que a exceção se aplica. */
+  data: string;
+  hora_inicio: string;
+  hora_fim: string;
+  tipo: "bloqueio" | "extra";
 };
 
 // ---------- supervisão (0041) ----------

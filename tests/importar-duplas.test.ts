@@ -69,6 +69,7 @@ const dir = (over: Partial<DiretorioPar> = {}): DiretorioPar => ({
   duplas: [],
   cronogramas: [crono("k1", "T1 · 2026/2027"), crono("k2", "T2 · 2026/2027")],
   capacidades: new Map([["m1", 1]]),
+  capacidadesEsp: new Map([["me1", 1]]),
   eventos: [
     { cronograma_id: "k1", tipo: "encontro", data: "2026-10-06" },
     { cronograma_id: "k2", tipo: "encontro", data: "2026-10-13" },
@@ -399,6 +400,42 @@ describe("resolverPares", () => {
     expect(r.par?.cronogramaId).toBeNull();
     expect(r.par?.turma).toBe("T1 · 2026/2027"); // da dupla DPP encerrada do jovem
     expect(r.par?.iniciadaEm).toMatch(/^\d{4}-\d{2}-\d{2}$/); // hoje
+  });
+
+  it("capacidade do especialista vem da pool própria (capacidadesEsp), não da DPP", () => {
+    // 1 trilha-esp em curso + teto-esp 1 → lotada mesmo com DPP folgada
+    const comTrilha = dir({
+      duplas: [
+        {
+          mentor_id: "me1",
+          mentorado_id: "j2",
+          trilha: "especialista",
+          status: "ativa",
+          turma: "T1 · 2026/2027",
+          created_at: "2026-10-01T00:00:00Z",
+        },
+      ],
+      capacidades: new Map([["me1", 5]]), // DPP folgada — não pode esconder
+      capacidadesEsp: new Map([["me1", 1]]), // a pool-esp cheia
+    });
+    const [lotada] = resolverPares(
+      [linha("Sofia Nogueira", "j1@escola.br")],
+      comTrilha
+    );
+    expect(lotada.status).toBe("falha");
+    expect(lotada.motivo).toContain("sem vaga (1/1");
+    // inverte: pool-esp folgada, DPP zerada — a trilha resolve normal (se a
+    // régua lesse `capacidades` aqui, falharia com sem vaga 0/0)
+    const folgada = dir({
+      capacidades: new Map([["me1", 0]]),
+      capacidadesEsp: new Map([["me1", 2]]),
+    });
+    const [ok] = resolverPares(
+      [linha("Sofia Nogueira", "j1@escola.br")],
+      folgada
+    );
+    expect(ok.status).toBe("ok");
+    expect(ok.par?.trilha).toBe("especialista");
   });
 
   it("demanda grava nas duas trilhas; vazia vira null", () => {

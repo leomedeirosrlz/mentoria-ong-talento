@@ -93,7 +93,9 @@ export function RemanejarDuplaDialog({
             .from("duplas")
             .select("mentor_id, mentorado_id, trilha, status")
             .neq("id", dupla.id),
-          supabase.from("mentor_profiles").select("profile_id, capacidade"),
+          supabase
+            .from("mentor_profiles")
+            .select("profile_id, capacidade, capacidade_especialista"),
         ]);
         const erro = [perfis, ments, ds, mps].find((r) => r.error)?.error;
         if (erro) throw erro;
@@ -109,15 +111,24 @@ export function RemanejarDuplaDialog({
         for (const d of (ds.data ?? []).filter(
           (x) => x.status === "ativa" || x.status === "pausada"
         )) {
-          contagem[d.mentor_id] = (contagem[d.mentor_id] ?? 0) + 1;
           const trilhas = ocup.get(d.mentorado_id) ?? new Set<string>();
           trilhas.add(d.trilha ?? "dpp");
           ocup.set(d.mentorado_id, trilhas);
+          // vaga do mentor conta só na própria trilha (0073) — a pool do
+          // especialista não consome a DPP e vice-versa
+          if ((d.trilha ?? "dpp") === (dupla.trilha ?? "dpp")) {
+            contagem[d.mentor_id] = (contagem[d.mentor_id] ?? 0) + 1;
+          }
         }
         setEmUso(contagem);
         setOcupacao(ocup);
         const porMentor: Record<string, number> = {};
-        for (const mp of mps.data ?? []) porMentor[mp.profile_id] = mp.capacidade;
+        for (const mp of mps.data ?? []) {
+          porMentor[mp.profile_id] =
+            dupla.trilha === "especialista"
+              ? (mp.capacidade_especialista ?? 1)
+              : mp.capacidade;
+        }
         setCapacidade(porMentor);
         carregou.current = true;
         setPronto(true);

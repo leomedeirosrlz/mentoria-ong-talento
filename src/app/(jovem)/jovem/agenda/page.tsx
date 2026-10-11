@@ -4,11 +4,13 @@ import {
   CalendarDots,
   CheckCircle,
   VideoCamera,
+  WhatsappLogo,
   XCircle,
 } from "@phosphor-icons/react/dist/ssr";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { Avatar } from "@/components/avatar";
 import {
   AvaliarPendenteButton,
   VerAvaliacaoButton,
@@ -21,8 +23,21 @@ import {
   NaoAconteceuJovem,
 } from "@/components/jovem-encontro-acoes";
 import { Estrelas } from "@/components/estrelas";
-import { formatDateTime, linkSeguro, maxEncontros } from "@/lib/ciclo";
-import { getJovemDuplas, getJovemEncontros } from "@/lib/queries-jovem";
+import {
+  formatDateTime,
+  formatDiaHora,
+  formatDiaSemana,
+  linkSeguro,
+  maxEncontros,
+  waLink,
+} from "@/lib/ciclo";
+import { avatarPublicUrl } from "@/lib/avatar";
+import {
+  getJovemContatos,
+  getJovemDuplas,
+  getJovemEncontros,
+} from "@/lib/queries-jovem";
+import { getSlotsLivres } from "@/lib/queries-especialista";
 import { getCicloEventos, getMe } from "@/lib/queries";
 import { getJovemAvaliacoes } from "@/lib/queries-avaliacao";
 import type { JovemEncontro } from "@/lib/queries-jovem";
@@ -54,13 +69,15 @@ const STATUS = {
 } as const;
 
 export default async function JovemAgenda() {
-  const [encontros, avaliacoes, me, duplas, eventos] = await Promise.all([
-    getJovemEncontros(),
-    getJovemAvaliacoes(),
-    getMe(),
-    getJovemDuplas(),
-    getCicloEventos(),
-  ]);
+  const [encontros, avaliacoes, me, duplas, eventos, contatos] =
+    await Promise.all([
+      getJovemEncontros(),
+      getJovemAvaliacoes(),
+      getMe(),
+      getJovemDuplas(),
+      getCicloEventos(),
+      getJovemContatos(),
+    ]);
   const agora = new Date().getTime();
   const primeiroNome = (me?.nome_social || me?.nome || "").split(" ")[0];
 
@@ -119,6 +136,46 @@ export default async function JovemAgenda() {
         .map((n) => ({ numero: n, data: oficialPorNumero.get(n) ?? null }))
     : [];
 
+  // trilha especialista (111): a agenda real do especialista chega como
+  // PROJEÇÃO de slots (especialista_slots_livres — timestamptz pronto) —
+  // grade/exceções crus nunca chegam ao papel mentorado. Combinar é fora do
+  // app (WhatsApp); a máquina de proposta/aceite é REALIZA-112 e não entra
+  // aqui de propósito.
+  const duplasEsp = duplas.filter(
+    (d) =>
+      d.status === "ativa" && d.trilha === "especialista" && d.mentor_id != null
+  );
+  const slotsEsp = new Map(
+    (
+      await Promise.all(duplasEsp.map((d) => getSlotsLivres(d.mentor_id!)))
+    ).map((slots, i) => [duplasEsp[i].id!, slots] as const)
+  );
+  const espPorDupla = new Map(
+    duplasEsp.map((d) => {
+      const contato = contatos.find(
+        (c) => c.dupla_id === d.id && c.papel === "mentor"
+      );
+      const nome =
+        contato?.nome_social ||
+        contato?.nome ||
+        d.mentor_nome_social ||
+        d.mentor_nome ||
+        "seu especialista";
+      return [
+        d.id!,
+        {
+          nome,
+          primeiro: nome.split(" ")[0],
+          avatar_path: contato?.avatar_path ?? d.mentor_avatar_path,
+          wa: waLink(
+            contato?.whatsapp,
+            `Olá, ${nome.split(" ")[0]}! Sou ${primeiroNome}, seu/sua mentorado(a) — quero combinar nosso próximo encontro.`
+          ),
+        },
+      ] as const;
+    })
+  );
+
   // futuros = agendado/remarcado com data pra frente; o resto é histórico
   // (inclui agendado já passado — "estava marcado e não rolou" é histórico,
   // não futuro)
@@ -159,6 +216,85 @@ export default async function JovemAgenda() {
         )}
       </header>
 
+      {duplasEsp.length > 0 && (
+        <section aria-labelledby="agenda-esp" className="space-y-2">
+          <h2
+            id="agenda-esp"
+            className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground"
+          >
+            Mentoria especializada
+          </h2>
+          <div className="grid gap-3">
+            {duplasEsp.map((d) => {
+              const esp = espPorDupla.get(d.id!)!;
+              const slots = slotsEsp.get(d.id!) ?? [];
+              return (
+                <Card key={d.id}>
+                  <CardContent className="space-y-3 p-5">
+                    <div className="flex flex-wrap items-center gap-3">
+                      <Avatar
+                        nome={esp.nome}
+                        src={
+                          esp.avatar_path
+                            ? avatarPublicUrl(esp.avatar_path)
+                            : null
+                        }
+                        size={40}
+                      />
+                      <div className="min-w-0 flex-1 basis-40">
+                        <p className="truncate text-sm font-medium">
+                          Horários de {esp.primeiro}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Sessões de 1h · escolhe um horário e combina por
+                          WhatsApp — quando a sessão for marcada ela aparece
+                          aqui na agenda.
+                        </p>
+                      </div>
+                      {esp.wa && (
+                        <a
+                          href={esp.wa}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          aria-label={`Chamar ${esp.nome} no WhatsApp`}
+                          className={cn(
+                            buttonVariants({ variant: "outline", size: "sm" }),
+                            "shrink-0"
+                          )}
+                        >
+                          <WhatsappLogo size={15} aria-hidden />
+                          <span className="hidden sm:inline">WhatsApp</span>
+                          <span className="sr-only"> (abre em nova aba)</span>
+                        </a>
+                      )}
+                    </div>
+                    {slots.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">
+                        {esp.primeiro} ainda não abriu horários livres
+                        {esp.wa
+                          ? " — chama no WhatsApp pra combinar."
+                          : "."}
+                      </p>
+                    ) : (
+                      <ul className="flex flex-wrap gap-1.5">
+                        {slots.slice(0, 10).map((s) => (
+                          <li
+                            key={s}
+                            className="rounded-md border border-border px-2 py-1 text-xs tabular-nums"
+                          >
+                            {rotuloSlot(s)}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
       {encontros.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center gap-2.5 py-10 text-center text-sm text-muted-foreground">
@@ -187,6 +323,7 @@ export default async function JovemAgenda() {
                       futuro
                       agora={agora}
                       duplaAtiva={ativaPorDupla.get(e.dupla_id) ?? false}
+                      trilha={trilhaPorDupla.get(e.dupla_id) ?? "dpp"}
                     />
                   ))}
                 </CardContent>
@@ -208,6 +345,7 @@ export default async function JovemAgenda() {
                       primeiroNome={primeiroNome}
                       agora={agora}
                       duplaAtiva={ativaPorDupla.get(e.dupla_id) ?? false}
+                      trilha={trilhaPorDupla.get(e.dupla_id) ?? "dpp"}
                     />
                   ))}
                 </CardContent>
@@ -227,6 +365,7 @@ function EncontroLinha({
   primeiroNome,
   agora,
   duplaAtiva = false,
+  trilha = "dpp",
 }: {
   e: JovemEncontro;
   futuro?: boolean;
@@ -238,6 +377,11 @@ function EncontroLinha({
   /** A RPC de agendar/não-aconteceu exige dupla ativa; desmarcar não checa,
    *  mas um gesto numa dupla encerrada seria ruído — os botões seguem ela. */
   duplaAtiva?: boolean;
+  /** agendar_encontro_mentorado é DPP-only (0072): na trilha de especialista
+   *  quem marca é o especialista — o botão de remarcar não renderiza pra não
+   *  prometer um gesto que a RPC recusaria. Desmarcar/"não aconteceu" valem
+   *  em qualquer trilha e seguem aparecendo. */
+  trilha?: string;
 }) {
   const st = STATUS[e.status];
   const quando = e.status === "realizado" && e.realizado_em ? e.realizado_em : e.data_hora;
@@ -303,17 +447,19 @@ function EncontroLinha({
         )}
         {agendadoFuturo && (
           <>
-            <JovemAgendarDialog
-              duplaId={e.dupla_id}
-              numero={e.numero}
-              atual={e}
-              trigger={
-                <Button variant="outline" size="sm">
-                  <CalendarDots size={15} aria-hidden />
-                  Remarcar
-                </Button>
-              }
-            />
+            {trilha !== "especialista" && (
+              <JovemAgendarDialog
+                duplaId={e.dupla_id}
+                numero={e.numero}
+                atual={e}
+                trigger={
+                  <Button variant="outline" size="sm">
+                    <CalendarDots size={15} aria-hidden />
+                    Remarcar
+                  </Button>
+                }
+              />
+            )}
             <DesmarcarEncontroJovem encontroId={e.id} />
           </>
         )}
@@ -337,4 +483,10 @@ function EncontroLinha({
       </div>
     </div>
   );
+}
+
+/** "ter 15/10 às 19:00" — o slot da RPC já é timestamptz pronto; aqui só
+ *  vira chip legível no fuso de Brasília (TZ do projeto nas formatadoras). */
+function rotuloSlot(iso: string) {
+  return `${formatDiaSemana(iso).replace("-feira", "")} ${formatDiaHora(iso)}`;
 }
