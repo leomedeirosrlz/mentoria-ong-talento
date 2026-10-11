@@ -564,7 +564,7 @@ export const getPessoaPerfil = cache(async (id: string): Promise<
 
 export const getMateriais = cache(async (): Promise<Material[]> => {
   const demo = await demoRole();
-  if (demo) return demoMateriais();
+  if (demo) return demoMateriais(demo);
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("materiais")

@@ -741,6 +741,11 @@ function build(): DemoData {
     responsavel,
     prazo: prazo ? ymd(prazo) : null,
     status,
+    // a coluna é NOT NULL (default now()) — a view jovem_encaminhamentos a
+    // expõe e a ordenação dos combinados a usa como desempate. Na vida real
+    // o combinado nasce junto do registro do encontro; aqui o fixture
+    // aproxima: "cobrado ~1 semana antes do prazo"
+    created_at: prazo ? em(addDias(prazo, -7), "20:30") : haDias(14, "20:30"),
   });
 
   // ---------- pessoas ----------
@@ -2407,9 +2412,9 @@ function build(): DemoData {
         created_at: haDias(9, "09:05"),
       },
     ],
-    // a persona mentorada não tem card na /demo ainda, mas a entrada existe
-    // porque o Record exige todos os papéis — e mantém o dataset pronto pra
-    // quando o /jovem virar demonstrável
+    // a persona mentorada (card /demo → /jovem): o aviso 'todos' que a RLS
+    // de comunicados entrega pra ela — href '/#avisos' ancora na seção da
+    // home depois que o redirect do (app) devolve o mentorado pro /jovem
     mentorado: [
       {
         id: uid(0x3040),
@@ -2503,6 +2508,16 @@ function build(): DemoData {
       token_expira_em: haDias(-28),
       assinatura_texto: null, assinado_em: null, ip: null, user_agent: null,
       hash_documento: null, created_by: marina.id, created_at: haDias(2, "11:31"),
+      template: tplTermoMentorando },
+    // Ana (persona mentorado): o termo dela saiu na mesma leva — pendente é
+    // o que faz o card "Documentos" da home do /jovem ter o botão Assinar.
+    // O link 0x3409 abre /assinar/<token> já no passo de dados+assinatura
+    // (menor de idade: a autorização da mãe — 0x3203 — já está assinada)
+    { id: uid(0x3209), template_id: uid(0x3303), profile_id: null, mentorado_id: ana.id,
+      status: "pendente", dados_snapshot: null, token: uid(0x3409),
+      token_expira_em: haDias(-28),
+      assinatura_texto: null, assinado_em: null, ip: null, user_agent: null,
+      hash_documento: null, created_by: marina.id, created_at: haDias(2, "11:32"),
       template: tplTermoMentorando },
     // Laura: a autorização foi emitida na mesma leva, mas a família nunca
     // abriu — o prazo venceu e o link morreu. Pendente com expira_em no

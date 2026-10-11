@@ -1,13 +1,19 @@
 import { redirect } from "next/navigation";
+import { DemoBar } from "@/components/demo-bar";
 import { JovemShell } from "@/components/jovem-shell";
 import { TelaConta } from "@/components/telas-conta";
+import { getDemoData } from "@/lib/demo/data";
+import { demoRole } from "@/lib/demo/mode";
 import { getMe, getNotificacoes } from "@/lib/queries";
+import type { AppRole } from "@/lib/types";
 import { BoasVindas } from "./boas-vindas";
 
 /** Gate do lado do jovem (REALIZA-108): os mesmos três becos do shell de
  *  staff (sem cadastro / desativado / sem papel) + a régua de papel — só
  *  `mentorado` entra; qualquer outro papel vai pra home dele ("/"). O
- *  onboarding vira uma tela de boas-vindas única: nada do wizard de staff. */
+ *  onboarding vira uma tela de boas-vindas única: nada do wizard de staff.
+ *  A DemoBar segue o visitante aqui também — trocar de papel saindo do
+ *  /jovem é o caminho de volta pras personas de staff. */
 export default async function JovemLayout({
   children,
 }: {
@@ -48,18 +54,48 @@ export default async function JovemLayout({
     );
   }
 
-  // o /jovem é do mentorado — staff (e demo, que só simula staff) cai na
-  // própria home; o espelho mora no (app)/layout, que devolve mentorado pra cá
+  // o /jovem é do mentorado — staff (demo ou real) cai na própria home; o
+  // espelho mora no (app)/layout, que devolve mentorado pra cá
   if (me.role !== "mentorado") redirect("/");
 
+  // mesma montagem do (app)/layout: mapa papel→primeiro nome + dock no header
+  // mobile do shell + pill flutuante do desktop
+  const demo = await demoRole();
+  const demoPersonas = demo
+    ? (Object.fromEntries(
+        Object.values(getDemoData().personas).map((p) => [
+          p.role,
+          p.nome.split(" ")[0],
+        ])
+      ) as Record<AppRole, string>)
+    : null;
+  const demoDock = demo && demoPersonas && (
+    <DemoBar variant="dock" papel={demo} personas={demoPersonas} />
+  );
+  const demoFloat = demo && demoPersonas && (
+    <div className="hidden md:block">
+      <DemoBar variant="float" papel={demo} personas={demoPersonas} />
+    </div>
+  );
+
   if (!me.onboarded_em) {
-    return <BoasVindas nome={me.nome_social || me.nome} />;
+    return (
+      <>
+        <BoasVindas nome={me.nome_social || me.nome} />
+        {/* boas-vindas não tem header pra dockar — a pill flutuante serve
+            os dois breakpoints (sem o wrapper hidden-md do shell) */}
+        {demo && demoPersonas && (
+          <DemoBar variant="float" papel={demo} personas={demoPersonas} />
+        )}
+      </>
+    );
   }
 
   const notificacoes = await getNotificacoes();
   return (
-    <JovemShell me={me} notificacoes={notificacoes}>
+    <JovemShell me={me} notificacoes={notificacoes} demo={demoDock || undefined}>
       {children}
+      {demoFloat}
     </JovemShell>
   );
 }

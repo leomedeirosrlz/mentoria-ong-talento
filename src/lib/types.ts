@@ -267,6 +267,7 @@ export type Encaminhamento = {
   responsavel: "mentor" | "mentorado";
   prazo: string | null;
   status: EncaminhamentoStatus;
+  created_at: string;
 };
 
 export type Registro = {

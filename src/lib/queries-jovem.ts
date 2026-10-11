@@ -1,5 +1,14 @@
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
+import { demoRole } from "./demo/mode";
+import {
+  demoJovemAssinaturas,
+  demoJovemContatos,
+  demoJovemDuplas,
+  demoJovemEncaminhamentos,
+  demoJovemEncontros,
+  demoJovemPerfil,
+} from "./demo/queries";
 import type {
   EncontroStatus,
   JovemAssinatura,
@@ -15,13 +24,14 @@ import type {
 // a projeção da view é a fronteira do que ele pode ver). As únicas tabelas
 // lidas direto são as de policy aberta pra ele: encontros (branch
 // exists(jovem_duplas) da 0068), materiais/comunicados audiencia='todos' e
-// notificacoes (self). Sem ramo de demo aqui: 'mentorado' não está em
-// DEMO_ROLES — o cookie é validado contra a lista e o shell de staff
-// redireciona qualquer outro papel pra "/".
+// notificacoes (self). O ramo demo delega às demoJovem* — que projetam as
+// mesmas colunas das views sobre o dataset em memória.
 
 /** Ficha do próprio jovem (view jovem_perfil) — null quando o vínculo
  *  profiles↔mentorados ainda não foi feito pela coordenação. */
 export const getJovemPerfil = cache(async (): Promise<JovemPerfil | null> => {
+  const demo = await demoRole();
+  if (demo) return demoJovemPerfil(demo);
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("jovem_perfil")
@@ -37,6 +47,8 @@ export const getJovemPerfil = cache(async (): Promise<JovemPerfil | null> => {
 /** Duplas do jovem (view jovem_duplas) — normalmente 0-1 ativa; o histórico
  *  (concluida/encerrada) também vem, pra agenda e home saberem distinguir. */
 export const getJovemDuplas = cache(async (): Promise<JovemDupla[]> => {
+  const demo = await demoRole();
+  if (demo) return demoJovemDuplas(demo);
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("jovem_duplas")
@@ -53,6 +65,8 @@ export const getJovemDuplas = cache(async (): Promise<JovemDupla[]> => {
  *  próprias duplas e a coordenação — os mesmos destinos que a policy de
  *  pedido_apoio valida (0069). */
 export const getJovemContatos = cache(async (): Promise<JovemContato[]> => {
+  const demo = await demoRole();
+  if (demo) return demoJovemContatos(demo);
   const supabase = await createClient();
   const { data, error } = await supabase.from("jovem_contatos").select("*");
   if (error) {
@@ -67,6 +81,8 @@ export const getJovemContatos = cache(async (): Promise<JovemContato[]> => {
  *  marcar_combinado; aqui é leitura ordenada (pendente com prazo primeiro). */
 export const getJovemEncaminhamentos = cache(
   async (): Promise<JovemEncaminhamento[]> => {
+    const demo = await demoRole();
+    if (demo) return demoJovemEncaminhamentos(demo);
     const supabase = await createClient();
     const { data, error } = await supabase
       .from("jovem_encaminhamentos")
@@ -86,6 +102,8 @@ export const getJovemEncaminhamentos = cache(
  *  token exposto só pra montar o link /assinar/[token]; nunca renderizado. */
 export const getJovemAssinaturas = cache(
   async (): Promise<JovemAssinatura[]> => {
+    const demo = await demoRole();
+    if (demo) return demoJovemAssinaturas(demo);
     const supabase = await createClient();
     const { data, error } = await supabase
       .from("jovem_assinaturas")
@@ -121,6 +139,8 @@ const JOVEM_ENCONTRO_COLS =
 /** Todos os encontros das duplas do jovem — a RLS (0068) já escopa às duplas
  *  dele via exists(jovem_duplas). Ordenação cronológica pra home e agenda. */
 export const getJovemEncontros = cache(async (): Promise<JovemEncontro[]> => {
+  const demo = await demoRole();
+  if (demo) return demoJovemEncontros(demo);
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("encontros")

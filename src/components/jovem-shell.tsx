@@ -36,10 +36,14 @@ function ativo(pathname: string, href: string) {
 export function JovemShell({
   me,
   notificacoes,
+  demo,
   children,
 }: {
   me: Profile;
   notificacoes: { itens: Notificacao[]; naoLidas: number };
+  /** pill compacta da DemoBar dockada no header mobile (no lugar do nome —
+   *  mesmo trade-off do AppShell, que docka sobre o rótulo de papel) */
+  demo?: React.ReactNode;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -71,12 +75,14 @@ export function JovemShell({
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src="/logo-realiza.png" alt="Realiza.vc" className="h-5 w-auto" />
             </Link>
-            <span
-              className="truncate text-xs font-medium text-muted-foreground max-w-44"
-              title={nomeTela}
-            >
-              {primeiroNome}
-            </span>
+            {demo ?? (
+              <span
+                className="truncate text-xs font-medium text-muted-foreground max-w-44"
+                title={nomeTela}
+              >
+                {primeiroNome}
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-1">
             <NotificacoesBell side="bottom" align="end" />

@@ -50,3 +50,58 @@ test("mentor DPP: entra na demo e vê a jornada", async ({ page }) => {
     page.getByText(/Semana do \d+º|Semana dos encontros/).first()
   ).toBeVisible();
 });
+
+test("mentorado: card → boas-vindas → home do /jovem, e volta pra staff", async ({
+  page,
+}) => {
+  await page.goto("/demo");
+  await page.getByRole("button", { name: /Mentorado/ }).click();
+
+  // entrarNaDemo cai em "/" e o (app) devolve o mentorado pro shell dele
+  await page.waitForURL((url) => url.pathname === "/jovem");
+
+  // primeiro acesso da persona: boas-vindas de tela única (não o wizard de
+  // staff) — "Entrar" grava o cookie demo_onboarded_mentorado
+  await expect(
+    page.getByRole("heading", { name: /Bem-vindo, Bia/i })
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Entrar" }).click();
+
+  // home da jovem: saudação com o nome social + as seções dela
+  await expect(page.getByRole("heading", { name: /Olá, Bia/ })).toBeVisible();
+  await expect(
+    page.locator('section[aria-labelledby="dupla-titulo"]')
+  ).toContainText("Minha mentoria");
+  const combinados = page.locator(
+    'section[aria-labelledby="combinados-titulo"]'
+  );
+  await expect(
+    combinados.getByText("Resolver os 10 exercícios de fração da lista")
+  ).toBeVisible();
+
+  // o checkbox é sr-only — o clique honesto é no label; em demo o write
+  // devolve o aviso em vez de mutar (a marca não muda de verdade)
+  const pendente = combinados.locator("label", {
+    hasText: "Resolver os 10 exercícios",
+  });
+  await pendente.click();
+  await expect(
+    page.getByText("Modo demonstração. Nada é gravado de verdade.")
+  ).toBeVisible();
+  await expect(
+    combinados.getByRole("checkbox").first()
+  ).not.toBeChecked();
+
+  // a DemoBar segue no shell da jovem — trocar de papel volta pra staff
+  const demoTrigger = page.getByRole("button", {
+    name: "Controles da demonstração",
+  });
+  await expect(demoTrigger).toBeVisible();
+  await expect(demoTrigger).toContainText("Mentorado");
+  await demoTrigger.click();
+  await page.getByRole("button", { name: /Coordenação/ }).click();
+  await page.waitForURL((url) => url.pathname === "/");
+  await expect(
+    page.getByRole("button", { name: "Controles da demonstração" })
+  ).toContainText("Coordenação");
+});

@@ -62,7 +62,12 @@ export async function pularOnboarding(page: Page) {
  *  precisa da url base da page já carregada — goto("/") antes. */
 export async function entrarNaDemo(
   page: Page,
-  papel: "coordenacao" | "supervisor" | "mentor_dpp" | "mentor_especialista"
+  papel:
+    | "coordenacao"
+    | "supervisor"
+    | "mentor_dpp"
+    | "mentor_especialista"
+    | "mentorado"
 ) {
   await page.goto("/demo"); // estabelece a origem pros cookies
   await page.context().addCookies([

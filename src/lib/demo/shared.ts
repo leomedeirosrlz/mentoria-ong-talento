@@ -19,6 +19,7 @@ export const DEMO_ROLES: readonly AppRole[] = [
   "supervisor",
   "mentor_dpp",
   "mentor_especialista",
+  "mentorado",
 ];
 
 export function papelDemoValido(v: string | undefined | null): AppRole | null {
