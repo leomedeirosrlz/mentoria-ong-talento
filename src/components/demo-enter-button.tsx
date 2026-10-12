@@ -25,7 +25,7 @@ export function DemoEnterButton({
       type="submit"
       disabled={pending}
       aria-busy={pending}
-      className="group w-full rounded-xl text-left outline-none transition-transform focus-visible:ring-3 focus-visible:ring-ring/50 active:scale-[0.98] disabled:pointer-events-none"
+      className="group h-full w-full rounded-xl text-left outline-none transition-transform focus-visible:ring-3 focus-visible:ring-ring/50 active:scale-[0.98] disabled:pointer-events-none"
     >
       <div className="flex h-full flex-col rounded-xl border border-transparent bg-card p-4 shadow-[var(--shadow-border)] transition-[border-color,box-shadow] ease-snappy group-hover:border-[var(--brand-lime)]/60 group-hover:shadow-[var(--shadow-border-hover)] group-disabled:opacity-70">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
