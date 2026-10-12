@@ -35,15 +35,25 @@ export function pedidoEmAberto(s: {
   );
 }
 
-/** Gate da demanda (0074): só o PRIMEIRO pedido precisa do porquê — quem
- *  já tem uma trilha de especialista ativa/pausada (qualquer uma) pede por
- *  motivo curto. O trigger solicita demanda iff `demanda is null` e
- *  `dupla_id is null` e não existe nenhuma dupla esp ativa/pausada do
- *  jovem. `trilhasAtivas` = os profile_ids dos especialistas com dupla esp
- *  ativa/pausada dele. */
-export function pedidoPrecisaDemanda(trilhasAtivas: Iterable<string>): boolean {
-  for (const _ of trilhasAtivas) return false;
-  return true;
+/** Gate da demanda (0074): a PRIMEIRA solicitação do PAR precisa do porquê
+ *  — sessões seguintes na mesma trilha são motivo-curto. O trigger pede
+ *  demanda quando `demanda is null` e `dupla_id is null` e não existe
+ *  dupla esp ativa/pausada do jovem que case o alvo — pra pedido dirigido
+ *  o par é (jovem × desejado); broadcast (sem alvo) já se resolve com
+ *  qualquer trilha viva. `trilhasAtivas` = os profile_ids dos
+ *  especialistas com dupla esp ativa/pausada dele; `especialistaId` = o
+ *  alvo dirigido em tela (null = broadcast ou ainda não escolhido). */
+export function pedidoPrecisaDemanda(
+  trilhasAtivas: Iterable<string>,
+  especialistaId?: string | null
+): boolean {
+  const trilhas = new Set(trilhasAtivas);
+  if (trilhas.size === 0) return true;
+  // broadcast: o trigger aceita qualquer dupla esp viva do jovem
+  if (especialistaId == null) return false;
+  // dirigido: só a trilha DESSE especialista libera o motivo-curto —
+  // um nome novo é "primeiro pedido do par" e pede a demanda rica
+  return !trilhas.has(especialistaId);
 }
 
 /** O pedido em aberto que já amarra o par jovem×especialista — a dedup da

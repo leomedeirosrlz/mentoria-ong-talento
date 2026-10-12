@@ -76,16 +76,30 @@ describe("pedidoEmAberto", () => {
   });
 });
 
-describe("pedidoPrecisaDemanda — gate da 0074", () => {
+describe("pedidoPrecisaDemanda — gate da 0074 (por PAR)", () => {
   it("o primeiro pedido (sem nenhuma trilha ativa) exige a demanda", () => {
     expect(pedidoPrecisaDemanda([])).toBe(true);
   });
 
-  it("com trilha ativa/pausada o pedido é motivo-curto — mesmo pra OUTRO especialista", () => {
-    // o trigger testa qualquer dupla esp ativa/pausada do jovem, não a do
-    // alvo — pedir a Helena tendo a Sofia em curso segue sendo follow-up
+  it("broadcast com trilha ativa é motivo-curto — qualquer par vivo resolve", () => {
+    // o trigger testa `especialista_desejado_id is null or mentor_id =
+    // desejado`: sem alvo, basta UMA dupla esp viva do jovem
     expect(pedidoPrecisaDemanda([ESP])).toBe(false);
-    expect(pedidoPrecisaDemanda([ESP, OUTRO])).toBe(false);
+    expect(pedidoPrecisaDemanda([ESP], null)).toBe(false);
+    expect(pedidoPrecisaDemanda([ESP, OUTRO], null)).toBe(false);
+  });
+
+  it("dirigido à própria trilha é follow-up — motivo-curto", () => {
+    expect(pedidoPrecisaDemanda([ESP], ESP)).toBe(false);
+    expect(pedidoPrecisaDemanda([ESP, OUTRO], OUTRO)).toBe(false);
+  });
+
+  it("dirigido a um especialista NOVO é primeiro do par — demanda mesmo com outra trilha", () => {
+    // o trigger casa mentor_id = desejado: a trilha da Sofia NÃO libera o
+    // pedido pra Helena — sem demanda o insert levanta 'pedido novo
+    // precisa de demanda' (o bug que este gate em tela evita)
+    expect(pedidoPrecisaDemanda([ESP], OUTRO)).toBe(true);
+    expect(pedidoPrecisaDemanda([OUTRO], ESP)).toBe(true);
   });
 });
 

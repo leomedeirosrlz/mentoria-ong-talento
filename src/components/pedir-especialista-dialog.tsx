@@ -172,7 +172,13 @@ export function PedirEspecialistaDialog({
 
   const esp = especialistas.find((e) => e.id === espId) ?? null;
   const slotsDoEsp = espId ? cacheSlots[espId] : undefined;
-  const precisaDemanda = pedidoPrecisaDemanda(trilhasAtivas);
+  // gate por PAR (trigger 0074): dirigido a um nome fora das trilhas ainda
+  // é "primeiro pedido" e pede a demanda rica — motivo-curto só vale pra
+  // trilha própria ou broadcast (qualquer trilha viva libera)
+  const precisaDemanda = pedidoPrecisaDemanda(
+    trilhasAtivas,
+    modo === "dirigido" ? espId : null
+  );
 
   function escolherEsp(id: string) {
     setEspId(id);
