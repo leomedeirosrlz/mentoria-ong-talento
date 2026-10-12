@@ -39,6 +39,11 @@ const IDS = {
   jovem2Profile: "e2e00000-0000-4000-8000-0000000000f0",
   mentoradoSemDpp: "e2e00000-0000-4000-8000-0000000000d0", // a ficha do jovem2
   duplaColega: "e2e00000-0000-4000-8000-0000000000f2",
+  mentorProfile: "e2e00000-0000-4000-8000-000000000010",
+  espProfile: "e2e00000-0000-4000-8000-000000000060",
+  esp2Profile: "e2e00000-0000-4000-8000-0000000000c0", // catálogo, sem dupla com o jovem
+  coordProfile: "e2e00000-0000-4000-8000-000000000040",
+  mentorReserva: "e2e00000-0000-4000-8000-000000000050", // adulto não-relacionado
 } as const;
 const JOVEM2_WHATSAPP = "5511999000091";
 
@@ -87,6 +92,102 @@ test.describe("diretório do jovem (REALIZA-113 / 0076)", () => {
     // outras fichas e2e são esse caso
     await expect(colegas.getByText("Mentorada E2E Dois")).toHaveCount(0);
     await expect(colegas.getByText("Mentorada E2E Livre")).toHaveCount(0);
+  });
+
+  test("abre o perfil de quem ele enxerga — cada fonte segura resolve", async ({
+    page,
+  }) => {
+    await loginComSenha(page, JOVEM_EMAIL, SENHA);
+    await page.goto("/jovem/pessoas");
+
+    // contato de dupla (jovem_contatos): o click do diretório cai no
+    // perfil — mesmo cartão-banner do /perfil de todo mundo
+    await page
+      .locator('section[aria-labelledby="mentoria-titulo"]')
+      .getByRole("link", { name: "Mentor E2E", exact: true })
+      .click();
+    await expect(page).toHaveURL(
+      new RegExp(`/jovem/pessoas/${IDS.mentorProfile}`)
+    );
+    await expect(
+      page.getByRole("heading", { name: "Mentor E2E", level: 1 })
+    ).toBeVisible();
+    await expect(page.getByText("Seu mentor DPP")).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: /e2e-mentor@realiza\.test/ })
+    ).toBeVisible();
+
+    // o especialista da trilha dele — papel 'especialista' da view
+    await page.goto(`/jovem/pessoas/${IDS.espProfile}`);
+    await expect(
+      page.getByRole("heading", { name: "Esp E2E", level: 1 })
+    ).toBeVisible();
+    await expect(page.getByText("Seu especialista")).toBeVisible();
+
+    // coordenação (dupla_id null — ainda é contato legítimo da view)
+    await page.goto(`/jovem/pessoas/${IDS.coordProfile}`);
+    await expect(
+      page.getByRole("heading", { name: "Coordenação E2E", level: 1 })
+    ).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: /e2e-coord@realiza\.test/ })
+    ).toBeVisible();
+
+    // colega da turma (mentorados_turma — id de mentorados, outro espaço)
+    await page.goto("/jovem/pessoas");
+    await page
+      .locator('section[aria-labelledby="colegas-titulo"]')
+      .getByRole("link", { name: /Jovem E2E Sem DPP/, exact: false })
+      .first()
+      .click();
+    await expect(page).toHaveURL(
+      new RegExp(`/jovem/pessoas/${IDS.mentoradoSemDpp}`)
+    );
+    await expect(
+      page.getByRole("heading", { name: "Jovem E2E Sem DPP", level: 1 })
+    ).toBeVisible();
+    await expect(page.getByText("Colega da turma")).toBeVisible();
+    // opt-in fechado: estado honesto, nunca um wa.me vazio
+    await expect(
+      page.getByText(/ainda não compartilhou o contato/)
+    ).toBeVisible();
+    await expect(page.getByRole("link", { name: /WhatsApp/ })).toHaveCount(0);
+
+    // especialista do catálogo (jovem_especialistas) — perfil abre, mas o
+    // canal direto só nasce com a trilha: sem e-mail nem WhatsApp
+    await page.goto(`/jovem/pessoas/${IDS.esp2Profile}`);
+    await expect(
+      page.getByRole("heading", { name: "Esp Dois E2E", level: 1 })
+    ).toBeVisible();
+    await expect(page.getByText("Mentor especialista")).toBeVisible();
+    await expect(
+      page.getByText(/O contato direto abre quando a sua trilha/)
+    ).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: /e2e-|WhatsApp/ })
+    ).toHaveCount(0);
+  });
+
+  test("perfil de quem ele não enxerga cai no mesmo 404 de quem não existe", async ({
+    page,
+  }) => {
+    await loginComSenha(page, JOVEM_EMAIL, SENHA);
+
+    // adulto que existe mas não é das duplas dele nem do catálogo — o
+    // profiles_select não deixa nem confirmar que o card existe
+    await page.goto(`/jovem/pessoas/${IDS.mentorReserva}`);
+    await expect(page.getByText("Página não encontrada")).toBeVisible();
+
+    // id aleatório — mesma resposta, sem vazar existência
+    await page.goto(
+      "/jovem/pessoas/00000000-0000-4000-8000-000000000000"
+    );
+    await expect(page.getByText("Página não encontrada")).toBeVisible();
+
+    // e o profile do próprio jovem não resolve pelo id de profiles — a
+    // fonte dele é a ficha (mentorados.id), colega não é ele mesmo
+    await page.goto(`/jovem/pessoas/${IDS.jovemProfile}`);
+    await expect(page.getByText("Página não encontrada")).toBeVisible();
   });
 
   test("o colega liga o próprio toggle no perfil e o WhatsApp aparece", async ({
@@ -138,6 +239,16 @@ test.describe("diretório do jovem (REALIZA-113 / 0076)", () => {
       .getByRole("link", { name: /WhatsApp/ });
     await expect(wa).toBeVisible();
     await expect(wa).toHaveAttribute(
+      "href",
+      new RegExp(`wa\\.me/${JOVEM2_WHATSAPP}`)
+    );
+
+    // e o perfil do colega espelha o mesmo opt-in — o número chega só
+    // através da view, então o botão da página aponta pro mesmo wa.me
+    await page.goto(`/jovem/pessoas/${IDS.mentoradoSemDpp}`);
+    const waPerfil = page.getByRole("link", { name: /WhatsApp/ });
+    await expect(waPerfil).toBeVisible();
+    await expect(waPerfil).toHaveAttribute(
       "href",
       new RegExp(`wa\\.me/${JOVEM2_WHATSAPP}`)
     );

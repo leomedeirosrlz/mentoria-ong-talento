@@ -1,109 +1,108 @@
-import type { Metadata } from "next";
+import { MapPin } from "@phosphor-icons/react/dist/ssr";
 import { redirect } from "next/navigation";
-import { Avatar } from "@/components/avatar";
-import { Card, CardContent } from "@/components/ui/card";
-import { getMe } from "@/lib/queries";
 import { getJovemPerfil } from "@/lib/queries-jovem";
-import { ESCOLARIDADE_LABELS } from "@/lib/ciclo";
+import { getMe } from "@/lib/queries";
+import { ESCOLARIDADE_LABELS, papelLabel } from "@/lib/ciclo";
 import type { Escolaridade } from "@/lib/types";
+import { Avatar } from "@/components/avatar";
+import { Badge } from "@/components/ui/badge";
+import { PessoaBanner } from "@/components/pessoa-banner";
+import { Linha } from "@/app/(app)/perfil/perfil-form";
 import { JovemPerfilForm } from "./perfil-form";
 import { PrivacidadeCard } from "./privacidade-card";
 
-export const metadata: Metadata = { title: "Meu perfil" };
+export const metadata = { title: "Meu perfil — Realiza.vc" };
 
-/** Perfil do jovem — duas fontes honestas: `profiles` é o canônico de
- *  pessoa/contato (ele edita aqui); `jovem_perfil` (o registro de programa
- *  em mentorados) é o que a coordenação mantém — aparece como leitura. */
 export default async function JovemPerfil() {
   const [me, perfil] = await Promise.all([getMe(), getJovemPerfil()]);
   if (!me) redirect("/login"); // o layout já barra — convenção das páginas
 
   const nomeTela = me.nome_social || me.nome;
   const escolaridadeRotulo = perfil?.escolaridade
-    ? (ESCOLARIDADE_LABELS[perfil.escolaridade as Escolaridade] ?? perfil.escolaridade)
+    ? (ESCOLARIDADE_LABELS[perfil.escolaridade as Escolaridade] ??
+      perfil.escolaridade)
     : null;
+  const meta = [
+    perfil?.ong_origem?.trim() || null,
+    me.cidade && me.uf
+      ? `${me.cidade}, ${me.uf}`
+      : me.cidade || me.uf || null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
   return (
-    <div className="space-y-6">
-      <header className="flex items-center gap-4">
-        {/* iniciais na v1 (decisão D2): foto do menor só com cláusula de uso
-            de imagem na autorização — o disco amarelo é a identidade */}
-        <Avatar nome={nomeTela} papel="mentorado" size={56} />
-        <div className="min-w-0">
-          <h1 className="truncate text-2xl font-semibold tracking-tight">
-            {nomeTela}
-          </h1>
-          <p className="text-sm text-muted-foreground">Mentorado(a) · {me.email}</p>
-        </div>
-      </header>
-
-      {/* o que a coordenação mantém — leitura, com honestidade de origem */}
-      <Card>
-        <CardContent className="space-y-4">
-          <div>
-            <h2 className="text-base font-semibold">Sua ficha no programa</h2>
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              Mantida pela coordenação — pra corrigir algo, fale com a equipe.
-            </p>
+    <div className="mx-auto max-w-3xl space-y-6">
+      {/* o mesmo cartão-banner do perfil de todo mundo — papel mentorado
+          pinta a paleta dele; o avatar aqui é inicial (foto é da ficha
+          civil, que não entra no app do jovem) */}
+      <section className="overflow-hidden rounded-xl bg-card shadow-[var(--shadow-border)]">
+        <PessoaBanner
+          papel="mentorado"
+          nome={nomeTela}
+          cidade={me.cidade}
+          uf={me.uf}
+          areas={me.interesses}
+          seed={me.id}
+        />
+        <div className="px-6 pb-6">
+          <div className="-mt-9 mb-4">
+            <div className="inline-block rounded-full bg-card p-1">
+              <Avatar nome={nomeTela} papel="mentorado" size={72} />
+            </div>
           </div>
-          {!perfil ? (
-            <p className="text-sm text-muted-foreground">
-              Sua ficha de mentorado ainda não está vinculada à sua conta — a
-              coordenação faz essa conexão no seu cadastro.
-            </p>
-          ) : (
-            <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
-              {perfil.objetivos && (
-                <div className="sm:col-span-2">
-                  <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    Seus objetivos com a mentoria
-                  </dt>
-                  <dd className="mt-1 whitespace-pre-wrap text-sm leading-relaxed">
-                    {perfil.objetivos}
-                  </dd>
-                </div>
-              )}
-              {escolaridadeRotulo && (
-                <div>
-                  <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    Escolaridade
-                  </dt>
-                  <dd className="mt-1 text-sm">{escolaridadeRotulo}</dd>
-                </div>
-              )}
-              {perfil.ong_origem && (
-                <div>
-                  <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    Como você chegou
-                  </dt>
-                  <dd className="mt-1 text-sm">{perfil.ong_origem}</dd>
-                </div>
-              )}
-              {!perfil.objetivos && !escolaridadeRotulo && !perfil.ong_origem && (
-                <p className="text-sm text-muted-foreground sm:col-span-2">
-                  Sua ficha ainda está vazia — ela é preenchida a partir da
-                  sua inscrição e do papo com a coordenação.
-                </p>
-              )}
-            </dl>
-          )}
-        </CardContent>
-      </Card>
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1.5">
+            <h1 className="text-xl font-semibold tracking-tight">
+              {nomeTela}
+            </h1>
+            <Badge variant="secondary">{papelLabel("mentorado")}</Badge>
+          </div>
+          {meta ? (
+            <div className="mt-1.5 flex items-center gap-1.5 text-sm text-muted-foreground">
+              <MapPin size={14} className="shrink-0" />
+              <span>{meta}</span>
+            </div>
+          ) : null}
+        </div>
+      </section>
 
-      {/* o que ele mesmo mantém — contato e nome de uso */}
-      <Card>
-        <CardContent>
-          <h2 className="text-base font-semibold">Seus dados</h2>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            É daqui que seu mentor e a coordenação falam com você.
+      {/* ficha do programa — leitura honesta: o jovem vê o que a
+          coordenação mantém dele, sem campos civis nem notas */}
+      <section className="rounded-xl bg-card p-6 shadow-[var(--shadow-border)]">
+        <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+          Sua ficha no programa
+        </h2>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Mantida pela coordenação — pra corrigir algo, fale com a equipe.
+        </p>
+        {!perfil ? (
+          <p className="mt-4 text-sm text-muted-foreground">
+            Sua ficha de mentorado ainda não está vinculada à sua conta — a
+            coordenação faz essa conexão no seu cadastro.
           </p>
-          <JovemPerfilForm me={me} />
-        </CardContent>
-      </Card>
+        ) : !perfil.objetivos && !escolaridadeRotulo && !perfil.ong_origem ? (
+          <p className="mt-4 text-sm text-muted-foreground">
+            Sua ficha ainda está vazia — ela é preenchida a partir da sua
+            inscrição e do papo com a coordenação.
+          </p>
+        ) : (
+          <dl className="mt-4 space-y-4">
+            <Linha
+              rotulo="Seus objetivos com a mentoria"
+              valor={perfil.objetivos?.trim() || "—"}
+            />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Linha rotulo="Escolaridade" valor={escolaridadeRotulo || "—"} />
+              <Linha
+                rotulo="Como você chegou"
+                valor={perfil.ong_origem?.trim() || "—"}
+              />
+            </div>
+          </dl>
+        )}
+      </section>
 
-      {/* opt-in colega↔colega (0076) — o número compartilhado é o da ficha
-          (mentorados.whatsapp), que a coordenação mantém; sem ele o
-          controle aparece desligado com o porquê, não escondido */}
+      <JovemPerfilForm me={me} />
       <PrivacidadeCard
         compartilhado={perfil?.contato_compartilhado ?? false}
         temWhatsapp={perfil?.whatsapp != null}

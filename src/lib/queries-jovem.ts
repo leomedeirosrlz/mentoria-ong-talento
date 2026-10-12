@@ -27,6 +27,7 @@ import type {
   JovemEncaminhamento,
   JovemEspecialista,
   JovemPerfil,
+  JovemPessoa,
   SolicitacaoEspecialista,
   SolicitacaoProposta,
 } from "./types";
@@ -107,6 +108,27 @@ export const getJovemColegas = cache(async (): Promise<ColegaTurma[]> => {
     comparaNome(a.nome_social || a.nome || "", b.nome_social || b.nome || "")
   );
 });
+
+/** A pessoa por trás de um card de /jovem/pessoas — resolvida SÓ nas
+ *  três fontes já seguras (contatos adultos → colegas de turma → catálogo
+ *  de especialistas). id de fora desses conjuntos cai no mesmo null de
+ *  quem não existe: a página 404 não vaza nem a existência do profile. */
+export const getJovemPessoa = cache(
+  async (id: string): Promise<JovemPessoa | null> => {
+    const [contatos, colegas, especialistas] = await Promise.all([
+      getJovemContatos(),
+      getJovemColegas(),
+      getJovemEspecialistas(),
+    ]);
+    const contato = contatos.find((c) => c.id === id);
+    if (contato) return { tipo: "contato", contato };
+    const colega = colegas.find((c) => c.id === id);
+    if (colega) return { tipo: "colega", colega };
+    const especialista = especialistas.find((e) => e.id === id);
+    if (especialista) return { tipo: "especialista", especialista };
+    return null;
+  }
+);
 
 /** Combinados do jovem (view jovem_encaminhamentos) — o que ele se
  *  comprometeu a fazer entre um encontro e outro. Escrita só via RPC

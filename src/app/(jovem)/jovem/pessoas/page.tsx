@@ -233,15 +233,20 @@ function ContatoLinha({
   );
   return (
     <li className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
-      <Avatar
-        nome={nome}
-        src={c.avatar_path ? avatarPublicUrl(c.avatar_path) : null}
-        size={40}
-      />
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium">{nome}</p>
-        {selo && <p className="text-xs text-muted-foreground">{selo}</p>}
-      </div>
+      <Link
+        href={`/jovem/pessoas/${c.id}`}
+        className="flex min-w-0 flex-1 items-center gap-3 rounded-md outline-none transition-colors focus-visible:ring-3 focus-visible:ring-ring/50"
+      >
+        <Avatar
+          nome={nome}
+          src={c.avatar_path ? avatarPublicUrl(c.avatar_path) : null}
+          size={40}
+        />
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-medium">{nome}</p>
+          {selo && <p className="text-xs text-muted-foreground">{selo}</p>}
+        </div>
+      </Link>
       <div className="flex shrink-0 items-center gap-1.5">
         {c.email && (
           <a
@@ -293,31 +298,36 @@ function ColegaLinha({
   );
   return (
     <li className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
-      <Avatar nome={nome} papel="mentorado" size={40} />
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium">{nome}</p>
-        {local && (
-          <p className="truncate text-xs text-muted-foreground">{local}</p>
-        )}
-        {interesses.length > 0 && (
-          <span className="mt-1 flex flex-wrap gap-1">
-            {interesses.slice(0, 4).map((i) => (
-              <Badge
-                key={i}
-                variant="outline"
-                className="bg-muted font-normal text-muted-foreground"
-              >
-                {i}
-              </Badge>
-            ))}
-            {interesses.length > 4 && (
-              <span className="self-center text-[11px] text-muted-foreground">
-                +{interesses.length - 4}
-              </span>
-            )}
-          </span>
-        )}
-      </div>
+      <Link
+        href={`/jovem/pessoas/${c.id}`}
+        className="flex min-w-0 flex-1 items-center gap-3 rounded-md outline-none transition-colors focus-visible:ring-3 focus-visible:ring-ring/50"
+      >
+        <Avatar nome={nome} papel="mentorado" size={40} />
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-medium">{nome}</p>
+          {local && (
+            <p className="truncate text-xs text-muted-foreground">{local}</p>
+          )}
+          {interesses.length > 0 && (
+            <span className="mt-1 flex flex-wrap gap-1">
+              {interesses.slice(0, 4).map((i) => (
+                <Badge
+                  key={i}
+                  variant="outline"
+                  className="bg-muted font-normal text-muted-foreground"
+                >
+                  {i}
+                </Badge>
+              ))}
+              {interesses.length > 4 && (
+                <span className="self-center text-[11px] text-muted-foreground">
+                  +{interesses.length - 4}
+                </span>
+              )}
+            </span>
+          )}
+        </div>
+      </Link>
       {wa ? (
         <a
           href={wa}

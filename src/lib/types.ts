@@ -868,3 +868,11 @@ export type JovemEspecialista = {
   avatar_path: string | null;
   areas: string[] | null;
 };
+
+/** A pessoa que /jovem/pessoas/[id] resolve — sempre de uma fonte já
+ *  autorizada (contato de dupla/coord, colega da turma ou catálogo de
+ *  especialista); cada ramo carrega a projeção segura da view dele. */
+export type JovemPessoa =
+  | { tipo: "contato"; contato: JovemContato }
+  | { tipo: "colega"; colega: ColegaTurma }
+  | { tipo: "especialista"; especialista: JovemEspecialista };
