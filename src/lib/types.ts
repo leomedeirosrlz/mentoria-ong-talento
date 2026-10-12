@@ -170,7 +170,28 @@ export type Mentorado = {
   /** Vínculo com o login do jovem (0066) — `profiles.id` da conta com
    *  role='mentorado'. null = participante sem acesso à plataforma. */
   profile_id?: string | null;
+  /** Opt-in colega↔colega (0076): ligado, o WhatsApp do cadastro aparece
+   *  aos colegas de turma com conta (view mentorados_turma). O dono do
+   *  toggle é o próprio jovem (RPC set_contato_compartilhado). */
+  contato_compartilhado?: boolean;
 };
+
+/** O mentorado dentro de uma dupla (embed do DUPLA_SELECT) — só o que o
+ *  par e a ficha consomem. O select completo (notas/documento_path/
+ *  ficha de matching) é coord-only e segue em getMentorados/getPessoaPerfil. */
+export type MentoradoPar = Pick<
+  Mentorado,
+  | "id"
+  | "nome"
+  | "nome_social"
+  | "avatar_path"
+  | "whatsapp"
+  | "email"
+  | "ong_origem"
+  | "cidade"
+  | "uf"
+  | "interesses"
+>;
 
 /** mentor_profiles — ficha do mentor que alimenta o board de matching
  *  (tipo canônico; queries.ts ainda tem um local com o subconjunto do board). */
@@ -429,7 +450,7 @@ export type Dupla = {
   /** O que a trilha devolve pro PDM — chega ao mentor DPP via solicitacoes_mural. */
   devolutiva_pdm?: string | null;
   mentor: Profile;
-  mentorado: Mentorado;
+  mentorado: MentoradoPar;
   supervisor: Profile | null;
   encontros: Encontro[];
   encaminhamentos: Encaminhamento[];
@@ -828,6 +849,12 @@ export type JovemEncaminhamento =
  *  (ip/ua/hash/snapshot) ficam fora da view. */
 export type JovemAssinatura =
   Database["public"]["Views"]["jovem_assinaturas"]["Row"];
+
+/** Colega de turma do jovem (view `mentorados_turma`, 0076) — só colegas
+ *  COM conta (profile_id) que dividem turma de dupla; `whatsapp` vem null
+ *  salvo quando o colega ligou `contato_compartilhado`. */
+export type ColegaTurma =
+  Database["public"]["Views"]["mentorados_turma"]["Row"];
 
 /** Linha da view `jovem_especialistas` (0075) — o catálogo que o jovem vê
  *  pra direcionar o pedido de especialista: nome/social/avatar/áreas.

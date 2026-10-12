@@ -32,6 +32,26 @@ async function me() {
   return { supabase, me: data };
 }
 
+/** Opt-in colega↔colega da 0076 — liga/desliga a exibição do WhatsApp do
+ *  cadastro pros colegas de turma com conta (view mentorados_turma). O
+ *  banco rejeita quem não é o próprio jovem; no demo a preferência é
+ *  fixa pra continuar ilustrando os dois estados dos colegas. */
+export async function setContatoCompartilhado(ligado: boolean) {
+  if (await demoAtivo()) return { error: DEMO_MSG };
+  const { supabase, me: eu } = await me();
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
+  if (eu.role !== "mentorado") {
+    return { error: "Essa escolha é só do jovem." };
+  }
+  const { error } = await supabase.rpc("set_contato_compartilhado", {
+    p_ligado: ligado,
+  });
+  if (error) return { error: erroAmigavel(error) };
+  revalidatePath("/jovem/perfil");
+  revalidatePath("/jovem/pessoas");
+  return { ok: true };
+}
+
 /** O jovem pede uma sessão de especialista (pedir_especialista_jovem,
  *  0074): direcionado (com slot opcional da grade real dele) ou broadcast
  *  pro mural. Sem dupla DPP ativa o pedido entra na triagem da coordenação
