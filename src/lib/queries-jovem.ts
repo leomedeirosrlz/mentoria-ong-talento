@@ -4,6 +4,7 @@ import { comparaNome } from "./ciclo";
 import { demoRole } from "./demo/mode";
 import {
   demoJovemAssinaturas,
+  demoJovemColegas,
   demoJovemContatos,
   demoJovemDuplas,
   demoJovemEncaminhamentos,
@@ -18,6 +19,7 @@ import {
   getSolicitacoesVisiveis,
 } from "./queries-especialista";
 import type {
+  ColegaTurma,
   EncontroStatus,
   JovemAssinatura,
   JovemContato,
@@ -85,6 +87,25 @@ export const getJovemContatos = cache(async (): Promise<JovemContato[]> => {
     return [];
   }
   return data ?? [];
+});
+
+/** Colegas de turma do jovem (view `mentorados_turma`, 0076 — definer,
+ *  mentorado-only): só quem tem conta na plataforma e divide turma de
+ *  dupla com ele; `whatsapp` chega null quando o colega não ligou o
+ *  compartilhamento — a UI mostra o estado honesto, não um CTA quebrado. */
+export const getJovemColegas = cache(async (): Promise<ColegaTurma[]> => {
+  const demo = await demoRole();
+  if (demo) return demoJovemColegas(demo);
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("mentorados_turma").select("*");
+  if (error) {
+    console.error("getJovemColegas:", error);
+    return [];
+  }
+  // pt-BR no app — a collation do banco ordena acentos depois de Z
+  return (data ?? []).sort((a, b) =>
+    comparaNome(a.nome_social || a.nome || "", b.nome_social || b.nome || "")
+  );
 });
 
 /** Combinados do jovem (view jovem_encaminhamentos) — o que ele se
