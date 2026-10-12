@@ -98,53 +98,49 @@ function DialogoDados({ me }: { me: Profile }) {
   );
 }
 
-/** Corpo do /jovem/perfil — as duas seções que são dele: "Seus dados"
- *  (preview + edição por Dialog, o gesto da ficha de staff) e "Conta"
- *  (e-mail, senha e saída — as mesmas linhas do perfil de todo mundo). */
-export function JovemPerfilForm({ me }: { me: Profile }) {
+/** "Seus dados" — o análogo do "Perfil público" de staff: preview em
+ *  <dl> sempre visível e edição no Dialog do lápis, nunca inline. */
+export function DadosSecao({ me }: { me: Profile }) {
+  return (
+    <section className="rounded-xl bg-card p-6 shadow-[var(--shadow-border)]">
+      <div className="flex items-start gap-3">
+        <div className="min-w-0 flex-1">
+          <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+            Seus dados
+          </h2>
+          <p className="mt-1 text-xs text-muted-foreground">
+            É daqui que seu mentor e a coordenação falam com você.
+          </p>
+        </div>
+        <DialogoDados me={me} />
+      </div>
+      <dl className="mt-4 space-y-4">
+        <Linha rotulo="Nome social" valor={me.nome_social?.trim() || "—"} />
+        <Linha rotulo="WhatsApp" valor={formatWhatsApp(me.whatsapp) || "—"} />
+        <div className="grid gap-4 sm:grid-cols-3">
+          <Linha
+            rotulo="Cidade"
+            valor={me.cidade?.trim() || "—"}
+            className="sm:col-span-2"
+          />
+          <Linha rotulo="UF" valor={me.uf?.trim() || "—"} />
+        </div>
+        <Linha
+          rotulo="Interesses"
+          valor={
+            me.interesses?.length ? <ChipsTags itens={me.interesses} /> : "—"
+          }
+        />
+      </dl>
+    </section>
+  );
+}
+
+/** "Conta" — as mesmas linhas de credencial do perfil de staff:
+ *  e-mail, senha e saída, cada uma abrindo seu Dialog/form real. */
+export function ContaSecao({ me }: { me: Profile }) {
   return (
     <>
-      <section className="rounded-xl bg-card p-6 shadow-[var(--shadow-border)]">
-        <div className="flex items-start gap-3">
-          <div className="min-w-0 flex-1">
-            <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-              Seus dados
-            </h2>
-            <p className="mt-1 text-xs text-muted-foreground">
-              É daqui que seu mentor e a coordenação falam com você.
-            </p>
-          </div>
-          <DialogoDados me={me} />
-        </div>
-        <dl className="mt-4 space-y-4">
-          <Linha
-            rotulo="Nome social"
-            valor={me.nome_social?.trim() || "—"}
-          />
-          <Linha rotulo="WhatsApp" valor={formatWhatsApp(me.whatsapp) || "—"} />
-          <div className="grid gap-4 sm:grid-cols-3">
-            <Linha
-              rotulo="Cidade"
-              valor={me.cidade?.trim() || "—"}
-              className="sm:col-span-2"
-            />
-            <Linha rotulo="UF" valor={me.uf?.trim() || "—"} />
-          </div>
-          <Linha
-            rotulo="Interesses"
-            valor={
-              me.interesses?.length ? (
-                <ChipsTags itens={me.interesses} />
-              ) : (
-                "—"
-              )
-            }
-          />
-        </dl>
-      </section>
-
-      {/* conta — as mesmas linhas de credencial do perfil de staff:
-          e-mail, senha e saída, cada uma abrindo seu Dialog/form real */}
       <section className="rounded-xl bg-card shadow-[var(--shadow-border)]">
         <h2 className="px-6 pt-5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
           Conta
