@@ -2284,48 +2284,123 @@ export type Database = {
           },
         ]
       }
+      solicitacao_propostas: {
+        Row: {
+          autor_id: string
+          created_at: string
+          id: string
+          mensagem: string | null
+          slot_proposto: string
+          solicitacao_id: string
+        }
+        Insert: {
+          autor_id: string
+          created_at?: string
+          id?: string
+          mensagem?: string | null
+          slot_proposto: string
+          solicitacao_id: string
+        }
+        Update: {
+          autor_id?: string
+          created_at?: string
+          id?: string
+          mensagem?: string | null
+          slot_proposto?: string
+          solicitacao_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "solicitacao_propostas_autor_id_fkey"
+            columns: ["autor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "solicitacao_propostas_autor_id_fkey"
+            columns: ["autor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_contato"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "solicitacao_propostas_autor_id_fkey"
+            columns: ["autor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_pessoal"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "solicitacao_propostas_solicitacao_id_fkey"
+            columns: ["solicitacao_id"]
+            isOneToOne: false
+            referencedRelation: "solicitacoes_especialista"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "solicitacao_propostas_solicitacao_id_fkey"
+            columns: ["solicitacao_id"]
+            isOneToOne: false
+            referencedRelation: "solicitacoes_mural"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       solicitacoes_especialista: {
         Row: {
           created_at: string
           created_by: string | null
-          demanda: string
-          dupla_dpp_id: string
+          demanda: string | null
+          dupla_dpp_id: string | null
           dupla_id: string | null
           especialista_desejado_id: string | null
           especialista_id: string | null
           id: string
+          justificativa_recusa: string | null
           mentorado_id: string
+          motivo: string | null
+          origem: string
           respondida_em: string | null
           slot_proposto: string | null
           status: string
+          turma: string | null
         }
         Insert: {
           created_at?: string
           created_by?: string | null
-          demanda: string
-          dupla_dpp_id: string
+          demanda?: string | null
+          dupla_dpp_id?: string | null
           dupla_id?: string | null
           especialista_desejado_id?: string | null
           especialista_id?: string | null
           id?: string
+          justificativa_recusa?: string | null
           mentorado_id: string
+          motivo?: string | null
+          origem?: string
           respondida_em?: string | null
           slot_proposto?: string | null
           status?: string
+          turma?: string | null
         }
         Update: {
           created_at?: string
           created_by?: string | null
-          demanda?: string
-          dupla_dpp_id?: string
+          demanda?: string | null
+          dupla_dpp_id?: string | null
           dupla_id?: string | null
           especialista_desejado_id?: string | null
           especialista_id?: string | null
           id?: string
+          justificativa_recusa?: string | null
           mentorado_id?: string
+          motivo?: string | null
+          origem?: string
           respondida_em?: string | null
           slot_proposto?: string | null
           status?: string
+          turma?: string | null
         }
         Relationships: [
           {
@@ -2921,12 +2996,19 @@ export type Database = {
           dupla_id: string | null
           especialista_desejado_id: string | null
           especialista_id: string | null
+          especialista_nome: string | null
           id: string | null
+          justificativa_recusa: string | null
           mentorado_id: string | null
           mentorado_nome: string | null
+          motivo: string | null
+          origem: string | null
           respondida_em: string | null
+          slot_proposto: string | null
           status: string | null
+          status_efetivo: string | null
           trilha_encerrada_em: string | null
+          turma: string | null
         }
         Relationships: [
           {
@@ -3045,7 +3127,11 @@ export type Database = {
       }
     }
     Functions: {
-      aceitar_solicitacao: { Args: { p_id: string }; Returns: string }
+      aceitar_proposta: { Args: { p_id: string }; Returns: string }
+      aceitar_solicitacao: {
+        Args: { p_id: string; p_slot?: string }
+        Returns: string
+      }
       agendar_encontro_mentorado: {
         Args: {
           p_data_hora: string
@@ -3078,10 +3164,15 @@ export type Database = {
       assinatura_por_token: { Args: { p_token: string }; Returns: Json }
       avaliacao_media_dpp: { Args: { p_dupla_id: string }; Returns: Json }
       avaliacao_por_token: { Args: { p_token: string }; Returns: Json }
+      cancelar_solicitacao: { Args: { p_id: string }; Returns: undefined }
       civis_btrim: { Args: { d: Json }; Returns: Json }
       conflito_encontro: {
         Args: { p_data_hora: string; p_dupla: string }
         Returns: Json
+      }
+      contra_propor_solicitacao: {
+        Args: { p_id: string; p_mensagem?: string; p_slot: string }
+        Returns: undefined
       }
       dados_civis_ok: {
         Args: { com_parentesco?: boolean; d: Json }
@@ -3140,7 +3231,24 @@ export type Database = {
       my_role: { Args: never; Returns: Database["public"]["Enums"]["app_role"] }
       nome_proprio: { Args: { p: string }; Returns: string }
       par_de_mim: { Args: { p_profile: string }; Returns: boolean }
+      pedir_especialista_jovem: {
+        Args: {
+          p_demanda?: string
+          p_especialista_id?: string
+          p_motivo?: string
+          p_slot?: string
+        }
+        Returns: string
+      }
       pegar_login_handoff: { Args: { p_nonce: string }; Returns: Json }
+      reconhecer_solicitacao: {
+        Args: { p_id: string; p_turma: string }
+        Returns: undefined
+      }
+      recusar_solicitacao: {
+        Args: { p_id: string; p_justificativa: string }
+        Returns: undefined
+      }
       regenerar_token_assinatura: { Args: { p_id: string }; Returns: string }
       registrar_email_apoio_avaliacao: {
         Args: {
@@ -3169,6 +3277,21 @@ export type Database = {
       revogar_assinatura: { Args: { p_id: string }; Returns: undefined }
       salvar_autoavaliacao: {
         Args: { p_disponivel: boolean; p_dupla: string; p_texto: string }
+        Returns: undefined
+      }
+      sol_coords: { Args: never; Returns: string[] }
+      sol_efetivar: {
+        Args: { p_esp: string; p_slot: string; p_sol: string }
+        Returns: string
+      }
+      sol_notificar: {
+        Args: {
+          p_corpo: string
+          p_href: string
+          p_profile: string
+          p_tipo: string
+          p_titulo: string
+        }
         Returns: undefined
       }
       submeter_avaliacao: {
