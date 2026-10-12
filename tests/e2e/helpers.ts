@@ -306,3 +306,57 @@ export async function rpcViaServiceRole<T = unknown>(
     throw new Error(`rpc ${fn} falhou: ${res.status} ${await res.text()}`);
   return (await res.json()) as T;
 }
+
+/** Access token de um usuário de teste (grant password do GoTrue) — pra
+ *  assert de RLS "com o token dele": o que o PostgREST devolve/faz na pele
+ *  do papel, não via service role (que ignora policy). O apikey só precisa
+ *  ser uma chave válida do projeto — a service serve; o papel resolvido vem
+ *  do Bearer nos calls seguintes. Mesmo hard-stop: spec app nunca fala com
+ *  prod. */
+export async function jwtDoUsuario(
+  email: string,
+  senha: string
+): Promise<string> {
+  if (supabaseUrl.includes(PROD_REF))
+    throw new Error("E2E_SUPABASE_URL aponta pra produção — login abortado");
+  const key = process.env.E2E_SUPABASE_SERVICE_ROLE_KEY!;
+  const res = await fetch(
+    `${supabaseUrl}/auth/v1/token?grant_type=password`,
+    {
+      method: "POST",
+      headers: { apikey: key, "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password: senha }),
+    }
+  );
+  if (!res.ok)
+    throw new Error(`login ${email} → ${res.status}: ${await res.text()}`);
+  const body = (await res.json()) as { access_token?: string };
+  if (!body.access_token) throw new Error(`login ${email} sem access_token`);
+  return body.access_token;
+}
+
+/** REST autenticado como o usuário do JWT — apikey service + Bearer dele:
+ *  o gateway valida a key e o PostgREST resolve a role pelo Bearer (é o
+ *  mesmo par que o supabase-js manda, só que com a key elevada). Devolve a
+ *  Response crua — assert de RLS quer o status (200 vazio × 4xx), não um
+ *  throw cedo. Mesmo hard-stop: spec app nunca fala com prod. */
+export async function restComoUsuario(
+  path: string,
+  jwt: string,
+  init: { method?: string; body?: unknown } = {}
+): Promise<Response> {
+  if (supabaseUrl.includes(PROD_REF))
+    throw new Error("E2E_SUPABASE_URL aponta pra produção — request abortado");
+  const key = process.env.E2E_SUPABASE_SERVICE_ROLE_KEY!;
+  return fetch(`${supabaseUrl}/rest/v1/${path}`, {
+    method: init.method ?? "GET",
+    headers: {
+      apikey: key,
+      Authorization: `Bearer ${jwt}`,
+      ...(init.body !== undefined
+        ? { "Content-Type": "application/json" }
+        : {}),
+    },
+    ...(init.body !== undefined ? { body: JSON.stringify(init.body) } : {}),
+  });
+}
