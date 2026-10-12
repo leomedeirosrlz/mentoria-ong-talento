@@ -181,6 +181,31 @@ export async function aceitarSolicitacao(
     return { error: error ? erroAmigavel(error) : "Não foi possível concluir. Tente de novo." };
   }
 
+  // a RPC avisa autor/jovem/mentor DPP mas não a coordenação — quem gerencia
+  // o programa precisa ver o aceite (link direto pra dupla nova, que é do
+  // escopo deles). Quem pediu sendo coord não duplica.
+  const [{ data: s }, { data: coords }] = await Promise.all([
+    supabase
+      .from("solicitacoes_especialista")
+      .select("created_by")
+      .eq("id", solicitacaoId)
+      .single(),
+    supabase.from("profiles").select("id").eq("role", "coordenacao").eq("ativo", true),
+  ]);
+  await notificar(
+    supabase,
+    (coords ?? [])
+      .filter((c: { id: string }) => c.id !== s?.created_by)
+      .map((c: { id: string }) => ({
+        profile_id: c.id,
+        tipo: "especialista_aceitou",
+        titulo: "Pedido de especialista aceito",
+        corpo: `${eu.nome} assumiu. A sessão foi marcada.`,
+        href: `/duplas/${duplaId}`,
+      })),
+    eu.id
+  );
+
   revalidarMural();
   return { ok: true, duplaId };
 }
