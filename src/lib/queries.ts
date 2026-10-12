@@ -54,6 +54,13 @@ const PROFILE_COLS_PUBLICAS =
 const MENTORADO_COLS_PUBLICAS =
   "id, nome, email, whatsapp, ong_origem, notas, avatar_path, documento_path, created_at, nome_social, cidade, uf, interesses, objetivos, escolaridade, origem, disponibilidade";
 
+/** Subconjunto do mentorado que vai no embed da dupla (0076): o que o par
+ *  e a ficha consomem — notas e documento_path do jovem não saem no select
+ *  embutido, que qualquer leitor da dupla recebe. getMentorados e as
+ *  queries de ficha/diretório seguem com MENTORADO_COLS_PUBLICAS. */
+const MENTORADO_COLS_PAR =
+  "id, nome, nome_social, avatar_path, whatsapp, email, ong_origem, cidade, uf, interesses";
+
 /** Os 4 sensíveis da 0034 + dados civis da 0046, idênticos em profiles e
  *  mentorados — fora do grant de coluna; só a coordenação os lê, pelas
  *  views *_pessoal. `responsavel` só existe em mentorados (null em
@@ -255,7 +262,7 @@ export const getCronogramas = cache(async (): Promise<Cronograma[]> => {
 const DUPLA_SELECT = `
   *,
   mentor:profiles!duplas_mentor_id_fkey(${PROFILE_COLS_PUBLICAS}),
-  mentorado:mentorados(${MENTORADO_COLS_PUBLICAS}),
+  mentorado:mentorados(${MENTORADO_COLS_PAR}),
   supervisor:profiles!duplas_supervisor_id_fkey(${PROFILE_COLS_PUBLICAS}),
   encontros(*, registro:registros(*, autor:profiles!registros_created_by_fkey(nome)),
     avaliacao_jovem:avaliacoes_encontro(*)),

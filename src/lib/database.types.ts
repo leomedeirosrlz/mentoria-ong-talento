@@ -12,6 +12,31 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       assinaturas: {
@@ -114,6 +139,13 @@ export type Database = {
             columns: ["mentorado_id"]
             isOneToOne: false
             referencedRelation: "mentorados_pessoal"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assinaturas_mentorado_id_fkey"
+            columns: ["mentorado_id"]
+            isOneToOne: false
+            referencedRelation: "mentorados_turma"
             referencedColumns: ["id"]
           },
           {
@@ -629,6 +661,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "documentos_pessoa_mentorado_id_fkey"
+            columns: ["mentorado_id"]
+            isOneToOne: false
+            referencedRelation: "mentorados_turma"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "documentos_pessoa_profile_id_fkey"
             columns: ["profile_id"]
             isOneToOne: false
@@ -771,6 +810,13 @@ export type Database = {
             columns: ["mentorado_id"]
             isOneToOne: false
             referencedRelation: "mentorados_pessoal"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "duplas_mentorado_id_fkey"
+            columns: ["mentorado_id"]
+            isOneToOne: false
+            referencedRelation: "mentorados_turma"
             referencedColumns: ["id"]
           },
           {
@@ -1421,6 +1467,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "formulario_links_dest_mentorado_id_fkey"
+            columns: ["dest_mentorado_id"]
+            isOneToOne: false
+            referencedRelation: "mentorados_turma"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "formulario_links_dest_profile_id_fkey"
             columns: ["dest_profile_id"]
             isOneToOne: false
@@ -1804,6 +1857,7 @@ export type Database = {
         Row: {
           avatar_path: string | null
           cidade: string | null
+          contato_compartilhado: boolean
           cor_raca: string | null
           created_at: string
           dados_civis: Json | null
@@ -1832,6 +1886,7 @@ export type Database = {
         Insert: {
           avatar_path?: string | null
           cidade?: string | null
+          contato_compartilhado?: boolean
           cor_raca?: string | null
           created_at?: string
           dados_civis?: Json | null
@@ -1860,6 +1915,7 @@ export type Database = {
         Update: {
           avatar_path?: string | null
           cidade?: string | null
+          contato_compartilhado?: boolean
           cor_raca?: string | null
           created_at?: string
           dados_civis?: Json | null
@@ -2092,6 +2148,13 @@ export type Database = {
             columns: ["mentorado_id"]
             isOneToOne: false
             referencedRelation: "mentorados_pessoal"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pessoa_notas_mentorado_id_fkey"
+            columns: ["mentorado_id"]
+            isOneToOne: false
+            referencedRelation: "mentorados_turma"
             referencedColumns: ["id"]
           },
           {
@@ -2735,6 +2798,13 @@ export type Database = {
             referencedRelation: "mentorados_pessoal"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "solicitacoes_especialista_mentorado_id_fkey"
+            columns: ["mentorado_id"]
+            isOneToOne: false
+            referencedRelation: "mentorados_turma"
+            referencedColumns: ["id"]
+          },
         ]
       }
       supervisoes: {
@@ -3098,6 +3168,7 @@ export type Database = {
         Row: {
           avatar_path: string | null
           cidade: string | null
+          contato_compartilhado: boolean | null
           cor_raca: string | null
           created_at: string | null
           dados_civis: Json | null
@@ -3122,6 +3193,7 @@ export type Database = {
         Insert: {
           avatar_path?: string | null
           cidade?: string | null
+          contato_compartilhado?: boolean | null
           cor_raca?: string | null
           created_at?: string | null
           dados_civis?: Json | null
@@ -3146,6 +3218,7 @@ export type Database = {
         Update: {
           avatar_path?: string | null
           cidade?: string | null
+          contato_compartilhado?: boolean | null
           cor_raca?: string | null
           created_at?: string | null
           dados_civis?: Json | null
@@ -3171,6 +3244,7 @@ export type Database = {
       }
       mentorados_pessoal: {
         Row: {
+          contato_compartilhado: boolean | null
           cor_raca: string | null
           dados_civis: Json | null
           data_nascimento: string | null
@@ -3183,6 +3257,7 @@ export type Database = {
           responsavel: Json | null
         }
         Insert: {
+          contato_compartilhado?: boolean | null
           cor_raca?: string | null
           dados_civis?: Json | null
           data_nascimento?: string | null
@@ -3195,6 +3270,7 @@ export type Database = {
           responsavel?: Json | null
         }
         Update: {
+          contato_compartilhado?: boolean | null
           cor_raca?: string | null
           dados_civis?: Json | null
           data_nascimento?: string | null
@@ -3205,6 +3281,39 @@ export type Database = {
           nome?: string | null
           pref_genero_par?: string | null
           responsavel?: Json | null
+        }
+        Relationships: []
+      }
+      mentorados_turma: {
+        Row: {
+          avatar_path: string | null
+          cidade: string | null
+          id: string | null
+          interesses: string[] | null
+          nome: string | null
+          nome_social: string | null
+          uf: string | null
+          whatsapp: string | null
+        }
+        Insert: {
+          avatar_path?: string | null
+          cidade?: string | null
+          id?: string | null
+          interesses?: string[] | null
+          nome?: string | null
+          nome_social?: string | null
+          uf?: string | null
+          whatsapp?: never
+        }
+        Update: {
+          avatar_path?: string | null
+          cidade?: string | null
+          id?: string | null
+          interesses?: string[] | null
+          nome?: string | null
+          nome_social?: string | null
+          uf?: string | null
+          whatsapp?: never
         }
         Relationships: []
       }
@@ -3423,6 +3532,13 @@ export type Database = {
             referencedRelation: "mentorados_pessoal"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "solicitacoes_especialista_mentorado_id_fkey"
+            columns: ["mentorado_id"]
+            isOneToOne: false
+            referencedRelation: "mentorados_turma"
+            referencedColumns: ["id"]
+          },
         ]
       }
     }
@@ -3516,6 +3632,7 @@ export type Database = {
         Returns: Json
       }
       interesses_ok: { Args: { interesses: string[] }; Returns: boolean }
+      jovem_relacionado: { Args: { p_profile: string }; Returns: boolean }
       marcar_combinado: {
         Args: { p_feito: boolean; p_id: string }
         Returns: undefined
@@ -3577,6 +3694,10 @@ export type Database = {
       revogar_assinatura: { Args: { p_id: string }; Returns: undefined }
       salvar_autoavaliacao: {
         Args: { p_disponivel: boolean; p_dupla: string; p_texto: string }
+        Returns: undefined
+      }
+      set_contato_compartilhado: {
+        Args: { p_ligado: boolean }
         Returns: undefined
       }
       sol_coords: { Args: never; Returns: string[] }
@@ -3753,6 +3874,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       app_role: [

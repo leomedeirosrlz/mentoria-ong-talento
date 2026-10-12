@@ -55,7 +55,17 @@ function normalize(row: Record<string, unknown>): SolicitacaoEspecialista {
       typeof mentorado_nome === "string" && mentorado_nome
         ? { nome: mentorado_nome }
         : null,
-    solicitante: norm(row.solicitante),
+    solicitante:
+      norm(row.solicitante) ??
+      // o embed do criador volta null quando o leitor não alcança o profile
+      // dele (profiles_select, 0076) — pedido do jovem resolve pelo
+      // mentorado_nome achatado da view; pedido de staff não tem nome plano
+      // e a UI cai no fallback honesto
+      (row.origem === "jovem" &&
+      typeof mentorado_nome === "string" &&
+      mentorado_nome
+        ? { nome: mentorado_nome }
+        : null),
     desejado: norm(row.desejado),
     especialista:
       norm(row.especialista) ??

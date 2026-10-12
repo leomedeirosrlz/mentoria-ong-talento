@@ -9,6 +9,7 @@ import {
   House,
   SignOut,
   UserCircle,
+  Users,
 } from "@phosphor-icons/react";
 import { signOut } from "@/lib/actions";
 import { Avatar } from "@/components/avatar";
@@ -19,12 +20,13 @@ import type { Notificacao, Profile } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 /** Lado do jovem (REALIZA-108) — shell próprio, não o AppShell filtrado:
- *  quatro destinos fixos e nada de navegação de staff. O acento da nav é o
+ *  cinco destinos fixos e nada de navegação de staff. O acento da nav é o
  *  amarelo --role-mentorado (o verde fica pros adultos) — a mesma cor do
  *  avatar-iniciais do jovem no resto do app. */
 const NAV = [
   { href: "/jovem", label: "Início", icon: House },
   { href: "/jovem/agenda", label: "Agenda", icon: CalendarDots },
+  { href: "/jovem/pessoas", label: "Pessoas", icon: Users },
   { href: "/jovem/materiais", label: "Materiais", icon: FolderOpen },
   { href: "/jovem/perfil", label: "Perfil", icon: UserCircle },
 ] as const;
@@ -98,7 +100,7 @@ export function JovemShell({
           </div>
         </header>
 
-        {/* sidebar desktop — mesma linguagem do AppShell, quatro destinos */}
+        {/* sidebar desktop — mesma linguagem do AppShell, cinco destinos */}
         <aside className="hidden md:flex w-56 shrink-0 bg-sidebar text-sidebar-foreground border-r border-sidebar-border flex-col fixed inset-y-0">
           <div className="px-5 pt-6 pb-8">
             <Link href="/jovem" className="inline-block" aria-label="Início">
@@ -186,7 +188,8 @@ export function JovemShell({
           <SiteFooter tone="ink" />
         </div>
 
-        {/* bottom nav mobile — os 4 destinos cabem sem "Mais" */}
+        {/* bottom nav mobile — os 5 destinos cabem sem "Mais" (flex-1 por
+            item divide a largura igualmente, 5 × ~20% continua legível) */}
         <nav
           aria-label="Navegação principal"
           className="fixed inset-x-0 bottom-0 z-40 border-t border-sidebar-border bg-sidebar pb-[env(safe-area-inset-bottom)] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] md:hidden"

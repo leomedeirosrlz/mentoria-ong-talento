@@ -122,6 +122,10 @@ const P = {
   // login da Ana (mentorada) — a persona existe no dataset mesmo sem card na
   // /demo: /pessoas mostra "Mentorado" e o vínculo com a ficha dela fecha
   anaLogin: 0x000f,
+  // contas dos colegas de turma da Bia (0076) — profile_id é o que os torna
+  // visíveis no diretório /jovem/pessoas
+  caioLogin: 0x0010,
+  dandaraLogin: 0x0011,
 } as const;
 
 const M = {
@@ -1063,9 +1067,37 @@ function build(): DemoData {
     consent_lgpd_em: haDias(45),
   };
 
+  // contas dos colegas de turma (0076): sem elas o mentorado não aparece no
+  // diretório do jovem — Eduardo e Pedro seguem sem login de propósito
+  const caioLogin: Profile = {
+    id: uid(P.caioLogin), user_id: uid(0xf010), nome: "Caio Henrique Oliveira",
+    email: "caiohenrique.oliveira@gmail.com", whatsapp: "5511976123002",
+    role: "mentorado", ativo: true, avatar_path: "demo/avatars/caio.svg",
+    created_at: haDias(45),
+    bio: null, linkedin: null, areas: null, voluntariado: null,
+    onboarded_em: haDias(40),
+    nome_social: null, cidade: "São Paulo", uf: "SP",
+    interesses: ["tecnologia", "inglês", "intercâmbio"],
+    origem: "Projeto Semente",
+    consent_lgpd_em: haDias(45),
+  };
+  const dandaraLogin: Profile = {
+    id: uid(P.dandaraLogin), user_id: uid(0xf011), nome: "Dandara Souza",
+    email: "dandara.souza@gmail.com", whatsapp: "5511976123003",
+    role: "mentorado", ativo: true, avatar_path: "demo/avatars/dandara.svg",
+    created_at: haDias(45),
+    bio: null, linkedin: null, areas: null, voluntariado: null,
+    onboarded_em: haDias(40),
+    nome_social: null, cidade: "São Paulo", uf: "SP",
+    interesses: ["jovem aprendiz", "comunicação", "redação"],
+    origem: "Casa do Saber",
+    consent_lgpd_em: haDias(45),
+  };
+
   const profiles: Profile[] = [
     marina, paulo, ricardo, sofia, beatriz, carlos, fernanda, joaoPedro,
     luiza, andre, helena, marcos, renata, patricia, anaLogin,
+    caioLogin, dandaraLogin,
   ];
 
   const personas: Record<AppRole, Profile> = {
@@ -1173,6 +1205,9 @@ function build(): DemoData {
     escolaridade: "medio", origem: "Oficina de projetos da ONG Horizonte",
     disponibilidade: { dias: ["ter", "qui"], periodos: ["noite"] },
     created_at: haDias(60),
+    // a Bia compartilha o contato dela de volta (0076) — o toggle do Perfil
+    // dela abre ligado na demo
+    contato_compartilhado: true,
     // sync-back da autorização assinada — a mãe dela ficou na ficha (0046)
     responsavel: {
       nome_civil: "Cleusa Maria Silva", rg: "22.334.556-7",
@@ -1183,6 +1218,9 @@ function build(): DemoData {
   const caio: Mentorado = {
     id: uid(M.caio), nome: "Caio Henrique Oliveira",
     email: "caiohenrique.oliveira@gmail.com", whatsapp: "5511976123002",
+    profile_id: uid(P.caioLogin), // tem conta → aparece no diretório da Bia
+    // opt-in ligado: o WhatsApp dele chega aos colegas de turma (0076)
+    contato_compartilhado: true,
     ong_origem: "Projeto Semente",
     notas: "1º ano. Interesse em tecnologia e intercâmbio; tímido no primeiro contato, engajado depois que pega confiança.",
     avatar_path: "demo/avatars/caio.svg", documento_path: "documentos/autorizacao-caio.pdf",
@@ -1199,6 +1237,8 @@ function build(): DemoData {
   const dandara: Mentorado = {
     id: uid(M.dandara), nome: "Dandara Souza",
     email: "dandara.souza@gmail.com", whatsapp: "5511976123003",
+    profile_id: uid(P.dandaraLogin), // tem conta → listada, mas sem WhatsApp:
+    // contato_compartilhado fica no default false (opt-out, 0076)
     ong_origem: "Casa do Saber",
     notas: "2º ano. Voltou a trabalhar fins de semana — agenda apertada. Sonha com vaga de jovem aprendiz.",
     avatar_path: "demo/avatars/dandara.svg", documento_path: "documentos/autorizacao-dandara.pdf",

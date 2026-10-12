@@ -46,9 +46,33 @@ function quemRecusou(sol: SolicitacaoEspecialista) {
   return n ? ` por ${n}` : "";
 }
 
+/** Nome do autor da proposta quando o embed `autor` vem null — o
+ *  profiles_select da 0076 devolve null pro profile que o leitor não
+ *  alcança (jovem fora da dupla dele; qualquer profile pro papel
+ *  mentorado). A solicitação pai resolve os dois lados da mesa sem
+ *  consultar profile: especialista engajado/dirigido pelos campos da
+ *  própria solicitação; o autor do pedido é o created_by — jovem chega
+ *  pelo mentorado_nome plano, staff sem nome plano vira "a equipe". */
+function nomeAutor(
+  p: SolicitacaoProposta,
+  s: SolicitacaoEspecialista
+): string | null {
+  if (p.autor?.nome) return p.autor.nome;
+  if (p.autor_id === s.especialista_id) return s.especialista?.nome ?? null;
+  if (p.autor_id === s.especialista_desejado_id)
+    return s.desejado?.nome ?? null;
+  if (p.autor_id === s.created_by)
+    return (
+      s.solicitante?.nome ??
+      (s.origem === "jovem" ? s.mentorado?.nome ?? null : "a equipe")
+    );
+  return null;
+}
+
 /** Linha da thread: quem propôs, o horário e o recado — append-only. */
-function Thread({ propostas, meuId, agoraMs }: {
+function Thread({ propostas, s, meuId, agoraMs }: {
   propostas: SolicitacaoProposta[];
+  s: SolicitacaoEspecialista;
   meuId: string;
   agoraMs: number;
 }) {
@@ -59,7 +83,7 @@ function Thread({ propostas, meuId, agoraMs }: {
         <li key={p.id} className="space-y-0.5">
           <p className="text-xs text-muted-foreground">
             <span className="font-medium text-foreground">
-              {p.autor_id === meuId ? "Você" : (p.autor?.nome ?? "—")}
+              {p.autor_id === meuId ? "Você" : (nomeAutor(p, s) ?? "—")}
             </span>{" "}
             propôs {rotuloSlot(p.slot_proposto)} ·{" "}
             {tempoRelativo(p.created_at, agoraMs)}
@@ -323,7 +347,7 @@ export function SolicitacaoNegociacao({
 
   const ultimoNome =
     ultima && ultima.autor_id !== meuId
-      ? (ultima.autor?.nome ?? "a outra parte")
+      ? (nomeAutor(ultima, s) ?? "a outra parte")
       : null;
 
   return (
@@ -338,7 +362,7 @@ export function SolicitacaoNegociacao({
         </p>
       )}
 
-      <Thread propostas={propostas} meuId={meuId} agoraMs={agoraMs} />
+      <Thread propostas={propostas} s={s} meuId={meuId} agoraMs={agoraMs} />
 
       {espereOutro ? (
         <p className="text-xs text-muted-foreground">

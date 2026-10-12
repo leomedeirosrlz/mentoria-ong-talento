@@ -116,6 +116,9 @@ export default async function JovemHome() {
   const porPapel = (papel: string): JovemContato[] =>
     contatosAtuais.filter((c) => c.papel === papel);
   const mentores = porPapel("mentor");
+  // a dupla de especialista entrega papel 'especialista' (0076) — antes
+  // caía como 'mentor' e a trilha esp ficava sem contato na home
+  const especialistas = porPapel("especialista");
   const supervisores = porPapel("supervisor");
   const coordenacao = porPapel("coordenacao");
 
@@ -296,6 +299,14 @@ export default async function JovemHome() {
                     nomeJovem={nomeTela}
                   />
                 ))}
+                {especialistas.map((c) => (
+                  <ContatoLinha
+                    key={c.id ?? c.nome}
+                    c={c}
+                    papel="Seu especialista"
+                    nomeJovem={nomeTela}
+                  />
+                ))}
                 {supervisores.map((c) => (
                   <ContatoLinha
                     key={c.id ?? c.nome}
@@ -312,7 +323,7 @@ export default async function JovemHome() {
                     nomeJovem={nomeTela}
                   />
                 ))}
-                {!mentores.length && !supervisores.length && !coordenacao.length && (
+                {!mentores.length && !especialistas.length && !supervisores.length && !coordenacao.length && (
                   <li className="py-3 text-sm text-muted-foreground">
                     A equipe aparece aqui quando a coordenação conectar seu
                     cadastro à plataforma.

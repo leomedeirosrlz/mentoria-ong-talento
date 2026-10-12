@@ -178,8 +178,12 @@ export default async function JovemAgenda() {
   );
   const espPorDupla = new Map(
     duplasEsp.map((d) => {
+      // a view rotula por trilha desde a 0076: na dupla esp o contato do
+      // titular chega como 'especialista' ('mentor' é o papel da DPP)
       const contato = contatos.find(
-        (c) => c.dupla_id === d.id && c.papel === "mentor"
+        (c) =>
+          c.dupla_id === d.id &&
+          (c.papel === "especialista" || c.papel === "mentor")
       );
       const nome =
         contato?.nome_social ||
