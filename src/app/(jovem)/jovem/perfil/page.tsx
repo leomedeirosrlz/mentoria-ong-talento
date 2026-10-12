@@ -33,10 +33,12 @@ export default async function JovemPerfil() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      {/* o mesmo cartão-banner do perfil de todo mundo — papel mentorado
-          pinta a paleta dele; o avatar aqui é inicial (foto é da ficha
-          civil, que não entra no app do jovem) */}
-      <section className="overflow-hidden rounded-xl bg-card shadow-[var(--shadow-border)]">
+      {/* o mesmo cartão-banner do perfil de todo mundo — mesma estrutura
+          exata do /perfil de staff (avatar posicionado com z-10 sobre o
+          banner); sem os botões de foto porque o jovem não faz upload —
+          o avatar dele é o disco de iniciais amarelo por decisão de
+          privacidade */}
+      <header className="overflow-hidden rounded-xl bg-card shadow-[var(--shadow-border)]">
         <PessoaBanner
           papel="mentorado"
           nome={nomeTela}
@@ -45,26 +47,33 @@ export default async function JovemPerfil() {
           areas={me.interesses}
           seed={me.id}
         />
-        <div className="px-6 pb-6">
-          <div className="-mt-9 mb-4">
-            <div className="inline-block rounded-full bg-card p-1">
-              <Avatar nome={nomeTela} papel="mentorado" size={72} />
+        <div className="px-4 pb-5 sm:px-6 sm:pb-6">
+          <div className="flex items-end justify-between gap-3">
+            <div className="relative z-10 -mt-10 shrink-0 sm:-mt-12">
+              <Avatar
+                nome={nomeTela}
+                papel="mentorado"
+                size={80}
+                className="size-20! ring-4 ring-card outline outline-1 outline-[var(--brand-ink)]/15 sm:size-24!"
+              />
             </div>
           </div>
-          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1.5">
-            <h1 className="text-xl font-semibold tracking-tight">
-              {nomeTela}
-            </h1>
-            <Badge variant="secondary">{papelLabel("mentorado")}</Badge>
+          <h1 className="mt-3 text-xl font-semibold tracking-tight sm:text-2xl">
+            {nomeTela}
+          </h1>
+          <div className="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1.5 text-sm text-muted-foreground">
+            <Badge variant="outline" className="gap-1.5 font-normal">
+              {papelLabel("mentorado")}
+            </Badge>
+            {meta ? (
+              <span className="flex items-center gap-1.5">
+                <MapPin size={14} className="shrink-0" aria-hidden />
+                {meta}
+              </span>
+            ) : null}
           </div>
-          {meta ? (
-            <div className="mt-1.5 flex items-center gap-1.5 text-sm text-muted-foreground">
-              <MapPin size={14} className="shrink-0" />
-              <span>{meta}</span>
-            </div>
-          ) : null}
         </div>
-      </section>
+      </header>
 
       {/* ficha do programa — leitura honesta: o jovem vê o que a
           coordenação mantém dele, sem campos civis nem notas */}
