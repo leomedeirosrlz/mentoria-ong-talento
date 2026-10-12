@@ -3,7 +3,10 @@ import Link from "next/link";
 import {
   EnvelopeSimple,
   Handshake,
+  Sparkle,
+  UserCheck,
   Users,
+  UsersFour,
   WhatsappLogo,
 } from "@phosphor-icons/react/dist/ssr";
 import { Avatar } from "@/components/avatar";
@@ -23,11 +26,11 @@ import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Pessoas" };
 
-/** O diretório do jovem (0076) — quem ele pode alcançar: os adultos das
- *  duplas dele (mentor, especialista, supervisor — todas, não só a atual)
- *  + a coordenação, e os colegas de turma com conta. Contato de adulto é
- *  direto por default; o de colega só aparece quando o próprio colega
- *  ligou o compartilhamento — e o do jovem ele controla no Perfil. */
+/** O diretório do jovem (0076), agrupado por cargo: mentoria, especialistas,
+ *  supervisão e coordenação vêm da `jovem_contatos` (adultos das duplas
+ *  dele — contato direto por default); os colegas da turma vêm da
+ *  `mentorados_turma` (só quem tem conta; WhatsApp só com opt-in do
+ *  próprio colega — o do jovem ele controla no Perfil). */
 export default async function JovemPessoas() {
   const [me, contatos, colegas, duplas] = await Promise.all([
     getMe(),
@@ -71,12 +74,6 @@ export default async function JovemPessoas() {
 
   const porPapel = (papel: string): JovemContato[] =>
     agrupaPorPessoa(contatos.filter((c) => c.papel === papel));
-  const mentores = porPapel("mentor");
-  const especialistas = porPapel("especialista");
-  const supervisores = porPapel("supervisor");
-  const coordenacao = porPapel("coordenacao");
-  const temAdultoDeDupla =
-    mentores.length + especialistas.length + supervisores.length > 0;
 
   /** Etiqueta de estado da dupla do contato — só quando não está ativa. */
   function seloDe(c: JovemContato): string | null {
@@ -86,81 +83,91 @@ export default async function JovemPessoas() {
     return `${base} ${d.status}`;
   }
 
+  const grupos: {
+    id: string;
+    titulo: string;
+    icon: typeof Handshake;
+    itens: JovemContato[];
+    vazio: string;
+  }[] = [
+    {
+      id: "mentoria",
+      titulo: "Mentoria",
+      icon: Handshake,
+      itens: porPapel("mentor"),
+      vazio: "Quando a sua dupla for formada, o seu mentor aparece aqui.",
+    },
+    {
+      id: "especialistas",
+      titulo: "Especialistas",
+      icon: Sparkle,
+      itens: porPapel("especialista"),
+      vazio:
+        "O especialista da sua trilha aparece aqui quando ela começar.",
+    },
+    {
+      id: "supervisao",
+      titulo: "Supervisão",
+      icon: UserCheck,
+      itens: porPapel("supervisor"),
+      vazio: "O supervisor da sua dupla aparece aqui.",
+    },
+    {
+      id: "coordenacao",
+      titulo: "Coordenação",
+      icon: UsersFour,
+      itens: porPapel("coordenacao"),
+      vazio: "A equipe da coordenação aparece aqui.",
+    },
+  ];
+
   return (
     <div className="grid gap-8">
       <header>
         <h1 className="text-2xl font-semibold tracking-tight">Pessoas</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          A equipe que caminha com você e os colegas da sua turma.
+          Mentoria, especialistas, coordenação e os colegas da sua turma.
         </p>
       </header>
 
-      {/* Os adultos — contato direto por default (jovem_contatos): mentor e
-          supervisor de CADA dupla, especialistas das trilhas ativas e
-          concluídas, e a coordenação */}
-      <section aria-labelledby="equipe-titulo">
-        <h2
-          id="equipe-titulo"
-          className="mb-3 flex items-center gap-2 font-semibold"
-        >
-          <Handshake size={18} className="text-muted-foreground" aria-hidden />
-          Quem caminha com você
-        </h2>
-        <Card className="animate-enter">
-          <CardContent>
-            <ul className="divide-y divide-border/60">
-              {mentores.map((c) => (
-                <ContatoLinha
-                  key={`mentor-${c.id}`}
-                  c={c}
-                  papel="Seu mentor"
-                  selo={seloDe(c)}
-                  nomeJovem={nomeTela}
-                />
-              ))}
-              {especialistas.map((c) => (
-                <ContatoLinha
-                  key={`esp-${c.id}`}
-                  c={c}
-                  papel="Seu especialista"
-                  selo={seloDe(c)}
-                  nomeJovem={nomeTela}
-                />
-              ))}
-              {supervisores.map((c) => (
-                <ContatoLinha
-                  key={`sup-${c.id}`}
-                  c={c}
-                  papel="Supervisor(a) da dupla"
-                  selo={seloDe(c)}
-                  nomeJovem={nomeTela}
-                />
-              ))}
-              {coordenacao.map((c) => (
-                <ContatoLinha
-                  key={`coord-${c.id}`}
-                  c={c}
-                  papel="Coordenação do programa"
-                  nomeJovem={nomeTela}
-                />
-              ))}
-              {!temAdultoDeDupla && coordenacao.length === 0 && (
-                <li className="py-3 text-sm text-muted-foreground">
-                  A equipe aparece aqui quando a coordenação conectar seu
-                  cadastro à plataforma.
-                </li>
+      {/* Os adultos, um grupo por cargo — contato direto por default
+          (jovem_contatos): mentor e supervisor de CADA dupla,
+          especialistas das trilhas e a coordenação */}
+      {grupos.map((g) => (
+        <section key={g.id} aria-labelledby={`${g.id}-titulo`}>
+          <h2
+            id={`${g.id}-titulo`}
+            className="mb-3 flex items-center gap-2 font-semibold"
+          >
+            <g.icon
+              size={18}
+              className="text-muted-foreground"
+              aria-hidden
+            />
+            {g.titulo}
+          </h2>
+          <Card className="animate-enter">
+            <CardContent>
+              {g.itens.length === 0 ? (
+                <p className="py-4 text-sm text-muted-foreground">
+                  {g.vazio}
+                </p>
+              ) : (
+                <ul className="divide-y divide-border/60">
+                  {g.itens.map((c) => (
+                    <ContatoLinha
+                      key={`${g.id}-${c.id}`}
+                      c={c}
+                      selo={seloDe(c)}
+                      nomeJovem={nomeTela}
+                    />
+                  ))}
+                </ul>
               )}
-            </ul>
-            {!temAdultoDeDupla && coordenacao.length > 0 && (
-              <p className="border-t border-border/60 pt-3 text-xs text-muted-foreground">
-                Quando sua dupla for formada, seu mentor e supervisor
-                aparecem aqui — e o especialista, quando você tiver uma
-                trilha.
-              </p>
-            )}
-          </CardContent>
-        </Card>
-      </section>
+            </CardContent>
+          </Card>
+        </section>
+      ))}
 
       {/* Colegas de turma — a view mentorados_turma: só quem tem conta e
           divide turma de dupla; o WhatsApp chega null pra quem não ligou
@@ -206,16 +213,15 @@ export default async function JovemPessoas() {
   );
 }
 
-/** Adulto da equipe — avatar + papel (com o estado da dupla quando não é
- *  ativa) + WhatsApp/e-mail diretos. */
+/** Adulto do diretório — avatar + nome (com o estado da dupla quando não
+ *  é ativa) + WhatsApp/e-mail diretos. O cargo é a seção onde a linha
+ *  mora — não repete em cada linha. */
 function ContatoLinha({
   c,
-  papel,
   selo,
   nomeJovem,
 }: {
   c: JovemContato;
-  papel: string;
   /** "trilha concluída", "mentoria pausada"… — null quando a dupla vive */
   selo?: string | null;
   nomeJovem: string;
@@ -234,10 +240,7 @@ function ContatoLinha({
       />
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium">{nome}</p>
-        <p className="text-xs text-muted-foreground">
-          {papel}
-          {selo ? ` · ${selo}` : ""}
-        </p>
+        {selo && <p className="text-xs text-muted-foreground">{selo}</p>}
       </div>
       <div className="flex shrink-0 items-center gap-1.5">
         {c.email && (

@@ -253,15 +253,17 @@ test.describe("mentorado — shell /jovem", () => {
     await expect(
       page.getByRole("heading", { name: "Pessoas", level: 1 })
     ).toBeVisible();
-    const equipe = page.locator(
-      'section[aria-labelledby="equipe-titulo"]'
+    // agrupado por cargo — uma seção por papel, a linha não repete o rótulo
+    const mentoria = page.locator(
+      'section[aria-labelledby="mentoria-titulo"]'
     );
-    await expect(equipe.getByText("Mentor E2E")).toBeVisible();
-    await expect(equipe.getByText("Seu mentor")).toBeVisible();
+    await expect(mentoria.getByText("Mentor E2E")).toBeVisible();
     // a trilha esp da ficha (duplaEsp) entrega papel 'especialista' desde a
     // 0076 — antes sumia como 'mentor' duplicado
-    await expect(equipe.getByText("Esp E2E")).toBeVisible();
-    await expect(equipe.getByText("Seu especialista")).toBeVisible();
+    const especialistas = page.locator(
+      'section[aria-labelledby="especialistas-titulo"]'
+    );
+    await expect(especialistas.getByText("Esp E2E")).toBeVisible();
     // o diretório de colegas existe mesmo sem colega com conta — o vazio
     // honesto é a resposta certa
     await expect(
