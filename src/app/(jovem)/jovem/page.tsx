@@ -685,17 +685,22 @@ function ContatoLinha({
   );
   return (
     <li className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
-      <Avatar
-        nome={c.nome_social || c.nome || "?"}
-        src={c.avatar_path ? avatarPublicUrl(c.avatar_path) : null}
-        size={40}
-      />
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium">
-          {c.nome_social || c.nome}
-        </p>
-        <p className="text-xs text-muted-foreground">{papel}</p>
-      </div>
+      <Link
+        href={`/jovem/pessoas/${c.id}`}
+        className="flex min-w-0 flex-1 items-center gap-3 rounded-md outline-none transition-colors focus-visible:ring-3 focus-visible:ring-ring/50"
+      >
+        <Avatar
+          nome={c.nome_social || c.nome || "?"}
+          src={c.avatar_path ? avatarPublicUrl(c.avatar_path) : null}
+          size={40}
+        />
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-medium">
+            {c.nome_social || c.nome}
+          </p>
+          <p className="text-xs text-muted-foreground">{papel}</p>
+        </div>
+      </Link>
       {wa && (
         <a
           href={wa}
