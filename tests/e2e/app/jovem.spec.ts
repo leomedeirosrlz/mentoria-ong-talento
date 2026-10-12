@@ -236,5 +236,39 @@ test.describe("mentorado — shell /jovem", () => {
     await expect(
       page.getByRole("heading", { name: "Seus dados" })
     ).toBeVisible();
+    // opt-in colega↔colega (0076): a ficha do jovem não tem WhatsApp — o
+    // controle aparece desligado e explicado, nunca escondido
+    await expect(
+      page.getByRole("heading", { name: "Privacidade" })
+    ).toBeVisible();
+    await expect(
+      page.getByRole("switch", { name: /Compartilhar meu WhatsApp/ })
+    ).toBeDisabled();
+  });
+
+  test("pessoas lista a equipe das duplas e o diretório de colegas", async ({
+    page,
+  }) => {
+    await page.goto("/jovem/pessoas");
+    await expect(
+      page.getByRole("heading", { name: "Pessoas", level: 1 })
+    ).toBeVisible();
+    const equipe = page.locator(
+      'section[aria-labelledby="equipe-titulo"]'
+    );
+    await expect(equipe.getByText("Mentor E2E")).toBeVisible();
+    await expect(equipe.getByText("Seu mentor")).toBeVisible();
+    // a trilha esp da ficha (duplaEsp) entrega papel 'especialista' desde a
+    // 0076 — antes sumia como 'mentor' duplicado
+    await expect(equipe.getByText("Esp E2E")).toBeVisible();
+    await expect(equipe.getByText("Seu especialista")).toBeVisible();
+    // o diretório de colegas existe mesmo sem colega com conta — o vazio
+    // honesto é a resposta certa
+    await expect(
+      page.locator('section[aria-labelledby="colegas-titulo"]')
+    ).toBeVisible();
+    await expect(
+      page.getByText(/o seu você controla em/i)
+    ).toBeVisible();
   });
 });
