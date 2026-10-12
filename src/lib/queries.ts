@@ -14,6 +14,7 @@ import {
   demoDuplas,
   demoDuplasOpcoes,
   demoDuplasResumo,
+  demoEncontrosPorDuplas,
   demoEspecialistaEventos,
   demoMateriais,
   demoMe,
@@ -28,7 +29,7 @@ import {
   demoPessoas,
   demoRegistros,
 } from "./demo/queries";
-import type { AvaliacaoJovem, CicloEvento, Comunicado, CorRaca, Cronograma, DadosCivis, DocumentoPessoa, Dupla, DuplaResumo, DuplaStatus, EncontroStatus, EspecialistaEvento, Genero, Material, Mentorado, MentorProfile, Notificacao, PessoaNota, PrefGeneroPar, Profile, Registro, ResponsavelCivis, Trilha } from "./types";
+import type { AvaliacaoJovem, CicloEvento, Comunicado, CorRaca, Cronograma, DadosCivis, DocumentoPessoa, Dupla, DuplaResumo, DuplaStatus, Encontro, EncontroStatus, EspecialistaEvento, Genero, Material, Mentorado, MentorProfile, Notificacao, PessoaNota, PrefGeneroPar, Profile, Registro, ResponsavelCivis, Trilha } from "./types";
 
 /** mentor_profiles — re-export do tipo canônico (types.ts): os callers da
  *  página de pessoas/board importam daqui historicamente. */
@@ -421,6 +422,30 @@ export const getDuplasResumoTodas = cache(async (): Promise<DuplaResumo[]> => {
   if (error) throw error;
   return data ?? [];
 });
+
+/** Encontros mínimos de um conjunto de duplas — o passo do guia da trilha
+ *  especialista é o rank entre realizados (0074), então derivá-lo exige o
+ *  histórico todo da dupla, não só o encontro linkado ao registro. */
+export async function getEncontrosPorDuplas(
+  duplaIds: string[]
+): Promise<Pick<Encontro, "id" | "dupla_id" | "numero" | "status">[]> {
+  if (!duplaIds.length) return [];
+  const demo = await demoRole();
+  if (demo) return demoEncontrosPorDuplas(demo, duplaIds);
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("encontros")
+    .select("id, dupla_id, numero, status")
+    .in("dupla_id", duplaIds);
+  if (error) {
+    console.error("getEncontrosPorDuplas:", error);
+    return [];
+  }
+  return (data ?? []) as Pick<
+    Encontro,
+    "id" | "dupla_id" | "numero" | "status"
+  >[];
+}
 
 /** Só a contagem (head: true, sem rows) — alimenta o checklist de setup da home. */
 export const getContagemPessoas = cache(async (): Promise<number> => {

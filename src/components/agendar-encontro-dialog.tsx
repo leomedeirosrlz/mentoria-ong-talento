@@ -43,6 +43,7 @@ export function AgendarEncontroDialog({
   sugerido,
   piso,
   jovemNome,
+  rotulo,
   trigger,
   onCreated,
 }: {
@@ -56,6 +57,10 @@ export function AgendarEncontroDialog({
   piso?: string;
   /** Primeiro nome do mentorado — sai no aviso de horário sobreposto. */
   jovemNome?: string;
+  /** Como o encontro aparece no título/toasts — default "Nº encontro". Na
+   *  trilha especialista a remarcação é de uma sessão que nasceu de pedido:
+   *  o rótulo diz isso ("sessão de especialista") sem número de passo. */
+  rotulo?: string;
   /** Elemento do trigger — default é o botão padrão da casa. */
   trigger?: React.ReactElement;
   /** Só no ramo retroativo (data passada): recebe (id do encontro criado,
@@ -105,6 +110,9 @@ export function AgendarEncontroDialog({
     (sugeridoLocal && pisoLocal && sugeridoLocal < pisoLocal ? pisoLocal : sugeridoLocal);
   // modo retroativo só existe pra encontro novo (sem row editável)
   const ehRetroativo = !atual && valorData !== "" && valorData <= agora;
+  // sujeito neutro pro copy — "4º encontro" no DPP, "sessão de especialista"
+  // na remarcação de pedido aceito; os verbos ficam sem gênero de propósito
+  const nome = rotulo ?? `${numero}º encontro`;
 
   useEffect(() => {
     if (pending) return;
@@ -170,7 +178,11 @@ export function AgendarEncontroDialog({
         const res = await agendarEncontro(fd);
         if (res?.error) toast.error(res.error);
         else {
-          toast.success(atual ? `${numero}º encontro remarcado.` : `${numero}º encontro agendado.`);
+          toast.success(
+            atual
+              ? `Remarcação confirmada — ${nome}.`
+              : `Agendamento confirmado — ${nome}.`
+          );
           setOpen(false);
           router.refresh();
         }
@@ -202,7 +214,7 @@ export function AgendarEncontroDialog({
       } />
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{numero}º encontro</DialogTitle>
+          <DialogTitle>{nome}</DialogTitle>
         </DialogHeader>
         <form onSubmit={submit} className="space-y-4">
           <div className="space-y-2">
@@ -291,7 +303,7 @@ export function AgendarEncontroDialog({
             atual.data_hora != null &&
             new Date(atual.data_hora) > new Date() && (
             <ConfirmDeleteButton
-              titulo={`Desmarcar o ${numero}º encontro?`}
+              titulo={`Desmarcar ${rotulo ? "a " : "o "}${nome}?`}
               descricao="O encontro sai da agenda — vocês podem marcar de novo quando combinarem."
               acao="Desmarcar"
               sucesso="Encontro desmarcado."

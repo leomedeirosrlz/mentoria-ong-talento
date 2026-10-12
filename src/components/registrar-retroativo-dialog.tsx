@@ -33,6 +33,7 @@ export function RegistrarRetroativoDialog({
   numeroInicial,
   quandoPadrao,
   onCreated,
+  esp,
 }: {
   duplaId: string;
   faltantes: EncontroFaltante[];
@@ -45,6 +46,9 @@ export function RegistrarRetroativoDialog({
   /** Recebe (id do encontro criado, "YYYY-MM-DD" dele) e substitui a navegação
    *  pra ficha — a agenda usa pra abrir o registro inline no dia em que ele caiu. */
   onCreated?: (encontroId: string, dia: string) => void;
+  /** Trilha de especialista: faltantes vêm em passo do guia e a sessão nasce
+   *  com numero-tentativa derivado no server (0074) — a UI fala em "passo". */
+  esp?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [numero, setNumero] = useState<string | null>(
@@ -56,6 +60,14 @@ export function RegistrarRetroativoDialog({
   const scrollTarget = useRef<string | null>(null);
   const [pending, start] = useTransition();
   const router = useRouter();
+  // vocabulário da trilha — especialista fala em sessão/passo (0074)
+  const nome = esp ? "sessão" : "encontro";
+  const rotuloFaltante = (f: EncontroFaltante) =>
+    esp
+      ? `Passo ${f.numero}`
+      : f.dataSugerida
+        ? `${f.numero}º encontro · sugerido ${formatDate(f.dataSugerida)}`
+        : `${f.numero}º encontro`;
   // teto do datetime-local: não aceita futuro (o server também valida)
   const agora = paraInputLocal(new Date());
   // default de "quando foi": o dia clicado (19h) ou a sugestão do encontro
@@ -93,7 +105,7 @@ export function RegistrarRetroativoDialog({
   function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!numero) {
-      toast.error("Escolha qual encontro foi.");
+      toast.error(`Escolha qual ${esp ? "passo" : "encontro"} foi.`);
       return;
     }
     const local = String(new FormData(e.currentTarget).get("data_hora") ?? "");
@@ -105,7 +117,9 @@ export function RegistrarRetroativoDialog({
         const res = await registrarEncontroRetroativo(duplaId, Number(numero), local);
         if (res?.error) toast.error(res.error);
         else {
-          toast.success("Encontro registrado. Agora complete o registro.");
+          toast.success(
+            `${esp ? "Sessão" : "Encontro"} registrad${esp ? "a" : "o"}. Agora complete o registro.`
+          );
           setOpen(false);
           setNumero(null);
           setQuando("");
@@ -149,41 +163,39 @@ export function RegistrarRetroativoDialog({
       <DialogTrigger render={trigger} />
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Registrar encontro que já aconteceu</DialogTitle>
+          <DialogTitle>Registrar {nome} que já aconteceu</DialogTitle>
         </DialogHeader>
         <DialogDescription className="leading-relaxed">
           Se encontraram sem agendar por aqui (combinaram por WhatsApp, por
-          exemplo), conte quando foi. O encontro já nasce como realizado e você
-          completa o registro em seguida.
+          exemplo), conte quando foi. {esp ? "A sessão" : "O encontro"} já
+          nasce como realizad{esp ? "a" : "o"} e você completa o registro em
+          seguida.
         </DialogDescription>
         <form onSubmit={submit} className="space-y-4">
           <div className="space-y-2">
-            <Label id="retro-numero-label">Qual encontro foi</Label>
+            <Label id="retro-numero-label">
+              Qual {esp ? "passo" : "encontro"} foi
+            </Label>
             <Select
               name="numero"
               required
               value={numero}
               // sem items o trigger fechado mostra só "3" — o label é o texto cheio
-              items={Object.fromEntries(faltantes.map((f) => [
-                String(f.numero),
-                f.dataSugerida
-                  ? `${f.numero}º encontro · sugerido ${formatDate(f.dataSugerida)}`
-                  : `${f.numero}º encontro`,
-              ]))}
+              items={Object.fromEntries(
+                faltantes.map((f) => [String(f.numero), rotuloFaltante(f)])
+              )}
               onValueChange={(v) => escolherNumero(v ?? null)}
             >
               <SelectTrigger
                 id="retro-numero-select"
                 aria-labelledby="retro-numero-label retro-numero-select"
               >
-                <SelectValue placeholder="Escolha o encontro" />
+                <SelectValue placeholder={`Escolha ${esp ? "o passo" : "o encontro"}`} />
               </SelectTrigger>
               <SelectContent>
                 {faltantes.map((f) => (
                   <SelectItem key={f.numero} value={String(f.numero)}>
-                    {f.dataSugerida
-                      ? `${f.numero}º encontro · sugerido ${formatDate(f.dataSugerida)}`
-                      : `${f.numero}º encontro`}
+                    {rotuloFaltante(f)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -203,7 +215,7 @@ export function RegistrarRetroativoDialog({
           </div>
           <Button type="submit" className="w-full" disabled={pending}>
             <ClockCounterClockwise size={16} />
-            {pending ? "Salvando…" : "Registrar encontro"}
+            {pending ? "Salvando…" : `Registrar ${nome}`}
           </Button>
         </form>
       </DialogContent>

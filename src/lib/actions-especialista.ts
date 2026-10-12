@@ -36,6 +36,17 @@ function resumo(texto: string, max = 200): string {
   return texto.length > max ? `${texto.slice(0, max).trimEnd()}…` : texto;
 }
 
+/** Status efetivo da solicitação (0074): pedido em aberto com slot vencido
+ *  lê 'expirada' sem writer — dedup e CTAs não podem olhar só a coluna. */
+const STATUS_EM_ABERTO = ["aberta", "aguardando_coord", "contra_proposta"];
+
+/** Revalida as rotas onde a solicitação aparece — com dupla_dpp_id a ficha
+ *  DPP entra junto; sem ela (pedido do jovem em triagem) só home/jovem. */
+function revalidarMural(duplaDppId?: string | null) {
+  revalidatePath("/");
+  if (duplaDppId) revalidatePath(`/duplas/${duplaDppId}`);
+}
+
 export async function criarSolicitacao(formData: FormData) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
@@ -54,7 +65,7 @@ export async function criarSolicitacao(formData: FormData) {
   // trilha principal, nunca de uma dupla de especialista ou encerrada
   const { data: dupla } = await supabase
     .from("duplas")
-    .select("id, mentor_id, mentorado_id, status, trilha")
+    .select("id, mentor_id, mentorado_id, status, trilha, turma")
     .eq("id", dupla_dpp_id)
     .maybeSingle();
   if (!dupla) return { error: "Dupla não encontrada." };
@@ -81,20 +92,25 @@ export async function criarSolicitacao(formData: FormData) {
     }
   }
 
+  // "em aberto" v2 (0074): aguardando triagem ou em negociação também ocupam
+  // o pedido — e um slot vencido (status_efetivo 'expirada') libera de novo
+  const agora = new Date().toISOString();
   const { data: aberta } = await supabase
     .from("solicitacoes_especialista")
     .select("id")
     .eq("dupla_dpp_id", dupla_dpp_id)
-    .eq("status", "aberta")
+    .in("status", STATUS_EM_ABERTO)
+    .or(`slot_proposto.is.null,slot_proposto.gt.${agora}`)
     .limit(1);
   if (aberta?.length) {
-    return { error: "Já existe uma solicitação aberta pra essa dupla." };
+    return { error: "Já existe uma solicitação em aberto pra essa dupla." };
   }
 
   const { error } = await supabase.from("solicitacoes_especialista").insert({
     mentorado_id: dupla.mentorado_id,
     dupla_dpp_id,
     demanda,
+    turma: dupla.turma,
     especialista_desejado_id: desejado,
     created_by: eu.id,
   });
@@ -137,63 +153,35 @@ export async function criarSolicitacao(formData: FormData) {
     eu.id
   );
 
-  revalidatePath(`/duplas/${dupla_dpp_id}`);
-  revalidatePath("/"); // card de demandas no dashboard da coordenação
+  revalidarMural(dupla_dpp_id);
   return { ok: true };
 }
 
-export async function aceitarSolicitacao(solicitacaoId: string) {
+export async function aceitarSolicitacao(
+  solicitacaoId: string,
+  slot: string | null = null
+) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada. Entre de novo." };
+  if (!solicitacaoId) return { error: "Solicitação não informada." };
+  if (slot != null && Number.isNaN(Date.parse(slot))) {
+    return { error: "Escolha um horário válido." };
+  }
 
-  // o RPC faz aceite + criação da dupla numa transação só — imune à corrida
-  // de dois especialistas aceitando a mesma demanda
+  // o RPC efetiva: pedido staff sem slot → o especialista escolhe na hora
+  // (p_slot); com slot na mesa (do jovem ou da última proposta) o aceite usa
+  // o proposto. Aceite + criação do encontro/dupla numa transação só —
+  // imune à corrida de dois especialistas. A notificação sai do próprio RPC.
   const { data: duplaId, error } = await supabase.rpc("aceitar_solicitacao", {
     p_id: solicitacaoId,
+    p_slot: slot,
   });
   if (error || !duplaId) {
     return { error: error ? erroAmigavel(error) : "Não foi possível concluir. Tente de novo." };
   }
 
-  // depois do aceite a solicitação é "a sua" — legível pela RLS do especialista
-  const [{ data: s }, { data: coords }] = await Promise.all([
-    supabase
-      .from("solicitacoes_especialista")
-      .select("created_by, dupla_dpp_id")
-      .eq("id", solicitacaoId)
-      .single(),
-    supabase.from("profiles").select("id").eq("role", "coordenacao").eq("ativo", true),
-  ]);
-
-  await notificar(
-    supabase,
-    [
-      // o solicitante volta pra ficha DPP — a dupla nova é do especialista e
-      // o mentor DPP não tem acesso a ela (RLS)
-      {
-        profile_id: s?.created_by,
-        tipo: "especialista_aceitou",
-        titulo: "Um especialista aceitou o pedido",
-        corpo: `${eu.nome} vai mentorar esse jovem.`,
-        href: `/duplas/${s?.dupla_dpp_id}`,
-      },
-      // a coordenação gerencia: link direto pra dupla recém-nascida. Quem
-      // solicitou já recebeu o ping acima — não duplica.
-      ...(coords ?? [])
-        .filter((c: { id: string }) => c.id !== s?.created_by)
-        .map((c: { id: string }) => ({
-          profile_id: c.id,
-          tipo: "especialista_aceitou",
-          titulo: "Pedido de especialista aceito",
-          corpo: `${eu.nome} assumiu. A dupla foi criada.`,
-          href: `/duplas/${duplaId}`,
-        })),
-    ],
-    eu.id
-  );
-
-  revalidatePath("/");
+  revalidarMural();
   return { ok: true, duplaId };
 }
 
@@ -208,52 +196,139 @@ export async function cancelarSolicitacao(solicitacaoId: string) {
     .eq("id", solicitacaoId)
     .maybeSingle();
   if (!s) return { error: "Solicitação não encontrada." };
-  if (s.status !== "aberta") {
-    return { error: "Só dá pra cancelar uma solicitação aberta." };
+  if (!STATUS_EM_ABERTO.includes(s.status)) {
+    return { error: "Esse pedido não pode mais ser cancelado." };
   }
   const ehSolicitante = s.created_by === eu.id;
   const ehCoord = eu.role === "coordenacao";
   if (!ehSolicitante && !ehCoord) {
-    return { error: "Só quem solicitou ou a coordenação podem cancelar." };
+    return { error: "Só quem pediu ou a coordenação podem cancelar." };
   }
 
-  // o eq(status) garante que uma corrida com o aceite não desfaça a dupla
-  const { error } = await supabase
-    .from("solicitacoes_especialista")
-    .update({ status: "cancelada", respondida_em: new Date().toISOString() })
-    .eq("id", solicitacaoId)
-    .eq("status", "aberta");
+  // a RPC valida de novo e notifica o especialista engajado/dirigido — o
+  // app só complementa: quando a coordenação cancela pedido alheio, quem
+  // pediu fica sabendo (a RPC só avisa o lado do especialista)
+  const { error } = await supabase.rpc("cancelar_solicitacao", {
+    p_id: solicitacaoId,
+  });
   if (error) return { error: erroAmigavel(error) };
 
-  // aviso leve no sentido oposto: mentor cancela → coordenação fica sabendo;
-  // coordenação cancela → quem pediu é avisado
-  const rows = ehCoord
-    ? [
+  if (ehCoord && !ehSolicitante) {
+    await notificar(
+      supabase,
+      [
         {
           profile_id: s.created_by,
           tipo: "solicitacao_cancelada",
           titulo: "Solicitação de especialista cancelada",
           corpo: "A coordenação cancelou o pedido de mentor especialista.",
-          href: `/duplas/${s.dupla_dpp_id}`,
+          href: s.dupla_dpp_id ? `/duplas/${s.dupla_dpp_id}` : "/",
         },
-      ]
-    : (
-        await supabase
-          .from("profiles")
-          .select("id")
-          .eq("role", "coordenacao")
-          .eq("ativo", true)
-      ).data?.map((c: { id: string }) => ({
-        profile_id: c.id,
-        tipo: "solicitacao_cancelada",
-        titulo: "Solicitação de especialista cancelada",
-        corpo: `${eu.nome} cancelou o pedido de mentor especialista.`,
-        href: `/duplas/${s.dupla_dpp_id}`,
-      })) ?? [];
-  await notificar(supabase, rows, eu.id);
+      ],
+      eu.id
+    );
+  }
 
-  revalidatePath(`/duplas/${s.dupla_dpp_id}`);
-  revalidatePath("/");
+  revalidarMural(s.dupla_dpp_id);
+  return { ok: true };
+}
+
+/** Contra-proposta de horário (0074) — dos dois lados da mesa: o
+ *  especialista responde ao pedido, o autor responde à proposta dele. O
+ *  slot SEMPRE sai da grade do especialista — a RPC valida. */
+export async function contraProporSolicitacao(
+  solicitacaoId: string,
+  slotIso: string,
+  mensagem?: string | null
+) {
+  if (await demoAtivo()) return { error: DEMO_MSG };
+  const { supabase, me: eu } = await me();
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
+  if (!solicitacaoId) return { error: "Solicitação não informada." };
+  if (!slotIso || Number.isNaN(Date.parse(slotIso))) {
+    return { error: "Escolha um horário válido." };
+  }
+  const msg = mensagem?.trim() || null;
+  if (msg && (msg.length < 3 || msg.length > 500)) {
+    return { error: "A mensagem precisa ter entre 3 e 500 caracteres." };
+  }
+
+  const { error } = await supabase.rpc("contra_propor_solicitacao", {
+    p_id: solicitacaoId,
+    p_slot: slotIso,
+    p_mensagem: msg,
+  });
+  if (error) return { error: erroAmigavel(error) };
+  revalidarMural();
+  return { ok: true };
+}
+
+/** Recusa do pedido — só o especialista procurado/engajado, e sempre com
+ *  justificativa (a recusa chega ao autor como `solicitacao_recusada`). */
+export async function recusarSolicitacao(
+  solicitacaoId: string,
+  justificativa: string
+) {
+  if (await demoAtivo()) return { error: DEMO_MSG };
+  const { supabase, me: eu } = await me();
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
+  if (!solicitacaoId) return { error: "Solicitação não informada." };
+  const just = justificativa.trim();
+  if (just.length < 3) {
+    return { error: "Explique o motivo da recusa." };
+  }
+  if (just.length > 500) {
+    return { error: "A justificativa aceita até 500 caracteres." };
+  }
+
+  const { error } = await supabase.rpc("recusar_solicitacao", {
+    p_id: solicitacaoId,
+    p_justificativa: just,
+  });
+  if (error) return { error: erroAmigavel(error) };
+  revalidarMural();
+  return { ok: true };
+}
+
+/** O autor (ou a coordenação) aceita a proposta que o especialista deixou
+ *  na mesa — a RPC confere que a última proposta é dele e efetiva. */
+export async function aceitarProposta(solicitacaoId: string) {
+  if (await demoAtivo()) return { error: DEMO_MSG };
+  const { supabase, me: eu } = await me();
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
+  if (!solicitacaoId) return { error: "Solicitação não informada." };
+
+  const { data: duplaId, error } = await supabase.rpc("aceitar_proposta", {
+    p_id: solicitacaoId,
+  });
+  if (error || !duplaId) {
+    return { error: error ? erroAmigavel(error) : "Não foi possível concluir. Tente de novo." };
+  }
+  revalidarMural();
+  return { ok: true, duplaId };
+}
+
+/** Triagem da coordenação (0074): pedido do jovem sem dupla DPP entra
+ *  'aguardando_coord' — reconhecer libera pro mural com a turma definida. */
+export async function reconhecerSolicitacao(
+  solicitacaoId: string,
+  turma: string
+) {
+  if (await demoAtivo()) return { error: DEMO_MSG };
+  const { supabase, me: eu } = await me();
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
+  if (eu.role !== "coordenacao") {
+    return { error: "Só a coordenação faz a triagem." };
+  }
+  if (!solicitacaoId) return { error: "Solicitação não informada." };
+  if (!turma.trim()) return { error: "Escolha uma turma." };
+
+  const { error } = await supabase.rpc("reconhecer_solicitacao", {
+    p_id: solicitacaoId,
+    p_turma: turma.trim(),
+  });
+  if (error) return { error: erroAmigavel(error) };
+  revalidarMural();
   return { ok: true };
 }
 
