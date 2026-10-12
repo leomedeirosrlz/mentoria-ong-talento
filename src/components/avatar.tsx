@@ -46,7 +46,7 @@ export function Avatar({
       className={cn(
         "grid shrink-0 place-items-center overflow-hidden rounded-full font-semibold",
         papel === "mentorado"
-          ? "bg-[var(--role-mentorado)]/30 text-[var(--brand-ink)]"
+          ? "bg-[var(--role-mentorado)] text-[var(--brand-ink)]"
           : "bg-[var(--brand-lime)] text-[var(--brand-ink)]",
         className
       )}
