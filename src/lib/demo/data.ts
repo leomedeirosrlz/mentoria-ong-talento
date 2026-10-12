@@ -49,6 +49,7 @@ import type {
   Registro,
   RegistroAnexo,
   SolicitacaoEspecialista,
+  SolicitacaoProposta,
   Supervisao,
 } from "@/lib/types";
 import type { Interacao } from "@/lib/interacoes";
@@ -71,6 +72,8 @@ export type DemoData = {
   materiais: Material[];
   comunicados: Comunicado[];
   solicitacoes: SolicitacaoEspecialista[];
+  /** Thread de propostas da negociação (0074) — append-only, por solicitação. */
+  solicitacaoPropostas: SolicitacaoProposta[];
   pessoaNotas: PessoaNota[];
   interacoes: Interacao[];
   notificacoes: Record<AppRole, Notificacao[]>;
@@ -152,7 +155,15 @@ const D = {
 // cronogramas (0061) — um por turma; a T2 é a turma que começou um mês depois
 const CRON = { t1: 0x5001, t2: 0x5002 } as const;
 
-const S = { aceita1: 0x2401, aceita2: 0x2402, direcionada: 0x2403, livre: 0x2404, cancelada: 0x2405, aceita3: 0x2406, aceita4: 0x2407 } as const;
+const S = {
+  aceita1: 0x2401, aceita2: 0x2402, direcionada: 0x2403, livre: 0x2404,
+  cancelada: 0x2405, aceita3: 0x2406, aceita4: 0x2407,
+  sess2: 0x2408, sess3: 0x2409, sess4: 0x240a,
+  pedidoJovem: 0x240b, triagem: 0x240c,
+} as const;
+
+// propostas da negociação (solicitacao_propostas, 0074)
+const PROP = { s1: 0x5601, s2: 0x5602 } as const;
 
 const MEET = "https://meet.google.com/demo-realiza";
 
@@ -1134,6 +1145,10 @@ function build(): DemoData {
   // grade). `|| 7` empurra pro ciclo seguinte quando hoje já é o dia.
   const proximaTerca = addDias(HOJE, ((2 - HOJE.getDay()) + 7) % 7 || 7);
   const proximoDomingo = addDias(HOJE, ((7 - HOJE.getDay()) + 7) % 7 || 7);
+  // slots da negociação demo — dentro das grades (Sofia qui 18-21/sáb 9-12,
+  // Helena qui 19-21) e sempre no futuro, senão o pedido "expira" na leitura
+  const proximaQuinta = addDias(HOJE, ((4 - HOJE.getDay()) + 7) % 7 || 7);
+  const proximoSabado = addDias(HOJE, ((6 - HOJE.getDay()) + 7) % 7 || 7);
   const especialistaExcecoes: (ExcecaoEspecialista & { profile_id: string })[] = [
     { id: uid(0x5401), profile_id: sofia.id, data: ymd(proximaTerca), hora_inicio: "18:00", hora_fim: "21:00", tipo: "bloqueio" },
     { id: uid(0x5402), profile_id: sofia.id, data: ymd(proximoDomingo), hora_inicio: "10:00", hora_fim: "12:00", tipo: "extra" },
@@ -1321,9 +1336,10 @@ function build(): DemoData {
 
   const mentorados = [ana, caio, dandara, eduardo, isabela, kaua, laura, pedro, rafael, wendel];
 
-  // ---------- solicitações de especialista ----------
+  // ---------- solicitações de especialista (0074 — pedido por sessão) ----
   // (montadas antes das duplas: as duplas de especialista referenciam a
-  // solicitação que as originou)
+  // solicitação que as originou — e CADA encontro da trilha nasce de um
+  // pedido aceito, então a esp1 acumula quatro)
 
   const solicitacoes: SolicitacaoEspecialista[] = [
     {
@@ -1332,6 +1348,11 @@ function build(): DemoData {
       dupla_dpp_id: uid(D.atraso),
       demanda:
         "O Eduardo pediu apoio com oratória pra uma apresentação na ONG, mas a agenda dele fechou com a escola — cancelamos por ora e retomamos depois.",
+      motivo: null,
+      slot_proposto: null,
+      origem: "staff",
+      turma: "T1 · 2026/2027",
+      justificativa_recusa: null,
       especialista_desejado_id: null,
       especialista_id: null,
       dupla_id: null,
@@ -1342,6 +1363,7 @@ function build(): DemoData {
       mentorado: { nome: eduardo.nome },
       solicitante: { nome: joaoPedro.nome },
       especialista: null,
+      especialista_nome: null,
     },
     {
       id: uid(S.aceita2),
@@ -1349,6 +1371,11 @@ function build(): DemoData {
       dupla_dpp_id: uid(D.risco),
       demanda:
         "A Dandara quer concorrer a uma vaga de jovem aprendiz e precisa de ajuda com currículo e entrevista — foge da minha área, um especialista de comunicação/RH faria toda a diferença.",
+      motivo: null,
+      slot_proposto: em(addDias(HOJE, -18), "20:00"),
+      origem: "staff",
+      turma: "T1 · 2026/2027",
+      justificativa_recusa: null,
       especialista_desejado_id: null,
       especialista_id: helena.id,
       dupla_id: uid(D.esp2),
@@ -1359,6 +1386,7 @@ function build(): DemoData {
       mentorado: { nome: dandara.nome },
       solicitante: { nome: fernanda.nome },
       especialista: { nome: helena.nome },
+      especialista_nome: helena.nome,
     },
     {
       id: uid(S.aceita3),
@@ -1366,6 +1394,11 @@ function build(): DemoData {
       dupla_dpp_id: uid(D.atraso),
       demanda:
         "O Eduardo trava em matemática básica (frações e razão) e isso derruba o resto das notas do 1º ano — a Sofia é professora de exatas e topou pegar uma segunda trilha.",
+      motivo: null,
+      slot_proposto: em(addDias(HOJE, -6), "19:30"),
+      origem: "staff",
+      turma: "T1 · 2026/2027",
+      justificativa_recusa: null,
       especialista_desejado_id: sofia.id,
       especialista_id: sofia.id,
       dupla_id: uid(D.esp3),
@@ -1376,6 +1409,8 @@ function build(): DemoData {
       mentorado: { nome: eduardo.nome },
       solicitante: { nome: joaoPedro.nome },
       especialista: { nome: sofia.nome },
+      especialista_nome: sofia.nome,
+      desejado: { nome: sofia.nome },
     },
     {
       // a Bia já fechou uma trilha antes da de matemática — oratória com a
@@ -1386,6 +1421,11 @@ function build(): DemoData {
       dupla_dpp_id: uid(D.ok),
       demanda:
         "A Bia vai apresentar o projeto dela num evento da ONG e trava pra falar em público — uma trilha de oratória com a Helena destrava a meta do PDM.",
+      motivo: null,
+      slot_proposto: em(addDias(HOJE, -28), "19:00"),
+      origem: "staff",
+      turma: "T1 · 2026/2027",
+      justificativa_recusa: null,
       especialista_desejado_id: helena.id,
       especialista_id: helena.id,
       dupla_id: uid(D.esp4),
@@ -1396,13 +1436,22 @@ function build(): DemoData {
       mentorado: { nome: ana.nome },
       solicitante: { nome: ricardo.nome },
       especialista: { nome: helena.nome },
+      especialista_nome: helena.nome,
+      desejado: { nome: helena.nome },
     },
     {
+      // sessões seguintes da mesma trilha (sessões 2-4 da d-esp1): slot-only,
+      // sem demanda — cada uma aponta pra dupla já formada
       id: uid(S.aceita1),
       mentorado_id: ana.id,
       dupla_dpp_id: uid(D.ok),
       demanda:
         "A Bia quer prestar ENEM no fim do ano e trava em matemática — faltou base de frações e funções. Um especialista em exatas ajudaria a destravar a meta do PDM.",
+      motivo: null,
+      slot_proposto: em(addDias(HOJE, -12), "18:30"),
+      origem: "staff",
+      turma: "T1 · 2026/2027",
+      justificativa_recusa: null,
       especialista_desejado_id: sofia.id,
       especialista_id: sofia.id,
       dupla_id: uid(D.esp1),
@@ -1413,23 +1462,108 @@ function build(): DemoData {
       mentorado: { nome: ana.nome },
       solicitante: { nome: ricardo.nome },
       especialista: { nome: sofia.nome },
+      especialista_nome: sofia.nome,
+      desejado: { nome: sofia.nome },
     },
     {
+      // a 2ª sessão — pedida pela própria Bia (pedido do jovem com dupla DPP
+      // nasce 'aberta'); a sessão furou (encontro 2 = nao_aconteceu)
+      id: uid(S.sess2),
+      mentorado_id: ana.id,
+      dupla_dpp_id: uid(D.ok),
+      demanda: null,
+      motivo: "Quero continuar a trilha de matemática com a Sofia.",
+      slot_proposto: em(addDias(HOJE, -8), "18:30"),
+      origem: "jovem",
+      turma: "T1 · 2026/2027",
+      justificativa_recusa: null,
+      especialista_desejado_id: sofia.id,
+      especialista_id: sofia.id,
+      dupla_id: uid(D.esp1),
+      status: "aceita",
+      created_by: anaLogin.id,
+      created_at: haDias(10, "20:10"),
+      respondida_em: haDias(9, "18:00"),
+      mentorado: { nome: ana.nome },
+      solicitante: { nome: anaLogin.nome_social ?? anaLogin.nome },
+      especialista: { nome: sofia.nome },
+      especialista_nome: sofia.nome,
+      desejado: { nome: sofia.nome },
+    },
+    {
+      // a 3ª — nova negociação depois da falta (passo 2 coberto na tentativa 3)
+      id: uid(S.sess3),
+      mentorado_id: ana.id,
+      dupla_dpp_id: uid(D.ok),
+      demanda: null,
+      motivo: "Remarcar a sessão que não rolou.",
+      slot_proposto: em(addDias(HOJE, -5), "18:30"),
+      origem: "jovem",
+      turma: "T1 · 2026/2027",
+      justificativa_recusa: null,
+      especialista_desejado_id: sofia.id,
+      especialista_id: sofia.id,
+      dupla_id: uid(D.esp1),
+      status: "aceita",
+      created_by: anaLogin.id,
+      created_at: haDias(7, "12:00"),
+      respondida_em: haDias(6, "19:00"),
+      mentorado: { nome: ana.nome },
+      solicitante: { nome: anaLogin.nome_social ?? anaLogin.nome },
+      especialista: { nome: sofia.nome },
+      especialista_nome: sofia.nome,
+      desejado: { nome: sofia.nome },
+    },
+    {
+      // a 4ª — a sessão agendada pra daqui a 4 dias nasceu deste pedido
+      id: uid(S.sess4),
+      mentorado_id: ana.id,
+      dupla_dpp_id: uid(D.ok),
+      demanda: null,
+      motivo: "Próxima sessão da trilha.",
+      slot_proposto: em(addDias(HOJE, 4), "18:30"),
+      origem: "jovem",
+      turma: "T1 · 2026/2027",
+      justificativa_recusa: null,
+      especialista_desejado_id: sofia.id,
+      especialista_id: sofia.id,
+      dupla_id: uid(D.esp1),
+      status: "aceita",
+      created_by: anaLogin.id,
+      created_at: haDias(3, "21:00"),
+      respondida_em: haDias(2, "08:30"),
+      mentorado: { nome: ana.nome },
+      solicitante: { nome: anaLogin.nome_social ?? anaLogin.nome },
+      especialista: { nome: sofia.nome },
+      especialista_nome: sofia.nome,
+      desejado: { nome: sofia.nome },
+    },
+    {
+      // em negociação: direcionada à Sofia, que engajou propondo sábado — o
+      // Carlos devolveu pedindo terça (thread em solicitacaoPropostas). A
+      // última proposta é do autor → a Sofia decide agora
       id: uid(S.direcionada),
       mentorado_id: caio.id,
       dupla_dpp_id: uid(D.pend),
       demanda:
         "O Caio vai concorrer a um programa de intercâmbio e precisa de inglês instrumental — entrevista e leitura de edital. Penso na Sofia, se ela tiver disponibilidade.",
+      motivo: null,
+      slot_proposto: em(proximaTerca, "19:30"),
+      origem: "staff",
+      turma: "T1 · 2026/2027",
+      justificativa_recusa: null,
       especialista_desejado_id: sofia.id,
-      especialista_id: null,
+      especialista_id: sofia.id,
       dupla_id: null,
-      status: "aberta",
+      status: "contra_proposta",
       created_by: carlos.id,
       created_at: haDias(4, "21:00"),
       respondida_em: null,
       mentorado: { nome: caio.nome },
       solicitante: { nome: carlos.nome },
-      especialista: null,
+      especialista: { nome: sofia.nome },
+      especialista_nome: sofia.nome,
+      desejado: { nome: sofia.nome },
     },
     {
       id: uid(S.livre),
@@ -1437,6 +1571,11 @@ function build(): DemoData {
       dupla_dpp_id: uid(D.risco),
       demanda:
         "A Dandara voltou mais participativa depois do apoio, mas pediu ajuda com redação pro ENEM — foge totalmente da minha área. Aberta pra qualquer especialista.",
+      motivo: null,
+      slot_proposto: null,
+      origem: "staff",
+      turma: "T1 · 2026/2027",
+      justificativa_recusa: null,
       especialista_desejado_id: null,
       especialista_id: null,
       dupla_id: null,
@@ -1447,6 +1586,81 @@ function build(): DemoData {
       mentorado: { nome: dandara.nome },
       solicitante: { nome: fernanda.nome },
       especialista: null,
+      especialista_nome: null,
+    },
+    {
+      // pedido do Kauã com dupla DPP ativa: nasce 'aberta' já com o slot que
+      // ele sugeriu — vai direto pra Helena, que não é persona (a demo mostra
+      // o estado pro coord e pro mentor DPP, não pra quem negocia)
+      id: uid(S.pedidoJovem),
+      mentorado_id: kaua.id,
+      dupla_dpp_id: uid(D.t2a),
+      demanda: null,
+      motivo: "Quero treinar apresentação em inglês pro processo da faculdade.",
+      slot_proposto: em(proximaQuinta, "20:00"),
+      origem: "jovem",
+      turma: "T2 · 2026/2027",
+      justificativa_recusa: null,
+      especialista_desejado_id: helena.id,
+      especialista_id: null,
+      dupla_id: null,
+      status: "aberta",
+      created_by: anaLogin.id, // persona de jovem da demo — ver nota do created_by
+      created_at: haDias(1, "18:40"),
+      respondida_em: null,
+      mentorado: { nome: kaua.nome },
+      solicitante: { nome: "Kauã" },
+      especialista: null,
+      especialista_nome: null,
+      desejado: { nome: helena.nome },
+    },
+    {
+      // pedido do Wendel SEM dupla DPP: entra na fila de triagem da
+      // coordenação — liberar exige definir a turma (reconhecer_solicitacao)
+      id: uid(S.triagem),
+      mentorado_id: wendel.id,
+      dupla_dpp_id: null,
+      demanda: null,
+      motivo: "Preciso de ajuda com matemática financeira pro negócio da família.",
+      slot_proposto: null,
+      origem: "jovem",
+      turma: null,
+      justificativa_recusa: null,
+      especialista_desejado_id: null,
+      especialista_id: null,
+      dupla_id: null,
+      status: "aguardando_coord",
+      created_by: anaLogin.id,
+      created_at: haDias(0, "09:15"),
+      respondida_em: null,
+      mentorado: { nome: wendel.nome },
+      solicitante: { nome: wendel.nome },
+      especialista: null,
+      especialista_nome: null,
+    },
+  ];
+
+  // thread de propostas do pedido do Caio (0074) — append-only: a Sofia
+  // engajou oferecendo sábado e o Carlos devolveu pedindo terça. O slot na
+  // mesa é o da última proposta (do autor — a vez é da Sofia)
+  const solicitacaoPropostas: SolicitacaoProposta[] = [
+    {
+      id: uid(PROP.s1),
+      solicitacao_id: uid(S.direcionada),
+      autor_id: sofia.id,
+      slot_proposto: em(proximoSabado, "10:00"),
+      mensagem: "Aceito o pedido — mas semana de prova, só consigo sábado de manhã.",
+      created_at: haDias(3, "20:00"),
+      autor: { nome: sofia.nome },
+    },
+    {
+      id: uid(PROP.s2),
+      solicitacao_id: uid(S.direcionada),
+      autor_id: carlos.id,
+      slot_proposto: em(proximaTerca, "19:30"),
+      mensagem: "Sábado o Caio tem curso — pode na terça à noite?",
+      created_at: haDias(2, "09:30"),
+      autor: { nome: carlos.nome },
     },
   ];
 
@@ -1832,8 +2046,11 @@ function build(): DemoData {
     notas: [],
   };
 
-  // d-esp1 · Sofia × Ana Beatriz — trilha de especialista (5 encontros, sem
-  // calendário oficial), nascida da solicitação aceita do Ricardo
+  // d-esp1 · Sofia × Ana Beatriz — trilha de especialista (5 passos, sem
+  // calendário oficial), nascida da solicitação aceita do Ricardo.
+  // numero = TENTATIVA (0074): a 2ª furou (a Bia teve prova surpresa e a
+  // sessão virou um novo pedido), então o que é passo 2 pra jornada mora
+  // na tentativa 3 — cada sessão aceita é uma solicitação própria.
   const encD6: Encontro[] = [
     comRegistro(
       realizado(uid(D.esp1), 1, addDias(HOJE, -12), { hora: "18:30", duracao: 60 }),
@@ -1843,8 +2060,9 @@ function build(): DemoData {
           "Foco da trilha: base de frações e funções pra chegar inteira no ENEM.",
       }
     ),
+    naoAconteceu(uid(D.esp1), 2, addDias(HOJE, -8), { hora: "18:30" }),
     comRegistro(
-      realizado(uid(D.esp1), 2, addDias(HOJE, -5), { hora: "18:30", duracao: 60 }),
+      realizado(uid(D.esp1), 3, addDias(HOJE, -5), { hora: "18:30", duracao: 60 }),
       sofia, "Bia", "especialista",
       {
         reflexoes:
@@ -1853,7 +2071,7 @@ function build(): DemoData {
           "Combinado: lista de 10 exercícios de fração progressiva até o próximo encontro.",
       }
     ),
-    agendado(uid(D.esp1), 3, addDias(HOJE, 4), { hora: "18:30" }),
+    agendado(uid(D.esp1), 4, addDias(HOJE, 4), { hora: "18:30" }),
   ];
 
   const duplaEsp1: Dupla = {
@@ -1871,7 +2089,7 @@ function build(): DemoData {
     supervisor: paulo,
     encontros: encD6,
     encaminhamentos: [
-      encaminhamento(uid(D.esp1), encD6[1].registro!.id,
+      encaminhamento(uid(D.esp1), encD6[2].registro!.id,
         "Resolver os 10 exercícios de fração da lista",
         "mentorado", addDias(HOJE, 4), "pendente"),
     ],
@@ -2499,7 +2717,7 @@ function build(): DemoData {
         tipo: "avaliacao_pendente",
         titulo: "Como foi seu encontro?",
         corpo: "Conte em 1 minuto como foi. Pro seu mentor, a nota só aparece na média.",
-        href: `/avaliar/demo-aval-${encD6[1].id.slice(-12)}`,
+        href: `/avaliar/demo-aval-${encD6[2].id.slice(-12)}`,
         lida_em: null,
         created_at: haDias(4, "21:00"),
       },
@@ -2858,6 +3076,7 @@ function build(): DemoData {
     materiais,
     comunicados,
     solicitacoes,
+    solicitacaoPropostas,
     pessoaNotas,
     interacoes,
     notificacoes,

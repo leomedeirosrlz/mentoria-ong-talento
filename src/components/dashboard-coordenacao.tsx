@@ -88,6 +88,7 @@ export function DashboardCoordenacao({
   supervisor = false,
   avisos = [],
   solicitacoes = [],
+  turmas = [],
   filtro,
   supervisaoItens = [],
   supervisaoAlvos = [],
@@ -115,6 +116,9 @@ export function DashboardCoordenacao({
   /** demandas de especialista visíveis ao papel — só a coordenação monitora
    *  o mural; supervisor não pede nem gerencia especialista. */
   solicitacoes?: SolicitacaoEspecialista[];
+  /** labels de turma pra triagem dos pedidos do jovem sem dupla DPP —
+   *  a coordenação define a turma ao liberar (reconhecer_solicitacao). */
+  turmas?: string[];
   /** valor cru de ?filtro= — validado contra FILTROS; desconhecido = visão cheia. */
   filtro?: string;
   /** sessões de supervisão recentes + mentores elegíveis — só a home do
@@ -612,7 +616,12 @@ export function DashboardCoordenacao({
             {/* mural de demandas entre mentores — a coordenação observa e
                 gerencia; o fluxo em si é DPP → especialista, sem coordenação
                 no caminho */}
-            {!supervisor && <SolicitacoesCoordCard solicitacoes={solicitacoes} />}
+            {!supervisor && (
+              <SolicitacoesCoordCard
+                solicitacoes={solicitacoes}
+                turmas={turmas}
+              />
+            )}
           </aside>
         )}
       </div>

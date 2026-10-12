@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
   alvoAgendamento,
+  encontroDoPassoEsp,
   encontroEsperado,
   eventoDaSemana,
   inicioDefaultDupla,
+  jornadaDaDupla,
   maxEncontros,
+  passoEsp,
   passosDaTrilha,
   resumoSemana,
   textoResumoSemana,
@@ -14,6 +17,7 @@ import type { CicloEvento } from "@/lib/types";
 import {
   CICLO_16,
   dt,
+  dth,
   encAgendado,
   encRealizado,
   ESP_5,
@@ -158,20 +162,144 @@ describe("alvoAgendamento", () => {
     expect(a.encontroAlvo?.status).toBe("realizado");
   });
 
-  it("especialista: teto de 5, sem data sugerida e faltantes sem calendário", () => {
+  it("especialista: numero é tentativa — o alvo fala em passo, sem data sugerida", () => {
     const dupla = mkDupla({
       trilha: "especialista",
       encontros: [encRealizado(1, "2025-10-07"), encAgendado(3, "2025-10-20")],
     });
     const a = alvoAgendamento(dupla, CICLO_16, dt("2025-10-15"));
-    expect(a.proximoNumero).toBe(3); // o agendado futuro
+    // 1 realizado → a tentativa 3 agendada cobre o passo 2; a row editável é ela
+    expect(a.proximoNumero).toBe(2);
+    expect(a.encontroAlvo?.numero).toBe(3);
     expect(a.sugeridoProximo).toBeUndefined();
-    // qualquer nº sem row pode ter rolado — 2, 4 e 5 são faltantes sem data
+    // passos 3–5 seguem abertos ao retroativo; o 2 já tem tentativa mirando
     expect(a.faltantes).toEqual([
-      { numero: 2, dataSugerida: null },
+      { numero: 3, dataSugerida: null },
       { numero: 4, dataSugerida: null },
       { numero: 5, dataSugerida: null },
     ]);
+  });
+});
+
+describe("especialista — numero = tentativa, passo = rank (0074)", () => {
+  const encNaoAconteceu = (numero: number, dia: string) =>
+    mkEncontro(numero, {
+      status: "nao_aconteceu",
+      data_hora: dth(dia).toISOString(),
+    });
+  const encCancelado = (numero: number, dia: string) =>
+    mkEncontro(numero, {
+      status: "cancelado",
+      data_hora: dth(dia).toISOString(),
+    });
+
+  it("passoEsp conta só realizados anteriores — falha não queima passo", () => {
+    const encontros = [
+      encRealizado(1, "2025-10-07"),
+      encNaoAconteceu(2, "2025-10-10"),
+      encRealizado(3, "2025-10-14"),
+      encAgendado(4, "2025-10-20"),
+    ];
+    // tentativa 3 cobriu o passo 2 porque a 2 não aconteceu
+    expect(passoEsp(encontros[0], encontros)).toBe(1);
+    expect(passoEsp(encontros[1], encontros)).toBe(2); // mirava o 2
+    expect(passoEsp(encontros[2], encontros)).toBe(2); // cobriu o 2
+    expect(passoEsp(encontros[3], encontros)).toBe(3); // próximo passo
+  });
+
+  it("passoEsp clampa no teto da trilha", () => {
+    const encontros = Array.from({ length: 6 }, (_, i) =>
+      encRealizado(i + 1, `2025-10-${String(i + 7).padStart(2, "0")}`)
+    );
+    expect(passoEsp(encontros[5], encontros)).toBe(5);
+  });
+
+  it("encontroDoPassoEsp prefere o realizado; sem ele, a última tentativa", () => {
+    const encontros = [
+      encRealizado(1, "2025-10-07"),
+      encNaoAconteceu(2, "2025-10-10"),
+      encRealizado(3, "2025-10-14"),
+      encAgendado(4, "2025-10-20"),
+    ];
+    // passo 2 teve duas tentativas — o nó mostra a que rolou (a 3)
+    expect(encontroDoPassoEsp(encontros, 1)?.numero).toBe(1);
+    expect(encontroDoPassoEsp(encontros, 2)?.numero).toBe(3);
+    expect(encontroDoPassoEsp(encontros, 3)?.numero).toBe(4);
+    expect(encontroDoPassoEsp(encontros, 4)).toBeNull();
+
+    // sem realizado no passo, a tentativa mais recente representa — o nó
+    // conta a última cartada, não o rastro de falhas
+    const falhando = [
+      encRealizado(1, "2025-10-07"),
+      encNaoAconteceu(2, "2025-10-10"),
+      encNaoAconteceu(3, "2025-10-12"),
+    ];
+    expect(encontroDoPassoEsp(falhando, 2)?.numero).toBe(3);
+  });
+
+  it("nao_aconteceu não avança o guia: a 3ª tentativa ainda mira o passo 2", () => {
+    const dupla = mkDupla({
+      trilha: "especialista",
+      encontros: [
+        encRealizado(1, "2025-10-07"),
+        encNaoAconteceu(2, "2025-10-10"),
+        encCancelado(3, "2025-10-11"),
+      ],
+    });
+    const a = alvoAgendamento(dupla, [], dt("2025-10-15"));
+    // só 1 realizado → próximo passo é o 2; a row alvo é a tentativa mais
+    // recente mirando nele (a 3, cancelada — desfazer/remarcar edita ela)
+    expect(a.proximoNumero).toBe(2);
+    expect(a.encontroAlvo?.numero).toBe(3);
+    expect(a.cicloCompleto).toBe(false);
+    expect(a.faltantes.map((f) => f.numero)).toEqual([2, 3, 4, 5]);
+  });
+
+  it("jornada multi-tentativa: a falha aparece no passo até a reposição rolar", () => {
+    const passos = passosDaTrilha("especialista", [], ESP_5);
+    const tentou = mkDupla({
+      trilha: "especialista",
+      encontros: [
+        encRealizado(1, "2025-10-07"),
+        encNaoAconteceu(2, "2025-10-10"),
+      ],
+    });
+    let j = jornadaDaDupla(tentou, passos, dt("2025-10-15"));
+    expect(j.feitos).toBe(1);
+    expect(j.nos[1].estado).toBe("nao_aconteceu");
+    expect(j.nos[1].encontro?.numero).toBe(2);
+    expect(j.proximoNumero).toBe(2);
+
+    // a tentativa 3 aconteceu — cobre o passo 2 e a trilha anda
+    const reposta = mkDupla({
+      trilha: "especialista",
+      encontros: [
+        encRealizado(1, "2025-10-07"),
+        encNaoAconteceu(2, "2025-10-10"),
+        encRealizado(3, "2025-10-14"),
+      ],
+    });
+    j = jornadaDaDupla(reposta, passos, dt("2025-10-15"));
+    expect(j.feitos).toBe(2);
+    expect(j.nos[1].encontro?.numero).toBe(3);
+    expect(j.nos[1].estado).toBe("realizado_completo");
+    expect(j.proximoNumero).toBe(3);
+  });
+
+  it("cicloCompleto conta realizados, não tentativas — 5 tentativas com falha não fecham", () => {
+    const dupla = mkDupla({
+      trilha: "especialista",
+      encontros: [
+        encRealizado(1, "2025-10-07"),
+        encNaoAconteceu(2, "2025-10-09"),
+        encRealizado(3, "2025-10-14"),
+        encRealizado(4, "2025-10-21"),
+        encRealizado(5, "2025-10-28"),
+      ],
+    });
+    const a = alvoAgendamento(dupla, [], dt("2025-11-01"));
+    expect(a.cicloCompleto).toBe(false); // 4 realizados de 5 passos
+    expect(a.proximoNumero).toBe(5);
   });
 });
 

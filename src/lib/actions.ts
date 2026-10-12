@@ -2092,6 +2092,16 @@ export async function agendarEncontro(formData: FormData) {
     return { error: "Esse encontro já foi realizado e não pode ser remarcado." };
   }
 
+  // trilha especialista (0074): sessão nova só nasce de pedido aceito —
+  // agendarEncontro continua servindo pra REMARCAR uma tentativa existente,
+  // nunca pra criar row do zero
+  if (d?.trilha === "especialista" && !existente) {
+    return {
+      error:
+        "As sessões da trilha especialista nascem dos pedidos aceitos — combine com o jovem ou a coordenação.",
+    };
+  }
+
   // agendamento é sempre pra frente — encontro que já aconteceu entra pelo fluxo
   // retroativo (grava realizado_em); mover um agendado pro passado esconderia
   // atraso. A mensagem aponta o controle que EXISTE, por contexto.
@@ -2104,10 +2114,11 @@ export async function agendarEncontro(formData: FormData) {
   }
   if (link && !urlOk(link)) return { error: "Confira o link: precisa ser um endereço completo (https://…)." };
 
-  // teto de nº por trilha — especialista tem 5 passos próprios; DPP mede
-  // contra o calendário DA DUPLA (0061), nunca o global
+  // teto de nº por trilha — especialista conta TENTATIVAS (o CHECK do banco
+  // aceita até 24; aqui só passa row existente, então o teto é o do banco);
+  // DPP mede contra o calendário DA DUPLA (0061), nunca o global
   const maxNum = d?.trilha === "especialista"
-    ? maxEncontros("especialista")
+    ? 24
     : (
         await supabase
           .from("ciclo_eventos").select("numero")
@@ -2245,8 +2256,9 @@ export async function registrarEncontroRetroativo(
   }
 
   // teto de nº e piso de data por trilha — na especialista não existe
-  // ciclo_eventos próprio: o teto é o da trilha e o piso é só o início da
-  // dupla. DPP mede contra o cronograma dela (0061).
+  // ciclo_eventos próprio e o numero é TENTATIVA (0074): o cliente pode até
+  // mandar o passo do guia, mas a row nasce com o próximo ordinal livre.
+  // DPP mede contra o cronograma dela (0061).
   const ehEspecialista = d.trilha === "especialista";
   const { data: evs } = ehEspecialista
     ? { data: null }
@@ -2255,7 +2267,7 @@ export async function registrarEncontroRetroativo(
         .eq("tipo", "encontro")
         .eq("cronograma_id", d.cronograma_id!)
         .order("numero", { ascending: true });
-  const maxNum = ehEspecialista ? maxEncontros("especialista") : evs?.at(-1)?.numero ?? 16;
+  const maxNum = ehEspecialista ? 24 : evs?.at(-1)?.numero ?? 16;
   if (!Number.isInteger(numero) || numero < 1 || numero > maxNum) {
     return { error: "Escolha um encontro da lista." };
   }
@@ -2264,16 +2276,33 @@ export async function registrarEncontroRetroativo(
     return { error: "A data não pode ser antes do início da mentoria." };
   }
 
+  // na trilha especialista o número é o ordinal da tentativa — quem decide é
+  // o servidor (max + 1), nunca o cliente: o passo do guia sai do rank entre
+  // realizados, não de um numero escolhido
+  let numeroFinal = numero;
+  if (ehEspecialista) {
+    const { data: ultimos } = await supabase
+      .from("encontros")
+      .select("numero")
+      .eq("dupla_id", duplaId)
+      .order("numero", { ascending: false })
+      .limit(1);
+    numeroFinal = (ultimos?.[0]?.numero ?? 0) + 1;
+    if (numeroFinal > maxNum) {
+      return { error: "Essa trilha já passou do número máximo de sessões." };
+    }
+  }
+
   // unique(dupla_id, numero) — check explícito pra mensagem clara antes do 23505
   const { data: existente } = await supabase
-    .from("encontros").select("id").eq("dupla_id", duplaId).eq("numero", numero).maybeSingle();
+    .from("encontros").select("id").eq("dupla_id", duplaId).eq("numero", numeroFinal).maybeSingle();
   if (existente) return { error: "Já existe um encontro com esse número." };
 
   const { data: novo, error } = await supabase
     .from("encontros")
     .insert({
       dupla_id: duplaId,
-      numero,
+      numero: numeroFinal,
       data_hora: quando.toISOString(),
       realizado_em: quando.toISOString(),
       status: "realizado",

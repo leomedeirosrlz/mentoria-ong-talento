@@ -27,6 +27,8 @@ import {
 } from "@/lib/queries";
 import {
   getEspecialistas,
+  getPropostas,
+  getSlotsLivres,
   getSolicitacoesDaDupla,
 } from "@/lib/queries-especialista";
 import { getEncerramentoDaDupla, getAvaliacao360DaDupla } from "@/lib/queries-encerramento";
@@ -46,12 +48,14 @@ import { DuplaNomes } from "@/components/dupla-nomes";
 import { VoltarLink } from "@/components/voltar-link";
 import {
   alvoAgendamento,
+  encontroDoPassoEsp,
   eventoDaSemana,
   eventosDoCronograma,
   formatDate,
   formatDateTime,
   jornadaDaDupla,
   linkSeguro,
+  passoEsp,
   passosDaTrilha,
   registroTardio,
   saudadeDaDupla,
@@ -92,6 +96,7 @@ import { PedirApoioDialog } from "@/components/pedir-apoio-dialog";
 import { ResolverApoioButton } from "@/components/resolver-apoio-button";
 import { TrajetoriaAvaliacoes } from "@/components/trajetoria-avaliacoes";
 import { SolicitacaoStatusChip } from "@/components/solicitacao-status-chip";
+import { SolicitacaoNegociacao } from "@/components/solicitacao-negociacao";
 import { SolicitarEspecialistaDialog } from "@/components/solicitar-especialista-dialog";
 import { PdmUrlDialog } from "@/components/pdm-url-dialog";
 import { TrilhaJornada } from "@/components/trilha-jornada";
@@ -196,6 +201,26 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
   // solicitação está aberta (re-pedir é pra quando a anterior se resolveu)
   const solicitacoes = !ehEsp ? await getSolicitacoesDaDupla(id) : [];
   const solicitacao = solicitacoes[0] ?? null;
+  // o pedido que ocupa a vaga agora (0074 — "em aberto" inclui triagem e
+  // negociação; o status_efetivo já desconta o slot vencido, então um
+  // expirado NÃO bloqueia — bate com o dedup do criarSolicitacao)
+  const STATUS_SOL_ABERTA = new Set([
+    "aberta",
+    "aguardando_coord",
+    "contra_proposta",
+  ]);
+  const solEmAberto =
+    solicitacoes.find((s) =>
+      STATUS_SOL_ABERTA.has(s.status_efetivo ?? s.status)
+    ) ?? null;
+  // a negociação precisa da thread e dos slots livres do especialista da
+  // mesa — o contra da equipe também sai da grade dele (regra da RPC)
+  const espDaMesa =
+    solEmAberto?.especialista_id ?? solEmAberto?.especialista_desejado_id;
+  const [propostasAberta, slotsEsp] = await Promise.all([
+    solEmAberto ? getPropostas(solEmAberto.id) : Promise.resolve([]),
+    espDaMesa ? getSlotsLivres(espDaMesa) : Promise.resolve([]),
+  ]);
   // avaliação estrela do jovem (0071): links tokenizados são coord-only
   // (policy), a média agregada só faz sentido pro mentor DPP e as estrelas
   // da trilha especialista vêm da view definer — cada leitura no seu papel
@@ -223,7 +248,7 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
   const podeSolicitar =
     !ehEsp &&
     dupla.status === "ativa" &&
-    solicitacao?.status !== "aberta" &&
+    !solEmAberto &&
     (souMentor || souCoord);
   const especialistas = podeSolicitar ? await getEspecialistas() : [];
   // calendário oficial DA DUPLA (0061): só os eventos do cronograma dela.
@@ -245,9 +270,15 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
   const combinadosPendentes = (dupla.encaminhamentos ?? [])
     .filter((e) => e.status !== "feito")
     .sort((a, b) => (a.prazo ?? "9999").localeCompare(b.prazo ?? "9999"));
-  // registro_id → nº do encontro, pra lista de encaminhamentos dizer de onde veio cada um
+  // registro_id → nº de exibição do encontro, pra lista de encaminhamentos
+  // dizer de onde veio cada um. Na trilha esp o nº gravado é a TENTATIVA —
+  // o que as linhas mostram é o passo do guia (0074), então mapeia pro passo
   const encontroNumeroPorRegistroId = Object.fromEntries(
-    dupla.encontros.flatMap((e) => (e.registro ? [[e.registro.id, e.numero]] : []))
+    dupla.encontros.flatMap((e) =>
+      e.registro
+        ? [[e.registro.id, ehEsp ? passoEsp(e, dupla.encontros) : e.numero]]
+        : []
+    )
   );
   // todos os anexos dos registros da dupla, mais novos primeiro — a seção
   // "Arquivos" agrega o que hoje só existe espalhado encontro a encontro
@@ -255,7 +286,7 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
     .flatMap((e) =>
       (e.registro ? (anexosPorRegistro[e.registro.id] ?? []) : []).map((a) => ({
         ...a,
-        encontroNumero: e.numero,
+        encontroNumero: ehEsp ? passoEsp(e, dupla.encontros) : e.numero,
       }))
     )
     .sort((a, b) => b.created_at.localeCompare(a.created_at));
@@ -391,8 +422,17 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
     dupla.encontros
       .filter(temPendencia)
       .sort((a, b) => a.numero - b.numero)[0] ?? null;
+  // agendar pela ficha é só pra trilha DPP — a sessão de especialista nasce
+  // de pedido aceito (0074); aqui o especialista só REMARCA a tentativa que
+  // já existe (a action barra criar row nova por esse caminho)
   const podeAgendar =
-    souMentor && saude.feitos < total && dupla.status === "ativa";
+    souMentor && !ehEsp && saude.feitos < total && dupla.status === "ativa";
+  // a tentativa já marcada na trilha esp — remarcável, nunca criável por aqui
+  const tentativaAgendada = ehEsp
+    ? (dupla.encontros
+        .filter((e) => e.status === "agendado" || e.status === "remarcado")
+        .sort((a, b) => a.numero - b.numero)[0] ?? null)
+    : null;
 
   // overflow — os dialogs entram pelo trigger custom (Menu.Item é o
   // Dialog.Trigger de fato); o keepMounted do Portal segura o dialog montado
@@ -468,12 +508,28 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
     );
   }
   const renderEncontro = (passo: PassoGuia) => {
-    const enc = dupla.encontros.find((e) => e.numero === passo.numero);
+    // DPP: numero é a identidade do passo. Especialista (0074): numero é a
+    // TENTATIVA — o passo é o rank entre realizados; várias tentativas miram
+    // o mesmo passo e a linha mostra a última cartada (o realizado vence)
+    const enc = ehEsp
+      ? encontroDoPassoEsp(dupla.encontros, passo.numero)
+      : (dupla.encontros.find((e) => e.numero === passo.numero) ?? null);
+    // sessões furadas antes da que a linha mostra — contexto honesto do
+    // "passo 2 na 3ª tentativa", some quando não houve falha
+    const tentativasFalhas = ehEsp
+      ? dupla.encontros.filter(
+          (e) =>
+            (e.status === "nao_aconteceu" || e.status === "cancelado") &&
+            passoEsp(e, dupla.encontros) === passo.numero &&
+            (enc == null || e.numero !== enc.numero)
+        ).length
+      : 0;
     return (
       <EncontroRow
         key={passo.id}
         passo={passo}
         encontro={enc ?? null}
+        tentativasFalhas={tentativasFalhas}
         duplaId={dupla.id}
         souMentor={souMentor}
         podeEditar={souMentor && dupla.status === "ativa"}
@@ -612,6 +668,18 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
               sugerido={sugeridoProximo}
               piso={dupla.iniciada_em ?? undefined}
               jovemNome={primeiroNomeMentorado}
+            />
+          )}
+          {souMentor && ehEsp && dupla.status === "ativa" && tentativaAgendada && (
+            // a sessão nasce do pedido aceito — aqui só se move a tentativa
+            // que já existe (numero = tentativa, não passo)
+            <AgendarEncontroDialog
+              duplaId={dupla.id}
+              numero={tentativaAgendada.numero}
+              atual={tentativaAgendada}
+              piso={dupla.iniciada_em ?? undefined}
+              jovemNome={primeiroNomeMentorado}
+              rotulo="sessão de especialista"
             />
           )}
           {/* pedido de apoio direto — o checkbox "preciso de apoio" dentro do
@@ -899,6 +967,27 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
             />
           )}
 
+          {/* o pedido em andamento é assunto da ficha: quem abriu (ou a
+              coord) responde a proposta daqui; a thread mostra a mesa. Fora
+              da triagem — aguardando_coord é espera, não negociação */}
+          {!ehEsp &&
+            solEmAberto &&
+            (solEmAberto.status_efetivo ?? solEmAberto.status) !==
+              "aguardando_coord" && (
+              <section className="rounded-xl bg-card p-4 text-sm space-y-3 shadow-[var(--shadow-border)]">
+                <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                  Pedido de especialista
+                </h2>
+                <SolicitacaoNegociacao
+                  s={solEmAberto}
+                  propostas={propostasAberta}
+                  slots={slotsEsp}
+                  meuId={me.id}
+                  papel={me.role}
+                />
+              </section>
+            )}
+
           {/* a trilha de especialista devolve o resultado pro PDM — chega ao
               mentor DPP pela solicitação que ele abriu */}
           {!ehEsp && <DevolutivaEspecialista solicitacoes={solicitacoes} />}
@@ -938,10 +1027,13 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
               <RegistrarRetroativoDialog
                 duplaId={dupla.id}
                 faltantes={faltantes}
+                esp={ehEsp}
                 trigger={
                   <Button variant="ghost" size="sm" className="-my-1 text-muted-foreground">
                     <ClockCounterClockwise size={14} />
-                    Registrar encontro já realizado
+                    {ehEsp
+                      ? "Registrar sessão já realizada"
+                      : "Registrar encontro já realizado"}
                   </Button>
                 }
               />
@@ -979,6 +1071,7 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
 function EncontroRow({
   passo,
   encontro,
+  tentativasFalhas = 0,
   duplaId,
   souMentor,
   podeEditar,
@@ -1003,6 +1096,9 @@ function EncontroRow({
   /** Passo do guia da trilha (data sugerida no DPP; sem data no especialista). */
   passo: PassoGuia;
   encontro: Encontro | null;
+  /** Tentativas furadas que miraram este passo antes da exibida — a linha
+   *  conta o caminho ("1 tentativa anterior não aconteceu"), trilha esp. */
+  tentativasFalhas?: number;
   duplaId: string;
   /** O visitante é o mentor da dupla — o "entrar na chamada" é gesto dele;
    *  coord/sup (e qualquer outro) copiam o link. Distinto de podeEditar:
@@ -1101,6 +1197,8 @@ function EncontroRow({
     diverge && `de fato em ${formatDate(encontro?.realizado_em)}`,
     encontro?.origem === "externo" && "marcado fora da plataforma",
     encontro?.motivo_reagendamento && `remarcado: ${encontro.motivo_reagendamento}`,
+    tentativasFalhas > 0 &&
+      `${tentativasFalhas === 1 ? "1 tentativa anterior não aconteceu" : `${tentativasFalhas} tentativas anteriores não aconteceram`}`,
     !materialHref &&
       material &&
       `${material.titulo}${materiais.length > 1 ? ` +${materiais.length - 1}` : ""}`,

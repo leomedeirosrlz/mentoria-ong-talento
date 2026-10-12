@@ -10,6 +10,7 @@ import {
 } from "react";
 import Link from "next/link";
 import {
+  ArrowsClockwise,
   Bell,
   CalendarDots,
   CalendarPlus,
@@ -19,9 +20,11 @@ import {
   CheckCircle,
   ClipboardText,
   FlagCheckered,
+  Funnel,
   HandHeart,
   Megaphone,
   Star,
+  ThumbsDown,
   UserCheck,
   UserPlus,
   UsersThree,
@@ -221,6 +224,10 @@ const ICONE: Record<Notificacao["tipo"], typeof Bell> = {
   encontro_marcado: CalendarPlus,
   encontro_alterado: CalendarDots,
   encontro_desfeito: CalendarX,
+  // 0074 — negociação do pedido: triagem no coord, proposta trocada, recusa
+  solicitacao_triagem: Funnel,
+  solicitacao_proposta: ArrowsClockwise,
+  solicitacao_recusada: ThumbsDown,
 };
 
 export function NotificacoesBell({

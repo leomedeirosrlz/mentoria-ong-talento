@@ -221,7 +221,11 @@ test.describe("coordenação — fluxos operacionais", () => {
       .getByRole("button", { name: "Criar 1 dupla" })
       .click();
 
-    await expect(dialog.getByText(/1 dupla criada/)).toBeVisible();
+    // a action cria dupla + sinos de uma vez — em suite serial de staging
+    // pode passar dos 5s padrão sem estar quebrada
+    await expect(dialog.getByText(/1 dupla criada/)).toBeVisible({
+      timeout: 20_000,
+    });
     // "Fechar" do footer — o X do header também se chama "Fechar"
     // (data-slot="dialog-close"), então filtro pelo botão de ação
     await dialog
@@ -230,7 +234,7 @@ test.describe("coordenação — fluxos operacionais", () => {
     // a dupla nova aparece na lista (router.refresh da action)
     await expect(
       page.getByRole("link", { name: /Mentor E2E Import/ })
-    ).toBeVisible();
+    ).toBeVisible({ timeout: 15_000 });
   });
 
   test("turmas: builder gera a prévia e grava o cronograma", async ({

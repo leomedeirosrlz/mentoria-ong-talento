@@ -25,10 +25,14 @@ import { cn } from "@/lib/utils";
 export function RegistroCard({
   r,
   tituloEncontro,
+  passoEsp = null,
   souCoord,
 }: {
   r: RegistroResumo;
   tituloEncontro: string | null;
+  /** Trilha especialista (0074): o passo do guia que a sessão cobriu — o
+   *  numero do encontro é a tentativa, não o passo. */
+  passoEsp?: number | null;
   souCoord: boolean;
 }) {
   const enc = r.encontro;
@@ -60,7 +64,11 @@ export function RegistroCard({
           <span className="flex items-start justify-between gap-3">
             <span className="min-w-0">
               <span className="block text-base font-semibold leading-snug">
-                {enc?.numero != null ? `${enc.numero}º encontro` : "Encontro"}
+                {passoEsp != null
+                  ? `${passoEsp}º passo`
+                  : enc?.numero != null
+                    ? `${enc.numero}º encontro`
+                    : "Encontro"}
                 {tituloEncontro ? ` · ${tituloEncontro}` : ""}
               </span>
               <span className="mt-1.5 flex items-center gap-2 text-sm font-medium">

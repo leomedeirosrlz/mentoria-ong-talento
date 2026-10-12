@@ -272,17 +272,17 @@ export async function encerrarTrilhaEspecialista(
   });
   if (error) return { error: erroAmigavel(error) };
 
-  // quem pediu o especialista precisa da devolutiva; a coordenação acompanha.
-  // A solicitação liga a dupla de especialista à dupla DPP de origem.
-  const [{ data: s }, { data: espDupla }, { data: coords }] = await Promise.all([
+  // quem pediu precisa da devolutiva — com N solicitações por dupla (0074:
+  // cada sessão é um pedido) os autores podem ser vários; pedido sem DPP
+  // alcança o jovem direto. A coordenação acompanha tudo.
+  const [{ data: sols }, { data: espDupla }, { data: coords }] = await Promise.all([
     supabase
       .from("solicitacoes_especialista")
-      .select("created_by, dupla_dpp_id, mentorado_id")
-      .eq("dupla_id", duplaId)
-      .maybeSingle(),
+      .select("created_by, dupla_dpp_id")
+      .eq("dupla_id", duplaId),
     supabase
       .from("duplas")
-      .select("mentor_id, mentorado:mentorados!duplas_mentorado_id_fkey(nome)")
+      .select("mentor_id, mentorado:mentorados!duplas_mentorado_id_fkey(nome, profile_id)")
       .eq("id", duplaId)
       .maybeSingle(),
     supabase
@@ -294,27 +294,55 @@ export async function encerrarTrilhaEspecialista(
   // embed to-one pode voltar como array no tipo do supabase-js
   const mdRaw = espDupla?.mentorado as unknown;
   const mdEmb = Array.isArray(mdRaw) ? mdRaw[0] : mdRaw;
-  const nomeMd = (mdEmb as { nome: string } | null | undefined)?.nome ?? null;
+  const nomeMd = (mdEmb as { nome?: string } | null | undefined)?.nome ?? null;
+  const jovemProfileId =
+    (mdEmb as { profile_id?: string } | null | undefined)?.profile_id ?? null;
   const titulo =
     tipo === "concluida" ? "Trilha de especialista concluída" : "Trilha de especialista encerrada";
+
+  // um ping por autor, sem repetir — o href aponta pro que cada um pode
+  // abrir: a ficha DPP quando ela existe; /jovem pro próprio mentorado
+  const destinatarios = new Map<string, { href: string; jovem: boolean }>();
+  for (const s of sols ?? []) {
+    if (!s.created_by || destinatarios.has(s.created_by)) continue;
+    const ehJovem = jovemProfileId != null && s.created_by === jovemProfileId;
+    destinatarios.set(s.created_by, {
+      href: s.dupla_dpp_id
+        ? `/duplas/${s.dupla_dpp_id}`
+        : ehJovem
+          ? "/jovem"
+          : "/",
+      jovem: ehJovem,
+    });
+  }
+  // pedido direto do jovem (sem DPP) — a devolutiva é dele também, mesmo
+  // quando a sessão seguinte foi criada por outra pessoa
+  if (
+    jovemProfileId &&
+    !destinatarios.has(jovemProfileId) &&
+    (sols ?? []).some((s) => s.dupla_dpp_id == null)
+  ) {
+    destinatarios.set(jovemProfileId, { href: "/jovem", jovem: true });
+  }
+
   await notificar(
     supabase,
     [
       // o solicitante volta pra ficha DPP — a devolutiva aparece lá, no chip
       // da solicitação (a dupla de especialista não é do escopo dele)
-      s?.created_by
-        ? {
-            profile_id: s.created_by,
-            tipo: "trilha_encerrada",
-            titulo,
-            corpo: nomeMd
-              ? `${eu.nome} fechou a mentoria de ${nomeMd}. A devolutiva pro PDM está na ficha da dupla.`
-              : `${eu.nome} fechou a trilha. A devolutiva pro PDM está na ficha da dupla.`,
-            href: `/duplas/${s.dupla_dpp_id}`,
-          }
-        : null,
+      ...[...destinatarios].map(([profileId, dest]) => ({
+        profile_id: profileId,
+        tipo: "trilha_encerrada",
+        titulo,
+        corpo: dest.jovem
+          ? `${eu.nome} fechou sua mentoria especializada — a devolutiva segue pro seu PDM.`
+          : nomeMd
+            ? `${eu.nome} fechou a mentoria de ${nomeMd}. A devolutiva pro PDM está na ficha da dupla.`
+            : `${eu.nome} fechou a trilha. A devolutiva pro PDM está na ficha da dupla.`,
+        href: dest.href,
+      })),
       ...(coords ?? [])
-        .filter((c: { id: string }) => c.id !== s?.created_by)
+        .filter((c: { id: string }) => !destinatarios.has(c.id))
         .map((c: { id: string }) => ({
           profile_id: c.id,
           tipo: "trilha_encerrada",
@@ -341,6 +369,8 @@ export async function encerrarTrilhaEspecialista(
   revalidatePath("/");
   revalidatePath("/duplas");
   revalidatePath(`/duplas/${duplaId}`);
-  if (s?.dupla_dpp_id) revalidatePath(`/duplas/${s.dupla_dpp_id}`);
+  for (const s of sols ?? []) {
+    if (s.dupla_dpp_id) revalidatePath(`/duplas/${s.dupla_dpp_id}`);
+  }
   return { ok: true };
 }

@@ -1025,9 +1025,52 @@ export function saudadeDaDupla(dupla: Dupla, eventos: CicloEvento[], hoje = new 
 
 /** Encontro da trilha ainda sem row em `encontros` — candidato a "aconteceu
  *  sem agendar" (registro retroativo). DPP: só oficiais já vencidos na janela
- *  da dupla, com a data oficial como sugestão. Especialista: qualquer nº sem
- *  row — sem data sugerida (não existe calendário pra sugerir). */
+ *  da dupla, com a data oficial como sugestão. Especialista: qualquer passo
+ *  ainda não coberto — sem data sugerida (não existe calendário pra sugerir). */
 export type EncontroFaltante = { numero: number; dataSugerida: string | null };
+
+// ---------- trilha especialista: numero = tentativa, passo = rank (0074) ----
+// Desde a 0074 o `numero` do encontro numa dupla de especialista é o ORDINAL
+// DA TENTATIVA (1, 2, 3… a cada pedido aceito) — um nao_aconteceu não queima
+// passo do guia. O passo que cada sessão cobre é o rank dela entre os
+// realizados; pra uma tentativa pendente/falha é onde ela cairia se rolasse.
+
+/** Passo do guia (1..5) que uma tentativa cobre — `encontros` deve ser a
+ *  lista da MESMA dupla. Clampa no teto da trilha: um hipotético 6º
+ *  realizado continua contando o 5º (o budget do banco barra antes). */
+export function passoEsp(
+  encontro: Pick<Encontro, "numero" | "status">,
+  encontros: Pick<Encontro, "numero" | "status">[]
+): number {
+  const realizadosAntes = encontros.filter(
+    (e) => e.status === "realizado" && e.numero < encontro.numero
+  ).length;
+  return Math.min(
+    Math.max(1 + realizadosAntes, 1),
+    TRILHA_LEN.especialista
+  );
+}
+
+/** O encontro que representa um passo do guia numa dupla de especialista:
+ *  o realizado que o cobriu (rank único), senão a tentativa mais recente
+ *  mirando nele — o nó mostra a última cartada, não o rastro de falhas. */
+export function encontroDoPassoEsp(
+  encontros: Encontro[],
+  passo: number
+): Encontro | null {
+  let alvo: Encontro | null = null;
+  for (const e of encontros) {
+    if (passoEsp(e, encontros) !== passo) continue;
+    if (
+      !alvo ||
+      e.status === "realizado" ||
+      (alvo.status !== "realizado" && e.numero > alvo.numero)
+    ) {
+      alvo = e;
+    }
+  }
+  return alvo;
+}
 
 /** O que a superfície de agendamento precisa saber da dupla — derivação única
  *  usada pela ficha, pela home do mentor e pela agenda (era copiada em cada). */
@@ -1063,17 +1106,33 @@ export function alvoAgendamento(
     : encontroEventos.length
       ? encontroEventos.length
       : TRILHA_LEN.dpp;
-  // primeiro número ainda não realizado — reposição deixa buracos na sequência
-  // (ex.: fez o 4º antes do 3º), então "feitos + 1" podia cair num realizado
-  const numerosFeitos = new Set(
-    dupla.encontros.filter((e) => e.status === "realizado").map((e) => e.numero)
-  );
-  let primeiroFaltante = 1;
-  while (numerosFeitos.has(primeiroFaltante)) primeiroFaltante++;
-  const proximoNumero = saude.proximo?.numero ?? Math.min(primeiroFaltante, total);
-  // a row real desse número é o que o dialog edita; saude.proximo só cobre
-  // agendados futuros
-  const encontroAlvo = dupla.encontros.find((e) => e.numero === proximoNumero) ?? null;
+  let proximoNumero: number;
+  let encontroAlvo: Encontro | null;
+  if (ehEspecialista) {
+    // numero é tentativa (0074): proximoNumero fala em PASSO — o do agendado
+    // futuro se houver, senão o primeiro passo sem realizado que o cubra
+    proximoNumero = saude.proximo
+      ? passoEsp(saude.proximo, dupla.encontros)
+      : Math.min(saude.feitos + 1, total);
+    // a row alvo é a tentativa que representa o passo — com agendado futuro
+    // é ele mesmo; senão, a última tentativa do passo (nao_aconteceu pode
+    // ser remarcada — a action edita a row existente)
+    encontroAlvo =
+      saude.proximo ?? encontroDoPassoEsp(dupla.encontros, proximoNumero);
+  } else {
+    // primeiro número ainda não realizado — reposição deixa buracos na
+    // sequência (ex.: fez o 4º antes do 3º), então "feitos + 1" podia cair
+    // num realizado
+    const numerosFeitos = new Set(
+      dupla.encontros.filter((e) => e.status === "realizado").map((e) => e.numero)
+    );
+    let primeiroFaltante = 1;
+    while (numerosFeitos.has(primeiroFaltante)) primeiroFaltante++;
+    proximoNumero = saude.proximo?.numero ?? Math.min(primeiroFaltante, total);
+    // a row real desse número é o que o dialog edita; saude.proximo só cobre
+    // agendados futuros
+    encontroAlvo = dupla.encontros.find((e) => e.numero === proximoNumero) ?? null;
+  }
   // sem calendário oficial não há data a sugerir — o dialog abre em branco.
   // A data oficial é a do PDF como ela é — quinta-feira numa semana de
   // encontro duplo sugere quinta, não terça.
@@ -1083,12 +1142,25 @@ export function alvoAgendamento(
 
   const hojeStr = toDateStr(hoje);
   const comEncontro = new Set(dupla.encontros.map((e) => e.numero));
+  // passo com tentativa ainda em aberto (agendada/remarcada) não é faltante:
+  // "rolou mesmo assim" se resolve marcando ESSA row, não criando outra
+  const passosEmAberto = ehEspecialista
+    ? new Set(
+        dupla.encontros
+          .filter((e) => e.status === "agendado" || e.status === "remarcado")
+          .map((e) => passoEsp(e, dupla.encontros))
+      )
+    : null;
   const faltantes: EncontroFaltante[] = ehEspecialista
-    ? // qualquer nº sem row pode ter rolado — a trilha não tem data oficial
-      // limitando "o que já devia ter acontecido"
-      Array.from({ length: total }, (_, i) => i + 1)
-        .filter((n) => !comEncontro.has(n))
-        .map((n) => ({ numero: n, dataSugerida: null }))
+    ? // passo ainda não coberto por um realizado nem mirado por uma
+      // tentativa em aberto — "aconteceu sem agendar" registra a tentativa
+      // nova; o passo é o rank, não o numero da row
+      Array.from(
+        { length: Math.max(0, total - saude.feitos) },
+        (_, i) => saude.feitos + i + 1
+      )
+        .filter((p) => !passosEmAberto!.has(p))
+        .map((numero) => ({ numero, dataSugerida: null }))
     : encontroEventos.flatMap((e) =>
         e.numero != null &&
         e.data <= hojeStr &&
@@ -1186,10 +1258,18 @@ export function jornadaDaDupla(
     ? oficiais.filter((e) => e.data == null || e.data >= dupla.iniciada_em!)
     : oficiais;
   const total = janela.length;
+  // DPP: numero é a identidade do passo. Especialista (0074): numero é a
+  // tentativa — o passo é o rank entre realizados; várias tentativas miram o
+  // mesmo passo e o nó mostra a última (o realizado sempre vence).
+  const ehEsp = dupla.trilha === "especialista";
   const porNumero = new Map(dupla.encontros.map((e) => [e.numero, e]));
+  const encontroDoPasso = (numero: number): Encontro | null =>
+    ehEsp
+      ? encontroDoPassoEsp(dupla.encontros, numero)
+      : (porNumero.get(numero) ?? null);
 
   const nos: NoJornada[] = janela.map((evento, i) => {
-    const encontro = porNumero.get(evento.numero) ?? null;
+    const encontro = encontroDoPasso(evento.numero);
     let estado: EstadoNoJornada;
     if (!encontro) estado = "futuro";
     else if (encontro.status === "realizado")
@@ -1429,6 +1509,13 @@ export function formatDiaSemanaMes(iso: string | null | undefined): string {
   const dia = formatDiaSemana(iso);
   const dm = formatDiaMes(iso);
   return dia ? `${dia} (${dm})` : dm;
+}
+
+/** "terça 06/10 às 19:00" — o rótulo de um slot da agenda do especialista
+ *  nos pickers de aceite/contra-proposta (mesma gramática do preview da
+ *  grade em /agenda). */
+export function rotuloSlot(iso: string): string {
+  return `${formatDiaSemana(iso).replace("-feira", "")} ${formatDiaHora(iso)}`;
 }
 
 /** Sugestões do TagInput de áreas de atuação (onboarding + /perfil + ficha da

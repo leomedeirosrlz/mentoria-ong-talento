@@ -6,6 +6,7 @@ import {
   demoEspecialistas,
   demoMinhaGrade,
   demoMinhasExcecoes,
+  demoPropostas,
   demoSlotsLivres,
   demoSolicitacoesDaDupla,
   demoSolicitacoesVisiveis,
@@ -16,21 +17,26 @@ import type {
   ExcecaoEspecialista,
   GradeJanela,
   SolicitacaoEspecialista,
+  SolicitacaoProposta,
 } from "./types";
 
-/** A leitura é da view `solicitacoes_mural` (0030): as mesmas colunas da
- *  tabela + `mentorado_nome` — o nome do jovem vem escopado por papel na
- *  view (só o nome; um embed de mentorados voltaria null pra quem a RLS de
- *  mentorados não alcança, ex.: o especialista no mural).
+/** A leitura é da view `solicitacoes_mural` (0030/0074): as mesmas colunas
+ *  da tabela + `mentorado_nome`/`especialista_nome`/`status_efetivo` — o nome
+ *  do jovem vem escopado por papel na view (só o nome; um embed de mentorados
+ *  voltaria null pra quem a RLS de mentorados não alcança, ex.: o
+ *  especialista no mural). `status_efetivo` é a leitura com expiração lazy.
  *  Só `nome` nos embeds de profiles — as demais colunas públicas não fazem
  *  falta aqui e email/whatsapp/documento_path dariam permission denied (0026). */
 const SOLICITACAO_SELECT = `
-  id, mentorado_id, dupla_dpp_id, demanda,
+  id, mentorado_id, dupla_dpp_id, demanda, motivo,
   especialista_desejado_id, especialista_id, dupla_id,
-  status, created_by, created_at, respondida_em, mentorado_nome,
+  status, status_efetivo, slot_proposto, origem, turma,
+  justificativa_recusa,
+  created_by, created_at, respondida_em, mentorado_nome, especialista_nome,
   devolutiva_pdm, trilha_encerrada_em,
   solicitante:profiles!solicitacoes_especialista_created_by_fkey(nome),
-  especialista:profiles!solicitacoes_especialista_especialista_id_fkey(nome)
+  especialista:profiles!solicitacoes_especialista_especialista_id_fkey(nome),
+  desejado:profiles!solicitacoes_especialista_especialista_desejado_id_fkey(nome)
 `;
 
 /** Embed to-one pode voltar como array no tipo do supabase-js. */
@@ -40,8 +46,9 @@ function norm(v: unknown): { nome: string } | null {
 }
 
 function normalize(row: Record<string, unknown>): SolicitacaoEspecialista {
-  // mentorado_nome é coluna plana da view — a UI consome `mentorado.nome`
-  const { mentorado_nome, ...rest } = row;
+  // mentorado_nome/especialista_nome são colunas planas da view — a UI
+  // consome `mentorado.nome`/`especialista.nome` nos dois caminhos
+  const { mentorado_nome, especialista_nome, ...rest } = row;
   return {
     ...(rest as unknown as SolicitacaoEspecialista),
     mentorado:
@@ -49,7 +56,12 @@ function normalize(row: Record<string, unknown>): SolicitacaoEspecialista {
         ? { nome: mentorado_nome }
         : null,
     solicitante: norm(row.solicitante),
-    especialista: norm(row.especialista),
+    desejado: norm(row.desejado),
+    especialista:
+      norm(row.especialista) ??
+      (typeof especialista_nome === "string" && especialista_nome
+        ? { nome: especialista_nome }
+        : null),
   };
 }
 
@@ -94,9 +106,11 @@ export const getSolicitacaoDaDupla = cache(
 );
 
 /** O que o papel atual pode ver — a RLS faz o escopo (coord → tudo;
- *  especialista → abertas + as que aceitou; mentor/supervisor → das suas
- *  duplas). Ordenação: abertas primeiro (a ordem alfabética do status já dá
- *  aberta → aceita → cancelada), mais recentes antes dentro de cada grupo. */
+ *  especialista → em aberto dirigidas/broadcast + as que engajou;
+ *  mentor/supervisor → das suas duplas; mentorado → os próprios pedidos).
+ *  Ordena por status_efetivo (texto — "aberta" casualmente encabeça o
+ *  alfabeto) e, dentro do mesmo estado, pelos mais recentes; a prioridade
+ *  de triagem é trabalho dos filtros de cada superfície, não da ordem. */
 export const getSolicitacoesVisiveis = cache(
   async (): Promise<SolicitacaoEspecialista[]> => {
     const demo = await demoRole();
@@ -105,7 +119,7 @@ export const getSolicitacoesVisiveis = cache(
     const { data, error } = await supabase
       .from("solicitacoes_mural")
       .select(SOLICITACAO_SELECT)
-      .order("status", { ascending: true })
+      .order("status_efetivo", { ascending: true })
       .order("created_at", { ascending: false });
     // o mural do especialista e o card da coordenação degradam pra vazio —
     // com log, porque erro silencioso esconde bug
@@ -116,6 +130,70 @@ export const getSolicitacoesVisiveis = cache(
     return (data ?? []).map((r) => normalize(r));
   }
 );
+
+// ---------- thread de propostas (0074) ----------
+
+const PROPOSTA_SELECT = `
+  id, solicitacao_id, autor_id, slot_proposto, mensagem, created_at,
+  autor:profiles!solicitacao_propostas_autor_id_fkey(nome)
+`;
+
+function normProposta(row: Record<string, unknown>): SolicitacaoProposta {
+  return {
+    ...(row as unknown as SolicitacaoProposta),
+    autor: norm(row.autor),
+  };
+}
+
+/** Thread completa de uma negociação, cronológica — a policy libera as
+ *  partes (autor, especialista engajado/dirigido, coordenação, jovem dono). */
+export const getPropostas = cache(
+  async (solicitacaoId: string): Promise<SolicitacaoProposta[]> => {
+    const demo = await demoRole();
+    if (demo) return demoPropostas(demo, solicitacaoId);
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("solicitacao_propostas")
+      .select(PROPOSTA_SELECT)
+      .eq("solicitacao_id", solicitacaoId)
+      .order("created_at");
+    if (error) {
+      console.error("getPropostas:", error);
+      return [];
+    }
+    return (data ?? []).map((r) => normProposta(r));
+  }
+);
+
+/** solicitacao_id → thread, numa query só — o mural da home e a ficha
+ *  carregam as negociações abertas sem N+1. */
+export async function getPropostasMap(
+  solicitacaoIds: string[]
+): Promise<Record<string, SolicitacaoProposta[]>> {
+  if (!solicitacaoIds.length) return {};
+  const demo = await demoRole();
+  if (demo) {
+    return Object.fromEntries(
+      solicitacaoIds.map((id) => [id, demoPropostas(demo, id)])
+    );
+  }
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("solicitacao_propostas")
+    .select(PROPOSTA_SELECT)
+    .in("solicitacao_id", solicitacaoIds)
+    .order("created_at");
+  if (error) {
+    console.error("getPropostasMap:", error);
+    return {};
+  }
+  const mapa: Record<string, SolicitacaoProposta[]> = {};
+  for (const r of data ?? []) {
+    const p = normProposta(r);
+    (mapa[p.solicitacao_id] ??= []).push(p);
+  }
+  return mapa;
+}
 
 /** Especialistas ativos (id + nome + áreas de atuação, 0030) — pro select
  *  "direcionar a um especialista específico" do dialog de solicitação. */
