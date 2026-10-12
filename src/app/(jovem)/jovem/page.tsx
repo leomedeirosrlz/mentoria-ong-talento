@@ -25,6 +25,7 @@ import {
 import { Avatar } from "@/components/avatar";
 import { JovemAvaliacoes } from "@/components/jovem-avaliacoes";
 import { JovemCombinados } from "@/components/jovem-combinados";
+import { JovemEspecialistas } from "@/components/jovem-especialistas";
 import { PedirAjudaDialog } from "@/components/jovem-pedir-ajuda";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -44,6 +45,7 @@ import {
   getJovemDuplas,
   getJovemEncaminhamentos,
   getJovemEncontros,
+  getJovemPedidosEspecialista,
   getJovemPerfil,
 } from "@/lib/queries-jovem";
 import { getJovemAvaliacoes } from "@/lib/queries-avaliacao";
@@ -78,7 +80,7 @@ const TIPO_ICONE_MATERIAL = {
 } as const;
 
 export default async function JovemHome() {
-  const [me, perfil, duplas, contatos, encaminhamentos, assinaturas, encontros, avisos, materiais, avaliacoes] =
+  const [me, perfil, duplas, contatos, encaminhamentos, assinaturas, encontros, avisos, materiais, avaliacoes, pedidosEsp] =
     await Promise.all([
       getMe(),
       getJovemPerfil(),
@@ -90,6 +92,7 @@ export default async function JovemHome() {
       getComunicados(),
       getMateriais(),
       getJovemAvaliacoes(),
+      getJovemPedidosEspecialista(),
     ]);
   if (!me) return null; // o layout já barra — convenção das páginas
 
@@ -173,6 +176,21 @@ export default async function JovemHome() {
   const waCoord = waLink(
     coordenacao[0]?.whatsapp,
     `Olá! Sou ${nomeTela}, mentorado(a) do programa, e preciso falar com a equipe.`
+  );
+
+  // pedidos de especialista (REALIZA-112): o gate da demanda é o da RPC —
+  // só quem NÃO tem trilha de especialista ativa/pausada precisa contar o
+  // porquê; e sem dupla DPP ativa o pedido entra na triagem da coordenação
+  const trilhasAtivasEsp = duplas
+    .filter(
+      (d) =>
+        d.trilha === "especialista" &&
+        (d.status === "ativa" || d.status === "pausada") &&
+        d.mentor_id != null
+    )
+    .map((d) => d.mentor_id!);
+  const semDuplaDpp = !duplas.some(
+    (d) => d.trilha !== "especialista" && d.status === "ativa"
   );
 
   return (
@@ -378,6 +396,22 @@ export default async function JovemHome() {
           </CardContent>
         </Card>
       </section>
+
+      {/* Especialistas (REALIZA-112) — o convite pra pedir apoio + os
+          pedidos em andamento com a mesa de negociação do jovem. Some quando
+          o profile ainda não tem ficha de mentorado vinculada — a RPC
+          negaria e a home não promete gesto impossível */}
+      <JovemEspecialistas
+        disponivel={perfil != null}
+        catalogo={pedidosEsp.catalogo}
+        solicitacoes={pedidosEsp.solicitacoes}
+        propostas={pedidosEsp.propostas}
+        slotsPorEsp={pedidosEsp.slotsPorEsp}
+        trilhasAtivas={trilhasAtivasEsp}
+        semDuplaDpp={semDuplaDpp}
+        meuId={me.id}
+        waCoord={waCoord}
+      />
 
       {/* Suas avaliações (0071) — pendência com CTA + histórico do que já
           foi dito; o toggle "meu mentor lê" mora no detalhe de cada uma */}

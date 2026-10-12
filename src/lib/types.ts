@@ -828,3 +828,16 @@ export type JovemEncaminhamento =
  *  (ip/ua/hash/snapshot) ficam fora da view. */
 export type JovemAssinatura =
   Database["public"]["Views"]["jovem_assinaturas"]["Row"];
+
+/** Linha da view `jovem_especialistas` (0075) — o catálogo que o jovem vê
+ *  pra direcionar o pedido de especialista: nome/social/avatar/áreas.
+ *  Contato direto NÃO entra (whatsapp/email ficam fora da view) — o canal
+ *  abre quando a dupla nasce, pelo jovem_contatos de sempre. Tipo local:
+ *  database.types.ts ainda não foi regenerado com a view. */
+export type JovemEspecialista = {
+  id: string;
+  nome: string;
+  nome_social: string | null;
+  avatar_path: string | null;
+  areas: string[] | null;
+};

@@ -5,6 +5,7 @@ import {
   ArrowsClockwise,
   CheckCircle,
   ThumbsDown,
+  WhatsappLogo,
   XCircle,
 } from "@phosphor-icons/react";
 import { toast } from "sonner";
@@ -20,7 +21,7 @@ import type {
   SolicitacaoEspecialista,
   SolicitacaoProposta,
 } from "@/lib/types";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -31,6 +32,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
 import { rotuloSlot, tempoRelativo } from "@/lib/ciclo";
+import { cn } from "@/lib/utils";
 
 /** Quem pode recusar: só o especialista procurado/engajado (a recusa é um
  *  não pessoal — pedido broadcast o especialista simplesmente não pega). */
@@ -205,6 +207,7 @@ export function SolicitacaoNegociacao({
   slots,
   meuId,
   papel,
+  waCoord,
   onAceito,
 }: {
   s: SolicitacaoEspecialista;
@@ -216,6 +219,10 @@ export function SolicitacaoNegociacao({
   /** profile.id do visitante — define a vez ("sua proposta" não se responde). */
   meuId: string;
   papel: AppRole | null;
+  /** Link wa.me da coordenação — o fallback do jovem nos estados sem saída
+   *  (expirou, idas e vindas demais): o especialista NÃO é contato dele
+   *  antes do aceite (jovem_contatos), então "falar com alguém" = a equipe. */
+  waCoord?: string | null;
   /** opcional — chamado com a dupla criada/efetivada quando o aceite fecha
    *  (o mural navega pra ficha da nova dupla). */
   onAceito?: (duplaId?: string) => void;
@@ -248,7 +255,14 @@ export function SolicitacaoNegociacao({
   if (!emNegociacao) {
     // estados encerrados — o que aconteceu conta história, não pede ação
     if (efetivo === "recusada" && s.justificativa_recusa) {
-      return (
+      // pro jovem, a voz é a dele: quem não pegou + a saída honesta
+      const quem = s.especialista?.nome ?? s.desejado?.nome;
+      return papel === "mentorado" ? (
+        <p className="text-sm text-muted-foreground">
+          {quem ? `${quem} não pôde pegar o pedido` : "O pedido não rolou"} —
+          “{s.justificativa_recusa}”. Você pode fazer um novo pedido.
+        </p>
+      ) : (
         <p className="text-sm text-muted-foreground">
           Recusado{quemRecusou(s)} — “{s.justificativa_recusa}”
         </p>
@@ -261,28 +275,46 @@ export function SolicitacaoNegociacao({
       return (
         <div className="space-y-2">
           <p className="text-sm text-muted-foreground">
-            O horário proposto passou — o pedido expirou. Um novo pedido
-            precisa ser feito.
+            {papel === "mentorado"
+              ? "O horário proposto passou e o pedido expirou — cancela esse pra pedir de novo, ou fala com a coordenação."
+              : "O horário proposto passou — o pedido expirou. Um novo pedido precisa ser feito."}
           </p>
-          {souAutorAqui && (
-            <ConfirmDeleteButton
-              titulo="Cancelar pedido?"
-              descricao="O pedido expirado sai da lista."
-              acao="Cancelar pedido"
-              sucesso="Pedido cancelado."
-              onConfirm={() => cancelarSolicitacao(s.id)}
-              trigger={
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="text-muted-foreground"
-                >
-                  <XCircle size={15} />
-                  Cancelar pedido
-                </Button>
-              }
-            />
-          )}
+          <div className="flex flex-wrap items-center gap-2">
+            {souAutorAqui && (
+              <ConfirmDeleteButton
+                titulo="Cancelar pedido?"
+                descricao="O pedido expirado sai da lista."
+                acao="Cancelar pedido"
+                sucesso="Pedido cancelado."
+                onConfirm={() => cancelarSolicitacao(s.id)}
+                trigger={
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="text-muted-foreground"
+                  >
+                    <XCircle size={15} />
+                    Cancelar pedido
+                  </Button>
+                }
+              />
+            )}
+            {papel === "mentorado" && waCoord && (
+              <a
+                href={waCoord}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={cn(
+                  buttonVariants({ variant: "outline", size: "sm" }),
+                  "text-muted-foreground"
+                )}
+              >
+                <WhatsappLogo size={15} aria-hidden />
+                Falar com a coordenação
+                <span className="sr-only"> (abre em nova aba)</span>
+              </a>
+            )}
+          </div>
         </div>
       );
     }
@@ -443,7 +475,9 @@ export function SolicitacaoNegociacao({
                   Aceitar {rotuloSlot(s.slot_proposto)}
                 </Button>
               )}
-              {s.especialista_id && (
+              {/* a RPC trava na 5ª proposta ("combinem por outro canal") —
+                  o botão some no teto e a saída honesta é o canal humano */}
+              {s.especialista_id && propostas.length < 4 && (
                 <Button
                   size="sm"
                   variant="outline"
@@ -455,7 +489,11 @@ export function SolicitacaoNegociacao({
               )}
               <ConfirmDeleteButton
                 titulo="Cancelar pedido?"
-                descricao="O pedido sai da negociação e o especialista é avisado."
+                descricao={
+                  papel === "mentorado"
+                    ? "O pedido sai da negociação."
+                    : "O pedido sai da negociação e o especialista é avisado."
+                }
                 acao="Cancelar pedido"
                 sucesso="Pedido cancelado."
                 onConfirm={() => cancelarSolicitacao(s.id)}
@@ -479,18 +517,52 @@ export function SolicitacaoNegociacao({
               onFechar={() => setAbrindo(null)}
             />
           )}
-          {!autorPodeAceitar && efetivo === "contra_proposta" && (
+          {propostas.length >= 4 ? (
+            <div className="space-y-1.5">
+              <p className="text-xs text-muted-foreground">
+                {papel === "mentorado"
+                  ? "Já foram muitas idas e vindas — se o horário não fechar, fala com a coordenação."
+                  : "Limite de propostas na mesa — combinem o horário por outro canal."}
+              </p>
+              {papel === "mentorado" && waCoord && (
+                <a
+                  href={waCoord}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={cn(
+                    buttonVariants({ variant: "outline", size: "sm" }),
+                    "text-muted-foreground"
+                  )}
+                >
+                  <WhatsappLogo size={15} aria-hidden />
+                  Falar com a coordenação
+                  <span className="sr-only"> (abre em nova aba)</span>
+                </a>
+              )}
+            </div>
+          ) : !autorPodeAceitar && efetivo === "contra_proposta" ? (
             <p className="text-xs text-muted-foreground">
               Aguardando {s.especialista?.nome ?? "o especialista"} responder.
             </p>
-          )}
-          {efetivo === "aberta" && (
+          ) : efetivo === "aberta" ? (
             <p className="text-xs text-muted-foreground">
-              Aguardando um especialista
-              {s.desejado?.nome ? ` (${s.desejado.nome})` : ""} responder.
+              {papel === "mentorado"
+                ? s.desejado?.nome
+                  ? `Aguardando ${s.desejado.nome} responder.`
+                  : "Aguardando um especialista responder."
+                : `Aguardando um especialista${
+                    s.desejado?.nome ? ` (${s.desejado.nome})` : ""
+                  } responder.`}
             </p>
-          )}
+          ) : null}
         </div>
+      ) : papel === "mentorado" ? (
+        // pedido aberto pela equipe no nome do jovem — ele enxerga, mas
+        // quem senta na mesa é o staff
+        <p className="text-xs text-muted-foreground">
+          Esse pedido foi aberto pela equipe pra você — quem combina o
+          horário é ela com {s.especialista?.nome ?? "o especialista"}.
+        </p>
       ) : (
         <p className="text-xs text-muted-foreground">
           Negociação em andamento entre o autor e{" "}
