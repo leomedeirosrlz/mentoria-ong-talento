@@ -7,6 +7,7 @@ import { getJovemPerfil } from "@/lib/queries-jovem";
 import { ESCOLARIDADE_LABELS } from "@/lib/ciclo";
 import type { Escolaridade } from "@/lib/types";
 import { JovemPerfilForm } from "./perfil-form";
+import { PrivacidadeCard } from "./privacidade-card";
 
 export const metadata: Metadata = { title: "Meu perfil" };
 
@@ -99,6 +100,14 @@ export default async function JovemPerfil() {
           <JovemPerfilForm me={me} />
         </CardContent>
       </Card>
+
+      {/* opt-in colega↔colega (0076) — o número compartilhado é o da ficha
+          (mentorados.whatsapp), que a coordenação mantém; sem ele o
+          controle aparece desligado com o porquê, não escondido */}
+      <PrivacidadeCard
+        compartilhado={perfil?.contato_compartilhado ?? false}
+        temWhatsapp={perfil?.whatsapp != null}
+      />
     </div>
   );
 }
