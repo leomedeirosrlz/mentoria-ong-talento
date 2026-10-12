@@ -25,8 +25,14 @@
 // 'especialista' ativa com a MESMA mentorada da dupla DPP e uma janela de
 // grade (terça 19:00–21:00) que alimenta a projeção de slots do jovem.
 // E as personas da solicitação v2 (REALIZA-112): um 2º especialista (esp2)
-// e um jovem SEM dupla DPP (profile mentorado + mentorado vinculado) —
+// e um jovem SEM dupla DPP ativa (profile mentorado + mentorado vinculado) —
 // alvos da triagem aguardando_coord e de pedidos direcionados.
+// E a fixture do diretório do jovem (REALIZA-113): a ficha do jovem sem DPP
+// ganha WhatsApp + uma dupla DPP PAUSADA na mesma turma (mentor próprio,
+// sem auth) — ele vira "colega com conta" na mentorados_turma (a view não
+// filtra status), mas segue sem DPP ativa: o pedido de especialista dele
+// continua caindo em aguardando_coord. O toggle de compartilhamento é dos
+// specs — o seed o devolve a false a cada run.
 // IDs fixos e2e00000-*, que o workflow usa pra cleanup determinístico.
 
 const URL_ = process.env.E2E_SUPABASE_URL;
@@ -90,6 +96,15 @@ const IDS = {
   // janela de grade do esp2 — os chips do pedido direcionado do jovem e os
   // slots da contra-proposta/aceite saem da grade REAL dele (0073)
   gradeEsp2: "e2e00000-0000-4000-8000-0000000000e1",
+  // REALIZA-113: o "colega com conta" do diretório — o jovem sem DPP ganha
+  // uma dupla DPP pausada (mentor próprio, nunca loga) na mesma turma.
+  // 'pausada' e não 'ativa' de propósito: a RPC pedir_especialista_jovem e
+  // o semDuplaDpp da home só olham DPP ativa — a triagem do pedido dele
+  // segue intacta — e o sweep de duplas esp do spec 112 nem enxerga trilha
+  // dpp. O trigger de capacidade conta ativa+pausada, então um mentor novo
+  // (cap implícito 1 livre) em vez de pendurar no reserva.
+  mentorColega: "e2e00000-0000-4000-8000-0000000000e2",
+  duplaColega: "e2e00000-0000-4000-8000-0000000000f2",
 };
 const EMAIL = "e2e-mentor@realiza.test";
 const COORD_EMAIL = "e2e-coord@realiza.test";
@@ -101,6 +116,9 @@ const ESP_WHATSAPP = "5511999000070";
 const ESP2_EMAIL = "esp2-e2e@realiza.test";
 const ESP2_WHATSAPP = "5511999990002";
 const JOVEM2_EMAIL = "jovem2-e2e@realiza.test";
+// o número que o opt-in dele libera pros colegas (0076) — alimenta o botão
+// WhatsApp do card dele na /jovem/pessoas do jovem
+const JOVEM2_WHATSAPP = "5511999000091";
 // assinaturas.token é uuid — os tokens fixos da fixture manual do staging
 const TOKEN_TERMO_JOVEM = "e2e00000-0000-4000-8000-0000000000aa";
 const TOKEN_AUTORIZ_JOVEM = "e2e00000-0000-4000-8000-0000000000ab";
@@ -154,14 +172,15 @@ console.log(`cronograma: ${cron.id} (${cron.turma})`);
     for (const dId of morremIds)
       await del(`notificacoes?tipo=eq.apoio_jovem&href=eq./duplas/${dId}`);
   }
-  // as condenadas de verdade — as três duplas fixture ficam (a do jovem, a
-  // dupla2 que só volta a 'ativa' e a trilha esp, também fixture). Filhos
-  // NO ACTION primeiro: especialista_, formulario_, supervisoes e
-  // encerramentos referenciam duplas sem cascade; encontros carrega
-  // registros/notas/interações em cascade, mas as avaliações/links só
-  // saíram acima por causa do dupla_id espelhado.
+  // as condenadas de verdade — as quatro duplas fixture ficam (a do jovem,
+  // a dupla2 que só volta a 'ativa', a trilha esp e a dupla pausada do
+  // colega, também fixtures). Filhos NO ACTION primeiro: especialista_,
+  // formulario_, supervisoes e encerramentos referenciam duplas sem
+  // cascade; encontros carrega registros/notas/interações em cascade, mas
+  // as avaliações/links só saíram acima por causa do dupla_id espelhado.
   const condenadas = morremIds.filter(
-    (d) => ![IDS.dupla, IDS.dupla2, IDS.duplaEsp].includes(d)
+    (d) =>
+      ![IDS.dupla, IDS.dupla2, IDS.duplaEsp, IDS.duplaColega].includes(d)
   );
   if (condenadas.length) {
     const ids = condenadas.join(",");
@@ -188,7 +207,7 @@ console.log(`cronograma: ${cron.id} (${cron.turma})`);
     console.log(`limpeza: ${condenadas.length} dupla(s) pendurada(s) removidas`);
   }
   await patch(`duplas?id=eq.${IDS.dupla2}`, { status: "ativa" });
-  const e2eProfiles = [IDS.mentorProfile, IDS.coordProfile, IDS.mentorReserva, IDS.mentorImport, IDS.jovemProfile, IDS.espProfile, IDS.esp2Profile, IDS.jovem2Profile].join(",");
+  const e2eProfiles = [IDS.mentorProfile, IDS.coordProfile, IDS.mentorReserva, IDS.mentorImport, IDS.jovemProfile, IDS.espProfile, IDS.esp2Profile, IDS.jovem2Profile, IDS.mentorColega].join(",");
   const e2eMentorados = [IDS.mentorado, IDS.mentorado2, IDS.mentoradoLivre, IDS.mentoradoImport, IDS.mentoradoSemDpp].join(",");
   // solicitações de especialista ligadas a qualquer mentorado e2e — o sweep
   // de condenadas só alcança as que morrem junto das duplas; as que apontam
@@ -227,7 +246,7 @@ console.log(`cronograma: ${cron.id} (${cron.turma})`);
   // trilha esp não tem encontro de seed (o spec mantém o próprio): todos os
   // dela são leftover — os filhos já morreram no sweep de avaliações acima.
   await del(
-    `encontros?dupla_id=in.(${IDS.dupla},${IDS.dupla2},${IDS.duplaEsp})&id=not.in.(${IDS.encontroJovem},${IDS.encontroAvaliacao})`
+    `encontros?dupla_id=in.(${IDS.dupla},${IDS.dupla2},${IDS.duplaEsp},${IDS.duplaColega})&id=not.in.(${IDS.encontroJovem},${IDS.encontroAvaliacao})`
   );
   // agenda do especialista (0073): janelas/exceções que um run de spec
   // morreu sem desfazer — a janela fixture é recriada no bloco do esp. Se o
@@ -581,8 +600,10 @@ console.log("janela de grade do esp (terça 19–21) criada");
 
 // ---- personas da solicitação v2 (REALIZA-112): esp2 + jovem sem DPP ----
 // esp2 é o alvo limpo de pedido direcionado (não disputa a duplaEsp nem o
-// cap do esp principal); jovem2/mentorado 00d0 NÃO tem dupla DPP — o pedido
-// dele nasce 'aguardando_coord' e alimenta a fila de triagem do coord card.
+// cap do esp principal); jovem2/mentorado 00d0 não tem dupla DPP ATIVA — o
+// pedido dele nasce 'aguardando_coord' e alimenta a fila de triagem do
+// coord card (a dupla pausada que o coloca no diretório de colegas, 0076,
+// não conta pro vínculo do pedido — a RPC só olha status 'ativa').
 let [esp2] = await rest(
   `profiles?select=id,user_id,role,ativo,onboarded_em,whatsapp&email=eq.${ESP2_EMAIL}`
 );
@@ -672,10 +693,13 @@ if (!jovem2) {
 }
 await vincularAuth(jovem2, JOVEM2_EMAIL);
 // a ficha mentorados vinculada — sem profile_id o my_mentorado_id() volta
-// null e o pedido do jovem não tem dono (cai em triagem sem autor)
+// null e o pedido do jovem não tem dono (cai em triagem sem autor). O
+// WhatsApp habilita o switch do card Privacidade (0076) e é o número que o
+// opt-in libera; contato_compartilhado volta a false a cada run — um spec
+// que liga o toggle não pode vazar opt-in pro run seguinte.
 {
   const [ficha] = await rest(
-    `mentorados?select=id,profile_id&id=eq.${IDS.mentoradoSemDpp}`
+    `mentorados?select=id,profile_id,whatsapp,contato_compartilhado&id=eq.${IDS.mentoradoSemDpp}`
   );
   if (!ficha) {
     await rest("mentorados", {
@@ -684,16 +708,93 @@ await vincularAuth(jovem2, JOVEM2_EMAIL);
         id: IDS.mentoradoSemDpp,
         nome: "Jovem E2E Sem DPP",
         profile_id: jovem2.id,
+        whatsapp: JOVEM2_WHATSAPP,
       }),
     });
     console.log("mentorado sem DPP criado");
-  } else if (ficha.profile_id !== jovem2.id) {
-    await patch(`mentorados?id=eq.${IDS.mentoradoSemDpp}`, {
-      profile_id: jovem2.id,
-    });
-    console.log("ficha do jovem sem DPP vinculada");
   } else {
-    console.log("ficha do jovem sem DPP já vinculada");
+    const fixes = {};
+    if (ficha.profile_id !== jovem2.id) fixes.profile_id = jovem2.id;
+    if (ficha.whatsapp !== JOVEM2_WHATSAPP) fixes.whatsapp = JOVEM2_WHATSAPP;
+    if (ficha.contato_compartilhado) fixes.contato_compartilhado = false;
+    if (Object.keys(fixes).length) {
+      await patch(`mentorados?id=eq.${IDS.mentoradoSemDpp}`, fixes);
+      console.log(
+        `ficha do jovem sem DPP convergida (${Object.keys(fixes).join(", ")})`
+      );
+    } else {
+      console.log("ficha do jovem sem DPP já vinculada");
+    }
+  }
+}
+
+// o mentor da dupla do colega — profile de staff sem auth (nunca loga). A
+// capacidade implícita é 1 e ele só tem a dupla pausada, então o trigger
+// duplas_capacidade passa de boa.
+const [mColega] = await rest(
+  `profiles?select=id&id=eq.${IDS.mentorColega}`
+);
+if (!mColega) {
+  await rest("profiles", {
+    method: "POST",
+    body: JSON.stringify({
+      id: IDS.mentorColega,
+      email: "e2e-mentor-colega@realiza.test",
+      nome: "Mentor E2E Colega",
+      role: "mentor_dpp",
+      ativo: true,
+      onboarded_em: new Date().toISOString(),
+    }),
+  });
+  console.log("mentor do colega criado");
+}
+
+// a dupla que põe o jovem sem DPP no diretório de colegas (0076): DPP
+// pausada na mesma turma — a mentorados_turma não filtra status, mas
+// "sem DPP ativa" ele continua (pedido de especialista cai em triagem).
+// Converge status/turma a cada run — um run morto ou dedo manual no
+// staging não deixa a fixture fora do ar.
+{
+  const [dc] = await rest(
+    `duplas?select=id,status,turma,mentor_id,mentorado_id,trilha&id=eq.${IDS.duplaColega}`
+  );
+  if (!dc) {
+    await rest("duplas", {
+      method: "POST",
+      body: JSON.stringify({
+        id: IDS.duplaColega,
+        mentor_id: IDS.mentorColega,
+        mentorado_id: IDS.mentoradoSemDpp,
+        turma: cron.turma,
+        cronograma_id: cron.id,
+        trilha: "dpp",
+        status: "pausada",
+        iniciada_em: "2026-09-08",
+      }),
+    });
+    console.log("dupla pausada do colega criada");
+  } else {
+    const fixes = {};
+    if (dc.status !== "pausada") {
+      fixes.status = "pausada";
+      // um encerramento manual deixa carimbo de saída — pausar de volta
+      // sem limpar fingiria uma dupla morta
+      fixes.encerrada_em = null;
+      fixes.motivo_encerramento = null;
+    }
+    if (dc.turma !== cron.turma) fixes.turma = cron.turma;
+    if (dc.mentor_id !== IDS.mentorColega) fixes.mentor_id = IDS.mentorColega;
+    if (dc.mentorado_id !== IDS.mentoradoSemDpp)
+      fixes.mentorado_id = IDS.mentoradoSemDpp;
+    if (dc.trilha !== "dpp") fixes.trilha = "dpp";
+    if (Object.keys(fixes).length) {
+      await patch(`duplas?id=eq.${IDS.duplaColega}`, fixes);
+      console.log(
+        `dupla do colega convergida (${Object.keys(fixes).join(", ")})`
+      );
+    } else {
+      console.log("dupla pausada do colega já existe");
+    }
   }
 }
 

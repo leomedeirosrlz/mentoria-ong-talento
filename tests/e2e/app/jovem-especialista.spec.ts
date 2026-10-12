@@ -38,7 +38,9 @@ import type { Page } from "@playwright/test";
 //                       fixture …00e0 com Esp E2E (…0060);
 //   Esp Dois E2E (…00c0) → o par NOVO — grade própria (quinta 19–21, id
 //                       fixture …00e1) pros slots do pedido/contra-proposta;
-//   Jovem E2E Sem DPP (…00f0) → mentorado …00d0, sem nenhuma dupla.
+//   Jovem E2E Sem DPP (…00f0) → mentorado …00d0, sem dupla DPP ATIVA — a
+//                       dupla pausada dele (fixture do diretório, 0076) não
+//                       conta pra triagem nem pro gate de demanda.
 
 const JOVEM_EMAIL = process.env.E2E_JOVEM_EMAIL ?? "jovem-e2e@realiza.test";
 const JOVEM2_EMAIL = process.env.E2E_JOVEM2_EMAIL ?? "jovem2-e2e@realiza.test";
