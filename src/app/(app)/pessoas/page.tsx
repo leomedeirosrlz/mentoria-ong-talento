@@ -26,6 +26,10 @@ export const metadata: Metadata = {
 
 export default async function PessoasPage() {
   const me = await getMe();
+  // o diretório de staff não é pro jovem — a shell dele tem a própria
+  // (/jovem/pessoas, 0076). O layout já desvia o papel; isto é o guard
+  // da rota pra quem chegar pela URL
+  if (me?.role === "mentorado") redirect("/jovem");
   // o layout já garante papel definido — guard defensivo pra query direta
   if (!me?.role) redirect("/");
   const souCoord = me.role === "coordenacao";
