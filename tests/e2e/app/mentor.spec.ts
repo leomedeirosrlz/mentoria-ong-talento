@@ -59,9 +59,11 @@ test.describe("mentor DPP — fluxos reais", () => {
       .click();
 
     // toast de sucesso e o dialog fecha — o refresh traz o card novo.
-    // O card da home também diz "Nº encontro agendado" (sem ponto) — o \.
-    // ancora a regex no toast ("agendado.") pra não resolver 2 elementos.
-    await expect(page.getByText(/encontro agendado\./i)).toBeVisible();
+    // O card da home fala "Nº encontro agendado" — o toast novo é
+    // "Agendamento confirmado — Nº encontro."; o \. final ancora nele.
+    await expect(
+      page.getByText(/Agendamento confirmado — \d+º encontro\./i)
+    ).toBeVisible();
     await expect(dialog).not.toBeVisible();
   });
 });

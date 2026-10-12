@@ -520,7 +520,10 @@ test.describe("mentorado — agenda livre (REALIZA-110)", () => {
     await dialog
       .getByRole("button", { name: "Confirmar agendamento" })
       .click();
-    await expect(page.getByText(/encontro agendado\./i)).toBeVisible();
+    // toast novo do dialog: "Agendamento confirmado — Nº encontro."
+    await expect(
+      page.getByText(/Agendamento confirmado — \d+º encontro\./i)
+    ).toBeVisible();
 
     // o outro lado recebeu — o corpo credita o mentor e o href é do jovem
     const [notif] = (await sinosDe(IDS.jovemProfile, "encontro_marcado"))

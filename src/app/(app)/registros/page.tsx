@@ -7,6 +7,7 @@ import {
   getAlertasRegistros,
   getCicloEventos,
   getDuplasOpcoes,
+  getEncontrosPorDuplas,
   getEspecialistaEventos,
   getMe,
   getRegistros,
@@ -20,13 +21,14 @@ import {
   formatDiaNum,
   formatMesAbrev,
   maxNumeroEncontro,
+  passoEsp,
   registroTardio,
 } from "@/lib/ciclo";
 import { RegistrosFiltros, type OrdemRegistros } from "@/components/registros-filtros";
 import { buttonVariants } from "@/components/ui/button";
 import { RegistroCard } from "@/components/registro-card";
 import { cn } from "@/lib/utils";
-import type { AvaliacaoJovem, Dificuldade } from "@/lib/types";
+import type { AvaliacaoJovem, Dificuldade, Encontro } from "@/lib/types";
 
 export const metadata: Metadata = { title: "Registros" };
 
@@ -113,6 +115,33 @@ export default async function RegistrosPage({
     getEspecialistaEventos(),
   ]);
 
+  // trilha especialista (0074): encontro.numero é a TENTATIVA — o passo do
+  // guia é o rank entre realizados, e derivá-lo exige o histórico da dupla
+  const espDuplaIds = [
+    ...new Set(
+      itens
+        .filter((r) => r.encontro?.dupla?.trilha === "especialista")
+        .map((r) => r.encontro!.dupla!.id)
+    ),
+  ];
+  const encEsp = await getEncontrosPorDuplas(espDuplaIds);
+  const encPorDupla = new Map<
+    string,
+    Pick<Encontro, "numero" | "status">[]
+  >();
+  for (const e of encEsp) {
+    const lista = encPorDupla.get(e.dupla_id) ?? [];
+    lista.push(e);
+    encPorDupla.set(e.dupla_id, lista);
+  }
+  const passoDoEncontro = (r: RegistroResumo): number | null => {
+    const enc = r.encontro;
+    if (!enc) return null;
+    if (enc.dupla?.trilha !== "especialista") return null;
+    const historico = encPorDupla.get(enc.dupla.id) ?? [];
+    return passoEsp(enc, historico.length ? historico : [enc]);
+  };
+
   // título do encontro por (cronograma, nº) — por trilha: o nº 3 DPP e o nº 3
   // especialista são eventos diferentes (ciclo_eventos vs especialista_eventos),
   // e o nº 3 da T1 e o da T2 também (0061 — numero solto não identifica)
@@ -122,12 +151,15 @@ export default async function RegistrosPage({
       .map((e) => [`${e.cronograma_id}:${e.numero}`, e.titulo])
   );
   const tituloEsp = new Map(espEventos.map((e) => [e.numero, e.titulo]));
-  const tituloEncontro = (r: RegistroResumo) =>
-    r.encontro?.dupla?.trilha === "especialista"
-      ? (tituloEsp.get(r.encontro.numero) ?? null)
-      : (tituloDpp.get(
-          `${r.encontro?.dupla?.cronograma_id}:${r.encontro?.numero}`
-        ) ?? null);
+  const tituloEncontro = (r: RegistroResumo) => {
+    const passo = passoDoEncontro(r);
+    if (passo != null) return tituloEsp.get(passo) ?? null;
+    return (
+      tituloDpp.get(
+        `${r.encontro?.dupla?.cronograma_id}:${r.encontro?.numero}`
+      ) ?? null
+    );
+  };
 
   // o banco já ordena por realizado_em; o sort estável acerta a fatia
   // carregada e empurra quem pede atenção pra cima dentro do mesmo dia.
@@ -223,6 +255,7 @@ export default async function RegistrosPage({
           <RegistroCard
             r={r}
             tituloEncontro={tituloEncontro(r)}
+            passoEsp={passoDoEncontro(r)}
             souCoord={souCoord}
           />
         </div>

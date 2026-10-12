@@ -15,6 +15,7 @@ import type {
   DocumentoPessoa,
   Dupla,
   DuplaResumo,
+  Encontro,
   EspecialistaAvaliacao,
   EspecialistaEvento,
   ExcecaoEspecialista,
@@ -32,6 +33,8 @@ import type {
   Profile,
   RegistroAnexo,
   SolicitacaoEspecialista,
+  SolicitacaoEspecialistaStatus,
+  SolicitacaoProposta,
   Supervisao,
 } from "../types";
 // Só tipos das queries reais — `import type` é apagado no build, então o
@@ -907,7 +910,23 @@ export function demoDuplasOpcoes(role: AppRole): DuplaOpcao[] {
     );
 }
 
-// ---------- trilha de especialista (0027) ----------
+// ---------- trilha de especialista (0027/0074) ----------
+
+/** status_efetivo da view (0074) — a expiração é lazy: pedido/proposta
+ *  pendente com o slot no passado lê 'expirada' sem writer. */
+function efetivo(s: SolicitacaoEspecialista): SolicitacaoEspecialistaStatus {
+  return (s.status === "aberta" || s.status === "contra_proposta") &&
+    s.slot_proposto != null &&
+    s.slot_proposto <= new Date().toISOString()
+    ? "expirada"
+    : s.status;
+}
+
+/** Devolve a solicitação como a view solicitacoes_mural — com status_efetivo
+ *  computado na leitura (a coluna só existe na view, não no dataset). */
+function comEfetivo(s: SolicitacaoEspecialista): SolicitacaoEspecialista {
+  return { ...s, status_efetivo: efetivo(s) };
+}
 
 /** Todas as solicitações da dupla DPP, mais recentes primeiro — só se a dupla
  *  estiver no escopo do papel (sol_select: mentor/supervisor da dupla de
@@ -922,6 +941,7 @@ export function demoSolicitacoesDaDupla(
   if (!noEscopo) return [];
   return data.solicitacoes
     .filter((s) => s.dupla_dpp_id === duplaDppId)
+    .map(comEfetivo)
     .sort((a, b) => b.created_at.localeCompare(a.created_at));
 }
 
@@ -933,10 +953,10 @@ export function demoSolicitacaoDaDupla(
   return demoSolicitacoesDaDupla(role, duplaDppId)[0] ?? null;
 }
 
-/** O que o papel vê no mural (sol_select, 0027): coord tudo; especialista as
- *  abertas + as que aceitou; mentor/supervisor as das próprias duplas.
- *  Ordenação da real: status asc (a ordem alfabética já dá aberta → aceita →
- *  cancelada), created_at desc dentro de cada grupo. */
+/** O que o papel vê no mural (sol_select v2, 0074): coord tudo; especialista
+ *  as abertas/em negociação broadcast-ou-direcionadas + as que engajou ou
+ *  criou; mentor/supervisor as das próprias duplas; mentorado os próprios
+ *  pedidos. Ordenação da real: status_efetivo asc + created_at desc. */
 export function demoSolicitacoesVisiveis(
   role: AppRole
 ): SolicitacaoEspecialista[] {
@@ -947,17 +967,67 @@ export function demoSolicitacoesVisiveis(
     lista = data.solicitacoes;
   } else if (role === "mentor_especialista") {
     lista = data.solicitacoes.filter(
-      (s) => s.status === "aberta" || s.especialista_id === eu.id
+      (s) =>
+        ((s.status === "aberta" || s.status === "contra_proposta") &&
+          (s.especialista_desejado_id == null ||
+            s.especialista_desejado_id === eu.id)) ||
+        s.especialista_id === eu.id ||
+        s.created_by === eu.id
     );
+  } else if (role === "mentorado") {
+    // a policy compara mentorado_id com my_mentorado_id() — a ficha do
+    // mentorado, não o profile dele
+    const meuMentorado = data.mentorados.find((m) => m.profile_id === eu.id)?.id;
+    lista = data.solicitacoes.filter((s) => s.mentorado_id === meuMentorado);
   } else {
     const ids = new Set(duplasDoPapel(data, role).map((d) => d.id));
-    lista = data.solicitacoes.filter((s) => ids.has(s.dupla_dpp_id));
+    lista = data.solicitacoes.filter(
+      (s) => s.dupla_dpp_id != null && ids.has(s.dupla_dpp_id)
+    );
   }
-  return [...lista].sort(
-    (a, b) =>
-      a.status.localeCompare(b.status) ||
-      b.created_at.localeCompare(a.created_at)
-  );
+  return lista
+    .map(comEfetivo)
+    .sort(
+      (a, b) =>
+        (a.status_efetivo ?? a.status).localeCompare(
+          b.status_efetivo ?? b.status
+        ) || b.created_at.localeCompare(a.created_at)
+    );
+}
+
+/** Thread de uma negociação, cronológica — prop_select libera as partes da
+ *  solicitação pai: quem vê a solicitação lê a thread. */
+export function demoPropostas(
+  role: AppRole,
+  solicitacaoId: string
+): SolicitacaoProposta[] {
+  const sol = getDemoData().solicitacoes.find((s) => s.id === solicitacaoId);
+  if (!sol) return [];
+  const visivel = demoSolicitacoesVisiveis(role).some((s) => s.id === sol.id);
+  if (!visivel) return [];
+  return getDemoData()
+    .solicitacaoPropostas.filter((p) => p.solicitacao_id === solicitacaoId)
+    .sort((a, b) => a.created_at.localeCompare(b.created_at));
+}
+
+/** Encontros mínimos de um conjunto de duplas (o que getEncontrosPorDuplas
+ *  seleciona) — o passo do guia esp deriva do histórico todo; o escopo é o
+ *  mesmo enc_select: só enxerga encontro de dupla que o papel vê. */
+export function demoEncontrosPorDuplas(
+  role: AppRole,
+  duplaIds: string[]
+): Pick<Encontro, "id" | "dupla_id" | "numero" | "status">[] {
+  const data = getDemoData();
+  const ids = new Set(duplaIds);
+  return duplasDoPapel(data, role)
+    .filter((d) => ids.has(d.id))
+    .flatMap((d) => d.encontros ?? [])
+    .map((e) => ({
+      id: e.id,
+      dupla_id: e.dupla_id,
+      numero: e.numero,
+      status: e.status,
+    }));
 }
 
 /** Especialistas ativos — pro select "direcionar a um especialista" do dialog. */

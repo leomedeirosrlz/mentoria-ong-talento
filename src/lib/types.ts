@@ -502,7 +502,10 @@ export type Notificacao = {
     | "apoio_jovem"
     | "encontro_marcado"
     | "encontro_alterado"
-    | "encontro_desfeito";
+    | "encontro_desfeito"
+    | "solicitacao_triagem"
+    | "solicitacao_proposta"
+    | "solicitacao_recusada";
   titulo: string;
   corpo: string | null;
   href: string | null;
@@ -519,19 +522,48 @@ export type EspecialistaEvento = {
   foco: string | null;
 };
 
-export type SolicitacaoEspecialistaStatus = "aberta" | "aceita" | "cancelada";
+/** Máquina de estados da solicitação v2 (0074). "Em aberto" pra dedup e CTAs
+ *  = as três primeiras — uma negociação em curso ainda ocupa o pedido. */
+export type SolicitacaoEspecialistaStatus =
+  | "aberta"
+  | "aguardando_coord"
+  | "contra_proposta"
+  | "aceita"
+  | "recusada"
+  | "cancelada"
+  | "expirada";
 
-/** Demanda de especialista registrada pelo mentor DPP (ou coord) — vira dupla
- *  quando um especialista aceita (`dupla_id` aponta pra ela). */
+/** Demanda de especialista — pedido por sessão (0074): nasce do mentor
+ *  DPP/coord (`origem` staff) ou do próprio jovem, e vira um encontro quando
+ *  um especialista aceita um horário. `dupla_id` aponta pra dupla já formada
+ *  quando o pedido é de sessão seguinte. */
 export type SolicitacaoEspecialista = {
   id: string;
   mentorado_id: string;
-  dupla_dpp_id: string;
-  demanda: string;
+  /** Dupla DPP de origem — null no pedido que o jovem abre sem dupla DPP
+   *  (entra aguardando_coord; a triagem da coordenação define a turma). */
+  dupla_dpp_id: string | null;
+  /** O porquê da trilha (gate) — null nos pedidos do jovem (que trazem
+   *  `motivo`) e nos pedidos de sessão seguinte de dupla já formada. */
+  demanda: string | null;
+  /** Motivo curto do pedido do jovem (0074) — convive com `demanda`. */
+  motivo: string | null;
+  /** Horário proposto na mesa — o do pedido do jovem ou o da última
+   *  contra-proposta; o histórico completo mora em solicitacao_propostas. */
+  slot_proposto: string | null;
+  /** Quem abriu o pedido: staff (mentor DPP/coord) ou o próprio jovem. */
+  origem: "staff" | "jovem";
+  /** Turma da sessão — a da dupla DPP ou a definida na triagem. */
+  turma: string | null;
+  /** Por que o especialista recusou (0074) — obrigatória na recusa. */
+  justificativa_recusa: string | null;
   especialista_desejado_id: string | null;
   especialista_id: string | null;
   dupla_id: string | null;
   status: SolicitacaoEspecialistaStatus;
+  /** Status com a expiração lazy aplicada (view, 0074): pedido ou proposta
+   *  pendente com o slot no passado lê 'expirada' sem writer rodando. */
+  status_efetivo?: SolicitacaoEspecialistaStatus;
   created_by: string | null;
   created_at: string;
   respondida_em: string | null;
@@ -539,12 +571,31 @@ export type SolicitacaoEspecialista = {
   mentorado?: { nome: string } | null;
   solicitante?: { nome: string } | null;
   especialista?: { nome: string } | null;
+  /** Nome de quem recebeu o pedido direcionado — embed de profiles via
+   *  especialista_desejado_id (null = broadcast pra todo especialista). */
+  desejado?: { nome: string } | null;
+  /** Nome do especialista engajado — coluna plana da view (0074); fallback
+   *  quando o embed de profiles não resolve. */
+  especialista_nome?: string | null;
   // ---------- colunas do mural (0037) — vêm da dupla de especialista
   // via join na view; null enquanto a trilha não fechou ----------
   /** O que a trilha devolveu pro PDM do jovem — o mentor DPP lê aqui. */
   devolutiva_pdm?: string | null;
   /** Quando a trilha de especialista fechou (dupla.encerrada_em). */
   trilha_encerrada_em?: string | null;
+};
+
+/** Uma rodada da negociação de horário (0074) — append-only: as RPCs
+ *  contra_propor/aceitar escrevem, as partes e a coordenação leem. */
+export type SolicitacaoProposta = {
+  id: string;
+  solicitacao_id: string;
+  autor_id: string;
+  slot_proposto: string;
+  mensagem: string | null;
+  created_at: string;
+  /** embed de profiles via autor_id — quem falou por último na negociação. */
+  autor?: { nome: string } | null;
 };
 
 // ---------- agenda real do especialista (0073) ----------

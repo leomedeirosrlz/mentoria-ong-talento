@@ -5,6 +5,7 @@ import {
   formatDateTime,
   jornadaDaDupla,
   linkSeguro,
+  passoEsp,
   passosDaTrilha,
 } from "@/lib/ciclo";
 import type {
@@ -34,10 +35,11 @@ const STATUS_LABEL: Record<Encontro["status"], string> = {
   cancelado: "cancelado",
 };
 
-/** Agenda da trilha especialista: sem calendário oficial — os encontros são
- *  combinados pela dupla dentro dos ~3 meses. O que a página mostra é a
- *  disponibilidade que o especialista oferece (0073) + a fila real da dupla
- *  (agendados e realizados) + o próximo passo da trilha. */
+/** Agenda da trilha especialista: sem calendário oficial — cada sessão
+ *  nasce de um pedido aceito (0074), combinado pelo jovem/coord com a
+ *  agenda do especialista. O que a página mostra é a disponibilidade que o
+ *  especialista oferece (0073) + a fila real da dupla (agendados e
+ *  realizados) + o próximo passo da trilha. */
 export function AgendaEspecialista({
   duplas,
   espEventos,
@@ -59,8 +61,8 @@ export function AgendaEspecialista({
       <header className={duplas.length > 1 ? "xl:col-span-2" : undefined}>
         <h1 className="text-2xl font-semibold tracking-tight">Agenda</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Mentoria especializada · até 5 encontros de 1h em até 3 meses. As
-          datas são combinadas por vocês, sem terça oficial.
+          Mentoria especializada · até 5 sessões de 1h em até 3 meses. Cada
+          sessão nasce de um pedido aceito — sem terça oficial.
         </p>
       </header>
 
@@ -78,9 +80,18 @@ export function AgendaEspecialista({
           passosDaTrilha("especialista", [], espEventos),
           agora
         );
-        const { proximoNumero, encontroAlvo, faltantes, cicloCompleto } =
-          alvoAgendamento(dupla, [], agora);
+        const { faltantes, cicloCompleto } = alvoAgendamento(
+          dupla,
+          [],
+          agora
+        );
         const ativa = dupla.status === "ativa";
+        // a única coisa editável por aqui é a tentativa já marcada —
+        // sessão nova não se cria na agenda (nasce do pedido aceito)
+        const tentativaAgendada =
+          dupla.encontros
+            .filter((e) => e.status === "agendado" || e.status === "remarcado")
+            .sort((a, b) => a.numero - b.numero)[0] ?? null;
         // fila cronológica: próximos primeiro (os já passados ficam abaixo,
         // mais recente primeiro — é o histórico, não a fila)
         const porVir = dupla.encontros
@@ -132,7 +143,12 @@ export function AgendaEspecialista({
                   </p>
                   <ul className="divide-y divide-border rounded-lg border border-border">
                     {porVir.map((e) => (
-                      <LinhaEncontro key={e.id} e={e} duplaId={dupla.id} />
+                      <LinhaEncontro
+                        key={e.id}
+                        e={e}
+                        duplaId={dupla.id}
+                        encontros={dupla.encontros}
+                      />
                     ))}
                   </ul>
                 </div>
@@ -145,7 +161,12 @@ export function AgendaEspecialista({
                   </p>
                   <ul className="divide-y divide-border rounded-lg border border-border">
                     {passados.map((e) => (
-                      <LinhaEncontro key={e.id} e={e} duplaId={dupla.id} />
+                      <LinhaEncontro
+                        key={e.id}
+                        e={e}
+                        duplaId={dupla.id}
+                        encontros={dupla.encontros}
+                      />
                     ))}
                   </ul>
                 </div>
@@ -153,20 +174,31 @@ export function AgendaEspecialista({
 
               {ativa && !cicloCompleto && (
                 <div className="flex flex-wrap items-center gap-2 border-t border-border pt-4">
-                  <AgendarEncontroDialog
-                    duplaId={dupla.id}
-                    numero={proximoNumero}
-                    atual={encontroAlvo}
-                    piso={dupla.iniciada_em ?? undefined}
-                    jovemNome={dupla.mentorado.nome.split(" ")[0]}
-                  />
+                  {tentativaAgendada ? (
+                    // a tentativa existente se move — numero é o ordinal da
+                    // tentativa, não o passo (0074)
+                    <AgendarEncontroDialog
+                      duplaId={dupla.id}
+                      numero={tentativaAgendada.numero}
+                      atual={tentativaAgendada}
+                      piso={dupla.iniciada_em ?? undefined}
+                      jovemNome={dupla.mentorado.nome.split(" ")[0]}
+                      rotulo="sessão de especialista"
+                    />
+                  ) : (
+                    <p className="text-xs text-muted-foreground">
+                      Sessão nova nasce de um pedido aceito — do jovem ou da
+                      coordenação. Quando um chegar, ela aparece aqui.
+                    </p>
+                  )}
                   {faltantes.length > 0 && (
                     <RegistrarRetroativoDialog
                       duplaId={dupla.id}
                       faltantes={faltantes}
+                      esp
                       trigger={
                         <Button variant="outline" size="sm">
-                          Registrar encontro já realizado
+                          Registrar sessão já realizada
                         </Button>
                       }
                     />
@@ -193,17 +225,29 @@ export function AgendaEspecialista({
   );
 }
 
-function LinhaEncontro({ e, duplaId }: { e: Encontro; duplaId: string }) {
+function LinhaEncontro({
+  e,
+  duplaId,
+  encontros,
+}: {
+  e: Encontro;
+  duplaId: string;
+  /** histórico da mesma dupla — o passo do guia é o rank entre realizados
+   *  (0074): sessão 3 pode cobrir o passo 2 */
+  encontros: Encontro[];
+}) {
   const link = linkSeguro(e.link);
+  const passo = passoEsp(e, encontros);
   return (
     <li className="flex items-center gap-3 px-3 py-2.5">
       <span className="min-w-0 flex-1">
         <span className="block truncate text-sm font-medium">
-          {e.numero}º encontro
+          Passo {passo} · sessão {e.numero}
         </span>
         <span className="block truncate text-xs text-muted-foreground">
           {STATUS_LABEL[e.status]}
           {e.data_hora ? ` · ${formatDateTime(e.data_hora)}` : " · data a definir"}
+          {e.origem === "externo" && " · registrado depois"}
           {e.status === "realizado" &&
             (e.registro ? " · registro entregue" : " · registro pendente")}
         </span>

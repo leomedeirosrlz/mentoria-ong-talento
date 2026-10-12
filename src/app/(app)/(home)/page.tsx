@@ -10,7 +10,11 @@ import {
   getMinhasDuplas,
 } from "@/lib/queries";
 import { getUltimasInteracoes } from "@/lib/interacoes";
-import { getSolicitacoesVisiveis } from "@/lib/queries-especialista";
+import {
+  getPropostasMap,
+  getSlotsLivres,
+  getSolicitacoesVisiveis,
+} from "@/lib/queries-especialista";
 import { getSupervisaoAlvos, getSupervisoesRecentes } from "@/lib/queries-supervisao";
 import { getMinhaAssinaturaTermo } from "@/lib/queries-assinaturas";
 import { DashboardCoordenacao } from "@/components/dashboard-coordenacao";
@@ -62,6 +66,7 @@ export default async function HomePage({
           avisos={avisos}
           filtro={filtro}
           solicitacoes={solicitacoes}
+          turmas={[...new Set(cronogramas.map((c) => c.turma))]}
           meuNome={me?.nome.split(" ")[0]}
         />
       </div>
@@ -108,6 +113,21 @@ export default async function HomePage({
       ? getSolicitacoesVisiveis()
       : Promise.resolve([]),
   ]);
+  // a negociação precisa da thread de propostas e da agenda do especialista
+  // (o slot sempre sai da grade dele — os picks de aceite/contra vêm daqui)
+  const emNegociacao = solicitacoes.filter(
+    (s) =>
+      (s.status_efetivo ?? s.status) === "aberta" ||
+      (s.status_efetivo ?? s.status) === "contra_proposta"
+  );
+  const [propostas, meusSlots] = await Promise.all([
+    emNegociacao.length
+      ? getPropostasMap(emNegociacao.map((s) => s.id))
+      : Promise.resolve({}),
+    me?.role === "mentor_especialista"
+      ? getSlotsLivres(me.id)
+      : Promise.resolve([]),
+  ]);
   return (
     <div className="space-y-8">
       {/* null = nunca assinou — qualquer estado ≠ assinado pede a assinatura */}
@@ -122,7 +142,12 @@ export default async function HomePage({
         me={me!}
       />
       {me?.role === "mentor_especialista" && (
-        <DemandasEspecialista solicitacoes={solicitacoes} meuId={me.id} />
+        <DemandasEspecialista
+          solicitacoes={solicitacoes}
+          propostas={propostas}
+          slots={meusSlots}
+          meuId={me.id}
+        />
       )}
       <AvisosSection avisos={avisos} souCoord={false} />
     </div>
