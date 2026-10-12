@@ -230,10 +230,10 @@ test.describe("mentorado — shell /jovem", () => {
       page.getByRole("heading", { name: "Jovem E2E", level: 1 })
     ).toBeVisible();
     // o desenho é o do perfil de todo mundo: badge de papel no header,
-    // ficha/dados como seções e as linhas de conta no fim
+    // ficha como gaveta (summary), dados como seção e conta no fim
     await expect(page.getByText("Mentorado").first()).toBeVisible();
     await expect(
-      page.getByRole("heading", { name: "Sua ficha no programa" })
+      page.locator("summary").getByText("Sua ficha no programa")
     ).toBeVisible();
     await expect(
       page.getByRole("heading", { name: "Seus dados" })
