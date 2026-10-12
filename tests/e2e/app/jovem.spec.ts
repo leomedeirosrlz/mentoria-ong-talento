@@ -229,13 +229,19 @@ test.describe("mentorado — shell /jovem", () => {
     await expect(
       page.getByRole("heading", { name: "Jovem E2E", level: 1 })
     ).toBeVisible();
-    await expect(page.getByText(/jovem-e2e@realiza\.test/)).toBeVisible();
+    // o desenho é o do perfil de todo mundo: badge de papel no header,
+    // ficha/dados como seções e as linhas de conta no fim
+    await expect(page.getByText("Mentorado").first()).toBeVisible();
     await expect(
       page.getByRole("heading", { name: "Sua ficha no programa" })
     ).toBeVisible();
     await expect(
       page.getByRole("heading", { name: "Seus dados" })
     ).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Conta" })
+    ).toBeVisible();
+    await expect(page.getByText(/jovem-e2e@realiza\.test/)).toBeVisible();
     // opt-in colega↔colega (0076): a ficha do jovem não tem WhatsApp — o
     // controle aparece desligado e explicado, nunca escondido
     await expect(
@@ -244,6 +250,28 @@ test.describe("mentorado — shell /jovem", () => {
     await expect(
       page.getByRole("switch", { name: /Compartilhar meu WhatsApp/ })
     ).toBeDisabled();
+  });
+
+  test("perfil edita os dados dele pelo lápis — o gesto do perfil de todos", async ({
+    page,
+  }) => {
+    await page.goto("/jovem/perfil");
+    await page
+      .getByRole("button", { name: "Editar seus dados" })
+      .click();
+    const dialog = page.getByRole("dialog");
+    await expect(
+      dialog.getByRole("heading", { name: "Seus dados" })
+    ).toBeVisible();
+    await dialog
+      .getByLabel("Seu WhatsApp")
+      .fill("(11) 98888-7777");
+    await dialog.getByRole("button", { name: /Salvar/i }).click();
+    await expect(page.getByText("(11) 98888-7777")).toBeVisible();
+    // reverte — o spec é rerodável e o número não é fixture de ninguém
+    await page.getByRole("button", { name: "Editar seus dados" }).click();
+    await page.getByRole("dialog").getByLabel("Seu WhatsApp").fill("");
+    await page.getByRole("dialog").getByRole("button", { name: /Salvar/i }).click();
   });
 
   test("pessoas lista a equipe das duplas e o diretório de colegas", async ({

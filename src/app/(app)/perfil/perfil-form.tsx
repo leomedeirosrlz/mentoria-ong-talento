@@ -61,7 +61,7 @@ import Link from "next/link";
 
 /** Chip "pendente" nas linhas do preview — a contagem do summary é a soma
  *  destes badges (completude se lê nos dados, não no modo). */
-function BadgePendente() {
+export function BadgePendente() {
   return (
     <Badge
       variant="outline"
@@ -78,7 +78,7 @@ function BadgePendente() {
  *  coluna lateral. `empilhado` trava o modo vertical: é o caso do card de
  *  cadastro, que mora num rail de ~290px e ainda divide em 2 colunas — lá
  *  a coluna lateral nunca cabe. Só entra em <dl>. */
-function Linha({
+export function Linha({
   rotulo,
   valor,
   pendente,
@@ -118,7 +118,7 @@ function Linha({
 }
 
 /** Tags estilo TagInput no modo leitura — mesmas pílulas, sem o gesto. */
-function ChipsTags({ itens }: { itens: string[] }) {
+export function ChipsTags({ itens }: { itens: string[] }) {
   return (
     <span className="flex flex-wrap gap-1.5">
       {itens.map((i) => (
@@ -138,7 +138,7 @@ type ValorSpec = {
   chips?: string[];
 };
 
-function Valor({ campo, pendente }: { campo: ValorSpec; pendente?: boolean }) {
+export function Valor({ campo, pendente }: { campo: ValorSpec; pendente?: boolean }) {
   return (
     <Linha
       rotulo={campo.rotulo}
@@ -173,7 +173,7 @@ type CampoCadastroSpec = {
  *  obrigatório: usado como `render` do DialogTrigger, ele recebe as props
  *  injetadas pelo base-ui (onClick, aria-haspopup, ref…) — sem repassar, o
  *  trigger vira um botão morto. */
-function BotaoLapis({
+export function BotaoLapis({
   label,
   className,
   ...props
@@ -203,7 +203,7 @@ function BotaoLapis({
  *  gaveta junto (o lápis é filho dela, e o toggle dispara em qualquer
  *  clique interno). Fica no onClick do summary pra rodar DEPOIS do handler
  *  do trigger (o Dialog já abriu quando o default morre aqui). */
-function cliqueSoDoDialog(e: React.MouseEvent<HTMLElement>) {
+export function cliqueSoDoDialog(e: React.MouseEvent<HTMLElement>) {
   if ((e.target as HTMLElement).closest("[data-slot='dialog-trigger']")) {
     e.preventDefault();
   }
@@ -212,7 +212,7 @@ function cliqueSoDoDialog(e: React.MouseEvent<HTMLElement>) {
 /** <form> comum dos modais de seção — cada um manda só os próprios campos;
  *  o action grava patch parcial por chave presente (o que não veio no
  *  FormData não é tocado). Sucesso: toast + refresh + fecha o modal. */
-function FormSecao({
+export function FormSecao({
   aoSalvar,
   children,
 }: {
@@ -541,7 +541,7 @@ function DialogoMentoria({ mentorProfile }: { mentorProfile: MentorProfile }) {
 
 /** Uma linha de credencial na seção Conta — rótulo + descrição à esquerda,
  *  ação à direita; o padrão de settings que o <details> improvisava antes. */
-function ContaLinha({
+export function ContaLinha({
   titulo,
   descricao,
   acao,
@@ -576,7 +576,7 @@ function ContaLinha({
  *  dispara o recovery implícito — o link pousa em /auth/definir-senha com
  *  a sessão criada no navegador que abrir o e-mail (é o dono da caixa,
  *  então qualquer navegador serve). */
-function DialogoSenha({ email }: { email: string }) {
+export function DialogoSenha({ email }: { email: string }) {
   const supabase = useMemo(() => createClient(), []);
   const otp = useMemo(() => createOtpClient(), []);
   const [open, setOpen] = useState(false);
@@ -794,7 +794,7 @@ function DialogoSenha({ email }: { email: string }) {
  *  mudança aplica na hora, sem link. A server action trocarEmail
  *  revalida a senha no servidor e chama auth.admin.updateUserById;
  *  o trigger sync_profile_email (0060) espelha em profiles. */
-function DialogoEmail({ email }: { email: string }) {
+export function DialogoEmail({ email }: { email: string }) {
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
   const [open, setOpen] = useState(false);

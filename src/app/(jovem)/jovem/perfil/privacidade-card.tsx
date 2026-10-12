@@ -3,7 +3,6 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Card, CardContent } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { setContatoCompartilhado } from "@/lib/actions-jovem";
 import { cn } from "@/lib/utils";
@@ -52,14 +51,14 @@ export function PrivacidadeCard({
   }
 
   return (
-    <Card>
-      <CardContent className="space-y-4">
-        <div>
-          <h2 className="text-base font-semibold">Privacidade</h2>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            Você escolhe se os colegas veem seu contato.
-          </p>
-        </div>
+    <section className="rounded-xl bg-card p-6 shadow-[var(--shadow-border)]">
+      <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+        Privacidade
+      </h2>
+      <p className="mt-1 text-xs text-muted-foreground">
+        Você escolhe se os colegas veem seu contato.
+      </p>
+      <div className="mt-4 space-y-4">
         <label
           className={cn(
             "flex items-start gap-3 rounded-lg border border-border px-3.5 py-3 text-sm",
@@ -88,7 +87,7 @@ export function PrivacidadeCard({
           Do outro lado é igual: um colega só mostra o WhatsApp dele se
           escolher compartilhar no próprio perfil.
         </p>
-      </CardContent>
-    </Card>
+      </div>
+    </section>
   );
 }
