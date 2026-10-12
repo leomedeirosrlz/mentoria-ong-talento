@@ -2089,7 +2089,7 @@ function build(): DemoData {
     supervisor: paulo,
     encontros: encD6,
     encaminhamentos: [
-      encaminhamento(uid(D.esp1), encD6[1].registro!.id,
+      encaminhamento(uid(D.esp1), encD6[2].registro!.id,
         "Resolver os 10 exercícios de fração da lista",
         "mentorado", addDias(HOJE, 4), "pendente"),
     ],
@@ -2717,7 +2717,7 @@ function build(): DemoData {
         tipo: "avaliacao_pendente",
         titulo: "Como foi seu encontro?",
         corpo: "Conte em 1 minuto como foi. Pro seu mentor, a nota só aparece na média.",
-        href: `/avaliar/demo-aval-${encD6[1].id.slice(-12)}`,
+        href: `/avaliar/demo-aval-${encD6[2].id.slice(-12)}`,
         lida_em: null,
         created_at: haDias(4, "21:00"),
       },
