@@ -87,6 +87,9 @@ const IDS = {
   esp2Profile: "e2e00000-0000-4000-8000-0000000000c0",
   mentoradoSemDpp: "e2e00000-0000-4000-8000-0000000000d0",
   jovem2Profile: "e2e00000-0000-4000-8000-0000000000f0",
+  // janela de grade do esp2 — os chips do pedido direcionado do jovem e os
+  // slots da contra-proposta/aceite saem da grade REAL dele (0073)
+  gradeEsp2: "e2e00000-0000-4000-8000-0000000000e1",
 };
 const EMAIL = "e2e-mentor@realiza.test";
 const COORD_EMAIL = "e2e-coord@realiza.test";
@@ -229,8 +232,11 @@ console.log(`cronograma: ${cron.id} (${cron.turma})`);
   // agenda do especialista (0073): janelas/exceções que um run de spec
   // morreu sem desfazer — a janela fixture é recriada no bloco do esp. Se o
   // profile ainda não existir o delete é no-op (o filtro não casa nada).
+  // esp2 idem — a grade dele vira fixture no bloco dele mais abaixo.
   await del(`especialista_grade?profile_id=eq.${IDS.espProfile}`);
   await del(`especialista_excecoes?profile_id=eq.${IDS.espProfile}`);
+  await del(`especialista_grade?profile_id=eq.${IDS.esp2Profile}`);
+  await del(`especialista_excecoes?profile_id=eq.${IDS.esp2Profile}`);
   // cronogramas criados pelo spec de turmas — eventos primeiro: a FK
   // ciclo_eventos.cronograma_id (0061) não tem ON DELETE CASCADE
   const crons = await rest(`cronogramas?select=id&turma=like.${encodeURIComponent(TURMA_E2E_PREFIX)}*`);
@@ -619,6 +625,22 @@ if (!mpEsp2) {
   });
   console.log("mentor_profiles do esp2 criado");
 }
+
+// janela mínima pro esp2 (quinta 19–21 — dia diferente da terça do esp
+// principal pros slots não se confundirem): o pedido direcionado do jovem
+// busca os horários dele pela RPC e o aceite valida contra a grade real.
+// A limpeza no topo varreu tudo do profile — insert seco.
+await rest("especialista_grade", {
+  method: "POST",
+  body: JSON.stringify({
+    id: IDS.gradeEsp2,
+    profile_id: esp2.id,
+    dia_semana: 4,
+    hora_inicio: "19:00",
+    hora_fim: "21:00",
+  }),
+});
+console.log("janela de grade do esp2 (quinta 19–21) criada");
 
 let [jovem2] = await rest(
   `profiles?select=id,user_id,role,ativo,onboarded_em&email=eq.${JOVEM2_EMAIL}`

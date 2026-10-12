@@ -40,10 +40,14 @@ function resumo(texto: string, max = 200): string {
  *  lê 'expirada' sem writer — dedup e CTAs não podem olhar só a coluna. */
 const STATUS_EM_ABERTO = ["aberta", "aguardando_coord", "contra_proposta"];
 
-/** Revalida as rotas onde a solicitação aparece — com dupla_dpp_id a ficha
- *  DPP entra junto; sem ela (pedido do jovem em triagem) só home/jovem. */
+/** Revalida as rotas onde a solicitação aparece — o mural staff (/), a ficha
+ *  DPP quando ela é a origem e as superfícies do jovem (o autor de pedido
+ *  jovem age pela própria home/agenda — cancelar, contra-propor, aceitar a
+ *  proposta do especialista). */
 function revalidarMural(duplaDppId?: string | null) {
   revalidatePath("/");
+  revalidatePath("/jovem");
+  revalidatePath("/jovem/agenda");
   if (duplaDppId) revalidatePath(`/duplas/${duplaDppId}`);
 }
 

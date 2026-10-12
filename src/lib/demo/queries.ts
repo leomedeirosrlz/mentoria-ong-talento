@@ -24,6 +24,7 @@ import type {
   JovemContato,
   JovemDupla,
   JovemEncaminhamento,
+  JovemEspecialista,
   JovemPerfil,
   Material,
   Mentorado,
@@ -978,7 +979,22 @@ export function demoSolicitacoesVisiveis(
     // a policy compara mentorado_id com my_mentorado_id() — a ficha do
     // mentorado, não o profile dele
     const meuMentorado = data.mentorados.find((m) => m.profile_id === eu.id)?.id;
-    lista = data.solicitacoes.filter((s) => s.mentorado_id === meuMentorado);
+    lista = data.solicitacoes
+      .filter((s) => s.mentorado_id === meuMentorado)
+      // os embeds de profiles não passam pela RLS do papel — o mural só
+      // denormaliza `especialista_nome` (engajado); o direcionado e o
+      // autor resolvem do catálogo no getJovemPedidosEspecialista
+      .map((s) => ({
+        ...s,
+        solicitante:
+          s.created_by === eu.id
+            ? { nome: eu.nome_social || eu.nome }
+            : null,
+        especialista: s.especialista_nome
+          ? { nome: s.especialista_nome }
+          : null,
+        desejado: null,
+      }));
   } else {
     const ids = new Set(duplasDoPapel(data, role).map((d) => d.id));
     lista = data.solicitacoes.filter(
@@ -1005,8 +1021,14 @@ export function demoPropostas(
   if (!sol) return [];
   const visivel = demoSolicitacoesVisiveis(role).some((s) => s.id === sol.id);
   if (!visivel) return [];
+  const eu = getDemoData().personas[role];
   return getDemoData()
     .solicitacaoPropostas.filter((p) => p.solicitacao_id === solicitacaoId)
+    // como no sol_select real: pro jovem, o embed `autor` de profiles só
+    // resolve a própria linha — o nome do especialista volta via catálogo
+    .map((p) =>
+      role === "mentorado" && p.autor_id !== eu.id ? { ...p, autor: null } : p
+    )
     .sort((a, b) => a.created_at.localeCompare(b.created_at));
 }
 
@@ -1039,6 +1061,23 @@ export function demoEspecialistas(): {
   return getDemoData()
     .profiles.filter((p) => p.role === "mentor_especialista" && p.ativo)
     .map((p) => ({ id: p.id, nome: p.nome, areas: p.areas ?? null }))
+    .sort(porNome);
+}
+
+/** O catálogo da view jovem_especialistas (0075) — os especialistas ativos,
+ *  projetados no que o jovem pode ver (nome/social/avatar/áreas, sem contato).
+ *  Só faz sentido pro papel mentorado. */
+export function demoJovemEspecialistas(role: AppRole): JovemEspecialista[] {
+  if (role !== "mentorado") return [];
+  return getDemoData()
+    .profiles.filter((p) => p.role === "mentor_especialista" && p.ativo)
+    .map((p) => ({
+      id: p.id,
+      nome: p.nome,
+      nome_social: p.nome_social ?? null,
+      avatar_path: p.avatar_path ?? null,
+      areas: p.areas ?? null,
+    }))
     .sort(porNome);
 }
 

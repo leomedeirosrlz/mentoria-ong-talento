@@ -1,11 +1,15 @@
 import {
+  agirComConfirma,
   appEnvOk,
   atualizarViaServiceRole,
   buscarViaServiceRole,
   expect,
   inserirViaServiceRole,
+  isoDoRotulo,
+  limparEncontrosDaDupla,
   limparViaServiceRole,
   loginComSenha,
+  relogar,
   test,
 } from "../helpers";
 import type { Page } from "@playwright/test";
@@ -47,7 +51,6 @@ const IDS = {
   solExpirada: "e2e00000-0000-4000-8000-0000000001c3",
 } as const;
 const MENTORADOS_E2E = `${IDS.mentorado},${IDS.mentorado2}`;
-const TZ = "America/Sao_Paulo"; // fuso do app e da RPC de slots
 // demandas com prefixo único — o escopo dos asserts é o próprio texto
 const DEMANDA_ACEITE =
   "E2E-112: jovem precisa de reforço em inglês instrumental pra entrevista de emprego.";
@@ -62,70 +65,9 @@ const MSG_CONTRA = "Nesse dia só consigo mais cedo — esse horário funciona?"
 
 test.skip(!appEnvOk(), "sem credenciais de teste (E2E_*) — pula specs de app");
 
-/** "terça 14/10 às 19:30" (o texto do option da agenda) → ISO do slot. O
- *  ano não viaja no rótulo — o slot é sempre futuro, então a data montada
- *  no ano corrente serve; se já passou (cruzar dezembro→janeiro), +1 ano. */
-function isoDoRotulo(rotulo: string): string {
-  const m = rotulo.match(/(\d{2})\/(\d{2}) às (\d{2}):(\d{2})/);
-  if (!m) throw new Error(`rótulo de slot inesperado: ${rotulo}`);
-  const [, dd, mm, hh, mi] = m;
-  const ano = Number(
-    new Date().toLocaleDateString("en-CA", { timeZone: TZ, year: "numeric" })
-  );
-  let iso = `${ano}-${mm}-${dd}T${hh}:${mi}:00-03:00`;
-  if (new Date(iso).getTime() <= Date.now()) {
-    iso = `${ano + 1}-${mm}-${dd}T${hh}:${mi}:00-03:00`;
-  }
-  return iso;
-}
-
 /** epoch fecha a conta sem depender do formato — PostgREST devolve
  *  timestamptz em +00:00, o slot da RPC idem. */
 const ms = (iso: string) => new Date(iso).getTime();
-
-/** Troca de papel dentro do mesmo teste: a sessão mora em cookie — limpa e
- *  loga de novo (sem clearCookies o /login desvia pra home da sessão viva). */
-async function relogar(page: Page, email: string, senha: string) {
-  await page.context().clearCookies();
-  await loginComSenha(page, email, senha);
-}
-
-/** Clique + confirmação no banco: se o primeiro clique caiu pré-hidratação
- *  (RSC demora a ligar handlers em dev/preview frio), o laço repete o gesto
- *  até o estado confirmar — o mesmo padrão do pularOnboarding dos helpers. */
-async function agirComConfirma(
-  agir: () => Promise<void>,
-  confirmou: () => Promise<boolean>,
-  timeoutMs = 20_000
-) {
-  const t0 = Date.now();
-  for (;;) {
-    // o click é seguro de repetir: o botão desabilita enquanto a action
-    // roda e some depois do sucesso; se o locator já morreu, engole
-    await agir().catch(() => {});
-    for (let i = 0; i < 10; i++) {
-      if (await confirmou()) return;
-      if (Date.now() - t0 > timeoutMs) {
-        throw new Error("ação não confirmou no tempo — estado não mudou");
-      }
-      await new Promise((r) => setTimeout(r, 600));
-    }
-  }
-}
-
-/** Filhos da 0071 primeiro — avaliacoes_encontro e avaliacao_links têm FK
- *  NO ACTION pra encontros; apagar o pai antes dá 409. */
-async function apagarEncontrosDeDupla(duplaId: string) {
-  const encs = await buscarViaServiceRole<{ id: string }[]>(
-    "encontros",
-    `select=id&dupla_id=eq.${duplaId}`
-  );
-  if (!encs.length) return;
-  const csv = encs.map((e) => e.id).join(",");
-  await limparViaServiceRole("avaliacoes_encontro", `encontro_id=in.(${csv})`);
-  await limparViaServiceRole("avaliacao_links", `encontro_id=in.(${csv})`);
-  await limparViaServiceRole("encontros", `id=in.(${csv})`);
-}
 
 /** Piso do spec: nem uma solicitação viva nos mentorados e2e, a duplaEsp
  *  sem tentativas (o numero=1 do 1º aceite fica determinístico) e nenhuma
@@ -159,7 +101,7 @@ async function convergirSolicitacoes() {
     "duplas",
     `select=id&mentorado_id=in.(${MENTORADOS_E2E})&trilha=eq.especialista&id=not.eq.${IDS.duplaEsp}`
   );
-  for (const d of espExtras) await apagarEncontrosDeDupla(d.id);
+  for (const d of espExtras) await limparEncontrosDaDupla(d.id);
   if (espExtras.length) {
     await limparViaServiceRole(
       "duplas",
@@ -167,7 +109,7 @@ async function convergirSolicitacoes() {
     );
   }
   // a trilha fixture volta ao estado do seed — sem tentativa nenhuma
-  await apagarEncontrosDeDupla(IDS.duplaEsp);
+  await limparEncontrosDaDupla(IDS.duplaEsp);
   // sino limpo: a assert de recusa conta exatamente a notificação do teste
   await limparViaServiceRole(
     "notificacoes",

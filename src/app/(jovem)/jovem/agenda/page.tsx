@@ -3,6 +3,7 @@ import {
   CalendarBlank,
   CalendarDots,
   CheckCircle,
+  Sparkle,
   VideoCamera,
   WhatsappLogo,
   XCircle,
@@ -22,20 +23,29 @@ import {
   DesmarcarEncontroJovem,
   NaoAconteceuJovem,
 } from "@/components/jovem-encontro-acoes";
+import { PedidoJovemMesa } from "@/components/jovem-pedido-item";
+import {
+  JovemEspSlots,
+  PedirEspecialistaDialog,
+} from "@/components/pedir-especialista-dialog";
 import { Estrelas } from "@/components/estrelas";
 import {
   formatDateTime,
-  formatDiaHora,
-  formatDiaSemana,
   linkSeguro,
   maxEncontros,
   waLink,
 } from "@/lib/ciclo";
+import {
+  efetivoDe,
+  pedidoAbertoComEsp,
+  resumoPedidoJovem,
+} from "@/lib/jovem-especialista";
 import { avatarPublicUrl } from "@/lib/avatar";
 import {
   getJovemContatos,
   getJovemDuplas,
   getJovemEncontros,
+  getJovemPedidosEspecialista,
 } from "@/lib/queries-jovem";
 import { getSlotsLivres } from "@/lib/queries-especialista";
 import { getCicloEventos, getMe } from "@/lib/queries";
@@ -69,7 +79,7 @@ const STATUS = {
 } as const;
 
 export default async function JovemAgenda() {
-  const [encontros, avaliacoes, me, duplas, eventos, contatos] =
+  const [encontros, avaliacoes, me, duplas, eventos, contatos, pedidosEsp] =
     await Promise.all([
       getJovemEncontros(),
       getJovemAvaliacoes(),
@@ -77,6 +87,7 @@ export default async function JovemAgenda() {
       getJovemDuplas(),
       getCicloEventos(),
       getJovemContatos(),
+      getJovemPedidosEspecialista(),
     ]);
   const agora = new Date().getTime();
   const primeiroNome = (me?.nome_social || me?.nome || "").split(" ")[0];
@@ -136,11 +147,11 @@ export default async function JovemAgenda() {
         .map((n) => ({ numero: n, data: oficialPorNumero.get(n) ?? null }))
     : [];
 
-  // trilha especialista (111): a agenda real do especialista chega como
-  // PROJEÇÃO de slots (especialista_slots_livres — timestamptz pronto) —
-  // grade/exceções crus nunca chegam ao papel mentorado. Combinar é fora do
-  // app (WhatsApp); a máquina de proposta/aceite é REALIZA-112 e não entra
-  // aqui de propósito.
+  // trilha especialista (111+112): a agenda real do especialista chega como
+  // PROJEÇÃO de slots (especialista_slots_livres — timestamptz pronto) e
+  // cada slot é um "pedir esse horário" — a sessão só nasce quando o
+  // especialista aceita (RPC 0074). Um pedido em aberto pro mesmo
+  // especialista substitui os chips: a dedup é do banco, a UI mostra a mesa.
   const duplasEsp = duplas.filter(
     (d) =>
       d.status === "ativa" && d.trilha === "especialista" && d.mentor_id != null
@@ -149,6 +160,21 @@ export default async function JovemAgenda() {
     (
       await Promise.all(duplasEsp.map((d) => getSlotsLivres(d.mentor_id!)))
     ).map((slots, i) => [duplasEsp[i].id!, slots] as const)
+  );
+  const trilhasAtivasEsp = duplas
+    .filter(
+      (d) =>
+        d.trilha === "especialista" &&
+        (d.status === "ativa" || d.status === "pausada") &&
+        d.mentor_id != null
+    )
+    .map((d) => d.mentor_id!);
+  const semDuplaDpp = !duplas.some(
+    (d) => d.trilha !== "especialista" && d.status === "ativa"
+  );
+  const waCoord = waLink(
+    contatos.find((c) => c.papel === "coordenacao")?.whatsapp,
+    `Olá! Sou ${me?.nome_social || me?.nome || ""}, mentorado(a) do programa, e preciso falar com a equipe.`
   );
   const espPorDupla = new Map(
     duplasEsp.map((d) => {
@@ -228,6 +254,12 @@ export default async function JovemAgenda() {
             {duplasEsp.map((d) => {
               const esp = espPorDupla.get(d.id!)!;
               const slots = slotsEsp.get(d.id!) ?? [];
+              // a dedup do banco é por par — se já tem pedido em aberto pra
+              // esse especialista, a mesa aparece no lugar dos chips
+              const pedido = pedidoAbertoComEsp(
+                pedidosEsp.solicitacoes,
+                d.mentor_id
+              );
               return (
                 <Card key={d.id}>
                   <CardContent className="space-y-3 p-5">
@@ -246,8 +278,8 @@ export default async function JovemAgenda() {
                           Horários de {esp.primeiro}
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          Sessões de 1h · escolhe um horário e combina por
-                          WhatsApp — quando a sessão for marcada ela aparece
+                          Sessões de 1h · escolhe um horário e manda o pedido
+                          — quando {esp.primeiro} aceitar, a sessão aparece
                           aqui na agenda.
                         </p>
                       </div>
@@ -268,24 +300,49 @@ export default async function JovemAgenda() {
                         </a>
                       )}
                     </div>
-                    {slots.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">
-                        {esp.primeiro} ainda não abriu horários livres
-                        {esp.wa
-                          ? " — chama no WhatsApp pra combinar."
-                          : "."}
-                      </p>
+                    {pedido ? (
+                      <div className="space-y-2 border-t border-border/60 pt-3">
+                        <p className="text-xs text-muted-foreground">
+                          {resumoPedidoJovem(efetivoDe(pedido), esp.primeiro)}
+                        </p>
+                        <PedidoJovemMesa
+                          s={pedido}
+                          propostas={pedidosEsp.propostas[pedido.id] ?? []}
+                          slots={slots}
+                          meuId={me?.id ?? ""}
+                          waCoord={waCoord}
+                        />
+                      </div>
+                    ) : slots.length === 0 ? (
+                      <div className="space-y-2">
+                        <p className="text-sm text-muted-foreground">
+                          {esp.primeiro} ainda não abriu horários livres —
+                          pede por aqui que quem aceita propõe um com você
+                          {esp.wa ? ", ou chama no WhatsApp" : ""}.
+                        </p>
+                        <PedirEspecialistaDialog
+                          especialistas={pedidosEsp.catalogo}
+                          trilhasAtivas={trilhasAtivasEsp}
+                          slotsPorEsp={{ [d.mentor_id!]: slots }}
+                          semDuplaDpp={semDuplaDpp}
+                          preEspId={d.mentor_id}
+                          trigger={
+                            <Button variant="outline" size="sm">
+                              <Sparkle size={15} aria-hidden />
+                              Pedir sessão com {esp.primeiro}
+                            </Button>
+                          }
+                        />
+                      </div>
                     ) : (
-                      <ul className="flex flex-wrap gap-1.5">
-                        {slots.slice(0, 10).map((s) => (
-                          <li
-                            key={s}
-                            className="rounded-md border border-border px-2 py-1 text-xs tabular-nums"
-                          >
-                            {rotuloSlot(s)}
-                          </li>
-                        ))}
-                      </ul>
+                      <JovemEspSlots
+                        espId={d.mentor_id!}
+                        slots={slots}
+                        especialistas={pedidosEsp.catalogo}
+                        trilhasAtivas={trilhasAtivasEsp}
+                        slotsPorEsp={{ [d.mentor_id!]: slots }}
+                        semDuplaDpp={semDuplaDpp}
+                      />
                     )}
                   </CardContent>
                 </Card>
@@ -485,8 +542,3 @@ function EncontroLinha({
   );
 }
 
-/** "ter 15/10 às 19:00" — o slot da RPC já é timestamptz pronto; aqui só
- *  vira chip legível no fuso de Brasília (TZ do projeto nas formatadoras). */
-function rotuloSlot(iso: string) {
-  return `${formatDiaSemana(iso).replace("-feira", "")} ${formatDiaHora(iso)}`;
-}
