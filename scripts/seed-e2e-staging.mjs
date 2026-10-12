@@ -24,6 +24,9 @@
 // mentor_profiles tipo 'especialista' (o aceite real a cria), uma trilha
 // 'especialista' ativa com a MESMA mentorada da dupla DPP e uma janela de
 // grade (terça 19:00–21:00) que alimenta a projeção de slots do jovem.
+// E as personas da solicitação v2 (REALIZA-112): um 2º especialista (esp2)
+// e um jovem SEM dupla DPP (profile mentorado + mentorado vinculado) —
+// alvos da triagem aguardando_coord e de pedidos direcionados.
 // IDs fixos e2e00000-*, que o workflow usa pra cleanup determinístico.
 
 const URL_ = process.env.E2E_SUPABASE_URL;
@@ -76,6 +79,14 @@ const IDS = {
   espProfile: "e2e00000-0000-4000-8000-000000000060",
   duplaEsp: "e2e00000-0000-4000-8000-0000000000e0",
   gradeEsp: "e2e00000-0000-4000-8000-0000000000f0",
+  // REALIZA-112: 2º especialista (alvo de pedido direcionado sem bagunçar a
+  // duplaEsp) e o jovem SEM dupla DPP — o pedido dele cai na triagem da
+  // coordenação (aguardando_coord). Os ids convergem com a fixture manual
+  // que o Thiago criou no staging; o 00f0 do jovem é profile — o gradeEsp
+  // 00f0 é OUTRA tabela, não conflita.
+  esp2Profile: "e2e00000-0000-4000-8000-0000000000c0",
+  mentoradoSemDpp: "e2e00000-0000-4000-8000-0000000000d0",
+  jovem2Profile: "e2e00000-0000-4000-8000-0000000000f0",
 };
 const EMAIL = "e2e-mentor@realiza.test";
 const COORD_EMAIL = "e2e-coord@realiza.test";
@@ -83,6 +94,10 @@ const JOVEM_EMAIL = "jovem-e2e@realiza.test";
 const ESP_EMAIL = "esp-e2e@realiza.test";
 // alimenta o "Chamar no WhatsApp" do card "Horários de …" na /jovem/agenda
 const ESP_WHATSAPP = "5511999000070";
+// personas da solicitação v2 — mesmo esquema de senha compartilhada do mentor
+const ESP2_EMAIL = "esp2-e2e@realiza.test";
+const ESP2_WHATSAPP = "5511999990002";
+const JOVEM2_EMAIL = "jovem2-e2e@realiza.test";
 // assinaturas.token é uuid — os tokens fixos da fixture manual do staging
 const TOKEN_TERMO_JOVEM = "e2e00000-0000-4000-8000-0000000000aa";
 const TOKEN_AUTORIZ_JOVEM = "e2e00000-0000-4000-8000-0000000000ab";
@@ -124,7 +139,7 @@ console.log(`cronograma: ${cron.id} (${cron.turma})`);
   // log de e-mail de apoio sobrevive à avaliação — ref_id é solto de
   // propósito.
   const morrem = await rest(
-    `duplas?select=id&or=(id.in.(${IDS.dupla},${IDS.dupla2},${IDS.duplaEsp}),remanejada_de.eq.${IDS.dupla2},mentor_id.eq.${IDS.mentorImport},mentorado_id.eq.${IDS.mentoradoLivre},and(mentorado_id.eq.${IDS.mentorado},id.not.in.(${IDS.dupla},${IDS.duplaEsp})))`
+    `duplas?select=id&or=(id.in.(${IDS.dupla},${IDS.dupla2},${IDS.duplaEsp}),remanejada_de.eq.${IDS.dupla2},mentor_id.eq.${IDS.mentorImport},mentorado_id.eq.${IDS.mentoradoLivre},mentorado_id.eq.${IDS.mentoradoSemDpp},and(mentorado_id.eq.${IDS.mentorado},id.not.in.(${IDS.dupla},${IDS.duplaEsp})))`
   );
   const morremIds = (morrem ?? []).map((d) => d.id);
   if (morremIds.length) {
@@ -155,7 +170,11 @@ console.log(`cronograma: ${cron.id} (${cron.turma})`);
     );
     const solIds = (sols ?? []).map((s) => s.id);
     if (solIds.length) {
-      await del(`especialista_eventos?solicitacao_id=in.(${solIds.join(",")})`);
+      // o thread de negociação é o filho (a 0074 batizou de
+      // solicitacao_propostas — "especialista_eventos" não existe como
+      // tabela e o delete sempre dava 400: a sol ficava de pé, travava o
+      // re-pedido pelo dedup e poluía o mural do especialista)
+      await del(`solicitacao_propostas?solicitacao_id=in.(${solIds.join(",")})`);
       await del(`solicitacoes_especialista?id=in.(${solIds.join(",")})`);
     }
     await del(`formulario_links?dupla_id=in.(${ids})`);
@@ -166,8 +185,26 @@ console.log(`cronograma: ${cron.id} (${cron.turma})`);
     console.log(`limpeza: ${condenadas.length} dupla(s) pendurada(s) removidas`);
   }
   await patch(`duplas?id=eq.${IDS.dupla2}`, { status: "ativa" });
-  const e2eProfiles = [IDS.mentorProfile, IDS.coordProfile, IDS.mentorReserva, IDS.mentorImport, IDS.jovemProfile, IDS.espProfile].join(",");
-  const e2eMentorados = [IDS.mentorado, IDS.mentorado2, IDS.mentoradoLivre, IDS.mentoradoImport].join(",");
+  const e2eProfiles = [IDS.mentorProfile, IDS.coordProfile, IDS.mentorReserva, IDS.mentorImport, IDS.jovemProfile, IDS.espProfile, IDS.esp2Profile, IDS.jovem2Profile].join(",");
+  const e2eMentorados = [IDS.mentorado, IDS.mentorado2, IDS.mentoradoLivre, IDS.mentoradoImport, IDS.mentoradoSemDpp].join(",");
+  // solicitações de especialista ligadas a qualquer mentorado e2e — o sweep
+  // de condenadas só alcança as que morrem junto das duplas; as que apontam
+  // pras duplas FIXTURE (dupla_dpp_id) ficariam de pé: uma 'aberta'/
+  // 'contra_proposta' pendurada trava o re-pedido (dedup) e polui o mural
+  // dos specs de solicitação. Nulla a aresta dupla→sol antes do delete.
+  {
+    const sols = await rest(
+      `solicitacoes_especialista?select=id&mentorado_id=in.(${e2eMentorados})`
+    );
+    const solIds = (sols ?? []).map((s) => s.id);
+    if (solIds.length) {
+      const csv = solIds.join(",");
+      await patch(`duplas?solicitacao_id=in.(${csv})`, { solicitacao_id: null });
+      await del(`solicitacao_propostas?solicitacao_id=in.(${csv})`);
+      await del(`solicitacoes_especialista?id=in.(${csv})`);
+      console.log(`limpeza: ${solIds.length} solicitação(ões) removidas`);
+    }
+  }
   // nota de saída do remanejo + notificações "dupla_formada" dos specs
   await del(
     `pessoa_notas?texto=like.*remanejamento*&or=(profile_id.in.(${e2eProfiles}),mentorado_id.in.(${e2eMentorados}))`
@@ -241,6 +278,49 @@ async function garantirAuthUser(email, senha, profile) {
   // o trigger handle_new_user já vinculou user_id pelo e-mail
   console.log(`auth user criado: ${user.id} (${email})`);
   return user;
+}
+
+/** Vínculo profile↔auth garantido pra uma persona com login. O
+ *  handle_new_user só roda no INSERT do GoTrue — um auth user órfão (run
+ *  morto entre o insert e o vínculo) faz o createUser dar 422; nesse caso
+ *  o caminho é update de senha + patch manual do user_id (mesma lógica que
+ *  o bloco do esp trazia inline). */
+async function vincularAuth(profile, email, senha = SENHA) {
+  if (profile.user_id) {
+    console.log(`auth user já vinculado: ${profile.user_id} (${email})`);
+    return;
+  }
+  const lista = await fetch(
+    `${URL_}/auth/v1/admin/users?filter=${encodeURIComponent(email)}`,
+    { headers: H }
+  ).then((r) => r.json());
+  const orfao = (lista.users ?? []).find(
+    (u) => u.email?.toLowerCase() === email.toLowerCase()
+  );
+  if (orfao) {
+    const res = await fetch(`${URL_}/auth/v1/admin/users/${orfao.id}`, {
+      method: "PUT",
+      headers: HJ,
+      body: JSON.stringify({
+        password: senha,
+        email_confirm: true,
+        user_metadata: { senha_em: new Date().toISOString() },
+      }),
+    });
+    if (!res.ok)
+      throw new Error(`admin updateUser ${email} → ${res.status}: ${await res.text()}`);
+    await patch(`profiles?id=eq.${profile.id}`, { user_id: orfao.id });
+    console.log(`auth user órfão re-vinculado: ${orfao.id} (${email})`);
+  } else {
+    const user = await garantirAuthUser(email, senha, profile);
+    // o trigger já vinculou pelo e-mail; se não (timing estranho), crava —
+    // sem o vínculo o login cai em "cadastro não encontrado"
+    const [depois] = await rest(`profiles?select=user_id&id=eq.${profile.id}`);
+    if (!depois?.user_id) {
+      await patch(`profiles?id=eq.${profile.id}`, { user_id: user.id });
+      console.log(`vínculo profile↔auth cravado à mão (${email})`);
+    }
+  }
 }
 
 if (!mentor.user_id) {
@@ -420,17 +500,27 @@ if (!esp.user_id) {
 }
 
 // o aceite real (0028) garante a row em mentor_profiles — a capacidade por
-// trilha (0073) mora nela; sem a row o trigger assume o cap implícito 1, o
-// que basta, mas a fixture fica mais fiel com ela
+// trilha (0073) mora nela; sem a row o trigger assume o cap implícito 1. O
+// spec 112 efetiva uma 2ª trilha pro mesmo esp (mentorado2), então a fixture
+// precisa de folga real — 3 vagas convergem a cada seed
 const [mpEsp] = await rest(
-  `mentor_profiles?select=profile_id&profile_id=eq.${esp.id}`
+  `mentor_profiles?select=profile_id,capacidade_especialista&profile_id=eq.${esp.id}`
 );
 if (!mpEsp) {
   await rest("mentor_profiles", {
     method: "POST",
-    body: JSON.stringify({ profile_id: esp.id, tipo: "especialista" }),
+    body: JSON.stringify({
+      profile_id: esp.id,
+      tipo: "especialista",
+      capacidade_especialista: 3,
+    }),
   });
   console.log("mentor_profiles do esp criado");
+} else if (mpEsp.capacidade_especialista !== 3) {
+  await patch(`mentor_profiles?profile_id=eq.${esp.id}`, {
+    capacidade_especialista: 3,
+  });
+  console.log("capacidade_especialista do esp convergida pra 3");
 }
 
 // trilha ativa Esp × a mesma mentorada da dupla DPP — um mentorado carrega
@@ -482,6 +572,108 @@ await rest("especialista_grade", {
   }),
 });
 console.log("janela de grade do esp (terça 19–21) criada");
+
+// ---- personas da solicitação v2 (REALIZA-112): esp2 + jovem sem DPP ----
+// esp2 é o alvo limpo de pedido direcionado (não disputa a duplaEsp nem o
+// cap do esp principal); jovem2/mentorado 00d0 NÃO tem dupla DPP — o pedido
+// dele nasce 'aguardando_coord' e alimenta a fila de triagem do coord card.
+let [esp2] = await rest(
+  `profiles?select=id,user_id,role,ativo,onboarded_em,whatsapp&email=eq.${ESP2_EMAIL}`
+);
+if (!esp2) {
+  [esp2] = await rest("profiles", {
+    method: "POST",
+    body: JSON.stringify({
+      id: IDS.esp2Profile,
+      email: ESP2_EMAIL,
+      nome: "Esp Dois E2E",
+      role: "mentor_especialista",
+      ativo: true,
+      whatsapp: ESP2_WHATSAPP,
+      onboarded_em: new Date().toISOString(),
+    }),
+  });
+  console.log("profile esp2 criado");
+} else {
+  const fixes = {};
+  if (esp2.role !== "mentor_especialista") fixes.role = "mentor_especialista";
+  if (!esp2.ativo) fixes.ativo = true;
+  if (!esp2.onboarded_em) fixes.onboarded_em = new Date().toISOString();
+  if (!esp2.whatsapp) fixes.whatsapp = ESP2_WHATSAPP;
+  if (Object.keys(fixes).length) {
+    await patch(`profiles?id=eq.${esp2.id}`, fixes);
+    console.log(`profile esp2 convergido (${Object.keys(fixes).join(", ")})`);
+  } else {
+    console.log("profile esp2 já existe");
+  }
+}
+await vincularAuth(esp2, ESP2_EMAIL);
+// capacidade por trilha — a row segue o mesmo critério do esp principal
+const [mpEsp2] = await rest(
+  `mentor_profiles?select=profile_id&profile_id=eq.${esp2.id}`
+);
+if (!mpEsp2) {
+  await rest("mentor_profiles", {
+    method: "POST",
+    body: JSON.stringify({ profile_id: esp2.id, tipo: "especialista" }),
+  });
+  console.log("mentor_profiles do esp2 criado");
+}
+
+let [jovem2] = await rest(
+  `profiles?select=id,user_id,role,ativo,onboarded_em&email=eq.${JOVEM2_EMAIL}`
+);
+if (!jovem2) {
+  [jovem2] = await rest("profiles", {
+    method: "POST",
+    body: JSON.stringify({
+      id: IDS.jovem2Profile,
+      email: JOVEM2_EMAIL,
+      nome: "Jovem E2E Sem DPP",
+      role: "mentorado",
+      ativo: true,
+      onboarded_em: new Date().toISOString(),
+    }),
+  });
+  console.log("profile jovem sem DPP criado");
+} else {
+  const fixes = {};
+  if (jovem2.role !== "mentorado") fixes.role = "mentorado";
+  if (!jovem2.ativo) fixes.ativo = true;
+  if (!jovem2.onboarded_em) fixes.onboarded_em = new Date().toISOString();
+  if (Object.keys(fixes).length) {
+    await patch(`profiles?id=eq.${jovem2.id}`, fixes);
+    console.log(`profile jovem sem DPP convergido (${Object.keys(fixes).join(", ")})`);
+  } else {
+    console.log("profile jovem sem DPP já existe");
+  }
+}
+await vincularAuth(jovem2, JOVEM2_EMAIL);
+// a ficha mentorados vinculada — sem profile_id o my_mentorado_id() volta
+// null e o pedido do jovem não tem dono (cai em triagem sem autor)
+{
+  const [ficha] = await rest(
+    `mentorados?select=id,profile_id&id=eq.${IDS.mentoradoSemDpp}`
+  );
+  if (!ficha) {
+    await rest("mentorados", {
+      method: "POST",
+      body: JSON.stringify({
+        id: IDS.mentoradoSemDpp,
+        nome: "Jovem E2E Sem DPP",
+        profile_id: jovem2.id,
+      }),
+    });
+    console.log("mentorado sem DPP criado");
+  } else if (ficha.profile_id !== jovem2.id) {
+    await patch(`mentorados?id=eq.${IDS.mentoradoSemDpp}`, {
+      profile_id: jovem2.id,
+    });
+    console.log("ficha do jovem sem DPP vinculada");
+  } else {
+    console.log("ficha do jovem sem DPP já vinculada");
+  }
+}
 
 // ---- jovem (mentorado) — fixtures do shell /jovem (REALIZA-108) ----
 // Mesmo esquema do mentor: profile ANTES do auth user pro handle_new_user
@@ -733,4 +925,6 @@ console.log("  E2E_COORD_PASSWORD=<a que você passou, ou a do mentor>");
 console.log(`  E2E_DUPLA2_ID=${IDS.dupla2}`);
 console.log(`  E2E_JOVEM_EMAIL=${JOVEM_EMAIL}`);
 console.log(`  E2E_ESP_EMAIL=${ESP_EMAIL}`);
+console.log(`  E2E_ESP2_EMAIL=${ESP2_EMAIL}`);
+console.log(`  E2E_JOVEM2_EMAIL=${JOVEM2_EMAIL}`);
 console.log("  E2E_SUPABASE_URL / E2E_SUPABASE_SERVICE_ROLE_KEY = do staging");

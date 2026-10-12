@@ -34,6 +34,10 @@ const IDS = {
   duplaEsp: "e2e00000-0000-4000-8000-0000000000e0",
   gradeFixture: "e2e00000-0000-4000-8000-0000000000f0", // terça 19:00–21:00
   encontroEsp: "e2e00000-0000-4000-8000-0000000000d3", // agendado, 1º da trilha
+  // a linha DPP do contraste ("Remarcar aparece na trilha comum") é a
+  // fixture nº 8 do jovem — de outro spec, então o piso garante ela de pé
+  duplaDpp: "e2e00000-0000-4000-8000-000000000030",
+  encontroDpp: "e2e00000-0000-4000-8000-0000000000d1",
 } as const;
 const TIPOS_AGENDA = [
   "encontro_marcado",
@@ -159,6 +163,31 @@ async function convergirPiso() {
     `profile_id=eq.${IDS.espProfile}`
   );
 
+  // o contraste do teste do jovem precisa do agendado DPP nº 8 — fixture do
+  // jovem-agenda, mas este arquivo roda ANTES dele na ordem alfabética e o
+  // cleanup do mentor varre a dupla inteira (run anterior pode ter levado).
+  // Reconverge no mesmo molde (id fixo, nº 8, agendado ~+3d).
+  const [dpp] = await buscarViaServiceRole<{ id: string; status: string }[]>(
+    "encontros",
+    `select=id,status&id=eq.${IDS.encontroDpp}`
+  );
+  const futura3d = new Date(Date.now() + 3 * 86400e3).toISOString();
+  if (dpp?.status === "agendado") {
+    await atualizarViaServiceRole("encontros", `id=eq.${IDS.encontroDpp}`, {
+      data_hora: futura3d,
+    });
+  } else {
+    // realizado/nao_aconteceu é imutável (0043) — sai de cena e volta criado
+    if (dpp) await apagarEncontros([dpp.id]);
+    await inserirViaServiceRole("encontros", {
+      id: IDS.encontroDpp,
+      dupla_id: IDS.duplaDpp,
+      numero: 8,
+      data_hora: futura3d,
+      status: "agendado",
+    });
+  }
+
   // DEPOIS dos writes: o trigger encontros_agenda_notify minta sinos de
   // agenda pros dois lados (ator=service role → "A coordenação…") — zera
   // aqui pra cada teste começar com o sino limpo
@@ -215,9 +244,11 @@ test.describe("mentor especialista — agenda (REALIZA-111)", () => {
     await expect(
       page.getByText("Mentorada E2E", { exact: true })
     ).toBeVisible();
-    // o agendado da trilha já aparece na fila de "Próximos" do especialista
+    // o agendado da trilha já aparece na fila de "Próximos" do especialista —
+    // a linha é link com a data e o passo ("1º encontro, agendado para … ·
+    // próximo passo"), então ancora pelo nome parcial, não pelo texto exato
     await expect(
-      page.getByText("1º encontro", { exact: true })
+      page.getByRole("link", { name: /1º encontro/ })
     ).toBeVisible();
 
     const grade = page

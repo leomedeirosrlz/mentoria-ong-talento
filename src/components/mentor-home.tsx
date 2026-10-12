@@ -371,7 +371,10 @@ export function MentorHome({
                             <span className="sr-only"> (abre em nova aba)</span>
                           </a>
                         )}
-                        {seguinteNumero != null && (
+                        {/* sessão de especialista nunca nasce por aqui — só
+                            de um pedido aceito (a action recusa a criação);
+                            mostrar o dialog era um CTA com erro garantido */}
+                        {seguinteNumero != null && !ehEsp && (
                           <AgendarEncontroDialog
                             duplaId={dupla.id}
                             numero={seguinteNumero}
@@ -423,6 +426,14 @@ export function MentorHome({
                         />
                       </div>
                     </>
+                  ) : ehEsp ? (
+                    // na trilha especialista não existe "agendar o próximo":
+                    // toda sessão nasce de um pedido aceito (jovem ou staff)
+                    // — o dialog daqui criaria a row que a action recusa
+                    <p className="font-medium">
+                      Sessão nova nasce de um pedido aceito — do jovem ou da
+                      coordenação.
+                    </p>
                   ) : (
                     <>
                       <p className="font-medium">{proximoNumero}º encontro ainda não agendado</p>
