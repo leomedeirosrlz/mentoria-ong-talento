@@ -66,6 +66,16 @@ export default async function JovemPessoaPerfil({
       ? [pessoa.colega.cidade, pessoa.colega.uf].filter(Boolean).join(" · ")
       : "";
 
+  // foto só pra adulto (contato/catálogo) — colega menor fica nas
+  // iniciais amarelas, a mesma decisão do diretório e do próprio perfil
+  const avatarSrc =
+    pessoa.tipo === "contato"
+      ? pessoa.contato.avatar_path && avatarPublicUrl(pessoa.contato.avatar_path)
+      : pessoa.tipo === "especialista"
+        ? pessoa.especialista.avatar_path &&
+          avatarPublicUrl(pessoa.especialista.avatar_path)
+        : null;
+
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <Link
@@ -76,7 +86,7 @@ export default async function JovemPessoaPerfil({
         Pessoas
       </Link>
 
-      <section className="overflow-hidden rounded-xl bg-card shadow-[var(--shadow-border)]">
+      <header className="overflow-hidden rounded-xl bg-card shadow-[var(--shadow-border)]">
         <PessoaBanner
           papel={papel}
           nome={nome}
@@ -85,47 +95,42 @@ export default async function JovemPessoaPerfil({
           areas={areas}
           seed={id}
         />
-        <div className="px-6 pb-6">
-          <div className="-mt-9 mb-4">
-            <div className="inline-block rounded-full bg-card p-1">
+        <div className="px-4 pb-5 sm:px-6 sm:pb-6">
+          <div className="flex items-end justify-between gap-3">
+            <div className="relative z-10 -mt-10 shrink-0 sm:-mt-12">
               <Avatar
                 nome={nome}
                 papel={pessoa.tipo === "colega" ? "mentorado" : undefined}
-                src={
-                  pessoa.tipo !== "colega" &&
-                  (pessoa.tipo === "contato"
-                    ? pessoa.contato.avatar_path
-                    : pessoa.especialista.avatar_path)
-                    ? avatarPublicUrl(
-                        pessoa.tipo === "contato"
-                          ? pessoa.contato.avatar_path!
-                          : pessoa.especialista.avatar_path!
-                      )
-                    : null
-                }
-                size={72}
+                src={avatarSrc}
+                size={80}
+                className="size-20! ring-4 ring-card outline outline-1 outline-[var(--brand-ink)]/15 sm:size-24!"
               />
             </div>
           </div>
-          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1.5">
-            <h1 className="text-xl font-semibold tracking-tight">{nome}</h1>
-            <Badge variant="secondary">
+          <h1 className="mt-3 text-xl font-semibold tracking-tight sm:text-2xl">
+            {nome}
+          </h1>
+          <div className="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1.5 text-sm text-muted-foreground">
+            <Badge variant="outline" className="gap-1.5 font-normal">
               {pessoa.tipo === "contato"
                 ? rotuloContato(pessoa.contato)
                 : pessoa.tipo === "colega"
                   ? "Colega da turma"
                   : "Mentor especialista"}
             </Badge>
-            <SeloDupla contato={pessoa.tipo === "contato" ? pessoa.contato : null} duplas={duplas} />
+            <SeloDupla
+              contato={pessoa.tipo === "contato" ? pessoa.contato : null}
+              duplas={duplas}
+            />
+            {meta ? (
+              <span className="flex items-center gap-1.5">
+                <MapPin size={14} className="shrink-0" aria-hidden />
+                {meta}
+              </span>
+            ) : null}
           </div>
-          {meta ? (
-            <div className="mt-1.5 flex items-center gap-1.5 text-sm text-muted-foreground">
-              <MapPin size={14} className="shrink-0" />
-              <span>{meta}</span>
-            </div>
-          ) : null}
         </div>
-      </section>
+      </header>
 
       {pessoa.tipo === "contato" && (
         <SecaoContato c={pessoa.contato} nomeJovem={nomeJovem} />
