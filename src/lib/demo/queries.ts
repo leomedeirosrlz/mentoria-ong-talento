@@ -9,6 +9,7 @@ import type {
   AssinaturaVia,
   AvaliacaoLink,
   CicloEvento,
+  ColegaTurma,
   Comunicado,
   Cronograma,
   DadosCivis,
@@ -28,6 +29,7 @@ import type {
   JovemPerfil,
   Material,
   Mentorado,
+  MentoradoPar,
   Notificacao,
   PessoaNota,
   Presenca,
@@ -94,6 +96,27 @@ function duplasDoPapel(data: DemoData, role: AppRole): Dupla[] {
   if (role === "supervisor")
     return data.duplas.filter((d) => d.supervisor?.id === eu.id);
   return data.duplas.filter((d) => d.mentor?.id === eu.id);
+}
+
+/** profiles_select pós-0076: a CONTA de um jovem (profile role='mentorado')
+ *  só é legível pra coordenação, pro próprio dono e pra adulto de uma dupla
+ *  dele (jovem_relacionado — mentor ou supervisor, em qualquer status).
+ *  Profiles de adulto seguem visíveis a qualquer staff, como sempre. */
+function jovemProfileVisivel(
+  data: DemoData,
+  role: AppRole,
+  profile: Profile
+): boolean {
+  if (role === "coordenacao" || profile.role !== "mentorado") return true;
+  const eu = data.personas[role];
+  if (profile.id === eu.id) return true;
+  const ficha = data.mentorados.find((m) => m.profile_id === profile.id);
+  if (!ficha) return false;
+  return data.duplas.some(
+    (d) =>
+      d.mentorado?.id === ficha.id &&
+      (d.mentor?.id === eu.id || d.supervisor?.id === eu.id)
+  );
 }
 
 /** Mapa id → contato, espelhando a view profiles_contato: coordenação vê
@@ -163,9 +186,34 @@ function semPessoal<P>(p: P): P {
   return q as P;
 }
 
+/** Embed mentorado:* das duplas (0076): só as colunas do par DPP — a
+ *  whitelist de MENTORADO_COLS_PAR aplicada no dataset, que guarda o
+ *  Mentorado inteiro. Notas, documento, ficha e sensíveis ficam fora pra
+ *  qualquer papel; a ficha real segue na rota própria, escopada pela RLS. */
+const COLS_MENTORADO_PAR: (keyof MentoradoPar)[] = [
+  "id",
+  "nome",
+  "nome_social",
+  "avatar_path",
+  "whatsapp",
+  "email",
+  "ong_origem",
+  "cidade",
+  "uf",
+  "interesses",
+];
+
+function mentoradoPar(m: MentoradoPar): MentoradoPar {
+  const q = {} as Record<string, unknown>;
+  for (const k of COLS_MENTORADO_PAR)
+    q[k] = (m as Record<string, unknown>)[k];
+  return q as MentoradoPar;
+}
+
 /** Contato em mentor/supervisor de cada dupla — idem mergeContatoDuplas.
  *  O embed real lista só colunas públicas: o strip dos sensíveis vale pra
- *  TODO papel, inclusive coordenação (a ficha dela vem pelas views). */
+ *  TODO papel, inclusive coordenação (a ficha dela vem pelas views). O
+ *  mentorado desce pro recorte PAR desde a 0076. */
 function comContatoDuplas(
   duplas: Dupla[],
   contatos: Map<string, Contato>
@@ -173,7 +221,7 @@ function comContatoDuplas(
   return duplas.map((d) => ({
     ...d,
     mentor: d.mentor ? semPessoal(comContato(d.mentor, contatos)) : d.mentor,
-    mentorado: d.mentorado ? semPessoal(d.mentorado) : d.mentorado,
+    mentorado: d.mentorado ? mentoradoPar(d.mentorado) : d.mentorado,
     supervisor: d.supervisor ? semPessoal(comContato(d.supervisor, contatos)) : null,
   }));
 }
@@ -375,13 +423,16 @@ export function demoContagemPessoas(): number {
   return data.profiles.length + data.mentorados.length;
 }
 
-/** /pessoas lista os profiles pra qualquer papel (profiles_select, 0026) —
- *  o contato vem do mapa escopado por papel e os sensíveis
+/** /pessoas lista os profiles legíveis pelo papel (profiles_select,
+ *  0026/0076): contas de jovem fora da dupla dele não aparecem pra staff.
+ *  O contato vem do mapa escopado por papel e os sensíveis
  *  (profiles_pessoal) só entram pra coordenação, como na real. */
 export function demoPessoas(role: AppRole): Profile[] {
+  const data = getDemoData();
   const contatos = demoContatosMap(role);
-  return getDemoData()
-    .profiles.map((p) => {
+  return data.profiles
+    .filter((p) => jovemProfileVisivel(data, role, p))
+    .map((p) => {
       const c = comContato(p, contatos);
       return role === "coordenacao" ? c : semPessoal(c);
     })
@@ -483,6 +534,9 @@ export function demoPessoaPerfil(
 
   const p = data.profiles.find((x) => x.id === id);
   if (p) {
+    // conta de jovem fora da dupla do papel — profiles_select (0076) nega a
+    // linha inteira e a página cai em notFound, como na real
+    if (!jovemProfileVisivel(data, role, p)) return null;
     const ehMentor = p.role === "mentor_dpp" || p.role === "mentor_especialista";
     return {
       tipo: "profile",
@@ -624,6 +678,7 @@ export function demoJovemPerfil(role: AppRole): JovemPerfil | null {
     responsavel: m.responsavel ?? null,
     cor_raca: m.cor_raca ?? null,
     created_at: m.created_at ?? null,
+    contato_compartilhado: m.contato_compartilhado ?? false,
   };
 }
 
@@ -659,9 +714,11 @@ export function demoJovemDuplas(role: AppRole): JovemDupla[] {
     .sort((a, b) => (b.iniciada_em ?? "").localeCompare(a.iniciada_em ?? ""));
 }
 
-/** jovem_contatos (0067): mentor + supervisor de CADA dupla dela (union all —
- *  o mesmo adulto repete por dupla, como a view faz) + coordenação ativa com
- *  dupla_id null. Nome, contato e foto — nada de dados civis. */
+/** jovem_contatos (0067/0076): mentor + supervisor de CADA dupla dela
+ *  (union all — o mesmo adulto repete por dupla, como a view faz) +
+ *  coordenação ativa com dupla_id null. O papel deriva da trilha (0076):
+ *  na dupla de especialista o mentor_id é o especialista e o rótulo certo
+ *  é 'especialista' — não 'mentor'. Nome, contato e foto — nada de civis. */
 export function demoJovemContatos(role: AppRole): JovemContato[] {
   const data = getDemoData();
   const m = mentoradoDaPersona(data, role);
@@ -686,12 +743,63 @@ export function demoJovemContatos(role: AppRole): JovemContato[] {
       : null;
   const dela = data.duplas.filter((d) => d.mentorado?.id === m.id);
   return [
-    ...dela.map((d) => contato(d.id, "mentor", d.mentor)),
+    ...dela.map((d) =>
+      contato(
+        d.id,
+        d.trilha === "especialista" ? "especialista" : "mentor",
+        d.mentor
+      )
+    ),
     ...dela.map((d) => contato(d.id, "supervisor", d.supervisor)),
     ...data.profiles
       .filter((p) => p.role === "coordenacao")
       .map((p) => contato(null, "coordenacao", p)),
   ].filter((c): c is JovemContato => c !== null);
+}
+
+/** mentorados_turma (0076): colegas COM CONTA (profile_id) que dividem a
+ *  turma de alguma dupla dela — turma é texto, então a coorte vale até por
+ *  dupla concluída, como a view. O whatsapp só sai atrás do opt-in
+ *  (contato_compartilhado); Eduardo e Pedro ficam fora porque não têm
+ *  login — mesmo recorte do WHERE da view. */
+export function demoJovemColegas(role: AppRole): ColegaTurma[] {
+  const data = getDemoData();
+  const m = mentoradoDaPersona(data, role);
+  if (!m) return [];
+  const minhasTurmas = new Set(
+    data.duplas
+      .filter((d) => d.mentorado?.id === m.id && d.turma != null)
+      .map((d) => d.turma as string)
+  );
+  if (minhasTurmas.size === 0) return [];
+  return data.mentorados
+    .filter(
+      (c) =>
+        c.id !== m.id &&
+        c.profile_id != null &&
+        data.duplas.some(
+          (d) =>
+            d.mentorado?.id === c.id &&
+            d.turma != null &&
+            minhasTurmas.has(d.turma)
+        )
+    )
+    .map((c) => ({
+      id: c.id,
+      nome: c.nome,
+      nome_social: c.nome_social ?? null,
+      avatar_path: c.avatar_path ?? null,
+      cidade: c.cidade ?? null,
+      uf: c.uf ?? null,
+      interesses: c.interesses ?? null,
+      whatsapp: c.contato_compartilhado ? c.whatsapp : null,
+    }))
+    .sort((a, b) =>
+      (a.nome_social || a.nome || "").localeCompare(
+        b.nome_social || b.nome || "",
+        "pt-BR"
+      )
+    );
 }
 
 /** jovem_encaminhamentos (0070): só os combinados DELA (responsavel =
@@ -1012,23 +1120,29 @@ export function demoSolicitacoesVisiveis(
 }
 
 /** Thread de uma negociação, cronológica — prop_select libera as partes da
- *  solicitação pai: quem vê a solicitação lê a thread. */
+ *  solicitação pai: quem vê a solicitação lê a thread. O embed `autor`
+ *  segue o profiles_select pós-0076: staff lê profile de adulto sempre e
+ *  de jovem só se da dupla dele (jovem_relacionado); pro papel mentorado
+ *  só a própria linha resolve — os nomes voltam pela solicitação pai. */
 export function demoPropostas(
   role: AppRole,
   solicitacaoId: string
 ): SolicitacaoProposta[] {
-  const sol = getDemoData().solicitacoes.find((s) => s.id === solicitacaoId);
+  const data = getDemoData();
+  const sol = data.solicitacoes.find((s) => s.id === solicitacaoId);
   if (!sol) return [];
   const visivel = demoSolicitacoesVisiveis(role).some((s) => s.id === sol.id);
   if (!visivel) return [];
-  const eu = getDemoData().personas[role];
-  return getDemoData()
-    .solicitacaoPropostas.filter((p) => p.solicitacao_id === solicitacaoId)
-    // como no sol_select real: pro jovem, o embed `autor` de profiles só
-    // resolve a própria linha — o nome do especialista volta via catálogo
-    .map((p) =>
-      role === "mentorado" && p.autor_id !== eu.id ? { ...p, autor: null } : p
-    )
+  const autorVisivel = (autorId: string): boolean => {
+    // papel mentorado: profiles_select devolve só a própria linha — os
+    // nomes do outro lado chegam achatados (solicitação) ou pelo catálogo
+    if (role === "mentorado") return autorId === data.personas.mentorado.id;
+    const p = data.profiles.find((x) => x.id === autorId);
+    return p ? jovemProfileVisivel(data, role, p) : false;
+  };
+  return data.solicitacaoPropostas
+    .filter((p) => p.solicitacao_id === solicitacaoId)
+    .map((p) => (autorVisivel(p.autor_id) ? p : { ...p, autor: null }))
     .sort((a, b) => a.created_at.localeCompare(b.created_at));
 }
 
@@ -1477,6 +1591,11 @@ function comAvaliacaoJovem(
   const porEncontro = new Map(
     data.avaliacoes.map((a) => [a.encontro_id, a])
   );
+  // a ficha guarda o profile_id do login dela (0066) — fora do pick da
+  // dupla (0076), então resolve pelo cadastro de mentorados
+  const meuMentorado = data.mentorados.find(
+    (m) => m.profile_id === eu.id
+  )?.id;
   return duplas.map((d) => ({
     ...d,
     encontros: (d.encontros ?? []).map((e) => {
@@ -1485,9 +1604,8 @@ function comAvaliacaoJovem(
         role === "coordenacao" ||
         role === "supervisor" ||
         (role === "mentor_dpp" && !!a?.avaliacao_visivel_mentor) ||
-        // jovem lê as próprias — branch exists(jovem_duplas) da policy;
-        // a ficha guarda o profile_id do login dela (0066)
-        (role === "mentorado" && d.mentorado?.profile_id === eu.id);
+        // jovem lê as próprias — branch exists(jovem_duplas) da policy
+        (role === "mentorado" && d.mentorado?.id === meuMentorado);
       return { ...e, avaliacao_jovem: visivel ? a : null };
     }),
   }));
