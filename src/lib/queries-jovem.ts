@@ -1,5 +1,6 @@
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
+import { comparaNome } from "./ciclo";
 import { demoRole } from "./demo/mode";
 import {
   demoJovemAssinaturas,
@@ -7,15 +8,25 @@ import {
   demoJovemDuplas,
   demoJovemEncaminhamentos,
   demoJovemEncontros,
+  demoJovemEspecialistas,
   demoJovemPerfil,
 } from "./demo/queries";
+import { pedidoEmAberto } from "./jovem-especialista";
+import {
+  getPropostasMap,
+  getSlotsLivres,
+  getSolicitacoesVisiveis,
+} from "./queries-especialista";
 import type {
   EncontroStatus,
   JovemAssinatura,
   JovemContato,
   JovemDupla,
   JovemEncaminhamento,
+  JovemEspecialista,
   JovemPerfil,
+  SolicitacaoEspecialista,
+  SolicitacaoProposta,
 } from "./types";
 
 // Leituras do shell /jovem (REALIZA-108). Contrato do D2: tudo que é dado
@@ -152,3 +163,110 @@ export const getJovemEncontros = cache(async (): Promise<JovemEncontro[]> => {
   }
   return (data ?? []) as JovemEncontro[];
 });
+
+/** Catálogo de especialistas pro pedido do jovem (view `jovem_especialistas`,
+ *  0075 — definer, escopada a my_role()='mentorado'): nome/social/avatar/
+ *  áreas de quem ele pode procurar. Contato direto não entra — o canal abre
+ *  quando a dupla nasce, pelo jovem_contatos de sempre. A view ainda não
+ *  está no database.types gerado — a projeção recebe cast local. */
+export const getJovemEspecialistas = cache(
+  async (): Promise<JovemEspecialista[]> => {
+    const demo = await demoRole();
+    if (demo) return demoJovemEspecialistas(demo);
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("jovem_especialistas")
+      .select("id, nome, nome_social, avatar_path, areas")
+      .order("nome");
+    if (error) {
+      console.error("getJovemEspecialistas:", error);
+      return [];
+    }
+    type Row = {
+      id: string | null;
+      nome: string | null;
+      nome_social: string | null;
+      avatar_path: string | null;
+      areas: string[] | null;
+    };
+    // a collation do banco ordena acentos depois de Z — pt-BR no app
+    return ((data ?? []) as Row[])
+      .filter(
+        (e): e is Row & { id: string; nome: string } =>
+          e.id != null && e.nome != null
+      )
+      .sort((a, b) => comparaNome(a.nome, b.nome));
+  }
+);
+
+/** Contexto do pedido de especialista do jovem (REALIZA-112): os pedidos
+ *  DELE (a RLS de solicitacoes_mural já escopa), o catálogo, as threads
+ *  das negociações abertas e a agenda livre de cada especialista na mesa.
+ *  Os embeds de profiles não passam pela RLS do papel mentorado — o
+ *  direcionado (`desejado`) e o autor especialista da thread voltam null
+ *  e são costurados aqui pelo catálogo. */
+export const getJovemPedidosEspecialista = cache(
+  async (): Promise<{
+    catalogo: JovemEspecialista[];
+    solicitacoes: SolicitacaoEspecialista[];
+    propostas: Record<string, SolicitacaoProposta[]>;
+    slotsPorEsp: Record<string, string[]>;
+  }> => {
+    const [catalogo, solicitacoes] = await Promise.all([
+      getJovemEspecialistas(),
+      getSolicitacoesVisiveis(),
+    ]);
+    const nomePorId = new Map(
+      catalogo.map((e) => [e.id, e.nome_social || e.nome] as const)
+    );
+
+    // o nome do direcionado entra como embed `desejado` — o que o rail e as
+    // frases de estado já consomem pro staff
+    const sols = solicitacoes.map((s) => ({
+      ...s,
+      desejado:
+        s.desejado ??
+        (s.especialista_desejado_id &&
+        nomePorId.has(s.especialista_desejado_id)
+          ? { nome: nomePorId.get(s.especialista_desejado_id)! }
+          : null),
+    }));
+
+    const emAberto = sols.filter(pedidoEmAberto);
+    const propostas: Record<string, SolicitacaoProposta[]> = {};
+    if (emAberto.length) {
+      const mapa = await getPropostasMap(emAberto.map((s) => s.id));
+      // o autor de proposta que não é o jovem também sai da RLS — costura o
+      // nome do catálogo; fora dele (staff), "a equipe"
+      for (const [sid, lista] of Object.entries(mapa)) {
+        propostas[sid] = lista.map((p) => ({
+          ...p,
+          autor:
+            p.autor ??
+            (nomePorId.has(p.autor_id)
+              ? { nome: nomePorId.get(p.autor_id)! }
+              : { nome: "a equipe" }),
+        }));
+      }
+    }
+
+    // a contra-proposta do jovem sai da grade real do especialista — dos
+    // dois lados da mesa (a RPC revalida); um mapa por id, sem N+1
+    const espIds = [
+      ...new Set(
+        emAberto
+          .map((s) => s.especialista_id ?? s.especialista_desejado_id)
+          .filter((id): id is string => id != null)
+      ),
+    ];
+    const slotsPorEsp = Object.fromEntries(
+      await Promise.all(
+        espIds.map(
+          async (id) => [id, await getSlotsLivres(id)] as const
+        )
+      )
+    );
+
+    return { catalogo, solicitacoes: sols, propostas, slotsPorEsp };
+  }
+);

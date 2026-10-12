@@ -160,10 +160,11 @@ const S = {
   cancelada: 0x2405, aceita3: 0x2406, aceita4: 0x2407,
   sess2: 0x2408, sess3: 0x2409, sess4: 0x240a,
   pedidoJovem: 0x240b, triagem: 0x240c,
+  biaNeg: 0x240d, biaMural: 0x240e,
 } as const;
 
 // propostas da negociação (solicitacao_propostas, 0074)
-const PROP = { s1: 0x5601, s2: 0x5602 } as const;
+const PROP = { s1: 0x5601, s2: 0x5602, s3: 0x5603 } as const;
 
 const MEET = "https://meet.google.com/demo-realiza";
 
@@ -1638,6 +1639,62 @@ function build(): DemoData {
       especialista: null,
       especialista_nome: null,
     },
+    {
+      // a Bia pedindo a Helena de volta: a trilha de oratória (d-esp4)
+      // concluiu, então não tem dupla ativa pra apontar — mas como ela já tem
+      // a de matemática aberta, o pedido é motivo-curto (o gate da demanda é
+      // do primeiro pedido). A Helena engajou e devolveu com terça 19h —
+      // o slot na mesa é o dela e a vez é da Bia (aceita ou contra-propõe)
+      id: uid(S.biaNeg),
+      mentorado_id: ana.id,
+      dupla_dpp_id: uid(D.ok),
+      demanda: null,
+      motivo:
+        "Quero voltar a treinar oratória pra apresentação do seminário de pedagogia.",
+      slot_proposto: em(proximaTerca, "19:00"),
+      origem: "jovem",
+      turma: "T1 · 2026/2027",
+      justificativa_recusa: null,
+      especialista_desejado_id: helena.id,
+      especialista_id: helena.id,
+      dupla_id: null,
+      status: "contra_proposta",
+      created_by: anaLogin.id,
+      created_at: haDias(1, "21:10"),
+      respondida_em: null,
+      mentorado: { nome: ana.nome },
+      solicitante: { nome: anaLogin.nome_social ?? anaLogin.nome },
+      especialista: { nome: helena.nome },
+      especialista_nome: helena.nome,
+      desejado: { nome: helena.nome },
+    },
+    {
+      // pedido em broadcast da Bia — "qualquer especialista": sem alvo nem
+      // slot, fica no mural até alguém engajar. Dois abertos ao mesmo tempo
+      // (dedup é por par; o teto dela é 3)
+      id: uid(S.biaMural),
+      mentorado_id: ana.id,
+      dupla_dpp_id: uid(D.ok),
+      demanda: null,
+      motivo:
+        "Tô em dúvida entre pedagogia e psicologia — queria conversar com alguém que já passou por isso.",
+      slot_proposto: null,
+      origem: "jovem",
+      turma: "T1 · 2026/2027",
+      justificativa_recusa: null,
+      especialista_desejado_id: null,
+      especialista_id: null,
+      dupla_id: null,
+      status: "aberta",
+      created_by: anaLogin.id,
+      created_at: haDias(0, "12:40"),
+      respondida_em: null,
+      mentorado: { nome: ana.nome },
+      solicitante: { nome: anaLogin.nome_social ?? anaLogin.nome },
+      especialista: null,
+      especialista_nome: null,
+      desejado: null,
+    },
   ];
 
   // thread de propostas do pedido do Caio (0074) — append-only: a Sofia
@@ -1661,6 +1718,19 @@ function build(): DemoData {
       mensagem: "Sábado o Caio tem curso — pode na terça à noite?",
       created_at: haDias(2, "09:30"),
       autor: { nome: carlos.nome },
+    },
+    {
+      // a Helena devolveu o pedido da Bia: a jovem propôs quinta 20h, a
+      // especialista só consegue terça 19h — o slot na mesa é o dela e a
+      // vez é da Bia (o rail mostra Aceitar / Propor outro / Cancelar)
+      id: uid(PROP.s3),
+      solicitacao_id: uid(S.biaNeg),
+      autor_id: helena.id,
+      slot_proposto: em(proximaTerca, "19:00"),
+      mensagem:
+        "Peguei seu pedido! Quinta 20h não rola pra mim — terça às 19h pode?",
+      created_at: haDias(1, "08:20"),
+      autor: { nome: helena.nome },
     },
   ];
 

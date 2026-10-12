@@ -106,6 +106,55 @@ export async function loginComSenha(
   });
 }
 
+/** Troca de papel dentro do mesmo teste: a sessão mora em cookie — limpa e
+ *  loga de novo (sem clearCookies o /login desvia pra home da sessão viva). */
+export async function relogar(page: Page, email: string, senha: string) {
+  await page.context().clearCookies();
+  await loginComSenha(page, email, senha);
+}
+
+/** Clique + confirmação: se o primeiro clique caiu pré-hidratação (RSC
+ *  demora a ligar handlers em dev/preview frio), o laço repete o gesto até
+ *  o estado confirmar — o mesmo padrão do pularOnboarding acima. `agir` é
+ *  seguro de repetir (o botão desabilita enquanto a action roda e some
+ *  depois do sucesso; um locator morto é engolido). */
+export async function agirComConfirma(
+  agir: () => Promise<void>,
+  confirmou: () => Promise<boolean>,
+  timeoutMs = 20_000
+) {
+  const t0 = Date.now();
+  for (;;) {
+    await agir().catch(() => {});
+    for (let i = 0; i < 10; i++) {
+      if (await confirmou()) return;
+      if (Date.now() - t0 > timeoutMs) {
+        throw new Error("ação não confirmou no tempo — estado não mudou");
+      }
+      await new Promise((r) => setTimeout(r, 600));
+    }
+  }
+}
+
+const TZ = "America/Sao_Paulo"; // fuso do app e das RPCs de slot
+
+/** "terça 14/10 às 19:30" (o texto do option/chip da agenda) → ISO do slot.
+ *  O ano não viaja no rótulo — o slot é sempre futuro, então a data montada
+ *  no ano corrente serve; se já passou (cruzar dezembro→janeiro), +1 ano. */
+export function isoDoRotulo(rotulo: string): string {
+  const m = rotulo.match(/(\d{2})\/(\d{2}) às (\d{2}):(\d{2})/);
+  if (!m) throw new Error(`rótulo de slot inesperado: ${rotulo}`);
+  const [, dd, mm, hh, mi] = m;
+  const ano = Number(
+    new Date().toLocaleDateString("en-CA", { timeZone: TZ, year: "numeric" })
+  );
+  let iso = `${ano}-${mm}-${dd}T${hh}:${mi}:00-03:00`;
+  if (new Date(iso).getTime() <= Date.now()) {
+    iso = `${ano + 1}-${mm}-${dd}T${hh}:${mi}:00-03:00`;
+  }
+  return iso;
+}
+
 // Hard-stop: specs "app" escrevem — E2E_* apontando pra prod é config
 // errada, não ambiente válido. appEnvOk recusa e o spec pula; o cleanup
 // confere de novo (belt & suspenders: service role nunca encosta em prod).
@@ -231,4 +280,29 @@ export async function atualizarViaServiceRole(
     body: JSON.stringify(patch),
   });
   if (!res.ok) throw new Error(`patch ${tabela} falhou: ${res.status}`);
+}
+
+/** POST /rest/v1/rpc/<fn> via service role — leituras/validações que a UI
+ *  não expõe (ex.: especialista_slots_livres pra escolher um slot real da
+ *  grade de um especialista antes de semear uma contra-proposta). Mesmo
+ *  hard-stop: spec app nunca fala com prod. */
+export async function rpcViaServiceRole<T = unknown>(
+  fn: string,
+  args: Record<string, unknown>
+): Promise<T> {
+  if (supabaseUrl.includes(PROD_REF))
+    throw new Error("E2E_SUPABASE_URL aponta pra produção — RPC abortada");
+  const key = process.env.E2E_SUPABASE_SERVICE_ROLE_KEY!;
+  const res = await fetch(`${supabaseUrl}/rest/v1/rpc/${fn}`, {
+    method: "POST",
+    headers: {
+      apikey: key,
+      Authorization: `Bearer ${key}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(args),
+  });
+  if (!res.ok)
+    throw new Error(`rpc ${fn} falhou: ${res.status} ${await res.text()}`);
+  return (await res.json()) as T;
 }
