@@ -1,7 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  cruzamentoDisponibilidade,
+  diaSemanaDe,
   diffDias,
   diasAtrasoRegistro,
+  disponibilidadeNoDia,
   disponibilidadeTexto,
   formatDate,
   formatDateTime,
@@ -20,7 +23,14 @@ import {
   ultimoRegistro,
   waLink,
 } from "@/lib/ciclo";
+import type { DiaSemana, Disponibilidade, Periodo } from "@/lib/types";
 import { mkDupla, mkEncontro, mkRegistro } from "./helpers";
+
+/** Literal de grade tipado — a Disponibilidade do CHECK é {dias,periodos}. */
+const grade = (dias: DiaSemana[], periodos: Periodo[] = []): Disponibilidade => ({
+  dias,
+  periodos,
+});
 
 describe("toDateStr / diffDias", () => {
   it("toDateStr formata no fuso do programa (YYYY-MM-DD)", () => {
@@ -162,6 +172,90 @@ describe("disponibilidadeTexto / parseDisponibilidade", () => {
     expect(parseDisponibilidade("{quebrado")).toEqual({
       error: "A disponibilidade chegou num formato inválido.",
     });
+  });
+});
+
+describe("diaSemanaDe / disponibilidadeNoDia / cruzamentoDisponibilidade", () => {
+  // 2025-10-14 = terça-feira; a grade usa o vocabulário seg..dom do CHECK
+  it("diaSemanaDe resolve o DiaSemana da data (sem escorregar de fuso)", () => {
+    expect(diaSemanaDe("2025-10-14")).toBe("ter");
+    expect(diaSemanaDe("2025-10-12")).toBe("dom");
+    expect(diaSemanaDe("2025-10-18")).toBe("sab");
+  });
+
+  it("disponibilidadeNoDia só olha `dias` — grade nula/sem dias não é livre", () => {
+    expect(disponibilidadeNoDia(grade(["ter", "qui"]), "ter")).toBe(true);
+    expect(disponibilidadeNoDia(grade(["ter", "qui"], ["noite"]), "qua")).toBe(false);
+    expect(disponibilidadeNoDia(grade([], ["noite"]), "ter")).toBe(false);
+    expect(disponibilidadeNoDia(null, "ter")).toBe(false);
+    expect(disponibilidadeNoDia(undefined, "ter")).toBe(false);
+  });
+
+  const MENTOR = grade(["ter", "qui"], ["noite"]);
+
+  it("ambos = mesmo dia + período em comum; período vazio é coringa", () => {
+    // encaixe exato (ter × noite nas duas grades)
+    expect(
+      cruzamentoDisponibilidade(MENTOR, [grade(["ter"], ["noite"])], "ter")
+    ).toBe("ambos");
+    // jovem sem períodos = "qualquer" — cruza com o "noite" do mentor
+    expect(
+      cruzamentoDisponibilidade(MENTOR, [grade(["qui"])], "qui")
+    ).toBe("ambos");
+    // mentor sem períodos também é coringa
+    expect(
+      cruzamentoDisponibilidade(
+        grade(["ter"]),
+        [grade(["ter"], ["manha"])],
+        "ter"
+      )
+    ).toBe("ambos");
+    // interseção parcial basta — o jovem tem "noite" entre os dele
+    expect(
+      cruzamentoDisponibilidade(MENTOR, [grade(["ter"], ["tarde", "noite"])], "ter")
+    ).toBe("ambos");
+  });
+
+  it("mesmo dia sem período em comum cai pra 'mentor', não 'ambos'", () => {
+    // honesto: ele pode de manhã, ela à noite — não é encaixe, mas ele está
+    // livre (e ela conta como jovem livre; "mentor" ganha na ordem)
+    expect(
+      cruzamentoDisponibilidade(MENTOR, [grade(["ter"], ["manha", "tarde"])], "ter")
+    ).toBe("mentor");
+  });
+
+  it("ordem ambos > mentor > jovem > nenhum, com OR entre jovens", () => {
+    // mentor livre, nenhum jovem no dia
+    expect(cruzamentoDisponibilidade(MENTOR, [grade(["seg"])], "ter")).toBe("mentor");
+    expect(cruzamentoDisponibilidade(MENTOR, [], "ter")).toBe("mentor");
+    // mentor fora do dia, jovem livre → "jovem" (sem mentor não há cruzamento,
+    // então período nem entra na conta)
+    expect(
+      cruzamentoDisponibilidade(MENTOR, [grade(["sab"], ["manha"])], "sab")
+    ).toBe("jovem");
+    // multi-jovem: basta UMA grade compatível pro "ambos"…
+    expect(
+      cruzamentoDisponibilidade(
+        MENTOR,
+        [grade(["ter"], ["manha"]), grade(["ter"], ["noite"])],
+        "ter"
+      )
+    ).toBe("ambos");
+    // …e basta um jovem livre pro "jovem" quando o mentor não está
+    expect(
+      cruzamentoDisponibilidade(
+        MENTOR,
+        [grade(["sab"], ["noite"]), null],
+        "sab"
+      )
+    ).toBe("jovem");
+    // ninguém livre
+    expect(cruzamentoDisponibilidade(MENTOR, [grade(["sab"])], "seg")).toBe("nenhum");
+    expect(cruzamentoDisponibilidade(null, [null], "ter")).toBe("nenhum");
+    // mentor sem grade: o lado dele nunca tá livre, o do jovem segue valendo
+    expect(
+      cruzamentoDisponibilidade(null, [grade(["ter"], ["noite"])], "ter")
+    ).toBe("jovem");
   });
 });
 

@@ -403,6 +403,57 @@ export function disponibilidadeTexto(d: Disponibilidade | null | undefined): str
   return partes.length ? partes.join(" ") : null;
 }
 
+/** "seg".."dom" de uma data "YYYY-MM-DD" — o DiaSemana da grade de
+ *  disponibilidade. Âncora no meio-dia, mesma regra de paraData: sem ela o
+ *  fuso podia devolver o dia anterior. */
+export function diaSemanaDe(iso: string): DiaSemana {
+  // getDay() 0=dom — DIAS_SEMANA é seg=0, então +6 % 7 realinha (sem o mapa
+  // paralelo "dom" caía fora do enum)
+  return DIAS_SEMANA[(new Date(`${iso}T12:00:00`).getDay() + 6) % 7];
+}
+
+/** O dia da semana está marcado como livre na grade? Só `dias` decide —
+ *  `periodos` qualifica a faixa, não o dia. Grade nula/sem dias = não livre. */
+export function disponibilidadeNoDia(
+  d: Disponibilidade | null | undefined,
+  dow: DiaSemana
+): boolean {
+  return (d?.dias ?? []).includes(dow);
+}
+
+/** Períodos em comum entre duas grades — lista vazia vale "qualquer
+ *  período" (a pessoa marcou dias sem recortar horário): cruza com tudo. */
+function periodosCruzam(
+  a: Periodo[] | null | undefined,
+  b: Periodo[] | null | undefined
+): boolean {
+  if (!a?.length || !b?.length) return true;
+  return a.some((p) => b.includes(p));
+}
+
+/** Cruzamento das grades do mentor × mentorados num dia da semana — a regra
+ *  do overlay da agenda (REALIZA-24). "ambos" exige encaixe honesto: o
+ *  mentor E algum jovem livres no dia E com período em comum — mentor livre
+ *  qui de manhã e jovem livre qui à noite não se encontram. O jovem livre
+ *  sem encaixe ainda conta como "jovem" (ele está livre, só incompatível).
+ *  Ordem: ambos > mentor > jovem > nenhum. */
+export function cruzamentoDisponibilidade(
+  mentor: Disponibilidade | null | undefined,
+  jovens: (Disponibilidade | null | undefined)[],
+  dow: DiaSemana
+): "nenhum" | "mentor" | "jovem" | "ambos" {
+  const mentorLivre = disponibilidadeNoDia(mentor, dow);
+  const jovensLivres = jovens.filter((j) => disponibilidadeNoDia(j, dow));
+  if (
+    mentorLivre &&
+    jovensLivres.some((j) => periodosCruzam(mentor?.periodos, j?.periodos))
+  )
+    return "ambos";
+  if (mentorLivre) return "mentor";
+  if (jovensLivres.length > 0) return "jovem";
+  return "nenhum";
+}
+
 /** Idade em anos a partir de "YYYY-MM-DD" — âncora no meio-dia pra não voltar
  *  um dia no fuso; null quando a data é inválida. */
 export function idade(iso: string | null | undefined): number | null {
