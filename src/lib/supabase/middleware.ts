@@ -66,6 +66,9 @@ export async function updateSession(request: NextRequest) {
     // desenho: bearer token + RPC definer, logado fora do dono é recusado
     // pela própria RPC (híbrido 0070)
     p.startsWith("/avaliar/") ||
+    // /resumo/<slug> — resumo compartilhável da turma por link obscuro
+    // (slug fixo conferido na página; mismatch cai em 404)
+    p.startsWith("/resumo/") ||
     p === "/privacidade";
 
   if (!user && !isPublic) {
