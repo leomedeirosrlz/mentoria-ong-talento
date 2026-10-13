@@ -4,9 +4,9 @@ name: e2e-app
 # runner — o modo demo não cobre persistência, e escrever no preview/prod
 # sujaria dados reais. `supabase start` aplica migrations + seed.sql frescos:
 # uma migration quebrada falha aqui antes de qualquer apply remoto.
-# só `push` — `pull_request` duplicaria cada push num branch com PR aberto.
+# Manual apenas (workflow_dispatch) — a cobertura no dia a dia fica no
+# e2e-preview, que roda a mesma suite contra o staging depois do deploy.
 on:
-  push:
   workflow_dispatch:
 
 concurrency:

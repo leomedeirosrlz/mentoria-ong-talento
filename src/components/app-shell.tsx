@@ -13,6 +13,7 @@ import {
   FolderOpen,
   ListChecks,
   SignOut,
+  Table,
   UserCircle,
   UsersThree,
 } from "@phosphor-icons/react";
@@ -38,6 +39,7 @@ const NAV = [
   { href: "/materiais", label: "Materiais", curto: "Materiais", icon: FolderOpen, roles: null },
   { href: "/formularios", label: "Formulários", curto: "Forms", icon: ListChecks, roles: ["coordenacao"] },
   { href: "/turmas", label: "Turmas", curto: "Turmas", icon: ChalkboardTeacher, roles: ["coordenacao"] },
+  { href: "/relatorios", label: "Relatórios", curto: "Relatórios", icon: Table, roles: ["coordenacao"] },
   { href: "/pessoas", label: "Pessoas", curto: "Pessoas", icon: UsersThree, roles: ["coordenacao", "supervisor", "mentor_dpp", "mentor_especialista"] },
 ] as const;
 
@@ -76,6 +78,7 @@ export function AppShell({
     "/registros",
     "/materiais",
     "/formularios",
+    "/relatorios",
   ];
   const itemsMobile =
     items.length > 5
