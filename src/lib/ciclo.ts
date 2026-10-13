@@ -454,6 +454,51 @@ export function cruzamentoDisponibilidade(
   return "nenhum";
 }
 
+/** Janela horária de cada período da grade — convenção do programa, não
+ *  dado do banco: "manhã/tarde/noite" vira faixas fixas de hora pra visão de
+ *  grade (REALIZA-25) pintar o cruzamento por horário, não só por dia.
+ *  [início, fim) em horas — quem marca "noite" cobre 18h–21h59, não as 22h. */
+export const JANELA_PERIODO: Record<Periodo, [number, number]> = {
+  manha: [8, 12],
+  tarde: [12, 18],
+  noite: [18, 22],
+};
+
+/** O lado tá livre naquele dia da semana NAQUELA hora cheia? `dias` decide o
+ *  dia; `periodos` afunila pra faixa — vazia = "qualquer horário" (mesmo
+ *  coringa do cruzamento por dia). `hora` é a hora inteira local (0–23). */
+export function disponibilidadeNaHora(
+  d: Disponibilidade | null | undefined,
+  dow: DiaSemana,
+  hora: number
+): boolean {
+  if (!disponibilidadeNoDia(d, dow)) return false;
+  const periodos = d?.periodos ?? [];
+  if (periodos.length === 0) return true;
+  return periodos.some((p) => {
+    const [ini, fim] = JANELA_PERIODO[p];
+    return hora >= ini && hora < fim;
+  });
+}
+
+/** Cruzamento por HORA — a versão da grade horária (REALIZA-25) do
+ *  cruzamentoDisponibilidade por dia. "ambos" exige os dois livres na mesma
+ *  hora: mentor livre às 9h e jovem só à noite não se encontram — a janela
+ *  resolve o encaixe que o dia inteiro não resolve. */
+export function cruzamentoDisponibilidadeHora(
+  mentor: Disponibilidade | null | undefined,
+  jovens: (Disponibilidade | null | undefined)[],
+  dow: DiaSemana,
+  hora: number
+): "nenhum" | "mentor" | "jovem" | "ambos" {
+  const mentorLivre = disponibilidadeNaHora(mentor, dow, hora);
+  const jovemLivre = jovens.some((j) => disponibilidadeNaHora(j, dow, hora));
+  if (mentorLivre && jovemLivre) return "ambos";
+  if (mentorLivre) return "mentor";
+  if (jovemLivre) return "jovem";
+  return "nenhum";
+}
+
 /** Idade em anos a partir de "YYYY-MM-DD" — âncora no meio-dia pra não voltar
  *  um dia no fuso; null quando a data é inválida. */
 export function idade(iso: string | null | undefined): number | null {

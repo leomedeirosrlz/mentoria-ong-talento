@@ -1,9 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   cruzamentoDisponibilidade,
+  cruzamentoDisponibilidadeHora,
   diaSemanaDe,
   diffDias,
   diasAtrasoRegistro,
+  disponibilidadeNaHora,
   disponibilidadeNoDia,
   disponibilidadeTexto,
   formatDate,
@@ -256,6 +258,83 @@ describe("diaSemanaDe / disponibilidadeNoDia / cruzamentoDisponibilidade", () =>
     expect(
       cruzamentoDisponibilidade(null, [grade(["ter"], ["noite"])], "ter")
     ).toBe("jovem");
+  });
+});
+
+describe("disponibilidadeNaHora / cruzamentoDisponibilidadeHora (REALIZA-25)", () => {
+  // janelas do programa: manhã 8–12, tarde 12–18, noite 18–22 — [ini, fim)
+  it("a hora cheia cai dentro da janela do período; a borda é do próximo", () => {
+    const noite = grade(["ter"], ["noite"]);
+    expect(disponibilidadeNaHora(noite, "ter", 18)).toBe(true);
+    expect(disponibilidadeNaHora(noite, "ter", 21)).toBe(true);
+    expect(disponibilidadeNaHora(noite, "ter", 22)).toBe(false); // fim exclusivo
+    expect(disponibilidadeNaHora(noite, "ter", 17)).toBe(false);
+    // manhã cobre 8–11, não o meio-dia
+    const manha = grade(["ter"], ["manha"]);
+    expect(disponibilidadeNaHora(manha, "ter", 8)).toBe(true);
+    expect(disponibilidadeNaHora(manha, "ter", 12)).toBe(false);
+  });
+
+  it("`dias` decide o dia; `periodos` vazio = qualquer hora do dia livre", () => {
+    // fora do dia marcado, nenhuma hora livre
+    expect(disponibilidadeNaHora(grade(["ter"], ["noite"]), "qua", 19)).toBe(false);
+    expect(disponibilidadeNaHora(null, "ter", 19)).toBe(false);
+    // dia marcado sem período = o dia inteiro livre (mesmo coringa do dia)
+    expect(disponibilidadeNaHora(grade(["ter"]), "ter", 7)).toBe(true);
+    expect(disponibilidadeNaHora(grade(["ter"]), "ter", 19)).toBe(true);
+    // OR entre períodos — tarde OU noite cobre 14h e 20h, não 9h
+    const duas = grade(["ter"], ["tarde", "noite"]);
+    expect(disponibilidadeNaHora(duas, "ter", 14)).toBe(true);
+    expect(disponibilidadeNaHora(duas, "ter", 20)).toBe(true);
+    expect(disponibilidadeNaHora(duas, "ter", 9)).toBe(false);
+  });
+
+  it("ambos = os dois livres NA MESMA HORA — o encaixe que o dia inteiro não vê", () => {
+    // o caso que o cruzamento por dia marcava "ambos" sem ser: ele de manhã,
+    // ela à noite — na grade horária isso nunca se encontra
+    const mentorManha = grade(["ter"], ["manha"]);
+    const jovemNoite = grade(["ter"], ["noite"]);
+    expect(
+      cruzamentoDisponibilidadeHora(mentorManha, [jovemNoite], "ter", 9)
+    ).toBe("mentor");
+    expect(
+      cruzamentoDisponibilidadeHora(mentorManha, [jovemNoite], "ter", 20)
+    ).toBe("jovem");
+    // com sobreposição real (tarde × tarde) é "ambos" nas horas em comum
+    const mentorTarde = grade(["ter"], ["tarde"]);
+    const jovemTardeNoite = grade(["ter"], ["tarde", "noite"]);
+    expect(
+      cruzamentoDisponibilidadeHora(mentorTarde, [jovemTardeNoite], "ter", 14)
+    ).toBe("ambos");
+    // fora da janela do mentor cai pra "jovem", não "ambos"
+    expect(
+      cruzamentoDisponibilidadeHora(mentorTarde, [jovemTardeNoite], "ter", 20)
+    ).toBe("jovem");
+  });
+
+  it("ordem ambos > mentor > jovem > nenhum, com OR entre jovens", () => {
+    const mentor = grade(["ter"], ["noite"]);
+    // basta UM jovem livre na hora pro "ambos"/"jovem" — mesmo OR do dia
+    expect(
+      cruzamentoDisponibilidadeHora(
+        mentor,
+        [grade(["ter"], ["manha"]), grade(["ter"], ["noite"])],
+        "ter",
+        19
+      )
+    ).toBe("ambos");
+    // mentor livre, jovem só de manhã → "mentor" na hora da noite
+    expect(
+      cruzamentoDisponibilidadeHora(mentor, [grade(["ter"], ["manha"])], "ter", 19)
+    ).toBe("mentor");
+    // mentor fora, jovem livre → "jovem"; ninguém → "nenhum"
+    expect(
+      cruzamentoDisponibilidadeHora(mentor, [grade(["ter"], ["manha"])], "ter", 9)
+    ).toBe("jovem");
+    expect(
+      cruzamentoDisponibilidadeHora(mentor, [grade(["ter"], ["manha"])], "qua", 19)
+    ).toBe("nenhum");
+    expect(cruzamentoDisponibilidadeHora(null, [null], "ter", 19)).toBe("nenhum");
   });
 });
 
