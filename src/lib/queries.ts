@@ -146,7 +146,7 @@ type Contato = {
  *  ativas/pausadas que supervisiona (nudge por WhatsApp), qualquer um vê a
  *  própria linha. Quem não está no mapa fica sem contato — nome e avatar
  *  seguem visíveis pelas colunas públicas. */
-const getContatos = cache(async (): Promise<Map<string, Contato>> => {
+export const getContatos = cache(async (): Promise<Map<string, Contato>> => {
   // modo demo: o escopo da view profiles_contato é replicado sobre o dataset
   const demo = await demoRole();
   if (demo) return demoContatosMap(demo);
