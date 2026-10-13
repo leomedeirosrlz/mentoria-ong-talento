@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import {
   BookOpen,
+  CalendarBlank,
   CalendarPlus,
   CaretDown,
   ChatsCircle,
@@ -77,6 +78,7 @@ import {
   VozDoJovemEspecialista,
 } from "@/components/avaliacao-jovem";
 import { AgendarEncontroDialog } from "@/components/agendar-encontro-dialog";
+import { EditarLinkDialog } from "@/components/editar-link-dialog";
 import { RegistrarRetroativoDialog } from "@/components/registrar-retroativo-dialog";
 import { EditarDuplaDialog } from "@/components/editar-dupla-dialog";
 import { RemanejarDuplaDialog } from "@/components/remanejar-dupla-dialog";
@@ -552,6 +554,8 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
         estrelaJovem={
           enc ? (estrelaEspPorEncontro.get(enc.id) ?? null) : null
         }
+        piso={dupla.iniciada_em ?? undefined}
+        ehEsp={ehEsp}
         urlBase={siteUrl}
         jovemNome={primeiroNomeMentorado}
         jovemWhatsapp={dupla.mentorado.whatsapp}
@@ -1089,6 +1093,8 @@ function EncontroRow({
   apoioDestinos,
   linkAvaliacao,
   estrelaJovem,
+  piso,
+  ehEsp,
   urlBase,
   jovemNome,
   jovemWhatsapp,
@@ -1129,6 +1135,10 @@ function EncontroRow({
   /** Estrela que o jovem deu nesta sessão de especialista — da view
    *  definer (só o número); null pra qualquer outro papel. */
   estrelaJovem: number | null;
+  /** YYYY-MM-DD do início da dupla — piso de data do dialog de remarcar. */
+  piso?: string;
+  /** Trilha especialista — o remarcar da linha se lê "sessão de especialista". */
+  ehEsp: boolean;
   /** Origem pública (NEXT_PUBLIC_SITE_URL) — monta o /avaliar/<token>. */
   urlBase: string;
   jovemNome: string;
@@ -1171,10 +1181,14 @@ function EncontroRow({
         ? <RevelarApos from={encontro.data_hora}>{node}</RevelarApos>
         : null;
   const podeRegistrar = !!(encontro && !reg && podeEditar);
+  // remarcar e trocar o link são gestos do encontro agendado — mentor de
+  // dupla ativa; a coord (e o sup) copia o link, nunca edita
+  const podeRemarcar = encontro?.status === "agendado" && podeEditar;
   // ≤3 ações por linha: status à esquerda, primária da pendência, o resto ghost
   const temAcoes =
     registroPendente ||
     podeRegistrar ||
+    podeRemarcar ||
     (encontro?.status === "agendado" && podeMarcar && !!encontro.data_hora) ||
     (naoAconteceu && podeMarcar) ||
     !!reg?.precisa_apoio;
@@ -1257,7 +1271,10 @@ function EncontroRow({
                 {linha2}
               </p>
             )}
-            {(linkSeguro(encontro?.link) || materialHref) && (
+            {/* o lápis do link entra no gate mesmo sem link/material: um
+                agendado SEM link é justamente quem precisa do "adicionar" —
+                colado ao entrar/copiar quando eles existem */}
+            {(linkSeguro(encontro?.link) || materialHref || podeRemarcar) && (
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 {linkSeguro(encontro?.link) &&
                   // entrar é da dupla (e pode virar CTA primário na janela do
@@ -1278,6 +1295,12 @@ function EncontroRow({
                   ) : (
                     <CopiarChamada url={linkSeguro(encontro?.link)!} />
                   ))}
+                {podeRemarcar && encontro && (
+                  <EditarLinkDialog
+                    encontroId={encontro.id}
+                    linkAtual={encontro.link}
+                  />
+                )}
                 {materialHref && (
                   <a
                     href={materialHref}
@@ -1306,6 +1329,25 @@ function EncontroRow({
               liberadoNoHorario(
                 <RegistroInlineTrigger encontroId={encontro.id} primario={!naoAconteceu} />
               )}
+            {/* remarcar mora na linha do próprio encontro — vale pro agendado
+                futuro E pro já passado (limbo): a action move a fonte passada
+                pra um alvo futuro; nº = a tentativa na trilha esp */}
+            {podeRemarcar && encontro && (
+              <AgendarEncontroDialog
+                duplaId={duplaId}
+                numero={encontro.numero}
+                atual={encontro}
+                piso={piso}
+                jovemNome={jovemNome}
+                rotulo={ehEsp ? "sessão de especialista" : undefined}
+                trigger={
+                  <Button variant="outline" size="sm">
+                    <CalendarBlank size={16} />
+                    Remarcar
+                  </Button>
+                }
+              />
+            )}
             {/* o botão só vale depois do horário — RevelarApos faz ele aparecer
                 pra quem ficou com a aba aberta atravessando o encontro */}
             {encontro?.status === "agendado" && podeMarcar && encontro.data_hora && (

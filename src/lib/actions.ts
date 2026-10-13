@@ -2218,6 +2218,81 @@ export async function desfazerNaoAconteceu(encontroId: string, duplaId: string) 
   return { ok: true };
 }
 
+/** Troca SÓ o link da chamada de um encontro agendado — sem tocar data,
+ *  status ou motivo (o campo morava dentro do fluxo de remarcar). O mentor
+ *  da dupla escreve direto (a RLS escopa à dupla dele); o mentorado passa
+ *  pela RPC definer da 0072 com a MESMA data — data igual não é remarcação,
+ *  então motivo não é cobrado. `link` vazio/null remove o link (gesto
+ *  legítimo: a chamada migrou pra fora da plataforma). */
+export async function salvarLinkEncontro(encontroId: string, link: string | null) {
+  if (await demoAtivo()) return { error: DEMO_MSG };
+  const { supabase, me: eu } = await me();
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
+  // quem combina a chamada é a dupla — coord/sup acompanham e copiam o link,
+  // nunca editam (mesma regra do agendarEncontro: a RLS deixaria a coord
+  // escrever, então o contrato mora aqui)
+  if (
+    eu.role !== "mentor_dpp" &&
+    eu.role !== "mentor_especialista" &&
+    eu.role !== "mentorado"
+  ) {
+    return { error: "O link da chamada é combinado pela dupla. A coordenação acompanha." };
+  }
+  const { data: encontro } = await supabase
+    .from("encontros")
+    .select("id, numero, status, data_hora, dupla_id, duplas(status, trilha)")
+    .eq("id", encontroId)
+    .maybeSingle();
+  if (!encontro) return { error: "Encontro não encontrado." };
+  if (encontro.status !== "agendado") {
+    return { error: "Só dá pra mexer no link de um encontro agendado." };
+  }
+  const dupla = Array.isArray(encontro.duplas) ? encontro.duplas[0] : encontro.duplas;
+  if (dupla && dupla.status !== "ativa") return { error: "Essa dupla não está ativa." };
+  const linkLimpo = link?.trim() || null;
+  if (linkLimpo && !urlOk(linkLimpo)) {
+    return { error: "Confira o link: precisa ser um endereço completo (https://…)." };
+  }
+
+  if (eu.role === "mentorado") {
+    // a RPC exige data futura ("agendamento é sempre pra frente") — encontro
+    // já passado não tem como trocar só o link por ela; a saída honesta é a
+    // remarcação, que edita data e link juntos
+    if (encontro.data_hora == null || new Date(encontro.data_hora).getTime() <= Date.now()) {
+      return { error: "Esse encontro já passou — pra trocar o link, remarque a data junto." };
+    }
+    const { data, error } = await supabase.rpc("agendar_encontro_mentorado", {
+      p_dupla: encontro.dupla_id,
+      p_numero: encontro.numero,
+      p_data_hora: encontro.data_hora,
+      p_link: linkLimpo,
+      p_motivo: null,
+    });
+    if (error) return { error: erroAmigavel(error) };
+    const ret = retornoRpc(data);
+    if (ret.error) return { error: ret.error };
+  } else {
+    // .eq("status") + select: se a row mudou de status entre a leitura e o
+    // update (ou a RLS escondeu — não é a dupla dele), nada é escrito e o
+    // retorno vazio vira erro em vez de sucesso mudo
+    const { data, error } = await supabase
+      .from("encontros")
+      .update({ link: linkLimpo })
+      .eq("id", encontroId)
+      .eq("status", "agendado")
+      .select("id");
+    if (error) return { error: erroAmigavel(error) };
+    if (!data?.length) return { error: "Esse encontro não está mais agendado." };
+  }
+  revalidatePath("/");
+  revalidatePath("/agenda");
+  revalidatePath("/duplas");
+  revalidatePath(`/duplas/${encontro.dupla_id}`);
+  revalidatePath("/jovem");
+  revalidatePath("/jovem/agenda");
+  return { ok: true };
+}
+
 /**
  * Encontro que já aconteceu sem agendamento prévio (combinado fora da
  * plataforma). Nasce direto como realizado — sem ele, a dupla ficava "em

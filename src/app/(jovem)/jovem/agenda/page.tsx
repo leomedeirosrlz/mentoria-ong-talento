@@ -19,6 +19,7 @@ import {
   type AvaliacaoPendente,
 } from "@/components/jovem-avaliacoes";
 import { JovemAgendarDialog } from "@/components/jovem-agendar-dialog";
+import { EditarLinkDialog } from "@/components/editar-link-dialog";
 import {
   DesmarcarEncontroJovem,
   NaoAconteceuJovem,
@@ -506,6 +507,12 @@ function EncontroLinha({
             <span className="sr-only"> na chamada (abre em nova aba)</span>
           </a>
         )}
+        {/* o lápis troca só o link (a action roteia o jovem pela RPC da
+            0072, DPP-only). Em agendado já passado a RPC não escreve — o
+            erro dela aponta o Remarcar ao lado, que edita data e link */}
+        {(agendadoFuturo || agendadoPassado) && trilha !== "especialista" && (
+          <EditarLinkDialog encontroId={e.id} linkAtual={e.link} />
+        )}
         {agendadoFuturo && (
           <>
             {trilha !== "especialista" && (
@@ -524,7 +531,26 @@ function EncontroLinha({
             <DesmarcarEncontroJovem encontroId={e.id} />
           </>
         )}
-        {agendadoPassado && <NaoAconteceuJovem encontroId={e.id} />}
+        {/* agendado vencido também remarca (a RPC aceita fonte passada →
+            alvo futuro) — "não aconteceu" não é a única saída do limbo */}
+        {agendadoPassado && (
+          <>
+            {trilha !== "especialista" && (
+              <JovemAgendarDialog
+                duplaId={e.dupla_id}
+                numero={e.numero}
+                atual={e}
+                trigger={
+                  <Button variant="outline" size="sm">
+                    <CalendarDots size={15} aria-hidden />
+                    Remarcar
+                  </Button>
+                }
+              />
+            )}
+            <NaoAconteceuJovem encontroId={e.id} />
+          </>
+        )}
         {aval?.pendente && (
           <AvaliarPendenteButton
             pendente={aval.pendente}

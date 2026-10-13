@@ -37,6 +37,7 @@ import { ChamadaFormacao } from "@/components/chamada-formacao";
 import { NotaEncontro } from "@/components/nota-encontro";
 import { WhatsAppRapido, type DestinoWA } from "@/components/whatsapp-rapido";
 import { AgendarEncontroDialog } from "@/components/agendar-encontro-dialog";
+import { EditarLinkDialog } from "@/components/editar-link-dialog";
 import { RegistrarRetroativoDialog } from "@/components/registrar-retroativo-dialog";
 import { RegistroForm } from "@/components/registro-form";
 import { EncontroDetalheDialog } from "@/components/encontro-detalhe-dialog";
@@ -2959,6 +2960,15 @@ function EncontroDuplaRow({
       <CopiarChamada url={linkChamada} icone />
     );
 
+  // trocar o link sem remarcar — gesto do mentor sobre o encontro agendado.
+  // Independe de linkChamada: o agendado SEM link é justamente quem precisa
+  // do "adicionar" — o lápis ocupa o lugar do chip quando ele não existe.
+  // Coord/sup copiam o link, nunca editam (regra da action, não só daqui)
+  const editarLink =
+    ehMentor && encontro.status === "agendado" ? (
+      <EditarLinkDialog encontroId={encontro.id} linkAtual={encontro.link} />
+    ) : null;
+
   return (
     <li
       className="animate-enter"
@@ -3076,7 +3086,7 @@ function EncontroDuplaRow({
           </DialogContent>
         </Dialog>
       )}
-      {(ctaRegistro || chamada) && (
+      {(ctaRegistro || chamada || editarLink) && (
         <div className="flex flex-wrap items-center gap-2 px-2 pb-1.5">
           {encontro.status === "realizado"
             ? ctaRegistro
@@ -3084,6 +3094,7 @@ function EncontroDuplaRow({
                 <RevelarApos from={encontro.data_hora!}>{ctaRegistro}</RevelarApos>
               )}
           {chamada}
+          {editarLink}
         </div>
       )}
     </li>
