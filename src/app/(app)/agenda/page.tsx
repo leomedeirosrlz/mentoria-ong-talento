@@ -6,6 +6,7 @@ import {
   getEspecialistaEventos,
   getMateriais,
   getMe,
+  getMeuMentorProfile,
 } from "@/lib/queries";
 import { getMentoresChamada, getPresencas } from "@/lib/queries-presenca";
 import {
@@ -34,14 +35,18 @@ export default async function AgendaPage({
   const { dia } = await searchParams;
   const diaInicial = dia && /^\d{4}-\d{2}-\d{2}$/.test(dia) ? dia : null;
 
-  // getDuplas vem no escopo do RLS: mentor→a própria, supervisor→supervisionadas, coord→todas
-  const [eventos, me, duplas, materiais, cronogramas] = await Promise.all([
-    getCicloEventos(),
-    getMe(),
-    getDuplas(),
-    getMateriais(),
-    getCronogramas(),
-  ]);
+  // getDuplas vem no escopo do RLS: mentor→a própria, supervisor→supervisionadas, coord→todas.
+  // getMeuMentorProfile resolve cedo pra quem não é mentor (getMe já cacheado) —
+  // a grade dele alimenta o overlay de disponibilidade da agenda (REALIZA-24).
+  const [eventos, me, duplas, materiais, cronogramas, meuMentorProfile] =
+    await Promise.all([
+      getCicloEventos(),
+      getMe(),
+      getDuplas(),
+      getMateriais(),
+      getCronogramas(),
+      getMeuMentorProfile(),
+    ]);
   // audiência = mesma regra de /materiais: "todos" pra todo mundo, "dpp" e
   // "especialista" pro papel correspondente, coordenação vê tudo
   const materiaisVisiveis = materiais.filter((m) => {
@@ -163,6 +168,15 @@ export default async function AgendaPage({
           role={me?.role ?? null}
           mentores={mentoresChamada}
           presencas={presencasPorEvento}
+          // Overlay "quem pode nesse dia" — só o mentor DPP (REALIZA-24):
+          // coord/sup veem TODAS as duplas (uma tinta por dupla seria
+          // ambígua) e o especialista tem o próprio sistema de slots
+          // (0073, AgendaEspecialista), não a grade dow×período
+          mentorDisponibilidade={
+            me?.role === "mentor_dpp"
+              ? (meuMentorProfile?.disponibilidade ?? null)
+              : undefined
+          }
         />
       )}
     </div>

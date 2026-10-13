@@ -201,6 +201,7 @@ const COLS_MENTORADO_PAR: (keyof MentoradoPar)[] = [
   "cidade",
   "uf",
   "interesses",
+  "disponibilidade",
 ];
 
 function mentoradoPar(m: MentoradoPar): MentoradoPar {
