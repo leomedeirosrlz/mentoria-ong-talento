@@ -56,10 +56,12 @@ const MENTORADO_COLS_PUBLICAS =
 
 /** Subconjunto do mentorado que vai no embed da dupla (0076): o que o par
  *  e a ficha consomem — notas e documento_path do jovem não saem no select
- *  embutido, que qualquer leitor da dupla recebe. getMentorados e as
- *  queries de ficha/diretório seguem com MENTORADO_COLS_PUBLICAS. */
+ *  embutido, que qualquer leitor da dupla recebe. `disponibilidade` é
+ *  coluna pública (não sensível) e alimenta o overlay da agenda do mentor
+ *  (REALIZA-24). getMentorados e as queries de ficha/diretório seguem com
+ *  MENTORADO_COLS_PUBLICAS. */
 const MENTORADO_COLS_PAR =
-  "id, nome, nome_social, avatar_path, whatsapp, email, ong_origem, cidade, uf, interesses";
+  "id, nome, nome_social, avatar_path, whatsapp, email, ong_origem, cidade, uf, interesses, disponibilidade";
 
 /** Os 4 sensíveis da 0034 + dados civis da 0046, idênticos em profiles e
  *  mentorados — fora do grant de coluna; só a coordenação os lê, pelas

@@ -65,7 +65,11 @@ import {
   bucketsDoEncontro,
   cronogramaVigente,
   cronogramasOpcoes,
+  cruzamentoDisponibilidade,
+  diaSemanaDe,
   diffDias,
+  disponibilidadeNoDia,
+  disponibilidadeTexto,
   duplasSemEncontroDoNumero,
   emLimbo,
   eventoDaSemana,
@@ -88,6 +92,7 @@ import type {
   AppRole,
   CicloEvento,
   Cronograma,
+  Disponibilidade,
   Dupla,
   Encontro,
   EncontroStatus,
@@ -311,6 +316,41 @@ const TIPO_PALAVRA: Record<CicloEvento["tipo"], string> = {
   evento_encerramento: "encerramento",
   formacao: "formação",
 };
+
+// ===== overlay de disponibilidade (REALIZA-24) =====
+// Tinta de fundo da célula: verde-claro do mentor (--ok), amarelo-claro do
+// mentorado (--role-mentorado) e split diagonal quando os dois cruzam com
+// período em comum. Grade dow×período — faixa de hora é da visão de grade
+// futura (REALIZA-25), aqui o dia inteiro carrega o cruzamento.
+
+/** Split do dia "ambos livres" — as duas cores lado a lado, não uma terceira
+ *  cor: lê-se a sobreposição literal das grades. Inline style — o
+ *  color-mix dentro do linear-gradient não sai legível em arbitrary value. */
+const GRADIENTE_AMBOS_DISPONIVEIS =
+  "linear-gradient(135deg, color-mix(in oklab, var(--ok) 12%, transparent) 50%, color-mix(in oklab, var(--role-mentorado) 22%, transparent) 50%)";
+
+/** Tinta dos estados simples — translúcida pra conviver com hatch-recesso
+ *  (bg-image por cima da tinta) e com o anel do dia selecionado. */
+const TINTA_DISPONIBILIDADE = {
+  mentor: "bg-[var(--ok)]/8",
+  jovem: "bg-[var(--role-mentorado)]/16",
+} as const;
+
+/** Swatch de ~20px da legenda: o mesmo matiz da célula com alfa mais denso
+ *  (num retângulo miúdo o alfa da célula some no branco — a chave precisa
+ *  ser legível sem mentir a cor). */
+const TINTA_LEGENDA = {
+  mentor: "bg-[var(--ok)]/16",
+  jovem: "bg-[var(--role-mentorado)]/28",
+} as const;
+const GRADIENTE_AMBOS_LEGENDA =
+  "linear-gradient(135deg, color-mix(in oklab, var(--ok) 20%, transparent) 50%, color-mix(in oklab, var(--role-mentorado) 34%, transparent) 50%)";
+
+/** Primeiro nome de uso do mentorado — nome social quando existe ("Bia"),
+ *  senão o primeiro do civil. Pro aria-label do dia e a linha do detalhe. */
+function primeiroNomeMentorado(m: Dupla["mentorado"]): string {
+  return (m?.nome_social ?? m?.nome ?? "").split(" ")[0] ?? "";
+}
 
 /** O nome do evento já diz o tipo? ("2º encontro · …", "Recesso de fim de ano",
  *  "…formação de mentores") — quando diz, o marcador fica só no glifo. */
@@ -550,6 +590,7 @@ export function AgendaCalendario({
   role,
   mentores = [],
   presencas = {},
+  mentorDisponibilidade,
 }: {
   eventos: CicloEvento[];
   /** Cronogramas do programa (0061) — cada um é um calendário oficial por
@@ -574,6 +615,12 @@ export function AgendaCalendario({
   /** Presenças marcadas: ciclo_evento_id → profile_id → presente. Idem —
    *  coordenação only; ausência de row = não marcado (não "ausente"). */
   presencas?: Record<string, Record<string, boolean>>;
+  /** Grade semanal do mentor logado (REALIZA-24): com ela, as células do
+   *  mês ganham a tinta de quem pode naquele dia — a dele × a dos
+   *  mentorados das duplas ativas. `undefined` desliga o overlay (coord/
+   *  sup/jovem renderizam como antes); `null` = overlay ligado com o lado
+   *  do mentor nunca livre (ele ainda não preencheu a grade). */
+  mentorDisponibilidade?: Disponibilidade | null;
 }) {
   const ehMentor = role === "mentor_dpp" || role === "mentor_especialista";
   const ehCoordSup = role === "coordenacao" || role === "supervisor";
@@ -670,6 +717,32 @@ export function AgendaCalendario({
       );
     return mapa;
   }, [duplas]);
+
+  // ===== overlay de disponibilidade (REALIZA-24) =====
+  // undefined = desligado (coord/sup/jovem renderizam como antes). As grades
+  // do outro lado são as dos mentorados das duplas DPP ativas — a trilha
+  // especialista tem o próprio sistema de janelas (0073) e o calendário dela
+  // não pinta célula por dow. Nome junto: o aria-label e o detalhe nomeiam
+  // quem tá livre, não só a cor.
+  const overlayDispo = mentorDisponibilidade !== undefined;
+  const jovensDispo = useMemo(
+    () =>
+      overlayDispo
+        ? duplas
+            .filter((d) => d.status === "ativa" && d.trilha !== "especialista")
+            .map((d) => ({
+              primeiroNome: primeiroNomeMentorado(d.mentorado),
+              disp: d.mentorado?.disponibilidade ?? null,
+            }))
+        : [],
+    [duplas, overlayDispo]
+  );
+  // a legenda só aparece se ALGUM lado tiver grade — dupla de grade vazia
+  // nunca pinta a célula e a chave solta seria decorativa
+  const legendaDispo =
+    overlayDispo &&
+    ((mentorDisponibilidade?.dias?.length ?? 0) > 0 ||
+      jovensDispo.some((j) => (j.disp?.dias?.length ?? 0) > 0));
 
   // trilha do ciclo: só os encontros oficiais (1–16), em ordem — alimenta o
   // rail. O guard de data refina pro tipo datado (o CHECK exige data em
@@ -1049,6 +1122,30 @@ export function AgendaCalendario({
   // a dela aparece sob a própria linha em "Sua dupla"
   const duplasAtivas = ehMentor ? duplas.filter((d) => d.status === "ativa") : [];
   const duplasAtivasDpp = duplasAtivas.filter((d) => d.trilha !== "especialista");
+
+  // linha "Disponível neste dia" do detalhe — quem tá livre no dia da semana
+  // selecionado, com a grade inteira de cada lado (a célula diz o dia; aqui
+  // aparece o PERÍODO que ela não carrega). Só lados livres entram — dia sem
+  // ninguém disponível não rende linha.
+  const dowSelecionado = overlayDispo ? diaSemanaDe(selecionado) : null;
+  const dispoDoSel: { quem: string; texto: string | null }[] = !dowSelecionado
+    ? []
+    : [
+        ...(disponibilidadeNoDia(mentorDisponibilidade, dowSelecionado)
+          ? [
+              {
+                quem: "você",
+                texto: disponibilidadeTexto(mentorDisponibilidade),
+              },
+            ]
+          : []),
+        ...jovensDispo
+          .filter((j) => disponibilidadeNoDia(j.disp, dowSelecionado))
+          .map((j) => ({
+            quem: j.primeiroNome,
+            texto: disponibilidadeTexto(j.disp),
+          })),
+      ];
 
   // "Hoje" só navega quando o mês de hoje está dentro da janela de meses do ciclo
   const mesHoje = mesIndice(hoje);
@@ -1722,6 +1819,35 @@ export function AgendaCalendario({
                   const passou = iso < hoje;
                   const fimDeSemana = c === 0 || c === 6;
 
+                  // tinta de disponibilidade do dia da semana da célula
+                  // (REALIZA-24) — passados também pintam: o planejamento
+                  // retrocede semanas inteiras, não só pra frente
+                  const dowCel = overlayDispo ? diaSemanaDe(iso) : null;
+                  const tintaDispo = dowCel
+                    ? cruzamentoDisponibilidade(
+                        mentorDisponibilidade,
+                        jovensDispo.map((j) => j.disp),
+                        dowCel
+                      )
+                    : "nenhum";
+                  const jovensLivresCel = dowCel
+                    ? jovensDispo.filter((j) =>
+                        disponibilidadeNoDia(j.disp, dowCel)
+                      )
+                    : [];
+                  // a cor precisa entrar no nome falado — "livre" aqui =
+                  // mesmo critério da tinta ("ambos" = período em comum)
+                  const dispoA11y =
+                    tintaDispo === "ambos"
+                      ? ", ambos livres"
+                      : tintaDispo === "mentor"
+                        ? ", você livre"
+                        : tintaDispo === "jovem"
+                          ? jovensLivresCel.length === 1
+                            ? `, ${jovensLivresCel[0].primeiroNome} livre`
+                            : ", mentorado livre"
+                          : "";
+
                   const rotuloDia =
                     (doDia.length > 0
                       ? `${doDia.map(descricaoEvento).join(" e ")}, ${fmtCompleta.format(parseDia(iso))}`
@@ -1734,7 +1860,8 @@ export function AgendaCalendario({
                       : "") +
                     (duplasDoDia.length > 0
                       ? `, ${resumoEncontrosDupla(duplasDoDia, agoraMs)}`
-                      : "");
+                      : "") +
+                    dispoA11y;
 
                   return (
                     <div role="gridcell" key={iso} className="p-0.5">
@@ -1757,14 +1884,33 @@ export function AgendaCalendario({
                         }}
                         onKeyDown={(e) => onDiaKeyDown(e, iso)}
                         className={cn(
-                          "flex min-h-11 w-full flex-col items-start rounded-lg px-1.5 pb-1 pt-1 transition-[color,background-color,box-shadow] hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-12",
+                          "relative flex min-h-11 w-full flex-col items-start rounded-lg px-1.5 pb-1 pt-1 transition-[color,background-color,box-shadow] hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-12",
                           temRecesso && "hatch-recesso",
                           ehSelecionado && "ring-2 ring-foreground/30"
                         )}
                       >
+                        {/* tinta de disponibilidade — atrás do conteúdo mas
+                            na frente do bg do botão: o hatch do recesso
+                            segue por baixo e o anel do selecionado por fora */}
+                        {tintaDispo !== "nenhum" && (
+                          <span
+                            aria-hidden
+                            className={cn(
+                              "absolute inset-0 rounded-lg",
+                              tintaDispo === "ambos"
+                                ? undefined
+                                : TINTA_DISPONIBILIDADE[tintaDispo]
+                            )}
+                            style={
+                              tintaDispo === "ambos"
+                                ? { backgroundImage: GRADIENTE_AMBOS_DISPONIVEIS }
+                                : undefined
+                            }
+                          />
+                        )}
                         <span
                           aria-hidden
-                          className="flex w-full items-center justify-between gap-1"
+                          className="relative flex w-full items-center justify-between gap-1"
                         >
                           <span
                             className={cn(
@@ -1788,7 +1934,7 @@ export function AgendaCalendario({
                         </span>
                         <span
                           aria-hidden
-                          className="mt-auto flex w-full items-center gap-1"
+                          className="relative mt-auto flex w-full items-center gap-1"
                         >
                           {doDia.map((e) => {
                             if (e.tipo === "encontro")
@@ -1913,6 +2059,44 @@ export function AgendaCalendario({
                 Duplas:
               </span>
               <ChaveDotsDupla />
+            </span>
+          )}
+          {/* chave da tinta de disponibilidade (REALIZA-24) — só quando o
+              overlay está ligado E algum lado tem grade; swatches usam os
+              alfas da legenda (TINTA_LEGENDA), mais densos que o da célula */}
+          {legendaDispo && (
+            <span className="flex flex-wrap items-center gap-x-3 gap-y-1 border-l border-border pl-4">
+              <span className="text-xs font-medium text-muted-foreground">
+                Disponibilidade:
+              </span>
+              <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <span
+                  aria-hidden
+                  className={cn(
+                    "h-3.5 w-5 rounded-[3px] ring-1 ring-inset ring-border",
+                    TINTA_LEGENDA.mentor
+                  )}
+                />
+                Você livre
+              </span>
+              <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <span
+                  aria-hidden
+                  className={cn(
+                    "h-3.5 w-5 rounded-[3px] ring-1 ring-inset ring-border",
+                    TINTA_LEGENDA.jovem
+                  )}
+                />
+                Mentorado livre
+              </span>
+              <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <span
+                  aria-hidden
+                  className="h-3.5 w-5 rounded-[3px] ring-1 ring-inset ring-border"
+                  style={{ backgroundImage: GRADIENTE_AMBOS_LEGENDA }}
+                />
+                Ambos livres
+              </span>
             </span>
           )}
         </div>
@@ -2262,6 +2446,21 @@ export function AgendaCalendario({
                 {relSel}
               </p>
             </div>
+            {/* a célula pinta o dia; a linha detalha o PERÍODO de quem tá
+                livre nesse dia da semana (REALIZA-24). Só entra lado livre —
+                dia sem ninguém disponível não rende linha */}
+            {dispoDoSel.length > 0 && (
+              <p className="mt-3 text-sm text-muted-foreground">
+                Disponível neste dia:{" "}
+                {dispoDoSel.map((s, i) => (
+                  <Fragment key={`${s.quem}-${i}`}>
+                    {i > 0 && " · "}
+                    <span className="text-foreground">{s.quem}</span>
+                    {s.texto ? ` (${s.texto})` : ""}
+                  </Fragment>
+                ))}
+              </p>
+            )}
             {eventosSelecionados.length === 0 ? (
               <div className="mt-3">
                 <p className="text-sm text-muted-foreground">

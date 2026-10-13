@@ -191,6 +191,9 @@ export type MentoradoPar = Pick<
   | "cidade"
   | "uf"
   | "interesses"
+  // pública (não sensível) — entra pro overlay de disponibilidade da agenda
+  // do mentor (REALIZA-24): cruzar a grade do jovem com a dele
+  | "disponibilidade"
 >;
 
 /** mentor_profiles — ficha do mentor que alimenta o board de matching

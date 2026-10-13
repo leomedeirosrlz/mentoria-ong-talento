@@ -450,6 +450,42 @@ for (const d of DUPLAS) {
   }
 }
 
+// ---- grades de disponibilidade (REALIZA-24): overlay da agenda do mentor ----
+// A tinta do calendário cruza a grade do mentor DPP (mentor_profiles via
+// getMeuMentorProfile) com a da mentorada da dupla ativa (embed da dupla).
+// Sem a row o overlay só pinta o lado do jovem — a fixture garante os três
+// estados: ter/qui "ambos" (mesma noite), sábado só do mentor ("você
+// livre"). Patch sempre converge — grade é dado aditivo, nenhum spec lê
+// o estado vazio. O guard do mentor_profiles (0004) só trava os campos de
+// validação no UPDATE — disponibilidade passa livre.
+const GRADE_MENTOR_E2E = { dias: ["ter", "qui", "sab"], periodos: ["noite"] };
+const GRADE_MENTORADA_E2E = { dias: ["ter", "qui"], periodos: ["noite"] };
+const [mpMentor] = await rest(
+  `mentor_profiles?select=profile_id,disponibilidade&profile_id=eq.${IDS.mentorProfile}`
+);
+if (!mpMentor) {
+  await rest("mentor_profiles", {
+    method: "POST",
+    body: JSON.stringify({
+      profile_id: IDS.mentorProfile,
+      tipo: "dpp",
+      disponibilidade: GRADE_MENTOR_E2E,
+    }),
+  });
+  console.log("mentor_profiles do mentor criado (grade da agenda)");
+} else {
+  // patch sempre converge — comparar JSON.stringify falharia por ordem de
+  // chave do jsonb, e regravar a mesma grade é no-op de qualquer jeito
+  await patch(`mentor_profiles?profile_id=eq.${IDS.mentorProfile}`, {
+    disponibilidade: GRADE_MENTOR_E2E,
+  });
+  console.log("disponibilidade do mentor convergida");
+}
+await patch(`mentorados?id=eq.${IDS.mentorado}`, {
+  disponibilidade: GRADE_MENTORADA_E2E,
+});
+console.log("disponibilidade da mentorada convergida");
+
 // ---- especialista (REALIZA-111): profile + auth + trilha + grade ----
 // Mesmo esquema do mentor/jovem: profile ANTES do auth user pro
 // handle_new_user vincular; converge papel/ativo/onboarded/whatsapp — no
