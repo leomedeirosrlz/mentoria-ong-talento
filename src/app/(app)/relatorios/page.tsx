@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { getMe } from "@/lib/queries";
+import { getContatos, getMe } from "@/lib/queries";
 import { createClient } from "@/lib/supabase/server";
 import { demoAtivo } from "@/lib/demo/mode";
 import { demoDuplas } from "@/lib/demo/queries";
@@ -60,19 +60,27 @@ export default async function RelatoriosPage() {
     }));
   } else {
     const supabase = await createClient();
-    const [dRes, pRes, mRes] = await Promise.all([
+    // profiles: grant por coluna da 0026 — email/whatsapp ficam de fora da
+    // tabela (permission denied) e chegam pela view profiles_contato, que a
+    // coordenação lê inteira. mentorados tem email/whatsapp no grant (0034).
+    const [dRes, pRes, mRes, contatos] = await Promise.all([
       supabase
         .from("duplas")
         .select("turma, mentor_id, mentorado_id, supervisor_id, status, iniciada_em, demanda")
         .order("iniciada_em"),
-      supabase.from("profiles").select("id, nome, email, whatsapp, cidade, uf"),
+      supabase.from("profiles").select("id, nome, cidade, uf"),
       supabase.from("mentorados").select("id, nome, email, whatsapp, cidade, uf"),
+      getContatos(),
     ]);
     if (dRes.error || pRes.error || mRes.error) {
       throw new Error(dRes.error?.message ?? pRes.error?.message ?? mRes.error?.message);
     }
     duplas = dRes.data ?? [];
-    profs = pRes.data ?? [];
+    profs = (pRes.data ?? []).map((p) => ({
+      ...p,
+      email: contatos.get(p.id)?.email ?? null,
+      whatsapp: contatos.get(p.id)?.whatsapp ?? null,
+    }));
     mentorados = mRes.data ?? [];
     turmas = [...new Set(duplas.map((d) => d.turma))].sort((a, b) =>
       b.localeCompare(a, "pt-BR")
