@@ -46,11 +46,15 @@ export function AgendarEncontroDialog({
   rotulo,
   trigger,
   onCreated,
+  open: openProp,
+  onOpenChange,
 }: {
   duplaId: string;
   numero: number;
   atual: Encontro | null;
-  /** YYYY-MM-DD — pré-preenche a data (19h) quando não é remarcação. */
+  /** "YYYY-MM-DD" ou "YYYY-MM-DDTHH:mm" — pré-preenche a data quando não é
+   *  remarcação; dia solto entra às 19h, a grade de horários (REALIZA-25)
+   *  chega com a hora do slot clicado. */
   sugerido?: string;
   /** YYYY-MM-DD do início da dupla — a sugestão nunca cai antes dele (o
    *  retroativo rejeitaria a data oficial de um encontro pré-dupla). */
@@ -61,22 +65,27 @@ export function AgendarEncontroDialog({
    *  trilha especialista a remarcação é de uma sessão que nasceu de pedido:
    *  o rótulo diz isso ("sessão de especialista") sem número de passo. */
   rotulo?: string;
-  /** Elemento do trigger — default é o botão padrão da casa. */
-  trigger?: React.ReactElement;
+  /** Elemento do trigger — default é o botão padrão da casa. `null` suprime
+   *  o trigger embutido: a grade de horários abre o dialog de forma
+   *  controlada, a partir do clique na coluna do dia. */
+  trigger?: React.ReactElement | null;
   /** Só no ramo retroativo (data passada): recebe (id do encontro criado,
    *  "YYYY-MM-DD" dele) e substitui a navegação pra ficha — a agenda usa pra
    *  abrir o registro inline no dia em que ele caiu. */
   onCreated?: (encontroId: string, dia: string) => void;
+  /** Modo controlado (opcional): o pai segura o estado — a grade de horários
+   *  abre o dialog com o slot clicado sem depender de trigger. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }) {
-  const [open, setOpen] = useState(false);
+  const [openInterno, setOpenInterno] = useState(false);
+  const open = openProp ?? openInterno;
   const [pending, start] = useTransition();
   // controlado pra revelar o campo de texto livre quando o motivo é "outro"
   const [motivo, setMotivo] = useState("");
   // motivo só é obrigatório quando a data muda — salvar a mesma data (ex.: só
   // pra trocar o link) não é reagendamento e o server também não exige motivo
   const [dataMudou, setDataMudou] = useState(false);
-  // valor vivo do campo — decide se o submit agenda ou registra (modo dual)
-  const [valorData, setValorData] = useState("");
   const [motivoLen, setMotivoLen] = useState(0);
   // overlap com sessão da OUTRA dupla do mesmo jovem — warning, não bloqueio.
   // Guardado com a data consultada: resposta atrasada de data que já mudou
@@ -101,13 +110,23 @@ export function AgendarEncontroDialog({
     : dataMudou || !valorAtual || valorAtual > agora
       ? agora
       : valorAtual;
-  const sugeridoLocal = sugerido ? `${sugerido}T19:00` : "";
+  // a grade de horários passa o slot completo ("…T19:30"); o clique no mês/
+  // no dia continua chegando só com a data — entra às 19h, o horário típico
+  const sugeridoLocal = sugerido
+    ? sugerido.includes("T")
+      ? sugerido
+      : `${sugerido}T19:00`
+    : "";
   // encontro novo: o dia sugerido vale mesmo já passado — cai no ramo
   // retroativo; mas nunca antes do início da dupla (a action rejeitaria)
   const pisoLocal = piso ? `${piso}T19:00` : "";
   const defaultValue =
     valorAtual ??
     (sugeridoLocal && pisoLocal && sugeridoLocal < pisoLocal ? pisoLocal : sugeridoLocal);
+  // valor vivo do campo — decide se o submit agenda ou registra (modo dual).
+  // Nasce com a sugestão: o mount já-aberto do modo controlado não passa
+  // pelo reset do onOpenChange
+  const [valorData, setValorData] = useState(defaultValue);
   // modo retroativo só existe pra encontro novo (sem row editável)
   const ehRetroativo = !atual && valorData !== "" && valorData <= agora;
   // sujeito neutro pro copy — "4º encontro" no DPP, "sessão de especialista"
@@ -157,7 +176,7 @@ export function AgendarEncontroDialog({
             return;
           }
           toast.success("Encontro registrado. Agora complete o registro.");
-          setOpen(false);
+          mudaOpen(false);
           if (res.encontroId) {
             if (onCreated) {
               // a agenda navega pro dia do encontro e abre o form nela —
@@ -183,7 +202,7 @@ export function AgendarEncontroDialog({
               ? `Remarcação confirmada — ${nome}.`
               : `Agendamento confirmado — ${nome}.`
           );
-          setOpen(false);
+          mudaOpen(false);
           router.refresh();
         }
       } catch {
@@ -192,11 +211,18 @@ export function AgendarEncontroDialog({
     });
   }
 
+  // fecha pelo estado interno E avisa o pai — no modo controlado é ele quem
+  // desmonta o dialog (a grade limpa o slot clicado)
+  function mudaOpen(o: boolean) {
+    setOpenInterno(o);
+    onOpenChange?.(o);
+  }
+
   return (
     <Dialog
       open={open}
       onOpenChange={(o) => {
-        setOpen(o);
+        mudaOpen(o);
         if (o) {
           setMotivo("");
           setDataMudou(false);
@@ -204,14 +230,16 @@ export function AgendarEncontroDialog({
         }
       }}
     >
-      <DialogTrigger render={
-        trigger ?? (
-          <Button variant={atual ? "outline" : "default"} size="sm">
-            <CalendarPlus size={16} />
-            {atual ? "Remarcar" : "Agendar encontro"}
-          </Button>
-        )
-      } />
+      {trigger !== null && (
+        <DialogTrigger render={
+          trigger ?? (
+            <Button variant={atual ? "outline" : "default"} size="sm">
+              <CalendarPlus size={16} />
+              {atual ? "Remarcar" : "Agendar encontro"}
+            </Button>
+          )
+        } />
+      )}
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{nome}</DialogTitle>
@@ -309,7 +337,7 @@ export function AgendarEncontroDialog({
               sucesso="Encontro desmarcado."
               onConfirm={async () => {
                 const res = await desmarcarEncontro(atual.id);
-                if (!res?.error) setOpen(false);
+                if (!res?.error) mudaOpen(false);
                 return res;
               }}
               trigger={
