@@ -23,6 +23,7 @@ import {
   WhatsappLogo,
 } from "@phosphor-icons/react/dist/ssr";
 import { Avatar } from "@/components/avatar";
+import { EditarLinkDialog } from "@/components/editar-link-dialog";
 import { JovemAvaliacoes } from "@/components/jovem-avaliacoes";
 import { JovemCombinados } from "@/components/jovem-combinados";
 import { JovemEspecialistas } from "@/components/jovem-especialistas";
@@ -140,6 +141,14 @@ export default async function JovemHome() {
   // resolve por dupla (a view jovem_duplas entrega — a tabela `duplas` não
   // é legível pro papel e o join acontece com o que ele já pode ver)
   const trilhaPorDupla = new Map(duplas.map((d) => [d.id, d.trilha ?? "dpp"]));
+  // o lápis "trocar link" do próximo encontro — mesmo recorte da agenda:
+  // agendado de dupla ativa e DPP (a RPC do jovem não escreve na trilha esp)
+  const linkEditavelProximo =
+    proximo != null &&
+    proximo.status === "agendado" &&
+    (duplas.find((d) => d.id === proximo.dupla_id)?.status === "ativa") &&
+    (trilhaPorDupla.get(proximo.dupla_id) ?? "dpp") !== "especialista";
+
   const avaliados = new Set(avaliacoes.map((a) => a.encontro_id));
   const avaliacoesPendentes = encontros
     .filter((e) => e.status === "realizado" && !avaliados.has(e.id))
@@ -379,17 +388,29 @@ export default async function JovemHome() {
                     </p>
                   )}
                 </div>
-                {linkSeguro(proximo.link) && (
-                  <a
-                    href={linkSeguro(proximo.link)!}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={buttonVariants({ variant: "outline", size: "sm" })}
-                  >
-                    <VideoCamera size={16} aria-hidden />
-                    Entrar na chamada
-                    <span className="sr-only"> (abre em nova aba)</span>
-                  </a>
+                {(linkSeguro(proximo.link) || linkEditavelProximo) && (
+                  <div className="flex items-center gap-2">
+                    {linkSeguro(proximo.link) && (
+                      <a
+                        href={linkSeguro(proximo.link)!}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={buttonVariants({ variant: "outline", size: "sm" })}
+                      >
+                        <VideoCamera size={16} aria-hidden />
+                        Entrar na chamada
+                        <span className="sr-only"> (abre em nova aba)</span>
+                      </a>
+                    )}
+                    {/* sem link ainda o lápis é o "adicionar" — o encontro
+                        agendado é quem mais precisa dele */}
+                    {linkEditavelProximo && (
+                      <EditarLinkDialog
+                        encontroId={proximo.id}
+                        linkAtual={proximo.link}
+                      />
+                    )}
+                  </div>
                 )}
               </div>
             ) : (

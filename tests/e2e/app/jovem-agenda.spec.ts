@@ -539,4 +539,123 @@ test.describe("mentorado — agenda livre (REALIZA-110)", () => {
       page.getByText(`${numero}º encontro marcado`)
     ).toBeVisible();
   });
+
+  // REALIZA-23: gestos por linha — o lápis troca SÓ o link (a action roteia
+  // o jovem pela RPC da 0072 com a mesma data → sem motivo) e o agendado
+  // vencido ganha "Remarcar" ao lado do "não aconteceu" — o limbo tem duas
+  // saídas honestas, não uma.
+  test("lápis troca só o link — o mentor é avisado", async ({ page }) => {
+    // agendado futuro SEM link — pra quem ainda não tem link o lápis é o
+    // "adicionar" da linha
+    const enc = await criarAgendado(5, 12);
+    await entrarComoJovem(page);
+    await page.goto("/jovem/agenda");
+
+    const proximos = page.locator(
+      'section[aria-labelledby="agenda-proximos"]'
+    );
+    const linha5 = linha(proximos, 5);
+    await linha5
+      .getByRole("button", { name: "Editar link da chamada" })
+      .click();
+    const dialog = page.getByRole("dialog");
+    await expect(
+      dialog.getByRole("heading", { name: "Editar link da chamada" })
+    ).toBeVisible();
+    await dialog.locator("#link").fill("https://meet.google.com/e2e-jovem");
+    await dialog.getByRole("button", { name: "Salvar" }).click();
+
+    await expect(page.getByText("Link atualizado.")).toBeVisible();
+    await expect(dialog).not.toBeVisible();
+    // o chip "Entrar" da linha aponta o link novo
+    await expect(
+      linha5.getByRole("link", { name: /Entrar/ })
+    ).toHaveAttribute("href", "https://meet.google.com/e2e-jovem");
+
+    // write real via RPC — a data não muda, então motivo não é cobrado
+    const [row] = await buscarViaServiceRole<
+      { link: string | null; data_hora: string; motivo_reagendamento: string | null }[]
+    >(
+      "encontros",
+      `select=link,data_hora,motivo_reagendamento&id=eq.${String(enc.id)}`
+    );
+    expect(row.link).toBe("https://meet.google.com/e2e-jovem");
+    expect(row.motivo_reagendamento).toBeNull();
+    // a RPC reenvia a mesma data — o instante não anda nem um milissegundo
+    expect(new Date(String(row.data_hora)).getTime()).toBe(
+      new Date(String(enc.data_hora)).getTime()
+    );
+
+    // sino do mentor — "atualizou o link", não "moveu" (o trigger separa)
+    const [notif] = (await sinosDe(IDS.mentorProfile, "encontro_alterado"))
+      .filter((n) => n.titulo === "5º encontro alterado");
+    expect(notif).toBeTruthy();
+    expect(notif?.corpo).toMatch(
+      /Jovem E2E atualizou o link do encontro de \d{2}\/\d{2}\./
+    );
+    expect(notif?.href).toBe(`/duplas/${DUPLA_ID}`);
+  });
+
+  test("agendado vencido também remarca — o limbo não é só 'não aconteceu'", async ({
+    page,
+  }) => {
+    const enc = await criarAgendado(4, -2);
+    await entrarComoJovem(page);
+    await page.goto("/jovem/agenda");
+
+    // agendado vencido cai no histórico — ao lado do "Não aconteceu" agora
+    // mora o "Remarcar" (a RPC aceita fonte passada → alvo futuro)
+    const historico = page.locator(
+      'section[aria-labelledby="agenda-historico"]'
+    );
+    await linha(historico, 4)
+      .getByRole("button", { name: "Remarcar" })
+      .click();
+    const dialog = page.getByRole("dialog");
+    await expect(
+      dialog.getByRole("heading", { name: "4º encontro" })
+    ).toBeVisible();
+
+    await dialog.locator("#data_hora").fill(emDias(9));
+    // data mudou → o hint some e o motivo passa a ser exigido
+    await expect(
+      dialog.getByText("Só precisa se mudar a data.")
+    ).toHaveCount(0);
+    await dialog.locator("#motivo-select").click();
+    await page.getByRole("option", { name: "Conflito de agenda" }).click();
+    await dialog
+      .getByRole("button", { name: "Confirmar remarcação" })
+      .click();
+
+    await expect(page.getByText("4º encontro remarcado.")).toBeVisible();
+    await expect(dialog).not.toBeVisible();
+
+    // a linha sai do limbo e migra do histórico pros Próximos
+    const proximos = page.locator(
+      'section[aria-labelledby="agenda-proximos"]'
+    );
+    await expect(linha(proximos, 4).getByText("Agendado")).toBeVisible();
+    await expect(historico.getByText("4º encontro")).toHaveCount(0);
+
+    const [row] = await buscarViaServiceRole<
+      { status: string; data_hora: string; motivo_reagendamento: string | null }[]
+    >(
+      "encontros",
+      `select=status,data_hora,motivo_reagendamento&id=eq.${String(enc.id)}`
+    );
+    expect(row.status).toBe("agendado");
+    expect(row.motivo_reagendamento).toBe("Conflito de agenda");
+    // a data moveu de passada pra futura de verdade (+9d pedidos)
+    expect(new Date(row.data_hora).getTime()).toBeGreaterThan(
+      Date.now() + 7 * 86400e3
+    );
+
+    // sino do mentor — remarcação leva data nova + motivo no corpo
+    const [notif] = (await sinosDe(IDS.mentorProfile, "encontro_alterado"))
+      .filter((n) => n.titulo === "4º encontro alterado");
+    expect(notif?.corpo).toMatch(
+      /Jovem E2E moveu para \d{2}\/\d{2} às \d{2}:\d{2}\./
+    );
+    expect(notif?.corpo).toContain("Motivo: Conflito de agenda");
+  });
 });
