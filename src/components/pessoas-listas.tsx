@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
+import { Collapsible } from "@base-ui/react/collapsible";
 import {
   CaretDown,
   FileText,
@@ -486,24 +487,12 @@ export function PessoasListas({
  *  pendências, autorização), que saiu da linha principal pra não poluir a
  *  leitura. O dot warn sinaliza "tem pendência aqui" sem devolver jargão. */
 function DetalhesTrigger({
-  aberto,
-  controlsId,
   temPendencia,
-  onAlternar,
 }: {
-  aberto: boolean;
-  controlsId: string;
   temPendencia: boolean;
-  onAlternar: () => void;
 }) {
   return (
-    <button
-      type="button"
-      aria-expanded={aberto}
-      aria-controls={controlsId}
-      onClick={onAlternar}
-      className="inline-flex min-h-11 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:min-h-8"
-    >
+    <Collapsible.Trigger className="group inline-flex min-h-11 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:min-h-8">
       Detalhes
       {temPendencia && (
         <>
@@ -514,12 +503,9 @@ function DetalhesTrigger({
       <CaretDown
         aria-hidden
         size={13}
-        className={cn(
-          "transition-transform duration-150",
-          aberto && "rotate-180"
-        )}
+        className="transition-transform duration-150 group-data-[panel-open]:rotate-180"
       />
-    </button>
+    </Collapsible.Trigger>
   );
 }
 
@@ -569,31 +555,31 @@ function LinkAssinatura({ id, children }: { id: string; children: ReactNode }) {
   );
 }
 
-/** Região colapsável de detalhes — sempre montada com `hidden` pra que
- *  aria-controls resolva também fechada; largura cheia abaixo da linha, segura
- *  em 390px. */
+/** Região colapsável de detalhes — keepMounted pra que o aria-controls do
+ *  trigger resolva também fechada (mesma regra do `hidden` anterior); largura
+ *  cheia abaixo da linha, segura em 390px. */
 function DetalhesRegiao({
   id,
   nome,
-  aberto,
   children,
 }: {
   id: string;
   /** Nome da pessoa — compõe o aria-label da região. */
   nome: string;
-  aberto: boolean;
   children: ReactNode;
 }) {
   return (
-    <div
+    <Collapsible.Panel
+      keepMounted
       id={id}
       role="region"
       aria-label={`Detalhes de ${nome}`}
-      hidden={!aberto}
-      className="mt-2.5 rounded-lg bg-muted/50 px-3 py-2.5 shadow-[var(--shadow-inset)]"
+      className="h-[var(--collapsible-panel-height)] overflow-hidden transition-[height] duration-150 data-ending-style:h-0 data-starting-style:h-0 [&[hidden]:not([hidden='until-found'])]:hidden"
     >
-      <ul className="space-y-1.5">{children}</ul>
-    </div>
+      <div className="mt-2.5 rounded-lg bg-muted/50 px-3 py-2.5 shadow-[var(--shadow-inset)]">
+        <ul className="space-y-1.5">{children}</ul>
+      </div>
+    </Collapsible.Panel>
   );
 }
 
@@ -628,7 +614,6 @@ function PessoaRow({
   faltantesTermo?: string[];
   souCoord: boolean;
 }) {
-  const [detalhesAbertos, setDetalhesAbertos] = useState(false);
   // mentor sem linha em mentor_profiles vale capacidade 1 (mesma regra do
   // createDupla) — na pool da própria trilha (0073)
   const capacidade =
@@ -654,7 +639,9 @@ function PessoaRow({
   const chipsPerfil = ehMentor(p) ? (p.areas ?? []) : (p.interesses ?? []);
   const CHIPS_MAX = 4;
   return (
-    <div
+    // Root do disclosure da linha — o trigger mora no cluster de ações e o
+    // painel vem depois da linha principal; uncontrolled, sem estado local
+    <Collapsible.Root
       className="animate-enter px-4 py-3.5 sm:px-5"
       style={{ "--i": Math.min(indice, 10) } as CSSProperties}
     >
@@ -742,12 +729,7 @@ function PessoaRow({
             Sem badge "especialista": o seletor de papel na mesma linha já diz
             "mentor especialista" (mp.tipo é derivado de role) */}
         {souCoord && ehMentor(p) && (
-          <DetalhesTrigger
-            aberto={detalhesAbertos}
-            controlsId={detalhesId}
-            temPendencia={temPendencia}
-            onAlternar={() => setDetalhesAbertos((v) => !v)}
-          />
+          <DetalhesTrigger temPendencia={temPendencia} />
         )}
         {/* a 390px o cluster cai pra linha própria — w-full deixa o select de
             papel ocupar a linha toda (alvo generoso) com o ⋮ na direita;
@@ -766,7 +748,7 @@ function PessoaRow({
         )}
       </div>
       {souCoord && ehMentor(p) && (
-        <DetalhesRegiao id={detalhesId} nome={p.nome} aberto={detalhesAbertos}>
+        <DetalhesRegiao id={detalhesId} nome={p.nome}>
           <ItemDetalhe icone={Users}>
             {vagas === 0
               ? temHistorico
@@ -804,7 +786,7 @@ function PessoaRow({
           )}
         </DetalhesRegiao>
       )}
-    </div>
+    </Collapsible.Root>
   );
 }
 
@@ -830,7 +812,6 @@ function MentoradoRow({
   faltantes?: Record<string, string[]>;
   souCoord: boolean;
 }) {
-  const [detalhesAbertos, setDetalhesAbertos] = useState(false);
   const detalhesId = `detalhes-${m.id}`;
   // LGPD: parear menor sem a autorização do responsável é pendência jurídica.
   // Vale tanto o upload manual (documento_path) quanto a assinatura por link.
@@ -858,7 +839,8 @@ function MentoradoRow({
     Object.keys(docs.assinado).length > 0 ||
     docs.pendente.length > 0;
   return (
-    <div
+    // idem PessoaRow — Root do disclosure: trigger no cluster, painel embaixo
+    <Collapsible.Root
       className="animate-enter px-4 py-3.5 sm:px-5"
       style={{ "--i": Math.min(indice, 10) } as CSSProperties}
     >
@@ -911,12 +893,7 @@ function MentoradoRow({
           </Badge>
         )}
         {souCoord && temDocs && (
-          <DetalhesTrigger
-            aberto={detalhesAbertos}
-            controlsId={detalhesId}
-            temPendencia={temPendencia}
-            onAlternar={() => setDetalhesAbertos((v) => !v)}
-          />
+          <DetalhesTrigger temPendencia={temPendencia} />
         )}
         {souCoord && (
           <div className="flex items-center gap-2 ml-auto">
@@ -925,7 +902,7 @@ function MentoradoRow({
         )}
       </div>
       {souCoord && temDocs && (
-        <DetalhesRegiao id={detalhesId} nome={m.nome} aberto={detalhesAbertos}>
+        <DetalhesRegiao id={detalhesId} nome={m.nome}>
           {menor && (
             <ItemDetalhe icone={FileText} warn={!autorizacaoOk}>
               {autorizacaoOk ? (
@@ -963,6 +940,6 @@ function MentoradoRow({
           )}
         </DetalhesRegiao>
       )}
-    </div>
+    </Collapsible.Root>
   );
 }
