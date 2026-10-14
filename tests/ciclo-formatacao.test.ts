@@ -8,6 +8,7 @@ import {
   disponibilidadeNaHora,
   disponibilidadeNoDia,
   disponibilidadeTexto,
+  disponibilidadeVazia,
   formatDate,
   formatDateTime,
   formatDiaMes,
@@ -191,6 +192,18 @@ describe("diaSemanaDe / disponibilidadeNoDia / cruzamentoDisponibilidade", () =>
     expect(disponibilidadeNoDia(grade([], ["noite"]), "ter")).toBe(false);
     expect(disponibilidadeNoDia(null, "ter")).toBe(false);
     expect(disponibilidadeNoDia(undefined, "ter")).toBe(false);
+  });
+
+  it("disponibilidadeVazia segue a mesma régua do cruzamento — sem dia não cruza", () => {
+    // a régua do lembrete do /jovem (REALIZA-114): null, esqueleto vazio e
+    // períodos-sem-dia não servem pro overlay — "pendente"
+    expect(disponibilidadeVazia(null)).toBe(true);
+    expect(disponibilidadeVazia(undefined)).toBe(true);
+    expect(disponibilidadeVazia(grade([]))).toBe(true);
+    expect(disponibilidadeVazia(grade([], ["noite"]))).toBe(true);
+    // dia marcado basta pra preencher — período vazio é "qualquer horário"
+    expect(disponibilidadeVazia(grade(["ter"]))).toBe(false);
+    expect(disponibilidadeVazia(grade(["ter"], ["noite"]))).toBe(false);
   });
 
   const MENTOR = grade(["ter", "qui"], ["noite"]);

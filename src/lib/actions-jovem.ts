@@ -2,11 +2,12 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { parseDisponibilidade } from "./ciclo";
 import { getSlotsLivres } from "./queries-especialista";
 import { demoAtivo } from "./demo/mode";
 import { DEMO_MSG } from "./demo/shared";
 import { erroAmigavel as erroAmigavelBase } from "./utils";
-import type { SolicitacaoEspecialistaStatus } from "./types";
+import type { Disponibilidade, SolicitacaoEspecialistaStatus } from "./types";
 
 // Writes do jovem (REALIZA-112 PR2) — o pedido de especialista vai direto
 // por RPC definer: a 0074 já valida tudo no servidor (teto de trilhas,
@@ -49,6 +50,34 @@ export async function setContatoCompartilhado(ligado: boolean) {
   if (error) return { error: erroAmigavel(error) };
   revalidatePath("/jovem/perfil");
   revalidatePath("/jovem/pessoas");
+  return { ok: true };
+}
+
+/** Grade semanal do próprio jovem (REALIZA-114) — escrita via RPC definer
+ *  set_disponibilidade_mentorado (0078): mentorados não tem UPDATE pro
+ *  papel, então a escrita deriva a ficha por my_mentorado_id() no banco.
+ *  A grade chega como objeto tipado do client; o parse revalida o
+ *  vocabulário do CHECK antes de mandar (grade vazia vira null). Serve o
+ *  wizard de primeiro acesso e a edição do /jovem/perfil. */
+export async function salvarDisponibilidadeJovem(
+  grade: Disponibilidade | null
+) {
+  if (await demoAtivo()) return { error: DEMO_MSG };
+  const { supabase, me: eu } = await me();
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
+  if (eu.role !== "mentorado") {
+    return { error: "Só o próprio jovem informa a disponibilidade dele." };
+  }
+  // round-trip pelo parser do domínio: filtra qualquer valor fora do
+  // vocabulário antes do jsonb — a RPC revalida de novo no servidor
+  const parsed = parseDisponibilidade(JSON.stringify(grade ?? null));
+  if (parsed && "error" in parsed) return { error: parsed.error };
+  const { error } = await supabase.rpc("set_disponibilidade_mentorado", {
+    p_grade: parsed,
+  });
+  if (error) return { error: erroAmigavel(error) };
+  revalidatePath("/jovem");
+  revalidatePath("/jovem/perfil");
   return { ok: true };
 }
 

@@ -105,6 +105,11 @@ const IDS = {
   // (cap implícito 1 livre) em vez de pendurar no reserva.
   mentorColega: "e2e00000-0000-4000-8000-0000000000e2",
   duplaColega: "e2e00000-0000-4000-8000-0000000000f2",
+  // REALIZA-114: o jovem do "1º acesso" — login próprio e ficha vinculada,
+  // mas SEM carimbo de onboarding e SEM grade na ficha: é o estado que o
+  // wizard do /jovem testa. O bloco re-zera os dois a cada run.
+  jovem3Profile: "e2e00000-0000-4000-8000-0000000000e3",
+  mentoradoOnboarding: "e2e00000-0000-4000-8000-0000000000f3",
 };
 const EMAIL = "e2e-mentor@realiza.test";
 const COORD_EMAIL = "e2e-coord@realiza.test";
@@ -119,6 +124,10 @@ const JOVEM2_EMAIL = "jovem2-e2e@realiza.test";
 // o número que o opt-in dele libera pros colegas (0076) — alimenta o botão
 // WhatsApp do card dele na /jovem/pessoas do jovem
 const JOVEM2_WHATSAPP = "5511999000091";
+// o jovem do onboarding (REALIZA-114): o WhatsApp é o que o passo de
+// contato do wizard exibe e o que o opt-in poderia compartilhar
+const JOVEM3_EMAIL = "jovem3-e2e@realiza.test";
+const JOVEM3_WHATSAPP = "5511999000093";
 // assinaturas.token é uuid — os tokens fixos da fixture manual do staging
 const TOKEN_TERMO_JOVEM = "e2e00000-0000-4000-8000-0000000000aa";
 const TOKEN_AUTORIZ_JOVEM = "e2e00000-0000-4000-8000-0000000000ab";
@@ -207,8 +216,8 @@ console.log(`cronograma: ${cron.id} (${cron.turma})`);
     console.log(`limpeza: ${condenadas.length} dupla(s) pendurada(s) removidas`);
   }
   await patch(`duplas?id=eq.${IDS.dupla2}`, { status: "ativa" });
-  const e2eProfiles = [IDS.mentorProfile, IDS.coordProfile, IDS.mentorReserva, IDS.mentorImport, IDS.jovemProfile, IDS.espProfile, IDS.esp2Profile, IDS.jovem2Profile, IDS.mentorColega].join(",");
-  const e2eMentorados = [IDS.mentorado, IDS.mentorado2, IDS.mentoradoLivre, IDS.mentoradoImport, IDS.mentoradoSemDpp].join(",");
+  const e2eProfiles = [IDS.mentorProfile, IDS.coordProfile, IDS.mentorReserva, IDS.mentorImport, IDS.jovemProfile, IDS.espProfile, IDS.esp2Profile, IDS.jovem2Profile, IDS.mentorColega, IDS.jovem3Profile].join(",");
+  const e2eMentorados = [IDS.mentorado, IDS.mentorado2, IDS.mentoradoLivre, IDS.mentoradoImport, IDS.mentoradoSemDpp, IDS.mentoradoOnboarding].join(",");
   // solicitações de especialista ligadas a qualquer mentorado e2e — o sweep
   // de condenadas só alcança as que morrem junto das duplas; as que apontam
   // pras duplas FIXTURE (dupla_dpp_id) ficariam de pé: uma 'aberta'/
@@ -834,6 +843,75 @@ if (!mColega) {
   }
 }
 
+// ---- jovem3 (REALIZA-114): o jovem do "1º acesso" ----
+// Profile mentorado + auth + ficha vinculada, mas o estado inicial é o do
+// nunca-entrou: onboarded_em null (o layout devolve o wizard em vez do
+// shell) e a ficha sem disponibilidade nem opt-in. A convergência ZERA o
+// carimbo a cada run — um spec que concluiu o wizard não pode vazar o
+// "já vi" pro run seguinte (o spec também re-converge no beforeEach).
+let [jovem3] = await rest(
+  `profiles?select=id,user_id,role,ativo,onboarded_em&email=eq.${JOVEM3_EMAIL}`
+);
+if (!jovem3) {
+  [jovem3] = await rest("profiles", {
+    method: "POST",
+    body: JSON.stringify({
+      id: IDS.jovem3Profile,
+      email: JOVEM3_EMAIL,
+      nome: "Jovem E2E Onboarding",
+      role: "mentorado",
+      ativo: true,
+    }),
+  });
+  console.log("profile jovem do onboarding criado");
+} else {
+  const fixes = {};
+  if (jovem3.role !== "mentorado") fixes.role = "mentorado";
+  if (!jovem3.ativo) fixes.ativo = true;
+  if (Object.keys(fixes).length) {
+    await patch(`profiles?id=eq.${jovem3.id}`, fixes);
+    console.log(
+      `profile jovem do onboarding convergido (${Object.keys(fixes).join(", ")})`
+    );
+  }
+}
+await patch(`profiles?id=eq.${IDS.jovem3Profile}`, { onboarded_em: null });
+await vincularAuth(jovem3, JOVEM3_EMAIL);
+// a ficha: vínculo + WhatsApp (o passo de contato do wizard exibe), e a
+// grade/opt-in de volta ao virgem — sem dupla de propósito: o spec só
+// testa o wizard, o lembrete e a edição no perfil
+{
+  const [ficha] = await rest(
+    `mentorados?select=id,profile_id,whatsapp&id=eq.${IDS.mentoradoOnboarding}`
+  );
+  if (!ficha) {
+    await rest("mentorados", {
+      method: "POST",
+      body: JSON.stringify({
+        id: IDS.mentoradoOnboarding,
+        nome: "Jovem E2E Onboarding",
+        profile_id: jovem3.id,
+        whatsapp: JOVEM3_WHATSAPP,
+      }),
+    });
+    console.log("mentorado do onboarding criado");
+  } else {
+    const fixes = {};
+    if (ficha.profile_id !== jovem3.id) fixes.profile_id = jovem3.id;
+    if (ficha.whatsapp !== JOVEM3_WHATSAPP) fixes.whatsapp = JOVEM3_WHATSAPP;
+    if (Object.keys(fixes).length) {
+      await patch(`mentorados?id=eq.${IDS.mentoradoOnboarding}`, fixes);
+      console.log(
+        `ficha do jovem do onboarding convergida (${Object.keys(fixes).join(", ")})`
+      );
+    }
+  }
+  await patch(`mentorados?id=eq.${IDS.mentoradoOnboarding}`, {
+    disponibilidade: null,
+    contato_compartilhado: false,
+  });
+}
+
 // ---- jovem (mentorado) — fixtures do shell /jovem (REALIZA-108) ----
 // Mesmo esquema do mentor: profile ANTES do auth user pro handle_new_user
 // vincular. onboarded_em carimbado — os specs caem na home, não na tela de
@@ -1086,4 +1164,5 @@ console.log(`  E2E_JOVEM_EMAIL=${JOVEM_EMAIL}`);
 console.log(`  E2E_ESP_EMAIL=${ESP_EMAIL}`);
 console.log(`  E2E_ESP2_EMAIL=${ESP2_EMAIL}`);
 console.log(`  E2E_JOVEM2_EMAIL=${JOVEM2_EMAIL}`);
+console.log(`  E2E_JOVEM3_EMAIL=${JOVEM3_EMAIL}`);
 console.log("  E2E_SUPABASE_URL / E2E_SUPABASE_SERVICE_ROLE_KEY = do staging");
