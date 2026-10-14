@@ -9,16 +9,16 @@ import {
   FileArrowDown,
   PencilSimple,
   Signature,
-  SignOut,
 } from "@phosphor-icons/react";
 import { createClient, createOtpClient } from "@/lib/supabase/client";
 import { emailValido, normEmail } from "@/lib/importar";
 import { DEMO_MSG, demoAtivoClient } from "@/lib/demo/shared";
-import { setAvatarPath, signOut, updateMeuPerfil } from "@/lib/actions";
+import { setAvatarPath, updateMeuPerfil } from "@/lib/actions";
 import { avisarSenhaAlterada, trocarEmail } from "@/lib/actions-conta";
 import { avatarPublicUrl, AVATAR_ACCEPT, AVATAR_MAX_BYTES } from "@/lib/avatar";
 import { Avatar } from "@/components/avatar";
 import { PessoaBanner } from "@/components/pessoa-banner";
+import { SignOutButton } from "@/components/signout-button";
 import { TagInput } from "@/components/tag-input";
 import {
   CampoConsentimento,
@@ -1493,25 +1493,18 @@ export function PerfilForm({
               titulo="Sessão"
               descricao="Encerra o acesso da sua conta neste dispositivo."
               acao={
-                <Button
-                  type="submit"
-                  form="form-sair"
+                <SignOutButton
                   variant="outline"
                   size="sm"
-                >
-                  <SignOut size={15} aria-hidden />
-                  Sair
-                </Button>
+                  iconSize={15}
+                  formClassName="contents"
+                />
               }
               borda
             />
           </section>
         </div>
       </div>
-
-      {/* o Sair usa um form real com server action; o botão se liga por
-          form= pra não precisar de estado */}
-      <form id="form-sair" action={signOut} className="hidden" />
     </div>
   );
 }

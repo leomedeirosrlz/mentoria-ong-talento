@@ -12,16 +12,15 @@ import {
   DotsThree,
   FolderOpen,
   ListChecks,
-  SignOut,
   Table,
   UserCircle,
   UsersThree,
 } from "@phosphor-icons/react";
-import { signOut } from "@/lib/actions";
 import { papelCurto, papelLabel } from "@/lib/ciclo";
 import { Avatar } from "@/components/avatar";
 import { T } from "@/components/motion";
 import { NotificacoesBell, NotificacoesProvider } from "@/components/notificacoes";
+import { SignOutButton } from "@/components/signout-button";
 import { SiteFooter } from "@/components/site-footer";
 import {
   Popover,
@@ -199,14 +198,12 @@ export function AppShell({
                 não existe top bar pra abrigar o sino fora da sidebar */}
             <NotificacoesBell side="right" align="end" />
           </div>
-          <form action={signOut}>
-            <button type="submit" className="mt-2 flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground outline-none transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-3 focus-visible:ring-ring/50">
-              <SignOut size={18} aria-hidden />
-              {/* em demo o signOut sai da demonstração — a sessão real dormente
-                  continua e o middleware devolve pro app logado */}
-              {demo ? "Sair da demonstração" : "Sair"}
-            </button>
-          </form>
+          {/* em demo o signOut sai da demonstração — a sessão real dormente
+              continua e o middleware devolve pro app logado */}
+          <SignOutButton
+            label={demo ? "Sair da demonstração" : "Sair"}
+            className="mt-2 flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground outline-none transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
+          />
         </div>
       </aside>
 

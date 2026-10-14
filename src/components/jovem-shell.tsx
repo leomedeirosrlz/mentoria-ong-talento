@@ -7,14 +7,13 @@ import {
   CalendarDots,
   FolderOpen,
   House,
-  SignOut,
   UserCircle,
   Users,
 } from "@phosphor-icons/react";
-import { signOut } from "@/lib/actions";
 import { Avatar } from "@/components/avatar";
 import { T } from "@/components/motion";
 import { NotificacoesBell, NotificacoesProvider } from "@/components/notificacoes";
+import { SignOutButton } from "@/components/signout-button";
 import { SiteFooter } from "@/components/site-footer";
 import type { Notificacao, Profile } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -88,15 +87,11 @@ export function JovemShell({
           </div>
           <div className="flex items-center gap-1">
             <NotificacoesBell side="bottom" align="end" />
-            <form action={signOut}>
-              <button
-                type="submit"
-                aria-label="Sair"
-                className="grid size-11 place-items-center rounded-lg text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
-              >
-                <SignOut size={18} aria-hidden />
-              </button>
-            </form>
+            <SignOutButton
+              somenteIcone
+              label="Sair"
+              className="grid size-11 place-items-center rounded-lg text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
+            />
           </div>
         </header>
 
@@ -166,15 +161,7 @@ export function JovemShell({
               </Link>
               <NotificacoesBell side="right" align="end" />
             </div>
-            <form action={signOut}>
-              <button
-                type="submit"
-                className="mt-2 flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground outline-none transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
-              >
-                <SignOut size={18} aria-hidden />
-                Sair
-              </button>
-            </form>
+            <SignOutButton className="mt-2 flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground outline-none transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-3 focus-visible:ring-ring/50" />
           </div>
         </aside>
 

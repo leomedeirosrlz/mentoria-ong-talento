@@ -4,7 +4,8 @@ import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, CircleNotch } from "@phosphor-icons/react";
 import { toast } from "sonner";
-import { concluirOnboarding, signOut } from "@/lib/actions";
+import { concluirOnboarding } from "@/lib/actions";
+import { SignOutButton } from "@/components/signout-button";
 import { Button } from "@/components/ui/button";
 
 /** Boas-vindas do jovem (REALIZA-108) — UMA tela, não um wizard: o programa
@@ -64,14 +65,13 @@ export function BoasVindas({ nome }: { nome: string }) {
         </Button>
         {/* conta errada acontece (e-mail da mãe, celular compartilhado) —
             a saída precisa existir, mas quieta */}
-        <form action={signOut} className="mt-5">
-          <button
-            type="submit"
-            className="text-xs text-muted-foreground underline transition-colors hover:text-foreground"
-          >
-            Não é você? Sair e voltar ao login
-          </button>
-        </form>
+        <SignOutButton
+          icone={false}
+          iconSize={13}
+          label="Não é você? Sair e voltar ao login"
+          formClassName="mt-5"
+          className="text-xs text-muted-foreground underline transition-colors hover:text-foreground"
+        />
       </div>
     </div>
   );
