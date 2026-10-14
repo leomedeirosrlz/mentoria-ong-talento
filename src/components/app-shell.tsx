@@ -239,7 +239,7 @@ export function AppShell({
                 href={item.href}
                 aria-current={ativo ? "page" : undefined}
                 className={cn(
-                  "relative flex flex-1 flex-col items-center gap-1 py-2.5 text-[11px] transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:ring-inset",
+                  "group relative flex flex-1 flex-col items-center gap-1 py-2.5 text-[11px] transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:ring-inset",
                   ativo ? "font-semibold text-[var(--brand-ink)]" : "font-medium text-sidebar-foreground/75 active:text-sidebar-foreground"
                 )}
               >
@@ -253,7 +253,15 @@ export function AppShell({
                     className="absolute top-0 h-0.5 w-8 rounded-full bg-[var(--brand-lime)]"
                   />
                 )}
-                <item.icon size={20} weight={ativo ? "fill" : "regular"} aria-hidden />
+                {/* press tactile no ícone — o scale do Button (0.96) adaptado
+                    pro alvo pequeno da bottom-nav; :active não desce pro filho,
+                    então o dip é group-active do link */}
+                <item.icon
+                  size={20}
+                  weight={ativo ? "fill" : "regular"}
+                  aria-hidden
+                  className="transition-transform group-active:scale-90"
+                />
                 {item.curto}
               </Link>
             );
@@ -263,7 +271,7 @@ export function AppShell({
               <PopoverTrigger
                 aria-label={maisAtivo ? `Mais seções, seção atual em ${overflow.find((i) => pathname.startsWith(i.href))?.label}` : "Mais seções"}
                 className={cn(
-                  "relative flex flex-1 flex-col items-center gap-1 py-2.5 text-[11px] transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:ring-inset",
+                  "group relative flex flex-1 flex-col items-center gap-1 py-2.5 text-[11px] transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:ring-inset",
                   maisAtivo ? "font-semibold text-[var(--brand-ink)]" : "font-medium text-sidebar-foreground/75 active:text-sidebar-foreground"
                 )}
               >
@@ -277,7 +285,12 @@ export function AppShell({
                     className="absolute top-0 h-0.5 w-8 rounded-full bg-[var(--brand-lime)]"
                   />
                 )}
-                <DotsThree size={20} weight={maisAtivo ? "bold" : "regular"} aria-hidden />
+                <DotsThree
+                  size={20}
+                  weight={maisAtivo ? "bold" : "regular"}
+                  aria-hidden
+                  className="transition-transform group-active:scale-90"
+                />
                 Mais
               </PopoverTrigger>
               <PopoverContent

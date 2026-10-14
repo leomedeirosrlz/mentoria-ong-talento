@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
+import type { CSSProperties } from "react";
 import { CalendarBlank, Plus } from "@phosphor-icons/react/dist/ssr";
 import { getCicloEventos, getCronogramas, getMe } from "@/lib/queries";
 import { getVinculosCronogramas } from "@/lib/queries-cronogramas";
@@ -88,7 +89,7 @@ export default async function TurmasPage() {
         </div>
       ) : (
         <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {ordenados.map((c) => {
+          {ordenados.map((c, i) => {
             const evs = eventosDoCronograma(eventos, c.id);
             const encontros = evs.filter((e) => e.tipo === "encontro").length;
             const vinc = vinculos.filter((v) => v.cronogramaId === c.id);
@@ -96,10 +97,16 @@ export default async function TurmasPage() {
               (v) => v.status === "ativa" || v.status === "pausada"
             ).length;
             return (
-              <li key={c.id}>
+              <li
+                key={c.id}
+                className="animate-enter"
+                style={{ "--i": Math.min(i, 10) } as CSSProperties}
+              >
+                {/* hover em 2 camadas, paridade com formularios/dashboard:
+                    lift de 1px + sombra-hover sobre o bg-muted/40 que já tinha */}
                 <Link
                   href={`/turmas/${c.id}`}
-                  className="flex h-full flex-col rounded-xl bg-card p-4 shadow-[var(--shadow-border)] transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:p-5"
+                  className="flex h-full flex-col rounded-xl bg-card p-4 shadow-[var(--shadow-border)] transition-[background-color,border-color,box-shadow,translate] ease-snappy hover:-translate-y-px hover:bg-muted/40 hover:shadow-[var(--shadow-border-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:p-5"
                 >
                   <div className="flex items-start justify-between gap-2">
                     <p className="min-w-0 text-sm font-semibold leading-snug">

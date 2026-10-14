@@ -179,7 +179,9 @@ function MaterialRow({ m, ehCoord, maxEncontro }: { m: Material; ehCoord: boolea
   );
   const headCls = "flex min-w-0 flex-1 basis-full items-center gap-x-4 px-5 py-3.5 lg:basis-0";
   return (
-    <div className={cn("flex flex-wrap items-center pr-2 transition-colors", href && "hover:bg-muted/50")}>
+    // o clique mora no <a> do head, mas :active sobe pros ancestrais — o
+    // press afunda a linha inteira, não só a zona clicável
+    <div className={cn("flex flex-wrap items-center pr-2 transition-colors", href && "hover:bg-muted/50 active:bg-muted")}>
       {href ? (
         <a
           href={href}
