@@ -246,9 +246,11 @@ test.describe("mentor especialista — agenda (REALIZA-111)", () => {
     ).toBeVisible();
     // o agendado da trilha já aparece na fila de "Próximos" do especialista —
     // a linha é link com a data e o passo ("1º encontro, agendado para … ·
-    // próximo passo"), então ancora pelo nome parcial, não pelo texto exato
+    // próximo passo"), então ancora pelo nome parcial, não pelo texto exato.
+    // O ^ ancora no início: o calendário ao lado também linka o mesmo dia
+    // com "Ir para o 1º encontro, …" — sem a âncora a regex casa os dois.
     await expect(
-      page.getByRole("link", { name: /1º encontro/ })
+      page.getByRole("link", { name: /^1º encontro/ })
     ).toBeVisible();
 
     const grade = page
