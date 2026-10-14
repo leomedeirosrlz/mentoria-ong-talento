@@ -21,16 +21,30 @@ const LARGURA_INICIAL = 168;
 type Ordem = { col: string; dir: 1 | -1 } | null;
 
 /** Célula em edição — `key` identifica o editor entre re-renders (o estado
- *  é recriado a cada keystroke) e `linha` guarda o objeto, não o índice:
- *  reordenar com a edição aberta deixa o editor grudado na row certa. */
+ *  é recriado a cada keystroke) e `linhaKey` é a identidade estável da linha:
+ *  montarLinhas devolve objetos novos a cada save que aterrissa, então
+ *  referência não serve — a chave mantém o editor grudado na row certa mesmo
+ *  reordenando ou salvando outra célula com a edição aberta. */
 type Edicao = {
   key: string;
-  linha: LinhaRelatorio;
+  linhaKey: string;
   col: string;
   alvos: AlvoRelatorio[];
   valores: string[];
   salvando: boolean;
 };
+
+/** Identidade estável da linha pra edição: os ids das pessoas que ela
+ *  escreve (`tabela:id`, únicos por linha nos dois relatórios). Linhas sem
+ *  `__alvos` (resumo público) nunca entram em edição — a chave vazia não
+ *  é consultada. */
+function chaveLinha(l: LinhaRelatorio): string {
+  const ids = new Set<string>();
+  for (const lista of Object.values(l.__alvos ?? {})) {
+    for (const a of lista) ids.add(`${a.tabela}:${a.id}`);
+  }
+  return [...ids].sort().join("|");
+}
 
 /** Tom do chip de status da dupla — mesma gramática dos badges de /pessoas:
  *  ok/warn/danger com texto na versão -text (AA); pausada é neutra,
@@ -59,14 +73,21 @@ const CAMPO_PLACEHOLDER: Record<CampoCadastro, string> = {
  *  o canvas é a página.
  *
  *  Com `editavel` (só /relatorios, que é coord-only) as células de cadastro
- *  abrem edição inline por duplo clique ou Enter — os alvos de escrita chegam
- *  prontos em `__alvos` (montarLinhas paraApp), então a página pública nunca
- *  tem o que editar mesmo se a prop vazar. */
+ *  ficam tingidas e abrem edição inline por clique ou Enter — os alvos de
+ *  escrita chegam prontos em `__alvos` (montarLinhas paraApp), então a
+ *  página pública nunca tem o que editar mesmo se a prop vazar.
+ *
+ *  Colunas entram e saem animadas: o pai marca `colunasEntrando` no clique
+ *  que liga a coluna (a célula monta já com fade+slide e a marca cai depois
+ *  da animação) e `colunasSaindo` no que desliga (o id segue no array
+ *  ~170ms pro fade-out rodar antes de desmontar). */
 export function RelatorioCanvas({
   colunas,
   linhas,
   storageKey,
   editavel = false,
+  colunasEntrando,
+  colunasSaindo,
   onSalvarCampo,
 }: {
   colunas: ColunaRelatorio[];
@@ -75,6 +96,10 @@ export function RelatorioCanvas({
   storageKey?: string;
   /** modo edição inline — exige `__alvos` nas linhas + `onSalvarCampo` */
   editavel?: boolean;
+  /** ids recém-ligados — entram animados (a marca cai após o fade+slide) */
+  colunasEntrando?: ReadonlySet<string>;
+  /** ids que estão saindo (o pai remove do array quando o fade termina) */
+  colunasSaindo?: ReadonlySet<string>;
   /** devolve mensagem de erro pra exibir em toast, ou null no sucesso */
   onSalvarCampo?: (alvo: AlvoRelatorio, novoValor: string) => Promise<string | null>;
 }) {
@@ -111,14 +136,15 @@ export function RelatorioCanvas({
     );
   }, [linhas, ordem]);
 
-  // o editor morre junto com a célula: save bem-sucedido reconstrói as
-  // linhas (objetos novos), desligar o modo edição ou ocultar a coluna
-  // também tira a célula debaixo dele
+  // o editor morre junto com a célula: modo edição desligado, coluna oculta
+  // ou a linha fora do recorte. O match é por linhaKey, não por referência —
+  // o save de outra célula reconstrói `linhas` sem derrubar este editor.
+  const linhaEditada = edicao
+    ? ordenadas.find((l) => chaveLinha(l) === edicao.linhaKey)
+    : undefined;
   if (
     edicao &&
-    (!ordenadas.includes(edicao.linha) ||
-      !editavel ||
-      !colunas.some((c) => c.id === edicao.col))
+    (!linhaEditada || !editavel || !colunas.some((c) => c.id === edicao.col))
   ) {
     setEdicao(null);
   }
@@ -169,7 +195,7 @@ export function RelatorioCanvas({
       if (!alvos?.length) return;
       setEdicao({
         key: String(++seqEdicao.current),
-        linha,
+        linhaKey: chaveLinha(linha),
         col,
         alvos,
         valores: alvos.map((a) => a.valor),
@@ -334,7 +360,13 @@ export function RelatorioCanvas({
       <div
         ref={wrapRef}
         tabIndex={-1}
-        className="scroll-fina max-h-[70dvh] overflow-auto overscroll-auto [scrollbar-gutter:stable]"
+        className={cn(
+          "scroll-fina max-h-[70dvh] overflow-auto overscroll-auto [scrollbar-gutter:stable]",
+          // moldura do modo edição: inset lime sutil em volta da área toda —
+          // box-shadow no scroller não rola com o conteúdo nem é clipada
+          editavel &&
+            "shadow-[inset_0_0_0_1.5px_color-mix(in_srgb,var(--brand-lime)_45%,transparent)]"
+        )}
       >
         <table
           className="border-separate border-spacing-0 text-left text-[13px] leading-snug"
@@ -348,13 +380,18 @@ export function RelatorioCanvas({
               />
               {colunas.map((c) => {
                 const ativo = ordem?.col === c.id;
+                const saindo = colunasSaindo?.has(c.id) ?? false;
                 return (
                   <th
                     key={c.id}
                     className={cn(
                       celula,
                       "sticky top-0 z-20 border-t bg-muted px-2.5 py-1.5 text-left text-xs font-medium text-foreground select-none",
-                      "cursor-pointer hover:bg-accent"
+                      "cursor-pointer hover:bg-accent",
+                      (colunasEntrando?.has(c.id) ?? false) &&
+                        "animate-in fade-in slide-in-from-left-2 duration-200 ease-snappy",
+                      saindo &&
+                        "animate-out fade-out slide-out-to-left-2 duration-150 ease-snappy"
                     )}
                     style={{ width: larguras[c.id] ?? LARGURA_INICIAL }}
                     onClick={() => clicarHeader(c.id)}
@@ -401,10 +438,13 @@ export function RelatorioCanvas({
                   {i + 1}
                 </td>
                 {colunas.map((c) => {
-                  const emEdicao = edicao?.linha === l && edicao.col === c.id;
+                  const saindo = colunasSaindo?.has(c.id) ?? false;
+                  const emEdicao =
+                    !!edicao && edicao.col === c.id && linhaEditada === l;
                   const alvosCelula = l.__alvos?.[c.id];
                   const podeEditar =
                     !emEdicao &&
+                    !saindo &&
                     editavel &&
                     !!onSalvarCampo &&
                     (alvosCelula?.length ?? 0) > 0;
@@ -417,9 +457,16 @@ export function RelatorioCanvas({
                       className={cn(
                         celula,
                         "px-2.5 py-1.5 align-top",
+                        (colunasEntrando?.has(c.id) ?? false) &&
+                          "animate-in fade-in slide-in-from-left-2 duration-200 ease-snappy",
+                        saindo &&
+                          "animate-out fade-out slide-out-to-left-2 duration-150 ease-snappy",
                         piscando && "animate-flash-ok",
                         podeEditar &&
-                          "cursor-text hover:shadow-[inset_0_0_0_1.5px_var(--brand-lime)] focus-visible:shadow-[inset_0_0_0_1.5px_var(--brand-lime)] focus-visible:outline-none"
+                          // tinta permanente no modo edição — a célula avisa
+                          // que é clicável antes do hover (o ring lime segue
+                          // no hover/focus)
+                          "bg-[var(--brand-lime)]/6 cursor-text hover:shadow-[inset_0_0_0_1.5px_var(--brand-lime)] focus-visible:shadow-[inset_0_0_0_1.5px_var(--brand-lime)] focus-visible:outline-none"
                       )}
                       // o flash termina de apagar → tira as chaves da célula
                       // (cada td limpa só as suas — o flash de outra segue).
@@ -441,8 +488,19 @@ export function RelatorioCanvas({
                       }
                       style={{ width: larguras[c.id] ?? LARGURA_INICIAL }}
                       tabIndex={podeEditar ? 0 : undefined}
-                      title={podeEditar ? "Duplo clique pra editar" : undefined}
-                      onDoubleClick={podeEditar ? () => abrirEdicao(l, c.id) : undefined}
+                      title={podeEditar ? "Clique pra editar" : undefined}
+                      onClick={
+                        podeEditar
+                          ? (e) => {
+                              // shift+clique segue a seleção de intervalo da
+                              // linha (borbulha pro tr); clique simples abre
+                              // a edição sem mexer na seleção
+                              if (e.shiftKey) return;
+                              e.stopPropagation();
+                              abrirEdicao(l, c.id);
+                            }
+                          : undefined
+                      }
                       onKeyDown={
                         podeEditar
                           ? (e) => {
@@ -534,7 +592,7 @@ export function RelatorioCanvas({
       <p className="mt-2 text-xs text-muted-foreground">
         Arraste a borda de uma coluna pra redimensionar · clique no título pra ordenar ·
         clique numa linha e Shift+clique em outra pra selecionar — Ctrl+C copia pra planilha.
-        {editavel && " Duplo clique (ou Enter) numa célula clara edita o cadastro — Enter confirma, Esc desfaz."}
+        {editavel && " Clique numa célula destacada pra editar — Enter confirma, Esc desfaz."}
       </p>
     </div>
   );
