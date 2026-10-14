@@ -25,7 +25,10 @@ concurrency:
 jobs:
   e2e:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # a suite passou de 80 specs (~89 hoje) em 1 worker — serial por desenho,
+    # os fixtures app compartilham estado no staging. Setup ~2min + suíte
+    # ~14min já cruzava 15; 25 dá margem pra crescer sem recisitar.
+    timeout-minutes: 25
     # O environment muda com o nº de projetos Vercel no repo: com dois era
     # 'Preview – realiza.vc' (o órfão 'realiza' foi deletado); com um só,
     # Vercel reporta 'Preview' a seco. Aceita os dois — se um segundo
