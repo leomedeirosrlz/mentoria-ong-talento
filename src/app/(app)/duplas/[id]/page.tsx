@@ -22,10 +22,16 @@ import {
   getDupla,
   getDuplaSucessora,
   getDuplaVinculo,
+  getDuplasResumo,
+  getDuplasResumoTodas,
   getEspecialistaEventos,
   getMateriais,
   getMe,
+  getMentorados,
+  getMentorProfiles,
+  getPessoas,
   type DuplaVinculo,
+  type MentorProfile,
 } from "@/lib/queries";
 import {
   getEspecialistas,
@@ -85,6 +91,7 @@ import { EditarLinkDialog } from "@/components/editar-link-dialog";
 import { RegistrarRetroativoDialog } from "@/components/registrar-retroativo-dialog";
 import { EditarDuplaDialog } from "@/components/editar-dupla-dialog";
 import { RemanejarDuplaDialog } from "@/components/remanejar-dupla-dialog";
+import { RemanejoSugerido } from "@/components/remanejo-sugerido";
 import { NaoAconteceuButton, DesfazerNaoAconteceuButton } from "@/components/nao-aconteceu-button";
 import { RegistroForm } from "@/components/registro-form";
 import {
@@ -124,7 +131,14 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import type { AvaliacaoLink, Encaminhamento, Encontro, Material, RegistroAnexo } from "@/lib/types";
+import type { AvaliacaoLink, Dupla, Encaminhamento, Encontro, Material, RegistroAnexo } from "@/lib/types";
+import { filaMentorados } from "@/lib/fila";
+import {
+  ladoDeMentor,
+  ladoDeMentorado,
+  ranquearMentorados,
+  ranquearMentores,
+} from "@/lib/remanejo";
 import { cn } from "@/lib/utils";
 
 // mesma pele do DropdownMenuContent (ui/dropdown-menu), composta à mão aqui:
@@ -133,6 +147,62 @@ import { cn } from "@/lib/utils";
 // qualquer dialog aberto a partir dele
 const MENU_POPUP =
   "z-50 max-h-(--available-height) w-56 min-w-32 origin-(--transform-origin) overflow-x-hidden overflow-y-auto rounded-lg bg-popover p-1 text-popover-foreground shadow-[var(--shadow-overlay)] duration-150 ease-[cubic-bezier(0.2,0,0,1)] outline-none data-[side=bottom]:slide-in-from-top-1 data-[side=bottom]:slide-out-to-top-1 data-[side=left]:slide-in-from-right-1 data-[side=left]:slide-out-to-right-1 data-[side=right]:slide-in-from-left-1 data-[side=right]:slide-out-to-left-1 data-[side=top]:slide-in-from-bottom-1 data-[side=top]:slide-out-to-bottom-1 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:overflow-hidden data-closed:fade-out-0 data-closed:zoom-out-95";
+
+/** Pools da sugestão de remanejo (REALIZA-115): mentores do papel da
+ *  trilha da dupla ranqueados por afinidade com o mentorado (cheios ficam
+ *  marcados, não somem — a saída deles é ajustar capacidade) × a fila
+ *  "Aguardando par" pura ranqueada por afinidade com o mentor. As queries
+ *  são as do board /pessoas — React.cache reusa o que a página já buscou. */
+async function montarSugestaoRemanejo(dupla: Dupla) {
+  const [pessoas, mentorados, mps, resumo, resumoTodas] = await Promise.all([
+    getPessoas(),
+    getMentorados(),
+    getMentorProfiles(),
+    getDuplasResumo(),
+    getDuplasResumoTodas(),
+  ]);
+  const mpMap: Record<string, MentorProfile> = Object.fromEntries(
+    mps.map((mp) => [mp.profile_id, mp])
+  );
+  // a régua do trigger (0073): ativas + pausadas contam vaga. O uso do
+  // mentor já é o da própria pool — ele tem um papel só, então as duplas
+  // dele são todas da mesma trilha (filtrar por trilha seria identidade)
+  const usadas: Record<string, number> = {};
+  const ocupados = new Set<string>();
+  for (const d of resumo) {
+    usadas[d.mentor_id] = (usadas[d.mentor_id] ?? 0) + 1;
+    ocupados.add(d.mentorado_id);
+  }
+  const historico = new Set(resumoTodas.map((d) => d.mentorado_id));
+  const fila = filaMentorados(mentorados, ocupados, historico);
+  const papel =
+    dupla.trilha === "especialista" ? "mentor_especialista" : "mentor_dpp";
+  // os lados que ficam vêm do cadastro completo — o embed da dupla não
+  // traz os sensíveis de matching (gênero/preferência de par), que a
+  // coordenação lê via *_pessoal e o score usa quando existem
+  const ficaMentorado =
+    mentorados.find((m) => m.id === dupla.mentorado.id) ?? dupla.mentorado;
+  const ficaMentor =
+    pessoas.find((p) => p.id === dupla.mentor.id) ?? dupla.mentor;
+  return {
+    mentores: ranquearMentores(
+      pessoas,
+      papel,
+      mpMap,
+      usadas,
+      ladoDeMentorado(ficaMentorado),
+      dupla.mentor.id
+    ),
+    mentorados: ranquearMentorados(
+      fila,
+      mentorados,
+      ladoDeMentor(ficaMentor, mpMap[dupla.mentor.id])
+    ),
+    // carimbo do SSR pro "há N dias na fila" — mora na montagem (fora do
+    // render) porque o react-hooks/purity barra Date.now() no JSX
+    agoraMs: Date.now(),
+  };
+}
 
 export async function generateMetadata({
   params,
@@ -263,6 +333,15 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
   const eventosDaDupla = eventosDoCronograma(eventos, dupla.cronograma_id);
   const passos = passosDaTrilha(dupla.trilha, eventosDaDupla, espEventos);
   const saude = saudadeDaDupla(dupla, eventos);
+  // sugestão de remanejo (REALIZA-115): risco já é o gatilho — nada de
+  // carência em "atencao". E só com a dupla viva: remanejar encerrada é
+  // contraditório (o RPC também barra)
+  const sugestaoRemanejo =
+    souCoord &&
+    saude.semaforo === "risco" &&
+    (dupla.status === "ativa" || dupla.status === "pausada")
+      ? await montarSugestaoRemanejo(dupla)
+      : null;
   const total = passos.length;
   const { proximoNumero, encontroAlvo, sugeridoProximo, faltantes } =
     alvoAgendamento(dupla, eventos);
@@ -771,6 +850,19 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
       </section>
       {souMentor && (
         <MarcoNotifier duplaId={dupla.id} feitos={jornada.feitos} total={jornada.total} />
+      )}
+
+      {/* risco virou pergunta de trabalho pra coordenação (REALIZA-115):
+          quem pode assumir cada lado, por afinidade — um clique abre o
+          remanejo atômico de sempre com o par já escolhido */}
+      {sugestaoRemanejo && (
+        <RemanejoSugerido
+          dupla={dupla}
+          motivo={saude.motivo}
+          mentores={sugestaoRemanejo.mentores}
+          mentorados={sugestaoRemanejo.mentorados}
+          agoraMs={sugestaoRemanejo.agoraMs}
+        />
       )}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">

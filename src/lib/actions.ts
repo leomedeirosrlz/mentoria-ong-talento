@@ -975,6 +975,50 @@ export async function updatePessoa(profileId: string, formData: FormData) {
   return { ok: true, aviso };
 }
 
+/** Capacidade de duplas do mentor em ajuste fino (REALIZA-116) — o
+ *  "aumentar capacidade →" que destrava o par certo cheio no board, no
+ *  NovaDuplaDialog e na sugestão de remanejo. A autoridade continua no
+ *  banco: o guard mentor_profiles (0004) só deixa a coordenação mexer em
+ *  capacidade — a action só antecipa a mensagem amigável — e a coluna
+ *  escrita é a pool da trilha do papel (0073), mesma regra do
+ *  updatePessoa. */
+export async function updateCapacidadeMentor(
+  profileId: string,
+  capacidade: number
+) {
+  if (await demoAtivo()) return { error: DEMO_MSG };
+  const { supabase, me: eu } = await me();
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
+  if (eu.role !== "coordenacao") {
+    return { error: "Só a coordenação ajusta a capacidade dos mentores." };
+  }
+  if (!Number.isInteger(capacidade) || capacidade < 1 || capacidade > 10) {
+    return { error: "A capacidade aceita valores de 1 a 10." };
+  }
+  // o papel decide a coluna — quem não é mentor não tem pool de vagas
+  const { data: alvo } = await supabase
+    .from("profiles")
+    .select("id, role")
+    .eq("id", profileId)
+    .single();
+  const ehEsp = alvo?.role === "mentor_especialista";
+  if (!alvo || (alvo.role !== "mentor_dpp" && !ehEsp)) {
+    return { error: "Capacidade só existe pra mentores." };
+  }
+  // upsert cobre o mentor sem linha em mentor_profiles (a pool vale 1 por
+  // default no banco — aqui ela vira explícita de uma vez)
+  const { error } = await supabase.from("mentor_profiles").upsert({
+    profile_id: profileId,
+    tipo: ehEsp ? "especialista" : "dpp",
+    ...(ehEsp ? { capacidade_especialista: capacidade } : { capacidade }),
+  });
+  if (error) return { error: erroAmigavel(error) };
+  revalidatePath("/pessoas");
+  revalidatePath(`/pessoas/${profileId}`);
+  revalidatePath("/duplas");
+  return { ok: true };
+}
+
 export async function setPessoaAtivo(profileId: string, ativo: boolean, forcar = false) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
