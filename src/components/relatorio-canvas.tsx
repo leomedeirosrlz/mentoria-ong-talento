@@ -1,29 +1,82 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { ColunaRelatorio, LinhaRelatorio } from "@/lib/relatorio";
+import { WhatsappLogo } from "@phosphor-icons/react";
+import { toast } from "sonner";
+import { waLink } from "@/lib/ciclo";
+import {
+  textoCelula,
+  type AlvoRelatorio,
+  type CampoCadastro,
+  type ColunaRelatorio,
+  type LinhaRelatorio,
+} from "@/lib/relatorio";
 import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
 
 const LARGURA_MIN = 56;
 const LARGURA_INICIAL = 168;
 
 type Ordem = { col: string; dir: 1 | -1 } | null;
 
+/** Célula em edição — `key` identifica o editor entre re-renders (o estado
+ *  é recriado a cada keystroke) e `linha` guarda o objeto, não o índice:
+ *  reordenar com a edição aberta deixa o editor grudado na row certa. */
+type Edicao = {
+  key: string;
+  linha: LinhaRelatorio;
+  col: string;
+  alvos: AlvoRelatorio[];
+  valores: string[];
+  salvando: boolean;
+};
+
+/** Tom do chip de status da dupla — mesma gramática dos badges de /pessoas:
+ *  ok/warn/danger com texto na versão -text (AA); pausada é neutra,
+ *  encerrada é muted com borda vermelha suave (fim de ciclo, não alarme). */
+const CHIP_STATUS: Record<string, string> = {
+  ativa: "border-[var(--ok)]/60 text-[var(--ok-text)]",
+  pausada: "text-muted-foreground",
+  concluida: "border-[var(--ok)]/40 text-muted-foreground",
+  encerrada: "border-[var(--danger)]/40 text-muted-foreground",
+  sem_dupla: "border-[var(--warn)]/60 text-[var(--warn-text)]",
+};
+
+const CAMPO_PLACEHOLDER: Record<CampoCadastro, string> = {
+  nome: "Nome",
+  email: "E-mail",
+  whatsapp: "WhatsApp",
+  cidade: "Cidade",
+  uf: "UF",
+};
+
 /** Grade livre estilo planilha: colunas redimensionáveis arrastando a borda
  *  do header, ordenação por clique, gutter de nº de linha (sticky à esquerda),
  *  seleção de intervalo e cópia TSV (cola direto no Excel/Sheets). O scroll é
  *  interno (header fixo) e devolve o gesto pra página no limite — sem
  *  overscroll-contain, que engolia a roda do mouse. Sem moldura de card —
- *  o canvas é a página. */
+ *  o canvas é a página.
+ *
+ *  Com `editavel` (só /relatorios, que é coord-only) as células de cadastro
+ *  abrem edição inline por duplo clique ou Enter — os alvos de escrita chegam
+ *  prontos em `__alvos` (montarLinhas paraApp), então a página pública nunca
+ *  tem o que editar mesmo se a prop vazar. */
 export function RelatorioCanvas({
   colunas,
   linhas,
   storageKey,
+  editavel = false,
+  onSalvarCampo,
 }: {
   colunas: ColunaRelatorio[];
   linhas: LinhaRelatorio[];
   /** persiste larguras por relatório (ex.: "t2-pessoas") */
   storageKey?: string;
+  /** modo edição inline — exige `__alvos` nas linhas + `onSalvarCampo` */
+  editavel?: boolean;
+  /** devolve mensagem de erro pra exibir em toast, ou null no sucesso */
+  onSalvarCampo?: (alvo: AlvoRelatorio, novoValor: string) => Promise<string | null>;
 }) {
   // larguras persistem por relatório — init lazy do localStorage; quem usa
   // deve passar key={storageKey} pra remontar quando o recorte mudar
@@ -38,15 +91,32 @@ export function RelatorioCanvas({
   const [ordem, setOrdem] = useState<Ordem>(null);
   const [selAncora, setSelAncora] = useState<number | null>(null);
   const [selFim, setSelFim] = useState<number | null>(null);
+  const [edicao, setEdicao] = useState<Edicao | null>(null);
+  // sequencial que dá identidade única a cada abertura de editor — o confirm
+  // assíncrono só fecha o editor se ele ainda for o mesmo (key casa)
+  const seqEdicao = useRef(0);
   const drag = useRef<{ col: string; x0: number; w0: number; wAtual?: number } | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
 
   const ordenadas = useMemo(() => {
     if (!ordem) return linhas;
     return [...linhas].sort(
-      (a, b) => (a[ordem.col] ?? "").localeCompare(b[ordem.col] ?? "", "pt-BR") * ordem.dir
+      (a, b) =>
+        textoCelula(a, ordem.col).localeCompare(textoCelula(b, ordem.col), "pt-BR") * ordem.dir
     );
   }, [linhas, ordem]);
+
+  // o editor morre junto com a célula: save bem-sucedido reconstrói as
+  // linhas (objetos novos), desligar o modo edição ou ocultar a coluna
+  // também tira a célula debaixo dele
+  if (
+    edicao &&
+    (!ordenadas.includes(edicao.linha) ||
+      !editavel ||
+      !colunas.some((c) => c.id === edicao.col))
+  ) {
+    setEdicao(null);
+  }
 
   const selecionadas = useMemo(() => {
     if (selAncora === null || selFim === null) return null;
@@ -57,7 +127,7 @@ export function RelatorioCanvas({
   const paraTsv = useCallback(
     (rows: LinhaRelatorio[]) =>
       [colunas.map((c) => c.label).join("\t"),
-        ...rows.map((l) => colunas.map((c) => l[c.id] ?? "").join("\t"))].join("\n"),
+        ...rows.map((l) => colunas.map((c) => textoCelula(l, c.id)).join("\t"))].join("\n"),
     [colunas]
   );
 
@@ -84,6 +154,53 @@ export function RelatorioCanvas({
     el.addEventListener("keydown", onKey);
     return () => el.removeEventListener("keydown", onKey);
   }, [selecionadas, copiar]);
+
+  // ---------- edição inline ----------
+
+  const abrirEdicao = useCallback(
+    (linha: LinhaRelatorio, col: string) => {
+      if (!editavel || !onSalvarCampo) return;
+      const alvos = linha.__alvos?.[col];
+      if (!alvos?.length) return;
+      setEdicao({
+        key: String(++seqEdicao.current),
+        linha,
+        col,
+        alvos,
+        valores: alvos.map((a) => a.valor),
+        salvando: false,
+      });
+    },
+    [editavel, onSalvarCampo]
+  );
+
+  const confirmarEdicao = useCallback(async () => {
+    const ed = edicao;
+    if (!ed || ed.salvando || !onSalvarCampo) return;
+    // campo que voltou ao valor original não dispara escrita
+    const mudancas = ed.alvos
+      .map((a, j) => ({ a, novo: ed.valores[j].trim() }))
+      .filter(({ a, novo }) => novo !== a.valor);
+    if (!mudancas.length) {
+      setEdicao(null);
+      return;
+    }
+    setEdicao((cur) => (cur?.key === ed.key ? { ...ed, salvando: true } : cur));
+    // sequencial e para no primeiro erro — campo errado não arrasta os outros
+    for (const { a, novo } of mudancas) {
+      const erro = await onSalvarCampo(a, novo);
+      if (erro) {
+        toast.error(erro);
+        // o pai só aplicou os campos salvos — fechar devolve a célula ao
+        // valor anterior sem reload
+        setEdicao((cur) => (cur?.key === ed.key ? null : cur));
+        return;
+      }
+    }
+    setEdicao((cur) => (cur?.key === ed.key ? null : cur));
+  }, [edicao, onSalvarCampo]);
+
+  // ---------- render ----------
 
   const iniciarDrag = (e: React.PointerEvent, col: string) => {
     e.preventDefault();
@@ -134,6 +251,71 @@ export function RelatorioCanvas({
   const gutter =
     "sticky left-0 border-r border-b border-l border-border bg-muted px-1 py-1 " +
     "text-center text-[10px] tabular-nums text-muted-foreground select-none";
+
+  /** Conteúdo da célula por coluna — chips/links são leitura (a edição é por
+   *  `__alvos`), então a mesma renderização serve o resumo público. */
+  const conteudoCelula = (l: LinhaRelatorio, c: ColunaRelatorio) => {
+    const texto = textoCelula(l, c.id);
+    if (c.id === "status_dupla" && texto) {
+      return (
+        <Badge
+          variant="outline"
+          className={cn("font-normal", CHIP_STATUS[l.__status ?? ""])}
+        >
+          {texto}
+        </Badge>
+      );
+    }
+    if (!texto) {
+      return <span className="text-muted-foreground/50">—</span>;
+    }
+    if (c.id === "papel") {
+      // o dot amarelo é o marcador de papel do mentorado em toda a
+      // plataforma (DuplaNomes, labels de parear) — o mentor não leva marca
+      return (
+        <span className="inline-flex items-center gap-1.5">
+          {l.__papel === "mentorado" && (
+            <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-[var(--role-mentorado)]" />
+          )}
+          {texto}
+        </span>
+      );
+    }
+    if (c.id === "par" && l.__links?.par) {
+      // nome do par → ficha da dupla: o caminho pra mexer em status/demanda
+      // (colunas derivadas, sem edição inline)
+      return (
+        <Link
+          href={l.__links.par}
+          onClick={(e) => e.stopPropagation()}
+          className="break-words rounded-sm underline-offset-2 decoration-muted-foreground/40 hover:decoration-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          {texto}
+        </Link>
+      );
+    }
+    if (c.id === "whatsapp") {
+      const wa = waLink(texto, "");
+      return (
+        <span className="inline-flex items-center gap-1">
+          <span className="break-words">{texto}</span>
+          {wa && (
+            <a
+              href={wa}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={`Chamar ${texto} no WhatsApp`}
+              onClick={(e) => e.stopPropagation()}
+              className="shrink-0 rounded-sm p-0.5 text-muted-foreground/60 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <WhatsappLogo size={13} aria-hidden />
+            </a>
+          )}
+        </span>
+      );
+    }
+    return <span className="break-words">{texto}</span>;
+  };
 
   return (
     <div>
@@ -209,15 +391,98 @@ export function RelatorioCanvas({
                 <td className={cn(gutter, "z-10")}>
                   {i + 1}
                 </td>
-                {colunas.map((c) => (
-                  <td
-                    key={c.id}
-                    className={cn(celula, "px-2.5 py-1.5 align-top")}
-                    style={{ width: larguras[c.id] ?? LARGURA_INICIAL }}
-                  >
-                    <span className="block break-words">{l[c.id] || <span className="text-muted-foreground/50">—</span>}</span>
-                  </td>
-                ))}
+                {colunas.map((c) => {
+                  const emEdicao = edicao?.linha === l && edicao.col === c.id;
+                  const podeEditar =
+                    !emEdicao &&
+                    editavel &&
+                    !!onSalvarCampo &&
+                    (l.__alvos?.[c.id]?.length ?? 0) > 0;
+                  return (
+                    <td
+                      key={c.id}
+                      className={cn(
+                        celula,
+                        "px-2.5 py-1.5 align-top",
+                        podeEditar &&
+                          "cursor-text hover:shadow-[inset_0_0_0_1.5px_var(--brand-lime)] focus-visible:shadow-[inset_0_0_0_1.5px_var(--brand-lime)] focus-visible:outline-none"
+                      )}
+                      style={{ width: larguras[c.id] ?? LARGURA_INICIAL }}
+                      tabIndex={podeEditar ? 0 : undefined}
+                      title={podeEditar ? "Duplo clique pra editar" : undefined}
+                      onDoubleClick={podeEditar ? () => abrirEdicao(l, c.id) : undefined}
+                      onKeyDown={
+                        podeEditar
+                          ? (e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                abrirEdicao(l, c.id);
+                              }
+                            }
+                          : undefined
+                      }
+                    >
+                      {emEdicao ? (
+                        // o blur confirma só quando o foco sai do editor
+                        // inteiro — Tab entre os inputs da célula composta
+                        // (Cidade/UF, contato) não fecha a edição
+                        <span
+                          className="flex items-center gap-1"
+                          onBlur={(e) => {
+                            if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+                              void confirmarEdicao();
+                            }
+                          }}
+                        >
+                          {edicao.alvos.map((a, j) => (
+                            <input
+                              key={a.campo}
+                              autoFocus={j === 0}
+                              value={edicao.valores[j]}
+                              disabled={edicao.salvando}
+                              placeholder={CAMPO_PLACEHOLDER[a.campo]}
+                              inputMode={
+                                a.campo === "whatsapp"
+                                  ? "tel"
+                                  : a.campo === "email"
+                                    ? "email"
+                                    : undefined
+                              }
+                              aria-label={CAMPO_PLACEHOLDER[a.campo]}
+                              onChange={(e) =>
+                                setEdicao((cur) =>
+                                  cur
+                                    ? {
+                                        ...cur,
+                                        valores: cur.valores.map((v, k) =>
+                                          k === j ? e.target.value : v
+                                        ),
+                                      }
+                                    : cur
+                                )
+                              }
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  e.preventDefault();
+                                  void confirmarEdicao();
+                                } else if (e.key === "Escape") {
+                                  e.preventDefault();
+                                  setEdicao(null);
+                                }
+                              }}
+                              className={cn(
+                                "min-w-0 flex-1 rounded-sm bg-background px-1.5 py-0.5 outline-none ring-1 ring-[var(--brand-lime)] disabled:opacity-60",
+                                a.campo === "uf" && "w-12 flex-none uppercase"
+                              )}
+                            />
+                          ))}
+                        </span>
+                      ) : (
+                        <span className="block">{conteudoCelula(l, c)}</span>
+                      )}
+                    </td>
+                  );
+                })}
               </tr>
             ))}
           </tbody>
@@ -231,6 +496,7 @@ export function RelatorioCanvas({
       <p className="mt-2 text-xs text-muted-foreground">
         Arraste a borda de uma coluna pra redimensionar · clique no título pra ordenar ·
         clique numa linha e Shift+clique em outra pra selecionar — Ctrl+C copia pra planilha.
+        {editavel && " Duplo clique (ou Enter) numa célula clara edita o cadastro — Enter confirma, Esc desfaz."}
       </p>
     </div>
   );
