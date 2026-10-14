@@ -4,7 +4,7 @@ import { useState, type CSSProperties } from "react";
 import Link from "next/link";
 import { ArrowRight, Funnel } from "@phosphor-icons/react";
 import type { FormularioListaItem } from "@/lib/forms/queries";
-import { SISTEMA_LABEL } from "@/lib/forms/schema";
+import { camposPerguntas, SISTEMA_LABEL } from "@/lib/forms/schema";
 import { formatDate } from "@/lib/ciclo";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -179,8 +179,10 @@ export function FormulariosLista({
                 {/* meta sem contagens zeradas — zero não informa nada e
                     "nenhum link" ganha warn porque é o próximo passo */}
                 <p className="mt-2 text-xs text-muted-foreground">
-                  {f.campos.length}{" "}
-                  {f.campos.length === 1 ? "pergunta" : "perguntas"}
+                  {camposPerguntas(f.campos).length}{" "}
+                  {camposPerguntas(f.campos).length === 1
+                    ? "pergunta"
+                    : "perguntas"}
                   {" · "}
                   {f.linksTotal === 0 ? (
                     <span className="font-medium text-[var(--warn-text)]">

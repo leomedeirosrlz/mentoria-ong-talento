@@ -7,15 +7,18 @@ import {
 } from "@phosphor-icons/react/dist/ssr";
 import {
   agregaRespostas,
+  INSTRUMENTOS_SISTEMA,
   respostaFormatada,
   TIPOS_LISTA_RESPOSTA,
   type FormularioCampo,
+  type FormularioSistema,
 } from "@/lib/forms/schema";
 import type { LinkResolvido } from "@/lib/forms/queries";
 import { formatDateTime, papelCurto } from "@/lib/ciclo";
 import { avatarPublicUrl } from "@/lib/avatar";
 import { Avatar } from "@/components/avatar";
 import { primeiroNome } from "@/components/forms/link-shared";
+import { InstrumentoResultado } from "@/components/instrumento-resultado";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -86,10 +89,11 @@ function ItemResposta({ autor, valor }: { autor: string; valor: string }) {
   );
 }
 
-/** Média de escala tem faixa de leitura — 1,8/5 não pode vestir verde. */
-function corMedia(media: number): string {
-  if (media >= 4) return "text-[var(--ok-text)]";
-  if (media < 2.5) return "text-[var(--warn-text)]";
+/** Média de escala tem faixa de leitura — 1,8/5 não pode vestir verde.
+ *  Limiares proporcionais ao teto (0080: a roda mede em 10). */
+function corMedia(media: number, teto: number): string {
+  if (media >= teto * 0.8) return "text-[var(--ok-text)]";
+  if (media < teto * 0.5) return "text-[var(--warn-text)]";
   return "text-foreground";
 }
 
@@ -133,9 +137,13 @@ function metaDoLink(l: LinkResolvido): string {
 export function RespostasSection({
   campos,
   links,
+  sistema = null,
 }: {
   campos: FormularioCampo[];
   links: LinkResolvido[];
+  /** sistema oficial (0042/0080): instrumento de dupla renderiza o
+   *  resultado estruturado (roda, metas, visão) no lugar da lista crua */
+  sistema?: FormularioSistema | null;
 }) {
   // mais recente primeiro — o retorno quente fica no topo dos accordions
   const respondidos = links
@@ -202,12 +210,17 @@ export function RespostasSection({
                       <span
                         className={cn(
                           "font-semibold tabular-nums",
-                          corMedia(ag.media)
+                          corMedia(
+                            ag.media,
+                            ag.campo.tipo === "escala_1_10" ? 10 : 5
+                          )
                         )}
                       >
                         {ag.media.toLocaleString("pt-BR")}
                       </span>
-                      <span>/5 em média · </span>
+                      <span>
+                        /{ag.campo.tipo === "escala_1_10" ? 10 : 5} em média ·{" "}
+                      </span>
                     </>
                   )}
                   <span className="tabular-nums">
@@ -331,6 +344,20 @@ export function RespostasSection({
                 />
               </Collapsible.Trigger>
               <Collapsible.Panel className="h-[var(--collapsible-panel-height)] overflow-hidden transition-[height] duration-150 data-ending-style:h-0 data-starting-style:h-0 [&[hidden]:not([hidden='until-found'])]:hidden">
+                {/* instrumento de dupla (0080) tem leitura própria — a roda
+                    desenhada, as metas estruturadas — no lugar da lista
+                    campo a campo */}
+                {(INSTRUMENTOS_SISTEMA as readonly string[]).includes(
+                  sistema ?? ""
+                ) ? (
+                  <div className="border-t border-border px-4 py-4 sm:px-5">
+                    <InstrumentoResultado
+                      sistema={sistema}
+                      campos={campos}
+                      respostas={l.resposta!.respostas}
+                    />
+                  </div>
+                ) : (
                 <dl className="space-y-3 border-t border-border px-4 py-3 sm:px-5">
                   {Object.entries(l.resposta!.respostas)
                     .sort(
@@ -356,6 +383,7 @@ export function RespostasSection({
                       );
                     })}
                 </dl>
+                )}
                 {/* a ficha abre fora do trigger (link dentro de button é
                     duplo acionamento) — rodapé quieto, só quando há pessoa */}
                 {l.dest_url && l.dest_nome && (

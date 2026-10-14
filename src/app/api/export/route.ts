@@ -5,6 +5,7 @@ import { getDemoData } from "@/lib/demo/data";
 import { demoPessoalMap } from "@/lib/demo/queries";
 import { getDemoFormularios } from "@/lib/demo/forms-data";
 import {
+  camposPerguntas,
   respostaFormatada,
   type FormularioCampo,
   type RespostaValor,
@@ -662,7 +663,10 @@ function csvRespostas(
   campos: FormularioCampo[],
   linhas: LinhaRespostaCsv[]
 ): string {
-  const declarados = new Set(campos.map((c) => c.id));
+  // 'secao' é rótulo de estrutura (0080) — nunca tem resposta; coluna vazia
+  // no backup só atrapalha a leitura
+  const perguntas = camposPerguntas(campos);
+  const declarados = new Set(perguntas.map((c) => c.id));
   const orfas: string[] = [];
   for (const l of linhas)
     for (const k of Object.keys(l.respostas))
@@ -673,7 +677,7 @@ function csvRespostas(
     "tipo",
     "dupla",
     "respondido_em",
-    ...campos.map((c) => c.label),
+    ...perguntas.map((c) => c.label),
     ...orfas,
   ];
 
@@ -690,7 +694,7 @@ function csvRespostas(
             l.tipo,
             l.dupla,
             dataHora(l.respondido_em),
-            ...campos.map((c) => celulaResposta(c, l.respostas[c.id])),
+            ...perguntas.map((c) => celulaResposta(c, l.respostas[c.id])),
             ...orfas.map((k) => celulaResposta(undefined, l.respostas[k])),
           ]
             .map(celula)

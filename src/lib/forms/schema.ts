@@ -10,9 +10,11 @@ export type FormularioCampoTipo =
   | "select"
   | "multi_select"
   | "escala_1_5"
+  | "escala_1_10"
   | "data"
   | "checkbox"
-  | "sim_nao";
+  | "sim_nao"
+  | "secao";
 
 export type FormularioCampo = {
   id: string;
@@ -21,19 +23,65 @@ export type FormularioCampo = {
   obrigatorio: boolean;
   /** só select/multi_select — 2+ opções */
   opcoes?: string[];
+  /** só secao (0080) — texto de apoio sob o título da seção */
+  descricao?: string;
 };
 
-/** Instrumento oficial do programa (0042) — vocabulário fechado espelhando
- *  o CHECK da coluna. null = form criado pela coordenação. */
+/** Instrumento oficial do programa (0042, 0080) — vocabulário fechado
+ *  espelhando o CHECK da coluna. null = form criado pela coordenação. */
 export type FormularioSistema =
   | "anamnese"
   | "avaliacao_360"
-  | "autoavaliacao_mentor";
+  | "autoavaliacao_mentor"
+  | "visao"
+  | "metas"
+  | "pdm"
+  | "roda_vida";
 
 export const SISTEMA_LABEL: Record<FormularioSistema, string> = {
   anamnese: "Anamnese",
   avaliacao_360: "360º",
   autoavaliacao_mentor: "Autoavaliação",
+  visao: "Visão",
+  metas: "Metas",
+  pdm: "PDM",
+  roda_vida: "Roda da Vida",
+};
+
+/** Instrumentos de trabalho da dupla (0080) — os 4 que o mentor "entrega"
+ *  e o mentorado responde pelo link. Ordem de jornada (visão → metas →
+ *  pdm → roda) é a da RPC instrumentos_da_dupla e da ficha da dupla. */
+export const INSTRUMENTOS_SISTEMA = [
+  "visao",
+  "metas",
+  "pdm",
+  "roda_vida",
+] as const satisfies readonly FormularioSistema[];
+
+export type InstrumentoSistema = (typeof INSTRUMENTOS_SISTEMA)[number];
+
+/** Resumo de uma linha da ficha da dupla — o que o instrumento é e quando
+ *  entra na jornada (guias DPP). */
+export const INSTRUMENTO_INFO: Record<
+  InstrumentoSistema,
+  { titulo: string; resumo: string }
+> = {
+  visao: {
+    titulo: "Construindo a sua Visão",
+    resumo: "O exercício do 1º encontro — o filme da vida ideal vira a Declaração de Visão.",
+  },
+  metas: {
+    titulo: "Definindo Minhas Metas",
+    resumo: "Da visão pra 3–5 metas com o porquê de cada uma — a dupla revisa com o modelo SMART.",
+  },
+  pdm: {
+    titulo: "PDM",
+    resumo: "O documento central: visão, metas com indicador de sucesso e prazo, mapa de submetas.",
+  },
+  roda_vida: {
+    titulo: "Roda da Vida",
+    resumo: "Satisfação 1–10 nas 16 áreas da vida, a partir do 5º mês — o desenho vira a roda.",
+  },
 };
 
 export type Formulario = {
@@ -85,9 +133,11 @@ export const CAMPO_TIPO_LABEL: Record<FormularioCampoTipo, string> = {
   select: "Lista de opções",
   multi_select: "Múltipla escolha",
   escala_1_5: "Escala de 1 a 5",
+  escala_1_10: "Escala de 1 a 10",
   data: "Data",
   checkbox: "Caixa de confirmação",
   sim_nao: "Sim ou não",
+  secao: "Seção (rótulo de estrutura)",
 };
 
 /** Tipos que usam `opcoes` no builder e validam contra a lista no envio. */
@@ -95,6 +145,17 @@ export const TIPOS_COM_OPCOES: readonly FormularioCampoTipo[] = [
   "select",
   "multi_select",
 ];
+
+/** Tipos que não esperam resposta (0080) — 'secao' é rótulo de estrutura
+ *  (título + descrição). Fora da contagem de perguntas, do progresso, da
+ *  validação e da agregação; a RPC de envio ignora o id por completo. */
+export const TIPOS_SEM_RESPOSTA: readonly FormularioCampoTipo[] = ["secao"];
+
+/** Só os campos que são pergunta de verdade — numeração, contagem e
+ *  progresso do /f/<token> ignoram seções. */
+export function camposPerguntas(campos: FormularioCampo[]): FormularioCampo[] {
+  return campos.filter((c) => !TIPOS_SEM_RESPOSTA.includes(c.tipo));
+}
 
 export const MAX_CAMPOS = 40;
 export const MAX_OPCOES = 30;
@@ -127,9 +188,11 @@ const TIPOS_VALIDOS = new Set<string>([
   "select",
   "multi_select",
   "escala_1_5",
+  "escala_1_10",
   "data",
   "checkbox",
   "sim_nao",
+  "secao",
 ]);
 
 /** Valida a lista de campos vinda do builder. Devolve a definição limpa
@@ -154,10 +217,18 @@ export function validaCampos(input: unknown): FormularioCampo[] | { error: strin
     if (!TIPOS_VALIDOS.has(tipo))
       return { error: `Tipo inválido na pergunta ${n}.` };
     const label = typeof c?.label === "string" ? c.label.trim() : "";
-    if (!label) return { error: `Escreva o texto da pergunta ${n}.` };
+    if (!label)
+      return {
+        error:
+          tipo === "secao"
+            ? `Escreva o título da seção ${n}.`
+            : `Escreva o texto da pergunta ${n}.`,
+      };
     if (label.length > 200)
       return { error: `O texto da pergunta ${n} passa de 200 caracteres.` };
-    const obrigatorio = c?.obrigatorio === true;
+    // secao não espera resposta — "obrigatória" num rótulo de estrutura
+    // criaria um form impossível de enviar (a RPC ignora o campo)
+    const obrigatorio = tipo === "secao" ? false : c?.obrigatorio === true;
 
     const campo: FormularioCampo = {
       id,
@@ -165,6 +236,12 @@ export function validaCampos(input: unknown): FormularioCampo[] | { error: strin
       label,
       obrigatorio,
     };
+    if (tipo === "secao") {
+      const desc = typeof c?.descricao === "string" ? c.descricao.trim() : "";
+      if (desc.length > 1000)
+        return { error: `O texto da seção ${n} passa de 1.000 caracteres.` };
+      if (desc) campo.descricao = desc;
+    }
     if (TIPOS_COM_OPCOES.includes(campo.tipo)) {
       const brutas = Array.isArray(c?.opcoes) ? c.opcoes : [];
       const vistas = new Set<string>();
@@ -202,6 +279,7 @@ export function respostaFormatada(
     return valor === "sim" ? "Sim" : valor === "nao" ? "Não" : String(valor);
   if (tipo === "checkbox") return valor === true ? "Confirmado" : "Não marcado";
   if (tipo === "escala_1_5") return `${valor}/5`;
+  if (tipo === "escala_1_10") return `${valor}/10`;
   if (tipo === "data") {
     const d = new Date(`${valor}T12:00:00-03:00`);
     return isNaN(d.getTime())
@@ -254,6 +332,8 @@ export function agregaRespostas(
 ): AgregadoCampo[] {
   const agregados: AgregadoCampo[] = [];
   for (const campo of campos) {
+    // rótulo de estrutura não tem resposta — nem entra na agregação
+    if (TIPOS_SEM_RESPOSTA.includes(campo.tipo)) continue;
     const entradas = respostas
       .filter((r) => r.respostas[campo.id] != null)
       .map((r) => ({ autor: r.autor, valor: r.respostas[campo.id] }));
@@ -274,17 +354,20 @@ export function agregaRespostas(
         }))
         .filter((e) => e.valor.trim().length > 0);
       ag.respondidas = ag.itens.length;
-    } else if (campo.tipo === "escala_1_5") {
+    } else if (campo.tipo === "escala_1_5" || campo.tipo === "escala_1_10") {
+      const teto = campo.tipo === "escala_1_5" ? 5 : 10;
       const nums = entradas
         .map((e) => e.valor)
         .filter((v): v is number => typeof v === "number");
       if (nums.length)
         ag.media =
           Math.round((nums.reduce((a, b) => a + b, 0) / nums.length) * 10) / 10;
-      ag.contagens = [1, 2, 3, 4, 5].map((n) => ({
-        rotulo: String(n),
-        n: nums.filter((v) => v === n).length,
-      }));
+      ag.contagens = Array.from({ length: teto }, (_, i) => i + 1).map(
+        (n) => ({
+          rotulo: String(n),
+          n: nums.filter((v) => v === n).length,
+        })
+      );
     } else if (campo.tipo === "sim_nao") {
       const valores = entradas.map((e) => e.valor);
       ag.contagens = [
@@ -323,4 +406,130 @@ export function agregaRespostas(
     agregados.push(ag);
   }
   return agregados;
+}
+
+// ---------- leitura estruturada dos instrumentos (0080) ----------
+// Os instrumentos oficiais usam convenções de id/tipo em vez de tipos de
+// campo dedicados: a 'secao' que precede um grupo de escala_1_10 é o
+// quadrante da Roda da Vida; metas são meta_N + is_N + prazo_N (PDM) ou
+// meta_N + porque_N (Definindo Metas). Os extratores abaixo transformam
+// respostas cruas ({campo_id: valor}) no dado aproveitável da ficha.
+
+export type RodaArea = {
+  id: string;
+  label: string;
+  /** null quando a área ficou sem nota (resposta parcial) */
+  nota: number | null;
+};
+
+export type RodaQuadrante = {
+  /** label da 'secao' que abre o grupo; "Geral" se a escala vier órfã */
+  nome: string;
+  areas: RodaArea[];
+};
+
+export type RodaDaVida = {
+  quadrantes: RodaQuadrante[];
+  /** média das áreas respondidas, 1 casa — null sem nenhuma nota */
+  media: number | null;
+  respondidas: number;
+  total: number;
+};
+
+/** Monta a roda a partir dos campos escala_1_10 na ordem do instrumento.
+ *  Devolve null quando o form não tem nenhuma escala 1–10 — ou seja, não
+ *  é uma roda (chamador decide o fallback). */
+export function extraiRodaDaVida(
+  campos: FormularioCampo[],
+  respostas: Record<string, RespostaValor>
+): RodaDaVida | null {
+  const quadrantes: RodaQuadrante[] = [];
+  let atual: RodaQuadrante | null = null;
+  for (const c of campos) {
+    if (c.tipo === "secao") {
+      atual = { nome: c.label, areas: [] };
+      quadrantes.push(atual);
+      continue;
+    }
+    if (c.tipo !== "escala_1_10") continue;
+    // escala antes de qualquer seção cai num grupo sem nome — a roda
+    // oficial sempre abre quadrante com 'secao'
+    if (!atual) {
+      atual = { nome: "", areas: [] };
+      quadrantes.push(atual);
+    }
+    const v = respostas[c.id];
+    atual.areas.push({
+      id: c.id,
+      label: c.label,
+      nota: typeof v === "number" ? v : null,
+    });
+  }
+  const areas = quadrantes.flatMap((q) => q.areas);
+  if (!areas.length) return null;
+  const notas = areas
+    .map((a) => a.nota)
+    .filter((n): n is number => typeof n === "number");
+  return {
+    quadrantes: quadrantes.filter((q) => q.areas.length > 0),
+    media: notas.length
+      ? Math.round((notas.reduce((a, b) => a + b, 0) / notas.length) * 10) / 10
+      : null,
+    respondidas: notas.length,
+    total: areas.length,
+  };
+}
+
+export type MetaExtraida = {
+  n: number;
+  meta: string;
+  /** indicador de sucesso (PDM) — "" sem resposta */
+  indicador: string;
+  /** ISO date (PDM) — null sem resposta */
+  prazo: string | null;
+  /** porquê (Definindo Metas) — "" sem resposta */
+  porque: string;
+};
+
+const META_RE = /^meta_(\d+)$/;
+
+/** Agrupa os campos meta_N/is_N/prazo_N/porque_N em metas respondidas —
+ *  meta vazia não entra (os opcionais 4–5 do Definindo Metas ficam fora
+ *  até serem usados). Ordenada pelo número da meta. */
+export function extraiMetas(
+  campos: FormularioCampo[],
+  respostas: Record<string, RespostaValor>
+): MetaExtraida[] {
+  const porN = new Map<number, MetaExtraida>();
+  for (const c of campos) {
+    const m = META_RE.exec(c.id);
+    if (!m) continue;
+    const v = respostas[c.id];
+    if (typeof v !== "string" || !v.trim()) continue;
+    const n = Number(m[1]);
+    const atual = porN.get(n) ?? {
+      n,
+      meta: "",
+      indicador: "",
+      prazo: null,
+      porque: "",
+    };
+    atual.meta = v.trim();
+    porN.set(n, atual);
+  }
+  // subcampos da meta: is_N, prazo_N, porque_N (e submetas_N do PDM não
+  // entra aqui — desdobramento é leitura textual, não meta acompanhável)
+  for (const c of campos) {
+    const g = /^(is|prazo|porque)_(\d+)$/.exec(c.id);
+    if (!g) continue;
+    const n = Number(g[2]);
+    const atual = porN.get(n);
+    if (!atual) continue;
+    const v = respostas[c.id];
+    if (typeof v !== "string" || !v.trim()) continue;
+    if (g[1] === "is") atual.indicador = v.trim();
+    else if (g[1] === "prazo") atual.prazo = v.trim();
+    else atual.porque = v.trim();
+  }
+  return [...porN.values()].sort((a, b) => a.n - b.n);
 }
