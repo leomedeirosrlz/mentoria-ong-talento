@@ -7,7 +7,7 @@ import { Plus } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import { createDupla } from "@/lib/actions";
-import { cronogramaVigente, podeSupervisionar, rotuloCronograma } from "@/lib/ciclo";
+import { cronogramaVigente, foraDoPrograma, podeSupervisionar, rotuloCronograma } from "@/lib/ciclo";
 import { AfinidadePar } from "@/components/matching-afinidade";
 import { Button } from "@/components/ui/button";
 import {
@@ -25,6 +25,7 @@ import type {
   Escolaridade,
   Genero,
   PrefGeneroPar,
+  SituacaoMentorado,
 } from "@/lib/types";
 
 type Opt = {
@@ -44,6 +45,7 @@ type MentoradoOpt = {
   objetivos?: string | null;
   escolaridade?: Escolaridade | null;
   disponibilidade?: Disponibilidade | null;
+  situacao?: SituacaoMentorado | null;
 };
 /** Campos sensíveis das views *_pessoal (0034) — coord-only; fora dela o
  *  select volta vazio e a afinidade omite os campos. */
@@ -107,7 +109,7 @@ export function NovaDuplaDialog() {
             .order("nome"),
           supabase
             .from("mentorados")
-            .select("id, nome, interesses, objetivos, escolaridade, cidade, uf, disponibilidade")
+            .select("id, nome, interesses, objetivos, escolaridade, cidade, uf, disponibilidade, situacao")
             .order("nome"),
           // sem filtro de status: a ocupação filtra em JS sobre o histórico
           // completo
@@ -129,7 +131,13 @@ export function NovaDuplaDialog() {
           p.role === "mentor_dpp" || p.role === "mentor_especialista"
         ));
         setSupervisores((perfis.data ?? []).filter((p) => podeSupervisionar(p.role)));
-        setMentorados((ments.data ?? []) as MentoradoOpt[]);
+        // quem saiu do programa (0077) não é opção de par — o server também
+        // barra; aqui some da lista pra não frustrar a escolha
+        setMentorados(
+          ((ments.data ?? []) as MentoradoOpt[]).filter(
+            (m) => !foraDoPrograma(m)
+          )
+        );
         const contagem: Record<string, number> = {};
         const ocup = new Map<string, Set<string>>();
         const sup: Record<string, number> = {};

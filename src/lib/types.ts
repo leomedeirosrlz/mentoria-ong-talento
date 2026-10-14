@@ -120,6 +120,11 @@ export type Profile = {
   form_bruto?: Record<string, unknown> | null;
 };
 
+/** Situação do cadastro do mentorado no programa (0077) — espelha o CHECK
+ *  mentorados_situacao_check. 'desistente' = saiu antes do fim; 'concluido'
+ *  = percorreu a jornada — a distinção separa evasão de formatura. */
+export type SituacaoMentorado = "ativo" | "desistente" | "concluido";
+
 export type Mentorado = {
   id: string;
   nome: string;
@@ -174,6 +179,16 @@ export type Mentorado = {
    *  aos colegas de turma com conta (view mentorados_turma). O dono do
    *  toggle é o próprio jovem (RPC set_contato_compartilhado). */
   contato_compartilhado?: boolean;
+  /** Situação no programa (0077) — NOT NULL com default 'ativo'; opcional
+   *  aqui como as demais colunas pós-0034 (selects parciais/personas demo
+   *  podem não trazer). ≠ 'ativo' tira o cadastro da fila e do board de
+   *  pareamento e o manda pra seção "Fora do programa" da /pessoas. */
+  situacao?: SituacaoMentorado;
+  /** Carimbo da saída (0077) — preenchido só quando situacao ≠ 'ativo'. */
+  saiu_em?: string | null;
+  /** Motivo curto da saída (0077) — livre no banco, vocabulário guiado
+   *  pelo dialog (MOTIVOS_SAIDA). Opcional só pra 'concluido'. */
+  motivo_saida?: string | null;
 };
 
 /** O mentorado dentro de uma dupla (embed do DUPLA_SELECT) — só o que o
@@ -194,6 +209,9 @@ export type MentoradoPar = Pick<
   // pública (não sensível) — entra pro overlay de disponibilidade da agenda
   // do mentor (REALIZA-24): cruzar a grade do jovem com a dele
   | "disponibilidade"
+  // 0077 — badge "Desistente/Concluiu" no card do mentorado da dupla: quem
+  // já lê a dupla encerrada merece saber por que ela não segue ativa
+  | "situacao"
 >;
 
 /** mentor_profiles — ficha do mentor que alimenta o board de matching

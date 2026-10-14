@@ -10,6 +10,7 @@ import {
   GraduationCap,
   LinkBreak,
   MagnifyingGlass,
+  SignOut,
   Student,
   Users,
   UsersThree,
@@ -19,7 +20,13 @@ import type { Mentorado, Profile } from "@/lib/types";
 import type { MentorProfile } from "@/lib/queries";
 import { filaMentorados, filaMentores } from "@/lib/fila";
 import { cn, normaliza } from "@/lib/utils";
-import { comparaNome, idade, papelLabel } from "@/lib/ciclo";
+import {
+  comparaNome,
+  foraDoPrograma,
+  idade,
+  papelLabel,
+  SITUACAO_MENTORADO_LABEL,
+} from "@/lib/ciclo";
 import { avatarPublicUrl } from "@/lib/avatar";
 import { Avatar } from "@/components/avatar";
 import { PessoaActions } from "@/components/pessoa-actions";
@@ -128,6 +135,7 @@ export function PessoasListas({
   mentorados,
   comDupla,
   comQualquerDupla,
+  duplaVivaPorMentorado,
   mentorProfiles,
   contagemPorMentor,
   assinaturas,
@@ -140,6 +148,9 @@ export function PessoasListas({
   comDupla: string[];
   /** Ids com QUALQUER dupla (até encerrada) — espelha a guarda das actions de exclusão. */
   comQualquerDupla: string[];
+  /** mentorado_id → id da dupla ativa/pausada (0077) — o dialog de saída
+   *  bloqueia quem tem par em andamento e linka direto pra ficha da dupla. */
+  duplaVivaPorMentorado: Record<string, string>;
   mentorProfiles: Record<string, MentorProfile>;
   contagemPorMentor: Record<string, number>;
   /** id da pessoa → documentos assinados/pendentes (badge "assinou vs. não"). */
@@ -157,16 +168,23 @@ export function PessoasListas({
 }) {
   const [busca, setBusca] = useState("");
   const [semDupla, setSemDupla] = useState(false);
+  // "Fora do programa" inverte o recorte: a lista principal passa a mostrar
+  // SÓ quem saiu (0077); desligado, eles moram na seção colapsável do fim
+  const [verFora, setVerFora] = useState(false);
+  const [foraAberto, setForaAberto] = useState(false);
+  const [inativosAberto, setInativosAberto] = useState(false);
   const [ordem, setOrdem] = useState<OrdemPessoas>("nome");
   const emDupla = useMemo(() => new Set(comDupla), [comDupla]);
   const temQualquerDupla = useMemo(() => new Set(comQualquerDupla), [comQualquerDupla]);
 
   const q = normaliza(busca.trim());
   // diretório de colegas: sem papel ainda não é colega — pré-cadastro que
-  // só a coordenação precisa enxergar (pro staff eles carregam estado
-  // operacional: inativa, nunca acessou). A base filtrada também é o
+  // só a coordenação precisa enxergar; cadastro inativo (saiu da equipe)
+  // idem — pro diretório ele não é mais colega. A base filtrada também é o
   // denominador do contador — mostrar o total cru mentiria
-  const basePessoas = souCoord ? pessoas : pessoas.filter((p) => p.role != null);
+  const basePessoas = souCoord
+    ? pessoas
+    : pessoas.filter((p) => p.role != null && p.ativo);
   // pra não-coord o e-mail não chega (view profiles_contato só devolve o
   // escopo do papel) — a busca é por nome (+ nome social, que é público)
   let pessoasFiltradas = q
@@ -177,6 +195,18 @@ export function PessoasListas({
           (souCoord && normaliza(p.email).includes(q))
       )
     : basePessoas;
+  // pra coordenação, cadastro desativado sai do grupo principal e vive na
+  // seção "Inativos" no fim — visível, mas sem diluir a leitura de quem segue
+  const inativas = useMemo(
+    () => (souCoord ? pessoas.filter((p) => !p.ativo) : []),
+    [souCoord, pessoas]
+  );
+  const inativasFiltradas = souCoord
+    ? pessoasFiltradas.filter((p) => !p.ativo)
+    : [];
+  if (souCoord) {
+    pessoasFiltradas = pessoasFiltradas.filter((p) => p.ativo);
+  }
   let mentoradosFiltrados = q
     ? mentorados.filter(
         (m) =>
@@ -186,6 +216,17 @@ export function PessoasListas({
           normaliza(m.ong_origem).includes(q)
       )
     : mentorados;
+  // saída do programa (0077): desistente/concluído sai do grupo principal e
+  // vai pra "Fora do programa" no fim — o chip inverte e filtra só eles.
+  // A seção respeita a busca (foraFiltrados já é pós-q) pra achar o nome
+  const foraFiltrados = mentoradosFiltrados.filter(foraDoPrograma);
+  const totalFora = useMemo(
+    () => mentorados.reduce((n, m) => n + (foraDoPrograma(m) ? 1 : 0), 0),
+    [mentorados]
+  );
+  mentoradosFiltrados = verFora
+    ? foraFiltrados
+    : mentoradosFiltrados.filter((m) => !foraDoPrograma(m));
 
   // fila "Aguardando par" (REALIZA-101): mentorados que NUNCA tiveram dupla
   // + mentores ativos com vaga livre — derivação pura em @/lib/fila
@@ -198,9 +239,14 @@ export function PessoasListas({
     [souCoord, pessoas, mentorProfiles, contagemPorMentor]
   );
 
-  // matching board: "Livres para dupla" deixa só mentores e mentorados livres pra parear
-  const mentoresLivres = pessoas.filter((p) => ehMentor(p) && !emDupla.has(p.id));
-  const mentoradosLivres = mentorados.filter((m) => !emDupla.has(m.id));
+  // matching board: "Livres para dupla" deixa só mentores e mentorados livres
+  // pra parear — inativo e fora-do-programa não são par de ninguém
+  const mentoresLivres = pessoas.filter(
+    (p) => ehMentor(p) && p.ativo && !emDupla.has(p.id)
+  );
+  const mentoradosLivres = mentorados.filter(
+    (m) => !emDupla.has(m.id) && !foraDoPrograma(m)
+  );
   const livres = mentoresLivres.length + mentoradosLivres.length;
   if (semDupla) {
     pessoasFiltradas = pessoasFiltradas.filter(
@@ -209,6 +255,16 @@ export function PessoasListas({
     mentoradosFiltrados = mentoradosFiltrados.filter((m) => !emDupla.has(m.id));
   }
   const filtrando = Boolean(q) || semDupla;
+
+  // quem saiu se ordena pela saída mais recente — arquivo cronológico, não
+  // fila de trabalho (pendência não se aplica a quem já partiu)
+  const porSaidaRecente = (a: Mentorado, b: Mentorado) =>
+    (b.saiu_em ?? "").localeCompare(a.saiu_em ?? "") ||
+    comparaNome(a.nome, b.nome);
+  const foraExibidos = [...foraFiltrados].sort(porSaidaRecente);
+  const inativasExibidas = [...inativasFiltradas].sort((a, b) =>
+    comparaNome(a.nome, b.nome)
+  );
 
   // uma ordenação pras duas seções — "pendências primeiro" usa a mesma
   // régua dos badges da linha (termo, formação, não-entrou, sem dupla)
@@ -228,13 +284,23 @@ export function PessoasListas({
           ) || comparaNome(a.nome, b.nome)
       : comparaNome(a.nome, b.nome)
   );
-  const mentoradosExibidos = [...mentoradosFiltrados].sort((a, b) =>
-    ordem === "pendencias"
-      ? pendenciasMentorado(b, !emDupla.has(b.id), assinaturas[b.id]) -
-          pendenciasMentorado(a, !emDupla.has(a.id), assinaturas[a.id]) ||
-        comparaNome(a.nome, b.nome)
-      : comparaNome(a.nome, b.nome)
-  );
+  const mentoradosExibidos = verFora
+    ? [...mentoradosFiltrados].sort(porSaidaRecente)
+    : [...mentoradosFiltrados].sort((a, b) =>
+        ordem === "pendencias"
+          ? pendenciasMentorado(b, !emDupla.has(b.id), assinaturas[b.id]) -
+              pendenciasMentorado(a, !emDupla.has(a.id), assinaturas[a.id]) ||
+            comparaNome(a.nome, b.nome)
+          : comparaNome(a.nome, b.nome)
+      );
+  // denominador honesto por seção: a principal conta seu próprio grupo
+  // (ativos), não o total da tabela — "9 de 9" com 1 fora seria mentira
+  const totalMentoradosSecao = verFora
+    ? totalFora
+    : mentorados.length - totalFora;
+  const totalPessoasSecao = souCoord
+    ? pessoas.length - inativas.length
+    : basePessoas.length;
 
   return (
     <>
@@ -272,6 +338,25 @@ export function PessoasListas({
                 )}
               >
                 {livres}
+              </span>
+            </button>
+            {/* quem saiu do programa (0077): inverte a seção Mentorados pra
+                mostrar só eles — a seção colapsável no fim continua sendo
+                o arquivo de sempre visível */}
+            <button
+              type="button"
+              aria-pressed={verFora}
+              onClick={() => setVerFora((v) => !v)}
+              className={filterChipCls(verFora)}
+            >
+              Fora do programa
+              <span
+                className={cn(
+                  "font-mono text-[11px] tabular-nums",
+                  verFora ? "text-background/70" : "text-muted-foreground/70"
+                )}
+              >
+                {totalFora}
               </span>
             </button>
             {/* vale pras duas seções (Com acesso + Mentorados) — pendências
@@ -316,8 +401,9 @@ export function PessoasListas({
       )}
 
       {/* board de pareamento — comparação de afinidade mentorado × mentor
-          só faz sentido com o filtro de livres ligado (visão da coordenação) */}
-      {souCoord && semDupla && (
+          só faz sentido com o filtro de livres ligado (visão da coordenação);
+          vendo "Fora do programa" ele é ruído no meio do arquivo */}
+      {souCoord && semDupla && !verFora && (
         <MatchingPanel
           mentores={mentoresLivres}
           mentorados={mentoradosLivres}
@@ -327,7 +413,7 @@ export function PessoasListas({
 
       <section className="space-y-2">
         <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground tabular-nums">
-          {souCoord ? "Com acesso" : "Mentores e equipe"} ({filtrando ? `${pessoasExibidas.length} de ${basePessoas.length}` : basePessoas.length})
+          {souCoord ? "Com acesso" : "Mentores e equipe"} ({filtrando ? `${pessoasExibidas.length} de ${totalPessoasSecao}` : totalPessoasSecao})
         </h2>
         <div className="rounded-xl bg-card shadow-[var(--shadow-border)] divide-y divide-border/60 overflow-hidden">
           {basePessoas.length === 0 && (
@@ -408,7 +494,7 @@ export function PessoasListas({
           linha discreta em vez do empty state de cadastro */}
       <section className="space-y-2">
         <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground tabular-nums">
-          Mentorados ({filtrando ? `${mentoradosExibidos.length} de ${mentorados.length}` : mentorados.length})
+          {verFora ? "Fora do programa" : "Mentorados"} ({filtrando ? `${mentoradosExibidos.length} de ${totalMentoradosSecao}` : totalMentoradosSecao})
         </h2>
         <div className="rounded-xl bg-card shadow-[var(--shadow-border)] divide-y divide-border/60 overflow-hidden">
           {mentorados.length === 0 &&
@@ -448,6 +534,22 @@ export function PessoasListas({
                     Limpar busca
                   </Button>
                 </>
+              ) : verFora ? (
+                <>
+                  <span className="grid size-11 place-items-center rounded-full bg-muted text-muted-foreground">
+                    <SignOut aria-hidden size={18} />
+                  </span>
+                  <p className="text-sm font-medium">Ninguém fora do programa</p>
+                  <p className="text-sm text-muted-foreground">
+                    Desistências e conclusões registradas no ⋮ do cadastro aparecem aqui.
+                  </p>
+                  <Button
+                    variant="ghost" size="sm" className="mt-2"
+                    onClick={() => setVerFora(false)}
+                  >
+                    Ver mentorados
+                  </Button>
+                </>
               ) : (
                 <>
                   <span className="grid size-11 place-items-center rounded-full bg-muted text-muted-foreground">
@@ -472,6 +574,7 @@ export function PessoasListas({
               indice={i}
               emDupla={emDupla.has(m.id)}
               temDupla={temQualquerDupla.has(m.id)}
+              duplaVivaId={duplaVivaPorMentorado[m.id] ?? null}
               docs={assinaturas[m.id]}
               faltantes={faltantes?.[m.id]}
               souCoord={souCoord}
@@ -479,6 +582,98 @@ export function PessoasListas({
           ))}
         </div>
       </section>
+
+      {/* arquivo de quem saiu do programa (0077) — colapsável, fora do
+          grupo principal pra não confundir "ativo" com "desistente"; a
+          busca força aberto pra o nome ainda ser encontrável. Com o chip
+          ligado a seção principal já é ela — não repete */}
+      {!verFora && foraExibidos.length > 0 && (
+        <Collapsible.Root
+          open={foraAberto || Boolean(q)}
+          onOpenChange={setForaAberto}
+          className="space-y-2"
+        >
+          <Collapsible.Trigger className="group flex w-full items-center gap-1.5 rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground tabular-nums">
+              Fora do programa ({foraExibidos.length}
+              {q && totalFora > foraExibidos.length ? ` de ${totalFora}` : ""})
+            </h2>
+            <CaretDown
+              aria-hidden
+              size={13}
+              className="text-muted-foreground transition-transform duration-150 group-data-[panel-open]:rotate-180"
+            />
+          </Collapsible.Trigger>
+          <Collapsible.Panel
+            keepMounted
+            className="h-[var(--collapsible-panel-height)] overflow-hidden transition-[height] duration-150 data-ending-style:h-0 data-starting-style:h-0 [&[hidden]:not([hidden='until-found'])]:hidden"
+          >
+            {/* levemente apagado — arquivo, não fila de trabalho */}
+            <div className="rounded-xl bg-card shadow-[var(--shadow-border)] divide-y divide-border/60 overflow-hidden opacity-80">
+              {foraExibidos.map((m, i) => (
+                <MentoradoRow
+                  key={m.id}
+                  m={m}
+                  indice={i}
+                  emDupla={emDupla.has(m.id)}
+                  temDupla={temQualquerDupla.has(m.id)}
+                  duplaVivaId={duplaVivaPorMentorado[m.id] ?? null}
+                  docs={assinaturas[m.id]}
+                  faltantes={faltantes?.[m.id]}
+                  souCoord={souCoord}
+                />
+              ))}
+            </div>
+          </Collapsible.Panel>
+        </Collapsible.Root>
+      )}
+
+      {/* idem pros cadastros desativados da equipe — mesma gramática do
+          arquivo de saídas (só coord vê; pros demais nem chegam) */}
+      {souCoord && inativasExibidas.length > 0 && (
+        <Collapsible.Root
+          open={inativosAberto || Boolean(q)}
+          onOpenChange={setInativosAberto}
+          className="space-y-2"
+        >
+          <Collapsible.Trigger className="group flex w-full items-center gap-1.5 rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground tabular-nums">
+              Inativos ({inativasExibidas.length}
+              {q && inativas.length > inativasExibidas.length
+                ? ` de ${inativas.length}`
+                : ""})
+            </h2>
+            <CaretDown
+              aria-hidden
+              size={13}
+              className="text-muted-foreground transition-transform duration-150 group-data-[panel-open]:rotate-180"
+            />
+          </Collapsible.Trigger>
+          <Collapsible.Panel
+            keepMounted
+            className="h-[var(--collapsible-panel-height)] overflow-hidden transition-[height] duration-150 data-ending-style:h-0 data-starting-style:h-0 [&[hidden]:not([hidden='until-found'])]:hidden"
+          >
+            <div className="rounded-xl bg-card shadow-[var(--shadow-border)] divide-y divide-border/60 overflow-hidden opacity-80">
+              {inativasExibidas.map((p, i) => (
+                <PessoaRow
+                  key={p.id}
+                  p={p}
+                  indice={i}
+                  emInativos
+                  emDupla={emDupla.has(p.id)}
+                  temHistorico={temQualquerDupla.has(p.id)}
+                  podeExcluir={!p.user_id && !temQualquerDupla.has(p.id)}
+                  mentorProfile={mentorProfiles[p.id]}
+                  vagas={contagemPorMentor[p.id] ?? 0}
+                  docs={assinaturas[p.id]}
+                  faltantesTermo={faltantes?.[p.id]?.["termo-voluntario"] ?? []}
+                  souCoord={souCoord}
+                />
+              ))}
+            </div>
+          </Collapsible.Panel>
+        </Collapsible.Root>
+      )}
     </>
   );
 }
@@ -599,6 +794,7 @@ function PessoaRow({
   docs: docsProp,
   faltantesTermo = [],
   souCoord,
+  emInativos = false,
 }: {
   p: Profile;
   indice: number;
@@ -613,6 +809,9 @@ function PessoaRow({
   /** labels do que falta na ficha pro termo do voluntário — coord-only */
   faltantesTermo?: string[];
   souCoord: boolean;
+  /** Na seção "Inativos" o badge "inativa" seria redundante em cada linha —
+   *  e as pendências operacionais (termo, não-entrou) não se aplicam mais. */
+  emInativos?: boolean;
 }) {
   // mentor sem linha em mentor_profiles vale capacidade 1 (mesma regra do
   // createDupla) — na pool da própria trilha (0073)
@@ -621,7 +820,9 @@ function PessoaRow({
       ? mp?.capacidade_especialista
       : mp?.capacidade) ?? 1;
   const detalhesId = `detalhes-${p.id}`;
-  const temPendencia = ehMentor(p) && (!mp?.termo_ok || !mp?.formacao_ok);
+  // inativo não tem pendência operacional a cobrar — a seção dele é arquivo
+  const temPendencia =
+    p.ativo && ehMentor(p) && (!mp?.termo_ok || !mp?.formacao_ok);
   const docs = docsProp ?? DOCS_VAZIO;
   const assinadoTermo = docs.assinado["termo-voluntario"];
   // o termo de voluntariado vale pra equipe inteira — mentor via termo_ok
@@ -704,7 +905,7 @@ function PessoaRow({
             {papelLabel(p.role)}
           </Badge>
         )}
-        {souCoord && !p.ativo && (
+        {souCoord && !p.ativo && !emInativos && (
           <Badge variant="outline" className="text-xs shrink-0 border-[var(--danger)]/50 text-[var(--danger)]">
             inativa
           </Badge>
@@ -717,7 +918,7 @@ function PessoaRow({
         {souCoord && emDupla && !(ehMentor(p) && vagas > 0) && (
           <Badge variant="outline" className="text-xs shrink-0">em dupla</Badge>
         )}
-        {souCoord && !termoOk && (
+        {souCoord && p.ativo && !termoOk && (
           <Badge
             variant="outline"
             className="text-xs shrink-0 border-[var(--warn)]/60 text-[var(--warn-text)]"
@@ -799,6 +1000,7 @@ function MentoradoRow({
   indice,
   emDupla,
   temDupla,
+  duplaVivaId,
   docs: docsProp,
   faltantes,
   souCoord,
@@ -807,12 +1009,19 @@ function MentoradoRow({
   indice: number;
   emDupla: boolean;
   temDupla: boolean;
+  /** Id da dupla ativa/pausada (0077) — alimenta o bloqueio do dialog de
+   *  saída (quem tem par em andamento encerra a dupla antes) */
+  duplaVivaId?: string | null;
   docs: DocsPessoa | undefined;
   /** slug → labels de faltante civil da ficha (coord-only, labels só) */
   faltantes?: Record<string, string[]>;
   souCoord: boolean;
 }) {
   const detalhesId = `detalhes-${m.id}`;
+  // quem saiu do programa (0077): fora do grupo principal — sem badges de
+  // pendência operacional (termo/autorização não se cobram de quem partiu),
+  // a situação vira badge própria e o motivo/data vão pra "Detalhes"
+  const fora = foraDoPrograma(m);
   // LGPD: parear menor sem a autorização do responsável é pendência jurídica.
   // Vale tanto o upload manual (documento_path) quanto a assinatura por link.
   const docs = docsProp ?? DOCS_VAZIO;
@@ -829,7 +1038,7 @@ function MentoradoRow({
   const termoEnviado = docs.pendente.includes("termo-mentorando");
   const docOk = menor ? autorizacaoOk : termoOk;
   const docEnviado = menor ? autEnviada : termoEnviado;
-  const temPendencia = !docOk;
+  const temPendencia = !docOk && !fora;
   // lacuna civil do documento que vale pra essa pessoa (autorização olha a
   // ficha do responsável; o termo olha a do jovem)
   const faltantesDoc =
@@ -837,7 +1046,8 @@ function MentoradoRow({
   const temDocs =
     temPendencia ||
     Object.keys(docs.assinado).length > 0 ||
-    docs.pendente.length > 0;
+    docs.pendente.length > 0 ||
+    Boolean(m.saiu_em || m.motivo_saida);
   return (
     // idem PessoaRow — Root do disclosure: trigger no cluster, painel embaixo
     <Collapsible.Root
@@ -861,7 +1071,12 @@ function MentoradoRow({
               {!m.avatar_path && (
                 <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-[var(--role-mentorado)]" />
               )}
-              <span className="truncate underline-offset-4 transition-colors group-hover:underline">
+              <span
+                className={cn(
+                  "truncate underline-offset-4 transition-colors group-hover:underline",
+                  fora && "text-muted-foreground"
+                )}
+              >
                 {m.nome}
               </span>
             </span>
@@ -871,10 +1086,24 @@ function MentoradoRow({
             </span>
           </span>
         </Link>
-        {souCoord && emDupla && (
+        {/* situação do programa (0077) — pra todo papel que alcança a ficha:
+            "Desistente"/"Concluiu" é o porquê dela não estar entre os ativos */}
+        {fora && (
+          <Badge
+            variant="outline"
+            className={cn(
+              "text-xs shrink-0",
+              m.situacao === "desistente" &&
+                "border-[var(--warn)]/60 text-[var(--warn-text)]"
+            )}
+          >
+            {SITUACAO_MENTORADO_LABEL[m.situacao ?? "ativo"]}
+          </Badge>
+        )}
+        {souCoord && !fora && emDupla && (
           <Badge variant="outline" className="text-xs shrink-0">em dupla</Badge>
         )}
-        {souCoord && !docOk && (
+        {souCoord && !fora && !docOk && (
           <Badge
             variant="outline"
             className={cn(
@@ -897,12 +1126,27 @@ function MentoradoRow({
         )}
         {souCoord && (
           <div className="flex items-center gap-2 ml-auto">
-            <MentoradoActions mentorado={m} temDupla={temDupla} />
+            <MentoradoActions
+              mentorado={m}
+              temDupla={temDupla}
+              duplaVivaId={duplaVivaId}
+            />
           </div>
         )}
       </div>
       {souCoord && temDocs && (
         <DetalhesRegiao id={detalhesId} nome={m.nome}>
+          {fora && (
+            <ItemDetalhe icone={SignOut}>
+              {[
+                SITUACAO_MENTORADO_LABEL[m.situacao ?? "ativo"],
+                m.saiu_em ? `saiu em ${fmtDia(m.saiu_em)}` : null,
+                m.motivo_saida,
+              ]
+                .filter(Boolean)
+                .join(" — ")}
+            </ItemDetalhe>
+          )}
           {menor && (
             <ItemDetalhe icone={FileText} warn={!autorizacaoOk}>
               {autorizacaoOk ? (

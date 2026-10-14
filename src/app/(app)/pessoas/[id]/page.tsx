@@ -27,6 +27,7 @@ import {
   NotePencil,
   Path,
   ShieldCheck,
+  SignOut,
   Signpost,
   Sparkle,
   Target,
@@ -46,12 +47,15 @@ import {
   disponibilidadeTexto,
   ESCOLARIDADE_LABELS,
   formatDate,
+  formatDiaMes,
+  foraDoPrograma,
   GENERO_LABELS,
   idade,
   linkSeguro,
   papelLabel,
   podeSupervisionar,
   PREF_GENERO_LABELS,
+  SITUACAO_MENTORADO_LABEL,
   waLink,
 } from "@/lib/ciclo";
 import type { DadosCivis } from "@/lib/types";
@@ -281,6 +285,14 @@ export default async function PessoaPerfilPage({
   // escolaridade/objetivos só em mentorado
   const prof = perfil.tipo === "profile" ? perfil.pessoa : null;
   const ment = perfil.tipo === "mentorado" ? perfil.pessoa : null;
+  // saída do programa (0077) — a ficha mostra a situação e o ⋮ oferece
+  // marcar/reativar; dupla viva vira link de bloqueio (o rito mora nela)
+  const foraMent = ment ? foraDoPrograma(ment) : false;
+  const duplaVivaMent = ehMentorado
+    ? (perfil.duplas.find(
+        (d) => d.status === "ativa" || d.status === "pausada"
+      )?.id ?? null)
+    : null;
   const mp = perfil.tipo === "profile" ? perfil.mentorProfile : null;
   // a pool de vagas mostrada é a da trilha do papel (0073)
   const capacidadeMentor =
@@ -455,6 +467,7 @@ export default async function PessoaPerfilPage({
                   <MentoradoActions
                     mentorado={perfil.pessoa}
                     temDupla={perfil.duplas.length > 0}
+                    duplaVivaId={duplaVivaMent}
                   />
                 ))}
             </div>
@@ -469,6 +482,21 @@ export default async function PessoaPerfilPage({
                   <span aria-hidden className="size-1.5 rounded-full bg-[var(--role-mentorado)]" />
                   Mentorado
                 </Badge>
+                {/* saída do programa (0077) — no header, não escondida no
+                    cadastro: era o "só descobre vendo a dupla encerrada" */}
+                {foraMent && ment && (
+                  <Badge
+                    variant="outline"
+                    className={cn(
+                      "font-normal",
+                      ment.situacao === "desistente" &&
+                        "border-[var(--warn)]/60 text-[var(--warn-text)]"
+                    )}
+                  >
+                    {SITUACAO_MENTORADO_LABEL[ment.situacao ?? "ativo"]}
+                    {ment.saiu_em ? ` · ${formatDiaMes(ment.saiu_em)}` : ""}
+                  </Badge>
+                )}
                 {"ong_origem" in p && p.ong_origem && <span>{p.ong_origem}</span>}
               </>
             ) : (
@@ -710,6 +738,27 @@ export default async function PessoaPerfilPage({
                           <div className="mt-5 border-t border-border/60 pt-5">
                             <SubFicha titulo="No programa" />
                             <dl className="mt-1 sm:grid sm:grid-cols-2 sm:gap-x-8">
+                              {/* situação da 0077 — "Saiu do programa em
+                                  dd/mm · motivo"; some pra ativo sem
+                                  histórico de saída */}
+                              {ment && (foraMent || ment.saiu_em) && (
+                                <Linha
+                                  icone={<SignOut size={15} />}
+                                  rotulo="Situação"
+                                  valor={[
+                                    SITUACAO_MENTORADO_LABEL[
+                                      ment.situacao ?? "ativo"
+                                    ],
+                                    ment.saiu_em
+                                      ? `em ${formatDiaMes(ment.saiu_em)}`
+                                      : null,
+                                    ment.motivo_saida,
+                                  ]
+                                    .filter(Boolean)
+                                    .join(" · ")}
+                                  sempre={souCoord}
+                                />
+                              )}
                               <Linha
                                 icone={<Signpost size={15} />}
                                 rotulo="Origem"
