@@ -18,7 +18,9 @@ export function SemaforoDot({ nivel, className }: { nivel: Semaforo; className?:
   return (
     <span
       role="img"
-      className={cn("relative inline-block size-2.5 rounded-full shrink-0", CORES[nivel], className)}
+      // transition-colors: mudança de nível (ok→atenção→risco) desliza a cor
+      // do dot em vez de trocar num pulo — estado de saúde é contínuo
+      className={cn("relative inline-block size-2.5 rounded-full shrink-0 transition-colors", CORES[nivel], className)}
       aria-label={ROTULOS[nivel]}
       title={ROTULOS[nivel]}
     >

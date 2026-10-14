@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { motion } from "motion/react";
 import { DotsThree, ListChecks, PencilSimple, Trash } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import {
@@ -24,6 +25,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
+import { T } from "@/components/motion";
 import { cn } from "@/lib/utils";
 
 export function EncaminhamentosList({
@@ -47,6 +49,9 @@ export function EncaminhamentosList({
 }) {
   const [pending, start] = useTransition();
   const [pendingId, setPendingId] = useState<string | null>(null);
+  // ids marcados "feito" nesta sessão — só eles ganham o check animado;
+  // itens que já chegam feitos do server não celebram de novo a cada mount
+  const [feitosAgora, setFeitosAgora] = useState<ReadonlySet<string>>(new Set());
   // um dialog compartilhado pros dois fluxos — o item alvo fica em estado
   const [editando, setEditando] = useState<Encaminhamento | null>(null);
   const [descLen, setDescLen] = useState(0);
@@ -80,7 +85,11 @@ export function EncaminhamentosList({
           // interativo (só phrasing content é válido ali) e do div read-only
           const texto = (
             <span className="block min-w-0 flex-1">
-              <span className={cn("block break-words text-sm", t.status === "feito" && "line-through text-muted-foreground")}>
+              {/* a cor transiciona (transition-colors); o riscado é binário —
+                  text-decoration não anima e manter o line-through sempre
+                  ativo com cor transparente entregaria "texto suprimido"
+                  pra leitor de tela */}
+              <span className={cn("block break-words text-sm transition-colors", t.status === "feito" && "line-through text-muted-foreground")}>
                 {t.descricao}
               </span>
               <span className="block text-xs text-muted-foreground mt-0.5">
@@ -125,7 +134,15 @@ export function EncaminhamentosList({
           );
 
           return (
-            <li key={t.id} className="flex items-start gap-1">
+            // layout: marcar "feito" reordena (pendentes primeiro) — a linha
+            // desliza pro novo lugar em vez de teleportar; reduced-motion
+            // desliga via MotionConfig global
+            <motion.li
+              key={t.id}
+              layout
+              transition={T.panel}
+              className="flex items-start gap-1"
+            >
               {podeEditar || podeMarcar ? (
                 // checkbox nativo + label: teclado, estado e o clique no texto
                 // funcionam sem ARIA manual; o quadrado é só a representação
@@ -142,6 +159,8 @@ export function EncaminhamentosList({
                     disabled={pending && pendingId === t.id}
                     onChange={() => {
                       setPendingId(t.id);
+                      if (t.status !== "feito")
+                        setFeitosAgora((s) => new Set(s).add(t.id));
                       start(async () => {
                         try {
                           const res = await toggleEncaminhamento(t.id, t.status !== "feito", duplaId);
@@ -165,8 +184,21 @@ export function EncaminhamentosList({
                     )}
                   >
                     {t.status === "feito" && (
-                      <svg viewBox="0 0 10 8" className="size-2.5 fill-none stroke-current stroke-2">
-                        <path d="M1 4l2.5 2.5L9 1" />
+                      // mesma coreografia do /auth/confirmado: o check entra
+                      // com pop (svg) e se desenha (path) — keyframes
+                      // confirm-pop/confirm-draw do globals, só no clique
+                      // desta sessão (feitosAgora)
+                      <svg
+                        viewBox="0 0 10 8"
+                        className={cn(
+                          "size-2.5 fill-none stroke-current stroke-2",
+                          feitosAgora.has(t.id) && "confirm-pop"
+                        )}
+                      >
+                        <path
+                          d="M1 4l2.5 2.5L9 1"
+                          className={cn(feitosAgora.has(t.id) && "confirm-draw")}
+                        />
                       </svg>
                     )}
                   </span>
@@ -191,7 +223,7 @@ export function EncaminhamentosList({
                 </div>
               )}
               {menu}
-            </li>
+            </motion.li>
           );
         })}
       </ul>

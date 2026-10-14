@@ -85,7 +85,12 @@ export function RegistrarRetroativoDialog({
     const alvo = scrollTarget.current;
     if (!alvo) return;
     scrollTarget.current = null;
-    document.getElementById(alvo)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    // o guard global de prefers-reduced-motion cobre CSS, não o behavior
+    // do scrollIntoView — checa aqui (mesmo padrão do trilha-jornada)
+    const reduz = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    document
+      .getElementById(alvo)
+      ?.scrollIntoView({ behavior: reduz ? "auto" : "smooth", block: "start" });
   }, [pending]);
 
   function escolherNumero(v: string | null) {
