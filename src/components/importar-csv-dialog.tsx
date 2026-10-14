@@ -2,15 +2,17 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { CaretDown, FileArrowDown, FileArrowUp, UploadSimple } from "@phosphor-icons/react";
+import { CaretDown, FileArrowDown, FileArrowUp, UploadSimple, Warning } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { importDuplas, importMentorados, importPessoas, previewDuplas } from "@/lib/actions";
 import {
   emailValido,
   fichaLinha,
+  normalizaLinha,
   normNome,
   normWhatsapp,
   parseCsv,
+  type DiffNormalizacao,
   type LinhaImportada,
 } from "@/lib/importar";
 import { parseCsvPares, type LinhaPar, type PreviewPar } from "@/lib/importar-duplas";
@@ -69,6 +71,13 @@ function extrasDaLinha(r: LinhaImportada): number {
   ].filter((v) => v.trim()).length;
 }
 
+/** Valor longo do diff cabe na célula — colapsa espaço e corta com
+ *  reticência (a célula inteira fica com title pro valor cru). */
+const curto = (v: string, max = 56) => {
+  const s = v.replace(/\s+/g, " ").trim();
+  return s.length > max ? `${s.slice(0, max - 1)}…` : s;
+};
+
 function linhaValida(tipo: Tipo, r: LinhaImportada): string | null {
   if (!r.nome.trim()) return "sem nome";
   if (tipo === "equipe" && !emailValido(r.email)) return "e-mail inválido";
@@ -104,6 +113,12 @@ export function ImportarCsvDialog({
   const [tipo, setTipo] = useState<Tipo>(tipoInicial);
   const [texto, setTexto] = useState("");
   const [linhas, setLinhas] = useState<LinhaImportada[] | null>(null);
+  // diffs da normalização por índice da linha — o "de → para" auditável da
+  // prévia (REALIZA-118): a linha em `linhas` já chega normalizada e é
+  // exatamente o que a action recebe
+  const [diffs, setDiffs] = useState<Map<number, DiffNormalizacao[]> | null>(
+    null
+  );
   // pareamento: a linha é par (não ficha) e a prévia é server-side — quem
   // resolve nome/e-mail contra o banco é o previewDuplas, não o client
   const [linhasPar, setLinhasPar] = useState<LinhaPar[] | null>(null);
@@ -115,6 +130,7 @@ export function ImportarCsvDialog({
   function reset() {
     setTexto("");
     setLinhas(null);
+    setDiffs(null);
     setLinhasPar(null);
     setPrevia(null);
     setResultado(null);
@@ -182,9 +198,17 @@ export function ImportarCsvDialog({
       });
       return;
     }
-    const { linhas, ignoradas } = parseCsv(conteudo);
-    setLinhas(linhas);
-    if (!linhas.length) toast.error("Nenhuma linha válida. Confira o cabeçalho.");
+    const { linhas: cruas, ignoradas } = parseCsv(conteudo);
+    // a linha que entra na prévia (e que o importar manda pro server) já é
+    // a normalizada — a action re-normaliza idempotente, mesma régua
+    const norm = cruas.map(normalizaLinha);
+    setLinhas(norm.map((n) => n.linha));
+    const mapa = new Map<number, DiffNormalizacao[]>();
+    norm.forEach((n, i) => {
+      if (n.diffs.length) mapa.set(i, n.diffs);
+    });
+    setDiffs(mapa.size ? mapa : null);
+    if (!cruas.length) toast.error("Nenhuma linha válida. Confira o cabeçalho.");
     else if (ignoradas)
       toast.warning(
         `${ignoradas} ${ignoradas === 1 ? "linha ignorada" : "linhas ignoradas"}: sem nome reconhecível.`
@@ -237,6 +261,8 @@ export function ImportarCsvDialog({
 
   const comErro = linhas?.filter((r) => linhaValida(tipo, r)) ?? [];
   const validas = (linhas?.length ?? 0) - comErro.length;
+  const totalDiffs = diffs ? [...diffs.values()].flat() : [];
+  const praRevisar = totalDiffs.filter((d) => d.revisar).length;
   const prontas = previa?.filter((r) => r.status === "ok") ?? [];
   // o resumo do fim fala "dupla criada" no pareamento — mesmo padrão do
   // "cadastro criado" dos outros tipos
@@ -368,6 +394,13 @@ export function ImportarCsvDialog({
               {validas === 1 ? "linha pronta" : "linhas prontas"}
               {comErro.length > 0 &&
                 ` · ${comErro.length} ${comErro.length === 1 ? "com problema (será pulada)" : "com problemas (serão puladas)"}`}
+              {totalDiffs.length > 0 &&
+                ` · ${totalDiffs.length} ${totalDiffs.length === 1 ? "campo normalizado" : "campos normalizados"}`}
+              {praRevisar > 0 && (
+                <span className="text-[var(--warn-text)]">
+                  {` (${praRevisar} pra revisar)`}
+                </span>
+              )}
             </p>
             {/* a tabela da prévia rola na horizontal (min-w-640px) — a barra
                 fina deixa a pista de scroll visível em vez de cortar colunas */}
@@ -379,6 +412,7 @@ export function ImportarCsvDialog({
                     <th className="px-3 py-2 font-medium">{tipo === "equipe" ? "E-mail" : "WhatsApp"}</th>
                     <th className="px-3 py-2 font-medium">{tipo === "equipe" ? "Papel" : "ONG"}</th>
                     <th className="px-3 py-2 font-medium">Ficha</th>
+                    <th className="px-3 py-2 font-medium">Normalizado</th>
                     <th className="px-3 py-2 font-medium">Status</th>
                   </tr>
                 </thead>
@@ -386,6 +420,7 @@ export function ImportarCsvDialog({
                   {linhas.map((r, i) => {
                     const erro = linhaValida(tipo, r);
                     const extras = extrasDaLinha(r);
+                    const rowDiffs = diffs?.get(i) ?? [];
                     return (
                       <tr key={i} className={cn(erro && "text-muted-foreground/60")}>
                         <td className="px-3 py-1.5">
@@ -405,6 +440,43 @@ export function ImportarCsvDialog({
                         <td className="px-3 py-1.5 text-xs text-muted-foreground">
                           {extras ? `${extras} ${extras === 1 ? "campo" : "campos"}` : "—"}
                         </td>
+                        {/* de → para da normalização; o amber "revisar" marca
+                            resgate ambíguo ou valor descartado (não é erro —
+                            a linha entra assim mesmo, a flag pede conferida) */}
+                        <td className="max-w-52 px-3 py-1.5 text-xs">
+                          {rowDiffs.length ? (
+                            <ul className="space-y-1">
+                              {rowDiffs.map((d, j) => (
+                                <li
+                                  key={j}
+                                  title={`${d.label}: ${d.de}`}
+                                  className="leading-snug"
+                                >
+                                  <span className="break-all text-muted-foreground/70 line-through decoration-muted-foreground/40">
+                                    {curto(d.de) || "(vazio)"}
+                                  </span>
+                                  {" → "}
+                                  {d.para ? (
+                                    <span className="break-all">{curto(d.para)}</span>
+                                  ) : (
+                                    <em className="text-muted-foreground">descartado</em>
+                                  )}
+                                  {d.revisar && (
+                                    <span
+                                      className="mt-0.5 flex items-center gap-1 text-[var(--warn-text)]"
+                                      title={d.aviso ?? "valor precisou de resgate"}
+                                    >
+                                      <Warning size={12} aria-hidden className="shrink-0" />
+                                      {`revisar${d.aviso ? ` — ${curto(d.aviso, 44)}` : ""}`}
+                                    </span>
+                                  )}
+                                </li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <span className="text-muted-foreground/60">—</span>
+                          )}
+                        </td>
                         <td className="px-3 py-1.5 text-xs">
                           {erro
                             ? <span className="text-[var(--danger)]">{erro}</span>
@@ -420,9 +492,11 @@ export function ImportarCsvDialog({
               A coluna Ficha conta os campos de matching reconhecidos (nascimento, gênero,
               cidade/UF, interesses, motivação, pref. de par e afins). Nascimento, gênero,
               motivação e preferência de par ficam visíveis só pra coordenação.
+              Normalizado mostra o que a planilha trouxe torto e já entra corrigido
+              (e-mail, telefone, data, link) — o que pede revisão sai sinalizado.
             </p>
             <div className="flex gap-2">
-              <Button variant="outline" onClick={() => setLinhas(null)}>Voltar</Button>
+              <Button variant="outline" onClick={() => { setLinhas(null); setDiffs(null); }}>Voltar</Button>
               <Button className="flex-1" disabled={pending || validas === 0} onClick={importar}>
                 <UploadSimple size={15} />
                 {pending ? "Importando…" : `Importar ${validas} ${validas === 1 ? "cadastro" : "cadastros"}`}

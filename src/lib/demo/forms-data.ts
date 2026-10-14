@@ -155,7 +155,7 @@ export function getDemoFormularios(): DemoFormularios {
     descricao: "Formulário de inscrição de jovens pro ciclo 2026/2027 do programa.",
     campos: [
       { id: "nome", tipo: "texto", label: "Nome completo", obrigatorio: true },
-      { id: "whatsapp", tipo: "texto", label: "WhatsApp com DDD", obrigatorio: true },
+      { id: "whatsapp", tipo: "texto", label: "WhatsApp com DDD", obrigatorio: true, formato: "telefone" },
       {
         id: "origem", tipo: "select", label: "Como conheceu o programa?",
         obrigatorio: true,

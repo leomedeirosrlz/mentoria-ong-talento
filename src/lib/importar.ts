@@ -1,6 +1,25 @@
 import type { AppRole, CorRaca, DadosCivis, Escolaridade, Genero, PrefGeneroPar } from "./types";
 import { UFS, parseDisponibilidade } from "./ciclo";
 import { capitalizar, nomeProprio } from "./utils";
+import {
+  emailValido as emailValidoBase,
+  normalizaCorRaca,
+  normalizaData,
+  normalizaEmail,
+  normalizaEscolaridade,
+  normalizaGenero,
+  normalizaPapel,
+  normalizaPrefGenero,
+  normalizaTelefone,
+  normalizaTexto,
+  normalizaUrl,
+  semAcento,
+  type NormResult,
+} from "./forms/normaliza";
+
+// semAcento mora na lib de normalização (REALIZA-118) — re-exportado aqui
+// porque canonHeader e os mapas de header falam o mesmo dialeto
+export { semAcento };
 
 export const MAX_INTERESSES = 20;
 export const INTERESSE_MAX_CHARS = 60;
@@ -109,10 +128,6 @@ const VAZIA: LinhaImportada = {
   form_bruto: "",
   consent_lgpd_em: "",
 };
-
-export function semAcento(s: string): string {
-  return s.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase().trim();
-}
 
 /** Normaliza header pra casar com o alias exato: sem acento, pontuação
  *  interna vira espaço e a pontuação final do Google Forms ("...:", "...?")
@@ -351,66 +366,35 @@ export function parseCsv(text: string): { linhas: LinhaImportada[]; ignoradas: n
 }
 
 export const normNome = (s: string) => s.trim().replace(/\s+/g, " ");
-export const normEmail = (s: string) => s.trim().toLowerCase();
-export const emailValido = (s: string) =>
-  /^[^\s@.][^\s@]*@([^\s@.]+\.)+[^\s@.]{2,}$/.test(s) && !s.includes("..");
+/** E-mail da planilha → lowercase válido ou "" (REALIZA-118): a lib
+ *  conserta `@@`, espaços e `gmail,com` antes de validar — o que não
+ *  resgatar volta vazio pro validador decidir. */
+export const normEmail = (s: string) => normalizaEmail(s).valor ?? "";
+export const emailValido = emailValidoBase;
 
-/** whatsapp -> só dígitos; completa 55 quando vem DD+número BR (0800/curto não é whatsapp).
- *  Com "+" no input o número já vem com DDI — nunca prefixar 55.
- *  Planilha corrompe número em notação científica ("1.1984788783E10") —
- *  expande antes de extrair os dígitos, senão o "E10" vira dígito extra. */
+/** whatsapp -> só dígitos `55DDDNUMERO`; completa 55 quando vem
+ *  DD+número BR (0800/curto não é whatsapp). Com "+" no input o número já
+ *  vem com DDI — nunca prefixar 55. Notação científica de planilha
+ *  ("1.1984788783E10") expande antes; "0 11 ..." resgata o zero de DDD. */
 export function normWhatsapp(s: string): string | null {
-  const v = s.trim();
-  if (/^\d+(\.\d+)?[eE]\+?\d+$/.test(v)) {
-    s = Number(v).toFixed(0);
-  }
-  const d = s.replace(/\D/g, "");
-  if (d.length < 10 || d.startsWith("0")) return null;
-  if (s.includes("+")) return d;
-  if (d.length <= 11) return `55${d}`;
-  return d;
+  return normalizaTelefone(s).valor;
 }
 
 export function mapRole(s: string): AppRole | null {
-  const n = semAcento(s);
-  if (!n) return null;
-  if (/coord/.test(n)) return "coordenacao";
-  // "auxiliar executivo(a)" é o nome do papel na UI; "supervisor" segue
-  // aceito pra planilhas antigas
-  if (/supervis|auxiliar/.test(n)) return "supervisor";
-  if (/especial/.test(n)) return "mentor_especialista";
-  if (/mentor|dpp/.test(n)) return "mentor_dpp";
-  return null;
+  return normalizaPapel(s).valor;
 }
 
 // ---------- campos do matching (0034) ----------
 // mesmos CHECKs do banco, validados aqui pra linha inválida virar skip
 // com motivo em pt-BR em vez de erro de banco no meio do import.
 
-/** "dd/mm/aaaa", "dd-mm-aaaa", ISO "aaaa-mm-dd" ou serial de planilha
- *  ("30762" — o Excel/Google Forms exporta data como número de dias desde
- *  1899-12-30; 5 dígitos cobre 1927–2127, suficiente pra nascimento)
- *  -> ISO; null = inválida/vazia. */
+/** "dd/mm/aaaa", "dd-mm-aaaa", "dd.mm.aaaa", ISO "aaaa-mm-dd" (e com
+ *  barra/ponto), ano de 2 dígitos, horário colado no fim ou serial de
+ *  planilha ("30762" — dias desde 1899-12-30) → ISO; null = inválida. A
+ *  implementação é a normalizaData da lib (REALIZA-118) — mais formatos
+ *  que a versão anterior, mesma rejeição de data impossível. */
 export function normData(s: string): string | null {
-  const v = s.trim();
-  if (!v) return null;
-  const serialM = /^(\d{5})(\.\d+)?$/.exec(v);
-  const isoM = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v);
-  const brM = /^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{4})$/.exec(v);
-  const iso = serialM
-    ? new Date(Date.UTC(1899, 11, 30) + Math.floor(Number(serialM[1])) * 86400000)
-        .toISOString().slice(0, 10)
-    : isoM
-      ? `${isoM[1]}-${isoM[2]}-${isoM[3]}`
-      : brM
-        ? `${brM[3]}-${brM[2].padStart(2, "0")}-${brM[1].padStart(2, "0")}`
-        : null;
-  if (!iso) return null;
-  const d = new Date(`${iso}T12:00:00`);
-  // rejeita 31/02, 30/02 etc. — Date normaliza em vez de falhar
-  if (isNaN(d.getTime()) || `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}` !== iso)
-    return null;
-  return iso;
+  return normalizaData(s).valor;
 }
 
 /** "sp", "São Paulo - SP" -> "SP"; null = não reconhecida. */
@@ -615,38 +599,18 @@ export function capitalizaItemLista(v: string): string {
   return v;
 }
 
+/** Fuzzy → enum — os mapas moram na lib (REALIZA-118); estes wrappers
+ *  mantêm a assinatura Enum|null dos callers antigos. */
 export function mapGenero(s: string): Genero | null {
-  const n = semAcento(s);
-  if (!n) return null;
-  // ordem importa: "prefiro não dizer" e "não binário" antes dos binários,
-  // e cis/transgênero resolve pelo núcleo ("cisgênero feminino" -> feminino)
-  if (/prefiro/.test(n)) return "prefiro_nao_dizer";
-  if (/nao.?bin|nb\b/.test(n)) return "nao_binario";
-  if (/fem|mulher/.test(n)) return "feminino";
-  if (/masc|homem/.test(n)) return "masculino";
-  if (/outro/.test(n)) return "outro";
-  return null;
+  return normalizaGenero(s).valor;
 }
 
 export function mapPrefGenero(s: string): PrefGeneroPar | null {
-  const n = semAcento(s);
-  if (!n) return null;
-  if (/indiferente|tanto faz|qualquer|sem pref|nao tenho pref/.test(n)) return "indiferente";
-  if (/fem|mulher/.test(n)) return "feminino";
-  if (/masc|homem/.test(n)) return "masculino";
-  return null;
+  return normalizaPrefGenero(s).valor;
 }
 
 export function mapEscolaridade(s: string): Escolaridade | null {
-  const n = semAcento(s);
-  if (!n) return null;
-  if (/fund/.test(n)) return "fundamental";
-  if (/medio|em\b/.test(n)) return "medio";
-  if (/tec/.test(n)) return "tecnico";
-  if (/pos|mestrado|doutorado|mba|especializ/.test(n)) return "pos";
-  if (/incompleto|cursando|inacabado/.test(n)) return "superior_incompleto";
-  if (/superior|graduac|faculdade|bacharel|licenciat/.test(n)) return "superior";
-  return null;
+  return normalizaEscolaridade(s).valor;
 }
 
 // ---------- intake real (0054) ----------
@@ -655,31 +619,14 @@ export function mapEscolaridade(s: string): Escolaridade | null {
  *  no form (gente coloca sobrenome, resposta torta) — não reconhecido vira
  *  null e o valor cru fica preservado no form_bruto, nunca derruba a linha. */
 export function mapCorRaca(s: string): CorRaca | null {
-  const n = semAcento(s);
-  if (!n) return null;
-  if (/prefiro/.test(n)) return "prefiro_nao_dizer";
-  if (/branc/.test(n)) return "branca";
-  if (/negr|pret/.test(n)) return "negra";
-  if (/pard/.test(n)) return "parda";
-  if (/amarel/.test(n)) return "amarela";
-  if (/indig/.test(n)) return "indigena";
-  if (/outro/.test(n)) return "outro";
-  return null;
+  return normalizaCorRaca(s).valor;
 }
 
 /** LinkedIn -> URL http(s) (CHECK profiles_linkedin_http). Sem scheme ganha
  *  https://; o que não virar URL com domínio volta null — texto solto
  *  ("não tenho") não derruba a linha, fica só no form_bruto. */
 export function normLinkedin(s: string): string | null {
-  const v = s.trim();
-  if (!v) return null;
-  const com = /^https?:\/\//i.test(v) ? v : `https://${v.replace(/^\/+/, "")}`;
-  try {
-    const u = new URL(com);
-    return u.hostname.includes(".") ? com.slice(0, 300) : null;
-  } catch {
-    return null;
-  }
+  return normalizaUrl(s).valor;
 }
 
 /** Campo de documento/endereço corrompido pela planilha: notação científica
@@ -859,4 +806,109 @@ export function fichaLinha(
   if (civis) out.dados_civis = civis;
 
   return out;
+}
+
+// ---------- normalização da linha inteira (REALIZA-118) ----------
+
+/** Um ajuste feito pela normalização na linha — o "de → para" que a
+ *  prévia do import mostra por campo. `revisar` sinaliza resgate ambíguo
+ *  (a lib marcou `aviso`) ou valor descartado por ilegível — flag em
+ *  amber pedindo conferência humana, nunca rejeição automática. */
+export type DiffNormalizacao = {
+  /** coluna da linha — casa o diff com a célula da tabela da prévia */
+  campo: keyof LinhaImportada;
+  /** rótulo amigável do campo no diff */
+  label: string;
+  /** valor bruto da planilha */
+  de: string;
+  /** valor gravado ("" quando o campo foi descartado por ilegível) */
+  para: string;
+  /** true = conferir antes de importar (resgate ambíguo ou descarte) */
+  revisar: boolean;
+  /** motivo — o `aviso` da lib ou o descarte padrão */
+  aviso: string | null;
+};
+
+/** Normalização agressiva por linha: e-mail, WhatsApp, LinkedIn, datas e
+ *  enums passam pela lib; o que vira valor gravável entra na `linha` de
+ *  saída, o que não vira sai vazio — e TUDO que mudou vira um Diff pra
+ *  prévia mostrar. A linha nunca morre aqui: campo obrigatório que esvaziou
+ *  (e-mail da equipe) é o linhaValida/fichaLinha que reprova, na mesma
+ *  régua de "rejeitar só o impossível".
+ *
+ *  Idempotente: normalizar a saída de novo não gera diff novo — o dialog
+ *  manda a linha já normalizada e a action re-normaliza sem custo. */
+export function normalizaLinha(l: LinhaImportada): {
+  linha: LinhaImportada;
+  diffs: DiffNormalizacao[];
+} {
+  const linha = { ...l };
+  const diffs: DiffNormalizacao[] = [];
+
+  const aplica = (
+    campo: keyof LinhaImportada,
+    label: string,
+    r: NormResult<string>,
+    opts?: {
+      /** quando o normalizador distingue "vazio de propósito" (URL: "não
+       *  tenho" → null/mudou/sem aviso), esse descarte não pede revisão —
+       *  é resposta legítima, não sujeira. Nos demais campos null em célula
+       *  preenchida é sempre suspeito. */
+      descartaSemFlag?: boolean;
+      /** motivo do flag quando o campo foi descartado por ilegível */
+      falha?: string;
+    }
+  ) => {
+    const de = String(l[campo] ?? "").trim();
+    if (!de) return; // vazio não é sujeira nem diff
+    const para = r.valor ?? "";
+    if (para === de) return; // já veio limpo — nada a auditar
+    const descarteIntencional =
+      r.valor === null && !!opts?.descartaSemFlag && r.mudou && !r.aviso;
+    const revisar = r.valor === null ? !descarteIntencional : !!r.aviso;
+    diffs.push({
+      campo,
+      label,
+      de,
+      para,
+      revisar,
+      aviso:
+        r.aviso ??
+        (r.valor === null && revisar
+          ? (opts?.falha ?? "não reconhecido — descartado")
+          : null),
+    });
+    linha[campo] = para;
+  };
+
+  aplica("nome", "nome", normalizaTexto(l.nome));
+  aplica("email", "e-mail", normalizaEmail(l.email));
+  aplica("whatsapp", "WhatsApp", normalizaTelefone(l.whatsapp));
+  aplica("linkedin", "LinkedIn", normalizaUrl(l.linkedin), {
+    descartaSemFlag: true,
+  });
+  aplica("data_nascimento", "nascimento", normalizaData(l.data_nascimento));
+  aplica(
+    "resp_nascimento",
+    "nascimento do responsável",
+    normalizaData(l.resp_nascimento)
+  );
+
+  // enums do matching — irreconhecível esvazia + flag em vez de derrubar a
+  // linha (o fichaLinha antigo reprovava genero/UF/escolaridade/pref sujos)
+  aplica("genero", "gênero", normalizaGenero(l.genero));
+  aplica("cor_raca", "cor/raça", normalizaCorRaca(l.cor_raca));
+  aplica("escolaridade", "escolaridade", normalizaEscolaridade(l.escolaridade));
+  aplica("pref_genero_par", "pref. de gênero do par", normalizaPrefGenero(l.pref_genero_par));
+
+  const uf = normUf(l.uf);
+  const ufOk = uf && (UFS as readonly string[]).includes(uf) ? uf : null;
+  aplica(
+    "uf",
+    "UF",
+    { valor: ufOk, mudou: ufOk !== String(l.uf ?? "").trim() },
+    { falha: "UF não reconhecida — descartada" }
+  );
+
+  return { linha, diffs };
 }

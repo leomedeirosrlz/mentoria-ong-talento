@@ -6,12 +6,20 @@ import { AnimatePresence, motion } from "motion/react";
 import { CaretDown, CheckCircle, CircleNotch, PaperPlaneRight } from "@phosphor-icons/react";
 import { submeterRespostaFormulario } from "@/lib/forms/actions";
 import {
+  CAMPO_FORMATO_ERRO,
   camposPerguntas,
+  campoFormato,
   SISTEMA_LABEL,
   type FormularioCampo,
   type FormularioSistema,
   type RespostaValor,
 } from "@/lib/forms/schema";
+import {
+  normalizaData,
+  normalizaPorFormato,
+  normalizaTexto,
+  type NormResult,
+} from "@/lib/forms/normaliza";
 import { fade, T } from "@/components/motion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -86,8 +94,27 @@ export function FormularioPublico({
     return v != null && String(v).trim() !== "";
   }
 
-  function coleta(fd: FormData): Record<string, RespostaValor> {
+  /** Normalização da resposta na entrada (REALIZA-118): campo 'texto' com
+   *  `formato` declarado passa pelo normalizador do formato; 'data' aceita
+   *  dd/mm/aaaa além do ISO que o input nativo já manda; o resto é trim.
+   *  O que sai daqui é o que a RPC recebe — gravado já normalizado. */
+  function normalizaResposta(c: FormularioCampo, v: string): NormResult {
+    const f = campoFormato(c);
+    if (f) return normalizaPorFormato(f, v);
+    if (c.tipo === "data") return normalizaData(v);
+    return normalizaTexto(v);
+  }
+
+  /** Coleta + normalização num passe só. `falhas` marca o campo cuja
+   *  resposta veio preenchida mas não resgatou — o validador transforma
+   *  isso em erro de formato só quando o campo é obrigatório (no opcional
+   *  ela simplesmente não é gravada: a submissão não morre por ele). */
+  function coleta(fd: FormData): {
+    respostas: Record<string, RespostaValor>;
+    falhas: Set<string>;
+  } {
     const respostas: Record<string, RespostaValor> = {};
+    const falhas = new Set<string>();
     for (const c of perguntas) {
       switch (c.tipo) {
         case "multi_select": {
@@ -106,22 +133,38 @@ export function FormularioPublico({
         }
         default: {
           const v = String(fd.get(c.id) ?? "").trim();
-          if (v) respostas[c.id] = v;
+          if (!v) break;
+          const r = normalizaResposta(c, v);
+          if (r.valor) respostas[c.id] = r.valor;
+          else falhas.add(c.id);
         }
       }
     }
-    return respostas;
+    return { respostas, falhas };
   }
 
   /** Espelho client-side das regras do servidor, um erro por campo — a RPC
    *  continua sendo a fronteira real, aqui a resposta é imediata. */
-  function valida(respostas: Record<string, RespostaValor>) {
+  function valida(
+    respostas: Record<string, RespostaValor>,
+    falhas: Set<string>
+  ) {
     const mapa: Record<string, string> = {};
     for (const c of perguntas) {
       if (!c.obrigatorio) continue;
       const v = respostas[c.id];
       if (c.tipo === "checkbox") {
         if (v !== true) mapa[c.id] = "Marque a caixa pra continuar.";
+      } else if (falhas.has(c.id)) {
+        // respondeu algo, mas não vira o formato — erro de formato é mais
+        // honesto que "responda esta pergunta" (a pessoa já respondeu)
+        const f = campoFormato(c);
+        mapa[c.id] =
+          c.tipo === "data"
+            ? "Use uma data válida (dd/mm/aaaa)."
+            : f
+              ? CAMPO_FORMATO_ERRO[f]
+              : "Responda esta pergunta.";
       } else if (v == null || v === "" || (Array.isArray(v) && !v.length)) {
         mapa[c.id] =
           c.tipo === "multi_select"
@@ -191,7 +234,10 @@ export function FormularioPublico({
     );
     if (chaveRascunho) {
       try {
-        localStorage.setItem(chaveRascunho, JSON.stringify(coleta(fd)));
+        localStorage.setItem(
+          chaveRascunho,
+          JSON.stringify(coleta(fd).respostas)
+        );
       } catch {
         // quota/storage desligado — o rascunho é conveniência, não requisito
       }
@@ -211,8 +257,8 @@ export function FormularioPublico({
     e.preventDefault();
     if (preview) return;
     const fd = new FormData(e.currentTarget);
-    const respostas = coleta(fd);
-    const mapa = valida(respostas);
+    const { respostas, falhas } = coleta(fd);
+    const mapa = valida(respostas, falhas);
     if (Object.keys(mapa).length) {
       setErros(mapa);
       setErro(ERRO_VALIDACAO);
@@ -545,7 +591,32 @@ function CampoRenderer({
   }
 
   switch (campo.tipo) {
-    case "texto":
+    case "texto": {
+      /* o `formato` declarado troca teclado do celular e autofill; a
+         normalização no submit faz o resto do resgate (REALIZA-118) */
+      const formato = campoFormato(campo);
+      const dicas =
+        formato === "email"
+          ? {
+              type: "email",
+              inputMode: "email" as const,
+              autoComplete: "email",
+              placeholder: "nome@exemplo.com",
+            }
+          : formato === "telefone"
+            ? {
+                type: "tel",
+                inputMode: "tel" as const,
+                autoComplete: "tel",
+                placeholder: "(11) 99999-8888",
+              }
+            : formato === "url"
+              ? {
+                  type: "url",
+                  inputMode: "url" as const,
+                  placeholder: "linkedin.com/in/voce",
+                }
+              : {};
       return (
         <div className={cn(cartao, "space-y-1.5")} data-campo={campo.id}>
           <Rotulo campo={campo} n={n} htmlFor={id} />
@@ -555,11 +626,13 @@ function CampoRenderer({
             required={campo.obrigatorio}
             maxLength={500}
             enterKeyHint={enterKeyHint}
+            {...dicas}
             {...a11y}
           />
           <ErroCampo id={erroId} msg={erro} />
         </div>
       );
+    }
 
     case "texto_longo":
       return (

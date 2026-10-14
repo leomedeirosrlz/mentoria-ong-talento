@@ -16,6 +16,34 @@ export type FormularioCampoTipo =
   | "sim_nao"
   | "secao";
 
+/** Semântica de formato de um campo 'texto' (REALIZA-118) — o hint que
+ *  liga a normalização da resposta na coleta pública (e-mail/WhatsApp/link
+ *  chegam sujos do teclado e da planilha) e os atributos de teclado do
+ *  input. E-mail de contato, WhatsApp e LinkedIn hoje são 'texto' puro:
+ *  o builder marca o formato e o /f/<token> limpa na entrada. */
+export type FormularioCampoFormato = "email" | "telefone" | "url";
+
+export const FORMATO_VALIDOS: readonly FormularioCampoFormato[] = [
+  "email",
+  "telefone",
+  "url",
+];
+
+export const CAMPO_FORMATO_LABEL: Record<FormularioCampoFormato, string> = {
+  email: "E-mail",
+  telefone: "Telefone/WhatsApp",
+  url: "Link (URL)",
+};
+
+/** Erro amigável quando a resposta não vira o formato declarado — marcado
+ *  no campo só quando ele é obrigatório (opcional irreconhecível simples-
+ *  mente não é gravado: a submissão só morre por vazio de obrigatório). */
+export const CAMPO_FORMATO_ERRO: Record<FormularioCampoFormato, string> = {
+  email: "Confira o e-mail — parece que faltou um pedaço (ex.: nome@dominio.com).",
+  telefone: "Confira o telefone — use DDD + número (ex.: 11 99999-8888).",
+  url: "Confira o link — escreva o endereço (ex.: linkedin.com/in/seu-nome).",
+};
+
 export type FormularioCampo = {
   id: string;
   tipo: FormularioCampoTipo;
@@ -25,6 +53,8 @@ export type FormularioCampo = {
   opcoes?: string[];
   /** só secao (0080) — texto de apoio sob o título da seção */
   descricao?: string;
+  /** só texto (REALIZA-118) — semântica de formato da resposta */
+  formato?: FormularioCampoFormato;
 };
 
 /** Instrumento oficial do programa (0042, 0080) — vocabulário fechado
@@ -157,6 +187,15 @@ export function camposPerguntas(campos: FormularioCampo[]): FormularioCampo[] {
   return campos.filter((c) => !TIPOS_SEM_RESPOSTA.includes(c.tipo));
 }
 
+/** Formato declarado de um campo 'texto' — null nos demais tipos e em
+ *  texto livre (a normalização só roda com hint explícito: inferir de
+ *  rótulo classificaria errado perguntas de prosa). */
+export function campoFormato(
+  c: FormularioCampo
+): FormularioCampoFormato | null {
+  return c.tipo === "texto" ? (c.formato ?? null) : null;
+}
+
 export const MAX_CAMPOS = 40;
 export const MAX_OPCOES = 30;
 
@@ -236,6 +275,14 @@ export function validaCampos(input: unknown): FormularioCampo[] | { error: strin
       label,
       obrigatorio,
     };
+    // formato só existe no tipo 'texto' — valor fora do vocabulário é
+    // erro de definição; em outro tipo é ignorado (não tem efeito)
+    if (tipo === "texto" && typeof c?.formato === "string" && c.formato.trim()) {
+      const f = c.formato.trim();
+      if (!(FORMATO_VALIDOS as readonly string[]).includes(f))
+        return { error: `Formato inválido na pergunta ${n}.` };
+      campo.formato = f as FormularioCampoFormato;
+    }
     if (tipo === "secao") {
       const desc = typeof c?.descricao === "string" ? c.descricao.trim() : "";
       if (desc.length > 1000)
