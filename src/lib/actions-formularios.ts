@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { demoAtivo } from "./demo/mode";
 import { DEMO_MSG } from "./demo/shared";
 import { gerarLinksFormulario, type DestinoLink } from "./forms/actions";
+import { INSTRUMENTOS_SISTEMA } from "./forms/schema";
 import { erroAmigavel } from "./utils";
 
 // "Enviar formulário" a partir da ficha da dupla — a action do motor
@@ -227,5 +228,37 @@ export async function enviarAnamneseMentorado(
     token: link.token,
     formularioId: form.id,
     reutilizado: (r.reutilizados ?? 0) > 0,
+  };
+}
+
+/** "Entregar instrumento" na ficha da dupla (0080) — a RPC
+ *  emitir_link_instrumento carrega a regra de quem pode (coord pra
+ *  qualquer dupla, o mentor DPP pra dupla viva dele) e o reuso de link
+ *  pendente; aqui só a higiene dos parâmetros e o erro amigável. O mentor
+ *  entrega — diferente das actions acima, não há gate coord-only: o guia
+ *  é dele. */
+export async function enviarInstrumentoMentorado(
+  duplaId: string,
+  sistema: string
+): Promise<
+  { error: string } | { ok: true; token: string; reutilizado: boolean }
+> {
+  if (await demoAtivo()) return { error: DEMO_MSG };
+  if (!UUID_RE.test(duplaId)) return { error: "Dupla inválida." };
+  if (!(INSTRUMENTOS_SISTEMA as readonly string[]).includes(sistema))
+    return { error: "Instrumento inválido." };
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("emitir_link_instrumento", {
+    p_dupla_id: duplaId,
+    p_sistema: sistema,
+  });
+  if (error) return { error: erroAmigavel(error) };
+  const token = (data as { token?: string } | null)?.token;
+  if (!token) return { error: "Link emitido, mas o token não voltou." };
+  return {
+    ok: true,
+    token,
+    reutilizado: (data as { reutilizado?: boolean }).reutilizado === true,
   };
 }

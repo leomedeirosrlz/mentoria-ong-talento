@@ -6,6 +6,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { CaretDown, CheckCircle, CircleNotch, PaperPlaneRight } from "@phosphor-icons/react";
 import { submeterRespostaFormulario } from "@/lib/forms/actions";
 import {
+  camposPerguntas,
   SISTEMA_LABEL,
   type FormularioCampo,
   type FormularioSistema,
@@ -59,6 +60,9 @@ export function FormularioPublico({
   const [respondidos, setRespondidos] = useState(0);
   const [pending, start] = useTransition();
   const formRef = useRef<HTMLFormElement>(null);
+  // progresso/validação/coleta ignoram rótulos de estrutura ('secao', 0080):
+  // a numeração que a pessoa vê é só de perguntas de verdade
+  const perguntas = camposPerguntas(campos);
 
   // rascunho por token+pergunta: o mentorado responde no celular e texto
   // longo não pode morrer num reload (rede caindo, troca de app). Um JSON
@@ -84,7 +88,7 @@ export function FormularioPublico({
 
   function coleta(fd: FormData): Record<string, RespostaValor> {
     const respostas: Record<string, RespostaValor> = {};
-    for (const c of campos) {
+    for (const c of perguntas) {
       switch (c.tipo) {
         case "multi_select": {
           const itens = fd.getAll(c.id).map(String).filter(Boolean);
@@ -94,7 +98,8 @@ export function FormularioPublico({
         case "checkbox":
           respostas[c.id] = fd.get(c.id) === "on";
           break;
-        case "escala_1_5": {
+        case "escala_1_5":
+        case "escala_1_10": {
           const v = fd.get(c.id);
           if (v != null && v !== "") respostas[c.id] = Number(v);
           break;
@@ -112,7 +117,7 @@ export function FormularioPublico({
    *  continua sendo a fronteira real, aqui a resposta é imediata. */
   function valida(respostas: Record<string, RespostaValor>) {
     const mapa: Record<string, string> = {};
-    for (const c of campos) {
+    for (const c of perguntas) {
       if (!c.obrigatorio) continue;
       const v = respostas[c.id];
       if (c.tipo === "checkbox") {
@@ -141,7 +146,7 @@ export function FormularioPublico({
       const form = formRef.current;
       if (!form) return;
       const nome = (id: string) => CSS.escape(id);
-      for (const c of campos) {
+      for (const c of perguntas) {
         const v = rascunho[c.id];
         if (v == null) continue;
         if (c.tipo === "multi_select" && Array.isArray(v)) {
@@ -155,7 +160,11 @@ export function FormularioPublico({
             `input[name="${nome(c.id)}"]`
           );
           if (inp) inp.checked = v === true;
-        } else if (c.tipo === "sim_nao" || c.tipo === "escala_1_5") {
+        } else if (
+          c.tipo === "sim_nao" ||
+          c.tipo === "escala_1_5" ||
+          c.tipo === "escala_1_10"
+        ) {
           const inp = form.querySelector<HTMLInputElement>(
             `input[name="${nome(c.id)}"][value="${nome(String(v))}"]`
           );
@@ -168,7 +177,7 @@ export function FormularioPublico({
         }
       }
       const fd = new FormData(form);
-      setRespondidos(campos.reduce((n, c) => n + (respondido(c, fd) ? 1 : 0), 0));
+      setRespondidos(perguntas.reduce((n, c) => n + (respondido(c, fd) ? 1 : 0), 0));
     } catch {
       // storage indisponível ou rascunho corrompido — o form segue vazio
     }
@@ -178,7 +187,7 @@ export function FormularioPublico({
   function onFormChange(e: React.FormEvent<HTMLFormElement>) {
     const fd = new FormData(e.currentTarget);
     setRespondidos(
-      campos.reduce((n, c) => n + (respondido(c, fd) ? 1 : 0), 0)
+      perguntas.reduce((n, c) => n + (respondido(c, fd) ? 1 : 0), 0)
     );
     if (chaveRascunho) {
       try {
@@ -189,7 +198,7 @@ export function FormularioPublico({
     }
     if (!Object.keys(erros).length) return;
     const next = { ...erros };
-    for (const c of campos)
+    for (const c of perguntas)
       if (next[c.id] && respondido(c, fd)) delete next[c.id];
     setErros(next);
     // quando o último campo marcado é corrigido, o banner global de validação
@@ -207,7 +216,7 @@ export function FormularioPublico({
     if (Object.keys(mapa).length) {
       setErros(mapa);
       setErro(ERRO_VALIDACAO);
-      const primeiro = campos.find((c) => mapa[c.id]);
+      const primeiro = perguntas.find((c) => mapa[c.id]);
       const alvo =
         primeiro &&
         formRef.current?.querySelector(
@@ -258,12 +267,12 @@ export function FormularioPublico({
     return base.charAt(0).toLocaleUpperCase("pt-BR") + base.slice(1);
   })();
 
-  const total = campos.length;
+  const total = perguntas.length;
   const minutos = Math.max(1, Math.round((total * 15) / 60));
   // a linha que ensina a convenção "(opcional)" só aparece se houver o que
   // pular — num form todo obrigatório ela seria ruído
-  const temOpcional = campos.some((c) => !c.obrigatorio);
-  const ultimoComEnter = [...campos]
+  const temOpcional = perguntas.some((c) => !c.obrigatorio);
+  const ultimoComEnter = [...perguntas]
     .reverse()
     .find((c) => TIPOS_COM_ENTER.includes(c.tipo))?.id;
 
@@ -374,15 +383,22 @@ export function FormularioPublico({
             noValidate
             className="space-y-3"
           >
-            {campos.map((c, i) => (
-              <CampoRenderer
-                key={c.id}
-                campo={c}
-                n={i + 1}
-                erro={erros[c.id]}
-                enterKeyHint={c.id === ultimoComEnter ? "send" : "next"}
-              />
-            ))}
+            {/* a numeração conta só perguntas — 'secao' é rótulo de
+                estrutura e não entra na contagem nem no "1." do card */}
+            {(() => {
+              const numeroPorId = new Map(
+                perguntas.map((c, i) => [c.id, i + 1])
+              );
+              return campos.map((c) => (
+                <CampoRenderer
+                  key={c.id}
+                  campo={c}
+                  n={numeroPorId.get(c.id) ?? 0}
+                  erro={erros[c.id]}
+                  enterKeyHint={c.id === ultimoComEnter ? "send" : "next"}
+                />
+              ));
+            })()}
 
             {/* honeypot anti-spam: invisível pra humanos, bots preenchem —
                 o servidor finge sucesso e não grava nada. Depois dos cards
@@ -509,6 +525,24 @@ function CampoRenderer({
     "rounded-xl bg-card p-4 shadow-[var(--shadow-border)] sm:p-5",
     erro && "ring-2 ring-destructive/60"
   );
+
+  // seção é estrutura, não pergunta — faixa de título entre os cards, sem
+  // numeração nem controle. A descrição leva a instrução do instrumento
+  // ("Antes de responder", "Mapa de submetas"…)
+  if (campo.tipo === "secao") {
+    return (
+      <div className="border-l-2 border-[var(--brand-lime)] pt-1 pl-3 sm:pl-4">
+        <h2 className="text-[15px] font-semibold tracking-tight sm:text-base">
+          {campo.label}
+        </h2>
+        {campo.descricao && (
+          <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+            {campo.descricao}
+          </p>
+        )}
+      </div>
+    );
+  }
 
   switch (campo.tipo) {
     case "texto":
@@ -653,6 +687,40 @@ function CampoRenderer({
           </div>
           {/* sem pontas "Muito ruim"/"Muito bom": semanticamente erradas pra
               metade das perguntas — os números 1–5 já comunicam */}
+          <ErroCampo id={erroId} msg={erro} />
+        </fieldset>
+      );
+
+    case "escala_1_10":
+      // a escala da Roda da Vida (0080) — 10 opções em 2×5 no mobile e
+      // uma linha só no desktop; mesma mecânica do 1–5
+      return (
+        <fieldset className={cartao} data-campo={campo.id} {...a11y}>
+          <legend>
+            <Rotulo campo={campo} n={n} />
+          </legend>
+          <div className="mt-1.5 grid grid-cols-5 gap-1 rounded-xl bg-muted p-1 sm:grid-cols-10">
+            {Array.from({ length: 10 }, (_, i) => i + 1).map((num) => (
+              <label
+                key={num}
+                className="flex h-11 cursor-pointer items-center justify-center rounded-lg text-sm font-semibold tabular-nums text-muted-foreground transition-colors select-none has-checked:bg-primary has-checked:text-primary-foreground has-focus-visible:ring-3 has-focus-visible:ring-ring/50 md:h-10"
+              >
+                <input
+                  type="radio"
+                  name={campo.id}
+                  value={num}
+                  required={campo.obrigatorio}
+                  className="sr-only"
+                  aria-label={`Nota ${num} de 10`}
+                />
+                <span aria-hidden>{num}</span>
+              </label>
+            ))}
+          </div>
+          <div className="mt-1 flex justify-between text-[11px] text-muted-foreground">
+            <span>Nada satisfeito</span>
+            <span>Muito satisfeito</span>
+          </div>
           <ErroCampo id={erroId} msg={erro} />
         </fieldset>
       );

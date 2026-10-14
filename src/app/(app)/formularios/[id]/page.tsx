@@ -5,6 +5,7 @@ import { getMe, getMentorados, getPessoas } from "@/lib/queries";
 import { getFormulario } from "@/lib/forms/queries";
 import {
   CAMPO_TIPO_LABEL,
+  camposPerguntas,
   linkStatus,
   SISTEMA_LABEL,
   type LinkStatus,
@@ -126,8 +127,10 @@ export default async function FormularioPage({
             <p className="mt-1.5 text-xs">
               Criado em {formatDate(f.created_at)}
               {" · "}
-              {f.campos.length}{" "}
-              {f.campos.length === 1 ? "pergunta" : "perguntas"}
+              {camposPerguntas(f.campos).length}{" "}
+              {camposPerguntas(f.campos).length === 1
+                ? "pergunta"
+                : "perguntas"}
             </p>
           </>
         }
@@ -219,27 +222,53 @@ export default async function FormularioPage({
             </p>
           )}
           <ol className="space-y-2">
-            {f.campos.map((c, i) => (
-              // meta na linha de baixo no mobile — o "Texto longo ·
-              // obrigatória" shrink-0 esmagava o enunciado
-              <li key={c.id} className="flex flex-wrap items-baseline gap-x-2 text-sm">
-                <span className="shrink-0 tabular-nums text-muted-foreground">
-                  {i + 1}.
-                </span>
-                <span className="min-w-0 flex-1">
-                  {c.label}
-                  {!!c.opcoes?.length && (
-                    <span className="mt-0.5 block text-xs text-muted-foreground">
-                      {c.opcoes.join(" · ")}
+            {/* numeração só nas perguntas — 'secao' é linha-divisória sem
+                número, igual ao que o respondente vê em /f/<token> */}
+            {(() => {
+              const numeroPorId = new Map(
+                camposPerguntas(f.campos).map((c, i) => [c.id, i + 1])
+              );
+              return f.campos.map((c) => {
+                if (c.tipo === "secao") {
+                  return (
+                    <li key={c.id} className="pt-2">
+                      <p className="border-l-2 border-[var(--brand-lime)] pl-2.5 text-sm font-semibold">
+                        {c.label}
+                      </p>
+                      {c.descricao && (
+                        <p className="mt-0.5 pl-3 text-xs leading-relaxed text-muted-foreground">
+                          {c.descricao}
+                        </p>
+                      )}
+                    </li>
+                  );
+                }
+                return (
+                  // meta na linha de baixo no mobile — o "Texto longo ·
+                  // obrigatória" shrink-0 esmagava o enunciado
+                  <li
+                    key={c.id}
+                    className="flex flex-wrap items-baseline gap-x-2 text-sm"
+                  >
+                    <span className="shrink-0 tabular-nums text-muted-foreground">
+                      {numeroPorId.get(c.id)}.
                     </span>
-                  )}
-                </span>
-                <span className="shrink-0 basis-full order-3 text-xs text-muted-foreground sm:basis-auto sm:order-none">
-                  {CAMPO_TIPO_LABEL[c.tipo]}
-                  {c.obrigatorio && " · obrigatória"}
-                </span>
-              </li>
-            ))}
+                    <span className="min-w-0 flex-1">
+                      {c.label}
+                      {!!c.opcoes?.length && (
+                        <span className="mt-0.5 block text-xs text-muted-foreground">
+                          {c.opcoes.join(" · ")}
+                        </span>
+                      )}
+                    </span>
+                    <span className="shrink-0 order-3 basis-full text-xs text-muted-foreground sm:order-none sm:basis-auto">
+                      {CAMPO_TIPO_LABEL[c.tipo]}
+                      {c.obrigatorio && " · obrigatória"}
+                    </span>
+                  </li>
+                );
+              });
+            })()}
           </ol>
         </div>
         {!f.sistema && (
@@ -293,7 +322,11 @@ export default async function FormularioPage({
         >
           Respostas{respondidos > 0 && ` (${respondidos})`}
         </h2>
-        <RespostasSection campos={f.campos} links={links} />
+        <RespostasSection
+          campos={f.campos}
+          links={links}
+          sistema={f.sistema ?? null}
+        />
       </section>
 
       {/* zona de perigo — destrutivo no fim da página, fora do header */}

@@ -46,7 +46,7 @@ import {
   getEspecialistaAvaliacoes,
 } from "@/lib/queries-avaliacao";
 import { getSupervisoesDaDupla } from "@/lib/queries-supervisao";
-import { getFormularios } from "@/lib/forms/queries";
+import { getFormularios, getInstrumentosDaDupla } from "@/lib/forms/queries";
 import { dadosResumoJornada } from "@/lib/encerramento";
 import { getAnexosPorRegistros } from "@/lib/anexos";
 import { avatarPublicUrl } from "@/lib/avatar";
@@ -118,6 +118,7 @@ import { EncerrarTrilhaDialog } from "@/components/encerrar-trilha-dialog";
 import { EncerramentoDupla } from "@/components/encerramento-dupla";
 import { EnviarFormularioDialog } from "@/components/enviar-formulario-dialog";
 import { ResumoJornadaSection } from "@/components/resumo-jornada";
+import { InstrumentosDupla } from "./instrumentos-dupla";
 import { DevolutivaEspecialista } from "@/components/devolutiva-especialista";
 import { SupervisaoDialog } from "@/components/supervisao-dialog";
 import { SupervisoesSection } from "@/components/supervisoes-section";
@@ -220,7 +221,7 @@ export async function generateMetadata({
 
 export default async function DuplaPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [dupla, eventos, me, materiais, anexosPorRegistro, encerramento, supervisoes] =
+  const [dupla, eventos, me, materiais, anexosPorRegistro, encerramento, supervisoes, instrumentos] =
     await Promise.all([
       getDupla(id),
       getCicloEventos(),
@@ -239,6 +240,9 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
       getDupla(id).then((d) =>
         d ? getSupervisoesDaDupla(d.id, d.mentor.id) : []
       ),
+      // instrumentos oficiais da jornada (0080) — RPC escopada: coord,
+      // mentor e supervisor da dupla (e o próprio jovem, na área dele)
+      getInstrumentosDaDupla(id),
     ]);
   if (!dupla || !me) notFound();
 
@@ -1042,6 +1046,23 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
                 realizados={realizadosCount}
               />
             ))}
+
+          {/* instrumentos oficiais (0080) — visão, metas, PDM e roda com o
+              estado de cada um na dupla e a leitura estruturada da resposta.
+              O mentor entrega (o guia é dele), não é job coord-only */}
+          {!ehEsp && (
+            <InstrumentosDupla
+              duplaId={dupla.id}
+              itens={instrumentos}
+              mentoradoNome={dupla.mentorado.nome}
+              mentoradoWhatsapp={dupla.mentorado.whatsapp}
+              podeEnviar={
+                souCoord ||
+                (souMentor &&
+                  (dupla.status === "ativa" || dupla.status === "pausada"))
+              }
+            />
+          )}
 
           {/* supervisão (0041) — sessões da dupla + as gerais do mentor; a
               seção fica visível pra coord/supervisor/mentor (o mentor lê o
