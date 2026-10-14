@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
+import { Collapsible } from "@base-ui/react/collapsible";
 import { CaretDown } from "@phosphor-icons/react";
 import { buttonVariants } from "@/components/ui/button";
 import { T } from "@/components/motion";
@@ -133,7 +134,7 @@ export function RegistroInlinePanel({
   );
 }
 
-/** Registro salvo na ficha da dupla: `<details>` com a linha-resumo sempre
+/** Registro salvo na ficha da dupla: Collapsible com a linha-resumo sempre
  *  visível e o corpo sob disclosure (a página abre por padrão só os mais
  *  recentes). O hash `#registrar-{id}` abre o corpo — mesmo alvo dos deep
  *  links de /registros e dos nudges; a escolha local vale até o próximo
@@ -142,12 +143,15 @@ export function RegistroDetails({
   encontroId,
   aberto = false,
   className,
+  summary,
   children,
 }: {
   encontroId: string;
-  /** Nasce aberto — os registros mais recentes da lista (SSR manda o atributo). */
+  /** Nasce aberto — os registros mais recentes da lista (SSR já renderiza o painel). */
   aberto?: boolean;
   className?: string;
+  /** Linha-resumo dentro do trigger — spans/badges (phrasing content, é um button). */
+  summary: React.ReactNode;
   children: React.ReactNode;
 }) {
   const alvo = `#registrar-${encontroId}`;
@@ -172,12 +176,19 @@ export function RegistroDetails({
   }, [alvo]);
 
   return (
-    <details
+    <Collapsible.Root
       open={forcado ?? (hashBate || aberto)}
-      onToggle={(e) => setForcado(e.currentTarget.open)}
+      onOpenChange={(o) => setForcado(o)}
       className={className}
     >
-      {children}
-    </details>
+      {/* mesma gramática do summary anterior: linha toda é o alvo; o caret
+          dos filhos gira via group-data-[panel-open] */}
+      <Collapsible.Trigger className="group flex w-full cursor-pointer items-center gap-2.5 px-4 py-2.5 text-left transition-colors hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring">
+        {summary}
+      </Collapsible.Trigger>
+      <Collapsible.Panel className="h-[var(--collapsible-panel-height)] overflow-hidden transition-[height] duration-150 data-ending-style:h-0 data-starting-style:h-0 [&[hidden]:not([hidden='until-found'])]:hidden">
+        {children}
+      </Collapsible.Panel>
+    </Collapsible.Root>
   );
 }

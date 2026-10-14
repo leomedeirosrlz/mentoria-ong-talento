@@ -16,6 +16,7 @@ import {
   VideoCamera,
 } from "@phosphor-icons/react/dist/ssr";
 import { Menu as MenuPrimitive } from "@base-ui/react/menu";
+import { Collapsible } from "@base-ui/react/collapsible";
 import {
   getCicloEventos,
   getDupla,
@@ -390,7 +391,7 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
     (ev) => numeroSemana != null && ev.numero > numeroSemana
   );
   // pendência de registro (realizado sem registro ou agendado já vencido) —
-  // nunca entra no <details>: o deep link #registrar-{id} precisa sempre existir
+  // nunca entra no collapsible: o deep link #registrar-{id} precisa sempre existir
   const temPendencia = (enc: Encontro | undefined) =>
     !!enc &&
     !enc.registro &&
@@ -1052,13 +1053,15 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
           )}
           {encontrosVisiveis.concat(futurosComPendencia).map(renderEncontro)}
           {encontrosColapsados.length > 0 && (
-            <details className="group">
-              <summary className="flex min-h-11 cursor-pointer list-none items-center gap-1.5 rounded-lg py-3 text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
+            <Collapsible.Root>
+              <Collapsible.Trigger className="group flex min-h-11 w-full cursor-pointer items-center gap-1.5 rounded-lg py-3 text-left text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                 Próximos {encontrosColapsados.length} encontros
-                <CaretDown size={14} aria-hidden className="transition-transform group-open:rotate-180" />
-              </summary>
-              <div className="space-y-3">{encontrosColapsados.map(renderEncontro)}</div>
-            </details>
+                <CaretDown size={14} aria-hidden className="transition-transform group-data-[panel-open]:rotate-180" />
+              </Collapsible.Trigger>
+              <Collapsible.Panel className="h-[var(--collapsible-panel-height)] overflow-hidden transition-[height] duration-150 data-ending-style:h-0 data-starting-style:h-0 [&[hidden]:not([hidden='until-found'])]:hidden">
+                <div className="space-y-3">{encontrosColapsados.map(renderEncontro)}</div>
+              </Collapsible.Panel>
+            </Collapsible.Root>
           )}
         </section>
       </div>
@@ -1395,31 +1398,33 @@ function EncontroRow({
         <RegistroDetails
           encontroId={encontro.id}
           aberto={registroAberto}
-          className="group/reg border-t border-border/60 bg-muted/50 shadow-[var(--shadow-inset)]"
-        >
-          <summary className="flex cursor-pointer list-none items-center gap-2.5 px-4 py-2.5 transition-colors hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
-            <span className="shrink-0 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-              Registro
-            </span>
-            {reg.precisa_apoio && (
-              <HandHeart
-                size={13}
-                aria-label="Apoio solicitado"
-                className="shrink-0 text-[var(--danger)]"
-              />
-            )}
-            {reg.avaliacao && <AvaliacaoBadge avaliacao={reg.avaliacao} />}
-            {regPreview && (
-              <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
-                {regPreview}
+          className="border-t border-border/60 bg-muted/50 shadow-[var(--shadow-inset)]"
+          summary={
+            <>
+              <span className="shrink-0 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                Registro
               </span>
-            )}
-            <CaretDown
-              size={13}
-              aria-hidden
-              className="ml-auto shrink-0 text-muted-foreground transition-transform group-open/reg:rotate-180"
-            />
-          </summary>
+              {reg.precisa_apoio && (
+                <HandHeart
+                  size={13}
+                  aria-label="Apoio solicitado"
+                  className="shrink-0 text-[var(--danger)]"
+                />
+              )}
+              {reg.avaliacao && <AvaliacaoBadge avaliacao={reg.avaliacao} />}
+              {regPreview && (
+                <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
+                  {regPreview}
+                </span>
+              )}
+              <CaretDown
+                size={13}
+                aria-hidden
+                className="ml-auto shrink-0 text-muted-foreground transition-transform group-data-[panel-open]:rotate-180"
+              />
+            </>
+          }
+        >
           <div className="space-y-2 px-4 pb-3.5 pt-1 text-sm">
             <RegistroView
               reg={reg}

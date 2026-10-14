@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Collapsible } from "@base-ui/react/collapsible";
 import {
   CaretDown,
   DownloadSimple,
@@ -18,9 +19,9 @@ import { primeiroNome } from "@/components/forms/link-shared";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-// Seção "Respostas" da ficha do formulário — server component: a expansão
-// usa <details>/<summary> nativos (sem JS), e a agregação vem pronta de
-// agregaRespostas().
+// Seção "Respostas" da ficha do formulário — server component: o acordeão
+// por pessoa usa Collapsible animado (o "ver todas" interno segue <details>
+// nativo), e a agregação vem pronta de agregaRespostas().
 
 /** Barrinha proporcional de uma contagem — CSS puro. Lime só onde a
  *  semântica é positiva ("Sim"); opções neutras/negativas ficam em
@@ -283,14 +284,14 @@ export function RespostasSection({
         </div>
       )}
 
-      {/* uma resposta por linha — <details> nativo expande sem JS. O
-          summary carrega a identidade do link (avatar, nome, contexto);
-          no genérico, "Resposta anônima" — nunca inventar identidade */}
+      {/* uma resposta por linha — Collapsible anima a abertura. O trigger
+          carrega a identidade do link (avatar, nome, contexto); no genérico,
+          "Resposta anônima" — nunca inventar identidade */}
       <ol className="space-y-2">
         {respondidos.map((l) => (
           <li key={l.id}>
-            <details className="group rounded-xl bg-card shadow-[var(--shadow-border)]">
-              <summary className="flex cursor-pointer list-none items-center gap-3 rounded-xl px-4 py-3 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring group-open:rounded-b-none sm:px-5 [&::-webkit-details-marker]:hidden">
+            <Collapsible.Root className="rounded-xl bg-card shadow-[var(--shadow-border)]">
+              <Collapsible.Trigger className="group flex w-full cursor-pointer items-center gap-3 rounded-xl px-4 py-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring data-[panel-open]:rounded-b-none sm:px-5">
                 {l.dest_tipo === "generico" ? (
                   <span
                     aria-hidden
@@ -326,47 +327,49 @@ export function RespostasSection({
                 <CaretDown
                   size={14}
                   aria-hidden
-                  className="shrink-0 text-muted-foreground transition-transform group-open:rotate-180"
+                  className="shrink-0 text-muted-foreground transition-transform group-data-[panel-open]:rotate-180"
                 />
-              </summary>
-              <dl className="space-y-3 border-t border-border px-4 py-3 sm:px-5">
-                {Object.entries(l.resposta!.respostas)
-                  .sort(
-                    ([a], [b]) =>
-                      (ordemCampos.get(a) ?? Number.MAX_SAFE_INTEGER) -
-                      (ordemCampos.get(b) ?? Number.MAX_SAFE_INTEGER)
-                  )
-                  .map(([campoId, valor]) => {
-                    const campo = campoPorId.get(campoId);
-                    return (
-                      <div key={campoId}>
-                        <dt className="text-xs font-medium text-muted-foreground">
-                          {campo?.label ?? (
-                            <span className="italic">
-                              pergunta removida do formulário
-                            </span>
-                          )}
-                        </dt>
-                        <dd className="mt-0.5 text-sm leading-relaxed whitespace-pre-wrap">
-                          {respostaFormatada(campo, valor)}
-                        </dd>
-                      </div>
-                    );
-                  })}
-              </dl>
-              {/* a ficha abre fora do summary (link dentro de summary é
-                  duplo acionamento) — rodapé quieto, só quando há pessoa */}
-              {l.dest_url && l.dest_nome && (
-                <div className="border-t border-border/60 px-4 py-2.5 sm:px-5">
-                  <Link
-                    href={l.dest_url}
-                    className="text-xs text-muted-foreground underline underline-offset-4 transition-colors hover:text-foreground"
-                  >
-                    Abrir ficha de {primeiroNome(l.dest_nome)}
-                  </Link>
-                </div>
-              )}
-            </details>
+              </Collapsible.Trigger>
+              <Collapsible.Panel className="h-[var(--collapsible-panel-height)] overflow-hidden transition-[height] duration-150 data-ending-style:h-0 data-starting-style:h-0 [&[hidden]:not([hidden='until-found'])]:hidden">
+                <dl className="space-y-3 border-t border-border px-4 py-3 sm:px-5">
+                  {Object.entries(l.resposta!.respostas)
+                    .sort(
+                      ([a], [b]) =>
+                        (ordemCampos.get(a) ?? Number.MAX_SAFE_INTEGER) -
+                        (ordemCampos.get(b) ?? Number.MAX_SAFE_INTEGER)
+                    )
+                    .map(([campoId, valor]) => {
+                      const campo = campoPorId.get(campoId);
+                      return (
+                        <div key={campoId}>
+                          <dt className="text-xs font-medium text-muted-foreground">
+                            {campo?.label ?? (
+                              <span className="italic">
+                                pergunta removida do formulário
+                              </span>
+                            )}
+                          </dt>
+                          <dd className="mt-0.5 text-sm leading-relaxed whitespace-pre-wrap">
+                            {respostaFormatada(campo, valor)}
+                          </dd>
+                        </div>
+                      );
+                    })}
+                </dl>
+                {/* a ficha abre fora do trigger (link dentro de button é
+                    duplo acionamento) — rodapé quieto, só quando há pessoa */}
+                {l.dest_url && l.dest_nome && (
+                  <div className="border-t border-border/60 px-4 py-2.5 sm:px-5">
+                    <Link
+                      href={l.dest_url}
+                      className="text-xs text-muted-foreground underline underline-offset-4 transition-colors hover:text-foreground"
+                    >
+                      Abrir ficha de {primeiroNome(l.dest_nome)}
+                    </Link>
+                  </div>
+                )}
+              </Collapsible.Panel>
+            </Collapsible.Root>
           </li>
         ))}
       </ol>

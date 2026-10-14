@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Collapsible } from "@base-ui/react/collapsible";
 import {
   ArrowUpRight,
   CaretDown,
@@ -19,9 +20,9 @@ import {
 import type { RegistroResumo } from "@/lib/queries";
 import { cn } from "@/lib/utils";
 
-/** Card de /registros: o <summary> inteiro é o alvo de clique (expande o
+/** Card de /registros: o trigger inteiro é o alvo de clique (expande o
  *  registro completo inline); o link pra ficha mora no corpo expandido —
- *  uma ação por zona, sem stretched link competindo com o details. */
+ *  uma ação por zona, sem stretched link competindo com o disclosure. */
 export function RegistroCard({
   r,
   tituloEncontro,
@@ -57,10 +58,11 @@ export function RegistroCard({
         r.precisa_apoio ? "border-[var(--danger)]/50" : "border-transparent"
       )}
     >
-      <details className="group/detalhe">
-        {/* summary = phrasing content: div/p dentro é inválido — tudo span
-            com block/flex. O header inteiro é o alvo (hit area enorme) */}
-        <summary className="cursor-pointer list-none rounded-xl px-4 py-3.5 transition-colors hover:bg-muted/30 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--ring)] sm:px-5 [&::-webkit-details-marker]:hidden">
+      <Collapsible.Root>
+        {/* trigger = phrasing content: div/p dentro de button é inválido —
+            tudo span com block/flex. O header inteiro é o alvo (hit area
+            enorme) */}
+        <Collapsible.Trigger className="group w-full cursor-pointer rounded-xl px-4 py-3.5 text-left transition-colors hover:bg-muted/30 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--ring)] sm:px-5">
           <span className="flex items-start justify-between gap-3">
             <span className="min-w-0">
               <span className="block text-base font-semibold leading-snug">
@@ -116,7 +118,7 @@ export function RegistroCard({
             <CaretDown
               size={15}
               aria-hidden
-              className="mt-1.5 shrink-0 text-muted-foreground transition-transform group-open/detalhe:rotate-180"
+              className="mt-1.5 shrink-0 text-muted-foreground transition-transform group-data-[panel-open]:rotate-180"
             />
           </span>
 
@@ -161,31 +163,33 @@ export function RegistroCard({
           )}
 
           <span className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-muted-foreground">
-            <span className="group-open/detalhe:hidden">Ver detalhes</span>
-            <span className="hidden group-open/detalhe:inline">
+            <span className="group-data-[panel-open]:hidden">Ver detalhes</span>
+            <span className="hidden group-data-[panel-open]:inline">
               Ocultar detalhes
             </span>
           </span>
-        </summary>
+        </Collapsible.Trigger>
 
-        <div className="space-y-2 border-t bg-muted/40 px-4 py-3.5 text-sm sm:px-5">
-          <RegistroView reg={r} tardio={tardio} ocultarMeta />
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 pt-1">
-            {href && (
-              <Link
-                href={href}
-                className="inline-flex min-h-11 items-center gap-1 text-xs font-medium underline underline-offset-2 transition-colors hover:text-muted-foreground sm:min-h-0"
-              >
-                Abrir na ficha da dupla
-                <ArrowUpRight size={12} aria-hidden />
-              </Link>
-            )}
-            {souCoord && r.precisa_apoio && dupla && (
-              <ResolverApoioButton registroId={r.id} duplaId={dupla.id} />
-            )}
+        <Collapsible.Panel className="h-[var(--collapsible-panel-height)] overflow-hidden transition-[height] duration-150 data-ending-style:h-0 data-starting-style:h-0 [&[hidden]:not([hidden='until-found'])]:hidden">
+          <div className="space-y-2 border-t bg-muted/40 px-4 py-3.5 text-sm sm:px-5">
+            <RegistroView reg={r} tardio={tardio} ocultarMeta />
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 pt-1">
+              {href && (
+                <Link
+                  href={href}
+                  className="inline-flex min-h-11 items-center gap-1 text-xs font-medium underline underline-offset-2 transition-colors hover:text-muted-foreground sm:min-h-0"
+                >
+                  Abrir na ficha da dupla
+                  <ArrowUpRight size={12} aria-hidden />
+                </Link>
+              )}
+              {souCoord && r.precisa_apoio && dupla && (
+                <ResolverApoioButton registroId={r.id} duplaId={dupla.id} />
+              )}
+            </div>
           </div>
-        </div>
-      </details>
+        </Collapsible.Panel>
+      </Collapsible.Root>
     </article>
   );
 }
