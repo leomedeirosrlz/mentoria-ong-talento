@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   agregaRespostas,
   camposPerguntas,
+  campoFormato,
   extraiMetas,
   extraiRodaDaVida,
   linkStatus,
@@ -373,5 +374,38 @@ describe("extraiMetas", () => {
 
   it("sem meta_N não extrai nada", () => {
     expect(extraiMetas([campo({ id: "livre" })], { livre: "x" })).toEqual([]);
+  });
+});
+
+// REALIZA-118 — `formato` no campo 'texto': o hint que liga teclado +
+// normalização da resposta no /f/<token>. Definição inválida é erro do
+// builder; em outro tipo é ignorada (não tem efeito).
+describe("formato do campo 'texto' (REALIZA-118)", () => {
+  it("formato válido passa pelo validaCampos e volta no campo", () => {
+    const cs = validaCampos([campo({ formato: "email" })]);
+    expect(cs).toEqual([
+      expect.objectContaining({ id: "f1", tipo: "texto", formato: "email" }),
+    ]);
+  });
+
+  it("formato fora do vocabulário é erro de definição", () => {
+    expect(validaCampos([campo({ formato: "cpf" as never })])).toEqual({
+      error: "Formato inválido na pergunta 1.",
+    });
+  });
+
+  it("formato em tipo não-texto é ignorado na validação", () => {
+    const cs = validaCampos([campo({ tipo: "data", formato: "url" as never })]);
+    expect(Array.isArray(cs)).toBe(true);
+    expect((cs as FormularioCampo[])[0].formato).toBeUndefined();
+  });
+
+  it("campoFormato resolve o hint só no 'texto'", () => {
+    expect(campoFormato(campo({ formato: "telefone" }))).toBe("telefone");
+    expect(campoFormato(campo())).toBeNull();
+    expect(
+      campoFormato(campo({ tipo: "data", formato: "telefone" }))
+    ).toBeNull();
+    expect(campoFormato(campo({ tipo: "texto_longo" }))).toBeNull();
   });
 });

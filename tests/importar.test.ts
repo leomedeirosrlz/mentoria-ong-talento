@@ -11,7 +11,9 @@ import {
   normNome,
   normUf,
   normWhatsapp,
+  normalizaLinha,
   parseCsv,
+  type LinhaImportada,
 } from "@/lib/importar";
 
 describe("parseCsv — detecção de delimitador e cabeçalho", () => {
@@ -347,5 +349,95 @@ describe("mapGenero / mapPrefGenero / mapEscolaridade", () => {
     expect(mapEscolaridade("Superior completo")).toBe("superior");
     expect(mapEscolaridade("graduação")).toBe("superior");
     expect(mapEscolaridade("")).toBeNull();
+  });
+});
+
+// REALIZA-118 — a linha inteira passa pela lib: o que entra na prévia (e
+// na action) já é normalizado, e todo ajuste vira um diff "de → para"
+// auditável; o ilegível sai vazio + flag "revisar" em vez de derrubar a
+// linha (regra: rejeitar só o impossível).
+describe("normalizaLinha — resgate por linha com diff auditável", () => {
+  const linhaDe = (patch: Partial<LinhaImportada>): LinhaImportada => ({
+    ...parseCsv("nome\nBase").linhas[0],
+    ...patch,
+  });
+
+  it("e-mail/WhatsApp/link/data tortos entram normalizados e viram diff", () => {
+    const { linha, diffs } = normalizaLinha(
+      linhaDe({
+        email: "Maria@@Gmail.com",
+        whatsapp: "(11)9.9999-8888",
+        linkedin: "linkedin.com/in/maria",
+        data_nascimento: "14/10/1990",
+      })
+    );
+    expect(linha.email).toBe("maria@gmail.com");
+    expect(linha.whatsapp).toBe("5511999998888");
+    expect(linha.linkedin).toBe("https://linkedin.com/in/maria");
+    expect(linha.data_nascimento).toBe("1990-10-14");
+    const campos = diffs.map((d) => d.campo);
+    for (const c of ["email", "whatsapp", "linkedin", "data_nascimento"])
+      expect(campos).toContain(c);
+    const dEmail = diffs.find((d) => d.campo === "email")!;
+    expect(dEmail.de).toBe("Maria@@Gmail.com");
+    expect(dEmail.para).toBe("maria@gmail.com");
+    expect(dEmail.revisar).toBe(false); // resgate determinístico, sem flag
+  });
+
+  it("o ilegível descarta o campo + marca revisar — a linha não morre", () => {
+    const { linha, diffs } = normalizaLinha(
+      linhaDe({
+        email: "não é email",
+        linkedin: "Marcos Silva",
+        genero: "xyzzy",
+        data_nascimento: "31/02/1990",
+        uf: "Brasil",
+      })
+    );
+    expect(linha.email).toBe("");
+    expect(linha.linkedin).toBe("");
+    expect(linha.genero).toBe("");
+    expect(linha.data_nascimento).toBe("");
+    expect(linha.uf).toBe("");
+    expect(diffs).toHaveLength(5);
+    expect(diffs.every((d) => d.revisar)).toBe(true);
+    expect(diffs.find((d) => d.campo === "uf")!.aviso).toMatch(/UF/);
+  });
+
+  it('"Não tenho preferência" → indiferente; "não tenho" em LinkedIn é vazio legítimo', () => {
+    const { linha, diffs } = normalizaLinha(
+      linhaDe({
+        pref_genero_par: "Não tenho preferência",
+        linkedin: "não tenho",
+      })
+    );
+    expect(linha.pref_genero_par).toBe("indiferente");
+    expect(linha.linkedin).toBe("");
+    // o linkedin foi esvaziado de propósito — o diff registra o de→para
+    // mas NÃO acende a flag de revisão (resposta legítima, não sujeira)
+    const dLink = diffs.find((d) => d.campo === "linkedin")!;
+    expect(dLink.para).toBe("");
+    expect(dLink.revisar).toBe(false);
+  });
+
+  it("linha limpa não gera diff; normalizar duas vezes é idempotente", () => {
+    const limpa = normalizaLinha(linhaDe({ email: "maria@gmail.com" }));
+    expect(limpa.diffs).toEqual([]);
+
+    const uma = normalizaLinha(linhaDe({ email: "maria@@gmail.com" }));
+    expect(uma.diffs).toHaveLength(1);
+    const duas = normalizaLinha(uma.linha);
+    expect(duas.diffs).toEqual([]);
+    expect(duas.linha.email).toBe("maria@gmail.com");
+  });
+
+  it("enums tortos da planilha mapeiam com diff; irreconhecível esvazia+flag", () => {
+    const { linha, diffs } = normalizaLinha(
+      linhaDe({ genero: "Mulher", cor_raca: "Parda", uf: "São Paulo - SP" })
+    );
+    expect(linha.genero).toBe("feminino");
+    expect(linha.cor_raca).toBe("parda");
+    expect(linha.uf).toBe("SP");
+    expect(diffs.every((d) => !d.revisar)).toBe(true); // mapeio certeiro não flaga
   });
 });
