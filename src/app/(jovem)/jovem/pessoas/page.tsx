@@ -110,7 +110,7 @@ export default async function JovemPessoas() {
       titulo: "Supervisão",
       icon: UserCheck,
       itens: porPapel("supervisor"),
-      vazio: "O supervisor da sua dupla aparece aqui.",
+      vazio: "O auxiliar executivo da sua dupla aparece aqui.",
     },
     {
       id: "coordenacao",

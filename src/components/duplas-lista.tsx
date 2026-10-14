@@ -87,7 +87,7 @@ export function DuplasLista({
   agora: string;
   podeCriar?: boolean;
   /** false na visão do supervisor: a lista já é filtrada por ele, então
-   *  "Supervisor: {ele mesmo}" seria prefixo constante em toda linha. */
+   *  "Auxiliar executivo: {ele mesmo}" seria prefixo constante em toda linha. */
   mostrarSupervisor?: boolean;
   /** true na visão do mentor: o próprio pedido de apoio não é "risco" —
    *  pra quem pediu, o estado é "solicitado" e a resposta vem da coordenação */
@@ -375,7 +375,7 @@ export function DuplasLista({
           const nivel = nivelDe(d);
           const motivoExibido = apoioProprio ? "Apoio solicitado" : motivo;
           const sub = [
-            mostrarSupervisor && d.supervisor ? `Supervisor: ${d.supervisor.nome}` : null,
+            mostrarSupervisor && d.supervisor ? `Auxiliar executivo: ${d.supervisor.nome}` : null,
             motivoExibido,
           ]
             .filter(Boolean)

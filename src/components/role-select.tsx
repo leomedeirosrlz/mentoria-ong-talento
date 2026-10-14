@@ -17,7 +17,7 @@ const ROLE_LABEL: Record<string, string> = {
   sem_papel: "Sem papel",
   mentor_dpp: "Mentor DPP",
   mentor_especialista: "Mentor especialista",
-  supervisor: "Supervisor",
+  supervisor: "Auxiliar executivo",
   coordenacao: "Coordenação",
   // só pro trigger fechado quando a row já é mentorado (login do jovem,
   // 0066) — não é SelectItem: o papel vem do vínculo mentorados.profile_id,
@@ -70,7 +70,7 @@ export function RoleSelect({ profileId, role, nome }: { profileId: string; role:
           <SelectItem value="sem_papel">Sem papel</SelectItem>
           <SelectItem value="mentor_dpp">Mentor DPP</SelectItem>
           <SelectItem value="mentor_especialista">Mentor especialista</SelectItem>
-          <SelectItem value="supervisor">Supervisor</SelectItem>
+          <SelectItem value="supervisor">Auxiliar executivo</SelectItem>
           <SelectItem value="coordenacao">Coordenação</SelectItem>
         </SelectContent>
       </Select>
