@@ -55,6 +55,13 @@ export const DEMO_TOKENS = {
   isabelaAvaliacao360: "demo-tok-360-isabela-oficia",
   ricardoAvaliacao360: "demo-tok-360-ricardo-ofici",
   luizaAutoavaliacao: "demo-tok-autoav-luiza-ofici",
+  // instrumentos da jornada (0080) — dupla Ricardo×Ana
+  anaVisao: "demo-tok-visao-ana-00000001",
+  anaMetas: "demo-tok-metas-ana-00000001",
+  anaPdm: "demo-tok-pdm-ana-0000000001",
+  anaRoda: "demo-tok-roda-ana-0000000001",
+  eduardoVisao: "demo-tok-visao-eduardo-00001",
+  eduardoRoda: "demo-tok-roda-eduardo-000001",
 } as const;
 
 export type DemoFormularios = {
@@ -246,6 +253,137 @@ export function getDemoFormularios(): DemoFormularios {
     updated_at: haDias(240, "09:00"),
   };
 
+  // ---------- 7-10. instrumentos da jornada (0080 — campos verbatim da
+  // migration; a 'secao' antes de um grupo de escala_1_10 é o quadrante da
+  // roda e meta_N/is_N/prazo_N/porque_N é a convenção estruturante) ----------
+
+  const fVisao: Formulario = {
+    id: uid(0x4007),
+    titulo: "Construindo a sua Visão",
+    descricao:
+      "Exercício de imaginação e projeção entregue ao(à) jovem ao final do primeiro encontro (guia DPP §5): o \"filme\" da vida ideal vira a Declaração de Visão, o norte de toda a mentoria.",
+    sistema: "visao",
+    campos: [
+      { id: "s_antes", tipo: "secao", label: "Antes de responder", obrigatorio: false, descricao: "Acomode-se com conforto e respire fundo algumas vezes, até se sentir tranquilo(a). Agora imagine um filme em que você é o personagem principal, vivendo a situação ideal que sonha para a sua vida pessoal e profissional." },
+      { id: "filme", tipo: "texto_longo", label: "Descreva o que está acontecendo com você nessa situação ideal. Narre as cenas desse filme.", obrigatorio: true },
+      { id: "aspectos", tipo: "texto_longo", label: "Quais são os aspectos mais significativos dessa situação ideal?", obrigatorio: true },
+      { id: "ser_fazer", tipo: "texto_longo", label: "Nessa situação, o que você está conseguindo ser ou fazer que tanto desejava?", obrigatorio: true },
+      { id: "deixou", tipo: "texto_longo", label: "O que você deixou de fazer, ou o que não está mais acontecendo, que tanto lhe desagradava?", obrigatorio: true },
+      { id: "valoriza", tipo: "texto_longo", label: "O que você mais valoriza nessa situação ideal?", obrigatorio: true },
+      { id: "s_declaracao", tipo: "secao", label: "Sua Declaração de Visão", obrigatorio: false, descricao: "Uma frase que resuma o que você deseja ser, alcançar ou conquistar. Comece por um verbo no futuro e inclua um prazo." },
+      { id: "declaracao_visao", tipo: "texto_longo", label: "Minha Declaração de Visão", obrigatorio: true },
+    ],
+    ativo: true,
+    versao: 1,
+    created_by: null,
+    created_at: haDias(240, "09:00"),
+    updated_at: haDias(240, "09:00"),
+  };
+
+  const fMetas: Formulario = {
+    id: uid(0x4008),
+    titulo: "Definindo Minhas Metas",
+    descricao:
+      "Template do mentorado da sequência da Visão (PDF oficial): da Declaração de Visão para 3 a 5 metas com o porquê de cada uma — a dupla revisa no encontro seguinte com o modelo SMART.",
+    sistema: "metas",
+    campos: [
+      { id: "s_visao", tipo: "secao", label: "Minha visão de futuro", obrigatorio: false, descricao: "No encontro anterior você construiu sua Declaração de Visão. Agora o passo é pensar: quais conquistas preciso alcançar para tornar essa visão realidade?" },
+      { id: "declaracao_visao", tipo: "texto_longo", label: "Minha Declaração de Visão (copie ou reescreva a frase que você criou)", obrigatorio: true },
+      { id: "preciso_criar", tipo: "texto", label: "Para me aproximar da minha visão, o que eu preciso CRIAR?", obrigatorio: false },
+      { id: "preciso_aprender", tipo: "texto", label: "O que eu preciso APRENDER?", obrigatorio: false },
+      { id: "preciso_melhorar", tipo: "texto", label: "O que eu preciso MELHORAR?", obrigatorio: false },
+      { id: "preciso_eliminar", tipo: "texto", label: "O que eu preciso ELIMINAR?", obrigatorio: false },
+      { id: "s_metas", tipo: "secao", label: "Minhas metas", obrigatorio: false, descricao: "Preencha de 3 a 5 metas. Dica: comece cada meta com um verbo de ação." },
+      { id: "meta_1", tipo: "texto", label: "Minha meta 1", obrigatorio: true },
+      { id: "porque_1", tipo: "texto_longo", label: "Por que a meta 1 é importante pra mim?", obrigatorio: true },
+      { id: "meta_2", tipo: "texto", label: "Minha meta 2", obrigatorio: true },
+      { id: "porque_2", tipo: "texto_longo", label: "Por que a meta 2 é importante pra mim?", obrigatorio: true },
+      { id: "meta_3", tipo: "texto", label: "Minha meta 3", obrigatorio: true },
+      { id: "porque_3", tipo: "texto_longo", label: "Por que a meta 3 é importante pra mim?", obrigatorio: true },
+      { id: "meta_4", tipo: "texto", label: "Minha meta 4", obrigatorio: false },
+      { id: "porque_4", tipo: "texto_longo", label: "Por que a meta 4 é importante pra mim?", obrigatorio: false },
+      { id: "meta_5", tipo: "texto", label: "Minha meta 5", obrigatorio: false },
+      { id: "porque_5", tipo: "texto_longo", label: "Por que a meta 5 é importante pra mim?", obrigatorio: false },
+      { id: "s_revisao", tipo: "secao", label: "Antes do nosso próximo encontro…", obrigatorio: false, descricao: "Revise suas metas e marque. No próximo encontro vocês revisam juntos com o modelo SMART." },
+      { id: "rev_ajudam", tipo: "sim_nao", label: "Minhas metas realmente me ajudam a chegar onde quero?", obrigatorio: true },
+      { id: "rev_importantes", tipo: "sim_nao", label: "Elas são importantes pra mim?", obrigatorio: true },
+      { id: "rev_claras", tipo: "sim_nao", label: "Consigo explicar claramente o que quero alcançar?", obrigatorio: true },
+      { id: "meta_principal", tipo: "select", label: "Qual dessas metas é mais importante pra você neste momento?", obrigatorio: true, opcoes: ["Meta 1", "Meta 2", "Meta 3", "Meta 4", "Meta 5"] },
+    ],
+    ativo: true,
+    versao: 1,
+    created_by: null,
+    created_at: haDias(240, "09:00"),
+    updated_at: haDias(240, "09:00"),
+  };
+
+  const fPdm: Formulario = {
+    id: uid(0x4009),
+    titulo: "Plano de Desenvolvimento do Mentorado (PDM)",
+    descricao:
+      "O documento central da mentoria (guia DPP §6): a Declaração de Visão com as três metas principais — cada uma com indicador de sucesso (IS) e prazo (P) — e o mapa de desdobramento em submetas.",
+    sistema: "pdm",
+    campos: [
+      { id: "s_visao", tipo: "secao", label: "Visão e metas", obrigatorio: false, descricao: "O norte da mentoria: a Declaração de Visão e as metas principais. Cada meta leva um indicador de sucesso (IS) e um prazo (P)." },
+      { id: "declaracao_visao", tipo: "texto_longo", label: "Declaração de Visão", obrigatorio: true },
+      { id: "meta_1", tipo: "texto", label: "Meta 1", obrigatorio: true },
+      { id: "is_1", tipo: "texto", label: "Indicador de sucesso (IS) da meta 1", obrigatorio: true },
+      { id: "prazo_1", tipo: "data", label: "Prazo (P) da meta 1", obrigatorio: true },
+      { id: "meta_2", tipo: "texto", label: "Meta 2", obrigatorio: false },
+      { id: "is_2", tipo: "texto", label: "Indicador de sucesso (IS) da meta 2", obrigatorio: false },
+      { id: "prazo_2", tipo: "data", label: "Prazo (P) da meta 2", obrigatorio: false },
+      { id: "meta_3", tipo: "texto", label: "Meta 3", obrigatorio: false },
+      { id: "is_3", tipo: "texto", label: "Indicador de sucesso (IS) da meta 3", obrigatorio: false },
+      { id: "prazo_3", tipo: "data", label: "Prazo (P) da meta 3", obrigatorio: false },
+      { id: "s_submetas", tipo: "secao", label: "Mapa de submetas", obrigatorio: false, descricao: "Para cada meta, pergunte \"o que eu preciso fazer para conseguir isso?\". As respostas são as submetas." },
+      { id: "submetas_1", tipo: "texto_longo", label: "Desdobramento da meta 1 (submetas, indicadores e prazos)", obrigatorio: false },
+      { id: "submetas_2", tipo: "texto_longo", label: "Desdobramento da meta 2", obrigatorio: false },
+      { id: "submetas_3", tipo: "texto_longo", label: "Desdobramento da meta 3", obrigatorio: false },
+    ],
+    ativo: true,
+    versao: 1,
+    created_by: null,
+    created_at: haDias(240, "09:00"),
+    updated_at: haDias(240, "09:00"),
+  };
+
+  const fRodaVida: Formulario = {
+    id: uid(0x400a),
+    titulo: "Roda da Vida",
+    descricao:
+      "Aplicada a partir do 5º mês (guia DPP §8): de 1 a 10, o grau de satisfação do(a) jovem em cada uma das 16 áreas da vida, nos quatro quadrantes. O desenho das notas vira a roda.",
+    sistema: "roda_vida",
+    campos: [
+      { id: "s_como", tipo: "secao", label: "Como funciona", obrigatorio: false, descricao: "De 1 a 10, qual é o seu grau de satisfação com cada área da sua vida neste momento? Não existe resposta certa." },
+      { id: "s_pessoal", tipo: "secao", label: "Pessoal", obrigatorio: false },
+      { id: "p_saude", tipo: "escala_1_10", label: "Saúde e disposição", obrigatorio: true },
+      { id: "p_intelecto", tipo: "escala_1_10", label: "Intelecto e cultura", obrigatorio: true },
+      { id: "p_equilibrio", tipo: "escala_1_10", label: "Equilíbrio emocional", obrigatorio: true },
+      { id: "p_independencia", tipo: "escala_1_10", label: "Independência", obrigatorio: true },
+      { id: "s_profissional", tipo: "secao", label: "Profissional", obrigatorio: false },
+      { id: "pr_carreira", tipo: "escala_1_10", label: "Carreira e trabalho", obrigatorio: true },
+      { id: "pr_financas", tipo: "escala_1_10", label: "Finanças", obrigatorio: true },
+      { id: "pr_escola", tipo: "escala_1_10", label: "Escola / universidade", obrigatorio: true },
+      { id: "pr_contribuicao", tipo: "escala_1_10", label: "Contribuição social", obrigatorio: true },
+      { id: "s_relacionamentos", tipo: "secao", label: "Relacionamentos", obrigatorio: false },
+      { id: "r_familia", tipo: "escala_1_10", label: "Família", obrigatorio: true },
+      { id: "r_amigos", tipo: "escala_1_10", label: "Amigos", obrigatorio: true },
+      { id: "r_amoroso", tipo: "escala_1_10", label: "Relacionamento amoroso", obrigatorio: true },
+      { id: "r_social", tipo: "escala_1_10", label: "Vida social", obrigatorio: true },
+      { id: "s_qualidade", tipo: "secao", label: "Qualidade de vida", obrigatorio: false },
+      { id: "q_hobbies", tipo: "escala_1_10", label: "Hobbies e diversão", obrigatorio: true },
+      { id: "q_atividade", tipo: "escala_1_10", label: "Atividade física", obrigatorio: true },
+      { id: "q_realizacao", tipo: "escala_1_10", label: "Realização e felicidade", obrigatorio: true },
+      { id: "q_espiritualidade", tipo: "escala_1_10", label: "Espiritualidade", obrigatorio: true },
+      { id: "reflexao", tipo: "texto_longo", label: "Olhando pra sua roda: quais áreas você mais gostaria de melhorar? Por quê?", obrigatorio: true },
+    ],
+    ativo: true,
+    versao: 1,
+    created_by: null,
+    created_at: haDias(240, "09:00"),
+    updated_at: haDias(240, "09:00"),
+  };
+
   // ---------- links ----------
   const links: FormularioLink[] = [
     // avaliação: ricardo e carlos já responderam; fernanda pendente;
@@ -360,6 +498,44 @@ export function getDemoFormularios(): DemoFormularios {
       dupla_id: duplaDe("Ricardo", "Ana"), contexto: { origem: "ficha" },
       usado_em: haDias(3, "21:05"), expira_em: null, created_by: marina, created_at: haDias(6),
     },
+    // instrumentos da jornada (0080), dupla Ricardo×Ana — a história da
+    // jornada: visão, metas e PDM respondidos; Roda da Vida ainda não
+    // entregue (entra no 5º mês). No Eduardo (dupla João Pedro) a visão
+    // saiu e aguarda resposta — a seção mostra cada estado: respondido,
+    // pendente e não enviado
+    {
+      id: uid(0x4217), formulario_id: fVisao.id, token: DEMO_TOKENS.anaVisao,
+      dest_profile_id: null, dest_mentorado_id: ment("Ana"),
+      dupla_id: duplaDe("Ricardo", "Ana"), contexto: { origem: "instrumentos" },
+      usado_em: haDias(28, "20:03"), expira_em: null, created_by: porNome("Ricardo"), created_at: haDias(30),
+    },
+    {
+      id: uid(0x4218), formulario_id: fMetas.id, token: DEMO_TOKENS.anaMetas,
+      dest_profile_id: null, dest_mentorado_id: ment("Ana"),
+      dupla_id: duplaDe("Ricardo", "Ana"), contexto: { origem: "instrumentos" },
+      usado_em: haDias(21, "18:44"), expira_em: null, created_by: porNome("Ricardo"), created_at: haDias(23),
+    },
+    {
+      id: uid(0x4219), formulario_id: fPdm.id, token: DEMO_TOKENS.anaPdm,
+      dest_profile_id: null, dest_mentorado_id: ment("Ana"),
+      dupla_id: duplaDe("Ricardo", "Ana"), contexto: { origem: "instrumentos" },
+      usado_em: haDias(7, "19:26"), expira_em: null, created_by: porNome("Ricardo"), created_at: haDias(9),
+    },
+    {
+      id: uid(0x4220), formulario_id: fVisao.id, token: DEMO_TOKENS.eduardoVisao,
+      dest_profile_id: null, dest_mentorado_id: ment("Eduardo"),
+      dupla_id: duplaDe("João Pedro", "Eduardo"), contexto: { origem: "instrumentos" },
+      usado_em: null, expira_em: null, created_by: porNome("João Pedro"), created_at: haDias(2),
+    },
+    // roda pendente pro Eduardo — é o link que o /f/<token> da demo abre
+    // pra mostrar a escala 1–10 (a Ana ainda não recebeu a dela: fica no
+    // estado "não enviado" com o botão Enviar visível na ficha)
+    {
+      id: uid(0x4221), formulario_id: fRodaVida.id, token: DEMO_TOKENS.eduardoRoda,
+      dest_profile_id: null, dest_mentorado_id: ment("Eduardo"),
+      dupla_id: duplaDe("João Pedro", "Eduardo"), contexto: { origem: "instrumentos" },
+      usado_em: null, expira_em: null, created_by: porNome("João Pedro"), created_at: haDias(1),
+    },
   ];
 
   // ---------- respostas ----------
@@ -471,6 +647,61 @@ export function getDemoFormularios(): DemoFormularios {
       },
       respondido_em: haDias(3, "21:05"),
     },
+    // instrumentos da Ana (0080) — o conteúdo que a seção Instrumentos e a
+    // aba Respostas transformam em visão/metas estruturadas
+    {
+      id: uid(0x4409), link_id: uid(0x4217),
+      respostas: {
+        filme: "No filme eu me vejo formada, trabalhando num lugar onde as pessoas me respeitam. Acordo cedo sem medo do dia. Ajudo minha mãe com as contas e ainda sobra tempo pra desenhar.",
+        aspectos: "Ter meu próprio dinheiro, um trabalho que eu goste e a minha família tranquila.",
+        ser_fazer: "Estou sendo alguém que termina o que começa — passei no vestibular e me sustento com o meu trabalho.",
+        deixou: "Não preciso mais pedir dinheiro emprestado no fim do mês e não tenho mais medo de falar em público.",
+        valoriza: "A liberdade de escolher e o orgulho da minha mãe.",
+        declaracao_visao: "Em até 3 anos, serei uma profissional formada e independente, sustentando meus estudos e ajudando minha família.",
+      },
+      respondido_em: haDias(28, "20:03"),
+    },
+    {
+      id: uid(0x4410), link_id: uid(0x4218),
+      respostas: {
+        declaracao_visao: "Em até 3 anos, serei uma profissional formada e independente, sustentando meus estudos e ajudando minha família.",
+        preciso_criar: "Um cronograma de estudos que eu consiga seguir",
+        preciso_aprender: "Matemática básica pro ENEM e a falar melhor em público",
+        preciso_melhorar: "Minha organização com os prazos da escola",
+        preciso_eliminar: "O hábito de deixar tudo pra última hora",
+        meta_1: "Concluir o ensino médio com notas suficientes pro ENEM",
+        porque_1: "É a porta de entrada pra faculdade — sem isso o resto não acontece.",
+        meta_2: "Conseguir um jovem aprendiz até o fim do ano",
+        porque_2: "Quero minha própria renda e experiência de trabalho de verdade.",
+        meta_3: "Melhorar minhas notas de matemática em 2 pontos",
+        porque_3: "É a matéria que mais me atrapalha no simulado.",
+        meta_4: "Apresentar um trabalho sem ler os slides",
+        porque_4: "Falar em público me trava — vencer isso muda tudo.",
+        rev_ajudam: "sim",
+        rev_importantes: "sim",
+        rev_claras: "sim",
+        meta_principal: "Meta 2",
+      },
+      respondido_em: haDias(21, "18:44"),
+    },
+    {
+      id: uid(0x4411), link_id: uid(0x4219),
+      respostas: {
+        declaracao_visao: "Em até 3 anos, serei uma profissional formada e independente, sustentando meus estudos e ajudando minha família.",
+        meta_1: "Conseguir um jovem aprendiz até dezembro",
+        is_1: "Contrato assinado num programa de jovem aprendiz",
+        prazo_1: "2026-12-15",
+        meta_2: "Subir a média de matemática pra 7,0",
+        is_2: "Média 7,0 ou mais no boletim do 3º bimestre",
+        prazo_2: "2026-10-30",
+        meta_3: "Fazer o simulado completo do ENEM sem zerar nenhuma área",
+        is_3: "Simulado completo com nota mínima 500 em cada área",
+        prazo_3: "2026-11-20",
+        submetas_1: "1. Montar o currículo com a Luana da ONG (até sexta). 2. Me inscrever nos 3 programas de aprendiz da cidade (até 15/09). 3. Treinar entrevista com o Ricardo (encontro 6).",
+        submetas_2: "1. 30 min de exercícios toda terça e quinta. 2. Levar as dúvidas pro encontro com o mentor. 3. Refazer a prova do 2º bimestre em casa.",
+      },
+      respondido_em: haDias(7, "19:26"),
+    },
   ];
 
   return {
@@ -481,6 +712,10 @@ export function getDemoFormularios(): DemoFormularios {
       fAnamneseOficial,
       fAvaliacao360,
       fAutoavaliacao,
+      fVisao,
+      fMetas,
+      fPdm,
+      fRodaVida,
     ],
     links,
     respostas,
@@ -542,4 +777,76 @@ export function demoAvaliacao360DaDupla(
     .sort()
     .at(-1);
   return maisRecente ?? null;
+}
+
+// ---------- instrumentos da dupla (0080) ----------
+
+/** Idem a RPC instrumentos_da_dupla: escopo da dupla (coord; mentor,
+ *  supervisor e mentorado DELA) e payload já estruturado — token junto,
+ *  respostas só nas entregas respondidas. */
+export function demoInstrumentosDaDupla(
+  role: AppRole,
+  duplaId: string
+): import("../forms/queries").InstrumentoDupla[] {
+  const data = getDemoData();
+  const dupla = data.duplas.find((d) => d.id === duplaId);
+  if (!dupla) return [];
+  const eu = data.personas[role];
+  const souMentorado =
+    role === "mentorado" &&
+    data.mentorados.some(
+      (m) => m.id === dupla.mentorado?.id && m.profile_id === eu.id
+    );
+  const podeVer =
+    role === "coordenacao" ||
+    dupla.mentor?.id === eu.id ||
+    dupla.supervisor?.id === eu.id ||
+    souMentorado;
+  if (!podeVer) return [];
+
+  const { formularios, links, respostas } = getDemoFormularios();
+  const agora = Date.now();
+  const ordem = { visao: 1, metas: 2, pdm: 3, roda_vida: 4 } as const;
+  return formularios
+    .filter((f) => f.sistema && f.sistema in ordem)
+    .sort(
+      (a, b) =>
+        ordem[a.sistema as keyof typeof ordem] -
+        ordem[b.sistema as keyof typeof ordem]
+    )
+    .map((f) => ({
+      sistema: f.sistema as import("../forms/schema").InstrumentoSistema,
+      formulario_id: f.id,
+      titulo: f.titulo,
+      descricao: f.descricao,
+      ativo: f.ativo,
+      campos: f.campos,
+      entregas: links
+        .filter(
+          (l) =>
+            l.formulario_id === f.id &&
+            l.dupla_id === duplaId &&
+            (l.dest_mentorado_id === dupla.mentorado?.id ||
+              l.dest_profile_id === dupla.mentor?.id)
+        )
+        .map((l) => {
+          const r = respostas.find((x) => x.link_id === l.id);
+          return {
+            link_id: l.id,
+            token: l.token,
+            destino: (l.dest_mentorado_id
+              ? "mentorado"
+              : l.dest_profile_id === dupla.mentor?.id
+                ? "mentor"
+                : "outro") as "mentorado" | "mentor" | "outro",
+            status: (l.usado_em
+              ? "respondido"
+              : l.expira_em && new Date(l.expira_em).getTime() < agora
+                ? "expirado"
+                : "pendente") as "pendente" | "respondido" | "expirado",
+            respondido_em: r?.respondido_em ?? l.usado_em,
+            respostas: r?.respostas ?? null,
+          };
+        }),
+    }));
 }

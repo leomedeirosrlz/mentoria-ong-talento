@@ -5,6 +5,7 @@ import { getDemoData } from "../demo/data";
 import { demoFormularioPorToken } from "../demo/queries";
 import {
   demoAnamneseMentorado,
+  demoInstrumentosDaDupla,
   getDemoFormularios,
 } from "../demo/forms-data";
 import type { AppRole } from "../types";
@@ -14,6 +15,8 @@ import type {
   FormularioLink,
   FormularioResposta,
   FormularioSistema,
+  InstrumentoSistema,
+  RespostaValor,
 } from "./schema";
 
 // Leituras da engine de formulários (0034). O escopo é o da RLS: tudo
@@ -291,6 +294,52 @@ export const getAnamneseMentorado = cache(
       }
     }
     return { formularioId: form.id, respondida_em, linkPendente };
+  }
+);
+
+// ---------- instrumentos da dupla (0080) ----------
+
+/** Uma entrega (link) do instrumento na dupla — a RPC instrumentos_da_dupla
+ *  devolve respostas só quando há (pendente/expirado sai sem payload). O
+ *  token acompanha: quem lê a RPC é quem entrega o link. */
+export type InstrumentoEntrega = {
+  link_id: string;
+  token: string;
+  destino: "mentorado" | "mentor" | "outro";
+  status: "pendente" | "respondido" | "expirado";
+  respondido_em: string | null;
+  respostas: Record<string, RespostaValor> | null;
+};
+
+/** Um instrumento oficial no contexto da dupla — definição + entregas. */
+export type InstrumentoDupla = {
+  sistema: InstrumentoSistema;
+  formulario_id: string;
+  titulo: string;
+  descricao: string | null;
+  ativo: boolean;
+  campos: FormularioCampo[];
+  entregas: InstrumentoEntrega[];
+};
+
+/** Os 4 instrumentos oficiais da jornada, com os links/respostas DESTA
+ *  dupla — RPC security definer (0080) porque mentor/supervisor/mentorado
+ *  não têm grant de tabela em formulario_links/respostas. O escopo fica no
+ *  SQL; aqui só degradamos: erro → [] (a seção não aparece, mas a ficha
+ *  continua abrindo). */
+export const getInstrumentosDaDupla = cache(
+  async (duplaId: string): Promise<InstrumentoDupla[]> => {
+    const demo = await demoRole();
+    if (demo) return demoInstrumentosDaDupla(demo, duplaId);
+    const supabase = await createClient();
+    const { data, error } = await supabase.rpc("instrumentos_da_dupla", {
+      p_dupla_id: duplaId,
+    });
+    if (error) {
+      console.error("getInstrumentosDaDupla:", error);
+      return [];
+    }
+    return (data ?? []) as InstrumentoDupla[];
   }
 );
 

@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   agregaRespostas,
+  camposPerguntas,
+  extraiMetas,
+  extraiRodaDaVida,
   linkStatus,
   respostaFormatada,
   validaCampos,
@@ -230,5 +233,145 @@ describe("agregaRespostas", () => {
       { autor: "Beto", valor: "02/01/2010" },
     ]);
     expect(nasc.respondidas).toBe(2);
+  });
+});
+
+// ---------- instrumentos (0080): secao, escala_1_10 e os extratores ----------
+
+describe("secao — rótulo de estrutura (0080)", () => {
+  it("valida com título; obrigatorio é forçado a false", () => {
+    const out = validaCampos([
+      {
+        id: "s1",
+        tipo: "secao",
+        label: "  Pessoal  ",
+        obrigatorio: true, // ignorado — seção não espera resposta
+        descricao: "  instruções do bloco ",
+      },
+      campo({ id: "f2", tipo: "escala_1_10" }),
+    ]);
+    expect(Array.isArray(out)).toBe(true);
+    if (!Array.isArray(out)) return;
+    expect(out[0]).toEqual({
+      id: "s1",
+      tipo: "secao",
+      label: "Pessoal",
+      obrigatorio: false,
+      descricao: "instruções do bloco",
+    });
+  });
+
+  it("título vazio e descrição gigante são recusados", () => {
+    expect(validaCampos([campo({ tipo: "secao", label: "  " })])).toEqual({
+      error: "Escreva o título da seção 1.",
+    });
+    expect(
+      validaCampos([
+        campo({ tipo: "secao", descricao: "x".repeat(1001) }),
+      ])
+    ).toEqual({ error: "O texto da seção 1 passa de 1.000 caracteres." });
+  });
+
+  it("camposPerguntas tira seções; agregação e formatação ignoram", () => {
+    const campos = [
+      campo({ id: "s1", tipo: "secao", label: "Pessoal" }),
+      campo({ id: "n1", tipo: "escala_1_10", label: "Saúde" }),
+      campo({ id: "s2", tipo: "secao", label: "Profissional" }),
+      campo({ id: "n2", tipo: "escala_1_10", label: "Finanças" }),
+    ];
+    expect(camposPerguntas(campos).map((c) => c.id)).toEqual(["n1", "n2"]);
+
+    const ag = agregaRespostas(campos, [
+      { autor: "Ana", respostas: { n1: 8, n2: 4 } },
+      { autor: "Beto", respostas: { n1: 6 } },
+    ]);
+    // as duas seções não viram agregado — só as perguntas
+    expect(ag.map((a) => a.campo.id)).toEqual(["n1", "n2"]);
+    expect(ag[0].media).toBe(7);
+    expect(ag[0].contagens).toHaveLength(10); // distribuição 1–10
+    expect(ag[0].contagens[7]).toEqual({ rotulo: "8", n: 1 });
+    expect(ag[1].respondidas).toBe(1); // opcional não respondido não conta
+
+    expect(respostaFormatada(campos[1], 9)).toBe("9/10");
+  });
+});
+
+describe("extraiRodaDaVida", () => {
+  const campos = [
+    campo({ id: "s_como", tipo: "secao", label: "Como funciona" }),
+    campo({ id: "s_p", tipo: "secao", label: "Pessoal" }),
+    campo({ id: "p_saude", tipo: "escala_1_10", label: "Saúde" }),
+    campo({ id: "p_int", tipo: "escala_1_10", label: "Intelecto" }),
+    campo({ id: "s_pr", tipo: "secao", label: "Profissional" }),
+    campo({ id: "pr_fin", tipo: "escala_1_10", label: "Finanças" }),
+    campo({ id: "reflexao", tipo: "texto_longo", label: "Reflexão" }),
+  ];
+
+  it("agrupa as notas pela seção que as precede e calcula média", () => {
+    const roda = extraiRodaDaVida(campos, {
+      p_saude: 7,
+      p_int: 5,
+      pr_fin: 3,
+      reflexao: "quero melhorar as finanças",
+    });
+    expect(roda).not.toBeNull();
+    expect(roda!.quadrantes.map((q) => q.nome)).toEqual([
+      "Pessoal",
+      "Profissional",
+    ]);
+    expect(roda!.quadrantes[0].areas.map((a) => a.nota)).toEqual([7, 5]);
+    expect(roda!.media).toBe(5); // (7+5+3)/3
+    expect(roda!.respondidas).toBe(3);
+    expect(roda!.total).toBe(3);
+  });
+
+  it("área sem nota sai null e não pesa na média; sem escala 1–10 devolve null", () => {
+    const roda = extraiRodaDaVida(campos, { p_saude: 9 });
+    expect(roda!.quadrantes[0].areas[1].nota).toBeNull();
+    expect(roda!.media).toBe(9);
+    expect(extraiRodaDaVida([campo({ id: "t" })], { t: "x" })).toBeNull();
+  });
+});
+
+describe("extraiMetas", () => {
+  const campos = [
+    campo({ id: "meta_1" }),
+    campo({ id: "porque_1", tipo: "texto_longo" }),
+    campo({ id: "meta_2" }),
+    campo({ id: "porque_2", tipo: "texto_longo" }),
+    campo({ id: "meta_3" }),
+    campo({ id: "is_1" }), // IS/P são do PDM
+    campo({ id: "prazo_1", tipo: "data" }),
+  ];
+
+  it("só meta com texto entra; subcampos casam pelo número", () => {
+    const metas = extraiMetas(campos, {
+      meta_1: " Concluir o ensino médio ",
+      porque_1: "porta da faculdade",
+      is_1: "boletim com média 7",
+      prazo_1: "2026-12-15",
+      meta_2: "   ", // vazia não entra
+      meta_3: "Jovem aprendiz",
+      // meta_3 sem porque — campo inexistente no mapa
+    });
+    expect(metas.map((m) => m.n)).toEqual([1, 3]);
+    expect(metas[0]).toEqual({
+      n: 1,
+      meta: "Concluir o ensino médio",
+      porque: "porta da faculdade",
+      indicador: "boletim com média 7",
+      prazo: "2026-12-15",
+    });
+    expect(metas[1]).toEqual({
+      n: 3,
+      meta: "Jovem aprendiz",
+      porque: "",
+      indicador: "",
+      prazo: null,
+    });
+  });
+
+  it("sem meta_N não extrai nada", () => {
+    expect(extraiMetas([campo({ id: "livre" })], { livre: "x" })).toEqual([]);
   });
 });
