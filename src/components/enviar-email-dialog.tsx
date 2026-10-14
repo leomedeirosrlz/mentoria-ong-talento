@@ -149,7 +149,9 @@ export function EnviarEmailDialog({
             </span>
             <div className="min-w-0">
               <p className="truncate text-sm font-medium">{tituloMaterial}</p>
-              <p className="text-xs text-muted-foreground">chega por e-mail com o link de acesso</p>
+              <p className="text-xs text-muted-foreground">
+                Chega por e-mail com o link de acesso.
+              </p>
             </div>
           </div>
           <fieldset className="space-y-1.5">

@@ -251,7 +251,8 @@ function FormularioEvento({
             </datalist>
           </div>
           <div className="space-y-2">
-            <Label>Instrumentos do guia</Label>
+            {/* o TagInput já tem aria-label próprio — <p> em vez de <Label> órfão */}
+            <p className="text-sm font-medium">Instrumentos do guia</p>
             <TagInput
               name={id("instrumentos")}
               sugestoes={[...INSTRUMENTOS_SUGESTOES]}
@@ -279,7 +280,10 @@ function FormularioEvento({
       </div>
 
       {erro && (
-        <p role="alert" className="text-sm text-destructive">
+        <p
+          role="alert"
+          className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive"
+        >
           {erro}
         </p>
       )}

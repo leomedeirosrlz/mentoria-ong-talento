@@ -281,7 +281,7 @@ export function PedirEspecialistaDialog({
 
           {modo === "dirigido" && (
             <div className="space-y-2">
-              <Label>Quem você quer procurar?</Label>
+              <p className="text-sm font-medium">Quem você quer procurar?</p>
               <ul className="max-h-52 space-y-1.5 overflow-y-auto pr-1">
                 {especialistas.map((e) => {
                   const nome = e.nome_social || e.nome;
@@ -335,12 +335,12 @@ export function PedirEspecialistaDialog({
 
           {modo === "dirigido" && esp && (
             <div className="space-y-2">
-              <Label>
+              <p className="text-sm font-medium">
                 Horário pra sessão{" "}
                 <span className="font-normal text-muted-foreground">
                   (opcional)
                 </span>
-              </Label>
+              </p>
               {slotsDoEsp === undefined ? (
                 <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
                   <CircleNotch size={13} className="animate-spin" aria-hidden />
