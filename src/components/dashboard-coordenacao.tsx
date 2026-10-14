@@ -795,9 +795,11 @@ function DuplaCard({
             className="h-1 w-full overflow-hidden rounded-full bg-muted"
           >
             {/* fill-grow lê o --i herdado do card: a barra enche uma vez,
-                logo depois da entrada do card, sem reflow de width */}
+                logo depois da entrada do card, sem reflow de width; a
+                transition-[width] anima updates pós-mount (refresh do
+                semáforo) — reduced-motion zera pelo guard global */}
             <span
-              className="fill-grow block h-full rounded-full bg-[var(--brand-lime)]"
+              className="fill-grow block h-full rounded-full bg-[var(--brand-lime)] transition-[width] duration-500 ease-snappy"
               style={{ width: `${progresso * 100}%` }}
             />
           </div>

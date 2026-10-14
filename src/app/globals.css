@@ -258,6 +258,20 @@
   animation: confirm-draw 420ms var(--ease-snappy) 260ms forwards;
 }
 
+/* feedback de mutação — a célula que acabou de gravar pisca o --ok a ~20%
+   e apaga em ~600ms. Uma vez só; o guard de reduced-motion zera. */
+@keyframes flash-ok {
+  from {
+    background-color: color-mix(in srgb, var(--ok) 20%, transparent);
+  }
+  to {
+    background-color: transparent;
+  }
+}
+.animate-flash-ok {
+  animation: flash-ok 600ms var(--ease-snappy);
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
@@ -287,6 +301,13 @@
       animation-delay: 0.01ms !important;
       transition-duration: 0.01ms !important;
       scroll-behavior: auto !important;
+    }
+    /* exceção funcional: o spinner (.animate-spin, sempre CircleNotch) é
+       estado de espera, não decoração — parado ele parece botão morto.
+       Mantém o giro (1s linear) mesmo com reduce. */
+    .animate-spin {
+      animation-duration: 1s !important;
+      animation-iteration-count: infinite !important;
     }
   }
 }
