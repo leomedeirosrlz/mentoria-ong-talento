@@ -718,7 +718,7 @@ export function RegistroForm({
               <div>
                 <p className="text-sm font-medium">Novos combinados</p>
                 <p className="text-xs text-muted-foreground">
-                  o que ficou combinado de fazer até a próxima vez
+                  O que a dupla combinou de fazer até o próximo encontro.
                 </p>
               </div>
               <Button

@@ -537,7 +537,9 @@ export function EditarDuplaDialog({ dupla }: { dupla: Dupla }) {
             <div className="space-y-2">
               <Label htmlFor="inicio">Início da mentoria</Label>
               <Input id="inicio" name="iniciada_em" type="date" defaultValue={dupla.iniciada_em ?? ""} />
-              <p className="text-xs text-muted-foreground">vazio mantém a data atual</p>
+              <p className="text-xs text-muted-foreground">
+                Em branco, mantém a data atual.
+              </p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="pdm-url">Link do PDM (opcional)</Label>

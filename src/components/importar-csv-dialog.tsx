@@ -489,11 +489,11 @@ export function ImportarCsvDialog({
               </table>
             </div>
             <p className="text-xs text-muted-foreground">
-              A coluna Ficha conta os campos de matching reconhecidos (nascimento, gênero,
-              cidade/UF, interesses, motivação, pref. de par e afins). Nascimento, gênero,
-              motivação e preferência de par ficam visíveis só pra coordenação.
-              Normalizado mostra o que a planilha trouxe torto e já entra corrigido
-              (e-mail, telefone, data, link) — o que pede revisão sai sinalizado.
+              Ficha conta os campos de matching reconhecidos (nascimento, gênero,
+              cidade/UF, interesses, motivação, preferência de par) — os sensíveis
+              ficam visíveis só pra coordenação. Normalizado mostra o que a planilha
+              trouxe torto e já entra corrigido (e-mail, telefone, data, link); o que
+              pede revisão sai sinalizado.
             </p>
             <div className="flex gap-2">
               <Button variant="outline" onClick={() => { setLinhas(null); setDiffs(null); }}>Voltar</Button>

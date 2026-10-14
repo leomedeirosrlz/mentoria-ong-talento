@@ -562,8 +562,8 @@ export function NovaDuplaDialog() {
             <Input id="iniciada_em" name="iniciada_em" type="date" />
             <p className="text-xs text-muted-foreground">
               {ehEsp
-                ? "Deixe em branco se a mentoria está começando agora. A dupla nasce hoje."
-                : "Deixe em branco se a dupla já existia desde o início do programa. Se ela está começando agora, use a data de hoje."}
+                ? "Em branco, a dupla nasce hoje."
+                : "Em branco, a dupla conta como existente desde o início do programa. Começando agora? Use a data de hoje."}
             </p>
           </div>
           <Button type="submit" className="w-full" disabled={pending || mentorLotado}>

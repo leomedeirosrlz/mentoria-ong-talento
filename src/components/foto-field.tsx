@@ -5,7 +5,6 @@ import { Camera } from "@phosphor-icons/react";
 import { AVATAR_ACCEPT, AVATAR_MAX_BYTES } from "@/lib/avatar";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
 
 /** Campo opcional de foto nos dialogs de cadastro — preview circular local
  *  (object URL, revogada na troca/desmonte); o arquivo viaja no FormData e o
@@ -31,7 +30,9 @@ export function FotoField({
 
   return (
     <div className="space-y-2">
-      <Label htmlFor={id}>Foto (opcional)</Label>
+      {/* o <input> é display:none e fora da tab order — htmlFor pra ele não
+          ativa nada; <p> em vez de <Label> órfão (o botão é o controle) */}
+      <p className="text-sm font-medium">Foto (opcional)</p>
       <div className="flex items-center gap-3">
         <span className="grid size-12 shrink-0 place-items-center overflow-hidden rounded-full bg-muted text-muted-foreground">
           {preview ? (
