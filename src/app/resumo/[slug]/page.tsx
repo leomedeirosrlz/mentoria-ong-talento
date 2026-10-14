@@ -42,7 +42,7 @@ export default async function ResumoPage({
   const [dRes, pRes, mRes] = await Promise.all([
     supabase
       .from("duplas")
-      .select("turma, mentor_id, mentorado_id, supervisor_id, status, iniciada_em, demanda")
+      .select("id, turma, mentor_id, mentorado_id, supervisor_id, status, iniciada_em, demanda")
       .order("iniciada_em"),
     supabase.from("profiles").select("id, nome, email, whatsapp, cidade, uf"),
     supabase.from("mentorados").select("id, nome, email, whatsapp, cidade, uf"),
