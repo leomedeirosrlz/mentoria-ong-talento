@@ -2,6 +2,7 @@
 
 import { Fragment, useEffect, useId, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { motion } from "motion/react";
 import { toast } from "sonner";
 import {
   CalendarBlank,
@@ -34,6 +35,7 @@ import {
   type FormularioCampoTipo,
 } from "@/lib/forms/schema";
 import { FormularioPublico } from "@/app/f/[token]/formulario-publico";
+import { fade, T } from "@/components/motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -465,7 +467,15 @@ export function FormularioBuilder({
             return (
               <Fragment key={c.id}>
                 {i > 0 && (
-                  <li className="-my-1 flex h-8 items-center justify-center">
+                  // separador também é layout: insere/remove/reordena deslizando
+                  // junto em vez de teletransportar enquanto o card anima
+                  <motion.li
+                    layout
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={T.micro}
+                    className="-my-1 flex h-8 items-center justify-center"
+                  >
                     <Button
                       type="button"
                       variant="ghost"
@@ -477,9 +487,16 @@ export function FormularioBuilder({
                     >
                       <Plus aria-hidden />
                     </Button>
-                  </li>
+                  </motion.li>
                 )}
-                <li
+                {/* continuidade espacial no editor: reorder (move) desliza os
+                    cards; inserir/duplicar entra com o fade+y:4 padrão; remover
+                    sai direto e os irmãos deslizam pra ocupar o espaço (§2) */}
+                <motion.li
+                  layout
+                  initial={fade.initial}
+                  animate={fade.animate}
+                  transition={T.enter}
                   className={cn(
                     "rounded-xl bg-card shadow-[var(--shadow-border)]",
                     msg && "ring-2 ring-destructive/60"
@@ -616,7 +633,7 @@ export function FormularioBuilder({
                       </Label>
                     </div>
                   </div>
-                </li>
+                </motion.li>
               </Fragment>
             );
           })}

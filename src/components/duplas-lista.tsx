@@ -295,7 +295,7 @@ export function DuplasLista({
 
       <div className="mt-4 rounded-xl bg-card divide-y divide-border/60 overflow-hidden shadow-[var(--shadow-border)]">
         {lista.length === 0 && (
-          <div className="px-5 py-12 text-center">
+          <div className="animate-enter px-5 py-12 text-center">
             {/* a dupla vazia usa o próprio símbolo: os dois discos sobrepostos
                 (mentor em lime à frente, mentorado atrás) */}
             <div aria-hidden className="flex justify-center">
@@ -317,7 +317,7 @@ export function DuplasLista({
           </div>
         )}
         {lista.length > 0 && base.length === 0 && (
-          <div className="px-5 py-12 text-center">
+          <div className="animate-enter px-5 py-12 text-center">
             <span className="mx-auto grid size-11 place-items-center rounded-full bg-muted text-muted-foreground">
               <MagnifyingGlass aria-hidden size={18} weight="regular" />
             </span>
@@ -337,7 +337,7 @@ export function DuplasLista({
           </div>
         )}
         {lista.length > 0 && base.length > 0 && exibidas.length === 0 && (
-          <div className="px-5 py-12 text-center">
+          <div className="animate-enter px-5 py-12 text-center">
             <span className="mx-auto grid size-11 place-items-center rounded-full bg-muted text-muted-foreground">
               <Funnel aria-hidden size={18} weight="regular" />
             </span>
@@ -385,7 +385,7 @@ export function DuplasLista({
               key={d.id}
               href={`/duplas/${d.id}`}
               style={{ "--i": Math.min(i, 10) } as CSSProperties}
-              className="group animate-enter flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-4 transition-colors hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+              className="group animate-enter flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-4 transition-colors hover:bg-muted/50 active:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
             >
               <SemaforoDot nivel={nivel} />
               {/* o par de discos é a identidade da dupla — reforça quem são
