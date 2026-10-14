@@ -428,7 +428,7 @@ export function PessoasListas({
               {souCoord && (
                 <>
                   <p className="text-sm text-muted-foreground max-w-sm">
-                    Quem tem acesso à plataforma (mentores, supervisores e coordenação)
+                    Quem tem acesso à plataforma (mentores, auxiliares executivos e coordenação)
                     entra por aqui, um a um ou de uma planilha.
                   </p>
                   <div className="mt-3 flex flex-wrap justify-center gap-2">
