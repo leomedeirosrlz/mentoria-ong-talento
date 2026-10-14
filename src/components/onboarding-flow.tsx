@@ -89,9 +89,9 @@ const RECURSOS: Record<AppRole, Recurso[]> = {
     { icon: NotePencil, texto: "Registrar cada encontro realizado." },
     { icon: FolderOpen, texto: "Os materiais oficiais do programa." },
   ],
-  // o jovem não passa por este wizard (a boas-vindas do /jovem é uma tela
-  // única) — a entrada existe porque o Record pede todos os papéis e as
-  // demos/queries compartilham a lista
+  // o jovem não passa por este wizard (o dele é o OnboardingJovem do
+  // /jovem, REALIZA-114) — a entrada existe porque o Record pede todos os
+  // papéis e as demos/queries compartilham a lista
   mentorado: [
     { icon: CalendarCheck, texto: "Sua agenda de encontros com o mentor." },
     { icon: ListChecks, texto: "Os combinados que ficaram pra você." },

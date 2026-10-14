@@ -8,8 +8,9 @@ import { Avatar } from "@/components/avatar";
 import { Badge } from "@/components/ui/badge";
 import { PessoaBanner } from "@/components/pessoa-banner";
 import { Linha } from "@/app/(app)/perfil/perfil-form";
-import { ContaSecao, DadosSecao } from "./perfil-form";
+import { ContaSecao, DadosSecao, DisponibilidadeCard } from "./perfil-form";
 import { PrivacidadeCard } from "./privacidade-card";
+import type { Disponibilidade } from "@/lib/types";
 
 export const metadata = { title: "Meu perfil — Realiza.vc" };
 
@@ -85,6 +86,15 @@ export default async function JovemPerfil() {
           cadastro" — summary + caret, sem lápis: leitura mantida pela
           coordenação), privacidade e conta por último */}
       <DadosSecao me={me} />
+
+      {/* a grade semanal é dele e editável (REALIZA-114) — só renderiza
+          com a ficha vinculada: sem ela a escrita não teria onde pousar e
+          o badge "não vinculada" da gaveta abaixo já explica */}
+      {perfil && (
+        <DisponibilidadeCard
+          grade={(perfil.disponibilidade as Disponibilidade | null) ?? null}
+        />
+      )}
 
       <details
         className="group/ficha rounded-xl bg-card shadow-[var(--shadow-border)]"
