@@ -51,7 +51,7 @@ test("mentor DPP: entra na demo e vê a jornada", async ({ page }) => {
   ).toBeVisible();
 });
 
-test("mentorado: card → boas-vindas → home do /jovem, e volta pra staff", async ({
+test("mentorado: card → wizard do 1º acesso → home do /jovem, e volta pra staff", async ({
   page,
 }) => {
   await page.goto("/demo");
@@ -60,11 +60,35 @@ test("mentorado: card → boas-vindas → home do /jovem, e volta pra staff", as
   // entrarNaDemo cai em "/" e o (app) devolve o mentorado pro shell dele
   await page.waitForURL((url) => url.pathname === "/jovem");
 
-  // primeiro acesso da persona: boas-vindas de tela única (não o wizard de
-  // staff) — "Entrar" grava o cookie demo_onboarded_mentorado
+  // primeiro acesso da persona: wizard de 3 passos do jovem (REALIZA-114),
+  // não o de staff — boas-vindas → grade semanal → contato
   await expect(
-    page.getByRole("heading", { name: /Bem-vindo, Bia/i })
+    page.getByRole("heading", { name: /Bem-vindo\(a\) ao Realiza, Bia/i })
   ).toBeVisible();
+
+  // passo da grade: a ficha demo da Bia já traz ter/qui × noite pré-marcada
+  await page.getByRole("button", { name: "Continuar" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Quando dá pra você?" })
+  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "Domingo" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Manhã" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Terça" })).toHaveAttribute(
+    "aria-pressed",
+    "true"
+  );
+
+  // "Preencher depois" é a saída honesta — na demo a grade já veio pronta,
+  // então seguimos por ela pra conferir o passo de contato
+  await page.getByRole("button", { name: "Continuar" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Seu contato tá certo?" })
+  ).toBeVisible();
+  await expect(
+    page.getByText(/Compartilhar meu WhatsApp com os colegas/)
+  ).toBeVisible();
+
+  // "Entrar" grava o cookie demo_onboarded_mentorado
   await page.getByRole("button", { name: "Entrar" }).click();
 
   // home da jovem: saudação com o nome social + as seções dela

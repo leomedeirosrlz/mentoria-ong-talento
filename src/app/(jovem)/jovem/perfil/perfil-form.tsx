@@ -1,6 +1,6 @@
 "use client";
 
-import { CampoInteresses, CampoUf } from "@/components/campos-pessoais";
+import { CampoDisponibilidade, CampoInteresses, CampoUf } from "@/components/campos-pessoais";
 import { SignOutButton } from "@/components/signout-button";
 import {
   Dialog,
@@ -10,10 +10,12 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { formatWhatsApp } from "@/lib/ciclo";
+import { disponibilidadeTexto, disponibilidadeVazia, formatWhatsApp } from "@/lib/ciclo";
 import { maskWhatsApp } from "@/lib/utils";
+import { salvarDisponibilidadeJovem } from "@/lib/actions-jovem";
 import {
   BotaoLapis,
   ChipsTags,
@@ -23,8 +25,10 @@ import {
   FormSecao,
   Linha,
 } from "@/app/(app)/perfil/perfil-form";
-import { useState } from "react";
-import type { Profile } from "@/lib/types";
+import { useRouter } from "next/navigation";
+import { useState, useTransition } from "react";
+import { toast } from "sonner";
+import type { Disponibilidade, Profile } from "@/lib/types";
 
 /** Perfil do jovem no desenho do /perfil de staff — mesmos primitivos
  *  (Linha, lápis→Dialog, ContaLinha): a diferença honesta é o escopo —
@@ -128,6 +132,110 @@ export function DadosSecao({ me }: { me: Profile }) {
           valor={
             me.interesses?.length ? <ChipsTags itens={me.interesses} /> : "—"
           }
+        />
+      </dl>
+    </section>
+  );
+}
+
+/** Corpo do Dialog da grade — estado próprio (remonta a cada abertura, o
+ *  rascunho descartado não vaza) e Salvar que chama a RPC do jovem: a
+ *  escrita é em mentorados, não em profiles — por isso não usa FormSecao
+ *  (que posta pro updateMeuPerfil). */
+function FormDisponibilidade({
+  grade,
+  aoSalvar,
+}: {
+  grade: Disponibilidade | null;
+  aoSalvar: () => void;
+}) {
+  const router = useRouter();
+  const [disp, setDisp] = useState<Disponibilidade | null>(grade);
+  const [pending, start] = useTransition();
+
+  function salvar() {
+    start(async () => {
+      try {
+        const res = await salvarDisponibilidadeJovem(disp);
+        if ("error" in res) {
+          toast.error(res.error);
+          return;
+        }
+        toast.success("Disponibilidade salva.");
+        aoSalvar();
+        router.refresh();
+      } catch {
+        toast.error("Sem conexão. Tente de novo.");
+      }
+    });
+  }
+
+  return (
+    <div className="space-y-4">
+      <CampoDisponibilidade value={disp} onChange={setDisp} />
+      <Button
+        type="button"
+        className="w-full"
+        onClick={salvar}
+        disabled={pending}
+      >
+        {pending ? "Salvando…" : "Salvar"}
+      </Button>
+    </div>
+  );
+}
+
+/** "Sua disponibilidade" (REALIZA-114) — o campo que o primeiro acesso
+ *  coleta e o lembrete da home aponta. Preview em <dl> sempre visível +
+ *  edição no Dialog do lápis, mesmo molde do "Seus dados"; grade vazia
+ *  marca o chip "pendente" em vez de esconder a linha. */
+export function DisponibilidadeCard({
+  grade,
+}: {
+  grade: Disponibilidade | null;
+}) {
+  const [open, setOpen] = useState(false);
+  const vazia = disponibilidadeVazia(grade);
+
+  return (
+    <section className="rounded-xl bg-card p-6 shadow-[var(--shadow-border)]">
+      <div className="flex items-start gap-3">
+        <div className="min-w-0 flex-1">
+          <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+            Sua disponibilidade
+          </h2>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Os dias e períodos que costumam ser livres pra você — a agenda
+            do seu mentor cruza com eles pra marcar os encontros.
+          </p>
+        </div>
+        <Dialog open={open} onOpenChange={setOpen}>
+          <DialogTrigger
+            render={
+              <BotaoLapis
+                label="Editar sua disponibilidade"
+                className="-mr-1.5 -my-1.5"
+              />
+            }
+          />
+          <DialogContent className="sm:max-w-xl">
+            <DialogHeader>
+              <DialogTitle>Sua disponibilidade</DialogTitle>
+              <DialogDescription>
+                Toque nos dias e períodos em que costuma ter tempo livre.
+                Com a sua grade e a do seu mentor, a agenda acha horários
+                em comum pros encontros.
+              </DialogDescription>
+            </DialogHeader>
+            <FormDisponibilidade grade={grade} aoSalvar={() => setOpen(false)} />
+          </DialogContent>
+        </Dialog>
+      </div>
+      <dl className="mt-4 space-y-4">
+        <Linha
+          rotulo="Dias e períodos livres"
+          valor={disponibilidadeTexto(grade) ?? "—"}
+          pendente={vazia}
         />
       </dl>
     </section>

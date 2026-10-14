@@ -466,6 +466,18 @@ export function disponibilidadeNoDia(
   return (d?.dias ?? []).includes(dow);
 }
 
+/** A grade não serve pro cruzamento? (REALIZA-114) — vazia = null ou sem
+ *  nenhum dia marcado: períodos sem dia nunca casam em disponibilidadeNoDia,
+ *  então a agenda cai em "nenhum horário em comum" como se não existisse.
+ *  Dias sem período contam como preenchida ("qualquer horário" é coringa).
+ *  É a régua do lembrete permanente no /jovem e do badge "pendente" do
+ *  /jovem/perfil. */
+export function disponibilidadeVazia(
+  d: Disponibilidade | null | undefined
+): boolean {
+  return !(d?.dias?.length);
+}
+
 /** Períodos em comum entre duas grades — lista vazia vale "qualquer
  *  período" (a pessoa marcou dias sem recortar horário): cruza com tudo. */
 function periodosCruzam(

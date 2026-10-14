@@ -5,15 +5,18 @@ import { TelaConta } from "@/components/telas-conta";
 import { getDemoData } from "@/lib/demo/data";
 import { demoRole } from "@/lib/demo/mode";
 import { getMe, getNotificacoes } from "@/lib/queries";
+import { getJovemPerfil } from "@/lib/queries-jovem";
 import type { AppRole } from "@/lib/types";
-import { BoasVindas } from "./boas-vindas";
+import { OnboardingJovem } from "./onboarding-jovem";
 
 /** Gate do lado do jovem (REALIZA-108): os mesmos três becos do shell de
  *  staff (sem cadastro / desativado / sem papel) + a régua de papel — só
  *  `mentorado` entra; qualquer outro papel vai pra home dele ("/"). O
- *  onboarding vira uma tela de boas-vindas única: nada do wizard de staff.
- *  A DemoBar segue o visitante aqui também — trocar de papel saindo do
- *  /jovem é o caminho de volta pras personas de staff. */
+ *  onboarding é um wizard curto próprio (REALIZA-114): boas-vindas, a
+ *  grade de disponibilidade que alimenta o cruzamento da agenda e a
+ *  confirmação de contato — nada do wizard de staff. A DemoBar segue o
+ *  visitante aqui também — trocar de papel saindo do /jovem é o caminho
+ *  de volta pras personas de staff. */
 export default async function JovemLayout({
   children,
 }: {
@@ -79,14 +82,14 @@ export default async function JovemLayout({
   );
 
   if (!me.onboarded_em) {
+    // a ficha do jovem preenche a grade e o contato do wizard — null = a
+    // coordenação ainda não vinculou o cadastro (os passos mostram o
+    // estado honesto em vez de quebrar)
+    const perfil = await getJovemPerfil();
     return (
       <>
-        <BoasVindas nome={me.nome_social || me.nome} />
-        {/* boas-vindas não tem header pra dockar — a pill flutuante serve
-            os dois breakpoints (sem o wrapper hidden-md do shell) */}
-        {demo && demoPersonas && (
-          <DemoBar variant="float" papel={demo} personas={demoPersonas} />
-        )}
+        <OnboardingJovem me={me} perfil={perfil} demo={demoDock} />
+        {demoFloat}
       </>
     );
   }

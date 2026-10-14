@@ -3709,6 +3709,10 @@ export type Database = {
         Args: { p_ligado: boolean }
         Returns: undefined
       }
+      set_disponibilidade_mentorado: {
+        Args: { p_grade: Json }
+        Returns: undefined
+      }
       sol_coords: { Args: never; Returns: string[] }
       sol_efetivar: {
         Args: { p_esp: string; p_slot: string; p_sol: string }
