@@ -1,5 +1,5 @@
 import type { AppRole, CorRaca, DadosCivis, Escolaridade, Genero, PrefGeneroPar } from "./types";
-import { UFS, parseDisponibilidade } from "./ciclo";
+import { UFS, normLinkExterno, parseDisponibilidade } from "./ciclo";
 import { capitalizar, nomeProprio } from "./utils";
 import {
   emailValido as emailValidoBase,
@@ -72,6 +72,8 @@ export type LinhaImportada = {
   cor_raca: string;
   linkedin: string;
   bio: string;
+  /** Link do currículo (Drive) do form de matching — vira curriculo_url. */
+  curriculo: string;
   /** JSON {"dias":["seg"],"periodos":["noite"]} — grade semanal. */
   disponibilidade: string;
   /** JSON objeto — payload integral do form de origem. */
@@ -124,6 +126,7 @@ const VAZIA: LinhaImportada = {
   cor_raca: "",
   linkedin: "",
   bio: "",
+  curriculo: "",
   disponibilidade: "",
   form_bruto: "",
   consent_lgpd_em: "",
@@ -165,6 +168,9 @@ const ALIAS_EXATO: Record<string, keyof LinhaImportada | null> = {
   "voce tem preferencia de ser mentorando por um mentor homem ou mulher": "pref_genero_par",
   "perfil no linkedin": "linkedin",
   "perfil no linkedin opcional": "linkedin",
+  // o form de matching pede o CV como upload — no export do Forms vira o
+  // link do Drive; confidencial (mentorados.curriculo_url, 0081)
+  curriculo: "curriculo",
   // "empresa/instituição" pegaria `ong` (instituicao) antes de empresa
   "empresa/instituicao": "empresa",
   // S/N auxiliar — a descrição que vale é a coluna seguinte
@@ -193,9 +199,14 @@ function canonHeader(h: string): keyof LinhaImportada | null {
   const exato = normHeader(h);
   if (exato in ALIAS_EXATO) return ALIAS_EXATO[exato];
   const n = semAcento(h);
+  // a coluna do currículo É um campo de verdade (mentorados.curriculo_url,
+  // 0081) — casa antes do guard de anexo porque o header do upload ("Anexe
+  // seu currículo") também diz "anex"; o resto do regex segue ignorando
+  // colunas de arquivo que não têm campo dedicado
+  if (/curriculo/.test(n)) return "curriculo";
   // coluna de arquivo (link do Drive) nunca é campo de texto — "Anexo do RG"
   // pegaria rg, "CPF - documento" pegaria cpf, "foto de perfil" pegaria papel
-  if (/\banex|\barquivo|upload|\bfoto\b|curriculo|comprovante|frente e verso|adicione/.test(n))
+  if (/\banex|\barquivo|upload|\bfoto\b|comprovante|frente e verso|adicione/.test(n))
     return null;
   // grade de horários do form ("disponibilidade de agenda: [09h às 10h]")
   // são N colunas — o transform funde num JSON só; aqui ignora, não quebra
@@ -790,6 +801,10 @@ export function fichaLinha(
     if (disp && "error" in disp) return { error: disp.error };
     out.disponibilidade = disp;
 
+    // currículo do matching (0081): link Drive normalizado — o que não vira
+    // URL some daqui mas fica no form_bruto; confidencial (coord + aux)
+    out.curriculo_url = normLinkExterno(String(l.curriculo ?? ""));
+
     const resp = civisImportado(l, "resp_");
     const parentesco = capitalizar(String(l.resp_parentesco ?? ""));
     if (resp) out.responsavel = { ...resp, parentesco: parentesco || null };
@@ -885,6 +900,9 @@ export function normalizaLinha(l: LinhaImportada): {
   aplica("email", "e-mail", normalizaEmail(l.email));
   aplica("whatsapp", "WhatsApp", normalizaTelefone(l.whatsapp));
   aplica("linkedin", "LinkedIn", normalizaUrl(l.linkedin), {
+    descartaSemFlag: true,
+  });
+  aplica("curriculo", "currículo", normalizaUrl(l.curriculo), {
     descartaSemFlag: true,
   });
   aplica("data_nascimento", "nascimento", normalizaData(l.data_nascimento));

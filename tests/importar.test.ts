@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   emailValido,
+  fichaLinha,
   mapEscolaridade,
   mapGenero,
   mapPrefGenero,
@@ -117,6 +118,15 @@ describe("parseCsv — cabeçalhos canônicos", () => {
     expect(campoDe("Empresa")).toBe("empresa");
     expect(campoDe("Origem")).toBe("origem");
     expect(campoDe("Como conheceu")).toBe("origem");
+  });
+
+  it("currículo é campo real (0081) — não cai no guard de anexos", () => {
+    // o header do upload no form de matching ("Currículo", "Anexe seu
+    // currículo") casa o campo; demais colunas de arquivo seguem ignoradas
+    expect(campoDe("Currículo")).toBe("curriculo");
+    expect(campoDe("Anexe seu currículo")).toBe("curriculo");
+    expect(campoDe("Anexo do RG")).toBeNull();
+    expect(campoDe("Comprovante de residência")).toBeNull();
   });
 
   it("substring não sequestra: 'sobrenome' não é nome, 'longo' não é ong", () => {
@@ -439,5 +449,32 @@ describe("normalizaLinha — resgate por linha com diff auditável", () => {
     expect(linha.cor_raca).toBe("parda");
     expect(linha.uf).toBe("SP");
     expect(diffs.every((d) => !d.revisar)).toBe(true); // mapeio certeiro não flaga
+  });
+
+  it("currículo: link do Drive vira curriculo_url; texto solto é descartado com flag", () => {
+    const { linha } = normalizaLinha(
+      linhaDe({ curriculo: "drive.google.com/file/d/abc/view" })
+    );
+    expect(linha.curriculo).toBe("https://drive.google.com/file/d/abc/view");
+
+    const ficha = fichaLinha(linha, "mentorado");
+    expect(ficha).not.toHaveProperty("error");
+    expect((ficha as Record<string, unknown>).curriculo_url).toBe(
+      "https://drive.google.com/file/d/abc/view"
+    );
+
+    // "não tenho currículo" num campo de link é resposta legítima — esvazia
+    // sem flag de revisão (mesma régua do linkedin); um nome próprio flaga
+    const semLink = normalizaLinha(linhaDe({ curriculo: "não tenho" }));
+    const dSem = semLink.diffs.find((d) => d.campo === "curriculo")!;
+    expect(dSem.revisar).toBe(false);
+    const fichaSem = fichaLinha(semLink.linha, "mentorado");
+    expect((fichaSem as Record<string, unknown>).curriculo_url).toBeNull();
+
+    const torto = normalizaLinha(linhaDe({ curriculo: "Marcos Silva" }));
+    expect(torto.linha.curriculo).toBe("");
+    expect(
+      torto.diffs.find((d) => d.campo === "curriculo")!.revisar
+    ).toBe(true);
   });
 });
