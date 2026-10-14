@@ -231,7 +231,7 @@ export function RemanejarDuplaDialog({
   // o histórico (encontros, registros) sempre fica na encerrada
   const herancas = [
     !ehEsp && "turma e cronograma",
-    dupla.supervisor && "o supervisor",
+    dupla.supervisor && "o auxiliar executivo",
     ehEsp && "o contexto",
     lado === "mentor" && "o link do PDM",
   ].filter(Boolean) as string[];

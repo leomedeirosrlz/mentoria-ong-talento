@@ -699,7 +699,7 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
             {!ehEsp && <SolicitacaoStatusChip solicitacao={solicitacao} />}
             {dupla.supervisor && (
               // terciário — não compete em text-sm com o semáforo (§4)
-              <span className="text-xs">Supervisor: {dupla.supervisor.nome}</span>
+              <span className="text-xs">Auxiliar executivo: {dupla.supervisor.nome}</span>
             )}
           </div>
           {/* linhagem do remanejo — linha discreta, quieta: é navegação de

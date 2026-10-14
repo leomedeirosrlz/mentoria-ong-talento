@@ -40,7 +40,7 @@ export async function registrarSupervisao(formData: FormData) {
   // supervisor_id da dupla (a policy de insert já a isenta desde o 0053;
   // a régua de escopo abaixo segue valendo: só dupla que EU supervisiono)
   if (!podeSupervisionar(eu.role)) {
-    return { error: "Só o supervisor registra sessões de supervisão." };
+    return { error: "Só o auxiliar executivo registra sessões de supervisão." };
   }
 
   const mentorId = String(formData.get("mentor_id") ?? "");

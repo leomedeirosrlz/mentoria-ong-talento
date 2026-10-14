@@ -473,7 +473,7 @@ function csvCiclo(duplas: Dupla[], cronogramas: Map<string, string>): string {
   return (
     "\uFEFF" +
     [
-      "dupla_mentor;dupla_mentorado;supervisor;trilha;turma;cronograma;encontro_num;data_agendada;realizado_em;status;motivo_reagendamento;registro_em;registro_avaliacao;registro_atividades;precisa_apoio",
+      "dupla_mentor;dupla_mentorado;auxiliar_executivo;trilha;turma;cronograma;encontro_num;data_agendada;realizado_em;status;motivo_reagendamento;registro_em;registro_avaliacao;registro_atividades;precisa_apoio",
       ...linhas,
     ].join("\r\n") +
     "\r\n"

@@ -325,7 +325,7 @@ describe("resolverPares", () => {
       dir()
     );
     expect(naoAcha.status).toBe("falha");
-    expect(naoAcha.motivo).toContain("supervisor");
+    expect(naoAcha.motivo).toContain("auxiliar executivo");
 
     // mentor DPP não pode ser supervisor da própria dupla
     const [semPapel] = resolverPares(
