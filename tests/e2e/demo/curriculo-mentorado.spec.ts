@@ -1,5 +1,5 @@
 import type { Page } from "@playwright/test";
-import { entrarNaDemo, expect, test } from "../helpers";
+import { apiGetApp, entrarNaDemo, expect, test } from "../helpers";
 
 // REALIZA-119 no modo demo — o currículo é o documento mais confidencial da
 // ficha do jovem: coordenação gerencia, auxiliar executivo (Paulo) lê só as
@@ -43,7 +43,8 @@ test.describe("demo — currículo confidencial do mentorado", () => {
     ).toHaveAttribute("href", /drive\.google\.com/);
 
     // o download passa pelo gate da rota — demo devolve o PDF placeholder
-    const resp = await page.request.get(
+    const resp = await apiGetApp(
+      page,
       `/api/documento/${CAIO_ID}?tipo=curriculo`
     );
     expect(resp.status()).toBe(200);
@@ -68,7 +69,8 @@ test.describe("demo — currículo confidencial do mentorado", () => {
     await expect(card.getByText(/Editar link externo/)).toHaveCount(0);
 
     // o download também passa — a policy do bucket espelha o recorte
-    const ok = await page.request.get(
+    const ok = await apiGetApp(
+      page,
       `/api/documento/${CAIO_ID}?tipo=curriculo`
     );
     expect(ok.status()).toBe(200);
@@ -79,7 +81,8 @@ test.describe("demo — currículo confidencial do mentorado", () => {
     await expect(
       page.getByText(/não encontrada|não existe|Página não/i).first()
     ).toBeVisible();
-    const negado = await page.request.get(
+    const negado = await apiGetApp(
+      page,
       `/api/documento/${DANDARA_ID}?tipo=curriculo`
     );
     expect(negado.status()).toBe(404);
