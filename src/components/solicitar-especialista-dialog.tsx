@@ -124,8 +124,8 @@ export function SolicitarEspecialistaDialog({
               placeholder="ex.: o jovem precisa de inglês pra entrevista de emprego"
             />
             <p className="text-xs text-muted-foreground">
-              Descreva a necessidade do jovem (ex.: inglês pra entrevista,
-              finanças pessoais, decisão de carreira. Mínimo de 10 caracteres.
+              O especialista lê esse contexto pra decidir se aceita. Mínimo de
+              10 caracteres.
             </p>
           </div>
           <div className="space-y-2">

@@ -57,12 +57,12 @@ export function PedirAjudaDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Pedir ajuda</DialogTitle>
+          <DialogDescription className="leading-relaxed">
+            A coordenação e os adultos da sua mentoria recebem um aviso na
+            hora e entram em contato com você. Se for urgente, fale direto
+            com eles pelo WhatsApp.
+          </DialogDescription>
         </DialogHeader>
-        <DialogDescription className="leading-relaxed">
-          A coordenação e os adultos da sua mentoria recebem um aviso na hora
-          e entram em contato com você. Se for urgente, fale direto com eles
-          pelo WhatsApp.
-        </DialogDescription>
         <form onSubmit={submit} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="ajuda-mensagem">

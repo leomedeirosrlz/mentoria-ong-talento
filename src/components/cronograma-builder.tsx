@@ -523,7 +523,8 @@ export function CronogramaBuilder({
 
         {/* exceções de intervalo: a folga do 8º→9º, a quinta de sessão dupla… */}
         <div className="mt-5 space-y-2">
-          <Label>Exceções de intervalo</Label>
+          {/* rotula o grupo de linhas abaixo — <p> em vez de <Label> órfão */}
+          <p className="text-sm font-medium">Exceções de intervalo</p>
           <p className="text-xs text-muted-foreground">
             Sempre que um par de encontros não segue o intervalo padrão — a
             folga de 15 dias entre o 8º e o 9º é o exemplo do guia.

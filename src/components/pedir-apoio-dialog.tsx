@@ -58,11 +58,11 @@ export function PedirApoioDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Pedir apoio à coordenação</DialogTitle>
+          <DialogDescription className="leading-relaxed">
+            A coordenação e o auxiliar executivo da dupla recebem um aviso na
+            hora e entram em contato com você.
+          </DialogDescription>
         </DialogHeader>
-        <DialogDescription className="leading-relaxed">
-          A coordenação e o auxiliar executivo da dupla recebem um aviso na hora e
-          entram em contato com você.
-        </DialogDescription>
         <form onSubmit={submit} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="apoio-mensagem">

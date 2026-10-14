@@ -255,7 +255,8 @@ export function PessoaActions({
           {/* o hidden do TagInput manda JSON — camposApresentacao aceita
               JSON ou vírgula, então os dois formatos continuam valendo */}
           <div className="space-y-2">
-            <Label>Áreas de atuação</Label>
+            {/* TagInput tem aria-label próprio — <p> em vez de <Label> órfão */}
+            <p className="text-sm font-medium">Áreas de atuação</p>
             <TagInput
               name="areas_perfil"
               sugestoes={AREAS_SUGESTOES}
