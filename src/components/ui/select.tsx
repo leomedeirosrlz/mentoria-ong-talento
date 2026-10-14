@@ -46,9 +46,11 @@ function SelectTrigger({
       {...props}
     >
       {children}
+      {/* data-popup-open chega no elemento renderizado (Base UI mapeia o
+          state open do trigger pro Icon) — o chevron gira ao abrir */}
       <SelectPrimitive.Icon
         render={
-          <CaretDown className="pointer-events-none size-4 text-muted-foreground" />
+          <CaretDown className="pointer-events-none size-4 text-muted-foreground transition-transform duration-150 ease-snappy data-[popup-open]:rotate-180" />
         }
       />
     </SelectPrimitive.Trigger>
