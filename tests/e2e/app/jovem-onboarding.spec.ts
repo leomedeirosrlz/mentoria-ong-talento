@@ -70,7 +70,7 @@ test.describe("mentorado — onboarding do 1º acesso (REALIZA-114)", () => {
     await expect(
       page.getByRole("heading", { name: "Seu contato tá certo?" })
     ).toBeVisible();
-    await expect(page.getByText("(11) 99000-0093")).toBeVisible();
+    await expect(page.getByText("(11) 99900-0093")).toBeVisible();
     await expect(page.getByText(JOVEM3_EMAIL)).toBeVisible();
     await expect(
       page.getByRole("switch", {
