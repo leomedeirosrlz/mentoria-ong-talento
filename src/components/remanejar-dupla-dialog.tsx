@@ -7,12 +7,13 @@ import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import { remanejarDupla } from "@/lib/actions";
 import {
+  foraDoPrograma,
   MOTIVOS_REMANEJO,
   motivoRemanejo,
   resumoRemanejo,
   type LadoRemanejo,
 } from "@/lib/ciclo";
-import type { Dupla } from "@/lib/types";
+import type { Dupla, SituacaoMentorado } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -86,7 +87,10 @@ export function RemanejarDuplaDialog({
             .in("role", ["mentor_dpp", "mentor_especialista"])
             .eq("ativo", true)
             .order("nome"),
-          supabase.from("mentorados").select("id, nome").order("nome"),
+          supabase
+            .from("mentorados")
+            .select("id, nome, situacao")
+            .order("nome"),
           // sem filtro de status: a ocupação filtra em JS. A própria dupla
           // sai pelo .neq — quem tá nela não conta vaga contra si mesmo
           supabase
@@ -103,8 +107,14 @@ export function RemanejarDuplaDialog({
         setMentores(
           ((perfis.data ?? []) as Opt[]).filter((m) => m.id !== dupla.mentor.id)
         );
+        // quem saiu do programa (0077) não recebe remanejo — o atual sai
+        // do pool por outra regra (o .filter de id abaixo)
         setMentorados(
-          ((ments.data ?? []) as Opt[]).filter((m) => m.id !== dupla.mentorado.id)
+          ((ments.data ?? []) as (Opt & {
+            situacao?: SituacaoMentorado | null;
+          })[]).filter(
+            (m) => m.id !== dupla.mentorado.id && !foraDoPrograma(m)
+          )
         );
         const contagem: Record<string, number> = {};
         const ocup = new Map<string, Set<string>>();

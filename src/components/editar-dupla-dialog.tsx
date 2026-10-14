@@ -18,8 +18,8 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { TRILHA_LABEL, podeSupervisionar, rotuloCronograma } from "@/lib/ciclo";
-import type { Cronograma } from "@/lib/types";
+import { TRILHA_LABEL, foraDoPrograma, podeSupervisionar, rotuloCronograma } from "@/lib/ciclo";
+import type { Cronograma, SituacaoMentorado } from "@/lib/types";
 
 type Opt = { id: string; nome: string; role?: string | null };
 const NENHUM = "__nenhum";
@@ -79,7 +79,10 @@ export function EditarDuplaDialog({ dupla }: { dupla: Dupla }) {
             .in("role", ["mentor_dpp", "mentor_especialista", "supervisor", "coordenacao"])
             .eq("ativo", true)
             .order("nome"),
-          supabase.from("mentorados").select("id, nome").order("nome"),
+          supabase
+            .from("mentorados")
+            .select("id, nome, situacao")
+            .order("nome"),
           // sem filtro de status: a ocupação filtra em JS. A própria dupla
           // sai pelo .neq — senão o mentor atual apareceria lotado por ela
           supabase
@@ -114,7 +117,13 @@ export function EditarDuplaDialog({ dupla }: { dupla: Dupla }) {
         }
         setMentores(ms);
         setSupervisores(ss);
-        const mts = (ments.data ?? []) as Opt[];
+        // fora do programa (0077) não é opção de remanejo — exceto o
+        // mentorado atual da dupla, que precisa seguir selecionável
+        const mts = ((ments.data ?? []) as (Opt & {
+          situacao?: SituacaoMentorado | null;
+        })[]).filter(
+          (m) => m.id === dupla.mentorado.id || !foraDoPrograma(m)
+        );
         if (!mts.some((m) => m.id === dupla.mentorado.id)) {
           mts.push({ id: dupla.mentorado.id, nome: dupla.mentorado.nome });
         }

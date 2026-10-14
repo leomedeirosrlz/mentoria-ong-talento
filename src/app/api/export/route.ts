@@ -194,7 +194,9 @@ async function exportPessoas(supabase: Awaited<ReturnType<typeof createClient>>)
   ] = await Promise.all([
     supabase.from("profiles").select("id,nome,role,ativo"),
     supabase.from("profiles_contato").select("id,email,whatsapp"),
-    supabase.from("mentorados").select("id,nome,email,whatsapp,ong_origem"),
+    supabase
+      .from("mentorados")
+      .select("id,nome,email,whatsapp,ong_origem,situacao,saiu_em,motivo_saida"),
     supabase
       .from("mentor_profiles")
       .select("profile_id,capacidade,capacidade_especialista"),
@@ -488,7 +490,17 @@ type SensPessoa = Pick<
 function csvPessoas(
   pessoas: Pick<Profile, "id" | "nome" | "role" | "ativo">[],
   contatos: Map<string, { email: string | null; whatsapp: string | null }>,
-  mentorados: Pick<Mentorado, "id" | "nome" | "email" | "whatsapp" | "ong_origem">[],
+  mentorados: Pick<
+    Mentorado,
+    | "id"
+    | "nome"
+    | "email"
+    | "whatsapp"
+    | "ong_origem"
+    | "situacao"
+    | "saiu_em"
+    | "motivo_saida"
+  >[],
   capacidades: Map<string, number | null>,
   capacidadesEsp: Map<string, number | null>,
   pessoalP: Map<string, SensPessoa>,
@@ -524,6 +536,8 @@ function csvPessoas(
         "",
         p.ativo ? "ativo" : "inativo",
         ...sens(pessoalP.get(p.id)),
+        "",
+        "",
       ],
     })),
     ...mentorados.map((m) => ({
@@ -534,8 +548,16 @@ function csvPessoas(
         m.whatsapp ?? "",
         "",
         m.ong_origem ?? "",
-        "",
+        // estado do cadastro (0077) — a prestação de contas distingue
+        // desistência de conclusão, não só "saiu"
+        m.situacao === "desistente"
+          ? "desistente"
+          : m.situacao === "concluido"
+            ? "concluído"
+            : "ativo",
         ...sens(pessoalM.get(m.id)),
+        m.saiu_em ? dia(m.saiu_em) : "",
+        m.motivo_saida ?? "",
       ],
     })),
   ];
@@ -543,7 +565,7 @@ function csvPessoas(
   return (
     "\uFEFF" +
     [
-      "nome;tipo;email;whatsapp;capacidade;ong_origem;status;data_nascimento;genero;cor_raca;pref_genero_par;motivacao",
+      "nome;tipo;email;whatsapp;capacidade;ong_origem;status;data_nascimento;genero;cor_raca;pref_genero_par;motivacao;saiu_em;motivo_saida",
       ...linhas
         .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"))
         .map((l) => [l.nome, ...l.resto].map(celula).join(";")),

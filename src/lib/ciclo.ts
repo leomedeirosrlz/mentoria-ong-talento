@@ -14,6 +14,7 @@ import type {
   Periodo,
   PrefGeneroPar,
   Registro,
+  SituacaoMentorado,
   Trilha,
 } from "./types";
 
@@ -234,6 +235,50 @@ export function resumoRemanejo(
       ? `${novoNome} + ${nomes.mentorado}`
       : `${nomes.mentor} + ${novoNome}`;
   return { antes, depois };
+}
+
+// ---------- saída de mentorado (0077) ----------
+
+/** Rótulo da situação do cadastro. 'ativo' quase nunca é exibido (é o
+ *  normal); os chips/badges usam os outros dois valores. */
+export const SITUACAO_MENTORADO_LABEL: Record<SituacaoMentorado, string> = {
+  ativo: "No programa",
+  desistente: "Desistente",
+  concluido: "Concluiu o programa",
+};
+
+/** Fora do programa = saiu antes do fim ou concluiu a jornada (0077).
+ *  Tolerante a campo ausente — select parcial/persona demo sem a coluna
+ *  lê como 'ativo'. */
+export const foraDoPrograma = (m: {
+  situacao?: SituacaoMentorado | null;
+}): boolean => m.situacao != null && m.situacao !== "ativo";
+
+/** Motivos de saída do select do dialog — `value` é a chave estável do
+ *  form; `label` é o texto canônico gravado em mentorados.motivo_saida
+ *  (auditável, sem enum no banco — mesmo esquema do motivoRemanejo).
+ *  'concluido' não tem preset: a conclusão se explica sozinha, o campo
+ *  vira detalhe livre opcional. */
+export const MOTIVOS_SAIDA = [
+  { value: "desistencia", label: "Desistiu do programa" },
+  { value: "mudou_cidade", label: "Mudou de cidade" },
+  { value: "sem_contato", label: "Perdemos o contato" },
+  { value: "pessoal_familiar", label: "Motivos pessoais ou familiares" },
+  { value: "outro", label: "Outro motivo" },
+] as const;
+
+/** Texto gravado em motivo_saida. Categoria conhecida vira "Rótulo —
+ *  detalhe" (ou só o rótulo sem detalhe); "outro" e categoria desconhecida
+ *  mandam o texto livre — vazio devolve null, que o dialog trata como
+ *  "falta o porquê" (desistente exige motivo; concluído não). */
+export function motivoSaida(
+  categoria: string,
+  detalhe: string
+): string | null {
+  const texto = detalhe.trim();
+  const cat = MOTIVOS_SAIDA.find((m) => m.value === categoria);
+  if (!cat || cat.value === "outro") return texto || null;
+  return texto ? `${cat.label} — ${texto}` : cat.label;
 }
 
 // ---------- matching/cadastro (0034) ----------
