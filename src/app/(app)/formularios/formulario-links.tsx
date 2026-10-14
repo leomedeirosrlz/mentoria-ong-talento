@@ -1,6 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import {
+  useEffect,
+  useMemo,
+  useOptimistic,
+  useRef,
+  useState,
+  useTransition,
+} from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -44,7 +51,8 @@ import {
   urlPublica,
 } from "@/components/forms/link-shared";
 import { useOrigem } from "@/components/forms/use-origem";
-import { fade, T } from "@/components/motion";
+import { demoAtivoClient } from "@/lib/demo/shared";
+import { ExitItem, ExitList, fade, T } from "@/components/motion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { filterChipCls } from "@/components/ui/filter-chip";
@@ -223,6 +231,13 @@ export function FormularioLinks({
   const [buscaLink, setBuscaLink] = useState("");
   const [ordemLinks, setOrdemLinks] = useState<OrdemLinks>("status");
   const [pending, start] = useTransition();
+  // remoção otimista: a linha sai na hora pelo ExitItem (e chip/contagem já
+  // descontam); erro da action faz rollback e ela volta com a entrada —
+  // na demo o delete sempre erra, então nem sai do lugar
+  const [linksView, removerLink] = useOptimistic(
+    links,
+    (cur: LinkResolvido[], id: string) => cur.filter((l) => l.id !== id)
+  );
   const router = useRouter();
   const destaqueTimer = useRef<ReturnType<typeof setTimeout>>(null);
   // origem do deploy depois do mount — SSR/hidratação emitem o texto do
@@ -240,31 +255,31 @@ export function FormularioLinks({
   // o chip "já tem link" avisa que gerar de novo não cria outro endereço
   const comLinkVigente = useMemo(() => {
     const s = new Set<string>();
-    for (const l of links) {
+    for (const l of linksView) {
       if (linkStatus(l) !== "pendente") continue;
       if (l.dest_profile_id) s.add(`p:${l.dest_profile_id}`);
       if (l.dest_mentorado_id) s.add(`m:${l.dest_mentorado_id}`);
     }
     return s;
-  }, [links]);
+  }, [linksView]);
 
   // quem já respondeu ganha o chip "já respondeu" — gerar de novo criaria um
   // segundo link pra quem já cumpriu (uso único é por link, não por pessoa)
   const comResposta = useMemo(() => {
     const s = new Set<string>();
-    for (const l of links) {
+    for (const l of linksView) {
       if (linkStatus(l) !== "respondido") continue;
       if (l.dest_profile_id) s.add(`p:${l.dest_profile_id}`);
       if (l.dest_mentorado_id) s.add(`m:${l.dest_mentorado_id}`);
     }
     return s;
-  }, [links]);
+  }, [linksView]);
 
   // form encerrado + pendente = ação morta — o hint da seção explica por que
   // os botões de envio somem das rows
   const temPendente = useMemo(
-    () => links.some((l) => linkStatus(l) === "pendente"),
-    [links]
+    () => linksView.some((l) => linkStatus(l) === "pendente"),
+    [linksView]
   );
 
   const filtrados = useMemo(() => {
@@ -295,7 +310,7 @@ export function FormularioLinks({
       ORDEM_STATUS[linkStatus(a)] - ORDEM_STATUS[linkStatus(b)];
     const porNome = (a: LinkResolvido, b: LinkResolvido) =>
       comparaNome(nomeDe(a), nomeDe(b));
-    return [...links].sort(
+    return [...linksView].sort(
       ordemLinks === "nome"
         ? (a, b) => porNome(a, b) || porStatus(a, b)
         : ordemLinks === "recentes"
@@ -307,7 +322,7 @@ export function FormularioLinks({
                 ) || porStatus(a, b) || porNome(a, b)
             : porStatus
     );
-  }, [links, ordemLinks]);
+  }, [linksView, ordemLinks]);
 
   // contagem por status alimenta os chips — o número junto do chip é a
   // própria explicação de por que filtrar
@@ -317,9 +332,9 @@ export function FormularioLinks({
       expirado: 0,
       respondido: 0,
     };
-    for (const l of links) c[linkStatus(l)]++;
+    for (const l of linksView) c[linkStatus(l)]++;
     return c;
-  }, [links]);
+  }, [linksView]);
 
   const linksVisiveis = useMemo(() => {
     const n = normaliza(buscaLink.trim());
@@ -656,6 +671,8 @@ export function FormularioLinks({
         </p>
       )}
 
+      {/* gates na base (`links`), não na view otimista — senão apagar o
+          último link trocava a <ul> pelo estado vazio no meio do exit */}
       {links.length > 0 && (
         <div className="flex flex-wrap items-center gap-2">
           {/* chips de status — um gesto filtra a lista sem sair da página;
@@ -668,7 +685,7 @@ export function FormularioLinks({
                 onClick={() => setFiltroStatus("todos")}
                 className={filterChipCls(filtroStatus === "todos")}
               >
-                Todos · {links.length}
+                Todos · {linksView.length}
               </button>
             </li>
             {(["pendente", "expirado", "respondido"] as const).map((s) => (
@@ -733,127 +750,133 @@ export function FormularioLinks({
           Nenhum link gerado ainda. Gere links individuais ou um genérico pra
           divulgar.
         </p>
-      ) : linksVisiveis.length === 0 ? (
+      ) : linksVisiveis.length === 0 && linksView.length === links.length ? (
         <p className="rounded-lg border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
           Nenhum link com esse filtro.
         </p>
       ) : (
         <ul className="divide-y divide-border overflow-hidden rounded-xl bg-card shadow-[var(--shadow-border)]">
-          {linksVisiveis.map((l) => {
-            const status = linkStatus(l);
-            return (
-              <li
-                key={l.id}
-                className={cn(
-                  "px-4 py-3 transition-colors duration-700 sm:px-5",
-                  l.id === destaqueId && "bg-[var(--brand-lime)]/15"
-                )}
-              >
-                {/* a 390px o wrap jogava nome, badge e ações em 3 linhas
-                    desalinhadas — agora são 2 linhas deliberadas: nome+badge
-                    (token/meta abaixo) e as ações encostadas à direita; a
-                    partir de sm: volta à linha única */}
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-                  <div className="min-w-0 flex-1 basis-full sm:basis-auto">
-                    <div className="flex min-w-0 items-center gap-2">
-                      <span className="truncate text-sm font-medium">
-                        {l.dest_nome ?? "Link genérico"}
-                      </span>
-                      <Badge
-                        variant={
-                          status === "respondido"
-                            ? "default"
-                            : status === "expirado"
-                              ? "secondary"
-                              : "outline"
-                        }
-                        className={cn(
-                          "shrink-0",
-                          status === "respondido" &&
-                            "bg-[var(--ok)]/15 text-[var(--ok-text)]",
-                          status === "expirado" &&
-                            "bg-[var(--warn)]/15 text-[var(--warn-text)]"
-                        )}
-                      >
-                        {LINK_STATUS_LABEL[status]}
-                      </Badge>
+          <ExitList>
+            {linksVisiveis.map((l) => {
+              const status = linkStatus(l);
+              return (
+                <ExitItem
+                  key={l.id}
+                  className={cn(
+                    "px-4 py-3 transition-colors duration-700 sm:px-5",
+                    l.id === destaqueId && "bg-[var(--brand-lime)]/15"
+                  )}
+                >
+                  {/* a 390px o wrap jogava nome, badge e ações em 3 linhas
+                      desalinhadas — agora são 2 linhas deliberadas: nome+badge
+                      (token/meta abaixo) e as ações encostadas à direita; a
+                      partir de sm: volta à linha única */}
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                    <div className="min-w-0 flex-1 basis-full sm:basis-auto">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <span className="truncate text-sm font-medium">
+                          {l.dest_nome ?? "Link genérico"}
+                        </span>
+                        <Badge
+                          variant={
+                            status === "respondido"
+                              ? "default"
+                              : status === "expirado"
+                                ? "secondary"
+                                : "outline"
+                          }
+                          className={cn(
+                            "shrink-0",
+                            status === "respondido" &&
+                              "bg-[var(--ok)]/15 text-[var(--ok-text)]",
+                            status === "expirado" &&
+                              "bg-[var(--warn)]/15 text-[var(--warn-text)]"
+                          )}
+                        >
+                          {LINK_STATUS_LABEL[status]}
+                        </Badge>
+                      </div>
+                      {/* sem fragmento de token na linha — era ruído técnico
+                          que parecia ID copiável; a meta que sobra (dupla,
+                          validade, uso) é o que ajuda a reconhecer o link */}
+                      {(() => {
+                        const meta: string[] = [];
+                        if (l.dupla)
+                          meta.push(
+                            `${primeiroNome(l.dupla.mentor_nome)} ↔ ${primeiroNome(l.dupla.mentorado_nome)}`
+                          );
+                        if (status === "pendente" && l.expira_em)
+                          meta.push(`até ${dataCurta(l.expira_em)}`);
+                        if (status === "expirado" && l.expira_em)
+                          meta.push(`expirou ${dataCurta(l.expira_em)}`);
+                        if (status === "respondido" && l.usado_em)
+                          meta.push(dataCurta(l.usado_em));
+                        return meta.length > 0 ? (
+                          <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                            {meta.join(" · ")}
+                          </p>
+                        ) : null;
+                      })()}
                     </div>
-                    {/* sem fragmento de token na linha — era ruído técnico
-                        que parecia ID copiável; a meta que sobra (dupla,
-                        validade, uso) é o que ajuda a reconhecer o link */}
-                    {(() => {
-                      const meta: string[] = [];
-                      if (l.dupla)
-                        meta.push(
-                          `${primeiroNome(l.dupla.mentor_nome)} ↔ ${primeiroNome(l.dupla.mentorado_nome)}`
-                        );
-                      if (status === "pendente" && l.expira_em)
-                        meta.push(`até ${dataCurta(l.expira_em)}`);
-                      if (status === "expirado" && l.expira_em)
-                        meta.push(`expirou ${dataCurta(l.expira_em)}`);
-                      if (status === "respondido" && l.usado_em)
-                        meta.push(dataCurta(l.usado_em));
-                      return meta.length > 0 ? (
-                        <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                          {meta.join(" · ")}
-                        </p>
-                      ) : null;
-                    })()}
+                    <div className="flex basis-full items-center justify-end gap-1.5 sm:basis-auto">
+                      {/* Copiar/WhatsApp só em link vivo de form ativo —
+                          respondido copia link morto, expirado ganha Reemitir
+                          (token novo) e form encerrado não coleta. O genérico
+                          não tem destinatário — NudgeButton diria "sem
+                          WhatsApp", razão falsa */}
+                      {status === "pendente" && formularioAtivo && (
+                        <>
+                          <CopiarLink token={l.token} />
+                          {l.dest_tipo !== "generico" && (
+                            <NudgeButton
+                              telefone={l.dest_whatsapp}
+                              mensagem={msgLinkWhatsApp(
+                                formularioTitulo,
+                                l.dest_nome,
+                                l.token,
+                                origem
+                              )}
+                              label="WhatsApp"
+                            />
+                          )}
+                        </>
+                      )}
+                      {status === "expirado" && (
+                        <ReemitirLinkButton
+                          linkId={l.id}
+                          formularioId={formularioId}
+                        />
+                      )}
+                      {status !== "respondido" && (
+                        <ConfirmDeleteButton
+                          titulo="Excluir link?"
+                          descricao={`O link de ${l.dest_nome ?? "uso genérico"} deixa de funcionar na hora.`}
+                          sucesso="Link excluído."
+                          onConfirm={() => {
+                            // dentro do start do ConfirmDeleteButton — vale
+                            // como transição pro otimista; na demo a action
+                            // sempre erra, então a linha nem sai
+                            if (!demoAtivoClient()) removerLink(l.id);
+                            return excluirLinkFormulario(l.id, formularioId);
+                          }}
+                          trigger={
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              aria-label={`Excluir link de ${l.dest_nome ?? "uso genérico"}`}
+                              className="text-muted-foreground hover:text-destructive"
+                            >
+                              <Trash aria-hidden />
+                            </Button>
+                          }
+                        />
+                      )}
+                    </div>
                   </div>
-                  <div className="flex basis-full items-center justify-end gap-1.5 sm:basis-auto">
-                    {/* Copiar/WhatsApp só em link vivo de form ativo —
-                        respondido copia link morto, expirado ganha Reemitir
-                        (token novo) e form encerrado não coleta. O genérico
-                        não tem destinatário — NudgeButton diria "sem
-                        WhatsApp", razão falsa */}
-                    {status === "pendente" && formularioAtivo && (
-                      <>
-                        <CopiarLink token={l.token} />
-                        {l.dest_tipo !== "generico" && (
-                          <NudgeButton
-                            telefone={l.dest_whatsapp}
-                            mensagem={msgLinkWhatsApp(
-                              formularioTitulo,
-                              l.dest_nome,
-                              l.token,
-                              origem
-                            )}
-                            label="WhatsApp"
-                          />
-                        )}
-                      </>
-                    )}
-                    {status === "expirado" && (
-                      <ReemitirLinkButton
-                        linkId={l.id}
-                        formularioId={formularioId}
-                      />
-                    )}
-                    {status !== "respondido" && (
-                      <ConfirmDeleteButton
-                        titulo="Excluir link?"
-                        descricao={`O link de ${l.dest_nome ?? "uso genérico"} deixa de funcionar na hora.`}
-                        sucesso="Link excluído."
-                        onConfirm={() =>
-                          excluirLinkFormulario(l.id, formularioId)
-                        }
-                        trigger={
-                          <Button
-                            variant="ghost"
-                            size="icon-sm"
-                            aria-label={`Excluir link de ${l.dest_nome ?? "uso genérico"}`}
-                            className="text-muted-foreground hover:text-destructive"
-                          >
-                            <Trash aria-hidden />
-                          </Button>
-                        }
-                      />
-                    )}
-                  </div>
-                </div>
-              </li>
-            );
-          })}
+                </ExitItem>
+              );
+            })}
+          </ExitList>
         </ul>
       )}
     </div>

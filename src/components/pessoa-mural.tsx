@@ -1,12 +1,19 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import {
+  useEffect,
+  useOptimistic,
+  useRef,
+  useState,
+  useTransition,
+} from "react";
 import { useRouter } from "next/navigation";
 import { CircleNotch, Trash } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { addPessoaNota, deletePessoaNota } from "@/lib/actions";
 import { demoAtivoClient } from "@/lib/demo/shared";
 import { Textarea } from "@/components/ui/textarea";
+import { ExitItem, ExitList } from "@/components/motion";
 import { formatDiaMes } from "@/lib/ciclo";
 
 export type MuralNota = {
@@ -44,6 +51,14 @@ export function PessoaMural({
     typeof window === "undefined" || demo ? "" : (localStorage.getItem(draftKey) ?? "")
   );
   const [pending, start] = useTransition();
+  const [, startDel] = useTransition();
+  // remoção otimista: a nota sai na hora pelo ExitItem; falha da action faz
+  // rollback (ela volta com a animação de entrada) — na demo o delete sempre
+  // erra, então nem sai do lugar
+  const [notasView, removerNota] = useOptimistic(
+    notas,
+    (cur: MuralNota[], id: string) => cur.filter((n) => n.id !== id)
+  );
   const [apagando, setApagando] = useState<string | null>(null);
   // refs pro cleanup do unmount enxergar o valor atual sem re-subscrever o
   // effect — atualizados pós-commit (escrever ref no render é proibido)
@@ -91,13 +106,18 @@ export function PessoaMural({
 
   function apagar(notaId: string) {
     setApagando(notaId);
-    deletePessoaNota(notaId, pessoaId)
-      .then((res) => {
+    startDel(async () => {
+      if (!demo) removerNota(notaId);
+      try {
+        const res = await deletePessoaNota(notaId, pessoaId);
         if (res?.error) toast.error(res.error);
         else router.refresh();
-      })
-      .catch(() => toast.error("Sem conexão. Tente de novo."))
-      .finally(() => setApagando(null));
+      } catch {
+        toast.error("Sem conexão. Tente de novo.");
+      } finally {
+        setApagando(null);
+      }
+    });
   }
 
   return (
@@ -141,6 +161,8 @@ export function PessoaMural({
         </div>
       )}
 
+      {/* checa `notas` (base), não a view otimista — senão apagar a última
+          nota desmontaria a <ul> na hora e cortaria o exit do ExitItem */}
       {notas.length === 0 ? (
         <p className="text-sm text-muted-foreground">
           Nenhuma nota sua ainda.
@@ -148,28 +170,30 @@ export function PessoaMural({
         </p>
       ) : (
         <ul className="space-y-3">
-          {notas.map((n) => (
-            <li key={n.id} className="group flex items-start gap-3">
-              <div className="min-w-0 flex-1">
-                <p className="text-xs text-muted-foreground">{formatDiaMes(n.created_at)}</p>
-                <p className="mt-0.5 whitespace-pre-wrap text-sm">{n.texto}</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => apagar(n.id)}
-                disabled={apagando === n.id}
-                aria-label="Apagar nota"
-                className="inline-flex min-h-11 shrink-0 items-center gap-1 rounded-md text-xs text-muted-foreground transition-colors hover:text-[var(--danger)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:min-h-6 md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100"
-              >
-                {apagando === n.id ? (
-                  <CircleNotch size={13} className="animate-spin" aria-hidden />
-                ) : (
-                  <Trash size={13} aria-hidden />
-                )}
-                Apagar
-              </button>
-            </li>
-          ))}
+          <ExitList>
+            {notasView.map((n) => (
+              <ExitItem key={n.id} className="group flex items-start gap-3">
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs text-muted-foreground">{formatDiaMes(n.created_at)}</p>
+                  <p className="mt-0.5 whitespace-pre-wrap text-sm">{n.texto}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => apagar(n.id)}
+                  disabled={apagando === n.id}
+                  aria-label="Apagar nota"
+                  className="inline-flex min-h-11 shrink-0 items-center gap-1 rounded-md text-xs text-muted-foreground transition-colors hover:text-[var(--danger)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:min-h-6 md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100"
+                >
+                  {apagando === n.id ? (
+                    <CircleNotch size={13} className="animate-spin" aria-hidden />
+                  ) : (
+                    <Trash size={13} aria-hidden />
+                  )}
+                  Apagar
+                </button>
+              </ExitItem>
+            ))}
+          </ExitList>
         </ul>
       )}
     </div>

@@ -1,4 +1,5 @@
 import { Flag, Megaphone, Siren, Trash } from "@phosphor-icons/react/dist/ssr";
+import { ExitItem, ExitList } from "@/components/motion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { excluirComunicado } from "@/lib/actions";
@@ -83,79 +84,90 @@ export function AvisosSection({
       ) : (
         <Card>
           <CardContent className="divide-y divide-border/60 p-0">
-            {avisos.map((a) => {
-              const prio = PRIORIDADE[a.prioridade];
-              const Icone = prio?.icone;
-              return (
-                <article
-                  key={a.id}
-                  className={cn(
-                    "px-4 py-3 sm:px-5",
-                    // o overflow-hidden do Card apara o tinte no rounded-xl
-                    prio?.tinte
-                  )}
-                >
-                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                    {prio && Icone && (
-                      <Badge variant="outline" className={prio.cls}>
-                        <Icone data-icon="inline-start" aria-hidden />
-                        {prio.texto}
-                      </Badge>
+            {/* saída animada por props (refresh-puro): a remoção chega via
+                router.refresh() do ConfirmDeleteButton e o AnimatePresence
+                segura o exit — o timing é o próprio round-trip da action,
+                que o dialog já esperava antes de fechar. Último item é a
+                exceção: esvaziar troca o Card pelo estado vazio e corta o
+                exit — segurar isso pediria um client boundary + interceptar
+                a action do ConfirmDeleteButton, desproporcional pra 220ms;
+                a troca direta pro estado vazio é honesta o bastante aqui */}
+            <ExitList>
+              {avisos.map((a) => {
+                const prio = PRIORIDADE[a.prioridade];
+                const Icone = prio?.icone;
+                return (
+                  <ExitItem
+                    tag="article"
+                    key={a.id}
+                    className={cn(
+                      "px-4 py-3 sm:px-5",
+                      // o overflow-hidden do Card apara o tinte no rounded-xl
+                      prio?.tinte
                     )}
-                    {/* título nunca trunca: basis-40 garante ~160px mínimos e
-                        flex-wrap joga ele pra linha própria quando badge+data
-                        disputam — rail de 300px e mobile leem o título todo */}
-                    <p className="min-w-0 flex-1 basis-40 text-sm font-medium">
-                      {a.titulo}
-                    </p>
-                    <span className="ms-auto shrink-0 text-xs text-muted-foreground">
-                      {formatDiaMes(a.created_at)}
-                    </span>
-                  </div>
-                  <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
-                    {a.corpo}
-                  </p>
-                  {/* meta-linha: chip de audiência minúsculo + ações da coord
-                      no rodapé — no mobile a coluna fixa de ações esmagava o
-                      corpo em ~170px; aqui o texto usa a largura toda */}
-                  {(a.audiencia !== "todos" || souCoord) && (
-                    <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
-                      {a.audiencia !== "todos" && (
-                        <span className="rounded-full border border-border px-1.5 py-px text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                          {AUDIENCIA_LABEL[a.audiencia]}
-                        </span>
+                  >
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                      {prio && Icone && (
+                        <Badge variant="outline" className={prio.cls}>
+                          <Icone data-icon="inline-start" aria-hidden />
+                          {prio.texto}
+                        </Badge>
                       )}
-                      {souCoord && (
-                        <div className="ms-auto flex items-center gap-1">
-                          {/* sutil: o aviso já sai por e-mail na publicação —
-                              aqui é reenvio manual (quem entrou depois, caixa
-                              perdida); o label some <sm e vira ícone */}
-                          <ReenviarComunicadoEmailButton comunicadoId={a.id} />
-                          {/* .bind gera a server reference serializável —
-                              closure inline quebra a serialização no payload
-                              do router.refresh() */}
-                          <ConfirmDeleteButton
-                            titulo={`Excluir "${a.titulo}"?`}
-                            descricao="O aviso sai da home de todo mundo e as notificações dele são removidas. Para corrigir, publique um novo."
-                            sucesso="Aviso excluído."
-                            onConfirm={excluirComunicado.bind(null, a.id)}
-                            trigger={
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                aria-label={`Excluir aviso "${a.titulo}"`}
-                              >
-                                <Trash size={15} />
-                              </Button>
-                            }
-                          />
-                        </div>
-                      )}
+                      {/* título nunca trunca: basis-40 garante ~160px mínimos e
+                          flex-wrap joga ele pra linha própria quando badge+data
+                          disputam — rail de 300px e mobile leem o título todo */}
+                      <p className="min-w-0 flex-1 basis-40 text-sm font-medium">
+                        {a.titulo}
+                      </p>
+                      <span className="ms-auto shrink-0 text-xs text-muted-foreground">
+                        {formatDiaMes(a.created_at)}
+                      </span>
                     </div>
-                  )}
-                </article>
-              );
-            })}
+                    <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
+                      {a.corpo}
+                    </p>
+                    {/* meta-linha: chip de audiência minúsculo + ações da coord
+                        no rodapé — no mobile a coluna fixa de ações esmagava o
+                        corpo em ~170px; aqui o texto usa a largura toda */}
+                    {(a.audiencia !== "todos" || souCoord) && (
+                      <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
+                        {a.audiencia !== "todos" && (
+                          <span className="rounded-full border border-border px-1.5 py-px text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                            {AUDIENCIA_LABEL[a.audiencia]}
+                          </span>
+                        )}
+                        {souCoord && (
+                          <div className="ms-auto flex items-center gap-1">
+                            {/* sutil: o aviso já sai por e-mail na publicação —
+                                aqui é reenvio manual (quem entrou depois, caixa
+                                perdida); o label some <sm e vira ícone */}
+                            <ReenviarComunicadoEmailButton comunicadoId={a.id} />
+                            {/* .bind gera a server reference serializável —
+                                closure inline quebra a serialização no payload
+                                do router.refresh() */}
+                            <ConfirmDeleteButton
+                              titulo={`Excluir "${a.titulo}"?`}
+                              descricao="O aviso sai da home de todo mundo e as notificações dele são removidas. Para corrigir, publique um novo."
+                              sucesso="Aviso excluído."
+                              onConfirm={excluirComunicado.bind(null, a.id)}
+                              trigger={
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  aria-label={`Excluir aviso "${a.titulo}"`}
+                                >
+                                  <Trash size={15} />
+                                </Button>
+                              }
+                            />
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </ExitItem>
+                );
+              })}
+            </ExitList>
           </CardContent>
         </Card>
       )}
