@@ -3716,6 +3716,7 @@ export type Database = {
         Args: { p_campos: Json; p_respostas: Json }
         Returns: Json
       }
+      importar_registros: { Args: { itens: Json }; Returns: Json }
       interesses_ok: { Args: { interesses: string[] }; Returns: boolean }
       jovem_relacionado: { Args: { p_profile: string }; Returns: boolean }
       marcar_combinado: {
