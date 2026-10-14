@@ -2,9 +2,15 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { DotsThree, PencilSimple, Trash } from "@phosphor-icons/react";
+import {
+  ArrowCounterClockwise,
+  DotsThree,
+  PencilSimple,
+  SignOut,
+  Trash,
+} from "@phosphor-icons/react";
 import { toast } from "sonner";
-import { deleteMentorado, updateMentorado } from "@/lib/actions";
+import { deleteMentorado, marcarSaidaMentorado, updateMentorado } from "@/lib/actions";
 import { avatarPublicUrl } from "@/lib/avatar";
 import { FotoField } from "@/components/foto-field";
 import {
@@ -19,7 +25,7 @@ import {
   WizardFicha,
   type PassoFicha,
 } from "@/components/campos-pessoais";
-import { formatWhatsApp } from "@/lib/ciclo";
+import { formatWhatsApp, foraDoPrograma } from "@/lib/ciclo";
 import { maskWhatsApp } from "@/lib/utils";
 import type { Disponibilidade, Mentorado } from "@/lib/types";
 import { Button } from "@/components/ui/button";
@@ -31,6 +37,7 @@ import {
   DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
+import { SaidaMentoradoDialog } from "@/components/saida-mentorado-dialog";
 import { DocumentoPessoa } from "@/components/documento-pessoa";
 import { AssinaturasPessoa } from "@/components/assinaturas-pessoa";
 import { DadosCivisFields } from "@/components/assinatura-form";
@@ -41,17 +48,42 @@ import { Textarea } from "@/components/ui/textarea";
 export function MentoradoActions({
   mentorado,
   temDupla,
+  duplaVivaId,
 }: {
   mentorado: Mentorado;
   temDupla: boolean;
+  /** Id da dupla ativa/pausada (0077) — quem tem par em andamento não pode
+   *  marcar saída direto: o dialog bloqueia e aponta pro rito da dupla. */
+  duplaVivaId?: string | null;
 }) {
   const [editOpen, setEditOpen] = useState(false);
   const [delOpen, setDelOpen] = useState(false);
+  const [saidaOpen, setSaidaOpen] = useState(false);
   const [interesses, setInteresses] = useState<string[]>(mentorado.interesses ?? []);
   const [disponibilidade, setDisponibilidade] = useState<Disponibilidade | null>(mentorado.disponibilidade ?? null);
   const [pending, start] = useTransition();
   const router = useRouter();
   const primeiroNome = (mentorado.nome_social || mentorado.nome).split(" ")[0];
+  // fora do programa (0077): o menu troca "Marcar saída" por "Reativar" —
+  // ação reversível, direta com toast (mesmo padrão do Reativar de profile)
+  const fora = foraDoPrograma(mentorado);
+
+  function reativar() {
+    start(async () => {
+      try {
+        const res = await marcarSaidaMentorado(mentorado.id, "ativo", null);
+        if (res?.error) toast.error(res.error);
+        else {
+          toast.success(
+            `Cadastro de ${primeiroNome} reativado — de volta pra lista principal.`
+          );
+          router.refresh();
+        }
+      } catch {
+        toast.error("Sem conexão. Tente de novo.");
+      }
+    });
+  }
 
   function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -249,10 +281,19 @@ export function MentoradoActions({
             </Button>
           }
         />
-        <DropdownMenuContent align="end" className="w-44">
+        <DropdownMenuContent align="end" className="w-48">
           <DropdownMenuItem onClick={() => setEditOpen(true)}>
             <PencilSimple /> Editar
           </DropdownMenuItem>
+          {fora ? (
+            <DropdownMenuItem disabled={pending} onClick={reativar}>
+              <ArrowCounterClockwise /> Reativar
+            </DropdownMenuItem>
+          ) : (
+            <DropdownMenuItem onClick={() => setSaidaOpen(true)}>
+              <SignOut /> Marcar saída…
+            </DropdownMenuItem>
+          )}
           <DropdownMenuSeparator />
           <DropdownMenuItem
             variant="destructive"
@@ -291,6 +332,13 @@ export function MentoradoActions({
           />
         </DialogContent>
       </Dialog>
+
+      <SaidaMentoradoDialog
+        mentorado={mentorado}
+        open={saidaOpen}
+        onOpenChange={setSaidaOpen}
+        duplaVivaId={duplaVivaId}
+      />
 
       <ConfirmDeleteButton
         open={delOpen}

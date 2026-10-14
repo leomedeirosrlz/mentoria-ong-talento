@@ -11,6 +11,7 @@ import {
 } from "@/lib/queries";
 import { getAssinaturasResumo } from "@/lib/queries-assinaturas";
 import { faltantesDocumento } from "@/lib/documentos/texto";
+import { foraDoPrograma } from "@/lib/ciclo";
 import type { DocsPessoa } from "@/components/pessoas-listas";
 import {
   NovaPessoaDialog,
@@ -69,6 +70,14 @@ export default async function PessoasPage() {
   const mentorProfiles: Record<string, MentorProfile> = {};
   for (const mp of perfisMentor) {
     mentorProfiles[mp.profile_id] = mp;
+  }
+
+  // mentorado → sua dupla em andamento (0077): o dialog de saída usa o id
+  // pra bloquear com link direto — quem tem par vivo passa pelo rito de
+  // encerramento da ficha da dupla antes de marcar desistência/conclusão
+  const duplaVivaPorMentorado: Record<string, string> = {};
+  for (const d of duplas) {
+    duplaVivaPorMentorado[d.mentorado_id] = d.id;
   }
 
   // status de assinatura por pessoa — os badges "assinou vs. não" da lista
@@ -141,12 +150,14 @@ export default async function PessoasPage() {
                   email: p.email || null,
                   whatsapp: p.whatsapp,
                 }))}
-              mentorados={mentorados.map((m) => ({
-                id: m.id,
-                nome: m.nome,
-                email: m.email || null,
-                whatsapp: m.whatsapp,
-              }))}
+              mentorados={mentorados
+                .filter((m) => !foraDoPrograma(m))
+                .map((m) => ({
+                  id: m.id,
+                  nome: m.nome,
+                  email: m.email || null,
+                  whatsapp: m.whatsapp,
+                }))}
               docs={docsPorPessoa}
               faltantes={faltantesPorPessoa}
             />
@@ -163,6 +174,7 @@ export default async function PessoasPage() {
         mentorados={mentorados}
         comDupla={[...comDupla]}
         comQualquerDupla={[...comQualquerDupla]}
+        duplaVivaPorMentorado={duplaVivaPorMentorado}
         mentorProfiles={mentorProfiles}
         contagemPorMentor={contagemPorMentor}
         assinaturas={docsPorPessoa}

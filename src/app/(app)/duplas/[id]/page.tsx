@@ -55,12 +55,14 @@ import {
   eventosDoCronograma,
   formatDate,
   formatDateTime,
+  foraDoPrograma,
   jornadaDaDupla,
   linkSeguro,
   passoEsp,
   passosDaTrilha,
   registroTardio,
   saudadeDaDupla,
+  SITUACAO_MENTORADO_LABEL,
   toDateStr,
   TRILHA_LABEL,
   type PassoGuia,
@@ -861,6 +863,20 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
                 </span>
               </span>
             </Link>
+            {/* saída do programa (0077) — a dupla encerrada já conta a
+                história, mas o badge evita ler "desistente" como bug */}
+            {foraDoPrograma(dupla.mentorado) && (
+              <Badge
+                variant="outline"
+                className={cn(
+                  "w-fit font-normal",
+                  dupla.mentorado.situacao === "desistente" &&
+                    "border-[var(--warn)]/60 text-[var(--warn-text)]"
+                )}
+              >
+                {SITUACAO_MENTORADO_LABEL[dupla.mentorado.situacao ?? "ativo"]}
+              </Badge>
+            )}
             {dupla.mentorado.ong_origem ? (
               <p className="text-muted-foreground">{dupla.mentorado.ong_origem}</p>
             ) : (

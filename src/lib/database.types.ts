@@ -1871,6 +1871,7 @@ export type Database = {
           id: string
           interesses: string[]
           motivacao: string | null
+          motivo_saida: string | null
           nome: string
           nome_social: string | null
           notas: string | null
@@ -1880,6 +1881,8 @@ export type Database = {
           pref_genero_par: string | null
           profile_id: string | null
           responsavel: Json | null
+          saiu_em: string | null
+          situacao: string
           uf: string | null
           whatsapp: string | null
         }
@@ -1900,6 +1903,7 @@ export type Database = {
           id?: string
           interesses?: string[]
           motivacao?: string | null
+          motivo_saida?: string | null
           nome: string
           nome_social?: string | null
           notas?: string | null
@@ -1909,6 +1913,8 @@ export type Database = {
           pref_genero_par?: string | null
           profile_id?: string | null
           responsavel?: Json | null
+          saiu_em?: string | null
+          situacao?: string
           uf?: string | null
           whatsapp?: string | null
         }
@@ -1929,6 +1935,7 @@ export type Database = {
           id?: string
           interesses?: string[]
           motivacao?: string | null
+          motivo_saida?: string | null
           nome?: string
           nome_social?: string | null
           notas?: string | null
@@ -1938,6 +1945,8 @@ export type Database = {
           pref_genero_par?: string | null
           profile_id?: string | null
           responsavel?: Json | null
+          saiu_em?: string | null
+          situacao?: string
           uf?: string | null
           whatsapp?: string | null
         }

@@ -18,7 +18,7 @@ import {
   podeSupervisionar,
 } from "@/lib/ciclo";
 import { capitalizar, cpfValido, erroAmigavel, nomeProprio } from "@/lib/utils";
-import type { ComunicadoPrioridade, CorRaca, Cronograma, DadosCivis, Disponibilidade, DocumentoPessoa, Endereco, Escolaridade, Genero, Notificacao, PrefGeneroPar, ResponsavelCivis, Trilha } from "@/lib/types";
+import type { ComunicadoPrioridade, CorRaca, Cronograma, DadosCivis, Disponibilidade, DocumentoPessoa, Endereco, Escolaridade, Genero, Notificacao, PrefGeneroPar, ResponsavelCivis, SituacaoMentorado, Trilha } from "@/lib/types";
 import {
   emailValido,
   fichaLinha,
@@ -652,6 +652,16 @@ export async function createDupla(formData: FormData) {
       return { error: "A pessoa escolhida como supervisor não pode supervisionar." };
     }
   }
+  // quem saiu do programa (0077) não volta pro board por acidente — a
+  // reativação do cadastro vem antes de parear de novo
+  const { data: mdSituacao } = await supabase
+    .from("mentorados").select("situacao").eq("id", mentorado_id).single();
+  if (mdSituacao && mdSituacao.situacao !== "ativo") {
+    return {
+      error:
+        "Esse mentorado está marcado como fora do programa. Reative o cadastro na aba Pessoas antes de formar dupla.",
+    };
+  }
   // um mentorado ocupa uma vaga POR trilha, em qualquer turma — a dupla de
   // especialista convive com a DPP em paralelo (índice global da 0061)
   const { data: emDupla } = await supabase
@@ -1112,6 +1122,70 @@ export async function deleteMentorado(id: string) {
   return { ok: true };
 }
 
+const SITUACOES_MENTORADO = ["ativo", "desistente", "concluido"] as const;
+
+/** Marca a saída do mentorado do programa (0077) — desistente/concluído —
+ *  ou a reativação (situacao 'ativo' limpa carimbo e motivo). Coord-only;
+ *  a dupla viva é pré-condição: quem tem par em andamento passa ANTES pelo
+ *  rito de encerramento da ficha da dupla (checklist + resumo da jornada) —
+ *  marcar a saída por cima deixaria vaga ocupada por quem já saiu. */
+export async function marcarSaidaMentorado(
+  id: string,
+  situacao: SituacaoMentorado,
+  motivo?: string | null
+) {
+  if (await demoAtivo()) return { error: DEMO_MSG };
+  const { supabase, me: eu } = await me();
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
+  if (eu.role !== "coordenacao") {
+    return { error: "Só a coordenação marca a saída de mentorados." };
+  }
+  if (!(SITUACOES_MENTORADO as readonly string[]).includes(situacao)) {
+    return { error: "Escolha uma situação válida." };
+  }
+  const motivoTxt = (motivo ?? "").trim() || null;
+  if (motivoTxt && motivoTxt.length > 300) {
+    return { error: "O motivo da saída aceita até 300 caracteres." };
+  }
+  // o motivo é o "porquê" que a ficha e a lista exibem — desistente sem ele
+  // vira dado mudo; concluído dispensa (a jornada se explica)
+  if (situacao === "desistente" && !motivoTxt) {
+    return { error: "Conte o motivo da saída — ele aparece na ficha e na lista." };
+  }
+  if (situacao !== "ativo") {
+    const { data: vivas } = await supabase
+      .from("duplas")
+      .select("id")
+      .eq("mentorado_id", id)
+      .in("status", ["ativa", "pausada"])
+      .limit(1);
+    if (vivas?.length) {
+      return {
+        error:
+          "Tem dupla em andamento — registre o encerramento na ficha da dupla antes de marcar a saída.",
+        duplaId: vivas[0].id,
+      };
+    }
+  }
+  const { data, error } = await supabase
+    .from("mentorados")
+    .update(
+      situacao === "ativo"
+        ? { situacao, saiu_em: null, motivo_saida: null }
+        : { situacao, saiu_em: new Date().toISOString(), motivo_saida: motivoTxt }
+    )
+    .eq("id", id)
+    .select("id");
+  if (error) return { error: erroAmigavel(error) };
+  if (!data?.length) {
+    return { error: "Não foi possível concluir. Recarregue a página e tente de novo." };
+  }
+  revalidatePath("/pessoas");
+  revalidatePath(`/pessoas/${id}`);
+  revalidatePath("/duplas");
+  return { ok: true };
+}
+
 /** Campos de cadastro que a grade de relatórios edita inline (typo/contato).
  *  Tudo que tem fluxo próprio — status e demanda de dupla, papel, datas —
  *  fica de fora de propósito: a grade corrige ficha, não opera o ciclo. */
@@ -1287,6 +1361,16 @@ export async function updateDupla(duplaId: string, formData: FormData) {
   // só ocupa vaga quem vai pra ativa/pausada — concluída e encerrada liberam,
   // então editar outros campos de uma dupla fechada não revalida capacidade
   if (atualDupla && (status === "ativa" || status === "pausada")) {
+    // e a vaga só conta pra quem segue no programa — dupla ativa com pessoa
+    // marcada como saída (0077) é exatamente o estado que a /pessoas separa
+    const { data: sitMd } = await supabase
+      .from("mentorados").select("situacao").eq("id", mentorado_id).single();
+    if (sitMd && sitMd.situacao !== "ativo") {
+      return {
+        error:
+          "Esse mentorado está marcado como fora do programa. Reative o cadastro na aba Pessoas antes de manter a dupla ativa.",
+      };
+    }
     // fechada (encerrada/concluída) voltando a ativa/pausada precisa revalidar
     // — a vaga pode ter sido ocupada por outra dupla enquanto estava fechada
     const voltando =
@@ -1614,6 +1698,18 @@ export async function remanejarDupla(
           ? "Essa pessoa já é o mentor da dupla — pra trocar, escolha outra."
           : "Essa pessoa já é o mentorado da dupla — pra trocar, escolha outra.",
     };
+  }
+  // quem entra do lado do mentorado precisa estar NO programa (0077) — o
+  // RPC não conhece situacao, então a guarda fica aqui
+  if (lado === "mentorado") {
+    const { data: sitNovo } = await supabase
+      .from("mentorados").select("situacao").eq("id", novoId).single();
+    if (sitNovo && sitNovo.situacao !== "ativo") {
+      return {
+        error:
+          "Esse mentorado está marcado como fora do programa. Reative o cadastro na aba Pessoas antes do remanejo.",
+      };
+    }
   }
   const { data: novaDuplaId, error } = await supabase.rpc("rematch_dupla", {
     p_dupla_id: duplaId,
