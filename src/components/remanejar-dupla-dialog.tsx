@@ -40,19 +40,37 @@ type Opt = { id: string; nome: string; role?: string | null };
  *  transação. Coord-only; a ficha antiga guarda o histórico, a nova herda
  *  turma/cronograma/supervisor/trilha (e o PDM, que é do mentorado, quando
  *  ele fica). O resumo "A + B → A + C" fica visível ANTES de confirmar —
- *  a troca não tem desfazer. */
+ *  a troca não tem desfazer.
+ *
+ *  Dois modos: com `trigger` (default próprio incluso) ele se abre sozinho;
+ *  controlado (`open`/`onOpenChange` + `trigger={null}`) o RemanejoSugerido
+ *  abre já com lado e par pré-escolhidos — a sugestão vira um clique, não
+ *  um form inteiro de novo. */
 export function RemanejarDuplaDialog({
   dupla,
   trigger,
+  open: openProp,
+  onOpenChange: onOpenChangeProp,
+  preselecao,
 }: {
   dupla: Dupla;
-  trigger?: React.ReactElement;
+  /** null = modo controlado, sem trigger próprio (o card de sugestão é
+   *  quem manda abrir). undefined = trigger default "Remanejar". */
+  trigger?: React.ReactElement | null;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  /** Lado + par que a sugestão já escolheu — lidos na abertura. */
+  preselecao?: { lado: LadoRemanejo; novoId: string } | null;
 }) {
-  const [open, setOpen] = useState(false);
+  const [openInt, setOpenInt] = useState(false);
+  const open = openProp ?? openInt;
+  const setOpen = onOpenChangeProp ?? setOpenInt;
   // quem sai — mentor é o default porque desistência costuma ser dele;
   // a mentorada é quem o programa protege de ficar sem par
-  const [lado, setLado] = useState<LadoRemanejo>("mentor");
-  const [novoId, setNovoId] = useState<string | null>(null);
+  // a preseleção semeia os iniciais — o diálogo controlado pode nascer já
+  // aberto (montado com a sugestão pronta)
+  const [lado, setLado] = useState<LadoRemanejo>(preselecao?.lado ?? "mentor");
+  const [novoId, setNovoId] = useState<string | null>(preselecao?.novoId ?? null);
   const [motivoSel, setMotivoSel] = useState<string>("desistencia");
   const [mentores, setMentores] = useState<Opt[]>([]);
   const [mentorados, setMentorados] = useState<Opt[]>([]);
@@ -70,6 +88,24 @@ export function RemanejarDuplaDialog({
   const [erro, setErro] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const router = useRouter();
+  // estado fresco por abertura — um remanejo abortado não pode vazar
+  // seleção pra próxima vez; com preseleção a sugestão já chega com lado
+  // e par escolhidos. Ajuste durante o render na borda de subida do `open`
+  // (o padrão "adjust state when props change" — sem frame de seleção
+  // velha): no modo controlado a sugestão abre de fora e o Base UI não
+  // chama onOpenChange — a transição da prop é o evento confiável
+  const [abertoAntes, setAbertoAntes] = useState(open);
+  if (open !== abertoAntes) {
+    setAbertoAntes(open);
+    if (open) {
+      setLado(preselecao?.lado ?? "mentor");
+      setNovoId(preselecao?.novoId ?? null);
+      setMotivoSel("desistencia");
+      setErro(null);
+      setFalha(false);
+    }
+  }
+
   // 1ª carga com skeleton; refetch de reabertura usa o cache — falha ali vira
   // toast, não bloqueio (as opções já carregadas continuam valendo)
   const carregou = useRef(false);
@@ -268,28 +304,21 @@ export function RemanejarDuplaDialog({
   return (
     <Dialog
       open={open}
-      onOpenChange={(o) => {
-        setOpen(o);
-        if (o) {
-          // estado fresco por abertura — um remanejo abortado não pode
-          // vazar seleção pra próxima vez
-          setLado("mentor");
-          setNovoId(null);
-          setMotivoSel("desistencia");
-          setErro(null);
-          setFalha(false);
-        }
-      }}
+      // o reset por abertura é o ajuste no render acima — aqui só flui o
+      // pedido de mudança do Base UI (fechar por Esc/backdrop/trigger)
+      onOpenChange={setOpen}
     >
-      <DialogTrigger
-        render={
-          trigger ?? (
-            <Button variant="outline" size="sm">
-              <ArrowsLeftRight size={15} /> Remanejar
-            </Button>
-          )
-        }
-      />
+      {trigger !== null && (
+        <DialogTrigger
+          render={
+            trigger ?? (
+              <Button variant="outline" size="sm">
+                <ArrowsLeftRight size={15} /> Remanejar
+              </Button>
+            )
+          }
+        />
+      )}
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Remanejar a dupla</DialogTitle>
@@ -372,6 +401,9 @@ export function RemanejarDuplaDialog({
                   key={lado}
                   name="novo_id"
                   required
+                  // controlado: a sugestão de remanejo entra com o par já
+                  // escolhido — null segue mostrando o placeholder
+                  value={novoId}
                   items={Object.fromEntries(
                     poolAtual.map((o) => [
                       o.id,

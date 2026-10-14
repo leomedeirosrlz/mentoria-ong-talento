@@ -1,9 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import { tetoMentor } from "@/lib/fila";
 import type { MentorProfile } from "@/lib/queries";
 import type { Mentorado, Profile } from "@/lib/types";
 import { AfinidadePar } from "@/components/matching-afinidade";
+import { CapacidadeMentorDialog } from "@/components/capacidade-mentor-dialog";
 import { NovaDuplaDialog } from "@/components/nova-dupla-dialog";
 import { Label } from "@/components/ui/label";
 import {
@@ -16,23 +18,55 @@ import {
 
 /** Painel do board de matching — aparece quando "Livres para dupla" está
  *  ligado em /pessoas (o chip só existe na visão da coordenação). A
- *  coordenação escolhe um mentorado e um mentor livres e compara a afinidade
+ *  coordenação escolhe um mentorado livre e um mentor e compara a afinidade
  *  antes de abrir o dialog de criação. Os sensíveis já vêm mergeados nos
- *  props (views *_pessoal só devolvem pra coordenação). */
+ *  props (views *_pessoal só devolvem pra coordenação).
+ *
+ *  Ocupação X/Y (REALIZA-116): todo mentor ativo aparece — com vaga
+ *  primeiro, cheio afunda marcado "sem vaga". Selecionar um cheio é o
+ *  convite pra comparar a afinidade e abrir "aumentar capacidade →":
+ *  esconder seria fingir que o par certo não existe. */
 export function MatchingPanel({
   mentores,
   mentorados,
   mentorProfiles,
+  ocupacao,
 }: {
+  /** Todos os mentores ativos — o X/Y de cada um vem de ocupacao+profiles. */
   mentores: Profile[];
   mentorados: Mentorado[];
   mentorProfiles: Record<string, MentorProfile>;
+  /** Duplas ativas/pausadas por mentor — a régua do trigger (0025/0073). */
+  ocupacao: Record<string, number>;
 }) {
   const [mentorId, setMentorId] = useState<string | null>(null);
   const [mentoradoId, setMentoradoId] = useState<string | null>(null);
   const mentor = mentores.find((m) => m.id === mentorId) ?? null;
   const mentorado = mentorados.find((m) => m.id === mentoradoId) ?? null;
   const mp = mentor ? mentorProfiles[mentor.id] : undefined;
+
+  const tetoDe = (id: string) => {
+    const p = mentores.find((m) => m.id === id);
+    return p ? tetoMentor(p, mentorProfiles[id]) : 1;
+  };
+  const usadasDe = (id: string) => ocupacao[id] ?? 0;
+  const mentorLotado =
+    mentor != null && usadasDe(mentor.id) >= tetoDe(mentor.id);
+  const comVaga = mentores.filter((m) => usadasDe(m.id) < tetoDe(m.id));
+  // livres primeiro (mais vagas na frente), cheios afundam; nome desempata —
+  // mesma régua dos selects dos dialogs
+  const mentoresOrd = [...mentores].sort(
+    (a, b) =>
+      tetoDe(b.id) - usadasDe(b.id) - (tetoDe(a.id) - usadasDe(a.id)) ||
+      a.nome.localeCompare(b.nome, "pt-BR")
+  );
+  const rotuloMentor = (m: Profile) => {
+    const esp = m.role === "mentor_especialista";
+    const cheio = usadasDe(m.id) >= tetoDe(m.id);
+    return `${m.nome} · ${usadasDe(m.id)}/${tetoDe(m.id)}${
+      esp ? " · especialista" : ""
+    }${cheio ? " · sem vaga" : ""}`;
+  };
 
   return (
     <section className="space-y-3 rounded-xl bg-card px-4 py-3.5 shadow-[var(--shadow-border)] sm:px-5">
@@ -42,13 +76,13 @@ export function MatchingPanel({
         </h2>
         <NovaDuplaDialog />
       </div>
-      {mentores.length === 0 || mentorados.length === 0 ? (
+      {mentorados.length === 0 || mentores.length === 0 ? (
         <p className="text-sm text-muted-foreground">
           {mentorados.length === 0 && mentores.length === 0
             ? "Ninguém livre pra parear agora."
             : mentorados.length === 0
               ? "Sem mentorado livre. Todos já estão em dupla."
-              : "Sem mentor livre. Todos já estão em dupla."}
+              : "Nenhum mentor ativo cadastrado."}
         </p>
       ) : (
         <>
@@ -62,7 +96,8 @@ export function MatchingPanel({
                 onValueChange={(v) => setMentoradoId(v ? String(v) : null)}
               >
                 <SelectTrigger
-                  aria-labelledby="parear-mentorado-label"
+                  id="parear-mentorado"
+                  aria-labelledby="parear-mentorado-label parear-mentorado"
                   className="w-full"
                 >
                   <SelectValue placeholder="Escolher" />
@@ -80,34 +115,63 @@ export function MatchingPanel({
               <Label id="parear-mentor-label">Mentor</Label>
               <Select
                 items={Object.fromEntries(
-                  mentores.map((m) => [
-                    m.id,
-                    m.role === "mentor_especialista"
-                      ? `${m.nome} · especialista`
-                      : m.nome,
-                  ])
+                  mentoresOrd.map((m) => [m.id, rotuloMentor(m)])
                 )}
                 onValueChange={(v) => setMentorId(v ? String(v) : null)}
               >
                 <SelectTrigger
-                  aria-labelledby="parear-mentor-label"
+                  id="parear-mentor"
+                  aria-labelledby="parear-mentor-label parear-mentor"
                   className="w-full"
                 >
                   <SelectValue placeholder="Escolher" />
                 </SelectTrigger>
                 <SelectContent>
-                  {mentores.map((m) => (
-                    <SelectItem key={m.id} value={m.id}>
-                      {m.nome}
-                      {m.role === "mentor_especialista"
-                        ? " · especialista"
-                        : ""}
-                    </SelectItem>
-                  ))}
+                  {mentoresOrd.map((m) => {
+                    const cheio = usadasDe(m.id) >= tetoDe(m.id);
+                    return (
+                      <SelectItem
+                        key={m.id}
+                        value={m.id}
+                        className={
+                          cheio ? "text-muted-foreground" : undefined
+                        }
+                      >
+                        {rotuloMentor(m)}
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
+              {comVaga.length === 0 && (
+                <p className="text-xs text-muted-foreground">
+                  Todos os mentores estão sem vaga — aumente a capacidade de
+                  um deles pra parear.
+                </p>
+              )}
             </div>
           </div>
+          {mentor && mentorLotado && (
+            <p className="flex flex-wrap items-center gap-x-1.5 text-xs text-[var(--warn-text)]">
+              {mentor.nome.split(" ")[0]} está sem vaga ({usadasDe(mentor.id)}
+              /{tetoDe(mentor.id)} duplas em andamento). Se a afinidade
+              fechar,{" "}
+              <CapacidadeMentorDialog
+                mentorId={mentor.id}
+                nome={mentor.nome}
+                atual={tetoDe(mentor.id)}
+                emUso={usadasDe(mentor.id)}
+                trigger={
+                  <button
+                    type="button"
+                    className="rounded-sm font-medium text-foreground underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    aumentar capacidade →
+                  </button>
+                }
+              />
+            </p>
+          )}
           {mentor && mentorado ? (
             <AfinidadePar
               mentor={{

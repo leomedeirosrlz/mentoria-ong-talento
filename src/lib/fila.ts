@@ -137,6 +137,21 @@ export function filaMentorados(
     .sort(porEspera);
 }
 
+/** Teto de vagas do mentor = a pool da trilha do papel dele (0073) —
+ *  especialista conta contra capacidade_especialista, DPP contra
+ *  capacidade. Sem linha em mentor_profiles vale 1, a mesma régua do
+ *  trigger check_mentor_capacidade. Como cada mentor tem um papel só,
+ *  a contagem de duplas ativas/pausadas dele já é o uso da própria trilha
+ *  (a pool da outra trilha nunca é consumida por ninguém). */
+export function tetoMentor(
+  p: Pick<Profile, "role">,
+  mp: MentorProfile | undefined
+): number {
+  return p.role === "mentor_especialista"
+    ? (mp?.capacidade_especialista ?? 1)
+    : (mp?.capacidade ?? 1);
+}
+
 /** Mentores com vaga livre — a reserva proposital do programa: sem dupla
  *  nenhuma OU com capacidade acima das ativas/pausadas (`contagem`). Sem
  *  linha em mentor_profiles vale capacidade 1, a mesma régua do
@@ -148,20 +163,13 @@ export function filaMentores(
   mentorProfiles: Record<string, MentorProfile>,
   contagem: Record<string, number>
 ): FilaItem[] {
-  // o teto é o da trilha do papel (0073) — especialista conta contra
-  // capacidade_especialista, DPP contra capacidade. Como cada mentor tem um
-  // papel só, `contagem` (todas as duplas dele) já é o uso da própria trilha.
-  const teto = (p: Profile, mp: MentorProfile | undefined) =>
-    p.role === "mentor_especialista"
-      ? (mp?.capacidade_especialista ?? 1)
-      : (mp?.capacidade ?? 1);
   return pessoas
     .filter((p) => {
       if (!ehMentor(p) || !p.ativo) return false;
-      return teto(p, mentorProfiles[p.id]) - (contagem[p.id] ?? 0) > 0;
+      return tetoMentor(p, mentorProfiles[p.id]) - (contagem[p.id] ?? 0) > 0;
     })
     .map((p) => {
-      const capacidade = teto(p, mentorProfiles[p.id]);
+      const capacidade = tetoMentor(p, mentorProfiles[p.id]);
       return {
         id: p.id,
         nome: p.nome,

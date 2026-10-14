@@ -18,7 +18,7 @@ import {
 } from "@phosphor-icons/react";
 import type { Mentorado, Profile } from "@/lib/types";
 import type { MentorProfile } from "@/lib/queries";
-import { filaMentorados, filaMentores } from "@/lib/fila";
+import { filaMentorados, filaMentores, tetoMentor } from "@/lib/fila";
 import { cn, normaliza } from "@/lib/utils";
 import {
   comparaNome,
@@ -34,6 +34,7 @@ import { MentoradoActions } from "@/components/mentorado-actions";
 import { RoleSelect } from "@/components/role-select";
 import { ImportarCsvDialog } from "@/components/importar-csv-dialog";
 import { FilaEspera } from "@/components/fila-espera";
+import { CapacidadeMentorDialog } from "@/components/capacidade-mentor-dialog";
 import { MatchingPanel } from "@/components/matching-panel";
 import { NovaPessoaDialog, NovoMentoradoDialog } from "@/components/pessoas-dialogs";
 import { Badge } from "@/components/ui/badge";
@@ -239,19 +240,20 @@ export function PessoasListas({
     [souCoord, pessoas, mentorProfiles, contagemPorMentor]
   );
 
-  // matching board: "Livres para dupla" deixa só mentores e mentorados livres
-  // pra parear — inativo e fora-do-programa não são par de ninguém
-  const mentoresLivres = pessoas.filter(
-    (p) => ehMentor(p) && p.ativo && !emDupla.has(p.id)
-  );
+  // matching board (REALIZA-116): "livre" pra mentor é ter VAGA, não estar
+  // zerado — com capacidade 2 a dupla 1/2 ainda aceita par. O painel recebe
+  // todos os ativos (cheios afundam marcados) e a ocupação pra desenhar o X/Y
+  const vagasDe = (p: Profile) =>
+    tetoMentor(p, mentorProfiles[p.id]) - (contagemPorMentor[p.id] ?? 0);
+  const temVaga = (p: Profile) => ehMentor(p) && p.ativo && vagasDe(p) > 0;
+  const mentoresAtivos = pessoas.filter((p) => ehMentor(p) && p.ativo);
+  const mentoresComVaga = mentoresAtivos.filter(temVaga);
   const mentoradosLivres = mentorados.filter(
     (m) => !emDupla.has(m.id) && !foraDoPrograma(m)
   );
-  const livres = mentoresLivres.length + mentoradosLivres.length;
+  const livres = mentoresComVaga.length + mentoradosLivres.length;
   if (semDupla) {
-    pessoasFiltradas = pessoasFiltradas.filter(
-      (p) => ehMentor(p) && !emDupla.has(p.id)
-    );
+    pessoasFiltradas = pessoasFiltradas.filter(temVaga);
     mentoradosFiltrados = mentoradosFiltrados.filter((m) => !emDupla.has(m.id));
   }
   const filtrando = Boolean(q) || semDupla;
@@ -273,13 +275,13 @@ export function PessoasListas({
       ? pendenciasPessoa(
             b,
             mentorProfiles[b.id],
-            ehMentor(b) && !emDupla.has(b.id),
+            temVaga(b),
             assinaturas[b.id]
           ) -
           pendenciasPessoa(
             a,
             mentorProfiles[a.id],
-            ehMentor(a) && !emDupla.has(a.id),
+            temVaga(a),
             assinaturas[a.id]
           ) || comparaNome(a.nome, b.nome)
       : comparaNome(a.nome, b.nome)
@@ -405,9 +407,10 @@ export function PessoasListas({
           vendo "Fora do programa" ele é ruído no meio do arquivo */}
       {souCoord && semDupla && !verFora && (
         <MatchingPanel
-          mentores={mentoresLivres}
+          mentores={mentoresAtivos}
           mentorados={mentoradosLivres}
           mentorProfiles={mentorProfiles}
+          ocupacao={contagemPorMentor}
         />
       )}
 
@@ -480,7 +483,7 @@ export function PessoasListas({
               temHistorico={temQualquerDupla.has(p.id)}
               podeExcluir={!p.user_id && !temQualquerDupla.has(p.id)}
               mentorProfile={mentorProfiles[p.id]}
-              vagas={contagemPorMentor[p.id] ?? 0}
+              usadas={contagemPorMentor[p.id] ?? 0}
               docs={assinaturas[p.id]}
               faltantesTermo={faltantes?.[p.id]?.["termo-voluntario"] ?? []}
               souCoord={souCoord}
@@ -664,7 +667,7 @@ export function PessoasListas({
                   temHistorico={temQualquerDupla.has(p.id)}
                   podeExcluir={!p.user_id && !temQualquerDupla.has(p.id)}
                   mentorProfile={mentorProfiles[p.id]}
-                  vagas={contagemPorMentor[p.id] ?? 0}
+                  usadas={contagemPorMentor[p.id] ?? 0}
                   docs={assinaturas[p.id]}
                   faltantesTermo={faltantes?.[p.id]?.["termo-voluntario"] ?? []}
                   souCoord={souCoord}
@@ -790,7 +793,7 @@ function PessoaRow({
   temHistorico,
   podeExcluir,
   mentorProfile: mp,
-  vagas,
+  usadas,
   docs: docsProp,
   faltantesTermo = [],
   souCoord,
@@ -804,7 +807,8 @@ function PessoaRow({
   temHistorico: boolean;
   podeExcluir: boolean;
   mentorProfile: MentorProfile | undefined;
-  vagas: number;
+  /** Duplas em andamento (ativa + pausada) — o X do "X/Y" da capacidade. */
+  usadas: number;
   docs: DocsPessoa | undefined;
   /** labels do que falta na ficha pro termo do voluntário — coord-only */
   faltantesTermo?: string[];
@@ -913,9 +917,9 @@ function PessoaRow({
         {souCoord && p.ativo && !p.user_id && (
           <Badge variant="outline" className="text-xs shrink-0">ainda não entrou</Badge>
         )}
-        {/* pra mentor a linha "Cuida de X de Y" em Detalhes já diz "em dupla" —
-            o badge só aparece quando ela não cobriria (vagas 0) */}
-        {souCoord && emDupla && !(ehMentor(p) && vagas > 0) && (
+        {/* pra mentor a linha "X/Y duplas em andamento" em Detalhes já diz
+            "em dupla" — o badge só aparece quando ela não cobriria (usadas 0) */}
+        {souCoord && emDupla && !(ehMentor(p) && usadas > 0) && (
           <Badge variant="outline" className="text-xs shrink-0">em dupla</Badge>
         )}
         {souCoord && p.ativo && !termoOk && (
@@ -951,11 +955,32 @@ function PessoaRow({
       {souCoord && ehMentor(p) && (
         <DetalhesRegiao id={detalhesId} nome={p.nome}>
           <ItemDetalhe icone={Users}>
-            {vagas === 0
+            {/* X/Y explícito (REALIZA-116): ativas + pausadas contra o teto
+                da pool — o "sem vaga" avisa que o próximo par pede ajuste */}
+            {usadas === 0
               ? temHistorico
-                ? "Sem dupla ativa. Histórico de dupla encerrada fica na ficha"
-                : `Ainda sem dupla · ${capacidade === 1 ? "vaga para 1" : `vagas para ${capacidade}`}`
-              : `Cuida de ${vagas} de ${capacidade} ${capacidade === 1 ? "dupla" : "duplas"}`}
+                ? `Sem dupla em andamento · ${capacidade === 1 ? "1 vaga" : `${capacidade} vagas`} — histórico na ficha`
+                : `Sem dupla em andamento · ${capacidade === 1 ? "1 vaga" : `${capacidade} vagas`} pra parear`
+              : `${usadas}/${capacidade} ${capacidade === 1 ? "dupla" : "duplas"} em andamento${usadas >= capacidade ? " · sem vaga" : ""}`}
+            {p.ativo && (
+              <>
+                {" · "}
+                <CapacidadeMentorDialog
+                  mentorId={p.id}
+                  nome={p.nome}
+                  atual={capacidade}
+                  emUso={usadas}
+                  trigger={
+                    <button
+                      type="button"
+                      className="rounded-sm font-medium text-foreground underline underline-offset-2 transition-colors hover:text-foreground/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      ajustar
+                    </button>
+                  }
+                />
+              </>
+            )}
           </ItemDetalhe>
           {mp?.termo_ok ? (
             <ItemDetalhe icone={FileText}>
