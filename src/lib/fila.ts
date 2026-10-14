@@ -4,7 +4,7 @@
 // que o board "Livres para dupla" não tinha (tempo de espera, origem,
 // contato) mora aqui.
 
-import { comparaNome } from "./ciclo";
+import { comparaNome, foraDoPrograma } from "./ciclo";
 import type { Mentorado, MentorProfile, Profile } from "./types";
 
 /** Item da fila — o mínimo pra linha: quem é, de onde veio, desde quando
@@ -113,17 +113,19 @@ const porEspera = (a: FilaItem, b: FilaItem) =>
 /** Mentorados aguardando o primeiro par. `ocupados` = quem ocupa vaga
  *  (dupla ativa|pausada); `historico` = qualquer dupla, até encerrada. A
  *  fila é de quem NUNCA teve par — dupla concluída/encerrada no histórico
- *  marca concluinte, saída ou remanejo, não espera (o cadastro de
- *  mentorado não tem flag de desistência: o sinal disponível é justamente
- *  "já teve dupla"). Re-entrar na fila é decisão manual — a pessoa segue
- *  visível no chip "Livres para dupla". */
+ *  marca concluinte, saída ou remanejo, não espera. Quem saiu do programa
+ *  (situacao ≠ 'ativo', 0077) também fica de fora — desistente não é
+ *  espera nem quando nunca pareou. Re-entrar na fila é decisão manual:
+ *  reativar o cadastro devolve a pessoa pra cá. */
 export function filaMentorados(
   mentorados: Mentorado[],
   ocupados: ReadonlySet<string>,
   historico: ReadonlySet<string>
 ): FilaItem[] {
   return mentorados
-    .filter((m) => !ocupados.has(m.id) && !historico.has(m.id))
+    .filter(
+      (m) => !ocupados.has(m.id) && !historico.has(m.id) && !foraDoPrograma(m)
+    )
     .map((m) => ({
       id: m.id,
       nome: m.nome,

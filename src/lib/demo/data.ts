@@ -1279,6 +1279,12 @@ function build(): DemoData {
     objetivos: "Concluir o técnico em administração e conseguir estágio na área.",
     escolaridade: "tecnico", origem: "Instituto Alavanca",
     disponibilidade: { dias: ["seg", "qua"], periodos: ["tarde"] },
+    // ciclo anterior fechado (a dupla com a Luiza é a "concluida" do
+    // dataset) — a saída do programa da 0077 já vem marcada: ela povoa a
+    // seção "Fora do programa" da /pessoas e some da fila/pareamento
+    situacao: "concluido",
+    saiu_em: haDias(228, "18:00"),
+    motivo_saida: "Ciclo 2025/2026 — concluiu a jornada e o PDM",
     created_at: haDias(400),
   };
   const kaua: Mentorado = {

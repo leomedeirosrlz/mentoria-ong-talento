@@ -52,7 +52,7 @@ const PROFILE_COLS_PUBLICAS =
  *  `select("*")` expandiria pras colunas revogadas e derrubaria a query
  *  inteira com permission denied — a lista é sempre explícita. */
 const MENTORADO_COLS_PUBLICAS =
-  "id, nome, email, whatsapp, ong_origem, notas, avatar_path, documento_path, created_at, nome_social, cidade, uf, interesses, objetivos, escolaridade, origem, disponibilidade";
+  "id, nome, email, whatsapp, ong_origem, notas, avatar_path, documento_path, created_at, nome_social, cidade, uf, interesses, objetivos, escolaridade, origem, disponibilidade, situacao, saiu_em, motivo_saida";
 
 /** Subconjunto do mentorado que vai no embed da dupla (0076): o que o par
  *  e a ficha consomem — notas e documento_path do jovem não saem no select
@@ -61,7 +61,7 @@ const MENTORADO_COLS_PUBLICAS =
  *  (REALIZA-24). getMentorados e as queries de ficha/diretório seguem com
  *  MENTORADO_COLS_PUBLICAS. */
 const MENTORADO_COLS_PAR =
-  "id, nome, nome_social, avatar_path, whatsapp, email, ong_origem, cidade, uf, interesses, disponibilidade";
+  "id, nome, nome_social, avatar_path, whatsapp, email, ong_origem, cidade, uf, interesses, disponibilidade, situacao";
 
 /** Os 4 sensíveis da 0034 + dados civis da 0046, idênticos em profiles e
  *  mentorados — fora do grant de coluna; só a coordenação os lê, pelas
