@@ -1,4 +1,4 @@
-import { signOut } from "@/lib/actions";
+import { SignOutButton } from "@/components/signout-button";
 
 /** Telas de conta bloqueada — o mesmo trio de gates nos dois shells
  *  ((app) staff e /jovem): autenticado sem profile, cadastro desativado e
@@ -19,14 +19,13 @@ export function TelaConta({
         <div className="mt-2 text-sm leading-relaxed text-muted-foreground">
           {children}
         </div>
-        <form action={signOut} className="mt-4">
-          <button
-            type="submit"
-            className="text-sm text-muted-foreground underline transition-colors hover:text-foreground"
-          >
-            Sair e voltar ao login
-          </button>
-        </form>
+        <SignOutButton
+          icone={false}
+          iconSize={13}
+          label="Sair e voltar ao login"
+          formClassName="mt-4"
+          className="text-sm text-muted-foreground underline transition-colors hover:text-foreground"
+        />
       </div>
     </div>
   );

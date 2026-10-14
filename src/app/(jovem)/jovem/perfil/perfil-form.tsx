@@ -1,9 +1,7 @@
 "use client";
 
-import { SignOut } from "@phosphor-icons/react";
-import { signOut } from "@/lib/actions";
 import { CampoInteresses, CampoUf } from "@/components/campos-pessoais";
-import { Button } from "@/components/ui/button";
+import { SignOutButton } from "@/components/signout-button";
 import {
   Dialog,
   DialogContent,
@@ -160,23 +158,16 @@ export function ContaSecao({ me }: { me: Profile }) {
           titulo="Sessão"
           descricao="Encerra o acesso da sua conta neste dispositivo."
           acao={
-            <Button
-              type="submit"
-              form="form-sair"
+            <SignOutButton
               variant="outline"
               size="sm"
-            >
-              <SignOut size={15} aria-hidden />
-              Sair
-            </Button>
+              iconSize={15}
+              formClassName="contents"
+            />
           }
           borda
         />
       </section>
-
-      {/* o Sair usa um form real com server action; o botão se liga por
-          form= pra não precisar de estado */}
-      <form id="form-sair" action={signOut} className="hidden" />
     </>
   );
 }
