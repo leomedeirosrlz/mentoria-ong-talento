@@ -28,10 +28,12 @@ import { JovemAvaliacoes } from "@/components/jovem-avaliacoes";
 import { JovemCombinados } from "@/components/jovem-combinados";
 import { JovemEspecialistas } from "@/components/jovem-especialistas";
 import { PedirAjudaDialog } from "@/components/jovem-pedir-ajuda";
+import { LembreteDisponibilidade } from "@/components/lembrete-disponibilidade";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
+  disponibilidadeVazia,
   formatDate,
   formatDateTime,
   formatDiaMes,
@@ -51,7 +53,7 @@ import {
 } from "@/lib/queries-jovem";
 import { getJovemAvaliacoes } from "@/lib/queries-avaliacao";
 import { getComunicados, getMateriais, getMe } from "@/lib/queries";
-import type { JovemContato } from "@/lib/types";
+import type { Disponibilidade, JovemContato } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Início" };
@@ -190,6 +192,13 @@ export default async function JovemHome() {
     `Olá! Sou ${nomeTela}, mentorado(a) do programa, e preciso falar com a equipe.`
   );
 
+  // lembrete permanente do "Preencher depois" (REALIZA-114): sem grade o
+  // cruzamento da agenda não tem com o que cruzar — a faixa fica até a
+  // pessoa preencher no Perfil (quem "pulou" no wizard cai no mesmo estado)
+  const gradeVazia =
+    perfil != null &&
+    disponibilidadeVazia(perfil.disponibilidade as Disponibilidade | null);
+
   // pedidos de especialista (REALIZA-112): o gate da demanda é o da RPC —
   // só quem NÃO tem trilha de especialista ativa/pausada precisa contar o
   // porquê; e sem dupla DPP ativa o pedido entra na triagem da coordenação
@@ -217,6 +226,10 @@ export default async function JovemHome() {
             : "Sua jornada de mentoria por aqui."}
         </p>
       </header>
+
+      {/* pendência da grade — some quando a pessoa preenche (sem ficha não
+          tem onde gravar: a faixa nem promete o gesto) */}
+      {gradeVazia && <LembreteDisponibilidade />}
 
       {/* canal de segurança sempre à mão — a ação mais importante da tela
           pra quem precisa dela não pode morar atrás de scroll nem de nav */}
