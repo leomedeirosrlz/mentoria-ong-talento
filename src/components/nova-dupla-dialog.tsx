@@ -9,6 +9,7 @@ import { createClient } from "@/lib/supabase/client";
 import { createDupla } from "@/lib/actions";
 import { cronogramaVigente, foraDoPrograma, podeSupervisionar, rotuloCronograma } from "@/lib/ciclo";
 import { AfinidadePar } from "@/components/matching-afinidade";
+import { CapacidadeMentorDialog } from "@/components/capacidade-mentor-dialog";
 import { Button } from "@/components/ui/button";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
@@ -210,6 +211,12 @@ export function NovaDuplaDialog() {
   const mentorSelObj = mentores.find((m) => m.id === mentorSel) ?? null;
   const mentoradoSelObj = mentorados.find((m) => m.id === mentoradoSel) ?? null;
   const ehEsp = mentorSelObj?.role === "mentor_especialista";
+  // mentor sem vaga: selecionável de propósito (a afinidade dele ainda
+  // compara — às vezes a saída certa é dar mais uma vaga a quem já encaixa),
+  // mas o submit bloqueia até a capacidade subir ou outro mentor entrar
+  const mentorLotado =
+    mentorSel != null &&
+    (emUso[mentorSel] ?? 0) >= (capacidade[mentorSel] ?? 1);
   const trilhaSel: "dpp" | "especialista" | null = mentorSel
     ? ehEsp ? "especialista" : "dpp"
     : null;
@@ -247,6 +254,9 @@ export function NovaDuplaDialog() {
 
   function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    // mentor lotado não sai do client — o trigger do banco segue sendo a
+    // guarda final da corrida (0025/0073), aqui é só o bloqueio honesto
+    if (mentorLotado) return;
     const fd = new FormData(e.currentTarget);
     if (fd.get("supervisor_id") === NENHUM) fd.set("supervisor_id", "");
     // dupla de especialista nunca leva supervisor — o server força null também
@@ -338,12 +348,15 @@ export function NovaDuplaDialog() {
             <Select
               name="mentor_id"
               required
-              items={Object.fromEntries(mentoresOrd.map((m) => [
-                m.id,
-                m.role === "mentor_especialista"
-                  ? `${m.nome} · ${emUso[m.id] ?? 0}/${capacidade[m.id] ?? 1} · especialista`
-                  : `${m.nome} · ${emUso[m.id] ?? 0}/${capacidade[m.id] ?? 1}`,
-              ]))}
+              items={Object.fromEntries(mentoresOrd.map((m) => {
+                const usadas = emUso[m.id] ?? 0;
+                const total = capacidade[m.id] ?? 1;
+                const cheio = usadas >= total;
+                const rotulo = `${m.nome} · ${usadas}/${total}${
+                  m.role === "mentor_especialista" ? " · especialista" : ""
+                }${cheio ? " · sem vaga" : ""}`;
+                return [m.id, rotulo];
+              }))}
               onValueChange={(v) => setMentorSel(v ? String(v) : null)}
             >
               <SelectTrigger id="mentor" aria-labelledby="mentor-label mentor"><SelectValue placeholder="Selecione" /></SelectTrigger>
@@ -354,15 +367,56 @@ export function NovaDuplaDialog() {
                 {mentoresOrd.map((m) => {
                   const usadas = emUso[m.id] ?? 0;
                   const total = capacidade[m.id] ?? 1;
+                  const cheio = usadas >= total;
                   const esp = m.role === "mentor_especialista";
                   return (
-                    <SelectItem key={m.id} value={m.id} disabled={usadas >= total}>
+                    // sem vaga segue selecionável — marcar é o convite pra
+                    // comparar a afinidade e abrir "aumentar capacidade";
+                    // esconder seria fingir que o mentor certo não existe
+                    <SelectItem
+                      key={m.id}
+                      value={m.id}
+                      className={cheio ? "text-muted-foreground" : undefined}
+                    >
                       {m.nome} · {usadas}/{total}{esp ? " · especialista" : ""}
+                      {cheio ? " · sem vaga" : ""}
                     </SelectItem>
                   );
                 })}
               </SelectContent>
             </Select>
+            {mentorSelObj && mentorLotado && (
+              <div
+                role="alert"
+                className="rounded-lg border border-[var(--warn)]/40 bg-[var(--warn)]/5 px-3.5 py-3 text-sm"
+              >
+                <p className="font-medium">
+                  {mentorSelObj.nome.split(" ")[0]} está sem vaga — já cuida
+                  de {emUso[mentorSel!]}/{capacidade[mentorSel!] ?? 1}{" "}
+                  {(capacidade[mentorSel!] ?? 1) === 1 ? "dupla" : "duplas"}.
+                </p>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  Se ela é o par certo, dá pra abrir mais uma vaga:{" "}
+                  <CapacidadeMentorDialog
+                    mentorId={mentorSelObj.id}
+                    nome={mentorSelObj.nome}
+                    atual={capacidade[mentorSelObj.id] ?? 1}
+                    emUso={emUso[mentorSelObj.id] ?? 0}
+                    onSaved={(n) =>
+                      setCapacidade((c) => ({ ...c, [mentorSelObj.id]: n }))
+                    }
+                    trigger={
+                      <button
+                        type="button"
+                        className="rounded-sm font-medium text-foreground underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      >
+                        aumentar capacidade →
+                      </button>
+                    }
+                  />
+                </p>
+              </div>
+            )}
             {ehEsp && (
               <p className="text-xs text-muted-foreground">
                 Mentoria especializada: até 5 encontros de 1h em até 3 meses,
@@ -512,7 +566,7 @@ export function NovaDuplaDialog() {
                 : "Deixe em branco se a dupla já existia desde o início do programa. Se ela está começando agora, use a data de hoje."}
             </p>
           </div>
-          <Button type="submit" className="w-full" disabled={pending}>
+          <Button type="submit" className="w-full" disabled={pending || mentorLotado}>
             {pending ? "Salvando…" : "Formar dupla"}
           </Button>
           </>
