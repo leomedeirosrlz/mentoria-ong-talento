@@ -357,3 +357,35 @@
     box-shadow: none;
   }
 }
+
+/* ==== instrumentos interativos ==== */
+
+/* entrada da Roda da Vida — o desenho nasce do centro como um compasso
+   abrindo (scale + fade no <g>, uma vez só). transform-box/origin no
+   fill-box porque transform de SVG não ancora no viewBox por padrão.
+   Coberto pelo guard global de prefers-reduced-motion. */
+@keyframes roda-abre {
+  from {
+    opacity: 0;
+    transform: scale(0.86);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.roda-entra {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: roda-abre 480ms var(--ease-snappy) both;
+}
+
+/* os pontos dos eixos e o traço do polígono acompanham o dedo: cx/cy/r e
+   points são propriedades geométricas de SVG2 (Chromium, Firefox, Safari
+   18+) — onde não animam, o valor muda direto (progressive enhancement) */
+.roda-ponto {
+  transition:
+    cx 160ms var(--ease-snappy),
+    cy 160ms var(--ease-snappy),
+    r 160ms var(--ease-snappy);
+}
