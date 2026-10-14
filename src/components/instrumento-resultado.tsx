@@ -5,16 +5,17 @@ import {
   type FormularioCampo,
   type FormularioSistema,
   type RespostaValor,
-  type RodaDaVida,
 } from "@/lib/forms/schema";
 import { cn } from "@/lib/utils";
+import { RodaSvg } from "./instrumentos/roda-svg";
 
 // Leitura estruturada das respostas dos instrumentos oficiais (0080) —
 // o form genérico guarda {campo_id: valor}; aqui o resultado vira o que o
-// instrumento é de verdade: a roda desenhada, a lista de metas com IS e
-// prazo, a declaração de visão. Usado na aba Respostas do /formularios/[id]
-// e na seção Instrumentos da ficha da dupla. Server component puro — sem
-// estado nem efeito.
+// instrumento é de verdade: a roda desenhada (o mesmo SVG que a pessoa
+// preencheu no /f/<token>), a lista de metas com IS e prazo, a declaração
+// de visão. Usado na aba Respostas do /formularios/[id] e na seção
+// Instrumentos da ficha da dupla. Server component puro — sem estado nem
+// efeito.
 
 /** Resposta de um campo pelo id, já formatada pra exibição. */
 function valorDe(
@@ -62,19 +63,6 @@ function Declaracao({ texto }: { texto: string }) {
 
 // ---------- Roda da Vida ----------
 
-const CX = 160;
-const CY = 160;
-const RAIO = 118;
-
-/** Ponto do eixo i na fração 0–1 do raio — eixo 0 aponta pra cima. */
-function pontoEixo(i: number, total: number, fracao: number) {
-  const ang = -Math.PI / 2 + (i * 2 * Math.PI) / total;
-  return {
-    x: CX + RAIO * fracao * Math.cos(ang),
-    y: CY + RAIO * fracao * Math.sin(ang),
-  };
-}
-
 function corNota(n: number | null): string {
   if (n == null) return "text-muted-foreground";
   if (n <= 4) return "text-[var(--warn-text)]";
@@ -88,99 +76,6 @@ function dataBr(iso: string): string {
   return isNaN(d.getTime())
     ? iso
     : d.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
-}
-
-/** Polígono SVG da roda: anéis de 2 em 2, um eixo por área e o traço das
- *  notas. Os quadrantes ganham o rótulo no meio do próprio arco. */
-function RodaSvg({ roda }: { roda: RodaDaVida }) {
-  const areas = roda.quadrantes.flatMap((q) => q.areas);
-  const total = areas.length;
-  if (!total) return null;
-  const aneis = [2, 4, 6, 8, 10].map((nivel) =>
-    areas
-      .map((_, i) => {
-        const p = pontoEixo(i, total, nivel / 10);
-        return `${p.x.toFixed(1)},${p.y.toFixed(1)}`;
-      })
-      .join(" ")
-  );
-  const dados = areas
-    .map((a, i) => {
-      const p = pontoEixo(i, total, (a.nota ?? 0) / 10);
-      return `${p.x.toFixed(1)},${p.y.toFixed(1)}`;
-    })
-    .join(" ");
-
-  // nome do quadrante no meio do arco dele (média dos índices das áreas)
-  const comNome = roda.quadrantes.filter((q) => q.nome);
-  const rotulosQuad = comNome
-    .map((q) => {
-      const ini = comNome
-        .slice(0, comNome.indexOf(q))
-        .reduce((acc, x) => acc + x.areas.length, 0);
-      const meio = ini + (q.areas.length - 1) / 2;
-      const ang = -Math.PI / 2 + (meio * 2 * Math.PI) / total;
-      const x = CX + (RAIO + 14) * Math.cos(ang);
-      const y = CY + (RAIO + 14) * Math.sin(ang);
-      return { nome: q.nome, x, y };
-    });
-
-  return (
-    <svg
-      viewBox="0 0 320 320"
-      role="img"
-      aria-label={`Roda da Vida — média ${roda.media?.toLocaleString("pt-BR") ?? "sem notas"} em ${total} áreas`}
-      className="mx-auto w-full max-w-[280px] shrink-0 sm:max-w-[300px]"
-    >
-      {aneis.map((pontos, i) => (
-        <polygon
-          key={i}
-          points={pontos}
-          fill="none"
-          className="stroke-border"
-          strokeWidth={i === aneis.length - 1 ? 1.4 : 0.7}
-        />
-      ))}
-      {areas.map((a, i) => {
-        const p = pontoEixo(i, total, 1);
-        return (
-          <line
-            key={a.id}
-            x1={CX}
-            y1={CY}
-            x2={p.x}
-            y2={p.y}
-            className="stroke-border"
-            strokeWidth={0.7}
-          />
-        );
-      })}
-      <polygon
-        points={dados}
-        className="fill-[var(--brand-lime)]/25 stroke-[var(--ok-text)]"
-        strokeWidth={1.8}
-        strokeLinejoin="round"
-      />
-      {areas.map((a, i) => {
-        const p = pontoEixo(i, total, (a.nota ?? 0) / 10);
-        return (
-          <circle key={a.id} cx={p.x} cy={p.y} r={3} className="fill-[var(--ok-text)]" />
-        );
-      })}
-      {rotulosQuad.map((q) => (
-        <text
-          key={q.nome}
-          x={q.x}
-          y={q.y}
-          textAnchor="middle"
-          dominantBaseline="middle"
-          className="fill-muted-foreground text-[10px] font-medium"
-        >
-          {q.nome}
-        </text>
-      ))}
-    </svg>
-  );
 }
 
 function RodaResultado({
@@ -198,7 +93,7 @@ function RodaResultado({
     <div className="space-y-4">
       <div className="grid gap-4 sm:grid-cols-[auto_1fr] sm:items-center">
         <div className="text-center">
-          <RodaSvg roda={roda} />
+          <RodaSvg roda={roda} className="max-w-[280px] sm:max-w-[300px]" />
           <p className="mt-1 text-sm text-muted-foreground">
             {roda.media != null && (
               <>

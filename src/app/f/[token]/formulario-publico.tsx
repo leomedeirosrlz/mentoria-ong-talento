@@ -20,12 +20,14 @@ import {
   normalizaTexto,
   type NormResult,
 } from "@/lib/forms/normaliza";
+import { ehInstrumento } from "@/lib/forms/instrumentos";
 import { fade, T } from "@/components/motion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import { InstrumentoFlow } from "@/components/instrumentos/flow";
 
 /** Tipos com teclado de texto — recebem enterKeyHint; o último deles leva
  *  "send" (fecha o teclado e envia em vez de saltar pra lugar nenhum). */
@@ -40,10 +42,33 @@ const TIPOS_COM_ENTER: readonly FormularioCampo["tipo"][] = [
  *  marcado é corrigido; o de servidor só sai no próximo submit. */
 const ERRO_VALIDACAO = "Revise os campos marcados antes de enviar.";
 
-/** Formulário público /f/<token> — renderiza a definição vinda da RPC e
- *  envia payload tipado pra submeterRespostaFormulario (o banco revalida
- *  tudo; aqui é só UX: validação por campo + espelho das regras). */
-export function FormularioPublico({
+/** Formulário público /f/<token> — despacha pelo sistema do form: os 4
+ *  instrumentos de jornada (0080) têm experiência sob medida
+ *  (src/components/instrumentos); todo o resto — incluindo anamnese, 360º
+ *  e autoavaliação — segue no renderer genérico. O contrato de submissão
+ *  é o mesmo nas duas vias. */
+export function FormularioPublico(props: {
+  token: string;
+  titulo: string;
+  descricao: string | null;
+  campos: FormularioCampo[];
+  destinatario: string | null;
+  /** 0042 — instrumento oficial ganha selo discreto (vem da RPC) */
+  sistema?: FormularioSistema | null;
+  /** prévia na ficha da coordenação — campos vivos, envio desligado */
+  preview?: boolean;
+}) {
+  const { sistema } = props;
+  if (ehInstrumento(sistema)) {
+    return <InstrumentoFlow {...props} sistema={sistema} />;
+  }
+  return <FormularioGenerico {...props} />;
+}
+
+/** Renderer genérico — a definição vinda da RPC vira um card por pergunta
+ *  e envia payload tipado pra submeterRespostaFormulario (o banco
+ *  revalida tudo; aqui é só UX: validação por campo + espelho das regras). */
+function FormularioGenerico({
   token,
   titulo,
   descricao,
@@ -57,9 +82,7 @@ export function FormularioPublico({
   descricao: string | null;
   campos: FormularioCampo[];
   destinatario: string | null;
-  /** 0042 — instrumento oficial ganha selo discreto (vem da RPC) */
   sistema?: FormularioSistema | null;
-  /** prévia na ficha da coordenação — campos vivos, envio desligado */
   preview?: boolean;
 }) {
   const [enviado, setEnviado] = useState(false);
@@ -572,13 +595,13 @@ function CampoRenderer({
     erro && "ring-2 ring-destructive/60"
   );
 
-  // seção é estrutura, não pergunta — faixa de título entre os cards, sem
-  // numeração nem controle. A descrição leva a instrução do instrumento
-  // ("Antes de responder", "Mapa de submetas"…)
+  // seção é estrutura, não pergunta — divider editorial entre os cards,
+  // sem numeração nem controle. A descrição leva a instrução do
+  // instrumento ("Antes de responder", "Mapa de submetas"…)
   if (campo.tipo === "secao") {
     return (
-      <div className="border-l-2 border-[var(--brand-lime)] pt-1 pl-3 sm:pl-4">
-        <h2 className="text-[15px] font-semibold tracking-tight sm:text-base">
+      <header className="px-1 pb-1 pt-3 first:pt-1">
+        <h2 className="text-base font-semibold tracking-tight sm:text-lg">
           {campo.label}
         </h2>
         {campo.descricao && (
@@ -586,7 +609,8 @@ function CampoRenderer({
             {campo.descricao}
           </p>
         )}
-      </div>
+        <div aria-hidden className="mt-3 h-px bg-border" />
+      </header>
     );
   }
 
@@ -628,6 +652,7 @@ function CampoRenderer({
             enterKeyHint={enterKeyHint}
             {...dicas}
             {...a11y}
+            placeholder={dicas.placeholder ?? "Escreva aqui…"}
           />
           <ErroCampo id={erroId} msg={erro} />
         </div>
@@ -645,6 +670,7 @@ function CampoRenderer({
             rows={4}
             maxLength={5000}
             enterKeyHint={enterKeyHint}
+            placeholder="Escreva com suas palavras…"
             {...a11y}
           />
           <ErroCampo id={erroId} msg={erro} />
@@ -717,7 +743,7 @@ function CampoRenderer({
             ).map((o) => (
               <label
                 key={o.v}
-                className="flex h-11 cursor-pointer items-center justify-center rounded-lg text-sm font-medium text-muted-foreground transition-colors select-none has-checked:bg-primary has-checked:text-primary-foreground has-focus-visible:ring-3 has-focus-visible:ring-ring/50 md:h-10"
+                className="flex h-11 cursor-pointer items-center justify-center rounded-lg text-sm font-medium text-muted-foreground transition-colors select-none has-checked:bg-primary has-checked:text-primary-foreground has-checked:shadow-sm has-focus-visible:ring-3 has-focus-visible:ring-ring/50 md:h-10"
               >
                 <input
                   type="radio"
@@ -744,7 +770,7 @@ function CampoRenderer({
             {[1, 2, 3, 4, 5].map((num) => (
               <label
                 key={num}
-                className="flex h-11 cursor-pointer items-center justify-center rounded-lg text-sm font-semibold tabular-nums text-muted-foreground transition-colors select-none has-checked:bg-primary has-checked:text-primary-foreground has-focus-visible:ring-3 has-focus-visible:ring-ring/50 md:h-10"
+                className="flex h-11 cursor-pointer items-center justify-center rounded-lg text-sm font-semibold tabular-nums text-muted-foreground transition-colors select-none has-checked:bg-primary has-checked:text-primary-foreground has-checked:shadow-sm has-focus-visible:ring-3 has-focus-visible:ring-ring/50 md:h-10"
               >
                 <input
                   type="radio"
@@ -776,7 +802,7 @@ function CampoRenderer({
             {Array.from({ length: 10 }, (_, i) => i + 1).map((num) => (
               <label
                 key={num}
-                className="flex h-11 cursor-pointer items-center justify-center rounded-lg text-sm font-semibold tabular-nums text-muted-foreground transition-colors select-none has-checked:bg-primary has-checked:text-primary-foreground has-focus-visible:ring-3 has-focus-visible:ring-ring/50 md:h-10"
+                className="flex h-11 cursor-pointer items-center justify-center rounded-lg text-sm font-semibold tabular-nums text-muted-foreground transition-colors select-none has-checked:bg-primary has-checked:text-primary-foreground has-checked:shadow-sm has-focus-visible:ring-3 has-focus-visible:ring-ring/50 md:h-10"
               >
                 <input
                   type="radio"
