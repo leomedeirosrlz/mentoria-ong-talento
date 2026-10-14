@@ -13,11 +13,13 @@ import {
   CircleNotch,
   Copy,
   Eye,
+  Gauge,
   ListBullets,
   ListChecks,
   PencilSimple,
   Plus,
   RadioButton,
+  Rows,
   Star,
   TextAlignLeft,
   TextT,
@@ -28,6 +30,7 @@ import {
 import { salvarFormulario } from "@/lib/forms/actions";
 import {
   CAMPO_TIPO_LABEL,
+  camposPerguntas,
   MAX_CAMPOS,
   MAX_OPCOES,
   TIPOS_COM_OPCOES,
@@ -59,6 +62,8 @@ type DraftCampo = {
   label: string;
   obrigatorio: boolean;
   opcoes: string[];
+  /** só secao (0080) — texto de apoio sob o título */
+  descricao: string;
 };
 
 const novoId = () => `c_${crypto.randomUUID().replace(/-/g, "").slice(0, 12)}`;
@@ -69,9 +74,11 @@ const CAMPO_TIPO_ICONE: Record<FormularioCampoTipo, Icon> = {
   select: ListBullets,
   multi_select: ListChecks,
   escala_1_5: Star,
+  escala_1_10: Gauge,
   data: CalendarBlank,
   checkbox: CheckSquare,
   sim_nao: RadioButton,
+  secao: Rows,
 };
 
 function paraDraft(c: FormularioCampo): DraftCampo {
@@ -81,6 +88,7 @@ function paraDraft(c: FormularioCampo): DraftCampo {
     label: c.label,
     obrigatorio: c.obrigatorio,
     opcoes: [...(c.opcoes ?? [])],
+    descricao: c.descricao ?? "",
   };
 }
 
@@ -91,6 +99,7 @@ function novoCampo(): DraftCampo {
     label: "",
     obrigatorio: false,
     opcoes: [],
+    descricao: "",
   };
 }
 
@@ -188,6 +197,9 @@ export function FormularioBuilder({
               ...(TIPOS_COM_OPCOES.includes(tipo) && c.opcoes.length === 0
                 ? { opcoes: ["", ""] }
                 : {}),
+              // secao não espera resposta — obrigatória é conceito inválido
+              // (o servidor também força false em validaCampos)
+              ...(tipo === "secao" ? { obrigatorio: false } : {}),
             }
           : c
       )
@@ -319,9 +331,12 @@ export function FormularioBuilder({
       id: c.id,
       tipo: c.tipo,
       label: c.label.trim(),
-      obrigatorio: c.obrigatorio,
+      obrigatorio: c.tipo === "secao" ? false : c.obrigatorio,
       ...(TIPOS_COM_OPCOES.includes(c.tipo)
         ? { opcoes: c.opcoes.map((o) => o.trim()).filter(Boolean) }
+        : {}),
+      ...(c.tipo === "secao" && c.descricao.trim()
+        ? { descricao: c.descricao.trim() }
         : {}),
     }));
   }
@@ -506,14 +521,22 @@ export function FormularioBuilder({
                     <div className="flex flex-col gap-3 sm:flex-row">
                       <Input
                         ref={reg(`en:${c.id}`)}
-                        aria-label={`Texto da pergunta ${i + 1}`}
+                        aria-label={
+                          c.tipo === "secao"
+                            ? `Título da seção ${i + 1}`
+                            : `Texto da pergunta ${i + 1}`
+                        }
                         aria-invalid={msg ? true : undefined}
                         aria-describedby={msg ? erroId : undefined}
                         className="flex-1"
                         value={c.label}
                         onChange={(e) => update(i, { label: e.target.value })}
                         maxLength={200}
-                        placeholder="Ex.: Como foi o encontro desta semana?"
+                        placeholder={
+                          c.tipo === "secao"
+                            ? "Ex.: Antes de responder"
+                            : "Ex.: Como foi o encontro desta semana?"
+                        }
                       />
                       <div className="w-full shrink-0 sm:w-44">
                         <Select
@@ -555,6 +578,19 @@ export function FormularioBuilder({
                         onUpdate={(j, v) => updateOpcao(i, j, v)}
                         onAdd={(depoisDe) => addOpcao(i, depoisDe)}
                         onRemove={(j) => removeOpcao(i, j)}
+                      />
+                    ) : c.tipo === "secao" ? (
+                      // a seção leva texto de apoio (instrução do bloco),
+                      // não maquete de resposta — não há o que responder
+                      <Textarea
+                        aria-label={`Texto de apoio da seção ${i + 1}`}
+                        value={c.descricao}
+                        onChange={(e) =>
+                          update(i, { descricao: e.target.value })
+                        }
+                        rows={2}
+                        maxLength={1000}
+                        placeholder="Texto de apoio sob o título (opcional) — instruções do bloco."
                       />
                     ) : (
                       <MockTipo tipo={c.tipo} />
@@ -614,24 +650,26 @@ export function FormularioBuilder({
                         <Trash aria-hidden />
                       </Button>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Switch
-                        id={`obr-${c.id}`}
-                        aria-labelledby={`obr-label-${c.id}`}
-                        checked={c.obrigatorio}
-                        disabled={pending}
-                        onCheckedChange={(v) =>
-                          update(i, { obrigatorio: v })
-                        }
-                      />
-                      <Label
-                        id={`obr-label-${c.id}`}
-                        htmlFor={`obr-${c.id}`}
-                        className="cursor-pointer font-normal"
-                      >
-                        Obrigatória
-                      </Label>
-                    </div>
+                    {c.tipo !== "secao" && (
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          id={`obr-${c.id}`}
+                          aria-labelledby={`obr-label-${c.id}`}
+                          checked={c.obrigatorio}
+                          disabled={pending}
+                          onCheckedChange={(v) =>
+                            update(i, { obrigatorio: v })
+                          }
+                        />
+                        <Label
+                          id={`obr-label-${c.id}`}
+                          htmlFor={`obr-${c.id}`}
+                          className="cursor-pointer font-normal"
+                        >
+                          Obrigatória
+                        </Label>
+                      </div>
+                    )}
                   </div>
                 </motion.li>
               </Fragment>
@@ -672,9 +710,15 @@ export function FormularioBuilder({
           aria-live="polite"
           className="text-xs tabular-nums text-muted-foreground"
         >
-          {campos.length} {campos.length === 1 ? "pergunta" : "perguntas"}
+          {/* seções não contam — a régua de tempo é de perguntas */}
+          {camposPerguntas(campos).length}{" "}
+          {camposPerguntas(campos).length === 1 ? "pergunta" : "perguntas"}
           {" · ~"}
-          {Math.max(1, Math.round((campos.length * 15) / 60))} min
+          {Math.max(
+            1,
+            Math.round((camposPerguntas(campos).length * 15) / 60)
+          )}{" "}
+          min
         </p>
         <div className="flex flex-1 flex-wrap items-center justify-end gap-2">
           <Button
@@ -806,6 +850,24 @@ function MockTipo({ tipo }: { tipo: FormularioCampoTipo }) {
             </span>
           ))}
         </div>
+      )}
+      {tipo === "escala_1_10" && (
+        <div className="grid max-w-xl grid-cols-5 gap-1 rounded-xl bg-muted p-1 sm:grid-cols-10">
+          {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
+            <span
+              key={n}
+              className="flex h-9 items-center justify-center rounded-lg text-sm font-semibold tabular-nums text-muted-foreground"
+            >
+              {n}
+            </span>
+          ))}
+        </div>
+      )}
+      {tipo === "secao" && (
+        <span className="flex items-center gap-2.5 text-sm text-muted-foreground">
+          <Rows aria-hidden className="size-4 shrink-0" />
+          Título de bloco — organiza as perguntas, não espera resposta
+        </span>
       )}
       {tipo === "sim_nao" && (
         <div className="grid max-w-sm grid-cols-2 gap-1 rounded-xl bg-muted p-1">
