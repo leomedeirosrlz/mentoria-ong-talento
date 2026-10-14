@@ -61,6 +61,7 @@ import {
 import type { DadosCivis } from "@/lib/types";
 import { AnamneseMentoradoChip } from "@/components/anamnese-mentorado";
 import { CapacidadeMentorDialog } from "@/components/capacidade-mentor-dialog";
+import { CurriculoMentorado } from "@/components/curriculo-mentorado";
 import { DocumentosPessoa } from "@/components/documentos-pessoa";
 import { AssinaturasPessoa } from "@/components/assinaturas-pessoa";
 import { Avatar } from "@/components/avatar";
@@ -1026,6 +1027,20 @@ export default async function PessoaPerfilPage({
                 </ul>
               )}
             </section>
+          )}
+
+          {/* currículo do mentorado (0081) — documento confidencial do
+              matching: staff lê (a view mentorados_curriculo já escopa o
+              auxiliar executivo às duplas dele), só a coord gerencia. Fica
+              fora da gaveta de documentos porque o auxiliar também consulta
+              — e o cadeado no título marca a confidencialidade */}
+          {ehMentorado && ehStaff && (
+            <CurriculoMentorado
+              mentoradoId={p.id}
+              curriculoPath={ment?.curriculo_path}
+              curriculoUrl={linkSeguro(ment?.curriculo_url)}
+              podeEditar={souCoord}
+            />
           )}
 
           {/* documentos + termos + anamnese — coord-only ponta a ponta. A

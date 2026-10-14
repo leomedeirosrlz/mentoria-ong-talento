@@ -1219,6 +1219,8 @@ function build(): DemoData {
       cpf: "32165498791", data_nascimento: "1979-06-30", parentesco: "Mãe",
       endereco: { logradouro: "Rua das Flores", numero: "88", complemento: null, bairro: "Jardim Brasil", cidade: "São Paulo", uf: "SP", cep: "08410250" },
     },
+    // currículo veio como link do Drive no form de matching (0081)
+    curriculo_url: "https://drive.google.com/file/d/demo-cv-ana-beatriz/view",
   };
   const caio: Mentorado = {
     id: uid(M.caio), nome: "Caio Henrique Oliveira",
@@ -1238,6 +1240,9 @@ function build(): DemoData {
     escolaridade: "medio", origem: "Projeto Semente",
     disponibilidade: { dias: ["sab"], periodos: ["manha"] },
     created_at: haDias(60),
+    // a coordenação já subiu o PDF recebido pro bucket (0081) — a outra
+    // forma do campo: arquivo, não link externo
+    curriculo_path: "documentos/curriculo-caio-henrique.pdf",
   };
   const dandara: Mentorado = {
     id: uid(M.dandara), nome: "Dandara Souza",
@@ -1256,6 +1261,9 @@ function build(): DemoData {
     escolaridade: "medio", origem: "Casa do Saber",
     disponibilidade: { dias: ["ter", "qua"], periodos: ["noite"] },
     created_at: haDias(60),
+    // supervisionada pela Beatriz — o CV dela é coord-only pro Paulo (0081):
+    // ele nem abre a ficha dela (RLS), quanto mais o documento
+    curriculo_url: "https://drive.google.com/file/d/demo-cv-dandara/view",
   };
   const eduardo: Mentorado = {
     id: uid(M.eduardo), nome: "Eduardo Lima",

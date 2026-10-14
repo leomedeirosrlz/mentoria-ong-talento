@@ -1760,6 +1760,23 @@ export function linkSeguro(url: string | null | undefined): string | null {
   return url != null && /^https?:\/\//i.test(url) ? url : null;
 }
 
+/** Link externo digitado/colado → URL http(s), teto de 300 chars. Sem
+ *  scheme ganha https://; o que não virar URL com domínio volta null —
+ *  mesma régua do normLinkedin do import (aqui sem acoplar ao módulo de
+ *  planilha). Lado da escrita do linkSeguro: a ficha do mentorado usa pro
+ *  currículo em link (0081). */
+export function normLinkExterno(s: string): string | null {
+  const v = s.trim();
+  if (!v) return null;
+  const com = /^https?:\/\//i.test(v) ? v : `https://${v.replace(/^\/+/, "")}`;
+  try {
+    const u = new URL(com);
+    return u.hostname.includes(".") ? com.slice(0, 300) : null;
+  } catch {
+    return null;
+  }
+}
+
 /** nomes pt-BR — cedilha/acento na ordem alfabética certa, case-insensitive.
  *  Mesma régua pra listas server e client (a collation do Postgres põe
  *  acentos depois de Z, então a ordenação final é sempre no app). */
