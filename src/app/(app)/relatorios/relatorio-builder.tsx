@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowSquareOut, Check, DownloadSimple, Link as LinkIcon, PencilSimple } from "@phosphor-icons/react";
 import { RelatorioCanvas } from "@/components/relatorio-canvas";
 import { salvarCampoRelatorio } from "@/lib/actions";
@@ -29,6 +29,14 @@ function csvDownload(nome: string, header: string[], linhas: string[][]) {
   URL.revokeObjectURL(url);
 }
 
+/** Saída animada de coluna: o id segue em `colunas` ~170ms marcado como
+ *  "saindo" pro fade-out do canvas rodar antes da remoção real. Um pouco
+ *  maior que o duration-150 da saída — a célula some já transparente.
+ *  ENTRADA marca o id só durante o fade+slide (200ms) — a classe precisa
+ *  estar na célula no mount, e sair depois não replaya nada. */
+const SAIDA_COLUNA_MS = 170;
+const ENTRADA_COLUNA_MS = 220;
+
 /** Rótulo de grupo de filtros — o mesmo overline de /duplas ("Turma",
  *  "Situação"), com id próprio pro role="group" referenciar. */
 function GrupoLabel({ id, children }: { id: string; children: string }) {
@@ -56,6 +64,11 @@ export function RelatorioBuilder({
   const [turma, setTurma] = useState<string>("T2 · 2026/2027");
   const [gran, setGran] = useState<GranularidadeRelatorio>("pessoas");
   const [colunas, setColunas] = useState<string[]>(() => catalogoDe("pessoas").map((c) => c.id));
+  // colunas em transição animada — "entrando" monta com fade+slide (a marca
+  // cai depois da animação), "saindo" segue na grade até o fade-out terminar
+  const [saindo, setSaindo] = useState<ReadonlySet<string>>(new Set());
+  const [entrando, setEntrando] = useState<ReadonlySet<string>>(new Set());
+  const colTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
   const [editando, setEditando] = useState(false);
   const [copiado, setCopiado] = useState(false);
   // edições gravadas aplicadas por cima dos dados do server — a célula
@@ -95,16 +108,81 @@ export function RelatorioBuilder({
   const linhas = montarLinhas(cfg, duplas, profsMap, mentsMap, { paraApp: true });
   const colVisiveis = catalogo.filter((c) => colunas.includes(c.id));
 
+  // timers de transição de coluna pendentes morrem junto com o componente
+  useEffect(
+    () => () => {
+      for (const t of colTimers.current.values()) clearTimeout(t);
+    },
+    []
+  );
+
+  const limparTimerCol = (id: string) => {
+    const t = colTimers.current.get(id);
+    if (t) clearTimeout(t);
+    colTimers.current.delete(id);
+  };
+
   const trocarGran = (g: GranularidadeRelatorio) => {
+    // transições em curso pertencem ao catálogo antigo — zeram junto
+    for (const t of colTimers.current.values()) clearTimeout(t);
+    colTimers.current.clear();
+    setSaindo(new Set());
+    setEntrando(new Set());
     setGran(g);
     setColunas(catalogoDe(g).map((c) => c.id));
     setEditando(false);
   };
 
-  const toggleCol = (id: string) =>
-    setColunas((prev) =>
-      prev.includes(id) ? prev.filter((c) => c !== id) : [...prev, id]
-    );
+  const toggleCol = (id: string) => {
+    limparTimerCol(id);
+    if (saindo.has(id)) {
+      // clicar durante a saída cancela a remoção — a coluna fica
+      setSaindo((s) => {
+        const n = new Set(s);
+        n.delete(id);
+        return n;
+      });
+      return;
+    }
+    if (colunas.includes(id)) {
+      // sai: se ainda estava entrando, a marca de entrada cai junto — as
+      // classes de entrada e saída disputariam a mesma propriedade
+      setEntrando((s) => {
+        const n = new Set(s);
+        n.delete(id);
+        return n;
+      });
+      setSaindo((s) => new Set(s).add(id));
+      colTimers.current.set(
+        id,
+        setTimeout(() => {
+          colTimers.current.delete(id);
+          setColunas((prev) => prev.filter((c) => c !== id));
+          setSaindo((s) => {
+            const n = new Set(s);
+            n.delete(id);
+            return n;
+          });
+        }, SAIDA_COLUNA_MS)
+      );
+    } else {
+      // entra: monta já com a classe de fade+slide; a marca cai depois da
+      // animação — remover a classe pós-mount não replaya nada
+      setEntrando((s) => new Set(s).add(id));
+      setColunas((prev) => [...prev, id]);
+      colTimers.current.set(
+        id,
+        setTimeout(() => {
+          colTimers.current.delete(id);
+          setEntrando((s) => {
+            const n = new Set(s);
+            n.delete(id);
+            return n;
+          });
+        }, ENTRADA_COLUNA_MS)
+      );
+    }
+  };
 
   const linkCompartilhavel = `/resumo/${RESUMO_SLUG_T2}?${configParaSearch(cfg)}`;
 
@@ -177,7 +255,9 @@ export function RelatorioBuilder({
         <div role="group" aria-labelledby="flt-colunas" className="flex flex-wrap items-center gap-1.5">
           <GrupoLabel id="flt-colunas">Colunas</GrupoLabel>
           {catalogo.map((c) => {
-            const on = colunas.includes(c.id);
+            // saindo já lê como desligado — a coluna desmonta quando o
+            // fade termina, mas o chip vira "off" no clique
+            const on = colunas.includes(c.id) && !saindo.has(c.id);
             return (
               <button
                 key={c.id}
@@ -229,17 +309,29 @@ export function RelatorioBuilder({
           </Button>
           {/* modo edição: toggle no padrão chip de filtro, jogado pra direita
               como o "Ordenar" de /pessoas — separa "o que a grade mostra" de
-              "o que ela deixa mexer" */}
-          <button
-            type="button"
-            aria-pressed={editando}
-            title="Corrige nome, e-mail, WhatsApp, cidade e UF direto nas células"
-            onClick={() => setEditando((v) => !v)}
-            className={cn(filterChipCls(editando), "ml-auto")}
-          >
-            <PencilSimple size={13} aria-hidden />
-            Editar cadastros
-          </button>
+              "o que ela deixa mexer". Ligado vira "Concluir edição" (chip
+              preenchido) e traz o lembrete do gesto junto. */}
+          <div className="ml-auto flex flex-wrap items-center justify-end gap-x-3 gap-y-1">
+            {editando && (
+              <span className="animate-in fade-in text-xs text-muted-foreground duration-150">
+                Clique numa célula pra editar — Enter confirma, Esc desfaz
+              </span>
+            )}
+            <button
+              type="button"
+              aria-pressed={editando}
+              title="Corrige nome, e-mail, WhatsApp, cidade e UF direto nas células"
+              onClick={() => setEditando((v) => !v)}
+              className={filterChipCls(editando)}
+            >
+              {editando ? (
+                <Check size={13} aria-hidden />
+              ) : (
+                <PencilSimple size={13} aria-hidden />
+              )}
+              {editando ? "Concluir edição" : "Editar cadastros"}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -251,6 +343,8 @@ export function RelatorioBuilder({
           linhas={linhas}
           storageKey={`${turma}-${gran}`}
           editavel={editando}
+          colunasEntrando={entrando}
+          colunasSaindo={saindo}
           onSalvarCampo={salvarCampo}
         />
       </div>
