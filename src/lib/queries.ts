@@ -9,6 +9,7 @@ import {
   demoComunicados,
   demoContagemPessoas,
   demoContatosMap,
+  demoCurriculoMap,
   demoDocumentosPessoa,
   demoDupla,
   demoDuplas,
@@ -131,6 +132,58 @@ function comPessoal<P extends { id: string }>(
     dados_civis: d?.dados_civis ?? null,
     responsavel: d?.responsavel ?? null,
     form_bruto: d?.form_bruto ?? null,
+  };
+}
+
+/** O par confidencial do currículo (0081) — arquivo no bucket `documentos`
+ *  e/ou link externo vindo do form de matching. Exportado como tipo: a
+ *  camada demo espelha o mesmo shape. */
+export type CurriculoMentorado = {
+  curriculo_path: string | null;
+  curriculo_url: string | null;
+};
+
+/** id → currículo, como devolvido pela view mentorados_curriculo (0081): o
+ *  WHERE da view entrega tudo pra coordenação e só os mentorados das duplas
+ *  supervisionadas pro auxiliar executivo — o mesmo recorte em que a RLS
+ *  deixa cada papel abrir a ficha. Mentor/jovem recebem mapa vazio (a query
+ *  nem dispara: getMe já está em cache). Falha degrada pra mapa vazio com
+ *  log — a ficha segue sem o bloco. */
+export const getCurriculoMap = cache(
+  async (): Promise<Map<string, CurriculoMentorado>> => {
+    // modo demo: replica o WHERE da view sobre o dataset
+    const demo = await demoRole();
+    if (demo) return demoCurriculoMap(demo);
+    const me = await getMe();
+    if (me?.role !== "coordenacao" && me?.role !== "supervisor") {
+      return new Map();
+    }
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("mentorados_curriculo")
+      .select("id, curriculo_path, curriculo_url");
+    if (error) {
+      console.error("getCurriculoMap:", error);
+      return new Map();
+    }
+    return new Map(
+      (data ?? []).map((r: { id: string } & CurriculoMentorado) => [r.id, r])
+    );
+  }
+);
+
+/** Merge do currículo numa linha de mentorados, por id — fora do staff o
+ *  mapa vem vazio e os campos ficam null (falsy), como a ausência de coluna
+ *  no grant faria. */
+function comCurriculo<M extends { id: string }>(
+  m: M,
+  curriculo: Map<string, CurriculoMentorado>
+): M & CurriculoMentorado {
+  const c = curriculo.get(m.id);
+  return {
+    ...m,
+    curriculo_path: c?.curriculo_path ?? null,
+    curriculo_url: c?.curriculo_url ?? null,
   };
 }
 
@@ -546,13 +599,16 @@ export const getPessoaPerfil = cache(async (id: string): Promise<
   // seria sempre eu mesmo, então não vale o join
   const NOTA_SELECT = `id, profile_id, mentorado_id, texto, created_by, created_at`;
 
-  const [{ data: p }, { data: m }, contatos, pessoalProf, pessoalMent] =
+  const [{ data: p }, { data: m }, contatos, pessoalProf, pessoalMent, curriculo] =
     await Promise.all([
       supabase.from("profiles").select(PROFILE_COLS_PUBLICAS).eq("id", id).maybeSingle(),
       supabase.from("mentorados").select(MENTORADO_COLS_PUBLICAS).eq("id", id).maybeSingle(),
       getContatos(),
       getPessoalMap("profiles_pessoal"),
       getPessoalMap("mentorados_pessoal"),
+      // confidencial (0081): fora do grant — só a view escopada entrega, e
+      // só coord/aux recebem linhas; pros demais o mapa sai vazio sem query
+      getCurriculoMap(),
     ]);
   const comEmail = (d: DuplaPerfil): DuplaPerfil => ({
     ...d,
@@ -593,7 +649,7 @@ export const getPessoaPerfil = cache(async (id: string): Promise<
     ]);
     return {
       tipo: "mentorado",
-      pessoa: comPessoal(m, pessoalMent) as Mentorado,
+      pessoa: comCurriculo(comPessoal(m, pessoalMent), curriculo) as Mentorado,
       duplas: ((duplas as unknown as DuplaPerfil[]) ?? []).map(comEmail),
       notas: (notas as unknown as PessoaNota[]) ?? [],
     };

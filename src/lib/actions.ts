@@ -14,6 +14,7 @@ import {
   cronogramaVigente,
   inicioDefaultDupla,
   maxEncontros,
+  normLinkExterno,
   parseDisponibilidade,
   podeSupervisionar,
 } from "@/lib/ciclo";
@@ -1144,11 +1145,22 @@ export async function deleteMentorado(id: string) {
     .from("duplas").select("id").eq("mentorado_id", id).limit(1);
   if (duplas?.length)
     return { error: "Esse mentorado já está em uma dupla. Encerre a dupla antes de excluir." };
-  const { data: m } = await supabase
-    .from("mentorados").select("documento_path").eq("id", id).single();
+  const [{ data: m }, { data: cv }] = await Promise.all([
+    supabase.from("mentorados").select("documento_path").eq("id", id).single(),
+    // curriculo_path está fora do grant de coluna — a view escopada é o
+    // único caminho de leitura (pra coordenação ela cobre todas as linhas)
+    supabase
+      .from("mentorados_curriculo")
+      .select("curriculo_path")
+      .eq("id", id)
+      .maybeSingle(),
+  ]);
   // mesmo cuidado do delete de pessoa: remove o objeto do bucket antes da row
-  if (m?.documento_path) {
-    await supabase.storage.from("documentos").remove([m.documento_path]);
+  const pathsDoc = [m?.documento_path, cv?.curriculo_path].filter(
+    (p): p is string => Boolean(p)
+  );
+  if (pathsDoc.length) {
+    await supabase.storage.from("documentos").remove(pathsDoc);
   }
   const { data: docsMentorado } = await supabase
     .from("documentos_pessoa").select("path").eq("mentorado_id", id);
@@ -3602,6 +3614,92 @@ export async function excluirDocumentoPessoa(docId: string, pessoaId: string) {
     .eq("id", docId);
   if (error) return { error: erroAmigavel(error) };
   revalidatePath(`/pessoas/${pessoaId}`);
+  return { ok: true };
+}
+
+// ---------- currículo do mentorado (0081) ----------
+
+/** Vincula o arquivo de currículo ao mentorado (curriculo_path) — path no
+ *  bucket privado `documentos`. Mesmo ritual do documento oficial: a coluna
+ *  é carimbada ANTES do upload do client porque a policy de INSERT do
+ *  storage só aceita objeto cujo name já é curriculo_path de alguém (via a
+ *  view mentorados_curriculo — a coluna está fora do grant). Se o upload
+ *  falhar o client chama removerCurriculoMentorado pra desfazer. Coord-only:
+ *  o auxiliar executivo lê o currículo, não gerencia. */
+export async function definirCurriculoMentorado(id: string, path: string) {
+  if (await demoAtivo()) return { error: DEMO_MSG };
+  const { supabase, me: eu } = await me();
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
+  if (eu.role !== "coordenacao") {
+    return { error: "Só a coordenação gerencia currículos." };
+  }
+  if (!DOCUMENTO_PATH_RE.test(path)) {
+    return { error: "Revise os campos: um dos valores não é válido." };
+  }
+  const { data, error } = await supabase
+    .from("mentorados")
+    .update({ curriculo_path: path })
+    .eq("id", id)
+    .select("id");
+  if (error) return { error: erroAmigavel(error) };
+  if (!data?.length) {
+    return { error: "Não foi possível concluir. Recarregue a página e tente de novo." };
+  }
+  revalidatePath("/pessoas");
+  revalidatePath(`/pessoas/${id}`);
+  return { ok: true };
+}
+
+/** Desfaz o vínculo do arquivo (curriculo_path -> null). O objeto no bucket
+ *  é removido pelo client ANTES de chamar — a policy de DELETE do storage é
+ *  bucket+coord, não exige path registrado. */
+export async function removerCurriculoMentorado(id: string) {
+  if (await demoAtivo()) return { error: DEMO_MSG };
+  const { supabase, me: eu } = await me();
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
+  if (eu.role !== "coordenacao") {
+    return { error: "Só a coordenação gerencia currículos." };
+  }
+  const { data, error } = await supabase
+    .from("mentorados")
+    .update({ curriculo_path: null })
+    .eq("id", id)
+    .select("id");
+  if (error) return { error: erroAmigavel(error) };
+  if (!data?.length) {
+    return { error: "Não foi possível concluir. Recarregue a página e tente de novo." };
+  }
+  revalidatePath("/pessoas");
+  revalidatePath(`/pessoas/${id}`);
+  return { ok: true };
+}
+
+/** Grava o link externo do currículo (curriculo_url — o Drive que o form
+ *  de matching coleta) ou limpa com string vazia. Normaliza pra http(s);
+ *  texto que não vira URL é recusado em vez de zerar o campo. Coord-only. */
+export async function salvarCurriculoUrlMentorado(id: string, url: string) {
+  if (await demoAtivo()) return { error: DEMO_MSG };
+  const { supabase, me: eu } = await me();
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
+  if (eu.role !== "coordenacao") {
+    return { error: "Só a coordenação gerencia currículos." };
+  }
+  const digitado = url.trim();
+  const normalizado = normLinkExterno(digitado);
+  if (digitado && !normalizado) {
+    return { error: "Revise o link: precisa ser uma URL (ex.: link do Google Drive)." };
+  }
+  const { data, error } = await supabase
+    .from("mentorados")
+    .update({ curriculo_url: normalizado })
+    .eq("id", id)
+    .select("id");
+  if (error) return { error: erroAmigavel(error) };
+  if (!data?.length) {
+    return { error: "Não foi possível concluir. Recarregue a página e tente de novo." };
+  }
+  revalidatePath("/pessoas");
+  revalidatePath(`/pessoas/${id}`);
   return { ok: true };
 }
 

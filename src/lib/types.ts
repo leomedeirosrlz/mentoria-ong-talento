@@ -189,6 +189,14 @@ export type Mentorado = {
   /** Motivo curto da saída (0077) — livre no banco, vocabulário guiado
    *  pelo dialog (MOTIVOS_SAIDA). Opcional só pra 'concluido'. */
   motivo_saida?: string | null;
+  /** Currículo em arquivo no bucket `documentos` (0081). Confidencial:
+   *  fora do grant de coluna — coordenação e auxiliar executivo (supervisor
+   *  da dupla) leem pela view mentorados_curriculo; merge de getCurriculoMap
+   *  na ficha. Mentor e jovem nunca recebem. */
+  curriculo_path?: string | null;
+  /** Currículo em link externo (Drive) — o que o form de matching coleta
+   *  (0081). Mesma visibilidade de curriculo_path. */
+  curriculo_url?: string | null;
 };
 
 /** O mentorado dentro de uma dupla (embed do DUPLA_SELECT) — só o que o

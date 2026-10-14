@@ -27,6 +27,17 @@ export { expect };
 
 // --- helpers compartilhados ---
 
+/** GET na origem do app fora do browser (api/documento e afins). O bypass do
+ *  Vercel entra via page.route — o APIRequestContext NÃO passa por ele e no
+ *  preview recebe a página de SSO (200 text/html) em vez da rota. O header
+ *  explícito cobre o gap; sem bypass (local/prod) segue limpo. */
+export function apiGetApp(page: Page, url: string) {
+  const bypass = process.env.VERCEL_AUTOMATION_BYPASS;
+  return page.request.get(url, {
+    headers: bypass ? { "x-vercel-protection-bypass": bypass } : undefined,
+  });
+}
+
 /** Wizard de primeiro acesso: "Pular tudo e começar" só renderiza em passos
  *  com formulário (step>=2) — o(s) primeiro(s) são só "Continuar".
  *  Clique pré-hidratação é no-op silencioso (RSC demora a ligar handlers em

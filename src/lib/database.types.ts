@@ -138,6 +138,13 @@ export type Database = {
             foreignKeyName: "assinaturas_mentorado_id_fkey"
             columns: ["mentorado_id"]
             isOneToOne: false
+            referencedRelation: "mentorados_curriculo"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assinaturas_mentorado_id_fkey"
+            columns: ["mentorado_id"]
+            isOneToOne: false
             referencedRelation: "mentorados_pessoal"
             referencedColumns: ["id"]
           },
@@ -657,6 +664,13 @@ export type Database = {
             foreignKeyName: "documentos_pessoa_mentorado_id_fkey"
             columns: ["mentorado_id"]
             isOneToOne: false
+            referencedRelation: "mentorados_curriculo"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "documentos_pessoa_mentorado_id_fkey"
+            columns: ["mentorado_id"]
+            isOneToOne: false
             referencedRelation: "mentorados_pessoal"
             referencedColumns: ["id"]
           },
@@ -803,6 +817,13 @@ export type Database = {
             columns: ["mentorado_id"]
             isOneToOne: false
             referencedRelation: "mentorados"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "duplas_mentorado_id_fkey"
+            columns: ["mentorado_id"]
+            isOneToOne: false
+            referencedRelation: "mentorados_curriculo"
             referencedColumns: ["id"]
           },
           {
@@ -1463,6 +1484,13 @@ export type Database = {
             foreignKeyName: "formulario_links_dest_mentorado_id_fkey"
             columns: ["dest_mentorado_id"]
             isOneToOne: false
+            referencedRelation: "mentorados_curriculo"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "formulario_links_dest_mentorado_id_fkey"
+            columns: ["dest_mentorado_id"]
+            isOneToOne: false
             referencedRelation: "mentorados_pessoal"
             referencedColumns: ["id"]
           },
@@ -1860,6 +1888,8 @@ export type Database = {
           contato_compartilhado: boolean
           cor_raca: string | null
           created_at: string
+          curriculo_path: string | null
+          curriculo_url: string | null
           dados_civis: Json | null
           data_nascimento: string | null
           disponibilidade: Json | null
@@ -1892,6 +1922,8 @@ export type Database = {
           contato_compartilhado?: boolean
           cor_raca?: string | null
           created_at?: string
+          curriculo_path?: string | null
+          curriculo_url?: string | null
           dados_civis?: Json | null
           data_nascimento?: string | null
           disponibilidade?: Json | null
@@ -1924,6 +1956,8 @@ export type Database = {
           contato_compartilhado?: boolean
           cor_raca?: string | null
           created_at?: string
+          curriculo_path?: string | null
+          curriculo_url?: string | null
           dados_civis?: Json | null
           data_nascimento?: string | null
           disponibilidade?: Json | null
@@ -2150,6 +2184,13 @@ export type Database = {
             columns: ["mentorado_id"]
             isOneToOne: false
             referencedRelation: "mentorados"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pessoa_notas_mentorado_id_fkey"
+            columns: ["mentorado_id"]
+            isOneToOne: false
+            referencedRelation: "mentorados_curriculo"
             referencedColumns: ["id"]
           },
           {
@@ -2804,6 +2845,13 @@ export type Database = {
             foreignKeyName: "solicitacoes_especialista_mentorado_id_fkey"
             columns: ["mentorado_id"]
             isOneToOne: false
+            referencedRelation: "mentorados_curriculo"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "solicitacoes_especialista_mentorado_id_fkey"
+            columns: ["mentorado_id"]
+            isOneToOne: false
             referencedRelation: "mentorados_pessoal"
             referencedColumns: ["id"]
           },
@@ -3251,6 +3299,27 @@ export type Database = {
         }
         Relationships: []
       }
+      mentorados_curriculo: {
+        Row: {
+          curriculo_path: string | null
+          curriculo_url: string | null
+          id: string | null
+          nome: string | null
+        }
+        Insert: {
+          curriculo_path?: string | null
+          curriculo_url?: string | null
+          id?: string | null
+          nome?: string | null
+        }
+        Update: {
+          curriculo_path?: string | null
+          curriculo_url?: string | null
+          id?: string | null
+          nome?: string | null
+        }
+        Relationships: []
+      }
       mentorados_pessoal: {
         Row: {
           contato_compartilhado: boolean | null
@@ -3532,6 +3601,13 @@ export type Database = {
             columns: ["mentorado_id"]
             isOneToOne: false
             referencedRelation: "mentorados"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "solicitacoes_especialista_mentorado_id_fkey"
+            columns: ["mentorado_id"]
+            isOneToOne: false
+            referencedRelation: "mentorados_curriculo"
             referencedColumns: ["id"]
           },
           {
