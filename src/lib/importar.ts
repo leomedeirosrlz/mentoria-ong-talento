@@ -375,7 +375,9 @@ export function mapRole(s: string): AppRole | null {
   const n = semAcento(s);
   if (!n) return null;
   if (/coord/.test(n)) return "coordenacao";
-  if (/supervis/.test(n)) return "supervisor";
+  // "auxiliar executivo(a)" é o nome do papel na UI; "supervisor" segue
+  // aceito pra planilhas antigas
+  if (/supervis|auxiliar/.test(n)) return "supervisor";
   if (/especial/.test(n)) return "mentor_especialista";
   if (/mentor|dpp/.test(n)) return "mentor_dpp";
   return null;

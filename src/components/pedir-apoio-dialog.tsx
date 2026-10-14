@@ -60,7 +60,7 @@ export function PedirApoioDialog({
           <DialogTitle>Pedir apoio à coordenação</DialogTitle>
         </DialogHeader>
         <DialogDescription className="leading-relaxed">
-          A coordenação e o supervisor da dupla recebem um aviso na hora e
+          A coordenação e o auxiliar executivo da dupla recebem um aviso na hora e
           entram em contato com você.
         </DialogDescription>
         <form onSubmit={submit} className="space-y-4">

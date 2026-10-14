@@ -867,7 +867,7 @@ function build(): DemoData {
     bio: "Psicóloga organizacional, 12 anos em programas de desenvolvimento de jovens.",
     linkedin: "https://linkedin.com/in/beatriz-lins",
     areas: ["projetos sociais", "educação", "RH"],
-    voluntariado: "Supervisora de duplas desde o primeiro ciclo do programa.",
+    voluntariado: "Auxiliar executiva de duplas desde o primeiro ciclo do programa.",
     onboarded_em: haDias(90),
     nome_social: null, data_nascimento: "1984-04-09", genero: "feminino",
     cidade: "São Paulo", uf: "SP",

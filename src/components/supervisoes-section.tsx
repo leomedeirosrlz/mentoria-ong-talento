@@ -69,7 +69,7 @@ export function SupervisoesSection({
                 <p className="text-xs text-muted-foreground">
                   {visao === "supervisor"
                     ? `com ${s.mentor?.nome ?? "mentor"}`
-                    : `por ${s.supervisor?.nome ?? "supervisor"}`}
+                    : `por ${s.supervisor?.nome ?? "auxiliar executivo"}`}
                 </p>
                 <p className="mt-1 whitespace-pre-line text-muted-foreground">
                   {s.resumo}

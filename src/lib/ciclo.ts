@@ -1698,7 +1698,7 @@ export const AREAS_SUGESTOES = [
 export function papelLabel(role: string | null | undefined) {
   switch (role) {
     case "coordenacao": return "Coordenação";
-    case "supervisor": return "Supervisor de relacionamento";
+    case "supervisor": return "Auxiliar executivo";
     case "mentor_dpp": return "Mentor DPP";
     case "mentor_especialista": return "Mentor especialista";
     case "mentorado": return "Mentorado";
@@ -1707,11 +1707,11 @@ export function papelLabel(role: string | null | undefined) {
 }
 
 /** Versão curta do papel — cabe nos ~80-140px da pill do header mobile e da
- *  DemoBar ("Supervisor de relacionamento" truncaria ali). */
+ *  DemoBar ("Auxiliar executivo" truncaria ali — sai só o núcleo). */
 export function papelCurto(role: string | null | undefined) {
   switch (role) {
     case "coordenacao": return "Coordenação";
-    case "supervisor": return "Supervisor";
+    case "supervisor": return "Auxiliar";
     case "mentor_dpp": return "Mentor DPP";
     case "mentor_especialista": return "Especialista";
     case "mentorado": return "Mentorado";

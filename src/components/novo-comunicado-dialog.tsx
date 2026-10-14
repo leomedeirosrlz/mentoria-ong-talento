@@ -17,13 +17,13 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 
-// mesma matriz de audiência dos materiais + 'equipe' (coord + supervisores —
-// aviso interno sem pingar mentores)
+// mesma matriz de audiência dos materiais + 'equipe' (coord + auxiliares
+// executivos — aviso interno sem pingar mentores)
 const AUDIENCIA_LABEL = {
   todos: "Todos",
   dpp: "Mentores DPP",
   especialista: "Mentores especialistas",
-  equipe: "Coordenação e supervisores",
+  equipe: "Coordenação e auxiliares executivos",
   coordenacao: "Só a coordenação",
 } as const;
 

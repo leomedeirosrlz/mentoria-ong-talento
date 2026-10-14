@@ -376,7 +376,7 @@ export function AvaliacaoEncontroForm({
               />
               <span>
                 <span className="font-medium">Preciso de ajuda</span> · a
-                coordenação e o supervisor são avisados na hora e falam com
+                coordenação e o auxiliar executivo são avisados na hora e falam com
                 você — pode ser sobre qualquer coisa, inclusive sobre o
                 encontro ou o mentor.
               </span>

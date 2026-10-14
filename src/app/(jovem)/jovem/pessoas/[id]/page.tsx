@@ -154,7 +154,7 @@ function rotuloContato(c: JovemContato): string {
     case "especialista":
       return "Seu especialista";
     case "supervisor":
-      return "Supervisor da sua dupla";
+      return "Auxiliar executivo da sua dupla";
     case "coordenacao":
       return papelLabel("coordenacao");
     default:

@@ -452,7 +452,7 @@ export function EditarDuplaDialog({ dupla }: { dupla: Dupla }) {
               {/* supervisor só existe na trilha DPP — especialista segue sem */}
               {!ehEsp ? (
                 <div className="space-y-2">
-                  <Label id="edit-supervisor-label">Supervisor</Label>
+                  <Label id="edit-supervisor-label">Auxiliar executivo</Label>
                   <Select
                     name="supervisor_id"
                     defaultValue={dupla.supervisor?.id ?? NENHUM}
@@ -469,7 +469,7 @@ export function EditarDuplaDialog({ dupla }: { dupla: Dupla }) {
                 </div>
               ) : (
                 <div className="space-y-2">
-                  <Label id="edit-supervisor-label">Supervisor</Label>
+                  <Label id="edit-supervisor-label">Auxiliar executivo</Label>
                   <p className="flex h-11 items-center rounded-lg bg-muted/40 px-2.5 text-sm text-muted-foreground md:h-8">
                     Não se aplica à mentoria especializada
                   </p>
