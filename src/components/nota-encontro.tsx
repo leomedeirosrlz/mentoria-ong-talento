@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { Collapsible } from "@base-ui/react/collapsible";
 import { CaretDown } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { salvarNotaEncontro } from "@/lib/actions";
@@ -13,9 +14,9 @@ const fmtHora = new Intl.DateTimeFormat("pt-BR", {
   timeZone: "America/Sao_Paulo",
 });
 
-/** Anotações/plano de aula do mentor por encontro do ciclo — `<details>`
- *  nativo (mesma gramática do "Próximos encontros") com autosave por
- *  debounce + flush no blur. Com nota, o summary mostra a 1ª linha como
+/** Anotações/plano de aula do mentor por encontro do ciclo — Collapsible
+ *  (mesma gramática do "Próximos encontros") com autosave por
+ *  debounce + flush no blur. Com nota, o trigger mostra a 1ª linha como
  *  preview — scent real em vez de um dot que só diz "existe". */
 export function NotaEncontro({
   duplaId,
@@ -106,8 +107,8 @@ export function NotaEncontro({
   const preview = texto.split("\n", 1)[0].trim();
 
   return (
-    <details className="group">
-      <summary className="grid min-h-11 cursor-pointer list-none grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-1.5 rounded-md py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:min-h-9 [&::-webkit-details-marker]:hidden">
+    <Collapsible.Root>
+      <Collapsible.Trigger className="group grid min-h-11 w-full cursor-pointer grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-1.5 rounded-md py-1.5 text-left text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:min-h-9">
         <span className="font-medium text-foreground/80">
           Anotações{rotulo ? ` · ${rotulo}` : ""}
         </span>
@@ -119,27 +120,31 @@ export function NotaEncontro({
         <CaretDown
           size={14}
           aria-hidden
-          className="col-start-3 justify-self-end text-muted-foreground transition-transform group-open:rotate-180"
+          className="col-start-3 justify-self-end text-muted-foreground transition-transform group-data-[panel-open]:rotate-180"
         />
-      </summary>
-      <div className="pb-1 pl-0.5">
-        <Textarea
-          value={texto}
-          onChange={(e) => agendar(e.target.value)}
-          onBlur={flush}
-          maxLength={10000}
-          placeholder="Plano do encontro, lembretes, links…"
-          aria-label={`Anotações do ${numero}º encontro`}
-          className="border-0 bg-muted/40 px-3 py-2 shadow-none focus-visible:ring-1"
-        />
-        <p aria-live="polite" className="mt-1 h-4 px-1 text-xs text-muted-foreground">
-          {status === "salvando" && "Salvando…"}
-          {status === "salvo" && salvoEm && `Salvo às ${fmtHora.format(salvoEm)}`}
-          {status === "erro" && (
-            <span className="text-[var(--danger)]">Não salvou. Saia e volte no campo para tentar de novo.</span>
-          )}
-        </p>
-      </div>
-    </details>
+      </Collapsible.Trigger>
+      {/* o texto mora no estado acima — fechar desmonta o textarea sem
+          perder o rascunho; o blur que precede o clique já fez o flush */}
+      <Collapsible.Panel className="h-[var(--collapsible-panel-height)] overflow-hidden transition-[height] duration-150 data-ending-style:h-0 data-starting-style:h-0 [&[hidden]:not([hidden='until-found'])]:hidden">
+        <div className="pb-1 pl-0.5">
+          <Textarea
+            value={texto}
+            onChange={(e) => agendar(e.target.value)}
+            onBlur={flush}
+            maxLength={10000}
+            placeholder="Plano do encontro, lembretes, links…"
+            aria-label={`Anotações do ${numero}º encontro`}
+            className="border-0 bg-muted/40 px-3 py-2 shadow-none focus-visible:ring-1"
+          />
+          <p aria-live="polite" className="mt-1 h-4 px-1 text-xs text-muted-foreground">
+            {status === "salvando" && "Salvando…"}
+            {status === "salvo" && salvoEm && `Salvo às ${fmtHora.format(salvoEm)}`}
+            {status === "erro" && (
+              <span className="text-[var(--danger)]">Não salvou. Saia e volte no campo para tentar de novo.</span>
+            )}
+          </p>
+        </div>
+      </Collapsible.Panel>
+    </Collapsible.Root>
   );
 }
