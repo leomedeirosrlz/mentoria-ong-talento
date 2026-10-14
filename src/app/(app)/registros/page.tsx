@@ -26,6 +26,7 @@ import {
 } from "@/lib/ciclo";
 import { RegistrosFiltros, type OrdemRegistros } from "@/components/registros-filtros";
 import { buttonVariants } from "@/components/ui/button";
+import { ImportarRegistrosDialog } from "@/components/importar-registros-dialog";
 import { RegistroCard } from "@/components/registro-card";
 import { cn } from "@/lib/utils";
 import type { AvaliacaoJovem, Dificuldade, Encontro } from "@/lib/types";
@@ -265,13 +266,18 @@ export default async function RegistrosPage({
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <header>
-        <h1 className="text-2xl font-semibold tracking-tight">Registros</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {souCoord
-            ? "O que os mentores reportaram em cada encontro · todas as duplas"
-            : "O que os mentores reportaram em cada encontro · suas duplas"}
-        </p>
+      <header className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Registros</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {souCoord
+              ? "O que os mentores reportaram em cada encontro · todas as duplas"
+              : "O que os mentores reportaram em cada encontro · suas duplas"}
+          </p>
+        </div>
+        {/* respostas do form semanal externo → encontros + registros
+            (só coord — é exceção à regra "o registro é do mentor") */}
+        {souCoord && <ImportarRegistrosDialog />}
       </header>
 
       {/* resumo operacional: o que pede ação vem antes da busca; clicar num
