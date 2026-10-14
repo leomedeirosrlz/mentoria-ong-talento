@@ -149,8 +149,13 @@ export function NovoMaterialDialog({ maxEncontro }: { maxEncontro: number }) {
             <Input id="titulo" name="titulo" required />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="descricao">Descrição</Label>
-            <Textarea id="descricao" name="descricao" rows={2} />
+            <Label htmlFor="descricao">Descrição (opcional)</Label>
+            <Textarea
+              id="descricao"
+              name="descricao"
+              rows={2}
+              placeholder="O que a pessoa encontra nesse material"
+            />
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
@@ -227,11 +232,20 @@ export function NovoMaterialDialog({ maxEncontro }: { maxEncontro: number }) {
             )}
           </fieldset>
           <div className="space-y-2">
-            <Label htmlFor="encontro_num">Encontro relacionado</Label>
-            <Input id="encontro_num" name="encontro_num" type="number" min={1} max={maxEncontroSel} inputMode="numeric" placeholder="-" />
+            <Label htmlFor="encontro_num">
+              Encontro relacionado (opcional)
+            </Label>
+            <Input
+              id="encontro_num"
+              name="encontro_num"
+              type="number"
+              min={1}
+              max={maxEncontroSel}
+              inputMode="numeric"
+            />
             <p className="text-xs text-muted-foreground">
-              Opcional: agrupa o material na seção daquele encontro na biblioteca
-              {audiencia === "especialista" ? " (5 encontros)" : ""}.
+              Agrupa o material na seção daquele encontro na biblioteca
+              {audiencia === "especialista" ? " (a trilha tem 5)" : ""}.
             </p>
           </div>
           <Button type="submit" className="w-full" disabled={pending}>

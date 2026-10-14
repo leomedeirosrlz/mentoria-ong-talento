@@ -45,7 +45,7 @@ export function DadosCivisFields({
   return (
     <div className="grid gap-4 sm:grid-cols-2">
       {!compacto && (
-        <div className="sm:col-span-2">
+        <div className="space-y-2 sm:col-span-2">
           <Label htmlFor={n("nome_civil")}>Nome civil completo</Label>
           <Input
             id={n("nome_civil")}
@@ -57,7 +57,7 @@ export function DadosCivisFields({
           />
         </div>
       )}
-      <div>
+      <div className="space-y-2">
         <Label htmlFor={n("rg")}>RG</Label>
         <Input
           id={n("rg")}
@@ -68,7 +68,7 @@ export function DadosCivisFields({
           defaultValue={defaults?.rg ?? ""}
         />
       </div>
-      <div>
+      <div className="space-y-2">
         <Label htmlFor={n("cpf")}>CPF</Label>
         <Input
           id={n("cpf")}
@@ -83,7 +83,7 @@ export function DadosCivisFields({
         />
       </div>
       {!compacto && (
-        <div>
+        <div className="space-y-2">
           <Label htmlFor={n("data_nascimento")}>Data de nascimento</Label>
           <Input
             id={n("data_nascimento")}
@@ -94,7 +94,7 @@ export function DadosCivisFields({
           />
         </div>
       )}
-      <div>
+      <div className="space-y-2">
         <Label htmlFor={n("cep")}>CEP</Label>
         <Input
           id={n("cep")}
@@ -109,7 +109,7 @@ export function DadosCivisFields({
         />
       </div>
       <div className="sm:col-span-2 grid grid-cols-[1fr_100px] gap-4">
-        <div>
+        <div className="space-y-2">
           <Label htmlFor={n("logradouro")}>Logradouro</Label>
           <Input
             id={n("logradouro")}
@@ -121,7 +121,7 @@ export function DadosCivisFields({
             defaultValue={e?.logradouro ?? ""}
           />
         </div>
-        <div>
+        <div className="space-y-2">
           <Label htmlFor={n("numero")}>Número</Label>
           <Input
             id={n("numero")}
@@ -131,7 +131,7 @@ export function DadosCivisFields({
           />
         </div>
       </div>
-      <div>
+      <div className="space-y-2">
         <Label htmlFor={n("complemento")}>Complemento</Label>
         <Input
           id={n("complemento")}
@@ -140,7 +140,7 @@ export function DadosCivisFields({
           defaultValue={e?.complemento ?? ""}
         />
       </div>
-      <div>
+      <div className="space-y-2">
         <Label htmlFor={n("bairro")}>Bairro</Label>
         <Input
           id={n("bairro")}
@@ -153,7 +153,7 @@ export function DadosCivisFields({
       </div>
       {!compacto && (
         <>
-          <div>
+          <div className="space-y-2">
             <Label htmlFor={n("cidade")}>Cidade</Label>
             <Input
               id={n("cidade")}
@@ -164,7 +164,7 @@ export function DadosCivisFields({
               defaultValue={e?.cidade ?? ""}
             />
           </div>
-          <div>
+          <div className="space-y-2">
             <Label htmlFor={n("uf")}>UF</Label>
             <Input
               id={n("uf")}
@@ -239,14 +239,14 @@ export function AssinaturaForm({
     <form onSubmit={onSubmit} className="grid gap-6">
       {modo === "autorizacao" && (
         <>
-          <div>
+          <div className="space-y-2">
             {/* rotula um <p> read-only — <p> em vez de <Label> órfão */}
             <p className="text-sm font-medium">Jovem autorizado(a)</p>
-            <p className="mt-1.5 rounded-lg bg-muted px-3 py-2.5 text-sm font-medium">
+            <p className="rounded-lg bg-muted px-3 py-2.5 text-sm font-medium">
               {alvoNome}
             </p>
           </div>
-          <div>
+          <div className="space-y-2">
             <Label htmlFor="parentesco">Seu parentesco com o(a) jovem</Label>
             <Input
               id="parentesco"
@@ -285,7 +285,7 @@ export function AssinaturaForm({
         </span>
       </label>
 
-      <div>
+      <div className="space-y-2">
         <Label htmlFor="assinatura_texto">Assinatura: digite seu nome completo</Label>
         <Input
           id="assinatura_texto"
