@@ -29,12 +29,14 @@ import {
 } from "@phosphor-icons/react";
 import { salvarFormulario } from "@/lib/forms/actions";
 import {
+  CAMPO_FORMATO_LABEL,
   CAMPO_TIPO_LABEL,
   camposPerguntas,
   MAX_CAMPOS,
   MAX_OPCOES,
   TIPOS_COM_OPCOES,
   type FormularioCampo,
+  type FormularioCampoFormato,
   type FormularioCampoTipo,
 } from "@/lib/forms/schema";
 import { FormularioPublico } from "@/app/f/[token]/formulario-publico";
@@ -64,6 +66,8 @@ type DraftCampo = {
   opcoes: string[];
   /** só secao (0080) — texto de apoio sob o título */
   descricao: string;
+  /** só texto (REALIZA-118) — ausente = texto livre, sem normalização */
+  formato?: FormularioCampoFormato;
 };
 
 const novoId = () => `c_${crypto.randomUUID().replace(/-/g, "").slice(0, 12)}`;
@@ -89,6 +93,7 @@ function paraDraft(c: FormularioCampo): DraftCampo {
     obrigatorio: c.obrigatorio,
     opcoes: [...(c.opcoes ?? [])],
     descricao: c.descricao ?? "",
+    formato: c.formato,
   };
 }
 
@@ -100,8 +105,13 @@ function novoCampo(): DraftCampo {
     obrigatorio: false,
     opcoes: [],
     descricao: "",
+    formato: undefined,
   };
 }
+
+/** Opções do seletor de formato do campo 'texto' — "livre" é o sentinela
+ *  do `formato` ausente (o Select não aceita item de valor vazio). */
+const FORMATO_OPCOES = { livre: "Texto livre", ...CAMPO_FORMATO_LABEL };
 
 export function FormularioBuilder({
   formulario,
@@ -200,6 +210,11 @@ export function FormularioBuilder({
               // secao não espera resposta — obrigatória é conceito inválido
               // (o servidor também força false em validaCampos)
               ...(tipo === "secao" ? { obrigatorio: false } : {}),
+              // formato é coisa de 'texto' — trocar de tipo limpa o hint,
+              // senão ficaria lixo invisível no payload
+              ...(tipo !== "texto" && c.formato
+                ? { formato: undefined }
+                : {}),
             }
           : c
       )
@@ -338,6 +353,7 @@ export function FormularioBuilder({
       ...(c.tipo === "secao" && c.descricao.trim()
         ? { descricao: c.descricao.trim() }
         : {}),
+      ...(c.tipo === "texto" && c.formato ? { formato: c.formato } : {}),
     }));
   }
 
@@ -579,6 +595,53 @@ export function FormularioBuilder({
                         onAdd={(depoisDe) => addOpcao(i, depoisDe)}
                         onRemove={(j) => removeOpcao(i, j)}
                       />
+                    ) : c.tipo === "texto" ? (
+                      // 'texto' pode declarar formato — o /f/<token> troca
+                      // o teclado e normaliza a resposta na entrada
+                      // (e-mail com @@, telefone com máscara, link sem
+                      // https — o mesmo resgate do import CSV, REALIZA-118)
+                      <div className="space-y-2">
+                        <MockTipo tipo={c.tipo} />
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-xs font-medium text-muted-foreground">
+                            Formato
+                          </span>
+                          <div className="w-full sm:w-56">
+                            <Select
+                              value={c.formato || "livre"}
+                              items={FORMATO_OPCOES}
+                              onValueChange={(v) =>
+                                update(i, {
+                                  formato:
+                                    v === "livre"
+                                      ? undefined
+                                      : (v as FormularioCampoFormato),
+                                })
+                              }
+                            >
+                              <SelectTrigger
+                                aria-label={`Formato da resposta da pergunta ${i + 1}`}
+                              >
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {Object.entries(FORMATO_OPCOES).map(
+                                  ([v, l]) => (
+                                    <SelectItem key={v} value={v}>
+                                      {l}
+                                    </SelectItem>
+                                  )
+                                )}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          {c.formato && (
+                            <span className="text-xs leading-snug text-muted-foreground">
+                              — a resposta é normalizada na entrada
+                            </span>
+                          )}
+                        </div>
+                      </div>
                     ) : c.tipo === "secao" ? (
                       // a seção leva texto de apoio (instrução do bloco),
                       // não maquete de resposta — não há o que responder

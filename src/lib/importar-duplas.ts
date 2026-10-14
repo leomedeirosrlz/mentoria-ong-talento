@@ -21,6 +21,7 @@ import {
   parseCsvCom,
   semAcento,
 } from "./importar";
+import { normalizaEmail } from "./forms/normaliza";
 import {
   cronogramaVigente,
   inicioDefaultDupla,
@@ -236,7 +237,9 @@ export function resolverPessoa<T extends PessoaRef>(
 ): { pessoa: T } | { erro: string } {
   const v = normNome(valor);
   if (ehEmail(v)) {
-    const alvo = normEmail(v);
+    // e-mail sujo da planilha ("maria@@gmail", "a@b.com, c@d.com") passa
+    // pela lib antes de casar — sem ela a linha morria no match exato
+    const alvo = normalizaEmail(v).valor ?? normEmail(v);
     const achados = candidatos.filter(
       (c) => c.email && normEmail(c.email) === alvo
     );
