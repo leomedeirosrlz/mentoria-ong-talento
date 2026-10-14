@@ -60,7 +60,9 @@ export function canonHeaderPar(h: string): CampoPar | null {
   if (/\bmentorad|\bmentorand|\bjovem|\bmentee|\bpupilo/.test(n))
     return "mentorado";
   if (/\bmentor(a|es)?\b|\btutor(a|es)?\b/.test(n)) return "mentor";
-  if (/\bsupervis/.test(n)) return "supervisor";
+  // "auxiliar executivo" é o nome novo do papel na UI; "supervisor" segue
+  // aceito pra planilhas antigas
+  if (/\bsupervis|\bauxiliar/.test(n)) return "supervisor";
   if (/\biniciad|\binicio\b|\bcomeco|\bdesde\b/.test(n)) return "iniciada_em";
   if (/\bdemanda\b|\beixo\b|\btema\b|\bfoco\b/.test(n)) return "demanda";
   if (/\bturma\b|\bgrupo\b|\bclasse\b/.test(n)) return "turma";
@@ -383,7 +385,7 @@ export function resolverPares(
     let supervisor: PessoaRef | null = null;
     if (trilha === "dpp" && linha.supervisor.trim()) {
       const rSup = resolverPessoa(linha.supervisor, dir.profiles);
-      if ("erro" in rSup) return falha(`supervisor: ${rSup.erro}`);
+      if ("erro" in rSup) return falha(`auxiliar executivo: ${rSup.erro}`);
       if (!podeSupervisionar(rSup.pessoa.role)) {
         return falha(`${rSup.pessoa.nome}: não pode supervisionar duplas`);
       }

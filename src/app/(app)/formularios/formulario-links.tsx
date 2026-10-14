@@ -110,7 +110,7 @@ const GRUPOS_DESTINO: {
   },
   {
     key: "supervisor",
-    titulo: "Supervisores",
+    titulo: "Auxiliares executivos",
     match: (d) => d.tipo === "profile" && d.papel === "supervisor",
   },
   {

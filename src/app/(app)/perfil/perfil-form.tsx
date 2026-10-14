@@ -472,7 +472,7 @@ function DialogoPerfilPublico({ me }: { me: Profile }) {
           <DialogTitle>Perfil público</DialogTitle>
           <DialogDescription>
             É o que aparece na sua página em Pessoas, visível pra coordenação
-            e supervisão.
+            e auxiliares executivos.
           </DialogDescription>
         </DialogHeader>
         <FormPerfilPublico me={me} aoSalvar={() => setOpen(false)} />
@@ -1274,7 +1274,7 @@ export function PerfilForm({
                 </h2>
                 <p className="mt-1 text-xs text-muted-foreground">
                   É o que aparece na sua página em Pessoas, visível pra
-                  coordenação e supervisão.
+                  coordenação e auxiliares executivos.
                 </p>
               </div>
               <DialogoPerfilPublico me={me} />

@@ -73,7 +73,7 @@ const SECOES: { titulo: string; corpo: React.ReactNode }[] = [
             oficiais e evidências.
           </li>
           <li>
-            <strong>Supervisores:</strong> dados das duplas que supervisionam.
+            <strong>Auxiliares executivos:</strong> dados das duplas que supervisionam.
           </li>
           <li>
             <strong>Mentor e mentorado:</strong> dados de contato e registros da

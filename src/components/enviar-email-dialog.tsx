@@ -33,7 +33,7 @@ import {
 // action (ROLES_POR_AUDIENCIA, @/lib/email). Ícones = os das personas da
 // /demo (Binoculars coord, MapTrifold DPP, Handshake especialista)
 const GRUPOS = [
-  { valor: "todos", rotulo: "Todos", detalhe: "coordenação, supervisores e mentores", Icone: Users },
+  { valor: "todos", rotulo: "Todos", detalhe: "coordenação, auxiliares executivos e mentores", Icone: Users },
   { valor: "dpp", rotulo: "Mentores DPP", detalhe: "a trilha principal do programa", Icone: MapTrifold },
   { valor: "especialista", rotulo: "Mentores especialistas", detalhe: "a trilha temática", Icone: Handshake },
   { valor: "coordenacao", rotulo: "Coordenação", detalhe: "só a equipe do programa", Icone: Binoculars },

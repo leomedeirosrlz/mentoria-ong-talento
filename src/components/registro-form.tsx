@@ -678,7 +678,7 @@ export function RegistroForm({
             />
             <span>
               <span className="font-medium">Preciso de apoio</span> · sinalizar a coordenação ou o
-              supervisor de relacionamento (situação que extrapola o papel do mentor).
+              auxiliar executivo (situação que extrapola o papel do mentor).
             </span>
           </label>
         </div>

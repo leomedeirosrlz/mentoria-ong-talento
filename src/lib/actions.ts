@@ -649,7 +649,7 @@ export async function createDupla(formData: FormData) {
     const { data: supervisor } = await supabase
       .from("profiles").select("role").eq("id", supervisorFinal).single();
     if (!podeSupervisionar(supervisor?.role)) {
-      return { error: "A pessoa escolhida como supervisor não pode supervisionar." };
+      return { error: "A pessoa escolhida como auxiliar executivo não pode supervisionar." };
     }
   }
   // quem saiu do programa (0077) não volta pro board por acidente — a
@@ -1399,7 +1399,7 @@ export async function updateDupla(duplaId: string, formData: FormData) {
     const { data: supervisor } = await supabase
       .from("profiles").select("role").eq("id", supervisorFinal).single();
     if (!podeSupervisionar(supervisor?.role)) {
-      return { error: "A pessoa escolhida como supervisor não pode supervisionar." };
+      return { error: "A pessoa escolhida como auxiliar executivo não pode supervisionar." };
     }
   }
   // só ocupa vaga quem vai pra ativa/pausada — concluída e encerrada liberam,
@@ -1557,7 +1557,7 @@ export async function updateDupla(duplaId: string, formData: FormData) {
         tipo: "dupla_formada",
         titulo: "Dupla saiu da sua supervisão",
         corpo: nomeMd
-          ? `A dupla com ${nomeMd} passou pra outro supervisor.`
+          ? `A dupla com ${nomeMd} passou pra outro auxiliar executivo.`
           : "A coordenação reorganizou as duplas.",
         href: "/",
       } : null,

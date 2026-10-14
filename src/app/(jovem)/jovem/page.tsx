@@ -333,7 +333,7 @@ export default async function JovemHome() {
                   <ContatoLinha
                     key={c.id ?? c.nome}
                     c={c}
-                    papel="Supervisor(a) da dupla"
+                    papel="Auxiliar executivo(a) da dupla"
                     nomeJovem={nomeTela}
                   />
                 ))}
