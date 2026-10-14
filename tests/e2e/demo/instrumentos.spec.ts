@@ -35,7 +35,9 @@ test.describe("demo — instrumentos oficiais da jornada", () => {
     const dialog = page.getByRole("dialog");
     await expect(dialog.getByText("Declaração de Visão")).toBeVisible();
     await expect(dialog.getByText(/Indicador:/).first()).toBeVisible();
-    await expect(dialog.getByText(/Desdobramento da meta/)).toBeVisible();
+    await expect(
+      dialog.getByText(/Desdobramento da meta/).first()
+    ).toBeVisible();
   });
 
   test("mentor da dupla: seção visível, enviar responde toast demo", async ({
