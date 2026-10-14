@@ -138,7 +138,12 @@ export function AgendarEncontroDialog({
     const alvo = scrollTarget.current;
     if (!alvo) return;
     scrollTarget.current = null;
-    document.getElementById(alvo)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    // o guard global de prefers-reduced-motion cobre CSS, não o behavior
+    // do scrollIntoView — checa aqui (mesmo padrão do trilha-jornada)
+    const reduz = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    document
+      .getElementById(alvo)
+      ?.scrollIntoView({ behavior: reduz ? "auto" : "smooth", block: "start" });
   }, [pending]);
 
   // warning de overlap (0072): debounce na data — a RPC olha as outras

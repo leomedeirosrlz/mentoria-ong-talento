@@ -429,8 +429,11 @@ export function DuplasLista({
                   aria-label={`${feitos} de ${totalDaDupla} encontros`}
                   className="h-1 w-full overflow-hidden rounded-full bg-muted"
                 >
+                  {/* fill-grow cobre o mount (scaleX); transition-[width]
+                      anima updates pós-mount — o guard de reduced-motion
+                      zera a transição junto */}
                   <div
-                    className="fill-grow h-full rounded-full bg-[var(--brand-lime)]"
+                    className="fill-grow h-full rounded-full bg-[var(--brand-lime)] transition-[width] duration-500 ease-snappy"
                     style={{ width: `${progresso * 100}%` }}
                   />
                 </div>

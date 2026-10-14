@@ -95,6 +95,11 @@ export function RelatorioCanvas({
   // sequencial que dá identidade única a cada abertura de editor — o confirm
   // assíncrono só fecha o editor se ele ainda for o mesmo (key casa)
   const seqEdicao = useRef(0);
+  // células recém-gravadas piscam verde (animate-flash-ok) — chave efêmera
+  // `${id do alvo}|${col}`: o id é da pessoa, então acha a célula certa
+  // depois do rebuild das linhas (o pai devolve objetos novos). O
+  // animationend do td remove as chaves dela — efêmera por definição.
+  const [flash, setFlash] = useState<Set<string> | null>(null);
   const drag = useRef<{ col: string; x0: number; w0: number; wAtual?: number } | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
 
@@ -197,6 +202,10 @@ export function RelatorioCanvas({
         return;
       }
     }
+    // todos gravaram — marca a(s) célula(s) tocada(s) pro flash verde ao
+    // voltar pra leitura (merge: um save rápido atrás do outro não apaga
+    // o flash ainda correndo em outra célula)
+    setFlash((f) => new Set([...(f ?? []), ...mudancas.map(({ a }) => `${a.id}|${ed.col}`)]));
     setEdicao((cur) => (cur?.key === ed.key ? null : cur));
   }, [edicao, onSalvarCampo]);
 
@@ -393,20 +402,43 @@ export function RelatorioCanvas({
                 </td>
                 {colunas.map((c) => {
                   const emEdicao = edicao?.linha === l && edicao.col === c.id;
+                  const alvosCelula = l.__alvos?.[c.id];
                   const podeEditar =
                     !emEdicao &&
                     editavel &&
                     !!onSalvarCampo &&
-                    (l.__alvos?.[c.id]?.length ?? 0) > 0;
+                    (alvosCelula?.length ?? 0) > 0;
+                  const piscando =
+                    flash != null &&
+                    (alvosCelula?.some((a) => flash.has(`${a.id}|${c.id}`)) ?? false);
                   return (
                     <td
                       key={c.id}
                       className={cn(
                         celula,
                         "px-2.5 py-1.5 align-top",
+                        piscando && "animate-flash-ok",
                         podeEditar &&
                           "cursor-text hover:shadow-[inset_0_0_0_1.5px_var(--brand-lime)] focus-visible:shadow-[inset_0_0_0_1.5px_var(--brand-lime)] focus-visible:outline-none"
                       )}
+                      // o flash termina de apagar → tira as chaves da célula
+                      // (cada td limpa só as suas — o flash de outra segue).
+                      // animationend borbulha do span filho (animate-in de
+                      // entrada) — só o evento do próprio td conta
+                      onAnimationEnd={
+                        piscando
+                          ? (e) => {
+                              if (e.target !== e.currentTarget) return;
+                              setFlash((f) => {
+                                if (!f) return f;
+                                const next = new Set(f);
+                                for (const a of alvosCelula ?? [])
+                                  next.delete(`${a.id}|${c.id}`);
+                                return next.size ? next : null;
+                              });
+                            }
+                          : undefined
+                      }
                       style={{ width: larguras[c.id] ?? LARGURA_INICIAL }}
                       tabIndex={podeEditar ? 0 : undefined}
                       title={podeEditar ? "Duplo clique pra editar" : undefined}
@@ -425,9 +457,11 @@ export function RelatorioCanvas({
                       {emEdicao ? (
                         // o blur confirma só quando o foco sai do editor
                         // inteiro — Tab entre os inputs da célula composta
-                        // (Cidade/UF, contato) não fecha a edição
+                        // (Cidade/UF, contato) não fecha a edição.
+                        // O fade-in (e o da leitura ao fechar) suaviza a troca
+                        // célula↔editor — CSS, não motion: é só enter/mount.
                         <span
-                          className="flex items-center gap-1"
+                          className="flex animate-in fade-in duration-150 ease-snappy items-center gap-1"
                           onBlur={(e) => {
                             if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
                               void confirmarEdicao();
@@ -478,7 +512,11 @@ export function RelatorioCanvas({
                           ))}
                         </span>
                       ) : (
-                        <span className="block">{conteudoCelula(l, c)}</span>
+                        // remonta só quando a célula sai da edição (o fade-in
+                        // é a "volta" do valor gravado, junto do flash-ok)
+                        <span className="block animate-in fade-in duration-150 ease-snappy">
+                          {conteudoCelula(l, c)}
+                        </span>
                       )}
                     </td>
                   );

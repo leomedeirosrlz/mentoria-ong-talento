@@ -240,8 +240,18 @@ export function NotificacoesBell({
   const ctx = useContext(NotificacoesCtx);
   const [aberto, setAberto] = useState(false);
   const [agoraMs, setAgoraMs] = useState(() => Date.now());
+  const naoLidas = ctx?.naoLidas ?? 0;
+  // o badge dá um pop só quando a contagem SOBE (mesmo gatilho do anúncio
+  // aria-live do provider) — decremento é ação do próprio usuário, já tem
+  // feedback no clique. popEm guarda a contagem que já disparou o pop.
+  const [popEm, setPopEm] = useState<number | null>(null);
+  const prevNaoLidas = useRef(naoLidas);
+  useEffect(() => {
+    if (naoLidas > prevNaoLidas.current) setPopEm(naoLidas);
+    prevNaoLidas.current = naoLidas;
+  }, [naoLidas]);
   if (!ctx) return null;
-  const { itens, naoLidas, marcar, marcarTodas, recarregar } = ctx;
+  const { itens, marcar, marcarTodas, recarregar } = ctx;
 
   return (
     <Popover
@@ -266,9 +276,16 @@ export function NotificacoesBell({
         {/* lime, não danger — contagem não-lida não é alerta; o vermelho
             fica reservado a apoio/risco */}
         {naoLidas > 0 && (
+          // key={naoLidas} + popEm===naoLidas: a classe confirm-pop (keyframes
+          // do /auth/confirmado) entra só no render em que a contagem subiu
+          // — decremento remonta o número sem animação
           <span
+            key={naoLidas}
             aria-hidden
-            className="absolute right-1 top-1 grid min-w-4 place-items-center rounded-full bg-[var(--brand-lime)] px-1 text-[11px] font-semibold leading-4 text-[var(--brand-ink)] tabular-nums"
+            className={cn(
+              "absolute right-1 top-1 grid min-w-4 place-items-center rounded-full bg-[var(--brand-lime)] px-1 text-[11px] font-semibold leading-4 text-[var(--brand-ink)] tabular-nums",
+              popEm === naoLidas && "confirm-pop"
+            )}
           >
             {naoLidas > 9 ? "9+" : naoLidas}
           </span>
