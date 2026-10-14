@@ -1115,7 +1115,9 @@ function build(): DemoData {
       experiencia_previa: "Primeiro ciclo como mentor — concluiu a formação e participou de duas rodas de conversa como ouvinte.",
       formacao_externa: "Trilha de liderança e feedback da empresa.",
       disponibilidade: { dias: ["ter", "qui"], periodos: ["noite"] } },
-    { profile_id: carlos.id, tipo: "dpp", areas: ["tecnologia", "carreira"], capacidade: 1, termo_ok: true, formacao_ok: true,
+    // Carlos capacidade 2: veterano da formação com 1 dupla em andamento —
+    // 1/2 deixa uma vaga pra sugestão de remanejo/board sem inflar a lotação
+    { profile_id: carlos.id, tipo: "dpp", areas: ["tecnologia", "carreira"], capacidade: 2, termo_ok: true, formacao_ok: true,
       experiencia_previa: "Foi monitor em cursinho comunitário por dois anos.",
       formacao_externa: "Mentor de novos devs no programa interno da fintech.",
       disponibilidade: { dias: ["seg", "qua"], periodos: ["noite"] } },
@@ -1129,7 +1131,10 @@ function build(): DemoData {
       experiencia_previa: null,
       formacao_externa: null,
       disponibilidade: { dias: ["sab"], periodos: ["manha"] } },
-    { profile_id: luiza.id, tipo: "dpp", areas: ["design", "comunicação"], capacidade: 1, termo_ok: true, formacao_ok: true,
+    // Luiza capacidade 2: voltou de um ciclo completo — 1/2 com a dupla da
+    // T2. A "comunicação" dela é o tema em comum com a Dandara que a
+    // sugestão de remanejo usa pra ranquear
+    { profile_id: luiza.id, tipo: "dpp", areas: ["design", "comunicação"], capacidade: 2, termo_ok: true, formacao_ok: true,
       experiencia_previa: "Mentora no ciclo anterior — a dupla concluiu o PDM inteiro.",
       formacao_externa: "Workshops de portfólio pra estudantes de design.",
       disponibilidade: { dias: ["qua", "sex"], periodos: ["tarde"] } },

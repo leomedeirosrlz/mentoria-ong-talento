@@ -60,6 +60,7 @@ import {
 } from "@/lib/ciclo";
 import type { DadosCivis } from "@/lib/types";
 import { AnamneseMentoradoChip } from "@/components/anamnese-mentorado";
+import { CapacidadeMentorDialog } from "@/components/capacidade-mentor-dialog";
 import { DocumentosPessoa } from "@/components/documentos-pessoa";
 import { AssinaturasPessoa } from "@/components/assinaturas-pessoa";
 import { Avatar } from "@/components/avatar";
@@ -299,6 +300,18 @@ export default async function PessoaPerfilPage({
     mp?.tipo === "especialista"
       ? (mp.capacidade_especialista ?? 1)
       : (mp?.capacidade ?? 1);
+  // X/Y da capacidade (REALIZA-116): ativas+pausadas do mentor — só pra
+  // coordenação. perfil.duplas chega escopado pelo RLS: pro supervisor o
+  // recorte seria só as duplas dele e o X mentiria ("0/1" pra mentor cheio
+  // supervisionado por outro) — por isso o stat sem uso quando não é coord
+  const emUsoMentor =
+    souCoord && mp
+      ? perfil.duplas.filter(
+          (d) =>
+            d.mentor?.id === p.id &&
+            (d.status === "ativa" || d.status === "pausada")
+        ).length
+      : null;
   const cargoEmpresa =
     prof && [prof.cargo, prof.empresa].filter(Boolean).join(" · ") || null;
   // supervisor só lê presença de mentor que supervisiona (RLS via duplas,
@@ -538,10 +551,40 @@ export default async function PessoaPerfilPage({
             {mp.tipo === "dpp" ? "Mentoria DPP" : "Mentoria especialista"}
           </h2>
           <dl className="mt-2.5 grid grid-cols-2 gap-x-4 gap-y-3.5 sm:grid-cols-4">
-            {/* a pool mostrada é a da trilha do papel (0073) */}
+            {/* a pool mostrada é a da trilha do papel (0073); o ajuste fino
+                é coord-only — o dialog reusa o guard do mentor_profiles */}
             <Stat
               rotulo="Capacidade"
-              valor={`${capacidadeMentor} ${capacidadeMentor === 1 ? "dupla" : "duplas"}`}
+              valor={
+                emUsoMentor != null
+                  ? `${emUsoMentor}/${capacidadeMentor} ${capacidadeMentor === 1 ? "dupla" : "duplas"}`
+                  : `${capacidadeMentor} ${capacidadeMentor === 1 ? "dupla" : "duplas"}`
+              }
+              estado={
+                emUsoMentor != null && emUsoMentor >= capacidadeMentor
+                  ? "pendente"
+                  : "neutro"
+              }
+              acao={
+                souCoord ? (
+                  <CapacidadeMentorDialog
+                    mentorId={p.id}
+                    nome={p.nome}
+                    atual={capacidadeMentor}
+                    emUso={emUsoMentor ?? 0}
+                    trigger={
+                      <button
+                        type="button"
+                        className="mt-0.5 inline-block text-xs font-normal text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline"
+                      >
+                        {emUsoMentor != null && emUsoMentor >= capacidadeMentor
+                          ? "aumentar →"
+                          : "ajustar"}
+                      </button>
+                    }
+                  />
+                ) : undefined
+              }
             />
             <Stat
               rotulo="Formação inicial"

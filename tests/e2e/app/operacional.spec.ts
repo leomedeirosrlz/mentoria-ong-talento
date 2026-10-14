@@ -3,6 +3,8 @@ import {
   atualizarViaServiceRole,
   buscarViaServiceRole,
   expect,
+  inserirViaServiceRole,
+  limparEncontrosDaDupla,
   limparViaServiceRole,
   loginComSenha,
   test,
@@ -30,6 +32,9 @@ const IDS = {
   mentoradoLivre: "e2e00000-0000-4000-8000-000000000080",
   mentorImport: "e2e00000-0000-4000-8000-000000000090",
   mentoradoImport: "e2e00000-0000-4000-8000-0000000000a0",
+  // mentor com a dupla pausada do jovem-sem-DPP (REALIZA-113): o "cheio de
+  // pausada" dos specs de capacidade — cap implícita 1, uso 1/1
+  mentorColega: "e2e00000-0000-4000-8000-0000000000e2",
 } as const;
 const PROFILES_E2E = [
   IDS.mentor,
@@ -78,6 +83,16 @@ async function restaurarFixtures() {
   await atualizarViaServiceRole("duplas", `id=eq.${DUPLA2_ID}`, {
     status: "ativa",
   });
+  // risco plantado pelo spec da sugestão de remanejo (encontro + registro
+  // com precisa_apoio) — filhos da 0071 primeiro, igual ao seed
+  await limparEncontrosDaDupla(DUPLA2_ID);
+  // capacidade ajustada nos specs (updateCapacidadeMentor faz upsert): a
+  // row que o spec cria sai — seed nunca semeia mentor_profiles pra esses
+  // dois, então apagar a linha volta ao default implícito 1
+  await limparViaServiceRole(
+    "mentor_profiles",
+    `profile_id=in.(${IDS.mentorReserva},${IDS.mentorColega})`
+  );
   // par criado pelo import CSV (identificado pelo mentor fixture)
   await limparViaServiceRole("duplas", `mentor_id=eq.${IDS.mentorImport}`);
   // rastros que os fluxos deixam: nota de saída do remanejo nas fichas das
@@ -132,8 +147,11 @@ test.describe("coordenação — fluxos operacionais", () => {
     page,
   }) => {
     await page.goto(`/duplas/${DUPLA2_ID}`);
+    // o "Remanejar" do header é o trigger do dialog (data-slot próprio) —
+    // quando a dupla está em risco a sugestão da 115 adiciona botões com
+    // o mesmo rótulo por candidato, então role+name sozinhos não bastam
     await page
-      .getByRole("button", { name: "Remanejar", exact: true })
+      .locator('button[data-slot="dialog-trigger"]', { hasText: "Remanejar" })
       .click();
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
@@ -281,5 +299,156 @@ test.describe("coordenação — fluxos operacionais", () => {
     await expect(
       page.getByText("Evento de encerramento do programa")
     ).toBeVisible();
+  });
+
+  // REALIZA-115 — dupla em risco vira pergunta de trabalho: o card sugere
+  // quem assume cada lado (cheio marcado "sem vaga", não escondido) e o
+  // clique abre o remanejo atômico de sempre já com o par escolhido
+  test("dupla em risco sugere remanejo e abre o dialog pré-escolhido", async ({
+    page,
+  }) => {
+    test.slow(); // dois writes em staging (risco plantado + ajuste de capacidade)
+    // risco plantado: registro com pedido de apoio num encontro realizado da
+    // dupla2 — o semáforo vira "risco" e o card nasce (cleanup tira os dois)
+    const enc = await inserirViaServiceRole("encontros", {
+      dupla_id: DUPLA2_ID,
+      numero: 24, // encontros_numero_faixa = 1..24; o cleanup zera a dupla2
+      status: "realizado",
+      data_hora: new Date(Date.now() - 2 * 86400000).toISOString(),
+      realizado_em: new Date(Date.now() - 2 * 86400000).toISOString(),
+    });
+    await inserirViaServiceRole("registros", {
+      encontro_id: enc.id,
+      avaliacao: "boa",
+      dificuldade: "nenhuma",
+      precisa_apoio: true,
+    });
+
+    await page.goto(`/duplas/${DUPLA2_ID}`);
+    const card = page.locator(
+      'section[aria-labelledby="remanejo-sugerido-titulo"]'
+    );
+    await expect(card).toBeVisible();
+    await expect(
+      card.getByText("Sugerir remanejamento", { exact: true })
+    ).toBeVisible();
+    await expect(card.getByText(/Pedido de apoio/)).toBeVisible();
+
+    // pool de mentores: o import (sem dupla) tem vaga e leva Remanejar;
+    // o colega (dupla PAUSADA, cap implícita 1) aparece cheio — a saída
+    // dele é ajustar a capacidade, não desaparecer
+    const linhaImport = card.locator("li", { hasText: "Mentor E2E Import" });
+    await expect(linhaImport).toBeVisible();
+    const linhaColega = card.locator("li", { hasText: "Mentor E2E Colega" });
+    await expect(linhaColega.getByText(/1\/1 · sem vaga/)).toBeVisible();
+    await expect(
+      linhaColega.getByRole("button", { name: /aumentar capacidade/ })
+    ).toBeVisible();
+
+    // lado do mentorado: a fila "Aguardando par" ranqueada — a Mentorada
+    // E2E Livre nunca teve dupla e segue no programa
+    await expect(
+      card.locator("li", { hasText: "Mentorada E2E Livre" })
+    ).toBeVisible();
+
+    // o clique abre o dialog de sempre com lado + par já escolhidos — o
+    // resumo "antes → depois" prova a preseleção sem submeter nada
+    await linhaImport
+      .getByRole("button", { name: "Remanejar", exact: true })
+      .click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByText(/será encerrada/)).toBeVisible({
+      timeout: 15_000,
+    });
+    // o nome aparece no select já escolhido e no resumo — strict mode pede first
+    await expect(dialog.getByText(/Mentor E2E Import/).first()).toBeVisible();
+    // fecha pelo X (sr-only "Fechar") — sem submeter: a prova é a preseleção
+    await dialog.getByRole("button", { name: "Fechar" }).click();
+    await expect(dialog).not.toBeVisible();
+
+    // a saída do cheio: o ajuste sobe a capacidade e o nome dele sai de
+    // "sem vaga" pra candidato — o card re-renderiza pelo refresh
+    await linhaColega
+      .getByRole("button", { name: /aumentar capacidade/ })
+      .click();
+    // accessible name vem do título do dialog ("Capacidade de Mentor…")
+    const capDialog = page.getByRole("dialog", { name: /Capacidade de/ });
+    await expect(capDialog.getByText(/Cuida de 1 dupla em andamento/)).toBeVisible();
+    await capDialog.locator("#cap-mentor").fill("2");
+    await capDialog.getByRole("button", { name: "Salvar" }).click();
+    // dev server compila a action no 1º hit — a janela de write em staging
+    // pede folga maior que a dos cliques read-only
+    await expect(capDialog).not.toBeVisible({ timeout: 30_000 });
+    await expect(
+      card.locator("li", { hasText: "Mentor E2E Colega" }).getByRole("button", {
+        name: "Remanejar",
+        exact: true,
+      })
+    ).toBeVisible({ timeout: 30_000 });
+    // o colega saiu de 1/1 cheio pra 1/2 — outros mentores seguem sem vaga
+    await expect(linhaColega.getByText(/sem vaga/)).not.toBeVisible();
+    await expect(linhaColega.getByText(/1\/2/)).toBeVisible();
+  });
+
+  // REALIZA-116 — o X/Y percorre o board e o NovaDuplaDialog: mentor cheio
+  // fica selecionável marcado "sem vaga" (a afinidade dele ainda compara)
+  // mas o submit bloqueia até a capacidade subir ou outro mentor entrar
+  test("matching: X/Y no board e nova dupla bloqueada até aumentar a capacidade", async ({
+    page,
+  }) => {
+    test.slow(); // write de capacidade em staging no meio do fluxo
+    await page.goto("/pessoas");
+    await page
+      .getByRole("button", { name: "Livres para dupla" })
+      .click();
+
+    // board: todo mentor ativo com o X/Y — o reserva (1/1 implícita) já
+    // nasce cheio marcado; o import (0/1) tem vaga
+    const painel = page.locator("section", {
+      has: page.getByRole("heading", { name: "Parear", exact: true }),
+    });
+    await expect(painel).toBeVisible();
+    await painel.locator("#parear-mentor").click();
+    await expect(
+      page.getByRole("option", { name: /Mentor E2E Reserva · 1\/1 · sem vaga/ })
+    ).toBeVisible();
+    await expect(
+      page.getByRole("option", { name: /Mentor E2E Import · 0\/1/ })
+    ).toBeVisible();
+    // o colega carrega a pausada na contagem — 1/1 sem vaga também
+    await expect(
+      page.getByRole("option", { name: /Mentor E2E Colega · 1\/1 · sem vaga/ })
+    ).toBeVisible();
+    await page.keyboard.press("Escape");
+
+    // NovaDuplaDialog: mentor cheio selecionável + marcado, mas o submit
+    // segura até a capacidade subir — e o "aumentar capacidade →" resolve
+    await painel.getByRole("button", { name: "Nova dupla" }).click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+    await dialog.locator("#mentor").click();
+    await page
+      .getByRole("option", { name: /Mentor E2E Reserva · 1\/1 · sem vaga/ })
+      .click();
+    const submit = dialog.getByRole("button", { name: "Formar dupla" });
+    await expect(submit).toBeDisabled();
+    await expect(dialog.getByText(/está sem vaga/)).toBeVisible();
+
+    await dialog
+      .getByRole("button", { name: /aumentar capacidade/ })
+      .click();
+    // o dialog de capacidade abre aninhado ao NovaDuplaDialog — o nome
+    // acessível ("Capacidade de …") é o escopo certo, não a ordem do DOM
+    const capDialog = page.getByRole("dialog", { name: /Capacidade de/ });
+    await capDialog.locator("#cap-mentor").fill("2");
+    await capDialog.getByRole("button", { name: "Salvar" }).click();
+    await expect(capDialog).not.toBeVisible({ timeout: 30_000 });
+    // capacidade subiu pra 2 (uso 1) — o bloqueio cai na hora (onSaved
+    // atualiza o mapa local sem depender do refresh)
+    await expect(submit).toBeEnabled({ timeout: 30_000 });
+    await expect(dialog.getByText(/está sem vaga/)).not.toBeVisible();
+    // não forma a dupla — o spec só valida o destrave do submit
+    await dialog.getByRole("button", { name: "Fechar" }).click();
   });
 });

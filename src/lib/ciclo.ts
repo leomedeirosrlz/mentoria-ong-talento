@@ -479,8 +479,10 @@ export function disponibilidadeVazia(
 }
 
 /** Períodos em comum entre duas grades — lista vazia vale "qualquer
- *  período" (a pessoa marcou dias sem recortar horário): cruza com tudo. */
-function periodosCruzam(
+ *  período" (a pessoa marcou dias sem recortar horário): cruza com tudo.
+ *  Exportada pro score de afinidade do remanejo sugerido (REALIZA-115),
+ *  mesma régua do overlay da agenda. */
+export function periodosCruzam(
   a: Periodo[] | null | undefined,
   b: Periodo[] | null | undefined
 ): boolean {
