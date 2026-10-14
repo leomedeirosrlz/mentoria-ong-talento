@@ -43,6 +43,7 @@ import type {
 // Só tipos das queries reais — `import type` é apagado no build, então o
 // ciclo queries.ts → demo/queries.ts → queries.ts não existe em runtime.
 import type {
+  CurriculoMentorado,
   DadosPessoais,
   DuplaOpcao,
   DuplaPerfil,
@@ -178,6 +179,11 @@ const CAMPOS_PESSOAIS = [
   "dados_civis",
   "responsavel",
   "form_bruto",
+  // currículo (0081) sai do objeto pra todo mundo que não é coordenação —
+  // o auxiliar executivo o recebe de volta pelo mapa dedicado
+  // (demoCurriculoMap), no mesmo modelo do grant+view do banco
+  "curriculo_path",
+  "curriculo_url",
 ] as const;
 
 function semPessoal<P>(p: P): P {
@@ -485,6 +491,36 @@ export function demoPessoalMap(
   return mapa;
 }
 
+/** Mapa id → currículo, espelhando o WHERE da view mentorados_curriculo
+ *  (0081): coordenação recebe todas as linhas; o auxiliar executivo só os
+ *  mentorados das duplas que supervisiona (o recorte de duplasDoPapel); os
+ *  demais papéis recebem mapa vazio — a real nem dispara a query. */
+export function demoCurriculoMap(
+  role: AppRole
+): Map<string, CurriculoMentorado> {
+  const mapa = new Map<string, CurriculoMentorado>();
+  const data = getDemoData();
+  // o embed mentorado da dupla é o shape público (MentoradoPar) — o
+  // currículo vem da linha cheia, resolvida por id, como a view faz
+  const supervisionados =
+    role === "supervisor"
+      ? new Set(duplasDoPapel(data, role).map((d) => d.mentorado?.id))
+      : null;
+  const escopo =
+    role === "coordenacao"
+      ? data.mentorados
+      : supervisionados != null
+        ? data.mentorados.filter((m) => supervisionados.has(m.id))
+        : [];
+  for (const m of escopo) {
+    mapa.set(m.id, {
+      curriculo_path: m.curriculo_path ?? null,
+      curriculo_url: m.curriculo_url ?? null,
+    });
+  }
+  return mapa;
+}
+
 /** Card de dupla da página de perfil — id, status, início e o par. */
 function duplaPerfil(
   d: Dupla,
@@ -561,9 +597,16 @@ export function demoPessoaPerfil(
     // mentor/supervisor sem vínculo ao mentorado: a RLS responderia vazio →
     // notFound (supervisor só lê mentorados de duplas que supervisiona — 0023)
     if (role !== "coordenacao" && duplas.length === 0) return null;
+    // currículo (0081): sai do objeto pelo strip (CAMPOS_PESSOAIS) e volta
+    // pelo mapa escopado — coord vê de todos, aux só das supervisionadas
+    const cv = demoCurriculoMap(role).get(m.id);
     return {
       tipo: "mentorado",
-      pessoa: role === "coordenacao" ? m : semPessoal(m),
+      pessoa: {
+        ...(role === "coordenacao" ? m : semPessoal(m)),
+        curriculo_path: cv?.curriculo_path ?? null,
+        curriculo_url: cv?.curriculo_url ?? null,
+      },
       duplas,
       notas: notasDe("mentorado_id"),
     };
