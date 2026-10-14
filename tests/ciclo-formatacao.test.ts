@@ -379,7 +379,7 @@ describe("waLink / linkSeguro", () => {
 describe("papelLabel", () => {
   it("rótulos pt-BR por papel, com fallback", () => {
     expect(papelLabel("coordenacao")).toBe("Coordenação");
-    expect(papelLabel("supervisor")).toBe("Supervisor de relacionamento");
+    expect(papelLabel("supervisor")).toBe("Auxiliar executivo");
     expect(papelLabel("mentor_dpp")).toBe("Mentor DPP");
     expect(papelLabel("mentor_especialista")).toBe("Mentor especialista");
     expect(papelLabel(null)).toBe("Sem papel definido");

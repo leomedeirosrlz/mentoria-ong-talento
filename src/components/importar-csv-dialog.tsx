@@ -31,18 +31,18 @@ type Resultado = { criados: number; puladas: string[] };
 
 // labels registradas no Select — sem elas o trigger fechado mostra o valor cru
 const TIPO_LABEL: Record<Tipo, string> = {
-  equipe: "Equipe (mentores, supervisores, coordenação)",
+  equipe: "Equipe (mentores, auxiliares executivos, coordenação)",
   mentorados: "Mentorados",
   duplas: "Pareamento (duplas)",
 };
 
 const DICAS: Record<Tipo, string> = {
   equipe:
-    "Colunas: nome, email, whatsapp, papel (mentor dpp / especialista / supervisor / coordenação, em branco vira mentor DPP; \"nenhum\" cadastra sem papel) e a ficha opcional: nome_social, data_nascimento (dd/mm/aaaa), genero, cor_raca, cidade, uf, cargo, empresa, bio, linkedin, interesses (separados por vírgula), motivacao, pref_genero_par, origem, experiencia_previa, formacao_externa e disponibilidade (JSON {dias,periodos}): estas três gravam na ficha de mentor. consent_lgpd_em carimba o consentimento (ISO). form_bruto (JSON) guarda a resposta original. Documentos pro termo: rg, cpf, cep, logradouro, numero, complemento, bairro. Os CSVs crus dos Google Forms de intake também entram. As colunas conhecidas são mapeadas e o resto é ignorado.",
+    "Colunas: nome, email, whatsapp, papel (mentor dpp / especialista / auxiliar executivo / coordenação, em branco vira mentor DPP; \"nenhum\" cadastra sem papel) e a ficha opcional: nome_social, data_nascimento (dd/mm/aaaa), genero, cor_raca, cidade, uf, cargo, empresa, bio, linkedin, interesses (separados por vírgula), motivacao, pref_genero_par, origem, experiencia_previa, formacao_externa e disponibilidade (JSON {dias,periodos}): estas três gravam na ficha de mentor. consent_lgpd_em carimba o consentimento (ISO). form_bruto (JSON) guarda a resposta original. Documentos pro termo: rg, cpf, cep, logradouro, numero, complemento, bairro. Os CSVs crus dos Google Forms de intake também entram. As colunas conhecidas são mapeadas e o resto é ignorado.",
   mentorados:
     "Colunas: nome, whatsapp, email, ong, notas e a ficha opcional: nome_social, data_nascimento (dd/mm/aaaa), genero, cor_raca, cidade, uf, escolaridade, interesses (por vírgula), objetivos, motivacao, pref_genero_par, origem, disponibilidade (JSON {dias,periodos}) e form_bruto (JSON). Só o nome é obrigatório. Documentos pro termo: rg, cpf, cep, logradouro, numero, complemento, bairro; e do responsável: resp_nome, resp_parentesco, resp_rg, resp_cpf, resp_nascimento, resp_cidade, resp_uf, resp_cep, resp_logradouro, resp_numero, resp_complemento, resp_bairro.",
   duplas:
-    "Uma linha = uma dupla. Obrigatórias: mentor e mentorado (nome ou e-mail — nome resolve sem acento e aceita o nome de exibição, ex.: \"Juliana Novaes\" acha \"Juliana Novaes de Oliveira\"; apelido que não é pedaço do nome não resolve — prefira o e-mail). Opcionais: supervisor (nome ou e-mail — informado e não achado falha a linha), turma (label exato, ex.: \"T2 · 2026/2027\"; em branco só vale quando existe um único cronograma ativo), demanda/eixo e iniciada_em (dd/mm/aaaa ou aaaa-mm-dd). Cada linha vira uma dupla ativa: a trilha sai do papel do mentor, a demanda vai pro campo demanda e, sem iniciada_em, a dupla DPP nasce uma semana antes do 1º encontro do cronograma. Par já existente (ativo ou pausado), mentor sem vaga e nome ambíguo pulam a linha — nada é gravado antes da prévia.",
+    "Uma linha = uma dupla. Obrigatórias: mentor e mentorado (nome ou e-mail — nome resolve sem acento e aceita o nome de exibição, ex.: \"Juliana Novaes\" acha \"Juliana Novaes de Oliveira\"; apelido que não é pedaço do nome não resolve — prefira o e-mail). Opcionais: auxiliar executivo (nome ou e-mail — informado e não achado falha a linha), turma (label exato, ex.: \"T2 · 2026/2027\"; em branco só vale quando existe um único cronograma ativo), demanda/eixo e iniciada_em (dd/mm/aaaa ou aaaa-mm-dd). Cada linha vira uma dupla ativa: a trilha sai do papel do mentor, a demanda vai pro campo demanda e, sem iniciada_em, a dupla DPP nasce uma semana antes do 1º encontro do cronograma. Par já existente (ativo ou pausado), mentor sem vaga e nome ambíguo pulam a linha — nada é gravado antes da prévia.",
 };
 
 const MODELO: Record<Tipo, string> = {
@@ -51,7 +51,7 @@ const MODELO: Record<Tipo, string> = {
   mentorados:
     "nome;whatsapp;email;ong;notas;nome_social;data_nascimento;genero;cor_raca;cidade;uf;escolaridade;interesses;objetivos;motivacao;pref_genero_par;origem;disponibilidade;form_bruto;rg;cpf;cep;logradouro;numero;complemento;bairro;resp_nome;resp_parentesco;resp_rg;resp_cpf;resp_nascimento;resp_cidade;resp_uf;resp_cep;resp_logradouro;resp_numero;resp_complemento;resp_bairro",
   duplas:
-    "mentor;mentorado;supervisor;turma;demanda;iniciada_em",
+    "mentor;mentorado;auxiliar executivo;turma;demanda;iniciada_em",
 };
 
 /** Campos da ficha (0034) + civis (0046) reconhecidos na linha — pro resumo
@@ -332,7 +332,7 @@ export function ImportarCsvDialog({
                             <span className="text-[var(--ok-text)]">
                               Pronta
                               {r.trilha === "especialista" ? " · especialista" : ""}
-                              {r.supervisorNome ? ` · sup. ${r.supervisorNome}` : ""}
+                              {r.supervisorNome ? ` · aux. ${r.supervisorNome}` : ""}
                             </span>
                           ) : r.status === "existe" ? (
                             <span className="text-[var(--warn-text)]">{r.motivo}</span>
@@ -349,7 +349,7 @@ export function ImportarCsvDialog({
             <p className="text-xs text-muted-foreground">
               Mentor e mentorado resolvem por e-mail ou nome (sem acento, com nome
               de exibição). Linha com problema não é criada — as prontas entram
-              mesmo se houver puladas. Mentores e supervisores são avisados.
+              mesmo se houver puladas. Mentores e auxiliares executivos são avisados.
             </p>
             <div className="flex gap-2">
               <Button variant="outline" onClick={() => { setPrevia(null); setLinhasPar(null); }}>Voltar</Button>
@@ -486,7 +486,7 @@ export function ImportarCsvDialog({
               <Textarea
                 id="csv_text" rows={7}
                 placeholder={tipo === "duplas"
-                  ? "mentor;mentorado;supervisor;turma;demanda;iniciada_em\nStéphanie Santos;Yaleh Nóbrega;;T2 · 2026/2027;Transição para tecnologia;06/10/2026"
+                  ? "mentor;mentorado;auxiliar executivo;turma;demanda;iniciada_em\nStéphanie Santos;Yaleh Nóbrega;;T2 · 2026/2027;Transição para tecnologia;06/10/2026"
                   : "nome;email;whatsapp;papel;cidade;uf;interesses\nMaria Silva;maria@email.com;11999998888;mentor dpp;São Paulo;SP;tecnologia, carreira"}
                 value={texto}
                 onChange={(e) => setTexto(e.target.value)}

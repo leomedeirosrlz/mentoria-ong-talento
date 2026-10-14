@@ -502,7 +502,7 @@ export function NovaDuplaDialog() {
               desabilitar pra não sugerir uma supervisão que não existe */}
           {!ehEsp && (
             <div className="space-y-2">
-              <Label id="supervisor-label">Supervisor de relacionamento (opcional)</Label>
+              <Label id="supervisor-label">Auxiliar executivo (opcional)</Label>
               <Select
                 name="supervisor_id"
                 defaultValue={NENHUM}

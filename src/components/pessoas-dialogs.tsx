@@ -47,7 +47,7 @@ import {
 const PAPEL_LABEL: Record<string, string> = {
   mentor_dpp: "Mentor DPP",
   mentor_especialista: "Mentor especialista",
-  supervisor: "Supervisor",
+  supervisor: "Auxiliar executivo",
   coordenacao: "Coordenação",
 };
 
