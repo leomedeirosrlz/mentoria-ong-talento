@@ -13,10 +13,14 @@ on:
 # órfão "Preview – realiza") — agrupar só por SHA deixava o deployment do
 # projeto órfão cancelar o run real (cancel-in-progress). O environment no
 # grupo separa os dois: cada um tem sua fila e o do órfão só pula no `if`.
+# Sem o SHA no grupo: dois branches com preview pronto competem pelos mesmos
+# fixtures do staging (seeds convergem pros mesmos IDs e2e00000-*) e um run
+# apaga o encontro que o outro acabou de criar — flake garantido. Uma fila
+# por environment serializa a suite inteira; commit novo espera o run atual.
 concurrency:
   group: >-
-    e2e-preview-${{ github.event.deployment.sha }}-${{ github.event.deployment.environment }}
-  cancel-in-progress: true
+    e2e-preview-${{ github.event.deployment.environment }}
+  cancel-in-progress: false
 
 jobs:
   e2e:
