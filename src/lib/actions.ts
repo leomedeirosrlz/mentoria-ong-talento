@@ -1112,6 +1112,104 @@ export async function deleteMentorado(id: string) {
   return { ok: true };
 }
 
+/** Campos de cadastro que a grade de relatórios edita inline (typo/contato).
+ *  Tudo que tem fluxo próprio — status e demanda de dupla, papel, datas —
+ *  fica de fora de propósito: a grade corrige ficha, não opera o ciclo. */
+const CAMPOS_RELATORIO = ["nome", "email", "whatsapp", "cidade", "uf"] as const;
+
+export async function salvarCampoRelatorio(
+  tabela: "profiles" | "mentorados",
+  id: string,
+  campo: string,
+  valor: string
+) {
+  if (await demoAtivo()) return { error: DEMO_MSG };
+  const { supabase, me: eu } = await me();
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
+  if (eu.role !== "coordenacao") {
+    return { error: "Só a coordenação edita cadastros." };
+  }
+  if (tabela !== "profiles" && tabela !== "mentorados") {
+    return { error: "Não foi possível concluir. Tente de novo." };
+  }
+  if (!(CAMPOS_RELATORIO as readonly string[]).includes(campo)) {
+    return { error: "Esse campo não é editável por aqui." };
+  }
+
+  // mesmas normalizações dos dialogs completos (updatePessoa/updateMentorado
+  // + camposFicha) — um campo digitado na grade vale o mesmo que no form
+  const v = valor.trim();
+  let normalizado: string | null;
+  switch (campo as (typeof CAMPOS_RELATORIO)[number]) {
+    case "nome": {
+      normalizado = nomeProprio(v);
+      if (!normalizado) return { error: "Nome é obrigatório." };
+      break;
+    }
+    case "email": {
+      normalizado = normEmail(v) || null;
+      if (normalizado && !emailValido(normalizado)) {
+        return { error: "Confira o e-mail." };
+      }
+      // e-mail de profile já vinculado a uma conta só muda pelo sync do
+      // auth (0060): a troca é self-service, feita pela própria pessoa
+      if (tabela === "profiles") {
+        const { data: atual } = await supabase
+          .from("profiles").select("user_id").eq("id", id).single();
+        if (atual?.user_id) {
+          return {
+            error:
+              "Essa pessoa já entrou na plataforma — o e-mail de acesso só muda pelo perfil dela.",
+          };
+        }
+      }
+      break;
+    }
+    case "whatsapp": {
+      normalizado = v ? normWhatsapp(v) : null;
+      // lixo digitado não pode zerar o campo silenciosamente
+      if (v && !normalizado) {
+        return { error: "Confira o WhatsApp: use DDD e o número completo." };
+      }
+      break;
+    }
+    case "cidade": {
+      normalizado = nomeProprio(v) || null;
+      if (normalizado && normalizado.length > 100) {
+        return { error: 'O campo "Cidade" aceita até 100 caracteres.' };
+      }
+      break;
+    }
+    case "uf": {
+      const uf = v.toUpperCase();
+      if (!uf) normalizado = null;
+      else if (!(UFS as readonly string[]).includes(uf)) {
+        return { error: "Escolha um estado (UF) válido." };
+      } else normalizado = uf;
+      break;
+    }
+  }
+
+  // UPDATE direto na tabela (nunca na view profiles_contato): coord cobre a
+  // row inteira pela policy *_coord for all (0001) — o grant por coluna da
+  // 0026/0034 só estreitou SELECT
+  const { data, error } = await supabase
+    .from(tabela)
+    .update({ [campo]: normalizado })
+    .eq("id", id)
+    .select("id");
+  if (error) return { error: erroAmigavel(error) };
+  if (!data?.length) {
+    return { error: "Não foi possível concluir. Recarregue a página e tente de novo." };
+  }
+  revalidatePath("/relatorios");
+  revalidatePath("/pessoas");
+  revalidatePath(`/pessoas/${id}`);
+  // devolve o valor gravado: a grade aplica o normalizado no estado local
+  // (o que aparece na célula é o que ficou no banco, não o que se digitou)
+  return { ok: true, valor: normalizado };
+}
+
 export async function updateDupla(duplaId: string, formData: FormData) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();

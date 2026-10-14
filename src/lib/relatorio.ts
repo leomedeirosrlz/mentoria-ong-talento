@@ -88,6 +88,9 @@ export function configParaSearch(cfg: RelatorioConfig): string {
 
 export type PessoaFonte = {
   id: string;
+  /** preenchido quando a pessoa já entrou — email de profile vinculado não
+   *  é editável na grade (a 0060 reserva a escrita ao sync do auth) */
+  user_id?: string | null;
   nome: string | null;
   email: string | null;
   whatsapp: string | null;
@@ -96,6 +99,7 @@ export type PessoaFonte = {
 };
 
 export type DuplaFonte = {
+  id: string;
   turma: string;
   mentor_id: string;
   mentorado_id: string;
@@ -105,14 +109,99 @@ export type DuplaFonte = {
   demanda: string | null;
 };
 
-export type LinhaRelatorio = Record<string, string>;
+// ---------- edição inline (só o app autenticado pede os metadados) ----------
+
+export type TabelaCadastro = "profiles" | "mentorados";
+
+/** Campos de cadastro que a grade corrige (typo/contato). Status, papel,
+ *  demanda e início têm fluxo próprio com notificações — ficam read-only. */
+export type CampoCadastro = "nome" | "email" | "whatsapp" | "cidade" | "uf";
+
+/** Destino de escrita de uma célula editável. Células compostas (Cidade/UF,
+ *  Contato do mentor) carregam uma lista — um alvo por campo. */
+export type AlvoRelatorio = {
+  tabela: TabelaCadastro;
+  id: string;
+  campo: CampoCadastro;
+  /** valor cru do campo — conteúdo inicial do input de edição */
+  valor: string;
+};
+
+type MetaLinha = Record<string, AlvoRelatorio[]> | Record<string, string>;
+
+/** A linha mistura valores de célula (string, indexados pelo id do catálogo)
+ *  e metadados `__*` — que nunca viram coluna porque o canvas só lê
+ *  `colunas`. `__alvos` (destinos de escrita) e `__links` (hrefs internos,
+ *  ex.: o par → ficha da dupla) só existem com `paraApp`; `__status` e
+ *  `__papel` são tokens semânticos que alimentam chip/cor em qualquer
+ *  contexto, inclusive o resumo público. */
+export interface LinhaRelatorio {
+  [col: string]: string | MetaLinha | undefined;
+  __alvos?: Record<string, AlvoRelatorio[]>;
+  __links?: Record<string, string>;
+  __status?: string;
+  __papel?: "mentor" | "mentorado";
+}
+
+/** Texto da célula — os metadados `__*` não são string, então toda leitura
+ *  de valor (ordenação, TSV/CSV, render) passa por aqui. */
+export function textoCelula(l: LinhaRelatorio, col: string): string {
+  const v = l[col];
+  return typeof v === "string" ? v : "";
+}
+
+/** Coluna → campos de cadastro que ela escreve na edição inline. As
+ *  compostas (cidade_uf, contato_*) abrem um input por campo, na ordem em
+ *  que aparecem na célula. */
+const CAMPOS_COLUNA_PESSOA: Record<string, readonly CampoCadastro[]> = {
+  nome: ["nome"],
+  email: ["email"],
+  whatsapp: ["whatsapp"],
+  cidade_uf: ["cidade", "uf"],
+};
+
+const CAMPOS_COLUNA_MENTOR: Record<string, readonly CampoCadastro[]> = {
+  mentor: ["nome"],
+  contato_mentor: ["whatsapp", "email"],
+};
+
+const CAMPOS_COLUNA_MENTORADO: Record<string, readonly CampoCadastro[]> = {
+  mentorado: ["nome"],
+  contato_mentorado: ["whatsapp", "email"],
+};
+
+/** `__alvos` de uma pessoa pra um mapa coluna→campos. E-mail de profile com
+ *  conta vinculada fica de fora — o servidor recusa (0060) e a grade nem
+ *  oferece a edição. Coluna cujos campos caíram todos no filtro não emite
+ *  chave (célula read-only). */
+function alvosDe(
+  tabela: TabelaCadastro,
+  p: PessoaFonte,
+  mapa: Record<string, readonly CampoCadastro[]>
+): Record<string, AlvoRelatorio[]> {
+  const out: Record<string, AlvoRelatorio[]> = {};
+  for (const col of Object.keys(mapa)) {
+    const lista = mapa[col]
+      .filter(
+        (campo) =>
+          !(tabela === "profiles" && campo === "email" && p.user_id)
+      )
+      .map((campo) => ({
+        tabela,
+        id: p.id,
+        campo,
+        valor: p[campo] ?? "",
+      }));
+    if (lista.length) out[col] = lista;
+  }
+  return out;
+}
 
 const STATUS_LABEL: Record<string, string> = {
   ativa: "Ativa",
   encerrada: "Encerrada",
   pausada: "Pausada",
   concluida: "Concluída",
-  "sem dupla": "Sem dupla",
 };
 
 export function labelStatus(s: string): string {
@@ -142,8 +231,10 @@ export function montarLinhas(
   cfg: RelatorioConfig,
   duplas: DuplaFonte[],
   profs: Map<string, PessoaFonte>,
-  mentorados: Map<string, PessoaFonte>
+  mentorados: Map<string, PessoaFonte>,
+  opts: { paraApp?: boolean } = {}
 ): LinhaRelatorio[] {
+  const { paraApp = false } = opts;
   const daTurma = duplas.filter((d) => !cfg.turma || d.turma === cfg.turma);
 
   if (cfg.granularidade === "duplas") {
@@ -152,7 +243,7 @@ export function montarLinhas(
         const mentor = profs.get(d.mentor_id);
         const mentorado = mentorados.get(d.mentorado_id);
         const sup = d.supervisor_id ? profs.get(d.supervisor_id) : null;
-        return {
+        const linha: LinhaRelatorio = {
           mentor: mentor?.nome ?? "",
           mentorado: mentorado?.nome ?? "",
           contato_mentor: mentor ? contato(mentor) : "",
@@ -161,9 +252,21 @@ export function montarLinhas(
           iniciada_em: formatDate(d.iniciada_em),
           demanda: d.demanda ?? "",
           auxiliar: sup?.nome ?? "",
+          __status: d.status,
         };
+        if (paraApp) {
+          linha.__alvos = {
+            ...(mentor
+              ? alvosDe("profiles", mentor, CAMPOS_COLUNA_MENTOR)
+              : {}),
+            ...(mentorado
+              ? alvosDe("mentorados", mentorado, CAMPOS_COLUNA_MENTORADO)
+              : {}),
+          };
+        }
+        return linha;
       })
-      .sort((a, b) => a.mentor.localeCompare(b.mentor, "pt-BR"));
+      .sort((a, b) => textoCelula(a, "mentor").localeCompare(textoCelula(b, "mentor"), "pt-BR"));
   }
 
   const linhas: LinhaRelatorio[] = [];
@@ -175,7 +278,7 @@ export function montarLinhas(
     const mentorado = mentorados.get(d.mentorado_id);
     const sup = d.supervisor_id ? profs.get(d.supervisor_id) : null;
     if (mentor) {
-      linhas.push({
+      const linha: LinhaRelatorio = {
         papel: "Mentor(a)",
         nome: mentor.nome ?? "",
         email: mentor.email ?? "",
@@ -186,10 +289,17 @@ export function montarLinhas(
         iniciada_em: formatDate(d.iniciada_em),
         demanda: d.demanda ?? "",
         auxiliar: sup?.nome ?? "",
-      });
+        __status: d.status,
+        __papel: "mentor",
+      };
+      if (paraApp) {
+        linha.__alvos = alvosDe("profiles", mentor, CAMPOS_COLUNA_PESSOA);
+        linha.__links = { par: `/duplas/${d.id}` };
+      }
+      linhas.push(linha);
     }
     if (mentorado) {
-      linhas.push({
+      const linha: LinhaRelatorio = {
         papel: "Mentorado(a)",
         nome: mentorado.nome ?? "",
         email: mentorado.email ?? "",
@@ -200,7 +310,14 @@ export function montarLinhas(
         iniciada_em: formatDate(d.iniciada_em),
         demanda: d.demanda ?? "",
         auxiliar: sup?.nome ?? "",
-      });
+        __status: d.status,
+        __papel: "mentorado",
+      };
+      if (paraApp) {
+        linha.__alvos = alvosDe("mentorados", mentorado, CAMPOS_COLUNA_PESSOA);
+        linha.__links = { par: `/duplas/${d.id}` };
+      }
+      linhas.push(linha);
     }
   }
 
@@ -208,27 +325,40 @@ export function montarLinhas(
     for (const pid of FILA_T2_MENTORES) {
       const p = profs.get(pid);
       if (p && !ativosMentor.has(pid)) {
-        linhas.push({
+        const linha: LinhaRelatorio = {
           papel: "Mentor(a)", nome: p.nome ?? "", email: p.email ?? "",
           whatsapp: p.whatsapp ?? "", cidade_uf: cidadeUf(p), par: "",
           status_dupla: "Sem dupla", iniciada_em: "", demanda: "", auxiliar: "",
-        });
+          __status: "sem_dupla",
+          __papel: "mentor",
+        };
+        if (paraApp) {
+          linha.__alvos = alvosDe("profiles", p, CAMPOS_COLUNA_PESSOA);
+        }
+        linhas.push(linha);
       }
     }
     for (const mid of FILA_T2_MENTORADOS) {
       const m = mentorados.get(mid);
       if (m && !ativosJovem.has(mid)) {
-        linhas.push({
+        const linha: LinhaRelatorio = {
           papel: "Mentorado(a)", nome: m.nome ?? "", email: m.email ?? "",
           whatsapp: m.whatsapp ?? "", cidade_uf: cidadeUf(m), par: "",
           status_dupla: "Sem dupla", iniciada_em: "", demanda: "", auxiliar: "",
-        });
+          __status: "sem_dupla",
+          __papel: "mentorado",
+        };
+        if (paraApp) {
+          linha.__alvos = alvosDe("mentorados", m, CAMPOS_COLUNA_PESSOA);
+        }
+        linhas.push(linha);
       }
     }
   }
 
   return linhas.sort(
     (a, b) =>
-      a.papel.localeCompare(b.papel, "pt-BR") || a.nome.localeCompare(b.nome, "pt-BR")
+      textoCelula(a, "papel").localeCompare(textoCelula(b, "papel"), "pt-BR") ||
+      textoCelula(a, "nome").localeCompare(textoCelula(b, "nome"), "pt-BR")
   );
 }
