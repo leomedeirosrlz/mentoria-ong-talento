@@ -23,6 +23,7 @@ export default async function RelatoriosPage() {
     const dd = demoDuplas("coordenacao");
     turmas = [...new Set(dd.map((d) => d.turma))];
     duplas = dd.map((d) => ({
+      id: d.id,
       turma: d.turma,
       mentor_id: d.mentor.id,
       mentorado_id: d.mentorado.id,
@@ -33,6 +34,7 @@ export default async function RelatoriosPage() {
     }));
     const pessoaFonte = (p: {
       id: string;
+      user_id?: string | null;
       nome: string | null;
       email?: string | null;
       whatsapp?: string | null;
@@ -40,6 +42,7 @@ export default async function RelatoriosPage() {
       uf?: string | null;
     }): PessoaFonte => ({
       id: p.id,
+      user_id: p.user_id ?? null,
       nome: p.nome,
       email: p.email ?? null,
       whatsapp: p.whatsapp ?? null,
@@ -66,9 +69,11 @@ export default async function RelatoriosPage() {
     const [dRes, pRes, mRes, contatos] = await Promise.all([
       supabase
         .from("duplas")
-        .select("turma, mentor_id, mentorado_id, supervisor_id, status, iniciada_em, demanda")
+        .select("id, turma, mentor_id, mentorado_id, supervisor_id, status, iniciada_em, demanda")
         .order("iniciada_em"),
-      supabase.from("profiles").select("id, nome, cidade, uf"),
+      // user_id alimenta o gate do e-mail editável na grade (conta
+      // vinculada → e-mail só muda pelo sync do auth, 0060)
+      supabase.from("profiles").select("id, user_id, nome, cidade, uf"),
       supabase.from("mentorados").select("id, nome, email, whatsapp, cidade, uf"),
       getContatos(),
     ]);
