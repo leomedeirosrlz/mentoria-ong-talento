@@ -1,10 +1,14 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import type { Metadata } from "next";
+import { sharedOg } from "@/lib/og";
 import { LoginForm } from "./login-form";
 
 export const metadata: Metadata = {
   title: "Entrar",
+  // canonical consolida as variantes ?next=… que o middleware propaga
+  alternates: { canonical: "/login" },
+  openGraph: { ...sharedOg, url: "/login" },
 };
 
 export default function LoginPage() {

@@ -3,6 +3,8 @@ import { Mitr, JetBrains_Mono } from "next/font/google";
 import { MotionConfig } from "motion/react";
 import { Toaster } from "@/components/ui/sonner";
 import { demoRole } from "@/lib/demo/mode";
+import { sharedOg } from "@/lib/og";
+import { SITE_URL } from "@/lib/site";
 import "./globals.css";
 
 const mitr = Mitr({
@@ -16,12 +18,26 @@ const jbMono = JetBrains_Mono({
   subsets: ["latin"],
 });
 
+const DESCRICAO =
+  "Plataforma do Programa de Mentoria Social do Instituto Realiza.vc — encontros, registros e acompanhamento das duplas num lugar só.";
+
 export const metadata: Metadata = {
+  // resolve os URLs relativos de openGraph (images, url, canonical) —
+  // sem ele, metadata com url relativa é erro de build no Next 16
+  metadataBase: new URL(SITE_URL),
   title: {
     default: "Realiza.vc · Programa de Mentoria Social",
     template: "%s · Realiza.vc",
   },
-  description: "Acompanhamento operacional do Programa de Mentoria Social do Instituto Realiza.vc",
+  description: DESCRICAO,
+  openGraph: {
+    ...sharedOg,
+    description: DESCRICAO,
+    url: "/",
+  },
+  twitter: {
+    card: "summary_large_image",
+  },
   appleWebApp: {
     capable: true,
     title: "Realiza.vc",
