@@ -494,7 +494,7 @@ function EncontroLinha({
           </p>
         )}
       </div>
-      <div className="ms-auto flex items-center gap-2">
+      <div className="ms-auto flex flex-wrap items-center justify-end gap-2">
         {futuro && linkSeguro(e.link) && (
           <a
             href={linkSeguro(e.link)!}

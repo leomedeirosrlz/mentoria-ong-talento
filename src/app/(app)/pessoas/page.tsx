@@ -20,6 +20,7 @@ import {
 } from "@/components/pessoas-dialogs";
 import { EnviarTermosDialog } from "@/components/enviar-termos-dialog";
 import { PessoasListas } from "@/components/pessoas-listas";
+import { PageHeader } from "@/components/page-header";
 
 export const metadata: Metadata = {
   title: "Pessoas",
@@ -122,49 +123,49 @@ export default async function PessoasPage() {
 
   return (
     <div className="space-y-8">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Pessoas</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            {souCoord
-              ? "Mentores, auxiliares executivos e equipe com acesso à plataforma"
-              : "Conheça quem faz o programa"}
-          </p>
-        </div>
-        {/* criação é o caminho primário e fica visível; importação e backups
-            vão pro "Mais ações" — 5 CTAs de mesmo peso viravam pilha a 390px.
-            Só a coordenação gerencia cadastros — pros demais é diretório */}
-        {souCoord && (
-          <div className="flex flex-wrap gap-2">
-            <NovoMentoradoDialog />
-            <NovaPessoaDialog />
-            {/* inativa não entra no pool de emissão — link pra quem saiu
-                do programa não faz sentido (a ficha dela segue com o
-                histórico, e reemitir manual continua possível) */}
-            <EnviarTermosDialog
-              pessoas={pessoas
-                .filter((p) => p.ativo)
-                .map((p) => ({
-                  id: p.id,
-                  nome: p.nome,
-                  email: p.email || null,
-                  whatsapp: p.whatsapp,
-                }))}
-              mentorados={mentorados
-                .filter((m) => !foraDoPrograma(m))
-                .map((m) => ({
-                  id: m.id,
-                  nome: m.nome,
-                  email: m.email || null,
-                  whatsapp: m.whatsapp,
-                }))}
-              docs={docsPorPessoa}
-              faltantes={faltantesPorPessoa}
-            />
-            <PessoasMaisAcoes />
-          </div>
-        )}
-      </header>
+      {/* criação é o caminho primário e fica visível; importação e backups
+          vão pro "Mais ações" — 5 CTAs de mesmo peso viravam pilha a 390px.
+          Só a coordenação gerencia cadastros — pros demais é diretório */}
+      <PageHeader
+        title="Pessoas"
+        meta={
+          souCoord
+            ? "Mentores, auxiliares executivos e equipe com acesso à plataforma"
+            : "Conheça quem faz o programa"
+        }
+        actions={
+          souCoord ? (
+            <>
+              <NovoMentoradoDialog />
+              <NovaPessoaDialog />
+              {/* inativa não entra no pool de emissão — link pra quem saiu
+                  do programa não faz sentido (a ficha dela segue com o
+                  histórico, e reemitir manual continua possível) */}
+              <EnviarTermosDialog
+                pessoas={pessoas
+                  .filter((p) => p.ativo)
+                  .map((p) => ({
+                    id: p.id,
+                    nome: p.nome,
+                    email: p.email || null,
+                    whatsapp: p.whatsapp,
+                  }))}
+                mentorados={mentorados
+                  .filter((m) => !foraDoPrograma(m))
+                  .map((m) => ({
+                    id: m.id,
+                    nome: m.nome,
+                    email: m.email || null,
+                    whatsapp: m.whatsapp,
+                  }))}
+                docs={docsPorPessoa}
+                faltantes={faltantesPorPessoa}
+              />
+              <PessoasMaisAcoes />
+            </>
+          ) : undefined
+        }
+      />
 
       {/* pré-cadastros sem papel nem entram no payload de não-coord —
           diretório é de colegas, e a existência do pré-cadastro já é

@@ -190,7 +190,7 @@ export function RodaVida({
                 aria-label={`Diminuir nota de ${areaAtiva.label}`}
                 disabled={!areaAtiva.nota || areaAtiva.nota <= 1}
                 onClick={() => escolher(ativo, (areaAtiva.nota ?? 2) - 1)}
-                className="grid size-9 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-muted disabled:opacity-40"
+                className="grid size-11 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-muted disabled:opacity-40 sm:size-9"
               >
                 <Minus size={16} aria-hidden />
               </button>
@@ -205,7 +205,7 @@ export function RodaVida({
                 aria-label={`Aumentar nota de ${areaAtiva.label}`}
                 disabled={areaAtiva.nota === 10}
                 onClick={() => escolher(ativo, (areaAtiva.nota ?? 0) + 1)}
-                className="grid size-9 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-muted disabled:opacity-40"
+                className="grid size-11 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-muted disabled:opacity-40 sm:size-9"
               >
                 <Plus size={16} aria-hidden />
               </button>

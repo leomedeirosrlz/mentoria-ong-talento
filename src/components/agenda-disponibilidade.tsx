@@ -158,7 +158,7 @@ export function AgendaDisponibilidade({
                           disabled={pending}
                           onClick={() => remover(removerJanela, j.id)}
                           aria-label={`Remover janela de ${label} das ${horaCurta(j.hora_inicio)}`}
-                          className="grid size-5 place-items-center rounded text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+                          className="-m-2.5 grid size-11 shrink-0 place-items-center rounded text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 sm:-m-1 sm:size-7"
                         >
                           <X size={11} aria-hidden />
                         </button>
@@ -248,7 +248,7 @@ export function AgendaDisponibilidade({
                     disabled={pending}
                     onClick={() => remover(removerExcecao, x.id)}
                     aria-label={`Remover ${x.tipo === "bloqueio" ? "bloqueio" : "horário extra"} de ${formatDate(x.data)}`}
-                    className="grid size-8 shrink-0 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 sm:size-6"
+                    className="grid size-11 shrink-0 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 sm:size-8"
                   >
                     <X size={13} aria-hidden />
                   </button>

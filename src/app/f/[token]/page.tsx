@@ -8,14 +8,12 @@ import {
   UserSwitch,
   WifiSlash,
 } from "@phosphor-icons/react/dist/ssr";
-import type { Icon } from "@phosphor-icons/react";
 import { demoRole } from "@/lib/demo/mode";
 import { formularioPorToken } from "@/lib/forms/queries";
 import { formatDateTime } from "@/lib/ciclo";
 import { sharedOg } from "@/lib/og";
-import { cn } from "@/lib/utils";
 import { SiteFooter } from "@/components/site-footer";
-import { buttonVariants } from "@/components/ui/button";
+import { EstadoCard } from "@/components/estado-card";
 import { FormularioPublico } from "./formulario-publico";
 
 const TOKEN_RE = /^[A-Za-z0-9_-]{20,128}$/;
@@ -48,51 +46,6 @@ export async function generateMetadata({
     // link individual por WhatsApp/e-mail — não é página de indexação
     robots: { index: false, follow: false },
   };
-}
-
-function EstadoCard({
-  icon: Icon,
-  titulo,
-  acao,
-  ok,
-  children,
-}: {
-  icon: Icon;
-  titulo: string;
-  /** saída do beco — mailto pra equipe ou retry do mesmo link */
-  acao?: { href: string; label: string };
-  /** tom de sucesso — círculo lime pro estado "já respondida" */
-  ok?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="rounded-xl bg-card p-6 text-center shadow-[var(--shadow-border)] sm:p-8">
-      <div
-        className={cn(
-          "mx-auto grid size-12 place-items-center rounded-full",
-          ok
-            ? "bg-[var(--brand-lime)] text-[var(--brand-ink)]"
-            : "bg-muted text-muted-foreground"
-        )}
-      >
-        <Icon size={24} weight={ok ? "bold" : "regular"} aria-hidden />
-      </div>
-      <h1 className="mt-4 text-lg font-semibold">{titulo}</h1>
-      <div className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-muted-foreground">
-        {children}
-      </div>
-      {acao && (
-        <p className="mt-5">
-          <a
-            href={acao.href}
-            className={buttonVariants({ variant: "outline", size: "sm" })}
-          >
-            {acao.label}
-          </a>
-        </p>
-      )}
-    </div>
-  );
 }
 
 export default async function FormularioTokenPage({

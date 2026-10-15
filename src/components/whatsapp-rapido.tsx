@@ -62,7 +62,7 @@ export function WhatsAppRapido({
         <span
           aria-disabled="true"
           title="Sem WhatsApp cadastrado"
-          className="grid size-8 shrink-0 cursor-not-allowed place-items-center rounded-md text-muted-foreground/40"
+          className="grid size-11 shrink-0 cursor-not-allowed place-items-center rounded-md text-muted-foreground/40 sm:size-8"
         >
           <WhatsappLogo size={16} aria-hidden />
         </span>
@@ -77,7 +77,7 @@ export function WhatsAppRapido({
           rel="noopener noreferrer"
           aria-label={d.rotulo}
           title={d.rotulo}
-          className="grid size-8 shrink-0 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-[var(--brand-lime)]/15 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="grid size-11 shrink-0 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-[var(--brand-lime)]/15 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:size-8"
         >
           <WhatsappLogo size={16} aria-hidden />
         </a>
@@ -87,7 +87,7 @@ export function WhatsAppRapido({
       <DropdownMenu>
         <DropdownMenuTrigger
           aria-label="WhatsApp"
-          className="grid size-8 shrink-0 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-[var(--brand-lime)]/15 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="grid size-11 shrink-0 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-[var(--brand-lime)]/15 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:size-8"
         >
           <WhatsappLogo size={16} aria-hidden />
         </DropdownMenuTrigger>

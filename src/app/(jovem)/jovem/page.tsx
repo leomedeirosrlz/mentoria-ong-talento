@@ -664,24 +664,45 @@ export default async function JovemHome() {
               {materiais.slice(0, 3).map((m) => {
                 const Icone = TIPO_ICONE_MATERIAL[m.tipo];
                 const href = m.path ? `/api/material/${m.id}` : linkSeguro(m.url);
-                return (
-                  <div key={m.id} className="flex items-center gap-3 px-5 py-3">
+                const interno = (
+                  <>
                     <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-muted/70 text-muted-foreground">
                       <Icone size={16} aria-hidden />
                     </span>
                     <p className="min-w-0 flex-1 truncate text-sm font-medium">
                       {m.titulo}
                     </p>
-                    {href && (
+                  </>
+                );
+                return (
+                  <div
+                    key={m.id}
+                    className={cn(
+                      "flex items-center pr-3 transition-colors",
+                      href && "hover:bg-muted/50"
+                    )}
+                  >
+                    {href ? (
                       <a
                         href={href}
                         target="_blank"
                         rel="noopener noreferrer"
                         aria-label={`Abrir ${m.titulo}`}
-                        className="grid size-9 shrink-0 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                        className="flex min-w-0 flex-1 items-center gap-3 px-5 py-3 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
                       >
-                        <ArrowSquareOut size={15} aria-hidden />
+                        {interno}
                       </a>
+                    ) : (
+                      <div className="flex min-w-0 flex-1 items-center gap-3 px-5 py-3">
+                        {interno}
+                      </div>
+                    )}
+                    {href && (
+                      <ArrowSquareOut
+                        size={15}
+                        className="shrink-0 text-muted-foreground"
+                        aria-hidden
+                      />
                     )}
                   </div>
                 );
