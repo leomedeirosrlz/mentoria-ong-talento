@@ -4,6 +4,7 @@ import { useMemo, useRef, useState } from "react";
 import {
   CaretLeft,
   CaretRight,
+  CheckCircle,
   Compass,
   Minus,
   Plus,
@@ -97,6 +98,11 @@ export function RodaVida({
     setAtivo(i);
   }
 
+  // a "volta completa" é a roda toda respondida — o contador + o badge
+  // celebram o fechamento da volta, não só a posição do eixo
+  const respondidas = areas.filter((a) => a.nota != null).length;
+  const completa = respondidas === total;
+
   return (
     <>
       {/* instrução do instrumento (as seções que precedem os quadrantes) */}
@@ -126,11 +132,42 @@ export function RodaVida({
 
       {/* a roda + o eixo em foco — uma zona de interação só */}
       <div className="rounded-xl bg-card p-4 shadow-[var(--shadow-border)] sm:p-5">
+        {/* o eixo em foco EM CIMA da roda — a faixa verde é o destaque da
+            seção: setas pretas trocam de área, o título diz o que você
+            está pontuando antes de arrastar */}
+        <div className="flex items-center gap-1.5 rounded-xl bg-[var(--brand-lime)] px-1.5 py-1.5 text-[var(--brand-ink)]">
+          <button
+            type="button"
+            onClick={() => passo(-1)}
+            aria-label="Área anterior"
+            className="grid size-10 shrink-0 place-items-center rounded-lg transition-colors hover:bg-[var(--brand-ink)]/10 active:bg-[var(--brand-ink)]/15"
+          >
+            <CaretLeft size={20} weight="bold" aria-hidden />
+          </button>
+          <div className="min-w-0 flex-1 text-center">
+            <p className="text-[10px] font-semibold tracking-[0.08em] opacity-70">
+              {quadAtivo ? `${quadAtivo} · ` : ""}Área {ativo + 1} de {total}
+            </p>
+            <h3 className="truncate text-[15px] font-bold leading-snug">
+              {areaAtiva.label}
+            </h3>
+          </div>
+          <button
+            type="button"
+            onClick={() => passo(1)}
+            aria-label="Próxima área"
+            className="grid size-10 shrink-0 place-items-center rounded-lg transition-colors hover:bg-[var(--brand-ink)]/10 active:bg-[var(--brand-ink)]/15"
+          >
+            <CaretRight size={20} weight="bold" aria-hidden />
+          </button>
+        </div>
+
         <RodaSvg
           roda={roda}
           ativo={ativo}
           onMudanca={escolher}
           onFim={fimGesto}
+          className="mt-3"
         />
         {/* anúncio do gesto pro leitor de tela — o svg é aria-hidden, a
             nota sai por aqui ao soltar o dedo */}
@@ -139,13 +176,14 @@ export function RodaVida({
         </p>
 
         <div className="mt-2 border-t border-border/60 pt-3">
-          <p className="text-[11px] font-semibold tracking-[0.08em] text-muted-foreground">
-            {quadAtivo ? `${quadAtivo} · ` : ""}Área {ativo + 1} de {total}
-          </p>
-          <div className="mt-1 flex items-center justify-between gap-3">
-            <h3 className="min-w-0 text-base font-semibold leading-snug">
-              {areaAtiva.label}
-            </h3>
+          <div className="flex items-center justify-between gap-3">
+            {/* progresso da volta — conta áreas com nota, não posição */}
+            <p className="text-xs font-medium text-muted-foreground">
+              <span className="font-semibold tabular-nums text-foreground">
+                {respondidas}
+              </span>{" "}
+              de {total} áreas
+            </p>
             <div className="flex shrink-0 items-center gap-1">
               <button
                 type="button"
@@ -173,28 +211,35 @@ export function RodaVida({
               </button>
             </div>
           </div>
-          <div className="mt-1 flex justify-between text-[11px] text-muted-foreground">
+          {/* trilha da volta — enche conforme as áreas ganham nota */}
+          <div
+            role="progressbar"
+            aria-label="Progresso da roda"
+            aria-valuemin={0}
+            aria-valuemax={total}
+            aria-valuenow={respondidas}
+            className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted"
+          >
+            <div
+              className="h-full rounded-full bg-[var(--brand-lime)] transition-[width] duration-300"
+              style={{ width: `${(respondidas / total) * 100}%` }}
+            />
+          </div>
+          <div className="mt-1.5 flex justify-between text-[11px] text-muted-foreground">
             <span>Nada satisfeito</span>
             <span>Muito satisfeito</span>
           </div>
-          <div className="mt-2 flex items-center justify-between">
-            <button
-              type="button"
-              onClick={() => passo(-1)}
-              className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-            >
-              <CaretLeft size={13} aria-hidden />
-              Anterior
-            </button>
-            <button
-              type="button"
-              onClick={() => passo(1)}
-              className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-            >
-              Próxima área
-              <CaretRight size={13} aria-hidden />
-            </button>
-          </div>
+          {completa && (
+            <p className="mt-3 flex items-center justify-center gap-1.5 rounded-lg bg-[var(--brand-lime)]/15 px-3 py-2 text-sm font-semibold text-[var(--ok-text)] animate-in fade-in zoom-in-95">
+              <CheckCircle size={17} weight="fill" aria-hidden />
+              Roda completa
+              {roda.media != null && (
+                <span className="font-normal">
+                  — média {roda.media.toLocaleString("pt-BR")}
+                </span>
+              )}
+            </p>
+          )}
         </div>
       </div>
 
