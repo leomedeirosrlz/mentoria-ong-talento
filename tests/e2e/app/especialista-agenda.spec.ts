@@ -280,10 +280,14 @@ test.describe("mentor especialista — agenda (REALIZA-111)", () => {
     await grade.getByRole("button", { name: "Adicionar" }).click();
 
     const linhaQuarta = grade.locator("li", { hasText: "Quarta" });
-    await expect(linhaQuarta.getByText("19:00–21:00")).toBeVisible();
+    // os asserts pós-write deste spec esperam server action + refresh —
+    // em preview frio isso passa dos 5s default (convenção da suite: 15s)
+    await expect(linhaQuarta.getByText("19:00–21:00")).toBeVisible({
+      timeout: 15_000,
+    });
     await expect(
       livres.getByText(/quarta \d{2}\/\d{2} às 19:00/).first()
-    ).toBeVisible();
+    ).toBeVisible({ timeout: 15_000 });
 
     // write real: a janela de quarta existe no banco (com as horas certas)
     const janelas = await buscarViaServiceRole<
@@ -305,11 +309,13 @@ test.describe("mentor especialista — agenda (REALIZA-111)", () => {
     await excecoes.getByRole("button", { name: "Adicionar" }).click();
 
     const linhaExtra = excecoes.locator("li", { hasText: "14:00–16:00" });
-    await expect(linhaExtra.getByText("Extra", { exact: true })).toBeVisible();
+    await expect(linhaExtra.getByText("Extra", { exact: true })).toBeVisible({
+      timeout: 15_000,
+    });
     // o extra projeta chips no dia — "dd/mm às 14:00" no dia de amanhã
     await expect(
       livres.getByText(new RegExp(`${ddmm(dataExtra)} às 14:00`))
-    ).toBeVisible();
+    ).toBeVisible({ timeout: 15_000 });
 
     // ---- bloqueio datado: a terça da semana seguinte sai inteira da projeção
     await expect(
@@ -327,11 +333,11 @@ test.describe("mentor especialista — agenda (REALIZA-111)", () => {
     const linhaBloqueio = excecoes.locator("li", { hasText: "00:00–23:59" });
     await expect(
       linhaBloqueio.getByText("Bloqueio", { exact: true })
-    ).toBeVisible();
+    ).toBeVisible({ timeout: 15_000 });
     // o dia bloqueado some da projeção; as demais terças seguem com slots
     await expect(
       livres.getByText(new RegExp(`terça ${ddmm(isoBloqueio)} às`))
-    ).toHaveCount(0);
+    ).toHaveCount(0, { timeout: 15_000 });
     await expect(
       livres.getByText(/terça \d{2}\/\d{2} às/).first()
     ).toBeVisible();
