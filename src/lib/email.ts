@@ -7,9 +7,10 @@ const FROM = process.env.EMAIL_FROM ?? "Realiza.vc <no-reply@realiza.vc>";
 const LOTE_MAX = 100;
 
 /** Base pública do app — links de CTA dos e-mails (cai no login quando a
- *  rota exige sessão; o middleware redireciona de volta depois). */
-export const SITE_URL =
-  process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+ *  rota exige sessão; o middleware redireciona de volta depois). Vive em
+ *  lib/site.ts (módulo neutro que o layout importa pra metadataBase);
+ *  re-exporta aqui pra não mexer nos consumidores. */
+export { SITE_URL } from "./site";
 
 /** Mesma matriz audiência → papéis do comunicados_select (0019) e do fan-out
  *  de notificações — se divergir, destinatário recebe e-mail de aviso que a
