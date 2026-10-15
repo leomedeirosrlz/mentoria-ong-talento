@@ -25,11 +25,22 @@
 import { readFileSync } from "node:fs";
 import { createClient } from "@supabase/supabase-js";
 
-const APPLY = process.argv.includes("--apply");
-const csvArg = process.argv.find((a) => a.startsWith("--csv="));
+// aceita as duas formas: --resolve=12=uuid e --resolve 12=uuid
+const argv = [];
+for (let i = 2; i < process.argv.length; i++) {
+  const a = process.argv[i];
+  if (a === "--resolve" && process.argv[i + 1] && !process.argv[i + 1].startsWith("--")) {
+    argv.push(`--resolve=${process.argv[++i]}`);
+  } else {
+    argv.push(a);
+  }
+}
+
+const APPLY = argv.includes("--apply");
+const csvArg = argv.find((a) => a.startsWith("--csv="));
 const CSV = csvArg?.slice(6) ?? "";
 const RESOLVE = new Map(
-  process.argv
+  argv
     .filter((a) => a.startsWith("--resolve="))
     .flatMap((a) =>
       a
