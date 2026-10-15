@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import type { CSSProperties } from "react";
 import { ArrowsLeftRight, Student, UsersThree } from "@phosphor-icons/react";
+import type { Mentorado, Profile } from "@/lib/types";
 import type { FilaItem } from "@/lib/fila";
 import { textoEspera } from "@/lib/fila";
 import { msgAguardandoPar } from "@/lib/whatsapp-msgs";
@@ -12,6 +13,8 @@ import { Avatar } from "@/components/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { WhatsAppRapido } from "@/components/whatsapp-rapido";
+import { MentoradoActions } from "@/components/mentorado-actions";
+import { PessoaActions } from "@/components/pessoa-actions";
 
 /** Seção "Aguardando par" (REALIZA-101) — a fila derivada que o board
  *  "Livres para dupla" não conta: quem se inscreveu e nunca teve par
@@ -24,11 +27,21 @@ import { WhatsAppRapido } from "@/components/whatsapp-rapido";
 export function FilaEspera({
   mentorados,
   mentores,
+  mentoradosPorId,
+  pessoasPorId,
+  semHistorico,
   euNome,
   onParear,
 }: {
   mentorados: FilaItem[];
   mentores: FilaItem[];
+  /** Fichas completas por id — o ⋯ de cada linha abre as mesmas ações das
+   *  listas abaixo, sem a coord ter que procurar a pessoa duas vezes. */
+  mentoradosPorId: ReadonlyMap<string, Mentorado>;
+  pessoasPorId: ReadonlyMap<string, Profile>;
+  /** Ids com qualquer dupla (até encerrada) — mesma guarda do podeExcluir
+   *  das linhas principais. */
+  semHistorico: ReadonlySet<string>;
   /** Nome de quem opera — assina a mensagem pronta do WhatsApp. */
   euNome?: string | null;
   /** Liga o board "Livres para dupla"; sem callback o CTA não renderiza
@@ -77,6 +90,9 @@ export function FilaEspera({
             itens={mentorados}
             lado="mentorado"
             vazio="Nenhum mentorado aguardando."
+            mentoradosPorId={mentoradosPorId}
+            pessoasPorId={pessoasPorId}
+            semHistorico={semHistorico}
             euNome={euNome}
             agoraMs={agoraMs}
           />
@@ -85,6 +101,9 @@ export function FilaEspera({
             itens={mentores}
             lado="mentor"
             vazio="Nenhum mentor com vaga livre."
+            mentoradosPorId={mentoradosPorId}
+            pessoasPorId={pessoasPorId}
+            semHistorico={semHistorico}
             euNome={euNome}
             agoraMs={agoraMs}
           />
@@ -99,6 +118,9 @@ function FilaColuna({
   itens,
   lado,
   vazio,
+  mentoradosPorId,
+  pessoasPorId,
+  semHistorico,
   euNome,
   agoraMs,
 }: {
@@ -106,6 +128,9 @@ function FilaColuna({
   itens: FilaItem[];
   lado: "mentor" | "mentorado";
   vazio: string;
+  mentoradosPorId: ReadonlyMap<string, Mentorado>;
+  pessoasPorId: ReadonlyMap<string, Profile>;
+  semHistorico: ReadonlySet<string>;
   euNome?: string | null;
   agoraMs: number;
 }) {
@@ -129,6 +154,9 @@ function FilaColuna({
               p={p}
               indice={i}
               lado={lado}
+              mentoradosPorId={mentoradosPorId}
+              pessoasPorId={pessoasPorId}
+              semHistorico={semHistorico}
               euNome={euNome}
               agoraMs={agoraMs}
             />
@@ -146,12 +174,18 @@ function FilaLinha({
   p,
   indice,
   lado,
+  mentoradosPorId,
+  pessoasPorId,
+  semHistorico,
   euNome,
   agoraMs,
 }: {
   p: FilaItem;
   indice: number;
   lado: "mentor" | "mentorado";
+  mentoradosPorId: ReadonlyMap<string, Mentorado>;
+  pessoasPorId: ReadonlyMap<string, Profile>;
+  semHistorico: ReadonlySet<string>;
   euNome?: string | null;
   agoraMs: number;
 }) {
@@ -212,6 +246,28 @@ function FilaLinha({
           },
         ]}
       />
+      {/* ⋯ direto na fila — quem aguarda par é exatamente quem precisa de
+          edição/saída; mesma guarda de exclusão das linhas principais */}
+      {lado === "mentorado"
+        ? (() => {
+            const m = mentoradosPorId.get(p.id);
+            return m ? (
+              <MentoradoActions
+                mentorado={m}
+                temDupla={false}
+                duplaVivaId={null}
+              />
+            ) : null;
+          })()
+        : (() => {
+            const pr = pessoasPorId.get(p.id);
+            return pr ? (
+              <PessoaActions
+                pessoa={pr}
+                podeExcluir={!pr.user_id && !semHistorico.has(p.id)}
+              />
+            ) : null;
+          })()}
     </li>
   );
 }
