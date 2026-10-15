@@ -239,6 +239,15 @@ export function PessoasListas({
     () => (souCoord ? filaMentores(pessoas, mentorProfiles, contagemPorMentor) : []),
     [souCoord, pessoas, mentorProfiles, contagemPorMentor]
   );
+  // fichas completas por id — o ⋯ da fila reusa as mesmas ações das linhas
+  const mentoradoPorId = useMemo(
+    () => new Map(mentorados.map((m) => [m.id, m])),
+    [mentorados]
+  );
+  const pessoaPorId = useMemo(
+    () => new Map(pessoas.map((p) => [p.id, p])),
+    [pessoas]
+  );
 
   // matching board (REALIZA-116): "livre" pra mentor é ter VAGA, não estar
   // zerado — com capacidade 2 a dupla 1/2 ainda aceita par. O painel recebe
@@ -397,6 +406,9 @@ export function PessoasListas({
         <FilaEspera
           mentorados={filaMds}
           mentores={filaMts}
+          mentoradosPorId={mentoradoPorId}
+          pessoasPorId={pessoaPorId}
+          semHistorico={temQualquerDupla}
           euNome={euNome}
           onParear={semDupla ? undefined : () => setSemDupla(true)}
         />
