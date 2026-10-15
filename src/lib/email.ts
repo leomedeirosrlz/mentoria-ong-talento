@@ -1,7 +1,7 @@
 import { Resend } from "resend";
 
 /** Remetente único do sistema — domínio realiza.vc no Resend. */
-const FROM = process.env.EMAIL_FROM ?? "Realiza.vc <no-reply@realiza.vc>";
+const FROM = process.env.EMAIL_FROM ?? "Realiza.vc <noreply@realiza.vc>";
 
 /** Teto da API de batch do Resend por chamada. */
 const LOTE_MAX = 100;
