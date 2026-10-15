@@ -1206,7 +1206,7 @@ export function PerfilForm({
                 aria-label="Trocar foto"
                 disabled={uploading}
                 onClick={() => fileRef.current?.click()}
-                className="absolute -right-0.5 -bottom-0.5 grid size-8 place-items-center rounded-full bg-card text-foreground shadow-[var(--shadow-border)] transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+                className="absolute -right-2 -bottom-2 grid size-11 place-items-center rounded-full bg-card text-foreground shadow-[var(--shadow-border)] transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 sm:-right-1 sm:-bottom-1 sm:size-9"
               >
                 <Camera size={15} aria-hidden />
               </button>

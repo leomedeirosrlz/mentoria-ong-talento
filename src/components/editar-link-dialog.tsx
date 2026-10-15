@@ -20,8 +20,8 @@ import { Label } from "@/components/ui/label";
  *  enterrado no fluxo de remarcar, que pede motivo quando a data muda. Aqui
  *  a data não se mexe, então motivo nunca é cobrado. "Remover link" (ghost)
  *  só aparece quando há link gravado — esvaziar o campo também remove.
- *  Trigger default: lápis ghost size-8, a mesma gramática de slot de linha
- *  do CopiarChamada icone. */
+ *  Trigger default: lápis ghost size-11 sm:size-8, a mesma gramática de
+ *  slot de linha do CopiarChamada icone. */
 export function EditarLinkDialog({
   encontroId,
   linkAtual,
@@ -67,7 +67,7 @@ export function EditarLinkDialog({
               type="button"
               aria-label="Editar link da chamada"
               title="Editar link da chamada"
-              className="grid size-8 shrink-0 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="grid size-11 shrink-0 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:size-8"
             >
               <PencilSimple size={16} aria-hidden />
             </button>

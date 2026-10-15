@@ -344,7 +344,7 @@ function FichaMeta({
               type="button"
               onClick={onRemover}
               aria-label={`Remover meta ${g.n}`}
-              className="grid size-8 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              className="grid size-11 shrink-0 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:size-8"
             >
               <X size={15} aria-hidden />
             </button>

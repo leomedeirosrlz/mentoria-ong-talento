@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { DownloadSimple } from "@phosphor-icons/react/dist/ssr";
 import { getCicloEventos, getDuplas, getMe, getMinhasDuplas } from "@/lib/queries";
 import { DuplasLista } from "@/components/duplas-lista";
+import { PageHeader } from "@/components/page-header";
 import { buttonVariants } from "@/components/ui/button";
 
 export const metadata: Metadata = {
@@ -25,23 +26,21 @@ export default async function DuplasPage() {
 
   return (
     <div className="space-y-6">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Duplas</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            {lista.length} {lista.length === 1 ? "dupla" : "duplas"} no programa
-          </p>
-        </div>
-        {me.role === "coordenacao" && (
-          <a
-            href="/api/export"
-            className={buttonVariants({ variant: "outline", size: "sm" })}
-          >
-            <DownloadSimple />
-            Exportar CSV
-          </a>
-        )}
-      </header>
+      <PageHeader
+        title="Duplas"
+        meta={`${lista.length} ${lista.length === 1 ? "dupla" : "duplas"} no programa`}
+        actions={
+          me.role === "coordenacao" ? (
+            <a
+              href="/api/export"
+              className={buttonVariants({ variant: "outline", size: "sm" })}
+            >
+              <DownloadSimple />
+              Exportar CSV
+            </a>
+          ) : undefined
+        }
+      />
 
       <DuplasLista
         lista={lista}

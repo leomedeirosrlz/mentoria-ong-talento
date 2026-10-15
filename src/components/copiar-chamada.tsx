@@ -11,8 +11,8 @@ const EASE = "ease-[cubic-bezier(0.2,0,0,1)]";
 /** Copia o link da chamada pra quem monitora (coord/sup) — o "entrar" é da
  *  dupla. Feedback: LinkSimple → Check verde por ~1,6s (mesmo padrão do
  *  CopiarResumoButton); falha → toast (clipboard pode estar indisponível
- *  fora de contexto seguro). `icone` = ghost size-8 pra slot de linha (a
- *  gramática do WhatsAppRapido icone); senão, outline sm com label. */
+ *  fora de contexto seguro). `icone` = ghost size-11 sm:size-8 pra slot de
+ *  linha (a gramática do WhatsAppRapido icone); senão, outline sm com label. */
 export function CopiarChamada({
   url,
   icone = false,
@@ -53,7 +53,7 @@ export function CopiarChamada({
         onClick={copiar}
         aria-label={copiado ? "Copiado" : "Copiar link da chamada"}
         title="Copiar link da chamada"
-        className="grid size-8 shrink-0 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className="grid size-11 shrink-0 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:size-8"
       >
         {copiado ? (
           <Check size={16} weight="bold" className="text-[var(--ok)]" aria-hidden />
