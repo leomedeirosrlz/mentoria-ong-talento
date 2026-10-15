@@ -17,6 +17,7 @@ import { SiteFooter } from "@/components/site-footer";
 import { TermoVoluntarioDoc } from "@/components/termo-doc";
 import { buttonVariants } from "@/components/ui/button";
 import { formatDateTime } from "@/lib/ciclo";
+import { sharedOg } from "@/lib/og";
 import { SITE_URL } from "@/lib/email";
 import {
   AUTORIZACAO_TITULO,
@@ -32,13 +33,30 @@ import {
 } from "@/lib/documentos/texto";
 import type { DadosAutorizacao, DadosCivis, ResponsavelCivis } from "@/lib/types";
 
-export const metadata: Metadata = {
-  title: "Assinatura de documento",
-  description:
-    "Assinatura eletrônica de documento do Programa de Mentoria Social · Realiza.vc.",
-  // link individual por WhatsApp — não é página de indexação (igual a /f)
-  robots: { index: false, follow: false },
-};
+const DESCRICAO_ASSINATURA =
+  "Assinatura eletrônica de documento do Programa de Mentoria Social · Realiza.vc.";
+
+// generateMetadata (não metadata estática) pra carregar o token no og:url —
+// não custa query nenhuma, o token já vem nos params
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ token: string }>;
+}): Promise<Metadata> {
+  const { token } = await params;
+  return {
+    title: "Assinatura de documento",
+    description: DESCRICAO_ASSINATURA,
+    openGraph: {
+      ...sharedOg,
+      title: "Assinatura de documento · Realiza.vc",
+      description: DESCRICAO_ASSINATURA,
+      url: `/assinar/${token}`,
+    },
+    // link individual por WhatsApp — não é página de indexação (igual a /f)
+    robots: { index: false, follow: false },
+  };
+}
 
 // uuid do token na URL — formato errado nem vai ao banco (e a RPC espera uuid,
 // então qualquer outra coisa daria erro feio em vez de tela amigável)
