@@ -7,6 +7,7 @@ import { ArrowSquareOut, File, FileText, FolderOpen, LinkSimple, BookOpen, Puzzl
 import { Badge } from "@/components/ui/badge";
 import { NovoMaterialDialog } from "@/components/novo-material-dialog";
 import { MaterialActions } from "@/components/material-actions";
+import { PageHeader } from "@/components/page-header";
 import type { Material } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -66,18 +67,17 @@ export default async function MateriaisPage() {
 
   return (
     <div className="space-y-6">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Materiais</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            A biblioteca oficial do programa. A coordenação publica conforme a jornada avança
-          </p>
-        </div>
-        {/* biblioteca vazia: o CTA mora dentro do card de estado vazio, não aqui */}
-        {ehCoord && grupos.length > 0 && (
-          <NovoMaterialDialog maxEncontro={maxEncontro} />
-        )}
-      </header>
+      {/* biblioteca vazia: o CTA mora dentro do card de estado vazio, não
+          aqui — por isso o actions some junto com a grade */}
+      <PageHeader
+        title="Materiais"
+        meta="A biblioteca oficial do programa. A coordenação publica conforme a jornada avança"
+        actions={
+          ehCoord && grupos.length > 0 ? (
+            <NovoMaterialDialog maxEncontro={maxEncontro} />
+          ) : undefined
+        }
+      />
 
       {grupos.length === 0 ? (
         <div className="flex flex-col items-center gap-1.5 rounded-xl bg-card px-5 py-10 text-center shadow-[var(--shadow-border)]">
