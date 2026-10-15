@@ -12,7 +12,8 @@
     "test:e2e:demo": "playwright test --project=demo",
     "test:e2e:app": "playwright test --project=app",
     "schema:check": "node scripts/check-schema-contract.mjs",
-    "seed:e2e": "node scripts/seed-e2e-staging.mjs"
+    "seed:e2e": "node scripts/seed-e2e-staging.mjs",
+    "seed:demo": "node scripts/seed-demo-staging.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",
