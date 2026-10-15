@@ -3763,6 +3763,17 @@ export type Database = {
         }
         Returns: Json
       }
+      registrar_ia_evento: {
+        Args: {
+          p_args: Json
+          p_canal: string
+          p_duracao_ms?: number
+          p_erro?: string
+          p_ok: boolean
+          p_tool: string
+        }
+        Returns: string
+      }
       registrar_login_handoff: {
         Args: { p_access: string; p_nonce: string; p_refresh: string }
         Returns: undefined
