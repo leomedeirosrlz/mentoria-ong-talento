@@ -340,10 +340,14 @@ test.describe("mentor especialista — agenda (REALIZA-111)", () => {
     await linhaQuarta
       .getByRole("button", { name: "Remover janela de Quarta das 19:00" })
       .click();
-    await expect(linhaQuarta.getByText("19:00–21:00")).toHaveCount(0);
+    // a remoção é server action — a lista só some depois do roundtrip;
+    // em preview frio isso passa dos 5s default
+    await expect(linhaQuarta.getByText("19:00–21:00")).toHaveCount(0, {
+      timeout: 15_000,
+    });
     await expect(
       livres.getByText(/quarta \d{2}\/\d{2} às 19:00/)
-    ).toHaveCount(0);
+    ).toHaveCount(0, { timeout: 15_000 });
     await expect(linhaTerca.getByText("19:00–21:00")).toBeVisible();
     const janelasDepois = await buscarViaServiceRole<{ id: string }[]>(
       "especialista_grade",
