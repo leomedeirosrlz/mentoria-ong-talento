@@ -62,21 +62,11 @@ jobs:
         run: pnpm install --frozen-lockfile
       - if: steps.check.outputs.skip != '1'
         run: pnpm exec playwright install --with-deps chromium
-      # fixtures no staging (idempotente — limpa e recria os ids e2e00000-*)
-      - if: steps.check.outputs.skip != '1'
-        name: fixtures e2e no staging
-        run: |
-          if [ -z "$E2E_SUPABASE_URL" ]; then
-            echo "::notice::secrets E2E_* ausentes — specs app pulam (demo roda)"
-          else
-            node scripts/seed-e2e-staging.mjs
-          fi
-        env:
-          E2E_SUPABASE_URL: ${{ secrets.E2E_SUPABASE_URL }}
-          E2E_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.E2E_SUPABASE_SERVICE_ROLE_KEY }}
-          E2E_MENTOR_PASSWORD: e2e-senha-teste
-          # secret criado uma vez no repo — sem ele cai na senha de teste
-          E2E_COORD_PASSWORD: ${{ secrets.E2E_COORD_PASSWORD || 'e2e-senha-teste' }}
+      # fixtures NÃO são re-seedadas aqui — os pisos dos specs (convergirPiso
+      # & cia) re-criam o estado volátil e a base persiste no staging. Re-seed
+      # a cada push apagava/recriava rows enquanto a suite lia (derrubava o
+      # PostgREST do free tier e gerava flake em massa). Se faltar fixture —
+      # ex.: staging recriado — roda `pnpm seed:e2e` manual com .env.staging.
       - if: steps.check.outputs.skip != '1'
         name: playwright (demo + app)
         run: pnpm test:e2e
