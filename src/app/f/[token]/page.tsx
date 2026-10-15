@@ -12,6 +12,7 @@ import type { Icon } from "@phosphor-icons/react";
 import { demoRole } from "@/lib/demo/mode";
 import { formularioPorToken } from "@/lib/forms/queries";
 import { formatDateTime } from "@/lib/ciclo";
+import { sharedOg } from "@/lib/og";
 import { cn } from "@/lib/utils";
 import { SiteFooter } from "@/components/site-footer";
 import { buttonVariants } from "@/components/ui/button";
@@ -19,7 +20,8 @@ import { FormularioPublico } from "./formulario-publico";
 
 const TOKEN_RE = /^[A-Za-z0-9_-]{20,128}$/;
 
-// o título real do form é o que o WhatsApp mostra no preview do link
+// o título real do form + o card de marca são o que o WhatsApp mostra no
+// preview do link — og precisa de title, description, url e image cheios
 export async function generateMetadata({
   params,
 }: {
@@ -27,11 +29,22 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { token } = await params;
   const r = TOKEN_RE.test(token) ? await formularioPorToken(token) : null;
-  const titulo =
-    r?.kind === "ok" ? (r.info.formulario?.titulo ?? "Formulário") : "Formulário";
+  const form = r?.kind === "ok" ? r.info.formulario : null;
+  const titulo = form?.titulo ?? "Formulário";
+  const descricao =
+    form?.descricao?.trim() ||
+    "Responda o formulário do Programa de Mentoria Social — leva poucos minutos.";
   return {
     title: titulo,
-    openGraph: { title: `${titulo} · Realiza.vc` },
+    description: descricao,
+    // merge raso do Next: sem espalhar o sharedOg a rota perderia
+    // siteName/images/url do layout
+    openGraph: {
+      ...sharedOg,
+      title: `${titulo} · Realiza.vc`,
+      description: descricao,
+      url: `/f/${token}`,
+    },
     // link individual por WhatsApp/e-mail — não é página de indexação
     robots: { index: false, follow: false },
   };
