@@ -22,21 +22,21 @@
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f5f5f6" style="background:#f5f5f6;">
 <tr><td align="center" style="padding:24px 0;">
   <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:600px;max-width:600px;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.06);">
-    <tr><td><img src="https://mentoria.realiza.vc/email/vamos-juntos.png" alt="Realiza.vc" width="600" style="display:block;width:100%;height:auto;max-width:600px;border:0;outline:none;"></td></tr>
+    <tr><td><img src="{{ .SiteURL }}/email/vamos-juntos.png" alt="Realiza.vc" width="600" style="display:block;width:100%;height:auto;max-width:600px;border:0;outline:none;"></td></tr>
     <tr>
       <td class="email-body" style="padding:32px;font-size:15px;line-height:1.55;color:#323232;">
         <p style="margin:0 0 6px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1.6px;color:#7fa02e;">Segurança da conta</p>
         <h1 style="margin:0 0 16px;font-size:22px;line-height:1.35;font-weight:600;color:#323232;">Redefinir sua senha</h1>
-        <p style="margin:0 0 14px;font-size:15px;line-height:1.55;color:#323232;">Olá! Recebemos um pedido pra redefinir a senha da sua conta no <strong>Realiza.vc</strong>.</p>
+        <p style="margin:0 0 14px;font-size:15px;line-height:1.55;color:#323232;">Olá! Recebemos um pedido pra redefinir a senha da conta <strong>{{ .Email }}</strong> no <strong>Realiza.vc</strong>.</p>
         <p style="margin:0 0 14px;font-size:15px;line-height:1.55;color:#323232;">Se foi você, clique no botão pra criar uma senha nova. O link vale por 1 hora e só pode ser usado uma vez.</p>
         <div style="text-align:center;margin:28px 0 8px;"><a href="{{ .ConfirmationURL }}" target="_blank" style="display:inline-block;background-color:#a0c644;background-image:linear-gradient(90deg,#a0c644 0%,#b8d85f 100%);color:#ffffff;text-decoration:none;font-weight:600;padding:14px 28px;border-radius:999px;font-size:15px;letter-spacing:0.2px;">Criar nova senha</a></div>
         <p style="margin:20px 0 0;font-size:13px;line-height:1.55;color:#9a9aa3;">Se não foi você, ignore este e-mail — sua senha atual continua valendo e ninguém entra sem o link.</p>
       </td>
     </tr>
     <tr><td class="email-extra" style="padding:0 32px 16px;font-size:14px;line-height:1.55;color:#323232;"><p style="margin:0;">— Equipe Realiza.vc</p></td></tr>
-    <tr><td><img src="https://mentoria.realiza.vc/email/vamos-juntos.png" alt="Instituto Realiza.vc — Vamos Juntos!" width="600" style="display:block;width:100%;height:auto;max-width:600px;border:0;outline:none;"></td></tr>
+    <tr><td><img src="{{ .SiteURL }}/email/vamos-juntos.png" alt="Instituto Realiza.vc — Vamos Juntos!" width="600" style="display:block;width:100%;height:auto;max-width:600px;border:0;outline:none;"></td></tr>
     <tr><td class="email-legal" style="padding:20px 32px 28px;font-size:11px;line-height:1.6;color:#9a9aa3;text-align:center;">
-      Instituto Realiza.vc &middot; <a href="https://mentoria.realiza.vc" style="color:#9a9aa3;text-decoration:underline;">mentoria.realiza.vc</a>
+      Instituto Realiza.vc &middot; <a href="{{ .SiteURL }}" style="color:#9a9aa3;text-decoration:underline;">{{ .SiteURL }}</a>
       <br>Se o botão não abrir, copie este endereço no navegador:<br><span style="word-break:break-all;">{{ .ConfirmationURL }}</span><br>Você está recebendo este e-mail porque alguém pediu a redefinição de senha desta conta.
     </td></tr>
   </table>
