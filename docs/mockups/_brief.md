@@ -108,7 +108,7 @@ Como o mock jovem-especialistas fez: a agenda do **André (mentor)** E a agenda 
 Os mocks da rodada 1 misturaram três coisas diferentes sob o rótulo "pedido de apoio". O domínio real:
 
 1. **Pedido de apoio** = chamado pra COORDENAÇÃO (o sistema de tickets — categorias agenda/metodologia/plataforma/urgência/outro). Não é desta tela; pode aparecer só como atalho secundário ("outra coisa? fale com a coordenação").
-2. **Solicitação de trilha de especialista** = a Ana pede acompanhamento especializado → a coordenação analisa → vai pro mural → um especialista aceita → nasce a **trilha** (~5 sessões em ~3 meses). É um processo com estado (em análise → aceita → em andamento), não um agendamento.
+2. **Solicitação de trilha de especialista** = a Ana pede acompanhamento especializado → o pedido vai pro **mural dos especialistas** → um especialista que combina com o tema aceita (ela pode indicar preferência) → nasce a **trilha** (~5 sessões em ~3 meses). É um processo com estado (no mural → aceita → em andamento), não um agendamento. **A trilha não passa pela coordenação — é entre mentorado e especialista; a coordenação só observa.**
 3. **Agendar sessão** = DENTRO de uma trilha ativa, cada sessão é marcada entre jovem e especialista (proposta/contra-proposta de horário). "Agendar encontro com especialista" só existe depois que a trilha existe.
 
 A tela da Ana deve mostrar: a trilha ativa (com Luísa — sessão 3 de 5, próxima marcada sex 16h, sessão 4 ainda sem horário), o estado de uma solicitação pendente se houver, o CTA de nova solicitação de trilha, o catálogo, e a distinção clara entre "pedir trilha" e "agendar sessão" — quem olha a página tem que entender que não dá pra "marcar horário" direto com especialista nenhum.

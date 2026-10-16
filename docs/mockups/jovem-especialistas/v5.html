@@ -442,8 +442,8 @@
      ================================================================== -->
 <div class="frame-tag" id="prancheta-mobile">
   <span class="t">Prancheta 1 · Mobile · <code>/jovem/trilha</code></span><br>
-  A tela comunica <b>onde a Ana está no ciclo</b>: pedido → aprovação → aceite → trilha em andamento → conclusão.
-  Agendar sessão só existe dentro da trilha ativa; “pedir trilha” passa pela coordenação; “falar com a coordenação” abre chamado — três conceitos separados.
+  A tela comunica <b>onde a Ana está no ciclo</b>: pedido → mural → aceite → trilha em andamento → conclusão.
+  Agendar sessão só existe dentro da trilha ativa; “pedir trilha” vai pro mural dos especialistas; “falar com a coordenação” abre chamado — três conceitos separados.
   Nav ganha o item <b>Trilha</b> (destino semanal por ~3 meses).
 </div>
 
@@ -499,7 +499,7 @@
           </li>
           <li class="done">
             <span class="dot" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></span>
-            <div class="st"><b>Coordenação aprovou</b><time>30 de setembro</time></div>
+            <div class="st"><b>Pedido no mural dos especialistas</b><time>30 de setembro</time></div>
           </li>
           <li class="done">
             <span class="dot" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></span>
@@ -631,7 +631,7 @@
           <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.6c.5 4.7 3 7.2 7.7 7.7-4.7.5-7.2 3-7.7 7.7-.5-4.7-3-7.2-7.7-7.7 4.7-.5 7.2-3 7.7-7.7Z"/><path d="M19.4 15.6c.2 2 1.3 3.1 3.3 3.3-2 .2-3.1 1.3-3.3 3.3-.2-2-1.3-3.1-3.3-3.3 2-.2 3.1-1.3 3.3-3.3Z"/></svg>
           Precisa de outra trilha?
         </span>
-        <p>Você conta o que precisa e a <strong>coordenação escolhe o especialista certo pra você — não é um agendamento direto</strong>. O pedido passa por análise e só vira trilha quando um especialista aceita.</p>
+        <p>Você conta o que precisa e o <strong>pedido vai pro mural dos especialistas — não é um agendamento direto</strong>. Só vira trilha quando um especialista aceita; você pode indicar preferência de pessoa no pedido.</p>
         <div class="n-foot">
           <a class="btn btn-p" href="#">Pedir uma trilha</a>
           <span class="n-mini">
@@ -750,7 +750,7 @@
           </article>
         </div>
 
-        <p class="cat-note">No pedido de trilha você pode indicar uma preferência de pessoa — quem confirma o encaminhamento é a coordenação.</p>
+        <p class="cat-note">No pedido de trilha você pode indicar uma preferência de pessoa — quem aceita é o especialista no mural.</p>
       </section>
 
       <p class="trust">
@@ -902,7 +902,7 @@
               </li>
               <li class="done">
                 <span class="dot" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></span>
-                <span class="lb">Coordenação aprovou<br>30 de set</span>
+                <span class="lb">Pedido no mural<br>30 de set</span>
               </li>
               <li class="done">
                 <span class="dot" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></span>
@@ -1027,7 +1027,7 @@
               <svg viewBox="0 0 24 24" width="17" height="17" fill="currentColor" aria-hidden="true"><path d="M12 2.6c.5 4.7 3 7.2 7.7 7.7-4.7.5-7.2 3-7.7 7.7-.5-4.7-3-7.2-7.7-7.7 4.7-.5 7.2-3 7.7-7.7Z"/><path d="M19.4 15.6c.2 2 1.3 3.1 3.3 3.3-2 .2-3.1 1.3-3.3 3.3-.2-2-1.3-3.1-3.3-3.3 2-.2 3.1-1.3 3.3-3.3Z"/></svg>
               Precisa de outra trilha?
             </span>
-            <p>Você conta o que precisa e a <strong>coordenação escolhe o especialista certo pra você — não é um agendamento direto</strong>. O pedido passa por análise e só vira trilha quando um especialista aceita.</p>
+            <p>Você conta o que precisa e o <strong>pedido vai pro mural dos especialistas — não é um agendamento direto</strong>. Só vira trilha quando um especialista aceita; você pode indicar preferência de pessoa no pedido.</p>
             <div class="n-foot">
               <a class="btn btn-p btn-block" href="#">Pedir uma trilha</a>
               <span class="n-mini">
@@ -1148,7 +1148,7 @@
           </article>
         </div>
 
-        <p class="cat-note">No pedido de trilha você pode indicar uma preferência de pessoa — quem confirma o encaminhamento é a coordenação.</p>
+        <p class="cat-note">No pedido de trilha você pode indicar uma preferência de pessoa — quem aceita é o especialista no mural.</p>
       </section>
     </main>
 
@@ -1188,9 +1188,9 @@
 </section>
 
 <ul class="notes">
-  <li><b>A página é o estado do pedido.</b> O stepper do ciclo de vida — pedido → aprovação da coordenação → aceite da especialista → trilha em andamento → conclusão e devolutiva — dita o que a tela oferece; em outro estado, a mesma rota mostra outra coisa.</li>
+  <li><b>A página é o estado do pedido.</b> O stepper do ciclo de vida — pedido → mural dos especialistas → aceite da especialista → trilha em andamento → conclusão e devolutiva — dita o que a tela oferece; em outro estado, a mesma rota mostra outra coisa. A trilha é entre mentorado e especialista; a coordenação só acompanha.</li>
   <li><b>Sessões viram lista própria, com estado por item.</b> Concluída traz registro e avaliação por estrelas; agendada traz Meet e “remarcar”; a sessão 4 mostra os horários que a Luísa oferece e o botão “agendar sessão 4” mora nela — agendar é ação da sessão, não da página, e só existe dentro de trilha ativa.</li>
-  <li><b>Três conceitos, três pesos visuais.</b> Solicitar trilha é processo (análise → aceite, caixa tracejada “pedir uma trilha”); agendar sessão é botão dentro do item da sessão; “falar com a coordenação” abre chamado — link-card terciário, explicitamente “não é sobre a trilha”.</li>
+  <li><b>Três conceitos, três pesos visuais.</b> Solicitar trilha é processo (mural → aceite, caixa tracejada “pedir uma trilha”); agendar sessão é botão dentro do item da sessão; “falar com a coordenação” abre chamado — link-card terciário, explicitamente “não é sobre a trilha”.</li>
   <li><b>Nav ganha “Trilha” como 6º item.</b> A página vira destino semanal pelos ~3 meses que a trilha dura; no desktop vira item de sidebar e o conteúdo se reparte — trilha e sessões na coluna principal, pedir trilha e chamado na lateral.</li>
 </ul>
 
