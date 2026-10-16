@@ -84,9 +84,38 @@ Persona: **Marina (coord)** — `/chamados` fila + thread. Precisa mostrar:
 - **Detalhe/thread**: timeline de **atualizações públicas** ("Pedido sendo revisado", "Aguardando liberação de verba", "Paula designada para acompanhar — atendimento iniciado") + comentários internos da equipe + ações (assumir, atribuir, resolver, reabrir).
 - ~6 chamados cobrindo categorias e status diferentes.
 
+## Rodada 2 — agenda com as regras de negócio reais
+
+A rodada 1 de agenda ganhou elogios de forma (cards por dia no desktop) mas falhou em DOMÍNIO — parecia calendário genérico. As dores reais que a agenda precisa resolver:
+
+### 1. Mentor com jovens em cronogramas/turmas diferentes — sem confundir
+O André (mentor DPP) tem compromissos com a Ana (T1, terças, encontro 8) e com o Caio (T2, quartas, encontro 5 — a turma começou 3 semanas depois). A agenda precisa deixar ÓBVIO a qual turma/dupla cada item pertence e por que os números de encontro divergem — sem o mentor ter que deduzir. Agrupar por turma, por dupla ou por tempo são respostas possíveis — escolha e justifique.
+
+### 2. DPP é orientador pessoal — precisa ver a jornada com especialistas
+Além dos compromissos DELE, o mentor acompanha como os jovens progridem com os especialistas (ele não participa das sessões, mas precisa saber): sessão 3 de 5 com a Luísa marcada pra sexta, a sessão 2 já tem registro e o jovem avaliou ★4, a sessão 4 ainda sem horário. Isso não é "evento na agenda" — é **acompanhamento de jornada**: progresso da trilha, últimos registros, pendências ("sessão 4 sem data", "avaliação do encontro 7 pendente"). O desafio: mostrar isso SEM poluir a agenda dele — uma camada/seção própria, ou itens visualmente distintos como "você acompanha, não participa".
+
+### 3. Disponibilidade — principalmente na agenda do especialista
+Especialistas gerenciam a trilha pelo que ESTÁ livre. A agenda da Luísa precisa mostrar: grade de disponibilidade semanal (dias/horários que ela oferece), sessões já marcadas das suas trilhas (Ana 3/5, Pedro 1/5), sessões pendentes de agendar (o jovem propôs horário? falta confirmar?), e o prazo das trilhas (~3 meses). A grade de disponibilidade é tão importante quanto os eventos — é o instrumento de trabalho dela.
+
+### 4. O básico bem feito
+Hoje/amanhã/próximos, compromisso vs pendência vs "informativo", ações claras (entrar no Meet, lembrar, ver registro), mobile que colapsa sem perder lógica. Poucos itens por semana é a realidade — não force densidade.
+
+### Rodada 2 deve mostrar DUAS personas no mesmo arquivo
+Como o mock jovem-especialistas fez: a agenda do **André (mentor)** E a agenda da **Luísa (especialista)** — lado a lado no desktop, empilhadas no mobile, com um rótulo "Persona: …" por prancheta. O mesmo arquivo prova as duas visões.
+
+## Rodada 2 — especialistas: separar apoio de trilha
+
+Os mocks da rodada 1 misturaram três coisas diferentes sob o rótulo "pedido de apoio". O domínio real:
+
+1. **Pedido de apoio** = chamado pra COORDENAÇÃO (o sistema de tickets — categorias agenda/metodologia/plataforma/urgência/outro). Não é desta tela; pode aparecer só como atalho secundário ("outra coisa? fale com a coordenação").
+2. **Solicitação de trilha de especialista** = a Ana pede acompanhamento especializado → a coordenação analisa → vai pro mural → um especialista aceita → nasce a **trilha** (~5 sessões em ~3 meses). É um processo com estado (em análise → aceita → em andamento), não um agendamento.
+3. **Agendar sessão** = DENTRO de uma trilha ativa, cada sessão é marcada entre jovem e especialista (proposta/contra-proposta de horário). "Agendar encontro com especialista" só existe depois que a trilha existe.
+
+A tela da Ana deve mostrar: a trilha ativa (com Luísa — sessão 3 de 5, próxima marcada sex 16h, sessão 4 ainda sem horário), o estado de uma solicitação pendente se houver, o CTA de nova solicitação de trilha, o catálogo, e a distinção clara entre "pedir trilha" e "agendar sessão" — quem olha a página tem que entender que não dá pra "marcar horário" direto com especialista nenhum.
+
 ## O que NÃO fazer
 
 - Não use dados genéricos americanos (John Doe, lorem ipsum).
-- Não faça 3 variantes iguais trocando cor — cada uma tem direção própria (vem no prompt).
+- Não faça variantes iguais trocando cor — cada uma tem direção própria (vem no prompt).
 - Não implemente funcionalidade — é apresentação estática. Hover/focus CSS simples ok.
 - Não copie o visual de outra variante se encontrar o arquivo — trabalhe só com seu brief.

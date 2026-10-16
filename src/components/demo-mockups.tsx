@@ -44,15 +44,15 @@ export function MockupsSection() {
               </span>
             </div>
             <div className="flex shrink-0 gap-1">
-              {[1, 2, 3].map((v) => (
+              {tela.variantes.map((nome, i) => (
                 <button
-                  key={v}
+                  key={i}
                   type="button"
-                  title={tela.variantes[v - 1]}
-                  onClick={() => abrir(tela.id, v)}
+                  title={nome}
+                  onClick={() => abrir(tela.id, i + 1)}
                   className="grid min-h-9 min-w-9 place-items-center rounded-lg border border-border text-xs font-semibold outline-none transition-colors hover:bg-muted focus-visible:bg-muted"
                 >
-                  v{v}
+                  v{i + 1}
                 </button>
               ))}
             </div>
@@ -103,15 +103,15 @@ function MockupViewToggle() {
         >
           App
         </button>
-        {[1, 2, 3].map((v) => (
+        {tela.variantes.map((nome, i) => (
           <button
-            key={v}
+            key={i}
             type="button"
-            title={tela.variantes[v - 1]}
-            onClick={() => selecionar(v)}
+            title={nome}
+            onClick={() => selecionar(i + 1)}
             className="min-h-9 rounded-full px-3 text-xs font-semibold text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
           >
-            v{v}
+            v{i + 1}
           </button>
         ))}
       </div>
@@ -155,35 +155,43 @@ export function MockupViewer() {
           <Flask size={11} weight="bold" aria-hidden />
           MOCKUP
         </span>
-        <div className="min-w-0 flex-1">
-          <span className="block truncate text-sm font-semibold">
-            {tela.label}
-            <span className="font-normal text-white/70">
-              {" "}
-              · {tela.variantes[variante - 1]}
-            </span>
-          </span>
-        </div>
+        {/* seletor de tela — troca de mockup sem sair do viewer (o "menu da
+            demo" dentro do mockup) */}
+        <select
+          aria-label="Tela do mockup"
+          value={tela.id}
+          onChange={(e) => navegar(`${e.target.value}:v1`)}
+          className="min-h-9 w-28 shrink-0 cursor-pointer truncate rounded-lg bg-white/10 px-2 text-sm font-semibold text-white outline-none transition-colors hover:bg-white/20 focus-visible:ring-2 focus-visible:ring-[var(--brand-lime)] sm:w-auto sm:min-w-36"
+        >
+          {MOCKUP_TELAS.map((t) => (
+            <option key={t.id} value={t.id} className="text-foreground">
+              {t.label}
+            </option>
+          ))}
+        </select>
+        <span className="hidden min-w-0 flex-1 truncate text-xs text-white/70 lg:inline">
+          {tela.variantes[variante - 1]}
+        </span>
         <div
           role="group"
           aria-label="Variante do mockup"
           className="flex shrink-0 gap-1"
         >
-          {[1, 2, 3].map((v) => (
+          {tela.variantes.map((nome, i) => (
             <button
-              key={v}
+              key={i}
               type="button"
-              aria-current={v === variante || undefined}
-              title={tela.variantes[v - 1]}
-              onClick={() => navegar(`${tela.id}:v${v}`)}
+              aria-current={i + 1 === variante || undefined}
+              title={nome}
+              onClick={() => navegar(`${tela.id}:v${i + 1}`)}
               className={cn(
                 "grid min-h-9 min-w-9 place-items-center rounded-lg text-xs font-semibold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[var(--brand-lime)]",
-                v === variante
+                i + 1 === variante
                   ? "bg-[var(--brand-lime)] text-[var(--brand-ink)]"
                   : "bg-white/10 text-white hover:bg-white/20",
               )}
             >
-              v{v}
+              v{i + 1}
             </button>
           ))}
         </div>

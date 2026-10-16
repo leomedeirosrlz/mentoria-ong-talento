@@ -9,7 +9,7 @@ type MockupTelaDef = {
   label: string;
   descricao: string;
   rotas: readonly string[];
-  variantes: readonly [string, string, string];
+  variantes: readonly string[];
 };
 
 export const MOCKUP_TELAS: readonly MockupTelaDef[] = [
@@ -18,7 +18,13 @@ export const MOCKUP_TELAS: readonly MockupTelaDef[] = [
     label: "Agenda",
     descricao: "Mentor com 2 mentorados em turmas diferentes",
     rotas: ["/agenda"],
-    variantes: ["Grade semanal", "Por mentorado", "Cards por dia"],
+    variantes: [
+      "Grade semanal",
+      "Por mentorado",
+      "Cards por dia",
+      "R2 · Duas superfícies",
+      "R2 · Por pessoa",
+    ],
   },
   {
     id: "duplas",
@@ -39,7 +45,13 @@ export const MOCKUP_TELAS: readonly MockupTelaDef[] = [
     label: "Especialistas",
     descricao: "Catálogo fora da home do jovem",
     rotas: ["/jovem"],
-    variantes: ["Aba na navegação", "Menu Mais", "Card na home"],
+    variantes: [
+      "Aba na navegação",
+      "Menu Mais",
+      "Card na home",
+      "R2 · Trilha explícita",
+      "R2 · Estados do pedido",
+    ],
   },
   {
     id: "chamados",
@@ -56,11 +68,14 @@ export type MockupTela = (typeof MOCKUP_TELAS)[number];
 /** Lê o param ?mockup=agenda:v2 — devolve { tela, variante } ou null. */
 export function parseMockupParam(
   raw: string | null,
-): { tela: MockupTela; variante: 1 | 2 | 3 } | null {
-  const m = raw && /^([a-z-]+):v([123])$/.exec(raw);
+): { tela: MockupTela; variante: number } | null {
+  const m = raw && /^([a-z-]+):v(\d+)$/.exec(raw);
   if (!m) return null;
   const tela = MOCKUP_TELAS.find((t) => t.id === m[1]);
-  return tela ? { tela, variante: Number(m[2]) as 1 | 2 | 3 } : null;
+  const v = Number(m[2]);
+  return tela && v >= 1 && v <= tela.variantes.length
+    ? { tela, variante: v }
+    : null;
 }
 
 /** Tela de mockup associada à rota real atual (ex.: /duplas → "duplas") —

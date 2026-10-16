@@ -1,24 +1,48 @@
-# Rodada 1 de mockups — relatório comparativo
+# Mockups — relatório comparativo
 
-_15 variantes (5 telas × 3), geradas por agentes independentes com o mesmo brief (`_brief.md`), screenshots Playwright em 1280px e 390px, julgadas por 5 revisores de UX com rubrica de 7 critérios (1–10)._
+_Rodada 1: 15 variantes (5 telas × 3), screenshots Playwright 1280/390px, 5 juízes UX. Rodada 2: +4 variantes focadas em regra de negócio (agenda v4/v5, jovem-especialistas v4/v5), julgadas contra as vencedoras R1 com rubrica de domínio._
 
 **TL;DR — vencedoras por tela:**
 
 | Tela | Vencedora | Direção |
 |---|---|---|
-| agenda | **v3** | Cards por dia (Hoje/Amanhã/Próximos) + chips de escopo |
+| agenda | **v4** (R2) | Duas superfícies: "Minha agenda" × "Acompanhando seus jovens" + grade de disponibilidade do especialista |
 | duplas | **v3** | Seções agrupadas por categoria com régua no header |
 | materiais | **v2** | Hero "Minha jornada" com trilha de marcos + 3 portais |
 | chamados | **v3** | Inbox denso + detalhe full-page |
-| jovem-especialistas | **v3** | Card-CTA na home → página cheia |
+| jovem-especialistas | **v4** (R2) | Trilha explícita: sessões 1–5 com estados, solicitação sem horário, apoio como outro canal |
 
-Arquivos: `docs/mockups/<tela>/v{1,2,3}.html` + `v{N}-{desktop,mobile}.png`.
+Arquivos: `docs/mockups/<tela>/v{1..5}.html` + `v{N}-{desktop,mobile}.png` (v4/v5 só em agenda e jovem-especialistas).
 
 ---
 
-## Agenda (mentor DPP, 2 turmas)
+## Rodada 2 — a correção de domínio
 
-**Vencedora: v3** — recorte temporal Hoje > Amanhã > Próximos com sticky headers. Responde "o que eu tenho hoje" primeiro; card guest âmbar tracejado com "agenda da Ana — você não participa" resolve ver-sem-participar por texto, não cor; é acionável (Entrar no Meet, Lembrar o Caio, Preencher registro); escala pra coordenação melhor que grade ou colunas.
+A R1 ganhou em forma mas falhou em regra de negócio — parecia calendário/loja genéricos. A R2 atacou as 3 dores reais e o erro de conceito em especialistas.
+
+### Agenda — vencedora **v4 "duas superfícies"** (78,5 × 75,5 da v5, 47 da v3)
+
+Estrutura da página resolve o domínio, não etiqueta: "Minha agenda" fica pura (só compromissos do André, cronológica, com legenda-nota "a T2 começou 3 semanas depois — por isso a Ana está no 8 e o Caio no 5"); toda a jornada vive na superfície âmbar "Acompanhando seus jovens" (progresso 3/5, registro + ★4, sessão 4 sem horário, stepper da solicitação do Caio). Na Luísa, a grade semanal de disponibilidade é instrumento de trabalho — a proposta do Pedro cai numa terça sem janela, com tag "fora da grade" e as duas ações de resposta.
+
+**Resolve as 3 dores?** Multi-turma: sim. Jornada DPP: sim (participo × acompanho é o princípio organizador). Disponibilidade: sim.
+
+**Resgates da v5:** barra "encontro 8 de 16 · T1" no header da dupla; faixa "Sua semana" (strip seg–dom); seção "Do programa" pra supervisão/formação; estado vazio do Caio; "+ novo" slot na grade.
+**Resgates da v3:** pendências do próprio mentor como warnrows no topo de "Hoje" (na v4 elas caíram na superfície errada); prazo vermelho discreto; chips de escopo como filtro pra quem tem 3+ duplas.
+**Correções p/ implementação:** metas/legendas 9,5–11,5px → ~12px; botões → ≥44px; grade da Luísa precisa de faixa horária configurável (a do mock é fixa 9–17h); Caio é qua 19h (o mock pôs 20h).
+
+### Jovem-especialistas — vencedora **v4 "trilha explícita"** (8,8 × 8,7 da v5, 5,1 da v3)
+
+Única que transforma a separação de conceitos em estrutura: trilha ativa (agendar mora dentro da sessão 4, nunca fora), solicitação de trilha com stepper "Pedido → Coordenação → Mural → Trilha" visivelmente **sem** campo de horário ("ainda não tem especialista — por isso também não tem horário aqui" — a melhor copy da rodada), e pedido de apoio como linha discreta no rodapé ("outro canal"). O catálogo mostra disponibilidade em períodos ("sex à tarde") — remove a affordance de agendamento na raiz.
+
+**Resgates da v5:** ciclo de vida com datas como header do card de trilha; sessões como cards com pill de estado + "Remarcar" + sessão final trancada; item "Trilha" na bottom nav — **decisão de produto aberta** (6 itens na nav × destino semanal real quando há trilha ativa; alternativa: item aparece só com trilha/solicitação).
+**Resgate da v3:** a caixa de negociação ("Luísa propôs sex 16h, você sugeriu ter 18h — Aceitar / Propor outro") deve nascer dentro da sessão "a agendar" da v4 — o "Escolher horário" unilateral é fraco demais.
+**⚠ Regra a arbitrar no domínio:** v4 permite solicitação em tema diferente coexistindo com trilha ativa; v5 impõe uma trilha por vez. Definir com a coordenação.
+
+---
+
+## Agenda (mentor DPP, 2 turmas) — R1, superada pela R2
+
+**Vencedora da R1: v3** — recorte temporal Hoje > Amanhã > Próximos com sticky headers. Responde "o que eu tenho hoje" primeiro; card guest âmbar tracejado com "agenda da Ana — você não participa" resolve ver-sem-participar por texto, não cor; é acionável (Entrar no Meet, Lembrar o Caio, Preencher registro); escala pra coordenação melhor que grade ou colunas.
 
 - **v1** (grade semanal GCal): melhor naming do par de visões ("Agenda do mentorado"/"Minha agenda") e painel contextual por pessoa — mas grade 8h–21h ~90% vazia; container domina o conteúdo.
 - **v2** (seções por mentorado + mini-cal): melhor explicação do desencontro T1/T2 e base acessível (radios reais) — mas mini-cals duplicados comem ⅓ da tela e o segmented descreve agrupamento, não escopo.
@@ -53,9 +77,9 @@ Arquivos: `docs/mockups/<tela>/v{1,2,3}.html` + `v{N}-{desktop,mobile}.png`.
 - **Correções na vencedora:** composer defaulta público — inverter pra interno; reforçar "aberto sem dono" com tint/borda na linha (hoje só o pill); separar facetas da barra de filtro (categoria/status/propriedade).
 - **Resgates:** legenda público×interno + master-detail como layout desktop opcional (v1); indicador de envelhecimento + resumo de resolução nos resolvidos + pill tracejado "Sem responsável" (v2).
 
-## Jovem-especialistas
+## Jovem-especialistas — R1, superada pela R2
 
-**Vencedora: v3** (57pts) — nav intocada (5 itens atuais) + card-CTA lime na home com estado vivo ("Luísa propôs sexta 24/10 às 16h · seu pedido em negociação") → página cheia `/jovem/especialistas`. Única que modela o fluxo real (solicitação → mural → proposta/negociação, stepper 4 passos, limite de 3, dedup honesto, horários livres), única com desktop desenhado (sidebar), única que acerta a nav amarela do jovem (`--role-mentorado`).
+**Vencedora da R1: v3** (57pts) — nav intocada (5 itens atuais) + card-CTA lime na home com estado vivo ("Luísa propôs sexta 24/10 às 16h · seu pedido em negociação") → página cheia `/jovem/especialistas`. Única que modela o fluxo real (solicitação → mural → proposta/negociação, stepper 4 passos, limite de 3, dedup honesto, horários livres), única com desktop desenhado (sidebar), única que acerta a nav amarela do jovem (`--role-mentorado`).
 
 - **v1** (aba dedicada): melhor descoberta (tripla redundância), mas rótulo "Especialistas" a 9.2px inaceitável e sacrificou "Pessoas" pro slot.
 - **v2** (overflow "Mais"): não sacrifica destino e o badge "1 novidade" é inteligente — mas recurso novo atrás de "•••" tem descoberta quase nula pra quem nunca usou.
