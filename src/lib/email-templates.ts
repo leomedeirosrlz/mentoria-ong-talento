@@ -1,4 +1,4 @@
-import { SITE_URL } from "@/lib/email";
+import { SITE_URL } from "./email";
 import type { ComunicadoPrioridade } from "@/lib/types";
 
 // hex equivalentes das CSS vars da marca (globals.css) — e-mail não herda
@@ -39,12 +39,12 @@ function paragrafos(texto: string): string {
     .join("");
 }
 
-/** Casca única dos e-mails do sistema — banner da marca em imagem (servido
- *  pelo próprio site, sem dependência de CDN externo), card branco 600px
- *  sobre fundo cinza, CTA pill em gradiente lime, assinatura "— Equipe
- *  Realiza.vc" e o mesmo banner fechando. Só tabelas + CSS inline: o que o
- *  Gmail/Outlook respeitam. `tagline` vira o eyebrow sobre o título e
- *  `preheader` é o texto de prévia que a caixa de entrada mostra. */
+/** Casca única dos e-mails do sistema — card branco 600px sobre fundo
+ *  cinza com moldura: barra lime em gradiente no topo + borda sutil;
+ *  banner da marca mora só no rodapé, numa faixa cinza separada do
+ *  card. Só tabelas + CSS inline: o que o Gmail/Outlook respeitam.
+ *  `tagline` vira o eyebrow sobre o título e `preheader` é o texto de
+ *  prévia que a caixa de entrada mostra. */
 export function emailLayout({
   titulo,
   conteudoHtml,
@@ -81,8 +81,8 @@ export function emailLayout({
 <style>
   @media screen and (max-width:620px) {
     .email-body { padding:24px 20px !important; }
-    .email-legal { padding:16px 20px 24px !important; }
-    .email-extra { padding:0 20px 12px !important; }
+    .email-legal { padding:14px 20px 24px !important; }
+    .email-extra { padding:0 20px 16px !important; }
   }
 </style>
 </head>
@@ -93,9 +93,9 @@ ${
     : ""
 }
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${FUNDO}" style="background:${FUNDO};">
-<tr><td align="center" style="padding:24px 0;">
-  <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:600px;max-width:600px;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.06);">
-    <tr><td><img src="${BANNER_URL}" alt="Realiza.vc" width="600" style="display:block;width:100%;height:auto;max-width:600px;border:0;outline:none;"></td></tr>
+<tr><td align="center" style="padding:28px 12px 0;">
+  <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:600px;max-width:600px;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid ${BORDA};box-shadow:0 1px 3px rgba(0,0,0,0.06);">
+    <tr><td style="height:6px;line-height:6px;font-size:1px;background-color:${LIME};background-image:linear-gradient(90deg,${LIME} 0%,${LIME_CLARO} 100%);">&nbsp;</td></tr>
     <tr>
       <td class="email-body" style="padding:32px;font-size:15px;line-height:1.55;color:${INK};">
         ${
@@ -108,9 +108,13 @@ ${
         ${ctaRender}
       </td>
     </tr>
-    <tr><td class="email-extra" style="padding:0 32px 16px;font-size:14px;line-height:1.55;color:${INK};"><p style="margin:0;">— Equipe Realiza.vc</p></td></tr>
-    <tr><td><img src="${BANNER_URL}" alt="Instituto Realiza.vc — Vamos Juntos!" width="600" style="display:block;width:100%;height:auto;max-width:600px;border:0;outline:none;"></td></tr>
-    <tr><td class="email-legal" style="padding:20px 32px 28px;font-size:11px;line-height:1.6;color:${MUTED};text-align:center;">
+    <tr><td class="email-extra" style="padding:0 32px 20px;font-size:14px;line-height:1.55;color:${INK};"><p style="margin:0;">— Equipe Realiza.vc</p></td></tr>
+  </table>
+</td></tr>
+<tr><td bgcolor="${BORDA}" style="background:${BORDA};">
+  <table role="presentation" width="600" align="center" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;margin:0 auto;">
+    <tr><td align="center" style="padding:24px 32px 0;"><img src="${BANNER_URL}" alt="Instituto Realiza.vc — Vamos Juntos!" width="440" style="display:inline-block;width:440px;max-width:100%;height:auto;border:0;outline:none;border-radius:12px;"></td></tr>
+    <tr><td class="email-legal" style="padding:14px 32px 26px;font-size:11px;line-height:1.6;color:${MUTED};text-align:center;">
       Instituto Realiza.vc &middot; <a href="${esc(SITE_URL)}" style="color:${MUTED};text-decoration:underline;">${esc(SITE_URL.replace(/^https?:\/\//, ""))}</a>
       ${rodapeExtra ? `<br>${rodapeExtra}` : ""}
     </td></tr>
