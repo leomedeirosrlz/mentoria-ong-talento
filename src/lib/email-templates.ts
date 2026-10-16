@@ -16,12 +16,15 @@ const DANGER_BG = "#fdf0ee";
 const WARN = "#b07a05";
 const WARN_BG = "#fdf6e4";
 const FONT = "'Mitr','Segoe UI',Helvetica,Arial,sans-serif";
+const FONT_LOGO = "'Archivo Black','Arial Black',Arial,sans-serif";
 const BANNER_URL = `${SITE_URL}/email/vamos-juntos.png`;
 const LOGO_PONTO = "#ffd531"; // amarelo do ponto do logo — --role-mentorado
 
 /** Wordmark em texto (e-mail não garante webfont/imagem): REALIZA ink +
- *  ponto âmbar + VC lime — mesmas cores do logo-realiza.png. */
-const LOGO = `<span style="font-size:22px;font-weight:800;font-style:italic;letter-spacing:0.4px;color:${INK};">REALIZA<span style="color:${LOGO_PONTO};">.</span><span style="color:${LIME};">VC</span></span>`;
+ *  ponto âmbar + VC lime — mesmas cores do logo-realiza.png. Archivo
+ *  Black é o peso do wordmark real; Arial Black/900 cobre clientes sem
+ *  webfont. */
+const LOGO = `<span style="font-family:${FONT_LOGO};font-size:26px;font-weight:900;font-style:italic;letter-spacing:0.5px;color:${INK};">REALIZA<span style="color:${LOGO_PONTO};">.</span><span style="color:${LIME};">VC</span></span>`;
 
 /** Conteúdo digitado pela coordenação vai pra HTML de e-mail — escapa sempre. */
 function esc(s: string): string {
@@ -83,7 +86,7 @@ export function emailLayout({
 <title>${esc(titulo)}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Mitr:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Mitr:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   @media screen and (max-width:620px) {
     .email-body { padding:24px 20px !important; }
@@ -116,8 +119,8 @@ ${
       </td>
     </tr>
     <tr><td class="email-extra" style="padding:0 32px 20px;font-size:14px;line-height:1.55;color:${INK};"><p style="margin:0;">— Equipe Realiza.vc</p></td></tr>
-    <tr><td bgcolor="${FUNDO}" style="background:${FUNDO};padding:24px 32px 0;" align="center"><img src="${BANNER_URL}" alt="Instituto Realiza.vc — Vamos Juntos!" width="440" style="display:inline-block;width:440px;max-width:100%;height:auto;border:0;outline:none;border-radius:12px;"></td></tr>
-    <tr><td class="email-legal" bgcolor="${FUNDO}" style="background:${FUNDO};padding:14px 32px 26px;font-size:11px;line-height:1.6;color:${MUTED};text-align:center;">
+    <tr><td bgcolor="${INK}" style="background:${INK};padding:26px 32px 6px;" align="center"><span style="display:inline-block;background:#ffffff;border-radius:14px;padding:12px 26px;"><img src="${BANNER_URL}" alt="Instituto Realiza.vc — Vamos Juntos!" width="200" style="display:inline-block;width:200px;max-width:100%;height:auto;border:0;outline:none;"></span></td></tr>
+    <tr><td class="email-legal" bgcolor="${INK}" style="background:${INK};padding:14px 32px 28px;font-size:11px;line-height:1.6;color:${MUTED};text-align:center;">
       Instituto Realiza.vc &middot; <a href="${esc(SITE_URL)}" style="color:${MUTED};text-decoration:underline;">${esc(SITE_URL.replace(/^https?:\/\//, ""))}</a>
       ${rodapeExtra ? `<br>${rodapeExtra}` : ""}
     </td></tr>
