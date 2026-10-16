@@ -5,6 +5,7 @@ import { Flask, X } from "@phosphor-icons/react";
 import {
   MOCKUP_TELAS,
   parseMockupParam,
+  rotuloVariante,
   telaPorRota,
 } from "@/lib/demo/mockups";
 import { cn } from "@/lib/utils";
@@ -34,8 +35,8 @@ export function MockupsSection() {
       </p>
       <div className="mt-2.5 space-y-2">
         {MOCKUP_TELAS.map((tela) => (
-          <div key={tela.id} className="flex items-center gap-2">
-            <div className="min-w-0 flex-1">
+          <div key={tela.id} className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+            <div className="min-w-0 flex-1 basis-40">
               <span className="block truncate text-sm font-medium">
                 {tela.label}
               </span>
@@ -50,9 +51,9 @@ export function MockupsSection() {
                   type="button"
                   title={nome}
                   onClick={() => abrir(tela.id, i + 1)}
-                  className="grid min-h-9 min-w-9 place-items-center rounded-lg border border-border text-xs font-semibold outline-none transition-colors hover:bg-muted focus-visible:bg-muted"
+                  className="grid min-h-9 min-w-9 place-items-center rounded-lg border border-border px-2 text-xs font-semibold outline-none transition-colors hover:bg-muted focus-visible:bg-muted"
                 >
-                  v{i + 1}
+                  {rotuloVariante(tela, i + 1)}
                 </button>
               ))}
             </div>
@@ -111,7 +112,7 @@ function MockupViewToggle() {
             onClick={() => selecionar(i + 1)}
             className="min-h-9 rounded-full px-3 text-xs font-semibold text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
           >
-            v{i + 1}
+            {rotuloVariante(tela, i + 1)}
           </button>
         ))}
       </div>
@@ -150,7 +151,7 @@ export function MockupViewer({ voltarLabel = "Voltar ao app" }: { voltarLabel?: 
 
   return (
     <div className="fixed inset-0 z-[80] flex flex-col bg-background">
-      <div className="flex shrink-0 items-center gap-2 border-b border-border bg-[var(--brand-ink)] px-3 py-2 text-white sm:gap-3 sm:px-4">
+      <div className="flex shrink-0 items-center gap-2 overflow-x-auto border-b border-border bg-[var(--brand-ink)] px-3 py-2 text-white sm:gap-3 sm:px-4">
         <span className="flex items-center gap-1.5 rounded-full bg-[var(--brand-lime)] px-2 py-0.5 text-[11px] font-bold text-[var(--brand-ink)]">
           <Flask size={11} weight="bold" aria-hidden />
           MOCKUP
@@ -160,7 +161,9 @@ export function MockupViewer({ voltarLabel = "Voltar ao app" }: { voltarLabel?: 
         <select
           aria-label="Tela do mockup"
           value={tela.id}
-          onChange={(e) => navegar(`${e.target.value}:v1`)}
+          onChange={(e) => navegar(
+              `${e.target.value}:v${MOCKUP_TELAS.find((t) => t.id === e.target.value)?.final ?? 1}`,
+            )}
           className="min-h-9 w-28 shrink-0 cursor-pointer truncate rounded-lg bg-white/10 px-2 text-sm font-semibold text-white outline-none transition-colors hover:bg-white/20 focus-visible:ring-2 focus-visible:ring-[var(--brand-lime)] sm:w-auto sm:min-w-36"
         >
           {MOCKUP_TELAS.map((t) => (
@@ -185,13 +188,13 @@ export function MockupViewer({ voltarLabel = "Voltar ao app" }: { voltarLabel?: 
               title={nome}
               onClick={() => navegar(`${tela.id}:v${i + 1}`)}
               className={cn(
-                "grid min-h-9 min-w-9 place-items-center rounded-lg text-xs font-semibold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[var(--brand-lime)]",
+                "grid min-h-9 min-w-9 shrink-0 place-items-center rounded-lg px-2 text-xs font-semibold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[var(--brand-lime)]",
                 i + 1 === variante
                   ? "bg-[var(--brand-lime)] text-[var(--brand-ink)]"
                   : "bg-white/10 text-white hover:bg-white/20",
               )}
             >
-              v{i + 1}
+              {rotuloVariante(tela, i + 1)}
             </button>
           ))}
         </div>

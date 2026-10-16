@@ -10,6 +10,8 @@ type MockupTelaDef = {
   descricao: string;
   rotas: readonly string[];
   variantes: readonly string[];
+  /** variante final composta (1-based) — a que abre por padrão e ganha o chip "Final" */
+  final: number;
 };
 
 export const MOCKUP_TELAS: readonly MockupTelaDef[] = [
@@ -24,21 +26,43 @@ export const MOCKUP_TELAS: readonly MockupTelaDef[] = [
       "Cards por dia",
       "R2 · Duas superfícies",
       "R2 · Por pessoa",
+      "Final · 5 visões por papel",
     ],
+    final: 6,
   },
   {
     id: "duplas",
     label: "Duplas",
     descricao: "Categorias explicadas + apoio separado do risco",
     rotas: ["/duplas"],
-    variantes: ["Critério nos filtros", "Legenda sob demanda", "Seções por categoria"],
+    variantes: [
+      "Critério nos filtros",
+      "Legenda sob demanda",
+      "Seções por categoria",
+      "Final · 4 visões por papel",
+    ],
+    final: 4,
   },
   {
     id: "materiais",
     label: "Materiais",
-    descricao: "Hub da jornada do jovem",
+    descricao: "Hub da jornada: instrumentos do programa por papel",
     rotas: ["/jovem/materiais"],
-    variantes: ["4 portais iguais", "Jornada protagonista", "Trilha narrativa"],
+    variantes: [
+      "4 portais iguais",
+      "Jornada protagonista",
+      "Trilha narrativa",
+      "Final · hub por papel",
+    ],
+    final: 4,
+  },
+  {
+    id: "instrumentos",
+    label: "Instrumentos",
+    descricao: "Roda da Vida, Metas/PDM e Visão (tela nova)",
+    rotas: [],
+    variantes: ["Final · Roda, Metas e Visão"],
+    final: 1,
   },
   {
     id: "jovem-especialistas",
@@ -51,7 +75,9 @@ export const MOCKUP_TELAS: readonly MockupTelaDef[] = [
       "Card na home",
       "R2 · Trilha explícita",
       "R2 · Estados do pedido",
+      "Final · 4 visões por papel",
     ],
+    final: 6,
   },
   {
     id: "chamados",
@@ -59,11 +85,22 @@ export const MOCKUP_TELAS: readonly MockupTelaDef[] = [
     descricao: "Fila + thread da coordenação (tela nova)",
     // sem rota real ainda — entrada só pelo catálogo do popover da DemoBar
     rotas: [],
-    variantes: ["Duas colunas", "Board por status", "Inbox"],
+    variantes: [
+      "Duas colunas",
+      "Board por status",
+      "Inbox",
+      "Final · 4 visões por papel",
+    ],
+    final: 4,
   },
 ];
 
 export type MockupTela = (typeof MOCKUP_TELAS)[number];
+
+/** Rótulo curto do chip: "Final" na variante composta, "vN" nas demais. */
+export function rotuloVariante(tela: MockupTela, variante: number): string {
+  return variante === tela.final ? "Final" : `v${variante}`;
+}
 
 /** Lê o param ?mockup=agenda:v2 — devolve { tela, variante } ou null. */
 export function parseMockupParam(

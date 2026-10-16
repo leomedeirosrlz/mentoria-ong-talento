@@ -2,6 +2,27 @@
 
 _Rodada 1: 15 variantes (5 telas × 3), screenshots Playwright 1280/390px, 5 juízes UX. Rodada 2: +4 variantes focadas em regra de negócio (agenda v4/v5, jovem-especialistas v4/v5), julgadas contra as vencedoras R1 com rubrica de domínio._
 
+## Rodada final — telas compostas por papel
+
+Nenhuma variante resolveu a tela sozinha. A rodada final costura os pontos fortes de cada uma sobre uma base escolhida, com **visão por papel dentro do próprio mock** (seletor "Ver como:") e matriz papel × ação nas notas. Especificação: `_brief-final.md` (dataset canônico, regras de domínio, composição por tela).
+
+| Tela | Arquivo | Base | Resgates | Papéis |
+|---|---|---|---|---|
+| agenda | `agenda/v6` | v3 (Minha agenda) | v5 (por mentorado, semana), v4 (grade, stepper do mural) | Coordenação · Auxiliar exec. · Mentor DPP · Especialista · Mentorado |
+| jovem-especialistas | `jovem-especialistas/v6` | v4 (trilha explícita) | v5 (ciclo de vida, sessões), v3 (card-CTA, negociação) | Mentorado · Especialista (mural) · Coordenação (só leitura) · Mentor DPP |
+| duplas | `duplas/v4` | v3 (seções por categoria) | v1 (feito×esperado), v2 (pills, recência, legenda) | Coordenação · Auxiliar exec. · Mentor DPP · Especialista |
+| materiais | `materiais/v4` | v2 (jornada) | v3 ("você escreveu"), v1 (listagem) | Mentorado · Mentor DPP · Coordenação · Auxiliar exec. |
+| instrumentos (nova) | `instrumentos/v1` | — | Roda da Vida (16 eixos), Metas/PDM (≤10 metas, ~20 submetas recursivas), Visão | Mentorado · Mentor DPP · Coordenação |
+| chamados | `chamados/v4` | v3 (inbox) | v1 (master-detail), v2 (idade, status) | Coordenação · Auxiliar exec. · Mentor · Mentorado |
+
+Correções que a rodada incorporou: coordenação nunca agenda por dupla; "X de Y realizaram" por cronograma; trilha sem passar pela coordenação (mural → aceite); uma trilha por jovem por ciclo; composer de chamado com default interno; apoio como eixo separado do semáforo.
+
+**Decisões em aberto** (registradas nas notas de cada mock): privacidade do conteúdo dos instrumentos (quem vê o quê); proposta de horário fora da grade do especialista como exceção; limites de metas/submetas (bloqueio duro × aviso; o guia fala em "até 3 metas"); nudge (canal e frequência); coexistência de `pdm_url` externo com o PDM nativo; permissão de o mentor emitir link de formulário (hoje só coordenação).
+
+---
+
+## Rodadas 1 e 2
+
 **TL;DR — vencedoras por tela:**
 
 | Tela | Vencedora | Direção |

@@ -1,0 +1,970 @@
+<!DOCTYPE html>
+<!-- MOCKUP chamados v4 — final: master-detail, 4 visões por papel -->
+<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chamados — Realiza.vc · mockup v4</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;650;700;750;800&display=swap" rel="stylesheet">
+<style>
+:root{
+--brand-lime:hsl(78 56% 53%);--brand-ink:hsl(0 0% 15%);--background:hsl(75 10% 95%);--card:#fff;
+--muted:hsl(75 7% 93%);--mf:hsl(75 4% 38%);--accent:hsl(75 8% 91%);--border:hsl(75 6% 85%);--input:hsl(75 8% 50%);
+--ok:hsl(78 58% 38%);--ok-text:hsl(78 55% 28%);--warn:hsl(43 95% 44%);--warn-text:hsl(43 90% 27%);
+--danger:hsl(0 80% 48%);--danger-text:hsl(0 70% 36%);--amber:hsl(48 100% 60%);--radius:.75rem;
+--c-urg-bg:hsl(0 80% 94%);--c-urg-fg:hsl(0 72% 36%);
+--c-agen-bg:hsl(212 80% 93%);--c-agen-fg:hsl(212 68% 32%);
+--c-met-bg:hsl(268 60% 93%);--c-met-fg:hsl(268 50% 34%);
+--c-plat-bg:hsl(178 60% 90%);--c-plat-fg:hsl(178 65% 24%);
+--c-out-bg:var(--muted);--c-out-fg:var(--mf);
+--int-bg:hsl(43 100% 94%);--int-bd:hsl(43 80% 52%);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--background);color:var(--brand-ink);font-size:14.5px;line-height:1.45;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+svg.ic{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.sr{position:absolute;opacity:0;width:1px;height:1px;pointer-events:none}
+:focus-visible{outline:3px solid hsl(212 90% 45%);outline-offset:2px}
+button,input,textarea,select{font:inherit;color:inherit}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
+
+/* ===== casca do mockup ===== */
+.board-head{background:var(--brand-ink);color:hsl(75 20% 88%);padding:13px 20px;display:flex;flex-wrap:wrap;align-items:center;gap:8px 18px;font-size:12.5px}
+.board-head b{color:var(--brand-lime);letter-spacing:.03em}
+.board-head .dir{color:hsl(75 10% 70%);flex:1 1 380px}
+.board-head nav{display:flex;gap:6px;flex-wrap:wrap}
+.board-head nav a{font-size:12px;font-weight:600;padding:5px 12px;border-radius:999px;border:1px solid hsl(75 10% 40%);color:hsl(75 20% 88%);text-decoration:none;display:inline-flex;align-items:center;min-height:32px}
+.board-head nav a:hover{border-color:var(--brand-lime);color:var(--brand-lime)}
+.viewbar{background:#fff;border-bottom:1px solid var(--border);padding:10px clamp(12px,3vw,28px);display:flex;flex-wrap:wrap;gap:8px 22px;align-items:center}
+.vgroup{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.vgroup>span{font-size:12.5px;font-weight:700;color:var(--mf);margin-right:2px}
+.pill{display:inline-flex;align-items:center;gap:6px;min-height:40px;padding:0 14px;border-radius:999px;border:1px solid var(--border);background:var(--background);font-size:13px;font-weight:650;cursor:pointer;white-space:nowrap}
+.pill:hover{background:var(--accent)}
+#r-coord:checked~.viewbar [for=r-coord],#r-aux:checked~.viewbar [for=r-aux],#r-mentor:checked~.viewbar [for=r-mentor],#r-jov:checked~.viewbar [for=r-jov],
+#e-has:checked~.viewbar [for=e-has],#e-vazio:checked~.viewbar [for=e-vazio]{background:var(--brand-ink);color:#fff;border-color:var(--brand-ink)}
+#r-coord:focus-visible~.viewbar [for=r-coord],#r-aux:focus-visible~.viewbar [for=r-aux],#r-mentor:focus-visible~.viewbar [for=r-mentor],#r-jov:focus-visible~.viewbar [for=r-jov],#e-has:focus-visible~.viewbar [for=e-has],#e-vazio:focus-visible~.viewbar [for=e-vazio]{outline:3px solid hsl(212 90% 45%);outline-offset:2px}
+.v{display:none}
+#r-coord:checked~.views .v-coord,#r-aux:checked~.views .v-aux,#r-mentor:checked~.views .v-mentor,#r-jov:checked~.views .v-jov{display:block}
+.empty-state,.vazio{display:none}
+#e-vazio:checked~.views .has{display:none}
+#e-vazio:checked~.views .vazio{display:block}
+
+.scope{display:flex;flex-wrap:wrap;gap:4px 18px;padding:10px 16px;background:hsl(78 56% 53% / .14);border:1px solid hsl(78 40% 60% / .6);border-radius:var(--radius);font-size:13px;margin-bottom:14px}
+.scope b{font-weight:700}
+.scope .no b{color:var(--danger-text)}
+.scope span{flex:1 1 300px}
+
+/* ===== chrome do app ===== */
+.topbar{background:#fff;border-bottom:1px solid var(--border)}
+.topbar .in{display:flex;align-items:center;gap:22px;height:58px;max-width:1280px;margin:0 auto;padding-inline:clamp(14px,3vw,32px)}
+.brand{display:flex;align-items:center;gap:10px;font-weight:750;font-size:15px}
+.logo{width:28px;height:28px;border-radius:8px;background:var(--brand-lime);display:grid;place-items:center;font-weight:800;font-size:13px}
+.tnav{display:flex;gap:2px;margin-left:8px}
+.tnav a{display:inline-flex;align-items:center;gap:6px;padding:0 12px;min-height:40px;border-radius:10px;font-size:14px;font-weight:550;color:var(--mf);text-decoration:none}
+.tnav a.on{background:hsl(78 56% 53% / .25);color:var(--brand-ink);font-weight:700}
+.tnav .bd{background:var(--danger);color:#fff;font-size:12px;font-weight:700;border-radius:999px;padding:0 7px;min-width:20px;text-align:center}
+.me{margin-left:auto;display:flex;align-items:center;gap:9px;font-size:13px}
+.me b{display:block;font-weight:650}.me small{color:var(--mf);font-size:12px}
+.av{width:30px;height:30px;border-radius:50%;display:inline-grid;place-items:center;font-size:12px;font-weight:700;flex:none}
+.av.mc{background:hsl(78 56% 53%/.4);color:hsl(78 60% 22%)}.av.pn{background:hsl(268 60% 92%);color:hsl(268 50% 32%)}
+.av.al{background:hsl(212 80% 92%);color:hsl(212 70% 30%)}.av.lp{background:hsl(178 60% 88%);color:hsl(178 65% 22%)}
+.av.rm{background:hsl(30 80% 90%);color:hsl(30 70% 28%)}.av.as{background:hsl(48 100% 82%);color:hsl(40 80% 22%)}.av.pr{background:hsl(330 70% 92%);color:hsl(330 60% 32%)}
+.av.none{border:1.5px dashed var(--input);background:transparent;color:var(--mf)}
+.av.sm{width:22px;height:22px;font-size:12px}
+.bnav{display:none}
+.main{max-width:1280px;margin:0 auto;padding:20px clamp(14px,3vw,32px) 40px}
+
+.sidebar{display:none}
+.v-jov .app{display:block}
+
+/* ===== cabeçalho da página ===== */
+.pagehead{display:flex;align-items:flex-end;justify-content:space-between;gap:14px;flex-wrap:wrap;padding-bottom:14px}
+h1{font-size:26px;letter-spacing:-.025em;font-weight:750}
+.sub{color:var(--mf);font-size:13.5px;margin-top:4px}
+.sub b{color:var(--brand-ink);font-weight:650}
+.oldest{display:flex;gap:8px;flex-wrap:wrap}
+.old{display:inline-flex;align-items:center;gap:8px;padding:8px 13px;border-radius:var(--radius);font-size:13px;background:#fff;border:1px solid var(--border)}
+.old.red{border-color:hsl(0 80% 48%/.45);background:hsl(0 80% 48%/.07);color:var(--danger-text)}
+.old.amb{border-color:hsl(43 95% 44%/.5);background:hsl(43 95% 44%/.1);color:var(--warn-text)}
+.old b{font-weight:700}
+.search{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid var(--input);border-radius:999px;padding:0 15px;min-height:44px;flex:1 1 220px;max-width:340px;color:var(--mf)}
+.search input{border:0;outline:0;background:transparent;width:100%;font-size:14px;min-height:44px}
+.search:focus-within{outline:3px solid hsl(212 90% 45%);outline-offset:2px}
+
+/* ===== botões ===== */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:40px;padding:0 16px;border-radius:999px;border:1px solid var(--input);background:#fff;font-size:13.5px;font-weight:650;cursor:pointer;text-decoration:none;color:var(--brand-ink);white-space:nowrap}
+.btn:hover{background:var(--accent)}
+.btn.pri{background:var(--brand-lime);border-color:hsl(78 56% 40%);}
+.btn.pri:hover{background:hsl(78 56% 47%)}
+.btn.dark{background:var(--brand-ink);color:#fff;border-color:var(--brand-ink)}
+.btn.dark:hover{background:hsl(0 0% 25%)}
+.btn.amber{background:var(--amber);border-color:hsl(45 90% 40%)}
+.btn.dis{background:var(--muted);color:var(--mf);border-style:dashed;cursor:not-allowed}
+.btn.dis:hover{background:var(--muted)}
+details.assign{position:relative}
+details.assign summary{list-style:none}
+details.assign summary::-webkit-details-marker{display:none}
+details.assign ul{position:absolute;z-index:6;top:calc(100% + 6px);left:0;min-width:250px;background:#fff;border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 8px 24px rgb(0 0 0/.14);list-style:none;padding:6px}
+details.assign li{display:flex;align-items:center;gap:9px;padding:0 10px;min-height:44px;border-radius:8px;font-size:13.5px;cursor:pointer}
+details.assign li:hover{background:var(--accent)}
+details.assign li.off{color:var(--mf);cursor:not-allowed}
+details.assign li.off:hover{background:none}
+details.assign li small{font-size:12px;color:var(--mf);display:block}
+
+/* ===== filtros ===== */
+.filters{display:grid;gap:8px;margin-bottom:14px}
+.frow{display:flex;align-items:center;gap:8px;min-width:0}
+.frow>.cap{font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--mf);flex:none;width:76px}
+.chips{display:flex;gap:7px;overflow-x:auto;scrollbar-width:none;padding:2px;min-width:0;flex:1}
+.chips::-webkit-scrollbar{display:none}
+.chip{flex:none;display:inline-flex;align-items:center;gap:7px;border:1px solid var(--border);background:#fff;border-radius:999px;min-height:36px;padding:0 13px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap}
+.chip:hover{background:var(--accent)}
+.chip b{color:var(--mf);font-size:12px;font-weight:650}
+.chip .dot{width:9px;height:9px;border-radius:50%}
+.chip.lock{background:var(--muted);color:var(--mf);border-style:dashed}
+.d-urg{background:var(--danger)}.d-agen{background:hsl(212 70% 48%)}.d-met{background:hsl(268 55% 52%)}.d-plat{background:hsl(178 60% 32%)}.d-out{background:var(--input)}
+
+/* ===== lista ===== */
+.layout{display:grid;gap:18px;grid-template-columns:minmax(0,1fr)}
+.listpane{min-width:0}
+.queue{background:#fff;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.qrow{display:block;position:relative;padding:13px 14px 13px 18px;border-bottom:1px solid var(--border);cursor:pointer;min-height:44px}
+.qrow:last-child{border-bottom:0}
+.qrow:hover{background:var(--accent)}
+.qrow::before{content:'';position:absolute;left:0;top:0;bottom:0;width:5px;background:transparent}
+.qrow[data-st=ab]{background:hsl(0 80% 48%/.06)}
+.qrow[data-st=ab]::before{background:var(--danger)}
+.qrow[data-st=ab]:hover{background:hsl(0 80% 48%/.1)}
+.qrow[data-st=ea]::before{background:var(--warn)}
+.qrow[data-st=rs]{background:hsl(75 10% 97%)}
+.qrow[data-st=rs] .r-subj{color:var(--mf);font-weight:550}
+.qrow.blocked{background:var(--muted);color:var(--mf)}
+.qrow.blocked::before{background:var(--input)}
+.qrow.blocked .r-subj{font-style:italic;font-weight:500}
+.r-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.r-top .time{margin-left:auto}
+.proto{font-size:12px;font-weight:700;letter-spacing:.06em;color:var(--mf);font-variant-numeric:tabular-nums}
+.time{font-size:12px;color:var(--mf);white-space:nowrap}
+.cat{font-size:12px;font-weight:650;border-radius:999px;padding:3px 10px 3px 8px;display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+.cat .ic{width:13px;height:13px}
+.c-urg{background:var(--c-urg-bg);color:var(--c-urg-fg)}.c-agen{background:var(--c-agen-bg);color:var(--c-agen-fg)}
+.c-met{background:var(--c-met-bg);color:var(--c-met-fg)}.c-plat{background:var(--c-plat-bg);color:var(--c-plat-fg)}.c-out{background:var(--c-out-bg);color:var(--c-out-fg)}
+.r-subj{font-size:15px;font-weight:650;letter-spacing:-.01em;margin-top:5px;overflow-wrap:anywhere}
+.r-meta{font-size:12.5px;color:var(--mf);margin-top:4px;display:flex;flex-wrap:wrap;gap:2px 8px;align-items:center}
+.r-meta .who{display:inline-flex;align-items:center;gap:6px;color:hsl(0 0% 25%);font-weight:550}
+.r-foot{margin-top:8px;display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center}
+.st{font-size:12.5px;font-weight:700;border-radius:999px;padding:3px 11px 3px 8px;display:inline-flex;gap:6px;align-items:center;white-space:nowrap}
+.st .ic{width:14px;height:14px}
+.st-ab{background:hsl(0 80% 48%/.12);color:var(--danger-text);border:1px solid hsl(0 80% 48%/.4)}
+.st-ea{background:hsl(43 95% 44%/.17);color:var(--warn-text);border:1px solid hsl(43 95% 44%/.5)}
+.st-rs{background:hsl(78 58% 38%/.13);color:var(--ok-text);border:1px solid hsl(78 58% 38%/.4)}
+.st-bl{background:#fff;color:var(--mf);border:1px dashed var(--input)}
+.age{font-size:12px;color:var(--mf)}
+.nodono{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:650;color:var(--danger-text);border:1.5px dashed hsl(0 80% 48%/.6);border-radius:999px;padding:2px 10px}
+.rowlock{display:inline-flex;align-items:center;gap:5px;font-size:12.5px;font-weight:650;color:var(--mf)}
+.sel-hl{}
+.sem{display:inline-flex;align-items:center;gap:4px;font-weight:600}
+.sem.ok{color:var(--ok-text)}.sem.at{color:var(--warn-text)}.sem.rs{color:var(--danger-text)}
+
+/* ===== detalhe ===== */
+.detailpane{display:none;min-width:0}
+.detail{display:none;background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:20px clamp(14px,2.4vw,26px) 24px}
+.back{display:none;align-items:center;gap:6px;min-height:44px;padding:0 12px 0 6px;font-weight:650;font-size:14px;cursor:pointer;border-radius:999px;margin-bottom:8px;color:var(--brand-ink)}
+.back:hover{background:var(--accent)}
+.d-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.d-head .time{margin-left:auto}
+.detail h2{font-size:21px;letter-spacing:-.02em;margin-top:8px;line-height:1.25;overflow-wrap:anywhere}
+.facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px 18px;margin-top:14px;padding:12px 0;border-block:1px solid var(--border)}
+.facts div{font-size:13.5px;min-width:0}
+.facts dt{font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--mf);margin-bottom:3px}
+.facts dd{display:flex;align-items:center;gap:7px;flex-wrap:wrap;font-weight:550}
+.actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;align-items:center}
+.actnote{font-size:12.5px;color:var(--mf);margin-top:8px;display:flex;gap:6px;align-items:flex-start}
+.msg{margin-top:18px;border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;background:hsl(75 10% 98%)}
+.msg h3,.tlh h3{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--mf);font-weight:700;margin-bottom:6px}
+.msg p{font-size:14.5px;overflow-wrap:anywhere}
+.msg .short{margin-top:8px;font-size:13px;color:var(--mf)}
+.resbox{margin-top:16px;border:1px solid hsl(78 58% 38%/.45);background:hsl(78 58% 38%/.08);border-radius:var(--radius);padding:12px 16px;font-size:13.5px}
+.resbox b{display:flex;gap:6px;align-items:center;color:var(--ok-text);margin-bottom:3px}
+.tlh{margin-top:22px;display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;justify-content:space-between}
+.tlh h3{margin:0}
+.legend{display:flex;gap:6px 14px;flex-wrap:wrap;font-size:12.5px;color:var(--mf)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.tag{font-size:12px;font-weight:650;border-radius:6px;padding:2px 8px;display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+.tag .ic{width:13px;height:13px}
+.tag.pub{background:hsl(78 58% 38%/.14);color:var(--ok-text)}
+.tag.int{background:var(--int-bg);color:var(--warn-text);border:1px dashed var(--int-bd)}
+.tag.sys{background:var(--muted);color:var(--mf)}
+.timeline{list-style:none;margin-top:12px;position:relative}
+.timeline::before{content:'';position:absolute;left:15px;top:8px;bottom:8px;width:2px;background:var(--border)}
+.ev{display:grid;grid-template-columns:32px minmax(0,1fr);gap:10px;padding-bottom:14px;position:relative}
+.ev .dot{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;background:#fff;border:2px solid var(--border);z-index:1}
+.ev.pub .dot{border-color:var(--ok);color:var(--ok-text)}
+.ev.int .dot{border:2px dashed var(--int-bd);color:var(--warn-text);background:var(--int-bg)}
+.ev.sys .dot{color:var(--mf)}
+.evb{border-radius:var(--radius);padding:9px 13px;min-width:0}
+.ev.pub .evb{background:#fff;border:1px solid hsl(78 58% 38%/.35)}
+.ev.int .evb{background:var(--int-bg);border:1.5px dashed var(--int-bd)}
+.ev.sys .evb{padding:5px 2px}
+.evh{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;font-size:13px}
+.evh b{font-weight:700}
+.evh time{font-size:12px;color:var(--mf);margin-left:auto}
+.evb p{font-size:14px;margin-top:4px;overflow-wrap:anywhere}
+.ev.sys .evb p{font-size:13px;color:var(--mf);margin-top:0}
+.ev.sys .evh{font-size:12.5px;color:var(--mf)}
+
+/* composer */
+.composer{margin-top:8px}
+.composer .tabs{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:-1px;position:relative;z-index:1}
+.tab{display:flex;align-items:center;justify-content:center;gap:7px;min-height:44px;padding:4px 10px;border:1.5px solid var(--border);border-bottom:0;border-radius:var(--radius) var(--radius) 0 0;background:var(--muted);color:var(--mf);font-size:13.5px;font-weight:650;cursor:pointer;text-align:center}
+.tab small{display:block;font-size:12px;font-weight:500}
+.r-int:checked~.tabs .t-int{background:var(--int-bg);color:var(--warn-text);border:1.5px dashed var(--int-bd);border-bottom:0}
+.r-pub:checked~.tabs .t-pub{background:#fff;color:var(--ok-text);border:1.5px solid var(--ok);border-bottom:0}
+.r-int:focus-visible~.tabs .t-int,.r-pub:focus-visible~.tabs .t-pub{outline:3px solid hsl(212 90% 45%);outline-offset:-3px}
+.cbody{border:1.5px solid var(--border);border-radius:0 0 var(--radius) var(--radius);padding:12px;background:#fff}
+.r-int:checked~.cbody{border:1.5px dashed var(--int-bd);background:var(--int-bg)}
+.r-pub:checked~.cbody{border:1.5px solid var(--ok)}
+.cbody textarea,.fld textarea,.fld input[type=text],.fld select{width:100%;border:1px solid var(--input);border-radius:10px;padding:10px 12px;background:#fff;font-size:14.5px;resize:vertical;min-height:44px}
+.cbody textarea{min-height:76px}
+.hint{font-size:12.5px;color:hsl(0 0% 25%);margin:8px 0;display:flex;gap:6px;align-items:flex-start}
+.cfoot{display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:space-between}
+.r-int:checked~.cbody .h-pub,.r-int:checked~.cbody .b-pub,.r-pub:checked~.cbody .h-int,.r-pub:checked~.cbody .b-int{display:none}
+.closed-note{margin-top:14px;display:flex;gap:8px;align-items:flex-start;font-size:13.5px;color:var(--mf);border:1px dashed var(--input);border-radius:var(--radius);padding:12px 14px}
+.blockedpanel{margin-top:18px;border:1.5px dashed var(--input);border-radius:var(--radius);background:var(--muted);padding:26px 18px;text-align:center;color:var(--mf)}
+.blockedpanel .ic{width:30px;height:30px;margin-bottom:6px}
+.blockedpanel b{display:block;color:var(--brand-ink);font-size:16px;margin-bottom:4px}
+
+/* stepper autor */
+.stepper{list-style:none;display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:16px}
+.stepper li{display:flex;flex-direction:column;gap:3px;padding:10px 12px;border-radius:var(--radius);border:1.5px solid var(--border);background:#fff;font-size:13px;min-width:0}
+.stepper li b{display:flex;align-items:center;gap:6px;font-size:13.5px}
+.stepper li small{font-size:12px;color:var(--mf)}
+.stepper li.todo{border-style:dashed;color:var(--mf);background:transparent}
+.stepper li.now.ab{border-color:var(--danger);background:hsl(0 80% 48%/.07);color:var(--danger-text)}
+.stepper li.now.ea{border-color:var(--warn);background:hsl(43 95% 44%/.12);color:var(--warn-text)}
+.stepper li.now.rs,.stepper li.done{border-color:var(--ok);background:hsl(78 58% 38%/.09)}
+.callout{margin-top:14px;display:flex;gap:9px;align-items:flex-start;font-size:13.5px;padding:11px 14px;border-radius:var(--radius);background:hsl(212 80% 95%);border:1px solid hsl(212 60% 80%);color:hsl(212 60% 22%)}
+.callout.red{background:hsl(0 80% 48%/.07);border-color:hsl(0 80% 48%/.35);color:var(--danger-text)}
+
+/* vazio */
+.vazio .box{background:#fff;border:1px dashed var(--input);border-radius:var(--radius);padding:44px 20px;text-align:center;max-width:620px;margin:20px auto}
+.vazio .box .big{width:64px;height:64px;border-radius:50%;background:hsl(78 56% 53%/.25);display:grid;place-items:center;margin:0 auto 12px}
+.vazio .box .big .ic{width:30px;height:30px;color:var(--ok-text)}
+.vazio h2{font-size:21px;margin-bottom:6px}
+.vazio p{color:var(--mf);max-width:46ch;margin:0 auto 14px;font-size:14px}
+
+/* ===== diálogo ===== */
+.dialog{display:none;position:fixed;inset:0;z-index:50;align-items:center;justify-content:center;padding:16px}
+.dialog:target{display:flex}
+.scrim{position:absolute;inset:0;background:hsl(0 0% 10%/.55)}
+.sheet{position:relative;background:#fff;border-radius:16px;width:100%;max-width:600px;max-height:calc(100vh - 32px);overflow-y:auto;padding:22px clamp(16px,3vw,26px) 20px;box-shadow:0 20px 60px rgb(0 0 0/.35)}
+.sheet h2{font-size:21px;letter-spacing:-.02em}
+.sheet .lead{color:var(--mf);font-size:13.5px;margin:4px 0 14px}
+.sheet .x{position:absolute;top:10px;right:10px;width:44px;height:44px;display:grid;place-items:center;border-radius:50%;color:var(--brand-ink);text-decoration:none}
+.sheet .x:hover{background:var(--accent)}
+.sheet .as{display:flex;gap:8px;align-items:center;font-size:13px;margin-bottom:12px}
+.fld{margin-top:14px;display:block}
+.fld>.lb{display:block;font-size:13.5px;font-weight:700;margin-bottom:6px}
+.fld .opt{font-weight:500;color:var(--mf)}
+.req{color:var(--danger-text)}
+.catgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px}
+.cg{display:flex;gap:10px;align-items:flex-start;border:1.5px solid var(--border);border-radius:var(--radius);padding:10px 12px;cursor:pointer;min-height:56px;background:#fff}
+.cg:hover{background:var(--accent)}
+.cg .cat{padding:4px;border-radius:8px}
+.cg .cat .ic{width:18px;height:18px}
+.cg span.t{font-size:14px;font-weight:700;display:block}
+.cg small{font-size:12px;color:var(--mf);display:block;line-height:1.3}
+#k-agenda:checked~.catgrid [for=k-agenda],#k-met:checked~.catgrid [for=k-met],#k-plat:checked~.catgrid [for=k-plat],#k-urg:checked~.catgrid [for=k-urg],#k-out:checked~.catgrid [for=k-out]{border-color:var(--brand-ink);box-shadow:inset 0 0 0 1.5px var(--brand-ink);background:hsl(78 56% 53%/.1)}
+.sheet .sr:focus-visible~.catgrid label{}
+#k-agenda:focus-visible~.catgrid [for=k-agenda],#k-met:focus-visible~.catgrid [for=k-met],#k-plat:focus-visible~.catgrid [for=k-plat],#k-urg:focus-visible~.catgrid [for=k-urg],#k-out:focus-visible~.catgrid [for=k-out]{outline:3px solid hsl(212 90% 45%);outline-offset:2px}
+.khint{display:none;margin-top:10px;font-size:13px;gap:8px;align-items:flex-start;padding:10px 13px;border-radius:var(--radius);background:var(--muted)}
+#k-agenda:checked~.kh-agenda,#k-met:checked~.kh-met,#k-plat:checked~.kh-plat,#k-urg:checked~.kh-urg,#k-out:checked~.kh-out{display:flex}
+.kh-urg{background:hsl(0 80% 48%/.08);color:var(--danger-text)}
+.kh-plat{background:var(--c-plat-bg);color:var(--c-plat-fg)}
+.kh-out{background:var(--int-bg);color:var(--warn-text)}
+.outro-extra{display:none}
+#k-out:checked~.fields .outro-extra{display:block}
+#k-out:checked~.fields .norm-desc{display:none}
+.err{display:none;color:var(--danger-text);font-size:12.5px;font-weight:600;margin-top:5px;gap:6px;align-items:center}
+.fields textarea:placeholder-shown~.err{display:flex}
+.autonote{margin-top:16px;display:flex;gap:9px;align-items:flex-start;font-size:13px;padding:11px 14px;border-radius:var(--radius);background:hsl(212 80% 95%);border:1px solid hsl(212 60% 80%);color:hsl(212 60% 22%)}
+.dfoot{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-top:18px}
+.sheet .as-x{display:none}
+#r-mentor:checked~.dialog .as-mentor,#r-jov:checked~.dialog .as-jov,#r-coord:checked~.dialog .as-mentor,#r-aux:checked~.dialog .as-mentor{display:flex}
+.only-mentor{display:none}
+#r-mentor:checked~.dialog .only-mentor,#r-coord:checked~.dialog .only-mentor,#r-aux:checked~.dialog .only-mentor{display:block}
+
+/* ===== notas ===== */
+.notes-wrap{max-width:1280px;margin:10px auto 60px;padding-inline:clamp(14px,3vw,32px)}
+.notes{list-style:none;display:grid;grid-template-columns:minmax(0,1fr);gap:10px;padding:18px 22px;border-radius:14px;background:var(--brand-ink);color:hsl(75 20% 84%);font-size:13px;line-height:1.55}
+.notes li{position:relative;padding-left:18px}
+.notes li::before{content:'';position:absolute;left:2px;top:.6em;width:6px;height:6px;border-radius:50%;background:var(--brand-lime)}
+.notes b{color:var(--brand-lime)}
+.notes li.open::before{background:var(--amber)}
+.notes li.open b{color:var(--amber)}
+.notes li.hd{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:hsl(75 10% 72%);padding:6px 0 0;font-weight:700}
+.notes li.hd::before{display:none}
+.tw{overflow-x:auto;border-radius:10px;border:1px solid hsl(75 10% 30%)}
+.notes table{border-collapse:collapse;width:100%;min-width:760px;font-size:12.5px}
+.notes th,.notes td{text-align:left;vertical-align:top;padding:9px 11px;border-bottom:1px solid hsl(75 10% 28%)}
+.notes th{color:var(--brand-lime);font-size:12px;letter-spacing:.04em;text-transform:uppercase;background:hsl(0 0% 19%)}
+.notes li.tbl::before{display:none}
+.notes tr:last-child td{border-bottom:0}
+.notes td:first-child{font-weight:700;color:#fff;white-space:nowrap}
+
+/* ===== responsivo ===== */
+@media (min-width:1024px){
+ .layout{grid-template-columns:minmax(340px,430px) minmax(0,1fr);align-items:start}
+ .detailpane{display:block}
+ .v .detail{}
+ .v-jov .app{display:grid;grid-template-columns:230px minmax(0,1fr);min-height:640px}
+ .sidebar{display:flex;flex-direction:column;gap:4px;background:#fff;border-right:1px solid var(--border);padding:18px 14px}
+ .sidebar .brand{padding:0 8px 16px}
+ .sidebar a{display:flex;align-items:center;gap:10px;min-height:44px;padding:0 12px;border-radius:12px;font-size:14.5px;font-weight:550;color:var(--mf);text-decoration:none}
+ .sidebar a.on{background:var(--amber);color:var(--brand-ink);font-weight:700}
+ .sidebar .me{margin:auto 0 0;padding:12px 8px 0;border-top:1px solid var(--border)}
+ .v-jov .main{max-width:none;margin:0;width:100%}
+}
+@media (max-width:1023px){
+ .v input.sel-none:not(:checked)~.pagehead,.v input.sel-none:not(:checked)~.filters,.v input.sel-none:not(:checked)~.scope{display:none}
+ .v input.sel-none:not(:checked)~.layout .listpane{display:none}
+ .v input.sel-none:not(:checked)~.layout .detailpane{display:block}
+ .v input.sel-none:checked~.layout .detailpane{display:none}
+ .back{display:inline-flex}
+ .stepper{grid-template-columns:1fr}
+}
+@media (max-width:767px){
+ body{font-size:15px}
+ .tnav,.topbar .me{display:none}
+ .topbar .in{height:52px}
+ .board-head{padding:12px 14px}
+ .main{padding-bottom:96px}
+ .bnav{display:grid;grid-template-columns:repeat(5,1fr);position:fixed;left:0;right:0;bottom:0;z-index:20;background:#fff;border-top:1px solid var(--border);padding:4px 4px calc(4px + env(safe-area-inset-bottom))}
+ .bnav a{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-height:56px;font-size:12px;font-weight:600;color:var(--mf);text-decoration:none;border-radius:12px;position:relative}
+ .bnav a.on{color:var(--brand-ink);font-weight:700;background:hsl(78 56% 53%/.25)}
+ .v-jov .bnav a.on{background:var(--amber)}
+ .bnav .bd{position:absolute;top:4px;left:calc(50% + 6px);background:var(--danger);color:#fff;font-size:12px;border-radius:999px;padding:0 6px;font-weight:700;min-width:18px;text-align:center}
+ .bnav .ic{width:22px;height:22px}
+ h1{font-size:23px}
+ .pill{min-height:44px}
+ .vgroup{width:100%}
+ .btn{min-height:44px}
+ .chip{min-height:44px}
+ .frow{flex-direction:column;align-items:stretch;gap:2px}
+ .frow>.cap{width:auto}
+ .search{max-width:none;flex-basis:100%}
+ .pagehead .btn{width:100%}
+ .actions .btn,.actions details{flex:1 1 140px}
+ .actions details summary{width:100%}
+ .composer .tabs .tab{font-size:13px}
+ .cfoot .btn{width:100%}
+ .dialog{align-items:flex-end;padding:0}
+ .sheet{max-width:none;border-radius:18px 18px 0 0;max-height:94vh;padding-bottom:calc(20px + env(safe-area-inset-bottom))}
+ .dfoot .btn{flex:1 1 140px}
+ .notes{padding:16px}
+}
+
+#co-own-none:checked~.layout .qrow:not([data-own=none]){display:none}
+#co-own-me:checked~.layout .qrow:not([data-own=me]){display:none}
+#co-cat-urg:checked~.layout .qrow:not([data-cat=urg]){display:none}
+#co-cat-agen:checked~.layout .qrow:not([data-cat=agen]){display:none}
+#co-cat-met:checked~.layout .qrow:not([data-cat=met]){display:none}
+#co-cat-plat:checked~.layout .qrow:not([data-cat=plat]){display:none}
+#co-cat-out:checked~.layout .qrow:not([data-cat=out]){display:none}
+#co-st-ab:checked~.layout .qrow:not([data-st=ab]){display:none}
+#co-st-ea:checked~.layout .qrow:not([data-st=ea]){display:none}
+#co-st-rs:checked~.layout .qrow:not([data-st=rs]){display:none}
+#co-own-all:checked~.filters [for=co-own-all]{background:var(--brand-ink);color:#fff;border-color:var(--brand-ink)}#co-own-all:checked~.filters [for=co-own-all] b{color:hsl(0 0% 100%/.7)}#co-own-all:focus-visible~.filters [for=co-own-all]{outline:3px solid hsl(212 90% 45%);outline-offset:2px}
+#co-own-none:checked~.filters [for=co-own-none]{background:var(--brand-ink);color:#fff;border-color:var(--brand-ink)}#co-own-none:checked~.filters [for=co-own-none] b{color:hsl(0 0% 100%/.7)}#co-own-none:focus-visible~.filters [for=co-own-none]{outline:3px solid hsl(212 90% 45%);outline-offset:2px}
+#co-own-me:checked~.filters [for=co-own-me]{background:var(--brand-ink);color:#fff;border-color:var(--brand-ink)}#co-own-me:checked~.filters [for=co-own-me] b{color:hsl(0 0% 100%/.7)}#co-own-me:focus-visible~.filters [for=co-own-me]{outline:3px solid hsl(212 90% 45%);outline-offset:2px}
+#co-cat-all:checked~.filters [for=co-cat-all]{background:var(--brand-ink);color:#fff;border-color:var(--brand-ink)}#co-cat-all:checked~.filters [for=co-cat-all] b{color:hsl(0 0% 100%/.7)}#co-cat-all:focus-visible~.filters [for=co-cat-all]{outline:3px solid hsl(212 90% 45%);outline-offset:2px}
+#co-cat-urg:checked~.filters [for=co-cat-urg]{background:var(--brand-ink);color:#fff;border-color:var(--brand-ink)}#co-cat-urg:checked~.filters [for=co-cat-urg] b{color:hsl(0 0% 100%/.7)}#co-cat-urg:focus-visible~.filters [for=co-cat-urg]{outline:3px solid hsl(212 90% 45%);outline-offset:2px}
+#co-cat-agen:checked~.filters [for=co-cat-agen]{background:var(--brand-ink);color:#fff;border-color:var(--brand-ink)}#co-cat-agen:checked~.filters [for=co-cat-agen] b{color:hsl(0 0% 100%/.7)}#co-cat-agen:focus-visible~.filters [for=co-cat-agen]{outline:3px solid hsl(212 90% 45%);outline-offset:2px}
+#co-cat-met:checked~.filters [for=co-cat-met]{background:var(--brand-ink);color:#fff;border-color:var(--brand-ink)}#co-cat-met:checked~.filters [for=co-cat-met] b{color:hsl(0 0% 100%/.7)}#co-cat-met:focus-visible~.filters [for=co-cat-met]{outline:3px solid hsl(212 90% 45%);outline-offset:2px}
+#co-cat-plat:checked~.filters [for=co-cat-plat]{background:var(--brand-ink);color:#fff;border-color:var(--brand-ink)}#co-cat-plat:checked~.filters [for=co-cat-plat] b{color:hsl(0 0% 100%/.7)}#co-cat-plat:focus-visible~.filters [for=co-cat-plat]{outline:3px solid hsl(212 90% 45%);outline-offset:2px}
+#co-cat-out:checked~.filters [for=co-cat-out]{background:var(--brand-ink);color:#fff;border-color:var(--brand-ink)}#co-cat-out:checked~.filters [for=co-cat-out] b{color:hsl(0 0% 100%/.7)}#co-cat-out:focus-visible~.filters [for=co-cat-out]{outline:3px solid hsl(212 90% 45%);outline-offset:2px}
+#co-st-all:checked~.filters [for=co-st-all]{background:var(--brand-ink);color:#fff;border-color:var(--brand-ink)}#co-st-all:checked~.filters [for=co-st-all] b{color:hsl(0 0% 100%/.7)}#co-st-all:focus-visible~.filters [for=co-st-all]{outline:3px solid hsl(212 90% 45%);outline-offset:2px}
+#co-st-ab:checked~.filters [for=co-st-ab]{background:var(--brand-ink);color:#fff;border-color:var(--brand-ink)}#co-st-ab:checked~.filters [for=co-st-ab] b{color:hsl(0 0% 100%/.7)}#co-st-ab:focus-visible~.filters [for=co-st-ab]{outline:3px solid hsl(212 90% 45%);outline-offset:2px}
+#co-st-ea:checked~.filters [for=co-st-ea]{background:var(--brand-ink);color:#fff;border-color:var(--brand-ink)}#co-st-ea:checked~.filters [for=co-st-ea] b{color:hsl(0 0% 100%/.7)}#co-st-ea:focus-visible~.filters [for=co-st-ea]{outline:3px solid hsl(212 90% 45%);outline-offset:2px}
+#co-st-rs:checked~.filters [for=co-st-rs]{background:var(--brand-ink);color:#fff;border-color:var(--brand-ink)}#co-st-rs:checked~.filters [for=co-st-rs] b{color:hsl(0 0% 100%/.7)}#co-st-rs:focus-visible~.filters [for=co-st-rs]{outline:3px solid hsl(212 90% 45%);outline-offset:2px}
+#co-sel-143:checked~.layout .d-143{display:block}
+#co-sel-143:checked~.layout .row-143{box-shadow:inset 0 0 0 2px var(--brand-ink);background:hsl(78 56% 53%/.14)}
+#co-sel-142:checked~.layout .d-142{display:block}
+#co-sel-142:checked~.layout .row-142{box-shadow:inset 0 0 0 2px var(--brand-ink);background:hsl(78 56% 53%/.14)}
+#co-sel-141:checked~.layout .d-141{display:block}
+#co-sel-141:checked~.layout .row-141{box-shadow:inset 0 0 0 2px var(--brand-ink);background:hsl(78 56% 53%/.14)}
+#co-sel-139:checked~.layout .d-139{display:block}
+#co-sel-139:checked~.layout .row-139{box-shadow:inset 0 0 0 2px var(--brand-ink);background:hsl(78 56% 53%/.14)}
+#co-sel-136:checked~.layout .d-136{display:block}
+#co-sel-136:checked~.layout .row-136{box-shadow:inset 0 0 0 2px var(--brand-ink);background:hsl(78 56% 53%/.14)}
+#co-sel-137:checked~.layout .d-137{display:block}
+#co-sel-137:checked~.layout .row-137{box-shadow:inset 0 0 0 2px var(--brand-ink);background:hsl(78 56% 53%/.14)}
+#co-sel-131:checked~.layout .d-131{display:block}
+#co-sel-131:checked~.layout .row-131{box-shadow:inset 0 0 0 2px var(--brand-ink);background:hsl(78 56% 53%/.14)}
+#co-sel-128:checked~.layout .d-128{display:block}
+#co-sel-128:checked~.layout .row-128{box-shadow:inset 0 0 0 2px var(--brand-ink);background:hsl(78 56% 53%/.14)}
+@media (min-width:1024px){#co-sel-none:checked~.layout .d-143{display:block}#co-sel-none:checked~.layout .row-143{box-shadow:inset 0 0 0 2px var(--brand-ink);background:hsl(78 56% 53%/.14)}}
+#au-own-none:checked~.layout .qrow:not([data-own=none]){display:none}
+#au-own-me:checked~.layout .qrow:not([data-own=me]){display:none}
+#au-cat-urg:checked~.layout .qrow:not([data-cat=urg]){display:none}
+#au-cat-agen:checked~.layout .qrow:not([data-cat=agen]){display:none}
+#au-cat-met:checked~.layout .qrow:not([data-cat=met]){display:none}
+#au-cat-plat:checked~.layout .qrow:not([data-cat=plat]){display:none}
+#au-cat-out:checked~.layout .qrow:not([data-cat=out]){display:none}
+#au-st-ab:checked~.layout .qrow:not([data-st=ab]){display:none}
+#au-st-ea:checked~.layout .qrow:not([data-st=ea]){display:none}
+#au-st-rs:checked~.layout .qrow:not([data-st=rs]){display:none}
+#au-own-all:checked~.filters [for=au-own-all]{background:var(--brand-ink);color:#fff;border-color:var(--brand-ink)}#au-own-all:checked~.filters [for=au-own-all] b{color:hsl(0 0% 100%/.7)}#au-own-all:focus-visible~.filters [for=au-own-all]{outline:3px solid hsl(212 90% 45%);outline-offset:2px}
+#au-own-none:checked~.filters [for=au-own-none]{background:var(--brand-ink);color:#fff;border-color:var(--brand-ink)}#au-own-none:checked~.filters [for=au-own-none] b{color:hsl(0 0% 100%/.7)}#au-own-none:focus-visible~.filters [for=au-own-none]{outline:3px solid hsl(212 90% 45%);outline-offset:2px}
+#au-own-me:checked~.filters [for=au-own-me]{background:var(--brand-ink);color:#fff;border-color:var(--brand-ink)}#au-own-me:checked~.filters [for=au-own-me] b{color:hsl(0 0% 100%/.7)}#au-own-me:focus-visible~.filters [for=au-own-me]{outline:3px solid hsl(212 90% 45%);outline-offset:2px}
+#au-cat-all:checked~.filters [for=au-cat-all]{background:var(--brand-ink);color:#fff;border-color:var(--brand-ink)}#au-cat-all:checked~.filters [for=au-cat-all] b{color:hsl(0 0% 100%/.7)}#au-cat-all:focus-visible~.filters [for=au-cat-all]{outline:3px solid hsl(212 90% 45%);outline-offset:2px}
+#au-cat-urg:checked~.filters [for=au-cat-urg]{background:var(--brand-ink);color:#fff;border-color:var(--brand-ink)}#au-cat-urg:checked~.filters [for=au-cat-urg] b{color:hsl(0 0% 100%/.7)}#au-cat-urg:focus-visible~.filters [for=au-cat-urg]{outline:3px solid hsl(212 90% 45%);outline-offset:2px}
+#au-cat-agen:checked~.filters [for=au-cat-agen]{background:var(--brand-ink);color:#fff;border-color:var(--brand-ink)}#au-cat-agen:checked~.filters [for=au-cat-agen] b{color:hsl(0 0% 100%/.7)}#au-cat-agen:focus-visible~.filters [for=au-cat-agen]{outline:3px solid hsl(212 90% 45%);outline-offset:2px}
+#au-cat-met:checked~.filters [for=au-cat-met]{background:var(--brand-ink);color:#fff;border-color:var(--brand-ink)}#au-cat-met:checked~.filters [for=au-cat-met] b{color:hsl(0 0% 100%/.7)}#au-cat-met:focus-visible~.filters [for=au-cat-met]{outline:3px solid hsl(212 90% 45%);outline-offset:2px}
+#au-cat-plat:checked~.filters [for=au-cat-plat]{background:var(--brand-ink);color:#fff;border-color:var(--brand-ink)}#au-cat-plat:checked~.filters [for=au-cat-plat] b{color:hsl(0 0% 100%/.7)}#au-cat-plat:focus-visible~.filters [for=au-cat-plat]{outline:3px solid hsl(212 90% 45%);outline-offset:2px}
+#au-cat-out:checked~.filters [for=au-cat-out]{background:var(--brand-ink);color:#fff;border-color:var(--brand-ink)}#au-cat-out:checked~.filters [for=au-cat-out] b{color:hsl(0 0% 100%/.7)}#au-cat-out:focus-visible~.filters [for=au-cat-out]{outline:3px solid hsl(212 90% 45%);outline-offset:2px}
+#au-st-all:checked~.filters [for=au-st-all]{background:var(--brand-ink);color:#fff;border-color:var(--brand-ink)}#au-st-all:checked~.filters [for=au-st-all] b{color:hsl(0 0% 100%/.7)}#au-st-all:focus-visible~.filters [for=au-st-all]{outline:3px solid hsl(212 90% 45%);outline-offset:2px}
+#au-st-ab:checked~.filters [for=au-st-ab]{background:var(--brand-ink);color:#fff;border-color:var(--brand-ink)}#au-st-ab:checked~.filters [for=au-st-ab] b{color:hsl(0 0% 100%/.7)}#au-st-ab:focus-visible~.filters [for=au-st-ab]{outline:3px solid hsl(212 90% 45%);outline-offset:2px}
+#au-st-ea:checked~.filters [for=au-st-ea]{background:var(--brand-ink);color:#fff;border-color:var(--brand-ink)}#au-st-ea:checked~.filters [for=au-st-ea] b{color:hsl(0 0% 100%/.7)}#au-st-ea:focus-visible~.filters [for=au-st-ea]{outline:3px solid hsl(212 90% 45%);outline-offset:2px}
+#au-st-rs:checked~.filters [for=au-st-rs]{background:var(--brand-ink);color:#fff;border-color:var(--brand-ink)}#au-st-rs:checked~.filters [for=au-st-rs] b{color:hsl(0 0% 100%/.7)}#au-st-rs:focus-visible~.filters [for=au-st-rs]{outline:3px solid hsl(212 90% 45%);outline-offset:2px}
+#au-sel-143:checked~.layout .d-143{display:block}
+#au-sel-143:checked~.layout .row-143{box-shadow:inset 0 0 0 2px var(--brand-ink);background:hsl(78 56% 53%/.14)}
+#au-sel-142:checked~.layout .d-142{display:block}
+#au-sel-142:checked~.layout .row-142{box-shadow:inset 0 0 0 2px var(--brand-ink);background:hsl(78 56% 53%/.14)}
+#au-sel-141:checked~.layout .d-141{display:block}
+#au-sel-141:checked~.layout .row-141{box-shadow:inset 0 0 0 2px var(--brand-ink);background:hsl(78 56% 53%/.14)}
+#au-sel-139:checked~.layout .d-139{display:block}
+#au-sel-139:checked~.layout .row-139{box-shadow:inset 0 0 0 2px var(--brand-ink);background:hsl(78 56% 53%/.14)}
+#au-sel-136:checked~.layout .d-136{display:block}
+#au-sel-136:checked~.layout .row-136{box-shadow:inset 0 0 0 2px var(--brand-ink);background:hsl(78 56% 53%/.14)}
+#au-sel-137:checked~.layout .d-137{display:block}
+#au-sel-137:checked~.layout .row-137{box-shadow:inset 0 0 0 2px var(--brand-ink);background:hsl(78 56% 53%/.14)}
+#au-sel-131:checked~.layout .d-131{display:block}
+#au-sel-131:checked~.layout .row-131{box-shadow:inset 0 0 0 2px var(--brand-ink);background:hsl(78 56% 53%/.14)}
+#au-sel-128:checked~.layout .d-128{display:block}
+#au-sel-128:checked~.layout .row-128{box-shadow:inset 0 0 0 2px var(--brand-ink);background:hsl(78 56% 53%/.14)}
+@media (min-width:1024px){#au-sel-none:checked~.layout .d-143{display:block}#au-sel-none:checked~.layout .row-143{box-shadow:inset 0 0 0 2px var(--brand-ink);background:hsl(78 56% 53%/.14)}}
+#me-st-ab:checked~.layout .qrow:not([data-st=ab]){display:none}
+#me-st-ea:checked~.layout .qrow:not([data-st=ea]){display:none}
+#me-st-rs:checked~.layout .qrow:not([data-st=rs]){display:none}
+#me-st-all:checked~.filters [for=me-st-all]{background:var(--brand-ink);color:#fff;border-color:var(--brand-ink)}#me-st-all:checked~.filters [for=me-st-all] b{color:hsl(0 0% 100%/.7)}#me-st-all:focus-visible~.filters [for=me-st-all]{outline:3px solid hsl(212 90% 45%);outline-offset:2px}
+#me-st-ab:checked~.filters [for=me-st-ab]{background:var(--brand-ink);color:#fff;border-color:var(--brand-ink)}#me-st-ab:checked~.filters [for=me-st-ab] b{color:hsl(0 0% 100%/.7)}#me-st-ab:focus-visible~.filters [for=me-st-ab]{outline:3px solid hsl(212 90% 45%);outline-offset:2px}
+#me-st-ea:checked~.filters [for=me-st-ea]{background:var(--brand-ink);color:#fff;border-color:var(--brand-ink)}#me-st-ea:checked~.filters [for=me-st-ea] b{color:hsl(0 0% 100%/.7)}#me-st-ea:focus-visible~.filters [for=me-st-ea]{outline:3px solid hsl(212 90% 45%);outline-offset:2px}
+#me-st-rs:checked~.filters [for=me-st-rs]{background:var(--brand-ink);color:#fff;border-color:var(--brand-ink)}#me-st-rs:checked~.filters [for=me-st-rs] b{color:hsl(0 0% 100%/.7)}#me-st-rs:focus-visible~.filters [for=me-st-rs]{outline:3px solid hsl(212 90% 45%);outline-offset:2px}
+#me-sel-143:checked~.layout .d-143{display:block}
+#me-sel-143:checked~.layout .row-143{box-shadow:inset 0 0 0 2px var(--brand-ink);background:hsl(78 56% 53%/.14)}
+#me-sel-142:checked~.layout .d-142{display:block}
+#me-sel-142:checked~.layout .row-142{box-shadow:inset 0 0 0 2px var(--brand-ink);background:hsl(78 56% 53%/.14)}
+#me-sel-128:checked~.layout .d-128{display:block}
+#me-sel-128:checked~.layout .row-128{box-shadow:inset 0 0 0 2px var(--brand-ink);background:hsl(78 56% 53%/.14)}
+@media (min-width:1024px){#me-sel-none:checked~.layout .d-143{display:block}#me-sel-none:checked~.layout .row-143{box-shadow:inset 0 0 0 2px var(--brand-ink);background:hsl(78 56% 53%/.14)}}
+#jv-st-ab:checked~.layout .qrow:not([data-st=ab]){display:none}
+#jv-st-ea:checked~.layout .qrow:not([data-st=ea]){display:none}
+#jv-st-rs:checked~.layout .qrow:not([data-st=rs]){display:none}
+#jv-st-all:checked~.filters [for=jv-st-all]{background:var(--brand-ink);color:#fff;border-color:var(--brand-ink)}#jv-st-all:checked~.filters [for=jv-st-all] b{color:hsl(0 0% 100%/.7)}#jv-st-all:focus-visible~.filters [for=jv-st-all]{outline:3px solid hsl(212 90% 45%);outline-offset:2px}
+#jv-st-ab:checked~.filters [for=jv-st-ab]{background:var(--brand-ink);color:#fff;border-color:var(--brand-ink)}#jv-st-ab:checked~.filters [for=jv-st-ab] b{color:hsl(0 0% 100%/.7)}#jv-st-ab:focus-visible~.filters [for=jv-st-ab]{outline:3px solid hsl(212 90% 45%);outline-offset:2px}
+#jv-st-ea:checked~.filters [for=jv-st-ea]{background:var(--brand-ink);color:#fff;border-color:var(--brand-ink)}#jv-st-ea:checked~.filters [for=jv-st-ea] b{color:hsl(0 0% 100%/.7)}#jv-st-ea:focus-visible~.filters [for=jv-st-ea]{outline:3px solid hsl(212 90% 45%);outline-offset:2px}
+#jv-st-rs:checked~.filters [for=jv-st-rs]{background:var(--brand-ink);color:#fff;border-color:var(--brand-ink)}#jv-st-rs:checked~.filters [for=jv-st-rs] b{color:hsl(0 0% 100%/.7)}#jv-st-rs:focus-visible~.filters [for=jv-st-rs]{outline:3px solid hsl(212 90% 45%);outline-offset:2px}
+#jv-sel-137:checked~.layout .d-137{display:block}
+#jv-sel-137:checked~.layout .row-137{box-shadow:inset 0 0 0 2px var(--brand-ink);background:hsl(78 56% 53%/.14)}
+#jv-sel-131:checked~.layout .d-131{display:block}
+#jv-sel-131:checked~.layout .row-131{box-shadow:inset 0 0 0 2px var(--brand-ink);background:hsl(78 56% 53%/.14)}
+@media (min-width:1024px){#jv-sel-none:checked~.layout .d-137{display:block}#jv-sel-none:checked~.layout .row-137{box-shadow:inset 0 0 0 2px var(--brand-ink);background:hsl(78 56% 53%/.14)}}</style></head><body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+<symbol id="i-alert" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v6M12 16.5v.5"/></symbol>
+<symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+<symbol id="i-check" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l3 3 5-6"/></symbol>
+<symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/></symbol>
+<symbol id="i-cal" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/></symbol>
+<symbol id="i-book" viewBox="0 0 24 24"><path d="M5 4h10a3 3 0 013 3v13H8a3 3 0 01-3-3V4z"/><path d="M5 17a3 3 0 013-3h10"/></symbol>
+<symbol id="i-monitor" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></symbol>
+<symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13 3L5 14h6l-1 7 8-11h-6l1-7z"/></symbol>
+<symbol id="i-dots" viewBox="0 0 24 24"><circle cx="6" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="18" cy="12" r="1.3"/></symbol>
+<symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+<symbol id="i-eyeoff" viewBox="0 0 24 24"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/><path d="M4 4l16 16"/></symbol>
+<symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5L18 18M18 6l-2.5 2.5M8.5 15.5L6 18"/></symbol>
+<symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+<symbol id="i-send" viewBox="0 0 24 24"><path d="M4 12L20 4l-6 16-3-7-7-1z"/></symbol>
+<symbol id="i-back" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></symbol>
+<symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+<symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4-4"/></symbol>
+<symbol id="i-home" viewBox="0 0 24 24"><path d="M4 11l8-7 8 7v9H4z"/></symbol>
+<symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0113 0M16 5a3.5 3.5 0 010 7M18 14a6.5 6.5 0 013.5 6"/></symbol>
+<symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0116 0"/></symbol>
+<symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"/></symbol>
+<symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.5"/><path d="M5.6 5.6l3.9 3.9M14.5 14.5l3.9 3.9M18.4 5.6l-3.9 3.9M9.5 14.5l-3.9 3.9"/></symbol>
+<symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 7.5v.5"/></symbol>
+<symbol id="i-undo" viewBox="0 0 24 24"><path d="M4 9h11a5 5 0 010 10H8M4 9l4-4M4 9l4 4"/></symbol>
+</defs></svg>
+<input class="sr" type="radio" name="role" id="r-coord" checked><input class="sr" type="radio" name="role" id="r-aux"><input class="sr" type="radio" name="role" id="r-mentor"><input class="sr" type="radio" name="role" id="r-jov">
+<input class="sr" type="radio" name="estado" id="e-has" checked><input class="sr" type="radio" name="estado" id="e-vazio">
+<header class="board-head"><b>MOCKUP · chamados · v4</b><span class="dir">Direção: pedidos de apoio como tickets — fila + detalhe lado a lado (desktop), inbox + página cheia (mobile). Vermelho só sem dono; interno por padrão; plataforma só coordenação.</span><nav><a href="#abrir-chamado">Diálogo</a><a href="#notas">Notas</a></nav></header>
+<div class="viewbar"><div class="vgroup" role="radiogroup" aria-label="Ver como"><span>Ver como:</span><label class="pill" for="r-coord">Coordenação</label><label class="pill" for="r-aux">Auxiliar executivo</label><label class="pill" for="r-mentor">Mentor</label><label class="pill" for="r-jov">Mentorado</label></div>
+<div class="vgroup" role="radiogroup" aria-label="Estado"><span>Estado:</span><label class="pill" for="e-has">Com chamados</label><label class="pill" for="e-vazio">Vazio</label></div></div>
+<div class="views"><div class="v v-coord"><header class="topbar"><div class="in"><div class="brand"><span class="logo">R</span>Realiza.vc</div><nav class="tnav" aria-label="Principal"><a href="#" class="" ><svg class="ic " aria-hidden="true"><use href="#i-home"/></svg>Início</a><a href="#" class="" ><svg class="ic " aria-hidden="true"><use href="#i-users"/></svg>Duplas</a><a href="#" class="" ><svg class="ic " aria-hidden="true"><use href="#i-cal"/></svg>Agenda</a><a href="#" class="" ><svg class="ic " aria-hidden="true"><use href="#i-user"/></svg>Pessoas</a><a href="#" class="" ><svg class="ic " aria-hidden="true"><use href="#i-folder"/></svg>Materiais</a><a href="#" class="on" aria-current="page"><svg class="ic " aria-hidden="true"><use href="#i-help"/></svg>Chamados<span class="bd" aria-label="3 sem dono">3</span></a></nav>
+<div class="me"><span class="av mc " aria-hidden="true">MC</span><div><b>Marina Costa</b><small>Coordenação</small></div></div></div></header>
+<main class="main"><div class="has"><div class="scope"><span><b>Você vê:</b> a fila completa — todas as categorias, inclusive plataforma — e a linha do tempo pública + interna.</span><span class="no"><b>Você pode:</b> assumir, atribuir, resolver, reabrir, devolver à fila. <b>Não existe:</b> “agendar pela dupla”.</span></div>
+<input class="sr sel sel-none" type="radio" name="co-sel" id="co-sel-none" checked><input class="sr sel" type="radio" name="co-sel" id="co-sel-143"><input class="sr sel" type="radio" name="co-sel" id="co-sel-142"><input class="sr sel" type="radio" name="co-sel" id="co-sel-141"><input class="sr sel" type="radio" name="co-sel" id="co-sel-139"><input class="sr sel" type="radio" name="co-sel" id="co-sel-136"><input class="sr sel" type="radio" name="co-sel" id="co-sel-137"><input class="sr sel" type="radio" name="co-sel" id="co-sel-131"><input class="sr sel" type="radio" name="co-sel" id="co-sel-128"><input class="sr" type="radio" name="co-own" id="co-own-all" checked><input class="sr" type="radio" name="co-own" id="co-own-none"><input class="sr" type="radio" name="co-own" id="co-own-me"><input class="sr" type="radio" name="co-cat" id="co-cat-all" checked><input class="sr" type="radio" name="co-cat" id="co-cat-urg"><input class="sr" type="radio" name="co-cat" id="co-cat-agen"><input class="sr" type="radio" name="co-cat" id="co-cat-met"><input class="sr" type="radio" name="co-cat" id="co-cat-plat"><input class="sr" type="radio" name="co-cat" id="co-cat-out"><input class="sr" type="radio" name="co-st" id="co-st-all" checked><input class="sr" type="radio" name="co-st" id="co-st-ab"><input class="sr" type="radio" name="co-st" id="co-st-ea"><input class="sr" type="radio" name="co-st" id="co-st-rs">
+<div class="pagehead"><div><h1>Chamados</h1><p class="sub"><b>8 chamados</b> · 3 sem dono · 3 em atendimento · 2 resolvidos</p></div>
+<div class="oldest"><span class="old red"><svg class="ic " aria-hidden="true"><use href="#i-alert"/></svg><span>Mais antigo sem dono: <b>há 3 d</b> · CHA-000137</span></span><span class="old amb"><svg class="ic " aria-hidden="true"><use href="#i-clock"/></svg><span>Mais antigo em atendimento: <b>há 4 d</b> · CHA-000139</span></span></div>
+<label class="search"><svg class="ic " aria-hidden="true"><use href="#i-search"/></svg><span class="sr">Buscar</span><input type="search" placeholder="Buscar por protocolo, autor, dupla ou assunto"></label></div>
+<div class="filters" role="group" aria-label="Filtros">
+ <div class="frow"><span class="cap">Fila</span><div class="chips"><label class="chip" for="co-own-all">Todos <b>8</b></label><label class="chip" for="co-own-none"><svg class="ic " aria-hidden="true"><use href="#i-alert"/></svg>Sem dono <b>3</b></label><label class="chip" for="co-own-me"><svg class="ic " aria-hidden="true"><use href="#i-user"/></svg>Atribuídos a mim <b>3</b></label></div></div>
+ <div class="frow"><span class="cap">Categoria</span><div class="chips"><label class="chip" for="co-cat-all">Todas</label><label class="chip" for="co-cat-urg"><span class="dot d-urg"></span>Urgência <b>2</b></label><label class="chip" for="co-cat-agen"><span class="dot d-agen"></span>Agenda <b>2</b></label><label class="chip" for="co-cat-met"><span class="dot d-met"></span>Metodologia <b>1</b></label><label class="chip" for="co-cat-plat"><span class="dot d-plat"></span>Plataforma <b>2</b></label><label class="chip" for="co-cat-out"><span class="dot d-out"></span>Outro <b>1</b></label></div></div>
+ <div class="frow"><span class="cap">Status</span><div class="chips"><label class="chip" for="co-st-all">Todos</label><label class="chip" for="co-st-ab"><svg class="ic " aria-hidden="true"><use href="#i-alert"/></svg>Aberto <b>3</b></label><label class="chip" for="co-st-ea"><svg class="ic " aria-hidden="true"><use href="#i-clock"/></svg>Em atendimento <b>3</b></label><label class="chip" for="co-st-rs"><svg class="ic " aria-hidden="true"><use href="#i-check"/></svg>Resolvido <b>2</b></label></div></div></div><div class="layout"><section class="listpane" aria-label="Lista de chamados"><div class="queue"><label for="co-sel-143" class="qrow row-143" data-cat="urg" data-st="ab" data-own="none">
+ <div class="r-top"><span class="proto">CHA-000143</span><span class="cat c-urg"><svg class="ic " aria-hidden="true"><use href="#i-bolt"/></svg>Urgência</span><span class="time">hoje 09:12</span></div>
+ <div class="r-subj">Caio não responde há 9 dias e o encontro 5 é amanhã</div>
+ <div class="r-meta"><span class="who"><span class="av al sm" aria-hidden="true">AL</span>André Lima <span style="font-weight:400;color:var(--mf)">· Mentor DPP</span></span><span>Caio Martins · T2</span></div>
+ <div class="r-foot"><span class="st st-ab"><svg class="ic " aria-hidden="true"><use href="#i-alert"/></svg>Aberto · sem dono</span><span class="nodono"><svg class="ic " aria-hidden="true"><use href="#i-alert"/></svg>Sem dono</span></div></label><label for="co-sel-142" class="qrow row-142" data-cat="agen" data-st="ea" data-own="me">
+ <div class="r-top"><span class="proto">CHA-000142</span><span class="cat c-agen"><svg class="ic " aria-hidden="true"><use href="#i-cal"/></svg>Agenda</span><span class="time">hoje 08:30</span></div>
+ <div class="r-subj">Local do encontro 5 · T2 ainda sem confirmação na Biblioteca</div>
+ <div class="r-meta"><span class="who"><span class="av al sm" aria-hidden="true">AL</span>André Lima <span style="font-weight:400;color:var(--mf)">· Mentor DPP</span></span><span>Caio Martins · T2</span></div>
+ <div class="r-foot"><span class="st st-ea"><svg class="ic " aria-hidden="true"><use href="#i-clock"/></svg>Em atendimento · Marina</span><span class="age"><span class="av mc sm" aria-hidden="true">MC</span></span></div></label><label for="co-sel-141" class="qrow row-141" data-cat="plat" data-st="ab" data-own="none">
+ <div class="r-top"><span class="proto">CHA-000141</span><span class="cat c-plat"><svg class="ic " aria-hidden="true"><use href="#i-monitor"/></svg>Plataforma</span><span class="time">ontem 16:40</span></div>
+ <div class="r-subj">Botão “Propor horário” não responde na sessão com a Luísa</div>
+ <div class="r-meta"><span class="who"><span class="av pr sm" aria-hidden="true">PR</span>Pedro Ramos <span style="font-weight:400;color:var(--mf)">· Mentorado · T2</span></span><span>Pedro Ramos · Renata Gomes · T2</span></div>
+ <div class="r-foot"><span class="st st-ab"><svg class="ic " aria-hidden="true"><use href="#i-alert"/></svg>Aberto · sem dono</span><span class="nodono"><svg class="ic " aria-hidden="true"><use href="#i-alert"/></svg>Sem dono</span></div></label><label for="co-sel-139" class="qrow row-139" data-cat="met" data-st="ea" data-own="other">
+ <div class="r-top"><span class="proto">CHA-000139</span><span class="cat c-met"><svg class="ic " aria-hidden="true"><use href="#i-book"/></svg>Metodologia</span><span class="time">ontem 10:15</span></div>
+ <div class="r-subj">Como registrar sessão de trilha quando o jovem avisa em cima da hora?</div>
+ <div class="r-meta"><span class="who"><span class="av lp sm" aria-hidden="true">LP</span>Luísa Prado <span style="font-weight:400;color:var(--mf)">· Mentora especialista</span></span><span>Ana Souza · trilha Carreira e portfólio</span></div>
+ <div class="r-foot"><span class="st st-ea"><svg class="ic " aria-hidden="true"><use href="#i-clock"/></svg>Em atendimento · Paula</span><span class="age"><span class="av pn sm" aria-hidden="true">PN</span></span></div></label><label for="co-sel-136" class="qrow row-136" data-cat="urg" data-st="ea" data-own="other">
+ <div class="r-top"><span class="proto">CHA-000136</span><span class="cat c-urg"><svg class="ic " aria-hidden="true"><use href="#i-bolt"/></svg>Urgência</span><span class="time">ontem 09:05</span></div>
+ <div class="r-subj">Preciso de apoio — Pedro faltou a dois encontros e a família não responde</div>
+ <div class="r-meta"><span class="who"><span class="av rm sm" aria-hidden="true">RG</span>Renata Gomes <span style="font-weight:400;color:var(--mf)">· Mentora DPP</span></span><span>Pedro Ramos · Renata Gomes · T2</span></div>
+ <div class="r-foot"><span class="st st-ea"><svg class="ic " aria-hidden="true"><use href="#i-clock"/></svg>Em atendimento · Paula</span><span class="age"><span class="av pn sm" aria-hidden="true">PN</span></span></div></label><label for="co-sel-137" class="qrow row-137" data-cat="out" data-st="ab" data-own="none">
+ <div class="r-top"><span class="proto">CHA-000137</span><span class="cat c-out"><svg class="ic " aria-hidden="true"><use href="#i-dots"/></svg>Outro</span><span class="time">sáb 4 out</span></div>
+ <div class="r-subj">Meu sobrenome está errado no cadastro</div>
+ <div class="r-meta"><span class="who"><span class="av as sm" aria-hidden="true">AS</span>Ana Souza <span style="font-weight:400;color:var(--mf)">· Mentorada · T1</span></span><span>Ana Souza · André Lima · T1</span></div>
+ <div class="r-foot"><span class="st st-ab"><svg class="ic " aria-hidden="true"><use href="#i-alert"/></svg>Aberto · sem dono</span><span class="nodono"><svg class="ic " aria-hidden="true"><use href="#i-alert"/></svg>Sem dono</span></div></label><label for="co-sel-131" class="qrow row-131" data-cat="agen" data-st="rs" data-own="me">
+ <div class="r-top"><span class="proto">CHA-000131</span><span class="cat c-agen"><svg class="ic " aria-hidden="true"><use href="#i-cal"/></svg>Agenda</span><span class="time">qui 2 out</span></div>
+ <div class="r-subj">Encontro 7 não aparece na minha agenda</div>
+ <div class="r-meta"><span class="who"><span class="av as sm" aria-hidden="true">AS</span>Ana Souza <span style="font-weight:400;color:var(--mf)">· Mentorada · T1</span></span><span>Ana Souza · André Lima · T1</span></div>
+ <div class="r-foot"><span class="st st-rs"><svg class="ic " aria-hidden="true"><use href="#i-check"/></svg>Resolvido</span><span class="age"><span class="av mc sm" aria-hidden="true">MC</span></span></div></label><label for="co-sel-128" class="qrow row-128" data-cat="plat" data-st="rs" data-own="me">
+ <div class="r-top"><span class="proto">CHA-000128</span><span class="cat c-plat"><svg class="ic " aria-hidden="true"><use href="#i-monitor"/></svg>Plataforma</span><span class="time">ter 30 set</span></div>
+ <div class="r-subj">PDF do PDM não abre</div>
+ <div class="r-meta"><span class="who"><span class="av al sm" aria-hidden="true">AL</span>André Lima <span style="font-weight:400;color:var(--mf)">· Mentor DPP</span></span><span>Ana Souza · André Lima · T1</span></div>
+ <div class="r-foot"><span class="st st-rs"><svg class="ic " aria-hidden="true"><use href="#i-check"/></svg>Resolvido</span><span class="age"><span class="av mc sm" aria-hidden="true">MC</span></span></div></label></div></section><section class="detailpane" aria-label="Detalhe do chamado"><article class="detail d-143"><label class="back" for="co-sel-none"><svg class="ic " aria-hidden="true"><use href="#i-back"/></svg>Voltar à fila</label>
+<div class="d-head"><span class="proto">CHA-000143</span><span class="cat c-urg"><svg class="ic " aria-hidden="true"><use href="#i-bolt"/></svg>Urgência</span><span class="st st-ab"><svg class="ic " aria-hidden="true"><use href="#i-alert"/></svg>Aberto · sem dono</span><span class="time">aberto ter 7 out · 09:12</span></div><h2>Caio não responde há 9 dias e o encontro 5 é amanhã</h2>
+<dl class="facts"><div><dt>Autor</dt><dd><span class="av al sm" aria-hidden="true">AL</span>André Lima<span style="font-weight:400;color:var(--mf)">· Mentor DPP</span></dd></div>
+<div><dt>Dupla</dt><dd>Caio Martins · T2 <span class="sem at">▲ Atenção</span></dd></div>
+<div><dt>Responsável</dt><dd><span class="nodono"><svg class="ic " aria-hidden="true"><use href="#i-alert"/></svg>Ninguém assumiu</span></dd></div>
+<div><dt>Origem</dt><dd style="font-weight:500">Aberto no app</dd></div></dl>
+<div class="actions"><span class="btn pri" role="button" tabindex="0"><svg class="ic " aria-hidden="true"><use href="#i-user"/></svg>Assumir</span><details class="assign"><summary class="btn"><svg class="ic " aria-hidden="true"><use href="#i-user"/></svg>Atribuir a… ▾</summary><ul>
+   <li><span class="av mc sm" aria-hidden="true">MC</span>Marina Costa<small>Coordenação</small></li>
+   <li><span class="av pn sm" aria-hidden="true">PN</span>Paula Nunes<small>Auxiliar executivo</small></li></ul></details><span class="btn" role="button" tabindex="0"><svg class="ic " aria-hidden="true"><use href="#i-check"/></svg>Resolver</span></div><p class="actnote"><svg class="ic " aria-hidden="true"><use href="#i-lock"/></svg><span>Assumir tira o chamado do vermelho: ele segue visível como “em atendimento” com você como dono.</span></p>
+<div class="msg"><h3>Pedido original</h3><p>Tentei WhatsApp e ligação desde o dia 28. A mãe também não atende. O encontro 5 · T2 é amanhã (qua 19h) e o registro do encontro 4 ainda está pendente. Preciso de orientação sobre como proceder.</p></div>
+
+<div class="tlh"><h3>Linha do tempo</h3><div class="legend" aria-label="Legenda da linha do tempo"><span><span class="tag pub"><svg class="ic " aria-hidden="true"><use href="#i-eye"/></svg>Público</span> o autor vê e é notificado</span><span><span class="tag int"><svg class="ic " aria-hidden="true"><use href="#i-eyeoff"/></svg>Interno</span> só a equipe</span><span><span class="tag sys"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg>Automático</span> eventos do sistema (públicos)</span></div></div>
+<ol class="timeline"><li class="ev sys"><span class="dot"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg></span><div class="evb"><div class="evh"><span class="tag sys"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg>Automático · público</span><time>07 out · 09:12</time></div><p>Chamado aberto por André Lima.</p></div></li><li class="ev sys"><span class="dot"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg></span><div class="evb"><div class="evh"><span class="tag sys"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg>Automático · público</span><time>07 out · 09:12</time></div><p>Urgência: Marina Costa e Paula Nunes foram notificadas (e-mail + app). Quem assumir primeiro trata.</p></div></li></ol>
+<div class="composer"><div class="tlh" style="margin-top:20px"><h3>Responder</h3></div>
+<input class="sr r-int" type="radio" name="cm-co-143" id="cm-co-143-i" checked><input class="sr r-pub" type="radio" name="cm-co-143" id="cm-co-143-p">
+<div class="tabs" role="presentation"><label class="tab t-int" for="cm-co-143-i"><svg class="ic " aria-hidden="true"><use href="#i-eyeoff"/></svg><span>Comentário interno<small>padrão · só a equipe</small></span></label><label class="tab t-pub" for="cm-co-143-p"><svg class="ic " aria-hidden="true"><use href="#i-eye"/></svg><span>Atualização pública<small>André vê</small></span></label></div>
+<div class="cbody"><label class="sr" for="tx-co-143">Mensagem</label><textarea id="tx-co-143" placeholder="Escreva aqui…" rows="3"></textarea>
+<p class="hint h-int"><svg class="ic " aria-hidden="true"><use href="#i-eyeoff"/></svg><span><b>Só a equipe vê.</b> André não é notificado e não enxerga este comentário.</span></p>
+<p class="hint h-pub"><svg class="ic " aria-hidden="true"><use href="#i-eye"/></svg><span><b>Visível para André Lima</b> e notificado por e-mail e no app. Evite dados sensíveis de terceiros.</span></p>
+<div class="cfoot"><span class="btn" role="button" tabindex="0">Anexar arquivo</span><span class="btn dark b-int" role="button" tabindex="0"><svg class="ic " aria-hidden="true"><use href="#i-send"/></svg>Comentar internamente</span><span class="btn pri b-pub" role="button" tabindex="0"><svg class="ic " aria-hidden="true"><use href="#i-send"/></svg>Publicar atualização</span></div></div></div>
+</article><article class="detail d-142"><label class="back" for="co-sel-none"><svg class="ic " aria-hidden="true"><use href="#i-back"/></svg>Voltar à fila</label>
+<div class="d-head"><span class="proto">CHA-000142</span><span class="cat c-agen"><svg class="ic " aria-hidden="true"><use href="#i-cal"/></svg>Agenda</span><span class="st st-ea"><svg class="ic " aria-hidden="true"><use href="#i-clock"/></svg>Em atendimento · Marina</span><span class="time">aberto seg 6 out · 14:20</span></div><h2>Local do encontro 5 · T2 ainda sem confirmação na Biblioteca</h2>
+<dl class="facts"><div><dt>Autor</dt><dd><span class="av al sm" aria-hidden="true">AL</span>André Lima<span style="font-weight:400;color:var(--mf)">· Mentor DPP</span></dd></div>
+<div><dt>Dupla</dt><dd>Caio Martins · T2 <span class="sem at">▲ Atenção</span></dd></div>
+<div><dt>Responsável</dt><dd><span class="av mc sm" aria-hidden="true">MC</span>Marina Costa</dd></div>
+<div><dt>Origem</dt><dd style="font-weight:500">Aberto no app</dd></div></dl>
+<div class="actions"><span class="btn pri" role="button" tabindex="0"><svg class="ic " aria-hidden="true"><use href="#i-check"/></svg>Resolver</span><details class="assign"><summary class="btn"><svg class="ic " aria-hidden="true"><use href="#i-user"/></svg>Atribuir a… ▾</summary><ul>
+   <li><span class="av mc sm" aria-hidden="true">MC</span>Marina Costa<small>Coordenação</small></li>
+   <li><span class="av pn sm" aria-hidden="true">PN</span>Paula Nunes<small>Auxiliar executivo</small></li></ul></details><span class="btn" role="button" tabindex="0"><svg class="ic " aria-hidden="true"><use href="#i-undo"/></svg>Devolver à fila</span></div>
+<div class="msg"><h3>Pedido original</h3><p>A Biblioteca Comunitária ainda não confirmou a sala para o encontro 5 de amanhã (qua 19h). Se não confirmar, o Caio fica sem lugar. Pode ajudar a validar ou sugerir outro local?</p></div>
+
+<div class="tlh"><h3>Linha do tempo</h3><div class="legend" aria-label="Legenda da linha do tempo"><span><span class="tag pub"><svg class="ic " aria-hidden="true"><use href="#i-eye"/></svg>Público</span> o autor vê e é notificado</span><span><span class="tag int"><svg class="ic " aria-hidden="true"><use href="#i-eyeoff"/></svg>Interno</span> só a equipe</span><span><span class="tag sys"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg>Automático</span> eventos do sistema (públicos)</span></div></div>
+<ol class="timeline"><li class="ev sys"><span class="dot"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg></span><div class="evb"><div class="evh"><span class="tag sys"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg>Automático · público</span><time>06 out · 14:20</time></div><p>Chamado aberto por André Lima.</p></div></li><li class="ev sys"><span class="dot"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg></span><div class="evb"><div class="evh"><span class="tag sys"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg>Automático · público</span><time>06 out · 15:02</time></div><p>Marina Costa assumiu — em atendimento.</p></div></li><li class="ev pub"><span class="dot"><svg class="ic " aria-hidden="true"><use href="#i-eye"/></svg></span><div class="evb"><div class="evh"><b>Marina Costa</b><span class="tag pub"><svg class="ic " aria-hidden="true"><use href="#i-eye"/></svg>Público · autor vê</span><time>06 out · 15:10</time></div><p>Oi, André! Estou confirmando a sala com a Biblioteca Comunitária. Te retorno aqui até amanhã às 12h.</p></div></li><li class="ev int"><span class="dot"><svg class="ic " aria-hidden="true"><use href="#i-eyeoff"/></svg></span><div class="evb"><div class="evh"><b>Marina Costa</b><span class="tag int"><svg class="ic " aria-hidden="true"><use href="#i-eyeoff"/></svg>Interno · só equipe</span><time>06 out · 15:12</time></div><p>Biblioteca só confirma por telefone — ligar às 10h. Plano B: Sede Realiza, sala 2, livre qua 19h.</p></div></li><li class="ev int"><span class="dot"><svg class="ic " aria-hidden="true"><use href="#i-eyeoff"/></svg></span><div class="evb"><div class="evh"><b>Paula Nunes</b><span class="tag int"><svg class="ic " aria-hidden="true"><use href="#i-eyeoff"/></svg>Interno · só equipe</span><time>07 out · 08:30</time></div><p>Posso avisar a família do Caio na supervisão de hoje 12h30 com o André? Assim já alinhamos o local.</p></div></li></ol>
+<div class="composer"><div class="tlh" style="margin-top:20px"><h3>Responder</h3></div>
+<input class="sr r-int" type="radio" name="cm-co-142" id="cm-co-142-i" checked><input class="sr r-pub" type="radio" name="cm-co-142" id="cm-co-142-p">
+<div class="tabs" role="presentation"><label class="tab t-int" for="cm-co-142-i"><svg class="ic " aria-hidden="true"><use href="#i-eyeoff"/></svg><span>Comentário interno<small>padrão · só a equipe</small></span></label><label class="tab t-pub" for="cm-co-142-p"><svg class="ic " aria-hidden="true"><use href="#i-eye"/></svg><span>Atualização pública<small>André vê</small></span></label></div>
+<div class="cbody"><label class="sr" for="tx-co-142">Mensagem</label><textarea id="tx-co-142" placeholder="Escreva aqui…" rows="3"></textarea>
+<p class="hint h-int"><svg class="ic " aria-hidden="true"><use href="#i-eyeoff"/></svg><span><b>Só a equipe vê.</b> André não é notificado e não enxerga este comentário.</span></p>
+<p class="hint h-pub"><svg class="ic " aria-hidden="true"><use href="#i-eye"/></svg><span><b>Visível para André Lima</b> e notificado por e-mail e no app. Evite dados sensíveis de terceiros.</span></p>
+<div class="cfoot"><span class="btn" role="button" tabindex="0">Anexar arquivo</span><span class="btn dark b-int" role="button" tabindex="0"><svg class="ic " aria-hidden="true"><use href="#i-send"/></svg>Comentar internamente</span><span class="btn pri b-pub" role="button" tabindex="0"><svg class="ic " aria-hidden="true"><use href="#i-send"/></svg>Publicar atualização</span></div></div></div>
+</article><article class="detail d-141"><label class="back" for="co-sel-none"><svg class="ic " aria-hidden="true"><use href="#i-back"/></svg>Voltar à fila</label>
+<div class="d-head"><span class="proto">CHA-000141</span><span class="cat c-plat"><svg class="ic " aria-hidden="true"><use href="#i-monitor"/></svg>Plataforma</span><span class="st st-ab"><svg class="ic " aria-hidden="true"><use href="#i-alert"/></svg>Aberto · sem dono</span><span class="time">aberto seg 6 out · 16:40</span></div><h2>Botão “Propor horário” não responde na sessão com a Luísa</h2>
+<dl class="facts"><div><dt>Autor</dt><dd><span class="av pr sm" aria-hidden="true">PR</span>Pedro Ramos<span style="font-weight:400;color:var(--mf)">· Mentorado · T2</span></dd></div>
+<div><dt>Dupla</dt><dd>Pedro Ramos · Renata Gomes · T2 <span class="sem rs">◆ Risco</span></dd></div>
+<div><dt>Responsável</dt><dd><span class="nodono"><svg class="ic " aria-hidden="true"><use href="#i-alert"/></svg>Ninguém assumiu</span></dd></div>
+<div><dt>Origem</dt><dd style="font-weight:500">Aberto no app</dd></div></dl>
+<div class="actions"><span class="btn pri" role="button" tabindex="0"><svg class="ic " aria-hidden="true"><use href="#i-user"/></svg>Assumir</span><details class="assign"><summary class="btn"><svg class="ic " aria-hidden="true"><use href="#i-user"/></svg>Atribuir a… ▾</summary><ul>
+   <li><span class="av mc sm" aria-hidden="true">MC</span>Marina Costa<small>Coordenação</small></li>
+   <li class="off" aria-disabled="true"><span class="av pn sm" aria-hidden="true">PN</span><span>Paula Nunes<small>Plataforma é só coordenação</small></span></li></ul></details><span class="btn" role="button" tabindex="0"><svg class="ic " aria-hidden="true"><use href="#i-check"/></svg>Resolver</span></div><p class="actnote"><svg class="ic " aria-hidden="true"><use href="#i-lock"/></svg><span>Assumir tira o chamado do vermelho: ele segue visível como “em atendimento” com você como dono.</span></p>
+<div class="msg"><h3>Pedido original</h3><p>Escolhi quinta 18h para a sessão 1 com a Luísa, mas quando toco em “Propor horário” nada acontece. Já tentei no celular e no computador.</p></div>
+
+<div class="tlh"><h3>Linha do tempo</h3><div class="legend" aria-label="Legenda da linha do tempo"><span><span class="tag pub"><svg class="ic " aria-hidden="true"><use href="#i-eye"/></svg>Público</span> o autor vê e é notificado</span><span><span class="tag int"><svg class="ic " aria-hidden="true"><use href="#i-eyeoff"/></svg>Interno</span> só a equipe</span><span><span class="tag sys"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg>Automático</span> eventos do sistema (públicos)</span></div></div>
+<ol class="timeline"><li class="ev sys"><span class="dot"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg></span><div class="evb"><div class="evh"><span class="tag sys"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg>Automático · público</span><time>06 out · 16:40</time></div><p>Chamado aberto por Pedro Ramos.</p></div></li><li class="ev sys"><span class="dot"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg></span><div class="evb"><div class="evh"><span class="tag sys"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg>Automático · público</span><time>06 out · 16:40</time></div><p>Categoria plataforma: visível só para a coordenação.</p></div></li></ol>
+<div class="composer"><div class="tlh" style="margin-top:20px"><h3>Responder</h3></div>
+<input class="sr r-int" type="radio" name="cm-co-141" id="cm-co-141-i" checked><input class="sr r-pub" type="radio" name="cm-co-141" id="cm-co-141-p">
+<div class="tabs" role="presentation"><label class="tab t-int" for="cm-co-141-i"><svg class="ic " aria-hidden="true"><use href="#i-eyeoff"/></svg><span>Comentário interno<small>padrão · só a equipe</small></span></label><label class="tab t-pub" for="cm-co-141-p"><svg class="ic " aria-hidden="true"><use href="#i-eye"/></svg><span>Atualização pública<small>Pedro vê</small></span></label></div>
+<div class="cbody"><label class="sr" for="tx-co-141">Mensagem</label><textarea id="tx-co-141" placeholder="Escreva aqui…" rows="3"></textarea>
+<p class="hint h-int"><svg class="ic " aria-hidden="true"><use href="#i-eyeoff"/></svg><span><b>Só a equipe vê.</b> Pedro não é notificado e não enxerga este comentário.</span></p>
+<p class="hint h-pub"><svg class="ic " aria-hidden="true"><use href="#i-eye"/></svg><span><b>Visível para Pedro Ramos</b> e notificado por e-mail e no app. Evite dados sensíveis de terceiros.</span></p>
+<div class="cfoot"><span class="btn" role="button" tabindex="0">Anexar arquivo</span><span class="btn dark b-int" role="button" tabindex="0"><svg class="ic " aria-hidden="true"><use href="#i-send"/></svg>Comentar internamente</span><span class="btn pri b-pub" role="button" tabindex="0"><svg class="ic " aria-hidden="true"><use href="#i-send"/></svg>Publicar atualização</span></div></div></div>
+</article><article class="detail d-139"><label class="back" for="co-sel-none"><svg class="ic " aria-hidden="true"><use href="#i-back"/></svg>Voltar à fila</label>
+<div class="d-head"><span class="proto">CHA-000139</span><span class="cat c-met"><svg class="ic " aria-hidden="true"><use href="#i-book"/></svg>Metodologia</span><span class="st st-ea"><svg class="ic " aria-hidden="true"><use href="#i-clock"/></svg>Em atendimento · Paula</span><span class="time">aberto sex 3 out · 11:30</span></div><h2>Como registrar sessão de trilha quando o jovem avisa em cima da hora?</h2>
+<dl class="facts"><div><dt>Autor</dt><dd><span class="av lp sm" aria-hidden="true">LP</span>Luísa Prado<span style="font-weight:400;color:var(--mf)">· Mentora especialista</span></dd></div>
+<div><dt>Dupla</dt><dd>Ana Souza · trilha Carreira e portfólio <span class="sem ok">● Em andamento</span></dd></div>
+<div><dt>Responsável</dt><dd><span class="av pn sm" aria-hidden="true">PN</span>Paula Nunes</dd></div>
+<div><dt>Origem</dt><dd style="font-weight:500">Aberto no app</dd></div></dl>
+<div class="actions"><span class="btn pri" role="button" tabindex="0"><svg class="ic " aria-hidden="true"><use href="#i-user"/></svg>Assumir de Paula</span><details class="assign"><summary class="btn"><svg class="ic " aria-hidden="true"><use href="#i-user"/></svg>Atribuir a… ▾</summary><ul>
+   <li><span class="av mc sm" aria-hidden="true">MC</span>Marina Costa<small>Coordenação</small></li>
+   <li><span class="av pn sm" aria-hidden="true">PN</span>Paula Nunes<small>Auxiliar executivo</small></li></ul></details><span class="btn" role="button" tabindex="0"><svg class="ic " aria-hidden="true"><use href="#i-undo"/></svg>Devolver à fila</span><span class="btn" role="button" tabindex="0"><svg class="ic " aria-hidden="true"><use href="#i-check"/></svg>Resolver</span></div>
+<div class="msg"><h3>Pedido original</h3><p>A Ana avisou 1h antes que não conseguiria a sessão. Registro como “não aconteceu”? Isso conta como uma das 5 sessões da trilha?</p></div>
+
+<div class="tlh"><h3>Linha do tempo</h3><div class="legend" aria-label="Legenda da linha do tempo"><span><span class="tag pub"><svg class="ic " aria-hidden="true"><use href="#i-eye"/></svg>Público</span> o autor vê e é notificado</span><span><span class="tag int"><svg class="ic " aria-hidden="true"><use href="#i-eyeoff"/></svg>Interno</span> só a equipe</span><span><span class="tag sys"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg>Automático</span> eventos do sistema (públicos)</span></div></div>
+<ol class="timeline"><li class="ev sys"><span class="dot"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg></span><div class="evb"><div class="evh"><span class="tag sys"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg>Automático · público</span><time>03 out · 11:30</time></div><p>Chamado aberto por Luísa Prado.</p></div></li><li class="ev sys"><span class="dot"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg></span><div class="evb"><div class="evh"><span class="tag sys"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg>Automático · público</span><time>03 out · 14:00</time></div><p>Paula Nunes assumiu — em atendimento.</p></div></li><li class="ev int"><span class="dot"><svg class="ic " aria-hidden="true"><use href="#i-eyeoff"/></svg></span><div class="evb"><div class="evh"><b>Paula Nunes</b><span class="tag int"><svg class="ic " aria-hidden="true"><use href="#i-eyeoff"/></svg>Interno · só equipe</span><time>03 out · 14:05</time></div><p>Pelo guia, falta com menos de 24h = “não aconteceu” sem penalidade. Confirmar com a Marina se a sessão é reposta.</p></div></li><li class="ev pub"><span class="dot"><svg class="ic " aria-hidden="true"><use href="#i-eye"/></svg></span><div class="evb"><div class="evh"><b>Paula Nunes</b><span class="tag pub"><svg class="ic " aria-hidden="true"><use href="#i-eye"/></svg>Público · autor vê</span><time>06 out · 10:15</time></div><p>Luísa, registre como “não aconteceu” com o motivo e proponha um novo horário dentro da sua grade. A sessão não é descontada das 5. Se repetir, me avise.</p></div></li></ol>
+<div class="composer"><div class="tlh" style="margin-top:20px"><h3>Responder</h3></div>
+<input class="sr r-int" type="radio" name="cm-co-139" id="cm-co-139-i" checked><input class="sr r-pub" type="radio" name="cm-co-139" id="cm-co-139-p">
+<div class="tabs" role="presentation"><label class="tab t-int" for="cm-co-139-i"><svg class="ic " aria-hidden="true"><use href="#i-eyeoff"/></svg><span>Comentário interno<small>padrão · só a equipe</small></span></label><label class="tab t-pub" for="cm-co-139-p"><svg class="ic " aria-hidden="true"><use href="#i-eye"/></svg><span>Atualização pública<small>Luísa vê</small></span></label></div>
+<div class="cbody"><label class="sr" for="tx-co-139">Mensagem</label><textarea id="tx-co-139" placeholder="Escreva aqui…" rows="3"></textarea>
+<p class="hint h-int"><svg class="ic " aria-hidden="true"><use href="#i-eyeoff"/></svg><span><b>Só a equipe vê.</b> Luísa não é notificado e não enxerga este comentário.</span></p>
+<p class="hint h-pub"><svg class="ic " aria-hidden="true"><use href="#i-eye"/></svg><span><b>Visível para Luísa Prado</b> e notificado por e-mail e no app. Evite dados sensíveis de terceiros.</span></p>
+<div class="cfoot"><span class="btn" role="button" tabindex="0">Anexar arquivo</span><span class="btn dark b-int" role="button" tabindex="0"><svg class="ic " aria-hidden="true"><use href="#i-send"/></svg>Comentar internamente</span><span class="btn pri b-pub" role="button" tabindex="0"><svg class="ic " aria-hidden="true"><use href="#i-send"/></svg>Publicar atualização</span></div></div></div>
+</article><article class="detail d-136"><label class="back" for="co-sel-none"><svg class="ic " aria-hidden="true"><use href="#i-back"/></svg>Voltar à fila</label>
+<div class="d-head"><span class="proto">CHA-000136</span><span class="cat c-urg"><svg class="ic " aria-hidden="true"><use href="#i-bolt"/></svg>Urgência</span><span class="st st-ea"><svg class="ic " aria-hidden="true"><use href="#i-clock"/></svg>Em atendimento · Paula</span><span class="time">aberto dom 5 out · 20:10</span></div><h2>Preciso de apoio — Pedro faltou a dois encontros e a família não responde</h2>
+<dl class="facts"><div><dt>Autor</dt><dd><span class="av rm sm" aria-hidden="true">RG</span>Renata Gomes<span style="font-weight:400;color:var(--mf)">· Mentora DPP</span></dd></div>
+<div><dt>Dupla</dt><dd>Pedro Ramos · Renata Gomes · T2 <span class="sem rs">◆ Risco</span></dd></div>
+<div><dt>Responsável</dt><dd><span class="av pn sm" aria-hidden="true">PN</span>Paula Nunes</dd></div>
+<div><dt>Origem</dt><dd style="font-weight:500">Aberto automaticamente · “Preciso de apoio” no registro do encontro 6</dd></div></dl>
+<div class="actions"><span class="btn pri" role="button" tabindex="0"><svg class="ic " aria-hidden="true"><use href="#i-user"/></svg>Assumir de Paula</span><details class="assign"><summary class="btn"><svg class="ic " aria-hidden="true"><use href="#i-user"/></svg>Atribuir a… ▾</summary><ul>
+   <li><span class="av mc sm" aria-hidden="true">MC</span>Marina Costa<small>Coordenação</small></li>
+   <li><span class="av pn sm" aria-hidden="true">PN</span>Paula Nunes<small>Auxiliar executivo</small></li></ul></details><span class="btn" role="button" tabindex="0"><svg class="ic " aria-hidden="true"><use href="#i-undo"/></svg>Devolver à fila</span><span class="btn" role="button" tabindex="0"><svg class="ic " aria-hidden="true"><use href="#i-check"/></svg>Resolver</span></div>
+<div class="msg"><h3>Pedido original</h3><p>Chamado criado a partir do registro do encontro 6 (Pedro Ramos): “Preciso de apoio” marcado pela mentora Renata Gomes. Dificuldade registrada: dois encontros seguidos não aconteceram; sem retorno da família.</p></div>
+
+<div class="tlh"><h3>Linha do tempo</h3><div class="legend" aria-label="Legenda da linha do tempo"><span><span class="tag pub"><svg class="ic " aria-hidden="true"><use href="#i-eye"/></svg>Público</span> o autor vê e é notificado</span><span><span class="tag int"><svg class="ic " aria-hidden="true"><use href="#i-eyeoff"/></svg>Interno</span> só a equipe</span><span><span class="tag sys"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg>Automático</span> eventos do sistema (públicos)</span></div></div>
+<ol class="timeline"><li class="ev sys"><span class="dot"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg></span><div class="evb"><div class="evh"><span class="tag sys"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg>Automático · público</span><time>05 out · 20:10</time></div><p>Chamado aberto automaticamente pelo registro do encontro 6.</p></div></li><li class="ev sys"><span class="dot"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg></span><div class="evb"><div class="evh"><span class="tag sys"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg>Automático · público</span><time>05 out · 20:10</time></div><p>Urgência: Marina Costa e Paula Nunes foram notificadas.</p></div></li><li class="ev sys"><span class="dot"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg></span><div class="evb"><div class="evh"><span class="tag sys"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg>Automático · público</span><time>05 out · 21:00</time></div><p>Paula Nunes assumiu — em atendimento.</p></div></li><li class="ev pub"><span class="dot"><svg class="ic " aria-hidden="true"><use href="#i-eye"/></svg></span><div class="evb"><div class="evh"><b>Paula Nunes</b><span class="tag pub"><svg class="ic " aria-hidden="true"><use href="#i-eye"/></svg>Público · autor vê</span><time>06 out · 09:00</time></div><p>Renata, vou ligar para a família do Pedro hoje e aviso aqui o resultado.</p></div></li><li class="ev int"><span class="dot"><svg class="ic " aria-hidden="true"><use href="#i-eyeoff"/></svg></span><div class="evb"><div class="evh"><b>Paula Nunes</b><span class="tag int"><svg class="ic " aria-hidden="true"><use href="#i-eyeoff"/></svg>Interno · só equipe</span><time>06 out · 09:05</time></div><p>Responsável já pediu antes para evitar WhatsApp à noite — ligar entre 12h e 14h.</p></div></li></ol>
+<div class="composer"><div class="tlh" style="margin-top:20px"><h3>Responder</h3></div>
+<input class="sr r-int" type="radio" name="cm-co-136" id="cm-co-136-i" checked><input class="sr r-pub" type="radio" name="cm-co-136" id="cm-co-136-p">
+<div class="tabs" role="presentation"><label class="tab t-int" for="cm-co-136-i"><svg class="ic " aria-hidden="true"><use href="#i-eyeoff"/></svg><span>Comentário interno<small>padrão · só a equipe</small></span></label><label class="tab t-pub" for="cm-co-136-p"><svg class="ic " aria-hidden="true"><use href="#i-eye"/></svg><span>Atualização pública<small>Renata vê</small></span></label></div>
+<div class="cbody"><label class="sr" for="tx-co-136">Mensagem</label><textarea id="tx-co-136" placeholder="Escreva aqui…" rows="3"></textarea>
+<p class="hint h-int"><svg class="ic " aria-hidden="true"><use href="#i-eyeoff"/></svg><span><b>Só a equipe vê.</b> Renata não é notificado e não enxerga este comentário.</span></p>
+<p class="hint h-pub"><svg class="ic " aria-hidden="true"><use href="#i-eye"/></svg><span><b>Visível para Renata Gomes</b> e notificado por e-mail e no app. Evite dados sensíveis de terceiros.</span></p>
+<div class="cfoot"><span class="btn" role="button" tabindex="0">Anexar arquivo</span><span class="btn dark b-int" role="button" tabindex="0"><svg class="ic " aria-hidden="true"><use href="#i-send"/></svg>Comentar internamente</span><span class="btn pri b-pub" role="button" tabindex="0"><svg class="ic " aria-hidden="true"><use href="#i-send"/></svg>Publicar atualização</span></div></div></div>
+</article><article class="detail d-137"><label class="back" for="co-sel-none"><svg class="ic " aria-hidden="true"><use href="#i-back"/></svg>Voltar à fila</label>
+<div class="d-head"><span class="proto">CHA-000137</span><span class="cat c-out"><svg class="ic " aria-hidden="true"><use href="#i-dots"/></svg>Outro</span><span class="st st-ab"><svg class="ic " aria-hidden="true"><use href="#i-alert"/></svg>Aberto · sem dono</span><span class="time">aberto sáb 4 out · 10:05</span></div><h2>Meu sobrenome está errado no cadastro</h2>
+<dl class="facts"><div><dt>Autor</dt><dd><span class="av as sm" aria-hidden="true">AS</span>Ana Souza<span style="font-weight:400;color:var(--mf)">· Mentorada · T1</span></dd></div>
+<div><dt>Dupla</dt><dd>Ana Souza · André Lima · T1 <span class="sem ok">● Em andamento</span></dd></div>
+<div><dt>Responsável</dt><dd><span class="nodono"><svg class="ic " aria-hidden="true"><use href="#i-alert"/></svg>Ninguém assumiu</span></dd></div>
+<div><dt>Origem</dt><dd style="font-weight:500">Aberto no app</dd></div></dl>
+<div class="actions"><span class="btn pri" role="button" tabindex="0"><svg class="ic " aria-hidden="true"><use href="#i-user"/></svg>Assumir</span><details class="assign"><summary class="btn"><svg class="ic " aria-hidden="true"><use href="#i-user"/></svg>Atribuir a… ▾</summary><ul>
+   <li><span class="av mc sm" aria-hidden="true">MC</span>Marina Costa<small>Coordenação</small></li>
+   <li><span class="av pn sm" aria-hidden="true">PN</span>Paula Nunes<small>Auxiliar executivo</small></li></ul></details><span class="btn" role="button" tabindex="0"><svg class="ic " aria-hidden="true"><use href="#i-check"/></svg>Resolver</span></div><p class="actnote"><svg class="ic " aria-hidden="true"><use href="#i-lock"/></svg><span>Assumir tira o chamado do vermelho: ele segue visível como “em atendimento” com você como dono.</span></p>
+<div class="msg"><h3>Pedido original</h3><p>No meu perfil aparece “Sousa”, mas o certo é “Souza” com z. Dá para corrigir antes de sair o certificado?</p><p class="short"><b>Descrição curta (obrigatória em “Outro”):</b> Sobrenome grafado errado no perfil (Sousa → Souza).</p></div>
+
+<div class="tlh"><h3>Linha do tempo</h3><div class="legend" aria-label="Legenda da linha do tempo"><span><span class="tag pub"><svg class="ic " aria-hidden="true"><use href="#i-eye"/></svg>Público</span> o autor vê e é notificado</span><span><span class="tag int"><svg class="ic " aria-hidden="true"><use href="#i-eyeoff"/></svg>Interno</span> só a equipe</span><span><span class="tag sys"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg>Automático</span> eventos do sistema (públicos)</span></div></div>
+<ol class="timeline"><li class="ev sys"><span class="dot"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg></span><div class="evb"><div class="evh"><span class="tag sys"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg>Automático · público</span><time>04 out · 10:05</time></div><p>Chamado aberto por Ana Souza.</p></div></li></ol>
+<div class="composer"><div class="tlh" style="margin-top:20px"><h3>Responder</h3></div>
+<input class="sr r-int" type="radio" name="cm-co-137" id="cm-co-137-i" checked><input class="sr r-pub" type="radio" name="cm-co-137" id="cm-co-137-p">
+<div class="tabs" role="presentation"><label class="tab t-int" for="cm-co-137-i"><svg class="ic " aria-hidden="true"><use href="#i-eyeoff"/></svg><span>Comentário interno<small>padrão · só a equipe</small></span></label><label class="tab t-pub" for="cm-co-137-p"><svg class="ic " aria-hidden="true"><use href="#i-eye"/></svg><span>Atualização pública<small>Ana vê</small></span></label></div>
+<div class="cbody"><label class="sr" for="tx-co-137">Mensagem</label><textarea id="tx-co-137" placeholder="Escreva aqui…" rows="3"></textarea>
+<p class="hint h-int"><svg class="ic " aria-hidden="true"><use href="#i-eyeoff"/></svg><span><b>Só a equipe vê.</b> Ana não é notificado e não enxerga este comentário.</span></p>
+<p class="hint h-pub"><svg class="ic " aria-hidden="true"><use href="#i-eye"/></svg><span><b>Visível para Ana Souza</b> e notificado por e-mail e no app. Evite dados sensíveis de terceiros.</span></p>
+<div class="cfoot"><span class="btn" role="button" tabindex="0">Anexar arquivo</span><span class="btn dark b-int" role="button" tabindex="0"><svg class="ic " aria-hidden="true"><use href="#i-send"/></svg>Comentar internamente</span><span class="btn pri b-pub" role="button" tabindex="0"><svg class="ic " aria-hidden="true"><use href="#i-send"/></svg>Publicar atualização</span></div></div></div>
+</article><article class="detail d-131"><label class="back" for="co-sel-none"><svg class="ic " aria-hidden="true"><use href="#i-back"/></svg>Voltar à fila</label>
+<div class="d-head"><span class="proto">CHA-000131</span><span class="cat c-agen"><svg class="ic " aria-hidden="true"><use href="#i-cal"/></svg>Agenda</span><span class="st st-rs"><svg class="ic " aria-hidden="true"><use href="#i-check"/></svg>Resolvido</span><span class="time">aberto qua 1 out · 18:40</span></div><h2>Encontro 7 não aparece na minha agenda</h2>
+<dl class="facts"><div><dt>Autor</dt><dd><span class="av as sm" aria-hidden="true">AS</span>Ana Souza<span style="font-weight:400;color:var(--mf)">· Mentorada · T1</span></dd></div>
+<div><dt>Dupla</dt><dd>Ana Souza · André Lima · T1 <span class="sem ok">● Em andamento</span></dd></div>
+<div><dt>Responsável</dt><dd><span class="av mc sm" aria-hidden="true">MC</span>Marina Costa</dd></div>
+<div><dt>Origem</dt><dd style="font-weight:500">Aberto no app</dd></div></dl>
+<div class="actions"><span class="btn dark" role="button" tabindex="0"><svg class="ic " aria-hidden="true"><use href="#i-undo"/></svg>Reabrir</span></div><p class="actnote"><svg class="ic " aria-hidden="true"><use href="#i-lock"/></svg><span>Reabrir devolve o chamado a “em atendimento” com o mesmo dono e avisa o autor.</span></p>
+<div class="msg"><h3>Pedido original</h3><p>O encontro 7 do T1 sumiu da minha agenda. Só aparecem o 6 e o 8.</p></div>
+<div class="resbox"><b><svg class="ic " aria-hidden="true"><use href="#i-check"/></svg>Resumo da resolução</b>Faltava vincular o encontro ao cronograma T1. Corrigido — o encontro 7 voltou à agenda.</div>
+<div class="tlh"><h3>Linha do tempo</h3><div class="legend" aria-label="Legenda da linha do tempo"><span><span class="tag pub"><svg class="ic " aria-hidden="true"><use href="#i-eye"/></svg>Público</span> o autor vê e é notificado</span><span><span class="tag int"><svg class="ic " aria-hidden="true"><use href="#i-eyeoff"/></svg>Interno</span> só a equipe</span><span><span class="tag sys"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg>Automático</span> eventos do sistema (públicos)</span></div></div>
+<ol class="timeline"><li class="ev sys"><span class="dot"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg></span><div class="evb"><div class="evh"><span class="tag sys"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg>Automático · público</span><time>01 out · 18:40</time></div><p>Chamado aberto por Ana Souza.</p></div></li><li class="ev sys"><span class="dot"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg></span><div class="evb"><div class="evh"><span class="tag sys"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg>Automático · público</span><time>02 out · 09:50</time></div><p>Marina Costa assumiu — em atendimento.</p></div></li><li class="ev int"><span class="dot"><svg class="ic " aria-hidden="true"><use href="#i-eyeoff"/></svg></span><div class="evb"><div class="evh"><b>Marina Costa</b><span class="tag int"><svg class="ic " aria-hidden="true"><use href="#i-eyeoff"/></svg>Interno · só equipe</span><time>02 out · 10:30</time></div><p>Cronograma T1 estava duplicado; conferido com ciclo_eventos.</p></div></li><li class="ev pub"><span class="dot"><svg class="ic " aria-hidden="true"><use href="#i-eye"/></svg></span><div class="evb"><div class="evh"><b>Marina Costa</b><span class="tag pub"><svg class="ic " aria-hidden="true"><use href="#i-eye"/></svg>Público · autor vê</span><time>02 out · 10:40</time></div><p>Ana, o encontro 7 voltou à sua agenda. Era um vínculo com o cronograma da turma.</p></div></li><li class="ev sys"><span class="dot"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg></span><div class="evb"><div class="evh"><span class="tag sys"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg>Automático · público</span><time>02 out · 10:41</time></div><p>Marina Costa resolveu o chamado.</p></div></li></ol>
+<p class="closed-note"><svg class="ic " aria-hidden="true"><use href="#i-lock"/></svg><span>Chamado resolvido. Para novas atualizações, reabra primeiro — o autor é avisado.</span></p>
+</article><article class="detail d-128"><label class="back" for="co-sel-none"><svg class="ic " aria-hidden="true"><use href="#i-back"/></svg>Voltar à fila</label>
+<div class="d-head"><span class="proto">CHA-000128</span><span class="cat c-plat"><svg class="ic " aria-hidden="true"><use href="#i-monitor"/></svg>Plataforma</span><span class="st st-rs"><svg class="ic " aria-hidden="true"><use href="#i-check"/></svg>Resolvido</span><span class="time">aberto seg 29 set · 17:15</span></div><h2>PDF do PDM não abre</h2>
+<dl class="facts"><div><dt>Autor</dt><dd><span class="av al sm" aria-hidden="true">AL</span>André Lima<span style="font-weight:400;color:var(--mf)">· Mentor DPP</span></dd></div>
+<div><dt>Dupla</dt><dd>Ana Souza · André Lima · T1 <span class="sem ok">● Em andamento</span></dd></div>
+<div><dt>Responsável</dt><dd><span class="av mc sm" aria-hidden="true">MC</span>Marina Costa</dd></div>
+<div><dt>Origem</dt><dd style="font-weight:500">Aberto no app</dd></div></dl>
+<div class="actions"><span class="btn dark" role="button" tabindex="0"><svg class="ic " aria-hidden="true"><use href="#i-undo"/></svg>Reabrir</span></div><p class="actnote"><svg class="ic " aria-hidden="true"><use href="#i-lock"/></svg><span>Reabrir devolve o chamado a “em atendimento” com o mesmo dono e avisa o autor.</span></p>
+<div class="msg"><h3>Pedido original</h3><p>Ao tocar em “Abrir PDM” da Ana o navegador mostra erro de link expirado.</p></div>
+<div class="resbox"><b><svg class="ic " aria-hidden="true"><use href="#i-check"/></svg>Resumo da resolução</b>O link do documento vale 5 minutos. Reabrir pelo botão “Abrir PDM” gera um link novo; funcionou.</div>
+<div class="tlh"><h3>Linha do tempo</h3><div class="legend" aria-label="Legenda da linha do tempo"><span><span class="tag pub"><svg class="ic " aria-hidden="true"><use href="#i-eye"/></svg>Público</span> o autor vê e é notificado</span><span><span class="tag int"><svg class="ic " aria-hidden="true"><use href="#i-eyeoff"/></svg>Interno</span> só a equipe</span><span><span class="tag sys"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg>Automático</span> eventos do sistema (públicos)</span></div></div>
+<ol class="timeline"><li class="ev sys"><span class="dot"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg></span><div class="evb"><div class="evh"><span class="tag sys"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg>Automático · público</span><time>29 set · 17:15</time></div><p>Chamado aberto por André Lima.</p></div></li><li class="ev sys"><span class="dot"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg></span><div class="evb"><div class="evh"><span class="tag sys"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg>Automático · público</span><time>29 set · 17:40</time></div><p>Marina Costa assumiu — em atendimento.</p></div></li><li class="ev int"><span class="dot"><svg class="ic " aria-hidden="true"><use href="#i-eyeoff"/></svg></span><div class="evb"><div class="evh"><b>Marina Costa</b><span class="tag int"><svg class="ic " aria-hidden="true"><use href="#i-eyeoff"/></svg>Interno · só equipe</span><time>30 set · 08:55</time></div><p>Link assinado expira em 300 s. Comportamento esperado; reforçar texto da UI no backlog.</p></div></li><li class="ev pub"><span class="dot"><svg class="ic " aria-hidden="true"><use href="#i-eye"/></svg></span><div class="evb"><div class="evh"><b>Marina Costa</b><span class="tag pub"><svg class="ic " aria-hidden="true"><use href="#i-eye"/></svg>Público · autor vê</span><time>30 set · 09:00</time></div><p>André, o link do PDM expira em 5 minutos. Se der erro, volte à ficha e toque em “Abrir PDM” de novo.</p></div></li><li class="ev sys"><span class="dot"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg></span><div class="evb"><div class="evh"><span class="tag sys"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg>Automático · público</span><time>30 set · 09:02</time></div><p>Marina Costa resolveu o chamado.</p></div></li></ol>
+<p class="closed-note"><svg class="ic " aria-hidden="true"><use href="#i-lock"/></svg><span>Chamado resolvido. Para novas atualizações, reabra primeiro — o autor é avisado.</span></p>
+</article></section></div></div>
+<div class="vazio"><div class="box"><span class="big"><svg class="ic " aria-hidden="true"><use href="#i-check"/></svg></span><h2>Inbox zerada</h2><p>Nenhum chamado aberto ou em atendimento. Quando alguém pedir apoio, ele aparece aqui — urgências também avisam você por e-mail.</p><span class="btn" role="button" tabindex="0">Ver resolvidos (2)</span></div></div></main>
+<nav class="bnav" aria-label="Navegação"><a href="#" class="" ><svg class="ic " aria-hidden="true"><use href="#i-home"/></svg>Início</a><a href="#" class="" ><svg class="ic " aria-hidden="true"><use href="#i-users"/></svg>Duplas</a><a href="#" class="" ><svg class="ic " aria-hidden="true"><use href="#i-cal"/></svg>Agenda</a><a href="#" class="" ><svg class="ic " aria-hidden="true"><use href="#i-folder"/></svg>Materiais</a><a href="#" class="on" aria-current="page"><svg class="ic " aria-hidden="true"><use href="#i-help"/></svg>Chamados<span class="bd" aria-label="3 sem dono">3</span></a></nav></div><div class="v v-aux"><header class="topbar"><div class="in"><div class="brand"><span class="logo">R</span>Realiza.vc</div><nav class="tnav" aria-label="Principal"><a href="#" class="" ><svg class="ic " aria-hidden="true"><use href="#i-home"/></svg>Início</a><a href="#" class="" ><svg class="ic " aria-hidden="true"><use href="#i-users"/></svg>Duplas</a><a href="#" class="" ><svg class="ic " aria-hidden="true"><use href="#i-cal"/></svg>Agenda</a><a href="#" class="" ><svg class="ic " aria-hidden="true"><use href="#i-folder"/></svg>Materiais</a><a href="#" class="on" aria-current="page"><svg class="ic " aria-hidden="true"><use href="#i-help"/></svg>Chamados<span class="bd" aria-label="3 sem dono">3</span></a></nav>
+<div class="me"><span class="av pn " aria-hidden="true">PN</span><div><b>Paula Nunes</b><small>Auxiliar executivo</small></div></div></div></header>
+<main class="main"><div class="has"><div class="scope"><span><b>Você vê:</b> todos os chamados, passivamente. Plataforma aparece bloqueada (só protocolo, categoria, estado e idade).</span><span class="no"><b>Você pode</b> assumir, comentar, publicar e resolver só os <b>não técnicos</b> (agenda, metodologia, urgência, outro). <b>Não pode:</b> plataforma, atribuir a outra pessoa, tirar o chamado de outro dono.</span></div>
+<input class="sr sel sel-none" type="radio" name="au-sel" id="au-sel-none" checked><input class="sr sel" type="radio" name="au-sel" id="au-sel-143"><input class="sr sel" type="radio" name="au-sel" id="au-sel-142"><input class="sr sel" type="radio" name="au-sel" id="au-sel-141"><input class="sr sel" type="radio" name="au-sel" id="au-sel-139"><input class="sr sel" type="radio" name="au-sel" id="au-sel-136"><input class="sr sel" type="radio" name="au-sel" id="au-sel-137"><input class="sr sel" type="radio" name="au-sel" id="au-sel-131"><input class="sr sel" type="radio" name="au-sel" id="au-sel-128"><input class="sr" type="radio" name="au-own" id="au-own-all" checked><input class="sr" type="radio" name="au-own" id="au-own-none"><input class="sr" type="radio" name="au-own" id="au-own-me"><input class="sr" type="radio" name="au-cat" id="au-cat-all" checked><input class="sr" type="radio" name="au-cat" id="au-cat-urg"><input class="sr" type="radio" name="au-cat" id="au-cat-agen"><input class="sr" type="radio" name="au-cat" id="au-cat-met"><input class="sr" type="radio" name="au-cat" id="au-cat-plat"><input class="sr" type="radio" name="au-cat" id="au-cat-out"><input class="sr" type="radio" name="au-st" id="au-st-all" checked><input class="sr" type="radio" name="au-st" id="au-st-ab"><input class="sr" type="radio" name="au-st" id="au-st-ea"><input class="sr" type="radio" name="au-st" id="au-st-rs">
+<div class="pagehead"><div><h1>Chamados</h1><p class="sub"><b>8 chamados</b> · 3 sem dono (2 você pode assumir) · 3 em atendimento · 2 resolvidos</p></div>
+<div class="oldest"><span class="old red"><svg class="ic " aria-hidden="true"><use href="#i-alert"/></svg><span>Mais antigo sem dono: <b>há 3 d</b> · CHA-000137</span></span><span class="old amb"><svg class="ic " aria-hidden="true"><use href="#i-clock"/></svg><span>Mais antigo em atendimento: <b>há 4 d</b> · CHA-000139</span></span></div>
+<label class="search"><svg class="ic " aria-hidden="true"><use href="#i-search"/></svg><span class="sr">Buscar</span><input type="search" placeholder="Buscar por protocolo, autor, dupla ou assunto"></label></div>
+<div class="filters" role="group" aria-label="Filtros">
+ <div class="frow"><span class="cap">Fila</span><div class="chips"><label class="chip" for="au-own-all">Todos <b>8</b></label><label class="chip" for="au-own-none"><svg class="ic " aria-hidden="true"><use href="#i-alert"/></svg>Sem dono <b>3</b></label><label class="chip" for="au-own-me"><svg class="ic " aria-hidden="true"><use href="#i-user"/></svg>Atribuídos a mim <b>2</b></label></div></div>
+ <div class="frow"><span class="cap">Categoria</span><div class="chips"><label class="chip" for="au-cat-all">Todas</label><label class="chip" for="au-cat-urg"><span class="dot d-urg"></span>Urgência <b>2</b></label><label class="chip" for="au-cat-agen"><span class="dot d-agen"></span>Agenda <b>2</b></label><label class="chip" for="au-cat-met"><span class="dot d-met"></span>Metodologia <b>1</b></label><label class="chip lock" for="au-cat-plat"><svg class="ic " aria-hidden="true"><use href="#i-lock"/></svg>Plataforma <b>só coord.</b></label><label class="chip" for="au-cat-out"><span class="dot d-out"></span>Outro <b>1</b></label></div></div>
+ <div class="frow"><span class="cap">Status</span><div class="chips"><label class="chip" for="au-st-all">Todos</label><label class="chip" for="au-st-ab"><svg class="ic " aria-hidden="true"><use href="#i-alert"/></svg>Aberto <b>3</b></label><label class="chip" for="au-st-ea"><svg class="ic " aria-hidden="true"><use href="#i-clock"/></svg>Em atendimento <b>3</b></label><label class="chip" for="au-st-rs"><svg class="ic " aria-hidden="true"><use href="#i-check"/></svg>Resolvido <b>2</b></label></div></div></div><div class="layout"><section class="listpane" aria-label="Lista de chamados"><div class="queue"><label for="au-sel-143" class="qrow row-143" data-cat="urg" data-st="ab" data-own="none">
+ <div class="r-top"><span class="proto">CHA-000143</span><span class="cat c-urg"><svg class="ic " aria-hidden="true"><use href="#i-bolt"/></svg>Urgência</span><span class="time">hoje 09:12</span></div>
+ <div class="r-subj">Caio não responde há 9 dias e o encontro 5 é amanhã</div>
+ <div class="r-meta"><span class="who"><span class="av al sm" aria-hidden="true">AL</span>André Lima <span style="font-weight:400;color:var(--mf)">· Mentor DPP</span></span><span>Caio Martins · T2</span></div>
+ <div class="r-foot"><span class="st st-ab"><svg class="ic " aria-hidden="true"><use href="#i-alert"/></svg>Aberto · sem dono</span><span class="nodono"><svg class="ic " aria-hidden="true"><use href="#i-alert"/></svg>Sem dono</span></div></label><label for="au-sel-142" class="qrow row-142" data-cat="agen" data-st="ea" data-own="other">
+ <div class="r-top"><span class="proto">CHA-000142</span><span class="cat c-agen"><svg class="ic " aria-hidden="true"><use href="#i-cal"/></svg>Agenda</span><span class="time">hoje 08:30</span></div>
+ <div class="r-subj">Local do encontro 5 · T2 ainda sem confirmação na Biblioteca</div>
+ <div class="r-meta"><span class="who"><span class="av al sm" aria-hidden="true">AL</span>André Lima <span style="font-weight:400;color:var(--mf)">· Mentor DPP</span></span><span>Caio Martins · T2</span></div>
+ <div class="r-foot"><span class="st st-ea"><svg class="ic " aria-hidden="true"><use href="#i-clock"/></svg>Em atendimento · Marina</span><span class="age"><span class="av mc sm" aria-hidden="true">MC</span></span></div></label><label for="au-sel-141" class="qrow row-141 blocked" data-cat="plat" data-st="ab" data-own="none">
+ <div class="r-top"><span class="proto">CHA-000141</span><span class="cat c-plat"><svg class="ic " aria-hidden="true"><use href="#i-monitor"/></svg>Plataforma</span><span class="time">ontem 16:40</span></div>
+ <div class="r-subj">Chamado de plataforma — conteúdo restrito</div>
+ <div class="r-meta"><span>há 1 d</span></div>
+ <div class="r-foot"><span class="st st-bl"><svg class="ic " aria-hidden="true"><use href="#i-lock"/></svg>Aberto</span><span class="rowlock"><svg class="ic " aria-hidden="true"><use href="#i-lock"/></svg>Só coordenação</span></div></label><label for="au-sel-139" class="qrow row-139" data-cat="met" data-st="ea" data-own="me">
+ <div class="r-top"><span class="proto">CHA-000139</span><span class="cat c-met"><svg class="ic " aria-hidden="true"><use href="#i-book"/></svg>Metodologia</span><span class="time">ontem 10:15</span></div>
+ <div class="r-subj">Como registrar sessão de trilha quando o jovem avisa em cima da hora?</div>
+ <div class="r-meta"><span class="who"><span class="av lp sm" aria-hidden="true">LP</span>Luísa Prado <span style="font-weight:400;color:var(--mf)">· Mentora especialista</span></span><span>Ana Souza · trilha Carreira e portfólio</span></div>
+ <div class="r-foot"><span class="st st-ea"><svg class="ic " aria-hidden="true"><use href="#i-clock"/></svg>Em atendimento · Paula</span><span class="age"><span class="av pn sm" aria-hidden="true">PN</span></span></div></label><label for="au-sel-136" class="qrow row-136" data-cat="urg" data-st="ea" data-own="me">
+ <div class="r-top"><span class="proto">CHA-000136</span><span class="cat c-urg"><svg class="ic " aria-hidden="true"><use href="#i-bolt"/></svg>Urgência</span><span class="time">ontem 09:05</span></div>
+ <div class="r-subj">Preciso de apoio — Pedro faltou a dois encontros e a família não responde</div>
+ <div class="r-meta"><span class="who"><span class="av rm sm" aria-hidden="true">RG</span>Renata Gomes <span style="font-weight:400;color:var(--mf)">· Mentora DPP</span></span><span>Pedro Ramos · Renata Gomes · T2</span></div>
+ <div class="r-foot"><span class="st st-ea"><svg class="ic " aria-hidden="true"><use href="#i-clock"/></svg>Em atendimento · Paula</span><span class="age"><span class="av pn sm" aria-hidden="true">PN</span></span></div></label><label for="au-sel-137" class="qrow row-137" data-cat="out" data-st="ab" data-own="none">
+ <div class="r-top"><span class="proto">CHA-000137</span><span class="cat c-out"><svg class="ic " aria-hidden="true"><use href="#i-dots"/></svg>Outro</span><span class="time">sáb 4 out</span></div>
+ <div class="r-subj">Meu sobrenome está errado no cadastro</div>
+ <div class="r-meta"><span class="who"><span class="av as sm" aria-hidden="true">AS</span>Ana Souza <span style="font-weight:400;color:var(--mf)">· Mentorada · T1</span></span><span>Ana Souza · André Lima · T1</span></div>
+ <div class="r-foot"><span class="st st-ab"><svg class="ic " aria-hidden="true"><use href="#i-alert"/></svg>Aberto · sem dono</span><span class="nodono"><svg class="ic " aria-hidden="true"><use href="#i-alert"/></svg>Sem dono</span></div></label><label for="au-sel-131" class="qrow row-131" data-cat="agen" data-st="rs" data-own="other">
+ <div class="r-top"><span class="proto">CHA-000131</span><span class="cat c-agen"><svg class="ic " aria-hidden="true"><use href="#i-cal"/></svg>Agenda</span><span class="time">qui 2 out</span></div>
+ <div class="r-subj">Encontro 7 não aparece na minha agenda</div>
+ <div class="r-meta"><span class="who"><span class="av as sm" aria-hidden="true">AS</span>Ana Souza <span style="font-weight:400;color:var(--mf)">· Mentorada · T1</span></span><span>Ana Souza · André Lima · T1</span></div>
+ <div class="r-foot"><span class="st st-rs"><svg class="ic " aria-hidden="true"><use href="#i-check"/></svg>Resolvido</span><span class="age"><span class="av mc sm" aria-hidden="true">MC</span></span></div></label><label for="au-sel-128" class="qrow row-128 blocked" data-cat="plat" data-st="rs" data-own="other">
+ <div class="r-top"><span class="proto">CHA-000128</span><span class="cat c-plat"><svg class="ic " aria-hidden="true"><use href="#i-monitor"/></svg>Plataforma</span><span class="time">ter 30 set</span></div>
+ <div class="r-subj">Chamado de plataforma — conteúdo restrito</div>
+ <div class="r-meta"><span>resolvido há 7 d</span></div>
+ <div class="r-foot"><span class="st st-bl"><svg class="ic " aria-hidden="true"><use href="#i-lock"/></svg>Resolvido</span><span class="rowlock"><svg class="ic " aria-hidden="true"><use href="#i-lock"/></svg>Só coordenação</span></div></label></div></section><section class="detailpane" aria-label="Detalhe do chamado"><article class="detail d-143"><label class="back" for="au-sel-none"><svg class="ic " aria-hidden="true"><use href="#i-back"/></svg>Voltar à fila</label>
+<div class="d-head"><span class="proto">CHA-000143</span><span class="cat c-urg"><svg class="ic " aria-hidden="true"><use href="#i-bolt"/></svg>Urgência</span><span class="st st-ab"><svg class="ic " aria-hidden="true"><use href="#i-alert"/></svg>Aberto · sem dono</span><span class="time">aberto ter 7 out · 09:12</span></div><h2>Caio não responde há 9 dias e o encontro 5 é amanhã</h2>
+<dl class="facts"><div><dt>Autor</dt><dd><span class="av al sm" aria-hidden="true">AL</span>André Lima<span style="font-weight:400;color:var(--mf)">· Mentor DPP</span></dd></div>
+<div><dt>Dupla</dt><dd>Caio Martins · T2 <span class="sem at">▲ Atenção</span></dd></div>
+<div><dt>Responsável</dt><dd><span class="nodono"><svg class="ic " aria-hidden="true"><use href="#i-alert"/></svg>Ninguém assumiu</span></dd></div>
+<div><dt>Origem</dt><dd style="font-weight:500">Aberto no app</dd></div></dl>
+<div class="actions"><span class="btn pri" role="button" tabindex="0"><svg class="ic " aria-hidden="true"><use href="#i-user"/></svg>Assumir</span><span class="btn" role="button" tabindex="0"><svg class="ic " aria-hidden="true"><use href="#i-check"/></svg>Resolver</span><span class="btn dis" role="button" aria-disabled="true"><svg class="ic " aria-hidden="true"><use href="#i-lock"/></svg>Atribuir a outra pessoa</span></div><p class="actnote"><svg class="ic " aria-hidden="true"><use href="#i-lock"/></svg><span>Você responde apenas chamados não técnicos. Atribuir a outra pessoa é só da coordenação.</span></p>
+<div class="msg"><h3>Pedido original</h3><p>Tentei WhatsApp e ligação desde o dia 28. A mãe também não atende. O encontro 5 · T2 é amanhã (qua 19h) e o registro do encontro 4 ainda está pendente. Preciso de orientação sobre como proceder.</p></div>
+
+<div class="tlh"><h3>Linha do tempo</h3><div class="legend" aria-label="Legenda da linha do tempo"><span><span class="tag pub"><svg class="ic " aria-hidden="true"><use href="#i-eye"/></svg>Público</span> o autor vê e é notificado</span><span><span class="tag int"><svg class="ic " aria-hidden="true"><use href="#i-eyeoff"/></svg>Interno</span> só a equipe</span><span><span class="tag sys"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg>Automático</span> eventos do sistema (públicos)</span></div></div>
+<ol class="timeline"><li class="ev sys"><span class="dot"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg></span><div class="evb"><div class="evh"><span class="tag sys"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg>Automático · público</span><time>07 out · 09:12</time></div><p>Chamado aberto por André Lima.</p></div></li><li class="ev sys"><span class="dot"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg></span><div class="evb"><div class="evh"><span class="tag sys"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg>Automático · público</span><time>07 out · 09:12</time></div><p>Urgência: Marina Costa e Paula Nunes foram notificadas (e-mail + app). Quem assumir primeiro trata.</p></div></li></ol>
+<div class="composer"><div class="tlh" style="margin-top:20px"><h3>Responder</h3></div>
+<input class="sr r-int" type="radio" name="cm-au-143" id="cm-au-143-i" checked><input class="sr r-pub" type="radio" name="cm-au-143" id="cm-au-143-p">
+<div class="tabs" role="presentation"><label class="tab t-int" for="cm-au-143-i"><svg class="ic " aria-hidden="true"><use href="#i-eyeoff"/></svg><span>Comentário interno<small>padrão · só a equipe</small></span></label><label class="tab t-pub" for="cm-au-143-p"><svg class="ic " aria-hidden="true"><use href="#i-eye"/></svg><span>Atualização pública<small>André vê</small></span></label></div>
+<div class="cbody"><label class="sr" for="tx-au-143">Mensagem</label><textarea id="tx-au-143" placeholder="Escreva aqui…" rows="3"></textarea>
+<p class="hint h-int"><svg class="ic " aria-hidden="true"><use href="#i-eyeoff"/></svg><span><b>Só a equipe vê.</b> André não é notificado e não enxerga este comentário.</span></p>
+<p class="hint h-pub"><svg class="ic " aria-hidden="true"><use href="#i-eye"/></svg><span><b>Visível para André Lima</b> e notificado por e-mail e no app. Evite dados sensíveis de terceiros.</span></p>
+<div class="cfoot"><span class="btn" role="button" tabindex="0">Anexar arquivo</span><span class="btn dark b-int" role="button" tabindex="0"><svg class="ic " aria-hidden="true"><use href="#i-send"/></svg>Comentar internamente</span><span class="btn pri b-pub" role="button" tabindex="0"><svg class="ic " aria-hidden="true"><use href="#i-send"/></svg>Publicar atualização</span></div></div></div>
+</article><article class="detail d-142"><label class="back" for="au-sel-none"><svg class="ic " aria-hidden="true"><use href="#i-back"/></svg>Voltar à fila</label>
+<div class="d-head"><span class="proto">CHA-000142</span><span class="cat c-agen"><svg class="ic " aria-hidden="true"><use href="#i-cal"/></svg>Agenda</span><span class="st st-ea"><svg class="ic " aria-hidden="true"><use href="#i-clock"/></svg>Em atendimento · Marina</span><span class="time">aberto seg 6 out · 14:20</span></div><h2>Local do encontro 5 · T2 ainda sem confirmação na Biblioteca</h2>
+<dl class="facts"><div><dt>Autor</dt><dd><span class="av al sm" aria-hidden="true">AL</span>André Lima<span style="font-weight:400;color:var(--mf)">· Mentor DPP</span></dd></div>
+<div><dt>Dupla</dt><dd>Caio Martins · T2 <span class="sem at">▲ Atenção</span></dd></div>
+<div><dt>Responsável</dt><dd><span class="av mc sm" aria-hidden="true">MC</span>Marina Costa</dd></div>
+<div><dt>Origem</dt><dd style="font-weight:500">Aberto no app</dd></div></dl>
+<div class="actions"><span class="btn dis" role="button" aria-disabled="true"><svg class="ic " aria-hidden="true"><use href="#i-lock"/></svg>Em atendimento por Marina</span><span class="btn dis" role="button" aria-disabled="true"><svg class="ic " aria-hidden="true"><use href="#i-lock"/></svg>Reatribuir · só coordenação</span></div><p class="actnote"><svg class="ic " aria-hidden="true"><use href="#i-lock"/></svg><span>Dono atual: Marina Costa. Você pode acompanhar e comentar; assumir de outra pessoa é só da coordenação.</span></p>
+<div class="msg"><h3>Pedido original</h3><p>A Biblioteca Comunitária ainda não confirmou a sala para o encontro 5 de amanhã (qua 19h). Se não confirmar, o Caio fica sem lugar. Pode ajudar a validar ou sugerir outro local?</p></div>
+
+<div class="tlh"><h3>Linha do tempo</h3><div class="legend" aria-label="Legenda da linha do tempo"><span><span class="tag pub"><svg class="ic " aria-hidden="true"><use href="#i-eye"/></svg>Público</span> o autor vê e é notificado</span><span><span class="tag int"><svg class="ic " aria-hidden="true"><use href="#i-eyeoff"/></svg>Interno</span> só a equipe</span><span><span class="tag sys"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg>Automático</span> eventos do sistema (públicos)</span></div></div>
+<ol class="timeline"><li class="ev sys"><span class="dot"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg></span><div class="evb"><div class="evh"><span class="tag sys"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg>Automático · público</span><time>06 out · 14:20</time></div><p>Chamado aberto por André Lima.</p></div></li><li class="ev sys"><span class="dot"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg></span><div class="evb"><div class="evh"><span class="tag sys"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg>Automático · público</span><time>06 out · 15:02</time></div><p>Marina Costa assumiu — em atendimento.</p></div></li><li class="ev pub"><span class="dot"><svg class="ic " aria-hidden="true"><use href="#i-eye"/></svg></span><div class="evb"><div class="evh"><b>Marina Costa</b><span class="tag pub"><svg class="ic " aria-hidden="true"><use href="#i-eye"/></svg>Público · autor vê</span><time>06 out · 15:10</time></div><p>Oi, André! Estou confirmando a sala com a Biblioteca Comunitária. Te retorno aqui até amanhã às 12h.</p></div></li><li class="ev int"><span class="dot"><svg class="ic " aria-hidden="true"><use href="#i-eyeoff"/></svg></span><div class="evb"><div class="evh"><b>Marina Costa</b><span class="tag int"><svg class="ic " aria-hidden="true"><use href="#i-eyeoff"/></svg>Interno · só equipe</span><time>06 out · 15:12</time></div><p>Biblioteca só confirma por telefone — ligar às 10h. Plano B: Sede Realiza, sala 2, livre qua 19h.</p></div></li><li class="ev int"><span class="dot"><svg class="ic " aria-hidden="true"><use href="#i-eyeoff"/></svg></span><div class="evb"><div class="evh"><b>Paula Nunes</b><span class="tag int"><svg class="ic " aria-hidden="true"><use href="#i-eyeoff"/></svg>Interno · só equipe</span><time>07 out · 08:30</time></div><p>Posso avisar a família do Caio na supervisão de hoje 12h30 com o André? Assim já alinhamos o local.</p></div></li></ol>
+<div class="composer"><div class="tlh" style="margin-top:20px"><h3>Responder</h3></div>
+<input class="sr r-int" type="radio" name="cm-au-142" id="cm-au-142-i" checked><input class="sr r-pub" type="radio" name="cm-au-142" id="cm-au-142-p">
+<div class="tabs" role="presentation"><label class="tab t-int" for="cm-au-142-i"><svg class="ic " aria-hidden="true"><use href="#i-eyeoff"/></svg><span>Comentário interno<small>padrão · só a equipe</small></span></label><label class="tab t-pub" for="cm-au-142-p"><svg class="ic " aria-hidden="true"><use href="#i-eye"/></svg><span>Atualização pública<small>André vê</small></span></label></div>
+<div class="cbody"><label class="sr" for="tx-au-142">Mensagem</label><textarea id="tx-au-142" placeholder="Escreva aqui…" rows="3"></textarea>
+<p class="hint h-int"><svg class="ic " aria-hidden="true"><use href="#i-eyeoff"/></svg><span><b>Só a equipe vê.</b> André não é notificado e não enxerga este comentário.</span></p>
+<p class="hint h-pub"><svg class="ic " aria-hidden="true"><use href="#i-eye"/></svg><span><b>Visível para André Lima</b> e notificado por e-mail e no app. Evite dados sensíveis de terceiros.</span></p>
+<div class="cfoot"><span class="btn" role="button" tabindex="0">Anexar arquivo</span><span class="btn dark b-int" role="button" tabindex="0"><svg class="ic " aria-hidden="true"><use href="#i-send"/></svg>Comentar internamente</span><span class="btn pri b-pub" role="button" tabindex="0"><svg class="ic " aria-hidden="true"><use href="#i-send"/></svg>Publicar atualização</span></div></div></div>
+</article><article class="detail d-141"><label class="back" for="au-sel-none"><svg class="ic " aria-hidden="true"><use href="#i-back"/></svg>Voltar à fila</label>
+<div class="d-head"><span class="proto">CHA-000141</span><span class="cat c-plat"><svg class="ic " aria-hidden="true"><use href="#i-monitor"/></svg>Plataforma</span><span class="st st-bl"><svg class="ic " aria-hidden="true"><use href="#i-lock"/></svg>Aberto</span><span class="time">aberto seg 6 out · 16:40</span></div><h2>Chamado de plataforma</h2>
+<div class="blockedpanel"><svg class="ic " aria-hidden="true"><use href="#i-lock"/></svg><b>Só coordenação</b>Você vê que este chamado existe (protocolo, categoria, estado e idade), mas não o conteúdo, o autor nem a linha do tempo. Problemas de plataforma são tratados só pela coordenação.</div></article><article class="detail d-139"><label class="back" for="au-sel-none"><svg class="ic " aria-hidden="true"><use href="#i-back"/></svg>Voltar à fila</label>
+<div class="d-head"><span class="proto">CHA-000139</span><span class="cat c-met"><svg class="ic " aria-hidden="true"><use href="#i-book"/></svg>Metodologia</span><span class="st st-ea"><svg class="ic " aria-hidden="true"><use href="#i-clock"/></svg>Em atendimento · Paula</span><span class="time">aberto sex 3 out · 11:30</span></div><h2>Como registrar sessão de trilha quando o jovem avisa em cima da hora?</h2>
+<dl class="facts"><div><dt>Autor</dt><dd><span class="av lp sm" aria-hidden="true">LP</span>Luísa Prado<span style="font-weight:400;color:var(--mf)">· Mentora especialista</span></dd></div>
+<div><dt>Dupla</dt><dd>Ana Souza · trilha Carreira e portfólio <span class="sem ok">● Em andamento</span></dd></div>
+<div><dt>Responsável</dt><dd><span class="av pn sm" aria-hidden="true">PN</span>Paula Nunes</dd></div>
+<div><dt>Origem</dt><dd style="font-weight:500">Aberto no app</dd></div></dl>
+<div class="actions"><span class="btn pri" role="button" tabindex="0"><svg class="ic " aria-hidden="true"><use href="#i-check"/></svg>Resolver</span><span class="btn" role="button" tabindex="0"><svg class="ic " aria-hidden="true"><use href="#i-undo"/></svg>Devolver à fila</span><span class="btn dis" role="button" aria-disabled="true"><svg class="ic " aria-hidden="true"><use href="#i-lock"/></svg>Atribuir a outra pessoa</span></div>
+<div class="msg"><h3>Pedido original</h3><p>A Ana avisou 1h antes que não conseguiria a sessão. Registro como “não aconteceu”? Isso conta como uma das 5 sessões da trilha?</p></div>
+
+<div class="tlh"><h3>Linha do tempo</h3><div class="legend" aria-label="Legenda da linha do tempo"><span><span class="tag pub"><svg class="ic " aria-hidden="true"><use href="#i-eye"/></svg>Público</span> o autor vê e é notificado</span><span><span class="tag int"><svg class="ic " aria-hidden="true"><use href="#i-eyeoff"/></svg>Interno</span> só a equipe</span><span><span class="tag sys"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg>Automático</span> eventos do sistema (públicos)</span></div></div>
+<ol class="timeline"><li class="ev sys"><span class="dot"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg></span><div class="evb"><div class="evh"><span class="tag sys"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg>Automático · público</span><time>03 out · 11:30</time></div><p>Chamado aberto por Luísa Prado.</p></div></li><li class="ev sys"><span class="dot"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg></span><div class="evb"><div class="evh"><span class="tag sys"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg>Automático · público</span><time>03 out · 14:00</time></div><p>Paula Nunes assumiu — em atendimento.</p></div></li><li class="ev int"><span class="dot"><svg class="ic " aria-hidden="true"><use href="#i-eyeoff"/></svg></span><div class="evb"><div class="evh"><b>Paula Nunes</b><span class="tag int"><svg class="ic " aria-hidden="true"><use href="#i-eyeoff"/></svg>Interno · só equipe</span><time>03 out · 14:05</time></div><p>Pelo guia, falta com menos de 24h = “não aconteceu” sem penalidade. Confirmar com a Marina se a sessão é reposta.</p></div></li><li class="ev pub"><span class="dot"><svg class="ic " aria-hidden="true"><use href="#i-eye"/></svg></span><div class="evb"><div class="evh"><b>Paula Nunes</b><span class="tag pub"><svg class="ic " aria-hidden="true"><use href="#i-eye"/></svg>Público · autor vê</span><time>06 out · 10:15</time></div><p>Luísa, registre como “não aconteceu” com o motivo e proponha um novo horário dentro da sua grade. A sessão não é descontada das 5. Se repetir, me avise.</p></div></li></ol>
+<div class="composer"><div class="tlh" style="margin-top:20px"><h3>Responder</h3></div>
+<input class="sr r-int" type="radio" name="cm-au-139" id="cm-au-139-i" checked><input class="sr r-pub" type="radio" name="cm-au-139" id="cm-au-139-p">
+<div class="tabs" role="presentation"><label class="tab t-int" for="cm-au-139-i"><svg class="ic " aria-hidden="true"><use href="#i-eyeoff"/></svg><span>Comentário interno<small>padrão · só a equipe</small></span></label><label class="tab t-pub" for="cm-au-139-p"><svg class="ic " aria-hidden="true"><use href="#i-eye"/></svg><span>Atualização pública<small>Luísa vê</small></span></label></div>
+<div class="cbody"><label class="sr" for="tx-au-139">Mensagem</label><textarea id="tx-au-139" placeholder="Escreva aqui…" rows="3"></textarea>
+<p class="hint h-int"><svg class="ic " aria-hidden="true"><use href="#i-eyeoff"/></svg><span><b>Só a equipe vê.</b> Luísa não é notificado e não enxerga este comentário.</span></p>
+<p class="hint h-pub"><svg class="ic " aria-hidden="true"><use href="#i-eye"/></svg><span><b>Visível para Luísa Prado</b> e notificado por e-mail e no app. Evite dados sensíveis de terceiros.</span></p>
+<div class="cfoot"><span class="btn" role="button" tabindex="0">Anexar arquivo</span><span class="btn dark b-int" role="button" tabindex="0"><svg class="ic " aria-hidden="true"><use href="#i-send"/></svg>Comentar internamente</span><span class="btn pri b-pub" role="button" tabindex="0"><svg class="ic " aria-hidden="true"><use href="#i-send"/></svg>Publicar atualização</span></div></div></div>
+</article><article class="detail d-136"><label class="back" for="au-sel-none"><svg class="ic " aria-hidden="true"><use href="#i-back"/></svg>Voltar à fila</label>
+<div class="d-head"><span class="proto">CHA-000136</span><span class="cat c-urg"><svg class="ic " aria-hidden="true"><use href="#i-bolt"/></svg>Urgência</span><span class="st st-ea"><svg class="ic " aria-hidden="true"><use href="#i-clock"/></svg>Em atendimento · Paula</span><span class="time">aberto dom 5 out · 20:10</span></div><h2>Preciso de apoio — Pedro faltou a dois encontros e a família não responde</h2>
+<dl class="facts"><div><dt>Autor</dt><dd><span class="av rm sm" aria-hidden="true">RG</span>Renata Gomes<span style="font-weight:400;color:var(--mf)">· Mentora DPP</span></dd></div>
+<div><dt>Dupla</dt><dd>Pedro Ramos · Renata Gomes · T2 <span class="sem rs">◆ Risco</span></dd></div>
+<div><dt>Responsável</dt><dd><span class="av pn sm" aria-hidden="true">PN</span>Paula Nunes</dd></div>
+<div><dt>Origem</dt><dd style="font-weight:500">Aberto automaticamente · “Preciso de apoio” no registro do encontro 6</dd></div></dl>
+<div class="actions"><span class="btn pri" role="button" tabindex="0"><svg class="ic " aria-hidden="true"><use href="#i-check"/></svg>Resolver</span><span class="btn" role="button" tabindex="0"><svg class="ic " aria-hidden="true"><use href="#i-undo"/></svg>Devolver à fila</span><span class="btn dis" role="button" aria-disabled="true"><svg class="ic " aria-hidden="true"><use href="#i-lock"/></svg>Atribuir a outra pessoa</span></div>
+<div class="msg"><h3>Pedido original</h3><p>Chamado criado a partir do registro do encontro 6 (Pedro Ramos): “Preciso de apoio” marcado pela mentora Renata Gomes. Dificuldade registrada: dois encontros seguidos não aconteceram; sem retorno da família.</p></div>
+
+<div class="tlh"><h3>Linha do tempo</h3><div class="legend" aria-label="Legenda da linha do tempo"><span><span class="tag pub"><svg class="ic " aria-hidden="true"><use href="#i-eye"/></svg>Público</span> o autor vê e é notificado</span><span><span class="tag int"><svg class="ic " aria-hidden="true"><use href="#i-eyeoff"/></svg>Interno</span> só a equipe</span><span><span class="tag sys"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg>Automático</span> eventos do sistema (públicos)</span></div></div>
+<ol class="timeline"><li class="ev sys"><span class="dot"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg></span><div class="evb"><div class="evh"><span class="tag sys"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg>Automático · público</span><time>05 out · 20:10</time></div><p>Chamado aberto automaticamente pelo registro do encontro 6.</p></div></li><li class="ev sys"><span class="dot"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg></span><div class="evb"><div class="evh"><span class="tag sys"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg>Automático · público</span><time>05 out · 20:10</time></div><p>Urgência: Marina Costa e Paula Nunes foram notificadas.</p></div></li><li class="ev sys"><span class="dot"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg></span><div class="evb"><div class="evh"><span class="tag sys"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg>Automático · público</span><time>05 out · 21:00</time></div><p>Paula Nunes assumiu — em atendimento.</p></div></li><li class="ev pub"><span class="dot"><svg class="ic " aria-hidden="true"><use href="#i-eye"/></svg></span><div class="evb"><div class="evh"><b>Paula Nunes</b><span class="tag pub"><svg class="ic " aria-hidden="true"><use href="#i-eye"/></svg>Público · autor vê</span><time>06 out · 09:00</time></div><p>Renata, vou ligar para a família do Pedro hoje e aviso aqui o resultado.</p></div></li><li class="ev int"><span class="dot"><svg class="ic " aria-hidden="true"><use href="#i-eyeoff"/></svg></span><div class="evb"><div class="evh"><b>Paula Nunes</b><span class="tag int"><svg class="ic " aria-hidden="true"><use href="#i-eyeoff"/></svg>Interno · só equipe</span><time>06 out · 09:05</time></div><p>Responsável já pediu antes para evitar WhatsApp à noite — ligar entre 12h e 14h.</p></div></li></ol>
+<div class="composer"><div class="tlh" style="margin-top:20px"><h3>Responder</h3></div>
+<input class="sr r-int" type="radio" name="cm-au-136" id="cm-au-136-i" checked><input class="sr r-pub" type="radio" name="cm-au-136" id="cm-au-136-p">
+<div class="tabs" role="presentation"><label class="tab t-int" for="cm-au-136-i"><svg class="ic " aria-hidden="true"><use href="#i-eyeoff"/></svg><span>Comentário interno<small>padrão · só a equipe</small></span></label><label class="tab t-pub" for="cm-au-136-p"><svg class="ic " aria-hidden="true"><use href="#i-eye"/></svg><span>Atualização pública<small>Renata vê</small></span></label></div>
+<div class="cbody"><label class="sr" for="tx-au-136">Mensagem</label><textarea id="tx-au-136" placeholder="Escreva aqui…" rows="3"></textarea>
+<p class="hint h-int"><svg class="ic " aria-hidden="true"><use href="#i-eyeoff"/></svg><span><b>Só a equipe vê.</b> Renata não é notificado e não enxerga este comentário.</span></p>
+<p class="hint h-pub"><svg class="ic " aria-hidden="true"><use href="#i-eye"/></svg><span><b>Visível para Renata Gomes</b> e notificado por e-mail e no app. Evite dados sensíveis de terceiros.</span></p>
+<div class="cfoot"><span class="btn" role="button" tabindex="0">Anexar arquivo</span><span class="btn dark b-int" role="button" tabindex="0"><svg class="ic " aria-hidden="true"><use href="#i-send"/></svg>Comentar internamente</span><span class="btn pri b-pub" role="button" tabindex="0"><svg class="ic " aria-hidden="true"><use href="#i-send"/></svg>Publicar atualização</span></div></div></div>
+</article><article class="detail d-137"><label class="back" for="au-sel-none"><svg class="ic " aria-hidden="true"><use href="#i-back"/></svg>Voltar à fila</label>
+<div class="d-head"><span class="proto">CHA-000137</span><span class="cat c-out"><svg class="ic " aria-hidden="true"><use href="#i-dots"/></svg>Outro</span><span class="st st-ab"><svg class="ic " aria-hidden="true"><use href="#i-alert"/></svg>Aberto · sem dono</span><span class="time">aberto sáb 4 out · 10:05</span></div><h2>Meu sobrenome está errado no cadastro</h2>
+<dl class="facts"><div><dt>Autor</dt><dd><span class="av as sm" aria-hidden="true">AS</span>Ana Souza<span style="font-weight:400;color:var(--mf)">· Mentorada · T1</span></dd></div>
+<div><dt>Dupla</dt><dd>Ana Souza · André Lima · T1 <span class="sem ok">● Em andamento</span></dd></div>
+<div><dt>Responsável</dt><dd><span class="nodono"><svg class="ic " aria-hidden="true"><use href="#i-alert"/></svg>Ninguém assumiu</span></dd></div>
+<div><dt>Origem</dt><dd style="font-weight:500">Aberto no app</dd></div></dl>
+<div class="actions"><span class="btn pri" role="button" tabindex="0"><svg class="ic " aria-hidden="true"><use href="#i-user"/></svg>Assumir</span><span class="btn" role="button" tabindex="0"><svg class="ic " aria-hidden="true"><use href="#i-check"/></svg>Resolver</span><span class="btn dis" role="button" aria-disabled="true"><svg class="ic " aria-hidden="true"><use href="#i-lock"/></svg>Atribuir a outra pessoa</span></div><p class="actnote"><svg class="ic " aria-hidden="true"><use href="#i-lock"/></svg><span>Você responde apenas chamados não técnicos. Atribuir a outra pessoa é só da coordenação.</span></p>
+<div class="msg"><h3>Pedido original</h3><p>No meu perfil aparece “Sousa”, mas o certo é “Souza” com z. Dá para corrigir antes de sair o certificado?</p><p class="short"><b>Descrição curta (obrigatória em “Outro”):</b> Sobrenome grafado errado no perfil (Sousa → Souza).</p></div>
+
+<div class="tlh"><h3>Linha do tempo</h3><div class="legend" aria-label="Legenda da linha do tempo"><span><span class="tag pub"><svg class="ic " aria-hidden="true"><use href="#i-eye"/></svg>Público</span> o autor vê e é notificado</span><span><span class="tag int"><svg class="ic " aria-hidden="true"><use href="#i-eyeoff"/></svg>Interno</span> só a equipe</span><span><span class="tag sys"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg>Automático</span> eventos do sistema (públicos)</span></div></div>
+<ol class="timeline"><li class="ev sys"><span class="dot"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg></span><div class="evb"><div class="evh"><span class="tag sys"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg>Automático · público</span><time>04 out · 10:05</time></div><p>Chamado aberto por Ana Souza.</p></div></li></ol>
+<div class="composer"><div class="tlh" style="margin-top:20px"><h3>Responder</h3></div>
+<input class="sr r-int" type="radio" name="cm-au-137" id="cm-au-137-i" checked><input class="sr r-pub" type="radio" name="cm-au-137" id="cm-au-137-p">
+<div class="tabs" role="presentation"><label class="tab t-int" for="cm-au-137-i"><svg class="ic " aria-hidden="true"><use href="#i-eyeoff"/></svg><span>Comentário interno<small>padrão · só a equipe</small></span></label><label class="tab t-pub" for="cm-au-137-p"><svg class="ic " aria-hidden="true"><use href="#i-eye"/></svg><span>Atualização pública<small>Ana vê</small></span></label></div>
+<div class="cbody"><label class="sr" for="tx-au-137">Mensagem</label><textarea id="tx-au-137" placeholder="Escreva aqui…" rows="3"></textarea>
+<p class="hint h-int"><svg class="ic " aria-hidden="true"><use href="#i-eyeoff"/></svg><span><b>Só a equipe vê.</b> Ana não é notificado e não enxerga este comentário.</span></p>
+<p class="hint h-pub"><svg class="ic " aria-hidden="true"><use href="#i-eye"/></svg><span><b>Visível para Ana Souza</b> e notificado por e-mail e no app. Evite dados sensíveis de terceiros.</span></p>
+<div class="cfoot"><span class="btn" role="button" tabindex="0">Anexar arquivo</span><span class="btn dark b-int" role="button" tabindex="0"><svg class="ic " aria-hidden="true"><use href="#i-send"/></svg>Comentar internamente</span><span class="btn pri b-pub" role="button" tabindex="0"><svg class="ic " aria-hidden="true"><use href="#i-send"/></svg>Publicar atualização</span></div></div></div>
+</article><article class="detail d-131"><label class="back" for="au-sel-none"><svg class="ic " aria-hidden="true"><use href="#i-back"/></svg>Voltar à fila</label>
+<div class="d-head"><span class="proto">CHA-000131</span><span class="cat c-agen"><svg class="ic " aria-hidden="true"><use href="#i-cal"/></svg>Agenda</span><span class="st st-rs"><svg class="ic " aria-hidden="true"><use href="#i-check"/></svg>Resolvido</span><span class="time">aberto qua 1 out · 18:40</span></div><h2>Encontro 7 não aparece na minha agenda</h2>
+<dl class="facts"><div><dt>Autor</dt><dd><span class="av as sm" aria-hidden="true">AS</span>Ana Souza<span style="font-weight:400;color:var(--mf)">· Mentorada · T1</span></dd></div>
+<div><dt>Dupla</dt><dd>Ana Souza · André Lima · T1 <span class="sem ok">● Em andamento</span></dd></div>
+<div><dt>Responsável</dt><dd><span class="av mc sm" aria-hidden="true">MC</span>Marina Costa</dd></div>
+<div><dt>Origem</dt><dd style="font-weight:500">Aberto no app</dd></div></dl>
+<div class="actions"><span class="btn dark" role="button" tabindex="0"><svg class="ic " aria-hidden="true"><use href="#i-undo"/></svg>Reabrir</span></div><p class="actnote"><svg class="ic " aria-hidden="true"><use href="#i-lock"/></svg><span>Auxiliar pode reabrir chamados não técnicos.</span></p>
+<div class="msg"><h3>Pedido original</h3><p>O encontro 7 do T1 sumiu da minha agenda. Só aparecem o 6 e o 8.</p></div>
+<div class="resbox"><b><svg class="ic " aria-hidden="true"><use href="#i-check"/></svg>Resumo da resolução</b>Faltava vincular o encontro ao cronograma T1. Corrigido — o encontro 7 voltou à agenda.</div>
+<div class="tlh"><h3>Linha do tempo</h3><div class="legend" aria-label="Legenda da linha do tempo"><span><span class="tag pub"><svg class="ic " aria-hidden="true"><use href="#i-eye"/></svg>Público</span> o autor vê e é notificado</span><span><span class="tag int"><svg class="ic " aria-hidden="true"><use href="#i-eyeoff"/></svg>Interno</span> só a equipe</span><span><span class="tag sys"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg>Automático</span> eventos do sistema (públicos)</span></div></div>
+<ol class="timeline"><li class="ev sys"><span class="dot"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg></span><div class="evb"><div class="evh"><span class="tag sys"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg>Automático · público</span><time>01 out · 18:40</time></div><p>Chamado aberto por Ana Souza.</p></div></li><li class="ev sys"><span class="dot"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg></span><div class="evb"><div class="evh"><span class="tag sys"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg>Automático · público</span><time>02 out · 09:50</time></div><p>Marina Costa assumiu — em atendimento.</p></div></li><li class="ev int"><span class="dot"><svg class="ic " aria-hidden="true"><use href="#i-eyeoff"/></svg></span><div class="evb"><div class="evh"><b>Marina Costa</b><span class="tag int"><svg class="ic " aria-hidden="true"><use href="#i-eyeoff"/></svg>Interno · só equipe</span><time>02 out · 10:30</time></div><p>Cronograma T1 estava duplicado; conferido com ciclo_eventos.</p></div></li><li class="ev pub"><span class="dot"><svg class="ic " aria-hidden="true"><use href="#i-eye"/></svg></span><div class="evb"><div class="evh"><b>Marina Costa</b><span class="tag pub"><svg class="ic " aria-hidden="true"><use href="#i-eye"/></svg>Público · autor vê</span><time>02 out · 10:40</time></div><p>Ana, o encontro 7 voltou à sua agenda. Era um vínculo com o cronograma da turma.</p></div></li><li class="ev sys"><span class="dot"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg></span><div class="evb"><div class="evh"><span class="tag sys"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg>Automático · público</span><time>02 out · 10:41</time></div><p>Marina Costa resolveu o chamado.</p></div></li></ol>
+<p class="closed-note"><svg class="ic " aria-hidden="true"><use href="#i-lock"/></svg><span>Chamado resolvido. Para novas atualizações, reabra primeiro — o autor é avisado.</span></p>
+</article><article class="detail d-128"><label class="back" for="au-sel-none"><svg class="ic " aria-hidden="true"><use href="#i-back"/></svg>Voltar à fila</label>
+<div class="d-head"><span class="proto">CHA-000128</span><span class="cat c-plat"><svg class="ic " aria-hidden="true"><use href="#i-monitor"/></svg>Plataforma</span><span class="st st-bl"><svg class="ic " aria-hidden="true"><use href="#i-lock"/></svg>Resolvido</span><span class="time">aberto seg 29 set · 17:15</span></div><h2>Chamado de plataforma</h2>
+<div class="blockedpanel"><svg class="ic " aria-hidden="true"><use href="#i-lock"/></svg><b>Só coordenação</b>Você vê que este chamado existe (protocolo, categoria, estado e idade), mas não o conteúdo, o autor nem a linha do tempo. Problemas de plataforma são tratados só pela coordenação.</div></article></section></div></div>
+<div class="vazio"><div class="box"><span class="big"><svg class="ic " aria-hidden="true"><use href="#i-check"/></svg></span><h2>Inbox zerada</h2><p>Nenhum chamado aberto ou em atendimento. Urgências avisam você e a coordenação ao mesmo tempo.</p></div></div></main>
+<nav class="bnav" aria-label="Navegação"><a href="#" class="" ><svg class="ic " aria-hidden="true"><use href="#i-home"/></svg>Início</a><a href="#" class="" ><svg class="ic " aria-hidden="true"><use href="#i-users"/></svg>Duplas</a><a href="#" class="" ><svg class="ic " aria-hidden="true"><use href="#i-cal"/></svg>Agenda</a><a href="#" class="" ><svg class="ic " aria-hidden="true"><use href="#i-folder"/></svg>Materiais</a><a href="#" class="on" aria-current="page"><svg class="ic " aria-hidden="true"><use href="#i-help"/></svg>Chamados<span class="bd" aria-label="3 sem dono">3</span></a></nav></div><div class="v v-mentor"><header class="topbar"><div class="in"><div class="brand"><span class="logo">R</span>Realiza.vc</div><nav class="tnav" aria-label="Principal"><a href="#" class="" ><svg class="ic " aria-hidden="true"><use href="#i-home"/></svg>Início</a><a href="#" class="" ><svg class="ic " aria-hidden="true"><use href="#i-users"/></svg>Minhas duplas</a><a href="#" class="" ><svg class="ic " aria-hidden="true"><use href="#i-cal"/></svg>Agenda</a><a href="#" class="" ><svg class="ic " aria-hidden="true"><use href="#i-folder"/></svg>Materiais</a><a href="#" class="on" aria-current="page"><svg class="ic " aria-hidden="true"><use href="#i-help"/></svg>Chamados</a></nav>
+<div class="me"><span class="av al " aria-hidden="true">AL</span><div><b>André Lima</b><small>Mentor DPP</small></div></div></div></header>
+<main class="main"><div class="has"><div class="scope"><span><b>Você vê:</b> os chamados que <b>você abriu</b>, com as <b>atualizações públicas</b> da equipe, datadas.</span><span class="no"><b>Você NÃO vê:</b> comentários internos da equipe, chamados de outras pessoas, nem a fila.</span></div>
+<input class="sr sel sel-none" type="radio" name="me-sel" id="me-sel-none" checked><input class="sr sel" type="radio" name="me-sel" id="me-sel-143"><input class="sr sel" type="radio" name="me-sel" id="me-sel-142"><input class="sr sel" type="radio" name="me-sel" id="me-sel-128"><input class="sr" type="radio" name="me-st" id="me-st-all" checked><input class="sr" type="radio" name="me-st" id="me-st-ab"><input class="sr" type="radio" name="me-st" id="me-st-ea"><input class="sr" type="radio" name="me-st" id="me-st-rs">
+<div class="pagehead"><div><h1>Meus chamados</h1><p class="sub"><b>3 chamados</b> · 1 aguardando · 1 em atendimento · 1 resolvido</p></div><a class="btn pri" href="#abrir-chamado"><svg class="ic " aria-hidden="true"><use href="#i-plus"/></svg>Abrir chamado</a></div>
+<div class="filters"><div class="frow"><span class="cap">Status</span><div class="chips"><label class="chip" for="me-st-all">Todos <b>3</b></label><label class="chip" for="me-st-ab"><svg class="ic " aria-hidden="true"><use href="#i-alert"/></svg>Aguardando <b>1</b></label><label class="chip" for="me-st-ea"><svg class="ic " aria-hidden="true"><use href="#i-clock"/></svg>Em atendimento <b>1</b></label><label class="chip" for="me-st-rs"><svg class="ic " aria-hidden="true"><use href="#i-check"/></svg>Resolvido <b>1</b></label></div></div></div><div class="layout"><section class="listpane" aria-label="Lista de chamados"><div class="queue"><label for="me-sel-143" class="qrow row-143" data-cat="urg" data-st="ab" data-own="none">
+ <div class="r-top"><span class="proto">CHA-000143</span><span class="cat c-urg"><svg class="ic " aria-hidden="true"><use href="#i-bolt"/></svg>Urgência</span><span class="time">há 3 h</span></div>
+ <div class="r-subj">Caio não responde há 9 dias e o encontro 5 é amanhã</div>
+ <div class="r-meta"><span>Atualizado hoje 09:12</span></div>
+ <div class="r-foot"><span class="st st-ab"><svg class="ic " aria-hidden="true"><use href="#i-alert"/></svg>Aberto · aguardando</span></div></label><label for="me-sel-142" class="qrow row-142" data-cat="agen" data-st="ea" data-own="other">
+ <div class="r-top"><span class="proto">CHA-000142</span><span class="cat c-agen"><svg class="ic " aria-hidden="true"><use href="#i-cal"/></svg>Agenda</span><span class="time">há 1 d</span></div>
+ <div class="r-subj">Local do encontro 5 · T2 ainda sem confirmação na Biblioteca</div>
+ <div class="r-meta"><span>Atualizado hoje 08:30</span></div>
+ <div class="r-foot"><span class="st st-ea"><svg class="ic " aria-hidden="true"><use href="#i-clock"/></svg>Em atendimento · Marina</span></div></label><label for="me-sel-128" class="qrow row-128" data-cat="plat" data-st="rs" data-own="other">
+ <div class="r-top"><span class="proto">CHA-000128</span><span class="cat c-plat"><svg class="ic " aria-hidden="true"><use href="#i-monitor"/></svg>Plataforma</span><span class="time">res. há 7 d</span></div>
+ <div class="r-subj">PDF do PDM não abre</div>
+ <div class="r-meta"><span>Atualizado ter 30 set</span></div>
+ <div class="r-foot"><span class="st st-rs"><svg class="ic " aria-hidden="true"><use href="#i-check"/></svg>Resolvido</span></div></label></div></section><section class="detailpane" aria-label="Detalhe do chamado"><article class="detail d-143"><label class="back" for="me-sel-none"><svg class="ic " aria-hidden="true"><use href="#i-back"/></svg>Meus chamados</label>
+<div class="d-head"><span class="proto">CHA-000143</span><span class="cat c-urg"><svg class="ic " aria-hidden="true"><use href="#i-bolt"/></svg>Urgência</span><span class="st st-ab"><svg class="ic " aria-hidden="true"><use href="#i-alert"/></svg>Aberto · aguardando</span></div>
+<h2>Caio não responde há 9 dias e o encontro 5 é amanhã</h2>
+<ol class="stepper" aria-label="Andamento do chamado"><li class="done"><b><svg class="ic " aria-hidden="true"><use href="#i-check"/></svg>Recebido</b><small>ter 7 out · 09:12</small></li><li class="now ab"><b><svg class="ic " aria-hidden="true"><use href="#i-alert"/></svg>Aguardando</b><small>ninguém assumiu ainda</small></li><li class="todo"><b><svg class="ic " aria-hidden="true"><use href="#i-check"/></svg>Resolvido</b><small>—</small></li></ol><p class="callout red"><svg class="ic " aria-hidden="true"><use href="#i-bolt"/></svg><span><b>Urgência recebida.</b> Coordenação e supervisão foram avisadas às 09:12. Quem puder assumir primeiro vai te responder aqui.</span></p>
+<dl class="facts"><div><dt>Quem cuida</dt><dd>Ainda sem responsável</dd></div><div><dt>Aberto em</dt><dd style="font-weight:500">ter 7 out · 09:12</dd></div></dl>
+<div class="msg"><h3>Você escreveu</h3><p>Tentei WhatsApp e ligação desde o dia 28. A mãe também não atende. O encontro 5 · T2 é amanhã (qua 19h) e o registro do encontro 4 ainda está pendente. Preciso de orientação sobre como proceder.</p></div>
+
+<div class="tlh"><h3>Atualizações</h3><div class="legend"><span><svg class="ic " aria-hidden="true"><use href="#i-eye"/></svg>Você vê o que a equipe publica para você.</span></div></div>
+<ol class="timeline"><li class="ev sys"><span class="dot"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg></span><div class="evb"><div class="evh"><span class="tag sys"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg>Automático</span><time>07 out · 09:12</time></div><p>Chamado aberto por André Lima.</p></div></li><li class="ev sys"><span class="dot"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg></span><div class="evb"><div class="evh"><span class="tag sys"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg>Automático</span><time>07 out · 09:12</time></div><p>Urgência: Marina Costa e Paula Nunes foram notificadas (e-mail + app). Quem assumir primeiro trata.</p></div></li></ol>
+<div class="fld"><label class="lb" for="re-me-143">Adicionar informação ao chamado</label><textarea id="re-me-143" rows="3" style="width:100%;border:1px solid var(--input);border-radius:10px;padding:10px 12px;font-size:14.5px" placeholder="Conte algo novo para a equipe…"></textarea></div><div class="actions"><span class="btn pri" role="button" tabindex="0"><svg class="ic " aria-hidden="true"><use href="#i-send"/></svg>Enviar atualização</span></div><p class="actnote"><svg class="ic " aria-hidden="true"><use href="#i-eye"/></svg><span>A equipe também pode escrever comentários internos entre si — esses você não vê.</span></p>
+</article><article class="detail d-142"><label class="back" for="me-sel-none"><svg class="ic " aria-hidden="true"><use href="#i-back"/></svg>Meus chamados</label>
+<div class="d-head"><span class="proto">CHA-000142</span><span class="cat c-agen"><svg class="ic " aria-hidden="true"><use href="#i-cal"/></svg>Agenda</span><span class="st st-ea"><svg class="ic " aria-hidden="true"><use href="#i-clock"/></svg>Em atendimento · Marina</span></div>
+<h2>Local do encontro 5 · T2 ainda sem confirmação na Biblioteca</h2>
+<ol class="stepper" aria-label="Andamento do chamado"><li class="done"><b><svg class="ic " aria-hidden="true"><use href="#i-check"/></svg>Recebido</b><small>seg 6 out · 14:20</small></li><li class="now ea"><b><svg class="ic " aria-hidden="true"><use href="#i-clock"/></svg>Em atendimento</b><small>com Marina</small></li><li class="todo"><b><svg class="ic " aria-hidden="true"><use href="#i-check"/></svg>Resolvido</b><small>—</small></li></ol>
+<dl class="facts"><div><dt>Quem cuida</dt><dd><span class="av mc sm" aria-hidden="true">MC</span>Marina Costa</dd></div><div><dt>Aberto em</dt><dd style="font-weight:500">seg 6 out · 14:20</dd></div></dl>
+<div class="msg"><h3>Você escreveu</h3><p>A Biblioteca Comunitária ainda não confirmou a sala para o encontro 5 de amanhã (qua 19h). Se não confirmar, o Caio fica sem lugar. Pode ajudar a validar ou sugerir outro local?</p></div>
+
+<div class="tlh"><h3>Atualizações</h3><div class="legend"><span><svg class="ic " aria-hidden="true"><use href="#i-eye"/></svg>Você vê o que a equipe publica para você.</span></div></div>
+<ol class="timeline"><li class="ev sys"><span class="dot"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg></span><div class="evb"><div class="evh"><span class="tag sys"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg>Automático</span><time>06 out · 14:20</time></div><p>Chamado aberto por André Lima.</p></div></li><li class="ev sys"><span class="dot"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg></span><div class="evb"><div class="evh"><span class="tag sys"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg>Automático</span><time>06 out · 15:02</time></div><p>Marina Costa assumiu — em atendimento.</p></div></li><li class="ev pub"><span class="dot"><svg class="ic " aria-hidden="true"><use href="#i-eye"/></svg></span><div class="evb"><div class="evh"><b>Marina Costa</b><time>06 out · 15:10</time></div><p>Oi, André! Estou confirmando a sala com a Biblioteca Comunitária. Te retorno aqui até amanhã às 12h.</p></div></li></ol>
+<div class="fld"><label class="lb" for="re-me-142">Adicionar informação ao chamado</label><textarea id="re-me-142" rows="3" style="width:100%;border:1px solid var(--input);border-radius:10px;padding:10px 12px;font-size:14.5px" placeholder="Conte algo novo para a equipe…"></textarea></div><div class="actions"><span class="btn pri" role="button" tabindex="0"><svg class="ic " aria-hidden="true"><use href="#i-send"/></svg>Enviar atualização</span></div><p class="actnote"><svg class="ic " aria-hidden="true"><use href="#i-eye"/></svg><span>A equipe também pode escrever comentários internos entre si — esses você não vê.</span></p>
+</article><article class="detail d-128"><label class="back" for="me-sel-none"><svg class="ic " aria-hidden="true"><use href="#i-back"/></svg>Meus chamados</label>
+<div class="d-head"><span class="proto">CHA-000128</span><span class="cat c-plat"><svg class="ic " aria-hidden="true"><use href="#i-monitor"/></svg>Plataforma</span><span class="st st-rs"><svg class="ic " aria-hidden="true"><use href="#i-check"/></svg>Resolvido</span></div>
+<h2>PDF do PDM não abre</h2>
+<ol class="stepper" aria-label="Andamento do chamado"><li class="done"><b><svg class="ic " aria-hidden="true"><use href="#i-check"/></svg>Recebido</b><small>seg 29 set · 17:15</small></li><li class="done"><b><svg class="ic " aria-hidden="true"><use href="#i-clock"/></svg>Em atendimento</b><small>com Marina</small></li><li class="now rs"><b><svg class="ic " aria-hidden="true"><use href="#i-check"/></svg>Resolvido</b><small>ter 30 set</small></li></ol>
+<dl class="facts"><div><dt>Quem cuida</dt><dd><span class="av mc sm" aria-hidden="true">MC</span>Marina Costa</dd></div><div><dt>Aberto em</dt><dd style="font-weight:500">seg 29 set · 17:15</dd></div></dl>
+<div class="msg"><h3>Você escreveu</h3><p>Ao tocar em “Abrir PDM” da Ana o navegador mostra erro de link expirado.</p></div>
+<div class="resbox"><b><svg class="ic " aria-hidden="true"><use href="#i-check"/></svg>O que foi feito</b>O link do documento vale 5 minutos. Reabrir pelo botão “Abrir PDM” gera um link novo; funcionou.</div>
+<div class="tlh"><h3>Atualizações</h3><div class="legend"><span><svg class="ic " aria-hidden="true"><use href="#i-eye"/></svg>Você vê o que a equipe publica para você.</span></div></div>
+<ol class="timeline"><li class="ev sys"><span class="dot"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg></span><div class="evb"><div class="evh"><span class="tag sys"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg>Automático</span><time>29 set · 17:15</time></div><p>Chamado aberto por André Lima.</p></div></li><li class="ev sys"><span class="dot"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg></span><div class="evb"><div class="evh"><span class="tag sys"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg>Automático</span><time>29 set · 17:40</time></div><p>Marina Costa assumiu — em atendimento.</p></div></li><li class="ev pub"><span class="dot"><svg class="ic " aria-hidden="true"><use href="#i-eye"/></svg></span><div class="evb"><div class="evh"><b>Marina Costa</b><time>30 set · 09:00</time></div><p>André, o link do PDM expira em 5 minutos. Se der erro, volte à ficha e toque em “Abrir PDM” de novo.</p></div></li><li class="ev sys"><span class="dot"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg></span><div class="evb"><div class="evh"><span class="tag sys"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg>Automático</span><time>30 set · 09:02</time></div><p>Marina Costa resolveu o chamado.</p></div></li></ol>
+<div class="actions"><span class="btn" role="button" tabindex="0"><svg class="ic " aria-hidden="true"><use href="#i-undo"/></svg>Não resolveu? Pedir reabertura</span></div><p class="actnote"><svg class="ic " aria-hidden="true"><use href="#i-info"/></svg><span>Ao pedir reabertura, a coordenação é avisada e o chamado volta para a fila.</span></p>
+</article></section></div></div>
+<div class="vazio"><div class="box"><span class="big"><svg class="ic " aria-hidden="true"><use href="#i-help"/></svg></span><h2>Você ainda não abriu nenhum chamado</h2><p>Precisa de ajuda com agenda, metodologia ou algo que travou? Abra um chamado e a coordenação responde aqui. Ao marcar “Preciso de apoio” no registro de um encontro, o chamado é aberto automaticamente.</p><a class="btn pri" href="#abrir-chamado"><svg class="ic " aria-hidden="true"><use href="#i-plus"/></svg>Abrir chamado</a></div></div></main>
+<nav class="bnav" aria-label="Navegação"><a href="#" class="" ><svg class="ic " aria-hidden="true"><use href="#i-home"/></svg>Início</a><a href="#" class="" ><svg class="ic " aria-hidden="true"><use href="#i-users"/></svg>Duplas</a><a href="#" class="" ><svg class="ic " aria-hidden="true"><use href="#i-cal"/></svg>Agenda</a><a href="#" class="" ><svg class="ic " aria-hidden="true"><use href="#i-folder"/></svg>Materiais</a><a href="#" class="on" aria-current="page"><svg class="ic " aria-hidden="true"><use href="#i-help"/></svg>Chamados</a></nav></div><div class="v v-jov"><div class="app"><aside class="sidebar"><div class="brand"><span class="logo">R</span>Realiza.vc</div><a href="#" class="" ><svg class="ic " aria-hidden="true"><use href="#i-home"/></svg>Início</a><a href="#" class="" ><svg class="ic " aria-hidden="true"><use href="#i-cal"/></svg>Agenda</a><a href="#" class="" ><svg class="ic " aria-hidden="true"><use href="#i-users"/></svg>Pessoas</a><a href="#" class="" ><svg class="ic " aria-hidden="true"><use href="#i-folder"/></svg>Materiais</a><a href="#" class="on" aria-current="page"><svg class="ic " aria-hidden="true"><use href="#i-user"/></svg>Perfil</a><div class="me"><span class="av as " aria-hidden="true">AS</span><div><b>Ana Souza</b><small>Mentorada · T1</small></div></div></aside>
+<div><header class="topbar" style="display:none"></header>
+<main class="main"><div class="has"><div class="scope" style="background:hsl(48 100% 60%/.25);border-color:hsl(45 80% 45%/.6)"><span><b>Você vê:</b> só os pedidos que <b>você</b> fez e o que a equipe publicou para você.</span><span class="no"><b>Você NÃO vê:</b> conversas internas da equipe nem pedidos de outras pessoas.</span></div>
+<input class="sr sel sel-none" type="radio" name="jv-sel" id="jv-sel-none" checked><input class="sr sel" type="radio" name="jv-sel" id="jv-sel-137"><input class="sr sel" type="radio" name="jv-sel" id="jv-sel-131"><input class="sr" type="radio" name="jv-st" id="jv-st-all" checked><input class="sr" type="radio" name="jv-st" id="jv-st-ab"><input class="sr" type="radio" name="jv-st" id="jv-st-ea"><input class="sr" type="radio" name="jv-st" id="jv-st-rs">
+<div class="pagehead"><div><p class="sub" style="margin:0 0 4px">Perfil › Falar com a coordenação</p><h1>Meus pedidos de apoio</h1><p class="sub">Aqui você acompanha o que pediu à coordenação.</p></div><a class="btn amber" href="#abrir-chamado"><svg class="ic " aria-hidden="true"><use href="#i-plus"/></svg>Pedir apoio</a></div>
+<div class="filters"><div class="frow"><span class="cap">Status</span><div class="chips"><label class="chip" for="jv-st-all">Todos <b>2</b></label><label class="chip" for="jv-st-ab"><svg class="ic " aria-hidden="true"><use href="#i-alert"/></svg>Aguardando <b>1</b></label><label class="chip" for="jv-st-ea"><svg class="ic " aria-hidden="true"><use href="#i-clock"/></svg>Em atendimento <b>0</b></label><label class="chip" for="jv-st-rs"><svg class="ic " aria-hidden="true"><use href="#i-check"/></svg>Resolvido <b>1</b></label></div></div></div><div class="layout"><section class="listpane" aria-label="Lista de chamados"><div class="queue"><label for="jv-sel-137" class="qrow row-137" data-cat="out" data-st="ab" data-own="none">
+ <div class="r-top"><span class="proto">CHA-000137</span><span class="cat c-out"><svg class="ic " aria-hidden="true"><use href="#i-dots"/></svg>Outro</span><span class="time">há 3 d</span></div>
+ <div class="r-subj">Meu sobrenome está errado no cadastro</div>
+ <div class="r-meta"><span>Atualizado sáb 4 out</span></div>
+ <div class="r-foot"><span class="st st-ab"><svg class="ic " aria-hidden="true"><use href="#i-alert"/></svg>Aberto · aguardando</span></div></label><label for="jv-sel-131" class="qrow row-131" data-cat="agen" data-st="rs" data-own="other">
+ <div class="r-top"><span class="proto">CHA-000131</span><span class="cat c-agen"><svg class="ic " aria-hidden="true"><use href="#i-cal"/></svg>Agenda</span><span class="time">res. há 5 d</span></div>
+ <div class="r-subj">Encontro 7 não aparece na minha agenda</div>
+ <div class="r-meta"><span>Atualizado qui 2 out</span></div>
+ <div class="r-foot"><span class="st st-rs"><svg class="ic " aria-hidden="true"><use href="#i-check"/></svg>Resolvido</span></div></label></div></section><section class="detailpane" aria-label="Detalhe do chamado"><article class="detail d-137"><label class="back" for="jv-sel-none"><svg class="ic " aria-hidden="true"><use href="#i-back"/></svg>Meus chamados</label>
+<div class="d-head"><span class="proto">CHA-000137</span><span class="cat c-out"><svg class="ic " aria-hidden="true"><use href="#i-dots"/></svg>Outro</span><span class="st st-ab"><svg class="ic " aria-hidden="true"><use href="#i-alert"/></svg>Aberto · aguardando</span></div>
+<h2>Meu sobrenome está errado no cadastro</h2>
+<ol class="stepper" aria-label="Andamento do chamado"><li class="done"><b><svg class="ic " aria-hidden="true"><use href="#i-check"/></svg>Recebido</b><small>sáb 4 out · 10:05</small></li><li class="now ab"><b><svg class="ic " aria-hidden="true"><use href="#i-alert"/></svg>Aguardando</b><small>ninguém assumiu ainda</small></li><li class="todo"><b><svg class="ic " aria-hidden="true"><use href="#i-check"/></svg>Resolvido</b><small>—</small></li></ol><p class="callout"><svg class="ic " aria-hidden="true"><use href="#i-info"/></svg><span>Seu pedido foi recebido e está na fila. Você será avisado quando alguém assumir.</span></p>
+<dl class="facts"><div><dt>Quem cuida</dt><dd>Ainda sem responsável</dd></div><div><dt>Aberto em</dt><dd style="font-weight:500">sáb 4 out · 10:05</dd></div></dl>
+<div class="msg"><h3>Você escreveu</h3><p>No meu perfil aparece “Sousa”, mas o certo é “Souza” com z. Dá para corrigir antes de sair o certificado?</p><p class="short"><b>Descrição curta:</b> Sobrenome grafado errado no perfil (Sousa → Souza).</p></div>
+
+<div class="tlh"><h3>Atualizações</h3><div class="legend"><span><svg class="ic " aria-hidden="true"><use href="#i-eye"/></svg>Você vê o que a equipe publica para você.</span></div></div>
+<ol class="timeline"><li class="ev sys"><span class="dot"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg></span><div class="evb"><div class="evh"><span class="tag sys"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg>Automático</span><time>04 out · 10:05</time></div><p>Chamado aberto por Ana Souza.</p></div></li></ol>
+<div class="fld"><label class="lb" for="re-jv-137">Adicionar informação ao chamado</label><textarea id="re-jv-137" rows="3" style="width:100%;border:1px solid var(--input);border-radius:10px;padding:10px 12px;font-size:14.5px" placeholder="Conte algo novo para a equipe…"></textarea></div><div class="actions"><span class="btn pri" role="button" tabindex="0"><svg class="ic " aria-hidden="true"><use href="#i-send"/></svg>Enviar atualização</span></div><p class="actnote"><svg class="ic " aria-hidden="true"><use href="#i-eye"/></svg><span>A equipe também pode escrever comentários internos entre si — esses você não vê.</span></p>
+</article><article class="detail d-131"><label class="back" for="jv-sel-none"><svg class="ic " aria-hidden="true"><use href="#i-back"/></svg>Meus chamados</label>
+<div class="d-head"><span class="proto">CHA-000131</span><span class="cat c-agen"><svg class="ic " aria-hidden="true"><use href="#i-cal"/></svg>Agenda</span><span class="st st-rs"><svg class="ic " aria-hidden="true"><use href="#i-check"/></svg>Resolvido</span></div>
+<h2>Encontro 7 não aparece na minha agenda</h2>
+<ol class="stepper" aria-label="Andamento do chamado"><li class="done"><b><svg class="ic " aria-hidden="true"><use href="#i-check"/></svg>Recebido</b><small>qua 1 out · 18:40</small></li><li class="done"><b><svg class="ic " aria-hidden="true"><use href="#i-clock"/></svg>Em atendimento</b><small>com Marina</small></li><li class="now rs"><b><svg class="ic " aria-hidden="true"><use href="#i-check"/></svg>Resolvido</b><small>qui 2 out</small></li></ol>
+<dl class="facts"><div><dt>Quem cuida</dt><dd><span class="av mc sm" aria-hidden="true">MC</span>Marina Costa</dd></div><div><dt>Aberto em</dt><dd style="font-weight:500">qua 1 out · 18:40</dd></div></dl>
+<div class="msg"><h3>Você escreveu</h3><p>O encontro 7 do T1 sumiu da minha agenda. Só aparecem o 6 e o 8.</p></div>
+<div class="resbox"><b><svg class="ic " aria-hidden="true"><use href="#i-check"/></svg>O que foi feito</b>Faltava vincular o encontro ao cronograma T1. Corrigido — o encontro 7 voltou à agenda.</div>
+<div class="tlh"><h3>Atualizações</h3><div class="legend"><span><svg class="ic " aria-hidden="true"><use href="#i-eye"/></svg>Você vê o que a equipe publica para você.</span></div></div>
+<ol class="timeline"><li class="ev sys"><span class="dot"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg></span><div class="evb"><div class="evh"><span class="tag sys"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg>Automático</span><time>01 out · 18:40</time></div><p>Chamado aberto por Ana Souza.</p></div></li><li class="ev sys"><span class="dot"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg></span><div class="evb"><div class="evh"><span class="tag sys"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg>Automático</span><time>02 out · 09:50</time></div><p>Marina Costa assumiu — em atendimento.</p></div></li><li class="ev pub"><span class="dot"><svg class="ic " aria-hidden="true"><use href="#i-eye"/></svg></span><div class="evb"><div class="evh"><b>Marina Costa</b><time>02 out · 10:40</time></div><p>Ana, o encontro 7 voltou à sua agenda. Era um vínculo com o cronograma da turma.</p></div></li><li class="ev sys"><span class="dot"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg></span><div class="evb"><div class="evh"><span class="tag sys"><svg class="ic " aria-hidden="true"><use href="#i-spark"/></svg>Automático</span><time>02 out · 10:41</time></div><p>Marina Costa resolveu o chamado.</p></div></li></ol>
+<div class="actions"><span class="btn" role="button" tabindex="0"><svg class="ic " aria-hidden="true"><use href="#i-undo"/></svg>Não resolveu? Pedir reabertura</span></div><p class="actnote"><svg class="ic " aria-hidden="true"><use href="#i-info"/></svg><span>Ao pedir reabertura, a coordenação é avisada e o chamado volta para a fila.</span></p>
+</article></section></div></div>
+<div class="vazio"><div class="box"><span class="big" style="background:hsl(48 100% 60%/.4)"><svg class="ic " aria-hidden="true"><use href="#i-help"/></svg></span><h2>Você ainda não pediu apoio</h2><p>Se algo travou, tem dúvida sobre sua agenda ou precisa falar com a coordenação, é só abrir um pedido. A gente responde por aqui.</p><a class="btn amber" href="#abrir-chamado"><svg class="ic " aria-hidden="true"><use href="#i-plus"/></svg>Pedir apoio</a></div></div></main></div></div>
+<nav class="bnav" aria-label="Navegação"><a href="#" class="" ><svg class="ic " aria-hidden="true"><use href="#i-home"/></svg>Início</a><a href="#" class="" ><svg class="ic " aria-hidden="true"><use href="#i-cal"/></svg>Agenda</a><a href="#" class="" ><svg class="ic " aria-hidden="true"><use href="#i-users"/></svg>Pessoas</a><a href="#" class="" ><svg class="ic " aria-hidden="true"><use href="#i-folder"/></svg>Materiais</a><a href="#" class="on" aria-current="page"><svg class="ic " aria-hidden="true"><use href="#i-user"/></svg>Perfil</a></nav></div></div>
+<div class="dialog" id="abrir-chamado" role="dialog" aria-modal="true" aria-labelledby="dlg-t"><a class="scrim" href="#fechar" aria-label="Fechar diálogo" tabindex="-1"></a>
+<form class="sheet" onsubmit="return false"><a class="x" href="#fechar" aria-label="Fechar"><svg class="ic " aria-hidden="true"><use href="#i-x"/></svg></a>
+<h2 id="dlg-t">Abrir chamado</h2><p class="lead">Conte o que está acontecendo. A coordenação responde por aqui, com atualizações datadas.</p>
+<div class="as as-x as-mentor"><span class="av al sm" aria-hidden="true">AL</span><span>Abrindo como <b>André Lima</b> · Mentor DPP</span></div>
+<div class="as as-x as-jov"><span class="av as sm" aria-hidden="true">AS</span><span>Abrindo como <b>Ana Souza</b> · Mentorada</span></div>
+<input class="sr" type="radio" name="categoria" id="k-agenda" checked><input class="sr" type="radio" name="categoria" id="k-met"><input class="sr" type="radio" name="categoria" id="k-plat"><input class="sr" type="radio" name="categoria" id="k-urg"><input class="sr" type="radio" name="categoria" id="k-out">
+<div class="lb" style="font-size:13.5px;font-weight:700;margin-bottom:8px" id="cat-lb">Categoria <span class="req" aria-hidden="true">*</span></div>
+<div class="catgrid" role="group" aria-labelledby="cat-lb">
+<label class="cg" for="k-agenda"><span class="cat c-agen"><svg class="ic " aria-hidden="true"><use href="#i-cal"/></svg></span><span><span class="t">Agenda</span><small>Encontro, horário, local, reagendamento</small></span></label><label class="cg" for="k-met"><span class="cat c-met"><svg class="ic " aria-hidden="true"><use href="#i-book"/></svg></span><span><span class="t">Metodologia</span><small>Dúvida sobre guia, registro, instrumentos</small></span></label><label class="cg" for="k-plat"><span class="cat c-plat"><svg class="ic " aria-hidden="true"><use href="#i-monitor"/></svg></span><span><span class="t">Plataforma</span><small>Algo travou ou não funciona no app</small></span></label><label class="cg" for="k-urg"><span class="cat c-urg"><svg class="ic " aria-hidden="true"><use href="#i-bolt"/></svg></span><span><span class="t">Urgência</span><small>Situação que não pode esperar</small></span></label><label class="cg" for="k-out"><span class="cat c-out"><svg class="ic " aria-hidden="true"><use href="#i-dots"/></svg></span><span><span class="t">Outro</span><small>Nada acima — descreva em poucas palavras</small></span></label></div>
+<p class="khint kh-agenda"><svg class="ic " aria-hidden="true"><use href="#i-cal"/></svg><span>Vai para a fila da coordenação e da supervisão. A coordenação não agenda pela dupla: ela ajuda a destravar.</span></p>
+<p class="khint kh-met"><svg class="ic " aria-hidden="true"><use href="#i-book"/></svg><span>Coordenação ou supervisão respondem.</span></p>
+<p class="khint kh-plat"><svg class="ic " aria-hidden="true"><use href="#i-lock"/></svg><span><b>Só a coordenação vê</b> chamados de plataforma. A supervisão não tem acesso.</span></p>
+<p class="khint kh-urg"><svg class="ic " aria-hidden="true"><use href="#i-bolt"/></svg><span><b>Notifica coordenação e supervisão ao mesmo tempo.</b> Quem assumir primeiro trata.</span></p>
+<p class="khint kh-out"><svg class="ic " aria-hidden="true"><use href="#i-info"/></svg><span>Em “Outro”, a descrição curta é obrigatória para a equipe triar.</span></p>
+<div class="fields">
+<label class="fld"><span class="lb">Assunto <span class="req" aria-hidden="true">*</span></span><input type="text" placeholder="Ex.: Local do encontro 5 sem confirmação"></label>
+<div class="only-mentor"><label class="fld"><span class="lb">Dupla relacionada <span class="opt">(opcional)</span></span><select><option>Nenhuma</option><option>Ana Souza · T1</option><option>Caio Martins · T2</option></select></label></div>
+<label class="fld norm-desc"><span class="lb">Detalhes <span class="opt">(opcional)</span></span><textarea rows="3" placeholder="O que aconteceu, desde quando, o que já tentou…"></textarea></label>
+<label class="fld outro-extra"><span class="lb">Descrição curta <span class="req">* obrigatória em “Outro”</span></span><textarea rows="3" maxlength="280" required placeholder="Em até 280 caracteres, diga o que você precisa"></textarea><span class="err"><svg class="ic " aria-hidden="true"><use href="#i-alert"/></svg>Descreva em poucas palavras para enviar.</span></label>
+</div>
+<p class="autonote"><svg class="ic " aria-hidden="true"><use href="#i-info"/></svg><span><b>Dica:</b> ao marcar <b>“Preciso de apoio”</b> no registro de um encontro, um chamado é aberto automaticamente — você não precisa abrir outro.</span></p>
+<div class="dfoot"><a class="btn" href="#fechar">Cancelar</a><a class="btn pri" href="#fechar"><svg class="ic " aria-hidden="true"><use href="#i-send"/></svg>Abrir chamado</a></div></form></div>
+<div class="notes-wrap" id="notas"><ul class="notes">
+<li class="hd">Matriz papel × o que vê × o que pode fazer</li>
+<li class="tbl" style="padding:0"><div class="tw"><table><thead><tr><th>Papel</th><th>Vê</th><th>Pode</th><th>Não pode</th></tr></thead><tbody>
+<tr><td>Coordenação · Marina Costa</td><td>Fila completa (todas as categorias, plataforma inclusa); timeline pública + interna; “mais antigo há X”.</td><td>Assumir · atribuir (a si ou à Paula; plataforma só a si) · devolver à fila · resolver · reabrir · comentar interno · publicar atualização.</td><td>Agendar encontro pela dupla (nem aqui).</td></tr>
+<tr><td>Auxiliar executivo · Paula Nunes</td><td>Todos, passivamente. Plataforma bloqueada/cinza: só protocolo, categoria, estado, idade.</td><td>Em agenda, metodologia, urgência e outro: assumir · comentar · publicar · resolver · reabrir. Em urgência recebe a notificação junto com a coordenação.</td><td>Plataforma (abrir, ler, responder) · atribuir a outra pessoa · tomar chamado de outro dono.</td></tr>
+<tr><td>Mentor DPP / especialista · André Lima, Luísa Prado</td><td>“Meus chamados” (só os que abriu) + atualizações públicas e eventos automáticos. Vê a própria plataforma que abriu.</td><td>Abrir (5 categorias) · acrescentar informação · pedir reabertura de resolvido.</td><td>Ver comentários internos · ver chamados alheios · ver a fila · assumir/atribuir/resolver.</td></tr>
+<tr><td>Mentorado · Ana Souza</td><td>Só os pedidos dela, com atualizações públicas.</td><td>Abrir · acrescentar informação · pedir reabertura.</td><td>O mesmo do mentor; nunca vê dados de outros jovens.</td></tr></tbody></table></div></li>
+<li class="hd">Regras visuais e de domínio</li>
+<li><b>Vermelho só enquanto ninguém assumiu.</b> Aberto = faixa + fundo vermelho + pílula “Aberto · sem dono” com ícone. Assumir leva a “Em atendimento” (âmbar) com o dono na linha — segue visível até resolvido. Estado nunca só por cor: ícone + texto em todos os pills.</li>
+<li><b>Composer: comentário interno é o padrão</b> (âmbar tracejado); alternar para “Atualização pública” (verde, nomeia quem vai ver) é um clique explícito e muda cor, texto de ajuda e botão. O autor <b>nunca</b> recebe nem vê o que é interno.</li>
+<li><b>Timeline intercalada</b> com legenda: público (verde, olho) · interno (âmbar tracejado, olho riscado) · automático (cinza, é público).</li>
+<li><b>“Preciso de apoio” no registro</b> abre chamado automático (ex.: CHA-000136, origem rotulada). <b>Urgência</b> notifica coordenação + supervisão ao mesmo tempo (ver CHA-000143, CHA-000136).</li>
+<li><b>Use “Estado: Vazio”</b> no topo para ver a inbox zerada (coord/aux) e “nenhum chamado” (mentor/mentorado). O diálogo abre pelos botões “Abrir chamado”/“Pedir apoio”. Filtros, seleção e composer funcionam em CSS puro.</li>
+<li class="hd">Rastreabilidade</li>
+<li><b>Base v3:</b> inbox densa, detalhe em página cheia no mobile, timeline público×interno, filtros “Sem dono”/“Atribuídos a mim”, busca. <b>Da v1:</b> master-detail em duas colunas no desktop e legenda público×interno; composer interno padrão (corrige a v3, que defaultava público). <b>Da v2:</b> “mais antigo há X”, filtro/coluna de status, pílula tracejada “Sem dono”, resumo de resolução nos resolvidos. <b>Novos:</b> plataforma bloqueada para a auxiliar, visões autor com stepper de andamento, diálogo de abertura com categoria <i>outro</i> exigindo descrição.</li>
+<li class="hd">Decisões em aberto</li>
+<li class="open"><b>Aberta:</b> uma atualização pública de quem não é dono assume o chamado automaticamente, ou só o botão “Assumir”? (O mock exige o botão.)</li>
+<li class="open"><b>Aberta:</b> o autor pode reabrir sozinho (e em quantos dias) ou só “pedir reabertura” para a equipe decidir?</li>
+<li class="open"><b>Aberta:</b> categoria do chamado automático do registro — sempre urgência (como no mock) ou o mentor escolhe?</li>
+<li class="open"><b>Aberta:</b> auxiliar vê chamados de duplas fora das 6 supervisionadas (mock: sim, “vê todos”)? E o que mostrar do bloqueado de plataforma (hoje: protocolo, categoria, estado, idade)?</li>
+<li class="open"><b>Aberta:</b> SLA — a partir de quantos dias sem dono o “mais antigo” escala (e-mail à coordenação)? Retenção/LGPD de textos sobre menores de 18 anos.</li>
+<li class="open"><b>Aberta:</b> mentorado e mentor podem anexar arquivos? Mock só mostra anexo na equipe.</li>
+</ul></div>
+</body></html>
