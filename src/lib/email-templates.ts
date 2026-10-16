@@ -17,6 +17,11 @@ const WARN = "#b07a05";
 const WARN_BG = "#fdf6e4";
 const FONT = "'Mitr','Segoe UI',Helvetica,Arial,sans-serif";
 const BANNER_URL = `${SITE_URL}/email/vamos-juntos.png`;
+const LOGO_PONTO = "#ffd531"; // amarelo do ponto do logo — --role-mentorado
+
+/** Wordmark em texto (e-mail não garante webfont/imagem): REALIZA ink +
+ *  ponto âmbar + VC lime — mesmas cores do logo-realiza.png. */
+const LOGO = `<span style="font-size:22px;font-weight:800;font-style:italic;letter-spacing:0.4px;color:${INK};">REALIZA<span style="color:${LOGO_PONTO};">.</span><span style="color:${LIME};">VC</span></span>`;
 
 /** Conteúdo digitado pela coordenação vai pra HTML de e-mail — escapa sempre. */
 function esc(s: string): string {
@@ -40,11 +45,12 @@ function paragrafos(texto: string): string {
 }
 
 /** Casca única dos e-mails do sistema — card branco 600px sobre fundo
- *  cinza com moldura: barra lime em gradiente no topo + borda sutil;
- *  banner da marca mora só no rodapé, numa faixa cinza separada do
- *  card. Só tabelas + CSS inline: o que o Gmail/Outlook respeitam.
- *  `tagline` vira o eyebrow sobre o título e `preheader` é o texto de
- *  prévia que a caixa de entrada mostra. */
+ *  cinza com moldura (barra lime em gradiente + borda sutil), logo em
+ *  texto multicolor no topo do corpo e o banner vamos-juntos fechando
+ *  num rodapé cinza acoplado ao card (radius herdado). Só tabelas +
+ *  CSS inline: o que o Gmail/Outlook respeitam. `tagline` vira o
+ *  eyebrow sobre o título e `preheader` é o texto de prévia que a
+ *  caixa de entrada mostra. */
 export function emailLayout({
   titulo,
   conteudoHtml,
@@ -98,6 +104,7 @@ ${
     <tr><td style="height:6px;line-height:6px;font-size:1px;background-color:${LIME};background-image:linear-gradient(90deg,${LIME} 0%,${LIME_CLARO} 100%);">&nbsp;</td></tr>
     <tr>
       <td class="email-body" style="padding:32px;font-size:15px;line-height:1.55;color:${INK};">
+        <div style="margin:0 0 20px;">${LOGO}</div>
         ${
           tagline
             ? `<p style="margin:0 0 6px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1.6px;color:${LIME_ESCURO};">${esc(tagline)}</p>`
@@ -109,12 +116,8 @@ ${
       </td>
     </tr>
     <tr><td class="email-extra" style="padding:0 32px 20px;font-size:14px;line-height:1.55;color:${INK};"><p style="margin:0;">— Equipe Realiza.vc</p></td></tr>
-  </table>
-</td></tr>
-<tr><td bgcolor="${BORDA}" style="background:${BORDA};">
-  <table role="presentation" width="600" align="center" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;margin:0 auto;">
-    <tr><td align="center" style="padding:24px 32px 0;"><img src="${BANNER_URL}" alt="Instituto Realiza.vc — Vamos Juntos!" width="440" style="display:inline-block;width:440px;max-width:100%;height:auto;border:0;outline:none;border-radius:12px;"></td></tr>
-    <tr><td class="email-legal" style="padding:14px 32px 26px;font-size:11px;line-height:1.6;color:${MUTED};text-align:center;">
+    <tr><td bgcolor="${FUNDO}" style="background:${FUNDO};padding:24px 32px 0;" align="center"><img src="${BANNER_URL}" alt="Instituto Realiza.vc — Vamos Juntos!" width="440" style="display:inline-block;width:440px;max-width:100%;height:auto;border:0;outline:none;border-radius:12px;"></td></tr>
+    <tr><td class="email-legal" bgcolor="${FUNDO}" style="background:${FUNDO};padding:14px 32px 26px;font-size:11px;line-height:1.6;color:${MUTED};text-align:center;">
       Instituto Realiza.vc &middot; <a href="${esc(SITE_URL)}" style="color:${MUTED};text-decoration:underline;">${esc(SITE_URL.replace(/^https?:\/\//, ""))}</a>
       ${rodapeExtra ? `<br>${rodapeExtra}` : ""}
     </td></tr>
