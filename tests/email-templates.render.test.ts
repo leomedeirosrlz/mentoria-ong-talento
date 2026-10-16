@@ -26,9 +26,10 @@ describe("templates de e-mail", () => {
     expect(html).toContain(">Urgente<"); // faixa de prioridade
     expect(html).toContain("&lt;até&gt;"); // corpo escapado
     expect(html).not.toContain("<até>");
-    // casca nova: banner só no rodapé cinza, card abre com barra lime
+    // casca nova: logo wordmark em texto no topo, banner só no rodapé cinza
     expect((html.match(/vamos-juntos\.png/g) ?? []).length).toBe(1);
-    expect(html).toContain("linear-gradient(90deg,#a0c644");
+    expect(html).toContain("REALIZA");
+    expect(html).toContain("#ffd531"); // ponto âmbar do logo
     expect(html).toContain("height:6px");
     expect(html).toContain("— Equipe Realiza.vc");
   });
