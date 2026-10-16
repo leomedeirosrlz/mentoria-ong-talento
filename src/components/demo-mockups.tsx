@@ -2,7 +2,11 @@
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Flask, X } from "@phosphor-icons/react";
-import { MOCKUP_TELAS, parseMockupParam } from "@/lib/demo/mockups";
+import {
+  MOCKUP_TELAS,
+  parseMockupParam,
+  telaPorRota,
+} from "@/lib/demo/mockups";
 import { cn } from "@/lib/utils";
 
 /** Seção "Layouts em teste" no popover da DemoBar — catálogo das telas com
@@ -56,6 +60,72 @@ export function MockupsSection() {
         ))}
       </div>
     </div>
+  );
+}
+
+/** Switch na própria tela — aparece nas rotas que têm mockup associado
+ *  (agenda → /agenda, duplas → /duplas etc.) quando a demo está ativa.
+ *  Pill segmentada "App | v1 | v2 | v3" flutuando acima do bottom nav;
+ *  escolher uma variante abre o MockupViewer por cima. Escondido enquanto
+ *  o overlay está aberto — a barra dele já troca de variante. */
+function MockupViewToggle() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const tela = telaPorRota(pathname);
+  const ativo = parseMockupParam(searchParams.get("mockup"));
+  if (!tela || ativo) return null;
+
+  function selecionar(variante: number | null) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (variante) params.set("mockup", `${tela!.id}:v${variante}`);
+    else params.delete("mockup");
+    router.push(`${pathname}?${params.toString()}`);
+  }
+
+  return (
+    <div
+      role="group"
+      aria-label={`Propostas de layout — ${tela.label}`}
+      /* acima do bottom nav mobile (4.75rem = altura do nav + folga),
+         centrado pra não disputar o canto com a pill da DemoBar */
+      className="fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom))] left-1/2 z-50 -translate-x-1/2 md:bottom-6"
+    >
+      <div className="flex items-center gap-0.5 rounded-full border border-border bg-card p-1 shadow-lg">
+        <span className="hidden pl-2.5 pr-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground sm:inline">
+          {tela.label}
+        </span>
+        <button
+          type="button"
+          aria-pressed={!ativo}
+          onClick={() => selecionar(null)}
+          className="min-h-9 rounded-full bg-[var(--brand-ink)] px-3 text-xs font-semibold text-white outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          App
+        </button>
+        {[1, 2, 3].map((v) => (
+          <button
+            key={v}
+            type="button"
+            title={tela.variantes[v - 1]}
+            onClick={() => selecionar(v)}
+            className="min-h-9 rounded-full px-3 text-xs font-semibold text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            v{v}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** Ponto único de montagem nos layouts — switch da tela + overlay. */
+export function DemoMockups() {
+  return (
+    <>
+      <MockupViewToggle />
+      <MockupViewer />
+    </>
   );
 }
 

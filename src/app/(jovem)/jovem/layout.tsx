@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { DemoBar } from "@/components/demo-bar";
-import { MockupViewer } from "@/components/demo-mockups";
+import { DemoMockups } from "@/components/demo-mockups";
 import { JovemShell } from "@/components/jovem-shell";
 import { TelaConta } from "@/components/telas-conta";
 import { getDemoData } from "@/lib/demo/data";
@@ -86,7 +86,7 @@ export default async function JovemLayout({
   // o jovem também compara as propostas de Materiais e Especialistas
   const demoMockups = demo && (
     <Suspense fallback={null}>
-      <MockupViewer />
+      <DemoMockups />
     </Suspense>
   );
 

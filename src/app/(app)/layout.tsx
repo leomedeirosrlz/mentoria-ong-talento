@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { AppShell } from "@/components/app-shell";
 import { DemoBar } from "@/components/demo-bar";
-import { MockupViewer } from "@/components/demo-mockups";
+import { DemoMockups } from "@/components/demo-mockups";
 import { OnboardingFlow } from "@/components/onboarding-flow";
 import { TelaConta } from "@/components/telas-conta";
 import { getDemoData } from "@/lib/demo/data";
@@ -86,7 +86,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // param é ignorado. Montado uma vez pro layout inteiro, como a DemoBar.
   const demoMockups = demo && (
     <Suspense fallback={null}>
-      <MockupViewer />
+      <DemoMockups />
     </Suspense>
   );
 
