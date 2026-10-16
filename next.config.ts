@@ -31,6 +31,22 @@ const CSP = [
   "frame-ancestors 'none'",
 ].join("; ");
 
+// CSP própria dos mockups de layout (public/demo/mockups): são HTML
+// standalone servidos dentro de <iframe> pelo viewer da demo — por isso
+// frame-ancestors 'self' em vez de 'none' — e carregam Inter via Google
+// Fonts. Sem essa exceção o X-Frame-Options global DENY apagava o overlay.
+const MOCKUP_CSP = [
+  "default-src 'self'",
+  "script-src 'self' 'unsafe-inline'",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  "img-src 'self' data:",
+  "connect-src 'self'",
+  "font-src 'self' https://fonts.gstatic.com",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "frame-ancestors 'self'",
+].join("; ");
+
 const nextConfig: NextConfig = {
   // sem "X-Powered-By: Next.js" — banner de stack não ajuda ninguém
   poweredByHeader: false,
@@ -46,7 +62,20 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
-        source: "/:path*",
+        // mockups da demo: podem ser iframed pelo próprio app (SAMEORIGIN)
+        // e usam Google Fonts — bloco separado do CSP global acima
+        source: "/demo/mockups/:path*",
+        headers: [
+          { key: "Content-Security-Policy", value: MOCKUP_CSP },
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          { key: "X-Frame-Options", value: "SAMEORIGIN" },
+        ],
+      },
+      {
+        // negative lookahead: o bloco global NÃO pode cobrir /demo/mockups —
+        // se cobrisse, o X-Frame-Options DENY voltaria a quebrar o viewer
+        source: "/((?!demo/mockups).*)",
         headers: [
           { key: "Content-Security-Policy", value: CSP },
           { key: "X-Content-Type-Options", value: "nosniff" },
