@@ -59,6 +59,13 @@
   .board-head h1{font-size:clamp(20px,3vw,28px);font-weight:800;letter-spacing:-.02em;color:#fff}
   .board-head .sub{margin-top:8px;font-size:14px;line-height:1.55;max-width:840px;color:var(--board-tx)}
   .board-head .sub b{color:var(--board-tx-hi)}
+  .board-head nav{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}
+  .board-head nav a{
+    font-size:12px;font-weight:650;padding:6px 14px;border-radius:999px;
+    border:1px solid var(--board-line);color:var(--board-tx-hi);text-decoration:none;
+  }
+  .board-head nav a:hover{border-color:var(--brand-lime);color:var(--brand-lime)}
+  figure.frame{scroll-margin-top:20px}
 
   .board{display:flex;flex-wrap:wrap;gap:30px;justify-content:center;max-width:1300px;margin:0 auto}
   figure.frame{flex:1 1 590px;max-width:645px;min-width:0;display:flex;flex-direction:column;gap:12px}
@@ -359,17 +366,21 @@
   <p class="kicker">Realiza.vc · Mockup v5 · Agenda (rodada 2)</p>
   <h1>A agenda é das relações — o tempo entra como contexto</h1>
   <p class="sub">
-    Mesma lógica, dois objetos: a página se organiza <b>por quem você acompanha ou conduz</b>, não pelo
+    <b>Direção:</b> duas personas, mesma lógica — a página se organiza <b>por quem você acompanha ou conduz</b>, não pelo
     calendário. À esquerda, <b>André</b> (mentor DPP) com dois mentorados em turmas desencontradas;
     à direita, <b>Luísa</b> (especialista), para quem a <b>grade de disponibilidade</b> é instrumento
     de trabalho. Em ambos, uma faixa “sua semana” no topo amarra os dias sem virar a estrutura.
   </p>
+  <nav aria-label="Pranchetas">
+    <a href="#andre">1 · André (mentor DPP)</a>
+    <a href="#luisa">2 · Luísa (especialista)</a>
+  </nav>
 </header>
 
 <main class="board">
 
   <!-- ══════════════════════ PRANCHETA 1 · ANDRÉ ══════════════════════ -->
-  <figure class="frame">
+  <figure class="frame" id="andre">
     <figcaption>
       <span class="who"><em>Persona: André Lima</em> — mentor DPP</span>
       Acompanha <b>Ana (T1 · encontro 8)</b> e <b>Caio (T2 · encontro 5)</b> — turmas com cronogramas
@@ -684,7 +695,7 @@
   </figure>
 
   <!-- ══════════════════════ PRANCHETA 2 · LUÍSA ══════════════════════ -->
-  <figure class="frame">
+  <figure class="frame" id="luisa">
     <figcaption>
       <span class="who"><em>Persona: Luísa Prado</em> — mentora especialista</span>
       Conduz <b>duas trilhas</b>: Ana (sessão 3 de 5) e Pedro (sessão 1, horário a confirmar) —

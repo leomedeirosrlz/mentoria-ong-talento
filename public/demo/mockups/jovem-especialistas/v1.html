@@ -41,9 +41,28 @@
   svg.ic { width: 20px; height: 20px; flex: none; }
 
   /* ---------- palco de apresentação ---------- */
-  .stage-head { text-align: center; padding: 36px 20px 6px; }
-  .stage-head h1 { font-size: 14px; font-weight: 700; letter-spacing: .01em; }
-  .stage-head p { font-size: 12.5px; color: var(--muted-foreground); margin-top: 4px; }
+  .board-head {
+    background: var(--brand-ink); color: hsl(75 20% 88%);
+    padding: 13px 20px; display: flex; flex-wrap: wrap; align-items: center;
+    gap: 8px 18px; font-size: 12.5px;
+  }
+  .board-head b { color: var(--brand-lime); font-weight: 700; letter-spacing: .03em; }
+  .board-head .dir { color: hsl(75 10% 62%); max-width: 76ch; }
+  .board-head nav { margin-left: auto; display: flex; gap: 6px; }
+  .board-head nav a {
+    font-size: 12px; font-weight: 600; padding: 5px 12px; border-radius: 999px;
+    border: 1px solid hsl(75 10% 35%); color: hsl(75 20% 85%); text-decoration: none;
+  }
+  .board-head nav a:hover { border-color: var(--brand-lime); color: var(--brand-lime); }
+
+  .notes {
+    width: min(62rem, 100% - 32px); margin: 0 auto 56px; padding: 18px 22px;
+    background: hsl(0 0% 100% / .6); border: 1px solid var(--border); border-radius: var(--radius);
+    display: grid; gap: 8px; font-size: 12.5px; line-height: 1.6; color: var(--muted-foreground);
+  }
+  .notes b { color: var(--brand-ink); }
+  .notes li { margin-left: 18px; }
+
   .stage {
     display: flex; gap: 60px; justify-content: center; align-items: flex-start;
     padding: 26px 24px 72px; flex-wrap: wrap;
@@ -280,21 +299,24 @@
   @media (max-width: 720px) {
     .stage { flex-direction: column; align-items: center; gap: 44px; padding: 20px 14px 56px; }
     figure.device { width: 100%; max-width: 390px; }
-    .stage-head { padding-top: 26px; }
   }
 </style>
 </head>
 <body>
 
-<header class="stage-head">
-  <h1>App do jovem — variante “aba dedicada”</h1>
-  <p>Especialistas entra como 5º item da bottom nav · Pessoas migra para o header e para o Perfil</p>
+<header class="board-head">
+  <span><b>MOCKUP</b> · jovem-especialistas · v1</span>
+  <span class="dir">Direção: aba dedicada — Especialistas vira o 5º item da bottom nav (Pessoas migra pro header e pro Perfil) e a página própria concentra pedido, trilha e catálogo</span>
+  <nav>
+    <a href="#tela-home">1 · Home</a>
+    <a href="#tela-especialistas">2 · Especialistas</a>
+  </nav>
 </header>
 
 <main class="stage">
 
   <!-- ============ TELA 1 · HOME ============ -->
-  <figure class="device">
+  <figure class="device" id="tela-home">
     <figcaption><span class="num">1</span> Home — aba “Início”</figcaption>
     <div class="phone">
       <div class="statusbar">
@@ -438,7 +460,7 @@
   </figure>
 
   <!-- ============ TELA 2 · ESPECIALISTAS ============ -->
-  <figure class="device">
+  <figure class="device" id="tela-especialistas">
     <figcaption><span class="num">2</span> Especialistas — aba dedicada</figcaption>
     <div class="phone">
       <div class="statusbar">
@@ -596,6 +618,13 @@
   </figure>
 
 </main>
+
+<ul class="notes">
+  <li><b>Aba dedicada custa um item.</b> Especialistas vira o 5º da bottom nav e Pessoas sai — vira ícone no header e segue acessível pelo Perfil. O rótulo de 13 letras exige fonte de 9–9,5px na barra: coube, mas é o limite.</li>
+  <li><b>Home encolhe pra dar lugar à aba.</b> Sem catálogo embutido, sobram próximo encontro, uma pendência e atalhos — Especialistas aparece no tile com tag “novo” e no banner de descoberta (“travou em algum tema?”).</li>
+  <li><b>Simplificação de domínio (anterior à correção).</b> O card “Seu pedido de apoio” mostra na prática a trilha ativa com a Luísa — sessão 3 de 5, próxima sexta, botão “reagendar” — e o CTA “Pedir apoio de especialista” confunde duas coisas: solicitar trilha (processo com análise e aceite) e pedido de apoio à coordenação (chamado, outro sistema). A separação correta vem nas v4/v5.</li>
+  <li><b>Catálogo com dedup honesto.</b> A Luísa aparece marcada “Em trilha com você” em vez de receber novo pedido; a Beatriz sai como “Indisponível”, não some da lista.</li>
+</ul>
 
 </body>
 </html>

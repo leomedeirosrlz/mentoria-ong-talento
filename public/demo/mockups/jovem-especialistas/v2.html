@@ -39,14 +39,20 @@
   }
 
   /* ---------- board (apresentação) ---------- */
-  .board-head { max-width: 1240px; margin: 0 auto 30px; }
-  .kicker {
-    font-size: 11px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase;
-    color: var(--brand-lime); margin-bottom: 10px;
+  .board-head {
+    max-width: 1240px; margin: 0 auto 30px;
+    background: hsl(60 9% 13%); border: 1px solid hsl(60 8% 22%); border-radius: 14px;
+    padding: 13px 18px; display: flex; flex-wrap: wrap; align-items: center;
+    gap: 8px 18px; font-size: 12.5px; color: hsl(60 8% 78%);
   }
-  .board-head h1 { font-size: clamp(20px, 3vw, 28px); font-weight: 800; letter-spacing: -.02em; color: #fff; }
-  .board-head .sub { margin-top: 8px; font-size: 14px; line-height: 1.55; color: hsl(60 6% 62%); max-width: 760px; }
-  .board-head .sub b { color: hsl(60 8% 85%); }
+  .board-head b { color: var(--brand-lime); font-weight: 700; letter-spacing: .03em; }
+  .board-head .dir { color: hsl(60 6% 58%); max-width: 72ch; }
+  .board-head nav { margin-left: auto; display: flex; gap: 6px; flex-wrap: wrap; }
+  .board-head nav a {
+    font-size: 12px; font-weight: 600; padding: 5px 12px; border-radius: 999px;
+    border: 1px solid hsl(60 8% 30%); color: hsl(60 8% 82%); text-decoration: none;
+  }
+  .board-head nav a:hover { border-color: var(--brand-lime); color: var(--brand-lime); }
 
   .board { display: flex; flex-wrap: wrap; gap: 28px; justify-content: center; max-width: 1240px; margin: 0 auto; }
   figure.frame { display: flex; flex-direction: column; gap: 14px; }
@@ -312,20 +318,19 @@
 <body>
 
 <header class="board-head">
-  <p class="kicker">Realiza.vc · Mockup v2 · Jovem → Especialistas</p>
-  <h1>Overflow “Mais” na bottom nav</h1>
-  <p class="sub">
-    Persona: <b>Ana Souza</b>, mentorada da Turma 1 — usa o app no celular.
-    A bottom nav mantém <b>5 itens fixos</b> (Início, Agenda, Pessoas, Materiais, Mais);
-    o item <b>“Mais”</b> abre um sheet com os destinos secundários —
-    é ali que <b>Especialistas</b> entra, com badge de novidade.
-  </p>
+  <span><b>MOCKUP</b> · jovem-especialistas · v2</span>
+  <span class="dir">Direção: menu “Mais” com overflow — a barra fixa os 4 destinos principais + “Mais”, que abre um sheet onde Especialistas entra com badge de novidade · persona: Ana Souza, mentorada T1, no celular</span>
+  <nav>
+    <a href="#tela-home">1 · Home</a>
+    <a href="#tela-mais">2 · Sheet “Mais”</a>
+    <a href="#tela-especialistas">3 · Especialistas</a>
+  </nav>
 </header>
 
 <main class="board">
 
   <!-- ═══════════ TELA 1 · HOME ═══════════ -->
-  <figure class="frame">
+  <figure class="frame" id="tela-home">
     <div class="phone">
       <div class="statusbar">
         <span>19:41</span>
@@ -425,7 +430,7 @@
   </figure>
 
   <!-- ═══════════ TELA 1b · SHEET "MAIS" ABERTO ═══════════ -->
-  <figure class="frame">
+  <figure class="frame" id="tela-mais">
     <div class="phone">
       <div class="statusbar">
         <span>19:41</span>
@@ -558,7 +563,7 @@
   </figure>
 
   <!-- ═══════════ TELA 2 · ESPECIALISTAS ═══════════ -->
-  <figure class="frame">
+  <figure class="frame" id="tela-especialistas">
     <div class="phone">
       <div class="statusbar">
         <span>19:44</span>
@@ -664,11 +669,12 @@
 
 </main>
 
-<section class="notes">
-  <li><b>Descoberta:</b> o badge “1 novidade” no sheet corresponde à atualização do pedido em andamento — limpa quando Ana abre a página (ou lê o aviso).</li>
-  <li><b>Por que overflow:</b> os 4 destinos principais ficam sempre nos mesmos slots (memória muscular); Perfil e Especialistas — acessos menos frequentes — vivem no “Mais”, que ainda escala pra futuros itens (Notificações, Configurações).</li>
-  <li><b>Desktop:</b> na nav lateral/web, Especialistas e Perfil aparecem direto no menu — o overflow “Mais” é uma solução só do mobile.</li>
-</section>
+<ul class="notes">
+  <li><b>Overflow preserva a memória muscular.</b> Os 4 destinos principais ficam sempre nos mesmos slots; Perfil e Especialistas — acessos menos frequentes — vivem no “Mais”, que ainda escala pra futuros itens (Notificações, Configurações).</li>
+  <li><b>Badge é estado, não enfeite.</b> O “1 novidade” no sheet corresponde à atualização do pedido em análise — limpa quando a Ana abre a página (ou lê o aviso).</li>
+  <li><b>Simplificação de domínio (anterior à correção).</b> O card “Seu pedido” é uma solicitação de trilha — stepper enviado → em análise → especialista designada — mas CTA e rótulo dizem “pedido de apoio”, que no domínio é chamado à coordenação, outro sistema. E a Luísa já aparece como “sua especialista” com sessão marcada sexta 16h, pressupondo trilha ativa: sessão só se agenda dentro de trilha — separação que v4/v5 explicitam.</li>
+  <li><b>Desktop não tem overflow.</b> Na nav lateral, Especialistas e Perfil aparecem direto no menu — o “Mais” é solução só do mobile.</li>
+</ul>
 
 </body>
 </html>

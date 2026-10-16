@@ -45,6 +45,34 @@
   a { color: inherit; text-decoration: none; }
   a:focus-visible { outline: 2.5px solid var(--brand-ink); outline-offset: 2px; border-radius: 6px; }
 
+  /* ---------- chrome do mockup (não é produto) ---------- */
+  .board-head {
+    background: var(--brand-ink); color: hsl(75 20% 88%);
+    padding: 13px 20px; display: flex; flex-wrap: wrap; align-items: center;
+    gap: 8px 18px; font-size: 12.5px; position: sticky; top: 0; z-index: 80;
+  }
+  .board-head b { color: var(--brand-lime); font-weight: 700; letter-spacing: .03em; }
+  .board-head .dir { color: hsl(75 10% 62%); }
+  .board-head nav { margin-left: auto; display: flex; gap: 6px; }
+  .board-head nav a {
+    font-size: 12px; font-weight: 600; padding: 5px 12px; border-radius: 999px;
+    border: 1px solid hsl(75 10% 35%); color: hsl(75 20% 85%); text-decoration: none;
+  }
+  .board-head nav a:hover { border-color: var(--brand-lime); color: var(--brand-lime); }
+
+  .notes {
+    width: min(1064px, calc(100% - 32px));
+    margin: 0 auto; padding: 18px 22px; border-radius: 14px;
+    background: var(--brand-ink); color: hsl(75 20% 80%);
+    display: grid; gap: 8px; font-size: 12.5px; line-height: 1.6;
+  }
+  .notes b { color: hsl(75 20% 94%); }
+  .notes li { margin-left: 18px; }
+
+  /* respiro no fim da página — margin do último filho colapsa no body;
+     o espaçador garante que a bottomnav fixa não cubra as notas no mobile */
+  body::after { content: ""; display: block; height: 110px; }
+
   .wrap { max-width: 1120px; margin: 0 auto; padding: 0 28px; }
 
   /* ---------- topbar ---------- */
@@ -296,6 +324,16 @@
 </head>
 <body>
 
+<!-- ===== chrome do mockup ===== -->
+<header class="board-head">
+  <span><b>MOCKUP</b> · materiais · v2</span>
+  <span class="dir">Direção: “Minha jornada” protagonista — hero lime com trilha de marcos — e os 3 portais de apoio rebaixados a cards brancos</span>
+  <nav>
+    <a href="#jornada">1 · Minha jornada</a>
+    <a href="#apoio">2 · Materiais de apoio</a>
+  </nav>
+</header>
+
 <header class="topbar">
   <div class="wrap topbar-in">
     <div class="brand"><span class="mark">R</span>Realiza</div>
@@ -314,7 +352,7 @@
   </div>
 
   <!-- HERÓI: MINHA JORNADA -->
-  <section class="hero" aria-label="Minha jornada">
+  <section class="hero" id="jornada" aria-label="Minha jornada">
     <div class="hero-top">
       <div>
         <span class="eyebrow">Turma 1 · Encontro 8 de 16</span>
@@ -423,7 +461,7 @@
   </section>
 
   <!-- PORTAIS SECUNDÁRIOS -->
-  <div class="plabels">
+  <div class="plabels" id="apoio">
     <h2>Materiais de apoio</h2>
     <p>Guias, modelos e links pra consultar quando precisar.</p>
   </div>
@@ -559,6 +597,15 @@
     Perfil
   </a>
 </nav>
+
+<!-- decisões -->
+<ul class="notes">
+  <li><b>Direção vencedora da rodada 1.</b> “Minha jornada” sai da grid simétrica e vira o hero lime da página — os outros três portais descem pra “Materiais de apoio”, cards brancos de segunda hierarquia.</li>
+  <li><b>Marcos, não arquivos.</b> A linha do tempo ordena os instrumentos pelo momento do ciclo (anamnese → mapa de metas → PDM → roda da vida → autoavaliação) com três estados: concluído (selo de check), em andamento (nó escuro com barra) e futuro (fantasma tracejado, sem ação).</li>
+  <li><b>A resposta é o destino.</b> Marco concluído oferece “Rever respostas”; o PDM em andamento ganha o único CTA em pill — “Continuar”. O documento do próprio jovem é a unidade da estante.</li>
+  <li><b>Apoio sem competir.</b> Guias, modelos e links ficam em cards discretos com amostra de 3 itens e rodapé “Ver todos · N” — consulta rápida que não disputa com a jornada.</li>
+  <li><b>Vertical no mobile.</b> Em telas estreitas a linha do tempo horizontal colapsa em trilha vertical à esquerda — mesma ordem e mesmos estados, refeita pra leitura de cima a baixo.</li>
+</ul>
 
 </body>
 </html>

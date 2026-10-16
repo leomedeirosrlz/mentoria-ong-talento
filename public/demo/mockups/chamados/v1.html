@@ -52,6 +52,36 @@
     stroke-linecap: round; stroke-linejoin: round;
   }
 
+  /* ---------- casca do mockup (não é produto) ---------- */
+  .board-head {
+    background: var(--brand-ink); color: hsl(75 20% 88%);
+    padding: 13px 20px; display: flex; flex-wrap: wrap; align-items: center;
+    gap: 8px 18px; font-size: 12.5px;
+  }
+  .board-head b { color: var(--brand-lime); font-weight: 700; letter-spacing: 0.03em; }
+  .board-head .dir { color: hsl(75 10% 62%); }
+  .board-head nav { margin-left: auto; display: flex; gap: 6px; flex-wrap: wrap; }
+  .board-head nav a {
+    font-size: 12px; font-weight: 600; padding: 5px 12px; border-radius: 999px;
+    border: 1px solid hsl(75 10% 35%); color: hsl(75 20% 85%); text-decoration: none;
+  }
+  .board-head nav a:hover { border-color: var(--brand-lime); color: var(--brand-lime); }
+  #fila, #thread { scroll-margin-top: 76px; }
+
+  .notes {
+    list-style: none; display: grid; gap: 9px;
+    width: calc(100% - 56px); max-width: 1224px; margin: 0 auto 44px;
+    padding: 17px 20px; border-radius: 14px;
+    background: var(--brand-ink); color: hsl(75 20% 82%);
+    font-size: 12.5px; line-height: 1.55;
+  }
+  .notes li { position: relative; padding-left: 18px; }
+  .notes li::before {
+    content: ""; position: absolute; left: 2px; top: 0.58em;
+    width: 6px; height: 6px; border-radius: 50%; background: var(--brand-lime);
+  }
+  .notes b { color: var(--brand-lime); font-weight: 700; }
+
   /* ---------- topbar ---------- */
   .top {
     position: sticky; top: 0; z-index: 5;
@@ -323,10 +353,21 @@
     .chips { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; }
     .chips::-webkit-scrollbar { display: none; }
     .chip { flex: none; }
+    .notes { width: calc(100% - 28px); margin-bottom: 32px; }
   }
 </style>
 </head>
 <body>
+
+<!-- ===== casca do mockup ===== -->
+<header class="board-head">
+  <span><b>MOCKUP</b> · chamados · v1</span>
+  <span class="dir">Direção: master-detail — a fila fica sempre visível à esquerda com seus filtros; a thread completa do chamado selecionado abre à direita</span>
+  <nav>
+    <a href="#fila">1 · Fila</a>
+    <a href="#thread">2 · Thread</a>
+  </nav>
+</header>
 
 <header class="top">
   <div class="brand"><span class="mark">R</span><span class="word">Realiza<em>.vc</em></span></div>
@@ -359,7 +400,7 @@
   <div class="layout">
 
     <!-- ===== FILA ===== -->
-    <aside class="queue">
+    <aside class="queue" id="fila">
       <div class="q-head">Fila <span class="q-count">6</span></div>
       <div class="filters">
         <div class="chips">
@@ -499,7 +540,7 @@
     </aside>
 
     <!-- ===== THREAD ===== -->
-    <section class="thread">
+    <section class="thread" id="thread">
       <div class="th-head">
         <div class="k-row">
           <span class="proto-lg">CHA-000235</span>
@@ -625,5 +666,14 @@
 
   </div>
 </main>
+
+<!-- ===== notas de direção ===== -->
+<ul class="notes">
+  <li><b>Duas colunas fixas.</b> A fila — com filtros por categoria, status e responsável — fica sempre visível à esquerda enquanto a thread abre à direita: triagem e leitura na mesma tela, sem ir e voltar. No mobile a lista vira a primeira tela e o detalhe abre em seguida.</li>
+  <li><b>Urgência fura a fila.</b> O card vermelho com barra lateral marca urgência sem dono — na operação, urgência notifica coordenação e supervisão, e quem assumir primeiro fica com o chamado.</li>
+  <li><b>Timeline de duas camadas.</b> O “Andamento” intercala atualizações públicas (lime — o autor do chamado vê) e comentários internos (âmbar — só coordenação e supervisão). A legenda no topo e o compositor que nasce em “Comentário interno” deixam a fronteira explícita.</li>
+  <li><b>Status lê de longe.</b> “Aberto” é pill vermelha; “em atendimento” sai do vermelho e passa a exibir o responsável; resolvido segue na fila, dessaturado, com quem fechou — nada desaparece.</li>
+</ul>
+
 </body>
 </html>

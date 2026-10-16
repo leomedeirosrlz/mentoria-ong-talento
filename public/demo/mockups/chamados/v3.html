@@ -55,6 +55,36 @@
   svg.ic { width: 15px; height: 15px; flex: none; }
   .shell { max-width: 1060px; margin: 0 auto; padding-inline: clamp(14px, 4vw, 36px); }
 
+  /* ---------- casca do mockup (não é produto) ---------- */
+  .board-head {
+    background: var(--brand-ink); color: hsl(75 20% 88%);
+    padding: 13px 20px; display: flex; flex-wrap: wrap; align-items: center;
+    gap: 8px 18px; font-size: 12.5px;
+  }
+  .board-head b { color: var(--brand-lime); font-weight: 700; letter-spacing: 0.03em; }
+  .board-head .dir { color: hsl(75 10% 62%); }
+  .board-head nav { margin-left: auto; display: flex; gap: 6px; flex-wrap: wrap; }
+  .board-head nav a {
+    font-size: 12px; font-weight: 600; padding: 5px 12px; border-radius: 999px;
+    border: 1px solid hsl(75 10% 35%); color: hsl(75 20% 85%); text-decoration: none;
+  }
+  .board-head nav a:hover { border-color: var(--brand-lime); color: var(--brand-lime); }
+  #fila { scroll-margin-top: 58px; }
+
+  .notes {
+    list-style: none; display: grid; gap: 9px;
+    width: calc(100% - clamp(28px, 8vw, 72px)); max-width: 988px; margin: -26px auto 0;
+    padding: 17px 20px; border-radius: 14px;
+    background: var(--brand-ink); color: hsl(75 20% 82%);
+    font-size: 12.5px; line-height: 1.55;
+  }
+  .notes li { position: relative; padding-left: 18px; }
+  .notes li::before {
+    content: ""; position: absolute; left: 2px; top: 0.58em;
+    width: 6px; height: 6px; border-radius: 50%; background: var(--brand-lime);
+  }
+  .notes b { color: var(--brand-lime); font-weight: 700; }
+
   /* ---------- topbar ---------- */
   .topbar { background: var(--card); border-bottom: 1px solid var(--border); }
   .topbar .in { display: flex; align-items: center; justify-content: space-between; height: 56px; }
@@ -298,6 +328,16 @@
 </head>
 <body>
 
+<!-- ===== casca do mockup ===== -->
+<header class="board-head">
+  <span><b>MOCKUP</b> · chamados · v3</span>
+  <span class="dir">Direção: inbox denso ordenado pela última movimentação + detalhe em página cheia — direção vencedora da rodada 1</span>
+  <nav>
+    <a href="#fila">1 · Fila</a>
+    <a href="#detalhe">2 · Detalhe</a>
+  </nav>
+</header>
+
 <!-- ============ TOPBAR ============ -->
 <header class="topbar">
   <div class="in shell">
@@ -345,7 +385,7 @@
 </div>
 
 <!-- ============ TELA 1 — FILA INBOX ============ -->
-<main class="shell">
+<main class="shell" id="fila">
   <ul class="queue">
 
     <!-- CHA-000137 — linha selecionada (liga com a tela de detalhe abaixo) -->
@@ -707,8 +747,17 @@
   </div>
 </section>
 
+<!-- ===== notas de direção ===== -->
+<ul class="notes">
+  <li><b>Inbox, não board.</b> Uma linha por chamado, ordenada pela última movimentação: protocolo, selo “novo”, categoria, autor, dupla com o semáforo dela, prévia da última atualização, status e dono. O ponto lime marca o que ninguém leu ainda.</li>
+  <li><b>Detalhe em página cheia.</b> A linha abre a segunda tela: ficha com autor, dupla (com link pra ficha), abertura, última atualização e quem acompanha — e as ações (assumir, atribuir, resolver) no topo.</li>
+  <li><b>Timeline intercalada.</b> Mensagem original com anexo, atualizações públicas automáticas e comentários internos em âmbar tracejado com @menção convivem na mesma linha do tempo — cada evento sinalizado pela tag “público” × “interno”.</li>
+  <li><b>Público é o padrão.</b> O compositor abre em “Atualização pública” — o autor recebe por e-mail e no app, e “Enviar e resolver” fecha num clique. O comentário interno fica a um toque, mas não é o default (inversão deliberada em relação à v1).</li>
+  <li><b>Filtro por trabalho.</b> Além de categoria e status, a barra traz “Sem dono” e “Atribuídos a mim” — os recortes que organizam o dia da equipe — e a busca cobre protocolo, nome e dupla.</li>
+</ul>
+
 <footer class="foot shell">
-  Mockup estático para avaliação de direção de design — dados fictícios em pt-BR. Chamados · v3 · inbox mobile-first.
+  Mockup estático para avaliação de direção de design — dados fictícios em pt-BR.
 </footer>
 
 </body>

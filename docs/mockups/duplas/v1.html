@@ -35,7 +35,7 @@
   }
 
   *{ box-sizing:border-box; margin:0; padding:0; }
-  html{ -webkit-text-size-adjust:100%; }
+  html{ -webkit-text-size-adjust:100%; scroll-behavior:smooth; }
   body{
     font-family:'Inter', system-ui, -apple-system, sans-serif;
     background:var(--background);
@@ -46,6 +46,28 @@
   a{ color:inherit; }
   button{ font:inherit; color:inherit; }
   :focus-visible{ outline:2px solid var(--input); outline-offset:2px; border-radius:6px; }
+
+  /* ---------- chrome do mockup (não é produto) ---------- */
+  .board-head{
+    background:var(--brand-ink); color:hsl(75 20% 88%);
+    padding:13px 20px; display:flex; flex-wrap:wrap; align-items:center;
+    gap:8px 18px; font-size:12.5px;
+  }
+  .board-head b{ color:var(--brand-lime); font-weight:700; letter-spacing:.03em; }
+  .board-head .dir{ color:hsl(75 10% 62%); }
+  .board-head nav{ margin-left:auto; display:flex; gap:6px; flex-wrap:wrap; }
+  .board-head nav a{
+    font-size:12px; font-weight:600; padding:5px 12px; border-radius:999px;
+    border:1px solid hsl(75 10% 35%); color:hsl(75 20% 85%); text-decoration:none;
+  }
+  .board-head nav a:hover{ border-color:var(--brand-lime); color:var(--brand-lime); }
+  .notes{
+    display:grid; gap:8px; margin-top:36px; padding:16px 22px 18px;
+    background:var(--brand-ink); color:hsl(75 14% 76%);
+    border-radius:var(--radius); font-size:12.5px; line-height:1.6;
+  }
+  .notes b{ color:var(--brand-lime); font-weight:700; }
+  .notes li{ margin-left:18px; }
 
   /* ---------- topbar ---------- */
   .topbar{
@@ -317,6 +339,15 @@
 </head>
 <body>
 
+<header class="board-head">
+  <span><b>MOCKUP</b> · duplas · v1</span>
+  <span class="dir">Direção: critério sempre visível — cada chip de categoria já carrega a régua que a define, e cada linha explica o porquê do estado</span>
+  <nav>
+    <a href="#categorias">1 · Categorias e réguas</a>
+    <a href="#lista">2 · Lista de duplas</a>
+  </nav>
+</header>
+
 <header class="topbar">
   <div class="topbar-in">
     <a class="brand" href="#">
@@ -366,7 +397,7 @@
   </div>
 
   <!-- Chips de categoria com a régua de cada uma sempre visível -->
-  <section class="cats" aria-label="Filtrar por categoria">
+  <section class="cats" id="categorias" aria-label="Filtrar por categoria">
     <button class="cat cat-all is-active" type="button" aria-pressed="true">
       <span class="cat-top"><i class="cat-dot"></i><span class="cat-name">Todas</span><span class="cat-count">8</span></span>
       <span class="cat-rule">todas as duplas do ciclo, em qualquer estado</span>
@@ -400,7 +431,7 @@
     <p class="legend"><i class="d d-j"></i>mentorado(a)<i class="d d-m"></i>mentor(a)</p>
   </div>
 
-  <section class="list" aria-label="Lista de duplas">
+  <section class="list" id="lista" aria-label="Lista de duplas">
     <div class="list-head" aria-hidden="true">
       <span>Status</span>
       <span>Dupla</span>
@@ -562,6 +593,15 @@
       <div class="cell-go"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg></div>
     </a>
   </section>
+
+  <!-- decisões da variante -->
+  <ul class="notes">
+    <li><b>A régua é o filtro.</b> Cada chip carrega nome, contagem e o critério da categoria ("2+ encontros atrasados, ou avaliação baixa + dificuldade" no risco; "1 atraso, avaliação baixa ou registro/encaminhamento pendente" na atenção) — quem opera não decora o semáforo nem abre ajuda. A nota abaixo dos chips amarra a fonte: encontros esperados × registros e avaliações do mentor.</li>
+    <li><b>Apoio corre num eixo separado.</b> Divisória visual + azul informativo: chamado aberto (CHA-…) é pedido de ajuda — trabalho a fazer pela coordenação, não falha da dupla. Sofia &amp; Ricardo provam o convívio na mesma linha: pill "Em andamento" + pill "Apoio".</li>
+    <li><b>Sinais em texto corrido, régua por item.</b> A coluna "Sinais" resume o porquê em frase única ("3 encontros atrasados · registro do 5º pendente") e a barra de progresso traz o marcador do esperado — "5 de 16 · esperado: 8" torna o atraso mensurável sem conta mental.</li>
+    <li><b>Avaliação é a nota do mentor.</b> O badge (Excelente → Baixa) vem sempre com a legenda inline "nota do mentor · Nº encontro" — ninguém confunde com avaliação do jovem ou da dupla.</li>
+    <li><b>Ordem = prioridade.</b> Sem agrupar nem esconder: a lista já vem ordenada por severidade (risco → atenção → apoio → em andamento → pausada) e o filtro por categoria só recorta essa fila.</li>
+  </ul>
 
 </main>
 </body>

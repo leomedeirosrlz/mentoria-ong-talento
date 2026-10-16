@@ -49,6 +49,30 @@
   .ic.lg{width:18px;height:18px}
   b{font-weight:650}
 
+  /* ---------- chrome do mockup (não é produto) ---------- */
+  .board-head{
+    background:var(--brand-ink);color:hsl(75 20% 88%);
+    padding:13px 20px;display:flex;flex-wrap:wrap;align-items:center;
+    gap:8px 18px;font-size:12.5px;
+  }
+  .board-head b{color:var(--brand-lime);font-weight:700;letter-spacing:.03em}
+  .board-head .dir{color:hsl(75 10% 62%)}
+  .board-head nav{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap}
+  .board-head nav a{
+    font-size:12px;font-weight:600;padding:5px 12px;border-radius:999px;
+    border:1px solid hsl(75 10% 35%);color:hsl(75 20% 85%);text-decoration:none;
+  }
+  .board-head nav a:hover{border-color:var(--brand-lime);color:var(--brand-lime)}
+  [id]{scroll-margin-top:calc(var(--topbar) + 14px)}
+  .notes{
+    width:calc(100% - 28px);max-width:1120px;margin:0 auto 60px;padding:16px 20px;
+    background:var(--card);border:1px solid var(--border);border-radius:14px;
+    display:grid;gap:8px;font-size:13px;line-height:1.55;color:var(--muted-foreground);
+  }
+  .notes b{color:var(--brand-ink)}
+  .notes li{margin-left:18px}
+  @media (max-width:760px){.notes{margin-bottom:110px}}
+
   /* ---------- topbar ---------- */
   .top{
     position:sticky;top:0;z-index:50;height:var(--topbar);
@@ -283,6 +307,18 @@
 </head>
 <body>
 
+<!-- ===== chrome do mockup ===== -->
+<header class="board-head">
+  <span><b>MOCKUP</b> · agenda · v3</span>
+  <span class="dir">Direção: fila única de cards agrupados por dia (Hoje · Amanhã · Próximos) com chips de escopo — o que não é compromisso seu chega sinalizado</span>
+  <nav>
+    <a href="#hoje">1 · Hoje</a>
+    <a href="#amanha">2 · Amanhã</a>
+    <a href="#proximos">3 · Próximos</a>
+    <a href="#resumo">4 · Resumo lateral</a>
+  </nav>
+</header>
+
 <header class="top">
   <div class="wrap top-in">
     <div class="brand">
@@ -325,7 +361,7 @@
     <p class="snote">“Tudo” junta os seus compromissos com o que a Ana e o Caio têm marcado — inclusive aquilo em que <b>você não participa</b>, que chega sinalizado.</p>
 
     <!-- ============ HOJE ============ -->
-    <section>
+    <section id="hoje">
       <header class="ghead today"><span class="cdot"></span><h2>Hoje</h2><span class="gd">terça-feira, 7 de outubro</span></header>
 
       <div class="item slim warnrow">
@@ -406,7 +442,7 @@
     </section>
 
     <!-- ============ AMANHÃ ============ -->
-    <section>
+    <section id="amanha">
       <header class="ghead"><h2>Amanhã</h2><span class="gd">quarta-feira, 8 de outubro</span></header>
 
       <article class="item">
@@ -444,7 +480,7 @@
     </section>
 
     <!-- ============ PRÓXIMOS ============ -->
-    <section>
+    <section id="proximos">
       <header class="ghead"><h2>Próximos</h2><span class="gd">de quinta à semana seguinte — só dias com compromisso</span></header>
 
       <h3 class="sub">Quinta-feira, 9 de outubro</h3>
@@ -564,7 +600,7 @@
   </main>
 
   <!-- ============ rail (desktop) ============ -->
-  <aside class="rail">
+  <aside class="rail" id="resumo">
     <div class="rcard">
       <h3>Esta semana</h3>
       <div class="rrow">
@@ -636,6 +672,15 @@
     Perfil
   </a>
 </nav>
+
+<!-- decisões -->
+<ul class="notes">
+  <li><b>O dia é a unidade.</b> A agenda é uma fila única — Hoje, Amanhã e Próximos com sub-cabeçalhos por dia — e só entram dias com compromisso. Pendências (registro do encontro 4, avaliação até 23h59) aparecem na mesma fila como linhas finas, não num painel separado.</li>
+  <li><b>“Não é seu” tem estado visual próprio.</b> O que o mentor acompanha mas não participa — a roda de conversa com as famílias, a sessão da Ana com a especialista — vira card âmbar tracejado com etiqueta de olho (“agenda da Ana — você não participa”) e sem botão de entrar.</li>
+  <li><b>Escopo por chips.</b> “Agenda de: Ana / Caio / Tudo” filtra a fila por dupla; a nota explica que “Tudo” inclui o que os mentorados têm marcado, sempre sinalizado.</li>
+  <li><b>Previstos ficam tracejados.</b> Os encontros da semana seguinte entram como linhas finas “a agendar” — o calendário oficial propõe o dia, a dupla confirma formato e local.</li>
+  <li><b>Rail resume, não repete.</b> No desktop, a coluna lateral totaliza a semana (2 encontros, 1 supervisão, 1 sessão, 1 prazo) e mostra o semáforo das duplas; some abaixo de 1040px e no mobile a navegação vira bottom nav fixa.</li>
+</ul>
 
 </body>
 </html>

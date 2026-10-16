@@ -68,6 +68,14 @@
   }
   .board-head nav a:hover { border-color: var(--brand-lime); color: var(--brand-lime); }
 
+  .notes {
+    width: min(60rem, 100% - 32px); margin: 36px auto 44px; padding: 18px 22px;
+    background: hsl(0 0% 100% / .55); border: 1px solid hsl(75 6% 82%); border-radius: var(--radius);
+    display: grid; gap: 8px; font-size: 12.5px; line-height: 1.6; color: hsl(75 5% 36%);
+  }
+  .notes b { color: var(--brand-ink); }
+  .notes li { margin-left: 18px; }
+
   .frame-tag {
     padding: 30px 18px 14px;
     text-align: center;
@@ -420,14 +428,14 @@
 <body>
 
 <!-- ===== chrome do mockup ===== -->
-<div class="board-head">
+<header class="board-head">
   <span><b>MOCKUP</b> · jovem-especialistas · v5</span>
-  <span class="dir">Direção “estados”: a página é o ciclo de vida da trilha — stepper no topo dita o que a página oferece · sessões viram lista própria · “pedir trilha” ≠ agendamento ≠ chamado</span>
+  <span class="dir">Direção: estados do pedido — a página é o ciclo de vida da trilha (stepper no topo dita o que a página oferece) · sessões viram lista própria · “pedir trilha” ≠ agendamento ≠ chamado</span>
   <nav>
     <a href="#prancheta-mobile">1 · Mobile</a>
     <a href="#prancheta-desktop">2 · Desktop</a>
   </nav>
-</div>
+</header>
 
 <!-- ==================================================================
      PRANCHETA 1 — MOBILE (experiência da Ana, ~390px)
@@ -1178,6 +1186,13 @@
     </nav>
   </div>
 </section>
+
+<ul class="notes">
+  <li><b>A página é o estado do pedido.</b> O stepper do ciclo de vida — pedido → aprovação da coordenação → aceite da especialista → trilha em andamento → conclusão e devolutiva — dita o que a tela oferece; em outro estado, a mesma rota mostra outra coisa.</li>
+  <li><b>Sessões viram lista própria, com estado por item.</b> Concluída traz registro e avaliação por estrelas; agendada traz Meet e “remarcar”; a sessão 4 mostra os horários que a Luísa oferece e o botão “agendar sessão 4” mora nela — agendar é ação da sessão, não da página, e só existe dentro de trilha ativa.</li>
+  <li><b>Três conceitos, três pesos visuais.</b> Solicitar trilha é processo (análise → aceite, caixa tracejada “pedir uma trilha”); agendar sessão é botão dentro do item da sessão; “falar com a coordenação” abre chamado — link-card terciário, explicitamente “não é sobre a trilha”.</li>
+  <li><b>Nav ganha “Trilha” como 6º item.</b> A página vira destino semanal pelos ~3 meses que a trilha dura; no desktop vira item de sidebar e o conteúdo se reparte — trilha e sessões na coluna principal, pedir trilha e chamado na lateral.</li>
+</ul>
 
 </body>
 </html>

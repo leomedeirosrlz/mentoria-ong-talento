@@ -59,6 +59,30 @@
   svg{ display:inline-block; vertical-align:middle; }
   button{ font:inherit; border:0; background:none; cursor:pointer; color:inherit; }
 
+  /* ---------- chrome do mockup (não é produto) ---------- */
+  .board-head{
+    background:var(--brand-ink); color:hsl(75 20% 88%);
+    padding:13px 20px; display:flex; flex-wrap:wrap; align-items:center;
+    gap:8px 18px; font-size:12.5px;
+  }
+  .board-head b{ color:var(--brand-lime); font-weight:700; letter-spacing:.03em; }
+  .board-head .dir{ color:hsl(75 10% 62%); }
+  .board-head nav{ margin-left:auto; display:flex; gap:6px; flex-wrap:wrap; }
+  .board-head nav a{
+    font-size:12px; font-weight:600; padding:5px 12px; border-radius:999px;
+    border:1px solid hsl(75 10% 35%); color:hsl(75 20% 85%); text-decoration:none;
+  }
+  .board-head nav a:hover{ border-color:var(--brand-lime); color:var(--brand-lime); }
+  [id]{ scroll-margin-top:72px; }
+  .notes{
+    width:calc(100% - 28px); max-width:1300px; margin:0 auto 60px; padding:16px 20px;
+    background:var(--card); border:1px solid var(--border); border-radius:14px;
+    display:grid; gap:8px; font-size:13px; line-height:1.55; color:var(--muted-foreground);
+  }
+  .notes b{ color:var(--brand-ink); }
+  .notes li{ margin-left:18px; }
+  @media (max-width:880px){ .notes{ margin-bottom:120px; } }
+
   /* ---------- shell ---------- */
   .topbar{
     background:var(--card); border-bottom:1px solid var(--border);
@@ -395,6 +419,16 @@
 </head>
 <body>
 
+<!-- ===== chrome do mockup ===== -->
+<header class="board-head">
+  <span><b>MOCKUP</b> · agenda · v1</span>
+  <span class="dir">Direção: grade semanal estilo GCal — o mentor alterna entre a agenda do mentorado (que ele só acompanha) e a própria agenda, com etiqueta de dono em cada bloco</span>
+  <nav>
+    <a href="#agenda-mentorado">1 · Agenda do mentorado</a>
+    <a href="#minha-agenda">2 · Minha agenda</a>
+  </nav>
+</header>
+
 <!-- ======================= shell ======================= -->
 <header class="topbar">
   <div class="topbar-in">
@@ -416,7 +450,7 @@
 <main class="page">
 
   <!-- ======================= ESTADO 1 · aba "Agenda do mentorado" ativa ======================= -->
-  <section>
+  <section id="agenda-mentorado">
     <div class="headrow">
       <div>
         <h1>Agenda</h1>
@@ -797,6 +831,15 @@
   <a class="bn"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>Materiais</a>
   <a class="bn"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 0 0-16 0"/></svg>Perfil</a>
 </nav>
+
+<!-- decisões -->
+<ul class="notes">
+  <li><b>Duas visões do mesmo calendário.</b> A aba “Agenda do mentorado” mostra a semana da Ana (o seletor troca para o Caio): encontros da dupla, sessões da especialista, eventos oficiais e prazos na mesma grade, com o painel lateral resumindo a dupla. “Minha agenda” junta tudo que envolve o André — e cada bloco ganha etiqueta de dono (Ana · T1, Caio · T2, Você).</li>
+  <li><b>Sessão de especialista entra como informativo.</b> Na visão do mentor, a sessão da Ana com a Luísa aparece tracejada e esmaecida — ele fica sabendo que existe, sem que vire compromisso dele.</li>
+  <li><b>Prazo mora na faixa de dia inteiro.</b> Avaliações e entregas ficam na faixa “o dia todo”, em vermelho tracejado — separadas dos blocos com horário marcado.</li>
+  <li><b>Numeração é por turma.</b> Ana (T1, terças) está no encontro 8 e Caio (T2, quartas) no 5 na mesma semana — as etiquetas carregam dono e turma justamente porque os cronogramas não coincidem.</li>
+  <li><b>Mobile vira um dia por vez.</b> A grade semanal só existe no desktop; no celular ela cede a um pager de dia, uma tira da semana em pontinhos e a lista do resto da semana.</li>
+</ul>
 
 </body>
 </html>

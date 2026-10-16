@@ -65,6 +65,14 @@
   }
   .board-head nav a:hover { border-color: var(--brand-lime); color: var(--brand-lime); }
 
+  .notes {
+    width: min(60rem, 100% - 32px); margin: 36px auto 44px; padding: 18px 22px;
+    background: hsl(0 0% 100% / .55); border: 1px solid hsl(75 6% 82%); border-radius: var(--radius);
+    display: grid; gap: 8px; font-size: 12.5px; line-height: 1.6; color: hsl(75 5% 36%);
+  }
+  .notes b { color: var(--brand-ink); }
+  .notes li { margin-left: 18px; }
+
   .frame-tag {
     padding: 34px 18px 16px;
     text-align: center;
@@ -404,14 +412,14 @@
 <body>
 
 <!-- ===== chrome do mockup ===== -->
-<div class="board-head">
+<header class="board-head">
   <span><b>MOCKUP</b> · jovem-especialistas · v3</span>
   <span class="dir">Direção: card-CTA verde na home → página cheia · a navegação não muda (5 itens)</span>
   <nav>
     <a href="#tela-inicio">1 · Início</a>
     <a href="#tela-especialistas">2 · Especialistas</a>
   </nav>
-</div>
+</header>
 
 <!-- ==================================================================
      TELA 1 — INÍCIO
@@ -987,6 +995,13 @@
     </a>
   </nav>
 </section>
+
+<ul class="notes">
+  <li><b>O card-CTA leva o estado pra home.</b> O cartão verde mostra “2 pedidos em aberto” e a strip com a contra-proposta da Luísa — quem toca chega à página já sabendo onde o pedido está. Nenhum item de nav muda: Início segue ativo nas duas telas.</li>
+  <li><b>Simplificação de domínio (anterior à correção).</b> O pedido vira negociação de horário direto com a especialista e o stepper termina em “Sessão marcada” — solicitar trilha e agendar sessão aparecem como um fluxo só. No domínio são separados: a solicitação passa por análise e aceite, e horário só se combina dentro da trilha ativa (o que v4/v5 corrigem).</li>
+  <li><b>Dois modos de solicitação em cena.</b> O card da Luísa é pedido dirigido (com pessoa escolhida); o card compacto mostra pedido aberto no mural — “sem especialista escolhido, qualquer um pode pegar”.</li>
+  <li><b>Catálogo com slots clicáveis e dedup.</b> Chips “sex · 16h” sugerem marcar horário na hora — a v4 troca por disponibilidade por período (“sex à tarde”), porque o verbo do catálogo é “pedir trilha”, não “marcar”. A Luísa aparece com “Pedido em andamento” e link, não com botão de pedir de novo.</li>
+</ul>
 
 </body>
 </html>

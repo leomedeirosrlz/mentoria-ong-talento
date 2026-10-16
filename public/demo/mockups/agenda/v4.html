@@ -65,6 +65,14 @@
     border:1px solid hsl(75 10% 35%);color:hsl(75 20% 85%);text-decoration:none;
   }
   .board-head nav a:hover{border-color:var(--brand-lime);color:var(--brand-lime)}
+  .board{scroll-margin-top:60px}
+  .notes{
+    width:calc(100% - 28px);max-width:1300px;margin:0 auto 70px;padding:16px 20px;
+    background:var(--card);border:1px solid hsl(75 7% 79%);border-radius:14px;
+    display:grid;gap:8px;font-size:13px;line-height:1.55;color:hsl(75 5% 32%);
+  }
+  .notes b{color:var(--brand-ink)}
+  .notes li{margin-left:18px}
 
   .boards{
     display:flex;gap:26px;align-items:flex-start;justify-content:center;
@@ -931,6 +939,15 @@
 </section>
 
 </div>
+
+<!-- decisões -->
+<ul class="notes">
+  <li><b>Duas superfícies, uma página.</b> “Minha agenda” só carrega compromissos do André — encontros DPP e formação. “Acompanhando seus jovens” é uma superfície âmbar separada que junta trilhas e pendências das duplas: o que ele vê e o que é dele ficam fisicamente separados.</li>
+  <li><b>Turmas desencontradas, explicadas.</b> A legenda logo abaixo de “Minha agenda” diz por que Ana está no encontro 8 e Caio no 5 — a T2 começou três semanas depois e cada turma numera os próprios encontros.</li>
+  <li><b>Trilha é jornada assistida.</b> No card de cada jovem, o mentor acompanha o stepper de 5 sessões, o último registro com a avaliação ★ do jovem e a próxima sessão marcada — sempre com a etiqueta “agenda da Ana”. A trilha do Caio mostra o funil da solicitação (solicitada → em análise → mural → em andamento).</li>
+  <li><b>A grade é o instrumento da especialista.</b> A prancheta da Luísa abre com a grade semanal editável: janelas oferecidas, sessão marcada e a proposta do Pedro fora da grade — que ela confirma como exceção ou responde com outro horário. O prazo de ~3 meses fica no topo de cada trilha.</li>
+  <li><b>Previsto não vira compromisso.</b> A semana seguinte aparece em linhas finas tracejadas “a agendar”: o calendário oficial propõe, quem confirma é a dupla.</li>
+</ul>
 
 </body>
 </html>

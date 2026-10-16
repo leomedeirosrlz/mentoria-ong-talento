@@ -50,6 +50,54 @@
 
   svg { display: block; }
 
+  /* ---------- chrome do mockup (não é produto) ---------- */
+
+  .board-head {
+    background: var(--brand-ink);
+    color: hsl(75 20% 88%);
+    padding: 13px 20px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 18px;
+    font-size: 12.5px;
+    position: sticky;
+    top: 0;
+    z-index: 80;
+  }
+  .board-head b { color: var(--brand-lime); font-weight: 700; letter-spacing: .03em; }
+  .board-head .dir { color: hsl(75 10% 62%); }
+  .board-head nav { margin-left: auto; display: flex; gap: 6px; }
+  .board-head nav a {
+    font-size: 12px;
+    font-weight: 600;
+    padding: 5px 12px;
+    border-radius: 999px;
+    border: 1px solid hsl(75 10% 35%);
+    color: hsl(75 20% 85%);
+    text-decoration: none;
+  }
+  .board-head nav a:hover { border-color: var(--brand-lime); color: var(--brand-lime); }
+
+  .notes {
+    width: min(976px, calc(100% - 32px));
+    margin: 0 auto;
+    padding: 18px 22px;
+    border-radius: 14px;
+    background: var(--brand-ink);
+    color: hsl(75 20% 80%);
+    display: grid;
+    gap: 8px;
+    font-size: 12.5px;
+    line-height: 1.6;
+  }
+  .notes b { color: hsl(75 20% 94%); }
+  .notes li { margin-left: 18px; }
+
+  /* respiro no fim da página — margin do último filho colapsa no body;
+     o espaçador garante que a bottomnav fixa não cubra as notas no mobile */
+  body::after { content: ""; display: block; height: 110px; }
+
   /* ---------- barra superior ---------- */
 
   .topbar {
@@ -403,6 +451,16 @@
 </head>
 <body>
 
+<!-- ===== chrome do mockup ===== -->
+<header class="board-head">
+  <span><b>MOCKUP</b> · materiais · v1</span>
+  <span class="dir">Direção: 4 portais de peso igual — a estante da jornada em grid simétrica lime, com prévia da listagem dentro de um portal</span>
+  <nav>
+    <a href="#portais">1 · Os 4 portais</a>
+    <a href="#listagem">2 · Dentro de um portal</a>
+  </nav>
+</header>
+
 <header class="topbar">
   <div class="wordmark"><span class="dot">R</span>Realiza<span class="vc">.vc</span></div>
   <div class="who">
@@ -421,7 +479,7 @@
   </div>
 
   <!-- ============ OS 4 PORTAIS (peso igual) ============ -->
-  <section class="portals">
+  <section class="portals" id="portais">
 
     <!-- Portal 1 — Minha jornada -->
     <article class="portal">
@@ -540,7 +598,7 @@
   </section>
 
   <!-- ============ PRÉVIA: como fica a listagem dentro de um portal ============ -->
-  <section class="preview">
+  <section class="preview" id="listagem">
     <div class="preview-eyebrow"><span>Ao entrar em um portal — exemplo: Guias oficiais</span></div>
 
     <div class="plist">
@@ -630,6 +688,14 @@
     Perfil
   </span>
 </nav>
+
+<!-- decisões -->
+<ul class="notes">
+  <li><b>Peso igual pros 4 portais.</b> Minha jornada, Guias oficiais, Modelos e instrumentos e Links ocupam cartões lime idênticos num grid 2×2 (uma coluna no mobile) — a estante não pressupõe que as respostas do jovem valham mais que o material da coordenação.</li>
+  <li><b>“Minha jornada” é um portal, não o portal.</b> O que a Ana já respondeu (anamnese social, mapa de metas, roda da vida, PDM) abre a grade com contagem “4 de 5 documentos” e data em cada linha — mas disputa atenção de igual pra igual com os outros três.</li>
+  <li><b>Cada porta já mostra o que tem dentro.</b> Antes do clique, o cartão antecipa 2–4 itens com metadados (“respondida em 15 abr”, “PDF”, “grupo”) — o jovem escolhe a porta sabendo o que vai encontrar.</li>
+  <li><b>Listagem é segundo nível.</b> A prévia “Guias oficiais” mostra como fica dentro de um portal: linhas com ícone, título, detalhe e ação por tipo de material (Baixar, Assistir, Abrir) — incluindo o estado “Em breve” pra material que a coordenação ainda não publicou.</li>
+</ul>
 
 </body>
 </html>
