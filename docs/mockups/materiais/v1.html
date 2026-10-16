@@ -1,0 +1,635 @@
+<!-- MOCKUP materiais v1 — 4 portais iguais -->
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Materiais — Realiza.vc</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --brand-lime: hsl(78 56% 53%);      /* verde principal */
+    --brand-ink: hsl(0 0% 15%);         /* quase-preto texto */
+    --background: hsl(75 10% 95%);      /* fundo "papel" quente */
+    --card: hsl(0 0% 100%);
+    --muted: hsl(75 7% 93%);
+    --muted-foreground: hsl(75 4% 40%);
+    --accent: hsl(75 8% 91%);           /* hover */
+    --border: hsl(75 6% 87%);
+    --input: hsl(75 8% 54%);
+    --ok: hsl(78 58% 38%);
+    --ok-text: hsl(78 55% 30%);
+    --warn: hsl(43 95% 44%);
+    --warn-text: hsl(43 90% 30%);
+    --danger: hsl(0 80% 48%);
+    --role-mentor: var(--brand-lime);   /* marcador mentor */
+    --role-mentorado: hsl(48 100% 60%); /* marcador jovem (amarelo) */
+    --radius: 0.75rem;                  /* cantos arredondados generosos */
+
+    /* derivados para texto/linha sobre o verde-lima */
+    --on-lime: hsl(0 0% 15%);
+    --on-lime-soft: hsl(0 0% 15% / .72);
+    --on-lime-faint: hsl(0 0% 15% / .55);
+    --on-lime-line: hsl(0 0% 15% / .14);
+    --on-lime-tile: hsl(0 0% 100% / .48);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html { -webkit-text-size-adjust: 100%; }
+
+  body {
+    font-family: "Inter", system-ui, -apple-system, sans-serif;
+    background: var(--background);
+    color: var(--brand-ink);
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  svg { display: block; }
+
+  /* ---------- barra superior ---------- */
+
+  .topbar {
+    max-width: 1024px;
+    margin: 0 auto;
+    padding: 18px 24px 6px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+  }
+
+  .wordmark {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 800;
+    font-size: 17px;
+    letter-spacing: -0.01em;
+  }
+  .wordmark .dot {
+    width: 30px; height: 30px;
+    border-radius: 9px;
+    background: var(--brand-lime);
+    color: var(--brand-ink);
+    display: grid; place-items: center;
+    font-size: 16px; font-weight: 800;
+  }
+  .wordmark .vc { color: var(--muted-foreground); font-weight: 600; }
+
+  .who {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 5px 14px 5px 6px;
+    font-size: 13px;
+  }
+  .who .avatar {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    background: var(--role-mentorado);
+    color: var(--brand-ink);
+    display: grid; place-items: center;
+    font-size: 13px; font-weight: 700;
+  }
+  .who .name { font-weight: 600; }
+  .who .turma { color: var(--muted-foreground); }
+
+  /* ---------- página ---------- */
+
+  .page {
+    max-width: 1024px;
+    margin: 0 auto;
+    padding: 26px 24px 64px;
+  }
+
+  .page-head { margin-bottom: 26px; }
+  .page-head h1 {
+    font-size: 30px;
+    font-weight: 800;
+    letter-spacing: -0.025em;
+  }
+  .page-head p {
+    margin-top: 6px;
+    font-size: 15px;
+    color: var(--muted-foreground);
+    max-width: 560px;
+  }
+
+  /* ---------- grade de portais (2x2 / empilhado) ---------- */
+
+  .portals {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+    align-items: stretch;
+  }
+
+  .portal {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    min-height: 272px;
+    padding: 22px 22px 16px;
+    border-radius: 20px;
+    background: linear-gradient(165deg, hsl(78 56% 56%), var(--brand-lime) 55%, hsl(78 57% 50%));
+    border: 1px solid hsl(78 45% 42% / .35);
+    color: var(--on-lime);
+    cursor: pointer;
+    transition: transform .18s ease, box-shadow .18s ease;
+  }
+  .portal:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 16px 32px -18px hsl(78 40% 25% / .5);
+  }
+
+  .portal-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+  .portal-icon {
+    width: 48px; height: 48px;
+    border-radius: 14px;
+    background: var(--on-lime-tile);
+    display: grid; place-items: center;
+    color: var(--on-lime);
+    flex: none;
+  }
+  .portal-count {
+    background: var(--on-lime-tile);
+    border-radius: 999px;
+    padding: 5px 12px;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--on-lime);
+    white-space: nowrap;
+  }
+
+  .portal h2 {
+    font-size: 19px;
+    font-weight: 700;
+    letter-spacing: -0.015em;
+  }
+  .portal .desc {
+    margin-top: 3px;
+    font-size: 13.5px;
+    color: var(--on-lime-soft);
+  }
+
+  .portal-list {
+    margin-top: 14px;
+    border-top: 1px solid var(--on-lime-line);
+  }
+  .prow {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--on-lime-line);
+    font-size: 13.5px;
+  }
+  .prow:last-child { border-bottom: none; }
+  .prow .ic { color: var(--ok-text); flex: none; display: grid; place-items: center; }
+  .prow .ic.plain { color: var(--on-lime-faint); }
+  .prow .label {
+    flex: 1;
+    min-width: 0;
+    font-weight: 500;
+    color: var(--on-lime);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .prow .meta {
+    flex: none;
+    font-size: 12.5px;
+    color: var(--on-lime-soft);
+  }
+
+  .portal-open {
+    margin-top: auto;
+    padding-top: 12px;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 13.5px;
+    font-weight: 700;
+    color: var(--on-lime);
+  }
+  .portal-open svg { transition: transform .18s ease; }
+  .portal:hover .portal-open svg { transform: translateX(3px); }
+
+  /* ---------- prévia da listagem dentro de um portal ---------- */
+
+  .preview { margin-top: 46px; }
+  .preview-eyebrow {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: .09em;
+    text-transform: uppercase;
+    color: var(--muted-foreground);
+    margin-bottom: 12px;
+  }
+  .preview-eyebrow::before,
+  .preview-eyebrow::after {
+    content: "";
+    height: 1px;
+    background: var(--border);
+    flex: 1;
+  }
+  .preview-eyebrow span { flex: none; }
+
+  .plist {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    overflow: hidden;
+  }
+  .plist-head {
+    padding: 18px 20px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  .plist-head .back {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--muted-foreground);
+    margin-bottom: 6px;
+  }
+  .plist-head h3 {
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: -0.015em;
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .plist-head h3 small {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--muted-foreground);
+  }
+
+  .lrow {
+    display: flex;
+    align-items: center;
+    gap: 13px;
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--border);
+    transition: background .15s ease;
+  }
+  .lrow:last-child { border-bottom: none; }
+  .lrow:hover { background: var(--accent); }
+  .lrow .fic {
+    width: 40px; height: 40px;
+    border-radius: 11px;
+    background: var(--muted);
+    color: var(--muted-foreground);
+    display: grid; place-items: center;
+    flex: none;
+  }
+  .lrow .body { flex: 1; min-width: 0; }
+  .lrow .t {
+    font-size: 14.5px;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .lrow .m {
+    margin-top: 1px;
+    font-size: 12.5px;
+    color: var(--muted-foreground);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .lrow .act {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 6px 13px;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--brand-ink);
+    background: var(--card);
+  }
+  .lrow.soon { opacity: .62; }
+  .lrow.soon:hover { background: var(--card); }
+  .lrow .soon-pill {
+    flex: none;
+    background: var(--muted);
+    color: var(--muted-foreground);
+    border-radius: 999px;
+    padding: 5px 12px;
+    font-size: 12.5px;
+    font-weight: 600;
+  }
+
+  /* ---------- nav inferior (mobile) ---------- */
+
+  .bottomnav { display: none; }
+
+  /* ---------- responsivo ---------- */
+
+  @media (max-width: 720px) {
+    .topbar { padding: 14px 16px 4px; }
+    .who { padding-right: 6px; }
+    .who .name, .who .turma { display: none; }
+    .who .name-short { display: inline; font-weight: 600; font-size: 13px; }
+
+    .page { padding: 20px 16px 96px; }
+    .page-head h1 { font-size: 26px; }
+    .portals { grid-template-columns: 1fr; gap: 14px; }
+    .portal { min-height: 0; }
+
+    .lrow { padding: 12px 16px; }
+    .lrow .act .act-label { display: none; }
+    .lrow .act { padding: 7px; border-radius: 10px; }
+
+    .bottomnav {
+      display: flex;
+      position: fixed;
+      left: 0; right: 0; bottom: 0;
+      z-index: 20;
+      background: var(--card);
+      border-top: 1px solid var(--border);
+      padding: 7px 6px calc(7px + env(safe-area-inset-bottom, 0px));
+    }
+    .bottomnav .item {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+      color: var(--muted-foreground);
+      font-size: 10.5px;
+      font-weight: 500;
+      padding-top: 1px;
+    }
+    .bottomnav .item .ic {
+      height: 26px;
+      display: grid;
+      place-items: center;
+      padding: 0 14px;
+      border-radius: 999px;
+    }
+    .bottomnav .item.active { color: var(--brand-ink); font-weight: 700; }
+    .bottomnav .item.active .ic { background: var(--brand-lime); }
+  }
+
+  @media (min-width: 721px) {
+    .who .name-short { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="wordmark"><span class="dot">R</span>Realiza<span class="vc">.vc</span></div>
+  <div class="who">
+    <span class="avatar">A</span>
+    <span class="name">Ana Souza</span>
+    <span class="name-short">Ana</span>
+    <span class="turma">· Turma 1</span>
+  </div>
+</header>
+
+<main class="page">
+
+  <div class="page-head">
+    <h1>Materiais</h1>
+    <p>Tudo do programa em um lugar: o que você já respondeu, os guias oficiais, modelos e links de apoio.</p>
+  </div>
+
+  <!-- ============ OS 4 PORTAIS (peso igual) ============ -->
+  <section class="portals">
+
+    <!-- Portal 1 — Minha jornada -->
+    <article class="portal">
+      <div class="portal-top">
+        <div class="portal-icon">
+          <!-- ícone: rota/jornada -->
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="18" r="2.6"/><circle cx="18" cy="6" r="2.6"/><path d="M8.6 18H14a4 4 0 0 0 4-4V8.6"/></svg>
+        </div>
+        <span class="portal-count">4 de 5 documentos</span>
+      </div>
+      <h2>Minha jornada</h2>
+      <p class="desc">O que você já respondeu no programa</p>
+      <div class="portal-list">
+        <div class="prow">
+          <span class="ic"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="m8.6 12.4 2.4 2.4 4.6-5"/></svg></span>
+          <span class="label">Anamnese social</span>
+          <span class="meta">respondida em 12 mar</span>
+        </div>
+        <div class="prow">
+          <span class="ic"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="m8.6 12.4 2.4 2.4 4.6-5"/></svg></span>
+          <span class="label">Mapa de metas</span>
+          <span class="meta">respondido em 2 abr</span>
+        </div>
+        <div class="prow">
+          <span class="ic"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="m8.6 12.4 2.4 2.4 4.6-5"/></svg></span>
+          <span class="label">Roda da vida</span>
+          <span class="meta">respondida em 15 abr</span>
+        </div>
+        <div class="prow">
+          <span class="ic"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="m8.6 12.4 2.4 2.4 4.6-5"/></svg></span>
+          <span class="label">PDM</span>
+          <span class="meta">atualizado em 22 abr</span>
+        </div>
+      </div>
+      <div class="portal-open">Ver meus documentos <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12h15"/><path d="m13.5 6 6 6-6 6"/></svg></div>
+    </article>
+
+    <!-- Portal 2 — Guias oficiais -->
+    <article class="portal">
+      <div class="portal-top">
+        <div class="portal-icon">
+          <!-- ícone: livro aberto -->
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6.8C9.8 5.2 6.9 4.7 4 4.7v14.6c2.9 0 5.8.4 8 2 2.2-1.6 5.1-2 8-2V4.7c-2.9 0-5.8.5-8 2.1Z"/><path d="M12 6.8v14.5"/></svg>
+        </div>
+        <span class="portal-count">6 itens</span>
+      </div>
+      <h2>Guias oficiais</h2>
+      <p class="desc">Os guias do programa, direto da coordenação</p>
+      <div class="portal-list">
+        <div class="prow">
+          <span class="ic plain"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8Z"/><path d="M14 3v5h5"/></svg></span>
+          <span class="label">Guia do programa · edição 2026</span>
+          <span class="meta">PDF</span>
+        </div>
+        <div class="prow">
+          <span class="ic plain"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8Z"/><path d="M14 3v5h5"/></svg></span>
+          <span class="label">Roteiro dos 16 encontros</span>
+          <span class="meta">PDF</span>
+        </div>
+      </div>
+      <div class="portal-open">Abrir guias <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12h15"/><path d="m13.5 6 6 6-6 6"/></svg></div>
+    </article>
+
+    <!-- Portal 3 — Modelos e instrumentos -->
+    <article class="portal">
+      <div class="portal-top">
+        <div class="portal-icon">
+          <!-- ícone: cópias/modelos -->
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2.5"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        </div>
+        <span class="portal-count">8 itens</span>
+      </div>
+      <h2>Modelos e instrumentos</h2>
+      <p class="desc">Em branco, pra preencher com o André</p>
+      <div class="portal-list">
+        <div class="prow">
+          <span class="ic plain"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8Z"/><path d="M14 3v5h5"/></svg></span>
+          <span class="label">Modelo de PDM</span>
+          <span class="meta">PDF</span>
+        </div>
+        <div class="prow">
+          <span class="ic plain"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8Z"/><path d="M14 3v5h5"/></svg></span>
+          <span class="label">Instrumento: roda da vida</span>
+          <span class="meta">PDF</span>
+        </div>
+      </div>
+      <div class="portal-open">Abrir modelos <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12h15"/><path d="m13.5 6 6 6-6 6"/></svg></div>
+    </article>
+
+    <!-- Portal 4 — Links -->
+    <article class="portal">
+      <div class="portal-top">
+        <div class="portal-icon">
+          <!-- ícone: elo de corrente -->
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+        </div>
+        <span class="portal-count">5 links</span>
+      </div>
+      <h2>Links</h2>
+      <p class="desc">O que acontece fora do app</p>
+      <div class="portal-list">
+        <div class="prow">
+          <span class="ic plain"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6"/><path d="M20 4 10.5 13.5"/><path d="M19 13.5V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h5.5"/></svg></span>
+          <span class="label">Comunidade no WhatsApp</span>
+          <span class="meta">grupo</span>
+        </div>
+        <div class="prow">
+          <span class="ic plain"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6"/><path d="M20 4 10.5 13.5"/><path d="M19 13.5V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h5.5"/></svg></span>
+          <span class="label">Canal de vídeos do ciclo</span>
+          <span class="meta">YouTube</span>
+        </div>
+      </div>
+      <div class="portal-open">Abrir links <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12h15"/><path d="m13.5 6 6 6-6 6"/></svg></div>
+    </article>
+
+  </section>
+
+  <!-- ============ PRÉVIA: como fica a listagem dentro de um portal ============ -->
+  <section class="preview">
+    <div class="preview-eyebrow"><span>Ao entrar em um portal — exemplo: Guias oficiais</span></div>
+
+    <div class="plist">
+      <div class="plist-head">
+        <span class="back"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m14.5 6-6 6 6 6"/></svg>Materiais</span>
+        <h3>Guias oficiais <small>6 itens · enviados pela coordenação</small></h3>
+      </div>
+
+      <div class="lrow">
+        <span class="fic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8Z"/><path d="M14 3v5h5"/></svg></span>
+        <div class="body">
+          <div class="t">Guia do Programa de Mentoria — edição 2026</div>
+          <div class="m">PDF · 3,2 MB · atualizado em fev/2026</div>
+        </div>
+        <span class="act"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v10.5"/><path d="m7.5 11 4.5 4.5L16.5 11"/><path d="M5 20h14"/></svg><span class="act-label">Baixar</span></span>
+      </div>
+
+      <div class="lrow">
+        <span class="fic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8Z"/><path d="M14 3v5h5"/></svg></span>
+        <div class="body">
+          <div class="t">Roteiro dos 16 encontros — Turma 1</div>
+          <div class="m">PDF · 1,1 MB · atualizado em mar/2026</div>
+        </div>
+        <span class="act"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v10.5"/><path d="m7.5 11 4.5 4.5L16.5 11"/><path d="M5 20h14"/></svg><span class="act-label">Baixar</span></span>
+      </div>
+
+      <div class="lrow">
+        <span class="fic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8Z"/><path d="M14 3v5h5"/></svg></span>
+        <div class="body">
+          <div class="t">Como se preparar para cada encontro</div>
+          <div class="m">PDF · 890 KB · atualizado em mar/2026</div>
+        </div>
+        <span class="act"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v10.5"/><path d="m7.5 11 4.5 4.5L16.5 11"/><path d="M5 20h14"/></svg><span class="act-label">Baixar</span></span>
+      </div>
+
+      <div class="lrow">
+        <span class="fic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="12" rx="3"/><path d="M10.4 9.6v4.8L14.9 12Z" fill="currentColor" stroke="none"/></svg></span>
+        <div class="body">
+          <div class="t">Vídeo: como aproveitar a mentoria</div>
+          <div class="m">Vídeo · 12 min · YouTube</div>
+        </div>
+        <span class="act"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6"/><path d="M20 4 10.5 13.5"/><path d="M19 13.5V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h5.5"/></svg><span class="act-label">Assistir</span></span>
+      </div>
+
+      <div class="lrow">
+        <span class="fic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></span>
+        <div class="body">
+          <div class="t">Perguntas frequentes do programa</div>
+          <div class="m">Link externo · site Realiza.vc</div>
+        </div>
+        <span class="act"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6"/><path d="M20 4 10.5 13.5"/><path d="M19 13.5V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h5.5"/></svg><span class="act-label">Abrir</span></span>
+      </div>
+
+      <div class="lrow soon">
+        <span class="fic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8Z"/><path d="M14 3v5h5"/></svg></span>
+        <div class="body">
+          <div class="t">Guia de carreira: primeiros passos</div>
+          <div class="m">PDF · chega junto com o 10º encontro</div>
+        </div>
+        <span class="soon-pill">Em breve</span>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<!-- nav inferior — só aparece em telas estreitas -->
+<nav class="bottomnav">
+  <span class="item">
+    <span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m4 11 8-7 8 7"/><path d="M6.2 9.3V20h11.6V9.3"/></svg></span>
+    Início
+  </span>
+  <span class="item">
+    <span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5.5" width="17" height="15" rx="2.5"/><path d="M3.5 10.5h17M8.5 3v4M15.5 3v4"/></svg></span>
+    Agenda
+  </span>
+  <span class="item">
+    <span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9.5" cy="8.5" r="3.2"/><path d="M3.5 19.5c.7-3.3 3-4.8 6-4.8s5.3 1.5 6 4.8"/><path d="M15.5 5.6a3.2 3.2 0 0 1 0 5.9"/><path d="M17.8 15.1c1.6.7 2.6 2.1 3 4.4"/></svg></span>
+    Pessoas
+  </span>
+  <span class="item active">
+    <span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 7.5a2 2 0 0 1 2-2H10l2 2.5h6.5a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2Z"/></svg></span>
+    Materiais
+  </span>
+  <span class="item">
+    <span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8.5" r="3.2"/><path d="M5.5 19.5c.8-3.3 3.2-4.8 6.5-4.8s5.7 1.5 6.5 4.8"/></svg></span>
+    Perfil
+  </span>
+</nav>
+
+</body>
+</html>

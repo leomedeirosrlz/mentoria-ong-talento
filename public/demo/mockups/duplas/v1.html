@@ -1,0 +1,568 @@
+<!-- MOCKUP duplas v1 — Critério sempre visível -->
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Duplas · Realiza.vc</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --brand-lime: hsl(78 56% 53%);      /* verde principal */
+    --brand-ink: hsl(0 0% 15%);         /* quase-preto texto */
+    --background: hsl(75 10% 95%);      /* fundo "papel" quente */
+    --card: hsl(0 0% 100%);
+    --muted: hsl(75 7% 93%);
+    --muted-foreground: hsl(75 4% 40%);
+    --accent: hsl(75 8% 91%);           /* hover */
+    --border: hsl(75 6% 87%);
+    --input: hsl(75 8% 54%);
+    --ok: hsl(78 58% 38%);
+    --ok-text: hsl(78 55% 30%);
+    --warn: hsl(43 95% 44%);
+    --warn-text: hsl(43 90% 30%);
+    --danger: hsl(0 80% 48%);
+    --role-mentor: var(--brand-lime);   /* marcador mentor */
+    --role-mentorado: hsl(48 100% 60%); /* marcador jovem (amarelo) */
+    --radius: 0.75rem;
+    /* Apoio vive num eixo separado do semáforo: cor própria (azul informativo) */
+    --info: hsl(207 82% 45%);
+    --info-text: hsl(207 82% 33%);
+    --info-bg: hsl(207 82% 96%);
+    --info-border: hsl(207 82% 80%);
+  }
+
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  html{ -webkit-text-size-adjust:100%; }
+  body{
+    font-family:'Inter', system-ui, -apple-system, sans-serif;
+    background:var(--background);
+    color:var(--brand-ink);
+    font-size:14px; line-height:1.45;
+    -webkit-font-smoothing:antialiased;
+  }
+  a{ color:inherit; }
+  button{ font:inherit; color:inherit; }
+  :focus-visible{ outline:2px solid var(--input); outline-offset:2px; border-radius:6px; }
+
+  /* ---------- topbar ---------- */
+  .topbar{
+    position:sticky; top:0; z-index:10;
+    background:hsl(75 10% 95% / .88);
+    backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--border);
+  }
+  .topbar-in{
+    max-width:1120px; margin:0 auto; padding:.7rem 1.25rem;
+    display:flex; align-items:center; gap:1.4rem;
+  }
+  .brand{ display:flex; align-items:center; gap:.55rem; text-decoration:none; }
+  .brand-mark{
+    width:30px; height:30px; border-radius:9px;
+    background:var(--brand-lime); display:grid; place-items:center;
+    box-shadow:inset 0 0 0 1px hsl(78 55% 40% / .25);
+  }
+  .brand-name{ font-size:17px; font-weight:800; letter-spacing:-.02em; }
+  .brand-name span{ color:var(--ok-text); font-weight:700; }
+
+  .topnav{ display:flex; gap:.15rem; }
+  .topnav a{
+    text-decoration:none; font-size:13.5px; font-weight:550;
+    color:var(--muted-foreground); padding:.42rem .75rem; border-radius:999px;
+  }
+  .topnav a:hover{ background:var(--accent); color:var(--brand-ink); }
+  .topnav a.is-on{ background:var(--brand-lime); color:hsl(78 60% 18%); font-weight:650; }
+
+  .user{ margin-left:auto; display:flex; align-items:center; gap:.6rem; }
+  .user-id{ text-align:right; line-height:1.15; }
+  .user-id b{ display:block; font-size:13px; font-weight:650; }
+  .user-id small{ font-size:11px; color:var(--muted-foreground); }
+  .uav{
+    width:32px; height:32px; border-radius:50%;
+    background:var(--brand-ink); color:#fff;
+    display:grid; place-items:center; font-size:11px; font-weight:700;
+  }
+
+  /* ---------- página ---------- */
+  .wrap{ max-width:1120px; margin:0 auto; padding:1.6rem 1.25rem 4.5rem; }
+
+  .page-head{
+    display:flex; align-items:flex-end; justify-content:space-between;
+    gap:1rem; flex-wrap:wrap;
+  }
+  .page-head h1{ font-size:26px; font-weight:750; letter-spacing:-.02em; }
+  .page-head .sub{ margin-top:.15rem; font-size:13px; color:var(--muted-foreground); }
+
+  .head-actions{ display:flex; align-items:center; gap:.6rem; }
+  .search{
+    display:flex; align-items:center; gap:.5rem;
+    background:var(--card); border:1px solid var(--border); border-radius:999px;
+    padding:.5rem .9rem; min-width:230px;
+    color:var(--muted-foreground); font-size:13px;
+  }
+  .btn-new{
+    display:inline-flex; align-items:center; gap:.45rem;
+    background:var(--brand-lime); color:hsl(78 60% 17%);
+    border:none; border-radius:999px; padding:.55rem 1.05rem;
+    font-size:13.5px; font-weight:650; cursor:pointer;
+    box-shadow:inset 0 0 0 1px hsl(78 55% 40% / .3);
+  }
+  .btn-new:hover{ filter:brightness(.96); }
+
+  /* ---------- chips de categoria (critério sempre visível) ---------- */
+  .cats{
+    display:flex; flex-wrap:wrap; gap:.6rem;
+    margin-top:1.4rem;
+  }
+  .cat{
+    flex:1 1 150px;
+    display:flex; flex-direction:column; gap:.35rem;
+    text-align:left; cursor:pointer;
+    background:var(--card); border:1px solid var(--border);
+    border-radius:var(--radius); padding:.7rem .85rem .75rem;
+    transition:border-color .15s, transform .15s, box-shadow .15s;
+  }
+  .cat:hover{ border-color:var(--input); transform:translateY(-1px); }
+  .cat-top{ display:flex; align-items:center; gap:.45rem; }
+  .cat-dot{ width:9px; height:9px; border-radius:50%; flex:none; }
+  .cat-name{ font-size:13.5px; font-weight:650; }
+  .cat-count{
+    margin-left:auto; font-size:11px; font-weight:700;
+    background:var(--muted); color:var(--muted-foreground);
+    padding:.08rem .5rem; border-radius:999px;
+  }
+  .cat-rule{
+    font-size:11.5px; line-height:1.4; color:var(--muted-foreground);
+    display:block;
+  }
+
+  .cat-all .cat-dot{ background:var(--brand-lime); }
+  .cat-risco .cat-dot{ background:var(--danger); }
+  .cat-atencao .cat-dot{ background:var(--warn); }
+  .cat-ok .cat-dot{ background:var(--ok); }
+  .cat-pausa .cat-dot{ background:hsl(75 4% 58%); }
+
+  .cat.is-active{
+    background:var(--brand-ink); border-color:var(--brand-ink); color:#fff;
+    box-shadow:0 6px 18px hsl(0 0% 15% / .18);
+  }
+  .cat.is-active .cat-rule{ color:hsl(0 0% 100% / .62); }
+  .cat.is-active .cat-count{ background:hsl(0 0% 100% / .16); color:#fff; }
+
+  /* separador + chip Apoio: eixo próprio, fora do semáforo */
+  .cat-sep{ width:1px; align-self:stretch; background:var(--border); margin:.25rem .15rem; flex:none; }
+  .cat-apoio{
+    flex:1.15 1 165px;
+    background:var(--info-bg); border-color:var(--info-border);
+  }
+  .cat-apoio:hover{ border-color:var(--info); }
+  .cat-apoio .cat-name{ display:flex; align-items:center; gap:.35rem; color:var(--info-text); }
+  .cat-apoio .cat-count{ background:hsl(207 82% 88%); color:var(--info-text); }
+
+  .cats-note{
+    margin-top:.55rem; font-size:11.5px; color:var(--muted-foreground);
+  }
+
+  /* ---------- barra da lista ---------- */
+  .list-bar{
+    display:flex; align-items:baseline; justify-content:space-between; gap:1rem;
+    margin:1.5rem 0 .55rem;
+  }
+  .list-count{ font-size:13px; color:var(--muted-foreground); }
+  .list-count b{ color:var(--brand-ink); font-weight:650; }
+  .legend{ font-size:11.5px; color:var(--muted-foreground); white-space:nowrap; }
+  .legend .d{
+    display:inline-block; width:9px; height:9px; border-radius:50%;
+    margin:0 .3rem 0 .7rem; vertical-align:-1px;
+    border:1px solid hsl(0 0% 0% / .14);
+  }
+  .legend .d:first-child{ margin-left:0; }
+  .d-j{ background:var(--role-mentorado); }
+  .d-m{ background:var(--role-mentor); }
+
+  /* ---------- lista de duplas ---------- */
+  .list{
+    background:var(--card); border:1px solid var(--border);
+    border-radius:var(--radius); overflow:hidden;
+  }
+  .list-head, .row{
+    display:grid; align-items:center;
+    grid-template-columns:104px minmax(205px,1.25fr) minmax(145px,.9fr) minmax(185px,1.3fr) 150px 18px;
+    column-gap:1rem;
+  }
+  .list-head{
+    padding:.55rem 1.25rem; border-bottom:1px solid var(--border);
+    font-size:10.5px; font-weight:700; letter-spacing:.05em;
+    text-transform:uppercase; color:var(--muted-foreground);
+  }
+  .row{
+    padding:.9rem 1.25rem; text-decoration:none;
+    transition:background .12s;
+  }
+  .row + .row{ border-top:1px solid var(--border); }
+  .row:hover{ background:var(--accent); }
+  .row.s-apoio{ background:hsl(207 82% 97.5%); }
+  .row.s-apoio:hover{ background:hsl(207 82% 94%); }
+
+  /* status */
+  .cell-status{ display:flex; flex-direction:column; align-items:flex-start; gap:.35rem; }
+  .pill{
+    display:inline-flex; align-items:center; gap:.35rem;
+    font-size:11.5px; font-weight:650; padding:.24rem .6rem; border-radius:999px;
+    white-space:nowrap;
+  }
+  .pill::before{ content:""; width:6px; height:6px; border-radius:50%; background:currentColor; flex:none; }
+  .p-risco{ background:hsl(0 80% 94%); color:var(--danger); }
+  .p-atencao{ background:hsl(43 95% 90%); color:var(--warn-text); }
+  .p-ok{ background:hsl(78 58% 90%); color:var(--ok-text); }
+  .p-pausa{ background:var(--muted); color:var(--muted-foreground); }
+  .p-apoio{ background:hsl(207 82% 90%); color:var(--info-text); }
+  .p-apoio::before{ display:none; }
+  .p-apoio svg{ flex:none; }
+
+  /* dupla */
+  .cell-dupla{ display:flex; align-items:center; gap:.7rem; min-width:0; }
+  .avas{ display:flex; flex:none; }
+  .av{
+    width:34px; height:34px; border-radius:50%;
+    display:grid; place-items:center;
+    background:var(--card); font-size:10.5px; font-weight:750;
+  }
+  .av-j{ border:2px solid var(--role-mentorado); }
+  .av-m{ border:2px solid var(--role-mentor); margin-left:-10px; }
+  .names{ min-width:0; }
+  .names .nm{ font-size:13.5px; }
+  .names .nm b{ font-weight:650; }
+  .names .amp{ color:var(--muted-foreground); font-weight:500; padding:0 .15rem; }
+  .names small{ display:block; font-size:11.5px; color:var(--muted-foreground); margin-top:.1rem; }
+
+  /* progresso */
+  .cell-prog{ min-width:0; }
+  .prog-lbl{
+    display:flex; justify-content:space-between; align-items:baseline;
+    font-size:11.5px; color:var(--muted-foreground); margin-bottom:.3rem;
+  }
+  .prog-lbl b{ font-size:12.5px; font-weight:650; color:var(--brand-ink); }
+  .bar{ position:relative; height:6px; background:var(--muted); border-radius:999px; }
+  .bar i{ display:block; height:100%; border-radius:inherit; background:var(--ok); }
+  .bar em{
+    position:absolute; top:-3px; bottom:-3px; width:2px; border-radius:1px;
+    background:hsl(0 0% 15% / .5);
+  }
+  .s-risco .bar i{ background:var(--danger); }
+  .s-atencao .bar i{ background:var(--warn); }
+  .s-pausa .bar i{ background:hsl(75 4% 62%); }
+  .s-pausa .bar em{ background:hsl(75 4% 45% / .5); }
+
+  /* sinais (motivos em texto corrido) */
+  .cell-sinais{
+    font-size:12.5px; font-weight:500; line-height:1.45;
+    color:hsl(75 5% 30%); min-width:0;
+  }
+  .s-risco .cell-sinais{ color:hsl(0 62% 36%); }
+  .s-atencao .cell-sinais{ color:hsl(40 88% 27%); }
+  .s-apoio .cell-sinais{ color:hsl(207 70% 33%); }
+  .s-pausa .cell-sinais{ color:var(--muted-foreground); }
+  .cha{
+    display:inline-block; font-size:10.5px; font-weight:700; letter-spacing:.02em;
+    background:hsl(207 82% 90%); color:var(--info-text);
+    padding:.06rem .4rem; border-radius:.4rem; vertical-align:1px;
+  }
+
+  /* avaliação: badge + legenda inline do que mede */
+  .cell-aval{ display:flex; flex-direction:column; align-items:flex-start; gap:.22rem; }
+  .badge{ font-size:12px; font-weight:650; padding:.28rem .65rem; border-radius:.55rem; white-space:nowrap; }
+  .b-exc{ background:var(--brand-lime); color:hsl(78 58% 20%); }
+  .b-boa{ background:hsl(78 45% 90%); color:var(--ok-text); }
+  .b-reg{ background:hsl(43 70% 90%); color:var(--warn-text); }
+  .b-baixa{ background:hsl(0 80% 94%); color:var(--danger); }
+  .cell-aval small{ font-size:10.5px; line-height:1.3; color:var(--muted-foreground); }
+  .s-pausa .cell-aval{ opacity:.6; }
+
+  .cell-go{ color:var(--muted-foreground); justify-self:end; }
+
+  /* ---------- responsivo ---------- */
+  @media (max-width: 940px){
+    .topnav{ display:none; }
+    .list-head{ display:none; }
+    .list{ background:none; border:none; border-radius:0; overflow:visible; }
+    .row{
+      display:flex; flex-direction:column; align-items:stretch; gap:.65rem;
+      background:var(--card); border:1px solid var(--border);
+      border-radius:var(--radius); padding:1rem 1.1rem; margin-bottom:.65rem;
+    }
+    .row + .row{ border-top:1px solid var(--border); }
+    .row:hover{ background:var(--card); }
+    .row.s-apoio{ background:var(--info-bg); }
+    .row.s-apoio:hover{ background:var(--info-bg); }
+    .cell-status{ flex-direction:row; }
+    .cell-aval{ flex-direction:row; align-items:center; gap:.55rem; }
+    .cell-go{ display:none; }
+  }
+  @media (max-width: 640px){
+    .page-head h1{ font-size:22px; }
+    .head-actions{ width:100%; flex-direction:column; align-items:stretch; }
+    .search{ min-width:0; }
+    .btn-new{ justify-content:center; }
+    .cats{ display:grid; grid-template-columns:1fr 1fr; }
+    .cat{ flex:none; }
+    .cat-sep{ display:none; }
+    .cat-apoio{ grid-column:1 / -1; }
+    .list-bar{ flex-direction:column; gap:.15rem; }
+    .user-id{ display:none; }
+  }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-in">
+    <a class="brand" href="#">
+      <span class="brand-mark" aria-hidden="true">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="hsl(78 60% 20%)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 21v-9"/>
+          <path d="M12 12c0-3.9 2.7-6.5 6.5-6.5 0 3.8-2.7 6.5-6.5 6.5z"/>
+          <path d="M12 12c0-3.9-2.7-6.5-6.5-6.5 0 3.8 2.7 6.5 6.5 6.5z"/>
+        </svg>
+      </span>
+      <span class="brand-name">realiza<span>.vc</span></span>
+    </a>
+    <nav class="topnav" aria-label="Principal">
+      <a href="#">Agenda</a>
+      <a href="#" class="is-on" aria-current="page">Duplas</a>
+      <a href="#">Pessoas</a>
+      <a href="#">Chamados</a>
+      <a href="#">Materiais</a>
+    </nav>
+    <div class="user">
+      <div class="user-id">
+        <b>Marina Costa</b>
+        <small>Coordenação</small>
+      </div>
+      <span class="uav" aria-hidden="true">MC</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <div class="page-head">
+    <div>
+      <h1>Duplas</h1>
+      <p class="sub">Ciclo 2026 · 8 duplas acompanhadas · encontros semanais às terças e quartas, 19h</p>
+    </div>
+    <div class="head-actions">
+      <div class="search" role="search">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        Buscar dupla, mentor ou mentorada…
+      </div>
+      <button class="btn-new" type="button">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+        Nova dupla
+      </button>
+    </div>
+  </div>
+
+  <!-- Chips de categoria com a régua de cada uma sempre visível -->
+  <section class="cats" aria-label="Filtrar por categoria">
+    <button class="cat cat-all is-active" type="button" aria-pressed="true">
+      <span class="cat-top"><i class="cat-dot"></i><span class="cat-name">Todas</span><span class="cat-count">8</span></span>
+      <span class="cat-rule">todas as duplas do ciclo, em qualquer estado</span>
+    </button>
+    <button class="cat cat-risco" type="button" aria-pressed="false">
+      <span class="cat-top"><i class="cat-dot"></i><span class="cat-name">Em risco</span><span class="cat-count">2</span></span>
+      <span class="cat-rule">2+ encontros atrasados, ou avaliação baixa + dificuldade</span>
+    </button>
+    <button class="cat cat-atencao" type="button" aria-pressed="false">
+      <span class="cat-top"><i class="cat-dot"></i><span class="cat-name">Atenção</span><span class="cat-count">2</span></span>
+      <span class="cat-rule">1 atraso, avaliação baixa ou registro/encaminhamento pendente</span>
+    </button>
+    <button class="cat cat-ok" type="button" aria-pressed="false">
+      <span class="cat-top"><i class="cat-dot"></i><span class="cat-name">Em andamento</span><span class="cat-count">2</span></span>
+      <span class="cat-rule">jornada dentro do previsto, sem pendências</span>
+    </button>
+    <button class="cat cat-pausa" type="button" aria-pressed="false">
+      <span class="cat-top"><i class="cat-dot"></i><span class="cat-name">Pausadas</span><span class="cat-count">1</span></span>
+      <span class="cat-rule">jornada congelada — sem encontros nem cobrança</span>
+    </button>
+    <span class="cat-sep" aria-hidden="true"></span>
+    <button class="cat cat-apoio" type="button" aria-pressed="false">
+      <span class="cat-top"><i class="cat-dot" style="background:var(--info)"></i><span class="cat-name"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="M5.6 5.6 9.2 9.2M18.4 5.6 14.8 9.2M5.6 18.4 9.2 14.8M18.4 18.4 14.8 14.8"/></svg>Apoio</span><span class="cat-count">1</span></span>
+      <span class="cat-rule">chamado aberto — não é falha da dupla</span>
+    </button>
+  </section>
+  <p class="cats-note">O semáforo compara os encontros esperados até hoje com registros de acompanhamento e avaliações do mentor — os critérios ficam sempre visíveis em cada categoria.</p>
+
+  <div class="list-bar">
+    <p class="list-count"><b>8 duplas</b> · ordenadas por prioridade</p>
+    <p class="legend"><i class="d d-j"></i>mentorado(a)<i class="d d-m"></i>mentor(a)</p>
+  </div>
+
+  <section class="list" aria-label="Lista de duplas">
+    <div class="list-head" aria-hidden="true">
+      <span>Status</span>
+      <span>Dupla</span>
+      <span>Encontros — feito × esperado</span>
+      <span>Sinais</span>
+      <span>Avaliação do mentor</span>
+      <span></span>
+    </div>
+
+    <!-- EM RISCO -->
+    <a class="row s-risco" href="#">
+      <div class="cell-status"><span class="pill p-risco">Em risco</span></div>
+      <div class="cell-dupla">
+        <div class="avas" aria-hidden="true"><span class="av av-j">ML</span><span class="av av-m">RA</span></div>
+        <div class="names">
+          <div class="nm"><b>Mariana Lopes</b><span class="amp">&amp;</span><b>Roberto Alves</b></div>
+          <small>T1 · encontros ter 19h · sup. Marina Costa</small>
+        </div>
+      </div>
+      <div class="cell-prog">
+        <div class="prog-lbl"><b>5 de 16</b><span>esperado: 8</span></div>
+        <div class="bar"><i style="width:31.25%"></i><em style="left:50%"></em></div>
+      </div>
+      <div class="cell-sinais">3 encontros atrasados · registro do 5º pendente</div>
+      <div class="cell-aval"><span class="badge b-boa">Boa</span><small>nota do mentor · 4º encontro</small></div>
+      <div class="cell-go"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg></div>
+    </a>
+
+    <a class="row s-risco" href="#">
+      <div class="cell-status"><span class="pill p-risco">Em risco</span></div>
+      <div class="cell-dupla">
+        <div class="avas" aria-hidden="true"><span class="av av-j">LF</span><span class="av av-m">CD</span></div>
+        <div class="names">
+          <div class="nm"><b>Lucas Ferreira</b><span class="amp">&amp;</span><b>Camila Duarte</b></div>
+          <small>T2 · encontros qua 19h · sup. Marina Costa</small>
+        </div>
+      </div>
+      <div class="cell-prog">
+        <div class="prog-lbl"><b>5 de 16</b><span>esperado: 5</span></div>
+        <div class="bar"><i style="width:31.25%"></i><em style="left:31.25%"></em></div>
+      </div>
+      <div class="cell-sinais">avaliação baixa no 5º encontro · dificuldade relatada pelo mentor</div>
+      <div class="cell-aval"><span class="badge b-baixa">Baixa</span><small>nota do mentor · 5º encontro</small></div>
+      <div class="cell-go"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg></div>
+    </a>
+
+    <!-- ATENÇÃO -->
+    <a class="row s-atencao" href="#">
+      <div class="cell-status"><span class="pill p-atencao">Atenção</span></div>
+      <div class="cell-dupla">
+        <div class="avas" aria-hidden="true"><span class="av av-j">CM</span><span class="av av-m">AL</span></div>
+        <div class="names">
+          <div class="nm"><b>Caio Moraes</b><span class="amp">&amp;</span><b>André Lima</b></div>
+          <small>T2 · encontros qua 19h · sup. Paula Nunes</small>
+        </div>
+      </div>
+      <div class="cell-prog">
+        <div class="prog-lbl"><b>4 de 16</b><span>esperado: 5</span></div>
+        <div class="bar"><i style="width:25%"></i><em style="left:31.25%"></em></div>
+      </div>
+      <div class="cell-sinais">1 encontro atrasado · registro do 4º pendente</div>
+      <div class="cell-aval"><span class="badge b-boa">Boa</span><small>nota do mentor · 3º encontro</small></div>
+      <div class="cell-go"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg></div>
+    </a>
+
+    <a class="row s-atencao" href="#">
+      <div class="cell-status"><span class="pill p-atencao">Atenção</span></div>
+      <div class="cell-dupla">
+        <div class="avas" aria-hidden="true"><span class="av av-j">PS</span><span class="av av-m">JM</span></div>
+        <div class="names">
+          <div class="nm"><b>Pedro Santos</b><span class="amp">&amp;</span><b>Juliana Matos</b></div>
+          <small>T1 · encontros ter 19h · sup. Paula Nunes</small>
+        </div>
+      </div>
+      <div class="cell-prog">
+        <div class="prog-lbl"><b>8 de 16</b><span>esperado: 8</span></div>
+        <div class="bar"><i style="width:50%"></i><em style="left:50%"></em></div>
+      </div>
+      <div class="cell-sinais">encaminhamento vencido há 5 dias · avaliação caiu para regular</div>
+      <div class="cell-aval"><span class="badge b-reg">Regular</span><small>nota do mentor · 8º encontro</small></div>
+      <div class="cell-go"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg></div>
+    </a>
+
+    <!-- APOIO (eixo separado: chamado aberto, dupla saudável) -->
+    <a class="row s-apoio" href="#">
+      <div class="cell-status">
+        <span class="pill p-ok">Em andamento</span>
+        <span class="pill p-apoio"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="M5.6 5.6 9.2 9.2M18.4 5.6 14.8 9.2M5.6 18.4 9.2 14.8M18.4 18.4 14.8 14.8"/></svg>Apoio</span>
+      </div>
+      <div class="cell-dupla">
+        <div class="avas" aria-hidden="true"><span class="av av-j">SM</span><span class="av av-m">RT</span></div>
+        <div class="names">
+          <div class="nm"><b>Sofia Martins</b><span class="amp">&amp;</span><b>Ricardo Torres</b></div>
+          <small>T1 · encontros ter 19h · sup. Paula Nunes</small>
+        </div>
+      </div>
+      <div class="cell-prog">
+        <div class="prog-lbl"><b>8 de 16</b><span>esperado: 8</span></div>
+        <div class="bar"><i style="width:50%"></i><em style="left:50%"></em></div>
+      </div>
+      <div class="cell-sinais">chamado <span class="cha">CHA-000142</span> em atendimento com Marina · jornada em dia</div>
+      <div class="cell-aval"><span class="badge b-boa">Boa</span><small>nota do mentor · 8º encontro</small></div>
+      <div class="cell-go"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg></div>
+    </a>
+
+    <!-- EM ANDAMENTO -->
+    <a class="row s-ok" href="#">
+      <div class="cell-status"><span class="pill p-ok">Em andamento</span></div>
+      <div class="cell-dupla">
+        <div class="avas" aria-hidden="true"><span class="av av-j">AS</span><span class="av av-m">AL</span></div>
+        <div class="names">
+          <div class="nm"><b>Ana Souza</b><span class="amp">&amp;</span><b>André Lima</b></div>
+          <small>T1 · encontros ter 19h · sup. Paula Nunes</small>
+        </div>
+      </div>
+      <div class="cell-prog">
+        <div class="prog-lbl"><b>8 de 16</b><span>esperado: 8</span></div>
+        <div class="bar"><i style="width:50%"></i><em style="left:50%"></em></div>
+      </div>
+      <div class="cell-sinais">jornada em dia · trilha com especialista Luísa (sex 16h)</div>
+      <div class="cell-aval"><span class="badge b-exc">Excelente</span><small>nota do mentor · 8º encontro</small></div>
+      <div class="cell-go"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg></div>
+    </a>
+
+    <a class="row s-ok" href="#">
+      <div class="cell-status"><span class="pill p-ok">Em andamento</span></div>
+      <div class="cell-dupla">
+        <div class="avas" aria-hidden="true"><span class="av av-j">BR</span><span class="av av-m">PM</span></div>
+        <div class="names">
+          <div class="nm"><b>Beatriz Ramos</b><span class="amp">&amp;</span><b>Patrícia Mendes</b></div>
+          <small>T2 · encontros qua 19h · sup. Paula Nunes</small>
+        </div>
+      </div>
+      <div class="cell-prog">
+        <div class="prog-lbl"><b>5 de 16</b><span>esperado: 5</span></div>
+        <div class="bar"><i style="width:31.25%"></i><em style="left:31.25%"></em></div>
+      </div>
+      <div class="cell-sinais">jornada em dia · PDM entregue no 3º encontro</div>
+      <div class="cell-aval"><span class="badge b-exc">Excelente</span><small>nota do mentor · 5º encontro</small></div>
+      <div class="cell-go"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg></div>
+    </a>
+
+    <!-- PAUSADA -->
+    <a class="row s-pausa" href="#">
+      <div class="cell-status"><span class="pill p-pausa">Pausada</span></div>
+      <div class="cell-dupla">
+        <div class="avas" aria-hidden="true"><span class="av av-j">GN</span><span class="av av-m">FC</span></div>
+        <div class="names">
+          <div class="nm"><b>Gabriel Nunes</b><span class="amp">&amp;</span><b>Fernando Costa</b></div>
+          <small>T1 · encontros ter 19h · sup. Paula Nunes</small>
+        </div>
+      </div>
+      <div class="cell-prog">
+        <div class="prog-lbl"><b>6 de 16</b><span>em pausa</span></div>
+        <div class="bar"><i style="width:37.5%"></i><em style="left:37.5%"></em></div>
+      </div>
+      <div class="cell-sinais">pausada em 20/mai · retorno previsto para julho</div>
+      <div class="cell-aval"><span class="badge b-boa">Boa</span><small>nota do mentor · 6º encontro</small></div>
+      <div class="cell-go"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg></div>
+    </a>
+  </section>
+
+</main>
+</body>
+</html>

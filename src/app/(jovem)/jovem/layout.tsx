@@ -1,5 +1,7 @@
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { DemoBar } from "@/components/demo-bar";
+import { MockupViewer } from "@/components/demo-mockups";
 import { JovemShell } from "@/components/jovem-shell";
 import { TelaConta } from "@/components/telas-conta";
 import { getDemoData } from "@/lib/demo/data";
@@ -80,6 +82,13 @@ export default async function JovemLayout({
       <DemoBar variant="float" papel={demo} personas={demoPersonas} />
     </div>
   );
+  // overlay de mockups de layout (?mockup=tela:vN), igual ao (app)/layout —
+  // o jovem também compara as propostas de Materiais e Especialistas
+  const demoMockups = demo && (
+    <Suspense fallback={null}>
+      <MockupViewer />
+    </Suspense>
+  );
 
   if (!me.onboarded_em) {
     // a ficha do jovem preenche a grade e o contato do wizard — null = a
@@ -90,6 +99,7 @@ export default async function JovemLayout({
       <>
         <OnboardingJovem me={me} perfil={perfil} demo={demoDock} />
         {demoFloat}
+        {demoMockups}
       </>
     );
   }
@@ -99,6 +109,7 @@ export default async function JovemLayout({
     <JovemShell me={me} notificacoes={notificacoes} demo={demoDock || undefined}>
       {children}
       {demoFloat}
+      {demoMockups}
     </JovemShell>
   );
 }

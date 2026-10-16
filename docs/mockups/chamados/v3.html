@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<!-- MOCKUP chamados v3 — Inbox mobile-first -->
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chamados · Coordenação — Realiza.vc</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;550;600;650;700;750;800&display=swap" rel="stylesheet">
+<style>
+  /* ---------- tokens ---------- */
+  :root {
+    --brand-lime: hsl(78 56% 53%);
+    --brand-ink: hsl(0 0% 15%);
+    --background: hsl(75 10% 95%);
+    --card: hsl(0 0% 100%);
+    --muted: hsl(75 7% 93%);
+    --muted-foreground: hsl(75 4% 40%);
+    --accent: hsl(75 8% 91%);
+    --border: hsl(75 6% 87%);
+    --input: hsl(75 8% 54%);
+    --ok: hsl(78 58% 38%);
+    --ok-text: hsl(78 55% 30%);
+    --warn: hsl(43 95% 44%);
+    --warn-text: hsl(43 90% 30%);
+    --danger: hsl(0 80% 48%);
+    --role-mentor: var(--brand-lime);
+    --role-mentorado: hsl(48 100% 60%);
+    --radius: 0.75rem;
+
+    /* categorias dos chamados (tints suaves sobre o papel quente) */
+    --cat-urg-bg:  hsl(0 80% 94%);   --cat-urg-fg:  hsl(0 72% 38%);
+    --cat-agen-bg: hsl(212 80% 93%); --cat-agen-fg: hsl(212 68% 34%);
+    --cat-met-bg:  hsl(268 60% 93%); --cat-met-fg:  hsl(268 50% 36%);
+    --cat-plat-bg: hsl(178 60% 90%); --cat-plat-fg: hsl(178 65% 26%);
+    --cat-out-bg:  var(--muted);     --cat-out-fg:  var(--muted-foreground);
+
+    /* status */
+    --st-aberto-bg: hsl(0 80% 48% / .10);  --st-aberto-fg: hsl(0 72% 40%);
+    --st-emat-bg:   hsl(43 95% 44% / .16); --st-emat-fg:   var(--warn-text);
+    --st-res-bg:    hsl(78 58% 38% / .12); --st-res-fg:    var(--ok-text);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    background: var(--background);
+    color: var(--brand-ink);
+    font-size: 14.5px;
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+  }
+  svg.ic { width: 15px; height: 15px; flex: none; }
+  .shell { max-width: 1060px; margin: 0 auto; padding-inline: clamp(14px, 4vw, 36px); }
+
+  /* ---------- topbar ---------- */
+  .topbar { background: var(--card); border-bottom: 1px solid var(--border); }
+  .topbar .in { display: flex; align-items: center; justify-content: space-between; height: 56px; }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 750; font-size: 15px; letter-spacing: -.01em; }
+  .logo { width: 26px; height: 26px; border-radius: 8px; background: var(--brand-lime); display: grid; place-items: center; font-weight: 800; font-size: 13px; }
+  .crumb { color: var(--muted-foreground); font-weight: 500; }
+  .me { display: flex; align-items: center; gap: 9px; font-size: 12.5px; }
+  .me b { display: block; font-size: 13px; font-weight: 650; }
+  .me small { color: var(--muted-foreground); }
+
+  /* avatares por pessoa (consistentes fila ↔ detalhe) */
+  .av { width: 28px; height: 28px; border-radius: 50%; display: inline-grid; place-items: center; font-size: 10.5px; font-weight: 700; flex: none; }
+  .av.mc { background: hsl(78 56% 53% / .38); color: hsl(78 60% 26%); }
+  .av.pn { background: hsl(268 60% 92%);     color: hsl(268 50% 36%); }
+  .av.al { background: hsl(212 80% 92%);     color: hsl(212 70% 34%); }
+  .av.lp { background: hsl(178 60% 90%);     color: hsl(178 65% 26%); }
+  .av.rm { background: hsl(30 80% 92%);      color: hsl(30 70% 34%); }
+  .av.none { border: 1.5px dashed var(--input); color: var(--muted-foreground); background: transparent; }
+
+  /* ---------- cabeçalho da página ---------- */
+  .pagehead { display: flex; align-items: flex-end; justify-content: space-between; gap: 14px; flex-wrap: wrap; padding-block: 24px 16px; }
+  h1 { font-size: 26px; letter-spacing: -.025em; font-weight: 750; }
+  .sub { color: var(--muted-foreground); font-size: 13px; margin-top: 4px; }
+  .sub b { color: var(--warn-text); font-weight: 650; }
+  .search {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--card); border: 1px solid var(--border); border-radius: 999px;
+    padding: 9px 15px; min-width: 290px; color: var(--muted-foreground);
+  }
+  .search input { border: 0; outline: 0; background: transparent; font: 400 13.5px 'Inter'; width: 100%; color: var(--brand-ink); }
+  .search input::placeholder { color: hsl(75 4% 52%); }
+
+  /* ---------- barra de filtros (rolável) ---------- */
+  .filterbar {
+    position: sticky; top: 0; z-index: 10;
+    background: hsl(75 10% 95% / .92); backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--border);
+  }
+  .chips { display: flex; gap: 8px; align-items: center; overflow-x: auto; padding-block: 10px; scrollbar-width: none; }
+  .chips::-webkit-scrollbar { display: none; }
+  .chip {
+    flex: none; display: inline-flex; align-items: center; gap: 7px;
+    border: 1px solid var(--border); background: var(--card); border-radius: 999px;
+    padding: 7px 13px; font: 600 12.5px 'Inter'; color: var(--brand-ink); cursor: pointer;
+    transition: background .12s;
+  }
+  .chip:hover { background: var(--accent); }
+  .chip b { color: var(--muted-foreground); font-weight: 650; font-size: 11.5px; font-variant-numeric: tabular-nums; }
+  .chip.on { background: var(--brand-ink); color: #fff; border-color: var(--brand-ink); }
+  .chip.on b { color: hsl(0 0% 100% / .6); }
+  .chip .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+  .sep { width: 1px; height: 20px; background: var(--border); flex: none; margin-inline: 4px; }
+  .d-urg { background: var(--danger); }  .d-agen { background: hsl(212 70% 50%); }
+  .d-met { background: hsl(268 55% 55%); } .d-plat { background: hsl(178 60% 35%); }
+  .d-out { background: var(--input); }
+  .d-ab  { background: var(--danger); }  .d-ea { background: var(--warn); } .d-rs { background: var(--ok); }
+  .chips::after { content: ''; flex: none; width: 2px; } /* respiro no fim do scroll */
+
+  /* ---------- a fila (inbox) ---------- */
+  .queue { list-style: none; border-top: 1px solid var(--border); margin-top: 8px; }
+
+  .qrow a {
+    display: grid; grid-template-columns: 10px minmax(0, 1fr) auto;
+    gap: 4px 12px; align-items: center;
+    padding: 13px 14px 13px 10px;
+    border-bottom: 1px solid var(--border);
+    text-decoration: none; color: inherit; position: relative;
+    transition: background .12s;
+  }
+  .qrow a:hover { background: var(--accent); }
+  .qrow.current a { background: hsl(78 56% 53% / .07); }
+  .qrow.current a::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--brand-lime); }
+  .qrow.done a { opacity: .72; }
+
+  .udot { width: 7px; height: 7px; border-radius: 50%; background: var(--brand-lime); justify-self: center; }
+  .udot.off { visibility: hidden; }
+
+  .r-main { min-width: 0; }
+  .r-top { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .proto { font-size: 11px; font-weight: 650; letter-spacing: .07em; color: var(--muted-foreground); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .new { font-size: 9.5px; font-weight: 750; text-transform: uppercase; letter-spacing: .06em; background: var(--brand-lime); color: var(--brand-ink); border-radius: 6px; padding: 2px 6px; }
+
+  .catpill { font-size: 11px; font-weight: 650; border-radius: 999px; padding: 2.5px 9px; display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+  .catpill svg { width: 11px; height: 11px; }
+  .c-urg { background: var(--cat-urg-bg);  color: var(--cat-urg-fg); }
+  .c-agen { background: var(--cat-agen-bg); color: var(--cat-agen-fg); }
+  .c-met { background: var(--cat-met-bg);  color: var(--cat-met-fg); }
+  .c-plat { background: var(--cat-plat-bg); color: var(--cat-plat-fg); }
+  .c-out { background: var(--cat-out-bg);  color: var(--cat-out-fg); }
+
+  .r-subject {
+    font-size: 15px; font-weight: 650; letter-spacing: -.012em; margin-top: 3px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .done .r-subject { color: var(--muted-foreground); font-weight: 550; }
+
+  .r-meta { font-size: 12.5px; color: var(--muted-foreground); margin-top: 3px; display: flex; align-items: center; gap: 6px; min-width: 0; flex-wrap: nowrap; }
+  .r-meta .av { width: 16px; height: 16px; font-size: 7.5px; }
+  .r-meta .who { white-space: nowrap; }
+  .dupla { display: inline-flex; align-items: center; gap: 5px; font-weight: 550; color: hsl(0 0% 28%); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .sem { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+  .sem.ok { background: var(--brand-lime); } .sem.at { background: var(--warn); } .sem.rs { background: var(--danger); }
+
+  .r-preview { font-size: 12.5px; color: var(--muted-foreground); margin-top: 3px; display: flex; gap: 6px; align-items: baseline; min-width: 0; }
+  .r-preview svg { width: 12px; height: 12px; position: relative; top: 1px; opacity: .7; }
+  .r-preview .pv { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+
+  .r-right { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; justify-content: center; }
+  .time { font-size: 11.5px; color: var(--muted-foreground); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .status { font-size: 11.5px; font-weight: 700; border-radius: 999px; padding: 3px 10px; display: inline-flex; gap: 6px; align-items: center; white-space: nowrap; }
+  .status i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .st-aberto { background: var(--st-aberto-bg); color: var(--st-aberto-fg); }
+  .st-emat   { background: var(--st-emat-bg);   color: var(--st-emat-fg); }
+  .st-res    { background: var(--st-res-bg);    color: var(--st-res-fg); }
+  .assignee { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 550; white-space: nowrap; }
+  .assignee .av { width: 20px; height: 20px; font-size: 9px; }
+  .assignee.none { color: var(--muted-foreground); font-weight: 550; }
+
+  /* ---------- divisor "segunda tela" ---------- */
+  .screendiv { max-width: 1060px; margin: 44px auto 0; padding-inline: clamp(14px, 4vw, 36px); }
+  .screendiv span {
+    display: flex; align-items: center; gap: 14px;
+    font-size: 11px; font-weight: 750; letter-spacing: .09em; text-transform: uppercase; color: var(--muted-foreground);
+  }
+  .screendiv span::before, .screendiv span::after { content: ''; flex: 1; border-top: 1.5px dashed var(--input); }
+
+  /* ---------- detalhe / thread ---------- */
+  .detail { padding-top: 20px; padding-bottom: 70px; scroll-margin-top: 64px; }
+  .back { font-size: 13px; color: var(--muted-foreground); margin-bottom: 14px; display: flex; gap: 8px; align-items: center; }
+  .back svg { width: 14px; height: 14px; }
+  .back b { color: var(--brand-ink); font-weight: 650; }
+
+  .dcard {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: calc(var(--radius) * 1.4);
+    padding: clamp(16px, 3vw, 26px);
+    box-shadow: 0 1px 2px hsl(75 10% 60% / .18);
+  }
+  .d-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .d-top .time { margin-left: auto; }
+  h2 { font-size: clamp(18px, 2.4vw, 22px); letter-spacing: -.02em; font-weight: 750; margin-top: 10px; }
+
+  .meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(185px, 1fr)); gap: 14px 20px; margin-top: 18px; padding-top: 15px; border-top: 1px solid var(--border); }
+  .m small { display: block; font-size: 10.5px; font-weight: 750; letter-spacing: .07em; text-transform: uppercase; color: var(--muted-foreground); margin-bottom: 4px; }
+  .m > span { font-size: 13px; display: flex; align-items: center; gap: 7px; font-weight: 550; }
+  .m .lnk { color: var(--muted-foreground); display: inline-flex; }
+  .m .lnk svg { width: 12px; height: 12px; }
+
+  .actions { display: flex; gap: 8px; margin-top: 20px; flex-wrap: wrap; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 7px;
+    border-radius: 10px; padding: 9px 15px;
+    font: 650 13px 'Inter'; border: 1px solid var(--border);
+    background: var(--card); color: var(--brand-ink); cursor: pointer;
+  }
+  .btn svg { width: 14px; height: 14px; }
+  .btn.pri { background: var(--brand-lime); border-color: transparent; }
+  .btn.ok  { border-color: hsl(78 58% 38% / .45); color: var(--ok-text); }
+  .btn.ghost { background: transparent; color: var(--muted-foreground); border-color: transparent; }
+  .btn[disabled] { opacity: .45; cursor: default; }
+
+  /* timeline intercalada público × interno */
+  .timeline { list-style: none; margin-top: 20px; position: relative; }
+  .timeline::before { content: ''; position: absolute; left: 19px; top: 10px; bottom: 10px; width: 2px; background: var(--border); }
+  .ev { display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 12px; padding-block: 9px; position: relative; }
+  .rail { display: flex; justify-content: center; }
+  .rail .av { width: 30px; height: 30px; font-size: 11px; border: 2px solid var(--background); z-index: 1; }
+  .sysicon { width: 26px; height: 26px; margin-top: 2px; border-radius: 50%; background: var(--muted); display: grid; place-items: center; color: var(--muted-foreground); border: 2px solid var(--background); z-index: 1; }
+  .sysicon svg { width: 13px; height: 13px; }
+
+  .ev-card { border-radius: 14px; padding: 11px 15px; font-size: 13.5px; }
+  .ev-card header { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; font-size: 12px; color: var(--muted-foreground); }
+  .ev-card header b { color: var(--brand-ink); font-weight: 650; }
+  .ev-card header time { margin-left: auto; font-size: 11.5px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .ev-card.public  { background: var(--card); border: 1px solid var(--border); }
+  .ev-card.interno { background: hsl(45 90% 55% / .10); border: 1px dashed hsl(43 80% 50% / .55); }
+  .ev-card.opened  { background: var(--card); border: 1px solid var(--border); border-left: 3px solid var(--brand-lime); }
+
+  .tag { font-size: 9.5px; font-weight: 750; letter-spacing: .06em; text-transform: uppercase; border-radius: 6px; padding: 2px 7px; display: inline-flex; align-items: center; gap: 4px; }
+  .tag svg { width: 10px; height: 10px; }
+  .tag.pub { background: hsl(78 56% 53% / .25); color: hsl(78 55% 30%); }
+  .tag.int { background: hsl(45 90% 55% / .28); color: hsl(43 85% 28%); }
+  .statusline { font-weight: 650; }
+  .mention { background: hsl(78 56% 53% / .32); border-radius: 5px; padding: 0 4px; font-weight: 650; }
+  .attach { display: inline-flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 12px; font-weight: 600; color: var(--cat-agen-fg); background: var(--cat-agen-bg); border-radius: 8px; padding: 5px 10px; }
+  .attach svg { width: 12px; height: 12px; }
+
+  /* composer */
+  .composer { background: var(--card); border: 1px solid var(--border); border-radius: calc(var(--radius) * 1.4); margin-top: 22px; padding: 15px 16px; box-shadow: 0 1px 3px hsl(75 10% 60% / .15); }
+  .seg { display: inline-flex; background: var(--muted); border-radius: 999px; padding: 3px; gap: 2px; margin-bottom: 11px; }
+  .seg button { border: 0; background: transparent; border-radius: 999px; padding: 6px 13px; font: 650 12.5px 'Inter'; color: var(--muted-foreground); display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+  .seg button svg { width: 13px; height: 13px; }
+  .seg button.on { background: var(--card); color: var(--brand-ink); box-shadow: 0 1px 2px hsl(0 0% 0% / .10); }
+  .composer textarea {
+    width: 100%; border: 1px solid var(--border); border-radius: 12px;
+    padding: 11px 13px; font: 400 13.5px/1.5 'Inter'; resize: vertical; min-height: 76px;
+    background: var(--background); color: var(--brand-ink);
+  }
+  .composer textarea::placeholder { color: hsl(75 4% 52%); }
+  .c-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 11px; flex-wrap: wrap; }
+  .hint { font-size: 11.5px; color: var(--muted-foreground); display: flex; gap: 6px; align-items: center; }
+  .hint svg { width: 13px; height: 13px; flex: none; }
+  .c-btns { display: flex; gap: 8px; }
+
+  .foot { padding: 34px 0 50px; color: var(--muted-foreground); font-size: 11.5px; }
+
+  /* ---------- mobile ≤640px ---------- */
+  @media (max-width: 640px) {
+    body { font-size: 14px; }
+    h1 { font-size: 22px; }
+    .pagehead { padding-block: 18px 12px; }
+    .search { min-width: 0; flex: 1 1 100%; }
+    .me .mtext { display: none; }
+
+    .qrow a { grid-template-columns: 8px minmax(0, 1fr) auto; gap: 3px 9px; padding: 12px 10px 12px 8px; }
+    .r-subject { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+    .status { font-size: 10.5px; padding: 2.5px 8px; }
+    .assignee .who { display: none; }
+    .assignee .av { width: 22px; height: 22px; font-size: 9.5px; }
+    .assignee.none { font-size: 10.5px; }
+    .r-meta { flex-wrap: wrap; row-gap: 1px; }
+    .r-meta .dash { display: none; }
+    .r-meta .who { white-space: normal; }
+    .dupla { font-size: 12px; width: 100%; }
+
+    .meta { grid-template-columns: 1fr 1fr; }
+    .ev { grid-template-columns: 32px minmax(0, 1fr); gap: 9px; }
+    .timeline::before { left: 15px; }
+    .rail .av { width: 26px; height: 26px; font-size: 10px; }
+    .sysicon { width: 22px; height: 22px; }
+    .ev-card { padding: 10px 12px; }
+    .ev-card header time { margin-left: 0; width: 100%; order: 5; }
+    .actions .btn { flex: 1 1 auto; justify-content: center; }
+    .composer textarea { min-height: 90px; }
+  }
+  @media (max-width: 420px) {
+    .meta { grid-template-columns: 1fr; }
+    .proto { letter-spacing: .04em; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ============ TOPBAR ============ -->
+<header class="topbar">
+  <div class="in shell">
+    <div class="brand">
+      <span class="logo">R</span>
+      Realiza <span class="crumb">/ Chamados</span>
+    </div>
+    <div class="me">
+      <span class="av mc">MC</span>
+      <span class="mtext"><b>Marina Costa</b><small>coordenação</small></span>
+    </div>
+  </div>
+</header>
+
+<!-- ============ CABEÇALHO ============ -->
+<div class="pagehead shell">
+  <div>
+    <h1>Chamados</h1>
+    <p class="sub">7 na fila · <b>3 abertos sem dono</b> — ordenados pela última atualização</p>
+  </div>
+  <label class="search">
+    <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg>
+    <input type="text" placeholder="Buscar por protocolo, nome ou dupla…">
+  </label>
+</div>
+
+<!-- ============ FILTROS (barra rolável) ============ -->
+<div class="filterbar">
+  <div class="chips shell">
+    <button class="chip on">Todas <b>7</b></button>
+    <span class="sep"></span>
+    <button class="chip"><i class="dot d-urg"></i>Urgência <b>2</b></button>
+    <button class="chip"><i class="dot d-agen"></i>Agenda <b>2</b></button>
+    <button class="chip"><i class="dot d-met"></i>Metodologia <b>1</b></button>
+    <button class="chip"><i class="dot d-plat"></i>Plataforma <b>1</b></button>
+    <button class="chip"><i class="dot d-out"></i>Outro <b>1</b></button>
+    <span class="sep"></span>
+    <button class="chip"><i class="dot d-ab"></i>Abertos <b>3</b></button>
+    <button class="chip"><i class="dot d-ea"></i>Em atendimento <b>3</b></button>
+    <button class="chip"><i class="dot d-rs"></i>Resolvidos <b>1</b></button>
+    <span class="sep"></span>
+    <button class="chip">Sem dono <b>3</b></button>
+    <button class="chip">Atribuídos a mim <b>2</b></button>
+  </div>
+</div>
+
+<!-- ============ TELA 1 — FILA INBOX ============ -->
+<main class="shell">
+  <ul class="queue">
+
+    <!-- CHA-000137 — linha selecionada (liga com a tela de detalhe abaixo) -->
+    <li class="qrow current">
+      <a href="#detalhe">
+        <span class="udot off"></span>
+        <div class="r-main">
+          <div class="r-top">
+            <span class="proto">CHA-000137</span>
+            <span class="catpill c-out">Outro</span>
+          </div>
+          <div class="r-subject">Reembolso do material da dinâmica de finanças (encontro 5)</div>
+          <div class="r-meta">
+            <span class="av al">AL</span>
+            <span class="who">André Lima · mentor </span><span class="dash">—</span>
+            <span class="dupla"><i class="sem at"></i>dupla c/ Caio · T2</span>
+          </div>
+          <div class="r-preview">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+            <span class="pv">“Aguardando liberação de verba — retorno do financeiro até sexta.”</span>
+          </div>
+        </div>
+        <div class="r-right">
+          <span class="time">há 1 h</span>
+          <span class="status st-emat"><i></i>Em atendimento</span>
+          <span class="assignee"><span class="av pn">PN</span><span class="who">Paula</span></span>
+        </div>
+      </a>
+    </li>
+
+    <!-- CHA-000143 — urgência, novo, sem dono -->
+    <li class="qrow">
+      <a href="#detalhe">
+        <span class="udot"></span>
+        <div class="r-main">
+          <div class="r-top">
+            <span class="proto">CHA-000143</span>
+            <span class="new">novo</span>
+            <span class="catpill c-urg"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21V4"/><path d="M5 5h12l-3 4 3 4H5"/></svg>Urgência</span>
+          </div>
+          <div class="r-subject">Ana não apareceu no encontro 8 e não responde no WhatsApp</div>
+          <div class="r-meta">
+            <span class="av al">AL</span>
+            <span class="who">André Lima · mentor </span><span class="dash">—</span>
+            <span class="dupla"><i class="sem rs"></i>dupla c/ Ana · T1</span>
+          </div>
+          <div class="r-preview">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+            <span class="pv">“Liguei duas vezes e mandei mensagem — sem retorno dela nem da mãe. Avisei a escola.”</span>
+          </div>
+        </div>
+        <div class="r-right">
+          <span class="time">há 3 h</span>
+          <span class="status st-aberto"><i></i>Aberto</span>
+          <span class="assignee none"><span class="av none"></span>sem dono</span>
+        </div>
+      </a>
+    </li>
+
+    <!-- CHA-000142 — agenda, em atendimento c/ Marina -->
+    <li class="qrow">
+      <a href="#detalhe">
+        <span class="udot off"></span>
+        <div class="r-main">
+          <div class="r-top">
+            <span class="proto">CHA-000142</span>
+            <span class="catpill c-agen">Agenda</span>
+          </div>
+          <div class="r-subject">Viagem a trabalho na terça — preciso remarcar o encontro 6</div>
+          <div class="r-meta">
+            <span class="av al">AL</span>
+            <span class="who">André Lima · mentor </span><span class="dash">—</span>
+            <span class="dupla"><i class="sem at"></i>dupla c/ Caio · T2</span>
+          </div>
+          <div class="r-preview">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+            <span class="pv">Marina: “O Caio pode sábado às 11h. André, confirma pra fechar?”</span>
+          </div>
+        </div>
+        <div class="r-right">
+          <span class="time">há 1 d</span>
+          <span class="status st-emat"><i></i>Em atendimento</span>
+          <span class="assignee"><span class="av mc">MC</span><span class="who">Marina</span></span>
+        </div>
+      </a>
+    </li>
+
+    <!-- CHA-000139 — metodologia, aberto, Luísa (trilha especialista) -->
+    <li class="qrow">
+      <a href="#detalhe">
+        <span class="udot off"></span>
+        <div class="r-main">
+          <div class="r-top">
+            <span class="proto">CHA-000139</span>
+            <span class="catpill c-met">Metodologia</span>
+          </div>
+          <div class="r-subject">Como adaptar a roda da vida para jovem de 15 anos?</div>
+          <div class="r-meta">
+            <span class="av lp">LP</span>
+            <span class="who">Luísa Prado · especialista </span><span class="dash">—</span>
+            <span class="dupla">trilha c/ Ana · T1</span>
+          </div>
+          <div class="r-preview">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+            <span class="pv">“Meu receio é ela não engajar no formato do guia. Existe adaptação sugerida?”</span>
+          </div>
+        </div>
+        <div class="r-right">
+          <span class="time">há 2 d</span>
+          <span class="status st-aberto"><i></i>Aberto</span>
+          <span class="assignee none"><span class="av none"></span>sem dono</span>
+        </div>
+      </a>
+    </li>
+
+    <!-- CHA-000141 — plataforma, novo, sem dono -->
+    <li class="qrow">
+      <a href="#detalhe">
+        <span class="udot"></span>
+        <div class="r-main">
+          <div class="r-top">
+            <span class="proto">CHA-000141</span>
+            <span class="new">novo</span>
+            <span class="catpill c-plat">Plataforma</span>
+          </div>
+          <div class="r-subject">Foto do registro não anexa — trava em 80% do upload no celular</div>
+          <div class="r-meta">
+            <span class="av al">AL</span>
+            <span class="who">André Lima · mentor </span><span class="dash">—</span>
+            <span class="dupla"><i class="sem at"></i>dupla c/ Caio · T2</span>
+          </div>
+          <div class="r-preview">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+            <span class="pv">“Tentei de novo hoje: Android 14, Chrome. O erro continua no mesmo ponto.”</span>
+          </div>
+        </div>
+        <div class="r-right">
+          <span class="time">há 2 d</span>
+          <span class="status st-aberto"><i></i>Aberto</span>
+          <span class="assignee none"><span class="av none"></span>sem dono</span>
+        </div>
+      </a>
+    </li>
+
+    <!-- CHA-000136 — urgência, em atendimento c/ Paula -->
+    <li class="qrow">
+      <a href="#detalhe">
+        <span class="udot off"></span>
+        <div class="r-main">
+          <div class="r-top">
+            <span class="proto">CHA-000136</span>
+            <span class="catpill c-urg"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21V4"/><path d="M5 5h12l-3 4 3 4H5"/></svg>Urgência</span>
+          </div>
+          <div class="r-subject">Pai do Caio pede contato sobre autorização de uso de imagem</div>
+          <div class="r-meta">
+            <span class="av pn">PN</span>
+            <span class="who">Paula Nunes · supervisora </span><span class="dash">—</span>
+            <span class="dupla"><i class="sem at"></i>dupla c/ Caio · T2</span>
+          </div>
+          <div class="r-preview">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+            <span class="pv">“Pai pediu retorno por escrito até sexta — minuta em revisão interna.”</span>
+          </div>
+        </div>
+        <div class="r-right">
+          <span class="time">há 4 d</span>
+          <span class="status st-emat"><i></i>Em atendimento</span>
+          <span class="assignee"><span class="av pn">PN</span><span class="who">Paula</span></span>
+        </div>
+      </a>
+    </li>
+
+    <!-- CHA-000131 — agenda, resolvido -->
+    <li class="qrow done">
+      <a href="#detalhe">
+        <span class="udot off"></span>
+        <div class="r-main">
+          <div class="r-top">
+            <span class="proto">CHA-000131</span>
+            <span class="catpill c-agen">Agenda</span>
+          </div>
+          <div class="r-subject">Encontro cairia no feriado — confirmar nova data com a dupla</div>
+          <div class="r-meta">
+            <span class="av rm">RM</span>
+            <span class="who">Renata Melo · mentora </span><span class="dash">—</span>
+            <span class="dupla"><i class="sem ok"></i>dupla c/ Júlia · T1</span>
+          </div>
+          <div class="r-preview">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+            <span class="pv">“Resolvido: encontro movido para quinta às 19h; a dupla confirmou.”</span>
+          </div>
+        </div>
+        <div class="r-right">
+          <span class="time">há 1 sem</span>
+          <span class="status st-res"><i></i>Resolvido</span>
+          <span class="assignee"><span class="av mc">MC</span><span class="who">Marina</span></span>
+        </div>
+      </a>
+    </li>
+
+  </ul>
+</main>
+
+<!-- ============ divisor — segunda tela ============ -->
+<div class="screendiv"><span>Tela 2 · Detalhe — abre ao tocar na linha CHA-000137</span></div>
+
+<!-- ============ TELA 2 — DETALHE / THREAD ============ -->
+<section class="detail shell" id="detalhe">
+  <nav class="back">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+    Chamados <span>/</span> <b>CHA-000137</b>
+  </nav>
+
+  <div class="dcard">
+    <div class="d-top">
+      <span class="proto">CHA-000137</span>
+      <span class="catpill c-out">Outro</span>
+      <span class="status st-emat"><i></i>Em atendimento</span>
+      <span class="time">aberto há 4 dias</span>
+    </div>
+    <h2>Reembolso do material da dinâmica de finanças (encontro 5)</h2>
+
+    <div class="meta">
+      <div class="m">
+        <small>Autor</small>
+        <span><span class="av al" style="width:22px;height:22px;font-size:9.5px">AL</span> André Lima · mentor</span>
+      </div>
+      <div class="m">
+        <small>Dupla</small>
+        <span><i class="sem at"></i> André ↔ Caio Santos · T2 · encontro 5
+          <a class="lnk" href="#detalhe" title="Ver ficha da dupla"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7"/><path d="M8 7h9v9"/></svg></a>
+        </span>
+      </div>
+      <div class="m">
+        <small>Abertura</small>
+        <span>ter 14 out · 09:12</span>
+      </div>
+      <div class="m">
+        <small>Última atualização</small>
+        <span>há 1 h · comentário interno</span>
+      </div>
+      <div class="m">
+        <small>Acompanhando</small>
+        <span><span class="av pn" style="width:22px;height:22px;font-size:9.5px">PN</span> Paula Nunes · supervisora</span>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="btn pri">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M3.5 20c.5-3.5 2.7-5.5 5.5-5.5s5 2 5.5 5.5"/><path d="M17 8.5v5M19.5 11h-5"/></svg>
+        Assumir
+      </button>
+      <button class="btn">Atribuir…</button>
+      <button class="btn ok">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+        Resolver
+      </button>
+      <button class="btn ghost" disabled>Reabrir</button>
+    </div>
+  </div>
+
+  <!-- timeline intercalada: público × interno -->
+  <ol class="timeline">
+
+    <li class="ev">
+      <div class="rail"><span class="av al">AL</span></div>
+      <div class="ev-card opened">
+        <header><b>André Lima</b> abriu o chamado <time>ter 14 out · 09:12</time></header>
+        <p>Comprei o material da dinâmica <b>“Mercado de verdade”</b> do encontro 5 (R$ 86,40, nota em anexo), como o guia sugere. Qual é o caminho pra pedir reembolso? Posso mandar a NF por aqui mesmo?</p>
+        <span class="attach">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.4 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l8.57-8.57A4 4 0 1118 8.84l-8.59 8.57a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>
+          NF-008614.pdf
+        </span>
+      </div>
+    </li>
+
+    <li class="ev">
+      <div class="rail"><span class="sysicon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10v4a1 1 0 001 1h2l8 4V5L7 9H5a1 1 0 00-1 1z"/><path d="M18 9.5a4 4 0 010 5"/></svg></span></div>
+      <div class="ev-card public">
+        <header><span class="tag pub">Público</span> Atualização de status — mensagem automática <time>ter 14 out · 09:13</time></header>
+        <p class="statusline">“Pedido sendo revisado”</p>
+      </div>
+    </li>
+
+    <li class="ev">
+      <div class="rail"><span class="av mc">MC</span></div>
+      <div class="ev-card interno">
+        <header>
+          <span class="tag int"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 018 0v3"/></svg>Interno</span>
+          <b>Marina Costa</b> <time>qua 15 out · 08:47</time>
+        </header>
+        <p>A verba de atividades da T2 já tem dois pedidos neste mês. <span class="mention">@Paula</span>, confirma pra mim se essa dinâmica estava prevista no plano do encontro 5?</p>
+      </div>
+    </li>
+
+    <li class="ev">
+      <div class="rail"><span class="sysicon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10v4a1 1 0 001 1h2l8 4V5L7 9H5a1 1 0 00-1 1z"/><path d="M18 9.5a4 4 0 010 5"/></svg></span></div>
+      <div class="ev-card public">
+        <header><span class="tag pub">Público</span> Atualização de status <time>qua 15 out · 09:05</time></header>
+        <p class="statusline">“Paula designada para acompanhar — atendimento iniciado”</p>
+      </div>
+    </li>
+
+    <li class="ev">
+      <div class="rail"><span class="av pn">PN</span></div>
+      <div class="ev-card interno">
+        <header>
+          <span class="tag int"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 018 0v3"/></svg>Interno</span>
+          <b>Paula Nunes</b> <time>qua 15 out · 14:20</time>
+        </header>
+        <p>Confirmei com o André: é a dinâmica “Mercado de verdade”, que está no guia do encontro 5. A NF veio sem CPF — pedi a reemissão.</p>
+      </div>
+    </li>
+
+    <li class="ev">
+      <div class="rail"><span class="sysicon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10v4a1 1 0 001 1h2l8 4V5L7 9H5a1 1 0 00-1 1z"/><path d="M18 9.5a4 4 0 010 5"/></svg></span></div>
+      <div class="ev-card public">
+        <header><span class="tag pub">Público</span> Atualização de status <time>qui 16 out · 10:02</time></header>
+        <p class="statusline">“Aguardando liberação de verba”</p>
+      </div>
+    </li>
+
+    <li class="ev">
+      <div class="rail"><span class="av mc">MC</span></div>
+      <div class="ev-card interno">
+        <header>
+          <span class="tag int"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 018 0v3"/></svg>Interno</span>
+          <b>Marina Costa</b> <time>hoje · 08:51</time>
+        </header>
+        <p>O financeiro aprova até sexta. Assim que cair, aviso o André e fechamos aqui.</p>
+      </div>
+    </li>
+
+  </ol>
+
+  <!-- composer de ação -->
+  <div class="composer">
+    <div class="seg">
+      <button class="on">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a15 15 0 010 18a15 15 0 010-18z"/></svg>
+        Atualização pública
+      </button>
+      <button>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 018 0v3"/></svg>
+        Comentário interno
+      </button>
+    </div>
+    <textarea placeholder="Escreva para André Lima… Use @ para chamar alguém da equipe."></textarea>
+    <div class="c-foot">
+      <span class="hint">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+        O autor recebe por e-mail e no app
+      </span>
+      <div class="c-btns">
+        <button class="btn">Enviar e resolver</button>
+        <button class="btn pri">Enviar atualização</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer class="foot shell">
+  Mockup estático para avaliação de direção de design — dados fictícios em pt-BR. Chamados · v3 · inbox mobile-first.
+</footer>
+
+</body>
+</html>

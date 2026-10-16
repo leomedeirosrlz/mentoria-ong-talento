@@ -1,0 +1,904 @@
+<!-- MOCKUP duplas v3 — agrupado por categoria -->
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Duplas · Coordenação — Realiza.vc</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --brand-lime: hsl(78 56% 53%);      /* verde principal */
+    --brand-ink: hsl(0 0% 15%);         /* quase-preto texto */
+    --background: hsl(75 10% 95%);      /* fundo "papel" quente */
+    --card: hsl(0 0% 100%);
+    --muted: hsl(75 7% 93%);
+    --muted-foreground: hsl(75 4% 40%);
+    --accent: hsl(75 8% 91%);           /* hover */
+    --border: hsl(75 6% 87%);
+    --input: hsl(75 8% 54%);
+    --ok: hsl(78 58% 38%);
+    --ok-text: hsl(78 55% 30%);
+    --warn: hsl(43 95% 44%);
+    --warn-text: hsl(43 90% 30%);
+    --danger: hsl(0 80% 48%);
+    --role-mentor: var(--brand-lime);   /* marcador mentor */
+    --role-mentorado: hsl(48 100% 60%); /* marcador jovem (amarelo) */
+    --radius: 0.75rem;                  /* cantos arredondados generosos */
+
+    /* tons derivados dos tokens p/ esta tela */
+    --danger-text: hsl(0 66% 38%);
+    --danger-soft: hsl(0 78% 95%);
+    --warn-soft: hsl(43 92% 93%);
+    --ok-soft: hsl(78 52% 90%);
+    --lime-soft: hsl(78 56% 53% / 0.14);
+    --lime-line: hsl(78 50% 62%);
+    --paused: hsl(75 3% 52%);
+    --paused-soft: hsl(75 6% 92%);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    font-family: "Inter", system-ui, -apple-system, sans-serif;
+    background: var(--background);
+    color: var(--brand-ink);
+    font-size: 15px;
+    line-height: 1.45;
+  }
+  svg { display: block; }
+  a { color: inherit; }
+
+  /* ---------- topbar ---------- */
+  .topbar {
+    background: var(--card);
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  .topbar-in {
+    max-width: 1120px;
+    margin: 0 auto;
+    padding: 0 20px;
+    height: 58px;
+    display: flex;
+    align-items: center;
+    gap: 22px;
+  }
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    font-weight: 800;
+    font-size: 16.5px;
+    letter-spacing: -0.02em;
+    white-space: nowrap;
+  }
+  .logo-mark {
+    width: 30px; height: 30px;
+    border-radius: 9px;
+    background: var(--brand-lime);
+    display: grid;
+    place-items: center;
+    color: var(--brand-ink);
+  }
+  .logo span small {
+    display: block;
+    font-size: 9.5px;
+    font-weight: 600;
+    color: var(--muted-foreground);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    line-height: 1;
+    margin-top: 2px;
+  }
+  .nav {
+    display: flex;
+    gap: 2px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    flex: 1;
+    min-width: 0;
+  }
+  .nav::-webkit-scrollbar { display: none; }
+  .nav a {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 7px 11px;
+    border-radius: 9px;
+    font-size: 13.5px;
+    font-weight: 500;
+    color: var(--muted-foreground);
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .nav a.on {
+    background: var(--lime-soft);
+    color: var(--brand-ink);
+    font-weight: 600;
+  }
+  .nav a:hover:not(.on) { background: var(--accent); color: var(--brand-ink); }
+  .nav .n-badge {
+    background: var(--danger);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    border-radius: 999px;
+    padding: 1px 6px;
+    margin-left: -2px;
+  }
+  .me {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: none;
+  }
+  .me-txt { text-align: right; line-height: 1.2; }
+  .me-txt b { font-size: 13px; font-weight: 600; display: block; }
+  .me-txt span { font-size: 11px; color: var(--muted-foreground); }
+  .avatar {
+    width: 34px; height: 34px;
+    border-radius: 50%;
+    background: var(--brand-lime);
+    color: var(--brand-ink);
+    font-weight: 700;
+    font-size: 12.5px;
+    display: grid;
+    place-items: center;
+    border: 2px solid #fff;
+    box-shadow: 0 0 0 1px var(--border);
+  }
+
+  /* ---------- página ---------- */
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 26px 20px 64px; }
+
+  .page-head {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 18px;
+    flex-wrap: wrap;
+  }
+  .page-head h1 {
+    font-size: 26px;
+    font-weight: 800;
+    letter-spacing: -0.025em;
+  }
+  .page-head .sub {
+    color: var(--muted-foreground);
+    font-size: 13.5px;
+    margin-top: 4px;
+    max-width: 560px;
+  }
+  .search {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 9px 12px;
+    color: var(--muted-foreground);
+    min-width: 250px;
+  }
+  .search span {
+    font-size: 13px;
+    color: var(--muted-foreground);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .legend {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 7px 14px;
+    margin-top: 14px;
+    font-size: 12px;
+    color: var(--muted-foreground);
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 9px 14px;
+  }
+  .legend .lg { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+  .legend .lg-sep { width: 1px; height: 14px; background: var(--border); }
+
+  .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex: none; }
+  .dot.m { background: var(--role-mentor); box-shadow: 0 0 0 1px hsl(78 50% 40%); }
+  .dot.j { background: var(--role-mentorado); box-shadow: 0 0 0 1px hsl(48 80% 42%); }
+
+  /* ---------- pills de avaliação ---------- */
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11.5px;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 999px;
+    white-space: nowrap;
+    line-height: 1.5;
+  }
+  .pill.exc { background: var(--ok-soft); color: var(--ok-text); }
+  .pill.boa { background: var(--muted); color: hsl(75 10% 30%); }
+  .pill.reg { background: var(--warn-soft); color: var(--warn-text); }
+  .pill.bxa { background: var(--danger-soft); color: var(--danger-text); }
+  .pill.off { background: var(--paused-soft); color: var(--muted-foreground); }
+
+  /* ---------- seções ---------- */
+  .group { margin-top: 30px; }
+  .g-head {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 0 4px;
+    margin-bottom: 12px;
+  }
+  .g-ico {
+    width: 36px; height: 36px;
+    flex: none;
+    border-radius: 11px;
+    display: grid;
+    place-items: center;
+    background: var(--tone-soft);
+    color: var(--tone-ico);
+    margin-top: 1px;
+  }
+  .g-txt { flex: 1; min-width: 0; }
+  .g-txt h2 {
+    font-size: 16.5px;
+    font-weight: 700;
+    letter-spacing: -0.015em;
+    display: flex;
+    align-items: baseline;
+    gap: 9px;
+    flex-wrap: wrap;
+  }
+  .g-count {
+    font-size: 11.5px;
+    font-weight: 700;
+    color: var(--tone-txt);
+    background: var(--tone-soft);
+    padding: 2px 9px;
+    border-radius: 999px;
+  }
+  .g-rule {
+    font-size: 13px;
+    color: var(--muted-foreground);
+    margin-top: 3px;
+    max-width: 640px;
+  }
+  .g-rule b { color: var(--tone-txt); font-weight: 600; }
+  .g-act {
+    flex: none;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--muted-foreground);
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 6px 10px;
+    border-radius: 8px;
+    margin-top: 4px;
+  }
+  .g-act:hover { background: var(--accent); color: var(--brand-ink); }
+
+  /* seção Apoio — destacada */
+  .group-apoio .g-head {
+    background: var(--lime-soft);
+    border: 1px solid var(--lime-line);
+    border-radius: var(--radius);
+    padding: 13px 16px;
+    align-items: center;
+  }
+  .group-apoio .g-rule { color: hsl(75 12% 32%); }
+  .group-apoio .g-act {
+    background: var(--card);
+    border: 1px solid var(--lime-line);
+    color: var(--ok-text);
+    margin-top: 0;
+  }
+
+  /* ---------- cards de dupla ---------- */
+  .cards { display: flex; flex-direction: column; gap: 10px; }
+
+  .card {
+    --tone: var(--muted-foreground);
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(240px, 290px) 1fr auto;
+    gap: 4px 26px;
+    align-items: center;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--tone);
+    border-radius: var(--radius);
+    padding: 15px 46px 15px 16px;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  .card:hover {
+    border-color: hsl(75 8% 78%);
+    box-shadow: 0 10px 28px -20px rgb(0 0 0 / 0.3);
+  }
+  .card.t-risco  { --tone: var(--danger); }
+  .card.t-apoio  { --tone: var(--brand-lime); }
+  .card.t-atenc  { --tone: var(--warn); }
+  .card.t-ok     { --tone: var(--ok); }
+  .card.t-pausa  { --tone: var(--paused); }
+
+  .names {
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .names .amp {
+    color: var(--muted-foreground);
+    font-weight: 400;
+    font-style: normal;
+    margin: 0 -1px;
+  }
+  .turma {
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    color: var(--muted-foreground);
+    background: var(--muted);
+    border-radius: 6px;
+    padding: 2px 7px;
+  }
+  .meta {
+    margin-top: 6px;
+    font-size: 12.5px;
+    color: var(--muted-foreground);
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 4px 10px;
+  }
+  .sep { color: var(--input); }
+  .prog {
+    width: 86px;
+    height: 4px;
+    border-radius: 999px;
+    background: var(--muted);
+    overflow: hidden;
+    display: inline-block;
+    vertical-align: middle;
+  }
+  .prog i { display: block; height: 100%; border-radius: 999px; background: var(--tone); }
+  .card.t-pausa .prog i { background: var(--paused); }
+
+  .c-why {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    min-width: 0;
+  }
+  .c-why li {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    font-size: 13px;
+    line-height: 1.4;
+    color: hsl(75 6% 28%);
+  }
+  .c-why li svg { flex: none; margin-top: 1.5px; }
+  .c-why .w-tone { color: var(--tone-txt); font-weight: 600; }
+  .c-why li.li-tone svg { color: var(--tone); }
+  .c-why li.li-mut svg { color: var(--muted-foreground); }
+  .cha {
+    font-weight: 700;
+    font-size: 12px;
+    letter-spacing: 0.02em;
+    background: var(--muted);
+    border-radius: 6px;
+    padding: 1px 7px;
+    color: var(--brand-ink);
+  }
+  .cha-cat {
+    font-weight: 600;
+    font-size: 11.5px;
+    border-radius: 999px;
+    padding: 1px 8px;
+    background: var(--danger-soft);
+    color: var(--danger-text);
+  }
+  .cha-cat.met { background: var(--ok-soft); color: var(--ok-text); }
+
+  .c-side {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 3px;
+    justify-self: end;
+  }
+  .c-side .cap {
+    font-size: 10.5px;
+    color: var(--muted-foreground);
+    white-space: nowrap;
+  }
+  .c-open {
+    position: absolute;
+    right: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--muted-foreground);
+  }
+  .card:hover .c-open { color: var(--brand-ink); }
+
+  /* linha "mostrar mais" do Em andamento */
+  .more {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    border: 1px dashed var(--border);
+    border-radius: var(--radius);
+    padding: 12px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--muted-foreground);
+    background: transparent;
+    cursor: pointer;
+  }
+  .more:hover { background: var(--accent); color: var(--brand-ink); }
+
+  /* tons por seção */
+  .group-risco   { --tone: var(--danger); --tone-soft: var(--danger-soft); --tone-ico: var(--danger); --tone-txt: var(--danger-text); }
+  .group-apoio   { --tone: var(--brand-lime); --tone-soft: var(--lime-soft); --tone-ico: var(--ok-text); --tone-txt: var(--ok-text); }
+  .group-atenc   { --tone: var(--warn); --tone-soft: var(--warn-soft); --tone-ico: var(--warn-text); --tone-txt: var(--warn-text); }
+  .group-ok      { --tone: var(--ok); --tone-soft: var(--ok-soft); --tone-ico: var(--ok); --tone-txt: var(--ok-text); }
+  .group-pausa   { --tone: var(--paused); --tone-soft: var(--paused-soft); --tone-ico: var(--muted-foreground); --tone-txt: var(--muted-foreground); }
+
+  .foot {
+    margin-top: 40px;
+    font-size: 12px;
+    color: var(--muted-foreground);
+    text-align: center;
+  }
+
+  /* ---------- mobile ---------- */
+  @media (max-width: 760px) {
+    .topbar-in { gap: 12px; height: 54px; padding: 0 14px; }
+    .logo span small { display: none; }
+    .me-txt { display: none; }
+    .nav a { font-size: 12.5px; padding: 6px 9px; }
+    .nav a svg { display: none; }
+
+    .wrap { padding: 18px 14px 48px; }
+    .page-head h1 { font-size: 22px; }
+    .page-head .sub { font-size: 12.5px; }
+    .search { min-width: 0; width: 100%; }
+
+    .g-head { padding: 0; }
+    .g-act span { display: none; }
+
+    .card {
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 9px;
+      padding: 14px 14px 14px 13px;
+    }
+    .names { padding-right: 104px; font-size: 14.5px; }
+    .c-side {
+      position: absolute;
+      top: 13px;
+      right: 12px;
+      flex-direction: row;
+      align-items: center;
+      gap: 5px;
+    }
+    .c-side .cap { display: none; }
+    .c-open { display: none; }
+    .c-why li { font-size: 12.5px; }
+  }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-in">
+    <div class="logo">
+      <span class="logo-mark">
+        <!-- par: dois círculos (dupla) -->
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <circle cx="5.6" cy="8" r="3.4"/>
+          <circle cx="10.4" cy="8" r="3.4"/>
+        </svg>
+      </span>
+      <span>Realiza<small>Programa de Mentoria</small></span>
+    </div>
+
+    <nav class="nav" aria-label="Navegação">
+      <a href="#">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><rect x="2" y="2" width="5" height="5" rx="1.4"/><rect x="9" y="2" width="5" height="5" rx="1.4"/><rect x="2" y="9" width="5" height="5" rx="1.4"/><rect x="9" y="9" width="5" height="5" rx="1.4"/></svg>
+        Visão geral
+      </a>
+      <a href="#" class="on" aria-current="page">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="6" cy="5.4" r="2.4"/><path d="M1.8 13.4c.5-2.3 2.2-3.6 4.2-3.6s3.7 1.3 4.2 3.6"/><circle cx="11.4" cy="5.8" r="2"/><path d="M11.9 9.9c1.5.2 2.6 1.3 3 3.1"/></svg>
+        Duplas
+      </a>
+      <a href="#">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><rect x="2" y="3" width="12" height="11" rx="2"/><path d="M2 6.6h12M5.4 1.8v2.4M10.6 1.8v2.4"/></svg>
+        Agenda
+      </a>
+      <a href="#">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="5.4" cy="5.6" r="2.2"/><path d="M1.9 13.2c.4-2 1.9-3.2 3.5-3.2s3.1 1.2 3.5 3.2"/><path d="M10.2 3.6h4M10.2 6.4h4M10.8 9.2h3.2"/></svg>
+        Pessoas
+      </a>
+      <a href="#">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M13.4 10.2c-.7.7-1.8 1-2.9.8L5 12.4l1.4-5.5c-.2-1.1.1-2.2.8-2.9a4.7 4.7 0 0 1 6.2 6.2Z"/><path d="M5.8 6.4h4.4M5.8 8.8h3"/></svg>
+        Chamados
+        <span class="n-badge">2</span>
+      </a>
+      <a href="#">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4.4A1.4 1.4 0 0 1 3.4 3h3l1.4 1.8h5.8A1.4 1.4 0 0 1 15 6.2v6.4a1.4 1.4 0 0 1-1.4 1.4H3.4A1.4 1.4 0 0 1 2 12.6Z"/></svg>
+        Materiais
+      </a>
+    </nav>
+
+    <div class="me">
+      <div class="me-txt">
+        <b>Marina Costa</b>
+        <span>Coordenação</span>
+      </div>
+      <span class="avatar">MC</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <div class="page-head">
+    <div>
+      <h1>Duplas</h1>
+      <p class="sub">26 duplas no ciclo, agrupadas pelo que pede atenção primeiro — do chamado aberto à jornada pausada.</p>
+    </div>
+    <label class="search">
+      <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="7" cy="7" r="4.4"/><path d="m10.4 10.4 3 3"/></svg>
+      <span>Buscar mentor, mentorado ou turma…</span>
+    </label>
+  </div>
+
+  <p class="legend">
+    <span class="lg"><i class="dot m"></i> mentor</span>
+    <span class="lg"><i class="dot j"></i> mentorado</span>
+    <span class="lg-sep"></span>
+    <span class="lg">avaliação = nota que o mentor deu ao último encontro realizado:</span>
+    <span class="lg"><span class="pill exc">Excelente</span> <span class="pill boa">Boa</span> <span class="pill reg">Regular</span> <span class="pill bxa">Baixa</span></span>
+  </p>
+
+  <!-- ============ APOIO (destacada) ============ -->
+  <section class="group group-apoio" aria-label="Apoio">
+    <header class="g-head">
+      <span class="g-ico">
+        <!-- lifebuoy -->
+        <svg width="19" height="19" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round">
+          <circle cx="10" cy="10" r="7.2"/><circle cx="10" cy="10" r="3"/>
+          <path d="M5.6 5.6 8 8M14.4 5.6 12 8M14.4 14.4 12 12M5.6 14.4 8 12"/>
+        </svg>
+      </span>
+      <div class="g-txt">
+        <h2>Apoio <span class="g-count">2 duplas</span></h2>
+        <p class="g-rule">Chamado aberto esperando retorno da coordenação. <b>Pedido de ajuda não é falha</b> — a dupla pode estar com a jornada em dia.</p>
+      </div>
+      <a class="g-act" href="#"><span>abrir fila de chamados</span>
+        <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 7h8M7.5 3.5 11 7l-3.5 3.5"/></svg>
+      </a>
+    </header>
+
+    <div class="cards">
+      <article class="card t-apoio">
+        <div class="c-who">
+          <p class="names"><i class="dot m"></i> André Lima <em class="amp">&amp;</em> <i class="dot j"></i> Ana Souza <span class="turma">T1</span></p>
+          <p class="meta">
+            <span>Encontro 8 de 16 marcado · ter às 19h</span>
+            <span class="prog"><i style="width:44%"></i></span>
+          </p>
+        </div>
+        <ul class="c-why">
+          <li class="li-tone">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7.5a5.4 5.4 0 0 1-5.4 5.3c-.8 0-1.5-.14-2.2-.4L1.5 13l.6-2.9A5.4 5.4 0 1 1 12 7.5Z"/></svg>
+            <span><span class="cha">CHA-000214</span> <span class="cha-cat met">metodologia</span> · aberto há 2 dias — “dúvida sobre o instrumento do encontro 8”</span>
+          </li>
+          <li class="li-mut">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="7" cy="7" r="5.6"/><path d="M7 4.4v2.9l1.9 1.2"/></svg>
+            <span>jornada em dia <span class="sep">·</span> também sinaliza: <span class="w-tone">registro do 7º encontro pendente</span></span>
+          </li>
+        </ul>
+        <div class="c-side">
+          <span class="pill exc">Excelente</span>
+          <span class="cap">últ. encontro</span>
+        </div>
+        <span class="c-open"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="m6 3.5 4.5 4.5L6 12.5"/></svg></span>
+      </article>
+
+      <article class="card t-apoio">
+        <div class="c-who">
+          <p class="names"><i class="dot m"></i> Carlos Eduardo Reis <em class="amp">&amp;</em> <i class="dot j"></i> Pedro Henrique <span class="turma">T2</span></p>
+          <p class="meta">
+            <span>Encontro 4 de 16 · próx. qua às 19h</span>
+            <span class="prog"><i style="width:25%"></i></span>
+            <span class="sep">·</span><span>sup. Paula Nunes</span>
+          </p>
+        </div>
+        <ul class="c-why">
+          <li class="li-tone">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7.5a5.4 5.4 0 0 1-5.4 5.3c-.8 0-1.5-.14-2.2-.4L1.5 13l.6-2.9A5.4 5.4 0 1 1 12 7.5Z"/></svg>
+            <span><span class="cha">CHA-000217</span> <span class="cha-cat">urgência</span> · em atendimento com Marina — “conflito de horário, precisa remarcar o 5º”</span>
+          </li>
+          <li class="li-mut">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="7" cy="7" r="5.6"/><path d="M7 4.4v2.9l1.9 1.2"/></svg>
+            <span>resposta combinada até amanhã <span class="sep">·</span> jornada sem outros sinais</span>
+          </li>
+        </ul>
+        <div class="c-side">
+          <span class="pill boa">Boa</span>
+          <span class="cap">últ. encontro</span>
+        </div>
+        <span class="c-open"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="m6 3.5 4.5 4.5L6 12.5"/></svg></span>
+      </article>
+    </div>
+  </section>
+
+  <!-- ============ EM RISCO ============ -->
+  <section class="group group-risco" aria-label="Em risco">
+    <header class="g-head">
+      <span class="g-ico">
+        <!-- warning triangle -->
+        <svg width="19" height="19" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M10 3.2 18 16H2Z"/><path d="M10 8v3.4"/><circle cx="10" cy="13.6" r="0.4" fill="currentColor"/>
+        </svg>
+      </span>
+      <div class="g-txt">
+        <h2>Em risco <span class="g-count">3 duplas</span></h2>
+        <p class="g-rule"><b>2 ou mais encontros atrasados</b>, ou avaliação Baixa somada a dificuldade identificada pelo mentor.</p>
+      </div>
+    </header>
+
+    <div class="cards">
+      <article class="card t-risco">
+        <div class="c-who">
+          <p class="names"><i class="dot m"></i> Rafael Monteiro <em class="amp">&amp;</em> <i class="dot j"></i> Lucas Ferreira <span class="turma">T1</span></p>
+          <p class="meta">
+            <span>Encontro 6 de 16 · esperado: 9º</span>
+            <span class="prog"><i style="width:37%"></i></span>
+            <span class="sep">·</span><span>sup. Paula Nunes</span>
+          </p>
+        </div>
+        <ul class="c-why">
+          <li class="li-tone">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M7 1.8 12.8 12H1.2Z"/><path d="M7 5.6v2.6"/><circle cx="7" cy="10" r="0.3" fill="currentColor"/></svg>
+            <span><span class="w-tone">3 encontros atrasados</span> · última avaliação Baixa</span>
+          </li>
+          <li class="li-mut">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 7.8V6.4a5 5 0 0 1 10 0v1.4M12 7.8v1.6a1.8 1.8 0 0 1-1.8 1.8H9.6M2 7.8v1.6A1.8 1.8 0 0 0 3.8 11h.6V7.8h-.6"/></svg>
+            <span>dificuldade: “mentorado não responde há 2 semanas”</span>
+          </li>
+        </ul>
+        <div class="c-side">
+          <span class="pill bxa">Baixa</span>
+          <span class="cap">últ. encontro</span>
+        </div>
+        <span class="c-open"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="m6 3.5 4.5 4.5L6 12.5"/></svg></span>
+      </article>
+
+      <article class="card t-risco">
+        <div class="c-who">
+          <p class="names"><i class="dot m"></i> André Lima <em class="amp">&amp;</em> <i class="dot j"></i> Caio Mendes <span class="turma">T2</span></p>
+          <p class="meta">
+            <span>Encontro 3 de 16 · esperado: 5º</span>
+            <span class="prog"><i style="width:19%"></i></span>
+            <span class="sep">·</span><span>sup. Paula Nunes</span>
+          </p>
+        </div>
+        <ul class="c-why">
+          <li class="li-tone">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M7 1.8 12.8 12H1.2Z"/><path d="M7 5.6v2.6"/><circle cx="7" cy="10" r="0.3" fill="currentColor"/></svg>
+            <span><span class="w-tone">2 encontros atrasados</span> · registro do 3º encontro pendente</span>
+          </li>
+          <li class="li-mut">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="7" cy="7" r="5.6"/><path d="M7 4.4v2.9l1.9 1.2"/></svg>
+            <span>5º encontro agendado para qua às 19h — confirmação vale nudge</span>
+          </li>
+        </ul>
+        <div class="c-side">
+          <span class="pill reg">Regular</span>
+          <span class="cap">últ. encontro</span>
+        </div>
+        <span class="c-open"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="m6 3.5 4.5 4.5L6 12.5"/></svg></span>
+      </article>
+
+      <article class="card t-risco">
+        <div class="c-who">
+          <p class="names"><i class="dot m"></i> Fernanda Rocha <em class="amp">&amp;</em> <i class="dot j"></i> Beatriz Alves <span class="turma">T1</span></p>
+          <p class="meta">
+            <span>Encontro 7 de 16 · cronograma em dia</span>
+            <span class="prog"><i style="width:44%"></i></span>
+          </p>
+        </div>
+        <ul class="c-why">
+          <li class="li-tone">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M7 1.8 12.8 12H1.2Z"/><path d="M7 5.6v2.6"/><circle cx="7" cy="10" r="0.3" fill="currentColor"/></svg>
+            <span><span class="w-tone">avaliação Baixa no 7º encontro</span> + dificuldade: “a conversa não engata”</span>
+          </li>
+          <li class="li-mut">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="7" cy="7" r="5.6"/><path d="m4.8 7 1.5 1.5 3-3.4"/></svg>
+            <span>sem atrasos — entrou em risco pela combinação avaliação + dificuldade</span>
+          </li>
+        </ul>
+        <div class="c-side">
+          <span class="pill bxa">Baixa</span>
+          <span class="cap">últ. encontro</span>
+        </div>
+        <span class="c-open"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="m6 3.5 4.5 4.5L6 12.5"/></svg></span>
+      </article>
+    </div>
+  </section>
+
+  <!-- ============ ATENÇÃO ============ -->
+  <section class="group group-atenc" aria-label="Atenção">
+    <header class="g-head">
+      <span class="g-ico">
+        <!-- warning circle / clock -->
+        <svg width="19" height="19" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round">
+          <circle cx="10" cy="10" r="7.2"/><path d="M10 6v4.4l2.8 1.7"/>
+        </svg>
+      </span>
+      <div class="g-txt">
+        <h2>Atenção <span class="g-count">2 duplas</span></h2>
+        <p class="g-rule"><b>1 encontro atrasado</b>, avaliação baixa isolada, registro pendente ou encaminhamento vencido.</p>
+      </div>
+    </header>
+
+    <div class="cards">
+      <article class="card t-atenc">
+        <div class="c-who">
+          <p class="names"><i class="dot m"></i> Juliana Paiva <em class="amp">&amp;</em> <i class="dot j"></i> Mariana Dias <span class="turma">T1</span></p>
+          <p class="meta">
+            <span>Encontro 7 de 16 · esperado: 8º</span>
+            <span class="prog"><i style="width:44%"></i></span>
+          </p>
+        </div>
+        <ul class="c-why">
+          <li class="li-tone">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="7" cy="7" r="5.6"/><path d="M7 4.6v2.8"/><circle cx="7" cy="10" r="0.3" fill="currentColor"/></svg>
+            <span><span class="w-tone">1 encontro atrasado</span> · avaliação Regular no último realizado</span>
+          </li>
+        </ul>
+        <div class="c-side">
+          <span class="pill reg">Regular</span>
+          <span class="cap">últ. encontro</span>
+        </div>
+        <span class="c-open"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="m6 3.5 4.5 4.5L6 12.5"/></svg></span>
+      </article>
+
+      <article class="card t-atenc">
+        <div class="c-who">
+          <p class="names"><i class="dot m"></i> Roberto Almeida <em class="amp">&amp;</em> <i class="dot j"></i> Gabriel Santos <span class="turma">T2</span></p>
+          <p class="meta">
+            <span>Encontro 4 de 16 · próx. qua às 19h</span>
+            <span class="prog"><i style="width:25%"></i></span>
+          </p>
+        </div>
+        <ul class="c-why">
+          <li class="li-tone">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="7" cy="7" r="5.6"/><path d="M7 4.6v2.8"/><circle cx="7" cy="10" r="0.3" fill="currentColor"/></svg>
+            <span><span class="w-tone">registro do 4º encontro pendente</span> há 6 dias</span>
+          </li>
+          <li class="li-mut">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7.6 6 10.6l5-6"/></svg>
+            <span>encaminhamento da coordenação vencido há 5 dias — cobrar retorno</span>
+          </li>
+        </ul>
+        <div class="c-side">
+          <span class="pill boa">Boa</span>
+          <span class="cap">últ. encontro</span>
+        </div>
+        <span class="c-open"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="m6 3.5 4.5 4.5L6 12.5"/></svg></span>
+      </article>
+    </div>
+  </section>
+
+  <!-- ============ EM ANDAMENTO ============ -->
+  <section class="group group-ok" aria-label="Em andamento">
+    <header class="g-head">
+      <span class="g-ico">
+        <!-- check circle -->
+        <svg width="19" height="19" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="10" cy="10" r="7.2"/><path d="m6.8 10.2 2.2 2.2 4.2-4.8"/>
+        </svg>
+      </span>
+      <div class="g-txt">
+        <h2>Em andamento <span class="g-count">18 duplas</span></h2>
+        <p class="g-rule">Seguindo o cronograma do ciclo — encontros em dia, registros completos e nenhum sinal aberto.</p>
+      </div>
+    </header>
+
+    <div class="cards">
+      <article class="card t-ok">
+        <div class="c-who">
+          <p class="names"><i class="dot m"></i> Camila Duarte <em class="amp">&amp;</em> <i class="dot j"></i> Isabela Nunes <span class="turma">T1</span></p>
+          <p class="meta">
+            <span>Encontro 8 de 16 · próx. ter às 19h</span>
+            <span class="prog"><i style="width:50%"></i></span>
+            <span class="sep">·</span><span>sup. Paula Nunes</span>
+          </p>
+        </div>
+        <ul class="c-why">
+          <li class="li-tone">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="7" r="5.6"/><path d="m4.6 7.2 1.7 1.7 3.2-3.6"/></svg>
+            <span>tudo em dia — 8º encontro realizado ter passada, registro entregue</span>
+          </li>
+        </ul>
+        <div class="c-side">
+          <span class="pill exc">Excelente</span>
+          <span class="cap">últ. encontro</span>
+        </div>
+        <span class="c-open"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="m6 3.5 4.5 4.5L6 12.5"/></svg></span>
+      </article>
+
+      <div class="more" role="button" tabindex="0">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="m3.5 5.2 3.5 3.6 3.5-3.6"/></svg>
+        mostrar as outras 17 duplas em andamento
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ PAUSADAS ============ -->
+  <section class="group group-pausa" aria-label="Pausadas">
+    <header class="g-head">
+      <span class="g-ico">
+        <!-- pause circle -->
+        <svg width="19" height="19" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round">
+          <circle cx="10" cy="10" r="7.2"/><path d="M8 7.2v5.6M12 7.2v5.6"/>
+        </svg>
+      </span>
+      <div class="g-txt">
+        <h2>Pausadas <span class="g-count">1 dupla</span></h2>
+        <p class="g-rule"><b>Jornada congelada</b> por acordo com a dupla — cronograma e sinais suspensos até o retorno.</p>
+      </div>
+    </header>
+
+    <div class="cards">
+      <article class="card t-pausa">
+        <div class="c-who">
+          <p class="names"><i class="dot m"></i> Marcelo Vieira <em class="amp">&amp;</em> <i class="dot j"></i> João Pedro Lima <span class="turma">T2</span></p>
+          <p class="meta">
+            <span>Pausada no 5º encontro · desde 12/set</span>
+            <span class="prog"><i style="width:31%"></i></span>
+          </p>
+        </div>
+        <ul class="c-why">
+          <li class="li-tone">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="7" cy="7" r="5.6"/><path d="M5.6 5.2v3.6M8.4 5.2v3.6"/></svg>
+            <span>mentorado mudou de cidade — retorno previsto para outubro</span>
+          </li>
+        </ul>
+        <div class="c-side">
+          <span class="pill off">Boa</span>
+          <span class="cap">antes da pausa</span>
+        </div>
+        <span class="c-open"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="m6 3.5 4.5 4.5L6 12.5"/></svg></span>
+      </article>
+    </div>
+  </section>
+
+  <p class="foot">Mockup estático para avaliação de direção — dados fictícios. Ordem das seções: da ação imediata (Apoio) à rotina (Pausadas).</p>
+
+</main>
+</body>
+</html>

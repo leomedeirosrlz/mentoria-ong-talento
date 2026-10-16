@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { Suspense, useState, useTransition } from "react";
 import { toast } from "sonner";
 import {
   ArrowsCounterClockwise,
@@ -31,6 +31,7 @@ import {
   PopoverTitle,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { MockupsSection } from "@/components/demo-mockups";
 import { cn } from "@/lib/utils";
 
 /** Ícone por papel — o mesmo da landing /demo, pra leitura "ver como X". */
@@ -177,6 +178,10 @@ export function DemoBar({
               );
             })}
           </div>
+
+          <Suspense fallback={null}>
+            <MockupsSection />
+          </Suspense>
 
           <div className="border-t border-border py-1.5">
             <button
