@@ -30,7 +30,7 @@ export function MockupsSection() {
         Layouts em teste
       </p>
       <p className="mt-0.5 text-xs text-muted-foreground">
-        3 propostas por tela — abre por cima do app, sem sair da demo.
+        Propostas de layout por tela — abrem por cima da demo.
       </p>
       <div className="mt-2.5 space-y-2">
         {MOCKUP_TELAS.map((tela) => (
@@ -133,7 +133,7 @@ export function DemoMockups() {
  *  Montado pelos layouts (app)/(jovem) só quando a demo está ativa — fora
  *  dela o param é ignorado. A barra superior troca de variante e devolve
  *  pro app (remove o param, o conteúdo real volta sem reload). */
-export function MockupViewer() {
+export function MockupViewer({ voltarLabel = "Voltar ao app" }: { voltarLabel?: string }) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -200,7 +200,7 @@ export function MockupViewer() {
           onClick={() => navegar(null)}
           className="grid min-h-9 shrink-0 place-items-center gap-1 rounded-lg bg-white/10 px-2.5 text-xs font-semibold outline-none transition-colors hover:bg-white/20 focus-visible:ring-2 focus-visible:ring-[var(--brand-lime)] sm:px-3"
         >
-          <span className="hidden sm:inline">Voltar ao app</span>
+          <span className="hidden sm:inline">{voltarLabel}</span>
           <X size={14} weight="bold" aria-hidden className="sm:hidden" />
         </button>
       </div>
