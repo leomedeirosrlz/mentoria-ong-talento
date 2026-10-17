@@ -71,9 +71,10 @@ export function MentorHome({
     duplas.every((d) => d.trilha === "especialista");
 
   // com N duplas (mentor_especialista pode carregar várias trilhas) a mais
-  // acionável vem primeiro — o semáforo da saúde já destila pedido de apoio,
-  // registro pendente e atraso; a ordenação é estável, então duplas no mesmo
-  // estado mantêm a ordem em que vieram
+  // acionável vem primeiro — o semáforo da saúde já destila registro
+  // pendente e atraso (pedido de apoio é eixo separado: o mentor sabe do
+  // próprio chamado, não ordena por ele); a ordenação é estável, então
+  // duplas no mesmo estado mantêm a ordem em que vieram
   const saudes = new Map(
     duplas.map((d) => [d.id, saudadeDaDupla(d, eventos, hoje)])
   );

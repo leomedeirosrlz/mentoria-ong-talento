@@ -1,9 +1,14 @@
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
-import { DownloadSimple } from "@phosphor-icons/react/dist/ssr";
-import { getCicloEventos, getDuplas, getMe, getMinhasDuplas } from "@/lib/queries";
-import { DuplasLista } from "@/components/duplas-lista";
-import { buttonVariants } from "@/components/ui/button";
+import {
+  getCicloEventos,
+  getDuplas,
+  getEspecialistaEventos,
+  getMe,
+  getMinhasDuplas,
+} from "@/lib/queries";
+import { getSupervisaoAlvos } from "@/lib/queries-supervisao";
+import { DuplasLista, type VisaoDuplas } from "@/components/duplas-lista";
 
 export const metadata: Metadata = {
   title: "Duplas",
@@ -11,46 +16,51 @@ export const metadata: Metadata = {
 
 export default async function DuplasPage() {
   const me = await getMe();
+  if (!me) redirect("/login");
   // mentor também entra — a RLS já limita a lista às próprias duplas
-  const mentor = me?.role === "mentor_dpp" || me?.role === "mentor_especialista";
-  if (me?.role !== "coordenacao" && me?.role !== "supervisor" && !mentor)
-    redirect("/");
+  const visao: VisaoDuplas | null =
+    me.role === "coordenacao"
+      ? "coordenacao"
+      : me.role === "supervisor"
+        ? "supervisor"
+        : me.role === "mentor_dpp"
+          ? "mentor"
+          : me.role === "mentor_especialista"
+            ? "especialista"
+            : null;
+  if (!visao) redirect("/");
 
   // coord vê tudo; supervisor/mentor já vêm escopados da query (uma leitura,
-  // sem baixar o ciclo inteiro pra filtrar em JS)
-  const [lista, eventos] = await Promise.all([
-    me.role === "coordenacao" ? getDuplas() : getMinhasDuplas(),
+  // sem baixar o ciclo inteiro pra filtrar em JS). Os extras são por visão:
+  // alvos do dialog de supervisão (auxiliar) e os 5 passos da trilha
+  // (especialista) — os demais não pagam essa leitura
+  const [lista, eventos, alvos, espEventos] = await Promise.all([
+    me.role === "coordenacao"
+      ? getDuplas()
+      : me.role === "supervisor"
+        ? // getMinhasDuplas abrange mentor_id OU supervisor_id — a visão do
+          // auxiliar é "duplas que você supervisiona", então o lado mentor
+          // (caso ela também seja mentora de alguém) sai do radar daqui
+          getMinhasDuplas().then((ds) =>
+            ds.filter((d) => d.supervisor?.id === me.id)
+          )
+        : getMinhasDuplas(),
     getCicloEventos(),
+    visao === "supervisor" ? getSupervisaoAlvos() : Promise.resolve([]),
+    visao === "especialista"
+      ? getEspecialistaEventos()
+      : Promise.resolve([]),
   ]);
 
   return (
-    <div className="space-y-6">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Duplas</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            {lista.length} {lista.length === 1 ? "dupla" : "duplas"} no programa
-          </p>
-        </div>
-        {me.role === "coordenacao" && (
-          <a
-            href="/api/export"
-            className={buttonVariants({ variant: "outline", size: "sm" })}
-          >
-            <DownloadSimple />
-            Exportar CSV
-          </a>
-        )}
-      </header>
-
-      <DuplasLista
-        lista={lista}
-        eventos={eventos}
-        agora={new Date().toISOString()}
-        podeCriar={me.role === "coordenacao"}
-        mostrarSupervisor={me.role === "coordenacao"}
-        paraMentor={mentor}
-      />
-    </div>
+    <DuplasLista
+      lista={lista}
+      eventos={eventos}
+      agora={new Date().toISOString()}
+      visao={visao}
+      meuNome={me.nome.split(" ")[0]}
+      supervisaoAlvos={alvos}
+      especialistaEventos={espEventos}
+    />
   );
 }

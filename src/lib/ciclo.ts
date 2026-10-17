@@ -584,9 +584,50 @@ export function ultimoRegistro(dupla: Dupla): Registro | null {
   );
 }
 
+/** Critério do semáforo que disparou — a fila que antes retornava no
+ *  primeiro match agora acumula tudo que está aceso (WP2). A ordem dos
+ *  tipos na fonte é a prioridade do motivo legado. */
+export type SinalTipo =
+  | "avaliacao_baixa_dificuldade"
+  | "atraso"
+  | "avaliacao_baixa"
+  | "dificuldade"
+  | "preventivo"
+  | "limbo"
+  | "registro_pendente"
+  | "encaminhamento_vencido"
+  | "estagnacao";
+
+/** Um critério aceso: `texto` é o que a linha/o motivo mostra, `detalhe`
+ *  é o complemento curto (números faltantes, recência "há N dias"). */
+export type Sinal = {
+  tipo: SinalTipo;
+  tom: Exclude<Semaforo, "ok">;
+  texto: string;
+  detalhe?: string;
+};
+
+/** Quem pediu apoio — os dois canais existentes, nunca fundidos: o do
+ *  mentor (`registros.precisa_apoio`) e o do jovem (`avaliacao_jovem.
+ *  pedir_apoio`, 0071 — pode ser sobre o próprio mentor). */
+export type ApoioOrigem = "mentor" | "mentorado" | "ambos";
+
 export type DuplaSaude = {
   semaforo: Semaforo;
+  /** Compat: primeiro item de `motivos` — o que um consumidor antigo lia. */
   motivo: string;
+  /** Todos os critérios acesos, na ordem de prioridade (ou o rótulo único
+   *  do estado: "Em dia", "Dupla pausada"…). */
+  motivos: string[];
+  /** Os sinais internos já calculados — vazios quando ok/congelada. */
+  sinais: Sinal[];
+  /** Pedido de apoio é TRABALHO a fazer (fila própria), não falha da
+   *  dupla: desde o WP2 não entra no semáforo. `aberto` só vive em dupla
+   *  ativa/pausada — concluída/encerrada é capítulo encerrado. */
+  apoio: {
+    aberto: boolean;
+    origem?: ApoioOrigem;
+  };
   esperado: number;
   feitos: number;
   proximo: Encontro | null;
@@ -1044,76 +1085,125 @@ export function saudadeDaDupla(dupla: Dupla, eventos: CicloEvento[], hoje = new 
   const ultimoReg = ultimoRegistro(dupla);
   const avaliacaoBaixa = ultimoReg?.avaliacao === "baixa";
   const comDificuldade = !!ultimoReg?.dificuldade && ultimoReg.dificuldade !== "nenhuma";
-  // campos comuns a todo retorno — os sinais novos (apoio do jovem,
-  // avaliações pendentes) acompanham o objeto em qualquer faixa
-  const base = { esperado, feitos, proximo, registroPendente, apoioJovem, avaliacaoJovemPendente };
 
-  if ((pediuApoio || apoioJovem) && (dupla.status === "ativa" || dupla.status === "pausada"))
-    // motivo em locução nominal — quem lê pode ser o próprio mentor ("Mentor
-    // pediu apoio" em 3ª pessoa lê como se fosse sobre outra pessoa)
-    return {
-      semaforo: "risco",
-      motivo:
-        pediuApoio && apoioJovem
-          ? "Pedidos de apoio em aberto"
-          : apoioJovem
-            ? "Pedido de ajuda do mentorado"
-            : "Pedido de apoio",
-      ...base,
-      pediuApoio,
-    };
-  // pedido de apoio fura o congelamento da pausada, mas não do fechamento —
-  // dupla concluída ou encerrada é capítulo encerrado
-  if (dupla.status !== "ativa")
-    return {
-      semaforo: "ok",
-      motivo:
-        dupla.status === "pausada"
-          ? "Dupla pausada"
-          : dupla.status === "concluida"
-            ? "Jornada concluída"
-            : "Dupla encerrada",
-      ...base,
-      pediuApoio: dupla.status === "pausada" && pediuApoio,
-      apoioJovem: dupla.status === "pausada" && apoioJovem,
-    };
+  // ---- apoio: eixo separado do semáforo (WP2) ----
+  // Pedido de apoio é chamado à coordenação — trabalho a fazer, não falha da
+  // jornada. Antes forçava risco; agora vive em `apoio` e nos flags de
+  // compat (pediuApoio/apoioJovem), filtrado pelas mesmas regras de
+  // visibilidade de sempre: ativa/pausada expõe, concluída/encerrada não.
+  const apoioAberto =
+    (pediuApoio || apoioJovem) &&
+    (dupla.status === "ativa" || dupla.status === "pausada");
+  const apoio: DuplaSaude["apoio"] = apoioAberto
+    ? {
+        aberto: true,
+        origem:
+          pediuApoio && apoioJovem
+            ? "ambos"
+            : apoioJovem
+              ? "mentorado"
+              : "mentor",
+      }
+    : { aberto: false };
+  const pediuApoioFlag = apoioAberto && pediuApoio;
+  const apoioJovemFlag = apoioAberto && apoioJovem;
+
+  // campos comuns a todo retorno — os sinais novos (apoio, avaliações
+  // pendentes) acompanham o objeto em qualquer faixa
+  const base = {
+    esperado,
+    feitos,
+    proximo,
+    registroPendente,
+    pediuApoio: pediuApoioFlag,
+    apoioJovem: apoioJovemFlag,
+    avaliacaoJovemPendente,
+    apoio,
+  };
+
+  // ---- fora da régua: pausada/concluída/encerrada não correm o semáforo ----
+  // A jornada congelada não acende critério nenhum (o "trabalho" do apoio
+  // aberto segue visível no campo próprio, mas não compõe estado). motivos
+  // carrega o rótulo único do status — é o que a linha exibe.
+  if (dupla.status !== "ativa") {
+    const motivo =
+      dupla.status === "pausada"
+        ? "Dupla pausada"
+        : dupla.status === "concluida"
+          ? "Jornada concluída"
+          : "Dupla encerrada";
+    return { semaforo: "ok", motivo, motivos: [motivo], sinais: [], ...base };
+  }
+
+  // ---- sinais: todo critério aceso, na ordem de prioridade histórica ----
+  // Antes a fila retornava no primeiro match e os demais se perdiam; agora
+  // cada um vira um Sinal. A ordem é a mesma dos early-returns antigos —
+  // motivos[0] continua sendo o motivo que um consumidor legado lia.
+  const sinais: Sinal[] = [];
+  // recência do sinal em "há N dias" — data-pura passa direto (parsear
+  // "YYYY-MM-DD" como UTC meia-noite voltaria um dia no fuso de SP)
+  const haDias = (iso: string | null | undefined): string | undefined => {
+    if (!iso) return undefined;
+    const dia = /^\d{4}-\d{2}-\d{2}$/.test(iso)
+      ? iso
+      : toDateStr(new Date(iso));
+    const d = diffDias(hojeStr, dia);
+    return `há ${d} ${d === 1 ? "dia" : "dias"}`;
+  };
+
+  // combo do último registro consome os sinais individuais (é UM critério —
+  // baixa+dificuldade juntas é risco; separadas seriam duas atenções)
   if (avaliacaoBaixa && comDificuldade)
-    return {
-      semaforo: "risco",
-      motivo: `Avaliação baixa e dificuldade de ${DIFICULDADE_LABEL[ultimoReg!.dificuldade!] ?? ultimoReg!.dificuldade} no último encontro`,
-      ...base,
-      pediuApoio,
-    };
+    sinais.push({
+      tipo: "avaliacao_baixa_dificuldade",
+      tom: "risco",
+      texto: `Avaliação baixa e dificuldade de ${DIFICULDADE_LABEL[ultimoReg!.dificuldade!] ?? ultimoReg!.dificuldade} no último encontro`,
+    });
+
   // atraso só existe contra um calendário — na especialista esperado = feitos
-  if (!ehEspecialista && atraso >= 2)
-    return { semaforo: "risco", motivo: `${atraso} encontros em atraso`, ...base, pediuApoio };
-  if (!ehEspecialista && atraso === 1)
-    return {
-      semaforo: "atencao",
-      motivo: `Encontro ${primeiroEncontroFaltante(dupla, eventos, hoje, limbo) ?? esperado} ainda não aconteceu (reposição na mesma semana)`,
-      ...base,
-      pediuApoio,
-    };
-  if (avaliacaoBaixa)
-    return {
-      semaforo: "atencao",
-      motivo: "Avaliação baixa no último encontro",
-      ...base,
-      pediuApoio,
-    };
-  if (comDificuldade)
-    return {
-      semaforo: "atencao",
-      motivo: `Dificuldade de ${DIFICULDADE_LABEL[ultimoReg!.dificuldade!] ?? ultimoReg!.dificuldade} identificada`,
-      ...base,
-      pediuApoio,
-    };
+  if (!ehEspecialista && atraso > 0) {
+    // encontros oficiais já vencidos que nenhum realizado cobre — vira o
+    // "6º e 7º" da linha; só sai no detalhe quando bate com a conta (um
+    // realizado fora da janela pode cobrir outro número)
+    const faltantes = [...numerosEsperados].filter(
+      (n) =>
+        !dupla.encontros.some((e) => e.numero === n && e.status === "realizado")
+    );
+    sinais.push(
+      atraso >= 2
+        ? {
+            tipo: "atraso",
+            tom: "risco",
+            texto: `${atraso} encontros em atraso`,
+            ...(faltantes.length === atraso
+              ? { detalhe: faltantes.map((n) => `${n}º`).join(" e ") }
+              : {}),
+          }
+        : {
+            tipo: "atraso",
+            tom: "atencao",
+            texto: `Encontro ${primeiroEncontroFaltante(dupla, eventos, hoje, limbo) ?? esperado} ainda não aconteceu (reposição na mesma semana)`,
+          }
+    );
+  }
+  if (avaliacaoBaixa && !comDificuldade)
+    sinais.push({
+      tipo: "avaliacao_baixa",
+      tom: "atencao",
+      texto: "Avaliação baixa no último encontro",
+    });
+  if (comDificuldade && !avaliacaoBaixa)
+    sinais.push({
+      tipo: "dificuldade",
+      tom: "atencao",
+      texto: `Dificuldade de ${DIFICULDADE_LABEL[ultimoReg!.dificuldade!] ?? ultimoReg!.dificuldade} identificada`,
+    });
   // preventivo: encontro oficial da semana bate em ≤5 dias e a dupla ainda não marcou nada
   // (qualquer row com esse numero — agendada, realizada, cancelada — já cobre o encontro).
   // Só DPP: a especialista não tem data oficial — "ainda não agendou" não é sinal.
   if (!ehEspecialista) {
     const oficial = eventoDaSemana(eventos, hoje);
-    const diasAteOficial = oficial ? diffDias(oficial.data, toDateStr(hoje)) : null;
+    const diasAteOficial = oficial ? diffDias(oficial.data, hojeStr) : null;
     const oficialNaDupla =
       oficial?.numero != null && dupla.encontros.some((e) => e.numero === oficial.numero);
     if (
@@ -1124,25 +1214,42 @@ export function saudadeDaDupla(dupla: Dupla, eventos: CicloEvento[], hoje = new 
       !proximo &&
       !oficialNaDupla
     )
-      return {
-        semaforo: "atencao",
-        motivo: `O ${oficial.numero}º encontro é ${formatDiaSemanaMes(oficial.data)} e ainda não foi agendado`,
-        ...base,
-        pediuApoio,
-      };
+      sinais.push({
+        tipo: "preventivo",
+        tom: "atencao",
+        texto: `O ${oficial.numero}º encontro é ${formatDiaSemanaMes(oficial.data)} e ainda não foi agendado`,
+      });
   }
-  if (pendencia)
-    return {
-      semaforo: "atencao",
-      motivo:
-        pendencia.status === "agendado"
-          ? `${pendencia.numero}º encontro agendado já passou: falta o registro`
-          : "Encontro realizado sem registro",
-      ...base,
-      pediuApoio,
-    };
-  if (encaminhamentoVencido)
-    return { semaforo: "atencao", motivo: "Combinado com prazo vencido", ...base, pediuApoio };
+  if (pendencia) {
+    const quando = pendencia.realizado_em ?? pendencia.data_hora;
+    sinais.push(
+      pendencia.status === "agendado"
+        ? {
+            tipo: "limbo",
+            tom: "atencao",
+            texto: `${pendencia.numero}º encontro agendado já passou: falta o registro`,
+            ...(haDias(quando) ? { detalhe: haDias(quando) } : {}),
+          }
+        : {
+            tipo: "registro_pendente",
+            tom: "atencao",
+            texto: "Encontro realizado sem registro",
+            ...(haDias(quando) ? { detalhe: haDias(quando) } : {}),
+          }
+    );
+  }
+  if (encaminhamentoVencido) {
+    // o combinado mais atrasado dita a recência do sinal
+    const maisAntigo = dupla.encaminhamentos
+      .filter((t) => t.status === "pendente" && t.prazo && t.prazo < hojeStr)
+      .sort((a, b) => a.prazo!.localeCompare(b.prazo!))[0]?.prazo;
+    sinais.push({
+      tipo: "encaminhamento_vencido",
+      tom: "atencao",
+      texto: "Combinado com prazo vencido",
+      ...(haDias(maisAntigo) ? { detalhe: haDias(maisAntigo) } : {}),
+    });
+  }
   // estagnação da trilha especialista (0073): sem calendário oficial, o
   // "parou no tempo" não aparece em atraso — 90 dias de trilha aberta sem
   // sessão recente nem agendada é o nudge do guia pra revisar o fit.
@@ -1166,18 +1273,24 @@ export function saudadeDaDupla(dupla: Dupla, eventos: CicloEvento[], hoje = new 
         new Date(e.data_hora).getTime() >= hoje.getTime()
     )
   )
-    return {
-      semaforo: "atencao",
-      motivo: "Trilha com 3 meses sem sessão nova — checar se segue fazendo sentido",
-      ...base,
-      pediuApoio,
-    };
-  return {
-    semaforo: "ok",
-    motivo: proximo ? `Próximo encontro ${formatDate(proximo.data_hora)}` : "Em dia",
-    ...base,
-    pediuApoio,
-  };
+    sinais.push({
+      tipo: "estagnacao",
+      tom: "atencao",
+      texto: "Trilha com 3 meses sem sessão nova — checar se segue fazendo sentido",
+    });
+
+  // o veredito é a pior faixa acesa — e o motivo o primeiro texto, como
+  // sempre foi (o consumidor legado não nota a diferença)
+  const semaforo: Semaforo = sinais.some((s) => s.tom === "risco")
+    ? "risco"
+    : sinais.length > 0
+      ? "atencao"
+      : "ok";
+  const motivos =
+    sinais.length > 0
+      ? sinais.map((s) => s.texto)
+      : [proximo ? `Próximo encontro ${formatDate(proximo.data_hora)}` : "Em dia"];
+  return { semaforo, motivo: motivos[0], motivos, sinais, ...base };
 }
 
 /** Encontro da trilha ainda sem row em `encontros` — candidato a "aconteceu

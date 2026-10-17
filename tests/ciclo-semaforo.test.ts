@@ -39,21 +39,47 @@ describe("saudadeDaDupla — congelamento por status", () => {
   });
 });
 
-describe("saudadeDaDupla — risco", () => {
-  it("pedido de apoio marca risco mesmo com a agenda em dia", () => {
+describe("saudadeDaDupla — apoio é eixo separado do semáforo", () => {
+  it("apoio aberto + jornada em dia ⇒ semáforo ok, apoio.aberto", () => {
     const dupla = mkDupla({
       encontros: [
         encRealizado(1, "2025-10-07", mkRegistro({ precisa_apoio: true })),
-        encAgendado(2, "2025-10-21"),
+        encAgendado(2, "2025-10-14"),
       ],
     });
-    const s = saudadeDaDupla(dupla, CICLO_16, dt("2025-10-15"));
-    expect(s.semaforo).toBe("risco");
-    expect(s.motivo).toBe("Pedido de apoio");
+    const s = saudadeDaDupla(dupla, CICLO_16, dt("2025-10-08"));
+    expect(s.semaforo).toBe("ok");
+    expect(s.motivo).toBe("Próximo encontro 14 de out. de 2025");
+    expect(s.apoio.aberto).toBe(true);
+    expect(s.apoio.origem).toBe("mentor");
     expect(s.pediuApoio).toBe(true);
+    expect(s.sinais).toEqual([]);
   });
 
-  it("pedido de apoio fura o congelamento da dupla pausada", () => {
+  it("apoio não acende risco nem pesa na fila — só a jornada conta", () => {
+    // mesma dupla com e sem pedido de apoio: semáforo idêntico
+    const com = saudadeDaDupla(
+      mkDupla({
+        encontros: [
+          encRealizado(1, "2025-10-07", mkRegistro({ precisa_apoio: true })),
+        ],
+      }),
+      CICLO_16,
+      dt("2025-10-15") // enc 2 esperado em 14/10 → 1 atraso
+    );
+    const sem = saudadeDaDupla(
+      mkDupla({ encontros: [encRealizado(1, "2025-10-07")] }),
+      CICLO_16,
+      dt("2025-10-15")
+    );
+    expect(com.semaforo).toBe("atencao");
+    expect(com.semaforo).toBe(sem.semaforo);
+    expect(com.motivo).toBe(sem.motivo);
+    expect(com.apoio.aberto).toBe(true);
+    expect(sem.apoio.aberto).toBe(false);
+  });
+
+  it("pausada fica fora da conta do semáforo, mas o apoio segue aberto", () => {
     const dupla = mkDupla({
       status: "pausada",
       encontros: [
@@ -61,12 +87,29 @@ describe("saudadeDaDupla — risco", () => {
       ],
     });
     const s = saudadeDaDupla(dupla, CICLO_16, dt("2025-10-15"));
-    expect(s.semaforo).toBe("risco");
-    expect(s.motivo).toBe("Pedido de apoio");
+    expect(s.semaforo).toBe("ok");
+    expect(s.motivo).toBe("Dupla pausada");
+    expect(s.sinais).toEqual([]);
+    expect(s.motivos).toEqual(["Dupla pausada"]);
+    // o apoio é trabalho operacional, não estado da jornada — continua visível
+    expect(s.apoio.aberto).toBe(true);
+    expect(s.apoio.origem).toBe("mentor");
     expect(s.pediuApoio).toBe(true);
   });
 
-  it("pedido de apoio NÃO fura o fechamento — encerrada segue ok", () => {
+  it("pausada com atrasos não acende nada — sinais e motivos só do status", () => {
+    const s = saudadeDaDupla(
+      mkDupla({ status: "pausada" }),
+      CICLO_16,
+      dt("2025-10-28") // 4 esperados, 0 feitos — ativa seria risco
+    );
+    expect(s.semaforo).toBe("ok");
+    expect(s.sinais).toEqual([]);
+    expect(s.motivos).toEqual(["Dupla pausada"]);
+    expect(s.apoio.aberto).toBe(false);
+  });
+
+  it("pedido de apoio NÃO fura o fechamento — encerrada sem apoio aberto", () => {
     const dupla = mkDupla({
       status: "encerrada",
       encontros: [
@@ -76,9 +119,12 @@ describe("saudadeDaDupla — risco", () => {
     const s = saudadeDaDupla(dupla, CICLO_16, dt("2025-10-15"));
     expect(s.semaforo).toBe("ok");
     expect(s.motivo).toBe("Dupla encerrada");
+    expect(s.apoio.aberto).toBe(false);
     expect(s.pediuApoio).toBe(false);
   });
+});
 
+describe("saudadeDaDupla — risco", () => {
   it("≥2 encontros em atraso é risco, com o plural no motivo", () => {
     const s = saudadeDaDupla(mkDupla(), CICLO_16, dt("2025-10-14"));
     expect(s.semaforo).toBe("risco");
@@ -345,7 +391,7 @@ describe("saudadeDaDupla — combinado vencido e ok", () => {
 });
 
 describe("saudadeDaDupla — sinais da avaliação do jovem (0071)", () => {
-  it("pedir_apoio do jovem é risco com motivo próprio — nunca funde no do mentor", () => {
+  it("pedir_apoio do jovem abre apoio com origem própria — nunca funde no do mentor", () => {
     const dupla = mkDupla({
       encontros: [
         {
@@ -355,14 +401,16 @@ describe("saudadeDaDupla — sinais da avaliação do jovem (0071)", () => {
       ],
     });
     const s = saudadeDaDupla(dupla, CICLO_16, dt("2025-10-08"));
-    expect(s.semaforo).toBe("risco");
-    expect(s.motivo).toBe("Pedido de ajuda do mentorado");
+    // pedido do jovem também não entra no semáforo — jornada em dia = ok
+    expect(s.semaforo).toBe("ok");
+    expect(s.apoio.aberto).toBe(true);
+    expect(s.apoio.origem).toBe("mentorado");
     expect(s.apoioJovem).toBe(true);
     // os dois canais ficam separados — o do mentor continua false
     expect(s.pediuApoio).toBe(false);
   });
 
-  it("pedidos dos dois lados viram o motivo plural", () => {
+  it("pedidos dos dois lados viram origem 'ambos'", () => {
     const dupla = mkDupla({
       encontros: [
         encRealizado(1, "2025-10-07", mkRegistro({ precisa_apoio: true })),
@@ -373,13 +421,13 @@ describe("saudadeDaDupla — sinais da avaliação do jovem (0071)", () => {
       ],
     });
     const s = saudadeDaDupla(dupla, CICLO_16, dt("2025-10-15"));
-    expect(s.semaforo).toBe("risco");
-    expect(s.motivo).toBe("Pedidos de apoio em aberto");
+    expect(s.apoio.aberto).toBe(true);
+    expect(s.apoio.origem).toBe("ambos");
     expect(s.pediuApoio).toBe(true);
     expect(s.apoioJovem).toBe(true);
   });
 
-  it("apoio do jovem fura o congelamento da pausada, mas não da encerrada", () => {
+  it("apoio do jovem segue aberto na pausada, mas não na encerrada", () => {
     const enc = {
       ...encRealizado(1, "2025-10-07"),
       avaliacao_jovem: mkAvaliacao({ pedir_apoio: true }),
@@ -389,7 +437,9 @@ describe("saudadeDaDupla — sinais da avaliação do jovem (0071)", () => {
       CICLO_16,
       dt("2025-10-15")
     );
-    expect(pausada.semaforo).toBe("risco");
+    expect(pausada.semaforo).toBe("ok");
+    expect(pausada.apoio.aberto).toBe(true);
+    expect(pausada.apoio.origem).toBe("mentorado");
     expect(pausada.apoioJovem).toBe(true);
 
     const encerrada = saudadeDaDupla(
@@ -398,6 +448,7 @@ describe("saudadeDaDupla — sinais da avaliação do jovem (0071)", () => {
       dt("2025-10-15")
     );
     expect(encerrada.semaforo).toBe("ok");
+    expect(encerrada.apoio.aberto).toBe(false);
     expect(encerrada.apoioJovem).toBe(false);
   });
 
@@ -570,5 +621,178 @@ describe("saudadeDaDupla — trilha de especialista (sem calendário)", () => {
       dt("2025-10-15")
     );
     expect(semInicio.semaforo).toBe("ok");
+  });
+});
+
+describe("saudadeDaDupla — motivos[] e sinais[] (todos os critérios)", () => {
+  // invariante: motivo é sempre o primeiro motivo — contrato legado
+  it("motivo === motivos[0] em todo estado", () => {
+    const casos = [
+      saudadeDaDupla(mkDupla(), CICLO_16, dt("2025-10-14")), // risco
+      saudadeDaDupla(
+        mkDupla({ encontros: [encRealizado(1, "2025-10-07")] }),
+        CICLO_16,
+        dt("2025-10-08")
+      ), // ok
+      saudadeDaDupla(mkDupla({ status: "pausada" }), CICLO_16, dt("2025-10-28")),
+      saudadeDaDupla(mkDupla({ status: "concluida" }), CICLO_16, dt("2025-10-28")),
+    ];
+    for (const s of casos) {
+      expect(s.motivos.length).toBeGreaterThanOrEqual(1);
+      expect(s.motivo).toBe(s.motivos[0]);
+      // com sinais acesos, motivos espelha os textos 1:1; fora disso, é o
+      // rótulo único do estado ("Dupla pausada", "Em dia", "Próximo encontro…")
+      if (s.sinais.length > 0) {
+        expect(s.motivos).toEqual(s.sinais.map((x) => x.texto));
+      } else {
+        expect(s.motivos).toEqual([s.motivo]);
+      }
+    }
+  });
+
+  it("cada critério aceso vira um sinal e um motivo — nada se perde", () => {
+    // enc 2 esperado (14/10) sem realização + enc 1 em limbo + combinado
+    // vencido: três pendências distintas devem aparecer juntas
+    const dupla = mkDupla({
+      encontros: [encAgendado(1, "2025-10-07")],
+      encaminhamentos: [
+        mkEncaminhamento({ status: "pendente", prazo: "2025-10-10" }),
+      ],
+    });
+    const s = saudadeDaDupla(dupla, CICLO_16, dt("2025-10-15"));
+    expect(s.semaforo).toBe("atencao");
+    expect(s.sinais.map((x) => x.tipo)).toEqual([
+      "atraso",
+      "limbo",
+      "encaminhamento_vencido",
+    ]);
+    expect(s.motivos).toEqual(s.sinais.map((x) => x.texto));
+    expect(s.motivo).toBe(s.motivos[0]);
+    // o detalhe carrega a recência que a linha mostra ("há N dias")
+    const limbo = s.sinais.find((x) => x.tipo === "limbo")!;
+    expect(limbo.detalhe).toMatch(/^há \d+ (dias|dia)$/);
+    const combinado = s.sinais.find((x) => x.tipo === "encaminhamento_vencido")!;
+    expect(combinado.detalhe).toBe("há 5 dias");
+  });
+
+  it("2+ atrasos: um sinal de tom risco com os números faltantes no detalhe", () => {
+    // 14/10: o 2º oficial vence HOJE sem agendamento — o preventivo também
+    // acende (critérios não se anulam mais: tudo que é fato entra na lista)
+    const s = saudadeDaDupla(mkDupla(), CICLO_16, dt("2025-10-14"));
+    expect(s.semaforo).toBe("risco");
+    expect(s.sinais.map((x) => x.tipo)).toEqual(["atraso", "preventivo"]);
+    expect(s.sinais[0]).toEqual({
+      tipo: "atraso",
+      tom: "risco",
+      texto: "2 encontros em atraso",
+      detalhe: "1º e 2º",
+    });
+    expect(s.motivos[0]).toBe("2 encontros em atraso");
+  });
+
+  it("combo avaliação baixa + dificuldade é UM sinal — não duplica em dois", () => {
+    const dupla = mkDupla({
+      encontros: [
+        encRealizado(
+          1,
+          "2025-10-07",
+          mkRegistro({ avaliacao: "baixa", dificuldade: "organizacao" })
+        ),
+      ],
+    });
+    const s = saudadeDaDupla(dupla, CICLO_16, dt("2025-10-14"));
+    expect(s.semaforo).toBe("risco");
+    expect(s.sinais.map((x) => x.tipo)).toEqual([
+      "avaliacao_baixa_dificuldade",
+      "atraso",
+      "preventivo", // o 2º oficial vence hoje sem agendamento — também é fato
+    ]);
+    expect(s.sinais[0].tom).toBe("risco");
+    expect(s.sinais[0].texto).toBe(
+      "Avaliação baixa e dificuldade de organização/rotina no último encontro"
+    );
+    // o motivo legado continua sendo o combo (o primeiro da fila)
+    expect(s.motivo).toBe(s.sinais[0].texto);
+  });
+
+  it("avaliação baixa sozinha e dificuldade sozinha são sinais de atenção", () => {
+    // a baixa/dificuldade mora no ÚLTIMO registro — enc 2 é o que conta
+    const baixa = saudadeDaDupla(
+      mkDupla({
+        encontros: [
+          encRealizado(1, "2025-10-07"),
+          encRealizado(
+            2,
+            "2025-10-14",
+            mkRegistro({ avaliacao: "baixa", dificuldade: "nenhuma" })
+          ),
+        ],
+      }),
+      CICLO_16,
+      dt("2025-10-15")
+    );
+    expect(baixa.sinais.map((x) => x.tipo)).toEqual(["avaliacao_baixa"]);
+    expect(baixa.sinais[0].tom).toBe("atencao");
+
+    const dif = saudadeDaDupla(
+      mkDupla({
+        encontros: [
+          encRealizado(1, "2025-10-07"),
+          encRealizado(
+            2,
+            "2025-10-14",
+            mkRegistro({ avaliacao: "boa", dificuldade: "participacao" })
+          ),
+        ],
+      }),
+      CICLO_16,
+      dt("2025-10-15")
+    );
+    expect(dif.sinais.map((x) => x.tipo)).toEqual(["dificuldade"]);
+    expect(dif.sinais[0].texto).toBe(
+      "Dificuldade de participação identificada"
+    );
+  });
+
+  it("preventivo e pendência de registro convivem na mesma dupla", () => {
+    // 13/10 (segunda): oficial 2 é amanhã e nada marcado + enc 1 em limbo
+    const dupla = mkDupla({ encontros: [encAgendado(1, "2025-10-07")] });
+    const s = saudadeDaDupla(dupla, CICLO_16, dt("2025-10-13"));
+    // limbo cobre o esperado do 1º → sem atraso; os dois sinais restam
+    expect(s.sinais.map((x) => x.tipo)).toEqual(["preventivo", "limbo"]);
+    expect(s.semaforo).toBe("atencao");
+  });
+
+  it("realizado sem registro vira sinal 'registro_pendente' (não limbo)", () => {
+    const dupla = mkDupla({
+      encontros: [encRealizado(1, "2025-10-07", null)],
+    });
+    const s = saudadeDaDupla(dupla, CICLO_16, dt("2025-10-09"));
+    expect(s.sinais.map((x) => x.tipo)).toEqual(["registro_pendente"]);
+  });
+
+  it("estagnação da trilha especialista é sinal próprio", () => {
+    const s = saudadeDaDupla(
+      mkDupla({
+        trilha: "especialista",
+        iniciada_em: "2025-07-01",
+        encontros: [],
+      }),
+      CICLO_16,
+      dt("2025-10-15")
+    );
+    expect(s.sinais.map((x) => x.tipo)).toEqual(["estagnacao"]);
+    expect(s.sinais[0].tom).toBe("atencao");
+  });
+
+  it("dupla em dia: sinais vazio, motivos espelham o motivo ok", () => {
+    const s = saudadeDaDupla(
+      mkDupla({ encontros: [encRealizado(1, "2025-10-07")] }),
+      CICLO_16,
+      dt("2025-10-08")
+    );
+    expect(s.semaforo).toBe("ok");
+    expect(s.sinais).toEqual([]);
+    expect(s.motivos).toEqual(["Em dia"]);
   });
 });

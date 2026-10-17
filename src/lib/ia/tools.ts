@@ -86,7 +86,7 @@ export const IA_TOOLS = {
   resumo_semana: {
     nome: "resumo_semana",
     descricao:
-      "Panorama das duplas vivas (ativas e pausadas): o semáforo de cada uma — ok, atenção ou risco — com o motivo, quantos encontros eram esperados × realizados e o próximo encontro marcado. Use pra 'como estão as duplas?', 'quem tá em risco?', 'resumo da semana'.",
+      "Panorama das duplas vivas (ativas e pausadas): o semáforo de cada uma — ok, atenção ou risco — com todos os motivos/sinais acesos, pedidos de apoio abertos (eixo separado do semáforo: trabalho, não falha), quantos encontros eram esperados × realizados e o próximo encontro marcado. Use pra 'como estão as duplas?', 'quem tá em risco?', 'resumo da semana'.",
     schema: semArgs,
     roles: ["coordenacao", "supervisor"],
     run: async (_args: z.infer<typeof semArgs>, ctx) => {
@@ -106,6 +106,11 @@ export const IA_TOOLS = {
           status: d.status,
           semaforo: s.semaforo,
           motivo: s.motivo,
+          // todos os critérios acesos — o semáforo resume, a lista explica
+          motivos: s.motivos,
+          sinais: s.sinais,
+          // apoio é eixo separado: chamado aberto, não falha da jornada
+          apoio: s.apoio,
           esperado: s.esperado,
           feitos: s.feitos,
           registro_pendente: s.registroPendente,
@@ -114,9 +119,11 @@ export const IA_TOOLS = {
             : null,
         };
       });
-      // risco primeiro — o radar da equipe ordena pelo que pede ação
+      // apoio aberto primeiro (trabalho a fazer), depois risco → atenção →
+      // ok — o radar da equipe ordena pelo que pede ação
       itens.sort(
         (a, b) =>
+          Number(b.apoio.aberto) - Number(a.apoio.aberto) ||
           semaforoOrd[a.semaforo] - semaforoOrd[b.semaforo] ||
           comparaNome(a.mentor ?? "", b.mentor ?? "")
       );
@@ -131,7 +138,7 @@ export const IA_TOOLS = {
   ficha_dupla: {
     nome: "ficha_dupla",
     descricao:
-      "Dados estruturados de uma dupla: trilha, status, nomes, demanda, link do PDM, o semáforo com motivo e a lista de encontros (número, status, datas, se tem registro). Pro jovem, devolve a própria dupla sem o semáforo (instrumento da equipe). null quando a dupla não existe ou está fora do alcance do papel.",
+      "Dados estruturados de uma dupla: trilha, status, nomes, demanda, link do PDM, o semáforo com motivo, todos os sinais acesos, o pedido de apoio aberto (eixo separado) e a lista de encontros (número, status, datas, se tem registro). Pro jovem, devolve a própria dupla sem o semáforo (instrumento da equipe). null quando a dupla não existe ou está fora do alcance do papel.",
     schema: duplaIdArgs,
     roles: TODOS_PAPEIS,
     run: async ({ dupla_id }: z.infer<typeof duplaIdArgs>, ctx) => {
@@ -172,6 +179,9 @@ export const IA_TOOLS = {
         supervisor: d.supervisor?.nome ?? null,
         semaforo: s.semaforo,
         motivo: s.motivo,
+        motivos: s.motivos,
+        sinais: s.sinais,
+        apoio: s.apoio,
         esperado: s.esperado,
         feitos: s.feitos,
         registro_pendente: s.registroPendente,

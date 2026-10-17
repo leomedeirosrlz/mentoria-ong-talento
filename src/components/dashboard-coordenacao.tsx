@@ -150,13 +150,18 @@ export function DashboardCoordenacao({
 
   const saude = duplas
     .map((d) => ({ dupla: d, saude: saudadeDaDupla(d, eventos, hoje) }))
-    // pedido de apoio fura o congelamento da pausada/encerrada — não pode
-    // sumir do radar; o do JOVEM (0071) segue a mesma regra
+    // pedido de apoio fura o congelamento da pausada — não pode sumir do
+    // radar (concluída/encerrada já é capítulo encerrado: apoio.aberto desce)
     .filter(
-      ({ dupla, saude }) =>
-        dupla.status === "ativa" || saude.pediuApoio || saude.apoioJovem
+      ({ dupla, saude }) => dupla.status === "ativa" || saude.apoio.aberto
     )
-    .sort((a, b) => ORDEM_SEMAFORO[a.saude.semaforo] - ORDEM_SEMAFORO[b.saude.semaforo]);
+    // apoio aberto primeiro (trabalho a fazer), depois o semáforo — mesma
+    // fila do radar de /duplas
+    .sort(
+      (a, b) =>
+        Number(b.saude.apoio.aberto) - Number(a.saude.apoio.aberto) ||
+        ORDEM_SEMAFORO[a.saude.semaforo] - ORDEM_SEMAFORO[b.saude.semaforo]
+    );
 
   const filtroAtivo: FiltroPainel | null =
     filtro === "risco" ||
@@ -630,14 +635,12 @@ export function DashboardCoordenacao({
 }
 
 /** Versão curta do motivo — usada na linha "Em risco" do resumo copiável.
- *  Risco só vem de: pedido de ajuda (jovem ou mentor), ≥2 atrasos,
- *  avaliação baixa + dificuldade. O do jovem vem primeiro: um menor
- *  pedindo ajuda é o sinal mais grave do radar. */
+ *  Desde o WP2 apoio não acende risco: o risco vem só dos sinais da jornada
+ *  (≥2 atrasos, avaliação baixa + dificuldade) — o primeiro vermelho manda. */
 function motivoCurto(s: DuplaSaude): string {
-  if (s.apoioJovem) return "jovem pediu ajuda";
-  if (s.pediuApoio) return "pediu apoio";
-  const atraso = s.esperado - s.feitos;
-  if (atraso >= 2) return `${atraso} atrasos`;
+  const risco = s.sinais.find((x) => x.tom === "risco");
+  if (!risco) return s.motivo;
+  if (risco.tipo === "atraso") return `${s.esperado - s.feitos} atrasos`;
   return "avaliação baixa + dificuldade";
 }
 
@@ -772,7 +775,7 @@ function DuplaCard({
           </div>
           <p className="mt-1.5 text-sm text-muted-foreground">
             {saude.motivo}
-            {dupla.status === "pausada" && saude.pediuApoio && " · dupla pausada"}
+            {dupla.status === "pausada" && saude.apoio.aberto && " · apoio em aberto"}
             {saude.proximo && saude.semaforo !== "ok" && (
               <> · próximo: {formatDateTime(saude.proximo.data_hora)}</>
             )}
