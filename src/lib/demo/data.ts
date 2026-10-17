@@ -54,6 +54,84 @@ import type {
 } from "@/lib/types";
 import type { Interacao } from "@/lib/interacoes";
 
+// ---------- tabelas da rodada de telas finais (ainda sem migration) ----------
+// Espelhos do plano `docs/planos/implementacao-telas-finais.md` — os WPs
+// criam os tipos canônicos em ../types quando as migrations aterrissarem;
+// até lá a demo usa estes formatos mínimos (ajustar ao schema final de 0084+).
+
+/** `profile_papeis` (WP0b · REALIZA-105): papel por programa — a linha
+ *  primária espelha `profiles.role`; o híbrido carrega uma linha extra. */
+export type ProfilePapel = {
+  profile_id: string;
+  papel: AppRole;
+  /** null = papel vale pro programa todo; preenchido = só naquela turma. */
+  escopo_turma: string | null;
+  primario: boolean;
+  criado_em?: string;
+};
+
+export type ChamadoCategoria =
+  | "agenda"
+  | "metodologia"
+  | "plataforma"
+  | "urgencia"
+  | "outro";
+export type ChamadoStatus = "aberto" | "em_atendimento" | "resolvido";
+/** 'manual' cobre os botões soltos do mentor e do jovem (D4). */
+export type ChamadoOrigem = "manual" | "registro" | "avaliacao_jovem";
+
+/** `chamados` (WP1 · REALIZA-127+) — o ticket unificado de apoio. */
+export type DemoChamado = {
+  id: string;
+  /** Serial do protocolo — a UI exibe "CHA-000143". */
+  numero: number;
+  categoria: ChamadoCategoria;
+  assunto: string;
+  /** CHECK do plano: obrigatória quando categoria='outro'. */
+  descricao_outro: string | null;
+  status: ChamadoStatus;
+  origem: ChamadoOrigem;
+  autor_id: string;
+  dupla_id: string | null;
+  /** O "dono" do ticket — null enquanto ninguém assumiu. */
+  atribuido_a: string | null;
+  /** Chaves de dedup do backfill dos flags (D4/0084). */
+  registro_id: string | null;
+  encontro_id: string | null;
+  created_at: string;
+  resolvido_em: string | null;
+};
+
+/** `chamado_comentarios` — conversa INTERNA da equipe; o autor nunca lê. */
+export type DemoChamadoComentario = {
+  id: string;
+  chamado_id: string;
+  autor_id: string;
+  corpo: string;
+  interno: boolean;
+  created_at: string;
+};
+
+/** `chamado_atualizacoes` — timeline pública de andamento (o autor vê). */
+export type DemoChamadoAtualizacao = {
+  id: string;
+  chamado_id: string;
+  autor_id: string;
+  descricao: string;
+  status_opcional: string | null;
+  created_at: string;
+};
+
+/** `devolutivas` (WP6) — feed datado por trilha; a última entrega continua
+ *  sendo a que marca o encerramento (devolutiva_pdm vira projeção dela). */
+export type DemoDevolutiva = {
+  id: string;
+  dupla_id: string;
+  autor_id: string;
+  texto: string;
+  created_at: string;
+};
+
 export type DemoData = {
   personas: Record<AppRole, Profile>;
   profiles: Profile[];
@@ -69,6 +147,16 @@ export type DemoData = {
    *  pro jovem só chegam os slots derivados). */
   especialistaGrade: (GradeJanela & { profile_id: string })[];
   especialistaExcecoes: (ExcecaoEspecialista & { profile_id: string })[];
+  /** Papel por programa (WP0b · REALIZA-105) — `profiles.role` segue como
+   *  primário de compatibilidade enquanto a migration não sai. */
+  profilePapeis: ProfilePapel[];
+  /** Ticket unificado de apoio (WP1 · REALIZA-127+) + conversa interna +
+   *  timeline pública de andamento. */
+  chamados: DemoChamado[];
+  chamadoComentarios: DemoChamadoComentario[];
+  chamadoAtualizacoes: DemoChamadoAtualizacao[];
+  /** Feed datado de devolutivas por trilha (WP6). */
+  devolutivas: DemoDevolutiva[];
   materiais: Material[];
   comunicados: Comunicado[];
   solicitacoes: SolicitacaoEspecialista[];
@@ -102,8 +190,9 @@ const uid = (n: number): string =>
 // assinatura: 34xx · presencas: 36xx · supervisoes: 38xx ·
 // avaliacao_links: 42xx · avaliacoes_encontro: 44xx ·
 // documentos_pessoa: 46xx · cronogramas: 50xx · especialista_grade: 52xx ·
-// especialista_excecoes: 54xx. user_id fake: f0xx.
-// especialista_eventos não tem id.
+// especialista_excecoes: 54xx · chamados: 58xx · chamado_comentarios: 60xx ·
+// chamado_atualizacoes: 62xx · devolutivas: 64xx. user_id fake: f0xx.
+// especialista_eventos e profile_papeis não tem id.
 const P = {
   marina: 0x0001, // persona coordenação
   paulo: 0x0002, // persona supervisor
@@ -1108,10 +1197,44 @@ function build(): DemoData {
     mentorado: anaLogin,
   };
 
+  // ---------- profile_papeis (WP0b · REALIZA-105) ----------
+  // Backfill da demo: todo profiles.role vira uma linha primária de escopo
+  // global (escopo_turma null), como a migration do WP0b fará em prod. As
+  // linhas extras materializam os híbridos do domínio (guia DPP §5: o pool
+  // de especialistas inclui mentores voluntários) — Ricardo e André levam
+  // mentor_dpp + mentor_especialista ao mesmo tempo, sem trocar o primário.
+  // Enquanto a tabela não existe no banco, este dataset é o que as queries
+  // demo usam pra exercitar o filtro por papel (ver papeisDe em queries.ts).
+  const profilePapeis: ProfilePapel[] = profiles.flatMap((p) =>
+    p.role
+      ? [
+          {
+            profile_id: p.id,
+            papel: p.role,
+            escopo_turma: null,
+            primario: true,
+            criado_em: p.created_at ?? undefined,
+          },
+        ]
+      : []
+  );
+  for (const p of [ricardo, andre]) {
+    profilePapeis.push({
+      profile_id: p.id,
+      papel: "mentor_especialista",
+      escopo_turma: null,
+      primario: false,
+      criado_em: p.created_at ?? undefined,
+    });
+  }
+
   const mentorProfiles: MentorProfile[] = [
     // Ricardo sem termo_ok: persona mentor_dpp entra na demo com o banner
-    // "termo pendente" — é o que demonstra o fluxo de assinatura
-    { profile_id: ricardo.id, tipo: "dpp", areas: ["carreira", "educação"], capacidade: 1, termo_ok: false, formacao_ok: true,
+    // "termo pendente" — é o que demonstra o fluxo de assinatura.
+    // capacidade_especialista 1: ele é um dos híbridos da demo (WP0b) — DPP
+    // da Bia E voluntário no pool de especialistas, como prevê o guia DPP
+    // ("o pool inclui mentores voluntários") — mas ainda sem grade aberta
+    { profile_id: ricardo.id, tipo: "dpp", areas: ["carreira", "educação"], capacidade: 1, capacidade_especialista: 1, termo_ok: false, formacao_ok: true,
       experiencia_previa: "Primeiro ciclo como mentor — concluiu a formação e participou de duas rodas de conversa como ouvinte.",
       formacao_externa: "Trilha de liderança e feedback da empresa.",
       disponibilidade: { dias: ["ter", "qui"], periodos: ["noite"] } },
@@ -1138,7 +1261,10 @@ function build(): DemoData {
       experiencia_previa: "Mentora no ciclo anterior — a dupla concluiu o PDM inteiro.",
       formacao_externa: "Workshops de portfólio pra estudantes de design.",
       disponibilidade: { dias: ["qua", "sex"], periodos: ["tarde"] } },
-    { profile_id: andre.id, tipo: "dpp", areas: ["empreendedorismo", "finanças"], capacidade: 2, termo_ok: true, formacao_ok: true,
+    // André é o híbrido funcional (WP0b): DPP da dupla pausada do Pedro e
+    // especialista disponível no pool — capacidade_especialista 1, nenhuma
+    // trilha ainda, e a grade dele abre a janela de seg à tarde abaixo
+    { profile_id: andre.id, tipo: "dpp", areas: ["empreendedorismo", "finanças"], capacidade: 2, capacidade_especialista: 1, termo_ok: true, formacao_ok: true,
       experiencia_previa: "Empreende há 8 anos; concluiu a formação e abriu a primeira dupla — pausada a pedido da família.",
       formacao_externa: "Mentorias do Sebrae pra pequenos negócios.",
       disponibilidade: { dias: ["seg", "ter", "qua", "qui", "sex"], periodos: ["manha", "tarde"] } },
@@ -1175,6 +1301,9 @@ function build(): DemoData {
     { id: uid(0x5203), profile_id: sofia.id, dia_semana: 6, hora_inicio: "09:00", hora_fim: "12:00" },
     { id: uid(0x5204), profile_id: helena.id, dia_semana: 2, hora_inicio: "19:00", hora_fim: "21:00" },
     { id: uid(0x5205), profile_id: helena.id, dia_semana: 4, hora_inicio: "19:00", hora_fim: "21:00" },
+    // André — a janela que ele abriu pro papel de especialista (híbrido):
+    // seg à tarde, dentro da disponibilidade que ele já tinha como DPP
+    { id: uid(0x5206), profile_id: andre.id, dia_semana: 1, hora_inicio: "14:00", hora_fim: "17:00" },
   ];
 
   // Exceções datadas — sempre dentro da janela de ~3 semanas da projeção:
@@ -2454,6 +2583,131 @@ function build(): DemoData {
 
   const duplas = [duplaOk, duplaPend, duplaRisco, duplaAtraso, duplaFim, duplaEsp1, duplaEsp2, duplaEsp3, duplaEsp4, duplaPausa, duplaT2a, duplaT2b];
 
+  // ---------- chamados (WP1 · REALIZA-127+) ----------
+  // Fila unificada de apoio no espírito do mock v4 (docs/mockups/chamados):
+  // um aberto do jovem (outro), uma urgência de mentor DPP ainda sem dono e
+  // um em atendimento com o auxiliar assumido. Sem página consumidora hoje —
+  // o dataset espera a superfície; enquanto isso cobre o stub do client.
+  const chamados: DemoChamado[] = [
+    {
+      id: uid(0x5801),
+      numero: 143,
+      categoria: "urgencia",
+      assunto:
+        "Preciso de apoio — o Pedro faltou aos últimos dois encontros e a família não responde",
+      descricao_outro: null,
+      status: "aberto",
+      origem: "manual",
+      autor_id: andre.id,
+      dupla_id: duplaPausa.id,
+      atribuido_a: null, // ainda na fila — ninguém assumiu
+      registro_id: null,
+      encontro_id: null,
+      created_at: haDias(1, "20:10"),
+      resolvido_em: null,
+    },
+    {
+      id: uid(0x5802),
+      numero: 139,
+      categoria: "metodologia",
+      assunto:
+        "Como registrar sessão de trilha quando o jovem avisa que não pode em cima da hora?",
+      descricao_outro: null,
+      status: "em_atendimento",
+      origem: "manual",
+      autor_id: helena.id,
+      dupla_id: duplaEsp2.id,
+      atribuido_a: beatriz.id, // a auxiliar assumiu — é o dono do ticket
+      registro_id: null,
+      encontro_id: null,
+      created_at: haDias(4, "11:30"),
+      resolvido_em: null,
+    },
+    {
+      id: uid(0x5803),
+      numero: 137,
+      categoria: "outro",
+      assunto: "Meu sobrenome está errado no cadastro",
+      descricao_outro:
+        "Está como “Silva Santos” e o certo é só “Silva” — dá pra corrigir?",
+      status: "aberto",
+      origem: "manual",
+      autor_id: anaLogin.id,
+      dupla_id: duplaOk.id,
+      atribuido_a: null,
+      registro_id: null,
+      encontro_id: null,
+      created_at: haDias(3, "10:05"),
+      resolvido_em: null,
+    },
+  ];
+
+  // Conversa INTERNA da equipe + timeline pública do chamado em atendimento
+  // — o par das duas visões que o wp1 desenha no detalhe do ticket.
+  const chamadoComentarios: DemoChamadoComentario[] = [
+    {
+      id: uid(0x6001),
+      chamado_id: uid(0x5802),
+      autor_id: beatriz.id,
+      corpo:
+        "Pelo guia, aviso com menos de 24h conta como “não aconteceu” sem penalidade — confirmar com a Marina se a sessão é reposta dentro do prazo da trilha.",
+      interno: true,
+      created_at: haDias(4, "14:05"),
+    },
+    {
+      id: uid(0x6002),
+      chamado_id: uid(0x5801),
+      autor_id: marina.id,
+      corpo:
+        "Vou ligar pra mãe do Pedro amanhã cedo. Se for o caso, a trilha segue pausada até a família responder — o André já sabe.",
+      interno: true,
+      created_at: haDias(1, "21:00"),
+    },
+  ];
+
+  const chamadoAtualizacoes: DemoChamadoAtualizacao[] = [
+    {
+      id: uid(0x6201),
+      chamado_id: uid(0x5802),
+      autor_id: beatriz.id,
+      descricao:
+        "Helena, registre como “não aconteceu” informando o motivo e proponha um novo horário dentro da sua grade — a sessão não é descontada das 5 da trilha.",
+      status_opcional: null,
+      created_at: haDias(1, "10:15"),
+    },
+  ];
+
+  // ---------- devolutivas (WP6) ----------
+  // Feed datado por trilha — a última entrega continua sendo o que marca a
+  // conclusão (a devolutiva_pdm da dupla vira projeção desse feed). A trilha
+  // concluída da Helena × Bia ganha as duas entregas do caminho; a da Sofia ×
+  // Bia mostra o feed em andamento.
+  const devolutivas: DemoDevolutiva[] = [
+    {
+      id: uid(0x6401),
+      dupla_id: duplaEsp4.id,
+      autor_id: helena.id,
+      texto:
+        "Meio da trilha: a Bia já fala 2 minutos sem notas e respira pausado. Próximo passo — responder pergunta de improviso sem travar.",
+      created_at: haDias(16, "20:30"),
+    },
+    {
+      id: uid(0x6402),
+      dupla_id: duplaEsp4.id,
+      autor_id: helena.id,
+      texto: duplaEsp4.devolutiva_pdm ?? "",
+      created_at: haDias(5, "19:00"),
+    },
+    {
+      id: uid(0x6403),
+      dupla_id: duplaEsp1.id,
+      autor_id: sofia.id,
+      texto:
+        "Diagnóstico fechado: o buraco é fração e função. Roteiro de 5 sessões desenhado; se o ritmo segurar, sobra sessão pra revisão.",
+      created_at: haDias(8, "21:00"),
+    },
+  ];
+
   // ---------- anexos de evidência ----------
 
   const anexos: RegistroAnexo[] = [
@@ -3202,6 +3456,11 @@ function build(): DemoData {
     especialistaEventos,
     especialistaGrade,
     especialistaExcecoes,
+    profilePapeis,
+    chamados,
+    chamadoComentarios,
+    chamadoAtualizacoes,
+    devolutivas,
     materiais,
     comunicados,
     solicitacoes,

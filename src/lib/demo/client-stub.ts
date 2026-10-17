@@ -212,9 +212,33 @@ function linhas(tabela: string, papel: AppRole | null): Linha[] {
       }));
     case "formulario_respostas":
       return getDemoFormularios().respostas as unknown as Linha[];
+    case "chamados":
+      return d.chamados as unknown as Linha[];
+    case "chamado_comentarios":
+      return d.chamadoComentarios as unknown as Linha[];
+    case "chamado_atualizacoes":
+      return d.chamadoAtualizacoes as unknown as Linha[];
+    case "devolutivas":
+      return d.devolutivas as unknown as Linha[];
+    case "profile_papeis":
+      return d.profilePapeis as unknown as Linha[];
     default:
+      avisarTabelaSemDataset(tabela);
       return [];
   }
+}
+
+// O default devolvia [] em silêncio — uma superfície nova (ex.: /chamados)
+// renderizaria vazia sem nenhum sinal de que faltava dataset. Agora avisa
+// uma vez por tabela no console; o fluxo segue sem quebrar.
+const tabelasAvisadas = new Set<string>();
+function avisarTabelaSemDataset(tabela: string) {
+  if (tabelasAvisadas.has(tabela)) return;
+  tabelasAvisadas.add(tabela);
+  console.warn(
+    `[demo] tabela "${tabela}" consultada sem dataset no stub — ` +
+      `devolvendo []. Adicionar em demo/data.ts + case em linhas() (client-stub.ts).`
+  );
 }
 
 /** Projeta o subselect do embed ("id, nome" / "*") sobre a linha achada;
