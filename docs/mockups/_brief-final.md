@@ -67,8 +67,11 @@ Cada agente recebe a sua. A base é decidida; os "resgates" são obrigatórios, 
 - **Coordenação**: só leitura — painel de trilhas (ativas, prazo, sessões feitas/esperadas), pedidos há X dias no mural sem aceite (alerta de acompanhamento), encerramento antecipado como única ação de exceção. Sem agendar, sem designar especialista.
 - **Mentor DPP**: cartão de acompanhamento da trilha da Ana (progresso, registros, ★) — sem ações de sessão.
 
-### duplas → `docs/mockups/duplas/v4.html` — visões: Coordenação · Auxiliar executivo · Mentor DPP · Mentor especialista
-- Base **v3** (seções Apoio → Em risco → Atenção → Em andamento → Pausadas; régua no header de cada seção). Resgates: barra "feito × esperado" com tick de referência (**v1**); pills de sinal com ícone + recência "há 26 dias" + resumo "2 em risco · 3 em atenção · 1 apoio aberto" no subtítulo + legenda expansível de critérios (**v2**); chips que saltam pras seções; botão **Nova dupla** (coord); filtro por turma/mentor/supervisor; busca. Cada dupla mostra turma + nº do encontro qualificado + "por que está nessa categoria" (motivos[]).
+### duplas → `docs/mockups/duplas/v5.html` — visões: Coordenação · Auxiliar executivo · Mentor DPP · Mentor especialista
+- **Decisão do Léo: base v1** ("mais limpo") — tabela densa, uma linha por dupla, chips de categoria carregando a régua. A v4 (seções + cards) foi descartada: chrome demais.
+- Mitigações sobre a v1 (o que ela perdia): as **4 visões por papel**; **ações na linha** ("Lembrar" nudge + "Ver ficha"); **recência** nos sinais ("há 26 dias"); **filtros** turma/supervisão/mentor em linha única; **massa saudável colapsada** ("mostrar as outras 16 em andamento") — a lista pura não escala pra 26 duplas; **legenda** sob demanda no rodapé.
+- **Sem banner de escopo** ("Você vê…") — era material de demo; a privacidade é RLS, o escopo fica nas notas do mock.
+- Apoio primeiro na fila (pill azul sobre o estado real + "Abrir chamado"). Cada linha mostra turma + encontro qualificado + porquê do estado em texto corrido.
 - **Coordenação**: 26 duplas, todos os filtros, Nova dupla, apoio com link pro chamado. **Auxiliar executivo**: só as 6 supervisionadas, agrupadas por turma, ação "registrar supervisão"; sem Nova dupla. **Mentor DPP ("Minhas duplas")**: André com Ana e Caio — versão enxuta em cards (semáforo, próximo passo, pendências), sem seções de gestão. **Mentor especialista**: duplas de trilha (Ana, Pedro) com progresso x de 5 e prazo.
 
 ### materiais (hub da jornada) → `docs/mockups/materiais/v4.html` — visões: Mentorado · Mentor DPP · Coordenação · Auxiliar executivo

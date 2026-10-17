@@ -39,9 +39,10 @@ export const MOCKUP_TELAS: readonly MockupTelaDef[] = [
       "Critério nos filtros",
       "Legenda sob demanda",
       "Seções por categoria",
-      "Final · 4 visões por papel",
+      "Seções + cards (descartada — Léo preferiu v1)",
+      "Final · v1 limpa + 4 visões",
     ],
-    final: 4,
+    final: 5,
   },
   {
     id: "materiais",

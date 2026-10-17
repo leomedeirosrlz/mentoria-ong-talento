@@ -10,7 +10,7 @@ Nenhuma variante resolveu a tela sozinha. A rodada final costura os pontos forte
 |---|---|---|---|---|
 | agenda | `agenda/v6` | v3 (Minha agenda) | v5 (por mentorado, semana), v4 (grade, stepper do mural) | Coordenação · Auxiliar exec. · Mentor DPP · Especialista · Mentorado |
 | jovem-especialistas | `jovem-especialistas/v6` | v4 (trilha explícita) | v5 (ciclo de vida, sessões), v3 (card-CTA, negociação) | Mentorado · Especialista (mural) · Coordenação (só leitura) · Mentor DPP |
-| duplas | `duplas/v4` | v3 (seções por categoria) | v1 (feito×esperado), v2 (pills, recência, legenda) | Coordenação · Auxiliar exec. · Mentor DPP · Especialista |
+| duplas | `duplas/v5` | **v1 (escolha do Léo — "mais limpo")**: tabela densa + régua nos chips | v4/v3 (seções+cards — descartada), v2 (legenda, recência), e mitigações: 4 visões, ações na linha, filtros em linha, massa saudável colapsada | Coordenação · Auxiliar exec. · Mentor DPP · Especialista |
 | materiais | `materiais/v4` | v2 (jornada) | v3 ("você escreveu"), v1 (listagem) | Mentorado · Mentor DPP · Coordenação · Auxiliar exec. |
 | instrumentos (nova) | `instrumentos/v1` | — | Roda da Vida (16 eixos), Metas/PDM (≤10 metas, ~20 submetas recursivas), Visão | Mentorado · Mentor DPP · Coordenação |
 | chamados | `chamados/v4` | v3 (inbox) | v1 (master-detail), v2 (idade, status) | Coordenação · Auxiliar exec. · Mentor · Mentorado |
