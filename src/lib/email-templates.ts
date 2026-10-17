@@ -297,12 +297,18 @@ export function emailApoioJovem({
   estrelas,
   comentario,
   duplaId,
+  chamadoHref,
+  chamadoNumero,
 }: {
   jovemNome: string;
   encontroNumero: number;
   estrelas: number;
   comentario: string | null;
   duplaId: string;
+  /** 0084: quando o chamado já nasceu na mesma transação, o e-mail leva
+   *  direto na fila — senão cai na ficha da dupla como antes. */
+  chamadoHref?: string | null;
+  chamadoNumero?: string | null;
 }): string {
   const estrelasTxt =
     "★".repeat(estrelas) + "☆".repeat(Math.max(0, 5 - estrelas));
@@ -317,11 +323,66 @@ export function emailApoioJovem({
         ? `<p style="margin:8px 0 0;font-size:14px;line-height:1.55;color:${INK};">“${esc(comentario)}”</p>`
         : "") +
       `</td></tr></table>` +
-      `<p style="margin:0 0 14px;font-size:15px;line-height:1.55;color:${INK};">Combinado do programa: <strong>responder em 1 dia útil</strong>. A ficha da dupla tem a avaliação completa e o botão pra marcar o pedido como atendido.</p>`,
-    ctaLabel: "Abrir ficha da dupla",
-    ctaHref: `${SITE_URL}/duplas/${duplaId}`,
+      `<p style="margin:0 0 14px;font-size:15px;line-height:1.55;color:${INK};">Combinado do programa: <strong>responder em 1 dia útil</strong>. ${chamadoNumero ? `O chamado <strong>${esc(chamadoNumero)}</strong> já está na fila` : "A ficha da dupla tem a avaliação completa"} e o botão pra marcar o pedido como atendido.</p>`,
+    ctaLabel: chamadoHref ? "Abrir chamado" : "Abrir ficha da dupla",
+    ctaHref: chamadoHref ?? `${SITE_URL}/duplas/${duplaId}`,
     preheader: `${jovemNome} marcou "preciso de ajuda" na avaliação do encontro ${encontroNumero}.`,
     rodapeExtra:
       "Você está recebendo este e-mail porque acompanha a coordenação ou a supervisão do programa.",
+  });
+}
+
+// 0084 — chamados unificados: urgência/origem jovem avisa a equipe por
+// e-mail (o sino não é garantia pra canal de segurança) e atualização
+// pública chega ao autor também fora do app.
+
+export function emailChamadoUrgencia({
+  numero,
+  assunto,
+  categoria,
+  autorNome,
+  href,
+}: {
+  numero: string;
+  assunto: string;
+  categoria: string;
+  autorNome: string;
+  href: string;
+}): string {
+  return emailLayout({
+    titulo: `Chamado ${esc(numero)} precisa de resposta`,
+    tagline: categoria === "urgencia" ? "Pedido urgente" : "Novo pedido de apoio",
+    conteudoHtml:
+      `<p style="margin:0 0 14px;font-size:15px;line-height:1.55;color:${INK};"><strong>${esc(autorNome)}</strong> abriu o chamado <strong>${esc(numero)}</strong>${categoria === "urgencia" ? ' marcado como <strong>urgente</strong>' : ""}.</p>` +
+      `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 14px;background:${categoria === "urgencia" ? DANGER_BG : CARD_SUAVE};border-radius:10px;"><tr><td style="padding:14px 16px;font-size:15px;line-height:1.55;color:${INK};">“${esc(assunto)}”</td></tr></table>` +
+      `<p style="margin:0 0 14px;font-size:15px;line-height:1.55;color:${INK};">Combinado do programa: <strong>responder em 1 dia útil</strong>. A fila de chamados tem a conversa completa.</p>`,
+    ctaLabel: "Abrir a fila de chamados",
+    ctaHref: href,
+    preheader: `${autorNome} abriu o chamado ${numero}: ${assunto}`,
+    rodapeExtra:
+      "Você está recebendo este e-mail porque faz parte da coordenação ou supervisão do programa.",
+  });
+}
+
+export function emailChamadoAtualizacao({
+  autorNome,
+  texto,
+  href,
+}: {
+  autorNome: string;
+  texto: string;
+  href: string;
+}): string {
+  return emailLayout({
+    titulo: "Atualização no seu pedido",
+    tagline: "Chamados · Realiza",
+    conteudoHtml:
+      `<p style="margin:0 0 14px;font-size:15px;line-height:1.55;color:${INK};">Oi${autorNome ? `, ${esc(autorNome.split(" ")[0])}` : ""}! A equipe respondeu no seu pedido de apoio:</p>` +
+      `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 14px;background:${CARD_SUAVE};border-radius:10px;"><tr><td style="padding:14px 16px;font-size:15px;line-height:1.55;color:${INK};">${paragrafos(texto)}</td></tr></table>`,
+    ctaLabel: "Ver a conversa",
+    ctaHref: href,
+    preheader: `A equipe respondeu no seu pedido de apoio.`,
+    rodapeExtra:
+      "Você está recebendo este e-mail porque abriu um pedido de apoio no Realiza.",
   });
 }

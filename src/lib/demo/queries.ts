@@ -7,6 +7,8 @@ import type {
   Assinatura,
   AssinaturaResumo,
   AssinaturaVia,
+  ChamadoFilaItem,
+  ChamadoTimelineItem,
   AvaliacaoLink,
   CicloEvento,
   ColegaTurma,
@@ -1851,4 +1853,112 @@ export function demoEspecialistaAvaliacoes(
       created_at: a.created_at,
     }))
     .sort((a, b) => a.numero - b.numero);
+}
+
+// ---------- chamados unificados (0084) ----------
+
+// replica o escopo do RLS: coord vê tudo; auxiliar executivo vê tudo com
+// plataforma mascarada (restrito); mentor/especialista/jovem só os próprios
+// (autor_id ou autor_mentorado_id → nada vaza pelo dupla_id).
+export function demoChamadosFila(role: AppRole): ChamadoFilaItem[] {
+  const data = getDemoData();
+  const eu = data.personas[role];
+  const nome = (id: string | null | undefined) =>
+    (id && (data.profiles.find((p) => p.id === id)?.nome ?? null)) || null;
+  const nomeMentorado = (id: string | null | undefined) =>
+    (id && (data.mentorados.find((m) => m.id === id)?.nome ?? null)) || null;
+  const encontroNumero = (registroId: string | null, avaliacaoId: string | null) => {
+    for (const d of data.duplas) {
+      for (const e of d.encontros ?? []) {
+        if (registroId && e.registro?.id === registroId) return e.numero;
+        if (avaliacaoId && data.avaliacoes.some((a) => a.id === avaliacaoId && a.encontro_id === e.id))
+          return e.numero;
+      }
+    }
+    return null;
+  };
+  const staff = role === "coordenacao" || role === "supervisor";
+  return data.chamados
+    .filter((c) => {
+      if (staff) return true;
+      if (c.autor_id === eu.id) return true;
+      const meuMentorado = data.mentorados.find((m) => m.profile_id === eu.id);
+      return meuMentorado ? c.autor_mentorado_id === meuMentorado.id : false;
+    })
+    .map((c) => {
+      const restrito = role === "supervisor" && c.categoria === "plataforma";
+      const nEnc = encontroNumero(c.registro_id, c.avaliacao_id);
+      const mNome = c.dupla_id
+        ? (data.duplas.find((d) => d.id === c.dupla_id)?.mentorado?.nome ?? null)
+        : null;
+      const contexto = restrito
+        ? null
+        : c.registro_id
+          ? `Registro do ${nEnc}º encontro${mNome ? ` · ${mNome}` : ""}`
+          : c.avaliacao_id
+            ? `Avaliação do ${nEnc}º encontro${mNome ? ` · ${mNome}` : ""}`
+            : mNome
+              ? `Dupla de ${mNome}`
+              : null;
+      return {
+        ...(restrito
+          ? {
+              ...c,
+              assunto: null, mensagem: null, descricao_outro: null,
+              autor_id: null, autor_mentorado_id: null, dupla_id: null,
+              atribuido_a: null, resolvido_por: null, resolucao_resumo: null,
+              registro_id: null, avaliacao_id: null,
+            }
+          : c),
+        restrito,
+        autor_nome: restrito
+          ? null
+          : (nome(c.autor_id) ?? nomeMentorado(c.autor_mentorado_id)),
+        autor_papel: c.autor_id
+          ? (data.profiles.find((p) => p.id === c.autor_id)?.role ?? null)
+          : "mentorado",
+        atribuido_nome: restrito ? null : nome(c.atribuido_a),
+        contexto,
+      } as ChamadoFilaItem;
+    })
+    .sort((a, b) => {
+      const ord = { aberto: 0, em_atendimento: 1, resolvido: 2 } as const;
+      const d = ord[a.status] - ord[b.status];
+      return d !== 0 ? d : b.created_at.localeCompare(a.created_at);
+    });
+}
+
+export function demoChamadoTimeline(
+  chamadoId: string,
+  staff: boolean
+): ChamadoTimelineItem[] {
+  const data = getDemoData();
+  const nome = (id: string | null | undefined) =>
+    (id && (data.profiles.find((p) => p.id === id)?.nome ?? null)) || null;
+  const out: ChamadoTimelineItem[] = data.chamadoAtualizacoes
+    .filter((u) => u.chamado_id === chamadoId)
+    .map((u) => ({
+      tipo: u.tipo,
+      item: { ...u, autor_nome: nome(u.autor_id) },
+    }));
+  if (staff) {
+    for (const c of data.chamadoComentarios.filter(
+      (x) => x.chamado_id === chamadoId
+    )) {
+      out.push({ tipo: "interno", item: { ...c, autor_nome: nome(c.autor_id) } });
+    }
+  }
+  for (const a of data.chamadoAnexos.filter(
+    (x) => x.chamado_id === chamadoId && (!x.interno || staff)
+  )) {
+    out.push({ tipo: "anexo", item: { ...a, autor_nome: nome(a.created_by) } });
+  }
+  return out.sort((a, b) => a.item.created_at.localeCompare(b.item.created_at));
+}
+
+export function demoChamadosSemDono(role: AppRole): number {
+  if (role !== "coordenacao" && role !== "supervisor") return 0;
+  return demoChamadosFila(role).filter(
+    (c) => c.status === "aberto" && !c.atribuido_a && !c.restrito
+  ).length;
 }

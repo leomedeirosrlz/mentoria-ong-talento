@@ -84,8 +84,8 @@ export const MOCKUP_TELAS: readonly MockupTelaDef[] = [
     id: "chamados",
     label: "Chamados",
     descricao: "Fila + thread da coordenação (tela nova)",
-    // sem rota real ainda — entrada só pelo catálogo do popover da DemoBar
-    rotas: [],
+    // /chamados existe (0084) — o switcher da variante abre dentro da tela
+    rotas: ["/chamados"],
     variantes: [
       "Duas colunas",
       "Board por status",

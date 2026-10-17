@@ -2706,10 +2706,8 @@ export async function salvarRegistro(formData: FormData) {
   // update preserva created_by de quem registrou primeiro; insert marca o autor
   const { data: regExistente } = await supabase
     .from("registros").select("id, precisa_apoio").eq("encontro_id", encontro_id).maybeSingle();
-  // pedido de apoio novo nessa gravação dispara aviso pra coordenação —
-  // edição que mantém o flag não repete a notificação
-  const novoApoio =
-    !regExistente?.precisa_apoio && formData.get("precisa_apoio") === "on";
+  // 0084: flag ligada abre o chamado pelo trigger registros_apoio_chamado_sync
+  // (que já notifica a equipe com chamado_aberto) — nada de pedido_apoio aqui
   const payload = {
     tema: String(formData.get("tema") ?? "").trim() || null,
     ferramenta: String(formData.get("ferramenta") ?? "").trim() || null,
@@ -2810,32 +2808,6 @@ export async function salvarRegistro(formData: FormData) {
         aviso = `Só ${concluidos} de ${concluirIds.length} combinados foram marcados como feitos. Confira a lista de combinados.`;
       }
     }
-  }
-
-  if (novoApoio) {
-    // coordenação toda + o supervisor dessa dupla (não todos os supervisores)
-    const [{ data: equipe }, { data: dApoio }] = await Promise.all([
-      supabase.from("profiles").select("id").eq("role", "coordenacao").eq("ativo", true),
-      supabase
-        .from("duplas")
-        .select("supervisor_id, mentorado:mentorados!mentorado_id(nome)")
-        .eq("id", dupla_id).single(),
-    ]);
-    const mdJoin = dApoio?.mentorado as unknown;
-    const nomeMd = Array.isArray(mdJoin)
-      ? (mdJoin[0] as { nome?: string } | undefined)?.nome
-      : (mdJoin as { nome?: string } | null | undefined)?.nome;
-    await notificar(supabase, [
-      ...(equipe ?? []).map((p) => p.id),
-      dApoio?.supervisor_id,
-    ].map((pid) => ({
-      profile_id: pid,
-      tipo: "pedido_apoio",
-      titulo: "Pedido de apoio",
-      corpo: `${eu.nome} sinalizou no registro do ${encDb.numero}º encontro${nomeMd ? ` · dupla com ${nomeMd}` : ""}.`,
-      // deep-link direto no card do registro que pediu apoio
-      href: `/duplas/${dupla_id}#registrar-${encontro_id}`,
-    })), eu.id);
   }
 
   revalidatePath("/");
@@ -3028,86 +3000,59 @@ export async function excluirEncaminhamento(id: string, duplaId: string) {
   return { ok: true };
 }
 
+/** "Marcar como atendido" no card do registro — 0084: resolve o chamado do
+ *  flag e limpa a flag na MESMA transação (resolver_chamado_por_origem); a
+ *  notificação chamado_resolvido pro autor sai da RPC. */
 export async function resolverApoio(registroId: string, duplaId: string) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada. Entre de novo." };
-  const { data, error } = await supabase
-    .from("registros")
-    .update({ precisa_apoio: false })
-    .eq("id", registroId)
-    .select("id, created_by");
-  if (error) return { error: erroAmigavel(error) };
-  if (!data?.length) {
-    return { error: "Não foi possível concluir. Recarregue a página e tente de novo." };
+  const { error } = await supabase.rpc("resolver_chamado_por_origem", {
+    p_registro_id: registroId,
+    p_avaliacao_id: null,
+    p_resumo: null,
+  });
+  if (error) {
+    return {
+      error:
+        error.code === "P0001" && error.message
+          ? error.message
+          : erroAmigavel(error),
+    };
   }
-  // o mentor fica sabendo que o pedido foi visto — fecha o ciclo do pedido
-  const { data: dApoio } = await supabase
-    .from("duplas").select("mentor_id").eq("id", duplaId).single();
-  await notificar(supabase, [{
-    profile_id: data[0].created_by ?? dApoio?.mentor_id,
-    tipo: "apoio_resolvido",
-    titulo: "Pedido de apoio atendido",
-    corpo: "A coordenação marcou seu pedido como atendido.",
-    href: `/duplas/${duplaId}`,
-  }], eu.id);
   revalidatePath("/");
   revalidatePath("/duplas");
   revalidatePath("/registros");
+  revalidatePath("/chamados");
   revalidatePath(`/duplas/${duplaId}`);
   return { ok: true };
 }
 
-/** Pedido de apoio fora do registro — o mentor não precisa esperar o
- *  follow-up pra sinalizar. A notificação É o registro do pedido: o
- *  notificacoes_insert (0041) permite não-coord → staff só nesse tipo, e a
- *  fila de pendentes é o sino da coordenação (não-lida = não atendida). */
+/** Pedido de apoio fora do registro — 0084: virou chamado manual. O dialog
+ *  novo (NovoChamadoDialog) chama abrirChamado direto; este wrapper cobre o
+ *  caminho legado com categoria fixa 'outro'. */
 export async function pedirApoio(duplaId: string, mensagem: string) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada. Entre de novo." };
-
-  const { data: d, error: dErr } = await supabase
-    .from("duplas")
-    .select("mentor_id, status, supervisor_id, mentorado:mentorados!mentorado_id(nome)")
-    .eq("id", duplaId)
-    .maybeSingle();
-  if (dErr) return { error: erroAmigavel(dErr) };
-  if (!d || d.mentor_id !== eu.id) {
-    return { error: "O pedido de apoio é do mentor da dupla." };
+  const texto = mensagem.trim();
+  const { error } = await supabase.rpc("abrir_chamado", {
+    p_categoria: "outro",
+    p_descricao_outro: "Pedido de apoio fora do registro",
+    p_assunto: texto.slice(0, 180) || "Pedido de apoio",
+    p_mensagem: texto || null,
+    p_dupla_id: duplaId,
+  });
+  if (error) {
+    return {
+      error:
+        error.code === "P0001" && error.message
+          ? error.message
+          : erroAmigavel(error),
+    };
   }
-  if (d.status !== "ativa" && d.status !== "pausada") {
-    return { error: "Essa dupla não está em curso." };
-  }
-
-  const texto = mensagem.trim().slice(0, 500) || null;
-  const { data: equipe } = await supabase
-    .from("profiles")
-    .select("id")
-    .eq("role", "coordenacao")
-    .eq("ativo", true);
-  const mdJoin = d.mentorado as unknown;
-  const nomeMd = Array.isArray(mdJoin)
-    ? (mdJoin[0] as { nome?: string } | undefined)?.nome
-    : (mdJoin as { nome?: string } | null | undefined)?.nome;
-  const destinos = new Set(
-    [...(equipe ?? []).map((p) => p.id), d.supervisor_id].filter(
-      (pid): pid is string => Boolean(pid) && pid !== eu.id
-    )
-  );
-  await notificar(
-    supabase,
-    [...destinos].map((pid) => ({
-      profile_id: pid,
-      tipo: "pedido_apoio",
-      titulo: "Pedido de apoio",
-      corpo:
-        `${eu.nome} pediu apoio${nomeMd ? ` · dupla com ${nomeMd}` : ""}` +
-        (texto ? `: "${texto}"` : "."),
-      href: `/duplas/${duplaId}`,
-    })),
-    eu.id
-  );
+  revalidatePath("/chamados");
+  revalidatePath(`/duplas/${duplaId}`);
   return { ok: true };
 }
 
@@ -3143,11 +3088,9 @@ export async function marcarCombinadoFeito(id: string, feito: boolean) {
   return { ok: true };
 }
 
-/** "Preciso de ajuda" do jovem — standalone, sem depender de encontro nem
- *  avaliação. A notificação É o registro (mesmo desenho do pedido de apoio
- *  do mentor): vai pra coordenação e pros adultos das próprias duplas — a
- *  policy (0069) valida cada destinatário contra a view jovem_contatos, que
- *  é a mesma fonte lida aqui. Sem dupla ativa, a coordenação segue na lista. */
+/** "Preciso de ajuda" do jovem — 0084: o dialog novo chama abrirChamado
+ *  (NovoChamadoDialog, papel mentorado → opções na linguagem dele). Fica o
+ *  wrapper por compat: mensagem solta vira chamado de urgência. */
 export async function pedirAjudaJovem(mensagem: string) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
@@ -3155,39 +3098,24 @@ export async function pedirAjudaJovem(mensagem: string) {
   if (eu.role !== "mentorado") {
     return { error: "Essa ação é do mentorado." };
   }
-  // destinatários = os adultos que o jovem vê (coord + mentor/supervisor das
-  // duplas dele); a ficha /pessoas/[mentorado.id] é o destino útil do lado de
-  // quem atende — o id vem da própria view, nunca de uma base-table
-  const [{ data: contatos, error: cErr }, { data: perfil, error: pErr }] =
-    await Promise.all([
-      supabase.from("jovem_contatos").select("id, papel"),
-      supabase.from("jovem_perfil").select("id").maybeSingle(),
-    ]);
-  if (cErr) return { error: erroAmigavel(cErr) };
-  if (pErr) return { error: erroAmigavel(pErr) };
-  const destinos = [...new Set((contatos ?? []).map((c) => c.id))].filter(
-    (pid): pid is string => Boolean(pid) && pid !== eu.id
-  );
-  if (!destinos.length) {
+  const texto = mensagem.trim();
+  const { error } = await supabase.rpc("abrir_chamado", {
+    p_categoria: "urgencia",
+    p_assunto: texto.slice(0, 180) || "Preciso de ajuda",
+    p_mensagem: texto || null,
+    p_descricao_outro: null,
+    p_dupla_id: null,
+  });
+  if (error) {
     return {
       error:
-        "Ainda não encontramos a equipe pra avisar. Se for urgente, chame a coordenação pelo WhatsApp.",
+        error.code === "P0001" && error.message
+          ? error.message
+          : erroAmigavel(error),
     };
   }
-  const texto = mensagem.trim().slice(0, 500) || null;
-  const { error } = await supabase.from("notificacoes").insert(
-    destinos.map((pid) => ({
-      profile_id: pid,
-      tipo: "pedido_apoio",
-      titulo: "Pedido de ajuda",
-      corpo: `${eu.nome} (mentorado) pediu ajuda${texto ? `: "${texto}"` : "."}`,
-      // href staff-side: a ficha do jovem em /pessoas — quem atende (coord
-      // e supervisor) tem acesso a ela; /jovem seria do próprio jovem
-      href: perfil?.id ? `/pessoas/${perfil.id}` : null,
-      created_by: eu.id,
-    }))
-  );
-  if (error) return { error: erroAmigavel(error) };
+  revalidatePath("/jovem");
+  revalidatePath("/jovem/perfil");
   return { ok: true };
 }
 

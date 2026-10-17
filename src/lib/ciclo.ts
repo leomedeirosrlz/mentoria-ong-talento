@@ -1,4 +1,6 @@
 import type {
+  ChamadoCategoria,
+  ChamadoStatus,
   CicloEvento,
   CorRaca,
   Cronograma,
@@ -1805,3 +1807,27 @@ export function tempoRelativo(iso: string, agoraMs: number): string {
   if (d < 7) return `há ${d} d`;
   return formatDate(iso);
 }
+
+// ---------- chamados (0084) ----------
+// Labels moram aqui (módulo puro, sem next/headers) porque quem renderiza
+// é client component — queries-chamados é server-only.
+
+export const CHAMADO_CATEGORIA_LABEL: Record<ChamadoCategoria, string> = {
+  agenda: "Agenda",
+  metodologia: "Metodologia",
+  plataforma: "Plataforma",
+  urgencia: "Urgência",
+  outro: "Outro",
+};
+
+export const CHAMADO_STATUS_LABEL: Record<ChamadoStatus, string> = {
+  aberto: "Aberto",
+  em_atendimento: "Em atendimento",
+  resolvido: "Resolvido",
+};
+
+export const CHAMADO_ORIGEM_LABEL: Record<string, string> = {
+  manual: "Manual",
+  registro: "Registro de encontro",
+  avaliacao_jovem: "Avaliação do jovem",
+};

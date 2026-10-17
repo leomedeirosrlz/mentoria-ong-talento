@@ -79,10 +79,15 @@ test.describe("mentorado — shell /jovem", () => {
       { status: "pendente" }
     );
     // pedidos de ajuda do spec — cada destinatário (incl. coords reais do
-    // staging) sai junto pelo created_by
+    // staging) sai junto pelo created_by; o chamado aberto pelo dialog e
+    // a trilha pública dele vão em cascata
     await limparViaServiceRole(
       "notificacoes",
       `created_by=eq.${IDS.jovemProfile}`
+    );
+    await limparViaServiceRole(
+      "chamados",
+      `autor_id=eq.${IDS.jovemProfile}`
     );
   });
 
@@ -170,28 +175,47 @@ test.describe("mentorado — shell /jovem", () => {
     ).toBeChecked();
   });
 
-  test("pedir ajuda notifica os adultos de verdade", async ({ page }) => {
+  test("pedir ajuda abre chamado e avisa a equipe — nunca o mentor", async ({
+    page,
+  }) => {
     await page.goto("/jovem");
     await page.getByRole("button", { name: "Pedir ajuda" }).click();
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
+    // 0084: o canal de segurança é um chamado — opção na linguagem dele
     await dialog
-      .locator("#ajuda-mensagem")
+      .getByRole("button", { name: /Com meu mentor/ })
+      .click();
+    await dialog
+      .locator("#chamado-assunto")
+      .fill("E2E: preciso falar com alguém da equipe");
+    await dialog
+      .locator("#chamado-mensagem")
       .fill("E2E: preciso falar com meu mentor");
     await dialog.getByRole("button", { name: "Enviar pedido" }).click();
 
     await expect(page.getByText(/equipe foi avisada/)).toBeVisible();
     await expect(dialog).not.toBeVisible();
 
-    // write real: uma notificação pedido_apoio por adulto da view
-    // jovem_contatos — o mentor da dupla e a coordenação têm que constar
+    // write real: o chamado existe com o jovem como autor (a equipe vê
+    // quem pediu — é canal de segurança, não anônimo)
+    const [chamado] = await buscarViaServiceRole<
+      { id: string; numero: string; autor_id: string }[]
+    >(
+      "chamados",
+      `select=id,numero,autor_id&autor_id=eq.${IDS.jovemProfile}&order=created_at.desc&limit=1`
+    );
+    expect(chamado.numero).toMatch(/^CHA-\d{6}$/);
+
+    // a equipe foi avisada no sino — o mentor da dupla NÃO entra na lista:
+    // o pedido pode ser justamente sobre ele (privacidade do canal)
     const rows = await buscarViaServiceRole<{ profile_id: string }[]>(
       "notificacoes",
-      `select=profile_id&created_by=eq.${IDS.jovemProfile}&tipo=eq.pedido_apoio`
+      `select=profile_id&tipo=eq.chamado_aberto&href=eq./chamados%3Fc%3D${chamado.id}`
     );
     const destinos = rows.map((r) => r.profile_id);
-    expect(destinos).toContain(IDS.mentorProfile);
     expect(destinos).toContain(IDS.coordProfile);
+    expect(destinos).not.toContain(IDS.mentorProfile);
   });
 
   test("agenda lista o encontro futuro", async ({ page }) => {
