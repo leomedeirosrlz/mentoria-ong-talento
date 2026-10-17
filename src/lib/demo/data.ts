@@ -74,58 +74,6 @@ export type ProfilePapel = {
   criado_em?: string;
 };
 
-export type ChamadoCategoria =
-  | "agenda"
-  | "metodologia"
-  | "plataforma"
-  | "urgencia"
-  | "outro";
-export type ChamadoStatus = "aberto" | "em_atendimento" | "resolvido";
-/** 'manual' cobre os botões soltos do mentor e do jovem (D4). */
-export type ChamadoOrigem = "manual" | "registro" | "avaliacao_jovem";
-
-/** `chamados` (WP1 · REALIZA-127+) — o ticket unificado de apoio. */
-export type DemoChamado = {
-  id: string;
-  /** Serial do protocolo — a UI exibe "CHA-000143". */
-  numero: number;
-  categoria: ChamadoCategoria;
-  assunto: string;
-  /** CHECK do plano: obrigatória quando categoria='outro'. */
-  descricao_outro: string | null;
-  status: ChamadoStatus;
-  origem: ChamadoOrigem;
-  autor_id: string;
-  dupla_id: string | null;
-  /** O "dono" do ticket — null enquanto ninguém assumiu. */
-  atribuido_a: string | null;
-  /** Chaves de dedup do backfill dos flags (D4/0084). */
-  registro_id: string | null;
-  encontro_id: string | null;
-  created_at: string;
-  resolvido_em: string | null;
-};
-
-/** `chamado_comentarios` — conversa INTERNA da equipe; o autor nunca lê. */
-export type DemoChamadoComentario = {
-  id: string;
-  chamado_id: string;
-  autor_id: string;
-  corpo: string;
-  interno: boolean;
-  created_at: string;
-};
-
-/** `chamado_atualizacoes` — timeline pública de andamento (o autor vê). */
-export type DemoChamadoAtualizacao = {
-  id: string;
-  chamado_id: string;
-  autor_id: string;
-  descricao: string;
-  status_opcional: string | null;
-  created_at: string;
-};
-
 /** `devolutivas` (WP6) — feed datado por trilha; a última entrega continua
  *  sendo a que marca o encerramento (devolutiva_pdm vira projeção dela). */
 export type DemoDevolutiva = {
@@ -154,11 +102,6 @@ export type DemoData = {
   /** Papel por programa (WP0b · REALIZA-105) — `profiles.role` segue como
    *  primário de compatibilidade enquanto a migration não sai. */
   profilePapeis: ProfilePapel[];
-  /** Ticket unificado de apoio (WP1 · REALIZA-127+) + conversa interna +
-   *  timeline pública de andamento. */
-  chamados: DemoChamado[];
-  chamadoComentarios: DemoChamadoComentario[];
-  chamadoAtualizacoes: DemoChamadoAtualizacao[];
   /** Feed datado de devolutivas por trilha (WP6). */
   devolutivas: DemoDevolutiva[];
   materiais: Material[];
@@ -199,8 +142,9 @@ const uid = (n: number): string =>
 // assinatura: 34xx · presencas: 36xx · supervisoes: 38xx ·
 // avaliacao_links: 42xx · avaliacoes_encontro: 44xx ·
 // documentos_pessoa: 46xx · cronogramas: 50xx · especialista_grade: 52xx ·
-// especialista_excecoes: 54xx · chamados: 58xx · chamado_comentarios: 60xx ·
-// chamado_atualizacoes: 62xx · devolutivas: 64xx. user_id fake: f0xx.
+// especialista_excecoes: 54xx · chamados: 58xx · chamado_atualizacoes: 60xx ·
+// chamado_comentarios: 62xx · chamado_anexos: 64xx · devolutivas: 66xx.
+// user_id fake: f0xx.
 // especialista_eventos e profile_papeis não tem id.
 const P = {
   marina: 0x0001, // persona coordenação
@@ -2592,100 +2536,6 @@ function build(): DemoData {
 
   const duplas = [duplaOk, duplaPend, duplaRisco, duplaAtraso, duplaFim, duplaEsp1, duplaEsp2, duplaEsp3, duplaEsp4, duplaPausa, duplaT2a, duplaT2b];
 
-  // ---------- chamados (WP1 · REALIZA-127+) ----------
-  // Fila unificada de apoio no espírito do mock v4 (docs/mockups/chamados):
-  // um aberto do jovem (outro), uma urgência de mentor DPP ainda sem dono e
-  // um em atendimento com o auxiliar assumido. Sem página consumidora hoje —
-  // o dataset espera a superfície; enquanto isso cobre o stub do client.
-  const chamados: DemoChamado[] = [
-    {
-      id: uid(0x5801),
-      numero: 143,
-      categoria: "urgencia",
-      assunto:
-        "Preciso de apoio — o Pedro faltou aos últimos dois encontros e a família não responde",
-      descricao_outro: null,
-      status: "aberto",
-      origem: "manual",
-      autor_id: andre.id,
-      dupla_id: duplaPausa.id,
-      atribuido_a: null, // ainda na fila — ninguém assumiu
-      registro_id: null,
-      encontro_id: null,
-      created_at: haDias(1, "20:10"),
-      resolvido_em: null,
-    },
-    {
-      id: uid(0x5802),
-      numero: 139,
-      categoria: "metodologia",
-      assunto:
-        "Como registrar sessão de trilha quando o jovem avisa que não pode em cima da hora?",
-      descricao_outro: null,
-      status: "em_atendimento",
-      origem: "manual",
-      autor_id: helena.id,
-      dupla_id: duplaEsp2.id,
-      atribuido_a: beatriz.id, // a auxiliar assumiu — é o dono do ticket
-      registro_id: null,
-      encontro_id: null,
-      created_at: haDias(4, "11:30"),
-      resolvido_em: null,
-    },
-    {
-      id: uid(0x5803),
-      numero: 137,
-      categoria: "outro",
-      assunto: "Meu sobrenome está errado no cadastro",
-      descricao_outro:
-        "Está como “Silva Santos” e o certo é só “Silva” — dá pra corrigir?",
-      status: "aberto",
-      origem: "manual",
-      autor_id: anaLogin.id,
-      dupla_id: duplaOk.id,
-      atribuido_a: null,
-      registro_id: null,
-      encontro_id: null,
-      created_at: haDias(3, "10:05"),
-      resolvido_em: null,
-    },
-  ];
-
-  // Conversa INTERNA da equipe + timeline pública do chamado em atendimento
-  // — o par das duas visões que o wp1 desenha no detalhe do ticket.
-  const chamadoComentarios: DemoChamadoComentario[] = [
-    {
-      id: uid(0x6001),
-      chamado_id: uid(0x5802),
-      autor_id: beatriz.id,
-      corpo:
-        "Pelo guia, aviso com menos de 24h conta como “não aconteceu” sem penalidade — confirmar com a Marina se a sessão é reposta dentro do prazo da trilha.",
-      interno: true,
-      created_at: haDias(4, "14:05"),
-    },
-    {
-      id: uid(0x6002),
-      chamado_id: uid(0x5801),
-      autor_id: marina.id,
-      corpo:
-        "Vou ligar pra mãe do Pedro amanhã cedo. Se for o caso, a trilha segue pausada até a família responder — o André já sabe.",
-      interno: true,
-      created_at: haDias(1, "21:00"),
-    },
-  ];
-
-  const chamadoAtualizacoes: DemoChamadoAtualizacao[] = [
-    {
-      id: uid(0x6201),
-      chamado_id: uid(0x5802),
-      autor_id: beatriz.id,
-      descricao:
-        "Helena, registre como “não aconteceu” informando o motivo e proponha um novo horário dentro da sua grade — a sessão não é descontada das 5 da trilha.",
-      status_opcional: null,
-      created_at: haDias(1, "10:15"),
-    },
-  ];
-
   // ---------- devolutivas (WP6) ----------
   // Feed datado por trilha — a última entrega continua sendo o que marca a
   // conclusão (a devolutiva_pdm da dupla vira projeção desse feed). A trilha
@@ -2693,7 +2543,7 @@ function build(): DemoData {
   // Bia mostra o feed em andamento.
   const devolutivas: DemoDevolutiva[] = [
     {
-      id: uid(0x6401),
+      id: uid(0x6601),
       dupla_id: duplaEsp4.id,
       autor_id: helena.id,
       texto:
@@ -2701,14 +2551,14 @@ function build(): DemoData {
       created_at: haDias(16, "20:30"),
     },
     {
-      id: uid(0x6402),
+      id: uid(0x6602),
       dupla_id: duplaEsp4.id,
       autor_id: helena.id,
       texto: duplaEsp4.devolutiva_pdm ?? "",
       created_at: haDias(5, "19:00"),
     },
     {
-      id: uid(0x6403),
+      id: uid(0x6603),
       dupla_id: duplaEsp1.id,
       autor_id: sofia.id,
       texto:
@@ -3637,9 +3487,6 @@ function build(): DemoData {
     especialistaGrade,
     especialistaExcecoes,
     profilePapeis,
-    chamados,
-    chamadoComentarios,
-    chamadoAtualizacoes,
     devolutivas,
     materiais,
     comunicados,
