@@ -129,3 +129,27 @@ test("mentorado: card → wizard do 1º acesso → home do /jovem, e volta pra s
     page.getByRole("button", { name: "Controles da demonstração" })
   ).toContainText("Coordenação");
 });
+
+test("stub demo: tabelas da rodada têm dataset (sem aviso no console)", async ({
+  page,
+}) => {
+  // Quando uma superfície consulta uma tabela sem caso em linhas(), o stub
+  // devolve [] e avisa `[demo] tabela "X" consultada sem dataset` UMA vez.
+  // As tabelas das telas finais já têm dataset — este teste é o guardrail:
+  // quando /chamados (ou a superfície de papeis/devolutivas) entrar, uma
+  // regressão do caso em linhas() falha aqui em vez de renderizar vazio.
+  const avisos: string[] = [];
+  page.on("console", (msg) => {
+    if (
+      msg.type() === "warning" &&
+      /\[demo\] tabela "(chamados|chamado_comentarios|chamado_atualizacoes|devolutivas|profile_papeis)"/.test(
+        msg.text()
+      )
+    )
+      avisos.push(msg.text());
+  });
+  await entrarNaDemo(page, "coordenacao");
+  await page.goto("/");
+  await page.goto("/agenda");
+  expect(avisos).toEqual([]);
+});

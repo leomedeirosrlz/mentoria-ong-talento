@@ -89,6 +89,18 @@ const porNome = (a: { nome: string }, b: { nome: string }) =>
 const criadoEm = (d: Dupla) =>
   (d as Dupla & { created_at?: string }).created_at ?? d.iniciada_em ?? "";
 
+/** Papéis efetivos da pessoa (WP0b · REALIZA-105): as linhas de
+ *  profile_papeis dela — o backfill garante uma por role e o híbrido
+ *  carrega duas. Sem linha na tabela, cai no profiles.role (estado
+ *  pré-migration); é o que o has_papel real fará quando a tabela sair. */
+function papeisDe(data: DemoData, profile: Profile): AppRole[] {
+  const linhas = data.profilePapeis.filter((r) => r.profile_id === profile.id);
+  if (linhas.length === 0) return profile.role ? [profile.role] : [];
+  return [...new Set(linhas.map((r) => r.papel))];
+}
+const temPapel = (data: DemoData, p: Profile, papel: AppRole) =>
+  papeisDe(data, p).includes(papel);
+
 /** Escopo de vínculo do papel — o mesmo das policies duplas_select: coord
  *  tudo; supervisor as supervisionadas; mentor/especialista as mentoradas. */
 function duplasDoPapel(data: DemoData, role: AppRole): Dupla[] {
@@ -359,13 +371,18 @@ export function demoSlotsLivres(profileId: string, dias = 21): string[] {
 /** Policy materiais_select (0065): 'todos' alcança qualquer papel — inclusive
  *  o mentorado; 'dpp'/'especialista' só o papel homônimo; coordenação vê tudo. */
 export function demoMateriais(role: AppRole): Material[] {
-  return getDemoData()
-    .materiais.filter(
+  const data = getDemoData();
+  const eu = data.personas[role];
+  return data.materiais
+    .filter(
       (m) =>
         m.audiencia === "todos" ||
         role === "coordenacao" ||
-        (m.audiencia === "dpp" && role === "mentor_dpp") ||
-        (m.audiencia === "especialista" && role === "mentor_especialista")
+        // papeis (WP0b) em vez do role do cookie: o híbrido recebe a
+        // audiência dos dois lados — "as duas superfícies" do papel multi
+        (m.audiencia === "dpp" && temPapel(data, eu, "mentor_dpp")) ||
+        (m.audiencia === "especialista" &&
+          temPapel(data, eu, "mentor_especialista"))
     )
     .sort((a, b) => a.ordem - b.ordem);
 }
@@ -574,7 +591,10 @@ export function demoPessoaPerfil(
     // conta de jovem fora da dupla do papel — profiles_select (0076) nega a
     // linha inteira e a página cai em notFound, como na real
     if (!jovemProfileVisivel(data, role, p)) return null;
-    const ehMentor = p.role === "mentor_dpp" || p.role === "mentor_especialista";
+    // papéis (WP0b) em vez do role primário: o híbrido é "mentor" pelos dois
+    // lados — DPP de uma dupla E especialista com trilha (ou grade aberta)
+    const ehMentor =
+      temPapel(data, p, "mentor_dpp") || temPapel(data, p, "mentor_especialista");
     return {
       tipo: "profile",
       pessoa: role === "coordenacao" ? comContato(p, contatos) : semPessoal(comContato(p, contatos)),
@@ -655,12 +675,16 @@ export function demoNotificacoes(
  *  coord vê tudo (inclusive 'coordenacao' e 'equipe'); 'dpp'/'especialista'
  *  por trilha; 'equipe' chega aos supervisores. */
 export function demoComunicados(role: AppRole): Comunicado[] {
+  const data = getDemoData();
+  const eu = data.personas[role];
   const visivel = (c: Comunicado) =>
     c.audiencia === "todos" ||
     role === "coordenacao" ||
-    (c.audiencia === "dpp" && role === "mentor_dpp") ||
-    (c.audiencia === "especialista" && role === "mentor_especialista") ||
-    (c.audiencia === "equipe" && role === "supervisor");
+    // papeis (WP0b) — o híbrido recebe a audiência dos dois lados
+    (c.audiencia === "dpp" && temPapel(data, eu, "mentor_dpp")) ||
+    (c.audiencia === "especialista" &&
+      temPapel(data, eu, "mentor_especialista")) ||
+    (c.audiencia === "equipe" && temPapel(data, eu, "supervisor"));
   // espelha prioridade_ord da coluna gerada (0055): prioridade antes de
   // recência, urgente antigo ganha o top-5 de informativo novo
   const ord: Record<Comunicado["prioridade"], number> = {
@@ -668,8 +692,8 @@ export function demoComunicados(role: AppRole): Comunicado[] {
     importante: 1,
     normal: 2,
   };
-  return getDemoData()
-    .comunicados.filter(visivel)
+  return data.comunicados
+    .filter(visivel)
     .sort(
       (a, b) =>
         ord[a.prioridade] - ord[b.prioridade] ||
@@ -1118,15 +1142,6 @@ export function demoSolicitacoesVisiveis(
   let lista: SolicitacaoEspecialista[];
   if (role === "coordenacao") {
     lista = data.solicitacoes;
-  } else if (role === "mentor_especialista") {
-    lista = data.solicitacoes.filter(
-      (s) =>
-        ((s.status === "aberta" || s.status === "contra_proposta") &&
-          (s.especialista_desejado_id == null ||
-            s.especialista_desejado_id === eu.id)) ||
-        s.especialista_id === eu.id ||
-        s.created_by === eu.id
-    );
   } else if (role === "mentorado") {
     // a policy compara mentorado_id com my_mentorado_id() — a ficha do
     // mentorado, não o profile dele
@@ -1148,10 +1163,28 @@ export function demoSolicitacoesVisiveis(
         desejado: null,
       }));
   } else {
+    // Escopo das duplas do papel + o mural quando a persona carrega papel de
+    // especialista (WP0b): pro especialista puro a parte de duplas não casa
+    // (trilha nunca é dupla_dpp_id) e o mural dá a mesma lista de antes; pro
+    // híbrido a união materializa as "duas superfícies" do papel multi.
     const ids = new Set(duplasDoPapel(data, role).map((d) => d.id));
     lista = data.solicitacoes.filter(
       (s) => s.dupla_dpp_id != null && ids.has(s.dupla_dpp_id)
     );
+    if (temPapel(data, eu, "mentor_especialista")) {
+      const vistos = new Set(lista.map((s) => s.id));
+      for (const s of data.solicitacoes) {
+        if (vistos.has(s.id)) continue;
+        if (
+          ((s.status === "aberta" || s.status === "contra_proposta") &&
+            (s.especialista_desejado_id == null ||
+              s.especialista_desejado_id === eu.id)) ||
+          s.especialista_id === eu.id ||
+          s.created_by === eu.id
+        )
+          lista.push(s);
+      }
+    }
   }
   return lista
     .map(comEfetivo)
@@ -1210,25 +1243,40 @@ export function demoEncontrosPorDuplas(
     }));
 }
 
-/** Especialistas ativos — pro select "direcionar a um especialista" do dialog. */
+/** Especialistas ativos — pro select "direcionar a um especialista" do dialog.
+ *  Filtra por profile_papeis (WP0b): o híbrido DPP+especialista entra aqui
+ *  sem que o role primário mude. */
 export function demoEspecialistas(): {
   id: string;
   nome: string;
   areas: string[] | null;
 }[] {
-  return getDemoData()
-    .profiles.filter((p) => p.role === "mentor_especialista" && p.ativo)
+  const data = getDemoData();
+  return data.profiles
+    .filter((p) => temPapel(data, p, "mentor_especialista") && p.ativo)
     .map((p) => ({ id: p.id, nome: p.nome, areas: p.areas ?? null }))
     .sort(porNome);
 }
 
 /** O catálogo da view jovem_especialistas (0075) — os especialistas ativos,
  *  projetados no que o jovem pode ver (nome/social/avatar/áreas, sem contato).
- *  Só faz sentido pro papel mentorado. */
+ *  Só faz sentido pro papel mentorado. Filtra por profile_papeis (o híbrido
+ *  aparece); a decisão D9 do guia tira o próprio DPP do jovem do catálogo. */
 export function demoJovemEspecialistas(role: AppRole): JovemEspecialista[] {
   if (role !== "mentorado") return [];
-  return getDemoData()
-    .profiles.filter((p) => p.role === "mentor_especialista" && p.ativo)
+  const data = getDemoData();
+  const m = mentoradoDaPersona(data, role);
+  const meuDppId = data.duplas.find(
+    (d) =>
+      d.mentorado?.id === m?.id && d.trilha === "dpp" && d.status === "ativa"
+  )?.mentor?.id;
+  return data.profiles
+    .filter(
+      (p) =>
+        temPapel(data, p, "mentor_especialista") &&
+        p.ativo &&
+        p.id !== meuDppId
+    )
     .map((p) => ({
       id: p.id,
       nome: p.nome,
