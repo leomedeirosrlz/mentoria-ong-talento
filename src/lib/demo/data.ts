@@ -27,6 +27,10 @@ import type {
   AvaliacaoEncontro,
   AvaliacaoJovem,
   AvaliacaoLink,
+  Chamado,
+  ChamadoAnexo,
+  ChamadoAtualizacao,
+  ChamadoComentario,
   CicloEvento,
   Comunicado,
   Cronograma,
@@ -76,6 +80,11 @@ export type DemoData = {
   solicitacaoPropostas: SolicitacaoProposta[];
   pessoaNotas: PessoaNota[];
   interacoes: Interacao[];
+  /** 0084 — chamados unificados: a fila + trilha pública + internos. */
+  chamados: Chamado[];
+  chamadoAtualizacoes: ChamadoAtualizacao[];
+  chamadoComentarios: ChamadoComentario[];
+  chamadoAnexos: ChamadoAnexo[];
   notificacoes: Record<AppRole, Notificacao[]>;
   documentoTemplates: DocumentoTemplate[];
   assinaturas: Assinatura[];
@@ -2689,14 +2698,16 @@ function build(): DemoData {
         created_at: haDias(1, "09:00"),
       },
       {
+        // 0084: a flag do registro da Fernanda abriu o CHA-000141 — o sino
+        // aponta pro chamado, não mais pra ficha da dupla
         id: uid(0x3002),
-        tipo: "pedido_apoio",
-        titulo: "Pedido de apoio · Fernanda & Dandara",
+        tipo: "chamado_aberto",
+        titulo: "Chamado CHA-000141 aberto",
         corpo:
           "Fernanda marcou 'preciso de apoio' no registro do 2º encontro: participação da mentorada caiu e ela não consegue contato.",
-        href: `/duplas/${uid(D.risco)}`,
-        lida_em: haDias(19, "08:00"),
-        created_at: haDias(21, "22:30"),
+        href: `/chamados?c=${uid(0x5829)}`,
+        lida_em: null,
+        created_at: depoisDe(regD3E2.created_at, 1),
       },
       {
         id: uid(0x3003),
@@ -2721,28 +2732,30 @@ function build(): DemoData {
         created_at: haDias(33, "19:12"),
       },
       {
-        // canal de segurança do jovem (0071) — separado do pedido_apoio
-        // do mentor: a notificação própria não deixa o caso do Caio se
-        // perder na fila dos registros
+        // canal de segurança do jovem → CHA-000142 (urgência, sem login:
+        // autor pela ficha do Caio). O sino aponta pro chamado — o caso
+        // não se perde mais no meio dos registros
         id: uid(0x3005),
-        tipo: "apoio_jovem",
-        titulo: "Pedido de ajuda · Caio marcou na avaliação",
+        tipo: "chamado_aberto",
+        titulo: "Pedido de ajuda · CHA-000142",
         corpo:
           "Caio avaliou o 4º encontro com 2 estrelas e marcou 'preciso de ajuda'. Combinado do programa: responder em 1 dia útil.",
-        href: `/duplas/${uid(D.pend)}`,
+        href: `/chamados?c=${uid(0x582a)}`,
         lida_em: null,
         created_at: depoisDe(encD2[3].realizado_em!, 6),
       },
     ],
     supervisor: [
       {
+        // a coord atribuiu o chamado de metodologia ao Paulo (persona
+        // supervisor) — a notificação própria da atribuição
         id: uid(0x3010),
-        tipo: "apoio_resolvido",
-        titulo: "Pedido de apoio resolvido · Fernanda & Dandara",
-        corpo: "A coordenação encaminhou o caso e marcou o pedido de apoio como resolvido.",
-        href: `/duplas/${uid(D.risco)}`,
+        tipo: "chamado_atribuido",
+        titulo: "Chamado CHA-000145 com você",
+        corpo: "Guia do encontro 7: adaptar o roteiro pra dupla online",
+        href: `/chamados?c=${uid(0x582d)}`,
         lida_em: null,
-        created_at: haDias(2, "15:00"),
+        created_at: haDias(3, "11:06"),
       },
       {
         id: uid(0x3011),
@@ -2754,14 +2767,14 @@ function build(): DemoData {
         created_at: haDias(10, "11:00"),
       },
       {
-        // o supervisor do Carlos acompanha o apoio do jovem igual acompanha
-        // o do mentor — leitura completa pela RLS das supervisionadas
+        // o supervisor do Carlos recebe o chamado do jovem igual recebia o
+        // apoio_jovem — urgência da dupla supervisionada chega aos dois
         id: uid(0x3012),
-        tipo: "apoio_jovem",
-        titulo: "Pedido de ajuda do jovem · Carlos & Caio",
+        tipo: "chamado_aberto",
+        titulo: "Pedido de ajuda · CHA-000142",
         corpo:
           "Caio marcou 'preciso de ajuda' na avaliação do 4º encontro. A coordenação foi notificada e encaminha o caso.",
-        href: `/duplas/${uid(D.pend)}`,
+        href: `/chamados?c=${uid(0x582a)}`,
         lida_em: null,
         created_at: depoisDe(encD2[3].realizado_em!, 6),
       },
@@ -2796,6 +2809,16 @@ function build(): DemoData {
         lida_em: haDias(12, "08:00"),
         created_at: haDias(13, "18:40"),
       },
+      {
+        // a Marina respondeu o chamado de agenda do Ricardo (CHA-000143)
+        id: uid(0x3023),
+        tipo: "chamado_atualizacao",
+        titulo: "Atualização no chamado CHA-000143",
+        corpo: "Oi, Ricardo! Conversei com a Ana — quinta funciona pra ela. Pode remarcar os dois encontros.",
+        href: `/chamados?c=${uid(0x582b)}`,
+        lida_em: null,
+        created_at: haDias(1, "10:05"),
+      },
     ],
     mentor_especialista: [
       {
@@ -2824,6 +2847,16 @@ function build(): DemoData {
         href: `/duplas/${uid(D.esp3)}`,
         lida_em: null,
         created_at: haDias(9, "09:05"),
+      },
+      {
+        // a devolutiva errada da Sofia foi resolvida (CHA-000136)
+        id: uid(0x3033),
+        tipo: "chamado_resolvido",
+        titulo: "Chamado CHA-000136 resolvido",
+        corpo: "Sua solicitação foi respondida pela equipe: Roteado certo — a devolutiva era da trilha DPP e seguiu pro Ricardo.",
+        href: `/chamados?c=${uid(0x5824)}`,
+        lida_em: null,
+        created_at: haDias(4, "16:20"),
       },
     ],
     // a persona mentorada (card /demo → /jovem): o aviso 'todos' que a RLS
@@ -3190,6 +3223,153 @@ function build(): DemoData {
       })
   );
 
+  // ---------- chamados unificados (0084) ----------
+  // 8 casos cobrindo origem, categoria e estado — a fila da coordenação e
+  // os "meus chamados" de mentor e jovem saem do mesmo dataset. Os dois
+  // nascidos de flag têm a flag ainda acesa na origem (dual-run coerente).
+  const ch = (o: Partial<Chamado> & Pick<Chamado, "numero" | "categoria" | "assunto" | "created_at">): Chamado => ({
+    id: uid(0x5800 + parseInt(o.numero.slice(-3), 10) - 100),
+    autor_id: null,
+    autor_mentorado_id: null,
+    dupla_id: null,
+    descricao_outro: null,
+    mensagem: null,
+    status: "aberto",
+    atribuido_a: null,
+    origem: "manual",
+    registro_id: null,
+    avaliacao_id: null,
+    updated_at: o.created_at,
+    resolvido_em: null,
+    resolvido_por: null,
+    resolucao_resumo: null,
+    ...o,
+  });
+  const chamados: Chamado[] = [
+    // a fila pede um chamado por flag — o registro da Fernanda é o 0084 real
+    ch({
+      numero: "CHA-000141", categoria: "outro",
+      descricao_outro: "Pedido de apoio marcado no registro do 2º encontro",
+      assunto: "Pedido de apoio no registro — 2º encontro",
+      mensagem: "Dandara faltou aos dois últimos combinados e responde pouco no WhatsApp — a mãe contou que ela voltou a trabalhar aos fins de semana.",
+      autor_id: fernanda.id, dupla_id: duplaRisco.id, origem: "registro",
+      registro_id: regD3E2.id,
+      created_at: depoisDe(regD3E2.created_at, 1),
+    }),
+    // canal de segurança do jovem — Caio não tem login, autor pela ficha
+    ch({
+      numero: "CHA-000142", categoria: "urgencia",
+      assunto: "Preciso de ajuda — avaliação do 4º encontro",
+      mensagem: "O encontro não rolou direito — a gente trocou o tema na hora e eu saí sem saber o que fazer da semana.",
+      autor_mentorado_id: caio.id, dupla_id: duplaPend.id,
+      origem: "avaliacao_jovem", avaliacao_id: uid(0x4406),
+      created_at: depoisDe(encD2[3].realizado_em!, 6),
+    }),
+    // mentor DPP pedindo ajuste de agenda — em atendimento com a Marina
+    ch({
+      numero: "CHA-000143", categoria: "agenda",
+      assunto: "Trocar o encontro de terça pra quinta nas próximas duas semanas",
+      mensagem: "Entrei num projeto no trabalho e terça virou dia de reunião até o fim do mês. A Ana topa quinta.",
+      autor_id: ricardo.id, dupla_id: duplaOk.id,
+      status: "em_atendimento", atribuido_a: marina.id,
+      created_at: haDias(1, "09:12"),
+    }),
+    // jovem logada abrindo chamado de plataforma — pro auxiliar executivo a
+    // linha aparece mascarada na fila (restrito à coordenação)
+    ch({
+      numero: "CHA-000144", categoria: "plataforma",
+      assunto: "Não consigo anexar a foto do combinado",
+      mensagem: "Quando escolho a foto no celular a tela fecha sozinha.",
+      autor_id: anaLogin.id, autor_mentorado_id: ana.id, dupla_id: duplaOk.id,
+      created_at: haDias(2, "14:40"),
+    }),
+    // coordenação abrindo em nome de — trilha metodologia com o Paulo
+    ch({
+      numero: "CHA-000145", categoria: "metodologia",
+      assunto: "Guia do encontro 7: adaptar o roteiro pra dupla online",
+      mensagem: "A Fernanda pediu sugestões — a dupla anda fazendo os encontros por vídeo.",
+      autor_id: marina.id, dupla_id: duplaRisco.id,
+      status: "em_atendimento", atribuido_a: paulo.id,
+      created_at: haDias(3, "11:05"),
+    }),
+    // especialista com pedido resolvido — devolutiva PDM (outro + descrição)
+    ch({
+      numero: "CHA-000136", categoria: "outro", descricao_outro: "Devolutiva PDM",
+      assunto: "Devolutiva do PDM chegou pro mentor errado",
+      mensagem: "A devolutiva da sessão 3 caiu pra outra dupla — a Ana não é minha mentorada na trilha que conta.",
+      autor_id: sofia.id, dupla_id: duplaEsp1.id,
+      status: "resolvido", atribuido_a: marina.id,
+      resolvido_em: haDias(4, "16:20"), resolvido_por: marina.id,
+      resolucao_resumo: "Roteado certo — a devolutiva era da trilha DPP e seguiu pro Ricardo.",
+      created_at: haDias(6, "10:15"),
+    }),
+    // urgência antiga resolvida — trilha completa pro autor ver
+    ch({
+      numero: "CHA-000129", categoria: "urgencia",
+      assunto: "Fiquei sem contato com o Eduardo",
+      mensagem: "Faz uma semana que ele não responde e faltou ao último encontro.",
+      autor_id: joaoPedro.id, dupla_id: duplaAtraso.id,
+      status: "resolvido", atribuido_a: marina.id,
+      resolvido_em: haDias(12, "18:00"), resolvido_por: marina.id,
+      resolucao_resumo: "A família confirmou a mudança de turno; a dupla repactuou o horário pros sábados.",
+      created_at: haDias(15, "08:30"),
+    }),
+    // metodologia resolvida antiga — fim do funil na fila
+    ch({
+      numero: "CHA-000118", categoria: "metodologia",
+      assunto: "O roteiro do encontro 4 não abria no app",
+      mensagem: "O link do guia voltava pra lista de materiais.",
+      autor_id: ricardo.id, dupla_id: duplaOk.id,
+      status: "resolvido", atribuido_a: marina.id,
+      resolvido_em: haDias(22, "09:00"), resolvido_por: marina.id,
+      resolucao_resumo: "Era o link antigo do material — já corrigi na biblioteca.",
+      created_at: haDias(24, "15:45"),
+    }),
+  ];
+  const chamadoAtualizacoes: ChamadoAtualizacao[] = [
+    { id: uid(0x6001), chamado_id: uid(0x5829), autor_id: null, tipo: "sistema",
+      texto: "Chamado aberto automaticamente — o mentor marcou “preciso de apoio” no registro.",
+      created_at: depoisDe(regD3E2.created_at, 1) },
+    { id: uid(0x6002), chamado_id: uid(0x582a), autor_id: null, tipo: "sistema",
+      texto: "Chamado aberto — a pessoa mentorada marcou “preciso de ajuda” na avaliação do encontro.",
+      created_at: depoisDe(encD2[3].realizado_em!, 6) },
+    { id: uid(0x6003), chamado_id: uid(0x582b), autor_id: null, tipo: "sistema",
+      texto: "Chamado aberto por Ricardo Salles.", created_at: haDias(1, "09:12") },
+    { id: uid(0x6004), chamado_id: uid(0x582b), autor_id: null, tipo: "sistema",
+      texto: "Chamado assumido por Marina Duarte.", created_at: haDias(1, "10:02") },
+    { id: uid(0x6005), chamado_id: uid(0x582b), autor_id: marina.id, tipo: "publica",
+      texto: "Oi, Ricardo! Conversei com a Ana — quinta funciona pra ela. Pode remarcar os dois encontros.",
+      created_at: haDias(1, "10:05") },
+    { id: uid(0x6006), chamado_id: uid(0x582c), autor_id: null, tipo: "sistema",
+      texto: "Chamado aberto por Ana Beatriz Silva.", created_at: haDias(2, "14:40") },
+    { id: uid(0x6007), chamado_id: uid(0x5824), autor_id: null, tipo: "sistema",
+      texto: "Chamado resolvido — Roteado certo — a devolutiva era da trilha DPP e seguiu pro Ricardo.",
+      created_at: haDias(4, "16:20") },
+    { id: uid(0x6008), chamado_id: uid(0x581d), autor_id: marina.id, tipo: "publica",
+      texto: "Falamos com a família do Eduardo — ele mudou de turno no trabalho e os sábados passam a ser o melhor dia.",
+      created_at: haDias(12, "17:30") },
+    { id: uid(0x6009), chamado_id: uid(0x581d), autor_id: null, tipo: "sistema",
+      texto: "Chamado resolvido — A família confirmou a mudança de turno; a dupla repactuou o horário pros sábados.",
+      created_at: haDias(12, "18:00") },
+  ];
+  const chamadoComentarios: ChamadoComentario[] = [
+    { id: uid(0x6201), chamado_id: uid(0x5829), autor_id: marina.id,
+      texto: "@Beatriz esse cruza com o risco da dupla — faltas + apoio. Posso puxar as duas coisas juntas?",
+      created_at: depoisDe(regD3E2.created_at, 5) },
+    { id: uid(0x6202), chamado_id: uid(0x582a), autor_id: marina.id,
+      texto: "Caso sensível — o comentário do Caio diz que o encontro não rolou como o registro marca. Vou falar com ele antes de abordar o Carlos.",
+      created_at: depoisDe(encD2[3].realizado_em!, 8) },
+    { id: uid(0x6203), chamado_id: uid(0x582b), autor_id: marina.id,
+      texto: "Remarcação simples — só alinhar com a Ana e validar a agenda.",
+      created_at: haDias(1, "10:03") },
+  ];
+  const chamadoAnexos: ChamadoAnexo[] = [
+    { id: uid(0x6401), chamado_id: uid(0x582c),
+      path: `${uid(0x582c)}/demo-print-anexo.png`, nome: "print-do-erro.png",
+      tamanho: 184_320, mime: "image/png", interno: false,
+      created_by: anaLogin.id, created_at: haDias(2, "14:45") },
+  ];
+
   return {
     personas,
     profiles,
@@ -3216,6 +3396,10 @@ function build(): DemoData {
     documentosPessoa,
     avaliacoes,
     avaliacaoLinks,
+    chamados,
+    chamadoAtualizacoes,
+    chamadoComentarios,
+    chamadoAnexos,
   };
 }
 
