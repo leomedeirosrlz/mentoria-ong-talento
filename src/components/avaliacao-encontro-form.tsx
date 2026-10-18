@@ -131,7 +131,9 @@ export function AvaliacaoEncontroForm({
           <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-muted-foreground">
             {pedidoAjuda
               ? `Obrigado${primeiroNome ? `, ${primeiroNome}` : ""} por contar. A coordenação foi avisada na hora e fala com você — o combinado do programa é responder em 1 dia útil.`
-              : `Obrigado${primeiroNome ? `, ${primeiroNome}` : ""}. Suas respostas ficam entre você e a equipe da Realiza.vc — pro seu mentor só aparece a média. Pode fechar esta página.`}
+              : trilha === "dpp"
+                ? `Obrigado${primeiroNome ? `, ${primeiroNome}` : ""}. Suas respostas ficam entre você e a equipe da Realiza.vc — pro seu mentor só aparece a média. Pode fechar esta página.`
+                : `Obrigado${primeiroNome ? `, ${primeiroNome}` : ""}. Suas respostas ficam entre você e a equipe da Realiza.vc — seu mentor vê só as estrelas desta sessão. Pode fechar esta página.`}
           </p>
         </motion.div>
       ) : (

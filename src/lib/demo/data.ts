@@ -18,7 +18,10 @@
  * risco, uma com atraso, uma encerrada do ciclo anterior, três trilhas de
  * especialista (duas na mesma mentora — a Sofia) e a fila "Aguardando par"
  * com dois mentorados inscritos (Rafael e Wendel) e um especialista de
- * reserva com vagas (o Marcos).
+ * reserva com vagas (o Marcos). WP3: o Ricardo ganhou uma 2ª dupla DPP na
+ * T2 (o Matheus — 1 registro entregue, 1 pendente, 1 encontro em limbo e um
+ * pedido de especialista aberto no mural), pra agenda do mentor exercitar
+ * as visões "Minha agenda" e "Por mentorado" com dois jovens.
  */
 
 import type {
@@ -181,6 +184,7 @@ const M = {
   pedro: 0x0408,
   rafael: 0x0409, // intake da T2, aguarda matching
   wendel: 0x040a, // veio pelo formulário, aguarda matching (fila)
+  matheus: 0x040b, // T2 — a 2ª dupla DPP do Ricardo (WP3)
 } as const;
 
 const D = {
@@ -196,6 +200,7 @@ const D = {
   esp4: 0x060a,
   t2a: 0x060b,
   t2b: 0x060c,
+  t2c: 0x060d, // Ricardo × Matheus — a 2ª dupla DPP do híbrido (WP3)
 } as const;
 
 // cronogramas (0061) — um por turma; a T2 é a turma que começou um mês depois
@@ -208,6 +213,7 @@ const S = {
   pedidoJovem: 0x240b, triagem: 0x240c,
   biaNeg: 0x240d, biaMural: 0x240e,
   biaSug: 0x240f,
+  t2cPedido: 0x2410,
 } as const;
 
 // propostas da negociação (solicitacao_propostas, 0074)
@@ -1187,8 +1193,10 @@ function build(): DemoData {
     // "termo pendente" — é o que demonstra o fluxo de assinatura.
     // capacidade_especialista 1: ele é um dos híbridos da demo (WP0b) — DPP
     // da Bia E voluntário no pool de especialistas, como prevê o guia DPP
-    // ("o pool inclui mentores voluntários") — mas ainda sem grade aberta
-    { profile_id: ricardo.id, tipo: "dpp", areas: ["carreira", "educação"], capacidade: 1, capacidade_especialista: 1, termo_ok: false, formacao_ok: true,
+    // ("o pool inclui mentores voluntários") — mas ainda sem grade aberta.
+    // capacidade 2 (WP3): a dupla da T2 com o Matheus usa a 2ª vaga — 2/2
+    // o coloca entre os "cheios" do remanejo, como o André
+    { profile_id: ricardo.id, tipo: "dpp", areas: ["carreira", "educação"], capacidade: 2, capacidade_especialista: 1, termo_ok: false, formacao_ok: true,
       experiencia_previa: "Primeiro ciclo como mentor — concluiu a formação e participou de duas rodas de conversa como ouvinte.",
       formacao_externa: "Trilha de liderança e feedback da empresa.",
       disponibilidade: { dias: ["ter", "qui"], periodos: ["noite"] } },
@@ -1476,8 +1484,29 @@ function build(): DemoData {
     created_at: haDias(4),
     form_bruto: { "Carimbo de data/hora": serialExcel(haDias(6, "20:15")) },
   };
+  // a 2ª dupla DPP do Ricardo (WP3): veio na mesma leva da T2 que o Kauã —
+  // a ONG parceira entregou o matching pronto e o mentor assumiu a segunda
+  // vaga da capacidade dele. A grade repete a do Ricardo (ter/qui à noite) —
+  // encaixe que o matching usou, e que mantém o overlay "ambos livres" da
+  // agenda nos mesmos dias da Bia
+  const matheus: Mentorado = {
+    id: uid(M.matheus), nome: "Matheus Gonçalves",
+    email: "matheus.goncalves@gmail.com", whatsapp: "5511976123011",
+    ong_origem: "Cidadão Pró-Mundo",
+    notas: "2º ano. Entrou na T2 — o match com o Ricardo fechou em tecnologia e carreira; quer montar portfólio pra concorrer a estágio.",
+    avatar_path: "demo/avatars/matheus.svg", documento_path: null,
+    nome_social: null, data_nascimento: "2009-06-03", genero: "masculino",
+    cidade: "São Paulo", uf: "SP",
+    interesses: ["tecnologia", "carreira", "primeiro emprego"],
+    motivacao: "Quero um estágio em tecnologia ainda no ensino médio — portfólio é o que me falta.",
+    pref_genero_par: "masculino",
+    objetivos: "Montar um portfólio com 2 projetos e conseguir o primeiro estágio.",
+    escolaridade: "medio", origem: "ONG Cidadão Pró-Mundo",
+    disponibilidade: { dias: ["ter", "qui"], periodos: ["noite"] },
+    created_at: haDias(32),
+  };
 
-  const mentorados = [ana, caio, dandara, eduardo, isabela, kaua, laura, pedro, rafael, wendel];
+  const mentorados = [ana, caio, dandara, eduardo, isabela, kaua, laura, pedro, rafael, wendel, matheus];
 
   // ---------- solicitações de especialista (0074 — pedido por sessão) ----
   // (montadas antes das duplas: as duplas de especialista referenciam a
@@ -1859,6 +1888,34 @@ function build(): DemoData {
       created_at: haDias(0, "16:20"),
       respondida_em: null,
       mentorado: { nome: ana.nome },
+      solicitante: { nome: ricardo.nome },
+      especialista: null,
+      especialista_nome: null,
+      desejado: null,
+    },
+    {
+      // WP3 — pedido aberto da 2ª dupla do Ricardo: é o que alimenta o
+      // stepper "Pedido → No mural → Aceite → Trilha" do card do Matheus na
+      // visão Por mentorado (o jovem ainda não tem trilha). Broadcast — sem
+      // alvo nem slot — pra mostrar o estado "ninguém aceitou ainda"
+      id: uid(S.t2cPedido),
+      mentorado_id: matheus.id,
+      dupla_dpp_id: uid(D.t2c),
+      demanda:
+        "O Matheus quer montar um portfólio de projetos pra concorrer a estágio em tecnologia — foge da minha área, um especialista de produto/carreira destrava.",
+      motivo: null,
+      slot_proposto: null,
+      origem: "staff",
+      turma: "T2 · 2026/2027",
+      justificativa_recusa: null,
+      especialista_desejado_id: null,
+      especialista_id: null,
+      dupla_id: null,
+      status: "aberta",
+      created_by: ricardo.id,
+      created_at: haDias(2, "18:00"),
+      respondida_em: null,
+      mentorado: { nome: matheus.nome },
       solicitante: { nome: ricardo.nome },
       especialista: null,
       especialista_nome: null,
@@ -2562,7 +2619,50 @@ function build(): DemoData {
     notas: [],
   };
 
-  const duplas = [duplaOk, duplaPend, duplaRisco, duplaAtraso, duplaFim, duplaEsp1, duplaEsp2, duplaEsp3, duplaEsp4, duplaPausa, duplaT2a, duplaT2b];
+  // d-t2c · Ricardo × Matheus — a SEGUNDA dupla DPP do híbrido (WP3). O
+  // matching da T2 fechou no tema tecnologia/carreira e ele assumiu a 2ª
+  // vaga da capacidade — a agenda do mentor DPP precisava de um 2º jovem
+  // pra visão "Por mentorado" renderizar dois cards. A dupla começou ~2-3
+  // semanas antes de hoje (matching entregue pronto pela ONG), então já
+  // correu dois encontros: o 1º com registro entregue, o 2º realizado sem
+  // registro (a pendência "Registro do encontro" deep-linkável que o
+  // warnrow da Minha agenda aponta), o 3º agendado no passado sem registro
+  // (limbo — exercita o "remarcar/não aconteceu") e o 4º já marcado pra
+  // semana seguinte.
+  const encT2c: Encontro[] = [
+    comRegistro(
+      realizado(uid(D.t2c), 1, addDias(HOJE, -14), { duracao: 75 }),
+      ricardo, "Matheus", "dpp"
+    ),
+    realizado(uid(D.t2c), 2, addDias(HOJE, -6), { duracao: 60, origem: "externo" }),
+    agendado(uid(D.t2c), 3, addDias(HOJE, -1), {}),
+    agendado(uid(D.t2c), 4, addDias(HOJE, 5), {}),
+  ];
+
+  const regT2cE1 = encT2c[0].registro!;
+
+  const duplaT2c: Dupla = {
+    id: uid(D.t2c),
+    turma: "T2 · 2026/2027",
+    cronograma_id: cronogramaT2,
+    status: "ativa",
+    iniciada_em: ymd(addDias(HOJE, -18)),
+    trilha: "dpp",
+    demanda: null,
+    solicitacao_id: null,
+    mentor: ricardo,
+    mentorado: matheus,
+    supervisor: paulo,
+    encontros: encT2c,
+    encaminhamentos: [
+      encaminhamento(uid(D.t2c), regT2cE1.id,
+        "Preencher a Roda da Vida e mandar foto antes do próximo encontro",
+        "mentorado", addDias(HOJE, 4), "pendente"),
+    ],
+    notas: [],
+  };
+
+  const duplas = [duplaOk, duplaPend, duplaRisco, duplaAtraso, duplaFim, duplaEsp1, duplaEsp2, duplaEsp3, duplaEsp4, duplaPausa, duplaT2a, duplaT2b, duplaT2c];
 
   // ---------- devolutivas (WP6) ----------
   // Feed datado por trilha — a última entrega continua sendo o que marca a

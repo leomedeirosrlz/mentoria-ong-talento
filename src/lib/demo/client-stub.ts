@@ -4,6 +4,7 @@ import {
   demoAssinaturaCompletaPorToken,
   demoAssinaturaPorToken,
   demoFormularioPorToken,
+  demoTrilhasDosJovens,
 } from "./queries";
 import { getDemoFormularios } from "./forms-data";
 import { normaliza } from "../utils";
@@ -720,10 +721,20 @@ function canalDemo() {
  *  (aceitar_solicitacao...) — cai no default: a demo não grava. */
 async function rpcDemo(
   fn: string,
-  params?: Record<string, unknown>
+  params?: Record<string, unknown>,
+  papel: AppRole | null = null
 ): Promise<Resultado> {
   const token = String(params?.p_token ?? "");
   switch (fn) {
+    // jsonb array — as trilhas de especialista do mentorado de uma dupla DPP
+    // (0092, WP3): a definer valida mentor/supervisor da dupla ou coord e a
+    // RLS nunca alcançaria o DPP — o espelho demo aplica a mesma régua por
+    // papel (id inválido/fora do escopo → [], como o erro da real)
+    case "trilha_do_jovem": {
+      const id = String(params?.p_dupla_dpp_id ?? "");
+      const mapa = papel ? demoTrilhasDosJovens(papel, [id]) : {};
+      return { data: mapa[id] ?? [], error: null, count: null };
+    }
     // jsonb ou null — null quando o token não existe
     case "assinatura_por_token":
       return { data: demoAssinaturaPorToken(token), error: null, count: null };
@@ -754,7 +765,8 @@ export function createDemoClient() {
       new ConsultaDemo(linhas(tabela, papel), tabela, papel),
     storage: { from: bucketDemo },
     auth: authDemo(papel),
-    rpc: rpcDemo,
+    rpc: (fn: string, params?: Record<string, unknown>) =>
+      rpcDemo(fn, params, papel),
     channel: canalDemo,
     removeChannel: async () => "ok" as const,
     getChannels: () => [] as unknown[],

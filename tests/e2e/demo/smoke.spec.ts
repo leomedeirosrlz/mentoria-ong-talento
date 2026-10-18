@@ -23,7 +23,7 @@ test("agenda: painel de etapas de preparação + semana do encontro", async ({
   page,
 }) => {
   await entrarNaDemo(page, "coordenacao");
-  await page.goto("/agenda");
+  await page.goto("/agenda?aba=calendario");
 
   // a semana corrente tem encontro oficial — rótulo "Semana do Nº encontro"
   // ou, em semana dupla, "Semana dos encontros N e M"
@@ -43,7 +43,9 @@ test("agenda: painel de etapas de preparação + semana do encontro", async ({
 
 test("mentor DPP: entra na demo e vê a jornada", async ({ page }) => {
   await entrarNaDemo(page, "mentor_dpp");
-  await page.goto("/agenda");
+  // WP3: o default do mentor virou "Minha agenda" — o calendário oficial é
+  // a aba explícita ?aba=calendario
+  await page.goto("/agenda?aba=calendario");
 
   // agenda do mentor: semana do encontro + trilha/rail do ciclo
   await expect(
@@ -151,5 +153,8 @@ test("stub demo: tabelas da rodada têm dataset (sem aviso no console)", async (
   await entrarNaDemo(page, "coordenacao");
   await page.goto("/");
   await page.goto("/agenda");
+  // WP3: o calendário continua sendo a superfície pesada da agenda — a
+  // visita à aba explícita mantém a cobertura de console-error nela
+  await page.goto("/agenda?aba=calendario");
   expect(avisos).toEqual([]);
 });

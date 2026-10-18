@@ -10,7 +10,9 @@ test("agenda do mentor demo: legenda + tinta 'ambos livres' + detalhe do dia", a
   page,
 }) => {
   await entrarNaDemo(page, "mentor_dpp");
-  await page.goto("/agenda");
+  // WP3: o overlay pinta no calendário — a aba "Minha agenda" (default do
+  // mentor) não tem grade; o spec entra direto no modo calendário
+  await page.goto("/agenda?aba=calendario");
 
   // legenda com os três estados — aparece porque os dois lados têm grade
   await expect(page.getByText("Disponibilidade:")).toBeVisible();
@@ -47,7 +49,7 @@ test("agenda do mentor demo: legenda + tinta 'ambos livres' + detalhe do dia", a
 
 test("agenda demo da coordenação não tem o overlay", async ({ page }) => {
   await entrarNaDemo(page, "coordenacao");
-  await page.goto("/agenda");
+  await page.goto("/agenda?aba=calendario");
 
   // coord aterrissa na visão "semana"; troca pra "mês" — nem assim a grade
   // pinta: o overlay é prop exclusiva do mentor DPP
