@@ -711,6 +711,45 @@ export type Database = {
           },
         ]
       }
+      devolutivas: {
+        Row: {
+          autor_id: string
+          created_at: string
+          dupla_id: string
+          id: string
+          texto: string
+        }
+        Insert: {
+          autor_id: string
+          created_at?: string
+          dupla_id: string
+          id?: string
+          texto: string
+        }
+        Update: {
+          autor_id?: string
+          created_at?: string
+          dupla_id?: string
+          id?: string
+          texto?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "devolutivas_autor_id_fkey"
+            columns: ["autor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "devolutivas_dupla_id_fkey"
+            columns: ["dupla_id"]
+            isOneToOne: false
+            referencedRelation: "duplas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       duplas: {
         Row: {
           created_at: string
@@ -3201,23 +3240,53 @@ export type Database = {
         Row: {
           areas: string[] | null
           avatar_path: string | null
+          bio: string | null
+          cargo: string | null
+          cidade: string | null
+          empresa: string | null
+          experiencia_previa: string | null
+          formacao_externa: string | null
+          grade_resumo: string[] | null
           id: string | null
           nome: string | null
           nome_social: string | null
+          uf: string | null
+          vagas: number | null
+          voluntariado: string | null
         }
         Insert: {
           areas?: string[] | null
           avatar_path?: string | null
+          bio?: string | null
+          cargo?: string | null
+          cidade?: string | null
+          empresa?: string | null
+          experiencia_previa?: string | null
+          formacao_externa?: string | null
+          grade_resumo?: string[] | null
           id?: string | null
           nome?: string | null
           nome_social?: string | null
+          uf?: string | null
+          vagas?: number | null
+          voluntariado?: string | null
         }
         Update: {
           areas?: string[] | null
           avatar_path?: string | null
+          bio?: string | null
+          cargo?: string | null
+          cidade?: string | null
+          empresa?: string | null
+          experiencia_previa?: string | null
+          formacao_externa?: string | null
+          grade_resumo?: string[] | null
           id?: string | null
           nome?: string | null
           nome_social?: string | null
+          uf?: string | null
+          vagas?: number | null
+          voluntariado?: string | null
         }
         Relationships: []
       }
@@ -3296,6 +3365,24 @@ export type Database = {
           responsavel?: Json | null
           uf?: string | null
           whatsapp?: string | null
+        }
+        Relationships: []
+      }
+      jovem_trilha_esp: {
+        Row: {
+          foco: string | null
+          numero: number | null
+          titulo: string | null
+        }
+        Insert: {
+          foco?: string | null
+          numero?: number | null
+          titulo?: string | null
+        }
+        Update: {
+          foco?: string | null
+          numero?: number | null
+          titulo?: string | null
         }
         Relationships: []
       }
@@ -3667,6 +3754,15 @@ export type Database = {
       avaliacao_por_token: { Args: { p_token: string }; Returns: Json }
       cancelar_solicitacao: { Args: { p_id: string }; Returns: undefined }
       civis_btrim: { Args: { d: Json }; Returns: Json }
+      confirmar_sugestao_especialista: {
+        Args: {
+          p_demanda?: string
+          p_especialista_id?: string
+          p_id: string
+          p_objetivo?: string
+        }
+        Returns: undefined
+      }
       conflito_encontro: {
         Args: { p_data_hora: string; p_dupla: string }
         Returns: Json
@@ -3688,6 +3784,10 @@ export type Database = {
         Returns: Json
       }
       desmarcar_encontro: { Args: { p_encontro: string }; Returns: Json }
+      dispensar_sugestao_especialista: {
+        Args: { p_id: string }
+        Returns: undefined
+      }
       disponibilidade_ok: { Args: { d: Json }; Returns: boolean }
       email_disponivel: { Args: { p_email: string }; Returns: boolean }
       encerramento_checklist_ok: { Args: { c: Json }; Returns: boolean }
@@ -3744,6 +3844,10 @@ export type Database = {
         Returns: string
       }
       pegar_login_handoff: { Args: { p_nonce: string }; Returns: Json }
+      postar_devolutiva: {
+        Args: { p_dupla_id: string; p_texto: string }
+        Returns: string
+      }
       reconhecer_solicitacao: {
         Args: { p_id: string; p_turma: string }
         Returns: undefined
@@ -3829,6 +3933,15 @@ export type Database = {
           p_visivel_mentor?: boolean
         }
         Returns: Json
+      }
+      sugerir_especialista_mentor: {
+        Args: {
+          p_demanda: string
+          p_especialista_id?: string
+          p_mentorado_id: string
+          p_objetivo?: string
+        }
+        Returns: string
       }
       submeter_resposta_formulario: {
         Args: { p_respostas: Json; p_token: string }

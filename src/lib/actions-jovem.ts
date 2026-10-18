@@ -162,3 +162,64 @@ export async function buscarSlotsEspecialista(
   if (!especialistaId) return { slots: [] };
   return { slots: await getSlotsLivres(especialistaId) };
 }
+
+/** WP6 — o jovem confirma a sugestão que o mentor DPP registrou (status
+ *  'sugerida' → 'aberta', virando pedido de verdade). Pode ajustar o
+ *  especialista-destino, a demanda e o objetivo antes de mandar — a RPC
+ *  refaz os tetos de pedidos em aberto e o dedup por especialista. */
+export async function confirmarSugestaoEspecialista(input: {
+  id: string;
+  especialistaId?: string | null;
+  demanda?: string | null;
+  objetivo?: string | null;
+}): Promise<{ ok?: true; error?: string }> {
+  if (await demoAtivo()) return { error: DEMO_MSG };
+  const { supabase, me: eu } = await me();
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
+  if (eu.role !== "mentorado") {
+    return { error: "Só o jovem mentorado confirma a sugestão." };
+  }
+  if (!input.id) return { error: "Sugestão não encontrada." };
+  const demanda = input.demanda?.trim() || null;
+  const objetivo = input.objetivo?.trim() || null;
+  if (demanda && (demanda.length < 10 || demanda.length > 1000)) {
+    return { error: "A demanda precisa ter entre 10 e 1.000 caracteres." };
+  }
+  if (objetivo && (objetivo.length < 3 || objetivo.length > 500)) {
+    return { error: "O objetivo precisa ter entre 3 e 500 caracteres." };
+  }
+  const { error } = await supabase.rpc("confirmar_sugestao_especialista", {
+    p_id: input.id,
+    p_demanda: demanda ?? undefined,
+    p_objetivo: objetivo ?? undefined,
+    p_especialista_id: input.especialistaId ?? undefined,
+  });
+  if (error) return { error: erroAmigavel(error) };
+  revalidatePath("/jovem");
+  revalidatePath("/jovem/agenda");
+  revalidatePath("/jovem/especialistas");
+  revalidatePath("/");
+  return { ok: true };
+}
+
+/** WP6 — o jovem dispensa a sugestão do mentor (vira 'cancelada' e sai de
+ *  vista). A decisão é dele — a demanda pertence a quem vive o tema. */
+export async function dispensarSugestaoEspecialista(
+  id: string
+): Promise<{ ok?: true; error?: string }> {
+  if (await demoAtivo()) return { error: DEMO_MSG };
+  const { supabase, me: eu } = await me();
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
+  if (eu.role !== "mentorado") {
+    return { error: "Só o jovem mentorado responde à sugestão." };
+  }
+  if (!id) return { error: "Sugestão não encontrada." };
+  const { error } = await supabase.rpc("dispensar_sugestao_especialista", {
+    p_id: id,
+  });
+  if (error) return { error: erroAmigavel(error) };
+  revalidatePath("/jovem");
+  revalidatePath("/jovem/especialistas");
+  revalidatePath("/");
+  return { ok: true };
+}

@@ -100,6 +100,8 @@ export function resumoPedidoJovem(
   nomeEsp: string | null
 ): string {
   switch (efetivo) {
+    case "sugerida":
+      return "Seu mentor sugeriu — decide na página de especialistas.";
     case "aguardando_coord":
       return "A coordenação tá olhando seu pedido antes de liberar.";
     case "aberta":

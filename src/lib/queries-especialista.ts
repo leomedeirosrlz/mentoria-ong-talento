@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { toDateStr } from "./ciclo";
 import { demoRole } from "./demo/mode";
 import {
+  demoDevolutivas,
   demoEspecialistas,
   demoMinhaGrade,
   demoMinhasExcecoes,
@@ -14,6 +15,7 @@ import {
 import { demoTrilhaFechamento } from "./demo/encerramento-data";
 import { getMe } from "./queries";
 import type {
+  Devolutiva,
   ExcecaoEspecialista,
   GradeJanela,
   SolicitacaoEspecialista,
@@ -206,7 +208,9 @@ export async function getPropostasMap(
 }
 
 /** Especialistas ativos (id + nome + áreas de atuação, 0030) — pro select
- *  "direcionar a um especialista específico" do dialog de solicitação. */
+ *  "direcionar a um especialista específico" do dialog de solicitação.
+ *  0087: o papel é relação — o !inner em profile_papeis pega também o
+ *  híbrido cujo primário é mentor_dpp. */
 export const getEspecialistas = cache(
   async (): Promise<{ id: string; nome: string; areas: string[] | null }[]> => {
     const demo = await demoRole();
@@ -214,8 +218,8 @@ export const getEspecialistas = cache(
     const supabase = await createClient();
     const { data, error } = await supabase
       .from("profiles")
-      .select("id, nome, areas")
-      .eq("role", "mentor_especialista")
+      .select("id, nome, areas, profile_papeis!inner(papel)")
+      .eq("profile_papeis.papel", "mentor_especialista")
       .eq("ativo", true)
       .order("nome");
     if (error) {
@@ -298,5 +302,29 @@ export const getSlotsLivres = cache(
       return [];
     }
     return (data ?? []).map((r: { inicio: string }) => r.inicio);
+  }
+);
+
+/** Feed de devolutivas de uma dupla (0086) — a policy lê pro autor, pra
+ *  coordenação e pro jovem dono da trilha; a ficha da dupla esp monta com
+ *  o embed do autor (staff lê profiles). */
+export const getDevolutivasDupla = cache(
+  async (duplaId: string): Promise<Devolutiva[]> => {
+    const demo = await demoRole();
+    if (demo) return demoDevolutivas(demo, [duplaId]);
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("devolutivas")
+      .select("id, dupla_id, autor_id, texto, created_at, autor:profiles(nome)")
+      .eq("dupla_id", duplaId)
+      .order("created_at", { ascending: true });
+    if (error) {
+      console.error("getDevolutivasDupla:", error);
+      return [];
+    }
+    return (data ?? []).map((d) => ({
+      ...(d as Omit<typeof d, "autor">),
+      autor: Array.isArray(d.autor) ? (d.autor[0] ?? null) : d.autor,
+    })) as Devolutiva[];
   }
 );
