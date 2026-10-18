@@ -2,6 +2,8 @@ import { CaretDown, MapPin } from "@phosphor-icons/react/dist/ssr";
 import { redirect } from "next/navigation";
 import { getJovemPerfil } from "@/lib/queries-jovem";
 import { getMe } from "@/lib/queries";
+import { getChamados, getChamadoDetalhe } from "@/lib/queries-chamados";
+import { JovemChamados } from "@/components/jovem-chamados";
 import { ESCOLARIDADE_LABELS, papelLabel } from "@/lib/ciclo";
 import type { Escolaridade } from "@/lib/types";
 import { Avatar } from "@/components/avatar";
@@ -14,9 +16,23 @@ import type { Disponibilidade } from "@/lib/types";
 
 export const metadata = { title: "Meu perfil — Realiza.vc" };
 
-export default async function JovemPerfil() {
-  const [me, perfil] = await Promise.all([getMe(), getJovemPerfil()]);
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export default async function JovemPerfil({
+  searchParams,
+}: {
+  searchParams: Promise<{ c?: string }>;
+}) {
+  const { c } = await searchParams;
+  const [me, perfil, meusChamados] = await Promise.all([
+    getMe(),
+    getJovemPerfil(),
+    getChamados(),
+  ]);
   if (!me) redirect("/login"); // o layout já barra — convenção das páginas
+  const cSel = c && UUID_RE.test(c) ? c : null;
+  const detalhe = cSel ? await getChamadoDetalhe(cSel) : null;
 
   const nomeTela = me.nome_social || me.nome;
   const escolaridadeRotulo = perfil?.escolaridade
@@ -151,6 +167,24 @@ export default async function JovemPerfil() {
           </p>
         </div>
       </details>
+
+      {/* 0084: "Meus pedidos" do jovem mora no perfil — trilha pública dos
+          chamados dele, sem comentário interno nem vitrine pro mentor */}
+      <JovemChamados
+        itens={meusChamados.itens}
+        meuId={me.id}
+        meuNome={me.nome_social || me.nome}
+        cSel={cSel}
+        detalhe={
+          detalhe?.chamado
+            ? {
+                chamado: detalhe.chamado,
+                timeline: detalhe.timeline,
+                equipe: detalhe.equipe,
+              }
+            : null
+        }
+      />
 
       <PrivacidadeCard
         compartilhado={perfil?.contato_compartilhado ?? false}

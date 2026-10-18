@@ -7,6 +7,8 @@ import type {
   Assinatura,
   AssinaturaResumo,
   AssinaturaVia,
+  ChamadoFilaItem,
+  ChamadoTimelineItem,
   AvaliacaoLink,
   CicloEvento,
   ColegaTurma,
@@ -88,6 +90,18 @@ const porNome = (a: { nome: string }, b: { nome: string }) =>
  *  (a dupla do ciclo anterior abre a lista asc, como no created_at do real). */
 const criadoEm = (d: Dupla) =>
   (d as Dupla & { created_at?: string }).created_at ?? d.iniciada_em ?? "";
+
+/** Papéis efetivos da pessoa (WP0b · REALIZA-105): as linhas de
+ *  profile_papeis dela — o backfill garante uma por role e o híbrido
+ *  carrega duas. Sem linha na tabela, cai no profiles.role (estado
+ *  pré-migration); é o que o has_papel real fará quando a tabela sair. */
+function papeisDe(data: DemoData, profile: Profile): AppRole[] {
+  const linhas = data.profilePapeis.filter((r) => r.profile_id === profile.id);
+  if (linhas.length === 0) return profile.role ? [profile.role] : [];
+  return [...new Set(linhas.map((r) => r.papel))];
+}
+const temPapel = (data: DemoData, p: Profile, papel: AppRole) =>
+  papeisDe(data, p).includes(papel);
 
 /** Escopo de vínculo do papel — o mesmo das policies duplas_select: coord
  *  tudo; supervisor as supervisionadas; mentor/especialista as mentoradas. */
@@ -359,13 +373,18 @@ export function demoSlotsLivres(profileId: string, dias = 21): string[] {
 /** Policy materiais_select (0065): 'todos' alcança qualquer papel — inclusive
  *  o mentorado; 'dpp'/'especialista' só o papel homônimo; coordenação vê tudo. */
 export function demoMateriais(role: AppRole): Material[] {
-  return getDemoData()
-    .materiais.filter(
+  const data = getDemoData();
+  const eu = data.personas[role];
+  return data.materiais
+    .filter(
       (m) =>
         m.audiencia === "todos" ||
         role === "coordenacao" ||
-        (m.audiencia === "dpp" && role === "mentor_dpp") ||
-        (m.audiencia === "especialista" && role === "mentor_especialista")
+        // papeis (WP0b) em vez do role do cookie: o híbrido recebe a
+        // audiência dos dois lados — "as duas superfícies" do papel multi
+        (m.audiencia === "dpp" && temPapel(data, eu, "mentor_dpp")) ||
+        (m.audiencia === "especialista" &&
+          temPapel(data, eu, "mentor_especialista"))
     )
     .sort((a, b) => a.ordem - b.ordem);
 }
@@ -574,7 +593,10 @@ export function demoPessoaPerfil(
     // conta de jovem fora da dupla do papel — profiles_select (0076) nega a
     // linha inteira e a página cai em notFound, como na real
     if (!jovemProfileVisivel(data, role, p)) return null;
-    const ehMentor = p.role === "mentor_dpp" || p.role === "mentor_especialista";
+    // papéis (WP0b) em vez do role primário: o híbrido é "mentor" pelos dois
+    // lados — DPP de uma dupla E especialista com trilha (ou grade aberta)
+    const ehMentor =
+      temPapel(data, p, "mentor_dpp") || temPapel(data, p, "mentor_especialista");
     return {
       tipo: "profile",
       pessoa: role === "coordenacao" ? comContato(p, contatos) : semPessoal(comContato(p, contatos)),
@@ -655,12 +677,16 @@ export function demoNotificacoes(
  *  coord vê tudo (inclusive 'coordenacao' e 'equipe'); 'dpp'/'especialista'
  *  por trilha; 'equipe' chega aos supervisores. */
 export function demoComunicados(role: AppRole): Comunicado[] {
+  const data = getDemoData();
+  const eu = data.personas[role];
   const visivel = (c: Comunicado) =>
     c.audiencia === "todos" ||
     role === "coordenacao" ||
-    (c.audiencia === "dpp" && role === "mentor_dpp") ||
-    (c.audiencia === "especialista" && role === "mentor_especialista") ||
-    (c.audiencia === "equipe" && role === "supervisor");
+    // papeis (WP0b) — o híbrido recebe a audiência dos dois lados
+    (c.audiencia === "dpp" && temPapel(data, eu, "mentor_dpp")) ||
+    (c.audiencia === "especialista" &&
+      temPapel(data, eu, "mentor_especialista")) ||
+    (c.audiencia === "equipe" && temPapel(data, eu, "supervisor"));
   // espelha prioridade_ord da coluna gerada (0055): prioridade antes de
   // recência, urgente antigo ganha o top-5 de informativo novo
   const ord: Record<Comunicado["prioridade"], number> = {
@@ -668,8 +694,8 @@ export function demoComunicados(role: AppRole): Comunicado[] {
     importante: 1,
     normal: 2,
   };
-  return getDemoData()
-    .comunicados.filter(visivel)
+  return data.comunicados
+    .filter(visivel)
     .sort(
       (a, b) =>
         ord[a.prioridade] - ord[b.prioridade] ||
@@ -1118,15 +1144,6 @@ export function demoSolicitacoesVisiveis(
   let lista: SolicitacaoEspecialista[];
   if (role === "coordenacao") {
     lista = data.solicitacoes;
-  } else if (role === "mentor_especialista") {
-    lista = data.solicitacoes.filter(
-      (s) =>
-        ((s.status === "aberta" || s.status === "contra_proposta") &&
-          (s.especialista_desejado_id == null ||
-            s.especialista_desejado_id === eu.id)) ||
-        s.especialista_id === eu.id ||
-        s.created_by === eu.id
-    );
   } else if (role === "mentorado") {
     // a policy compara mentorado_id com my_mentorado_id() — a ficha do
     // mentorado, não o profile dele
@@ -1148,10 +1165,28 @@ export function demoSolicitacoesVisiveis(
         desejado: null,
       }));
   } else {
+    // Escopo das duplas do papel + o mural quando a persona carrega papel de
+    // especialista (WP0b): pro especialista puro a parte de duplas não casa
+    // (trilha nunca é dupla_dpp_id) e o mural dá a mesma lista de antes; pro
+    // híbrido a união materializa as "duas superfícies" do papel multi.
     const ids = new Set(duplasDoPapel(data, role).map((d) => d.id));
     lista = data.solicitacoes.filter(
       (s) => s.dupla_dpp_id != null && ids.has(s.dupla_dpp_id)
     );
+    if (temPapel(data, eu, "mentor_especialista")) {
+      const vistos = new Set(lista.map((s) => s.id));
+      for (const s of data.solicitacoes) {
+        if (vistos.has(s.id)) continue;
+        if (
+          ((s.status === "aberta" || s.status === "contra_proposta") &&
+            (s.especialista_desejado_id == null ||
+              s.especialista_desejado_id === eu.id)) ||
+          s.especialista_id === eu.id ||
+          s.created_by === eu.id
+        )
+          lista.push(s);
+      }
+    }
   }
   return lista
     .map(comEfetivo)
@@ -1210,25 +1245,40 @@ export function demoEncontrosPorDuplas(
     }));
 }
 
-/** Especialistas ativos — pro select "direcionar a um especialista" do dialog. */
+/** Especialistas ativos — pro select "direcionar a um especialista" do dialog.
+ *  Filtra por profile_papeis (WP0b): o híbrido DPP+especialista entra aqui
+ *  sem que o role primário mude. */
 export function demoEspecialistas(): {
   id: string;
   nome: string;
   areas: string[] | null;
 }[] {
-  return getDemoData()
-    .profiles.filter((p) => p.role === "mentor_especialista" && p.ativo)
+  const data = getDemoData();
+  return data.profiles
+    .filter((p) => temPapel(data, p, "mentor_especialista") && p.ativo)
     .map((p) => ({ id: p.id, nome: p.nome, areas: p.areas ?? null }))
     .sort(porNome);
 }
 
 /** O catálogo da view jovem_especialistas (0075) — os especialistas ativos,
  *  projetados no que o jovem pode ver (nome/social/avatar/áreas, sem contato).
- *  Só faz sentido pro papel mentorado. */
+ *  Só faz sentido pro papel mentorado. Filtra por profile_papeis (o híbrido
+ *  aparece); a decisão D9 do guia tira o próprio DPP do jovem do catálogo. */
 export function demoJovemEspecialistas(role: AppRole): JovemEspecialista[] {
   if (role !== "mentorado") return [];
-  return getDemoData()
-    .profiles.filter((p) => p.role === "mentor_especialista" && p.ativo)
+  const data = getDemoData();
+  const m = mentoradoDaPersona(data, role);
+  const meuDppId = data.duplas.find(
+    (d) =>
+      d.mentorado?.id === m?.id && d.trilha === "dpp" && d.status === "ativa"
+  )?.mentor?.id;
+  return data.profiles
+    .filter(
+      (p) =>
+        temPapel(data, p, "mentor_especialista") &&
+        p.ativo &&
+        p.id !== meuDppId
+    )
     .map((p) => ({
       id: p.id,
       nome: p.nome,
@@ -1803,4 +1853,112 @@ export function demoEspecialistaAvaliacoes(
       created_at: a.created_at,
     }))
     .sort((a, b) => a.numero - b.numero);
+}
+
+// ---------- chamados unificados (0084) ----------
+
+// replica o escopo do RLS: coord vê tudo; auxiliar executivo vê tudo com
+// plataforma mascarada (restrito); mentor/especialista/jovem só os próprios
+// (autor_id ou autor_mentorado_id → nada vaza pelo dupla_id).
+export function demoChamadosFila(role: AppRole): ChamadoFilaItem[] {
+  const data = getDemoData();
+  const eu = data.personas[role];
+  const nome = (id: string | null | undefined) =>
+    (id && (data.profiles.find((p) => p.id === id)?.nome ?? null)) || null;
+  const nomeMentorado = (id: string | null | undefined) =>
+    (id && (data.mentorados.find((m) => m.id === id)?.nome ?? null)) || null;
+  const encontroNumero = (registroId: string | null, avaliacaoId: string | null) => {
+    for (const d of data.duplas) {
+      for (const e of d.encontros ?? []) {
+        if (registroId && e.registro?.id === registroId) return e.numero;
+        if (avaliacaoId && data.avaliacoes.some((a) => a.id === avaliacaoId && a.encontro_id === e.id))
+          return e.numero;
+      }
+    }
+    return null;
+  };
+  const staff = role === "coordenacao" || role === "supervisor";
+  return data.chamados
+    .filter((c) => {
+      if (staff) return true;
+      if (c.autor_id === eu.id) return true;
+      const meuMentorado = data.mentorados.find((m) => m.profile_id === eu.id);
+      return meuMentorado ? c.autor_mentorado_id === meuMentorado.id : false;
+    })
+    .map((c) => {
+      const restrito = role === "supervisor" && c.categoria === "plataforma";
+      const nEnc = encontroNumero(c.registro_id, c.avaliacao_id);
+      const mNome = c.dupla_id
+        ? (data.duplas.find((d) => d.id === c.dupla_id)?.mentorado?.nome ?? null)
+        : null;
+      const contexto = restrito
+        ? null
+        : c.registro_id
+          ? `Registro do ${nEnc}º encontro${mNome ? ` · ${mNome}` : ""}`
+          : c.avaliacao_id
+            ? `Avaliação do ${nEnc}º encontro${mNome ? ` · ${mNome}` : ""}`
+            : mNome
+              ? `Dupla de ${mNome}`
+              : null;
+      return {
+        ...(restrito
+          ? {
+              ...c,
+              assunto: null, mensagem: null, descricao_outro: null,
+              autor_id: null, autor_mentorado_id: null, dupla_id: null,
+              atribuido_a: null, resolvido_por: null, resolucao_resumo: null,
+              registro_id: null, avaliacao_id: null,
+            }
+          : c),
+        restrito,
+        autor_nome: restrito
+          ? null
+          : (nome(c.autor_id) ?? nomeMentorado(c.autor_mentorado_id)),
+        autor_papel: c.autor_id
+          ? (data.profiles.find((p) => p.id === c.autor_id)?.role ?? null)
+          : "mentorado",
+        atribuido_nome: restrito ? null : nome(c.atribuido_a),
+        contexto,
+      } as ChamadoFilaItem;
+    })
+    .sort((a, b) => {
+      const ord = { aberto: 0, em_atendimento: 1, resolvido: 2 } as const;
+      const d = ord[a.status] - ord[b.status];
+      return d !== 0 ? d : b.created_at.localeCompare(a.created_at);
+    });
+}
+
+export function demoChamadoTimeline(
+  chamadoId: string,
+  staff: boolean
+): ChamadoTimelineItem[] {
+  const data = getDemoData();
+  const nome = (id: string | null | undefined) =>
+    (id && (data.profiles.find((p) => p.id === id)?.nome ?? null)) || null;
+  const out: ChamadoTimelineItem[] = data.chamadoAtualizacoes
+    .filter((u) => u.chamado_id === chamadoId)
+    .map((u) => ({
+      tipo: u.tipo,
+      item: { ...u, autor_nome: nome(u.autor_id) },
+    }));
+  if (staff) {
+    for (const c of data.chamadoComentarios.filter(
+      (x) => x.chamado_id === chamadoId
+    )) {
+      out.push({ tipo: "interno", item: { ...c, autor_nome: nome(c.autor_id) } });
+    }
+  }
+  for (const a of data.chamadoAnexos.filter(
+    (x) => x.chamado_id === chamadoId && (!x.interno || staff)
+  )) {
+    out.push({ tipo: "anexo", item: { ...a, autor_nome: nome(a.created_by) } });
+  }
+  return out.sort((a, b) => a.item.created_at.localeCompare(b.item.created_at));
+}
+
+export function demoChamadosSemDono(role: AppRole): number {
+  if (role !== "coordenacao" && role !== "supervisor") return 0;
+  return demoChamadosFila(role).filter(
+    (c) => c.status === "aberto" && !c.atribuido_a && !c.restrito
+  ).length;
 }

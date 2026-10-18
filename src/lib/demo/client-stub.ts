@@ -212,9 +212,88 @@ function linhas(tabela: string, papel: AppRole | null): Linha[] {
       }));
     case "formulario_respostas":
       return getDemoFormularios().respostas as unknown as Linha[];
+    // ---------- chamados (0084): o stub espelha o escopo RLS ----------
+    case "chamados": {
+      // base: autor vê o próprio; coord vê tudo; supervisor tudo menos
+      // plataforma (a fila mascarada sai pela view abaixo). Mentor NÃO
+      // enxerga o chamado do mentorado pela dupla — mesma regra do banco.
+      const eu = papel ? d.personas[papel] : null;
+      const meuMentorado = eu
+        ? d.mentorados.find((m) => m.profile_id === eu.id)?.id
+        : null;
+      return d.chamados.filter((c) => {
+        if (papel === "coordenacao") return true;
+        if (papel === "supervisor") return c.categoria !== "plataforma";
+        return c.autor_id === eu?.id || c.autor_mentorado_id === meuMentorado;
+      }) as unknown as Linha[];
+    }
+    case "chamados_fila": {
+      // a view: staff-only; pro supervisor as linhas de plataforma chegam
+      // mascaradas (metadados nulos — molde chamados_fila da 0084)
+      if (papel !== "coordenacao" && papel !== "supervisor") return [];
+      const sup = papel === "supervisor";
+      return d.chamados.map((c) => {
+        const masc = sup && c.categoria === "plataforma";
+        const l = c as unknown as Linha;
+        return masc
+          ? {
+              id: l.id, numero: l.numero, categoria: l.categoria,
+              status: l.status, origem: l.origem, created_at: l.created_at,
+              resolvido_em: l.resolvido_em, updated_at: l.updated_at,
+              assunto: null, mensagem: null, descricao_outro: null,
+              autor_id: null, autor_mentorado_id: null, dupla_id: null,
+              atribuido_a: null, resolvido_por: null,
+              resolucao_resumo: null, registro_id: null, avaliacao_id: null,
+            }
+          : l;
+      });
+    }
+    case "chamado_atualizacoes":
+      // trilha pública segue a visibilidade do chamado (o exists do RLS)
+      return d.chamadoAtualizacoes.filter((u) =>
+        (linhas("chamados", papel) as Linha[]).some(
+          (c) => c.id === (u as unknown as Linha).chamado_id
+        )
+      ) as unknown as Linha[];
+    case "chamado_comentarios":
+      // interno: só equipe (e plataforma continua coord-only via chamados)
+      if (papel !== "coordenacao" && papel !== "supervisor") return [];
+      return d.chamadoComentarios.filter((cm) =>
+        (linhas("chamados", papel) as Linha[]).some(
+          (c) => c.id === (cm as unknown as Linha).chamado_id
+        )
+      ) as unknown as Linha[];
+    case "chamado_anexos": {
+      const ehEquipe = papel === "coordenacao" || papel === "supervisor";
+      return d.chamadoAnexos.filter(
+        (a) =>
+          (!a.interno || ehEquipe) &&
+          (linhas("chamados", papel) as Linha[]).some(
+            (c) => c.id === (a as unknown as Linha).chamado_id
+          )
+      ) as unknown as Linha[];
+    }
+    case "devolutivas":
+      return d.devolutivas as unknown as Linha[];
+    case "profile_papeis":
+      return d.profilePapeis as unknown as Linha[];
     default:
+      avisarTabelaSemDataset(tabela);
       return [];
   }
+}
+
+// O default devolvia [] em silêncio — uma superfície nova (ex.: /chamados)
+// renderizaria vazia sem nenhum sinal de que faltava dataset. Agora avisa
+// uma vez por tabela no console; o fluxo segue sem quebrar.
+const tabelasAvisadas = new Set<string>();
+function avisarTabelaSemDataset(tabela: string) {
+  if (tabelasAvisadas.has(tabela)) return;
+  tabelasAvisadas.add(tabela);
+  console.warn(
+    `[demo] tabela "${tabela}" consultada sem dataset no stub — ` +
+      `devolvendo []. Adicionar em demo/data.ts + case em linhas() (client-stub.ts).`
+  );
 }
 
 /** Projeta o subselect do embed ("id, nome" / "*") sobre a linha achada;

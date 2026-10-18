@@ -74,7 +74,7 @@ import {
   type PassoGuia,
 } from "@/lib/ciclo";
 import { msgsContato } from "@/lib/whatsapp-msgs";
-import { AvaliacaoBadge, SemaforoBadge, SemaforoDot } from "@/components/semaforo";
+import { AvaliacaoBadge, SemaforoBadge } from "@/components/semaforo";
 import { NudgeButton } from "@/components/nudge-button";
 import { CopiarChamada } from "@/components/copiar-chamada";
 import { WhatsAppRapido, type DestinoWA } from "@/components/whatsapp-rapido";
@@ -342,7 +342,7 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
   // contraditório (o RPC também barra)
   const sugestaoRemanejo =
     souCoord &&
-    saude.semaforo === "risco" &&
+    (saude.semaforo === "risco" || saude.apoio.aberto) &&
     (dupla.status === "ativa" || dupla.status === "pausada")
       ? await montarSugestaoRemanejo(dupla)
       : null;
@@ -674,18 +674,30 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
             <DuplaNomes mentor={dupla.mentor.nome} mentorado={dupla.mentorado.nome} />
           </h1>
           <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-            {/* pro mentor o próprio pedido de apoio não é "risco" — é um
-                pedido já recebido; o tom é "avisamos, relaxa", não alarme */}
-            {souMentor && saude.pediuApoio ? (
-              <span className="inline-flex items-center gap-2">
-                <SemaforoDot nivel="atencao" />
-                <span className="font-medium text-foreground">
-                  Apoio solicitado
-                </span>
-                <span>a coordenação entra em contato com você</span>
+            <SemaforoBadge nivel={saude.semaforo} motivo={saude.motivo} />
+            {/* pro mentor o próprio pedido de apoio é eixo separado (WP2):
+                um chamado já recebido ao lado do semáforo real — o tom é
+                "avisamos, relaxa", não alarme */}
+            {souMentor && saude.pediuApoio && (
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--info-border)] bg-[var(--info-bg)] px-2.5 py-1 text-[11px] font-semibold text-[var(--info-text)]">
+                <HandHeart size={12} aria-hidden />
+                Apoio solicitado
+                <span className="font-normal">· a coordenação entra em contato</span>
               </span>
-            ) : (
-              <SemaforoBadge nivel={saude.semaforo} motivo={saude.motivo} />
+            )}
+            {/* apoio aberto é eixo separado do semáforo (WP2): pra equipe a
+                jornada pode estar em dia E ter chamado — o pill azul mostra
+                o trabalho sem fingir falha da dupla */}
+            {!souMentor && saude.apoio.aberto && (
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--info-border)] bg-[var(--info-bg)] px-2.5 py-1 text-[11px] font-semibold text-[var(--info-text)]">
+                <HandHeart size={12} aria-hidden />
+                Apoio aberto
+                {saude.apoio.origem === "mentorado"
+                  ? " · do mentorado"
+                  : saude.apoio.origem === "ambos"
+                    ? " · dos dois"
+                    : ""}
+              </span>
             )}
             {/* mono fica só no contador — "encontros" é prosa, volta pro sans */}
             <span><span className="font-mono">{saude.feitos}/{total}</span> encontros</span>
@@ -862,7 +874,18 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
       {sugestaoRemanejo && (
         <RemanejoSugerido
           dupla={dupla}
-          motivo={saude.motivo}
+          // semáforo aceso explica pela jornada; apoio sozinho (dupla em
+          // dia + chamado) explica pelo eixo de trabalho — "Em dia." não
+          // sustenta a frase de remanejo
+          motivo={
+            saude.semaforo !== "ok"
+              ? saude.motivo
+              : saude.apoio.origem === "mentorado"
+                ? "Pedido de apoio aberto pelo mentorado"
+                : saude.apoio.origem === "ambos"
+                  ? "Pedidos de apoio abertos nos dois lados"
+                  : "Pedido de apoio aberto pelo mentor"
+          }
           mentores={sugestaoRemanejo.mentores}
           mentorados={sugestaoRemanejo.mentorados}
           agoraMs={sugestaoRemanejo.agoraMs}

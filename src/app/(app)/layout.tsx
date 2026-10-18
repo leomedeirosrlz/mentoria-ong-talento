@@ -5,6 +5,7 @@ import { TelaConta } from "@/components/telas-conta";
 import { getDemoData } from "@/lib/demo/data";
 import { demoRole } from "@/lib/demo/mode";
 import { getMe, getMeuMentorProfile, getMeusDadosPessoais, getNotificacoes } from "@/lib/queries";
+import { getChamadosSemDono } from "@/lib/queries-chamados";
 import { getMeusDadosCivis, getMinhaAssinaturaTermo } from "@/lib/queries-assinaturas";
 import { avatarPublicUrl, gravatarUrl } from "@/lib/avatar";
 import type { AppRole } from "@/lib/types";
@@ -111,13 +112,20 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     );
   }
 
-  const notificacoes = await getNotificacoes();
+  const [notificacoes, chamadosSemDono] = await Promise.all([
+    getNotificacoes(),
+    // badge da fila só faz sentido pra quem atende (coordenação/auxiliar)
+    me.role === "coordenacao" || me.role === "supervisor"
+      ? getChamadosSemDono()
+      : Promise.resolve(0),
+  ]);
   return (
     <AppShell
       me={me}
       avatarUrl={me.avatar_path ? avatarPublicUrl(me.avatar_path) : null}
       gravatarUrl={gravatarUrl(me.email)}
       notificacoes={notificacoes}
+      chamadosSemDono={chamadosSemDono}
       demo={demoDock}
     >
       {children}
