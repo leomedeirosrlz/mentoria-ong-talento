@@ -3951,6 +3951,7 @@ export type Database = {
         Args: { p_respostas: Json; p_token: string }
         Returns: string
       }
+      trilha_do_jovem: { Args: { p_dupla_dpp_id: string }; Returns: Json }
     }
     Enums: {
       app_role:

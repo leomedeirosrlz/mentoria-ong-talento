@@ -273,35 +273,40 @@ Sequência sugerida: **WP0b → (WP6 ‖ WP1) → WP2 → WP3 → WP4/WP5 → WP
 
 ---
 
-### WP3 — Agenda do mentor DPP (L) · REALIZA-133 a 135 (135: D2 decidiu resumo — ★ + "registro entregue" — texto integral só com confirmação da coordenação)
+### WP3 — Agenda do mentor DPP (L) · REALIZA-133 a 135 — **revisado após recon (out/2026)**
 
-**Objetivo / dor:** (1) compromissos de jovens em turmas diferentes se confundem; (2) o DPP é orientador pessoal e precisa ver a jornada do jovem com o especialista, sem que isso vire compromisso dele.
+**Objetivo / dor:** (1) compromissos de jovens em turmas diferentes se confundem; (2) o DPP é orientador pessoal e precisa ver a jornada do jovem com o especialista, sem que isso vire compromisso dele; (3) **feedback real da mentora Kelyng** — calendário confunde com sessões atrasadas, CTA de registro aparece em dia já registrado, sessão vencida sem remarcação óbvia, anexos fora do fluxo, e dúvida de privacidade ("o mentorado lê minha avaliação?").
 
-**Estado atual:** `AgendaCalendario` recebe `duplas` e `role`; há seletor de cronograma, e as visões semana/mês/lista/horários. O DPP **não lê** nada da trilha do jovem.
+**Recon (3 agentes):** mock `docs/mockups/agenda/v6.html` aprovado pelo Thiago como base (satisfaz REALIZA-137 p/ agenda); o DPP **já lê** pedido+devolutiva via `solicitacoes_mural` — falta só a projeção de sessões; `especialista_eventos` é catálogo (não por-dupla); passo das sessões = rank entre realizados (`passoEsp`), `numero` = tentativa.
 
-**Decisão técnica:** não reescrever o calendário. Criar uma camada por cima, deixando as visões atuais disponíveis.
+**Decisões reconciliadas (Thiago):**
+- **Visibilidade COMPLETA** (134 prevalece sobre "resumo" de 135): datas/estados das sessões + **registro integral** + ★ por sessão + devolutivas. Fora: `link` da sessão (acompanha, não participa) e campos de avaliação que identificam o jovem além da nota (sentimento/comentário/temas/avancei/pedir_apoio).
+- **★ por sessão: sempre visível** (sem gate de `avaliacao_visivel_mentor`). Compensação honesta: rótulo "quem vê" nos forms (avaliação do jovem diz que o mentor lê a nota; registro do especialista diz que o DPP lê).
+- **Navegação:** `role="tablist"` dentro da visão DPP com param `?aba=minha|por-mentorado|calendario` — `minha` = cronológica nova (default), `por-mentorado` = cards por jovem, `calendario` = `AgendaCalendario` atual **intacto** (mês/semana/lista/horários + overlay de disponibilidade sobrevivem — reduz regressão e preserva os specs pinados). Não reusa `nav[name="Visão da agenda"]` (é o `?visao=` do híbrido WP6b — os dois níveis coexistem).
+
+**Migration:** `0092_trilha_do_jovem` (staging+prod) — definer, valida mentor/supervisor da dupla DPP ou coordenação (mesmo predicado do ramo 2 da `solicitacoes_mural`), retorna jsonb: sessões+registro+anexos(nomes)+★, devolutivas, metadados da trilha. Não exige trilha ativa (histórico legitima).
 
 **Mudanças**
-1. **Duas abas** para o mentor:
-   - **Minha agenda**: nova visão cronológica (Hoje / Amanhã / Próximos) com chips **Ana · Caio · Eu · Tudo**, rail "Esta semana", previstos tracejados "a agendar" e pendências **próprias** (registro, avaliação) como faixa no topo de "Hoje". Itens de especialista aparecem como "agenda da Ana — você não participa", **sem botão de entrar**. Semana/mês permanecem como visões alternativas.
-   - **Por mentorado**: componente novo `AgendaPorMentorado` — um card por jovem com turma, barra "encontro N de 16 · T1", próximo encontro, pendências da dupla e a **jornada com o especialista** em modo "você acompanha, não participa".
-2. **Número do encontro sempre com a turma** em todos os itens, e uma nota explícita quando as turmas começam em datas diferentes ("a T2 começou 3 semanas depois").
-3. **Dados novos (depende de D2):** RPC/view `definer` `trilha_do_jovem(dupla_dpp_id)` — devolve ao DPP da dupla as sessões de especialista (data, estado, "registro entregue", ★ do jovem). Projeção mínima; texto do registro só se D2 liberar.
-4. **Estado vazio honesto** quando o jovem não tem trilha: explica que a trilha nasce do pedido do jovem **ou de uma sugestão do mentor que ele confirma** (D10) — link para "Sugerir especialista" na ficha, nunca criação direta pelo mentor.
+1. **Três abas** para o mentor (`AbasAgendaMentor`, role=tablist, `?aba=`):
+   - **Minha agenda** (default): cronológica Hoje/Amanhã/Próximos com chips de escopo (mentorado+Eu+Tudo), warnrows de pendências próprias no topo de Hoje (registro pendente, encaminhamento vencido — **sem prazo inventado**), guest items esp âmbar "agenda da Ana — você não participa" (sem link/entrar), previstos tracejados "a agendar", rail "Esta semana" + "Suas duplas" (semáforo).
+   - **Por mentorado**: card por jovem — turma + semáforo, barra "encontro N de 16 · Tx", próximo encontro/limbo honesto, bloco âmbar da trilha esp (5 sessões com estados reais, registro integral expansível, ★, devolutivas, `devolutiva_pdm`), pendências, stepper do pedido (sugerida/aberta/contra_proposta/aguardando_coord/aceita/expirada — estados reais do banco), CTA "Sugerir especialista" quando nada em voo, trilhas anteriores colapsadas.
+   - **Calendário**: `AgendaCalendario` como hoje.
+2. **Número do encontro sempre com a turma** ("encontro 8 · T1") + nota do desencontro quando turmas começam em datas diferentes.
+3. **Fixes Kelyng (produção):** itens da dupla ANTES do evento oficial no painel do dia; dia resolvido (realizado+registro) sem CTA "Registrar encontro" solto; encontro agendado vencido com "Remarcar" explícito (+ "não aconteceu" se action existir); anexos no fim do fluxo de registro (estado pós-save no mesmo dialog); disclosure "quem vê" nos forms de registro/avaliação.
+4. **Pendente (registrado, não bloqueia):** strip "Sua semana", seção "Do programa" (supervisão/formação no card — "Eu" cobre em Minha agenda), botão "Lembrar" mentor→jovem (canal indefinido — D5), pendência "avaliação do mentor" (write-path inexistente — provável que mapeie pro campo `registros.avaliacao`).
 
-**Por quê:** separa "o que eu faço" de "o que eu acompanho", que era a principal fonte de confusão; dá ao DPP o contexto para orientar sem invadir a sessão do especialista.
-
-**Reaproveitar:** `AgendaCalendario` (visão lista, `cronogramaSel`, `MaterialDoEncontro`), `AcaoDiaMentor`, `TrilhaJornada` e `TrilhaPrazoBadge` (já mostram progresso da trilha), `jornadaDaDupla`, `alvoAgendamento`, `NudgeButton`.
+**Reaproveitar:** `AgendaCalendario` intocado na aba calendário, `jornadaDaDupla`, `alvoAgendamento`, `passoEsp`/`encontroDoPassoEsp`, `SolicitacaoStatusChip`, `TrilhaPrazoBadge`, `SugerirEspecialistaDialog`, `DevolutivaEspecialista`, `AgendarEncontroDialog`/`RegistrarRetroativoDialog`.
 
 **Riscos e mitigação**
 | Risco | Mitigação |
 |---|---|
-| Vazar registro/avaliação sensível do jovem ao DPP | Só RPC `definer` com projeção mínima, validando vínculo; nunca ramo de policy em `encontros`/`registros`; teste de persona com JWT real; D2 decidida antes |
-| Quebrar o calendário atual da coordenação | Camada por cima; e2e `agenda-views` e `agenda-disponibilidade` rodando no PR; nenhum edit estrutural no miolo |
-| Confundir "acompanha" com "participa" | Estilo próprio (faixa âmbar tracejada + ícone de olho + rótulo), sem botão de entrar; texto "você não participa" |
-| Mentor com 1 dupla vê abas desnecessárias | Aba "Por mentorado" só aparece com 2+ duplas; com 1, a agenda abre direto em "Minha agenda" |
+| Escopo errado na RPC | Validação à la `avaliacao_media_dpp`/`instrumentos_da_dupla`; `revoke` de public/anon; teste de persona |
+| Jovem se auto-censura sabendo que o mentor lê a ★ | Disclosure "quem vê" no form de avaliação (decisão explícita documentada) |
+| Quebrar o calendário atual | `?aba=calendario` preserva o componente inteiro; specs `agenda-views`/`agenda-disponibilidade` migrados pra URL da aba |
+| Colisão de navs (`?visao=` híbrido × `?aba=`) | `role="tablist"` + param próprio; spec híbrido cobre |
+| Mentor com 1 dupla | "Por mentorado" renderiza o card único (conteúdo ainda útil); chips de escopo funcionam com 1 jovem |
 
-**Aceite:** o mentor identifica, sem clicar, a qual turma pertence cada item; vê que a sessão da Ana é dela e que a sessão 4 está sem horário; não existe botão de entrar na sessão do especialista.
+**Aceite:** mentor identifica turma de cada item sem clicar; sessão da Ana marcada "você não participa" sem botão de entrar; registro integral do especialista expansível; agendado vencido oferece "Remarcar" a um toque; dia registrado não mostra "Registrar encontro"; painel do dia mostra a dupla antes do oficial; registro anexa evidências no mesmo fluxo.
 
 ---
 
