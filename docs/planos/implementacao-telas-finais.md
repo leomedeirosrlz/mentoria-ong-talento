@@ -635,3 +635,15 @@ Edge case coberto de ponta a ponta: mentor com `mentor_dpp` **e** `mentor_especi
 **Jira:** REALIZA-148, REALIZA-149 e REALIZA-150 → Concluído.
 
 **Débito conhecido:** a fixture `hib-e2e` do staging tem híbrido completo mas ainda não há spec app que logue **como** ele (demo cobre o caminho DPP-primário; o caminho esp-primário+DPP depende de fixture logada); redesign visual da home do mentor segue no WP3.
+
+## WP6b review follow-up — fechado (PR #62 · merge 99651c3)
+
+Revisão multi-agent do merge anterior (3 revisores paralelos: DB, lib/actions, UI/demo) achou a mesma classe de bug fora do recorte + bugs reais de UI; todos os ALTAs/MEDIAs corrigidos.
+
+**Migration `0091` (staging E produção):** `rematch_dupla` valida papel **com escopo da turma**; destinatários/autores de `notificacoes_insert`, fila de chamados (`eh_equipe`/`chamado_visivel_equipe`/`chamado_notifica_equipe`), `supervisoes_insert`, `documentos_storage_select_curriculo`, `pessoa_notas_insert`, `comunicados_*`, `materiais_*` → `has_papel` (coord/supervisor/mentorado **secundários** agora agem e recebem — superset seguro, `has_papel ⊇ role`); `abrir_chamado` com revoke PUBLIC/anon.
+
+**App:** aba "Ciclo DPP" inalcançável pro híbrido esp-primário (href sem `?visao=`); `CapacidadeMentorDialog` sem `trilha` escrevia a pool errada (nova-dupla, remanejo-sugerido); "(atual)" no editar podia migrar trilha da dupla; trilha por papel efetivo nos dialogs; `/pessoas/[id]` com stats por trilha; `me()` das actions carrega `papeis`; `setPessoaRole` preserva `mentor_profiles` quando papel mentor secundário sobrevive; `updateDupla` confere capacidade na troca de trilha; e-mail por audiência via `profile_papeis!inner`+dedupe; tools IA por `my_papeis()`; import CSV com coluna `trilha` (obrigatória pra híbrido); `!inner` dedupe; demo/stub com `papeis` em `demoPessoas` + to-one pendurado→`null`; export `tipo` une papéis.
+
+**Gates:** tsc 0 · eslint limpo · vitest 532 · build ok · schema-contract 0 · e2e demo **29/29** (spec híbrida ampliada: href `?visao=dpp`, ida/volta, `?visao=` inválido) · **e2e app no preview: verde (7m55s)**.
+
+**Decisão registrada:** supervisor/coord/mentorado como papel secundário é suportado — `has_papel` decide (0091), não o primário.
