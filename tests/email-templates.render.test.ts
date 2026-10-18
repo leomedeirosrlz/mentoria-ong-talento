@@ -26,9 +26,12 @@ describe("templates de e-mail", () => {
     expect(html).toContain(">Urgente<"); // faixa de prioridade
     expect(html).toContain("&lt;até&gt;"); // corpo escapado
     expect(html).not.toContain("<até>");
-    // casca nova: banner da marca abre e fecha, CTA em gradiente lime
-    expect((html.match(/vamos-juntos\.png/g) ?? []).length).toBe(2);
-    expect(html).toContain("linear-gradient(90deg,#a0c644");
+    // casca nova: logo wordmark pesado no topo, rodapé ink com chip do emblema
+    expect(html).toContain("Archivo Black");
+    expect(html).toContain("REALIZA");
+    expect(html).toContain("#ffd531"); // ponto âmbar do logo
+    expect(html).toContain('bgcolor="#323232"'); // rodapé ink
+    expect(html).toContain("height:6px");
     expect(html).toContain("— Equipe Realiza.vc");
   });
 
