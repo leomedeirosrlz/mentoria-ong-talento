@@ -83,6 +83,7 @@ const linha = (mentor: string, mentorado: string, extra: Partial<LinhaPar> = {})
   mentorado,
   supervisor: "",
   turma: "T2 · 2026/2027",
+  trilha: "",
   demanda: "",
   iniciada_em: "",
   ...extra,

@@ -7,6 +7,7 @@ import { toDateStr } from "./ciclo";
 import { demoAtivo } from "./demo/mode";
 import { DEMO_MSG } from "./demo/shared";
 import { erroAmigavel as erroAmigavelBase } from "./utils";
+import type { AppRole } from "./types";
 
 /** Erro de UI do fluxo de especialista — as exceções de domínio do RPC
  *  aceitar_solicitacao (raise exception → P0001) já chegam em pt-BR e passam
@@ -19,15 +20,33 @@ function erroAmigavel(e: { message: string; code?: string }): string {
   return erroAmigavelBase(e);
 }
 
+/** Normaliza o embed `profile_papeis` pro `papeis` efetivo — união do role
+ *  primário com as linhas do embed (mesmo padrão do comPapeis de
+ *  queries.ts, com o primário na união pra temPapel funcionar). */
+const comPapeis = <T extends { role: AppRole | null }>(
+  p: T & { profile_papeis?: { papel: AppRole }[] | null }
+): Omit<T, "profile_papeis"> & { papeis: AppRole[] } => {
+  const { profile_papeis, ...rest } = p;
+  return {
+    ...rest,
+    papeis: [
+      ...new Set<AppRole>([
+        ...(p.role ? [p.role] : []),
+        ...(profile_papeis ?? []).map((r) => r.papel),
+      ]),
+    ],
+  };
+};
+
 async function me() {
   const supabase = await createClient();
   const { data: claimsData } = await supabase.auth.getClaims();
   const { data } = await supabase
     .from("profiles")
-    .select("id, role, nome")
+    .select("id, role, nome, profile_papeis(papel)")
     .eq("user_id", (claimsData?.claims?.sub as string) ?? "")
     .single();
-  return { supabase, me: data };
+  return { supabase, me: data ? comPapeis(data) : data };
 }
 
 /** Corpo da notificação com a demanda resumida — o texto completo fica na
@@ -139,11 +158,16 @@ export async function criarSolicitacao(formData: FormData) {
     supabase.from("mentorados").select("nome").eq("id", dupla.mentorado_id).maybeSingle(),
   ]);
   const nomeMentorado = mentorado.data?.nome;
+  // o !inner devolve UMA linha de profile por linha de papel — o papel em
+  // múltiplos escopos duplicaria o especialista e o ping chegaria em dobro
+  const espIds = [
+    ...new Set((esps.data ?? []).map((d: { id: string }) => d.id)),
+  ];
   await notificar(
     supabase,
     [
-      ...(esps.data ?? []).map((d: { id: string }) => ({
-        profile_id: d.id,
+      ...espIds.map((id) => ({
+        profile_id: id,
         tipo: "demanda_especialista",
         titulo: "Novo pedido de mentoria especializada",
         corpo: resumo(demanda),

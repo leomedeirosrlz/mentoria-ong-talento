@@ -60,6 +60,14 @@ type Pessoal = {
 };
 const NENHUM = "__nenhum";
 
+/** Papéis efetivos com fallback no primário — embed `profile_papeis` vazio
+ *  ou ausente cai no `role` (a policy pode negar a linha alheia). O papel
+ *  de mentor pode existir SÓ em papeis (primário sup/coord): derivar a
+ *  trilha do primário mandaria "dpp" no hidden e o server recusaria sem
+ *  caminho de correção. */
+const papeisDe = (m: Opt | null | undefined): AppRole[] =>
+  m?.papeis?.length ? m.papeis : m?.role ? [m.role as AppRole] : [];
+
 export function NovaDuplaDialog() {
   const [open, setOpen] = useState(false);
   const [mentores, setMentores] = useState<Opt[]>([]);
@@ -146,11 +154,15 @@ export function NovaDuplaDialog() {
                 (r: { papel: AppRole }) => r.papel
               ),
             }))
-            .filter(
-              (p) =>
-                p.papeis.includes("mentor_dpp") ||
-                p.papeis.includes("mentor_especialista")
-            )
+            // papel EFETIVO decide a pool (WP6b) — a união com o primário
+            // cobre o embed vazio (RLS/linha faltando não tira o mentor
+            // DPP puro da lista) e o papel só-secundário entra
+            .filter((p) => {
+              const pp = papeisDe(p);
+              return (
+                pp.includes("mentor_dpp") || pp.includes("mentor_especialista")
+              );
+            })
         );
         setSupervisores((perfis.data ?? []).filter((p) => podeSupervisionar(p.role)));
         // quem saiu do programa (0077) não é opção de par — o server também
@@ -231,14 +243,17 @@ export function NovaDuplaDialog() {
 
   const mentorSelObj = mentores.find((m) => m.id === mentorSel) ?? null;
   const mentoradoSelObj = mentorados.find((m) => m.id === mentoradoSel) ?? null;
-  // híbrido: os dois papéis de mentor — a trilha vira escolha explícita
+  // trilha nasce do papel EFETIVO (WP6b): quem tem papel de mentor só em
+  // profile_papeis (primário sup/coord) entra no pool — ler o primário
+  // aqui mandava "dpp" no hidden e o server recusava sem correção. Híbrido:
+  // os dois papéis de mentor — a trilha vira escolha explícita
+  const papeisSel = papeisDe(mentorSelObj);
   const ehHibrido =
-    (mentorSelObj?.papeis ?? []).includes("mentor_dpp") &&
-    (mentorSelObj?.papeis ?? []).includes("mentor_especialista");
+    papeisSel.includes("mentor_dpp") && papeisSel.includes("mentor_especialista");
   const trilhaSel: "dpp" | "especialista" | null = mentorSelObj
     ? ehHibrido
       ? trilhaEsc
-      : mentorSelObj.role === "mentor_especialista"
+      : papeisSel.includes("mentor_especialista")
         ? "especialista"
         : "dpp"
     : null;
@@ -280,9 +295,11 @@ export function NovaDuplaDialog() {
   const vagasLabel = (m: Opt) => {
     const uso = (t: string) => emUso[`${m.id}:${t}`] ?? 0;
     const cap = capacidade[m.id];
+    // papel efetivo — quem tem mentor só secundário (primário sup/coord)
+    // conta na pool da trilha dele, não na do primário
+    const papeisM = papeisDe(m);
     const hibrido =
-      (m.papeis ?? []).includes("mentor_dpp") &&
-      (m.papeis ?? []).includes("mentor_especialista");
+      papeisM.includes("mentor_dpp") && papeisM.includes("mentor_especialista");
     if (hibrido) {
       const d = `${uso("dpp")}/${cap?.dpp ?? 1}`;
       const e = `${uso("especialista")}/${cap?.esp ?? 1}`;
@@ -293,7 +310,7 @@ export function NovaDuplaDialog() {
           : uso("dpp") >= (cap?.dpp ?? 1));
       return `DPP ${d} · esp ${e}${cheio ? " · sem vaga" : ""}`;
     }
-    const esp = m.role === "mentor_especialista";
+    const esp = papeisM.includes("mentor_especialista");
     const usadas = uso(esp ? "especialista" : "dpp");
     const total = (esp ? cap?.esp : cap?.dpp) ?? 1;
     return `${usadas}/${total}${esp ? " · especialista" : ""}${usadas >= total ? " · sem vaga" : ""}`;
@@ -416,10 +433,19 @@ export function NovaDuplaDialog() {
               onValueChange={(v) => {
                 const id = v ? String(v) : null;
                 setMentorSel(id);
-                // troca de mentor rederiva a trilha default do primário dele
+                // troca de mentor rederiva a trilha default dos papéis
+                // EFETIVOS dele — papel de mentor só secundário (primário
+                // sup/coord) já nasce na trilha certa; no híbrido o
+                // primário desempata
                 const novo = mentores.find((m) => m.id === id);
+                const papeisNovo = papeisDe(novo);
+                const soEsp =
+                  papeisNovo.includes("mentor_especialista") &&
+                  !papeisNovo.includes("mentor_dpp");
                 setTrilhaEsc(
-                  novo?.role === "mentor_especialista" ? "especialista" : "dpp"
+                  soEsp || novo?.role === "mentor_especialista"
+                    ? "especialista"
+                    : "dpp"
                 );
               }}
             >
@@ -456,6 +482,9 @@ export function NovaDuplaDialog() {
                     nome={mentorSelObj.nome}
                     atual={capSel}
                     emUso={usoSel}
+                    // pool da trilha em edição — sem ela o server escreve
+                    // a do papel primário e o híbrido ajusta a errada
+                    trilha={ehEsp ? "especialista" : "dpp"}
                     onSaved={(n) =>
                       setCapacidade((c) => ({
                         ...c,

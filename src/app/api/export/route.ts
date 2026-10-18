@@ -65,11 +65,16 @@ export async function GET(request: NextRequest) {
       );
       const capacidadesEsp = new Map(
         d.mentorProfiles.map(
-          (m) => [m.profile_id, m.capacidade_especialista ?? 1] as const
+          // repasse cru, como a real: a coluna é not null default 1 (0073),
+          // então quem tem linha sempre carrega valor — e quem não tem
+          // linha exporta "" pelo ?? "" de csvPessoas nos dois caminhos
+          (m) => [m.profile_id, m.capacidade_especialista ?? null] as const
         )
       );
       // papéis efetivos: o híbrido do dataset chega com as duas linhas —
-      // sem isso a coluna de capacidade dele exportava só a pool primária
+      // sem isso a coluna de capacidade dele exportava só a pool primária.
+      // Normalização idem comPapeis da real (só o que o embed traz; sem
+      // linha em profile_papeis sai [] — o temPapel cai no role sozinho)
       const papeisDemo = new Map<string, AppRole[]>();
       for (const pp of d.profilePapeis) {
         papeisDemo.set(pp.profile_id, [...(papeisDemo.get(pp.profile_id) ?? []), pp.papel]);
@@ -78,7 +83,7 @@ export async function GET(request: NextRequest) {
         csvPessoas(
           d.profiles.map((p) => ({
             ...p,
-            papeis: papeisDemo.get(p.id) ?? (p.role ? [p.role] : []),
+            papeis: papeisDemo.get(p.id) ?? [],
           })),
           contatos,
           d.mentorados,
@@ -506,6 +511,17 @@ type SensPessoa = Pick<
   "data_nascimento" | "genero" | "cor_raca" | "pref_genero_par" | "motivacao"
 >;
 
+/** Coluna `tipo` — os papéis efetivos (união role ∪ papeis, mesma regra do
+ *  temPapel), não só o primário: o híbrido exporta "Mentor DPP + Mentor
+ *  especialista" em vez de esconder a segunda trilha. */
+const tipoPessoa = (p: Pick<Profile, "role" | "papeis">): string => {
+  // primário primeiro — a ordem do embed profile_papeis não é garantida
+  const efetivos = [
+    ...new Set([...(p.role ? [p.role] : []), ...(p.papeis ?? [])]),
+  ];
+  return efetivos.length ? efetivos.map(papelLabel).join(" + ") : "Sem papel";
+};
+
 function csvPessoas(
   pessoas: Pick<Profile, "id" | "nome" | "role" | "papeis" | "ativo">[],
   contatos: Map<string, { email: string | null; whatsapp: string | null }>,
@@ -541,12 +557,14 @@ function csvPessoas(
     ...pessoas.map((p) => ({
       nome: p.nome,
       resto: [
-        p.role ? papelLabel(p.role) : "Sem papel",
+        tipoPessoa(p),
         contatos.get(p.id)?.email ?? "",
         contatos.get(p.id)?.whatsapp ?? "",
-        // a coluna capacidade mostra a pool da trilha do papel (0073);
-        // o híbrido (WP6b) exporta as duas rotuladas — "2 DPP / 3 ESP"
-        p.role?.startsWith("mentor")
+        // a coluna capacidade mostra a pool da trilha do papel (0073) —
+        // gate por papel efetivo (temPapel), não pelo primário: mentor
+        // só-secundário também exporta a pool dele; o híbrido (WP6b)
+        // exporta as duas rotuladas — "2 DPP / 3 ESP"
+        temPapel(p, "mentor_dpp") || temPapel(p, "mentor_especialista")
           ? temPapel(p, "mentor_dpp") && temPapel(p, "mentor_especialista")
             ? `${capacidades.get(p.id) ?? ""} DPP / ${capacidadesEsp.get(p.id) ?? ""} ESP`
             : String(
