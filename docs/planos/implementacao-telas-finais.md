@@ -652,3 +652,17 @@ Revisão multi-agent do merge anterior (3 revisores paralelos: DB, lib/actions, 
 **Gates:** tsc 0 · eslint limpo · vitest 532 · build ok · schema-contract 0 · e2e demo **29/29** (spec híbrida ampliada: href `?visao=dpp`, ida/volta, `?visao=` inválido) · **e2e app no preview: verde (7m55s)**.
 
 **Decisão registrada:** supervisor/coord/mentorado como papel secundário é suportado — `has_papel` decide (0091), não o primário.
+
+## WP3 — agenda do mentor fechado (PR #63 · merge d49dd18)
+
+Pipeline multi-agent: 3 agentes de recon (cruzaram codebase, schema/RLS e docs/mocks/e2e — descobriram que o mock v6 já existia e que o DPP já lia o pedido via `solicitacoes_mural`), 4 agentes de implementação em arquivos disjuntos (Minha agenda, Por mentorado, fixes Kelyng, demo parity) e 3 revisores independentes antes do merge.
+
+**Migration `0092 trilha_do_jovem` (staging E produção):** projeção completa da trilha esp pra DPP/sup/coord — sessões (datas/estados/nº/passo), **registro integral**, ★ por sessão, `registro_anexos` reduzido a metadados, `devolutivas` + `devolutiva_pdm`. Sem `link` da sessão. **`0093` + re-apply da 0092:** NULL-trap nos gates de RPC — `supervisor_id` nullable fazia `false OR NULL` avaliar NULL, `not(NULL)` ≠ true e qualquer autenticado passava. Fix `is not true` nas três RPCs (`trilha_do_jovem`, `instrumentos_da_dupla` 0080, `emitir_link_instrumento` 0090); verificado negando acesso a caller sem profile.
+
+**App:** `?aba=minha|por-mentorado|calendario` dentro da visão DPP (default minha; `?dia=` sem `?aba=` → calendário); Minha agenda cronológica (warnrows, chips mentorado+Eu+Tudo, guest items âmbar sem ação, rail Esta semana/Suas duplas); Por mentorado (card por jovem, trilha esp completa, stepper do pedido). Fixes Kelyng 1–5: anexos no fluxo de registro (estado pós-save), sem CTA em dia registrado, remarcar+não-aconteceu em limbo vencido (cobre `remarcado` legado em `limboAberto`/`ehPendenciaRegistro`/`marcarNaoAconteceu`), dupla antes do oficial no painel do dia, rótulo "quem vê" por trilha (DPP: média; esp: só ★). Supervisão por `mentor_id`, ordenação numérica, `agora` determinístico do server (sem hydration mismatch), fetches tardios por aba.
+
+**Demo:** 2ª dupla DPP pro Ricardo (Matheus/T2, enc1 realizado+registro, enc2 realizado sem registro, enc3 em limbo, enc4 futuro + pedido de especialista no mural), `demoTrilhasDosJovens` + `trilha_do_jovem` no stub; specs calendário migrados pra `?aba=calendario`.
+
+**Gates:** tsc 0 · eslint limpo · vitest **557** (21 agenda-minha + 4 edge: remarcado, sem-data, ordenação numérica, supervisão homônima) · build ok · schema-contract 0 · demo e2e **34/34** · **e2e app no preview: verde**.
+
+**Débitos registrados:** extras do card pendentes ("Sua semana" strip, seção "Do programa", "Lembrar" mentor→jovem, pendência "avaliação do mentor"); persona pass manual do híbrido+mentor em staging; `resumoSemanaDe`/`receber` por `mentor_id` permanecem (pré-existentes, fora do WP3).
