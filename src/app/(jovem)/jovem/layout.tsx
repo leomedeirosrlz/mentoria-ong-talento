@@ -1,7 +1,5 @@
-import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { DemoBar } from "@/components/demo-bar";
-import { DemoMockups } from "@/components/demo-mockups";
 import { JovemShell } from "@/components/jovem-shell";
 import { TelaConta } from "@/components/telas-conta";
 import { getDemoData } from "@/lib/demo/data";
@@ -82,22 +80,11 @@ export default async function JovemLayout({
       <DemoBar variant="float" papel={demo} personas={demoPersonas} />
     </div>
   );
-  // overlay de mockups de layout (?mockup=tela:vN), igual ao (app)/layout —
-  // o jovem também compara as propostas de Materiais e Especialistas
-  const demoMockups = demo && (
-    <Suspense fallback={null}>
-      <DemoMockups />
-    </Suspense>
-  );
-
   if (!me.onboarded_em) {
     // a ficha do jovem preenche a grade e o contato do wizard — null = a
     // coordenação ainda não vinculou o cadastro (os passos mostram o
     // estado honesto em vez de quebrar)
     const perfil = await getJovemPerfil();
-    // sem demoMockups aqui: o toggle flutuante cobre o footer do wizard
-    // (intercepta o "Continuar") — e não faz sentido trocar de layout
-    // enquanto o primeiro acesso está aberto
     return (
       <>
         <OnboardingJovem me={me} perfil={perfil} demo={demoDock} />
@@ -111,7 +98,6 @@ export default async function JovemLayout({
     <JovemShell me={me} notificacoes={notificacoes} demo={demoDock || undefined}>
       {children}
       {demoFloat}
-      {demoMockups}
     </JovemShell>
   );
 }

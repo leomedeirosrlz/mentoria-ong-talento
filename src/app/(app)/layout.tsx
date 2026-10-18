@@ -1,7 +1,5 @@
-import { Suspense } from "react";
 import { AppShell } from "@/components/app-shell";
 import { DemoBar } from "@/components/demo-bar";
-import { DemoMockups } from "@/components/demo-mockups";
 import { OnboardingFlow } from "@/components/onboarding-flow";
 import { TelaConta } from "@/components/telas-conta";
 import { getDemoData } from "@/lib/demo/data";
@@ -83,13 +81,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <DemoBar variant="float" papel={demo} personas={demoPersonas} />
     </div>
   );
-  // overlay de mockups de layout (?mockup=tela:vN) — só na demo; fora dela o
-  // param é ignorado. Montado uma vez pro layout inteiro, como a DemoBar.
-  const demoMockups = demo && (
-    <Suspense fallback={null}>
-      <DemoMockups />
-    </Suspense>
-  );
 
   // onboarding pendente (0031): o wizard substitui o shell inteiro, como as
   // telas bloqueadas acima — concluirOnboarding + router.refresh() devolve o app
@@ -117,9 +108,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           demo={demoDock}
         />
         {demoFloat}
-        {/* sem demoMockups no wizard — o toggle flutuante cobre o footer
-            (intercepta o "Continuar") e trocar de layout com o primeiro
-            acesso aberto não faz sentido */}
       </>
     );
   }
@@ -142,7 +130,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     >
       {children}
       {demoFloat}
-      {demoMockups}
     </AppShell>
   );
 }

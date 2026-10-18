@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Suspense } from "react";
 import type { Metadata } from "next";
 import {
   Binoculars,
@@ -13,7 +12,6 @@ import {
 // quebraria a página (server component) se viesse como import de valor
 import type { Icon } from "@phosphor-icons/react";
 import { DemoEnterButton } from "@/components/demo-enter-button";
-import { MockupsSection, MockupViewer } from "@/components/demo-mockups";
 import { papelLabel } from "@/lib/ciclo";
 import { entrarNaDemo } from "@/lib/demo/actions";
 import { getDemoData } from "@/lib/demo/data";
@@ -102,14 +100,6 @@ export default async function DemoPage() {
           ))}
         </div>
 
-        {/* catálogo de mockups direto na seleção de papel — abre por cima
-            desta tela via ?mockup=, sem precisar entrar num papel */}
-        <div className="mt-5 rounded-xl border border-border bg-card">
-          <Suspense fallback={null}>
-            <MockupsSection />
-          </Suspense>
-        </div>
-
         <div className="mt-6 border-t border-border pt-4 text-center text-xs leading-relaxed text-muted-foreground">
           <p>Uso interno pra alinhamento · pessoas e dados são fictícios.</p>
           <p className="mt-1.5">
@@ -123,12 +113,6 @@ export default async function DemoPage() {
           </p>
         </div>
       </div>
-
-      {/* overlay do mockup — cobre a seleção de papel; "Voltar" remove o
-          param e a página volta a aparecer */}
-      <Suspense fallback={null}>
-        <MockupViewer voltarLabel="Voltar" />
-      </Suspense>
     </div>
   );
 }
