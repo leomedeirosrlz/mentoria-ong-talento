@@ -249,10 +249,17 @@ test.describe("coordenação — fluxos operacionais", () => {
     await dialog
       .locator('button[data-slot="button"]', { hasText: "Fechar" })
       .click();
-    // a dupla nova aparece na lista (router.refresh da action)
+    // a dupla nova aparece na lista (router.refresh da action). Na v5 o
+    // lockup de nomes não é link — a linha densa tem "Ver ficha ›" — e a
+    // massa saudável colapsa num <details>: a busca a traz pra linha cheia
+    await page.getByLabel("Buscar dupla").fill("Mentor E2E Import");
+    const listaDuplas = page.locator('section[aria-label="Lista de duplas"]');
     await expect(
-      page.getByRole("link", { name: /Mentor E2E Import/ })
+      listaDuplas.getByText("Mentor E2E Import")
     ).toBeVisible({ timeout: 15_000 });
+    await expect(
+      listaDuplas.getByRole("link", { name: "Ver ficha" })
+    ).toBeVisible();
   });
 
   test("turmas: builder gera a prévia e grava o cronograma", async ({
@@ -308,8 +315,10 @@ test.describe("coordenação — fluxos operacionais", () => {
     page,
   }) => {
     test.slow(); // dois writes em staging (risco plantado + ajuste de capacidade)
-    // risco plantado: registro com pedido de apoio num encontro realizado da
-    // dupla2 — o semáforo vira "risco" e o card nasce (cleanup tira os dois)
+    // risco plantado: registro com avaliação baixa + dificuldade no último
+    // encontro da dupla2 — o combo vira o motivo[0] do semáforo ("risco") e
+    // o card nasce. O pedido de apoio segue junto mas no WP2 é eixo
+    // separado — não compõe o motivo (cleanup tira os dois)
     const enc = await inserirViaServiceRole("encontros", {
       dupla_id: DUPLA2_ID,
       numero: 24, // encontros_numero_faixa = 1..24; o cleanup zera a dupla2
@@ -319,8 +328,8 @@ test.describe("coordenação — fluxos operacionais", () => {
     });
     await inserirViaServiceRole("registros", {
       encontro_id: enc.id,
-      avaliacao: "boa",
-      dificuldade: "nenhuma",
+      avaliacao: "baixa",
+      dificuldade: "participacao",
       precisa_apoio: true,
     });
 
@@ -332,7 +341,12 @@ test.describe("coordenação — fluxos operacionais", () => {
     await expect(
       card.getByText("Sugerir remanejamento", { exact: true })
     ).toBeVisible();
-    await expect(card.getByText(/Pedido de apoio/)).toBeVisible();
+    // WP2: o motivo do card é o 1º sinal do semáforo — o combo baixa +
+    // dificuldade plantado. "Pedido de apoio" vive no eixo próprio, fora
+    // dos sinais, então não abre a frase do remanejo
+    await expect(
+      card.getByText(/Avaliação baixa e dificuldade de participação/)
+    ).toBeVisible();
 
     // pool de mentores: o import (sem dupla) tem vaga e leva Remanejar;
     // o colega (dupla PAUSADA, cap implícita 1) aparece cheio — a saída
