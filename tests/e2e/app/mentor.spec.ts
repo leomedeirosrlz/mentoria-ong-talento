@@ -121,7 +121,9 @@ test.describe("mentor DPP — fluxos reais", () => {
   });
 
   test("agenda renderiza a semana e o cronograma oficial", async ({ page }) => {
-    await page.goto("/agenda");
+    // WP3: o calendário oficial é a aba explícita — o default do mentor é
+    // "Minha agenda"
+    await page.goto("/agenda?aba=calendario");
     await expect(
       page.getByText(/Semana do \d+º|Semana dos encontros|Semana/).first()
     ).toBeVisible();
@@ -334,7 +336,9 @@ test.describe("mentor DPP — fluxos reais", () => {
       const dia = new Date(String(enc.data_hora)).toLocaleDateString("en-CA", {
         timeZone: "America/Sao_Paulo",
       });
-      await page.goto(`/agenda?dia=${dia}`);
+      // WP3: ?dia= só aterra no detalhe dentro da aba calendário — sem o
+      // param a agenda do mentor abriria em "Minha agenda"
+      await page.goto(`/agenda?aba=calendario&dia=${dia}`);
 
       const detalhe = page.locator(
         'section[aria-label="Detalhe do dia selecionado"]'

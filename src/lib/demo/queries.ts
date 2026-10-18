@@ -42,6 +42,10 @@ import type {
   SolicitacaoEspecialistaStatus,
   SolicitacaoProposta,
   Supervisao,
+  TrilhaJovem,
+  TrilhaJovemDevolutiva,
+  TrilhaJovemRegistro,
+  TrilhaJovemSessao,
 } from "../types";
 // Só tipos das queries reais — `import type` é apagado no build, então o
 // ciclo queries.ts → demo/queries.ts → queries.ts não existe em runtime.
@@ -1400,6 +1404,110 @@ export function demoDevolutivas(role: AppRole, duplaIds: string[]): Devolutiva[]
       },
     }))
     .sort((a, b) => a.created_at.localeCompare(b.created_at));
+}
+
+/** Espelho da RPC `trilha_do_jovem` (0092): as trilhas de especialista do
+ *  mentorado de cada dupla DPP informada, na projeção COMPLETA que o mentor
+ *  DPP recebe (sessões + registro integral + anexos + ★ do jovem +
+ *  devolutivas — sem `link`: ele acompanha, não participa).
+ *  Mesma régua de acesso da definer: a dupla existe e é DPP e o papel é o
+ *  mentor dela, o supervisor dela ou coordenação — o caller mapeia cada id
+ *  inválido/fora do escopo pra [], como faz com o erro da RPC real. */
+export function demoTrilhasDosJovens(
+  role: AppRole,
+  duplaDppIds: string[]
+): Record<string, TrilhaJovem[]> {
+  const data = getDemoData();
+  const eu = data.personas[role];
+  const pares: [string, TrilhaJovem[]][] = duplaDppIds.map((id) => {
+    const dpp = data.duplas.find((d) => d.id === id);
+    const autorizado =
+      dpp != null &&
+      dpp.trilha === "dpp" &&
+      (dpp.mentor?.id === eu.id ||
+        dpp.supervisor?.id === eu.id ||
+        temPapel(data, eu, "coordenacao"));
+    if (!autorizado || !dpp.mentorado?.id) return [id, []];
+
+    const trilhas = data.duplas
+      .filter(
+        (ed) =>
+          ed.trilha === "especialista" &&
+          ed.mentorado?.id === dpp.mentorado?.id
+      )
+      // order by ed.iniciada_em desc nulls last — idem jsonb_agg da RPC
+      .sort((a, b) => (b.iniciada_em ?? "").localeCompare(a.iniciada_em ?? ""))
+      .map((ed): TrilhaJovem => {
+        const sessoes: TrilhaJovemSessao[] = [...(ed.encontros ?? [])]
+          .sort((a, b) => a.numero - b.numero)
+          .map((e): TrilhaJovemSessao => {
+            const r = e.registro;
+            const registro: TrilhaJovemRegistro | null = r
+              ? {
+                  id: r.id,
+                  tema: r.tema,
+                  ferramenta: r.ferramenta,
+                  atividades: r.atividades,
+                  avaliacao: r.avaliacao,
+                  dificuldade: r.dificuldade,
+                  dificuldade_detalhe: r.dificuldade_detalhe,
+                  reflexoes: r.reflexoes,
+                  observacoes: r.observacoes,
+                  proximo_passo: r.proximo_passo,
+                  proximo_passo_detalhe: r.proximo_passo_detalhe,
+                  precisa_apoio: r.precisa_apoio,
+                  created_at: r.created_at,
+                  anexos: data.anexos
+                    .filter((an) => an.registro_id === r.id)
+                    .sort((a, b) => a.created_at.localeCompare(b.created_at))
+                    .map((an) => ({
+                      nome: an.nome,
+                      tamanho: an.tamanho,
+                      mime: an.mime,
+                    })),
+                }
+              : null;
+            return {
+              id: e.id,
+              numero: e.numero,
+              data_hora: e.data_hora,
+              realizado_em: e.realizado_em,
+              status: e.status,
+              duracao_min: e.duracao_min,
+              motivo_reagendamento: e.motivo_reagendamento ?? null,
+              // ★ da avaliacoes_encontro do jovem — a única fatia dela que
+              // a 0092 projeta (o resto identificaria o avaliador)
+              estrelas:
+                data.avaliacoes.find((av) => av.encontro_id === e.id)
+                  ?.estrelas ?? null,
+              registro,
+            };
+          });
+        const devolutivas: TrilhaJovemDevolutiva[] = data.devolutivas
+          .filter((dv) => dv.dupla_id === ed.id)
+          .sort((a, b) => a.created_at.localeCompare(b.created_at))
+          .map((dv) => ({
+            autor_nome:
+              data.profiles.find((ap) => ap.id === dv.autor_id)?.nome ?? null,
+            texto: dv.texto,
+            created_at: dv.created_at,
+          }));
+        return {
+          dupla_id: ed.id,
+          especialista_nome: ed.mentor?.nome ?? null,
+          demanda: ed.demanda,
+          status: ed.status,
+          iniciada_em: ed.iniciada_em,
+          encerrada_em: ed.encerrada_em ?? null,
+          motivo_encerramento: ed.motivo_encerramento ?? null,
+          devolutiva_pdm: ed.devolutiva_pdm ?? null,
+          sessoes,
+          devolutivas,
+        };
+      });
+    return [id, trilhas];
+  });
+  return Object.fromEntries(pares);
 }
 
 // ---------- interações e anexos ----------

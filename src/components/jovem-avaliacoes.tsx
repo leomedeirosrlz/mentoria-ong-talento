@@ -76,8 +76,9 @@ export function AvaliarPendenteButton({
               {pendente.numero}º encontro — como foi?
             </DialogTitle>
             <DialogDescription>
-              1 minuto. Suas respostas ficam entre você e a equipe da
-              Realiza.vc.
+              {pendente.trilha === "especialista"
+                ? "1 minuto. Suas respostas ficam entre você e a equipe da Realiza.vc — só a sua nota aparece pro seu mentor."
+                : "1 minuto. Suas respostas ficam entre você e a equipe da Realiza.vc — pro seu mentor só aparece a média, e você escolhe o que ele lê."}
             </DialogDescription>
           </DialogHeader>
           <AvaliacaoEncontroForm
@@ -165,7 +166,9 @@ export function JovemAvaliacoes({
             </p>
             <p className="mt-0.5 text-xs text-muted-foreground">
               {p.realizado_em ? formatDate(p.realizado_em) + " · " : ""}
-              Conte em 1 minuto. Pro seu mentor só aparece a média.
+              {p.trilha === "especialista"
+                ? "Conte em 1 minuto. Pro seu mentor aparece a sua nota."
+                : "Conte em 1 minuto. Pro seu mentor só aparece a média."}
             </p>
           </div>
           <AvaliarPendenteButton pendente={p} primeiroNome={primeiroNome} />
@@ -287,9 +290,16 @@ function DetalheAvaliacao({ a }: { a: AvaliacaoFeita }) {
         )}
       </dl>
 
-      {/* o toggle é do jovem e só vale na trilha DPP — lá o mentor lê a
-          linha inteira; na especialista ele não lê nada além da estrela,
-          então o controle nem aparece */}
+      {/* quem lê, honesto por trilha (K6): na especialista a estrela SEMPRE
+          aparece pro mentor DPP (decisão 0092) — o resto da resposta fica
+          entre o jovem e a equipe; no DPP o mentor só lê a resposta
+          inteira quando o toggle do jovem autoriza */}
+      {a.trilha === "especialista" && (
+        <p className="text-xs text-muted-foreground">
+          Nas sessões de especialista, sua nota aparece pro seu mentor — o
+          resto desta resposta fica entre você e a equipe.
+        </p>
+      )}
       {a.trilha === "dpp" && (
         <label
           className={cn(

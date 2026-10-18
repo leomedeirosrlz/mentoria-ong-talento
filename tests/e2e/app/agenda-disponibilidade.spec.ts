@@ -31,7 +31,9 @@ test.describe("agenda — overlay de disponibilidade do mentor (REALIZA-24)", ()
   test("mentor vê legenda, células tintas e o detalhe do dia", async ({
     page,
   }) => {
-    await page.goto("/agenda");
+    // WP3: a agenda do mentor abre em "Minha agenda" — o overlay vive na
+    // aba calendário
+    await page.goto("/agenda?aba=calendario");
 
     // legenda "Disponibilidade:" com os três estados — só existe porque
     // algum lado tem grade preenchida
@@ -91,7 +93,7 @@ test.describe("agenda — overlay de disponibilidade do mentor (REALIZA-24)", ()
     page,
   }) => {
     await relogar(page, COORD_EMAIL, COORD_SENHA);
-    await page.goto("/agenda");
+    await page.goto("/agenda?aba=calendario");
 
     // a visão default da coord é "semana"; troca pra "mês" — o overlay é
     // prop só do mentor (undefined pra coord), a grade não pinta pra ela

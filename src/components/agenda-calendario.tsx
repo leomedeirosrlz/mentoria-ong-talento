@@ -17,6 +17,7 @@ import {
   ArrowSquareOut,
   ArrowUpRight,
   BookOpen,
+  CalendarBlank,
   CaretDown,
   CaretLeft,
   CaretRight,
@@ -34,6 +35,7 @@ import {
 import { DuplaNomes } from "@/components/dupla-nomes";
 import { CopiarChamada } from "@/components/copiar-chamada";
 import { ChamadaFormacao } from "@/components/chamada-formacao";
+import { NaoAconteceuButton } from "@/components/nao-aconteceu-button";
 import { NotaEncontro } from "@/components/nota-encontro";
 import { WhatsAppRapido, type DestinoWA } from "@/components/whatsapp-rapido";
 import { AgendarEncontroDialog } from "@/components/agendar-encontro-dialog";
@@ -78,7 +80,6 @@ import {
   disponibilidadeNoDia,
   disponibilidadeTexto,
   duplasSemEncontroDoNumero,
-  emLimbo,
   eventoDaSemana,
   eventosDoCronograma,
   formatDate,
@@ -96,6 +97,7 @@ import {
   type ItemEncontroDupla,
   type PassoGuia,
 } from "@/lib/ciclo";
+import { limboAberto } from "@/lib/agenda-minha";
 import type { MentorChamada } from "@/lib/queries-presenca";
 import { temPapel } from "@/lib/types";
 import type {
@@ -434,7 +436,7 @@ function contagemEncontros(itens: ItemDupla[], agora: number) {
     if (encontro.status === "realizado")
       cont[encontro.registro ? "ok" : "warn"]++;
     else if (encontro.status === "agendado" || encontro.status === "remarcado")
-      cont[emLimbo(encontro, agora) ? "warn" : "agendado"]++;
+      cont[limboAberto(encontro, agora) ? "warn" : "agendado"]++;
     else cont.apagado++;
   }
   return cont;
@@ -2128,7 +2130,7 @@ export function AgendaCalendario({
                                   ({ encontro }) =>
                                     (encontro.status === "realizado" &&
                                       !encontro.registro) ||
-                                    emLimbo(encontro, agoraMs)
+                                    limboAberto(encontro, agoraMs)
                                 )
                                   ? "text-[var(--warn-text)]"
                                   : "text-muted-foreground"
@@ -2545,8 +2547,98 @@ export function AgendaCalendario({
                 ))}
               </p>
             )}
+            {/* encontros das duplas no dia vêm ANTES do oficial — quem abre o
+                dia procura primeiro "qual encontro eu registrei/marquei aqui"
+                (K5); o que o ciclo marca pro dia fecha o painel. A superfície
+                tinta separa "seu" (linhas + ações) do oficial do ciclo. Pra
+                coord/sup o bloco também hospeda a coorte invisível do
+                encontro oficial do dia, então ela sozinha já abre a
+                superfície */}
+            {(itensDupla.length > 0 || faltantesDoDia.length > 0) && (
+              <div className="mt-3 rounded-xl bg-muted/50 p-3 shadow-[var(--shadow-inset)]">
+                {itensDupla.length > 0 && (
+                  <>
+                    <h3 className="px-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                      {ehMentor ? "Sua dupla" : "Duplas"}
+                    </h3>
+                    {/* chave dos dots de status — contextual, junto de onde eles aparecem */}
+                    <ChaveDotsDupla className="mt-1 px-2" />
+                    {/* com muitos itens a leitura é por status (mesmo componente
+                        do board da semana); dia leve segue lista plana */}
+                    {ehCoordSup && itensDupla.length > 5 ? (
+                      <BucketsEncontros
+                        buckets={bucketsDoDia}
+                        renderItem={(item, i) => rowDupla(item, i, selecionado)}
+                      />
+                    ) : (
+                      <ul className="mt-1.5">
+                        {itensDupla.map((item, i) =>
+                          rowDupla(item, i, selecionado)
+                        )}
+                      </ul>
+                    )}
+                  </>
+                )}
+                {/* encontro agendado fora do dia oficial (nº sem evento do ciclo
+                    aqui) não tem bloco próprio acima — a anotação mora sob a
+                    linha, rotulada pelo nº (v1: só o mentor escreve) */}
+                {ehMentor &&
+                  itensDupla
+                    // na trilha especialista o nº nunca tem "dia oficial" — a
+                    // nota mora sempre sob a linha do encontro dela. DPP
+                    // compara com os oficiais do cronograma DA DUPLA
+                    .filter(
+                      (i) =>
+                        i.dupla.trilha === "especialista" ||
+                        !numerosOficiaisDe(i.dupla).has(i.encontro.numero)
+                    )
+                    .map((i) => (
+                      <div key={i.encontro.id} className="px-2">
+                        <NotaEncontro
+                          duplaId={i.dupla.id}
+                          numero={i.encontro.numero}
+                          nota={
+                            i.dupla.notas?.find((n) => n.numero === i.encontro.numero)
+                              ?.texto ?? null
+                          }
+                          rotulo={`${i.encontro.numero}º encontro`}
+                        />
+                      </div>
+                    ))}
+                {/* quem ainda não marcou o encontro oficial do dia — o mesmo
+                    recorte do board da semana, com o nudge ao lado */}
+                {faltantesDoDia.length > 0 && (
+                  <div
+                    className={cn(
+                      itensDupla.length > 0 &&
+                        "mt-2 border-t border-border/70"
+                    )}
+                  >
+                    <p className="px-2 pb-0.5 pt-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                      Sem o {oficialDoDia!.numero}º encontro (
+                      {faltantesDoDia.length})
+                    </p>
+                    <ul>
+                      {faltantesDoDia.map((d) => (
+                        <LinhaSemEncontro
+                          key={d.id}
+                          dupla={d}
+                          numero={oficialDoDia!.numero!}
+                        />
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
             {eventosSelecionados.length === 0 ? (
-              <div className="mt-3">
+              <div
+                className={
+                  itensDupla.length > 0 || faltantesDoDia.length > 0
+                    ? "mt-4"
+                    : "mt-3"
+                }
+              >
                 <p className="text-sm text-muted-foreground">
                   Nenhum evento oficial neste dia.
                 </p>
@@ -2568,7 +2660,24 @@ export function AgendaCalendario({
                 )}
               </div>
             ) : (
-              <div className="mt-3 space-y-4">
+              <div
+                className={cn(
+                  "space-y-4",
+                  itensDupla.length > 0 || faltantesDoDia.length > 0
+                    ? "mt-4"
+                    : "mt-3"
+                )}
+              >
+                {/* rótulo do bloco oficial — só quando há itens de dupla
+                    acima: separa "o que o programa marca pro dia" do "seu"
+                    na ordem nova do painel (K5) */}
+                {(itensDupla.length > 0 || faltantesDoDia.length > 0) && (
+                  <h3 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                    {eventosSelecionados.length > 1
+                      ? "Eventos oficiais"
+                      : "Evento oficial"}
+                  </h3>
+                )}
                 {eventosSelecionados.map((e) => {
                   const nomeEvento =
                     e.numero != null
@@ -2679,95 +2788,6 @@ export function AgendaCalendario({
                   </div>
                   );
                 })}
-              </div>
-            )}
-            {/* encontros das duplas no dia — visível mesmo sem evento oficial.
-                A superfície tinta separa "seu" (linhas + ações) do oficial do
-                ciclo (o que o programa diz sobre o dia). Pra coord/sup o bloco
-                também hospeda a coorte invisível do encontro oficial do dia,
-                então ela sozinha já abre a superfície */}
-            {(itensDupla.length > 0 || faltantesDoDia.length > 0) && (
-              <div
-                className={cn(
-                  // poço inset — afunda na superfície do painel pra separar
-                  // "seu" (linhas + ações) do oficial do ciclo
-                  "rounded-xl bg-muted/50 p-3 shadow-[var(--shadow-inset)]",
-                  eventosSelecionados.length > 0 ? "mt-4" : "mt-3"
-                )}
-              >
-                {itensDupla.length > 0 && (
-                  <>
-                    <h3 className="px-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                      {ehMentor ? "Sua dupla" : "Duplas"}
-                    </h3>
-                    {/* chave dos dots de status — contextual, junto de onde eles aparecem */}
-                    <ChaveDotsDupla className="mt-1 px-2" />
-                    {/* com muitos itens a leitura é por status (mesmo componente
-                        do board da semana); dia leve segue lista plana */}
-                    {ehCoordSup && itensDupla.length > 5 ? (
-                      <BucketsEncontros
-                        buckets={bucketsDoDia}
-                        renderItem={(item, i) => rowDupla(item, i, selecionado)}
-                      />
-                    ) : (
-                      <ul className="mt-1.5">
-                        {itensDupla.map((item, i) =>
-                          rowDupla(item, i, selecionado)
-                        )}
-                      </ul>
-                    )}
-                  </>
-                )}
-                {/* encontro agendado fora do dia oficial (nº sem evento do ciclo
-                    aqui) não tem bloco próprio acima — a anotação mora sob a
-                    linha, rotulada pelo nº (v1: só o mentor escreve) */}
-                {ehMentor &&
-                  itensDupla
-                    // na trilha especialista o nº nunca tem "dia oficial" — a
-                    // nota mora sempre sob a linha do encontro dela. DPP
-                    // compara com os oficiais do cronograma DA DUPLA
-                    .filter(
-                      (i) =>
-                        i.dupla.trilha === "especialista" ||
-                        !numerosOficiaisDe(i.dupla).has(i.encontro.numero)
-                    )
-                    .map((i) => (
-                      <div key={i.encontro.id} className="px-2">
-                        <NotaEncontro
-                          duplaId={i.dupla.id}
-                          numero={i.encontro.numero}
-                          nota={
-                            i.dupla.notas?.find((n) => n.numero === i.encontro.numero)
-                              ?.texto ?? null
-                          }
-                          rotulo={`${i.encontro.numero}º encontro`}
-                        />
-                      </div>
-                    ))}
-                {/* quem ainda não marcou o encontro oficial do dia — o mesmo
-                    recorte do board da semana, com o nudge ao lado */}
-                {faltantesDoDia.length > 0 && (
-                  <div
-                    className={cn(
-                      itensDupla.length > 0 &&
-                        "mt-2 border-t border-border/70"
-                    )}
-                  >
-                    <p className="px-2 pb-0.5 pt-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                      Sem o {oficialDoDia!.numero}º encontro (
-                      {faltantesDoDia.length})
-                    </p>
-                    <ul>
-                      {faltantesDoDia.map((d) => (
-                        <LinhaSemEncontro
-                          key={d.id}
-                          dupla={d}
-                          numero={oficialDoDia!.numero!}
-                        />
-                      ))}
-                    </ul>
-                  </div>
-                )}
               </div>
             )}
             {/* ação do dia pro mentor: agendar (futuro) ou registrar (passado)
@@ -2947,7 +2967,12 @@ function CoberturaEncontro({ duplas, numero }: { duplas: Dupla[]; numero: number
  *  pro próximo encontro pendente. Encontro criado aqui fica na agenda:
  *  `onEncontroCriado` navega pro dia dele e abre o registro em modal na linha —
  *  realizado/agendado-vencido sem registro ganha o CTA na própria linha
- *  ("Sua dupla"), sem depender deste bloco. */
+ *  ("Sua dupla"), sem depender deste bloco.
+ *  K3: quando o dia já tem encontro desta dupla (linha em "Sua dupla"), o
+ *  retroativo nunca pode ler como ação sobre ela — dia resolvido
+ *  (realizado+registro) ganha a nota de "outro que ficou faltando" e o
+ *  rótulo nomeia o alvo; qualquer outra linha no dia já força "outro
+ *  encontro"/"o Nº encontro" no rótulo. */
 function AcaoDiaMentor({
   dupla,
   eventos,
@@ -2994,6 +3019,28 @@ function AcaoDiaMentor({
     ? (dupla.encontros.find((e) => e.numero === oficial.numero) ?? null)
     : null;
 
+  // encontro desta dupla caindo no dia selecionado aparece em "Sua dupla"
+  // acima — o realizado COM registro "resolve" o dia (K3): o botão
+  // "Registrar encontro" solto embaixo lia como ação sobre essa linha
+  // ("o encontro não foi registrado"). Regra: dia resolvido ⇒ a nota
+  // ancora o gesto (é outro encontro, em qualquer data) e o rótulo nomeia
+  // o alvo; dia com outro encontro qualquer ⇒ o rótulo já diz "outro".
+  const encontrosNoDia = dupla.encontros.some(
+    (e) => diaDoEncontro(e) === selecionado
+  );
+  const diaResolvido = dupla.encontros.some(
+    (e) =>
+      e.status === "realizado" &&
+      e.registro != null &&
+      diaDoEncontro(e) === selecionado
+  );
+  const notaResolvido = diaResolvido ? (
+    <p className="w-full text-xs text-muted-foreground">
+      O encontro deste dia já tem registro — aqui você registra outro que
+      ficou faltando.
+    </p>
+  ) : null;
+
   let acao: ReactNode = null;
   if (oficial?.numero != null) {
     if (!rowOficial) {
@@ -3010,20 +3057,28 @@ function AcaoDiaMentor({
           />
         );
       } else if (alvo.faltantes.some((f) => f.numero === oficial.numero)) {
+        // K3: com encontro da dupla no dia, o rótulo nomeia o nº faltante —
+        // nunca um "Registrar encontro" genérico que pareça se referir à
+        // linha de "Sua dupla"; e com o dia resolvido a nota ancora o gesto
         acao = (
-          <RegistrarRetroativoDialog
-            duplaId={dupla.id}
-            faltantes={alvo.faltantes}
-            numeroInicial={oficial.numero}
-            quandoPadrao={oficial.data}
-            onCreated={onEncontroCriado}
-            trigger={
-              <Button variant="outline" size="sm">
-                <ClockCounterClockwise size={16} />
-                Registrar encontro
-              </Button>
-            }
-          />
+          <>
+            {notaResolvido}
+            <RegistrarRetroativoDialog
+              duplaId={dupla.id}
+              faltantes={alvo.faltantes}
+              numeroInicial={oficial.numero}
+              quandoPadrao={oficial.data}
+              onCreated={onEncontroCriado}
+              trigger={
+                <Button variant="outline" size="sm">
+                  <ClockCounterClockwise size={16} />
+                  {encontrosNoDia
+                    ? `Registrar o ${oficial.numero}º encontro`
+                    : "Registrar encontro"}
+                </Button>
+              }
+            />
+          </>
         );
       }
       // oficial passado fora da janela da dupla (antes do início) — sem CTA,
@@ -3081,19 +3136,27 @@ function AcaoDiaMentor({
           dataSugerida: alvo.sugeridoProximo ?? selecionado,
         });
       if (opcoes.length > 0)
+        // K3: o CTA retroativo do dia genérico também obedece à regra do
+        // dia resolvido — "outro encontro" (qualquer data) com a nota, e
+        // nunca botão isolado sob a linha de um encontro já registrado
         acao = (
-          <RegistrarRetroativoDialog
-            duplaId={dupla.id}
-            faltantes={opcoes}
-            quandoPadrao={selecionado}
-            onCreated={onEncontroCriado}
-            trigger={
-              <Button variant="outline" size="sm">
-                <ClockCounterClockwise size={16} />
-                Registrar encontro
-              </Button>
-            }
-          />
+          <>
+            {notaResolvido}
+            <RegistrarRetroativoDialog
+              duplaId={dupla.id}
+              faltantes={opcoes}
+              quandoPadrao={selecionado}
+              onCreated={onEncontroCriado}
+              trigger={
+                <Button variant="outline" size="sm">
+                  <ClockCounterClockwise size={16} />
+                  {encontrosNoDia
+                    ? "Registrar outro encontro"
+                    : "Registrar encontro"}
+                </Button>
+              }
+            />
+          </>
         );
     }
   }
@@ -3157,7 +3220,7 @@ function EncontroDuplaRow({
   const mesmoDia = diaDoEncontro(encontro) === selecionado;
   // agendado cuja hora já passou sem virar realizado nem não-aconteceu — a
   // mesma leitura de "limbo" da trilha (jornadaDaDupla) e da ficha
-  const limbo = emLimbo(encontro, agora);
+  const limbo = limboAberto(encontro, agora);
   const registroPendente =
     !encontro.registro && (encontro.status === "realizado" || limbo);
   // nudge da coord/sup sobre a pendência — os dois lados da dupla; limbo
@@ -3251,6 +3314,36 @@ function EncontroDuplaRow({
   const editarLink =
     ehMentor && encontro.status === "agendado" ? (
       <EditarLinkDialog encontroId={encontro.id} linkAtual={encontro.link} />
+    ) : null;
+
+  // limbo (agendado vencido sem registro — K4): "remarcar" e "não aconteceu"
+  // a um toque da linha, mesmo par de gestos da ficha. O follow-up do CTA
+  // resolve o "rolou"; estes resolvem "não rolou" e "rola noutra data" —
+  // a remarcação abre o AgendarEncontroDialog em modo edição (a action
+  // move o agendado passado pra um alvo futuro)
+  const acoesLimbo =
+    ehMentor && limbo ? (
+      <>
+        <AgendarEncontroDialog
+          duplaId={dupla.id}
+          numero={encontro.numero}
+          atual={encontro}
+          piso={dupla.iniciada_em ?? undefined}
+          jovemNome={dupla.mentorado.nome.split(" ")[0]}
+          rotulo={
+            dupla.trilha === "especialista"
+              ? "sessão de especialista"
+              : undefined
+          }
+          trigger={
+            <Button variant="outline" size="sm">
+              <CalendarBlank size={16} />
+              Remarcar
+            </Button>
+          }
+        />
+        <NaoAconteceuButton encontroId={encontro.id} duplaId={dupla.id} />
+      </>
     ) : null;
 
   return (
@@ -3364,13 +3457,14 @@ function EncontroDuplaRow({
               encontroId={encontro.id}
               duplaId={dupla.id}
               evento={evento}
+              trilha={dupla.trilha}
               combinadosPendentes={combinadosPendentes}
               onSaved={onRegistroSalvo}
             />
           </DialogContent>
         </Dialog>
       )}
-      {(ctaRegistro || chamada || editarLink) && (
+      {(ctaRegistro || chamada || editarLink || acoesLimbo) && (
         <div className="flex flex-wrap items-center gap-2 px-2 pb-1.5">
           {encontro.status === "realizado"
             ? ctaRegistro
@@ -3379,6 +3473,7 @@ function EncontroDuplaRow({
               )}
           {chamada}
           {editarLink}
+          {acoesLimbo}
         </div>
       )}
     </li>
@@ -3746,7 +3841,7 @@ function hrefEncontroMentor(item: ItemDupla, agora: number): string {
   const { encontro, dupla } = item;
   const pendente =
     !encontro.registro &&
-    (encontro.status === "realizado" || emLimbo(encontro, agora));
+    (encontro.status === "realizado" || limboAberto(encontro, agora));
   return pendente
     ? `/duplas/${dupla.id}#registrar-${encontro.id}`
     : `/duplas/${dupla.id}`;
