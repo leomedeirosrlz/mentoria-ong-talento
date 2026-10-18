@@ -1,4 +1,4 @@
-import { SITE_URL } from "./email";
+import { SITE_URL } from "@/lib/email";
 import type { ComunicadoPrioridade } from "@/lib/types";
 
 // hex equivalentes das CSS vars da marca (globals.css) — e-mail não herda
