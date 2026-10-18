@@ -555,13 +555,127 @@ export type Notificacao = {
     | "encontro_desfeito"
     | "solicitacao_triagem"
     | "solicitacao_proposta"
-    | "solicitacao_recusada";
+    | "solicitacao_recusada"
+    // 0084 — chamados unificados (fila de atendimento + conversa)
+    | "chamado_aberto"
+    | "chamado_atribuido"
+    | "chamado_atualizacao"
+    | "chamado_resposta_autor"
+    | "chamado_resolvido"
+    | "chamado_reaberto"
+    | "chamado_mencao";
   titulo: string;
   corpo: string | null;
   href: string | null;
   lida_em: string | null;
   created_at: string;
 };
+
+// ---------- chamados unificados (0084, WP1 telas finais) ----------
+
+export type ChamadoCategoria =
+  | "agenda"
+  | "metodologia"
+  | "plataforma"
+  | "urgencia"
+  | "outro";
+export type ChamadoStatus = "aberto" | "em_atendimento" | "resolvido";
+export type ChamadoOrigem = "manual" | "registro" | "avaliacao_jovem";
+
+/** Row da tabela `chamados`. autor_id é null quando o autor é o jovem sem
+ *  login (link da avaliação) — a ficha mora em autor_mentorado_id. */
+export type Chamado = {
+  id: string;
+  numero: string;
+  autor_id: string | null;
+  autor_mentorado_id: string | null;
+  dupla_id: string | null;
+  categoria: ChamadoCategoria;
+  descricao_outro: string | null;
+  assunto: string;
+  mensagem: string | null;
+  status: ChamadoStatus;
+  atribuido_a: string | null;
+  origem: ChamadoOrigem;
+  registro_id: string | null;
+  avaliacao_id: string | null;
+  created_at: string;
+  updated_at: string;
+  resolvido_em: string | null;
+  resolvido_por: string | null;
+  resolucao_resumo: string | null;
+};
+
+/** Linha da view `chamados_fila` (0084) — o staff vê a fila inteira; pro
+ *  auxiliar executivo os chamados de plataforma chegam mascarados
+ *  (restrito=true: protocolo, categoria, estado e idade — molde do mock). */
+export type ChamadoFila = Omit<
+  Chamado,
+  | "autor_id" | "autor_mentorado_id" | "dupla_id" | "atribuido_a"
+  | "resolvido_por" | "resolucao_resumo" | "assunto" | "mensagem"
+  | "descricao_outro" | "registro_id" | "avaliacao_id"
+> & {
+  assunto: string | null;
+  mensagem: string | null;
+  descricao_outro: string | null;
+  autor_id: string | null;
+  autor_mentorado_id: string | null;
+  dupla_id: string | null;
+  atribuido_a: string | null;
+  resolvido_por: string | null;
+  resolucao_resumo: string | null;
+  registro_id: string | null;
+  avaliacao_id: string | null;
+  restrito: boolean;
+};
+
+/** Item de fila/detalhe enriquecido pela query — nomes resolvidos pra não
+ *  fazer N+1 na lista. */
+export type ChamadoFilaItem = ChamadoFila & {
+  autor_nome: string | null;
+  autor_papel: string | null;
+  atribuido_nome: string | null;
+  contexto: string | null; // "Encontro 4 · Ana" — origem+dupla resumidos
+};
+
+export type ChamadoAtualizacao = {
+  id: string;
+  chamado_id: string;
+  autor_id: string | null; // null = evento de sistema
+  tipo: "publica" | "sistema";
+  texto: string;
+  created_at: string;
+  autor_nome?: string | null;
+};
+
+export type ChamadoComentario = {
+  id: string;
+  chamado_id: string;
+  autor_id: string;
+  texto: string;
+  created_at: string;
+  autor_nome?: string | null;
+};
+
+export type ChamadoAnexo = {
+  id: string;
+  chamado_id: string;
+  path: string;
+  nome: string;
+  tamanho: number | null;
+  mime: string | null;
+  interno: boolean;
+  created_by: string | null;
+  created_at: string;
+  autor_nome?: string | null;
+};
+
+/** Entry do timeline renderizado — público (autor vê), interno (só equipe)
+ *  ou anexo. */
+export type ChamadoTimelineItem =
+  | { tipo: "sistema" | "publica"; item: ChamadoAtualizacao }
+  | { tipo: "interno"; item: ChamadoComentario }
+  | { tipo: "anexo"; item: ChamadoAnexo };
 
 // ---------- trilha de especialista (0027) ----------
 

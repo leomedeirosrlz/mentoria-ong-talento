@@ -22,7 +22,6 @@ import {
   encRealizado,
   mkCronograma,
   mkDupla,
-  mkEvento,
 } from "./helpers";
 
 // T2 = T1 inteiro deslocado 4 semanas — os mesmos números, outras datas. A

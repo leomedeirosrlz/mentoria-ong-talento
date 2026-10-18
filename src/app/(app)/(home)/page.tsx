@@ -17,8 +17,10 @@ import {
 } from "@/lib/queries-especialista";
 import { getSupervisaoAlvos, getSupervisoesRecentes } from "@/lib/queries-supervisao";
 import { getMinhaAssinaturaTermo } from "@/lib/queries-assinaturas";
+import { getChamados } from "@/lib/queries-chamados";
 import { DashboardCoordenacao } from "@/components/dashboard-coordenacao";
 import { DemandasEspecialista } from "@/components/demandas-especialista";
+import { MeusChamadosCard } from "@/components/meus-chamados-card";
 import { MentorHome } from "@/components/mentor-home";
 import { TermoBanner } from "@/components/termo-banner";
 import { AvisosSection } from "@/components/avisos-section";
@@ -120,14 +122,22 @@ export default async function HomePage({
       (s.status_efetivo ?? s.status) === "aberta" ||
       (s.status_efetivo ?? s.status) === "contra_proposta"
   );
-  const [propostas, meusSlots] = await Promise.all([
+  const [propostas, meusSlots, meusChamados] = await Promise.all([
     emNegociacao.length
       ? getPropostasMap(emNegociacao.map((s) => s.id))
       : Promise.resolve({}),
     me?.role === "mentor_especialista"
       ? getSlotsLivres(me.id)
       : Promise.resolve([]),
+    // 0084: os chamados do mentor moram na home dele (coord/sup têm a fila)
+    getChamados(),
   ]);
+  const duplasOpcoes = duplas
+    .filter((d) => d.status === "ativa" || d.status === "pausada")
+    .map((d) => ({
+      id: d.id,
+      label: `${d.mentorado?.nome?.split(" ")[0] ?? "Mentorado(a)"} · ${d.trilha === "especialista" ? "Especialista" : "DPP"}`,
+    }));
   return (
     <div className="space-y-8">
       {/* null = nunca assinou — qualquer estado ≠ assinado pede a assinatura */}
@@ -140,6 +150,11 @@ export default async function HomePage({
         espEventos={espEventos}
         cronogramas={cronogramas}
         me={me!}
+      />
+      <MeusChamadosCard
+        chamados={meusChamados.itens}
+        duplas={duplasOpcoes}
+        papel={me?.role ?? ""}
       />
       {me?.role === "mentor_especialista" && (
         <DemandasEspecialista
