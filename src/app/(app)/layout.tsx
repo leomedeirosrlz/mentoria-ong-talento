@@ -117,7 +117,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           demo={demoDock}
         />
         {demoFloat}
-        {demoMockups}
+        {/* sem demoMockups no wizard — o toggle flutuante cobre o footer
+            (intercepta o "Continuar") e trocar de layout com o primeiro
+            acesso aberto não faz sentido */}
       </>
     );
   }

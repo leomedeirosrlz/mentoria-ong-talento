@@ -893,7 +893,11 @@ declare
   v_dupla_id uuid;
   v_aval_id uuid;
   v_dests jsonb;
-  v_chamado record;
+  -- scalars, não record: `record` não-atribuído explode no acesso ao campo
+  -- (55000) — sem pedir_apoio o select nunca roda e a função morreria no
+  -- jsonb_build_object do return
+  v_chamado_id uuid;
+  v_chamado_numero text; -- protocolo 'CHA-000001', não int
 begin
   if p_estrelas is null or p_estrelas < 1 or p_estrelas > 5 then
     raise exception 'nota de 1 a 5 estrelas é obrigatória';
@@ -953,7 +957,7 @@ begin
    where encontro_id = p_encontro_id and status = 'pendente';
 
   if coalesce(p_pedir_apoio, false) then
-    select id, numero into v_chamado from chamados
+    select id, numero into v_chamado_id, v_chamado_numero from chamados
      where avaliacao_id = v_aval_id;
     -- e-mail redundante: canal de segurança de menor não depende do sino
     select jsonb_agg(jsonb_build_object(
@@ -968,7 +972,7 @@ begin
   return jsonb_build_object(
     'ok', true, 'avaliacao_id', v_aval_id,
     'pedir_apoio', coalesce(p_pedir_apoio, false),
-    'chamado_id', v_chamado.id, 'chamado_numero', v_chamado.numero,
+    'chamado_id', v_chamado_id, 'chamado_numero', v_chamado_numero,
     'destinatarios', coalesce(v_dests, '[]'::jsonb));
 end $$;
 

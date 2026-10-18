@@ -95,11 +95,13 @@ export default async function JovemLayout({
     // coordenação ainda não vinculou o cadastro (os passos mostram o
     // estado honesto em vez de quebrar)
     const perfil = await getJovemPerfil();
+    // sem demoMockups aqui: o toggle flutuante cobre o footer do wizard
+    // (intercepta o "Continuar") — e não faz sentido trocar de layout
+    // enquanto o primeiro acesso está aberto
     return (
       <>
         <OnboardingJovem me={me} perfil={perfil} demo={demoDock} />
         {demoFloat}
-        {demoMockups}
       </>
     );
   }
