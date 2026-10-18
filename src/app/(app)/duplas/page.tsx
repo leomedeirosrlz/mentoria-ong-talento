@@ -8,6 +8,7 @@ import {
   getMinhasDuplas,
 } from "@/lib/queries";
 import { getSupervisaoAlvos } from "@/lib/queries-supervisao";
+import { temPapel } from "@/lib/types";
 import { DuplasLista, type VisaoDuplas } from "@/components/duplas-lista";
 
 export const metadata: Metadata = {
@@ -17,17 +18,21 @@ export const metadata: Metadata = {
 export default async function DuplasPage() {
   const me = await getMe();
   if (!me) redirect("/login");
-  // mentor também entra — a RLS já limita a lista às próprias duplas
+  // mentor também entra — a RLS já limita a lista às próprias duplas.
+  // Papéis efetivos, não o primário: quem é DPP + especialista ganha a
+  // visão híbrida (as duas seções, cada card na régua da própria trilha)
   const visao: VisaoDuplas | null =
     me.role === "coordenacao"
       ? "coordenacao"
       : me.role === "supervisor"
         ? "supervisor"
-        : me.role === "mentor_dpp"
-          ? "mentor"
-          : me.role === "mentor_especialista"
-            ? "especialista"
-            : null;
+        : temPapel(me, "mentor_dpp") && temPapel(me, "mentor_especialista")
+          ? "hibrido"
+          : temPapel(me, "mentor_dpp")
+            ? "mentor"
+            : temPapel(me, "mentor_especialista")
+              ? "especialista"
+              : null;
   if (!visao) redirect("/");
 
   // coord vê tudo; supervisor/mentor já vêm escopados da query (uma leitura,
@@ -47,7 +52,7 @@ export default async function DuplasPage() {
         : getMinhasDuplas(),
     getCicloEventos(),
     visao === "supervisor" ? getSupervisaoAlvos() : Promise.resolve([]),
-    visao === "especialista"
+    visao === "especialista" || visao === "hibrido"
       ? getEspecialistaEventos()
       : Promise.resolve([]),
   ]);

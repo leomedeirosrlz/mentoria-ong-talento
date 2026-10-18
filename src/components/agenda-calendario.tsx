@@ -97,6 +97,7 @@ import {
   type PassoGuia,
 } from "@/lib/ciclo";
 import type { MentorChamada } from "@/lib/queries-presenca";
+import { temPapel } from "@/lib/types";
 import type {
   AppRole,
   CicloEvento,
@@ -600,6 +601,7 @@ export function AgendaCalendario({
   mentores = [],
   presencas = {},
   mentorDisponibilidade,
+  papeis = null,
 }: {
   eventos: CicloEvento[];
   /** Cronogramas do programa (0061) — cada um é um calendário oficial por
@@ -630,8 +632,12 @@ export function AgendaCalendario({
    *  sup/jovem renderizam como antes); `null` = overlay ligado com o lado
    *  do mentor nunca livre (ele ainda não preencheu a grade). */
   mentorDisponibilidade?: Disponibilidade | null;
+  /** Papéis efetivos (WP6b) — o híbrido esp-primário também é mentor nas
+   *  duplas DPP dele; sem a prop cai no role primário (comportamento antigo) */
+  papeis?: AppRole[] | null;
 }) {
-  const ehMentor = role === "mentor_dpp" || role === "mentor_especialista";
+  const ehMentor = temPapel({ role, papeis }, "mentor_dpp") ||
+    temPapel({ role, papeis }, "mentor_especialista");
   const ehCoordSup = role === "coordenacao" || role === "supervisor";
   const ehCoord = role === "coordenacao";
   const router = useRouter();

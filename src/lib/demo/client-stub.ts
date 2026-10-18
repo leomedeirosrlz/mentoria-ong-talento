@@ -342,9 +342,10 @@ function resolveEmbed(
     const v = linha[c];
     if (typeof v === "string" && v) {
       const alvo = linhas(spec.tabela, papel).find((r) => r.id === v);
-      // FK preenchida sem linha correspondente -> embed to-one vira null,
-      // como no PostgREST
-      return alvo ? projetaAlvo(alvo as Linha, spec.sub) : null;
+      // FK resolvida → to-one projetado. Não achada, segue pros próximos
+      // candidatos e por fim pro ramo to-many — sem isso um `user_id` na
+      // linha pai engolia embeds filhos tipo `profile_papeis(papel)` (WP6b)
+      if (alvo) return projetaAlvo(alvo as Linha, spec.sub);
     }
   }
   // to-many: filhas que apontam pra origem ("duplas" -> "dupla_id")

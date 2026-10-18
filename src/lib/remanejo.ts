@@ -22,6 +22,7 @@ import {
   periodosCruzam,
 } from "./ciclo";
 import { tetoMentor, type FilaItem } from "./fila";
+import { temPapel } from "./types";
 import { normaliza } from "./utils";
 import type {
   Disponibilidade,
@@ -235,11 +236,12 @@ export function afinidadeScore(a: LadoMatching, b: LadoMatching): Pontuacao {
 export type OcupacaoMentor = { usadas: number; teto: number };
 
 export function ocupacaoMentor(
-  p: Pick<Profile, "role">,
+  p: Pick<Profile, "role" | "papeis">,
   mp: MentorProfile | undefined,
-  usadas: number | undefined
+  usadas: number | undefined,
+  trilha?: "dpp" | "especialista"
 ): OcupacaoMentor {
-  return { usadas: usadas ?? 0, teto: tetoMentor(p, mp) };
+  return { usadas: usadas ?? 0, teto: tetoMentor(p, mp, trilha) };
 }
 
 export type CandidatoMentor = {
@@ -265,10 +267,18 @@ export function ranquearMentores(
   par: LadoMatching,
   excluirId?: string
 ): CandidatoMentor[] {
+  const trilha = papel === "mentor_especialista" ? "especialista" : "dpp";
   return pessoas
-    .filter((p) => p.role === papel && p.ativo && p.id !== excluirId)
+    // papel efetivo (WP6b): o híbrido entra no pool da trilha que ele tem —
+    // e a ocupação lê só a pool dela (chave `${id}:${trilha}`)
+    .filter((p) => temPapel(p, papel) && p.ativo && p.id !== excluirId)
     .map((p) => {
-      const o = ocupacaoMentor(p, mentorProfiles[p.id], usadas[p.id]);
+      const o = ocupacaoMentor(
+        p,
+        mentorProfiles[p.id],
+        usadas[`${p.id}:${trilha}`],
+        trilha
+      );
       return {
         profile: p,
         usadas: o.usadas,

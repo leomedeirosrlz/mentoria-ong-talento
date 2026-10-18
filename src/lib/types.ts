@@ -4,6 +4,18 @@ export type AppRole =
   | "mentor_dpp"
   | "mentor_especialista"
   | "mentorado";
+
+/** Papéis efetivos (WP0b · profile_papeis): `role` é só o primário — o
+ *  híbrido DPP+especialista tem o segundo papel numa linha extra. `getMe`
+ *  carrega `papeis` via my_papeis(); embeds/personas trazem só o primário,
+ *  então o campo é opcional e o fallback cobre os dois mundos. */
+export function temPapel(
+  p: { role: AppRole | null; papeis?: AppRole[] | null } | null | undefined,
+  papel: AppRole
+): boolean {
+  if (!p) return false;
+  return p.role === papel || (p.papeis?.includes(papel) ?? false);
+}
 /** 'concluida' (0037) = jornada percorrida até o fim; 'encerrada' = fechamento
  *  antecipado. Ambas liberam a vaga e congelam a trilha como a encerrada. */
 export type DuplaStatus = "ativa" | "pausada" | "concluida" | "encerrada";
@@ -66,6 +78,8 @@ export type Profile = {
   email: string;
   whatsapp: string | null;
   role: AppRole | null;
+  /** Papéis efetivos (0085) — só o getMe/self carrega; embeds ficam sem. */
+  papeis?: AppRole[];
   ativo: boolean;
   /** Carimbo de criação do cadastro — vem em PROFILE_COLS_PUBLICAS; opcional
    *  porque fontes sem a coluna existem (personas demo, selects parciais). */
@@ -492,6 +506,7 @@ export type DuplaResumo = {
   mentor_id: string;
   mentorado_id: string;
   supervisor_id: string | null;
+  trilha: Trilha;
 };
 
 export type Material = {

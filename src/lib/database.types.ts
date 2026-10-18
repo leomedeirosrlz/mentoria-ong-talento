@@ -3830,6 +3830,10 @@ export type Database = {
       meus_dados_civis: { Args: never; Returns: Json }
       meus_dados_pessoais: { Args: never; Returns: Json }
       my_mentorado_id: { Args: never; Returns: string }
+      my_papeis: {
+        Args: never
+        Returns: Database["public"]["Enums"]["app_role"][]
+      }
       my_profile_id: { Args: never; Returns: string }
       my_role: { Args: never; Returns: Database["public"]["Enums"]["app_role"] }
       nome_proprio: { Args: { p: string }; Returns: string }

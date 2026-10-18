@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { tetoMentor } from "@/lib/fila";
 import type { MentorProfile } from "@/lib/queries";
+import { temPapel } from "@/lib/types";
 import type { Mentorado, Profile } from "@/lib/types";
 import { AfinidadePar } from "@/components/matching-afinidade";
 import { CapacidadeMentorDialog } from "@/components/capacidade-mentor-dialog";
@@ -45,11 +46,14 @@ export function MatchingPanel({
   const mentorado = mentorados.find((m) => m.id === mentoradoId) ?? null;
   const mp = mentor ? mentorProfiles[mentor.id] : undefined;
 
+  // board de pareamento é DPP (WP6b): especialista pareja pelo mural. A
+  // ocupação vem chaveada `${id}:${trilha}` — aqui sempre a pool DPP, e o
+  // híbrido comparece só se tiver o papel DPP.
   const tetoDe = (id: string) => {
     const p = mentores.find((m) => m.id === id);
-    return p ? tetoMentor(p, mentorProfiles[id]) : 1;
+    return p ? tetoMentor(p, mentorProfiles[id], "dpp") : 1;
   };
-  const usadasDe = (id: string) => ocupacao[id] ?? 0;
+  const usadasDe = (id: string) => ocupacao[`${id}:dpp`] ?? 0;
   const mentorLotado =
     mentor != null && usadasDe(mentor.id) >= tetoDe(mentor.id);
   const comVaga = mentores.filter((m) => usadasDe(m.id) < tetoDe(m.id));
@@ -61,10 +65,11 @@ export function MatchingPanel({
       a.nome.localeCompare(b.nome, "pt-BR")
   );
   const rotuloMentor = (m: Profile) => {
-    const esp = m.role === "mentor_especialista";
+    const hibrido =
+      temPapel(m, "mentor_dpp") && temPapel(m, "mentor_especialista");
     const cheio = usadasDe(m.id) >= tetoDe(m.id);
     return `${m.nome} · ${usadasDe(m.id)}/${tetoDe(m.id)}${
-      esp ? " · especialista" : ""
+      hibrido ? " · DPP e especialista" : ""
     }${cheio ? " · sem vaga" : ""}`;
   };
 
@@ -161,6 +166,7 @@ export function MatchingPanel({
                 nome={mentor.nome}
                 atual={tetoDe(mentor.id)}
                 emUso={usadasDe(mentor.id)}
+                trilha="dpp"
                 trigger={
                   <button
                     type="button"

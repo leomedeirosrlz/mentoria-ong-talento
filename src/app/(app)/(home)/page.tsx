@@ -18,6 +18,7 @@ import {
 import { getSupervisaoAlvos, getSupervisoesRecentes } from "@/lib/queries-supervisao";
 import { getMinhaAssinaturaTermo } from "@/lib/queries-assinaturas";
 import { getChamados } from "@/lib/queries-chamados";
+import { temPapel } from "@/lib/types";
 import { DashboardCoordenacao } from "@/components/dashboard-coordenacao";
 import { DemandasEspecialista } from "@/components/demandas-especialista";
 import { MeusChamadosCard } from "@/components/meus-chamados-card";
@@ -110,8 +111,9 @@ export default async function HomePage({
     duplas.some((d) => d.trilha === "especialista")
       ? getEspecialistaEventos()
       : Promise.resolve([]),
-    // o mural de demandas é a home do especialista — pros demais não existe
-    me?.role === "mentor_especialista"
+    // o mural de demandas é a home do especialista — pros demais não existe.
+    // temPapel: o híbrido DPP-primário também atende demandas (WP6b)
+    temPapel(me, "mentor_especialista")
       ? getSolicitacoesVisiveis()
       : Promise.resolve([]),
   ]);
@@ -126,8 +128,8 @@ export default async function HomePage({
     emNegociacao.length
       ? getPropostasMap(emNegociacao.map((s) => s.id))
       : Promise.resolve({}),
-    me?.role === "mentor_especialista"
-      ? getSlotsLivres(me.id)
+    temPapel(me, "mentor_especialista")
+      ? getSlotsLivres(me!.id)
       : Promise.resolve([]),
     // 0084: os chamados do mentor moram na home dele (coord/sup têm a fila)
     getChamados(),
@@ -156,12 +158,12 @@ export default async function HomePage({
         duplas={duplasOpcoes}
         papel={me?.role ?? ""}
       />
-      {me?.role === "mentor_especialista" && (
+      {temPapel(me, "mentor_especialista") && (
         <DemandasEspecialista
           solicitacoes={solicitacoes}
           propostas={propostas}
           slots={meusSlots}
-          meuId={me.id}
+          meuId={me!.id}
         />
       )}
       <AvisosSection avisos={avisos} souCoord={false} />

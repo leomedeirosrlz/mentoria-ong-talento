@@ -62,11 +62,12 @@ export default async function PessoasPage() {
       .filter((id): id is string => Boolean(id))
   );
 
-  // matching board: vagas ocupadas por mentor (duplas não-encerradas)
-  // e capacidade/prontidão de cada um, indexados por profile_id
+  // matching board: vagas ocupadas por mentor E trilha (WP6b — o híbrido
+  // tem duas pools) e capacidade/prontidão de cada um, por profile_id
   const contagemPorMentor: Record<string, number> = {};
   for (const d of duplas) {
-    contagemPorMentor[d.mentor_id] = (contagemPorMentor[d.mentor_id] ?? 0) + 1;
+    const chave = `${d.mentor_id}:${d.trilha ?? "dpp"}`;
+    contagemPorMentor[chave] = (contagemPorMentor[chave] ?? 0) + 1;
   }
   const mentorProfiles: Record<string, MentorProfile> = {};
   for (const mp of perfisMentor) {

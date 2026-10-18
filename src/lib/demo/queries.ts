@@ -251,9 +251,15 @@ function comContatoDuplas(
 /** Persona do papel + marca de onboarding do cookie demo (o gate do wizard
  *  lê onboarded_em via getMe). */
 export function demoMe(role: AppRole, onboarded: boolean): Profile {
-  const p = getDemoData().personas[role];
+  const data = getDemoData();
+  const p = data.personas[role];
   const base = comContato(
-    { ...p, onboarded_em: onboarded ? new Date().toISOString() : null },
+    {
+      ...p,
+      onboarded_em: onboarded ? new Date().toISOString() : null,
+      // papéis efetivos — Ricardo chega híbrido (dpp+esp) como no banco
+      papeis: papeisDe(data, p),
+    },
     demoContatosMap(role)
   );
   // getMe real nunca traz os sensíveis (grant de coluna) — nem do próprio
@@ -454,6 +460,7 @@ export function demoDuplasResumo(role: AppRole, todas: boolean): DuplaResumo[] {
       mentor_id: d.mentor.id,
       mentorado_id: d.mentorado.id,
       supervisor_id: d.supervisor?.id ?? null,
+      trilha: d.trilha,
     }));
 }
 
@@ -1788,7 +1795,11 @@ function comAvaliacaoJovem(
       const visivel =
         role === "coordenacao" ||
         role === "supervisor" ||
-        (role === "mentor_dpp" && !!a?.avaliacao_visivel_mentor) ||
+        // papel efetivo + trilha DPP (0090): o híbrido não lê a avaliação
+        // integral da própria trilha esp — mesma autocensura do especialista
+        (temPapel(data, data.personas[role], "mentor_dpp") &&
+          !!a?.avaliacao_visivel_mentor &&
+          d.trilha !== "especialista") ||
         // jovem lê as próprias — branch exists(jovem_duplas) da policy
         (role === "mentorado" && d.mentorado?.id === meuMentorado);
       return { ...e, avaliacao_jovem: visivel ? a : null };
@@ -1924,8 +1935,10 @@ export function demoEspecialistaAvaliacoes(
   const data = getDemoData();
   const eu = data.personas[role];
   const d = data.duplas.find((x) => x.id === duplaId);
+  // papel efetivo (WP6b): o híbrido DPP-primário lê as avaliações das
+  // trilhas esp dele — igual ao especialista puro
   if (
-    role !== "mentor_especialista" ||
+    !temPapel(data, eu, "mentor_especialista") ||
     !d ||
     d.trilha !== "especialista" ||
     d.mentor?.id !== eu.id

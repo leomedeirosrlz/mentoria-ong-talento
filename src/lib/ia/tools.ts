@@ -18,6 +18,7 @@ import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { comparaNome, saudadeDaDupla } from "@/lib/ciclo";
 import { filaMentorados, filaMentores, tetoMentor } from "@/lib/fila";
+import { temPapel } from "@/lib/types";
 import type { AppRole, Dupla, Mentorado, Profile } from "@/lib/types";
 import {
   getCapacidadeInsumos,
@@ -57,9 +58,6 @@ const TODOS_PAPEIS: readonly Papel[] = [
 /** Erro "de negócio" — mensagem segura pra devolver ao modelo/usuário.
  *  Erros inesperados (rede, PostgREST) viram mensagem genérica + log. */
 class ErroTool extends Error {}
-
-const ehMentor = (role: AppRole | null) =>
-  role === "mentor_dpp" || role === "mentor_especialista";
 
 const semArgs = z.object({}).strict();
 
@@ -282,18 +280,23 @@ export const IA_TOOLS = {
     roles: ["coordenacao"],
     run: async (_args: z.infer<typeof semArgs>, ctx) => {
       const ins = await getCapacidadeInsumos(ctx.supabase);
+      // uma linha por trilha servida (WP6b) — o híbrido aparece nas duas,
+      // cada uma com uso e teto da própria pool
       const mentores = ins.pessoas
-        .filter((p) => ehMentor(p.role) && p.ativo)
-        .map((p) => ({
-          mentor_id: p.id,
-          nome: p.nome,
-          trilha:
-            p.role === "mentor_especialista"
-              ? ("especialista" as const)
-              : ("dpp" as const),
-          em_uso: ins.contagemPorMentor[p.id] ?? 0,
-          capacidade: tetoMentor(p, ins.mentorProfiles[p.id]),
-        }))
+        .filter((p) => p.ativo)
+        .flatMap((p) => {
+          const trilhas = [
+            temPapel(p, "mentor_dpp") ? ("dpp" as const) : null,
+            temPapel(p, "mentor_especialista") ? ("especialista" as const) : null,
+          ].filter((t): t is "dpp" | "especialista" => t != null);
+          return trilhas.map((trilha) => ({
+            mentor_id: p.id,
+            nome: p.nome,
+            trilha,
+            em_uso: ins.contagemPorMentor[`${p.id}:${trilha}`] ?? 0,
+            capacidade: tetoMentor(p, ins.mentorProfiles[p.id], trilha),
+          }));
+        })
         .sort((a, b) => comparaNome(a.nome, b.nome));
       return { mentores, total: mentores.length };
     },

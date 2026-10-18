@@ -13,7 +13,7 @@ import {
   resumoRemanejo,
   type LadoRemanejo,
 } from "@/lib/ciclo";
-import type { Dupla, SituacaoMentorado } from "@/lib/types";
+import type { AppRole, Dupla, SituacaoMentorado } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -33,7 +33,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-type Opt = { id: string; nome: string; role?: string | null };
+type Opt = { id: string; nome: string; role?: string | null; papeis?: AppRole[] };
 
 /** "Remanejar" — troca UM lado da dupla sem costurar encerra-e-cria na mão:
  *  o RPC rematch_dupla (0064) encerra a atual e abre a sucessora numa
@@ -119,7 +119,7 @@ export function RemanejarDuplaDialog({
         const [perfis, ments, ds, mps] = await Promise.all([
           supabase
             .from("profiles")
-            .select("id, nome, role")
+            .select("id, nome, role, profile_papeis(papel)")
             .in("role", ["mentor_dpp", "mentor_especialista"])
             .eq("ativo", true)
             .order("nome"),
@@ -141,7 +141,14 @@ export function RemanejarDuplaDialog({
         if (erro) throw erro;
         if (cancelado) return;
         setMentores(
-          ((perfis.data ?? []) as Opt[]).filter((m) => m.id !== dupla.mentor.id)
+          ((perfis.data ?? []) as (Opt & {
+            profile_papeis?: { papel: AppRole }[];
+          })[])
+            .map((p) => ({
+              ...p,
+              papeis: (p.profile_papeis ?? []).map((r) => r.papel),
+            }))
+            .filter((m) => m.id !== dupla.mentor.id)
         );
         // quem saiu do programa (0077) não recebe remanejo — o atual sai
         // do pool por outra regra (o .filter de id abaixo)
@@ -197,9 +204,12 @@ export function RemanejarDuplaDialog({
 
   const ehEsp = dupla.trilha === "especialista";
   // o papel do novo mentor precisa casar com a trilha — o RPC revalida,
-  // mas o select já nasce filtrado pra erro não ser nem opção
+  // mas o select já nasce filtrado pra erro não ser nem opção. Papel
+  // EFETIVO (WP6b): o híbrido entra no pool da trilha que ele tem.
   const papelOk = ehEsp ? "mentor_especialista" : "mentor_dpp";
-  const mentorPool = mentores.filter((m) => m.role === papelOk);
+  const mentorPool = mentores.filter((m) =>
+    (m.papeis ?? (m.role ? [m.role as AppRole] : [])).includes(papelOk)
+  );
   const mentorLotado = (id: string) =>
     (emUso[id] ?? 0) >= (capacidade[id] ?? 1);
   const mentoradoOcupado = (id: string) =>
