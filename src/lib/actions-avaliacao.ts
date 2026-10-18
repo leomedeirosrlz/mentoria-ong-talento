@@ -4,8 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { demoAtivo } from "./demo/mode";
 import { DEMO_MSG } from "./demo/shared";
-import { notificar } from "./notificar";
-import { enviarEmailsLote } from "./email";
+import { enviarEmailsLote, SITE_URL } from "./email";
 import { emailApoioJovem } from "./email-templates";
 import {
   AVANCEI_AVALIACAO_LABEL,
@@ -76,6 +75,8 @@ type RetornoSubmit = {
   ok: boolean;
   avaliacao_id: string;
   pedir_apoio: boolean;
+  chamado_id?: string | null;
+  chamado_numero?: string | null;
   destinatarios: { profile_id: string; email: string; nome: string }[];
 };
 
@@ -212,6 +213,10 @@ export async function submeterAvaliacao(input: EnvioAvaliacao) {
           estrelas,
           comentario,
           duplaId,
+          chamadoHref: ret.chamado_id
+            ? `${SITE_URL}/chamados?c=${ret.chamado_id}`
+            : null,
+          chamadoNumero: ret.chamado_numero ?? null,
         });
         const envio = await enviarEmailsLote({ para: emails, assunto, html });
         // log coord-only por RPC definer — registra até a falha total:
@@ -265,11 +270,10 @@ export async function definirVisibilidadeAvaliacao(
   return { ok: true };
 }
 
-/** Atendimento do pedido de ajuda do jovem — o guard do banco garante que
- *  só a coordenação limpa a flag; a action gateia o papel antes e fecha o
- *  ciclo com o jovem que tem login ("seu pedido foi visto"). Jovem por
- *  token (sem respondido_por) recebe o cuidado por WhatsApp da coordenação,
- *  como no fluxo do mentor. */
+/** Atendimento do pedido de ajuda do jovem — 0084: resolve o chamado da
+ *  avaliação e limpa a flag na mesma transação (resolver_chamado_por_origem);
+ *  a notificação chamado_resolvido fecha o ciclo com o jovem que tem login.
+ *  Jovem por token recebe o cuidado por WhatsApp da coordenação, como antes. */
 export async function resolverApoioJovem(avaliacaoId: string, duplaId: string) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
@@ -278,33 +282,22 @@ export async function resolverApoioJovem(avaliacaoId: string, duplaId: string) {
     return { error: "Só a coordenação atende pedidos de ajuda." };
   if (!UUID_RE.test(avaliacaoId)) return { error: "Avaliação inválida." };
 
-  const { data, error } = await supabase
-    .from("avaliacoes_encontro")
-    .update({ pedir_apoio: false })
-    .eq("id", avaliacaoId)
-    .select("id, respondido_por_profile_id");
-  if (error) return { error: erroAmigavel(error) };
-  if (!data?.length) {
+  const { error } = await supabase.rpc("resolver_chamado_por_origem", {
+    p_registro_id: null,
+    p_avaliacao_id: avaliacaoId,
+    p_resumo: null,
+  });
+  if (error) {
     return {
-      error: "Não foi possível concluir. Recarregue a página e tente de novo.",
+      error:
+        error.code === "P0001" && error.message
+          ? error.message
+          : erroAmigavel(error),
     };
   }
-  await notificar(
-    supabase,
-    [
-      {
-        profile_id: data[0].respondido_por_profile_id,
-        tipo: "apoio_resolvido",
-        titulo: "Seu pedido de ajuda foi visto",
-        corpo:
-          "A coordenação recebeu o que você marcou na avaliação e vai falar com você.",
-        href: "/jovem",
-      },
-    ],
-    eu.id
-  );
   revalidatePath("/");
   revalidatePath("/duplas");
+  revalidatePath("/chamados");
   revalidatePath(`/duplas/${duplaId}`);
   return { ok: true };
 }

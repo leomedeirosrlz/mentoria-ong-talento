@@ -11,6 +11,7 @@ import {
   ClipboardText,
   DotsThree,
   FolderOpen,
+  Lifebuoy,
   ListChecks,
   Table,
   UserCircle,
@@ -33,6 +34,9 @@ import { cn } from "@/lib/utils";
 const NAV = [
   { href: "/", label: "Visão geral", curto: "Início", icon: ChartLineUp, roles: null },
   { href: "/duplas", label: "Duplas", curto: "Duplas", icon: UserCircle, roles: ["coordenacao", "supervisor", "mentor_dpp", "mentor_especialista"] },
+  // 0084: a fila de chamados é casa nova da coordenação/auxiliar — badge =
+  // chamados sem dono (quem assumir primeiro trata)
+  { href: "/chamados", label: "Chamados", curto: "Chamados", icon: Lifebuoy, roles: ["coordenacao", "supervisor"] },
   { href: "/registros", label: "Registros", curto: "Registros", icon: ClipboardText, roles: ["coordenacao", "supervisor"] },
   { href: "/agenda", label: "Agenda", curto: "Agenda", icon: CalendarDots, roles: null },
   { href: "/materiais", label: "Materiais", curto: "Materiais", icon: FolderOpen, roles: null },
@@ -47,6 +51,7 @@ export function AppShell({
   avatarUrl,
   gravatarUrl,
   notificacoes,
+  chamadosSemDono = 0,
   demo,
   children,
 }: {
@@ -54,6 +59,8 @@ export function AppShell({
   avatarUrl: string | null;
   gravatarUrl: string;
   notificacoes: { itens: Notificacao[]; naoLidas: number };
+  /** badge do item Chamados — fila sem dono (0084) */
+  chamadosSemDono?: number;
   /** pill compacta da DemoBar dockada no header mobile (substitui o span de
    *  papel — sempre visível e sem cobrir conteúdo) */
   demo?: React.ReactNode;
@@ -176,6 +183,14 @@ export function AppShell({
                 )}
                 <item.icon size={18} weight={ativo ? "fill" : "regular"} aria-hidden className="relative" />
                 <span className="relative">{item.label}</span>
+                {item.href === "/chamados" && chamadosSemDono > 0 && (
+                  <span
+                    aria-label={`${chamadosSemDono} chamados na fila`}
+                    className="relative ml-auto grid min-w-5 place-items-center rounded-full bg-[var(--warn)]/20 px-1.5 py-0.5 text-[10px] font-semibold text-[var(--warn-text)]"
+                  >
+                    {chamadosSemDono}
+                  </span>
+                )}
               </Link>
             );
           })}
@@ -316,6 +331,14 @@ export function AppShell({
                         >
                           <item.icon size={18} weight={ativo ? "fill" : "regular"} aria-hidden />
                           {item.label}
+                          {item.href === "/chamados" && chamadosSemDono > 0 && (
+                            <span
+                              aria-label={`${chamadosSemDono} chamados na fila`}
+                              className="ml-auto grid min-w-5 place-items-center rounded-full bg-[var(--warn)]/20 px-1.5 py-0.5 text-[10px] font-semibold text-[var(--warn-text)]"
+                            >
+                              {chamadosSemDono}
+                            </span>
+                          )}
                         </Link>
                       </li>
                     );

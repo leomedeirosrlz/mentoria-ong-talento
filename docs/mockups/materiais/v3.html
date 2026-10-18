@@ -1,0 +1,1210 @@
+<!-- MOCKUP materiais v3 — Trilha da jornada -->
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Materiais · Sua jornada — Realiza.vc</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --brand-lime: hsl(78 56% 53%);
+    --brand-ink: hsl(0 0% 15%);
+    --background: hsl(75 10% 95%);
+    --card: hsl(0 0% 100%);
+    --muted: hsl(75 7% 93%);
+    --muted-foreground: hsl(75 4% 40%);
+    --accent: hsl(75 8% 91%);
+    --border: hsl(75 6% 87%);
+    --input: hsl(75 8% 54%);
+    --ok: hsl(78 58% 38%);
+    --ok-text: hsl(78 55% 30%);
+    --warn: hsl(43 95% 44%);
+    --warn-text: hsl(43 90% 30%);
+    --danger: hsl(0 80% 48%);
+    --role-mentor: var(--brand-lime);
+    --role-mentorado: hsl(48 100% 60%);
+    --radius: 0.75rem;
+    --line-future: hsl(75 8% 68%);
+    --shadow: 0 1px 2px hsl(0 0% 0% / .05), 0 8px 24px -18px hsl(75 20% 30% / .25);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html { -webkit-text-size-adjust: 100%; }
+
+  body {
+    font-family: "Inter", system-ui, -apple-system, sans-serif;
+    background: var(--background);
+    color: var(--brand-ink);
+    font-size: 16px;
+    line-height: 1.5;
+  }
+
+  ::selection { background: hsl(78 56% 53% / .45); }
+
+  a { color: inherit; text-decoration: none; }
+
+  svg { display: block; }
+
+  /* ---------- chrome do mockup (não é produto) ---------- */
+
+  /* sem position:sticky — a .topbar do app já é sticky e ficaria escondida atrás da barra */
+  .board-head {
+    background: var(--brand-ink);
+    color: hsl(75 20% 88%);
+    padding: 13px 20px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 18px;
+    font-size: 12.5px;
+  }
+  .board-head b { color: var(--brand-lime); font-weight: 700; letter-spacing: .03em; }
+  .board-head .dir { color: hsl(75 10% 62%); }
+  .board-head nav { margin-left: auto; display: flex; gap: 6px; }
+  .board-head nav a {
+    font-size: 12px;
+    font-weight: 600;
+    padding: 5px 12px;
+    border-radius: 999px;
+    border: 1px solid hsl(75 10% 35%);
+    color: hsl(75 20% 85%);
+    text-decoration: none;
+  }
+  .board-head nav a:hover { border-color: var(--brand-lime); color: var(--brand-lime); }
+
+  .notes {
+    width: min(1024px, calc(100% - 32px));
+    margin: 0 auto;
+    padding: 18px 22px;
+    border-radius: 14px;
+    background: var(--brand-ink);
+    color: hsl(75 20% 80%);
+    display: grid;
+    gap: 8px;
+    font-size: 12.5px;
+    line-height: 1.6;
+  }
+  .notes b { color: hsl(75 20% 94%); }
+  .notes li { margin-left: 18px; }
+
+  /* respiro no fim da página — margin do último filho colapsa no body;
+     o espaçador garante que a bottomnav fixa não cubra as notas no mobile */
+  body::after { content: ""; display: block; height: 110px; }
+
+  /* ---------- Topbar ---------- */
+
+  .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    background: hsl(75 10% 95% / .88);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .topbar-in {
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 0 28px;
+    height: 64px;
+    display: flex;
+    align-items: center;
+    gap: 32px;
+  }
+
+  .brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 800;
+    font-size: 1.05rem;
+    letter-spacing: -0.02em;
+  }
+
+  .brand-mark { width: 30px; height: 30px; flex: none; }
+
+  .brand-dot { color: var(--ok); }
+
+  .mainnav {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: 12px;
+    flex: 1;
+  }
+
+  .mainnav a {
+    padding: 8px 14px;
+    border-radius: 999px;
+    font-size: .9rem;
+    font-weight: 500;
+    color: var(--muted-foreground);
+    transition: background .15s, color .15s;
+  }
+
+  .mainnav a:hover { background: var(--accent); color: var(--brand-ink); }
+
+  .mainnav a.on {
+    background: var(--brand-lime);
+    color: var(--brand-ink);
+    font-weight: 600;
+  }
+
+  .who {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-left: auto;
+  }
+
+  .who-name {
+    font-size: .85rem;
+    font-weight: 600;
+    line-height: 1.25;
+    text-align: right;
+  }
+
+  .who-name small {
+    display: block;
+    font-weight: 500;
+    color: var(--muted-foreground);
+    font-size: .75rem;
+  }
+
+  .avatar {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    background: var(--role-mentorado);
+    color: var(--brand-ink);
+    font-weight: 800;
+    display: grid;
+    place-items: center;
+    font-size: .95rem;
+    flex: none;
+    border: 2px solid hsl(48 100% 45% / .35);
+  }
+
+  /* ---------- Hero ---------- */
+
+  .hero {
+    max-width: 680px;
+    margin: 0 auto;
+    padding: 64px 24px 40px;
+    text-align: center;
+  }
+
+  .eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: .78rem;
+    font-weight: 700;
+    letter-spacing: .09em;
+    text-transform: uppercase;
+    color: var(--ok-text);
+    background: hsl(78 56% 53% / .18);
+    border: 1px solid hsl(78 56% 53% / .4);
+    padding: 7px 14px;
+    border-radius: 999px;
+  }
+
+  .eyebrow svg { width: 15px; height: 15px; }
+
+  .hero h1 {
+    margin-top: 20px;
+    font-size: clamp(2rem, 4.6vw, 2.9rem);
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    line-height: 1.12;
+  }
+
+  .hero .lede {
+    margin-top: 14px;
+    color: var(--muted-foreground);
+    font-size: 1.03rem;
+    max-width: 52ch;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  /* ---------- Bloco de progresso ---------- */
+
+  .progress-card {
+    margin-top: 28px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 18px 22px;
+    text-align: left;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 6px 20px;
+    align-items: center;
+  }
+
+  .progress-nums {
+    font-size: .82rem;
+    font-weight: 600;
+    color: var(--muted-foreground);
+    white-space: nowrap;
+  }
+
+  .progress-nums strong {
+    display: block;
+    font-size: 1.9rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: var(--brand-ink);
+    line-height: 1.1;
+  }
+
+  .progress-nums strong small {
+    font-size: 1rem;
+    color: var(--muted-foreground);
+    font-weight: 700;
+  }
+
+  .bar {
+    height: 10px;
+    border-radius: 999px;
+    background: var(--muted);
+    overflow: hidden;
+    grid-column: 2;
+    align-self: center;
+  }
+
+  .bar i {
+    display: block;
+    height: 100%;
+    width: 83%;
+    border-radius: 999px;
+    background: var(--brand-lime);
+  }
+
+  .next {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: .85rem;
+    color: var(--muted-foreground);
+    border-top: 1px solid var(--border);
+    padding-top: 12px;
+    margin-top: 4px;
+  }
+
+  .next svg { width: 16px; height: 16px; flex: none; color: var(--ok); }
+  .next b { color: var(--brand-ink); font-weight: 600; }
+
+  /* ---------- A trilha ---------- */
+
+  .trail-wrap {
+    max-width: 880px;
+    margin: 0 auto;
+    padding: 24px 28px 8px;
+  }
+
+  .trilha { list-style: none; }
+
+  .trilha > li {
+    position: relative;
+    padding-bottom: 76px;
+  }
+
+  /* segmento vertical da linha — cada <li> desenha o seu,
+     então a linha muda de estado junto com a estação */
+  .trilha > li::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    border-left: 3px solid var(--brand-lime);
+  }
+
+  .trilha > li.locked::before,
+  .trilha > li.fim::before {
+    border-left: 3px dashed var(--line-future);
+  }
+
+  /* a trilha "nasce" na primeira estação… */
+  .trilha > li:first-child::before { top: 52px; }
+
+  /* …e termina na bandeira */
+  .trilha > li.fim { padding-bottom: 0; }
+  .trilha > li.fim::before { bottom: auto; height: 24px; }
+
+  .node {
+    position: absolute;
+    top: 26px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: var(--brand-lime);
+    color: var(--brand-ink);
+    display: grid;
+    place-items: center;
+    z-index: 2;
+    box-shadow: 0 0 0 5px var(--background);
+  }
+
+  .node > svg { width: 26px; height: 26px; }
+
+  .node .check {
+    position: absolute;
+    right: -3px;
+    bottom: -3px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--card);
+    border: 2px solid var(--brand-lime);
+    display: grid;
+    place-items: center;
+  }
+
+  .node .check svg { width: 11px; height: 11px; }
+
+  .locked .node {
+    background: var(--card);
+    border: 2px dashed var(--line-future);
+    color: var(--muted-foreground);
+  }
+
+  /* ---------- Card da estação ---------- */
+
+  .st-card {
+    position: relative;
+    width: calc(50% - 64px);
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 22px 24px;
+    z-index: 1;
+  }
+
+  .trilha > li:nth-child(even) .st-card { margin-left: auto; }
+
+  /* conector horizontal card ↔ linha */
+  .st-card::after {
+    content: "";
+    position: absolute;
+    top: 52px;
+    width: 38px;
+    border-top: 2px solid var(--brand-lime);
+  }
+
+  .trilha > li:nth-child(odd) .st-card::after { left: 100%; }
+  .trilha > li:nth-child(even) .st-card::after { right: 100%; }
+
+  .locked .st-card::after { border-top: 2px dashed var(--line-future); }
+
+  .st-eyebrow {
+    font-size: .72rem;
+    font-weight: 700;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--muted-foreground);
+  }
+
+  .st-card h2 {
+    margin-top: 6px;
+    font-size: 1.22rem;
+    font-weight: 700;
+    letter-spacing: -0.015em;
+  }
+
+  .st-date {
+    margin-top: 8px;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: .82rem;
+    font-weight: 500;
+    color: var(--ok-text);
+  }
+
+  .st-date svg { width: 15px; height: 15px; flex: none; }
+
+  .st-desc {
+    margin-top: 10px;
+    font-size: .92rem;
+    color: var(--muted-foreground);
+  }
+
+  .st-quote {
+    margin-top: 14px;
+    background: hsl(78 56% 53% / .09);
+    border-left: 3px solid var(--brand-lime);
+    border-radius: 0 10px 10px 0;
+    padding: 12px 14px;
+  }
+
+  .st-quote-tag {
+    display: block;
+    font-size: .68rem;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--ok-text);
+    margin-bottom: 4px;
+  }
+
+  .st-quote blockquote {
+    font-size: .92rem;
+    font-style: italic;
+    line-height: 1.5;
+  }
+
+  .st-actions {
+    margin-top: 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 18px;
+    border-radius: 999px;
+    border: 1.5px solid hsl(75 8% 60%);
+    font-size: .88rem;
+    font-weight: 600;
+    color: var(--brand-ink);
+    background: var(--card);
+    transition: background .15s, border-color .15s;
+    cursor: pointer;
+  }
+
+  .btn:hover { background: var(--brand-lime); border-color: var(--brand-lime); }
+  .btn svg { width: 16px; height: 16px; }
+
+  .btn:focus-visible { outline: 2px solid var(--ok); outline-offset: 2px; }
+
+  /* estação futura */
+
+  .locked .st-card {
+    background: hsl(0 0% 100% / .6);
+    border-style: dashed;
+    border-color: var(--line-future);
+    box-shadow: none;
+  }
+
+  .locked .st-card h2 { color: hsl(0 0% 32%); }
+  .locked .st-date { color: var(--muted-foreground); }
+
+  .st-pending {
+    margin-top: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: .83rem;
+    color: var(--muted-foreground);
+    background: var(--muted);
+    border-radius: 10px;
+    padding: 10px 14px;
+  }
+
+  .st-pending svg { width: 15px; height: 15px; flex: none; }
+
+  /* ---------- Bandeira final ---------- */
+
+  .fim .node {
+    top: 0;
+    background: var(--card);
+    border: 2px dashed var(--line-future);
+    color: var(--muted-foreground);
+    width: 46px;
+    height: 46px;
+  }
+
+  .fim .node > svg { width: 22px; height: 22px; }
+
+  .fim-caption {
+    text-align: center;
+    font-size: .8rem;
+    color: var(--muted-foreground);
+    padding-top: 58px;
+    line-height: 1.45;
+  }
+
+  .fim-caption b { color: var(--brand-ink); font-weight: 600; }
+
+  /* ---------- Kit para o caminho (portais compactos) ---------- */
+
+  .kit {
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 72px 28px 40px;
+  }
+
+  .kit-head { max-width: 560px; }
+
+  .kit-head h2 {
+    font-size: 1.6rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .kit-head h2 svg { width: 28px; height: 28px; color: var(--ok); flex: none; }
+
+  .kit-head p {
+    margin-top: 8px;
+    color: var(--muted-foreground);
+    font-size: .95rem;
+  }
+
+  .kit-grid {
+    margin-top: 26px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+  }
+
+  .portal {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .portal-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .portal-ico {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    background: var(--brand-lime);
+    color: var(--brand-ink);
+    display: grid;
+    place-items: center;
+    flex: none;
+  }
+
+  .portal-ico svg { width: 23px; height: 23px; }
+
+  .portal-head h3 {
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+
+  .portal-head small {
+    display: block;
+    font-size: .76rem;
+    font-weight: 500;
+    color: var(--muted-foreground);
+    margin-top: 1px;
+  }
+
+  .portal ul { list-style: none; margin-top: 6px; }
+
+  .portal li a {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 11px 6px;
+    border-radius: 10px;
+    transition: background .15s;
+  }
+
+  .portal li a:hover { background: var(--accent); }
+
+  .portal li + li a { border-top: 1px solid var(--border); }
+
+  .item-txt { flex: 1; min-width: 0; }
+
+  .item-txt span {
+    display: block;
+    font-size: .88rem;
+    font-weight: 600;
+    line-height: 1.3;
+  }
+
+  .item-txt small {
+    display: block;
+    font-size: .75rem;
+    color: var(--muted-foreground);
+    margin-top: 1px;
+  }
+
+  .item-ico { width: 17px; height: 17px; color: var(--muted-foreground); flex: none; }
+
+  .portal li a:hover .item-ico { color: var(--ok); }
+
+  /* ---------- Rodapé ---------- */
+
+  .foot {
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 28px 28px 48px;
+    font-size: .78rem;
+    color: var(--muted-foreground);
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  /* ---------- Bottom nav (mobile) ---------- */
+
+  .bottomnav { display: none; }
+
+  /* ---------- Responsivo ---------- */
+
+  @media (max-width: 840px) {
+    .mainnav { display: none; }
+
+    .bottomnav {
+      display: flex;
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 40;
+      background: hsl(0 0% 100% / .94);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border-top: 1px solid var(--border);
+      padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px));
+    }
+
+    .bottomnav a {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+      padding: 7px 0 5px;
+      font-size: .64rem;
+      font-weight: 600;
+      color: var(--muted-foreground);
+      border-radius: 10px;
+    }
+
+    .bottomnav a svg { width: 22px; height: 22px; }
+
+    .bottomnav a.on { color: var(--brand-ink); }
+    .bottomnav a.on svg { color: var(--ok); }
+
+    body { padding-bottom: 76px; }
+  }
+
+  @media (max-width: 760px) {
+    .topbar-in { padding: 0 18px; gap: 12px; }
+
+    .hero { padding: 44px 20px 32px; text-align: left; }
+
+    .eyebrow { font-size: .72rem; }
+
+    .hero .lede { margin-left: 0; }
+
+    .progress-card { grid-template-columns: auto 1fr; padding: 16px 18px; }
+
+    /* a linha desce pela lateral esquerda */
+    .trail-wrap { padding: 8px 20px 0; }
+
+    .trilha > li { padding-bottom: 56px; padding-left: 68px; }
+
+    .trilha > li::before { left: 24px; }
+    .trilha > li:first-child::before { top: 45px; }
+    .trilha > li.fim::before { height: 24px; }
+
+    .node { left: 24px; top: 22px; width: 46px; height: 46px; }
+    .node > svg { width: 23px; height: 23px; }
+    .node .check { width: 18px; height: 18px; }
+
+    .st-card { width: 100%; padding: 18px 18px; }
+    .st-card::after { display: none; }
+
+    .fim .node { top: 0; left: 24px; }
+    .fim-caption { text-align: left; padding-top: 0; padding-left: 0; transform: translateY(8px); }
+
+    .kit { padding: 56px 20px 32px; }
+    .kit-grid { grid-template-columns: 1fr; gap: 14px; }
+
+    .foot { padding: 20px 20px 36px; }
+  }
+
+  @media (max-width: 480px) {
+    .who-name { display: none; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ===== chrome do mockup ===== -->
+<header class="board-head">
+  <span><b>MOCKUP</b> · materiais · v3</span>
+  <span class="dir">Direção: a jornada como estrada — trilha vertical de estações com snippets “você escreveu…”, e o restante vira “kit para o caminho”</span>
+  <nav>
+    <a href="#trilha">1 · A trilha</a>
+    <a href="#kit">2 · Kit para o caminho</a>
+  </nav>
+</header>
+
+<header class="topbar">
+  <div class="topbar-in">
+    <a class="brand" href="#">
+      <svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true">
+        <rect width="24" height="24" rx="7" fill="hsl(78 56% 53%)"/>
+        <path d="M7 15.5c2-5.5 4-5.5 5.5-2s3.6.6 4.5-3" fill="none" stroke="hsl(0 0% 15%)" stroke-width="2" stroke-linecap="round"/>
+        <circle cx="7" cy="15.5" r="1.7" fill="hsl(0 0% 15%)"/>
+        <circle cx="17" cy="10.5" r="1.7" fill="hsl(0 0% 15%)"/>
+      </svg>
+      Realiza<span class="brand-dot">.</span>vc
+    </a>
+    <nav class="mainnav" aria-label="Navegação principal">
+      <a href="#">Início</a>
+      <a href="#">Agenda</a>
+      <a href="#">Pessoas</a>
+      <a href="#" class="on" aria-current="page">Materiais</a>
+      <a href="#">Perfil</a>
+    </nav>
+    <div class="who">
+      <span class="who-name">Ana Souza<small>Mentorada · Turma 1</small></span>
+      <span class="avatar" aria-hidden="true">A</span>
+    </div>
+  </div>
+</header>
+
+<main>
+
+  <!-- ============ HERO ============ -->
+  <section class="hero">
+    <p class="eyebrow">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+        <circle cx="4.5" cy="19" r="2"/>
+        <circle cx="19.5" cy="5" r="2"/>
+        <path d="M6.6 19H13a4 4 0 0 0 4-4V7.2"/>
+      </svg>
+      Minha jornada · materiais
+    </p>
+    <h1>Cada estação é algo<br>que você já construiu.</h1>
+    <p class="lede">Esta trilha é o seu percurso no programa. Cada parada guarda um documento que você respondeu, uma decisão que você tomou — a sua história até aqui.</p>
+
+    <div class="progress-card">
+      <div class="progress-nums">
+        <strong>5<small>/6</small></strong>
+        estações concluídas
+      </div>
+      <div class="bar" role="img" aria-label="5 de 6 estações concluídas"><i></i></div>
+      <p class="next">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M12 21s-6.5-5.3-6.5-10a6.5 6.5 0 0 1 13 0c0 4.7-6.5 10-6.5 10z"/>
+          <circle cx="12" cy="11" r="2.3"/>
+        </svg>
+        Próxima parada: <b>Avaliação 360°</b> — libera em 19 de maio, no 12º encontro.
+      </p>
+    </div>
+  </section>
+
+  <!-- ============ A TRILHA ============ -->
+  <section class="trail-wrap" id="trilha" aria-label="Sua jornada">
+    <ol class="trilha">
+
+      <!-- Estação 1 -->
+      <li class="done">
+        <span class="node" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="5" width="18" height="14" rx="2.5"/>
+            <circle cx="8.4" cy="10.6" r="1.9"/>
+            <path d="M5.8 16.2c.5-1.6 1.5-2.4 2.6-2.4s2.1.8 2.6 2.4"/>
+            <path d="M13.5 9.6h4.5M13.5 13h4.5"/>
+          </svg>
+          <i class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 12.8l3.4 3.4 7.6-8"/></svg></i>
+        </span>
+        <article class="st-card">
+          <p class="st-eyebrow">Estação 01 · Inscrição</p>
+          <h2>Anamnese Social</h2>
+          <p class="st-date">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="4" y="5" width="16" height="16" rx="3"/>
+              <path d="M8 3v4M16 3v4M4 11h16"/>
+            </svg>
+            Respondido em 12 de fevereiro de 2026
+          </p>
+          <p class="st-desc">Seu ponto de partida: quem você é, sua família e o que te trouxe até o programa.</p>
+          <div class="st-quote">
+            <span class="st-quote-tag">Você escreveu</span>
+            <blockquote>“Moro em Heliópolis com a minha mãe e meus dois irmãos. Quero ser a primeira da família a fazer faculdade.”</blockquote>
+          </div>
+          <div class="st-actions">
+            <a class="btn" href="#">Rever resposta
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6"/></svg>
+            </a>
+          </div>
+        </article>
+      </li>
+
+      <!-- Estação 2 -->
+      <li class="done">
+        <span class="node" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="8.5"/>
+            <circle cx="12" cy="12" r="2.2"/>
+            <path d="M12 3.5v6.3M12 14.2v6.3M3.5 12h6.3M14.2 12h6.3M6 6l4.4 4.4M13.6 13.6 18 18M18 6l-4.4 4.4M10.4 13.6 6 18"/>
+          </svg>
+          <i class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 12.8l3.4 3.4 7.6-8"/></svg></i>
+        </span>
+        <article class="st-card">
+          <p class="st-eyebrow">Estação 02 · Encontro 2</p>
+          <h2>Roda da Vida</h2>
+          <p class="st-date">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="4" y="5" width="16" height="16" rx="3"/>
+              <path d="M8 3v4M16 3v4M4 11h16"/>
+            </svg>
+            Respondido em 11 de março de 2026
+          </p>
+          <p class="st-desc">Um retrato seu em dez áreas — da saúde ao lazer, dos estudos às amizades.</p>
+          <div class="st-quote">
+            <span class="st-quote-tag">O que você marcou</span>
+            <blockquote>Finanças ficou com 4 e Saúde com 9. Você escolheu por onde começar.</blockquote>
+          </div>
+          <div class="st-actions">
+            <a class="btn" href="#">Rever resposta
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6"/></svg>
+            </a>
+          </div>
+        </article>
+      </li>
+
+      <!-- Estação 3 -->
+      <li class="done">
+        <span class="node" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="8.5"/>
+            <circle cx="12" cy="12" r="4.8"/>
+            <circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none"/>
+          </svg>
+          <i class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 12.8l3.4 3.4 7.6-8"/></svg></i>
+        </span>
+        <article class="st-card">
+          <p class="st-eyebrow">Estação 03 · Encontro 4</p>
+          <h2>Mapa de Metas</h2>
+          <p class="st-date">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="4" y="5" width="16" height="16" rx="3"/>
+              <path d="M8 3v4M16 3v4M4 11h16"/>
+            </svg>
+            Respondido em 25 de março de 2026
+          </p>
+          <p class="st-desc">As metas que vão guiar os seus encontros com o André ao longo do ciclo.</p>
+          <div class="st-quote">
+            <span class="st-quote-tag">Sua meta</span>
+            <blockquote>“Até junho, quero ter meu primeiro currículo pronto e já ter passado por uma entrevista de verdade.”</blockquote>
+          </div>
+          <div class="st-actions">
+            <a class="btn" href="#">Rever resposta
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6"/></svg>
+            </a>
+          </div>
+        </article>
+      </li>
+
+      <!-- Estação 4 -->
+      <li class="done">
+        <span class="node" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 4 3.5 6v14L9 18l6 2 5.5-2V4L15 6 9 4z"/>
+            <path d="M9 4v14M15 6v14"/>
+          </svg>
+          <i class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 12.8l3.4 3.4 7.6-8"/></svg></i>
+        </span>
+        <article class="st-card">
+          <p class="st-eyebrow">Estação 04 · Encontro 6</p>
+          <h2>PDM — Plano de Desenvolvimento</h2>
+          <p class="st-date">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="4" y="5" width="16" height="16" rx="3"/>
+              <path d="M8 3v4M16 3v4M4 11h16"/>
+            </svg>
+            Construído com o André em 15 de abril de 2026
+          </p>
+          <p class="st-desc">Seu plano de desenvolvimento do mentorado, montado a quatro mãos na sessão.</p>
+          <div class="st-quote">
+            <span class="st-quote-tag">O combinado</span>
+            <blockquote>Três passos até o fim do ciclo, começando pelo curso de lógica de programação.</blockquote>
+          </div>
+          <div class="st-actions">
+            <a class="btn" href="#">Ver meu PDM
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6"/></svg>
+            </a>
+          </div>
+        </article>
+      </li>
+
+      <!-- Estação 5 -->
+      <li class="done">
+        <span class="node" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 3.5l2.1 5 5.4.8-3.9 3.8.9 5.4-4.5-2.6-4.5 2.6.9-5.4-3.9-3.8 5.4-.8 2.1-5z"/>
+          </svg>
+          <i class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 12.8l3.4 3.4 7.6-8"/></svg></i>
+        </span>
+        <article class="st-card">
+          <p class="st-eyebrow">Estação 05 · Encontro 8</p>
+          <h2>Autoavaliação</h2>
+          <p class="st-date">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="4" y="5" width="16" height="16" rx="3"/>
+              <path d="M8 3v4M16 3v4M4 11h16"/>
+            </svg>
+            Respondido em 22 de abril de 2026
+          </p>
+          <p class="st-desc">Um olhar seu sobre a sua própria caminhada até a metade do ciclo.</p>
+          <div class="st-quote">
+            <span class="st-quote-tag">Sua nota para você mesma</span>
+            <blockquote>Você se deu nota 8. “Estou mais confiante para falar em grupo e pedir ajuda quando preciso.”</blockquote>
+          </div>
+          <div class="st-actions">
+            <a class="btn" href="#">Rever resposta
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6"/></svg>
+            </a>
+          </div>
+        </article>
+      </li>
+
+      <!-- Estação 6 — futura -->
+      <li class="locked">
+        <span class="node" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="6" y="11" width="12" height="9" rx="2.5"/>
+            <path d="M9 11V8a3 3 0 0 1 6 0v3"/>
+          </svg>
+        </span>
+        <article class="st-card">
+          <p class="st-eyebrow">Estação 06 · 12º encontro</p>
+          <h2>Avaliação 360°</h2>
+          <p class="st-date">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="6" y="11" width="12" height="9" rx="2.5"/>
+              <path d="M9 11V8a3 3 0 0 1 6 0v3"/>
+            </svg>
+            Libera em 19 de maio de 2026
+          </p>
+          <p class="st-desc">A última parada antes da celebração: você olha para o ciclo inteiro — o programa, o André e você mesma.</p>
+          <div class="st-pending">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="8.5"/>
+              <path d="M12 7.5V12l3 2"/>
+            </svg>
+            A coordenação abre quando chegar a hora — falta pouco.
+          </div>
+        </article>
+      </li>
+
+      <!-- Chegada -->
+      <li class="fim">
+        <span class="node" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M6 21V3.5"/>
+            <path d="M6 4.5c3-1.6 6 1.6 9 0v7c-3 1.6-6-1.6-9 0"/>
+          </svg>
+        </span>
+        <p class="fim-caption">Encontro 16 · 16 de junho de 2026<br><b>Celebração da jornada</b></p>
+      </li>
+
+    </ol>
+  </section>
+
+  <!-- ============ KIT PARA O CAMINHO ============ -->
+  <section class="kit" id="kit" aria-label="Kit para o caminho">
+    <div class="kit-head">
+      <h2>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M6.5 9.5A5.5 5.5 0 0 1 12 4a5.5 5.5 0 0 1 5.5 5.5"/>
+          <rect x="6" y="8" width="12" height="13" rx="4"/>
+          <path d="M9.5 15h5M9.5 15v3.5h5V15"/>
+        </svg>
+        Kit para o caminho
+      </h2>
+      <p>Guias, modelos e links que te acompanham em qualquer ponto do percurso — sempre à mão.</p>
+    </div>
+
+    <div class="kit-grid">
+
+      <!-- Guias oficiais -->
+      <article class="portal">
+        <div class="portal-head">
+          <span class="portal-ico" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 6.5C10.2 4.9 7.3 4.6 3.5 5v13.5c3.8-.4 6.7-.1 8.5 1.5 1.8-1.6 4.7-1.9 8.5-1.5V5c-3.8-.4-6.7-.1-8.5 1.5z"/>
+              <path d="M12 6.5V20"/>
+            </svg>
+          </span>
+          <div>
+            <h3>Guias oficiais</h3>
+            <small>O material de cada encontro</small>
+          </div>
+        </div>
+        <ul>
+          <li><a href="#">
+            <span class="item-txt"><span>Guia do mentorado · ciclo 2026</span><small>PDF · 3,2 MB</small></span>
+            <svg class="item-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v10M7.5 10.5 12 15l4.5-4.5M5 19.5h14"/></svg>
+          </a></li>
+          <li><a href="#">
+            <span class="item-txt"><span>Guia dos encontros 9 a 16</span><small>PDF · 1,8 MB</small></span>
+            <svg class="item-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v10M7.5 10.5 12 15l4.5-4.5M5 19.5h14"/></svg>
+          </a></li>
+          <li><a href="#">
+            <span class="item-txt"><span>Cartilha da família Realiza</span><small>PDF · 960 KB</small></span>
+            <svg class="item-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v10M7.5 10.5 12 15l4.5-4.5M5 19.5h14"/></svg>
+          </a></li>
+        </ul>
+      </article>
+
+      <!-- Modelos e instrumentos -->
+      <article class="portal">
+        <div class="portal-head">
+          <span class="portal-ico" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M13.5 3H7a1.5 1.5 0 0 0-1.5 1.5v15A1.5 1.5 0 0 0 7 21h10a1.5 1.5 0 0 0 1.5-1.5V8.5L13.5 3z"/>
+              <path d="M13.5 3v5.5h5"/>
+              <path d="M9 13.5h6M9 16.8h6"/>
+            </svg>
+          </span>
+          <div>
+            <h3>Modelos e instrumentos</h3>
+            <small>Versões em branco para refazer</small>
+          </div>
+        </div>
+        <ul>
+          <li><a href="#">
+            <span class="item-txt"><span>Roda da vida — em branco</span><small>Refaça quando quiser</small></span>
+            <svg class="item-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v10M7.5 10.5 12 15l4.5-4.5M5 19.5h14"/></svg>
+          </a></li>
+          <li><a href="#">
+            <span class="item-txt"><span>Plano de metas — modelo</span><small>PDF editável · 620 KB</small></span>
+            <svg class="item-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v10M7.5 10.5 12 15l4.5-4.5M5 19.5h14"/></svg>
+          </a></li>
+          <li><a href="#">
+            <span class="item-txt"><span>Carta para o eu do futuro</span><small>Instrumento do ciclo</small></span>
+            <svg class="item-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v10M7.5 10.5 12 15l4.5-4.5M5 19.5h14"/></svg>
+          </a></li>
+        </ul>
+      </article>
+
+      <!-- Links -->
+      <article class="portal">
+        <div class="portal-head">
+          <span class="portal-ico" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M10 14a4 4 0 0 0 6 .4l3-3a4 4 0 0 0-5.6-5.6l-1.7 1.7"/>
+              <path d="M14 10a4 4 0 0 0-6-.4l-3 3a4 4 0 0 0 5.6 5.6l1.7-1.7"/>
+            </svg>
+          </span>
+          <div>
+            <h3>Links</h3>
+            <small>Fora da plataforma, sempre por perto</small>
+          </div>
+        </div>
+        <ul>
+          <li><a href="#">
+            <span class="item-txt"><span>Comunidade da Turma 1</span><small>Grupo no WhatsApp</small></span>
+            <svg class="item-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M9.5 7H17v7.5"/></svg>
+          </a></li>
+          <li><a href="#">
+            <span class="item-txt"><span>Canal do Realiza no YouTube</span><small>Vídeos e histórias do programa</small></span>
+            <svg class="item-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M9.5 7H17v7.5"/></svg>
+          </a></li>
+          <li><a href="#">
+            <span class="item-txt"><span>Fale com a coordenação</span><small>Dúvidas, apoio e sugestões</small></span>
+            <svg class="item-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M9.5 7H17v7.5"/></svg>
+          </a></li>
+        </ul>
+      </article>
+
+    </div>
+  </section>
+
+</main>
+
+<footer class="foot">
+  <span>Realiza.vc · Programa de Mentoria — ciclo 2026</span>
+  <span>Turma 1 · mentoria com André Lima</span>
+</footer>
+
+<nav class="bottomnav" aria-label="Navegação principal">
+  <a href="#">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M3.5 10.5 12 3l8.5 7.5"/>
+      <path d="M5.5 9.5V20a1 1 0 0 0 1 1H10v-6h4v6h3.5a1 1 0 0 0 1-1V9.5"/>
+    </svg>
+    Início
+  </a>
+  <a href="#">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <rect x="4" y="5" width="16" height="16" rx="3"/>
+      <path d="M8 3v4M16 3v4M4 11h16"/>
+    </svg>
+    Agenda
+  </a>
+  <a href="#">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <circle cx="9" cy="8" r="3.2"/>
+      <path d="M3.5 19.5c0-3.2 2.5-5.2 5.5-5.2s5.5 2 5.5 5.2"/>
+      <circle cx="16.8" cy="9" r="2.6"/>
+      <path d="M16.5 14.4c2.3.2 4 2 4 4.4"/>
+    </svg>
+    Pessoas
+  </a>
+  <a href="#" class="on" aria-current="page">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <rect x="6" y="8" width="12" height="13" rx="4"/>
+      <path d="M9.5 8V6.5A2.5 2.5 0 0 1 12 4a2.5 2.5 0 0 1 2.5 2.5V8"/>
+      <path d="M9.5 14.5h5"/>
+    </svg>
+    Materiais
+  </a>
+  <a href="#">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="8.5"/>
+      <circle cx="12" cy="9.8" r="2.8"/>
+      <path d="M6.8 18.6c1-2.7 2.9-4.1 5.2-4.1s4.2 1.4 5.2 4.1"/>
+    </svg>
+    Perfil
+  </a>
+</nav>
+
+<!-- decisões -->
+<ul class="notes">
+  <li><b>A página inteira é a jornada.</b> Em vez de portais, a tela vira uma estrada vertical: 6 estações alternando lados numa linha lime contínua, que desce até a bandeira “Celebração da jornada” (encontro 16).</li>
+  <li><b>“Você escreveu…” é o coração.</b> Cada estação concluída traz um trecho da própria resposta — a anamnese (“Moro em Heliópolis…”), a roda da vida (finanças 4, saúde 9), a meta do currículo, o combinado do PDM, a nota 8 da autoavaliação. A estante prova autoria, não só guarda PDF.</li>
+  <li><b>Futuro é tracejado e travado.</b> Do trecho da estação 06 em diante a linha fica pontilhada; a Avaliação 360° vem bloqueada com data (“libera em 19 de maio”) e dono (“a coordenação abre quando chegar a hora”) — sem CTA falso.</li>
+  <li><b>Kit fora da linha do tempo.</b> Guias oficiais, modelos em branco e links não fingem fazer parte da história: ficam em três cards utilitários ao final, agrupados como “kit para o caminho”.</li>
+  <li><b>Hero resume antes de rolar.</b> O topo centraliza o placar “5/6 estações” e a próxima parada (Avaliação 360°, no 12º encontro) — quem abre a página sabe onde está na jornada sem descer.</li>
+</ul>
+
+</body>
+</html>
