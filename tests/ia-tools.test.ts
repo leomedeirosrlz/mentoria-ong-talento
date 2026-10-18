@@ -68,7 +68,10 @@ function supaFake({
       return builder(tabela);
     },
     rpc: (nome: string, args?: Record<string, unknown>) => {
-      if (nome === "my_role") return { data: papel, error: null };
+      // o gate virou my_papeis (0085) — o papel do fixture volta como o
+      // conjunto efetivo de 1 elemento
+      if (nome === "my_papeis")
+        return { data: papel ? [papel] : [], error: null };
       if (nome === "registrar_ia_evento") {
         auditCalls.push(args ?? {});
         const erro = rpcErro[nome] ?? null;

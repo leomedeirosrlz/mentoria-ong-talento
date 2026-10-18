@@ -29,7 +29,7 @@ import {
   getInstrumentosDaDuplaIa,
   getJovemDuplaIa,
   getRegistrosDaDuplaIa,
-  papelDoUsuario,
+  papeisDoUsuario,
 } from "./queries";
 
 /** Canais registrados em ia_eventos — o CHECK do banco fecha o vocabulário. */
@@ -409,8 +409,15 @@ export async function executarTool(
       throw new ErroTool(`Argumentos inválidos: ${resumoZod(parsed.error)}`);
     argsLog = argsParaLog(parsed.data);
 
-    const papel = await papelDoUsuario(supabase);
-    if (!papel || !(tool.roles as readonly Papel[]).includes(papel))
+    // gate por papel EFETIVO (0085): my_papeis traz primário + secundários
+    // — o híbrido chama a tool do papel que ele tem, mesmo fora do primário.
+    // ctx.papel é o papel que liberou (ordem do roles da tool — staff antes
+    // de mentorado), pra run ramificar certo (ex.: ficha do jovem)
+    const papeis = await papeisDoUsuario(supabase);
+    const papel = (tool.roles as readonly Papel[]).find((r) =>
+      papeis.includes(r)
+    );
+    if (!papel)
       throw new ErroTool("Esta consulta não está disponível pro seu papel.");
 
     // `parsed.data` já passou no schema da própria tool — o `as never`

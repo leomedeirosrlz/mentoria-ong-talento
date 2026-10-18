@@ -71,14 +71,17 @@ export async function dispararParaRoles({
   try {
     // e-mail/whatsapp saíram do grant de coluna de profiles (0026): os
     // endereços vêm da view profiles_contato, que pra coordenação devolve
-    // todo mundo — role/ativo continuam na tabela base (grant público)
+    // todo mundo. O filtro por papel vai no !inner de profile_papeis
+    // (0085): a audiência vale pros papéis EFETIVOS, não só pro primário —
+    // senão o híbrido via in-app (has_papel) mas o e-mail não chegaria
     const { data: pessoas, error: errPessoas } = await supabase
       .from("profiles")
-      .select("id")
-      .in("role", roles)
+      .select("id, profile_papeis!inner(papel)")
+      .in("profile_papeis.papel", roles)
       .eq("ativo", true);
     if (errPessoas) console.error("dispararParaRoles: profiles", errPessoas);
-    const ids = (pessoas ?? []).map((p) => p.id);
+    // !inner devolve o profile uma vez por linha de papel — dedupe por id
+    const ids = [...new Set((pessoas ?? []).map((p) => p.id))];
 
     let emails: string[] = [];
     if (ids.length) {

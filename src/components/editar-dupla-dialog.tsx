@@ -24,6 +24,13 @@ import type { AppRole, Cronograma, SituacaoMentorado } from "@/lib/types";
 type Opt = { id: string; nome: string; role?: string | null; papeis?: AppRole[] };
 const NENHUM = "__nenhum";
 
+/** Papéis efetivos com fallback no primário — embed `profile_papeis` vazio
+ *  ou ausente cai no `role`. O papel de mentor pode existir SÓ em papeis
+ *  (primário sup/coord): derivar a trilha do primário mandaria "dpp" no
+ *  hidden e o server recusaria sem caminho de correção. */
+const papeisDe = (m: Opt | null | undefined): AppRole[] =>
+  m?.papeis?.length ? m.papeis : m?.role ? [m.role as AppRole] : [];
+
 // sem items o trigger fechado mostra o value cru (UUID/enum)
 const STATUS_DUPLA: Record<string, string> = {
   ativa: "Ativa",
@@ -111,19 +118,32 @@ export function EditarDuplaDialog({ dupla }: { dupla: Dupla }) {
           papeis: (p.profile_papeis ?? []).map((r) => r.papel),
         }));
         // idem nova-dupla: coordenação veio no fetch só como supervisora
-        // possível — mentor é quem TEM o papel (WP6b), nunca a equipe
-        const ms: Opt[] = lista.filter((p) =>
-          (p.papeis ?? []).some(
-            (r) => r === "mentor_dpp" || r === "mentor_especialista"
-          )
-        );
+        // possível — mentor é quem TEM o papel (WP6b), nunca a equipe.
+        // papeisDe une o primário ao embed: embed vazio (RLS/linha
+        // faltando) não tira o mentor DPP puro da lista, e o papel
+        // só-secundário entra
+        const ms: Opt[] = lista.filter((p) => {
+          const pp = papeisDe(p);
+          return pp.includes("mentor_dpp") || pp.includes("mentor_especialista");
+        });
         const ss: Opt[] = lista.filter((p) => podeSupervisionar(p.role));
         if (!ms.some((m) => m.id === dupla.mentor.id)) {
+          // o "(atual)" ficou de fora do fetch (inativo ou primário fora
+          // dos 4) e chega sem profile_papeis — declara o papel que a
+          // TRILHA da dupla exige: sem ele uma dupla ESP de mentor
+          // DPP-primário caía no primário e migrava pra DPP no submit
+          // (e o inverso, uma DPP de mentor esp-primário)
+          const papelDaTrilha: AppRole =
+            dupla.trilha === "especialista"
+              ? "mentor_especialista"
+              : "mentor_dpp";
           ms.unshift({
             id: dupla.mentor.id,
             nome: `${dupla.mentor.nome} (atual)`,
             role: dupla.mentor.role,
-            papeis: dupla.mentor.role ? [dupla.mentor.role] : [],
+            papeis: dupla.mentor.role
+              ? [...new Set<AppRole>([papelDaTrilha, dupla.mentor.role])]
+              : [papelDaTrilha],
           });
         }
         const sup0 = dupla.supervisor;
@@ -200,28 +220,39 @@ export function EditarDuplaDialog({ dupla }: { dupla: Dupla }) {
   // explícito (default: manter a da dupla); com um só, nasce do papel dele.
   // Trocar de trilha migra a dupla — o server barra quando já há encontros.
   const mentorSelObj = mentores.find((m) => m.id === mentorSel);
-  const papeisSel =
-    mentorSelObj?.papeis ??
-    (mentorSelObj?.role ? [mentorSelObj.role as AppRole] : []);
+  const papeisSel = papeisDe(mentorSelObj);
   const ehHibrido =
     papeisSel.includes("mentor_dpp") && papeisSel.includes("mentor_especialista");
-  const papelSel = mentorSelObj?.role;
   const trilhaSel: "dpp" | "especialista" = ehHibrido
     ? trilhaEsc
-    : papelSel != null
-      ? papelSel === "mentor_especialista" ? "especialista" : "dpp"
-      : dupla.trilha === "especialista" ? "especialista" : "dpp";
+    : mentorSelObj
+      ? papeisSel.includes("mentor_especialista")
+        ? "especialista"
+        : "dpp"
+      : dupla.trilha === "especialista"
+        ? "especialista"
+        : "dpp";
   const ehEsp = trilhaSel === "especialista";
   const temEncontros = dupla.encontros.length > 0;
   // com encontros criados a trilha é imutável — quem não serve a trilha
   // atual some da seleção; o híbrido serve as duas, nunca bloqueia
   const trilhaBloqueada = (m: Opt) => {
     if (!temEncontros) return false;
-    const papeis = m.papeis ?? (m.role ? [m.role as AppRole] : []);
+    const papeis = papeisDe(m);
     if (papeis.includes("mentor_dpp") && papeis.includes("mentor_especialista")) {
       return false;
     }
-    return (m.role === "mentor_especialista" ? "especialista" : "dpp") !== dupla.trilha;
+    return (papeis.includes("mentor_especialista") ? "especialista" : "dpp") !== dupla.trilha;
+  };
+  /** Sufixo de papel efetivo no item do mentor — híbrido e "só
+   *  especialista" (inclusive papel secundário com primário sup/coord)
+   *  ganham o rótulo; o primário sozinho esconderia os dois casos. */
+  const sufixoPapel = (m: Opt) => {
+    const papeis = papeisDe(m);
+    if (papeis.includes("mentor_dpp") && papeis.includes("mentor_especialista")) {
+      return " · DPP e especialista";
+    }
+    return papeis.includes("mentor_especialista") ? " · especialista" : "";
   };
   const ocupadoEm = (id: string) => {
     if (id === dupla.mentorado.id) return null;
@@ -453,26 +484,33 @@ export function EditarDuplaDialog({ dupla }: { dupla: Dupla }) {
                 defaultValue={dupla.mentor.id}
                 items={Object.fromEntries(mentoresOrd.map((m) => [
                   m.id,
-                  `${m.nome} · ${usoTrilha(m.id)}/${capTrilha(m.id)}${
-                    (m.papeis ?? []).includes("mentor_dpp") &&
-                    (m.papeis ?? []).includes("mentor_especialista")
-                      ? " · DPP e especialista"
-                      : m.role === "mentor_especialista"
-                        ? " · especialista"
-                        : ""
-                  }`,
+                  `${m.nome} · ${usoTrilha(m.id)}/${capTrilha(m.id)}${sufixoPapel(m)}`,
                 ]))}
-                onValueChange={(v) => setMentorSel(v ?? dupla.mentor.id)}
+                onValueChange={(v) => {
+                  const id = v ?? dupla.mentor.id;
+                  setMentorSel(id);
+                  // troca pra híbrido: o Select de trilha aparece e o
+                  // default volta a ser a trilha da própria dupla — nem a
+                  // última escolha nem o primário dele (com um papel só
+                  // trilhaEsc nem entra: trilhaSel deriva do papel efetivo)
+                  const papeisNovo = papeisDe(
+                    mentores.find((m) => m.id === id)
+                  );
+                  if (
+                    papeisNovo.includes("mentor_dpp") &&
+                    papeisNovo.includes("mentor_especialista")
+                  ) {
+                    setTrilhaEsc(
+                      dupla.trilha === "especialista" ? "especialista" : "dpp"
+                    );
+                  }
+                }}
               >
                 <SelectTrigger id="edit-mentor-select" aria-labelledby="edit-mentor-label edit-mentor-select"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {mentoresOrd.map((m) => {
                     const usadas = usoTrilha(m.id);
                     const total = capTrilha(m.id);
-                    const hibrido =
-                      (m.papeis ?? []).includes("mentor_dpp") &&
-                      (m.papeis ?? []).includes("mentor_especialista");
-                    const esp = !hibrido && m.role === "mentor_especialista";
                     return (
                       <SelectItem
                         key={m.id}
@@ -480,7 +518,7 @@ export function EditarDuplaDialog({ dupla }: { dupla: Dupla }) {
                         disabled={(m.id !== dupla.mentor.id && usadas >= total) || trilhaBloqueada(m)}
                       >
                         {m.nome} · {usadas}/{total}
-                        {hibrido ? " · DPP e especialista" : esp ? " · especialista" : ""}
+                        {sufixoPapel(m)}
                         {trilhaBloqueada(m) ? " · outro tipo" : ""}
                       </SelectItem>
                     );

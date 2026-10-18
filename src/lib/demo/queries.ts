@@ -478,10 +478,24 @@ export function demoContagemPessoas(): number {
 export function demoPessoas(role: AppRole): Profile[] {
   const data = getDemoData();
   const contatos = demoContatosMap(role);
+  const eu = data.personas[role];
   return data.profiles
     .filter((p) => jovemProfileVisivel(data, role, p))
     .map((p) => {
-      const c = comContato(p, contatos);
+      // papéis efetivos — o PROFILE_COLS_COM_PAPEIS da real (WP6b): sem
+      // eles /pessoas não mostra a segunda pool do híbrido nem o caminho
+      // híbrido do PessoaRow/PessoaActions. A policy profile_papeis_select
+      // (0085) libera a tabela pra todo staff; o mentorado só lê as
+      // próprias linhas — nos perfis alheios o embed viria [] e o
+      // consumidor cairia no fallback do role (temPapel), igual aqui
+      const c = comContato(
+        {
+          ...p,
+          papeis:
+            role !== "mentorado" || p.id === eu.id ? papeisDe(data, p) : [],
+        },
+        contatos
+      );
       return role === "coordenacao" ? c : semPessoal(c);
     })
     .sort(porNome);
@@ -571,6 +585,7 @@ function duplaPerfil(
     id: d.id,
     status: d.status,
     iniciada_em: d.iniciada_em,
+    trilha: d.trilha,
     mentor: d.mentor
       ? {
           id: d.mentor.id,

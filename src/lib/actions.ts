@@ -54,15 +54,35 @@ import { DEMO_MSG } from "./demo/shared";
 import { getDemoData } from "./demo/data";
 import { demoNotificacoes } from "./demo/queries";
 
+/** Normaliza o embed `profile_papeis` pro `papeis` efetivo — união do role
+ *  primário com as linhas do embed (o primário também vive lá; o dedupe
+ *  cobre linha órfã ou embed escondido pela RLS). Mesmo padrão do
+ *  comPapeis de queries.ts, mas aqui o primário entra na união porque os
+ *  callers decidem por temPapel, não por role. */
+const comPapeis = <T extends { role: AppRole | null }>(
+  p: T & { profile_papeis?: { papel: AppRole }[] | null }
+): Omit<T, "profile_papeis"> & { papeis: AppRole[] } => {
+  const { profile_papeis, ...rest } = p;
+  return {
+    ...rest,
+    papeis: [
+      ...new Set<AppRole>([
+        ...(p.role ? [p.role] : []),
+        ...(profile_papeis ?? []).map((r) => r.papel),
+      ]),
+    ],
+  };
+};
+
 async function me() {
   const supabase = await createClient();
   const { data: claimsData } = await supabase.auth.getClaims();
   const { data } = await supabase
     .from("profiles")
-    .select("id, role, nome, consent_lgpd_em")
+    .select("id, role, nome, consent_lgpd_em, profile_papeis(papel)")
     .eq("user_id", (claimsData?.claims?.sub as string) ?? "")
     .single();
-  return { supabase, me: data };
+  return { supabase, me: data ? comPapeis(data) : data };
 }
 
 const FOTO_TIPOS = ["image/png", "image/jpeg", "image/webp"];
@@ -642,9 +662,12 @@ export async function createDupla(formData: FormData) {
     .select("role, profile_papeis(papel)")
     .eq("id", mentor_id)
     .single();
-  const papeisMentor = new Set(
+  // papéis efetivos = embed + primário (o embed cobre o secundário; o
+  // primário entra na união por segurança — o embed normalmente já o traz)
+  const papeisMentor = new Set<AppRole>(
     (mentor?.profile_papeis ?? []).map((r: { papel: AppRole }) => r.papel)
   );
+  if (mentor?.role) papeisMentor.add(mentor.role);
   if (!papeisMentor.has("mentor_dpp") && !papeisMentor.has("mentor_especialista")) {
     return { error: "A pessoa escolhida como mentor não tem papel de mentor." };
   }
@@ -883,12 +906,27 @@ export async function setPessoaRole(profileId: string, role: string | null) {
     return { error: "Não foi possível concluir. Recarregue a página e tente de novo." };
   }
 
-  // mentor_profiles acompanha o papel: mentor tem linha (upsert preserva
-  // capacidade/areas/validações existentes), qualquer outro papel remove a linha
-  if (novoRole === "mentor_dpp" || novoRole === "mentor_especialista") {
+  // mentor_profiles acompanha o CONJUNTO de papéis efetivos, não só o
+  // primário (0085): rebaixar o primário pra não-mentor mantém um papel
+  // mentor_* secundário em profile_papeis (o trigger só move a marca de
+  // primário) — deletar a linha apagaria capacidade/areas/termo de quem
+  // segue mentor. O update acima já rodou o espelho role→papeis, então a
+  // leitura aqui reflete os papéis depois da troca.
+  const { data: papeisAlvo } = await supabase
+    .from("profile_papeis")
+    .select("papel")
+    .eq("profile_id", profileId);
+  const segueMentor = (papeisAlvo ?? []).some(
+    (r: { papel: AppRole }) =>
+      r.papel === "mentor_dpp" || r.papel === "mentor_especialista"
+  );
+  if (segueMentor) {
     const { error: mpErr } = await supabase.from("mentor_profiles").upsert({
       profile_id: profileId,
-      tipo: novoRole === "mentor_dpp" ? "dpp" : "especialista",
+      // tipo deriva do NOVO primário (mesmo critério do updatePessoa) —
+      // primário não-mentor cai no default dpp; o upsert sem as demais
+      // colunas preserva capacidade/areas/termo já gravados
+      tipo: novoRole === "mentor_especialista" ? "especialista" : "dpp",
     });
     if (mpErr) return { error: erroAmigavel(mpErr) };
   } else {
@@ -1050,9 +1088,10 @@ export async function updateCapacidadeMentor(
     .select("id, role, profile_papeis(papel)")
     .eq("id", profileId)
     .single();
-  const papeisAlvo = new Set(
+  const papeisAlvo = new Set<AppRole>(
     (alvo?.profile_papeis ?? []).map((r: { papel: AppRole }) => r.papel)
   );
+  if (alvo?.role) papeisAlvo.add(alvo.role);
   const ehMentorAlvo =
     papeisAlvo.has("mentor_dpp") || papeisAlvo.has("mentor_especialista");
   if (!alvo || !ehMentorAlvo) {
@@ -1451,9 +1490,10 @@ export async function updateDupla(duplaId: string, formData: FormData) {
     .select("role, profile_papeis(papel)")
     .eq("id", mentor_id)
     .single();
-  const papeisMentor = new Set(
+  const papeisMentor = new Set<AppRole>(
     (mentor?.profile_papeis ?? []).map((r: { papel: AppRole }) => r.papel)
   );
+  if (mentor?.role) papeisMentor.add(mentor.role);
   if (!papeisMentor.has("mentor_dpp") && !papeisMentor.has("mentor_especialista")) {
     return { error: "A pessoa escolhida como mentor não tem papel de mentor." };
   }
@@ -1526,7 +1566,10 @@ export async function updateDupla(duplaId: string, formData: FormData) {
         return { error: "Esse mentorado já está em uma dupla ativa ou pausada nesse tipo de mentoria." };
       }
     }
-    if (voltando || mentor_id !== atualDupla.mentor_id) {
+    // mudança de trilha também revalida (espelha o gate do mentorado
+    // acima): a vaga sai de um pool e entra no outro — a trilha nova pode
+    // estar lotada mesmo com a DPP folgada
+    if (voltando || mentor_id !== atualDupla.mentor_id || trilhaNova !== atualDupla.trilha) {
       // vagas do mentor são por trilha (0073) — a dupla nova conta só no
       // próprio pool
       const [{ data: doMentor }, { data: mp }] = await Promise.all([
@@ -2178,7 +2221,9 @@ async function diretorioPareamento(supabase: Supa): Promise<DiretorioPar> {
     { data: mps },
     { data: evs },
   ] = await Promise.all([
-    supabase.from("profiles").select("id, nome, role, ativo, nome_social"),
+    // profile_papeis vem embutido: o papel mentor_* pode ser secundário
+    // (WP6b) e resolverPares decide por papel efetivo, não pelo primário
+    supabase.from("profiles").select("id, nome, role, ativo, nome_social, profile_papeis(papel)"),
     supabase.from("profiles_contato").select("id, email"),
     supabase.from("mentorados").select("id, nome, email, nome_social"),
     supabase
@@ -2194,10 +2239,19 @@ async function diretorioPareamento(supabase: Supa): Promise<DiretorioPar> {
   ]);
   const emailPorId = new Map((contatos ?? []).map((c) => [c.id, c.email]));
   return {
-    profiles: (profs ?? []).map((p) => ({
-      ...p,
-      email: emailPorId.get(p.id) ?? null,
-    })),
+    profiles: (profs ?? []).map((p) => {
+      const { profile_papeis, ...rest } = p;
+      return {
+        ...rest,
+        email: emailPorId.get(p.id) ?? null,
+        // mesmo papel em 2 escopos vira 2 linhas do embed — dedupe
+        papeis: [
+          ...new Set(
+            (profile_papeis ?? []).map((r: { papel: AppRole }) => r.papel)
+          ),
+        ],
+      };
+    }),
     mentorados: mdos ?? [],
     duplas: dups ?? [],
     cronogramas: (crons ?? []) as Cronograma[],
@@ -2222,6 +2276,15 @@ function diretorioPareamentoDemo(): DiretorioPar {
       nome_social: p.nome_social ?? null,
       role: p.role,
       ativo: p.ativo,
+      // papéis efetivos do dataset demo (WP0b) — os híbridos Ricardo e
+      // André carregam a linha extra de mentor_especialista
+      papeis: [
+        ...new Set(
+          d.profilePapeis
+            .filter((r) => r.profile_id === p.id)
+            .map((r) => r.papel)
+        ),
+      ],
     })),
     mentorados: d.mentorados.map((m) => ({
       id: m.id,

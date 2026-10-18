@@ -298,20 +298,32 @@ export default async function PessoaPerfilPage({
       )?.id ?? null)
     : null;
   const mp = perfil.tipo === "profile" ? perfil.mentorProfile : null;
-  // a pool de vagas mostrada é a da trilha do papel (0073)
-  const capacidadeMentor =
-    mp?.tipo === "especialista"
-      ? (mp.capacidade_especialista ?? 1)
-      : (mp?.capacidade ?? 1);
-  // X/Y da capacidade (REALIZA-116): ativas+pausadas do mentor — só pra
-  // coordenação. perfil.duplas chega escopado pelo RLS: pro supervisor o
-  // recorte seria só as duplas dele e o X mentiria ("0/1" pra mentor cheio
-  // supervisionado por outro) — por isso o stat sem uso quando não é coord
-  const emUsoMentor =
+  // pools separadas por trilha (WP6b): o híbrido tem as duas — papel
+  // EFETIVO decide quais stats existem (o papel de mentor pode viver só em
+  // profile_papeis, com primário sup/coord); pro híbrido a pool do papel
+  // primário vem primeiro
+  const ehMentorHibrido =
+    !!prof &&
+    temPapel(prof, "mentor_dpp") &&
+    temPapel(prof, "mentor_especialista");
+  const trilhasMentor: ("dpp" | "especialista")[] = ehMentorHibrido
+    ? prof?.role === "mentor_especialista"
+      ? ["especialista", "dpp"]
+      : ["dpp", "especialista"]
+    : [temPapel(prof, "mentor_especialista") ? "especialista" : "dpp"];
+  const capPorTrilha = (t: "dpp" | "especialista") =>
+    t === "especialista" ? (mp?.capacidade_especialista ?? 1) : (mp?.capacidade ?? 1);
+  // X/Y da capacidade (REALIZA-116): ativas+pausadas do mentor POR TRILHA
+  // — só pra coordenação. perfil.duplas chega escopado pelo RLS: pro
+  // supervisor o recorte seria só as duplas dele e o X mentiria ("0/1" pra
+  // mentor cheio supervisionado por outro) — por isso o stat sem uso
+  // quando não é coord
+  const emUsoPorTrilha = (t: "dpp" | "especialista") =>
     souCoord && mp
       ? perfil.duplas.filter(
           (d) =>
             d.mentor?.id === p.id &&
+            (d.trilha ?? "dpp") === t &&
             (d.status === "ativa" || d.status === "pausada")
         ).length
       : null;
@@ -551,44 +563,61 @@ export default async function PessoaPerfilPage({
         <section className="rounded-xl bg-card px-4 py-4 shadow-[var(--shadow-border)] sm:px-5">
           <h2 className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
             <Handshake size={15} aria-hidden className="shrink-0" />
-            {mp.tipo === "dpp" ? "Mentoria DPP" : "Mentoria especialista"}
+            {ehMentorHibrido
+              ? "Mentoria"
+              : trilhasMentor[0] === "especialista"
+                ? "Mentoria especialista"
+                : "Mentoria DPP"}
           </h2>
           <dl className="mt-2.5 grid grid-cols-2 gap-x-4 gap-y-3.5 sm:grid-cols-4">
-            {/* a pool mostrada é a da trilha do papel (0073); o ajuste fino
-                é coord-only — o dialog reusa o guard do mentor_profiles */}
-            <Stat
-              rotulo="Capacidade"
-              valor={
-                emUsoMentor != null
-                  ? `${emUsoMentor}/${capacidadeMentor} ${capacidadeMentor === 1 ? "dupla" : "duplas"}`
-                  : `${capacidadeMentor} ${capacidadeMentor === 1 ? "dupla" : "duplas"}`
-              }
-              estado={
-                emUsoMentor != null && emUsoMentor >= capacidadeMentor
-                  ? "pendente"
-                  : "neutro"
-              }
-              acao={
-                souCoord ? (
-                  <CapacidadeMentorDialog
-                    mentorId={p.id}
-                    nome={p.nome}
-                    atual={capacidadeMentor}
-                    emUso={emUsoMentor ?? 0}
-                    trigger={
-                      <button
-                        type="button"
-                        className="mt-0.5 inline-block text-xs font-normal text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline"
-                      >
-                        {emUsoMentor != null && emUsoMentor >= capacidadeMentor
-                          ? "aumentar →"
-                          : "ajustar"}
-                      </button>
-                    }
-                  />
-                ) : undefined
-              }
-            />
+            {/* a pool mostrada é a da trilha (0073); o híbrido tem as duas,
+                cada uma com X/Y e ajuste próprios — a trilha explícita
+                impede o server de derivar a pool do papel primário. O
+                ajuste fino é coord-only — o dialog reusa o guard do
+                mentor_profiles */}
+            {trilhasMentor.map((t) => {
+              const capacidade = capPorTrilha(t);
+              const emUso = emUsoPorTrilha(t);
+              return (
+                <Stat
+                  key={t}
+                  rotulo={
+                    ehMentorHibrido
+                      ? t === "especialista"
+                        ? "Capacidade especialista"
+                        : "Capacidade DPP"
+                      : "Capacidade"
+                  }
+                  valor={
+                    emUso != null
+                      ? `${emUso}/${capacidade} ${capacidade === 1 ? "dupla" : "duplas"}`
+                      : `${capacidade} ${capacidade === 1 ? "dupla" : "duplas"}`
+                  }
+                  estado={emUso != null && emUso >= capacidade ? "pendente" : "neutro"}
+                  acao={
+                    souCoord ? (
+                      <CapacidadeMentorDialog
+                        mentorId={p.id}
+                        nome={p.nome}
+                        atual={capacidade}
+                        emUso={emUso ?? 0}
+                        trilha={t}
+                        trigger={
+                          <button
+                            type="button"
+                            className="mt-0.5 inline-block text-xs font-normal text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline"
+                          >
+                            {emUso != null && emUso >= capacidade
+                              ? "aumentar →"
+                              : "ajustar"}
+                          </button>
+                        }
+                      />
+                    ) : undefined
+                  }
+                />
+              );
+            })}
             <Stat
               rotulo="Formação inicial"
               valor={formacaoTxt}
