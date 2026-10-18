@@ -614,3 +614,24 @@ Itens abaixo foram conferidos contra migrations e `src/` no fechamento do plano.
 **Jira:** REALIZA-139 e REALIZA-146 → Concluído.
 
 **Débito conhecido:** a sugestão não rende Card-CTA na home do jovem além do banner (o CTA completo com sessão N/mural ficou no mínimo da página própria); roteamento de superfície do híbrido (qual home ele cai) fica pro WP3.
+
+## WP6b — mentor híbrido fechado (PR #61 · merge 071cc7b)
+
+Edge case coberto de ponta a ponta: mentor com `mentor_dpp` **e** `mentor_especialista` em `profile_papeis`. O roteamento por `role` primário tornava o segundo papel invisível — o híbrido DPP-primário não recebia pedidos dirigidos, não editava a grade e não entrava nos pools da trilha esp. Fundação: `getMe` carrega `papeis` via `my_papeis()`; `temPapel(p, papel)` decide gates por papel efetivo (primário ∪ `papeis`); papéis efetivos propagados por `profile_papeis(papel)` embed em `getPessoas`/`getPessoaPerfil`/export/IA.
+
+**Migration `0090` (staging E produção):** `has_papel` em `notificacoes_insert` (destinatário de `demanda_especialista` + autor dos pings esp), `comunicados_select`, `materiais_select`/storage, `especialista_avaliacoes`, `rematch_dupla`, `emitir_link_instrumento` e policies de `especialista_grade`/`especialista_excecoes` da 0073; `avaliacoes_select` restrita a `trilha='dpp'` (o ramo DPP não lê integral de trilha esp — privacidade); **bugfix `abrir_chamado`** (`d.especialista_id` não existia → 42703 pra qualquer não-mentorado com `p_dupla_id` — bug geral em prod, não só híbrido).
+
+**Frontend:**
+- Home: `DemandasEspecialista` + `getSolicitacoesVisiveis`/`getSlotsLivres` montam quando `temPapel(esp)` — o pedido dirigido ao híbrido agora tem superfície pra responder; negociação passa `papel` contextual da trilha.
+- `/agenda`: abas `?visao=dpp|especialista` (decisão de produto registrada) — o híbrido edita a grade/exceções da trilha esp; `/duplas`: visão `hibrido` com seções por trilha (cada card na régua da própria).
+- Criar/editar dupla: **select explícito de trilha** quando o mentor escolhido é híbrido (trilha nunca mais derivada do primário; `createDupla`/`updateDupla` recebem `trilha` opcional).
+- Capacidade por trilha: `capacidade` (DPP) × `capacidade_especialista` (esp) — pools independentes, contagem `${mentor}:${trilha}` em fila/remanejo/matching/`/pessoas`/export/tools da IA; edição de pessoa expõe as duas pools pro híbrido (`updatePessoa` grava as duas); `mentor_profiles.tipo` segue o **primário** (pool secundária não inverte o tipo).
+- Swap mecânico restante dos gates `me.role ===` "é mentor" → `temPapel` (nav, onboarding, perfil, materiais, agenda, `pessoa-actions`, fan-outs de `actions-especialista` via `profile_papeis!inner`).
+
+**Demo:** stub corrigido — `resolveEmbed` só devolve to-one quando a linha alvo **existe**; senão cai no ramo to-many (um `user_id` no pai engolia `profile_papeis(papel)` → pool de remanejo vazio — regressão pega pela suite); `demoMe`/gates demo espelham `has_papel` e a restrição por trilha de `avaliacoes_select`.
+
+**Gates:** tsc 0 · eslint limpo · vitest 532 (fixtures migradas pra chave `${id}:${trilha}` + casos híbridos novos em `fila`/`remanejo`) · build ok · e2e demo **28/28** incluindo `hibrido.spec.ts` novo (mural na home DPP, abas da agenda, seções por trilha em `/duplas`) · **e2e app no preview: tudo verde (12m32s)**.
+
+**Jira:** REALIZA-148, REALIZA-149 e REALIZA-150 → Concluído.
+
+**Débito conhecido:** a fixture `hib-e2e` do staging tem híbrido completo mas ainda não há spec app que logue **como** ele (demo cobre o caminho DPP-primário; o caminho esp-primário+DPP depende de fixture logada); redesign visual da home do mentor segue no WP3.
