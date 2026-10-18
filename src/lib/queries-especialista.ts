@@ -226,10 +226,26 @@ export const getEspecialistas = cache(
       console.error("getEspecialistas:", error);
       return [];
     }
+    // o !inner devolve o profile UMA vez por linha de papel — o papel em
+    // 2 escopos listaria o mesmo nome duas vezes no select; dedupe por id.
+    // O embed não volta pro client: a linha dedupada carrega só os 3 campos
+    const unicos = new Map<
+      string,
+      { id: string; nome: string; areas: string[] | null }
+    >();
+    for (const p of (data ?? []) as {
+      id: string;
+      nome: string;
+      areas: string[] | null;
+    }[]) {
+      if (!unicos.has(p.id)) {
+        unicos.set(p.id, { id: p.id, nome: p.nome, areas: p.areas });
+      }
+    }
     // a collation do banco ordena acentos depois de Z — pt-BR no app
-    return (
-      (data ?? []) as { id: string; nome: string; areas: string[] | null }[]
-    ).sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+    return [...unicos.values()].sort((a, b) =>
+      a.nome.localeCompare(b.nome, "pt-BR")
+    );
   }
 );
 

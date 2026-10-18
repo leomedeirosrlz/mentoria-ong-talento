@@ -329,15 +329,25 @@ function resolveEmbed(
         .replace(new RegExp(`^${tabelaOrigem}_`), "")
         .replace(/_fkey$/, "")
     : null;
-  const candidatos = [
+  // direcionados apontam pra tabela alvo pelo nome (a constraint explícita,
+  // <alias>_id ou <singular da tabela>_id); os genéricos só apontam pra
+  // algum lugar quando o alvo é profiles — created_by/autor_id/profile_id/
+  // user_id são sempre referência a usuário
+  const direcionados = [
     deFkey,
     `${spec.alias}_id`,
     `${spec.tabela.replace(/s$/, "")}_id`,
-    "created_by",
-    "autor_id",
-    "profile_id",
-    "user_id",
   ].filter((c): c is string => Boolean(c));
+  const candidatos = [
+    ...new Set([
+      ...direcionados,
+      "created_by",
+      "autor_id",
+      "profile_id",
+      "user_id",
+    ]),
+  ];
+  let fkPendurada = false;
   for (const c of candidatos) {
     const v = linha[c];
     if (typeof v === "string" && v) {
@@ -346,13 +356,25 @@ function resolveEmbed(
       // candidatos e por fim pro ramo to-many — sem isso um `user_id` na
       // linha pai engolia embeds filhos tipo `profile_papeis(papel)` (WP6b)
       if (alvo) return projetaAlvo(alvo as Linha, spec.sub);
+      // preenchida e sem match: só conta como FK pendurada se a coluna de
+      // fato apontava pro alvo — direcionada sempre; genérica só quando o
+      // alvo é profiles (o user_id de uma linha de profiles não aponta pra
+      // profile_papeis — sem o filtro o embed to-many viraria null)
+      if (direcionados.includes(c) || spec.tabela === "profiles") {
+        fkPendurada = true;
+      }
     }
   }
   // to-many: filhas que apontam pra origem ("duplas" -> "dupla_id")
   const chavePai = `${tabelaOrigem.replace(/s$/, "")}_id`;
-  return linhas(spec.tabela, papel)
+  const filhas = linhas(spec.tabela, papel)
     .filter((r) => r[chavePai] === linha.id)
     .map((f) => projetaAlvo(f, spec.sub));
+  // to-many com filhas vence. Vazio + FK pendurada = to-one cujo alvo não
+  // existe — o PostgREST devolveria null (join sem match), não []; vazio
+  // sem nenhuma FK candidata é to-many sem filhas, [] mesmo
+  if (filhas.length > 0) return filhas;
+  return fkPendurada ? null : filhas;
 }
 
 /** A linha volta inteira (select do app é subset de colunas já presentes);

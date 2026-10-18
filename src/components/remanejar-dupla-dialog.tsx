@@ -35,6 +35,12 @@ import {
 
 type Opt = { id: string; nome: string; role?: string | null; papeis?: AppRole[] };
 
+/** Papéis efetivos com fallback no primário — embed `profile_papeis` vazio
+ *  ou ausente cai no `role` (a policy pode negar a linha alheia). O papel
+ *  de mentor pode existir SÓ em papeis (primário sup/coord). */
+const papeisDe = (m: Opt | null | undefined): AppRole[] =>
+  m?.papeis?.length ? m.papeis : m?.role ? [m.role as AppRole] : [];
+
 /** "Remanejar" — troca UM lado da dupla sem costurar encerra-e-cria na mão:
  *  o RPC rematch_dupla (0064) encerra a atual e abre a sucessora numa
  *  transação. Coord-only; a ficha antiga guarda o histórico, a nova herda
@@ -120,7 +126,10 @@ export function RemanejarDuplaDialog({
           supabase
             .from("profiles")
             .select("id, nome, role, profile_papeis(papel)")
-            .in("role", ["mentor_dpp", "mentor_especialista"])
+            // 4 primários, como no nova/editar: quem tem papel de mentor
+            // só em profile_papeis (primário sup/coord) não pode ficar de
+            // fora do fetch — o pool filtra por papel efetivo abaixo
+            .in("role", ["mentor_dpp", "mentor_especialista", "supervisor", "coordenacao"])
             .eq("ativo", true)
             .order("nome"),
           supabase
@@ -207,9 +216,7 @@ export function RemanejarDuplaDialog({
   // mas o select já nasce filtrado pra erro não ser nem opção. Papel
   // EFETIVO (WP6b): o híbrido entra no pool da trilha que ele tem.
   const papelOk = ehEsp ? "mentor_especialista" : "mentor_dpp";
-  const mentorPool = mentores.filter((m) =>
-    (m.papeis ?? (m.role ? [m.role as AppRole] : [])).includes(papelOk)
-  );
+  const mentorPool = mentores.filter((m) => papeisDe(m).includes(papelOk));
   const mentorLotado = (id: string) =>
     (emUso[id] ?? 0) >= (capacidade[id] ?? 1);
   const mentoradoOcupado = (id: string) =>

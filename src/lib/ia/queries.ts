@@ -29,17 +29,19 @@ import type {
 } from "@/lib/types";
 import type { InstrumentoDupla } from "@/lib/forms/queries";
 
-/** Papel do dono do client — a mesma my_role() que a RLS usa: a leitura do
- *  papel sai de uma fonte só (o banco), nunca de claim adivinhada. null =
- *  sem sessão ou profile sem papel — o gate de papel da tool resolve. */
-export const papelDoUsuario = cache(
-  async (supabase: SupabaseClient): Promise<AppRole | null> => {
-    const { data, error } = await supabase.rpc("my_role");
+/** Papéis efetivos do dono do client — a mesma my_papeis() que o getMe usa
+ *  (0085): a leitura sai de uma fonte só (o banco), nunca de claim
+ *  adivinhada. O gate da tool decide por INTERSEÇÃO — um papel que vive
+ *  só como secundário (o híbrido DPP+especialista) também libera a tool.
+ *  [] = sem sessão ou profile sem papel — nada passa no gate. */
+export const papeisDoUsuario = cache(
+  async (supabase: SupabaseClient): Promise<AppRole[]> => {
+    const { data, error } = await supabase.rpc("my_papeis");
     if (error) {
-      console.error("papelDoUsuario:", error);
-      return null;
+      console.error("papeisDoUsuario:", error);
+      return [];
     }
-    return (data as AppRole | null) ?? null;
+    return (data as AppRole[] | null) ?? [];
   }
 );
 

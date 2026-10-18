@@ -777,9 +777,18 @@ export function DuplasLista({
     }
     // cada seção recebe a fatia da própria trilha (e o resumo dela) — seção
     // sem duplas não aparece: um título "Minhas duplas" sobre zero cards
-    // seria ruído, não contexto
+    // seria ruído, não contexto. Com as duas seções o h1 é da página e elas
+    // viram h2 — dois h1 na mesma página quebram a hierarquia do heading
+    const duasSecoes = dpp.length > 0 && esp.length > 0;
     return (
       <div className="space-y-10">
+        {duasSecoes && (
+          <header>
+            <h1 className="text-2xl font-semibold tracking-tight">
+              Minhas duplas e trilhas
+            </h1>
+          </header>
+        )}
         {dpp.length > 0 && (
           <VisaoMentor
             lista={dpp}
@@ -787,6 +796,7 @@ export function DuplasLista({
             hoje={hoje}
             saudePorId={saudePorId}
             resumo={resumoDaLista(dpp, saudePorId, "mentor")}
+            nivel={duasSecoes ? "h2" : "h1"}
           />
         )}
         {esp.length > 0 && (
@@ -796,6 +806,7 @@ export function DuplasLista({
             saudePorId={saudePorId}
             resumo={resumoDaLista(esp, saudePorId, "especialista")}
             espEventos={especialistaEventos}
+            nivel={duasSecoes ? "h2" : "h1"}
           />
         )}
       </div>
@@ -1460,12 +1471,15 @@ function VisaoMentor({
   hoje,
   saudePorId,
   resumo,
+  nivel = "h1",
 }: {
   lista: Dupla[];
   eventos: CicloEvento[];
   hoje: Date;
   saudePorId: Map<string, Saude>;
   resumo: ReturnType<typeof resumoDaLista>;
+  /** h1 standalone; h2 quando embutida como seção da visão híbrida. */
+  nivel?: "h1" | "h2";
 }) {
   const ordenadas = [...lista].sort(
     (a, b) =>
@@ -1474,10 +1488,19 @@ function VisaoMentor({
       comparaNome(a.mentorado.nome, b.mentorado.nome)
   );
 
+  // h1 standalone; h2 quando a visão é seção dentro da híbrida (um h1 por página)
+  const Titulo = nivel;
   return (
     <>
       <header>
-        <h1 className="text-2xl font-semibold tracking-tight">Minhas duplas</h1>
+        <Titulo
+          className={cn(
+            "font-semibold tracking-tight",
+            nivel === "h1" ? "text-2xl" : "text-xl"
+          )}
+        >
+          Minhas duplas
+        </Titulo>
         <ResumoLinha resumo={resumo} />
       </header>
 
@@ -1681,21 +1704,33 @@ function VisaoEspecialista({
   saudePorId,
   resumo,
   espEventos,
+  nivel = "h1",
 }: {
   lista: Dupla[];
   hoje: Date;
   saudePorId: Map<string, Saude>;
   resumo: ReturnType<typeof resumoDaLista>;
   espEventos: EspecialistaEvento[];
+  /** h1 standalone; h2 quando embutida como seção da visão híbrida. */
+  nivel?: "h1" | "h2";
 }) {
   const ordenadas = [...lista].sort((a, b) =>
     comparaNome(a.mentorado.nome, b.mentorado.nome)
   );
 
+  // h1 standalone; h2 quando a visão é seção dentro da híbrida (um h1 por página)
+  const Titulo = nivel;
   return (
     <>
       <header>
-        <h1 className="text-2xl font-semibold tracking-tight">Minhas trilhas</h1>
+        <Titulo
+          className={cn(
+            "font-semibold tracking-tight",
+            nivel === "h1" ? "text-2xl" : "text-xl"
+          )}
+        >
+          Minhas trilhas
+        </Titulo>
         <ResumoLinha resumo={resumo} />
       </header>
 

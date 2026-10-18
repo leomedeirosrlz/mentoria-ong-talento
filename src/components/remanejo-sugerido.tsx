@@ -157,6 +157,9 @@ export function RemanejoSugerido({
                     nome={c.profile.nome}
                     atual={c.teto}
                     emUso={c.usadas}
+                    // pool da trilha da dupla — sem ela o server escreve
+                    // a do papel primário e o híbrido ajusta a errada
+                    trilha={ehEsp ? "especialista" : "dpp"}
                     trigger={
                       <button
                         type="button"
