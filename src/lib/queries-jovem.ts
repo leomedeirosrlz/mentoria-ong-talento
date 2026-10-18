@@ -3,6 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { comparaNome } from "./ciclo";
 import { demoRole } from "./demo/mode";
 import {
+  demoDevolutivas,
+  demoTrilhaEsp,
   demoJovemAssinaturas,
   demoJovemColegas,
   demoJovemContatos,
@@ -20,6 +22,7 @@ import {
 } from "./queries-especialista";
 import type {
   ColegaTurma,
+  Devolutiva,
   EncontroStatus,
   JovemAssinatura,
   JovemContato,
@@ -238,6 +241,7 @@ export const getJovemEspecialistas = cache(
         (e): e is Row & { id: string; nome: string } =>
           e.id != null && e.nome != null
       )
+      .map((e) => ({ ...e, vagas: e.vagas ?? 0 }))
       .sort((a, b) => comparaNome(a.nome, b.nome));
   }
 );
@@ -311,5 +315,54 @@ export const getJovemPedidosEspecialista = cache(
     );
 
     return { catalogo, solicitacoes: sols, propostas, slotsPorEsp };
+  }
+);
+
+/** Devolutivas das trilhas do jovem (0086 — feed datado por dupla esp). A
+ *  RLS da tabela base escopa às duplas dele; aqui o caller passa os ids
+ *  das trilhas que já carregou, e o nome do autor vem do mentor da dupla
+ *  (mentorado não tem SELECT em profiles — se quem escreveu foi a
+ *  coordenação, cai no fallback "Equipe"). */
+export const getDevolutivas = cache(
+  async (duplaIds: string[]): Promise<Devolutiva[]> => {
+    if (duplaIds.length === 0) return [];
+    const demo = await demoRole();
+    if (demo) return demoDevolutivas(demo, duplaIds);
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("devolutivas")
+      .select("id, dupla_id, autor_id, texto, created_at")
+      .in("dupla_id", duplaIds)
+      .order("created_at", { ascending: true });
+    if (error) {
+      console.error("getDevolutivas:", error);
+      return [];
+    }
+    return (data ?? []) as Devolutiva[];
+  }
+);
+
+/** Os 5 passos do guia da trilha de especialista, projetados pro jovem pela
+ *  view definer 0088 (a tabela base não abre pro papel mentorado — 0065). */
+export const getJovemTrilhaEsp = cache(
+  async (): Promise<{ numero: number; titulo: string; foco: string | null }[]> => {
+    const demo = await demoRole();
+    if (demo) {
+      if (demo !== "mentorado") return [];
+      return demoTrilhaEsp();
+    }
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("jovem_trilha_esp")
+      .select("numero, titulo, foco")
+      .order("numero");
+    if (error) {
+      console.error("getJovemTrilhaEsp:", error);
+      return [];
+    }
+    return (data ?? []).filter(
+      (e): e is { numero: number; titulo: string; foco: string | null } =>
+        e.numero != null && e.titulo != null
+    );
   }
 );

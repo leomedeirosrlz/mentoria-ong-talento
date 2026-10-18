@@ -16,6 +16,7 @@ import type {
   Cronograma,
   DadosCivis,
   DocumentoPessoa,
+  Devolutiva,
   Dupla,
   DuplaResumo,
   Encontro,
@@ -297,6 +298,20 @@ export function demoEspecialistaEventos(): EspecialistaEvento[] {
   return [...getDemoData().especialistaEventos].sort(
     (a, b) => a.numero - b.numero
   );
+}
+
+/** Projeção da view jovem_trilha_esp (0088) — os 5 passos do guia esp pro
+ *  stepper da trilha do jovem. */
+export function demoTrilhaEsp(): {
+  numero: number;
+  titulo: string;
+  foco: string | null;
+}[] {
+  return getDemoData().especialistaEventos.map((e) => ({
+    numero: e.numero,
+    titulo: e.titulo,
+    foco: e.foco ?? null,
+  }));
 }
 
 // ---------- agenda do especialista (0073) ----------
@@ -1279,14 +1294,90 @@ export function demoJovemEspecialistas(role: AppRole): JovemEspecialista[] {
         p.ativo &&
         p.id !== meuDppId
     )
-    .map((p) => ({
-      id: p.id,
-      nome: p.nome,
-      nome_social: p.nome_social ?? null,
-      avatar_path: p.avatar_path ?? null,
-      areas: p.areas ?? null,
-    }))
+    .map((p) => {
+      const mp = data.mentorProfiles.find((x) => x.profile_id === p.id);
+      // grade_resumo: mesma projeção da view (0086) — período por dia, nunca
+      // slot exato. A grade crua fica fora do que o jovem lê.
+      const grade_resumo = data.especialistaGrade
+        .filter((g) => g.profile_id === p.id)
+        .flatMap((g) => {
+          const dia =
+            ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"][
+              g.dia_semana
+            ] ?? "";
+          const per: string[] = [];
+          if (g.hora_inicio < "12:00") per.push(`${dia} de manhã`);
+          if (g.hora_inicio < "18:00" && g.hora_fim > "12:00")
+            per.push(`${dia} à tarde`);
+          if (g.hora_fim > "18:00") per.push(`${dia} à noite`);
+          return per;
+        });
+      const ativas = data.duplas.filter(
+        (d) =>
+          d.mentor?.id === p.id &&
+          d.trilha === "especialista" &&
+          (d.status === "ativa" || d.status === "pausada")
+      ).length;
+      return {
+        id: p.id,
+        nome: p.nome,
+        nome_social: p.nome_social ?? null,
+        avatar_path: p.avatar_path ?? null,
+        areas: p.areas ?? null,
+        bio: p.bio ?? null,
+        cargo: p.cargo ?? null,
+        empresa: p.empresa ?? null,
+        cidade: p.cidade ?? null,
+        uf: p.uf ?? null,
+        voluntariado: p.voluntariado ?? null,
+        experiencia_previa: mp?.experiencia_previa ?? null,
+        formacao_externa: mp?.formacao_externa ?? null,
+        grade_resumo: grade_resumo.length ? [...new Set(grade_resumo)] : null,
+        vagas: Math.max(0, (mp?.capacidade_especialista ?? 1) - ativas),
+      };
+    })
     .sort(porNome);
+}
+
+/** Feed datado por trilha (0086) — o jovem lê as das duplas dele; o
+ *  especialista/autor lê as próprias; coordenacao lê tudo (mesma régua da
+ *  policy devolutivas_select). */
+export function demoDevolutivas(role: AppRole, duplaIds: string[]): Devolutiva[] {
+  const data = getDemoData();
+  const ids = new Set(duplaIds);
+  // MentoradoPar não carrega profile_id — o dono sai da ficha do mentorado
+  const meuMentoradoId =
+    role === "mentorado"
+      ? (data.mentorados.find(
+          (m) => m.profile_id === data.personas.mentorado?.id
+        )?.id ?? null)
+      : null;
+  const minhas =
+    role === "coordenacao"
+      ? ids
+      : role === "mentorado"
+        ? new Set(
+            data.duplas
+              .filter(
+                (d) => ids.has(d.id) && d.mentorado?.id === meuMentoradoId
+              )
+              .map((d) => d.id)
+          )
+        : new Set(
+            data.devolutivas
+              .filter((v) => ids.has(v.dupla_id) && v.autor_id === data.personas[role]?.id)
+              .map((v) => v.dupla_id)
+          );
+  return data.devolutivas
+    .filter((v) => minhas.has(v.dupla_id))
+    .map((v) => ({
+      ...v,
+      autor: {
+        nome:
+          data.profiles.find((p) => p.id === v.autor_id)?.nome ?? "Equipe",
+      },
+    }))
+    .sort((a, b) => a.created_at.localeCompare(b.created_at));
 }
 
 // ---------- interações e anexos ----------

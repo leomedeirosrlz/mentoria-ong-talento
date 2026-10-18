@@ -482,3 +482,72 @@ export async function removerExcecao(id: string) {
   revalidarAgenda();
   return { ok: true };
 }
+
+/** WP6 — o mentor DPP registra a demanda de especialista em nome do jovem:
+ *  nasce 'sugerida' (fora dos tetos e do mural) e só vira pedido real
+ *  quando o jovem confirma. A RPC valida que o autor é o DPP da dupla
+ *  ativa — aqui saneamos forma e repassamos. */
+export async function sugerirEspecialistaMentor(input: {
+  mentoradoId: string;
+  demanda: string;
+  objetivo?: string | null;
+  especialistaId?: string | null;
+  duplaDppId?: string | null;
+}): Promise<{ ok?: true; error?: string }> {
+  if (await demoAtivo()) return { error: DEMO_MSG };
+  const { supabase, me: eu } = await me();
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
+  if (eu.role === "mentorado") {
+    return { error: "O jovem pede direto pela página de especialistas." };
+  }
+
+  const demanda = input.demanda?.trim() ?? "";
+  const objetivo = input.objetivo?.trim() || null;
+  if (!input.mentoradoId) return { error: "Mentorado não informado." };
+  if (demanda.length < 10 || demanda.length > 1000) {
+    return { error: "Descreva o tema em 10 a 1.000 caracteres." };
+  }
+  if (objetivo && (objetivo.length < 3 || objetivo.length > 500)) {
+    return { error: "O objetivo precisa ter entre 3 e 500 caracteres." };
+  }
+
+  const { error } = await supabase.rpc("sugerir_especialista_mentor", {
+    p_mentorado_id: input.mentoradoId,
+    p_demanda: demanda,
+    p_objetivo: objetivo ?? undefined,
+    p_especialista_id: input.especialistaId ?? undefined,
+  });
+  if (error) return { error: erroAmigavel(error) };
+
+  revalidarMural(input.duplaDppId);
+  revalidatePath("/jovem/especialistas");
+  return { ok: true };
+}
+
+/** WP6 — o especialista devolve pra trilha ao longo do percurso (não só no
+ *  encerramento). Só o mentor daquela dupla esp aberta escreve — a RPC
+ *  confere o vínculo de novo. */
+export async function postarDevolutiva(input: {
+  duplaId: string;
+  texto: string;
+}): Promise<{ ok?: true; error?: string }> {
+  if (await demoAtivo()) return { error: DEMO_MSG };
+  const { supabase, me: eu } = await me();
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
+
+  const texto = input.texto?.trim() ?? "";
+  if (!input.duplaId) return { error: "Trilha não informada." };
+  if (texto.length < 10 || texto.length > 4000) {
+    return { error: "Escreva a devolutiva (entre 10 e 4.000 caracteres)." };
+  }
+
+  const { error } = await supabase.rpc("postar_devolutiva", {
+    p_dupla_id: input.duplaId,
+    p_texto: texto,
+  });
+  if (error) return { error: erroAmigavel(error) };
+
+  revalidatePath(`/duplas/${input.duplaId}`);
+  revalidatePath("/jovem/especialistas");
+  return { ok: true };
+}
