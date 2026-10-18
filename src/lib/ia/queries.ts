@@ -220,6 +220,7 @@ export type PessoaFilaIa = Pick<
   | "id"
   | "nome"
   | "role"
+  | "papeis"
   | "ativo"
   | "origem"
   | "consent_lgpd_em"
@@ -257,13 +258,15 @@ export const getFilaInsumos = cache(
       await Promise.all([
         supabase
           .from("profiles")
-          .select("id, nome, role, ativo, origem, consent_lgpd_em, created_at"),
+          .select(
+            "id, nome, role, ativo, origem, consent_lgpd_em, created_at, profile_papeis(papel)"
+          ),
         supabase
           .from("mentorados")
           .select("id, nome, ong_origem, origem, situacao, created_at"),
         getFormBrutoMap(supabase, "profiles_pessoal"),
         getFormBrutoMap(supabase, "mentorados_pessoal"),
-        supabase.from("duplas").select("mentor_id, mentorado_id, status"),
+        supabase.from("duplas").select("mentor_id, mentorado_id, status, trilha"),
         supabase
           .from("mentor_profiles")
           .select("profile_id, tipo, capacidade, capacidade_especialista"),
@@ -283,20 +286,28 @@ export const getFilaInsumos = cache(
     const historico = new Set<string>(
       (duplas.data ?? []).map((d: { mentorado_id: string }) => d.mentorado_id)
     );
+    // contagem por mentor E trilha (WP6b — a filaMentores lê chave por pool)
     const contagemPorMentor: Record<string, number> = {};
     for (const d of vivas) {
-      const mid = (d as { mentor_id: string }).mentor_id;
-      contagemPorMentor[mid] = (contagemPorMentor[mid] ?? 0) + 1;
+      const viva = d as { mentor_id: string; trilha: string | null };
+      const chave = `${viva.mentor_id}:${viva.trilha ?? "dpp"}`;
+      contagemPorMentor[chave] = (contagemPorMentor[chave] ?? 0) + 1;
     }
     const mentorProfiles: Record<string, MentorProfile> = {};
     for (const mp of (mps.data ?? []) as MentorProfile[]) {
       mentorProfiles[mp.profile_id] = mp;
     }
     return {
-      pessoas: ((pessoas.data ?? []) as PessoaFilaIa[]).map((p) => ({
-        ...p,
-        form_bruto: brutoP.get(p.id) ?? null,
-      })),
+      pessoas: ((pessoas.data ?? []) as (PessoaFilaIa & {
+        profile_papeis?: { papel: AppRole }[];
+      })[]).map((p) => {
+        const { profile_papeis, ...rest } = p;
+        return {
+          ...rest,
+          papeis: (profile_papeis ?? []).map((r) => r.papel),
+          form_bruto: brutoP.get(p.id) ?? null,
+        };
+      }),
       mentorados: ((mentorados.data ?? []) as MentoradoFilaIa[]).map((m) => ({
         ...m,
         form_bruto: brutoM.get(m.id) ?? null,
@@ -315,13 +326,15 @@ export const getCapacidadeInsumos = cache(
   async (
     supabase: SupabaseClient
   ): Promise<{
-    pessoas: Pick<Profile, "id" | "nome" | "role" | "ativo">[];
+    pessoas: Pick<Profile, "id" | "nome" | "role" | "papeis" | "ativo">[];
     mentorProfiles: Record<string, MentorProfile>;
     contagemPorMentor: Record<string, number>;
   }> => {
     const [pessoas, duplas, mps] = await Promise.all([
-      supabase.from("profiles").select("id, nome, role, ativo"),
-      supabase.from("duplas").select("mentor_id, status"),
+      supabase
+        .from("profiles")
+        .select("id, nome, role, ativo, profile_papeis(papel)"),
+      supabase.from("duplas").select("mentor_id, status, trilha"),
       supabase
         .from("mentor_profiles")
         .select("profile_id, tipo, capacidade, capacidade_especialista"),
@@ -333,20 +346,28 @@ export const getCapacidadeInsumos = cache(
     for (const d of (duplas.data ?? []) as {
       mentor_id: string;
       status: DuplaStatus;
+      trilha: string | null;
     }[]) {
-      if (d.status === "ativa" || d.status === "pausada")
-        contagemPorMentor[d.mentor_id] =
-          (contagemPorMentor[d.mentor_id] ?? 0) + 1;
+      if (d.status === "ativa" || d.status === "pausada") {
+        const chave = `${d.mentor_id}:${d.trilha ?? "dpp"}`;
+        contagemPorMentor[chave] = (contagemPorMentor[chave] ?? 0) + 1;
+      }
     }
     const mentorProfiles: Record<string, MentorProfile> = {};
     for (const mp of (mps.data ?? []) as MentorProfile[]) {
       mentorProfiles[mp.profile_id] = mp;
     }
     return {
-      pessoas: (pessoas.data ?? []) as Pick<
+      pessoas: ((pessoas.data ?? []) as (Pick<
         Profile,
         "id" | "nome" | "role" | "ativo"
-      >[],
+      > & { profile_papeis?: { papel: AppRole }[] })[]).map((p) => {
+        const { profile_papeis, ...rest } = p;
+        return {
+          ...rest,
+          papeis: (profile_papeis ?? []).map((r) => r.papel),
+        };
+      }),
       mentorProfiles,
       contagemPorMentor,
     };

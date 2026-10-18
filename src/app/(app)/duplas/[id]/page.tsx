@@ -136,6 +136,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { temPapel } from "@/lib/types";
 import type { AvaliacaoLink, Dupla, Encaminhamento, Encontro, Material, RegistroAnexo } from "@/lib/types";
 import { filaMentorados } from "@/lib/fila";
 import {
@@ -169,13 +170,13 @@ async function montarSugestaoRemanejo(dupla: Dupla) {
   const mpMap: Record<string, MentorProfile> = Object.fromEntries(
     mps.map((mp) => [mp.profile_id, mp])
   );
-  // a régua do trigger (0073): ativas + pausadas contam vaga. O uso do
-  // mentor já é o da própria pool — ele tem um papel só, então as duplas
-  // dele são todas da mesma trilha (filtrar por trilha seria identidade)
+  // a régua do trigger (0073): ativas + pausadas contam vaga, chaveadas
+  // por trilha (WP6b — a pool do híbrido é separada em cada trilha)
   const usadas: Record<string, number> = {};
   const ocupados = new Set<string>();
   for (const d of resumo) {
-    usadas[d.mentor_id] = (usadas[d.mentor_id] ?? 0) + 1;
+    const chave = `${d.mentor_id}:${d.trilha ?? "dpp"}`;
+    usadas[chave] = (usadas[chave] ?? 0) + 1;
     ocupados.add(d.mentorado_id);
   }
   const historico = new Set(resumoTodas.map((d) => d.mentorado_id));
@@ -1170,12 +1171,20 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
                 <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
                   Pedido de especialista
                 </h2>
+                {/* papel-no-contexto (WP6b): o componente só habilita o lado
+                    especialista quando o visitante é o alvo/desejado ou o
+                    pedido é broadcast — informar o papel efetivo é seguro e
+                    destrava o híbrido DPP-primário */}
                 <SolicitacaoNegociacao
                   s={solEmAberto}
                   propostas={propostasAberta}
                   slots={slotsEsp}
                   meuId={me.id}
-                  papel={me.role}
+                  papel={
+                    temPapel(me, "mentor_especialista")
+                      ? "mentor_especialista"
+                      : me.role
+                  }
                 />
               </section>
             )}

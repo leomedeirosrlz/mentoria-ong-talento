@@ -56,6 +56,7 @@ import {
   PREF_GENERO_LABELS,
 } from "@/lib/ciclo";
 import { cn, maskWhatsApp, sessaoFresca } from "@/lib/utils";
+import { temPapel } from "@/lib/types";
 import type { Assinatura, Disponibilidade, MentorProfile, Profile } from "@/lib/types";
 import Link from "next/link";
 
@@ -1093,7 +1094,8 @@ export function PerfilForm({
   const nomeExibicao = me.nome_social?.trim() || me.nome;
   // mentores ganham o dot lime no chip de papel — "quem age" na dupla,
   // mesma convenção do board de matching e da lista de pessoas
-  const isMentor = me.role === "mentor_dpp" || me.role === "mentor_especialista";
+  const isMentor =
+    temPapel(me, "mentor_dpp") || temPapel(me, "mentor_especialista");
   // linha meta do header: cada segmento só entra com dado — created_at é
   // opcional no tipo (selects parciais podem omitir), então "no programa
   // desde" é condicional
