@@ -593,6 +593,9 @@ export type DuplaPerfil = {
   id: string;
   status: DuplaStatus;
   iniciada_em: string | null;
+  /** Trilha da dupla (WP6b) — a ficha do mentor híbrido conta vagas por
+   *  pool (DPP × especialista), sem ela o X/Y misturava as duas. */
+  trilha: Trilha;
   mentor: { id: string; nome: string; avatar_path?: string | null; email?: string | null } | null;
   mentorado: { id: string; nome: string; avatar_path?: string | null } | null;
 };
@@ -614,7 +617,7 @@ export const getPessoaPerfil = cache(async (id: string): Promise<
   // email não entra no embed de profiles (grant de coluna, 0026) — vem do
   // merge com a view quando o papel alcança; o gravatar cai nas iniciais senão
   const DUPLA_PERFIL_SELECT = `
-    id, status, iniciada_em,
+    id, status, iniciada_em, trilha,
     mentor:profiles!duplas_mentor_id_fkey(id, nome, avatar_path),
     mentorado:mentorados(id, nome, avatar_path)
   `;

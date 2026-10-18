@@ -35,9 +35,13 @@ export default async function AgendaPage({
   searchParams: Promise<{ dia?: string; visao?: string }>;
 }) {
   // ?dia=YYYY-MM-DD abre a agenda já no dia (deep-link da ficha/notificações);
-  // ?visao=especialista abre a aba de especialista do híbrido (WP6b)
+  // ?visao=dpp|especialista abre a aba correspondente do híbrido (WP6b)
   const { dia, visao: visaoParam } = await searchParams;
   const diaInicial = dia && /^\d{4}-\d{2}-\d{2}$/.test(dia) ? dia : null;
+  // valor fora do vocabulário vale como param ausente — cai no default do
+  // papel primário em vez de forçar a visão DPP
+  const visao =
+    visaoParam === "dpp" || visaoParam === "especialista" ? visaoParam : null;
 
   // getDuplas vem no escopo do RLS: mentor→a própria, supervisor→supervisionadas, coord→todas.
   // getMeuMentorProfile resolve cedo pra quem não é mentor (getMe já cacheado) —
@@ -88,9 +92,7 @@ export default async function AgendaPage({
   const visaoEsp =
     souEsp &&
     (!duasVisoes ||
-      (visaoParam
-        ? visaoParam === "especialista"
-        : me?.role === "mentor_especialista"));
+      (visao ? visao === "especialista" : me?.role === "mentor_especialista"));
 
   if (visaoEsp) {
     // agenda real do especialista (0073): grade semanal + exceções + a
@@ -221,7 +223,10 @@ function AbasAgenda({ ativa }: { ativa: "dpp" | "especialista" }) {
     >
       {(
         [
-          ["dpp", "Ciclo DPP", "/agenda"],
+          // o param explícito é obrigatório — sem ele o default recai na
+          // visão do papel primário e a aba DPP fica inalcançável pro
+          // híbrido com primário especialista
+          ["dpp", "Ciclo DPP", "/agenda?visao=dpp"],
           ["especialista", "Especialista", "/agenda?visao=especialista"],
         ] as const
       ).map(([v, label, href]) => (

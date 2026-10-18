@@ -11,7 +11,12 @@
  *  fallback "nome de exibição contido" (todo token do valor é token do
  *  cadastro — "Juliana Novaes" acha "Juliana Novaes de Oliveira"). Apelido
  *  que não é pedaço do nome ("Drica" -> Adriana) NÃO resolve sozinho;
- *  2+ candidatos em qualquer passo = linha falha, nunca chute. */
+ *  2+ candidatos em qualquer passo = linha falha, nunca chute.
+ *
+ *  Papéis (WP6b/0085): o mentor vale por papel EFETIVO — a linha de papel
+ *  secundário em profile_papeis conta igual ao primário. A coluna
+ *  `trilha` (dpp|especialista, opcional) desempata quem tem os dois
+ *  papéis; sem ela o híbrido falha pedindo a coluna. */
 
 import {
   normData,
@@ -37,6 +42,7 @@ export type CampoPar =
   | "mentorado"
   | "supervisor"
   | "turma"
+  | "trilha"
   | "demanda"
   | "iniciada_em";
 
@@ -49,6 +55,7 @@ const PAR_VAZIO: Record<CampoPar, string> = {
   mentorado: "",
   supervisor: "",
   turma: "",
+  trilha: "",
   demanda: "",
   iniciada_em: "",
 };
@@ -66,6 +73,9 @@ export function canonHeaderPar(h: string): CampoPar | null {
   if (/\bsupervis|\bauxiliar/.test(n)) return "supervisor";
   if (/\biniciad|\binicio\b|\bcomeco|\bdesde\b/.test(n)) return "iniciada_em";
   if (/\bdemanda\b|\beixo\b|\btema\b|\bfoco\b/.test(n)) return "demanda";
+  // trilha decide a trilha da dupla quando o mentor tem os DOIS papéis —
+  // "tipo"/"modalidade" são os rótulos que a planilha de pareamento usa
+  if (/\btrilha\b|\btipo\b|\bmodalidade\b/.test(n)) return "trilha";
   if (/\bturma\b|\bgrupo\b|\bclasse\b/.test(n)) return "turma";
   return null;
 }
@@ -99,6 +109,7 @@ export function saneiaLinhaPar(l: Partial<LinhaPar>, i: number): LinhaPar {
     mentorado: s(l.mentorado),
     supervisor: s(l.supervisor),
     turma: s(l.turma),
+    trilha: s(l.trilha),
     demanda: s(l.demanda),
     iniciada_em: s(l.iniciada_em),
   };
@@ -106,22 +117,26 @@ export function saneiaLinhaPar(l: Partial<LinhaPar>, i: number): LinhaPar {
 
 // ---------- resolução ----------
 
-/** Candidato a match — o mínimo que a resolução precisa. `role`/`ativo`
- *  só chegam nos profiles; mentorados não têm os campos (sempre aptos). */
+/** Candidato a match — o mínimo que a resolução precisa. `role`/`ativo`/
+ *  `papeis` só chegam nos profiles; mentorados não têm os campos (sempre
+ *  aptos). `papeis` são os papéis efetivos (0085 — embed profile_papeis);
+ *  sem a chave, a resolução cai no `role` primário como antes. */
 export type PessoaRef = {
   id: string;
   nome: string;
   email?: string | null;
   nome_social?: string | null;
   role?: AppRole | null;
+  papeis?: AppRole[];
   ativo?: boolean;
 };
 
-/** Dupla como o diretório precisa — o status decide se ocupa vaga. */
+/** Dupla como o diretório precisa — o status decide se ocupa vaga.
+ *  `trilha` null = dupla DPP legada (pré-0061) — vale "dpp". */
 export type DuplaRef = {
   mentor_id: string;
   mentorado_id: string;
-  trilha: string;
+  trilha: string | null;
   status: string;
   turma: string;
   /** ISO — o desempate da "dupla DPP mais recente" na derivação de turma. */
@@ -150,8 +165,9 @@ export type DiretorioPar = {
 };
 
 /** O que uma linha resolvida vira no insert — espelha o cadastro manual
- *  (createDupla): trilha derivada do papel do mentor, supervisor fora da
- *  trilha especialista, iniciada_em uma semana antes do 1º encontro do
+ *  (createDupla): trilha derivada do papel efetivo do mentor (a coluna
+ *  `trilha` da planilha desempata o híbrido), supervisor fora da trilha
+ *  especialista, iniciada_em uma semana antes do 1º encontro do
  *  cronograma quando a célula vem vazia. */
 export type ParPronto = {
   mentor: PessoaRef;
@@ -321,7 +337,7 @@ export function resolverPares(
     emCurso.map((d) => `${d.mentor_id}|${d.mentorado_id}`)
   );
   const vagaOcupada = new Set(
-    emCurso.map((d) => `${d.mentorado_id}|${d.trilha}`)
+    emCurso.map((d) => `${d.mentorado_id}|${d.trilha ?? "dpp"}`)
   );
   // vagas do mentor contam por trilha (0073) — a trilha especialista tem o
   // pool próprio e não consome a capacidade DPP, nem o contrário
@@ -363,12 +379,49 @@ export function resolverPares(
     if (mentor.ativo === false) {
       return falha(`${mentor.nome}: cadastro inativo — reative antes de parear`);
     }
-    if (mentor.role !== "mentor_dpp" && mentor.role !== "mentor_especialista") {
+    // papel efetivo (0085): o papel mentor_* pode ser só secundário — vive
+    // em profile_papeis, não no primário. Sem `papeis` na ref cai no
+    // primário, comportamento pré-tabela.
+    const papeisMentor = new Set<AppRole>([
+      ...(mentor.papeis ?? []),
+      ...(mentor.role ? [mentor.role] : []),
+    ]);
+    const temDpp = papeisMentor.has("mentor_dpp");
+    const temEsp = papeisMentor.has("mentor_especialista");
+    if (!temDpp && !temEsp) {
       return falha(`${mentor.nome}: não tem papel de mentor`);
     }
-    // mesma régua do createDupla — a trilha é do mentor, não da planilha
-    const trilha: Trilha =
-      mentor.role === "mentor_especialista" ? "especialista" : "dpp";
+    // mesma régua do createDupla — a trilha sai do papel do mentor. A
+    // coluna `trilha` (opcional) é o desempate do híbrido: com os DOIS
+    // papéis ela é obrigatória — o primário não adivinha a intenção;
+    // com papel único deriva dele. Valor fora do vocabulário falha a
+    // linha, como uma data inválida.
+    const trilhaTxt = semAcento(linha.trilha);
+    const trilhaCol: Trilha | null =
+      trilhaTxt === "dpp"
+        ? "dpp"
+        : trilhaTxt === "especialista" || trilhaTxt === "esp"
+          ? "especialista"
+          : null;
+    if (trilhaTxt && !trilhaCol) {
+      return falha(
+        `trilha inválida ("${linha.trilha.trim()}" — use dpp ou especialista)`
+      );
+    }
+    if (!trilhaCol && temDpp && temEsp) {
+      return falha(
+        `${mentor.nome}: mentor híbrido — informe a coluna trilha (dpp ou especialista)`
+      );
+    }
+    const trilha: Trilha = trilhaCol ?? (temEsp ? "especialista" : "dpp");
+    if (
+      (trilha === "especialista" && !temEsp) ||
+      (trilha === "dpp" && !temDpp)
+    ) {
+      return falha(
+        `${mentor.nome}: não tem papel na trilha ${trilha === "especialista" ? "especialista" : "DPP"}`
+      );
+    }
 
     // mentorado — resolve em mentorados
     const rMd = resolverPessoa(linha.mentorado, dir.mentorados);
@@ -433,7 +486,10 @@ export function resolverPares(
       turma = rC.cronograma.turma;
     } else {
       const dpp = dir.duplas
-        .filter((d) => d.mentorado_id === mentorado.id && d.trilha === "dpp")
+        .filter(
+          (d) =>
+            d.mentorado_id === mentorado.id && (d.trilha ?? "dpp") === "dpp"
+        )
         .sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
       turma =
         dpp?.turma ?? cronogramaVigente(dir.cronogramas, hoje)?.turma ?? null;
