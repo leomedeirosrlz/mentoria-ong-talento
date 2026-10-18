@@ -11,6 +11,7 @@ import {
   demoSlotsLivres,
   demoSolicitacoesDaDupla,
   demoSolicitacoesVisiveis,
+  demoTrilhasDosJovens,
 } from "./demo/queries";
 import { demoTrilhaFechamento } from "./demo/encerramento-data";
 import { getMe } from "./queries";
@@ -20,6 +21,7 @@ import type {
   GradeJanela,
   SolicitacaoEspecialista,
   SolicitacaoProposta,
+  TrilhaJovem,
 } from "./types";
 
 /** A leitura é da view `solicitacoes_mural` (0030/0074): as mesmas colunas
@@ -342,5 +344,32 @@ export const getDevolutivasDupla = cache(
       ...(d as Omit<typeof d, "autor">),
       autor: Array.isArray(d.autor) ? (d.autor[0] ?? null) : d.autor,
     })) as Devolutiva[];
+  }
+);
+
+/** Trilhas de especialista do mentorado de uma dupla DPP — RPC definer
+ *  `trilha_do_jovem` (0092): a RLS exclui o DPP de duplas/encontros/registros
+ *  da trilha esp, então a projeção completa sai pelo definer validando
+ *  mentor/supervisor da dupla DPP ou coordenação. Retorna {} por dupla sem
+ *  trilha (e degrada pra vazio com log, seguindo os loaders da ficha). */
+export const getTrilhasDosJovens = cache(
+  async (duplaDppIds: string[]): Promise<Record<string, TrilhaJovem[]>> => {
+    if (duplaDppIds.length === 0) return {};
+    const demo = await demoRole();
+    if (demo) return demoTrilhasDosJovens(demo, duplaDppIds);
+    const supabase = await createClient();
+    const pares = await Promise.all(
+      duplaDppIds.map(async (id) => {
+        const { data, error } = await supabase.rpc("trilha_do_jovem", {
+          p_dupla_dpp_id: id,
+        });
+        if (error) {
+          console.error("getTrilhasDosJovens:", error);
+          return [id, []] as const;
+        }
+        return [id, (data ?? []) as unknown as TrilhaJovem[]] as const;
+      })
+    );
+    return Object.fromEntries(pares);
   }
 );

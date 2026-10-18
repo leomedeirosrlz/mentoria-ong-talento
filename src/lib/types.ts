@@ -1064,3 +1064,60 @@ export type JovemPessoa =
   | { tipo: "contato"; contato: JovemContato }
   | { tipo: "colega"; colega: ColegaTurma }
   | { tipo: "especialista"; especialista: JovemEspecialista };
+
+/** Projeção da trilha de especialista do mentorado pro mentor DPP — saída da
+ *  RPC `trilha_do_jovem` (0092). Visibilidade COMPLETA (decisão out/2026):
+ *  datas/estados das sessões, registro integral do especialista, ★ do jovem
+ *  por sessão e devolutivas. Não carrega `link` (o DPP acompanha, não
+ *  participa) nem os campos de avaliação que identificam o jovem além da
+ *  nota (sentimento/comentário/temas/avancei/pedir_apoio). */
+export type TrilhaJovemRegistro = {
+  id: string;
+  tema: string | null;
+  ferramenta: string | null;
+  atividades: string[] | null;
+  avaliacao: string | null;
+  dificuldade: string | null;
+  dificuldade_detalhe: string | null;
+  reflexoes: string | null;
+  observacoes: string | null;
+  proximo_passo: string | null;
+  proximo_passo_detalhe: string | null;
+  precisa_apoio: boolean | null;
+  created_at: string;
+  anexos: { nome: string; tamanho: number | null; mime: string | null }[];
+};
+
+export type TrilhaJovemSessao = {
+  id: string;
+  numero: number;
+  data_hora: string | null;
+  realizado_em: string | null;
+  status: EncontroStatus;
+  duracao_min: number | null;
+  /** Por que a sessão foi remarcada — o DPP lê na própria dupla; aqui é o
+   *  texto do especialista (não identifica o jovem). */
+  motivo_reagendamento: string | null;
+  /** ★ que o jovem deu à sessão — sempre projetada (decisão explícita). */
+  estrelas: number | null;
+  registro: TrilhaJovemRegistro | null;
+};
+
+export type TrilhaJovemDevolutiva = {
+  autor_nome: string | null;
+  texto: string;
+  created_at: string;
+};
+
+export type TrilhaJovem = {
+  dupla_id: string;
+  especialista_nome: string | null;
+  demanda: string | null;
+  status: DuplaStatus;
+  iniciada_em: string | null;
+  encerrada_em: string | null;
+  motivo_encerramento: string | null;
+  devolutiva_pdm: string | null;
+  sessoes: TrilhaJovemSessao[];
+  devolutivas: TrilhaJovemDevolutiva[];
+};

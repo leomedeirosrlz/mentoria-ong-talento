@@ -2584,7 +2584,10 @@ export async function marcarNaoAconteceu(encontroId: string, duplaId: string) {
     .from("encontros")
     .update({ status: "nao_aconteceu" })
     .eq("id", encontroId)
-    .eq("status", "agendado")
+    // "remarcado" é status legado (a RPC de remarcação grava "agendado" de
+    // novo) — uma row vencida nele tem a mesma ambiguidade e precisa poder
+    // ser encerrada como não-aconteceu, senão fica presa pra sempre
+    .in("status", ["agendado", "remarcado"])
     .select("id");
   if (error) return { error: erroAmigavel(error) };
   if (!data?.length) return { error: "Esse encontro não está mais agendado." };

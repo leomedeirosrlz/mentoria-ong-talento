@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useTransition } from "react";
+import { useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { CircleNotch, Paperclip, Trash } from "@phosphor-icons/react";
 import { toast } from "sonner";
@@ -47,6 +47,20 @@ export function AnexosRegistro({
   const [pending, start] = useTransition();
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
+  // deltas otimistas sobre a prop — o servidor segue a fonte da verdade:
+  // o refresh traz a lista canônica e os extras já nela saem pelo dedupe.
+  // Host com prop estática (a etapa pós-save do RegistroForm) precisa ver
+  // o anexo na hora, sem depender de refresh no pai — derivar a lista vale
+  // mais que espelhar estado em efeito
+  const [extras, setExtras] = useState<RegistroAnexo[]>([]);
+  const [removidos, setRemovidos] = useState<ReadonlySet<string>>(new Set());
+  const mostrados = useMemo(() => {
+    const naLista = new Set(anexos.map((a) => a.id));
+    return [
+      ...anexos.filter((a) => !removidos.has(a.id)),
+      ...extras.filter((x) => !naLista.has(x.id) && !removidos.has(x.id)),
+    ];
+  }, [anexos, extras, removidos]);
 
   function onPick(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -80,7 +94,7 @@ export function AnexosRegistro({
             mime: file.type,
             created_by: autorId,
           })
-          .select("id")
+          .select("id, registro_id, path, nome, tamanho, mime, created_by, created_at")
           .single();
         if (rowError || !row) {
           toast.error("Não foi possível registrar o anexo. Tente de novo.");
@@ -99,6 +113,7 @@ export function AnexosRegistro({
         }
 
         toast.success("Evidência anexada.");
+        setExtras((prev) => [...prev, row as RegistroAnexo]);
         router.refresh();
       } catch {
         toast.error("Sem conexão. Tente de novo.");
@@ -117,17 +132,18 @@ export function AnexosRegistro({
       .eq("id", a.id);
     if (rowError)
       return { error: "O arquivo saiu, mas a referência ficou. Atualize a página." };
+    setRemovidos((prev) => new Set(prev).add(a.id));
     return { ok: true };
   }
 
   // estado vazio não renderiza nada — o botão de anexar mora junto ao registro
-  if (anexos.length === 0 && !podeAnexar) return null;
+  if (mostrados.length === 0 && !podeAnexar) return null;
 
   return (
     <div className="space-y-2 pt-1">
-      {anexos.length > 0 && (
+      {mostrados.length > 0 && (
         <ul className="space-y-1.5">
-          {anexos.map((a) => (
+          {mostrados.map((a) => (
             <li key={a.id} className="text-xs">
               <span className="flex min-w-0 items-center gap-1.5">
                 <Paperclip size={12} className="shrink-0 text-muted-foreground" />
