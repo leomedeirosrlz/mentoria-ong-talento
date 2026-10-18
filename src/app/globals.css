@@ -85,6 +85,13 @@
   /* versões escuras para texto (AA ≥4.5:1 sobre fundo claro) — fills/dots seguem com as cores claras acima */
   --ok-text: hsl(78 55% 30%);
   --warn-text: hsl(43 90% 30%);
+  /* apoio/chamado: eixo informativo separado do semáforo (WP2) — azul
+     sinaliza "trabalho a fazer", nunca falha; danger/warn ficam reservados
+     à saúde da jornada */
+  --info: hsl(207 82% 45%);
+  --info-text: hsl(207 82% 33%);
+  --info-bg: hsl(207 82% 96%);
+  --info-border: hsl(207 82% 80%);
   /* identidade de papel na dupla: mentor = lime do disco (quem age);
      mentorado = amarelo do ponto do logo (rgb 255,213,49) — sempre como
      marcador (dot/disco), nunca como cor de texto. Spec §1 */

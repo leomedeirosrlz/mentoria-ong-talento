@@ -15,6 +15,7 @@ import {
   CalendarDots,
   CalendarPlus,
   CalendarX,
+  ChatCircleText,
   ChatsCircle,
   Check,
   CheckCircle,
@@ -22,6 +23,7 @@ import {
   FlagCheckered,
   Funnel,
   HandHeart,
+  Lifebuoy,
   Megaphone,
   Star,
   ThumbsDown,
@@ -228,6 +230,14 @@ const ICONE: Record<Notificacao["tipo"], typeof Bell> = {
   solicitacao_triagem: Funnel,
   solicitacao_proposta: ArrowsClockwise,
   solicitacao_recusada: ThumbsDown,
+  // 0084 — chamados: o lifebuoy é o canal; marco/ação ficam por tom textual
+  chamado_aberto: Lifebuoy,
+  chamado_atribuido: UserCheck,
+  chamado_atualizacao: ChatCircleText,
+  chamado_resposta_autor: ChatCircleText,
+  chamado_resolvido: CheckCircle,
+  chamado_reaberto: ArrowsClockwise,
+  chamado_mencao: ChatsCircle,
 };
 
 export function NotificacoesBell({

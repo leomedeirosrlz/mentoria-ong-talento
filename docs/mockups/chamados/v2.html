@@ -1,0 +1,784 @@
+<!-- MOCKUP chamados v2 — Board por status -->
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chamados — Coordenação · Realiza.vc</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --brand-lime: hsl(78 56% 53%);      /* verde principal */
+    --brand-ink: hsl(0 0% 15%);         /* quase-preto texto */
+    --background: hsl(75 10% 95%);      /* fundo "papel" quente */
+    --card: hsl(0 0% 100%);
+    --muted: hsl(75 7% 93%);
+    --muted-foreground: hsl(75 4% 40%);
+    --accent: hsl(75 8% 91%);           /* hover */
+    --border: hsl(75 6% 87%);
+    --input: hsl(75 8% 54%);
+    --ok: hsl(78 58% 38%);
+    --ok-text: hsl(78 55% 30%);
+    --warn: hsl(43 95% 44%);
+    --warn-text: hsl(43 90% 30%);
+    --danger: hsl(0 80% 48%);
+    --role-mentor: var(--brand-lime);   /* marcador mentor */
+    --role-mentorado: hsl(48 100% 60%); /* marcador jovem (amarelo) */
+    --radius: 0.75rem;
+
+    /* tints locais: colunas do board e pills de categoria */
+    --col-aberto-bg: hsl(0 62% 97%);
+    --col-aberto-bd: hsl(0 55% 90%);
+    --col-atend-bg: hsl(43 70% 96%);
+    --col-atend-bd: hsl(43 55% 88%);
+    --col-resolv-bg: hsl(78 30% 95%);
+    --col-resolv-bd: hsl(78 20% 88%);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html { -webkit-text-size-adjust: 100%; }
+
+  body {
+    font-family: "Inter", system-ui, -apple-system, sans-serif;
+    background: var(--background);
+    color: var(--brand-ink);
+    font-size: 14px;
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  svg { flex: none; }
+
+  /* ---------- casca do mockup (não é produto) ---------- */
+  .board-head {
+    background: var(--brand-ink); color: hsl(75 20% 88%);
+    padding: 13px 20px; display: flex; flex-wrap: wrap; align-items: center;
+    gap: 8px 18px; font-size: 12.5px;
+  }
+  .board-head b { color: var(--brand-lime); font-weight: 700; letter-spacing: 0.03em; }
+  .board-head .dir { color: hsl(75 10% 62%); }
+  .board-head nav { margin-left: auto; display: flex; gap: 6px; flex-wrap: wrap; }
+  .board-head nav a {
+    font-size: 12px; font-weight: 600; padding: 5px 12px; border-radius: 999px;
+    border: 1px solid hsl(75 10% 35%); color: hsl(75 20% 85%); text-decoration: none;
+  }
+  .board-head nav a:hover { border-color: var(--brand-lime); color: var(--brand-lime); }
+  .col { scroll-margin-top: 16px; }
+
+  .notes {
+    list-style: none; display: grid; gap: 9px;
+    width: calc(100% - 56px); max-width: 1204px; margin: -28px auto 50px;
+    padding: 17px 20px; border-radius: 14px;
+    background: var(--brand-ink); color: hsl(75 20% 82%);
+    font-size: 12.5px; line-height: 1.55;
+  }
+  .notes li { position: relative; padding-left: 18px; }
+  .notes li::before {
+    content: ""; position: absolute; left: 2px; top: 0.58em;
+    width: 6px; height: 6px; border-radius: 50%; background: var(--brand-lime);
+  }
+  .notes b { color: var(--brand-lime); font-weight: 700; }
+
+  /* ---------- topbar ---------- */
+  .topbar {
+    background: var(--card);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 28px;
+  }
+  .logo {
+    width: 30px; height: 30px;
+    border-radius: 9px;
+    background: var(--brand-lime);
+    display: grid; place-items: center;
+    font-weight: 800; font-size: 15px; color: var(--brand-ink);
+  }
+  .topbar .brand { font-weight: 700; font-size: 14.5px; letter-spacing: -0.01em; }
+  .topbar .crumb { color: var(--muted-foreground); font-size: 13px; }
+  .topbar .crumb::before { content: "/"; margin: 0 8px; color: var(--input); }
+  .topbar .spacer { flex: 1; }
+  .userchip { display: flex; align-items: center; gap: 9px; font-size: 12.5px; color: var(--muted-foreground); }
+  .avatar {
+    width: 28px; height: 28px; border-radius: 50%;
+    background: var(--brand-ink); color: #fff;
+    display: grid; place-items: center;
+    font-size: 10px; font-weight: 700; letter-spacing: 0.02em;
+  }
+  .avatar.sm { width: 22px; height: 22px; font-size: 9px; }
+
+  /* ---------- página ---------- */
+  main { max-width: 1260px; margin: 0 auto; padding: 26px 28px 64px; }
+
+  .page-head {
+    display: flex; align-items: flex-end; justify-content: space-between;
+    gap: 16px; flex-wrap: wrap;
+    margin-bottom: 18px;
+  }
+  .page-head h1 { font-size: 23px; font-weight: 800; letter-spacing: -0.02em; }
+  .page-head .sub { color: var(--muted-foreground); font-size: 13.5px; margin-top: 3px; }
+  .head-stats { display: flex; gap: 8px; flex-wrap: wrap; }
+  .stat {
+    font-size: 12px; color: var(--muted-foreground);
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 999px; padding: 5px 11px;
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .stat b { color: var(--brand-ink); font-weight: 700; }
+  .stat.danger { border-color: hsl(0 65% 85%); background: hsl(0 70% 96%); color: hsl(0 70% 36%); }
+  .stat.danger b { color: hsl(0 75% 40%); }
+
+  /* ---------- filtros ---------- */
+  .filters {
+    display: flex; align-items: center; gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 18px;
+  }
+  .filters .lbl { font-size: 12px; font-weight: 600; color: var(--muted-foreground); margin-right: 2px; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 12.5px; font-weight: 600;
+    padding: 6px 13px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--card);
+    color: var(--brand-ink);
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .chip:hover { background: var(--accent); }
+  .chip .n { font-size: 11px; font-weight: 700; color: var(--muted-foreground); }
+  .chip.on { background: var(--brand-ink); color: #fff; border-color: var(--brand-ink); }
+  .chip.on .n { color: hsl(0 0% 75%); }
+  .chip .cdot { width: 7px; height: 7px; border-radius: 50%; }
+  .chip.on .cdot { outline: 2px solid hsl(0 0% 100% / .35); }
+  .filters .sep { width: 1px; height: 22px; background: var(--border); margin: 0 4px; }
+  .chip.ghost { color: var(--muted-foreground); font-weight: 500; }
+  .chip.ghost svg { opacity: .7; }
+
+  /* ---------- abas de status (mobile) ---------- */
+  .boardwrap > input {
+    position: absolute; opacity: 0; pointer-events: none;
+    width: 1px; height: 1px;
+  }
+  .tab-labels { display: none; }
+
+  /* ---------- board ---------- */
+  .board {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+    align-items: start;
+  }
+  .col {
+    border-radius: calc(var(--radius) + 4px);
+    border: 1px solid var(--border);
+    background: var(--muted);
+    padding: 12px;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .col-aberto { background: var(--col-aberto-bg); border-color: var(--col-aberto-bd); }
+  .col-atend  { background: var(--col-atend-bg);  border-color: var(--col-atend-bd); }
+  .col-resolv { background: var(--col-resolv-bg); border-color: var(--col-resolv-bd); }
+
+  .col-head {
+    display: flex; align-items: center; gap: 8px;
+    padding: 4px 4px 2px;
+    flex-wrap: wrap;
+  }
+  .col-dot { width: 9px; height: 9px; border-radius: 50%; }
+  .col-aberto .col-dot { background: var(--danger); box-shadow: 0 0 0 3px hsl(0 80% 48% / .18); }
+  .col-atend  .col-dot { background: var(--warn);   box-shadow: 0 0 0 3px hsl(43 95% 44% / .18); }
+  .col-resolv .col-dot { background: var(--ok);     box-shadow: 0 0 0 3px hsl(78 58% 38% / .16); }
+  .col-head h2 { font-size: 13.5px; font-weight: 700; letter-spacing: -0.01em; }
+  .count {
+    font-size: 11px; font-weight: 700;
+    border-radius: 999px; padding: 1px 8px;
+  }
+  .col-aberto .count { background: hsl(0 80% 92%); color: hsl(0 75% 38%); }
+  .col-atend  .count { background: hsl(43 90% 88%); color: var(--warn-text); }
+  .col-resolv .count { background: hsl(78 45% 88%); color: var(--ok-text); }
+  .col-sub {
+    flex-basis: 100%;
+    font-size: 11.5px; color: var(--muted-foreground);
+    margin-top: -2px;
+  }
+  .col-aberto .col-sub { color: hsl(0 55% 42%); }
+
+  /* ---------- card de chamado ---------- */
+  .ticket {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 13px 14px 12px;
+    box-shadow: 0 1px 2px hsl(75 10% 30% / .05);
+    transition: border-color .15s, box-shadow .15s;
+  }
+  .ticket:hover { border-color: var(--input); box-shadow: 0 3px 10px hsl(75 10% 30% / .08); }
+
+  .t-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .proto {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 11px; letter-spacing: .02em;
+    color: var(--muted-foreground);
+  }
+  .age {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 11px; font-weight: 600; color: var(--muted-foreground);
+  }
+  .age.hot { color: var(--danger); }
+
+  .t-title {
+    font-size: 13.5px; font-weight: 600; letter-spacing: -0.01em;
+    margin: 6px 0 8px;
+    line-height: 1.35;
+  }
+
+  .t-meta { display: flex; flex-direction: column; gap: 3px; margin-bottom: 10px; }
+  .role { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--brand-ink); font-weight: 500; }
+  .role::before { content: ""; width: 7px; height: 7px; border-radius: 50%; }
+  .role.rm::before { background: var(--role-mentor); }
+  .role.ry::before { background: var(--role-mentorado); }
+  .role em { font-style: normal; color: var(--muted-foreground); font-weight: 400; }
+  .dupla {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 11.5px; color: var(--muted-foreground);
+  }
+
+  .t-foot { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .pill {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 11px; font-weight: 700;
+    padding: 3px 9px; border-radius: 999px;
+  }
+  .pill .pd { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .cat-urgencia    { background: hsl(0 80% 94%);   color: hsl(0 72% 36%); }
+  .cat-agenda      { background: hsl(207 75% 93%); color: hsl(207 70% 32%); }
+  .cat-metodologia { background: hsl(280 55% 94%); color: hsl(280 50% 35%); }
+  .cat-plataforma  { background: hsl(180 55% 91%); color: hsl(180 70% 25%); }
+  .cat-outro       { background: var(--muted);     color: var(--muted-foreground); }
+
+  .assignee {
+    display: inline-flex; align-items: center; gap: 7px;
+    font-size: 12px; font-weight: 500; color: var(--brand-ink);
+    margin-left: auto;
+  }
+  .assignee.none {
+    color: var(--muted-foreground); font-weight: 500;
+    border: 1px dashed var(--input); border-radius: 999px;
+    padding: 3px 9px;
+    margin-left: auto;
+  }
+  .assignee.none.hot { color: hsl(0 70% 40%); border-color: hsl(0 65% 70%); }
+
+  .chev { margin-left: 2px; color: var(--input); }
+
+  /* linha de status "em atendimento · quem" + última atualização pública */
+  .sline {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 11.5px; font-weight: 600; color: var(--warn-text);
+    margin-top: 10px;
+  }
+  .sline .sdot { width: 7px; height: 7px; border-radius: 50%; background: var(--warn); }
+  .t-update {
+    display: flex; align-items: flex-start; gap: 6px;
+    font-size: 11.5px; color: var(--muted-foreground);
+    margin-top: 6px;
+    background: hsl(43 70% 95%);
+    border-radius: 8px;
+    padding: 6px 9px;
+  }
+  .t-update svg { margin-top: 1px; color: var(--warn-text); }
+  .t-update i { font-style: normal; }
+
+  /* ---------- card expandido (detalhe inline) ---------- */
+  .ticket.open {
+    border-color: hsl(0 60% 80%);
+    box-shadow: 0 0 0 3px hsl(0 70% 90% / .5), 0 4px 14px hsl(75 10% 30% / .08);
+  }
+  .ticket.open .chev { transform: rotate(180deg); color: var(--danger); }
+
+  .t-detail { border-top: 1px solid var(--border); margin-top: 11px; padding-top: 11px; }
+  .desc {
+    font-size: 12.5px; color: var(--brand-ink);
+    background: var(--muted);
+    border-radius: 9px;
+    padding: 9px 11px;
+    margin-bottom: 12px;
+  }
+  .desc b { font-weight: 600; }
+  .desc .who { display: block; font-size: 11px; color: var(--muted-foreground); margin-top: 4px; }
+
+  .timeline { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+  .timeline li { display: flex; gap: 9px; align-items: flex-start; }
+  .ti {
+    width: 24px; height: 24px; border-radius: 8px;
+    display: grid; place-items: center;
+    border: 1px solid var(--border);
+    background: var(--card);
+  }
+  .timeline .pub  .ti { background: hsl(78 60% 93%); border-color: hsl(78 50% 82%); color: var(--ok-text); }
+  .timeline .int  .ti { background: hsl(43 85% 92%); border-color: hsl(43 70% 80%); color: var(--warn-text); }
+  .timeline p { font-size: 12px; line-height: 1.45; }
+  .timeline .tt { display: block; font-size: 10.5px; color: var(--muted-foreground); margin-top: 2px; }
+  .timeline .tt .tag-interno { color: var(--warn-text); font-weight: 600; }
+
+  .actions { display: flex; gap: 8px; margin-top: 13px; flex-wrap: wrap; }
+  .btn {
+    font-family: inherit; font-size: 12.5px; font-weight: 600;
+    padding: 7px 13px; border-radius: 9px;
+    border: 1px solid var(--border); background: var(--card);
+    color: var(--brand-ink); cursor: pointer;
+  }
+  .btn:hover { background: var(--accent); }
+  .btn.primary { background: var(--brand-lime); border-color: transparent; }
+  .btn.primary:hover { background: hsl(78 56% 48%); }
+
+  /* ---------- resolvido ---------- */
+  .ticket.done .t-title { color: hsl(75 4% 34%); }
+  .resumo {
+    display: flex; gap: 8px; align-items: flex-start;
+    background: hsl(78 45% 94%);
+    border: 1px solid hsl(78 35% 85%);
+    border-radius: 9px;
+    padding: 8px 10px;
+    margin-top: 10px;
+  }
+  .resumo svg { color: var(--ok-text); margin-top: 1px; }
+  .resumo .rh { font-size: 11px; font-weight: 700; color: var(--ok-text); }
+  .resumo p { font-size: 11.5px; color: hsl(75 5% 32%); margin-top: 1px; }
+  .reopen {
+    font-family: inherit;
+    background: none; border: none; cursor: pointer;
+    font-size: 11.5px; font-weight: 600; color: var(--muted-foreground);
+    display: inline-flex; align-items: center; gap: 4px;
+    margin-top: 8px; padding: 2px 0;
+  }
+  .reopen:hover { color: var(--brand-ink); text-decoration: underline; }
+
+  /* ---------- mobile: board vira tabs por status ---------- */
+  @media (max-width: 860px) {
+    .topbar { padding: 11px 16px; }
+    .topbar .crumb { display: none; }
+    .userchip .uname { display: none; }
+    main { padding: 18px 14px 48px; }
+    .page-head h1 { font-size: 20px; }
+
+    .filters {
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      padding-bottom: 6px;
+      margin-left: -14px; margin-right: -14px;
+      padding-left: 14px; padding-right: 14px;
+      scrollbar-width: none;
+    }
+    .filters::-webkit-scrollbar { display: none; }
+    .filters .lbl { display: none; }
+    .filters .sep { display: none; }
+
+    .tab-labels {
+      display: flex; gap: 6px;
+      background: var(--muted);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 4px;
+      margin-bottom: 14px;
+    }
+    .tab-labels label {
+      flex: 1;
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+      font-size: 12px; font-weight: 600;
+      padding: 8px 4px;
+      border-radius: 9px;
+      color: var(--muted-foreground);
+      cursor: pointer;
+      text-align: center;
+    }
+    .tab-labels label .td { width: 7px; height: 7px; border-radius: 50%; }
+    .tab-labels label .tn { font-size: 10.5px; font-weight: 700; opacity: .75; }
+    label[for="st-ab"] .td { background: var(--danger); }
+    label[for="st-at"] .td { background: var(--warn); }
+    label[for="st-re"] .td { background: var(--ok); }
+
+    #st-ab:checked ~ .tab-labels label[for="st-ab"],
+    #st-at:checked ~ .tab-labels label[for="st-at"],
+    #st-re:checked ~ .tab-labels label[for="st-re"] {
+      background: var(--card);
+      color: var(--brand-ink);
+      box-shadow: 0 1px 3px hsl(75 10% 30% / .12);
+    }
+
+    .board { display: block; }
+    .board .col { display: none; }
+    #st-ab:checked ~ .board .col-aberto { display: flex; }
+    #st-at:checked ~ .board .col-atend  { display: flex; }
+    #st-re:checked ~ .board .col-resolv { display: flex; }
+
+    .notes { width: calc(100% - 28px); margin-top: -18px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ===== casca do mockup ===== -->
+<header class="board-head">
+  <span><b>MOCKUP</b> · chamados · v2</span>
+  <span class="dir">Direção: board por status — três colunas (aberto → em atendimento → resolvido) e o detalhe que expande dentro do próprio card</span>
+  <nav>
+    <a href="#c-aberto">1 · Abertos</a>
+    <a href="#c-atend">2 · Em atendimento</a>
+    <a href="#c-resolv">3 · Resolvidos</a>
+  </nav>
+</header>
+
+<header class="topbar">
+  <span class="logo">R</span>
+  <span class="brand">Realiza</span>
+  <span class="crumb">Coordenação · Chamados</span>
+  <span class="spacer"></span>
+  <span class="userchip">
+    <span class="uname">Marina Costa · Coordenação</span>
+    <span class="avatar">MC</span>
+  </span>
+</header>
+
+<main>
+
+  <div class="page-head">
+    <div>
+      <h1>Fila de chamados</h1>
+      <p class="sub">Pedidos de apoio das duplas — triagem e acompanhamento da coordenação</p>
+    </div>
+    <div class="head-stats">
+      <span class="stat danger"><b>3</b> aguardando triagem</span>
+      <span class="stat"><b>2</b> em atendimento</span>
+      <span class="stat"><b>2</b> resolvidos</span>
+    </div>
+  </div>
+
+  <div class="filters">
+    <span class="lbl">Categoria</span>
+    <button class="chip on">Todas <span class="n">7</span></button>
+    <button class="chip"><span class="cdot" style="background:hsl(0 72% 45%)"></span>Urgência <span class="n">1</span></button>
+    <button class="chip"><span class="cdot" style="background:hsl(207 70% 45%)"></span>Agenda <span class="n">2</span></button>
+    <button class="chip"><span class="cdot" style="background:hsl(280 50% 48%)"></span>Metodologia <span class="n">2</span></button>
+    <button class="chip"><span class="cdot" style="background:hsl(180 60% 38%)"></span>Plataforma <span class="n">1</span></button>
+    <button class="chip"><span class="cdot" style="background:hsl(75 5% 55%)"></span>Outro <span class="n">1</span></button>
+    <span class="sep"></span>
+    <button class="chip ghost">
+      Responsável: todos
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m7 10 5 5 5-5"/></svg>
+    </button>
+    <button class="chip ghost">Só sem dono</button>
+  </div>
+
+  <div class="boardwrap">
+    <!-- radios controlam as tabs de status no mobile (CSS puro) -->
+    <input type="radio" name="status-tab" id="st-ab" checked>
+    <input type="radio" name="status-tab" id="st-at">
+    <input type="radio" name="status-tab" id="st-re">
+
+    <div class="tab-labels">
+      <label for="st-ab"><span class="td"></span>Abertos <span class="tn">3</span></label>
+      <label for="st-at"><span class="td"></span>Em atend. <span class="tn">2</span></label>
+      <label for="st-re"><span class="td"></span>Resolvidos <span class="tn">2</span></label>
+    </div>
+
+    <div class="board">
+
+      <!-- ============ COLUNA: ABERTO ============ -->
+      <section class="col col-aberto" id="c-aberto">
+        <header class="col-head">
+          <span class="col-dot"></span>
+          <h2>Aberto</h2>
+          <span class="count">3</span>
+          <span class="col-sub">Aguardando triagem · mais antigo há 1 d</span>
+        </header>
+
+        <!-- card expandido: detalhe/thread inline -->
+        <article class="ticket open">
+          <div class="t-top">
+            <span class="proto">CHA-000241</span>
+            <span class="age hot">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+              há 2 h
+            </span>
+          </div>
+          <h3 class="t-title">Mentor faltou o encontro e não responde há 3 dias</h3>
+          <div class="t-meta">
+            <span class="role ry">Beatriz Rocha <em>· mentorada</em></span>
+            <span class="dupla">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8.5" r="3"/><path d="M3.5 19.5c0-3 2.5-5 5.5-5s5.5 2 5.5 5"/><path d="M15.5 5.8a3 3 0 0 1 0 5.9"/><path d="M17.5 14.7c1.8.7 3 2.2 3 4.3"/></svg>
+              Beatriz × Sérgio · T1
+            </span>
+          </div>
+          <div class="t-foot">
+            <span class="pill cat-urgencia"><span class="pd"></span>Urgência</span>
+            <span class="assignee none hot">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="8.5" stroke-dasharray="3.5 3.5"/></svg>
+              Sem responsável
+            </span>
+            <svg class="chev" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+          </div>
+
+          <div class="t-detail">
+            <p class="desc">
+              “O Sérgio não apareceu no encontro de terça e não responde minhas mensagens desde sábado. Tô preocupada, não sei se aconteceu alguma coisa.”
+              <span class="who">Enviado por Beatriz pelo botão “pedir apoio” na ficha da dupla</span>
+            </p>
+
+            <ol class="timeline">
+              <li class="pub">
+                <span class="ti">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.5 2.4 3.8 5.6 3.8 9s-1.3 6.6-3.8 9c-2.5-2.4-3.8-5.6-3.8-9S9.5 5.4 12 3Z"/></svg>
+                </span>
+                <div>
+                  <p><b>Pedido recebido pela coordenação</b> — automático</p>
+                  <span class="tt">há 2 h · visível para Beatriz</span>
+                </div>
+              </li>
+              <li class="pub">
+                <span class="ti">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.5 2.4 3.8 5.6 3.8 9s-1.3 6.6-3.8 9c-2.5-2.4-3.8-5.6-3.8-9S9.5 5.4 12 3Z"/></svg>
+                </span>
+                <div>
+                  <p><b>Pedido sendo revisado</b> — Marina Costa</p>
+                  <span class="tt">há 40 min · visível para Beatriz</span>
+                </div>
+              </li>
+              <li class="int">
+                <span class="ti">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2.5"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+                </span>
+                <div>
+                  <p><b>Marina Costa:</b> “Sérgio avisou no grupo dos mentores que viajava a trabalho esta semana. Vou ligar pra ele agora e retorno pra Beatriz ainda hoje.”</p>
+                  <span class="tt">há 30 min · <span class="tag-interno">comentário interno</span> — só a equipe vê</span>
+                </div>
+              </li>
+              <li class="int">
+                <span class="ti">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2.5"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+                </span>
+                <div>
+                  <p><b>Paula Nunes:</b> “Se não localizar até as 18h, eu assumo e já proponho reposição quinta.”</p>
+                  <span class="tt">há 10 min · <span class="tag-interno">comentário interno</span> — só a equipe vê</span>
+                </div>
+              </li>
+            </ol>
+
+            <div class="actions">
+              <button class="btn primary">Assumir chamado</button>
+              <button class="btn">Atribuir a…</button>
+              <button class="btn">Resolver</button>
+            </div>
+          </div>
+        </article>
+
+        <article class="ticket">
+          <div class="t-top">
+            <span class="proto">CHA-000245</span>
+            <span class="age">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+              há 5 h
+            </span>
+          </div>
+          <h3 class="t-title">Prova na faculdade terça — preciso remarcar o encontro 4</h3>
+          <div class="t-meta">
+            <span class="role ry">Renata Moraes <em>· mentorada</em></span>
+            <span class="dupla">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8.5" r="3"/><path d="M3.5 19.5c0-3 2.5-5 5.5-5s5.5 2 5.5 5"/><path d="M15.5 5.8a3 3 0 0 1 0 5.9"/><path d="M17.5 14.7c1.8.7 3 2.2 3 4.3"/></svg>
+              Renata × Felipe · T2
+            </span>
+          </div>
+          <div class="t-foot">
+            <span class="pill cat-agenda"><span class="pd"></span>Agenda</span>
+            <span class="assignee none">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="8.5" stroke-dasharray="3.5 3.5"/></svg>
+              Sem responsável
+            </span>
+            <svg class="chev" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+          </div>
+        </article>
+
+        <article class="ticket">
+          <div class="t-top">
+            <span class="proto">CHA-000238</span>
+            <span class="age">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+              há 1 d
+            </span>
+          </div>
+          <h3 class="t-title">Como adaptar a roda da vida pro 5º encontro do Caio?</h3>
+          <div class="t-meta">
+            <span class="role rm">André Lima <em>· mentor</em></span>
+            <span class="dupla">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8.5" r="3"/><path d="M3.5 19.5c0-3 2.5-5 5.5-5s5.5 2 5.5 5"/><path d="M15.5 5.8a3 3 0 0 1 0 5.9"/><path d="M17.5 14.7c1.8.7 3 2.2 3 4.3"/></svg>
+              Caio × André · T2
+            </span>
+          </div>
+          <div class="t-foot">
+            <span class="pill cat-metodologia"><span class="pd"></span>Metodologia</span>
+            <span class="assignee none">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="8.5" stroke-dasharray="3.5 3.5"/></svg>
+              Sem responsável
+            </span>
+            <svg class="chev" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+          </div>
+        </article>
+      </section>
+
+      <!-- ============ COLUNA: EM ATENDIMENTO ============ -->
+      <section class="col col-atend" id="c-atend">
+        <header class="col-head">
+          <span class="col-dot"></span>
+          <h2>Em atendimento</h2>
+          <span class="count">2</span>
+          <span class="col-sub">Com responsável designado</span>
+        </header>
+
+        <article class="ticket">
+          <div class="t-top">
+            <span class="proto">CHA-000234</span>
+            <span class="age">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+              há 2 d
+            </span>
+          </div>
+          <h3 class="t-title">Não consigo anexar o PDF da atividade pelo celular</h3>
+          <div class="t-meta">
+            <span class="role ry">Caio Henrique <em>· mentorado</em></span>
+            <span class="dupla">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8.5" r="3"/><path d="M3.5 19.5c0-3 2.5-5 5.5-5s5.5 2 5.5 5"/><path d="M15.5 5.8a3 3 0 0 1 0 5.9"/><path d="M17.5 14.7c1.8.7 3 2.2 3 4.3"/></svg>
+              Caio × André · T2
+            </span>
+          </div>
+          <div class="t-foot">
+            <span class="pill cat-plataforma"><span class="pd"></span>Plataforma</span>
+            <span class="assignee"><span class="avatar sm">MC</span>Marina</span>
+            <svg class="chev" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+          </div>
+          <div class="sline"><span class="sdot"></span>Em atendimento · Marina</div>
+          <p class="t-update">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.5 2.4 3.8 5.6 3.8 9s-1.3 6.6-3.8 9c-2.5-2.4-3.8-5.6-3.8-9S9.5 5.4 12 3Z"/></svg>
+            <span>“Marina pediu um print da tela de erro — aguardando retorno” · <i>há 3 h</i></span>
+          </p>
+        </article>
+
+        <article class="ticket">
+          <div class="t-top">
+            <span class="proto">CHA-000229</span>
+            <span class="age">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+              há 4 d
+            </span>
+          </div>
+          <h3 class="t-title">Kit de boas-vindas não chegou na casa da mentorada</h3>
+          <div class="t-meta">
+            <span class="role rm">Felipe Ramos <em>· mentor</em></span>
+            <span class="dupla">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8.5" r="3"/><path d="M3.5 19.5c0-3 2.5-5 5.5-5s5.5 2 5.5 5"/><path d="M15.5 5.8a3 3 0 0 1 0 5.9"/><path d="M17.5 14.7c1.8.7 3 2.2 3 4.3"/></svg>
+              Renata × Felipe · T2
+            </span>
+          </div>
+          <div class="t-foot">
+            <span class="pill cat-outro"><span class="pd"></span>Outro</span>
+            <span class="assignee"><span class="avatar sm">PN</span>Paula</span>
+            <svg class="chev" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+          </div>
+          <div class="sline"><span class="sdot"></span>Em atendimento · Paula</div>
+          <p class="t-update">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.5 2.4 3.8 5.6 3.8 9s-1.3 6.6-3.8 9c-2.5-2.4-3.8-5.6-3.8-9S9.5 5.4 12 3Z"/></svg>
+            <span>“Aguardando liberação de verba — envio previsto sexta” · <i>há 1 d</i></span>
+          </p>
+        </article>
+      </section>
+
+      <!-- ============ COLUNA: RESOLVIDO ============ -->
+      <section class="col col-resolv" id="c-resolv">
+        <header class="col-head">
+          <span class="col-dot"></span>
+          <h2>Resolvido</h2>
+          <span class="count">2</span>
+          <span class="col-sub">Últimos 30 dias</span>
+        </header>
+
+        <article class="ticket done">
+          <div class="t-top">
+            <span class="proto">CHA-000221</span>
+            <span class="age">há 3 d</span>
+          </div>
+          <h3 class="t-title">Encontro caiu no feriado — confirmar reposição</h3>
+          <div class="t-meta">
+            <span class="role ry">Júlia Fernandes <em>· mentorada</em></span>
+            <span class="dupla">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8.5" r="3"/><path d="M3.5 19.5c0-3 2.5-5 5.5-5s5.5 2 5.5 5"/><path d="M15.5 5.8a3 3 0 0 1 0 5.9"/><path d="M17.5 14.7c1.8.7 3 2.2 3 4.3"/></svg>
+              Júlia × Ricardo · T1
+            </span>
+          </div>
+          <div class="t-foot">
+            <span class="pill cat-agenda"><span class="pd"></span>Agenda</span>
+            <span class="assignee"><span class="avatar sm">PN</span>Paula</span>
+          </div>
+          <div class="resumo">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m8.5 12.3 2.4 2.4 4.8-5.2"/></svg>
+            <div>
+              <span class="rh">Resolvido por Paula · há 3 d</span>
+              <p>Reposição confirmada para quinta 19h; agenda da dupla atualizada e os dois avisados por WhatsApp.</p>
+            </div>
+          </div>
+          <button class="reopen">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 10a8 8 0 1 1 1.8 6.5"/><path d="M4.5 4v6h6"/></svg>
+            Reabrir chamado
+          </button>
+        </article>
+
+        <article class="ticket done">
+          <div class="t-top">
+            <span class="proto">CHA-000214</span>
+            <span class="age">há 1 sem</span>
+          </div>
+          <h3 class="t-title">Instrumento de metas não bate com o guia do encontro 9</h3>
+          <div class="t-meta">
+            <span class="role rm">Ricardo Alves <em>· mentor</em></span>
+            <span class="dupla">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8.5" r="3"/><path d="M3.5 19.5c0-3 2.5-5 5.5-5s5.5 2 5.5 5"/><path d="M15.5 5.8a3 3 0 0 1 0 5.9"/><path d="M17.5 14.7c1.8.7 3 2.2 3 4.3"/></svg>
+              Júlia × Ricardo · T1
+            </span>
+          </div>
+          <div class="t-foot">
+            <span class="pill cat-metodologia"><span class="pd"></span>Metodologia</span>
+            <span class="assignee"><span class="avatar sm">MC</span>Marina</span>
+          </div>
+          <div class="resumo">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m8.5 12.3 2.4 2.4 4.8-5.2"/></svg>
+            <div>
+              <span class="rh">Resolvido por Marina · há 1 sem</span>
+              <p>Guia correto reenviado ao mentor; instrumento de metas atualizado na aba Materiais.</p>
+            </div>
+          </div>
+          <button class="reopen">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 10a8 8 0 1 1 1.8 6.5"/><path d="M4.5 4v6h6"/></svg>
+            Reabrir chamado
+          </button>
+        </article>
+      </section>
+
+    </div>
+  </div>
+
+</main>
+
+<!-- ===== notas de direção ===== -->
+<ul class="notes">
+  <li><b>Board por status.</b> As três colunas são o ciclo de vida do chamado — aberto (aguardando triagem, com o mais antigo sinalizado), em atendimento (com dono) e resolvido (últimos 30 dias). A coluna vermelha expõe o gargalo da triagem no primeiro olhar.</li>
+  <li><b>O card carrega o contexto.</b> Marcador de papel do autor (mentor × mentorado), dupla e turma, categoria, idade do chamado e responsável. Em atendimento, a última atualização pública aparece em linha; resolvido traz o resumo da solução e “Reabrir chamado”.</li>
+  <li><b>Detalhe expande inline.</b> O card abre dentro da própria coluna: solicitação original, timeline pública × interna e as ações (assumir, atribuir, resolver) — sem sair do board nem perder a fila de vista.</li>
+  <li><b>Urgência é categoria, não coluna.</b> Ela fura a fila pela pill vermelha e pelo filtro — e notifica coordenação e supervisão, que disputam quem assume primeiro. No mobile, as colunas viram abas por status (radios em CSS puro).</li>
+</ul>
+
+</body>
+</html>
