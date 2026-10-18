@@ -21,7 +21,8 @@ import {
   TRILHA_LABEL,
 } from "@/lib/ciclo";
 import type { DadosPessoais } from "@/lib/queries";
-import type { Dupla, EncontroStatus, Mentorado, Profile } from "@/lib/types";
+import { temPapel } from "@/lib/types";
+import type { AppRole, Dupla, EncontroStatus, Mentorado, Profile } from "@/lib/types";
 
 // GET /api/export — só pra coordenação. ?tipo=ciclo (default): relatório do
 // ciclo em CSV, uma linha por encontro — a prestação de contas. ?tipo=pessoas:
@@ -67,9 +68,18 @@ export async function GET(request: NextRequest) {
           (m) => [m.profile_id, m.capacidade_especialista ?? 1] as const
         )
       );
+      // papéis efetivos: o híbrido do dataset chega com as duas linhas —
+      // sem isso a coluna de capacidade dele exportava só a pool primária
+      const papeisDemo = new Map<string, AppRole[]>();
+      for (const pp of d.profilePapeis) {
+        papeisDemo.set(pp.profile_id, [...(papeisDemo.get(pp.profile_id) ?? []), pp.papel]);
+      }
       return csvResponse(
         csvPessoas(
-          d.profiles,
+          d.profiles.map((p) => ({
+            ...p,
+            papeis: papeisDemo.get(p.id) ?? (p.role ? [p.role] : []),
+          })),
           contatos,
           d.mentorados,
           capacidades,
@@ -193,7 +203,7 @@ async function exportPessoas(supabase: Awaited<ReturnType<typeof createClient>>)
     { data: pessoalP, error: ePP },
     { data: pessoalM, error: ePM },
   ] = await Promise.all([
-    supabase.from("profiles").select("id,nome,role,ativo"),
+    supabase.from("profiles").select("id,nome,role,ativo,profile_papeis(papel)"),
     supabase.from("profiles_contato").select("id,email,whatsapp"),
     supabase
       .from("mentorados")
@@ -226,7 +236,15 @@ async function exportPessoas(supabase: Awaited<ReturnType<typeof createClient>>)
 
   return csvResponse(
     csvPessoas(
-      pessoas ?? [],
+      ((pessoas ?? []) as (Pick<Profile, "id" | "nome" | "role" | "ativo"> & {
+        profile_papeis?: { papel: AppRole }[];
+      })[]).map((p) => {
+        const { profile_papeis, ...rest } = p;
+        return {
+          ...rest,
+          papeis: (profile_papeis ?? []).map((r) => r.papel),
+        };
+      }),
       contatoPorId,
       mentorados ?? [],
       capacidades,
@@ -489,7 +507,7 @@ type SensPessoa = Pick<
 >;
 
 function csvPessoas(
-  pessoas: Pick<Profile, "id" | "nome" | "role" | "ativo">[],
+  pessoas: Pick<Profile, "id" | "nome" | "role" | "papeis" | "ativo">[],
   contatos: Map<string, { email: string | null; whatsapp: string | null }>,
   mentorados: Pick<
     Mentorado,
@@ -526,13 +544,16 @@ function csvPessoas(
         p.role ? papelLabel(p.role) : "Sem papel",
         contatos.get(p.id)?.email ?? "",
         contatos.get(p.id)?.whatsapp ?? "",
-        // a coluna capacidade mostra a pool da trilha do papel (0073)
+        // a coluna capacidade mostra a pool da trilha do papel (0073);
+        // o híbrido (WP6b) exporta as duas rotuladas — "2 DPP / 3 ESP"
         p.role?.startsWith("mentor")
-          ? String(
-              (p.role === "mentor_especialista"
-                ? capacidadesEsp.get(p.id)
-                : capacidades.get(p.id)) ?? ""
-            )
+          ? temPapel(p, "mentor_dpp") && temPapel(p, "mentor_especialista")
+            ? `${capacidades.get(p.id) ?? ""} DPP / ${capacidadesEsp.get(p.id) ?? ""} ESP`
+            : String(
+                (temPapel(p, "mentor_especialista")
+                  ? capacidadesEsp.get(p.id)
+                  : capacidades.get(p.id)) ?? ""
+              )
           : "",
         "",
         p.ativo ? "ativo" : "inativo",

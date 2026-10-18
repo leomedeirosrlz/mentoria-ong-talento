@@ -30,7 +30,8 @@ import {
   demoPessoas,
   demoRegistros,
 } from "./demo/queries";
-import type { AvaliacaoJovem, CicloEvento, Comunicado, CorRaca, Cronograma, DadosCivis, DocumentoPessoa, Dupla, DuplaResumo, DuplaStatus, Encontro, EncontroStatus, EspecialistaEvento, Genero, Material, Mentorado, MentorProfile, Notificacao, PessoaNota, PrefGeneroPar, Profile, Registro, ResponsavelCivis, Trilha } from "./types";
+import { temPapel } from "./types";
+import type { AppRole, AvaliacaoJovem, CicloEvento, Comunicado, CorRaca, Cronograma, DadosCivis, DocumentoPessoa, Dupla, DuplaResumo, DuplaStatus, Encontro, EncontroStatus, EspecialistaEvento, Genero, Material, Mentorado, MentorProfile, Notificacao, PessoaNota, PrefGeneroPar, Profile, Registro, ResponsavelCivis, Trilha } from "./types";
 
 /** mentor_profiles — re-export do tipo canônico (types.ts): os callers da
  *  página de pessoas/board importam daqui historicamente. */
@@ -47,6 +48,22 @@ export type { MentorProfile } from "./types";
  *  um deles em profiles dá permission denied. */
 const PROFILE_COLS_PUBLICAS =
   "id, user_id, nome, role, ativo, avatar_path, created_at, bio, linkedin, areas, voluntariado, onboarded_em, nome_social, cidade, uf, interesses, cargo, empresa, origem, consent_lgpd_em";
+
+/** Versão com papéis efetivos embutidos (WP6b) — usada onde a lista decide
+ *  por papel, não por role primário (fila, pools de dialog). A policy de
+ *  profile_papeis devolve [] pra quem não pode ler a linha alheia — o
+ *  consumidor cai no fallback do role, que é o comportamento antigo. */
+const PROFILE_COLS_COM_PAPEIS = `${PROFILE_COLS_PUBLICAS}, profile_papeis(papel)`;
+
+/** Normaliza o embed `profile_papeis` pro `papeis` do tipo Profile. A
+ *  interseção evita o weak-type check: um objeto sem a chave do embed (ex.
+ *  já normalizado) continua sendo um argumento válido — sai com []. */
+const comPapeis = <T extends object>(
+  p: T & { profile_papeis?: { papel: AppRole }[] | null }
+): Omit<T, "profile_papeis"> & { papeis: AppRole[] } => {
+  const { profile_papeis, ...rest } = p;
+  return { ...rest, papeis: (profile_papeis ?? []).map((r) => r.papel) };
+};
 
 /** Colunas de mentorados legíveis por qualquer autenticado — a 0034 tirou o
  *  SELECT table-level e voltou grant por coluna (as sensíveis ficam de fora).
@@ -271,18 +288,24 @@ export const getMe = cache(async (): Promise<Profile | null> => {
   const sub = data?.claims?.sub;
   if (!sub) return null;
   // maybeSingle: profile ainda não criado (ou removido) -> null -> layout manda pro login
-  const [{ data: profile, error }, contatos] = await Promise.all([
-    supabase
-      .from("profiles")
-      .select(PROFILE_COLS_PUBLICAS)
-      .eq("user_id", sub)
-      .maybeSingle(),
-    // o self-scope da view garante a própria linha — email/whatsapp voltam
-    // pro Gravatar do shell e pro form de /perfil
-    getContatos(),
-  ]);
+  const [{ data: profile, error }, contatos, { data: papeis }] =
+    await Promise.all([
+      supabase
+        .from("profiles")
+        .select(PROFILE_COLS_PUBLICAS)
+        .eq("user_id", sub)
+        .maybeSingle(),
+      // o self-scope da view garante a própria linha — email/whatsapp voltam
+      // pro Gravatar do shell e pro form de /perfil
+      getContatos(),
+      // papéis efetivos (0085) — o híbrido carrega a linha extra de
+      // profile_papeis; as telas decidem por temPapel, não por role.
+      supabase.rpc("my_papeis"),
+    ]);
   if (error) throw error;
-  return profile ? comContato(profile, contatos) : null;
+  return profile
+    ? { ...comContato(profile, contatos), papeis: papeis ?? [] }
+    : null;
 });
 
 export const getCicloEventos = cache(async (): Promise<CicloEvento[]> => {
@@ -465,7 +488,7 @@ export const getDuplasResumo = cache(async (): Promise<DuplaResumo[]> => {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("duplas")
-    .select("id,mentor_id,mentorado_id,supervisor_id")
+    .select("id,mentor_id,mentorado_id,supervisor_id,trilha")
     // "está em dupla" = ocupa vaga — concluída e encerrada já liberaram
     .in("status", ["ativa", "pausada"]);
   if (error) throw error;
@@ -480,7 +503,7 @@ export const getDuplasResumoTodas = cache(async (): Promise<DuplaResumo[]> => {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("duplas")
-    .select("id,mentor_id,mentorado_id,supervisor_id");
+    .select("id,mentor_id,mentorado_id,supervisor_id,trilha");
   if (error) throw error;
   return data ?? [];
 });
@@ -536,7 +559,7 @@ export const getPessoas = cache(async (): Promise<Profile[]> => {
   if (demo) return demoPessoas(demo);
   const supabase = await createClient();
   const [{ data, error }, contatos, pessoal] = await Promise.all([
-    supabase.from("profiles").select(PROFILE_COLS_PUBLICAS).order("nome"),
+    supabase.from("profiles").select(PROFILE_COLS_COM_PAPEIS).order("nome"),
     getContatos(),
     getPessoalMap("profiles_pessoal"),
   ]);
@@ -547,7 +570,7 @@ export const getPessoas = cache(async (): Promise<Profile[]> => {
   // (o resto fica ""/null e os chips nem renderizam).
   // Os sensíveis (nascimento/gênero/pref./motivação) só preenchem pra coord.
   return ((data ?? []) as { id: string; nome: string }[])
-    .map((p) => comPessoal(comContato(p, contatos), pessoal))
+    .map((p) => comPapeis(comPessoal(comContato(p, contatos), pessoal)))
     .sort(porNome) as unknown as Profile[];
 });
 
@@ -601,7 +624,7 @@ export const getPessoaPerfil = cache(async (id: string): Promise<
 
   const [{ data: p }, { data: m }, contatos, pessoalProf, pessoalMent, curriculo] =
     await Promise.all([
-      supabase.from("profiles").select(PROFILE_COLS_PUBLICAS).eq("id", id).maybeSingle(),
+      supabase.from("profiles").select(PROFILE_COLS_COM_PAPEIS).eq("id", id).maybeSingle(),
       supabase.from("mentorados").select(MENTORADO_COLS_PUBLICAS).eq("id", id).maybeSingle(),
       getContatos(),
       getPessoalMap("profiles_pessoal"),
@@ -619,7 +642,9 @@ export const getPessoaPerfil = cache(async (id: string): Promise<
   if (p) {
     // mentor_profiles é legível por autenticado (grant table-level) — a ficha
     // de mentor (disponibilidade/experiência/formação) entra no perfil dele
-    const ehMentor = p.role === "mentor_dpp" || p.role === "mentor_especialista";
+    const perfil = comPapeis(p);
+    const ehMentor =
+      temPapel(perfil, "mentor_dpp") || temPapel(perfil, "mentor_especialista");
     const [{ data: duplas }, { data: notas }, { data: mp }] = await Promise.all([
       supabase.from("duplas").select(DUPLA_PERFIL_SELECT)
         .or(`mentor_id.eq.${id},supervisor_id.eq.${id}`)
@@ -633,7 +658,7 @@ export const getPessoaPerfil = cache(async (id: string): Promise<
     ]);
     return {
       tipo: "profile",
-      pessoa: comPessoal(comContato(p, contatos), pessoalProf) as Profile,
+      pessoa: comPessoal(comContato(perfil, contatos), pessoalProf) as Profile,
       mentorProfile: (mp as MentorProfile | null) ?? null,
       duplas: ((duplas as unknown as DuplaPerfil[]) ?? []).map(comEmail),
       notas: (notas as unknown as PessoaNota[]) ?? [],
@@ -694,7 +719,11 @@ export const getMeuMentorProfile = cache(
     const demo = await demoRole();
     if (demo) return demoMeuMentorProfile(demo);
     const me = await getMe();
-    if (!me || (me.role !== "mentor_dpp" && me.role !== "mentor_especialista"))
+    // papel efetivo (WP6b): o híbrido tem mentor_profile igual a qualquer um
+    if (
+      !me ||
+      (!temPapel(me, "mentor_dpp") && !temPapel(me, "mentor_especialista"))
+    )
       return null;
     const supabase = await createClient();
     const { data, error } = await supabase

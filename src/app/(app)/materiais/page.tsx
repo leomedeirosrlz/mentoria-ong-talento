@@ -3,6 +3,7 @@ import type { CSSProperties } from "react";
 import Link from "next/link";
 import { getCicloEventos, getMateriais, getMe } from "@/lib/queries";
 import { linkSeguro, maxNumeroEncontro } from "@/lib/ciclo";
+import { temPapel } from "@/lib/types";
 import { ArrowSquareOut, File, FileText, FolderOpen, LinkSimple, BookOpen, PuzzlePiece } from "@phosphor-icons/react/dist/ssr";
 import { Badge } from "@/components/ui/badge";
 import { NovoMaterialDialog } from "@/components/novo-material-dialog";
@@ -54,8 +55,9 @@ export default async function MateriaisPage() {
   const visiveis = materiais.filter((m) => {
     if (m.audiencia === "todos") return true;
     if (me?.role === "coordenacao") return true;
-    if (m.audiencia === "dpp") return me?.role === "mentor_dpp";
-    if (m.audiencia === "especialista") return me?.role === "mentor_especialista";
+    if (m.audiencia === "dpp") return temPapel(me, "mentor_dpp");
+    if (m.audiencia === "especialista")
+      return temPapel(me, "mentor_especialista");
     return false;
   });
 

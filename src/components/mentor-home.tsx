@@ -15,6 +15,7 @@ import {
   toDateStr,
   totalDaTrilha,
 } from "@/lib/ciclo";
+import { temPapel } from "@/lib/types";
 import type {
   CicloEvento,
   Cronograma,
@@ -67,7 +68,8 @@ export function MentorHome({
   // um dado alheio, tenha ele dupla ou não (every em [] = true cobre o caso
   // de ainda não pareado; um DPP sem dupla segue vendo a semana do ciclo)
   const soEspecialista =
-    me.role === "mentor_especialista" &&
+    temPapel(me, "mentor_especialista") &&
+    !temPapel(me, "mentor_dpp") &&
     duplas.every((d) => d.trilha === "especialista");
 
   // com N duplas (mentor_especialista pode carregar várias trilhas) a mais

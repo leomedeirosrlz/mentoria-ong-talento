@@ -188,8 +188,12 @@ describe("filaMentores", () => {
     const ficha = {
       "p-esp": { ...mp(1, 2), profile_id: "p-esp", tipo: "especialista" as const },
     };
-    expect(filaMentores([esp], ficha, { "p-esp": 1 })[0].vagas).toBe(1);
-    expect(filaMentores([esp], ficha, { "p-esp": 2 })).toHaveLength(0);
+    expect(
+      filaMentores([esp], ficha, { "p-esp:especialista": 1 })[0].vagas
+    ).toBe(1);
+    expect(
+      filaMentores([esp], ficha, { "p-esp:especialista": 2 })
+    ).toHaveLength(0);
     // sem capacidade_especialista na ficha vale 1 — mesma régua do createDupla
     expect(
       filaMentores([esp], { "p-esp": { ...mp(3), profile_id: "p-esp" } }, {})
@@ -201,16 +205,52 @@ describe("filaMentores", () => {
     const mentor = mkProfile({ id: "p-1", role: "mentor_dpp" });
     // 1 de 2 vagas ocupada → entra com 1 vaga livre
     expect(
-      filaMentores([mentor], { "p-1": { ...mp(2), profile_id: "p-1" } }, { "p-1": 1 })[0]
-        .vagas
+      filaMentores(
+        [mentor],
+        { "p-1": { ...mp(2), profile_id: "p-1" } },
+        { "p-1:dpp": 1 }
+      )[0].vagas
     ).toBe(1);
     // lotado → some da fila
     expect(
-      filaMentores([mentor], { "p-1": { ...mp(2), profile_id: "p-1" } }, { "p-1": 2 })
+      filaMentores(
+        [mentor],
+        { "p-1": { ...mp(2), profile_id: "p-1" } },
+        { "p-1:dpp": 2 }
+      )
     ).toHaveLength(0);
     // sem ficha em mentor_profiles vale capacidade 1 (régua do createDupla)
-    expect(filaMentores([mentor], {}, { "p-1": 1 })).toHaveLength(0);
+    expect(filaMentores([mentor], {}, { "p-1:dpp": 1 })).toHaveLength(0);
     expect(filaMentores([mentor], {}, {})).toHaveLength(1);
+  });
+
+  it("híbrido (DPP+esp) entra nas duas pools, cada uma independente", () => {
+    // WP6b: role primário DPP + papel efetivo especialista — uma linha por
+    // trilha; a pool cheia de uma não bloqueia a outra
+    const hib = mkProfile({
+      id: "p-hib",
+      role: "mentor_dpp",
+      papeis: ["mentor_dpp", "mentor_especialista"],
+    });
+    const ficha = {
+      "p-hib": { ...mp(2, 3), profile_id: "p-hib" },
+    };
+    // DPP cheia (2/2) + esp com 1 de 3 usada → só a linha esp aparece
+    const fila = filaMentores([hib], ficha, {
+      "p-hib:dpp": 2,
+      "p-hib:especialista": 1,
+    });
+    expect(fila).toHaveLength(1);
+    expect(fila[0].trilha).toBe("especialista");
+    expect(fila[0].vagas).toBe(2);
+    // vaga nas duas → duas linhas do mesmo mentor, cada uma com seu teto
+    const duas = filaMentores([hib], ficha, { "p-hib:dpp": 1 });
+    expect(duas.map((f) => [f.trilha, f.vagas])).toEqual(
+      expect.arrayContaining([
+        ["dpp", 1],
+        ["especialista", 3],
+      ])
+    );
   });
 
   it("inativa e não-mentor não entram — reserva é de quem ficou", () => {

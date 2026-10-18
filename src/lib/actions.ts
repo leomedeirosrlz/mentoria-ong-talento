@@ -19,7 +19,8 @@ import {
   podeSupervisionar,
 } from "@/lib/ciclo";
 import { capitalizar, cpfValido, erroAmigavel, nomeProprio } from "@/lib/utils";
-import type { ComunicadoPrioridade, CorRaca, Cronograma, DadosCivis, Disponibilidade, DocumentoPessoa, Endereco, Escolaridade, Genero, Notificacao, PrefGeneroPar, ResponsavelCivis, SituacaoMentorado, Trilha } from "@/lib/types";
+import { temPapel } from "@/lib/types";
+import type { AppRole, ComunicadoPrioridade, CorRaca, Cronograma, DadosCivis, Disponibilidade, DocumentoPessoa, Endereco, Escolaridade, Genero, Notificacao, PrefGeneroPar, ResponsavelCivis, SituacaoMentorado, Trilha } from "@/lib/types";
 import {
   emailValido,
   fichaLinha,
@@ -637,13 +638,32 @@ export async function createDupla(formData: FormData) {
     return { error: "Escolha um cronograma da lista." };
   }
   const { data: mentor } = await supabase
-    .from("profiles").select("role").eq("id", mentor_id).single();
-  if (mentor?.role !== "mentor_dpp" && mentor?.role !== "mentor_especialista") {
+    .from("profiles")
+    .select("role, profile_papeis(papel)")
+    .eq("id", mentor_id)
+    .single();
+  const papeisMentor = new Set(
+    (mentor?.profile_papeis ?? []).map((r: { papel: AppRole }) => r.papel)
+  );
+  if (!papeisMentor.has("mentor_dpp") && !papeisMentor.has("mentor_especialista")) {
     return { error: "A pessoa escolhida como mentor não tem papel de mentor." };
   }
-  // a trilha é derivada do papel do mentor — o client não escolhe (o campo
-  // oculto/role no banco é a fonte de verdade; mentor_especialista nunca vira DPP)
-  const trilha: Trilha = mentor.role === "mentor_especialista" ? "especialista" : "dpp";
+  // WP6b: quem tem os dois papéis não deixa a trilha ser adivinhada do
+  // primário — o form manda `trilha` explícita. Sem campo (client antigo),
+  // cai na trilha do papel primário, como sempre foi.
+  const trilhaForm = String(formData.get("trilha") ?? "");
+  const trilha: Trilha =
+    trilhaForm === "especialista" || trilhaForm === "dpp"
+      ? trilhaForm
+      : mentor?.role === "mentor_especialista"
+        ? "especialista"
+        : "dpp";
+  if (
+    (trilha === "especialista" && !papeisMentor.has("mentor_especialista")) ||
+    (trilha === "dpp" && !papeisMentor.has("mentor_dpp"))
+  ) {
+    return { error: "Esse mentor não tem papel nessa trilha." };
+  }
   // dupla de especialista não tem supervisor — força null mesmo se o form mandar
   const supervisorFinal = trilha === "especialista" ? null : supervisor_id;
   if (supervisorFinal) {
@@ -904,10 +924,19 @@ export async function updatePessoa(profileId: string, formData: FormData) {
   if (formData.has("capacidade") && (!Number.isInteger(capacidade) || capacidade < 1)) {
     return { error: "Informe uma capacidade de pelo menos 1." };
   }
+  // pool esp separada (WP6b): o híbrido edita as duas no mesmo form
+  const capacidadeEspRaw = String(formData.get("capacidade_esp") ?? "").trim();
+  if (formData.has("capacidade_esp") && !capacidadeEspRaw) {
+    return { error: "Informe a capacidade de trilhas de especialista." };
+  }
+  const capacidadeEsp = Number(capacidadeEspRaw || 1);
+  if (formData.has("capacidade_esp") && (!Number.isInteger(capacidadeEsp) || capacidadeEsp < 1)) {
+    return { error: "Informe uma capacidade de pelo menos 1." };
+  }
 
   // e-mail = identidade do link de acesso; só muda enquanto a pessoa nunca entrou
   const { data: atual } = await supabase
-    .from("profiles").select("user_id, role, consent_lgpd_em").eq("id", profileId).single();
+    .from("profiles").select("user_id, role, consent_lgpd_em, profile_papeis(papel)").eq("id", profileId).single();
   // campos de apresentação (0030) — a coordenação edita os mesmos que a
   // pessoa edita em /perfil; o form manda `areas_perfil` porque `areas` já é
   // o campo do mentor_profile
@@ -954,16 +983,33 @@ export async function updatePessoa(profileId: string, formData: FormData) {
 
   // só mexe no mentor_profile quando o form trouxe os campos — se o fetch do
   // dialog falhou, salvar sem eles não pode zerar capacidade/areas/checklists
-  if ((atual?.role === "mentor_dpp" || atual?.role === "mentor_especialista") && formData.has("capacidade")) {
+  const papeisAlvo = new Set<AppRole>(
+    ((atual as { profile_papeis?: { papel: AppRole }[] } | null)?.profile_papeis ?? [])
+      .map((r) => r.papel)
+  );
+  if (atual?.role) papeisAlvo.add(atual.role);
+  const alvoDpp = papeisAlvo.has("mentor_dpp");
+  const alvoEsp = papeisAlvo.has("mentor_especialista");
+  if ((alvoDpp || alvoEsp) && (formData.has("capacidade") || formData.has("capacidade_esp"))) {
     const areas = String(formData.get("areas") ?? "")
       .split(",").map((s) => s.trim()).filter(Boolean);
-    const ehEsp = atual.role === "mentor_especialista";
     const { error: mpErr } = await supabase.from("mentor_profiles").upsert({
       profile_id: profileId,
-      tipo: ehEsp ? "especialista" : "dpp",
-      // a pool editada é a da trilha do papel (0073) — a outra coluna fica
-      // como está, sem ser zerada pelo upsert
-      ...(ehEsp ? { capacidade_especialista: capacidade } : { capacidade }),
+      // tipo segue o papel PRIMÁRIO do alvo (WP6b) — editar a pool
+      // secundária de um híbrido não pode inverter a ficha dele
+      tipo: atual?.role === "mentor_especialista" ? "especialista" : "dpp",
+      // cada campo escreve na própria pool (0073/WP6b) — coluna ausente no
+      // upsert preserva o valor atual; campo que a trilha não serve é
+      // ignorado em vez de gravar lixo
+      ...(formData.has("capacidade") && alvoDpp ? { capacidade } : {}),
+      ...(formData.has("capacidade_esp") && alvoEsp
+        ? { capacidade_especialista: capacidadeEsp }
+        : {}),
+      // client antigo manda só `capacidade` sem trilha: cai na pool do papel
+      // primário (comportamento da 0073 preservado)
+      ...(formData.has("capacidade") && !formData.has("capacidade_esp") && !alvoDpp && alvoEsp
+        ? { capacidade_especialista: capacidade }
+        : {}),
       areas,
       termo_ok: formData.get("termo_ok") === "on",
       formacao_ok: formData.get("formacao_ok") === "on",
@@ -985,7 +1031,8 @@ export async function updatePessoa(profileId: string, formData: FormData) {
  *  updatePessoa. */
 export async function updateCapacidadeMentor(
   profileId: string,
-  capacidade: number
+  capacidade: number,
+  trilha?: "dpp" | "especialista"
 ) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
@@ -996,21 +1043,38 @@ export async function updateCapacidadeMentor(
   if (!Number.isInteger(capacidade) || capacidade < 1 || capacidade > 10) {
     return { error: "A capacidade aceita valores de 1 a 10." };
   }
-  // o papel decide a coluna — quem não é mentor não tem pool de vagas
+  // a pool escolhida decide a coluna — sem `trilha` cai na do papel
+  // primário (comportamento antigo); o híbrido (WP6b) manda a trilha
   const { data: alvo } = await supabase
     .from("profiles")
-    .select("id, role")
+    .select("id, role, profile_papeis(papel)")
     .eq("id", profileId)
     .single();
-  const ehEsp = alvo?.role === "mentor_especialista";
-  if (!alvo || (alvo.role !== "mentor_dpp" && !ehEsp)) {
+  const papeisAlvo = new Set(
+    (alvo?.profile_papeis ?? []).map((r: { papel: AppRole }) => r.papel)
+  );
+  const ehMentorAlvo =
+    papeisAlvo.has("mentor_dpp") || papeisAlvo.has("mentor_especialista");
+  if (!alvo || !ehMentorAlvo) {
     return { error: "Capacidade só existe pra mentores." };
   }
+  const ehEsp =
+    trilha != null
+      ? trilha === "especialista"
+      : alvo.role === "mentor_especialista";
+  if (ehEsp && !papeisAlvo.has("mentor_especialista")) {
+    return { error: "Esse mentor não tem papel de especialista." };
+  }
+  if (!ehEsp && !papeisAlvo.has("mentor_dpp")) {
+    return { error: "Esse mentor não tem papel de mentor DPP." };
+  }
   // upsert cobre o mentor sem linha em mentor_profiles (a pool vale 1 por
-  // default no banco — aqui ela vira explícita de uma vez)
+  // default no banco — aqui ela vira explícita de uma vez). `tipo` segue o
+  // papel primário — ajustar a pool secundária do híbrido não pode virar
+  // o tipo dele.
   const { error } = await supabase.from("mentor_profiles").upsert({
     profile_id: profileId,
-    tipo: ehEsp ? "especialista" : "dpp",
+    tipo: alvo.role === "mentor_especialista" ? "especialista" : "dpp",
     ...(ehEsp ? { capacidade_especialista: capacidade } : { capacidade }),
   });
   if (error) return { error: erroAmigavel(error) };
@@ -1383,14 +1447,33 @@ export async function updateDupla(duplaId: string, formData: FormData) {
     pdmNovo = pdm || null;
   }
   const { data: mentor } = await supabase
-    .from("profiles").select("role").eq("id", mentor_id).single();
-  if (mentor?.role !== "mentor_dpp" && mentor?.role !== "mentor_especialista") {
+    .from("profiles")
+    .select("role, profile_papeis(papel)")
+    .eq("id", mentor_id)
+    .single();
+  const papeisMentor = new Set(
+    (mentor?.profile_papeis ?? []).map((r: { papel: AppRole }) => r.papel)
+  );
+  if (!papeisMentor.has("mentor_dpp") && !papeisMentor.has("mentor_especialista")) {
     return { error: "A pessoa escolhida como mentor não tem papel de mentor." };
   }
-  // a trilha segue o papel do mentor — trocar de mentor DPP pra especialista
-  // (ou o contrário) migra a dupla; com encontros já criados ela é imutável
-  // (mover numerariação entre calendário e trilha livre exigiria reparo de dados)
-  const trilhaNova: Trilha = mentor.role === "mentor_especialista" ? "especialista" : "dpp";
+  // WP6b: mesma regra do create — trilha explícita no form, primário como
+  // default. Trocar de trilha migra a dupla; com encontros já criados ela é
+  // imutável (mover numerariação entre calendário e trilha livre exigiria
+  // reparo de dados)
+  const trilhaForm = String(formData.get("trilha") ?? "");
+  const trilhaNova: Trilha =
+    trilhaForm === "especialista" || trilhaForm === "dpp"
+      ? trilhaForm
+      : mentor?.role === "mentor_especialista"
+        ? "especialista"
+        : "dpp";
+  if (
+    (trilhaNova === "especialista" && !papeisMentor.has("mentor_especialista")) ||
+    (trilhaNova === "dpp" && !papeisMentor.has("mentor_dpp"))
+  ) {
+    return { error: "Esse mentor não tem papel nessa trilha." };
+  }
   // dupla ativa/pausada ocupa vaga do mentor e do mentorado; encerrada não ocupa,
   // então só valida quando o novo status volta a contar. A própria dupla sai da
   // conta (.neq) pra edição simples não brigar com ela mesma
@@ -2482,8 +2565,8 @@ export async function salvarLinkEncontro(encontroId: string, link: string | null
   // nunca editam (mesma regra do agendarEncontro: a RLS deixaria a coord
   // escrever, então o contrato mora aqui)
   if (
-    eu.role !== "mentor_dpp" &&
-    eu.role !== "mentor_especialista" &&
+    !temPapel(eu, "mentor_dpp") &&
+    !temPapel(eu, "mentor_especialista") &&
     eu.role !== "mentorado"
   ) {
     return { error: "O link da chamada é combinado pela dupla. A coordenação acompanha." };
@@ -2828,7 +2911,7 @@ export async function salvarNotaEncontro(duplaId: string, numero: number, texto:
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada. Entre de novo." };
   // a nota é o plano de aula do mentor — nem a coord escreve nela
-  if (eu.role !== "mentor_dpp" && eu.role !== "mentor_especialista") {
+  if (!temPapel(eu, "mentor_dpp") && !temPapel(eu, "mentor_especialista")) {
     return { error: "A nota do encontro é do mentor da dupla." };
   }
 
@@ -3686,7 +3769,7 @@ export async function updateMeuPerfil(formData: FormData) {
   // formação/disponibilidade; o guard da 0004 continua travando
   // termo_ok/formacao_ok/capacidade/tipo. UPDATE direto: self não tem INSERT
   // (a linha nasce no cadastro pela coordenação).
-  const ehMentor = eu.role === "mentor_dpp" || eu.role === "mentor_especialista";
+  const ehMentor = temPapel(eu, "mentor_dpp") || temPapel(eu, "mentor_especialista");
   if (ehMentor && formData.has("disponibilidade")) {
     const mentorCampos = camposMentor(formData);
     if ("error" in mentorCampos) return { error: mentorCampos.error };
@@ -3759,7 +3842,7 @@ export async function salvarOnboarding(formData: FormData) {
 
   // passo "Disponibilidade" (mentor): grade semanal + experiência/formação
   // do mentor_profiles — self-update (0004 trava só os campos de validação)
-  const ehMentor = eu.role === "mentor_dpp" || eu.role === "mentor_especialista";
+  const ehMentor = temPapel(eu, "mentor_dpp") || temPapel(eu, "mentor_especialista");
   if (ehMentor) {
     const mentorCampos = camposMentor(formData, { parcial: true });
     if ("error" in mentorCampos) return { error: mentorCampos.error };

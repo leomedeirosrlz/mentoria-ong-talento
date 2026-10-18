@@ -187,7 +187,7 @@ describe("ranquearMentores", () => {
       mentores,
       "mentor_dpp",
       { "p-cheio": mp(1), "p-livre": mp(1) },
-      { "p-cheio": 1 },
+      { "p-cheio:dpp": 1 },
       { papel: "mentorado" },
       "p-atual"
     );
@@ -209,7 +209,7 @@ describe("ranquearMentores", () => {
       [evelyn],
       "mentor_dpp",
       { "p-evelyn": mp(2) },
-      { "p-evelyn": 2 },
+      { "p-evelyn:dpp": 2 },
       { papel: "mentorado" }
     );
     expect(ranked[0].livre).toBe(false);
@@ -219,10 +219,42 @@ describe("ranquearMentores", () => {
       [evelyn],
       "mentor_dpp",
       { "p-evelyn": mp(2) },
-      { "p-evelyn": 1 },
+      { "p-evelyn:dpp": 1 },
       { papel: "mentorado" }
     );
     expect(livre[0].livre).toBe(true);
+  });
+
+  it("híbrido (primário DPP + papel esp) entra no pool da trilha esp — WP6b", () => {
+    const hib = mkProfile({
+      id: "p-hib",
+      nome: "Hib Rido",
+      role: "mentor_dpp",
+      papeis: ["mentor_dpp", "mentor_especialista"],
+    });
+    const ranked = ranquearMentores(
+      [hib],
+      "mentor_especialista",
+      // pool esp dele tem teto 3 com 1 usada — a DPP cheia (1/1) não conta
+      { "p-hib": { ...mp(1), profile_id: "p-hib", capacidade_especialista: 3 } },
+      { "p-hib:dpp": 1, "p-hib:especialista": 1 },
+      { papel: "mentorado" }
+    );
+    expect(ranked.map((c) => c.profile.id)).toEqual(["p-hib"]);
+    expect(ranked[0].livre).toBe(true);
+    expect(ranked[0].usadas).toBe(1);
+    expect(ranked[0].teto).toBe(3);
+    // e no pool DPP ele mede contra a pool DPP — cheio, some do fim marcado
+    const rankedDpp = ranquearMentores(
+      [hib],
+      "mentor_dpp",
+      { "p-hib": { ...mp(1), profile_id: "p-hib", capacidade_especialista: 3 } },
+      { "p-hib:dpp": 1, "p-hib:especialista": 1 },
+      { papel: "mentorado" }
+    );
+    expect(rankedDpp[0].livre).toBe(false);
+    expect(rankedDpp[0].usadas).toBe(1);
+    expect(rankedDpp[0].teto).toBe(1);
   });
 
   it("afinidade decide entre livres; nome desempata o empate", () => {

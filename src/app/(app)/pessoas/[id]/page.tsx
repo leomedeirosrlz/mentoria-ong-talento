@@ -58,6 +58,7 @@ import {
   SITUACAO_MENTORADO_LABEL,
   waLink,
 } from "@/lib/ciclo";
+import { temPapel } from "@/lib/types";
 import type { DadosCivis } from "@/lib/types";
 import { AnamneseMentoradoChip } from "@/components/anamnese-mentorado";
 import { CapacidadeMentorDialog } from "@/components/capacidade-mentor-dialog";
@@ -228,7 +229,8 @@ export default async function PessoaPerfilPage({
   // interna mas aberta — o que cada papel enxerga nela é decidido seção a
   // seção abaixo, espelhando os grants do banco (sensíveis só chegam
   // preenchidos pra coordenação, contato só pra quem tem vínculo)
-  const ehMentor = me.role === "mentor_dpp" || me.role === "mentor_especialista";
+  const ehMentor =
+    temPapel(me, "mentor_dpp") || temPapel(me, "mentor_especialista");
   const ehStaff = me.role === "coordenacao" || me.role === "supervisor";
   if (perfil.tipo === "profile" && perfil.pessoa.id === me.id) redirect("/perfil");
   // mentorado fora de vínculo: o RLS já barrou quem não alcança (query voltou null)

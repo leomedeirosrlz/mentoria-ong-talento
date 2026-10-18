@@ -62,7 +62,10 @@ export type VisaoDuplas =
   | "coordenacao"
   | "supervisor"
   | "mentor"
-  | "especialista";
+  | "especialista"
+  /** DPP + especialista ao mesmo tempo (WP6b): as duas seções empilhadas,
+   *  a lista dividida por trilha — "Minhas duplas" sobre "Minhas trilhas". */
+  | "hibrido";
 
 // ---------- status → pill ----------
 
@@ -756,6 +759,48 @@ export function DuplasLista({
         espEventos={especialistaEventos}
       />
     );
+  if (visao === "hibrido") {
+    const dpp = lista.filter((d) => d.trilha !== "especialista");
+    const esp = lista.filter((d) => d.trilha === "especialista");
+    if (!dpp.length && !esp.length) {
+      return (
+        <EstadoVazio
+          lista={lista}
+          visao="mentor"
+          podeCriar={false}
+          busca=""
+          filtroAtivo={false}
+          onLimparBusca={() => {}}
+          onLimparFiltro={() => {}}
+        />
+      );
+    }
+    // cada seção recebe a fatia da própria trilha (e o resumo dela) — seção
+    // sem duplas não aparece: um título "Minhas duplas" sobre zero cards
+    // seria ruído, não contexto
+    return (
+      <div className="space-y-10">
+        {dpp.length > 0 && (
+          <VisaoMentor
+            lista={dpp}
+            eventos={eventos}
+            hoje={hoje}
+            saudePorId={saudePorId}
+            resumo={resumoDaLista(dpp, saudePorId, "mentor")}
+          />
+        )}
+        {esp.length > 0 && (
+          <VisaoEspecialista
+            lista={esp}
+            hoje={hoje}
+            saudePorId={saudePorId}
+            resumo={resumoDaLista(esp, saudePorId, "especialista")}
+            espEventos={especialistaEventos}
+          />
+        )}
+      </div>
+    );
+  }
   return (
     <VisaoMentor
       lista={lista}

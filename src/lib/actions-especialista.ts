@@ -86,12 +86,16 @@ export async function criarSolicitacao(formData: FormData) {
   }
 
   if (desejado) {
+    // papel efetivo (WP6b): o híbrido com especialista como secundário vale
+    // — !inner em profile_papeis devolve null quando a linha não existe
     const { data: esp } = await supabase
       .from("profiles")
-      .select("id, role, ativo")
+      .select("id, profile_papeis!inner(papel)")
       .eq("id", desejado)
+      .eq("profile_papeis.papel", "mentor_especialista")
+      .eq("ativo", true)
       .maybeSingle();
-    if (esp?.role !== "mentor_especialista" || !esp.ativo) {
+    if (!esp) {
       return { error: "Escolha um mentor especialista ativo." };
     }
   }
@@ -125,10 +129,11 @@ export async function criarSolicitacao(formData: FormData) {
   const [esps, coords, mentorado] = await Promise.all([
     desejado
       ? Promise.resolve({ data: [{ id: desejado }] })
-      : supabase
+      : // broadcast vai pra quem TEM o papel, não só pro primário (WP6b)
+        supabase
           .from("profiles")
-          .select("id")
-          .eq("role", "mentor_especialista")
+          .select("id, profile_papeis!inner(papel)")
+          .eq("profile_papeis.papel", "mentor_especialista")
           .eq("ativo", true),
     supabase.from("profiles").select("id").eq("role", "coordenacao").eq("ativo", true),
     supabase.from("mentorados").select("nome").eq("id", dupla.mentorado_id).maybeSingle(),
