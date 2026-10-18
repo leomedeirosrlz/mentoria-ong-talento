@@ -16,7 +16,15 @@ const DANGER_BG = "#fdf0ee";
 const WARN = "#b07a05";
 const WARN_BG = "#fdf6e4";
 const FONT = "'Mitr','Segoe UI',Helvetica,Arial,sans-serif";
+const FONT_LOGO = "'Archivo Black','Arial Black',Arial,sans-serif";
 const BANNER_URL = `${SITE_URL}/email/vamos-juntos.png`;
+const LOGO_PONTO = "#ffd531"; // amarelo do ponto do logo — --role-mentorado
+
+/** Wordmark em texto (e-mail não garante webfont/imagem): REALIZA ink +
+ *  ponto âmbar + VC lime — mesmas cores do logo-realiza.png. Archivo
+ *  Black é o peso do wordmark real; Arial Black/900 cobre clientes sem
+ *  webfont. */
+const LOGO = `<span style="font-family:${FONT_LOGO};font-size:26px;font-weight:900;font-style:italic;letter-spacing:0.5px;color:${INK};">REALIZA<span style="color:${LOGO_PONTO};">.</span><span style="color:${LIME};">VC</span></span>`;
 
 /** Conteúdo digitado pela coordenação vai pra HTML de e-mail — escapa sempre. */
 function esc(s: string): string {
@@ -39,12 +47,13 @@ function paragrafos(texto: string): string {
     .join("");
 }
 
-/** Casca única dos e-mails do sistema — banner da marca em imagem (servido
- *  pelo próprio site, sem dependência de CDN externo), card branco 600px
- *  sobre fundo cinza, CTA pill em gradiente lime, assinatura "— Equipe
- *  Realiza.vc" e o mesmo banner fechando. Só tabelas + CSS inline: o que o
- *  Gmail/Outlook respeitam. `tagline` vira o eyebrow sobre o título e
- *  `preheader` é o texto de prévia que a caixa de entrada mostra. */
+/** Casca única dos e-mails do sistema — card branco 600px sobre fundo
+ *  cinza com moldura (barra lime em gradiente + borda sutil), logo em
+ *  texto multicolor no topo do corpo e o banner vamos-juntos fechando
+ *  num rodapé cinza acoplado ao card (radius herdado). Só tabelas +
+ *  CSS inline: o que o Gmail/Outlook respeitam. `tagline` vira o
+ *  eyebrow sobre o título e `preheader` é o texto de prévia que a
+ *  caixa de entrada mostra. */
 export function emailLayout({
   titulo,
   conteudoHtml,
@@ -77,12 +86,12 @@ export function emailLayout({
 <title>${esc(titulo)}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Mitr:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Mitr:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   @media screen and (max-width:620px) {
     .email-body { padding:24px 20px !important; }
-    .email-legal { padding:16px 20px 24px !important; }
-    .email-extra { padding:0 20px 12px !important; }
+    .email-legal { padding:14px 20px 24px !important; }
+    .email-extra { padding:0 20px 16px !important; }
   }
 </style>
 </head>
@@ -93,11 +102,12 @@ ${
     : ""
 }
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${FUNDO}" style="background:${FUNDO};">
-<tr><td align="center" style="padding:24px 0;">
-  <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:600px;max-width:600px;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.06);">
-    <tr><td><img src="${BANNER_URL}" alt="Realiza.vc" width="600" style="display:block;width:100%;height:auto;max-width:600px;border:0;outline:none;"></td></tr>
+<tr><td align="center" style="padding:28px 12px 0;">
+  <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:600px;max-width:600px;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid ${BORDA};box-shadow:0 1px 3px rgba(0,0,0,0.06);">
+    <tr><td style="height:6px;line-height:6px;font-size:1px;background-color:${LIME};background-image:linear-gradient(90deg,${LIME} 0%,${LIME_CLARO} 100%);">&nbsp;</td></tr>
     <tr>
       <td class="email-body" style="padding:32px;font-size:15px;line-height:1.55;color:${INK};">
+        <div style="margin:0 0 20px;">${LOGO}</div>
         ${
           tagline
             ? `<p style="margin:0 0 6px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1.6px;color:${LIME_ESCURO};">${esc(tagline)}</p>`
@@ -108,9 +118,9 @@ ${
         ${ctaRender}
       </td>
     </tr>
-    <tr><td class="email-extra" style="padding:0 32px 16px;font-size:14px;line-height:1.55;color:${INK};"><p style="margin:0;">— Equipe Realiza.vc</p></td></tr>
-    <tr><td><img src="${BANNER_URL}" alt="Instituto Realiza.vc — Vamos Juntos!" width="600" style="display:block;width:100%;height:auto;max-width:600px;border:0;outline:none;"></td></tr>
-    <tr><td class="email-legal" style="padding:20px 32px 28px;font-size:11px;line-height:1.6;color:${MUTED};text-align:center;">
+    <tr><td class="email-extra" style="padding:0 32px 20px;font-size:14px;line-height:1.55;color:${INK};"><p style="margin:0;">— Equipe Realiza.vc</p></td></tr>
+    <tr><td bgcolor="${INK}" style="background:${INK};padding:26px 32px 6px;" align="center"><span style="display:inline-block;background:#ffffff;border-radius:14px;padding:12px 26px;"><img src="${BANNER_URL}" alt="Instituto Realiza.vc — Vamos Juntos!" width="200" style="display:inline-block;width:200px;max-width:100%;height:auto;border:0;outline:none;"></span></td></tr>
+    <tr><td class="email-legal" bgcolor="${INK}" style="background:${INK};padding:14px 32px 28px;font-size:11px;line-height:1.6;color:${MUTED};text-align:center;">
       Instituto Realiza.vc &middot; <a href="${esc(SITE_URL)}" style="color:${MUTED};text-decoration:underline;">${esc(SITE_URL.replace(/^https?:\/\//, ""))}</a>
       ${rodapeExtra ? `<br>${rodapeExtra}` : ""}
     </td></tr>
