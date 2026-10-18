@@ -219,18 +219,18 @@ export const getJovemEspecialistas = cache(
     const supabase = await createClient();
     const { data, error } = await supabase
       .from("jovem_especialistas")
-      .select("id, nome, nome_social, avatar_path, areas")
+      .select(
+        "id, nome, nome_social, avatar_path, areas, bio, cargo, empresa, cidade, uf, voluntariado, experiencia_previa, formacao_externa, grade_resumo, vagas"
+      )
       .order("nome");
     if (error) {
       console.error("getJovemEspecialistas:", error);
       return [];
     }
-    type Row = {
+    type Row = Omit<JovemEspecialista, "id" | "nome" | "vagas"> & {
       id: string | null;
       nome: string | null;
-      nome_social: string | null;
-      avatar_path: string | null;
-      areas: string[] | null;
+      vagas: number | null;
     };
     // a collation do banco ordena acentos depois de Z — pt-BR no app
     return ((data ?? []) as Row[])
