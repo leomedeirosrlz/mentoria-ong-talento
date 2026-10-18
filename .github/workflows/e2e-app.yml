@@ -76,7 +76,7 @@ jobs:
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ env.ANON_KEY }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ env.SERVICE_ROLE_KEY }}
           RESEND_API_KEY: re_placeholder
-          EMAIL_FROM: no-reply@realiza.vc
+          EMAIL_FROM: noreply@realiza.vc
       - name: playwright browsers
         run: pnpm exec playwright install --with-deps chromium
       - name: fixtures e2e

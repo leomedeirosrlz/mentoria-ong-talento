@@ -11,6 +11,7 @@ import {
   linkAvaliacaoMeta,
 } from "@/lib/queries-avaliacao";
 import { formatDateTime } from "@/lib/ciclo";
+import { sharedOg } from "@/lib/og";
 import { SiteFooter } from "@/components/site-footer";
 import { EstadoCard } from "@/components/estado-card";
 import { AvaliarTokenFlow } from "@/components/avaliar-token-flow";
@@ -28,9 +29,17 @@ export async function generateMetadata({
   const r = TOKEN_RE.test(token) ? await avaliacaoPorToken(token) : null;
   const jovem = r?.kind === "ok" ? r.info.alvo?.jovem_nome : null;
   const titulo = "Como foi o encontro?";
+  const descricao =
+    "Sua avaliação ajuda a mentoria a melhorar — leva menos de 1 minuto.";
   return {
     title: jovem ? `${titulo} · ${jovem.split(/\s+/)[0]}` : titulo,
-    openGraph: { title: `${titulo} · Realiza.vc` },
+    description: descricao,
+    openGraph: {
+      ...sharedOg,
+      title: `${titulo} · Realiza.vc`,
+      description: descricao,
+      url: `/avaliar/${token}`,
+    },
     // link individual por WhatsApp/e-mail — não é página de indexação
     robots: { index: false, follow: false },
   };

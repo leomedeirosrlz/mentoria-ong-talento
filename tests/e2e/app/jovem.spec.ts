@@ -3,6 +3,7 @@ import {
   atualizarViaServiceRole,
   buscarViaServiceRole,
   expect,
+  inserirViaServiceRole,
   limparViaServiceRole,
   loginComSenha,
   test,
@@ -34,18 +35,34 @@ const COMBINADO_MENTOR = "Mentor prepara material de revisão";
 test.skip(!appEnvOk(), "sem credenciais de teste (E2E_*) — pula specs de app");
 
 /** Piso entre specs (e retries): combinado pendente e encontro com data
- *  futura — o seed cria; aqui só re-converge o que um teste muda ou um run
- *  morto deixou sujo (PATCH em row ausente é no-op, quem cria é o seed). */
+ *  futura. O combinado é PATCH (o seed garante a row); o encontro também
+ *  é re-criado se ausente — este arquivo deleta a d1 no afterAll e retries
+ *  do Playwright rodam depois dele, então PATCH-only morria no retry. */
 async function restaurarJovem() {
   await atualizarViaServiceRole(
     "encaminhamentos",
     `id=eq.${IDS.combinado}`,
     { status: "pendente" }
   );
-  await atualizarViaServiceRole("encontros", `id=eq.${IDS.encontro}`, {
-    data_hora: new Date(Date.now() + 3 * 86400e3).toISOString(),
-    status: "agendado",
-  });
+  const futura3d = new Date(Date.now() + 3 * 86400e3).toISOString();
+  const [d1] = await buscarViaServiceRole<{ id: string }[]>(
+    "encontros",
+    `select=id&id=eq.${IDS.encontro}`
+  );
+  if (d1) {
+    await atualizarViaServiceRole("encontros", `id=eq.${IDS.encontro}`, {
+      data_hora: futura3d,
+      status: "agendado",
+    });
+  } else {
+    await inserirViaServiceRole("encontros", {
+      id: IDS.encontro,
+      dupla_id: process.env.E2E_DUPLA_ID ?? "e2e00000-0000-4000-8000-000000000030",
+      numero: 8,
+      data_hora: futura3d,
+      status: "agendado",
+    });
+  }
 }
 
 test.describe("mentorado — shell /jovem", () => {
@@ -164,7 +181,9 @@ test.describe("mentorado — shell /jovem", () => {
     await expect(
       page.getByText("Combinado marcado como feito.")
     ).toBeVisible();
-    await expect(checkbox).toBeChecked();
+    // checked vem do server (RPC + router.refresh) — preview frio leva
+    // mais que os 5s default; a suite já usa 15s pra roundtrip assim
+    await expect(checkbox).toBeChecked({ timeout: 15_000 });
     // o router.refresh re-renderizou — e o estado sobrevive a um reload de
     // verdade (write passou pelo banco, não por estado local)
     await page.reload();
@@ -224,7 +243,9 @@ test.describe("mentorado — shell /jovem", () => {
       page.getByRole("heading", { name: "Agenda", level: 1 })
     ).toBeVisible();
     const proximos = page.locator('section[aria-labelledby="agenda-proximos"]');
-    await expect(proximos.getByText("8º encontro")).toBeVisible();
+    await expect(proximos.getByText("8º encontro")).toBeVisible({
+      timeout: 15_000,
+    });
     // .first: a trilha esp (e specs paralelos) põe outro "Agendado" na
     // mesma lista — o assert é "o encontro existe com o badge", não "1 só"
     await expect(proximos.getByText("Agendado").first()).toBeVisible();

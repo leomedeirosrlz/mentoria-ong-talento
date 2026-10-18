@@ -8,18 +8,18 @@ import {
   UserSwitch,
   WifiSlash,
 } from "@phosphor-icons/react/dist/ssr";
-import type { Icon } from "@phosphor-icons/react";
 import { demoRole } from "@/lib/demo/mode";
 import { formularioPorToken } from "@/lib/forms/queries";
 import { formatDateTime } from "@/lib/ciclo";
-import { cn } from "@/lib/utils";
+import { sharedOg } from "@/lib/og";
 import { SiteFooter } from "@/components/site-footer";
-import { buttonVariants } from "@/components/ui/button";
+import { EstadoCard } from "@/components/estado-card";
 import { FormularioPublico } from "./formulario-publico";
 
 const TOKEN_RE = /^[A-Za-z0-9_-]{20,128}$/;
 
-// o título real do form é o que o WhatsApp mostra no preview do link
+// o título real do form + o card de marca são o que o WhatsApp mostra no
+// preview do link — og precisa de title, description, url e image cheios
 export async function generateMetadata({
   params,
 }: {
@@ -27,59 +27,25 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { token } = await params;
   const r = TOKEN_RE.test(token) ? await formularioPorToken(token) : null;
-  const titulo =
-    r?.kind === "ok" ? (r.info.formulario?.titulo ?? "Formulário") : "Formulário";
+  const form = r?.kind === "ok" ? r.info.formulario : null;
+  const titulo = form?.titulo ?? "Formulário";
+  const descricao =
+    form?.descricao?.trim() ||
+    "Responda o formulário do Programa de Mentoria Social — leva poucos minutos.";
   return {
     title: titulo,
-    openGraph: { title: `${titulo} · Realiza.vc` },
+    description: descricao,
+    // merge raso do Next: sem espalhar o sharedOg a rota perderia
+    // siteName/images/url do layout
+    openGraph: {
+      ...sharedOg,
+      title: `${titulo} · Realiza.vc`,
+      description: descricao,
+      url: `/f/${token}`,
+    },
     // link individual por WhatsApp/e-mail — não é página de indexação
     robots: { index: false, follow: false },
   };
-}
-
-function EstadoCard({
-  icon: Icon,
-  titulo,
-  acao,
-  ok,
-  children,
-}: {
-  icon: Icon;
-  titulo: string;
-  /** saída do beco — mailto pra equipe ou retry do mesmo link */
-  acao?: { href: string; label: string };
-  /** tom de sucesso — círculo lime pro estado "já respondida" */
-  ok?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="rounded-xl bg-card p-6 text-center shadow-[var(--shadow-border)] sm:p-8">
-      <div
-        className={cn(
-          "mx-auto grid size-12 place-items-center rounded-full",
-          ok
-            ? "bg-[var(--brand-lime)] text-[var(--brand-ink)]"
-            : "bg-muted text-muted-foreground"
-        )}
-      >
-        <Icon size={24} weight={ok ? "bold" : "regular"} aria-hidden />
-      </div>
-      <h1 className="mt-4 text-lg font-semibold">{titulo}</h1>
-      <div className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-muted-foreground">
-        {children}
-      </div>
-      {acao && (
-        <p className="mt-5">
-          <a
-            href={acao.href}
-            className={buttonVariants({ variant: "outline", size: "sm" })}
-          >
-            {acao.label}
-          </a>
-        </p>
-      )}
-    </div>
-  );
 }
 
 export default async function FormularioTokenPage({

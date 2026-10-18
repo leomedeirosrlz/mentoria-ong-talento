@@ -1,5 +1,10 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { Compass } from "@phosphor-icons/react/dist/ssr";
+
+export const metadata: Metadata = {
+  title: "Página não encontrada",
+};
 
 export default function NotFound() {
   return (

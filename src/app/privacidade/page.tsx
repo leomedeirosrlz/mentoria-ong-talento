@@ -1,11 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { sharedOg } from "@/lib/og";
 import { SiteFooter } from "@/components/site-footer";
 
 export const metadata: Metadata = {
   title: "Privacidade e LGPD",
   description:
     "Como a Realiza.vc coleta, usa e protege os dados pessoais do Programa de Mentoria Social.",
+  alternates: { canonical: "/privacidade" },
+  openGraph: { ...sharedOg, url: "/privacidade" },
 };
 
 const SECOES: { titulo: string; corpo: React.ReactNode }[] = [
