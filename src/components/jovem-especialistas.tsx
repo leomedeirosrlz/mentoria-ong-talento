@@ -1,4 +1,5 @@
-import { Sparkle } from "@phosphor-icons/react/dist/ssr";
+import Link from "next/link";
+import { ArrowRight, Sparkle } from "@phosphor-icons/react/dist/ssr";
 import {
   efetivoDe,
   nomeEspDoPedido,
@@ -64,6 +65,11 @@ export function JovemEspecialistas({
   // teto da RPC: 3 pedidos em aberto (a expirada lazy conta — a coluna cru
   // segue 'aberta' no banco até o cancelamento)
   const lotado = abertos >= 3;
+  // WP6: a sugestão do mentor não é pedido ainda — a decisão mora na página
+  // de especialistas; a home sinaliza e linka
+  const sugestoesPendentes = solicitacoes.filter(
+    (s) => s.status === "sugerida"
+  ).length;
 
   return (
     <section aria-labelledby="esp-titulo">
@@ -76,6 +82,18 @@ export function JovemEspecialistas({
       </h2>
       <Card className="animate-enter">
         <CardContent className="space-y-4 py-5">
+          {sugestoesPendentes > 0 && (
+            <Link
+              href="/jovem/especialistas"
+              className="flex items-center justify-between gap-3 rounded-lg border border-[var(--role-mentorado)]/40 bg-[var(--role-mentorado)]/10 px-3.5 py-3 text-sm font-medium transition-colors hover:bg-[var(--role-mentorado)]/20"
+            >
+              <span className="flex items-center gap-2">
+                <Sparkle size={16} aria-hidden />
+                Seu mentor sugeriu um especialista — veja e responda
+              </span>
+              <ArrowRight size={16} aria-hidden className="shrink-0" />
+            </Link>
+          )}
           {visiveis.length === 0 ? (
             <div>
               <p className="font-medium">
@@ -114,7 +132,7 @@ export function JovemEspecialistas({
               })}
             </ul>
           )}
-          <div>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
             {lotado ? (
               <p className="text-xs text-muted-foreground">
                 Você já tem {abertos} pedidos em aberto — espera uma resposta
@@ -139,6 +157,13 @@ export function JovemEspecialistas({
                 }
               />
             )}
+            <Link
+              href="/jovem/especialistas"
+              className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline"
+            >
+              Conhecer os especialistas e suas trilhas
+              <ArrowRight size={13} aria-hidden />
+            </Link>
           </div>
         </CardContent>
       </Card>

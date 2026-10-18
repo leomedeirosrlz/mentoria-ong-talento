@@ -592,3 +592,38 @@ Itens abaixo foram conferidos contra migrations e `src/` no fechamento do plano.
 - `docs/planos/mentorado-na-plataforma.md` — RLS do jovem (RPC `definer` em vez de ramo de policy).
 - `docs/planos/turmas-cronogramas.md`, `docs/planos/navegacao-turmas.md` — turmas e cronogramas.
 - Guias oficiais do programa (PDFs): Guia do Mentor DPP (roteiro dos 16 encontros, modalidades, papéis), Guia do Mentor Especialista (5 encontros, fluxo de contato), cronogramas T1/T2, "Novos sistemas Realiza" (decisões de produto: perfil por programa, anamnese externa, devolutivas múltiplas).
+
+---
+## WP6 — progresso (sessão atual)
+
+**Feito (commit 646fb38 na branch feat/wp6-especialistas-jovem):**
+- Migration `0086_especialista_sugestao_devolutivas.sql` — APLICADA no staging:
+  - checks: `origem` + 'mentor', `status` + 'sugerida'
+  - trigger `solicitacao_integridade`: INSERT aceita 'sugerida' só com origem='mentor' + autor=DPP da dupla_dpp_id; UPDATE libera demanda/motivo/especialista_desejado_id enquanto old.status='sugerida' (identidade segue imutável); alvo dirigido valida `has_papel(., 'mentor_especialista')`
+  - RPCs: `sugerir_especialista_mentor`, `confirmar_sugestao_especialista`, `dispensar_sugestao_especialista`, `postar_devolutiva` (todas definer, grants p/ authenticated)
+  - tabela `devolutivas` (dupla_id, autor_id, texto 10-4000, created_at) — select: jovem dono + autor + coord; escrita só via RPC
+  - view `jovem_especialistas` drop+create: +bio/cargo/empresa/cidade/uf/voluntariado/experiencia_previa/formacao_externa/grade_resumo(text[] "seg à tarde")/vagas(int); filtro has_papel esp na turma do jovem; DPP da própria dupla excluído
+  - notificacoes_tipo_check + 'sugestao_especialista' + 'devolutiva_especialista'
+- types.ts: status + 'sugerida', origem + 'mentor', JovemEspecialista rico, tipo Devolutiva
+- queries-jovem.ts: select do catálogo estendido (colunas novas)
+- Smoke no staging: RPCs respondem com erros semânticos corretos
+
+**Pendente — migration 0087 (híbrido funciona como especialista):**
+Trocar `my_role()='mentor_especialista'` → `has_papel('mentor_especialista')` (self, qualquer escopo) nas definições vigentes (todas na 0074/0073):
+- policies 0073: especialista_grade_insert/update + especialista_excecoes_insert/update (with-check)
+- sol_select policy + view solicitacoes_mural (ramo especialista — 0074:246/300)
+- pedir_especialista_jovem: validação do alvo `p.role='mentor_especialista'` (0074:381) → has_papel
+- contra_propor_solicitacao: linhas 741, 749, 781 (gate de quem propõe, engajar em broadcast, coalesce especialista_id)
+- aceitar_solicitacao + recusar_solicitacao: conferir gates de papel no corpo (0074 ~460-560 e ~795+)
+- SEM isso o catálogo mente: híbrido (primário=dpp) listado não conseguiria ver/aceitar pedido dirigido. Roteamento de superfícies do híbrido (qual home ele cai) fica pro WP3 — o banco já responde certo.
+
+**Pendente — frontend:**
+- rota `/jovem/especialistas` (mover JovemEspecialistas + cardápio rico + stepper trilha + feed devolutivas + card sugestão)
+- home /jovem: trocar seção por Card-CTA (sessão N · próximo horário / mural / triagem / sugestão pendente / fallback)
+- sugestão pendente: card confirmar/editar/dispensar (chama confirmar_/dispensar_sugestao_especialista)
+- ficha da dupla DPP: botão "Sugerir especialista" (dialog tema+objetivo+preferência → RPC)
+- especialista: postar devolutiva na trilha (componente DevolutivaEspecialista existe p/ final — criar feed de percurso)
+- actions: confirmar/dispensar (actions-jovem.ts), sugerir (actions-especialista.ts), postarDevolutiva
+- demo: demoJovemEspecialistas já filtra por papel+DPP — estender pro shape rico; stubs p/ devolutivas; DEMO_MSG nas actions novas
+- database.types.ts: regenerar (npx supabase gen types --linked?) ou casts locais (convenção atual)
+- testes: vitest (efetivoDe/resumoPedidoJovem 'sugerida', pedidoEmAberto NÃO conta sugerida), e2e demo+app

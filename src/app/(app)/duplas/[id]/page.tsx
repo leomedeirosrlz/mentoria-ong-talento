@@ -12,6 +12,7 @@ import {
   FlagCheckered,
   HandHeart,
   PaperPlaneTilt,
+  Sparkle,
   UserPlus,
   VideoCamera,
 } from "@phosphor-icons/react/dist/ssr";
@@ -34,6 +35,7 @@ import {
   type MentorProfile,
 } from "@/lib/queries";
 import {
+  getDevolutivasDupla,
   getEspecialistas,
   getPropostas,
   getSlotsLivres,
@@ -110,6 +112,8 @@ import { TrajetoriaAvaliacoes } from "@/components/trajetoria-avaliacoes";
 import { SolicitacaoStatusChip } from "@/components/solicitacao-status-chip";
 import { SolicitacaoNegociacao } from "@/components/solicitacao-negociacao";
 import { SolicitarEspecialistaDialog } from "@/components/solicitar-especialista-dialog";
+import { SugerirEspecialistaDialog } from "@/components/sugerir-especialista-dialog";
+import { DevolutivaComposer } from "@/components/devolutivas-card";
 import { PdmUrlDialog } from "@/components/pdm-url-dialog";
 import { TrilhaJornada } from "@/components/trilha-jornada";
 import { TrilhaPrazoBadge } from "@/components/trilha-prazo-badge";
@@ -303,11 +307,17 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
   // avaliação estrela do jovem (0071): links tokenizados são coord-only
   // (policy), a média agregada só faz sentido pro mentor DPP e as estrelas
   // da trilha especialista vêm da view definer — cada leitura no seu papel
-  const [avaliacaoLinks, mediaJovem, espAvaliacoes] = await Promise.all([
-    souCoord ? getAvaliacaoLinks(id) : Promise.resolve([]),
-    souMentor && !ehEsp ? getAvaliacaoMediaDpp(id) : Promise.resolve(null),
-    souMentor && ehEsp ? getEspecialistaAvaliacoes(id) : Promise.resolve([]),
-  ]);
+  const [avaliacaoLinks, mediaJovem, espAvaliacoes, devolutivasFeed] =
+    await Promise.all([
+      souCoord ? getAvaliacaoLinks(id) : Promise.resolve([]),
+      souMentor && !ehEsp ? getAvaliacaoMediaDpp(id) : Promise.resolve(null),
+      souMentor && ehEsp ? getEspecialistaAvaliacoes(id) : Promise.resolve([]),
+      // WP6: feed datado da trilha esp — a policy lê pro autor (o
+      // especialista) e pra coord; supervisor/mentor DPP não veem a coluna
+      ehEsp && (souMentor || souCoord)
+        ? getDevolutivasDupla(id)
+        : Promise.resolve([]),
+    ]);
   const linkAvalPorEncontro = new Map(
     avaliacaoLinks.map((l) => [l.encontro_id, l])
   );
@@ -329,7 +339,16 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
     dupla.status === "ativa" &&
     !solEmAberto &&
     (souMentor || souCoord);
-  const especialistas = podeSolicitar ? await getEspecialistas() : [];
+  // WP6: a sugestão mentor→jovem é do DPP da dupla — e só uma pendente por
+  // vez (a RPC deduplica; aqui a gente some o gesto em vez de errar depois)
+  const sugestaoPendente = solicitacoes.some((s) => s.status === "sugerida");
+  const podeSugerir =
+    !ehEsp &&
+    dupla.status === "ativa" &&
+    souMentor &&
+    !sugestaoPendente;
+  const especialistas =
+    podeSolicitar || podeSugerir ? await getEspecialistas() : [];
   // calendário oficial DA DUPLA (0061): só os eventos do cronograma dela.
   // Especialista e dupla histórica sem vínculo caem em [] — especialista
   // usa os 5 passos próprios; histórica vive do que está gravado (fallback
@@ -577,6 +596,22 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
         trigger={
           <DropdownMenuItem render={<button type="button" />} nativeButton>
             <UserPlus aria-hidden /> Solicitar mentor especialista
+          </DropdownMenuItem>
+        }
+      />
+    );
+  }
+  if (podeSugerir) {
+    maisItens.push(
+      <SugerirEspecialistaDialog
+        key="sug"
+        mentoradoId={dupla.mentorado.id}
+        duplaDppId={dupla.id}
+        especialistas={especialistas}
+        nomeJovem={dupla.mentorado.nome}
+        trigger={
+          <DropdownMenuItem render={<button type="button" />} nativeButton>
+            <Sparkle aria-hidden /> Sugerir especialista pro jovem
           </DropdownMenuItem>
         }
       />
@@ -1148,6 +1183,40 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
           {/* a trilha de especialista devolve o resultado pro PDM — chega ao
               mentor DPP pela solicitação que ele abriu */}
           {!ehEsp && <DevolutivaEspecialista solicitacoes={solicitacoes} />}
+
+          {/* WP6: feed datado das devolutivas da trilha esp — o especialista
+              posta ao longo do percurso e o jovem lê na página dele; a
+              entrega final segue na devolutiva_pdm do encerramento */}
+          {ehEsp && (devolutivasFeed.length > 0 || souMentor) && (
+            <section className="rounded-xl bg-card p-4 text-sm space-y-3 shadow-[var(--shadow-border)]">
+              <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                Devolutivas da trilha
+              </h2>
+              {devolutivasFeed.length > 0 && (
+                <ul className="space-y-3">
+                  {devolutivasFeed.map((v) => (
+                    <li key={v.id} className="space-y-1">
+                      <blockquote className="rounded-lg border-l-2 border-[var(--brand-lime)] bg-muted/30 px-3 py-2 text-muted-foreground">
+                        <p className="whitespace-pre-line">{v.texto}</p>
+                      </blockquote>
+                      <p className="text-xs text-muted-foreground">
+                        {v.autor?.nome ?? "O especialista"} ·{" "}
+                        {formatDateTime(v.created_at)}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {/* o especialista da dupla posta enquanto a trilha segue
+                  aberta — depois do encerramento a devolutiva final é a
+                  devolutiva_pdm */}
+              {souMentor &&
+                (dupla.status === "ativa" || dupla.status === "pausada") &&
+                dupla.encerrada_em == null && (
+                  <DevolutivaComposer duplaId={dupla.id} />
+                )}
+            </section>
+          )}
 
           {/* o rito de fechamento do ciclo DPP: checklist da coordenação +
               decisão; a autoavaliação é a parte do mentor */}

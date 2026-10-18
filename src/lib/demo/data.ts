@@ -207,6 +207,7 @@ const S = {
   sess2: 0x2408, sess3: 0x2409, sess4: 0x240a,
   pedidoJovem: 0x240b, triagem: 0x240c,
   biaNeg: 0x240d, biaMural: 0x240e,
+  biaSug: 0x240f,
 } as const;
 
 // propostas da negociação (solicitacao_propostas, 0074)
@@ -1832,6 +1833,33 @@ function build(): DemoData {
       respondida_em: null,
       mentorado: { nome: ana.nome },
       solicitante: { nome: anaLogin.nome_social ?? anaLogin.nome },
+      especialista: null,
+      especialista_nome: null,
+      desejado: null,
+    },
+    {
+      // WP6 — o Ricardo (DPP da Bia) registrou uma sugestão: nasce 'sugerida',
+      // fora dos tetos e do mural, e espera a resposta dela na página de
+      // especialistas (confirmar edita/aceita; dispensar cancela)
+      id: uid(S.biaSug),
+      mentorado_id: ana.id,
+      dupla_dpp_id: uid(D.ok),
+      demanda:
+        "A Bia mencionou que quer aprender a editar vídeo pro projeto dela — uma trilha curta com alguém de audiovisual destrava a entrega.",
+      motivo: "Quero aprender edição de vídeo pra entregar o projeto do semestre.",
+      slot_proposto: null,
+      origem: "mentor",
+      turma: "T1 · 2026/2027",
+      justificativa_recusa: null,
+      especialista_desejado_id: null,
+      especialista_id: null,
+      dupla_id: null,
+      status: "sugerida",
+      created_by: ricardo.id,
+      created_at: haDias(0, "16:20"),
+      respondida_em: null,
+      mentorado: { nome: ana.nome },
+      solicitante: { nome: ricardo.nome },
       especialista: null,
       especialista_nome: null,
       desejado: null,

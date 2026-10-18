@@ -7,6 +7,7 @@ import {
   CalendarDots,
   FolderOpen,
   House,
+  Sparkle,
   UserCircle,
   Users,
 } from "@phosphor-icons/react";
@@ -19,12 +20,13 @@ import type { Notificacao, Profile } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 /** Lado do jovem (REALIZA-108) — shell próprio, não o AppShell filtrado:
- *  cinco destinos fixos e nada de navegação de staff. O acento da nav é o
+ *  seis destinos fixos e nada de navegação de staff. O acento da nav é o
  *  amarelo --role-mentorado (o verde fica pros adultos) — a mesma cor do
  *  avatar-iniciais do jovem no resto do app. */
 const NAV = [
   { href: "/jovem", label: "Início", icon: House },
   { href: "/jovem/agenda", label: "Agenda", icon: CalendarDots },
+  { href: "/jovem/especialistas", label: "Especialistas", icon: Sparkle },
   { href: "/jovem/pessoas", label: "Pessoas", icon: Users },
   { href: "/jovem/materiais", label: "Materiais", icon: FolderOpen },
   { href: "/jovem/perfil", label: "Perfil", icon: UserCircle },
@@ -175,8 +177,8 @@ export function JovemShell({
           <SiteFooter tone="ink" />
         </div>
 
-        {/* bottom nav mobile — os 5 destinos cabem sem "Mais" (flex-1 por
-            item divide a largura igualmente, 5 × ~20% continua legível) */}
+        {/* bottom nav mobile — os 6 destinos cabem sem "Mais" (flex-1 por
+            item divide a largura igualmente, 6 × ~16% continua legível) */}
         <nav
           aria-label="Navegação principal"
           className="fixed inset-x-0 bottom-0 z-40 border-t border-sidebar-border bg-sidebar pb-[env(safe-area-inset-bottom)] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] md:hidden"

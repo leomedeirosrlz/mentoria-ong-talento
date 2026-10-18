@@ -48,6 +48,17 @@ export function SolicitacaoStatusChip({
             : "Especialista solicitado"}
         </Badge>
       );
+    case "sugerida":
+      // WP6: a sugestão do mentor espera a resposta do jovem — ainda não é
+      // pedido (não entra na mesa nem nos tetos)
+      return (
+        <Badge
+          variant="outline"
+          className="border-[var(--warn)]/60 text-[var(--warn-text)]"
+        >
+          Sugestão com o jovem
+        </Badge>
+      );
     case "aguardando_coord":
       return (
         <Badge
