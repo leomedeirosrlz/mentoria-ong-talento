@@ -7,7 +7,10 @@ import {
   pedidoPrecisaDemanda,
   resumoPedidoJovem,
 } from "@/lib/jovem-especialista";
-import type { SolicitacaoEspecialista } from "@/lib/types";
+import type {
+  JovemEspecialista,
+  SolicitacaoEspecialista,
+} from "@/lib/types";
 
 // espelho das regras da 0074 no lado do jovem — a dedup lê
 // coalesce(especialista_desejado_id, especialista_id) entre os status crus
@@ -135,13 +138,23 @@ describe("pedidoAbertoComEsp — a dedup da RPC na UI", () => {
 });
 
 describe("nomeEspDoPedido — a costura que a RLS não faz", () => {
-  const catalogo = [
+  const catalogo: JovemEspecialista[] = [
     {
       id: ESP,
       nome: "Helena Costa",
       nome_social: "Lena",
       avatar_path: null,
       areas: ["oratória"],
+      bio: null,
+      cargo: null,
+      empresa: null,
+      cidade: null,
+      uf: null,
+      voluntariado: null,
+      experiencia_previa: null,
+      formacao_externa: null,
+      grade_resumo: null,
+      vagas: 1,
     },
   ];
 

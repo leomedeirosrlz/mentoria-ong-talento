@@ -689,6 +689,7 @@ export type EspecialistaEvento = {
 /** Máquina de estados da solicitação v2 (0074). "Em aberto" pra dedup e CTAs
  *  = as três primeiras — uma negociação em curso ainda ocupa o pedido. */
 export type SolicitacaoEspecialistaStatus =
+  | "sugerida"
   | "aberta"
   | "aguardando_coord"
   | "contra_proposta"
@@ -715,8 +716,10 @@ export type SolicitacaoEspecialista = {
   /** Horário proposto na mesa — o do pedido do jovem ou o da última
    *  contra-proposta; o histórico completo mora em solicitacao_propostas. */
   slot_proposto: string | null;
-  /** Quem abriu o pedido: staff (mentor DPP/coord) ou o próprio jovem. */
-  origem: "staff" | "jovem";
+  /** Quem abriu o pedido: staff (coord), o próprio jovem ou o mentor DPP
+   *  ('mentor' nasce 'sugerida' e só vira pedido real na confirmação dele,
+   *  0086). */
+  origem: "staff" | "jovem" | "mentor";
   /** Turma da sessão — a da dupla DPP ou a definida na triagem. */
   turma: string | null;
   /** Por que o especialista recusou (0074) — obrigatória na recusa. */
@@ -999,17 +1002,44 @@ export type JovemAssinatura =
 export type ColegaTurma =
   Database["public"]["Views"]["mentorados_turma"]["Row"];
 
-/** Linha da view `jovem_especialistas` (0075) — o catálogo que o jovem vê
- *  pra direcionar o pedido de especialista: nome/social/avatar/áreas.
- *  Contato direto NÃO entra (whatsapp/email ficam fora da view) — o canal
- *  abre quando a dupla nasce, pelo jovem_contatos de sempre. Tipo local:
- *  database.types.ts ainda não foi regenerado com a view. */
+/** Linha da view `jovem_especialistas` (0075, enriquecida em 0086) — o
+ *  cardápio que o jovem vê pra direcionar o pedido de especialista.
+ *  Contato direto NÃO entra (whatsapp/email/linkedin ficam fora da view)
+ *  — o canal abre quando a dupla nasce, pelo jovem_contatos de sempre.
+ *  Agenda vira `grade_resumo` com rótulos "dia + período" ("seg à tarde")
+ *  — nunca slot exato. `vagas` alimenta o estado do card, não um contador
+ *  visível. Tipo local: database.types.ts ainda não foi regenerado com a
+ *  view. */
 export type JovemEspecialista = {
   id: string;
   nome: string;
   nome_social: string | null;
   avatar_path: string | null;
   areas: string[] | null;
+  bio: string | null;
+  cargo: string | null;
+  empresa: string | null;
+  cidade: string | null;
+  uf: string | null;
+  voluntariado: string | null;
+  experiencia_previa: string | null;
+  formacao_externa: string | null;
+  /** Rótulos "dia + período" derivados da grade — nunca horário exato. */
+  grade_resumo: string[] | null;
+  /** Vagas livres derivadas (capacidade_especialista − trilhas vivas). */
+  vagas: number;
+};
+
+/** Devolutiva datada da trilha de especialista (0086) — o feed que devolve
+ *  pro jovem ao longo do percurso; a entrega final segue em
+ *  duplas.devolutiva_pdm. */
+export type Devolutiva = {
+  id: string;
+  dupla_id: string;
+  autor_id: string;
+  autor?: { nome: string } | null;
+  texto: string;
+  created_at: string;
 };
 
 /** A pessoa que /jovem/pessoas/[id] resolve — sempre de uma fonte já
