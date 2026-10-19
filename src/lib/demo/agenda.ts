@@ -5,6 +5,8 @@
 // a agenda física dele é uma só; a disponibilidade do JOVEM só entra na
 // proposta da 112). Manter alinhada ao SQL se a RPC mudar.
 
+import { toDateStr } from "../ciclo";
+
 /** "HH:mm[:ss]" → minutos desde meia-noite (PostgREST devolve time com
  *  segundos; o terceiro pedaço é ignorado). */
 const paraMin = (hora: string): number => {
@@ -15,11 +17,16 @@ const paraMin = (hora: string): number => {
 const paraHora = (min: number): string =>
   `${String(Math.floor(min / 60)).padStart(2, "0")}:${String(min % 60).padStart(2, "0")}`;
 
-// o dataset ancora datas no meio-dia local — mesma convenção de data.ts
+// `desde`/`ate` chegam como instantes (`new Date()` no caller) — `toDateStr`
+// lê a data de calendário SP, a mesma régua da grade e das exceções. UTC e
+// máquina local são arbitrários; ancorar neles desloca "hoje" perto da
+// meia-noite BRT (ou o dia inteiro em fusos extremos).
 const DIA_MS = 24 * 3600 * 1000;
 const addDias = (d: Date, n: number): Date => new Date(d.getTime() + n * DIA_MS);
-const ymd = (d: Date): string =>
-  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+const ymd = (d: Date): string => toDateStr(d);
+/** dow Postgres (0=dom) do dia de calendário "YYYY-MM-DD" — sem fuso. */
+const dowDaData = (dataStr: string): number =>
+  new Date(`${dataStr}T12:00:00Z`).getUTCDay();
 /** Dia + "HH:mm" no fuso do programa — o `at time zone 'America/Sao_Paulo'`
  *  do SQL (SP não tem DST desde 2019, -03:00 fixo). */
 const instanteSP = (d: Date, hora: string): Date =>
@@ -68,7 +75,7 @@ export function slotsLivresEspecialista(o: {
     const dataStr = ymd(dia);
     const minutos = new Set<number>(); // distinct, como o SQL
     for (const j of o.grade) {
-      if (j.dia_semana !== dia.getDay()) continue;
+      if (j.dia_semana !== dowDaData(dataStr)) continue;
       for (
         let m = paraMin(j.hora_inicio);
         m + 60 <= paraMin(j.hora_fim);

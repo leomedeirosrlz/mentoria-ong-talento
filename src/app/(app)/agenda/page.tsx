@@ -28,6 +28,7 @@ import {
   eventosDoCronograma,
   toDateStr,
 } from "@/lib/ciclo";
+import { sessoesDaGrade } from "@/lib/agenda-especialista";
 import { AgendaCalendario } from "@/components/agenda-calendario";
 import { AgendaDisponibilidade } from "@/components/agenda-disponibilidade";
 import { AgendaEspecialista } from "@/components/agenda-especialista";
@@ -100,8 +101,16 @@ export default async function AgendaPage({
     ]);
     // sem dupla ainda: cabeçalho + a agenda editável + o estado vazio — a
     // grade de terças DPP não se aplica a ele. No híbrido, a fila usa só as
-    // trilhas esp — a DPP tem a própria aba de calendário
-    const duplasEsp = duplas.filter((d) => d.trilha === "especialista");
+    // trilhas esp — a DPP tem a própria aba de calendário.
+    // `duplas` vem no escopo do RLS — pra supervisor/coord que TAMBÉM é
+    // mentor_especialista ele traz duplas de outros mentores; a visão esp é
+    // "minha agenda", então filtra pelas do próprio mentor antes de derivar.
+    const minhasDuplas = duplas.filter((d) => d.mentor?.id === me!.id);
+    const duplasEsp = minhasDuplas.filter((d) => d.trilha === "especialista");
+    // Blocos de sessão da grade visual: todas as duplas do mentor — os
+    // encontros DPP do híbrido ocupam a agenda física (a projeção de slots
+    // já os desconta), então aparecem muted pra não fingir horário livre
+    const sessoes = sessoesDaGrade(minhasDuplas);
     const conteudoEsp =
       duplasEsp.length === 0 ? (
         <div className="space-y-6">
@@ -116,6 +125,8 @@ export default async function AgendaPage({
             grade={grade}
             excecoes={excecoes}
             slots={slots}
+            sessoes={sessoes}
+            hojeIso={hoje}
           />
           <div className="rounded-xl bg-card px-5 py-10 text-center shadow-[var(--shadow-border)]">
             <p className="text-sm text-muted-foreground">
@@ -132,6 +143,8 @@ export default async function AgendaPage({
           grade={grade}
           excecoes={excecoes}
           slots={slots}
+          sessoes={sessoes}
+          hojeIso={hoje}
         />
       );
     return duasVisoes ? (

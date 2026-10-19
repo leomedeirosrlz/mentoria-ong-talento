@@ -329,7 +329,26 @@ Sequência sugerida: **WP0b → (WP6 ‖ WP1) → WP2 → WP3 → WP4/WP5 → WP
 
 **Riscos e mitigação:** grade visual divergir da lógica de slots → derivar **só** dos dados já projetados pelo banco (nunca recalcular janelas no cliente); `tests/agenda-especialista.test.ts` estendido para a função pura que posiciona janelas/sessões.
 
+**Decisões do recon (WP4):**
+- Grade = **semana corrente** (seg–dom de hoje), sem navegação — `getMinhasExcecoes` já filtra `data >= hoje`; passado não tem exceção pra desenhar.
+- Blocos: janela (lime-tint/ok-alpha), sessão esp (ink, `nome · sessão N`), **encontro DPP do híbrido = bloco muted** (a RPC já o desconta dos slots — escondê-lo fingiria disponibilidade), exceção `extra` = janela datada, `bloqueio` = overlay hatch sobre a janela, **livres = faixas tracejadas** agregando inícios contíguos projetados (posicionamento, não recálculo).
+- Grade é **leitura** (aria-label agregado); a única edição é "Editar grade" (`<details>` com o form atual, aberto por default só quando a grade está vazia). Sem botão "+ novo" por dia (mock ambíguo); sem eixo configurável; sem "salvar em lote".
+- "Propor outro horário" → link pro thread `SolicitacaoNegociacao` na ficha da dupla (sem queries novas em `/agenda`).
+- Sessão = **1h** (o "50min" do mock é copy errada — RPC projeta 60min a cada 30min).
+- Mock divergente que **não** se constrói: proposta fora da grade / "aceitar como exceção" (D7), nav "Mural"/"Trilhas" (rotas inexistentes), callout "1 trilha por jovem" (C1 — real é 3 simultâneas).
+
 **Aceite:** o especialista vê a semana como grade, com janelas e sessões; editar a grade atualiza a visão sem recarregar a página inteira.
+
+**Implementado (2026-10-18):**
+- `src/lib/agenda-especialista.ts` — camada pura: `gradeVisualSemana` deriva seg–dom da âncora `hojeIso` em **espaço de data UTC** (imune ao fuso da máquina; `hojeIso` inválido → grade vazia), clipa blocos ao eixo 8h–20h com altura estritamente positiva, agrega inícios de 30min projetados em faixas contíguas de 60min e `sessoesDaGrade` achata as duplas do mentor (status `agendado`/`remarcado`/`realizado`; `realizado_em ?? data_hora`; duração default 60min).
+- `agenda-grade-semanal.tsx` — desktop: colunas seg–dom com blocos posicionados (janela, extra datada, bloqueio hatch sobre a janela, sessão, faixa tracejada "livre p/ agendar", compromisso DPP muted do híbrido); mobile <768px: cards por dia com pills (intervalo + tipo). Sessões `realizado` atenuadas e anunciadas no aria-label; legenda cobre os 6 tipos de bloco.
+- `agenda-disponibilidade.tsx` — grade visual antes do editor; `<details>` "Editar grade" com **estado** (`editorAberto`, aberto só quando a grade está vazia) — cadastrar a 1ª janela não colapsa mais o editor no refresh. "Próximos horários livres" corta **2 chips por dia** (total 16) em vez de flat-12 — dias tardios da semana não desaparecem mais atrás de dias cheios.
+- `page.tsx` — `minhasDuplas = duplas.filter(d => d.mentor?.id === me.id)` antes de derivar sessões: coordenação/supervisor com papel esp **não** vê sessões de duplas alheias como próprias (achado convergente dos 2 revisores).
+- `getMinhasExcecoes` (real + demo) — bound `>= segunda da semana corrente` (`semanaBounds`), não `>= hoje`: exceções de segunda continuam desenhando no resto da semana.
+- **TZ fix (revisor C):** `demo/data.ts` ancora `HOJE` no meio-dia **UTC** da data SP (`toDateStr`), `ymd`/`getUTCDay` leem a data UTC, `em()` continua construindo o instante em `-03:00`; `demo/agenda.ts` lê dow por `dowDaData(dataStr)`; `ciclo.semanaBounds` também migrado pra UTC-date space (antes retornava a semana um dia antes em máquinas UTC+10…+14).
+- Fixtures: sessão demo da Bia re-ancorada pra hoje (única garantia dentro da semana seg–dom); exceções `extra`/`bloqueio` ancoradas em HOJE; staging Luísa 20:00→**19:30** (início às 20h clipa a zero no eixo).
+- Testes: `tests/agenda-especialista.test.ts` 33 casos (posição, clipping, agrupamento, exceções, datas inválidas, status, boundaries, `sessoesDaGrade`); `tests/demo-datas.test.ts` novo — invariantes de âncora evergreen do dataset; `tests/e2e/demo/agenda-especialista.spec.ts` (4 casos: grade desktop, editor, links, mobile); spec app estendido com assert da grade + locator endurecido pelo href da fixture.
+- Gates: tsc 0 · eslint 0 · vitest **585** · build ok · demo **38/38** · app serial **78/78** (1 flake de timing re-rodado isolado: verde).
 
 ---
 

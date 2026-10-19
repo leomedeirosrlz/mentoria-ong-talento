@@ -9,7 +9,8 @@ import { entrarNaDemo, expect, test } from "../helpers";
 // Dataset: o Ricardo (mentor_dpp — híbrido, então a page também renderiza o
 // nav "Visão da agenda") tem DUAS duplas DPP:
 //   · Ana Beatriz · T1 (d-ok) — com duas trilhas de especialista: Sofia ×
-//     matemática ativa (sessão 4 agendada pra daqui a 4 dias) e Helena ×
+//     matemática ativa (sessão 4 agendada pro próximo sábado 10:00 — dentro
+//     da janela de sábado da grade, WP4) e Helena ×
 //     oratória concluída; a sessão futura entra na Minha agenda como item
 //     guest "você não participa" — sem link de chamada (a projeção da
 //     trilha_do_jovem nem carrega `link`)
@@ -62,7 +63,7 @@ test.describe("agenda demo do mentor DPP — Minha agenda / Por mentorado / Cale
     await entrarNaDemo(page, "mentor_dpp");
     await page.goto("/agenda");
 
-    // a sessão 4 da trilha Sofia × Ana (agendada pra daqui a 4 dias) aparece
+    // a sessão 4 da trilha Sofia × Ana (agendada pro próximo sábado) aparece
     // nos Próximos como item guest — o DPP acompanha, não participa: a
     // sinalização "acompanha, não participa" (ou a tag "só acompanhamento" do
     // mockup) vem no lugar do botão de chamada — a projeção sequer carrega
