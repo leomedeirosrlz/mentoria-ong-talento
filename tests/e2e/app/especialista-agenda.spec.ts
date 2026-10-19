@@ -1,3 +1,4 @@
+import type { Page } from "@playwright/test";
 import {
   appEnvOk,
   atualizarViaServiceRole,
@@ -197,6 +198,25 @@ async function convergirPiso() {
   );
 }
 
+/** WP4: a grade visual semanal é a superfície default do card "Sua
+ *  agenda" — as seções de edição ("Toda semana"/"Dias específicos") agora
+ *  moram num <details> "Editar grade" fechado por default quando a grade
+ *  não é vazia (a fixture tem a janela de terça → fechado). Idempotente:
+ *  chamar de novo com o details aberto não faz nada, então vai antes de
+ *  TODO write/leitura do editor — um router.refresh() pós-action pode
+ *  re-colapsar o painel. */
+async function abrirEditarGrade(page: Page) {
+  const summary = page
+    .locator("summary")
+    .filter({ hasText: /Editar grade/ })
+    .first();
+  await summary.waitFor({ state: "visible", timeout: 15_000 });
+  const aberto = await summary.evaluate((el) =>
+    el.parentElement?.hasAttribute("open")
+  );
+  if (!aberto) await summary.click();
+}
+
 test.describe("mentor especialista — agenda (REALIZA-111)", () => {
   test.beforeEach(convergirPiso);
   test.afterEach(convergirPiso);
@@ -226,13 +246,22 @@ test.describe("mentor especialista — agenda (REALIZA-111)", () => {
   test("especialista edita grade e exceções e a projeção acompanha", async ({
     page,
   }) => {
-    // a terça a bloquear é a SEGUINTE à do encontro agendado — o encontro já
-    // comeu os slots 19:00/19:30 da terça mais próxima
+    // a terça a bloquear é a SEGUINTE à próxima — o encontro do spec, de
+    // volta pra próxima terça no afterEach, é quem come os slots 19:00/19:30
+    // dela (é o que o teste do jovem usa pra provar a subtração)
     const tercaEncontro = proximaDataDow(2);
     const dataBloqueio = new Date(`${tercaEncontro}T12:00:00Z`);
     dataBloqueio.setUTCDate(dataBloqueio.getUTCDate() + 7);
     const isoBloqueio = dataBloqueio.toISOString().slice(0, 10);
     const dataExtra = diaBrt(1); // amanhã — fora de qualquer janela da grade
+
+    // WP4: o bloco de sessão só desenha se cair na semana exibida (seg–dom)
+    // — a fixture senta na próxima terça, que já é a semana que vem quando
+    // o teste roda de qua a sáb. Ancora em hoje só pra este teste (o
+    // convergirPiso do afterEach devolve pra próxima terça).
+    await atualizarViaServiceRole("encontros", `id=eq.${IDS.encontroEsp}`, {
+      data_hora: `${diaBrt(0)}T19:30:00-03:00`,
+    });
 
     await loginComSenha(page, ESP_EMAIL, SENHA);
     await page.goto("/agenda");
@@ -247,11 +276,28 @@ test.describe("mentor especialista — agenda (REALIZA-111)", () => {
     // o agendado da trilha já aparece na fila de "Próximos" do especialista —
     // a linha é link com a data e o passo ("1º encontro, agendado para … ·
     // próximo passo"), então ancora pelo nome parcial, não pelo texto exato.
-    // O ^ ancora no início: o calendário ao lado também linka o mesmo dia
-    // com "Ir para o 1º encontro, …" — sem a âncora a regex casa os dois.
+    // O href da dupla da fixture casa só a fila dela: o calendário ao lado
+    // linka o mesmo dia ("Ir para o 1º encontro, …") e duplas esp residuais
+    // de runs mortos em staging também teriam um "1º encontro" na fila.
     await expect(
-      page.getByRole("link", { name: /^1º encontro/ })
+      page.locator(
+        `a[href^="/duplas/${IDS.duplaEsp}"][aria-label^="1º encontro"]`
+      )
     ).toBeVisible();
+
+    // WP4: a grade visual semanal renderiza a janela da fixture (terça
+    // 19–21) e a sessão …00d3 posicionada na terça — blocos com
+    // aria-label do contrato ("Terça 19h–21h disponível", "Sessão …")
+    await expect(
+      page.locator('[aria-label^="Terça"][aria-label*="disponível"]').first()
+    ).toBeVisible();
+    await expect(
+      page.locator('[aria-label^="Sessão"]').first()
+    ).toBeVisible();
+
+    // as seções do editor moram no <details> "Editar grade" (fechado por
+    // default — a fixture já tem janela) — abre antes de ler/escrever nelas
+    await abrirEditarGrade(page);
 
     const grade = page
       .locator("section")
@@ -301,6 +347,7 @@ test.describe("mentor especialista — agenda (REALIZA-111)", () => {
     expect(janelas[0].hora_fim).toBe("21:00:00");
 
     // ---- horário extra datado: amanhã, fora da grade — vira slot no dia
+    await abrirEditarGrade(page); // o refresh pós-write pode re-colapsar
     await excecoes.getByLabel("Tipo da exceção").click();
     await page.getByRole("option", { name: "Horário extra" }).click();
     await excecoes.getByLabel("Data da exceção").fill(dataExtra);
@@ -323,6 +370,7 @@ test.describe("mentor especialista — agenda (REALIZA-111)", () => {
         .getByText(new RegExp(`terça ${ddmm(isoBloqueio)} às`))
         .first()
     ).toBeVisible();
+    await abrirEditarGrade(page);
     await excecoes.getByLabel("Tipo da exceção").click();
     await page.getByRole("option", { name: "Bloquear um dia" }).click();
     await excecoes.getByLabel("Data da exceção").fill(isoBloqueio);
@@ -343,6 +391,7 @@ test.describe("mentor especialista — agenda (REALIZA-111)", () => {
     ).toBeVisible();
 
     // ---- remove a janela criada pela UI — a fixture de terça fica intacta
+    await abrirEditarGrade(page);
     await linhaQuarta
       .getByRole("button", { name: "Remover janela de Quarta das 19:00" })
       .click();
