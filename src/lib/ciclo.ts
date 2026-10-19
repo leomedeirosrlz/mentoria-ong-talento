@@ -789,13 +789,16 @@ function primeiroEncontroFaltante(
 /** Bounds "YYYY-MM-DD" da semana calendário (seg–dom) que contém `hoje`.
  *  Âncora no meio-dia pra o dia da semana não depender do fuso do servidor. */
 export function semanaBounds(hoje: Date): { seg: string; dom: string } {
-  const hojeData = new Date(`${toDateStr(hoje)}T12:00:00`);
-  const dow = (hojeData.getDay() + 6) % 7; // seg=0 … dom=6
-  const seg = new Date(hojeData);
-  seg.setDate(hojeData.getDate() - dow);
-  const dom = new Date(seg);
-  dom.setDate(seg.getDate() + 6);
-  return { seg: toDateStr(seg), dom: toDateStr(dom) };
+  // date-only em espaço UTC — meio-dia local leria a data SP um dia antes em
+  // máquinas UTC+10…+14 (local noon = SP do dia anterior)
+  const hojeData = new Date(`${toDateStr(hoje)}T12:00:00Z`);
+  const dow = (hojeData.getUTCDay() + 6) % 7; // seg=0 … dom=6
+  const seg = new Date(hojeData.getTime() - dow * 86400000);
+  const dom = new Date(seg.getTime() + 6 * 86400000);
+  return {
+    seg: seg.toISOString().slice(0, 10),
+    dom: dom.toISOString().slice(0, 10),
+  };
 }
 
 /** TODOS os encontros oficiais cuja data cai na semana calendário (seg–dom)

@@ -67,6 +67,21 @@ const dataEncontro = (numero, hora = "19:00") =>
 const encontroISO = (numero, hora = "19:00") => iso(new Date(dataEncontro(numero, hora)));
 const encontroDate = (numero) => dateOf(new Date(dataEncontro(numero)));
 
+// Âncoras relativas ao run (WP4) — exceções e sessões "sempre futuras" não
+// podem ficar presas ao epoch do cronograma, senão expiram e somem da UI.
+// Tudo em America/Sao_Paulo (o fuso do app e da RPC de slots); `|| 7`
+// empurra pra semana seguinte quando hoje já é o dow alvo — mesma regra
+// que src/lib/demo/data.ts usa pras âncoras evergreen.
+const TZ_SP = "America/Sao_Paulo";
+const diaBrt = (dias = 0) =>
+  new Date(Date.now() + dias * DIA).toLocaleDateString("en-CA", { timeZone: TZ_SP });
+// dow do Postgres (0=dom … 6=sáb) de uma data ISO — meio-dia UTC tira o
+// getDay da borda de fuso
+const dowDe = (isoDate) => new Date(`${isoDate}T12:00:00Z`).getUTCDay();
+/** "YYYY-MM-DD" da 1ª data > hoje (BRT) com o dow pedido. */
+const proximoDow = (dow) =>
+  diaBrt(((dow - dowDe(diaBrt())) + 7) % 7 || 7);
+
 // ---------- 0. limpeza idempotente do range de000000-* ----------
 async function limpar() {
   console.log("limpando range de000000-* …");
@@ -99,6 +114,23 @@ async function limpar() {
   // uuid não aceita LIKE no PostgREST — range scan no prefixo de000000-…-8000-*
   const LO = "de000000-0000-4000-8000-000000000000", HI = "de000000-0000-4000-8001-000000000000";
   const emRange = (col) => `${col}=gte.${LO}&${col}=lt.${HI}`;
+  // chamados abertos pela UI/demo nascem com id randômico (o range de000000-*
+  // só cobre o que este script semeia) — apaga por FK de range e em cascata
+  // pros filhos, que penduram em chamado_id fora do range
+  const chIds = new Set();
+  for (const col of ["autor_id", "autor_mentorado_id", "dupla_id", "atribuido_a", "resolvido_por", "registro_id", "avaliacao_id"]) {
+    try {
+      const rows = await rest(`chamados?select=id&${emRange(col)}`);
+      for (const r of rows ?? []) chIds.add(r.id);
+    } catch (e) { console.log(`  skip chamados.${col}: ${e.message.slice(0, 80)}`); }
+  }
+  if (chIds.size) {
+    const csv = [...chIds].join(",");
+    for (const filho of ["chamado_comentarios", "chamado_atualizacoes", "chamado_anexos"]) {
+      try { await del(`${filho}?chamado_id=in.(${csv})`); } catch (e) { console.log(`  skip ${filho}: ${e.message.slice(0, 80)}`); }
+    }
+    await del(`chamados?id=in.(${csv})`);
+  }
   for (const [tabela, col] of porFk) {
     try { await del(`${tabela}?${emRange(col)}`); } catch (e) { console.log(`  skip ${tabela}.${col}: ${e.message.slice(0, 80)}`); }
   }
@@ -306,7 +338,9 @@ const PLANO_ENCONTROS = {
   [D.d12]: { feitos: 3, hora: "19:00", proximo: false, duracao: 60 },        // encerrada
   [D.d13]: { feitos: 6, hora: "19:00", proximo: true, duracao: 90 },         // 2ª dupla do Otávio
   [D.d14]: { feitos: 6, hora: "19:00", proximo: true, duracao: 60 },
-  [D.trilha1]: { feitos: 3, hora: "20:00", proximo: true, duracao: 45, trilha: true },
+  // a sessão agendada ancora em HOJE: a grade visual só desenha a semana
+  // corrente (seg–dom) e "próximo dia X" foge dela na maior parte da semana
+  [D.trilha1]: { feitos: 3, hora: "19:30", proximo: true, duracao: 45, trilha: true, hoje: true },
   [D.trilha2]: { feitos: 5, hora: "10:00", proximo: false, duracao: 45, trilha: true }, // trilha completa (5 passos)
 };
 
@@ -398,7 +432,12 @@ function registrosDaDupla(duplaId, mentorId, plano) {
     out.encontros.push({
       id: uid((parseInt(duplaId.slice(-4), 16) << 8) + 0xf0), dupla_id: duplaId,
       numero: plano.trilha ? plano.feitos + 1 : 7,
-      data_hora: plano.trilha ? encontroISO(plano.feitos + 1, plano.hora) : encontroISO(7, plano.hora),
+      // WP4: trilhas não seguem o cronograma — o agendado ancora em hoje
+      // (a grade visual só desenha a semana corrente); quando hoje é qui
+      // cai dentro da janela 19–21 da Luísa, senão fica "fora da grade"
+      data_hora: plano.trilha
+        ? iso(new Date(`${diaBrt()}T${plano.hora}:00-03:00`))
+        : encontroISO(7, plano.hora),
       duracao_min: plano.duracao, status: "agendado", origem: null,
       link: "https://meet.google.com/demo-" + duplaId.slice(-8), created_by: mentorId,
     });
@@ -613,6 +652,21 @@ await post("especialista_grade", [
   { id: uid(0x1103), profile_id: P.marcos, dia_semana: 6, hora_inicio: "10:00", hora_fim: "12:00" },
   { id: uid(0x1104), profile_id: P.sofia, dia_semana: 6, hora_inicio: "09:00", hora_fim: "11:00" },
   { id: uid(0x1105), profile_id: P.pedroH, dia_semana: 1, hora_inicio: "18:00", hora_fim: "20:00" },
+]);
+
+// especialista_excecoes (WP4): a grade visual da Luísa precisa de exceções
+// datadas vivas — um bloqueio na próxima terça cobrindo a janela dela
+// (19:00–21:00) e um horário extra no próximo domingo (fora da grade),
+// MAIS um par ancorado em hoje: a grade só desenha a semana corrente
+// (seg–dom) e "próximo dia X" foge dela na maior parte dos dias. O bloqueio
+// de hoje rasga a janela quando hoje é ter/qui; o extra de 7h–9h clipa no
+// eixo 8h. Datas relativas ao run — exceção no passado o select filtra
+// (data >= hoje). O cleanup é o porFK `profile_id` do range de*, já coberto.
+await post("especialista_excecoes", [
+  { id: uid(0x1110), profile_id: P.luisa, data: proximoDow(2), hora_inicio: "19:00", hora_fim: "21:00", tipo: "bloqueio" },
+  { id: uid(0x1111), profile_id: P.luisa, data: proximoDow(0), hora_inicio: "10:00", hora_fim: "12:00", tipo: "extra" },
+  { id: uid(0x1112), profile_id: P.luisa, data: diaBrt(), hora_inicio: "07:00", hora_fim: "09:00", tipo: "extra" },
+  { id: uid(0x1113), profile_id: P.luisa, data: diaBrt(), hora_inicio: "12:00", hora_fim: "14:00", tipo: "bloqueio" },
 ]);
 
 // assinaturas: termo do voluntário pra maioria dos mentores, mentorando e

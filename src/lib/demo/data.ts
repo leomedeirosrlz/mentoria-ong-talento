@@ -6,7 +6,8 @@
  * `demo/queries.ts` (server components, quando o cookie `demo_role` está
  * ativo) e por `demo/client-stub.ts` (browser, pro stub do supabase-js) —
  * por isso este módulo não pode importar nada server-only (next/*, react,
- * @/lib/supabase/*): só `import type`, apagado no build.
+ * @/lib/supabase/*) — `import type` é apagado no build e módulos puros de
+ * domínio (`../ciclo`) seguem seguros no browser.
  *
  * Evergreen: nenhuma data é fixa. Os calendários oficiais (16 encontros de
  * terça-feira, formação, recesso, marco — cópia fiel do seed.sql) vivem em
@@ -60,6 +61,7 @@ import type {
   Supervisao,
 } from "@/lib/types";
 import type { Interacao } from "@/lib/interacoes";
+import { toDateStr } from "../ciclo";
 
 // ---------- tabelas da rodada de telas finais (ainda sem migration) ----------
 // Espelhos do plano `docs/planos/implementacao-telas-finais.md` — os WPs
@@ -228,12 +230,11 @@ const HORA_MS = 3600 * 1000;
 
 const addDias = (d: Date, n: number): Date => new Date(d.getTime() + n * DIA_MS);
 
-/** "YYYY-MM-DD" do dia de um Date — os Date aqui nascem ancorados no
- *  meio-dia local, então a virada de dia/fuso não desloca a data. */
-const ymd = (d: Date): string =>
-  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
-    d.getDate()
-  ).padStart(2, "0")}`;
+/** "YYYY-MM-DD" do dia de um Date — data de calendário SP, a mesma régua da
+ *  grade visual e das exceções. Os Date aqui nascem ancorados no meio-dia
+ *  UTC (ver HOJE), então a data SP é a data UTC do instante; pra instantes
+ *  soltos, ler o fuso do programa também é o comportamento certo. */
+const ymd = (d: Date): string => toDateStr(d);
 
 /** Instante ISO de um dia + horário no fuso do programa (America/Sao_Paulo)
  *  — "19:00" de uma terça vira "T22:00:00.000Z", como o Postgres devolveria. */
@@ -253,17 +254,14 @@ const serialExcel = (iso: string): string =>
 const depoisDe = (iso: string, horas: number): string =>
   new Date(new Date(iso).getTime() + horas * HORA_MS).toISOString();
 
-/** "hoje" ancorado no meio-dia — todas as datas relativas partem daqui. */
-const AGORA = new Date();
-const HOJE = new Date(
-  AGORA.getFullYear(),
-  AGORA.getMonth(),
-  AGORA.getDate(),
-  12
-);
+/** "hoje" ancorado no meio-dia UTC do dia de calendário SP — todas as datas
+ *  relativas partem daqui. UTC-date space é o único plano neutro: meio-dia
+ *  local numa máquina UTC+10…+14 seria o dia anterior em SP, e ler campos
+ *  locais dessa âncora volta a depender do fuso do servidor. */
+const HOJE = new Date(`${toDateStr(new Date())}T12:00:00Z`);
 
 /** Terça-feira da semana corrente — âncora do 5º encontro do ciclo. */
-const TERCA_ENCONTRO_5 = addDias(HOJE, ((2 - HOJE.getDay()) + 7) % 7);
+const TERCA_ENCONTRO_5 = addDias(HOJE, ((2 - HOJE.getUTCDay()) + 7) % 7);
 
 /** Dia oficial do encontro n do ciclo (espelha o seed/cronograma oficial):
  *  1–8 semanais a partir da âncora; 15 dias entre o 8º e o 9º (tempo de
@@ -1254,8 +1252,9 @@ function build(): DemoData {
   ];
 
   // ---------- agenda real do especialista (0073) ----------
-  // Grade semanal da Sofia: noites de ter/qui (onde as sessões dela caem —
-  // 18:30 com a Bia, 19:30 com o Eduardo) + manhã de sábado. A Helena tem a
+  // Grade semanal da Sofia: noites de ter/qui + manhã de sábado — onde as
+  // sessões dela caem (Eduardo qui 19:30, Bia sáb 10:00; a terça livre é a
+  // que a semana de provas bloqueia). A Helena tem a
   // dela; o Marcos ainda não preencheu — o editor dele abre no empty state.
   const especialistaGrade: (GradeJanela & { profile_id: string })[] = [
     { id: uid(0x5201), profile_id: sofia.id, dia_semana: 2, hora_inicio: "18:00", hora_fim: "21:00" },
@@ -1272,15 +1271,21 @@ function build(): DemoData {
   // um bloqueio na próxima terça (semana de provas na escola, a noite inteira
   // da grade cai) e um horário extra no próximo domingo (abre manhã fora da
   // grade). `|| 7` empurra pro ciclo seguinte quando hoje já é o dia.
-  const proximaTerca = addDias(HOJE, ((2 - HOJE.getDay()) + 7) % 7 || 7);
-  const proximoDomingo = addDias(HOJE, ((7 - HOJE.getDay()) + 7) % 7 || 7);
+  const proximaTerca = addDias(HOJE, ((2 - HOJE.getUTCDay()) + 7) % 7 || 7);
+  const proximoDomingo = addDias(HOJE, ((7 - HOJE.getUTCDay()) + 7) % 7 || 7);
   // slots da negociação demo — dentro das grades (Sofia qui 18-21/sáb 9-12,
   // Helena qui 19-21) e sempre no futuro, senão o pedido "expira" na leitura
-  const proximaQuinta = addDias(HOJE, ((4 - HOJE.getDay()) + 7) % 7 || 7);
-  const proximoSabado = addDias(HOJE, ((6 - HOJE.getDay()) + 7) % 7 || 7);
+  const proximaQuinta = addDias(HOJE, ((4 - HOJE.getUTCDay()) + 7) % 7 || 7);
+  const proximoSabado = addDias(HOJE, ((6 - HOJE.getUTCDay()) + 7) % 7 || 7);
   const especialistaExcecoes: (ExcecaoEspecialista & { profile_id: string })[] = [
     { id: uid(0x5401), profile_id: sofia.id, data: ymd(proximaTerca), hora_inicio: "18:00", hora_fim: "21:00", tipo: "bloqueio" },
     { id: uid(0x5402), profile_id: sofia.id, data: ymd(proximoDomingo), hora_inicio: "10:00", hora_fim: "12:00", tipo: "extra" },
+    // WP4: a grade visual só desenha a semana corrente — exceção datada em
+    // semana futura (terça/domingo acima) nunca aparece nela. Estas duas,
+    // ancoradas em HOJE, renderizam o hatch de bloqueio e a janela "extra"
+    // (7h–9h clipada no eixo 8h) todo dia da semana.
+    { id: uid(0x5403), profile_id: sofia.id, data: ymd(HOJE), hora_inicio: "07:00", hora_fim: "09:00", tipo: "extra" },
+    { id: uid(0x5404), profile_id: sofia.id, data: ymd(HOJE), hora_inicio: "12:00", hora_fim: "14:00", tipo: "bloqueio" },
   ];
 
   // ---------- mentorados ----------
@@ -1687,13 +1692,14 @@ function build(): DemoData {
       desejado: { nome: sofia.nome },
     },
     {
-      // a 4ª — a sessão agendada pra daqui a 4 dias nasceu deste pedido
+      // a 4ª — a sessão agendada pro próximo sábado 10:00 nasceu deste
+      // pedido (WP4: o slot aceito casa com o encontro ancorado na grade)
       id: uid(S.sess4),
       mentorado_id: ana.id,
       dupla_dpp_id: uid(D.ok),
       demanda: null,
       motivo: "Próxima sessão da trilha.",
-      slot_proposto: em(addDias(HOJE, 4), "18:30"),
+      slot_proposto: em(proximoSabado, "10:00"),
       origem: "jovem",
       turma: "T1 · 2026/2027",
       justificativa_recusa: null,
@@ -2367,7 +2373,9 @@ function build(): DemoData {
           "Combinado: lista de 10 exercícios de fração progressiva até o próximo encontro.",
       }
     ),
-    agendado(uid(D.esp1), 4, addDias(HOJE, 4), { hora: "18:30" }),
+    // WP4: ancorada no próximo sábado 10:00 — sempre dentro da janela de
+    // sábado 9–12 da grade, nunca cai na terça bloqueada nem flutua de dow
+    agendado(uid(D.esp1), 4, proximoSabado, { hora: "10:00" }),
   ];
 
   const duplaEsp1: Dupla = {
@@ -2441,7 +2449,11 @@ function build(): DemoData {
   // semáforo marca "atenção" e joga esta dupla no topo da home dela
   const encD8: Encontro[] = [
     realizado(uid(D.esp3), 1, addDias(HOJE, -6), { hora: "19:30", duracao: 60 }),
-    agendado(uid(D.esp3), 2, addDias(HOJE, 3), { hora: "19:30" }),
+    // WP4: ancorada em HOJE — a grade visual só desenha a semana corrente
+    // (seg–dom), e "próxima quinta" fugia dela de sex a dom. Hoje 19:30 cai
+    // dentro da janela em ter/qui e vira "sessão combinada fora da grade"
+    // nos outros dias — os dois casos renderizam.
+    agendado(uid(D.esp3), 2, HOJE, { hora: "19:30" }),
   ];
 
   const duplaEsp3: Dupla = {
@@ -3287,7 +3299,7 @@ function build(): DemoData {
           presente: !(cid === cronogramaT1 && diaIdx === 1 && p.id === joaoPedro.id),
           marcado_por: marina.id, // a chamada é da coordenação
           // carimbo da noite do evento — como o trigger stamp_presenca faria
-          marcado_em: em(new Date(`${ev.data}T12:00:00`), "20:30"),
+          marcado_em: em(new Date(`${ev.data}T12:00:00Z`), "20:30"),
         }))
       )
   );
