@@ -868,7 +868,9 @@ export function resumoSemanaDe(
   // (etapa concluída) não tem semana pra medir
   if (evento.data == null && semana == null) return null;
   const { seg, dom } =
-    semana ?? semanaBounds(new Date(`${evento.data}T12:00:00`));
+    // date-only vive em espaço UTC — meio-dia local andaria um dia em fusos
+    // a frente de SP (mesma régua do semanaBounds)
+    semana ?? semanaBounds(new Date(`${evento.data}T12:00:00Z`));
   // semana oficial é métrica da trilha DPP — duplas de especialista não seguem
   // o calendário oficial e ficariam sempre "sem encontro esta semana". O
   // denominador é SÓ do cronograma do evento (0061): com duas turmas ativas,
@@ -978,7 +980,11 @@ export function bucketsDoEncontro(
  *  encontro, mesmo critério do preventivo do semáforo. */
 export function duplasSemEncontroDoNumero(
   duplas: Dupla[],
-  evento: CicloEvento
+  evento: CicloEvento,
+  /** Superfícies de monitoramento (fila da coord/auxiliar) mostram TODAS as
+   *  duplas sem row do vigente — a dupla formada depois da data oficial não
+   *  "faltou", mas precisa do 1º agendamento e some do radar sem a flag. */
+  incluirNovas = false
 ): Dupla[] {
   if (evento.numero == null || evento.data == null) return [];
   const numero = evento.numero;
@@ -988,7 +994,7 @@ export function duplasSemEncontroDoNumero(
       d.status === "ativa" &&
       d.trilha !== "especialista" &&
       d.cronograma_id === evento.cronograma_id &&
-      (!d.iniciada_em || d.iniciada_em <= dataOficial) &&
+      (incluirNovas || !d.iniciada_em || d.iniciada_em <= dataOficial) &&
       !d.encontros.some((e) => e.numero === numero)
   );
 }
@@ -1846,6 +1852,21 @@ export function papelCurto(role: string | null | undefined) {
  *  não olha papel (as policies trabalham com o vínculo supervisor_id). */
 export function podeSupervisionar(role: string | null | undefined): boolean {
   return role === "supervisor" || role === "coordenacao";
+}
+
+/** D5 — no máximo 1 lembrete por dupla a cada 48h, qualquer autor, incluindo
+ *  o WhatsApp manual (tipo `nudge` em `interacoes`). A RPC `enviar_lembrete`
+ *  e a rota `/api/nudge` fazem cumprir; na UI o botão desabilita com a data. */
+export const LEMBRETE_INTERVALO_MS = 48 * 3600 * 1000;
+
+/** Até quando a dupla está bloqueada pra novo lembrete — null se livre. */
+export function lembreteBloqueadoAte(
+  ultimoNudge: { created_at: string } | null | undefined,
+  agora: Date | number = new Date()
+): Date | null {
+  if (!ultimoNudge) return null;
+  const fim = new Date(ultimoNudge.created_at).getTime() + LEMBRETE_INTERVALO_MS;
+  return fim > +agora ? new Date(fim) : null;
 }
 
 export function waLink(phone: string | null | undefined, mensagem: string): string | null {

@@ -25,6 +25,7 @@ import {
   HandHeart,
   Lifebuoy,
   Megaphone,
+  Sparkle,
   Star,
   ThumbsDown,
   UserCheck,
@@ -238,6 +239,12 @@ const ICONE: Record<Notificacao["tipo"], typeof Bell> = {
   chamado_resolvido: CheckCircle,
   chamado_reaberto: ArrowsClockwise,
   chamado_mencao: ChatsCircle,
+  // 0093 — sugestão de trilha esp cai no sino do jovem; a devolutiva do
+  // encerramento, no do mentor DPP (a estrela é a trilha em toda a casa)
+  sugestao_especialista: Sparkle,
+  devolutiva_especialista: FlagCheckered,
+  // 0094 — o "Lembrar" (D5) cai no sino do destinatário
+  lembrete: ChatsCircle,
 };
 
 export function NotificacoesBell({

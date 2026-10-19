@@ -25,8 +25,10 @@ import {
   eventosDoCronograma,
   formatDate,
   formatDiaHora,
+  formatDiaMes,
   formatDiaSemanaMes,
   jornadaDaDupla,
+  lembreteBloqueadoAte,
   linkSeguro,
   ORDEM_SEMAFORO,
   passoEsp,
@@ -47,14 +49,24 @@ import type {
   Encontro,
   SolicitacaoEspecialista,
   SolicitacaoEspecialistaStatus,
+  Supervisao,
   TrilhaJovem,
   TrilhaJovemRegistro,
   TrilhaJovemSessao,
 } from "@/lib/types";
-import { ehPendenciaRegistro, limboAberto } from "@/lib/agenda-minha";
+import {
+  ehPendenciaRegistro,
+  limboAberto,
+  type AgendaItem,
+} from "@/lib/agenda-minha";
+import type { Interacao } from "@/lib/interacoes";
+import { msgsContato } from "@/lib/whatsapp-msgs";
 import { cn } from "@/lib/utils";
 import { avatarPublicUrl } from "@/lib/avatar";
 import { Avatar } from "@/components/avatar";
+import { AgendaSuaSemana } from "@/components/agenda-sua-semana";
+import { LembreteButton } from "@/components/lembrete-button";
+import { dowCurto, Tag } from "@/components/agenda-partes";
 import { Estrelas } from "@/components/estrelas";
 import { SemaforoBadge } from "@/components/semaforo";
 import { SolicitacaoStatusChip } from "@/components/solicitacao-status-chip";
@@ -70,6 +82,16 @@ export type AgendaPorMentoradoProps = {
   especialistas: { id: string; nome: string }[];
   eventos: CicloEvento[];
   cronogramas: Cronograma[];
+  /** Sessões do mentor — conduzidas + recebidas; "Do programa" filtra as
+   *  recebidas (mentor_id === meuId) e o strip usa todas. */
+  supervisoes: Supervisao[];
+  /** Último contato por dupla — o "Lembrar o jovem" só conta tipo nudge. */
+  nudges: Record<string, Interacao>;
+  /** Os MESMOS itens da Minha agenda — o strip "Sua semana" os condensa. */
+  itensSemana: AgendaItem[];
+  meuId: string;
+  /** Primeiro nome do mentor — assina o check-in do Lembrar. */
+  meuNome: string;
   hoje: string;
 };
 
@@ -99,6 +121,11 @@ export function AgendaPorMentorado({
   especialistas,
   eventos,
   cronogramas,
+  supervisoes,
+  nudges,
+  itensSemana,
+  meuId,
+  meuNome,
   hoje,
 }: AgendaPorMentoradoProps) {
   const agora = new Date();
@@ -142,24 +169,42 @@ export function AgendaPorMentorado({
   }
 
   return (
-    // >1 dupla: cards em 2 colunas em xl (mesma régua da home do mentor);
-    // com 1 só, a coluna única mantém a leitura confortável
-    <div className={cn("grid gap-6", duplas.length > 1 && "xl:grid-cols-2")}>
-      {duplasOrdenadas.map((dupla) => (
-        <CardMentorado
-          key={dupla.id}
-          dupla={dupla}
-          saude={saudePorDupla.get(dupla.id)!}
-          trilhas={trilhas[dupla.id] ?? []}
-          solicitacoes={solicitacoes[dupla.id] ?? []}
-          especialistas={especialistasDialog}
-          eventos={eventos}
-          cronogramas={cronogramas}
-          agora={agora}
-          agoraMs={agoraMs}
-          hoje={hoje}
-        />
-      ))}
+    <div className="space-y-6">
+      {/* o strip da semana só aparece quando tem o que condensar — sem
+          itens derivados ele seria 7 "livre" sem utilidade */}
+      {itensSemana.length > 0 && (
+        <AgendaSuaSemana itens={itensSemana} hoje={hoje} />
+      )}
+      {/* >1 dupla: cards em 2 colunas em xl (mesma régua da home do
+          mentor); com 1 só, a coluna única mantém a leitura confortável */}
+      <div className={cn("grid gap-6", duplas.length > 1 && "xl:grid-cols-2")}>
+        {duplasOrdenadas.map((dupla) => (
+          <CardMentorado
+            key={dupla.id}
+            dupla={dupla}
+            saude={saudePorDupla.get(dupla.id)!}
+            trilhas={trilhas[dupla.id] ?? []}
+            solicitacoes={solicitacoes[dupla.id] ?? []}
+            especialistas={especialistasDialog}
+            eventos={eventos}
+            cronogramas={cronogramas}
+            nudge={
+              nudges[dupla.id]?.tipo === "nudge" ? nudges[dupla.id] : null
+            }
+            meuNome={meuNome}
+            agora={agora}
+            agoraMs={agoraMs}
+            hoje={hoje}
+          />
+        ))}
+      </div>
+      <DoPrograma
+        supervisoes={supervisoes}
+        eventos={eventos}
+        duplas={duplas}
+        meuId={meuId}
+        hoje={hoje}
+      />
     </div>
   );
 }
@@ -174,6 +219,8 @@ function CardMentorado({
   especialistas,
   eventos,
   cronogramas,
+  nudge,
+  meuNome,
   agora,
   agoraMs,
   hoje,
@@ -185,6 +232,10 @@ function CardMentorado({
   especialistas: { id: string; nome: string; areas: string[] | null }[];
   eventos: CicloEvento[];
   cronogramas: Cronograma[];
+  /** Último `interacoes` tipo nudge da dupla — alimenta o cap de 48h. */
+  nudge: Interacao | null;
+  /** Primeiro nome do mentor — assina o check-in do Lembrar. */
+  meuNome: string;
   agora: Date;
   agoraMs: number;
   hoje: string;
@@ -460,7 +511,8 @@ function CardMentorado({
 
       {/* uma saída nomeada pro trabalho real — agendar/remarcar acontece na
           ficha, que é onde a dupla agenda (o mentor DPP não marca sessão
-          de especialista nem recebe CTA dela aqui) */}
+          de especialista nem recebe CTA dela aqui). O "Lembrar" (D5) é o
+          canal leve com o jovem — notificação + WhatsApp, nunca cobrança */}
       <div className="mt-auto flex flex-wrap gap-2 border-t border-border/60 pt-4">
         <Link
           href={`/duplas/${dupla.id}`}
@@ -469,6 +521,30 @@ function CardMentorado({
           Abrir ficha da dupla
           <ArrowRight size={14} />
         </Link>
+        {dupla.status === "ativa" && (
+          <LembreteButton
+            duplaId={dupla.id}
+            destino="mentorado"
+            rotulo={`Lembrar ${primeiroNome}`}
+            telefone={dupla.mentorado.whatsapp ?? null}
+            titulo="Lembrete do seu mentor"
+            corpo={
+              msgsContato(
+                {
+                  eu: meuNome,
+                  mentorNome: meuNome,
+                  mentoradoNome: primeiroNome,
+                },
+                {
+                  casoMentorado:
+                    "Passando pra ver como você está e se precisa de algo por aqui. Os encontros seguem abertos pra vocês marcarem quando couber.",
+                }
+              ).mentorado ?? ""
+            }
+            href="/jovem/agenda"
+            bloqueadoAte={lembreteBloqueadoAte(nudge, agora)}
+          />
+        )}
       </div>
     </article>
   );
@@ -1189,6 +1265,95 @@ function SemTrilhaBlock({
           </Button>
         }
       />
+    </section>
+  );
+}
+
+// ---------- "Do programa" ----------
+
+/** O que a equipe faz COM o mentor — supervisões recebidas ("por Paula
+ *  Nunes") e as formações do calendário oficial das turmas dele. Vai no
+ *  fim: é contexto, não ação do dia. Sem itens a seção some (estado vazio
+ *  aqui é só ausência, não defeito). */
+function DoPrograma({
+  supervisoes,
+  eventos,
+  duplas,
+  meuId,
+  hoje,
+}: {
+  supervisoes: Supervisao[];
+  eventos: CicloEvento[];
+  duplas: Dupla[];
+  meuId: string;
+  hoje: string;
+}) {
+  const recebidas = supervisoes
+    .filter((s) => s.mentor_id === meuId)
+    .slice(0, 3);
+  const cronosDasDuplas = new Set(
+    duplas.map((d) => d.cronograma_id).filter(Boolean)
+  );
+  const formacoes = eventos
+    .filter(
+      (e) =>
+        e.tipo === "formacao" &&
+        e.data != null &&
+        e.data >= hoje &&
+        e.cronograma_id != null &&
+        cronosDasDuplas.has(e.cronograma_id)
+    )
+    .sort((a, b) => a.data!.localeCompare(b.data!))
+    .slice(0, 3);
+
+  const itens = [
+    ...recebidas.map((s) => ({
+      key: `sup-${s.id}`,
+      data: s.data,
+      titulo: `Supervisão com ${s.supervisor?.nome ?? "auxiliar executivo"}`,
+      detalhe: s.dupla?.mentorado?.nome
+        ? `sobre a dupla com ${s.dupla.mentorado.nome}`
+        : "sessão geral",
+    })),
+    ...formacoes.map((e) => ({
+      key: `for-${e.id}`,
+      data: e.data!,
+      titulo: "Formação de mentores",
+      detalhe: [e.titulo, e.observacao].filter(Boolean).join(" · "),
+    })),
+    // cronológico desc — supervisão (já aconteceu) e formação (vai acontecer)
+    // na mesma linha do tempo; concatenar deixava a mais recente embaixo
+  ].sort((a, b) => b.data.localeCompare(a.data));
+  if (itens.length === 0) return null;
+
+  return (
+    <section aria-label="Do programa" className="space-y-2">
+      <h2 className="text-base font-semibold">Do programa</h2>
+      <ul className="divide-y divide-border/60 overflow-hidden rounded-xl border bg-card">
+        {itens.map((it) => (
+          <li key={it.key} className="flex flex-wrap items-center gap-3 px-4 py-3">
+            <div className="w-12 shrink-0 text-center">
+              <b className="block text-lg font-bold leading-none tabular-nums">
+                {Number(it.data.slice(8, 10))}
+              </b>
+              <i className="text-xs font-medium not-italic text-muted-foreground">
+                {dowCurto(it.data)}
+              </i>
+            </div>
+            <div className="min-w-0 flex-1 basis-52">
+              <p className="text-sm font-semibold leading-snug">{it.titulo}</p>
+              {it.detalhe && (
+                <p className="mt-0.5 text-xs leading-snug text-muted-foreground">
+                  {it.detalhe}
+                </p>
+              )}
+            </div>
+            <Tag tom={it.data === hoje ? "warn" : "muted"}>
+              {it.data === hoje ? "hoje" : formatDiaMes(it.data)}
+            </Tag>
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }
