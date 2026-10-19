@@ -578,7 +578,11 @@ export type Notificacao = {
     | "chamado_resposta_autor"
     | "chamado_resolvido"
     | "chamado_reaberto"
-    | "chamado_mencao";
+    | "chamado_mencao"
+    // 0093+ — sugestão/devolutiva de trilha esp e o lembrete D5 (0094)
+    | "sugestao_especialista"
+    | "devolutiva_especialista"
+    | "lembrete";
   titulo: string;
   corpo: string | null;
   href: string | null;

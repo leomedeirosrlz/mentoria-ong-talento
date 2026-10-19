@@ -371,6 +371,17 @@ Sequência sugerida: **WP0b → (WP6 ‖ WP1) → WP2 → WP3 → WP4/WP5 → WP
 
 **Aceite:** com duas turmas ativas, nenhum número "X de Y" mistura cronogramas; o auxiliar alterna entre por turma e consolidada.
 
+**Implementado (WP5/D5):**
+
+- **Auxiliar** (`role supervisor`): `/agenda` bifurca pro `AgendaAuxiliar` — abas **Por turma** (grupos por cronograma com régua de vigente, hint de desencontro só entre coortes com vigente, grupo de trilhas rotulado "Trilhas de especialista") e **Consolidada** (lista por dia com pill Você/turma, convidados âmbar, a-agendar tracejados; horas em `America/Sao_Paulo`, date-only renderiza "—"). Ações: registrar supervisão, abrir ficha, **Lembrar** nas supervisionadas. Header conta "N supervisionadas · M encerradas" (o que a tela mostra, não o total bruto).
+- **Coordenação**: aterrissagem em **Monitoramento** — cards por cronograma (vigente + régua 1–16 + barra realizaram/agendadas/sem agendamento por contagem direta), fila **Para acompanhar** (sem data, atraso, limbo, registro pendente, sessão esp — "Sessão"/"sessões" no vocábulo correto, dupla nova rotulada "dupla nova, 1º agendamento pendente"), **Semana no programa** (oficiais + supervisões), e calendário atrás de `?aba=calendario`.
+- **Lembrar (D5)**: `enviar_lembrete` RPC definer (0094) — coord→qualquer dupla ativa, supervisor→supervisionadas, mentor→`mentorado` da própria; cap **1/dupla/48h cross-author** com `pg_advisory_xact_lock`, `created_at <= now()`, NULL-safe supervisor/mentor, `has_papel('coordenacao', turma)` escopado, self-nudge → `sem_destino`, revoke de `public`/`anon`. `/api/nudge` (wa.me) valida destino por URL parse (`https`, host `wa.me`, path `/\d+` — aceita `?text=`) + mesmo cap como régua de UX. `getUltimasInteracoes(ids, "nudge")` filtra o tipo pra não misturar contato com lembrete.
+- **Extras WP3**: "Sua semana" (strip 7 células UTC-noon, convidado âmbar tracejado — legenda corrigida), "Do programa" (supervisões recebidas + formações das turmas, cronológico desc) e "Lembrar <jovem>" no card do mentorado.
+- **Fixtures**: staging T1/T2 evergreen (CRON1/CRON2 relativos ao run — enc 6 T1 e enc 4 T2 na terça corrente; `T1E6_PASSOU` decide realizado×agendado), nudge <48h seedeado (estado "Lembrada" fora da memória), dataset em memória com TTL 6h, cleanup em cascata de `chamados`.
+- **Híbrido staff**: `role` primário decide a aterrissagem — coord/supervisor com papel de mentor caem na superfície de equipe; `?visao=`/`?aba=calendario` são o escape explícito pro lado mentor/esp.
+- Testes: `tests/agenda-coordenacao.test.ts` + `agenda-auxiliar.test.ts`; e2e demo `agenda-coordenacao`/`agenda-auxiliar`/`agenda-dpp-extras` (11 casos) + app `agenda-coordenacao` (3 casos, RPC-level: escopo, NULL-supervisor, cap cross-author, destino vedado).
+- Gates: tsc 0 · eslint 0 · vitest **620** · demo **49/49** · app `agenda-coordenacao` **3/3** (suite serial no relato do PR).
+
 ---
 
 ### WP6 — Especialistas do jovem (L) · REALIZA-139 + REALIZA-146 (D10 pedido pelo DPP)
