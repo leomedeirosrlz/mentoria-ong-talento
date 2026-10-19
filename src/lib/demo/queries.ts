@@ -1,5 +1,5 @@
 import { getDemoData, type DemoData } from "./data";
-import { registroTardio, toDateStr } from "../ciclo";
+import { registroTardio, semanaBounds } from "../ciclo";
 import { slotsLivresEspecialista } from "./agenda";
 import { normaliza } from "../utils";
 import type {
@@ -345,13 +345,15 @@ export function demoMinhaGrade(role: AppRole): GradeJanela[] {
     );
 }
 
-/** Exceções atuais/futuras da persona — o real filtra data >= hoje. */
+/** Exceções da persona — o real filtra data >= seg da semana corrente. */
 export function demoMinhasExcecoes(role: AppRole): ExcecaoEspecialista[] {
   const eu = getDemoData().personas[role];
-  const hoje = toDateStr(new Date());
+  // mesmo bound da query real: desde a segunda da semana corrente — a grade
+  // visual desenha seg→dom inteira e a exceção de início de semana aparece
+  const seg = semanaBounds(new Date()).seg;
   return getDemoData()
     .especialistaExcecoes.filter(
-      (x) => x.profile_id === eu.id && x.data >= hoje
+      (x) => x.profile_id === eu.id && x.data >= seg
     )
     // tira profile_id — ExcecaoEspecialista é a projeção do select real
     .map((x) => ({

@@ -1,6 +1,6 @@
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
-import { toDateStr } from "./ciclo";
+import { semanaBounds, toDateStr } from "./ciclo";
 import { demoRole } from "./demo/mode";
 import {
   demoDevolutivas,
@@ -276,8 +276,11 @@ export const getMinhaGrade = cache(async (): Promise<GradeJanela[]> => {
   return (data ?? []) as GradeJanela[];
 });
 
-/** Exceções datadas do especialista logado — só as de hoje em diante: uma
- *  exceção passada não muda mais a projeção e a lista ficaria infinita. */
+/** Exceções datadas do especialista logado — a partir da SEGUNDA da semana
+ *  corrente (não de hoje): a grade visual desenha seg→dom inteira, e um
+ *  bloqueio/extra de segunda continua visível quando hoje é quarta. Semanas
+ *  anteriores ficam fora — exceção velha não muda a projeção e a lista
+ *  ficaria infinita. */
 export const getMinhasExcecoes = cache(
   async (): Promise<ExcecaoEspecialista[]> => {
     const demo = await demoRole();
@@ -289,7 +292,7 @@ export const getMinhasExcecoes = cache(
       .from("especialista_excecoes")
       .select("id, data, hora_inicio, hora_fim, tipo")
       .eq("profile_id", me.id)
-      .gte("data", toDateStr(new Date()))
+      .gte("data", semanaBounds(new Date()).seg)
       .order("data")
       .order("hora_inicio");
     if (error) {
