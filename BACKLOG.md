@@ -280,3 +280,27 @@ deriva `trilha` do papel do mentor. O que resta está na seção Pendências.)*
 - Policies `for all` remanescentes (fora anexos, já endurecidos): os triggers
   de autoria da 0023 cobrem a parte de autoria; o restante (colunas de status)
   exige trigger por coluna ou RPCs dedicadas.
+
+## Sprint UI — padronização de telas + skeletons + transições (out/2026)
+
+Pedido do Thiago: as telas funcionam mas não têm cara de produto único —
+anatomia diverge entre superfícies, loaders faltam em rotas novas, e trocar
+de tela é seco. Rodar como sprint com recon de inventário primeiro.
+
+- [ ] **Padronização de telas** — recon inventaria anatomia por rota
+  (header/padrão de título, espaçamento, composição de cards, empty states,
+  hierarquia de ações) e propõe os padrões-canônicos antes de tocar código;
+  `/jovem` × staff têm shells diferentes mas as mesmas moléculas devem valer.
+- [ ] **Skeleton loaders nativos — fechar as rotas sem `loading.tsx`**:
+  hoje 25 rotas cobertas espelhando layout; faltam `/jovem/especialistas`
+  (a página nova do WP6!), `/chamados`, `/assinar/[token]`, `/avaliar/[token]`,
+  `/privacidade`. Manter a regra do sprint anterior: skeleton espelha a
+  anatomia real, nunca spinner genérico; um boundary por navegação.
+- [ ] **Animações de alternância de tela** — transição sutil entre rotas
+  (fade/slide curto, respeitando `prefers-reduced-motion`). **Atenção:** este
+  Next tem breaking changes — ver `node_modules/next/dist/docs/` antes
+  (ViewTransition/componente nativo vs. CSS puro); definir escopo
+  (rota inteira vs. só o conteúdo) e onde aplicar (shell app + jovem).
+- [ ] **Gates:** demo e2e existente segue verde (skeletons não devem vazar
+  pro DOM estável), + spec visual simples de transição se o mecanismo
+  escolhido for verificável.
