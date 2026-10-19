@@ -17,6 +17,7 @@ import {
   formatDateTime,
   formatDiaMes,
   formatDiaSemanaMes,
+  lembreteBloqueadoAte,
   ORDEM_SEMAFORO,
   saudadeDaDupla,
   toDateStr,
@@ -26,6 +27,7 @@ import {
 } from "@/lib/ciclo";
 import { prazoTrilhaEspecialista } from "@/lib/encerramento";
 import { msgsContato } from "@/lib/whatsapp-msgs";
+import type { Interacao } from "@/lib/interacoes";
 import type { SupervisaoAlvo } from "@/lib/queries-supervisao";
 import type {
   CicloEvento,
@@ -38,7 +40,7 @@ import { DuplaNomes } from "@/components/dupla-nomes";
 import { AvaliacaoBadge } from "@/components/semaforo";
 import { NovaDuplaDialog } from "@/components/nova-dupla-dialog";
 import { ImportarCsvDialog } from "@/components/importar-csv-dialog";
-import { NudgeButton } from "@/components/nudge-button";
+import { LembreteButton } from "@/components/lembrete-button";
 import { SupervisaoDialog } from "@/components/supervisao-dialog";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { filterChipCls } from "@/components/ui/filter-chip";
@@ -705,6 +707,7 @@ export function DuplasLista({
   meuNome,
   supervisaoAlvos = [],
   especialistaEventos = [],
+  nudges = {},
 }: {
   lista: Dupla[];
   eventos: CicloEvento[];
@@ -717,6 +720,8 @@ export function DuplasLista({
   supervisaoAlvos?: SupervisaoAlvo[];
   /** os 5 passos do guia — visão da especialista (e só ela os consome). */
   especialistaEventos?: EspecialistaEvento[];
+  /** último contato por dupla — a coordenação lê o cap de 48h do Lembrar */
+  nudges?: Record<string, Interacao>;
 }) {
   const hoje = new Date(agora);
   const hojeStr = toDateStr(hoje);
@@ -735,6 +740,7 @@ export function DuplasLista({
         saudePorId={saudePorId}
         resumo={resumo}
         meuNome={meuNome}
+        nudges={nudges}
       />
     );
   if (visao === "supervisor")
@@ -835,6 +841,7 @@ function VisaoCoordenacao({
   saudePorId,
   resumo,
   meuNome,
+  nudges,
 }: {
   lista: Dupla[];
   eventos: CicloEvento[];
@@ -843,6 +850,7 @@ function VisaoCoordenacao({
   saudePorId: Map<string, Saude>;
   resumo: ReturnType<typeof resumoDaLista>;
   meuNome?: string;
+  nudges: Record<string, Interacao>;
 }) {
   const [busca, setBusca] = useState("");
   const [filtro, setFiltro] = useState<FiltroCat>("todas");
@@ -938,12 +946,19 @@ function VisaoCoordenacao({
   const linha = (d: Dupla, i: number) => {
     const s = saudePorId.get(d.id)!;
     // "Lembrar" só existe quando há pendência apontável — dupla em dia não
-    // leva nudge (e a fora da régua não tem o que lembrar)
+    // leva nudge (e a fora da régua não tem o que lembrar). O cap de 48h
+    // conta só interações tipo nudge — um "contato" manual não bloqueia
+    const ultimoNudge =
+      nudges[d.id]?.tipo === "nudge" ? nudges[d.id] : null;
     const lembrar =
       d.status === "ativa" && s.sinais.length > 0 ? (
-        <NudgeButton
+        <LembreteButton
+          duplaId={d.id}
+          destino="mentor"
+          rotulo="Lembrar"
           telefone={d.mentor.whatsapp}
-          mensagem={
+          titulo="Lembrete da coordenação"
+          corpo={
             msgsContato(
               {
                 eu: meuNome,
@@ -953,8 +968,8 @@ function VisaoCoordenacao({
               { casoMentor: casoLembrete(d, s, hoje) }
             ).mentor ?? ""
           }
-          label="Lembrar"
-          duplaId={d.id}
+          href={`/duplas/${d.id}`}
+          bloqueadoAte={lembreteBloqueadoAte(ultimoNudge, hoje)}
         />
       ) : undefined;
     return (

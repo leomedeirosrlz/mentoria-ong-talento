@@ -409,12 +409,14 @@ test.describe("agenda do mentor — visões Semana e Horários (REALIZA-25)", ()
     for (const visao of ["semana", "horarios"] as const) {
       await abrirVisao(page, visao);
       const inicial = await rotulo.innerText();
-      expect(inicial).toMatch(/\d+–\d+ \w+ \d{4}/);
+      // "12–18 jan 2026" no mesmo mês, "26 out–1 nov 2026" cruzando o mês —
+      // o label pinta o mês nas duas pontas quando a semana vira
+      expect(inicial).toMatch(/\d+( \w+)?–\d+ \w+ \d{4}/);
 
       await page.getByRole("button", { name: "Próxima semana" }).click();
       await expect(rotulo).not.toHaveText(inicial);
       const seguinte = await rotulo.innerText();
-      expect(seguinte).toMatch(/\d+–\d+ \w+ \d{4}/);
+      expect(seguinte).toMatch(/\d+( \w+)?–\d+ \w+ \d{4}/);
 
       await page.getByRole("button", { name: "Semana anterior" }).click();
       await expect(rotulo).toHaveText(inicial);

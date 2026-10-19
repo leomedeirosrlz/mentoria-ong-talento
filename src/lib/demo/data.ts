@@ -15,8 +15,9 @@
  * da semana corrente e a T2 começa 4 semanas depois dela, com as 3 quintas
  * de sessão dupla do plano real. Todos os timestamps derivam de `new Date()`.
  * Abrir a demo daqui a meses continua contando a mesma história: semana 5
- * da T1 e semana 1 da T2, dupla saudável, uma com registro pendente, uma em
- * risco, uma com atraso, uma encerrada do ciclo anterior, três trilhas de
+ * da T1 e semana 1 da T2, dupla saudável, uma com registro pendente e sem
+ * data pro encontro vigente (o "sem_data" do "Para acompanhar" da WP5), uma
+ * em risco, uma com atraso, uma encerrada do ciclo anterior, três trilhas de
  * especialista (duas na mesma mentora — a Sofia) e a fila "Aguardando par"
  * com dois mentorados inscritos (Rafael e Wendel) e um especialista de
  * reserva com vagas (o Marcos). WP3: o Ricardo ganhou uma 2ª dupla DPP na
@@ -459,6 +460,19 @@ function buildCicloEventos(cronogramaT1: string, cronogramaT2: string): CicloEve
 
   return [
     ...turma(cronogramaT1, diaEncontro, etapasT1(diaEncontro)),
+    // WP5 — roda de casos da T1 no domingo da semana corrente: as formações
+    // do onboarding (enc1-5d/-4d) já passaram e a agenda precisa de uma
+    // sessão 'formacao' viva — a "Semana no programa" da coordenação lista
+    // os oficiais do seg–dom e o "Do programa" do mentor só mostra eventos
+    // com data >= hoje. O domingo cobre os dois filtros em qualquer dia do
+    // run (a ordem auto-incrementa pra depois do encerramento — sessão
+    // continuada anexada ao calendário, sem reescrever a sequência do PDF)
+    ev(
+      cronogramaT1, "formacao", null,
+      addDias(HOJE, (7 - HOJE.getUTCDay()) % 7),
+      "Roda de casos — formação continuada de mentores", null, [], null,
+      { observacao: "Sessão quinzenal de casos com a supervisão — a chamada abre no dia" }
+    ),
     ...turma(cronogramaT2, diaEncontroT2, etapasT2(diaEncontroT2), QUINTA_DUPLA_T2),
   ];
 }
@@ -2087,7 +2101,12 @@ function build(): DemoData {
   };
 
   // d-pend · Carlos × Caio — encontro 4 realizado sem registro (a pendência
-  // que o semáforo cobra) + um registro tardio no histórico
+  // que o semáforo cobra) + um registro tardio no histórico + o 5º oficial
+  // sem row nenhuma: é a dupla do motivo "sem data" no "Para acompanhar"
+  // (WP5) — a Marina já mandou nudge há 5 dias (log de interações) e o par
+  // segue sem marcar. Mantida no lugar de uma dupla nova pra não mexer nos
+  // denominadores: T1 segue com 4 ativas, o Carlos continua 1/2 e a lista
+  // supervisionada do Paulo intocada.
   const encD2: Encontro[] = [
     comRegistro(
       realizado(uid(D.pend), 1, diaEncontro(1), { duracao: 60 }),
@@ -2111,7 +2130,7 @@ function build(): DemoData {
       { created_at: depoisDe(em(diaEncontro(3), "19:00"), 24 * 5 + 3) }
     ),
     realizado(uid(D.pend), 4, diaEncontro(4), { duracao: 60, origem: "externo" }),
-    agendado(uid(D.pend), 5, diaEncontro(5), {}),
+    // sem enc 5 — a janela do oficial vigente tá aberta e a dupla não marcou
   ];
 
   const regD2E1 = encD2[0].registro!;
@@ -2863,7 +2882,13 @@ function build(): DemoData {
   ];
 
   // ---------- interacoes (log de nudges/contatos da coordenação) ----------
-
+  // D5/WP5 — o "Para acompanhar" cobre os dois estados do lembrete (cap de
+  // 48h por dupla, medido sobre o ÚLTIMO nudge — contato de outro tipo não
+  //  destrava nem bloqueia):
+  //  · pend (sem_data + registro): nudge de 5d atrás → livre, "Lembrar"
+  //  · atraso (limbo):             nudge de 4d atrás → livre
+  //  · risco (atraso):             nudge de ~20h     → bloqueado ("Lembrada")
+  //  · t2c  (limbo na T2):         nudge de 6d atrás → livre, turma nova
   const interacoes: Interacao[] = [
     {
       dupla_id: uid(D.pend),
@@ -2891,6 +2916,21 @@ function build(): DemoData {
       tipo: "apoio",
       canal: "whatsapp",
       created_at: haDias(2, "14:00"),
+      autor: { nome: marina.nome },
+    },
+    {
+      dupla_id: uid(D.risco),
+      tipo: "nudge",
+      canal: "whatsapp",
+      // ~20h atrás — dentro do cap de 48h em qualquer dia/hora de execução
+      created_at: new Date(Date.now() - 20 * HORA_MS).toISOString(),
+      autor: { nome: marina.nome },
+    },
+    {
+      dupla_id: uid(D.t2c),
+      tipo: "nudge",
+      canal: "whatsapp",
+      created_at: haDias(6, "10:30"),
       autor: { nome: marina.nome },
     },
   ];
@@ -3315,11 +3355,15 @@ function build(): DemoData {
       supervisor_id: paulo.id,
       mentor_id: ricardo.id,
       dupla_id: duplaOk.id,
-      data: ymd(addDias(HOJE, -13)),
+      // WP5 — domingo da semana corrente (seg–dom): dentro da janela da
+      // "Consolidada" do auxiliar e da "Semana no programa" da coordenação,
+      // e ≥ hoje pra entrar na agenda do mentor como sessão recebida ("Do
+      // programa" filtra data >= hoje — qualquer dia do run cobre)
+      data: ymd(addDias(HOJE, (7 - HOJE.getUTCDay()) % 7)),
       resumo:
-        "Primeira supervisão do ciclo com o Ricardo. A dupla engatou rápido: a Bia já fechou o PDM e entrou na execução das submetas. Ponto trabalhado: ela tende a abraçar metas demais — combinamos segurar uma submeta por vez e revisar o ritmo no registro semanal. Ele sai com o combinado de trazer as dúvidas de condução na próxima sessão.",
+        "Supervisão da semana com o Ricardo — a dupla engatou rápido: a Bia já fechou o PDM e entrou na execução das submetas. Ponto pra domingo: ela tende a abraçar metas demais — vale segurar uma submeta por vez e revisar o ritmo no registro semanal. Combinado de ele trazer as dúvidas de condução.",
       created_by: paulo.id,
-      created_at: haDias(13, "18:40"),
+      created_at: haDias(6, "18:40"),
       supervisor: { id: paulo.id, nome: paulo.nome },
       mentor: { id: ricardo.id, nome: ricardo.nome },
       dupla: { id: duplaOk.id, mentorado: { nome: ana.nome } },
@@ -3650,10 +3694,14 @@ function build(): DemoData {
 }
 
 // montado uma vez por processo — o dataset é imutável durante a sessão demo
-// (mutations retornam DEMO_MSG antes de chegar aqui)
-let cache: DemoData | null = null;
+// (mutations retornam DEMO_MSG antes de chegar aqui). TTL de 6h: sem ele um
+// server dev/preview de vida longa congela as âncoras relativas e "o nudge
+// de ontem" vira semana passada — datas evergreen precisam expirar.
+const DEMO_TTL_MS = 6 * 60 * 60 * 1000;
+let cache: { at: number; data: DemoData } | null = null;
 
 export function getDemoData(): DemoData {
-  cache ??= build();
-  return cache;
+  if (!cache || Date.now() - cache.at > DEMO_TTL_MS)
+    cache = { at: Date.now(), data: build() };
+  return cache.data;
 }

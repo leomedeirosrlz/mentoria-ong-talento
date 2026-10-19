@@ -3671,7 +3671,9 @@ function LinhaSemEncontro({ dupla, numero }: { dupla: Dupla; numero: number }) {
       rotulo: "Chamar mentorado",
       telefone: dupla.mentorado.whatsapp,
       mensagem: msgs.mentorado ?? "",
-      t: "contato",
+      // D5: nudge pro jovem também conta no cap de 48h da dupla — um
+      // lembrete por dupla, seja por qual canal/ponta chegar
+      t: "nudge",
     },
   ];
   return (
