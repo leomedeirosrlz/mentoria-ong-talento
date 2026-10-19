@@ -164,6 +164,7 @@ export default async function HomePage({
           propostas={propostas}
           slots={meusSlots}
           meuId={me!.id}
+          minhasAreas={me?.areas ?? undefined}
         />
       )}
       <AvisosSection avisos={avisos} souCoord={false} />

@@ -174,6 +174,10 @@ const P = {
   // visíveis no diretório /jovem/pessoas
   caioLogin: 0x0010,
   dandaraLogin: 0x0011,
+  // especialista com a capacidade zerada pro ciclo — o card "Sem vagas" do
+  // cardápio do jovem precisa de alguém nessa variante (os de sempre ou são
+  // trilha da Bia ou são pedido dela)
+  camila: 0x0012,
 } as const;
 
 const M = {
@@ -909,7 +913,12 @@ function build(): DemoData {
     role: "mentor_especialista", ativo: true, avatar_path: "demo/avatars/sofia.svg",
     created_at: haDias(55),
     documento_path: "documentos/termo-sofia-nogueira.pdf",
-    bio: null, linkedin: null, areas: null, voluntariado: null, onboarded_em: null,
+    // áreas = a matéria-prima dos chips do mural ("Combina com você" e um
+    // chip por tema): inglês é o que fez o Carlos direcionar o pedido do
+    // Caio pra ela; matemática é a base das trilhas que ela já carrega
+    bio: null, linkedin: null,
+    areas: ["inglês", "matemática", "redação"],
+    voluntariado: null, onboarded_em: null,
     nome_social: null, data_nascimento: "1992-09-05", genero: "feminino",
     cidade: "São Paulo", uf: "SP",
     interesses: ["matemática", "ENEM", "educação"],
@@ -1071,6 +1080,29 @@ function build(): DemoData {
     cargo: "Engenheiro de dados", empresa: "Consultoria",
     origem: "Post no LinkedIn", consent_lgpd_em: haDias(25),
   };
+  // especialista com a agenda publicada mas a capacidade zerada neste ciclo
+  // (capacidade_especialista: 0 no mentor_profile — a coord segurou a vaga
+  // dela): o cardápio do jovem a mostra "Sem vagas" — o pedido dirigido não
+  // aterrissa, então o CTA honesto é "Pedir pro mural"
+  const camila: Profile = {
+    id: uid(P.camila), user_id: uid(0xf012), nome: "Camila Ferraz",
+    email: "camila.ferraz@realiza.vc", whatsapp: "5511987654015",
+    role: "mentor_especialista", ativo: true, avatar_path: "demo/avatars/camila.svg",
+    created_at: haDias(40),
+    documento_path: "documentos/termo-camila-ferraz.pdf",
+    bio: "Contadora, migrou pra educação financeira — dá trilhas curtas de finanças pessoais.",
+    linkedin: "https://linkedin.com/in/camilaferraz",
+    areas: ["finanças", "empreendedorismo"],
+    voluntariado: "Especialista de finanças pessoais desde o ciclo passado.",
+    onboarded_em: haDias(35),
+    nome_social: null, data_nascimento: "1991-03-22", genero: "feminino",
+    cidade: "São Paulo", uf: "SP",
+    interesses: ["educação financeira", "empreendedorismo"],
+    motivacao: "Jovem que aprende a fechar o mês no azul muda a vida da casa inteira.",
+    pref_genero_par: "indiferente",
+    cargo: "Contadora", empresa: "Escritório próprio",
+    origem: "Formação de voluntários", consent_lgpd_em: haDias(35),
+  };
   // cadastro recebido, ainda não entrou: user_id null + ativo — a badge da
   // lista de pessoas deriva disso, não de flag própria
   const renata: Profile = {
@@ -1157,7 +1189,7 @@ function build(): DemoData {
 
   const profiles: Profile[] = [
     marina, paulo, ricardo, sofia, beatriz, carlos, fernanda, joaoPedro,
-    luiza, andre, helena, marcos, renata, patricia, anaLogin,
+    luiza, andre, helena, marcos, camila, renata, patricia, anaLogin,
     caioLogin, dandaraLogin,
   ];
 
@@ -1257,6 +1289,13 @@ function build(): DemoData {
       experiencia_previa: "Professor de curso técnico aos sábados; engenheiro de dados durante a semana.",
       formacao_externa: null,
       disponibilidade: { dias: ["seg", "qua", "sab"], periodos: ["manha", "noite"] } },
+    // Camila: vagas zeradas pro ciclo (capacidade_especialista 0) — a grade
+    // segue publicada, mas o cardápio do jovem a pinta "Sem vagas" e o
+    // pedido dirigido a ela vira proposta pro mural
+    { profile_id: camila.id, tipo: "especialista", areas: ["finanças", "empreendedorismo"], capacidade: 0, capacidade_especialista: 0, termo_ok: true, formacao_ok: true,
+      experiencia_previa: "Contadora; educação financeira em ONGs há 4 anos.",
+      formacao_externa: null,
+      disponibilidade: { dias: ["seg"], periodos: ["noite"] } },
     // Patrícia afastada: ficha existe mas sem disponibilidade — o board de
     // matching a mostra como indisponível
     { profile_id: patricia.id, tipo: "dpp", areas: ["RH", "carreira"], capacidade: 1, termo_ok: true, formacao_ok: true,
@@ -1279,6 +1318,9 @@ function build(): DemoData {
     // André — a janela que ele abriu pro papel de especialista (híbrido):
     // seg à tarde, dentro da disponibilidade que ele já tinha como DPP
     { id: uid(0x5206), profile_id: andre.id, dia_semana: 1, hora_inicio: "14:00", hora_fim: "17:00" },
+    // Camila — grade publicada, capacidade zerada: "Atende:" no card com o
+    // badge "Sem vagas" (vagas 0 = agenda cheia pro ciclo)
+    { id: uid(0x5207), profile_id: camila.id, dia_semana: 1, hora_inicio: "19:00", hora_fim: "21:00" },
   ];
 
   // Exceções datadas — sempre dentro da janela de ~3 semanas da projeção:
@@ -1823,7 +1865,9 @@ function build(): DemoData {
       dupla_id: null,
       status: "aguardando_coord",
       created_by: anaLogin.id,
-      created_at: haDias(0, "09:15"),
+      // 6 dias parado: o limiar do alerta do painel da coordenação é 5 —
+      // o Wendel aparece nos "Pedidos parados" como o caso de triagem
+      created_at: haDias(6, "09:15"),
       respondida_em: null,
       mentorado: { nome: wendel.nome },
       solicitante: { nome: wendel.nome },
@@ -1900,7 +1944,9 @@ function build(): DemoData {
       origem: "mentor",
       turma: "T1 · 2026/2027",
       justificativa_recusa: null,
-      especialista_desejado_id: null,
+      // o Ricardo apontou o Marcos — alimenta o "Pensando em:" do card de
+      // sugestão na página de especialistas do jovem
+      especialista_desejado_id: marcos.id,
       especialista_id: null,
       dupla_id: null,
       status: "sugerida",
@@ -1911,7 +1957,7 @@ function build(): DemoData {
       solicitante: { nome: ricardo.nome },
       especialista: null,
       especialista_nome: null,
-      desejado: null,
+      desejado: { nome: marcos.nome },
     },
     {
       // WP3 — pedido aberto da 2ª dupla do Ricardo: é o que alimenta o
@@ -3148,6 +3194,20 @@ function build(): DemoData {
     // home depois que o redirect do (app) devolve o mentorado pro /jovem
     mentorado: [
       {
+        // WP6 — o sol_notificar da sugerir_especialista_mentor: avisa a Bia
+        // que o Ricardo registrou a sugestão (mesmo instante da biaSug) e
+        // leva direto pra página de especialistas confirmar/dispensar
+        id: uid(0x3042),
+        tipo: "sugestao_especialista",
+        // texto espelha o sol_notificar da sugerir_especialista_mentor
+        titulo: "Seu mentor sugeriu um especialista",
+        corpo:
+          "Ele registrou um tema pra você — confirme ou ajuste na página de especialistas.",
+        href: "/jovem/especialistas",
+        lida_em: null,
+        created_at: haDias(0, "16:20"),
+      },
+      {
         id: uid(0x3040),
         tipo: "comunicado",
         titulo: "Encontro de formação dos jovens no sábado",
@@ -3166,6 +3226,17 @@ function build(): DemoData {
         href: `/avaliar/demo-aval-${encD6[2].id.slice(-12)}`,
         lida_em: null,
         created_at: haDias(4, "21:00"),
+      },
+      {
+        // WP6 — espelha a devolutiva 0x6603 da trilha Sofia × Bia (mesma
+        // data do postar_devolutiva, que notifica na mesma transação)
+        id: uid(0x3043),
+        tipo: "devolutiva_especialista",
+        titulo: "Nova devolutiva da trilha",
+        corpo: "Sofia Nogueira registrou uma devolutiva pra você.",
+        href: "/jovem/especialistas",
+        lida_em: haDias(7, "09:00"),
+        created_at: haDias(8, "21:00"),
       },
     ],
   };

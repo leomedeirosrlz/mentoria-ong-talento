@@ -259,12 +259,22 @@ export const getJovemPedidosEspecialista = cache(
     propostas: Record<string, SolicitacaoProposta[]>;
     slotsPorEsp: Record<string, string[]>;
   }> => {
-    const [catalogo, solicitacoes] = await Promise.all([
+    const [catalogo, solicitacoes, contatos] = await Promise.all([
       getJovemEspecialistas(),
       getSolicitacoesVisiveis(),
+      getJovemContatos(),
     ]);
     const nomePorId = new Map(
       catalogo.map((e) => [e.id, e.nome_social || e.nome] as const)
+    );
+    // o autor de uma sugestão/pedido staff é adulto alcançável do jovem —
+    // a jovem_contatos já o expõe com nome (mentor das próprias duplas,
+    // supervisor, coordenação), então o mentorado vê "Otávio sugeriu" em
+    // vez do fallback "Seu mentor" — sem abrir leitura em profiles
+    const nomeContato = new Map(
+      contatos
+        .filter((c) => c.id != null && (c.nome_social || c.nome) != null)
+        .map((c) => [c.id!, (c.nome_social || c.nome)!] as const)
     );
 
     // o nome do direcionado entra como embed `desejado` — o que o rail e as
@@ -276,6 +286,11 @@ export const getJovemPedidosEspecialista = cache(
         (s.especialista_desejado_id &&
         nomePorId.has(s.especialista_desejado_id)
           ? { nome: nomePorId.get(s.especialista_desejado_id)! }
+          : null),
+      solicitante:
+        s.solicitante ??
+        (s.created_by && nomeContato.has(s.created_by)
+          ? { nome: nomeContato.get(s.created_by)! }
           : null),
     }));
 

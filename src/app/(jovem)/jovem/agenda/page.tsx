@@ -47,11 +47,13 @@ import {
   getJovemDuplas,
   getJovemEncontros,
   getJovemPedidosEspecialista,
+  getJovemPerfil,
 } from "@/lib/queries-jovem";
 import { getSlotsLivres } from "@/lib/queries-especialista";
 import { getCicloEventos, getMe } from "@/lib/queries";
 import { getJovemAvaliacoes } from "@/lib/queries-avaliacao";
 import type { JovemEncontro } from "@/lib/queries-jovem";
+import type { Disponibilidade } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Agenda" };
@@ -80,7 +82,7 @@ const STATUS = {
 } as const;
 
 export default async function JovemAgenda() {
-  const [encontros, avaliacoes, me, duplas, eventos, contatos, pedidosEsp] =
+  const [encontros, avaliacoes, me, duplas, eventos, contatos, pedidosEsp, perfil] =
     await Promise.all([
       getJovemEncontros(),
       getJovemAvaliacoes(),
@@ -89,6 +91,7 @@ export default async function JovemAgenda() {
       getCicloEventos(),
       getJovemContatos(),
       getJovemPedidosEspecialista(),
+      getJovemPerfil(),
     ]);
   const agora = new Date().getTime();
   const primeiroNome = (me?.nome_social || me?.nome || "").split(" ")[0];
@@ -177,6 +180,10 @@ export default async function JovemAgenda() {
     contatos.find((c) => c.papel === "coordenacao")?.whatsapp,
     `Olá! Sou ${me?.nome_social || me?.nome || ""}, mentorado(a) do programa, e preciso falar com a equipe.`
   );
+  // a grade do jovem marca nos chips/slots do especialista os horários que
+  // encaixam nela ("encaixa com você" — mesma régua da mesa de negociação)
+  const dispJovem =
+    (perfil?.disponibilidade as Disponibilidade | null | undefined) ?? null;
   const espPorDupla = new Map(
     duplasEsp.map((d) => {
       // a view rotula por trilha desde a 0076: na dupla esp o contato do
@@ -316,6 +323,7 @@ export default async function JovemAgenda() {
                           slots={slots}
                           meuId={me?.id ?? ""}
                           waCoord={waCoord}
+                          disponibilidade={dispJovem}
                         />
                       </div>
                     ) : slots.length === 0 ? (
@@ -347,6 +355,7 @@ export default async function JovemAgenda() {
                         trilhasAtivas={trilhasAtivasEsp}
                         slotsPorEsp={{ [d.mentor_id!]: slots }}
                         semDuplaDpp={semDuplaDpp}
+                        disponibilidade={dispJovem}
                       />
                     )}
                   </CardContent>
@@ -373,7 +382,10 @@ export default async function JovemAgenda() {
         <>
           {futuros.length > 0 && (
             <section aria-labelledby="agenda-proximos" className="space-y-2">
-              <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+              <h2
+                id="agenda-proximos"
+                className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground"
+              >
                 Próximos
               </h2>
               <Card>
@@ -394,7 +406,10 @@ export default async function JovemAgenda() {
           )}
           {passados.length > 0 && (
             <section aria-labelledby="agenda-historico" className="space-y-2">
-              <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+              <h2
+                id="agenda-historico"
+                className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground"
+              >
                 Histórico
               </h2>
               <Card>
