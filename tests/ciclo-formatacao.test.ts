@@ -22,6 +22,7 @@ import {
   parseDisponibilidade,
   podeSupervisionar,
   registroTardio,
+  slotCompativel,
   toDateStr,
   ultimoRegistro,
   waLink,
@@ -348,6 +349,42 @@ describe("disponibilidadeNaHora / cruzamentoDisponibilidadeHora (REALIZA-25)", (
       cruzamentoDisponibilidadeHora(mentor, [grade(["ter"], ["manha"])], "qua", 19)
     ).toBe("nenhum");
     expect(cruzamentoDisponibilidadeHora(null, [null], "ter", 19)).toBe("nenhum");
+  });
+});
+
+describe("slotCompativel — o slot do especialista × a grade do jovem (WP6)", () => {
+  // 2025-10-14 = terça; os slots da RPC vêm em timestamptz — a leitura é
+  // sempre no fuso do programa, nunca no da máquina
+  it("casa quando o dia e a hora (em SP) caem numa janela da grade", () => {
+    const jovem = grade(["ter"], ["tarde"]);
+    // 18h UTC = 15h em SP — a régua certa é a de Brasília
+    expect(slotCompativel(jovem, "2025-10-14T18:00:00Z")).toBe(true);
+    // 21h UTC = 18h em SP — tarde termina às 18, vira noite
+    expect(slotCompativel(jovem, "2025-10-14T21:00:00Z")).toBe(false);
+    // com offset explícito idem — 9h SP é manhã, não tarde
+    expect(slotCompativel(jovem, "2025-10-14T09:00:00-03:00")).toBe(false);
+  });
+
+  it("dia fora da grade não casa, nem na hora certa; slot inválido = false", () => {
+    const jovem = grade(["ter"], ["tarde"]);
+    // quarta 15h — a hora bate, o dia não
+    expect(slotCompativel(jovem, "2025-10-15T15:00:00-03:00")).toBe(false);
+    expect(slotCompativel(jovem, "não-é-data")).toBe(false);
+    expect(slotCompativel(null, "2025-10-14T15:00:00-03:00")).toBe(false);
+    expect(slotCompativel(undefined, "2025-10-14T15:00:00-03:00")).toBe(false);
+  });
+
+  it("grade sem períodos é coringa — o dia todo vale; madrugada UTC ainda é terça em SP", () => {
+    expect(slotCompativel(grade(["ter"]), "2025-10-14T07:00:00-03:00")).toBe(
+      true
+    );
+    // 00:30 UTC de quarta = 21:30 de terça em SP — lê o dia/hora de SP
+    expect(
+      slotCompativel(grade(["ter"], ["noite"]), "2025-10-15T00:30:00Z")
+    ).toBe(true);
+    expect(
+      slotCompativel(grade(["qua"], ["noite"]), "2025-10-15T00:30:00Z")
+    ).toBe(false);
   });
 });
 

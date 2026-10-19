@@ -38,6 +38,7 @@ import {
   formatDateTime,
   formatDiaMes,
   linkSeguro,
+  passoEsp,
   toDateStr,
   waLink,
 } from "@/lib/ciclo";
@@ -104,17 +105,29 @@ export default async function JovemHome() {
   const agora = new Date();
   const hoje = toDateStr(agora);
 
-  // a dupla "atual" é a ativa/pausada; sem ela cai na mais recente (uma dupla
-  // concluída continua sendo referência — contatos e histórico seguem dela)
+  // a dupla "atual" é a DPP ativa/pausada — ela é o eixo da mentoria e o
+  // mentor não pode sumir porque uma trilha esp (mais nova) entrou depois;
+  // sem DPP viva cai na esp ativa (a mentoria dela é a que está em curso) e
+  // por último na mais recente (concluída segue referência de contatos)
+  const ativas = duplas.filter(
+    (d) => d.status === "ativa" || d.status === "pausada"
+  );
   const duplaAtual =
-    duplas.find((d) => d.status === "ativa" || d.status === "pausada") ??
+    ativas.find((d) => d.trilha !== "especialista") ??
+    ativas[0] ??
     duplas[0] ??
     null;
   const duplaEmCurso = duplaAtual?.status === "ativa" || duplaAtual?.status === "pausada";
 
-  // contatos da dupla atual + a coordenação (dupla_id null na view)
+  // contatos de TODAS as duplas vivas + a coordenação (dupla_id null na
+  // view) — o especialista da trilha esp é contato real, não some porque a
+  // "dupla atual" é a DPP
+  const idsVivas = new Set(ativas.map((d) => d.id));
   const contatosAtuais = contatos.filter(
-    (c) => c.dupla_id == null || c.dupla_id === duplaAtual?.id
+    (c) =>
+      c.dupla_id == null ||
+      idsVivas.has(c.dupla_id) ||
+      c.dupla_id === duplaAtual?.id
   );
   const porPapel = (papel: string): JovemContato[] =>
     contatosAtuais.filter((c) => c.papel === papel);
@@ -199,20 +212,53 @@ export default async function JovemHome() {
     perfil != null &&
     disponibilidadeVazia(perfil.disponibilidade as Disponibilidade | null);
 
-  // pedidos de especialista (REALIZA-112): o gate da demanda é o da RPC —
-  // só quem NÃO tem trilha de especialista ativa/pausada precisa contar o
-  // porquê; e sem dupla DPP ativa o pedido entra na triagem da coordenação
-  const trilhasAtivasEsp = duplas
-    .filter(
+  // card-CTA da home: a trilha de especialista mais "viva" — a que tem a
+  // próxima sessão mais perto; sem sessão marcada, a mais nova (até 3
+  // trilhas podem correr em paralelo, mas o card mostra uma — a página de
+  // especialistas lista todas)
+  const trilhaResumo = (() => {
+    const ativas = duplas.filter(
       (d) =>
         d.trilha === "especialista" &&
         (d.status === "ativa" || d.status === "pausada") &&
-        d.mentor_id != null
-    )
-    .map((d) => d.mentor_id!);
-  const semDuplaDpp = !duplas.some(
-    (d) => d.trilha !== "especialista" && d.status === "ativa"
-  );
+        d.id != null
+    );
+    const comProx = ativas
+      .map((d) => {
+        const enc = encontros.filter((e) => e.dupla_id === d.id);
+        // a próxima sessão marcada; sem ela, a tentativa que cobriria o
+        // próximo passo (o passoEsp dá o rank entre realizados nos dois)
+        const prox = futuros.find((e) => e.dupla_id === d.id) ?? null;
+        const alvo = prox ?? {
+          numero: enc.reduce((m, e) => Math.max(m, e.numero), 0) + 1,
+          status: "agendado" as const,
+        };
+        return { d, prox, sessao: passoEsp(alvo, enc) };
+      })
+      .sort((a, b) => {
+        if (a.prox && b.prox)
+          return (
+            new Date(a.prox.data_hora!).getTime() -
+            new Date(b.prox.data_hora!).getTime()
+          );
+        if (a.prox) return -1;
+        if (b.prox) return 1;
+        return (b.d.iniciada_em ?? "").localeCompare(a.d.iniciada_em ?? "");
+      })[0];
+    if (!comProx) return null;
+    return {
+      tema: comProx.d.demanda ?? "Trilha de especialista",
+      espNome:
+        (
+          comProx.d.mentor_nome_social ||
+          comProx.d.mentor_nome ||
+          ""
+        ).split(" ")[0] || "seu especialista",
+      sessao: comProx.sessao,
+      proxima: comProx.prox?.data_hora ?? null,
+      pausada: comProx.d.status === "pausada",
+    };
+  })();
 
   return (
     <div className="grid gap-8">
@@ -442,20 +488,16 @@ export default async function JovemHome() {
         </Card>
       </section>
 
-      {/* Especialistas (REALIZA-112) — o convite pra pedir apoio + os
-          pedidos em andamento com a mesa de negociação do jovem. Some quando
-          o profile ainda não tem ficha de mentorado vinculada — a RPC
-          negaria e a home não promete gesto impossível */}
+      {/* Especialistas (mock v6) — card-CTA vivo: o estado mais urgente
+          (sugestão > trilha > pedido > convite) linka pra página, onde a
+          mesa de negociação e o catálogo moram de verdade. Some quando o
+          profile ainda não tem ficha de mentorado vinculada. */}
       <JovemEspecialistas
         disponivel={perfil != null}
         catalogo={pedidosEsp.catalogo}
         solicitacoes={pedidosEsp.solicitacoes}
-        propostas={pedidosEsp.propostas}
-        slotsPorEsp={pedidosEsp.slotsPorEsp}
-        trilhasAtivas={trilhasAtivasEsp}
-        semDuplaDpp={semDuplaDpp}
-        meuId={me.id}
-        waCoord={waCoord}
+        trilha={trilhaResumo}
+        agoraMs={agora.getTime()}
       />
 
       {/* Suas avaliações (0071) — pendência com CTA + histórico do que já

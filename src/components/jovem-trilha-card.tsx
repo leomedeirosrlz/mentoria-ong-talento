@@ -1,6 +1,12 @@
 import { Check, Circle, Clock, Quotes } from "@phosphor-icons/react/dist/ssr";
 import { formatDateTime, passoEsp } from "@/lib/ciclo";
-import type { Devolutiva, JovemDupla } from "@/lib/types";
+import { stepperCicloDeVida } from "@/lib/jovem-especialista";
+import type {
+  Devolutiva,
+  Dupla,
+  JovemDupla,
+  SolicitacaoEspecialista,
+} from "@/lib/types";
 import type { JovemEncontro } from "@/lib/queries-jovem";
 import { avatarPublicUrl } from "@/lib/avatar";
 import { Avatar } from "@/components/avatar";
@@ -65,12 +71,17 @@ const SR_ESTADO: Record<EstadoPasso, string> = {
  *  motivo_encerramento/devolutiva_pdm — o card mostra o desfecho igual. */
 export function JovemTrilhaCard({
   dupla,
+  solicitacao,
   passos,
   encontros,
   devolutivas,
   agoraMs,
 }: {
   dupla: JovemDupla;
+  /** A solicitação que originou a trilha (resolvida pela página — a view
+   *  jovem_duplas não carrega solicitacao_id). Alimenta o stepper de ciclo
+   *  de vida; null = trilha sem pedido à vista (dado antigo/staff). */
+  solicitacao?: SolicitacaoEspecialista | null;
   passos: { numero: number; titulo: string; foco: string | null }[];
   encontros: JovemEncontro[];
   devolutivas: Devolutiva[];
@@ -95,6 +106,27 @@ export function JovemTrilhaCard({
           estadoPasso(daTrilha, p.numero, agoraMs).estado !== "feito"
       )?.numero ?? null)
     : null;
+
+  // a view jovem_duplas é achatada (sem a árvore encontros/mentor que o
+  // tipo Dupla carrega) — o stepper de ciclo de vida lê só
+  // status/iniciada_em/encerrada_em, o nome do mentor e numero+status dos
+  // encontros, todos à mão aqui: a montagem entrega exatamente isso
+  const duplaVida = {
+    id: dupla.id,
+    status: dupla.status,
+    iniciada_em: dupla.iniciada_em,
+    encerrada_em: dupla.encerrada_em,
+    mentor: {
+      nome: dupla.mentor_nome,
+      nome_social: dupla.mentor_nome_social,
+    },
+    encontros: daTrilha,
+  } as unknown as Dupla;
+  const vida = stepperCicloDeVida({
+    solicitacao: solicitacao ?? null,
+    dupla: duplaVida,
+    hoje: new Date(agoraMs),
+  });
 
   return (
     <Card className="animate-enter">
@@ -122,8 +154,67 @@ export function JovemTrilhaCard({
           </span>
         </div>
 
-        {/* stepper — mesma gramática dos dots da TrilhaJornada, sem o estado
-            "registro pendente" (o registro é interno do especialista) */}
+        {/* ciclo de vida pedido→trilha (mock v6 ol.life) — vertical no
+            mobile, 5 colunas a partir de md; um nó "atual" por vez marca a
+            fase onde a trilha está parada */}
+        <ol
+          className="grid md:grid-cols-5 md:gap-2"
+          aria-label="Ciclo de vida da trilha"
+        >
+          {vida.map((p, i) => (
+            <li
+              key={i}
+              className="relative flex gap-2.5 pb-3 last:pb-0 md:flex-col md:gap-1.5 md:pb-0"
+            >
+              {i < vida.length - 1 && (
+                <span
+                  aria-hidden
+                  className="absolute top-6 bottom-0 left-[11px] w-0.5 bg-border md:top-[11px] md:right-[-8px] md:bottom-auto md:left-7 md:h-0.5 md:w-auto"
+                />
+              )}
+              <span
+                className={cn(
+                  "z-10 grid size-6 shrink-0 place-items-center rounded-full border-2 border-border bg-card text-xs font-extrabold text-muted-foreground",
+                  p.estado === "feito" &&
+                    "border-[var(--ok)] bg-[var(--ok)] text-white",
+                  p.estado === "atual" &&
+                    "border-[var(--brand-ink)] bg-[var(--role-mentorado)] text-[var(--brand-ink)]"
+                )}
+              >
+                {p.estado === "feito" ? (
+                  <Check size={13} weight="bold" aria-hidden />
+                ) : (
+                  <span aria-hidden>{i + 1}</span>
+                )}
+                <span className="sr-only">
+                  {p.rotulo} —{" "}
+                  {p.estado === "feito"
+                    ? "concluído"
+                    : p.estado === "atual"
+                      ? "em andamento"
+                      : "a caminho"}
+                </span>
+              </span>
+              <div className="min-w-0">
+                <p
+                  className={cn(
+                    "text-sm leading-snug font-medium",
+                    p.estado === "futuro" && "text-muted-foreground"
+                  )}
+                >
+                  {p.rotulo}
+                </p>
+                {p.data && (
+                  <p className="text-xs text-muted-foreground">{p.data}</p>
+                )}
+              </div>
+            </li>
+          ))}
+        </ol>
+
+        {/* stepper das sessões — mesma gramática dos dots da TrilhaJornada,
+            sem o estado "registro pendente" (o registro é interno do
+            especialista) */}
         <ol className="flex items-start" aria-label="Passos da trilha">
           {passos.map((p, i) => {
             const { estado, encontro } = estadoPasso(

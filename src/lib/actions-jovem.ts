@@ -141,10 +141,11 @@ export async function pedirEspecialistaJovem(input: {
     .eq("id", id)
     .single();
 
-  // o pedido muda a home do jovem, a agenda (dedup por especialista) e o
-  // mural de quem atende (especialista/coordenação na home staff)
+  // o pedido muda a home do jovem, a agenda (dedup por especialista), a
+  // página de especialistas e o mural de quem atende (staff na home)
   revalidatePath("/jovem");
   revalidatePath("/jovem/agenda");
+  revalidatePath("/jovem/especialistas");
   revalidatePath("/");
   return {
     ok: true,
