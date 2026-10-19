@@ -16,8 +16,12 @@ import {
 import type { Page } from "@playwright/test";
 
 // O lado JOVEM do pedido de especialista (REALIZA-112 PR2 / migrations
-// 0073–0075) contra backend real — a vertical inteira pela UI:
-//   1) home /jovem: a seção "Especialistas" com o convite de primeiro pedido;
+// 0073–0075) contra backend real — a vertical inteira pela UI. WP6-R2
+// (REALIZA-139/146) mudou o endereço: a home /jovem ficou só com o
+// card-CTA vivo e a mesa de pedidos + o cardápio foram pra
+// /jovem/especialistas — os asserts de pedido leem a seção #pedidos de lá:
+//   1) home /jovem: o card-CTA — trilha em andamento pro jovem com trilha,
+//      convite "Quer o apoio?" pra quem não tem nada;
 //   2) pedido DIRIGIDO com slot da grade real — par novo, então a demanda
 //      rica é exigida (o gate é por PAR: a trilha ativa do jovem é com OUTRO
 //      especialista, não libera motivo-curto pro alvo novo — bug que este
@@ -98,9 +102,15 @@ test.skip(!appEnvOk(), "sem credenciais de teste (E2E_*) — pula specs de app")
  *  timestamptz em +00:00, o slot da RPC idem. */
 const ms = (iso: string) => new Date(iso).getTime();
 
-/** Seção Especialistas da home do jovem. */
+/** Seção Especialistas da home do jovem — o card-CTA vivo (sugestão >
+ *  trilha > pedido > convite) que linka pra /jovem/especialistas. */
 const secaoEsp = (page: Page) =>
   page.locator('section[aria-labelledby="esp-titulo"]');
+
+/** A mesa de pedidos do jovem — seção "Pedidos em aberto" da página
+ *  /jovem/especialistas (só renderiza quando há pedido visível; os asserts
+ *  de contagem-zero leem o locator vazio igual). */
+const secaoPedidos = (page: Page) => page.locator("section#pedidos");
 
 /** Mural do especialista — section rotulada da home staff. */
 const mural = (page: Page) =>
@@ -230,11 +240,11 @@ test.describe("pedido de especialista pelo jovem (REALIZA-112 PR2)", () => {
   test.beforeEach(convergirSolicitacoes);
   test.afterAll(convergirSolicitacoes);
 
-  test("home /jovem mostra a seção Especialistas com o convite", async ({
+  test("home /jovem: o card-CTA — trilha em andamento × convite quieto", async ({
     page,
   }) => {
     // piso garantido pela convergência: nenhum pedido do jovem no banco —
-    // a seção tem que cair no convite, não num item fantasma
+    // pra ele o card mais urgente é a trilha esp fixture (…00e0, ativa)
     const sols = await buscarViaServiceRole(
       "solicitacoes_especialista",
       `select=id&mentorado_id=eq.${IDS.mentorado}`
@@ -248,11 +258,42 @@ test.describe("pedido de especialista pelo jovem (REALIZA-112 PR2)", () => {
     await expect(
       secao.getByRole("heading", { name: "Especialistas" })
     ).toBeVisible();
+    // estado "trilha em andamento": badge de sessão, tema do pedido de
+    // origem, próximo passo sem horário (o cleanup zera os encontros dela)
     await expect(
-      secao.getByText("Precisa de uma mão em algo específico?")
+      secao.getByText(/Trilha em andamento · sessão \d de 5/)
     ).toBeVisible();
     await expect(
-      secao.getByRole("button", { name: "Pedir apoio de um especialista" })
+      secao.getByText(/mentoria especializada \(vestibular e rotina de estudos\)\.? com Esp/i)
+    ).toBeVisible();
+    await expect(
+      secao.getByText(/sessão \d ainda precisa de horário/i)
+    ).toBeVisible();
+    // o gesto é ir pra página — o link ancora na seção de trilhas
+    const link = secao.getByRole("link", { name: /Abrir minha trilha/ });
+    await expect(link).toHaveAttribute(
+      "href",
+      "/jovem/especialistas#trilhas"
+    );
+
+    // jovem2 — sem trilha nem pedido: o card cai no convite quieto
+    await relogar(page, JOVEM2_EMAIL, SENHA);
+    await page.goto("/jovem");
+    const secao2 = secaoEsp(page);
+    await expect(
+      secao2.getByText("Quer o apoio de um especialista?")
+    ).toBeVisible();
+    await expect(
+      secao2.getByRole("link", { name: "Conhecer" })
+    ).toHaveAttribute("href", "/jovem/especialistas");
+    // e a página de especialistas abre com o cardápio pra ele
+    await secao2.getByRole("link", { name: "Conhecer" }).click();
+    await page.waitForURL("**/jovem/especialistas");
+    await expect(
+      page.getByRole("heading", { name: "Especialistas" })
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Pedir trilha" })
     ).toBeVisible();
   });
 
@@ -260,15 +301,13 @@ test.describe("pedido de especialista pelo jovem (REALIZA-112 PR2)", () => {
     page,
   }) => {
     await loginComSenha(page, JOVEM_EMAIL, SENHA);
-    await page.goto("/jovem");
-    const secao = secaoEsp(page);
+    await page.goto("/jovem/especialistas");
+    const secao = secaoPedidos(page);
     const dialog = page.getByRole("dialog");
 
+    // o gesto "pedir" mora no cardápio — um dialog compartilhado pra página
     await agirComConfirma(
-      () =>
-        secao
-          .getByRole("button", { name: "Pedir apoio de um especialista" })
-          .click(),
+      () => page.getByRole("button", { name: "Pedir trilha" }).click(),
       () => dialog.isVisible()
     );
 
@@ -365,7 +404,7 @@ test.describe("pedido de especialista pelo jovem (REALIZA-112 PR2)", () => {
       ["demanda_especialista", "solicitacao_registrada"].sort()
     );
 
-    // e a home do jovem conta o estado na voz dele — sem refresh manual:
+    // e a página do jovem conta o estado na voz dele — sem refresh manual:
     // a action já rodou router.refresh()
     const item = secao.locator("li", { hasText: "Sessão com Esp" });
     await expect(
@@ -394,15 +433,15 @@ test.describe("pedido de especialista pelo jovem (REALIZA-112 PR2)", () => {
     });
 
     await loginComSenha(page, JOVEM_EMAIL, SENHA);
-    await page.goto("/jovem");
-    const secao = secaoEsp(page);
-    // o pedido em aberto já aparece na lista — o CTA vira "outro pedido"
+    await page.goto("/jovem/especialistas");
+    const secao = secaoPedidos(page);
+    // o pedido em aberto já aparece na lista — o gesto segue o mesmo dialog
     await expect(
       secao.getByText("Esperando Esp responder.")
     ).toBeVisible();
     const dialog = page.getByRole("dialog");
     await agirComConfirma(
-      () => secao.getByRole("button", { name: "Fazer outro pedido" }).click(),
+      () => page.getByRole("button", { name: "Pedir trilha" }).click(),
       () => dialog.isVisible()
     );
     await agirComConfirma(
@@ -445,15 +484,12 @@ test.describe("pedido de especialista pelo jovem (REALIZA-112 PR2)", () => {
     page,
   }) => {
     await loginComSenha(page, JOVEM_EMAIL, SENHA);
-    await page.goto("/jovem");
-    const secao = secaoEsp(page);
+    await page.goto("/jovem/especialistas");
+    const secao = secaoPedidos(page);
     const dialog = page.getByRole("dialog");
 
     await agirComConfirma(
-      () =>
-        secao
-          .getByRole("button", { name: "Pedir apoio de um especialista" })
-          .click(),
+      () => page.getByRole("button", { name: "Pedir trilha" }).click(),
       () => dialog.isVisible()
     );
     await agirComConfirma(
@@ -500,7 +536,7 @@ test.describe("pedido de especialista pelo jovem (REALIZA-112 PR2)", () => {
     expect(sol.dupla_dpp_id).toBe(IDS.duplaDpp);
     expect(sol.created_by).toBe(IDS.jovemProfile);
 
-    // a home conta onde o pedido está — "no mural", não com um nome
+    // a página conta onde o pedido está — "no mural", não com um nome
     await expect(secao.getByText("Pedido no mural")).toBeVisible();
     await expect(
       secao.getByText("Seu pedido tá no mural dos especialistas.")
@@ -550,8 +586,8 @@ test.describe("pedido de especialista pelo jovem (REALIZA-112 PR2)", () => {
     });
 
     await loginComSenha(page, JOVEM_EMAIL, SENHA);
-    await page.goto("/jovem");
-    const secao = secaoEsp(page);
+    await page.goto("/jovem/especialistas");
+    const secao = secaoPedidos(page);
     const item = secao.locator("li", { hasText: "Sessão com Esp" });
     await expect(
       item.getByText("Negociando horário com Esp.")
@@ -634,7 +670,7 @@ test.describe("pedido de especialista pelo jovem (REALIZA-112 PR2)", () => {
     );
     expect(notifs).toHaveLength(1);
 
-    // a home solta o item — pedido aceito vira sessão (mora na agenda)
+    // a página solta o item — pedido aceito vira sessão (mora na agenda)
     await expect(secao.getByText("Sessão com Esp")).toHaveCount(0);
   });
 
@@ -642,18 +678,15 @@ test.describe("pedido de especialista pelo jovem (REALIZA-112 PR2)", () => {
     page,
   }) => {
     await loginComSenha(page, JOVEM2_EMAIL, SENHA);
-    await page.goto("/jovem");
-    const secao = secaoEsp(page);
+    await page.goto("/jovem/especialistas");
+    const secao = secaoPedidos(page);
     await expect(
-      secao.getByRole("heading", { name: "Especialistas" })
+      page.getByRole("heading", { name: "Especialistas" })
     ).toBeVisible();
 
     const dialog = page.getByRole("dialog");
     await agirComConfirma(
-      () =>
-        secao
-          .getByRole("button", { name: "Pedir apoio de um especialista" })
-          .click(),
+      () => page.getByRole("button", { name: "Pedir trilha" }).click(),
       () => dialog.isVisible()
     );
     await agirComConfirma(
@@ -708,7 +741,7 @@ test.describe("pedido de especialista pelo jovem (REALIZA-112 PR2)", () => {
     expect(sol.demanda).toBe(DEMANDA_SEM_DPP);
     expect(sol.created_by).toBe(IDS.jovem2Profile);
 
-    // a home conta o estado na voz dele — e quem tira da fila é a coord
+    // a página conta o estado na voz dele — e quem tira da fila é a coord
     await expect(
       secao.getByText("A coordenação tá olhando seu pedido antes de liberar.")
     ).toBeVisible();
@@ -743,8 +776,8 @@ test.describe("pedido de especialista pelo jovem (REALIZA-112 PR2)", () => {
     });
 
     await loginComSenha(page, JOVEM_EMAIL, SENHA);
-    await page.goto("/jovem");
-    const secao = secaoEsp(page);
+    await page.goto("/jovem/especialistas");
+    const secao = secaoPedidos(page);
     const item = secao.locator("li", { hasText: "Sessão com Esp" });
     await expect(
       item.getByText("Esperando Esp responder.")

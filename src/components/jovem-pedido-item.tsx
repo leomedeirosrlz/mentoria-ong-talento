@@ -7,6 +7,7 @@ import { cancelarSolicitacao } from "@/lib/actions-especialista";
 import { tempoRelativo } from "@/lib/ciclo";
 import { efetivoDe, resumoPedidoJovem } from "@/lib/jovem-especialista";
 import type {
+  Disponibilidade,
   SolicitacaoEspecialista,
   SolicitacaoProposta,
 } from "@/lib/types";
@@ -26,12 +27,16 @@ export function PedidoJovemMesa({
   slots,
   meuId,
   waCoord,
+  disponibilidade,
 }: {
   s: SolicitacaoEspecialista;
   propostas: SolicitacaoProposta[];
   slots: string[];
   meuId: string;
   waCoord: string | null;
+  /** Grade do próprio jovem — pinta "encaixa com você" nos slots da
+   *  contra-proposta; null/undefined = mesa sem o destaque. */
+  disponibilidade?: Disponibilidade | null;
 }) {
   const router = useRouter();
   if (efetivoDe(s) === "aguardando_coord") {
@@ -70,6 +75,7 @@ export function PedidoJovemMesa({
       meuId={meuId}
       papel="mentorado"
       waCoord={waCoord}
+      disponibilidade={disponibilidade}
       onAceito={() => router.refresh()}
     />
   );
@@ -84,6 +90,7 @@ export function PedidoJovemItem({
   meuId,
   waCoord,
   alvo,
+  disponibilidade,
 }: {
   s: SolicitacaoEspecialista;
   propostas: SolicitacaoProposta[];
@@ -93,6 +100,8 @@ export function PedidoJovemItem({
   /** O especialista da mesa (engajado ?? direcionado) — nome/foto vindos do
    *  catálogo jovem_especialistas; null = pedido em broadcast. */
   alvo: { nome: string; avatar_path: string | null } | null;
+  /** Grade do jovem — a mesa marca os slots que encaixam nela. */
+  disponibilidade?: Disponibilidade | null;
 }) {
   const [agoraMs] = useState(() => Date.now());
   const efetivo = efetivoDe(s);
@@ -139,6 +148,7 @@ export function PedidoJovemItem({
           slots={slots}
           meuId={meuId}
           waCoord={waCoord}
+          disponibilidade={disponibilidade}
         />
       </div>
     </li>

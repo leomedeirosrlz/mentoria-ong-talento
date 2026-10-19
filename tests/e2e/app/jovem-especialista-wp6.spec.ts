@@ -162,12 +162,27 @@ test.describe("WP6 — especialista do lado do jovem", () => {
         .getByText(DEMANDA_SUG)
     ).toHaveCount(0);
 
-    // --- o jovem confirma na página de especialistas ---
+    // --- o jovem vê a sugestão COM O NOME DO AUTOR, não "Seu mentor" ---
+    // RLS impede o jovem de ler profiles do autor: a query costura o nome
+    // via jovem_contatos (o mentor dele já é contato). Sem o stitch cai no
+    // fallback "Seu mentor sugeriu…" — este assert trava o bug.
     await relogar(page, JOVEM_EMAIL, SENHA);
+    await page.goto("/jovem");
+    const cardHome = page.locator('section[aria-labelledby="esp-titulo"]');
+    await expect(
+      cardHome.getByText("Sugestão esperando sua resposta")
+    ).toBeVisible();
+    await expect(cardHome.getByText(/Mentor sugeriu/)).toBeVisible();
+    await expect(
+      cardHome.getByRole("link", { name: "Ver a sugestão" })
+    ).toHaveAttribute("href", "/jovem/especialistas");
+
     await page.goto("/jovem/especialistas");
     await expect(
-      page.getByText(/sugeriu um especialista pra você/i)
+      page.getByText("Mentor E2E sugeriu um especialista pra você")
     ).toBeVisible();
+    await expect(page.getByText(/Pensando em:/)).toBeVisible();
+    await expect(page.getByText("Esp Dois E2E").first()).toBeVisible();
     await expect(page.getByText(DEMANDA_SUG)).toBeVisible();
     await page.getByRole("button", { name: /Quero seguir/ }).click();
     await page
@@ -181,6 +196,17 @@ test.describe("WP6 — especialista do lado do jovem", () => {
     sol = await solDoJovem();
     expect(sol!.status).toBe("aberta");
     expect(sol!.especialista_desejado_id).toBe(IDS.esp2Profile);
+
+    // o card-CTA da home troca de estado: a sugestão saiu e a prioridade
+    // cai pra trilha em andamento (pedido dirigido aberto apareceria no
+    // mural-badge, mas a trilha viva com o Esp E2E é mais urgente)
+    await page.goto("/jovem");
+    await expect(
+      cardHome.getByText(/Trilha em andamento · sessão \d de 5/)
+    ).toBeVisible();
+    await expect(
+      cardHome.getByRole("link", { name: "Abrir minha trilha" })
+    ).toHaveAttribute("href", "/jovem/especialistas#trilhas");
 
     // o especialista foi avisado; o mentor autor também
     const sinos = await buscarViaServiceRole<
@@ -282,7 +308,15 @@ test.describe("WP6 — especialista do lado do jovem", () => {
 
     await relogar(page, JOVEM_EMAIL, SENHA);
     await page.goto("/jovem/especialistas");
-    await expect(page.getByText(TEXTO_DEVOLUTIVA)).toBeVisible();
+    // feed datado dentro do card da trilha — stepper de 5 passos + feed
+    const trilha = page.locator("section#trilhas");
+    await expect(
+      trilha.locator('ol[aria-label="Passos da trilha"] li')
+    ).toHaveCount(5);
+    await expect(trilha.getByText("Devolutivas da trilha")).toBeVisible();
+    await expect(trilha.getByText(TEXTO_DEVOLUTIVA)).toBeVisible();
+    // autor assinado — o jovem lê quem escreveu
+    await expect(trilha.getByText(/Esp E2E ·/)).toBeVisible();
   });
 
   test("mentor híbrido aparece no catálogo do jovem (has_papel)", async ({

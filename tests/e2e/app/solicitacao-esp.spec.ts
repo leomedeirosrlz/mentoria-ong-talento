@@ -376,26 +376,27 @@ test.describe("solicitação de especialista v2 — fluxo staff (REALIZA-112)", 
     await page.goto("/");
     const card = mural(page).locator("li", { hasText: DEMANDA_CONTRA });
     await expect(card.getByText("Direcionada a você")).toBeVisible();
+    // a contra-proposta não é mais um Select: é a grade de dias do mock v6 —
+    // cada horário livre do especialista vira um radio (input sr-only, o
+    // <label> pai recebe o clique e ativa a escolha)
     await agirComConfirma(
       () =>
         card.getByRole("button", { name: "Propor outro horário" }).click(),
-      () => card.getByLabel("Novo horário").isVisible()
+      () =>
+        card
+          .getByRole("radiogroup", { name: "Horários livres do especialista" })
+          .isVisible()
     );
-    await agirComConfirma(
-      () => card.getByLabel("Novo horário").click(),
-      () => page.getByRole("option").first().isVisible()
-    );
-    const options = page.getByRole("option");
-    await agirComConfirma(
-      () => options.first().click(),
-      async () =>
-        (await card.getByLabel("Novo horário").textContent())?.includes("às") ??
-        false
-    );
+    const radios = card.getByRole("radio", { name: / às \d{2}:\d{2}/ });
+    await expect(radios.first()).toHaveCount(1, { timeout: 15_000 });
     const rotuloProposto = (
-      await card.getByLabel("Novo horário").textContent()
+      await radios.first().getAttribute("aria-label")
     )!.trim();
     const isoProposto = isoDoRotulo(rotuloProposto);
+    await agirComConfirma(
+      () => radios.first().locator("xpath=..").click(),
+      async () => radios.first().isChecked()
+    );
     await card.getByLabel("Mensagem da contra-proposta").fill(MSG_CONTRA);
     await agirComConfirma(
       () => card.getByRole("button", { name: "Propor", exact: true }).click(),

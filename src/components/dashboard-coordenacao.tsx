@@ -31,6 +31,7 @@ import { CopiarResumoButton } from "@/components/copiar-resumo-button";
 import { DuplaNomes } from "@/components/dupla-nomes";
 import { AvisosSection } from "@/components/avisos-section";
 import { SolicitacoesCoordCard } from "@/components/solicitacoes-coord-card";
+import { TrilhasCoordPanel } from "@/components/trilhas-coord-panel";
 import { SupervisaoDialog } from "@/components/supervisao-dialog";
 import { SupervisoesSection } from "@/components/supervisoes-section";
 import { WhatsAppRapido, type DestinoWA } from "@/components/whatsapp-rapido";
@@ -625,6 +626,16 @@ export function DashboardCoordenacao({
               <SolicitacoesCoordCard
                 solicitacoes={solicitacoes}
                 turmas={turmas}
+              />
+            )}
+
+            {/* painel read-only das trilhas de especialista (WP6): KPIs +
+                pedidos parados + atalho pra ficha — observar sem agir */}
+            {!supervisor && (
+              <TrilhasCoordPanel
+                duplas={duplas}
+                solicitacoes={solicitacoes}
+                hoje={hoje}
               />
             )}
           </aside>

@@ -16,13 +16,12 @@ import {
   nomeEspDoPedido,
   pedidoEmAberto,
 } from "@/lib/jovem-especialista";
-import { JovemEspecialistaCard } from "@/components/jovem-especialista-card";
+import { CatalogoJovem } from "@/components/catalogo-jovem";
 import { JovemTrilhaCard } from "@/components/jovem-trilha-card";
 import { SugestaoEspecialistaCard } from "@/components/jovem-sugestao-card";
-import { PedirEspecialistaDialog } from "@/components/pedir-especialista-dialog";
 import { PedidoJovemItem } from "@/components/jovem-pedido-item";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import type { Disponibilidade, JovemDupla } from "@/lib/types";
 
 export const metadata: Metadata = { title: "Especialistas" };
 
@@ -85,9 +84,17 @@ export default async function JovemEspecialistasPage() {
   const devolutivas = await getDevolutivas(
     trilhas.map((d) => d.id!)
   );
-  // o autor da devolutiva é o mentor da trilha (ou a coordenação) — o nome
-  // vem do embed da própria dupla; mentorado não lê profiles direto
-  const nomeAutor = new Map(
+  // o autor da devolutiva é quase sempre o especialista da trilha — mas a
+  // coordenação também posta (postar_devolutiva aceita staff). mentorado
+  // não lê profiles: o nome sai de jovem_contatos (mentor, supervisor,
+  // coordenação são alcançáveis), com o mentor da dupla como fallback —
+  // atribuir uma devolutiva da coord ao especialista seria errado
+  const nomeContato = new Map(
+    contatos
+      .filter((c) => c.id != null && (c.nome_social || c.nome) != null)
+      .map((c) => [c.id!, (c.nome_social || c.nome)!] as const)
+  );
+  const nomeMentor = new Map(
     trilhas.map((d) => [
       d.id,
       d.mentor_nome_social || d.mentor_nome || "Equipe",
@@ -95,7 +102,10 @@ export default async function JovemEspecialistasPage() {
   );
   const feedComAutor = devolutivas.map((v) => ({
     ...v,
-    autor: { nome: nomeAutor.get(v.dupla_id) ?? "Equipe" },
+    autor: {
+      nome:
+        nomeContato.get(v.autor_id) ?? nomeMentor.get(v.dupla_id) ?? "Equipe",
+    },
   }));
 
   const trilhasAtivas = trilhas
@@ -115,7 +125,32 @@ export default async function JovemEspecialistasPage() {
         (ORDEM[efetivoDe(a)] ?? 9) - (ORDEM[efetivoDe(b)] ?? 9) ||
         b.created_at.localeCompare(a.created_at)
     );
-  const lotado = solicitacoes.filter(pedidoEmAberto).length >= 3;
+  const abertos = solicitacoes.filter(pedidoEmAberto);
+  const lotado = abertos.length >= 3;
+  // a grade do jovem pinta o "encaixa com você" na mesa de negociação
+  const dispJovem = (perfil?.disponibilidade ?? null) as Disponibilidade | null;
+
+  /** A solicitação que originou a trilha — o aceite grava `dupla_id` nela,
+   *  mas o follow-up de sessão seguinte também nasce com `dupla_id` (e
+   *  'aberta' ordena antes de 'aceita'): entre os matches, o pedido-origem
+   *  é o `aceita` — senão o stepper conta a história do pedido novo com a
+   *  trilha velha. Sem match (view sem solicitacao_id, aceite por caminho
+   *  staff, dado antigo) cai na mais recente do mesmo par. */
+  const solDaTrilha = (d: JovemDupla) => {
+    const vinculadas = solicitacoes.filter((s) => s.dupla_id === d.id);
+    return (
+      vinculadas.find((s) => s.status === "aceita") ??
+      vinculadas.sort((a, b) => a.created_at.localeCompare(b.created_at))[0] ??
+      solicitacoes
+        .filter(
+          (s) =>
+            s.especialista_id === d.mentor_id ||
+            s.especialista_desejado_id === d.mentor_id
+        )
+        .sort((a, b) => b.created_at.localeCompare(a.created_at))[0] ??
+      null
+    );
+  };
 
   if (!disponivel) {
     // sem ficha de mentorado a RPC negaria — a página diz por que em vez de
@@ -148,6 +183,37 @@ export default async function JovemEspecialistasPage() {
         </p>
       </header>
 
+      {/* os três gestos separados na própria página (mock v6 .three) — a
+          confusão real era chamar tudo de "pedir especialista": o chamado
+          é outro sistema e a sessão não existe sem trilha */}
+      <div
+        role="note"
+        aria-label="Três coisas diferentes"
+        className="grid gap-2 text-xs leading-relaxed text-muted-foreground sm:grid-cols-3"
+      >
+        <p className="rounded-lg border border-[var(--role-mentorado)]/50 bg-[var(--role-mentorado)]/10 p-3">
+          <span className="mb-0.5 block font-semibold text-foreground">
+            Pedir uma trilha
+          </span>
+          É o que esta página faz. Seu pedido vai ao mural e um
+          especialista aceita — não passa pela coordenação.
+        </p>
+        <p className="rounded-lg border border-border p-3">
+          <span className="mb-0.5 block font-semibold text-foreground">
+            Agendar uma sessão
+          </span>
+          Só existe dentro de uma trilha ativa, nos horários da grade do
+          especialista.
+        </p>
+        <p className="rounded-lg border border-border p-3">
+          <span className="mb-0.5 block font-semibold text-foreground">
+            Pedir apoio à coordenação
+          </span>
+          Outra coisa: é um chamado (agenda, metodologia, urgência…). Link
+          no fim da página.
+        </p>
+      </div>
+
       {sugestoes.length > 0 && (
         <section aria-label="Sugestões do seu mentor" className="space-y-3">
           {sugestoes.map((s) => (
@@ -157,7 +223,12 @@ export default async function JovemEspecialistasPage() {
       )}
 
       {trilhas.length > 0 && (
-        <section aria-labelledby="trilhas-titulo" className="space-y-3">
+        // id="trilhas": o card-CTA da home ancora aqui ("Abrir minha trilha")
+        <section
+          id="trilhas"
+          aria-labelledby="trilhas-titulo"
+          className="space-y-3"
+        >
           <h2
             id="trilhas-titulo"
             className="flex items-center gap-2 font-semibold"
@@ -169,6 +240,7 @@ export default async function JovemEspecialistasPage() {
               <JovemTrilhaCard
                 key={d.id}
                 dupla={d}
+                solicitacao={solDaTrilha(d)}
                 passos={passos}
                 encontros={encontros}
                 devolutivas={feedComAutor}
@@ -180,7 +252,8 @@ export default async function JovemEspecialistasPage() {
       )}
 
       {visiveis.length > 0 && (
-        <section aria-labelledby="pedidos-titulo">
+        // id="pedidos": o card "pedido em andamento" do catálogo ancora aqui
+        <section id="pedidos" aria-labelledby="pedidos-titulo">
           <h2
             id="pedidos-titulo"
             className="mb-3 flex items-center gap-2 font-semibold"
@@ -209,6 +282,7 @@ export default async function JovemEspecialistasPage() {
                       meuId={me.id}
                       waCoord={waCoord}
                       alvo={alvo}
+                      disponibilidade={dispJovem}
                     />
                   );
                 })}
@@ -226,43 +300,14 @@ export default async function JovemEspecialistasPage() {
           <Sparkle size={18} className="text-muted-foreground" aria-hidden />
           Quem pode te ajudar
         </h2>
-        {catalogo.length === 0 ? (
-          <Card>
-            <CardContent className="py-5 text-sm text-muted-foreground">
-              Ainda não tem especialista disponível pra sua turma — a
-              coordenação avisa quando entrar alguém.
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="grid gap-4 sm:grid-cols-2">
-            {catalogo.map((e) => (
-              <JovemEspecialistaCard
-                key={e.id}
-                e={e}
-                trilhasAtivas={trilhasAtivas}
-                slotsPorEsp={slotsPorEsp}
-                semDuplaDpp={semDuplaDpp}
-                lotado={lotado}
-              />
-            ))}
-          </div>
-        )}
-        {!lotado && catalogo.length > 0 && (
-          <div className="mt-4">
-            <PedirEspecialistaDialog
-              especialistas={catalogo}
-              trilhasAtivas={trilhasAtivas}
-              slotsPorEsp={slotsPorEsp}
-              semDuplaDpp={semDuplaDpp}
-              trigger={
-                <Button size="sm" variant="outline">
-                  <Sparkle size={15} aria-hidden />
-                  Pedir sem escolher — a coordenação direciona
-                </Button>
-              }
-            />
-          </div>
-        )}
+        <CatalogoJovem
+          catalogo={catalogo}
+          trilhasAtivas={trilhasAtivas}
+          slotsPorEsp={slotsPorEsp}
+          semDuplaDpp={semDuplaDpp}
+          lotado={lotado}
+          pedidosAbertos={abertos}
+        />
       </section>
     </div>
   );
