@@ -1518,13 +1518,16 @@ export function demoTrilhasDosJovens(
  *  pelo caller, que passa as próprias duplas). */
 export function demoUltimasInteracoes(
   role: AppRole,
-  duplaIds: string[]
+  duplaIds: string[],
+  // mesmo contrato da real: filtra por tipo — o cap de 48h mede o último
+  // nudge, não o último contato de qualquer tipo
+  tipo?: Interacao["tipo"]
 ): Record<string, Interacao> {
   if (duplaIds.length === 0) return {};
   const ids = new Set(duplaIds);
   const ultimas: Record<string, Interacao> = {};
   for (const i of [...getDemoData().interacoes]
-    .filter((x) => ids.has(x.dupla_id))
+    .filter((x) => ids.has(x.dupla_id) && (tipo == null || x.tipo === tipo))
     .sort((a, b) => b.created_at.localeCompare(a.created_at))) {
     // a lista vem desc — a primeira ocorrência de cada dupla é a mais recente
     ultimas[i.dupla_id] ??= i;

@@ -8,6 +8,7 @@ import {
   getMinhasDuplas,
 } from "@/lib/queries";
 import { getSupervisaoAlvos } from "@/lib/queries-supervisao";
+import { getUltimasInteracoes } from "@/lib/interacoes";
 import { temPapel } from "@/lib/types";
 import { DuplasLista, type VisaoDuplas } from "@/components/duplas-lista";
 
@@ -56,6 +57,12 @@ export default async function DuplasPage() {
       ? getEspecialistaEventos()
       : Promise.resolve([]),
   ]);
+  // o "Lembrar" da coordenação lê o cap de 48h (último nudge da dupla) —
+  // só ela renderiza o botão, os demais não pagam a leitura
+  const nudges =
+    visao === "coordenacao"
+      ? await getUltimasInteracoes(lista.map((d) => d.id), "nudge")
+      : {};
 
   return (
     <DuplasLista
@@ -66,6 +73,7 @@ export default async function DuplasPage() {
       meuNome={me.nome.split(" ")[0]}
       supervisaoAlvos={alvos}
       especialistaEventos={espEventos}
+      nudges={nudges}
     />
   );
 }

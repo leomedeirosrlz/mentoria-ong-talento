@@ -54,7 +54,7 @@ export default async function HomePage({
       getContagemPessoas(),
       getSolicitacoesVisiveis(),
     ]);
-    const interacoes = await getUltimasInteracoes(duplas.map((d) => d.id));
+    const interacoes = await getUltimasInteracoes(duplas.map((d) => d.id), "nudge");
     return (
       <div className="space-y-8">
         {assinatura?.status !== "assinado" && <TermoBanner />}
@@ -82,7 +82,7 @@ export default async function HomePage({
       getSupervisoesRecentes(),
       getSupervisaoAlvos(),
     ]);
-    const interacoes = await getUltimasInteracoes(duplas.map((d) => d.id));
+    const interacoes = await getUltimasInteracoes(duplas.map((d) => d.id), "nudge");
     return (
       <div className="space-y-8">
         {assinatura?.status !== "assinado" && <TermoBanner />}
