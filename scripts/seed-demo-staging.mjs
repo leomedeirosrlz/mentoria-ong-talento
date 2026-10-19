@@ -135,13 +135,20 @@ async function limpar() {
     ["interacoes", "dupla_id"], ["interacoes", "autor_id"],
     ["encaminhamentos", "dupla_id"],
     ["avaliacoes_encontro", "dupla_id"], ["avaliacoes_encontro", "encontro_id"], ["avaliacoes_encontro", "respondido_por_profile_id"],
-    ["avaliacao_links", "dupla_id"],
+    ["avaliacao_links", "dupla_id"], ["avaliacao_links", "respondido_por_profile_id"],
+    ["formulario_links", "respondido_por_profile_id"],
+    ["ia_eventos", "profile_id"],
+    ["emails_enviados", "autor_id"],
+    ["encontro_notas", "created_by"],
+    ["registro_anexos", "created_by"],
     ["registros", "created_by"], ["registros", "encontro_id"],
     ["pessoa_notas", "profile_id"], ["pessoa_notas", "mentorado_id"], ["pessoa_notas", "created_by"],
     ["solicitacao_propostas", "solicitacao_id"], ["solicitacao_propostas", "autor_id"],
     // solicitacoes_mural é VIEW — a tabela real é solicitacoes_especialista
     ["solicitacoes_especialista", "id"], ["solicitacoes_especialista", "mentorado_id"],
     ["solicitacoes_especialista", "dupla_id"], ["solicitacoes_especialista", "created_by"],
+    // devolutivas (WP6) — filho de duplas × profiles, antes deles
+    ["devolutivas", "dupla_id"], ["devolutivas", "autor_id"],
     ["especialista_grade", "profile_id"], ["especialista_excecoes", "profile_id"],
     ["encerramentos", "dupla_id"],
     ["formulario_links", "dupla_id"], ["formulario_links", "dest_profile_id"], ["formulario_links", "dest_mentorado_id"],
@@ -301,6 +308,9 @@ const M = {
 };
 
 const jovemProfile = uid(0x140); // profile de login da Ana
+// profile da Larissa — a devolutiva da trilha1 notifica o jovem por
+// profile_id; ela ainda não tem conta (user_id null = convite pendente)
+const larissaProfile = uid(0x141);
 
 const mentorados = [
   { id: M.ana, nome: "Ana Beatriz Souza", email: "jovem@realiza.test", whatsapp: WA(11, 91010001), ong_origem: "ONG Futuro Agora", data_nascimento: "2007-03-14", genero: "feminino", cidade: "São Paulo", uf: "SP", escolaridade: "medio", interesses: ["Medicina", "Vôlei", "Desenho"], objetivos: "Passar no vestibular de Medicina e ser a primeira médica da família.", motivacao: "Quero provar pra mim mesma que dá.", origem: "ONG Futuro Agora", situacao: "ativo", profile_id: jovemProfile, contato_compartilhado: true, disponibilidade: { seg: [], ter: ["19:00-21:00"], qua: ["19:00-21:00"], qui: [], sex: [], sab: ["14:00-16:00"], dom: [] } },
@@ -315,7 +325,7 @@ const mentorados = [
   { id: M.yasmin, nome: "Yasmin Barbosa", whatsapp: WA(11, 91010010), ong_origem: "ONG Futuro Agora", data_nascimento: "2007-07-08", genero: "feminino", cidade: "São Paulo", uf: "SP", escolaridade: "medio", interesses: ["RH", "Liderança", "Dança"], objetivos: "Primeiro emprego em escritório e faculdade de Administração.", origem: "ONG Futuro Agora", situacao: "ativo", disponibilidade: { seg: [], ter: ["19:00-21:00"], qua: [], qui: [], sex: ["19:00-21:00"], sab: [], dom: [] } },
   { id: M.kaique, nome: "Kaique dos Santos", whatsapp: WA(11, 91010011), ong_origem: "Programa Jovem Aprendiz", data_nascimento: "2005-09-21", genero: "masculino", cidade: "São Paulo", uf: "SP", escolaridade: "superior_incompleto", interesses: ["Dados", "Excel", "Futebol"], objetivos: "Trabalhar com análise de dados.", origem: "Programa Jovem Aprendiz", situacao: "ativo", disponibilidade: { seg: ["19:00-21:00"], ter: [], qua: ["19:00-21:00"], qui: [], sex: [], sab: ["10:00-12:00"], dom: [] } },
   { id: M.manuela, nome: "Manuela Rodrigues", whatsapp: WA(11, 91010012), ong_origem: "ONG Futuro Agora", data_nascimento: "2008-10-17", genero: "feminino", cidade: "Santos", uf: "SP", escolaridade: "medio", interesses: ["Escrita", "Jornalismo"], objetivos: "Escrever pra um jornal um dia.", origem: "ONG Futuro Agora", situacao: "ativo", disponibilidade: { seg: [], ter: ["19:00-21:00"], qua: [], qui: [], sex: [], sab: ["11:00-13:00"], dom: [] } },
-  { id: M.larissa, nome: "Larissa Campos", whatsapp: WA(11, 91010013), ong_origem: "Instituto Ponte", data_nascimento: "2009-03-25", genero: "feminino", cidade: "São Paulo", uf: "SP", escolaridade: "medio", interesses: ["Vestibular", "Ansiedade", "Biologia"], objetivos: "Controlar a ansiedade e escolher entre Biologia e Psicologia.", origem: "Instituto Ponte", situacao: "ativo", responsavel: { nome: "Denise Campos", parentesco: "Mãe", whatsapp: WA(11, 91010013) }, disponibilidade: { seg: [], ter: ["19:00-21:00"], qua: [], qui: ["19:00-21:00"], sex: [], sab: [], dom: [] } },
+  { id: M.larissa, nome: "Larissa Campos", whatsapp: WA(11, 91010013), ong_origem: "Instituto Ponte", data_nascimento: "2009-03-25", genero: "feminino", cidade: "São Paulo", uf: "SP", escolaridade: "medio", interesses: ["Vestibular", "Ansiedade", "Biologia"], objetivos: "Controlar a ansiedade e escolher entre Biologia e Psicologia.", origem: "Instituto Ponte", situacao: "ativo", responsavel: { nome: "Denise Campos", parentesco: "Mãe", whatsapp: WA(11, 91010013) }, profile_id: larissaProfile, disponibilidade: { seg: [], ter: ["19:00-21:00"], qua: [], qui: ["19:00-21:00"], sex: [], sab: [], dom: [] } },
   { id: M.beatrizN, nome: "Beatriz Nogueira", whatsapp: WA(11, 91010014), ong_origem: "Escola Estadual Prof. Ramos", data_nascimento: "2007-12-01", genero: "feminino", cidade: "São Paulo", uf: "SP", escolaridade: "medio", interesses: ["Engenharia", "Desenho técnico"], objetivos: "Engenharia civil ou arquitetura.", origem: "Escola parceira", situacao: "ativo", disponibilidade: { seg: ["19:00-21:00"], ter: [], qua: [], qui: ["19:00-21:00"], sex: [], sab: [], dom: [] } },
   { id: M.matheus, nome: "Matheus Henrique Lima", whatsapp: WA(11, 91010015), ong_origem: "Instituto Ponte", data_nascimento: "2004-02-14", genero: "masculino", cidade: "São Paulo", uf: "SP", escolaridade: "superior_incompleto", interesses: ["Concurso público", "Rotina de estudos"], objetivos: "Passar num concurso e ter estabilidade.", origem: "Instituto Ponte", situacao: "desistente", saiu_em: iso(new Date("2026-10-06T10:00:00-03:00")), motivo_saida: "Foi chamado num concurso do município e saiu do estado." },
   // fila aguardando par — UMA pessoa demo só: o card "Sugerir
@@ -340,6 +350,14 @@ profiles.push({
   onboarded_em: iso(new Date("2026-09-04T19:00:00-03:00")),
   cidade: "São Paulo", uf: "SP", interesses: ["Medicina", "Vôlei", "Desenho"],
   data_nascimento: "2007-03-14", genero: "feminino",
+});
+// a Larissa só tem profile porque a devolutiva da trilha dela notifica por
+// profile_id — sem user_id e sem onboarded_em: o convite segue pendente
+profiles.push({
+  id: larissaProfile, nome: "Larissa Campos", email: "larissa.campos@realiza.test",
+  whatsapp: WA(11, 91010013), role: "mentorado", ativo: true,
+  cidade: "São Paulo", uf: "SP", interesses: ["Vestibular", "Ansiedade", "Biologia"],
+  data_nascimento: "2009-03-25", genero: "feminino",
 });
 
 
@@ -774,11 +792,29 @@ await post("comunicados", [
 // mural de especialistas: 1 aberta (genérica), 1 aguardando triagem, 2
 // aceitas→trilhas (a view solicitacoes_mural projeta esta tabela e junta
 // nomes/devolutiva — *_nome e status_efetivo não são colunas reais)
+// + 1 sugerida (WP6): a sugestão do mentor nasce fora dos tetos e do mural,
+// esperando a confirmação da Ana em /jovem/especialistas. O Otávio aponta
+// a Luísa — a área dela é exatamente a demanda — e o texto da demanda é
+// compartilhado com o corpo da notificação (mesmo evento, dois destinos)
+const SUG_ANA_DEMANDA = "A Ana mira Medicina e a ansiedade de prova derruba o simulado — uma trilha curta de ansiedade de desempenho destrava.";
+const SUG_ANA_QUANDO = iso(new Date(Date.now() - DIA)); // ~1 dia atrás
 await post("solicitacoes_especialista", [
   { id: uid(0x1000), mentorado_id: M.gabriela, dupla_dpp_id: D.d5, demanda: "Carreiras em tecnologia", motivo: "A Gabriela quer entender qual área de tech combina com ela antes de escolher o curso técnico.", turma: T1_TURMA, status: "aberta", origem: "staff", created_by: P.ricardo, created_at: iso(new Date("2026-10-08T10:00:00-03:00")) },
   { id: uid(0x1001), mentorado_id: M.igor, demanda: "Orientação vocacional", motivo: "O Igor está dividido entre técnico em eletrônica e mecânica — pediu direto pelo mural do jovem.", turma: null, status: "aguardando_coord", origem: "jovem", created_by: jovemProfile, created_at: iso(new Date("2026-10-12T10:00:00-03:00")) },
   { id: uid(0x1002), mentorado_id: M.larissa, dupla_dpp_id: D.d13, demanda: "Ansiedade de desempenho", motivo: "A Larissa trava em prova — o mentor pediu apoio de especialista.", turma: T1_TURMA, status: "aceita", origem: "staff", especialista_id: P.luisa, dupla_id: D.trilha1, created_by: P.andre, created_at: iso(new Date("2026-09-20T10:00:00-03:00")), respondida_em: iso(new Date("2026-09-22T10:00:00-03:00")) },
   { id: uid(0x1003), mentorado_id: M.enzo, dupla_dpp_id: D.d9, demanda: "Finanças pessoais", motivo: "Enzo queria aprender a cuidar do primeiro salário.", turma: T1_TURMA, status: "aceita", origem: "staff", especialista_id: P.sofia, dupla_id: D.trilha2, created_by: P.gustavo, created_at: iso(new Date("2026-09-05T10:00:00-03:00")), respondida_em: iso(new Date("2026-09-08T10:00:00-03:00")) },
+  { id: uid(0x1004), mentorado_id: M.ana, dupla_dpp_id: D.d1, demanda: SUG_ANA_DEMANDA, motivo: "Quero controlar a ansiedade pra render nos simulados.", turma: T1_TURMA, status: "sugerida", origem: "mentor", especialista_desejado_id: P.luisa, created_by: P.andre, created_at: SUG_ANA_QUANDO },
+]);
+
+// devolutivas (WP6) — o feed datado da trilha Luísa × Larissa: uma de meio
+// de percurso e uma recente (datas relativas ao run, evergreen)
+await post("devolutivas", [
+  { id: uid(0x1400), dupla_id: D.trilha1, autor_id: P.luisa,
+    texto: "Meio do caminho: a Larissa já separa prova de julgamento — o gatilho dela é a sala cheia, não a matéria. Próximas sessões ensaiam simulado curto.",
+    created_at: iso(new Date(Date.now() - 17 * DIA)) },
+  { id: uid(0x1401), dupla_id: D.trilha1, autor_id: P.luisa,
+    texto: "Simulado de 20 questões sem travar — ela saiu do blank com respiração e rascunho. Reta final: consolidar o ritual pré-prova.",
+    created_at: iso(new Date(Date.now() - 3 * DIA)) },
 ]);
 
 await post("supervisoes", [
@@ -824,6 +860,11 @@ await post("notificacoes", [
   { id: uid(0xf01), profile_id: P.coord, tipo: "solicitacao_triagem", titulo: "Nova solicitação aguardando triagem", corpo: "Igor Batista pediu orientação vocacional (sem dupla DPP).", href: "/especialistas", created_at: iso(new Date("2026-10-12T10:05:00-03:00")) },
   { id: uid(0xf02), profile_id: P.sup1, tipo: "comunicado", titulo: "Dupla em risco — Tiago × Lucas", corpo: "2 encontros atrasados no ciclo.", href: `/duplas/${D.d7}`, created_at: iso(new Date("2026-10-14T07:00:00-03:00")) },
   { id: uid(0xf03), profile_id: P.andre, tipo: "supervisao_registrada", titulo: "Sessão de supervisão registrada", corpo: "Paula registrou a supervisão de 25/set — confira o resumo na sua página.", href: "/perfil", lida_em: iso(new Date("2026-09-26T08:00:00-03:00")), created_at: iso(new Date("2026-09-25T20:05:00-03:00")) },
+  // WP6 — sol_notificar da sugerir_especialista_mentor / postar_devolutiva:
+  // a Ana recebe a sugestão do Otávio (mesmo carimbo da row 'sugerida') e a
+  // Larissa é avisada da devolutiva mais recente da trilha dela
+  { id: uid(0xf10), profile_id: jovemProfile, tipo: "sugestao_especialista", titulo: "Seu mentor sugeriu um especialista", corpo: "Ele registrou um tema pra você — confirme ou ajuste na página de especialistas.", href: "/jovem/especialistas", created_at: SUG_ANA_QUANDO },
+  { id: uid(0xf11), profile_id: larissaProfile, tipo: "devolutiva_especialista", titulo: "Nova devolutiva da trilha", corpo: "Luísa Camargo registrou uma devolutiva pra você.", href: "/jovem/especialistas", created_at: iso(new Date(Date.now() - 3 * DIA)) },
 ]);
 
 // especialista_grade: agendas dos especialistas pra projeção de slots

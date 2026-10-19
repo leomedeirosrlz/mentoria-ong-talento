@@ -1632,6 +1632,12 @@ const fmtDia = new Intl.DateTimeFormat("en-CA", {
   day: "2-digit",
 });
 
+const fmtHoraInteira = new Intl.DateTimeFormat("pt-BR", {
+  timeZone: TZ,
+  hour: "2-digit",
+  hourCycle: "h23",
+});
+
 /** "hoje" no fuso do programa — en-CA formata YYYY-MM-DD. */
 export function toDateStr(d: Date): string {
   return fmtDia.format(d);
@@ -1795,6 +1801,29 @@ export function formatDiaSemanaMes(iso: string | null | undefined): string {
  *  grade em /agenda). */
 export function rotuloSlot(iso: string): string {
   return `${formatDiaSemana(iso).replace("-feira", "")} ${formatDiaHora(iso)}`;
+}
+
+/** O slot proposto cai dentro da grade de disponibilidade? Recebe um
+ *  timestamptz (o `inicio` da RPC slots_livres / slot_proposto da mesa) e
+ *  cruza com `Disponibilidade` {dias, periodos} — a régua pra destacar os
+ *  horários do especialista que batem com a grade do jovem (WP6). O dia e a
+ *  hora são lidos no fuso do programa: `new Date(iso).getHours()` daria a
+ *  hora da máquina, que em UTC puxa o slot 3h pra frente — mesma razão pela
+ *  qual a agenda usa Intl com timeZone e nunca getHours(). Slot inválido =
+ *  incompatível (false), não erro. */
+export function slotCompativel(
+  d: Disponibilidade | null | undefined,
+  iso: string
+): boolean {
+  const dt = new Date(iso);
+  if (isNaN(dt.getTime())) return false;
+  // formatToParts, não Number(format()) — se o CLDR passar a renderizar
+  // "19h" em pt-BR, Number() devolvia NaN e todo slot virava incompatível
+  const hora = Number(
+    fmtHoraInteira.formatToParts(dt).find((p) => p.type === "hour")?.value
+  );
+  if (isNaN(hora)) return false;
+  return disponibilidadeNaHora(d, diaSemanaDe(toDateStr(dt)), hora);
 }
 
 /** Sugestões do TagInput de áreas de atuação (onboarding + /perfil + ficha da
