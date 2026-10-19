@@ -696,3 +696,51 @@ Pipeline multi-agent: 3 agentes de recon (cruzaram codebase, schema/RLS e docs/m
 **Gates:** tsc 0 · eslint limpo · vitest **557** (21 agenda-minha + 4 edge: remarcado, sem-data, ordenação numérica, supervisão homônima) · build ok · schema-contract 0 · demo e2e **34/34** · **e2e app no preview: verde**.
 
 **Débitos registrados:** extras do card → **WP5** (decisão Thiago): "Sua semana" strip, seção "Do programa", "Lembrar". **Lembrar — canal decidido: os dois** (wa.me deep link + notificação in-app pro jovem; `waLink()` já existe e o telefone do jovem já é visível na ficha). Warnrow "avaliação do encontro" do mock = **registro pendente** (já coberto — a avaliação do mentor é o campo do registro; e a avaliação DO JOVEM não vira pendência visível ao mentor por privacidade — ele vê só média/★, saber "a Ana não avaliou" vazaria estado individual da jornada dela). Pendência "persona pass em staging" suprimida — e2e-preview verde + spec híbrido a escrever cobrem.
+
+## WP6-R2 — especialistas do jovem fechado (PR #67 · merge fda99ec)
+
+Recon multi-agent confirmou ~80% do WP6 já vivo no PR #60 — este délta fecha
+a superfície do jovem contra o mock v6 + plano, **sem migrations novas** além
+do fix de follow-up (0095).
+
+**Jovem (`/jovem` + `/jovem/especialistas`):** três conceitos explícitos —
+pedir trilha (vai pro mural, quem aceita é o especialista), agendar sessão
+(só dentro de trilha viva), pedir apoio à coord (chamado formal — o wa.me
+saiu). Cardápio com os 5 estados (`varianteDoCard`): sua especialista→Pedir
+próxima sessão · andamento · sem vagas→mural · agenda não aberta→mural ·
+disponível — e follow-up aberto vence "sua" (o CTA quebraria na RPC).
+Preferência "Prefiro esta pessoa" → chip "Sua preferência" + "falta enviar"
+até o envio real. Mesa de negociação vira grade de dias com radios +
+"encaixa com você" (`slotCompativel` cruza `mentorados.disponibilidade` ×
+slots em America/Sao_Paulo via Intl). Stepper de vida datado
+(`stepperCicloDeVida`): sugestão/pedido → mural/triagem → "{Nome} aceitou" →
+sessão N/5 → concluída + devolutiva; fechamento antecipado lê "Encerrada",
+nunca "Concluída". Home CTA vivo: sugestão > trilha > pedido > convite.
+
+**Coordenação:** painel read-only de trilhas esp na home
+(`painelTrilhasCoord` + `trilhas-coord-panel.tsx`): KPIs (ativas, paradas ≥
+limiar, concluídas, sessões realizadas), "Pedidos parados" por local
+(mural/triagem/expirada), trilhas com esperadas×realizadas + próxima sessão +
+prazo + link pra ficha. Aceite é sempre do especialista — painel explicita.
+
+**Especialista:** mural com busca acento-insensível, chips das áreas reais
+do especialista, "Combina com você", e "Já foi aceita por outro
+especialista" só no erro exato da RPC — erro de slot não vira race.
+
+**Backend:** `0095_pedir_esp_followup` — `pedir_especialista_jovem` resolve
+a dupla do par ANTES do teto de 3 trilhas (o teto é sobre pares novos;
+travava todo follow-up de jovem com 3 trilhas). Aplicada em staging e prod
+via Management API, ledger registrado. `queries-jovem` costura nome do
+solicitante/autor de proposta e devolutiva via `jovem_contatos` (RLS do
+mentorado não lê profiles — sugestão mostrava "Seu mentor" em vez do nome).
+
+**Fixtures:** sugestão do mentor + sino com o texto real da RPC, 2
+devolutivas datadas + sino, Camila "Sem vagas", grade seg-noite, Wendel na
+triagem há 6 dias, cleanup cobrindo FKs novas (ia_eventos, emails_enviados,
+avaliacao_links, formulario_links, encontro_notas, registro_anexos).
+
+**Gates:** tsc 0 · eslint 0 · vitest **651** · build ok · demo e2e **54/54**
+· app serial **84/84** (local vs staging — flakes de cold-compile isolados)
+· **e2e-preview verde (136 pass, 15m22s)**. **Dívida conhecida:** notebook offline —
+`nb push` + gates canônicos remotos pendentes; PR aberto via clone local
+do GitHub (histórico = origin/main).
