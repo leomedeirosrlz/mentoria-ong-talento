@@ -817,15 +817,15 @@ function entregasDaEstacao(
 export function estacoesPainelDupla(
   linha: PainelJornadaLinha,
   ctx: PainelTurmaCtx,
-  /** régua da DUPLA (posição dela na jornada) — a janela "aberta" usa
-   *  min(encVigente da turma, posição da dupla), a mesma de
-   *  atrasadasPainel: a coorte pode estar no enc. 12 e a dupla no 4 —
-   *  nesse caso a estação que abre no 9 segue trancada PRA ELA, igual ao
-   *  que a jornada dela mostra (encCorrente). */
+  /** régua da DUPLA (posição dela na jornada) — a janela "aberta" usa a
+   *  posição dela, a mesma que a jovem vê como encCorrente: a coorte pode
+   *  estar no enc. 12 e a dupla no 4 — a estação que abre no 9 segue
+   *  trancada PRA ELA; e dupla à frente do calendário (reposições) já
+   *  passou da janela do lado dela, sem desconto do encVigente. */
   encCorrDupla: number
 ): Record<EstacaoChave, EstacaoPainelEstado> {
   const out = {} as Record<EstacaoChave, EstacaoPainelEstado>;
-  const regua = Math.min(ctx.encVigente, encCorrDupla);
+  const regua = encCorrDupla;
   for (const chave of ESTACAO_CHAVES) {
     if (chave === "avaliacao_encontro") {
       const { feitas, realizados } = linha.avaliacoes_encontro;
@@ -864,7 +864,7 @@ export function estacoesPainelDupla(
 }
 
 /** Estações fora da janela do guia — o recorte da lista de ação do painel.
- *  A régua é `min(encVigente, encCorrDupla)`: a coorte encerrou a janela
+ *  A régua é a posição da dupla (encCorrDupla): a coorte encerrou a janela
  *  E ela já passou pra dupla — dupla recém-emparelhada ou atrasada tem a
  *  janela ainda aberta pra ela e não pode ser flagada por um prazo que
  *  nunca existiu do lado dela (o nudge ao mentor ficaria injusto). */
@@ -873,7 +873,7 @@ export function atrasadasPainel(
   ctx: PainelTurmaCtx,
   encCorrDupla: number
 ): EstacaoChave[] {
-  const regua = Math.min(ctx.encVigente, encCorrDupla);
+  const regua = encCorrDupla;
   return ESTACAO_CHAVES.filter((chave) => {
     if (chave === "avaliacao_encontro") {
       return estados[chave] === "pendente";

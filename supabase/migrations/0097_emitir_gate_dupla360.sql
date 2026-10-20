@@ -47,13 +47,13 @@ begin
   -- genérico — os diferenciais de trilha/status vazariam a classificação
   -- pra qualquer autenticado que chutasse o UUID (execute é de
   -- authenticated, como sempre foi)
-  if not (
+  if (
     public.my_role() = 'coordenacao'
     or (
       public.has_papel('mentor_dpp'::public.app_role)
       and v_dupla.mentor_id = public.my_profile_id()
     )
-  ) then
+  ) is not true then
     raise exception 'sem permissão pra enviar instrumento desta dupla';
   end if;
   if v_dupla.trilha = 'especialista' then
@@ -320,10 +320,17 @@ begin
     select 1 from public.duplas d
      where d.mentorado_id = s.mentorado_id
        and d.mentor_id = p_esp
-       and d.trilha <> 'especialista'
+       and d.trilha is distinct from 'especialista'
        and d.status in ('ativa', 'pausada')
   ) then
     raise exception 'O mentor DPP da jovem não pode assumir também a trilha de especialista';
+  end if;
+
+  -- e o papel tem que estar vivo no aceite: quem perdeu mentor_especialista
+  -- entre proposta e efetivação não herda a dupla (janela curta, mas o
+  -- choke point é o último lugar onde checar)
+  if not public.has_papel(p_esp, 'mentor_especialista'::public.app_role) then
+    raise exception 'O especialista não está mais habilitado pra essa trilha';
   end if;
 
   select d.id into v_dupla from public.duplas d
@@ -441,9 +448,93 @@ from (
       p.id, 'coordenacao'::app_role,
       (select d.turma from public.duplas d
         where d.mentorado_id = public.my_mentorado_id()
-          and coalesce(d.trilha,'dpp') = 'dpp' and d.status = 'ativa'
+          and coalesce(d.trilha,'dpp') = 'dpp'
+          and d.status in ('ativa', 'pausada')
+        -- mesma régua do jovem_jornada: a viva mais recente vence —
+        -- sem ORDER BY duas DPP em ciclos diferentes escolhem turma
+        -- não-determinística; pausada conta (dupla viva ≠ "sem DPP")
+        order by d.iniciada_em desc nulls last, d.created_at desc
         limit 1))
 ) contatos
 where public.my_role() = 'mentorado'::app_role;
+
+-- NULL-trap do gate de autor (0074:684/894) — `my_role() <> 'coordenacao'`
+-- com role NULL devolve NULL, o `and` morre e o raise não dispara: um
+-- autenticado sem papel (pré-cadastrado) aceitava contra-proposta ou
+-- cancelava pedido alheio só conhecendo o UUID. `is distinct from`
+-- trata NULL como "não é coordenação" — e `meu is null` cobre profile
+-- ainda não vinculado (mesma régua do contra_propor).
+create or replace function public.aceitar_proposta(p_id uuid)
+returns uuid language plpgsql security definer set search_path = '' as $$
+declare
+  s public.solicitacoes_especialista%rowtype;
+  meu uuid := public.my_profile_id();
+  v_dupla uuid;
+begin
+  select * into s from public.solicitacoes_especialista
+   where id = p_id for update;
+  if not found then
+    raise exception 'Solicitação não encontrada';
+  end if;
+  if meu is null or (
+    s.created_by is distinct from meu
+    and public.my_role() is distinct from 'coordenacao'
+  ) then
+    raise exception 'Só o autor do pedido aceita a proposta';
+  end if;
+  if s.status <> 'contra_proposta' or s.especialista_id is null then
+    raise exception 'Não há proposta na mesa';
+  end if;
+  if (select p.autor_id from public.solicitacao_propostas p
+      where p.solicitacao_id = s.id
+      order by p.created_at desc limit 1) is distinct from s.especialista_id then
+    raise exception 'A última proposta não é do especialista';
+  end if;
+  if s.slot_proposto is null or s.slot_proposto <= now() then
+    raise exception 'O horário proposto já passou';
+  end if;
+
+  v_dupla := public.sol_efetivar(s.id, s.especialista_id, s.slot_proposto);
+
+  perform public.sol_notificar(s.especialista_id, 'especialista_aceitou',
+    'Proposta aceita',
+    'Sua proposta de horário foi aceita — sessão marcada.',
+    '/');
+  return v_dupla;
+end $$;
+grant execute on function public.aceitar_proposta(uuid) to authenticated;
+
+create or replace function public.cancelar_solicitacao(p_id uuid)
+returns void language plpgsql security definer set search_path = '' as $$
+declare
+  s public.solicitacoes_especialista%rowtype;
+  meu uuid := public.my_profile_id();
+begin
+  select * into s from public.solicitacoes_especialista
+   where id = p_id for update;
+  if not found then
+    raise exception 'Solicitação não encontrada';
+  end if;
+  if meu is null or (
+    s.created_by is distinct from meu
+    and public.my_role() is distinct from 'coordenacao'
+  ) then
+    raise exception 'Só o autor cancela o pedido';
+  end if;
+  if s.status not in ('aberta','aguardando_coord','contra_proposta') then
+    raise exception 'Esse pedido não pode mais ser cancelado';
+  end if;
+
+  perform set_config('realiza.sol_transicao', 'on', true);
+  update public.solicitacoes_especialista
+     set status = 'cancelada', respondida_em = now()
+   where id = s.id;
+
+  perform public.sol_notificar(
+    coalesce(s.especialista_id, s.especialista_desejado_id),
+    'solicitacao_cancelada', 'Pedido de especialista cancelado',
+    'O pedido direcionado a você foi cancelado pelo autor.', '/');
+end $$;
+grant execute on function public.cancelar_solicitacao(uuid) to authenticated;
 
 commit;
