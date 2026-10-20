@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowsLeftRight } from "@phosphor-icons/react";
+import { Collapsible } from "@base-ui/react/collapsible";
+import { ArrowsLeftRight, CaretDown } from "@phosphor-icons/react";
 import { textoEspera } from "@/lib/fila";
 import type { CandidatoMentor, CandidatoMentorado } from "@/lib/remanejo";
 import type { Dupla } from "@/lib/types";
@@ -73,16 +74,28 @@ export function RemanejoSugerido({
   return (
     <section
       aria-labelledby="remanejo-sugerido-titulo"
-      className="rounded-xl border border-[var(--danger)]/40 bg-[var(--danger)]/[0.04] px-4 py-3.5 shadow-[var(--shadow-border)] sm:px-5"
+      className="rounded-xl border border-[var(--danger)]/40 bg-[var(--danger)]/[0.04] shadow-[var(--shadow-border)]"
     >
-      <h2
-        id="remanejo-sugerido-titulo"
-        className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground"
-      >
-        <ArrowsLeftRight size={15} aria-hidden className="shrink-0" />
-        Sugerir remanejamento
-      </h2>
-      <p className="mt-1 text-sm text-muted-foreground">
+      {/* recolhido por padrão (REALIZA-153): o risco já aparece no semáforo,
+          a lista de candidatos é ação de segunda ordem — abre sob demanda */}
+      <Collapsible.Root>
+        <h2 id="remanejo-sugerido-titulo">
+          <Collapsible.Trigger className="group flex w-full cursor-pointer items-center gap-1.5 rounded-xl px-4 py-3.5 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:px-5">
+            <ArrowsLeftRight size={15} aria-hidden className="shrink-0" />
+            Sugerir remanejamento
+            <span className="min-w-0 flex-1 truncate font-normal normal-case tracking-normal">
+              · {motivo}
+            </span>
+            <CaretDown
+              size={14}
+              aria-hidden
+              className="ml-auto shrink-0 transition-transform group-data-[panel-open]:rotate-180"
+            />
+          </Collapsible.Trigger>
+        </h2>
+        <Collapsible.Panel className="h-[var(--collapsible-panel-height)] overflow-hidden transition-[height] duration-150 data-ending-style:h-0 data-starting-style:h-0 [&[hidden]:not([hidden='until-found'])]:hidden">
+          <div className="px-4 pb-3.5 sm:px-5">
+      <p className="text-sm text-muted-foreground">
         {motivo}. Se a conversa não destravar, dá pra trocar um lado sem
         perder o histórico — sugestões por afinidade, a decisão é sua.
       </p>
@@ -244,8 +257,12 @@ export function RemanejoSugerido({
         </button>{" "}
         — o dialog lista todo mundo.
       </p>
+          </div>
+        </Collapsible.Panel>
+      </Collapsible.Root>
 
-      {/* o dialog de sempre, controlado — a sugestão só escolhe lado + par */}
+      {/* o dialog de sempre, controlado — a sugestão só escolhe lado + par.
+          Fora do painel: recolher não pode desmontar um dialog aberto */}
       <RemanejarDuplaDialog
         dupla={dupla}
         trigger={null}

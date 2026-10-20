@@ -339,14 +339,20 @@ test.describe("coordenação — fluxos operacionais", () => {
       'section[aria-labelledby="remanejo-sugerido-titulo"]'
     );
     await expect(card).toBeVisible();
-    await expect(
-      card.getByText("Sugerir remanejamento", { exact: true })
-    ).toBeVisible();
+    // REALIZA-153: o card nasce recolhido — o gatilho carrega o motivo
+    // como "scent" e a lista de candidatos só monta depois do clique
+    const gatilho = card.getByRole("button", {
+      name: /Sugerir remanejamento/,
+    });
+    await expect(gatilho).toHaveAttribute("aria-expanded", "false");
+    await gatilho.click();
+    await expect(gatilho).toHaveAttribute("aria-expanded", "true");
     // WP2: o motivo do card é o 1º sinal do semáforo — o combo baixa +
     // dificuldade plantado. "Pedido de apoio" vive no eixo próprio, fora
-    // dos sinais, então não abre a frase do remanejo
+    // dos sinais, então não abre a frase do remanejo (o gatilho repete o
+    // motivo — a frase completa do painel desambigua)
     await expect(
-      card.getByText(/Avaliação baixa e dificuldade de participação/)
+      card.getByText(/Avaliação baixa e dificuldade de participação.*Se a conversa não destravar/)
     ).toBeVisible();
 
     // pool de mentores: o import (sem dupla) tem vaga e leva Remanejar;
