@@ -847,9 +847,13 @@ await post("supervisoes", [
   { id: uid(0xb10), supervisor_id: P.sup2, mentor_id: P.monica, dupla_id: D.dT2a, data: diaBrt(), resumo: "Primeira supervisão da Mônica com a turma nova — a T2 engatou: o Davi chegou com a meta do curso técnico meio formada. Combinado: ela segura o ritmo semanal e eu reviso os registros dela a cada quinzena.", created_by: P.sup2, created_at: iso(new Date()) },
 ]);
 
-// presenças nos dois encontros de formação (03 e 04/set)
-const eventoForm1 = "f10e9ec6-8ee0-49a4-b7a4-516b2526fd2b";
-const eventoForm2 = "709a7c38-14b3-4cc1-ad36-b3a21f846cad";
+// presenças nos dois encontros de formação (03 e 04/set) — os ids variam
+// por ambiente (staging vs `supabase start`), resolve por data+tipo
+const [evF1] = await rest("ciclo_eventos?select=id&tipo=eq.formacao&data=eq.2026-09-03&order=data.asc&limit=1");
+const [evF2] = await rest("ciclo_eventos?select=id&tipo=eq.formacao&data=eq.2026-09-04&order=data.asc&limit=1");
+if (!evF1 || !evF2) throw new Error("eventos de formação 03/04-set não encontrados");
+const eventoForm1 = evF1.id;
+const eventoForm2 = evF2.id;
 const presencas = [];
 let pi = 0;
 const mentorIds = [P.andre, P.beatriz, P.fernando, P.juliana, P.ricardo, P.camila, P.tiago, P.gustavo, P.patricia, P.leonardo, P.vanessa, P.eduardo, P.luisa, P.marcos, P.sofia, P.pedroH];
@@ -915,10 +919,13 @@ await post("especialista_excecoes", [
 ]);
 
 // assinaturas: termo do voluntário pra maioria dos mentores, mentorando e
-// responsável pra jovens (esp. menores)
-const TPL_VOL = "1725587d-ac54-4bf2-8341-aee025a5208f";
-const TPL_RESP = "77218b10-948c-449b-8362-70c9053b6989";
-const TPL_MENT = "bd803b04-a480-47ac-9f64-a186a46881f8";
+// responsável pra jovens (esp. menores) — ids por slug (variam por ambiente)
+const tplRows = await rest("documento_templates?select=id,slug&slug=in.(termo-voluntario,termo-mentorando,autorizacao-responsavel)");
+const tplId = Object.fromEntries((tplRows ?? []).map((t) => [t.slug, t.id]));
+const TPL_VOL = tplId["termo-voluntario"];
+const TPL_RESP = tplId["autorizacao-responsavel"];
+const TPL_MENT = tplId["termo-mentorando"];
+if (!TPL_VOL || !TPL_RESP || !TPL_MENT) throw new Error("documento_templates do seed.sql ausentes");
 const assinaturas = [];
 let ai = 0;
 const assinado = (tpl, profileId, mentoradoId, quem, quando) => ({

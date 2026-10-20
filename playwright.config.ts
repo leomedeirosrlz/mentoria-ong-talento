@@ -11,7 +11,10 @@ export default defineConfig({
   testDir: "tests/e2e",
   timeout: 30_000,
   retries: process.env.CI ? 1 : 0,
-  workers: process.env.CI ? 1 : undefined,
+  // serial em todo ambiente: os specs app dividem as mesmas fixtures
+  // (dupla e2e…030 e afins) — beforeEach de um arquivo deleta o que outro
+  // criou no meio do teste. `--workers=N` na CLI segue disponível.
+  workers: 1,
   forbidOnly: !!process.env.CI,
   reporter: process.env.CI ? [["github"], ["html", { open: "never" }]] : "list",
   use: {

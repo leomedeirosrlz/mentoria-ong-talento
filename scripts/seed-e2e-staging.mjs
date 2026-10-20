@@ -190,53 +190,6 @@ if (!cron) {
 }
 console.log(`cronograma: ${cron.id} (${cron.turma})`);
 
-// ---- cronograma E2E dedicado + eventos clonados do domínio ----
-// Os specs leem vigente/cobertura por cronograma_id — os eventos têm que
-// existir na turma E2E também (clone verbatim das linhas do domínio).
-{
-  const [tem] = await rest(`cronogramas?select=id&id=eq.${IDS.cronogramaE2e}`);
-  if (!tem) {
-    const [base] = await rest(
-      `cronogramas?select=inicio_em,fim_em,encontros_esperados&id=eq.${cron.id}`
-    );
-    await rest("cronogramas", {
-      method: "POST",
-      body: JSON.stringify({
-        id: IDS.cronogramaE2e,
-        nome: "Calendário oficial · Turma E2E",
-        turma: TURMA_E2E,
-        inicio_em: base?.inicio_em ?? null,
-        fim_em: base?.fim_em ?? null,
-        encontros_esperados: base?.encontros_esperados ?? 16,
-        status: "ativo",
-        created_by: IDS.coordProfile,
-      }),
-    });
-    console.log("cronograma E2E criado");
-  }
-  const evE2e = await rest(
-    `ciclo_eventos?select=id&cronograma_id=eq.${IDS.cronogramaE2e}`
-  );
-  if (!evE2e?.length) {
-    const evDom = await rest(
-      `ciclo_eventos?select=*&cronograma_id=eq.${cron.id}&order=data`
-    );
-    for (const [i, e] of (evDom ?? []).entries()) {
-      const resto = { ...e };
-      delete resto.id;
-      await rest("ciclo_eventos", {
-        method: "POST",
-        body: JSON.stringify({
-          id: `e2e00000-0000-4000-8000-0000000002${String(i).padStart(2, "0")}`,
-          ...resto,
-          cronograma_id: IDS.cronogramaE2e,
-        }),
-      });
-    }
-    console.log(`ciclo_eventos E2E: ${evDom?.length ?? 0} eventos clonados`);
-  }
-}
-
 // ---- limpeza de leftovers de runs anteriores ----
 // o afterEach dos specs é a regra; isto é o piso pra quando um run morre no
 // meio — sem ele, um remanejo/cronograma/import pendurado quebrava o run
@@ -479,6 +432,53 @@ if (!coord.user_id) {
   await garantirAuthUser(COORD_EMAIL, SENHA_COORD, coord);
 } else {
   console.log(`auth user coord já vinculado: ${coord.user_id}`);
+}
+
+// ---- cronograma E2E dedicado + eventos clonados do domínio ----
+// Os specs leem vigente/cobertura por cronograma_id — os eventos têm que
+// existir na turma E2E também (clone verbatim das linhas do domínio).
+{
+  const [tem] = await rest(`cronogramas?select=id&id=eq.${IDS.cronogramaE2e}`);
+  if (!tem) {
+    const [base] = await rest(
+      `cronogramas?select=inicio_em,fim_em,encontros_esperados&id=eq.${cron.id}`
+    );
+    await rest("cronogramas", {
+      method: "POST",
+      body: JSON.stringify({
+        id: IDS.cronogramaE2e,
+        nome: "Calendário oficial · Turma E2E",
+        turma: TURMA_E2E,
+        inicio_em: base?.inicio_em ?? null,
+        fim_em: base?.fim_em ?? null,
+        encontros_esperados: base?.encontros_esperados ?? 16,
+        status: "ativo",
+        created_by: IDS.coordProfile,
+      }),
+    });
+    console.log("cronograma E2E criado");
+  }
+  const evE2e = await rest(
+    `ciclo_eventos?select=id&cronograma_id=eq.${IDS.cronogramaE2e}`
+  );
+  if (!evE2e?.length) {
+    const evDom = await rest(
+      `ciclo_eventos?select=*&cronograma_id=eq.${cron.id}&order=data`
+    );
+    for (const [i, e] of (evDom ?? []).entries()) {
+      const resto = { ...e };
+      delete resto.id;
+      await rest("ciclo_eventos", {
+        method: "POST",
+        body: JSON.stringify({
+          id: `e2e00000-0000-4000-8000-0000000002${String(i).padStart(2, "0")}`,
+          ...resto,
+          cronograma_id: IDS.cronogramaE2e,
+        }),
+      });
+    }
+    console.log(`ciclo_eventos E2E: ${evDom?.length ?? 0} eventos clonados`);
+  }
 }
 
 // ---- mentor reserva: tem a 2ª dupla; sem auth user (nunca loga) ----
