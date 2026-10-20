@@ -103,6 +103,7 @@ const IDS = {
   // janela de grade do esp2 — os chips do pedido direcionado do jovem e os
   // slots da contra-proposta/aceite saem da grade REAL dele (0073)
   gradeEsp2: "e2e00000-0000-4000-8000-0000000000e1",
+  cronogramaE2e: "e2e00000-0000-4000-8000-0000000000e2",
   // REALIZA-113: o "colega com conta" do diretório — o jovem sem DPP ganha
   // uma dupla DPP pausada (mentor próprio, nunca loga) na mesma turma.
   // 'pausada' e não 'ativa' de propósito: a RPC pedir_especialista_jovem e
@@ -159,6 +160,12 @@ const TOKEN_AUTORIZ_JOVEM = "e2e00000-0000-4000-8000-0000000000ab";
 // turma que o spec de cronograma cria pelo builder — prefixo único pro
 // cleanup não depender de id conhecido
 const TURMA_E2E_PREFIX = "E2E ";
+// turma própria das fixtures (REALIZA-151): duplas e2e moravam no
+// cronograma do domínio e a turma compartilhada vazava fixtures pro
+// diretório/catálogo do jovem (mentorados_turma casa por string de turma)
+// e pro contato de coordenação (jovem_contatos, 0097). "Turma E2E" NÃO
+// casa o prefixo 'E2E ' — o sweep de leftovers dos specs não apaga ela.
+const TURMA_E2E = "Turma E2E";
 
 // CSVs das fixtures e2e — o sweep de leftovers e os blocos defensivos de
 // profile_papeis/chamados lá no fim compartilham a mesma base
@@ -182,6 +189,53 @@ if (!cron) {
   process.exit(1);
 }
 console.log(`cronograma: ${cron.id} (${cron.turma})`);
+
+// ---- cronograma E2E dedicado + eventos clonados do domínio ----
+// Os specs leem vigente/cobertura por cronograma_id — os eventos têm que
+// existir na turma E2E também (clone verbatim das linhas do domínio).
+{
+  const [tem] = await rest(`cronogramas?select=id&id=eq.${IDS.cronogramaE2e}`);
+  if (!tem) {
+    const [base] = await rest(
+      `cronogramas?select=inicio_em,fim_em,encontros_esperados&id=eq.${cron.id}`
+    );
+    await rest("cronogramas", {
+      method: "POST",
+      body: JSON.stringify({
+        id: IDS.cronogramaE2e,
+        nome: "Calendário oficial · Turma E2E",
+        turma: TURMA_E2E,
+        inicio_em: base?.inicio_em ?? null,
+        fim_em: base?.fim_em ?? null,
+        encontros_esperados: base?.encontros_esperados ?? 16,
+        status: "ativo",
+        created_by: IDS.coordProfile,
+      }),
+    });
+    console.log("cronograma E2E criado");
+  }
+  const evE2e = await rest(
+    `ciclo_eventos?select=id&cronograma_id=eq.${IDS.cronogramaE2e}`
+  );
+  if (!evE2e?.length) {
+    const evDom = await rest(
+      `ciclo_eventos?select=*&cronograma_id=eq.${cron.id}&order=data`
+    );
+    for (const [i, e] of (evDom ?? []).entries()) {
+      const resto = { ...e };
+      delete resto.id;
+      await rest("ciclo_eventos", {
+        method: "POST",
+        body: JSON.stringify({
+          id: `e2e00000-0000-4000-8000-0000000002${String(i).padStart(2, "0")}`,
+          ...resto,
+          cronograma_id: IDS.cronogramaE2e,
+        }),
+      });
+    }
+    console.log(`ciclo_eventos E2E: ${evDom?.length ?? 0} eventos clonados`);
+  }
+}
 
 // ---- limpeza de leftovers de runs anteriores ----
 // o afterEach dos specs é a regra; isto é o piso pra quando um run morre no
@@ -336,7 +390,7 @@ if (!mentor) {
 }
 
 // ---- auth user com senha (senha_em → o app não desvia pra /auth/definir-senha) ----
-async function garantirAuthUser(email, senha, profile) {
+async function garantirAuthUser(email, senha) {
   const res = await fetch(`${URL_}/auth/v1/admin/users`, {
     method: "POST",
     headers: HJ,
@@ -488,8 +542,8 @@ for (const d of DUPLAS) {
       method: "POST",
       body: JSON.stringify({
         ...d,
-        turma: cron.turma,
-        cronograma_id: cron.id,
+        turma: TURMA_E2E,
+        cronograma_id: IDS.cronogramaE2e,
         trilha: "dpp",
         status: "ativa",
         iniciada_em: "2026-09-08",
@@ -651,7 +705,7 @@ if (!duplaEsp) {
       id: IDS.duplaEsp,
       mentor_id: IDS.espProfile,
       mentorado_id: IDS.mentorado,
-      turma: cron.turma,
+      turma: TURMA_E2E,
       cronograma_id: null,
       trilha: "especialista",
       status: "ativa",
@@ -850,8 +904,8 @@ if (!mColega) {
         id: IDS.duplaColega,
         mentor_id: IDS.mentorColega,
         mentorado_id: IDS.mentoradoSemDpp,
-        turma: cron.turma,
-        cronograma_id: cron.id,
+        turma: TURMA_E2E,
+        cronograma_id: IDS.cronogramaE2e,
         trilha: "dpp",
         status: "pausada",
         iniciada_em: "2026-09-08",
@@ -867,7 +921,7 @@ if (!mColega) {
       fixes.encerrada_em = null;
       fixes.motivo_encerramento = null;
     }
-    if (dc.turma !== cron.turma) fixes.turma = cron.turma;
+    if (dc.turma !== TURMA_E2E) fixes.turma = TURMA_E2E;
     if (dc.mentor_id !== IDS.mentorColega) fixes.mentor_id = IDS.mentorColega;
     if (dc.mentorado_id !== IDS.mentoradoSemDpp)
       fixes.mentorado_id = IDS.mentoradoSemDpp;
@@ -1274,8 +1328,8 @@ for (const m of [
         id: IDS.duplaHibDpp,
         mentor_id: hib.id,
         mentorado_id: IDS.mentoradoHib,
-        turma: cron.turma,
-        cronograma_id: cron.id,
+        turma: TURMA_E2E,
+        cronograma_id: IDS.cronogramaE2e,
         trilha: "dpp",
         status: "ativa",
         iniciada_em: "2026-09-08",
@@ -1302,7 +1356,7 @@ for (const m of [
         id: IDS.duplaHibEsp,
         mentor_id: hib.id,
         mentorado_id: IDS.mentoradoHibEsp,
-        turma: cron.turma,
+        turma: TURMA_E2E,
         cronograma_id: null,
         trilha: "especialista",
         status: "ativa",
@@ -1337,6 +1391,20 @@ await rest("especialista_grade", {
   }),
 });
 console.log("janela de grade do híbrido (sexta 19–21) criada");
+
+// ---- convergência de turma das duplas fixture (REALIZA-151) ----
+// Runs antigos gravaram a turma do domínio — PATCH idempotente migra as
+// duplas e2e pra turma dedicada (DPP ganha o cronograma E2E; especialista
+// segue sem calendário oficial). mentorados_turma casa por string de
+// turma — depois daqui nenhuma fixture vaza pro diretório do jovem demo.
+await patch(
+  `duplas?id=in.(${IDS.dupla},${IDS.dupla2},${IDS.duplaColega},${IDS.duplaHibDpp})`,
+  { turma: TURMA_E2E, cronograma_id: IDS.cronogramaE2e }
+);
+await patch(`duplas?id=in.(${IDS.duplaEsp},${IDS.duplaHibEsp})`, {
+  turma: TURMA_E2E,
+});
+console.log("duplas e2e convergidas pra Turma E2E");
 
 // ---- profile_papeis (WP0b · REALIZA-105) — bloco DEFENSIVO ----
 // A tabela chega pela migration do WP0b; até lá o papel provisório segue
@@ -1374,17 +1442,40 @@ if (papeisOk) {
       [IDS.hibProfile, "mentor_especialista"],
     ];
     for (const [profile_id, papel] of PAPEIS_E2E) {
-      const [existe] = await rest(
-        `profile_papeis?select=profile_id&profile_id=eq.${profile_id}&papel=eq.${papel}&limit=1`
+      // escopo Turma E2E (REALIZA-151): jovem_especialistas/jovem_contatos
+      // filtram papel por has_papel(..., turma do jovem) — papel global da
+      // fixture vazava pro catálogo/contatos do jovem demo. Converge a
+      // linha existente (run antigo criou com escopo null) e remove a
+      // duplicata global que o sync de profiles.role pode ter recriado.
+      const rows = await rest(
+        `profile_papeis?select=id,escopo_turma&profile_id=eq.${profile_id}&papel=eq.${papel}`
       );
-      if (existe) continue;
+      const scoped = (rows ?? []).find((r) => r.escopo_turma === TURMA_E2E);
+      if (scoped) {
+        for (const r of rows.filter(
+          (x) => x.id !== scoped.id && x.escopo_turma !== TURMA_E2E
+        )) {
+          await del(`profile_papeis?id=eq.${r.id}`);
+        }
+        continue;
+      }
+      const global = (rows ?? []).find((r) => r.escopo_turma === null);
+      if (global) {
+        await patch(`profile_papeis?id=eq.${global.id}`, {
+          escopo_turma: TURMA_E2E,
+        });
+        for (const r of rows.filter((x) => x.id !== global.id)) {
+          await del(`profile_papeis?id=eq.${r.id}`);
+        }
+        continue;
+      }
       // a linha que espelha profiles.role é a primária; a extra do híbrido
-      // (mentor_especialista) é a secundária. `escopo_turma` null = papel
-      // vale pro programa todo, como no backfill planejado.
+      // (mentor_especialista) é a secundária. Escopo Turma E2E — o papel
+      // só vale na turma fixture, igual ao mundo que os specs exercem.
       const linha = {
         profile_id,
         papel,
-        escopo_turma: null,
+        escopo_turma: TURMA_E2E,
         primario:
           !(profile_id === IDS.hibProfile && papel === "mentor_especialista"),
       };

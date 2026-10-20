@@ -640,33 +640,33 @@ function LegendaSemaforo() {
       </summary>
       <div className="grid gap-3 px-4 pb-4 pt-1 sm:grid-cols-2 lg:grid-cols-3">
         <div className="border-l-4 border-[var(--danger)] pl-3 text-xs">
-          <h3 className="text-[13px] font-semibold">Em risco</h3>
+          <p className="text-[13px] font-semibold">Em risco</p>
           <p className="text-muted-foreground">
             2+ encontros atrasados, <b>ou</b> avaliação baixa + dificuldade.
           </p>
         </div>
         <div className="border-l-4 border-[var(--warn)] pl-3 text-xs">
-          <h3 className="text-[13px] font-semibold">Atenção</h3>
+          <p className="text-[13px] font-semibold">Atenção</p>
           <p className="text-muted-foreground">
             1 atraso, avaliação baixa, dificuldade, registro pendente ou
             encaminhamento vencido.
           </p>
         </div>
         <div className="border-l-4 border-[var(--ok)] pl-3 text-xs">
-          <h3 className="text-[13px] font-semibold">Em andamento</h3>
+          <p className="text-[13px] font-semibold">Em andamento</p>
           <p className="text-muted-foreground">
             Encontros em dia, sem sinais abertos. Pausada sai da conta.
           </p>
         </div>
         <div className="border-l-4 border-[var(--info)] pl-3 text-xs">
-          <h3 className="text-[13px] font-semibold">Apoio — eixo separado</h3>
+          <p className="text-[13px] font-semibold">Apoio — eixo separado</p>
           <p className="text-muted-foreground">
             Pedido de apoio é chamado à coordenação:{" "}
             <b>trabalho a fazer, não falha</b>.
           </p>
         </div>
         <div className="border-l-4 border-border pl-3 text-xs">
-          <h3 className="text-[13px] font-semibold">Barra feito × esperado</h3>
+          <p className="text-[13px] font-semibold">Barra feito × esperado</p>
           <p className="text-muted-foreground">
             O traço marca quantos encontros o calendário da turma já esperava.
           </p>
@@ -1043,7 +1043,7 @@ function VisaoCoordenacao({
             className={cn(
               "flex min-h-11 flex-[1.15] basis-[165px] flex-col gap-1 rounded-xl border p-3 text-left transition-[border-color,transform] hover:-translate-y-px max-sm:col-span-2",
               filtro === "apoio"
-                ? "border-[var(--info)] bg-[var(--info)] text-white shadow-md"
+                ? "border-[var(--info-text)] bg-[var(--info-text)] text-white shadow-md"
                 : "border-[var(--info-border)] bg-[var(--info-bg)] hover:border-[var(--info)]"
             )}
           >
@@ -1135,7 +1135,7 @@ function VisaoCoordenacao({
                   ...(temSemSup ? { nenhum: "Sem supervisor" } : {}),
                 }}
               >
-                <SelectTrigger size="sm" className="w-auto min-w-36" aria-label="Filtrar por supervisão">
+                <SelectTrigger size="sm" className="w-auto min-w-36 max-w-56" aria-label="Filtrar por supervisão">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -1173,7 +1173,7 @@ function VisaoCoordenacao({
                     ...Object.fromEntries(mentores.map((m) => [m.id, m.nome])),
                   }}
                 >
-                  <SelectTrigger size="sm" className="w-auto min-w-40" aria-label="Filtrar por mentor">
+                  <SelectTrigger size="sm" className="w-auto min-w-40 max-w-56" aria-label="Filtrar por mentor">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -1572,7 +1572,7 @@ function VisaoMentor({
                 key={d.id}
                 style={{ "--i": Math.min(idx, 10) } as CSSProperties}
                 className={cn(
-                  "animate-enter grid gap-3 rounded-xl border border-border border-l-4 bg-card p-4 shadow-[var(--shadow-border)]",
+                  "animate-enter grid grid-cols-1 gap-3 rounded-xl border border-border border-l-4 bg-card p-4 shadow-[var(--shadow-border)]",
                   tomCard
                 )}
               >

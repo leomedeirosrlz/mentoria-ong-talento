@@ -767,7 +767,7 @@ function TrilhaBlock({
             <FlagCheckered size={13} aria-hidden />
             Devolutiva final — segue pro PDM de {primeiroNome}
           </p>
-          <p className="mt-1 whitespace-pre-line text-sm text-muted-foreground">
+          <p className="mt-1 whitespace-pre-line break-words text-sm text-muted-foreground">
             {trilha.devolutiva_pdm}
           </p>
         </div>
@@ -789,7 +789,7 @@ function TrilhaBlock({
                 key={i}
                 className="rounded-md bg-card/70 px-3 py-2 text-sm"
               >
-                <p className="whitespace-pre-line">{d.texto}</p>
+                <p className="whitespace-pre-line break-words">{d.texto}</p>
                 <p className="mt-1 text-xs text-muted-foreground">
                   {d.autor_nome ?? "Especialista"} · {formatDate(d.created_at)}
                 </p>
@@ -996,7 +996,7 @@ function RegistroSessao({ registro }: { registro: TrilhaJovemRegistro }) {
           {linhas.map(([k, v]) => (
             <div key={k} className="contents">
               <dt className="font-medium text-muted-foreground">{k}</dt>
-              <dd className="min-w-0 whitespace-pre-line">{v}</dd>
+              <dd className="min-w-0 whitespace-pre-line break-words">{v}</dd>
             </div>
           ))}
         </dl>
@@ -1057,7 +1057,7 @@ function TrilhasAnteriores({ trilhas }: { trilhas: TrilhaJovem[] }) {
                 {t.motivo_encerramento && ` — ${t.motivo_encerramento}`}
               </p>
               {t.devolutiva_pdm && (
-                <p className="mt-1.5 whitespace-pre-line rounded-md border-l-2 border-[var(--brand-lime)] bg-card/70 px-3 py-2 text-sm text-muted-foreground">
+                <p className="mt-1.5 whitespace-pre-line break-words rounded-md border-l-2 border-[var(--brand-lime)] bg-card/70 px-3 py-2 text-sm text-muted-foreground">
                   {t.devolutiva_pdm}
                 </p>
               )}

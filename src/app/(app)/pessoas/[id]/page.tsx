@@ -683,7 +683,7 @@ export default async function PessoaPerfilPage({
                 Sobre
               </h2>
               {perfilPro.bio && (
-                <p className="mt-2 whitespace-pre-wrap">
+                <p className="mt-2 whitespace-pre-wrap break-words">
                   {perfilPro.bio}
                 </p>
               )}

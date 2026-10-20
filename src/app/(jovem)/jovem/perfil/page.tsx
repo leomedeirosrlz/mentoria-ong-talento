@@ -14,7 +14,7 @@ import { ContaSecao, DadosSecao, DisponibilidadeCard } from "./perfil-form";
 import { PrivacidadeCard } from "./privacidade-card";
 import type { Disponibilidade } from "@/lib/types";
 
-export const metadata = { title: "Meu perfil — Realiza.vc" };
+export const metadata = { title: "Meu perfil" };
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

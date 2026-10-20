@@ -6,7 +6,7 @@ import {
 } from "@/lib/queries-chamados";
 import { ChamadosApp } from "@/components/chamados-app";
 
-export const metadata = { title: "Chamados — Realiza.vc" };
+export const metadata = { title: "Chamados" };
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

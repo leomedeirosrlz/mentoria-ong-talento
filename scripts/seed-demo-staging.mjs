@@ -311,6 +311,9 @@ const jovemProfile = uid(0x140); // profile de login da Ana
 // profile da Larissa — a devolutiva da trilha1 notifica o jovem por
 // profile_id; ela ainda não tem conta (user_id null = convite pendente)
 const larissaProfile = uid(0x141);
+// profile do Igor — a solicitação dele (origem "jovem", mural) precisa de
+// um created_by que seja DELE, não o da Ana. Sem user_id: convite pendente.
+const igorProfile = uid(0x142);
 
 const mentorados = [
   { id: M.ana, nome: "Ana Beatriz Souza", email: "jovem@realiza.test", whatsapp: WA(11, 91010001), ong_origem: "ONG Futuro Agora", data_nascimento: "2007-03-14", genero: "feminino", cidade: "São Paulo", uf: "SP", escolaridade: "medio", interesses: ["Medicina", "Vôlei", "Desenho"], objetivos: "Passar no vestibular de Medicina e ser a primeira médica da família.", motivacao: "Quero provar pra mim mesma que dá.", origem: "ONG Futuro Agora", situacao: "ativo", profile_id: jovemProfile, contato_compartilhado: true, disponibilidade: { seg: [], ter: ["19:00-21:00"], qua: ["19:00-21:00"], qui: [], sex: [], sab: ["14:00-16:00"], dom: [] } },
@@ -332,7 +335,7 @@ const mentorados = [
   // remanejamento" fatia a fila em 4 e o spec e2e precisa que a fixture
   // "Mentorada E2E Livre" caiba no corte (desempate é por espera, e os
   // carimbos demo são sempre mais antigos que o reseed e2e)
-  { id: M.igor, nome: "Igor Batista", whatsapp: WA(11, 91010017), ong_origem: "Instituto Ponte", data_nascimento: "2007-09-09", genero: "masculino", cidade: "São Paulo", uf: "SP", escolaridade: "medio", interesses: ["Eletrônica", "Mecânica"], objetivos: "Curso técnico e primeiro emprego.", origem: "Instituto Ponte", situacao: "ativo", disponibilidade: { seg: ["19:00-21:00"], ter: [], qua: ["19:00-21:00"], qui: [], sex: [], sab: ["14:00-16:00"], dom: [] } },
+  { id: M.igor, nome: "Igor Batista", whatsapp: WA(11, 91010017), ong_origem: "Instituto Ponte", data_nascimento: "2007-09-09", genero: "masculino", cidade: "São Paulo", uf: "SP", escolaridade: "medio", interesses: ["Eletrônica", "Mecânica"], objetivos: "Curso técnico e primeiro emprego.", origem: "Instituto Ponte", situacao: "ativo", profile_id: igorProfile, disponibilidade: { seg: ["19:00-21:00"], ter: [], qua: ["19:00-21:00"], qui: [], sex: [], sab: ["14:00-16:00"], dom: [] } },
   { id: M.vanessaR, nome: "Vanessa Ribeiro", whatsapp: WA(11, 91010016), ong_origem: "ONG Futuro Agora", data_nascimento: "2008-06-30", genero: "feminino", cidade: "São Paulo", uf: "SP", escolaridade: "medio", interesses: ["Enfermagem", "Cuidar de pessoas"], objetivos: "Ser enfermeira.", origem: "ONG Futuro Agora", situacao: "desistente", saiu_em: iso(new Date("2026-09-28T10:00:00-03:00")), motivo_saida: "Família se mudou pra outra cidade no meio do ciclo." },
   { id: M.helena, nome: "Helena Castro", whatsapp: WA(11, 91010018), ong_origem: "Escola Estadual Prof. Ramos", data_nascimento: "2008-04-19", genero: "feminino", cidade: "São Paulo", uf: "SP", escolaridade: "medio", interesses: ["Publicidade", "Redes sociais"], objetivos: "Trabalhar com marketing.", origem: "Escola parceira", situacao: "desistente", saiu_em: iso(new Date("2026-10-08T10:00:00-03:00")), motivo_saida: "Entrou no Jovem Aprendiz e ficou sem horário compatível." },
   // saídas
@@ -353,6 +356,12 @@ profiles.push({
 });
 // a Larissa só tem profile porque a devolutiva da trilha dela notifica por
 // profile_id — sem user_id e sem onboarded_em: o convite segue pendente
+profiles.push({
+  id: igorProfile, nome: "Igor Batista", email: "igor.batista@realiza.test",
+  whatsapp: WA(11, 91010017), role: "mentorado", ativo: true,
+  cidade: "São Paulo", uf: "SP", interesses: ["Eletrônica", "Mecânica"],
+  data_nascimento: "2007-09-09", genero: "masculino",
+});
 profiles.push({
   id: larissaProfile, nome: "Larissa Campos", email: "larissa.campos@realiza.test",
   whatsapp: WA(11, 91010013), role: "mentorado", ativo: true,
@@ -813,7 +822,7 @@ const SUG_ANA_DEMANDA = "A Ana mira Medicina e a ansiedade de prova derruba o si
 const SUG_ANA_QUANDO = iso(new Date(Date.now() - DIA)); // ~1 dia atrás
 await post("solicitacoes_especialista", [
   { id: uid(0x1000), mentorado_id: M.gabriela, dupla_dpp_id: D.d5, demanda: "Carreiras em tecnologia", motivo: "A Gabriela quer entender qual área de tech combina com ela antes de escolher o curso técnico.", turma: T1_TURMA, status: "aberta", origem: "staff", created_by: P.ricardo, created_at: iso(new Date("2026-10-08T10:00:00-03:00")) },
-  { id: uid(0x1001), mentorado_id: M.igor, demanda: "Orientação vocacional", motivo: "O Igor está dividido entre técnico em eletrônica e mecânica — pediu direto pelo mural do jovem.", turma: null, status: "aguardando_coord", origem: "jovem", created_by: jovemProfile, created_at: iso(new Date("2026-10-12T10:00:00-03:00")) },
+  { id: uid(0x1001), mentorado_id: M.igor, demanda: "Orientação vocacional", motivo: "O Igor está dividido entre técnico em eletrônica e mecânica — pediu direto pelo mural do jovem.", turma: null, status: "aguardando_coord", origem: "jovem", created_by: igorProfile, created_at: iso(new Date("2026-10-12T10:00:00-03:00")) },
   { id: uid(0x1002), mentorado_id: M.larissa, dupla_dpp_id: D.d13, demanda: "Ansiedade de desempenho", motivo: "A Larissa trava em prova — o mentor pediu apoio de especialista.", turma: T1_TURMA, status: "aceita", origem: "staff", especialista_id: P.luisa, dupla_id: D.trilha1, created_by: P.andre, created_at: iso(new Date("2026-09-20T10:00:00-03:00")), respondida_em: iso(new Date("2026-09-22T10:00:00-03:00")) },
   { id: uid(0x1003), mentorado_id: M.enzo, dupla_dpp_id: D.d9, demanda: "Finanças pessoais", motivo: "Enzo queria aprender a cuidar do primeiro salário.", turma: T1_TURMA, status: "aceita", origem: "staff", especialista_id: P.sofia, dupla_id: D.trilha2, created_by: P.gustavo, created_at: iso(new Date("2026-09-05T10:00:00-03:00")), respondida_em: iso(new Date("2026-09-08T10:00:00-03:00")) },
   { id: uid(0x1004), mentorado_id: M.ana, dupla_dpp_id: D.d1, demanda: SUG_ANA_DEMANDA, motivo: "Quero controlar a ansiedade pra render nos simulados.", turma: T1_TURMA, status: "sugerida", origem: "mentor", especialista_desejado_id: P.luisa, created_by: P.andre, created_at: SUG_ANA_QUANDO },

@@ -8,6 +8,7 @@ import {
   emLimbo,
   eventoDaSemana,
   eventosDoCronograma,
+  formatDiaNum,
   linkSeguro,
   passoEsp,
   saudadeDaDupla,
@@ -16,6 +17,7 @@ import {
   type EventoDatado,
 } from "./ciclo";
 import { primeiroNomeDaDupla } from "./agenda-minha";
+import { prazoTrilhaEspecialista } from "./encerramento";
 import type {
   CicloEvento,
   Cronograma,
@@ -388,6 +390,13 @@ export function contextoDuplaAux(
   eventos: CicloEvento[],
   hoje: Date = new Date()
 ): { texto: string; problema: boolean } {
+  // trilha de especialista sai ANTES de qualquer lógica do calendário
+  // oficial: o semáforo DPP (vigente, atrasos, "sem data") não se aplica a
+  // uma trilha de 5 sessões com calendário livre — mesmo quando a dupla
+  // herda cronograma_id da turma do jovem. O bug auditado: "o 6º ainda
+  // não tem data" numa trilha que só tem 5.
+  if (dupla.trilha === "especialista")
+    return contextoEspecialistaAux(dupla, hoje);
   // o caller já passa o recorte do cronograma; refiltrar é idempotente
   const evs = eventosDoCronograma(eventos, dupla.cronograma_id);
   const saude = saudadeDaDupla(dupla, evs, hoje);
@@ -395,8 +404,7 @@ export function contextoDuplaAux(
     return { texto: saude.motivo, problema: false };
 
   const turma = dupla.turma;
-  const rotuloEnc = dupla.trilha === "especialista" ? "Sessão" : "Encontro";
-  const tag = (n: number) => `${rotuloEnc} ${n}${turma ? ` · ${turma}` : ""}`;
+  const tag = (n: number) => `Encontro ${n}${turma ? ` · ${turma}` : ""}`;
   const agoraMs = hoje.getTime();
   const vig = eventoDaSemana(evs, hoje);
   const pend = pendenciaDeRegistro(dupla, agoraMs);
@@ -485,4 +493,62 @@ export function contextoDuplaAux(
   }
   if (pend) t += ` ${pendTxt(pend)}`;
   return { texto: t, problema: false };
+}
+
+/** Contexto da trilha de especialista (0097): calendário livre de até 5
+ *  sessões + marco duro de 3 meses desde `iniciada_em` — nenhum número de
+ *  encontro oficial existe aqui ("Sessão", nunca "encontro Nº"). Regras:
+ *  trilha cheia ou status ≠ ativa → rótulo neutro; prazo vencido com
+ *  sessões em falta → problema; sessão vencida sem registro → problema;
+ *  agendada futura → quando; senão, progresso × prazo. */
+function contextoEspecialistaAux(
+  dupla: Dupla,
+  hoje: Date
+): { texto: string; problema: boolean } {
+  const teto = TRILHA_LEN.especialista;
+  if (dupla.status !== "ativa")
+    return { texto: saudadeDaDupla(dupla, [], hoje).motivo, problema: false };
+
+  const agoraMs = hoje.getTime();
+  const feitas = dupla.encontros.filter(
+    (e) => e.status === "realizado"
+  ).length;
+  const prazo = prazoTrilhaEspecialista(dupla.iniciada_em, hoje);
+  const pend = pendenciaDeRegistro(dupla, agoraMs);
+  const prox = dupla.encontros
+    .filter(
+      (e) =>
+        (e.status === "agendado" || e.status === "remarcado") &&
+        e.data_hora != null &&
+        Date.parse(e.data_hora) > agoraMs
+    )
+    .sort((a, b) => Date.parse(a.data_hora!) - Date.parse(b.data_hora!))[0];
+
+  if (feitas >= teto)
+    return {
+      texto: `Trilha completa — ${feitas} de ${teto} sessões.`,
+      problema: false,
+    };
+  if (prazo?.estado === "passou")
+    return {
+      texto: `Prazo de 3 meses encerrado com ${feitas} de ${teto} sessões — levar à coordenação.`,
+      problema: true,
+    };
+  if (pend)
+    return {
+      texto:
+        pend.status === "agendado"
+          ? `Sessão ${pend.numero} — agendada já passou e segue sem registro (rolou?).`
+          : `Sessão ${pend.numero} — registro pendente.`,
+      problema: true,
+    };
+  if (prox?.data_hora)
+    return {
+      texto: `Sessão ${passoEsp(prox, dupla.encontros)} — ${quandoTxt(prox.data_hora, hoje)}${linkSeguro(prox.link) ? ", online" : ""}.`,
+      problema: false,
+    };
+  return {
+    texto: `Sessões ${feitas} de ${teto} — próxima a agendar${prazo ? ` (prazo: ${formatDiaNum(prazo.fim)})` : ""}.`,
+    problema: false,
+  };
 }

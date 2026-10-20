@@ -153,6 +153,7 @@ export function SaidaMentoradoDialog({
               </Button>
               <Button
                 render={<Link href={`/duplas/${bloqueio}`} />}
+                nativeButton={false}
                 onClick={() => onOpenChange(false)}
               >
                 Abrir a ficha da dupla
