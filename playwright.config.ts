@@ -27,6 +27,10 @@ export default defineConfig({
     { name: "demo", testMatch: "demo/**/*.spec.ts" },
     // app = backend real: login por senha, fluxos com write. Só roda quando
     // há credenciais de teste (preview apontando pro Supabase de staging).
-    { name: "app", testMatch: "app/**/*.spec.ts" },
+    // Teto dobrado: spec com 2+ logins/ações morre nos 30s globais quando o
+    // preview acorda frio (runs 39386682715 e 39388319471 — writes já
+    // commitados no banco quando o teste expirava). Os mais pesados seguem
+    // com setTimeout explícito acima disso.
+    { name: "app", testMatch: "app/**/*.spec.ts", timeout: 60_000 },
   ],
 });
