@@ -40,6 +40,7 @@ import {
 } from "@/components/ui/select";
 import { normaliza } from "@/lib/utils";
 import { SISTEMA_LABEL, type FormularioSistema } from "@/lib/forms/schema";
+import { ehInstrumento } from "@/lib/forms/instrumentos";
 
 export type FormularioOpcao = {
   id: string;
@@ -81,16 +82,23 @@ export function EnviarFormularioDialog({
   // ids únicos por instância — o dialog aparece 2x na ficha (header + 360º)
   const uid = useId();
   const formLabelId = `${uid}-form`;
+  // os 4 instrumentos de jornada não são emissíveis por aqui — a entrega é
+  // do mentor pela seção Instrumentos da ficha (a action recusa também).
+  // 360º/anamnese/autoavaliação seguem selecionáveis — a coord emite mesmo.
+  const selecionaveis = useMemo(
+    () => formularios.filter((f) => !ehInstrumento(f.sistema)),
+    [formularios]
+  );
   const ordenados = useMemo(() => {
-    if (!sugestao) return formularios;
+    if (!sugestao) return selecionaveis;
     const n = normaliza(sugestao);
     // casa pelo título OU pelo selo do instrumento oficial ("360" acha a
     // avaliacao_360 mesmo que o título não traga o número)
     const casam = (f: FormularioOpcao) =>
       normaliza(f.titulo).includes(n) ||
       (f.sistema ? normaliza(SISTEMA_LABEL[f.sistema]).includes(n) : false);
-    return [...formularios].sort((a, b) => Number(casam(b)) - Number(casam(a)));
-  }, [formularios, sugestao]);
+    return [...selecionaveis].sort((a, b) => Number(casam(b)) - Number(casam(a)));
+  }, [selecionaveis, sugestao]);
   const [formId, setFormId] = useState("");
   const [para, setPara] = useState({ mentor: true, mentorado: true });
   const [validade, setValidade] = useState("0");
@@ -100,7 +108,7 @@ export function EnviarFormularioDialog({
   // WhatsApp com URL relativa e o absoluto entra na re-render seguinte
   const origem = useOrigem();
 
-  const formSel = formularios.find((f) => f.id === formId) ?? null;
+  const formSel = selecionaveis.find((f) => f.id === formId) ?? null;
   const nDestinos = Number(para.mentor) + Number(para.mentorado);
 
   const itensProntos = useMemo<LinkProntoItem[]>(
@@ -203,7 +211,7 @@ export function EnviarFormularioDialog({
                 onOutros={() => setLinks(null)}
               />
             </motion.div>
-          ) : formularios.length === 0 ? (
+          ) : selecionaveis.length === 0 ? (
             <motion.p
               key="vazio"
               {...fade}

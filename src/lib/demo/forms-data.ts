@@ -18,12 +18,21 @@
  */
 
 import { getDemoData } from "./data";
-import type { AppRole } from "../types";
+import type { AppRole, Dupla } from "../types";
 import type {
   Formulario,
   FormularioLink,
   FormularioResposta,
+  RespostaValor,
 } from "../forms/schema";
+import type {
+  Entrega360,
+  EntregaJornada,
+  EventoJornada,
+  InstrumentoJornada,
+  JovemJornadaDados,
+  PainelJornadaLinha,
+} from "../jornada";
 
 const uid = (n: number): string =>
   `de000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
@@ -62,6 +71,15 @@ export const DEMO_TOKENS = {
   anaRoda: "demo-tok-roda-ana-0000000001",
   eduardoVisao: "demo-tok-visao-eduardo-00001",
   eduardoRoda: "demo-tok-roda-eduardo-000001",
+  // WP7 — o painel da jornada precisa de entregas nas outras duplas DPP:
+  // a T2 em começo de ciclo (visão/roda inicial abertas, metas ainda
+  // trancada) e a pausada com link vencido — cada estado na vitrine
+  kauaVisao: "demo-tok-visao-kaua-0000001",
+  kauaRoda: "demo-tok-roda-kaua-00000001",
+  matheusVisao: "demo-tok-visao-matheus-0001",
+  matheusRoda: "demo-tok-roda-matheus-00001",
+  pedroVisao: "demo-tok-visao-pedro-0000001",
+  dandaraVisao: "demo-tok-visao-dandara-00001",
 } as const;
 
 export type DemoFormularios = {
@@ -528,13 +546,67 @@ export function getDemoFormularios(): DemoFormularios {
       usado_em: null, expira_em: null, created_by: porNome("João Pedro"), created_at: haDias(2),
     },
     // roda pendente pro Eduardo — é o link que o /f/<token> da demo abre
-    // pra mostrar a escala 1–10 (a Ana ainda não recebeu a dela: fica no
-    // estado "não enviado" com o botão Enviar visível na ficha)
+    // pra mostrar a escala 1–10. O `momento` ausente cai no recorte por
+    // data: criado agora, muito antes do enc. 12 da T1 → leitura inicial
     {
       id: uid(0x4221), formulario_id: fRodaVida.id, token: DEMO_TOKENS.eduardoRoda,
       dest_profile_id: null, dest_mentorado_id: ment("Eduardo"),
       dupla_id: duplaDe("João Pedro", "Eduardo"), contexto: { origem: "instrumentos" },
       usado_em: null, expira_em: null, created_by: porNome("João Pedro"), created_at: haDias(1),
+    },
+    // roda da Ana — a leitura inicial do 1º encontro, já respondida (o
+    // contexto.momento marca a aplicação; sem ele a data anterior ao enc.
+    // 12 resolveria igual). Fecha o desenho "jornada completa na janela"
+    // dela no painel da coordenação
+    {
+      id: uid(0x4222), formulario_id: fRodaVida.id, token: DEMO_TOKENS.anaRoda,
+      dest_profile_id: null, dest_mentorado_id: ment("Ana"),
+      dupla_id: duplaDe("Ricardo", "Ana"),
+      contexto: { origem: "instrumentos", momento: "inicial" },
+      usado_em: haDias(33, "20:41"), expira_em: null, created_by: porNome("Ricardo"), created_at: haDias(35),
+    },
+    // WP7 · T2 (começo de ciclo — janela do enc. 1 aberta): o Kauã já fez
+    // a roda inicial e tem a visão pendente; o Matheus respondeu a visão e
+    // tem a roda pendente; a Dandara (T1 em risco) só respondeu a visão —
+    // metas/PDM/roda dela saem "não enviado" fora da janela no painel; o
+    // Pedro (pausada) mostra o link expirado sem resposta
+    {
+      id: uid(0x4223), formulario_id: fRodaVida.id, token: DEMO_TOKENS.kauaRoda,
+      dest_profile_id: null, dest_mentorado_id: ment("Kauã"),
+      dupla_id: duplaDe("André", "Kauã"),
+      contexto: { origem: "instrumentos", momento: "inicial" },
+      usado_em: haDias(4, "19:33"), expira_em: null, created_by: porNome("André"), created_at: haDias(6),
+    },
+    {
+      id: uid(0x4224), formulario_id: fVisao.id, token: DEMO_TOKENS.kauaVisao,
+      dest_profile_id: null, dest_mentorado_id: ment("Kauã"),
+      dupla_id: duplaDe("André", "Kauã"), contexto: { origem: "instrumentos" },
+      usado_em: null, expira_em: null, created_by: porNome("André"), created_at: haDias(1),
+    },
+    {
+      id: uid(0x4225), formulario_id: fVisao.id, token: DEMO_TOKENS.matheusVisao,
+      dest_profile_id: null, dest_mentorado_id: ment("Matheus"),
+      dupla_id: duplaDe("Ricardo", "Matheus"), contexto: { origem: "instrumentos" },
+      usado_em: haDias(11, "21:09"), expira_em: null, created_by: porNome("Ricardo"), created_at: haDias(13),
+    },
+    {
+      id: uid(0x4226), formulario_id: fRodaVida.id, token: DEMO_TOKENS.matheusRoda,
+      dest_profile_id: null, dest_mentorado_id: ment("Matheus"),
+      dupla_id: duplaDe("Ricardo", "Matheus"), contexto: { origem: "instrumentos" },
+      usado_em: null, expira_em: null, created_by: porNome("Ricardo"), created_at: haDias(3),
+    },
+    {
+      id: uid(0x4227), formulario_id: fVisao.id, token: DEMO_TOKENS.dandaraVisao,
+      dest_profile_id: null, dest_mentorado_id: ment("Dandara"),
+      dupla_id: duplaDe("Fernanda", "Dandara"), contexto: { origem: "instrumentos" },
+      usado_em: haDias(32, "20:15"), expira_em: null, created_by: porNome("Fernanda"), created_at: haDias(34),
+    },
+    {
+      id: uid(0x4228), formulario_id: fVisao.id, token: DEMO_TOKENS.pedroVisao,
+      dest_profile_id: null, dest_mentorado_id: ment("Pedro"),
+      dupla_id: duplaDe("André", "Pedro"), contexto: { origem: "instrumentos" },
+      // venceu sem resposta — o painel mostra "expirado", a ficha "Reenviar"
+      usado_em: null, expira_em: haDias(16), created_by: porNome("André"), created_at: haDias(30),
     },
   ];
 
@@ -702,6 +774,59 @@ export function getDemoFormularios(): DemoFormularios {
       },
       respondido_em: haDias(7, "19:26"),
     },
+    // roda inicial da Ana (enc. 1) — as 16 áreas do 1–10 + a reflexão
+    // livre; o recorte "inicial" vem do contexto.momento do link
+    {
+      id: uid(0x4412), link_id: uid(0x4222),
+      respostas: {
+        p_saude: 7, p_intelecto: 6, p_equilibrio: 5, p_independencia: 6,
+        pr_carreira: 3, pr_financas: 4, pr_escola: 6, pr_contribuicao: 5,
+        r_familia: 8, r_amigos: 7, r_amoroso: 5, r_social: 6,
+        q_hobbies: 8, q_atividade: 5, q_realizacao: 6, q_espiritualidade: 7,
+        reflexao: "Carreira e finanças são as que mais me preocupam — é por isso que quero o jovem aprendiz. Família e amigos são o que me segura.",
+      },
+      respondido_em: haDias(33, "20:41"),
+    },
+    // roda inicial do Kauã — T2 em começo de ciclo
+    {
+      id: uid(0x4413), link_id: uid(0x4223),
+      respostas: {
+        p_saude: 6, p_intelecto: 7, p_equilibrio: 6, p_independencia: 5,
+        pr_carreira: 4, pr_financas: 3, pr_escola: 7, pr_contribuicao: 6,
+        r_familia: 9, r_amigos: 8, r_amoroso: 4, r_social: 7,
+        q_hobbies: 7, q_atividade: 8, q_realizacao: 6, q_espiritualidade: 5,
+        reflexao: "Finanças é o que mais pesa — ajudo em casa no fim de semana. Quero aprender a organizar melhor meu tempo.",
+      },
+      respondido_em: haDias(4, "19:33"),
+    },
+    // visão do Matheus — respondida entre o enc. 1 e o 2 da T2
+    {
+      id: uid(0x4414), link_id: uid(0x4225),
+      respostas: {
+        filme: "No filme eu estou trabalhando com tecnologia, numa equipe pequena, e ainda tenho tempo pra jogar com meus amigos no fim de semana.",
+        aspectos: "Trabalhar com o que eu gosto e ganhar meu próprio dinheiro.",
+        ser_fazer: "Consigo programar projetos de verdade e ajudar em casa sem apertar.",
+        deixou: "Parei de depender de bico e de ficar sem saber o que fazer da vida.",
+        valoriza: "Liberdade de escolha e estabilidade.",
+        declaracao_visao: "Em 2 anos, serei desenvolvedor júnior numa empresa de tecnologia, ajudando minha família.",
+      },
+      respondido_em: haDias(11, "21:09"),
+    },
+    // visão da Dandara — respondida no enc. 1, antes da dupla entrar em
+    // risco; o painel da coord mostra a estação feita num contexto de
+    // parada — é o desenho "feito mas fora do ritmo"
+    {
+      id: uid(0x4415), link_id: uid(0x4227),
+      respostas: {
+        filme: "Eu me vejo enfermeira, de jaleco, num hospital da cidade. Minha mãe me conta pras amigas com orgulho.",
+        aspectos: "Cuidar das pessoas e ter um salário fixo.",
+        ser_fazer: "Ser referência pra minha irmã menor — a primeira da família com profissão.",
+        deixou: "Não fico mais trocando de emprego informal toda hora.",
+        valoriza: "Rotina estável e respeito.",
+        declaracao_visao: "Em 3 anos, serei técnica de enfermagem empregada.",
+      },
+      respondido_em: haDias(32, "20:15"),
+    },
   ];
 
   return {
@@ -779,11 +904,265 @@ export function demoAvaliacao360DaDupla(
   return maisRecente ?? null;
 }
 
-// ---------- instrumentos da dupla (0080) ----------
+// ---------- instrumentos da dupla (0080) + jornada (0096) ----------
+
+/** Entrega no superset da 0096 — `EntregaJornada` (contexto/datas é o que
+ *  separa Roda inicial da formal) com `respostas` estreito o bastante pra
+ *  servir também de `InstrumentoEntrega` na ficha da dupla. */
+type EntregaDemo = Omit<EntregaJornada, "respostas"> & {
+  respostas: Record<string, RespostaValor> | null;
+};
+
+/** Instrumento no shape compartilhado: satisfaz `InstrumentoDupla` (ficha)
+ *  e `InstrumentoJornada` (jornada do jovem) — os dois tipos divergem só
+ *  em detalhe de campo, a derivação é uma só. */
+type InstrumentoDemo = Omit<
+  import("../forms/queries").InstrumentoDupla,
+  "entregas"
+> & { entregas: EntregaDemo[] };
+
+const ORDEM_JORNADA = { visao: 1, metas: 2, pdm: 3, roda_vida: 4 } as const;
+
+/** link → entrega: status deriva de usado_em/expira_em (o mesmo CASE das
+ *  três RPCs da 0096) e `destino` separa o lado do mentor do lado do
+ *  jovem — o painel e a jornada dependem da distinção. */
+function linkParaEntrega(
+  l: FormularioLink,
+  r: FormularioResposta | undefined,
+  dupla: Dupla,
+  agora: number
+): EntregaDemo {
+  return {
+    link_id: l.id,
+    token: l.token,
+    destino: l.dest_mentorado_id
+      ? "mentorado"
+      : l.dest_profile_id === dupla.mentor?.id
+        ? "mentor"
+        : "outro",
+    status: l.usado_em
+      ? "respondido"
+      : l.expira_em && new Date(l.expira_em).getTime() < agora
+        ? "expirado"
+        : "pendente",
+    respondido_em: r?.respondido_em ?? l.usado_em,
+    respostas: r?.respostas ?? null,
+    contexto: l.contexto ?? null,
+    created_at: l.created_at,
+    usado_em: l.usado_em,
+    expira_em: l.expira_em,
+  };
+}
+
+/** Os 4 instrumentos da jornada com as entregas DA dupla — a projeção da
+ *  RPC instrumentos_da_dupla, sem o gate de papel (cada mirror aplica o
+ *  seu: ficha por vínculo, jornada pelo mentorado, painel por escopo). */
+function instrumentosDaDuplaRaw(dupla: Dupla): InstrumentoDemo[] {
+  const { formularios, links, respostas } = getDemoFormularios();
+  const agora = Date.now();
+  return formularios
+    .filter((f) => f.sistema && f.sistema in ORDEM_JORNADA)
+    .sort(
+      (a, b) =>
+        ORDEM_JORNADA[a.sistema as keyof typeof ORDEM_JORNADA] -
+        ORDEM_JORNADA[b.sistema as keyof typeof ORDEM_JORNADA]
+    )
+    .map((f) => ({
+      sistema:
+        f.sistema as import("../forms/schema").InstrumentoSistema,
+      formulario_id: f.id,
+      titulo: f.titulo,
+      descricao: f.descricao,
+      ativo: f.ativo,
+      campos: f.campos,
+      entregas: links
+        .filter(
+          (l) =>
+            l.formulario_id === f.id &&
+            l.dupla_id === dupla.id &&
+            (l.dest_mentorado_id === dupla.mentorado?.id ||
+              l.dest_profile_id === dupla.mentor?.id)
+        )
+        .map((l) =>
+          linkParaEntrega(
+            l,
+            respostas.find((x) => x.link_id === l.id),
+            dupla,
+            agora
+          )
+        ),
+    }));
+}
+
+/** WP7 — mirror de `jovem_jornada()` (0096): a dupla DPP mais recente do
+ *  persona mentorado + o cronograma da turma + os 4 instrumentos + os
+ *  links 360º endereçados a ela. Null → a página cai na biblioteca plana
+ *  (mesmo fallback da RPC sem dupla). */
+export function demoJovemJornada(role: AppRole): JovemJornadaDados | null {
+  if (role !== "mentorado") return null;
+  const data = getDemoData();
+  const eu = data.personas[role];
+  const ment = data.mentorados.find((m) => m.profile_id === eu.id);
+  if (!ment) return null;
+  const dupla = data.duplas
+    .filter((d) => d.mentorado?.id === ment.id && d.trilha !== "especialista")
+    .sort((a, b) => (b.iniciada_em ?? "").localeCompare(a.iniciada_em ?? ""))
+    .at(0);
+  if (!dupla) return null;
+
+  // o RPC emite e.tipo cru; EventoJornada declara o rótulo da jornada —
+  // etapas de preparação e o evento de encerramento viram 'marco' (a lib
+  // só lê 'encontro' pras recortes de janela, como na real)
+  const tipoEvento: Record<string, EventoJornada["tipo"]> = {
+    encontro: "encontro",
+    formacao: "formacao",
+    recesso: "recesso",
+  };
+  const cronograma: EventoJornada[] = data.cicloEventos
+    .filter((e) => e.cronograma_id === dupla.cronograma_id)
+    .sort((a, b) => (a.data ?? "￿").localeCompare(b.data ?? "￿"))
+    .map((e) => ({
+      numero: e.numero,
+      data: e.data ?? "",
+      tipo: tipoEvento[e.tipo] ?? "marco",
+      fase: e.fase,
+      instrumentos: e.instrumentos,
+    }));
+
+  const form360 = getDemoFormularios().formularios.find(
+    (f) => f.sistema === "avaliacao_360"
+  );
+  const { links, respostas } = getDemoFormularios();
+  const agora = Date.now();
+  const avaliacao_360: Entrega360[] = form360
+    ? links
+        .filter(
+          (l) =>
+            l.formulario_id === form360.id &&
+            l.dest_mentorado_id === ment.id &&
+            (l.dupla_id === dupla.id || l.dupla_id === null)
+        )
+        .map((l) => {
+          const e = linkParaEntrega(
+            l,
+            respostas.find((x) => x.link_id === l.id),
+            dupla,
+            agora
+          );
+          // Entrega360 não carrega destino/usado_em (o lado é sempre o
+          // mentorado; a resposta basta no respondido_em)
+          return {
+            link_id: e.link_id,
+            token: e.token,
+            status: e.status,
+            respondido_em: e.respondido_em,
+            respostas: e.respostas,
+            contexto: e.contexto,
+            created_at: e.created_at,
+            expira_em: e.expira_em,
+          };
+        })
+    : [];
+
+  const instrumentos: InstrumentoJornada[] = instrumentosDaDuplaRaw(dupla);
+  return {
+    dupla_id: dupla.id,
+    cronograma,
+    instrumentos,
+    avaliacao_360,
+  };
+}
+
+/** WP7 — mirror de `painel_instrumentos_jornada()` (0096): por dupla DPP
+ *  viva do escopo do papel (coord todas, supervisor as supervisionadas —
+ *  trilhas de especialista fora por regra da RPC), as entregas por
+ *  sistema SEM respostas/tokens + a contagem de avaliações de encontro
+ *  (feitas = row em avaliacoes_encontro sobre encontro realizado). */
+export function demoPainelInstrumentosJornada(
+  role: AppRole
+): PainelJornadaLinha[] {
+  if (role !== "coordenacao" && role !== "supervisor") return [];
+  const data = getDemoData();
+  const eu = data.personas[role];
+  const { formularios, links } = getDemoFormularios();
+  const agora = Date.now();
+  const sistemasPainel = new Set([
+    "visao",
+    "metas",
+    "pdm",
+    "roda_vida",
+    "avaliacao_360",
+  ]);
+  const formPorId = new Map(formularios.map((f) => [f.id, f]));
+
+  return data.duplas
+    .filter(
+      (d) =>
+        d.trilha !== "especialista" &&
+        (d.status === "ativa" || d.status === "pausada")
+    )
+    .filter(
+      (d) => role === "coordenacao" || d.supervisor?.id === eu.id
+    )
+    .map((d) => {
+      const entregas: PainelJornadaLinha["entregas"] = {};
+      for (const l of links) {
+        if (l.dupla_id !== d.id) continue;
+        const f = formPorId.get(l.formulario_id);
+        if (!f?.sistema || !sistemasPainel.has(f.sistema)) continue;
+        const proMentorado = l.dest_mentorado_id === d.mentorado?.id;
+        if (!proMentorado && l.dest_profile_id !== d.mentor?.id) continue;
+        const s = f.sistema as keyof PainelJornadaLinha["entregas"];
+        (entregas[s] ??= []).push({
+          status: l.usado_em
+            ? "respondido"
+            : l.expira_em && new Date(l.expira_em).getTime() < agora
+              ? "expirado"
+              : "pendente",
+          created_at: l.created_at,
+          destino: proMentorado ? "mentorado" : "mentor",
+        });
+      }
+      for (const k of Object.keys(entregas) as (keyof typeof entregas)[]) {
+        entregas[k]!.sort((a, b) => a.created_at.localeCompare(b.created_at));
+      }
+      const realizados = new Set(
+        (d.encontros ?? [])
+          .filter((e) => e.status === "realizado")
+          .map((e) => e.id)
+      );
+      return {
+        dupla_id: d.id,
+        turma: d.turma,
+        cronograma_id: d.cronograma_id ?? "",
+        mentor_id: d.mentor?.id ?? "",
+        mentor_nome: d.mentor?.nome_social ?? d.mentor?.nome ?? "",
+        mentorado_id: d.mentorado?.id ?? "",
+        jovem_nome: d.mentorado?.nome_social ?? d.mentorado?.nome ?? "",
+        entregas,
+        avaliacoes_encontro: {
+          feitas: data.avaliacoes.filter(
+            (a) => a.dupla_id === d.id && realizados.has(a.encontro_id)
+          ).length,
+          realizados: realizados.size,
+          max_numero:
+            (d.encontros ?? [])
+              .filter((e) => e.status === "realizado")
+              .reduce((m, e) => Math.max(m, e.numero), 0) || null,
+        },
+      };
+    })
+    .sort(
+      (a, b) =>
+        (a.turma ?? "").localeCompare(b.turma ?? "") ||
+        a.jovem_nome.localeCompare(b.jovem_nome)
+    );
+}
 
 /** Idem a RPC instrumentos_da_dupla: escopo da dupla (coord; mentor,
  *  supervisor e mentorado DELA) e payload já estruturado — token junto,
- *  respostas só nas entregas respondidas. */
+ *  respostas só nas entregas respondidas, metadados do link (contexto e
+ *  datas) desde a 0096. */
 export function demoInstrumentosDaDupla(
   role: AppRole,
   duplaId: string
@@ -803,50 +1182,5 @@ export function demoInstrumentosDaDupla(
     dupla.supervisor?.id === eu.id ||
     souMentorado;
   if (!podeVer) return [];
-
-  const { formularios, links, respostas } = getDemoFormularios();
-  const agora = Date.now();
-  const ordem = { visao: 1, metas: 2, pdm: 3, roda_vida: 4 } as const;
-  return formularios
-    .filter((f) => f.sistema && f.sistema in ordem)
-    .sort(
-      (a, b) =>
-        ordem[a.sistema as keyof typeof ordem] -
-        ordem[b.sistema as keyof typeof ordem]
-    )
-    .map((f) => ({
-      sistema: f.sistema as import("../forms/schema").InstrumentoSistema,
-      formulario_id: f.id,
-      titulo: f.titulo,
-      descricao: f.descricao,
-      ativo: f.ativo,
-      campos: f.campos,
-      entregas: links
-        .filter(
-          (l) =>
-            l.formulario_id === f.id &&
-            l.dupla_id === duplaId &&
-            (l.dest_mentorado_id === dupla.mentorado?.id ||
-              l.dest_profile_id === dupla.mentor?.id)
-        )
-        .map((l) => {
-          const r = respostas.find((x) => x.link_id === l.id);
-          return {
-            link_id: l.id,
-            token: l.token,
-            destino: (l.dest_mentorado_id
-              ? "mentorado"
-              : l.dest_profile_id === dupla.mentor?.id
-                ? "mentor"
-                : "outro") as "mentorado" | "mentor" | "outro",
-            status: (l.usado_em
-              ? "respondido"
-              : l.expira_em && new Date(l.expira_em).getTime() < agora
-                ? "expirado"
-                : "pendente") as "pendente" | "respondido" | "expirado",
-            respondido_em: r?.respondido_em ?? l.usado_em,
-            respostas: r?.respostas ?? null,
-          };
-        }),
-    }));
+  return instrumentosDaDuplaRaw(dupla);
 }

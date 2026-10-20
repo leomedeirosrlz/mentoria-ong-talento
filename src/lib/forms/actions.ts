@@ -7,8 +7,10 @@ import { createClient } from "@/lib/supabase/server";
 import { demoAtivo } from "../demo/mode";
 import { DEMO_MSG } from "../demo/shared";
 import {
+  INSTRUMENTOS_SISTEMA,
   validaCampos,
   type FormularioCampo,
+  type FormularioSistema,
   type RespostaValor,
 } from "./schema";
 import { erroAmigavel as erroAmigavelBase } from "../utils";
@@ -229,11 +231,24 @@ export async function gerarLinksFormulario(input: {
 
   const { data: form, error: fErr } = await supabase
     .from("formularios")
-    .select("id")
+    .select("id, sistema")
     .eq("id", input.formularioId)
     .maybeSingle();
   if (fErr) return { error: erroAmigavel(fErr) };
   if (!form) return { error: "Formulário não encontrado." };
+  // os 4 instrumentos de jornada têm via própria (RPC emitir_link_instrumento
+  // pela seção Instrumentos da ficha — o mentor entrega no tempo do guia e o
+  // link já nasce com o contexto certo). O caminho genérico geraria um link
+  // de fora da trilha. 360º/anamnese/autoavaliação seguem por aqui mesmo.
+  if (
+    (INSTRUMENTOS_SISTEMA as readonly string[]).includes(
+      (form.sistema as FormularioSistema | null) ?? ""
+    )
+  )
+    return {
+      error:
+        "Instrumento de jornada se emite pela ficha da dupla (Instrumentos → Enviar link).",
+    };
 
   // links pendentes já emitidos — reenviar pro mesmo destinatário reutiliza o
   // token existente (evita dois links válidos pra mesma pessoa). O genérico

@@ -30,6 +30,8 @@ import {
   demoPessoas,
   demoRegistros,
 } from "./demo/queries";
+import { demoPainelInstrumentosJornada } from "./demo/forms-data";
+import type { PainelJornadaLinha } from "./jornada";
 import { temPapel } from "./types";
 import type { AppRole, AvaliacaoJovem, CicloEvento, Comunicado, CorRaca, Cronograma, DadosCivis, DocumentoPessoa, Dupla, DuplaResumo, DuplaStatus, Encontro, EncontroStatus, EspecialistaEvento, Genero, Material, Mentorado, MentorProfile, Notificacao, PessoaNota, PrefGeneroPar, Profile, Registro, ResponsavelCivis, Trilha } from "./types";
 
@@ -1018,6 +1020,29 @@ export const getEspecialistaEventos = cache(
       .order("numero");
     if (error) throw error;
     return data ?? [];
+  }
+);
+
+// ---------- jornada do jovem (WP7, 0096) ----------
+
+/** Painel agregado de instrumentos da jornada (RPC
+ *  `painel_instrumentos_jornada`, 0096 — definer coord/supervisor): por
+ *  dupla DPP viva do escopo, as entregas por sistema SEM respostas nem
+ *  tokens + a contagem de avaliações de encontro. A resolução por estação
+ *  (roda inicial × formal, janelas da turma) é da lib de jornada no
+ *  cliente. Erro → [] com log: o painel omite a seção em vez de derrubar
+ *  a página. */
+export const getPainelInstrumentosJornada = cache(
+  async (): Promise<PainelJornadaLinha[]> => {
+    const demo = await demoRole();
+    if (demo) return demoPainelInstrumentosJornada(demo);
+    const supabase = await createClient();
+    const { data, error } = await supabase.rpc("painel_instrumentos_jornada");
+    if (error) {
+      console.error("getPainelInstrumentosJornada:", error);
+      return [];
+    }
+    return (data ?? []) as PainelJornadaLinha[];
   }
 );
 

@@ -14,6 +14,8 @@ import {
   demoJovemEspecialistas,
   demoJovemPerfil,
 } from "./demo/queries";
+import { demoJovemJornada } from "./demo/forms-data";
+import type { JovemJornadaDados } from "./jornada";
 import { pedidoEmAberto } from "./jovem-especialista";
 import {
   getPropostasMap,
@@ -379,5 +381,24 @@ export const getJovemTrilhaEsp = cache(
       (e): e is { numero: number; titulo: string; foco: string | null } =>
         e.numero != null && e.titulo != null
     );
+  }
+);
+
+/** O contrato da "Minha jornada" (WP7 — RPC `jovem_jornada`, 0096): a dupla
+ *  DPP mais recente do caller + cronograma da turma + os 4 instrumentos com
+ *  entregas + o 360º dela. Self-scoped por my_mentorado_id() — o jovem só
+ *  lê a própria jornada. Null (sem dupla DPP, erro de RPC) → a página cai
+ *  na biblioteca plana, que é o fallback do plano. */
+export const getJovemJornada = cache(
+  async (): Promise<JovemJornadaDados | null> => {
+    const demo = await demoRole();
+    if (demo) return demoJovemJornada(demo);
+    const supabase = await createClient();
+    const { data, error } = await supabase.rpc("jovem_jornada");
+    if (error) {
+      console.error("getJovemJornada:", error);
+      return null;
+    }
+    return (data ?? null) as JovemJornadaDados | null;
   }
 );
