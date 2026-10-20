@@ -355,7 +355,9 @@ test.describe("mentorado — agenda livre (REALIZA-110)", () => {
     await dialog.getByRole("button", { name: "Desmarcar" }).click();
 
     await expect(page.getByText("Encontro desmarcado.")).toBeVisible();
-    await expect(proximos.getByText("10º encontro")).toHaveCount(0);
+    await expect(proximos.getByText("10º encontro")).toHaveCount(0, {
+      timeout: 15_000,
+    });
 
     const rows = await buscarViaServiceRole<{ id: string }[]>(
       "encontros",

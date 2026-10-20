@@ -2745,7 +2745,11 @@ function build(): DemoData {
     ),
     realizado(uid(D.t2c), 2, addDias(HOJE, -6), { duracao: 60, origem: "externo" }),
     agendado(uid(D.t2c), 3, addDias(HOJE, -1), {}),
-    agendado(uid(D.t2c), 4, addDias(HOJE, 5), {}),
+    // âncora na terça (não em HOJE+n): a segunda da próxima semana é
+    // sempre segunda — com HOJE+n o dia varia com o dia da build e um
+    // "agendado pra semana seguinte" podia cair no domingo da semana
+    // corrente (o strip "Sua semana" contava ele como item próprio a mais)
+    agendado(uid(D.t2c), 4, addDias(TERCA_ENCONTRO_5, 6), {}),
   ];
 
   const regT2cE1 = encT2c[0].registro!;
