@@ -959,6 +959,9 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
           {/* depois do fechamento a trilha conta o desfecho: motivo + a
               devolutiva que seguiu pro PDM do jovem */}
           {ehEsp && <TrilhaFechamento dupla={dupla} />}
+          {/* sem combinados a seção não rende nada — some de vez (os links
+              #combinados só nascem quando existe pendente pra marcar) */}
+          {(dupla.encaminhamentos?.length ?? 0) > 0 && (
           <section
             id="combinados"
             className="scroll-mt-20 rounded-xl bg-card p-4 shadow-[var(--shadow-border)]"
@@ -1000,6 +1003,7 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
               encontroNumeroPorRegistroId={encontroNumeroPorRegistroId}
             />
           </section>
+          )}
 
           <ArquivosDupla arquivos={arquivosDaDupla} />
 

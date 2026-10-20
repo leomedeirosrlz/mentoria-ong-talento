@@ -23,8 +23,15 @@ test.describe("demo — sugestão de remanejo e capacidade", () => {
       'section[aria-labelledby="remanejo-sugerido-titulo"]'
     );
     await expect(card).toBeVisible();
+    // recolhido por padrão (REALIZA-153) — o trigger carrega o motivo como
+    // scent; expandir revela os pools de candidatos
+    const trigger = card.getByRole("button", {
+      name: /Sugerir remanejamento/,
+    });
+    await expect(trigger).toHaveAttribute("aria-expanded", "false");
+    await trigger.click();
     await expect(
-      card.getByText(/Avaliação baixa e dificuldade de participação/)
+      card.getByText(/Avaliação baixa e dificuldade de participação/).first()
     ).toBeVisible();
 
     // livres primeiro: Luiza (tema em comum "comunicação" com a Dandara)
@@ -64,6 +71,8 @@ test.describe("demo — sugestão de remanejo e capacidade", () => {
     const card = page.locator(
       'section[aria-labelledby="remanejo-sugerido-titulo"]'
     );
+    // card recolhido por padrão — expande antes de clicar no candidato
+    await card.getByRole("button", { name: /Sugerir remanejamento/ }).click();
     await card
       .locator("li", { hasText: "Luiza Campos" })
       .getByRole("button", { name: "Remanejar", exact: true })
