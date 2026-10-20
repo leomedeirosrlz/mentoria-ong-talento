@@ -161,7 +161,10 @@ export type DestinoLink =
 
 /** Dupla de contexto do destinatário — a resposta sabe a quem/a qual dupla
  *  pertence sem o coordenador precisar informar. Mentor → sua dupla ativa;
- *  mentorado → a dele. Sem dupla ativa, fica null mesmo. */
+ *  mentorado → a dele. Sem dupla ativa, fica null mesmo.
+ *  Sempre a dupla DPP: um mentorado com trilha de especialista ativa tinha
+ *  o link (ex.: 360º do encerramento) carimbado nela — e a resposta caía
+ *  numa dupla que nenhuma superfície de jornada enxerga. */
 async function duplaDoDestino(
   supabase: Awaited<ReturnType<typeof createClient>>,
   dest: DestinoLink
@@ -172,6 +175,7 @@ async function duplaDoDestino(
     .from("duplas")
     .select("id")
     .eq(col, dest.id)
+    .neq("trilha", "especialista")
     .in("status", ["ativa", "pausada"])
     .order("created_at", { ascending: false })
     .limit(1)

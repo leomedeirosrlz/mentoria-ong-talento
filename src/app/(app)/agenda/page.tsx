@@ -104,6 +104,21 @@ export default async function AgendaPage({
     (!duasVisoes ||
       (visao ? visao === "especialista" : me?.role === "mentor_especialista"));
 
+  // ?visao= pedida mas inaplicável degradava mudo — o banner explica o que
+  // a tela está mostrando (SSR, sem estado: some na próxima navegação)
+  const avisoVisao =
+    visao === "especialista" && !visaoEsp ? (
+      <p className="rounded-lg border border-border bg-muted/50 px-4 py-2.5 text-sm text-muted-foreground">
+        A visão de especialista não se aplica ao seu papel — mostrando a
+        agenda normal.
+      </p>
+    ) : visao === "dpp" && !mostraDpp ? (
+      <p className="rounded-lg border border-border bg-muted/50 px-4 py-2.5 text-sm text-muted-foreground">
+        Você não tem dupla DPP — mostrando a agenda da trilha de
+        especialista.
+      </p>
+    ) : null;
+
   if (visaoEsp) {
     // agenda real do especialista (0073): grade semanal + exceções + a
     // projeção de slots que os jovens veem — buscadas sempre, mesmo sem
@@ -164,11 +179,15 @@ export default async function AgendaPage({
       );
     return duasVisoes ? (
       <div className="space-y-6">
+        {avisoVisao}
         <AbasAgenda ativa="especialista" />
         {conteudoEsp}
       </div>
     ) : (
-      conteudoEsp
+      <div className="space-y-6">
+        {avisoVisao}
+        {conteudoEsp}
+      </div>
     );
   }
 
@@ -231,6 +250,7 @@ export default async function AgendaPage({
         : [];
     return (
       <div className="space-y-6">
+        {avisoVisao}
         <header>
           <h1 className="text-2xl font-semibold tracking-tight">Agenda</h1>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -294,6 +314,7 @@ export default async function AgendaPage({
     ]);
     return (
       <div className="space-y-6">
+        {avisoVisao}
         {duasVisoes && <AbasAgenda ativa="dpp" />}
         <AgendaAuxiliar
           duplas={supervisionadas}
@@ -325,6 +346,7 @@ export default async function AgendaPage({
     ]);
     return (
       <div className="space-y-6">
+        {avisoVisao}
         {duasVisoes && <AbasAgenda ativa="dpp" />}
         <AbasAgendaCoord ativa="monitoramento" />
         <AgendaCoordenacao

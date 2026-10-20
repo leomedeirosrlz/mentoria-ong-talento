@@ -84,7 +84,7 @@
   --danger: hsl(0 80% 48%);
   /* versões escuras para texto (AA ≥4.5:1 sobre fundo claro) — fills/dots seguem com as cores claras acima */
   --ok-text: hsl(78 55% 30%);
-  --warn-text: hsl(43 90% 30%);
+  --warn-text: hsl(43 90% 27%);
   /* apoio/chamado: eixo informativo separado do semáforo (WP2) — azul
      sinaliza "trabalho a fazer", nunca falha; danger/warn ficam reservados
      à saúde da jornada */

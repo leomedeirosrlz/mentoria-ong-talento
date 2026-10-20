@@ -142,9 +142,9 @@ export function AgendaAuxiliar({
           {correndo.length === 1 ? "dupla supervisionada" : "duplas supervisionadas"}
           {encerradas > 0 &&
             ` · ${encerradas} encerrada${encerradas === 1 ? "" : "s"}`}
-          {turmas.length > 0 ? ` · ${turmas.join(" e ")}` : ""} · semana{" "}
-          {semanaIso(hoje)}, {Number(seg.slice(8, 10))} a{" "}
-          {Number(dom.slice(8, 10))} de {mesLongo(dom)}
+          {turmas.length > 0 ? ` · ${turmas.join(" e ")}` : ""}
+          {correndo.length > 0 &&
+            ` · semana ${semanaIso(hoje)}, ${Number(seg.slice(8, 10))} a ${Number(dom.slice(8, 10))} de ${mesLongo(dom)}`}
         </p>
       </header>
 
@@ -195,7 +195,7 @@ export function AgendaAuxiliar({
                 className="space-y-3"
               >
                 <div className="flex flex-wrap items-center gap-2.5">
-                  {g.turma && <PillTurma>{g.turma}</PillTurma>}
+                  {g.turma && <PillTurma turma={g.turma} />}
                   <h2 className="text-lg font-bold">{rotuloGrupo}</h2>
                 </div>
                 <div className="grid items-start gap-4 lg:grid-cols-2">
@@ -368,7 +368,7 @@ function CardDuplaAux({
         <div className="min-w-0 flex-1">
           <p className="flex flex-wrap items-center gap-2 text-sm font-semibold leading-snug">
             {nome}
-            <PillTurma>{d.turma}</PillTurma>
+            <PillTurma turma={d.turma} />
           </p>
           <p className="mt-0.5 text-xs text-muted-foreground">
             mentor: {d.mentor?.nome}
@@ -565,7 +565,7 @@ function LinhaConsolidada({
             <p className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs font-medium text-muted-foreground">
               <Icone size={13} aria-hidden className="shrink-0" />
               {ROTULO_TIPO[item.tipo]}
-              {item.pill && <PillTurma>{item.pill}</PillTurma>}
+              {item.pill && <PillTurma turma={item.pill} />}
             </p>
             <h3 className="mt-0.5 text-sm font-semibold leading-snug">
               {item.titulo}

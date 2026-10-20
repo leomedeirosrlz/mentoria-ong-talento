@@ -399,7 +399,7 @@ export function PessoasListas({
               <SelectTrigger
                 size="sm"
                 aria-label="Ordenar"
-                className="ml-auto w-auto sm:w-48"
+                className="ml-auto w-auto max-w-48 sm:w-48"
               >
                 <SelectValue />
               </SelectTrigger>

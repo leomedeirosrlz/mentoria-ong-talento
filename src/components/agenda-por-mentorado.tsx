@@ -327,7 +327,7 @@ function CardMentorado({
     <article className="flex flex-col gap-4 rounded-xl bg-card p-5 shadow-[var(--shadow-border)]">
       {/* header: identidade + saúde da dupla — o texto do semáforo carrega
           o estado (cor nunca é o único canal, PV-2) */}
-      <div className="flex items-start gap-3">
+      <div className="flex flex-wrap items-start gap-3">
         <Avatar
           papel="mentorado"
           nome={nome}
@@ -338,7 +338,7 @@ function CardMentorado({
               : null
           }
         />
-        <div className="min-w-0 flex-1">
+        <div className="min-w-28 flex-1">
           <h3 className="flex flex-wrap items-center gap-x-2 gap-y-1 font-semibold leading-snug">
             <span className="truncate">{nome}</span>
             <Badge variant="secondary">{dupla.turma}</Badge>
@@ -767,7 +767,7 @@ function TrilhaBlock({
             <FlagCheckered size={13} aria-hidden />
             Devolutiva final — segue pro PDM de {primeiroNome}
           </p>
-          <p className="mt-1 whitespace-pre-line text-sm text-muted-foreground">
+          <p className="mt-1 whitespace-pre-line break-words text-sm text-muted-foreground">
             {trilha.devolutiva_pdm}
           </p>
         </div>
@@ -789,7 +789,7 @@ function TrilhaBlock({
                 key={i}
                 className="rounded-md bg-card/70 px-3 py-2 text-sm"
               >
-                <p className="whitespace-pre-line">{d.texto}</p>
+                <p className="whitespace-pre-line break-words">{d.texto}</p>
                 <p className="mt-1 text-xs text-muted-foreground">
                   {d.autor_nome ?? "Especialista"} · {formatDate(d.created_at)}
                 </p>
@@ -996,7 +996,7 @@ function RegistroSessao({ registro }: { registro: TrilhaJovemRegistro }) {
           {linhas.map(([k, v]) => (
             <div key={k} className="contents">
               <dt className="font-medium text-muted-foreground">{k}</dt>
-              <dd className="min-w-0 whitespace-pre-line">{v}</dd>
+              <dd className="min-w-0 whitespace-pre-line break-words">{v}</dd>
             </div>
           ))}
         </dl>
@@ -1057,7 +1057,7 @@ function TrilhasAnteriores({ trilhas }: { trilhas: TrilhaJovem[] }) {
                 {t.motivo_encerramento && ` — ${t.motivo_encerramento}`}
               </p>
               {t.devolutiva_pdm && (
-                <p className="mt-1.5 whitespace-pre-line rounded-md border-l-2 border-[var(--brand-lime)] bg-card/70 px-3 py-2 text-sm text-muted-foreground">
+                <p className="mt-1.5 whitespace-pre-line break-words rounded-md border-l-2 border-[var(--brand-lime)] bg-card/70 px-3 py-2 text-sm text-muted-foreground">
                   {t.devolutiva_pdm}
                 </p>
               )}

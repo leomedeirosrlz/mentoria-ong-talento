@@ -32,12 +32,14 @@ export function ReverRespostaDialog({
   sistema,
   campos,
   respostas,
+  label = "Rever resposta",
 }: {
   titulo: string;
   respondidoEm: string | null;
   sistema: FormularioSistema | null;
   campos: FormularioCampo[];
   respostas: Record<string, RespostaValor>;
+  label?: string;
 }) {
   return (
     <Dialog>
@@ -45,7 +47,7 @@ export function ReverRespostaDialog({
         render={
           <Button size="sm" variant="outline">
             <Eye aria-hidden />
-            Rever resposta
+            {label}
           </Button>
         }
       />

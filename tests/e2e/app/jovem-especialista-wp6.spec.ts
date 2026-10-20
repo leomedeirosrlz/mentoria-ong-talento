@@ -116,6 +116,9 @@ test.describe("WP6 — especialista do lado do jovem", () => {
   test("mentor sugere → jovem confirma → pedido dirigido nasce 'aberta'", async ({
     page,
   }) => {
+    // 3 logins + 4 server actions + queries service-role — o teto global de
+    // 30s estoura no preview frio (a run 39386682715 morreu no 2º relogar)
+    test.setTimeout(90_000);
     // --- o mentor DPP registra a sugestão na ficha da dupla ---
     await loginComSenha(page, MENTOR_EMAIL, SENHA);
     await page.goto(`/duplas/${IDS.duplaDpp}`);

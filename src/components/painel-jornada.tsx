@@ -243,13 +243,13 @@ export function PainelJornada({
 
   const resolvidas: LinhaResolvida[] = linhas.map((linha) => {
     const ctx = painelTurmaCtx(eventos, linha.cronograma_id);
-    const estados = estacoesPainelDupla(linha, ctx);
-    // a régua "fora da janela" é a da dupla, não só a da coorte — dupla
-    // tardia/atrasada tem a janela ainda aberta do lado dela
+    // a régua "janela aberta / fora da janela" é a da dupla, não só a da
+    // coorte — dupla tardia/atrasada tem a janela ainda aberta do lado dela
     const encCorrDupla = Math.min(
       16,
       (linha.avaliacoes_encontro.max_numero ?? 0) + 1
     );
+    const estados = estacoesPainelDupla(linha, ctx, encCorrDupla);
     return {
       linha,
       encVigente: ctx.encVigente,
@@ -354,7 +354,8 @@ export function PainelJornada({
           </h3>
           <p className="mt-0.5 text-xs text-muted-foreground">
             O instrumento não fecha sozinho — vale lembrar o mentor de
-            enviar o link na ficha da dupla.
+            enviar o link na ficha da dupla. A avaliação do encontro é da
+            jovem: o link nasce sozinho quando o encontro vira realizado.
           </p>
           <ul className="mt-2 divide-y divide-border/60">
             {foraLista.map((r) => {
@@ -404,7 +405,7 @@ export function PainelJornada({
                   key={linha.dupla_id}
                   className="flex flex-wrap items-center gap-x-4 gap-y-2 py-2.5"
                 >
-                  <div className="min-w-0 flex-1">
+                  <div className="min-w-40 flex-1">
                     <p className="text-sm font-medium">
                       {linha.jovem_nome}
                       <span className="ml-2 text-xs font-normal text-muted-foreground">
@@ -466,7 +467,9 @@ export function PainelJornada({
                       atrasada={r.atrasadas.has(c)}
                       aval={
                         c === "avaliacao_encontro"
-                          ? `Aval. ${r.linha.avaliacoes_encontro.feitas}/${r.linha.avaliacoes_encontro.realizados}`
+                          ? r.linha.avaliacoes_encontro.realizados > 0
+                            ? `Aval. ${r.linha.avaliacoes_encontro.feitas}/${r.linha.avaliacoes_encontro.realizados}`
+                            : "Aval. —"
                           : null
                       }
                     />

@@ -6,6 +6,7 @@ import {
 } from "@/lib/ciclo";
 import type { MotivoAcompanhar } from "@/lib/agenda-coordenacao";
 import type { CicloEvento, Dupla } from "@/lib/types";
+import { partesTurma } from "@/lib/ciclo";
 import { msgsContato } from "@/lib/whatsapp-msgs";
 import { cn } from "@/lib/utils";
 
@@ -50,11 +51,15 @@ export function Tag({
   );
 }
 
-/** Pill de turma ("T1") — o chip pequeno junto a nomes e títulos. */
-export function PillTurma({ children }: { children: ReactNode }) {
+/** Pill de turma — nome forte ("Turma 1") + ano em menor peso. Recebe o
+ *  valor cru ("T1 · 2026/2027"); `partesTurma` separa nome/ano (texto
+ *  livre renderiza inteiro). */
+export function PillTurma({ turma }: { turma: string }) {
+  const { nome, ano } = partesTurma(turma);
   return (
-    <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">
-      {children}
+    <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">
+      <span className="text-foreground/80">{nome}</span>
+      {ano && <span className="font-normal">{ano}</span>}
     </span>
   );
 }
@@ -105,6 +110,23 @@ export function lembreteDaDupla(
     d.mentorado?.nome ||
     ""
   ).split(" ")[0];
+  // trilha de especialista: calendário livre — não existe "encontro oficial
+  // da semana" pra carregar no texto. A mesma régua do contextoDuplaAux:
+  // pendência de registro cobra o follow-up, senão "marcar a próxima
+  // sessão". O nº oficial do cronograma DPP seria informação falsa aqui.
+  if (d.trilha === "especialista") {
+    const pendEsp = [...d.encontros]
+      .sort((a, b) => a.numero - b.numero)
+      .find((e) => !e.registro && emLimbo(e, agora.getTime()));
+    return {
+      titulo: pendEsp
+        ? "Lembrete — sessão por confirmar"
+        : "Lembrete — marcar a sessão",
+      corpo: pendEsp
+        ? `Oi ${mentorNome}, tudo bem? A sessão de ${mentoradoNome} estava agendada e já passou. Rolou? Se rolou, dá pra registrar como foi; se não, vale remarcar.`
+        : `Oi ${mentorNome}! Passando pra lembrar de marcar a próxima sessão de ${mentoradoNome} na trilha de especialista. Qualquer coisa me chama :)`,
+    };
+  }
   const vigente = eventoDaSemana(
     eventosDoCronograma(eventos, d.cronograma_id),
     agora

@@ -123,7 +123,7 @@ export function AgendaEspecialista({
           <Card key={dupla.id} className="animate-enter overflow-hidden">
             <CardHeader className="border-b bg-muted/30">
               <div className="flex items-center justify-between gap-3">
-                <div>
+                <div className="min-w-0">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
                     Mentoria especializada
                   </p>
@@ -136,7 +136,7 @@ export function AgendaEspecialista({
                       completar vira warn sugerindo o fechamento */}
                   <TrilhaPrazoBadge dupla={dupla} />
                   <span className="font-mono text-sm tabular-nums text-muted-foreground">
-                    {jornada.feitos}/{jornada.total} encontros
+                    {jornada.feitos}/{jornada.total} sessões
                   </span>
                 </span>
               </div>
@@ -232,7 +232,7 @@ export function AgendaEspecialista({
                   <p className="text-sm text-muted-foreground">
                     {dupla.encerrada_em
                       ? "Trilha fechada. A devolutiva já seguiu pro PDM."
-                      : "Os 5 encontros foram realizados. Falta o fechamento com a devolutiva pro PDM."}
+                      : "As 5 sessões aconteceram. Falta o fechamento com a devolutiva pro PDM."}
                   </p>
                   {!dupla.encerrada_em && (
                     <EncerrarTrilhaDialog duplaId={dupla.id} />

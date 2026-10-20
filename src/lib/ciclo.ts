@@ -999,6 +999,35 @@ export function duplasSemEncontroDoNumero(
   );
 }
 
+/** Cobertura de um encontro oficial entre as duplas **do cronograma do
+ *  evento**: quantas têm o encontro `numero` realizado e com registro
+ *  entregue. Antes do 0097 o denominador misturava turmas — "0 de 16"
+ *  num cronograma de 3 duplas. Mesma régua do sibling acima: só duplas
+ *  ativas (pausada não deve cobertura) da trilha DPP. */
+export function coberturaEncontro(
+  duplas: Dupla[],
+  evento: CicloEvento
+): { registraram: number; total: number } {
+  const elegiveis = duplas.filter(
+    (d) =>
+      d.status === "ativa" &&
+      d.trilha !== "especialista" &&
+      d.cronograma_id === evento.cronograma_id
+  );
+  let registraram = 0;
+  for (const d of elegiveis)
+    if (
+      d.encontros.some(
+        (e) =>
+          e.numero === evento.numero &&
+          e.status === "realizado" &&
+          e.registro
+      )
+    )
+      registraram++;
+  return { registraram, total: elegiveis.length };
+}
+
 /** Texto da faixa "Esta semana" pronto pra WhatsApp da equipe.
  *  `emRisco` recebe strings prontas tipo "Ana & João (2 atrasos)"; `etiqueta`
  *  é o rótulo do cronograma — com duas turmas o número sozinho é ambíguo. */
@@ -1655,6 +1684,18 @@ function paraData(iso: string): Date {
 // o ciclo cruza a virada do ano ("2026/2027" = out→jun) — "15 de jan." sem
 // ano é ambíguo em registro e log, então os formatos de prosa levam ano
 // sempre; os compactos de grid/trilha (diaCompacto, formatDiaNum) ficam sem
+/** "T1 · 2026/2027" → { nome: "Turma 1", ano: "2026/2027" } — o rótulo
+ *  curto vira o nome forte e o ano perde peso visual (decisão REALIZA-151).
+ *  Turma sem o padrão ("2025/2026", texto livre) devolve o valor inteiro
+ *  como nome — dado do usuário não é normalizado à força. */
+export function partesTurma(
+  turma: string
+): { nome: string; ano: string | null } {
+  const m = turma.match(/^T(\d+)\s*[·\-.]?\s*(.+)$/);
+  if (!m) return { nome: turma, ano: null };
+  return { nome: `Turma ${m[1]}`, ano: m[2].trim() };
+}
+
 export function formatDate(iso: string | null | undefined): string {
   if (!iso) return "a definir";
   const d = paraData(iso);

@@ -782,3 +782,55 @@ reabre a estação (revisão PDM enc. 9); copy honesta pós-janela;
 · demo spec novo **5/5** · app 13/13 vs staging · stamping `momento`
 verificado ao vivo · prod auditada (zero links de instrumento pro
 mentor). e2e-preview no pipeline do PR.
+
+## REALIZA-151 — sprint pós-auditoria generalista (PR #69)
+
+Auditoria de 6 agentes + 4 specs recon + 3 revisores adversariais sobre
+o WP7 mergeado. Os furos reais eram quase todos cross-surface: layout
+mobile quebrando em grade implícita, e três bugs de dados entre trilhas
+DPP/especialista e entre turmas.
+
+**Domínio (0097 — staging via pooler; prod pendente de credencial):**
+`emitir_link_instrumento` com gate simétrico (coord e mentor exigem
+trilha DPP + jornada viva; autorização antes do erro diferenciado —
+sem oráculo de classificação pra UUID chutado). Guard de
+autoatribuição no choke point `sol_efetivar` (cobre aceite direto,
+contra-proposta e pedido direcionado — a revisão final achou o bypass
+por `aceitar_proposta`) + cópia em `aceitar_solicitacao`. UPDATE
+retroativo: 360º carimbado em dupla esp volta pra DPP da mentorada
+(coalesce dest_mentorado_id → mentorado da dupla carimbada — sem isso
+o 360 do mentor órfã). `jovem_contatos` com coordenação escopada por
+`has_papel(profile, papel, turma da DPP ativa)` — mesmo predicado do
+catálogo; sem DPP → fallback amplo (decisão: o canal não some).
+`duplaDoDestino` só carimba DPP viva — fecha a porta dos órfãos.
+`contextoEspecialistaAux` (régua 5 sessões × 3 meses) + early-return
+em `lembreteDaDupla` — o calendário DPP não vaza mais pra trilha.
+`coberturaEncontro` por `cronograma_id`. Painel: re-emissão vira
+`pendente` dentro da janela (`min(vigente, posição)`); jornada:
+janela vence re-emissão e "Rever" sobrevive.
+
+**Jovem:** dedup de contatos por pessoa+papel (`agrupaContatosPorPessoa`,
+vínculo vivo vence) na home e no diretório — React key duplicada morta.
+"Sessão N com {esp}" na agenda; encerramento oficial deduplica no
+escopo Tudo por `eventoId`. Bottom-nav com overflow "Mais" (5 células,
+`aria-current` no item do overflow, fecha ao navegar) + rótulo
+"Materiais"→"Jornada". Acervo: thumbnail edge-to-edge — PDF em
+`<object>` (fallback nativo pro Android) e imagem em `<img>`, ambos
+`pointer-events-none` e `aria-hidden`; acesso segue em
+`/api/material/[id]`. Autoavaliação do encerramento indisponível até
+`realizados ≥ 12` (dupla tardia não libera cedo).
+
+**Layout/a11y:** `minmax(0,1fr)` nos grids implícitos + `DuplaNomes`
+shrink-safe + `min-w-0` nos pais flex — mata os 6 overflows @375px
+medidos. Cards de instrumento sem `sm:flex-row` no rail ~290px.
+Contraste: `--ok`/`--info` com variantes `-text`, `--warn-text`
+escurecido (AA). DemoBar "Demo" só no mobile; avatares SVG que
+faltavam; `ERRO_JA_ACEITA` compartilhado; banner de `?visao`
+inaplicável; `partesTurma` ("Turma 1" forte + "2026/2027" muted).
+
+**Fixtures:** cronograma "Turma E2E" dedicado + `ciclo_eventos`
+clonados + duplas migradas + `profile_papeis` escopado — personas e2e
+não vazam mais pro diretório/catálogo/colegas do jovem demo (as três
+fontes confirmadas ao vivo: Ana/T1 com zero persona e2e). Spec novo
+pina o isolamento com JWT real, gated na existência da persona demo
+(e2e-app local não semeia o dataset).

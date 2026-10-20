@@ -87,6 +87,7 @@ import {
   formatDiaSemana,
   JANELA_PERIODO,
   linkSeguro,
+  coberturaEncontro,
   passosDaTrilha,
   resumoSemanaDe,
   semanaBounds,
@@ -297,28 +298,6 @@ function resumoEncontrosDupla(itens: ItemDupla[], agora: number): string {
       `${b.naoAconteceram.length} não ${b.naoAconteceram.length === 1 ? "aconteceu" : "aconteceram"}`
     );
   return `${itens.length} encontros de duplas: ${partes.join(", ")}`;
-}
-
-/** Cobertura de um encontro oficial entre as duplas visíveis: quantas têm o
- *  encontro `numero` realizado e com registro entregue. */
-function coberturaEncontro(
-  duplas: Dupla[],
-  numero: number
-): { registraram: number; total: number } {
-  // denominador = duplas ativas da trilha do calendário — a especialista não
-  // deve o encontro oficial DPP de nº igual (o dela é outra trilha)
-  const ativas = duplas.filter(
-    (d) => d.status === "ativa" && d.trilha !== "especialista"
-  );
-  let registraram = 0;
-  for (const d of ativas)
-    if (
-      d.encontros.some(
-        (e) => e.numero === numero && e.status === "realizado" && e.registro
-      )
-    )
-      registraram++;
-  return { registraram, total: ativas.length };
 }
 
 const TIPO_PALAVRA: Record<CicloEvento["tipo"], string> = {
@@ -2765,7 +2744,7 @@ export function AgendaCalendario({
                       e.tipo === "encontro" &&
                       e.numero != null &&
                       duplas.length > 0 && (
-                        <CoberturaEncontro duplas={duplas} numero={e.numero} />
+                        <CoberturaEncontro duplas={duplas} evento={e} />
                       )}
                     {/* plano de aula/anotações do mentor — uma por dupla ativa
                         da trilha DPP, rotulada pelo mentorado quando ele tem
@@ -2866,7 +2845,7 @@ export function AgendaCalendario({
                   e.numero != null &&
                   passou &&
                   duplas.length > 0
-                    ? coberturaEncontro(duplas, e.numero)
+                    ? coberturaEncontro(duplas, e)
                     : null;
                 // a fase mora no título do mês e no detalhe do dia — na linha
                 // só sobra o intervalo de evento que atravessa dias (recesso)
@@ -2945,8 +2924,8 @@ export function AgendaCalendario({
 
 /** "X de Y duplas registraram" — cobertura agregada do encontro oficial no
  *  detalhe do dia (coord/supervisor). */
-function CoberturaEncontro({ duplas, numero }: { duplas: Dupla[]; numero: number }) {
-  const { registraram, total } = coberturaEncontro(duplas, numero);
+function CoberturaEncontro({ duplas, evento }: { duplas: Dupla[]; evento: CicloEvento }) {
+  const { registraram, total } = coberturaEncontro(duplas, evento);
   return (
     <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
       <Users aria-hidden size={14} />
@@ -4003,7 +3982,12 @@ function SemanaMentor({
       className="animate-enter-x"
       style={{ "--dir": `${direcao * 8}px` } as CSSProperties}
     >
-      <div className="scroll-fina overflow-x-auto">
+      <div
+        role="region"
+        aria-label="Grade do mês — role horizontalmente"
+        tabIndex={0}
+        className="scroll-fina overflow-x-auto"
+      >
         <div role="grid" aria-labelledby="agenda-mes-rotulo">
           <div role="row" className="grid min-w-[32rem] grid-cols-7">
           {dias.map((iso) => {
@@ -4330,7 +4314,12 @@ function HorariosMentor({
     >
       {/* gutter das horas (2.5rem) + 7 colunas com piso de ~72px — no mobile
           o conjunto rola horizontal em vez de esmagar os blocos */}
-      <div className="scroll-fina overflow-x-auto">
+      <div
+        role="region"
+        aria-label="Grade da semana — role horizontalmente"
+        tabIndex={0}
+        className="scroll-fina overflow-x-auto"
+      >
         <div className="grid grid-cols-[2.5rem_repeat(7,minmax(4.5rem,1fr))]">
           {/* header: canto do gutter vazio + dow/dia por coluna */}
           <span aria-hidden className="border-b border-border/60" />

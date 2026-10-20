@@ -53,6 +53,7 @@ import {
   getJovemEncontros,
   getJovemJornada,
 } from "@/lib/queries-jovem";
+import { PreviewPdf } from "@/components/material-preview-pdf";
 import type { Material } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -568,13 +569,29 @@ function EstacaoItem({
     }
     if (est.estado === "a_fazer" && est.token) {
       return (
-        <Link
-          href={`/f/${est.token}`}
-          className={buttonVariants({ size: "sm" })}
-        >
-          Continuar
-          <ArrowRight size={15} data-icon="inline-end" aria-hidden />
-        </Link>
+        // re-emissão (revisão do PDM): a rodada aberta tem CTA, mas a
+        // resposta anterior segue acessível — a estação diz "segue salva"
+        // e o Rever prova. (0097: resolveEstacao devolve respostas da
+        // última respondida também no a_fazer)
+        <div className="flex flex-wrap items-center gap-2">
+          {est.respostas && campos.length > 0 && (
+            <ReverRespostaDialog
+              titulo={est.titulo}
+              respondidoEm={est.respondidoEm}
+              sistema={sistema}
+              campos={campos}
+              respostas={est.respostas as Record<string, RespostaValor>}
+              label="Rever resposta anterior"
+            />
+          )}
+          <Link
+            href={`/f/${est.token}`}
+            className={buttonVariants({ size: "sm" })}
+          >
+            Continuar
+            <ArrowRight size={15} data-icon="inline-end" aria-hidden />
+          </Link>
+        </div>
       );
     }
     return null;
@@ -764,6 +781,34 @@ function FimItem({
 
 // ---------- acervo (a página anterior, intacta como fallback e seção) ----------
 
+const EXT_IMG = /\.(png|jpe?g|webp|gif|avif|svg)$/i;
+const EXT_PDF = /\.pdf$/i;
+
+/** Capa do material — thumbnail borda-a-borda no topo do item (o arquivo
+ *  vive no bucket privado; a URL assinada vem do /api/material/[id] de
+ *  sempre). PDF vira iframe cortado na 1ª página (o leaf client-side cai
+ *  pro ícone onde o browser não embute — Android); imagem vira
+ *  <img> object-cover. Decorativo: o link da linha abaixo segue sendo o
+ *  gesto — pointer-events-none pra thumbnail não roubar o toque. */
+function PreviewMaterial({ m }: { m: Material }) {
+  if (!m.path) return null;
+  const src = `/api/material/${m.id}`;
+  if (EXT_PDF.test(m.path)) return <PreviewPdf src={src} />;
+  if (EXT_IMG.test(m.path)) {
+    return (
+      <div aria-hidden className="h-36 overflow-hidden bg-muted/60">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={src}
+          alt=""
+          className="pointer-events-none h-full w-full object-cover object-top"
+        />
+      </div>
+    );
+  }
+  return null;
+}
+
 function MateriaisLista({ materiais }: { materiais: Material[] }) {
   const grupos = agrupar(materiais);
   if (grupos.length === 0) {
@@ -820,14 +865,15 @@ function MateriaisLista({ materiais }: { materiais: Material[] }) {
                 </>
               );
               return (
-                <div
-                  key={m.id}
-                  className={cn(
-                    "flex items-center pr-3 transition-colors",
-                    href && "hover:bg-muted/50"
-                  )}
-                >
-                  {href ? (
+                <div key={m.id}>
+                  <PreviewMaterial m={m} />
+                  <div
+                    className={cn(
+                      "flex items-center pr-3 transition-colors",
+                      href && "hover:bg-muted/50"
+                    )}
+                  >
+                    {href ? (
                     <a
                       href={href}
                       target="_blank"
@@ -841,26 +887,27 @@ function MateriaisLista({ materiais }: { materiais: Material[] }) {
                       {interno}
                     </div>
                   )}
-                  {m.path ? (
-                    <File
-                      size={15}
-                      className="shrink-0 text-muted-foreground"
-                      aria-hidden
-                    />
-                  ) : urlOk ? (
-                    <ArrowSquareOut
-                      size={15}
-                      className="shrink-0 text-muted-foreground"
-                      aria-hidden
-                    />
-                  ) : (
-                    <Badge
-                      variant="outline"
-                      className="shrink-0 text-xs text-muted-foreground"
-                    >
-                      em breve
-                    </Badge>
-                  )}
+                    {m.path ? (
+                      <File
+                        size={15}
+                        className="shrink-0 text-muted-foreground"
+                        aria-hidden
+                      />
+                    ) : urlOk ? (
+                      <ArrowSquareOut
+                        size={15}
+                        className="shrink-0 text-muted-foreground"
+                        aria-hidden
+                      />
+                    ) : (
+                      <Badge
+                        variant="outline"
+                        className="shrink-0 text-xs text-muted-foreground"
+                      >
+                        em breve
+                      </Badge>
+                    )}
+                  </div>
                 </div>
               );
             })}
@@ -878,7 +925,7 @@ function BibliotecaJovem({ materiais }: { materiais: Material[] }) {
   return (
     <div className="space-y-6">
       <header>
-        <h1 className="text-2xl font-semibold tracking-tight">Materiais</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Minha jornada</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Os guias e conteúdos oficiais do programa.
         </p>
