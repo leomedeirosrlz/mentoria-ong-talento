@@ -7,6 +7,11 @@ export type Json =
   | Json[]
 
 export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "14.17"
+  }
   graphql_public: {
     Tables: {
       [_ in never]: never
@@ -4514,6 +4519,7 @@ export type Database = {
       importar_registros: { Args: { itens: Json }; Returns: Json }
       instrumentos_da_dupla: { Args: { p_dupla_id: string }; Returns: Json }
       interesses_ok: { Args: { interesses: string[] }; Returns: boolean }
+      jovem_jornada: { Args: never; Returns: Json }
       jovem_relacionado: { Args: { p_profile: string }; Returns: boolean }
       marcar_combinado: {
         Args: { p_feito: boolean; p_id: string }
@@ -4533,6 +4539,7 @@ export type Database = {
       my_profile_id: { Args: never; Returns: string }
       my_role: { Args: never; Returns: Database["public"]["Enums"]["app_role"] }
       nome_proprio: { Args: { p: string }; Returns: string }
+      painel_instrumentos_jornada: { Args: never; Returns: Json }
       par_de_mim: { Args: { p_profile: string }; Returns: boolean }
       pedir_especialista_jovem: {
         Args: {
@@ -4841,4 +4848,3 @@ export const Constants = {
     },
   },
 } as const
-

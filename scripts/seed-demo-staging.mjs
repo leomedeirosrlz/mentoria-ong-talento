@@ -739,21 +739,30 @@ const FORM = {
 };
 const links = [], resps = [];
 let li = 0;
-function linkComResposta(duplaId, mentoradoId, formId, respostas, respondidoNumero) {
+// WP7: `contexto` + `created_at` são o ciclo de vida da entrega — a jornada
+// separa a Roda inicial da formal pelo contexto->>'momento' (ou pelo
+// created_at vs a data do enc. 12) e o painel lê as datas, então o link
+// nasce ~1h antes do uso, no encontro-alvo do guia. `respondido_por` só
+// faz sentido pra jovem com login (a Ana); os demais respondem por token.
+function linkComResposta(duplaId, mentoradoId, formId, respostas, respondidoNumero,
+                         { contexto = { origem: "instrumentos" }, respondidoPor = null } = {}) {
   const lid = uid(0x700 + li), rid = uid(0x800 + li); li++;
   links.push({
     id: lid, formulario_id: formId, token: `demo-${lid}-t`,
-    dest_mentorado_id: mentoradoId, dupla_id: duplaId,
+    dest_mentorado_id: mentoradoId, dupla_id: duplaId, contexto,
+    created_at: encontroISO(respondidoNumero, "19:40"),
     usado_em: encontroISO(respondidoNumero, "21:00"), created_by: P.coord,
-    respondido_por_profile_id: jovemProfile,
+    respondido_por_profile_id: respondidoPor,
   });
   resps.push({ id: rid, link_id: lid, respostas, respondido_em: encontroISO(respondidoNumero, "21:00") });
 }
-// dupla 1 (Ana × Otávio) — jornada completa
-linkComResposta(D.d1, M.ana, FORM.roda, RODA(), 5);
-linkComResposta(D.d1, M.ana, FORM.visao, VISAO, 3);
-linkComResposta(D.d1, M.ana, FORM.metas, METAS, 4);
-linkComResposta(D.d1, M.ana, FORM.pdm, PDM, 4);
+// dupla 1 (Ana × Otávio) — jornada completa: a roda é a leitura inicial
+// (contexto.momento marca a aplicação, criada no enc. 1 como manda o guia)
+linkComResposta(D.d1, M.ana, FORM.roda, RODA(), 1,
+  { contexto: { origem: "instrumentos", momento: "inicial" }, respondidoPor: jovemProfile });
+linkComResposta(D.d1, M.ana, FORM.visao, VISAO, 3, { respondidoPor: jovemProfile });
+linkComResposta(D.d1, M.ana, FORM.metas, METAS, 4, { respondidoPor: jovemProfile });
+linkComResposta(D.d1, M.ana, FORM.pdm, PDM, 4, { respondidoPor: jovemProfile });
 linkComResposta(D.d1, M.ana, FORM.anamnese, {
   quem_mora: "Moro com a minha mãe e meu irmão mais novo.",
   territorio: "Vila Esperança, zona leste.",
@@ -766,17 +775,21 @@ linkComResposta(D.d1, M.ana, FORM.anamnese, {
   expectativas: "Passar em Medicina e ser a primeira médica da família.",
   pref_genero_mentor: "Indiferente",
 }, 0);
-// parciais em outras duplas
-linkComResposta(D.d4, M.joaoPedro, FORM.roda, RODA({ pr_financas: 5, p_saude: 8, r_familia: 9 }), 4);
+// parciais em outras duplas — todas as rodas abaixo são leituras iniciais
+// (enc. 1 do guia), marcadas com contexto.momento = 'inicial'
+const INICIAL = { origem: "instrumentos", momento: "inicial" };
+linkComResposta(D.d4, M.joaoPedro, FORM.roda, RODA({ pr_financas: 5, p_saude: 8, r_familia: 9 }), 1, { contexto: INICIAL });
 linkComResposta(D.d4, M.joaoPedro, FORM.metas, METAS, 3);
-linkComResposta(D.d6, M.rafaela, FORM.roda, RODA({ p_equilibrio: 7, pr_escola: 5 }), 5);
-linkComResposta(D.d10, M.yasmin, FORM.roda, RODA({ pr_carreira: 6, q_realizacao: 8 }), 5);
-linkComResposta(D.d13, M.larissa, FORM.roda, RODA({ p_equilibrio: 3, pr_escola: 6 }), 4);
+linkComResposta(D.d6, M.rafaela, FORM.roda, RODA({ p_equilibrio: 7, pr_escola: 5 }), 1, { contexto: INICIAL });
+linkComResposta(D.d10, M.yasmin, FORM.roda, RODA({ pr_carreira: 6, q_realizacao: 8 }), 1, { contexto: INICIAL });
+linkComResposta(D.d13, M.larissa, FORM.roda, RODA({ p_equilibrio: 3, pr_escola: 6 }), 1, { contexto: INICIAL });
 linkComResposta(D.d13, M.larissa, FORM.visao, { ...VISAO, filme: "Me vejo calma na hora da prova, segura da minha escolha.", declaracao_visao: "Escolher minha carreira com clareza e chegar no vestibular sem pavor." }, 3);
-// uma roda pendente (link emitido, não respondido) pra mostrar o estado
+// uma roda pendente (link emitido, não respondido) pra mostrar o estado —
+// emitida no enc. 6 (fora da janela do enc. 1: é o caso "atrasada" do painel)
 links.push({
   id: uid(0x7f0), formulario_id: FORM.roda, token: "demo-roda-pendente-00000000000001",
-  dest_mentorado_id: M.gabriela, dupla_id: D.d5, expira_em: iso(new Date(Date.now() + 30 * DIA)),
+  dest_mentorado_id: M.gabriela, dupla_id: D.d5, contexto: INICIAL,
+  created_at: encontroISO(6, "19:40"), expira_em: iso(new Date(Date.now() + 30 * DIA)),
   created_by: P.ricardo,
 });
 await post("formulario_links", links);

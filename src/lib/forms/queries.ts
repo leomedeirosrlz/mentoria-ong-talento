@@ -301,14 +301,24 @@ export const getAnamneseMentorado = cache(
 
 /** Uma entrega (link) do instrumento na dupla — a RPC instrumentos_da_dupla
  *  devolve respostas só quando há (pendente/expirado sai sem payload). O
- *  token acompanha: quem lê a RPC é quem entrega o link. */
+ *  token acompanha: quem lê a RPC é quem entrega o link. Desde a 0096 a RPC
+ *  também manda contexto/created_at/usado_em/expira_em — opcionais aqui pra
+ *  não quebrar mirrors (demo) montados antes do superset. */
 export type InstrumentoEntrega = {
   link_id: string;
-  token: string;
+  /** null quando o caller é o mentorado da dupla e a entrega não é
+   *  endereçada a ele (0096 — a jovem não carrega bearer token alheio). */
+  token: string | null;
   destino: "mentorado" | "mentor" | "outro";
   status: "pendente" | "respondido" | "expirado";
   respondido_em: string | null;
   respostas: Record<string, RespostaValor> | null;
+  /** metadados do link (0096): origem/momento da aplicação e datas — é o
+   *  que separa Roda inicial da formal na jornada do jovem */
+  contexto?: Record<string, unknown> | null;
+  created_at?: string;
+  usado_em?: string | null;
+  expira_em?: string | null;
 };
 
 /** Um instrumento oficial no contexto da dupla — definição + entregas. */
