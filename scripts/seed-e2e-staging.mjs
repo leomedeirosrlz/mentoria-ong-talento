@@ -253,7 +253,7 @@ console.log(`cronograma: ${cron.id} (${cron.turma})`);
   // log de e-mail de apoio sobrevive à avaliação — ref_id é solto de
   // propósito.
   const morrem = await rest(
-    `duplas?select=id&or=(id.in.(${IDS.dupla},${IDS.dupla2},${IDS.duplaEsp}),remanejada_de.eq.${IDS.dupla2},mentor_id.eq.${IDS.mentorImport},mentorado_id.eq.${IDS.mentoradoLivre},mentorado_id.eq.${IDS.mentoradoSemDpp},mentorado_id.eq.${IDS.mentoradoHib},mentorado_id.eq.${IDS.mentoradoHibEsp},and(mentorado_id.eq.${IDS.mentorado},id.not.in.(${IDS.dupla},${IDS.duplaEsp})))`
+    `duplas?select=id&or=(id.in.(${IDS.dupla},${IDS.dupla2},${IDS.duplaEsp}),remanejada_de.eq.${IDS.dupla2},mentor_id.eq.${IDS.mentorImport},mentorado_id.eq.${IDS.mentoradoLivre},mentorado_id.eq.${IDS.mentoradoSemDpp},mentorado_id.eq.${IDS.mentoradoHib},mentorado_id.eq.${IDS.mentoradoHibEsp},and(mentorado_id.eq.${IDS.mentorado},id.not.in.(${IDS.dupla},${IDS.duplaEsp})),and(mentorado_id.eq.${IDS.mentorado2},id.not.in.(${IDS.dupla2})))`
   );
   const morremIds = (morrem ?? []).map((d) => d.id);
   if (morremIds.length) {

@@ -538,8 +538,8 @@ function contextoEspecialistaAux(
     return {
       texto:
         pend.status === "agendado"
-          ? `Sessão ${pend.numero} — agendada já passou e segue sem registro (rolou?).`
-          : `Sessão ${pend.numero} — registro pendente.`,
+          ? `Sessão ${passoEsp(pend, dupla.encontros)} — agendada já passou e segue sem registro (rolou?).`
+          : `Sessão ${passoEsp(pend, dupla.encontros)} — registro pendente.`,
       problema: true,
     };
   if (prox?.data_hora)
