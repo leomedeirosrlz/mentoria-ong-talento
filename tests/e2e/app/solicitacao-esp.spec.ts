@@ -213,6 +213,10 @@ test.describe("solicitação de especialista v2 — fluxo staff (REALIZA-112)", 
   test("mentor pede especialista dirigido; especialista escolhe o slot e aceita", async ({
     page,
   }) => {
+    // 2 logins + 2 server actions + polls service-role — o teto global de
+    // 30s estoura no preview frio (a run 39388319471 morreu no waitForURL
+    // do aceite, com a sol já 'aceita' no banco)
+    test.setTimeout(90_000);
     // ---- lado staff: o pedido nasce pela UI da ficha (a superfície real)
     await loginComSenha(page, MENTOR_EMAIL, SENHA);
     await page.goto(`/duplas/${IDS.dupla}`);
@@ -315,7 +319,7 @@ test.describe("solicitação de especialista v2 — fluxo staff (REALIZA-112)", 
       }
     );
     // o aceite navega pra ficha da dupla de especialista efetivada
-    await page.waitForURL(`**/duplas/${IDS.duplaEsp}`, { timeout: 15_000 });
+    await page.waitForURL(`**/duplas/${IDS.duplaEsp}`, { timeout: 30_000 });
 
     // efetivação atômica: sol aceita apontando pra trilha existente do par
     // + encontro numero=1 no slot escolhido (a fixture …00e0 é reusada —
@@ -357,6 +361,8 @@ test.describe("solicitação de especialista v2 — fluxo staff (REALIZA-112)", 
   test("contra-proposta do especialista é aceita pelo autor", async ({
     page,
   }) => {
+    // mesmo peso do irmão acima: login + ação + relogin + ação no mural
+    test.setTimeout(90_000);
     // sol staff dirigida ao esp, dessa vez na dupla2 — a mentorada ainda não
     // tem trilha esp, então o aceite prova a CRIAÇÃO da dupla (não a reusa)
     await inserirViaServiceRole("solicitacoes_especialista", {
