@@ -198,7 +198,7 @@ export function SaidaMentoradoDialog({
             <div className="grid gap-4 sm:grid-cols-2">
               {situacao === "desistente" && (
                 <div className="space-y-2">
-                  <Label id="saida-motivo-label">Motivo</Label>
+                  <Label id="saida-motivo-label" htmlFor="saida-motivo">Motivo</Label>
                   <Select
                     value={motivoSel}
                     items={Object.fromEntries(

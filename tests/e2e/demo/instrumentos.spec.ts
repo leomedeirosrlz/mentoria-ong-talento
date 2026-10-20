@@ -8,6 +8,7 @@ import { entrarNaDemo, expect, test } from "../helpers";
 // novos tipos (secao + escala_1_10). Sem writes — spec demo segura.
 
 const DUPLA_OK = "de000000-0000-4000-8000-000000001537"; // Ricardo × Ana
+const DUPLA_FIM = "de000000-0000-4000-8000-000000000605"; // Luiza × Isabela (concluída)
 const DUPLA_MATHEUS = "de000000-0000-4000-8000-000000001549"; // Ricardo × Matheus
 const TOK_VISAO_EDUARDO = "demo-tok-visao-eduardo-00001";
 const TOK_RODA_EDUARDO = "demo-tok-roda-eduardo-000001";
@@ -80,6 +81,37 @@ test.describe("demo — instrumentos oficiais da jornada", () => {
     await expect(
       page.getByText("Sua Declaração de Visão", { exact: true })
     ).toBeVisible();
+  });
+
+  // dupla fechada = jornada congelada: ninguém emite, copia ou manda link
+  // de instrumento — só lê. O pin trava a decisão REALIZA-151 (o gating
+  // vive só no JSX: sem spec, regredir não quebra nada)
+  test("dupla concluída não oferece ação de emissão de instrumento", async ({
+    page,
+  }) => {
+    await entrarNaDemo(page, "coordenacao");
+    await page.goto(`/duplas/${DUPLA_FIM}`);
+
+    const sec = page.locator("section", {
+      hasText: "Instrumentos da jornada",
+    });
+    await expect(
+      sec.getByRole("button", { name: "Gerar link" })
+    ).toHaveCount(0);
+    await expect(
+      sec.getByRole("button", { name: /Copiar link/ })
+    ).toHaveCount(0);
+    await expect(
+      sec.getByRole("link", { name: /WhatsApp/ })
+    ).toHaveCount(0);
+    // o menu "Mais" também não oferece "Enviar formulário" em dupla fechada
+    const mais = page.getByRole("button", { name: "Mais" });
+    if (await mais.count()) {
+      await mais.click();
+      await expect(
+        page.getByRole("menuitem", { name: /Enviar formulário/ })
+      ).toHaveCount(0);
+    }
   });
 
   test("/f/<token>: roda da vida com quadrantes e escala 1–10", async ({

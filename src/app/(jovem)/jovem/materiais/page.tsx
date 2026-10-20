@@ -53,6 +53,7 @@ import {
   getJovemEncontros,
   getJovemJornada,
 } from "@/lib/queries-jovem";
+import { PreviewPdf } from "@/components/material-preview-pdf";
 import type { Material } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -785,28 +786,14 @@ const EXT_PDF = /\.pdf$/i;
 
 /** Capa do material — thumbnail borda-a-borda no topo do item (o arquivo
  *  vive no bucket privado; a URL assinada vem do /api/material/[id] de
- *  sempre). PDF vira <object> cortado na 1ª página (o fallback nativo
- *  mostra o ícone onde o browser não embute PDF — Android); imagem vira
+ *  sempre). PDF vira iframe cortado na 1ª página (o leaf client-side cai
+ *  pro ícone onde o browser não embute — Android); imagem vira
  *  <img> object-cover. Decorativo: o link da linha abaixo segue sendo o
  *  gesto — pointer-events-none pra thumbnail não roubar o toque. */
 function PreviewMaterial({ m }: { m: Material }) {
   if (!m.path) return null;
   const src = `/api/material/${m.id}`;
-  if (EXT_PDF.test(m.path)) {
-    return (
-      <div aria-hidden className="h-36 overflow-hidden bg-muted/60">
-        <object
-          data={`${src}#page=1&toolbar=0&navpanes=0&view=FitH`}
-          type="application/pdf"
-          className="pointer-events-none h-full w-full"
-        >
-          <span className="grid h-full place-items-center text-muted-foreground">
-            <FileText size={28} weight="duotone" aria-hidden />
-          </span>
-        </object>
-      </div>
-    );
-  }
+  if (EXT_PDF.test(m.path)) return <PreviewPdf src={src} />;
   if (EXT_IMG.test(m.path)) {
     return (
       <div aria-hidden className="h-36 overflow-hidden bg-muted/60">
