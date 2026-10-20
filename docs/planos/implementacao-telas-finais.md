@@ -744,3 +744,41 @@ avaliacao_links, formulario_links, encontro_notas, registro_anexos).
 · e2e-preview aguardando deploy. **Dívida conhecida:** notebook offline —
 `nb push` + gates canônicos remotos pendentes; PR aberto via clone local
 do GitHub (histórico = origin/main).
+
+## WP7 — Minha jornada fechado (PR #68 · REALIZA-140)
+
+`/jovem/materiais` deixa de ser biblioteca plana e vira **hub narrativo
+de 7 estações** do guia DPP (Roda inicial → Visão → Metas → PDM →
+Avaliação do encontro → Roda formal → 360º), com datas do cronograma da
+turma dela — nenhuma data inventada. Estados honestos: feita (snippet da
+resposta real + Rever), a fazer (CTA `/f/<token>` ou "o mentor envia"),
+trancada ("libera no enc. N" — nunca botão falso), futuras recolhidas
+num `<details>` único. Acervo preservado ("não conta no progresso");
+rascunho local explícito ("salvo neste aparelho"); fallback pra
+biblioteca antiga se RPC falha / sem dupla DPP / sem cronograma.
+
+**Staff** (`/materiais`): painel "Progresso da jornada" read-only —
+stackbars por turma, célula por estação, "fora da janela" + Lembrar por
+mentor (cap 48h existente), dupla pausada sem ação viva, copy de escopo.
+**Ficha** (`/duplas/[id]`): chips de janela do guia + "Como conduzir".
+
+**Backend (0096, staging+prod+ledger):** `jovem_jornada()` auto-escopada
+— cronograma + 4 instrumentos + 360º dela; **token/respostas stripped**
+quando a entrega é do mentor (whitelist de contexto: origem/momento/
+encontro/dupla_id). `painel_instrumentos_jornada()` — agregado sem
+respostas/tokens + `max_numero` (régua "fora da janela" é da dupla, não
+só da coorte). `emitir_link_instrumento()` grava `contexto.momento` da
+roda pela régua de **respondidas** (0 → inicial; ≥1 → formal — re-envio
+de link expirado continua inicial). Guarda bloqueia os 4 instrumentos
+no caminho genérico de links (`/formularios` esconde as ações mortas).
+
+**Revisão multi-agent:** resposta de mentor não fecha estação da jovem
+(`destino=mentorado` antes de snippet/feito); 1ª roda sem marca é
+sempre a inicial (nunca a data do enc. 12 — dupla tardia); re-emissão
+reabre a estação (revisão PDM enc. 9); copy honesta pós-janela;
+`EventoJornada.tipo` alinhado ao schema 0062.
+
+**Gates:** tsc 0 · eslint 0 · vitest **692** (41 de jornada) · build ok
+· demo spec novo **5/5** · app 13/13 vs staging · stamping `momento`
+verificado ao vivo · prod auditada (zero links de instrumento pro
+mentor). e2e-preview no pipeline do PR.
