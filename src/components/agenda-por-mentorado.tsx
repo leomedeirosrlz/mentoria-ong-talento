@@ -327,7 +327,7 @@ function CardMentorado({
     <article className="flex flex-col gap-4 rounded-xl bg-card p-5 shadow-[var(--shadow-border)]">
       {/* header: identidade + saúde da dupla — o texto do semáforo carrega
           o estado (cor nunca é o único canal, PV-2) */}
-      <div className="flex items-start gap-3">
+      <div className="flex flex-wrap items-start gap-3">
         <Avatar
           papel="mentorado"
           nome={nome}
@@ -338,7 +338,7 @@ function CardMentorado({
               : null
           }
         />
-        <div className="min-w-0 flex-1">
+        <div className="min-w-28 flex-1">
           <h3 className="flex flex-wrap items-center gap-x-2 gap-y-1 font-semibold leading-snug">
             <span className="truncate">{nome}</span>
             <Badge variant="secondary">{dupla.turma}</Badge>
