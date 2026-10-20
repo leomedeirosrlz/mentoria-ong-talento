@@ -24,9 +24,17 @@ const IDS = {
   jovemProfile: "e2e00000-0000-4000-8000-0000000000b0",
   combinado: "e2e00000-0000-4000-8000-0000000000c1",
   encontro: "e2e00000-0000-4000-8000-0000000000d1",
+  // WP7 — o encontro realizado da fixture de avaliação (REALIZA-109): é a
+  // âncora da jornada (encontro corrente 16, "falta avaliar"). Fixture
+  // compartilhada com avaliacao.spec — convergida, nunca deletada aqui.
+  encontroRealizado: "e2e00000-0000-4000-8000-0000000000d2",
   mentorProfile: "e2e00000-0000-4000-8000-000000000010",
   coordProfile: "e2e00000-0000-4000-8000-000000000040",
+  // a ficha da mentorada da dupla …0030 — destino dos links de instrumento
+  mentorado: "e2e00000-0000-4000-8000-000000000020",
 } as const;
+const DUPLA_ID =
+  process.env.E2E_DUPLA_ID ?? "e2e00000-0000-4000-8000-000000000030";
 
 // as descrições moram no seed — se mudarem lá, mudam aqui
 const COMBINADO_JOVEM = "Ler o capítulo 3 do guia até o próximo encontro";
@@ -57,10 +65,29 @@ async function restaurarJovem() {
   } else {
     await inserirViaServiceRole("encontros", {
       id: IDS.encontro,
-      dupla_id: process.env.E2E_DUPLA_ID ?? "e2e00000-0000-4000-8000-000000000030",
+      dupla_id: DUPLA_ID,
       numero: 8,
       data_hora: futura3d,
       status: "agendado",
+    });
+  }
+  // WP7 — "Minha jornada" precisa de um realizado de âncora: sem ele o
+  // encontro corrente cai pra 1 e as estações tardias trancam (o mentor.spec
+  // varre os encontros da dupla — se o d2 sumiu, a trilha muda inteira).
+  // Recria a fixture do seed (o insert dispara o trigger que minta o link).
+  const [d2] = await buscarViaServiceRole<{ id: string }[]>(
+    "encontros",
+    `select=id&id=eq.${IDS.encontroRealizado}`
+  );
+  if (!d2) {
+    const ha2d = new Date(Date.now() - 2 * 86400e3).toISOString();
+    await inserirViaServiceRole("encontros", {
+      id: IDS.encontroRealizado,
+      dupla_id: DUPLA_ID,
+      numero: 16,
+      data_hora: ha2d,
+      realizado_em: ha2d,
+      status: "realizado",
     });
   }
 }
@@ -251,20 +278,122 @@ test.describe("mentorado — shell /jovem", () => {
     await expect(proximos.getByText("Agendado").first()).toBeVisible();
   });
 
-  test("materiais abre a biblioteca — conteúdo ou estado vazio honesto", async ({
+  // WP7 (REALIZA-140) — /jovem/materiais é o hub "Minha jornada": as 7
+  // estações canônicas do guia com datas da turma dela (RPC jovem_jornada,
+  // 0096) + a biblioteca de sempre como "Acervo". Sem dupla/cronograma a
+  // página cai no fallback "Materiais" — a fixture …0030 tem os dois.
+  test("materiais é o hub Minha jornada — trilha das 7 estações + acervo", async ({
     page,
   }) => {
     await page.goto("/jovem/materiais");
     await expect(
-      page.getByRole("heading", { name: "Materiais", level: 1 })
+      page.getByRole("heading", { name: "Minha jornada", level: 1 })
     ).toBeVisible();
-    // a RLS entrega só audiencia='todos'; o seed de domínio tem algumas, mas
-    // num stack sem elas o vazio honesto é a resposta certa
+    // hero — posição no ciclo + progresso de entregas. O d2 convergido no
+    // piso dá "encontro 16 de 16"; a regex tolera um sweep paralelo que
+    // apague a âncora (a trilha tranca, mas o hub continua de pé)
+    await expect(page.getByText(/encontro \d+ de 16/)).toBeVisible();
     await expect(
-      page
-        .getByText("Nenhum material por aqui ainda")
-        .or(page.getByRole("heading", { level: 2 }).first())
+      page.getByRole("img", { name: /\d+ de 7 entregas feitas/ })
     ).toBeVisible();
+
+    // a trilha — estações sempre na ordem narrativa do guia. Com o realizado
+    // no lugar (enc. corrente 16) as 7 estão visíveis, sem exceção.
+    const trilha = page.locator('section[aria-label="Sua jornada"]');
+    await expect(trilha.getByText(/Estação 1/)).toBeVisible();
+    for (const titulo of [
+      "Roda da Vida · leitura inicial",
+      "Construindo a sua Visão",
+      "Definindo minhas metas",
+      "PDM · Plano de Desenvolvimento",
+      "Avaliação do encontro",
+      "Roda da Vida · aplicação formal",
+      "Avaliação 360º",
+    ]) {
+      await expect(
+        trilha.getByRole("heading", { name: titulo })
+      ).toBeVisible();
+    }
+    // sem link emitido: o pill "A fazer" vem com quem envia — a jornada
+    // nunca empurra link que não existe (emissor mentor × coord no 360º)
+    await expect(
+      trilha
+        .getByText(
+          /o mentor envia quando chegar a hora|a coordenação envia quando chegar a hora/
+        )
+        .first()
+    ).toBeVisible();
+    // a recorrente: a fixture deixa o enc. 16 realizado sem a estrela — o
+    // detalhe conta a pendência (ou o "em dia · X de Y" se um spec paralelo
+    // já avaliou — os dois são o estado honesto da estação)
+    await expect(
+      trilha
+        .getByText(/falta avaliar o encontro \d+|em dia · \d+ de \d+/)
+        .first()
+    ).toBeVisible();
+
+    // sub-nav de página + o acervo — a biblioteca de sempre continua embaixo
+    const nav = page.getByRole("navigation", { name: "Nesta página" });
+    await expect(
+      nav.getByRole("link", { name: "Jornada" })
+    ).toBeVisible();
+    await expect(
+      page.locator("section#acervo").getByRole("heading", { name: "Acervo" })
+    ).toBeVisible();
+  });
+
+  test("estação com link pendente vira CTA 'Continuar' — e 'Em andamento' com rascunho local", async ({
+    page,
+  }) => {
+    // O recorte "a_fazer + token → link /f/<token>" + o overlay do pill
+    // (rascunho no localStorage DESTE aparelho, mesma chave do form público).
+    // O link é semeado via service role e sai junto no fim — o seed não
+    // cria entrega nenhuma pra essa dupla.
+    const [form] = await buscarViaServiceRole<{ id: string }[]>(
+      "formularios",
+      "select=id&sistema=eq.visao&ativo=eq.true&limit=1"
+    );
+    test.skip(!form, "sem instrumento oficial de visão ativo no ambiente");
+    const token = crypto.randomUUID().replaceAll("-", "");
+    try {
+      // piso cirúrgico: uma entrega respondida esconderia a pendente (a
+      // resposta vence na derivação) — links visão↔mentorada da dupla são
+      // leftover de run morto, nunca fixture do seed
+      await limparViaServiceRole(
+        "formulario_links",
+        `dupla_id=eq.${DUPLA_ID}&formulario_id=eq.${form.id}&dest_mentorado_id=eq.${IDS.mentorado}`
+      );
+      await inserirViaServiceRole("formulario_links", {
+        formulario_id: form.id,
+        token,
+        dest_mentorado_id: IDS.mentorado,
+        dupla_id: DUPLA_ID,
+        contexto: { origem: "instrumentos" },
+        created_by: IDS.mentorProfile,
+      });
+      // o rascunho é conhecimento local — o JornadaRascunho lê a chave uma
+      // vez no mount; plantar antes da navegação simula a volta do /f/token
+      await page.addInitScript(
+        (k) => {
+          localStorage.setItem(k, JSON.stringify({ filme: "rascunho e2e" }));
+        },
+        `rascunho:/f/${token}`
+      );
+      await page.goto("/jovem/materiais");
+
+      const trilha = page.locator('section[aria-label="Sua jornada"]');
+      const visao = trilha.locator("article", {
+        hasText: "Construindo a sua Visão",
+      });
+      const cta = visao.getByRole("link", { name: "Continuar" });
+      await expect(cta).toHaveAttribute("href", `/f/${token}`);
+      await expect(visao.getByText("Em andamento")).toBeVisible();
+      await expect(
+        visao.getByText("rascunho salvo neste aparelho")
+      ).toBeVisible();
+    } finally {
+      await limparViaServiceRole("formulario_links", `token=eq.${token}`);
+    }
   });
 
   test("perfil mostra a ficha do programa e os dados de contato", async ({
