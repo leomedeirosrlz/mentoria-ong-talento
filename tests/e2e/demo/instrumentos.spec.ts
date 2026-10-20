@@ -61,7 +61,7 @@ test.describe("demo — instrumentos oficiais da jornada", () => {
       hasText: "Instrumentos da jornada",
     });
     await expect(sec.getByText("Definindo Minhas Metas")).toBeVisible();
-    await sec.getByRole("button", { name: "Enviar" }).first().click();
+    await sec.getByRole("button", { name: "Gerar link" }).first().click();
     await expect(page.getByText(/Modo demonstração/)).toBeVisible();
   });
 

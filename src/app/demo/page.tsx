@@ -66,7 +66,7 @@ export default async function DemoPage() {
     // viewport o topo continua rolável — centraliza só quando há espaço.
     // flex, não grid: em grid o w-full do filho resolve contra o padding
     // box e vaza os px-4
-    <div className="flex min-h-[100dvh] flex-col bg-background px-4 py-6">
+    <main className="flex min-h-[100dvh] flex-col bg-background px-4 py-6">
       {/* animate-rise: mesma entrada suave do onboarding — coberta pelo guard
           global de prefers-reduced-motion */}
       <div className="m-auto w-full max-w-xl animate-rise">
@@ -113,6 +113,6 @@ export default async function DemoPage() {
           </p>
         </div>
       </div>
-    </div>
+    </main>
   );
 }

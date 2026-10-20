@@ -2,9 +2,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState } from "react";
 import { motion } from "motion/react";
 import {
   CalendarDots,
+  DotsThree,
   FolderOpen,
   House,
   Sparkle,
@@ -16,6 +18,11 @@ import { T } from "@/components/motion";
 import { NotificacoesBell, NotificacoesProvider } from "@/components/notificacoes";
 import { SignOutButton } from "@/components/signout-button";
 import { SiteFooter } from "@/components/site-footer";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import type { Notificacao, Profile } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -28,8 +35,21 @@ const NAV = [
   { href: "/jovem/agenda", label: "Agenda", icon: CalendarDots },
   { href: "/jovem/especialistas", label: "Especialistas", icon: Sparkle },
   { href: "/jovem/pessoas", label: "Pessoas", icon: Users },
-  { href: "/jovem/materiais", label: "Materiais", icon: FolderOpen },
+  { href: "/jovem/materiais", label: "Jornada", icon: FolderOpen },
   { href: "/jovem/perfil", label: "Perfil", icon: UserCircle },
+] as const;
+
+/** Bottom nav: 5 cells no máximo (mesmo contrato do AppShell — 6 labels a
+ *  375px colidiam "EspecialistasPessoasJornada"). Primárias = o que ela
+ *  abre todo dia: home, agenda, a jornada (é onde moram os links dos
+ *  forms) e as pessoas. Especialistas e Perfil a 1 toque no "Mais". */
+const MOBILE_PRIMEIRO = [
+  "/jovem",
+  "/jovem/agenda",
+  "/jovem/materiais",
+  "/jovem/pessoas",
+  "/jovem/especialistas",
+  "/jovem/perfil",
 ] as const;
 
 function ativo(pathname: string, href: string) {
@@ -50,6 +70,24 @@ export function JovemShell({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const [abertoMais, setAbertoMais] = useState(false);
+  const itemsMobile = [...NAV].sort(
+    (a, b) =>
+      MOBILE_PRIMEIRO.indexOf(a.href as (typeof MOBILE_PRIMEIRO)[number]) -
+      MOBILE_PRIMEIRO.indexOf(b.href as (typeof MOBILE_PRIMEIRO)[number])
+  );
+  const visiveis = itemsMobile.slice(0, 4);
+  const overflow = itemsMobile.slice(4);
+  const maisAtivo = overflow.some((i) => pathname.startsWith(i.href));
+
+  // navegar pelo popover (ou por fora) fecha o Mais — ajuste durante o
+  // render (padrão "props mudaram", igual ao AppShell)
+  const [ultimoPath, setUltimoPath] = useState(pathname);
+  if (pathname !== ultimoPath) {
+    setUltimoPath(pathname);
+    setAbertoMais(false);
+  }
+
   // nome de uso primeiro — o cadastro guarda o civil, mas a tela chama pelo
   // que a pessoa escolheu; o primeiro nome já basta de saudação no header
   const nomeTela = me.nome_social || me.nome;
@@ -177,14 +215,14 @@ export function JovemShell({
           <SiteFooter tone="ink" />
         </div>
 
-        {/* bottom nav mobile — os 6 destinos cabem sem "Mais" (flex-1 por
-            item divide a largura igualmente, 6 × ~16% continua legível) */}
+        {/* bottom nav mobile — 5 cells no máximo, overflow no "Mais"
+            (mesmo padrão do AppShell; 6 labels a 375px colidiam) */}
         <nav
           aria-label="Navegação principal"
           className="fixed inset-x-0 bottom-0 z-40 border-t border-sidebar-border bg-sidebar pb-[env(safe-area-inset-bottom)] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] md:hidden"
         >
           <div className="flex">
-            {NAV.map((item) => {
+            {visiveis.map((item) => {
               const at = ativo(pathname, item.href);
               return (
                 <Link
@@ -211,6 +249,58 @@ export function JovemShell({
                 </Link>
               );
             })}
+            <Popover open={abertoMais} onOpenChange={setAbertoMais}>
+              <PopoverTrigger
+                aria-label={
+                  maisAtivo
+                    ? `Mais seções, seção atual em ${overflow.find((i) => pathname.startsWith(i.href))?.label}`
+                    : "Mais seções"
+                }
+                className={cn(
+                  "relative flex flex-1 flex-col items-center gap-1 py-2.5 text-[11px] transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:ring-inset",
+                  maisAtivo
+                    ? "font-semibold text-[var(--brand-ink)]"
+                    : "font-medium text-sidebar-foreground/75 active:text-sidebar-foreground"
+                )}
+              >
+                {/* a rota atual mora no overflow → o indicador viaja pra
+                    cell Mais e ela veste o estilo ativo */}
+                {maisAtivo && (
+                  <motion.span
+                    layoutId="nav-jovem-bottom"
+                    transition={T.pill}
+                    aria-hidden
+                    className="absolute top-0 h-0.5 w-8 rounded-full bg-[var(--role-mentorado)]"
+                  />
+                )}
+                <DotsThree size={20} weight={maisAtivo ? "bold" : "regular"} aria-hidden />
+                Mais
+              </PopoverTrigger>
+              <PopoverContent side="top" align="end" sideOffset={8} className="w-56 p-1.5">
+                <ul>
+                  {overflow.map((item) => {
+                    const at = ativo(pathname, item.href);
+                    return (
+                      <li key={item.href}>
+                        <Link
+                          href={item.href}
+                          aria-current={at ? "page" : undefined}
+                          className={cn(
+                            "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors outline-none focus-visible:bg-muted",
+                            at
+                              ? "font-semibold text-[var(--brand-ink)]"
+                              : "text-foreground/80 hover:bg-muted"
+                          )}
+                        >
+                          <item.icon size={18} weight={at ? "fill" : "regular"} aria-hidden />
+                          {item.label}
+                        </Link>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </PopoverContent>
+            </Popover>
           </div>
         </nav>
       </div>

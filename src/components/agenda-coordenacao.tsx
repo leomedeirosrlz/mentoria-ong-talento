@@ -197,10 +197,7 @@ function CardResumo({ r, dom }: { r: ResumoTurmaCard; dom: string }) {
     <article className="rounded-xl border bg-card p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <PillTurma>
-            {r.turma}
-            {r.meta ? ` · ${r.meta}` : ""}
-          </PillTurma>
+          <PillTurma turma={r.meta ? `${r.turma} · ${r.meta}` : r.turma} />
           <h3 className="mt-1.5 text-lg font-bold leading-snug">
             {r.eventoNumero != null
               ? `Encontro ${r.eventoNumero} · ${r.turma}`
@@ -354,7 +351,7 @@ function LinhaAcompanhar({
       <div className="min-w-0 flex-1 basis-56">
         <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-semibold">
           {item.nomes}
-          <PillTurma>{item.turma}</PillTurma>
+          <PillTurma turma={item.turma} />
         </p>
         <p className="mt-0.5 text-xs leading-snug text-muted-foreground">
           {item.contexto}

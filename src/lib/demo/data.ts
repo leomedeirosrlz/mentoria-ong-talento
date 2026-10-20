@@ -174,6 +174,10 @@ const P = {
   // visíveis no diretório /jovem/pessoas
   caioLogin: 0x0010,
   dandaraLogin: 0x0011,
+  // personas "sem conta" que autora pedidos no mural (0066): profiles sem
+  // user_id — o convite segue pendente; created_by aponta pra pessoa certa
+  kauaLogin: 0x0013,
+  wendelLogin: 0x0014,
   // especialista com a capacidade zerada pro ciclo — o card "Sem vagas" do
   // cardápio do jovem precisa de alguém nessa variante (os de sempre ou são
   // trilha da Bia ou são pedido dela)
@@ -1187,10 +1191,38 @@ function build(): DemoData {
     consent_lgpd_em: haDias(45),
   };
 
+  // Kauã e Wendel pediram especialista pelo mural (solicitacoes abaixo) —
+  // o created_by precisa ser DELES: profiles sem user_id, convite pendente
+  // (não entram no diretório de colegas — profile_id do mentorado fica null)
+  const kauaLogin: Profile = {
+    id: uid(P.kauaLogin), user_id: null, nome: "Kauã Rodrigues",
+    email: "kaua.rodrigues@gmail.com", whatsapp: "5511976123006",
+    role: "mentorado", ativo: true, avatar_path: "demo/avatars/kaua.svg",
+    created_at: haDias(20),
+    bio: null, linkedin: null, areas: null, voluntariado: null,
+    onboarded_em: null,
+    nome_social: null, cidade: "São Paulo", uf: "SP",
+    interesses: ["empreendedorismo", "primeiro emprego", "vendas"],
+    origem: "Projeto Semente",
+    consent_lgpd_em: null,
+  };
+  const wendelLogin: Profile = {
+    id: uid(P.wendelLogin), user_id: null, nome: "Wendel Ferreira",
+    email: "wendel.ferreira@realiza.test", whatsapp: "5511976123010",
+    role: "mentorado", ativo: true, avatar_path: null,
+    created_at: haDias(6),
+    bio: null, linkedin: null, areas: null, voluntariado: null,
+    onboarded_em: null,
+    nome_social: null, cidade: "São Paulo", uf: "SP",
+    interesses: ["futebol", "música"],
+    origem: "Formulário de matching",
+    consent_lgpd_em: null,
+  };
+
   const profiles: Profile[] = [
     marina, paulo, ricardo, sofia, beatriz, carlos, fernanda, joaoPedro,
     luiza, andre, helena, marcos, camila, renata, patricia, anaLogin,
-    caioLogin, dandaraLogin,
+    caioLogin, dandaraLogin, kauaLogin, wendelLogin,
   ];
 
   const personas: Record<AppRole, Profile> = {
@@ -1839,7 +1871,7 @@ function build(): DemoData {
       especialista_id: null,
       dupla_id: null,
       status: "aberta",
-      created_by: anaLogin.id, // persona de jovem da demo — ver nota do created_by
+      created_by: kauaLogin.id,
       created_at: haDias(1, "18:40"),
       respondida_em: null,
       mentorado: { nome: kaua.nome },
@@ -1864,7 +1896,7 @@ function build(): DemoData {
       especialista_id: null,
       dupla_id: null,
       status: "aguardando_coord",
-      created_by: anaLogin.id,
+      created_by: wendelLogin.id,
       // 6 dias parado: o limiar do alerta do painel da coordenação é 5 —
       // o Wendel aparece nos "Pedidos parados" como o caso de triagem
       created_at: haDias(6, "09:15"),

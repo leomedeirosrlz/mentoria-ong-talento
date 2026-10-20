@@ -826,6 +826,59 @@ describe("regressão — re-emissão depois de respondida reabre a estação (M3
     expect(p.detalhe).toContain("nova rodada");
   });
 
+  it("Rever sobrevive: a_fazer da re-emissão traz respostas+data da rodada anterior", () => {
+    const est = estacoesJornada(
+      base({
+        encontros: realizados(9),
+        instrumentos: [
+          inst("pdm", CAMPOS_PDM, [
+            entrega({
+              status: "respondido",
+              created_at: "2026-03-10T10:00:00-03:00",
+              respondido_em: "2026-03-15T20:00:00-03:00",
+              respostas: { meta_1: "Passar no vestibular" },
+            }),
+            entrega({
+              status: "pendente",
+              created_at: `${dataEnc(9)}T10:00:00-03:00`,
+              token: "tok-reemissao",
+            }),
+          ]),
+        ],
+      })
+    );
+    const p = por(est, "pdm");
+    expect(p.estado).toBe("a_fazer");
+    expect(p.respostas?.meta_1).toBe("Passar no vestibular");
+    expect(p.respondidoEm).toBe("2026-03-15T20:00:00-03:00");
+  });
+
+  it("a janela vence: re-emissão antes do enc. de abertura segue feito", () => {
+    // 360º (janela = enc. 16) respondida cedo + link novo no enc. 5 —
+    // paridade com a estação trancada: sem CTA fora da janela
+    const est = estacoesJornada(
+      base({
+        encontros: realizados(5),
+        avaliacao360: [
+          entrega360({
+            status: "respondido",
+            created_at: "2026-03-01T10:00:00-03:00",
+            respondido_em: "2026-03-02T20:00:00-03:00",
+            respostas: { comentario: "ótimo ciclo" },
+          }),
+          entrega360({
+            status: "pendente",
+            created_at: "2026-03-05T10:00:00-03:00",
+            token: "tok-360-novo",
+          }),
+        ],
+      })
+    );
+    const p = por(est, "avaliacao_360");
+    expect(p.estado).toBe("feito");
+    expect(p.token).toBeNull();
+  });
+
   it("link novo pro MENTOR depois de respondida não reabre a estação dela", () => {
     const est = estacoesJornada(
       base({
@@ -873,17 +926,15 @@ describe("painel — estacoesPainelDupla + atrasadasPainel", () => {
   });
 
   it("roda: a primeira entrega sem marca é a inicial, a segunda a formal", () => {
-    const estados = estacoesPainelDupla(
-      linha({
+    const l = linha({
         entregas: {
           roda_vida: [
             { status: "respondido", created_at: "2026-03-05T10:00:00-03:00", destino: "mentorado" },
             { status: "pendente", created_at: `${dataEnc(13)}T10:00:00-03:00`, destino: "mentorado" },
           ],
         },
-      }),
-      ctxPainel(13)
-    );
+      });
+    const estados = estacoesPainelDupla(l, ctxPainel(13), 13);
     expect(estados.roda_inicial).toBe("respondido");
     expect(estados.roda_formal).toBe("pendente");
   });
@@ -897,7 +948,8 @@ describe("painel — estacoesPainelDupla + atrasadasPainel", () => {
           ],
         },
       }),
-      ctxPainel(13)
+      ctxPainel(13),
+      13
     );
     expect(estados.roda_inicial).toBe("respondido");
     expect(estados.roda_formal).not.toBe("respondido");
@@ -912,7 +964,8 @@ describe("painel — estacoesPainelDupla + atrasadasPainel", () => {
           ],
         },
       }),
-      ctxPainel(13)
+      ctxPainel(13),
+      13
     );
     expect(estados.roda_inicial).toBe("respondido");
     expect(estados.roda_formal).not.toBe("respondido");
@@ -927,13 +980,14 @@ describe("painel — estacoesPainelDupla + atrasadasPainel", () => {
           ],
         },
       }),
-      ctxPainel(3)
+      ctxPainel(3),
+      3
     );
     expect(estados.visao).not.toBe("respondido");
   });
 
   it("régua da dupla: dupla recém-emparelhada não fica 'fora da janela' pela coorte", () => {
-    const estados = estacoesPainelDupla(linha(), ctxPainel(10));
+    const estados = estacoesPainelDupla(linha(), ctxPainel(10), 1);
     // coorte no enc. 10, dupla ainda sem encontro realizado (max_numero null → posição 1)
     const atrasadas = atrasadasPainel(estados, ctxPainel(10), 1);
     expect(atrasadas).not.toContain("visao");
@@ -944,22 +998,52 @@ describe("painel — estacoesPainelDupla + atrasadasPainel", () => {
     expect(atrasadas2).toContain("metas");
   });
 
+  it("re-emissão: pendente nova pós-resposta reabre a estação só com janela aberta", () => {
+    const mk = () =>
+      linha({
+        entregas: {
+          pdm: [
+            { status: "respondido", created_at: "2026-03-01T10:00:00-03:00", destino: "mentorado" },
+            { status: "pendente", created_at: "2026-03-20T10:00:00-03:00", destino: "mentorado" },
+          ],
+        },
+      });
+    // janela aberta pra dupla (regua 9 ≥ encIni 1) → pendente: a coord vê
+    // que há link novo esperando a jovem
+    expect(estacoesPainelDupla(mk(), ctxPainel(9), 9).pdm).toBe("pendente");
+    // janela ainda não abriu pra ela (dupla em 0, estação encIni 12) —
+    // resposta anterior continua sendo o fato (paridade com a jornada)
+    const mk2 = () =>
+      linha({
+        avaliacoes_encontro: { feitas: 0, realizados: 0, max_numero: null },
+        entregas: {
+          roda_vida: [
+            { status: "respondido", created_at: "2026-03-01T10:00:00-03:00", destino: "mentorado", contexto: { momento: "formal" } },
+            { status: "pendente", created_at: "2026-03-20T10:00:00-03:00", destino: "mentorado", contexto: { momento: "formal" } },
+          ],
+        },
+      });
+    expect(estacoesPainelDupla(mk2(), ctxPainel(13), 1).roda_formal).toBe("respondido");
+  });
+
   it("avaliação recorrente: realizados=0 trancada, feitas=realizados em dia, senão pendente", () => {
     const base_ = { realizados: 0, feitas: 0, max_numero: null };
     expect(
-      estacoesPainelDupla(linha({ avaliacoes_encontro: base_ }), ctxPainel(5))
+      estacoesPainelDupla(linha({ avaliacoes_encontro: base_ }), ctxPainel(5), 5)
         .avaliacao_encontro
     ).toBe("trancada");
     expect(
       estacoesPainelDupla(
         linha({ avaliacoes_encontro: { realizados: 3, feitas: 3, max_numero: 3 } }),
-        ctxPainel(5)
+        ctxPainel(5),
+        4
       ).avaliacao_encontro
     ).toBe("respondido");
     expect(
       estacoesPainelDupla(
         linha({ avaliacoes_encontro: { realizados: 3, feitas: 1, max_numero: 3 } }),
-        ctxPainel(5)
+        ctxPainel(5),
+        4
       ).avaliacao_encontro
     ).toBe("pendente");
   });

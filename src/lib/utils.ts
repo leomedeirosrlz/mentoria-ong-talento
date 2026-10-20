@@ -164,3 +164,8 @@ export function cpfValido(cpf: string): boolean {
   };
   return dv(d.slice(0, 9)) === Number(d[9]) && dv(d.slice(0, 10)) === Number(d[10]);
 }
+
+/** Mensagem crua da RPC de aceite quando a corrida termina no servidor —
+ *  os componentes do mural testam contra ela pra mostrar a copy humana
+ *  ("Já foi aceita por outro especialista") em vez do erro técnico. */
+export const ERRO_JA_ACEITA = /n[aã]o est[aá] mais aberta/i;

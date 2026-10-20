@@ -34,6 +34,7 @@ import {
   formatDateTime,
   linkSeguro,
   maxEncontros,
+  passoEsp,
   waLink,
 } from "@/lib/ciclo";
 import {
@@ -213,6 +214,23 @@ export default async function JovemAgenda() {
       ] as const;
     })
   );
+  // passo da sessão = rank do encontro entre os realizados da MESMA dupla
+  // (e.numero é a tentativa — a 3ª tentativa pode ser a 2ª sessão; "Sessão N"
+  // é o passo do guia). Só computa pras trilhas esp — o DPP usa o oficial.
+  const passoPorEncontroEsp = new Map(
+    encontros
+      .filter((e) => trilhaPorDupla.get(e.dupla_id) === "especialista")
+      .map((e) => [
+        e.id,
+        passoEsp(
+          e,
+          encontros.filter((x) => x.dupla_id === e.dupla_id)
+        ),
+      ])
+  );
+  const rotuloSessao = (e: JovemEncontro) =>
+    `Sessão ${passoPorEncontroEsp.get(e.id) ?? e.numero} com ${espPorDupla.get(e.dupla_id)?.primeiro ?? "seu especialista"}`;
+
 
   // futuros = agendado/remarcado com data pra frente; o resto é histórico
   // (inclui agendado já passado — "estava marcado e não rolou" é histórico,
@@ -398,6 +416,7 @@ export default async function JovemAgenda() {
                       agora={agora}
                       duplaAtiva={ativaPorDupla.get(e.dupla_id) ?? false}
                       trilha={trilhaPorDupla.get(e.dupla_id) ?? "dpp"}
+                      rotuloEsp={rotuloSessao(e)}
                     />
                   ))}
                 </CardContent>
@@ -423,6 +442,7 @@ export default async function JovemAgenda() {
                       agora={agora}
                       duplaAtiva={ativaPorDupla.get(e.dupla_id) ?? false}
                       trilha={trilhaPorDupla.get(e.dupla_id) ?? "dpp"}
+                      rotuloEsp={rotuloSessao(e)}
                     />
                   ))}
                 </CardContent>
@@ -443,6 +463,7 @@ function EncontroLinha({
   agora,
   duplaAtiva = false,
   trilha = "dpp",
+  rotuloEsp,
 }: {
   e: JovemEncontro;
   futuro?: boolean;
@@ -459,6 +480,10 @@ function EncontroLinha({
    *  prometer um gesto que a RPC recusaria. Desmarcar/"não aconteceu" valem
    *  em qualquer trilha e seguem aparecendo. */
   trilha?: string;
+  /** rótulo "Sessão N com Fulana" — o passo vem do caller (rank entre
+   *  realizados; e.numero é tentativa). Distinção DPP×esp na listagem
+   *  mista (0097: antes eram dois "3º encontro" indistinguíveis). */
+  rotuloEsp?: string;
 }) {
   const st = STATUS[e.status];
   const quando = e.status === "realizado" && e.realizado_em ? e.realizado_em : e.data_hora;
@@ -498,7 +523,9 @@ function EncontroLinha({
       </span>
       <div className="min-w-0 flex-1 basis-48">
         <p className="text-sm font-medium">
-          {e.numero}º encontro
+          {trilha === "especialista" && rotuloEsp
+            ? rotuloEsp
+            : `${e.numero}º encontro`}
         </p>
         <p className="mt-0.5 text-xs text-muted-foreground">
           {quando ? formatDateTime(quando) : "data a combinar"}

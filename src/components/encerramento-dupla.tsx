@@ -1,4 +1,4 @@
-import { Check, CheckCircle, FlagCheckered, Minus, PaperPlaneTilt } from "@phosphor-icons/react/dist/ssr";
+import { Check, CheckCircle, FlagCheckered, LockSimple, Minus, PaperPlaneTilt } from "@phosphor-icons/react/dist/ssr";
 import { CHECKLIST_ENCERRAMENTO } from "@/lib/encerramento";
 import { formatDateTime, formatDiaMes } from "@/lib/ciclo";
 import { AutoavaliacaoMentorForm } from "@/components/autoavaliacao-mentor-form";
@@ -20,6 +20,7 @@ export function EncerramentoDupla({
   souCoord,
   formularios,
   avaliacao360Em,
+  realizadosCount,
 }: {
   dupla: Pick<Dupla, "id" | "status" | "mentor" | "mentorado">;
   encerramento: Encerramento | null;
@@ -30,9 +31,17 @@ export function EncerramentoDupla({
   /** respondido_em da resposta 360º oficial (join resposta←link←form, 0042)
    *  — null em marcação manual antiga ou papel sem acesso aos forms */
   avaliacao360Em: string | null;
+  /** encontros realizados — a régua que "abre" o rito (0097: o form
+   *  aparecia em qualquer dupla nova, enc. 4/16) */
+  realizadosCount: number;
 }) {
   const decidido = !!encerramento?.tipo;
   const aberta = dupla.status === "ativa" || dupla.status === "pausada";
+  // o rito é do fim da jornada — abre quando ela amadureceu (mesma janela
+  // da roda formal, enc. 12) ou quando já existe row (quem abriu antes por
+  // encerramento antecipado continua vendo/agindo). Abaixo disso a seção
+  // se apresenta indisponível em vez de oferecer form meses adiantado.
+  const madura = realizadosCount >= 12 || encerramento != null;
   // supervisor sem row ainda não tem o que ver — a seção só existe quando há
   // conteúdo ou ação pra quem olha
   if (!souMentor && !souCoord && !encerramento) return null;
@@ -63,6 +72,28 @@ export function EncerramentoDupla({
         )}
       </div>
 
+      {aberta && !madura ? (
+        <>
+          <div className="flex items-start gap-2 rounded-lg border border-dashed border-border px-3 py-2.5 text-xs text-muted-foreground">
+            <LockSimple
+              size={13}
+              aria-hidden
+              className="mt-0.5 shrink-0 text-muted-foreground/60"
+            />
+            <p>
+              Encerramento do ciclo — abre na reta final da jornada (a
+              partir do encontro 12). A autoavaliação do mentor e o
+              checklist aparecem aqui quando chegar a hora.
+            </p>
+          </div>
+          {/* encerramento antecipado é fluxo real — dupla que não vingou
+              fecha antes do enc. 12; a coord mantém a saída sempre à mão */}
+          {souCoord && (
+            <EncerrarDuplaDialog duplaId={dupla.id} encerramento={encerramento} />
+          )}
+        </>
+      ) : (
+      <>
       {/* checklist do rito — antes da decisão mostra o que já chegou
           (a autoavaliação é a única peça que não é clique da coordenação) */}
       <ul className="space-y-1">
@@ -149,7 +180,7 @@ export function EncerramentoDupla({
               <p className="mb-1 font-medium text-foreground">
                 Autoavaliação de {dupla.mentor.nome.split(" ")[0]}
               </p>
-              <p className="whitespace-pre-line">
+              <p className="whitespace-pre-line break-words">
                 {encerramento!.autoavaliacao_mentor}
               </p>
               {encerramento!.disponivel_proximo_ciclo != null && (
@@ -198,7 +229,7 @@ export function EncerramentoDupla({
                   <p className="mb-1 font-medium text-foreground">
                     Autoavaliação de {dupla.mentor.nome.split(" ")[0]}
                   </p>
-                  <p className="whitespace-pre-line line-clamp-4">
+                  <p className="whitespace-pre-line break-words line-clamp-4">
                     {encerramento.autoavaliacao_mentor}
                   </p>
                   <p className="mt-1">
@@ -223,6 +254,8 @@ export function EncerramentoDupla({
             </p>
           )}
         </>
+      )}
+      </>
       )}
     </section>
   );

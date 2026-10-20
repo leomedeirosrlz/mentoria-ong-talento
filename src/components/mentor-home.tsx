@@ -221,7 +221,7 @@ export function MentorHome({
                 a única faixa de marca da tela (uma por tela) */}
             <CardHeader className="-mt-(--card-spacing) border-b-2 border-[var(--brand-lime)] bg-[var(--brand-ink)] pb-(--card-spacing) pt-(--card-spacing) text-white">
               <div className="flex items-center justify-between gap-4">
-                <div>
+                <div className="min-w-0">
                   {/* "Sua dupla" vira redundante com várias — o nome do
                       mentorado é o que distingue um card do outro */}
                   <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-white/50">

@@ -9,6 +9,15 @@ import {
   XCircle,
 } from "@phosphor-icons/react";
 import { toast } from "sonner";
+
+/** corrida de aceite → copy humana (o erro cru da RPC virava toast técnico;
+ *  onErro segue recebendo a mensagem original — marcarTomada testa nela) */
+const toastErro = (e: string) =>
+  toast.error(
+    ERRO_JA_ACEITA.test(e)
+      ? "Este pedido já foi aceito por outro especialista."
+      : e
+  );
 import {
   aceitarProposta,
   aceitarSolicitacao,
@@ -41,7 +50,7 @@ import {
   tempoRelativo,
   toDateStr,
 } from "@/lib/ciclo";
-import { cn } from "@/lib/utils";
+import { cn, ERRO_JA_ACEITA } from "@/lib/utils";
 
 /** "19:00" da grade do especialista — derivado do formatDiaHora pra ficar
  *  no fuso do programa (os helpers de ciclo.ts todos usam America/Sao_Paulo;
@@ -263,7 +272,7 @@ function ContraPropostaForm({
                 mensagem.trim() || null
               );
               if (r.error) {
-                toast.error(r.error);
+                toastErro(r.error);
                 onErro?.(r.error);
               }
               else {
@@ -316,7 +325,7 @@ function RecusaForm({
             start(async () => {
               const r = await recusarSolicitacao(solicitacaoId, texto.trim());
               if (r.error) {
-                toast.error(r.error);
+                toastErro(r.error);
                 onErro?.(r.error);
               }
               else {
@@ -350,6 +359,7 @@ export function SolicitacaoNegociacao({
   papel,
   waCoord,
   disponibilidade,
+  mentoradosProprios,
   onAceito,
   onErro,
 }: {
@@ -376,6 +386,10 @@ export function SolicitacaoNegociacao({
   /** opcional — chamado com a mensagem quando uma ação da mesa falha (o
    *  mural do especialista marca "já aceita por outro" na corrida de aceite). */
   onErro?: (mensagem: string) => void;
+  /** mentorado_ids das duplas DPP vivas do visitante — quem já mentora o
+   *  jovem numa trilha DPP não pode se aceitar como especialista dele (a
+   *  trilha pede um segundo adulto; a RPC 0097 também barra). */
+  mentoradosProprios?: string[];
 }) {
   const [agoraMs] = useState(() => Date.now());
   const [abrindo, setAbrindo] = useState<"proposta" | "recusa" | null>(null);
@@ -389,6 +403,7 @@ export function SolicitacaoNegociacao({
   const souAutor = s.created_by === meuId || papel === "coordenacao";
   const souEsp =
     papel === "mentor_especialista" &&
+    !mentoradosProprios?.includes(s.mentorado_id) &&
     (s.especialista_id === meuId ||
       s.especialista_desejado_id === meuId ||
       (s.especialista_id == null && s.especialista_desejado_id == null));
@@ -508,7 +523,7 @@ export function SolicitacaoNegociacao({
                     start(async () => {
                       const r = await aceitarSolicitacao(s.id);
                       if (r.error) {
-                        toast.error(r.error);
+                        toastErro(r.error);
                         onErro?.(r.error);
                       } else {
                         toast.success("Pedido aceito — sessão marcada.");
@@ -554,7 +569,7 @@ export function SolicitacaoNegociacao({
                       start(async () => {
                         const r = await aceitarSolicitacao(s.id, slotAceite!);
                         if (r.error) {
-                          toast.error(r.error);
+                          toastErro(r.error);
                           onErro?.(r.error);
                         } else {
                           toast.success("Pedido aceito — sessão marcada.");
@@ -633,7 +648,7 @@ export function SolicitacaoNegociacao({
                     start(async () => {
                       const r = await aceitarProposta(s.id);
                       if (r.error) {
-                        toast.error(r.error);
+                        toastErro(r.error);
                         onErro?.(r.error);
                       } else {
                         toast.success("Horário aceito — sessão marcada.");

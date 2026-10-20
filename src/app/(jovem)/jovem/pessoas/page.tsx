@@ -15,13 +15,14 @@ import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { avatarPublicUrl } from "@/lib/avatar";
 import { waLink } from "@/lib/ciclo";
+import { agrupaContatosPorPessoa } from "@/lib/jovem-contatos";
 import {
   getJovemColegas,
   getJovemContatos,
   getJovemDuplas,
 } from "@/lib/queries-jovem";
 import { getMe } from "@/lib/queries";
-import type { ColegaTurma, JovemContato, JovemDupla } from "@/lib/types";
+import type { ColegaTurma, JovemContato } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Pessoas" };
@@ -46,31 +47,8 @@ export default async function JovemPessoas() {
   const porDupla = new Map(
     duplas.map((d) => [d.id, { status: d.status, trilha: d.trilha }])
   );
-  // "vida" da dupla — o vínculo ainda em curso vence na dedupe abaixo
-  const pesoStatus = (status: JovemDupla["status"] | undefined): number =>
-    status === "ativa" ? 0
-    : status === "pausada" ? 1
-    : status === "concluida" ? 2
-    : status === "encerrada" ? 3
-    : 0;
-
-  /** A view repete a pessoa por dupla (mentor de duas trilhas, supervisor
-   *  de três) — a linha é uma por papel, marcando a dupla mais viva. */
-  function agrupaPorPessoa(lista: JovemContato[]): JovemContato[] {
-    const mapa = new Map<string, JovemContato>();
-    for (const c of lista) {
-      const chave = `${c.id}:${c.papel}`;
-      const atual = mapa.get(chave);
-      const pesoNovo = pesoStatus(
-        c.dupla_id ? porDupla.get(c.dupla_id)?.status : null
-      );
-      const pesoAtual = pesoStatus(
-        atual?.dupla_id ? porDupla.get(atual.dupla_id)?.status : null
-      );
-      if (!atual || pesoNovo < pesoAtual) mapa.set(chave, c);
-    }
-    return [...mapa.values()];
-  }
+  const agrupaPorPessoa = (lista: JovemContato[]): JovemContato[] =>
+    agrupaContatosPorPessoa(lista, porDupla);
 
   const porPapel = (papel: string): JovemContato[] =>
     agrupaPorPessoa(contatos.filter((c) => c.papel === papel));

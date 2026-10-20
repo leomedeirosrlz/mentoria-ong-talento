@@ -135,7 +135,7 @@ export function CatalogoJovem({
               className="text-muted-foreground"
             >
               <ChatsCircle size={15} aria-hidden />
-              Falar com a coordenação (abre um chamado)
+              Falar com a coordenação
             </Button>
           }
         />

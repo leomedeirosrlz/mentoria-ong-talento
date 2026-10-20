@@ -942,7 +942,7 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
                 Contexto
               </h2>
               {dupla.demanda ? (
-                <p className="whitespace-pre-line text-muted-foreground">
+                <p className="whitespace-pre-line break-words text-muted-foreground">
                   {dupla.demanda}
                 </p>
               ) : (
@@ -1115,10 +1115,9 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
               itens={instrumentos}
               mentoradoNome={dupla.mentorado.nome}
               mentoradoWhatsapp={dupla.mentorado.whatsapp}
-              podeEnviar={
-                souCoord ||
-                (souMentor &&
-                  (dupla.status === "ativa" || dupla.status === "pausada"))
+              podeEnviar={souCoord || souMentor}
+              jornadaViva={
+                dupla.status === "ativa" || dupla.status === "pausada"
               }
             />
           )}
@@ -1185,6 +1184,11 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
                       ? "mentor_especialista"
                       : me.role
                   }
+                  mentoradosProprios={
+                    souMentor && dupla.trilha !== "especialista"
+                      ? [dupla.mentorado.id]
+                      : undefined
+                  }
                 />
               </section>
             )}
@@ -1206,7 +1210,7 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
                   {devolutivasFeed.map((v) => (
                     <li key={v.id} className="space-y-1">
                       <blockquote className="rounded-lg border-l-2 border-[var(--brand-lime)] bg-muted/30 px-3 py-2 text-muted-foreground">
-                        <p className="whitespace-pre-line">{v.texto}</p>
+                        <p className="whitespace-pre-line break-words">{v.texto}</p>
                       </blockquote>
                       <p className="text-xs text-muted-foreground">
                         {v.autor?.nome ?? "O especialista"} ·{" "}
@@ -1237,6 +1241,7 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
               souCoord={souCoord}
               formularios={formulariosAtivos}
               avaliacao360Em={avaliacao360Em}
+              realizadosCount={realizadosCount}
             />
           )}
         </aside>

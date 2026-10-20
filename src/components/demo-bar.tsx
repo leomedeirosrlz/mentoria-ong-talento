@@ -17,7 +17,7 @@ import {
   UsersThree,
   type Icon,
 } from "@phosphor-icons/react";
-import { papelCurto, papelLabel } from "@/lib/ciclo";
+import { papelLabel } from "@/lib/ciclo";
 import {
   reverOnboardingDemo,
   sairDaDemo,
@@ -93,7 +93,7 @@ export function DemoBar({
         <Flask size={dock ? 14 : 15} weight="fill" aria-hidden />
       )}
       {/* nowrap: no header mobile o flex espremeria a pill em 2 linhas */}
-      <span className="whitespace-nowrap">Demo · {dock ? papelCurto(papel) : papelLabel(papel)}</span>
+      <span className="whitespace-nowrap">{dock ? "Demo" : `Demo · ${papelLabel(papel)}`}</span>
       {dock ? (
         <CaretDown
           size={12}
