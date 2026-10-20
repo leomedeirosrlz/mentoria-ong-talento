@@ -70,16 +70,26 @@ async function limparCronogramasE2E() {
   await limparViaServiceRole("cronogramas", `id=in.(${ids})`);
 }
 
+/** DELETE de duplas com os links de instrumento que o trigger 0099 minta
+ *  no INSERT — filho primeiro, FK depois (mesmo padrão do seed). */
+async function limparDuplasComLinks(filtro: string) {
+  const rows = await buscarViaServiceRole<{ id: string }[]>(
+    "duplas",
+    `${filtro}&select=id`
+  );
+  if (!rows.length) return;
+  const ids = rows.map((r) => r.id).join(",");
+  await limparViaServiceRole("formulario_links", `dupla_id=in.(${ids})`);
+  await limparViaServiceRole("duplas", `id=in.(${ids})`);
+}
+
 /** Devolve o staging ao estado do seed — idempotente, vale tanto pro
  *  afterEach quanto pro pre-clean de um staging que sobrou de run quebrado. */
 async function restaurarFixtures() {
   // sucessora criada pelo remanejo (carrega remanejada_de=dupla2) e qualquer
   // vínculo do mentorado livre — depois a dupla2 volta a "ativa"
-  await limparViaServiceRole("duplas", `remanejada_de=eq.${DUPLA2_ID}`);
-  await limparViaServiceRole(
-    "duplas",
-    `mentorado_id=eq.${IDS.mentoradoLivre}`
-  );
+  await limparDuplasComLinks(`remanejada_de=eq.${DUPLA2_ID}`);
+  await limparDuplasComLinks(`mentorado_id=eq.${IDS.mentoradoLivre}`);
   await atualizarViaServiceRole("duplas", `id=eq.${DUPLA2_ID}`, {
     status: "ativa",
   });
@@ -94,7 +104,7 @@ async function restaurarFixtures() {
     `profile_id=in.(${IDS.mentorReserva},${IDS.mentorColega})`
   );
   // par criado pelo import CSV (identificado pelo mentor fixture)
-  await limparViaServiceRole("duplas", `mentor_id=eq.${IDS.mentorImport}`);
+  await limparDuplasComLinks(`mentor_id=eq.${IDS.mentorImport}`);
   // rastros que os fluxos deixam: nota de saída do remanejo nas fichas das
   // fixtures e notificações "dupla_formada" (remanejo + import)
   await limparViaServiceRole(
