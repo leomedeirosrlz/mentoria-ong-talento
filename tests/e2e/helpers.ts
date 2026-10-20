@@ -113,7 +113,8 @@ export async function loginComSenha(
   await page.locator("#senha").fill(senha);
   await page.getByRole("button", { name: "Entrar" }).click();
   await page.waitForURL((url) => !url.pathname.startsWith("/login"), {
-    timeout: 15_000,
+    // login + redirect do middleware em preview frio passa dos 15s às vezes
+    timeout: 30_000,
   });
 }
 

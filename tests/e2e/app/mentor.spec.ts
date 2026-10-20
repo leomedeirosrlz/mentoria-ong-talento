@@ -151,8 +151,8 @@ test.describe("mentor DPP — fluxos reais", () => {
     // "Agendamento confirmado — Nº encontro."; o \. final ancora nele.
     await expect(
       page.getByText(/Agendamento confirmado — \d+º encontro\./i)
-    ).toBeVisible();
-    await expect(dialog).not.toBeVisible();
+    ).toBeVisible({ timeout: 15_000 });
+    await expect(dialog).not.toBeVisible({ timeout: 15_000 });
   });
 
   test.describe("link da chamada e remarcação por linha (REALIZA-23)", () => {
@@ -205,13 +205,15 @@ test.describe("mentor DPP — fluxos reais", () => {
       await dialog.locator("#link").fill("https://meet.google.com/e2e-ficha");
       await dialog.getByRole("button", { name: "Salvar" }).click();
 
-      await expect(page.getByText("Link atualizado.")).toBeVisible();
-      await expect(dialog).not.toBeVisible();
+      await expect(page.getByText("Link atualizado.")).toBeVisible({ timeout: 15_000 });
+      await expect(dialog).not.toBeVisible({ timeout: 15_000 });
 
       // o chip "Entrar na chamada" aponta o link novo
       await expect(
         linha.getByRole("link", { name: /Entrar na chamada/ })
-      ).toHaveAttribute("href", "https://meet.google.com/e2e-ficha");
+      ).toHaveAttribute("href", "https://meet.google.com/e2e-ficha", {
+        timeout: 15_000,
+      });
 
       // write real: update direto na row (RLS do mentor), link persistido
       const [row] = await buscarViaServiceRole<{ link: string | null }[]>(
@@ -254,16 +256,16 @@ test.describe("mentor DPP — fluxos reais", () => {
       );
       await dialog.getByRole("button", { name: "Remover link" }).click();
 
-      await expect(page.getByText("Link removido.")).toBeVisible();
-      await expect(dialog).not.toBeVisible();
+      await expect(page.getByText("Link removido.")).toBeVisible({ timeout: 15_000 });
+      await expect(dialog).not.toBeVisible({ timeout: 15_000 });
 
       // chip some da linha, lápis fica — sem link o gesto vira "adicionar"
       await expect(
         linha.getByRole("link", { name: /Entrar na chamada/ })
-      ).toHaveCount(0);
+      ).toHaveCount(0, { timeout: 15_000 });
       await expect(
         linha.getByRole("button", { name: "Editar link da chamada" })
-      ).toBeVisible();
+      ).toBeVisible({ timeout: 15_000 });
 
       const [row] = await buscarViaServiceRole<{ link: string | null }[]>(
         "encontros",
@@ -307,17 +309,17 @@ test.describe("mentor DPP — fluxos reais", () => {
 
       await expect(
         page.getByText("Remarcação confirmada — 4º encontro.")
-      ).toBeVisible();
-      await expect(dialog).not.toBeVisible();
+      ).toBeVisible({ timeout: 15_000 });
+      await expect(dialog).not.toBeVisible({ timeout: 15_000 });
 
       // a linha mostra a data nova e o motivo — leitura honesta do limbo
       // resolvido
       await expect(
         linha.getByText(`agendado ${rotuloDataHora(alvo)}`)
-      ).toBeVisible();
+      ).toBeVisible({ timeout: 15_000 });
       await expect(
         linha.getByText("remarcado: Conflito de agenda")
-      ).toBeVisible();
+      ).toBeVisible({ timeout: 15_000 });
 
       const [row] = await buscarViaServiceRole<
         { status: string; data_hora: string; motivo_reagendamento: string | null }[]
@@ -358,13 +360,15 @@ test.describe("mentor DPP — fluxos reais", () => {
       await dialog.locator("#link").fill("https://meet.google.com/e2e-agenda");
       await dialog.getByRole("button", { name: "Salvar" }).click();
 
-      await expect(page.getByText("Link atualizado.")).toBeVisible();
-      await expect(dialog).not.toBeVisible();
+      await expect(page.getByText("Link atualizado.")).toBeVisible({ timeout: 15_000 });
+      await expect(dialog).not.toBeVisible({ timeout: 15_000 });
 
       // o chip verde do encontro na agenda aponta o link novo
       await expect(
         linhaDia.getByRole("link", { name: /Entrar na chamada/ })
-      ).toHaveAttribute("href", "https://meet.google.com/e2e-agenda");
+      ).toHaveAttribute("href", "https://meet.google.com/e2e-agenda", {
+        timeout: 15_000,
+      });
 
       const [row] = await buscarViaServiceRole<{ link: string | null }[]>(
         "encontros",
