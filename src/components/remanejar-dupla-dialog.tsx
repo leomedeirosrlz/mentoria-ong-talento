@@ -409,7 +409,7 @@ export function RemanejarDuplaDialog({
               </fieldset>
 
               <div className="space-y-2">
-                <Label id="remanejo-novo-label">
+                <Label id="remanejo-novo-label" htmlFor="remanejo-novo">
                   {lado === "mentor" ? "Novo mentor" : "Novo mentorado"}
                 </Label>
                 <Select
@@ -474,7 +474,7 @@ export function RemanejarDuplaDialog({
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label id="remanejo-motivo-label">Motivo</Label>
+                  <Label id="remanejo-motivo-label" htmlFor="remanejo-motivo">Motivo</Label>
                   <Select
                     name="motivo_cat"
                     value={motivoSel}

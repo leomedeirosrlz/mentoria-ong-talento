@@ -25,6 +25,9 @@ const CSP = [
       : ""
   }`,
   "font-src 'self'",
+  // preview do Acervo embute o PDF do bucket via /api/material → signed URL;
+  // frame-src (não object-src) cobre o iframe — plugins continuam proibidos
+  "frame-src 'self' https://*.supabase.co",
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self'",

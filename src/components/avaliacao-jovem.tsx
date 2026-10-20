@@ -166,6 +166,7 @@ export function AvaliacaoPendenteLinha({
   jovemWhatsapp,
   numero,
   souCoord,
+  jornadaViva = true,
 }: {
   link: AvaliacaoLink | null;
   urlBase: string;
@@ -173,6 +174,9 @@ export function AvaliacaoPendenteLinha({
   jovemWhatsapp: string | null;
   numero: number;
   souCoord: boolean;
+  /** Dupla fechada (concluida/encerrada): a pendência fica como fato —
+   *  copiar/enviar link morre junto com as demais ações de emissão. */
+  jornadaViva?: boolean;
 }) {
   const url = link ? `${urlBase}/avaliar/${link.token}` : null;
   const wa =
@@ -187,7 +191,7 @@ export function AvaliacaoPendenteLinha({
         <Star size={13} aria-hidden />
         Avaliação do jovem ainda não chegou
       </span>
-      {souCoord && link?.status === "pendente" && url && (
+      {souCoord && jornadaViva && link?.status === "pendente" && url && (
         <span className="flex flex-wrap items-center gap-2">
           <CopiarLinkAvaliacao url={url} />
           {wa && (
