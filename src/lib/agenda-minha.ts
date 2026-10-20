@@ -948,10 +948,25 @@ export function filtraAgenda(
   escopo: EscopoAgenda
 ): { avisos: AvisoAgenda[]; secoes: AgendaSecao[] } {
   const avisos = agenda.avisos.filter((a) => itemNoEscopo(a, escopo));
+  // "tudo" com 2 duplas na mesma turma lista o evento oficial duplicado
+  // (ele é por cronograma, renderizado por dupla) — dedup por eventoId;
+  // nos chips de dupla cada escopo segue vendo o item da própria dupla.
+  const vistos = new Set<string>();
+  const dedupTudo = (i: AgendaItem) => {
+    if (escopo !== "tudo" || i.eventoId == null) return true;
+    if (vistos.has(i.eventoId)) return false;
+    vistos.add(i.eventoId);
+    return true;
+  };
   const secoes = agenda.secoes.map((s) => ({
     ...s,
     grupos: s.grupos
-      .map((g) => ({ ...g, itens: g.itens.filter((i) => itemNoEscopo(i, escopo)) }))
+      .map((g) => ({
+        ...g,
+        itens: g.itens.filter(
+          (i) => itemNoEscopo(i, escopo) && dedupTudo(i)
+        ),
+      }))
       .filter((g) => g.itens.length > 0),
   }));
   return { avisos, secoes };

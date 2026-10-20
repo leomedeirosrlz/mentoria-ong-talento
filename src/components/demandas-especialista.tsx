@@ -10,6 +10,7 @@ import {
   MagnifyingGlass,
 } from "@phosphor-icons/react";
 import { formatDate, rotuloSlot } from "@/lib/ciclo";
+import { ERRO_JA_ACEITA } from "@/lib/utils";
 import type {
   SolicitacaoEspecialista,
   SolicitacaoProposta,
@@ -32,7 +33,6 @@ const norm = (v: string) =>
  *  — a corrida de aceite termina no status, então "não está mais aberta" é
  *  o sinal. Erros de slot/negociação NÃO entram: pedido parado na mesa de
  *  negociação ainda pode fechar. */
-const ERRO_JA_ACEITA = /n[aã]o está mais aberta/i;
 
 /** Chip de filtro do mural: "todos" desliga, "combina" cruza a demanda com
  *  as áreas do especialista logado, e cada área vira um chip de texto —
@@ -51,6 +51,7 @@ export function DemandasEspecialista({
   slots,
   meuId,
   minhasAreas,
+  mentoradosProprios,
 }: {
   solicitacoes: SolicitacaoEspecialista[];
   /** solicitacao_id → thread — só as negociações em andamento vêm da query. */
@@ -60,6 +61,10 @@ export function DemandasEspecialista({
   /** Áreas do especialista logado (profiles.areas) — alimentam o chip
    *  "Combina com você" e os chips de tema; vazio esconde a fileira. */
   minhasAreas?: string[];
+  /** mentorado_ids das duplas DPP vivas do visitante — repassado à mesa
+   *  de negociação pra esconder o lado especialista no pedido do próprio
+   *  mentorado (a RPC 0097 barra o aceite; aqui a mesa nem oferece). */
+  mentoradosProprios?: string[];
 }) {
   const router = useRouter();
   const [busca, setBusca] = useState("");
@@ -251,6 +256,7 @@ export function DemandasEspecialista({
                         slots={slots}
                         meuId={meuId}
                         papel="mentor_especialista"
+                        mentoradosProprios={mentoradosProprios}
                         onAceito={(duplaId) => {
                           if (duplaId) router.push(`/duplas/${duplaId}`);
                         }}

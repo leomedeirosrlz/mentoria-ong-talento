@@ -42,6 +42,7 @@ import {
   toDateStr,
   waLink,
 } from "@/lib/ciclo";
+import { agrupaContatosPorPessoa } from "@/lib/jovem-contatos";
 import { avatarPublicUrl } from "@/lib/avatar";
 import {
   getJovemAssinaturas,
@@ -129,8 +130,17 @@ export default async function JovemHome() {
       idsVivas.has(c.dupla_id) ||
       c.dupla_id === duplaAtual?.id
   );
+  // a view repete a pessoa por dupla — dedupe por papel com a dupla mais
+  // viva vencendo (mesma régua de /jovem/pessoas; mata a React key
+  // duplicada e a linha do supervisor repetida)
+  const porDupla = new Map(
+    duplas.map((d) => [d.id, { status: d.status, trilha: d.trilha }])
+  );
   const porPapel = (papel: string): JovemContato[] =>
-    contatosAtuais.filter((c) => c.papel === papel);
+    agrupaContatosPorPessoa(
+      contatosAtuais.filter((c) => c.papel === papel),
+      porDupla
+    );
   const mentores = porPapel("mentor");
   // a dupla de especialista entrega papel 'especialista' (0076) — antes
   // caía como 'mentor' e a trilha esp ficava sem contato na home
@@ -261,7 +271,7 @@ export default async function JovemHome() {
   })();
 
   return (
-    <div className="grid gap-8">
+    <div className="grid grid-cols-1 gap-8">
       <header>
         <h1 className="text-2xl font-semibold tracking-tight">
           Olá, {primeiroNome}
@@ -361,7 +371,7 @@ export default async function JovemHome() {
               <ul className="divide-y divide-border/60">
                 {mentores.map((c) => (
                   <ContatoLinha
-                    key={c.id ?? c.nome}
+                    key={`${c.papel}-${c.id ?? c.nome}`}
                     c={c}
                     papel="Seu mentor"
                     nomeJovem={nomeTela}
@@ -369,7 +379,7 @@ export default async function JovemHome() {
                 ))}
                 {especialistas.map((c) => (
                   <ContatoLinha
-                    key={c.id ?? c.nome}
+                    key={`${c.papel}-${c.id ?? c.nome}`}
                     c={c}
                     papel="Seu especialista"
                     nomeJovem={nomeTela}
@@ -377,7 +387,7 @@ export default async function JovemHome() {
                 ))}
                 {supervisores.map((c) => (
                   <ContatoLinha
-                    key={c.id ?? c.nome}
+                    key={`${c.papel}-${c.id ?? c.nome}`}
                     c={c}
                     papel="Auxiliar executivo(a) da dupla"
                     nomeJovem={nomeTela}
@@ -385,7 +395,7 @@ export default async function JovemHome() {
                 ))}
                 {coordenacao.map((c) => (
                   <ContatoLinha
-                    key={c.id ?? c.nome}
+                    key={`${c.papel}-${c.id ?? c.nome}`}
                     c={c}
                     papel="Coordenação do programa"
                     nomeJovem={nomeTela}

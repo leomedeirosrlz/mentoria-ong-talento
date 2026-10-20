@@ -436,14 +436,19 @@ function resolveEstacao<
         )
         .sort((a, b) => b.created_at.localeCompare(a.created_at))[0]
     : undefined;
-  if (reemissao) {
+  // ...mas a JANELA vence: re-emissão antes do enc. de abertura não abre o
+  // CTA — cai no `feito` da resposta anterior (paridade com a estação
+  // trancada e com o painel, que usa a mesma régua min(vigente, dupla))
+  if (reemissao && ctx.encCorrente >= ESTACOES[chave].encIni) {
     return {
       estado: "a_fazer",
-      respondidoEm: null,
+      // Rever sobrevive à re-emissão: respondidoEm/respostas da última
+      // respondida — não da pendente nova (que ainda não tem resposta)
+      respondidoEm: ultima!.respondido_em ?? ultima!.usado_em ?? null,
       token: reemissao.token,
       snippet: null,
       detalhe: "o mentor enviou uma nova rodada — a resposta anterior segue salva",
-      respostas: null,
+      respostas: ultima!.respostas,
     };
   }
   if (ultima) {
@@ -811,9 +816,16 @@ function entregasDaEstacao(
  *  recorrente de feitas × realizados. */
 export function estacoesPainelDupla(
   linha: PainelJornadaLinha,
-  ctx: PainelTurmaCtx
+  ctx: PainelTurmaCtx,
+  /** régua da DUPLA (posição dela na jornada) — a janela "aberta" usa a
+   *  posição dela, a mesma que a jovem vê como encCorrente: a coorte pode
+   *  estar no enc. 12 e a dupla no 4 — a estação que abre no 9 segue
+   *  trancada PRA ELA; e dupla à frente do calendário (reposições) já
+   *  passou da janela do lado dela, sem desconto do encVigente. */
+  encCorrDupla: number
 ): Record<EstacaoChave, EstacaoPainelEstado> {
   const out = {} as Record<EstacaoChave, EstacaoPainelEstado>;
+  const regua = encCorrDupla;
   for (const chave of ESTACAO_CHAVES) {
     if (chave === "avaliacao_encontro") {
       const { feitas, realizados } = linha.avaliacoes_encontro;
@@ -822,9 +834,23 @@ export function estacoesPainelDupla(
       continue;
     }
     const entregas = entregasDaEstacao(linha, chave);
-    if (entregas.some((e) => e.status === "respondido")) {
+    const ultimaResp = entregas
+      .filter((e) => e.status === "respondido")
+      .sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
+    // pendente NOVA depois da última respondida = re-emissão viva (revisão
+    // do PDM no enc. 9). A estação volta a `pendente` — a coord vê que há
+    // link esperando a jovem — quando a janela está aberta pra dupla;
+    // antes disso o fato dominante segue a resposta anterior (paridade
+    // com resolveEstacao, onde a janela vence a re-emissão).
+    const reemissaoViva =
+      ultimaResp != null &&
+      regua >= ESTACOES[chave].encIni &&
+      entregas.some(
+        (e) => e.status === "pendente" && e.created_at > ultimaResp.created_at
+      );
+    if (ultimaResp && !reemissaoViva) {
       out[chave] = "respondido";
-    } else if (ctx.encVigente < ESTACOES[chave].encIni) {
+    } else if (regua < ESTACOES[chave].encIni) {
       out[chave] = "trancada";
     } else if (entregas.some((e) => e.status === "pendente")) {
       out[chave] = "pendente";
@@ -838,7 +864,7 @@ export function estacoesPainelDupla(
 }
 
 /** Estações fora da janela do guia — o recorte da lista de ação do painel.
- *  A régua é `min(encVigente, encCorrDupla)`: a coorte encerrou a janela
+ *  A régua é a posição da dupla (encCorrDupla): a coorte encerrou a janela
  *  E ela já passou pra dupla — dupla recém-emparelhada ou atrasada tem a
  *  janela ainda aberta pra ela e não pode ser flagada por um prazo que
  *  nunca existiu do lado dela (o nudge ao mentor ficaria injusto). */
@@ -847,7 +873,7 @@ export function atrasadasPainel(
   ctx: PainelTurmaCtx,
   encCorrDupla: number
 ): EstacaoChave[] {
-  const regua = Math.min(ctx.encVigente, encCorrDupla);
+  const regua = encCorrDupla;
   return ESTACAO_CHAVES.filter((chave) => {
     if (chave === "avaliacao_encontro") {
       return estados[chave] === "pendente";

@@ -180,22 +180,23 @@ test.describe("coordenação — fluxos operacionais", () => {
       (url) =>
         /^\/duplas\/[0-9a-f-]{36}$/.test(url.pathname) &&
         !url.pathname.includes(DUPLA2_ID),
-      { timeout: 15_000 }
+      // action pesada (RPC + sinos + revalidate) + router.push em preview frio
+      { timeout: 30_000 }
     );
     await expect(
       page.getByRole("heading", { name: /Mentorada E2E Livre/ })
-    ).toBeVisible();
-    await expect(page.getByText(/Originada de/)).toBeVisible();
+    ).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText(/Originada de/)).toBeVisible({ timeout: 15_000 });
 
     // a ficha antiga guarda a linhagem: encerrada + aponta a sucessora
     await page.goto(`/duplas/${DUPLA2_ID}`);
-    await expect(page.getByText(/Substituída por/)).toBeVisible();
+    await expect(page.getByText(/Substituída por/)).toBeVisible({ timeout: 15_000 });
     await expect(
       page.getByRole("link", { name: /Mentorada E2E Livre/ })
-    ).toBeVisible();
+    ).toBeVisible({ timeout: 15_000 });
     await expect(
       page.getByText("Dupla encerrada", { exact: true })
-    ).toBeVisible();
+    ).toBeVisible({ timeout: 15_000 });
     // remanejo é de dupla viva — a encerrada não oferece o botão de novo
     await expect(
       page.getByRole("button", { name: "Remanejar", exact: true })

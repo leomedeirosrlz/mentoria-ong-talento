@@ -95,8 +95,8 @@ export function EncerrarTrilhaDialog({
               <span>
                 <span className="font-medium">Concluir a trilha</span>
                 <span className="block text-xs text-muted-foreground">
-                  Os objetivos foram alcançados. Pode ser antes do 5º
-                  encontro, como manda o guia.
+                  Os objetivos foram alcançados. Pode ser antes da 5ª
+                  sessão, como manda o guia.
                 </span>
               </span>
             </label>
@@ -127,7 +127,7 @@ export function EncerrarTrilhaDialog({
               required
               minLength={3}
               maxLength={300}
-              placeholder="ex.: objetivos alcançados no 4º encontro"
+              placeholder="ex.: objetivos alcançados na 4ª sessão"
             />
           </div>
 

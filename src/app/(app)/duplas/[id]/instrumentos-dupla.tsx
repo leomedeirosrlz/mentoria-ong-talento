@@ -100,6 +100,7 @@ function LinhaInstrumento({
   mentoradoNome,
   mentoradoWhatsapp,
   podeEnviar,
+  jornadaViva,
 }: {
   /** null quando o instrumento ainda não foi semeado no banco — a linha
    *  existe pra jornada completa aparecer, mas sem ação */
@@ -108,6 +109,10 @@ function LinhaInstrumento({
   mentoradoNome: string;
   mentoradoWhatsapp: string | null;
   podeEnviar: boolean;
+  /** ativa|pausada — dupla fechada esconde TODAS as ações de link pra
+   *  qualquer papel (Copiar/WhatsApp/Gerar): o link que o jovem já tem
+   *  segue respondível, mas ninguém emite nem reenvia. */
+  jornadaViva: boolean;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -142,14 +147,14 @@ function LinhaInstrumento({
       toast.success(
         r.reutilizado
           ? "Este link já estava pendente — reaproveitado."
-          : "Link do instrumento gerado."
+          : "Link gerado — copie ou envie pelo WhatsApp."
       );
       router.refresh();
     });
   }
 
   return (
-    <li className="flex flex-col gap-2 py-3 first:pt-0 last:pb-0 sm:flex-row sm:items-start sm:gap-3">
+    <li className="flex flex-col gap-2 py-3 first:pt-0 last:pb-0 sm:flex-row sm:items-start sm:gap-3 lg:flex-col lg:items-stretch">
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           <p className="text-sm font-medium">{titulo}</p>
@@ -224,7 +229,7 @@ function LinhaInstrumento({
           </Dialog>
         )}
 
-        {status === "pendente" && tokenVivo && (
+        {status === "pendente" && tokenVivo && jornadaViva && (
           <motion.div
             {...fade}
             transition={T.enter}
@@ -247,6 +252,7 @@ function LinhaInstrumento({
 
         {(status === "nao_enviado" || status === "expirado") &&
           podeEnviar &&
+          jornadaViva &&
           item && (
             <Button
               type="button"
@@ -261,7 +267,7 @@ function LinhaInstrumento({
               ) : (
                 <PaperPlaneTilt aria-hidden />
               )}
-              {status === "expirado" ? "Reenviar" : "Enviar"}
+              {status === "expirado" ? "Gerar novo link" : "Gerar link"}
             </Button>
           )}
       </div>
@@ -275,6 +281,7 @@ export function InstrumentosDupla({
   mentoradoNome,
   mentoradoWhatsapp,
   podeEnviar,
+  jornadaViva,
   className,
 }: {
   duplaId: string;
@@ -284,6 +291,8 @@ export function InstrumentosDupla({
   mentoradoWhatsapp: string | null;
   /** coord sempre; o mentor DPP da dupla viva também entrega (o guia é dele) */
   podeEnviar: boolean;
+  /** ativa|pausada — dupla fechada vira só leitura de resultados */
+  jornadaViva: boolean;
   className?: string;
 }) {
   if (!itens.length) return null;
@@ -311,6 +320,7 @@ export function InstrumentosDupla({
             mentoradoNome={mentoradoNome}
             mentoradoWhatsapp={mentoradoWhatsapp}
             podeEnviar={podeEnviar}
+            jornadaViva={jornadaViva}
           />
         ))}
       </ul>

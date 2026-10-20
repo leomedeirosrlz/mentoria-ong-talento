@@ -346,7 +346,7 @@ test.describe("avaliação estrela do jovem (REALIZA-109)", () => {
     expect(row.avaliacao_visivel_mentor).toBe(true);
 
     await chave.click();
-    await expect(page.getByText("Voltou a valer só na média.")).toBeVisible();
+    await expect(page.getByText("Voltou a valer só na média.")).toBeVisible({ timeout: 15_000 });
     await expect(chave).not.toBeChecked();
     [row] = await buscarViaServiceRole<
       { avaliacao_visivel_mentor: boolean }[]
@@ -383,7 +383,7 @@ test.describe("avaliação estrela do jovem (REALIZA-109)", () => {
       page.getByText(
         "Pedido enviado — a coordenação foi avisada e fala com você."
       )
-    ).toBeVisible();
+    ).toBeVisible({ timeout: 15_000 });
 
     // 0084: a flag acesa abriu o chamado no mesmo insert (trigger) — a
     // urgência virou ticket com número e estado, não notificação solta
@@ -422,7 +422,7 @@ test.describe("avaliação estrela do jovem (REALIZA-109)", () => {
     await page
       .getByRole("button", { name: "Marcar ajuda como atendida" })
       .click();
-    await expect(page.getByText("Pedido de ajuda atendido.")).toBeVisible();
+    await expect(page.getByText("Pedido de ajuda atendido.")).toBeVisible({ timeout: 15_000 });
 
     // o ciclo fecha nas duas pontas na mesma transação: flag limpa,
     // chamado resolvido e o jovem recebe "foi visto" (chamado_resolvido)

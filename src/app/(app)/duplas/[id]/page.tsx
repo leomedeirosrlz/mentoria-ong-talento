@@ -564,7 +564,7 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
       />
     );
   }
-  if (souCoord) {
+  if (souCoord && (dupla.status === "ativa" || dupla.status === "pausada")) {
     maisItens.push(
       <EnviarFormularioDialog
         key="form"
@@ -657,8 +657,11 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
         duplaId={dupla.id}
         souMentor={souMentor}
         podeEditar={souMentor && dupla.status === "ativa"}
-        podeMarcar={souMentor || souCoord}
+        podeMarcar={(souMentor || souCoord) && dupla.status === "ativa"}
         ativa={dupla.status === "ativa"}
+        jornadaViva={
+          dupla.status === "ativa" || dupla.status === "pausada"
+        }
         souCoord={souCoord}
         autorId={me.id}
         // evidência é do mentor — coord só remove (moderação), sup só lê
@@ -942,7 +945,7 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
                 Contexto
               </h2>
               {dupla.demanda ? (
-                <p className="whitespace-pre-line text-muted-foreground">
+                <p className="whitespace-pre-line break-words text-muted-foreground">
                   {dupla.demanda}
                 </p>
               ) : (
@@ -979,13 +982,21 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
             </div>
             <p className="mb-2 text-xs text-muted-foreground">
               Tarefas que a dupla combinou nos encontros
-              {(souMentor || souCoord) && ". Marque quando forem feitas"}.
+              {(souMentor || souCoord) &&
+                (dupla.status === "ativa" || dupla.status === "pausada") &&
+                ". Marque quando forem feitas"}.
             </p>
             <EncaminhamentosList
               itens={dupla.encaminhamentos}
               duplaId={dupla.id}
-              podeEditar={souMentor}
-              podeMarcar={souMentor || souCoord}
+              podeEditar={
+                souMentor &&
+                (dupla.status === "ativa" || dupla.status === "pausada")
+              }
+              podeMarcar={
+                (souMentor || souCoord) &&
+                (dupla.status === "ativa" || dupla.status === "pausada")
+              }
               hoje={hojeStr}
               encontroNumeroPorRegistroId={encontroNumeroPorRegistroId}
             />
@@ -1115,10 +1126,9 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
               itens={instrumentos}
               mentoradoNome={dupla.mentorado.nome}
               mentoradoWhatsapp={dupla.mentorado.whatsapp}
-              podeEnviar={
-                souCoord ||
-                (souMentor &&
-                  (dupla.status === "ativa" || dupla.status === "pausada"))
+              podeEnviar={souCoord || souMentor}
+              jornadaViva={
+                dupla.status === "ativa" || dupla.status === "pausada"
               }
             />
           )}
@@ -1185,6 +1195,11 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
                       ? "mentor_especialista"
                       : me.role
                   }
+                  mentoradosProprios={
+                    souMentor && dupla.trilha !== "especialista"
+                      ? [dupla.mentorado.id]
+                      : undefined
+                  }
                 />
               </section>
             )}
@@ -1206,7 +1221,7 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
                   {devolutivasFeed.map((v) => (
                     <li key={v.id} className="space-y-1">
                       <blockquote className="rounded-lg border-l-2 border-[var(--brand-lime)] bg-muted/30 px-3 py-2 text-muted-foreground">
-                        <p className="whitespace-pre-line">{v.texto}</p>
+                        <p className="whitespace-pre-line break-words">{v.texto}</p>
                       </blockquote>
                       <p className="text-xs text-muted-foreground">
                         {v.autor?.nome ?? "O especialista"} ·{" "}
@@ -1237,6 +1252,7 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
               souCoord={souCoord}
               formularios={formulariosAtivos}
               avaliacao360Em={avaliacao360Em}
+              realizadosCount={realizadosCount}
             />
           )}
         </aside>
@@ -1331,6 +1347,7 @@ function EncontroRow({
   urlBase,
   jovemNome,
   jovemWhatsapp,
+  jornadaViva,
 }: {
   /** Passo do guia da trilha (data sugerida no DPP; sem data no especialista). */
   passo: PassoGuia;
@@ -1376,6 +1393,9 @@ function EncontroRow({
   urlBase: string;
   jovemNome: string;
   jovemWhatsapp: string | null;
+  /** Dupla viva (ativa|pausada) — destrava as ações de link da pendência
+   *  de avaliação; fechada deixa só o aviso como fato. */
+  jornadaViva: boolean;
 }) {
   const feito = encontro?.status === "realizado";
   const naoAconteceu = encontro?.status === "nao_aconteceu";
@@ -1710,6 +1730,7 @@ function EncontroRow({
             jovemWhatsapp={jovemWhatsapp}
             numero={passo.numero}
             souCoord={souCoord}
+            jornadaViva={jornadaViva}
           />
         )}
       {/* especialista: só a estrela — a view definer é o recorte inteiro */}

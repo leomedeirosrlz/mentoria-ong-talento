@@ -175,7 +175,7 @@ export function ChamadosApp({
     <div
       className={cn(
         "grid gap-4",
-        staff && "lg:grid-cols-[minmax(0,380px)_1fr] lg:items-start"
+        staff && "lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)] lg:items-start"
       )}
     >
       <section
@@ -230,7 +230,7 @@ export function ChamadosApp({
                 onValueChange={(v) => setFCategoria(v ?? "todas")}
               >
                 <SelectTrigger
-                  className="h-11 w-auto min-w-32 text-xs md:h-8"
+                  className="h-11 w-auto min-w-32 max-w-48 text-xs md:h-8"
                   aria-label="Filtrar por categoria"
                 >
                   <SelectValue placeholder="Categoria" />
@@ -249,7 +249,7 @@ export function ChamadosApp({
                 onValueChange={(v) => setFStatus(v ?? "todos")}
               >
                 <SelectTrigger
-                  className="h-11 w-auto min-w-32 text-xs md:h-8"
+                  className="h-11 w-auto min-w-32 max-w-48 text-xs md:h-8"
                   aria-label="Filtrar por estado"
                 >
                   <SelectValue placeholder="Estado" />
@@ -838,7 +838,7 @@ function TimelineItem({
         )}
         <span className="ml-auto">{quando}</span>
       </div>
-      <p className="mt-1 whitespace-pre-line text-sm leading-relaxed text-foreground/90">
+      <p className="mt-1 whitespace-pre-line break-words text-sm leading-relaxed text-foreground/90">
         {entry.item.texto}
       </p>
     </li>

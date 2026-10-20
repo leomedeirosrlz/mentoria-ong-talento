@@ -165,6 +165,14 @@ export default async function HomePage({
           slots={meusSlots}
           meuId={me!.id}
           minhasAreas={me?.areas ?? undefined}
+          mentoradosProprios={duplas
+            .filter(
+              (d) =>
+                d.trilha !== "especialista" &&
+                (d.status === "ativa" || d.status === "pausada")
+            )
+            .map((d) => d.mentorado?.id)
+            .filter((id): id is string => id != null)}
         />
       )}
       <AvisosSection avisos={avisos} souCoord={false} />

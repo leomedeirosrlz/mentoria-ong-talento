@@ -2602,6 +2602,12 @@ export async function desfazerNaoAconteceu(encontroId: string, duplaId: string) 
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada. Entre de novo." };
+  // dupla fechada é histórico congelado — a UI esconde o Desfazer e a
+  // action espelha o guard do marcarNaoAconteceu
+  const { data: enc } = await supabase
+    .from("encontros").select("duplas(status)").eq("id", encontroId).single();
+  const dupla = Array.isArray(enc?.duplas) ? enc?.duplas[0] : enc?.duplas;
+  if (dupla && dupla.status !== "ativa") return { error: "Essa dupla não está ativa." };
   const { data, error } = await supabase
     .from("encontros")
     .update({ status: "agendado" })
@@ -3082,6 +3088,12 @@ export async function toggleEncaminhamento(id: string, feito: boolean, duplaId: 
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada. Entre de novo." };
+  // combinado de dupla fechada é histórico — só dupla viva marca
+  const { data: dupla } = await supabase
+    .from("duplas").select("status").eq("id", duplaId).single();
+  if (dupla && dupla.status !== "ativa" && dupla.status !== "pausada") {
+    return { error: "Essa dupla não está mais ativa." };
+  }
   const { data, error } = await supabase
     .from("encaminhamentos")
     .update({ status: feito ? "feito" : "pendente" })
@@ -3104,6 +3116,11 @@ export async function editarEncaminhamento(id: string, duplaId: string, formData
   // o texto do acordo é da dupla — a coord só marca feito (toggleEncaminhamento)
   if (eu.role === "coordenacao") {
     return { error: "O combinado é da dupla. A coordenação só pode marcar como feito." };
+  }
+  const { data: dupla } = await supabase
+    .from("duplas").select("status").eq("id", duplaId).single();
+  if (dupla && dupla.status !== "ativa" && dupla.status !== "pausada") {
+    return { error: "Essa dupla não está mais ativa." };
   }
   const descricao = String(formData.get("descricao") ?? "").trim();
   const responsavel = String(formData.get("responsavel") ?? "mentorado");
@@ -3137,6 +3154,11 @@ export async function excluirEncaminhamento(id: string, duplaId: string) {
   if (!eu) return { error: "Sessão expirada. Entre de novo." };
   if (eu.role === "coordenacao") {
     return { error: "O combinado é da dupla. A coordenação só pode marcar como feito." };
+  }
+  const { data: dupla } = await supabase
+    .from("duplas").select("status").eq("id", duplaId).single();
+  if (dupla && dupla.status !== "ativa" && dupla.status !== "pausada") {
+    return { error: "Essa dupla não está mais ativa." };
   }
   const { data, error } = await supabase
     .from("encaminhamentos").delete().eq("id", id).select("id");

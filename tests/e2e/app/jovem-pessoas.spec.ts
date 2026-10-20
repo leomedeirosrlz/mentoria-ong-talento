@@ -46,6 +46,10 @@ const IDS = {
   mentorReserva: "e2e00000-0000-4000-8000-000000000050", // adulto não-relacionado
 } as const;
 const JOVEM2_WHATSAPP = "5511999000091";
+// jovem demo do seed:demo (Ana, turma T1) — divide o staging com as
+// fixtures e serve de pin "outra turma" pro teste de escopo da 0097
+const JOVEM_DEMO_EMAIL = "jovem@realiza.test";
+const SENHA_DEMO = process.env.E2E_DEMO_JOVEM_PASSWORD ?? "realiza123";
 
 test.skip(!appEnvOk(), "sem credenciais de teste (E2E_*) — pula specs de app");
 
@@ -322,4 +326,56 @@ test.describe("diretório do jovem (REALIZA-113 / 0076)", () => {
       { contato_compartilhado: false }
     );
   });
+
+  test("persona e2e não vaza pro diretório do jovem de outra turma (escopo 0097)", async ({
+    page,
+  }) => {
+    // Ana (seed:demo) é turma T1; as personas do seed e2e agora têm papel
+    // escopado na "Turma E2E" e duplas na mesma turma — jovem_contatos
+    // (0097), jovem_especialistas (0086) e mentorados_turma (join por
+    // turma da dupla) devem ignorar tudo isso pra ela. Antes da 0097 o
+    // branch de coordenação listava qualquer profile com o papel.
+    // Depende do dataset demo — o e2e-app (stack local) só semeia e2e:
+    // sem a persona o teste pula, não quebra.
+    const [anaExiste] = await buscarViaServiceRole<{ id: string }[]>(
+      "profiles",
+      `select=id&email=eq.${JOVEM_DEMO_EMAIL}`
+    );
+    test.skip(!anaExiste, "jovem demo (seed:demo) ausente nesta base");
+    await loginComSenha(page, JOVEM_DEMO_EMAIL, SENHA_DEMO);
+    await page.goto("/jovem/pessoas");
+
+    const coord = page.locator(
+      'section[aria-labelledby="coordenacao-titulo"]'
+    );
+    await expect(coord.getByText("Coordenação E2E")).toHaveCount(0);
+    const colegas = page.locator(
+      'section[aria-labelledby="colegas-titulo"]'
+    );
+    await expect(colegas.getByText("Jovem E2E Sem DPP")).toHaveCount(0);
+    await expect(colegas.getByText("Mentorada E2E Dois")).toHaveCount(0);
+
+    // catálogo escopado (jovem_especialistas): esp com papel só na Turma
+    // E2E não aparece pra turma dela
+    await page.goto("/jovem/especialistas");
+    await expect(page.getByText("Esp Dois E2E")).toHaveCount(0);
+    await expect(page.getByText("Esp E2E")).toHaveCount(0);
+
+    // na borda do PostgREST com o JWT real dela — é a view quem filtra,
+    // não a UI (o teste de tela acima podia passar por acidente de nome)
+    const jwt = await jwtDoUsuario(JOVEM_DEMO_EMAIL, SENHA_DEMO);
+    const res = await restComoUsuario(
+      `jovem_contatos?select=id&or=(id.eq.${IDS.espProfile},id.eq.${IDS.esp2Profile},id.eq.${IDS.coordProfile},id.eq.${IDS.mentorProfile})`,
+      jwt
+    );
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual([]);
+    const resColega = await restComoUsuario(
+      `mentorados_turma?select=id&id=eq.${IDS.mentoradoSemDpp}`,
+      jwt
+    );
+    expect(resColega.status).toBe(200);
+    expect(await resColega.json()).toEqual([]);
+  });
 });
+
