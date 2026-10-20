@@ -648,21 +648,6 @@ export function EditarDuplaDialog({ dupla }: { dupla: Dupla }) {
                 Em branco, mantém a data atual.
               </p>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="pdm-url">Link do PDM (opcional)</Label>
-              <Input
-                id="pdm-url"
-                name="pdm_url"
-                type="url"
-                inputMode="url"
-                defaultValue={dupla.pdm_url ?? ""}
-                placeholder="https://…"
-              />
-              <p className="text-xs text-muted-foreground">
-                Plano de desenvolvimento do mentorado. Preenchido vira o botão
-                “Abrir PDM” na ficha e na home do mentor.
-              </p>
-            </div>
             <Button type="submit" className="w-full" disabled={pending}>
               {pending ? "Salvando…" : "Salvar"}
             </Button>

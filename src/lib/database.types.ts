@@ -1227,7 +1227,6 @@ export type Database = {
           mentor_id: string
           mentorado_id: string
           motivo_encerramento: string | null
-          pdm_url: string | null
           remanejada_de: string | null
           solicitacao_id: string | null
           status: Database["public"]["Enums"]["dupla_status"]
@@ -1246,7 +1245,6 @@ export type Database = {
           mentor_id: string
           mentorado_id: string
           motivo_encerramento?: string | null
-          pdm_url?: string | null
           remanejada_de?: string | null
           solicitacao_id?: string | null
           status?: Database["public"]["Enums"]["dupla_status"]
@@ -1265,7 +1263,6 @@ export type Database = {
           mentor_id?: string
           mentorado_id?: string
           motivo_encerramento?: string | null
-          pdm_url?: string | null
           remanejada_de?: string | null
           solicitacao_id?: string | null
           status?: Database["public"]["Enums"]["dupla_status"]
@@ -3771,7 +3768,6 @@ export type Database = {
           mentor_nome: string | null
           mentor_nome_social: string | null
           motivo_encerramento: string | null
-          pdm_url: string | null
           status: Database["public"]["Enums"]["dupla_status"] | null
           supervisor_avatar_path: string | null
           supervisor_id: string | null
@@ -4442,10 +4438,6 @@ export type Database = {
       dados_civis_ok: {
         Args: { com_parentesco?: boolean; d: Json }
         Returns: boolean
-      }
-      definir_pdm_url: {
-        Args: { p_dupla: string; p_url: string }
-        Returns: undefined
       }
       definir_visibilidade_avaliacao: {
         Args: { p_id: string; p_visivel: boolean }
