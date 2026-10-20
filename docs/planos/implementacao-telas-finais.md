@@ -697,7 +697,7 @@ Pipeline multi-agent: 3 agentes de recon (cruzaram codebase, schema/RLS e docs/m
 
 **Débitos registrados:** extras do card → **WP5** (decisão Thiago): "Sua semana" strip, seção "Do programa", "Lembrar". **Lembrar — canal decidido: os dois** (wa.me deep link + notificação in-app pro jovem; `waLink()` já existe e o telefone do jovem já é visível na ficha). Warnrow "avaliação do encontro" do mock = **registro pendente** (já coberto — a avaliação do mentor é o campo do registro; e a avaliação DO JOVEM não vira pendência visível ao mentor por privacidade — ele vê só média/★, saber "a Ana não avaliou" vazaria estado individual da jornada dela). Pendência "persona pass em staging" suprimida — e2e-preview verde + spec híbrido a escrever cobrem.
 
-## WP6-R2 — especialistas do jovem fechado (PR #67 · merge fda99ec)
+## WP6-R2 — especialistas do jovem fechado (PR #67 · merge pendente)
 
 Recon multi-agent confirmou ~80% do WP6 já vivo no PR #60 — este délta fecha
 a superfície do jovem contra o mock v6 + plano, **sem migrations novas** além
@@ -741,6 +741,6 @@ avaliacao_links, formulario_links, encontro_notas, registro_anexos).
 
 **Gates:** tsc 0 · eslint 0 · vitest **651** · build ok · demo e2e **54/54**
 · app serial **84/84** (local vs staging — flakes de cold-compile isolados)
-· **e2e-preview verde (136 pass, 15m22s)**. **Dívida conhecida:** notebook offline —
+· e2e-preview aguardando deploy. **Dívida conhecida:** notebook offline —
 `nb push` + gates canônicos remotos pendentes; PR aberto via clone local
 do GitHub (histórico = origin/main).

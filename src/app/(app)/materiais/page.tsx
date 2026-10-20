@@ -1,13 +1,21 @@
 import type { Metadata } from "next";
 import type { CSSProperties } from "react";
 import Link from "next/link";
-import { getCicloEventos, getMateriais, getMe } from "@/lib/queries";
+import {
+  getCicloEventos,
+  getDuplas,
+  getMateriais,
+  getMe,
+  getPainelInstrumentosJornada,
+} from "@/lib/queries";
+import { getUltimasInteracoes } from "@/lib/interacoes";
 import { linkSeguro, maxNumeroEncontro } from "@/lib/ciclo";
 import { temPapel } from "@/lib/types";
 import { ArrowSquareOut, File, FileText, FolderOpen, LinkSimple, BookOpen, PuzzlePiece } from "@phosphor-icons/react/dist/ssr";
 import { Badge } from "@/components/ui/badge";
 import { NovoMaterialDialog } from "@/components/novo-material-dialog";
 import { MaterialActions } from "@/components/material-actions";
+import { PainelJornada } from "@/components/painel-jornada";
 import { PageHeader } from "@/components/page-header";
 import type { Material } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -67,6 +75,29 @@ export default async function MateriaisPage() {
   // turmas) — o teto do seletor é o maior nº que existe, não a soma das linhas
   const maxEncontro = maxNumeroEncontro(eventos);
 
+  // WP7 — o painel "Progresso da jornada" é staff-only (a RPC valida
+  // coord/supervisor; a chamada nem rola fora dos dois papéis). status +
+  // whatsapp do mentor vem das duplas — o payload agregado não os carrega
+  // e o Lembrar precisa dos dois (pausada não recebe nudge; o wa.me só
+  // abre com telefone real). O cap de 48h lê só interações tipo nudge.
+  const vePainel =
+    me != null && (temPapel(me, "coordenacao") || temPapel(me, "supervisor"));
+  const [painel, duplasPainel] = vePainel
+    ? await Promise.all([getPainelInstrumentosJornada(), getDuplas()])
+    : [[], []];
+  const nudges = painel.length
+    ? await getUltimasInteracoes(
+        painel.map((l) => l.dupla_id),
+        "nudge"
+      )
+    : {};
+  const duplasInfo = new Map(
+    duplasPainel.map((d) => [
+      d.id,
+      { status: d.status, mentorWhatsapp: d.mentor?.whatsapp ?? null },
+    ])
+  );
+
   return (
     <div className="space-y-6">
       {/* biblioteca vazia: o CTA mora dentro do card de estado vazio, não
@@ -80,6 +111,17 @@ export default async function MateriaisPage() {
           ) : undefined
         }
       />
+
+      {painel.length > 0 && me && (
+        <PainelJornada
+          linhas={painel}
+          eventos={eventos}
+          nudges={nudges}
+          duplasInfo={duplasInfo}
+          meuNome={me.nome_social || me.nome}
+          ehSupervisor={!temPapel(me, "coordenacao")}
+        />
+      )}
 
       {grupos.length === 0 ? (
         <div className="flex flex-col items-center gap-1.5 rounded-xl bg-card px-5 py-10 text-center shadow-[var(--shadow-border)]">

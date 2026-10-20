@@ -12,6 +12,8 @@ export default defineConfig({
     // getDay()/getDate() baterem com o fuso do programa em qualquer máquina.
     environment: "node",
     env: { TZ: "America/Sao_Paulo" },
-    include: ["tests/**/*.test.ts"],
+    // tests/ é a casa histórica; src/**/*.test.ts cobre specs colocadas
+    // junto do domínio (ex.: src/lib/jornada.test.ts do WP7)
+    include: ["tests/**/*.test.ts", "src/**/*.test.ts"],
   },
 });
