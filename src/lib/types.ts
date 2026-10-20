@@ -479,8 +479,6 @@ export type Dupla = {
   demanda: string | null;
   /** Solicitação que originou a dupla de especialista (null nas DPP). */
   solicitacao_id: string | null;
-  /** Link do PDM do mentorado (0044) — https obrigatório quando preenchido. */
-  pdm_url?: string | null;
   /** Dupla encerrada que esta substituiu num remanejamento (0063) —
    *  null = dupla original, sem linhagem. */
   remanejada_de?: string | null;

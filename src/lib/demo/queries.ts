@@ -813,7 +813,6 @@ export function demoJovemDuplas(role: AppRole): JovemDupla[] {
       iniciada_em: d.iniciada_em,
       encerrada_em: d.encerrada_em ?? null,
       motivo_encerramento: d.motivo_encerramento ?? null,
-      pdm_url: d.pdm_url ?? null,
       demanda: d.demanda,
       mentor_id: d.mentor?.id ?? null,
       mentor_nome: d.mentor?.nome ?? null,

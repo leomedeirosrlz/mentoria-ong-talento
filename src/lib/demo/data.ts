@@ -2146,7 +2146,6 @@ function build(): DemoData {
     status: "ativa",
     iniciada_em: inicioCiclo,
     trilha: "dpp",
-    pdm_url: "https://docs.google.com/document/d/1aBcDeFgHiJkLmNoPqRsTuVwXyZ/edit",
     demanda: null,
     solicitacao_id: null,
     mentor: ricardo,

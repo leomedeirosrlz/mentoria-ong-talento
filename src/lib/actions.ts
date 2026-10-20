@@ -1475,16 +1475,6 @@ export async function updateDupla(duplaId: string, formData: FormData) {
       cronogramaNovo = c;
     }
   }
-  // link do PDM (0044): campo presente no form → grava; vazio limpa. A coluna
-  // tem CHECK https — valida aqui pra mensagem clara em vez do 23514
-  let pdmNovo: string | null | undefined;
-  if (formData.has("pdm_url")) {
-    const pdm = String(formData.get("pdm_url") ?? "").trim();
-    if (pdm && !/^https:\/\/\S+$/i.test(pdm)) {
-      return { error: "O link do PDM precisa ser um endereço completo (https://…)." };
-    }
-    pdmNovo = pdm || null;
-  }
   const { data: mentor } = await supabase
     .from("profiles")
     .select("role, profile_papeis(papel)")
@@ -1647,7 +1637,6 @@ export async function updateDupla(duplaId: string, formData: FormData) {
     }
   }
   if (iniciada_em) patch.iniciada_em = iniciada_em;
-  if (pdmNovo !== undefined) patch.pdm_url = pdmNovo;
   const { data, error } = await supabase.from("duplas").update(patch).eq("id", duplaId).select("id");
   if (error) return { error: erroAmigavel(error) };
   if (!data?.length) {
@@ -1993,40 +1982,6 @@ export async function remanejarDupla(
   revalidatePath("/pessoas");
   revalidatePath(`/pessoas/${saiId}`);
   return { ok: true, novaDuplaId };
-}
-
-/** Link do PDM (0044): mentor edita o da própria dupla — UPDATE em duplas é
- *  coord-only, então a escrita real é a RPC `definir_pdm_url` (definer,
- *  escopada). Os checks aqui só antecipam a mensagem amigável; o banco
- *  revalida papel, status e formato. */
-export async function definirPdmUrl(duplaId: string, url: string) {
-  if (await demoAtivo()) return { error: DEMO_MSG };
-  const { supabase, me: eu } = await me();
-  if (!eu) return { error: "Sessão expirada. Entre de novo." };
-  const u = (url ?? "").trim();
-  if (u && !/^https:\/\/\S+$/i.test(u)) {
-    return { error: "O link do PDM precisa ser um endereço completo (https://…)." };
-  }
-  const { data: d } = await supabase
-    .from("duplas").select("mentor_id, status").eq("id", duplaId).maybeSingle();
-  if (!d) return { error: "Não foi possível identificar a dupla. Recarregue a página." };
-  if (eu.role !== "coordenacao") {
-    if (d.mentor_id !== eu.id) {
-      return { error: "Só o mentor da dupla pode definir o link do PDM." };
-    }
-    if (d.status !== "ativa" && d.status !== "pausada") {
-      return { error: "O link do PDM só pode ser editado com a dupla ativa ou pausada." };
-    }
-  }
-  const { error } = await supabase.rpc("definir_pdm_url", {
-    p_dupla: duplaId,
-    p_url: u || null,
-  });
-  if (error) return { error: erroAmigavel(error) };
-  revalidatePath("/");
-  revalidatePath("/duplas");
-  revalidatePath(`/duplas/${duplaId}`);
-  return { ok: true };
 }
 
 export async function deleteMaterial(id: string) {

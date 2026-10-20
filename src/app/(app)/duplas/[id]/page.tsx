@@ -114,7 +114,6 @@ import { SolicitacaoNegociacao } from "@/components/solicitacao-negociacao";
 import { SolicitarEspecialistaDialog } from "@/components/solicitar-especialista-dialog";
 import { SugerirEspecialistaDialog } from "@/components/sugerir-especialista-dialog";
 import { DevolutivaComposer } from "@/components/devolutivas-card";
-import { PdmUrlDialog } from "@/components/pdm-url-dialog";
 import { TrilhaJornada } from "@/components/trilha-jornada";
 import { TrilhaPrazoBadge } from "@/components/trilha-prazo-badge";
 import { TrilhaFechamento } from "@/components/trilha-fechamento";
@@ -1070,30 +1069,9 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
                 ]}
               />
             )}
-            {/* PDM do mentorado — o link é mantido pelo mentor da dupla (RPC
-                definir_pdm_url; UPDATE em duplas é coord-only) ou pela
-                coordenação. Preenchido vira saída direta pra todos os papéis */}
-            {(linkSeguro(dupla.pdm_url) ||
-              ((souMentor || souCoord) &&
-                (dupla.status === "ativa" || dupla.status === "pausada"))) && (
-              <div className="flex flex-wrap items-center gap-1 pt-1">
-                {linkSeguro(dupla.pdm_url) && (
-                  <a
-                    href={linkSeguro(dupla.pdm_url)!}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={buttonVariants({ variant: "outline", size: "sm" })}
-                  >
-                    <BookOpen />
-                    Abrir PDM
-                  </a>
-                )}
-                {(souMentor || souCoord) &&
-                  (dupla.status === "ativa" || dupla.status === "pausada") && (
-                    <PdmUrlDialog duplaId={dupla.id} atual={dupla.pdm_url ?? null} />
-                  )}
-              </div>
-            )}
+            {/* PDM vive no instrumento nativo (0080) — o link externo
+                (pdm_url, 0044) foi removido na 0098; PDMs antigos entram
+                por importação de materiais. */}
           </section>
 
           {/* voz do jovem (0071) — o recorte que cada papel pode ler:
