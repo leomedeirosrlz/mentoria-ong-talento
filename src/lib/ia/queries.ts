@@ -55,7 +55,7 @@ export const papeisDoUsuario = cache(
  *  tema ficam fora por construção — se o semáforo passar a ler outro campo,
  *  ampliar aqui junto (o type DuplaIa mostra o que a tool enxerga). */
 export const IA_SAUDE_SELECT = `
-  id, turma, trilha, status, cronograma_id, iniciada_em, demanda, pdm_url,
+  id, turma, trilha, status, cronograma_id, iniciada_em, demanda,
   mentor:profiles!duplas_mentor_id_fkey(nome),
   mentorado:mentorados(nome),
   supervisor:profiles!duplas_supervisor_id_fkey(nome),
@@ -78,7 +78,6 @@ export type DuplaIa = {
   cronograma_id: string | null;
   iniciada_em: string | null;
   demanda: string | null;
-  pdm_url: string | null;
   mentor: { nome: string } | null;
   mentorado: { nome: string } | null;
   supervisor: { nome: string } | null;
@@ -385,7 +384,6 @@ export type JovemDuplaIa = {
   turma: string;
   iniciada_em: string | null;
   demanda: string | null;
-  pdm_url: string | null;
   mentor_nome: string | null;
   supervisor_nome: string | null;
 };
@@ -411,7 +409,7 @@ export const getJovemDuplaIa = cache(
     const { data, error } = await supabase
       .from("jovem_duplas")
       .select(
-        "id, trilha, status, turma, iniciada_em, demanda, pdm_url, mentor_nome, supervisor_nome"
+        "id, trilha, status, turma, iniciada_em, demanda, mentor_nome, supervisor_nome"
       )
       .eq("id", duplaId)
       .maybeSingle();

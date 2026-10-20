@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
 import Link from "next/link";
-import { ArrowUpRight, BookOpen, CalendarPlus, ClipboardText, HandHeart, VideoCamera } from "@phosphor-icons/react/dist/ssr";
+import { ArrowUpRight, CalendarPlus, ClipboardText, HandHeart, VideoCamera } from "@phosphor-icons/react/dist/ssr";
 import {
   alvoAgendamento,
   cronogramaVigente,
@@ -528,23 +528,6 @@ export function MentorHome({
                 </div>
               </div>
 
-              {/* um caminho nomeado pra ficha por card: "Abrir dupla" já mora
-                  no header — aqui só saidas que a ficha não dá (o PDM é link
-                  externo preenchido na dupla; o mentor edita na ficha via RPC
-                  definir_pdm_url ou a coordenação no dialog de edição) */}
-              {linkSeguro(dupla.pdm_url) && (
-                <div className="flex flex-wrap items-center gap-3">
-                  <a
-                    href={linkSeguro(dupla.pdm_url)!}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={buttonVariants({ variant: "outline", size: "sm" })}
-                  >
-                    <BookOpen size={16} />
-                    Abrir PDM
-                  </a>
-                </div>
-              )}
             </CardContent>
           </Card>
         );

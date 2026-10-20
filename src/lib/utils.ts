@@ -143,8 +143,6 @@ export function erroAmigavel(e: { message: string; code?: string }): string {
   if (/capacidade do mentor excedida/i.test(e.message)) {
     return "Esse mentor já atingiu o número máximo de duplas.";
   }
-  // RPC definir_pdm_url (0044) levanta a razão já em pt-BR — repassa direto
-  if (/link do pdm|definir o link/i.test(e.message)) return e.message;
   if (/autoria forjada|created_by não pode ser forjado/i.test(e.message)) {
     return "Não foi possível concluir. Recarregue a página e tente de novo.";
   }

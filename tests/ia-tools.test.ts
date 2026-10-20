@@ -363,7 +363,6 @@ describe("executarTool — tools", () => {
             turma: "2025/2026",
             iniciada_em: null,
             demanda: "carreira",
-            pdm_url: "https://x/pdm.pdf",
             mentor_nome: "Ana",
             supervisor_nome: "Bia",
           },
