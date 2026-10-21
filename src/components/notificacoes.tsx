@@ -212,6 +212,8 @@ const ICONE: Record<Notificacao["tipo"], typeof Bell> = {
   pedido_apoio: HandHeart,
   apoio_resolvido: CheckCircle,
   dupla_formada: UsersThree,
+  // 0102 — a bandeira quadriculada é a reta final da jornada
+  dupla_reta_final: FlagCheckered,
   demanda_especialista: UserPlus,
   solicitacao_registrada: ClipboardText,
   especialista_aceitou: UserCheck,

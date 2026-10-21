@@ -469,6 +469,11 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
     !!encerramento?.tipo ||
     !!dupla.encerrada_em;
 
+  // concluída pelo automático (0102) com o rito ainda pendente — o mentor
+  // segue podendo mexer no registro do último encontro e nos anexos dele
+  const ritoPendente =
+    dupla.status === "concluida" && encerramento != null && !encerramento.tipo;
+
   // encontros depois do oficial da semana ficam colapsados (página tem 16
   // linhas). Na trilha especialista não há "semana oficial" — os 5 passos
   // ficam sempre abertos.
@@ -655,7 +660,10 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
         tentativasFalhas={tentativasFalhas}
         duplaId={dupla.id}
         souMentor={souMentor}
-        podeEditar={souMentor && dupla.status === "ativa"}
+        // registro/anexos do mentor seguem abertos na concluída-com-rito-
+        // -pendente (0102): o fechamento automático pode nascer de um
+        // retroativo sem follow-up, e o registro do 16º continua editável
+        podeEditar={souMentor && (dupla.status === "ativa" || ritoPendente)}
         podeMarcar={(souMentor || souCoord) && dupla.status === "ativa"}
         ativa={dupla.status === "ativa"}
         jornadaViva={
@@ -664,8 +672,8 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
         souCoord={souCoord}
         autorId={me.id}
         // evidência é do mentor — coord só remove (moderação), sup só lê
-        podeAnexar={souMentor && dupla.status === "ativa"}
-        podeRemoverAnexos={souCoord || (souMentor && dupla.status === "ativa")}
+        podeAnexar={souMentor && (dupla.status === "ativa" || ritoPendente)}
+        podeRemoverAnexos={souCoord || (souMentor && (dupla.status === "ativa" || ritoPendente))}
         anexos={(enc?.registro && anexosPorRegistro[enc.registro.id]) || []}
         materiais={materiaisPorNumero.get(passo.numero) ?? []}
         combinadosPendentes={combinadosPendentes}

@@ -37,6 +37,11 @@ export function EncerramentoDupla({
 }) {
   const decidido = !!encerramento?.tipo;
   const aberta = dupla.status === "ativa" || dupla.status === "pausada";
+  // fechamento automático (0102): o último encontro conclui a dupla e a row
+  // nasce pendente — o rito continua aberto aqui (autoavaliação do mentor,
+  // 360 tardio, checklist da coordenação) até a decisão
+  const ritoPendente = !aberta && encerramento != null && !decidido;
+  const operavel = aberta || ritoPendente;
   // o rito é do fim da jornada — abre quando ela amadureceu (mesma janela
   // da roda formal, enc. 12) ou quando já existe row (quem abriu antes por
   // encerramento antecipado continua vendo/agindo). Abaixo disso a seção
@@ -56,6 +61,15 @@ export function EncerramentoDupla({
           <span aria-hidden className="size-1.5 rounded-full bg-[var(--info)]" />
           Encerramento
         </h2>
+        {ritoPendente && (
+          <Badge
+            variant="outline"
+            className="border-[var(--ok)]/60 text-[var(--ok-text)]"
+          >
+            <FlagCheckered size={12} aria-hidden />
+            Jornada concluída · rito pendente
+          </Badge>
+        )}
         {decidido && (
           <Badge
             variant="outline"
@@ -141,7 +155,7 @@ export function EncerramentoDupla({
               {item.key === "avaliacao_360_enviada" &&
                 !feito &&
                 souCoord &&
-                aberta && (
+                operavel && (
                   <span className="ml-auto shrink-0">
                     <EnviarFormularioDialog
                       formularios={formularios}
@@ -210,7 +224,7 @@ export function EncerramentoDupla({
       ) : (
         <>
           {/* a parte do mentor no rito — ele preenche aqui, antes da decisão */}
-          {souMentor && aberta && (
+          {souMentor && operavel && (
             <AutoavaliacaoMentorForm
               duplaId={dupla.id}
               inicial={
@@ -223,7 +237,7 @@ export function EncerramentoDupla({
               }
             />
           )}
-          {souCoord && aberta && (
+          {souCoord && operavel && (
             <>
               {encerramento?.autoavaliacao_mentor ? (
                 <blockquote className="rounded-lg border-l-2 border-[var(--brand-lime)] bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
@@ -245,7 +259,11 @@ export function EncerramentoDupla({
                   aqui na ficha.
                 </p>
               )}
-              <EncerrarDuplaDialog duplaId={dupla.id} encerramento={encerramento} />
+              <EncerrarDuplaDialog
+                duplaId={dupla.id}
+                encerramento={encerramento}
+                somenteConclusao={dupla.status === "concluida"}
+              />
             </>
           )}
           {!souMentor && !souCoord && (

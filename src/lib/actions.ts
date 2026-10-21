@@ -2796,7 +2796,12 @@ export async function salvarRegistro(formData: FormData) {
   }
 
   const { data: d } = await supabase.from("duplas").select("status").eq("id", dupla_id).single();
-  if (d && d.status !== "ativa") return { error: "Essa dupla não está ativa." };
+  // 'concluida' entra junto: o fechamento automático (0102) vira status no
+  // instante do último encontro — trancar aqui impediria até editar o
+  // registro que acabou de fechar a jornada. Pausada/encerrada seguem fora.
+  if (d && d.status !== "ativa" && d.status !== "concluida") {
+    return { error: "Essa dupla não está ativa." };
+  }
 
   // só registra encontro da própria dupla que já aconteceu (ou foi marcado realizado)
   const { data: encDb } = await supabase
