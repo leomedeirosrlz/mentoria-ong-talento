@@ -563,6 +563,8 @@ export type Notificacao = {
     | "pedido_apoio"
     | "apoio_resolvido"
     | "dupla_formada"
+    // 0102 — aviso "faltam 2 encontros" pra coord/supervisor no ciclo da dupla
+    | "dupla_reta_final"
     | "demanda_especialista"
     | "solicitacao_registrada"
     | "especialista_aceitou"
