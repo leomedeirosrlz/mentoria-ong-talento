@@ -132,8 +132,8 @@ test.describe("agenda da coordenação — monitoramento e lembrete real (WP5/D5
         page.locator(`section[aria-label="${label}"]`)
       ).toBeVisible();
 
-    // deep-link pro calendário: os chips da coord são Semana/Mês/Lista —
-    // "Horários" e a superfície de agendar são só do mentor (REALIZA-25 já
+    // deep-link pro calendário: os chips da coord são Dia/Semana/Mês/Lista
+    // — "Horários" e a superfície de agendar são só do mentor (REALIZA-25 já
     // cobre os valores; aqui basta a transição + a ausência do clique-vazio)
     await abas.getByRole("tab", { name: "Calendário" }).click();
     await page.waitForURL(/aba=calendario/);

@@ -72,7 +72,8 @@ test.describe("agenda demo do mentor DPP — Sua semana / Do programa / Lembrar 
     ).toBeVisible();
 
     // a formação futura do cronograma do Ricardo (roda de casos no domingo)
-    await expect(prog.getByText("Formação de mentores")).toBeVisible();
+    // o rótulo de categoria repete a cada formação listada — basta uma
+    await expect(prog.getByText("Formação de mentores").first()).toBeVisible();
     await expect(
       prog.getByText(/Roda de casos — formação continuada de mentores/)
     ).toBeVisible();

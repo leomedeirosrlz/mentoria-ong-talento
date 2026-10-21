@@ -62,7 +62,7 @@ import type {
   Supervisao,
 } from "@/lib/types";
 import type { Interacao } from "@/lib/interacoes";
-import { toDateStr } from "../ciclo";
+import { disponibilidadeDeConjuntos, toDateStr } from "../ciclo";
 
 // ---------- tabelas da rodada de telas finais (ainda sem migration) ----------
 // Espelhos do plano `docs/planos/implementacao-telas-finais.md` — os WPs
@@ -1275,59 +1275,59 @@ function build(): DemoData {
     { profile_id: ricardo.id, tipo: "dpp", areas: ["carreira", "educação"], capacidade: 2, capacidade_especialista: 1, termo_ok: false, formacao_ok: true,
       experiencia_previa: "Primeiro ciclo como mentor — concluiu a formação e participou de duas rodas de conversa como ouvinte.",
       formacao_externa: "Trilha de liderança e feedback da empresa.",
-      disponibilidade: { dias: ["ter", "qui"], periodos: ["noite"] } },
+      disponibilidade: disponibilidadeDeConjuntos(["ter", "qui"], ["noite"]) },
     // Carlos capacidade 2: veterano da formação com 1 dupla em andamento —
     // 1/2 deixa uma vaga pra sugestão de remanejo/board sem inflar a lotação
     { profile_id: carlos.id, tipo: "dpp", areas: ["tecnologia", "carreira"], capacidade: 2, termo_ok: true, formacao_ok: true,
       experiencia_previa: "Foi monitor em cursinho comunitário por dois anos.",
       formacao_externa: "Mentor de novos devs no programa interno da fintech.",
-      disponibilidade: { dias: ["seg", "qua"], periodos: ["noite"] } },
+      disponibilidade: disponibilidadeDeConjuntos(["seg", "qua"], ["noite"]) },
     { profile_id: fernanda.id, tipo: "dpp", areas: ["educação", "projetos sociais"], capacidade: 1, termo_ok: true, formacao_ok: true,
       experiencia_previa: "Coordena projeto de reforço escolar com 40 alunos na rede pública.",
       formacao_externa: null,
-      disponibilidade: { dias: ["ter", "qui"], periodos: ["tarde", "noite"] } },
+      disponibilidade: disponibilidadeDeConjuntos(["ter", "qui"], ["tarde", "noite"]) },
     // João Pedro é o mentor novo que ainda não concluiu a formação — é o que
     // faz o board de matching mostrar o badge "sem formação"
     { profile_id: joaoPedro.id, tipo: "dpp", areas: ["dados", "finanças"], capacidade: 1, termo_ok: true, formacao_ok: false,
       experiencia_previa: null,
       formacao_externa: null,
-      disponibilidade: { dias: ["sab"], periodos: ["manha"] } },
+      disponibilidade: disponibilidadeDeConjuntos(["sab"], ["manha"]) },
     // Luiza capacidade 2: voltou de um ciclo completo — 1/2 com a dupla da
     // T2. A "comunicação" dela é o tema em comum com a Dandara que a
     // sugestão de remanejo usa pra ranquear
     { profile_id: luiza.id, tipo: "dpp", areas: ["design", "comunicação"], capacidade: 2, termo_ok: true, formacao_ok: true,
       experiencia_previa: "Mentora no ciclo anterior — a dupla concluiu o PDM inteiro.",
       formacao_externa: "Workshops de portfólio pra estudantes de design.",
-      disponibilidade: { dias: ["qua", "sex"], periodos: ["tarde"] } },
+      disponibilidade: disponibilidadeDeConjuntos(["qua", "sex"], ["tarde"]) },
     // André é o híbrido funcional (WP0b): DPP da dupla pausada do Pedro e
     // especialista disponível no pool — capacidade_especialista 1, nenhuma
     // trilha ainda, e a grade dele abre a janela de seg à tarde abaixo
     { profile_id: andre.id, tipo: "dpp", areas: ["empreendedorismo", "finanças"], capacidade: 2, capacidade_especialista: 1, termo_ok: true, formacao_ok: true,
       experiencia_previa: "Empreende há 8 anos; concluiu a formação e abriu a primeira dupla — pausada a pedido da família.",
       formacao_externa: "Mentorias do Sebrae pra pequenos negócios.",
-      disponibilidade: { dias: ["seg", "ter", "qua", "qui", "sex"], periodos: ["manha", "tarde"] } },
+      disponibilidade: disponibilidadeDeConjuntos(["seg", "ter", "qua", "qui", "sex"], ["manha", "tarde"]) },
     // Sofia carrega 2 trilhas ativas (Bia + Eduardo) — pool de especialista
     // separado do DPP desde a 0073; o DPP fica no default informativo
     { profile_id: sofia.id, tipo: "especialista", areas: ["educação", "dados"], capacidade: 1, capacidade_especialista: 2, termo_ok: true, formacao_ok: true,
       experiencia_previa: "Professora de matemática há 10 anos, com aulas particulares focadas em ENEM.",
       formacao_externa: "Especialização em avaliação educacional.",
-      disponibilidade: { dias: ["sab", "dom"], periodos: ["manha", "tarde"] } },
+      disponibilidade: disponibilidadeDeConjuntos(["sab", "dom"], ["manha", "tarde"]) },
     { profile_id: helena.id, tipo: "especialista", areas: ["comunicação", "carreira"], capacidade: 1, capacidade_especialista: 1, termo_ok: true, formacao_ok: true,
       experiencia_previa: "Treina equipes e executivos em apresentações e entrevistas.",
       formacao_externa: "Formação em coaching de oratória.",
-      disponibilidade: { dias: ["ter", "qui"], periodos: ["manha", "noite"] } },
+      disponibilidade: disponibilidadeDeConjuntos(["ter", "qui"], ["manha", "noite"]) },
     // Marcos é o especialista de reserva com vagas — 2 no pool, nenhuma em uso
     { profile_id: marcos.id, tipo: "especialista", areas: ["tecnologia", "dados"], capacidade: 2, capacidade_especialista: 2, termo_ok: true, formacao_ok: true,
       experiencia_previa: "Professor de curso técnico aos sábados; engenheiro de dados durante a semana.",
       formacao_externa: null,
-      disponibilidade: { dias: ["seg", "qua", "sab"], periodos: ["manha", "noite"] } },
+      disponibilidade: disponibilidadeDeConjuntos(["seg", "qua", "sab"], ["manha", "noite"]) },
     // Camila: vagas zeradas pro ciclo (capacidade_especialista 0) — a grade
     // segue publicada, mas o cardápio do jovem a pinta "Sem vagas" e o
     // pedido dirigido a ela vira proposta pro mural
     { profile_id: camila.id, tipo: "especialista", areas: ["finanças", "empreendedorismo"], capacidade: 0, capacidade_especialista: 0, termo_ok: true, formacao_ok: true,
       experiencia_previa: "Contadora; educação financeira em ONGs há 4 anos.",
       formacao_externa: null,
-      disponibilidade: { dias: ["seg"], periodos: ["noite"] } },
+      disponibilidade: disponibilidadeDeConjuntos(["seg"], ["noite"]) },
     // Patrícia afastada: ficha existe mas sem disponibilidade — o board de
     // matching a mostra como indisponível
     { profile_id: patricia.id, tipo: "dpp", areas: ["RH", "carreira"], capacidade: 1, termo_ok: true, formacao_ok: true,
@@ -1392,7 +1392,7 @@ function build(): DemoData {
     pref_genero_par: "feminino",
     objetivos: "Passar no ENEM pra pedagogia e montar um plano de estudos que eu consiga seguir.",
     escolaridade: "medio", origem: "Oficina de projetos da ONG Horizonte",
-    disponibilidade: { dias: ["ter", "qui"], periodos: ["noite"] },
+    disponibilidade: disponibilidadeDeConjuntos(["ter", "qui"], ["noite"]),
     created_at: haDias(60),
     // a Bia compartilha o contato dela de volta (0076) — o toggle do Perfil
     // dela abre ligado na demo
@@ -1422,7 +1422,7 @@ function build(): DemoData {
     pref_genero_par: "indiferente",
     objetivos: "Conquistar a bolsa de intercâmbio da escola e destravar o inglês instrumental.",
     escolaridade: "medio", origem: "Projeto Semente",
-    disponibilidade: { dias: ["sab"], periodos: ["manha"] },
+    disponibilidade: disponibilidadeDeConjuntos(["sab"], ["manha"]),
     created_at: haDias(60),
     // a coordenação já subiu o PDF recebido pro bucket (0081) — a outra
     // forma do campo: arquivo, não link externo
@@ -1443,7 +1443,7 @@ function build(): DemoData {
     pref_genero_par: "feminino",
     objetivos: "Conseguir a vaga de jovem aprendiz e melhorar a redação pro ENEM.",
     escolaridade: "medio", origem: "Casa do Saber",
-    disponibilidade: { dias: ["ter", "qua"], periodos: ["noite"] },
+    disponibilidade: disponibilidadeDeConjuntos(["ter", "qua"], ["noite"]),
     created_at: haDias(60),
     // supervisionada pela Beatriz — o CV dela é coord-only pro Paulo (0081):
     // ele nem abre a ficha dela (RLS), quanto mais o documento
@@ -1475,7 +1475,7 @@ function build(): DemoData {
     pref_genero_par: "feminino",
     objetivos: "Concluir o técnico em administração e conseguir estágio na área.",
     escolaridade: "tecnico", origem: "Instituto Alavanca",
-    disponibilidade: { dias: ["seg", "qua"], periodos: ["tarde"] },
+    disponibilidade: disponibilidadeDeConjuntos(["seg", "qua"], ["tarde"]),
     // ciclo anterior fechado (a dupla com a Luiza é a "concluida" do
     // dataset) — a saída do programa da 0077 já vem marcada: ela povoa a
     // seção "Fora do programa" da /pessoas e some da fila/pareamento
@@ -1497,7 +1497,7 @@ function build(): DemoData {
     pref_genero_par: "masculino",
     objetivos: "Conseguir o primeiro emprego e montar um plano realista pra microempresa da família.",
     escolaridade: "medio", origem: "Projeto Semente",
-    disponibilidade: { dias: ["ter", "qui"], periodos: ["noite"] },
+    disponibilidade: disponibilidadeDeConjuntos(["ter", "qui"], ["noite"]),
     // ficha do responsável veio da planilha da ONG — a autorização pendente
     // dele (token 0x3404) já abre o link preenchido, só falta a mãe assinar
     responsavel: {
@@ -1525,7 +1525,7 @@ function build(): DemoData {
     pref_genero_par: "feminino",
     objetivos: "Organizar a rotina de estudos e subir as notas de exatas.",
     escolaridade: "medio", origem: "Casa do Saber",
-    disponibilidade: { dias: ["ter", "qui"], periodos: ["tarde", "noite"] },
+    disponibilidade: disponibilidadeDeConjuntos(["ter", "qui"], ["tarde", "noite"]),
     created_at: haDias(32),
   };
   const pedro: Mentorado = {
@@ -1573,7 +1573,7 @@ function build(): DemoData {
     pref_genero_par: "masculino",
     objetivos: "Organizar os estudos e descobrir uma profissão que eu goste.",
     escolaridade: "medio", origem: "Formulário de matching",
-    disponibilidade: { dias: ["ter", "qui"], periodos: ["noite"] },
+    disponibilidade: disponibilidadeDeConjuntos(["ter", "qui"], ["noite"]),
     created_at: haDias(4),
     form_bruto: { "Carimbo de data/hora": serialExcel(haDias(6, "20:15")) },
   };
@@ -1595,7 +1595,7 @@ function build(): DemoData {
     pref_genero_par: "masculino",
     objetivos: "Montar um portfólio com 2 projetos e conseguir o primeiro estágio.",
     escolaridade: "medio", origem: "ONG Cidadão Pró-Mundo",
-    disponibilidade: { dias: ["ter", "qui"], periodos: ["noite"] },
+    disponibilidade: disponibilidadeDeConjuntos(["ter", "qui"], ["noite"]),
     created_at: haDias(32),
   };
 

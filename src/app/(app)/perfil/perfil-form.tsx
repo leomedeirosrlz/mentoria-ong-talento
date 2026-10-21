@@ -46,6 +46,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   AREAS_SUGESTOES,
   disponibilidadeTexto,
+  disponibilidadeVazia,
   formatDate,
   formatMesAno,
   formatWhatsApp,
@@ -1061,9 +1062,9 @@ export function PerfilForm({
   const termoOk = assinaturaTermo?.status === "assinado";
   const pendentesTotal = cadPendentes.length + (termoOk ? 0 : 1);
 
-  // ficha de mentor: disponibilidade sem nenhum dia conta como pendente
+  // ficha de mentor: disponibilidade sem nenhuma célula conta como pendente
   // (é o dado que o matching cruza), igual os textos vazios
-  const dispOk = (mentorProfile?.disponibilidade?.dias?.length ?? 0) > 0;
+  const dispOk = !disponibilidadeVazia(mentorProfile?.disponibilidade);
   const experienciaOk = tem(mentorProfile?.experiencia_previa);
   const formacaoOk = tem(mentorProfile?.formacao_externa);
   const mentPendentes = mentorProfile

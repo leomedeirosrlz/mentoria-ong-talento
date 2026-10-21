@@ -17,6 +17,7 @@ import {
 import { formatDate, rotuloSlot, toDateStr } from "@/lib/ciclo";
 import type { ExcecaoEspecialista, GradeJanela } from "@/lib/types";
 import { AgendaGradeSemanal } from "@/components/agenda-grade-semanal";
+import { AgendaGradeEdicao } from "@/components/agenda-grade-edicao";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
@@ -50,6 +51,11 @@ const DIAS: [string, string][] = [
 
 /** PostgREST devolve `time` com segundos ("18:00:00") — a UI corta. */
 const horaCurta = (t: string) => t.slice(0, 5);
+
+/** minutos-do-dia → "HH:mm" — o formato do input `time` que a action
+ *  valida (a pintura da grade manda minutos snapados, não o input). */
+const hhmm = (min: number) =>
+  `${String(Math.floor(min / 60)).padStart(2, "0")}:${String(min % 60).padStart(2, "0")}`;
 
 /** A agenda real do especialista (0073): grade semanal + exceções datadas +
  *  a projeção de slots que os jovens veem. Quem agenda a sessão continua
@@ -141,6 +147,31 @@ export function AgendaDisponibilidade({
     });
   }
 
+  // a projeção da semana — a grade de leitura desenha tudo; o editor usa o
+  // mesmo resultado pro contexto read-only (sessões/extras/bloqueios)
+  const diasGrade = useMemo(
+    () => gradeVisualSemana({ hojeIso, grade, excecoes, sessoes, slots }),
+    [hojeIso, grade, excecoes, sessoes, slots]
+  );
+
+  /** Pintura na grade (REALIZA-163): a mesma action do form, mas o FormData
+   *  vem do gesto (dow + minutos snapados) em vez dos inputs. */
+  function adicionarNaGrade(diaSemana: number, iniMin: number, fimMin: number) {
+    const fd = new FormData();
+    fd.set("dia_semana", String(diaSemana));
+    fd.set("hora_inicio", hhmm(iniMin));
+    fd.set("hora_fim", hhmm(fimMin));
+    start(async () => {
+      try {
+        const res = await adicionarJanela(fd);
+        if (res?.error) toast.error(res.error);
+        else router.refresh();
+      } catch {
+        toast.error("Sem conexão. Tente de novo.");
+      }
+    });
+  }
+
   const gradePorDia = new Map<number, GradeJanela[]>();
   for (const j of grade) {
     const lista = gradePorDia.get(j.dia_semana) ?? [];
@@ -160,9 +191,7 @@ export function AgendaDisponibilidade({
       </CardHeader>
       <CardContent className="space-y-6 pt-5">
         {/* ---------- grade visual da semana — a leitura é o default ---------- */}
-        <AgendaGradeSemanal
-          dias={gradeVisualSemana({ hojeIso, grade, excecoes, sessoes, slots })}
-        />
+        <AgendaGradeSemanal dias={diasGrade} />
 
         {/* ---------- edição — recolhida quando a grade já existe ----------
             <details> nativo: o `open` vem de state (default = grade vazia);
@@ -190,6 +219,17 @@ export function AgendaDisponibilidade({
             movidas.
           </p>
           <div className="mt-4 space-y-6">
+            {/* editor primário (REALIZA-163): pintar direto na grade — a
+                lista por dia embaixo segue como o caminho de teclado/leitor
+                de tela e o único no <md (a grade é desktop-only) */}
+            <AgendaGradeEdicao
+              grade={grade}
+              dias={diasGrade}
+              pending={pending}
+              onAdicionar={adicionarNaGrade}
+              onRemover={(id) => remover(removerJanela, id)}
+            />
+
             {/* ---------- grade semanal ---------- */}
             <section>
               <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">

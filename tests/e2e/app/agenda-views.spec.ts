@@ -206,8 +206,9 @@ test.describe("agenda do mentor — visões Semana e Horários (REALIZA-25)", ()
     // calendário (mes/semana/horários) vivem na aba ?aba=calendario
     await page.goto("/agenda?aba=calendario");
 
-    // os três chips do mentor — mês/semana/horários (a lista é da coord)
-    for (const v of ["mes", "semana", "horarios"])
+    // os quatro chips do mentor — dia/mês/semana/horários (a lista é da
+    // coord; "dia" entrou no REALIZA-163)
+    for (const v of ["dia", "mes", "semana", "horarios"])
       await expect(
         page.locator(`input[name="agenda-visao"][value="${v}"]`)
       ).toBeAttached();
@@ -429,8 +430,8 @@ test.describe("agenda do mentor — visões Semana e Horários (REALIZA-25)", ()
     await relogar(page, COORD_EMAIL, COORD_SENHA);
     await page.goto("/agenda?aba=calendario");
 
-    // chips da coord: Semana/Mês/Lista — "Horários" é só do mentor
-    for (const v of ["semana", "mes", "lista"])
+    // chips da coord: Dia/Semana/Mês/Lista — "Horários" é só do mentor
+    for (const v of ["dia", "semana", "mes", "lista"])
       await expect(
         page.locator(`input[name="agenda-visao"][value="${v}"]`)
       ).toBeAttached();

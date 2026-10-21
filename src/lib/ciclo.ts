@@ -1,4 +1,5 @@
 import type {
+  CelulaDisponibilidade,
   ChamadoCategoria,
   ChamadoStatus,
   CicloEvento,
@@ -369,6 +370,18 @@ export const PERIODOS_LABELS: Record<Periodo, string> = {
   noite: "Noite",
 };
 
+/** Sigla do dia pros headers da matriz de disponibilidade — a forma longa
+ *  é dos textos/aria-labels; na coluna da grade só cabe a curta. */
+export const DIAS_SEMANA_CURTOS: Record<DiaSemana, string> = {
+  seg: "Seg",
+  ter: "Ter",
+  qua: "Qua",
+  qui: "Qui",
+  sex: "Sex",
+  sab: "Sáb",
+  dom: "Dom",
+};
+
 /** Siglas pra select de UF — o banco guarda char(2) maiúsculo (CHECK). */
 export const UFS = [
   "AC", "AL", "AM", "AP", "BA", "CE", "DF", "ES", "GO", "MA", "MG", "MS",
@@ -397,9 +410,72 @@ export const INTERESSES_SUGESTOES = [
   "culinária",
 ];
 
-/** Grade semanal do grid de chips (JSON {"dias":[],"periodos":[]}) — valida
- *  contra o mesmo vocabulário do CHECK disponibilidade_ok. Vazio ou grade
- *  sem nada marcado vira null ("não informado"), nunca esqueleto vazio. */
+/** A forma de conjuntos (legada, pré-0100) expandida pra células —
+ *  {"dias":["seg"],"periodos":["noite"]} vira (seg,noite). `periodos`
+ *  vazio/ausente vale "o dia inteiro": a régua histórica era dia marcado
+ *  sem recorte = qualquer horário, então expande pras 3 células do dia.
+ *  Entradas fora do vocabulário são descartadas; sem célula nenhuma,
+ *  devolve null ("não informado"), nunca esqueleto vazio. */
+export function disponibilidadeDeConjuntos(
+  dias: readonly DiaSemana[],
+  periodos: readonly Periodo[]
+): Disponibilidade | null {
+  const celulas: CelulaDisponibilidade[] = [];
+  const vistos = new Set<string>();
+  const ps = periodos.length ? periodos : PERIODOS;
+  for (const dia of dias) {
+    if (!(DIAS_SEMANA as readonly string[]).includes(dia)) continue;
+    for (const periodo of ps) {
+      if (!(PERIODOS as readonly string[]).includes(periodo)) continue;
+      const chave = `${dia}:${periodo}`;
+      if (vistos.has(chave)) continue;
+      vistos.add(chave);
+      celulas.push({ dia, periodo });
+    }
+  }
+  return celulas.length ? { celulas } : null;
+}
+
+/** Células de uma grade, tolerante às duas formas — a coluna é jsonb e a
+ *  janela de deploy pode misturar {dias,periodos} (legada) com {celulas}
+ *  (canônica): ler o legado sem normalizar devolveria "sem grade". */
+export function celulasDe(
+  d: Disponibilidade | null | undefined
+): CelulaDisponibilidade[] {
+  if (!d) return [];
+  const cel = (d as { celulas?: unknown }).celulas;
+  if (Array.isArray(cel)) {
+    const out: CelulaDisponibilidade[] = [];
+    const vistos = new Set<string>();
+    for (const c of cel) {
+      const dia = String((c as CelulaDisponibilidade | null)?.dia ?? "");
+      const periodo = String(
+        (c as CelulaDisponibilidade | null)?.periodo ?? ""
+      );
+      if (
+        !(DIAS_SEMANA as readonly string[]).includes(dia) ||
+        !(PERIODOS as readonly string[]).includes(periodo)
+      )
+        continue;
+      const chave = `${dia}:${periodo}`;
+      if (vistos.has(chave)) continue;
+      vistos.add(chave);
+      out.push({ dia: dia as DiaSemana, periodo: periodo as Periodo });
+    }
+    return out;
+  }
+  const legado = d as { dias?: DiaSemana[]; periodos?: Periodo[] };
+  return (
+    disponibilidadeDeConjuntos(legado.dias ?? [], legado.periodos ?? [])
+      ?.celulas ?? []
+  );
+}
+
+/** Grade semanal — JSON {"celulas":[{"dia":"seg","periodo":"manha"}]}
+ *  (canônica, 0100) ou a forma legada {"dias":[],"periodos":[]}, que
+ *  expande pelo disponibilidadeDeConjuntos. Valida contra o mesmo
+ *  vocabulário do CHECK disponibilidade_ok; vazio ou grade sem nada
+ *  marcado vira null ("não informado"), nunca esqueleto vazio. */
 export function parseDisponibilidade(
   raw: string
 ): Disponibilidade | null | { error: string } {
@@ -411,7 +487,31 @@ export function parseDisponibilidade(
   } catch {
     return { error: "A disponibilidade chegou num formato inválido." };
   }
-  const d = parsed as { dias?: unknown; periodos?: unknown };
+  const d = parsed as {
+    celulas?: unknown;
+    dias?: unknown;
+    periodos?: unknown;
+  } | null;
+  if (Array.isArray(d?.celulas)) {
+    const celulas: CelulaDisponibilidade[] = [];
+    const vistos = new Set<string>();
+    for (const c of d.celulas) {
+      const dia = String((c as CelulaDisponibilidade | null)?.dia ?? "");
+      const periodo = String(
+        (c as CelulaDisponibilidade | null)?.periodo ?? ""
+      );
+      if (
+        !(DIAS_SEMANA as readonly string[]).includes(dia) ||
+        !(PERIODOS as readonly string[]).includes(periodo)
+      )
+        continue;
+      const chave = `${dia}:${periodo}`;
+      if (vistos.has(chave)) continue;
+      vistos.add(chave);
+      celulas.push({ dia: dia as DiaSemana, periodo: periodo as Periodo });
+    }
+    return celulas.length ? { celulas } : null;
+  }
   const dias = (Array.isArray(d?.dias) ? d.dias.map(String) : []).filter(
     (x): x is DiaSemana => (DIAS_SEMANA as readonly string[]).includes(x)
   );
@@ -420,34 +520,88 @@ export function parseDisponibilidade(
   ).filter((x): x is Periodo =>
     (PERIODOS as readonly string[]).includes(x)
   );
-  return dias.length || periodos.length ? { dias, periodos } : null;
+  return disponibilidadeDeConjuntos(dias, periodos);
 }
 
-/** "ter e qui à noite" — grade semanal do mentor em frase curta (ficha de
- *  pessoa, board de matching). Grade vazia/ausente devolve null. */
-export function disponibilidadeTexto(d: Disponibilidade | null | undefined): string | null {
-  if (!d || (!d.dias?.length && !d.periodos?.length)) return null;
-  const dias = (d.dias ?? []).map((dia) => DIAS_SEMANA_LABELS[dia] ?? dia);
-  const periodos = (d.periodos ?? []).map(
+/** Junta lista em pt-BR: "a", "a e b", "a, b e c". */
+function juntaLista(l: string[]): string {
+  return l.length <= 1
+    ? (l[0] ?? "")
+    : `${l.slice(0, -1).join(", ")} e ${l.at(-1)}`;
+}
+
+/** "Segunda a Sexta" pra faixas contíguas de 3+ dias; os soltos e pares
+ *  listam por extenso ("Terça e Quinta"). `dias` na ordem seg→dom. */
+function textoDias(dias: DiaSemana[]): string {
+  const partes: string[] = [];
+  let i = 0;
+  while (i < dias.length) {
+    let j = i;
+    while (
+      j + 1 < dias.length &&
+      DIAS_SEMANA.indexOf(dias[j + 1]) === DIAS_SEMANA.indexOf(dias[j]) + 1
+    )
+      j++;
+    if (j - i >= 2) {
+      partes.push(
+        `${DIAS_SEMANA_LABELS[dias[i]]} a ${DIAS_SEMANA_LABELS[dias[j]]}`
+      );
+    } else {
+      partes.push(DIAS_SEMANA_LABELS[dias[i]]);
+      if (j === i + 1) partes.push(DIAS_SEMANA_LABELS[dias[j]]);
+    }
+    i = j + 1;
+  }
+  return juntaLista(partes);
+}
+
+/** "à noite" / "às manhãs e tardes" / "o dia inteiro" — o recorte de
+ *  períodos de um grupo de dias. */
+function textoPeriodos(periodos: Periodo[]): string {
+  if (periodos.length >= PERIODOS.length) return "o dia inteiro";
+  const labels = periodos.map(
     (p) => PERIODOS_LABELS[p]?.toLocaleLowerCase("pt-BR") ?? p
   );
-  const junta = (l: string[]) =>
-    l.length <= 1 ? (l[0] ?? "") : `${l.slice(0, -1).join(", ")} e ${l.at(-1)}`;
+  if (periodos.length === 1) return `à ${labels[0]}`;
   // plural de cada período: "às tardes e noites" (não "às tarde e noite")
-  const PERIODO_PLURAL: Record<string, string> = {
+  const PLURAL: Record<string, string> = {
     manhã: "manhãs",
     tarde: "tardes",
     noite: "noites",
   };
-  const partes = [
-    dias.length ? junta(dias) : null,
-    periodos.length === 1
-      ? `à ${periodos[0]}`
-      : periodos.length
-        ? `às ${junta(periodos.map((x) => PERIODO_PLURAL[x] ?? x))}`
-        : null,
-  ].filter(Boolean);
-  return partes.length ? partes.join(" ") : null;
+  return `às ${juntaLista(labels.map((x) => PLURAL[x] ?? x))}`;
+}
+
+/** "Terça e Quinta à noite" — a grade semanal em frase curta (ficha de
+ *  pessoa, board de matching). Dias que dividem a mesma combinação de
+ *  períodos saem juntos: "Segunda a Sexta às manhãs e tardes · Sábado à
+ *  manhã". Grade vazia/ausente devolve null. */
+export function disponibilidadeTexto(
+  d: Disponibilidade | null | undefined
+): string | null {
+  const celulas = celulasDe(d);
+  if (!celulas.length) return null;
+  const porDia = new Map<DiaSemana, Set<Periodo>>();
+  for (const c of celulas) {
+    const s = porDia.get(c.dia) ?? new Set<Periodo>();
+    s.add(c.periodo);
+    porDia.set(c.dia, s);
+  }
+  // um grupo por combinação de períodos — a forma comum (mesmos períodos
+  // em todos os dias) continua compacta como antes
+  const grupos = new Map<string, { periodos: Periodo[]; dias: DiaSemana[] }>();
+  for (const dia of DIAS_SEMANA) {
+    const set = porDia.get(dia);
+    if (!set) continue;
+    const periodos = PERIODOS.filter((p) => set.has(p));
+    const chave = periodos.join("+");
+    const g = grupos.get(chave) ?? { periodos, dias: [] };
+    g.dias.push(dia);
+    grupos.set(chave, g);
+  }
+  return [...grupos.values()]
+    .map((g) => `${textoDias(g.dias)} ${textoPeriodos(g.periodos)}`)
+    .join(" · ");
 }
 
 /** "seg".."dom" de uma data "YYYY-MM-DD" — o DiaSemana da grade de
@@ -459,42 +613,80 @@ export function diaSemanaDe(iso: string): DiaSemana {
   return DIAS_SEMANA[(new Date(`${iso}T12:00:00`).getDay() + 6) % 7];
 }
 
-/** O dia da semana está marcado como livre na grade? Só `dias` decide —
- *  `periodos` qualifica a faixa, não o dia. Grade nula/sem dias = não livre. */
+/** O dia da semana tem alguma célula marcada? Grade nula/sem célula no
+ *  dia = não livre. */
 export function disponibilidadeNoDia(
   d: Disponibilidade | null | undefined,
   dow: DiaSemana
 ): boolean {
-  return (d?.dias ?? []).includes(dow);
+  return celulasDe(d).some((c) => c.dia === dow);
+}
+
+/** A célula (dia, período) está marcada? — a leitura fina pro editor da
+ *  grade e pros cruzamentos que o dia inteiro não resolve. */
+export function disponibilidadeNoPeriodo(
+  d: Disponibilidade | null | undefined,
+  dia: DiaSemana,
+  periodo: Periodo
+): boolean {
+  return celulasDe(d).some((c) => c.dia === dia && c.periodo === periodo);
+}
+
+/** Períodos marcados num dia, na ordem manhã→noite — a agenda usa o
+ *  primeiro pra sugerir o horário padrão do encontro. */
+export function periodosNoDia(
+  d: Disponibilidade | null | undefined,
+  dow: DiaSemana
+): Periodo[] {
+  const marcados = new Set(
+    celulasDe(d).flatMap((c) => (c.dia === dow ? [c.periodo] : []))
+  );
+  return PERIODOS.filter((p) => marcados.has(p));
 }
 
 /** A grade não serve pro cruzamento? (REALIZA-114) — vazia = null ou sem
- *  nenhum dia marcado: períodos sem dia nunca casam em disponibilidadeNoDia,
- *  então a agenda cai em "nenhum horário em comum" como se não existisse.
- *  Dias sem período contam como preenchida ("qualquer horário" é coringa).
- *  É a régua do lembrete permanente no /jovem e do badge "pendente" do
- *  /jovem/perfil. */
+ *  nenhuma célula: a agenda cai em "nenhum horário em comum" como se ela
+ *  não existisse. É a régua do lembrete permanente no /jovem e do badge
+ *  "pendente" do /jovem/perfil. */
 export function disponibilidadeVazia(
   d: Disponibilidade | null | undefined
 ): boolean {
-  return !(d?.dias?.length);
+  return !celulasDe(d).length;
 }
 
-/** Períodos em comum entre duas grades — lista vazia vale "qualquer
- *  período" (a pessoa marcou dias sem recortar horário): cruza com tudo.
- *  Exportada pro score de afinidade do remanejo sugerido (REALIZA-115),
- *  mesma régua do overlay da agenda. */
-export function periodosCruzam(
-  a: Periodo[] | null | undefined,
-  b: Periodo[] | null | undefined
+/** Células idênticas nas duas grades (mesmo dia E mesmo período) — o
+ *  cruzamento honesto do modelo de células: "ele ter de manhã, ela ter à
+ *  noite" não encaixa. Devolvidas na ordem canônica (seg→dom, manhã→noite)
+ *  pro motivo do matching e o "coincidem em" do AfinidadePar. */
+export function celulasComuns(
+  a: Disponibilidade | null | undefined,
+  b: Disponibilidade | null | undefined
+): CelulaDisponibilidade[] {
+  const setA = new Set(celulasDe(a).map((c) => `${c.dia}:${c.periodo}`));
+  const setB = new Set(celulasDe(b).map((c) => `${c.dia}:${c.periodo}`));
+  const comuns: CelulaDisponibilidade[] = [];
+  for (const dia of DIAS_SEMANA) {
+    for (const periodo of PERIODOS) {
+      const chave = `${dia}:${periodo}`;
+      if (setA.has(chave) && setB.has(chave)) comuns.push({ dia, periodo });
+    }
+  }
+  return comuns;
+}
+
+/** As duas grades têm alguma célula em comum? — a régua do score de
+ *  afinidade do remanejo sugerido (REALIZA-115), mesma do overlay da
+ *  agenda. */
+export function celulasCruzam(
+  a: Disponibilidade | null | undefined,
+  b: Disponibilidade | null | undefined
 ): boolean {
-  if (!a?.length || !b?.length) return true;
-  return a.some((p) => b.includes(p));
+  return celulasComuns(a, b).length > 0;
 }
 
 /** Cruzamento das grades do mentor × mentorados num dia da semana — a regra
- *  do overlay da agenda (REALIZA-24). "ambos" exige encaixe honesto: o
- *  mentor E algum jovem livres no dia E com período em comum — mentor livre
+ *  do overlay da agenda (REALIZA-24). "ambos" exige célula em comum NO DIA:
+ *  o mentor E algum jovem livres no mesmo (dia, período) — mentor livre
  *  qui de manhã e jovem livre qui à noite não se encontram. O jovem livre
  *  sem encaixe ainda conta como "jovem" (ele está livre, só incompatível).
  *  Ordem: ambos > mentor > jovem > nenhum. */
@@ -503,14 +695,16 @@ export function cruzamentoDisponibilidade(
   jovens: (Disponibilidade | null | undefined)[],
   dow: DiaSemana
 ): "nenhum" | "mentor" | "jovem" | "ambos" {
-  const mentorLivre = disponibilidadeNoDia(mentor, dow);
+  const periodosMentor = new Set(periodosNoDia(mentor, dow));
   const jovensLivres = jovens.filter((j) => disponibilidadeNoDia(j, dow));
   if (
-    mentorLivre &&
-    jovensLivres.some((j) => periodosCruzam(mentor?.periodos, j?.periodos))
+    periodosMentor.size > 0 &&
+    jovensLivres.some((j) =>
+      periodosNoDia(j, dow).some((p) => periodosMentor.has(p))
+    )
   )
     return "ambos";
-  if (mentorLivre) return "mentor";
+  if (periodosMentor.size > 0) return "mentor";
   if (jovensLivres.length > 0) return "jovem";
   return "nenhum";
 }
@@ -525,19 +719,18 @@ export const JANELA_PERIODO: Record<Periodo, [number, number]> = {
   noite: [18, 22],
 };
 
-/** O lado tá livre naquele dia da semana NAQUELA hora cheia? `dias` decide o
- *  dia; `periodos` afunila pra faixa — vazia = "qualquer horário" (mesmo
- *  coringa do cruzamento por dia). `hora` é a hora inteira local (0–23). */
+/** O lado tá livre naquele dia da semana NAQUELA hora cheia? A célula é a
+ *  unidade: (dia, período) marcado cobre a janela fixa do período — fora
+ *  das três faixas (madrugada, por exemplo) nenhuma grade cobre.
+ *  `hora` é a hora inteira local (0–23). */
 export function disponibilidadeNaHora(
   d: Disponibilidade | null | undefined,
   dow: DiaSemana,
   hora: number
 ): boolean {
-  if (!disponibilidadeNoDia(d, dow)) return false;
-  const periodos = d?.periodos ?? [];
-  if (periodos.length === 0) return true;
-  return periodos.some((p) => {
-    const [ini, fim] = JANELA_PERIODO[p];
+  return celulasDe(d).some((c) => {
+    if (c.dia !== dow) return false;
+    const [ini, fim] = JANELA_PERIODO[c.periodo];
     return hora >= ini && hora < fim;
   });
 }
@@ -1846,7 +2039,7 @@ export function rotuloSlot(iso: string): string {
 
 /** O slot proposto cai dentro da grade de disponibilidade? Recebe um
  *  timestamptz (o `inicio` da RPC slots_livres / slot_proposto da mesa) e
- *  cruza com `Disponibilidade` {dias, periodos} — a régua pra destacar os
+ *  cruza com as `celulas` da Disponibilidade — a régua pra destacar os
  *  horários do especialista que batem com a grade do jovem (WP6). O dia e a
  *  hora são lidos no fuso do programa: `new Date(iso).getHours()` daria a
  *  hora da máquina, que em UTC puxa o slot 3h pra frente — mesma razão pela
