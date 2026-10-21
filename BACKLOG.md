@@ -173,7 +173,7 @@ Spec em **`.devin/formularios-ux-v2.md`** (3 críticos com skills: público resp
 - [x] ~~**`me()` em actions.ts**~~ — 58 call sites com early-return "Sessão expirada" (auditoria completa).
 - [ ] **Refactor de complexidade** (react-doctor): `duplas/[id]/page.tsx` e `registro-form.tsx` estão grandes — candidatos a split quando a próxima feature tocar neles.
 - [x] ~~**Anexos**: teste E2E~~ — RLS provado contra o remoto; **e** `deleteDupla` remove os objetos do bucket antes da row (sem órfãos em `registro-anexos`).
-- [ ] **Import do form semanal — normalização fraca + modal apertado** (**REALIZA-164**, reportado pelo Thiago com CSV real "Avaliação semanal das Mentorias", out/2026): ~9 duplas caíram em "pedem sua escolha" — o match por tiers binários (`importar-registros.ts`) não resolve apelido/parcial/ordem. Plano no ticket: score de confiança 0–100 com sinais ponderados (nome dos dois lados, apelidos pt-BR do cadastro real, encontro/data do CSV × cronograma da dupla, desconto de ambiguidade) + evidência visível por linha; modal largo/redesenhado via skill `ux-review`; pipeline com recon cruzando CSV × cadastro e benchmark antes/depois. Regra dura: auto-match nunca erra — ambíguo real segue manual.
+- [x] ~~**Import do form semanal — normalização fraca + modal apertado**~~ (**REALIZA-164**, merge `0951485` / PR #82): match por score de certeza weakest-link + contexto (auto ≥90 com os dois lados ≥80 e sem ambiguidade; provável sugere, manual nunca pré-seleciona), evidências legíveis por linha, trilhas dedicadas pra placeholder e par-sem-dupla, modal `sm:max-w-6xl` agrupado por ação, dedup `(dupla,nº)` no executar e no CLI. Benchmark no CSV real: 38 auto / 4 provável / 1 manual.
 
 ## Decisões de produto — maiores
 
