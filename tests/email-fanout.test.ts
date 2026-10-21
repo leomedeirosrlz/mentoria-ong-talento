@@ -45,10 +45,11 @@ describe("rolesParaAudiencias — fan-out audiência → papéis", () => {
   });
 });
 
-// kill-switch global (TODO pendente): enquanto desligado, NADA sai — o
-// retorno imita falha de transporte pra nunca fingir sucesso pro caller
+// kill-switch global (TODO pendente): enquanto desligado, só auth/conta
+// sai — notificação volta como falha de transporte coerente, nunca falso
+// sucesso pro caller
 describe("EMAIL_ENVIO_LIBERADO — kill-switch do envio", () => {
-  it("desligado: nada sai, todos voltam em falhas com error coerente", async () => {
+  it("desligado: notificação não sai, destinos voltam em falhas", async () => {
     expect(EMAIL_ENVIO_LIBERADO).toBe(false);
     const r = await enviarEmailsLote({
       para: ["a@x.com", "b@x.com"],
@@ -58,5 +59,26 @@ describe("EMAIL_ENVIO_LIBERADO — kill-switch do envio", () => {
     expect(r.enviados).toBe(0);
     expect(r.falhas).toEqual(["a@x.com", "b@x.com"]);
     expect(r.error).toMatch(/desativado/);
+  });
+
+  it("critico fura o switch — e-mail de conta chega ao guard seguinte", async () => {
+    // sem RESEND_API_KEY no vitest: passar do kill-switch e cair no guard
+    // de config prova o bypass (error muda de "desativado" pra "não
+    // configurado"); a key fica stubada vazia por garantia — nunca rede
+    const key = process.env.RESEND_API_KEY;
+    process.env.RESEND_API_KEY = "";
+    try {
+      const r = await enviarEmailsLote({
+        para: ["a@x.com"],
+        assunto: "teste",
+        html: "<p>x</p>",
+        critico: true,
+      });
+      expect(r.error).toMatch(/não configurado/);
+      expect(r.enviados).toBe(0);
+    } finally {
+      if (key === undefined) delete process.env.RESEND_API_KEY;
+      else process.env.RESEND_API_KEY = key;
+    }
   });
 });
