@@ -34,7 +34,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { formatDate, linkSeguro } from "@/lib/ciclo";
 import { formularioPorToken } from "@/lib/forms/queries";
 import {
+  encCorrenteDe,
   estacoesJornada,
+  materialLiberadoParaJovem,
   resumoJornada,
   type Estacao,
   type EstacaoChave,
@@ -155,6 +157,22 @@ export default async function JovemMateriais() {
     ]);
   if (!me) return null; // o layout já barra — convenção das páginas
 
+  // Régua do acervo progressivo (REALIZA-160): fallback pra quando a RPC
+  // da jornada falha — a posição da dupla DPP viva derivada dos encontros.
+  // Com a RPC no ar a régua sai de `jornada.dupla_id` (mesma dupla que a
+  // trilha mostra, uma âncora só). Sem DPP viva não há cronograma pra
+  // esperar → null = acervo todo livre.
+  const duplaDppViva =
+    duplas.find(
+      (d) =>
+        d.id != null &&
+        (d.trilha ?? "dpp") !== "especialista" &&
+        (d.status === "ativa" || d.status === "pausada")
+    ) ?? null;
+  const encAcervo = duplaDppViva
+    ? encCorrenteDe(encontros.filter((e) => e.dupla_id === duplaDppViva.id))
+    : null;
+
   // Fallbacks do plano §WP7: sem jornada (RPC null/erro), sem dupla ou sem
   // cronograma → biblioteca plana, exatamente como a página sempre foi.
   const dupla =
@@ -162,7 +180,9 @@ export default async function JovemMateriais() {
       ? (duplas.find((d) => d.id === jornada.dupla_id) ?? null)
       : null;
   if (!jornada || !dupla || !(jornada.cronograma?.length ?? 0)) {
-    return <BibliotecaJovem materiais={materiais} />;
+    return (
+      <BibliotecaJovem materiais={materiais} encCorrente={encAcervo} />
+    );
   }
 
   const encontrosDpp = encontros.filter((e) => e.dupla_id === jornada.dupla_id);
@@ -187,16 +207,14 @@ export default async function JovemMateriais() {
   } catch {
     estacoes = [];
   }
-  if (!estacoes.length) return <BibliotecaJovem materiais={materiais} />;
+  if (!estacoes.length)
+    return (
+      <BibliotecaJovem materiais={materiais} encCorrente={encAcervo} />
+    );
 
-  // "encontro corrente" — mesma âncora da home e da lib: o maior nº de
+  // "encontro corrente" — a âncora compartilhada (lib): o maior nº de
   // encontro realizado + 1, teto 16 (realizado, não agendado futuro).
-  const encontroCorrente = Math.min(
-    16,
-    encontrosDpp
-      .filter((e) => e.status === "realizado")
-      .reduce((m, e) => Math.max(m, e.numero), 0) + 1
-  );
+  const encontroCorrente = encCorrenteDe(encontrosDpp);
 
   const passosGuia = jornada.cronograma
     .filter(
@@ -204,6 +222,12 @@ export default async function JovemMateriais() {
         e.tipo === "encontro" && e.numero != null
     )
     .sort((a, b) => a.numero - b.numero);
+  // numero → data oficial da turma dela, pro "libera em dd/mm" do acervo
+  const dataPorNumero = new Map(
+    passosGuia
+      .filter((e) => e.data != null)
+      .map((e) => [e.numero, e.data!])
+  );
   // a fase REAL do hero vem do passo corrente — a mais próxima pra trás se o
   // cronograma não cobre o nº exato (turma encurtada)
   const eventoCorrente =
@@ -454,7 +478,8 @@ export default async function JovemMateriais() {
         </ol>
       </section>
 
-      {/* ---------- acervo: a biblioteca de sempre, inalterada ---------- */}
+      {/* ---------- acervo: a biblioteca, agora progressiva (REALIZA-160 —
+          material com encontro_num libera quando a jornada alcança) ------- */}
       <section
         id="acervo"
         aria-labelledby="acervo-titulo"
@@ -476,7 +501,11 @@ export default async function JovemMateriais() {
             Para ler e consultar quando quiser — não conta no seu progresso.
           </p>
         </div>
-        <MateriaisLista materiais={materiais} />
+        <MateriaisLista
+          materiais={materiais}
+          encCorrente={encontroCorrente}
+          datasEnc={dataPorNumero}
+        />
       </section>
     </div>
   );
@@ -1004,19 +1033,37 @@ function MaterialCard({ m }: { m: Material }) {
   );
 }
 
-function MateriaisLista({ materiais }: { materiais: Material[] }) {
+function MateriaisLista({
+  materiais,
+  encCorrente = null,
+  datasEnc = null,
+}: {
+  materiais: Material[];
+  /** régua do acervo progressivo (REALIZA-160): nº do encontro corrente da
+   *  dupla viva. null = sem jornada em curso → tudo liberado. */
+  encCorrente?: number | null;
+  /** numero → data oficial da turma dela (cronograma), pro "libera em
+   *  dd/mm" dos trancados. null no fallback sem cronograma. */
+  datasEnc?: Map<number, string> | null;
+}) {
   // REALIZA-162: o que já dá pra abrir vira grid; o "em breve" (sem path e
   // sem url — material real que a coordenação ainda não subiu) sai da
   // vitrine e fecha o acervo no grupo apagado "A caminho" — de-emphasized,
   // nunca escondido.
+  // REALIZA-160: o material marcado com encontro futuro vira o terceiro
+  // bucket — recolhido no <details> "Mais adiante na jornada", mesmo
+  // tratamento das estações trancadas da trilha.
   const prontos: Material[] = [];
   const aCaminho: Material[] = [];
+  const trancados: Material[] = [];
   for (const m of materiais) {
-    if (m.path || linkSeguro(m.url)) prontos.push(m);
+    if (!materialLiberadoParaJovem(m, encCorrente)) trancados.push(m);
+    else if (m.path || linkSeguro(m.url)) prontos.push(m);
     else aCaminho.push(m);
   }
+  trancados.sort((a, b) => (a.encontro_num ?? 0) - (b.encontro_num ?? 0));
   const grupos = agrupar(prontos);
-  if (grupos.length === 0 && aCaminho.length === 0) {
+  if (grupos.length === 0 && aCaminho.length === 0 && trancados.length === 0) {
     return (
       <div className="flex flex-col items-center gap-1.5 rounded-xl bg-card px-5 py-10 text-center shadow-[var(--shadow-border)]">
         <span className="grid size-11 place-items-center rounded-full bg-muted text-muted-foreground">
@@ -1085,6 +1132,75 @@ function MateriaisLista({ materiais }: { materiais: Material[] }) {
           </div>
         </section>
       )}
+      {trancados.length > 0 && (
+        <details
+          className="group animate-enter rounded-xl border border-dashed border-border bg-card/60"
+          style={
+            {
+              "--i": Math.min(grupos.length + (aCaminho.length ? 1 : 0), 10),
+            } as CSSProperties
+          }
+        >
+          {/* summary admite heading direto (phrasing + heading content) —
+              mesmo padrão das estações: o grupo inteiro lê como seção */}
+          <summary className="flex cursor-pointer list-none flex-wrap items-center gap-x-3 gap-y-1 p-4 outline-none marker:hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset sm:p-5 [&::-webkit-details-marker]:hidden">
+            <span className="min-w-0 flex-1">
+              <h3 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                Mais adiante na jornada · {trancados.length}{" "}
+                {trancados.length === 1 ? "material" : "materiais"}
+              </h3>
+              <span className="mt-1 block text-sm font-medium">
+                {trancados
+                  .map((m) => `${m.titulo} (enc. ${m.encontro_num})`)
+                  .join(" · ")}
+              </span>
+              <span className="mt-0.5 block text-xs text-muted-foreground">
+                Cada um abre sozinho quando a jornada chega no encontro.
+              </span>
+            </span>
+            <CaretDown
+              size={16}
+              className="shrink-0 text-muted-foreground transition-transform group-open:rotate-180"
+              aria-hidden
+            />
+          </summary>
+          <ul className="divide-y divide-border/60 border-t border-dashed border-border px-4 sm:px-5">
+            {trancados.map((m) => {
+              const Icone = TIPO_ICONE[m.tipo];
+              const data =
+                m.encontro_num != null
+                  ? diaMesCurto(datasEnc?.get(m.encontro_num))
+                  : "";
+              return (
+                <li
+                  key={m.id}
+                  className="flex items-center gap-x-4 py-3 text-muted-foreground"
+                >
+                  <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-muted/70">
+                    <Icone size={17} aria-hidden />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-foreground/80">
+                      {m.titulo}
+                    </p>
+                    <p className="mt-0.5 flex items-center gap-1.5 text-xs">
+                      <LockSimple
+                        size={13}
+                        aria-hidden
+                        className="shrink-0"
+                      />
+                      Libera no encontro {m.encontro_num}
+                      {/* diaMesCurto já fecha com ponto ("4 de nov.") —
+                          sem data a frase precisa dele */}
+                      {data ? ` (${data})` : "."}
+                    </p>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </details>
+      )}
     </>
   );
 }
@@ -1092,8 +1208,15 @@ function MateriaisLista({ materiais }: { materiais: Material[] }) {
 /** Fallback §WP7 — biblioteca sem trilha: header "Minha jornada" + o
  *  acervo em grade (a trilha só existe com dupla + cronograma). Renderiza
  *  quando a RPC falha/vem vazia, quando o jovem não tem dupla ou quando a
- *  turma não tem cronograma. */
-function BibliotecaJovem({ materiais }: { materiais: Material[] }) {
+ *  turma não tem cronograma. `encCorrente` segue valendo aqui — a régua do
+ *  acervo é derivada dos encontros, não da RPC (REALIZA-160). */
+function BibliotecaJovem({
+  materiais,
+  encCorrente = null,
+}: {
+  materiais: Material[];
+  encCorrente?: number | null;
+}) {
   return (
     <div className="space-y-6">
       <header>
@@ -1102,7 +1225,7 @@ function BibliotecaJovem({ materiais }: { materiais: Material[] }) {
           Os guias e conteúdos oficiais do programa.
         </p>
       </header>
-      <MateriaisLista materiais={materiais} />
+      <MateriaisLista materiais={materiais} encCorrente={encCorrente} />
     </div>
   );
 }

@@ -10,7 +10,7 @@ import {
 import { LembreteButton } from "@/components/lembrete-button";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
-import { lembreteBloqueadoAte } from "@/lib/ciclo";
+import { lembreteBloqueadoAte, TRILHA_LEN } from "@/lib/ciclo";
 import type { Interacao } from "@/lib/interacoes";
 import {
   atrasadasPainel,
@@ -246,7 +246,7 @@ export function PainelJornada({
     // a régua "janela aberta / fora da janela" é a da dupla, não só a da
     // coorte — dupla tardia/atrasada tem a janela ainda aberta do lado dela
     const encCorrDupla = Math.min(
-      16,
+      TRILHA_LEN.dpp,
       (linha.avaliacoes_encontro.max_numero ?? 0) + 1
     );
     const estados = estacoesPainelDupla(linha, ctx, encCorrDupla);

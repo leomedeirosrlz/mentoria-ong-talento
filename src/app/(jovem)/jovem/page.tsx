@@ -43,6 +43,10 @@ import {
   waLink,
 } from "@/lib/ciclo";
 import { agrupaContatosPorPessoa } from "@/lib/jovem-contatos";
+import {
+  encCorrenteDe,
+  materialLiberadoParaJovem,
+} from "@/lib/jornada";
 import { avatarPublicUrl } from "@/lib/avatar";
 import {
   getJovemAssinaturas,
@@ -119,6 +123,20 @@ export default async function JovemHome() {
     duplas[0] ??
     null;
   const duplaEmCurso = duplaAtual?.status === "ativa" || duplaAtual?.status === "pausada";
+
+  // régua do acervo progressivo (REALIZA-160): a vitrine da home só mostra
+  // o que já liberou — material marcado pra encontro futuro não vaza na
+  // prévia. Só a dupla DPP ancora (trilha esp tem outra escala, 5 sessões);
+  // sem DPP viva → null = acervo livre.
+  const encCorrAcervo =
+    duplaEmCurso &&
+    duplaAtual?.id != null &&
+    duplaAtual.trilha !== "especialista"
+      ? encCorrenteDe(encontros.filter((e) => e.dupla_id === duplaAtual.id))
+      : null;
+  const materiaisVisiveis = materiais.filter((m) =>
+    materialLiberadoParaJovem(m, encCorrAcervo)
+  );
 
   // contatos de TODAS as duplas vivas + a coordenação (dupla_id null na
   // view) — o especialista da trilha esp é contato real, não some porque a
@@ -691,8 +709,9 @@ export default async function JovemHome() {
         </section>
       )}
 
-      {/* Materiais oficiais — idem: só 'todos' chega pelo RLS */}
-      {materiais.length > 0 && (
+      {/* Materiais oficiais — idem: só 'todos' chega pelo RLS, e o gate
+          progressivo (REALIZA-160) segura o que é de encontro futuro */}
+      {materiaisVisiveis.length > 0 && (
         <section aria-labelledby="materiais-titulo">
           <div className="mb-3 flex items-center justify-between gap-3">
             <h2 id="materiais-titulo" className="flex items-center gap-2 font-semibold">
@@ -713,7 +732,7 @@ export default async function JovemHome() {
           </div>
           <Card className="animate-enter">
             <CardContent className="divide-y divide-border/60 p-0">
-              {materiais.slice(0, 3).map((m) => {
+              {materiaisVisiveis.slice(0, 3).map((m) => {
                 const Icone = TIPO_ICONE_MATERIAL[m.tipo];
                 const href = m.path ? `/api/material/${m.id}` : linkSeguro(m.url);
                 const interno = (

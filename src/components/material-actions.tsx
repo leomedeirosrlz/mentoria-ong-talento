@@ -220,7 +220,15 @@ export function MaterialActions({ material, maxEncontro }: { material: Material;
       />
 
       {/* metadados do material — o arquivo em si troca pelo clip */}
-      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+      <Dialog
+        open={editOpen}
+        onOpenChange={(o) => {
+          setEditOpen(o);
+          // Select de audiência é defaultValue — sem o reset o estado fica
+          // à frente do que ele exibe quando o dialog reabre
+          if (!o) setAudiencia(material.audiencia);
+        }}
+      >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Editar material</DialogTitle>
@@ -289,6 +297,11 @@ export function MaterialActions({ material, maxEncontro }: { material: Material;
                   min={1} max={maxEncontroSel}
                   defaultValue={material.encontro_num ?? ""}
                 />
+                {audiencia === "todos" && (
+                  <p className="text-xs text-muted-foreground">
+                    Pro jovem, libera quando a dupla chegar no encontro.
+                  </p>
+                )}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="mat-url">Link externo</Label>
@@ -315,6 +328,7 @@ export function MaterialActions({ material, maxEncontro }: { material: Material;
         tituloMaterial={material.titulo}
         audienciaPadrao={material.audiencia}
         tipoMaterial={material.tipo}
+        encontroNum={material.encontro_num}
         open={emailOpen}
         onOpenChange={setEmailOpen}
       />

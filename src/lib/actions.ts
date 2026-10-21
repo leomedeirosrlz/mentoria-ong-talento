@@ -3451,12 +3451,16 @@ export async function salvarMaterial(formData: FormData) {
   }).select("id").single();
   if (error) return { error: erroAmigavel(error) };
   // aviso por e-mail pra audiência do material — complemento: falha de
-  // envio não derruba o material já gravado
+  // envio não derruba o material já gravado. Material programado pra um
+  // encontro (REALIZA-160) não vaza pro jovem no ato — o acervo abre sozinho
+  // na régua dela; o envio manual continua sendo escolha da coordenação.
   const email = await dispararMaterialEmail({
     supabase,
     material: { id: novo.id as string, titulo, descricao, tipo, url, path },
     audiencias: [audiencia],
     autorId: eu.id,
+    excluirRoles:
+      audiencia === "todos" && encontroNum != null ? ["mentorado"] : undefined,
   });
   revalidatePath("/materiais");
   // id volta pro client poder desfazer a row se o upload do arquivo falhar

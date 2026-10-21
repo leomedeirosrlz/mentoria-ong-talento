@@ -20,6 +20,7 @@ import {
   type RespostaValor,
   type RodaArea,
 } from "./forms/schema";
+import { TRILHA_LEN } from "./ciclo";
 
 export type EstacaoChave =
   | "roda_inicial"
@@ -542,6 +543,38 @@ function resolveEstacao<
  *    mais antigo sem avaliação); em dia (X=Y, Y>0) → `feito` + detalhe
  *    "em dia · X de Y" — conta no progresso sem "fechar" nunca.
  */
+
+/** "Encontro corrente" da dupla — a régua compartilhada da jornada: o
+ *  maior nº realizado + 1, teto no tamanho da trilha DPP (16 canônico;
+ *  um cronograma estendido acima disso deixaria de liberar — edge
+ *  documentado, o guia oficial é o limite hoje). Realizado, não
+ *  agendado: o que conta é o que já aconteceu. A mesma âncora do hero
+ *  da jovem e do `jornada_autoemit` (0099). */
+export function encCorrenteDe(
+  encontros: { numero: number; status: string }[]
+): number {
+  const max = encontros
+    .filter((e) => e.status === "realizado")
+    .reduce((m, e) => Math.max(m, e.numero), 0);
+  return Math.min(TRILHA_LEN.dpp, max + 1);
+}
+
+/** Acervo progressivo (REALIZA-160): material com `encontro_num` libera
+ *  pra jovem quando a régua dela alcança o encontro; sem vínculo (item de
+ *  referência do programa) fica sempre disponível. `encCorrente` null =
+ *  sem dupla/cronograma — não há o que esperar, mostra tudo. Gate de UI,
+ *  não de RLS: o acervo é referência (audiencia 'todos'), não segredo. */
+export function materialLiberadoParaJovem(
+  m: { encontro_num: number | null },
+  encCorrente: number | null
+): boolean {
+  return (
+    encCorrente == null ||
+    m.encontro_num == null ||
+    m.encontro_num <= encCorrente
+  );
+}
+
 export function estacoesJornada(input: {
   cronograma: EventoJornada[];
   instrumentos: InstrumentoJornada[];
@@ -565,8 +598,7 @@ export function estacoesJornada(input: {
   // encontro corrente = último realizado + 1 (teto 16) — realizado, não
   // agendado: a régua é o que já aconteceu, não o que está marcado
   const realizados = input.encontros.filter((e) => e.status === "realizado");
-  const maxRealizado = realizados.reduce((m, e) => Math.max(m, e.numero), 0);
-  const encCorrente = Math.min(16, maxRealizado + 1);
+  const encCorrente = encCorrenteDe(input.encontros);
 
   const instPorSistema = new Map(input.instrumentos.map((i) => [i.sistema, i]));
   const camposDe = (sistema: InstrumentoJornada["sistema"]): FormularioCampo[] => {

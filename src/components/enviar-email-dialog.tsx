@@ -33,7 +33,7 @@ import {
 // action (ROLES_POR_AUDIENCIA, @/lib/email). Ícones = os das personas da
 // /demo (Binoculars coord, MapTrifold DPP, Handshake especialista)
 const GRUPOS = [
-  { valor: "todos", rotulo: "Todos", detalhe: "coordenação, auxiliares executivos e mentores", Icone: Users },
+  { valor: "todos", rotulo: "Todos", detalhe: "coordenação, mentores e jovens", Icone: Users },
   { valor: "dpp", rotulo: "Mentores DPP", detalhe: "a trilha principal do programa", Icone: MapTrifold },
   { valor: "especialista", rotulo: "Mentores especialistas", detalhe: "a trilha temática", Icone: Handshake },
   { valor: "coordenacao", rotulo: "Coordenação", detalhe: "só a equipe do programa", Icone: Binoculars },
@@ -79,6 +79,7 @@ export function EnviarEmailDialog({
   tituloMaterial,
   audienciaPadrao,
   tipoMaterial,
+  encontroNum,
   open,
   onOpenChange,
 }: {
@@ -86,6 +87,10 @@ export function EnviarEmailDialog({
   tituloMaterial: string;
   audienciaPadrao: string;
   tipoMaterial?: keyof typeof TIPO_ICONE;
+  /** Encontro de liberação (REALIZA-160) — quando setado, o envio manual
+   *  adianta o material pro jovem antes da régua: o aviso deixa a
+   *  escolha informada, o envio segue sendo a escolha da coordenação. */
+  encontroNum?: number | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
@@ -154,6 +159,12 @@ export function EnviarEmailDialog({
               </p>
             </div>
           </div>
+          {encontroNum != null && selecionados.includes("todos") && (
+            <p className="rounded-xl border border-warn/50 bg-warn/10 px-3 py-2 text-xs text-foreground">
+              Programado pra liberar no encontro {encontroNum} — marcando
+              “Todos”, o link chega pros jovens agora, antes do acervo abrir.
+            </p>
+          )}
           <fieldset className="space-y-1.5">
             <legend className="text-sm font-medium leading-none select-none">
               Quem recebe

@@ -26,6 +26,20 @@ export const ROLES_POR_AUDIENCIA: Record<string, string[]> = {
   equipe: ["coordenacao", "supervisor"],
 };
 
+/** Resolve audiências → papéis efetivos do fan-out, dedupado e sem os
+ *  papéis explicitamente excluídos (REALIZA-160: material programado não
+ *  vaza pro jovem por e-mail). Puro — compartilhado pelo fan-out de
+ *  e-mail e testável sem banco. */
+export function rolesParaAudiencias(
+  audiencias: string[],
+  excluirRoles?: string[]
+): string[] {
+  const excluir = new Set(excluirRoles ?? []);
+  return [
+    ...new Set(audiencias.flatMap((a) => ROLES_POR_AUDIENCIA[a] ?? [])),
+  ].filter((r) => !excluir.has(r));
+}
+
 export type EnvioLoteResult = {
   enviados: number;
   /** Endereços que não saíram (lote rejeitado ou falha individual). */
