@@ -84,7 +84,7 @@ const supabase = createClient(URL, KEY, {
 
 // ---------- universo (mesmo recorte da action) ----------
 
-const [{ data: mentores }, { data: mentorados }, { data: duplas }, { data: encs }] =
+const [{ data: mentores }, { data: mentorados }, { data: duplas }, { data: encs }, { data: eventos }] =
   await Promise.all([
     supabase
       .from("profiles")
@@ -94,9 +94,13 @@ const [{ data: mentores }, { data: mentorados }, { data: duplas }, { data: encs 
     supabase
       .from("duplas")
       .select(
-        "id, mentor_id, mentorado_id, status, trilha, mentor:profiles!duplas_mentor_id_fkey(nome), mentorado:mentorados!duplas_mentorado_id_fkey(nome)"
+        "id, mentor_id, mentorado_id, status, trilha, cronograma_id, iniciada_em, mentor:profiles!duplas_mentor_id_fkey(nome), mentorado:mentorados!duplas_mentorado_id_fkey(nome)"
       ),
-    supabase.from("encontros").select("dupla_id, numero, status, registros(id)"),
+    supabase.from("encontros").select("dupla_id, numero, status, data_hora, registros(id)"),
+    supabase
+      .from("ciclo_eventos")
+      .select("cronograma_id, numero, data")
+      .eq("tipo", "encontro"),
   ]);
 
 const norm = (v) => (Array.isArray(v) ? v[0] ?? null : v);
@@ -109,6 +113,8 @@ const duplasRef = (duplas ?? []).map((d) => {
     mentorado_id: d.mentorado_id,
     status: d.status,
     trilha: d.trilha,
+    cronograma_id: d.cronograma_id,
+    iniciada_em: d.iniciada_em,
     mentorNome: mentor?.nome ?? "?",
     mentoradoNome: mentorado?.nome ?? "?",
   };
@@ -121,7 +127,26 @@ const encInfo = new Map(
       : "anexa",
   ])
 );
-const universo = { mentores: mentores ?? [], mentorados: mentorados ?? [], duplas: duplasRef };
+const encontros = new Map();
+for (const e of encs ?? []) {
+  let m = encontros.get(e.dupla_id);
+  if (!m) encontros.set(e.dupla_id, (m = new Map()));
+  m.set(e.numero, { status: e.status, data: e.data_hora });
+}
+const calendario = new Map();
+for (const ev of eventos ?? []) {
+  if (ev.numero == null || !ev.data) continue;
+  let m = calendario.get(ev.cronograma_id);
+  if (!m) calendario.set(ev.cronograma_id, (m = new Map()));
+  m.set(ev.numero, ev.data);
+}
+const universo = {
+  mentores: mentores ?? [],
+  mentorados: mentorados ?? [],
+  duplas: duplasRef,
+  calendario,
+  encontros,
+};
 
 // ---------- parse + match ----------
 
@@ -146,12 +171,25 @@ for (const l of linhas) {
 
 console.log(`\n== ${linhas.length} respostas no CSV` + (ignoradas ? ` (${ignoradas} linhas sem dado ignoradas)` : ""));
 const aImportar = [];
+// (dupla, numero) é unique — segunda linha na mesma chave é pulada em
+// vez de sobrescrever a primeira (dedup igual ao da action)
+const vistos = new Map();
 for (const l of linhas) {
+  const resolvida = l.status === "revisar" && RESOLVE.has(l.n);
   const info = l.duplaId ? (encInfo.get(`${l.duplaId}|${l.numero}`) ?? "novo") : null;
-  if (l.status === "ok" || l.duplaId) {
-    const manual = l.status === "revisar" && RESOLVE.has(l.n) ? " [resolvida com --resolve]" : "";
-    // linha 'revisar' que já traz dupla (só flag de campo — ano 1960 etc.)
-    // entra no lote, mas o motivo fica à vista pra conferência
+  // 'revisar' NUNCA entra sozinha — provável traz duplaId sugerido, mas a
+  // sugestão precisa de confirmação humana (--resolve ou a UI). Antes do
+  // scorer, revisar+duplaId era só flag de campo e entrava direto.
+  if (l.status === "ok" || resolvida) {
+    const chave = `${l.duplaId}|${l.numero}`;
+    if (vistos.has(chave)) {
+      console.log(
+        `  ✗ L${l.n} ${rotulo(l)} — mesma dupla e nº da linha ${vistos.get(chave)}; resolva com --resolve`
+      );
+      continue;
+    }
+    vistos.set(chave, l.n);
+    const manual = resolvida ? " [resolvida com --resolve]" : "";
     const flag = l.status === "revisar" ? ` (confere: ${l.motivo})` : "";
     console.log(
       `  ✓ L${l.n} ${rotulo(l)} → ${l.mentoradoNome} × ${l.mentorNome} ` +
@@ -159,24 +197,33 @@ for (const l of linhas) {
     );
     aImportar.push(l);
   } else if (l.status === "revisar") {
-    console.log(`  ? L${l.n} ${rotulo(l)} — ${l.motivo}`);
+    console.log(
+      `  ? L${l.n} ${rotulo(l)} — ${l.motivo}` + (l.score != null ? ` [confiança ${l.score}]` : "")
+    );
+    for (const ev of (l.evidencias ?? []).slice(0, 5)) {
+      console.log(`      · ${ev.texto}`);
+    }
     for (const c of l.candidatos.slice(0, 4)) {
-      console.log(`      candidata: ${c.mentoradoNome} × ${c.mentorNome} (${c.status}) ${c.id}`);
+      console.log(
+        `      candidata: ${c.mentoradoNome} × ${c.mentorNome} (${c.status}) ${c.id}` +
+          (c.score != null ? ` [${c.score}]` : "")
+      );
     }
     if (!l.candidatos.length) console.log(`      (sem candidatas — veja a lista em /registros)`);
   } else {
     console.log(`  ✗ L${l.n} ${rotulo(l)} — ignorar: ${l.motivo}`);
   }
 }
-for (const [n] of RESOLVE) {
-  if (!linhas.some((l) => l.n === n && l.duplaId))
+for (const [n, id] of RESOLVE) {
+  const l = linhas.find((x) => x.n === n);
+  if (!l || l.status !== "revisar" || l.duplaId !== id)
     console.log(`  !! --resolve ${n}=… não aplicado (linha não estava em revisar ou id inválido)`);
 }
 
 if (!APPLY) {
-  // 'a revisar' = revisar SEM dupla — as que já trazem duplaId entram no
-  // lote do apply (a flag de campo vai à vista, não bloqueia)
-  const aRevisar = linhas.filter((l) => l.status === "revisar" && !l.duplaId).length;
+  const aRevisar = linhas.filter(
+    (l) => l.status === "revisar" && !RESOLVE.has(l.n)
+  ).length;
   console.log(
     `\n== dry-run: ${aImportar.length} a importar · ${aRevisar} a revisar · ${stats.ignorar} ignoradas.` +
       `\n   Nada foi escrito. Rode com --apply pra gravar (linhas a revisar só entram com --resolve).`
