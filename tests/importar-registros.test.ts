@@ -12,6 +12,8 @@ import {
   parseCsvRegistros,
   parseDataEncontro,
   processaLinhas,
+  saneiaLinhaReg,
+  scoreLinha,
   type DuplaCandidata,
   type LinhaRegCsv,
   type PessoaRef,
@@ -424,5 +426,267 @@ describe("processaLinhas", () => {
     expect(linhas[0].status).toBe("revisar");
     expect(linhas[0].motivo).toContain("conferir");
     expect(linhas[0].duplaId).toBe("d1");
+  });
+});
+
+// ---------- scoreLinha — pontuação de certeza ----------
+
+describe("scoreLinha", () => {
+  /** universoBase + contexto: cronograma oficial de d1, encontro já
+   *  registrado e início da dupla — é o que o import real enxerga. */
+  const uniCtx = (): UniversoReg => {
+    const u = universoBase();
+    u.duplas[0].cronograma_id = "c1";
+    u.duplas[0].iniciada_em = "2026-09-01";
+    u.duplas[3].cronograma_id = "c1";
+    u.calendario = new Map([
+      ["c1", new Map([[1, "2026-09-08"], [2, "2026-09-15"], [4, "2026-09-29"]])],
+    ]);
+    u.encontros = new Map([
+      ["d1", new Map([[1, { status: "realizado", data: "2026-09-08" }]])],
+    ]);
+    return u;
+  };
+  const HOJE_ISO = "2026-10-08";
+  const evTexto = (r: { evidencias: { texto: string }[] }) =>
+    r.evidencias.map((e) => e.texto).join(" · ");
+
+  it("par exato + contexto cheio → auto 100", () => {
+    const r = scoreLinha("Fernando Toledo Martins", "Nicolly Jesus", 1, "2026-09-08", uniCtx(), {
+      hoje: HOJE_ISO,
+    });
+    expect(r.nivel).toBe("auto");
+    expect(r.score).toBe(100);
+    expect(r.top?.id).toBe("d1");
+    expect(evTexto(r)).toContain("nome exato");
+    expect(evTexto(r)).toContain("oficial era");
+  });
+
+  it("typo dist-1 → provável com a sugestão certa, nunca auto", () => {
+    // "Larissa Prado" exato 100 × "Priscila Stuanni" ≈ Stuani ~78 → o elo
+    // mais fraco dita; contexto não lava um lado de grafia duvidosa.
+    const u = uniCtx();
+    u.duplas.push(dupla("d6", "m2", "j4", "Priscila Stuani", "Larissa Prado"));
+    u.duplas.find((d) => d.id === "d6")!.cronograma_id = "c1";
+    const r = scoreLinha("Priscila Stuanni", "Larissa Prado", 2, "2026-09-15", u, {
+      hoje: HOJE_ISO,
+    });
+    expect(r.nivel).toBe("provavel");
+    expect(r.top?.id).toBe("d6");
+    expect(evTexto(r)).toContain("grafia");
+  });
+
+  it("lado fraco + contexto máximo ainda não fecha auto", () => {
+    const r = scoreLinha("Fernando Toledo", "Nicolly Barbosa", 1, "2026-09-08", uniCtx(), {
+      hoje: HOJE_ISO,
+    });
+    // "Nicolly Barbosa" só divide o 1º nome com JBR → lado ~55; mesmo
+    // somando data oficial + nº + encontro, o auto exige os dois lados ≥80
+    expect(r.nivel).not.toBe("auto");
+    expect(r.top?.id).toBe("d1");
+    expect(r.score).toBeLessThan(90);
+  });
+
+  it("rótulo genérico ('Mentorada') → revisão explicada, nunca auto", () => {
+    const r = scoreLinha("Fernando Toledo Martins", "Mentorada", 2, "2026-09-15", uniCtx(), {
+      hoje: HOJE_ISO,
+    });
+    expect(r.nivel).not.toBe("auto");
+    expect(r.motivo).toContain("rótulo genérico");
+    // a dupla do mentor resolvido responde por eliminação (prior do rótulo)
+    expect(r.top?.id).toBe("d1");
+  });
+
+  it("dupla encerrada continua alvo legítimo (histórico retroativo)", () => {
+    const r = scoreLinha("Julio Almeida", "Ednilson Alves", 2, "2026-09-15", uniCtx(), {
+      hoje: HOJE_ISO,
+    });
+    expect(r.nivel).toBe("auto");
+    expect(r.top?.id).toBe("d2");
+    expect(r.top?.status).toBe("encerrada");
+  });
+
+  it("duas pessoas com o mesmo nome — o par desempata", () => {
+    const u = universoBase();
+    u.mentores.push(mentor("m9", "Julio Almeida"));
+    u.duplas.push(dupla("d9", "m9", "j4", "Julio Almeida", "Larissa Prado"));
+    const r = scoreLinha("Julio Almeida", "Ednilson Alves", null, null, u);
+    // "Julio Almeida" empata m3×m9; só a dupla do m3 tem o Ednilson
+    expect(r.nivel).toBe("auto");
+    expect(r.top?.id).toBe("d2");
+  });
+
+  it("par real que não forma dupla → manual com motivo dedicado", () => {
+    const u = universoBase();
+    // Fernanda Arrelaro existe como pessoa mas não tem dupla; Larissa
+    // Prado tem dupla — com a Renata, não com ela. Nenhuma hipótese se
+    // forma porque cada lado resolveu alguém real do cadastro.
+    u.mentores.push(mentor("m9", "Fernanda Arrelaro Santos"));
+    const r = scoreLinha("Fernanda Arrelaro", "Larissa Prado", null, null, u);
+    expect(r.nivel).toBe("manual");
+    expect(r.score).toBe(0);
+    expect(r.top).toBeNull();
+    expect(r.motivo).toContain("não forma dupla cadastrada");
+    // a pessoa resolveu mesmo assim — aparece como resolução do lado
+    expect(r.mentorNome).toBe("Fernanda Arrelaro Santos");
+  });
+
+  it("lado desconhecido → duplas do outro lado como candidatas, manual", () => {
+    const r = scoreLinha("Julio Almeida", "Guto", null, null, universoBase());
+    expect(r.nivel).toBe("manual");
+    expect(new Set(r.candidatos.map((d) => d.id))).toEqual(new Set(["d2", "d3"]));
+  });
+
+  it("empate entre duplas plausíveis → manual, sem pré-seleção", () => {
+    const u = universoBase();
+    // Fernando ganha uma 2ª dupla com outra Nicolly — "Nicolly Barbosa"
+    // só divide o 1º nome com as duas
+    u.mentorados.push(jovem("j5", "Nicolly Albuquerque Ferreira"));
+    u.duplas.push(dupla("d5", "m1", "j5", "Fernando Toledo Martins", "Nicolly Albuquerque Ferreira"));
+    const r = scoreLinha("Fernando Toledo", "Nicolly Barbosa", null, null, u);
+    expect(r.nivel).toBe("manual");
+    expect(r.motivo).toContain("plausível");
+    expect(new Set(r.candidatos.map((d) => d.id))).toEqual(new Set(["d1", "d5"]));
+  });
+
+  it("data no futuro pesa na nota e flaga a linha", () => {
+    const r = scoreLinha("Fernando Toledo Martins", "Nicolly Jesus", 1, "2026-11-08", uniCtx(), {
+      hoje: HOJE_ISO,
+    });
+    expect(evTexto(r)).toContain("futuro");
+    const { linhas } = processaLinhas(
+      [linhaCsv({ n: 1, mentor: "Fernando Toledo Martins", mentorado: "Nicolly Jesus", numero: "1º", data: "08/11/2026" })],
+      universoBase(),
+      HOJE
+    );
+    expect(linhas[0].status).toBe("revisar");
+    expect(linhas[0].motivo).toContain("data no futuro");
+  });
+
+  it("data anterior ao início da dupla → evidência de alerta", () => {
+    const r = scoreLinha("Fernando Toledo Martins", "Nicolly Jesus", 1, "2026-08-20", uniCtx(), {
+      hoje: HOJE_ISO,
+    });
+    expect(evTexto(r)).toContain("anterior ao início");
+  });
+
+  it("nº acima da trilha da dupla → penalidade, não bônus", () => {
+    const u = universoBase();
+    u.duplas.push(dupla("d9", "m4", "j1", "Renata Campos", "Nicolly Jesus Bento Rodrigues"));
+    u.duplas.find((d) => d.id === "d9")!.trilha = "especialista";
+    const r = scoreLinha("Renata Campos", "Nicolly Jesus", 7, null, u);
+    expect(evTexto(r)).toContain("excede a trilha (máx 5)");
+  });
+
+  it("duplicata no lote: a 2ª linha perde confiança e flaga", () => {
+    const duas = [
+      linhaCsv({ n: 1, mentor: "Fernando Toledo", mentorado: "Nicolly Jesus", numero: "1º", data: "16/09/2026" }),
+      linhaCsv({ n: 2, mentor: "Fernando Toledo Martins", mentorado: "Nicolly Jesus", numero: "1º", data: "16/09/2026" }),
+    ];
+    const { linhas } = processaLinhas(duas, universoBase(), HOJE);
+    expect(linhas[0].status).toBe("ok");
+    expect(linhas[1].status).toBe("revisar");
+    expect(linhas[1].motivo).toContain("linha 1 já aponta");
+  });
+
+  it("empate 100×100 → manual, sem cara-ou-coroa pré-selecionada", () => {
+    const u = universoBase();
+    // dupla gêmea nominal da d2 — mesmos nomes, outras pessoas
+    u.mentores.push(mentor("m9", "Julio Almeida"));
+    u.mentorados.push(jovem("j9", "Ednilson Alves"));
+    u.duplas.push(dupla("d9", "m9", "j9", "Julio Almeida", "Ednilson Alves"));
+    const r = scoreLinha("Julio Almeida", "Ednilson Alves", null, null, u);
+    expect(r.nivel).toBe("manual");
+    expect(r.motivo).toContain("empatad");
+    // o pipeline não pré-seleciona uma das duas ao acaso
+    const { linhas } = processaLinhas(
+      [linhaCsv({ n: 1, mentor: "Julio Almeida", mentorado: "Ednilson Alves", numero: "2º", data: "16/09/2026" })],
+      u,
+      HOJE
+    );
+    expect(linhas[0].nivel).toBe("manual");
+    expect(linhas[0].duplaId).toBeNull();
+  });
+
+  it("contexto desempata acima do cap: a dupla corroborada é a sugestão", () => {
+    const u = uniCtx();
+    // gêmea nominal da d2, mas SEM cronograma/encontro — capar o score em
+    // 100 saturava as duas e a menos corroborada ia pro topo da sugestão
+    u.mentores.push(mentor("m9", "Julio Almeida"));
+    u.mentorados.push(jovem("j9", "Ednilson Alves"));
+    u.duplas.push(dupla("d9", "m9", "j9", "Julio Almeida", "Ednilson Alves"));
+    u.duplas.find((d) => d.id === "d2")!.cronograma_id = "c1";
+    u.encontros!.set("d2", new Map([[2, { status: "realizado", data: "2026-09-15" }]]));
+    const r = scoreLinha("Julio Almeida", "Ednilson Alves", 2, "2026-09-15", u, {
+      hoje: HOJE_ISO,
+    });
+    expect(r.top?.id).toBe("d2");
+    // gêmea segue ambígua: sugere a corroborada, não fecha sozinha
+    expect(r.nivel).toBe("provavel");
+    expect(evTexto(r)).toContain("outra dupla plausível");
+  });
+
+  it("placeholder com artigo ('o menino') entra no caminho do rótulo", () => {
+    const r = scoreLinha("Fernando Toledo", "o menino", null, null, universoBase());
+    expect(r.motivo).toContain("rótulo genérico");
+    // 1 dupla só pro lado resolvido → eliminação vira sugestão provável
+    expect(r.nivel).toBe("provavel");
+    expect(r.top?.id).toBe("d1");
+  });
+
+  it("placeholder com 2 duplas possíveis → manual, nunca cara-ou-coroa", () => {
+    // m3 tem d2 e d3 — "mentorado" não escolhe entre elas
+    const r = scoreLinha("Julio Almeida", "mentorado", null, null, universoBase());
+    expect(r.nivel).toBe("manual");
+    expect(r.motivo).toContain("rótulo genérico");
+    expect(r.motivo).toContain("empatad");
+  });
+
+  it("lado em branco → explicado como branco, não só 'provável'", () => {
+    const r = scoreLinha("Fernando Toledo Martins", "  ", null, null, universoBase());
+    expect(r.nivel).toBe("provavel");
+    expect(r.motivo).toContain("em branco");
+  });
+
+  it("busca sem token útil ('A') não fabrica evidência nem resolve lado", () => {
+    const r = scoreLinha("A", "Nicolly Jesus", null, null, universoBase());
+    expect(r.nivel).not.toBe("auto");
+    expect(r.motivo).toContain("não encontrado");
+    expect(evTexto(r)).not.toContain('"a" ⊆');
+  });
+
+  it("manual nunca pré-seleciona: provável sugere, manual deixa vazio", () => {
+    const u = universoBase();
+    u.duplas.push(dupla("d6", "m2", "j4", "Priscila Stuani", "Larissa Prado"));
+    const { linhas } = processaLinhas(
+      [
+        // provável: typo → sugestão pré-selecionada
+        linhaCsv({ n: 1, mentor: "Priscila Stuanni", mentorado: "Larissa Prado", numero: "2º", data: "16/09/2026" }),
+        // manual: "Guto" não resolve → Select vazio
+        linhaCsv({ n: 2, mentor: "Julio Almeida", mentorado: "Guto", numero: "2º", data: "16/09/2026" }),
+      ],
+      u,
+      HOJE
+    );
+    expect(linhas[0].nivel).toBe("provavel");
+    expect(linhas[0].duplaId).toBe("d6");
+    expect(linhas[1].nivel).toBe("manual");
+    expect(linhas[1].duplaId).toBeNull();
+    expect(linhas[1].candidatos.map((d) => d.id).sort()).toEqual(["d2", "d3"]);
+  });
+});
+
+describe("saneiaLinhaReg", () => {
+  it("score, nivel e evidencias sobrevivem à fronteira server/client", () => {
+    const { linhas } = processaLinhas(
+      [linhaCsv({ n: 1, mentor: "Fernando Toledo Martins", mentorado: "Nicolly Jesus", numero: "1º", data: "16/09/2026" })],
+      universoBase(),
+      HOJE
+    );
+    const s = saneiaLinhaReg(JSON.parse(JSON.stringify(linhas[0])), 0);
+    expect(s.score).toBe(linhas[0].score);
+    expect(s.nivel).toBe("auto");
+    expect(s.evidencias.length).toBeGreaterThan(0);
+    expect(s.status).toBe("ok");
   });
 });

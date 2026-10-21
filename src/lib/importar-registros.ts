@@ -27,11 +27,17 @@
  *    do mentor na plataforma, import não infere (o semáforo já acende pela
  *    dificuldade/avaliação).
  *
- *  Match: score por overlap de tokens normalizados — exato e subset
- *  ("Fernando Toledo" ⊆ "Fernando Toledo Martins") resolvem sozinhos;
- *  overlap parcial e fuzzy de token (typo — "Nucolly") só alimentam a
- *  lista de candidatos pra coordenação decidir. Ambíguo ou sem match →
- *  status 'revisar', nunca chute.
+ *  Match: scoreLinha — confiança 0–100 por dupla plausível. Cada lado
+ *  (mentor/mentorado) tira nota própria contra o cadastro (exato,
+ *  subset de tokens, prefixo, typo ≤1/≤2 edições, apelido derivado do
+ *  roster, token único com unicidade); o par vale o elo mais fraco e
+ *  contexto (data oficial do cronograma, nº da trilha, encontro já
+ *  existente, dupla única, duplicata no lote) soma ou desconta — nunca
+ *  lava lado fraco pra auto. 'auto' exige score ≥90 com os DOIS lados
+ *  ≥80 e sem ambiguidade; 60+ vira 'provável' (sugestão pré-selecionada
+ *  pra um clique); abaixo disso 'manual'. Empate técnico e placeholder
+ *  ("Mentorada") nunca fecham auto. Toda decisão carrega evidencias
+ *  pt-BR — a prévia explica o porquê de cada linha.
  */
 
 import type { AvaliacaoJovem, Dificuldade, ProximoPasso } from "./types";
@@ -392,6 +398,12 @@ export type DuplaCandidata = {
   trilha: string;
   mentorNome: string;
   mentoradoNome: string;
+  /** contexto opcional do universo — afina o score (data oficial,
+   *  início da dupla). Ausente, o match usa só os nomes. */
+  cronograma_id?: string | null;
+  iniciada_em?: string | null;
+  /** nota da hipótese no scoreLinha — preenchido nos candidatos */
+  score?: number;
 };
 
 /** Linha processada — o que a prévia exibe e o que `executar` manda pra
@@ -415,6 +427,11 @@ export type LinhaReg = {
   mentorNome: string | null;
   mentoradoNome: string | null;
   candidatos: DuplaCandidata[];
+  /** confiança do match 0–100 + nível + a trilha de sinais que a
+   *  compuseram — null nas linhas 'ignorar' (match nem roda). */
+  score: number | null;
+  nivel: NivelMatch | null;
+  evidencias: Evidencia[];
   diffs: DiffReg[];
   payload: RegistroPayload;
 };
@@ -531,6 +548,9 @@ export function normalizaLinhaReg(
     mentorNome: null,
     mentoradoNome: null,
     candidatos: [],
+    score: null,
+    nivel: null,
+    evidencias: [],
     diffs,
     payload: {
       tema: txt(l.tema, 500, "tema", "tema"),
@@ -547,7 +567,7 @@ export function normalizaLinhaReg(
   };
 }
 
-// ---------- match de dupla ----------
+// ---------- match de dupla: score de confiança ----------
 
 /** O mínimo que o match precisa de cada pessoa. */
 export type PessoaRef = {
@@ -561,6 +581,27 @@ export type UniversoReg = {
   mentores: PessoaRef[];
   mentorados: PessoaRef[];
   duplas: DuplaCandidata[];
+  /** cronograma_id → numero → data oficial (ciclo_eventos). Contexto
+   *  opcional — afina o score quando o universo o traz. */
+  calendario?: Map<string, Map<number, string>>;
+  /** dupla_id → numero → encontro existente — corrobora a hipótese. */
+  encontros?: Map<string, Map<number, { status: string; data: string | null }>>;
+};
+
+/** Nível de confiança do match: 'auto' fecha sozinho · 'provável'
+ *  pré-seleciona a sugestão pra um clique · 'manual' exige escolha. */
+export type NivelMatch = "auto" | "provavel" | "manual";
+
+/** Um sinal que compôs (ou descontou) o score — vai direto pra prévia,
+ *  é a resposta de "por que essa dupla?". `peso` = nota do lado (0–100)
+ *  nos itens de nome, delta no resto. */
+export type Evidencia = {
+  icone:
+    | "user" | "users" | "id-badge" | "sparkle" | "link" | "calendar"
+    | "hash" | "check" | "copy" | "minus" | "warning" | "question";
+  texto: string;
+  peso: number;
+  lado?: "mentor" | "mentorado" | "par" | "contexto";
 };
 
 const chaveNome = (s: string) => semAcentoReg(normTexto(s));
@@ -569,71 +610,698 @@ const tokensDe = (s: string) =>
     .split(" ")
     .filter((t) => t.length >= 2);
 
-/** Distância de edição ≤ 2 pra tokens de 4+ letras — só pra tier fraco
- *  (dica visual), nunca resolve sozinho. */
-function dist1(a: string, b: string): boolean {
-  if (Math.abs(a.length - b.length) > 1) return false;
-  const dp = b.split("").map((_, j) => j);
-  for (let i = 1; i <= a.length; i++) {
-    let prev = dp[0];
-    dp[0] = i;
-    for (let j = 1; j <= b.length; j++) {
-      const t = dp[j];
-      dp[j] = Math.min(dp[j] + 1, dp[j - 1] + 1, prev + (a[i - 1] === b[j - 1] ? 0 : 1));
-      prev = t;
+/** Distância de edição Damerau-Levenshtein (transposição conta 1
+ *  edição — "nicloly"→"nicolly"). Usada nos tiers de typo. */
+function distEd(a: string, b: string): number {
+  if (a === b) return 0;
+  const la = a.length,
+    lb = b.length;
+  if (Math.abs(la - lb) > 2) return 3;
+  const dp: number[][] = [];
+  for (let i = 0; i <= la; i++) dp[i] = [i];
+  for (let j = 1; j <= lb; j++) dp[0][j] = j;
+  for (let i = 1; i <= la; i++) {
+    for (let j = 1; j <= lb; j++) {
+      const custo = a[i - 1] === b[j - 1] ? 0 : 1;
+      let v = Math.min(
+        dp[i - 1][j] + 1,
+        dp[i][j - 1] + 1,
+        dp[i - 1][j - 1] + custo
+      );
+      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) {
+        v = Math.min(v, dp[i - 2][j - 2] + custo);
+      }
+      dp[i][j] = v;
     }
   }
-  return dp[b.length] <= 1;
+  return dp[la][lb];
 }
 
-const casaToken = (q: string, c: string): boolean =>
-  q === c ||
-  (q.length >= 4 && (q.startsWith(c) || c.startsWith(q)));
+/** Qualidade token-a-token: 1 exato · .95 prefixo firme (razão ≥.7 —
+ *  "fernando"~"fernan") · .75 typo ≤1 edição ("nucolly"~"nicolly",
+ *  "stuanni"~"stuani") · .60 prefixo curto ou apelido derivado · .50
+ *  typo ≤2 em token longo · 0 sem casa. "guto" NÃO é prefixo de
+ *  "gustavo" (3ª letra diverge) — fica de fora, como sempre foi. */
+function qualToken(q: string, c: string): number {
+  if (q === c) return 1;
+  const [s, l] = q.length <= c.length ? [q, c] : [c, q];
+  if (l.startsWith(s)) {
+    if (s.length / l.length >= 0.7) return 0.95;
+    return s.length >= 3 ? 0.6 : 0;
+  }
+  if (s.length >= 4 && l.length >= 4) {
+    const d = distEd(q, c);
+    if (d <= 1) return 0.75;
+    if (d <= 2 && s.length >= 7 && l.length >= 7) return 0.5;
+  }
+  return 0;
+}
 
-/** Candidatos de um lado do par.
- *   fortes — todo token da busca casa (exato ou prefixo 4+) algum token do
- *            cadastro: "Fernando Toledo" ⊆ "Fernando Toledo Martins".
- *            Resolvem sozinhos quando únicos.
- *   fracos — overlap parcial ou typo (edição ≤1 — "Stuanni"→"Stuani",
- *            "Nucolly"→"Nicolly"): alimentam o Select da revisão,
- *            nunca fecham o match — grafia errada não é certeza. */
-export function candidatosDeNome(
+/** Apelidos deriváveis do PRÓPRIO cadastro (diminutivos pt-BR do 1º
+ *  nome + iniciais): "fernando"→"fernandinho", iniciais de nome com 3+
+ *  tokens. Nada de dicionário externo — só o que o roster autoriza, e
+ *  morre com o cadastro. */
+function apelidosDe(p: PessoaRef): Set<string> {
+  const out = new Set<string>();
+  for (const nome of [p.nome, p.nome_social ?? ""].filter((s) => s?.trim())) {
+    const toks = tokensDe(nome);
+    const f = toks[0];
+    if (f && f.length >= 4) {
+      const base = f.replace(/[aeiou]+$/, "");
+      for (const sfx of ["inho", "inha", "zinho", "zinha"]) {
+        out.add(base + sfx);
+        out.add(f + sfx);
+      }
+    }
+    if (toks.length >= 3) out.add(toks.map((t) => t[0]).join(""));
+  }
+  return out;
+}
+
+/** Rótulos genéricos digitados no lugar do nome ("Mentorada", "o
+ *  menino") — lado ausente: resolve por eliminação via dupla do outro
+ *  lado, nunca como nome. */
+const PLACEHOLDER_NOME = new Set([
+  "mentor", "mentora", "mentorado", "mentorada", "mentorando", "mentoranda",
+  "jovem", "aluno", "aluna", "pupilo", "pupila", "aprendiz",
+  "menino", "menina", "garoto", "garota", "crianca", "rapaz", "moco", "moca",
+  "nome", "teste", "sem nome", "na", "n a", "xx", "xxx",
+]);
+/** Artigos/possessivos que precedem o rótulo — "o menino", "minha
+ *  mentorada". Sem eles o rótulo seria sobrenome ("João Menino" é nome). */
+const ARTIGO_NOME = new Set([
+  "o", "a", "os", "as", "um", "uma", "meu", "minha", "meus", "minhas",
+  "seu", "sua", "este", "esta", "esse", "essa", "aquele", "aquela",
+]);
+const ehPlaceholder = (v: string): boolean => {
+  const t = v.trim();
+  if (!t || /^[-—?.]+$/.test(t)) return true;
+  const partes = chaveNome(t).split(" ");
+  return (
+    PLACEHOLDER_NOME.has(partes.join(" ")) ||
+    (partes.length >= 2 &&
+      ARTIGO_NOME.has(partes[0]) &&
+      PLACEHOLDER_NOME.has(partes.slice(1).join(" ")))
+  );
+};
+
+type AvalNome = {
+  /** |q|≥2 → nota do tier; |q|==1 → qualidade crua 0–1 (pool decide). */
+  score: number;
+  via: string;
+  social: boolean;
+  /** matches imperfeitos (qualidade <1) pra compor a evidência */
+  casados: { q: string; c: string; qk: number }[];
+};
+
+/** Busca × uma variante de nome (nome ou nome_social) de UMA pessoa. */
+function avaliaNome(
+  q: string,
+  qtok: string[],
+  nome: string,
+  apelidos: Set<string>,
+  social: boolean
+): AvalNome {
+  const zero: AvalNome = { score: 0, via: "zero", social, casados: [] };
+  const cheio = chaveNome(nome);
+  if (!cheio) return zero;
+  if (cheio === q) return { ...zero, score: 100, via: "exato" };
+  // busca sem token útil ("A", "J", "1") não pontua ninguém — sem esse
+  // guard, matched===qtok.length (0===0) premiava 68 no pool inteiro
+  if (!qtok.length) return zero;
+  const ctok = tokensDe(nome);
+  const quals: number[] = [];
+  const casados: AvalNome["casados"] = [];
+  let apelidoTok = "";
+  for (const t of qtok) {
+    let best = 0,
+      bc = "";
+    for (const c of ctok) {
+      const qk = qualToken(t, c);
+      if (qk > best) {
+        best = qk;
+        bc = c;
+      }
+    }
+    if (best < 0.6 && apelidos.has(t)) {
+      best = 0.6;
+      bc = ctok[0] ?? t;
+      apelidoTok = t;
+    }
+    quals.push(best);
+    if (best > 0 && best < 1) casados.push({ q: t, c: bc, qk: best });
+  }
+  if (qtok.length === 1) {
+    return {
+      score: quals[0] ?? 0,
+      via: apelidoTok ? "apelido" : "token",
+      social,
+      casados,
+    };
+  }
+  const matched = quals.filter((x) => x > 0).length;
+  const weakest = quals.length ? Math.min(...quals) : 0;
+  if (matched === qtok.length) {
+    const score =
+      weakest >= 1 ? 95 : weakest >= 0.95 ? 92 : weakest >= 0.75 ? 78 : weakest >= 0.6 ? 74 : 68;
+    const via =
+      weakest >= 1
+        ? "subset"
+        : weakest >= 0.95
+          ? "subset_prefixo"
+          : weakest >= 0.75
+            ? "subset_typo"
+            : weakest >= 0.6
+              ? "subset_apelido"
+              : "subset_frac";
+    return { score, via, social, casados };
+  }
+  const first = quals[0] > 0,
+    last = quals[quals.length - 1] > 0;
+  if (first && last) return { score: 65, via: "ancora", social, casados };
+  if (
+    matched / qtok.length >= 0.5 &&
+    ctok.length > 0 &&
+    qualToken(qtok[0], ctok[0]) > 0
+  ) {
+    return { score: 55, via: "parcial_1nome", social, casados };
+  }
+  if (matched > 0) return { score: 40, via: "parcial", social, casados };
+  return zero;
+}
+
+type Lado = {
+  /** nota do melhor candidato do pool (0–100) */
+  score: number;
+  /** melhor pessoa se única no topo (empate → null) */
+  pessoa: PessoaRef | null;
+  via: string;
+  evidencias: Evidencia[];
+  /** pessoa.id → nota — base das hipóteses de dupla */
+  porPessoa: Map<string, number>;
+  /** pessoas com nota ≥40, desc — alimentam o Select */
+  plausiveis: PessoaRef[];
+  placeholder: boolean;
+};
+
+const ddmm = (iso: string) =>
+  `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
+
+/** Busca × pool do lado (mentores ou mentorados). Resolve a nota de
+ *  cada pessoa — incluindo o tier de unicidade pra busca de 1 token —
+ *  e monta a evidência legível do melhor resultado. */
+function scoreLado(
   valor: string,
-  pessoas: PessoaRef[]
-): { fortes: PessoaRef[]; fracos: PessoaRef[] } {
+  pessoas: PessoaRef[],
+  apelidosPool: Map<string, Set<string>>,
+  papel: "mentor" | "mentorado"
+): Lado {
+  const vazio: Lado = {
+    score: 0,
+    pessoa: null,
+    via: "zero",
+    evidencias: [],
+    porPessoa: new Map(),
+    plausiveis: [],
+    placeholder: false,
+  };
+  const rotulo = papel === "mentor" ? "mentor(a)" : "mentorado(a)";
+  if (ehPlaceholder(valor)) {
+    return {
+      ...vazio,
+      via: "placeholder",
+      placeholder: true,
+      evidencias: valor.trim()
+        ? [
+            {
+              icone: "question" as const,
+              texto: `"${normTexto(valor)}" não é nome — rótulo genérico`,
+              peso: 0,
+              lado: papel,
+            },
+          ]
+        : [],
+    };
+  }
   const q = chaveNome(valor);
-  if (!q) return { fortes: [], fracos: [] };
   const qtok = tokensDe(valor);
-  const nomesDe = (p: PessoaRef) =>
-    [p.nome, p.nome_social ?? ""].filter((s) => s.trim()).map((n) => ({
-      cheio: chaveNome(n),
-      tokens: tokensDe(n),
-    }));
+  const avalPorPessoa = pessoas.map((p) => {
+    const ap = apelidosPool.get(p.id) ?? new Set<string>();
+    const variantes = [
+      { n: p.nome, social: false },
+      ...(p.nome_social?.trim() ? [{ n: p.nome_social, social: true }] : []),
+    ];
+    let best: AvalNome = { score: 0, via: "zero", social: false, casados: [] };
+    for (const v of variantes) {
+      const a = avaliaNome(q, qtok, v.n, ap, v.social);
+      if (a.score > best.score) best = a;
+    }
+    return { p, best };
+  });
 
-  const exatos = pessoas.filter((p) => nomesDe(p).some((n) => n.cheio === q));
-  if (exatos.length) return { fortes: exatos, fracos: [] };
-
-  const fortes = pessoas.filter((p) =>
-    nomesDe(p).some((n) => {
-      const alvo = new Set(n.tokens);
-      return qtok.length > 0 && qtok.every((t) => [...alvo].some((c) => casaToken(t, c)));
-    })
-  );
-  if (fortes.length) return { fortes, fracos: [] };
-
-  const fracos = pessoas.filter((p) =>
-    nomesDe(p).some((n) => {
-      const alvo = n.tokens;
-      const comuns = qtok.filter((t) => alvo.includes(t));
-      if (comuns.length > 0) return true;
-      // typo de token: algum token da busca a ≤1 edição de algum cadastrado
-      return qtok.some(
-        (t) => t.length >= 4 && alvo.some((c) => c.length >= 4 && dist1(t, c))
+  const porPessoa = new Map<string, number>();
+  if (qtok.length === 1) {
+    // token único: força vem da UNICIDADE no pool, não do comprimento
+    const plaus = avalPorPessoa.filter((x) => x.best.score >= 0.5);
+    for (const { p, best } of avalPorPessoa) {
+      const qk = best.score;
+      if (qk < 0.5) continue;
+      const unico = plaus.filter((x) => x.best.score >= 0.6).length <= 1;
+      porPessoa.set(
+        p.id,
+        qk >= 1
+          ? unico
+            ? 85
+            : 45
+          : qk >= 0.95
+            ? unico
+              ? 80
+              : 45
+            : qk >= 0.75
+              ? unico
+                ? 62
+                : 45
+              : qk >= 0.6
+                ? unico
+                  ? 72
+                  : 45
+                : unico
+                  ? 50
+                  : 40
       );
-    })
-  );
-  return { fortes: [], fracos };
+    }
+  } else {
+    for (const { p, best } of avalPorPessoa) {
+      if (best.score > 0) porPessoa.set(p.id, best.score);
+    }
+  }
+
+  const ordenados = [...porPessoa.entries()].sort((a, b) => b[1] - a[1]);
+  const plausiveis = ordenados
+    .filter(([, s]) => s >= 40)
+    .slice(0, 4)
+    .map(([id]) => pessoas.find((p) => p.id === id)!)
+    .filter(Boolean);
+  const top = ordenados[0];
+  if (!top || top[1] <= 0) {
+    return {
+      ...vazio,
+      evidencias: [
+        {
+          icone: "question" as const,
+          texto: `${rotulo} "${normTexto(valor)}" não consta no cadastro`,
+          peso: 0,
+          lado: papel,
+        },
+      ],
+    };
+  }
+  const [topId, topScore] = top;
+  const empate = ordenados.length > 1 && ordenados[1][1] === topScore;
+  const pessoa = empate ? null : (pessoas.find((p) => p.id === topId) ?? null);
+  const best = avalPorPessoa.find((x) => x.p.id === topId)!.best;
+
+  // evidência do lado — string única, pt-BR, pronta pra prévia. O nome
+  // citado é o do CANDIDATO pontuado (mesmo em empate — pessoa só zera
+  // a unicidade, não a exibição).
+  const nom = (pessoas.find((p) => p.id === topId) ?? pessoa)?.nome ?? "?";
+  const detalhe = best.casados
+    .filter((x) => x.q !== x.c)
+    .map((x) =>
+      x.qk >= 0.95
+        ? `"${x.q}" ≈ início de "${x.c}"`
+        : x.qk >= 0.75
+          ? `"${x.q}" ≈ "${x.c}" (grafia)`
+          : `"${x.q}" ≈ "${x.c}"`
+    )
+    .join(" · ");
+  let texto: string;
+  switch (best.via) {
+    case "exato":
+      texto = `"${normTexto(valor)}" — ${best.social ? "nome social exato" : "nome exato"}`;
+      break;
+    case "subset":
+      texto = `"${normTexto(valor)}" ⊆ "${nom}"`;
+      break;
+    case "subset_prefixo":
+    case "subset_typo":
+    case "subset_apelido":
+    case "subset_frac":
+      texto = detalhe ? `${detalhe} ⊆ "${nom}"` : `"${normTexto(valor)}" ⊆ "${nom}"`;
+      break;
+    case "token":
+      texto = `"${normTexto(valor)}" — único(a) ${rotulo} com esse nome`;
+      break;
+    case "apelido":
+      texto = `"${normTexto(valor)}" ≈ apelido de "${nom}"`;
+      break;
+    case "ancora":
+      texto = `"${normTexto(valor)}" ~ "${nom}" (1º e último nome)`;
+      break;
+    case "parcial_1nome":
+      texto = `só "${qtok[0]}" aparece em "${nom}"`;
+      break;
+    default:
+      texto = detalhe ? `${detalhe} em "${nom}"` : `pedaço de "${normTexto(valor)}" ≈ "${nom}"`;
+  }
+  return {
+    score: topScore,
+    pessoa,
+    via: best.via,
+    evidencias: [{ icone: best.social ? "id-badge" : "user", texto, peso: topScore, lado: papel }],
+    porPessoa,
+    plausiveis,
+    placeholder: false,
+  };
 }
+
+export type ScoreLinha = {
+  /** melhor hipótese — pré-selecionada quando nivel ≥ 'provavel' */
+  top: DuplaCandidata | null;
+  score: number;
+  nivel: NivelMatch;
+  motivo: string | null;
+  evidencias: Evidencia[];
+  candidatos: DuplaCandidata[];
+  mentorNome: string | null;
+  mentoradoNome: string | null;
+};
+
+const rotuloDupla = (d: DuplaCandidata) =>
+  `${d.mentoradoNome} × ${d.mentorNome}`;
+
+const TRILHA_MAX = (trilha: string) => (trilha === "especialista" ? 5 : 16);
+
+/** Núcleo do match: pontua cada dupla plausível e devolve a melhor com
+ *  a trilha de evidência. O par vale pelo elo mais fraco (min dos dois
+ *  lados); contexto (data oficial, nº, encontro existente, dupla única,
+ *  lote) soma ±19 — corrobora, nunca lava um lado fraco pra auto. */
+export function scoreLinha(
+  mentorTxt: string,
+  mentoradoTxt: string,
+  numero: number | null,
+  dataIso: string | null,
+  universo: UniversoReg,
+  ctx?: { claimed?: Map<string, number>; hoje?: string }
+): ScoreLinha {
+  const apelidosPool = new Map<string, Set<string>>();
+  for (const p of [...universo.mentores, ...universo.mentorados]) {
+    apelidosPool.set(p.id, apelidosDe(p));
+  }
+  const ladoM = scoreLado(mentorTxt, universo.mentores, apelidosPool, "mentor");
+  const ladoD = scoreLado(mentoradoTxt, universo.mentorados, apelidosPool, "mentorado");
+
+  const diffDias = (a: string, b: string) =>
+    Math.abs(Date.parse(a) - Date.parse(b)) / 86400000;
+  const unicas = (p: PessoaRef | null, campo: "mentor_id" | "mentorado_id") =>
+    p ? universo.duplas.filter((x) => x[campo] === p.id) : [];
+
+  type Hip = {
+    d: DuplaCandidata;
+    sM: number;
+    sD: number;
+    score: number;
+    ev: Evidencia[];
+    /** lado ausente resolvido por eliminação — nunca auto */
+    especial: "placeholder" | "desconhecido" | null;
+  };
+  const hips: Hip[] = [];
+  for (const d of universo.duplas) {
+    const sM = ladoM.porPessoa.get(d.mentor_id) ?? 0;
+    const sD = ladoD.porPessoa.get(d.mentorado_id) ?? 0;
+    if (sM <= 0 && sD <= 0) continue;
+    const ev: Evidencia[] = [];
+    let base: number,
+      especial: Hip["especial"] = null;
+    if (sM > 0 && sD > 0) {
+      base = Math.min(sM, sD);
+    } else {
+      // um lado ausente — a dupla do lado resolvido responde por
+      // eliminação; rótulo genérico tem prior, nome desconhecido não.
+      // Mas "ausente" é GLOBAL: lado que resolveu outra pessoa real do
+      // cadastro não é ausente — essa dupla simplesmente não é do par
+      // escrito (cai no semPar lá embaixo, não vira hipótese).
+      const ladoAusente = sM > 0 ? ladoD : ladoM;
+      if (!ladoAusente.placeholder && ladoAusente.score > 0) continue;
+      const outro = Math.max(sM, sD);
+      if (ladoAusente.placeholder) {
+        base = Math.round(0.55 * outro) + 25;
+        especial = "placeholder";
+      } else {
+        base = Math.round(0.55 * outro) - 10;
+        especial = "desconhecido";
+      }
+    }
+    let score = base;
+    // data × calendário oficial da dupla (bônus só — atraso não refuta)
+    const oficial =
+      numero != null && d.cronograma_id
+        ? universo.calendario?.get(d.cronograma_id)?.get(numero)
+        : undefined;
+    if (oficial && dataIso) {
+      const dd = diffDias(oficial, dataIso);
+      const b = dd <= 4 ? 8 : dd <= 10 ? 5 : dd <= 21 ? 2 : 0;
+      if (b) {
+        score += b;
+        ev.push({
+          icone: "calendar",
+          texto: `${numero}º oficial era ${ddmm(oficial)} — data informada ${ddmm(dataIso)} (±${Math.round(dd)}d)`,
+          peso: b,
+          lado: "contexto",
+        });
+      }
+    }
+    if (numero != null) {
+      const max = d.cronograma_id
+        ? (universo.calendario?.get(d.cronograma_id)?.size ?? TRILHA_MAX(d.trilha))
+        : TRILHA_MAX(d.trilha);
+      if (numero <= max) {
+        score += 3;
+        ev.push({
+          icone: "hash",
+          texto: `${numero}º dentro da trilha (máx ${max})`,
+          peso: 3,
+          lado: "contexto",
+        });
+      } else {
+        score -= 10;
+        ev.push({
+          icone: "warning",
+          texto: `${numero}º excede a trilha (máx ${max})`,
+          peso: -10,
+          lado: "contexto",
+        });
+      }
+    }
+    // lado resolvido com exatamente uma dupla no universo → só pode ser ela
+    if (!especial) {
+      const uniM = unicas(ladoM.pessoa, "mentor_id");
+      const uniD = unicas(ladoD.pessoa, "mentorado_id");
+      const quem =
+        uniM.length === 1 && uniM[0].id === d.id
+          ? ladoM.pessoa
+          : uniD.length === 1 && uniD[0].id === d.id
+            ? ladoD.pessoa
+            : null;
+      if (quem) {
+        score += 4;
+        ev.push({
+          icone: "link",
+          texto: `única dupla de "${quem.nome}"`,
+          peso: 4,
+          lado: "par",
+        });
+      }
+    }
+    // encontro (dupla, numero) já existente corrobora a hipótese
+    const enc =
+      numero != null ? universo.encontros?.get(d.id)?.get(numero) : undefined;
+    if (enc) {
+      const dd = enc.data && dataIso ? diffDias(enc.data.slice(0, 10), dataIso) : 999;
+      const b = dd <= 10 ? 4 : 2;
+      score += b;
+      ev.push({
+        icone: "check",
+        texto: `encontro ${numero}º já existe pra essa dupla (${enc.status})`,
+        peso: b,
+        lado: "contexto",
+      });
+    }
+    // penalidades
+    if (dataIso && ctx?.hoje && dataIso > ctx.hoje) {
+      score -= 8;
+      ev.push({
+        icone: "warning",
+        texto: `data ${ddmm(dataIso)} está no futuro`,
+        peso: -8,
+        lado: "contexto",
+      });
+    }
+    if (dataIso && d.iniciada_em) {
+      const lim = new Date(`${d.iniciada_em.slice(0, 10)}T00:00:00`);
+      lim.setDate(lim.getDate() - 7);
+      const limIso = `${lim.getFullYear()}-${String(lim.getMonth() + 1).padStart(2, "0")}-${String(lim.getDate()).padStart(2, "0")}`;
+      if (dataIso < limIso) {
+        score -= 8;
+        ev.push({
+          icone: "warning",
+          texto: `data anterior ao início da dupla (${ddmm(d.iniciada_em.slice(0, 10))})`,
+          peso: -8,
+          lado: "contexto",
+        });
+      }
+    }
+    const claim = numero != null ? ctx?.claimed?.get(`${d.id}|${numero}`) : undefined;
+    if (claim != null) {
+      score -= 12;
+      ev.push({
+        icone: "copy",
+        texto: `linha ${claim} já aponta essa dupla no ${numero}º encontro`,
+        peso: -12,
+        lado: "contexto",
+      });
+    }
+    hips.push({
+      d,
+      sM,
+      sD,
+      // score interno SEM o cap de exibição — capar aqui saturava duas
+      // hipóteses em 100 e fabricava empate onde o contexto diferenciava
+      score: Math.max(0, Math.round(score)),
+      ev,
+      especial,
+    });
+  }
+  hips.sort((a, b) => b.score - a.score);
+
+  // desconto de ambiguidade — empate técnico nunca fecha auto. O gap que
+  // decide ambig/forcaManual é o PRÉ-desconto: medir depois transformava
+  // 100/100 em 90/100 e a cara-ou-coroa ia pro ar como "confiança 100".
+  let ambig = false,
+    forcaManual = false;
+  const diffTop =
+    hips[0] && hips[1] ? hips[0].score - hips[1].score : Infinity;
+  if (hips[0] && hips[1] && hips[1].score >= 55 && diffTop <= 15) {
+    hips[0].score = Math.max(0, hips[0].score - 10);
+    ambig = true;
+    hips.sort((a, b) => b.score - a.score);
+  }
+  if (hips[0] && hips[1] && hips[1].score >= 55 && diffTop <= 8) {
+    forcaManual = true;
+  }
+  const top = hips[0] ?? null;
+
+  // par sem dupla: os dois lados se resolvem mas nenhuma dupla os junta
+  const semPar =
+    hips.length === 0 &&
+    !ladoM.placeholder &&
+    !ladoD.placeholder &&
+    ladoM.score >= 80 &&
+    ladoD.score >= 80;
+
+  let nivel: NivelMatch = "manual";
+  if (!semPar && top) {
+    if (
+      top.score >= 90 &&
+      top.sM >= 80 &&
+      top.sD >= 80 &&
+      !ambig &&
+      !forcaManual &&
+      !top.especial
+    ) {
+      nivel = "auto";
+    } else if (top.score >= 60 && !forcaManual) {
+      nivel = "provavel";
+    }
+  }
+
+  // candidatos pro Select: hipóteses por score → duplas dos plausíveis
+  const vistos = new Set<string>();
+  const candidatos: DuplaCandidata[] = [];
+  const push = (d: DuplaCandidata, score?: number) => {
+    if (vistos.has(d.id)) return;
+    vistos.add(d.id);
+    candidatos.push(score != null ? { ...d, score } : d);
+  };
+  for (const h of hips) push(h.d, Math.min(100, h.score));
+  for (const p of ladoM.plausiveis)
+    universo.duplas.filter((d) => d.mentor_id === p.id).forEach((d) => push(d));
+  for (const p of ladoD.plausiveis)
+    universo.duplas.filter((d) => d.mentorado_id === p.id).forEach((d) => push(d));
+
+  const evidencias = [
+    ...ladoM.evidencias,
+    ...ladoD.evidencias,
+    ...(top?.ev ?? []),
+    ...(ambig && hips[1]
+      ? [
+          {
+            icone: "minus" as const,
+            texto: `outra dupla plausível: ${rotuloDupla(hips[1].d)} (${Math.min(100, hips[1].score)})`,
+            peso: -10,
+            lado: "par" as const,
+          },
+        ]
+      : []),
+    ...(semPar
+      ? [
+          {
+            icone: "warning" as const,
+            texto: `"${normTexto(mentorTxt)}" × "${normTexto(mentoradoTxt)}" se resolvem, mas não formam dupla cadastrada`,
+            peso: 0,
+            lado: "par" as const,
+          },
+        ]
+      : []),
+  ];
+
+  const motivos: string[] = [];
+  if (semPar) {
+    motivos.push("o par se resolve, mas não forma dupla cadastrada — escolha");
+  } else {
+    for (const [txt, lado, rot] of [
+      [mentorTxt, ladoM, "mentor"],
+      [mentoradoTxt, ladoD, "mentorado(a)"],
+    ] as const) {
+      if (lado.placeholder) {
+        motivos.push(
+          txt.trim()
+            ? `${rot} "${normTexto(txt)}" não é nome — rótulo genérico`
+            : `${rot} em branco`
+        );
+      } else if (!lado.placeholder && lado.score === 0) {
+        motivos.push(
+          lado.plausiveis.length
+            ? `${rot} "${normTexto(txt)}" não bate 100% (parecidos: ${lado.plausiveis
+                .slice(0, 3)
+                .map((p) => p.nome)
+                .join(", ")})`
+            : `${rot} "${normTexto(txt)}" não encontrado`
+        );
+      }
+    }
+    if (forcaManual) motivos.push("duplas plausíveis empatadas — escolha");
+    else if (ambig) motivos.push("mais de uma dupla plausível — escolha");
+    else if (nivel === "provavel" && !motivos.length) {
+      motivos.push(
+        `match provável (confiança ${Math.min(100, top!.score)}) — confira a sugestão`
+      );
+    }
+  }
+
+  return {
+    top: top?.d ?? null,
+    score: top ? Math.min(100, top.score) : 0,
+    nivel,
+    motivo: motivos.join(" · ") || (nivel === "manual" ? "dupla não identificada — escolha" : null),
+    evidencias,
+    candidatos,
+    mentorNome: ladoM.pessoa && ladoM.score >= 55 ? ladoM.pessoa.nome : null,
+    mentoradoNome: ladoD.pessoa && ladoD.score >= 55 ? ladoD.pessoa.nome : null,
+  };
+}
+
+// ---------- compat: API antiga por cima do scorer ----------
 
 export type MatchDupla = {
   dupla: DuplaCandidata | null;
@@ -643,104 +1311,59 @@ export type MatchDupla = {
   motivo: string | null;
 };
 
-/** Resolve (mentorTxt, mentoradoTxt) → dupla. 1 dupla forte = match;
- *  qualquer outra configuração → null + candidatos pra UI mostrar e a
- *  coordenação escolher. Ordem dos candidatos: par resolvido nos dois
- *  lados → duplas do mentor achado → duplas do mentorado achado → vazio. */
+/** Compat com a API anterior: só devolve dupla quando o scorer fecha
+ *  'auto' sem contexto de encontro/data. O caminho real é scoreLinha. */
 export function matchDupla(
   mentorTxt: string,
   mentoradoTxt: string,
   universo: UniversoReg
 ): MatchDupla {
-  const cm = candidatosDeNome(mentorTxt, universo.mentores);
-  const cmd = candidatosDeNome(mentoradoTxt, universo.mentorados);
-  const mentorNome = cm.fortes.length === 1 ? cm.fortes[0].nome : null;
-  const mentoradoNome = cmd.fortes.length === 1 ? cmd.fortes[0].nome : null;
-
-  const idsM = new Set(cm.fortes.map((p) => p.id));
-  const idsMd = new Set(cmd.fortes.map((p) => p.id));
-  const fortes = universo.duplas.filter(
-    (d) => idsM.has(d.mentor_id) && idsMd.has(d.mentorado_id)
-  );
-  if (fortes.length === 1) {
-    return {
-      dupla: fortes[0],
-      candidatos: [],
-      mentorNome: fortes[0].mentorNome,
-      mentoradoNome: fortes[0].mentoradoNome,
-      motivo: null,
-    };
-  }
-  if (fortes.length > 1) {
-    return {
-      dupla: null,
-      candidatos: fortes,
-      mentorNome,
-      mentoradoNome,
-      motivo: `${fortes.length} duplas possíveis pro par — escolha`,
-    };
-  }
-
-  // nenhum par forte: monta a trilha de pistas pro Select
-  const idsMf = new Set([...cm.fortes, ...cm.fracos].map((p) => p.id));
-  const idsMdf = new Set([...cmd.fortes, ...cmd.fracos].map((p) => p.id));
-  const porPar = universo.duplas.filter(
-    (d) => idsMf.has(d.mentor_id) && idsMdf.has(d.mentorado_id)
-  );
-  // lado com UM forte — ou um único fraco (typo tipo "stuanni"/"nucolly",
-  // provavelmente é ele mesmo) — traz as duplas dele como prováveis
-  const provM =
-    cm.fortes.length === 1 ? cm.fortes[0] : cm.fracos.length === 1 ? cm.fracos[0] : null;
-  const provMd =
-    cmd.fortes.length === 1 ? cmd.fortes[0] : cmd.fracos.length === 1 ? cmd.fracos[0] : null;
-  const doMentor = provM ? universo.duplas.filter((d) => d.mentor_id === provM.id) : [];
-  const doMentorado = provMd ? universo.duplas.filter((d) => d.mentorado_id === provMd.id) : [];
-  const vistos = new Set<string>();
-  const candidatos = [...porPar, ...doMentor, ...doMentorado].filter((d) => {
-    if (vistos.has(d.id)) return false;
-    vistos.add(d.id);
-    return true;
-  });
-
-  const motivos: string[] = [];
-  if (!mentorTxt.trim() && !mentoradoTxt.trim()) motivos.push("sem nomes na linha");
-  else {
-    if (cm.fortes.length === 0)
-      motivos.push(
-        cm.fracos.length
-          ? `mentor "${mentorTxt}" não bate 100% (parecidos: ${cm.fracos.slice(0, 3).map((p) => p.nome).join(", ")})`
-          : `mentor "${mentorTxt}" não encontrado`
-      );
-    if (cmd.fortes.length === 0)
-      motivos.push(
-        cmd.fracos.length
-          ? `mentorado(a) "${mentoradoTxt}" não bate 100% (parecidos: ${cmd.fracos.slice(0, 3).map((p) => p.nome).join(", ")})`
-          : `mentorado(a) "${mentoradoTxt}" não encontrado(a)`
-      );
-    if (cm.fortes.length === 1 && cmd.fortes.length === 1)
-      motivos.push("o par não forma nenhuma dupla cadastrada — escolha");
-  }
+  const s = scoreLinha(mentorTxt, mentoradoTxt, null, null, universo);
   return {
-    dupla: null,
-    candidatos,
-    mentorNome,
-    mentoradoNome,
-    motivo: motivos.join(" · ") || "dupla não identificada — escolha",
+    dupla: s.nivel === "auto" ? s.top : null,
+    candidatos: s.candidatos,
+    mentorNome: s.mentorNome,
+    mentoradoNome: s.mentoradoNome,
+    motivo: s.motivo,
   };
+}
+
+/** Lista de nomes parecidos de um lado — forte = nota ≥85 (exato,
+ *  subset, token único); fraco = o resto acima de zero. Mantida pra
+ *  usos que só querem o universo de nomes, sem o par. */
+export function candidatosDeNome(
+  valor: string,
+  pessoas: PessoaRef[]
+): { fortes: PessoaRef[]; fracos: PessoaRef[] } {
+  const apelidosPool = new Map<string, Set<string>>();
+  for (const p of pessoas) apelidosPool.set(p.id, apelidosDe(p));
+  const lado = scoreLado(valor, pessoas, apelidosPool, "mentor");
+  const fortes: PessoaRef[] = [];
+  const fracos: PessoaRef[] = [];
+  for (const p of pessoas) {
+    const s = lado.porPessoa.get(p.id) ?? 0;
+    if (s >= 85) fortes.push(p);
+    else if (s > 0) fracos.push(p);
+  }
+  return { fortes, fracos };
 }
 
 // ---------- linha + universo → LinhaReg final ----------
 
-/** Pipeline completo: normaliza cada linha, tenta o match da dupla e
- *  fixa o status. 'ok' só quando a dupla fechou e não há flag de data;
- *  'revisar' pede olho humano (Select de dupla na UI); 'ignorar' = sem
- *  número de encontro, não há como gravar. */
+/** Pipeline completo: normaliza cada linha, pontua o match da dupla e
+ *  fixa o status. 'ok' só quando o scorer fecha 'auto' e não há flag de
+ *  campo/data; 'revisar' cobre 'provável' (sugestão pré-selecionada) e
+ *  'manual' (Select de dupla na UI); 'ignorar' = sem número de encontro. */
 export function processaLinhas(
   linhas: LinhaRegCsv[],
   universo: UniversoReg,
   hoje = new Date()
 ): { linhas: LinhaReg[]; stats: { ok: number; revisar: number; ignorar: number } } {
   const stats = { ok: 0, revisar: 0, ignorar: 0 };
+  const hojeIso = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, "0")}-${String(hoje.getDate()).padStart(2, "0")}`;
+  // (duplaId|numero) → linha que reivindicou primeiro — flaga resposta
+  // duplicada dentro do próprio arquivo (upsert sobrescreveria quieto)
+  const claimed = new Map<string, number>();
   const out = linhas.map((l) => {
     const r = normalizaLinhaReg(l, hoje);
     const motivos: string[] = [];
@@ -749,20 +1372,34 @@ export function processaLinhas(
       stats.ignorar++;
       return r;
     }
-    const m = matchDupla(r.mentorTxt, r.mentoradoTxt, universo);
+    const m = scoreLinha(r.mentorTxt, r.mentoradoTxt, r.numero, r.dataIso, universo, {
+      claimed,
+      hoje: hojeIso,
+    });
+    r.score = m.score;
+    r.nivel = m.nivel;
+    r.evidencias = m.evidencias;
     r.mentorNome = m.mentorNome;
     r.mentoradoNome = m.mentoradoNome;
     r.candidatos = m.candidatos;
-    if (m.dupla) {
-      r.duplaId = m.dupla.id;
-      r.mentorNome = m.dupla.mentorNome;
-      r.mentoradoNome = m.dupla.mentoradoNome;
-    } else {
-      motivos.push(m.motivo!);
+    // a sugestão só pré-seleciona quando não é 'manual' — manual começa
+    // com o Select vazio pra escolha ser de fato explícita (empate não
+    // tem palpite de cara-cara). O claim também só nasce daí: uma linha
+    // não resolvida não pode travar a dupla pras próximas.
+    const dupClaim = m.top ? claimed.get(`${m.top.id}|${r.numero}`) : undefined;
+    if (m.top && m.nivel !== "manual") {
+      r.duplaId = m.top.id;
+      r.mentorNome = m.top.mentorNome;
+      r.mentoradoNome = m.top.mentoradoNome;
+      claimed.set(`${m.top.id}|${r.numero}`, r.n);
     }
+    if (m.nivel !== "auto") motivos.push(m.motivo!);
+    if (dupClaim != null)
+      motivos.push(`linha ${dupClaim} já aponta essa dupla no ${r.numero}º encontro`);
     if (!r.dataIso && r.dataTxt) motivos.push("data ilegível");
     if (!r.dataTxt) motivos.push("sem data do encontro");
-    if (r.diffs.some((d) => d.revisar) && m.dupla)
+    if (r.dataIso && r.dataIso > hojeIso) motivos.push("data no futuro — conferir");
+    if (r.diffs.some((d) => d.revisar) && m.top)
       motivos.push("campos marcados pra conferir");
     if (motivos.length) {
       r.status = "revisar";
@@ -808,6 +1445,10 @@ export function saneiaLinhaReg(l: Partial<LinhaReg>, i: number): LinhaReg {
   const strOrNull = (v: unknown) => (typeof v === "string" && v.trim() ? v : null);
   const numOrNull = (v: unknown) =>
     typeof v === "number" && Number.isInteger(v) ? v : null;
+  const posNumOrNull = (v: unknown) => {
+    const n = numOrNull(v);
+    return n != null && n > 0 ? n : null;
+  };
   const payload = (l.payload ?? {}) as Partial<RegistroPayload>;
   const lista = Array.isArray(payload.atividades)
     ? payload.atividades.filter((a): a is string => typeof a === "string")
@@ -818,7 +1459,7 @@ export function saneiaLinhaReg(l: Partial<LinhaReg>, i: number): LinhaReg {
     mentoradoTxt: s(l.mentoradoTxt),
     numeroTxt: s(l.numeroTxt),
     dataTxt: s(l.dataTxt),
-    numero: numOrNull(l.numero),
+    numero: posNumOrNull(l.numero),
     dataIso: strOrNull(l.dataIso),
     dataHora: strOrNull(l.dataHora),
     duracaoMin: numOrNull(l.duracaoMin),
@@ -831,6 +1472,12 @@ export function saneiaLinhaReg(l: Partial<LinhaReg>, i: number): LinhaReg {
     mentorNome: strOrNull(l.mentorNome),
     mentoradoNome: strOrNull(l.mentoradoNome),
     candidatos: Array.isArray(l.candidatos) ? l.candidatos : [],
+    score: numOrNull(l.score),
+    nivel:
+      l.nivel === "auto" || l.nivel === "provavel" || l.nivel === "manual"
+        ? l.nivel
+        : null,
+    evidencias: Array.isArray(l.evidencias) ? l.evidencias : [],
     diffs: Array.isArray(l.diffs) ? l.diffs : [],
     payload: {
       tema: strOrNull(payload.tema),
