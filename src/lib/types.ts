@@ -591,7 +591,9 @@ export type Notificacao = {
     // 0093+ — sugestão/devolutiva de trilha esp e o lembrete D5 (0094)
     | "sugestao_especialista"
     | "devolutiva_especialista"
-    | "lembrete";
+    | "lembrete"
+    // 0103 — resposta da avaliação por terceiros chegou (submit público)
+    | "terceiro_respondeu";
   titulo: string;
   corpo: string | null;
   href: string | null;
