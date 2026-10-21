@@ -60,6 +60,16 @@ test.describe("demo — Minha jornada do mentorado", () => {
     await expect(trilha.getByText("Feito", { exact: true })).toHaveCount(5);
     await expect(trilha.getByText(/Respondido em /).first()).toBeVisible();
 
+    // as feitas são recibos fechados por padrão na trilha compacta
+    // (REALIZA-162): o conteúdo só aparece ao expandir
+    await expect(trilha.getByText("Você escreveu")).toBeHidden();
+    await expect(
+      trilha.getByRole("button", { name: "Rever última avaliação" })
+    ).toBeHidden();
+    for (const summary of await trilha.locator("article summary").all()) {
+      await summary.click();
+    }
+
     // o "Você escreveu…" da visão — a declaração real da resposta demo
     await expect(trilha.getByText("Você escreveu")).toBeVisible();
     await expect(
@@ -83,8 +93,10 @@ test.describe("demo — Minha jornada do mentorado", () => {
     await page.goto("/jovem/materiais");
 
     // qualquer estação feita com resposta+campos ganha o botão — a primeira
-    // da trilha é a leitura inicial da roda
+    // da trilha é a leitura inicial da roda. No layout compacto o botão
+    // mora dentro do recibo fechado: abre a linha primeiro (REALIZA-162)
     const trilha = page.locator('section[aria-label="Sua jornada"]');
+    await trilha.locator("article summary").first().click();
     await trilha
       .getByRole("button", { name: "Rever resposta" })
       .first()
@@ -152,9 +164,11 @@ test.describe("demo — Minha jornada do mentorado", () => {
       acervo.getByText(/Para ler e consultar quando quiser/)
     ).toBeVisible();
     // o acervo do mentorado é só audiencia='todos' (a policy do 0065):
-    // os Guias dos mentores não aparecem — a seção "Modelos" tem o
-    // checklist sem destino → o estado legítimo "em breve" no badge
-    await expect(acervo.getByText("Modelos")).toBeVisible();
+    // os Guias dos mentores não aparecem — os links prontos viram grid e
+    // o checklist/autoavaliação sem destino fecham no grupo apagado
+    // "A caminho" com o estado legítimo "em breve" no badge (REALIZA-162)
+    await expect(acervo.getByText("Links")).toBeVisible();
+    await expect(acervo.getByText("A caminho")).toBeVisible();
     await expect(acervo.getByText("Guias")).toHaveCount(0);
     await expect(acervo.getByText("em breve").first()).toBeVisible();
   });
