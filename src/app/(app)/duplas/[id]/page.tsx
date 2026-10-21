@@ -695,7 +695,14 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
         <VoltarLink fallback="/duplas" />
       </div>
 
-      <header className="flex flex-wrap items-start justify-between gap-4">
+      {/* hero da ficha — a dupla como identidade visual: a faixa lime→amarelo
+          repete a ordem dos nomes (mentor→mentorado) e as cores de papel do
+          logo. No resto da página cada cor volta a significar seu eixo */}
+      <header className="relative flex flex-wrap items-start justify-between gap-4 overflow-hidden rounded-xl bg-card px-4 py-4 shadow-[var(--shadow-border)] sm:px-5">
+        <span
+          aria-hidden
+          className="absolute inset-x-0 top-0 h-1 bg-[linear-gradient(90deg,var(--brand-lime),var(--role-mentorado))]"
+        />
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-balance">
             {/* par de avatares sobrepostos — a dupla como unidade visual (§4);
@@ -706,7 +713,6 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
                 mentorado={dupla.mentorado}
                 size={40}
                 linkar
-                sobrePapel
               />
             </span>
             <DuplaNomes mentor={dupla.mentor.nome} mentorado={dupla.mentorado.nome} />
@@ -893,8 +899,20 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
       </header>
 
       {/* trilha da jornada — visível e read-only pra todos os papéis (é fato,
-          não placar); o brinde de marco é só do mentor */}
-      <section className="rounded-xl bg-card px-4 py-3.5 shadow-[var(--shadow-border)]">
+          não placar); o brinde de marco é só do mentor. A borda esquerda
+          carrega o semáforo — mesmo idioma do tomCard da lista de duplas */}
+      <section
+        className={cn(
+          "rounded-xl border-l-4 bg-card px-4 py-3.5 shadow-[var(--shadow-border)]",
+          dupla.status !== "ativa"
+            ? "border-l-muted-foreground/40"
+            : saude.semaforo === "risco"
+              ? "border-l-[var(--danger)]"
+              : saude.semaforo === "atencao" || saude.apoio.aberto
+                ? "border-l-[var(--warn)]"
+                : "border-l-[var(--ok)]"
+        )}
+      >
         <TrilhaJornada
           jornada={jornada}
           statusDupla={dupla.status}
@@ -940,7 +958,8 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
               antes do 1º encontro e pra coordenação acompanhar */}
           {ehEsp && (
             <section className="rounded-xl bg-card p-4 text-sm space-y-2 shadow-[var(--shadow-border)]">
-              <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+              <h2 className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                <span aria-hidden className="size-1.5 rounded-full bg-[var(--info)]" />
                 Contexto
               </h2>
               {dupla.demanda ? (
@@ -967,7 +986,8 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
             className="scroll-mt-20 rounded-xl bg-card p-4 shadow-[var(--shadow-border)]"
           >
             <div className="mb-1 flex items-center justify-between gap-2">
-              <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+              <h2 className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                <span aria-hidden className="size-1.5 rounded-full bg-[var(--info)]" />
                 Combinados
               </h2>
               {/* sem WhatsApp o botão fica desabilitado com a razão visível —
@@ -1008,7 +1028,9 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
           <ArquivosDupla arquivos={arquivosDaDupla} />
 
           <section className="rounded-xl bg-card p-4 text-sm space-y-2 shadow-[var(--shadow-border)]">
-            <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+            <h2 className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+              {/* papel da pessoa no dot — amarelo do jovem, gramática da §1 */}
+              <span aria-hidden className="size-1.5 rounded-full bg-[var(--role-mentorado)]" />
               Mentorado
             </h2>
             {/* avatar+nome num link só (padrão da lista de pessoas) */}
@@ -1160,7 +1182,8 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
             (solEmAberto.status_efetivo ?? solEmAberto.status) !==
               "aguardando_coord" && (
               <section className="rounded-xl bg-card p-4 text-sm space-y-3 shadow-[var(--shadow-border)]">
-                <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                <h2 className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                  <span aria-hidden className="size-1.5 rounded-full bg-[var(--info)]" />
                   Pedido de especialista
                 </h2>
                 {/* papel-no-contexto (WP6b): o componente só habilita o lado
@@ -1195,7 +1218,8 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
               entrega final segue na devolutiva_pdm do encerramento */}
           {ehEsp && (devolutivasFeed.length > 0 || souMentor) && (
             <section className="rounded-xl bg-card p-4 text-sm space-y-3 shadow-[var(--shadow-border)]">
-              <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+              <h2 className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                <span aria-hidden className="size-1.5 rounded-full bg-[var(--info)]" />
                 Devolutivas da trilha
               </h2>
               {devolutivasFeed.length > 0 && (
@@ -1246,7 +1270,8 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
                 uma vez só: as datas das linhas são as do guia do ciclo —
                 a dupla confirma ou remarca (a real aparece como "agendado
                 {data}" na própria linha) */}
-            <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+            <h2 className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+              <span aria-hidden className="size-1.5 rounded-full bg-[var(--brand-lime)]" />
               Encontros
               <span className="font-normal normal-case tracking-normal">
                 {" "}
@@ -1381,6 +1406,11 @@ function EncontroRow({
 }) {
   const feito = encontro?.status === "realizado";
   const naoAconteceu = encontro?.status === "nao_aconteceu";
+  // agendado/remarcado com horário marcado = compromisso firmado — o disco
+  // ganha o tom da trilha; "a combinar" segue neutro (é só o passo do guia)
+  const marcado =
+    (encontro?.status === "agendado" || encontro?.status === "remarcado") &&
+    !!encontro.data_hora;
   const reg = encontro?.registro;
   // realizado sem registro — a dupla deve o follow-up; marca a linha em warn
   // suave. Em dupla pausada/encerrada ninguém pode registrar: a badge e a
@@ -1469,10 +1499,12 @@ function EncontroRow({
     <div
       id={encontro ? `registrar-${encontro.id}` : undefined}
       className={cn(
-        // border-transparent: a borda fica reservada pro estado de apoio; quem
-        // desenha a aresta no estado normal é o anel do shadow-border
+        // border-transparent: a borda fica reservada pro estado; quem desenha
+        // a aresta no estado normal é o anel do shadow-border
         "scroll-mt-20 overflow-hidden rounded-xl border border-transparent bg-card shadow-[var(--shadow-border)]",
-        reg?.precisa_apoio && "border-[var(--danger)]/50"
+        reg?.precisa_apoio
+          ? "border-[var(--danger)]/50"
+          : registroPendente && "border-[var(--warn)]/50"
       )}
     >
       <div
@@ -1484,14 +1516,17 @@ function EncontroRow({
         <div className="flex min-w-0 flex-1 items-center gap-4">
           <span
             className={cn(
-              // disco do nº do encontro — mesma gramática da agenda: lime cheio =
-              // aconteceu; muted = futuro/agendado; riscado = não aconteceu
+              // disco do nº do encontro — lime cheio = aconteceu; lime de
+              // contorno = compromisso firmado (agendado/remarcado); muted =
+              // passo do guia ainda sem data; riscado = não aconteceu
               "grid size-8 shrink-0 place-items-center rounded-full font-mono text-xs font-semibold tabular-nums",
               feito
                 ? "bg-[var(--brand-lime)] text-[var(--brand-ink)]"
                 : naoAconteceu
                   ? "bg-muted text-muted-foreground/60 line-through"
-                  : "bg-muted text-muted-foreground"
+                  : marcado
+                    ? "bg-[var(--brand-lime)]/20 text-[var(--brand-ink)] ring-1 ring-[var(--brand-lime)]/60"
+                    : "bg-muted text-muted-foreground"
             )}
           >
             {passo.numero}
@@ -1633,7 +1668,8 @@ function EncontroRow({
           className="border-t border-border/60 bg-muted/50 shadow-[var(--shadow-inset)]"
           summary={
             <>
-              <span className="shrink-0 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+              <span className="flex shrink-0 items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                <span aria-hidden className="size-1.5 rounded-full bg-[var(--brand-lime)]" />
                 Registro
               </span>
               {reg.precisa_apoio && (

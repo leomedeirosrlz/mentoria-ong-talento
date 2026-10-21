@@ -63,7 +63,8 @@ export function AvaliacaoJovemCard({
       }
     >
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-        <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+        <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+          <span aria-hidden className="size-1.5 rounded-full bg-[var(--role-mentorado)]" />
           Avaliação do jovem
         </span>
         <Estrelas n={avaliacao.estrelas} size={13} />
@@ -222,7 +223,8 @@ export function AvaliacaoPendenteLinha({
 export function EstrelaEspecialistaChip({ estrelas }: { estrelas: number }) {
   return (
     <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-      <span className="text-[11px] font-semibold uppercase tracking-[0.08em]">
+      <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em]">
+        <span aria-hidden className="size-1.5 rounded-full bg-[var(--role-mentorado)]" />
         Jovem
       </span>
       <Estrelas n={estrelas} size={12} />
@@ -259,7 +261,8 @@ export function VozDoJovemCard({
 
   return (
     <section className="rounded-xl bg-card p-4 text-sm space-y-2 shadow-[var(--shadow-border)]">
-      <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+      <h2 className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+        <span aria-hidden className="size-1.5 rounded-full bg-[var(--role-mentorado)]" />
         Voz do jovem
       </h2>
 
@@ -340,7 +343,8 @@ export function VozDoJovemEspecialista({
   if (!itens.length) return null;
   return (
     <section className="rounded-xl bg-card p-4 text-sm space-y-2 shadow-[var(--shadow-border)]">
-      <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+      <h2 className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+        <span aria-hidden className="size-1.5 rounded-full bg-[var(--role-mentorado)]" />
         Voz do jovem
       </h2>
       <ul className="space-y-1.5">

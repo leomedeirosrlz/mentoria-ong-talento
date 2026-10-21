@@ -52,7 +52,8 @@ export function EncerramentoDupla({
   return (
     <section className="rounded-xl bg-card p-4 text-sm space-y-3 shadow-[var(--shadow-border)]">
       <div className="flex items-center justify-between gap-2">
-        <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+        <h2 className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+          <span aria-hidden className="size-1.5 rounded-full bg-[var(--info)]" />
           Encerramento
         </h2>
         {decidido && (
