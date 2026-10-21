@@ -4,17 +4,19 @@ import {
   itensDaSemanaPrograma,
   paraAcompanhar,
   resumosPorCronograma,
-  type ItemParaAcompanhar,
+  sinteseMonitoramento,
   type ItemPrograma,
+  type MotivoAcompanhar,
   type ResumoTurmaCard,
 } from "@/lib/agenda-coordenacao";
 import { formatMesAbrev, semanaBounds } from "@/lib/ciclo";
 import { rotuloDiaAgenda } from "@/lib/agenda-minha";
+import { msgsContato } from "@/lib/whatsapp-msgs";
 import type { Interacao } from "@/lib/interacoes";
 import type { CicloEvento, Cronograma, Dupla, Supervisao } from "@/lib/types";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { LembreteButton } from "@/components/lembrete-button";
+import { FilaAcompanhar, type LinhaFila } from "@/components/fila-acompanhar";
 import {
   dowCurto,
   lembreteDaDupla,
@@ -22,15 +24,17 @@ import {
   PillTurma,
   semanaIso,
   Tag,
-  type TomTag,
 } from "@/components/agenda-partes";
 
-/** Visão "Monitoramento" da coordenação (WP5 · mock v6): resumo da semana
- *  por cronograma (nunca misturado — cada turma corre o seu calendário), a
- *  fila "Para acompanhar" com o Lembrar universal e os itens oficiais da
- *  semana. A coordenação NÃO agenda por ninguém: a única ação sobre dupla
- *  aqui é o nudge. Toda a derivação mora em lib/agenda-coordenacao (pura);
- *  a página é quem busca os dados — este componente só compõe e renderiza. */
+/** Visão "Monitoramento" da coordenação (WP5 · mock v6 → dashboard
+ *  REALIZA-161): faixa de síntese no topo (a leitura de 2s da fila), resumo
+ *  da semana por cronograma (nunca misturado — cada turma corre o seu
+ *  calendário) com a régua oficial linkada pro dia, e a fila "Para
+ *  acompanhar" — badges por dimensão (vermelho só no acompanhamento),
+ *  filtros/busca/grupos no client (fila-acompanhar) e o Lembrar universal.
+ *  A coordenação NÃO agenda por ninguém: a única ação sobre dupla aqui é o
+ *  nudge. Toda a derivação mora em lib/agenda-coordenacao (pura); a página
+ *  é quem busca os dados — este componente só compõe e renderiza. */
 export function AgendaCoordenacao({
   duplas,
   eventos,
@@ -64,6 +68,53 @@ export function AgendaCoordenacao({
   );
   const duplasPorId = new Map(duplas.map((d) => [d.id, d]));
   const rotuloHoje = rotuloDiaAgenda(hoje);
+  const sintese =
+    acompanhar.length > 0
+      ? sinteseMonitoramento(acompanhar, resumos, duplas, eventos, agora)
+      : null;
+  // as linhas saem daqui já prontas pra boundary client da fila: destino,
+  // rótulo, texto do lembrete e telefone resolvem no server — Dupla/
+  // CicloEvento não cruzam pra lá
+  const linhas: LinhaFila[] = acompanhar.map((item) => {
+    const dupla = duplasPorId.get(item.duplaId);
+    // o caso que assina a mensagem: registro > limbo > atraso > sem data —
+    // prioridade própria do lembrete, não a ordem que a lib escolheu
+    const caso: MotivoAcompanhar = item.motivos.includes("registro_pendente")
+      ? "registro_pendente"
+      : item.motivos.includes("limbo")
+        ? "limbo"
+        : item.motivos.includes("atraso")
+          ? "atraso"
+          : "sem_data";
+    // pedido de apoio que partiu do JOVEM: o domínio diz "chamar o jovem,
+    // nunca o mentor" — pode ser sobre o próprio mentor. Destino, rótulo
+    // ("Chamar", não cobrança), texto e telefone trocam de ponta.
+    const apoioDoJovem =
+      item.saude.apoio.aberto &&
+      (item.saude.apoio.origem === "mentorado" ||
+        item.saude.apoio.origem === "ambos");
+    return {
+      item,
+      destino: apoioDoJovem ? "mentorado" : "mentor",
+      rotulo: apoioDoJovem ? "Chamar" : item.rotuloLembrete,
+      lembrete: apoioDoJovem
+        ? {
+            titulo: "A equipe quer te ouvir",
+            corpo:
+              msgsContato("apoio_jovem", {
+                mentoradoNome:
+                  dupla?.mentorado?.nome_social || dupla?.mentorado?.nome,
+                autorNome: meuNome,
+              }).mentorado ?? "",
+          }
+        : dupla
+          ? lembreteDaDupla(dupla, caso, eventos, meuNome)
+          : { titulo: "Lembrete da equipe", corpo: "" },
+      telefone: apoioDoJovem
+        ? (dupla?.mentorado?.whatsapp ?? null)
+        : (dupla?.mentor?.whatsapp ?? null),
+    };
+  });
 
   return (
     <div className="space-y-6">
@@ -85,6 +136,64 @@ export function AgendaCoordenacao({
           Monitoramento — a agenda de cada dupla é da dupla
         </p>
       </header>
+
+      {/* faixa de síntese — leitura de 2s do estado da fila antes dos cards.
+          Só existe com fila viva (o empty state lá embaixo já cobre o "tudo
+          em dia"); o único número com peso é o de críticas */}
+      {sintese && (
+        <p
+          role="note"
+          aria-label="Síntese do monitoramento"
+          className="text-xs leading-relaxed text-muted-foreground"
+        >
+          <b className="font-semibold text-foreground">
+            {sintese.total} para acompanhar
+          </b>
+          {" · "}
+          <b
+            className={
+              sintese.criticas > 0
+                ? "font-semibold text-destructive"
+                : "font-medium"
+            }
+          >
+            {sintese.criticas}{" "}
+            {sintese.criticas === 1 ? "crítica" : "críticas"}
+          </b>
+          {sintese.atencao > 0 && ` · ${sintese.atencao} atenção`}
+          {/* "sem agendamento" aqui = denominador dos cards (semAgendamento),
+              não o motivo sem_data da fila — o rótulo casa com a legenda da
+              barra hatch pra não parecer o mesmo número do chip do filtro */}
+          {sintese.semData > 0 && ` · ${sintese.semData} sem agendamento`}
+          {sintese.registrosPendentes > 0 &&
+            ` · ${sintese.registrosPendentes} ${
+              sintese.registrosPendentes === 1
+                ? "registro pendente"
+                : "registros pendentes"
+            }`}
+          {sintese.lembretesEm48h > 0 &&
+            ` · ${sintese.lembretesEm48h} ${
+              sintese.lembretesEm48h === 1 ? "lembrete" : "lembretes"
+            } em 48h`}
+          {/* pedidos de apoio contam TODAS as duplas vivas — o sinal mais
+              urgente da tela, e a fila dele é /chamados (uma dupla "em
+              dia" com pedido aberto não aparece em "para acompanhar") */}
+          {sintese.apoioAberto > 0 && (
+            <>
+              {" · "}
+              <Link
+                href="/chamados"
+                className="font-medium text-foreground underline decoration-muted-foreground/40 underline-offset-2 transition-colors hover:text-primary"
+              >
+                {sintese.apoioAberto}{" "}
+                {sintese.apoioAberto === 1
+                  ? "pedido de apoio"
+                  : "pedidos de apoio"}
+              </Link>
+            </>
+          )}
+        </p>
+      )}
 
       {/* ---- Semana do encontro, por cronograma ---- */}
       <section aria-label="Semana do encontro por cronograma">
@@ -142,17 +251,7 @@ export function AgendaCoordenacao({
             Tudo em dia — nenhuma dupla pede atenção.
           </p>
         ) : (
-          <ul className="mt-3 divide-y divide-border/60 overflow-hidden rounded-xl border bg-card">
-            {acompanhar.map((item) => (
-              <LinhaAcompanhar
-                key={item.duplaId}
-                item={item}
-                dupla={duplasPorId.get(item.duplaId)}
-                eventos={eventos}
-                meuNome={meuNome}
-              />
-            ))}
-          </ul>
+          <FilaAcompanhar linhas={linhas} />
         )}
       </section>
 
@@ -176,15 +275,6 @@ export function AgendaCoordenacao({
 }
 
 // ---------- card "Encontro N · Tx" ----------
-
-const SEMAFORO_ROW: Record<
-  ItemParaAcompanhar["saude"]["semaforo"],
-  { tom: TomTag; rotulo: string }
-> = {
-  ok: { tom: "muted", rotulo: "Em andamento" },
-  atencao: { tom: "warn", rotulo: "Atenção" },
-  risco: { tom: "danger", rotulo: "Risco" },
-};
 
 function CardResumo({ r, dom }: { r: ResumoTurmaCard; dom: string }) {
   const comData = r.regua.filter((p) => p.data != null);
@@ -274,7 +364,9 @@ function CardResumo({ r, dom }: { r: ResumoTurmaCard; dom: string }) {
       </ul>
 
       {/* régua oficial: círculos numerados — atual sai em tinta com anel
-          lime, feito em ok, futuro em traço */}
+          lime, feito em ok, futuro em traço. Cada círculo datado é link pro
+          dia no calendário (?aba=calendario&dia=) — o li segue wrapper pra
+          a contagem/estado continuar na régua */}
       <ol
         className="mt-3 flex flex-wrap gap-1"
         aria-label={`Calendário oficial ${r.turma}: ${r.regua.length} encontros`}
@@ -292,10 +384,43 @@ function CardResumo({ r, dom }: { r: ResumoTurmaCard; dom: string }) {
               p.estado === "futuro" && "border-border text-muted-foreground"
             )}
           >
-            {p.numero}
+            {p.data != null ? (
+              <Link
+                href={`/agenda?aba=calendario&dia=${p.data}`}
+                aria-label={`encontro ${p.numero} · ${r.turma} — abrir o dia no calendário`}
+                className="grid size-full place-items-center rounded-full"
+              >
+                {p.numero}
+              </Link>
+            ) : (
+              p.numero
+            )}
           </li>
         ))}
       </ol>
+      {/* legenda da régua — os swatches repetem os estados dos círculos
+          (ok, tinta+anel, contorno) */}
+      <p
+        role="note"
+        aria-label="Legenda da régua"
+        className="mt-2 flex items-center gap-3 text-[11px] text-muted-foreground"
+      >
+        <span className="inline-flex items-center gap-1">
+          <i aria-hidden className="size-2.5 rounded-full bg-[var(--ok)]" />
+          feito
+        </span>
+        <span className="inline-flex items-center gap-1">
+          <i
+            aria-hidden
+            className="size-2.5 rounded-full bg-foreground ring-1 ring-[var(--brand-lime)]"
+          />
+          atual
+        </span>
+        <span className="inline-flex items-center gap-1">
+          <i aria-hidden className="size-2.5 rounded-full border border-border" />
+          futuro
+        </span>
+      </p>
       {primeiro && ultimo && (
         <p className="mt-2 flex justify-between gap-2 text-xs text-muted-foreground">
           <span>
@@ -316,65 +441,6 @@ function CardResumo({ r, dom }: { r: ResumoTurmaCard; dom: string }) {
         </p>
       )}
     </article>
-  );
-}
-
-// ---------- fila "Para acompanhar" ----------
-
-function LinhaAcompanhar({
-  item,
-  dupla,
-  eventos,
-  meuNome,
-}: {
-  item: ItemParaAcompanhar;
-  dupla: Dupla | undefined;
-  eventos: CicloEvento[];
-  meuNome: string | undefined;
-}) {
-  const st = SEMAFORO_ROW[item.saude.semaforo];
-  // o caso que assina a mensagem: registro > limbo > atraso > sem data —
-  // o primeiro motivo da lista já vem na ordem do severo, mas o mapa
-  // explícito não depende da ordem que a lib escolheu
-  const caso = item.motivos.includes("registro_pendente")
-    ? "registro_pendente"
-    : item.motivos.includes("limbo")
-      ? "limbo"
-      : item.motivos.includes("atraso")
-        ? "atraso"
-        : "sem_data";
-  const lembrete = dupla
-    ? lembreteDaDupla(dupla, caso, eventos, meuNome)
-    : { titulo: "Lembrete da equipe", corpo: "" };
-  return (
-    <li className="flex flex-wrap items-center gap-3 px-4 py-3">
-      <div className="min-w-0 flex-1 basis-56">
-        <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-semibold">
-          {item.nomes}
-          <PillTurma turma={item.turma} />
-        </p>
-        <p className="mt-0.5 text-xs leading-snug text-muted-foreground">
-          {item.contexto}
-        </p>
-      </div>
-      <Tag tom={st.tom}>{st.rotulo}</Tag>
-      <LembreteButton
-        duplaId={item.duplaId}
-        destino="mentor"
-        rotulo={item.rotuloLembrete}
-        telefone={dupla?.mentor?.whatsapp ?? null}
-        titulo={lembrete.titulo}
-        corpo={lembrete.corpo}
-        href={`/duplas/${item.duplaId}`}
-        bloqueadoAte={item.bloqueadoAte}
-      />
-      <Link
-        href={`/duplas/${item.duplaId}`}
-        className="inline-flex min-h-9 items-center rounded-lg px-2 text-xs font-semibold text-foreground/80 transition-colors hover:bg-muted hover:text-foreground"
-      >
-        Ver ficha ›
-      </Link>
-    </li>
   );
 }
 

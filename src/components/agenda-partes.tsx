@@ -111,10 +111,18 @@ export function lembreteDaDupla(
     ""
   ).split(" ")[0];
   // trilha de especialista: calendário livre — não existe "encontro oficial
-  // da semana" pra carregar no texto. A mesma régua do contextoDuplaAux:
-  // pendência de registro cobra o follow-up, senão "marcar a próxima
-  // sessão". O nº oficial do cronograma DPP seria informação falsa aqui.
+  // da semana" pra carregar no texto. O `caso` que o server resolveu manda:
+  // sessão realizada sem registro cobra o follow-up (antes o ramo só olhava
+  // o limbo e ela saía com texto de "marcar a sessão" — a ação errada);
+  // agendado vencido pergunta "rolou?"; sem pendência, "marcar a próxima".
+  // O nº oficial do cronograma DPP seria informação falsa aqui.
   if (d.trilha === "especialista") {
+    if (caso === "registro_pendente") {
+      return {
+        titulo: "Lembrete — registro pendente",
+        corpo: `Oi ${mentorNome}, tudo bem? A sessão de ${mentoradoNome} já aconteceu, mas ainda falta o registro — completa quando puder, leva poucos minutos.`,
+      };
+    }
     const pendEsp = [...d.encontros]
       .sort((a, b) => a.numero - b.numero)
       .find((e) => !e.registro && emLimbo(e, agora.getTime()));

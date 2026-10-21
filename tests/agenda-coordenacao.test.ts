@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+  dimensoesDoItem,
   itensDaSemanaPrograma,
   paraAcompanhar,
   resumosPorCronograma,
+  sinteseMonitoramento,
+  type ItemParaAcompanhar,
 } from "@/lib/agenda-coordenacao";
 import { LEMBRETE_INTERVALO_MS } from "@/lib/ciclo";
 import type { Interacao } from "@/lib/interacoes";
@@ -10,6 +13,7 @@ import type {
   CicloEvento,
   Cronograma,
   Dupla,
+  Encaminhamento,
   Encontro,
   MentoradoPar,
   Profile,
@@ -501,6 +505,282 @@ describe("paraAcompanhar", () => {
       paraAcompanhar([dD, dConcluida], EVENTOS, {}, AGORA)
     ).toEqual([]);
     expect(paraAcompanhar([], EVENTOS, {}, AGORA)).toEqual([]);
+  });
+});
+
+// ============================================================
+// REALIZA-161 — a fila virou dashboard: badges por dimensão (vermelho só
+// no acompanhamento) e a faixa de síntese do topo. Âncora AGORA_SEG
+// (segunda 05/10): esperado = enc. 6 e 7, vigente = enc. 8 na semana.
+describe("dimensoesDoItem + sinteseMonitoramento", () => {
+  const reg = (over: object): Encontro["registro"] =>
+    ({ id: `r-${Math.random().toString(36).slice(2, 8)}`, ...over }) as Encontro["registro"];
+  const encRealizado = (
+    duplaId: string,
+    numero: number,
+    dia: string,
+    registro: Encontro["registro"] = COM_REGISTRO
+  ): Encontro =>
+    mkEncontro({
+      dupla_id: duplaId,
+      numero,
+      status: "realizado",
+      data_hora: `${dia}T22:00:00Z`,
+      realizado_em: `${dia}T22:00:00Z`,
+      registro,
+    });
+  // dois realizados com registro (6 e 7) cobrem o esperado de segunda —
+  // cada fixture só muda o que o teste acende
+  const baseEmDia = (duplaId: string): Encontro[] => [
+    encRealizado(duplaId, 6, "2026-09-22"),
+    encRealizado(duplaId, 7, "2026-09-29"),
+  ];
+
+  // pedido de apoio no registro do 7 (origem mentor) + sem row do 8
+  const dApoio = mkDupla({
+    id: "dApoio",
+    mentor: mkProfile("Sofia Prado"),
+    mentorado: mkMentorado("Lara Reis"),
+    encontros: [
+      encRealizado("dApoio", 6, "2026-09-22"),
+      encRealizado("dApoio", 7, "2026-09-29", reg({ precisa_apoio: true })),
+    ],
+  });
+  // avaliação baixa + dificuldade no último registro → combo crítico
+  const dCombo = mkDupla({
+    id: "dCombo",
+    mentorado: mkMentorado("Maitê Luz"),
+    encontros: [
+      encRealizado("dCombo", 6, "2026-09-22"),
+      encRealizado("dCombo", 7, "2026-09-29",
+        reg({ avaliacao: "baixa", dificuldade: "participacao" })),
+    ],
+  });
+  // dificuldade sozinha (avaliação regular) → atenção, não crise
+  const dDif = mkDupla({
+    id: "dDif",
+    mentorado: mkMentorado("Nina Paes"),
+    encontros: [
+      encRealizado("dDif", 6, "2026-09-22"),
+      encRealizado("dDif", 7, "2026-09-29",
+        reg({ avaliacao: "regular", dificuldade: "organizacao" })),
+    ],
+  });
+  // nada realizado nem marcado — atraso puro (esperado 2) + sem data do 8
+  const dAtrasada = mkDupla({
+    id: "dAtrasada",
+    mentor: mkProfile("Rui Alves"),
+    mentorado: mkMentorado("Otto Braga"),
+  });
+  // enc. 6 realizado sem registro + sem row do 8
+  const dReg = mkDupla({
+    id: "dRP",
+    mentorado: mkMentorado("Iris Lins"),
+    encontros: [
+      encRealizado("dRP", 6, "2026-09-22", null),
+      encRealizado("dRP", 7, "2026-09-29"),
+    ],
+  });
+  // combinado vencido — encaminhamento pendente com prazo passado
+  const dEncam = mkDupla({
+    id: "dEncam",
+    mentorado: mkMentorado("Lia Noce"),
+    encontros: baseEmDia("dEncam"),
+    encaminhamentos: [
+      {
+        id: "enc-1",
+        dupla_id: "dEncam",
+        registro_id: null,
+        descricao: "Ligar pra família sobre o horário",
+        responsavel: "mentor",
+        prazo: "2026-10-01",
+        status: "pendente",
+        created_at: "2026-09-25T00:00:00Z",
+      } satisfies Encaminhamento,
+    ],
+  });
+  // enc. 8 marcado como não-aconteceu: não entra na fila (tem row), mas a
+  // barra hatch do card conta ela em "sem agendamento" — a distinção que o
+  // semData da síntese pega dos resumos
+  const dNao = mkDupla({
+    id: "dNao",
+    mentorado: mkMentorado("Bia Sales"),
+    encontros: [
+      ...baseEmDia("dNao"),
+      mkEncontro({
+        dupla_id: "dNao",
+        numero: 8,
+        status: "nao_aconteceu",
+        data_hora: "2026-10-06T22:00:00Z",
+      }),
+    ],
+  });
+
+  it("apoio aberto → acompanhamento danger 'Apoio pedido' (origem no detalhe)", () => {
+    const [item] = paraAcompanhar([dApoio], EVENTOS, {}, AGORA_SEG);
+    const d = dimensoesDoItem(item);
+    expect(d.acompanhamento).toEqual({
+      tom: "danger",
+      rotulo: "Apoio pedido",
+      detalhe: "pedido do mentor",
+    });
+    expect(d.cronograma).toEqual({ tom: "muted", rotulo: "sem data" });
+    expect(d.operacional).toBeNull();
+  });
+
+  it("avaliação baixa + dificuldade → 'Acompanhamento crítico' danger; só dificuldade → warn", () => {
+    const [combo] = paraAcompanhar([dCombo], EVENTOS, {}, AGORA_SEG);
+    expect(dimensoesDoItem(combo).acompanhamento).toEqual({
+      tom: "danger",
+      rotulo: "Acompanhamento crítico",
+    });
+    const [dif] = paraAcompanhar([dDif], EVENTOS, {}, AGORA_SEG);
+    expect(dimensoesDoItem(dif).acompanhamento).toEqual({
+      tom: "warn",
+      rotulo: "Acompanhamento",
+    });
+  });
+
+  it("atraso puro vira warn no cronograma — nunca danger (tudo risco = nada é risco)", () => {
+    const [item] = paraAcompanhar([dAtrasada], EVENTOS, {}, AGORA_SEG);
+    const d = dimensoesDoItem(item);
+    expect(d.acompanhamento).toBeNull();
+    expect(d.cronograma).toEqual({
+      tom: "warn",
+      rotulo: "2 encontros atrasados",
+    });
+    expect(d.operacional).toBeNull();
+  });
+
+  it("limbo → 'agendamento vencido'; sem_data sozinho → 'sem data' muted", () => {
+    const dLimbo = mkDupla({
+      id: "dLimbo",
+      mentorado: mkMentorado("Bela Ruas"),
+      encontros: [
+        encRealizado("dLimbo", 6, "2026-09-22"),
+        // agendado já vencido sem registro → limbo cobre o esperado do 7
+        mkEncontro({
+          dupla_id: "dLimbo",
+          numero: 7,
+          data_hora: "2026-09-29T22:00:00Z",
+        }),
+      ],
+    });
+    const [limbo] = paraAcompanhar([dLimbo], EVENTOS, {}, AGORA_SEG);
+    expect(dimensoesDoItem(limbo).cronograma).toEqual({
+      tom: "warn",
+      rotulo: "agendamento vencido",
+    });
+    const dSoSemData = mkDupla({
+      id: "dSD",
+      mentorado: mkMentorado("Cora Melo"),
+      encontros: baseEmDia("dSD"),
+    });
+    const [sd] = paraAcompanhar([dSoSemData], EVENTOS, {}, AGORA_SEG);
+    expect(dimensoesDoItem(sd).cronograma).toEqual({
+      tom: "muted",
+      rotulo: "sem data",
+    });
+  });
+
+  it("operacional: registro pendente e combinado vencido saem em muted", () => {
+    const [pend] = paraAcompanhar([dReg], EVENTOS, {}, AGORA_SEG);
+    expect(dimensoesDoItem(pend).operacional).toEqual({
+      tom: "muted",
+      rotulo: "registro pendente",
+    });
+    const [enc] = paraAcompanhar([dEncam], EVENTOS, {}, AGORA_SEG);
+    expect(dimensoesDoItem(enc).operacional).toEqual({
+      tom: "muted",
+      rotulo: "encaminhamento vencido",
+    });
+  });
+
+  it("item sem nada aceso → as três dimensões null", () => {
+    const limpo: ItemParaAcompanhar = {
+      duplaId: "d0",
+      nomes: "Ana · André",
+      turma: "T1",
+      saude: {
+        semaforo: "ok",
+        motivo: "Em dia",
+        motivos: ["Em dia"],
+        sinais: [],
+        apoio: { aberto: false },
+        esperado: 2,
+        feitos: 2,
+        proximo: null,
+        registroPendente: false,
+        pediuApoio: false,
+        apoioJovem: false,
+        avaliacaoJovemPendente: 0,
+      },
+      motivos: [],
+      contexto: "Em dia",
+      contextoPartes: ["Em dia"],
+      rotuloLembrete: "Lembrar",
+      ultimoNudge: null,
+      bloqueadoAte: null,
+    };
+    expect(dimensoesDoItem(limpo)).toEqual({
+      acompanhamento: null,
+      cronograma: null,
+      operacional: null,
+    });
+  });
+
+  it("contextoPartes: [0] é o caso decisório, o resto segue — contexto intacto", () => {
+    const [item] = paraAcompanhar([dAtrasada], EVENTOS, {}, AGORA_SEG);
+    expect(item.contextoPartes).toEqual([
+      "2 encontros atrasados (enc. 6 e 7 · T1)",
+      "sem data para o 8",
+    ]);
+    // o texto legado continua colando o lead com " — "
+    expect(item.contexto).toBe(
+      "2 encontros atrasados (enc. 6 e 7 · T1) — sem data para o 8"
+    );
+    const [pend] = paraAcompanhar([dReg], EVENTOS, {}, AGORA_SEG);
+    // a pendência é o motivo que pôs a dupla na fila — encabeça as partes
+    // (o "ainda sem data" vira contexto secundário, não a boa notícia)
+    expect(pend.contextoPartes[0]).toBe("registro do 6º encontro pendente");
+    expect(pend.contextoPartes[1]).toContain("ainda sem data");
+  });
+
+  it("síntese: counts da fila + 'sem data' reconciliado com os cards", () => {
+    const nudgeRecente: Interacao = {
+      dupla_id: "dRP",
+      tipo: "nudge",
+      canal: "in_app",
+      created_at: "2026-10-05T11:00:00-03:00", // 1h antes de AGORA_SEG
+      autor: null,
+    };
+    const duplas = [dApoio, dAtrasada, dReg, dEncam, dNao];
+    const fila = paraAcompanhar(duplas, EVENTOS, { dRP: nudgeRecente }, AGORA_SEG);
+    const resumos = resumosPorCronograma(duplas, [C1], EVENTOS, AGORA_SEG);
+    expect(
+      sinteseMonitoramento(fila, resumos, duplas, EVENTOS, AGORA_SEG)
+    ).toEqual({
+      total: 4, // dNao não entra na fila (tem row do enc. 8)
+      criticas: 1, // só dApoio
+      atencao: 3,
+      // semAgendamento do card = 5: as 4 sem row do 8 + dNao (não-aconteceu)
+      semData: 5,
+      registrosPendentes: 1, // dReg
+      lembretesEm48h: 1, // o nudge de 1h atrás na dReg segura ela no cap
+      apoioAberto: 1, // o pedido da dApoio — independente de estar na fila
+    });
+  });
+
+  it("síntese vazia zera tudo", () => {
+    expect(sinteseMonitoramento([], [], [], EVENTOS, AGORA_SEG)).toEqual({
+      total: 0,
+      criticas: 0,
+      atencao: 0,
+      semData: 0,
+      registrosPendentes: 0,
+      lembretesEm48h: 0,
+      apoioAberto: 0,
+    });
   });
 });
 

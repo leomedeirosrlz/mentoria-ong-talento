@@ -14,6 +14,7 @@ import {
   toDateStr,
   type DuplaSaude,
   type EventoDatado,
+  type SinalTipo,
 } from "./ciclo";
 import { primeiroNomeDaDupla } from "./agenda-minha";
 import type {
@@ -258,6 +259,12 @@ export type ItemParaAcompanhar = {
   motivos: MotivoAcompanhar[];
   /** Linha pronta: "Encontro 8 · T1 — ainda sem data (prazo: dom 12)". */
   contexto: string;
+  /** As partes do contexto reordenadas (REALIZA-161): [0] é o caso
+   *  decisório — o motivo que pôs a dupla na fila (pendência > atraso >
+   *  sem_data) — a linha mostra ele em foreground e o resto em menor peso
+   *  com " · ". `contexto` segue na ordem legada (agendamento primeiro)
+   *  pra quem lia a string única. */
+  contextoPartes: string[];
   /** "Lembrar" | "Lembrar registro" — segue o mock. */
   rotuloLembrete: string;
   /** Último `interacoes` tipo nudge da dupla (null = nunca). */
@@ -270,14 +277,17 @@ export type ItemParaAcompanhar = {
  *  sem_data puro ("Encontro 8 · T1 — ainda sem data nesta semana (prazo:
  *  dom 12)"), atraso dominando ("2 encontros atrasados — sem data para o
  *  8"), registro solto ("Encontro 5 · T2 agendado qua 8, 19h — registro do
- *  4 pendente"). */
+ *  4 pendente"). Devolve o texto pronto E as partes: a fila nova
+ *  (REALIZA-161) destaca a primeira como "caso" decisório — por isso as
+ *  partes são reordenadas (a pendência encabeça; o `contexto` legado
+ *  mantém a ordem de montagem) — sem re-duplicar a montagem na tela. */
 function contextoAcompanhar(
   d: Dupla,
   saude: DuplaSaude,
   vig: EventoDatado | null,
   motivos: MotivoAcompanhar[],
   hoje: Date
-): string {
+): { contexto: string; contextoPartes: string[] } {
   const pend = pendenciaDeRegistro(d, hoje.getTime());
   const atraso = Math.max(0, saude.esperado - saude.feitos);
   // detalhe do sinal é "6º e 7º" — vira "enc. 6 e 7" no parentético
@@ -295,7 +305,7 @@ function contextoAcompanhar(
   // com 2+ atrasados o lead é a gravidade, não o encontro da semana
   const lead =
     atraso >= 2
-      ? `${atraso} ${d.trilha === "especialista" ? "sessões" : "encontros"} atrasados${detAtraso ? ` (enc. ${detAtraso} · ${d.turma})` : ""}`
+      ? `${atraso} ${esp ? "sessões" : "encontros"} atrasados${detAtraso ? ` (enc. ${detAtraso} · ${turmaCurta(d.turma)})` : ""}`
       : null;
 
   if (motivos.includes("sem_data") && vig?.numero != null) {
@@ -308,10 +318,10 @@ function contextoAcompanhar(
     const nestaSemana = vig.data >= seg && vig.data <= domCorrente;
     partes.push(
       novaNaTurma
-        ? `${rotuloEnc} ${vig.numero} · ${d.turma} — dupla nova, 1º agendamento pendente`
+        ? `${rotuloEnc} ${vig.numero} · ${turmaCurta(d.turma)} — dupla nova, 1º agendamento pendente`
         : lead
           ? `sem data para o ${vig.numero}`
-          : `${rotuloEnc} ${vig.numero} · ${d.turma} — ainda sem data${
+          : `${rotuloEnc} ${vig.numero} · ${turmaCurta(d.turma)} — ainda sem data${
               nestaSemana
                 ? " nesta semana"
                 : ` para ${vig.data.slice(8, 10)}/${vig.data.slice(5, 7)}`
@@ -319,30 +329,44 @@ function contextoAcompanhar(
     );
   } else if (saude.proximo?.data_hora) {
     partes.push(
-      `${rotuloEnc} ${saude.proximo.numero} · ${d.turma} agendado ${quandoTxt(saude.proximo.data_hora, hoje)}`
+      `${rotuloEnc} ${saude.proximo.numero} · ${turmaCurta(d.turma)} agendado ${quandoTxt(saude.proximo.data_hora, hoje)}`
     );
   } else if (lead) {
     partes.push(`sem ${encLow} agendad${encFem}`);
   }
   if (atraso === 1) partes.push(`1 ${encLow} atrasad${encFem}`);
+  // a pendência de registro/limbo é o que tira a dupla da régua — guardada
+  // à parte pra encabeçar as partes da linha sem mexer na ordem do texto
+  // legado (que abre com o agendamento como boa notícia de propósito)
+  let pendencia: string | null = null;
   if (pend?.status === "agendado")
-    partes.push(
-      `${pend.numero}${encOrd} ${encLow} agendad${encFem} já passou — falta o registro`
-    );
+    pendencia = `${pend.numero}${encOrd} ${encLow} agendad${encFem} já passou — falta o registro`;
   else if (pend)
-    partes.push(
-      `registro d${encFem} ${pend.numero}${encOrd} ${encLow} pendente`
-    );
+    pendencia = `registro d${encFem} ${pend.numero}${encOrd} ${encLow} pendente`;
+  if (pendencia) partes.push(pendencia);
 
   const corpo = partes.join(" · ") || saude.motivo;
-  return lead ? `${lead} — ${corpo}` : corpo;
+  // o lead de atraso (2+) é o caso decisório — primeira parte da lista e
+  // prefixo do texto legado (que continua colando com " — ")
+  const lista = lead ? [lead, ...partes] : partes;
+  // contextoPartes: o motivo que pôs a dupla na fila encabeça — senão a
+  // linha abria com "Encontro 8 agendado qui" (boa notícia) e esmaecia o
+  // registro pendente que é a razão dela estar ali. A mesma prioridade do
+  // rótulo do lembrete: registro > limbo > atraso > sem_data.
+  const partesOrd = pendencia
+    ? [pendencia, ...lista.filter((p) => p !== pendencia)]
+    : lista;
+  return {
+    contexto: lead ? `${lead} — ${corpo}` : corpo,
+    contextoPartes: partesOrd.length ? partesOrd : [saude.motivo],
+  };
 }
 
 /** União dedup: coorte sem row do vigente de CADA cronograma ativo + duplas
  *  com sinais atraso/limbo/registro_pendente. Ordena risco→atenção→em
- *  andamento (ORDEM_SEMAFORO). `nudges` vem de `getUltimasInteracoes` —
- *  filtrado a tipo==='nudge' aqui dentro (a query devolve o último contato
- *  de qualquer tipo; o cap só conta nudge). */
+ *  andamento (ORDEM_SEMAFORO). `nudges` vem de `getUltimasInteracoes` com
+ *  tipo:'nudge' — o re-check `ult?.tipo === "nudge"` aqui dentro é defesa
+ *  de contrato, porque o cap de 48h não pode valer sobre outro contato. */
 export function paraAcompanhar(
   duplas: Dupla[],
   eventos: CicloEvento[],
@@ -401,10 +425,12 @@ export function paraAcompanhar(
       turma: d.turma,
       saude,
       motivos: lista,
-      contexto: contextoAcompanhar(
+      ...contextoAcompanhar(
         d,
         saude,
-        d.cronograma_id ? (vigentePorCronograma.get(d.cronograma_id) ?? null) : null,
+        d.cronograma_id
+          ? (vigentePorCronograma.get(d.cronograma_id) ?? null)
+          : null,
         lista,
         hoje
       ),
@@ -422,6 +448,122 @@ export function paraAcompanhar(
       ORDEM_SEMAFORO[a.saude.semaforo] - ORDEM_SEMAFORO[b.saude.semaforo] ||
       comparaNome(a.nomes, b.nomes)
   );
+}
+
+// ---------- dimensões da linha + síntese do topo (REALIZA-161) ----------
+
+/** Um badge de dimensão — `tom` é o mesmo vocabulário do Tag da tela. */
+export type DimensaoBadge = {
+  tom: "danger" | "warn" | "muted";
+  rotulo: string;
+  /** Complemento curto pro title do chip (ex.: origem do pedido de apoio). */
+  detalhe?: string;
+};
+
+/** As três perguntas que a coordenação faz de cada linha da fila: "como vai
+ *  a dupla?" (acompanhamento), "está no calendário?" (cronograma) e "falta
+ *  burocracia?" (operacional). Vermelho SÓ existe na primeira — atraso
+ *  puro não é crise: se quase tudo é risco, nada é risco. */
+export type DimensoesItem = {
+  acompanhamento: DimensaoBadge | null;
+  cronograma: DimensaoBadge | null;
+  operacional: DimensaoBadge | null;
+};
+
+export function dimensoesDoItem(item: ItemParaAcompanhar): DimensoesItem {
+  const { saude, motivos } = item;
+  const temSinal = (t: SinalTipo) => saude.sinais.some((s) => s.tipo === t);
+
+  const acompanhamento: DimensaoBadge | null = saude.apoio.aberto
+    ? {
+        tom: "danger",
+        rotulo: "Apoio pedido",
+        detalhe:
+          saude.apoio.origem === "mentorado"
+            ? "pedido do jovem"
+            : saude.apoio.origem === "ambos"
+              ? "pedido do mentor e do jovem"
+              : "pedido do mentor",
+      }
+    : temSinal("avaliacao_baixa_dificuldade")
+      ? { tom: "danger", rotulo: "Acompanhamento crítico" }
+      : temSinal("avaliacao_baixa") || temSinal("dificuldade")
+        ? { tom: "warn", rotulo: "Acompanhamento" }
+        : null;
+
+  const atraso = Math.max(0, saude.esperado - saude.feitos);
+  const cronograma: DimensaoBadge | null =
+    atraso >= 1
+      ? {
+          tom: "warn",
+          rotulo: `${atraso} ${atraso === 1 ? "encontro atrasado" : "encontros atrasados"}`,
+        }
+      : motivos.includes("limbo")
+        ? { tom: "warn", rotulo: "agendamento vencido" }
+        : motivos.includes("sem_data")
+          ? { tom: "muted", rotulo: "sem data" }
+          : temSinal("estagnacao")
+            ? { tom: "warn", rotulo: "estagnada" }
+            : null;
+
+  const operacional: DimensaoBadge | null = motivos.includes(
+    "registro_pendente"
+  )
+    ? { tom: "muted", rotulo: "registro pendente" }
+    : temSinal("encaminhamento_vencido")
+      ? { tom: "muted", rotulo: "encaminhamento vencido" }
+      : null;
+
+  return { acompanhamento, cronograma, operacional };
+}
+
+/** Os números da faixa de síntese — a leitura de 2s antes dos cards. */
+export type SinteseMonitoramento = {
+  /** tamanho da fila "Para acompanhar". */
+  total: number;
+  /** dimensão acompanhamento em danger — as que pedem intervenção. */
+  criticas: number;
+  /** o resto da fila (não-críticas) — soma com `criticas` = `total`. */
+  atencao: number;
+  /** duplas sem agendamento pro encontro vigente — o MESMO denominador da
+   *  barra hatch dos cards (soma de `semAgendamento`, não a contagem de
+   *  linhas com motivo sem_data: a faixa reconcilia com o que a coordenação
+   *  acabou de ler nos cards). */
+  semData: number;
+  /** linhas com registro pendente. */
+  registrosPendentes: number;
+  /** lembretes dentro do cap de 48h (D5) — `bloqueadoAte` já vem resolvido
+   *  do paraAcompanhar: não-null ⟺ "aguardando a dupla". */
+  lembretesEm48h: number;
+  /** Pedidos de apoio abertos em TODAS as duplas vivas — não só a fila: um
+   *  pedido de dupla "em dia" é o sinal mais urgente da tela e mora em
+   *  /chamados. `saudadeDaDupla` já zera `aberto` em concluída/encerrada. */
+  apoioAberto: number;
+};
+
+export function sinteseMonitoramento(
+  acompanhar: ItemParaAcompanhar[],
+  resumos: ResumoTurmaCard[],
+  duplas: Dupla[],
+  eventos: CicloEvento[],
+  hoje: Date
+): SinteseMonitoramento {
+  const criticas = acompanhar.filter(
+    (i) => dimensoesDoItem(i).acompanhamento?.tom === "danger"
+  ).length;
+  return {
+    total: acompanhar.length,
+    criticas,
+    atencao: acompanhar.length - criticas,
+    semData: resumos.reduce((s, r) => s + r.semAgendamento, 0),
+    registrosPendentes: acompanhar.filter((i) =>
+      i.motivos.includes("registro_pendente")
+    ).length,
+    lembretesEm48h: acompanhar.filter((i) => i.bloqueadoAte != null).length,
+    apoioAberto: duplas.filter(
+      (d) => saudadeDaDupla(d, eventos, hoje).apoio.aberto
+    ).length,
+  };
 }
 
 // ---------- "Semana no programa" ----------
