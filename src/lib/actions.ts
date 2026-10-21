@@ -477,8 +477,9 @@ type CamposMentor = Partial<{
 
 /** Ficha de mentor (mentor_profiles, 0034) — experiência prévia, formação
  *  externa e a grade semanal. A disponibilidade chega como JSON
- *  {"dias":[],"periodos":[]} do grid de chips; grade com as duas listas
- *  vazias grava null ("não informado"), nunca um esqueleto vazio. */
+ *  {"celulas":[{"dia","periodo"}]} da matriz (ou a forma legada
+ *  {"dias","periodos"}, que o parse expande — janela de deploy da 0100);
+ *  grade sem nada marcado grava null ("não informado"), nunca esqueleto. */
 function camposMentor(
   formData: FormData,
   opts: { parcial?: boolean } = {}

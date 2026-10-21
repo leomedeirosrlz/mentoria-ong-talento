@@ -67,9 +67,18 @@ export type CorRaca =
 export type DiaSemana = "seg" | "ter" | "qua" | "qui" | "sex" | "sab" | "dom";
 export type Periodo = "manha" | "tarde" | "noite";
 
-/** Grade semanal do mentor — mentor_profiles.disponibilidade (jsonb com
- *  CHECK no banco: só essas chaves e vocabulário fechado). */
-export type Disponibilidade = { dias: DiaSemana[]; periodos: Periodo[] };
+/** Uma célula da grade semanal — (dia, período) marcado como livre. A
+ *  disponibilidade é a lista delas (≤21), não o produto dias×períodos:
+ *  "ter de manhã, qui à noite" só se expressa por célula (0100). */
+export type CelulaDisponibilidade = { dia: DiaSemana; periodo: Periodo };
+
+/** Grade semanal do mentor — mentor_profiles.disponibilidade e
+ *  mentorados.disponibilidade (jsonb com CHECK no banco: só a chave
+ *  `celulas` e vocabulário fechado; a 0100 aceita e normaliza a forma
+ *  legada {"dias","periodos"} pra esta). O jsonb gravado carrega também
+ *  `dias`/`periodos` derivados das células — superset pra leitura do app
+ *  antigo; o tipo expõe só a canônica. */
+export type Disponibilidade = { celulas: CelulaDisponibilidade[] };
 
 export type Profile = {
   id: string;
@@ -168,8 +177,8 @@ export type Mentorado = {
   objetivos?: string | null;
   escolaridade?: Escolaridade | null;
   origem?: string | null;
-  /** Grade semanal {dias,periodos} (0038) — insumo do matching, mesma forma
-   *  da de mentor_profiles. */
+  /** Grade semanal {celulas:[{dia,periodo}]} (0038, forma de células desde
+   *  a 0100) — insumo do matching, mesma forma da de mentor_profiles. */
   disponibilidade?: Disponibilidade | null;
   /** Dados civis do(a) jovem pro termo de participação (0046). Sensível —
    *  coordenação via mentorados_pessoal; signatário via token RPC. */

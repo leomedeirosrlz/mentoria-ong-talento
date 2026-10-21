@@ -16,10 +16,10 @@
 // remanejarDupla/rematch_dupla de sempre.
 
 import {
+  celulasComuns,
   comparaNome,
   DIAS_SEMANA_LABELS,
   GENERO_LABELS,
-  periodosCruzam,
 } from "./ciclo";
 import { tetoMentor, type FilaItem } from "./fila";
 import { temPapel } from "./types";
@@ -189,14 +189,12 @@ export function afinidadeScore(a: LadoMatching, b: LadoMatching): Pontuacao {
   const motivos: string[] = [];
   const alertas: string[] = [];
 
-  const dias = (a.disponibilidade?.dias ?? []).filter((d) =>
-    (b.disponibilidade?.dias ?? []).includes(d)
-  );
-  if (
-    dias.length > 0 &&
-    periodosCruzam(a.disponibilidade?.periodos, b.disponibilidade?.periodos)
-  ) {
+  // célula em comum = mesmo dia E mesmo período — o encaixe honesto:
+  // "ele ter de manhã, ela ter à noite" não junta a dupla (0100)
+  const agendaComum = celulasComuns(a.disponibilidade, b.disponibilidade);
+  if (agendaComum.length > 0) {
     score += 4;
+    const dias = [...new Set(agendaComum.map((c) => c.dia))];
     motivos.push(
       `agendas se cruzam (${dias.map((d) => DIAS_SEMANA_LABELS[d]).join(", ")})`
     );

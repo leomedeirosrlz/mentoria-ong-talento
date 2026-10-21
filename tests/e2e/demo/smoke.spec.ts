@@ -73,12 +73,20 @@ test("mentorado: card → wizard do 1º acesso → home do /jovem, e volta pra s
   await expect(
     page.getByRole("heading", { name: "Quando dá pra você?" })
   ).toBeVisible();
-  await expect(page.getByRole("button", { name: "Domingo" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Manhã" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Terça" })).toHaveAttribute(
-    "aria-pressed",
-    "true"
-  );
+  // a grade agora é a matriz dia×período (REALIZA-163) — ter/qui × noite
+  // da ficha demo viram as duas células ligadas
+  await expect(
+    page.getByRole("grid", { name: "Dias e períodos livres na semana" })
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Alternar Domingo inteiro" })
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Terça de noite" })
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(
+    page.getByRole("button", { name: "Quinta de noite" })
+  ).toHaveAttribute("aria-pressed", "true");
 
   // "Preencher depois" é a saída honesta — na demo a grade já veio pronta,
   // então seguimos por ela pra conferir o passo de contato

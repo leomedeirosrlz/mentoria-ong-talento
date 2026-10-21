@@ -12,24 +12,28 @@ import {
 } from "@/lib/agenda-especialista";
 import { cn } from "@/lib/utils";
 
-/** Escala do eixo: 1h = 48px — a régua da grade e dos blocos absolutos. */
-const HORA_PX = 48;
-const ALTURA_PX = ((EIXO_FIM_MIN - EIXO_INI_MIN) / 60) * HORA_PX; // 12h × 48 = 576
-const PX_POR_MIN = HORA_PX / 60;
+/** Escala do eixo: 1h = 48px — a régua da grade e dos blocos absolutos.
+ *  Exportadas junto com `posicao`/`intervalo`/`fmtHora` pro editor da grade
+ *  (agenda-grade-edicao) desenhar com a mesma régua — o componente segue
+ *  server-safe (só constantes e funções puras saem daqui). */
+export const HORA_PX = 48;
+export const ALTURA_PX = ((EIXO_FIM_MIN - EIXO_INI_MIN) / 60) * HORA_PX; // 12h × 48 = 576
+export const PX_POR_MIN = HORA_PX / 60;
 /** Rótulos do gutter: um por hora, 8h–19h (a linha das 20h é a borda). */
-const HORAS = Array.from(
+export const HORAS = Array.from(
   { length: (EIXO_FIM_MIN - EIXO_INI_MIN) / 60 },
   (_, i) => EIXO_INI_MIN / 60 + i
 );
 
 /** "18h" / "18h30" — formato compacto de hora nos blocos e nas pills. */
-function fmtHora(min: number): string {
+export function fmtHora(min: number): string {
   const h = Math.floor(min / 60);
   const m = min % 60;
   return m ? `${h}h${String(m).padStart(2, "0")}` : `${h}h`;
 }
 
-const intervalo = (b: BlocoPosicionado) => `${fmtHora(b.iniMin)}–${fmtHora(b.fimMin)}`;
+export const intervalo = (b: BlocoPosicionado) =>
+  `${fmtHora(b.iniMin)}–${fmtHora(b.fimMin)}`;
 
 /** "06/out" — cabeçalho do dia sem o ano (a semana já data o conjunto; o
  *  mês abreviado desambigua a virada de mês dentro dela). */
@@ -43,7 +47,7 @@ function diaLongo(iso: string): string {
 
 /** Posição absoluta do bloco dentro da coluna, clampada ao eixo — o que a
  *  lib manda pode transbordar (sessão 20h30) e o que sai da grade some. */
-function posicao(b: BlocoPosicionado): { top: number; height: number } | null {
+export function posicao(b: BlocoPosicionado): { top: number; height: number } | null {
   const top = Math.max(0, (b.iniMin - EIXO_INI_MIN) * PX_POR_MIN);
   const bottom = Math.min(ALTURA_PX, (b.fimMin - EIXO_INI_MIN) * PX_POR_MIN);
   const height = bottom - top;

@@ -41,10 +41,10 @@ describe("afinidadeScore", () => {
   it("agenda que cruza pesa mais que tema", () => {
     const agenda = afinidadeScore(
       {
-        disponibilidade: { dias: ["ter"], periodos: ["noite"] },
+        disponibilidade: { celulas: [{ dia: "ter", periodo: "noite" }] },
       },
       {
-        disponibilidade: { dias: ["ter"], periodos: ["noite"] },
+        disponibilidade: { celulas: [{ dia: "ter", periodo: "noite" }] },
       }
     );
     const tema = afinidadeScore(
@@ -56,10 +56,10 @@ describe("afinidadeScore", () => {
     expect(tema.motivos[0]).toContain("tema em comum: tecnologia");
   });
 
-  it("dia em comum sem período cruzável não pontua agenda", () => {
+  it("mesmo dia sem a mesma célula não pontua agenda — ter de manhã × ter à noite", () => {
     const r = afinidadeScore(
-      { disponibilidade: { dias: ["ter"], periodos: ["manha"] } },
-      { disponibilidade: { dias: ["ter"], periodos: ["noite"] } }
+      { disponibilidade: { celulas: [{ dia: "ter", periodo: "manha" }] } },
+      { disponibilidade: { celulas: [{ dia: "ter", periodo: "noite" }] } }
     );
     expect(r.score).toBe(0);
     expect(r.motivos).toHaveLength(0);

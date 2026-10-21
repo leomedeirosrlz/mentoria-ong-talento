@@ -1,12 +1,16 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  celulasComuns,
+  celulasCruzam,
   cruzamentoDisponibilidade,
   cruzamentoDisponibilidadeHora,
   diaSemanaDe,
   diffDias,
   diasAtrasoRegistro,
+  disponibilidadeDeConjuntos,
   disponibilidadeNaHora,
   disponibilidadeNoDia,
+  disponibilidadeNoPeriodo,
   disponibilidadeTexto,
   disponibilidadeVazia,
   formatDate,
@@ -30,11 +34,13 @@ import {
 import type { DiaSemana, Disponibilidade, Periodo } from "@/lib/types";
 import { mkDupla, mkEncontro, mkRegistro } from "./helpers";
 
-/** Literal de grade tipado — a Disponibilidade do CHECK é {dias,periodos}. */
-const grade = (dias: DiaSemana[], periodos: Periodo[] = []): Disponibilidade => ({
-  dias,
-  periodos,
-});
+/** Literal de grade — a Disponibilidade canônica (0100) é {celulas}; a
+ *  fábrica expande conjuntos como o parser faz com a forma legada:
+ *  `periodos` vazio = o dia inteiro, nenhum dia = null. */
+const grade = (
+  dias: DiaSemana[],
+  periodos: Periodo[] = []
+): Disponibilidade | null => disponibilidadeDeConjuntos(dias, periodos);
 
 describe("toDateStr / diffDias", () => {
   it("toDateStr formata no fuso do programa (YYYY-MM-DD)", () => {
@@ -146,29 +152,103 @@ describe("disponibilidadeTexto / parseDisponibilidade", () => {
   it("grade vazia ou ausente vira null", () => {
     expect(disponibilidadeTexto(null)).toBeNull();
     expect(disponibilidadeTexto(undefined)).toBeNull();
-    expect(disponibilidadeTexto({ dias: [], periodos: [] })).toBeNull();
+    expect(disponibilidadeTexto({ celulas: [] })).toBeNull();
+    // o esqueleto legado também continua lendo como vazio (janela de deploy)
+    expect(
+      disponibilidadeTexto({
+        dias: [],
+        periodos: [],
+      } as unknown as Disponibilidade)
+    ).toBeNull();
   });
 
-  it("monta a frase curta com 'e' e plural do 'às'", () => {
-    expect(disponibilidadeTexto({ dias: ["ter", "qui"], periodos: ["noite"] })).toBe(
+  it("monta a frase curta com 'e', faixas contíguas e plural do 'às'", () => {
+    expect(disponibilidadeTexto(grade(["ter", "qui"], ["noite"]))).toBe(
       "Terça e Quinta à noite"
     );
+    // dias soltos listam por extenso; o recorte comum sai junto
     expect(
-      disponibilidadeTexto({ dias: ["seg", "qua", "sex"], periodos: ["manha", "tarde"] })
+      disponibilidadeTexto(grade(["seg", "qua", "sex"], ["manha", "tarde"]))
     ).toBe("Segunda, Quarta e Sexta às manhãs e tardes");
-    expect(disponibilidadeTexto({ dias: ["sab"], periodos: [] })).toBe("Sábado");
-    expect(disponibilidadeTexto({ dias: [], periodos: ["manha"] })).toBe("à manhã");
+    // faixa contígua de 3+ vira "X a Y"
+    expect(
+      disponibilidadeTexto(
+        grade(["seg", "ter", "qua", "qui", "sex"], ["manha", "tarde"])
+      )
+    ).toBe("Segunda a Sexta às manhãs e tardes");
+    // dia inteiro (as três células) diz "o dia inteiro"
+    expect(disponibilidadeTexto(grade(["sab"]))).toBe("Sábado o dia inteiro");
   });
 
-  it("parseDisponibilidade valida o JSON contra o vocabulário do CHECK", () => {
-    expect(parseDisponibilidade('{"dias":["ter","qui"],"periodos":["noite"]}')).toEqual({
-      dias: ["ter", "qui"],
-      periodos: ["noite"],
+  it("agrupa dias por combinação de períodos — '·' separa os recortes", () => {
+    // recorte igual pra todos continua uma frase só — seg a sáb contígua
+    expect(
+      disponibilidadeTexto(
+        grade(["seg", "ter", "qua", "qui", "sex", "sab"], ["manha", "tarde"])
+      )
+    ).toBe("Segunda a Sábado às manhãs e tardes");
+    // o caso que motivou a 0100: semana útil de manhã/tarde + sábado só
+    // de manhã — impossível de dizer com o produto de conjuntos
+    const recortes = {
+      celulas: [
+        ...disponibilidadeDeConjuntos(["seg", "ter", "qua", "qui", "sex"], [
+          "manha",
+          "tarde",
+        ])!.celulas,
+        { dia: "sab" as const, periodo: "manha" as const },
+      ],
+    };
+    expect(disponibilidadeTexto(recortes)).toBe(
+      "Segunda a Sexta às manhãs e tardes · Sábado à manhã"
+    );
+  });
+
+  it("parseDisponibilidade lê a forma canônica {celulas}", () => {
+    expect(
+      parseDisponibilidade(
+        '{"celulas":[{"dia":"ter","periodo":"noite"},{"dia":"qui","periodo":"noite"}]}'
+      )
+    ).toEqual({
+      celulas: [
+        { dia: "ter", periodo: "noite" },
+        { dia: "qui", periodo: "noite" },
+      ],
+    });
+    // duplicadas dedupam; inválidas caem; sobrando nada, vira null
+    expect(
+      parseDisponibilidade(
+        '{"celulas":[{"dia":"ter","periodo":"noite"},{"dia":"ter","periodo":"noite"},{"dia":"x","periodo":"noite"},{"dia":"ter","periodo":"x"},null]}'
+      )
+    ).toEqual({ celulas: [{ dia: "ter", periodo: "noite" }] });
+    expect(parseDisponibilidade('{"celulas":[]}')).toBeNull();
+    expect(parseDisponibilidade('{"celulas":[{"dia":"x"}]}')).toBeNull();
+  });
+
+  it("parseDisponibilidade expande a forma legada {dias,periodos} pro produto", () => {
+    // a janela de deploy pode gravar a forma velha — o parse normaliza:
+    // o produto dos conjuntos, com períodos vazio = o dia inteiro
+    expect(
+      parseDisponibilidade('{"dias":["ter","qui"],"periodos":["noite"]}')
+    ).toEqual({
+      celulas: [
+        { dia: "ter", periodo: "noite" },
+        { dia: "qui", periodo: "noite" },
+      ],
+    });
+    expect(parseDisponibilidade('{"dias":["sab"],"periodos":[]}')).toEqual({
+      celulas: [
+        { dia: "sab", periodo: "manha" },
+        { dia: "sab", periodo: "tarde" },
+        { dia: "sab", periodo: "noite" },
+      ],
     });
     // valores fora do vocabulário são filtrados; sobrando nada, vira null
     expect(parseDisponibilidade('{"dias":["ter","x"],"periodos":[]}')).toEqual({
-      dias: ["ter"],
-      periodos: [],
+      celulas: [
+        { dia: "ter", periodo: "manha" },
+        { dia: "ter", periodo: "tarde" },
+        { dia: "ter", periodo: "noite" },
+      ],
     });
     expect(parseDisponibilidade('{"dias":["x"]}')).toBeNull();
     expect(parseDisponibilidade("")).toBeNull();
@@ -187,7 +267,7 @@ describe("diaSemanaDe / disponibilidadeNoDia / cruzamentoDisponibilidade", () =>
     expect(diaSemanaDe("2025-10-18")).toBe("sab");
   });
 
-  it("disponibilidadeNoDia só olha `dias` — grade nula/sem dias não é livre", () => {
+  it("disponibilidadeNoDia exige célula no dia — grade nula/sem célula não é livre", () => {
     expect(disponibilidadeNoDia(grade(["ter", "qui"]), "ter")).toBe(true);
     expect(disponibilidadeNoDia(grade(["ter", "qui"], ["noite"]), "qua")).toBe(false);
     expect(disponibilidadeNoDia(grade([], ["noite"]), "ter")).toBe(false);
@@ -195,30 +275,66 @@ describe("diaSemanaDe / disponibilidadeNoDia / cruzamentoDisponibilidade", () =>
     expect(disponibilidadeNoDia(undefined, "ter")).toBe(false);
   });
 
-  it("disponibilidadeVazia segue a mesma régua do cruzamento — sem dia não cruza", () => {
-    // a régua do lembrete do /jovem (REALIZA-114): null, esqueleto vazio e
-    // períodos-sem-dia não servem pro overlay — "pendente"
+  it("disponibilidadeNoPeriodo lê a célula exata (dia E período)", () => {
+    const d = grade(["ter", "qui"], ["noite"]);
+    expect(disponibilidadeNoPeriodo(d, "ter", "noite")).toBe(true);
+    // mesmo dia, outro período — o par que o produto de conjuntos confundia
+    expect(disponibilidadeNoPeriodo(d, "ter", "manha")).toBe(false);
+    expect(disponibilidadeNoPeriodo(d, "qua", "noite")).toBe(false);
+    expect(disponibilidadeNoPeriodo(null, "ter", "noite")).toBe(false);
+  });
+
+  it("disponibilidadeVazia segue a mesma régua do cruzamento — sem célula não cruza", () => {
+    // a régua do lembrete do /jovem (REALIZA-114): null e grade sem nada
+    // marcado não servem pro overlay — "pendente"
     expect(disponibilidadeVazia(null)).toBe(true);
     expect(disponibilidadeVazia(undefined)).toBe(true);
     expect(disponibilidadeVazia(grade([]))).toBe(true);
     expect(disponibilidadeVazia(grade([], ["noite"]))).toBe(true);
-    // dia marcado basta pra preencher — período vazio é "qualquer horário"
+    expect(disponibilidadeVazia({ celulas: [] })).toBe(true);
+    // qualquer célula basta pra preencher
     expect(disponibilidadeVazia(grade(["ter"]))).toBe(false);
     expect(disponibilidadeVazia(grade(["ter"], ["noite"]))).toBe(false);
   });
 
+  it("celulasCruzam/celulasComuns exigem mesma célula — dia em comum não basta", () => {
+    // o caso que motivou a 0100: ele ter de manhã, ela ter à noite —
+    // mesmo dia, nenhum encaixe
+    expect(
+      celulasCruzam(grade(["ter"], ["manha"]), grade(["ter"], ["noite"]))
+    ).toBe(false);
+    expect(
+      celulasComuns(grade(["ter"], ["manha"]), grade(["ter"], ["noite"]))
+    ).toEqual([]);
+    // a célula exata cruza e sai na ordem canônica (dia, depois período)
+    expect(
+      celulasCruzam(grade(["ter"], ["noite"]), grade(["ter"], ["noite"]))
+    ).toBe(true);
+    expect(
+      celulasComuns(
+        grade(["ter", "qui"], ["manha", "noite"]),
+        grade(["qui", "ter"], ["noite", "tarde"])
+      )
+    ).toEqual([
+      { dia: "ter", periodo: "noite" },
+      { dia: "qui", periodo: "noite" },
+    ]);
+    // null em qualquer lado nunca cruza
+    expect(celulasCruzam(null, grade(["ter"], ["noite"]))).toBe(false);
+  });
+
   const MENTOR = grade(["ter", "qui"], ["noite"]);
 
-  it("ambos = mesmo dia + período em comum; período vazio é coringa", () => {
+  it("ambos = célula em comum no dia — período vazio expande pro dia inteiro", () => {
     // encaixe exato (ter × noite nas duas grades)
     expect(
       cruzamentoDisponibilidade(MENTOR, [grade(["ter"], ["noite"])], "ter")
     ).toBe("ambos");
-    // jovem sem períodos = "qualquer" — cruza com o "noite" do mentor
+    // jovem sem recorte = dia inteiro — cruza com o "noite" do mentor
     expect(
       cruzamentoDisponibilidade(MENTOR, [grade(["qui"])], "qui")
     ).toBe("ambos");
-    // mentor sem períodos também é coringa
+    // mentor sem recorte idem — o dia inteiro encontra a manhã dela
     expect(
       cruzamentoDisponibilidade(
         grade(["ter"]),
@@ -289,12 +405,14 @@ describe("disponibilidadeNaHora / cruzamentoDisponibilidadeHora (REALIZA-25)", (
     expect(disponibilidadeNaHora(manha, "ter", 12)).toBe(false);
   });
 
-  it("`dias` decide o dia; `periodos` vazio = qualquer hora do dia livre", () => {
+  it("a célula decide o dia E a faixa; o dia inteiro cobre as três janelas", () => {
     // fora do dia marcado, nenhuma hora livre
     expect(disponibilidadeNaHora(grade(["ter"], ["noite"]), "qua", 19)).toBe(false);
     expect(disponibilidadeNaHora(null, "ter", 19)).toBe(false);
-    // dia marcado sem período = o dia inteiro livre (mesmo coringa do dia)
-    expect(disponibilidadeNaHora(grade(["ter"]), "ter", 7)).toBe(true);
+    // dia marcado sem recorte = as três células — 7h fica fora delas,
+    // 9h e 19h dentro
+    expect(disponibilidadeNaHora(grade(["ter"]), "ter", 7)).toBe(false);
+    expect(disponibilidadeNaHora(grade(["ter"]), "ter", 9)).toBe(true);
     expect(disponibilidadeNaHora(grade(["ter"]), "ter", 19)).toBe(true);
     // OR entre períodos — tarde OU noite cobre 14h e 20h, não 9h
     const duas = grade(["ter"], ["tarde", "noite"]);
@@ -374,8 +492,11 @@ describe("slotCompativel — o slot do especialista × a grade do jovem (WP6)", 
     expect(slotCompativel(undefined, "2025-10-14T15:00:00-03:00")).toBe(false);
   });
 
-  it("grade sem períodos é coringa — o dia todo vale; madrugada UTC ainda é terça em SP", () => {
+  it("grade sem recorte vale as três janelas do dia — a madrugada segue fora; madrugada UTC ainda é terça em SP", () => {
     expect(slotCompativel(grade(["ter"]), "2025-10-14T07:00:00-03:00")).toBe(
+      false
+    );
+    expect(slotCompativel(grade(["ter"]), "2025-10-14T08:00:00-03:00")).toBe(
       true
     );
     // 00:30 UTC de quarta = 21:30 de terça em SP — lê o dia/hora de SP

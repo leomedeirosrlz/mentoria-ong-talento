@@ -23,7 +23,12 @@ const IDS = {
 } as const;
 
 type FichaGrade = {
-  disponibilidade: { dias: string[]; periodos: string[] } | null;
+  // a 0100 grava a forma canônica + as chaves derivadas (leitura legada)
+  disponibilidade: {
+    celulas: { dia: string; periodo: string }[];
+    dias: string[];
+    periodos: string[];
+  } | null;
 };
 
 test.skip(!appEnvOk(), "sem credenciais de teste (E2E_*) — pula specs de app");
@@ -61,8 +66,9 @@ test.describe("mentorado — onboarding do 1º acesso (REALIZA-114)", () => {
     await expect(
       page.getByRole("heading", { name: "Quando dá pra você?" })
     ).toBeVisible();
-    await page.getByRole("button", { name: "Sábado" }).click();
-    await page.getByRole("button", { name: "Manhã" }).click();
+    await page
+      .getByRole("button", { name: "Sábado de manhã", exact: true })
+      .click();
     await page.getByRole("button", { name: "Continuar" }).click();
 
     // passo 3 — contato: WhatsApp da ficha formatado + o toggle do opt-in
@@ -93,6 +99,7 @@ test.describe("mentorado — onboarding do 1º acesso (REALIZA-114)", () => {
       `select=disponibilidade&id=eq.${IDS.mentoradoOnboarding}`
     );
     expect(ficha.disponibilidade).toEqual({
+      celulas: [{ dia: "sab", periodo: "manha" }],
       dias: ["sab"],
       periodos: ["manha"],
     });
@@ -133,8 +140,9 @@ test.describe("mentorado — onboarding do 1º acesso (REALIZA-114)", () => {
       .getByRole("button", { name: "Editar sua disponibilidade" })
       .click();
     const dialogo = page.getByRole("dialog");
-    await dialogo.getByRole("button", { name: "Domingo" }).click();
-    await dialogo.getByRole("button", { name: "Noite" }).click();
+    await dialogo
+      .getByRole("button", { name: "Domingo de noite", exact: true })
+      .click();
     await dialogo.getByRole("button", { name: "Salvar" }).click();
     await expect(page.getByText("Disponibilidade salva.")).toBeVisible();
 
@@ -144,6 +152,7 @@ test.describe("mentorado — onboarding do 1º acesso (REALIZA-114)", () => {
       `select=disponibilidade&id=eq.${IDS.mentoradoOnboarding}`
     );
     expect(ficha.disponibilidade).toEqual({
+      celulas: [{ dia: "dom", periodo: "noite" }],
       dias: ["dom"],
       periodos: ["noite"],
     });
