@@ -1442,11 +1442,15 @@ if (papeisOk) {
       [IDS.hibProfile, "mentor_especialista"],
     ];
     for (const [profile_id, papel] of PAPEIS_E2E) {
-      // escopo Turma E2E (REALIZA-151): jovem_especialistas/jovem_contatos
-      // filtram papel por has_papel(..., turma do jovem) — papel global da
-      // fixture vazava pro catálogo/contatos do jovem demo. Converge a
-      // linha existente (run antigo criou com escopo null) e remove a
-      // duplicata global que o sync de profiles.role pode ter recriado.
+      // escopo Turma E2E (REALIZA-151): jovem_contatos e o remanejo DPP
+      // filtram papel por has_papel(..., turma do jovem/dupla) — papel
+      // global da fixture vazava pros contatos do jovem demo. Pra
+      // mentor_especialista o escopo é inerte desde a 0101 (pool global,
+      // REALIZA-158) — mantido por simetria e porque o spec de isolamento
+      // agora confirma a visibilidade cross-turma dele no catálogo.
+      // Converge a linha existente (run antigo criou com escopo null) e
+      // remove a duplicata global que o sync de profiles.role pode ter
+      // recriado.
       const rows = await rest(
         `profile_papeis?select=id,escopo_turma&profile_id=eq.${profile_id}&papel=eq.${papel}`
       );
