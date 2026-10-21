@@ -366,11 +366,13 @@ export async function aceitarProposta(solicitacaoId: string) {
   return { ok: true, duplaId };
 }
 
-/** Triagem da coordenação (0074): pedido do jovem sem dupla DPP entra
- *  'aguardando_coord' — reconhecer libera pro mural com a turma definida. */
+/** Triagem da coordenação (0074, 0101): pedido do jovem sem dupla DPP
+ *  entra 'aguardando_coord' — reconhecer libera pro mural. Com o pool
+ *  global a turma é opcional: definida agora ou resolvida na efetivação
+ *  (s.turma → DPP → cronograma vigente). */
 export async function reconhecerSolicitacao(
   solicitacaoId: string,
-  turma: string
+  turma?: string | null
 ) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
@@ -379,11 +381,10 @@ export async function reconhecerSolicitacao(
     return { error: "Só a coordenação faz a triagem." };
   }
   if (!solicitacaoId) return { error: "Solicitação não informada." };
-  if (!turma.trim()) return { error: "Escolha uma turma." };
 
   const { error } = await supabase.rpc("reconhecer_solicitacao", {
     p_id: solicitacaoId,
-    p_turma: turma.trim(),
+    p_turma: turma?.trim() || null,
   });
   if (error) return { error: erroAmigavel(error) };
   revalidarMural();

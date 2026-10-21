@@ -332,9 +332,12 @@ test.describe("diretório do jovem (REALIZA-113 / 0076)", () => {
   }) => {
     // Ana (seed:demo) é turma T1; as personas do seed e2e agora têm papel
     // escopado na "Turma E2E" e duplas na mesma turma — jovem_contatos
-    // (0097), jovem_especialistas (0086) e mentorados_turma (join por
-    // turma da dupla) devem ignorar tudo isso pra ela. Antes da 0097 o
-    // branch de coordenação listava qualquer profile com o papel.
+    // (0097) e mentorados_turma (join por turma da dupla) devem ignorar
+    // tudo isso pra ela. Antes da 0097 o branch de coordenação listava
+    // qualquer profile com o papel.
+    // jovem_especialistas é a exceção deliberada: o catálogo virou pool
+    // GLOBAL (0101, REALIZA-158) — o escopo dos personas e2e NÃO esconde
+    // eles dela, e o assert abaixo confirma justamente o oposto.
     // Depende do dataset demo — o e2e-app (stack local) só semeia e2e:
     // sem a persona o teste pula, não quebra.
     const [anaExiste] = await buscarViaServiceRole<{ id: string }[]>(
@@ -355,15 +358,21 @@ test.describe("diretório do jovem (REALIZA-113 / 0076)", () => {
     await expect(colegas.getByText("Jovem E2E Sem DPP")).toHaveCount(0);
     await expect(colegas.getByText("Mentorada E2E Dois")).toHaveCount(0);
 
-    // catálogo escopado (jovem_especialistas): esp com papel só na Turma
-    // E2E não aparece pra turma dela
+    // catálogo global (0101): o especialista e2e aparece pra Ana mesmo
+    // com o papel escopado em outra turma — é a regra do ticket
     await page.goto("/jovem/especialistas");
-    await expect(page.getByText("Esp Dois E2E")).toHaveCount(0);
-    await expect(page.getByText("Esp E2E")).toHaveCount(0);
+    await expect(page.getByText("Esp Dois E2E").first()).toBeVisible();
+    await expect(page.getByText("Esp E2E").first()).toBeVisible();
 
     // na borda do PostgREST com o JWT real dela — é a view quem filtra,
     // não a UI (o teste de tela acima podia passar por acidente de nome)
     const jwt = await jwtDoUsuario(JOVEM_DEMO_EMAIL, SENHA_DEMO);
+    const resEsp = await restComoUsuario(
+      `jovem_especialistas?select=id&id=in.(${IDS.espProfile},${IDS.esp2Profile})`,
+      jwt
+    );
+    expect(resEsp.status).toBe(200);
+    expect(await resEsp.json()).toHaveLength(2);
     const res = await restComoUsuario(
       `jovem_contatos?select=id&or=(id.eq.${IDS.espProfile},id.eq.${IDS.esp2Profile},id.eq.${IDS.coordProfile},id.eq.${IDS.mentorProfile})`,
       jwt

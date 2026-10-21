@@ -6,10 +6,13 @@ import {
   expect,
   inserirViaServiceRole,
   isoDoRotulo,
+  jwtDoUsuario,
   limparEncontrosDaDupla,
   limparViaServiceRole,
   loginComSenha,
   relogar,
+  restComoUsuario,
+  rpcViaServiceRole,
   test,
 } from "../helpers";
 import type { Page } from "@playwright/test";
@@ -578,3 +581,155 @@ test.describe("solicitação de especialista v2 — fluxo staff (REALIZA-112)", 
     expect(notifs).toHaveLength(1);
   });
 });
+
+// ── REALIZA-158 / migration 0101 — pool global de especialistas ─────────
+// Os gates de atuação já eram globais desde a 0087; a 0101 tirou os restos
+// (catálogo do jovem, rematch, triagem com turma obrigatória, budget por
+// par+turma). O spec visual cobre o catálogo (jovem-pessoas); aqui ficam
+// os dois caminhos que só o banco enxerga, na borda do PostgREST com o JWT
+// real de cada papel — a mesma camada que o app chama.
+const JOVEM2_PROFILE = "e2e00000-0000-4000-8000-0000000000f0";
+const MENTORADO_SEM_DPP = "e2e00000-0000-4000-8000-0000000000d0";
+const ESP2_PROFILE = "e2e00000-0000-4000-8000-0000000000c0"; // escopo "Turma E2E"
+const ESP2_EMAIL = process.env.E2E_ESP2_EMAIL ?? "esp2-e2e@realiza.test";
+const DEMANDA_158 = "E2E-158: triagem libera sem turma e o aceite é global.";
+
+/** Limpa tudo que o bloco 158 semeia: sols com a demanda do teste, a dupla
+ *  esp criada no aceite (e o remanejo encadeado), encontros e o sino. */
+async function limpar158() {
+  const sols = await buscarViaServiceRole<{ id: string }[]>(
+    "solicitacoes_especialista",
+    `select=id&demanda=like.E2E-158:*`
+  );
+  const duplas = await buscarViaServiceRole<{ id: string }[]>(
+    "duplas",
+    `select=id&mentorado_id=eq.${MENTORADO_SEM_DPP}&trilha=eq.especialista`
+  );
+  // aresta circular dupla↔sol (0028): zera as duas pontas antes de deletar
+  if (duplas.length) {
+    await atualizarViaServiceRole(
+      "duplas",
+      `id=in.(${duplas.map((d) => d.id).join(",")})`,
+      { solicitacao_id: null }
+    );
+  }
+  if (sols.length) {
+    await atualizarViaServiceRole(
+      "solicitacoes_especialista",
+      `id=in.(${sols.map((s) => s.id).join(",")})`,
+      { dupla_id: null }
+    );
+    await limparViaServiceRole(
+      "solicitacao_propostas",
+      `solicitacao_id=in.(${sols.map((s) => s.id).join(",")})`
+    );
+    await limparViaServiceRole(
+      "solicitacoes_especialista",
+      `id=in.(${sols.map((s) => s.id).join(",")})`
+    );
+  }
+  for (const d of duplas) await limparEncontrosDaDupla(d.id);
+  if (duplas.length) {
+    await limparViaServiceRole(
+      "duplas",
+      `id=in.(${duplas.map((d) => d.id).join(",")})`
+    );
+  }
+  await limparViaServiceRole(
+    "notificacoes",
+    `profile_id=eq.${JOVEM2_PROFILE}&tipo=in.(solicitacao_registrada,solicitacao_triagem)`
+  );
+}
+
+test.describe("especialista global — turma não restringe (REALIZA-158)", () => {
+  test.beforeEach(limpar158);
+  test.afterAll(limpar158);
+
+  test("triagem libera sem turma; esp de outro escopo aceita e coord remaneja cross-turma", async () => {
+    // pedido do jovem sem DPP ativa entra na triagem (aguardando_coord)
+    const sol = await inserirViaServiceRole("solicitacoes_especialista", {
+      mentorado_id: MENTORADO_SEM_DPP,
+      origem: "jovem",
+      status: "aguardando_coord",
+      demanda: DEMANDA_158,
+      motivo: "E2E-158 motivo",
+      especialista_desejado_id: ESP2_PROFILE,
+      created_by: JOVEM2_PROFILE,
+    });
+    const solId = sol.id as string;
+
+    // 1) a coord libera SEM escolher turma — antes da 0101 a RPC exigia
+    const jwtCoord = await jwtDoUsuario(COORD_EMAIL, SENHA_COORD);
+    const lib = await restComoUsuario("rpc/reconhecer_solicitacao", jwtCoord, {
+      method: "POST",
+      body: { p_id: solId },
+    });
+    const libText = await lib.text();
+    expect(lib.ok, `reconhecer sem turma → ${libText}`).toBeTruthy();
+    const [aberta] = await buscarViaServiceRole<
+      { status: string; turma: string | null }[]
+    >("solicitacoes_especialista", `select=status,turma&id=eq.${solId}`);
+    expect(aberta?.status).toBe("aberta");
+    expect(aberta?.turma).toBeNull();
+
+    // 2) o pedido mira a turma do jovem quando o efetivar roda — aqui o
+    // mentorado é da Turma E2E, então marcamos T1 pra forçar o cenário
+    // "esp escopado noutra turma aceita" (o papel do esp2 é Turma E2E).
+    await atualizarViaServiceRole(
+      "solicitacoes_especialista",
+      `id=eq.${solId}`,
+      { turma: "T1 · 2026/2027" }
+    );
+
+    // slot livre real do esp2 (grade qui 19–21)
+    const desde = new Date().toISOString().slice(0, 10);
+    const ate = new Date(Date.now() + 14 * 86400e3).toISOString().slice(0, 10);
+    const slots = await rpcViaServiceRole<{ inicio: string }[]>(
+      "especialista_slots_livres",
+      { p_especialista: ESP2_PROFILE, p_desde: desde, p_ate: ate }
+    );
+    expect(slots.length).toBeGreaterThan(0);
+
+    const jwtEsp2 = await jwtDoUsuario(ESP2_EMAIL, SENHA);
+    const aceite = await restComoUsuario("rpc/aceitar_solicitacao", jwtEsp2, {
+      method: "POST",
+      body: { p_id: solId, p_slot: slots[0].inicio },
+    });
+    const aceiteText = await aceite.text();
+    expect(aceite.ok, `aceite cross-escopo → ${aceiteText}`).toBeTruthy();
+    const duplaId = JSON.parse(aceiteText) as string;
+
+    const [dupla] = await buscarViaServiceRole<
+      { trilha: string; turma: string; mentor_id: string; status: string }[]
+    >(
+      "duplas",
+      `select=trilha,turma,mentor_id,status&id=eq.${duplaId}`
+    );
+    expect(dupla?.trilha).toBe("especialista");
+    expect(dupla?.mentor_id).toBe(ESP2_PROFILE);
+    expect(dupla?.turma).toBe("T1 · 2026/2027");
+
+    // 3) rematch cross-turma: o mentor principal (esp …0060, papel escopo
+    // "Turma E2E") assume a dupla carimbada T1 — antes da 0101 a RPC barrava
+    const rem = await restComoUsuario("rpc/rematch_dupla", jwtCoord, {
+      method: "POST",
+      body: {
+        p_dupla_id: duplaId,
+        p_lado: "mentor",
+        p_novo_id: IDS.espProfile,
+        p_motivo: "E2E-158: rematch cross-turma",
+        p_registrar_nota: false,
+      },
+    });
+    const remText = await rem.text();
+    expect(rem.ok, `rematch cross-turma → ${remText}`).toBeTruthy();
+    const novaId = JSON.parse(remText) as string;
+    const [nova] = await buscarViaServiceRole<
+      { mentor_id: string; trilha: string; status: string }[]
+    >("duplas", `select=mentor_id,trilha,status&id=eq.${novaId}`);
+    expect(nova?.mentor_id).toBe(IDS.espProfile);
+    expect(nova?.trilha).toBe("especialista");
+    expect(nova?.status).toBe("ativa");
+  });
+});
+
