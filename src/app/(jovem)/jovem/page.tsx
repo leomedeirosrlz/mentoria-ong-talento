@@ -19,6 +19,7 @@ import {
   ShareNetwork,
   Siren,
   Star,
+  UsersThree,
   VideoCamera,
   WhatsappLogo,
 } from "@phosphor-icons/react/dist/ssr";
@@ -58,6 +59,7 @@ import {
   getJovemPerfil,
 } from "@/lib/queries-jovem";
 import { getJovemAvaliacoes } from "@/lib/queries-avaliacao";
+import { getConsolidadoTerceirosJovem } from "@/lib/terceiros/queries";
 import { getComunicados, getMateriais, getMe } from "@/lib/queries";
 import type { Disponibilidade, JovemContato } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -89,7 +91,7 @@ const TIPO_ICONE_MATERIAL = {
 } as const;
 
 export default async function JovemHome() {
-  const [me, perfil, duplas, contatos, encaminhamentos, assinaturas, encontros, avisos, materiais, avaliacoes, pedidosEsp] =
+  const [me, perfil, duplas, contatos, encaminhamentos, assinaturas, encontros, avisos, materiais, avaliacoes, pedidosEsp, consolidadoTerc] =
     await Promise.all([
       getMe(),
       getJovemPerfil(),
@@ -102,6 +104,9 @@ export default async function JovemHome() {
       getMateriais(),
       getJovemAvaliacoes(),
       getJovemPedidosEspecialista(),
+      // a síntese anônima da avaliação por terceiros (0103) — só chega aqui
+      // depois que o mentor publica; RLS filtra pro DPP dele
+      getConsolidadoTerceirosJovem(),
     ]);
   if (!me) return null; // o layout já barra — convenção das páginas
 
@@ -430,6 +435,30 @@ export default async function JovemHome() {
           </Card>
         )}
       </section>
+
+      {/* Avaliação por terceiros (0103, guia sem. 2): o mentor publica a
+          síntese das respostas das pessoas indicadas — anônima por desenho.
+          O card aparece só quando existe publicado; o jovem compara com a
+          autoavaliação na conversa do encontro */}
+      {consolidadoTerc && (
+        <section aria-labelledby="terceiros-titulo">
+          <h2 id="terceiros-titulo" className="mb-3 flex items-center gap-2 font-semibold">
+            <UsersThree size={18} className="text-muted-foreground" aria-hidden />
+            Como as pessoas próximas te veem
+          </h2>
+          <Card className="animate-enter">
+            <CardContent>
+              <p className="whitespace-pre-wrap text-sm leading-relaxed">
+                {consolidadoTerc.consolidado}
+              </p>
+              <p className="mt-3 border-t border-border/60 pt-2 text-xs text-muted-foreground">
+                Síntese que seu mentor fez das respostas — quem respondeu fica
+                anônimo. Vale comparar com a sua autoavaliação.
+              </p>
+            </CardContent>
+          </Card>
+        </section>
+      )}
 
       {/* Encontros */}
       <section aria-labelledby="encontros-titulo">

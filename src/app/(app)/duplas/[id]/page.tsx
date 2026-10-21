@@ -49,6 +49,7 @@ import {
 } from "@/lib/queries-avaliacao";
 import { getSupervisoesDaDupla } from "@/lib/queries-supervisao";
 import { getFormularios, getInstrumentosDaDupla } from "@/lib/forms/queries";
+import { getTerceirosDaDupla } from "@/lib/terceiros/queries";
 import { dadosResumoJornada } from "@/lib/encerramento";
 import { getAnexosPorRegistros } from "@/lib/anexos";
 import { avatarPublicUrl } from "@/lib/avatar";
@@ -122,6 +123,7 @@ import { EncerramentoDupla } from "@/components/encerramento-dupla";
 import { EnviarFormularioDialog } from "@/components/enviar-formulario-dialog";
 import { ResumoJornadaSection } from "@/components/resumo-jornada";
 import { InstrumentosDupla } from "./instrumentos-dupla";
+import { TerceirosDupla } from "./terceiros-dupla";
 import { DevolutivaEspecialista } from "@/components/devolutiva-especialista";
 import { SupervisaoDialog } from "@/components/supervisao-dialog";
 import { SupervisoesSection } from "@/components/supervisoes-section";
@@ -225,7 +227,7 @@ export async function generateMetadata({
 
 export default async function DuplaPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [dupla, eventos, me, materiais, anexosPorRegistro, encerramento, supervisoes, instrumentos] =
+  const [dupla, eventos, me, materiais, anexosPorRegistro, encerramento, supervisoes, instrumentos, terceiros] =
     await Promise.all([
       getDupla(id),
       getCicloEventos(),
@@ -247,6 +249,11 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
       // instrumentos oficiais da jornada (0080) — RPC escopada: coord,
       // mentor e supervisor da dupla (e o próprio jovem, na área dele)
       getInstrumentosDaDupla(id),
+      // avaliação por terceiros (0103, guia sem. 1→2) — só trilha DPP; no
+      // paralelo do Promise.all via getDupla cacheado, sem +1 RTT serial
+      getDupla(id).then((d) =>
+        d?.trilha === "dpp" ? getTerceirosDaDupla(id) : null
+      ),
     ]);
   if (!dupla || !me) notFound();
 
@@ -1139,6 +1146,22 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
               mentoradoNome={dupla.mentorado.nome}
               mentoradoWhatsapp={dupla.mentorado.whatsapp}
               podeEnviar={souCoord || souMentor}
+              jornadaViva={
+                dupla.status === "ativa" || dupla.status === "pausada"
+              }
+            />
+          )}
+
+          {/* avaliação por terceiros (0103) — semana 1→2 do guia: convites
+              por link, respostas identificadas pro mentor, síntese anônima
+              pro jovem. Mesmo escopo dos instrumentos: DPP + jornada viva */}
+          {!ehEsp && terceiros && (
+            <TerceirosDupla
+              duplaId={dupla.id}
+              contatos={terceiros.contatos}
+              consolidacao={terceiros.consolidacao}
+              mentoradoNome={dupla.mentorado.nome_social ?? dupla.mentorado.nome}
+              podeGerenciar={souCoord || souMentor}
               jornadaViva={
                 dupla.status === "ativa" || dupla.status === "pausada"
               }

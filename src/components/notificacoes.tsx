@@ -29,6 +29,7 @@ import {
   Star,
   ThumbsDown,
   UserCheck,
+  UserList,
   UserPlus,
   UsersThree,
   XCircle,
@@ -247,6 +248,8 @@ const ICONE: Record<Notificacao["tipo"], typeof Bell> = {
   devolutiva_especialista: FlagCheckered,
   // 0094 — o "Lembrar" (D5) cai no sino do destinatário
   lembrete: ChatsCircle,
+  // 0103 — alguém do círculo do jovem respondeu a avaliação por terceiros
+  terceiro_respondeu: UserList,
 };
 
 export function NotificacoesBell({
