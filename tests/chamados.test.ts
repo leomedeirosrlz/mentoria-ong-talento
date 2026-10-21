@@ -77,9 +77,12 @@ describe("demoChamadosFila — escopo por papel", () => {
     expect(idx("aberto")).toBeGreaterThanOrEqual(0);
     expect(idx("aberto")).toBeLessThan(idx("em_atendimento"));
     expect(idx("em_atendimento")).toBeLessThan(idx("resolvido"));
-    // dentro dos abertos, o mais novo primeiro (145 > 141 na created_at)
+    // dentro dos abertos, o mais novo primeiro — por created_at, não por
+    // número fixo: as datas do fixture derivam de hoje, e um chamado
+    // ancorado a encontro pode virar o mais novo depois de um rollover
     const abertos = fila.filter((c) => c.status === "aberto");
-    expect(abertos[0].numero).toBe(NUM.plataforma);
+    const stamps = abertos.map((c) => c.created_at);
+    expect(stamps).toEqual([...stamps].sort().reverse());
   });
 
   it("contexto descreve a origem (registro / avaliação / dupla)", () => {
