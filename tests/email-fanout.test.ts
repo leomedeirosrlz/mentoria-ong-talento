@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { rolesParaAudiencias } from "@/lib/email";
+import {
+  rolesParaAudiencias,
+  enviarEmailsLote,
+  EMAIL_ENVIO_LIBERADO,
+} from "@/lib/email";
 
 // REALIZA-160 — o fan-out de e-mail é o caminho que furava a liberação
 // programada: material 'todos' com encontro futuro chegava ao jovem no
@@ -38,5 +42,21 @@ describe("rolesParaAudiencias — fan-out audiência → papéis", () => {
 
   it("excluir o único papel zera a lista — disparo vira no-op coerente", () => {
     expect(rolesParaAudiencias(["dpp"], ["mentor_dpp"])).toEqual([]);
+  });
+});
+
+// kill-switch global (TODO pendente): enquanto desligado, NADA sai — o
+// retorno imita falha de transporte pra nunca fingir sucesso pro caller
+describe("EMAIL_ENVIO_LIBERADO — kill-switch do envio", () => {
+  it("desligado: nada sai, todos voltam em falhas com error coerente", async () => {
+    expect(EMAIL_ENVIO_LIBERADO).toBe(false);
+    const r = await enviarEmailsLote({
+      para: ["a@x.com", "b@x.com"],
+      assunto: "teste",
+      html: "<p>x</p>",
+    });
+    expect(r.enviados).toBe(0);
+    expect(r.falhas).toEqual(["a@x.com", "b@x.com"]);
+    expect(r.error).toMatch(/desativado/);
   });
 });
