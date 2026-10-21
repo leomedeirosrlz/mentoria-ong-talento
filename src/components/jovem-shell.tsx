@@ -208,7 +208,10 @@ export function JovemShell({
         {/* coluna de conteúdo */}
         <div className="flex min-w-0 flex-1 flex-col md:ml-56">
           <main id="conteudo" tabIndex={-1} className="flex-1">
-            <div className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6 md:py-8">
+            {/* medida mobile-first que abre um degrau por breakpoint no
+                desktop (mesma régua do AppShell, um degrau abaixo — a
+                jornada do jovem é leitura, não planilha) */}
+            <div className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6 md:py-8 xl:max-w-5xl 2xl:max-w-6xl">
               {children}
             </div>
           </main>

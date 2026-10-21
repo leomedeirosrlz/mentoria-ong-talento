@@ -266,8 +266,35 @@ export default async function JovemMateriais() {
   }
 
   const lista = estacoes.map((e, i) => ({ est: e, n: i + 1 }));
-  const visiveis = lista.filter((l) => l.est.estado !== "trancada");
+  // REALIZA-162 (densidade desktop): as abertas saem da trilha e viram o
+  // bloco de ação "A fazer agora" logo abaixo do hero — na trilha elas NÃO
+  // repetem nem marcador (decisão registrada no PR): duplicar o título
+  // criaria heading/texto duplicado na mesma seção e um segundo foco de
+  // atenção sem informação nova. A trilha fica sendo o histórico (feitas
+  // recolhidas em recibo) + o futuro (trancadas) + a bandeira.
+  const afazer = lista.filter((l) => l.est.estado === "a_fazer");
+  const feitas = lista.filter((l) => l.est.estado === "feito");
   const trancadas = lista.filter((l) => l.est.estado === "trancada");
+
+  /** Props da ação de cada estação — o mesmo recorte por chave que o mapa
+   *  antigo fazia inline (avaliação do encontro usa o fluxo 0071; 360º lê
+   *  os campos pelo token; os 4 instrumentos pelos campos do sistema). */
+  const propsEstacao = (chave: EstacaoChave) => ({
+    pendenteAvaliacao:
+      chave === "avaliacao_encontro" ? pendenteAvaliacao : null,
+    ultimaAvaliacao:
+      chave === "avaliacao_encontro" ? ultimaAvaliacao : null,
+    sistema:
+      chave === "avaliacao_360"
+        ? ("avaliacao_360" as FormularioSistema)
+        : (SISTEMA_DA_ESTACAO[chave] ?? null),
+    campos:
+      chave === "avaliacao_360"
+        ? campos360
+        : chave === "avaliacao_encontro"
+          ? []
+          : (camposPorSistema.get(SISTEMA_DA_ESTACAO[chave] ?? "") ?? []),
+  });
 
   return (
     <div className="space-y-6">
@@ -365,54 +392,64 @@ export default async function JovemMateriais() {
         </a>
       </nav>
 
-      {/* ---------- a trilha (v3): estações numeradas na linha ---------- */}
+      {/* ---------- a jornada: ação primeiro, histórico depois ----------
+          Fica tudo dentro da mesma <section aria-label="Sua jornada"> —
+          contrato dos specs e2e (article = estação, details = trancadas). */}
       <section
         id="jornada"
         aria-label="Sua jornada"
-        className="scroll-mt-28 md:scroll-mt-14"
+        className="scroll-mt-28 space-y-6 md:scroll-mt-14"
       >
+        {/* "A fazer agora" — as estações abertas em cards de ação de linha
+            inteira. Some a seção inteira quando não há nada aberto. */}
+        {afazer.length > 0 && (
+          <section aria-labelledby="afazer-titulo">
+            <h2
+              id="afazer-titulo"
+              className="flex items-center gap-2 font-semibold"
+            >
+              <CircleDashed
+                size={18}
+                className="text-muted-foreground"
+                aria-hidden
+              />
+              A fazer agora
+            </h2>
+            <div className="mt-3 space-y-4">
+              {afazer.map((l) => (
+                <EstacaoAberta
+                  key={l.est.chave}
+                  est={l.est}
+                  n={l.n}
+                  primeiroNome={primeiroNome}
+                  {...propsEstacao(l.est.chave)}
+                />
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* a trilha compacta — rail esquerdo único (o zigzag saiu na
+            densidade): recibos fechados das feitas, o <details> das
+            trancadas e a bandeira do enc. 16 */}
         <ol>
-          {visiveis.map((l, i) => (
-            <EstacaoItem
+          {feitas.map((l, i) => (
+            <EstacaoFeita
               key={l.est.chave}
               est={l.est}
               n={l.n}
-              lado={i % 2}
               primeiro={i === 0}
-              pendenteAvaliacao={
-                l.est.chave === "avaliacao_encontro" ? pendenteAvaliacao : null
-              }
-              ultimaAvaliacao={
-                l.est.chave === "avaliacao_encontro" ? ultimaAvaliacao : null
-              }
               primeiroNome={primeiroNome}
-              sistema={
-                l.est.chave === "avaliacao_360"
-                  ? "avaliacao_360"
-                  : (SISTEMA_DA_ESTACAO[l.est.chave] ?? null)
-              }
-              campos={
-                l.est.chave === "avaliacao_360"
-                  ? campos360
-                  : l.est.chave === "avaliacao_encontro"
-                    ? []
-                    : (camposPorSistema.get(
-                        SISTEMA_DA_ESTACAO[l.est.chave] ?? ""
-                      ) ?? [])
-              }
+              {...propsEstacao(l.est.chave)}
             />
           ))}
           {trancadas.length > 0 && (
-            <TrancadasItem
-              itens={trancadas}
-              lado={visiveis.length % 2}
-              primeiro={visiveis.length === 0}
-            />
+            <TrancadasItem itens={trancadas} primeiro={feitas.length === 0} />
           )}
           <FimItem
             numero={eventoFim?.numero ?? null}
             data={eventoFim?.data ?? null}
-            primeiro={visiveis.length === 0 && trancadas.length === 0}
+            primeiro={feitas.length === 0 && trancadas.length === 0}
           />
         </ol>
       </section>
@@ -447,10 +484,23 @@ export default async function JovemMateriais() {
 
 // ---------- a trilha ----------
 
+/** Props compartilhadas das estações — o que a página resolve por chave
+ *  (avaliação do encontro × instrumentos × 360º) e passa igual pros dois
+ *  formatos: o card de ação ("A fazer agora") e o recibo fechado. */
+type EstacaoProps = {
+  est: Estacao;
+  n: number;
+  pendenteAvaliacao: AvaliacaoPendente | null;
+  ultimaAvaliacao: AvaliacaoFeita | null;
+  primeiroNome: string;
+  sistema: FormularioSistema | null;
+  campos: FormularioCampo[];
+};
+
 /** Segmento vertical da linha — cada <li> desenha o seu, então a linha muda
- *  de estado junto com a estação (v3): lime sólido no percorrido/aberto e
- *  tracejado no que está por vir. No mobile desce pela esquerda; no desktop
- *  pelo centro, com os cards alternando lados. */
+ *  de estado junto com a estação: lime sólido no percorrido e tracejado no
+ *  que está por vir. Rail único à esquerda em todo breakpoint (o zigzag do
+ *  desktop saiu na densidade REALIZA-162). */
 function SegmentoLinha({
   trancada,
   primeiro,
@@ -462,7 +512,7 @@ function SegmentoLinha({
     <span
       aria-hidden
       className={cn(
-        "absolute inset-y-0 left-6 -translate-x-1/2 border-l-2 md:left-1/2",
+        "absolute inset-y-0 left-5 -translate-x-1/2 border-l-2",
         primeiro && "top-11",
         trancada ? "border-dashed border-border" : "border-[var(--brand-lime)]"
       )}
@@ -470,6 +520,8 @@ function SegmentoLinha({
   );
 }
 
+/** Nó numerado — a mesma linguagem de antes, menor (size-7) pra trilha
+ *  compacta: o número identifica a estação, o check lateral o feito. */
 function NoEstacao({
   n,
   estado,
@@ -481,21 +533,21 @@ function NoEstacao({
     return (
       <span
         aria-hidden
-        className="absolute left-6 top-4 z-10 grid size-11 -translate-x-1/2 place-items-center rounded-full border-2 border-dashed border-border bg-card text-muted-foreground md:left-1/2"
+        className="absolute left-5 top-4 z-10 grid size-7 -translate-x-1/2 place-items-center rounded-full border-2 border-dashed border-border bg-card text-muted-foreground"
       >
-        <LockSimple size={18} aria-hidden />
+        <LockSimple size={13} aria-hidden />
       </span>
     );
   }
   return (
     <span
       aria-hidden
-      className="absolute left-6 top-4 z-10 grid size-11 -translate-x-1/2 place-items-center rounded-full bg-[var(--brand-lime)] text-[var(--brand-ink)] ring-4 ring-background md:left-1/2"
+      className="absolute left-5 top-4 z-10 grid size-7 -translate-x-1/2 place-items-center rounded-full bg-[var(--brand-lime)] text-[var(--brand-ink)] ring-4 ring-background"
     >
-      <span className="text-sm font-bold">{n}</span>
+      <span className="text-xs font-bold">{n}</span>
       {estado === "feito" && (
-        <span className="absolute -bottom-0.5 -right-0.5 grid size-4.5 place-items-center rounded-full border-2 border-[var(--brand-lime)] bg-card text-[var(--ok-text)]">
-          <Check size={10} weight="bold" aria-hidden />
+        <span className="absolute -bottom-0.5 -right-0.5 grid size-3.5 place-items-center rounded-full border-2 border-[var(--brand-lime)] bg-card text-[var(--ok-text)]">
+          <Check size={8} weight="bold" aria-hidden />
         </span>
       )}
     </span>
@@ -511,163 +563,236 @@ function PillAFazer() {
   );
 }
 
-function EstacaoItem({
+/** O pill de estado — "Feito" verdinho ou "A fazer" (com a troca "Em
+ *  andamento" do rascunho local quando há token). Mesmo nos dois formatos
+ *  de estação; no recibo fechado ele mora na linha do summary. */
+function EstadoPill({ est }: { est: Estacao }) {
+  if (est.estado === "feito") {
+    return (
+      <Badge className="bg-[var(--ok)]/15 text-[var(--ok-text)]">
+        <CheckCircle data-icon="inline-start" aria-hidden />
+        Feito
+      </Badge>
+    );
+  }
+  return est.token ? (
+    // "em andamento" é overlay client-side: o rascunho vive no
+    // localStorage deste aparelho — o pill troca depois do mount
+    <JornadaRascunho token={est.token}>
+      <PillAFazer />
+    </JornadaRascunho>
+  ) : (
+    <PillAFazer />
+  );
+}
+
+/** A ação da estação — o que muda por estado/chave (a mesma regra do card
+ *  antigo, agora compartilhada pelo "A fazer agora" e pelo recibo aberto). */
+function EstacaoAcao({
   est,
-  n,
-  lado,
-  primeiro,
   pendenteAvaliacao,
   ultimaAvaliacao,
   primeiroNome,
   sistema,
   campos,
-}: {
-  est: Estacao;
-  n: number;
-  /** 0 = card à esquerda / 1 = à direita no desktop (mobile é sempre fluxo). */
-  lado: number;
-  primeiro: boolean;
-  pendenteAvaliacao: AvaliacaoPendente | null;
-  ultimaAvaliacao: AvaliacaoFeita | null;
-  primeiroNome: string;
-  sistema: FormularioSistema | null;
-  campos: FormularioCampo[];
-}) {
-  const acao = (() => {
-    // a estação recorrente usa o fluxo real de avaliação (0071): pendente →
-    // dialog do form; feita → a última resposta (o toggle "meu mentor lê"
-    // continua lá dentro, onde sempre morou)
-    if (est.chave === "avaliacao_encontro") {
-      if (est.estado === "a_fazer" && pendenteAvaliacao) {
-        return (
-          <AvaliarPendenteButton
-            pendente={pendenteAvaliacao}
-            primeiroNome={primeiroNome}
-          />
-        );
-      }
-      if (est.estado === "feito" && ultimaAvaliacao) {
-        return (
-          <VerAvaliacaoButton
-            avaliacao={ultimaAvaliacao}
-            label="Rever última avaliação"
-          />
-        );
-      }
-      return null;
-    }
-    if (est.estado === "feito" && est.respostas && campos.length) {
+}: Omit<EstacaoProps, "n">) {
+  // a estação recorrente usa o fluxo real de avaliação (0071): pendente →
+  // dialog do form; feita → a última resposta (o toggle "meu mentor lê"
+  // continua lá dentro, onde sempre morou)
+  if (est.chave === "avaliacao_encontro") {
+    if (est.estado === "a_fazer" && pendenteAvaliacao) {
       return (
-        <ReverRespostaDialog
-          titulo={est.titulo}
-          respondidoEm={est.respondidoEm}
-          sistema={sistema}
-          campos={campos}
-          respostas={est.respostas as Record<string, RespostaValor>}
+        <AvaliarPendenteButton
+          pendente={pendenteAvaliacao}
+          primeiroNome={primeiroNome}
         />
       );
     }
-    if (est.estado === "a_fazer" && est.token) {
+    if (est.estado === "feito" && ultimaAvaliacao) {
       return (
-        // re-emissão (revisão do PDM): a rodada aberta tem CTA, mas a
-        // resposta anterior segue acessível — a estação diz "segue salva"
-        // e o Rever prova. (0097: resolveEstacao devolve respostas da
-        // última respondida também no a_fazer)
-        <div className="flex flex-wrap items-center gap-2">
-          {est.respostas && campos.length > 0 && (
-            <ReverRespostaDialog
-              titulo={est.titulo}
-              respondidoEm={est.respondidoEm}
-              sistema={sistema}
-              campos={campos}
-              respostas={est.respostas as Record<string, RespostaValor>}
-              label="Rever resposta anterior"
-            />
-          )}
-          <Link
-            href={`/f/${est.token}`}
-            className={buttonVariants({ size: "sm" })}
-          >
-            Continuar
-            <ArrowRight size={15} data-icon="inline-end" aria-hidden />
-          </Link>
-        </div>
+        <VerAvaliacaoButton
+          avaliacao={ultimaAvaliacao}
+          label="Rever última avaliação"
+        />
       );
     }
     return null;
-  })();
+  }
+  if (est.estado === "feito" && est.respostas && campos.length) {
+    return (
+      <ReverRespostaDialog
+        titulo={est.titulo}
+        respondidoEm={est.respondidoEm}
+        sistema={sistema}
+        campos={campos}
+        respostas={est.respostas as Record<string, RespostaValor>}
+      />
+    );
+  }
+  if (est.estado === "a_fazer" && est.token) {
+    return (
+      // re-emissão (revisão do PDM): a rodada aberta tem CTA, mas a
+      // resposta anterior segue acessível — a estação diz "segue salva"
+      // e o Rever prova. (0097: resolveEstacao devolve respostas da
+      // última respondida também no a_fazer)
+      <div className="flex flex-wrap items-center gap-2">
+        {est.respostas && campos.length > 0 && (
+          <ReverRespostaDialog
+            titulo={est.titulo}
+            respondidoEm={est.respondidoEm}
+            sistema={sistema}
+            campos={campos}
+            respostas={est.respostas as Record<string, RespostaValor>}
+            label="Rever resposta anterior"
+          />
+        )}
+        <Link href={`/f/${est.token}`} className={buttonVariants()}>
+          Continuar
+          <ArrowRight size={15} data-icon="inline-end" aria-hidden />
+        </Link>
+      </div>
+    );
+  }
+  return null;
+}
 
+/** O corpo do card — data, descrição, "Você escreveu…", detalhe honesto e
+ *  ação. No recibo fechado a linha do summary já carrega data+detalhe,
+ *  então o corpo aberto os omite (um texto só — duplicar quebraria a
+ *  contagem exata dos specs e2e e repetiria informação na tela). */
+function EstacaoCorpo({
+  est,
+  acao,
+  mostrarData = true,
+  mostrarDetalhe = true,
+}: {
+  est: Estacao;
+  acao: React.ReactNode;
+  mostrarData?: boolean;
+  mostrarDetalhe?: boolean;
+}) {
   return (
-    <li className="relative pb-12 pl-16 md:pl-0">
+    <>
+      {mostrarData && est.respondidoEm && (
+        <p className="mt-2 flex items-center gap-1.5 text-xs font-medium text-[var(--ok-text)]">
+          <CalendarCheck size={14} aria-hidden />
+          Respondido em {formatDate(est.respondidoEm)}
+        </p>
+      )}
+      <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+        {est.descricao}
+      </p>
+      {est.snippet && est.snippet.texto !== est.detalhe && (
+        <div className="mt-3 rounded-r-xl border-l-[3px] border-[var(--brand-lime)] bg-[var(--brand-lime)]/10 px-3.5 py-3">
+          <span className="block text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--ok-text)]">
+            {est.snippet.tag}
+          </span>
+          <blockquote className="mt-1 text-sm italic leading-relaxed">
+            “{est.snippet.texto}”
+          </blockquote>
+        </div>
+      )}
+      {mostrarDetalhe && est.detalhe && (
+        <p className="mt-3 flex items-start gap-1.5 rounded-lg bg-muted px-3 py-2 text-xs leading-relaxed text-muted-foreground">
+          {est.estado === "feito" ? (
+            <CheckCircle
+              size={14}
+              className="mt-0.5 shrink-0 text-[var(--ok)]"
+              aria-hidden
+            />
+          ) : (
+            <Clock size={14} className="mt-0.5 shrink-0" aria-hidden />
+          )}
+          <span>{est.detalhe}</span>
+        </p>
+      )}
+      {acao && (
+        <div className="mt-4 flex flex-wrap items-center gap-2">{acao}</div>
+      )}
+    </>
+  );
+}
+
+/** Estação aberta no "A fazer agora" — card de ação de linha inteira (o
+ *  conteúdo do card da trilha antiga, sem o <li> do zigzag): o CTA é o
+ *  protagonista e o resto explica o que falta. */
+function EstacaoAberta(props: EstacaoProps) {
+  const { est, n } = props;
+  return (
+    <article className="rounded-xl bg-card p-4 shadow-[var(--shadow-border)] sm:p-6">
+      <p className="flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+        Estação {n}
+        <span className="rounded-md bg-[var(--brand-ink)] px-1.5 py-0.5 text-[10px] font-semibold normal-case tracking-normal text-white">
+          {est.janela.label}
+        </span>
+      </p>
+      <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+        <h3 className="text-base font-semibold tracking-tight">
+          {est.titulo}
+        </h3>
+        <EstadoPill est={est} />
+      </div>
+      <EstacaoCorpo est={est} acao={<EstacaoAcao {...props} />} />
+    </article>
+  );
+}
+
+/** Recibo da estação feita — a linha compacta da trilha (nó + Estação N +
+ *  título + "Feito" + data/detalhe) que abre no próprio lugar: o <details>
+ *  revela a descrição, o "Você escreveu…" e o Rever resposta. O estado
+ *  expandido é nativo do elemento — leitor de tela anuncia aberto/fechado
+ *  sem aria-expanded manual. */
+function EstacaoFeita({
+  primeiro,
+  ...props
+}: EstacaoProps & { primeiro: boolean }) {
+  const { est, n } = props;
+  return (
+    <li className="relative pb-4 pl-12">
       <SegmentoLinha primeiro={primeiro} />
       <NoEstacao n={n} estado={est.estado} />
-      <article
-        className={cn(
-          "rounded-xl bg-card p-4 shadow-[var(--shadow-border)] sm:p-5 md:w-[calc(50%-3.25rem)]",
-          lado === 1 && "md:ml-auto"
-        )}
-      >
-        <p className="flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-          Estação {n}
-          <span className="rounded-md bg-[var(--brand-ink)] px-1.5 py-0.5 text-[10px] font-semibold normal-case tracking-normal text-white">
-            {est.janela.label}
-          </span>
-        </p>
-        <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1.5">
-          <h3 className="text-base font-semibold tracking-tight">
-            {est.titulo}
-          </h3>
-          {est.estado === "feito" ? (
-            <Badge className="bg-[var(--ok)]/15 text-[var(--ok-text)]">
-              <CheckCircle data-icon="inline-start" aria-hidden />
-              Feito
-            </Badge>
-          ) : est.token ? (
-            // "em andamento" é overlay client-side: o rascunho vive no
-            // localStorage deste aparelho — o pill troca depois do mount
-            <JornadaRascunho token={est.token}>
-              <PillAFazer />
-            </JornadaRascunho>
-          ) : (
-            <PillAFazer />
-          )}
-        </div>
-        {est.respondidoEm && (
-          <p className="mt-2 flex items-center gap-1.5 text-xs font-medium text-[var(--ok-text)]">
-            <CalendarCheck size={14} aria-hidden />
-            Respondido em {formatDate(est.respondidoEm)}
-          </p>
-        )}
-        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-          {est.descricao}
-        </p>
-        {est.snippet && (
-          <div className="mt-3 rounded-r-xl border-l-[3px] border-[var(--brand-lime)] bg-[var(--brand-lime)]/10 px-3.5 py-3">
-            <span className="block text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--ok-text)]">
-              {est.snippet.tag}
+      <article className="overflow-hidden rounded-xl bg-card shadow-[var(--shadow-border)]">
+        <details className="group">
+          {/* summary admite heading direto (phrasing + heading content) —
+              o h3 mora na linha sem wrapper inválido; o caret vai pro fim
+              com ml-auto e o meta data/detalhe quebra a linha no wrap */}
+          <summary className="flex cursor-pointer list-none flex-wrap items-center gap-x-2.5 gap-y-1 px-4 py-3 outline-none marker:hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset [&::-webkit-details-marker]:hidden">
+            <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+              Estação {n}
             </span>
-            <blockquote className="mt-1 text-sm italic leading-relaxed">
-              “{est.snippet.texto}”
-            </blockquote>
-          </div>
-        )}
-        {est.detalhe && (
-          <p className="mt-3 flex items-start gap-1.5 rounded-lg bg-muted px-3 py-2 text-xs leading-relaxed text-muted-foreground">
-            {est.estado === "feito" ? (
-              <CheckCircle
-                size={14}
-                className="mt-0.5 shrink-0 text-[var(--ok)]"
-                aria-hidden
-              />
-            ) : (
-              <Clock size={14} className="mt-0.5 shrink-0" aria-hidden />
+            <span className="rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">
+              {est.janela.label}
+            </span>
+            <h3 className="text-sm font-semibold tracking-tight">
+              {est.titulo}
+            </h3>
+            <EstadoPill est={est} />
+            {(est.respondidoEm || est.detalhe) && (
+              <span className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+                {est.respondidoEm && (
+                  <span className="inline-flex items-center gap-1">
+                    <CalendarCheck size={12} aria-hidden />
+                    Respondido em {formatDate(est.respondidoEm)}
+                  </span>
+                )}
+                {est.detalhe && <span>{est.detalhe}</span>}
+              </span>
             )}
-            <span>{est.detalhe}</span>
-          </p>
-        )}
-        {acao && (
-          <div className="mt-4 flex flex-wrap items-center gap-2">{acao}</div>
-        )}
+            <CaretDown
+              size={15}
+              className="ml-auto shrink-0 text-muted-foreground transition-transform group-open:rotate-180"
+              aria-hidden
+            />
+          </summary>
+          <div className="border-t border-border/60 px-4 pb-4 pt-1">
+            <EstacaoCorpo
+              est={est}
+              mostrarData={false}
+              mostrarDetalhe={false}
+              acao={<EstacaoAcao {...props} />}
+            />
+          </div>
+        </details>
       </article>
     </li>
   );
@@ -677,23 +802,16 @@ function EstacaoItem({
  *  "Daqui pra frente", com nomes+datas no summary (anti-extensão mobile). */
 function TrancadasItem({
   itens,
-  lado,
   primeiro,
 }: {
   itens: { est: Estacao; n: number }[];
-  lado: number;
   primeiro: boolean;
 }) {
   return (
-    <li className="relative pb-12 pl-16 md:pl-0">
+    <li className="relative pb-4 pl-12">
       <SegmentoLinha trancada primeiro={primeiro} />
       <NoEstacao n={0} estado="trancada" />
-      <details
-        className={cn(
-          "group rounded-xl border border-dashed border-border bg-card/60 md:w-[calc(50%-3.25rem)]",
-          lado === 1 && "md:ml-auto"
-        )}
-      >
+      <details className="group rounded-xl border border-dashed border-border bg-card/60">
         <summary className="flex cursor-pointer list-none flex-wrap items-center gap-x-3 gap-y-1 p-4 outline-none marker:hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset sm:p-5 [&::-webkit-details-marker]:hidden">
           <span className="min-w-0 flex-1">
             <span className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
@@ -750,21 +868,21 @@ function FimItem({
   primeiro: boolean;
 }) {
   return (
-    <li className="relative pl-16 md:pl-0">
+    <li className="relative pl-12">
       <span
         aria-hidden
         className={cn(
-          "absolute left-6 top-0 h-6 -translate-x-1/2 border-l-2 border-dashed border-border md:left-1/2",
+          "absolute left-5 top-0 h-6 -translate-x-1/2 border-l-2 border-dashed border-border",
           primeiro && "h-0"
         )}
       />
       <span
         aria-hidden
-        className="absolute left-6 top-0 z-10 grid size-10 -translate-x-1/2 place-items-center rounded-full border-2 border-dashed border-border bg-card text-muted-foreground md:left-1/2"
+        className="absolute left-5 top-0 z-10 grid size-8 -translate-x-1/2 place-items-center rounded-full border-2 border-dashed border-border bg-card text-muted-foreground"
       >
-        <Flag size={18} aria-hidden />
+        <Flag size={14} aria-hidden />
       </span>
-      <p className="pt-12 text-xs leading-relaxed text-muted-foreground md:text-center">
+      <p className="pt-10 text-xs leading-relaxed text-muted-foreground">
         {numero != null && data && (
           <>
             Encontro {numero} · {formatDate(data)}
@@ -809,9 +927,96 @@ function PreviewMaterial({ m }: { m: Material }) {
   return null;
 }
 
+/** Card do acervo — a linha de sempre virada peça de grid: thumbnail no
+ *  topo (quando o arquivo existe) e a linha clicável embaixo. */
+function MaterialCard({ m }: { m: Material }) {
+  const Icone = TIPO_ICONE[m.tipo];
+  const urlOk = linkSeguro(m.url);
+  const href = m.path ? `/api/material/${m.id}` : urlOk;
+  const interno = (
+    <>
+      <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-muted/70 text-muted-foreground">
+        <Icone size={17} aria-hidden />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-medium">{m.titulo}</p>
+        {m.descricao && (
+          <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
+            {m.descricao}
+          </p>
+        )}
+        <span className="sr-only">
+          {TIPO_LABEL[m.tipo]}
+          {m.path
+            ? " · arquivo"
+            : urlOk && m.tipo !== "link"
+              ? " · link externo"
+              : ""}
+        </span>
+      </div>
+    </>
+  );
+  return (
+    <div className="flex flex-col overflow-hidden rounded-xl bg-card shadow-[var(--shadow-border)]">
+      <PreviewMaterial m={m} />
+      <div
+        className={cn(
+          "flex flex-1 items-center pr-3 transition-colors",
+          href && "hover:bg-muted/50"
+        )}
+      >
+        {href ? (
+          <a
+            href={href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex min-w-0 flex-1 items-center gap-x-4 px-5 py-3.5 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+          >
+            {interno}
+          </a>
+        ) : (
+          <div className="flex min-w-0 flex-1 items-center gap-x-4 px-5 py-3.5">
+            {interno}
+          </div>
+        )}
+        {m.path ? (
+          <File
+            size={15}
+            className="shrink-0 text-muted-foreground"
+            aria-hidden
+          />
+        ) : urlOk ? (
+          <ArrowSquareOut
+            size={15}
+            className="shrink-0 text-muted-foreground"
+            aria-hidden
+          />
+        ) : (
+          <Badge
+            variant="outline"
+            className="shrink-0 text-xs text-muted-foreground"
+          >
+            em breve
+          </Badge>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function MateriaisLista({ materiais }: { materiais: Material[] }) {
-  const grupos = agrupar(materiais);
-  if (grupos.length === 0) {
+  // REALIZA-162: o que já dá pra abrir vira grid; o "em breve" (sem path e
+  // sem url — material real que a coordenação ainda não subiu) sai da
+  // vitrine e fecha o acervo no grupo apagado "A caminho" — de-emphasized,
+  // nunca escondido.
+  const prontos: Material[] = [];
+  const aCaminho: Material[] = [];
+  for (const m of materiais) {
+    if (m.path || linkSeguro(m.url)) prontos.push(m);
+    else aCaminho.push(m);
+  }
+  const grupos = agrupar(prontos);
+  if (grupos.length === 0 && aCaminho.length === 0) {
     return (
       <div className="flex flex-col items-center gap-1.5 rounded-xl bg-card px-5 py-10 text-center shadow-[var(--shadow-border)]">
         <span className="grid size-11 place-items-center rounded-full bg-muted text-muted-foreground">
@@ -836,91 +1041,58 @@ function MateriaisLista({ materiais }: { materiais: Material[] }) {
           <h3 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
             {rotulo}
           </h3>
-          <div className="divide-y divide-border/60 overflow-hidden rounded-xl bg-card shadow-[var(--shadow-border)]">
-            {itens.map((m) => {
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {itens.map((m) => (
+              <MaterialCard key={m.id} m={m} />
+            ))}
+          </div>
+        </section>
+      ))}
+      {aCaminho.length > 0 && (
+        <section
+          className="animate-enter space-y-2"
+          style={{ "--i": Math.min(grupos.length, 10) } as CSSProperties}
+        >
+          <h3 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+            A caminho
+          </h3>
+          <div className="divide-y divide-border/60 overflow-hidden rounded-xl border border-dashed border-border bg-card/60">
+            {aCaminho.map((m) => {
               const Icone = TIPO_ICONE[m.tipo];
-              const urlOk = linkSeguro(m.url);
-              const href = m.path ? `/api/material/${m.id}` : urlOk;
-              const interno = (
-                <>
-                  <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-muted/70 text-muted-foreground">
+              return (
+                <div
+                  key={m.id}
+                  className="flex items-center gap-x-4 px-5 py-3 text-muted-foreground"
+                >
+                  <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-muted/70">
                     <Icone size={17} aria-hidden />
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium">{m.titulo}</p>
-                    {m.descricao && (
-                      <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
-                        {m.descricao}
-                      </p>
-                    )}
-                    <span className="sr-only">
-                      {TIPO_LABEL[m.tipo]}
-                      {m.path
-                        ? " · arquivo"
-                        : urlOk && m.tipo !== "link"
-                          ? " · link externo"
-                          : ""}
-                    </span>
+                    <p className="text-sm font-medium text-foreground/80">
+                      {m.titulo}
+                    </p>
+                    <span className="sr-only">{TIPO_LABEL[m.tipo]}</span>
                   </div>
-                </>
-              );
-              return (
-                <div key={m.id}>
-                  <PreviewMaterial m={m} />
-                  <div
-                    className={cn(
-                      "flex items-center pr-3 transition-colors",
-                      href && "hover:bg-muted/50"
-                    )}
+                  <Badge
+                    variant="outline"
+                    className="shrink-0 text-xs text-muted-foreground"
                   >
-                    {href ? (
-                    <a
-                      href={href}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex min-w-0 flex-1 items-center gap-x-4 px-5 py-3.5 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
-                    >
-                      {interno}
-                    </a>
-                  ) : (
-                    <div className="flex min-w-0 flex-1 items-center gap-x-4 px-5 py-3.5">
-                      {interno}
-                    </div>
-                  )}
-                    {m.path ? (
-                      <File
-                        size={15}
-                        className="shrink-0 text-muted-foreground"
-                        aria-hidden
-                      />
-                    ) : urlOk ? (
-                      <ArrowSquareOut
-                        size={15}
-                        className="shrink-0 text-muted-foreground"
-                        aria-hidden
-                      />
-                    ) : (
-                      <Badge
-                        variant="outline"
-                        className="shrink-0 text-xs text-muted-foreground"
-                      >
-                        em breve
-                      </Badge>
-                    )}
-                  </div>
+                    em breve
+                  </Badge>
                 </div>
               );
             })}
           </div>
         </section>
-      ))}
+      )}
     </>
   );
 }
 
-/** Fallback §WP7 — a página exatamente como era: biblioteca plana, header
- *  "Materiais" e nada de trilha. Renderiza quando a RPC falha/vem vazia,
- *  quando o jovem não tem dupla ou quando a turma não tem cronograma. */
+/** Fallback §WP7 — biblioteca sem trilha: header "Minha jornada" + o
+ *  acervo em grade (a trilha só existe com dupla + cronograma). Renderiza
+ *  quando a RPC falha/vem vazia, quando o jovem não tem dupla ou quando a
+ *  turma não tem cronograma. */
 function BibliotecaJovem({ materiais }: { materiais: Material[] }) {
   return (
     <div className="space-y-6">
