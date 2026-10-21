@@ -48,12 +48,15 @@ export type EnvioLoteResult = {
   error?: string;
 };
 
-/** TODO(pendente): kill-switch global do envio de e-mail — false segura
- *  TODA saída (avisos, materiais, chamados, assinaturas) até o produto
- *  estar pronto pro envio real. O early return devolve `error` coerente
- *  e os callers já tratam como falha de transporte (toast honesto, nunca
- *  falso sucesso). Magic link do Supabase Auth passa por fora (SMTP da
- *  auth@) e não é afetado. Virar `true` quando liberar de verdade. */
+/** TODO(pendente): kill-switch do envio de e-mail — false segura a saída
+ *  de NOTIFICAÇÃO (avisos, materiais, chamados, assinaturas) até o
+ *  produto estar pronto pro envio real. O early return devolve `error`
+ *  coerente e os callers já tratam como falha de transporte (toast
+ *  honesto, nunca falso sucesso). Não cobre auth/conta: magic link passa
+ *  por fora (SMTP auth@ do Supabase) e os e-mails de segurança da conta
+ *  (senha/e-mail alterado) furam o bloqueio com `critico: true` — são
+ *  on-demand, disparados pelo próprio usuário. Virar `true` quando
+ *  liberar de verdade. */
 export const EMAIL_ENVIO_LIBERADO = false;
 
 /** Dispara o mesmo e-mail pra uma lista de destinatários — um envelope por
@@ -65,13 +68,17 @@ export async function enviarEmailsLote({
   assunto,
   html,
   replyTo,
+  critico,
 }: {
   para: string[];
   assunto: string;
   html: string;
   replyTo?: string;
+  /** fura o kill-switch — só pra e-mail de auth/conta (segurança,
+   *  on-demand). Notificação nunca marca. */
+  critico?: boolean;
 }): Promise<EnvioLoteResult> {
-  if (!EMAIL_ENVIO_LIBERADO) {
+  if (!EMAIL_ENVIO_LIBERADO && !critico) {
     return {
       enviados: 0,
       falhas: [...para],
@@ -127,12 +134,16 @@ export async function enviarEmailsLote({
 export async function enviarEmailsIndividuais({
   mensagens,
   replyTo,
+  critico,
 }: {
   mensagens: { to: string; subject: string; html: string }[];
   replyTo?: string;
+  /** fura o kill-switch — só pra e-mail de auth/conta (segurança,
+   *  on-demand). Notificação nunca marca. */
+  critico?: boolean;
 }): Promise<EnvioLoteResult> {
   const destinos = mensagens.map((m) => m.to);
-  if (!EMAIL_ENVIO_LIBERADO) {
+  if (!EMAIL_ENVIO_LIBERADO && !critico) {
     return {
       enviados: 0,
       falhas: destinos,
