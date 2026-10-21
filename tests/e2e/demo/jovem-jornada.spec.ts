@@ -165,12 +165,30 @@ test.describe("demo — Minha jornada do mentorado", () => {
     ).toBeVisible();
     // o acervo do mentorado é só audiencia='todos' (a policy do 0065):
     // os Guias dos mentores não aparecem — os links prontos viram grid e
-    // o checklist/autoavaliação sem destino fecham no grupo apagado
-    // "A caminho" com o estado legítimo "em breve" no badge (REALIZA-162)
+    // o checklist sem destino fecha no grupo apagado "A caminho" com o
+    // estado legítimo "em breve" no badge (REALIZA-162)
     await expect(acervo.getByText("Links")).toBeVisible();
     await expect(acervo.getByText("A caminho")).toBeVisible();
     await expect(acervo.getByText("Guias")).toHaveCount(0);
     await expect(acervo.getByText("em breve").first()).toBeVisible();
+
+    // acervo progressivo (REALIZA-160): a Ana está no enc. 5 — o material
+    // marcado pro enc. 16 sai da vitrine e recolhe no <details> apagado
+    const trancados = acervo.locator("details", {
+      hasText: "Mais adiante na jornada",
+    });
+    await expect(trancados).toBeVisible();
+    await expect(
+      trancados.getByText("Autoavaliação do mentor (enc. 16)")
+    ).toBeVisible();
+    // recolhido por padrão — o item não é clicável nem aparece na grid
+    await expect(
+      acervo.getByRole("link", { name: /Autoavaliação do mentor/ })
+    ).toHaveCount(0);
+    await trancados.locator("summary").click();
+    await expect(
+      trancados.getByText(/Libera no encontro 16/)
+    ).toBeVisible();
   });
 });
 

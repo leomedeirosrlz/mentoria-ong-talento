@@ -131,9 +131,12 @@ export function NovoMaterialDialog({ maxEncontro }: { maxEncontro: number }) {
       open={open}
       onOpenChange={(o) => {
         setOpen(o);
-        // fechou → destino volta pro padrão e o arquivo escolhido não fica preso
+        // fechou → destino e audiência voltam pro padrão e o arquivo
+        // escolhido não fica preso (o Select é defaultValue — sem reset o
+        // estado sobrevive e dessincroniza do que ele exibe na reabertura)
         if (!o) {
           setDestino("arquivo");
+          setAudiencia("todos");
           if (fileRef.current) fileRef.current.value = "";
         }
       }}
@@ -246,6 +249,9 @@ export function NovoMaterialDialog({ maxEncontro }: { maxEncontro: number }) {
             <p className="text-xs text-muted-foreground">
               Agrupa o material na seção daquele encontro na biblioteca
               {audiencia === "especialista" ? " (a trilha tem 5)" : ""}.
+              {audiencia === "todos"
+                ? " Pro jovem, libera quando a dupla chegar nele."
+                : ""}
             </p>
           </div>
           <Button type="submit" className="w-full" disabled={pending}>

@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { jornadaDaDupla, marcosEntre, passosDaTrilha } from "@/lib/ciclo";
 import {
+  encCorrenteDe,
+  materialLiberadoParaJovem,
+} from "@/lib/jornada";
+import {
   CICLO_16,
   dt,
   encAgendado,
@@ -123,5 +127,36 @@ describe("jornadaDaDupla", () => {
     expect(j.feitos).toBe(1);
     expect(j.proximoNumero).toBe(2);
     expect(j.faseAtual).toBeNull(); // passos da especialista não têm fase
+  });
+});
+
+// REALIZA-160 — régua compartilhada do acervo progressivo
+describe("encCorrenteDe — a âncora única", () => {
+  it("maior realizado + 1, teto 16; agendado não conta", () => {
+    expect(encCorrenteDe([])).toBe(1);
+    expect(
+      encCorrenteDe([encRealizado(4, "2025-10-01"), encAgendado(5, "2025-10-08")])
+    ).toBe(5);
+    expect(encCorrenteDe([encRealizado(16, "2025-10-01")])).toBe(16);
+  });
+});
+
+describe("materialLiberadoParaJovem — acervo progressivo", () => {
+  const mat = (encontro_num: number | null) => ({ encontro_num });
+
+  it("sem vínculo de encontro fica sempre disponível", () => {
+    expect(materialLiberadoParaJovem(mat(null), 1)).toBe(true);
+    expect(materialLiberadoParaJovem(mat(null), null)).toBe(true);
+  });
+
+  it("marcado libera quando a régua alcança o encontro", () => {
+    expect(materialLiberadoParaJovem(mat(5), 4)).toBe(false);
+    expect(materialLiberadoParaJovem(mat(5), 5)).toBe(true);
+    expect(materialLiberadoParaJovem(mat(16), 5)).toBe(false);
+    expect(materialLiberadoParaJovem(mat(16), 16)).toBe(true);
+  });
+
+  it("sem jornada em curso (null) libera tudo — não há cronograma a esperar", () => {
+    expect(materialLiberadoParaJovem(mat(12), null)).toBe(true);
   });
 });

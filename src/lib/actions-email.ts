@@ -1,7 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
-import { enviarEmailsLote, ROLES_POR_AUDIENCIA, SITE_URL } from "@/lib/email";
+import { enviarEmailsLote, rolesParaAudiencias, SITE_URL } from "@/lib/email";
 import { emailAviso, emailMaterial } from "@/lib/email-templates";
 import { erroAmigavel } from "@/lib/utils";
 import { demoAtivo } from "./demo/mode";
@@ -56,6 +56,7 @@ export async function dispararParaRoles({
   audiencias,
   autorId,
   supabase,
+  excluirRoles,
 }: {
   tipo: "comunicado" | "material";
   refId?: string | null;
@@ -64,10 +65,11 @@ export async function dispararParaRoles({
   audiencias: string[];
   autorId: string;
   supabase: Supa;
+  /** papéis a tirar do fan-out mesmo constando na audiência — o material
+   *  com liberação programada (REALIZA-160) não vaza pro jovem por e-mail */
+  excluirRoles?: string[];
 }): Promise<ResumoEnvioEmail> {
-  const roles = [
-    ...new Set(audiencias.flatMap((a) => ROLES_POR_AUDIENCIA[a] ?? [])),
-  ];
+  const roles = rolesParaAudiencias(audiencias, excluirRoles);
   try {
     // e-mail/whatsapp saíram do grant de coluna de profiles (0026): os
     // endereços vêm da view profiles_contato, que pra coordenação devolve
@@ -193,11 +195,13 @@ export async function dispararMaterialEmail({
   material,
   audiencias,
   autorId,
+  excluirRoles,
 }: {
   supabase: Supa;
   material: MaterialEmail;
   audiencias: string[];
   autorId: string;
+  excluirRoles?: string[];
 }): Promise<ResumoEnvioEmail> {
   // mesma regra da página de materiais: path ganha da url; sem nenhum dos
   // dois o material está "a caminho" e o CTA cai na biblioteca
@@ -218,6 +222,7 @@ export async function dispararMaterialEmail({
     audiencias,
     autorId,
     supabase,
+    excluirRoles,
   });
 }
 
