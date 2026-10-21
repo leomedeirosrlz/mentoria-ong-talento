@@ -304,7 +304,8 @@ export function InstrumentosDupla({
         className
       )}
     >
-      <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+      <h2 className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+        <span aria-hidden className="size-1.5 rounded-full bg-[var(--brand-lime)]" />
         Instrumentos da jornada
       </h2>
       <p className="mt-1 text-xs text-muted-foreground">

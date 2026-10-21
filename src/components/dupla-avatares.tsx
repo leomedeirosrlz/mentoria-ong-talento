@@ -17,17 +17,14 @@ export function DuplaAvatares({
   mentorado,
   size = 32,
   linkar = false,
-  sobrePapel = false,
 }: {
   mentor: Pessoa;
   mentorado: Pessoa;
   size?: number;
   linkar?: boolean;
-  /** os discos vivem em bg-card quase sempre — só o h1 da ficha fica sobre
-   *  o papel do fundo, onde o anel precisa casar com --background */
-  sobrePapel?: boolean;
 }) {
-  const anel = sobrePapel ? "ring-2 ring-background" : "ring-2 ring-card";
+  // os discos vivem sempre sobre bg-card — o anel casa com a superfície
+  const anel = "ring-2 ring-card";
   const discos = [
     {
       pessoa: mentor,

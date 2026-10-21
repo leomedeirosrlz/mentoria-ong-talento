@@ -29,13 +29,15 @@ const MARCO_SR: Record<MarcoJornada, string> = {
 };
 
 /** Disco do passo — mesma gramática dos dots da agenda: fill = aconteceu,
- *  anel = futuro ou incerteza, apagado = não rolou. O "passo atual" não muda
- *  a cor do disco: ganha um anel lime por fora (posição ≠ situação). */
+ *  lime de contorno = compromisso firmado (agendado/remarcado), anel warn =
+ *  incerteza, apagado = não rolou ou passo do guia sem data. O "passo atual"
+ *  não muda a cor do disco: ganha um anel lime por fora (posição ≠ situação). */
 const DISCO: Record<EstadoNoJornada, string> = {
   realizado_completo: "bg-[var(--brand-lime)] text-[var(--brand-ink)]",
   pendente_registro: "bg-[var(--warn)] text-[var(--brand-ink)]",
   limbo: "ring-2 ring-inset ring-[var(--warn)]/70 text-[var(--warn-text)]",
-  agendado: "ring-1 ring-inset ring-muted-foreground/60 text-muted-foreground",
+  agendado:
+    "bg-[var(--brand-lime)]/20 text-[var(--brand-ink)] ring-1 ring-inset ring-[var(--brand-lime)]/60",
   nao_aconteceu: "bg-muted text-muted-foreground/60 line-through",
   futuro: "bg-muted text-muted-foreground",
 };
@@ -70,7 +72,7 @@ function chaveDot(estado: EstadoNoJornada): React.ReactNode {
     case "limbo":
       return <span aria-hidden className="size-2 rounded-full ring-1 ring-inset ring-[var(--warn)]/70" />;
     case "agendado":
-      return <span aria-hidden className="size-2 rounded-full ring-1 ring-inset ring-muted-foreground/60" />;
+      return <span aria-hidden className="size-2 rounded-full bg-[var(--brand-lime)]/20 ring-1 ring-inset ring-[var(--brand-lime)]/60" />;
     case "nao_aconteceu":
       // disco apagado e riscado, como o nó na trilha
       return (

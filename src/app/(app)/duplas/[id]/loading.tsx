@@ -10,7 +10,9 @@ export default function Loading() {
         <Skeleton className="h-4 w-16" />
       </div>
 
-      <header className="flex flex-wrap items-start justify-between gap-4">
+      {/* espelha o hero-card: faixa de papel da dupla no topo */}
+      <header className="relative flex flex-wrap items-start justify-between gap-4 overflow-hidden rounded-xl bg-card px-4 py-4 shadow-[var(--shadow-border)] sm:px-5">
+        <Skeleton className="absolute inset-x-0 top-0 h-1 rounded-none" />
         <div>
           <Skeleton className="h-8 w-80 max-w-full" />
           {/* meta: semáforo + contagem + supervisor */}
