@@ -13,6 +13,7 @@
 
 export type ContextoWA =
   | "apoio"
+  | "apoio_jovem"
   | "limbo"
   | "registro_pendente"
   | "sem_encontro"
@@ -89,6 +90,13 @@ const CATALOGO: Record<ContextoWA, Msgs> = {
   apoio: {
     mentor: (i) =>
       `${oiM(i)}, tudo bem? ${autoria(i.autorNome)}. Vi o seu pedido de apoio no registro da mentoria${comMd(i)}. O que está rolando? Pode contar comigo.`,
+  },
+  // pedido de apoio do JOVEM (avaliacao_jovem.pedir_apoio — pode ser sobre
+  // o próprio mentor): a resposta é chamar ELE, nunca o mentor. O texto
+  // acolhe sem expor o teor — ele sabe o que pediu.
+  apoio_jovem: {
+    mentorado: (i) =>
+      `${oiMd(i)}, tudo bem? ${autoria(i.autorNome)}. Vimos o seu pedido e queremos te ouvir — quando puder, chama a gente por aqui.`,
   },
   // agendado vencido sem virar realizado — a pergunta honesta é "rolou?"
   limbo: {
