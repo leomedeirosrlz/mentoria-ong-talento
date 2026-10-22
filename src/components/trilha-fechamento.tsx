@@ -62,6 +62,14 @@ export function TrilhaFechamento({
           <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <Star size={12} weight="fill" className="text-[var(--warn)]" aria-hidden />
             Avaliação geral respondida em {formatDateTime(avaliacao.respondido_em)}
+            {avaliacao.formulario_id && !avaliacao.token && (
+              <Link
+                href={`/formularios/${avaliacao.formulario_id}`}
+                className="font-medium text-[var(--info)] underline-offset-2 hover:underline"
+              >
+                Ver respostas
+              </Link>
+            )}
           </p>
         ) : avaliacao.token ? (
           <Link
@@ -76,6 +84,14 @@ export function TrilhaFechamento({
             <Star size={12} className="text-muted-foreground" aria-hidden />
             Avaliação geral do especialista: pendente — o link seguiu por
             notificação
+            {avaliacao.formulario_id && (
+              <Link
+                href={`/formularios/${avaliacao.formulario_id}`}
+                className="font-medium text-[var(--info)] underline-offset-2 hover:underline"
+              >
+                Acompanhar
+              </Link>
+            )}
           </p>
         ))}
       <p className="text-xs text-muted-foreground">

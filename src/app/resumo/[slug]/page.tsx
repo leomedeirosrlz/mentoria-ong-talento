@@ -9,6 +9,7 @@ import {
   montarLinhas,
   parseConfig,
 } from "@/lib/relatorio";
+import type { LinhaRelatorio } from "@/lib/relatorio";
 import { formatDateTime } from "@/lib/ciclo";
 
 // link "livre" por obscuridade: só abre com o slug exato, que não aparece
@@ -63,6 +64,15 @@ export default async function ResumoPage({
     new Map((pRes.data ?? []).map((p) => [p.id, p])),
     new Map((mRes.data ?? []).map((m) => [m.id, m]))
   );
+  // o opt-in de contato não é só visual: as linhas vão serializadas pro
+  // client — poda antes pra que email/whatsapp nem cheguem no payload
+  const permitidas = new Set([...cfg.colunas, "__status", "__papel"]);
+  const linhasPodadas = linhas.map(
+    (l): LinhaRelatorio =>
+      Object.fromEntries(
+        Object.entries(l).filter(([k]) => permitidas.has(k))
+      )
+  );
   const colunas = catalogoDe(cfg.granularidade).filter((c) =>
     cfg.colunas.includes(c.id)
   );
@@ -92,7 +102,7 @@ export default async function ResumoPage({
               <RelatorioCanvas
                 key={`resumo-${cfg.turma ?? "todas"}-${cfg.granularidade}`}
                 colunas={colunas}
-                linhas={linhas}
+                linhas={linhasPodadas}
                 storageKey={`resumo-${cfg.turma ?? "todas"}-${cfg.granularidade}`}
               />
             </div>

@@ -1448,6 +1448,13 @@ export async function updateDupla(duplaId: string, formData: FormData) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada. Entre de novo." };
+  // gerenciar dupla é coord-only (RLS barra o write de qualquer forma, mas
+  // sem o guard um request forjado atravessava as ~8 queries de validação
+  // pra morrer no fim com erro genérico — e no delete, APAGAVA os objetos
+  // do bucket antes da row ser barrada)
+  if (eu.role !== "coordenacao") {
+    return { error: "Só a coordenação edita duplas." };
+  }
   const mentor_id = String(formData.get("mentor_id") ?? "");
   const mentorado_id = String(formData.get("mentorado_id") ?? "");
   const supervisor_id = String(formData.get("supervisor_id") || "") || null;
@@ -1740,6 +1747,11 @@ export async function deleteDupla(duplaId: string) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada. Entre de novo." };
+  // coord-only — sem o guard, um mentor autor de anexos apagava os objetos
+  // do bucket pela remoção abaixo enquanto a row era barrada pelo RLS
+  if (eu.role !== "coordenacao") {
+    return { error: "Só a coordenação exclui duplas." };
+  }
   // FKs NO ACTION bloqueiam o delete (a cascata cobre encontros→registros→
   // anexos, mas supervisões, encerramento, solicitações — via dupla_id e
   // dupla_dpp_id —, links de formulário e a sucessora do remanejamento são
@@ -2732,6 +2744,22 @@ export async function registrarEncontroRetroativo(
   // realizados, não de um numero escolhido
   let numeroFinal = numero;
   if (ehEspecialista) {
+    // o guia prevê 5 sessões por trilha — o orçamento do sol_efetivar conta
+    // realizados em TODAS as duplas do par na turma; um retroativo forjado
+    // além do teto sobreatenderia a jovem e queimaria o orçamento do par.
+    // conta realizado + agendado: a sessão marcada também é teto (ela vira
+    // realizado no dia), senão 4+1 agendada deixava nascer a 6ª
+    const { count: realizados } = await supabase
+      .from("encontros")
+      .select("id", { count: "exact", head: true })
+      .eq("dupla_id", duplaId)
+      .in("status", ["realizado", "agendado"]);
+    if ((realizados ?? 0) >= 5) {
+      return {
+        error:
+          "O guia prevê 5 sessões por trilha de especialista — essa já completou.",
+      };
+    }
     const { data: ultimos } = await supabase
       .from("encontros")
       .select("numero")

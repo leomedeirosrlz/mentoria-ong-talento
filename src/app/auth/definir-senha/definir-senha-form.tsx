@@ -43,7 +43,8 @@ export function DefinirSenhaForm() {
         const accessToken = p.get("access_token");
         const refreshToken = p.get("refresh_token");
         const linkQueimado = p.get("error") ?? p.get("error_code");
-        setRecovery(p.get("type") === "recovery");
+        const ehRecovery = p.get("type") === "recovery";
+        setRecovery(ehRecovery);
         // tira os tokens da barra de endereço em qualquer desfecho
         window.history.replaceState(
           null,
@@ -54,7 +55,10 @@ export function DefinirSenhaForm() {
           setFase("expirada");
           return;
         }
-        if (accessToken && refreshToken) {
+        // só recovery pode plantar sessão aqui — um magiclink solto nesta
+        // rota fixaria a conta de quem gerou o link no browser de quem
+        // abriu (mesmo guard do ?h= no /login)
+        if (accessToken && refreshToken && ehRecovery) {
           const { error } = await supabase.auth.setSession({
             access_token: accessToken,
             refresh_token: refreshToken,

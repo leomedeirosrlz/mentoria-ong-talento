@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   montarLinhas,
+  parseConfig,
   textoCelula,
   type DuplaFonte,
   type PessoaFonte,
@@ -137,5 +138,30 @@ describe("montarLinhas · alvos de edição (paraApp)", () => {
     // contato = whatsapp + email, na ordem da célula
     expect(l.__alvos?.contato_mentor?.map((a) => a.campo)).toEqual(["whatsapp", "email"]);
     expect(l.__alvos?.contato_mentorado?.map((a) => a.campo)).toEqual(["whatsapp", "email"]);
+  });
+});
+
+describe("parseConfig · contato opt-in no resumo público (0105)", () => {
+  it("sem ?col= o default exclui e-mail/whatsapp/contatos", () => {
+    for (const gran of ["pessoas", "duplas"] as const) {
+      const cfg = parseConfig({ gran: gran });
+      for (const c of cfg.colunas) {
+        expect(["email", "whatsapp", "contato_mentor", "contato_mentorado"]).not.toContain(c);
+      }
+      // e o resto da grade continua presente
+      expect(cfg.colunas).toContain(gran === "pessoas" ? "nome" : "mentor");
+      expect(cfg.colunas.length).toBeGreaterThan(3);
+    }
+  });
+
+  it("?col= explícito readmitte contato (link montado no builder)", () => {
+    const cfg = parseConfig({ gran: "pessoas", col: "nome,email,whatsapp" });
+    expect(cfg.colunas).toEqual(["nome", "email", "whatsapp"]);
+  });
+
+  it("?col= com só lixo cai no default sem contato", () => {
+    const cfg = parseConfig({ gran: "duplas", col: "foo,bar" });
+    expect(cfg.colunas).not.toContain("contato_mentor");
+    expect(cfg.colunas).toContain("mentor");
   });
 });
