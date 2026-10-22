@@ -193,6 +193,7 @@ Spec em **`.devin/formularios-ux-v2.md`** (3 críticos com skills: público resp
 - [x] ~~Signup aberto → convite/allowlist~~ — `0045`: trigger em `auth.users` exige e-mail pré-cadastrado em `profiles` (signup público E `admin.createUser` — dentro do GoTrue são indistinguíveis; SQL direto/migrações bypassam). **Coordenação precisa pré-cadastrar antes de convidar** — magic link de e-mail novo falha com mensagem pt-BR.
 - [x] ~~Deploy Vercel~~ — `https://realizavc.vercel.app` no ar (projeto `thisux1s-projects/realiza.vc`, repo `thisux1/realiza.vc` conectado — push na main já dispara redeploy). Envs de prod: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_SITE_URL` (todas Config/exposed). Dashboard Supabase: ~~Site URL `https://realizavc.vercel.app` + Redirect URLs `/**`~~ — feito. Resta o SMTP da tarefa acima.
 - [ ] E-mail pra coordenação quando `precisa_apoio = true` (após Resend).
+- [x] ~~Observabilidade (Sentry)~~ — org `realizavc`/`realizamentoria-nextjs`: erros + tracing (10% prod), tunnel `/monitoring`, PII off + scrub de bearer tokens (path + query + fragment), sem Replay. Falta: `SENTRY_AUTH_TOKEN` na Vercel prod+preview (source maps).
 - [x] ~~Export CSV de pessoas/mentorados~~ — `/api/export?tipo=pessoas` coord-only, agora com bloco sensível (nascimento/gênero/pref/motivação) via views `*_pessoal`.
 - [x] ~~`middleware`→`proxy`~~ — feito (build reconhece `ƒ Proxy`).
 

@@ -28,3 +28,6 @@ openwa/
 
 # benchmark com dados reais — nunca commitar
 .bench-data/
+
+# Sentry Config File
+.env.sentry-build-plugin
