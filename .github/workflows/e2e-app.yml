@@ -1,23 +1,92 @@
 name: e2e-app
 
-# E2E do app real (specs de login+write) contra um supabase LOCAL subido no
-# runner — o modo demo não cobre persistência, e escrever no preview/prod
-# sujaria dados reais. `supabase start` aplica migrations + seed.sql frescos:
-# uma migration quebrada falha aqui antes de qualquer apply remoto.
-# Manual apenas (workflow_dispatch) — a cobertura no dia a dia fica no
-# e2e-preview, que roda a mesma suite contra o staging depois do deploy.
+# E2E do app real (login + writes) como GATE do dia a dia: o código do push
+# builda no runner (`pnpm build && pnpm start` em :3000) e aponta pro
+# Supabase de STAGING via secrets E2E_* — os mesmos do e2e-preview. Não
+# depende de deploy Vercel: imune ao Ignored Build Step, que deixava push
+# sem deploy com zero e2e.
+#
+# Gatilhos: push em branch ≠ main (main só muda via merge de PR já verde),
+# pull_request → main (alimenta o required check no contexto do PR), nightly
+# 10:00 BRT (canário de flake — separa "suite instável" de "código quebrou")
+# e workflow_dispatch com input `backend`:
+#   staging (default) → o caminho acima; exige os secrets E2E_*
+#   local             → `supabase start` no runner (Docker funciona lá) com
+#                       migrations + seed.sql frescos e gate de types —
+#                       valida o stack local sem nenhum secret externo
+#
+# `e2e-app / e2e` é required check do main: o guard de secrets FALHA com
+# ::error:: em vez de skipar — step/job skipped conta como verde no GitHub
+# e o gate viraria teatro. PR de fork não recebe secrets → vermelho
+# explícito (repo single-dev; se um fork aparecer, maintainer dispara a mão).
 on:
+  push:
+    branches-ignore: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "0 13 * * *" # 10:00 BRT — uma hora depois do demo-smoke em prod
   workflow_dispatch:
+    inputs:
+      backend:
+        description: "staging (default — app no runner × Supabase staging) ou local (supabase start no runner, sem secrets)"
+        type: choice
+        options:
+          - staging
+          - local
+        default: staging
 
+# As fixtures e2e00000-*/de* são GLOBAIS no staging e divididas com o
+# e2e-preview: dois runs e2e concorrentes — de qualquer workflow — apagam a
+# fixture um do outro (flake garantido). Concurrency groups são repo-wide:
+# este nome é compartilhado com e2e-preview.yml e serializa TODOS os runs da
+# suite numa fila única. Sem cancel-in-progress: um run cortado no meio
+# deixa fixture em estado parcial — push novo espera na fila.
 concurrency:
-  group: e2e-app-${{ github.ref }}
-  cancel-in-progress: true
+  group: e2e-staging
+  cancel-in-progress: false
+
+permissions:
+  contents: read
 
 jobs:
   e2e:
     runs-on: ubuntu-latest
+    # setup (install+build) ~3-4min + suite serial ~14min — mesma margem do
+    # e2e-preview; regressão de duração é o alarme natural do histórico
     timeout-minutes: 25
     steps:
+      # O modo sai UMA vez daqui; todo step condicional usa o output.
+      # Staging exige os 3 secrets E2E_* — faltando, FALHA (nunca skip:
+      # required check não pode ser verde-gratuito). Segunda trava: a URL
+      # não pode conter o ref de prod — specs app escrevem de verdade
+      # (defesa em profundidade sobre o hard-stop de tests/e2e/helpers.ts).
+      - name: modo do backend + guard de secrets
+        id: modo
+        env:
+          BACKEND: >-
+            ${{ github.event_name == 'workflow_dispatch' &&
+                inputs.backend == 'local' && 'local' || 'staging' }}
+          E2E_URL: ${{ secrets.E2E_SUPABASE_URL }}
+          E2E_KEY: ${{ secrets.E2E_SUPABASE_SERVICE_ROLE_KEY }}
+          E2E_ANON: ${{ secrets.E2E_SUPABASE_ANON_KEY }}
+        run: |
+          echo "backend=$BACKEND" >> "$GITHUB_OUTPUT"
+          if [ "$BACKEND" = "local" ]; then
+            exit 0
+          fi
+          falta=""
+          if [ -z "$E2E_URL" ]; then falta="$falta E2E_SUPABASE_URL"; fi
+          if [ -z "$E2E_KEY" ]; then falta="$falta E2E_SUPABASE_SERVICE_ROLE_KEY"; fi
+          if [ -z "$E2E_ANON" ]; then falta="$falta E2E_SUPABASE_ANON_KEY"; fi
+          if [ -n "$falta" ]; then
+            echo "::error::secrets ausentes:$falta — criar apontando pro projeto realiza-staging (ref onkosatlcvircdrfgyzq; o anon key é o mesmo das envs Preview da Vercel). Sem secrets, rode manual com backend=local."
+            exit 1
+          fi
+          if [[ "$E2E_URL" == *yhjzmxleotahijinjepl* ]]; then
+            echo "::error::E2E_SUPABASE_URL aponta pra PRODUÇÃO — os specs app fazem writes; o alvo certo é o staging (ref onkosatlcvircdrfgyzq)"
+            exit 1
+          fi
       - uses: actions/checkout@v4
       # pnpm sai do packageManager do package.json — pinar version aqui
       # conflita ("Multiple versions of pnpm specified")
@@ -27,10 +96,13 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # ---- modo local: stack supabase inteiro no runner ----
       # CLI pinado pela devDep `supabase` — sem setup-cli@latest derivando
-      - name: supabase local
+      - if: steps.modo.outputs.backend == 'local'
+        name: supabase local
         run: pnpm exec supabase start
-      - name: capturar envs do supabase local
+      - if: steps.modo.outputs.backend == 'local'
+        name: capturar envs do supabase local
         # status -o env emite valores COM aspas (API_URL="http://...") e
         # $GITHUB_ENV não desquota — o seed e o fetch quebrariam no URL
         run: |
@@ -41,7 +113,8 @@ jobs:
       # com o que as migrations produzem. gen types emite os schemas que o
       # stack local expõe (graphql_public etc.) — --schema não filtra — então
       # compara-se só o bloco public (o mesmo que o contract check lê).
-      - name: types atualizados vs migrations
+      - if: steps.modo.outputs.backend == 'local'
+        name: types atualizados vs migrations
         run: |
           pnpm exec supabase gen types typescript --db-url "$DB_URL" \
             > /tmp/dbtypes.ts
@@ -66,20 +139,30 @@ jobs:
             diff /tmp/pub-new.ts /tmp/pub-old.ts | head -40
             exit 1
           fi
+      # ---- build do código sob teste; backend conforme o modo ----
+      # NEXT_PUBLIC_* são embutidas no bundle no build: no modo local vêm do
+      # $GITHUB_ENV capturado acima; no staging, dos secrets E2E_*.
       - name: build + start
         run: |
           pnpm build
           nohup pnpm start > /tmp/app.log 2>&1 &
           npx wait-on http://localhost:3000/login -t 120000
         env:
-          NEXT_PUBLIC_SUPABASE_URL: ${{ env.API_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ env.ANON_KEY }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ env.SERVICE_ROLE_KEY }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ env.API_URL || secrets.E2E_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ env.ANON_KEY || secrets.E2E_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ env.SERVICE_ROLE_KEY || secrets.E2E_SUPABASE_SERVICE_ROLE_KEY }}
           RESEND_API_KEY: re_placeholder
           EMAIL_FROM: noreply@realiza.vc
       - name: playwright browsers
         run: pnpm exec playwright install --with-deps chromium
-      - name: fixtures e2e
+      # Fixtures só no modo local (stack nasce zerada). No STAGING o seed é
+      # manual (`pnpm seed:e2e` com .env.staging): re-seed a cada run
+      # derrubava o PostgREST do free tier e gerava flake em massa — os
+      # pisos convergirPiso dos specs re-criam o estado volátil (mesma
+      # decisão do e2e-preview.yml). Staging sem fixtures → o primeiro spec
+      # falha com erro claro; o runbook é o seed manual.
+      - if: steps.modo.outputs.backend == 'local'
+        name: fixtures e2e
         run: node scripts/seed-e2e-staging.mjs
         env:
           E2E_SUPABASE_URL: ${{ env.API_URL }}
@@ -91,8 +174,8 @@ jobs:
         run: pnpm test:e2e
         env:
           E2E_BASE_URL: http://localhost:3000
-          E2E_SUPABASE_URL: ${{ env.API_URL }}
-          E2E_SUPABASE_SERVICE_ROLE_KEY: ${{ env.SERVICE_ROLE_KEY }}
+          E2E_SUPABASE_URL: ${{ env.API_URL || secrets.E2E_SUPABASE_URL }}
+          E2E_SUPABASE_SERVICE_ROLE_KEY: ${{ env.SERVICE_ROLE_KEY || secrets.E2E_SUPABASE_SERVICE_ROLE_KEY }}
           E2E_MENTOR_EMAIL: e2e-mentor@realiza.test
           E2E_MENTOR_PASSWORD: e2e-senha-teste
           E2E_DUPLA_ID: e2e00000-0000-4000-8000-000000000030
@@ -101,8 +184,12 @@ jobs:
           E2E_DUPLA2_ID: e2e00000-0000-4000-8000-000000000070
           # jovem usa a mesma senha do mentor — um secret a menos
           E2E_JOVEM_EMAIL: jovem-e2e@realiza.test
+      # em falha: report html + test-results (é lá que moram os traces — o
+      # que debugga flake no trace.playwright.dev)
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
           name: playwright-report
-          path: playwright-report/
+          path: |
+            playwright-report/
+            test-results/

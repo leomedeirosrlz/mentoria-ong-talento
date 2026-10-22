@@ -284,8 +284,13 @@ test.describe("demo — painel Progresso da jornada (staff)", () => {
     }
 
     // a biblioteca continua abaixo do painel — grupos + badge "sem
-    // conteúdo" (rótulo staff; pro jovem o mesmo estado diz "em breve")
+    // conteúdo" (rótulo staff; pro jovem o mesmo estado diz "em breve").
+    // Com o hub por encontro (REALIZA-173) parte desses badges mora em
+    // <details> fechados — o primeiro match no DOM pode estar oculto; o
+    // filtro garante um visível (os transversais seguem abertos)
     await expect(page.getByRole("heading", { name: "Guias" })).toBeVisible();
-    await expect(page.getByText("sem conteúdo").first()).toBeVisible();
+    await expect(
+      page.getByText("sem conteúdo").filter({ visible: true }).first()
+    ).toBeVisible();
   });
 });

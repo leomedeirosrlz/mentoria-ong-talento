@@ -10,6 +10,7 @@ import {
   parseConfig,
 } from "@/lib/relatorio";
 import type { LinhaRelatorio } from "@/lib/relatorio";
+import { logAcessoResumo } from "@/lib/resumo-acesso";
 import { formatDateTime } from "@/lib/ciclo";
 
 // link "livre" por obscuridade: só abre com o slug exato, que não aparece
@@ -32,6 +33,11 @@ export default async function ResumoPage({
 }) {
   const [{ slug }, sp] = await Promise.all([params, searchParams]);
   if (slug !== RESUMO_SLUG_T2) notFound();
+
+  // fire-and-forget depois do gate: slug errado nem vira linha (o log não
+  // pode ser sensor de enumeração de slugs). O insert é awaited dentro do
+  // helper e a falha morre lá — auditoria nunca entra no caminho crítico.
+  void logAcessoResumo(slug, sp);
 
   const cfg = parseConfig({
     turma: sp.turma,
