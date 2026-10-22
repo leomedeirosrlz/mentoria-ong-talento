@@ -89,8 +89,8 @@ export function CapacidadeMentorDialog({
       }}
     >
       <DialogTrigger render={trigger} />
-      {/* sem override de largura — sm da base já é o degrau "1 campo" */}
-      <DialogContent>
+      {/* sm explícito — o default md da base é largo demais pra 1 campo */}
+      <DialogContent size="sm">
         <DialogHeader>
           <DialogTitle>Capacidade de {primeiro}</DialogTitle>
           <DialogDescription>

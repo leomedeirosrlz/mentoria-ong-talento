@@ -469,7 +469,7 @@ function DialogoPerfilPublico({ me }: { me: Profile }) {
           <BotaoLapis label="Editar perfil público" className="-mr-1.5 -my-1.5" />
         }
       />
-      <DialogContent className="sm:max-w-xl">
+      <DialogContent size="xl">
         <DialogHeader>
           <DialogTitle>Perfil público</DialogTitle>
           <DialogDescription>
@@ -503,7 +503,7 @@ function DialogoCadastro({
           />
         }
       />
-      <DialogContent className="sm:max-w-xl">
+      <DialogContent size="xl">
         <DialogHeader>
           <DialogTitle>Dados de cadastro</DialogTitle>
           <DialogDescription>
@@ -527,7 +527,7 @@ function DialogoMentoria({ mentorProfile }: { mentorProfile: MentorProfile }) {
           <BotaoLapis label="Editar mentoria" className="-my-3 ml-auto" />
         }
       />
-      <DialogContent className="sm:max-w-xl">
+      <DialogContent size="2xl">
         <DialogHeader>
           <DialogTitle>Mentoria</DialogTitle>
           <DialogDescription>
@@ -714,7 +714,7 @@ export function DialogoSenha({ email }: { email: string }) {
           </Button>
         }
       />
-      <DialogContent className="sm:max-w-md">
+      <DialogContent size="md">
         <DialogHeader>
           <DialogTitle>{temSenha ? "Trocar senha" : "Criar senha"}</DialogTitle>
           <DialogDescription>
@@ -862,7 +862,7 @@ export function DialogoEmail({ email }: { email: string }) {
           </Button>
         }
       />
-      <DialogContent className="sm:max-w-md">
+      <DialogContent size="md">
         <DialogHeader>
           <DialogTitle>Trocar e-mail</DialogTitle>
           <DialogDescription>

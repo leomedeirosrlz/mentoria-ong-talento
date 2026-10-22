@@ -483,7 +483,7 @@ export function PessoaActions({
           }
         }}
       >
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent size="2xl">
           <DialogHeader>
             <DialogTitle>Editar {primeiroNome}</DialogTitle>
             <DialogDescription>

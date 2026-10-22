@@ -493,7 +493,7 @@ export function RegistrosFiltros({
       <Dialog open={aberto} onOpenChange={setAberto}>
         {/* md, não lg: o corpo são pílulas e checks em coluna — acima de md
             sobrava fundo ocioso; o scroll interno já vem do DialogContent */}
-        <DialogContent className="sm:max-w-md">
+        <DialogContent size="md">
           <DialogHeader>
             <DialogTitle>Filtros</DialogTitle>
             <DialogDescription>

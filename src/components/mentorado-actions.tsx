@@ -330,7 +330,7 @@ export function MentoradoActions({
           }
         }}
       >
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent size="2xl">
           <DialogHeader>
             <DialogTitle>Editar {primeiroNome}</DialogTitle>
             <DialogDescription>

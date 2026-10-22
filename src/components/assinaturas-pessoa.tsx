@@ -161,7 +161,7 @@ function ContraAssinaturaDialog() {
       >
         <GearSix size={15} />
       </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent size="md">
         <DialogHeader>
           <DialogTitle>Contra-assinatura do presidente</DialogTitle>
           <DialogDescription className="leading-relaxed">

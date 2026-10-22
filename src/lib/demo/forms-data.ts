@@ -314,11 +314,14 @@ export function getDemoFormularios(): DemoFormularios {
     updated_at: haDias(240, "09:00"),
   };
 
+  // shape pós-0118 do oficial: o desdobramento (submetas_N) acompanha
+  // cada meta e o fechamento de revisão saiu do template na 0109 — as
+  // respostas antigas ainda guardam rev_*/meta_principal no snapshot
   const fMetas: Formulario = {
     id: uid(0x4008),
     titulo: "Definindo Minhas Metas",
     descricao:
-      "Template do mentorado da sequência da Visão (PDF oficial): da Declaração de Visão para 3 a 5 metas com o porquê de cada uma — a dupla revisa no encontro seguinte com o modelo SMART.",
+      "Template do mentorado da sequência da Visão (PDF oficial): da Declaração de Visão para 3 a 5 metas com o porquê de cada uma e o desdobramento em submetas — a dupla revisa no encontro seguinte com o modelo SMART.",
     sistema: "metas",
     campos: [
       { id: "s_visao", tipo: "secao", label: "Minha visão de futuro", obrigatorio: false, descricao: "No encontro anterior você construiu sua Declaração de Visão. Agora o passo é pensar: quais conquistas preciso alcançar para tornar essa visão realidade?" },
@@ -327,22 +330,22 @@ export function getDemoFormularios(): DemoFormularios {
       { id: "preciso_aprender", tipo: "texto", label: "O que eu preciso APRENDER?", obrigatorio: false },
       { id: "preciso_melhorar", tipo: "texto", label: "O que eu preciso MELHORAR?", obrigatorio: false },
       { id: "preciso_eliminar", tipo: "texto", label: "O que eu preciso ELIMINAR?", obrigatorio: false },
-      { id: "s_metas", tipo: "secao", label: "Minhas metas", obrigatorio: false, descricao: "Preencha de 3 a 5 metas. Dica: comece cada meta com um verbo de ação." },
-      { id: "meta_1", tipo: "texto", label: "Minha meta 1", obrigatorio: true },
+      { id: "s_metas", tipo: "secao", label: "Minhas metas", obrigatorio: false, descricao: "Preencha de 3 a 5 metas, da mais importante pra menos importante. Dica: comece cada meta com um verbo de ação. Se já souber os primeiros passos de uma meta, anote no desdobramento — uma submeta por linha." },
+      { id: "meta_1", tipo: "texto", label: "Minha meta 1 (a mais importante)", obrigatorio: true },
       { id: "porque_1", tipo: "texto_longo", label: "Por que a meta 1 é importante pra mim?", obrigatorio: true },
+      { id: "submetas_1", tipo: "texto_longo", label: "Desdobramento — submetas (uma por linha)", obrigatorio: false },
       { id: "meta_2", tipo: "texto", label: "Minha meta 2", obrigatorio: true },
       { id: "porque_2", tipo: "texto_longo", label: "Por que a meta 2 é importante pra mim?", obrigatorio: true },
+      { id: "submetas_2", tipo: "texto_longo", label: "Desdobramento — submetas (uma por linha)", obrigatorio: false },
       { id: "meta_3", tipo: "texto", label: "Minha meta 3", obrigatorio: true },
       { id: "porque_3", tipo: "texto_longo", label: "Por que a meta 3 é importante pra mim?", obrigatorio: true },
+      { id: "submetas_3", tipo: "texto_longo", label: "Desdobramento — submetas (uma por linha)", obrigatorio: false },
       { id: "meta_4", tipo: "texto", label: "Minha meta 4", obrigatorio: false },
       { id: "porque_4", tipo: "texto_longo", label: "Por que a meta 4 é importante pra mim?", obrigatorio: false },
+      { id: "submetas_4", tipo: "texto_longo", label: "Desdobramento — submetas (uma por linha)", obrigatorio: false },
       { id: "meta_5", tipo: "texto", label: "Minha meta 5", obrigatorio: false },
       { id: "porque_5", tipo: "texto_longo", label: "Por que a meta 5 é importante pra mim?", obrigatorio: false },
-      { id: "s_revisao", tipo: "secao", label: "Antes do nosso próximo encontro…", obrigatorio: false, descricao: "Revise suas metas e marque. No próximo encontro vocês revisam juntos com o modelo SMART." },
-      { id: "rev_ajudam", tipo: "sim_nao", label: "Minhas metas realmente me ajudam a chegar onde quero?", obrigatorio: true },
-      { id: "rev_importantes", tipo: "sim_nao", label: "Elas são importantes pra mim?", obrigatorio: true },
-      { id: "rev_claras", tipo: "sim_nao", label: "Consigo explicar claramente o que quero alcançar?", obrigatorio: true },
-      { id: "meta_principal", tipo: "select", label: "Qual dessas metas é mais importante pra você neste momento?", obrigatorio: true, opcoes: ["Meta 1", "Meta 2", "Meta 3", "Meta 4", "Meta 5"] },
+      { id: "submetas_5", tipo: "texto_longo", label: "Desdobramento — submetas (uma por linha)", obrigatorio: false },
     ],
     ativo: true,
     versao: 1,
@@ -880,6 +883,11 @@ export function getDemoFormularios(): DemoFormularios {
         porque_3: "É a matéria que mais me atrapalha no simulado.",
         meta_4: "Apresentar um trabalho sem ler os slides",
         porque_4: "Falar em público me trava — vencer isso muda tudo.",
+        submetas_1: "Passar na recuperação de matemática do 3º bimestre\nFechar a lista de exercícios do professor Renan toda semana\nLevar as dúvidas pro encontro com o mentor",
+        submetas_2: "Me inscrever nos programas de jovem aprendiz da cidade\nMontar o currículo com a Luana da ONG\nTreinar entrevista com o Ricardo",
+        submetas_4: "Ensaiar a apresentação em casa 3 vezes",
+        // rev_*/meta_principal — chaves do template pré-0109, preservadas
+        // no snapshot mesmo depois da saída do form (contrato histórico)
         rev_ajudam: "sim",
         rev_importantes: "sim",
         rev_claras: "sim",

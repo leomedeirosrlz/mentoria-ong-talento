@@ -347,7 +347,7 @@ export function RemanejarDuplaDialog({
           }
         />
       )}
-      <DialogContent className="sm:max-w-md">
+      <DialogContent size="xl">
         <DialogHeader>
           <DialogTitle>Remanejar a dupla</DialogTitle>
           <DialogDescription>

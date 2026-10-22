@@ -72,7 +72,7 @@ export function AvaliarPendenteButton({
       <Dialog open={open} onOpenChange={setOpen}>
         {/* md: form de coluna única (estrelas, chips, cartões empilhados) —
             acima disso sobrava fundo ocioso lateral */}
-        <DialogContent className="sm:max-w-md">
+        <DialogContent size="md">
           <DialogHeader>
             <DialogTitle>
               {pendente.numero}º encontro — como foi?
@@ -120,7 +120,7 @@ export function VerAvaliacaoButton({
         {label}
       </Button>
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent size="md">
           <DialogHeader>
             <DialogTitle>
               {avaliacao.encontro?.numero

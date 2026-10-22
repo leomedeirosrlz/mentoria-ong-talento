@@ -81,7 +81,7 @@ export function VincularResposta({
         <LinkSimple aria-hidden />
         Vincular a um jovem
       </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent size="md">
         <DialogHeader>
           <DialogTitle>Vincular resposta a um jovem</DialogTitle>
           <DialogDescription>

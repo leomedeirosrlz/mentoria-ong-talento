@@ -111,7 +111,7 @@ export function SupervisaoDialog({
           )
         }
       />
-      <DialogContent className="sm:max-w-md">
+      <DialogContent size="xl">
         <DialogHeader>
           <DialogTitle>Registrar supervisão</DialogTitle>
           <DialogDescription>

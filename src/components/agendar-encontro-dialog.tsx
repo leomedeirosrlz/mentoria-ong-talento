@@ -248,7 +248,7 @@ export function AgendarEncontroDialog({
           )
         } />
       )}
-      <DialogContent className="sm:max-w-md">
+      <DialogContent size="xl">
         <DialogHeader>
           <DialogTitle>{nome}</DialogTitle>
           <DialogDescription>

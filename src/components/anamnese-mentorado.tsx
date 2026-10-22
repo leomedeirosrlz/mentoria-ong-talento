@@ -121,7 +121,7 @@ export function AnamneseMentoradoChip({
       </Button>
 
       <Dialog open={!!token} onOpenChange={(o) => !o && setToken(null)}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent size="md">
           <DialogHeader>
             <DialogTitle>Anamnese pra {primeiroNome}</DialogTitle>
             <DialogDescription>

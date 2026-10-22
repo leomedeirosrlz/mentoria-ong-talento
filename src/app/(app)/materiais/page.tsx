@@ -88,7 +88,11 @@ export default async function MateriaisPage() {
           aqui — por isso o actions some junto com o catálogo */}
       <PageHeader
         title="Materiais"
-        meta="A biblioteca oficial do programa. A coordenação publica conforme a jornada avança"
+        meta={
+          ehCoord
+            ? "A biblioteca oficial do programa — publique por encontro; a trilha de cobertura mostra o que falta"
+            : "A biblioteca oficial do programa. A coordenação publica conforme a jornada avança"
+        }
         actions={
           ehCoord && visiveis.length > 0 ? (
             <NovoMaterialDialog maxEncontro={maxEncontro} />
@@ -128,7 +132,7 @@ export default async function MateriaisPage() {
             ) : (
               <Link
                 href="/agenda"
-                className="text-sm font-medium underline underline-offset-2 transition-colors hover:text-muted-foreground"
+                className="inline-flex min-h-11 items-center text-sm font-medium underline underline-offset-2 transition-colors hover:text-muted-foreground sm:min-h-8"
               >
                 Ver a agenda
               </Link>

@@ -1,7 +1,7 @@
 import { Skeleton } from "@/components/ui/skeleton";
 
 // Espelho de /materiais (REALIZA-173): header + ação, card da trilha de
-// cobertura (células size-7), linhas de encontro colapsadas (min-h-11) e um
+// cobertura (células size-9), linhas de encontro colapsadas (min-h-11) e um
 // card de transversais (bloco da linha = ícone + título; trailing = badge).
 export default function Loading() {
   return (
@@ -19,7 +19,7 @@ export default function Loading() {
         <Skeleton className="h-4 w-44" />
         <div className="mt-3 flex gap-1.5 overflow-hidden">
           {Array.from({ length: 16 }, (_, i) => (
-            <Skeleton key={i} className="size-7 shrink-0 rounded-md" />
+            <Skeleton key={i} className="size-9 shrink-0 rounded-md" />
           ))}
         </div>
       </section>

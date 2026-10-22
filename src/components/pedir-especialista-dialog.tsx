@@ -254,9 +254,9 @@ export function PedirEspecialistaDialog({
           }
         />
       )}
-      {/* lg: cards de alvo lado a lado + lista de especialistas com avatar —
+      {/* xl: cards de alvo lado a lado + lista de especialistas com avatar —
           abaixo disso a escolha dirigida ficava apertada */}
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent size="xl">
         <DialogHeader>
           <DialogTitle>Pedir apoio de um especialista</DialogTitle>
         </DialogHeader>

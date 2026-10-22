@@ -11,6 +11,7 @@ import {
 import { linkSeguro } from "@/lib/ciclo";
 import type { CicloEvento, Material } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
+import { CelulaCobertura } from "@/components/celula-cobertura";
 import { MaterialActions } from "@/components/material-actions";
 import { NovoMaterialDialog } from "@/components/novo-material-dialog";
 import { cn } from "@/lib/utils";
@@ -142,43 +143,28 @@ export function CoberturaTrilha({
         </ul>
       </div>
       <ol className="mt-3 flex gap-1.5 overflow-x-auto pb-0.5">
-        {nums.map((n) => (
-          <li key={n} className="shrink-0">
-            <CelulaCobertura n={n} itens={porEncontro.get(n) ?? []} />
-          </li>
-        ))}
+        {nums.map((n) => {
+          // estado/rótulo resolvidos no server — a célula client só cuida
+          // do clique que abre o <details> de destino
+          const itens = porEncontro.get(n) ?? [];
+          const k = itens.length;
+          const comConteudo = itens.filter(temConteudo).length;
+          const estado =
+            k === 0 ? "vazio" : comConteudo > 0 ? "coberto" : "parcial";
+          const rotulo =
+            estado === "vazio"
+              ? `Encontro ${n} · sem material`
+              : `Encontro ${n} · ${k} ${k === 1 ? "material" : "materiais"}${
+                  comConteudo < k ? ` · ${k - comConteudo} em breve` : ""
+                }`;
+          return (
+            <li key={n} className="shrink-0">
+              <CelulaCobertura n={n} estado={estado} rotulo={rotulo} />
+            </li>
+          );
+        })}
       </ol>
     </section>
-  );
-}
-
-function CelulaCobertura({ n, itens }: { n: number; itens: Material[] }) {
-  const k = itens.length;
-  const comConteudo = itens.filter(temConteudo).length;
-  const estado = k === 0 ? "vazio" : comConteudo > 0 ? "coberto" : "parcial";
-  const rotulo =
-    estado === "vazio"
-      ? `Encontro ${n} · sem material`
-      : `Encontro ${n} · ${k} ${k === 1 ? "material" : "materiais"}${
-          comConteudo < k ? ` · ${k - comConteudo} em breve` : ""
-        }`;
-  return (
-    <a
-      href={`#mat-encontro-${n}`}
-      title={rotulo}
-      aria-label={rotulo}
-      className={cn(
-        "grid size-9 place-items-center rounded-md text-xs font-semibold tabular-nums transition-colors",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-        estado === "coberto" && "bg-[var(--brand-lime)] text-[var(--brand-ink)]",
-        estado === "parcial" &&
-          "border border-[var(--warn)]/50 bg-[var(--warn)]/15 text-[var(--warn-text)]",
-        estado === "vazio" &&
-          "border border-dashed border-input text-muted-foreground/70 hover:border-muted-foreground/40 hover:text-muted-foreground"
-      )}
-    >
-      {n}
-    </a>
   );
 }
 
@@ -220,8 +206,10 @@ export function EncontroDetails({
         <span role="heading" aria-level={3} className="shrink-0 text-[13px] font-semibold">
           Encontro {n}
         </span>
+        {/* título do encontro visível em todo viewport — trunca em vez de
+            sumir no mobile: "Encontro 7" sozinho não diz o tema da semana */}
         {titulo && (
-          <span className="hidden min-w-0 truncate text-xs text-muted-foreground sm:inline">
+          <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
             {titulo}
           </span>
         )}

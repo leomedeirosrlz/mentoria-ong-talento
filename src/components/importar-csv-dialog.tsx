@@ -282,7 +282,7 @@ export function ImportarCsvDialog({
           }
         />
       )}
-      <DialogContent className="sm:max-w-2xl">
+      <DialogContent size="2xl">
         <DialogHeader>
           <DialogTitle>Importar de planilha</DialogTitle>
           <DialogDescription>

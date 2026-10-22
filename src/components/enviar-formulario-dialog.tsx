@@ -213,7 +213,7 @@ export function EnviarFormularioDialog({
           }
         />
       )}
-      <DialogContent className="sm:max-w-md">
+      <DialogContent size="xl">
         <DialogHeader>
           <DialogTitle>Enviar formulário</DialogTitle>
           <DialogDescription>

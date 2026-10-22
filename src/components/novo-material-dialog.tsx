@@ -2,7 +2,7 @@
 
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Plus } from "@phosphor-icons/react";
+import { Paperclip, Plus } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { deleteMaterial, salvarMaterial } from "@/lib/actions";
 import { TRILHA_LEN } from "@/lib/ciclo";
@@ -81,6 +81,9 @@ export function NovoMaterialDialog({
   const [encontroNum, setEncontroNum] = useState(
     defaultEncontro?.toString() ?? ""
   );
+  // nome do arquivo escolhido — o input real é hidden (padrão dos anexos
+  // do app); sem o state o nome ficaria invisível até o submit
+  const [fileNome, setFileNome] = useState<string | null>(null);
   const maxEncontroSel =
     audiencia === "especialista" ? TRILHA_LEN.especialista : maxEncontro;
   const [pending, start] = useTransition();
@@ -137,6 +140,7 @@ export function NovoMaterialDialog({
         setDestino("arquivo");
         setAudiencia("todos");
         setEncontroNum(defaultEncontro?.toString() ?? "");
+        setFileNome(null);
         if (fileRef.current) fileRef.current.value = "";
         router.refresh();
       } catch {
@@ -157,6 +161,7 @@ export function NovoMaterialDialog({
           setDestino("arquivo");
           setAudiencia("todos");
           setEncontroNum(defaultEncontro?.toString() ?? "");
+          setFileNome(null);
           if (fileRef.current) fileRef.current.value = "";
         }
       }}
@@ -243,15 +248,40 @@ export function NovoMaterialDialog({
             </div>
             {destino === "arquivo" ? (
               <>
-                {/* sem name: o arquivo não vai no FormData — sobe direto pro storage */}
-                <Input
+                {/* input real fora da tab order — o botão é o controle
+                    (mesmo padrão de anexos-registro/foto-field); o nome do
+                    arquivo escolhido aparece ao lado dele */}
+                <input
                   ref={fileRef}
                   id="arquivo"
                   type="file"
                   accept={ACCEPT}
-                  aria-label="Arquivo do material (PDF ou imagem)"
-                  className="h-auto cursor-pointer py-2 text-xs file:mr-3 file:rounded-md file:border-0 file:bg-muted file:px-2.5 file:py-1.5 file:text-xs file:font-medium"
+                  className="hidden"
+                  tabIndex={-1}
+                  aria-hidden="true"
+                  onChange={(e) =>
+                    setFileNome(e.target.files?.[0]?.name ?? null)
+                  }
                 />
+                <div className="flex items-center gap-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => fileRef.current?.click()}
+                  >
+                    <Paperclip data-icon="inline-start" aria-hidden />
+                    Escolher arquivo
+                  </Button>
+                  <p
+                    className={cn(
+                      "min-w-0 flex-1 truncate text-sm",
+                      fileNome ? "text-foreground" : "text-muted-foreground"
+                    )}
+                    aria-live="polite"
+                  >
+                    {fileNome ?? "Nenhum arquivo escolhido"}
+                  </p>
+                </div>
                 <p className="text-xs text-muted-foreground">
                   PDF ou imagem, até 20 MB. O arquivo é servido por link temporário. Só quem tem acesso ao material abre.
                 </p>

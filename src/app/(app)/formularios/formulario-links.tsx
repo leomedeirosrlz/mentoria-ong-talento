@@ -453,7 +453,7 @@ export function FormularioLinks({
             <LinkIcon aria-hidden />
             Gerar links
           </DialogTrigger>
-          <DialogContent className="sm:max-w-md">
+          <DialogContent size="2xl">
             <DialogHeader>
               <DialogTitle>Gerar links de resposta</DialogTitle>
               <DialogDescription>

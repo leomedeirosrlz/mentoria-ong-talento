@@ -3568,7 +3568,7 @@ function EncontroDuplaRow({
           o modal já é responsivo por si (mobile ocupa a tela útil inteira) */}
       {podeTerRegistro && (
         <Dialog open={aberto} onOpenChange={onAlternarRegistro}>
-          <DialogContent className="sm:max-w-xl">
+          <DialogContent size="2xl">
             <DialogHeader>
               <DialogTitle>
                 Como foi o {encontro.numero}º encontro

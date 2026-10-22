@@ -162,7 +162,7 @@ export function JovemAgendarDialog({
           </Button>
         )
       } />
-      <DialogContent className="sm:max-w-md">
+      <DialogContent size="xl">
         <DialogHeader>
           <DialogTitle>
             {atual || numero ? `${numeroFinal ?? numero}º encontro` : "Agendar encontro"}

@@ -438,7 +438,7 @@ export function ImportarRegistrosDialog() {
       />
       {/* 3xl, não 6xl: a linha da prévia é basis-80 + w-80 (~43,5rem) —
           em 2xl a coluna de escolha quebrava, em 6xl sobrava fundo ocioso */}
-      <DialogContent className="sm:max-w-3xl">
+      <DialogContent size="3xl">
         <DialogHeader>
           <DialogTitle>Importar respostas do form semanal</DialogTitle>
           <DialogDescription>

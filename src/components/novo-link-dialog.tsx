@@ -241,7 +241,7 @@ export function NovoLinkDialog({
           )
         }
       />
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent size="xl">
         <DialogHeader>
           <DialogTitle>
             {resultado ? "Link criado" : "Publicar relatório"}

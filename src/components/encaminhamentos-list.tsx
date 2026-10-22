@@ -230,7 +230,7 @@ export function EncaminhamentosList({
 
       {/* edição — um dialog por lista; os defaults vêm do item alvo */}
       <Dialog open={editando !== null} onOpenChange={(o) => !o && setEditando(null)}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent size="xl">
           <DialogHeader>
             <DialogTitle>Editar combinado</DialogTitle>
             <DialogDescription>

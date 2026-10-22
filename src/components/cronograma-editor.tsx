@@ -140,7 +140,7 @@ function ConfirmarAcao({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger render={trigger} />
-      <DialogContent>
+      <DialogContent size="sm">
         <DialogHeader>
           <DialogTitle>{titulo}</DialogTitle>
         </DialogHeader>
@@ -260,7 +260,7 @@ export function CronogramaAcoes({
             </Button>
           }
         />
-        <DialogContent className="sm:max-w-md">
+        <DialogContent size="xl">
           <DialogHeader>
             <DialogTitle>Dados do cronograma</DialogTitle>
             <DialogDescription>

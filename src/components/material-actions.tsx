@@ -229,7 +229,9 @@ export function MaterialActions({ material, maxEncontro }: { material: Material;
           if (!o) setAudiencia(material.audiencia);
         }}
       >
-        <DialogContent className="sm:max-w-md">
+        {/* mesmo teto do dialog de criação — os dois grids de 2 colunas
+            (tipo×audiência, encontro×url) respiram melhor que no md */}
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Editar material</DialogTitle>
             <DialogDescription>
