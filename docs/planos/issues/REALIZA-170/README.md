@@ -75,3 +75,5 @@ REST. A parte cara é a disciplina de allowlist por tipo (sdr).
 - **Enumeração de slugs** — slug não encontrado e senha errada respondem o
   mesmo `{ok:false}` genérico na RPC; página faz 404 só quando `info.existe=false`.
 - **Demo:** UI de gestão mostra links canned do dataset; mutações → `DEMO_MSG`.
+
+> DECIDIDO (Thiago): v1 = link+senha, só dados operacionais; respostas brutas de instrumentos fora.

@@ -73,3 +73,5 @@ multi-uso + RPC, promoção, UI de gestão do link público, demo, e2e.
 
 `plan.md` · `sdd.md` (intake links — referência também pro 69) ·
 `design.md` · `sdr.md` · `acceptance.md`.
+
+> DECIDIDO (Thiago): 1 grade de disponibilidade só — a duplicata era artefato do Google Form.

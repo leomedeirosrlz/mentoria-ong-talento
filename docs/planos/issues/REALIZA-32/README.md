@@ -44,3 +44,5 @@ Documentada como decisão pendente com os dois cenários desenhados em `sdd.md` 
 
 - **M-G** conforme o desfecho do BLOCKER (turma inteira = mais simples; por dupla designada = mais uma tabela).
 - Risco principal: **alargar leitura do auxiliar** sem querer (menores de outras turmas) — mitigado por policies explícitas + testes RLS em acceptance.
+
+> DECIDIDO (Thiago): auxiliar vê a turma inteira por default; designação individual por dupla é refinamento posterior acessível à coord.

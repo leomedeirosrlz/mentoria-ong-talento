@@ -31,3 +31,5 @@
 - Termo do responsável é rascunho não-revisado — se questionado por responsável/ONG parceira, não há lastro.
 - Terceiros (amigos/família) armazenados sem nenhum consentimento — mitigação possível barata (aviso no convite + exclusão a pedido).
 - Sem retenção: dados de desistentes ficam pra sempre; crescimento contínuo do passivo por ciclo.
+
+> DECIDIDO (Thiago): escopo B aprovado; ele revisa cláusulas com o jurídico.

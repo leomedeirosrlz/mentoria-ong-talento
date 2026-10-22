@@ -92,3 +92,5 @@ encerramento automático".
 - **Re-notificação após reabertura** — ledger é por `(dupla,marco)`: se a
   trilha for encerrada e uma **nova** dupla esp for criada pro mesmo par,
   `dupla_id` novo = marcos novos = lembretes novos (correto).
+
+> DECISÃO DERIVADA: rota /api/jobs/* entra no isPublic do middleware + 401 JSON sem Bearer + vercel.json (fix sistêmico da review).

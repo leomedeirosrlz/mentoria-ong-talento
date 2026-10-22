@@ -74,3 +74,5 @@ navegáveis na demo (A), ou construir modos reais paralelos (B)?"*
 - Escopo temporal: artefato de avaliação — remover `public/mockups/` + rotas
   + seção da DemoBar ao fim da validação (WP9 já prevê; código marcado com
   `REALIZA-138` pra grep).
+
+> DECIDIDO (Thiago): Opção A confirmada — viewer de mockups na demo; sem modos reais paralelos.

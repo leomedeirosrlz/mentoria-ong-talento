@@ -30,3 +30,5 @@
 
 - 16 labels ao redor podem colidir/estourar em viewports ~1024px — a grade 2 col é fallback seguro.
 - Regressão no payload de resposta e no `instrumento-resultado` (aceite explícito da issue).
+
+> DECIDIDO (Thiago): variante A — labels ao redor da roda (escolha sobre a recomendação técnica de B).

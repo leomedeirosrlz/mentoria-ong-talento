@@ -27,3 +27,5 @@
 - Manter status quo = acervo da org refém de conta Gmail pessoal (`thixaraujo@gmail.com`) — sai a pessoa, some o acesso/ownership.
 - Migração manual depende da colaboração de cada dono (não há "force move" de fora); mitigar com checklist + janela combinada.
 - Shared Drive mistura público-interno e sensível sem cuidado — pastas com restrição de membro resolvem (intake histórico com RG/CPF não é pra org inteira).
+
+> DECIDIDO (Thiago): Shared Drive postergado.

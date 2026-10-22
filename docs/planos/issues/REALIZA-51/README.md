@@ -31,3 +31,5 @@
 
 - Disparo em massa → spam/bounce se e-mails do intake estiverem ruins; mitigar com lista de pulados + log por destinatário.
 - Reenvio duplicado: a RPC de emissão já reusa link pendente — idempotente por natureza.
+
+> DECIDIDO (Thiago): e-mail do lote vai pro mentorado (mentorados.email) com fallback pro mentor repassar.

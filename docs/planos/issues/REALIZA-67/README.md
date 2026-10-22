@@ -26,3 +26,5 @@
 
 - Cortar devolução do MVP deixa um valor morto no enum `'devolvida'` e o fluxo num beco: entrega ruim vira conversa morta por fora + custo de re-criar atividade (o rascunho — o grande ativo do link multi-sessão — se perde).
 - Incluir devolução "completa" demais (PDF anotado pelo mentor) infla o MVP: exige superfície de edição pro mentor (co-edição) ou upload de devolução — é outro produto, fase 2.
+
+> DECIDIDO (Thiago): SUSPENSO junto com a 55.

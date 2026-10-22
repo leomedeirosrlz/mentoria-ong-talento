@@ -71,3 +71,5 @@ Migration curta + route handler + vercel.json + testes do handler com fake
   semáforo *de hoje* para eventos que já existiam em D. Aceitável pra buracos
   curtos; `fonte='backfill'` deixa isso explícito no dado.
 - **Volume:** ~40 duplas × 365 = ~15k rows/ano — trivial.
+
+> DECISÃO DERIVADA: idem 169 — middleware allowlist + 401 JSON + vercel.json compartilhado.

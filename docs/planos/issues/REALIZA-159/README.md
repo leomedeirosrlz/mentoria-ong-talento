@@ -78,3 +78,5 @@ resolve (identidade histórica) — regressão obrigatória nos dois sentidos.
 
 **M** — 1 migration (RPC definer, ~120 linhas) + action + dialog + item de
 menu + testes RLS. Sem ALTER TABLE.
+
+> DECIDIDO (Thiago): elegibilidade = só situacao=concluido; desistentes não entram.

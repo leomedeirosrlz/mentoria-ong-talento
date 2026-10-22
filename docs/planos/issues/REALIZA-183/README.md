@@ -49,3 +49,5 @@ página, com IP **hasheado** (LGPD — não guarda IP cru).
   é baixo (link interno, noindex); poda lazy sugerida no sdr.
 - **Ordem com a 170:** esta issue deve aterrissar antes ou junto — a 170 assume a
   tabela pra rate limit de senha.
+
+> DECIDIDO (Thiago): retenção 13 meses; prod falha visível sem RESUMO_SALT.

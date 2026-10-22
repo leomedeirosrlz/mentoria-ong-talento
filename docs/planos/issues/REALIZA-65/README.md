@@ -28,3 +28,5 @@
 - Estourar o 1 GB free no meio do ciclo com T1+T2 ativas — mitigar medindo o uso real **agora** (a verificar).
 - Arquivar manualmente cedo demais = arquivos fora do alcance da app (links quebram na ficha) — por isso a recomendação é esperar gatilho.
 - `documentos` é coord-only: mover pra Drive não muda a fronteira de segurança (a app já media todo acesso via signed URL), mas registra outro subprocessador com PII — cruzar com a REALIZA-33.
+
+> DECIDIDO (Thiago): offload quando storage >~70% do 1GB; depende da 53.
