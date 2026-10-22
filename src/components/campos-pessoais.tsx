@@ -380,7 +380,7 @@ export function CampoDisponibilidade({
                 type="button"
                 onClick={() => alternarColuna(d)}
                 aria-label={`Alternar ${DIAS_SEMANA_LABELS[d]} ${d === "sab" || d === "dom" ? "inteiro" : "inteira"}`}
-                className="w-full rounded-md px-1 py-1 text-center text-[11px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+                className="min-h-11 w-full rounded-md px-1 py-1 text-center text-[11px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 sm:min-h-8"
               >
                 {DIAS_SEMANA_CURTOS[d]}
               </button>
@@ -394,7 +394,7 @@ export function CampoDisponibilidade({
                 type="button"
                 onClick={() => alternarLinha(p)}
                 aria-label={`Alternar ${PERIODOS_LABELS[p]} inteira`}
-                className="flex h-full w-full items-center rounded-md px-1.5 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+                className="flex h-full min-h-11 w-full items-center rounded-md px-1.5 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 sm:min-h-0"
               >
                 {PERIODOS_LABELS[p]}
               </button>
@@ -418,7 +418,7 @@ export function CampoDisponibilidade({
                     onKeyDown={setas(di, pi)}
                     onFocus={() => setFoco(idx)}
                     className={cn(
-                      "grid h-9 w-full place-items-center rounded-md border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 sm:h-10",
+                      "grid h-11 w-full place-items-center rounded-md border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 sm:h-10",
                       ativo
                         ? "border-primary/40 bg-primary/15 text-primary"
                         : "border-border bg-card text-muted-foreground hover:bg-muted"

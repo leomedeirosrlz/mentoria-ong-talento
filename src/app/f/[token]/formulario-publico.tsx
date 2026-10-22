@@ -3,24 +3,39 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { CaretDown, CheckCircle, CircleNotch, PaperPlaneRight } from "@phosphor-icons/react";
-import { submeterRespostaFormulario } from "@/lib/forms/actions";
 import {
-  CAMPO_FORMATO_ERRO,
+  ArrowUp,
+  CaretDown,
+  CheckCircle,
+  CircleNotch,
+  FileText,
+  PaperPlaneRight,
+  X,
+} from "@phosphor-icons/react";
+import {
+  subirAnexoFormulario,
+  submeterRespostaFormulario,
+} from "@/lib/forms/actions";
+import {
   camposPerguntas,
   campoFormato,
+  ARQUIVO_MAX_MB,
+  ARQUIVO_MIMES,
   SISTEMA_LABEL,
+  visivel,
   type FormularioCampo,
   type FormularioSistema,
   type RespostaValor,
 } from "@/lib/forms/schema";
 import {
-  normalizaData,
-  normalizaPorFormato,
-  normalizaTexto,
-  type NormResult,
-} from "@/lib/forms/normaliza";
+  aplicaOutro,
+  campoRespondido,
+  coletaRespostas,
+  leDeFormData,
+  validaRespostas,
+} from "@/lib/forms/resposta";
 import { ehInstrumento } from "@/lib/forms/instrumentos";
+import { GridDisponibilidade } from "@/components/forms/grid-disponibilidade";
 import { fade, T } from "@/components/motion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -29,11 +44,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { InstrumentoFlow } from "@/components/instrumentos/flow";
 
-/** Tipos com teclado de texto — recebem enterKeyHint; o último deles leva
- *  "send" (fecha o teclado e envia em vez de saltar pra lugar nenhum). */
+/** Tipos de linha única que recebem enterKeyHint; o último deles leva
+ *  "send" (fecha o teclado e envia em vez de saltar pra lugar nenhum).
+ *  texto_longo fica fora DE PROPÓSITO: na textarea a tecla insere \n, não
+ *  envia — rotulá-la "send" (ou "next") mentiria sobre o gesto. O default
+ *  "enter" do SO já descreve certo a quebra de linha. */
 const TIPOS_COM_ENTER: readonly FormularioCampo["tipo"][] = [
   "texto",
-  "texto_longo",
   "data",
 ];
 
@@ -41,6 +58,12 @@ const TIPOS_COM_ENTER: readonly FormularioCampo["tipo"][] = [
  *  servidor/rede: o banner de validação some assim que o último campo
  *  marcado é corrigido; o de servidor só sai no próximo submit. */
 const ERRO_VALIDACAO = "Revise os campos marcados antes de enviar.";
+
+/** Forms oficiais de inscrição (REALIZA-70/69): ganham copy de inscrição
+ *  ("recebida" ≠ "enviada") no painel de sucesso. */
+function ehIntake(sistema: FormularioSistema | null | undefined): boolean {
+  return sistema === "intake_mentor" || sistema === "intake_mentorado";
+}
 
 /** Formulário público /f/<token> — despacha pelo sistema do form: os 4
  *  instrumentos de jornada (0080) têm experiência sob medida
@@ -90,10 +113,17 @@ function FormularioGenerico({
   const [erros, setErros] = useState<Record<string, string>>({});
   const [respondidos, setRespondidos] = useState(0);
   const [pending, start] = useTransition();
+  // valores controlados fora do FormData: upload ('arquivo') e a grade
+  // horária — o input hidden espelha o mesmo valor pra coleta/validação
+  const [extras, setExtras] = useState<Record<string, RespostaValor>>({});
+  // snapshot das respostas atuais — alimenta visivel() das perguntas
+  // condicionais (o gatilho pode ser qualquer campo já respondido)
+  const [atuais, setAtuais] = useState<Record<string, RespostaValor>>({});
   const formRef = useRef<HTMLFormElement>(null);
   // progresso/validação/coleta ignoram rótulos de estrutura ('secao', 0080):
-  // a numeração que a pessoa vê é só de perguntas de verdade
-  const perguntas = camposPerguntas(campos);
+  // a numeração que a pessoa vê é só de perguntas de verdade. Ainda por
+  // cima, a pergunta condicional fora da condição nem entra na conta.
+  const perguntas = camposPerguntas(campos).filter((c) => visivel(c, atuais));
 
   // rascunho por token+pergunta: o mentorado responde no celular e texto
   // longo não pode morrer num reload (rede caindo, troca de app). Um JSON
@@ -108,150 +138,134 @@ function FormularioGenerico({
     el.focus({ preventScroll: true });
   }, []);
 
-  /** O campo tem valor no form — usado pelo progresso e pra limpar erro
-   *  assim que a pessoa corrige (sem esperar novo submit). */
+  const setExtra = useCallback(
+    (id: string, v: RespostaValor | null) => {
+      setExtras((prev) => {
+        const next = { ...prev };
+        if (v == null) delete next[id];
+        else next[id] = v;
+        return next;
+      });
+      // upload/grid mudam as condições e o progresso do mesmo jeito que
+      // um campo de texto — sincroniza o snapshot
+      setAtuais((prev) => {
+        const next = { ...prev };
+        if (v == null) delete next[id];
+        else next[id] = v;
+        return next;
+      });
+      setErros((prev) => {
+        if (!prev[id]) return prev;
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
+    },
+    []
+  );
+
+  /** O campo tem valor — progresso/limpeza de erro. FormData cobre os
+   *  inputs nativos; o JSON do hidden cobre arquivo/grid (mesma regra de
+   *  campoRespondido: path presente / célula marcada). */
   function respondido(c: FormularioCampo, fd: FormData): boolean {
     if (c.tipo === "multi_select") return fd.getAll(c.id).length > 0;
     if (c.tipo === "checkbox") return fd.get(c.id) === "on";
-    const v = fd.get(c.id);
-    return v != null && String(v).trim() !== "";
+    return campoRespondido(c, fd.get(c.id));
   }
 
-  /** Normalização da resposta na entrada (REALIZA-118): campo 'texto' com
-   *  `formato` declarado passa pelo normalizador do formato; 'data' aceita
-   *  dd/mm/aaaa além do ISO que o input nativo já manda; o resto é trim.
-   *  O que sai daqui é o que a RPC recebe — gravado já normalizado. */
-  function normalizaResposta(c: FormularioCampo, v: string): NormResult {
-    const f = campoFormato(c);
-    if (f) return normalizaPorFormato(f, v);
-    if (c.tipo === "data") return normalizaData(v);
-    return normalizaTexto(v);
-  }
-
-  /** Coleta + normalização num passe só. `falhas` marca o campo cuja
-   *  resposta veio preenchida mas não resgatou — o validador transforma
-   *  isso em erro de formato só quando o campo é obrigatório (no opcional
-   *  ela simplesmente não é gravada: a submissão não morre por ele). */
+  /** Coleta + normalização — resposta.ts espelha a RPC; os controlados
+   *  entram pelo hidden input do próprio campo (arquivo/grid). */
   function coleta(fd: FormData): {
     respostas: Record<string, RespostaValor>;
     falhas: Set<string>;
   } {
-    const respostas: Record<string, RespostaValor> = {};
-    const falhas = new Set<string>();
-    for (const c of perguntas) {
-      switch (c.tipo) {
-        case "multi_select": {
-          const itens = fd.getAll(c.id).map(String).filter(Boolean);
-          if (itens.length) respostas[c.id] = itens;
-          break;
-        }
-        case "checkbox":
-          respostas[c.id] = fd.get(c.id) === "on";
-          break;
-        case "escala_1_5":
-        case "escala_1_10": {
-          const v = fd.get(c.id);
-          if (v != null && v !== "") respostas[c.id] = Number(v);
-          break;
-        }
-        default: {
-          const v = String(fd.get(c.id) ?? "").trim();
-          if (!v) break;
-          const r = normalizaResposta(c, v);
-          if (r.valor) respostas[c.id] = r.valor;
-          else falhas.add(c.id);
-        }
-      }
-    }
-    return { respostas, falhas };
+    return coletaRespostas(camposPerguntas(campos), leDeFormData(fd));
   }
 
-  /** Espelho client-side das regras do servidor, um erro por campo — a RPC
-   *  continua sendo a fronteira real, aqui a resposta é imediata. */
+  /** Espelho client-side das regras do servidor — validaRespostas sobre
+   *  as perguntas VISÍVEIS (condicional fora da condição não obriga). */
   function valida(
     respostas: Record<string, RespostaValor>,
     falhas: Set<string>
   ) {
-    const mapa: Record<string, string> = {};
-    for (const c of perguntas) {
-      if (!c.obrigatorio) continue;
-      const v = respostas[c.id];
-      if (c.tipo === "checkbox") {
-        if (v !== true) mapa[c.id] = "Marque a caixa pra continuar.";
-      } else if (falhas.has(c.id)) {
-        // respondeu algo, mas não vira o formato — erro de formato é mais
-        // honesto que "responda esta pergunta" (a pessoa já respondeu)
-        const f = campoFormato(c);
-        mapa[c.id] =
-          c.tipo === "data"
-            ? "Use uma data válida (dd/mm/aaaa)."
-            : f
-              ? CAMPO_FORMATO_ERRO[f]
-              : "Responda esta pergunta.";
-      } else if (v == null || v === "" || (Array.isArray(v) && !v.length)) {
-        mapa[c.id] =
-          c.tipo === "multi_select"
-            ? "Marque ao menos uma opção."
-            : TIPOS_COM_ENTER.includes(c.tipo)
-              ? "Responda esta pergunta."
-              : "Escolha uma opção.";
-      }
-    }
-    return mapa;
+    return validaRespostas(perguntas, respostas, falhas);
   }
 
   // restaura o rascunho depois do mount: cada campo ganha de volta o que
   // foi digitado e o progresso recalcula — localStorage nunca é lido no
-  // render (SSR/privado) nem na prévia da coordenação
+  // render (SSR/privado) nem na prévia da coordenação. Restaura sobre
+  // TODAS as perguntas (inclusive as condicionais): a resposta do gatilho
+  // restaurada reexibe a pergunta dependente no mesmo tick.
   useEffect(() => {
     if (!chaveRascunho) return;
-    try {
-      const raw = localStorage.getItem(chaveRascunho);
-      if (!raw) return;
-      const rascunho = JSON.parse(raw) as Record<string, RespostaValor>;
-      const form = formRef.current;
-      if (!form) return;
-      const nome = (id: string) => CSS.escape(id);
-      for (const c of perguntas) {
-        const v = rascunho[c.id];
-        if (v == null) continue;
-        if (c.tipo === "multi_select" && Array.isArray(v)) {
-          for (const inp of form.querySelectorAll<HTMLInputElement>(
-            `input[name="${nome(c.id)}"]`
-          )) {
-            inp.checked = v.includes(inp.value);
+    // restaura depois do primeiro paint: o DOM dos inputs já existe no
+    // commit, mas setState síncrono no corpo do efeito cascateia render
+    // (react-hooks/set-state-in-effect) — o timeout aplica o rascunho
+    // num passe só, fora do ciclo de montagem
+    const t = setTimeout(() => {
+      try {
+        const raw = localStorage.getItem(chaveRascunho);
+        if (!raw) return;
+        const rascunho = JSON.parse(raw) as Record<string, RespostaValor>;
+        const form = formRef.current;
+        if (!form) return;
+        const nome = (id: string) => CSS.escape(id);
+        const extrasRest: Record<string, RespostaValor> = {};
+        for (const c of camposPerguntas(campos)) {
+          const v = rascunho[c.id];
+          if (v == null) continue;
+          if (c.tipo === "arquivo" || c.tipo === "grid_disponibilidade") {
+            // valor controlado — volta pelo estado (o upload já está no
+            // servidor; só o metadado {path,nome,tamanho} viaja)
+            extrasRest[c.id] = v;
+            continue;
           }
-        } else if (c.tipo === "checkbox") {
-          const inp = form.querySelector<HTMLInputElement>(
-            `input[name="${nome(c.id)}"]`
-          );
-          if (inp) inp.checked = v === true;
-        } else if (
-          c.tipo === "sim_nao" ||
-          c.tipo === "escala_1_5" ||
-          c.tipo === "escala_1_10"
-        ) {
-          const inp = form.querySelector<HTMLInputElement>(
-            `input[name="${nome(c.id)}"][value="${nome(String(v))}"]`
-          );
-          if (inp) inp.checked = true;
-        } else {
-          const inp = form.querySelector<
-            HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
-          >(`[name="${nome(c.id)}"]`);
-          if (inp) inp.value = String(v);
+          if (c.tipo === "multi_select" && Array.isArray(v)) {
+            for (const inp of form.querySelectorAll<HTMLInputElement>(
+              `input[name="${nome(c.id)}"]`
+            )) {
+              inp.checked = v.includes(inp.value);
+            }
+          } else if (c.tipo === "checkbox") {
+            const inp = form.querySelector<HTMLInputElement>(
+              `input[name="${nome(c.id)}"]`
+            );
+            if (inp) inp.checked = v === true;
+          } else if (
+            c.tipo === "sim_nao" ||
+            c.tipo === "escala_1_5" ||
+            c.tipo === "escala_1_10"
+          ) {
+            const inp = form.querySelector<HTMLInputElement>(
+              `input[name="${nome(c.id)}"][value="${nome(String(v))}"]`
+            );
+            if (inp) inp.checked = true;
+          } else {
+            const inp = form.querySelector<
+              HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
+            >(`[name="${nome(c.id)}"]`);
+            if (inp) inp.value = String(v);
+          }
         }
+        setExtras(extrasRest);
+        const fd = new FormData(form);
+        const coletado = coleta(fd).respostas;
+        setAtuais({ ...coletado, ...extrasRest });
+        setRespondidos(
+          perguntas.reduce((n, c) => n + (respondido(c, fd) ? 1 : 0), 0)
+        );
+      } catch {
+        // storage indisponível ou rascunho corrompido — o form segue vazio
       }
-      const fd = new FormData(form);
-      setRespondidos(perguntas.reduce((n, c) => n + (respondido(c, fd) ? 1 : 0), 0));
-    } catch {
-      // storage indisponível ou rascunho corrompido — o form segue vazio
-    }
+    }, 0);
+    return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- restaura uma vez no mount; respondido/campos são estáveis por render
   }, [chaveRascunho]);
 
   function onFormChange(e: React.FormEvent<HTMLFormElement>) {
     const fd = new FormData(e.currentTarget);
+    const coletado = coleta(fd).respostas;
+    setAtuais({ ...coletado, ...extras });
     setRespondidos(
       perguntas.reduce((n, c) => n + (respondido(c, fd) ? 1 : 0), 0)
     );
@@ -259,7 +273,7 @@ function FormularioGenerico({
       try {
         localStorage.setItem(
           chaveRascunho,
-          JSON.stringify(coleta(fd).respostas)
+          JSON.stringify({ ...coletado, ...extras })
         );
       } catch {
         // quota/storage desligado — o rascunho é conveniência, não requisito
@@ -280,7 +294,14 @@ function FormularioGenerico({
     e.preventDefault();
     if (preview) return;
     const fd = new FormData(e.currentTarget);
-    const { respostas, falhas } = coleta(fd);
+    const { respostas: coletado, falhas } = coleta(fd);
+    // controlados (arquivo/grid) entram por cima do FormData e o "Outro"
+    // compõe "Outro: <texto>" — a RPC valida o mesmo formato
+    const respostas = aplicaOutro(
+      perguntas,
+      { ...coletado, ...extras },
+      (c) => String(fd.get(`${c.id}__outro`) ?? "")
+    );
     const mapa = valida(respostas, falhas);
     if (Object.keys(mapa).length) {
       setErros(mapa);
@@ -359,11 +380,18 @@ function FormularioGenerico({
           <div className="mx-auto grid size-12 place-items-center rounded-full bg-[var(--brand-lime)] text-[var(--brand-ink)]">
             <CheckCircle size={24} weight="bold" aria-hidden />
           </div>
-          <h1 className="mt-4 text-lg font-semibold">Resposta enviada!</h1>
+          <h1 className="mt-4 text-lg font-semibold">
+            {ehIntake(sistema) ? "Inscrição recebida!" : "Resposta enviada!"}
+          </h1>
           <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-muted-foreground">
-            Obrigado{primeiroNome ? `, ${primeiroNome}` : ""}. Sua resposta
-            pra “{titulo}” foi registrada e já está com a equipe do
-            Realiza.vc. Pode fechar esta página.
+            {ehIntake(sistema)
+              ? `Obrigado${primeiroNome ? `, ${primeiroNome}` : ""}! Sua
+            inscrição foi registrada e já está com a equipe do Realiza.vc,
+            que entra em contato pelos próximos passos. Pode fechar esta
+            página.`
+              : `Obrigado${primeiroNome ? `, ${primeiroNome}` : ""}. Sua resposta
+            pra “${titulo}” foi registrada e já está com a equipe do
+            Realiza.vc. Pode fechar esta página.`}
           </p>
         </motion.div>
       ) : (
@@ -458,15 +486,25 @@ function FormularioGenerico({
               const numeroPorId = new Map(
                 perguntas.map((c, i) => [c.id, i + 1])
               );
-              return campos.map((c) => (
-                <CampoRenderer
-                  key={c.id}
-                  campo={c}
-                  n={numeroPorId.get(c.id) ?? 0}
-                  erro={erros[c.id]}
-                  enterKeyHint={c.id === ultimoComEnter ? "send" : "next"}
-                />
-              ));
+              return campos.map((c) => {
+                // condicional fora da condição não renderiza — some da
+                // tela, da numeração e da coleta (a RPC concorda)
+                if (c.tipo !== "secao" && !visivel(c, atuais)) return null;
+                return (
+                  <CampoRenderer
+                    key={c.id}
+                    campo={c}
+                    n={numeroPorId.get(c.id) ?? 0}
+                    erro={erros[c.id]}
+                    enterKeyHint={c.id === ultimoComEnter ? "send" : "next"}
+                    token={token}
+                    preview={preview}
+                    valor={extras[c.id]}
+                    atual={atuais[c.id]}
+                    onValor={setExtra}
+                  />
+                );
+              });
             })()}
 
             {/* honeypot anti-spam: invisível pra humanos, bots preenchem —
@@ -540,6 +578,13 @@ function Rotulo({
           (opcional)
         </span>
       )}
+      {/* instrução da pergunta ("Responda com até 2 linhas…") mora na
+          descricao — nos cards de secao ela já renderiza no header */}
+      {campo.tipo !== "secao" && campo.descricao && (
+        <span className="mt-0.5 block text-xs font-normal leading-relaxed text-muted-foreground">
+          {campo.descricao}
+        </span>
+      )}
     </>
   );
   // fora de fieldset: <label> com for; dentro de grupos o caller usa <legend>
@@ -568,16 +613,154 @@ function ErroCampo({ id, msg }: { id: string; msg: string | undefined }) {
   );
 }
 
+/** Input do "Outro" — aparece quando a escolha é a opção livre; o texto
+ *  viaja em `${campo.id}__outro` e o submit compõe "Outro: <texto>"
+ *  (mesmo formato que a RPC saneia). */
+function CampoOutro({ campo, ativo }: { campo: FormularioCampo; ativo: boolean }) {
+  if (!campo.permite_outro || !ativo) return null;
+  return (
+    <div className="mt-2">
+      {/* "Outro" marcado pede o texto — o sanitizer só aceita
+          "Outro: <1-120>"; a validação client marca o mesmo campo */}
+      <Input
+        name={`${campo.id}__outro`}
+        placeholder="Qual?"
+        maxLength={120}
+        required
+        aria-label={`${campo.label} — outro`}
+      />
+    </div>
+  );
+}
+
+/** Upload de arquivo (REALIZA-70): escolhe → sobe via action pro bucket
+ *  privado → o valor do campo é só o metadado {path,nome,tamanho} que a
+ *  resposta grava. Sem o path ninguém baixa — o objeto nunca é público. */
+function CampoArquivo({
+  campo,
+  token,
+  valor,
+  onValor,
+  preview,
+}: {
+  campo: FormularioCampo;
+  token: string;
+  valor: RespostaValor | undefined;
+  onValor: (id: string, v: RespostaValor | null) => void;
+  preview: boolean;
+}) {
+  const [pending, start] = useTransition();
+  const [erroUp, setErroUp] = useState<string | null>(null);
+  const arq =
+    valor && typeof valor === "object" && !Array.isArray(valor)
+      ? (valor as { path: string; nome: string; tamanho: number })
+      : null;
+
+  function escolheu(file: File | null) {
+    if (!file || pending) return;
+    const maxMb = campo.max_mb ?? ARQUIVO_MAX_MB;
+    if (file.size > maxMb * 1024 * 1024) {
+      setErroUp(`Arquivo grande demais — máximo ${maxMb} MB.`);
+      return;
+    }
+    const fd = new FormData();
+    fd.set("file", file);
+    setErroUp(null);
+    start(async () => {
+      const r = await subirAnexoFormulario(token, campo.id, fd);
+      if (r.error || !r.arquivo?.path) {
+        setErroUp(r.error ?? "Não deu pra enviar. Tente de novo.");
+        return;
+      }
+      onValor(campo.id, r.arquivo);
+    });
+  }
+
+  return (
+    <div>
+      {/* o valor real viaja no hidden — coleta/validação leem o JSON do
+          FormData como qualquer outro campo */}
+      <input
+        type="hidden"
+        name={campo.id}
+        value={arq ? JSON.stringify(arq) : ""}
+      />
+      {arq ? (
+        <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/40 px-3 py-2.5">
+          <FileText size={18} className="shrink-0 text-muted-foreground" aria-hidden />
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-medium">{arq.nome}</p>
+            <p className="text-xs text-muted-foreground">
+              {(arq.tamanho / 1024 / 1024).toFixed(1).replace(".", ",")} MB ·
+              enviado
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => onValor(campo.id, null)}
+            aria-label={`Remover ${arq.nome}`}
+            className="grid size-8 shrink-0 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          >
+            <X size={16} aria-hidden />
+          </button>
+        </div>
+      ) : (
+        <label
+          className={cn(
+            "flex h-24 cursor-pointer flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed border-input text-sm text-muted-foreground transition-colors hover:border-ring hover:text-foreground has-focus-visible:ring-3 has-focus-visible:ring-ring/50",
+            (pending || preview) && "pointer-events-none opacity-60"
+          )}
+        >
+          {pending ? (
+            <CircleNotch size={20} className="animate-spin" aria-hidden />
+          ) : (
+            <ArrowUp size={20} aria-hidden />
+          )}
+          <span className="font-medium">
+            {pending ? "Enviando…" : "Toque pra escolher o arquivo"}
+          </span>
+          <span className="text-xs">
+            PDF ou imagem · até {campo.max_mb ?? ARQUIVO_MAX_MB} MB
+          </span>
+          <input
+            type="file"
+            accept={(campo.accept ?? ARQUIVO_MIMES).join(",")}
+            disabled={pending || preview}
+            className="sr-only"
+            onChange={(e) => escolheu(e.target.files?.[0] ?? null)}
+          />
+        </label>
+      )}
+      {erroUp && (
+        <p className="mt-1.5 text-sm leading-snug text-destructive">{erroUp}</p>
+      )}
+    </div>
+  );
+}
+
 function CampoRenderer({
   campo,
   n,
   erro,
   enterKeyHint,
+  token,
+  preview = false,
+  valor,
+  atual,
+  onValor,
 }: {
   campo: FormularioCampo;
   n: number;
   erro: string | undefined;
   enterKeyHint: "next" | "send";
+  /** o upload precisa do token do link — a action valida token+campo */
+  token: string;
+  preview?: boolean;
+  /** valor controlado (arquivo/grid) — vem do estado do form */
+  valor?: RespostaValor;
+  /** resposta atual do próprio campo — decide se o input "Outro" aparece */
+  atual?: RespostaValor;
+  onValor?: (id: string, v: RespostaValor | null) => void;
 }) {
   const id = `f-${campo.id}`;
   const erroId = `${id}-erro`;
@@ -660,6 +843,8 @@ function CampoRenderer({
     }
 
     case "texto_longo":
+      // sem enterKeyHint: na textarea a tecla insere \n — o rótulo "enter"
+      // (default do SO) descreve o gesto de verdade, "send"/"next" mentiria
       return (
         <div className={cn(cartao, "space-y-1.5")} data-campo={campo.id}>
           <Rotulo campo={campo} n={n} htmlFor={id} />
@@ -669,7 +854,6 @@ function CampoRenderer({
             required={campo.obrigatorio}
             rows={4}
             maxLength={5000}
-            enterKeyHint={enterKeyHint}
             placeholder="Escreva com suas palavras…"
             {...a11y}
           />
@@ -717,6 +901,7 @@ function CampoRenderer({
                   {o}
                 </option>
               ))}
+              {campo.permite_outro && <option value="Outro">Outro</option>}
             </select>
             <CaretDown
               size={16}
@@ -724,6 +909,8 @@ function CampoRenderer({
               className="pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2 text-muted-foreground"
             />
           </div>
+          {/* escolheu "Outro" → input livre; o submit compõe "Outro: <texto>" */}
+          <CampoOutro campo={campo} ativo={atual === "Outro"} />
           <ErroCampo id={erroId} msg={erro} />
         </div>
       );
@@ -849,7 +1036,24 @@ function CampoRenderer({
                 </label>
               </li>
             ))}
+            {campo.permite_outro && (
+              <li>
+                <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-lg px-2 text-sm transition-colors select-none hover:bg-muted active:bg-muted has-focus-visible:ring-3 has-focus-visible:ring-ring/50">
+                  <input
+                    type="checkbox"
+                    name={campo.id}
+                    value="Outro"
+                    className="size-5 shrink-0 rounded accent-primary"
+                  />
+                  Outro
+                </label>
+              </li>
+            )}
           </ul>
+          <CampoOutro
+            campo={campo}
+            ativo={Array.isArray(atual) && atual.includes("Outro")}
+          />
           <ErroCampo id={erroId} msg={erro} />
         </fieldset>
       );
@@ -881,6 +1085,36 @@ function CampoRenderer({
               )}
             </span>
           </label>
+          <ErroCampo id={erroId} msg={erro} />
+        </div>
+      );
+
+    case "arquivo":
+      return (
+        <div className={cn(cartao, "space-y-1.5")} data-campo={campo.id}>
+          <Rotulo campo={campo} n={n} />
+          <CampoArquivo
+            campo={campo}
+            token={token}
+            valor={valor}
+            onValor={onValor ?? (() => {})}
+            preview={preview}
+          />
+          <ErroCampo id={erroId} msg={erro} />
+        </div>
+      );
+
+    case "grid_disponibilidade":
+      // a grade é controlada e renderiza o próprio hidden com o JSON —
+      // coleta/validação leem do FormData como qualquer outro campo
+      return (
+        <div className={cn(cartao, "space-y-1.5")} data-campo={campo.id}>
+          <Rotulo campo={campo} n={n} />
+          <GridDisponibilidade
+            name={campo.id}
+            value={valor ?? null}
+            onChange={(v) => onValor?.(campo.id, v)}
+          />
           <ErroCampo id={erroId} msg={erro} />
         </div>
       );
