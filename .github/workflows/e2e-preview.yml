@@ -9,17 +9,18 @@ name: e2e-preview
 on:
   deployment_status:
 
-# a Vercel emite DOIS deployments por commit ("Preview – realiza.vc" e o
-# órfão "Preview – realiza") — agrupar só por SHA deixava o deployment do
-# projeto órfão cancelar o run real (cancel-in-progress). O environment no
-# grupo separa os dois: cada um tem sua fila e o do órfão só pula no `if`.
-# Sem o SHA no grupo: dois branches com preview pronto competem pelos mesmos
-# fixtures do staging (seeds convergem pros mesmos IDs e2e00000-*) e um run
-# apaga o encontro que o outro acabou de criar — flake garantido. Uma fila
-# por environment serializa a suite inteira; commit novo espera o run atual.
+# As fixtures e2e00000-*/de* são GLOBAIS no staging e divididas com o
+# e2e-app (push/PR/nightly — app buildado no runner contra o mesmo backend):
+# dois runs e2e concorrentes — de qualquer workflow — apagam a fixture um do
+# outro (flake garantido). O grupo `e2e-staging` é repo-wide e compartilhado
+# com e2e-app.yml: TODA a suite serializa numa fila única; run novo espera o
+# atual terminar. O deployment órfão "Preview – realiza" da Vercel entra na
+# mesma fila e morre no `if` do job em segundos — o sufixo de environment
+# que o isolava não é mais preciso.
+# Sem cancel-in-progress: run cortado no meio deixa fixture em estado
+# parcial — commit novo espera, nunca cancela.
 concurrency:
-  group: >-
-    e2e-preview-${{ github.event.deployment.environment }}
+  group: e2e-staging
   cancel-in-progress: false
 
 jobs:

@@ -122,7 +122,12 @@ test.describe("agenda da coordenação — monitoramento e lembrete real (WP5/D5
     ).toHaveAttribute("aria-selected", "false");
 
     // as três seções do modo existem mesmo com fila vazia (o conteúdo delas
-    // depende do estado do staging — a moldura é o contrato)
+    // depende do estado do staging — a moldura é o contrato), e a primeira
+    // é a fila operacional (REALIZA-176: a resposta dos 5s no topo)
+    await expect(page.locator("section[aria-label]").first()).toHaveAttribute(
+      "aria-label",
+      "Duplas para acompanhar"
+    );
     for (const label of [
       "Semana do encontro por cronograma",
       "Duplas para acompanhar",

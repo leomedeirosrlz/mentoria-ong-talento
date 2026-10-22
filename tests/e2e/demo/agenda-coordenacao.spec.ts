@@ -1,15 +1,16 @@
 import { entrarNaDemo, expect, test } from "../helpers";
 
-// WP5 → REALIZA-161 — a agenda da coordenação no modo "Monitoramento"
-// virou dashboard operacional (DOM real): faixa de síntese no topo (a
-// leitura de 2s), "Semana do encontro, por cronograma" (um card por turma,
-// nunca misturado — régua com legenda e círculos linkados pro dia), "Para
+// WP5 → REALIZA-161 → REALIZA-176 — a agenda da coordenação no modo
+// "Monitoramento" virou dashboard operacional (DOM real): faixa de síntese
+// no topo (a leitura de 2s) e depois a ordem operacional — 1º "Para
 // acompanhar" (a fila com badges por dimensão — vermelho só no
 // acompanhamento — filtros em chips, agrupamento críticas × demais e o
-// Lembrar universal; o cap D5 de 48h por dupla já chega computado) e
-// "Semana no programa" (os oficiais do seg–dom + supervisões da equipe). A
-// coordenação NÃO agenda por ninguém: a única ação sobre dupla aqui é o
-// nudge.
+// Lembrar universal; o cap D5 de 48h por dupla já chega computado), 2º
+// "Semana no programa" (os oficiais do seg–dom + supervisões da equipe) e
+// 3º "Semana do encontro, por cronograma" (uma linha por turma — nunca
+// misturado — com o deep-link pro dia oficial e a barra única lime/muted;
+// sem barra segmentada nem número gigante). A coordenação NÃO agenda por
+// ninguém: a única ação sobre dupla aqui é o nudge.
 //
 // Dataset demo (src/lib/demo/data.ts):
 //   · vigentes da semana: enc. 5 da T1 e enc. 1 da T2 — as duas turmas rolam
@@ -73,7 +74,12 @@ test.describe("agenda demo da coordenação — Monitoramento (WP5)", () => {
       "/agenda?aba=calendario"
     );
 
-    // as três seções do modo — as labels acessíveis são o contrato
+    // as três seções do modo — as labels acessíveis são o contrato, e a
+    // primeira é a fila operacional (REALIZA-176: a resposta dos 5s no topo)
+    await expect(page.locator("section[aria-label]").first()).toHaveAttribute(
+      "aria-label",
+      "Duplas para acompanhar"
+    );
     for (const label of [
       "Semana do encontro por cronograma",
       "Duplas para acompanhar",
@@ -84,25 +90,47 @@ test.describe("agenda demo da coordenação — Monitoramento (WP5)", () => {
       ).toBeVisible();
   });
 
-  test("semana do encontro por cronograma — T1 no enc. 5, T2 no enc. 1", async ({
+  test("semana do encontro por cronograma — uma linha por turma", async ({
     page,
   }) => {
     const sec = page.locator(
       'section[aria-label="Semana do encontro por cronograma"]'
     );
 
-    // um card por cronograma ativo — o heading carrega o nº vigente + turma.
-    // O vigente da T1 anda com o dia da semana: seg/ter é o enc. 5 (a âncora
+    // REALIZA-176 — a seção compactou: uma linha por cronograma ativo (não
+    // cards 2×n), todas com a mesma anatomia — pill da turma, título com o
+    // deep-link pro dia oficial, sublinha de contagem e a barra única
+    const linhas = sec.getByRole("listitem");
+    await expect(linhas).toHaveCount(2);
+
+    // o vigente da T1 anda com o dia da semana: seg/ter é o enc. 5 (a âncora
     // do dataset mira a terça que vem); de qua a dom o 5 já saltou pra
     // semana seguinte e o vigente é o 4 — a história é a mesma
+    const linkT1 = sec.getByRole("link", {
+      name: /Encontro [45] · T1 · 2026\/2027 — abrir o dia no calendário/,
+    });
+    await expect(linkT1).toBeVisible();
+    await expect(linkT1).toHaveAttribute(
+      "href",
+      /^\/agenda\?aba=calendario&dia=\d{4}-\d{2}-\d{2}$/
+    );
     await expect(
-      sec.getByRole("heading", { name: /Encontro [45] · T1 · 2026\/2027/ })
-    ).toBeVisible();
-    await expect(
-      sec.getByRole("heading", { name: "Encontro 1 · T2 · 2026/2027" })
+      sec.getByRole("link", {
+        name: "Encontro 1 · T2 · 2026/2027 — abrir o dia no calendário",
+      })
     ).toBeVisible();
 
-    // o hint do desencontro — as turmas não começaram juntas
+    // "X de Y realizaram" em texto corrido — sem número gigante. T1: 0 ou 2
+    // de 4 conforme o vigente; T2 estável em 1 de 3 (só o Matheus realizou)
+    const linhaT1 = linhas.filter({ hasText: "Turma 1" });
+    await expect(linhaT1).toContainText(/[02] de 4/);
+    await expect(linhaT1).toContainText("realizaram");
+    await expect(
+      linhas.filter({ hasText: "Turma 2" })
+    ).toContainText(/1 de 3/);
+
+    // o hint do desencontro — as turmas não começaram juntas (a nota "por
+    // turma" vive dentro da seção, não ao lado do título)
     await expect(
       sec.getByText(/As turmas não começaram juntas/)
     ).toBeVisible();
@@ -113,46 +141,27 @@ test.describe("agenda demo da coordenação — Monitoramento (WP5)", () => {
       sec.getByText(/T2 · 2026\/2027 está no encontro 1/)
     ).toBeVisible();
 
-    // barra de 3 segmentos por turma — seg/ter (enc. 5 vigente): "0
-    // realizaram, 3 agendadas, 1 sem agendamento" (o Caio não tem row);
-    // qua–dom (enc. 4 vigente): "2 realizaram, 0 agendadas, 2 sem
-    // agendamento" (Dandara sem row do 4, Eduardo marcou não-aconteceu).
-    // A T2 é estável: só o Matheus realizou o enc. 1
+    // a barra única por turma — progressbar lime/muted (a gramática dos
+    // outros painéis), com o detalhe completo no aria-label. Seg/ter (enc.
+    // 5 vigente): "0 realizaram, 3 agendadas, 1 sem agendamento" (o Caio
+    // não tem row); qua–dom (enc. 4 vigente): "2 realizaram, 0 agendadas,
+    // 2 sem agendamento" (Dandara sem row do 4, Eduardo marcou
+    // não-aconteceu). A T2 é estável: só o Matheus realizou o enc. 1
     await expect(
-      sec.getByRole("img", {
+      sec.getByRole("progressbar", {
         name: /realizaram, \d+ agendadas, \d+ sem agendamento/,
       })
     ).toHaveCount(2);
     await expect(
-      sec.getByRole("img", {
+      sec.getByRole("progressbar", {
         name: /0 realizaram, 3 agendadas, 1 sem agendamento|2 realizaram, 0 agendadas, 2 sem agendamento/,
       })
     ).toBeVisible();
     await expect(
-      sec.getByRole("img", {
-        name: "1 realizaram, 2 agendadas, 0 sem agendamento",
+      sec.getByRole("progressbar", {
+        name: /1 realizaram, 2 agendadas, 0 sem agendamento/,
       })
     ).toBeVisible();
-
-    // a régua oficial do card — 16 círculos numerados, cada um datado vira
-    // link pro dia no calendário (li segue wrapper: a contagem é da régua)
-    const reguaT1 = sec.locator(
-      'ol[aria-label="Calendário oficial T1 · 2026/2027: 16 encontros"]'
-    );
-    await expect(reguaT1).toBeVisible();
-    await expect(reguaT1.locator("li")).toHaveCount(16);
-    await expect(reguaT1.getByRole("link")).toHaveCount(16);
-    await expect(reguaT1.getByRole("link").first()).toHaveAttribute(
-      "href",
-      /^\/agenda\?aba=calendario&dia=\d{4}-\d{2}-\d{2}$/
-    );
-
-    // a legenda da régua — ● feito · ◎ atual · ○ futuro, uma por card
-    const legendas = sec.locator('p[aria-label="Legenda da régua"]');
-    await expect(legendas).toHaveCount(2);
-    await expect(legendas.first()).toContainText("feito");
-    await expect(legendas.first()).toContainText("atual");
-    await expect(legendas.first()).toContainText("futuro");
   });
 
   test("para acompanhar — síntese, dimensões por linha, filtros e cap 48h", async ({

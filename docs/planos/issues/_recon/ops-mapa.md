@@ -27,23 +27,35 @@ de `packageManager`, nunca pinada no workflow — `e2e-app.yml:22-24`).
   secrets estiverem ausentes, pula com `::notice::` (`:49-53`).
 - **Secrets usados:** `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` (prod).
 
-### `e2e-app.yml` — manual, stack local (`e2e-app.yml`)
+### `e2e-app.yml` — gate do dia a dia, staging real (`e2e-app.yml`)
 
-- **Trigger:** só `workflow_dispatch` (`:9-10`). A cobertura do dia a dia é o
-  e2e-preview; este valida migration/stack local à mão — um `supabase start`
-  quebrado falha aqui antes de qualquer apply remoto.
-- **Job `e2e`** (timeout 25min): `pnpm exec supabase start` no runner (Docker
-  funciona lá) → `supabase status -o env` desquotado pro `$GITHUB_ENV`
-  (`:36-39`) → **gate de freshness de types**: `supabase gen types
-  typescript --db-url $DB_URL`, extrai o bloco `public:` dos dois arquivos e
-  `diff` contra `src/lib/database.types.ts` — divergir = erro com instrução
-  de regen (`:44-68`) → `pnpm build` + `pnpm start` em `:3000` com
-  `NEXT_PUBLIC_*`/service do stack local + `RESEND_API_KEY` placeholder +
-  `EMAIL_FROM` (`:69-79`) → `playwright install --with-deps chromium` →
-  `node scripts/seed-e2e-staging.mjs` → `pnpm test:e2e` (demo + app).
-- **Secrets:** `E2E_COORD_PASSWORD` (opcional — fallback `e2e-senha-teste`,
-  `:89`). Todo o resto vem do `supabase status` local.
-- Upload do `playwright-report/` só em `failure()` (`:104-108`).
+- **Triggers:** `push` (branches ≠ `main`), `pull_request` → `main`,
+  `schedule` (`0 13 * * *` — 10:00 BRT) e `workflow_dispatch` com input
+  `backend: staging|local` (default staging). A cobertura do dia a dia é
+  este workflow; o modo `local` preserva o antigo `supabase start` no runner
+  pra validar migration/stack local à mão.
+- **Concurrency:** grupo repo-wide `e2e-staging` compartilhado com
+  e2e-preview (fixtures globais `e2e00000-*`/`de*` — runs simultâneos se
+  apagam), `cancel-in-progress: false`.
+- **Guard `modo`** (primeiro step): resolve backend (staging = tudo que não
+  é dispatch com `backend=local`); em staging exige `E2E_SUPABASE_URL`,
+  `E2E_SUPABASE_SERVICE_ROLE_KEY`, `E2E_SUPABASE_ANON_KEY` e recusa URL com
+  o ref de prod — falha com `::error::` (nunca skip: `e2e-app / e2e` é
+  required check do `main` e skipped conta como verde).
+- **Job `e2e`** (timeout 25min): staging → `pnpm build` + `pnpm start` em
+  `:3000` com `NEXT_PUBLIC_*`/service dos secrets → playwright → `pnpm
+  test:e2e`. Local (só dispatch) → `pnpm exec supabase start` →
+  `supabase status -o env` desquotado pro `$GITHUB_ENV` → **gate de
+  freshness de types** (`gen types` × `database.types.ts`, bloco `public`)
+  → build/start com envs locais → `node scripts/seed-e2e-staging.mjs` →
+  `pnpm test:e2e`. No staging **não re-seeda** (mesma decisão do preview —
+  pisos `convergirPiso` cobrem o volátil; staging recriado → `pnpm
+  seed:e2e` manual).
+- **Secrets:** `E2E_SUPABASE_URL`, `E2E_SUPABASE_ANON_KEY`,
+  `E2E_SUPABASE_SERVICE_ROLE_KEY` (staging), `E2E_COORD_PASSWORD` (opcional
+  — fallback `e2e-senha-teste`). O modo local não usa secrets.
+- Upload de `playwright-report/` + `test-results/` (traces) só em
+  `failure()`.
 
 ### `e2e-preview.yml` — o gate real (`e2e-preview.yml`)
 
@@ -52,10 +64,10 @@ de `packageManager`, nunca pinada no workflow — `e2e-app.yml:22-24`).
 - **`if` do job** (`:37-40`): `state == 'success'` E environment ∈ {`Preview`,
   `Preview – realiza.vc`} — tolera os dois formatos de nome conforme o nº de
   projetos Vercel conectados (comentário `:32-36`).
-- **Concurrency** (`:20-23`): grupo `e2e-preview-<environment>`,
-  `cancel-in-progress: false` — serializa a suite por environment (fixtures
-  compartilhadas colidiriam entre branches; histórico do deployment órfão no
-  comentário `:12-19`).
+- **Concurrency** (`:22-24`): grupo repo-wide `e2e-staging` compartilhado
+  com e2e-app — serializa TODA a suite (fixtures globais colidiriam entre
+  runs de qualquer workflow), `cancel-in-progress: false`. O deployment
+  órfão da Vercel cai na mesma fila e morre no `if` em segundos.
 - **Guard de secret primeiro** (`:43-51`): sem `VERCEL_AUTOMATION_BYPASS` o
   run pula inteiro com notice — não gasta ~1min de checkout/install.
 - **Não re-seeda** (`:65-69`): pisos `convergirPiso` re-criam estado volátil;

@@ -339,7 +339,7 @@ export const getCronogramas = cache(async (): Promise<Cronograma[]> => {
   return data ?? [];
 });
 
-const DUPLA_SELECT = `
+export const DUPLA_SELECT = `
   *,
   mentor:profiles!duplas_mentor_id_fkey(${PROFILE_COLS_PUBLICAS}),
   mentorado:mentorados(${MENTORADO_COLS_PAR}),

@@ -224,6 +224,15 @@ function LinhaDupla({
     ? d.encontros.find((e) => e.registro?.id === ultimoReg.id)
     : null;
   const sinais = textoSinais(d, saude, hojeStr);
+  const recencia = recenciaUltimo(d, hojeStr);
+  const apoioTxt = saude.apoio.aberto
+    ? `apoio aberto (${APOIO_ORIGEM_LABEL[saude.apoio.origem ?? "mentor"]})`
+    : null;
+  // o texto completo vai pro title — a linha nunca quebra a altura da
+  // tabela; o detalhe integral vive na ficha (title é a degradação desktop)
+  const tituloSinais = [apoioTxt, sinais.join(" · ")]
+    .filter(Boolean)
+    .join(" · ");
   const tomSinais =
     estado.tom === "risco"
       ? "text-[hsl(0_62%_36%)]"
@@ -239,13 +248,15 @@ function LinhaDupla({
       className={cn(
         "animate-enter transition-colors",
         // desktop: a grade densa; mobile: vira card empilhado
-        "flex flex-col gap-3 rounded-xl border border-border bg-card p-4 lg:grid lg:items-center lg:gap-x-4 lg:gap-y-0 lg:rounded-none lg:border-0 lg:px-5 lg:py-3 lg:hover:bg-muted/50",
+        "flex flex-col gap-2 rounded-xl border border-border bg-card p-3 lg:grid lg:items-center lg:gap-x-4 lg:gap-y-0 lg:rounded-none lg:border-0 lg:px-5 lg:py-2.5 lg:hover:bg-muted/50",
         GRID_COLS,
         saude.apoio.aberto && "bg-[var(--info-bg)]/60 lg:hover:bg-[var(--info-bg)]"
       )}
     >
-      {/* estado + apoio (eixo separado — pill azul sobre o estado real) */}
-      <div className="flex flex-wrap items-center gap-1.5 lg:flex-col lg:items-start">
+      {/* estado + apoio (eixo separado — pill azul sobre o estado real);
+          no mobile, "Ver ficha" mora aqui quando não há ação — nada de
+          rodapé com um link solto no fim do card */}
+      <div className="flex flex-wrap items-center gap-1.5 lg:flex-col lg:items-start lg:gap-1">
         <Pill tom={estado.tom}>
           <span aria-hidden className="size-1.5 rounded-full bg-current" />
           {estado.label}
@@ -256,6 +267,14 @@ function LinhaDupla({
               <Lifebuoy size={12} aria-hidden />
               Apoio
             </Pill>
+          </Link>
+        )}
+        {!acao && (
+          <Link
+            href={`/duplas/${d.id}`}
+            className="ml-auto inline-flex min-h-11 items-center whitespace-nowrap rounded-lg px-2 text-xs font-semibold text-foreground/80 hover:bg-muted hover:text-foreground lg:hidden"
+          >
+            Ver ficha ›
           </Link>
         )}
       </div>
@@ -330,22 +349,25 @@ function LinhaDupla({
         </div>
       </div>
 
-      {/* sinais — todos os critérios acesos, com recência */}
-      <div className={cn("min-w-0 text-xs leading-relaxed", tomSinais)}>
-        {saude.apoio.aberto && (
-          <span className="font-medium text-[var(--info-text)]">
-            apoio aberto ({APOIO_ORIGEM_LABEL[saude.apoio.origem ?? "mentor"]})
-            {" · "}
-          </span>
-        )}
-        {sinais.map((parte, j) => (
-          <span key={j}>
-            {j > 0 && " · "}
-            <span className={j === sinais.length - 1 && recenciaUltimo(d, hojeStr) ? "text-muted-foreground" : undefined}>
-              {parte}
+      {/* sinais — todos os critérios acesos, com recência; sempre 1 linha
+          (title carrega o texto inteiro, a ficha tem o detalhe) */}
+      <div className={cn("min-w-0 text-[10.5px] leading-normal", tomSinais)}>
+        <p className="truncate" title={tituloSinais}>
+          {apoioTxt && (
+            <span className="font-medium text-[var(--info-text)]">
+              {apoioTxt}
+              {" · "}
             </span>
-          </span>
-        ))}
+          )}
+          {sinais.map((parte, j) => (
+            <span key={j}>
+              {j > 0 && " · "}
+              <span className={j === sinais.length - 1 && recencia ? "text-muted-foreground" : undefined}>
+                {parte}
+              </span>
+            </span>
+          ))}
+        </p>
       </div>
 
       {/* última avaliação do mentor */}
@@ -364,8 +386,15 @@ function LinhaDupla({
       </div>
 
       {/* ações explícitas: a linha não é um link inteiro — "Ver ficha" é o
-          destino, a ação é separada (v5: nada de <a> aninhando botões) */}
-      <div className="flex items-center gap-2 lg:justify-end">
+          destino, a ação é separada (v5: nada de <a> aninhando botões).
+          Mobile sem ação: o bloco some — "Ver ficha" já está no topo do
+          card, rodapé com link solto é footer morto */}
+      <div
+        className={cn(
+          "items-center gap-2 lg:flex lg:justify-end",
+          acao ? "flex" : "hidden"
+        )}
+      >
         {acao}
         <Link
           href={`/duplas/${d.id}`}
@@ -417,6 +446,31 @@ function LinhaMini({
       >
         Ver ficha ›
       </Link>
+    </div>
+  );
+}
+
+/** O header de coluna da tabela densa — coord e auxiliar compartilham a
+ *  mesma régua. O `title` no "Feito × esperado" carrega a única explicação
+ *  que a antiga legenda `<details>` tinha a mais que os chips de categoria:
+ *  o traço na barra = esperado do calendário. */
+function CabecalhoColunas() {
+  return (
+    <div
+      aria-hidden
+      className={cn(
+        "hidden border-b border-border px-5 py-2.5 text-[10.5px] font-bold uppercase tracking-[0.05em] text-muted-foreground lg:grid lg:gap-x-4",
+        GRID_COLS
+      )}
+    >
+      <span>Status</span>
+      <span>Dupla</span>
+      <span title="O traço na barra marca quantos encontros o calendário da turma já esperava até hoje">
+        Feito × esperado
+      </span>
+      <span>Sinais</span>
+      <span>Avaliação do mentor</span>
+      <span />
     </div>
   );
 }
@@ -622,58 +676,6 @@ function EstadoVazio({
     );
   }
   return null;
-}
-
-// ---------- legenda sob demanda ----------
-
-function LegendaSemaforo() {
-  return (
-    <details className="group mt-4 rounded-xl border border-border bg-card">
-      <summary className="flex min-h-11 cursor-pointer list-none items-center gap-1.5 px-4 text-[13px] font-semibold marker:hidden [&::-webkit-details-marker]:hidden">
-        <span
-          aria-hidden
-          className="text-[10px] text-muted-foreground transition-transform group-open:rotate-90"
-        >
-          ▸
-        </span>
-        Como o semáforo é calculado
-      </summary>
-      <div className="grid gap-3 px-4 pb-4 pt-1 sm:grid-cols-2 lg:grid-cols-3">
-        <div className="border-l-4 border-[var(--danger)] pl-3 text-xs">
-          <p className="text-[13px] font-semibold">Em risco</p>
-          <p className="text-muted-foreground">
-            2+ encontros atrasados, <b>ou</b> avaliação baixa + dificuldade.
-          </p>
-        </div>
-        <div className="border-l-4 border-[var(--warn)] pl-3 text-xs">
-          <p className="text-[13px] font-semibold">Atenção</p>
-          <p className="text-muted-foreground">
-            1 atraso, avaliação baixa, dificuldade, registro pendente ou
-            encaminhamento vencido.
-          </p>
-        </div>
-        <div className="border-l-4 border-[var(--ok)] pl-3 text-xs">
-          <p className="text-[13px] font-semibold">Em andamento</p>
-          <p className="text-muted-foreground">
-            Encontros em dia, sem sinais abertos. Pausada sai da conta.
-          </p>
-        </div>
-        <div className="border-l-4 border-[var(--info)] pl-3 text-xs">
-          <p className="text-[13px] font-semibold">Apoio — eixo separado</p>
-          <p className="text-muted-foreground">
-            Pedido de apoio é chamado à coordenação:{" "}
-            <b>trabalho a fazer, não falha</b>.
-          </p>
-        </div>
-        <div className="border-l-4 border-border pl-3 text-xs">
-          <p className="text-[13px] font-semibold">Barra feito × esperado</p>
-          <p className="text-muted-foreground">
-            O traço marca quantos encontros o calendário da turma já esperava.
-          </p>
-        </div>
-      </div>
-    </details>
-  );
 }
 
 // ---------- nudge da coordenação ----------
@@ -1233,20 +1235,7 @@ function VisaoCoordenacao({
             aria-label="Lista de duplas"
             className="overflow-hidden rounded-xl bg-card shadow-[var(--shadow-border)] max-sm:contents"
           >
-            <div
-              aria-hidden
-              className={cn(
-                "hidden border-b border-border px-5 py-2.5 text-[10.5px] font-bold uppercase tracking-[0.05em] text-muted-foreground lg:grid lg:gap-x-4",
-                GRID_COLS
-              )}
-            >
-              <span>Status</span>
-              <span>Dupla</span>
-              <span>Feito × esperado</span>
-              <span>Sinais</span>
-              <span>Avaliação do mentor</span>
-              <span />
-            </div>
+            <CabecalhoColunas />
             <div className="divide-y divide-border/60 max-sm:space-y-3 max-sm:divide-y-0">
               {antes.map((d) => linha(d, i++))}
               {usarMassa && (
@@ -1279,8 +1268,6 @@ function VisaoCoordenacao({
           </section>
         );
       })()}
-
-      {lista.length > 0 && <LegendaSemaforo />}
     </>
   );
 }
@@ -1395,21 +1382,8 @@ function VisaoSupervisor({
           aria-label="Duplas supervisionadas"
           className="overflow-hidden rounded-xl bg-card shadow-[var(--shadow-border)] max-sm:contents"
         >
-            <div
-              aria-hidden
-              className={cn(
-                "hidden border-b border-border px-5 py-2.5 text-[10.5px] font-bold uppercase tracking-[0.05em] text-muted-foreground lg:grid lg:gap-x-4",
-                GRID_COLS
-              )}
-            >
-              <span>Status</span>
-              <span>Dupla</span>
-              <span>Feito × esperado</span>
-              <span>Sinais</span>
-              <span>Avaliação do mentor</span>
-              <span />
-            </div>
-            {gruposOrdenados.map(([turma, duplas], gi) => {
+          <CabecalhoColunas />
+          {gruposOrdenados.map(([turma, duplas], gi) => {
               // o próximo encontro oficial do calendário da turma — o "esta
               // semana é o N" do sub-header (duplas da turma correm o mesmo
               // cronograma; especialista cai fora)
@@ -1572,7 +1546,7 @@ function VisaoMentor({
                 key={d.id}
                 style={{ "--i": Math.min(idx, 10) } as CSSProperties}
                 className={cn(
-                  "animate-enter grid grid-cols-1 gap-3 rounded-xl border border-border border-l-4 bg-card p-4 shadow-[var(--shadow-border)]",
+                  "animate-enter grid grid-cols-1 gap-2 rounded-xl border border-border border-l-4 bg-card p-3 shadow-[var(--shadow-border)]",
                   tomCard
                 )}
               >
@@ -1586,17 +1560,29 @@ function VisaoMentor({
                       </span>
                     )}
                   </p>
-                  {apoioProprio ? (
-                    <Pill tom="atencao">
-                      <span aria-hidden className="size-1.5 rounded-full bg-current" />
-                      Apoio solicitado
-                    </Pill>
-                  ) : (
-                    <Pill tom={estado.tom}>
-                      <span aria-hidden className="size-1.5 rounded-full bg-current" />
-                      {estado.label}
-                    </Pill>
-                  )}
+                  {/* sem pendência, "Abrir ficha" é a única ação — fica
+                      inline no header em vez de um footer com botão só */}
+                  <span className="flex items-center gap-2">
+                    {apoioProprio ? (
+                      <Pill tom="atencao">
+                        <span aria-hidden className="size-1.5 rounded-full bg-current" />
+                        Apoio solicitado
+                      </Pill>
+                    ) : (
+                      <Pill tom={estado.tom}>
+                        <span aria-hidden className="size-1.5 rounded-full bg-current" />
+                        {estado.label}
+                      </Pill>
+                    )}
+                    {!pendente && (
+                      <Link
+                        href={`/duplas/${d.id}`}
+                        className={buttonVariants({ size: "sm" })}
+                      >
+                        Abrir ficha
+                      </Link>
+                    )}
+                  </span>
                 </header>
 
                 {/* feito × esperado com o tick do calendário */}
@@ -1681,25 +1667,25 @@ function VisaoMentor({
                   </ul>
                 </div>
 
-                <div className="flex flex-wrap justify-start gap-2 border-t border-dashed border-border pt-3">
-                  {pendente && (
+                {/* footer só com par de ações — pendência abre "Registrar"
+                    ao lado do "Abrir ficha"; sem ela, a ação única já está
+                    no header e o border-t vazio não renderiza */}
+                {pendente && (
+                  <div className="flex flex-wrap justify-start gap-2 border-t border-dashed border-border pt-2">
                     <Link
                       href={`/duplas/${d.id}#registrar-${pendente.id}`}
                       className={buttonVariants({ size: "sm" })}
                     >
                       Registrar encontro {pendente.numero}
                     </Link>
-                  )}
-                  <Link
-                    href={`/duplas/${d.id}`}
-                    className={buttonVariants({
-                      variant: pendente ? "outline" : "default",
-                      size: "sm",
-                    })}
-                  >
-                    Abrir ficha
-                  </Link>
-                </div>
+                    <Link
+                      href={`/duplas/${d.id}`}
+                      className={buttonVariants({ variant: "outline", size: "sm" })}
+                    >
+                      Abrir ficha
+                    </Link>
+                  </div>
+                )}
               </article>
             );
           })}
@@ -1778,7 +1764,7 @@ function VisaoEspecialista({
               <article
                 key={d.id}
                 style={{ "--i": Math.min(idx, 10) } as CSSProperties}
-                className="animate-enter grid gap-3 rounded-xl border border-border border-l-4 border-l-[var(--brand-lime)] bg-card p-4 shadow-[var(--shadow-border)]"
+                className="animate-enter grid gap-2 rounded-xl border border-border border-l-4 border-l-[var(--brand-lime)] bg-card p-3 shadow-[var(--shadow-border)]"
               >
                 <header className="flex flex-wrap items-center justify-between gap-2">
                   {/* a trilha é dela × o jovem — ela é a constante, o nome da
@@ -1795,12 +1781,22 @@ function VisaoEspecialista({
                       </span>
                     )}
                   </p>
-                  <Pill tom={d.status === "ativa" ? "ok" : "pausa"}>
-                    <span aria-hidden className="size-1.5 rounded-full bg-current" />
-                    {d.status === "ativa"
-                      ? "Trilha ativa"
-                      : (STATUS_LABEL[d.status]?.label ?? d.status)}
-                  </Pill>
+                  {/* "Abrir trilha" é a única ação do card — inline no
+                      header, sem footer de botão solto embaixo */}
+                  <span className="flex items-center gap-2">
+                    <Pill tom={d.status === "ativa" ? "ok" : "pausa"}>
+                      <span aria-hidden className="size-1.5 rounded-full bg-current" />
+                      {d.status === "ativa"
+                        ? "Trilha ativa"
+                        : (STATUS_LABEL[d.status]?.label ?? d.status)}
+                    </Pill>
+                    <Link
+                      href={`/duplas/${d.id}`}
+                      className={buttonVariants({ size: "sm" })}
+                    >
+                      Abrir trilha
+                    </Link>
+                  </span>
                 </header>
 
                 {/* o tema que originou a trilha */}
@@ -1884,15 +1880,6 @@ function VisaoEspecialista({
                     </span>
                   </p>
                 )}
-
-                <div className="flex flex-wrap justify-start gap-2 border-t border-dashed border-border pt-3">
-                  <Link
-                    href={`/duplas/${d.id}`}
-                    className={buttonVariants({ size: "sm" })}
-                  >
-                    Abrir trilha
-                  </Link>
-                </div>
               </article>
             );
           })}
