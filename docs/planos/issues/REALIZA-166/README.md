@@ -74,3 +74,17 @@ Sem mudança de custo de infra (staging já existe).
 - **Secrets em fork** — PRs de fork não recebem secrets → job falharia como
   required check em PR externo. Hoje o repo é single-dev; documentar o
   comportamento (falha explícita) em vez de skip silencioso.
+
+## Ações manuais do Thiago (fora do diff)
+
+1. **Secret novo no GitHub**: `E2E_SUPABASE_ANON_KEY` — anon key do projeto
+   `realiza-staging` (ref `onkosatlcvircdrfgyzq`; mesmo valor das envs
+   Preview da Vercel / `NEXT_PUBLIC_SUPABASE_ANON_KEY_STAGING` do
+   `.env.staging`). O e2e-app **builda** o app no runner e a anon key é
+   embutida no bundle — sem ela o guard falha com `::error::`. Os demais
+   (`E2E_SUPABASE_URL`, `E2E_SUPABASE_SERVICE_ROLE_KEY`) já existem pro
+   e2e-preview. Não usar a service role como anon: ela bypassaria RLS nas
+   chamadas do browser.
+2. **Required check**: Settings → Branches → `main` → adicionar
+   `e2e-app / e2e` aos required status checks. Sem isso o check roda mas
+   não bloqueia merge.
