@@ -8,6 +8,7 @@ import {
   PencilSimple,
   SignOut,
   Trash,
+  UserSwitch,
 } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { deleteMentorado, marcarSaidaMentorado, updateMentorado } from "@/lib/actions";
@@ -30,7 +31,7 @@ import { maskWhatsApp } from "@/lib/utils";
 import type { Disponibilidade, Mentorado } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle,
+  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
@@ -38,6 +39,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
 import { SaidaMentoradoDialog } from "@/components/saida-mentorado-dialog";
+import { PromoverMentorDialog } from "@/components/promover-mentor-dialog";
 import { DocumentoPessoa } from "@/components/documento-pessoa";
 import { AssinaturasPessoa } from "@/components/assinaturas-pessoa";
 import { DadosCivisFields } from "@/components/assinatura-form";
@@ -59,6 +61,7 @@ export function MentoradoActions({
   const [editOpen, setEditOpen] = useState(false);
   const [delOpen, setDelOpen] = useState(false);
   const [saidaOpen, setSaidaOpen] = useState(false);
+  const [promoverOpen, setPromoverOpen] = useState(false);
   const [interesses, setInteresses] = useState<string[]>(mentorado.interesses ?? []);
   const [disponibilidade, setDisponibilidade] = useState<Disponibilidade | null>(mentorado.disponibilidade ?? null);
   const [pending, start] = useTransition();
@@ -294,6 +297,13 @@ export function MentoradoActions({
               <SignOut /> Marcar saída…
             </DropdownMenuItem>
           )}
+          {/* alumni → mentor (REALIZA-159): só quem concluiu — desistente
+              volta pelo Reativar e conclui primeiro */}
+          {mentorado.situacao === "concluido" && (
+            <DropdownMenuItem onClick={() => setPromoverOpen(true)}>
+              <UserSwitch /> Promover a mentor…
+            </DropdownMenuItem>
+          )}
           <DropdownMenuSeparator />
           <DropdownMenuItem
             variant="destructive"
@@ -323,6 +333,9 @@ export function MentoradoActions({
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Editar {primeiroNome}</DialogTitle>
+            <DialogDescription>
+              Os dados do cadastro em etapas — salve no fim.
+            </DialogDescription>
           </DialogHeader>
           <WizardFicha
             passos={passos}
@@ -339,6 +352,14 @@ export function MentoradoActions({
         onOpenChange={setSaidaOpen}
         duplaVivaId={duplaVivaId}
       />
+
+      {mentorado.situacao === "concluido" && (
+        <PromoverMentorDialog
+          mentorado={mentorado}
+          open={promoverOpen}
+          onOpenChange={setPromoverOpen}
+        />
+      )}
 
       <ConfirmDeleteButton
         open={delOpen}

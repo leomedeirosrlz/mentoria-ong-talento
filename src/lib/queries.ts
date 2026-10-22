@@ -29,8 +29,15 @@ import {
   demoPessoaPerfil,
   demoPessoas,
   demoRegistros,
+  demoRelatorioLinks,
+  demoTurmaInscricoesAguardando,
 } from "./demo/queries";
-import type { AvaliacaoJovem, CicloEvento, Comunicado, CorRaca, Cronograma, DadosCivis, DocumentoPessoa, Dupla, DuplaResumo, DuplaStatus, Encontro, EncontroStatus, EspecialistaEvento, Genero, Material, Mentorado, MentorProfile, Notificacao, PessoaNota, PrefGeneroPar, Profile, Registro, ResponsavelCivis, Trilha } from "./types";
+import { getDemoData } from "./demo/data";
+import { demoPainelInstrumentosJornada } from "./demo/forms-data";
+import type { PainelJornadaLinha } from "./jornada";
+import type { InscricaoFilaTurma, RelatorioLinkItem } from "./relatorio";
+import { temPapel } from "./types";
+import type { AppRole, AvaliacaoJovem, CicloEvento, Comunicado, CorRaca, Cronograma, DadosCivis, DocumentoPessoa, DocumentoTemplate, Dupla, DuplaResumo, DuplaStatus, Encontro, EncontroStatus, EspecialistaEvento, Genero, Material, Mentorado, MentorProfile, Notificacao, PessoaNota, PrefGeneroPar, Profile, Registro, ResponsavelCivis, Trilha } from "./types";
 
 /** mentor_profiles — re-export do tipo canônico (types.ts): os callers da
  *  página de pessoas/board importam daqui historicamente. */
@@ -48,12 +55,31 @@ export type { MentorProfile } from "./types";
 const PROFILE_COLS_PUBLICAS =
   "id, user_id, nome, role, ativo, avatar_path, created_at, bio, linkedin, areas, voluntariado, onboarded_em, nome_social, cidade, uf, interesses, cargo, empresa, origem, consent_lgpd_em";
 
+/** Versão com papéis efetivos embutidos (WP6b) — usada onde a lista decide
+ *  por papel, não por role primário (fila, pools de dialog). A policy de
+ *  profile_papeis devolve [] pra quem não pode ler a linha alheia — o
+ *  consumidor cai no fallback do role, que é o comportamento antigo. */
+const PROFILE_COLS_COM_PAPEIS = `${PROFILE_COLS_PUBLICAS}, profile_papeis(papel)`;
+
+/** Normaliza o embed `profile_papeis` pro `papeis` do tipo Profile. A
+ *  interseção evita o weak-type check: um objeto sem a chave do embed (ex.
+ *  já normalizado) continua sendo um argumento válido — sai com []. */
+const comPapeis = <T extends object>(
+  p: T & { profile_papeis?: { papel: AppRole }[] | null }
+): Omit<T, "profile_papeis"> & { papeis: AppRole[] } => {
+  const { profile_papeis, ...rest } = p;
+  return { ...rest, papeis: (profile_papeis ?? []).map((r) => r.papel) };
+};
+
 /** Colunas de mentorados legíveis por qualquer autenticado — a 0034 tirou o
  *  SELECT table-level e voltou grant por coluna (as sensíveis ficam de fora).
  *  `select("*")` expandiria pras colunas revogadas e derrubaria a query
  *  inteira com permission denied — a lista é sempre explícita. */
+// profile_id (0066) ganhou grant só na 0112 — antes o select inteiro caía
+// em permission denied; com o grant ele fecha a história do vínculo
+// jovem↔conta na UI (promoção ex-mentorado → mentor)
 const MENTORADO_COLS_PUBLICAS =
-  "id, nome, email, whatsapp, ong_origem, notas, avatar_path, documento_path, created_at, nome_social, cidade, uf, interesses, objetivos, escolaridade, origem, disponibilidade, situacao, saiu_em, motivo_saida";
+  "id, nome, email, whatsapp, ong_origem, notas, avatar_path, documento_path, created_at, nome_social, cidade, uf, interesses, objetivos, escolaridade, origem, disponibilidade, situacao, saiu_em, motivo_saida, profile_id";
 
 /** Subconjunto do mentorado que vai no embed da dupla (0076): o que o par
  *  e a ficha consomem — notas e documento_path do jovem não saem no select
@@ -271,18 +297,24 @@ export const getMe = cache(async (): Promise<Profile | null> => {
   const sub = data?.claims?.sub;
   if (!sub) return null;
   // maybeSingle: profile ainda não criado (ou removido) -> null -> layout manda pro login
-  const [{ data: profile, error }, contatos] = await Promise.all([
-    supabase
-      .from("profiles")
-      .select(PROFILE_COLS_PUBLICAS)
-      .eq("user_id", sub)
-      .maybeSingle(),
-    // o self-scope da view garante a própria linha — email/whatsapp voltam
-    // pro Gravatar do shell e pro form de /perfil
-    getContatos(),
-  ]);
+  const [{ data: profile, error }, contatos, { data: papeis }] =
+    await Promise.all([
+      supabase
+        .from("profiles")
+        .select(PROFILE_COLS_PUBLICAS)
+        .eq("user_id", sub)
+        .maybeSingle(),
+      // o self-scope da view garante a própria linha — email/whatsapp voltam
+      // pro Gravatar do shell e pro form de /perfil
+      getContatos(),
+      // papéis efetivos (0085) — o híbrido carrega a linha extra de
+      // profile_papeis; as telas decidem por temPapel, não por role.
+      supabase.rpc("my_papeis"),
+    ]);
   if (error) throw error;
-  return profile ? comContato(profile, contatos) : null;
+  return profile
+    ? { ...comContato(profile, contatos), papeis: papeis ?? [] }
+    : null;
 });
 
 export const getCicloEventos = cache(async (): Promise<CicloEvento[]> => {
@@ -314,7 +346,7 @@ export const getCronogramas = cache(async (): Promise<Cronograma[]> => {
   return data ?? [];
 });
 
-const DUPLA_SELECT = `
+export const DUPLA_SELECT = `
   *,
   mentor:profiles!duplas_mentor_id_fkey(${PROFILE_COLS_PUBLICAS}),
   mentorado:mentorados(${MENTORADO_COLS_PAR}),
@@ -465,7 +497,7 @@ export const getDuplasResumo = cache(async (): Promise<DuplaResumo[]> => {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("duplas")
-    .select("id,mentor_id,mentorado_id,supervisor_id")
+    .select("id,mentor_id,mentorado_id,supervisor_id,trilha")
     // "está em dupla" = ocupa vaga — concluída e encerrada já liberaram
     .in("status", ["ativa", "pausada"]);
   if (error) throw error;
@@ -480,7 +512,7 @@ export const getDuplasResumoTodas = cache(async (): Promise<DuplaResumo[]> => {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("duplas")
-    .select("id,mentor_id,mentorado_id,supervisor_id");
+    .select("id,mentor_id,mentorado_id,supervisor_id,trilha");
   if (error) throw error;
   return data ?? [];
 });
@@ -536,7 +568,7 @@ export const getPessoas = cache(async (): Promise<Profile[]> => {
   if (demo) return demoPessoas(demo);
   const supabase = await createClient();
   const [{ data, error }, contatos, pessoal] = await Promise.all([
-    supabase.from("profiles").select(PROFILE_COLS_PUBLICAS).order("nome"),
+    supabase.from("profiles").select(PROFILE_COLS_COM_PAPEIS).order("nome"),
     getContatos(),
     getPessoalMap("profiles_pessoal"),
   ]);
@@ -547,7 +579,7 @@ export const getPessoas = cache(async (): Promise<Profile[]> => {
   // (o resto fica ""/null e os chips nem renderizam).
   // Os sensíveis (nascimento/gênero/pref./motivação) só preenchem pra coord.
   return ((data ?? []) as { id: string; nome: string }[])
-    .map((p) => comPessoal(comContato(p, contatos), pessoal))
+    .map((p) => comPapeis(comPessoal(comContato(p, contatos), pessoal)))
     .sort(porNome) as unknown as Profile[];
 });
 
@@ -570,6 +602,9 @@ export type DuplaPerfil = {
   id: string;
   status: DuplaStatus;
   iniciada_em: string | null;
+  /** Trilha da dupla (WP6b) — a ficha do mentor híbrido conta vagas por
+   *  pool (DPP × especialista), sem ela o X/Y misturava as duas. */
+  trilha: Trilha;
   mentor: { id: string; nome: string; avatar_path?: string | null; email?: string | null } | null;
   mentorado: { id: string; nome: string; avatar_path?: string | null } | null;
 };
@@ -591,7 +626,7 @@ export const getPessoaPerfil = cache(async (id: string): Promise<
   // email não entra no embed de profiles (grant de coluna, 0026) — vem do
   // merge com a view quando o papel alcança; o gravatar cai nas iniciais senão
   const DUPLA_PERFIL_SELECT = `
-    id, status, iniciada_em,
+    id, status, iniciada_em, trilha,
     mentor:profiles!duplas_mentor_id_fkey(id, nome, avatar_path),
     mentorado:mentorados(id, nome, avatar_path)
   `;
@@ -601,7 +636,7 @@ export const getPessoaPerfil = cache(async (id: string): Promise<
 
   const [{ data: p }, { data: m }, contatos, pessoalProf, pessoalMent, curriculo] =
     await Promise.all([
-      supabase.from("profiles").select(PROFILE_COLS_PUBLICAS).eq("id", id).maybeSingle(),
+      supabase.from("profiles").select(PROFILE_COLS_COM_PAPEIS).eq("id", id).maybeSingle(),
       supabase.from("mentorados").select(MENTORADO_COLS_PUBLICAS).eq("id", id).maybeSingle(),
       getContatos(),
       getPessoalMap("profiles_pessoal"),
@@ -619,7 +654,9 @@ export const getPessoaPerfil = cache(async (id: string): Promise<
   if (p) {
     // mentor_profiles é legível por autenticado (grant table-level) — a ficha
     // de mentor (disponibilidade/experiência/formação) entra no perfil dele
-    const ehMentor = p.role === "mentor_dpp" || p.role === "mentor_especialista";
+    const perfil = comPapeis(p);
+    const ehMentor =
+      temPapel(perfil, "mentor_dpp") || temPapel(perfil, "mentor_especialista");
     const [{ data: duplas }, { data: notas }, { data: mp }] = await Promise.all([
       supabase.from("duplas").select(DUPLA_PERFIL_SELECT)
         .or(`mentor_id.eq.${id},supervisor_id.eq.${id}`)
@@ -633,7 +670,7 @@ export const getPessoaPerfil = cache(async (id: string): Promise<
     ]);
     return {
       tipo: "profile",
-      pessoa: comPessoal(comContato(p, contatos), pessoalProf) as Profile,
+      pessoa: comPessoal(comContato(perfil, contatos), pessoalProf) as Profile,
       mentorProfile: (mp as MentorProfile | null) ?? null,
       duplas: ((duplas as unknown as DuplaPerfil[]) ?? []).map(comEmail),
       notas: (notas as unknown as PessoaNota[]) ?? [],
@@ -694,7 +731,11 @@ export const getMeuMentorProfile = cache(
     const demo = await demoRole();
     if (demo) return demoMeuMentorProfile(demo);
     const me = await getMe();
-    if (!me || (me.role !== "mentor_dpp" && me.role !== "mentor_especialista"))
+    // papel efetivo (WP6b): o híbrido tem mentor_profile igual a qualquer um
+    if (
+      !me ||
+      (!temPapel(me, "mentor_dpp") && !temPapel(me, "mentor_especialista"))
+    )
       return null;
     const supabase = await createClient();
     const { data, error } = await supabase
@@ -985,6 +1026,123 @@ export const getEspecialistaEventos = cache(
       .select("numero, titulo, foco")
       .order("numero");
     if (error) throw error;
+    return data ?? [];
+  }
+);
+
+// ---------- jornada do jovem (WP7, 0096) ----------
+
+/** Painel agregado de instrumentos da jornada (RPC
+ *  `painel_instrumentos_jornada`, 0096 — definer coord/supervisor): por
+ *  dupla DPP viva do escopo, as entregas por sistema SEM respostas nem
+ *  tokens + a contagem de avaliações de encontro. A resolução por estação
+ *  (roda inicial × formal, janelas da turma) é da lib de jornada no
+ *  cliente. Erro → [] com log: o painel omite a seção em vez de derrubar
+ *  a página. */
+export const getPainelInstrumentosJornada = cache(
+  async (): Promise<PainelJornadaLinha[]> => {
+    const demo = await demoRole();
+    if (demo) return demoPainelInstrumentosJornada(demo);
+    const supabase = await createClient();
+    const { data, error } = await supabase.rpc("painel_instrumentos_jornada");
+    if (error) {
+      console.error("getPainelInstrumentosJornada:", error);
+      return [];
+    }
+    return (data ?? []) as PainelJornadaLinha[];
+  }
+);
+
+// ---------- parametrização de turma (REALIZA-167, migration 0111) ----------
+
+/** Fila de espera por turma (turma_inscricoes): inscritos `aguardando` — a
+ *  linha "Sem dupla" do relatório deriva daqui pra qualquer turma (antes a
+ *  fila da T2 era um array de ids hardcoded no código). `turma` null devolve
+ *  todas as filas — o builder de /relatorios agrupa no cliente pra troca de
+ *  turma sem round-trip. RLS + gate por papel: pra não-coord devolve [] sem
+ *  disparar query. Falha de leitura → [] com log: a grade segue sem a seção
+ *  "Sem dupla" em vez de derrubar a página. */
+export const getTurmaInscricoesAguardando = cache(
+  async (turma: string | null = null): Promise<InscricaoFilaTurma[]> => {
+    // modo demo: replica a policy coord-only sobre o dataset fixo
+    const demo = await demoRole();
+    if (demo) return demoTurmaInscricoesAguardando(demo, turma);
+    const me = await getMe();
+    if (me?.role !== "coordenacao") return [];
+    const supabase = await createClient();
+    let q = supabase
+      .from("turma_inscricoes")
+      .select("turma, profile_id, mentorado_id, papel_esperado")
+      .eq("status", "aguardando");
+    if (turma) q = q.eq("turma", turma);
+    const { data, error } = await q;
+    if (error) {
+      console.error("getTurmaInscricoesAguardando:", error);
+      return [];
+    }
+    // normaliza pro shape discriminado do montarLinhas — o XOR +
+    // coerência papel×coluna são CHECK no banco; linha incoerente (só se o
+    // CHECK for removido) é descartada em vez de renderizar quebrada
+    return (data ?? []).flatMap((r): InscricaoFilaTurma[] => {
+      if (r.papel_esperado === "mentor" && r.profile_id)
+        return [
+          {
+            turma: r.turma,
+            papel_esperado: "mentor",
+            profile_id: r.profile_id,
+          },
+        ];
+      if (r.papel_esperado === "mentorado" && r.mentorado_id)
+        return [
+          {
+            turma: r.turma,
+            papel_esperado: "mentorado",
+            mentorado_id: r.mentorado_id,
+          },
+        ];
+      return [];
+    });
+  }
+);
+
+/** Painel de links públicos (relatorio_links, REALIZA-170) — metadados +
+ *  contadores de acesso via RPC relatorio_links_stats: senha_hash nunca sai
+ *  do banco (nem pra coordenação — `protegido` booleano resolve a UI). */
+export const getRelatorioLinks = cache(
+  async (): Promise<RelatorioLinkItem[]> => {
+    if (await demoRole()) return demoRelatorioLinks();
+    const me = await getMe();
+    if (me?.role !== "coordenacao") return [];
+    const supabase = await createClient();
+    const { data, error } = await supabase.rpc("relatorio_links_stats");
+    if (error) {
+      console.error("getRelatorioLinks:", error);
+      return [];
+    }
+    return (data ?? []) as RelatorioLinkItem[];
+  }
+);
+
+/** Templates de documento ativos — alimenta o seletor do recorte
+ *  'assinaturas' do NovoLinkDialog. Leitura authenticated (0033); quem não
+ *  é coordenador nem chama (a página já barra). */
+export const getDocumentoTemplates = cache(
+  async (): Promise<Pick<DocumentoTemplate, "slug" | "titulo">[]> => {
+    if (await demoRole()) {
+      return getDemoData().documentoTemplates
+        .filter((t) => t.ativo)
+        .map((t) => ({ slug: t.slug, titulo: t.titulo }));
+    }
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("documento_templates")
+      .select("slug, titulo")
+      .eq("ativo", true)
+      .order("titulo");
+    if (error) {
+      console.error("getDocumentoTemplates:", error);
+      return [];
+    }
     return data ?? [];
   }
 );

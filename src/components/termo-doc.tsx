@@ -38,12 +38,14 @@ export function TermoVoluntarioDoc({
       {/* documento integral inline — nada de scroll interno cortando
           cláusula no meio */}
       <div className="px-5 py-6 sm:px-8">
+        {/* text-left no mobile — a ~46ch o justificado gera rios de espaço
+            em pt-BR; a partir de sm o alinhamento formal do documento volta */}
         <div className="space-y-4 font-serif text-[15px] leading-relaxed">
           <h2 className="text-center font-bold uppercase tracking-wide">
             {TERMO_TITULO}
           </h2>
           {preambuloTermo(civisPreview(civis)).map((p, i) => (
-            <p key={i} className="text-justify">
+            <p key={i} className="text-left sm:text-justify">
               {p}
             </p>
           ))}
@@ -51,13 +53,13 @@ export function TermoVoluntarioDoc({
             <div key={titulo} className="space-y-2">
               <h3 className="font-bold uppercase">{titulo}</h3>
               {paragrafos.map((p, i) => (
-                <p key={i} className="text-justify">
+                <p key={i} className="text-left sm:text-justify">
                   {p}
                 </p>
               ))}
             </div>
           ))}
-          <p className="text-justify">{FECHO_TERMO}</p>
+          <p className="text-left sm:text-justify">{FECHO_TERMO}</p>
           {/* o anexo é transcrição legal de apoio — <details> nativo tira
               meia página de lei do caminho sem esconder que ela existe;
               título e parágrafos seguem verbatim a fonte oficial */}
@@ -75,7 +77,7 @@ export function TermoVoluntarioDoc({
                 {ANEXO_I_TITULO}
               </h3>
               {ANEXO_I_PARAGRAFOS.map((p, i) => (
-                <p key={i} className="text-justify">
+                <p key={i} className="text-left sm:text-justify">
                   {p}
                 </p>
               ))}

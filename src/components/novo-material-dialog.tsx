@@ -9,7 +9,7 @@ import { TRILHA_LEN } from "@/lib/ciclo";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
+  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -58,12 +58,29 @@ function saneiaNome(nome: string): string {
   return limpo || "arquivo";
 }
 
-export function NovoMaterialDialog({ maxEncontro }: { maxEncontro: number }) {
+export function NovoMaterialDialog({
+  maxEncontro,
+  defaultEncontro,
+  triggerLabel = "Novo material",
+  triggerVariant = "default",
+}: {
+  maxEncontro: number;
+  /** "Adicionar aqui" do hub por encontro (REALIZA-173): o nº já vem
+   *  preenchido — segue editável, é só ponto de partida. */
+  defaultEncontro?: number;
+  triggerLabel?: string;
+  triggerVariant?: "default" | "outline" | "ghost";
+}) {
   const [open, setOpen] = useState(false);
   const [destino, setDestino] = useState<"link" | "arquivo">("arquivo");
   // audiência controlada — o teto de "encontro relacionado" segue a trilha
   // dela (5 no especialista, N do ciclo nas demais)
   const [audiencia, setAudiencia] = useState("todos");
+  // encontro controlado pelo mesmo motivo (defaultValue deixaria o valor
+  // digitado sobreviver ao fechar/reabrir; defaultEncontro é o reset)
+  const [encontroNum, setEncontroNum] = useState(
+    defaultEncontro?.toString() ?? ""
+  );
   const maxEncontroSel =
     audiencia === "especialista" ? TRILHA_LEN.especialista : maxEncontro;
   const [pending, start] = useTransition();
@@ -118,6 +135,8 @@ export function NovoMaterialDialog({ maxEncontro }: { maxEncontro: number }) {
         setOpen(false);
         // fecha programático não passa pelo onOpenChange — reseta aqui também
         setDestino("arquivo");
+        setAudiencia("todos");
+        setEncontroNum(defaultEncontro?.toString() ?? "");
         if (fileRef.current) fileRef.current.value = "";
         router.refresh();
       } catch {
@@ -131,17 +150,27 @@ export function NovoMaterialDialog({ maxEncontro }: { maxEncontro: number }) {
       open={open}
       onOpenChange={(o) => {
         setOpen(o);
-        // fechou → destino volta pro padrão e o arquivo escolhido não fica preso
+        // fechou → destino e audiência voltam pro padrão e o arquivo
+        // escolhido não fica preso (o Select é defaultValue — sem reset o
+        // estado sobrevive e dessincroniza do que ele exibe na reabertura)
         if (!o) {
           setDestino("arquivo");
+          setAudiencia("todos");
+          setEncontroNum(defaultEncontro?.toString() ?? "");
           if (fileRef.current) fileRef.current.value = "";
         }
       }}
     >
-      <DialogTrigger render={<Button size="sm"><Plus size={16} /> Novo material</Button>} />
-      <DialogContent>
+      <DialogTrigger render={<Button size="sm" variant={triggerVariant}><Plus size={16} /> {triggerLabel}</Button>} />
+      {/* lg: a linha tipo×encontro é grid de 2 colunas — abaixo disso
+          os selects lado a lado ficavam apertados */}
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Adicionar material</DialogTitle>
+          <DialogDescription>
+            O material entra na biblioteca e fica disponível pra quem
+            acompanha a trilha.
+          </DialogDescription>
         </DialogHeader>
         <form onSubmit={submit} className="space-y-4">
           <div className="space-y-2">
@@ -242,10 +271,15 @@ export function NovoMaterialDialog({ maxEncontro }: { maxEncontro: number }) {
               min={1}
               max={maxEncontroSel}
               inputMode="numeric"
+              value={encontroNum}
+              onChange={(e) => setEncontroNum(e.target.value)}
             />
             <p className="text-xs text-muted-foreground">
               Agrupa o material na seção daquele encontro na biblioteca
               {audiencia === "especialista" ? " (a trilha tem 5)" : ""}.
+              {audiencia === "todos"
+                ? " Pro jovem, libera quando a dupla chegar nele."
+                : ""}
             </p>
           </div>
           <Button type="submit" className="w-full" disabled={pending}>

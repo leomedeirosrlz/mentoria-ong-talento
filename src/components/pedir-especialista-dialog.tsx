@@ -13,9 +13,9 @@ import {
   buscarSlotsEspecialista,
   pedirEspecialistaJovem,
 } from "@/lib/actions-jovem";
-import { rotuloSlot } from "@/lib/ciclo";
+import { rotuloSlot, slotCompativel } from "@/lib/ciclo";
 import { pedidoPrecisaDemanda } from "@/lib/jovem-especialista";
-import type { JovemEspecialista } from "@/lib/types";
+import type { Disponibilidade, JovemEspecialista } from "@/lib/types";
 import { avatarPublicUrl } from "@/lib/avatar";
 import { Avatar } from "@/components/avatar";
 import { Button } from "@/components/ui/button";
@@ -95,7 +95,7 @@ function ChipSlot({
       aria-pressed={selecionado}
       onClick={onClick}
       className={cn(
-        "rounded-md border px-2 py-1 text-xs tabular-nums transition-colors",
+        "inline-flex min-h-11 items-center rounded-md border px-2.5 text-xs tabular-nums transition-colors",
         selecionado
           ? "border-primary bg-primary/10 font-medium text-foreground"
           : "border-border text-muted-foreground hover:border-primary hover:bg-primary/5"
@@ -122,6 +122,7 @@ export function PedirEspecialistaDialog({
   trigger,
   open: openProp,
   onOpenChange: onOpenChangeProp,
+  onEnviado,
 }: {
   /** Catálogo jovem_especialistas — nome/social/avatar/áreas, sem contato. */
   especialistas: JovemEspecialista[];
@@ -141,6 +142,10 @@ export function PedirEspecialistaDialog({
   /** controlado externamente (os chips de slot da agenda são o trigger) */
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
+  /** Chamado quando o pedido sai (antes do refresh) — o catálogo usa pra
+   *  limpar a preferência marcada (o router.refresh sozinho preserva o
+   *  useState do wrapper, a limpeza precisa ser explícita). */
+  onEnviado?: () => void;
 }) {
   const [openInt, setOpenInt] = useState(false);
   const open = openProp ?? openInt;
@@ -227,6 +232,7 @@ export function PedirEspecialistaDialog({
           );
         }
         setOpen(false);
+        onEnviado?.();
         router.refresh();
       } catch {
         toast.error("Sem conexão. Tente de novo.");
@@ -248,7 +254,9 @@ export function PedirEspecialistaDialog({
           }
         />
       )}
-      <DialogContent>
+      {/* lg: cards de alvo lado a lado + lista de especialistas com avatar —
+          abaixo disso a escolha dirigida ficava apertada */}
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Pedir apoio de um especialista</DialogTitle>
         </DialogHeader>
@@ -282,7 +290,7 @@ export function PedirEspecialistaDialog({
           {modo === "dirigido" && (
             <div className="space-y-2">
               <p className="text-sm font-medium">Quem você quer procurar?</p>
-              <ul className="max-h-52 space-y-1.5 overflow-y-auto pr-1">
+              <ul className="max-h-[40dvh] space-y-1.5 overflow-y-auto pr-1">
                 {especialistas.map((e) => {
                   const nome = e.nome_social || e.nome;
                   return (
@@ -460,35 +468,53 @@ export function PedirEspecialistaDialog({
 }
 
 /** Os chips de horário do especialista viram "pedir esse horário" — cada
- *  clique abre o dialog já com o especialista e o slot preenchidos. */
+ *  clique abre o dialog já com o especialista e o slot preenchidos. Com a
+ *  `disponibilidade` do jovem à mão, o chip que encaixa na grade dele ganha
+ *  o destaque âmbar "encaixa com você" (mesmo sinal da mesa de negociação). */
 export function JovemEspSlots({
   espId,
   slots,
+  disponibilidade,
   ...dialogProps
 }: Omit<
   React.ComponentProps<typeof PedirEspecialistaDialog>,
   "preEspId" | "preSlot" | "open" | "onOpenChange" | "trigger"
-> & { espId: string; slots: string[] }) {
+> & {
+  espId: string;
+  slots: string[];
+  /** Grade do jovem — slots que encaixam ganham a borda/fundo âmbar. */
+  disponibilidade?: Disponibilidade | null;
+}) {
   const [open, setOpen] = useState(false);
   const [slotSel, setSlotSel] = useState<string | null>(null);
   return (
     <>
       <ul className="flex flex-wrap gap-1.5">
-        {slots.slice(0, 10).map((s) => (
-          <li key={s}>
-            <button
-              type="button"
-              title={`Pedir sessão ${rotuloSlot(s)}`}
-              onClick={() => {
-                setSlotSel(s);
-                setOpen(true);
-              }}
-              className="rounded-md border border-border px-2 py-1 text-xs tabular-nums transition-colors hover:border-primary hover:bg-primary/10"
-            >
-              {rotuloSlot(s)}
-            </button>
-          </li>
-        ))}
+        {slots.slice(0, 10).map((s) => {
+          const compat = disponibilidade
+            ? slotCompativel(disponibilidade, s)
+            : false;
+          return (
+            <li key={s}>
+              <button
+                type="button"
+                title={`Pedir sessão ${rotuloSlot(s)}${compat ? " — encaixa com você" : ""}`}
+                onClick={() => {
+                  setSlotSel(s);
+                  setOpen(true);
+                }}
+                className={cn(
+                  "inline-flex min-h-11 items-center rounded-md border px-2.5 text-xs tabular-nums transition-colors",
+                  compat
+                    ? "border-[var(--warn)]/70 bg-[var(--role-mentorado)]/15 font-medium text-[var(--warn-text)] hover:bg-[var(--role-mentorado)]/25"
+                    : "border-border hover:border-primary hover:bg-primary/10"
+                )}
+              >
+                {rotuloSlot(s)}
+              </button>
+            </li>
+          );
+        })}
       </ul>
       <PedirEspecialistaDialog
         {...dialogProps}

@@ -1,8 +1,9 @@
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
-import { toDateStr } from "./ciclo";
+import { semanaBounds, toDateStr } from "./ciclo";
 import { demoRole } from "./demo/mode";
 import {
+  demoDevolutivas,
   demoEspecialistas,
   demoMinhaGrade,
   demoMinhasExcecoes,
@@ -10,14 +11,18 @@ import {
   demoSlotsLivres,
   demoSolicitacoesDaDupla,
   demoSolicitacoesVisiveis,
+  demoTrilhasDosJovens,
 } from "./demo/queries";
 import { demoTrilhaFechamento } from "./demo/encerramento-data";
+import { demoAvaliacaoEspDaDupla } from "./demo/forms-data";
 import { getMe } from "./queries";
 import type {
+  Devolutiva,
   ExcecaoEspecialista,
   GradeJanela,
   SolicitacaoEspecialista,
   SolicitacaoProposta,
+  TrilhaJovem,
 } from "./types";
 
 /** A leitura é da view `solicitacoes_mural` (0030/0074): as mesmas colunas
@@ -206,7 +211,9 @@ export async function getPropostasMap(
 }
 
 /** Especialistas ativos (id + nome + áreas de atuação, 0030) — pro select
- *  "direcionar a um especialista específico" do dialog de solicitação. */
+ *  "direcionar a um especialista específico" do dialog de solicitação.
+ *  0087: o papel é relação — o !inner em profile_papeis pega também o
+ *  híbrido cujo primário é mentor_dpp. */
 export const getEspecialistas = cache(
   async (): Promise<{ id: string; nome: string; areas: string[] | null }[]> => {
     const demo = await demoRole();
@@ -214,18 +221,34 @@ export const getEspecialistas = cache(
     const supabase = await createClient();
     const { data, error } = await supabase
       .from("profiles")
-      .select("id, nome, areas")
-      .eq("role", "mentor_especialista")
+      .select("id, nome, areas, profile_papeis!inner(papel)")
+      .eq("profile_papeis.papel", "mentor_especialista")
       .eq("ativo", true)
       .order("nome");
     if (error) {
       console.error("getEspecialistas:", error);
       return [];
     }
+    // o !inner devolve o profile UMA vez por linha de papel — o papel em
+    // 2 escopos listaria o mesmo nome duas vezes no select; dedupe por id.
+    // O embed não volta pro client: a linha dedupada carrega só os 3 campos
+    const unicos = new Map<
+      string,
+      { id: string; nome: string; areas: string[] | null }
+    >();
+    for (const p of (data ?? []) as {
+      id: string;
+      nome: string;
+      areas: string[] | null;
+    }[]) {
+      if (!unicos.has(p.id)) {
+        unicos.set(p.id, { id: p.id, nome: p.nome, areas: p.areas });
+      }
+    }
     // a collation do banco ordena acentos depois de Z — pt-BR no app
-    return (
-      (data ?? []) as { id: string; nome: string; areas: string[] | null }[]
-    ).sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+    return [...unicos.values()].sort((a, b) =>
+      a.nome.localeCompare(b.nome, "pt-BR")
+    );
   }
 );
 
@@ -254,8 +277,11 @@ export const getMinhaGrade = cache(async (): Promise<GradeJanela[]> => {
   return (data ?? []) as GradeJanela[];
 });
 
-/** Exceções datadas do especialista logado — só as de hoje em diante: uma
- *  exceção passada não muda mais a projeção e a lista ficaria infinita. */
+/** Exceções datadas do especialista logado — a partir da SEGUNDA da semana
+ *  corrente (não de hoje): a grade visual desenha seg→dom inteira, e um
+ *  bloqueio/extra de segunda continua visível quando hoje é quarta. Semanas
+ *  anteriores ficam fora — exceção velha não muda a projeção e a lista
+ *  ficaria infinita. */
 export const getMinhasExcecoes = cache(
   async (): Promise<ExcecaoEspecialista[]> => {
     const demo = await demoRole();
@@ -267,7 +293,7 @@ export const getMinhasExcecoes = cache(
       .from("especialista_excecoes")
       .select("id, data, hora_inicio, hora_fim, tipo")
       .eq("profile_id", me.id)
-      .gte("data", toDateStr(new Date()))
+      .gte("data", semanaBounds(new Date()).seg)
       .order("data")
       .order("hora_inicio");
     if (error) {
@@ -298,5 +324,87 @@ export const getSlotsLivres = cache(
       return [];
     }
     return (data ?? []).map((r: { inicio: string }) => r.inicio);
+  }
+);
+
+/** Feed de devolutivas de uma dupla (0086) — a policy lê pro autor, pra
+ *  coordenação e pro jovem dono da trilha; a ficha da dupla esp monta com
+ *  o embed do autor (staff lê profiles). */
+export const getDevolutivasDupla = cache(
+  async (duplaId: string): Promise<Devolutiva[]> => {
+    const demo = await demoRole();
+    if (demo) return demoDevolutivas(demo, [duplaId]);
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("devolutivas")
+      .select("id, dupla_id, autor_id, texto, created_at, autor:profiles(nome)")
+      .eq("dupla_id", duplaId)
+      .order("created_at", { ascending: true });
+    if (error) {
+      console.error("getDevolutivasDupla:", error);
+      return [];
+    }
+    return (data ?? []).map((d) => ({
+      ...(d as Omit<typeof d, "autor">),
+      autor: Array.isArray(d.autor) ? (d.autor[0] ?? null) : d.autor,
+    })) as Devolutiva[];
+  }
+);
+
+/** Trilhas de especialista do mentorado de uma dupla DPP — RPC definer
+ *  `trilha_do_jovem` (0092): a RLS exclui o DPP de duplas/encontros/registros
+ *  da trilha esp, então a projeção completa sai pelo definer validando
+ *  mentor/supervisor da dupla DPP ou coordenação. Retorna {} por dupla sem
+ *  trilha (e degrada pra vazio com log, seguindo os loaders da ficha). */
+export const getTrilhasDosJovens = cache(
+  async (duplaDppIds: string[]): Promise<Record<string, TrilhaJovem[]>> => {
+    if (duplaDppIds.length === 0) return {};
+    const demo = await demoRole();
+    if (demo) return demoTrilhasDosJovens(demo, duplaDppIds);
+    const supabase = await createClient();
+    const pares = await Promise.all(
+      duplaDppIds.map(async (id) => {
+        const { data, error } = await supabase.rpc("trilha_do_jovem", {
+          p_dupla_dpp_id: id,
+        });
+        if (error) {
+          console.error("getTrilhasDosJovens:", error);
+          return [id, []] as const;
+        }
+        return [id, (data ?? []) as unknown as TrilhaJovem[]] as const;
+      })
+    );
+    return Object.fromEntries(pares);
+  }
+);
+
+export type AvaliacaoEspDupla = {
+  respondido: boolean;
+  respondido_em: string | null;
+  /** o form oficial — a coord usa pra linkar /formularios/[id] e chegar
+   *  nas respostas */
+  formulario_id?: string | null;
+  /** vem só quando o caller é o especialista da trilha (o respondente) —
+   *  a coord recebe o estado e opera o link por /formularios/[id]. */
+  token?: string | null;
+};
+
+/** Estado do link da avaliação geral da trilha esp (0104) — a RPC definer
+ *  atravessa o RLS coord-only de formulario_links só até onde o papel vai:
+ *  especialista da dupla ganha o token de volta (caminho quando a
+ *  notificação se perdeu), coord ganha o status. */
+export const getAvaliacaoEspDaDupla = cache(
+  async (duplaId: string): Promise<AvaliacaoEspDupla | null> => {
+    const demo = await demoRole();
+    if (demo) return demoAvaliacaoEspDaDupla(demo, duplaId);
+    const supabase = await createClient();
+    const { data, error } = await supabase.rpc("avaliacao_esp_da_dupla", {
+      p_dupla: duplaId,
+    });
+    if (error) {
+      console.error("getAvaliacaoEspDaDupla:", error);
+      return null;
+    }
+    return data as AvaliacaoEspDupla | null;
   }
 );

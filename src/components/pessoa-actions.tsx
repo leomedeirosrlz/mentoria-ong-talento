@@ -23,10 +23,11 @@ import {
 } from "@/components/campos-pessoais";
 import { AREAS_SUGESTOES, formatWhatsApp } from "@/lib/ciclo";
 import { maskWhatsApp } from "@/lib/utils";
+import { temPapel } from "@/lib/types";
 import type { Disponibilidade, Profile } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle,
+  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
@@ -42,7 +43,7 @@ import { Textarea } from "@/components/ui/textarea";
 
 // subset do mentor_profile que a coordenação edita — inclui a ficha de
 // matching da 0034 (experiência/formação/disponibilidade) e os dois pools
-// de capacidade da 0073 (a UI mostra só a da trilha do papel)
+// de capacidade da 0073 (o híbrido edita os dois, um por trilha — WP6b)
 type MentorProfile = {
   capacidade: number;
   capacidade_especialista: number | null;
@@ -74,7 +75,10 @@ export function PessoaActions({
   const [disponibilidade, setDisponibilidade] = useState<Disponibilidade | null>(null);
   const [pending, start] = useTransition();
   const router = useRouter();
-  const ehMentor = pessoa.role === "mentor_dpp" || pessoa.role === "mentor_especialista";
+  const ehDpp = temPapel(pessoa, "mentor_dpp");
+  const ehEsp = temPapel(pessoa, "mentor_especialista");
+  const ehMentor = ehDpp || ehEsp;
+  const hibrido = ehDpp && ehEsp;
   const primeiroNome = (pessoa.nome_social || pessoa.nome).split(" ")[0];
 
   useEffect(() => {
@@ -288,22 +292,42 @@ export function PessoaActions({
           conteudo: (
             <div className="space-y-4 rounded-lg bg-muted/40 p-3.5">
               <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="e_cap">
-                    {pessoa.role === "mentor_especialista"
-                      ? "Capacidade (trilhas de especialista)"
-                      : "Capacidade (duplas DPP)"}
-                  </Label>
-                  <Input
-                    id="e_cap" name="capacidade" type="number" min={1} max={10}
-                    required
-                    defaultValue={
-                      (pessoa.role === "mentor_especialista"
-                        ? mp?.capacidade_especialista
-                        : mp?.capacidade) ?? 1
-                    }
-                  />
-                </div>
+                {hibrido ? (
+                  // duas pools independentes (WP6b): uma por trilha servida
+                  <>
+                    <div className="space-y-2">
+                      <Label htmlFor="e_cap">Capacidade (duplas DPP)</Label>
+                      <Input
+                        id="e_cap" name="capacidade" type="number" min={1} max={10}
+                        required
+                        defaultValue={mp?.capacidade ?? 1}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="e_cap_esp">Capacidade (trilhas de especialista)</Label>
+                      <Input
+                        id="e_cap_esp" name="capacidade_esp" type="number" min={1} max={10}
+                        required
+                        defaultValue={mp?.capacidade_especialista ?? 1}
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <div className="space-y-2">
+                    <Label htmlFor="e_cap">
+                      {ehEsp
+                        ? "Capacidade (trilhas de especialista)"
+                        : "Capacidade (duplas DPP)"}
+                    </Label>
+                    <Input
+                      id="e_cap" name="capacidade" type="number" min={1} max={10}
+                      required
+                      defaultValue={
+                        (ehEsp ? mp?.capacidade_especialista : mp?.capacidade) ?? 1
+                      }
+                    />
+                  </div>
+                )}
                 <div className="space-y-2">
                   <Label htmlFor="e_areas">Áreas (separadas por vírgula)</Label>
                   <Input
@@ -462,6 +486,9 @@ export function PessoaActions({
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Editar {primeiroNome}</DialogTitle>
+            <DialogDescription>
+              Os dados do cadastro em etapas — salve no fim.
+            </DialogDescription>
           </DialogHeader>
           <WizardFicha
             passos={passos}

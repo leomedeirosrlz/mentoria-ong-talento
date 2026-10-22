@@ -7,6 +7,7 @@ import {
   lePonteiro,
   pontoEixo,
   pontosPoligono,
+  quebraRotuloEixo,
   rotuloQuadrante,
   RODA_CX,
   RODA_CY,
@@ -152,6 +153,67 @@ describe("geometria da roda (pontoEixo/lePonteiro)", () => {
     const r = rotuloQuadrante(0, 4, 16, 16);
     const dist = Math.hypot(r.x - RODA_CX, r.y - RODA_CY);
     expect(dist).toBeCloseTo(RODA_RAIO + 16);
+  });
+});
+
+// ---------- rótulos externos da roda (REALIZA-143, variante A) ----------
+
+describe("quebraRotuloEixo — a coroa de nomes do desktop", () => {
+  it("os 16 rótulos oficiais viram no máximo 2 linhas, como no mock v1", () => {
+    const oficiais = [
+      "Saúde e disposição",
+      "Intelecto e cultura",
+      "Equilíbrio emocional",
+      "Independência",
+      "Carreira e trabalho",
+      "Finanças",
+      "Escola / universidade",
+      "Contribuição social",
+      "Família",
+      "Amigos",
+      "Relacionamento amoroso",
+      "Vida social",
+      "Hobbies e diversão",
+      "Atividade física",
+      "Realização e felicidade",
+      "Espiritualidade",
+    ];
+    for (const l of oficiais) {
+      const linhas = quebraRotuloEixo(l);
+      expect(linhas.length).toBeGreaterThanOrEqual(1);
+      expect(linhas.length).toBeLessThanOrEqual(2);
+      // nenhuma linha nasce vazia e o texto todo sobrevive
+      expect(linhas.every((x) => x.trim().length > 0)).toBe(true);
+      expect(linhas.join(" ").replace(/\s+/g, " ")).toBe(l);
+    }
+  });
+
+  it("corta guloso com teto de 14: 'Saúde e' / 'disposição'", () => {
+    expect(quebraRotuloEixo("Saúde e disposição")).toEqual([
+      "Saúde e",
+      "disposição",
+    ]);
+    expect(quebraRotuloEixo("Relacionamento amoroso")).toEqual([
+      "Relacionamento",
+      "amoroso",
+    ]);
+  });
+
+  it("rótulo curto fica em linha única; '/' nunca abre linha", () => {
+    expect(quebraRotuloEixo("Família")).toEqual(["Família"]);
+    expect(quebraRotuloEixo("Vida social")).toEqual(["Vida social"]);
+    expect(quebraRotuloEixo("Escola / universidade")).toEqual([
+      "Escola /",
+      "universidade",
+    ]);
+  });
+
+  it("palavra maior que o teto fica inteira; excedente fecha na 2ª linha", () => {
+    expect(quebraRotuloEixo("Espiritualidade")).toEqual(["Espiritualidade"]);
+    expect(quebraRotuloEixo("Vida contemplativa e meditativa")).toEqual([
+      "Vida",
+      "contemplativa e meditativa",
+    ]);
   });
 });
 

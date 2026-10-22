@@ -80,7 +80,7 @@ export default async function JovemPessoaPerfil({
     <div className="mx-auto max-w-3xl space-y-6">
       <Link
         href="/jovem/pessoas"
-        className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+        className="inline-flex min-h-11 items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
       >
         <ArrowLeft size={15} aria-hidden />
         Pessoas

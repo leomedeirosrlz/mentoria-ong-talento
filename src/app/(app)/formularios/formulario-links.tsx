@@ -34,6 +34,7 @@ import {
   type LinkStatus,
 } from "@/lib/forms/schema";
 import type { LinkResolvido } from "@/lib/forms/queries";
+import { ehInstrumento } from "@/lib/forms/instrumentos";
 import { comparaNome } from "@/lib/ciclo";
 import type { AppRole } from "@/lib/types";
 import { NudgeButton } from "@/components/nudge-button";
@@ -230,6 +231,10 @@ export function FormularioLinks({
   const [filtroStatus, setFiltroStatus] = useState<LinkStatus | "todos">("todos");
   const [buscaLink, setBuscaLink] = useState("");
   const [ordemLinks, setOrdemLinks] = useState<OrdemLinks>("status");
+  // os 4 instrumentos de jornada só emitem pela ficha da dupla
+  // (emitir_link_instrumento carrega dupla_id + momento); o link genérico
+  // daqui é rejeitado pela action — esconder é melhor que falhar
+  const instrumento = ehInstrumento(formularioSistema);
   const [pending, start] = useTransition();
   // remoção otimista: a linha sai na hora pelo ExitItem (e chip/contagem já
   // descontam); erro da action faz rollback e ela volta com a entrada —
@@ -473,7 +478,14 @@ export function FormularioLinks({
 
   return (
     <div className="space-y-4">
+      {instrumento && (
+        <p className="rounded-lg bg-muted px-3 py-2 text-xs text-muted-foreground">
+          Instrumento oficial da jornada — os links são emitidos pela ficha
+          da dupla, em <em>Instrumentos da dupla</em>.
+        </p>
+      )}
       <div className="flex flex-wrap items-center gap-2">
+        {!instrumento && (
         <Dialog open={open} onOpenChange={aoAbrir}>
           <DialogTrigger render={<Button size="sm" />}>
             <LinkIcon aria-hidden />
@@ -639,11 +651,13 @@ export function FormularioLinks({
             </AnimatePresence>
           </DialogContent>
         </Dialog>
+        )}
       </div>
 
       {/* o genérico é caminho terciário — não resolve destinatário e quem
           responde por ele cai anônimo; a ação fica colada na advertência
           pra escolha ser consciente, longe do botão primário */}
+      {!instrumento && (
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-dashed border-border px-3.5 py-2">
         <p className="min-w-0 flex-1 text-xs text-muted-foreground">
           O link genérico não identifica quem respondeu. Use pra divulgação aberta:
@@ -662,6 +676,7 @@ export function FormularioLinks({
           Copiar link genérico
         </button>
       </div>
+      )}
 
       {/* pendente em form encerrado é ação morta — as rows escondem
           Copiar/WhatsApp e este aviso diz por quê */}
@@ -715,7 +730,7 @@ export function FormularioLinks({
               placeholder="Buscar por nome"
               value={buscaLink}
               onChange={(e) => setBuscaLink(e.target.value)}
-              className="h-8 pl-8 text-xs"
+              className="h-11 pl-8 text-base md:h-8 md:text-xs"
             />
           </div>
           {/* ordenar convive com o filtro de status — primeiro o que a

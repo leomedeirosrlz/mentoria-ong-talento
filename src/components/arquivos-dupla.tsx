@@ -14,7 +14,8 @@ export function ArquivosDupla({ arquivos }: { arquivos: ArquivoDaDupla[] }) {
   if (!arquivos.length) return null;
   return (
     <section className="rounded-xl bg-card p-4 shadow-[var(--shadow-border)]">
-      <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+      <h2 className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+        <span aria-hidden className="size-1.5 rounded-full bg-[var(--brand-lime)]" />
         Arquivos
       </h2>
       <p className="mb-2 mt-1 text-xs text-muted-foreground">

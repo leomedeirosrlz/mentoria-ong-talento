@@ -14,7 +14,9 @@ export type FormularioCampoTipo =
   | "data"
   | "checkbox"
   | "sim_nao"
-  | "secao";
+  | "secao"
+  | "arquivo"
+  | "grid_disponibilidade";
 
 /** Semântica de formato de um campo 'texto' (REALIZA-118) — o hint que
  *  liga a normalização da resposta na coleta pública (e-mail/WhatsApp/link
@@ -44,6 +46,15 @@ export const CAMPO_FORMATO_ERRO: Record<FormularioCampoFormato, string> = {
   url: "Confira o link — escreva o endereço (ex.: linkedin.com/in/seu-nome).",
 };
 
+/** Condição de exibição (REALIZA-70): o campo só aparece quando a
+ *  resposta do campo `campo` — obrigatoriamente ANTERIOR na definição —
+ *  casa com um dos valores de `em`. Fora da condição a pergunta não é
+ *  enviada nem validada; o sanitizer da 0115 replica a regra no banco. */
+export type VisibleIf = {
+  campo: string;
+  em: (string | number | boolean)[];
+};
+
 export type FormularioCampo = {
   id: string;
   tipo: FormularioCampoTipo;
@@ -51,10 +62,20 @@ export type FormularioCampo = {
   obrigatorio: boolean;
   /** só select/multi_select — 2+ opções */
   opcoes?: string[];
-  /** só secao (0080) — texto de apoio sob o título da seção */
+  /** em secao: texto de apoio sob o título (0080). Nos demais tipos:
+   *  dica curta sob o rótulo da pergunta ("Até 3 hobbies") */
   descricao?: string;
   /** só texto (REALIZA-118) — semântica de formato da resposta */
   formato?: FormularioCampoFormato;
+  /** só perguntas — renderiza/valida só com a condição satisfeita */
+  visible_if?: VisibleIf;
+  /** só select/multi_select — agrega a opção "Outro" com texto livre;
+   *  a resposta serializa como "Outro: <texto>" (máx. 120 chars) */
+  permite_outro?: boolean;
+  /** só arquivo — mimes aceitos (default ARQUIVO_MIMES) */
+  accept?: string[];
+  /** só arquivo — teto em MB: 5, 10 ou 20 (default 10) */
+  max_mb?: number;
 };
 
 /** Instrumento oficial do programa (0042, 0080) — vocabulário fechado
@@ -63,19 +84,25 @@ export type FormularioSistema =
   | "anamnese"
   | "avaliacao_360"
   | "autoavaliacao_mentor"
+  | "avaliacao_especialista"
   | "visao"
   | "metas"
   | "pdm"
-  | "roda_vida";
+  | "roda_vida"
+  | "intake_mentor"
+  | "intake_mentorado";
 
 export const SISTEMA_LABEL: Record<FormularioSistema, string> = {
   anamnese: "Anamnese",
   avaliacao_360: "360º",
   autoavaliacao_mentor: "Autoavaliação",
+  avaliacao_especialista: "Avaliação da trilha",
   visao: "Visão",
   metas: "Metas",
   pdm: "PDM",
   roda_vida: "Roda da Vida",
+  intake_mentor: "Inscrição de mentores",
+  intake_mentorado: "Inscrição de mentorados",
 };
 
 /** Instrumentos de trabalho da dupla (0080) — os 4 que o mentor "entrega"
@@ -139,6 +166,10 @@ export type FormularioLink = {
   contexto: Record<string, unknown>;
   usado_em: string | null;
   expira_em: string | null;
+  /** link de campanha (0115): aceita N respostas anônimas, sem usado_em */
+  multi_uso?: boolean;
+  /** manual = destinatário específico; intake = divulgação pública */
+  origem?: "manual" | "intake";
   created_by: string | null;
   created_at: string;
 };
@@ -149,11 +180,35 @@ export type FormularioResposta = {
   /** {campo_id: valor} — só chaves declaradas; a RPC saneou no envio */
   respostas: Record<string, RespostaValor>;
   respondido_em: string;
+  /** carimbo da promoção (0115): a resposta de intake virou cadastro */
+  promovido_profile_id?: string | null;
+};
+
+/** upload resolvido por form_anexo_put + storage — path é o nome do
+ *  objeto no bucket form-anexos ("<link_id>/<uuid>.<ext>") */
+export type RespostaArquivo = {
+  path: string;
+  nome: string;
+  tamanho: number;
+};
+
+/** grade de disponibilidade: `celulas` é o canônico {dia, periodo} da
+ *  0100 (o que matching/perfil consomem sem adaptador); `horas` preserva
+ *  a marcação verbatim seg–sex × 09h–19h pra leitura da coordenação */
+export type RespostaGrid = {
+  celulas: { dia: string; periodo: string }[];
+  horas?: { dia: string; hora: number }[];
 };
 
 /** Valor de uma resposta conforme o tipo do campo — a RPC
  *  formularios_limpa_respostas garante o formato. */
-export type RespostaValor = string | number | boolean | string[];
+export type RespostaValor =
+  | string
+  | number
+  | boolean
+  | string[]
+  | RespostaArquivo
+  | RespostaGrid;
 
 // ---------- labels & constantes ----------
 
@@ -168,7 +223,22 @@ export const CAMPO_TIPO_LABEL: Record<FormularioCampoTipo, string> = {
   checkbox: "Caixa de confirmação",
   sim_nao: "Sim ou não",
   secao: "Seção (rótulo de estrutura)",
+  arquivo: "Arquivo (upload)",
+  grid_disponibilidade: "Grade de disponibilidade",
 };
+
+/** Allowlist de upload do campo 'arquivo' (0115) — PDF + imagens de
+ *  documento. Executáveis e svg ficam fora por construção (o mime
+ *  precisa estar na lista pra o RPC form_anexo_put aceitar). */
+export const ARQUIVO_MIMES: readonly string[] = [
+  "application/pdf",
+  "image/png",
+  "image/jpeg",
+  "image/webp",
+];
+export const ARQUIVO_EXT_PROIBIDAS: readonly string[] = ["exe", "svg"];
+export const ARQUIVO_MAX_MB_OPCOES = [5, 10, 20] as const;
+export const ARQUIVO_MAX_MB = 10;
 
 /** Tipos que usam `opcoes` no builder e validam contra a lista no envio. */
 export const TIPOS_COM_OPCOES: readonly FormularioCampoTipo[] = [
@@ -232,6 +302,8 @@ const TIPOS_VALIDOS = new Set<string>([
   "checkbox",
   "sim_nao",
   "secao",
+  "arquivo",
+  "grid_disponibilidade",
 ]);
 
 /** Valida a lista de campos vinda do builder. Devolve a definição limpa
@@ -288,6 +360,12 @@ export function validaCampos(input: unknown): FormularioCampo[] | { error: strin
       if (desc.length > 1000)
         return { error: `O texto da seção ${n} passa de 1.000 caracteres.` };
       if (desc) campo.descricao = desc;
+    } else if (typeof c?.descricao === "string" && c.descricao.trim()) {
+      // dica curta sob o rótulo (intake) — fora de secao fica em 200
+      const desc = c.descricao.trim();
+      if (desc.length > 200)
+        return { error: `A dica da pergunta ${n} passa de 200 caracteres.` };
+      campo.descricao = desc;
     }
     if (TIPOS_COM_OPCOES.includes(campo.tipo)) {
       const brutas = Array.isArray(c?.opcoes) ? c.opcoes : [];
@@ -306,11 +384,79 @@ export function validaCampos(input: unknown): FormularioCampo[] | { error: strin
       if (opcoes.length > MAX_OPCOES)
         return { error: `A pergunta "${label}" passa de ${MAX_OPCOES} opções.` };
       campo.opcoes = opcoes;
+      // "Outro" com texto livre só faz sentido onde há lista de opções
+      if (c?.permite_outro === true) campo.permite_outro = true;
+    }
+    // arquivo: allowlist de mimes e teto de tamanho — fora do vocabulário
+    // fecha por construção (a definição é a whitelist do upload anônimo)
+    if (campo.tipo === "arquivo") {
+      const mimes = Array.isArray(c?.accept) ? c.accept : [];
+      const limpos = mimes
+        .map((m) => String(m).trim())
+        .filter((m) => ARQUIVO_MIMES.includes(m));
+      if (mimes.length && limpos.length !== mimes.length)
+        return { error: `Tipo de arquivo não aceito na pergunta ${n}.` };
+      if (limpos.length) campo.accept = limpos;
+      const mb = c?.max_mb;
+      if (mb != null) {
+        const n2 = typeof mb === "string" ? Number(mb) : mb;
+        if (
+          typeof n2 !== "number" ||
+          !(ARQUIVO_MAX_MB_OPCOES as readonly number[]).includes(n2)
+        )
+          return { error: `Tamanho máximo inválido na pergunta ${n}.` };
+        campo.max_mb = n2;
+      }
+    }
+    // pergunta condicional: o gatilho é um campo já definido (referência
+    // sempre pra trás) de tipo com resposta discreta — texto livre ou o
+    // próprio campo como gatilho seriam condição impossível de cumprir
+    if (c?.visible_if != null) {
+      const vi = c.visible_if as Record<string, unknown> | null;
+      const ref = typeof vi?.campo === "string" ? vi.campo.trim() : "";
+      const em = Array.isArray(vi?.em) ? vi.em : [];
+      const alvo = campos.find((x) => x.id === ref);
+      const TIPOS_GATILHO = new Set([
+        "select",
+        "multi_select",
+        "sim_nao",
+        "checkbox",
+        "escala_1_5",
+        "escala_1_10",
+      ]);
+      if (
+        !ref ||
+        !alvo ||
+        !TIPOS_GATILHO.has(alvo.tipo) ||
+        !em.length ||
+        em.some(
+          (v) => !["string", "number", "boolean"].includes(typeof v)
+        )
+      )
+        return { error: `Condição inválida na pergunta ${n}.` };
+      campo.visible_if = { campo: ref, em: em as VisibleIf["em"] };
     }
     ids.add(id);
     campos.push(campo);
   }
   return campos;
+}
+
+/** O campo aparece com as respostas atuais? Sem visible_if, sempre. A
+ *  regra espelha o sanitizer da 0115: a resposta do gatilho casa com um
+ *  dos valores de `em` (array de resposta em multi_select vale se
+ *  CONTÉM algum valor da condição). */
+export function visivel(
+  campo: FormularioCampo,
+  respostas: Record<string, RespostaValor | undefined>
+): boolean {
+  const vi = campo.visible_if;
+  if (!vi) return true;
+  const v = respostas[vi.campo];
+  if (v == null) return false;
+  return vi.em.some((e) =>
+    Array.isArray(v) ? v.some((x) => x === e) : v === e
+  );
 }
 
 // ---------- leitura de respostas ----------
@@ -333,7 +479,29 @@ export function respostaFormatada(
       ? String(valor)
       : d.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
   }
+  if (tipo === "arquivo") {
+    // {path, nome, tamanho} — exibe o nome do arquivo; o download sai
+    // por /api/form-anexo/<id> na UI (aqui só o texto, que vai pro CSV)
+    const a = valor as RespostaArquivo;
+    return a?.nome ? a.nome : "—";
+  }
+  if (tipo === "grid_disponibilidade") {
+    const g = valor as RespostaGrid;
+    const horas = g?.horas ?? [];
+    if (horas.length) {
+      const lista = horas
+        .map((h) => `${h.dia} ${String(h.hora).padStart(2, "0")}h`)
+        .join("; ");
+      return `${horas.length} horário${horas.length === 1 ? "" : "s"} · ${lista}`;
+    }
+    const cel = g?.celulas ?? [];
+    return cel.length
+      ? `${cel.length} faixa${cel.length === 1 ? "" : "s"} · ` +
+          cel.map((c) => `${c.dia} ${c.periodo}`).join("; ")
+      : "—";
+  }
   if (Array.isArray(valor)) return valor.join(", ");
+  if (valor != null && typeof valor === "object") return "—";
   return String(valor);
 }
 
@@ -361,6 +529,8 @@ export const TIPOS_LISTA_RESPOSTA: readonly FormularioCampoTipo[] = [
   "texto",
   "texto_longo",
   "data",
+  "arquivo",
+  "grid_disponibilidade",
 ];
 
 /** Entrada da agregação: o mapa de respostas + quem respondeu (o resumo

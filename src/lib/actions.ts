@@ -19,7 +19,8 @@ import {
   podeSupervisionar,
 } from "@/lib/ciclo";
 import { capitalizar, cpfValido, erroAmigavel, nomeProprio } from "@/lib/utils";
-import type { ComunicadoPrioridade, CorRaca, Cronograma, DadosCivis, Disponibilidade, DocumentoPessoa, Endereco, Escolaridade, Genero, Notificacao, PrefGeneroPar, ResponsavelCivis, SituacaoMentorado, Trilha } from "@/lib/types";
+import { temPapel } from "@/lib/types";
+import type { AppRole, ComunicadoPrioridade, CorRaca, Cronograma, DadosCivis, Disponibilidade, DocumentoPessoa, Endereco, Escolaridade, Genero, Notificacao, PrefGeneroPar, ResponsavelCivis, SituacaoMentorado, Trilha } from "@/lib/types";
 import {
   emailValido,
   fichaLinha,
@@ -53,15 +54,35 @@ import { DEMO_MSG } from "./demo/shared";
 import { getDemoData } from "./demo/data";
 import { demoNotificacoes } from "./demo/queries";
 
+/** Normaliza o embed `profile_papeis` pro `papeis` efetivo — união do role
+ *  primário com as linhas do embed (o primário também vive lá; o dedupe
+ *  cobre linha órfã ou embed escondido pela RLS). Mesmo padrão do
+ *  comPapeis de queries.ts, mas aqui o primário entra na união porque os
+ *  callers decidem por temPapel, não por role. */
+const comPapeis = <T extends { role: AppRole | null }>(
+  p: T & { profile_papeis?: { papel: AppRole }[] | null }
+): Omit<T, "profile_papeis"> & { papeis: AppRole[] } => {
+  const { profile_papeis, ...rest } = p;
+  return {
+    ...rest,
+    papeis: [
+      ...new Set<AppRole>([
+        ...(p.role ? [p.role] : []),
+        ...(profile_papeis ?? []).map((r) => r.papel),
+      ]),
+    ],
+  };
+};
+
 async function me() {
   const supabase = await createClient();
   const { data: claimsData } = await supabase.auth.getClaims();
   const { data } = await supabase
     .from("profiles")
-    .select("id, role, nome, consent_lgpd_em")
+    .select("id, role, nome, consent_lgpd_em, profile_papeis(papel)")
     .eq("user_id", (claimsData?.claims?.sub as string) ?? "")
     .single();
-  return { supabase, me: data };
+  return { supabase, me: data ? comPapeis(data) : data };
 }
 
 const FOTO_TIPOS = ["image/png", "image/jpeg", "image/webp"];
@@ -456,8 +477,9 @@ type CamposMentor = Partial<{
 
 /** Ficha de mentor (mentor_profiles, 0034) — experiência prévia, formação
  *  externa e a grade semanal. A disponibilidade chega como JSON
- *  {"dias":[],"periodos":[]} do grid de chips; grade com as duas listas
- *  vazias grava null ("não informado"), nunca um esqueleto vazio. */
+ *  {"celulas":[{"dia","periodo"}]} da matriz (ou a forma legada
+ *  {"dias","periodos"}, que o parse expande — janela de deploy da 0100);
+ *  grade sem nada marcado grava null ("não informado"), nunca esqueleto. */
 function camposMentor(
   formData: FormData,
   opts: { parcial?: boolean } = {}
@@ -637,13 +659,35 @@ export async function createDupla(formData: FormData) {
     return { error: "Escolha um cronograma da lista." };
   }
   const { data: mentor } = await supabase
-    .from("profiles").select("role").eq("id", mentor_id).single();
-  if (mentor?.role !== "mentor_dpp" && mentor?.role !== "mentor_especialista") {
+    .from("profiles")
+    .select("role, profile_papeis(papel)")
+    .eq("id", mentor_id)
+    .single();
+  // papéis efetivos = embed + primário (o embed cobre o secundário; o
+  // primário entra na união por segurança — o embed normalmente já o traz)
+  const papeisMentor = new Set<AppRole>(
+    (mentor?.profile_papeis ?? []).map((r: { papel: AppRole }) => r.papel)
+  );
+  if (mentor?.role) papeisMentor.add(mentor.role);
+  if (!papeisMentor.has("mentor_dpp") && !papeisMentor.has("mentor_especialista")) {
     return { error: "A pessoa escolhida como mentor não tem papel de mentor." };
   }
-  // a trilha é derivada do papel do mentor — o client não escolhe (o campo
-  // oculto/role no banco é a fonte de verdade; mentor_especialista nunca vira DPP)
-  const trilha: Trilha = mentor.role === "mentor_especialista" ? "especialista" : "dpp";
+  // WP6b: quem tem os dois papéis não deixa a trilha ser adivinhada do
+  // primário — o form manda `trilha` explícita. Sem campo (client antigo),
+  // cai na trilha do papel primário, como sempre foi.
+  const trilhaForm = String(formData.get("trilha") ?? "");
+  const trilha: Trilha =
+    trilhaForm === "especialista" || trilhaForm === "dpp"
+      ? trilhaForm
+      : mentor?.role === "mentor_especialista"
+        ? "especialista"
+        : "dpp";
+  if (
+    (trilha === "especialista" && !papeisMentor.has("mentor_especialista")) ||
+    (trilha === "dpp" && !papeisMentor.has("mentor_dpp"))
+  ) {
+    return { error: "Esse mentor não tem papel nessa trilha." };
+  }
   // dupla de especialista não tem supervisor — força null mesmo se o form mandar
   const supervisorFinal = trilha === "especialista" ? null : supervisor_id;
   if (supervisorFinal) {
@@ -863,12 +907,27 @@ export async function setPessoaRole(profileId: string, role: string | null) {
     return { error: "Não foi possível concluir. Recarregue a página e tente de novo." };
   }
 
-  // mentor_profiles acompanha o papel: mentor tem linha (upsert preserva
-  // capacidade/areas/validações existentes), qualquer outro papel remove a linha
-  if (novoRole === "mentor_dpp" || novoRole === "mentor_especialista") {
+  // mentor_profiles acompanha o CONJUNTO de papéis efetivos, não só o
+  // primário (0085): rebaixar o primário pra não-mentor mantém um papel
+  // mentor_* secundário em profile_papeis (o trigger só move a marca de
+  // primário) — deletar a linha apagaria capacidade/areas/termo de quem
+  // segue mentor. O update acima já rodou o espelho role→papeis, então a
+  // leitura aqui reflete os papéis depois da troca.
+  const { data: papeisAlvo } = await supabase
+    .from("profile_papeis")
+    .select("papel")
+    .eq("profile_id", profileId);
+  const segueMentor = (papeisAlvo ?? []).some(
+    (r: { papel: AppRole }) =>
+      r.papel === "mentor_dpp" || r.papel === "mentor_especialista"
+  );
+  if (segueMentor) {
     const { error: mpErr } = await supabase.from("mentor_profiles").upsert({
       profile_id: profileId,
-      tipo: novoRole === "mentor_dpp" ? "dpp" : "especialista",
+      // tipo deriva do NOVO primário (mesmo critério do updatePessoa) —
+      // primário não-mentor cai no default dpp; o upsert sem as demais
+      // colunas preserva capacidade/areas/termo já gravados
+      tipo: novoRole === "mentor_especialista" ? "especialista" : "dpp",
     });
     if (mpErr) return { error: erroAmigavel(mpErr) };
   } else {
@@ -904,10 +963,19 @@ export async function updatePessoa(profileId: string, formData: FormData) {
   if (formData.has("capacidade") && (!Number.isInteger(capacidade) || capacidade < 1)) {
     return { error: "Informe uma capacidade de pelo menos 1." };
   }
+  // pool esp separada (WP6b): o híbrido edita as duas no mesmo form
+  const capacidadeEspRaw = String(formData.get("capacidade_esp") ?? "").trim();
+  if (formData.has("capacidade_esp") && !capacidadeEspRaw) {
+    return { error: "Informe a capacidade de trilhas de especialista." };
+  }
+  const capacidadeEsp = Number(capacidadeEspRaw || 1);
+  if (formData.has("capacidade_esp") && (!Number.isInteger(capacidadeEsp) || capacidadeEsp < 1)) {
+    return { error: "Informe uma capacidade de pelo menos 1." };
+  }
 
   // e-mail = identidade do link de acesso; só muda enquanto a pessoa nunca entrou
   const { data: atual } = await supabase
-    .from("profiles").select("user_id, role, consent_lgpd_em").eq("id", profileId).single();
+    .from("profiles").select("user_id, role, consent_lgpd_em, profile_papeis(papel)").eq("id", profileId).single();
   // campos de apresentação (0030) — a coordenação edita os mesmos que a
   // pessoa edita em /perfil; o form manda `areas_perfil` porque `areas` já é
   // o campo do mentor_profile
@@ -954,16 +1022,33 @@ export async function updatePessoa(profileId: string, formData: FormData) {
 
   // só mexe no mentor_profile quando o form trouxe os campos — se o fetch do
   // dialog falhou, salvar sem eles não pode zerar capacidade/areas/checklists
-  if ((atual?.role === "mentor_dpp" || atual?.role === "mentor_especialista") && formData.has("capacidade")) {
+  const papeisAlvo = new Set<AppRole>(
+    ((atual as { profile_papeis?: { papel: AppRole }[] } | null)?.profile_papeis ?? [])
+      .map((r) => r.papel)
+  );
+  if (atual?.role) papeisAlvo.add(atual.role);
+  const alvoDpp = papeisAlvo.has("mentor_dpp");
+  const alvoEsp = papeisAlvo.has("mentor_especialista");
+  if ((alvoDpp || alvoEsp) && (formData.has("capacidade") || formData.has("capacidade_esp"))) {
     const areas = String(formData.get("areas") ?? "")
       .split(",").map((s) => s.trim()).filter(Boolean);
-    const ehEsp = atual.role === "mentor_especialista";
     const { error: mpErr } = await supabase.from("mentor_profiles").upsert({
       profile_id: profileId,
-      tipo: ehEsp ? "especialista" : "dpp",
-      // a pool editada é a da trilha do papel (0073) — a outra coluna fica
-      // como está, sem ser zerada pelo upsert
-      ...(ehEsp ? { capacidade_especialista: capacidade } : { capacidade }),
+      // tipo segue o papel PRIMÁRIO do alvo (WP6b) — editar a pool
+      // secundária de um híbrido não pode inverter a ficha dele
+      tipo: atual?.role === "mentor_especialista" ? "especialista" : "dpp",
+      // cada campo escreve na própria pool (0073/WP6b) — coluna ausente no
+      // upsert preserva o valor atual; campo que a trilha não serve é
+      // ignorado em vez de gravar lixo
+      ...(formData.has("capacidade") && alvoDpp ? { capacidade } : {}),
+      ...(formData.has("capacidade_esp") && alvoEsp
+        ? { capacidade_especialista: capacidadeEsp }
+        : {}),
+      // client antigo manda só `capacidade` sem trilha: cai na pool do papel
+      // primário (comportamento da 0073 preservado)
+      ...(formData.has("capacidade") && !formData.has("capacidade_esp") && !alvoDpp && alvoEsp
+        ? { capacidade_especialista: capacidade }
+        : {}),
       areas,
       termo_ok: formData.get("termo_ok") === "on",
       formacao_ok: formData.get("formacao_ok") === "on",
@@ -985,7 +1070,8 @@ export async function updatePessoa(profileId: string, formData: FormData) {
  *  updatePessoa. */
 export async function updateCapacidadeMentor(
   profileId: string,
-  capacidade: number
+  capacidade: number,
+  trilha?: "dpp" | "especialista"
 ) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
@@ -996,21 +1082,39 @@ export async function updateCapacidadeMentor(
   if (!Number.isInteger(capacidade) || capacidade < 1 || capacidade > 10) {
     return { error: "A capacidade aceita valores de 1 a 10." };
   }
-  // o papel decide a coluna — quem não é mentor não tem pool de vagas
+  // a pool escolhida decide a coluna — sem `trilha` cai na do papel
+  // primário (comportamento antigo); o híbrido (WP6b) manda a trilha
   const { data: alvo } = await supabase
     .from("profiles")
-    .select("id, role")
+    .select("id, role, profile_papeis(papel)")
     .eq("id", profileId)
     .single();
-  const ehEsp = alvo?.role === "mentor_especialista";
-  if (!alvo || (alvo.role !== "mentor_dpp" && !ehEsp)) {
+  const papeisAlvo = new Set<AppRole>(
+    (alvo?.profile_papeis ?? []).map((r: { papel: AppRole }) => r.papel)
+  );
+  if (alvo?.role) papeisAlvo.add(alvo.role);
+  const ehMentorAlvo =
+    papeisAlvo.has("mentor_dpp") || papeisAlvo.has("mentor_especialista");
+  if (!alvo || !ehMentorAlvo) {
     return { error: "Capacidade só existe pra mentores." };
   }
+  const ehEsp =
+    trilha != null
+      ? trilha === "especialista"
+      : alvo.role === "mentor_especialista";
+  if (ehEsp && !papeisAlvo.has("mentor_especialista")) {
+    return { error: "Esse mentor não tem papel de especialista." };
+  }
+  if (!ehEsp && !papeisAlvo.has("mentor_dpp")) {
+    return { error: "Esse mentor não tem papel de mentor DPP." };
+  }
   // upsert cobre o mentor sem linha em mentor_profiles (a pool vale 1 por
-  // default no banco — aqui ela vira explícita de uma vez)
+  // default no banco — aqui ela vira explícita de uma vez). `tipo` segue o
+  // papel primário — ajustar a pool secundária do híbrido não pode virar
+  // o tipo dele.
   const { error } = await supabase.from("mentor_profiles").upsert({
     profile_id: profileId,
-    tipo: ehEsp ? "especialista" : "dpp",
+    tipo: alvo.role === "mentor_especialista" ? "especialista" : "dpp",
     ...(ehEsp ? { capacidade_especialista: capacidade } : { capacidade }),
   });
   if (error) return { error: erroAmigavel(error) };
@@ -1344,6 +1448,13 @@ export async function updateDupla(duplaId: string, formData: FormData) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada. Entre de novo." };
+  // gerenciar dupla é coord-only (RLS barra o write de qualquer forma, mas
+  // sem o guard um request forjado atravessava as ~8 queries de validação
+  // pra morrer no fim com erro genérico — e no delete, APAGAVA os objetos
+  // do bucket antes da row ser barrada)
+  if (eu.role !== "coordenacao") {
+    return { error: "Só a coordenação edita duplas." };
+  }
   const mentor_id = String(formData.get("mentor_id") ?? "");
   const mentorado_id = String(formData.get("mentorado_id") ?? "");
   const supervisor_id = String(formData.get("supervisor_id") || "") || null;
@@ -1372,25 +1483,35 @@ export async function updateDupla(duplaId: string, formData: FormData) {
       cronogramaNovo = c;
     }
   }
-  // link do PDM (0044): campo presente no form → grava; vazio limpa. A coluna
-  // tem CHECK https — valida aqui pra mensagem clara em vez do 23514
-  let pdmNovo: string | null | undefined;
-  if (formData.has("pdm_url")) {
-    const pdm = String(formData.get("pdm_url") ?? "").trim();
-    if (pdm && !/^https:\/\/\S+$/i.test(pdm)) {
-      return { error: "O link do PDM precisa ser um endereço completo (https://…)." };
-    }
-    pdmNovo = pdm || null;
-  }
   const { data: mentor } = await supabase
-    .from("profiles").select("role").eq("id", mentor_id).single();
-  if (mentor?.role !== "mentor_dpp" && mentor?.role !== "mentor_especialista") {
+    .from("profiles")
+    .select("role, profile_papeis(papel)")
+    .eq("id", mentor_id)
+    .single();
+  const papeisMentor = new Set<AppRole>(
+    (mentor?.profile_papeis ?? []).map((r: { papel: AppRole }) => r.papel)
+  );
+  if (mentor?.role) papeisMentor.add(mentor.role);
+  if (!papeisMentor.has("mentor_dpp") && !papeisMentor.has("mentor_especialista")) {
     return { error: "A pessoa escolhida como mentor não tem papel de mentor." };
   }
-  // a trilha segue o papel do mentor — trocar de mentor DPP pra especialista
-  // (ou o contrário) migra a dupla; com encontros já criados ela é imutável
-  // (mover numerariação entre calendário e trilha livre exigiria reparo de dados)
-  const trilhaNova: Trilha = mentor.role === "mentor_especialista" ? "especialista" : "dpp";
+  // WP6b: mesma regra do create — trilha explícita no form, primário como
+  // default. Trocar de trilha migra a dupla; com encontros já criados ela é
+  // imutável (mover numerariação entre calendário e trilha livre exigiria
+  // reparo de dados)
+  const trilhaForm = String(formData.get("trilha") ?? "");
+  const trilhaNova: Trilha =
+    trilhaForm === "especialista" || trilhaForm === "dpp"
+      ? trilhaForm
+      : mentor?.role === "mentor_especialista"
+        ? "especialista"
+        : "dpp";
+  if (
+    (trilhaNova === "especialista" && !papeisMentor.has("mentor_especialista")) ||
+    (trilhaNova === "dpp" && !papeisMentor.has("mentor_dpp"))
+  ) {
+    return { error: "Esse mentor não tem papel nessa trilha." };
+  }
   // dupla ativa/pausada ocupa vaga do mentor e do mentorado; encerrada não ocupa,
   // então só valida quando o novo status volta a contar. A própria dupla sai da
   // conta (.neq) pra edição simples não brigar com ela mesma
@@ -1405,6 +1526,21 @@ export async function updateDupla(duplaId: string, formData: FormData) {
       return { error: "O tipo de mentoria não pode mudar: a dupla já tem encontros." };
     }
   }
+  // trilha de especialista só fecha pelo rito próprio (EncerrarTrilhaDialog →
+  // RPC: motivo + devolutiva + link da avaliação geral, 0104). O edit genérico
+  // não oferece "encerrada" pra esp (UI) e aqui recusa mesmo por request
+  // forjado — sem o rito a dupla fecharia sem link, sem motivo e sem
+  // devolutiva. Reabrir (ativa/pausada) segue livre.
+  if (
+    (trilhaNova === "especialista" ||
+      atualDupla?.trilha === "especialista") &&
+    (status === "encerrada" || status === "concluida") &&
+    status !== atualDupla?.status
+  )
+    return {
+      error:
+        "Trilha de especialista se encerra pelo botão 'Encerrar trilha' da ficha — é o rito que pede motivo e devolutiva e emite a avaliação geral.",
+    };
   // dupla de especialista não tem supervisor — null forçado, nunca confia no form
   const supervisorFinal = trilhaNova === "especialista" ? null : supervisor_id;
   if (supervisorFinal) {
@@ -1443,7 +1579,10 @@ export async function updateDupla(duplaId: string, formData: FormData) {
         return { error: "Esse mentorado já está em uma dupla ativa ou pausada nesse tipo de mentoria." };
       }
     }
-    if (voltando || mentor_id !== atualDupla.mentor_id) {
+    // mudança de trilha também revalida (espelha o gate do mentorado
+    // acima): a vaga sai de um pool e entra no outro — a trilha nova pode
+    // estar lotada mesmo com a DPP folgada
+    if (voltando || mentor_id !== atualDupla.mentor_id || trilhaNova !== atualDupla.trilha) {
       // vagas do mentor são por trilha (0073) — a dupla nova conta só no
       // próprio pool
       const [{ data: doMentor }, { data: mp }] = await Promise.all([
@@ -1521,7 +1660,6 @@ export async function updateDupla(duplaId: string, formData: FormData) {
     }
   }
   if (iniciada_em) patch.iniciada_em = iniciada_em;
-  if (pdmNovo !== undefined) patch.pdm_url = pdmNovo;
   const { data, error } = await supabase.from("duplas").update(patch).eq("id", duplaId).select("id");
   if (error) return { error: erroAmigavel(error) };
   if (!data?.length) {
@@ -1609,6 +1747,11 @@ export async function deleteDupla(duplaId: string) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada. Entre de novo." };
+  // coord-only — sem o guard, um mentor autor de anexos apagava os objetos
+  // do bucket pela remoção abaixo enquanto a row era barrada pelo RLS
+  if (eu.role !== "coordenacao") {
+    return { error: "Só a coordenação exclui duplas." };
+  }
   // FKs NO ACTION bloqueiam o delete (a cascata cobre encontros→registros→
   // anexos, mas supervisões, encerramento, solicitações — via dupla_id e
   // dupla_dpp_id —, links de formulário e a sucessora do remanejamento são
@@ -1869,40 +2012,6 @@ export async function remanejarDupla(
   return { ok: true, novaDuplaId };
 }
 
-/** Link do PDM (0044): mentor edita o da própria dupla — UPDATE em duplas é
- *  coord-only, então a escrita real é a RPC `definir_pdm_url` (definer,
- *  escopada). Os checks aqui só antecipam a mensagem amigável; o banco
- *  revalida papel, status e formato. */
-export async function definirPdmUrl(duplaId: string, url: string) {
-  if (await demoAtivo()) return { error: DEMO_MSG };
-  const { supabase, me: eu } = await me();
-  if (!eu) return { error: "Sessão expirada. Entre de novo." };
-  const u = (url ?? "").trim();
-  if (u && !/^https:\/\/\S+$/i.test(u)) {
-    return { error: "O link do PDM precisa ser um endereço completo (https://…)." };
-  }
-  const { data: d } = await supabase
-    .from("duplas").select("mentor_id, status").eq("id", duplaId).maybeSingle();
-  if (!d) return { error: "Não foi possível identificar a dupla. Recarregue a página." };
-  if (eu.role !== "coordenacao") {
-    if (d.mentor_id !== eu.id) {
-      return { error: "Só o mentor da dupla pode definir o link do PDM." };
-    }
-    if (d.status !== "ativa" && d.status !== "pausada") {
-      return { error: "O link do PDM só pode ser editado com a dupla ativa ou pausada." };
-    }
-  }
-  const { error } = await supabase.rpc("definir_pdm_url", {
-    p_dupla: duplaId,
-    p_url: u || null,
-  });
-  if (error) return { error: erroAmigavel(error) };
-  revalidatePath("/");
-  revalidatePath("/duplas");
-  revalidatePath(`/duplas/${duplaId}`);
-  return { ok: true };
-}
-
 export async function deleteMaterial(id: string) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
@@ -2095,7 +2204,9 @@ async function diretorioPareamento(supabase: Supa): Promise<DiretorioPar> {
     { data: mps },
     { data: evs },
   ] = await Promise.all([
-    supabase.from("profiles").select("id, nome, role, ativo, nome_social"),
+    // profile_papeis vem embutido: o papel mentor_* pode ser secundário
+    // (WP6b) e resolverPares decide por papel efetivo, não pelo primário
+    supabase.from("profiles").select("id, nome, role, ativo, nome_social, profile_papeis(papel)"),
     supabase.from("profiles_contato").select("id, email"),
     supabase.from("mentorados").select("id, nome, email, nome_social"),
     supabase
@@ -2111,10 +2222,19 @@ async function diretorioPareamento(supabase: Supa): Promise<DiretorioPar> {
   ]);
   const emailPorId = new Map((contatos ?? []).map((c) => [c.id, c.email]));
   return {
-    profiles: (profs ?? []).map((p) => ({
-      ...p,
-      email: emailPorId.get(p.id) ?? null,
-    })),
+    profiles: (profs ?? []).map((p) => {
+      const { profile_papeis, ...rest } = p;
+      return {
+        ...rest,
+        email: emailPorId.get(p.id) ?? null,
+        // mesmo papel em 2 escopos vira 2 linhas do embed — dedupe
+        papeis: [
+          ...new Set(
+            (profile_papeis ?? []).map((r: { papel: AppRole }) => r.papel)
+          ),
+        ],
+      };
+    }),
     mentorados: mdos ?? [],
     duplas: dups ?? [],
     cronogramas: (crons ?? []) as Cronograma[],
@@ -2139,6 +2259,15 @@ function diretorioPareamentoDemo(): DiretorioPar {
       nome_social: p.nome_social ?? null,
       role: p.role,
       ativo: p.ativo,
+      // papéis efetivos do dataset demo (WP0b) — os híbridos Ricardo e
+      // André carregam a linha extra de mentor_especialista
+      papeis: [
+        ...new Set(
+          d.profilePapeis
+            .filter((r) => r.profile_id === p.id)
+            .map((r) => r.papel)
+        ),
+      ],
     })),
     mentorados: d.mentorados.map((m) => ({
       id: m.id,
@@ -2438,7 +2567,10 @@ export async function marcarNaoAconteceu(encontroId: string, duplaId: string) {
     .from("encontros")
     .update({ status: "nao_aconteceu" })
     .eq("id", encontroId)
-    .eq("status", "agendado")
+    // "remarcado" é status legado (a RPC de remarcação grava "agendado" de
+    // novo) — uma row vencida nele tem a mesma ambiguidade e precisa poder
+    // ser encerrada como não-aconteceu, senão fica presa pra sempre
+    .in("status", ["agendado", "remarcado"])
     .select("id");
   if (error) return { error: erroAmigavel(error) };
   if (!data?.length) return { error: "Esse encontro não está mais agendado." };
@@ -2453,6 +2585,12 @@ export async function desfazerNaoAconteceu(encontroId: string, duplaId: string) 
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada. Entre de novo." };
+  // dupla fechada é histórico congelado — a UI esconde o Desfazer e a
+  // action espelha o guard do marcarNaoAconteceu
+  const { data: enc } = await supabase
+    .from("encontros").select("duplas(status)").eq("id", encontroId).single();
+  const dupla = Array.isArray(enc?.duplas) ? enc?.duplas[0] : enc?.duplas;
+  if (dupla && dupla.status !== "ativa") return { error: "Essa dupla não está ativa." };
   const { data, error } = await supabase
     .from("encontros")
     .update({ status: "agendado" })
@@ -2482,8 +2620,8 @@ export async function salvarLinkEncontro(encontroId: string, link: string | null
   // nunca editam (mesma regra do agendarEncontro: a RLS deixaria a coord
   // escrever, então o contrato mora aqui)
   if (
-    eu.role !== "mentor_dpp" &&
-    eu.role !== "mentor_especialista" &&
+    !temPapel(eu, "mentor_dpp") &&
+    !temPapel(eu, "mentor_especialista") &&
     eu.role !== "mentorado"
   ) {
     return { error: "O link da chamada é combinado pela dupla. A coordenação acompanha." };
@@ -2606,6 +2744,22 @@ export async function registrarEncontroRetroativo(
   // realizados, não de um numero escolhido
   let numeroFinal = numero;
   if (ehEspecialista) {
+    // o guia prevê 5 sessões por trilha — o orçamento do sol_efetivar conta
+    // realizados em TODAS as duplas do par na turma; um retroativo forjado
+    // além do teto sobreatenderia a jovem e queimaria o orçamento do par.
+    // conta realizado + agendado: a sessão marcada também é teto (ela vira
+    // realizado no dia), senão 4+1 agendada deixava nascer a 6ª
+    const { count: realizados } = await supabase
+      .from("encontros")
+      .select("id", { count: "exact", head: true })
+      .eq("dupla_id", duplaId)
+      .in("status", ["realizado", "agendado"]);
+    if ((realizados ?? 0) >= 5) {
+      return {
+        error:
+          "O guia prevê 5 sessões por trilha de especialista — essa já completou.",
+      };
+    }
     const { data: ultimos } = await supabase
       .from("encontros")
       .select("numero")
@@ -2685,7 +2839,12 @@ export async function salvarRegistro(formData: FormData) {
   }
 
   const { data: d } = await supabase.from("duplas").select("status").eq("id", dupla_id).single();
-  if (d && d.status !== "ativa") return { error: "Essa dupla não está ativa." };
+  // 'concluida' entra junto: o fechamento automático (0102) vira status no
+  // instante do último encontro — trancar aqui impediria até editar o
+  // registro que acabou de fechar a jornada. Pausada/encerrada seguem fora.
+  if (d && d.status !== "ativa" && d.status !== "concluida") {
+    return { error: "Essa dupla não está ativa." };
+  }
 
   // só registra encontro da própria dupla que já aconteceu (ou foi marcado realizado)
   const { data: encDb } = await supabase
@@ -2706,10 +2865,8 @@ export async function salvarRegistro(formData: FormData) {
   // update preserva created_by de quem registrou primeiro; insert marca o autor
   const { data: regExistente } = await supabase
     .from("registros").select("id, precisa_apoio").eq("encontro_id", encontro_id).maybeSingle();
-  // pedido de apoio novo nessa gravação dispara aviso pra coordenação —
-  // edição que mantém o flag não repete a notificação
-  const novoApoio =
-    !regExistente?.precisa_apoio && formData.get("precisa_apoio") === "on";
+  // 0084: flag ligada abre o chamado pelo trigger registros_apoio_chamado_sync
+  // (que já notifica a equipe com chamado_aberto) — nada de pedido_apoio aqui
   const payload = {
     tema: String(formData.get("tema") ?? "").trim() || null,
     ferramenta: String(formData.get("ferramenta") ?? "").trim() || null,
@@ -2812,32 +2969,6 @@ export async function salvarRegistro(formData: FormData) {
     }
   }
 
-  if (novoApoio) {
-    // coordenação toda + o supervisor dessa dupla (não todos os supervisores)
-    const [{ data: equipe }, { data: dApoio }] = await Promise.all([
-      supabase.from("profiles").select("id").eq("role", "coordenacao").eq("ativo", true),
-      supabase
-        .from("duplas")
-        .select("supervisor_id, mentorado:mentorados!mentorado_id(nome)")
-        .eq("id", dupla_id).single(),
-    ]);
-    const mdJoin = dApoio?.mentorado as unknown;
-    const nomeMd = Array.isArray(mdJoin)
-      ? (mdJoin[0] as { nome?: string } | undefined)?.nome
-      : (mdJoin as { nome?: string } | null | undefined)?.nome;
-    await notificar(supabase, [
-      ...(equipe ?? []).map((p) => p.id),
-      dApoio?.supervisor_id,
-    ].map((pid) => ({
-      profile_id: pid,
-      tipo: "pedido_apoio",
-      titulo: "Pedido de apoio",
-      corpo: `${eu.nome} sinalizou no registro do ${encDb.numero}º encontro${nomeMd ? ` · dupla com ${nomeMd}` : ""}.`,
-      // deep-link direto no card do registro que pediu apoio
-      href: `/duplas/${dupla_id}#registrar-${encontro_id}`,
-    })), eu.id);
-  }
-
   revalidatePath("/");
   revalidatePath("/duplas");
   revalidatePath("/agenda");
@@ -2856,7 +2987,7 @@ export async function salvarNotaEncontro(duplaId: string, numero: number, texto:
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada. Entre de novo." };
   // a nota é o plano de aula do mentor — nem a coord escreve nela
-  if (eu.role !== "mentor_dpp" && eu.role !== "mentor_especialista") {
+  if (!temPapel(eu, "mentor_dpp") && !temPapel(eu, "mentor_especialista")) {
     return { error: "A nota do encontro é do mentor da dupla." };
   }
 
@@ -2961,6 +3092,12 @@ export async function toggleEncaminhamento(id: string, feito: boolean, duplaId: 
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada. Entre de novo." };
+  // combinado de dupla fechada é histórico — só dupla viva marca
+  const { data: dupla } = await supabase
+    .from("duplas").select("status").eq("id", duplaId).single();
+  if (dupla && dupla.status !== "ativa" && dupla.status !== "pausada") {
+    return { error: "Essa dupla não está mais ativa." };
+  }
   const { data, error } = await supabase
     .from("encaminhamentos")
     .update({ status: feito ? "feito" : "pendente" })
@@ -2983,6 +3120,11 @@ export async function editarEncaminhamento(id: string, duplaId: string, formData
   // o texto do acordo é da dupla — a coord só marca feito (toggleEncaminhamento)
   if (eu.role === "coordenacao") {
     return { error: "O combinado é da dupla. A coordenação só pode marcar como feito." };
+  }
+  const { data: dupla } = await supabase
+    .from("duplas").select("status").eq("id", duplaId).single();
+  if (dupla && dupla.status !== "ativa" && dupla.status !== "pausada") {
+    return { error: "Essa dupla não está mais ativa." };
   }
   const descricao = String(formData.get("descricao") ?? "").trim();
   const responsavel = String(formData.get("responsavel") ?? "mentorado");
@@ -3017,6 +3159,11 @@ export async function excluirEncaminhamento(id: string, duplaId: string) {
   if (eu.role === "coordenacao") {
     return { error: "O combinado é da dupla. A coordenação só pode marcar como feito." };
   }
+  const { data: dupla } = await supabase
+    .from("duplas").select("status").eq("id", duplaId).single();
+  if (dupla && dupla.status !== "ativa" && dupla.status !== "pausada") {
+    return { error: "Essa dupla não está mais ativa." };
+  }
   const { data, error } = await supabase
     .from("encaminhamentos").delete().eq("id", id).select("id");
   if (error) return { error: erroAmigavel(error) };
@@ -3028,86 +3175,59 @@ export async function excluirEncaminhamento(id: string, duplaId: string) {
   return { ok: true };
 }
 
+/** "Marcar como atendido" no card do registro — 0084: resolve o chamado do
+ *  flag e limpa a flag na MESMA transação (resolver_chamado_por_origem); a
+ *  notificação chamado_resolvido pro autor sai da RPC. */
 export async function resolverApoio(registroId: string, duplaId: string) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada. Entre de novo." };
-  const { data, error } = await supabase
-    .from("registros")
-    .update({ precisa_apoio: false })
-    .eq("id", registroId)
-    .select("id, created_by");
-  if (error) return { error: erroAmigavel(error) };
-  if (!data?.length) {
-    return { error: "Não foi possível concluir. Recarregue a página e tente de novo." };
+  const { error } = await supabase.rpc("resolver_chamado_por_origem", {
+    p_registro_id: registroId,
+    p_avaliacao_id: null,
+    p_resumo: null,
+  });
+  if (error) {
+    return {
+      error:
+        error.code === "P0001" && error.message
+          ? error.message
+          : erroAmigavel(error),
+    };
   }
-  // o mentor fica sabendo que o pedido foi visto — fecha o ciclo do pedido
-  const { data: dApoio } = await supabase
-    .from("duplas").select("mentor_id").eq("id", duplaId).single();
-  await notificar(supabase, [{
-    profile_id: data[0].created_by ?? dApoio?.mentor_id,
-    tipo: "apoio_resolvido",
-    titulo: "Pedido de apoio atendido",
-    corpo: "A coordenação marcou seu pedido como atendido.",
-    href: `/duplas/${duplaId}`,
-  }], eu.id);
   revalidatePath("/");
   revalidatePath("/duplas");
   revalidatePath("/registros");
+  revalidatePath("/chamados");
   revalidatePath(`/duplas/${duplaId}`);
   return { ok: true };
 }
 
-/** Pedido de apoio fora do registro — o mentor não precisa esperar o
- *  follow-up pra sinalizar. A notificação É o registro do pedido: o
- *  notificacoes_insert (0041) permite não-coord → staff só nesse tipo, e a
- *  fila de pendentes é o sino da coordenação (não-lida = não atendida). */
+/** Pedido de apoio fora do registro — 0084: virou chamado manual. O dialog
+ *  novo (NovoChamadoDialog) chama abrirChamado direto; este wrapper cobre o
+ *  caminho legado com categoria fixa 'outro'. */
 export async function pedirApoio(duplaId: string, mensagem: string) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada. Entre de novo." };
-
-  const { data: d, error: dErr } = await supabase
-    .from("duplas")
-    .select("mentor_id, status, supervisor_id, mentorado:mentorados!mentorado_id(nome)")
-    .eq("id", duplaId)
-    .maybeSingle();
-  if (dErr) return { error: erroAmigavel(dErr) };
-  if (!d || d.mentor_id !== eu.id) {
-    return { error: "O pedido de apoio é do mentor da dupla." };
+  const texto = mensagem.trim();
+  const { error } = await supabase.rpc("abrir_chamado", {
+    p_categoria: "outro",
+    p_descricao_outro: "Pedido de apoio fora do registro",
+    p_assunto: texto.slice(0, 180) || "Pedido de apoio",
+    p_mensagem: texto || null,
+    p_dupla_id: duplaId,
+  });
+  if (error) {
+    return {
+      error:
+        error.code === "P0001" && error.message
+          ? error.message
+          : erroAmigavel(error),
+    };
   }
-  if (d.status !== "ativa" && d.status !== "pausada") {
-    return { error: "Essa dupla não está em curso." };
-  }
-
-  const texto = mensagem.trim().slice(0, 500) || null;
-  const { data: equipe } = await supabase
-    .from("profiles")
-    .select("id")
-    .eq("role", "coordenacao")
-    .eq("ativo", true);
-  const mdJoin = d.mentorado as unknown;
-  const nomeMd = Array.isArray(mdJoin)
-    ? (mdJoin[0] as { nome?: string } | undefined)?.nome
-    : (mdJoin as { nome?: string } | null | undefined)?.nome;
-  const destinos = new Set(
-    [...(equipe ?? []).map((p) => p.id), d.supervisor_id].filter(
-      (pid): pid is string => Boolean(pid) && pid !== eu.id
-    )
-  );
-  await notificar(
-    supabase,
-    [...destinos].map((pid) => ({
-      profile_id: pid,
-      tipo: "pedido_apoio",
-      titulo: "Pedido de apoio",
-      corpo:
-        `${eu.nome} pediu apoio${nomeMd ? ` · dupla com ${nomeMd}` : ""}` +
-        (texto ? `: "${texto}"` : "."),
-      href: `/duplas/${duplaId}`,
-    })),
-    eu.id
-  );
+  revalidatePath("/chamados");
+  revalidatePath(`/duplas/${duplaId}`);
   return { ok: true };
 }
 
@@ -3143,11 +3263,9 @@ export async function marcarCombinadoFeito(id: string, feito: boolean) {
   return { ok: true };
 }
 
-/** "Preciso de ajuda" do jovem — standalone, sem depender de encontro nem
- *  avaliação. A notificação É o registro (mesmo desenho do pedido de apoio
- *  do mentor): vai pra coordenação e pros adultos das próprias duplas — a
- *  policy (0069) valida cada destinatário contra a view jovem_contatos, que
- *  é a mesma fonte lida aqui. Sem dupla ativa, a coordenação segue na lista. */
+/** "Preciso de ajuda" do jovem — 0084: o dialog novo chama abrirChamado
+ *  (NovoChamadoDialog, papel mentorado → opções na linguagem dele). Fica o
+ *  wrapper por compat: mensagem solta vira chamado de urgência. */
 export async function pedirAjudaJovem(mensagem: string) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
@@ -3155,39 +3273,24 @@ export async function pedirAjudaJovem(mensagem: string) {
   if (eu.role !== "mentorado") {
     return { error: "Essa ação é do mentorado." };
   }
-  // destinatários = os adultos que o jovem vê (coord + mentor/supervisor das
-  // duplas dele); a ficha /pessoas/[mentorado.id] é o destino útil do lado de
-  // quem atende — o id vem da própria view, nunca de uma base-table
-  const [{ data: contatos, error: cErr }, { data: perfil, error: pErr }] =
-    await Promise.all([
-      supabase.from("jovem_contatos").select("id, papel"),
-      supabase.from("jovem_perfil").select("id").maybeSingle(),
-    ]);
-  if (cErr) return { error: erroAmigavel(cErr) };
-  if (pErr) return { error: erroAmigavel(pErr) };
-  const destinos = [...new Set((contatos ?? []).map((c) => c.id))].filter(
-    (pid): pid is string => Boolean(pid) && pid !== eu.id
-  );
-  if (!destinos.length) {
+  const texto = mensagem.trim();
+  const { error } = await supabase.rpc("abrir_chamado", {
+    p_categoria: "urgencia",
+    p_assunto: texto.slice(0, 180) || "Preciso de ajuda",
+    p_mensagem: texto || null,
+    p_descricao_outro: null,
+    p_dupla_id: null,
+  });
+  if (error) {
     return {
       error:
-        "Ainda não encontramos a equipe pra avisar. Se for urgente, chame a coordenação pelo WhatsApp.",
+        error.code === "P0001" && error.message
+          ? error.message
+          : erroAmigavel(error),
     };
   }
-  const texto = mensagem.trim().slice(0, 500) || null;
-  const { error } = await supabase.from("notificacoes").insert(
-    destinos.map((pid) => ({
-      profile_id: pid,
-      tipo: "pedido_apoio",
-      titulo: "Pedido de ajuda",
-      corpo: `${eu.nome} (mentorado) pediu ajuda${texto ? `: "${texto}"` : "."}`,
-      // href staff-side: a ficha do jovem em /pessoas — quem atende (coord
-      // e supervisor) tem acesso a ela; /jovem seria do próprio jovem
-      href: perfil?.id ? `/pessoas/${perfil.id}` : null,
-      created_by: eu.id,
-    }))
-  );
-  if (error) return { error: erroAmigavel(error) };
+  revalidatePath("/jovem");
+  revalidatePath("/jovem/perfil");
   return { ok: true };
 }
 
@@ -3396,12 +3499,16 @@ export async function salvarMaterial(formData: FormData) {
   }).select("id").single();
   if (error) return { error: erroAmigavel(error) };
   // aviso por e-mail pra audiência do material — complemento: falha de
-  // envio não derruba o material já gravado
+  // envio não derruba o material já gravado. Material programado pra um
+  // encontro (REALIZA-160) não vaza pro jovem no ato — o acervo abre sozinho
+  // na régua dela; o envio manual continua sendo escolha da coordenação.
   const email = await dispararMaterialEmail({
     supabase,
     material: { id: novo.id as string, titulo, descricao, tipo, url, path },
     audiencias: [audiencia],
     autorId: eu.id,
+    excluirRoles:
+      audiencia === "todos" && encontroNum != null ? ["mentorado"] : undefined,
   });
   revalidatePath("/materiais");
   // id volta pro client poder desfazer a row se o upload do arquivo falhar
@@ -3758,7 +3865,7 @@ export async function updateMeuPerfil(formData: FormData) {
   // formação/disponibilidade; o guard da 0004 continua travando
   // termo_ok/formacao_ok/capacidade/tipo. UPDATE direto: self não tem INSERT
   // (a linha nasce no cadastro pela coordenação).
-  const ehMentor = eu.role === "mentor_dpp" || eu.role === "mentor_especialista";
+  const ehMentor = temPapel(eu, "mentor_dpp") || temPapel(eu, "mentor_especialista");
   if (ehMentor && formData.has("disponibilidade")) {
     const mentorCampos = camposMentor(formData);
     if ("error" in mentorCampos) return { error: mentorCampos.error };
@@ -3831,7 +3938,7 @@ export async function salvarOnboarding(formData: FormData) {
 
   // passo "Disponibilidade" (mentor): grade semanal + experiência/formação
   // do mentor_profiles — self-update (0004 trava só os campos de validação)
-  const ehMentor = eu.role === "mentor_dpp" || eu.role === "mentor_especialista";
+  const ehMentor = temPapel(eu, "mentor_dpp") || temPapel(eu, "mentor_especialista");
   if (ehMentor) {
     const mentorCampos = camposMentor(formData, { parcial: true });
     if ("error" in mentorCampos) return { error: mentorCampos.error };

@@ -70,16 +70,26 @@ async function limparCronogramasE2E() {
   await limparViaServiceRole("cronogramas", `id=in.(${ids})`);
 }
 
+/** DELETE de duplas com os links de instrumento que o trigger 0099 minta
+ *  no INSERT — filho primeiro, FK depois (mesmo padrão do seed). */
+async function limparDuplasComLinks(filtro: string) {
+  const rows = await buscarViaServiceRole<{ id: string }[]>(
+    "duplas",
+    `${filtro}&select=id`
+  );
+  if (!rows.length) return;
+  const ids = rows.map((r) => r.id).join(",");
+  await limparViaServiceRole("formulario_links", `dupla_id=in.(${ids})`);
+  await limparViaServiceRole("duplas", `id=in.(${ids})`);
+}
+
 /** Devolve o staging ao estado do seed — idempotente, vale tanto pro
  *  afterEach quanto pro pre-clean de um staging que sobrou de run quebrado. */
 async function restaurarFixtures() {
   // sucessora criada pelo remanejo (carrega remanejada_de=dupla2) e qualquer
   // vínculo do mentorado livre — depois a dupla2 volta a "ativa"
-  await limparViaServiceRole("duplas", `remanejada_de=eq.${DUPLA2_ID}`);
-  await limparViaServiceRole(
-    "duplas",
-    `mentorado_id=eq.${IDS.mentoradoLivre}`
-  );
+  await limparDuplasComLinks(`remanejada_de=eq.${DUPLA2_ID}`);
+  await limparDuplasComLinks(`mentorado_id=eq.${IDS.mentoradoLivre}`);
   await atualizarViaServiceRole("duplas", `id=eq.${DUPLA2_ID}`, {
     status: "ativa",
   });
@@ -94,7 +104,7 @@ async function restaurarFixtures() {
     `profile_id=in.(${IDS.mentorReserva},${IDS.mentorColega})`
   );
   // par criado pelo import CSV (identificado pelo mentor fixture)
-  await limparViaServiceRole("duplas", `mentor_id=eq.${IDS.mentorImport}`);
+  await limparDuplasComLinks(`mentor_id=eq.${IDS.mentorImport}`);
   // rastros que os fluxos deixam: nota de saída do remanejo nas fichas das
   // fixtures e notificações "dupla_formada" (remanejo + import)
   await limparViaServiceRole(
@@ -180,22 +190,23 @@ test.describe("coordenação — fluxos operacionais", () => {
       (url) =>
         /^\/duplas\/[0-9a-f-]{36}$/.test(url.pathname) &&
         !url.pathname.includes(DUPLA2_ID),
-      { timeout: 15_000 }
+      // action pesada (RPC + sinos + revalidate) + router.push em preview frio
+      { timeout: 30_000 }
     );
     await expect(
       page.getByRole("heading", { name: /Mentorada E2E Livre/ })
-    ).toBeVisible();
-    await expect(page.getByText(/Originada de/)).toBeVisible();
+    ).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText(/Originada de/)).toBeVisible({ timeout: 15_000 });
 
     // a ficha antiga guarda a linhagem: encerrada + aponta a sucessora
     await page.goto(`/duplas/${DUPLA2_ID}`);
-    await expect(page.getByText(/Substituída por/)).toBeVisible();
+    await expect(page.getByText(/Substituída por/)).toBeVisible({ timeout: 15_000 });
     await expect(
       page.getByRole("link", { name: /Mentorada E2E Livre/ })
-    ).toBeVisible();
+    ).toBeVisible({ timeout: 15_000 });
     await expect(
       page.getByText("Dupla encerrada", { exact: true })
-    ).toBeVisible();
+    ).toBeVisible({ timeout: 15_000 });
     // remanejo é de dupla viva — a encerrada não oferece o botão de novo
     await expect(
       page.getByRole("button", { name: "Remanejar", exact: true })
@@ -249,10 +260,17 @@ test.describe("coordenação — fluxos operacionais", () => {
     await dialog
       .locator('button[data-slot="button"]', { hasText: "Fechar" })
       .click();
-    // a dupla nova aparece na lista (router.refresh da action)
+    // a dupla nova aparece na lista (router.refresh da action). Na v5 o
+    // lockup de nomes não é link — a linha densa tem "Ver ficha ›" — e a
+    // massa saudável colapsa num <details>: a busca a traz pra linha cheia
+    await page.getByLabel("Buscar dupla").fill("Mentor E2E Import");
+    const listaDuplas = page.locator('section[aria-label="Lista de duplas"]');
     await expect(
-      page.getByRole("link", { name: /Mentor E2E Import/ })
+      listaDuplas.getByText("Mentor E2E Import")
     ).toBeVisible({ timeout: 15_000 });
+    await expect(
+      listaDuplas.getByRole("link", { name: "Ver ficha" })
+    ).toBeVisible();
   });
 
   test("turmas: builder gera a prévia e grava o cronograma", async ({
@@ -308,8 +326,10 @@ test.describe("coordenação — fluxos operacionais", () => {
     page,
   }) => {
     test.slow(); // dois writes em staging (risco plantado + ajuste de capacidade)
-    // risco plantado: registro com pedido de apoio num encontro realizado da
-    // dupla2 — o semáforo vira "risco" e o card nasce (cleanup tira os dois)
+    // risco plantado: registro com avaliação baixa + dificuldade no último
+    // encontro da dupla2 — o combo vira o motivo[0] do semáforo ("risco") e
+    // o card nasce. O pedido de apoio segue junto mas no WP2 é eixo
+    // separado — não compõe o motivo (cleanup tira os dois)
     const enc = await inserirViaServiceRole("encontros", {
       dupla_id: DUPLA2_ID,
       numero: 24, // encontros_numero_faixa = 1..24; o cleanup zera a dupla2
@@ -319,8 +339,8 @@ test.describe("coordenação — fluxos operacionais", () => {
     });
     await inserirViaServiceRole("registros", {
       encontro_id: enc.id,
-      avaliacao: "boa",
-      dificuldade: "nenhuma",
+      avaliacao: "baixa",
+      dificuldade: "participacao",
       precisa_apoio: true,
     });
 
@@ -329,10 +349,21 @@ test.describe("coordenação — fluxos operacionais", () => {
       'section[aria-labelledby="remanejo-sugerido-titulo"]'
     );
     await expect(card).toBeVisible();
+    // REALIZA-153: o card nasce recolhido — o gatilho carrega o motivo
+    // como "scent" e a lista de candidatos só monta depois do clique
+    const gatilho = card.getByRole("button", {
+      name: /Sugerir remanejamento/,
+    });
+    await expect(gatilho).toHaveAttribute("aria-expanded", "false");
+    await gatilho.click();
+    await expect(gatilho).toHaveAttribute("aria-expanded", "true");
+    // WP2: o motivo do card é o 1º sinal do semáforo — o combo baixa +
+    // dificuldade plantado. "Pedido de apoio" vive no eixo próprio, fora
+    // dos sinais, então não abre a frase do remanejo (o gatilho repete o
+    // motivo — a frase completa do painel desambigua)
     await expect(
-      card.getByText("Sugerir remanejamento", { exact: true })
+      card.getByText(/Avaliação baixa e dificuldade de participação.*Se a conversa não destravar/)
     ).toBeVisible();
-    await expect(card.getByText(/Pedido de apoio/)).toBeVisible();
 
     // pool de mentores: o import (sem dupla) tem vaga e leva Remanejar;
     // o colega (dupla PAUSADA, cap implícita 1) aparece cheio — a saída

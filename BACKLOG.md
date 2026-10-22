@@ -173,12 +173,16 @@ Spec em **`.devin/formularios-ux-v2.md`** (3 críticos com skills: público resp
 - [x] ~~**`me()` em actions.ts**~~ — 58 call sites com early-return "Sessão expirada" (auditoria completa).
 - [ ] **Refactor de complexidade** (react-doctor): `duplas/[id]/page.tsx` e `registro-form.tsx` estão grandes — candidatos a split quando a próxima feature tocar neles.
 - [x] ~~**Anexos**: teste E2E~~ — RLS provado contra o remoto; **e** `deleteDupla` remove os objetos do bucket antes da row (sem órfãos em `registro-anexos`).
+- [x] ~~**Import do form semanal — normalização fraca + modal apertado**~~ (**REALIZA-164**, merge `0951485` / PR #82): match por score de certeza weakest-link + contexto (auto ≥90 com os dois lados ≥80 e sem ambiguidade; provável sugere, manual nunca pré-seleciona), evidências legíveis por linha, trilhas dedicadas pra placeholder e par-sem-dupla, modal `sm:max-w-6xl` agrupado por ação, dedup `(dupla,nº)` no executar e no CLI. Benchmark no CSV real: 38 auto / 4 provável / 1 manual.
 
 ## Decisões de produto — maiores
 
+- [x] ~~**Avaliação por terceiros**~~ (**REALIZA-165**, merge `f9e6df5` / PR #83, `0103` em prod): instrumento do guia DPP semana 1→2 — o jovem indica até 9 pessoas (cap 3 por vínculo), cada uma responde 2 perguntas por link público `/t/[token]` sem login; mentor lê identificado e publica síntese anônima que o jovem lê na home. Tabelas dedicadas (fora da forms engine: respondente externo, 9 links por dupla), token self-minted, reemissão reutiliza pendente/roda expirado, respondido nunca se apaga, notificação `terceiro_respondeu`. E2E cobre o caminho inteiro.
 - [x] ~~**Trilha especialista — restos**~~ — `0037`: encerramento antecipado, prazo de 3 meses (chip urgente/vencido) e devolutiva notificando o mentor DPP.
 - [x] ~~Materiais de verdade~~ — `0010`: `materiais.path` + bucket privado `materiais` (policies de storage espelham a audiência — coord lê tudo, trilha só a própria, supervisor só "todos"); upload no `NovoMaterialDialog` (toggle arquivo/link, 20MB, PDF/imagem) e "Anexar arquivo" no `MaterialActions`; `/api/material/[id]` → signed URL 300s; card de encontro na página da dupla abre o arquivo.
-- [ ] **PDM da dupla**: `duplas.pdm_url` (link Drive/Docs) ou storage por dupla.
+- [x] ~~**Avaliação geral final do especialista**~~ (guia-esp §13) — `0104`: form oficial `sistema='avaliacao_especialista'` (trilha + programa/coordenação), emitido **dentro** da RPC `encerrar_trilha_especialista` com dedup por (form, dest, dupla) + notificação `avaliacao_pendente` → `/f/<token>` logado. Bypass fechado em review: `Editar dupla` não oferece "encerrada/concluída" pra trilha esp e `updateDupla` recusa server-side (sem o rito não há link/motivo/devolutiva); `avaliacao_esp_da_dupla` (definer) devolve token só pro especialista e estado pra coord — CTA/status no `TrilhaFechamento`; emissão manual bloqueada (picker + action). Validador REST 20/20.
+- [ ] **PDM nativo na plataforma** — **decisão fechada (REALIZA-181)**: o PDM deixa de ser só `duplas.pdm_url` (link Drive) e vira modelo de dados próprio — `pdm_metas` (meta SMART: descrição, área da vida, indicador de sucesso, prazo, status) + `pdm_submetas` com progresso. Co-edição mentor+mentorado, coord lê, superfícies na ficha da dupla / portal do jovem / resumo de jornada. `pdm_url` fica como legado opcional.
+- [ ] **Roteiros semanais 7–16**: os cartões-roteiro dos encontros 1–6 já estão em prod como `materiais` (`tipo=conteudo`, `audiencia=dpp`, `encontro_num` 1–6 — grupo "Encontro N", acervo progressivo). Semanas 7–16 ainda não existem em PDF — subir conforme a equipe produzir (mesmo padrão: `conteudo`/`dpp`/`encontro_num=N`, ordem 3+N).
 - [ ] **Termos da equipe executiva** (coordenação/supervisores): todo mundo que entra na plataforma deveria assinar, mas hoje só mentores (`termo-voluntario`) e mentorados (`termo-mentorando`/`autorizacao-responsavel`) têm documento. Quando o jurídico definir o modelo da equipe, vira mais um slug em `documento_templates` + renderer em `src/lib/documentos/` — a infra de assinatura/evidência/link já é genérica.
 - [ ] **Contra-assinatura do presidente**: subir o PNG em qualquer ficha → seção Assinaturas → engrenagem (ou `documentos/sistema/contra-assinatura.png` no storage). Os PDFs do termo já saem assinados pelo instituto quando a imagem existe.
 
@@ -189,6 +193,7 @@ Spec em **`.devin/formularios-ux-v2.md`** (3 críticos com skills: público resp
 - [x] ~~Signup aberto → convite/allowlist~~ — `0045`: trigger em `auth.users` exige e-mail pré-cadastrado em `profiles` (signup público E `admin.createUser` — dentro do GoTrue são indistinguíveis; SQL direto/migrações bypassam). **Coordenação precisa pré-cadastrar antes de convidar** — magic link de e-mail novo falha com mensagem pt-BR.
 - [x] ~~Deploy Vercel~~ — `https://realizavc.vercel.app` no ar (projeto `thisux1s-projects/realiza.vc`, repo `thisux1/realiza.vc` conectado — push na main já dispara redeploy). Envs de prod: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_SITE_URL` (todas Config/exposed). Dashboard Supabase: ~~Site URL `https://realizavc.vercel.app` + Redirect URLs `/**`~~ — feito. Resta o SMTP da tarefa acima.
 - [ ] E-mail pra coordenação quando `precisa_apoio = true` (após Resend).
+- [x] ~~Observabilidade (Sentry)~~ — org `realizavc`/`realizamentoria-nextjs`: erros + tracing (10% prod), tunnel `/monitoring`, PII off + scrub de bearer tokens (path + query + fragment), sem Replay. Falta: `SENTRY_AUTH_TOKEN` na Vercel prod+preview (source maps).
 - [x] ~~Export CSV de pessoas/mentorados~~ — `/api/export?tipo=pessoas` coord-only, agora com bloco sensível (nascimento/gênero/pref/motivação) via views `*_pessoal`.
 - [x] ~~`middleware`→`proxy`~~ — feito (build reconhece `ƒ Proxy`).
 
@@ -279,3 +284,27 @@ deriva `trilha` do papel do mentor. O que resta está na seção Pendências.)*
 - Policies `for all` remanescentes (fora anexos, já endurecidos): os triggers
   de autoria da 0023 cobrem a parte de autoria; o restante (colunas de status)
   exige trigger por coluna ou RPCs dedicadas.
+
+## Sprint UI — padronização de telas + skeletons + transições (out/2026)
+
+Pedido do Thiago: as telas funcionam mas não têm cara de produto único —
+anatomia diverge entre superfícies, loaders faltam em rotas novas, e trocar
+de tela é seco. Rodar como sprint com recon de inventário primeiro.
+
+- [ ] **Padronização de telas** — recon inventaria anatomia por rota
+  (header/padrão de título, espaçamento, composição de cards, empty states,
+  hierarquia de ações) e propõe os padrões-canônicos antes de tocar código;
+  `/jovem` × staff têm shells diferentes mas as mesmas moléculas devem valer.
+- [ ] **Skeleton loaders nativos — fechar as rotas sem `loading.tsx`**:
+  hoje 25 rotas cobertas espelhando layout; faltam `/jovem/especialistas`
+  (a página nova do WP6!), `/chamados`, `/assinar/[token]`, `/avaliar/[token]`,
+  `/privacidade`. Manter a regra do sprint anterior: skeleton espelha a
+  anatomia real, nunca spinner genérico; um boundary por navegação.
+- [ ] **Animações de alternância de tela** — transição sutil entre rotas
+  (fade/slide curto, respeitando `prefers-reduced-motion`). **Atenção:** este
+  Next tem breaking changes — ver `node_modules/next/dist/docs/` antes
+  (ViewTransition/componente nativo vs. CSS puro); definir escopo
+  (rota inteira vs. só o conteúdo) e onde aplicar (shell app + jovem).
+- [ ] **Gates:** demo e2e existente segue verde (skeletons não devem vazar
+  pro DOM estável), + spec visual simples de transição se o mecanismo
+  escolhido for verificável.

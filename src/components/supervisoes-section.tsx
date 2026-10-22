@@ -34,7 +34,7 @@ export function SupervisoesSection({
     <section className="rounded-xl bg-card p-4 text-sm shadow-[var(--shadow-border)] sm:p-5">
       <div className="mb-1 flex items-center justify-between gap-2">
         <h2 className="flex items-center gap-1.5 text-sm font-semibold">
-          <Binoculars size={15} aria-hidden className="shrink-0 text-muted-foreground" />
+          <Binoculars size={15} aria-hidden className="shrink-0 text-[var(--info)]" />
           {titulo}
         </h2>
         {acao}

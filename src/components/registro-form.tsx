@@ -6,6 +6,7 @@ import { CaretLeft, CaretRight, Plus, Trash } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { salvarRegistro } from "@/lib/actions";
 import { demoAtivoClient } from "@/lib/demo/shared";
+import { createClient } from "@/lib/supabase/client";
 import {
   ATIVIDADES_ENCONTRO,
   formatDiaMes,
@@ -18,8 +19,11 @@ import type {
   Encaminhamento,
   ProximoPasso,
   Registro,
+  RegistroAnexo,
+  Trilha,
 } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { AnexosRegistro } from "@/components/anexos-registro";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -57,6 +61,11 @@ const DURACAO_OPCOES: Record<string, string> = {
 
 const ETAPAS = ["Como foi", "Sinais de atenção", "Combinados"] as const;
 
+// identidade estável pro `anexos` da etapa pós-save — a lista mostrada no
+// AnexosRegistro deriva da prop + deltas otimistas, e uma referência fixa
+// mantém o useMemo dele barato a cada re-render do form
+const SEM_ANEXOS: RegistroAnexo[] = [];
+
 /** Rascunho local do form — autosave no localStorage pra refresh não perder tudo. */
 type RegistroDraft = {
   savedAt: string;
@@ -81,6 +90,7 @@ export function RegistroForm({
   encontroId,
   duplaId,
   evento,
+  trilha = null,
   registro = null,
   combinadosPendentes,
   onSaved,
@@ -90,6 +100,9 @@ export function RegistroForm({
   duplaId: string;
   /** Passo do guia da trilha — título/instrumentos (DPP) ou foco (especialista). */
   evento: PassoGuia | null;
+  /** Trilha da dupla — decide a linha de privacidade (K6). Quando o host não
+   *  repassa (ficha), o form resolve sozinho pela dupla. */
+  trilha?: Trilha | null;
   registro?: Registro | null;
   /** Encaminhamentos da dupla ainda não feitos (status !== "feito"), por prazo. */
   combinadosPendentes?: Encaminhamento[];
@@ -135,6 +148,35 @@ export function RegistroForm({
   // pro que um visitante digita não sobrar pro próximo (o flush de desmonte
   // roda depois do cookie ir embora, por isso não dá pra checar na hora)
   const [demo] = useState(demoAtivoClient);
+  // etapa pós-save (K1): evidências anexadas no mesmo fluxo — o form vira a
+  // tela "registro salvo" com o uploader. Só na criação (edição já tem o
+  // bloco de anexos do host)
+  const [posSave, setPosSave] = useState<{
+    registroId: string;
+    autorId: string;
+    aviso?: string;
+  } | null>(null);
+  // "Concluir" num host sem onSaved (ficha) recolhe num "salvo" mínimo —
+  // o refresh que vem em seguida troca o card; voltar pro form vazio leria
+  // como registro perdido
+  const [fechado, setFechado] = useState(false);
+  // trilha pra linha de privacidade (K6) — quando o host não repassa
+  const [trilhaForm, setTrilhaForm] = useState<Trilha | null>(trilha);
+
+  // host não passou a trilha (ex.: ficha monta o form só com ids) — busca
+  // direto na dupla, uma vez. Sem ela a linha de privacidade fica neutra
+  useEffect(() => {
+    if (trilhaForm != null || demo) return;
+    const supabase = createClient();
+    supabase
+      .from("duplas")
+      .select("trilha")
+      .eq("id", duplaId)
+      .single()
+      .then(({ data }) => {
+        if (data?.trilha) setTrilhaForm(data.trilha as Trilha);
+      });
+  }, [trilhaForm, demo, duplaId]);
 
   // ---------- rascunho local ----------
 
@@ -397,15 +439,69 @@ export function RegistroForm({
           setEncaminhamentos([]);
           setConcluirIds(new Set());
           setRestored(null);
-          // edição inline recolhe depois de salvar; hosts de criação podem
-          // fazer o mesmo — dispara em toda gravação bem-sucedida
-          onSaved?.();
-          router.refresh();
+          if (registro) {
+            // edição inline recolhe depois de salvar — evidências já moram
+            // no bloco de anexos do host
+            onSaved?.();
+            router.refresh();
+          } else {
+            // K1 — criação não fecha na hora: o fluxo continua na etapa de
+            // evidências (o FK do anexo exige a row já gravada). O refresh
+            // fica adiado pro fechamento — se rodasse agora, hosts como o
+            // detalhe do dia desmontariam este form (a linha some com o
+            // "sem registro") no meio do upload
+            const { data: reg } = await createClient()
+              .from("registros")
+              .select("id, created_by")
+              .eq("encontro_id", encontroId)
+              .maybeSingle();
+            if (reg?.id && reg.created_by) {
+              setPosSave({
+                registroId: reg.id,
+                autorId: reg.created_by,
+                aviso: res?.aviso,
+              });
+            } else {
+              // sem a row à mão não dá pra montar o uploader — cai no fluxo
+              // antigo; evidências seguem acessíveis na ficha da dupla
+              onSaved?.();
+              router.refresh();
+            }
+          }
         }
       } catch {
         toast.error("Sem conexão. Tente de novo.");
       }
     });
+  }
+
+  function fecharPosSave() {
+    // host com onSaved (detalhe do dia) fecha o dialog; sem callback
+    // (ficha) o form recolhe no "salvo" mínimo e o refresh troca o card
+    if (onSaved) onSaved();
+    else setFechado(true);
+    router.refresh();
+  }
+
+  // K1 — criação bem-sucedida cede a tela pra etapa de evidências no
+  // mesmo container (dialog da agenda ou card inline da ficha): o FK do
+  // anexo exige a row gravada, por isso a etapa existe só depois do save
+  if (posSave) {
+    if (fechado)
+      return (
+        <p className="py-2 text-sm text-muted-foreground">
+          Registro salvo — as evidências ficam na ficha da dupla.
+        </p>
+      );
+    return (
+      <PosSaveRegistro
+        registroId={posSave.registroId}
+        duplaId={duplaId}
+        autorId={posSave.autorId}
+        aviso={posSave.aviso}
+        onFechar={fecharPosSave}
+      />
+    );
   }
 
   return (
@@ -431,6 +527,17 @@ export function RegistroForm({
             {evento.foco ? ` · ${evento.foco}` : ""}
           </p>
         )}
+        {/* quem lê, honesto por trilha (K6): o jovem nunca lê registros; na
+            trilha de especialista o mentor DPP do jovem lê o registro
+            integral (decisão 0092). Com trilha desconhecida a linha fica
+            no recorte mínimo garantido — equipe sim, jovem não */}
+        <p className="mt-0.5 text-xs text-muted-foreground">
+          {trilhaForm === "especialista"
+            ? "A equipe do programa e o mentor DPP do jovem leem este registro."
+            : trilhaForm === "dpp"
+              ? "Só você e a equipe do programa leem este registro — o jovem não vê."
+              : "A equipe do programa lê este registro — o jovem não vê."}
+        </p>
       </div>
 
       {restored && (
@@ -825,5 +932,54 @@ export function RegistroForm({
         )}
       </div>
     </form>
+  );
+}
+
+/** Etapa final do registro novo (K1): evidências no mesmo fluxo — foto do
+ *  encontro, print, atividade feita. A row já está gravada, então o
+ *  uploader trabalha sobre id real; os anexos sobem pelos inserts/storage
+ *  do AnexosRegistro e aparecem nos slots da ficha quando o refresh do
+ *  desmonte (Concluir ou o host fechando o dialog) chega. */
+function PosSaveRegistro({
+  registroId,
+  duplaId,
+  autorId,
+  aviso,
+  onFechar,
+}: {
+  registroId: string;
+  duplaId: string;
+  autorId: string;
+  aviso?: string;
+  onFechar: () => void;
+}) {
+  const router = useRouter();
+  useEffect(() => () => router.refresh(), [router]);
+  return (
+    <div className="space-y-4">
+      <div className="space-y-1">
+        <p className="text-sm font-medium">
+          Registro salvo — anexe as evidências
+        </p>
+        <p className="text-xs text-muted-foreground">
+          Foto do encontro, print, atividade feita — PDF ou imagem até
+          10&nbsp;MB. Dá pra anexar depois na ficha da dupla também.
+        </p>
+        {aviso && <p className="text-xs text-muted-foreground">{aviso}</p>}
+      </div>
+      <AnexosRegistro
+        registroId={registroId}
+        duplaId={duplaId}
+        autorId={autorId}
+        podeAnexar
+        podeRemover
+        anexos={SEM_ANEXOS}
+      />
+      <div className="flex justify-end border-t pt-3">
+        <Button type="button" onClick={onFechar}>
+          Concluir
+        </Button>
+      </div>
+    </div>
   );
 }

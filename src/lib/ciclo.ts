@@ -1,4 +1,7 @@
 import type {
+  CelulaDisponibilidade,
+  ChamadoCategoria,
+  ChamadoStatus,
   CicloEvento,
   CorRaca,
   Cronograma,
@@ -367,6 +370,18 @@ export const PERIODOS_LABELS: Record<Periodo, string> = {
   noite: "Noite",
 };
 
+/** Sigla do dia pros headers da matriz de disponibilidade — a forma longa
+ *  é dos textos/aria-labels; na coluna da grade só cabe a curta. */
+export const DIAS_SEMANA_CURTOS: Record<DiaSemana, string> = {
+  seg: "Seg",
+  ter: "Ter",
+  qua: "Qua",
+  qui: "Qui",
+  sex: "Sex",
+  sab: "Sáb",
+  dom: "Dom",
+};
+
 /** Siglas pra select de UF — o banco guarda char(2) maiúsculo (CHECK). */
 export const UFS = [
   "AC", "AL", "AM", "AP", "BA", "CE", "DF", "ES", "GO", "MA", "MG", "MS",
@@ -395,9 +410,72 @@ export const INTERESSES_SUGESTOES = [
   "culinária",
 ];
 
-/** Grade semanal do grid de chips (JSON {"dias":[],"periodos":[]}) — valida
- *  contra o mesmo vocabulário do CHECK disponibilidade_ok. Vazio ou grade
- *  sem nada marcado vira null ("não informado"), nunca esqueleto vazio. */
+/** A forma de conjuntos (legada, pré-0100) expandida pra células —
+ *  {"dias":["seg"],"periodos":["noite"]} vira (seg,noite). `periodos`
+ *  vazio/ausente vale "o dia inteiro": a régua histórica era dia marcado
+ *  sem recorte = qualquer horário, então expande pras 3 células do dia.
+ *  Entradas fora do vocabulário são descartadas; sem célula nenhuma,
+ *  devolve null ("não informado"), nunca esqueleto vazio. */
+export function disponibilidadeDeConjuntos(
+  dias: readonly DiaSemana[],
+  periodos: readonly Periodo[]
+): Disponibilidade | null {
+  const celulas: CelulaDisponibilidade[] = [];
+  const vistos = new Set<string>();
+  const ps = periodos.length ? periodos : PERIODOS;
+  for (const dia of dias) {
+    if (!(DIAS_SEMANA as readonly string[]).includes(dia)) continue;
+    for (const periodo of ps) {
+      if (!(PERIODOS as readonly string[]).includes(periodo)) continue;
+      const chave = `${dia}:${periodo}`;
+      if (vistos.has(chave)) continue;
+      vistos.add(chave);
+      celulas.push({ dia, periodo });
+    }
+  }
+  return celulas.length ? { celulas } : null;
+}
+
+/** Células de uma grade, tolerante às duas formas — a coluna é jsonb e a
+ *  janela de deploy pode misturar {dias,periodos} (legada) com {celulas}
+ *  (canônica): ler o legado sem normalizar devolveria "sem grade". */
+export function celulasDe(
+  d: Disponibilidade | null | undefined
+): CelulaDisponibilidade[] {
+  if (!d) return [];
+  const cel = (d as { celulas?: unknown }).celulas;
+  if (Array.isArray(cel)) {
+    const out: CelulaDisponibilidade[] = [];
+    const vistos = new Set<string>();
+    for (const c of cel) {
+      const dia = String((c as CelulaDisponibilidade | null)?.dia ?? "");
+      const periodo = String(
+        (c as CelulaDisponibilidade | null)?.periodo ?? ""
+      );
+      if (
+        !(DIAS_SEMANA as readonly string[]).includes(dia) ||
+        !(PERIODOS as readonly string[]).includes(periodo)
+      )
+        continue;
+      const chave = `${dia}:${periodo}`;
+      if (vistos.has(chave)) continue;
+      vistos.add(chave);
+      out.push({ dia: dia as DiaSemana, periodo: periodo as Periodo });
+    }
+    return out;
+  }
+  const legado = d as { dias?: DiaSemana[]; periodos?: Periodo[] };
+  return (
+    disponibilidadeDeConjuntos(legado.dias ?? [], legado.periodos ?? [])
+      ?.celulas ?? []
+  );
+}
+
+/** Grade semanal — JSON {"celulas":[{"dia":"seg","periodo":"manha"}]}
+ *  (canônica, 0100) ou a forma legada {"dias":[],"periodos":[]}, que
+ *  expande pelo disponibilidadeDeConjuntos. Valida contra o mesmo
+ *  vocabulário do CHECK disponibilidade_ok; vazio ou grade sem nada
+ *  marcado vira null ("não informado"), nunca esqueleto vazio. */
 export function parseDisponibilidade(
   raw: string
 ): Disponibilidade | null | { error: string } {
@@ -409,7 +487,31 @@ export function parseDisponibilidade(
   } catch {
     return { error: "A disponibilidade chegou num formato inválido." };
   }
-  const d = parsed as { dias?: unknown; periodos?: unknown };
+  const d = parsed as {
+    celulas?: unknown;
+    dias?: unknown;
+    periodos?: unknown;
+  } | null;
+  if (Array.isArray(d?.celulas)) {
+    const celulas: CelulaDisponibilidade[] = [];
+    const vistos = new Set<string>();
+    for (const c of d.celulas) {
+      const dia = String((c as CelulaDisponibilidade | null)?.dia ?? "");
+      const periodo = String(
+        (c as CelulaDisponibilidade | null)?.periodo ?? ""
+      );
+      if (
+        !(DIAS_SEMANA as readonly string[]).includes(dia) ||
+        !(PERIODOS as readonly string[]).includes(periodo)
+      )
+        continue;
+      const chave = `${dia}:${periodo}`;
+      if (vistos.has(chave)) continue;
+      vistos.add(chave);
+      celulas.push({ dia: dia as DiaSemana, periodo: periodo as Periodo });
+    }
+    return celulas.length ? { celulas } : null;
+  }
   const dias = (Array.isArray(d?.dias) ? d.dias.map(String) : []).filter(
     (x): x is DiaSemana => (DIAS_SEMANA as readonly string[]).includes(x)
   );
@@ -418,34 +520,88 @@ export function parseDisponibilidade(
   ).filter((x): x is Periodo =>
     (PERIODOS as readonly string[]).includes(x)
   );
-  return dias.length || periodos.length ? { dias, periodos } : null;
+  return disponibilidadeDeConjuntos(dias, periodos);
 }
 
-/** "ter e qui à noite" — grade semanal do mentor em frase curta (ficha de
- *  pessoa, board de matching). Grade vazia/ausente devolve null. */
-export function disponibilidadeTexto(d: Disponibilidade | null | undefined): string | null {
-  if (!d || (!d.dias?.length && !d.periodos?.length)) return null;
-  const dias = (d.dias ?? []).map((dia) => DIAS_SEMANA_LABELS[dia] ?? dia);
-  const periodos = (d.periodos ?? []).map(
+/** Junta lista em pt-BR: "a", "a e b", "a, b e c". */
+function juntaLista(l: string[]): string {
+  return l.length <= 1
+    ? (l[0] ?? "")
+    : `${l.slice(0, -1).join(", ")} e ${l.at(-1)}`;
+}
+
+/** "Segunda a Sexta" pra faixas contíguas de 3+ dias; os soltos e pares
+ *  listam por extenso ("Terça e Quinta"). `dias` na ordem seg→dom. */
+function textoDias(dias: DiaSemana[]): string {
+  const partes: string[] = [];
+  let i = 0;
+  while (i < dias.length) {
+    let j = i;
+    while (
+      j + 1 < dias.length &&
+      DIAS_SEMANA.indexOf(dias[j + 1]) === DIAS_SEMANA.indexOf(dias[j]) + 1
+    )
+      j++;
+    if (j - i >= 2) {
+      partes.push(
+        `${DIAS_SEMANA_LABELS[dias[i]]} a ${DIAS_SEMANA_LABELS[dias[j]]}`
+      );
+    } else {
+      partes.push(DIAS_SEMANA_LABELS[dias[i]]);
+      if (j === i + 1) partes.push(DIAS_SEMANA_LABELS[dias[j]]);
+    }
+    i = j + 1;
+  }
+  return juntaLista(partes);
+}
+
+/** "à noite" / "às manhãs e tardes" / "o dia inteiro" — o recorte de
+ *  períodos de um grupo de dias. */
+function textoPeriodos(periodos: Periodo[]): string {
+  if (periodos.length >= PERIODOS.length) return "o dia inteiro";
+  const labels = periodos.map(
     (p) => PERIODOS_LABELS[p]?.toLocaleLowerCase("pt-BR") ?? p
   );
-  const junta = (l: string[]) =>
-    l.length <= 1 ? (l[0] ?? "") : `${l.slice(0, -1).join(", ")} e ${l.at(-1)}`;
+  if (periodos.length === 1) return `à ${labels[0]}`;
   // plural de cada período: "às tardes e noites" (não "às tarde e noite")
-  const PERIODO_PLURAL: Record<string, string> = {
+  const PLURAL: Record<string, string> = {
     manhã: "manhãs",
     tarde: "tardes",
     noite: "noites",
   };
-  const partes = [
-    dias.length ? junta(dias) : null,
-    periodos.length === 1
-      ? `à ${periodos[0]}`
-      : periodos.length
-        ? `às ${junta(periodos.map((x) => PERIODO_PLURAL[x] ?? x))}`
-        : null,
-  ].filter(Boolean);
-  return partes.length ? partes.join(" ") : null;
+  return `às ${juntaLista(labels.map((x) => PLURAL[x] ?? x))}`;
+}
+
+/** "Terça e Quinta à noite" — a grade semanal em frase curta (ficha de
+ *  pessoa, board de matching). Dias que dividem a mesma combinação de
+ *  períodos saem juntos: "Segunda a Sexta às manhãs e tardes · Sábado à
+ *  manhã". Grade vazia/ausente devolve null. */
+export function disponibilidadeTexto(
+  d: Disponibilidade | null | undefined
+): string | null {
+  const celulas = celulasDe(d);
+  if (!celulas.length) return null;
+  const porDia = new Map<DiaSemana, Set<Periodo>>();
+  for (const c of celulas) {
+    const s = porDia.get(c.dia) ?? new Set<Periodo>();
+    s.add(c.periodo);
+    porDia.set(c.dia, s);
+  }
+  // um grupo por combinação de períodos — a forma comum (mesmos períodos
+  // em todos os dias) continua compacta como antes
+  const grupos = new Map<string, { periodos: Periodo[]; dias: DiaSemana[] }>();
+  for (const dia of DIAS_SEMANA) {
+    const set = porDia.get(dia);
+    if (!set) continue;
+    const periodos = PERIODOS.filter((p) => set.has(p));
+    const chave = periodos.join("+");
+    const g = grupos.get(chave) ?? { periodos, dias: [] };
+    g.dias.push(dia);
+    grupos.set(chave, g);
+  }
+  return [...grupos.values()]
+    .map((g) => `${textoDias(g.dias)} ${textoPeriodos(g.periodos)}`)
+    .join(" · ");
 }
 
 /** "seg".."dom" de uma data "YYYY-MM-DD" — o DiaSemana da grade de
@@ -457,42 +613,80 @@ export function diaSemanaDe(iso: string): DiaSemana {
   return DIAS_SEMANA[(new Date(`${iso}T12:00:00`).getDay() + 6) % 7];
 }
 
-/** O dia da semana está marcado como livre na grade? Só `dias` decide —
- *  `periodos` qualifica a faixa, não o dia. Grade nula/sem dias = não livre. */
+/** O dia da semana tem alguma célula marcada? Grade nula/sem célula no
+ *  dia = não livre. */
 export function disponibilidadeNoDia(
   d: Disponibilidade | null | undefined,
   dow: DiaSemana
 ): boolean {
-  return (d?.dias ?? []).includes(dow);
+  return celulasDe(d).some((c) => c.dia === dow);
+}
+
+/** A célula (dia, período) está marcada? — a leitura fina pro editor da
+ *  grade e pros cruzamentos que o dia inteiro não resolve. */
+export function disponibilidadeNoPeriodo(
+  d: Disponibilidade | null | undefined,
+  dia: DiaSemana,
+  periodo: Periodo
+): boolean {
+  return celulasDe(d).some((c) => c.dia === dia && c.periodo === periodo);
+}
+
+/** Períodos marcados num dia, na ordem manhã→noite — a agenda usa o
+ *  primeiro pra sugerir o horário padrão do encontro. */
+export function periodosNoDia(
+  d: Disponibilidade | null | undefined,
+  dow: DiaSemana
+): Periodo[] {
+  const marcados = new Set(
+    celulasDe(d).flatMap((c) => (c.dia === dow ? [c.periodo] : []))
+  );
+  return PERIODOS.filter((p) => marcados.has(p));
 }
 
 /** A grade não serve pro cruzamento? (REALIZA-114) — vazia = null ou sem
- *  nenhum dia marcado: períodos sem dia nunca casam em disponibilidadeNoDia,
- *  então a agenda cai em "nenhum horário em comum" como se não existisse.
- *  Dias sem período contam como preenchida ("qualquer horário" é coringa).
- *  É a régua do lembrete permanente no /jovem e do badge "pendente" do
- *  /jovem/perfil. */
+ *  nenhuma célula: a agenda cai em "nenhum horário em comum" como se ela
+ *  não existisse. É a régua do lembrete permanente no /jovem e do badge
+ *  "pendente" do /jovem/perfil. */
 export function disponibilidadeVazia(
   d: Disponibilidade | null | undefined
 ): boolean {
-  return !(d?.dias?.length);
+  return !celulasDe(d).length;
 }
 
-/** Períodos em comum entre duas grades — lista vazia vale "qualquer
- *  período" (a pessoa marcou dias sem recortar horário): cruza com tudo.
- *  Exportada pro score de afinidade do remanejo sugerido (REALIZA-115),
- *  mesma régua do overlay da agenda. */
-export function periodosCruzam(
-  a: Periodo[] | null | undefined,
-  b: Periodo[] | null | undefined
+/** Células idênticas nas duas grades (mesmo dia E mesmo período) — o
+ *  cruzamento honesto do modelo de células: "ele ter de manhã, ela ter à
+ *  noite" não encaixa. Devolvidas na ordem canônica (seg→dom, manhã→noite)
+ *  pro motivo do matching e o "coincidem em" do AfinidadePar. */
+export function celulasComuns(
+  a: Disponibilidade | null | undefined,
+  b: Disponibilidade | null | undefined
+): CelulaDisponibilidade[] {
+  const setA = new Set(celulasDe(a).map((c) => `${c.dia}:${c.periodo}`));
+  const setB = new Set(celulasDe(b).map((c) => `${c.dia}:${c.periodo}`));
+  const comuns: CelulaDisponibilidade[] = [];
+  for (const dia of DIAS_SEMANA) {
+    for (const periodo of PERIODOS) {
+      const chave = `${dia}:${periodo}`;
+      if (setA.has(chave) && setB.has(chave)) comuns.push({ dia, periodo });
+    }
+  }
+  return comuns;
+}
+
+/** As duas grades têm alguma célula em comum? — a régua do score de
+ *  afinidade do remanejo sugerido (REALIZA-115), mesma do overlay da
+ *  agenda. */
+export function celulasCruzam(
+  a: Disponibilidade | null | undefined,
+  b: Disponibilidade | null | undefined
 ): boolean {
-  if (!a?.length || !b?.length) return true;
-  return a.some((p) => b.includes(p));
+  return celulasComuns(a, b).length > 0;
 }
 
 /** Cruzamento das grades do mentor × mentorados num dia da semana — a regra
- *  do overlay da agenda (REALIZA-24). "ambos" exige encaixe honesto: o
- *  mentor E algum jovem livres no dia E com período em comum — mentor livre
+ *  do overlay da agenda (REALIZA-24). "ambos" exige célula em comum NO DIA:
+ *  o mentor E algum jovem livres no mesmo (dia, período) — mentor livre
  *  qui de manhã e jovem livre qui à noite não se encontram. O jovem livre
  *  sem encaixe ainda conta como "jovem" (ele está livre, só incompatível).
  *  Ordem: ambos > mentor > jovem > nenhum. */
@@ -501,14 +695,16 @@ export function cruzamentoDisponibilidade(
   jovens: (Disponibilidade | null | undefined)[],
   dow: DiaSemana
 ): "nenhum" | "mentor" | "jovem" | "ambos" {
-  const mentorLivre = disponibilidadeNoDia(mentor, dow);
+  const periodosMentor = new Set(periodosNoDia(mentor, dow));
   const jovensLivres = jovens.filter((j) => disponibilidadeNoDia(j, dow));
   if (
-    mentorLivre &&
-    jovensLivres.some((j) => periodosCruzam(mentor?.periodos, j?.periodos))
+    periodosMentor.size > 0 &&
+    jovensLivres.some((j) =>
+      periodosNoDia(j, dow).some((p) => periodosMentor.has(p))
+    )
   )
     return "ambos";
-  if (mentorLivre) return "mentor";
+  if (periodosMentor.size > 0) return "mentor";
   if (jovensLivres.length > 0) return "jovem";
   return "nenhum";
 }
@@ -523,19 +719,18 @@ export const JANELA_PERIODO: Record<Periodo, [number, number]> = {
   noite: [18, 22],
 };
 
-/** O lado tá livre naquele dia da semana NAQUELA hora cheia? `dias` decide o
- *  dia; `periodos` afunila pra faixa — vazia = "qualquer horário" (mesmo
- *  coringa do cruzamento por dia). `hora` é a hora inteira local (0–23). */
+/** O lado tá livre naquele dia da semana NAQUELA hora cheia? A célula é a
+ *  unidade: (dia, período) marcado cobre a janela fixa do período — fora
+ *  das três faixas (madrugada, por exemplo) nenhuma grade cobre.
+ *  `hora` é a hora inteira local (0–23). */
 export function disponibilidadeNaHora(
   d: Disponibilidade | null | undefined,
   dow: DiaSemana,
   hora: number
 ): boolean {
-  if (!disponibilidadeNoDia(d, dow)) return false;
-  const periodos = d?.periodos ?? [];
-  if (periodos.length === 0) return true;
-  return periodos.some((p) => {
-    const [ini, fim] = JANELA_PERIODO[p];
+  return celulasDe(d).some((c) => {
+    if (c.dia !== dow) return false;
+    const [ini, fim] = JANELA_PERIODO[c.periodo];
     return hora >= ini && hora < fim;
   });
 }
@@ -582,9 +777,50 @@ export function ultimoRegistro(dupla: Dupla): Registro | null {
   );
 }
 
+/** Critério do semáforo que disparou — a fila que antes retornava no
+ *  primeiro match agora acumula tudo que está aceso (WP2). A ordem dos
+ *  tipos na fonte é a prioridade do motivo legado. */
+export type SinalTipo =
+  | "avaliacao_baixa_dificuldade"
+  | "atraso"
+  | "avaliacao_baixa"
+  | "dificuldade"
+  | "preventivo"
+  | "limbo"
+  | "registro_pendente"
+  | "encaminhamento_vencido"
+  | "estagnacao";
+
+/** Um critério aceso: `texto` é o que a linha/o motivo mostra, `detalhe`
+ *  é o complemento curto (números faltantes, recência "há N dias"). */
+export type Sinal = {
+  tipo: SinalTipo;
+  tom: Exclude<Semaforo, "ok">;
+  texto: string;
+  detalhe?: string;
+};
+
+/** Quem pediu apoio — os dois canais existentes, nunca fundidos: o do
+ *  mentor (`registros.precisa_apoio`) e o do jovem (`avaliacao_jovem.
+ *  pedir_apoio`, 0071 — pode ser sobre o próprio mentor). */
+export type ApoioOrigem = "mentor" | "mentorado" | "ambos";
+
 export type DuplaSaude = {
   semaforo: Semaforo;
+  /** Compat: primeiro item de `motivos` — o que um consumidor antigo lia. */
   motivo: string;
+  /** Todos os critérios acesos, na ordem de prioridade (ou o rótulo único
+   *  do estado: "Em dia", "Dupla pausada"…). */
+  motivos: string[];
+  /** Os sinais internos já calculados — vazios quando ok/congelada. */
+  sinais: Sinal[];
+  /** Pedido de apoio é TRABALHO a fazer (fila própria), não falha da
+   *  dupla: desde o WP2 não entra no semáforo. `aberto` só vive em dupla
+   *  ativa/pausada — concluída/encerrada é capítulo encerrado. */
+  apoio: {
+    aberto: boolean;
+    origem?: ApoioOrigem;
+  };
   esperado: number;
   feitos: number;
   proximo: Encontro | null;
@@ -746,13 +982,16 @@ function primeiroEncontroFaltante(
 /** Bounds "YYYY-MM-DD" da semana calendário (seg–dom) que contém `hoje`.
  *  Âncora no meio-dia pra o dia da semana não depender do fuso do servidor. */
 export function semanaBounds(hoje: Date): { seg: string; dom: string } {
-  const hojeData = new Date(`${toDateStr(hoje)}T12:00:00`);
-  const dow = (hojeData.getDay() + 6) % 7; // seg=0 … dom=6
-  const seg = new Date(hojeData);
-  seg.setDate(hojeData.getDate() - dow);
-  const dom = new Date(seg);
-  dom.setDate(seg.getDate() + 6);
-  return { seg: toDateStr(seg), dom: toDateStr(dom) };
+  // date-only em espaço UTC — meio-dia local leria a data SP um dia antes em
+  // máquinas UTC+10…+14 (local noon = SP do dia anterior)
+  const hojeData = new Date(`${toDateStr(hoje)}T12:00:00Z`);
+  const dow = (hojeData.getUTCDay() + 6) % 7; // seg=0 … dom=6
+  const seg = new Date(hojeData.getTime() - dow * 86400000);
+  const dom = new Date(seg.getTime() + 6 * 86400000);
+  return {
+    seg: seg.toISOString().slice(0, 10),
+    dom: dom.toISOString().slice(0, 10),
+  };
 }
 
 /** TODOS os encontros oficiais cuja data cai na semana calendário (seg–dom)
@@ -822,7 +1061,9 @@ export function resumoSemanaDe(
   // (etapa concluída) não tem semana pra medir
   if (evento.data == null && semana == null) return null;
   const { seg, dom } =
-    semana ?? semanaBounds(new Date(`${evento.data}T12:00:00`));
+    // date-only vive em espaço UTC — meio-dia local andaria um dia em fusos
+    // a frente de SP (mesma régua do semanaBounds)
+    semana ?? semanaBounds(new Date(`${evento.data}T12:00:00Z`));
   // semana oficial é métrica da trilha DPP — duplas de especialista não seguem
   // o calendário oficial e ficariam sempre "sem encontro esta semana". O
   // denominador é SÓ do cronograma do evento (0061): com duas turmas ativas,
@@ -932,7 +1173,11 @@ export function bucketsDoEncontro(
  *  encontro, mesmo critério do preventivo do semáforo. */
 export function duplasSemEncontroDoNumero(
   duplas: Dupla[],
-  evento: CicloEvento
+  evento: CicloEvento,
+  /** Superfícies de monitoramento (fila da coord/auxiliar) mostram TODAS as
+   *  duplas sem row do vigente — a dupla formada depois da data oficial não
+   *  "faltou", mas precisa do 1º agendamento e some do radar sem a flag. */
+  incluirNovas = false
 ): Dupla[] {
   if (evento.numero == null || evento.data == null) return [];
   const numero = evento.numero;
@@ -942,9 +1187,38 @@ export function duplasSemEncontroDoNumero(
       d.status === "ativa" &&
       d.trilha !== "especialista" &&
       d.cronograma_id === evento.cronograma_id &&
-      (!d.iniciada_em || d.iniciada_em <= dataOficial) &&
+      (incluirNovas || !d.iniciada_em || d.iniciada_em <= dataOficial) &&
       !d.encontros.some((e) => e.numero === numero)
   );
+}
+
+/** Cobertura de um encontro oficial entre as duplas **do cronograma do
+ *  evento**: quantas têm o encontro `numero` realizado e com registro
+ *  entregue. Antes do 0097 o denominador misturava turmas — "0 de 16"
+ *  num cronograma de 3 duplas. Mesma régua do sibling acima: só duplas
+ *  ativas (pausada não deve cobertura) da trilha DPP. */
+export function coberturaEncontro(
+  duplas: Dupla[],
+  evento: CicloEvento
+): { registraram: number; total: number } {
+  const elegiveis = duplas.filter(
+    (d) =>
+      d.status === "ativa" &&
+      d.trilha !== "especialista" &&
+      d.cronograma_id === evento.cronograma_id
+  );
+  let registraram = 0;
+  for (const d of elegiveis)
+    if (
+      d.encontros.some(
+        (e) =>
+          e.numero === evento.numero &&
+          e.status === "realizado" &&
+          e.registro
+      )
+    )
+      registraram++;
+  return { registraram, total: elegiveis.length };
 }
 
 /** Texto da faixa "Esta semana" pronto pra WhatsApp da equipe.
@@ -1042,76 +1316,125 @@ export function saudadeDaDupla(dupla: Dupla, eventos: CicloEvento[], hoje = new 
   const ultimoReg = ultimoRegistro(dupla);
   const avaliacaoBaixa = ultimoReg?.avaliacao === "baixa";
   const comDificuldade = !!ultimoReg?.dificuldade && ultimoReg.dificuldade !== "nenhuma";
-  // campos comuns a todo retorno — os sinais novos (apoio do jovem,
-  // avaliações pendentes) acompanham o objeto em qualquer faixa
-  const base = { esperado, feitos, proximo, registroPendente, apoioJovem, avaliacaoJovemPendente };
 
-  if ((pediuApoio || apoioJovem) && (dupla.status === "ativa" || dupla.status === "pausada"))
-    // motivo em locução nominal — quem lê pode ser o próprio mentor ("Mentor
-    // pediu apoio" em 3ª pessoa lê como se fosse sobre outra pessoa)
-    return {
-      semaforo: "risco",
-      motivo:
-        pediuApoio && apoioJovem
-          ? "Pedidos de apoio em aberto"
-          : apoioJovem
-            ? "Pedido de ajuda do mentorado"
-            : "Pedido de apoio",
-      ...base,
-      pediuApoio,
-    };
-  // pedido de apoio fura o congelamento da pausada, mas não do fechamento —
-  // dupla concluída ou encerrada é capítulo encerrado
-  if (dupla.status !== "ativa")
-    return {
-      semaforo: "ok",
-      motivo:
-        dupla.status === "pausada"
-          ? "Dupla pausada"
-          : dupla.status === "concluida"
-            ? "Jornada concluída"
-            : "Dupla encerrada",
-      ...base,
-      pediuApoio: dupla.status === "pausada" && pediuApoio,
-      apoioJovem: dupla.status === "pausada" && apoioJovem,
-    };
+  // ---- apoio: eixo separado do semáforo (WP2) ----
+  // Pedido de apoio é chamado à coordenação — trabalho a fazer, não falha da
+  // jornada. Antes forçava risco; agora vive em `apoio` e nos flags de
+  // compat (pediuApoio/apoioJovem), filtrado pelas mesmas regras de
+  // visibilidade de sempre: ativa/pausada expõe, concluída/encerrada não.
+  const apoioAberto =
+    (pediuApoio || apoioJovem) &&
+    (dupla.status === "ativa" || dupla.status === "pausada");
+  const apoio: DuplaSaude["apoio"] = apoioAberto
+    ? {
+        aberto: true,
+        origem:
+          pediuApoio && apoioJovem
+            ? "ambos"
+            : apoioJovem
+              ? "mentorado"
+              : "mentor",
+      }
+    : { aberto: false };
+  const pediuApoioFlag = apoioAberto && pediuApoio;
+  const apoioJovemFlag = apoioAberto && apoioJovem;
+
+  // campos comuns a todo retorno — os sinais novos (apoio, avaliações
+  // pendentes) acompanham o objeto em qualquer faixa
+  const base = {
+    esperado,
+    feitos,
+    proximo,
+    registroPendente,
+    pediuApoio: pediuApoioFlag,
+    apoioJovem: apoioJovemFlag,
+    avaliacaoJovemPendente,
+    apoio,
+  };
+
+  // ---- fora da régua: pausada/concluída/encerrada não correm o semáforo ----
+  // A jornada congelada não acende critério nenhum (o "trabalho" do apoio
+  // aberto segue visível no campo próprio, mas não compõe estado). motivos
+  // carrega o rótulo único do status — é o que a linha exibe.
+  if (dupla.status !== "ativa") {
+    const motivo =
+      dupla.status === "pausada"
+        ? "Dupla pausada"
+        : dupla.status === "concluida"
+          ? "Jornada concluída"
+          : "Dupla encerrada";
+    return { semaforo: "ok", motivo, motivos: [motivo], sinais: [], ...base };
+  }
+
+  // ---- sinais: todo critério aceso, na ordem de prioridade histórica ----
+  // Antes a fila retornava no primeiro match e os demais se perdiam; agora
+  // cada um vira um Sinal. A ordem é a mesma dos early-returns antigos —
+  // motivos[0] continua sendo o motivo que um consumidor legado lia.
+  const sinais: Sinal[] = [];
+  // recência do sinal em "há N dias" — data-pura passa direto (parsear
+  // "YYYY-MM-DD" como UTC meia-noite voltaria um dia no fuso de SP)
+  const haDias = (iso: string | null | undefined): string | undefined => {
+    if (!iso) return undefined;
+    const dia = /^\d{4}-\d{2}-\d{2}$/.test(iso)
+      ? iso
+      : toDateStr(new Date(iso));
+    const d = diffDias(hojeStr, dia);
+    return `há ${d} ${d === 1 ? "dia" : "dias"}`;
+  };
+
+  // combo do último registro consome os sinais individuais (é UM critério —
+  // baixa+dificuldade juntas é risco; separadas seriam duas atenções)
   if (avaliacaoBaixa && comDificuldade)
-    return {
-      semaforo: "risco",
-      motivo: `Avaliação baixa e dificuldade de ${DIFICULDADE_LABEL[ultimoReg!.dificuldade!] ?? ultimoReg!.dificuldade} no último encontro`,
-      ...base,
-      pediuApoio,
-    };
+    sinais.push({
+      tipo: "avaliacao_baixa_dificuldade",
+      tom: "risco",
+      texto: `Avaliação baixa e dificuldade de ${DIFICULDADE_LABEL[ultimoReg!.dificuldade!] ?? ultimoReg!.dificuldade} no último encontro`,
+    });
+
   // atraso só existe contra um calendário — na especialista esperado = feitos
-  if (!ehEspecialista && atraso >= 2)
-    return { semaforo: "risco", motivo: `${atraso} encontros em atraso`, ...base, pediuApoio };
-  if (!ehEspecialista && atraso === 1)
-    return {
-      semaforo: "atencao",
-      motivo: `Encontro ${primeiroEncontroFaltante(dupla, eventos, hoje, limbo) ?? esperado} ainda não aconteceu (reposição na mesma semana)`,
-      ...base,
-      pediuApoio,
-    };
-  if (avaliacaoBaixa)
-    return {
-      semaforo: "atencao",
-      motivo: "Avaliação baixa no último encontro",
-      ...base,
-      pediuApoio,
-    };
-  if (comDificuldade)
-    return {
-      semaforo: "atencao",
-      motivo: `Dificuldade de ${DIFICULDADE_LABEL[ultimoReg!.dificuldade!] ?? ultimoReg!.dificuldade} identificada`,
-      ...base,
-      pediuApoio,
-    };
+  if (!ehEspecialista && atraso > 0) {
+    // encontros oficiais já vencidos que nenhum realizado cobre — vira o
+    // "6º e 7º" da linha; só sai no detalhe quando bate com a conta (um
+    // realizado fora da janela pode cobrir outro número)
+    const faltantes = [...numerosEsperados].filter(
+      (n) =>
+        !dupla.encontros.some((e) => e.numero === n && e.status === "realizado")
+    );
+    sinais.push(
+      atraso >= 2
+        ? {
+            tipo: "atraso",
+            tom: "risco",
+            texto: `${atraso} encontros em atraso`,
+            ...(faltantes.length === atraso
+              ? { detalhe: faltantes.map((n) => `${n}º`).join(" e ") }
+              : {}),
+          }
+        : {
+            tipo: "atraso",
+            tom: "atencao",
+            texto: `Encontro ${primeiroEncontroFaltante(dupla, eventos, hoje, limbo) ?? esperado} ainda não aconteceu (reposição na mesma semana)`,
+          }
+    );
+  }
+  if (avaliacaoBaixa && !comDificuldade)
+    sinais.push({
+      tipo: "avaliacao_baixa",
+      tom: "atencao",
+      texto: "Avaliação baixa no último encontro",
+    });
+  if (comDificuldade && !avaliacaoBaixa)
+    sinais.push({
+      tipo: "dificuldade",
+      tom: "atencao",
+      texto: `Dificuldade de ${DIFICULDADE_LABEL[ultimoReg!.dificuldade!] ?? ultimoReg!.dificuldade} identificada`,
+    });
   // preventivo: encontro oficial da semana bate em ≤5 dias e a dupla ainda não marcou nada
   // (qualquer row com esse numero — agendada, realizada, cancelada — já cobre o encontro).
   // Só DPP: a especialista não tem data oficial — "ainda não agendou" não é sinal.
   if (!ehEspecialista) {
     const oficial = eventoDaSemana(eventos, hoje);
-    const diasAteOficial = oficial ? diffDias(oficial.data, toDateStr(hoje)) : null;
+    const diasAteOficial = oficial ? diffDias(oficial.data, hojeStr) : null;
     const oficialNaDupla =
       oficial?.numero != null && dupla.encontros.some((e) => e.numero === oficial.numero);
     if (
@@ -1122,25 +1445,42 @@ export function saudadeDaDupla(dupla: Dupla, eventos: CicloEvento[], hoje = new 
       !proximo &&
       !oficialNaDupla
     )
-      return {
-        semaforo: "atencao",
-        motivo: `O ${oficial.numero}º encontro é ${formatDiaSemanaMes(oficial.data)} e ainda não foi agendado`,
-        ...base,
-        pediuApoio,
-      };
+      sinais.push({
+        tipo: "preventivo",
+        tom: "atencao",
+        texto: `O ${oficial.numero}º encontro é ${formatDiaSemanaMes(oficial.data)} e ainda não foi agendado`,
+      });
   }
-  if (pendencia)
-    return {
-      semaforo: "atencao",
-      motivo:
-        pendencia.status === "agendado"
-          ? `${pendencia.numero}º encontro agendado já passou: falta o registro`
-          : "Encontro realizado sem registro",
-      ...base,
-      pediuApoio,
-    };
-  if (encaminhamentoVencido)
-    return { semaforo: "atencao", motivo: "Combinado com prazo vencido", ...base, pediuApoio };
+  if (pendencia) {
+    const quando = pendencia.realizado_em ?? pendencia.data_hora;
+    sinais.push(
+      pendencia.status === "agendado"
+        ? {
+            tipo: "limbo",
+            tom: "atencao",
+            texto: `${pendencia.numero}º encontro agendado já passou: falta o registro`,
+            ...(haDias(quando) ? { detalhe: haDias(quando) } : {}),
+          }
+        : {
+            tipo: "registro_pendente",
+            tom: "atencao",
+            texto: "Encontro realizado sem registro",
+            ...(haDias(quando) ? { detalhe: haDias(quando) } : {}),
+          }
+    );
+  }
+  if (encaminhamentoVencido) {
+    // o combinado mais atrasado dita a recência do sinal
+    const maisAntigo = dupla.encaminhamentos
+      .filter((t) => t.status === "pendente" && t.prazo && t.prazo < hojeStr)
+      .sort((a, b) => a.prazo!.localeCompare(b.prazo!))[0]?.prazo;
+    sinais.push({
+      tipo: "encaminhamento_vencido",
+      tom: "atencao",
+      texto: "Combinado com prazo vencido",
+      ...(haDias(maisAntigo) ? { detalhe: haDias(maisAntigo) } : {}),
+    });
+  }
   // estagnação da trilha especialista (0073): sem calendário oficial, o
   // "parou no tempo" não aparece em atraso — 90 dias de trilha aberta sem
   // sessão recente nem agendada é o nudge do guia pra revisar o fit.
@@ -1164,18 +1504,24 @@ export function saudadeDaDupla(dupla: Dupla, eventos: CicloEvento[], hoje = new 
         new Date(e.data_hora).getTime() >= hoje.getTime()
     )
   )
-    return {
-      semaforo: "atencao",
-      motivo: "Trilha com 3 meses sem sessão nova — checar se segue fazendo sentido",
-      ...base,
-      pediuApoio,
-    };
-  return {
-    semaforo: "ok",
-    motivo: proximo ? `Próximo encontro ${formatDate(proximo.data_hora)}` : "Em dia",
-    ...base,
-    pediuApoio,
-  };
+    sinais.push({
+      tipo: "estagnacao",
+      tom: "atencao",
+      texto: "Trilha com 3 meses sem sessão nova — checar se segue fazendo sentido",
+    });
+
+  // o veredito é a pior faixa acesa — e o motivo o primeiro texto, como
+  // sempre foi (o consumidor legado não nota a diferença)
+  const semaforo: Semaforo = sinais.some((s) => s.tom === "risco")
+    ? "risco"
+    : sinais.length > 0
+      ? "atencao"
+      : "ok";
+  const motivos =
+    sinais.length > 0
+      ? sinais.map((s) => s.texto)
+      : [proximo ? `Próximo encontro ${formatDate(proximo.data_hora)}` : "Em dia"];
+  return { semaforo, motivo: motivos[0], motivos, sinais, ...base };
 }
 
 /** Encontro da trilha ainda sem row em `encontros` — candidato a "aconteceu
@@ -1508,6 +1854,12 @@ const fmtDia = new Intl.DateTimeFormat("en-CA", {
   day: "2-digit",
 });
 
+const fmtHoraInteira = new Intl.DateTimeFormat("pt-BR", {
+  timeZone: TZ,
+  hour: "2-digit",
+  hourCycle: "h23",
+});
+
 /** "hoje" no fuso do programa — en-CA formata YYYY-MM-DD. */
 export function toDateStr(d: Date): string {
   return fmtDia.format(d);
@@ -1525,6 +1877,18 @@ function paraData(iso: string): Date {
 // o ciclo cruza a virada do ano ("2026/2027" = out→jun) — "15 de jan." sem
 // ano é ambíguo em registro e log, então os formatos de prosa levam ano
 // sempre; os compactos de grid/trilha (diaCompacto, formatDiaNum) ficam sem
+/** "T1 · 2026/2027" → { nome: "Turma 1", ano: "2026/2027" } — o rótulo
+ *  curto vira o nome forte e o ano perde peso visual (decisão REALIZA-151).
+ *  Turma sem o padrão ("2025/2026", texto livre) devolve o valor inteiro
+ *  como nome — dado do usuário não é normalizado à força. */
+export function partesTurma(
+  turma: string
+): { nome: string; ano: string | null } {
+  const m = turma.match(/^T(\d+)\s*[·\-.]?\s*(.+)$/);
+  if (!m) return { nome: turma, ano: null };
+  return { nome: `Turma ${m[1]}`, ano: m[2].trim() };
+}
+
 export function formatDate(iso: string | null | undefined): string {
   if (!iso) return "a definir";
   const d = paraData(iso);
@@ -1673,6 +2037,29 @@ export function rotuloSlot(iso: string): string {
   return `${formatDiaSemana(iso).replace("-feira", "")} ${formatDiaHora(iso)}`;
 }
 
+/** O slot proposto cai dentro da grade de disponibilidade? Recebe um
+ *  timestamptz (o `inicio` da RPC slots_livres / slot_proposto da mesa) e
+ *  cruza com as `celulas` da Disponibilidade — a régua pra destacar os
+ *  horários do especialista que batem com a grade do jovem (WP6). O dia e a
+ *  hora são lidos no fuso do programa: `new Date(iso).getHours()` daria a
+ *  hora da máquina, que em UTC puxa o slot 3h pra frente — mesma razão pela
+ *  qual a agenda usa Intl com timeZone e nunca getHours(). Slot inválido =
+ *  incompatível (false), não erro. */
+export function slotCompativel(
+  d: Disponibilidade | null | undefined,
+  iso: string
+): boolean {
+  const dt = new Date(iso);
+  if (isNaN(dt.getTime())) return false;
+  // formatToParts, não Number(format()) — se o CLDR passar a renderizar
+  // "19h" em pt-BR, Number() devolvia NaN e todo slot virava incompatível
+  const hora = Number(
+    fmtHoraInteira.formatToParts(dt).find((p) => p.type === "hour")?.value
+  );
+  if (isNaN(hora)) return false;
+  return disponibilidadeNaHora(d, diaSemanaDe(toDateStr(dt)), hora);
+}
+
 /** Sugestões do TagInput de áreas de atuação (onboarding + /perfil + ficha da
  *  coordenação) — o campo aceita digitação livre; a lista só acelera o toque.
  *  Teto de 10 itens / 40 chars por área é o CHECK profiles_areas_ok (0030). */
@@ -1728,6 +2115,21 @@ export function papelCurto(role: string | null | undefined) {
  *  não olha papel (as policies trabalham com o vínculo supervisor_id). */
 export function podeSupervisionar(role: string | null | undefined): boolean {
   return role === "supervisor" || role === "coordenacao";
+}
+
+/** D5 — no máximo 1 lembrete por dupla a cada 48h, qualquer autor, incluindo
+ *  o WhatsApp manual (tipo `nudge` em `interacoes`). A RPC `enviar_lembrete`
+ *  e a rota `/api/nudge` fazem cumprir; na UI o botão desabilita com a data. */
+export const LEMBRETE_INTERVALO_MS = 48 * 3600 * 1000;
+
+/** Até quando a dupla está bloqueada pra novo lembrete — null se livre. */
+export function lembreteBloqueadoAte(
+  ultimoNudge: { created_at: string } | null | undefined,
+  agora: Date | number = new Date()
+): Date | null {
+  if (!ultimoNudge) return null;
+  const fim = new Date(ultimoNudge.created_at).getTime() + LEMBRETE_INTERVALO_MS;
+  return fim > +agora ? new Date(fim) : null;
 }
 
 export function waLink(phone: string | null | undefined, mensagem: string): string | null {
@@ -1805,3 +2207,27 @@ export function tempoRelativo(iso: string, agoraMs: number): string {
   if (d < 7) return `há ${d} d`;
   return formatDate(iso);
 }
+
+// ---------- chamados (0084) ----------
+// Labels moram aqui (módulo puro, sem next/headers) porque quem renderiza
+// é client component — queries-chamados é server-only.
+
+export const CHAMADO_CATEGORIA_LABEL: Record<ChamadoCategoria, string> = {
+  agenda: "Agenda",
+  metodologia: "Metodologia",
+  plataforma: "Plataforma",
+  urgencia: "Urgência",
+  outro: "Outro",
+};
+
+export const CHAMADO_STATUS_LABEL: Record<ChamadoStatus, string> = {
+  aberto: "Aberto",
+  em_atendimento: "Em atendimento",
+  resolvido: "Resolvido",
+};
+
+export const CHAMADO_ORIGEM_LABEL: Record<string, string> = {
+  manual: "Manual",
+  registro: "Registro de encontro",
+  avaliacao_jovem: "Avaliação do jovem",
+};

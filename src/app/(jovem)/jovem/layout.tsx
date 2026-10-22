@@ -80,7 +80,6 @@ export default async function JovemLayout({
       <DemoBar variant="float" papel={demo} personas={demoPersonas} />
     </div>
   );
-
   if (!me.onboarded_em) {
     // a ficha do jovem preenche a grade e o contato do wizard — null = a
     // coordenação ainda não vinculou o cadastro (os passos mostram o

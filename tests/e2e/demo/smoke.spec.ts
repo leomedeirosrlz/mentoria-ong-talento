@@ -23,7 +23,7 @@ test("agenda: painel de etapas de preparação + semana do encontro", async ({
   page,
 }) => {
   await entrarNaDemo(page, "coordenacao");
-  await page.goto("/agenda");
+  await page.goto("/agenda?aba=calendario");
 
   // a semana corrente tem encontro oficial — rótulo "Semana do Nº encontro"
   // ou, em semana dupla, "Semana dos encontros N e M"
@@ -43,7 +43,9 @@ test("agenda: painel de etapas de preparação + semana do encontro", async ({
 
 test("mentor DPP: entra na demo e vê a jornada", async ({ page }) => {
   await entrarNaDemo(page, "mentor_dpp");
-  await page.goto("/agenda");
+  // WP3: o default do mentor virou "Minha agenda" — o calendário oficial é
+  // a aba explícita ?aba=calendario
+  await page.goto("/agenda?aba=calendario");
 
   // agenda do mentor: semana do encontro + trilha/rail do ciclo
   await expect(
@@ -71,12 +73,20 @@ test("mentorado: card → wizard do 1º acesso → home do /jovem, e volta pra s
   await expect(
     page.getByRole("heading", { name: "Quando dá pra você?" })
   ).toBeVisible();
-  await expect(page.getByRole("button", { name: "Domingo" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Manhã" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Terça" })).toHaveAttribute(
-    "aria-pressed",
-    "true"
-  );
+  // a grade agora é a matriz dia×período (REALIZA-163) — ter/qui × noite
+  // da ficha demo viram as duas células ligadas
+  await expect(
+    page.getByRole("grid", { name: "Dias e períodos livres na semana" })
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Alternar Domingo inteiro" })
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Terça de noite" })
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(
+    page.getByRole("button", { name: "Quinta de noite" })
+  ).toHaveAttribute("aria-pressed", "true");
 
   // "Preencher depois" é a saída honesta — na demo a grade já veio pronta,
   // então seguimos por ela pra conferir o passo de contato
@@ -128,4 +138,31 @@ test("mentorado: card → wizard do 1º acesso → home do /jovem, e volta pra s
   await expect(
     page.getByRole("button", { name: "Controles da demonstração" })
   ).toContainText("Coordenação");
+});
+
+test("stub demo: tabelas da rodada têm dataset (sem aviso no console)", async ({
+  page,
+}) => {
+  // Quando uma superfície consulta uma tabela sem caso em linhas(), o stub
+  // devolve [] e avisa `[demo] tabela "X" consultada sem dataset` UMA vez.
+  // As tabelas das telas finais já têm dataset — este teste é o guardrail:
+  // quando /chamados (ou a superfície de papeis/devolutivas) entrar, uma
+  // regressão do caso em linhas() falha aqui em vez de renderizar vazio.
+  const avisos: string[] = [];
+  page.on("console", (msg) => {
+    if (
+      msg.type() === "warning" &&
+      /\[demo\] tabela "(chamados|chamado_comentarios|chamado_atualizacoes|devolutivas|profile_papeis)"/.test(
+        msg.text()
+      )
+    )
+      avisos.push(msg.text());
+  });
+  await entrarNaDemo(page, "coordenacao");
+  await page.goto("/");
+  await page.goto("/agenda");
+  // WP3: o calendário continua sendo a superfície pesada da agenda — a
+  // visita à aba explícita mantém a cobertura de console-error nela
+  await page.goto("/agenda?aba=calendario");
+  expect(avisos).toEqual([]);
 });

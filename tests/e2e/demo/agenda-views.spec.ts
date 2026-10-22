@@ -14,10 +14,13 @@ test.describe("agenda demo — visões Semana e Horários (REALIZA-25)", () => {
     page,
   }) => {
     await entrarNaDemo(page, "mentor_dpp");
-    await page.goto("/agenda");
+    // WP3: a agenda do mentor abre na aba "Minha agenda" — o calendário
+    // (mes/semana/horários) vive na aba explícita ?aba=calendario
+    await page.goto("/agenda?aba=calendario");
 
-    // três chips do mentor — horários incluído (a coord não tem esse)
-    for (const v of ["mes", "semana", "horarios"])
+    // quatro chips do mentor — dia/mês/semana/horários (a coord não tem
+    // "horarios"; "dia" entrou no REALIZA-163)
+    for (const v of ["dia", "mes", "semana", "horarios"])
       await expect(
         page.locator(`input[name="agenda-visao"][value="${v}"]`)
       ).toBeAttached();
@@ -42,7 +45,9 @@ test.describe("agenda demo — visões Semana e Horários (REALIZA-25)", () => {
     ).toHaveCount(8);
 
     // clique num slot vazio (quarta ~10h — fora da tinta e longe do bloco do
-    // 5º encontro, que fica na terça às 19h) abre o diálogo de agendamento
+    // 5º encontro, que fica na terça às 19h) abre o seletor de dupla —
+    // Ricardo tem duas (Bia × T1 e Matheus × T2, WP3), então o clique abre
+    // um menu "Remarcar com <jovem>" e a escolha é que abre o diálogo
     const qua = page.getByRole("button", {
       name: /^Agendar encontro na quarta-feira/,
     });
@@ -52,6 +57,9 @@ test.describe("agenda demo — visões Semana e Horários (REALIZA-25)", () => {
     await qua.click({
       position: { x: box.width / 2, y: box.height * 0.25 },
     });
+    await page
+      .getByRole("menuitem", { name: /Remarcar com Bia/ })
+      .click();
 
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
@@ -71,9 +79,9 @@ test.describe("agenda demo — visões Semana e Horários (REALIZA-25)", () => {
 
   test("coordenação demo não tem a visão de horários", async ({ page }) => {
     await entrarNaDemo(page, "coordenacao");
-    await page.goto("/agenda");
+    await page.goto("/agenda?aba=calendario");
 
-    for (const v of ["semana", "mes", "lista"])
+    for (const v of ["dia", "semana", "mes", "lista"])
       await expect(
         page.locator(`input[name="agenda-visao"][value="${v}"]`)
       ).toBeAttached();

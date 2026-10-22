@@ -9,6 +9,15 @@ import {
   XCircle,
 } from "@phosphor-icons/react";
 import { toast } from "sonner";
+
+/** corrida de aceite → copy humana (o erro cru da RPC virava toast técnico;
+ *  onErro segue recebendo a mensagem original — marcarTomada testa nela) */
+const toastErro = (e: string) =>
+  toast.error(
+    ERRO_JA_ACEITA.test(e)
+      ? "Este pedido já foi aceito por outro especialista."
+      : e
+  );
 import {
   aceitarProposta,
   aceitarSolicitacao,
@@ -18,6 +27,7 @@ import {
 } from "@/lib/actions-especialista";
 import type {
   AppRole,
+  Disponibilidade,
   SolicitacaoEspecialista,
   SolicitacaoProposta,
 } from "@/lib/types";
@@ -31,8 +41,46 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
-import { rotuloSlot, tempoRelativo } from "@/lib/ciclo";
-import { cn } from "@/lib/utils";
+import {
+  formatDiaHora,
+  formatDiaNum,
+  formatDiaSemana,
+  rotuloSlot,
+  slotCompativel,
+  tempoRelativo,
+  toDateStr,
+} from "@/lib/ciclo";
+import { cn, ERRO_JA_ACEITA } from "@/lib/utils";
+
+/** "19:00" da grade do especialista — derivado do formatDiaHora pra ficar
+ *  no fuso do programa (os helpers de ciclo.ts todos usam America/Sao_Paulo;
+ *  Date.getHours() local poderia divergir do rótulo). */
+function horaDoSlot(iso: string): string {
+  return formatDiaHora(iso).split("às ")[1] ?? "";
+}
+
+/** "19h" — chip do slot; hora quebrada ("19:30") fica como veio. */
+function horaCurta(iso: string): string {
+  return horaDoSlot(iso).replace(/:00$/, "h");
+}
+
+/** Rótulo do dia na grade: "Seg 13" + a janela do dia "14–18h" (a faixa do
+ *  primeiro ao último horário livre + 1h — slot é hora de início). */
+function rotuloDia(iso: string): string {
+  const semana = formatDiaSemana(iso);
+  const curta = semana ? semana.slice(0, 3) : "";
+  const dia = curta
+    ? `${curta.charAt(0).toUpperCase()}${curta.slice(1)} ${formatDiaNum(iso)}`
+    : formatDiaNum(iso);
+  return dia;
+}
+
+function faixaDoDia(slotsDia: string[]): string {
+  const horas = slotsDia.map((s) => parseInt(horaDoSlot(s), 10));
+  const min = Math.min(...horas);
+  const max = Math.max(...horas) + 1;
+  return `${min}–${max}h`;
+}
 
 /** Quem pode recusar: só o especialista procurado/engajado (a recusa é um
  *  não pessoal — pedido broadcast o especialista simplesmente não pega). */
@@ -98,19 +146,39 @@ function Thread({ propostas, s, meuId, agoraMs }: {
 }
 
 /** Form de contra-proposta — o slot sai SEMPRE da grade do especialista da
- *  negociação (a RPC rejeita horário fora dela, dos dois lados da mesa). */
+ *  negociação (a RPC rejeita horário fora dela, dos dois lados da mesa).
+ *  Seleção em grade por dia (mock v6 .days): cada horário livre é um radio;
+ *  quando o caller passa a `disponibilidade` de quem escolhe, o slot que
+ *  encaixa na grade dele ganha o destaque âmbar "encaixa com você". */
 function ContraPropostaForm({
   solicitacaoId,
   slots,
+  disponibilidade,
   onFechar,
+  onErro,
 }: {
   solicitacaoId: string;
   slots: string[];
+  /** Grade de quem escolhe (o jovem na mesa dele) — pinta os encaixes;
+   *  sem a prop os slots renderizam neutros. */
+  disponibilidade?: Disponibilidade | null;
   onFechar: () => void;
+  /** opcional — o chamador observa erros de domínio (ex.: aceite em corrida). */
+  onErro?: (mensagem: string) => void;
 }) {
   const [slot, setSlot] = useState<string | null>(null);
   const [mensagem, setMensagem] = useState("");
   const [pendente, start] = useTransition();
+  // agrupa os slots por dia no fuso do programa (toDateStr é TZ-aware)
+  const porDia = new Map<string, string[]>();
+  for (const sl of slots) {
+    const dia = toDateStr(new Date(sl));
+    (porDia.get(dia) ?? porDia.set(dia, []).get(dia)!).push(sl);
+  }
+  const algumCompat =
+    disponibilidade != null &&
+    slots.some((sl) => slotCompativel(disponibilidade, sl));
+
   if (slots.length === 0) {
     return (
       <p className="text-xs text-muted-foreground">
@@ -120,22 +188,71 @@ function ContraPropostaForm({
   }
   return (
     <div className="space-y-2 rounded-lg border border-border/60 bg-muted/30 p-3">
-      <Select
-        value={slot}
-        onValueChange={(v) => setSlot(v as string)}
-        items={Object.fromEntries(slots.map((sl) => [sl, rotuloSlot(sl)]))}
+      <div
+        role="radiogroup"
+        aria-label="Horários livres do especialista"
+        className="space-y-1.5"
       >
-        <SelectTrigger size="sm" aria-label="Novo horário">
-          <SelectValue placeholder="Escolha um horário da agenda" />
-        </SelectTrigger>
-        <SelectContent>
-          {slots.map((sl) => (
-            <SelectItem key={sl} value={sl}>
-              {rotuloSlot(sl)}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+        {[...porDia.entries()].map(([dia, slotsDia]) => (
+          <div
+            key={dia}
+            className="flex flex-wrap items-center gap-1.5 rounded-lg border border-border/60 bg-card px-2 py-1.5"
+          >
+            <span className="w-16 shrink-0 text-xs leading-tight font-semibold">
+              {rotuloDia(slotsDia[0])}
+              <span className="block font-normal text-muted-foreground">
+                {faixaDoDia(slotsDia)}
+              </span>
+            </span>
+            {slotsDia.map((sl) => {
+              const compat = disponibilidade
+                ? slotCompativel(disponibilidade, sl)
+                : false;
+              return (
+                <label key={sl} className="inline-flex flex-col items-center">
+                  <input
+                    type="radio"
+                    name={`cp-slot-${solicitacaoId}`}
+                    value={sl}
+                    checked={slot === sl}
+                    onChange={() => setSlot(sl)}
+                    className="peer sr-only"
+                    aria-label={`${rotuloSlot(sl)}${compat ? " — encaixa com você" : ""}`}
+                  />
+                  <span
+                    title={compat ? "encaixa com você" : undefined}
+                    className={cn(
+                      "inline-flex min-h-11 min-w-14 cursor-pointer items-center justify-center rounded-lg border border-input bg-card px-2 text-sm font-semibold tabular-nums transition-colors",
+                      "peer-checked:border-foreground peer-checked:bg-foreground peer-checked:text-background peer-hover:bg-muted peer-focus-visible:ring-2 peer-focus-visible:ring-ring/50",
+                      compat &&
+                        "border-[var(--warn)]/70 bg-[var(--role-mentorado)]/15"
+                    )}
+                  >
+                    {horaCurta(sl)}
+                  </span>
+                  {compat && (
+                    <span
+                      aria-hidden
+                      className="mt-0.5 text-[10px] leading-none font-medium text-[var(--warn-text)]"
+                    >
+                      encaixa
+                    </span>
+                  )}
+                </label>
+              );
+            })}
+          </div>
+        ))}
+      </div>
+      {algumCompat && (
+        <p className="text-[11px] text-muted-foreground">
+          <span
+            aria-hidden
+            className="mr-1 inline-block size-2 rounded-full bg-[var(--warn)] align-middle"
+          />
+          Em âmbar = encaixa com a sua grade de disponibilidade.
+        </p>
+      )}
       <Textarea
         value={mensagem}
         onChange={(e) => setMensagem(e.target.value)}
@@ -154,7 +271,10 @@ function ContraPropostaForm({
                 slot!,
                 mensagem.trim() || null
               );
-              if (r.error) toast.error(r.error);
+              if (r.error) {
+                toastErro(r.error);
+                onErro?.(r.error);
+              }
               else {
                 toast.success("Contra-proposta enviada.");
                 onFechar();
@@ -178,9 +298,12 @@ function ContraPropostaForm({
 function RecusaForm({
   solicitacaoId,
   onFechar,
+  onErro,
 }: {
   solicitacaoId: string;
   onFechar: () => void;
+  /** opcional — o chamador observa erros de domínio (ex.: aceite em corrida). */
+  onErro?: (mensagem: string) => void;
 }) {
   const [texto, setTexto] = useState("");
   const [pendente, start] = useTransition();
@@ -201,7 +324,10 @@ function RecusaForm({
           onClick={() =>
             start(async () => {
               const r = await recusarSolicitacao(solicitacaoId, texto.trim());
-              if (r.error) toast.error(r.error);
+              if (r.error) {
+                toastErro(r.error);
+                onErro?.(r.error);
+              }
               else {
                 toast.success("Pedido recusado — o autor foi avisado.");
                 onFechar();
@@ -232,7 +358,10 @@ export function SolicitacaoNegociacao({
   meuId,
   papel,
   waCoord,
+  disponibilidade,
+  mentoradosProprios,
   onAceito,
+  onErro,
 }: {
   s: SolicitacaoEspecialista;
   propostas: SolicitacaoProposta[];
@@ -247,9 +376,20 @@ export function SolicitacaoNegociacao({
    *  (expirou, idas e vindas demais): o especialista NÃO é contato dele
    *  antes do aceite (jovem_contatos), então "falar com alguém" = a equipe. */
   waCoord?: string | null;
+  /** Grade de disponibilidade de quem escolhe o horário — na mesa do jovem
+   *  é a dele (jovem_perfil.disponibilidade); pinta "encaixa com você" nos
+   *  slots da grade de dias da contra-proposta. Null/ausente = sem destaque. */
+  disponibilidade?: Disponibilidade | null;
   /** opcional — chamado com a dupla criada/efetivada quando o aceite fecha
    *  (o mural navega pra ficha da nova dupla). */
   onAceito?: (duplaId?: string) => void;
+  /** opcional — chamado com a mensagem quando uma ação da mesa falha (o
+   *  mural do especialista marca "já aceita por outro" na corrida de aceite). */
+  onErro?: (mensagem: string) => void;
+  /** mentorado_ids das duplas DPP vivas do visitante — quem já mentora o
+   *  jovem numa trilha DPP não pode se aceitar como especialista dele (a
+   *  trilha pede um segundo adulto; a RPC 0097 também barra). */
+  mentoradosProprios?: string[];
 }) {
   const [agoraMs] = useState(() => Date.now());
   const [abrindo, setAbrindo] = useState<"proposta" | "recusa" | null>(null);
@@ -263,6 +403,7 @@ export function SolicitacaoNegociacao({
   const souAutor = s.created_by === meuId || papel === "coordenacao";
   const souEsp =
     papel === "mentor_especialista" &&
+    !mentoradosProprios?.includes(s.mentorado_id) &&
     (s.especialista_id === meuId ||
       s.especialista_desejado_id === meuId ||
       (s.especialista_id == null && s.especialista_desejado_id == null));
@@ -381,8 +522,10 @@ export function SolicitacaoNegociacao({
                   onClick={() =>
                     start(async () => {
                       const r = await aceitarSolicitacao(s.id);
-                      if (r.error) toast.error(r.error);
-                      else {
+                      if (r.error) {
+                        toastErro(r.error);
+                        onErro?.(r.error);
+                      } else {
                         toast.success("Pedido aceito — sessão marcada.");
                         onAceito?.(r.duplaId);
                       }
@@ -425,8 +568,10 @@ export function SolicitacaoNegociacao({
                     onClick={() =>
                       start(async () => {
                         const r = await aceitarSolicitacao(s.id, slotAceite!);
-                        if (r.error) toast.error(r.error);
-                        else {
+                        if (r.error) {
+                          toastErro(r.error);
+                          onErro?.(r.error);
+                        } else {
                           toast.success("Pedido aceito — sessão marcada.");
                           onAceito?.(r.duplaId);
                         }
@@ -438,15 +583,19 @@ export function SolicitacaoNegociacao({
                   </Button>
                 </>
               )}
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={abrindo === "proposta"}
-                onClick={() => setAbrindo("proposta")}
-              >
-                <ArrowsClockwise size={15} />
-                Propor outro horário
-              </Button>
+              {/* mesmo teto do lado autor: a RPC trava na 5ª proposta —
+                  o botão some antes de prometer um gesto impossível */}
+              {propostas.length < 4 && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={abrindo === "proposta"}
+                  onClick={() => setAbrindo("proposta")}
+                >
+                  <ArrowsClockwise size={15} />
+                  Propor outro horário
+                </Button>
+              )}
               {podeRecusar(s, meuId) && (
                 <Button
                   size="sm"
@@ -464,14 +613,25 @@ export function SolicitacaoNegociacao({
             <ContraPropostaForm
               solicitacaoId={s.id}
               slots={slots}
+              disponibilidade={disponibilidade}
               onFechar={() => setAbrindo(null)}
+              onErro={onErro}
             />
           )}
           {abrindo === "recusa" && (
             <RecusaForm
               solicitacaoId={s.id}
               onFechar={() => setAbrindo(null)}
+              onErro={onErro}
             />
+          )}
+          {/* o aviso do teto existia só pro autor — o especialista é quem
+              costuma propor mais; sem ele a mesa parecia bugada */}
+          {propostas.length >= 4 && (
+            <p className="text-xs text-muted-foreground">
+              Limite de propostas na mesa — combinem o horário por outro
+              canal.
+            </p>
           )}
         </div>
       ) : souAutor ? (
@@ -487,8 +647,10 @@ export function SolicitacaoNegociacao({
                   onClick={() =>
                     start(async () => {
                       const r = await aceitarProposta(s.id);
-                      if (r.error) toast.error(r.error);
-                      else {
+                      if (r.error) {
+                        toastErro(r.error);
+                        onErro?.(r.error);
+                      } else {
                         toast.success("Horário aceito — sessão marcada.");
                         onAceito?.(r.duplaId);
                       }
@@ -500,17 +662,21 @@ export function SolicitacaoNegociacao({
                 </Button>
               )}
               {/* a RPC trava na 5ª proposta ("combinem por outro canal") —
-                  o botão some no teto e a saída honesta é o canal humano */}
-              {s.especialista_id && propostas.length < 4 && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setAbrindo("proposta")}
-                >
-                  <ArrowsClockwise size={15} />
-                  Propor outro horário
-                </Button>
-              )}
+                  o botão some no teto e a saída honesta é o canal humano.
+                  E coord é parte só pra aceitar/cancelar — a RPC de
+                  contra-proposta não tem ramo dela */}
+              {s.especialista_id &&
+                propostas.length < 4 &&
+                papel !== "coordenacao" && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setAbrindo("proposta")}
+                  >
+                    <ArrowsClockwise size={15} />
+                    Propor outro horário
+                  </Button>
+                )}
               <ConfirmDeleteButton
                 titulo="Cancelar pedido?"
                 descricao={
@@ -538,7 +704,9 @@ export function SolicitacaoNegociacao({
             <ContraPropostaForm
               solicitacaoId={s.id}
               slots={slots}
+              disponibilidade={disponibilidade}
               onFechar={() => setAbrindo(null)}
+              onErro={onErro}
             />
           )}
           {propostas.length >= 4 ? (

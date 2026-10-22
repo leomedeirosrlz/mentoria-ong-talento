@@ -4,11 +4,27 @@ export type AppRole =
   | "mentor_dpp"
   | "mentor_especialista"
   | "mentorado";
+
+/** Papéis efetivos (WP0b · profile_papeis): `role` é só o primário — o
+ *  híbrido DPP+especialista tem o segundo papel numa linha extra. `getMe`
+ *  carrega `papeis` via my_papeis(); embeds/personas trazem só o primário,
+ *  então o campo é opcional e o fallback cobre os dois mundos. */
+export function temPapel(
+  p: { role: AppRole | null; papeis?: AppRole[] | null } | null | undefined,
+  papel: AppRole
+): boolean {
+  if (!p) return false;
+  return p.role === papel || (p.papeis?.includes(papel) ?? false);
+}
 /** 'concluida' (0037) = jornada percorrida até o fim; 'encerrada' = fechamento
  *  antecipado. Ambas liberam a vaga e congelam a trilha como a encerrada. */
 export type DuplaStatus = "ativa" | "pausada" | "concluida" | "encerrada";
 export type Trilha = "dpp" | "especialista";
+// remarcado/cancelado são legados do enum — nenhum writer os grava mais
+// (remarcação grava "agendado"; nao_aconteceu é reversível e cobre o cancel);
+// ficam no union porque rows antigas podem carregá-los e o read path trata.
 export type EncontroStatus = "agendado" | "realizado" | "remarcado" | "nao_aconteceu" | "cancelado";
+// idem 'atrasado' — valor-fantasma: o prazo vencido deriva de data, não se grava.
 export type EncaminhamentoStatus = "pendente" | "feito" | "atrasado";
 export type AvaliacaoJovem = "excelente" | "boa" | "regular" | "baixa";
 export type Dificuldade =
@@ -55,9 +71,18 @@ export type CorRaca =
 export type DiaSemana = "seg" | "ter" | "qua" | "qui" | "sex" | "sab" | "dom";
 export type Periodo = "manha" | "tarde" | "noite";
 
-/** Grade semanal do mentor — mentor_profiles.disponibilidade (jsonb com
- *  CHECK no banco: só essas chaves e vocabulário fechado). */
-export type Disponibilidade = { dias: DiaSemana[]; periodos: Periodo[] };
+/** Uma célula da grade semanal — (dia, período) marcado como livre. A
+ *  disponibilidade é a lista delas (≤21), não o produto dias×períodos:
+ *  "ter de manhã, qui à noite" só se expressa por célula (0100). */
+export type CelulaDisponibilidade = { dia: DiaSemana; periodo: Periodo };
+
+/** Grade semanal do mentor — mentor_profiles.disponibilidade e
+ *  mentorados.disponibilidade (jsonb com CHECK no banco: só a chave
+ *  `celulas` e vocabulário fechado; a 0100 aceita e normaliza a forma
+ *  legada {"dias","periodos"} pra esta). O jsonb gravado carrega também
+ *  `dias`/`periodos` derivados das células — superset pra leitura do app
+ *  antigo; o tipo expõe só a canônica. */
+export type Disponibilidade = { celulas: CelulaDisponibilidade[] };
 
 export type Profile = {
   id: string;
@@ -66,6 +91,8 @@ export type Profile = {
   email: string;
   whatsapp: string | null;
   role: AppRole | null;
+  /** Papéis efetivos (0085) — só o getMe/self carrega; embeds ficam sem. */
+  papeis?: AppRole[];
   ativo: boolean;
   /** Carimbo de criação do cadastro — vem em PROFILE_COLS_PUBLICAS; opcional
    *  porque fontes sem a coluna existem (personas demo, selects parciais). */
@@ -154,8 +181,8 @@ export type Mentorado = {
   objetivos?: string | null;
   escolaridade?: Escolaridade | null;
   origem?: string | null;
-  /** Grade semanal {dias,periodos} (0038) — insumo do matching, mesma forma
-   *  da de mentor_profiles. */
+  /** Grade semanal {celulas:[{dia,periodo}]} (0038, forma de células desde
+   *  a 0100) — insumo do matching, mesma forma da de mentor_profiles. */
   disponibilidade?: Disponibilidade | null;
   /** Dados civis do(a) jovem pro termo de participação (0046). Sensível —
    *  coordenação via mentorados_pessoal; signatário via token RPC. */
@@ -465,8 +492,6 @@ export type Dupla = {
   demanda: string | null;
   /** Solicitação que originou a dupla de especialista (null nas DPP). */
   solicitacao_id: string | null;
-  /** Link do PDM do mentorado (0044) — https obrigatório quando preenchido. */
-  pdm_url?: string | null;
   /** Dupla encerrada que esta substituiu num remanejamento (0063) —
    *  null = dupla original, sem linhagem. */
   remanejada_de?: string | null;
@@ -492,6 +517,7 @@ export type DuplaResumo = {
   mentor_id: string;
   mentorado_id: string;
   supervisor_id: string | null;
+  trilha: Trilha;
 };
 
 export type Material = {
@@ -541,6 +567,8 @@ export type Notificacao = {
     | "pedido_apoio"
     | "apoio_resolvido"
     | "dupla_formada"
+    // 0102 — aviso "faltam 2 encontros" pra coord/supervisor no ciclo da dupla
+    | "dupla_reta_final"
     | "demanda_especialista"
     | "solicitacao_registrada"
     | "especialista_aceitou"
@@ -555,13 +583,138 @@ export type Notificacao = {
     | "encontro_desfeito"
     | "solicitacao_triagem"
     | "solicitacao_proposta"
-    | "solicitacao_recusada";
+    | "solicitacao_recusada"
+    // 0084 — chamados unificados (fila de atendimento + conversa)
+    | "chamado_aberto"
+    | "chamado_atribuido"
+    | "chamado_atualizacao"
+    | "chamado_resposta_autor"
+    | "chamado_resolvido"
+    | "chamado_reaberto"
+    | "chamado_mencao"
+    // 0093+ — sugestão/devolutiva de trilha esp e o lembrete D5 (0094)
+    | "sugestao_especialista"
+    | "devolutiva_especialista"
+    | "lembrete"
+    // 0103 — resposta da avaliação por terceiros chegou (submit público)
+    | "terceiro_respondeu"
+    // 0108 — lembretes do prazo de 3 meses da trilha esp (tick diário):
+    // trilha_prazo → especialista (15d/7d/vencida); trilha_prazo_coord →
+    // coordenação no escopo da turma (só vencida)
+    | "trilha_prazo"
+    | "trilha_prazo_coord";
   titulo: string;
   corpo: string | null;
   href: string | null;
   lida_em: string | null;
   created_at: string;
 };
+
+// ---------- chamados unificados (0084, WP1 telas finais) ----------
+
+export type ChamadoCategoria =
+  | "agenda"
+  | "metodologia"
+  | "plataforma"
+  | "urgencia"
+  | "outro";
+export type ChamadoStatus = "aberto" | "em_atendimento" | "resolvido";
+export type ChamadoOrigem = "manual" | "registro" | "avaliacao_jovem";
+
+/** Row da tabela `chamados`. autor_id é null quando o autor é o jovem sem
+ *  login (link da avaliação) — a ficha mora em autor_mentorado_id. */
+export type Chamado = {
+  id: string;
+  numero: string;
+  autor_id: string | null;
+  autor_mentorado_id: string | null;
+  dupla_id: string | null;
+  categoria: ChamadoCategoria;
+  descricao_outro: string | null;
+  assunto: string;
+  mensagem: string | null;
+  status: ChamadoStatus;
+  atribuido_a: string | null;
+  origem: ChamadoOrigem;
+  registro_id: string | null;
+  avaliacao_id: string | null;
+  created_at: string;
+  updated_at: string;
+  resolvido_em: string | null;
+  resolvido_por: string | null;
+  resolucao_resumo: string | null;
+};
+
+/** Linha da view `chamados_fila` (0084) — o staff vê a fila inteira; pro
+ *  auxiliar executivo os chamados de plataforma chegam mascarados
+ *  (restrito=true: protocolo, categoria, estado e idade — molde do mock). */
+export type ChamadoFila = Omit<
+  Chamado,
+  | "autor_id" | "autor_mentorado_id" | "dupla_id" | "atribuido_a"
+  | "resolvido_por" | "resolucao_resumo" | "assunto" | "mensagem"
+  | "descricao_outro" | "registro_id" | "avaliacao_id"
+> & {
+  assunto: string | null;
+  mensagem: string | null;
+  descricao_outro: string | null;
+  autor_id: string | null;
+  autor_mentorado_id: string | null;
+  dupla_id: string | null;
+  atribuido_a: string | null;
+  resolvido_por: string | null;
+  resolucao_resumo: string | null;
+  registro_id: string | null;
+  avaliacao_id: string | null;
+  restrito: boolean;
+};
+
+/** Item de fila/detalhe enriquecido pela query — nomes resolvidos pra não
+ *  fazer N+1 na lista. */
+export type ChamadoFilaItem = ChamadoFila & {
+  autor_nome: string | null;
+  autor_papel: string | null;
+  atribuido_nome: string | null;
+  contexto: string | null; // "Encontro 4 · Ana" — origem+dupla resumidos
+};
+
+export type ChamadoAtualizacao = {
+  id: string;
+  chamado_id: string;
+  autor_id: string | null; // null = evento de sistema
+  tipo: "publica" | "sistema";
+  texto: string;
+  created_at: string;
+  autor_nome?: string | null;
+};
+
+export type ChamadoComentario = {
+  id: string;
+  chamado_id: string;
+  autor_id: string;
+  texto: string;
+  created_at: string;
+  autor_nome?: string | null;
+};
+
+export type ChamadoAnexo = {
+  id: string;
+  chamado_id: string;
+  path: string;
+  nome: string;
+  tamanho: number | null;
+  mime: string | null;
+  interno: boolean;
+  created_by: string | null;
+  created_at: string;
+  autor_nome?: string | null;
+};
+
+/** Entry do timeline renderizado — público (autor vê), interno (só equipe)
+ *  ou anexo. */
+export type ChamadoTimelineItem =
+  | { tipo: "sistema" | "publica"; item: ChamadoAtualizacao }
+  | { tipo: "interno"; item: ChamadoComentario }
+  | { tipo: "anexo"; item: ChamadoAnexo };
 
 // ---------- trilha de especialista (0027) ----------
 
@@ -575,6 +728,7 @@ export type EspecialistaEvento = {
 /** Máquina de estados da solicitação v2 (0074). "Em aberto" pra dedup e CTAs
  *  = as três primeiras — uma negociação em curso ainda ocupa o pedido. */
 export type SolicitacaoEspecialistaStatus =
+  | "sugerida"
   | "aberta"
   | "aguardando_coord"
   | "contra_proposta"
@@ -601,8 +755,10 @@ export type SolicitacaoEspecialista = {
   /** Horário proposto na mesa — o do pedido do jovem ou o da última
    *  contra-proposta; o histórico completo mora em solicitacao_propostas. */
   slot_proposto: string | null;
-  /** Quem abriu o pedido: staff (mentor DPP/coord) ou o próprio jovem. */
-  origem: "staff" | "jovem";
+  /** Quem abriu o pedido: staff (coord), o próprio jovem ou o mentor DPP
+   *  ('mentor' nasce 'sugerida' e só vira pedido real na confirmação dele,
+   *  0086). */
+  origem: "staff" | "jovem" | "mentor";
   /** Turma da sessão — a da dupla DPP ou a definida na triagem. */
   turma: string | null;
   /** Por que o especialista recusou (0074) — obrigatória na recusa. */
@@ -885,17 +1041,44 @@ export type JovemAssinatura =
 export type ColegaTurma =
   Database["public"]["Views"]["mentorados_turma"]["Row"];
 
-/** Linha da view `jovem_especialistas` (0075) — o catálogo que o jovem vê
- *  pra direcionar o pedido de especialista: nome/social/avatar/áreas.
- *  Contato direto NÃO entra (whatsapp/email ficam fora da view) — o canal
- *  abre quando a dupla nasce, pelo jovem_contatos de sempre. Tipo local:
- *  database.types.ts ainda não foi regenerado com a view. */
+/** Linha da view `jovem_especialistas` (0075, enriquecida em 0086) — o
+ *  cardápio que o jovem vê pra direcionar o pedido de especialista.
+ *  Contato direto NÃO entra (whatsapp/email/linkedin ficam fora da view)
+ *  — o canal abre quando a dupla nasce, pelo jovem_contatos de sempre.
+ *  Agenda vira `grade_resumo` com rótulos "dia + período" ("seg à tarde")
+ *  — nunca slot exato. `vagas` alimenta o estado do card, não um contador
+ *  visível. Tipo local: database.types.ts ainda não foi regenerado com a
+ *  view. */
 export type JovemEspecialista = {
   id: string;
   nome: string;
   nome_social: string | null;
   avatar_path: string | null;
   areas: string[] | null;
+  bio: string | null;
+  cargo: string | null;
+  empresa: string | null;
+  cidade: string | null;
+  uf: string | null;
+  voluntariado: string | null;
+  experiencia_previa: string | null;
+  formacao_externa: string | null;
+  /** Rótulos "dia + período" derivados da grade — nunca horário exato. */
+  grade_resumo: string[] | null;
+  /** Vagas livres derivadas (capacidade_especialista − trilhas vivas). */
+  vagas: number;
+};
+
+/** Devolutiva datada da trilha de especialista (0086) — o feed que devolve
+ *  pro jovem ao longo do percurso; a entrega final segue em
+ *  duplas.devolutiva_pdm. */
+export type Devolutiva = {
+  id: string;
+  dupla_id: string;
+  autor_id: string;
+  autor?: { nome: string } | null;
+  texto: string;
+  created_at: string;
 };
 
 /** A pessoa que /jovem/pessoas/[id] resolve — sempre de uma fonte já
@@ -905,3 +1088,80 @@ export type JovemPessoa =
   | { tipo: "contato"; contato: JovemContato }
   | { tipo: "colega"; colega: ColegaTurma }
   | { tipo: "especialista"; especialista: JovemEspecialista };
+
+/** Projeção da trilha de especialista do mentorado pro mentor DPP — saída da
+ *  RPC `trilha_do_jovem` (0092). Visibilidade COMPLETA (decisão out/2026):
+ *  datas/estados das sessões, registro integral do especialista, ★ do jovem
+ *  por sessão e devolutivas. Não carrega `link` (o DPP acompanha, não
+ *  participa) nem os campos de avaliação que identificam o jovem além da
+ *  nota (sentimento/comentário/temas/avancei/pedir_apoio). */
+export type TrilhaJovemRegistro = {
+  id: string;
+  tema: string | null;
+  ferramenta: string | null;
+  atividades: string[] | null;
+  avaliacao: string | null;
+  dificuldade: string | null;
+  dificuldade_detalhe: string | null;
+  reflexoes: string | null;
+  observacoes: string | null;
+  proximo_passo: string | null;
+  proximo_passo_detalhe: string | null;
+  precisa_apoio: boolean | null;
+  created_at: string;
+  anexos: { nome: string; tamanho: number | null; mime: string | null }[];
+};
+
+export type TrilhaJovemSessao = {
+  id: string;
+  numero: number;
+  data_hora: string | null;
+  realizado_em: string | null;
+  status: EncontroStatus;
+  duracao_min: number | null;
+  /** Por que a sessão foi remarcada — o DPP lê na própria dupla; aqui é o
+   *  texto do especialista (não identifica o jovem). */
+  motivo_reagendamento: string | null;
+  /** ★ que o jovem deu à sessão — sempre projetada (decisão explícita). */
+  estrelas: number | null;
+  registro: TrilhaJovemRegistro | null;
+};
+
+export type TrilhaJovemDevolutiva = {
+  autor_nome: string | null;
+  texto: string;
+  created_at: string;
+};
+
+export type TrilhaJovem = {
+  dupla_id: string;
+  especialista_nome: string | null;
+  demanda: string | null;
+  status: DuplaStatus;
+  iniciada_em: string | null;
+  encerrada_em: string | null;
+  motivo_encerramento: string | null;
+  devolutiva_pdm: string | null;
+  sessoes: TrilhaJovemSessao[];
+  devolutivas: TrilhaJovemDevolutiva[];
+};
+
+/** turma_inscricoes (0111, REALIZA-167) — quem pertence à turma SEM estar em
+ *  dupla: mentor importado aguardando vaga, jovem inscrito sem matching. XOR
+ *  profile_id/mentorado_id é garantido por CHECK no banco; `papel_esperado`
+ *  denormaliza o lado pra leitura rápida. Não confundir com profile_papeis.
+ *  escopo_turma (papel de staff) nem duplas.turma (a dupla formada). */
+export type TurmaInscricao = {
+  id: string;
+  turma: string;
+  profile_id: string | null;
+  mentorado_id: string | null;
+  papel_esperado: "mentor" | "mentorado";
+  /** aguardando = o que a fila do relatório mostra; formada = entrou em
+   *  dupla (registro — a regra de exibição continua sendo "tem dupla ativa
+   *  → some"); desistiu = sai da fila mas fica no histórico. */
+  status: "aguardando" | "formada" | "desistiu";
+  nota: string | null;
+  created_by: string | null;
+  created_at: string;
+};

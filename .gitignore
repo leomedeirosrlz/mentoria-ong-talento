@@ -25,3 +25,9 @@ openwa/
 # playwright e2e
 /test-results/
 /playwright-report/
+
+# benchmark com dados reais — nunca commitar
+.bench-data/
+
+# Sentry Config File
+.env.sentry-build-plugin

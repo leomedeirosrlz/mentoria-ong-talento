@@ -9,17 +9,18 @@ name: e2e-preview
 on:
   deployment_status:
 
-# a Vercel emite DOIS deployments por commit ("Preview – realiza.vc" e o
-# órfão "Preview – realiza") — agrupar só por SHA deixava o deployment do
-# projeto órfão cancelar o run real (cancel-in-progress). O environment no
-# grupo separa os dois: cada um tem sua fila e o do órfão só pula no `if`.
-# Sem o SHA no grupo: dois branches com preview pronto competem pelos mesmos
-# fixtures do staging (seeds convergem pros mesmos IDs e2e00000-*) e um run
-# apaga o encontro que o outro acabou de criar — flake garantido. Uma fila
-# por environment serializa a suite inteira; commit novo espera o run atual.
+# As fixtures e2e00000-*/de* são GLOBAIS no staging e divididas com o
+# e2e-app (push/PR/nightly — app buildado no runner contra o mesmo backend):
+# dois runs e2e concorrentes — de qualquer workflow — apagam a fixture um do
+# outro (flake garantido). O grupo `e2e-staging` é repo-wide e compartilhado
+# com e2e-app.yml: TODA a suite serializa numa fila única; run novo espera o
+# atual terminar. O deployment órfão "Preview – realiza" da Vercel entra na
+# mesma fila e morre no `if` do job em segundos — o sufixo de environment
+# que o isolava não é mais preciso.
+# Sem cancel-in-progress: run cortado no meio deixa fixture em estado
+# parcial — commit novo espera, nunca cancela.
 concurrency:
-  group: >-
-    e2e-preview-${{ github.event.deployment.environment }}
+  group: e2e-staging
   cancel-in-progress: false
 
 jobs:
@@ -62,21 +63,11 @@ jobs:
         run: pnpm install --frozen-lockfile
       - if: steps.check.outputs.skip != '1'
         run: pnpm exec playwright install --with-deps chromium
-      # fixtures no staging (idempotente — limpa e recria os ids e2e00000-*)
-      - if: steps.check.outputs.skip != '1'
-        name: fixtures e2e no staging
-        run: |
-          if [ -z "$E2E_SUPABASE_URL" ]; then
-            echo "::notice::secrets E2E_* ausentes — specs app pulam (demo roda)"
-          else
-            node scripts/seed-e2e-staging.mjs
-          fi
-        env:
-          E2E_SUPABASE_URL: ${{ secrets.E2E_SUPABASE_URL }}
-          E2E_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.E2E_SUPABASE_SERVICE_ROLE_KEY }}
-          E2E_MENTOR_PASSWORD: e2e-senha-teste
-          # secret criado uma vez no repo — sem ele cai na senha de teste
-          E2E_COORD_PASSWORD: ${{ secrets.E2E_COORD_PASSWORD || 'e2e-senha-teste' }}
+      # fixtures NÃO são re-seedadas aqui — os pisos dos specs (convergirPiso
+      # & cia) re-criam o estado volátil e a base persiste no staging. Re-seed
+      # a cada push apagava/recriava rows enquanto a suite lia (derrubava o
+      # PostgREST do free tier e gerava flake em massa). Se faltar fixture —
+      # ex.: staging recriado — roda `pnpm seed:e2e` manual com .env.staging.
       - if: steps.check.outputs.skip != '1'
         name: playwright (demo + app)
         run: pnpm test:e2e

@@ -18,6 +18,7 @@ import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { comparaNome, saudadeDaDupla } from "@/lib/ciclo";
 import { filaMentorados, filaMentores, tetoMentor } from "@/lib/fila";
+import { temPapel } from "@/lib/types";
 import type { AppRole, Dupla, Mentorado, Profile } from "@/lib/types";
 import {
   getCapacidadeInsumos,
@@ -28,7 +29,7 @@ import {
   getInstrumentosDaDuplaIa,
   getJovemDuplaIa,
   getRegistrosDaDuplaIa,
-  papelDoUsuario,
+  papeisDoUsuario,
 } from "./queries";
 
 /** Canais registrados em ia_eventos — o CHECK do banco fecha o vocabulário. */
@@ -58,9 +59,6 @@ const TODOS_PAPEIS: readonly Papel[] = [
  *  Erros inesperados (rede, PostgREST) viram mensagem genérica + log. */
 class ErroTool extends Error {}
 
-const ehMentor = (role: AppRole | null) =>
-  role === "mentor_dpp" || role === "mentor_especialista";
-
 const semArgs = z.object({}).strict();
 
 const duplaIdArgs = z
@@ -86,7 +84,7 @@ export const IA_TOOLS = {
   resumo_semana: {
     nome: "resumo_semana",
     descricao:
-      "Panorama das duplas vivas (ativas e pausadas): o semáforo de cada uma — ok, atenção ou risco — com o motivo, quantos encontros eram esperados × realizados e o próximo encontro marcado. Use pra 'como estão as duplas?', 'quem tá em risco?', 'resumo da semana'.",
+      "Panorama das duplas vivas (ativas e pausadas): o semáforo de cada uma — ok, atenção ou risco — com todos os motivos/sinais acesos, pedidos de apoio abertos (eixo separado do semáforo: trabalho, não falha), quantos encontros eram esperados × realizados e o próximo encontro marcado. Use pra 'como estão as duplas?', 'quem tá em risco?', 'resumo da semana'.",
     schema: semArgs,
     roles: ["coordenacao", "supervisor"],
     run: async (_args: z.infer<typeof semArgs>, ctx) => {
@@ -106,6 +104,11 @@ export const IA_TOOLS = {
           status: d.status,
           semaforo: s.semaforo,
           motivo: s.motivo,
+          // todos os critérios acesos — o semáforo resume, a lista explica
+          motivos: s.motivos,
+          sinais: s.sinais,
+          // apoio é eixo separado: chamado aberto, não falha da jornada
+          apoio: s.apoio,
           esperado: s.esperado,
           feitos: s.feitos,
           registro_pendente: s.registroPendente,
@@ -114,9 +117,11 @@ export const IA_TOOLS = {
             : null,
         };
       });
-      // risco primeiro — o radar da equipe ordena pelo que pede ação
+      // apoio aberto primeiro (trabalho a fazer), depois risco → atenção →
+      // ok — o radar da equipe ordena pelo que pede ação
       itens.sort(
         (a, b) =>
+          Number(b.apoio.aberto) - Number(a.apoio.aberto) ||
           semaforoOrd[a.semaforo] - semaforoOrd[b.semaforo] ||
           comparaNome(a.mentor ?? "", b.mentor ?? "")
       );
@@ -131,7 +136,7 @@ export const IA_TOOLS = {
   ficha_dupla: {
     nome: "ficha_dupla",
     descricao:
-      "Dados estruturados de uma dupla: trilha, status, nomes, demanda, link do PDM, o semáforo com motivo e a lista de encontros (número, status, datas, se tem registro). Pro jovem, devolve a própria dupla sem o semáforo (instrumento da equipe). null quando a dupla não existe ou está fora do alcance do papel.",
+      "Dados estruturados de uma dupla: trilha, status, nomes, demanda, link do PDM, o semáforo com motivo, todos os sinais acesos, o pedido de apoio aberto (eixo separado) e a lista de encontros (número, status, datas, se tem registro). Pro jovem, devolve a própria dupla sem o semáforo (instrumento da equipe). null quando a dupla não existe ou está fora do alcance do papel.",
     schema: duplaIdArgs,
     roles: TODOS_PAPEIS,
     run: async ({ dupla_id }: z.infer<typeof duplaIdArgs>, ctx) => {
@@ -147,7 +152,6 @@ export const IA_TOOLS = {
           turma: r.dupla.turma,
           iniciada_em: r.dupla.iniciada_em,
           demanda: r.dupla.demanda,
-          pdm_url: r.dupla.pdm_url,
           mentor: r.dupla.mentor_nome,
           supervisor: r.dupla.supervisor_nome,
           encontros: r.encontros,
@@ -166,12 +170,14 @@ export const IA_TOOLS = {
         turma: d.turma,
         iniciada_em: d.iniciada_em,
         demanda: d.demanda,
-        pdm_url: d.pdm_url,
         mentor: d.mentor?.nome ?? null,
         mentorado: d.mentorado?.nome ?? null,
         supervisor: d.supervisor?.nome ?? null,
         semaforo: s.semaforo,
         motivo: s.motivo,
+        motivos: s.motivos,
+        sinais: s.sinais,
+        apoio: s.apoio,
         esperado: s.esperado,
         feitos: s.feitos,
         registro_pendente: s.registroPendente,
@@ -272,18 +278,23 @@ export const IA_TOOLS = {
     roles: ["coordenacao"],
     run: async (_args: z.infer<typeof semArgs>, ctx) => {
       const ins = await getCapacidadeInsumos(ctx.supabase);
+      // uma linha por trilha servida (WP6b) — o híbrido aparece nas duas,
+      // cada uma com uso e teto da própria pool
       const mentores = ins.pessoas
-        .filter((p) => ehMentor(p.role) && p.ativo)
-        .map((p) => ({
-          mentor_id: p.id,
-          nome: p.nome,
-          trilha:
-            p.role === "mentor_especialista"
-              ? ("especialista" as const)
-              : ("dpp" as const),
-          em_uso: ins.contagemPorMentor[p.id] ?? 0,
-          capacidade: tetoMentor(p, ins.mentorProfiles[p.id]),
-        }))
+        .filter((p) => p.ativo)
+        .flatMap((p) => {
+          const trilhas = [
+            temPapel(p, "mentor_dpp") ? ("dpp" as const) : null,
+            temPapel(p, "mentor_especialista") ? ("especialista" as const) : null,
+          ].filter((t): t is "dpp" | "especialista" => t != null);
+          return trilhas.map((trilha) => ({
+            mentor_id: p.id,
+            nome: p.nome,
+            trilha,
+            em_uso: ins.contagemPorMentor[`${p.id}:${trilha}`] ?? 0,
+            capacidade: tetoMentor(p, ins.mentorProfiles[p.id], trilha),
+          }));
+        })
         .sort((a, b) => comparaNome(a.nome, b.nome));
       return { mentores, total: mentores.length };
     },
@@ -396,8 +407,15 @@ export async function executarTool(
       throw new ErroTool(`Argumentos inválidos: ${resumoZod(parsed.error)}`);
     argsLog = argsParaLog(parsed.data);
 
-    const papel = await papelDoUsuario(supabase);
-    if (!papel || !(tool.roles as readonly Papel[]).includes(papel))
+    // gate por papel EFETIVO (0085): my_papeis traz primário + secundários
+    // — o híbrido chama a tool do papel que ele tem, mesmo fora do primário.
+    // ctx.papel é o papel que liberou (ordem do roles da tool — staff antes
+    // de mentorado), pra run ramificar certo (ex.: ficha do jovem)
+    const papeis = await papeisDoUsuario(supabase);
+    const papel = (tool.roles as readonly Papel[]).find((r) =>
+      papeis.includes(r)
+    );
+    if (!papel)
       throw new ErroTool("Esta consulta não está disponível pro seu papel.");
 
     // `parsed.data` já passou no schema da própria tool — o `as never`

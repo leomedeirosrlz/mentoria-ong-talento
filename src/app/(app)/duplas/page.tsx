@@ -1,10 +1,16 @@
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
-import { DownloadSimple } from "@phosphor-icons/react/dist/ssr";
-import { getCicloEventos, getDuplas, getMe, getMinhasDuplas } from "@/lib/queries";
-import { DuplasLista } from "@/components/duplas-lista";
-import { PageHeader } from "@/components/page-header";
-import { buttonVariants } from "@/components/ui/button";
+import {
+  getCicloEventos,
+  getDuplas,
+  getEspecialistaEventos,
+  getMe,
+  getMinhasDuplas,
+} from "@/lib/queries";
+import { getSupervisaoAlvos } from "@/lib/queries-supervisao";
+import { getUltimasInteracoes } from "@/lib/interacoes";
+import { temPapel } from "@/lib/types";
+import { DuplasLista, type VisaoDuplas } from "@/components/duplas-lista";
 
 export const metadata: Metadata = {
   title: "Duplas",
@@ -12,44 +18,62 @@ export const metadata: Metadata = {
 
 export default async function DuplasPage() {
   const me = await getMe();
-  // mentor também entra — a RLS já limita a lista às próprias duplas
-  const mentor = me?.role === "mentor_dpp" || me?.role === "mentor_especialista";
-  if (me?.role !== "coordenacao" && me?.role !== "supervisor" && !mentor)
-    redirect("/");
+  if (!me) redirect("/login");
+  // mentor também entra — a RLS já limita a lista às próprias duplas.
+  // Papéis efetivos, não o primário: quem é DPP + especialista ganha a
+  // visão híbrida (as duas seções, cada card na régua da própria trilha)
+  const visao: VisaoDuplas | null =
+    me.role === "coordenacao"
+      ? "coordenacao"
+      : me.role === "supervisor"
+        ? "supervisor"
+        : temPapel(me, "mentor_dpp") && temPapel(me, "mentor_especialista")
+          ? "hibrido"
+          : temPapel(me, "mentor_dpp")
+            ? "mentor"
+            : temPapel(me, "mentor_especialista")
+              ? "especialista"
+              : null;
+  if (!visao) redirect("/");
 
   // coord vê tudo; supervisor/mentor já vêm escopados da query (uma leitura,
-  // sem baixar o ciclo inteiro pra filtrar em JS)
-  const [lista, eventos] = await Promise.all([
-    me.role === "coordenacao" ? getDuplas() : getMinhasDuplas(),
+  // sem baixar o ciclo inteiro pra filtrar em JS). Os extras são por visão:
+  // alvos do dialog de supervisão (auxiliar) e os 5 passos da trilha
+  // (especialista) — os demais não pagam essa leitura
+  const [lista, eventos, alvos, espEventos] = await Promise.all([
+    me.role === "coordenacao"
+      ? getDuplas()
+      : me.role === "supervisor"
+        ? // getMinhasDuplas abrange mentor_id OU supervisor_id — a visão do
+          // auxiliar é "duplas que você supervisiona", então o lado mentor
+          // (caso ela também seja mentora de alguém) sai do radar daqui
+          getMinhasDuplas().then((ds) =>
+            ds.filter((d) => d.supervisor?.id === me.id)
+          )
+        : getMinhasDuplas(),
     getCicloEventos(),
+    visao === "supervisor" ? getSupervisaoAlvos() : Promise.resolve([]),
+    visao === "especialista" || visao === "hibrido"
+      ? getEspecialistaEventos()
+      : Promise.resolve([]),
   ]);
+  // o "Lembrar" da coordenação lê o cap de 48h (último nudge da dupla) —
+  // só ela renderiza o botão, os demais não pagam a leitura
+  const nudges =
+    visao === "coordenacao"
+      ? await getUltimasInteracoes(lista.map((d) => d.id), "nudge")
+      : {};
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Duplas"
-        meta={`${lista.length} ${lista.length === 1 ? "dupla" : "duplas"} no programa`}
-        actions={
-          me.role === "coordenacao" ? (
-            <a
-              href="/api/export"
-              className={buttonVariants({ variant: "outline", size: "sm" })}
-            >
-              <DownloadSimple />
-              Exportar CSV
-            </a>
-          ) : undefined
-        }
-      />
-
-      <DuplasLista
-        lista={lista}
-        eventos={eventos}
-        agora={new Date().toISOString()}
-        podeCriar={me.role === "coordenacao"}
-        mostrarSupervisor={me.role === "coordenacao"}
-        paraMentor={mentor}
-      />
-    </div>
+    <DuplasLista
+      lista={lista}
+      eventos={eventos}
+      agora={new Date().toISOString()}
+      visao={visao}
+      meuNome={me.nome.split(" ")[0]}
+      supervisaoAlvos={alvos}
+      especialistaEventos={espEventos}
+      nudges={nudges}
+    />
   );
 }

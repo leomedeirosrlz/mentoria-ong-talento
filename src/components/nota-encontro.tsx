@@ -96,7 +96,8 @@ export function NotaEncontro({
     if (!inicial) return null;
     return (
       <div>
-        <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+        <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+          <span aria-hidden className="size-1.5 rounded-full bg-[var(--brand-lime)]" />
           Anotações{rotulo ? ` · ${rotulo}` : ""}
         </p>
         <p className="mt-1 whitespace-pre-wrap break-words text-sm">{inicial}</p>

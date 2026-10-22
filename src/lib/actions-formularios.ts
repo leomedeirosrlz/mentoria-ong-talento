@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { demoAtivo } from "./demo/mode";
 import { DEMO_MSG } from "./demo/shared";
 import { gerarLinksFormulario, type DestinoLink } from "./forms/actions";
-import { INSTRUMENTOS_SISTEMA } from "./forms/schema";
+import { INSTRUMENTOS_SISTEMA, type FormularioSistema } from "./forms/schema";
 import { erroAmigavel } from "./utils";
 
 // "Enviar formulário" a partir da ficha da dupla — a action do motor
@@ -66,6 +66,27 @@ export async function gerarLinksParaDupla(input: {
   if (!eu) return { error: "Sessão expirada. Entre de novo." };
   if (eu.role !== "coordenacao")
     return { error: "Só a coordenação envia formulários." };
+
+  // instrumento de jornada não sai pelo caminho genérico — a seção
+  // Instrumentos da ficha emite com contexto próprio (o mentor entrega).
+  // gerarLinksFormulario repete o guard; aqui ele falha antes de ler a
+  // dupla. 360º/anamnese/autoavaliação seguem emissíveis daqui.
+  const { data: form, error: eForm } = await supabase
+    .from("formularios")
+    .select("id, sistema")
+    .eq("id", formularioId)
+    .maybeSingle();
+  if (eForm) return { error: erroAmigavel(eForm) };
+  if (!form) return { error: "Formulário não encontrado." };
+  if (
+    (INSTRUMENTOS_SISTEMA as readonly string[]).includes(
+      (form.sistema as FormularioSistema | null) ?? ""
+    )
+  )
+    return {
+      error:
+        "Instrumento de jornada se emite pela ficha da dupla (Instrumentos → Enviar link).",
+    };
 
   const { data: dupla, error: eDupla } = await supabase
     .from("duplas")

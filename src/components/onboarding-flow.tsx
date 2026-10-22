@@ -47,6 +47,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import type { DadosPessoais } from "@/lib/queries";
+import { temPapel } from "@/lib/types";
 import type {
   AppRole,
   Assinatura,
@@ -143,7 +144,8 @@ export function OnboardingFlow({
   demo?: React.ReactNode;
 }) {
   const router = useRouter();
-  const ehMentor = me.role === "mentor_dpp" || me.role === "mentor_especialista";
+  const ehMentor =
+    temPapel(me, "mentor_dpp") || temPapel(me, "mentor_especialista");
   // passo do termo existe só enquanto a assinatura estiver pendente — e é
   // CONGELADO no mount: assinar no próprio wizard dispara router.refresh() e
   // a prop voltaria "assinado", encolhendo `total` com o usuário já sentado

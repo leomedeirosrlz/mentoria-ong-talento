@@ -1,5 +1,10 @@
 import Link from "next/link";
-import { ArrowUpRight } from "@phosphor-icons/react/dist/ssr";
+import {
+  ArrowsClockwise,
+  ArrowUpRight,
+  VideoCamera,
+} from "@phosphor-icons/react/dist/ssr";
+import type { SessaoEntrada } from "@/lib/agenda-especialista";
 import {
   alvoAgendamento,
   formatDateTime,
@@ -23,8 +28,7 @@ import { EncerrarTrilhaDialog } from "@/components/encerrar-trilha-dialog";
 import { AgendarEncontroDialog } from "@/components/agendar-encontro-dialog";
 import { RegistrarRetroativoDialog } from "@/components/registrar-retroativo-dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { VideoCamera } from "@phosphor-icons/react/dist/ssr";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 const STATUS_LABEL: Record<Encontro["status"], string> = {
@@ -46,12 +50,19 @@ export function AgendaEspecialista({
   grade,
   excecoes,
   slots,
+  sessoes,
+  hojeIso,
 }: {
   duplas: Dupla[];
   espEventos: EspecialistaEvento[];
   grade: GradeJanela[];
   excecoes: ExcecaoEspecialista[];
   slots: string[];
+  /** Blocos de sessão pra grade visual — a página faz o flatten de TODAS as
+   *  duplas do mentor (esp + DPP do híbrido pinta como "compromisso DPP"). */
+  sessoes: SessaoEntrada[];
+  /** "YYYY-MM-DD" âncora da semana que a grade desenha. */
+  hojeIso: string;
 }) {
   const agora = new Date();
   return (
@@ -71,6 +82,8 @@ export function AgendaEspecialista({
           grade={grade}
           excecoes={excecoes}
           slots={slots}
+          sessoes={sessoes}
+          hojeIso={hojeIso}
         />
       </div>
 
@@ -110,7 +123,7 @@ export function AgendaEspecialista({
           <Card key={dupla.id} className="animate-enter overflow-hidden">
             <CardHeader className="border-b bg-muted/30">
               <div className="flex items-center justify-between gap-3">
-                <div>
+                <div className="min-w-0">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
                     Mentoria especializada
                   </p>
@@ -123,7 +136,7 @@ export function AgendaEspecialista({
                       completar vira warn sugerindo o fechamento */}
                   <TrilhaPrazoBadge dupla={dupla} />
                   <span className="font-mono text-sm tabular-nums text-muted-foreground">
-                    {jornada.feitos}/{jornada.total} encontros
+                    {jornada.feitos}/{jornada.total} sessões
                   </span>
                 </span>
               </div>
@@ -203,6 +216,15 @@ export function AgendaEspecialista({
                       }
                     />
                   )}
+                  {/* a conversa de horário mora na ficha — lá vivem a
+                      tentativa agendada (remarcar) e o histórico */}
+                  <Link
+                    href={`/duplas/${dupla.id}`}
+                    className={buttonVariants({ variant: "outline", size: "sm" })}
+                  >
+                    <ArrowsClockwise aria-hidden />
+                    Propor outro horário
+                  </Link>
                 </div>
               )}
               {cicloCompleto && (
@@ -210,7 +232,7 @@ export function AgendaEspecialista({
                   <p className="text-sm text-muted-foreground">
                     {dupla.encerrada_em
                       ? "Trilha fechada. A devolutiva já seguiu pro PDM."
-                      : "Os 5 encontros foram realizados. Falta o fechamento com a devolutiva pro PDM."}
+                      : "As 5 sessões aconteceram. Falta o fechamento com a devolutiva pro PDM."}
                   </p>
                   {!dupla.encerrada_em && (
                     <EncerrarTrilhaDialog duplaId={dupla.id} />

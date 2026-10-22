@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
 import Link from "next/link";
-import { ArrowUpRight, BookOpen, CalendarPlus, ClipboardText, HandHeart, VideoCamera } from "@phosphor-icons/react/dist/ssr";
+import { ArrowUpRight, CalendarPlus, ClipboardText, HandHeart, VideoCamera } from "@phosphor-icons/react/dist/ssr";
 import {
   alvoAgendamento,
   cronogramaVigente,
@@ -15,6 +15,7 @@ import {
   toDateStr,
   totalDaTrilha,
 } from "@/lib/ciclo";
+import { temPapel } from "@/lib/types";
 import type {
   CicloEvento,
   Cronograma,
@@ -67,13 +68,15 @@ export function MentorHome({
   // um dado alheio, tenha ele dupla ou não (every em [] = true cobre o caso
   // de ainda não pareado; um DPP sem dupla segue vendo a semana do ciclo)
   const soEspecialista =
-    me.role === "mentor_especialista" &&
+    temPapel(me, "mentor_especialista") &&
+    !temPapel(me, "mentor_dpp") &&
     duplas.every((d) => d.trilha === "especialista");
 
   // com N duplas (mentor_especialista pode carregar várias trilhas) a mais
-  // acionável vem primeiro — o semáforo da saúde já destila pedido de apoio,
-  // registro pendente e atraso; a ordenação é estável, então duplas no mesmo
-  // estado mantêm a ordem em que vieram
+  // acionável vem primeiro — o semáforo da saúde já destila registro
+  // pendente e atraso (pedido de apoio é eixo separado: o mentor sabe do
+  // próprio chamado, não ordena por ele); a ordenação é estável, então
+  // duplas no mesmo estado mantêm a ordem em que vieram
   const saudes = new Map(
     duplas.map((d) => [d.id, saudadeDaDupla(d, eventos, hoje)])
   );
@@ -218,7 +221,7 @@ export function MentorHome({
                 a única faixa de marca da tela (uma por tela) */}
             <CardHeader className="-mt-(--card-spacing) border-b-2 border-[var(--brand-lime)] bg-[var(--brand-ink)] pb-(--card-spacing) pt-(--card-spacing) text-white">
               <div className="flex items-center justify-between gap-4">
-                <div>
+                <div className="min-w-0">
                   {/* "Sua dupla" vira redundante com várias — o nome do
                       mentorado é o que distingue um card do outro */}
                   <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-white/50">
@@ -525,23 +528,6 @@ export function MentorHome({
                 </div>
               </div>
 
-              {/* um caminho nomeado pra ficha por card: "Abrir dupla" já mora
-                  no header — aqui só saidas que a ficha não dá (o PDM é link
-                  externo preenchido na dupla; o mentor edita na ficha via RPC
-                  definir_pdm_url ou a coordenação no dialog de edição) */}
-              {linkSeguro(dupla.pdm_url) && (
-                <div className="flex flex-wrap items-center gap-3">
-                  <a
-                    href={linkSeguro(dupla.pdm_url)!}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={buttonVariants({ variant: "outline", size: "sm" })}
-                  >
-                    <BookOpen size={16} />
-                    Abrir PDM
-                  </a>
-                </div>
-              )}
             </CardContent>
           </Card>
         );

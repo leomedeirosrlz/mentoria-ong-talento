@@ -30,7 +30,7 @@ import type { Disponibilidade } from "@/lib/types";
 import { maskWhatsApp } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
+  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
@@ -299,6 +299,10 @@ export function NovaPessoaDialog() {
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Cadastrar pessoa</DialogTitle>
+          <DialogDescription>
+            O cadastro em etapas: identificação, contato, interesses e
+            disponibilidade.
+          </DialogDescription>
         </DialogHeader>
         <WizardFicha
           passos={passos}
@@ -459,6 +463,10 @@ export function NovoMentoradoDialog() {
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Cadastrar mentorado</DialogTitle>
+          <DialogDescription>
+            O cadastro do jovem em etapas: identificação, contato,
+            interesses e disponibilidade.
+          </DialogDescription>
         </DialogHeader>
         <WizardFicha
           passos={passos}

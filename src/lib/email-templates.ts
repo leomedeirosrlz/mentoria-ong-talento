@@ -16,7 +16,15 @@ const DANGER_BG = "#fdf0ee";
 const WARN = "#b07a05";
 const WARN_BG = "#fdf6e4";
 const FONT = "'Mitr','Segoe UI',Helvetica,Arial,sans-serif";
+const FONT_LOGO = "'Archivo Black','Arial Black',Arial,sans-serif";
 const BANNER_URL = `${SITE_URL}/email/vamos-juntos.png`;
+const LOGO_PONTO = "#ffd531"; // amarelo do ponto do logo — --role-mentorado
+
+/** Wordmark em texto (e-mail não garante webfont/imagem): REALIZA ink +
+ *  ponto âmbar + VC lime — mesmas cores do logo-realiza.png. Archivo
+ *  Black é o peso do wordmark real; Arial Black/900 cobre clientes sem
+ *  webfont. */
+const LOGO = `<span style="font-family:${FONT_LOGO};font-size:26px;font-weight:900;font-style:italic;letter-spacing:0.5px;color:${INK};">REALIZA<span style="color:${LOGO_PONTO};">.</span><span style="color:${LIME};">VC</span></span>`;
 
 /** Conteúdo digitado pela coordenação vai pra HTML de e-mail — escapa sempre. */
 function esc(s: string): string {
@@ -39,12 +47,13 @@ function paragrafos(texto: string): string {
     .join("");
 }
 
-/** Casca única dos e-mails do sistema — banner da marca em imagem (servido
- *  pelo próprio site, sem dependência de CDN externo), card branco 600px
- *  sobre fundo cinza, CTA pill em gradiente lime, assinatura "— Equipe
- *  Realiza.vc" e o mesmo banner fechando. Só tabelas + CSS inline: o que o
- *  Gmail/Outlook respeitam. `tagline` vira o eyebrow sobre o título e
- *  `preheader` é o texto de prévia que a caixa de entrada mostra. */
+/** Casca única dos e-mails do sistema — card branco 600px sobre fundo
+ *  cinza com moldura (barra lime em gradiente + borda sutil), logo em
+ *  texto multicolor no topo do corpo e o banner vamos-juntos fechando
+ *  num rodapé cinza acoplado ao card (radius herdado). Só tabelas +
+ *  CSS inline: o que o Gmail/Outlook respeitam. `tagline` vira o
+ *  eyebrow sobre o título e `preheader` é o texto de prévia que a
+ *  caixa de entrada mostra. */
 export function emailLayout({
   titulo,
   conteudoHtml,
@@ -77,12 +86,12 @@ export function emailLayout({
 <title>${esc(titulo)}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Mitr:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Mitr:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   @media screen and (max-width:620px) {
     .email-body { padding:24px 20px !important; }
-    .email-legal { padding:16px 20px 24px !important; }
-    .email-extra { padding:0 20px 12px !important; }
+    .email-legal { padding:14px 20px 24px !important; }
+    .email-extra { padding:0 20px 16px !important; }
   }
 </style>
 </head>
@@ -93,11 +102,12 @@ ${
     : ""
 }
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${FUNDO}" style="background:${FUNDO};">
-<tr><td align="center" style="padding:24px 0;">
-  <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:600px;max-width:600px;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.06);">
-    <tr><td><img src="${BANNER_URL}" alt="Realiza.vc" width="600" style="display:block;width:100%;height:auto;max-width:600px;border:0;outline:none;"></td></tr>
+<tr><td align="center" style="padding:28px 12px 0;">
+  <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:600px;max-width:600px;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid ${BORDA};box-shadow:0 1px 3px rgba(0,0,0,0.06);">
+    <tr><td style="height:6px;line-height:6px;font-size:1px;background-color:${LIME};background-image:linear-gradient(90deg,${LIME} 0%,${LIME_CLARO} 100%);">&nbsp;</td></tr>
     <tr>
       <td class="email-body" style="padding:32px;font-size:15px;line-height:1.55;color:${INK};">
+        <div style="margin:0 0 20px;">${LOGO}</div>
         ${
           tagline
             ? `<p style="margin:0 0 6px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1.6px;color:${LIME_ESCURO};">${esc(tagline)}</p>`
@@ -108,9 +118,9 @@ ${
         ${ctaRender}
       </td>
     </tr>
-    <tr><td class="email-extra" style="padding:0 32px 16px;font-size:14px;line-height:1.55;color:${INK};"><p style="margin:0;">— Equipe Realiza.vc</p></td></tr>
-    <tr><td><img src="${BANNER_URL}" alt="Instituto Realiza.vc — Vamos Juntos!" width="600" style="display:block;width:100%;height:auto;max-width:600px;border:0;outline:none;"></td></tr>
-    <tr><td class="email-legal" style="padding:20px 32px 28px;font-size:11px;line-height:1.6;color:${MUTED};text-align:center;">
+    <tr><td class="email-extra" style="padding:0 32px 20px;font-size:14px;line-height:1.55;color:${INK};"><p style="margin:0;">— Equipe Realiza.vc</p></td></tr>
+    <tr><td bgcolor="${INK}" style="background:${INK};padding:26px 32px 6px;" align="center"><span style="display:inline-block;background:#ffffff;border-radius:14px;padding:12px 26px;"><img src="${BANNER_URL}" alt="Instituto Realiza.vc — Vamos Juntos!" width="200" style="display:inline-block;width:200px;max-width:100%;height:auto;border:0;outline:none;"></span></td></tr>
+    <tr><td class="email-legal" bgcolor="${INK}" style="background:${INK};padding:14px 32px 28px;font-size:11px;line-height:1.6;color:${MUTED};text-align:center;">
       Instituto Realiza.vc &middot; <a href="${esc(SITE_URL)}" style="color:${MUTED};text-decoration:underline;">${esc(SITE_URL.replace(/^https?:\/\//, ""))}</a>
       ${rodapeExtra ? `<br>${rodapeExtra}` : ""}
     </td></tr>
@@ -297,12 +307,18 @@ export function emailApoioJovem({
   estrelas,
   comentario,
   duplaId,
+  chamadoHref,
+  chamadoNumero,
 }: {
   jovemNome: string;
   encontroNumero: number;
   estrelas: number;
   comentario: string | null;
   duplaId: string;
+  /** 0084: quando o chamado já nasceu na mesma transação, o e-mail leva
+   *  direto na fila — senão cai na ficha da dupla como antes. */
+  chamadoHref?: string | null;
+  chamadoNumero?: string | null;
 }): string {
   const estrelasTxt =
     "★".repeat(estrelas) + "☆".repeat(Math.max(0, 5 - estrelas));
@@ -317,11 +333,124 @@ export function emailApoioJovem({
         ? `<p style="margin:8px 0 0;font-size:14px;line-height:1.55;color:${INK};">“${esc(comentario)}”</p>`
         : "") +
       `</td></tr></table>` +
-      `<p style="margin:0 0 14px;font-size:15px;line-height:1.55;color:${INK};">Combinado do programa: <strong>responder em 1 dia útil</strong>. A ficha da dupla tem a avaliação completa e o botão pra marcar o pedido como atendido.</p>`,
-    ctaLabel: "Abrir ficha da dupla",
-    ctaHref: `${SITE_URL}/duplas/${duplaId}`,
+      `<p style="margin:0 0 14px;font-size:15px;line-height:1.55;color:${INK};">Combinado do programa: <strong>responder em 1 dia útil</strong>. ${chamadoNumero ? `O chamado <strong>${esc(chamadoNumero)}</strong> já está na fila` : "A ficha da dupla tem a avaliação completa"} e o botão pra marcar o pedido como atendido.</p>`,
+    ctaLabel: chamadoHref ? "Abrir chamado" : "Abrir ficha da dupla",
+    ctaHref: chamadoHref ?? `${SITE_URL}/duplas/${duplaId}`,
     preheader: `${jovemNome} marcou "preciso de ajuda" na avaliação do encontro ${encontroNumero}.`,
     rodapeExtra:
       "Você está recebendo este e-mail porque acompanha a coordenação ou a supervisão do programa.",
+  });
+}
+
+/** Link do instrumento da jornada pro JOVEM (REALIZA-51 — lote da
+ *  coordenação). O e-mail leva só nome + instrumento + link: o token é o
+ *  fator de posse, então nada de resposta/dado de outra pessoa no corpo.
+ *  Copy "sem senha, no seu tempo" — a entrega que antes ia por WhatsApp
+ *  agora tem canal próprio. */
+export function emailInstrumentoJovem({
+  primeiroNome,
+  instrumento,
+  link,
+}: {
+  primeiroNome: string;
+  instrumento: string;
+  link: string;
+}): string {
+  return emailLayout({
+    titulo: instrumento,
+    tagline: "Instrumento da jornada",
+    conteudoHtml:
+      `<p style="margin:0 0 14px;font-size:15px;line-height:1.55;color:${INK};">Oi${primeiroNome ? `, ${esc(primeiroNome)}` : ""}!</p>` +
+      `<p style="margin:0 0 14px;font-size:15px;line-height:1.55;color:${INK};">Chegou a sua vez de responder <strong>${esc(instrumento)}</strong> — um exercício da sua jornada de mentoria.</p>` +
+      `<p style="margin:0 0 14px;font-size:15px;line-height:1.55;color:${INK};">É só seu: responda no seu tempo, direto pelo botão abaixo. Não precisa de senha nem de cadastro.</p>`,
+    ctaLabel: "Responder agora",
+    ctaHref: link,
+    preheader: `${instrumento}: seu link chegou — responda no seu tempo, sem senha.`,
+    rodapeExtra: `Se o botão não abrir, copie este endereço no navegador:<br><span style="word-break:break-all;">${esc(link)}</span><br>Este link é pessoal e só seu.`,
+  });
+}
+
+/** Mesma entrega por repasse (decisão da issue): jovem sem e-mail
+ *  cadastrado → o link chega ao MENTOR pra repassar. O texto deixa claro
+ *  de quem é o exercício — o mentor é canal, não destinatário. */
+export function emailInstrumentoRepasseMentor({
+  mentorNome,
+  jovemNome,
+  instrumento,
+  link,
+}: {
+  mentorNome: string;
+  jovemNome: string;
+  instrumento: string;
+  link: string;
+}): string {
+  const primeiroMentor = mentorNome.trim().split(/\s+/)[0] ?? "";
+  const primeiroJovem = jovemNome.trim().split(/\s+/)[0] ?? "";
+  return emailLayout({
+    titulo: instrumento,
+    tagline: "Instrumento da jornada",
+    conteudoHtml:
+      `<p style="margin:0 0 14px;font-size:15px;line-height:1.55;color:${INK};">Oi${primeiroMentor ? `, ${esc(primeiroMentor)}` : ""}!</p>` +
+      `<p style="margin:0 0 14px;font-size:15px;line-height:1.55;color:${INK};"><strong>${esc(jovemNome)}</strong> não tem e-mail cadastrado, então o link de <strong>${esc(instrumento)}</strong> veio pra você.</p>` +
+      `<p style="margin:0 0 14px;font-size:15px;line-height:1.55;color:${INK};">Repasse pra ${esc(primeiroJovem) || "a jovem"} — o exercício faz parte da jornada de mentoria e a resposta é dela. O link abre direto, sem senha.</p>`,
+    ctaLabel: "Abrir o link",
+    ctaHref: link,
+    preheader: `${instrumento}: o link de ${jovemNome} veio pra você repassar.`,
+    rodapeExtra: `Se o botão não abrir, copie este endereço no navegador:<br><span style="word-break:break-all;">${esc(link)}</span><br>Este link é da jornada de ${esc(jovemNome)}.`,
+  });
+}
+
+// 0084 — chamados unificados: urgência/origem jovem avisa a equipe por
+// e-mail (o sino não é garantia pra canal de segurança) e atualização
+// pública chega ao autor também fora do app.
+
+export function emailChamadoUrgencia({
+  numero,
+  assunto,
+  categoria,
+  autorNome,
+  href,
+}: {
+  numero: string;
+  assunto: string;
+  categoria: string;
+  autorNome: string;
+  href: string;
+}): string {
+  return emailLayout({
+    titulo: `Chamado ${esc(numero)} precisa de resposta`,
+    tagline: categoria === "urgencia" ? "Pedido urgente" : "Novo pedido de apoio",
+    conteudoHtml:
+      `<p style="margin:0 0 14px;font-size:15px;line-height:1.55;color:${INK};"><strong>${esc(autorNome)}</strong> abriu o chamado <strong>${esc(numero)}</strong>${categoria === "urgencia" ? ' marcado como <strong>urgente</strong>' : ""}.</p>` +
+      `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 14px;background:${categoria === "urgencia" ? DANGER_BG : CARD_SUAVE};border-radius:10px;"><tr><td style="padding:14px 16px;font-size:15px;line-height:1.55;color:${INK};">“${esc(assunto)}”</td></tr></table>` +
+      `<p style="margin:0 0 14px;font-size:15px;line-height:1.55;color:${INK};">Combinado do programa: <strong>responder em 1 dia útil</strong>. A fila de chamados tem a conversa completa.</p>`,
+    ctaLabel: "Abrir a fila de chamados",
+    ctaHref: href,
+    preheader: `${autorNome} abriu o chamado ${numero}: ${assunto}`,
+    rodapeExtra:
+      "Você está recebendo este e-mail porque faz parte da coordenação ou supervisão do programa.",
+  });
+}
+
+export function emailChamadoAtualizacao({
+  autorNome,
+  texto,
+  href,
+}: {
+  autorNome: string;
+  texto: string;
+  href: string;
+}): string {
+  return emailLayout({
+    titulo: "Atualização no seu pedido",
+    tagline: "Chamados · Realiza",
+    conteudoHtml:
+      `<p style="margin:0 0 14px;font-size:15px;line-height:1.55;color:${INK};">Oi${autorNome ? `, ${esc(autorNome.split(" ")[0])}` : ""}! A equipe respondeu no seu pedido de apoio:</p>` +
+      `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 14px;background:${CARD_SUAVE};border-radius:10px;"><tr><td style="padding:14px 16px;font-size:15px;line-height:1.55;color:${INK};">${paragrafos(texto)}</td></tr></table>`,
+    ctaLabel: "Ver a conversa",
+    ctaHref: href,
+    preheader: `A equipe respondeu no seu pedido de apoio.`,
+    rodapeExtra:
+      "Você está recebendo este e-mail porque abriu um pedido de apoio no Realiza.",
   });
 }

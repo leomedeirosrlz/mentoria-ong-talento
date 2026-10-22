@@ -143,8 +143,6 @@ export function erroAmigavel(e: { message: string; code?: string }): string {
   if (/capacidade do mentor excedida/i.test(e.message)) {
     return "Esse mentor já atingiu o número máximo de duplas.";
   }
-  // RPC definir_pdm_url (0044) levanta a razão já em pt-BR — repassa direto
-  if (/link do pdm|definir o link/i.test(e.message)) return e.message;
   if (/autoria forjada|created_by não pode ser forjado/i.test(e.message)) {
     return "Não foi possível concluir. Recarregue a página e tente de novo.";
   }
@@ -164,3 +162,8 @@ export function cpfValido(cpf: string): boolean {
   };
   return dv(d.slice(0, 9)) === Number(d[9]) && dv(d.slice(0, 10)) === Number(d[10]);
 }
+
+/** Mensagem crua da RPC de aceite quando a corrida termina no servidor —
+ *  os componentes do mural testam contra ela pra mostrar a copy humana
+ *  ("Já foi aceita por outro especialista") em vez do erro técnico. */
+export const ERRO_JA_ACEITA = /n[aã]o est[aá] mais aberta/i;

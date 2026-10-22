@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useId, useRef, useState, type CSSProperties } from "react";
-import { CaretLeft, CaretRight } from "@phosphor-icons/react";
+import { CaretLeft, CaretRight, Check } from "@phosphor-icons/react";
 import { cn } from "cn";
 import {
+  celulasDe,
   COR_RACA_LABELS,
   DIAS_SEMANA,
+  DIAS_SEMANA_CURTOS,
   DIAS_SEMANA_LABELS,
   ESCOLARIDADE_LABELS,
   GENERO_LABELS,
@@ -186,9 +188,29 @@ export function CampoInteresses({
   );
 }
 
-/** Grade semanal do mentor — chips de dia × período; emite JSON no hidden
- *  `disponibilidade` ({"dias":[...],"periodos":[...]}) que o action valida
- *  contra o vocabulário do CHECK disponibilidade_ok. */
+/** Chave da célula — "dia:periodo", o id estável nos sets da grade. */
+const chaveCelula = (dia: DiaSemana, periodo: Periodo) =>
+  `${dia}:${periodo}`;
+
+/** Preposição do período nos aria-labels: "Segunda de manhã". */
+const PERIODO_DE: Record<Periodo, string> = {
+  manha: "de manhã",
+  tarde: "de tarde",
+  noite: "de noite",
+};
+
+/** Colunas da grade: rótulo de período + 7 dias — a mesma largura no
+ *  cabeçalho e nas 3 linhas pra matriz alinhar. */
+const GRADE_COLS =
+  "grid grid-cols-[2.75rem_repeat(7,minmax(0,1fr))] items-stretch gap-1";
+
+/** Grade semanal — matriz 7 dias × 3 períodos, uma célula por encaixe
+ *  (0100): "ter de manhã e qui à noite" era impossível de dizer com o
+ *  produto de conjuntos. Clique alterna, arrastar pinta (o gesto fixa o
+ *  modo da célula âncora e repete nas vizinhas), cabeçalhos alternam a
+ *  coluna/linha inteira, setas navegam e Espaço/Enter alternam. Emite
+ *  JSON {"celulas":[...]} no hidden `disponibilidade`, ou null quando
+ *  nada ficou marcado. */
 export function CampoDisponibilidade({
   value,
   onChange,
@@ -196,61 +218,224 @@ export function CampoDisponibilidade({
   value: Disponibilidade | null;
   onChange: (v: Disponibilidade | null) => void;
 }) {
-  const dias = new Set<DiaSemana>(value?.dias ?? []);
-  const periodos = new Set<Periodo>(value?.periodos ?? []);
+  // celulasDe tolera a forma legada — na janela de deploy uma grade velha
+  // vinda do banco não pode renderizar vazia e ser salva por cima
+  const marcadas = new Set(
+    celulasDe(value).map((c) => chaveCelula(c.dia, c.periodo))
+  );
 
-  const emitir = (d: Set<DiaSemana>, p: Set<Periodo>) =>
-    onChange(d.size || p.size ? { dias: [...d], periodos: [...p] } : null);
+  // roving tabindex: só uma célula entra no Tab; as setas movem o foco
+  const [foco, setFoco] = useState(0);
+  const celulasRef = useRef<(HTMLButtonElement | null)[]>([]);
 
-  const toggle = <T,>(set: Set<T>, v: T): Set<T> => {
-    const n = new Set(set);
-    if (n.has(v)) n.delete(v);
-    else n.add(v);
+  // gesto de pintura: null fora de arraste; dentro carrega o modo (ligar
+  // ou apagar, fixado pela célula âncora) e o conjunto de trabalho —
+  // pointerenter sucessivos não podem esperar o re-render entre eventos
+  const pintura = useRef<{ alvo: boolean; set: Set<string> } | null>(null);
+
+  useEffect(() => {
+    const fim = () => {
+      pintura.current = null;
+    };
+    // pointerup fora da grade também encerra o gesto — sem listener de
+    // janela o arrasto ficava preso quando o dedo soltava noutra área
+    window.addEventListener("pointerup", fim);
+    window.addEventListener("pointercancel", fim);
+    return () => {
+      window.removeEventListener("pointerup", fim);
+      window.removeEventListener("pointercancel", fim);
+    };
+  }, []);
+
+  const emitir = (set: Set<string>) => {
+    const celulas = DIAS_SEMANA.flatMap((dia) =>
+      PERIODOS.flatMap((periodo) =>
+        set.has(chaveCelula(dia, periodo)) ? [{ dia, periodo }] : []
+      )
+    );
+    onChange(celulas.length ? { celulas } : null);
+  };
+
+  const comCelula = (
+    base: Set<string>,
+    dia: DiaSemana,
+    periodo: Periodo,
+    ligado: boolean
+  ) => {
+    const n = new Set(base);
+    const k = chaveCelula(dia, periodo);
+    if (ligado) n.add(k);
+    else n.delete(k);
     return n;
   };
 
-  const chip = (ativo: boolean, rotulo: string, aoClicar: () => void) => (
-    <button
-      key={rotulo}
-      type="button"
-      aria-pressed={ativo}
-      onClick={aoClicar}
-      className={cn(
-        // ≥44px de alvo no mobile; desktop volta à densidade compacta
-        "min-h-11 rounded-full border px-3 text-sm transition-all outline-none active:scale-[0.97] focus-visible:ring-3 focus-visible:ring-ring/50 md:min-h-0 md:py-1.5",
-        ativo
-          ? "border-primary bg-primary text-primary-foreground"
-          : "border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground"
-      )}
-    >
-      {rotulo}
-    </button>
-  );
+  const down =
+    (dia: DiaSemana, periodo: Periodo, idx: number) =>
+    (e: React.PointerEvent<HTMLButtonElement>) => {
+      // botão secundário não pinta (e o menu de contexto segue vivo); um
+      // segundo dedo no meio do gesto não reinicia a pintura
+      if (e.button !== 0 || !e.isPrimary) return;
+      // sem seleção de texto nem scroll durante o arraste; o click
+      // sintético do pointer morre aqui — teclado alterna via onClick
+      e.preventDefault();
+      if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+        // a captura implícita do touch prenderia o gesto na célula âncora
+        // e o pointerenter das vizinhas nunca disparava
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      }
+      e.currentTarget.focus();
+      setFoco(idx);
+      const alvo = !marcadas.has(chaveCelula(dia, periodo));
+      const set = comCelula(marcadas, dia, periodo, alvo);
+      pintura.current = { alvo, set };
+      emitir(set);
+    };
+
+  const enter = (dia: DiaSemana, periodo: Periodo) => () => {
+    const p = pintura.current;
+    if (!p) return;
+    if (p.set.has(chaveCelula(dia, periodo)) === p.alvo) return;
+    p.set = comCelula(p.set, dia, periodo, p.alvo);
+    emitir(p.set);
+  };
+
+  // só o click de teclado/AT (detail 0) alterna aqui — o click de pointer
+  // (detail ≥1) já foi pintado no pointerdown e voltaria a desfazer a
+  // célula: preventDefault NÃO suprime o click do tap, sem o guard todo
+  // toque dupla-alternava e apagava a marca
+  const alternar =
+    (dia: DiaSemana, periodo: Periodo) =>
+    (e: React.MouseEvent<HTMLButtonElement>) => {
+      if (e.detail !== 0) return;
+      emitir(
+        comCelula(
+          marcadas,
+          dia,
+          periodo,
+          !marcadas.has(chaveCelula(dia, periodo))
+        )
+      );
+    };
+
+  const alternarColuna = (dia: DiaSemana) => {
+    // coluna cheia apaga inteira; qualquer buraco marca inteira
+    const ligado = !PERIODOS.every((p) => marcadas.has(chaveCelula(dia, p)));
+    const set = new Set(marcadas);
+    for (const p of PERIODOS) {
+      if (ligado) set.add(chaveCelula(dia, p));
+      else set.delete(chaveCelula(dia, p));
+    }
+    emitir(set);
+  };
+
+  const alternarLinha = (periodo: Periodo) => {
+    const ligado = !DIAS_SEMANA.every((d) =>
+      marcadas.has(chaveCelula(d, periodo))
+    );
+    const set = new Set(marcadas);
+    for (const d of DIAS_SEMANA) {
+      if (ligado) set.add(chaveCelula(d, periodo));
+      else set.delete(chaveCelula(d, periodo));
+    }
+    emitir(set);
+  };
+
+  const setas = (di: number, pi: number) => (e: React.KeyboardEvent) => {
+    const passo: Record<string, [number, number]> = {
+      ArrowLeft: [0, -1],
+      ArrowRight: [0, 1],
+      ArrowUp: [-1, 0],
+      ArrowDown: [1, 0],
+    };
+    const d = passo[e.key];
+    if (!d) return;
+    e.preventDefault();
+    // as bordas dão a volta — ninguém fica preso no canto da grade
+    const idx =
+      ((pi + d[0] + PERIODOS.length) % PERIODOS.length) * DIAS_SEMANA.length +
+      ((di + d[1] + DIAS_SEMANA.length) % DIAS_SEMANA.length);
+    setFoco(idx);
+    celulasRef.current[idx]?.focus();
+  };
 
   return (
-    <fieldset className="space-y-3">
+    <fieldset className="space-y-2">
       <input
         type="hidden"
         name="disponibilidade"
-        value={JSON.stringify(value ?? { dias: [], periodos: [] })}
+        value={JSON.stringify(value ?? { celulas: [] })}
       />
       <legend className="sr-only">Disponibilidade semanal</legend>
-      <div className="space-y-1.5">
-        <p className="text-xs font-medium text-muted-foreground">Dias da semana</p>
-        <div className="flex flex-wrap gap-2">
-          {DIAS_SEMANA.map((d) =>
-            chip(dias.has(d), DIAS_SEMANA_LABELS[d], () => emitir(toggle(dias, d), periodos))
-          )}
+      <div
+        role="grid"
+        aria-label="Dias e períodos livres na semana"
+        className="touch-none select-none space-y-1"
+      >
+        {/* cabeçalho de dias — cada um alterna a coluna inteira */}
+        <div role="row" className={GRADE_COLS}>
+          <span role="columnheader" aria-hidden />
+          {DIAS_SEMANA.map((d) => (
+            <span role="columnheader" key={d} className="min-w-0">
+              <button
+                type="button"
+                onClick={() => alternarColuna(d)}
+                aria-label={`Alternar ${DIAS_SEMANA_LABELS[d]} ${d === "sab" || d === "dom" ? "inteiro" : "inteira"}`}
+                className="min-h-11 w-full rounded-md px-1 py-1 text-center text-[11px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 sm:min-h-8"
+              >
+                {DIAS_SEMANA_CURTOS[d]}
+              </button>
+            </span>
+          ))}
         </div>
+        {PERIODOS.map((p, pi) => (
+          <div role="row" key={p} className={GRADE_COLS}>
+            <span role="rowheader" className="min-w-0">
+              <button
+                type="button"
+                onClick={() => alternarLinha(p)}
+                aria-label={`Alternar ${PERIODOS_LABELS[p]} inteira`}
+                className="flex h-full min-h-11 w-full items-center rounded-md px-1.5 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 sm:min-h-0"
+              >
+                {PERIODOS_LABELS[p]}
+              </button>
+            </span>
+            {DIAS_SEMANA.map((d, di) => {
+              const idx = pi * DIAS_SEMANA.length + di;
+              const ativo = marcadas.has(chaveCelula(d, p));
+              return (
+                <span role="gridcell" key={d} className="min-w-0">
+                  <button
+                    ref={(el) => {
+                      celulasRef.current[idx] = el;
+                    }}
+                    type="button"
+                    tabIndex={idx === foco ? 0 : -1}
+                    aria-pressed={ativo}
+                    aria-label={`${DIAS_SEMANA_LABELS[d]} ${PERIODO_DE[p]}`}
+                    onPointerDown={down(d, p, idx)}
+                    onPointerEnter={enter(d, p)}
+                    onClick={alternar(d, p)}
+                    onKeyDown={setas(di, pi)}
+                    onFocus={() => setFoco(idx)}
+                    className={cn(
+                      "grid h-11 w-full place-items-center rounded-md border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 sm:h-10",
+                      ativo
+                        ? "border-primary/40 bg-primary/15 text-primary"
+                        : "border-border bg-card text-muted-foreground hover:bg-muted"
+                    )}
+                  >
+                    {ativo ? <Check size={13} weight="bold" aria-hidden /> : null}
+                  </button>
+                </span>
+              );
+            })}
+          </div>
+        ))}
       </div>
-      <div className="space-y-1.5">
-        <p className="text-xs font-medium text-muted-foreground">Períodos</p>
-        <div className="flex flex-wrap gap-2">
-          {PERIODOS.map((p) =>
-            chip(periodos.has(p), PERIODOS_LABELS[p], () => emitir(dias, toggle(periodos, p)))
-          )}
-        </div>
-      </div>
+      <p className="text-xs text-muted-foreground">
+        Arraste pra marcar ou desmarcar vários de uma vez; os cabeçalhos
+        alternam o dia ou o período inteiro.
+      </p>
     </fieldset>
   );
 }

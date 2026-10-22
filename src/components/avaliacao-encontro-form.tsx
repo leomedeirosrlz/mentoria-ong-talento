@@ -81,6 +81,7 @@ export function AvaliacaoEncontroForm({
         const r = await submeterAvaliacao({
           token,
           encontroId,
+          honeypot: String(fd.get("website") ?? ""),
           estrelas,
           sentimento: String(fd.get("sentimento") ?? "") || null,
           avancei: String(fd.get("avancei") ?? "") || null,
@@ -131,7 +132,9 @@ export function AvaliacaoEncontroForm({
           <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-muted-foreground">
             {pedidoAjuda
               ? `Obrigado${primeiroNome ? `, ${primeiroNome}` : ""} por contar. A coordenação foi avisada na hora e fala com você — o combinado do programa é responder em 1 dia útil.`
-              : `Obrigado${primeiroNome ? `, ${primeiroNome}` : ""}. Suas respostas ficam entre você e a equipe da Realiza.vc — pro seu mentor só aparece a média. Pode fechar esta página.`}
+              : trilha === "dpp"
+                ? `Obrigado${primeiroNome ? `, ${primeiroNome}` : ""}. Suas respostas ficam entre você e a equipe da Realiza.vc — pro seu mentor só aparece a média. Pode fechar esta página.`
+                : `Obrigado${primeiroNome ? `, ${primeiroNome}` : ""}. Suas respostas ficam entre você e a equipe da Realiza.vc — seu mentor vê só as estrelas desta sessão. Pode fechar esta página.`}
           </p>
         </motion.div>
       ) : (
@@ -247,7 +250,7 @@ export function AvaliacaoEncontroForm({
                 {SENTIMENTO_AVALIACAO.map((o) => (
                   <label
                     key={o.value}
-                    className="flex h-10 cursor-pointer items-center rounded-full bg-muted px-3.5 text-sm font-medium text-muted-foreground transition-colors select-none has-checked:bg-primary has-checked:text-primary-foreground has-focus-visible:ring-3 has-focus-visible:ring-ring/50"
+                    className="flex h-11 cursor-pointer items-center rounded-full bg-muted px-3.5 text-sm font-medium text-muted-foreground transition-colors select-none has-checked:bg-primary has-checked:text-primary-foreground has-focus-visible:ring-3 has-focus-visible:ring-ring/50 md:h-10"
                   >
                     <input
                       type="radio"
@@ -307,7 +310,7 @@ export function AvaliacaoEncontroForm({
                 {TEMAS_AVALIACAO.map((o) => (
                   <label
                     key={o.value}
-                    className="flex h-10 cursor-pointer items-center rounded-full bg-muted px-3.5 text-sm font-medium text-muted-foreground transition-colors select-none has-checked:bg-primary has-checked:text-primary-foreground has-focus-visible:ring-3 has-focus-visible:ring-ring/50"
+                    className="flex h-11 cursor-pointer items-center rounded-full bg-muted px-3.5 text-sm font-medium text-muted-foreground transition-colors select-none has-checked:bg-primary has-checked:text-primary-foreground has-focus-visible:ring-3 has-focus-visible:ring-ring/50 md:h-10"
                   >
                     <input
                       type="checkbox"
@@ -393,6 +396,23 @@ export function AvaliacaoEncontroForm({
             >
               {erro}
             </p>
+
+            {/* honeypot anti-spam — mesmo molde do /f e /t: bot preenche o
+                campo invisível, o servidor finge sucesso e não grava nada */}
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute -left-[9999px] h-0 w-0 overflow-hidden"
+            >
+              <label>
+                Site
+                <input
+                  type="text"
+                  name="website"
+                  tabIndex={-1}
+                  autoComplete="off"
+                />
+              </label>
+            </div>
 
             <Button
               type="submit"

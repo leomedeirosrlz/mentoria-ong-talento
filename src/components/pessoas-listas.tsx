@@ -16,6 +16,7 @@ import {
   UsersThree,
   type Icon,
 } from "@phosphor-icons/react";
+import { temPapel } from "@/lib/types";
 import type { Mentorado, Profile } from "@/lib/types";
 import type { MentorProfile } from "@/lib/queries";
 import { filaMentorados, filaMentores, tetoMentor } from "@/lib/fila";
@@ -50,7 +51,7 @@ import {
 } from "@/components/ui/select";
 
 const ehMentor = (p: Profile) =>
-  p.role === "mentor_dpp" || p.role === "mentor_especialista";
+  temPapel(p, "mentor_dpp") || temPapel(p, "mentor_especialista");
 
 /** Status de assinatura de uma pessoa, montado na page a partir do resumo:
  *  `assinado` = slug → ISO da assinatura; `pendente` = slugs com link vivo. */
@@ -251,9 +252,27 @@ export function PessoasListas({
 
   // matching board (REALIZA-116): "livre" pra mentor é ter VAGA, não estar
   // zerado — com capacidade 2 a dupla 1/2 ainda aceita par. O painel recebe
-  // todos os ativos (cheios afundam marcados) e a ocupação pra desenhar o X/Y
-  const vagasDe = (p: Profile) =>
-    tetoMentor(p, mentorProfiles[p.id]) - (contagemPorMentor[p.id] ?? 0);
+  // todos os ativos (cheios afundam marcados) e a ocupação pra desenhar o X/Y.
+  // WP6b: a contagem é por trilha — o híbrido é livre se QUALQUER pool dele
+  // tiver vaga (a outra pool não consome a vaga desta).
+  const usoDe = (p: Profile, trilha: "dpp" | "especialista") =>
+    contagemPorMentor[`${p.id}:${trilha}`] ?? 0;
+  const vagasDe = (p: Profile) => {
+    let livres = 0;
+    if (temPapel(p, "mentor_dpp")) {
+      livres = Math.max(
+        livres,
+        tetoMentor(p, mentorProfiles[p.id], "dpp") - usoDe(p, "dpp")
+      );
+    }
+    if (temPapel(p, "mentor_especialista")) {
+      livres = Math.max(
+        livres,
+        tetoMentor(p, mentorProfiles[p.id], "especialista") - usoDe(p, "especialista")
+      );
+    }
+    return livres;
+  };
   const temVaga = (p: Profile) => ehMentor(p) && p.ativo && vagasDe(p) > 0;
   const mentoresAtivos = pessoas.filter((p) => ehMentor(p) && p.ativo);
   const mentoresComVaga = mentoresAtivos.filter(temVaga);
@@ -380,7 +399,7 @@ export function PessoasListas({
               <SelectTrigger
                 size="sm"
                 aria-label="Ordenar"
-                className="ml-auto w-auto sm:w-48"
+                className="ml-auto w-auto max-w-48 sm:w-48"
               >
                 <SelectValue />
               </SelectTrigger>
@@ -419,7 +438,7 @@ export function PessoasListas({
           vendo "Fora do programa" ele é ruído no meio do arquivo */}
       {souCoord && semDupla && !verFora && (
         <MatchingPanel
-          mentores={mentoresAtivos}
+          mentores={mentoresAtivos.filter((p) => temPapel(p, "mentor_dpp"))}
           mentorados={mentoradosLivres}
           mentorProfiles={mentorProfiles}
           ocupacao={contagemPorMentor}
@@ -495,7 +514,10 @@ export function PessoasListas({
               temHistorico={temQualquerDupla.has(p.id)}
               podeExcluir={!p.user_id && !temQualquerDupla.has(p.id)}
               mentorProfile={mentorProfiles[p.id]}
-              usadas={contagemPorMentor[p.id] ?? 0}
+              usadas={{
+                dpp: contagemPorMentor[`${p.id}:dpp`] ?? 0,
+                especialista: contagemPorMentor[`${p.id}:especialista`] ?? 0,
+              }}
               docs={assinaturas[p.id]}
               faltantesTermo={faltantes?.[p.id]?.["termo-voluntario"] ?? []}
               souCoord={souCoord}
@@ -608,7 +630,7 @@ export function PessoasListas({
           onOpenChange={setForaAberto}
           className="space-y-2"
         >
-          <Collapsible.Trigger className="group flex w-full items-center gap-1.5 rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          <Collapsible.Trigger className="group flex min-h-11 w-full items-center gap-1.5 rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:min-h-0">
             <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground tabular-nums">
               Fora do programa ({foraExibidos.length}
               {q && totalFora > foraExibidos.length ? ` de ${totalFora}` : ""})
@@ -651,7 +673,7 @@ export function PessoasListas({
           onOpenChange={setInativosAberto}
           className="space-y-2"
         >
-          <Collapsible.Trigger className="group flex w-full items-center gap-1.5 rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          <Collapsible.Trigger className="group flex min-h-11 w-full items-center gap-1.5 rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:min-h-0">
             <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground tabular-nums">
               Inativos ({inativasExibidas.length}
               {q && inativas.length > inativasExibidas.length
@@ -679,7 +701,10 @@ export function PessoasListas({
                   temHistorico={temQualquerDupla.has(p.id)}
                   podeExcluir={!p.user_id && !temQualquerDupla.has(p.id)}
                   mentorProfile={mentorProfiles[p.id]}
-                  usadas={contagemPorMentor[p.id] ?? 0}
+                  usadas={{
+                    dpp: contagemPorMentor[`${p.id}:dpp`] ?? 0,
+                    especialista: contagemPorMentor[`${p.id}:especialista`] ?? 0,
+                  }}
                   docs={assinaturas[p.id]}
                   faltantesTermo={faltantes?.[p.id]?.["termo-voluntario"] ?? []}
                   souCoord={souCoord}
@@ -819,8 +844,9 @@ function PessoaRow({
   temHistorico: boolean;
   podeExcluir: boolean;
   mentorProfile: MentorProfile | undefined;
-  /** Duplas em andamento (ativa + pausada) — o X do "X/Y" da capacidade. */
-  usadas: number;
+  /** Duplas em andamento (ativa + pausada) POR TRILHA — o X do "X/Y" da
+   *  capacidade; o híbrido tem duas pools (WP6b). */
+  usadas: { dpp: number; especialista: number };
   docs: DocsPessoa | undefined;
   /** labels do que falta na ficha pro termo do voluntário — coord-only */
   faltantesTermo?: string[];
@@ -830,11 +856,16 @@ function PessoaRow({
   emInativos?: boolean;
 }) {
   // mentor sem linha em mentor_profiles vale capacidade 1 (mesma regra do
-  // createDupla) — na pool da própria trilha (0073)
-  const capacidade =
-    (p.role === "mentor_especialista"
-      ? mp?.capacidade_especialista
-      : mp?.capacidade) ?? 1;
+  // createDupla) — por trilha (0073/WP6b: o híbrido tem as duas pools)
+  const capDpp = mp?.capacidade ?? 1;
+  const capEsp = mp?.capacidade_especialista ?? 1;
+  const hibrido =
+    temPapel(p, "mentor_dpp") && temPapel(p, "mentor_especialista");
+  const trilhaPrimaria =
+    p.role === "mentor_especialista" ? "especialista" : "dpp";
+  const capacidade = trilhaPrimaria === "especialista" ? capEsp : capDpp;
+  const usoPrimario =
+    trilhaPrimaria === "especialista" ? usadas.especialista : usadas.dpp;
   const detalhesId = `detalhes-${p.id}`;
   // inativo não tem pendência operacional a cobrar — a seção dele é arquivo
   const temPendencia =
@@ -931,7 +962,7 @@ function PessoaRow({
         )}
         {/* pra mentor a linha "X/Y duplas em andamento" em Detalhes já diz
             "em dupla" — o badge só aparece quando ela não cobriria (usadas 0) */}
-        {souCoord && emDupla && !(ehMentor(p) && usadas > 0) && (
+        {souCoord && emDupla && !(ehMentor(p) && usadas.dpp + usadas.especialista > 0) && (
           <Badge variant="outline" className="text-xs shrink-0">em dupla</Badge>
         )}
         {souCoord && p.ativo && !termoOk && (
@@ -968,12 +999,19 @@ function PessoaRow({
         <DetalhesRegiao id={detalhesId} nome={p.nome}>
           <ItemDetalhe icone={Users}>
             {/* X/Y explícito (REALIZA-116): ativas + pausadas contra o teto
-                da pool — o "sem vaga" avisa que o próximo par pede ajuste */}
-            {usadas === 0
+                da pool — o "sem vaga" avisa que o próximo par pede ajuste.
+                WP6b: híbrido mostra a pool do papel primário aqui e a
+                secundária na linha seguinte, cada uma com seu ajuste */}
+            {hibrido && (
+              <span className="mr-1 font-medium">
+                {trilhaPrimaria === "especialista" ? "Especialista:" : "DPP:"}
+              </span>
+            )}
+            {usoPrimario === 0
               ? temHistorico
                 ? `Sem dupla em andamento · ${capacidade === 1 ? "1 vaga" : `${capacidade} vagas`} — histórico na ficha`
                 : `Sem dupla em andamento · ${capacidade === 1 ? "1 vaga" : `${capacidade} vagas`} pra parear`
-              : `${usadas}/${capacidade} ${capacidade === 1 ? "dupla" : "duplas"} em andamento${usadas >= capacidade ? " · sem vaga" : ""}`}
+              : `${usoPrimario}/${capacidade} ${capacidade === 1 ? "dupla" : "duplas"} em andamento${usoPrimario >= capacidade ? " · sem vaga" : ""}`}
             {p.ativo && (
               <>
                 {" · "}
@@ -981,11 +1019,12 @@ function PessoaRow({
                   mentorId={p.id}
                   nome={p.nome}
                   atual={capacidade}
-                  emUso={usadas}
+                  emUso={usoPrimario}
+                  trilha={trilhaPrimaria}
                   trigger={
                     <button
                       type="button"
-                      className="rounded-sm font-medium text-foreground underline underline-offset-2 transition-colors hover:text-foreground/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      className="-my-2 min-h-11 rounded-sm font-medium text-foreground underline underline-offset-2 transition-colors hover:text-foreground/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:my-0 sm:min-h-0"
                     >
                       ajustar
                     </button>
@@ -994,6 +1033,49 @@ function PessoaRow({
               </>
             )}
           </ItemDetalhe>
+          {hibrido && (
+            <ItemDetalhe icone={Users}>
+              {/* segunda pool do híbrido (WP6b) — X/Y e ajuste próprios */}
+              <span className="mr-1 font-medium">
+                {trilhaPrimaria === "especialista" ? "DPP:" : "Especialista:"}
+              </span>
+              {(() => {
+                const uso2 =
+                  trilhaPrimaria === "especialista" ? usadas.dpp : usadas.especialista;
+                const cap2 =
+                  trilhaPrimaria === "especialista" ? capDpp : capEsp;
+                const trilha2 =
+                  trilhaPrimaria === "especialista" ? "dpp" : "especialista";
+                return (
+                  <>
+                    {uso2 === 0
+                      ? `Sem dupla em andamento · ${cap2 === 1 ? "1 vaga" : `${cap2} vagas`} pra parear`
+                      : `${uso2}/${cap2} ${cap2 === 1 ? "dupla" : "duplas"} em andamento${uso2 >= cap2 ? " · sem vaga" : ""}`}
+                    {p.ativo && (
+                      <>
+                        {" · "}
+                        <CapacidadeMentorDialog
+                          mentorId={p.id}
+                          nome={p.nome}
+                          atual={cap2}
+                          emUso={uso2}
+                          trilha={trilha2}
+                          trigger={
+                            <button
+                              type="button"
+                              className="-my-2 min-h-11 rounded-sm font-medium text-foreground underline underline-offset-2 transition-colors hover:text-foreground/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:my-0 sm:min-h-0"
+                            >
+                              ajustar
+                            </button>
+                          }
+                        />
+                      </>
+                    )}
+                  </>
+                );
+              })()}
+            </ItemDetalhe>
+          )}
           {mp?.termo_ok ? (
             <ItemDetalhe icone={FileText}>
               {assinadoTermo !== undefined ? (

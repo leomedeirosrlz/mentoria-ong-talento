@@ -16,7 +16,7 @@ import type { Encontro } from "@/lib/types";
 import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
 import { Button } from "@/components/ui/button";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
+  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -125,8 +125,21 @@ export function AgendarEncontroDialog({
     (sugeridoLocal && pisoLocal && sugeridoLocal < pisoLocal ? pisoLocal : sugeridoLocal);
   // valor vivo do campo — decide se o submit agenda ou registra (modo dual).
   // Nasce com a sugestão: o mount já-aberto do modo controlado não passa
-  // pelo reset do onOpenChange
+  // pelo reset da transição de open
   const [valorData, setValorData] = useState(defaultValue);
+  // estado fresco por abertura — ajuste na borda de subida do `open`: no
+  // modo controlado (menu "Mais", grade de horários) a abertura vem da prop
+  // e o Base UI não reemite onOpenChange — a transição é o evento confiável
+  // (mesmo padrão do RemanejarDuplaDialog)
+  const [abertoAntes, setAbertoAntes] = useState(open);
+  if (open !== abertoAntes) {
+    setAbertoAntes(open);
+    if (open) {
+      setMotivo("");
+      setDataMudou(false);
+      setValorData(defaultValue);
+    }
+  }
   // modo retroativo só existe pra encontro novo (sem row editável)
   const ehRetroativo = !atual && valorData !== "" && valorData <= agora;
   // sujeito neutro pro copy — "4º encontro" no DPP, "sessão de especialista"
@@ -224,17 +237,7 @@ export function AgendarEncontroDialog({
   }
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(o) => {
-        mudaOpen(o);
-        if (o) {
-          setMotivo("");
-          setDataMudou(false);
-          setValorData(defaultValue);
-        }
-      }}
-    >
+    <Dialog open={open} onOpenChange={mudaOpen}>
       {trigger !== null && (
         <DialogTrigger render={
           trigger ?? (
@@ -245,9 +248,13 @@ export function AgendarEncontroDialog({
           )
         } />
       )}
-      <DialogContent>
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>{nome}</DialogTitle>
+          <DialogDescription>
+            Marque a data e o horário — se a data mudou, conte o motivo da
+            remarcação.
+          </DialogDescription>
         </DialogHeader>
         <form onSubmit={submit} className="space-y-4">
           <div className="space-y-2">

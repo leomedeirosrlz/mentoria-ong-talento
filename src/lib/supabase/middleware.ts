@@ -62,6 +62,9 @@ export async function updateSession(request: NextRequest) {
     // formulários públicos por token (/f/<token>) — o destinatário responde
     // sem login; a segurança é a RPC (anon não tem grant de tabela, 0034)
     p.startsWith("/f/") ||
+    // convite da avaliação por terceiros (/t/<token>) — o indicado pelo
+    // jovem responde sem login; mesmo desenho do /f (0103)
+    p.startsWith("/t/") ||
     // avaliação estrela do jovem por token (/avaliar/<token>) — mesmo
     // desenho: bearer token + RPC definer, logado fora do dono é recusado
     // pela própria RPC (híbrido 0070)
@@ -69,6 +72,11 @@ export async function updateSession(request: NextRequest) {
     // /resumo/<slug> — resumo compartilhável da turma por link obscuro
     // (slug fixo conferido na página; mismatch cai em 404)
     p.startsWith("/resumo/") ||
+    // /api/jobs/* — crons da Vercel (169/182/183) não têm sessão Supabase;
+    // sem isso o redirect pra /login devolvia 307 e o job nunca rodava. A
+    // autenticação é o bearer CRON_SECRET dentro da rota, que responde
+    // 401 JSON — nunca redirect.
+    p.startsWith("/api/jobs/") ||
     p === "/privacidade";
 
   if (!user && !isPublic) {

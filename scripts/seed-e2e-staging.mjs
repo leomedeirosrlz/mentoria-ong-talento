@@ -33,6 +33,13 @@
 // filtra status), mas segue sem DPP ativa: o pedido de especialista dele
 // continua caindo em aguardando_coord. O toggle de compartilhamento é dos
 // specs — o seed o devolve a false a cada run.
+// E as personas da rodada de telas finais (WP0b/WP1): um supervisor com
+// login próprio ligado às duplas fixture por duplas.supervisor_id (as duplas
+// do híbrido ficam de fora — são a checagem negativa do escopo) e um mentor
+// híbrido — DPP de uma dupla + especialista com trilha e grade próprias,
+// como o guia prevê pro pool de especialistas (REALIZA-105). Os blocos de
+// profile_papeis e chamados são DEFENSIVOS: enquanto as migrations do
+// WP0b/WP1 não aterrissam no ambiente, os probes pulam tudo sem falhar.
 // IDs fixos e2e00000-*, que o workflow usa pra cleanup determinístico.
 
 const URL_ = process.env.E2E_SUPABASE_URL;
@@ -96,6 +103,7 @@ const IDS = {
   // janela de grade do esp2 — os chips do pedido direcionado do jovem e os
   // slots da contra-proposta/aceite saem da grade REAL dele (0073)
   gradeEsp2: "e2e00000-0000-4000-8000-0000000000e1",
+  cronogramaE2e: "e2e00000-0000-4000-8000-0000000000e2",
   // REALIZA-113: o "colega com conta" do diretório — o jovem sem DPP ganha
   // uma dupla DPP pausada (mentor próprio, nunca loga) na mesma turma.
   // 'pausada' e não 'ativa' de propósito: a RPC pedir_especialista_jovem e
@@ -110,6 +118,20 @@ const IDS = {
   // wizard do /jovem testa. O bloco re-zera os dois a cada run.
   jovem3Profile: "e2e00000-0000-4000-8000-0000000000e3",
   mentoradoOnboarding: "e2e00000-0000-4000-8000-0000000000f3",
+  // Telas finais (WP0b/WP1): supervisor com login, mentor híbrido e as duas
+  // pontas dele (ficha DPP + ficha de trilha — mentorado diferente em cada,
+  // porque DPP do próprio jovem fica fora do pool de especialista), mais os
+  // três chamados da fila de apoio quando a tabela do WP1 existir.
+  supProfile: "e2e00000-0000-4000-8000-000000000100",
+  hibProfile: "e2e00000-0000-4000-8000-000000000110",
+  mentoradoHib: "e2e00000-0000-4000-8000-000000000120",
+  mentoradoHibEsp: "e2e00000-0000-4000-8000-000000000130",
+  duplaHibDpp: "e2e00000-0000-4000-8000-000000000140",
+  duplaHibEsp: "e2e00000-0000-4000-8000-000000000150",
+  gradeHib: "e2e00000-0000-4000-8000-000000000160",
+  chamadoJovem: "e2e00000-0000-4000-8000-000000000170",
+  chamadoUrgencia: "e2e00000-0000-4000-8000-000000000180",
+  chamadoAtendimento: "e2e00000-0000-4000-8000-000000000190",
 };
 const EMAIL = "e2e-mentor@realiza.test";
 const COORD_EMAIL = "e2e-coord@realiza.test";
@@ -128,12 +150,27 @@ const JOVEM2_WHATSAPP = "5511999000091";
 // contato do wizard exibe e o que o opt-in poderia compartilhar
 const JOVEM3_EMAIL = "jovem3-e2e@realiza.test";
 const JOVEM3_WHATSAPP = "5511999000093";
+// supervisor (papel auxiliar) e mentor híbrido — mesma senha compartilhada
+// das demais personas staff (E2E_MENTOR_PASSWORD)
+const SUP_EMAIL = "sup-e2e@realiza.test";
+const HIB_EMAIL = "hib-e2e@realiza.test";
 // assinaturas.token é uuid — os tokens fixos da fixture manual do staging
 const TOKEN_TERMO_JOVEM = "e2e00000-0000-4000-8000-0000000000aa";
 const TOKEN_AUTORIZ_JOVEM = "e2e00000-0000-4000-8000-0000000000ab";
 // turma que o spec de cronograma cria pelo builder — prefixo único pro
 // cleanup não depender de id conhecido
 const TURMA_E2E_PREFIX = "E2E ";
+// turma própria das fixtures (REALIZA-151): duplas e2e moravam no
+// cronograma do domínio e a turma compartilhada vazava fixtures pro
+// diretório/catálogo do jovem (mentorados_turma casa por string de turma)
+// e pro contato de coordenação (jovem_contatos, 0097). "Turma E2E" NÃO
+// casa o prefixo 'E2E ' — o sweep de leftovers dos specs não apaga ela.
+const TURMA_E2E = "Turma E2E";
+
+// CSVs das fixtures e2e — o sweep de leftovers e os blocos defensivos de
+// profile_papeis/chamados lá no fim compartilham a mesma base
+const E2E_PROFILES = [IDS.mentorProfile, IDS.coordProfile, IDS.mentorReserva, IDS.mentorImport, IDS.jovemProfile, IDS.espProfile, IDS.esp2Profile, IDS.jovem2Profile, IDS.mentorColega, IDS.jovem3Profile, IDS.supProfile, IDS.hibProfile].join(",");
+const E2E_MENTORADOS = [IDS.mentorado, IDS.mentorado2, IDS.mentoradoLivre, IDS.mentoradoImport, IDS.mentoradoSemDpp, IDS.mentoradoOnboarding, IDS.mentoradoHib, IDS.mentoradoHibEsp].join(",");
 
 async function rest(path, init = {}) {
   const res = await fetch(`${URL_}/rest/v1/${path}`, { ...init, headers: { ...HJ, ...(init.headers ?? {}) } });
@@ -169,7 +206,7 @@ console.log(`cronograma: ${cron.id} (${cron.turma})`);
   // log de e-mail de apoio sobrevive à avaliação — ref_id é solto de
   // propósito.
   const morrem = await rest(
-    `duplas?select=id&or=(id.in.(${IDS.dupla},${IDS.dupla2},${IDS.duplaEsp}),remanejada_de.eq.${IDS.dupla2},mentor_id.eq.${IDS.mentorImport},mentorado_id.eq.${IDS.mentoradoLivre},mentorado_id.eq.${IDS.mentoradoSemDpp},and(mentorado_id.eq.${IDS.mentorado},id.not.in.(${IDS.dupla},${IDS.duplaEsp})))`
+    `duplas?select=id&or=(id.in.(${IDS.dupla},${IDS.dupla2},${IDS.duplaEsp}),remanejada_de.eq.${IDS.dupla2},mentor_id.eq.${IDS.mentorImport},mentorado_id.eq.${IDS.mentoradoLivre},mentorado_id.eq.${IDS.mentoradoSemDpp},mentorado_id.eq.${IDS.mentoradoHib},mentorado_id.eq.${IDS.mentoradoHibEsp},and(mentorado_id.eq.${IDS.mentorado},id.not.in.(${IDS.dupla},${IDS.duplaEsp})),and(mentorado_id.eq.${IDS.mentorado2},id.not.in.(${IDS.dupla2})))`
   );
   const morremIds = (morrem ?? []).map((d) => d.id);
   if (morremIds.length) {
@@ -189,7 +226,14 @@ console.log(`cronograma: ${cron.id} (${cron.turma})`);
   // as avaliações/links só saíram acima por causa do dupla_id espelhado.
   const condenadas = morremIds.filter(
     (d) =>
-      ![IDS.dupla, IDS.dupla2, IDS.duplaEsp, IDS.duplaColega].includes(d)
+      ![
+        IDS.dupla,
+        IDS.dupla2,
+        IDS.duplaEsp,
+        IDS.duplaColega,
+        IDS.duplaHibDpp,
+        IDS.duplaHibEsp,
+      ].includes(d)
   );
   if (condenadas.length) {
     const ids = condenadas.join(",");
@@ -216,8 +260,8 @@ console.log(`cronograma: ${cron.id} (${cron.turma})`);
     console.log(`limpeza: ${condenadas.length} dupla(s) pendurada(s) removidas`);
   }
   await patch(`duplas?id=eq.${IDS.dupla2}`, { status: "ativa" });
-  const e2eProfiles = [IDS.mentorProfile, IDS.coordProfile, IDS.mentorReserva, IDS.mentorImport, IDS.jovemProfile, IDS.espProfile, IDS.esp2Profile, IDS.jovem2Profile, IDS.mentorColega, IDS.jovem3Profile].join(",");
-  const e2eMentorados = [IDS.mentorado, IDS.mentorado2, IDS.mentoradoLivre, IDS.mentoradoImport, IDS.mentoradoSemDpp, IDS.mentoradoOnboarding].join(",");
+  const e2eProfiles = E2E_PROFILES;
+  const e2eMentorados = E2E_MENTORADOS;
   // solicitações de especialista ligadas a qualquer mentorado e2e — o sweep
   // de condenadas só alcança as que morrem junto das duplas; as que apontam
   // pras duplas FIXTURE (dupla_dpp_id) ficariam de pé: uma 'aberta'/
@@ -255,16 +299,19 @@ console.log(`cronograma: ${cron.id} (${cron.turma})`);
   // trilha esp não tem encontro de seed (o spec mantém o próprio): todos os
   // dela são leftover — os filhos já morreram no sweep de avaliações acima.
   await del(
-    `encontros?dupla_id=in.(${IDS.dupla},${IDS.dupla2},${IDS.duplaEsp},${IDS.duplaColega})&id=not.in.(${IDS.encontroJovem},${IDS.encontroAvaliacao})`
+    `encontros?dupla_id=in.(${IDS.dupla},${IDS.dupla2},${IDS.duplaEsp},${IDS.duplaColega},${IDS.duplaHibDpp},${IDS.duplaHibEsp})&id=not.in.(${IDS.encontroJovem},${IDS.encontroAvaliacao})`
   );
   // agenda do especialista (0073): janelas/exceções que um run de spec
   // morreu sem desfazer — a janela fixture é recriada no bloco do esp. Se o
   // profile ainda não existir o delete é no-op (o filtro não casa nada).
-  // esp2 idem — a grade dele vira fixture no bloco dele mais abaixo.
+  // esp2 idem — a grade dele vira fixture no bloco dele mais abaixo. O
+  // híbrido também: a janela do papel especialista dele é recriada lá embaixo.
   await del(`especialista_grade?profile_id=eq.${IDS.espProfile}`);
   await del(`especialista_excecoes?profile_id=eq.${IDS.espProfile}`);
   await del(`especialista_grade?profile_id=eq.${IDS.esp2Profile}`);
   await del(`especialista_excecoes?profile_id=eq.${IDS.esp2Profile}`);
+  await del(`especialista_grade?profile_id=eq.${IDS.hibProfile}`);
+  await del(`especialista_excecoes?profile_id=eq.${IDS.hibProfile}`);
   // cronogramas criados pelo spec de turmas — eventos primeiro: a FK
   // ciclo_eventos.cronograma_id (0061) não tem ON DELETE CASCADE
   const crons = await rest(`cronogramas?select=id&turma=like.${encodeURIComponent(TURMA_E2E_PREFIX)}*`);
@@ -296,7 +343,7 @@ if (!mentor) {
 }
 
 // ---- auth user com senha (senha_em → o app não desvia pra /auth/definir-senha) ----
-async function garantirAuthUser(email, senha, profile) {
+async function garantirAuthUser(email, senha) {
   const res = await fetch(`${URL_}/auth/v1/admin/users`, {
     method: "POST",
     headers: HJ,
@@ -387,6 +434,53 @@ if (!coord.user_id) {
   console.log(`auth user coord já vinculado: ${coord.user_id}`);
 }
 
+// ---- cronograma E2E dedicado + eventos clonados do domínio ----
+// Os specs leem vigente/cobertura por cronograma_id — os eventos têm que
+// existir na turma E2E também (clone verbatim das linhas do domínio).
+{
+  const [tem] = await rest(`cronogramas?select=id&id=eq.${IDS.cronogramaE2e}`);
+  if (!tem) {
+    const [base] = await rest(
+      `cronogramas?select=inicio_em,fim_em,encontros_esperados&id=eq.${cron.id}`
+    );
+    await rest("cronogramas", {
+      method: "POST",
+      body: JSON.stringify({
+        id: IDS.cronogramaE2e,
+        nome: "Calendário oficial · Turma E2E",
+        turma: TURMA_E2E,
+        inicio_em: base?.inicio_em ?? null,
+        fim_em: base?.fim_em ?? null,
+        encontros_esperados: base?.encontros_esperados ?? 16,
+        status: "ativo",
+        created_by: IDS.coordProfile,
+      }),
+    });
+    console.log("cronograma E2E criado");
+  }
+  const evE2e = await rest(
+    `ciclo_eventos?select=id&cronograma_id=eq.${IDS.cronogramaE2e}`
+  );
+  if (!evE2e?.length) {
+    const evDom = await rest(
+      `ciclo_eventos?select=*&cronograma_id=eq.${cron.id}&order=data`
+    );
+    for (const [i, e] of (evDom ?? []).entries()) {
+      const resto = { ...e };
+      delete resto.id;
+      await rest("ciclo_eventos", {
+        method: "POST",
+        body: JSON.stringify({
+          id: `e2e00000-0000-4000-8000-0000000002${String(i).padStart(2, "0")}`,
+          ...resto,
+          cronograma_id: IDS.cronogramaE2e,
+        }),
+      });
+    }
+    console.log(`ciclo_eventos E2E: ${evDom?.length ?? 0} eventos clonados`);
+  }
+}
+
 // ---- mentor reserva: tem a 2ª dupla; sem auth user (nunca loga) ----
 const [reserva] = await rest(`profiles?select=id&id=eq.${IDS.mentorReserva}`);
 if (!reserva) {
@@ -448,8 +542,8 @@ for (const d of DUPLAS) {
       method: "POST",
       body: JSON.stringify({
         ...d,
-        turma: cron.turma,
-        cronograma_id: cron.id,
+        turma: TURMA_E2E,
+        cronograma_id: IDS.cronogramaE2e,
         trilha: "dpp",
         status: "ativa",
         iniciada_em: "2026-09-08",
@@ -611,7 +705,7 @@ if (!duplaEsp) {
       id: IDS.duplaEsp,
       mentor_id: IDS.espProfile,
       mentorado_id: IDS.mentorado,
-      turma: cron.turma,
+      turma: TURMA_E2E,
       cronograma_id: null,
       trilha: "especialista",
       status: "ativa",
@@ -810,8 +904,8 @@ if (!mColega) {
         id: IDS.duplaColega,
         mentor_id: IDS.mentorColega,
         mentorado_id: IDS.mentoradoSemDpp,
-        turma: cron.turma,
-        cronograma_id: cron.id,
+        turma: TURMA_E2E,
+        cronograma_id: IDS.cronogramaE2e,
         trilha: "dpp",
         status: "pausada",
         iniciada_em: "2026-09-08",
@@ -827,7 +921,7 @@ if (!mColega) {
       fixes.encerrada_em = null;
       fixes.motivo_encerramento = null;
     }
-    if (dc.turma !== cron.turma) fixes.turma = cron.turma;
+    if (dc.turma !== TURMA_E2E) fixes.turma = TURMA_E2E;
     if (dc.mentor_id !== IDS.mentorColega) fixes.mentor_id = IDS.mentorColega;
     if (dc.mentorado_id !== IDS.mentoradoSemDpp)
       fixes.mentorado_id = IDS.mentoradoSemDpp;
@@ -1109,6 +1203,418 @@ if (!linkAval) {
   console.log("link de avaliação re-convergido pra pendente");
 }
 
+// ---- supervisor (auxiliar) — login próprio pras telas finais (WP9/WP1) ----
+// A home do auxiliar e a fila de chamados precisam de um supervisor
+// autenticado; duplas.supervisor_id é a aresta que as policies dele usam
+// ("as supervisionadas" — 0023). As duplas do híbrido ficam SEM ele de
+// propósito: são a checagem negativa do escopo.
+let [sup] = await rest(
+  `profiles?select=id,user_id,role,ativo,onboarded_em&email=eq.${SUP_EMAIL}`
+);
+if (!sup) {
+  [sup] = await rest("profiles", {
+    method: "POST",
+    body: JSON.stringify({
+      id: IDS.supProfile,
+      email: SUP_EMAIL,
+      nome: "Supervisor E2E",
+      role: "supervisor",
+      ativo: true,
+      onboarded_em: new Date().toISOString(),
+    }),
+  });
+  console.log("profile supervisor criado");
+} else {
+  const fixes = {};
+  if (sup.role !== "supervisor") fixes.role = "supervisor";
+  if (!sup.ativo) fixes.ativo = true;
+  if (!sup.onboarded_em) fixes.onboarded_em = new Date().toISOString();
+  if (Object.keys(fixes).length) {
+    await patch(`profiles?id=eq.${sup.id}`, fixes);
+    console.log(`profile supervisor convergido (${Object.keys(fixes).join(", ")})`);
+  } else {
+    console.log("profile supervisor já existe");
+  }
+}
+await vincularAuth(sup, SUP_EMAIL);
+// aresta supervisor↔dupla nas fixtures clássicas — converge a cada run; o
+// trigger duplas_capacidade só olha mentor_id/status, então passa livre
+for (const dId of [IDS.dupla, IDS.dupla2, IDS.duplaEsp, IDS.duplaColega]) {
+  await patch(`duplas?id=eq.${dId}`, { supervisor_id: sup.id });
+}
+console.log("duplas fixture ligadas ao supervisor");
+
+// ---- mentor híbrido (WP0b · REALIZA-105): DPP de uma dupla + especialista ----
+// O guia prevê mentor voluntário no pool de especialistas — a mesma pessoa
+// carrega os dois papéis. profiles.role fica 'mentor_dpp' (primário
+// provisório até a profile_papeis entrar — o bloco defensivo dela vem
+// abaixo); as duas duplas já materializam os dois lados do híbrido.
+let [hib] = await rest(
+  `profiles?select=id,user_id,role,ativo,onboarded_em&email=eq.${HIB_EMAIL}`
+);
+if (!hib) {
+  [hib] = await rest("profiles", {
+    method: "POST",
+    body: JSON.stringify({
+      id: IDS.hibProfile,
+      email: HIB_EMAIL,
+      nome: "Mentor E2E Híbrido",
+      role: "mentor_dpp",
+      ativo: true,
+      onboarded_em: new Date().toISOString(),
+    }),
+  });
+  console.log("profile mentor híbrido criado");
+} else {
+  const fixes = {};
+  if (hib.role !== "mentor_dpp") fixes.role = "mentor_dpp";
+  if (!hib.ativo) fixes.ativo = true;
+  if (!hib.onboarded_em) fixes.onboarded_em = new Date().toISOString();
+  if (Object.keys(fixes).length) {
+    await patch(`profiles?id=eq.${hib.id}`, fixes);
+    console.log(`profile mentor híbrido convergido (${Object.keys(fixes).join(", ")})`);
+  } else {
+    console.log("profile mentor híbrido já existe");
+  }
+}
+await vincularAuth(hib, HIB_EMAIL);
+
+// mentor_profiles: tipo 'dpp' (primário) com vaga nos dois pools. Os campos
+// de validação (tipo/capacidade*) ficam travados no UPDATE pelo guard 0004 —
+// só a disponibilidade converge; os valores certos nascem no INSERT.
+const GRADE_HIB = { dias: ["seg", "sex"], periodos: ["tarde", "noite"] };
+const [mpHib] = await rest(
+  `mentor_profiles?select=profile_id&profile_id=eq.${hib.id}`
+);
+if (!mpHib) {
+  await rest("mentor_profiles", {
+    method: "POST",
+    body: JSON.stringify({
+      profile_id: hib.id,
+      tipo: "dpp",
+      capacidade: 1,
+      capacidade_especialista: 1,
+      disponibilidade: GRADE_HIB,
+    }),
+  });
+  console.log("mentor_profiles do híbrido criado");
+} else {
+  await patch(`mentor_profiles?profile_id=eq.${hib.id}`, {
+    disponibilidade: GRADE_HIB,
+  });
+  console.log("disponibilidade do híbrido convergida");
+}
+
+// as duas fichas dele — mentorados sem auth (nunca logam), uma pro DPP e
+// outra pra trilha (especialista do PRÓPRIO jovem é vetado pelo guia — D9)
+for (const m of [
+  { id: IDS.mentoradoHib, nome: "Mentorada E2E Híbrido" },
+  { id: IDS.mentoradoHibEsp, nome: "Mentorada E2E Trilha Híbrido" },
+]) {
+  const [existe] = await rest(`mentorados?select=id&id=eq.${m.id}`);
+  if (!existe) {
+    await rest("mentorados", { method: "POST", body: JSON.stringify(m) });
+    console.log(`mentorado criado: ${m.nome}`);
+  }
+}
+
+// a dupla DPP e a trilha — insert-or-converge no padrão das outras fixtures
+{
+  const [d] = await rest(`duplas?select=id,status&id=eq.${IDS.duplaHibDpp}`);
+  if (!d) {
+    await rest("duplas", {
+      method: "POST",
+      body: JSON.stringify({
+        id: IDS.duplaHibDpp,
+        mentor_id: hib.id,
+        mentorado_id: IDS.mentoradoHib,
+        turma: TURMA_E2E,
+        cronograma_id: IDS.cronogramaE2e,
+        trilha: "dpp",
+        status: "ativa",
+        iniciada_em: "2026-09-08",
+      }),
+    });
+    console.log("dupla DPP do híbrido criada");
+  } else if (d.status !== "ativa") {
+    await patch(`duplas?id=eq.${IDS.duplaHibDpp}`, {
+      status: "ativa",
+      encerrada_em: null,
+      motivo_encerramento: null,
+    });
+    console.log("dupla DPP do híbrido reativada");
+  } else {
+    console.log("dupla DPP do híbrido já existe");
+  }
+}
+{
+  const [d] = await rest(`duplas?select=id,status&id=eq.${IDS.duplaHibEsp}`);
+  if (!d) {
+    await rest("duplas", {
+      method: "POST",
+      body: JSON.stringify({
+        id: IDS.duplaHibEsp,
+        mentor_id: hib.id,
+        mentorado_id: IDS.mentoradoHibEsp,
+        turma: TURMA_E2E,
+        cronograma_id: null,
+        trilha: "especialista",
+        status: "ativa",
+        iniciada_em: iniciadaEsp,
+        demanda: "E2E: trilha especializada do mentor híbrido.",
+      }),
+    });
+    console.log("trilha do híbrido criada");
+  } else if (d.status !== "ativa") {
+    await patch(`duplas?id=eq.${IDS.duplaHibEsp}`, {
+      status: "ativa",
+      encerrada_em: null,
+      motivo_encerramento: null,
+    });
+    console.log("trilha do híbrido reativada");
+  } else {
+    console.log("trilha do híbrido já existe");
+  }
+}
+
+// janela de grade do papel especialista dele (sexta 19–21 — dia distinto
+// das fixtures dos esps pros slots não se confundirem). O sweep no topo já
+// varreu o profile — insert seco.
+await rest("especialista_grade", {
+  method: "POST",
+  body: JSON.stringify({
+    id: IDS.gradeHib,
+    profile_id: hib.id,
+    dia_semana: 5,
+    hora_inicio: "19:00",
+    hora_fim: "21:00",
+  }),
+});
+console.log("janela de grade do híbrido (sexta 19–21) criada");
+
+// ---- convergência de turma das duplas fixture (REALIZA-151) ----
+// Runs antigos gravaram a turma do domínio — PATCH idempotente migra as
+// duplas e2e pra turma dedicada (DPP ganha o cronograma E2E; especialista
+// segue sem calendário oficial). mentorados_turma casa por string de
+// turma — depois daqui nenhuma fixture vaza pro diretório do jovem demo.
+await patch(
+  `duplas?id=in.(${IDS.dupla},${IDS.dupla2},${IDS.duplaColega},${IDS.duplaHibDpp})`,
+  { turma: TURMA_E2E, cronograma_id: IDS.cronogramaE2e }
+);
+await patch(`duplas?id=in.(${IDS.duplaEsp},${IDS.duplaHibEsp})`, {
+  turma: TURMA_E2E,
+});
+console.log("duplas e2e convergidas pra Turma E2E");
+
+// ---- profile_papeis (WP0b · REALIZA-105) — bloco DEFENSIVO ----
+// A tabela chega pela migration do WP0b; até lá o papel provisório segue
+// sendo profiles.role e este bloco inteiro é no-op (o probe falha com
+// PGRST205 e pula sem quebrar o seed).
+// TODO REALIZA-105: remover fallback quando profile_papeis estiver em prod
+let papeisOk = false;
+try {
+  await rest("profile_papeis?select=profile_id&limit=1");
+  papeisOk = true;
+} catch {
+  console.log(
+    "profile_papeis ainda não existe (WP0b pendente) — profiles.role é o primário provisório"
+  );
+}
+if (papeisOk) {
+  try {
+    // uma linha por papel de cada fixture — o equivalente ao backfill da
+    // migration pra essas personas (linhas de outros profiles ficam fora
+    // do escopo). O híbrido é o único com duas: a segunda é o papel que o
+    // backfill de profiles.role não consegue gerar.
+    const PAPEIS_E2E = [
+      [IDS.mentorProfile, "mentor_dpp"],
+      [IDS.coordProfile, "coordenacao"],
+      [IDS.mentorReserva, "mentor_dpp"],
+      [IDS.mentorImport, "mentor_dpp"],
+      [IDS.jovemProfile, "mentorado"],
+      [IDS.espProfile, "mentor_especialista"],
+      [IDS.esp2Profile, "mentor_especialista"],
+      [IDS.jovem2Profile, "mentorado"],
+      [IDS.mentorColega, "mentor_dpp"],
+      [IDS.jovem3Profile, "mentorado"],
+      [IDS.supProfile, "supervisor"],
+      [IDS.hibProfile, "mentor_dpp"],
+      [IDS.hibProfile, "mentor_especialista"],
+    ];
+    for (const [profile_id, papel] of PAPEIS_E2E) {
+      // escopo Turma E2E (REALIZA-151): jovem_contatos e o remanejo DPP
+      // filtram papel por has_papel(..., turma do jovem/dupla) — papel
+      // global da fixture vazava pros contatos do jovem demo. Pra
+      // mentor_especialista o escopo é inerte desde a 0101 (pool global,
+      // REALIZA-158) — mantido por simetria e porque o spec de isolamento
+      // agora confirma a visibilidade cross-turma dele no catálogo.
+      // Converge a linha existente (run antigo criou com escopo null) e
+      // remove a duplicata global que o sync de profiles.role pode ter
+      // recriado.
+      const rows = await rest(
+        `profile_papeis?select=id,escopo_turma&profile_id=eq.${profile_id}&papel=eq.${papel}`
+      );
+      const scoped = (rows ?? []).find((r) => r.escopo_turma === TURMA_E2E);
+      if (scoped) {
+        for (const r of rows.filter(
+          (x) => x.id !== scoped.id && x.escopo_turma !== TURMA_E2E
+        )) {
+          await del(`profile_papeis?id=eq.${r.id}`);
+        }
+        continue;
+      }
+      const global = (rows ?? []).find((r) => r.escopo_turma === null);
+      if (global) {
+        await patch(`profile_papeis?id=eq.${global.id}`, {
+          escopo_turma: TURMA_E2E,
+        });
+        for (const r of rows.filter((x) => x.id !== global.id)) {
+          await del(`profile_papeis?id=eq.${r.id}`);
+        }
+        continue;
+      }
+      // a linha que espelha profiles.role é a primária; a extra do híbrido
+      // (mentor_especialista) é a secundária. Escopo Turma E2E — o papel
+      // só vale na turma fixture, igual ao mundo que os specs exercem.
+      const linha = {
+        profile_id,
+        papel,
+        escopo_turma: TURMA_E2E,
+        primario:
+          !(profile_id === IDS.hibProfile && papel === "mentor_especialista"),
+      };
+      try {
+        await rest("profile_papeis", {
+          method: "POST",
+          body: JSON.stringify(linha),
+        });
+      } catch {
+        // escopo_turma/primario ainda não saíram na migration aplicada —
+        // insere o núcleo (profile_id+papel) e segue; ajustar ao schema final
+        await rest("profile_papeis", {
+          method: "POST",
+          body: JSON.stringify({ profile_id, papel }),
+        });
+        console.log(`profile_papeis: linha mínima criada pra ${papel} de ${profile_id}`);
+      }
+    }
+    console.log("profile_papeis: papéis das fixtures e2e garantidos");
+  } catch (e) {
+    console.warn(`profile_papeis: fixture não aplicada — ${e.message}`);
+  }
+}
+
+// ---- chamados (WP1 · REALIZA-127+) — bloco DEFENSIVO ----
+// A tabela chega pela migration do WP1; até lá todo o bloco é no-op. Os
+// campos seguem o plano (implementacao-telas-finais.md §WP1 + rascunho
+// ux-revisao-chamados.md): autor_id, dupla_id, categoria, descricao_outro,
+// assunto, status ('aberto'|'em_atendimento'|'resolvido'), atribuido_a
+// (o dono), origem, numero do protocolo. AJUSTAR ao schema final de 0084 —
+// coluna divergente faz o insert falhar e o retry grava só o núcleo.
+let chamadosOk = false;
+try {
+  await rest("chamados?select=id&limit=1");
+  chamadosOk = true;
+} catch {
+  console.log("chamados ainda não existe (WP1 pendente) — fixtures de chamado puladas");
+}
+if (chamadosOk) {
+  try {
+    const chIds = [IDS.chamadoJovem, IDS.chamadoUrgencia, IDS.chamadoAtendimento].join(",");
+    // leftovers primeiro: comentários/atualizações pendurados nos fixtures e
+    // chamados que specs abriram como personas e2e — filhos antes dos pais
+    const extras = await rest(
+      `chamados?select=id&autor_id=in.(${E2E_PROFILES})&id=not.in.(${chIds})`
+    );
+    const extrasIds = (extras ?? []).map((x) => x.id).join(",");
+    if (extrasIds.length) {
+      await del(`chamado_comentarios?chamado_id=in.(${extrasIds})`).catch(() => {});
+      await del(`chamado_atualizacoes?chamado_id=in.(${extrasIds})`).catch(() => {});
+      await del(`chamados?id=in.(${extrasIds})`);
+      console.log(`limpeza: ${extrasIds.split(",").length} chamado(s) leftover removidos`);
+    }
+    await del(`chamado_comentarios?chamado_id=in.(${chIds})`).catch(() => {});
+    await del(`chamado_atualizacoes?chamado_id=in.(${chIds})`).catch(() => {});
+
+    // 3 casos do mock v4: um aberto do jovem (outro), uma urgência de mentor
+    // DPP sem dono e um em atendimento assumido pelo supervisor
+    const CHAMADOS = [
+      {
+        id: IDS.chamadoUrgencia,
+        numero: 143,
+        categoria: "urgencia",
+        assunto:
+          "Preciso de apoio — a mentorada faltou aos últimos dois encontros e a família não responde",
+        descricao_outro: null,
+        status: "aberto",
+        origem: "manual",
+        autor_id: IDS.mentorProfile,
+        dupla_id: IDS.dupla,
+        atribuido_a: null,
+      },
+      {
+        id: IDS.chamadoAtendimento,
+        numero: 139,
+        categoria: "metodologia",
+        assunto:
+          "Como registrar sessão de trilha quando o jovem avisa em cima da hora?",
+        descricao_outro: null,
+        status: "em_atendimento",
+        origem: "manual",
+        autor_id: IDS.espProfile,
+        dupla_id: IDS.duplaEsp,
+        atribuido_a: IDS.supProfile,
+      },
+      {
+        id: IDS.chamadoJovem,
+        numero: 137,
+        categoria: "outro",
+        assunto: "Meu sobrenome está errado no cadastro",
+        descricao_outro: "Está como “Silva Santos” e o certo é só “Silva”.",
+        status: "aberto",
+        origem: "manual",
+        autor_id: IDS.jovemProfile,
+        dupla_id: IDS.dupla,
+        atribuido_a: null,
+      },
+    ];
+    for (const c of CHAMADOS) {
+      const [existe] = await rest(`chamados?select=id&id=eq.${c.id}`);
+      if (!existe) {
+        try {
+          await rest("chamados", { method: "POST", body: JSON.stringify(c) });
+          console.log(`chamado criado: ${c.assunto.slice(0, 40)}…`);
+        } catch {
+          // coluna divergiu do plano — grava o núcleo certeiro; ajustar ao
+          // schema final de 0084
+          const nucleo = {
+            id: c.id,
+            categoria: c.categoria,
+            status: c.status,
+            autor_id: c.autor_id,
+            dupla_id: c.dupla_id,
+          };
+          await rest("chamados", { method: "POST", body: JSON.stringify(nucleo) });
+          console.log(`chamado ${c.id} criado no formato mínimo (schema divergente)`);
+        }
+      } else {
+        // spec assumiu/resolveu — devolve ao estado da fixture
+        try {
+          await patch(`chamados?id=eq.${c.id}`, {
+            status: c.status,
+            atribuido_a: c.atribuido_a,
+          });
+        } catch {
+          /* atribuido_a ainda não existe no schema aplicado — o spec re-assume */
+        }
+      }
+    }
+    console.log("chamados e2e garantidos");
+  } catch (e) {
+    console.warn(`chamados: fixtures não aplicadas — ${e.message}`);
+  }
+}
+
 // documentos do jovem — a seção "Documentos" da home: termo dele (Assinar)
 // + autorização do responsável (Encaminhar). Templates vêm do banco por
 // slug; a fixture manual do staging já usa esses ids/tokens.
@@ -1165,4 +1671,6 @@ console.log(`  E2E_ESP_EMAIL=${ESP_EMAIL}`);
 console.log(`  E2E_ESP2_EMAIL=${ESP2_EMAIL}`);
 console.log(`  E2E_JOVEM2_EMAIL=${JOVEM2_EMAIL}`);
 console.log(`  E2E_JOVEM3_EMAIL=${JOVEM3_EMAIL}`);
+console.log(`  E2E_SUP_EMAIL=${SUP_EMAIL}`);
+console.log(`  E2E_HIB_EMAIL=${HIB_EMAIL}`);
 console.log("  E2E_SUPABASE_URL / E2E_SUPABASE_SERVICE_ROLE_KEY = do staging");

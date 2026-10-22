@@ -89,6 +89,7 @@ export async function trocarEmail(input: {
   // await porque serverless mata promise solta ao responder; a função nunca
   // lança, então falha de envio não trava a troca (que já aconteceu)
   await enviarEmailsIndividuais({
+    critico: true, // e-mail de conta (segurança) — fura o kill-switch
     mensagens: [
       {
         to: user.email,
@@ -113,6 +114,7 @@ export async function avisarSenhaAlterada(): Promise<{ ok: true }> {
   } = await supabase.auth.getUser();
   if (user?.email) {
     await enviarEmailsIndividuais({
+      critico: true, // e-mail de conta (segurança) — fura o kill-switch
       mensagens: [
         {
           to: user.email,

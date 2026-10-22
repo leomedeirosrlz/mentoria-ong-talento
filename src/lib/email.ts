@@ -26,6 +26,20 @@ export const ROLES_POR_AUDIENCIA: Record<string, string[]> = {
   equipe: ["coordenacao", "supervisor"],
 };
 
+/** Resolve audiências → papéis efetivos do fan-out, dedupado e sem os
+ *  papéis explicitamente excluídos (REALIZA-160: material programado não
+ *  vaza pro jovem por e-mail). Puro — compartilhado pelo fan-out de
+ *  e-mail e testável sem banco. */
+export function rolesParaAudiencias(
+  audiencias: string[],
+  excluirRoles?: string[]
+): string[] {
+  const excluir = new Set(excluirRoles ?? []);
+  return [
+    ...new Set(audiencias.flatMap((a) => ROLES_POR_AUDIENCIA[a] ?? [])),
+  ].filter((r) => !excluir.has(r));
+}
+
 export type EnvioLoteResult = {
   enviados: number;
   /** Endereços que não saíram (lote rejeitado ou falha individual). */
@@ -33,6 +47,17 @@ export type EnvioLoteResult = {
   /** Falha de configuração/transporte — quando presente, nada foi tentado. */
   error?: string;
 };
+
+/** TODO(pendente): kill-switch do envio de e-mail — false segura a saída
+ *  de NOTIFICAÇÃO (avisos, materiais, chamados, assinaturas) até o
+ *  produto estar pronto pro envio real. O early return devolve `error`
+ *  coerente e os callers já tratam como falha de transporte (toast
+ *  honesto, nunca falso sucesso). Não cobre auth/conta: magic link passa
+ *  por fora (SMTP auth@ do Supabase) e os e-mails de segurança da conta
+ *  (senha/e-mail alterado) furam o bloqueio com `critico: true` — são
+ *  on-demand, disparados pelo próprio usuário. Virar `true` quando
+ *  liberar de verdade. */
+export const EMAIL_ENVIO_LIBERADO = false;
 
 /** Dispara o mesmo e-mail pra uma lista de destinatários — um envelope por
  *  pessoa (batch, nunca `to:` múltiplo: ninguém vê o e-mail de ninguém).
@@ -43,12 +68,23 @@ export async function enviarEmailsLote({
   assunto,
   html,
   replyTo,
+  critico,
 }: {
   para: string[];
   assunto: string;
   html: string;
   replyTo?: string;
+  /** fura o kill-switch — só pra e-mail de auth/conta (segurança,
+   *  on-demand). Notificação nunca marca. */
+  critico?: boolean;
 }): Promise<EnvioLoteResult> {
+  if (!EMAIL_ENVIO_LIBERADO && !critico) {
+    return {
+      enviados: 0,
+      falhas: [...para],
+      error: "Envio de e-mail desativado (pendente de liberação).",
+    };
+  }
   if (!process.env.RESEND_API_KEY) {
     return {
       enviados: 0,
@@ -98,11 +134,22 @@ export async function enviarEmailsLote({
 export async function enviarEmailsIndividuais({
   mensagens,
   replyTo,
+  critico,
 }: {
   mensagens: { to: string; subject: string; html: string }[];
   replyTo?: string;
+  /** fura o kill-switch — só pra e-mail de auth/conta (segurança,
+   *  on-demand). Notificação nunca marca. */
+  critico?: boolean;
 }): Promise<EnvioLoteResult> {
   const destinos = mensagens.map((m) => m.to);
+  if (!EMAIL_ENVIO_LIBERADO && !critico) {
+    return {
+      enviados: 0,
+      falhas: destinos,
+      error: "Envio de e-mail desativado (pendente de liberação).",
+    };
+  }
   if (!process.env.RESEND_API_KEY) {
     return {
       enviados: 0,

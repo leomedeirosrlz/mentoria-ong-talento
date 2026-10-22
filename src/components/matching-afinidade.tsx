@@ -2,12 +2,12 @@
 
 import { Check, Warning } from "@phosphor-icons/react";
 import {
-  DIAS_SEMANA_LABELS,
+  celulasComuns,
+  disponibilidadeNoDia,
   disponibilidadeTexto,
   ESCOLARIDADE_LABELS,
   GENERO_LABELS,
   idade,
-  PERIODOS_LABELS,
 } from "@/lib/ciclo";
 import type {
   Disponibilidade,
@@ -139,14 +139,14 @@ export function AfinidadePar({
 
   const agendaTxt = disponibilidadeTexto(mentor.disponibilidade);
   const agendaJovemTxt = disponibilidadeTexto(mentorado.disponibilidade ?? null);
-  const diasComuns = (mentor.disponibilidade?.dias ?? []).filter((d) =>
-    (mentorado.disponibilidade?.dias ?? []).includes(d)
+  // células em comum (mesmo dia E mesmo período) — a frase do "coincidem"
+  // é a própria disponibilidadeTexto aplicada à interseção
+  const agendaComum = celulasComuns(
+    mentor.disponibilidade,
+    mentorado.disponibilidade ?? null
   );
-  const periodosComuns = (mentor.disponibilidade?.periodos ?? []).filter((p) =>
-    (mentorado.disponibilidade?.periodos ?? []).includes(p)
-  );
-  const temSobreposicao = diasComuns.length > 0 && periodosComuns.length > 0;
-  const cobreTer = Boolean(mentor.disponibilidade?.dias?.includes("ter"));
+  const temSobreposicao = agendaComum.length > 0;
+  const cobreTer = disponibilidadeNoDia(mentor.disponibilidade, "ter");
   const temInteresses = intMentor.length + intMentorado.length > 0;
   const temMotivacao =
     mentorado.motivacao || mentorado.objetivos || mentor.motivacao;
@@ -267,13 +267,7 @@ export function AfinidadePar({
               (temSobreposicao ? (
                 <p className="flex items-center gap-1.5 text-[var(--ok-text)]">
                   <Check size={12} weight="bold" aria-hidden />
-                  Coincidem em{" "}
-                  {diasComuns.map((d) => DIAS_SEMANA_LABELS[d]).join(", ")}{" "}
-                  ·{" "}
-                  {periodosComuns
-                    .map((p) => PERIODOS_LABELS[p])
-                    .join(", ")}
-                  .
+                  Coincidem em {disponibilidadeTexto({ celulas: agendaComum })}.
                 </p>
               ) : (
                 <p className="flex items-start gap-1.5 text-[var(--warn-text)]">

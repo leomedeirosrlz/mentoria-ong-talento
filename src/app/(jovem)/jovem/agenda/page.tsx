@@ -34,6 +34,7 @@ import {
   formatDateTime,
   linkSeguro,
   maxEncontros,
+  passoEsp,
   waLink,
 } from "@/lib/ciclo";
 import {
@@ -47,11 +48,13 @@ import {
   getJovemDuplas,
   getJovemEncontros,
   getJovemPedidosEspecialista,
+  getJovemPerfil,
 } from "@/lib/queries-jovem";
 import { getSlotsLivres } from "@/lib/queries-especialista";
-import { getCicloEventos, getMe } from "@/lib/queries";
+import { getMe } from "@/lib/queries";
 import { getJovemAvaliacoes } from "@/lib/queries-avaliacao";
 import type { JovemEncontro } from "@/lib/queries-jovem";
+import type { Disponibilidade } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Agenda" };
@@ -80,15 +83,15 @@ const STATUS = {
 } as const;
 
 export default async function JovemAgenda() {
-  const [encontros, avaliacoes, me, duplas, eventos, contatos, pedidosEsp] =
+  const [encontros, avaliacoes, me, duplas, contatos, pedidosEsp, perfil] =
     await Promise.all([
       getJovemEncontros(),
       getJovemAvaliacoes(),
       getMe(),
       getJovemDuplas(),
-      getCicloEventos(),
       getJovemContatos(),
       getJovemPedidosEspecialista(),
+      getJovemPerfil(),
     ]);
   const agora = new Date().getTime();
   const primeiroNome = (me?.nome_social || me?.nome || "").split(" ")[0];
@@ -122,30 +125,20 @@ export default async function JovemAgenda() {
   };
 
   // CTA "Agendar encontro" — só a dupla DPP ativa entra (a RPC recusa a
-  // trilha especialista). Os números livres são os sem row ainda: a data
-  // oficial sai como hint quando o calendário é legível — pro papel
-  // mentorado ciclo_eventos é filtrado a vazio pela RLS (0065) e o Select
-  // lista só o nº; a RPC mede o teto real contra o cronograma da dupla.
+  // trilha especialista). Os números livres são os sem row ainda: o Select
+  // lista só o nº (a data oficial não é legível pro papel mentorado — a
+  // RLS filtra o calendário a vazio); a RPC mede o teto real contra o
+  // cronograma da dupla.
   const duplaDpp =
     duplas.find((d) => d.status === "ativa" && d.trilha !== "especialista") ??
     null;
-  const oficialPorNumero = new Map(
-    eventos
-      .filter(
-        (ev) =>
-          ev.tipo === "encontro" &&
-          ev.numero != null &&
-          ev.cronograma_id === duplaDpp?.cronograma_id
-      )
-      .map((ev) => [ev.numero!, ev.data] as const)
-  );
   const ocupados = new Set(
     encontros.filter((e) => e.dupla_id === duplaDpp?.id).map((e) => e.numero)
   );
   const numerosLivres = duplaDpp
     ? Array.from({ length: maxEncontros("dpp") }, (_, i) => i + 1)
         .filter((n) => !ocupados.has(n))
-        .map((n) => ({ numero: n, data: oficialPorNumero.get(n) ?? null }))
+        .map((n) => ({ numero: n }))
     : [];
 
   // trilha especialista (111+112): a agenda real do especialista chega como
@@ -177,6 +170,10 @@ export default async function JovemAgenda() {
     contatos.find((c) => c.papel === "coordenacao")?.whatsapp,
     `Olá! Sou ${me?.nome_social || me?.nome || ""}, mentorado(a) do programa, e preciso falar com a equipe.`
   );
+  // a grade do jovem marca nos chips/slots do especialista os horários que
+  // encaixam nela ("encaixa com você" — mesma régua da mesa de negociação)
+  const dispJovem =
+    (perfil?.disponibilidade as Disponibilidade | null | undefined) ?? null;
   const espPorDupla = new Map(
     duplasEsp.map((d) => {
       // a view rotula por trilha desde a 0076: na dupla esp o contato do
@@ -206,6 +203,23 @@ export default async function JovemAgenda() {
       ] as const;
     })
   );
+  // passo da sessão = rank do encontro entre os realizados da MESMA dupla
+  // (e.numero é a tentativa — a 3ª tentativa pode ser a 2ª sessão; "Sessão N"
+  // é o passo do guia). Só computa pras trilhas esp — o DPP usa o oficial.
+  const passoPorEncontroEsp = new Map(
+    encontros
+      .filter((e) => trilhaPorDupla.get(e.dupla_id) === "especialista")
+      .map((e) => [
+        e.id,
+        passoEsp(
+          e,
+          encontros.filter((x) => x.dupla_id === e.dupla_id)
+        ),
+      ])
+  );
+  const rotuloSessao = (e: JovemEncontro) =>
+    `Sessão ${passoPorEncontroEsp.get(e.id) ?? e.numero} com ${espPorDupla.get(e.dupla_id)?.primeiro ?? "seu especialista"}`;
+
 
   // futuros = agendado/remarcado com data pra frente; o resto é histórico
   // (inclui agendado já passado — "estava marcado e não rolou" é histórico,
@@ -316,6 +330,7 @@ export default async function JovemAgenda() {
                           slots={slots}
                           meuId={me?.id ?? ""}
                           waCoord={waCoord}
+                          disponibilidade={dispJovem}
                         />
                       </div>
                     ) : slots.length === 0 ? (
@@ -347,6 +362,7 @@ export default async function JovemAgenda() {
                         trilhasAtivas={trilhasAtivasEsp}
                         slotsPorEsp={{ [d.mentor_id!]: slots }}
                         semDuplaDpp={semDuplaDpp}
+                        disponibilidade={dispJovem}
                       />
                     )}
                   </CardContent>
@@ -373,7 +389,10 @@ export default async function JovemAgenda() {
         <>
           {futuros.length > 0 && (
             <section aria-labelledby="agenda-proximos" className="space-y-2">
-              <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+              <h2
+                id="agenda-proximos"
+                className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground"
+              >
                 Próximos
               </h2>
               <Card>
@@ -386,6 +405,7 @@ export default async function JovemAgenda() {
                       agora={agora}
                       duplaAtiva={ativaPorDupla.get(e.dupla_id) ?? false}
                       trilha={trilhaPorDupla.get(e.dupla_id) ?? "dpp"}
+                      rotuloEsp={rotuloSessao(e)}
                     />
                   ))}
                 </CardContent>
@@ -394,7 +414,10 @@ export default async function JovemAgenda() {
           )}
           {passados.length > 0 && (
             <section aria-labelledby="agenda-historico" className="space-y-2">
-              <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+              <h2
+                id="agenda-historico"
+                className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground"
+              >
                 Histórico
               </h2>
               <Card>
@@ -408,6 +431,7 @@ export default async function JovemAgenda() {
                       agora={agora}
                       duplaAtiva={ativaPorDupla.get(e.dupla_id) ?? false}
                       trilha={trilhaPorDupla.get(e.dupla_id) ?? "dpp"}
+                      rotuloEsp={rotuloSessao(e)}
                     />
                   ))}
                 </CardContent>
@@ -428,6 +452,7 @@ function EncontroLinha({
   agora,
   duplaAtiva = false,
   trilha = "dpp",
+  rotuloEsp,
 }: {
   e: JovemEncontro;
   futuro?: boolean;
@@ -444,6 +469,10 @@ function EncontroLinha({
    *  prometer um gesto que a RPC recusaria. Desmarcar/"não aconteceu" valem
    *  em qualquer trilha e seguem aparecendo. */
   trilha?: string;
+  /** rótulo "Sessão N com Fulana" — o passo vem do caller (rank entre
+   *  realizados; e.numero é tentativa). Distinção DPP×esp na listagem
+   *  mista (0097: antes eram dois "3º encontro" indistinguíveis). */
+  rotuloEsp?: string;
 }) {
   const st = STATUS[e.status];
   const quando = e.status === "realizado" && e.realizado_em ? e.realizado_em : e.data_hora;
@@ -483,7 +512,9 @@ function EncontroLinha({
       </span>
       <div className="min-w-0 flex-1 basis-48">
         <p className="text-sm font-medium">
-          {e.numero}º encontro
+          {trilha === "especialista" && rotuloEsp
+            ? rotuloEsp
+            : `${e.numero}º encontro`}
         </p>
         <p className="mt-0.5 text-xs text-muted-foreground">
           {quando ? formatDateTime(quando) : "data a combinar"}
@@ -495,12 +526,17 @@ function EncontroLinha({
         )}
       </div>
       <div className="ms-auto flex flex-wrap items-center justify-end gap-2">
+        {/* Entrar é a ação decisiva na hora da chamada — por isso fica
+            em default enquanto Remarcar/Desmarcar ficam em outline/ghost.
+            (Overflow-menu pro Desmarcar ficou de fora: por estado só há um
+            ghost por vez e os Dialogs moram em jovem-encontro-acoes —
+            menu de item único só adicionaria um toque.) */}
         {futuro && linkSeguro(e.link) && (
           <a
             href={linkSeguro(e.link)!}
             target="_blank"
             rel="noopener noreferrer"
-            className={buttonVariants({ variant: "outline", size: "sm" })}
+            className={buttonVariants({ variant: "default", size: "sm" })}
           >
             <VideoCamera size={15} aria-hidden />
             Entrar

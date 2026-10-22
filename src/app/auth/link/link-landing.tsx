@@ -79,7 +79,7 @@ export function LinkLanding() {
 
   if (falhou) {
     return (
-      <div className="min-h-[100dvh] grid place-items-center bg-background px-4">
+      <div className="min-h-[100dvh] grid place-items-center bg-background px-4 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))]">
         <div className="max-w-xs text-center">
           <div
             role="alert"
@@ -97,7 +97,7 @@ export function LinkLanding() {
   }
 
   return (
-    <div className="min-h-[100dvh] grid place-items-center bg-background px-4">
+    <div className="min-h-[100dvh] grid place-items-center bg-background px-4 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))]">
       <p role="status" className="flex items-center gap-2 text-sm text-muted-foreground">
         <CircleNotch size={16} className="animate-spin" aria-hidden="true" />
         Confirmando…

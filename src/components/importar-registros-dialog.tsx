@@ -2,7 +2,13 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { CaretDown, FileArrowUp, UploadSimple, Warning } from "@phosphor-icons/react";
+import { Collapsible } from "@base-ui/react/collapsible";
+import {
+  CaretDown,
+  FileArrowUp,
+  UploadSimple,
+  Warning,
+} from "@phosphor-icons/react";
 import { toast } from "sonner";
 import {
   executarImportRegistros,
@@ -14,14 +20,16 @@ import type { DuplaCandidata, LinhaReg } from "@/lib/importar-registros";
 import { formatDate } from "@/lib/ciclo";
 import { Button } from "@/components/ui/button";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
+  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Select, SelectContent, SelectGroup, SelectItem, SelectLabel,
   SelectSeparator, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import { Tag, type TomTag } from "@/components/agenda-partes";
 import { cn } from "@/lib/utils";
 
 type Resultado = {
@@ -52,34 +60,67 @@ const curto = (v: string, max = 56) => {
 const duplaLabel = (d: DuplaCandidata) =>
   `${d.mentoradoNome} × ${d.mentorNome}` +
   (d.status !== "ativa" ? ` (${d.status})` : "") +
-  (d.trilha === "especialista" ? " · especialista" : "");
+  (d.trilha === "especialista" ? " · especialista" : "") +
+  (d.score != null ? ` · ${d.score}` : "");
 
-const ENC_INFO: Record<EncontroInfo, string> = {
-  novo: "encontro novo",
-  anexa: "anexa ao encontro",
-  atualiza: "já tem registro",
+const ENC_INFO: Record<EncontroInfo, { rotulo: string; tom: TomTag }> = {
+  novo: { rotulo: "encontro novo", tom: "ok" },
+  anexa: { rotulo: "anexa ao encontro", tom: "muted" },
+  atualiza: { rotulo: "já tem registro", tom: "warn" },
 };
+
+const NIVEL_TAG: Record<string, { rotulo: string; tom: TomTag }> = {
+  auto: { rotulo: "confiança", tom: "ok" },
+  provavel: { rotulo: "confiança", tom: "info" },
+  manual: { rotulo: "manual", tom: "warn" },
+};
+
+/** Tag de confiança do match — "87" verde quando auto, azul quando a
+ *  sugestão é provável, "manual" âmbar quando não há palpite. */
+function ConfTag({ l }: { l: LinhaPrev }) {
+  if (l.status === "ignorar") return <Tag tom="muted">ignorada</Tag>;
+  const n = NIVEL_TAG[l.nivel ?? "manual"];
+  return (
+    <Tag tom={n.tom}>
+      {l.nivel === "manual" || l.score == null
+        ? n.rotulo
+        : `${n.rotulo} ${l.score}`}
+    </Tag>
+  );
+}
 
 export function ImportarRegistrosDialog() {
   const [open, setOpen] = useState(false);
   const [texto, setTexto] = useState("");
+  const [arquivo, setArquivo] = useState<string | null>(null);
   const [linhas, setLinhas] = useState<LinhaPrev[] | null>(null);
   const [duplas, setDuplas] = useState<DuplaCandidata[]>([]);
+  // dupla_id → (nº → estado do encontro) — recomputa o tag "já tem
+  // registro" pra dupla que a pessoa escolher no Select, não a sugerida
+  const [encPorDupla, setEncPorDupla] = useState<
+    Record<string, Record<number, EncontroInfo>>
+  >({});
   // n → duplaId escolhido | IGNORAR | "" (pendente) — a decisão humana das
   // linhas 'revisar'; as 'ok' não entram no mapa
   const [escolhas, setEscolhas] = useState<Map<number, string>>(new Map());
   const [ignoradas, setIgnoradas] = useState(0);
   const [resultado, setResultado] = useState<Resultado | null>(null);
+  const [erroParse, setErroParse] = useState<string | null>(null);
+  const [busca, setBusca] = useState("");
   const [pending, start] = useTransition();
   const router = useRouter();
 
   function reset() {
     setTexto("");
+    setArquivo(null);
     setLinhas(null);
     setDuplas([]);
+    setEncPorDupla({});
     setEscolhas(new Map());
     setIgnoradas(0);
     setResultado(null);
+    setErroParse(null);
+    setBusca("");
   }
 
   function aoMudar(o: boolean) {
@@ -91,6 +132,7 @@ export function ImportarRegistrosDialog() {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file) return;
+    setArquivo(file.name);
     file
       .arrayBuffer()
       .then((buf) => {
@@ -110,23 +152,25 @@ export function ImportarRegistrosDialog() {
 
   function preVisualizar(conteudo = texto) {
     if (!conteudo.trim()) return;
+    setErroParse(null);
     start(async () => {
       const res = await previewImportRegistros(conteudo);
       if ("error" in res && res.error) {
-        toast.error(res.error);
+        setErroParse(res.error);
         return;
       }
       if (!res.linhas?.length) {
-        toast.error(
+        setErroParse(
           "Nenhuma resposta reconhecida. Confira se é o CSV do form semanal (precisa das colunas Nome, Nome do Mentorando e encontro/semana)."
         );
         return;
       }
       setLinhas(res.linhas);
       setDuplas(res.duplas ?? []);
+      setEncPorDupla(res.encPorDupla ?? {});
       setIgnoradas(res.ignoradas ?? 0);
-      // linhas revisar com dupla já resolvida (só flag de data/campo)
-      // chegam com a sugestão preenchida — a pessoa confere e aprova
+      // prováveis chegam com a sugestão preenchida — a pessoa confere e
+      // aprova; manuais ficam "" até escolha explícita
       const pre = new Map<number, string>();
       for (const l of res.linhas) {
         if (l.status === "revisar") pre.set(l.n, l.duplaId ?? "");
@@ -172,6 +216,24 @@ export function ImportarRegistrosDialog() {
     });
   }
 
+  // ---- grupos da prévia: ação primeiro, pronto recolhido por último ----
+  const b = busca.trim().toLowerCase();
+  const visiveis = (linhas ?? []).filter(
+    (l) =>
+      !b ||
+      [l.mentorTxt, l.mentoradoTxt, l.mentorNome, l.mentoradoNome, String(l.n)]
+        .filter(Boolean)
+        .some((v) => v!.toLowerCase().includes(b))
+  );
+  const manuais = visiveis.filter(
+    (l) => l.status === "revisar" && (l.nivel === "manual" || !l.duplaId)
+  );
+  const provaveis = visiveis.filter(
+    (l) => l.status === "revisar" && l.nivel !== "manual" && !!l.duplaId
+  );
+  const ignorCsv = visiveis.filter((l) => l.status === "ignorar");
+  const prontas = visiveis.filter((l) => l.status === "ok");
+
   const ok = linhas?.filter((l) => l.status === "ok").length ?? 0;
   const revisar = linhas?.filter((l) => l.status === "revisar") ?? [];
   const aprovadasRevisar = revisar.filter(
@@ -182,17 +244,19 @@ export function ImportarRegistrosDialog() {
   const importaveis = ok + aprovadasRevisar;
   const ignorar = linhas?.filter((l) => l.status === "ignorar").length ?? 0;
 
-  /** Select de dupla da linha 'revisar': prováveis primeiro (as pistas do
-   *  match), separador, todas as duplas, e "ignorar" no fim. */
-  function selectDupla(l: LinhaPrev) {
+  /** Select de dupla da linha 'revisar': candidatos em ordem de nota (a
+   *  nota aparece no label), separador, todas as duplas, "ignorar" no fim. */
+  function selectDupla(l: LinhaPrev, largo = false) {
     const valor = escolhas.get(l.n) ?? "";
+    // candidatos chegam ordenados por score e carregam a nota — duplas[]
+    // cruas não têm score, por isso o grupo provável usa eles
+    const prov = l.candidatos;
+    const cand = new Set(prov.map((c) => c.id));
+    const demais = duplas.filter((d) => !cand.has(d.id));
     const items: Record<string, string> = Object.fromEntries(
-      duplas.map((d) => [d.id, duplaLabel(d)])
+      [...prov, ...demais].map((d) => [d.id, duplaLabel(d)])
     );
     items[IGNORAR] = "Ignorar esta linha";
-    const cand = new Set(l.candidatos.map((c) => c.id));
-    const provaveis = duplas.filter((d) => cand.has(d.id));
-    const demais = duplas.filter((d) => !cand.has(d.id));
     return (
       <Select
         value={valor}
@@ -204,22 +268,22 @@ export function ImportarRegistrosDialog() {
         <SelectTrigger
           size="sm"
           aria-label={`Dupla da linha ${l.n}`}
-          className={cn("w-full min-w-44", !valor && "border-dashed")}
+          className={cn("w-full", largo ? "min-w-72" : "min-w-44", !valor && "border-dashed")}
         >
           <SelectValue placeholder="escolher dupla…" />
         </SelectTrigger>
         <SelectContent>
-          {provaveis.length > 0 && (
+          {prov.length > 0 && (
             <SelectGroup>
               <SelectLabel>Prováveis</SelectLabel>
-              {provaveis.map((d) => (
+              {prov.map((d) => (
                 <SelectItem key={d.id} value={d.id}>{duplaLabel(d)}</SelectItem>
               ))}
             </SelectGroup>
           )}
-          {provaveis.length > 0 && <SelectSeparator />}
+          {prov.length > 0 && <SelectSeparator />}
           <SelectGroup>
-            <SelectLabel>{provaveis.length ? "Todas as duplas" : "Duplas"}</SelectLabel>
+            <SelectLabel>{prov.length ? "Todas as duplas" : "Duplas"}</SelectLabel>
             {demais.map((d) => (
               <SelectItem key={d.id} value={d.id}>{duplaLabel(d)}</SelectItem>
             ))}
@@ -228,6 +292,138 @@ export function ImportarRegistrosDialog() {
           <SelectItem value={IGNORAR}>Ignorar esta linha</SelectItem>
         </SelectContent>
       </Select>
+    );
+  }
+
+  /** Uma linha da prévia: #n + confiança + nomes resolvidos × CSV + porquê
+   *  (motivo + trilha de evidências) + normalizações; à direita o destino
+   *  (encontro + Select ou dupla fixada). */
+  function linhaImport(l: LinhaPrev) {
+    const resolvM = l.mentorNome ?? l.mentorTxt;
+    const resolvD = l.mentoradoNome ?? l.mentoradoTxt;
+    const mudou =
+      (l.mentorNome && l.mentorNome !== l.mentorTxt) ||
+      (l.mentoradoNome && l.mentoradoNome !== l.mentoradoTxt);
+    // tag de encontro sempre pra dupla VIGENTE no Select — "já tem
+    // registro" aparece inclusive na linha manual que a pessoa acabou
+    // de apontar; sem escolha/nº, sem tag
+    const encSel =
+      l.status === "ok" ? l.duplaId : (escolhas.get(l.n) ?? null);
+    const encInfo =
+      encSel && encSel !== IGNORAR && l.numero != null
+        ? (encPorDupla[encSel]?.[l.numero] ?? "novo")
+        : null;
+    // avisos (peso<0) primeiro — a dupla concorrente/duplicata é o que
+    // precisa de olho; ordem original preservada dentro de cada grupo
+    const evs = [...l.evidencias]
+      .sort((a, b) => Number(a.peso < 0) - Number(b.peso < 0))
+      .slice(0, 5);
+    const diffs = l.diffs.slice(0, 3);
+    return (
+      <li
+        className={cn(
+          "flex flex-wrap gap-x-6 gap-y-2 px-4 py-3",
+          l.status === "ignorar" && "opacity-60"
+        )}
+      >
+        <div className="min-w-0 flex-1 basis-80">
+          <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+            <span className="text-xs tabular-nums text-muted-foreground">#{l.n}</span>
+            <span className="font-medium">
+              {resolvD || "—"} <span className="text-muted-foreground">×</span> {resolvM || "—"}
+            </span>
+            <ConfTag l={l} />
+            {encInfo && (
+              <Tag tom={ENC_INFO[encInfo].tom}>
+                {ENC_INFO[encInfo].rotulo}
+              </Tag>
+            )}
+          </p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            {mudou ? `no CSV: ${l.mentorTxt} × ${l.mentoradoTxt} · ` : ""}
+            {l.numero != null ? `${l.numero}º encontro` : "sem número"}
+            {l.dataIso && ` · ${formatDate(l.dataIso)}`}
+            {!l.dataIso && l.dataTxt && ` · data ilegível: “${curto(l.dataTxt, 20)}”`}
+          </p>
+          {l.motivo && (
+            <p className="mt-1 text-xs text-[var(--warn-text)]">{l.motivo}</p>
+          )}
+          {evs.length > 0 && l.status !== "ignorar" && (
+            <ul className="mt-1 space-y-0.5">
+              {evs.map((e, i) => (
+                <li
+                  key={i}
+                  className={cn(
+                    "text-xs",
+                    e.peso < 0 ? "text-[var(--warn-text)]" : "text-muted-foreground"
+                  )}
+                >
+                  · {e.texto}
+                </li>
+              ))}
+            </ul>
+          )}
+          {diffs.length > 0 && (
+            <ul className="mt-1 space-y-0.5 text-xs">
+              {diffs.map((d, j) => (
+                <li key={j} title={`${d.label}: ${d.de}`} className="leading-snug">
+                  <span className="break-all text-muted-foreground/70 line-through decoration-muted-foreground/40">
+                    {curto(d.de, 44) || "(vazio)"}
+                  </span>
+                  {" → "}
+                  {d.para ? (
+                    <span className="break-all">{curto(d.para, 44)}</span>
+                  ) : (
+                    <em className="text-muted-foreground">descartado</em>
+                  )}
+                  {d.revisar && (
+                    <span className="ml-1 inline-flex items-center gap-1 text-[var(--warn-text)]">
+                      <Warning size={11} aria-hidden />
+                      {`revisar${d.aviso ? ` — ${curto(d.aviso, 40)}` : ""}`}
+                    </span>
+                  )}
+                </li>
+              ))}
+              {l.diffs.length > 3 && (
+                <li className="text-muted-foreground">
+                  + {l.diffs.length - 3} normalizações
+                </li>
+              )}
+            </ul>
+          )}
+        </div>
+        <div className="w-full shrink-0 sm:w-80">
+          {l.status === "revisar" ? (
+            selectDupla(l, true)
+          ) : l.duplaId ? (
+            <p className="text-xs text-muted-foreground">
+              <span className="text-foreground">{l.mentoradoNome} × {l.mentorNome}</span>
+              {l.status === "ok" && " — entra direto"}
+            </p>
+          ) : l.status === "ignorar" ? (
+            <p className="text-xs text-muted-foreground">{l.motivo ?? "fora do lote"}</p>
+          ) : null}
+        </div>
+      </li>
+    );
+  }
+
+  function grupoImport(
+    titulo: string,
+    grupo: LinhaPrev[],
+    acao?: React.ReactNode
+  ) {
+    if (!grupo.length) return null;
+    return (
+      <div key={titulo}>
+        <h3 className="mb-1.5 flex items-center justify-between text-xs font-semibold text-muted-foreground">
+          {titulo}
+          {acao}
+        </h3>
+        <ul className="divide-y divide-border/60 overflow-hidden rounded-xl border bg-card">
+          {grupo.map(linhaImport)}
+        </ul>
+      </div>
     );
   }
 
@@ -240,9 +436,16 @@ export function ImportarRegistrosDialog() {
           </Button>
         }
       />
+      {/* 3xl, não 6xl: a linha da prévia é basis-80 + w-80 (~43,5rem) —
+          em 2xl a coluna de escolha quebrava, em 6xl sobrava fundo ocioso */}
       <DialogContent className="sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle>Importar respostas do form semanal</DialogTitle>
+          <DialogDescription>
+            {linhas
+              ? `${arquivo ?? "conteúdo colado"} · ${linhas.length} ${linhas.length === 1 ? "resposta" : "respostas"} lidas`
+              : "Cada linha vira encontro realizado + registro do mentor."}
+          </DialogDescription>
         </DialogHeader>
 
         {resultado ? (
@@ -269,127 +472,79 @@ export function ImportarRegistrosDialog() {
           </div>
         ) : linhas ? (
           <div ref={(el) => el?.focus()} tabIndex={-1} className="space-y-3 min-w-0 outline-none">
-            <p className="text-sm text-muted-foreground">
-              <span className="text-foreground font-medium">{importaveis}</span>{" "}
-              {importaveis === 1 ? "resposta pronta" : "respostas prontas"}
-              {pendentes > 0 &&
-                ` · ${pendentes} ${pendentes === 1 ? "pede" : "pedem"} sua escolha`}
-              {ignoradasMarcadas + ignorar > 0 &&
-                ` · ${ignoradasMarcadas + ignorar} ${ignoradasMarcadas + ignorar === 1 ? "será pulada" : "serão puladas"}`}
-              {ignoradas > 0 &&
-                ` · ${ignoradas} ${ignoradas === 1 ? "linha do CSV ignorada" : "linhas do CSV ignoradas"}`}
-            </p>
-            <div className="scroll-fina max-h-80 overflow-auto rounded-lg border">
-              <table className="w-full min-w-[760px] text-sm">
-                <thead className="sticky top-0 bg-card">
-                  <tr className="border-b text-left text-xs text-muted-foreground">
-                    <th className="px-3 py-2 font-medium">Mentor × mentorado(a)</th>
-                    <th className="px-3 py-2 font-medium">Encontro</th>
-                    <th className="px-3 py-2 font-medium">Dupla</th>
-                    <th className="px-3 py-2 font-medium">Status</th>
-                    <th className="px-3 py-2 font-medium">Normalizado</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {linhas.map((l) => {
-                    return (
-                      <tr key={l.n} className={cn(l.status === "ignorar" && "text-muted-foreground/60")}>
-                        <td className="max-w-52 px-3 py-1.5">
-                          {l.mentorNome ?? l.mentorTxt ?? "—"}
-                          {l.mentorNome && l.mentorNome !== l.mentorTxt && (
-                            <span className="block text-xs text-muted-foreground">
-                              no CSV: {l.mentorTxt}
-                            </span>
-                          )}
-                          <span className="block text-xs text-muted-foreground">
-                            {l.mentoradoNome ?? l.mentoradoTxt ?? "—"}
-                            {l.mentoradoNome && l.mentoradoNome !== l.mentoradoTxt &&
-                              ` (no CSV: ${l.mentoradoTxt})`}
-                          </span>
-                        </td>
-                        <td className="px-3 py-1.5 text-xs whitespace-nowrap">
-                          {l.numero != null ? `${l.numero}º` : "—"}
-                          {l.dataIso && (
-                            <span className="block text-muted-foreground">
-                              {formatDate(l.dataIso)}
-                            </span>
-                          )}
-                          {l.encontroInfo && (
-                            <span
-                              className={cn(
-                                "block",
-                                l.encontroInfo === "atualiza"
-                                  ? "text-[var(--warn-text)]"
-                                  : "text-muted-foreground"
-                              )}
-                            >
-                              {ENC_INFO[l.encontroInfo]}
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-3 py-1.5">
-                          {l.status === "revisar" ? (
-                            selectDupla(l)
-                          ) : l.duplaId ? (
-                            <span className="text-xs">
-                              {l.mentoradoNome} × {l.mentorNome}
-                            </span>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">—</span>
-                          )}
-                        </td>
-                        <td className="max-w-56 px-3 py-1.5 text-xs">
-                          {l.status === "ok" ? (
-                            <span className="text-[var(--ok-text)]">Ok</span>
-                          ) : l.status === "ignorar" ? (
-                            <span className="text-muted-foreground">{l.motivo}</span>
-                          ) : (
-                            <span className="text-[var(--warn-text)]">{l.motivo}</span>
-                          )}
-                        </td>
-                        <td className="max-w-52 px-3 py-1.5 text-xs">
-                          {l.diffs.length ? (
-                            <ul className="space-y-1">
-                              {l.diffs.map((d, j) => (
-                                <li key={j} title={`${d.label}: ${d.de}`} className="leading-snug">
-                                  <span className="break-all text-muted-foreground/70 line-through decoration-muted-foreground/40">
-                                    {curto(d.de) || "(vazio)"}
-                                  </span>
-                                  {" → "}
-                                  {d.para ? (
-                                    <span className="break-all">{curto(d.para)}</span>
-                                  ) : (
-                                    <em className="text-muted-foreground">descartado</em>
-                                  )}
-                                  {d.revisar && (
-                                    <span
-                                      className="mt-0.5 flex items-center gap-1 text-[var(--warn-text)]"
-                                      title={d.aviso ?? "valor precisou de resgate"}
-                                    >
-                                      <Warning size={12} aria-hidden className="shrink-0" />
-                                      {`revisar${d.aviso ? ` — ${curto(d.aviso, 44)}` : ""}`}
-                                    </span>
-                                  )}
-                                </li>
-                              ))}
-                            </ul>
-                          ) : (
-                            <span className="text-muted-foreground/60">—</span>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+              <p className="text-sm text-muted-foreground">
+                <span className="text-foreground font-medium">{importaveis}</span>{" "}
+                {importaveis === 1 ? "resposta pronta" : "respostas prontas"}
+                {pendentes > 0 &&
+                  ` · ${pendentes} ${pendentes === 1 ? "pede" : "pedem"} sua escolha`}
+                {ignoradasMarcadas + ignorar > 0 &&
+                  ` · ${ignoradasMarcadas + ignorar} ${ignoradasMarcadas + ignorar === 1 ? "será pulada" : "serão puladas"}`}
+                {ignoradas > 0 &&
+                  ` · ${ignoradas} ${ignoradas === 1 ? "linha do CSV ignorada" : "linhas do CSV ignoradas"}`}
+              </p>
+              {linhas.length > 10 && (
+                <Input
+                  type="search"
+                  aria-label="Buscar linha por nome ou número"
+                  placeholder="Buscar por nome ou #linha"
+                  value={busca}
+                  onChange={(e) => setBusca(e.target.value)}
+                  className="ml-auto w-56"
+                />
+              )}
             </div>
+
+            <div className="scroll-fina max-h-[58vh] space-y-4 overflow-y-auto pr-1">
+              {grupoImport(
+                `Pedem sua escolha (${manuais.length})`,
+                manuais,
+                manuais.length > 1 ? (
+                  <button
+                    type="button"
+                    className="-my-1 min-h-11 rounded-md px-2 text-xs font-normal text-muted-foreground underline-offset-2 hover:underline"
+                    onClick={() => {
+                      const m = new Map(escolhas);
+                      for (const l of manuais) m.set(l.n, IGNORAR);
+                      setEscolhas(m);
+                    }}
+                  >
+                    {b ? "Ignorar estas" : "Ignorar todas"}
+                  </button>
+                ) : undefined
+              )}
+              {grupoImport(
+                `Prováveis — confira a sugestão (${provaveis.length})`,
+                provaveis
+              )}
+              {grupoImport(`Ignoradas no CSV (${ignorCsv.length})`, ignorCsv)}
+              {prontas.length > 0 && (
+                <Collapsible.Root
+                  defaultOpen={!manuais.length && !provaveis.length && !ignorCsv.length}
+                >
+                  <Collapsible.Trigger className="group mb-1.5 flex min-h-11 w-full cursor-pointer items-center gap-1.5 text-left text-xs font-semibold text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                    {`Prontas — entram direto (${prontas.length})`}
+                    <CaretDown
+                      size={13}
+                      aria-hidden
+                      className="transition-transform group-data-[panel-open]:rotate-180"
+                    />
+                  </Collapsible.Trigger>
+                  <Collapsible.Panel className="h-[var(--collapsible-panel-height)] overflow-hidden transition-[height] duration-150 data-ending-style:h-0 data-starting-style:h-0 [&[hidden]:not([hidden='until-found'])]:hidden">
+                    <ul className="divide-y divide-border/60 overflow-hidden rounded-xl border bg-card">
+                      {prontas.map(linhaImport)}
+                    </ul>
+                  </Collapsible.Panel>
+                </Collapsible.Root>
+              )}
+            </div>
+
             <p className="text-xs text-muted-foreground">
-              Cada resposta vira encontro realizado + registro atribuído ao mentor.
               Encontro ou registro já existente é atualizado, nunca duplicado.
               Linha pendente não entra — escolha a dupla ou marque &quot;ignorar&quot;.
             </p>
             <div className="flex gap-2">
-              <Button variant="outline" onClick={() => { setLinhas(null); setEscolhas(new Map()); }}>
+              <Button variant="outline" onClick={() => { setLinhas(null); setEscolhas(new Map()); setBusca(""); }}>
                 Voltar
               </Button>
               <Button className="flex-1" disabled={pending || importaveis === 0} onClick={importar}>
@@ -402,6 +557,12 @@ export function ImportarRegistrosDialog() {
           </div>
         ) : (
           <div className="space-y-4">
+            {erroParse && (
+              <p role="alert" className="flex items-start gap-2 rounded-lg border border-[var(--warn)]/40 bg-[var(--warn)]/10 px-3 py-2.5 text-sm text-[var(--warn-text)]">
+                <Warning size={16} aria-hidden className="mt-0.5 shrink-0" />
+                {erroParse}
+              </p>
+            )}
             <div className="space-y-2">
               <Label htmlFor="reg_csv_file">Arquivo .csv das respostas</Label>
               <input
@@ -427,7 +588,7 @@ export function ImportarRegistrosDialog() {
                 id="reg_csv_text" rows={7}
                 placeholder={'Carimbo de data/hora,Pontuação,Nome,Nome do Mentorando,"Qual encontro/semana está sendo avaliado?","Data do encontro",…\n08/10/2026 21:03,,Fernando Toledo,Nicolly Barbosa,"1º Encontro",16/09/2026,…'}
                 value={texto}
-                onChange={(e) => setTexto(e.target.value)}
+                onChange={(e) => { setTexto(e.target.value); setErroParse(null); }}
                 className="font-mono text-xs"
               />
             </div>

@@ -17,8 +17,11 @@ import {
 } from "@/lib/queries-especialista";
 import { getSupervisaoAlvos, getSupervisoesRecentes } from "@/lib/queries-supervisao";
 import { getMinhaAssinaturaTermo } from "@/lib/queries-assinaturas";
+import { getChamados } from "@/lib/queries-chamados";
+import { temPapel } from "@/lib/types";
 import { DashboardCoordenacao } from "@/components/dashboard-coordenacao";
 import { DemandasEspecialista } from "@/components/demandas-especialista";
+import { MeusChamadosCard } from "@/components/meus-chamados-card";
 import { MentorHome } from "@/components/mentor-home";
 import { TermoBanner } from "@/components/termo-banner";
 import { AvisosSection } from "@/components/avisos-section";
@@ -51,7 +54,19 @@ export default async function HomePage({
       getContagemPessoas(),
       getSolicitacoesVisiveis(),
     ]);
-    const interacoes = await getUltimasInteracoes(duplas.map((d) => d.id));
+    const interacoes = await getUltimasInteracoes(duplas.map((d) => d.id), "nudge");
+    // staff+especialista (papel secundário): o sino já notifica os pedidos —
+    // a home tem que dar a superfície de agir, senão o ping morre aqui
+    const ehEsp = temPapel(me, "mentor_especialista");
+    const emNegociacao = solicitacoes.filter((s) =>
+      ["aberta", "contra_proposta"].includes(s.status_efetivo ?? s.status)
+    );
+    const [propostas, meusSlots] = await Promise.all([
+      ehEsp && emNegociacao.length
+        ? getPropostasMap(emNegociacao.map((s) => s.id))
+        : Promise.resolve({}),
+      ehEsp ? getSlotsLivres(me.id) : Promise.resolve([]),
+    ]);
     return (
       <div className="space-y-8">
         {assinatura?.status !== "assinado" && <TermoBanner />}
@@ -69,17 +84,49 @@ export default async function HomePage({
           turmas={[...new Set(cronogramas.map((c) => c.turma))]}
           meuNome={me?.nome.split(" ")[0]}
         />
+        {ehEsp && (
+          <DemandasEspecialista
+            solicitacoes={solicitacoes}
+            propostas={propostas}
+            slots={meusSlots}
+            meuId={me.id}
+            minhasAreas={me.areas ?? undefined}
+            mentoradosProprios={duplas
+              .filter(
+                (d) =>
+                  d.trilha !== "especialista" &&
+                  d.mentor?.id === me.id &&
+                  (d.status === "ativa" || d.status === "pausada")
+              )
+              .map((d) => d.mentorado?.id)
+              .filter((id): id is string => id != null)}
+          />
+        )}
       </div>
     );
   }
 
   if (me?.role === "supervisor") {
-    const [duplas, supervisoes, supervisaoAlvos] = await Promise.all([
-      getMinhasDuplas(),
-      getSupervisoesRecentes(),
-      getSupervisaoAlvos(),
-    ]);
-    const interacoes = await getUltimasInteracoes(duplas.map((d) => d.id));
+    // idem coord: sup+esp também recebe o ping do mural — a home dele tem
+    // que deixar agir. Os fetches sobem no mesmo batch: só dependem de `me`
+    const ehEspSup = temPapel(me, "mentor_especialista");
+    const [duplas, supervisoes, supervisaoAlvos, solicitacoesEsp, slotsSup, interacoes] =
+      await Promise.all([
+        getMinhasDuplas(),
+        getSupervisoesRecentes(),
+        getSupervisaoAlvos(),
+        ehEspSup ? getSolicitacoesVisiveis() : Promise.resolve([]),
+        ehEspSup ? getSlotsLivres(me.id) : Promise.resolve([]),
+        getMinhasDuplas().then((d) =>
+          getUltimasInteracoes(d.map((x) => x.id), "nudge")
+        ),
+      ]);
+    const emNegSup = solicitacoesEsp.filter((s) =>
+      ["aberta", "contra_proposta"].includes(s.status_efetivo ?? s.status)
+    );
+    const propostasSup = emNegSup.length
+      ? await getPropostasMap(emNegSup.map((s) => s.id))
+      : {};
     return (
       <div className="space-y-8">
         {assinatura?.status !== "assinado" && <TermoBanner />}
@@ -97,6 +144,24 @@ export default async function HomePage({
           supervisaoAlvos={supervisaoAlvos}
           meuNome={me?.nome.split(" ")[0]}
         />
+        {ehEspSup && (
+          <DemandasEspecialista
+            solicitacoes={solicitacoesEsp}
+            propostas={propostasSup}
+            slots={slotsSup}
+            meuId={me.id}
+            minhasAreas={me.areas ?? undefined}
+            mentoradosProprios={duplas
+              .filter(
+                (d) =>
+                  d.trilha !== "especialista" &&
+                  d.mentor?.id === me.id &&
+                  (d.status === "ativa" || d.status === "pausada")
+              )
+              .map((d) => d.mentorado?.id)
+              .filter((id): id is string => id != null)}
+          />
+        )}
       </div>
     );
   }
@@ -108,8 +173,9 @@ export default async function HomePage({
     duplas.some((d) => d.trilha === "especialista")
       ? getEspecialistaEventos()
       : Promise.resolve([]),
-    // o mural de demandas é a home do especialista — pros demais não existe
-    me?.role === "mentor_especialista"
+    // o mural de demandas é a home do especialista — pros demais não existe.
+    // temPapel: o híbrido DPP-primário também atende demandas (WP6b)
+    temPapel(me, "mentor_especialista")
       ? getSolicitacoesVisiveis()
       : Promise.resolve([]),
   ]);
@@ -120,14 +186,22 @@ export default async function HomePage({
       (s.status_efetivo ?? s.status) === "aberta" ||
       (s.status_efetivo ?? s.status) === "contra_proposta"
   );
-  const [propostas, meusSlots] = await Promise.all([
+  const [propostas, meusSlots, meusChamados] = await Promise.all([
     emNegociacao.length
       ? getPropostasMap(emNegociacao.map((s) => s.id))
       : Promise.resolve({}),
-    me?.role === "mentor_especialista"
-      ? getSlotsLivres(me.id)
+    temPapel(me, "mentor_especialista")
+      ? getSlotsLivres(me!.id)
       : Promise.resolve([]),
+    // 0084: os chamados do mentor moram na home dele (coord/sup têm a fila)
+    getChamados(),
   ]);
+  const duplasOpcoes = duplas
+    .filter((d) => d.status === "ativa" || d.status === "pausada")
+    .map((d) => ({
+      id: d.id,
+      label: `${d.mentorado?.nome?.split(" ")[0] ?? "Mentorado(a)"} · ${d.trilha === "especialista" ? "Especialista" : "DPP"}`,
+    }));
   return (
     <div className="space-y-8">
       {/* null = nunca assinou — qualquer estado ≠ assinado pede a assinatura */}
@@ -141,12 +215,26 @@ export default async function HomePage({
         cronogramas={cronogramas}
         me={me!}
       />
-      {me?.role === "mentor_especialista" && (
+      <MeusChamadosCard
+        chamados={meusChamados.itens}
+        duplas={duplasOpcoes}
+        papel={me?.role ?? ""}
+      />
+      {temPapel(me, "mentor_especialista") && (
         <DemandasEspecialista
           solicitacoes={solicitacoes}
           propostas={propostas}
           slots={meusSlots}
-          meuId={me.id}
+          meuId={me!.id}
+          minhasAreas={me?.areas ?? undefined}
+          mentoradosProprios={duplas
+            .filter(
+              (d) =>
+                d.trilha !== "especialista" &&
+                (d.status === "ativa" || d.status === "pausada")
+            )
+            .map((d) => d.mentorado?.id)
+            .filter((id): id is string => id != null)}
         />
       )}
       <AvisosSection avisos={avisos} souCoord={false} />

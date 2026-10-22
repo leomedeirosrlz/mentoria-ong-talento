@@ -18,12 +18,21 @@
  */
 
 import { getDemoData } from "./data";
-import type { AppRole } from "../types";
+import type { AppRole, Dupla } from "../types";
 import type {
   Formulario,
   FormularioLink,
   FormularioResposta,
+  RespostaValor,
 } from "../forms/schema";
+import type {
+  Entrega360,
+  EntregaJornada,
+  EventoJornada,
+  InstrumentoJornada,
+  JovemJornadaDados,
+  PainelJornadaLinha,
+} from "../jornada";
 
 const uid = (n: number): string =>
   `de000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
@@ -62,12 +71,37 @@ export const DEMO_TOKENS = {
   anaRoda: "demo-tok-roda-ana-0000000001",
   eduardoVisao: "demo-tok-visao-eduardo-00001",
   eduardoRoda: "demo-tok-roda-eduardo-000001",
+  // WP7 — o painel da jornada precisa de entregas nas outras duplas DPP:
+  // a T2 em começo de ciclo (visão/roda inicial abertas, metas ainda
+  // trancada) e a pausada com link vencido — cada estado na vitrine
+  kauaVisao: "demo-tok-visao-kaua-0000001",
+  kauaRoda: "demo-tok-roda-kaua-00000001",
+  matheusVisao: "demo-tok-visao-matheus-0001",
+  matheusRoda: "demo-tok-roda-matheus-00001",
+  pedroVisao: "demo-tok-visao-pedro-0000001",
+  dandaraVisao: "demo-tok-visao-dandara-00001",
+  // avaliação geral da trilha de especialista (0104) — emitida no
+  // fechamento; Helena responde pelo link (especialista logada)
+  helenaAvaliacaoEsp: "demo-tok-avalesp-helena-0001",
 } as const;
+
+/** Metadados de upload do intake no dataset (mesma forma de
+ *  FormularioAnexo em forms/queries — tipo local pra não criar ciclo). */
+export type DemoFormularioAnexo = {
+  id: string;
+  link_id: string;
+  campo_id: string;
+  path: string;
+  nome: string;
+  tamanho: number;
+  created_at: string;
+};
 
 export type DemoFormularios = {
   formularios: Formulario[];
   links: FormularioLink[];
   respostas: FormularioResposta[];
+  anexos: DemoFormularioAnexo[];
 };
 
 /** Monta o trio formularios/links/respostas da demo. Os ids de destino e
@@ -384,6 +418,104 @@ export function getDemoFormularios(): DemoFormularios {
     updated_at: haDias(240, "09:00"),
   };
 
+  // ---------- 11. avaliação geral da trilha de especialista (0104 —
+  // campos verbatim da migration; emitida sozinha no fechamento da
+  // trilha, respondida pelo especialista logado) ----------
+
+  const fAvaliacaoEsp: Formulario = {
+    id: uid(0x400b),
+    titulo: "Avaliação geral da trilha de especialista",
+    descricao:
+      "A avaliação final do guia do especialista (§13), respondida ao concluir o acompanhamento de um(a) jovem: como foi a trilha e percepções sobre o programa e o trabalho da coordenação.",
+    sistema: "avaliacao_especialista",
+    campos: [
+      { id: "s1", tipo: "secao", label: "A trilha", obrigatorio: false },
+      { id: "experiencia", tipo: "escala_1_5", label: "No geral, como você avalia a experiência desta mentoria especialista?", obrigatorio: true },
+      { id: "atendeu_demanda", tipo: "escala_1_5", label: "O quanto a trilha respondeu à demanda do(a) jovem?", obrigatorio: true },
+      { id: "resultados", tipo: "texto_longo", label: "Quais resultados ou avanços você percebeu no(a) jovem?", obrigatorio: true },
+      { id: "melhorar_trilha", tipo: "texto_longo", label: "O que poderia ter sido melhor na condução da trilha?", obrigatorio: false },
+      { id: "s2", tipo: "secao", label: "O programa e a coordenação", obrigatorio: false },
+      { id: "apoio_coordenacao", tipo: "escala_1_5", label: "Como você avalia o suporte da coordenação durante a trilha?", obrigatorio: true },
+      { id: "percepcoes", tipo: "texto_longo", label: "Percepções sobre o programa e o trabalho da coordenação — o que vale registrar?", obrigatorio: false },
+      { id: "participaria_outra", tipo: "sim_nao", label: "Você participaria de outra trilha como especialista?", obrigatorio: false },
+    ],
+    ativo: true,
+    versao: 1,
+    created_by: null,
+    created_at: haDias(240, "09:00"),
+    updated_at: haDias(240, "09:00"),
+  };
+
+  // ---------- 12. inscrição de mentores (intake oficial, 0115 — campos
+  // verbatim do seed: uma grade de horários só, "Outro" em cor/raça,
+  // pergunta condicional de experiência, uploads privados) ----------
+  const fIntakeMentor: Formulario = {
+    id: uid(0x400c),
+    titulo: "Inscrição de mentores · Matching de Mentores",
+    descricao:
+      "Inscrição pra quem quer ser mentor(a) no próximo ciclo. Recebemos a sua candidatura por um link público; a coordenação revisa cada inscrição antes do cadastro.",
+    sistema: "intake_mentor",
+    campos: [
+      { id: "sec_dados", tipo: "secao", label: "Dados pessoais", obrigatorio: false },
+      { id: "nome_civil", tipo: "texto", label: "Nome completo civil", obrigatorio: true },
+      { id: "nome_social", tipo: "texto", label: "Nome social", obrigatorio: false },
+      { id: "nascimento", tipo: "data", label: "Data de nascimento", obrigatorio: true },
+      {
+        id: "genero", tipo: "select", label: "Gênero", obrigatorio: true,
+        opcoes: ["Cisgênero feminino", "Cisgênero masculino", "Transgênero", "Não binário", "Prefiro não informar"],
+      },
+      {
+        id: "cor_raca", tipo: "select", label: "Cor/raça", obrigatorio: true,
+        opcoes: ["Negra", "Branca", "Amarela", "Parda", "Indígena"],
+        permite_outro: true,
+      },
+      { id: "cidade", tipo: "texto", label: "Estado/município de residência", obrigatorio: true },
+      { id: "sec_trajetoria", tipo: "secao", label: "Trajetória pessoal e profissional", obrigatorio: false },
+      { id: "hobbies", tipo: "texto_longo", label: "Hobbies", obrigatorio: true, descricao: "Até 3 hobbies" },
+      { id: "esportes", tipo: "texto_longo", label: "Esportes", obrigatorio: true, descricao: "Assistir ou praticar" },
+      { id: "inspiracoes", tipo: "texto_longo", label: "Inspirações", obrigatorio: true, descricao: "Até 3 inspirações" },
+      { id: "valores", tipo: "texto_longo", label: "Valores", obrigatorio: true, descricao: "Até 3 valores" },
+      { id: "realizacoes", tipo: "texto_longo", label: "Principais realizações", obrigatorio: true, descricao: "Pessoais ou profissionais" },
+      { id: "auto_descricao", tipo: "texto_longo", label: "Auto-descrição em parágrafo", obrigatorio: true },
+      { id: "companheiro", tipo: "texto_longo", label: "Como esposa/marido/companheiro(a) lhe descreveria?", obrigatorio: true },
+      { id: "sec_trabalho", tipo: "secao", label: "Trabalho e emprego", obrigatorio: false },
+      { id: "cargo", tipo: "texto", label: "Cargo", obrigatorio: true },
+      { id: "empresa", tipo: "texto", label: "Empresa/instituição", obrigatorio: true },
+      { id: "curriculo", tipo: "arquivo", label: "Currículo", obrigatorio: true, max_mb: 10 },
+      { id: "linkedin", tipo: "texto", label: "LinkedIn", obrigatorio: false, formato: "url" },
+      { id: "sec_contato", tipo: "secao", label: "Dados de contato", obrigatorio: false },
+      { id: "email", tipo: "texto", label: "E-mail", obrigatorio: true, formato: "email" },
+      { id: "telefone", tipo: "texto", label: "Telefone", obrigatorio: true, formato: "telefone" },
+      { id: "sec_mentoria", tipo: "secao", label: "A mentoria", obrigatorio: false },
+      { id: "formacao_erlich", tipo: "sim_nao", label: "Formação Erlich Mentoring", obrigatorio: true },
+      { id: "experiencia_previa", tipo: "sim_nao", label: "Experiência prévia como mentor", obrigatorio: true },
+      {
+        id: "experiencia_descricao", tipo: "texto_longo",
+        label: "Caso possua experiência prévia, descreva-a", obrigatorio: false,
+        visible_if: { campo: "experiencia_previa", em: ["sim"] },
+      },
+      { id: "objetivos", tipo: "texto_longo", label: "Objetivos/expectativa", obrigatorio: true },
+      {
+        id: "pref_genero_mentorado", tipo: "select", label: "Preferência de gênero do mentorado",
+        obrigatorio: true,
+        opcoes: ["Mentorado homem", "Mentorada mulher", "Sem preferência"],
+      },
+      { id: "foto", tipo: "arquivo", label: "Foto de perfil", obrigatorio: true, max_mb: 10 },
+      { id: "disponibilidade", tipo: "grid_disponibilidade", label: "Disponibilidade", obrigatorio: true },
+      {
+        id: "sec_comprovantes", tipo: "secao", label: "Comprovantes", obrigatorio: false,
+        descricao: "Documentos para conferência da coordenação — ficam privados na plataforma.",
+      },
+      { id: "doc_identidade", tipo: "arquivo", label: "Anexo do RG ou CNH", obrigatorio: true, max_mb: 10 },
+      { id: "comprovante_residencia", tipo: "arquivo", label: "Comprovante de residência", obrigatorio: true, max_mb: 10 },
+    ],
+    ativo: true,
+    versao: 1,
+    created_by: null,
+    created_at: haDias(20, "09:00"),
+    updated_at: haDias(20, "09:00"),
+  };
+
   // ---------- links ----------
   const links: FormularioLink[] = [
     // avaliação: ricardo e carlos já responderam; fernanda pendente;
@@ -528,13 +660,84 @@ export function getDemoFormularios(): DemoFormularios {
       usado_em: null, expira_em: null, created_by: porNome("João Pedro"), created_at: haDias(2),
     },
     // roda pendente pro Eduardo — é o link que o /f/<token> da demo abre
-    // pra mostrar a escala 1–10 (a Ana ainda não recebeu a dela: fica no
-    // estado "não enviado" com o botão Enviar visível na ficha)
+    // pra mostrar a escala 1–10. O `momento` ausente cai no recorte por
+    // data: criado agora, muito antes do enc. 12 da T1 → leitura inicial
     {
       id: uid(0x4221), formulario_id: fRodaVida.id, token: DEMO_TOKENS.eduardoRoda,
       dest_profile_id: null, dest_mentorado_id: ment("Eduardo"),
       dupla_id: duplaDe("João Pedro", "Eduardo"), contexto: { origem: "instrumentos" },
       usado_em: null, expira_em: null, created_by: porNome("João Pedro"), created_at: haDias(1),
+    },
+    // roda da Ana — a leitura inicial do 1º encontro, já respondida (o
+    // contexto.momento marca a aplicação; sem ele a data anterior ao enc.
+    // 12 resolveria igual). Fecha o desenho "jornada completa na janela"
+    // dela no painel da coordenação
+    {
+      id: uid(0x4222), formulario_id: fRodaVida.id, token: DEMO_TOKENS.anaRoda,
+      dest_profile_id: null, dest_mentorado_id: ment("Ana"),
+      dupla_id: duplaDe("Ricardo", "Ana"),
+      contexto: { origem: "instrumentos", momento: "inicial" },
+      usado_em: haDias(33, "20:41"), expira_em: null, created_by: porNome("Ricardo"), created_at: haDias(35),
+    },
+    // WP7 · T2 (começo de ciclo — janela do enc. 1 aberta): o Kauã já fez
+    // a roda inicial e tem a visão pendente; o Matheus respondeu a visão e
+    // tem a roda pendente; a Dandara (T1 em risco) só respondeu a visão —
+    // metas/PDM/roda dela saem "não enviado" fora da janela no painel; o
+    // Pedro (pausada) mostra o link expirado sem resposta
+    {
+      id: uid(0x4223), formulario_id: fRodaVida.id, token: DEMO_TOKENS.kauaRoda,
+      dest_profile_id: null, dest_mentorado_id: ment("Kauã"),
+      dupla_id: duplaDe("André", "Kauã"),
+      contexto: { origem: "instrumentos", momento: "inicial" },
+      usado_em: haDias(4, "19:33"), expira_em: null, created_by: porNome("André"), created_at: haDias(6),
+    },
+    {
+      id: uid(0x4224), formulario_id: fVisao.id, token: DEMO_TOKENS.kauaVisao,
+      dest_profile_id: null, dest_mentorado_id: ment("Kauã"),
+      dupla_id: duplaDe("André", "Kauã"), contexto: { origem: "instrumentos" },
+      usado_em: null, expira_em: null, created_by: porNome("André"), created_at: haDias(1),
+    },
+    {
+      id: uid(0x4225), formulario_id: fVisao.id, token: DEMO_TOKENS.matheusVisao,
+      dest_profile_id: null, dest_mentorado_id: ment("Matheus"),
+      dupla_id: duplaDe("Ricardo", "Matheus"), contexto: { origem: "instrumentos" },
+      usado_em: haDias(11, "21:09"), expira_em: null, created_by: porNome("Ricardo"), created_at: haDias(13),
+    },
+    {
+      id: uid(0x4226), formulario_id: fRodaVida.id, token: DEMO_TOKENS.matheusRoda,
+      dest_profile_id: null, dest_mentorado_id: ment("Matheus"),
+      dupla_id: duplaDe("Ricardo", "Matheus"), contexto: { origem: "instrumentos" },
+      usado_em: null, expira_em: null, created_by: porNome("Ricardo"), created_at: haDias(3),
+    },
+    {
+      id: uid(0x4227), formulario_id: fVisao.id, token: DEMO_TOKENS.dandaraVisao,
+      dest_profile_id: null, dest_mentorado_id: ment("Dandara"),
+      dupla_id: duplaDe("Fernanda", "Dandara"), contexto: { origem: "instrumentos" },
+      usado_em: haDias(32, "20:15"), expira_em: null, created_by: porNome("Fernanda"), created_at: haDias(34),
+    },
+    {
+      id: uid(0x4228), formulario_id: fVisao.id, token: DEMO_TOKENS.pedroVisao,
+      dest_profile_id: null, dest_mentorado_id: ment("Pedro"),
+      dupla_id: duplaDe("André", "Pedro"), contexto: { origem: "instrumentos" },
+      // venceu sem resposta — o painel mostra "expirado", a ficha "Reenviar"
+      usado_em: null, expira_em: haDias(16), created_by: porNome("André"), created_at: haDias(30),
+    },
+    // avaliação geral da trilha de especialista (0104) — a trilha da
+    // Helena com a Bia concluiu há 5 dias; o link espera a resposta dela
+    {
+      id: uid(0x4229), formulario_id: fAvaliacaoEsp.id, token: DEMO_TOKENS.helenaAvaliacaoEsp,
+      dest_profile_id: porNome("Helena"), dest_mentorado_id: null,
+      dupla_id: duplaDe("Helena", "Ana"), contexto: { origem: "auto", trilha: "especialista" },
+      usado_em: null, expira_em: null, created_by: porNome("Helena"), created_at: haDias(5),
+    },
+    // link de inscrição do intake (0115): UM endereço público, N
+    // respostas anônimas — usado_em fica null pra sempre, a contagem sai
+    // das respostas. A identidade da candidata vem do conteúdo, não do link.
+    {
+      id: uid(0x4230), formulario_id: fIntakeMentor.id, token: "demo-tok-intake-mentores-001",
+      dest_profile_id: null, dest_mentorado_id: null, dupla_id: null,
+      contexto: {}, multi_uso: true, origem: "intake",
+      usado_em: null, expira_em: null, created_by: marina, created_at: haDias(18),
     },
   ];
 
@@ -702,6 +905,163 @@ export function getDemoFormularios(): DemoFormularios {
       },
       respondido_em: haDias(7, "19:26"),
     },
+    // roda inicial da Ana (enc. 1) — as 16 áreas do 1–10 + a reflexão
+    // livre; o recorte "inicial" vem do contexto.momento do link
+    {
+      id: uid(0x4412), link_id: uid(0x4222),
+      respostas: {
+        p_saude: 7, p_intelecto: 6, p_equilibrio: 5, p_independencia: 6,
+        pr_carreira: 3, pr_financas: 4, pr_escola: 6, pr_contribuicao: 5,
+        r_familia: 8, r_amigos: 7, r_amoroso: 5, r_social: 6,
+        q_hobbies: 8, q_atividade: 5, q_realizacao: 6, q_espiritualidade: 7,
+        reflexao: "Carreira e finanças são as que mais me preocupam — é por isso que quero o jovem aprendiz. Família e amigos são o que me segura.",
+      },
+      respondido_em: haDias(33, "20:41"),
+    },
+    // roda inicial do Kauã — T2 em começo de ciclo
+    {
+      id: uid(0x4413), link_id: uid(0x4223),
+      respostas: {
+        p_saude: 6, p_intelecto: 7, p_equilibrio: 6, p_independencia: 5,
+        pr_carreira: 4, pr_financas: 3, pr_escola: 7, pr_contribuicao: 6,
+        r_familia: 9, r_amigos: 8, r_amoroso: 4, r_social: 7,
+        q_hobbies: 7, q_atividade: 8, q_realizacao: 6, q_espiritualidade: 5,
+        reflexao: "Finanças é o que mais pesa — ajudo em casa no fim de semana. Quero aprender a organizar melhor meu tempo.",
+      },
+      respondido_em: haDias(4, "19:33"),
+    },
+    // visão do Matheus — respondida entre o enc. 1 e o 2 da T2
+    {
+      id: uid(0x4414), link_id: uid(0x4225),
+      respostas: {
+        filme: "No filme eu estou trabalhando com tecnologia, numa equipe pequena, e ainda tenho tempo pra jogar com meus amigos no fim de semana.",
+        aspectos: "Trabalhar com o que eu gosto e ganhar meu próprio dinheiro.",
+        ser_fazer: "Consigo programar projetos de verdade e ajudar em casa sem apertar.",
+        deixou: "Parei de depender de bico e de ficar sem saber o que fazer da vida.",
+        valoriza: "Liberdade de escolha e estabilidade.",
+        declaracao_visao: "Em 2 anos, serei desenvolvedor júnior numa empresa de tecnologia, ajudando minha família.",
+      },
+      respondido_em: haDias(11, "21:09"),
+    },
+    // visão da Dandara — respondida no enc. 1, antes da dupla entrar em
+    // risco; o painel da coord mostra a estação feita num contexto de
+    // parada — é o desenho "feito mas fora do ritmo"
+    {
+      id: uid(0x4415), link_id: uid(0x4227),
+      respostas: {
+        filme: "Eu me vejo enfermeira, de jaleco, num hospital da cidade. Minha mãe me conta pras amigas com orgulho.",
+        aspectos: "Cuidar das pessoas e ter um salário fixo.",
+        ser_fazer: "Ser referência pra minha irmã menor — a primeira da família com profissão.",
+        deixou: "Não fico mais trocando de emprego informal toda hora.",
+        valoriza: "Rotina estável e respeito.",
+        declaracao_visao: "Em 3 anos, serei técnica de enfermagem empregada.",
+      },
+      respondido_em: haDias(32, "20:15"),
+    },
+    // candidata já promovida — a resposta carimba o profile criado (a
+    // Luiza, que hoje é mentora DPP na base demo)
+    {
+      id: uid(0x4416), link_id: uid(0x4230),
+      promovido_profile_id: porNome("Luiza"),
+      respostas: {
+        nome_civil: "Luiza Campos Ribeiro",
+        nome_social: "Luiza",
+        nascimento: "1989-03-14",
+        genero: "Cisgênero feminino",
+        cor_raca: "Branca",
+        cidade: "São Paulo/SP",
+        hobbies: "Corrida de rua, cerâmica e clubes de leitura",
+        esportes: "Corro 10km aos domingos",
+        inspiracoes: "Minha avó, que alfabetizou mulheres na roça",
+        valores: "Honestidade, curiosidade e presença",
+        realizacoes: "Abri duas clínicas de fisioterapia e formei 30 estagiários",
+        auto_descricao: "Sou objetiva, gosto de gente e acredito que constância pequena vence plano grande.",
+        companheiro: "Que sou teimosa no bom sentido — quando decido, vou até o fim.",
+        cargo: "Sócia-fundadora",
+        empresa: "Clínica Movimento",
+        curriculo: { path: `${uid(0x4230)}/cv-luiza.pdf`, nome: "curriculo-luiza.pdf", tamanho: 184320 },
+        linkedin: "linkedin.com/in/luizacampos",
+        email: "luiza.campos@exemplo.com",
+        telefone: "(11) 98877-1234",
+        formacao_erlich: "sim",
+        experiencia_previa: "sim",
+        experiencia_descricao: "Mentorei jovens da periferia por 2 anos num projeto da faculdade.",
+        objetivos: "Quero devolver pra um jovem o que a mentoria fez por mim na faculdade.",
+        pref_genero_mentorado: "Mentorada mulher",
+        foto: { path: `${uid(0x4230)}/foto-luiza.jpg`, nome: "foto-luiza.jpg", tamanho: 921600 },
+        disponibilidade: {
+          celulas: [
+            { dia: "seg", periodo: "noite" },
+            { dia: "qua", periodo: "noite" },
+            { dia: "sex", periodo: "tarde" },
+          ],
+          horas: [
+            { dia: "seg", hora: 18 }, { dia: "seg", hora: 19 },
+            { dia: "qua", hora: 18 }, { dia: "qua", hora: 19 },
+            { dia: "sex", hora: 14 }, { dia: "sex", hora: 15 },
+          ],
+        },
+        doc_identidade: { path: `${uid(0x4230)}/rg-luiza.pdf`, nome: "rg-luiza.pdf", tamanho: 512000 },
+        comprovante_residencia: { path: `${uid(0x4230)}/comprovante-luiza.pdf`, nome: "comprovante-luiza.pdf", tamanho: 402432 },
+      },
+      respondido_em: haDias(16, "20:41"),
+    },
+    // candidato na fila — ainda não revisado (o botão "Revisar e cadastrar"
+    // abre o prefill da promoção a partir dessa resposta)
+    {
+      id: uid(0x4417), link_id: uid(0x4230),
+      respostas: {
+        nome_civil: "Maurício Ferraz de Almeida",
+        nascimento: "1984-11-02",
+        genero: "Cisgênero masculino",
+        cor_raca: "Parda",
+        cidade: "Campinas - SP",
+        hobbies: "Xadrez e fotografia de rua",
+        esportes: "Futebol society às quintas",
+        inspiracoes: "Um professor que me tirou da reprovação",
+        valores: "Palavra dada, trabalho e família",
+        realizacoes: "Construí a área de dados da empresa do zero",
+        auto_descricao: "Engenheiro, pai de duas meninas, acredito em educação como alavanca.",
+        companheiro: "Que sou calmo por fora e competitivo por dentro.",
+        cargo: "Head de Dados",
+        empresa: "Varejo S.A.",
+        curriculo: { path: `${uid(0x4230)}/cv-mauricio.pdf`, nome: "cv-mauricio-ferraz.pdf", tamanho: 256000 },
+        email: "mauricio.ferraz@exemplo.com",
+        telefone: "(19) 97766-4321",
+        formacao_erlich: "nao",
+        experiencia_previa: "nao",
+        objetivos: "Ensinar um jovem a olhar pro futuro com método — foi o que faltou pra mim.",
+        pref_genero_mentorado: "Sem preferência",
+        foto: { path: `${uid(0x4230)}/foto-mauricio.jpg`, nome: "foto-mauricio.jpg", tamanho: 838860 },
+        disponibilidade: {
+          celulas: [
+            { dia: "ter", periodo: "noite" },
+            { dia: "qui", periodo: "noite" },
+          ],
+          horas: [
+            { dia: "ter", hora: 18 }, { dia: "ter", hora: 19 },
+            { dia: "qui", hora: 18 }, { dia: "qui", hora: 19 },
+          ],
+        },
+        doc_identidade: { path: `${uid(0x4230)}/rg-mauricio.pdf`, nome: "rg-mauricio.pdf", tamanho: 499712 },
+        comprovante_residencia: { path: `${uid(0x4230)}/comprovante-mauricio.pdf`, nome: "comprovante-mauricio.pdf", tamanho: 376832 },
+      },
+      respondido_em: haDias(6, "19:03"),
+    },
+  ];
+
+  // ---------- anexos do intake (0115) ----------
+  // metadados espelhando os {path} das respostas — /api/form-anexo/<id>
+  // serve PDF placeholder na demo, igual aos anexos de registro
+  const anexos: DemoFormularioAnexo[] = [
+    { id: uid(0x4601), link_id: uid(0x4230), campo_id: "curriculo", path: `${uid(0x4230)}/cv-luiza.pdf`, nome: "curriculo-luiza.pdf", tamanho: 184320, created_at: haDias(16, "20:40") },
+    { id: uid(0x4602), link_id: uid(0x4230), campo_id: "foto", path: `${uid(0x4230)}/foto-luiza.jpg`, nome: "foto-luiza.jpg", tamanho: 921600, created_at: haDias(16, "20:40") },
+    { id: uid(0x4603), link_id: uid(0x4230), campo_id: "doc_identidade", path: `${uid(0x4230)}/rg-luiza.pdf`, nome: "rg-luiza.pdf", tamanho: 512000, created_at: haDias(16, "20:40") },
+    { id: uid(0x4604), link_id: uid(0x4230), campo_id: "comprovante_residencia", path: `${uid(0x4230)}/comprovante-luiza.pdf`, nome: "comprovante-luiza.pdf", tamanho: 402432, created_at: haDias(16, "20:40") },
+    { id: uid(0x4605), link_id: uid(0x4230), campo_id: "curriculo", path: `${uid(0x4230)}/cv-mauricio.pdf`, nome: "cv-mauricio-ferraz.pdf", tamanho: 256000, created_at: haDias(6, "19:02") },
+    { id: uid(0x4606), link_id: uid(0x4230), campo_id: "foto", path: `${uid(0x4230)}/foto-mauricio.jpg`, nome: "foto-mauricio.jpg", tamanho: 838860, created_at: haDias(6, "19:02") },
+    { id: uid(0x4607), link_id: uid(0x4230), campo_id: "doc_identidade", path: `${uid(0x4230)}/rg-mauricio.pdf`, nome: "rg-mauricio.pdf", tamanho: 499712, created_at: haDias(6, "19:02") },
+    { id: uid(0x4608), link_id: uid(0x4230), campo_id: "comprovante_residencia", path: `${uid(0x4230)}/comprovante-mauricio.pdf`, nome: "comprovante-mauricio.pdf", tamanho: 376832, created_at: haDias(6, "19:02") },
   ];
 
   return {
@@ -716,9 +1076,12 @@ export function getDemoFormularios(): DemoFormularios {
       fMetas,
       fPdm,
       fRodaVida,
+      fAvaliacaoEsp,
+      fIntakeMentor,
     ],
     links,
     respostas,
+    anexos,
   };
 }
 
@@ -779,11 +1142,265 @@ export function demoAvaliacao360DaDupla(
   return maisRecente ?? null;
 }
 
-// ---------- instrumentos da dupla (0080) ----------
+// ---------- instrumentos da dupla (0080) + jornada (0096) ----------
+
+/** Entrega no superset da 0096 — `EntregaJornada` (contexto/datas é o que
+ *  separa Roda inicial da formal) com `respostas` estreito o bastante pra
+ *  servir também de `InstrumentoEntrega` na ficha da dupla. */
+type EntregaDemo = Omit<EntregaJornada, "respostas"> & {
+  respostas: Record<string, RespostaValor> | null;
+};
+
+/** Instrumento no shape compartilhado: satisfaz `InstrumentoDupla` (ficha)
+ *  e `InstrumentoJornada` (jornada do jovem) — os dois tipos divergem só
+ *  em detalhe de campo, a derivação é uma só. */
+type InstrumentoDemo = Omit<
+  import("../forms/queries").InstrumentoDupla,
+  "entregas"
+> & { entregas: EntregaDemo[] };
+
+const ORDEM_JORNADA = { visao: 1, metas: 2, pdm: 3, roda_vida: 4 } as const;
+
+/** link → entrega: status deriva de usado_em/expira_em (o mesmo CASE das
+ *  três RPCs da 0096) e `destino` separa o lado do mentor do lado do
+ *  jovem — o painel e a jornada dependem da distinção. */
+function linkParaEntrega(
+  l: FormularioLink,
+  r: FormularioResposta | undefined,
+  dupla: Dupla,
+  agora: number
+): EntregaDemo {
+  return {
+    link_id: l.id,
+    token: l.token,
+    destino: l.dest_mentorado_id
+      ? "mentorado"
+      : l.dest_profile_id === dupla.mentor?.id
+        ? "mentor"
+        : "outro",
+    status: l.usado_em
+      ? "respondido"
+      : l.expira_em && new Date(l.expira_em).getTime() < agora
+        ? "expirado"
+        : "pendente",
+    respondido_em: r?.respondido_em ?? l.usado_em,
+    respostas: r?.respostas ?? null,
+    contexto: l.contexto ?? null,
+    created_at: l.created_at,
+    usado_em: l.usado_em,
+    expira_em: l.expira_em,
+  };
+}
+
+/** Os 4 instrumentos da jornada com as entregas DA dupla — a projeção da
+ *  RPC instrumentos_da_dupla, sem o gate de papel (cada mirror aplica o
+ *  seu: ficha por vínculo, jornada pelo mentorado, painel por escopo). */
+function instrumentosDaDuplaRaw(dupla: Dupla): InstrumentoDemo[] {
+  const { formularios, links, respostas } = getDemoFormularios();
+  const agora = Date.now();
+  return formularios
+    .filter((f) => f.sistema && f.sistema in ORDEM_JORNADA)
+    .sort(
+      (a, b) =>
+        ORDEM_JORNADA[a.sistema as keyof typeof ORDEM_JORNADA] -
+        ORDEM_JORNADA[b.sistema as keyof typeof ORDEM_JORNADA]
+    )
+    .map((f) => ({
+      sistema:
+        f.sistema as import("../forms/schema").InstrumentoSistema,
+      formulario_id: f.id,
+      titulo: f.titulo,
+      descricao: f.descricao,
+      ativo: f.ativo,
+      campos: f.campos,
+      entregas: links
+        .filter(
+          (l) =>
+            l.formulario_id === f.id &&
+            l.dupla_id === dupla.id &&
+            (l.dest_mentorado_id === dupla.mentorado?.id ||
+              l.dest_profile_id === dupla.mentor?.id)
+        )
+        .map((l) =>
+          linkParaEntrega(
+            l,
+            respostas.find((x) => x.link_id === l.id),
+            dupla,
+            agora
+          )
+        ),
+    }));
+}
+
+/** WP7 — mirror de `jovem_jornada()` (0096): a dupla DPP mais recente do
+ *  persona mentorado + o cronograma da turma + os 4 instrumentos + os
+ *  links 360º endereçados a ela. Null → a página cai na biblioteca plana
+ *  (mesmo fallback da RPC sem dupla). */
+export function demoJovemJornada(role: AppRole): JovemJornadaDados | null {
+  if (role !== "mentorado") return null;
+  const data = getDemoData();
+  const eu = data.personas[role];
+  const ment = data.mentorados.find((m) => m.profile_id === eu.id);
+  if (!ment) return null;
+  const dupla = data.duplas
+    .filter((d) => d.mentorado?.id === ment.id && d.trilha !== "especialista")
+    .sort((a, b) => (b.iniciada_em ?? "").localeCompare(a.iniciada_em ?? ""))
+    .at(0);
+  if (!dupla) return null;
+
+  // o RPC emite e.tipo cru; EventoJornada declara o rótulo da jornada —
+  // etapas de preparação e o evento de encerramento viram 'marco' (a lib
+  // só lê 'encontro' pras recortes de janela, como na real)
+  const tipoEvento: Record<string, EventoJornada["tipo"]> = {
+    encontro: "encontro",
+    formacao: "formacao",
+    recesso: "recesso",
+  };
+  const cronograma: EventoJornada[] = data.cicloEventos
+    .filter((e) => e.cronograma_id === dupla.cronograma_id)
+    .sort((a, b) => (a.data ?? "￿").localeCompare(b.data ?? "￿"))
+    .map((e) => ({
+      numero: e.numero,
+      data: e.data ?? "",
+      tipo: tipoEvento[e.tipo] ?? "marco",
+      fase: e.fase,
+      instrumentos: e.instrumentos,
+    }));
+
+  const form360 = getDemoFormularios().formularios.find(
+    (f) => f.sistema === "avaliacao_360"
+  );
+  const { links, respostas } = getDemoFormularios();
+  const agora = Date.now();
+  const avaliacao_360: Entrega360[] = form360
+    ? links
+        .filter(
+          (l) =>
+            l.formulario_id === form360.id &&
+            l.dest_mentorado_id === ment.id &&
+            (l.dupla_id === dupla.id || l.dupla_id === null)
+        )
+        .map((l) => {
+          const e = linkParaEntrega(
+            l,
+            respostas.find((x) => x.link_id === l.id),
+            dupla,
+            agora
+          );
+          // Entrega360 não carrega destino/usado_em (o lado é sempre o
+          // mentorado; a resposta basta no respondido_em)
+          return {
+            link_id: e.link_id,
+            token: e.token,
+            status: e.status,
+            respondido_em: e.respondido_em,
+            respostas: e.respostas,
+            contexto: e.contexto,
+            created_at: e.created_at,
+            expira_em: e.expira_em,
+          };
+        })
+    : [];
+
+  const instrumentos: InstrumentoJornada[] = instrumentosDaDuplaRaw(dupla);
+  return {
+    dupla_id: dupla.id,
+    cronograma,
+    instrumentos,
+    avaliacao_360,
+  };
+}
+
+/** WP7 — mirror de `painel_instrumentos_jornada()` (0096): por dupla DPP
+ *  viva do escopo do papel (coord todas, supervisor as supervisionadas —
+ *  trilhas de especialista fora por regra da RPC), as entregas por
+ *  sistema SEM respostas/tokens + a contagem de avaliações de encontro
+ *  (feitas = row em avaliacoes_encontro sobre encontro realizado). */
+export function demoPainelInstrumentosJornada(
+  role: AppRole
+): PainelJornadaLinha[] {
+  if (role !== "coordenacao" && role !== "supervisor") return [];
+  const data = getDemoData();
+  const eu = data.personas[role];
+  const { formularios, links } = getDemoFormularios();
+  const agora = Date.now();
+  const sistemasPainel = new Set([
+    "visao",
+    "metas",
+    "pdm",
+    "roda_vida",
+    "avaliacao_360",
+  ]);
+  const formPorId = new Map(formularios.map((f) => [f.id, f]));
+
+  return data.duplas
+    .filter(
+      (d) =>
+        d.trilha !== "especialista" &&
+        (d.status === "ativa" || d.status === "pausada")
+    )
+    .filter(
+      (d) => role === "coordenacao" || d.supervisor?.id === eu.id
+    )
+    .map((d) => {
+      const entregas: PainelJornadaLinha["entregas"] = {};
+      for (const l of links) {
+        if (l.dupla_id !== d.id) continue;
+        const f = formPorId.get(l.formulario_id);
+        if (!f?.sistema || !sistemasPainel.has(f.sistema)) continue;
+        const proMentorado = l.dest_mentorado_id === d.mentorado?.id;
+        if (!proMentorado && l.dest_profile_id !== d.mentor?.id) continue;
+        const s = f.sistema as keyof PainelJornadaLinha["entregas"];
+        (entregas[s] ??= []).push({
+          status: l.usado_em
+            ? "respondido"
+            : l.expira_em && new Date(l.expira_em).getTime() < agora
+              ? "expirado"
+              : "pendente",
+          created_at: l.created_at,
+          destino: proMentorado ? "mentorado" : "mentor",
+        });
+      }
+      for (const k of Object.keys(entregas) as (keyof typeof entregas)[]) {
+        entregas[k]!.sort((a, b) => a.created_at.localeCompare(b.created_at));
+      }
+      const realizados = new Set(
+        (d.encontros ?? [])
+          .filter((e) => e.status === "realizado")
+          .map((e) => e.id)
+      );
+      return {
+        dupla_id: d.id,
+        turma: d.turma,
+        cronograma_id: d.cronograma_id ?? "",
+        mentor_id: d.mentor?.id ?? "",
+        mentor_nome: d.mentor?.nome_social ?? d.mentor?.nome ?? "",
+        mentorado_id: d.mentorado?.id ?? "",
+        jovem_nome: d.mentorado?.nome_social ?? d.mentorado?.nome ?? "",
+        entregas,
+        avaliacoes_encontro: {
+          feitas: data.avaliacoes.filter(
+            (a) => a.dupla_id === d.id && realizados.has(a.encontro_id)
+          ).length,
+          realizados: realizados.size,
+          max_numero:
+            (d.encontros ?? [])
+              .filter((e) => e.status === "realizado")
+              .reduce((m, e) => Math.max(m, e.numero), 0) || null,
+        },
+      };
+    })
+    .sort(
+      (a, b) =>
+        (a.turma ?? "").localeCompare(b.turma ?? "") ||
+        a.jovem_nome.localeCompare(b.jovem_nome)
+    );
+}
 
 /** Idem a RPC instrumentos_da_dupla: escopo da dupla (coord; mentor,
  *  supervisor e mentorado DELA) e payload já estruturado — token junto,
- *  respostas só nas entregas respondidas. */
+ *  respostas só nas entregas respondidas, metadados do link (contexto e
+ *  datas) desde a 0096. */
 export function demoInstrumentosDaDupla(
   role: AppRole,
   duplaId: string
@@ -803,50 +1420,39 @@ export function demoInstrumentosDaDupla(
     dupla.supervisor?.id === eu.id ||
     souMentorado;
   if (!podeVer) return [];
+  return instrumentosDaDuplaRaw(dupla);
+}
 
-  const { formularios, links, respostas } = getDemoFormularios();
-  const agora = Date.now();
-  const ordem = { visao: 1, metas: 2, pdm: 3, roda_vida: 4 } as const;
-  return formularios
-    .filter((f) => f.sistema && f.sistema in ordem)
-    .sort(
-      (a, b) =>
-        ordem[a.sistema as keyof typeof ordem] -
-        ordem[b.sistema as keyof typeof ordem]
-    )
-    .map((f) => ({
-      sistema: f.sistema as import("../forms/schema").InstrumentoSistema,
-      formulario_id: f.id,
-      titulo: f.titulo,
-      descricao: f.descricao,
-      ativo: f.ativo,
-      campos: f.campos,
-      entregas: links
-        .filter(
-          (l) =>
-            l.formulario_id === f.id &&
-            l.dupla_id === duplaId &&
-            (l.dest_mentorado_id === dupla.mentorado?.id ||
-              l.dest_profile_id === dupla.mentor?.id)
-        )
-        .map((l) => {
-          const r = respostas.find((x) => x.link_id === l.id);
-          return {
-            link_id: l.id,
-            token: l.token,
-            destino: (l.dest_mentorado_id
-              ? "mentorado"
-              : l.dest_profile_id === dupla.mentor?.id
-                ? "mentor"
-                : "outro") as "mentorado" | "mentor" | "outro",
-            status: (l.usado_em
-              ? "respondido"
-              : l.expira_em && new Date(l.expira_em).getTime() < agora
-                ? "expirado"
-                : "pendente") as "pendente" | "respondido" | "expirado",
-            respondido_em: r?.respondido_em ?? l.usado_em,
-            respostas: r?.respostas ?? null,
-          };
-        }),
-    }));
+/** Estado do link da avaliação geral da trilha de especialista (0104) —
+ *  idem a RPC avaliacao_esp_da_dupla: a especialista recebe o token pra
+ *  responder de novo (a notificação pode se perder); a coord vê só o
+ *  estado. */
+export function demoAvaliacaoEspDaDupla(
+  role: AppRole,
+  duplaId: string
+): {
+  respondido: boolean;
+  respondido_em: string | null;
+  formulario_id?: string;
+  token?: string;
+} | null {
+  const data = getDemoData();
+  const dupla = data.duplas.find((d) => d.id === duplaId);
+  if (!dupla || dupla.trilha !== "especialista") return null;
+  const eu = data.personas[role];
+  if (role !== "coordenacao" && dupla.mentor?.id !== eu.id) return null;
+  const { formularios, links } = getDemoFormularios();
+  const formIds = new Set(
+    formularios.filter((f) => f.sistema === "avaliacao_especialista").map((f) => f.id)
+  );
+  const link = links.find(
+    (l) => l.dupla_id === duplaId && formIds.has(l.formulario_id)
+  );
+  if (!link) return null;
+  return {
+    respondido: link.usado_em != null,
+    respondido_em: link.usado_em,
+    formulario_id: link.formulario_id,
+    token: dupla.mentor?.id === eu.id ? link.token : undefined,
+  };
 }

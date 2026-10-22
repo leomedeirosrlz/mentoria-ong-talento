@@ -5,6 +5,9 @@ import { entrarNaDemo, expect, test } from "../helpers";
 // (1/2), André está cheio em 2/2 com a pausada contando (a régua do
 // trigger) e a fila traz Rafael e Wendel. Sem writes — spec demo seguro
 // em qualquer ambiente, produção inclusa.
+// WP2: o motivo do card é o 1º sinal do semáforo novo — avaliação baixa +
+// dificuldade do registro do 2º encontro. "Pedido de apoio" saiu do motivo:
+// apoio virou eixo separado (pill própria), não falha da jornada.
 
 const DUPLA_RISCO = "de000000-0000-4000-8000-000000001539";
 const ANDRE_ID = "de000000-0000-4000-8000-000000000010";
@@ -20,7 +23,16 @@ test.describe("demo — sugestão de remanejo e capacidade", () => {
       'section[aria-labelledby="remanejo-sugerido-titulo"]'
     );
     await expect(card).toBeVisible();
-    await expect(card.getByText(/Pedido de apoio/)).toBeVisible();
+    // recolhido por padrão (REALIZA-153) — o trigger carrega o motivo como
+    // scent; expandir revela os pools de candidatos
+    const trigger = card.getByRole("button", {
+      name: /Sugerir remanejamento/,
+    });
+    await expect(trigger).toHaveAttribute("aria-expanded", "false");
+    await trigger.click();
+    await expect(
+      card.getByText(/Avaliação baixa e dificuldade de participação/).first()
+    ).toBeVisible();
 
     // livres primeiro: Luiza (tema em comum "comunicação" com a Dandara)
     // e Carlos, ambos 1/2 — cada um com o Remanejar que abre o dialog
@@ -59,6 +71,8 @@ test.describe("demo — sugestão de remanejo e capacidade", () => {
     const card = page.locator(
       'section[aria-labelledby="remanejo-sugerido-titulo"]'
     );
+    // card recolhido por padrão — expande antes de clicar no candidato
+    await card.getByRole("button", { name: /Sugerir remanejamento/ }).click();
     await card
       .locator("li", { hasText: "Luiza Campos" })
       .getByRole("button", { name: "Remanejar", exact: true })

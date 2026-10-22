@@ -61,11 +61,68 @@ const uid = (n) => `de000000-0000-4000-8000-${n.toString(16).padStart(12, "0")}`
 const DIA = 864e5;
 const iso = (d) => d.toISOString();
 const dateOf = (d) => iso(d).slice(0, 10);
-// encontros do ciclo são terças a partir de 2026-09-08 (cronograma 2026/2027)
+// encontros do ciclo são terças — evergreen: a T1 demo tem cronograma
+// próprio (CRON1, mais abaixo) com o 6º encontro oficial na terça da semana
+// corrente, como a T2 e o dataset em memória. dataT1/t2Semanas são
+// declaradas depois, mas dataEncontro só é chamada dentro de main() — TDZ ok.
 const dataEncontro = (numero, hora = "19:00") =>
-  new Date(`2026-09-08T${hora}:00-03:00`).getTime() + (numero - 1) * 7 * DIA;
+  new Date(`${dataT1(numero)}T${hora}:00-03:00`).getTime();
 const encontroISO = (numero, hora = "19:00") => iso(new Date(dataEncontro(numero, hora)));
-const encontroDate = (numero) => dateOf(new Date(dataEncontro(numero)));
+const encontroDate = (numero) => dataT1(numero);
+
+// Âncoras relativas ao run (WP4) — exceções e sessões "sempre futuras" não
+// podem ficar presas ao epoch do cronograma, senão expiram e somem da UI.
+// Tudo em America/Sao_Paulo (o fuso do app e da RPC de slots); `|| 7`
+// empurra pra semana seguinte quando hoje já é o dow alvo — mesma regra
+// que src/lib/demo/data.ts usa pras âncoras evergreen.
+const TZ_SP = "America/Sao_Paulo";
+const diaBrt = (dias = 0) =>
+  new Date(Date.now() + dias * DIA).toLocaleDateString("en-CA", { timeZone: TZ_SP });
+// dow do Postgres (0=dom … 6=sáb) de uma data ISO — meio-dia UTC tira o
+// getDay da borda de fuso
+const dowDe = (isoDate) => new Date(`${isoDate}T12:00:00Z`).getUTCDay();
+/** "YYYY-MM-DD" da 1ª data > hoje (BRT) com o dow pedido. */
+const proximoDow = (dow) =>
+  diaBrt(((dow - dowDe(diaBrt())) + 7) % 7 || 7);
+/** "YYYY-MM-DD" de `ymd` + n dias — âncora no meio-dia UTC, mesma régua. */
+const somaDia = (ymd, n) =>
+  new Date(Date.parse(`${ymd}T12:00:00Z`) + n * DIA).toISOString().slice(0, 10);
+/** Terça-feira da semana seg–dom deslocada `sem` semanas da corrente. */
+const tercaDaSemana = (sem) =>
+  somaDia(diaBrt(), -((dowDe(diaBrt()) + 6) % 7) + 1 + sem * 7);
+
+// ---------- 2º cronograma (T2 demo) — relativo ao run, como as âncoras WP4 ----------
+// A turma que entrou ~3 semanas depois da T1: o 1º encontro oficial dela é a
+// terça de 3 semanas atrás, então o vigente da semana corrente é SEMPRE o
+// enc 4 — é ele que separa a dupla agendada da sem_data do "Para acompanhar"
+// no backend real, evergreen pra qualquer data de execução. Mesmo esqueleto
+// da T1 (seed.sql/0062): preparação → 16 encontros de terça com o gap de
+// prática 8º→9º → recesso entre o 14º e o 15º → encerramento +3d do 16º.
+const CRON2 = uid(0x500);
+const T2_TURMA = "T2 · 2026/2027";
+const T2E1 = tercaDaSemana(-3); // 1º encontro oficial da T2
+// deslocamento em semanas vs o enc 1: 15d entre 8º e 9º; ~3 semanas de
+// recesso entre 14º e 15º (mesma régua da T1 e da demo em memória)
+const t2Semanas = (n) => (n <= 8 ? n - 1 : n <= 14 ? n : n + 2);
+const dataT2 = (n) => somaDia(T2E1, t2Semanas(n) * 7); // YYYY-MM-DD
+const encontroISOT2 = (numero, hora = "19:00") =>
+  iso(new Date(`${dataT2(numero)}T${hora}:00-03:00`));
+
+// ---------- T1 evergreen — cronograma demo espelho do oficial ----------
+// Antes a T1 apontava pro cronograma REAL do staging (2026-09-08 fixo):
+// cada semana que passava empurrava o vigente e as duplas demo iam
+// acumulando atrasos falsos. Agora a T1 tem cronograma próprio, ancorado
+// pra que o 6º encontro oficial caia na terça da semana corrente — então
+// os encontros 1–5 são SEMPRE passados e o vigente é 6 (terça em diante)
+// ou 5 (dom/seg, quando a terça ainda não virou data <= hoje).
+const CRON1 = uid(0x4f0);
+const T1E1 = tercaDaSemana(-5); // enc 6 = terça desta semana
+const dataT1 = (n) => somaDia(T1E1, t2Semanas(n) * 7); // mesma régua da T2
+// o enc 6 "realizado" só é verdade depois das 19h da terça — antes disso a
+// row sai agendada (vigente coberto, sem fake-futuro)
+const T1E6_PASSOU =
+  Date.now() > new Date(`${dataT1(6)}T19:00:00-03:00`).getTime();
+const T1_TURMA = "T1 · 2026/2027";
 
 // ---------- 0. limpeza idempotente do range de000000-* ----------
 async function limpar() {
@@ -78,19 +135,29 @@ async function limpar() {
     ["interacoes", "dupla_id"], ["interacoes", "autor_id"],
     ["encaminhamentos", "dupla_id"],
     ["avaliacoes_encontro", "dupla_id"], ["avaliacoes_encontro", "encontro_id"], ["avaliacoes_encontro", "respondido_por_profile_id"],
-    ["avaliacao_links", "dupla_id"],
+    ["avaliacao_links", "dupla_id"], ["avaliacao_links", "respondido_por_profile_id"],
+    ["formulario_links", "respondido_por_profile_id"],
+    ["ia_eventos", "profile_id"],
+    ["emails_enviados", "autor_id"],
+    ["encontro_notas", "created_by"],
+    ["registro_anexos", "created_by"],
     ["registros", "created_by"], ["registros", "encontro_id"],
     ["pessoa_notas", "profile_id"], ["pessoa_notas", "mentorado_id"], ["pessoa_notas", "created_by"],
     ["solicitacao_propostas", "solicitacao_id"], ["solicitacao_propostas", "autor_id"],
     // solicitacoes_mural é VIEW — a tabela real é solicitacoes_especialista
     ["solicitacoes_especialista", "id"], ["solicitacoes_especialista", "mentorado_id"],
     ["solicitacoes_especialista", "dupla_id"], ["solicitacoes_especialista", "created_by"],
+    // devolutivas (WP6) — filho de duplas × profiles, antes deles
+    ["devolutivas", "dupla_id"], ["devolutivas", "autor_id"],
     ["especialista_grade", "profile_id"], ["especialista_excecoes", "profile_id"],
     ["encerramentos", "dupla_id"],
     ["formulario_links", "dupla_id"], ["formulario_links", "dest_profile_id"], ["formulario_links", "dest_mentorado_id"],
     ["assinaturas", "profile_id"], ["assinaturas", "mentorado_id"],
     ["encontros", "dupla_id"], ["encontros", "created_by"],
     ["duplas", "id"],
+    // 2º cronograma demo (de000000-…0500) — eventos antes do pai
+    ["ciclo_eventos", "cronograma_id"], ["ciclo_eventos", "id"],
+    ["cronogramas", "created_by"], ["cronogramas", "id"],
     ["mentor_profiles", "profile_id"],
     ["comunicados", "created_by"],
     ["mentorados", "id"],
@@ -99,6 +166,23 @@ async function limpar() {
   // uuid não aceita LIKE no PostgREST — range scan no prefixo de000000-…-8000-*
   const LO = "de000000-0000-4000-8000-000000000000", HI = "de000000-0000-4000-8001-000000000000";
   const emRange = (col) => `${col}=gte.${LO}&${col}=lt.${HI}`;
+  // chamados abertos pela UI/demo nascem com id randômico (o range de000000-*
+  // só cobre o que este script semeia) — apaga por FK de range e em cascata
+  // pros filhos, que penduram em chamado_id fora do range
+  const chIds = new Set();
+  for (const col of ["autor_id", "autor_mentorado_id", "dupla_id", "atribuido_a", "resolvido_por", "registro_id", "avaliacao_id"]) {
+    try {
+      const rows = await rest(`chamados?select=id&${emRange(col)}`);
+      for (const r of rows ?? []) chIds.add(r.id);
+    } catch (e) { console.log(`  skip chamados.${col}: ${e.message.slice(0, 80)}`); }
+  }
+  if (chIds.size) {
+    const csv = [...chIds].join(",");
+    for (const filho of ["chamado_comentarios", "chamado_atualizacoes", "chamado_anexos"]) {
+      try { await del(`${filho}?chamado_id=in.(${csv})`); } catch (e) { console.log(`  skip ${filho}: ${e.message.slice(0, 80)}`); }
+    }
+    await del(`chamados?id=in.(${csv})`);
+  }
   for (const [tabela, col] of porFk) {
     try { await del(`${tabela}?${emRange(col)}`); } catch (e) { console.log(`  skip ${tabela}.${col}: ${e.message.slice(0, 80)}`); }
   }
@@ -149,6 +233,7 @@ const P = {
   ricardo: uid(0x114), camila: uid(0x115), tiago: uid(0x116), renata: uid(0x117),
   gustavo: uid(0x118), patricia: uid(0x119), leonardo: uid(0x11a), vanessa: uid(0x11b),
   eduardo: uid(0x11c), monica: uid(0x11d), daniel: uid(0x11e),
+  elisa: uid(0x11f), // mentora nova da T2
   // especialistas
   luisa: uid(0x130), marcos: uid(0x131), sofia: uid(0x132), pedroH: uid(0x133),
 };
@@ -173,8 +258,10 @@ const profiles = [
   { id: P.leonardo, nome: "Rodrigo Brito", email: "rodrigo.brito@realiza.test", whatsapp: WA(11, 82010011), role: "mentor_dpp", ativo: true, onboarded_em: iso(new Date("2026-09-03T20:00:00-03:00")), cidade: "São Paulo", uf: "SP", cargo: "Cientista de dados", empresa: "Mercado Livre", areas: ["Dados", "Matemática aplicada"], motivacao: "Quero desmistificar matemática pra quem acha que não é pra eles.", origem: "Google Forms 2026" },
   { id: P.vanessa, nome: "Vanessa Cardoso", email: "vanessa.cardoso@realiza.test", whatsapp: WA(11, 82010012), role: "mentor_dpp", ativo: true, onboarded_em: iso(new Date("2026-09-03T20:00:00-03:00")), cidade: "Santos", uf: "SP", cargo: "Jornalista", empresa: "Globo", areas: ["Comunicação", "Escrita"], motivacao: "Contar histórias é o meu ofício; quero ajudar jovens a contar a deles.", origem: "Indicação interna" },
   { id: P.eduardo, nome: "Wagner Sales", email: "wagner.sales@realiza.test", whatsapp: WA(11, 82010013), role: "mentor_dpp", ativo: true, onboarded_em: iso(new Date("2026-09-03T20:00:00-03:00")), cidade: "São Paulo", uf: "SP", cargo: "Engenheiro civil", empresa: "MRV", areas: ["Engenharia", "Gestão de projetos"], motivacao: "Construo prédios; quero ajudar a construir futuros.", origem: "Google Forms 2026" },
-  { id: P.monica, nome: "Mônica Freitas", email: "monica.freitas@realiza.test", whatsapp: WA(11, 82010014), role: "mentor_dpp", ativo: true, onboarded_em: iso(new Date("2026-10-01T14:00:00-03:00")), cidade: "São Paulo", uf: "SP", cargo: "Nutricionista", empresa: "Hospital Sírio-Libanês", areas: ["Saúde", "Rotina e hábitos"], motivacao: "Entrei no meio do ciclo — ainda aguardo meu par.", origem: "Google Forms 2026" },
+  { id: P.monica, nome: "Mônica Freitas", email: "monica.freitas@realiza.test", whatsapp: WA(11, 82010014), role: "mentor_dpp", ativo: true, onboarded_em: iso(new Date("2026-10-01T14:00:00-03:00")), cidade: "São Paulo", uf: "SP", cargo: "Nutricionista", empresa: "Hospital Sírio-Libanês", areas: ["Saúde", "Rotina e hábitos"], motivacao: "Entrei no meio do ciclo — assumi o par na turma nova (T2).", origem: "Google Forms 2026" },
   { id: P.daniel, nome: "Natan Peixoto", email: "natan.peixoto@realiza.test", whatsapp: WA(11, 82010015), role: "mentor_dpp", ativo: true, onboarded_em: iso(new Date("2026-10-05T14:00:00-03:00")), cidade: "São Paulo", uf: "SP", cargo: "Chef de cozinha", empresa: "Restaurante próprio", areas: ["Gastronomia", "Empreendedorismo"], motivacao: "A cozinha me salvou. Quero mostrar que profissão braçal também é carreira.", origem: "Parceria Sebrae" },
+  // mentora nova da T2 — onboarded na semana do onboarding da turma dela
+  { id: P.elisa, nome: "Elisa Prado", email: "elisa.prado@realiza.test", whatsapp: WA(11, 82010016), role: "mentor_dpp", ativo: true, onboarded_em: iso(new Date(`${somaDia(T2E1, -5)}T20:00:00-03:00`)), cidade: "São Paulo", uf: "SP", cargo: "Veterinária", empresa: "Clínica própria", areas: ["Saúde", "Ciências"], interesses: ["Corrida de rua", "Fotografia"], motivacao: "Mentoria me tirou de um curso errado aos 17 — quero retribuir.", origem: "Indicação interna" },
   // especialistas
   { id: P.luisa, nome: "Luísa Camargo", email: "especialista@realiza.test", whatsapp: WA(11, 83010001), role: "mentor_especialista", ativo: true, interesses: [], onboarded_em: iso(new Date("2026-09-03T20:00:00-03:00")), cidade: "São Paulo", uf: "SP", cargo: "Psicóloga — orientação vocacional", empresa: "Autônoma", areas: ["Escolha de carreira", "Ansiedade de desempenho"], bio: "Especialista em transição escola-trabalho." },
   { id: P.marcos, nome: "Marcos Vinícius", email: "marcos.vinicius@realiza.test", whatsapp: WA(11, 83010002), role: "mentor_especialista", ativo: true, interesses: [], onboarded_em: iso(new Date("2026-09-03T20:00:00-03:00")), cidade: "São Paulo", uf: "SP", cargo: "Headhunter executivo", empresa: "Robert Half", areas: ["Currículo", "Entrevistas", "LinkedIn"] },
@@ -199,6 +286,8 @@ const mentorProfiles = [
   { profile_id: P.eduardo, tipo: "dpp", capacidade: 2, termo_ok: true, formacao_ok: true, areas: ["Engenharia"], disponibilidade: { seg: ["19:00-21:00"], ter: [], qua: [], qui: ["19:00-21:00"], sex: [], sab: [], dom: [] } },
   { profile_id: P.monica, tipo: "dpp", capacidade: 1, termo_ok: true, formacao_ok: true, areas: ["Saúde"], disponibilidade: { seg: [], ter: ["19:00-21:00"], qua: [], qui: [], sex: [], sab: ["09:00-12:00"], dom: [] } },
   { profile_id: P.daniel, tipo: "dpp", capacidade: 1, termo_ok: true, formacao_ok: false, areas: ["Gastronomia"], disponibilidade: { seg: ["15:00-17:00"], ter: [], qua: ["15:00-17:00"], qui: [], sex: [], sab: [], dom: [] } },
+  // mentora nova da T2 — formada no onboarding da turma dela
+  { profile_id: P.elisa, tipo: "dpp", capacidade: 1, termo_ok: true, formacao_ok: true, areas: ["Saúde", "Ciências"], disponibilidade: { seg: [], ter: ["19:00-21:00"], qua: [], qui: ["19:00-21:00"], sex: [], sab: ["09:00-11:00"], dom: [] } },
   { profile_id: P.luisa, tipo: "especialista", capacidade_especialista: 2, termo_ok: true, formacao_ok: true, areas: ["Escolha de carreira"], disponibilidade: { seg: [], ter: ["19:00-21:00"], qua: [], qui: ["19:00-21:00"], sex: [], sab: [], dom: [] } },
   { profile_id: P.marcos, tipo: "especialista", capacidade_especialista: 2, termo_ok: true, formacao_ok: true, areas: ["Currículo", "Entrevistas"], disponibilidade: { seg: [], ter: [], qua: ["18:00-20:00"], qui: [], sex: [], sab: ["10:00-12:00"], dom: [] } },
   { profile_id: P.sofia, tipo: "especialista", capacidade_especialista: 1, termo_ok: true, formacao_ok: true, areas: ["Finanças pessoais"], disponibilidade: { seg: [], ter: [], qua: [], qui: [], sex: [], sab: ["09:00-11:00"], dom: ["10:00-12:00"] } },
@@ -211,12 +300,20 @@ const M = {
   gabriela: uid(0x204), rafaela: uid(0x205), lucasG: uid(0x206), isabela: uid(0x207),
   enzo: uid(0x208), yasmin: uid(0x209), kaique: uid(0x20a), manuela: uid(0x20b),
   larissa: uid(0x20c), beatrizN: uid(0x20d), matheus: uid(0x20e),
+  // T2 demo — a turma nova trouxe os dois pela ONG parceira dela
+  davi: uid(0x215), luna: uid(0x216),
   // fila + saídas
   vanessaR: uid(0x210), igor: uid(0x211), helena: uid(0x212),
   bruno: uid(0x213), carla: uid(0x214),
 };
 
 const jovemProfile = uid(0x140); // profile de login da Ana
+// profile da Larissa — a devolutiva da trilha1 notifica o jovem por
+// profile_id; ela ainda não tem conta (user_id null = convite pendente)
+const larissaProfile = uid(0x141);
+// profile do Igor — a solicitação dele (origem "jovem", mural) precisa de
+// um created_by que seja DELE, não o da Ana. Sem user_id: convite pendente.
+const igorProfile = uid(0x142);
 
 const mentorados = [
   { id: M.ana, nome: "Ana Beatriz Souza", email: "jovem@realiza.test", whatsapp: WA(11, 91010001), ong_origem: "ONG Futuro Agora", data_nascimento: "2007-03-14", genero: "feminino", cidade: "São Paulo", uf: "SP", escolaridade: "medio", interesses: ["Medicina", "Vôlei", "Desenho"], objetivos: "Passar no vestibular de Medicina e ser a primeira médica da família.", motivacao: "Quero provar pra mim mesma que dá.", origem: "ONG Futuro Agora", situacao: "ativo", profile_id: jovemProfile, contato_compartilhado: true, disponibilidade: { seg: [], ter: ["19:00-21:00"], qua: ["19:00-21:00"], qui: [], sex: [], sab: ["14:00-16:00"], dom: [] } },
@@ -231,19 +328,22 @@ const mentorados = [
   { id: M.yasmin, nome: "Yasmin Barbosa", whatsapp: WA(11, 91010010), ong_origem: "ONG Futuro Agora", data_nascimento: "2007-07-08", genero: "feminino", cidade: "São Paulo", uf: "SP", escolaridade: "medio", interesses: ["RH", "Liderança", "Dança"], objetivos: "Primeiro emprego em escritório e faculdade de Administração.", origem: "ONG Futuro Agora", situacao: "ativo", disponibilidade: { seg: [], ter: ["19:00-21:00"], qua: [], qui: [], sex: ["19:00-21:00"], sab: [], dom: [] } },
   { id: M.kaique, nome: "Kaique dos Santos", whatsapp: WA(11, 91010011), ong_origem: "Programa Jovem Aprendiz", data_nascimento: "2005-09-21", genero: "masculino", cidade: "São Paulo", uf: "SP", escolaridade: "superior_incompleto", interesses: ["Dados", "Excel", "Futebol"], objetivos: "Trabalhar com análise de dados.", origem: "Programa Jovem Aprendiz", situacao: "ativo", disponibilidade: { seg: ["19:00-21:00"], ter: [], qua: ["19:00-21:00"], qui: [], sex: [], sab: ["10:00-12:00"], dom: [] } },
   { id: M.manuela, nome: "Manuela Rodrigues", whatsapp: WA(11, 91010012), ong_origem: "ONG Futuro Agora", data_nascimento: "2008-10-17", genero: "feminino", cidade: "Santos", uf: "SP", escolaridade: "medio", interesses: ["Escrita", "Jornalismo"], objetivos: "Escrever pra um jornal um dia.", origem: "ONG Futuro Agora", situacao: "ativo", disponibilidade: { seg: [], ter: ["19:00-21:00"], qua: [], qui: [], sex: [], sab: ["11:00-13:00"], dom: [] } },
-  { id: M.larissa, nome: "Larissa Campos", whatsapp: WA(11, 91010013), ong_origem: "Instituto Ponte", data_nascimento: "2009-03-25", genero: "feminino", cidade: "São Paulo", uf: "SP", escolaridade: "medio", interesses: ["Vestibular", "Ansiedade", "Biologia"], objetivos: "Controlar a ansiedade e escolher entre Biologia e Psicologia.", origem: "Instituto Ponte", situacao: "ativo", responsavel: { nome: "Denise Campos", parentesco: "Mãe", whatsapp: WA(11, 91010013) }, disponibilidade: { seg: [], ter: ["19:00-21:00"], qua: [], qui: ["19:00-21:00"], sex: [], sab: [], dom: [] } },
+  { id: M.larissa, nome: "Larissa Campos", whatsapp: WA(11, 91010013), ong_origem: "Instituto Ponte", data_nascimento: "2009-03-25", genero: "feminino", cidade: "São Paulo", uf: "SP", escolaridade: "medio", interesses: ["Vestibular", "Ansiedade", "Biologia"], objetivos: "Controlar a ansiedade e escolher entre Biologia e Psicologia.", origem: "Instituto Ponte", situacao: "ativo", responsavel: { nome: "Denise Campos", parentesco: "Mãe", whatsapp: WA(11, 91010013) }, profile_id: larissaProfile, disponibilidade: { seg: [], ter: ["19:00-21:00"], qua: [], qui: ["19:00-21:00"], sex: [], sab: [], dom: [] } },
   { id: M.beatrizN, nome: "Beatriz Nogueira", whatsapp: WA(11, 91010014), ong_origem: "Escola Estadual Prof. Ramos", data_nascimento: "2007-12-01", genero: "feminino", cidade: "São Paulo", uf: "SP", escolaridade: "medio", interesses: ["Engenharia", "Desenho técnico"], objetivos: "Engenharia civil ou arquitetura.", origem: "Escola parceira", situacao: "ativo", disponibilidade: { seg: ["19:00-21:00"], ter: [], qua: [], qui: ["19:00-21:00"], sex: [], sab: [], dom: [] } },
   { id: M.matheus, nome: "Matheus Henrique Lima", whatsapp: WA(11, 91010015), ong_origem: "Instituto Ponte", data_nascimento: "2004-02-14", genero: "masculino", cidade: "São Paulo", uf: "SP", escolaridade: "superior_incompleto", interesses: ["Concurso público", "Rotina de estudos"], objetivos: "Passar num concurso e ter estabilidade.", origem: "Instituto Ponte", situacao: "desistente", saiu_em: iso(new Date("2026-10-06T10:00:00-03:00")), motivo_saida: "Foi chamado num concurso do município e saiu do estado." },
   // fila aguardando par — UMA pessoa demo só: o card "Sugerir
   // remanejamento" fatia a fila em 4 e o spec e2e precisa que a fixture
   // "Mentorada E2E Livre" caiba no corte (desempate é por espera, e os
   // carimbos demo são sempre mais antigos que o reseed e2e)
-  { id: M.igor, nome: "Igor Batista", whatsapp: WA(11, 91010017), ong_origem: "Instituto Ponte", data_nascimento: "2007-09-09", genero: "masculino", cidade: "São Paulo", uf: "SP", escolaridade: "medio", interesses: ["Eletrônica", "Mecânica"], objetivos: "Curso técnico e primeiro emprego.", origem: "Instituto Ponte", situacao: "ativo", disponibilidade: { seg: ["19:00-21:00"], ter: [], qua: ["19:00-21:00"], qui: [], sex: [], sab: ["14:00-16:00"], dom: [] } },
+  { id: M.igor, nome: "Igor Batista", whatsapp: WA(11, 91010017), ong_origem: "Instituto Ponte", data_nascimento: "2007-09-09", genero: "masculino", cidade: "São Paulo", uf: "SP", escolaridade: "medio", interesses: ["Eletrônica", "Mecânica"], objetivos: "Curso técnico e primeiro emprego.", origem: "Instituto Ponte", situacao: "ativo", profile_id: igorProfile, disponibilidade: { seg: ["19:00-21:00"], ter: [], qua: ["19:00-21:00"], qui: [], sex: [], sab: ["14:00-16:00"], dom: [] } },
   { id: M.vanessaR, nome: "Vanessa Ribeiro", whatsapp: WA(11, 91010016), ong_origem: "ONG Futuro Agora", data_nascimento: "2008-06-30", genero: "feminino", cidade: "São Paulo", uf: "SP", escolaridade: "medio", interesses: ["Enfermagem", "Cuidar de pessoas"], objetivos: "Ser enfermeira.", origem: "ONG Futuro Agora", situacao: "desistente", saiu_em: iso(new Date("2026-09-28T10:00:00-03:00")), motivo_saida: "Família se mudou pra outra cidade no meio do ciclo." },
   { id: M.helena, nome: "Helena Castro", whatsapp: WA(11, 91010018), ong_origem: "Escola Estadual Prof. Ramos", data_nascimento: "2008-04-19", genero: "feminino", cidade: "São Paulo", uf: "SP", escolaridade: "medio", interesses: ["Publicidade", "Redes sociais"], objetivos: "Trabalhar com marketing.", origem: "Escola parceira", situacao: "desistente", saiu_em: iso(new Date("2026-10-08T10:00:00-03:00")), motivo_saida: "Entrou no Jovem Aprendiz e ficou sem horário compatível." },
   // saídas
   { id: M.bruno, nome: "Bruno Almeida", whatsapp: WA(11, 91010019), ong_origem: "Instituto Ponte", data_nascimento: "2006-08-20", genero: "masculino", cidade: "São Paulo", uf: "SP", escolaridade: "medio", interesses: ["Música"], objetivos: "Ser músico profissional.", origem: "Instituto Ponte", situacao: "desistente", saiu_em: iso(new Date("2026-09-25T10:00:00-03:00")), motivo_saida: "Começou a trabalhar em período integral e não tinha mais horário." },
   { id: M.carla, nome: "Carla Teixeira", whatsapp: WA(11, 91010020), ong_origem: "Escola Estadual Prof. Ramos", data_nascimento: "2007-11-11", genero: "feminino", cidade: "São Paulo", uf: "SP", escolaridade: "medio", interesses: ["Gastronomia"], objetivos: "Curso de gastronomia.", origem: "Escola parceira", situacao: "desistente", saiu_em: iso(new Date("2026-10-02T10:00:00-03:00")), motivo_saida: "Sem resposta aos contatos por 3 semanas." },
+  // T2 demo — entraram com a turma nova pela ONG parceira dela
+  { id: M.davi, nome: "Davi Santos", whatsapp: WA(11, 91010021), ong_origem: "Cidadão Pró-Mundo", data_nascimento: "2009-01-17", genero: "masculino", cidade: "São Paulo", uf: "SP", escolaridade: "medio", interesses: ["Tecnologia", "Skate"], objetivos: "Curso técnico de informática e o primeiro emprego.", origem: "Cidadão Pró-Mundo", situacao: "ativo", responsavel: { nome: "Sandra Santos", parentesco: "Mãe", whatsapp: WA(11, 91010021) }, disponibilidade: { seg: [], ter: ["19:00-21:00"], qua: [], qui: ["19:00-21:00"], sex: [], sab: [], dom: [] } },
+  { id: M.luna, nome: "Luna Ferreira", whatsapp: WA(11, 91010022), ong_origem: "Cidadão Pró-Mundo", data_nascimento: "2008-04-02", genero: "feminino", cidade: "São Paulo", uf: "SP", escolaridade: "medio", interesses: ["Biologia", "Voluntariado"], objetivos: "Vestibular de Biologia e projetos de extensão.", origem: "Cidadão Pró-Mundo", situacao: "ativo", disponibilidade: { seg: ["19:00-21:00"], ter: [], qua: [], qui: [], sex: [], sab: ["14:00-16:00"], dom: [] } },
 ];
 
 // profiles extras (login da jovem + staff sem conta já cobertos)
@@ -254,60 +354,166 @@ profiles.push({
   cidade: "São Paulo", uf: "SP", interesses: ["Medicina", "Vôlei", "Desenho"],
   data_nascimento: "2007-03-14", genero: "feminino",
 });
+// a Larissa só tem profile porque a devolutiva da trilha dela notifica por
+// profile_id — sem user_id e sem onboarded_em: o convite segue pendente
+profiles.push({
+  id: igorProfile, nome: "Igor Batista", email: "igor.batista@realiza.test",
+  whatsapp: WA(11, 91010017), role: "mentorado", ativo: true,
+  cidade: "São Paulo", uf: "SP", interesses: ["Eletrônica", "Mecânica"],
+  data_nascimento: "2007-09-09", genero: "masculino",
+});
+profiles.push({
+  id: larissaProfile, nome: "Larissa Campos", email: "larissa.campos@realiza.test",
+  whatsapp: WA(11, 91010013), role: "mentorado", ativo: true,
+  cidade: "São Paulo", uf: "SP", interesses: ["Vestibular", "Ansiedade", "Biologia"],
+  data_nascimento: "2009-03-25", genero: "feminino",
+});
 
-const CRON = "8d62f232-f7f6-464f-a438-28bf1ae7eb3a"; // cronograma 2026/2027
-const TURMA = "2026/2027";
+
+// ---------- esqueleto oficial do ciclo (compartilhado T1 × T2) ----------
+// [tipo, numero, data, titulo, fase, instrumentos, data_fim, status, observacao]
+// — mesma sequência explícita do PDF oficial que a T1 espelha no seed.sql.
+const F1 = "Criar vínculo e construir o PDM";
+const F2 = "Colocar o plano em prática";
+const F3 = "Consolidar a autonomia";
+const F4 = "Aprofundar o vínculo e o aprendizado";
+const F5 = "Roda da Vida";
+const F6 = "Encerrar e celebrar";
+const montaEventosDpp = (E1, dataE, cronId, idBase) =>
+  [
+    ["etapa_preparacao", null, null, "Inscrições", null, [], null, "concluida", "Inscrição e indicação pela ONG parceira Cidadão Pró-Mundo"],
+    ["etapa_preparacao", null, null, "Triagem e matching", null, [], null, "concluida", "Entregue concluída pela ONG parceira Cidadão Pró-Mundo"],
+    ["etapa_preparacao", null, somaDia(E1, -5), "Onboarding de mentores", null, [], somaDia(E1, -4), "concluida", null],
+    ["formacao", null, somaDia(E1, -5), "Encontro inicial de formação de mentores", null, [], null, "pendente", null],
+    ["formacao", null, somaDia(E1, -4), "Encontro final de formação de mentores", null, [], null, "pendente", null],
+    ["etapa_preparacao", null, somaDia(E1, -4), "Onboarding de mentorados", null, [], null, "concluida", "Encontro de abertura com a coordenação"],
+    ["etapa_preparacao", null, E1, "Início", null, [], null, "concluida", null],
+    ["encontro", 1, dataE(1), "Boas-vindas, histórias de vida e abertura", F1, ["Perguntas Eficazes", "Escuta Ativa", "PDM", "Roda da Vida (leitura inicial)"], null, "pendente", "Reposição na mesma semana"],
+    ["encontro", 2, dataE(2), "Avaliação por terceiros e visão de futuro", F1, ["PDM", "Construindo a sua Visão"], null, "pendente", null],
+    ["encontro", 3, dataE(3), "Declaração de Visão e metas SMART", F1, ["PDM", "Modelo SMART"], null, "pendente", null],
+    ["encontro", 4, dataE(4), "Fechamento da construção do PDM", F1, ["PDM", "Perguntas Eficazes"], null, "pendente", null],
+    ["encontro", 5, dataE(5), "Acompanhamento das primeiras submetas", F2, ["PDM", "Feedback Construtivo"], null, "pendente", null],
+    ["encontro", 6, dataE(6), "Superação de obstáculos", F2, ["PDM", "Feedback Construtivo"], null, "pendente", null],
+    ["encontro", 7, dataE(7), "Ajustes de prazos e desdobramentos", F2, ["PDM", "Feedback Construtivo"], null, "pendente", null],
+    ["encontro", 8, dataE(8), "Monitoramento e responsabilidade", F3, ["PDM", "Escuta Ativa"], null, "pendente", null],
+    ["encontro", 9, dataE(9), "Revisão de meio de percurso", F3, ["PDM", "Escuta Ativa"], null, "pendente", "15 dias desde o 8º encontro — tempo de prática das submetas"],
+    ["encontro", 10, dataE(10), "O mentor como espelho", F4, ["Papel de modelo", "Escuta Ativa"], null, "pendente", null],
+    ["encontro", 11, dataE(11), "Rede de apoio e novos espaços", F4, ["Papel de modelo", "Escuta Ativa"], null, "pendente", null],
+    ["encontro", 12, dataE(12), "Aplicação e leitura da Roda da Vida", F5, ["Roda da Vida", "Modelo SMART"], null, "pendente", null],
+    ["encontro", 13, dataE(13), "Metas das áreas prioritárias", F5, ["Roda da Vida", "Modelo SMART"], null, "pendente", null],
+    ["encontro", 14, dataE(14), "Desdobramento e plano de continuidade", F5, ["Roda da Vida", "Modelo SMART"], null, "pendente", null],
+    ["recesso", null, somaDia(dataE(14), 1), "Recesso de fim de ano", null, [], somaDia(dataE(14), 18), "pendente", "Sem encontros — retomada na semana seguinte"],
+    ["encontro", 15, dataE(15), "Reflexão e reconhecimento", F6, ["PDM", "Roda da Vida"], null, "pendente", null],
+    ["encontro", 16, dataE(16), "Encerramento e celebração", F6, ["Avaliação 360º", "Autoavaliação do mentor"], null, "pendente", null],
+    ["evento_encerramento", null, somaDia(dataE(16), 3), "Evento de encerramento do programa", null, [], null, "pendente", null],
+  ].map((v, i) => ({
+    id: uid(idBase + i),
+    cronograma_id: cronId,
+    tipo: v[0], numero: v[1], data: v[2], titulo: v[3], fase: v[4],
+    instrumentos: v[5], data_fim: v[6], status: v[7], observacao: v[8],
+    ordem: i + 1,
+  }));
+// início/fim derivam dos eventos — a mesma conta do backfill da 0061
+const montaCronograma = (id, nome, turma, eventos, e1) => ({
+  id,
+  nome,
+  turma,
+  trilha: "dpp",
+  inicio_em: eventos.flatMap((e) => (e.data ? [e.data] : [])).sort()[0] ?? null,
+  fim_em:
+    eventos
+      .flatMap((e) => {
+        const f = e.data_fim ?? e.data;
+        return f ? [f] : [];
+      })
+      .sort()
+      .at(-1) ?? null,
+  encontros_esperados: eventos.filter((e) => e.tipo === "encontro").length,
+  status: "ativo",
+  created_by: P.coord,
+  created_at: iso(new Date(`${somaDia(e1, -45)}T10:00:00-03:00`)),
+});
+
+const eventosT1 = montaEventosDpp(T1E1, dataT1, CRON1, 0x4f0);
+const cronogramaT1 = montaCronograma(
+  CRON1, "Calendário oficial · T1", T1_TURMA, eventosT1, T1E1);
+
+const eventosT2 = montaEventosDpp(T2E1, dataT2, CRON2, 0x510);
+const cronogramaT2 = montaCronograma(
+  CRON2, "Calendário oficial · T2", T2_TURMA, eventosT2, T2E1);
 
 // ---- duplas ----
 // 10 DPP ativas em semáforos variados + pausada/concluida/encerrada + trilhas
+// + 2 DPP da T2 demo (o 2º cronograma) — "Para acompanhar" sem misturar
+// denominadores: a coorte T2 corre contra o calendário dela
 const D = {
   d1: uid(0x300), d2: uid(0x301), d3: uid(0x302), d4: uid(0x303), d5: uid(0x304),
   d6: uid(0x305), d7: uid(0x306), d8: uid(0x307), d9: uid(0x308), d10: uid(0x309),
   d11: uid(0x30a), d12: uid(0x30b), d13: uid(0x30c), d14: uid(0x30d),
   trilha1: uid(0x320), trilha2: uid(0x321),
+  dT2a: uid(0x150), dT2b: uid(0x151), // T2 demo — …0150 e …0151
 };
 
 const duplas = [
-  { id: D.d1, mentor_id: P.andre, mentorado_id: M.ana, supervisor_id: P.sup1, turma: TURMA, cronograma_id: CRON, trilha: "dpp", status: "ativa", iniciada_em: encontroDate(1) },
-  { id: D.d2, mentor_id: P.beatriz, mentorado_id: M.pedroLucas, supervisor_id: P.sup1, turma: TURMA, cronograma_id: CRON, trilha: "dpp", status: "ativa", iniciada_em: encontroDate(1) },
-  { id: D.d3, mentor_id: P.fernando, mentorado_id: M.mariaFer, supervisor_id: P.sup1, turma: TURMA, cronograma_id: CRON, trilha: "dpp", status: "ativa", iniciada_em: encontroDate(1) },
-  { id: D.d4, mentor_id: P.juliana, mentorado_id: M.joaoPedro, supervisor_id: P.sup1, turma: TURMA, cronograma_id: CRON, trilha: "dpp", status: "ativa", iniciada_em: encontroDate(1) },
-  { id: D.d5, mentor_id: P.ricardo, mentorado_id: M.gabriela, supervisor_id: P.sup2, turma: TURMA, cronograma_id: CRON, trilha: "dpp", status: "ativa", iniciada_em: encontroDate(1) },
-  { id: D.d6, mentor_id: P.camila, mentorado_id: M.rafaela, supervisor_id: P.sup2, turma: TURMA, cronograma_id: CRON, trilha: "dpp", status: "ativa", iniciada_em: encontroDate(1) },
-  { id: D.d7, mentor_id: P.tiago, mentorado_id: M.lucasG, supervisor_id: P.sup2, turma: TURMA, cronograma_id: CRON, trilha: "dpp", status: "ativa", iniciada_em: encontroDate(1) },
-  { id: D.d8, mentor_id: P.renata, mentorado_id: M.isabela, supervisor_id: P.sup2, turma: TURMA, cronograma_id: CRON, trilha: "dpp", status: "pausada", iniciada_em: encontroDate(1) },
+  { id: D.d1, mentor_id: P.andre, mentorado_id: M.ana, supervisor_id: P.sup1, turma: T1_TURMA, cronograma_id: CRON1, trilha: "dpp", status: "ativa", iniciada_em: encontroDate(1) },
+  { id: D.d2, mentor_id: P.beatriz, mentorado_id: M.pedroLucas, supervisor_id: P.sup1, turma: T1_TURMA, cronograma_id: CRON1, trilha: "dpp", status: "ativa", iniciada_em: encontroDate(1) },
+  { id: D.d3, mentor_id: P.fernando, mentorado_id: M.mariaFer, supervisor_id: P.sup1, turma: T1_TURMA, cronograma_id: CRON1, trilha: "dpp", status: "ativa", iniciada_em: encontroDate(1) },
+  { id: D.d4, mentor_id: P.juliana, mentorado_id: M.joaoPedro, supervisor_id: P.sup1, turma: T1_TURMA, cronograma_id: CRON1, trilha: "dpp", status: "ativa", iniciada_em: encontroDate(1) },
+  { id: D.d5, mentor_id: P.ricardo, mentorado_id: M.gabriela, supervisor_id: P.sup2, turma: T1_TURMA, cronograma_id: CRON1, trilha: "dpp", status: "ativa", iniciada_em: encontroDate(1) },
+  { id: D.d6, mentor_id: P.camila, mentorado_id: M.rafaela, supervisor_id: P.sup2, turma: T1_TURMA, cronograma_id: CRON1, trilha: "dpp", status: "ativa", iniciada_em: encontroDate(1) },
+  { id: D.d7, mentor_id: P.tiago, mentorado_id: M.lucasG, supervisor_id: P.sup2, turma: T1_TURMA, cronograma_id: CRON1, trilha: "dpp", status: "ativa", iniciada_em: encontroDate(1) },
+  { id: D.d8, mentor_id: P.renata, mentorado_id: M.isabela, supervisor_id: P.sup2, turma: T1_TURMA, cronograma_id: CRON1, trilha: "dpp", status: "pausada", iniciada_em: encontroDate(1) },
   // concluída/encerrada em DPP: o fechamento mora na tabela `encerramentos`
   // (duplas_encerramento_esp só deixa esses campos em trilha especialista)
-  { id: D.d9, mentor_id: P.gustavo, mentorado_id: M.enzo, supervisor_id: P.sup1, turma: TURMA, cronograma_id: CRON, trilha: "dpp", status: "concluida", iniciada_em: encontroDate(1) },
-  { id: D.d10, mentor_id: P.patricia, mentorado_id: M.yasmin, supervisor_id: P.sup1, turma: TURMA, cronograma_id: CRON, trilha: "dpp", status: "ativa", iniciada_em: encontroDate(1) },
-  { id: D.d11, mentor_id: P.leonardo, mentorado_id: M.kaique, supervisor_id: P.sup2, turma: TURMA, cronograma_id: CRON, trilha: "dpp", status: "ativa", iniciada_em: encontroDate(1) },
-  { id: D.d12, mentor_id: P.vanessa, mentorado_id: M.manuela, supervisor_id: P.sup1, turma: TURMA, cronograma_id: CRON, trilha: "dpp", status: "encerrada", iniciada_em: encontroDate(1) },
-  { id: D.d13, mentor_id: P.andre, mentorado_id: M.larissa, supervisor_id: P.sup1, turma: TURMA, cronograma_id: CRON, trilha: "dpp", status: "ativa", iniciada_em: encontroDate(1) },
-  { id: D.d14, mentor_id: P.eduardo, mentorado_id: M.beatrizN, supervisor_id: P.sup2, turma: TURMA, cronograma_id: CRON, trilha: "dpp", status: "ativa", iniciada_em: encontroDate(1) },
+  { id: D.d9, mentor_id: P.gustavo, mentorado_id: M.enzo, supervisor_id: P.sup1, turma: T1_TURMA, cronograma_id: CRON1, trilha: "dpp", status: "concluida", iniciada_em: encontroDate(1) },
+  { id: D.d10, mentor_id: P.patricia, mentorado_id: M.yasmin, supervisor_id: P.sup1, turma: T1_TURMA, cronograma_id: CRON1, trilha: "dpp", status: "ativa", iniciada_em: encontroDate(1) },
+  { id: D.d11, mentor_id: P.leonardo, mentorado_id: M.kaique, supervisor_id: P.sup2, turma: T1_TURMA, cronograma_id: CRON1, trilha: "dpp", status: "ativa", iniciada_em: encontroDate(1) },
+  { id: D.d12, mentor_id: P.vanessa, mentorado_id: M.manuela, supervisor_id: P.sup1, turma: T1_TURMA, cronograma_id: CRON1, trilha: "dpp", status: "encerrada", iniciada_em: encontroDate(1) },
+  { id: D.d13, mentor_id: P.andre, mentorado_id: M.larissa, supervisor_id: P.sup1, turma: T1_TURMA, cronograma_id: CRON1, trilha: "dpp", status: "ativa", iniciada_em: encontroDate(1) },
+  { id: D.d14, mentor_id: P.eduardo, mentorado_id: M.beatrizN, supervisor_id: P.sup2, turma: T1_TURMA, cronograma_id: CRON1, trilha: "dpp", status: "ativa", iniciada_em: encontroDate(1) },
   // trilhas especialista
-  { id: D.trilha1, mentor_id: P.luisa, mentorado_id: M.larissa, supervisor_id: P.sup1, turma: TURMA, cronograma_id: CRON, trilha: "especialista", status: "ativa", iniciada_em: encontroDate(3), demanda: "Escolha de carreira + ansiedade de desempenho" },
-  { id: D.trilha2, mentor_id: P.sofia, mentorado_id: M.enzo, supervisor_id: P.sup1, turma: TURMA, cronograma_id: CRON, trilha: "especialista", status: "concluida", iniciada_em: encontroDate(1), encerrada_em: iso(new Date("2026-10-10T19:00:00-03:00")), motivo_encerramento: "Trilha concluída nos 5 encontros.", demanda: "Finanças pessoais e primeiro salário", devolutiva_pdm: "Trilha de finanças fechada: o Enzo saiu do zero pra uma planilha própria e conta aberta." },
+  { id: D.trilha1, mentor_id: P.luisa, mentorado_id: M.larissa, supervisor_id: P.sup1, turma: T1_TURMA, cronograma_id: CRON1, trilha: "especialista", status: "ativa", iniciada_em: encontroDate(3), demanda: "Escolha de carreira + ansiedade de desempenho" },
+  { id: D.trilha2, mentor_id: P.sofia, mentorado_id: M.enzo, supervisor_id: P.sup1, turma: T1_TURMA, cronograma_id: CRON1, trilha: "especialista", status: "concluida", iniciada_em: encontroDate(1), encerrada_em: iso(new Date("2026-10-10T19:00:00-03:00")), motivo_encerramento: "Trilha concluída nos 5 encontros.", demanda: "Finanças pessoais e primeiro salário", devolutiva_pdm: "Trilha de finanças fechada: o Enzo saiu do zero pra uma planilha própria e conta aberta." },
+  // T2 demo — supervisão do Carlos Nogueira (sup2); a lista da Paula segue
+  // intacta. A da Mônica tem o vigente (enc 4) agendado e o 5 já marcado; a
+  // da Elisa não tem row do vigente — é o sem_data real do "Para acompanhar"
+  { id: D.dT2a, mentor_id: P.monica, mentorado_id: M.davi, supervisor_id: P.sup2, turma: T2_TURMA, cronograma_id: CRON2, trilha: "dpp", status: "ativa", iniciada_em: T2E1 },
+  { id: D.dT2b, mentor_id: P.elisa, mentorado_id: M.luna, supervisor_id: P.sup2, turma: T2_TURMA, cronograma_id: CRON2, trilha: "dpp", status: "ativa", iniciada_em: T2E1 },
 ];
 
-// ---- plano de encontros por dupla: quantos dos 6 passados aconteceram ----
-// (gera o semáforo variado: 6=ok, 5=atenção/atraso, ≤4=risco)
+// ---- plano de encontros por dupla: quantos já aconteceram ----
+// Evergreen (enc 6 oficial = terça da semana corrente): os enc 1–5 são
+// sempre passados; o 6º sai "realizado" quando a terça-19h já passou e
+// "agendado" antes disso — o gerador trata a borda. Semáforo: 6=ok,
+// 5 sem vigente=atenção/atraso, ≤4=risco (≥2 atrasos em qualquer weekday).
 const PLANO_ENCONTROS = {
   [D.d1]: { feitos: 6, hora: "19:00", proximo: true, duracao: 90, avalPendente: 6 },
-  [D.d2]: { feitos: 5, hora: "19:00", proximo: true, duracao: 60 },          // atraso: faltou o 6º
+  [D.d2]: { feitos: 5, hora: "19:00", proximo: false, duracao: 60 },         // atraso/sem data: faltou o 6º e não marcou
   [D.d3]: { feitos: 6, hora: "19:30", proximo: true, duracao: 60, apoio: true }, // apoio aberto → risco
   [D.d4]: { feitos: 6, hora: "18:00", proximo: true, duracao: 60 },
   [D.d5]: { feitos: 6, hora: "19:00", proximo: true, duracao: 90, regular: true }, // avaliação regular + dificuldade → atenção
   [D.d6]: { feitos: 6, hora: "19:00", proximo: true, duracao: 60 },
-  [D.d7]: { feitos: 4, hora: "19:00", proximo: false, duracao: 60 },         // ≥2 atrasos → risco
+  [D.d7]: { feitos: 3, hora: "19:00", proximo: false, duracao: 60 },         // ≥2 atrasos → risco
   [D.d8]: { feitos: 3, hora: "19:00", proximo: false, duracao: 60 },         // pausada desde encontro 4
-  [D.d9]: { feitos: 6, hora: "19:00", proximo: false, duracao: 60 },         // concluída
+  [D.d9]: { feitos: 5, hora: "19:00", proximo: false, duracao: 60 },         // concluída
   [D.d10]: { feitos: 6, hora: "19:00", proximo: true, duracao: 90 },
   [D.d11]: { feitos: 6, hora: "19:00", proximo: true, duracao: 60, pendente: 6 },  // registro do 6º pendente → atenção
   [D.d12]: { feitos: 3, hora: "19:00", proximo: false, duracao: 60 },        // encerrada
   [D.d13]: { feitos: 6, hora: "19:00", proximo: true, duracao: 90 },         // 2ª dupla do Otávio
   [D.d14]: { feitos: 6, hora: "19:00", proximo: true, duracao: 60 },
-  [D.trilha1]: { feitos: 3, hora: "20:00", proximo: true, duracao: 45, trilha: true },
+  // a sessão agendada ancora em HOJE: a grade visual só desenha a semana
+  // corrente (seg–dom) e "próximo dia X" foge dela na maior parte da semana
+  [D.trilha1]: { feitos: 3, hora: "19:30", proximo: true, duracao: 45, trilha: true, hoje: true },
   [D.trilha2]: { feitos: 5, hora: "10:00", proximo: false, duracao: 45, trilha: true }, // trilha completa (5 passos)
+  // T2 demo — o vigente da semana corrente é sempre o enc 4 (o enc 1 da T2 é
+  // a terça de 3 semanas atrás). A dupla da Mônica fez 1–3 e já marcou o 4
+  // pro sábado — o mentor agenda quando funciona pra dupla, a data oficial é
+  // a terça — e o 5 na terça oficial seguinte. A da Elisa fez 1–2, furou o
+  // 3 e não marcou o vigente: é o sem_data real do "Para acompanhar" no
+  // backend, não no stub (e o 3 passado sem sessão já dá o atraso dela)
+  [D.dT2a]: { feitos: 3, hora: "19:00", duracao: 60, t2: true,
+              proximos: [{ num: 4, quando: `${proximoDow(6)}T19:00:00-03:00` }, { num: 5 }] },
+  [D.dT2b]: { feitos: 2, hora: "19:00", duracao: 60, t2: true },
 };
 
 // conteúdo dos registros — roteiro com variação por índice
@@ -336,16 +542,26 @@ const OBS = [
   null,
 ];
 
-function registrosDaDupla(duplaId, mentorId, plano) {
+function registrosDaDupla(duplaId, mentorId, plano,
+                          cal = { iso: encontroISO, date: encontroDate }) {
   const out = { encontros: [], registros: [], avaliacoes: [], encaminhamentos: [] };
+  const ehT1 = cal.iso === encontroISO; // só a T1 tem borda de vigente (enc 6)
   for (let i = 1; i <= plano.feitos; i++) {
     const eid = uid((parseInt(duplaId.slice(-4), 16) << 8) + i); // determinístico por dupla
+    // enc 6 da T1 = terça desta semana: "realizado" antes das 19h de terça
+    // seria um futuro forjado — sai agendado (vigente coberto) até passar
+    const enc6Futuro = ehT1 && i === 6 && !T1E6_PASSOU;
     out.encontros.push({
       id: eid, dupla_id: duplaId, numero: i,
-      data_hora: encontroISO(i, plano.hora), duracao_min: plano.duracao,
-      status: "realizado", origem: null, created_by: mentorId,
-      realizado_em: encontroISO(i, plano.hora),
+      data_hora: cal.iso(i, plano.hora), duracao_min: plano.duracao,
+      status: enc6Futuro ? "agendado" : "realizado", origem: null,
+      created_by: mentorId,
+      realizado_em: enc6Futuro ? null : cal.iso(i, plano.hora),
+      ...(enc6Futuro
+        ? { link: "https://meet.google.com/demo-" + duplaId.slice(-8) }
+        : {}),
     });
+    if (enc6Futuro) continue; // agendado não minta link nem gera registro
     // link /avaliar é mintado por trigger no insert realizado — depois do
     // insert eu faço PATCH de status por encontro (respondido/expirado/
     // pendente-vivo pra Ana). O encontro avaliado é i%5!==4, salvo avalPendente.
@@ -365,7 +581,7 @@ function registrosDaDupla(duplaId, mentorId, plano) {
         proximo_passo: i === plano.feitos ? "acompanhar_de_perto" : "continuar",
         proximo_passo_detalhe: null,
         precisa_apoio: !!(plano.apoio && i === plano.feitos),
-        created_at: encontroISO(i, "21:00"), updated_at: encontroISO(i, "21:00"),
+        created_at: cal.iso(i, "21:00"), updated_at: cal.iso(i, "21:00"),
       });
       // avaliação estrela do jovem em ~80% dos encontros
       if (temAval) {
@@ -377,7 +593,7 @@ function registrosDaDupla(duplaId, mentorId, plano) {
           avancei: "sim", temas: ["vinculo", "clareza"],
           comentario: i === 1 ? "Primeira vez que contei minha história toda pra alguém de fora." : null,
           avaliacao_visivel_mentor: true,
-          created_at: encontroISO(i, "22:30"),
+          created_at: cal.iso(i, "22:30"),
         });
       }
       // encaminhamento ocasional
@@ -386,19 +602,30 @@ function registrosDaDupla(duplaId, mentorId, plano) {
           id: uid((parseInt(duplaId.slice(-4), 16) << 8) + 0xc0 + i),
           dupla_id: duplaId, registro_id: out.registros.at(-1).id,
           descricao: i === 3 ? "Jovem envia a lista de 3 cursos de interesse pro mentor" : "Ajustar a rotina de estudos e revisar no próximo encontro",
-          responsavel: "mentorado", prazo: encontroDate(i + 1),
+          responsavel: "mentorado", prazo: cal.date(i + 1),
           status: plano.regular && i === plano.feitos ? "pendente" : "feito",
-          created_at: encontroISO(i, "21:05"),
+          created_at: cal.iso(i, "21:05"),
         });
       }
     }
   }
-  // próximo encontro agendado (encontro 7, terça que vem)
-  if (plano.proximo) {
+  // próximo(s) agendado(s): `proximo` = o 7 da T1 (ou feitos+1 de trilha);
+  // `proximos` lista numerada — a T2 agenda o vigente (e o seguinte) no
+  // calendário dela, e `quando` sobrescreve a data (a dupla agenda quando
+  // funciona; o oficial é sempre terça)
+  const proximos =
+    plano.proximos ?? (plano.proximo ? [plano.trilha ? plano.feitos + 1 : 7] : []);
+  for (const p of proximos) {
+    const num = typeof p === "number" ? p : p.num;
     out.encontros.push({
-      id: uid((parseInt(duplaId.slice(-4), 16) << 8) + 0xf0), dupla_id: duplaId,
-      numero: plano.trilha ? plano.feitos + 1 : 7,
-      data_hora: plano.trilha ? encontroISO(plano.feitos + 1, plano.hora) : encontroISO(7, plano.hora),
+      id: uid((parseInt(duplaId.slice(-4), 16) << 8) + 0xe0 + num), dupla_id: duplaId,
+      numero: num,
+      // WP4: trilhas não seguem o cronograma — o agendado ancora em hoje
+      // (a grade visual só desenha a semana corrente); quando hoje é qui
+      // cai dentro da janela 19–21 da Luísa, senão fica "fora da grade"
+      data_hora: plano.trilha
+        ? iso(new Date(`${diaBrt()}T${plano.hora}:00-03:00`))
+        : p.quando ? iso(new Date(p.quando)) : cal.iso(num, plano.hora),
       duracao_min: plano.duracao, status: "agendado", origem: null,
       link: "https://meet.google.com/demo-" + duplaId.slice(-8), created_by: mentorId,
     });
@@ -470,6 +697,11 @@ await post("mentorados", mentorados.map((m) => ({
   contato_compartilhado: false, ...m, disponibilidade: paraDisponibilidade(m.disponibilidade),
 })));
 
+// cronogramas demo (T1 evergreen + T2) antes das duplas — FK cronograma_id
+console.log("inserindo os cronogramas demo (T1/T2) e os eventos deles…");
+await post("cronogramas", [cronogramaT1, cronogramaT2]);
+await post("ciclo_eventos", [...eventosT1, ...eventosT2]);
+
 console.log("inserindo duplas…");
 await post("duplas", duplas);
 
@@ -478,7 +710,9 @@ const enc = [], reg = [], avl = [], encam = [];
 for (const d of duplas) {
   const plano = PLANO_ENCONTROS[d.id];
   if (!plano) continue;
-  const r = registrosDaDupla(d.id, d.mentor_id, plano);
+  // duplas da T2 correm contra o calendário dela — mesma função, outra régua
+  const calT2 = plano.t2 ? { iso: encontroISOT2, date: dataT2 } : undefined;
+  const r = registrosDaDupla(d.id, d.mentor_id, plano, calT2);
   enc.push(...r.encontros); reg.push(...r.registros); avl.push(...r.avaliacoes);
   encam.push(...r.encaminhamentos);
 }
@@ -492,9 +726,11 @@ await post("encaminhamentos", encam);
 const avaliados = avl.map((a) => a.encontro_id);
 if (avaliados.length)
   await patch(`avaliacao_links?encontro_id=in.(${avaliados.join(",")})`,
-    { status: "respondido", respondido_em: iso(new Date("2026-10-14T21:00:00-03:00")) });
+    { status: "respondido", respondido_em: iso(new Date(Date.now() - 12 * 36e5)) });
 // Ana (jovem com login): encontro 6 fica pendente e válido — aparece nas
-// "Suas avaliações" do /jovem
+// "Suas avaliações" do /jovem. Só existe link quando o enc 6 saiu
+// "realizado" (terça 19h passada); antes disso o patch é no-op e a Ana
+// simplesmente não tem avaliação pendente na semana
 const encAna6 = uid((0x300 << 8) + 6);
 await patch(`avaliacao_links?encontro_id=eq.${encAna6}`,
   { status: "pendente", expira_em: iso(new Date(Date.now() + 14 * DIA)) });
@@ -512,21 +748,30 @@ const FORM = {
 };
 const links = [], resps = [];
 let li = 0;
-function linkComResposta(duplaId, mentoradoId, formId, respostas, respondidoNumero) {
+// WP7: `contexto` + `created_at` são o ciclo de vida da entrega — a jornada
+// separa a Roda inicial da formal pelo contexto->>'momento' (ou pelo
+// created_at vs a data do enc. 12) e o painel lê as datas, então o link
+// nasce ~1h antes do uso, no encontro-alvo do guia. `respondido_por` só
+// faz sentido pra jovem com login (a Ana); os demais respondem por token.
+function linkComResposta(duplaId, mentoradoId, formId, respostas, respondidoNumero,
+                         { contexto = { origem: "instrumentos" }, respondidoPor = null } = {}) {
   const lid = uid(0x700 + li), rid = uid(0x800 + li); li++;
   links.push({
     id: lid, formulario_id: formId, token: `demo-${lid}-t`,
-    dest_mentorado_id: mentoradoId, dupla_id: duplaId,
+    dest_mentorado_id: mentoradoId, dupla_id: duplaId, contexto,
+    created_at: encontroISO(respondidoNumero, "19:40"),
     usado_em: encontroISO(respondidoNumero, "21:00"), created_by: P.coord,
-    respondido_por_profile_id: jovemProfile,
+    respondido_por_profile_id: respondidoPor,
   });
   resps.push({ id: rid, link_id: lid, respostas, respondido_em: encontroISO(respondidoNumero, "21:00") });
 }
-// dupla 1 (Ana × Otávio) — jornada completa
-linkComResposta(D.d1, M.ana, FORM.roda, RODA(), 5);
-linkComResposta(D.d1, M.ana, FORM.visao, VISAO, 3);
-linkComResposta(D.d1, M.ana, FORM.metas, METAS, 4);
-linkComResposta(D.d1, M.ana, FORM.pdm, PDM, 4);
+// dupla 1 (Ana × Otávio) — jornada completa: a roda é a leitura inicial
+// (contexto.momento marca a aplicação, criada no enc. 1 como manda o guia)
+linkComResposta(D.d1, M.ana, FORM.roda, RODA(), 1,
+  { contexto: { origem: "instrumentos", momento: "inicial" }, respondidoPor: jovemProfile });
+linkComResposta(D.d1, M.ana, FORM.visao, VISAO, 3, { respondidoPor: jovemProfile });
+linkComResposta(D.d1, M.ana, FORM.metas, METAS, 4, { respondidoPor: jovemProfile });
+linkComResposta(D.d1, M.ana, FORM.pdm, PDM, 4, { respondidoPor: jovemProfile });
 linkComResposta(D.d1, M.ana, FORM.anamnese, {
   quem_mora: "Moro com a minha mãe e meu irmão mais novo.",
   territorio: "Vila Esperança, zona leste.",
@@ -539,17 +784,21 @@ linkComResposta(D.d1, M.ana, FORM.anamnese, {
   expectativas: "Passar em Medicina e ser a primeira médica da família.",
   pref_genero_mentor: "Indiferente",
 }, 0);
-// parciais em outras duplas
-linkComResposta(D.d4, M.joaoPedro, FORM.roda, RODA({ pr_financas: 5, p_saude: 8, r_familia: 9 }), 4);
+// parciais em outras duplas — todas as rodas abaixo são leituras iniciais
+// (enc. 1 do guia), marcadas com contexto.momento = 'inicial'
+const INICIAL = { origem: "instrumentos", momento: "inicial" };
+linkComResposta(D.d4, M.joaoPedro, FORM.roda, RODA({ pr_financas: 5, p_saude: 8, r_familia: 9 }), 1, { contexto: INICIAL });
 linkComResposta(D.d4, M.joaoPedro, FORM.metas, METAS, 3);
-linkComResposta(D.d6, M.rafaela, FORM.roda, RODA({ p_equilibrio: 7, pr_escola: 5 }), 5);
-linkComResposta(D.d10, M.yasmin, FORM.roda, RODA({ pr_carreira: 6, q_realizacao: 8 }), 5);
-linkComResposta(D.d13, M.larissa, FORM.roda, RODA({ p_equilibrio: 3, pr_escola: 6 }), 4);
+linkComResposta(D.d6, M.rafaela, FORM.roda, RODA({ p_equilibrio: 7, pr_escola: 5 }), 1, { contexto: INICIAL });
+linkComResposta(D.d10, M.yasmin, FORM.roda, RODA({ pr_carreira: 6, q_realizacao: 8 }), 1, { contexto: INICIAL });
+linkComResposta(D.d13, M.larissa, FORM.roda, RODA({ p_equilibrio: 3, pr_escola: 6 }), 1, { contexto: INICIAL });
 linkComResposta(D.d13, M.larissa, FORM.visao, { ...VISAO, filme: "Me vejo calma na hora da prova, segura da minha escolha.", declaracao_visao: "Escolher minha carreira com clareza e chegar no vestibular sem pavor." }, 3);
-// uma roda pendente (link emitido, não respondido) pra mostrar o estado
+// uma roda pendente (link emitido, não respondido) pra mostrar o estado —
+// emitida no enc. 6 (fora da janela do enc. 1: é o caso "atrasada" do painel)
 links.push({
   id: uid(0x7f0), formulario_id: FORM.roda, token: "demo-roda-pendente-00000000000001",
-  dest_mentorado_id: M.gabriela, dupla_id: D.d5, expira_em: iso(new Date(Date.now() + 30 * DIA)),
+  dest_mentorado_id: M.gabriela, dupla_id: D.d5, contexto: INICIAL,
+  created_at: encontroISO(6, "19:40"), expira_em: iso(new Date(Date.now() + 30 * DIA)),
   created_by: P.ricardo,
 });
 await post("formulario_links", links);
@@ -565,22 +814,46 @@ await post("comunicados", [
 // mural de especialistas: 1 aberta (genérica), 1 aguardando triagem, 2
 // aceitas→trilhas (a view solicitacoes_mural projeta esta tabela e junta
 // nomes/devolutiva — *_nome e status_efetivo não são colunas reais)
+// + 1 sugerida (WP6): a sugestão do mentor nasce fora dos tetos e do mural,
+// esperando a confirmação da Ana em /jovem/especialistas. O Otávio aponta
+// a Luísa — a área dela é exatamente a demanda — e o texto da demanda é
+// compartilhado com o corpo da notificação (mesmo evento, dois destinos)
+const SUG_ANA_DEMANDA = "A Ana mira Medicina e a ansiedade de prova derruba o simulado — uma trilha curta de ansiedade de desempenho destrava.";
+const SUG_ANA_QUANDO = iso(new Date(Date.now() - DIA)); // ~1 dia atrás
 await post("solicitacoes_especialista", [
-  { id: uid(0x1000), mentorado_id: M.gabriela, dupla_dpp_id: D.d5, demanda: "Carreiras em tecnologia", motivo: "A Gabriela quer entender qual área de tech combina com ela antes de escolher o curso técnico.", turma: TURMA, status: "aberta", origem: "staff", created_by: P.ricardo, created_at: iso(new Date("2026-10-08T10:00:00-03:00")) },
-  { id: uid(0x1001), mentorado_id: M.igor, demanda: "Orientação vocacional", motivo: "O Igor está dividido entre técnico em eletrônica e mecânica — pediu direto pelo mural do jovem.", turma: null, status: "aguardando_coord", origem: "jovem", created_by: jovemProfile, created_at: iso(new Date("2026-10-12T10:00:00-03:00")) },
-  { id: uid(0x1002), mentorado_id: M.larissa, dupla_dpp_id: D.d13, demanda: "Ansiedade de desempenho", motivo: "A Larissa trava em prova — o mentor pediu apoio de especialista.", turma: TURMA, status: "aceita", origem: "staff", especialista_id: P.luisa, dupla_id: D.trilha1, created_by: P.andre, created_at: iso(new Date("2026-09-20T10:00:00-03:00")), respondida_em: iso(new Date("2026-09-22T10:00:00-03:00")) },
-  { id: uid(0x1003), mentorado_id: M.enzo, dupla_dpp_id: D.d9, demanda: "Finanças pessoais", motivo: "Enzo queria aprender a cuidar do primeiro salário.", turma: TURMA, status: "aceita", origem: "staff", especialista_id: P.sofia, dupla_id: D.trilha2, created_by: P.gustavo, created_at: iso(new Date("2026-09-05T10:00:00-03:00")), respondida_em: iso(new Date("2026-09-08T10:00:00-03:00")) },
+  { id: uid(0x1000), mentorado_id: M.gabriela, dupla_dpp_id: D.d5, demanda: "Carreiras em tecnologia", motivo: "A Gabriela quer entender qual área de tech combina com ela antes de escolher o curso técnico.", turma: T1_TURMA, status: "aberta", origem: "staff", created_by: P.ricardo, created_at: iso(new Date("2026-10-08T10:00:00-03:00")) },
+  { id: uid(0x1001), mentorado_id: M.igor, demanda: "Orientação vocacional", motivo: "O Igor está dividido entre técnico em eletrônica e mecânica — pediu direto pelo mural do jovem.", turma: null, status: "aguardando_coord", origem: "jovem", created_by: igorProfile, created_at: iso(new Date("2026-10-12T10:00:00-03:00")) },
+  { id: uid(0x1002), mentorado_id: M.larissa, dupla_dpp_id: D.d13, demanda: "Ansiedade de desempenho", motivo: "A Larissa trava em prova — o mentor pediu apoio de especialista.", turma: T1_TURMA, status: "aceita", origem: "staff", especialista_id: P.luisa, dupla_id: D.trilha1, created_by: P.andre, created_at: iso(new Date("2026-09-20T10:00:00-03:00")), respondida_em: iso(new Date("2026-09-22T10:00:00-03:00")) },
+  { id: uid(0x1003), mentorado_id: M.enzo, dupla_dpp_id: D.d9, demanda: "Finanças pessoais", motivo: "Enzo queria aprender a cuidar do primeiro salário.", turma: T1_TURMA, status: "aceita", origem: "staff", especialista_id: P.sofia, dupla_id: D.trilha2, created_by: P.gustavo, created_at: iso(new Date("2026-09-05T10:00:00-03:00")), respondida_em: iso(new Date("2026-09-08T10:00:00-03:00")) },
+  { id: uid(0x1004), mentorado_id: M.ana, dupla_dpp_id: D.d1, demanda: SUG_ANA_DEMANDA, motivo: "Quero controlar a ansiedade pra render nos simulados.", turma: T1_TURMA, status: "sugerida", origem: "mentor", especialista_desejado_id: P.luisa, created_by: P.andre, created_at: SUG_ANA_QUANDO },
+]);
+
+// devolutivas (WP6) — o feed datado da trilha Luísa × Larissa: uma de meio
+// de percurso e uma recente (datas relativas ao run, evergreen)
+await post("devolutivas", [
+  { id: uid(0x1400), dupla_id: D.trilha1, autor_id: P.luisa,
+    texto: "Meio do caminho: a Larissa já separa prova de julgamento — o gatilho dela é a sala cheia, não a matéria. Próximas sessões ensaiam simulado curto.",
+    created_at: iso(new Date(Date.now() - 17 * DIA)) },
+  { id: uid(0x1401), dupla_id: D.trilha1, autor_id: P.luisa,
+    texto: "Simulado de 20 questões sem travar — ela saiu do blank com respiração e rascunho. Reta final: consolidar o ritual pré-prova.",
+    created_at: iso(new Date(Date.now() - 3 * DIA)) },
 ]);
 
 await post("supervisoes", [
   { id: uid(0xb00), supervisor_id: P.sup1, mentor_id: P.andre, dupla_id: D.d1, data: "2026-09-25", resumo: "Otávio trouxe a dificuldade de a Ana não falar da família. Trabalhamos escuta ativa e perguntas abertas — saiu com plano.", created_by: P.sup1, created_at: iso(new Date("2026-09-25T20:00:00-03:00")) },
   { id: uid(0xb01), supervisor_id: P.sup1, mentor_id: P.fernando, dupla_id: D.d3, data: "2026-10-09", resumo: "Conversa sobre o pedido de apoio da Maria Fernanda. Orientei o Sérgio a escutar sem resolver — ele segue com acompanhamento próximo.", created_by: P.sup1, created_at: iso(new Date("2026-10-09T20:00:00-03:00")) },
   { id: uid(0xb02), supervisor_id: P.sup2, mentor_id: P.tiago, dupla_id: D.d7, data: "2026-10-07", resumo: "Tiago está com a agenda apertada — combinado horário fixo de sábado de manhã e compromisso de resposta em 24h.", created_by: P.sup2, created_at: iso(new Date("2026-10-07T20:00:00-03:00")) },
+  // T2 demo — supervisão corrente da dupla nova (data relativa ao run)
+  { id: uid(0xb10), supervisor_id: P.sup2, mentor_id: P.monica, dupla_id: D.dT2a, data: diaBrt(), resumo: "Primeira supervisão da Mônica com a turma nova — a T2 engatou: o Davi chegou com a meta do curso técnico meio formada. Combinado: ela segura o ritmo semanal e eu reviso os registros dela a cada quinzena.", created_by: P.sup2, created_at: iso(new Date()) },
 ]);
 
-// presenças nos dois encontros de formação (03 e 04/set)
-const eventoForm1 = "f10e9ec6-8ee0-49a4-b7a4-516b2526fd2b";
-const eventoForm2 = "709a7c38-14b3-4cc1-ad36-b3a21f846cad";
+// presenças nos dois encontros de formação (03 e 04/set) — os ids variam
+// por ambiente (staging vs `supabase start`), resolve por data+tipo
+const [evF1] = await rest("ciclo_eventos?select=id&tipo=eq.formacao&data=eq.2026-09-03&order=data.asc&limit=1");
+const [evF2] = await rest("ciclo_eventos?select=id&tipo=eq.formacao&data=eq.2026-09-04&order=data.asc&limit=1");
+if (!evF1 || !evF2) throw new Error("eventos de formação 03/04-set não encontrados");
+const eventoForm1 = evF1.id;
+const eventoForm2 = evF2.id;
 const presencas = [];
 let pi = 0;
 const mentorIds = [P.andre, P.beatriz, P.fernando, P.juliana, P.ricardo, P.camila, P.tiago, P.gustavo, P.patricia, P.leonardo, P.vanessa, P.eduardo, P.luisa, P.marcos, P.sofia, P.pedroH];
@@ -589,13 +862,23 @@ for (const pid of mentorIds) {
   // renata e daniel faltaram o 2º dia (formacao_ok false bate com isso)
   presencas.push({ id: uid(0xa00 + pi++), ciclo_evento_id: eventoForm2, profile_id: pid, presente: pid !== P.renata && pid !== P.daniel, marcado_por: P.coord, marcado_em: iso(new Date("2026-09-04T21:00:00-03:00")) });
 }
+// T2 demo: a Mônica e a Elisa formaram no onboarding da turma nova —
+// presença registrada nos dois encontros de formação da T2 (sync_formacao_ok
+// mantém o formacao_ok delas, que já nasce true)
+for (const evf of eventosT2.filter((e) => e.tipo === "formacao"))
+  for (const pid of [P.monica, P.elisa])
+    presencas.push({ id: uid(0xa00 + pi++), ciclo_evento_id: evf.id, profile_id: pid, presente: true, marcado_por: P.coord, marcado_em: iso(new Date(`${evf.data}T21:00:00-03:00`)) });
 await post("presencas", presencas);
 
 await post("interacoes", [
-  { id: uid(0xc00), dupla_id: D.d7, autor_id: P.coord, canal: "whatsapp", tipo: "nudge", nota: "Tiago, faltam 2 encontros do ciclo — consegue encaixar o Lucas no sábado?", created_at: iso(new Date("2026-10-06T14:00:00-03:00")) },
-  { id: uid(0xc01), dupla_id: D.d7, autor_id: P.coord, canal: "whatsapp", tipo: "contato", nota: "Confirmei com o Lucas que sábado de manhã funciona pra ele.", created_at: iso(new Date("2026-10-07T09:30:00-03:00")) },
-  { id: uid(0xc02), dupla_id: D.d2, autor_id: P.sup1, canal: "whatsapp", tipo: "nudge", nota: "Sabrina, o encontro 6 passou sem agendar — tudo bem por aí?", created_at: iso(new Date("2026-10-14T10:00:00-03:00")) },
-  { id: uid(0xc03), dupla_id: D.d3, autor_id: P.coord, canal: "outro", tipo: "apoio", nota: "Pedido de apoio da Maria Fernanda recebido — supervisão já acionada, retorno ao mentor em 48h.", created_at: iso(new Date("2026-10-14T11:00:00-03:00")) },
+  // evergreen: datas relativas ao run — fixas de out/2026 envelheceriam e
+  // o cap de 48h do "Lembrar" perderia o caso bloqueado em staging
+  { id: uid(0xc00), dupla_id: D.d7, autor_id: P.coord, canal: "whatsapp", tipo: "nudge", nota: "Tiago, faltam 2 encontros do ciclo — consegue encaixar o Lucas no sábado?", created_at: iso(new Date(Date.now() - 4 * DIA)) },
+  { id: uid(0xc01), dupla_id: D.d7, autor_id: P.coord, canal: "whatsapp", tipo: "contato", nota: "Confirmei com o Lucas que sábado de manhã funciona pra ele.", created_at: iso(new Date(Date.now() - 3 * DIA - 14 * 36e5)) },
+  { id: uid(0xc02), dupla_id: D.d2, autor_id: P.sup1, canal: "in_app", tipo: "nudge", nota: "lembrete → mentor", created_at: iso(new Date(Date.now() - 26 * 36e5)) },
+  { id: uid(0xc03), dupla_id: D.d3, autor_id: P.coord, canal: "outro", tipo: "apoio", nota: "Pedido de apoio da Maria Fernanda recebido — supervisão já acionada, retorno ao mentor em 48h.", created_at: iso(new Date(Date.now() - DIA)) },
+  // T2 demo — o nudge do sem_data da Elisa, evergreen (>48h → lembrete livre)
+  { id: uid(0xc10), dupla_id: D.dT2b, autor_id: P.coord, canal: "whatsapp", tipo: "nudge", nota: "Elisa, o encontro 4 da T2 tá sem data — bora combinar com a Luna?", created_at: iso(new Date(Date.now() - 3 * DIA)) },
 ]);
 
 await post("notificacoes", [
@@ -603,6 +886,11 @@ await post("notificacoes", [
   { id: uid(0xf01), profile_id: P.coord, tipo: "solicitacao_triagem", titulo: "Nova solicitação aguardando triagem", corpo: "Igor Batista pediu orientação vocacional (sem dupla DPP).", href: "/especialistas", created_at: iso(new Date("2026-10-12T10:05:00-03:00")) },
   { id: uid(0xf02), profile_id: P.sup1, tipo: "comunicado", titulo: "Dupla em risco — Tiago × Lucas", corpo: "2 encontros atrasados no ciclo.", href: `/duplas/${D.d7}`, created_at: iso(new Date("2026-10-14T07:00:00-03:00")) },
   { id: uid(0xf03), profile_id: P.andre, tipo: "supervisao_registrada", titulo: "Sessão de supervisão registrada", corpo: "Paula registrou a supervisão de 25/set — confira o resumo na sua página.", href: "/perfil", lida_em: iso(new Date("2026-09-26T08:00:00-03:00")), created_at: iso(new Date("2026-09-25T20:05:00-03:00")) },
+  // WP6 — sol_notificar da sugerir_especialista_mentor / postar_devolutiva:
+  // a Ana recebe a sugestão do Otávio (mesmo carimbo da row 'sugerida') e a
+  // Larissa é avisada da devolutiva mais recente da trilha dela
+  { id: uid(0xf10), profile_id: jovemProfile, tipo: "sugestao_especialista", titulo: "Seu mentor sugeriu um especialista", corpo: "Ele registrou um tema pra você — confirme ou ajuste na página de especialistas.", href: "/jovem/especialistas", created_at: SUG_ANA_QUANDO },
+  { id: uid(0xf11), profile_id: larissaProfile, tipo: "devolutiva_especialista", titulo: "Nova devolutiva da trilha", corpo: "Luísa Camargo registrou uma devolutiva pra você.", href: "/jovem/especialistas", created_at: iso(new Date(Date.now() - 3 * DIA)) },
 ]);
 
 // especialista_grade: agendas dos especialistas pra projeção de slots
@@ -615,11 +903,29 @@ await post("especialista_grade", [
   { id: uid(0x1105), profile_id: P.pedroH, dia_semana: 1, hora_inicio: "18:00", hora_fim: "20:00" },
 ]);
 
+// especialista_excecoes (WP4): a grade visual da Luísa precisa de exceções
+// datadas vivas — um bloqueio na próxima terça cobrindo a janela dela
+// (19:00–21:00) e um horário extra no próximo domingo (fora da grade),
+// MAIS um par ancorado em hoje: a grade só desenha a semana corrente
+// (seg–dom) e "próximo dia X" foge dela na maior parte dos dias. O bloqueio
+// de hoje rasga a janela quando hoje é ter/qui; o extra de 7h–9h clipa no
+// eixo 8h. Datas relativas ao run — exceção no passado o select filtra
+// (data >= hoje). O cleanup é o porFK `profile_id` do range de*, já coberto.
+await post("especialista_excecoes", [
+  { id: uid(0x1110), profile_id: P.luisa, data: proximoDow(2), hora_inicio: "19:00", hora_fim: "21:00", tipo: "bloqueio" },
+  { id: uid(0x1111), profile_id: P.luisa, data: proximoDow(0), hora_inicio: "10:00", hora_fim: "12:00", tipo: "extra" },
+  { id: uid(0x1112), profile_id: P.luisa, data: diaBrt(), hora_inicio: "07:00", hora_fim: "09:00", tipo: "extra" },
+  { id: uid(0x1113), profile_id: P.luisa, data: diaBrt(), hora_inicio: "12:00", hora_fim: "14:00", tipo: "bloqueio" },
+]);
+
 // assinaturas: termo do voluntário pra maioria dos mentores, mentorando e
-// responsável pra jovens (esp. menores)
-const TPL_VOL = "1725587d-ac54-4bf2-8341-aee025a5208f";
-const TPL_RESP = "77218b10-948c-449b-8362-70c9053b6989";
-const TPL_MENT = "bd803b04-a480-47ac-9f64-a186a46881f8";
+// responsável pra jovens (esp. menores) — ids por slug (variam por ambiente)
+const tplRows = await rest("documento_templates?select=id,slug&slug=in.(termo-voluntario,termo-mentorando,autorizacao-responsavel)");
+const tplId = Object.fromEntries((tplRows ?? []).map((t) => [t.slug, t.id]));
+const TPL_VOL = tplId["termo-voluntario"];
+const TPL_RESP = tplId["autorizacao-responsavel"];
+const TPL_MENT = tplId["termo-mentorando"];
+if (!TPL_VOL || !TPL_RESP || !TPL_MENT) throw new Error("documento_templates do seed.sql ausentes");
 const assinaturas = [];
 let ai = 0;
 const assinado = (tpl, profileId, mentoradoId, quem, quando) => ({
@@ -646,6 +952,11 @@ for (const [mid, nome, quando] of [
 for (const [mid, resp] of [[M.pedroLucas, "Márcia Silva"], [M.gabriela, "Sônia Oliveira"], [M.enzo, "Rogério Carvalho"], [M.larissa, "Denise Campos"]]) {
   assinaturas.push(assinado(TPL_RESP, null, mid, resp, iso(new Date("2026-09-05T10:00:00-03:00"))));
 }
+// T2 demo — termos do onboarding da turma nova (datas relativas ao run)
+assinaturas.push(assinado(TPL_VOL, P.elisa, null, "Elisa Prado", iso(new Date(`${somaDia(T2E1, -5)}T20:40:00-03:00`))));
+assinaturas.push(assinado(TPL_MENT, null, M.davi, "Davi Santos", iso(new Date(`${somaDia(T2E1, -4)}T19:30:00-03:00`))));
+assinaturas.push(assinado(TPL_MENT, null, M.luna, "Luna Ferreira", iso(new Date(`${somaDia(T2E1, -4)}T19:32:00-03:00`))));
+assinaturas.push(assinado(TPL_RESP, null, M.davi, "Sandra Santos", iso(new Date(`${somaDia(T2E1, -4)}T19:35:00-03:00`))));
 // um termo pendente (Natan ainda não assinou)
 assinaturas.push({
   id: uid(0xe00 + ai++), template_id: TPL_VOL, profile_id: P.daniel, status: "pendente",

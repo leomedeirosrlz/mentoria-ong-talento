@@ -13,7 +13,7 @@ import { formatDate, formatDiaHora, MOTIVOS_REAGENDAMENTO } from "@/lib/ciclo";
 import type { JovemEncontro } from "@/lib/queries-jovem";
 import { Button } from "@/components/ui/button";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
+  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -162,11 +162,14 @@ export function JovemAgendarDialog({
           </Button>
         )
       } />
-      <DialogContent>
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>
             {atual || numero ? `${numeroFinal ?? numero}º encontro` : "Agendar encontro"}
           </DialogTitle>
+          <DialogDescription>
+            Escolha o encontro e marque a data e o horário com seu mentor.
+          </DialogDescription>
         </DialogHeader>
         <form onSubmit={submit} className="space-y-4">
           {numero == null && !atual && numeros && numeros.length > 0 && (

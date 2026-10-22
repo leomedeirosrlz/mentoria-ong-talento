@@ -17,7 +17,7 @@ import { Button } from "@/components/ui/button";
 import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
 import { EnviarEmailDialog } from "@/components/enviar-email-dialog";
 import {
-  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -220,10 +220,21 @@ export function MaterialActions({ material, maxEncontro }: { material: Material;
       />
 
       {/* metadados do material — o arquivo em si troca pelo clip */}
-      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+      <Dialog
+        open={editOpen}
+        onOpenChange={(o) => {
+          setEditOpen(o);
+          // Select de audiência é defaultValue — sem o reset o estado fica
+          // à frente do que ele exibe quando o dialog reabre
+          if (!o) setAudiencia(material.audiencia);
+        }}
+      >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Editar material</DialogTitle>
+            <DialogDescription>
+              Título, descrição, tipo e o encontro a que o material pertence.
+            </DialogDescription>
           </DialogHeader>
           <form
             className="space-y-4"
@@ -286,9 +297,15 @@ export function MaterialActions({ material, maxEncontro }: { material: Material;
                 <Label htmlFor="mat-encontro">Encontro (nº, opcional)</Label>
                 <Input
                   id="mat-encontro" name="encontro_num" type="number"
+                  inputMode="numeric"
                   min={1} max={maxEncontroSel}
                   defaultValue={material.encontro_num ?? ""}
                 />
+                {audiencia === "todos" && (
+                  <p className="text-xs text-muted-foreground">
+                    Pro jovem, libera quando a dupla chegar no encontro.
+                  </p>
+                )}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="mat-url">Link externo</Label>
@@ -315,6 +332,7 @@ export function MaterialActions({ material, maxEncontro }: { material: Material;
         tituloMaterial={material.titulo}
         audienciaPadrao={material.audiencia}
         tipoMaterial={material.tipo}
+        encontroNum={material.encontro_num}
         open={emailOpen}
         onOpenChange={setEmailOpen}
       />

@@ -44,6 +44,36 @@ import { cn } from "@/lib/utils";
 // /mandar de novo, respondido → "Ver resultado" abre a leitura estruturada
 // (a roda desenhada, as metas com IS/prazo, a declaração de visão).
 
+/** WP7 — a janela do guia por instrumento (as mesmas âncoras de ESTACOES
+ *  na lib de jornada) + a condução em uma frase. O chip diz QUANDO entra;
+ *  o "Como conduzir" diz como o mentor usa — nenhum dos dois muda o fluxo
+ *  de envio, que continua o mesmo. */
+const GUIA_ENCONTRO: Record<
+  InstrumentoSistema,
+  { chip: string; conduzir: string }
+> = {
+  visao: {
+    chip: "Enc. 1–4",
+    conduzir:
+      "Entregue no 1º encontro (a janela do guia vai até o 4º). O exercício pede imaginação: o jovem narra o “filme” da vida ideal e fecha com a Declaração de Visão — uma frase no futuro, com prazo. Releiam juntos no encontro seguinte: a frase é o topo do PDM.",
+  },
+  metas: {
+    chip: "Enc. 2–3",
+    conduzir:
+      "Da Declaração de Visão saem 3 a 5 metas, cada uma com o porquê escrito pelo jovem. Antes de fechar, revisem com o modelo SMART: específica, mensurável, alcançável, relevante e com prazo. A meta prioritária abre o PDM.",
+  },
+  pdm: {
+    chip: "Construir 1–4 · revisão enc. 9",
+    conduzir:
+      "Documento vivo construído nos enc. 1–4: Visão no topo, metas com indicador de sucesso (IS) e prazo (P), depois o mapa de submetas — pra cada meta, “o que preciso fazer pra conseguir isso?”. Volta à mesa na revisão de meio de percurso (enc. 9).",
+  },
+  roda_vida: {
+    chip: "Leitura enc. 1 · aplicação enc. 12–14",
+    conduzir:
+      "Duas aplicações: a leitura inicial no enc. 1 — o ponto de partida — e a aplicação formal nos enc. 12–14, que se compara com a primeira. O jovem dá nota de 1 a 10 nas 16 áreas; o desenho vira a roda e orienta as metas das áreas prioritárias.",
+  },
+};
+
 /** O estado que a ficha mostra: respondido ganha sempre (a resposta é o
  *  produto); depois pendente (tem link vivo pra mandar); expirado e "não
  *  enviado" pedem o botão de envio. */
@@ -70,6 +100,7 @@ function LinhaInstrumento({
   mentoradoNome,
   mentoradoWhatsapp,
   podeEnviar,
+  jornadaViva,
 }: {
   /** null quando o instrumento ainda não foi semeado no banco — a linha
    *  existe pra jornada completa aparecer, mas sem ação */
@@ -78,6 +109,10 @@ function LinhaInstrumento({
   mentoradoNome: string;
   mentoradoWhatsapp: string | null;
   podeEnviar: boolean;
+  /** ativa|pausada — dupla fechada esconde TODAS as ações de link pra
+   *  qualquer papel (Copiar/WhatsApp/Gerar): o link que o jovem já tem
+   *  segue respondível, mas ninguém emite nem reenvia. */
+  jornadaViva: boolean;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -112,17 +147,22 @@ function LinhaInstrumento({
       toast.success(
         r.reutilizado
           ? "Este link já estava pendente — reaproveitado."
-          : "Link do instrumento gerado."
+          : "Link gerado — copie ou envie pelo WhatsApp."
       );
       router.refresh();
     });
   }
 
   return (
-    <li className="flex flex-col gap-2 py-3 first:pt-0 last:pb-0 sm:flex-row sm:items-start sm:gap-3">
+    <li className="flex flex-col gap-2 py-3 first:pt-0 last:pb-0 sm:flex-row sm:items-start sm:gap-3 lg:flex-col lg:items-stretch">
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           <p className="text-sm font-medium">{titulo}</p>
+          {sistema && (
+            <Badge variant="outline" className="font-normal">
+              {GUIA_ENCONTRO[sistema].chip}
+            </Badge>
+          )}
           {status === "respondido" && (
             <Badge className="bg-[var(--ok)]/15 text-[var(--ok-text)]">
               respondido
@@ -142,6 +182,16 @@ function LinhaInstrumento({
             {info.resumo}
           </p>
         )}
+        {sistema && (
+          <details className="group mt-1.5">
+            <summary className="cursor-pointer select-none text-xs font-medium text-muted-foreground underline-offset-2 outline-none transition-colors hover:text-foreground hover:underline focus-visible:ring-2 focus-visible:ring-ring">
+              Como conduzir
+            </summary>
+            <p className="mt-1 max-w-prose text-xs leading-relaxed text-muted-foreground">
+              {GUIA_ENCONTRO[sistema].conduzir}
+            </p>
+          </details>
+        )}
         {status === "respondido" && entrega?.respondido_em && (
           <p className="mt-1 text-xs tabular-nums text-muted-foreground">
             Respondido em {formatDate(entrega.respondido_em)}
@@ -160,7 +210,9 @@ function LinhaInstrumento({
                 </Button>
               }
             />
-            <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
+            {/* xl, não 2xl: leitura estruturada do instrumento, não prévia
+                tabular; o scroll vem da base do DialogContent */}
+            <DialogContent className="sm:max-w-xl">
               <DialogHeader>
                 <DialogTitle>{item.titulo}</DialogTitle>
                 <DialogDescription>
@@ -179,7 +231,7 @@ function LinhaInstrumento({
           </Dialog>
         )}
 
-        {status === "pendente" && tokenVivo && (
+        {status === "pendente" && tokenVivo && jornadaViva && (
           <motion.div
             {...fade}
             transition={T.enter}
@@ -202,6 +254,7 @@ function LinhaInstrumento({
 
         {(status === "nao_enviado" || status === "expirado") &&
           podeEnviar &&
+          jornadaViva &&
           item && (
             <Button
               type="button"
@@ -216,7 +269,7 @@ function LinhaInstrumento({
               ) : (
                 <PaperPlaneTilt aria-hidden />
               )}
-              {status === "expirado" ? "Reenviar" : "Enviar"}
+              {status === "expirado" ? "Gerar novo link" : "Gerar link"}
             </Button>
           )}
       </div>
@@ -230,6 +283,7 @@ export function InstrumentosDupla({
   mentoradoNome,
   mentoradoWhatsapp,
   podeEnviar,
+  jornadaViva,
   className,
 }: {
   duplaId: string;
@@ -239,6 +293,8 @@ export function InstrumentosDupla({
   mentoradoWhatsapp: string | null;
   /** coord sempre; o mentor DPP da dupla viva também entrega (o guia é dele) */
   podeEnviar: boolean;
+  /** ativa|pausada — dupla fechada vira só leitura de resultados */
+  jornadaViva: boolean;
   className?: string;
 }) {
   if (!itens.length) return null;
@@ -250,7 +306,8 @@ export function InstrumentosDupla({
         className
       )}
     >
-      <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+      <h2 className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+        <span aria-hidden className="size-1.5 rounded-full bg-[var(--brand-lime)]" />
         Instrumentos da jornada
       </h2>
       <p className="mt-1 text-xs text-muted-foreground">
@@ -266,6 +323,7 @@ export function InstrumentosDupla({
             mentoradoNome={mentoradoNome}
             mentoradoWhatsapp={mentoradoWhatsapp}
             podeEnviar={podeEnviar}
+            jornadaViva={jornadaViva}
           />
         ))}
       </ul>

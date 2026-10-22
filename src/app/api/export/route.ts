@@ -21,7 +21,8 @@ import {
   TRILHA_LABEL,
 } from "@/lib/ciclo";
 import type { DadosPessoais } from "@/lib/queries";
-import type { Dupla, EncontroStatus, Mentorado, Profile } from "@/lib/types";
+import { temPapel } from "@/lib/types";
+import type { AppRole, Dupla, EncontroStatus, Mentorado, Profile } from "@/lib/types";
 
 // GET /api/export — só pra coordenação. ?tipo=ciclo (default): relatório do
 // ciclo em CSV, uma linha por encontro — a prestação de contas. ?tipo=pessoas:
@@ -64,12 +65,26 @@ export async function GET(request: NextRequest) {
       );
       const capacidadesEsp = new Map(
         d.mentorProfiles.map(
-          (m) => [m.profile_id, m.capacidade_especialista ?? 1] as const
+          // repasse cru, como a real: a coluna é not null default 1 (0073),
+          // então quem tem linha sempre carrega valor — e quem não tem
+          // linha exporta "" pelo ?? "" de csvPessoas nos dois caminhos
+          (m) => [m.profile_id, m.capacidade_especialista ?? null] as const
         )
       );
+      // papéis efetivos: o híbrido do dataset chega com as duas linhas —
+      // sem isso a coluna de capacidade dele exportava só a pool primária.
+      // Normalização idem comPapeis da real (só o que o embed traz; sem
+      // linha em profile_papeis sai [] — o temPapel cai no role sozinho)
+      const papeisDemo = new Map<string, AppRole[]>();
+      for (const pp of d.profilePapeis) {
+        papeisDemo.set(pp.profile_id, [...(papeisDemo.get(pp.profile_id) ?? []), pp.papel]);
+      }
       return csvResponse(
         csvPessoas(
-          d.profiles,
+          d.profiles.map((p) => ({
+            ...p,
+            papeis: papeisDemo.get(p.id) ?? [],
+          })),
           contatos,
           d.mentorados,
           capacidades,
@@ -193,7 +208,7 @@ async function exportPessoas(supabase: Awaited<ReturnType<typeof createClient>>)
     { data: pessoalP, error: ePP },
     { data: pessoalM, error: ePM },
   ] = await Promise.all([
-    supabase.from("profiles").select("id,nome,role,ativo"),
+    supabase.from("profiles").select("id,nome,role,ativo,profile_papeis(papel)"),
     supabase.from("profiles_contato").select("id,email,whatsapp"),
     supabase
       .from("mentorados")
@@ -226,7 +241,15 @@ async function exportPessoas(supabase: Awaited<ReturnType<typeof createClient>>)
 
   return csvResponse(
     csvPessoas(
-      pessoas ?? [],
+      ((pessoas ?? []) as (Pick<Profile, "id" | "nome" | "role" | "ativo"> & {
+        profile_papeis?: { papel: AppRole }[];
+      })[]).map((p) => {
+        const { profile_papeis, ...rest } = p;
+        return {
+          ...rest,
+          papeis: (profile_papeis ?? []).map((r) => r.papel),
+        };
+      }),
       contatoPorId,
       mentorados ?? [],
       capacidades,
@@ -368,24 +391,36 @@ async function exportRespostas(
       | null;
   };
 
-  const linhas = ((links ?? []) as unknown as LinkRaw[])
-    .map((l): LinhaRespostaCsv | null => {
-      const r = norm(l.resposta);
-      if (!r) return null; // link sem resposta não vira linha
+  const linhas = ((links ?? []) as unknown as LinkRaw[]).flatMap(
+    (l): LinhaRespostaCsv[] => {
+      // link de intake (multi_uso) carrega TODAS as respostas — uma linha
+      // por inscrição, não por link
+      const todas = Array.isArray(l.resposta)
+        ? l.resposta
+        : l.resposta
+          ? [l.resposta]
+          : [];
+      if (!todas.length) return [];
       const p = norm(l.dest_profile);
       const m = norm(l.dest_mentorado);
       const dupla = norm(l.dupla);
-      return {
-        destinatario: p?.nome ?? m?.nome ?? "Link genérico",
+      return todas.map((r) => ({
+        // no link anônimo a identidade vem do conteúdo da resposta
+        destinatario:
+          p?.nome ??
+          m?.nome ??
+          (typeof r.respostas?.nome_civil === "string"
+            ? (r.respostas.nome_civil as string)
+            : "Link genérico"),
         tipo: p ? papelLabel(p.role) : m ? "Mentorado" : "Link genérico",
         dupla: dupla
           ? `${norm(dupla.mentor)?.nome ?? ""} ↔ ${norm(dupla.mentorado)?.nome ?? ""}`
           : "",
         respondido_em: r.respondido_em,
         respostas: r.respostas ?? {},
-      };
-    })
-    .filter((l): l is LinhaRespostaCsv => l !== null);
+      }));
+    }
+  );
 
   const campos = (f.campos as unknown as FormularioCampo[]) ?? [];
   return csvResponse(csvRespostas(campos, linhas), nomeCsvRespostas(f.titulo));
@@ -406,8 +441,10 @@ function exportRespostasDemo(
   const linhas: LinhaRespostaCsv[] = [];
   for (const l of links) {
     if (l.formulario_id !== f.id) continue;
-    const r = respostas.find((x) => x.link_id === l.id);
-    if (!r) continue;
+    // multi_uso (intake): TODAS as respostas do link viram linha — a
+    // identidade sai do conteúdo (nome_civil), igual à query real
+    const doLink = respostas.filter((x) => x.link_id === l.id);
+    if (!doLink.length) continue;
     const p = l.dest_profile_id
       ? d.profiles.find((x) => x.id === l.dest_profile_id)
       : null;
@@ -417,15 +454,22 @@ function exportRespostasDemo(
     const dupla = l.dupla_id
       ? d.duplas.find((x) => x.id === l.dupla_id)
       : null;
-    linhas.push({
-      destinatario: p?.nome ?? m?.nome ?? "Link genérico",
-      tipo: p ? papelLabel(p.role) : m ? "Mentorado" : "Link genérico",
-      dupla: dupla
-        ? `${dupla.mentor?.nome ?? ""} ↔ ${dupla.mentorado?.nome ?? ""}`
-        : "",
-      respondido_em: r.respondido_em,
-      respostas: r.respostas,
-    });
+    for (const r of doLink) {
+      linhas.push({
+        destinatario:
+          p?.nome ??
+          m?.nome ??
+          (typeof r.respostas.nome_civil === "string"
+            ? r.respostas.nome_civil
+            : "Link genérico"),
+        tipo: p ? papelLabel(p.role) : m ? "Mentorado" : "Link genérico",
+        dupla: dupla
+          ? `${dupla.mentor?.nome ?? ""} ↔ ${dupla.mentorado?.nome ?? ""}`
+          : "",
+        respondido_em: r.respondido_em,
+        respostas: r.respostas,
+      });
+    }
   }
   return csvResponse(csvRespostas(f.campos, linhas), nomeCsvRespostas(f.titulo));
 }
@@ -488,8 +532,19 @@ type SensPessoa = Pick<
   "data_nascimento" | "genero" | "cor_raca" | "pref_genero_par" | "motivacao"
 >;
 
+/** Coluna `tipo` — os papéis efetivos (união role ∪ papeis, mesma regra do
+ *  temPapel), não só o primário: o híbrido exporta "Mentor DPP + Mentor
+ *  especialista" em vez de esconder a segunda trilha. */
+const tipoPessoa = (p: Pick<Profile, "role" | "papeis">): string => {
+  // primário primeiro — a ordem do embed profile_papeis não é garantida
+  const efetivos = [
+    ...new Set([...(p.role ? [p.role] : []), ...(p.papeis ?? [])]),
+  ];
+  return efetivos.length ? efetivos.map(papelLabel).join(" + ") : "Sem papel";
+};
+
 function csvPessoas(
-  pessoas: Pick<Profile, "id" | "nome" | "role" | "ativo">[],
+  pessoas: Pick<Profile, "id" | "nome" | "role" | "papeis" | "ativo">[],
   contatos: Map<string, { email: string | null; whatsapp: string | null }>,
   mentorados: Pick<
     Mentorado,
@@ -523,16 +578,21 @@ function csvPessoas(
     ...pessoas.map((p) => ({
       nome: p.nome,
       resto: [
-        p.role ? papelLabel(p.role) : "Sem papel",
+        tipoPessoa(p),
         contatos.get(p.id)?.email ?? "",
         contatos.get(p.id)?.whatsapp ?? "",
-        // a coluna capacidade mostra a pool da trilha do papel (0073)
-        p.role?.startsWith("mentor")
-          ? String(
-              (p.role === "mentor_especialista"
-                ? capacidadesEsp.get(p.id)
-                : capacidades.get(p.id)) ?? ""
-            )
+        // a coluna capacidade mostra a pool da trilha do papel (0073) —
+        // gate por papel efetivo (temPapel), não pelo primário: mentor
+        // só-secundário também exporta a pool dele; o híbrido (WP6b)
+        // exporta as duas rotuladas — "2 DPP / 3 ESP"
+        temPapel(p, "mentor_dpp") || temPapel(p, "mentor_especialista")
+          ? temPapel(p, "mentor_dpp") && temPapel(p, "mentor_especialista")
+            ? `${capacidades.get(p.id) ?? ""} DPP / ${capacidadesEsp.get(p.id) ?? ""} ESP`
+            : String(
+                (temPapel(p, "mentor_especialista")
+                  ? capacidadesEsp.get(p.id)
+                  : capacidades.get(p.id)) ?? ""
+              )
           : "",
         "",
         p.ativo ? "ativo" : "inativo",
@@ -716,7 +776,14 @@ function celulaResposta(
   if (typeof valor === "boolean") return valor ? "Sim" : "Não";
   if (campo?.tipo === "sim_nao")
     return valor === "sim" ? "Sim" : valor === "nao" ? "Não" : String(valor);
-  if (campo?.tipo === "data") return respostaFormatada(campo, valor);
+  // objeto (arquivo {path,nome,tamanho}, grade {celulas,horas}) e data —
+  // respostaFormatada devolve o texto legível em vez de "[object Object]"
+  if (
+    campo?.tipo === "data" ||
+    campo?.tipo === "arquivo" ||
+    campo?.tipo === "grid_disponibilidade"
+  )
+    return respostaFormatada(campo, valor);
   return String(valor);
 }
 

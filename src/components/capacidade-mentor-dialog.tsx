@@ -27,16 +27,19 @@ export function CapacidadeMentorDialog({
   nome,
   atual,
   emUso,
+  trilha,
   trigger,
   onSaved,
 }: {
   mentorId: string;
   nome: string;
-  /** Teto atual da pool da trilha do papel (capacidade ou
-   *  capacidade_especialista — o server decide a coluna). */
+  /** Teto atual da pool da trilha (capacidade ou capacidade_especialista). */
   atual: number;
   /** Duplas em andamento (ativa + pausada) — piso do ajuste. */
   emUso: number;
+  /** Pool ajustada (WP6b): sem ela o server escreve a da trilha do papel
+   *  primário — o híbrido tem as duas e precisa escolher qual. */
+  trilha?: "dpp" | "especialista";
   trigger: React.ReactElement;
   /** Callback pro pai atualizar estado local (ex.: o mapa de capacidade
    *  do NovaDuplaDialog) sem depender só do refresh. */
@@ -55,7 +58,7 @@ export function CapacidadeMentorDialog({
     setErro(null);
     start(async () => {
       try {
-        const res = await updateCapacidadeMentor(mentorId, cap);
+        const res = await updateCapacidadeMentor(mentorId, cap, trilha);
         if (res?.error) {
           setErro(res.error);
           return;
@@ -86,7 +89,8 @@ export function CapacidadeMentorDialog({
       }}
     >
       <DialogTrigger render={trigger} />
-      <DialogContent className="sm:max-w-sm">
+      {/* sem override de largura — sm da base já é o degrau "1 campo" */}
+      <DialogContent>
         <DialogHeader>
           <DialogTitle>Capacidade de {primeiro}</DialogTitle>
           <DialogDescription>

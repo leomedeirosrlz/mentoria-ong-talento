@@ -26,11 +26,20 @@ import { Textarea } from "@/components/ui/textarea";
 export function EncerrarTrilhaDialog({
   duplaId,
   trigger,
+  open: openProp,
+  onOpenChange: onOpenChangeProp,
 }: {
   duplaId: string;
-  trigger?: React.ReactElement;
+  /** Elemento do trigger — default é o botão padrão da casa. `null` suprime:
+   *  o menu "Mais" da ficha abre o dialog controlado (REALIZA-157). */
+  trigger?: React.ReactElement | null;
+  /** Modo controlado (opcional): o pai segura o estado. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }) {
-  const [open, setOpen] = useState(false);
+  const [openInt, setOpenInt] = useState(false);
+  const open = openProp ?? openInt;
+  const setOpen = onOpenChangeProp ?? setOpenInt;
   const [tipo, setTipo] = useState<"concluida" | "encerrada">("concluida");
   const [devolutivaLen, setDevolutivaLen] = useState(0);
   const [pending, start] = useTransition();
@@ -48,8 +57,8 @@ export function EncerrarTrilhaDialog({
         }
         toast.success(
           tipo === "concluida"
-            ? "Trilha concluída. A devolutiva chegou ao PDM."
-            : "Trilha encerrada. A devolutiva chegou ao PDM."
+            ? "Trilha concluída. A devolutiva chegou ao PDM — a avaliação geral segue por notificação."
+            : "Trilha encerrada. A devolutiva chegou ao PDM — a avaliação geral segue por notificação."
         );
         setOpen(false);
         router.refresh();
@@ -59,19 +68,33 @@ export function EncerrarTrilhaDialog({
     });
   }
 
+  // estado fresco por abertura — ajuste na borda de subida do `open`: no
+  // modo controlado a abertura vem da prop e o Base UI não reemite
+  // onOpenChange (mesmo padrão do RemanejarDuplaDialog)
+  const [abertoAntes, setAbertoAntes] = useState(open);
+  if (open !== abertoAntes) {
+    setAbertoAntes(open);
+    if (open) {
+      setTipo("concluida");
+      setDevolutivaLen(0);
+    }
+  }
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger
-        render={
-          trigger ?? (
-            <Button variant="outline" size="sm">
-              <FlagCheckered size={15} />
-              Encerrar trilha
-            </Button>
-          )
-        }
-      />
-      <DialogContent className="sm:max-w-lg">
+      {trigger !== null && (
+        <DialogTrigger
+          render={
+            trigger ?? (
+              <Button variant="outline" size="sm">
+                <FlagCheckered size={15} />
+                Encerrar trilha
+              </Button>
+            )
+          }
+        />
+      )}
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Encerrar a trilha de especialista</DialogTitle>
           <DialogDescription>
@@ -95,8 +118,8 @@ export function EncerrarTrilhaDialog({
               <span>
                 <span className="font-medium">Concluir a trilha</span>
                 <span className="block text-xs text-muted-foreground">
-                  Os objetivos foram alcançados. Pode ser antes do 5º
-                  encontro, como manda o guia.
+                  Os objetivos foram alcançados. Pode ser antes da 5ª
+                  sessão, como manda o guia.
                 </span>
               </span>
             </label>
@@ -127,7 +150,7 @@ export function EncerrarTrilhaDialog({
               required
               minLength={3}
               maxLength={300}
-              placeholder="ex.: objetivos alcançados no 4º encontro"
+              placeholder="ex.: objetivos alcançados na 4ª sessão"
             />
           </div>
 

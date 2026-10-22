@@ -1,10 +1,18 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { getContatos, getMe } from "@/lib/queries";
+import {
+  getContatos,
+  getCronogramas,
+  getDocumentoTemplates,
+  getMe,
+  getRelatorioLinks,
+  getTurmaInscricoesAguardando,
+} from "@/lib/queries";
 import { createClient } from "@/lib/supabase/server";
 import { demoAtivo } from "@/lib/demo/mode";
-import { demoDuplas } from "@/lib/demo/queries";
+import { demoDuplas, demoMentorados, demoPessoas } from "@/lib/demo/queries";
 import { PageHeader } from "@/components/page-header";
+import { RelatorioLinksCard } from "@/components/relatorio-links-card";
 import { RelatorioBuilder } from "./relatorio-builder";
 import type { DuplaFonte, PessoaFonte } from "@/lib/relatorio";
 
@@ -18,6 +26,14 @@ export default async function RelatoriosPage() {
   let duplas: DuplaFonte[];
   let profs: PessoaFonte[];
   let mentorados: PessoaFonte[];
+  // fila "Sem dupla" de todas as turmas (turma_inscricoes) + o painel de
+  // links públicos (170) com os seletores dos recortes ciclo/assinaturas
+  const [inscricoes, links, cronogramas, templates] = await Promise.all([
+    getTurmaInscricoesAguardando(null),
+    getRelatorioLinks(),
+    getCronogramas(),
+    getDocumentoTemplates(),
+  ]);
 
   if (await demoAtivo()) {
     const dd = demoDuplas("coordenacao");
@@ -61,6 +77,24 @@ export default async function RelatoriosPage() {
       cidade: d.mentorado.cidade ?? null,
       uf: d.mentorado.uf ?? null,
     }));
+    // pessoas da fila que não estão em dupla nenhuma não chegam pelos mapas
+    // derivados de `duplas` — resolve no dataset demo completo (mesma
+    // regra da query real, que lê as tabelas inteiras)
+    if (inscricoes.length) {
+      const todasProfs = new Map(demoPessoas("coordenacao").map((p) => [p.id, p]));
+      const todasMents = new Map(demoMentorados("coordenacao").map((m) => [m.id, m]));
+      const temProf = new Set(profs.map((p) => p.id));
+      const temMent = new Set(mentorados.map((m) => m.id));
+      for (const i of inscricoes) {
+        if (i.papel_esperado === "mentor") {
+          const p = todasProfs.get(i.profile_id);
+          if (p && !temProf.has(p.id)) profs.push(pessoaFonte(p));
+        } else {
+          const m = todasMents.get(i.mentorado_id);
+          if (m && !temMent.has(m.id)) mentorados.push(pessoaFonte(m));
+        }
+      }
+    }
   } else {
     const supabase = await createClient();
     // profiles: grant por coluna da 0026 — email/whatsapp ficam de fora da
@@ -92,6 +126,11 @@ export default async function RelatoriosPage() {
     );
   }
 
+  // turma que só existe na fila (T3 recém-inscrita, sem dupla ainda) também
+  // entra no seletor — senão a fila dela ficaria invisível no builder
+  turmas = [...new Set([...turmas, ...inscricoes.map((i) => i.turma)])].sort(
+    (a, b) => b.localeCompare(a, "pt-BR")
+  );
   return (
     <div className="space-y-6">
       <PageHeader
@@ -99,11 +138,20 @@ export default async function RelatoriosPage() {
         title="Relatórios"
         meta="Escolha turma, granularidade e colunas — a grade abaixo é livre: redimensione, ordene e exporte"
       />
+      <RelatorioLinksCard
+        links={links}
+        turmas={turmas}
+        cronogramas={cronogramas}
+        templates={templates}
+      />
       <RelatorioBuilder
         turmas={turmas}
         duplas={duplas}
         profs={profs}
         mentorados={mentorados}
+        inscricoes={inscricoes}
+        cronogramas={cronogramas}
+        templates={templates}
       />
     </div>
   );

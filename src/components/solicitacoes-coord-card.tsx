@@ -47,8 +47,9 @@ function efetivoDe(s: SolicitacaoEspecialista) {
   return s.status_efetivo ?? s.status;
 }
 
-/** Linha de triagem: pedido do jovem sem dupla DPP — liberar exige definir a
- *  turma (reconhecer_solicitacao grava a turma e vira 'aberta'). */
+/** Linha de triagem: pedido do jovem sem dupla DPP. Liberar vira 'aberta';
+ *  a turma é opcional (pool global de especialistas, 0101) — definida aqui
+ *  ou resolvida na efetivação pelo cronograma vigente. */
 function TriagemItem({
   s,
   turmas,
@@ -102,7 +103,7 @@ function TriagemItem({
             items={Object.fromEntries(turmas.map((t) => [t, t]))}
           >
             <SelectTrigger size="sm" aria-label="Turma da sessão">
-              <SelectValue placeholder="Escolha a turma" />
+              <SelectValue placeholder="Turma (opcional)" />
             </SelectTrigger>
             <SelectContent>
               {turmas.map((t) => (
@@ -115,10 +116,10 @@ function TriagemItem({
         </div>
         <Button
           size="sm"
-          disabled={!turma || pendente}
+          disabled={pendente}
           onClick={() =>
             start(async () => {
-              const r = await reconhecerSolicitacao(s.id, turma!);
+              const r = await reconhecerSolicitacao(s.id, turma);
               if (r.error) toast.error(r.error);
               else toast.success("Pedido liberado para os especialistas.");
             })
@@ -128,13 +129,17 @@ function TriagemItem({
           Liberar
         </Button>
       </div>
+      <p className="text-xs text-muted-foreground">
+        Sem turma definida, a dupla herda a turma do jovem (ou o cronograma
+        vigente) na efetivação.
+      </p>
     </li>
   );
 }
 
 /** Card do dashboard da coordenação: pedidos de especialista que pedem
- *  atenção — a fila de triagem (pedidos do jovem sem dupla DPP, que só saem
- *  com turma definida) e os pedidos em aberto/em negociação, com estado
+ *  atenção — a fila de triagem (pedidos do jovem sem dupla DPP; a turma é
+ *  opcional desde a 0101) e os pedidos em aberto/em negociação, com estado
  *  honesto e cancelamento. A lista chega por prop com o escopo da query.
  *  Sem nada acionável o card não renderiza (empty state honesto).
  *  `className` recebe o placement do grid da home (rail, sob os avisos). */
@@ -144,7 +149,8 @@ export function SolicitacoesCoordCard({
   className,
 }: {
   solicitacoes: SolicitacaoEspecialista[];
-  /** Labels de turma pra triagem — vêm dos cronogramas ativos (0061). */
+  /** Labels de turma pra triagem — vêm dos cronogramas (0061); opcional
+   *  desde a 0101 (pool global). */
   turmas: string[];
   /** placement no grid da home — merge no <Card> raiz */
   className?: string;

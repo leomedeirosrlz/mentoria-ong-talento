@@ -1,0 +1,707 @@
+<!-- MOCKUP jovem-especialistas v6 — final: base v4 + ciclo de vida (v5) + card-CTA e negociação de horário (v3) -->
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mockup — Especialistas · v6 final</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --brand-lime:hsl(78 56% 53%);--brand-ink:hsl(0 0% 15%);--background:hsl(75 10% 95%);--card:#fff;
+  --muted:hsl(75 7% 93%);--muted-foreground:hsl(75 4% 40%);--accent:hsl(75 8% 91%);--border:hsl(75 6% 87%);
+  --input:hsl(75 8% 54%);--ok:hsl(78 58% 38%);--ok-text:hsl(78 55% 30%);--warn:hsl(43 95% 44%);--warn-text:hsl(43 90% 28%);
+  --danger:hsl(0 80% 48%);--danger-text:hsl(0 75% 38%);--amber:hsl(48 100% 60%);--amber-soft:hsl(48 100% 92%);
+  --lime-soft:hsl(78 55% 92%);--radius:.75rem;--shadow:0 1px 2px hsl(75 10% 20%/.05),0 4px 14px hsl(75 10% 20%/.05);
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;font-family:Inter,system-ui,-apple-system,sans-serif;font-size:15px;line-height:1.45;color:var(--brand-ink);background:var(--background);-webkit-font-smoothing:antialiased}
+svg.i{width:20px;height:20px;flex:none;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+svg.s{width:16px;height:16px}
+a{color:inherit;text-decoration:none}
+h1,h2,h3,p{margin:0}
+button{font:inherit;color:inherit;cursor:pointer}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.rd{position:absolute;opacity:0;width:1px;height:1px;pointer-events:none}
+*:focus-visible{outline:3px solid hsl(220 90% 50%);outline-offset:2px}
+@media(prefers-reduced-motion:no-preference){.btn,.pill-v,.chip{transition:background .15s,border-color .15s}}
+
+/* ---------- prancheta (apresentação) ---------- */
+.board-head{margin:10px;background:hsl(60 9% 13%);border:1px solid hsl(60 8% 22%);border-radius:14px;padding:13px 16px;display:flex;flex-wrap:wrap;align-items:center;gap:8px 18px;font-size:13px;color:hsl(60 8% 78%)}
+.board-head b{color:var(--brand-lime);letter-spacing:.03em}
+.board-head .dir{color:hsl(60 6% 70%);flex:1 1 320px;max-width:90ch}
+.board-head nav{display:flex;gap:6px;flex-wrap:wrap}
+.board-head nav a{font-size:13px;font-weight:600;color:hsl(60 8% 88%);border:1px solid hsl(60 8% 34%);padding:0 14px;min-height:44px;display:inline-flex;align-items:center;border-radius:999px}
+.board-head nav a:hover{border-color:var(--brand-lime);color:var(--brand-lime)}
+.vbar{margin:0 10px 10px;background:var(--card);border:1px solid var(--border);border-radius:14px;padding:10px 12px;box-shadow:var(--shadow)}
+.vbar .row{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px}
+.vbar .row+.row{margin-top:8px;padding-top:8px;border-top:1px dashed var(--border)}
+.vbar .lbl{font-size:13px;font-weight:700;color:var(--muted-foreground);margin-right:2px}
+.pill-v{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:0 16px;border:1px solid var(--border);border-radius:999px;background:var(--background);font-size:14px;font-weight:600;cursor:pointer;user-select:none}
+.pill-v:hover{background:var(--accent)}
+#v-m:checked~.app label[for=v-m],#v-e:checked~.app label[for=v-e],#v-c:checked~.app label[for=v-c],#v-d:checked~.app label[for=v-d],
+#s-home:checked~.app label[for=s-home],#s-esp:checked~.app label[for=s-esp],
+#p-ana:checked~.app label[for=p-ana],#p-caio:checked~.app label[for=p-caio],#p-vazio:checked~.app label[for=p-vazio]{background:var(--brand-ink);color:#fff;border-color:var(--brand-ink)}
+#v-m:focus-visible~.app label[for=v-m],#v-e:focus-visible~.app label[for=v-e],#v-c:focus-visible~.app label[for=v-c],#v-d:focus-visible~.app label[for=v-d],
+#s-home:focus-visible~.app label[for=s-home],#s-esp:focus-visible~.app label[for=s-esp],
+#p-ana:focus-visible~.app label[for=p-ana],#p-caio:focus-visible~.app label[for=p-caio],#p-vazio:focus-visible~.app label[for=p-vazio]{outline:3px solid hsl(220 90% 50%);outline-offset:2px}
+
+/* visões */
+.view{display:none}
+#v-m:checked~.app .view-m,#v-e:checked~.app .view-e,#v-c:checked~.app .view-c,#v-d:checked~.app .view-d{display:block}
+.vbar .row.only-m{display:none}
+#v-m:checked~.app .vbar .row.only-m{display:flex}
+.scr{display:none}
+#s-home:checked~.app .scr-home,#s-esp:checked~.app .scr-esp{display:block}
+.pa,.pc,.pv{display:none}
+#p-ana:checked~.app .pa,#p-caio:checked~.app .pc,#p-vazio:checked~.app .pv{display:block}
+
+/* ---------- chrome do produto ---------- */
+.stage{margin:0 10px;border:1px solid var(--border);border-radius:16px;background:var(--background);overflow:hidden}
+.view-m{display:none}
+.shell{display:block}
+.side{display:none}
+.tabbar{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--card);border-top:1px solid var(--border);display:grid;grid-template-columns:repeat(5,1fr);padding-bottom:env(safe-area-inset-bottom)}
+.tab{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-height:56px;font-size:12px;font-weight:600;color:var(--muted-foreground);border-radius:10px;margin:4px 2px}
+.tab.on{background:var(--amber);color:var(--brand-ink)}
+.main{padding:16px 14px 90px;max-width:900px;margin:0 auto}
+.brand{display:flex;align-items:center;gap:8px;font-weight:800;font-size:17px;letter-spacing:-.01em}
+.brand i{width:26px;height:26px;border-radius:8px;background:var(--brand-lime);display:grid;place-items:center;font-style:normal;font-size:13px;color:var(--brand-ink)}
+.top{display:flex;align-items:center;gap:12px;padding:8px 14px;background:var(--card);border-bottom:1px solid var(--border);min-height:60px}
+.top nav{display:none;gap:4px;margin-left:12px}
+.top nav a{min-height:44px;display:inline-flex;align-items:center;padding:0 12px;border-radius:10px;font-size:14px;font-weight:600;color:var(--muted-foreground)}
+.top nav a.on{background:var(--lime-soft);color:var(--brand-ink)}
+.who{margin-left:auto;display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600}
+.av{width:32px;height:32px;border-radius:50%;background:var(--brand-lime);display:grid;place-items:center;font-weight:700;font-size:12px}
+.av.y{background:var(--amber)}
+.menu-b{display:inline-flex;align-items:center;justify-content:center;min-width:44px;min-height:44px;border:1px solid var(--border);border-radius:10px;background:var(--card)}
+@media(min-width:768px){.top nav{display:flex}.menu-b{display:none}}
+@media(min-width:1024px){
+  .shell{display:grid;grid-template-columns:230px 1fr;min-height:640px}
+  .side{display:flex;flex-direction:column;gap:4px;padding:16px 12px;background:var(--card);border-right:1px solid var(--border)}
+  .side .brand{padding:6px 10px 16px}
+  .side a{display:flex;align-items:center;gap:10px;min-height:44px;padding:0 12px;border-radius:10px;font-weight:600;font-size:14px;color:var(--muted-foreground)}
+  .side a.on{background:var(--amber);color:var(--brand-ink)}
+  .tabbar{display:none}
+  .main{padding:28px 32px 48px}
+}
+.view-m.on-m{display:block}
+#v-m:checked~.app .view-m{display:block}
+
+/* ---------- componentes ---------- */
+.scope{display:flex;gap:10px;align-items:flex-start;background:var(--lime-soft);border:1px solid hsl(78 40% 78%);border-radius:var(--radius);padding:10px 12px;font-size:13px;margin-bottom:14px}
+.scope.y{background:var(--amber-soft);border-color:hsl(48 80% 74%)}
+.scope svg{margin-top:1px}
+.scope b{font-weight:700}
+.h1{font-size:24px;font-weight:800;letter-spacing:-.02em;line-height:1.2}
+.sub{color:var(--muted-foreground);font-size:14px;margin-top:4px}
+.sec{margin-top:22px}
+.sec>h2{font-size:12px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted-foreground);font-weight:700;margin-bottom:10px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:14px;box-shadow:var(--shadow)}
+.card+.card{margin-top:10px}
+.card h3{font-size:16px;font-weight:700;line-height:1.3}
+.muted{color:var(--muted-foreground)}
+.small{font-size:13px}
+.tiny{font-size:12px}
+.row{display:flex;gap:10px;align-items:center}
+.wrap{flex-wrap:wrap}
+.grow{flex:1;min-width:0}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:0 16px;border-radius:10px;border:1px solid var(--input);background:var(--card);font-weight:600;font-size:14px}
+.btn:hover{background:var(--accent)}
+.btn.p{background:var(--brand-lime);border-color:var(--brand-lime);color:var(--brand-ink)}
+.btn.p:hover{background:hsl(78 56% 47%)}
+.btn.k{background:var(--brand-ink);color:#fff;border-color:var(--brand-ink)}
+.btn.d{border-color:var(--danger);color:var(--danger-text)}
+.btn.link{border-color:transparent;background:transparent;text-decoration:underline;text-underline-offset:3px;padding:0 8px}
+.btn[disabled],.btn.off{opacity:1;background:var(--muted);border-color:var(--border);color:var(--muted-foreground);cursor:not-allowed}
+.acts{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.tag{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:700;padding:3px 9px;border-radius:999px;border:1px solid var(--border);background:var(--muted);color:var(--brand-ink);white-space:nowrap}
+.tag.ok{background:var(--lime-soft);border-color:hsl(78 40% 74%);color:var(--ok-text)}
+.tag.wn{background:var(--amber-soft);border-color:hsl(48 80% 70%);color:var(--warn-text)}
+.tag.rk{background:hsl(0 90% 96%);border-color:hsl(0 70% 80%);color:var(--danger-text)}
+.tag.lk{background:var(--muted);color:var(--muted-foreground)}
+.ava{width:44px;height:44px;border-radius:50%;background:var(--lime-soft);border:1px solid hsl(78 40% 74%);display:grid;place-items:center;font-weight:700;flex:none;font-size:14px}
+.ava.sm{width:36px;height:36px;font-size:12px}
+.ava.g{background:var(--muted);border-color:var(--border);color:var(--muted-foreground)}
+.ava.y{background:var(--amber-soft);border-color:hsl(48 80% 70%)}
+.bar{height:8px;border-radius:99px;background:var(--muted);overflow:hidden}
+.bar i{display:block;height:100%;background:var(--ok);border-radius:99px}
+.three{display:grid;gap:8px;grid-template-columns:1fr}
+.three>div{border:1px solid var(--border);border-radius:var(--radius);background:var(--card);padding:10px 12px;font-size:13px}
+.three>div.here{border:2px solid var(--brand-ink)}
+.three b{display:flex;align-items:center;gap:6px;font-size:14px;margin-bottom:2px}
+@media(min-width:768px){.three{grid-template-columns:repeat(3,1fr)}}
+
+/* home / CTA */
+.cta{display:block;border-radius:var(--radius);border:1px solid hsl(48 80% 62%);background:var(--amber-soft);padding:14px;box-shadow:var(--shadow)}
+.cta.quiet{background:var(--card);border-color:var(--border)}
+.cta .t{font-weight:700;font-size:16px}
+.cta .go{display:inline-flex;align-items:center;gap:6px;min-height:44px;font-weight:700;font-size:14px;margin-top:6px;padding:0 16px;border-radius:10px;background:var(--brand-ink);color:#fff}
+.cta.quiet .go{background:var(--card);color:var(--brand-ink);border:1px solid var(--input)}
+.live{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--warn-text)}
+.live::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--warn)}
+.agenda-li{display:flex;gap:12px;align-items:flex-start;padding:10px 0}
+.agenda-li+.agenda-li{border-top:1px solid var(--border)}
+.when{width:54px;flex:none;text-align:center;font-size:12px;font-weight:700;color:var(--muted-foreground);line-height:1.2}
+.when b{display:block;font-size:20px;color:var(--brand-ink)}
+
+/* ciclo de vida */
+.life{list-style:none;margin:0;padding:0;display:grid;gap:0}
+.life li{position:relative;display:flex;gap:10px;padding:0 0 12px 0;font-size:13px}
+.life li::before{content:"";position:absolute;left:11px;top:24px;bottom:0;width:2px;background:var(--border)}
+.life li:last-child{padding-bottom:0}.life li:last-child::before{display:none}
+.life .dot{width:24px;height:24px;border-radius:50%;flex:none;display:grid;place-items:center;border:2px solid var(--border);background:var(--card);font-size:12px;font-weight:800;color:var(--muted-foreground)}
+.life .done .dot{background:var(--ok);border-color:var(--ok);color:#fff}
+.life .now .dot{background:var(--amber);border-color:var(--brand-ink);color:var(--brand-ink)}
+.life b{display:block;font-size:14px}
+.life .dt{color:var(--muted-foreground)}
+@media(min-width:768px){
+  .life{grid-template-columns:repeat(5,1fr);gap:8px}
+  .life li{flex-direction:column;padding:0}
+  .life li::before{left:28px;right:-8px;top:11px;bottom:auto;width:auto;height:2px}
+}
+
+/* sessões */
+.ses{display:grid;grid-template-columns:40px 1fr;gap:10px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:12px}
+.ses+.ses{margin-top:8px}
+.ses .n{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;font-weight:800;background:var(--muted);border:2px solid var(--border)}
+.ses.feita .n{background:var(--ok);border-color:var(--ok);color:#fff}
+.ses.conf{border:2px solid var(--ok)}.ses.conf .n{background:var(--lime-soft);border-color:var(--ok)}
+.ses.ag{border:2px solid var(--brand-ink)}.ses.ag .n{background:var(--amber);border-color:var(--brand-ink)}
+.ses.lock{background:var(--muted);border-style:dashed}
+.ses h3{font-size:15px}
+.ses .hd{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;justify-content:space-between}
+.quote{border-left:3px solid var(--amber);padding:2px 0 2px 10px;margin-top:8px;font-size:13px}
+.stars{display:inline-flex;gap:1px;color:var(--warn);vertical-align:middle}
+.stars svg{width:16px;height:16px;fill:currentColor;stroke:none}
+.stars .e{color:var(--border)}
+.nego{margin-top:10px;border:1px solid hsl(48 80% 62%);background:var(--amber-soft);border-radius:var(--radius);padding:12px;font-size:14px}
+.nego .t{font-weight:700;margin-bottom:6px}
+.nego ol{margin:8px 0 0;padding:0;list-style:none;display:grid;gap:6px;font-size:13px}
+.nego ol li{display:flex;gap:8px}
+.days{display:grid;gap:8px;margin-top:8px}
+.day{display:flex;flex-wrap:wrap;align-items:center;gap:6px;border:1px solid var(--border);border-radius:10px;padding:6px 8px;background:var(--card)}
+.day>span{width:64px;font-size:13px;font-weight:700;line-height:1.2}
+.day>span em{display:block;font-style:normal;font-weight:500;color:var(--muted-foreground);font-size:12px}
+.slot{position:relative;display:inline-block}
+.slot span{display:inline-flex;align-items:center;justify-content:center;min-width:56px;min-height:44px;padding:0 10px;border:1px solid var(--input);border-radius:10px;font-weight:700;font-size:14px;cursor:pointer;background:var(--card)}
+.slot span:hover{background:var(--accent)}
+.slot input:checked+span{background:var(--brand-ink);border-color:var(--brand-ink);color:#fff}
+.slot input:focus-visible+span{outline:3px solid hsl(220 90% 50%);outline-offset:2px}
+.slot.busy span{background:var(--muted);color:var(--muted-foreground);text-decoration:line-through;border-style:dashed;cursor:not-allowed}
+.legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;color:var(--muted-foreground);margin-top:8px}
+
+/* catálogo */
+.cat{display:grid;gap:10px}
+@media(min-width:768px){.cat{grid-template-columns:1fr 1fr}.cat .card+.card{margin-top:0}}
+.cat .card{display:flex;flex-direction:column;gap:8px}
+.per{font-size:13px;display:flex;gap:8px;align-items:flex-start}
+.per b{font-weight:700}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{display:inline-flex;align-items:center;min-height:44px;padding:0 14px;border:1px solid var(--input);border-radius:999px;background:var(--card);font-size:14px;font-weight:600}
+.chip.on{background:var(--brand-ink);color:#fff;border-color:var(--brand-ink)}
+.chip.off{background:var(--muted);color:var(--muted-foreground);border-color:var(--border)}
+
+/* form */
+.field{display:grid;gap:5px;margin-top:12px}
+.field label,.field .l{font-size:14px;font-weight:600}.field label{display:flex;align-items:flex-end;min-height:44px;padding-bottom:2px}
+.field input[type=text],.field textarea,.field select{font:inherit;font-size:16px;min-height:44px;padding:8px 12px;border:1px solid var(--input);border-radius:10px;background:#fff;width:100%;color:var(--brand-ink)}
+.field textarea{min-height:88px;resize:vertical}
+.field .hint{font-size:13px;color:var(--muted-foreground)}
+
+details.dd>summary{list-style:none;min-height:44px;display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:600;font-size:14px}
+details.dd>summary::-webkit-details-marker{display:none}
+details.dd>summary::after{content:"+";margin-left:auto;font-size:20px;font-weight:700;width:32px;text-align:center}
+details.dd[open]>summary::after{content:"–"}
+
+/* tabelas/linhas de adulto */
+.kpis{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+@media(min-width:768px){.kpis{grid-template-columns:repeat(4,1fr)}}
+.kpi{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:12px}
+.kpi b{display:block;font-size:26px;font-weight:800;line-height:1.1}
+.kpi span{font-size:13px;color:var(--muted-foreground)}
+.kpi.al{border:2px solid var(--warn);background:var(--amber-soft)}
+.trk{display:grid;gap:10px}
+@media(min-width:900px){.trk.two{grid-template-columns:1fr 1fr}.trk .card+.card{margin-top:0}}
+.facts{display:grid;grid-template-columns:repeat(2,1fr);gap:8px 12px;margin-top:10px;font-size:13px}
+.facts dt{color:var(--muted-foreground);font-size:12px}
+.facts dd{margin:0;font-weight:600}
+.mini{display:flex;gap:4px;margin-top:10px}
+.mini i{flex:1;height:8px;border-radius:99px;background:var(--border)}
+.mini i.f{background:var(--ok)}.mini i.c{background:var(--amber);outline:1px solid var(--brand-ink)}
+.grade{display:grid;gap:6px;grid-template-columns:1fr 1fr}
+@media(min-width:768px){.grade{grid-template-columns:repeat(4,1fr)}}
+.grade div{border:1px solid var(--border);border-radius:10px;padding:8px 10px;font-size:13px;background:var(--card)}
+.grade b{display:block;font-size:14px}
+.notice{border:1px solid var(--border);background:var(--muted);border-radius:var(--radius);padding:10px 12px;font-size:13px;display:flex;gap:8px}
+.alert{border:2px solid var(--warn);background:var(--amber-soft);border-radius:var(--radius);padding:12px;display:flex;gap:10px;font-size:14px}
+.ro{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--muted-foreground);border:1px dashed var(--input);padding:3px 10px;border-radius:999px}
+
+/* notas */
+.notes-w{margin:14px 10px 28px;background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px}
+.notes-w h2{font-size:18px;margin-bottom:6px}
+.notes-w h3{font-size:14px;margin:18px 0 6px}
+ul.notes{margin:0;padding-left:20px;font-size:14px}
+ul.notes li{margin:5px 0}
+.mx{width:100%;border-collapse:collapse;font-size:13px}
+.mx th{text-align:left;font-size:12px;background:var(--muted);padding:8px;border-bottom:1px solid var(--border)}
+.mx td{padding:8px;border-bottom:1px solid var(--border);vertical-align:top}
+.mx thead{display:none}
+.mx tr{display:block;padding:6px 0;border-bottom:2px solid var(--border)}
+.mx td{display:block;border:0;padding:3px 0}
+.mx td:first-child{font-weight:700;font-size:14px}
+.mx td[data-l]::before{content:attr(data-l) ": ";font-weight:700;color:var(--muted-foreground)}
+@media(min-width:900px){
+  .mx thead{display:table-header-group}.mx tr{display:table-row;padding:0}.mx td{display:table-cell;border-bottom:1px solid var(--border);padding:8px}
+  .mx td[data-l]::before{content:none}
+}
+.open{background:var(--amber-soft);border:1px solid hsl(48 80% 70%);border-radius:6px;padding:0 6px;font-weight:700;font-size:12px;color:var(--warn-text);white-space:nowrap}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+
+<!-- ícones -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<defs>
+<symbol id="i-home" viewBox="0 0 24 24"><path d="M3.5 10.6 12 3.4l8.5 7.2V20a1 1 0 0 1-1 1h-4.8v-5.6H9.3V21H4.5a1 1 0 0 1-1-1Z"/></symbol>
+<symbol id="i-cal" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="16" rx="2.5"/><path d="M3.5 9.8h17M8 3v4M16 3v4"/></symbol>
+<symbol id="i-people" viewBox="0 0 24 24"><circle cx="9" cy="8.5" r="3.3"/><path d="M3.5 19.5c.6-3.1 2.9-4.8 5.5-4.8s4.9 1.7 5.5 4.8"/><circle cx="16.8" cy="9.5" r="2.6"/><path d="M16.4 14.9c2.3.3 3.8 1.8 4.2 4.3"/></symbol>
+<symbol id="i-folder" viewBox="0 0 24 24"><path d="M3.5 7.5a2 2 0 0 1 2-2h3.6l2 2.4h7.4a2 2 0 0 1 2 2V18a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2Z"/></symbol>
+<symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="9.6" r="2.7"/><path d="M6.4 18.2c1-2.3 3.1-3.5 5.6-3.5s4.6 1.2 5.6 3.5"/></symbol>
+<symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></symbol>
+<symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></symbol>
+<symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="10" rx="2.5"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/></symbol>
+<symbol id="i-star" viewBox="0 0 24 24"><path d="m12 3.5 2.6 5.5 6 .8-4.4 4.2 1.1 6-5.3-2.9-5.3 2.9 1.1-6L3.4 9.8l6-.8Z"/></symbol>
+<symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 11v5M12 7.8v.1"/></symbol>
+<symbol id="i-back" viewBox="0 0 24 24"><path d="m14.5 6-6 6 6 6"/></symbol>
+<symbol id="i-next" viewBox="0 0 24 24"><path d="m9.5 6 6 6-6 6"/></symbol>
+<symbol id="i-chat" viewBox="0 0 24 24"><path d="M4 5.5h16v10.5H9.5L5.5 19.5V16H4Z"/></symbol>
+<symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.8 12S6 5.8 12 5.8 21.2 12 21.2 12 18 18.2 12 18.2 2.8 12 2.8 12Z"/><circle cx="12" cy="12" r="2.8"/></symbol>
+<symbol id="i-board" viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M8 9h8M8 13h5"/></symbol>
+<symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+<symbol id="i-warn" viewBox="0 0 24 24"><path d="M12 4 21 19.5H3Z"/><path d="M12 10v4.5M12 17v.1"/></symbol>
+<symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 21s6.5-5.6 6.5-11a6.5 6.5 0 0 0-13 0c0 5.4 6.5 11 6.5 11Z"/><circle cx="12" cy="10" r="2.3"/></symbol>
+</defs>
+</svg>
+
+<header class="board-head">
+  <span><b>MOCKUP</b> · jovem-especialistas · v6 (final)</span>
+  <span class="dir">Direção: base v4 (trilha explícita) + ciclo de vida com datas e cards de sessão (v5) + card-CTA vivo na home e negociação de horário dentro da sessão (v3). Pedir trilha ≠ agendar sessão ≠ pedir apoio à coordenação — três conceitos, três lugares. A coordenação só observa.</span>
+  <nav aria-label="Âncoras"><a href="#stage">Mockup</a><a href="#notas">Notas</a><a href="#matriz">Matriz</a><a href="#abertas">Decisões em aberto</a></nav>
+</header>
+
+<input class="rd" type="radio" name="v" id="v-m" checked aria-label="Ver como Mentorado">
+<input class="rd" type="radio" name="v" id="v-e" aria-label="Ver como Mentor especialista">
+<input class="rd" type="radio" name="v" id="v-c" aria-label="Ver como Coordenação">
+<input class="rd" type="radio" name="v" id="v-d" aria-label="Ver como Mentor DPP">
+<input class="rd" type="radio" name="s" id="s-home" checked aria-label="Tela Início">
+<input class="rd" type="radio" name="s" id="s-esp" aria-label="Tela Especialistas">
+<input class="rd" type="radio" name="p" id="p-ana" checked aria-label="Estado Ana">
+<input class="rd" type="radio" name="p" id="p-caio" aria-label="Estado Caio">
+<input class="rd" type="radio" name="p" id="p-vazio" aria-label="Estado sem trilha e sem pedido">
+
+<div class="app">
+<div class="vbar" role="group" aria-label="Seletor de visão">
+  <div class="row"><span class="lbl">Ver como:</span>
+    <label class="pill-v" for="v-m">Mentorado</label>
+    <label class="pill-v" for="v-e">Mentor especialista</label>
+    <label class="pill-v" for="v-c">Coordenação</label>
+    <label class="pill-v" for="v-d">Mentor DPP</label>
+  </div>
+  <div class="row only-m"><span class="lbl">Tela:</span>
+    <label class="pill-v" for="s-home">Início (home)</label>
+    <label class="pill-v" for="s-esp">Especialistas</label>
+  </div>
+  <div class="row only-m"><span class="lbl">Estado:</span>
+    <label class="pill-v" for="p-ana">Ana · trilha ativa</label>
+    <label class="pill-v" for="p-caio">Caio · pedido no mural</label>
+    <label class="pill-v" for="p-vazio">Sem trilha nem pedido</label>
+  </div>
+</div>
+
+<main class="stage" id="stage">
+
+<!-- ═══════════════ VISÃO · MENTORADO ═══════════════ -->
+<div class="view view-m">
+ <div class="shell">
+  <aside class="side" aria-label="Navegação principal">
+    <div class="brand"><i>R</i>Realiza.vc</div>
+    <a class="on" href="#" aria-current="page"><svg class="i"><use href="#i-home"/></svg>Início</a>
+    <a href="#"><svg class="i"><use href="#i-cal"/></svg>Agenda</a>
+    <a href="#"><svg class="i"><use href="#i-people"/></svg>Pessoas</a>
+    <a href="#"><svg class="i"><use href="#i-folder"/></svg>Materiais</a>
+    <a href="#"><svg class="i"><use href="#i-user"/></svg>Perfil</a>
+  </aside>
+  <div class="main">
+
+  <!-- ===== HOME ===== -->
+  <div class="scr scr-home">
+    <div class="pa"><p class="h1">Oi, Ana</p><p class="sub">Terça, 7 de outubro · T1 · encontro 8 de 16</p></div>
+    <div class="pc pv"><p class="h1">Oi, Caio</p><p class="sub">Terça, 7 de outubro · T2 · encontro 5 de 16 amanhã</p></div>
+
+    <div class="sec" style="margin-top:16px"><h2>Próximo encontro com o André</h2>
+      <div class="pa"><div class="card"><div class="row wrap"><div class="grow"><h3>Encontro 8 · T1 — hoje, 19h</h3><p class="small muted">Online · Google Meet · com André Lima</p></div><span class="tag ok"><svg class="i s"><use href="#i-cal"/></svg>Confirmado</span></div>
+        <div class="acts"><button class="btn p" type="button">Entrar no Meet</button><button class="btn" type="button">Reagendar</button></div></div></div>
+      <div class="pc pv"><div class="card"><div class="row wrap"><div class="grow"><h3>Encontro 5 · T2 — amanhã (qua), 19h</h3><p class="small muted">Presencial · Biblioteca Comunitária · com André Lima</p></div><span class="tag wn"><svg class="i s"><use href="#i-pin"/></svg>Local a confirmar</span></div>
+        <div class="acts"><button class="btn" type="button">Reagendar</button></div></div></div>
+    </div>
+
+    <div class="sec"><h2>Especialistas</h2>
+      <!-- card-CTA com estado vivo -->
+      <div class="pa"><label class="cta" for="s-esp" style="cursor:pointer">
+        <span class="live">Trilha em andamento · sessão 3 de 5</span>
+        <p class="t" style="margin-top:4px">Carreira e portfólio com Luísa Prado</p>
+        <p class="small">Sex 10/out · 16h–16h50 · confirmada. A sessão 4 ainda precisa de horário.</p>
+        <span class="go">Abrir minha trilha <svg class="i s"><use href="#i-next"/></svg></span></label></div>
+      <div class="pc"><label class="cta" for="s-esp" style="cursor:pointer">
+        <span class="live">Seu pedido está no mural</span>
+        <p class="t" style="margin-top:4px">Finanças · desde 30 set (7 dias)</p>
+        <p class="small">Nenhum especialista aceitou ainda. Você é avisado assim que alguém aceitar.</p>
+        <span class="go">Ver meu pedido <svg class="i s"><use href="#i-next"/></svg></span></label></div>
+      <div class="pv"><label class="cta quiet" for="s-esp" style="cursor:pointer">
+        <div class="row wrap"><div class="grow"><p class="t">Quer o apoio de um especialista?</p><p class="small muted">Carreira, finanças, vendas… 5 sessões em ~3 meses.</p></div>
+        <span class="go" style="margin-top:0">Conhecer <svg class="i s"><use href="#i-next"/></svg></span></div></label></div>
+    </div>
+
+    <div class="sec"><h2>Esta semana</h2>
+      <div class="card" style="padding:4px 14px">
+        <div class="pa">
+          <div class="agenda-li"><div class="when">TER<b>7</b></div><div><p style="font-weight:600">Encontro 8 com o André</p><p class="small muted">19h · Meet</p></div></div>
+          <div class="agenda-li"><div class="when">QUI<b>9</b></div><div><p style="font-weight:600">Roda de conversa com as famílias</p><p class="small muted">19h30 · evento oficial da T1</p></div></div>
+          <div class="agenda-li"><div class="when">SEX<b>10</b></div><div><p style="font-weight:600">Sessão 3 · Luísa Prado <span class="tag ok" style="margin-left:4px">Especialista</span></p><p class="small muted">16h–16h50 · Carreira e portfólio</p></div></div>
+          <div class="agenda-li"><div class="when" style="color:var(--danger-text)">SEX<b style="color:inherit">10</b></div><div><p style="font-weight:600">Avaliar o encontro 7</p><p class="small muted"><svg class="i s" style="display:inline;vertical-align:-3px"><use href="#i-clock"/></svg> Fecha sexta às 23h59 · pendente</p></div></div>
+        </div>
+        <div class="pc pv">
+          <div class="agenda-li"><div class="when">QUA<b>8</b></div><div><p style="font-weight:600">Encontro 5 com o André</p><p class="small muted">19h · presencial · local a confirmar</p></div></div>
+          <div class="agenda-li"><div class="when">—<b>·</b></div><div><p style="font-weight:600">Registro do encontro 4</p><p class="small muted">Ainda pendente — o André preenche; ele vai te lembrar.</p></div></div>
+        </div>
+      </div>
+    </div>
+    <p class="tiny muted" style="margin-top:14px">Nav do jovem intacta (5 itens): “Especialistas” não é aba — entra pelo card acima. “Início” permanece âmbar nas duas telas.</p>
+  </div>
+
+  <!-- ===== ESPECIALISTAS ===== -->
+  <div class="scr scr-esp">
+    <label for="s-home" class="btn link" style="padding-left:0;margin-left:-4px"><svg class="i s"><use href="#i-back"/></svg>Início</label>
+    <h1 class="h1">Especialistas</h1>
+    <p class="sub">Apoio de uma pessoa da rede em um tema específico, em uma trilha de 5 sessões (~3 meses). Uma trilha por jovem em cada ciclo.</p>
+
+    <div class="sec" style="margin-top:14px"><div class="three" role="note" aria-label="Três coisas diferentes">
+      <div class="here"><b><svg class="i s"><use href="#i-board"/></svg>Pedir uma trilha</b>É o que esta página faz. Seu pedido vai ao mural e um especialista aceita. Não passa pela coordenação.</div>
+      <div><b><svg class="i s"><use href="#i-cal"/></svg>Agendar uma sessão</b>Só existe dentro de uma trilha ativa, nos horários da grade do especialista.</div>
+      <div><b><svg class="i s"><use href="#i-chat"/></svg>Pedir apoio à coordenação</b>Outra coisa: é um chamado (agenda, metodologia, urgência…). Link no fim da página.</div>
+    </div></div>
+
+    <!-- ===== ANA ===== -->
+    <div class="pa">
+      <div class="sec"><h2>Minha trilha</h2>
+        <div class="card">
+          <div class="row"><span class="ava">LP</span><div class="grow"><h3>Carreira e portfólio</h3><p class="small muted">com Luísa Prado · especialista em carreira/portfólio</p></div></div>
+          <div class="row wrap" style="margin-top:12px;gap:6px 14px"><span class="tag ok"><svg class="i s"><use href="#i-check"/></svg>Em andamento</span><span class="small"><b>Sessão 3 de 5</b> · prazo até 19 dez (~3 meses)</span></div>
+          <div class="mini" aria-hidden="true"><i class="f"></i><i class="f"></i><i class="c"></i><i></i><i></i></div>
+          <ol class="life" style="margin-top:16px" aria-label="Ciclo de vida da trilha">
+            <li class="done"><span class="dot"><svg class="i s" style="width:13px;height:13px;stroke-width:3"><use href="#i-check"/></svg></span><div><b>Pedido</b><span class="dt">12 set</span></div></li>
+            <li class="done"><span class="dot"><svg class="i s" style="width:13px;height:13px;stroke-width:3"><use href="#i-check"/></svg></span><div><b>No mural</b><span class="dt">12 a 19 set</span></div></li>
+            <li class="done"><span class="dot"><svg class="i s" style="width:13px;height:13px;stroke-width:3"><use href="#i-check"/></svg></span><div><b>Luísa aceitou</b><span class="dt">19 set</span></div></li>
+            <li class="now"><span class="dot">4</span><div><b>Em andamento</b><span class="dt">hoje · sessão 3</span></div></li>
+            <li><span class="dot">5</span><div><b>Concluída + devolutiva</b><span class="dt">até 19 dez</span></div></li>
+          </ol>
+        </div>
+      </div>
+      <div class="sec"><h2>Sessões</h2>
+        <div class="ses feita"><div class="n"><svg class="i" style="stroke-width:3"><use href="#i-check"/></svg></div><div>
+          <div class="hd"><h3>Sessão 1</h3><span class="tag ok"><svg class="i s"><use href="#i-check"/></svg>Feita · sex 26 set</span></div>
+          <p class="small muted">Registro da Luísa entregue.</p></div></div>
+        <div class="ses feita"><div class="n"><svg class="i" style="stroke-width:3"><use href="#i-check"/></svg></div><div>
+          <div class="hd"><h3>Sessão 2</h3><span class="tag ok"><svg class="i s"><use href="#i-check"/></svg>Feita · sex 3 out</span></div>
+          <p class="small muted">Registro entregue · você avaliou:
+            <span class="stars" role="img" aria-label="4 de 5 estrelas"><svg class="i"><use href="#i-star"/></svg><svg class="i"><use href="#i-star"/></svg><svg class="i"><use href="#i-star"/></svg><svg class="i" style="color:var(--border)"><use href="#i-star"/></svg></span> 4</p>
+          <p class="quote muted">“Me ajudou a montar o portfólio.”</p></div></div>
+        <div class="ses conf"><div class="n">3</div><div>
+          <div class="hd"><h3>Sessão 3</h3><span class="tag ok"><svg class="i s"><use href="#i-cal"/></svg>Confirmada</span></div>
+          <p style="font-weight:600;margin-top:2px">Sex 10 out · 16h–16h50</p><p class="small muted">Online · link do Meet aparece 15 min antes.</p>
+          <div class="acts"><button class="btn" type="button">Remarcar</button></div>
+          <p class="tiny muted" style="margin-top:6px">Remarcar = escolher outro horário livre da grade da Luísa; ela é avisada.</p></div></div>
+        <div class="ses ag"><div class="n">4</div><div>
+          <div class="hd"><h3>Sessão 4</h3><span class="tag wn"><svg class="i s"><use href="#i-clock"/></svg>A agendar · sem horário</span></div>
+          <div class="nego" role="group" aria-label="Negociação de horário da sessão 4">
+            <p class="t">Luísa contrapropôs outro horário</p>
+            <ol><li><svg class="i s"><use href="#i-user"/></svg><span>Você sugeriu <b>seg 13 out · 17h</b></span></li>
+                <li><svg class="i s"><use href="#i-chat"/></svg><span>Luísa propôs <b>sex 17 out · 16h–16h50</b> “tenho um compromisso na segunda”</span></li></ol>
+            <div class="acts"><button class="btn p" type="button">Aceitar sex 17 · 16h</button><button class="btn" type="button">Propor outro</button></div>
+          </div>
+          <p class="small" style="margin-top:12px;font-weight:600">Ou escolha outro horário livre da Luísa (semana de 13 a 18 out)</p>
+          <p class="tiny muted">Só aparecem faixas da grade dela. Sessões de 50 min; o horário é a hora de início.</p>
+          <div class="days" role="group" aria-label="Horários livres da Luísa">
+            <div class="day"><span>Seg 13<em>14–18h</em></span>
+              <label class="slot"><input class="rd" type="radio" name="slot" aria-label="Seg 13 às 14h"><span>14h</span></label>
+              <label class="slot"><input class="rd" type="radio" name="slot" aria-label="Seg 13 às 15h"><span>15h</span></label>
+              <label class="slot busy"><input class="rd" type="radio" name="slot" disabled aria-label="Seg 13 às 16h ocupado"><span>16h</span></label>
+              <label class="slot busy"><input class="rd" type="radio" name="slot" disabled aria-label="Seg 13 às 17h ocupado"><span>17h</span></label></div>
+            <div class="day"><span>Qua 15<em>14–18h</em></span>
+              <label class="slot"><input class="rd" type="radio" name="slot" aria-label="Qua 15 às 14h"><span>14h</span></label>
+              <label class="slot"><input class="rd" type="radio" name="slot" checked aria-label="Qua 15 às 15h"><span>15h</span></label>
+              <label class="slot"><input class="rd" type="radio" name="slot" aria-label="Qua 15 às 16h"><span>16h</span></label>
+              <label class="slot"><input class="rd" type="radio" name="slot" aria-label="Qua 15 às 17h"><span>17h</span></label></div>
+            <div class="day"><span>Sáb 18<em>9–12h</em></span>
+              <label class="slot"><input class="rd" type="radio" name="slot" aria-label="Sáb 18 às 9h"><span>9h</span></label>
+              <label class="slot busy"><input class="rd" type="radio" name="slot" disabled aria-label="Sáb 18 às 10h ocupado"><span>10h</span></label>
+              <label class="slot"><input class="rd" type="radio" name="slot" aria-label="Sáb 18 às 11h"><span>11h</span></label></div>
+          </div>
+          <div class="legend"><span>Riscado e tracejado = ocupado</span><span>Preto = sua escolha</span></div>
+          <div class="acts"><button class="btn k" type="button">Sugerir qua 15 out · 15h</button></div>
+          <p class="tiny muted" style="margin-top:6px">Sugestão não é marcação: a sessão só fica confirmada quando a Luísa aceitar.</p></div></div>
+        <div class="ses lock"><div class="n"><svg class="i"><use href="#i-lock"/></svg></div><div>
+          <div class="hd"><h3>Sessão 5</h3><span class="tag lk"><svg class="i s"><use href="#i-lock"/></svg>Trancada</span></div>
+          <p class="small muted">Libera quando a sessão 4 tiver registro. Fecha a trilha com a devolutiva da Luísa.</p></div></div>
+      </div>
+      <div class="sec"><div class="notice"><svg class="i"><use href="#i-info"/></svg><span>Você já tem uma trilha neste ciclo (uma por jovem). Um novo pedido só abre depois que esta for concluída ou encerrada — por isso não há botão “pedir trilha” aqui.</span></div></div>
+    </div>
+
+    <!-- ===== CAIO ===== -->
+    <div class="pc">
+      <div class="sec"><h2>Meu pedido de trilha</h2>
+        <div class="card">
+          <div class="row wrap"><div class="grow"><h3>Finanças — organizar meu dinheiro</h3><p class="small muted">Preferência: Tomás Ribeiro (qualquer especialista pode aceitar)</p></div><span class="tag wn"><svg class="i s"><use href="#i-clock"/></svg>No mural há 7 dias</span></div>
+          <ol class="life" style="margin-top:16px" aria-label="Ciclo de vida do pedido">
+            <li class="done"><span class="dot"><svg class="i s" style="width:13px;height:13px;stroke-width:3"><use href="#i-check"/></svg></span><div><b>Pedido enviado</b><span class="dt">30 set</span></div></li>
+            <li class="now"><span class="dot">2</span><div><b>No mural</b><span class="dt">há 7 dias · 0 aceites</span></div></li>
+            <li><span class="dot">3</span><div><b>Especialista aceita</b><span class="dt">você é avisado</span></div></li>
+            <li><span class="dot">4</span><div><b>Em andamento</b><span class="dt">5 sessões · ~3 meses</span></div></li>
+            <li><span class="dot">5</span><div><b>Concluída + devolutiva</b><span class="dt">prazo conta do aceite</span></div></li>
+          </ol>
+          <details class="dd" style="margin-top:12px;border-top:1px solid var(--border);padding-top:4px"><summary>O que acontece depois</summary>
+            <ul class="small" style="margin:4px 0 8px;padding-left:18px"><li>Um especialista que se encaixar aceita o pedido — o aceite é de uma pessoa só.</li><li>Nasce sua trilha de 5 sessões e o prazo de ~3 meses começa a contar.</li><li>Você propõe horários <b>dentro da grade</b> do especialista; ele confirma ou contrapropõe.</li><li>O André acompanha a jornada, mas não participa das sessões.</li><li>A coordenação só observa — não escolhe nem agenda.</li></ul></details>
+          <details class="dd" style="border-top:1px solid var(--border)"><summary>Ver / editar o que pedi</summary>
+            <div class="field"><label>Tema</label><input type="text" value="Finanças e primeiro emprego" aria-label="Tema"></div>
+            <div class="field"><label>Quero alcançar</label><textarea aria-label="Objetivo">Aprender a organizar o dinheiro do estágio e montar uma reserva.</textarea></div>
+            <div class="acts"><button class="btn p" type="button">Salvar alterações</button><button class="btn d" type="button">Cancelar pedido</button></div>
+            <p class="tiny muted" style="margin-top:6px">Cancelar libera você para fazer um pedido novo.</p></details>
+        </div>
+      </div>
+      <p class="sec"></p>
+    </div>
+
+    <!-- ===== SEM TRILHA ===== -->
+    <div class="pv">
+      <div class="sec"><h2>Pedir uma trilha</h2>
+        <div class="card">
+          <h3>Conte o que você quer trabalhar</h3>
+          <p class="small muted">Seu pedido vai para o mural. Quem aceitar vira seu especialista por 5 sessões.</p>
+          <div class="field"><label for="f-tema">Tema</label><select id="f-tema"><option>Escolha um tema</option><option>Carreira e portfólio</option><option>Vendas e empreender</option><option>Projetos e apresentações</option><option>Finanças e primeiro emprego</option><option>Outro</option></select></div>
+          <div class="field"><span class="l">Prefere alguém? <span class="muted" style="font-weight:400">(opcional)</span></span><p class="hint">Toque em “Prefiro esta pessoa” no catálogo abaixo. Ninguém é obrigado a aceitar.</p></div>
+          <div class="field"><label for="f-obj">O que você quer alcançar?</label><textarea id="f-obj" placeholder="Ex.: montar meu primeiro currículo e me preparar para entrevistas."></textarea><span class="hint">2 ou 3 frases bastam.</span></div>
+          <div class="acts"><button class="btn p" type="button">Enviar pedido ao mural</button></div>
+          <p class="tiny muted" style="margin-top:8px">Você só pode ter um pedido ou trilha por vez. Isto não é um chamado à coordenação.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- catálogo -->
+    <div class="sec"><h2>Quem são os especialistas</h2>
+      <p class="small muted" style="margin:-4px 0 10px">Disponibilidade em períodos, só para você se orientar. Horários exatos aparecem dentro de uma trilha.</p>
+      <div class="cat">
+        <div class="card"><div class="row"><span class="ava">LP</span><div class="grow"><h3>Luísa Prado</h3><p class="small muted">Carreira e portfólio</p></div><span class="pa tag ok">Sua especialista</span></div>
+          <p class="per"><svg class="i s"><use href="#i-clock"/></svg><span><b>Períodos:</b> segunda, quarta e sexta à tarde · sábado de manhã</span></p>
+          <div class="pv"><button class="btn" type="button">Prefiro esta pessoa</button></div></div>
+        <div class="card"><div class="row"><span class="ava">RA</span><div class="grow"><h3>Ricardo Almeida</h3><p class="small muted">Vendas e empreender</p></div></div>
+          <p class="per"><svg class="i s"><use href="#i-clock"/></svg><span><b>Períodos:</b> terça e quinta à noite</span></p>
+          <div class="pv"><button class="btn" type="button">Prefiro esta pessoa</button></div></div>
+        <div class="card"><div class="row"><span class="ava g">BF</span><div class="grow"><h3>Beatriz Fontoura</h3><p class="small muted">Projetos e apresentações</p></div><span class="tag lk"><svg class="i s"><use href="#i-lock"/></svg>Indisponível</span></div>
+          <p class="per"><svg class="i s"><use href="#i-clock"/></svg><span>Sem vagas neste momento. Você pode pedir a trilha mesmo assim — outro especialista do tema pode aceitar.</span></p></div>
+        <div class="card"><div class="row"><span class="ava">TR</span><div class="grow"><h3>Tomás Ribeiro</h3><p class="small muted">Finanças e primeiro emprego</p></div><span class="pc tag wn">Sua preferência</span></div>
+          <p class="per"><svg class="i s"><use href="#i-clock"/></svg><span><b>Períodos:</b> segunda e sexta de manhã</span></p>
+          <div class="pv"><button class="btn" type="button">Prefiro esta pessoa</button></div></div>
+      </div>
+    </div>
+
+    <div class="sec"><div class="row wrap" style="border-top:1px solid var(--border);padding-top:12px"><span class="small muted grow">Algo travou na agenda, no método ou na plataforma?</span>
+      <button class="btn link" type="button"><svg class="i s"><use href="#i-chat"/></svg>Falar com a coordenação (abre um chamado)</button></div></div>
+  </div>
+
+  </div><!-- /main -->
+ </div><!-- /shell -->
+ <nav class="tabbar" aria-label="Navegação principal">
+   <a class="tab on" href="#" aria-current="page"><svg class="i"><use href="#i-home"/></svg>Início</a>
+   <a class="tab" href="#"><svg class="i"><use href="#i-cal"/></svg>Agenda</a>
+   <a class="tab" href="#"><svg class="i"><use href="#i-people"/></svg>Pessoas</a>
+   <a class="tab" href="#"><svg class="i"><use href="#i-folder"/></svg>Materiais</a>
+   <a class="tab" href="#"><svg class="i"><use href="#i-user"/></svg>Perfil</a>
+ </nav>
+</div>
+
+<!-- ═══════════════ VISÃO · MENTOR ESPECIALISTA ═══════════════ -->
+<div class="view view-e">
+  <div class="top"><span class="brand"><i>R</i>Realiza.vc</span>
+    <nav aria-label="Navegação"><a href="#">Início</a><a href="#">Agenda</a><a class="on" href="#">Especialista</a><a href="#">Materiais</a></nav>
+    <div class="who"><span class="av">LP</span><span>Luísa Prado</span></div></div>
+  <div class="main" style="padding-bottom:40px">
+    <div class="scope"><svg class="i"><use href="#i-eye"/></svg><span><b>Você vê:</b> o mural de demandas abertas, suas trilhas e sua grade. <b>Você NÃO vê:</b> trilhas de outros especialistas nem instrumentos pessoais dos jovens.</span></div>
+    <h1 class="h1">Mural e minhas trilhas</h1>
+    <p class="sub">Terça, 7 de outubro · 2 trilhas ativas · 1 proposta de horário aguardando você</p>
+
+    <div class="sec"><h2>Mural de demandas</h2>
+      <div class="chips" role="group" aria-label="Filtrar por tema" style="margin-bottom:10px">
+        <span class="chip on">Todos os temas (3)</span><span class="chip">Meu perfil (2)</span><span class="chip">Carreira</span><span class="chip">Apresentações</span><span class="chip">Finanças</span></div>
+      <div class="trk">
+        <div class="card"><div class="row wrap"><span class="ava sm y">T1</span><div class="grow"><h3>Currículo e portfólio</h3><p class="small muted">Jovem · T1 · pedido há 2 dias</p></div><span class="tag ok"><svg class="i s"><use href="#i-check"/></svg>Combina com você</span></div>
+          <p class="small" style="margin-top:8px">“Quero montar meu primeiro currículo e mostrar o que já fiz em projetos da escola.”</p>
+          <div class="acts"><button class="btn p" type="button">Aceitar demanda</button></div></div>
+        <div class="card"><div class="row wrap"><span class="ava sm y">T2</span><div class="grow"><h3>Apresentações em público</h3><p class="small muted">Jovem · T2 · pedido há 4 dias · prefere Beatriz Fontoura (indisponível)</p></div><span class="tag ok"><svg class="i s"><use href="#i-check"/></svg>Combina com você</span></div>
+          <p class="small" style="margin-top:8px">“Tenho vergonha de falar na frente da turma e quero perder isso.”</p>
+          <div class="acts"><button class="btn p" type="button">Aceitar demanda</button></div></div>
+        <div class="card"><div class="row wrap"><span class="ava sm y">CM</span><div class="grow"><h3>Finanças — organizar meu dinheiro</h3><p class="small muted">Caio Martins · T2 · no mural desde 30 set (7 dias) · prefere Tomás Ribeiro</p></div><span class="tag lk">Fora do seu tema</span></div>
+          <p class="small" style="margin-top:8px">“Aprender a organizar o dinheiro do estágio e montar uma reserva.”</p>
+          <div class="acts"><button class="btn" type="button">Aceitar mesmo assim</button></div></div>
+        <div class="card" style="background:var(--muted)"><div class="row wrap"><span class="ava sm g">T1</span><div class="grow"><h3 class="muted">Vendas para o meu negócio</h3><p class="small muted">Jovem · T1 · aceito por Ricardo Almeida há 1 hora</p></div><span class="tag lk"><svg class="i s"><use href="#i-lock"/></svg>Já foi aceito por outro</span></div>
+          <div class="acts"><button class="btn off" type="button" disabled>Aceitar demanda</button></div></div>
+      </div>
+      <div class="notice" style="margin-top:10px"><svg class="i"><use href="#i-info"/></svg><span><b>Ao aceitar:</b> o aceite é atômico — só uma pessoa leva a demanda. Nasce a trilha de 5 sessões com prazo de ~3 meses, o jovem e o mentor DPP são avisados. A coordenação não aprova nem designa.</span></div>
+    </div>
+
+    <div class="sec"><h2>Minhas trilhas</h2>
+      <div class="trk two">
+        <div class="card"><div class="row"><span class="ava">AS</span><div class="grow"><h3>Ana Souza · T1</h3><p class="small muted">Carreira e portfólio · DPP André Lima</p></div><span class="tag ok">Em andamento</span></div>
+          <dl class="facts"><div><dt>Progresso</dt><dd>Sessão 3 de 5</dd></div><div><dt>Prazo</dt><dd>até 19 dez</dd></div><div><dt>Próxima</dt><dd>Sex 10 out · 16h</dd></div><div><dt>Última avaliação</dt><dd>★ 4 — “me ajudou a montar o portfólio”</dd></div></dl>
+          <div class="mini" aria-hidden="true"><i class="f"></i><i class="f"></i><i class="c"></i><i></i><i></i></div>
+          <div class="notice" style="margin-top:10px"><svg class="i"><use href="#i-clock"/></svg><span>Ana está negociando a sessão 4: <b>você propôs sex 17 out 16h</b>; ela decide.</span></div>
+          <div class="acts"><button class="btn" type="button">Propor outro horário</button><button class="btn" type="button">Registrar sessão 3</button></div></div>
+        <div class="card"><div class="row"><span class="ava">PR</span><div class="grow"><h3>Pedro Ramos · T2</h3><p class="small muted">Entrevistas e primeiro emprego · DPP Renata Gomes</p></div><span class="tag wn">Sessão 1 a confirmar</span></div>
+          <dl class="facts"><div><dt>Progresso</dt><dd>Sessão 1 de 5</dd></div><div><dt>Prazo</dt><dd>até 12 jan</dd></div></dl>
+          <div class="alert" style="margin-top:10px"><svg class="i"><use href="#i-warn"/></svg><span><b>Pedro propôs qui 9 out · 18h</b> — fora da grade atual (quinta não tem faixa). Você pode aceitar como exceção ou contrapropor um horário da grade.</span></div>
+          <div class="acts"><button class="btn p" type="button">Aceitar como exceção</button><button class="btn" type="button">Contrapropor</button></div></div>
+      </div>
+    </div>
+
+    <div class="sec"><h2>Minha grade de disponibilidade</h2>
+      <div class="grade"><div><b>Seg</b>14–18h</div><div><b>Qua</b>14–18h</div><div><b>Sex</b>14–18h</div><div><b>Sáb</b>9–12h</div></div>
+      <div class="acts"><button class="btn" type="button">Editar grade</button></div>
+      <p class="tiny muted" style="margin-top:6px">Faixas de 1h, sessões de 50 min. Os jovens só propõem dentro delas. A grade completa, com sessões plotadas, fica em Agenda.</p></div>
+  </div>
+</div>
+
+<!-- ═══════════════ VISÃO · COORDENAÇÃO ═══════════════ -->
+<div class="view view-c">
+  <div class="top"><span class="brand"><i>R</i>Realiza.vc</span>
+    <nav aria-label="Navegação"><a href="#">Início</a><a href="#">Duplas</a><a href="#">Agenda</a><a class="on" href="#">Trilhas</a><a href="#">Chamados</a></nav>
+    <div class="who"><span class="av">MC</span><span>Marina Costa</span></div></div>
+  <div class="main" style="padding-bottom:40px">
+    <div class="scope"><svg class="i"><use href="#i-eye"/></svg><span><b>Você vê:</b> todas as trilhas e pedidos do mural. <b>Você NÃO faz:</b> designar especialista, aceitar pedido nem agendar sessão — trilha é entre jovem e especialista. Única ação: encerramento antecipado.</span></div>
+    <div class="row wrap"><h1 class="h1 grow">Trilhas de especialistas</h1><span class="ro"><svg class="i s"><use href="#i-eye"/></svg>Somente leitura</span></div>
+    <p class="sub">Terça, 7 de outubro · ciclo atual</p>
+    <div class="sec" style="margin-top:14px"><div class="kpis">
+      <div class="kpi"><b>2</b><span>Trilhas ativas</span></div>
+      <div class="kpi al"><b>1</b><span><svg class="i s" style="display:inline;vertical-align:-3px"><use href="#i-warn"/></svg> Pedido sem aceite há 5+ dias</span></div>
+      <div class="kpi"><b>0</b><span>Concluídas</span></div>
+      <div class="kpi"><b>2</b><span>Sessões feitas</span></div></div></div>
+
+    <div class="sec"><h2>Acompanhamento — pedidos no mural</h2>
+      <div class="alert"><svg class="i"><use href="#i-warn"/></svg><div class="grow"><b>Caio Martins · T2 · Finanças</b> — <b>7 dias</b> no mural, nenhum aceite (limite de alerta: 5 dias). Preferência dele: Tomás Ribeiro.<p class="small muted" style="margin-top:4px">Mentor DPP: André Lima. Você acompanha; quem aceita é um especialista.</p></div></div>
+      <p class="tiny muted" style="margin-top:6px">Sem botão de designar. Para destravar, a conversa acontece fora da tela (com o André ou com os especialistas).</p>
+    </div>
+
+    <div class="sec"><h2>Trilhas ativas</h2>
+      <div class="trk two">
+        <div class="card"><div class="row"><span class="ava">AS</span><div class="grow"><h3>Ana Souza · T1</h3><p class="small muted">com Luísa Prado · DPP André Lima</p></div><span class="tag ok"><svg class="i s"><use href="#i-check"/></svg>No ritmo</span></div>
+          <dl class="facts"><div><dt>Sessões feitas / esperadas hoje</dt><dd>2 / 2</dd></div><div><dt>Próxima</dt><dd>Sex 10 out · 16h</dd></div><div><dt>Prazo</dt><dd>até 19 dez</dd></div><div><dt>Sessão 4</dt><dd>sem horário (em negociação)</dd></div></dl>
+          <div class="mini" aria-hidden="true"><i class="f"></i><i class="f"></i><i class="c"></i><i></i><i></i></div>
+          <div class="acts"><button class="btn d" type="button">Encerrar antecipadamente…</button></div></div>
+        <div class="card"><div class="row"><span class="ava">PR</span><div class="grow"><h3>Pedro Ramos · T2</h3><p class="small muted">com Luísa Prado · DPP Renata Gomes</p></div><span class="tag wn"><svg class="i s"><use href="#i-clock"/></svg>Sessão 1 a confirmar</span></div>
+          <dl class="facts"><div><dt>Sessões feitas / esperadas hoje</dt><dd>0 / 0</dd></div><div><dt>Proposta</dt><dd>qui 9 out · 18h (aguarda Luísa)</dd></div><div><dt>Prazo</dt><dd>até 12 jan</dd></div></dl>
+          <div class="mini" aria-hidden="true"><i class="c"></i><i></i><i></i><i></i><i></i></div>
+          <div class="acts"><button class="btn d" type="button">Encerrar antecipadamente…</button></div></div>
+      </div>
+      <div class="card" style="margin-top:10px"><h3 style="font-size:14px">Encerramento antecipado — única ação de exceção</h3>
+        <p class="small muted" style="margin-top:4px">Exige motivo registrado. A trilha vira “encerrada” (não “concluída”), jovem, especialista e DPP são avisados, e o jovem pode fazer um novo pedido. Não existe “agendar sessão” nem “designar especialista” nesta tela.</p></div>
+    </div>
+    <div class="sec"><div class="notice"><svg class="i"><use href="#i-chat"/></svg><span>Não confundir com <b>chamados de apoio</b> (agenda, metodologia, plataforma, urgência, outro): são outro sistema, na fila de Chamados.</span></div></div>
+  </div>
+</div>
+
+<!-- ═══════════════ VISÃO · MENTOR DPP ═══════════════ -->
+<div class="view view-d">
+  <div class="top"><span class="brand"><i>R</i>Realiza.vc</span>
+    <nav aria-label="Navegação"><a href="#">Início</a><a href="#">Agenda</a><a class="on" href="#">Minhas duplas</a><a href="#">Materiais</a></nav>
+    <div class="who"><span class="av">AL</span><span>André Lima</span></div></div>
+  <div class="main" style="padding-bottom:40px">
+    <div class="scope y"><svg class="i"><use href="#i-eye"/></svg><span><b>Você acompanha, não participa.</b> Vê progresso, registros e avaliações das trilhas dos seus mentorados. <b>Sem ações de sessão:</b> não agenda, não remarca, não pede trilha pelo jovem.</span></div>
+    <h1 class="h1">Trilhas dos meus mentorados</h1>
+    <p class="sub">André Lima · Ana (T1) e Caio (T2)</p>
+
+    <div class="sec"><h2>Ana Souza · T1 · encontro 8 de 16</h2>
+      <div class="card" style="border:2px solid hsl(48 80% 62%)">
+        <div class="row wrap"><span class="ava y">AS</span><div class="grow"><h3>Carreira e portfólio com Luísa Prado</h3><p class="small muted">Prazo até 19 dez · aceita em 19 set</p></div><span class="tag ok">Em andamento</span></div>
+        <div class="row wrap" style="margin-top:12px"><span class="small"><b>Sessão 3 de 5</b></span><span class="tag ok"><svg class="i s"><use href="#i-cal"/></svg>Sex 10 out · 16h confirmada</span></div>
+        <div class="mini" aria-hidden="true"><i class="f"></i><i class="f"></i><i class="c"></i><i></i><i></i></div>
+        <div class="sec" style="margin-top:14px"><h2 style="margin-bottom:4px">Sessões</h2>
+          <div class="agenda-li"><span class="tag ok"><svg class="i s"><use href="#i-check"/></svg>1</span><div><p class="small"><b>Feita · 26 set</b> · registro entregue</p></div></div>
+          <div class="agenda-li"><span class="tag ok"><svg class="i s"><use href="#i-check"/></svg>2</span><div><p class="small"><b>Feita · 3 out</b> · registro entregue · Ana avaliou ★ 4</p><p class="small muted">“Me ajudou a montar o portfólio.”</p></div></div>
+          <div class="agenda-li"><span class="tag ok"><svg class="i s"><use href="#i-cal"/></svg>3</span><div><p class="small"><b>Sex 10 out · 16h–16h50</b> · confirmada</p></div></div>
+          <div class="agenda-li"><span class="tag wn"><svg class="i s"><use href="#i-clock"/></svg>4</span><div><p class="small"><b>Sem horário</b> · Ana e Luísa estão negociando</p></div></div>
+          <div class="agenda-li"><span class="tag lk"><svg class="i s"><use href="#i-lock"/></svg>5</span><div><p class="small"><b>Trancada</b> · libera após o registro da sessão 4</p></div></div>
+        </div>
+        <p class="tiny muted" style="margin-top:8px"><svg class="i s" style="display:inline;vertical-align:-3px"><use href="#i-eye"/></svg> Só leitura. O que a Luísa escreve no registro aparece aqui como resumo — veja decisão em aberto.</p>
+      </div>
+    </div>
+
+    <div class="sec"><h2>Caio Martins · T2 · encontro 5 de 16</h2>
+      <div class="card"><div class="row wrap"><span class="ava y">CM</span><div class="grow"><h3>Pedido de trilha no mural — Finanças</h3><p class="small muted">Desde 30 set · 7 dias · nenhum especialista aceitou</p></div><span class="tag wn"><svg class="i s"><use href="#i-clock"/></svg>No mural</span></div>
+        <ol class="life" style="margin-top:14px"><li class="done"><span class="dot"><svg class="i s" style="width:13px;height:13px;stroke-width:3"><use href="#i-check"/></svg></span><div><b>Pedido enviado</b><span class="dt">30 set</span></div></li><li class="now"><span class="dot">2</span><div><b>No mural</b><span class="dt">há 7 dias</span></div></li><li><span class="dot">3</span><div><b>Aceite</b><span class="dt">pendente</span></div></li><li><span class="dot">4</span><div><b>Em andamento</b><span class="dt">—</span></div></li><li><span class="dot">5</span><div><b>Concluída</b><span class="dt">—</span></div></li></ol>
+        <p class="small muted" style="margin-top:10px">Dica para o encontro 5 (qua 8 out): perguntar ao Caio se o tema ainda faz sentido. O pedido é dele — você não edita nem cancela.</p>
+        <p class="tiny muted" style="margin-top:6px">Registro do encontro 4 ainda pendente (seu).</p></div>
+    </div>
+  </div>
+</div>
+
+</main>
+</div><!-- /app -->
+
+<section class="notes-w" id="notas" aria-labelledby="notas-t">
+  <h2 id="notas-t">Notas da prancheta</h2>
+  <p class="small muted">Papéis ausentes: Auxiliar executivo (Paula Nunes) não tem esta tela — as trilhas não fazem parte do que ele supervisiona.</p>
+
+  <h3 id="matriz">a) Matriz papel × o que vê × o que pode fazer</h3>
+  <table class="mx">
+    <thead><tr><th>Ação / dado</th><th>Mentorado</th><th>Mentor especialista</th><th>Coordenação</th><th>Mentor DPP</th></tr></thead>
+    <tbody>
+      <tr><td>Pedir trilha (mural)</td><td data-l="Mentorado">Sim — só sem trilha ativa/pedido aberto; pode indicar preferência</td><td data-l="Especialista">—</td><td data-l="Coordenação">—</td><td data-l="DPP">— (não pede pelo jovem)</td></tr>
+      <tr><td>Aceitar demanda do mural</td><td data-l="Mentorado">—</td><td data-l="Especialista">Sim — aceite atômico</td><td data-l="Coordenação">Não (só vê)</td><td data-l="DPP">—</td></tr>
+      <tr><td>Propor horário (dentro da grade)</td><td data-l="Mentorado">Sim, por sessão</td><td data-l="Especialista">Confirma ou contrapropõe</td><td data-l="Coordenação">—</td><td data-l="DPP">—</td></tr>
+      <tr><td>Remarcar sessão</td><td data-l="Mentorado">Sim</td><td data-l="Especialista">Sim</td><td data-l="Coordenação">—</td><td data-l="DPP">—</td></tr>
+      <tr><td>Registrar sessão / ver registro</td><td data-l="Mentorado">Vê status</td><td data-l="Especialista">Registra</td><td data-l="Coordenação">Vê status</td><td data-l="DPP">Vê (resumo — aberto)</td></tr>
+      <tr><td>Avaliar sessão (★ + comentário)</td><td data-l="Mentorado">Sim</td><td data-l="Especialista">Vê</td><td data-l="Coordenação">Vê</td><td data-l="DPP">Vê</td></tr>
+      <tr><td>Editar grade de disponibilidade</td><td data-l="Mentorado">Vê períodos (catálogo)</td><td data-l="Especialista">Sim</td><td data-l="Coordenação">Vê</td><td data-l="DPP">—</td></tr>
+      <tr><td>Painel de trilhas / pedidos sem aceite</td><td data-l="Mentorado">Só o seu</td><td data-l="Especialista">Mural + as suas</td><td data-l="Coordenação">Todos (leitura)</td><td data-l="DPP">Dos seus mentorados</td></tr>
+      <tr><td>Encerramento antecipado</td><td data-l="Mentorado">—</td><td data-l="Especialista">—</td><td data-l="Coordenação">Sim, com motivo (única ação)</td><td data-l="DPP">—</td></tr>
+      <tr><td>Chamado de apoio (outro sistema)</td><td data-l="Mentorado">Abre (link terciário)</td><td data-l="Especialista">Abre</td><td data-l="Coordenação">Atende</td><td data-l="DPP">Abre</td></tr>
+    </tbody>
+  </table>
+
+  <h3>b) Rastreabilidade</h3>
+  <ul class="notes">
+    <li><b>Base v4:</b> trilha explícita com sessões 1–5 e “escolher horário” como ação da sessão; pedido de trilha como processo com estado, sem horário; catálogo em períodos; apoio à coordenação fora das trilhas.</li>
+    <li><b>Da v5:</b> ciclo de vida com datas (pedido → no mural → aceitou → em andamento → concluída), cards de sessão com pill de estado, “Remarcar”, sessão 5 trancada, cartões de trilha por especialista.</li>
+    <li><b>Da v3:</b> card-CTA na home com estado vivo (3 variações) e caixa de negociação (“Luísa propôs… você tinha sugerido…” → Aceitar / Propor outro), com seletor dos horários livres da semana dentro da sessão.</li>
+    <li><b>Novo na v6:</b> três conceitos separados na própria página; estado vazio (sem trilha nem pedido) com formulário curto; visões de coordenação (leitura) e DPP (acompanha).</li>
+    <li>Nav do jovem com 5 itens inalterada; “Especialistas” alcançada pelo card-CTA.</li>
+  </ul>
+
+  <h3 id="abertas">c) Decisões em aberto</h3>
+  <ul class="notes">
+    <li><span class="open">ABERTO</span> <b>Inconsistência no dataset:</b> o dataset canônico diz que Pedro propôs qui 9 out 18h “dentro da grade”, mas a grade da Luísa é seg/qua/sex 14–18h e sáb 9–12h. O mock mostra como proposta <i>fora da grade</i> (exceção). Se a UI do jovem só permite horários da grade, como nasce uma proposta fora dela? Corrigir o dataset ou prever “proposta livre”.</li>
+    <li><span class="open">ABERTO</span> Limite do alerta da coordenação: 5 dias sem aceite (mock) — fixo ou configurável?</li>
+    <li><span class="open">ABERTO</span> Coordenação pode dar “nudge” em especialistas sobre pedidos parados? Hoje só observa; a v6 não tem o botão.</li>
+    <li><span class="open">ABERTO</span> O que o mentor DPP vê do registro da Luísa: só status, resumo ou texto completo?</li>
+    <li><span class="open">ABERTO</span> Preferência por especialista: respeitar por N dias antes de abrir para todos? Hoje qualquer um aceita.</li>
+    <li><span class="open">ABERTO</span> Especialista tem teto de trilhas simultâneas? Aceitar acima do teto precisa de aviso.</li>
+    <li><span class="open">ABERTO</span> Datas de Ana (pedido 12 set, aceite 19 set, sessões 26 set e 3 out) e de Pedro são ilustrativas — fora do dataset canônico.</li>
+    <li><span class="open">ABERTO</span> Prazo de 3 meses conta do aceite ou da sessão 1?</li>
+  </ul>
+</section>
+
+</body>
+</html>

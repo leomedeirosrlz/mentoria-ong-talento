@@ -7,6 +7,7 @@ import { toDateStr } from "./ciclo";
 import { demoAtivo } from "./demo/mode";
 import { DEMO_MSG } from "./demo/shared";
 import { erroAmigavel as erroAmigavelBase } from "./utils";
+import type { AppRole } from "./types";
 
 /** Erro de UI do fluxo de especialista — as exceções de domínio do RPC
  *  aceitar_solicitacao (raise exception → P0001) já chegam em pt-BR e passam
@@ -19,15 +20,33 @@ function erroAmigavel(e: { message: string; code?: string }): string {
   return erroAmigavelBase(e);
 }
 
+/** Normaliza o embed `profile_papeis` pro `papeis` efetivo — união do role
+ *  primário com as linhas do embed (mesmo padrão do comPapeis de
+ *  queries.ts, com o primário na união pra temPapel funcionar). */
+const comPapeis = <T extends { role: AppRole | null }>(
+  p: T & { profile_papeis?: { papel: AppRole }[] | null }
+): Omit<T, "profile_papeis"> & { papeis: AppRole[] } => {
+  const { profile_papeis, ...rest } = p;
+  return {
+    ...rest,
+    papeis: [
+      ...new Set<AppRole>([
+        ...(p.role ? [p.role] : []),
+        ...(profile_papeis ?? []).map((r) => r.papel),
+      ]),
+    ],
+  };
+};
+
 async function me() {
   const supabase = await createClient();
   const { data: claimsData } = await supabase.auth.getClaims();
   const { data } = await supabase
     .from("profiles")
-    .select("id, role, nome")
+    .select("id, role, nome, profile_papeis(papel)")
     .eq("user_id", (claimsData?.claims?.sub as string) ?? "")
     .single();
-  return { supabase, me: data };
+  return { supabase, me: data ? comPapeis(data) : data };
 }
 
 /** Corpo da notificação com a demanda resumida — o texto completo fica na
@@ -86,12 +105,16 @@ export async function criarSolicitacao(formData: FormData) {
   }
 
   if (desejado) {
+    // papel efetivo (WP6b): o híbrido com especialista como secundário vale
+    // — !inner em profile_papeis devolve null quando a linha não existe
     const { data: esp } = await supabase
       .from("profiles")
-      .select("id, role, ativo")
+      .select("id, profile_papeis!inner(papel)")
       .eq("id", desejado)
+      .eq("profile_papeis.papel", "mentor_especialista")
+      .eq("ativo", true)
       .maybeSingle();
-    if (esp?.role !== "mentor_especialista" || !esp.ativo) {
+    if (!esp) {
       return { error: "Escolha um mentor especialista ativo." };
     }
   }
@@ -125,20 +148,26 @@ export async function criarSolicitacao(formData: FormData) {
   const [esps, coords, mentorado] = await Promise.all([
     desejado
       ? Promise.resolve({ data: [{ id: desejado }] })
-      : supabase
+      : // broadcast vai pra quem TEM o papel, não só pro primário (WP6b)
+        supabase
           .from("profiles")
-          .select("id")
-          .eq("role", "mentor_especialista")
+          .select("id, profile_papeis!inner(papel)")
+          .eq("profile_papeis.papel", "mentor_especialista")
           .eq("ativo", true),
     supabase.from("profiles").select("id").eq("role", "coordenacao").eq("ativo", true),
     supabase.from("mentorados").select("nome").eq("id", dupla.mentorado_id).maybeSingle(),
   ]);
   const nomeMentorado = mentorado.data?.nome;
+  // o !inner devolve UMA linha de profile por linha de papel — o papel em
+  // múltiplos escopos duplicaria o especialista e o ping chegaria em dobro
+  const espIds = [
+    ...new Set((esps.data ?? []).map((d: { id: string }) => d.id)),
+  ];
   await notificar(
     supabase,
     [
-      ...(esps.data ?? []).map((d: { id: string }) => ({
-        profile_id: d.id,
+      ...espIds.map((id) => ({
+        profile_id: id,
         tipo: "demanda_especialista",
         titulo: "Novo pedido de mentoria especializada",
         corpo: resumo(demanda),
@@ -337,11 +366,13 @@ export async function aceitarProposta(solicitacaoId: string) {
   return { ok: true, duplaId };
 }
 
-/** Triagem da coordenação (0074): pedido do jovem sem dupla DPP entra
- *  'aguardando_coord' — reconhecer libera pro mural com a turma definida. */
+/** Triagem da coordenação (0074, 0101): pedido do jovem sem dupla DPP
+ *  entra 'aguardando_coord' — reconhecer libera pro mural. Com o pool
+ *  global a turma é opcional: definida agora ou resolvida na efetivação
+ *  (s.turma → DPP → cronograma vigente). */
 export async function reconhecerSolicitacao(
   solicitacaoId: string,
-  turma: string
+  turma?: string | null
 ) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
@@ -350,11 +381,10 @@ export async function reconhecerSolicitacao(
     return { error: "Só a coordenação faz a triagem." };
   }
   if (!solicitacaoId) return { error: "Solicitação não informada." };
-  if (!turma.trim()) return { error: "Escolha uma turma." };
 
   const { error } = await supabase.rpc("reconhecer_solicitacao", {
     p_id: solicitacaoId,
-    p_turma: turma.trim(),
+    p_turma: turma?.trim() || null,
   });
   if (error) return { error: erroAmigavel(error) };
   revalidarMural();
@@ -480,5 +510,74 @@ export async function removerExcecao(id: string) {
     .eq("profile_id", eu.id);
   if (error) return { error: erroAgenda(error) };
   revalidarAgenda();
+  return { ok: true };
+}
+
+/** WP6 — o mentor DPP registra a demanda de especialista em nome do jovem:
+ *  nasce 'sugerida' (fora dos tetos e do mural) e só vira pedido real
+ *  quando o jovem confirma. A RPC valida que o autor é o DPP da dupla
+ *  ativa — aqui saneamos forma e repassamos. */
+export async function sugerirEspecialistaMentor(input: {
+  mentoradoId: string;
+  demanda: string;
+  objetivo?: string | null;
+  especialistaId?: string | null;
+  duplaDppId?: string | null;
+}): Promise<{ ok?: true; error?: string }> {
+  if (await demoAtivo()) return { error: DEMO_MSG };
+  const { supabase, me: eu } = await me();
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
+  if (eu.role === "mentorado") {
+    return { error: "O jovem pede direto pela página de especialistas." };
+  }
+
+  const demanda = input.demanda?.trim() ?? "";
+  const objetivo = input.objetivo?.trim() || null;
+  if (!input.mentoradoId) return { error: "Mentorado não informado." };
+  if (demanda.length < 10 || demanda.length > 1000) {
+    return { error: "Descreva o tema em 10 a 1.000 caracteres." };
+  }
+  if (objetivo && (objetivo.length < 3 || objetivo.length > 500)) {
+    return { error: "O objetivo precisa ter entre 3 e 500 caracteres." };
+  }
+
+  const { error } = await supabase.rpc("sugerir_especialista_mentor", {
+    p_mentorado_id: input.mentoradoId,
+    p_demanda: demanda,
+    p_objetivo: objetivo ?? undefined,
+    p_especialista_id: input.especialistaId ?? undefined,
+  });
+  if (error) return { error: erroAmigavel(error) };
+
+  revalidarMural(input.duplaDppId);
+  revalidatePath("/jovem/especialistas");
+  return { ok: true };
+}
+
+/** WP6 — o especialista devolve pra trilha ao longo do percurso (não só no
+ *  encerramento). Só o mentor daquela dupla esp aberta escreve — a RPC
+ *  confere o vínculo de novo. */
+export async function postarDevolutiva(input: {
+  duplaId: string;
+  texto: string;
+}): Promise<{ ok?: true; error?: string }> {
+  if (await demoAtivo()) return { error: DEMO_MSG };
+  const { supabase, me: eu } = await me();
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
+
+  const texto = input.texto?.trim() ?? "";
+  if (!input.duplaId) return { error: "Trilha não informada." };
+  if (texto.length < 10 || texto.length > 4000) {
+    return { error: "Escreva a devolutiva (entre 10 e 4.000 caracteres)." };
+  }
+
+  const { error } = await supabase.rpc("postar_devolutiva", {
+    p_dupla_id: input.duplaId,
+    p_texto: texto,
+  });
+  if (error) return { error: erroAmigavel(error) };
+
+  revalidatePath(`/duplas/${input.duplaId}`);
+  revalidatePath("/jovem/especialistas");
   return { ok: true };
 }

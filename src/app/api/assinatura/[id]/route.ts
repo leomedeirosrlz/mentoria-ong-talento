@@ -5,6 +5,7 @@ import { demoAssinatura } from "@/lib/demo/queries";
 import { getAssinatura } from "@/lib/queries-assinaturas";
 import { renderDocumentoAssinado } from "@/lib/documentos/pdf";
 import { nomeArquivoVia } from "@/lib/documentos/texto";
+import { apiErro } from "@/lib/api-erro";
 import type { Assinatura } from "@/lib/types";
 
 // Download da via assinada (termo do voluntário, autorização do responsável):
@@ -55,18 +56,18 @@ export async function GET(
   if (demo) {
     const a = demoAssinatura(demo, id);
     if (!a || a.status !== "assinado") {
-      return new NextResponse("Documento não encontrado.", { status: 404 });
+      return apiErro("Documento não encontrado.", { status: 404 });
     }
     const pdf = await renderSeguro(a, null);
     if (!pdf) {
-      return new NextResponse("Não foi possível gerar o documento.", { status: 500 });
+      return apiErro("Não foi possível gerar o documento.", { status: 500 });
     }
     return pdfResponse(pdf, nomeArquivoVia(a));
   }
 
   // id cru no eq() — string malformada vira erro PostgREST (500); uuid ruim é 404
   if (!UUID_RE.test(id)) {
-    return new NextResponse("Documento não encontrado.", { status: 404 });
+    return apiErro("Documento não encontrado.", { status: 404 });
   }
 
   const supabase = await createClient();
@@ -76,19 +77,23 @@ export async function GET(
   const { data: claims } = await supabase.auth.getClaims();
   const sub = claims?.claims?.sub;
   if (!sub) {
-    return new NextResponse("Sessão expirada. Entre de novo.", { status: 401 });
+    return apiErro("Sessão expirada. Entre de novo.", {
+      status: 401,
+      acao: { href: "/login", label: "Ir para o login" },
+    });
   }
 
   let a: Assinatura | null;
   try {
     a = await getAssinatura(id);
   } catch {
-    return new NextResponse("Não foi possível abrir o documento. Tente de novo.", {
+    return apiErro("Não foi possível abrir o documento. Tente de novo.", {
       status: 500,
+      acao: { href: `/api/assinatura/${id}`, label: "Tentar de novo" },
     });
   }
   if (!a || a.status !== "assinado") {
-    return new NextResponse("Documento não encontrado.", { status: 404 });
+    return apiErro("Documento não encontrado.", { status: 404 });
   }
 
   // a policy assinaturas_select já só devolveu a row se eu for o dono ou a
@@ -99,7 +104,7 @@ export async function GET(
     .eq("user_id", sub)
     .single();
   if (!eu || (a.profile_id !== eu.id && eu.role !== "coordenacao")) {
-    return new NextResponse("Documento não encontrado.", { status: 404 });
+    return apiErro("Documento não encontrado.", { status: 404 });
   }
 
   // contra-assinatura do presidente é opcional — sem a imagem o PDF sai só
@@ -112,7 +117,10 @@ export async function GET(
 
   const pdf = await renderSeguro(a, contra);
   if (!pdf) {
-    return new NextResponse("Não foi possível gerar o documento.", { status: 500 });
+    return apiErro("Não foi possível gerar o documento.", {
+      status: 500,
+      acao: { href: `/api/assinatura/${id}`, label: "Tentar de novo" },
+    });
   }
   return pdfResponse(pdf, nomeArquivoVia(a));
 }

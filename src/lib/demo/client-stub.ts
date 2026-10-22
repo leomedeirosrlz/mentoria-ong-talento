@@ -4,6 +4,7 @@ import {
   demoAssinaturaCompletaPorToken,
   demoAssinaturaPorToken,
   demoFormularioPorToken,
+  demoTrilhasDosJovens,
 } from "./queries";
 import { getDemoFormularios } from "./forms-data";
 import { normaliza } from "../utils";
@@ -212,9 +213,88 @@ function linhas(tabela: string, papel: AppRole | null): Linha[] {
       }));
     case "formulario_respostas":
       return getDemoFormularios().respostas as unknown as Linha[];
+    // ---------- chamados (0084): o stub espelha o escopo RLS ----------
+    case "chamados": {
+      // base: autor vê o próprio; coord vê tudo; supervisor tudo menos
+      // plataforma (a fila mascarada sai pela view abaixo). Mentor NÃO
+      // enxerga o chamado do mentorado pela dupla — mesma regra do banco.
+      const eu = papel ? d.personas[papel] : null;
+      const meuMentorado = eu
+        ? d.mentorados.find((m) => m.profile_id === eu.id)?.id
+        : null;
+      return d.chamados.filter((c) => {
+        if (papel === "coordenacao") return true;
+        if (papel === "supervisor") return c.categoria !== "plataforma";
+        return c.autor_id === eu?.id || c.autor_mentorado_id === meuMentorado;
+      }) as unknown as Linha[];
+    }
+    case "chamados_fila": {
+      // a view: staff-only; pro supervisor as linhas de plataforma chegam
+      // mascaradas (metadados nulos — molde chamados_fila da 0084)
+      if (papel !== "coordenacao" && papel !== "supervisor") return [];
+      const sup = papel === "supervisor";
+      return d.chamados.map((c) => {
+        const masc = sup && c.categoria === "plataforma";
+        const l = c as unknown as Linha;
+        return masc
+          ? {
+              id: l.id, numero: l.numero, categoria: l.categoria,
+              status: l.status, origem: l.origem, created_at: l.created_at,
+              resolvido_em: l.resolvido_em, updated_at: l.updated_at,
+              assunto: null, mensagem: null, descricao_outro: null,
+              autor_id: null, autor_mentorado_id: null, dupla_id: null,
+              atribuido_a: null, resolvido_por: null,
+              resolucao_resumo: null, registro_id: null, avaliacao_id: null,
+            }
+          : l;
+      });
+    }
+    case "chamado_atualizacoes":
+      // trilha pública segue a visibilidade do chamado (o exists do RLS)
+      return d.chamadoAtualizacoes.filter((u) =>
+        (linhas("chamados", papel) as Linha[]).some(
+          (c) => c.id === (u as unknown as Linha).chamado_id
+        )
+      ) as unknown as Linha[];
+    case "chamado_comentarios":
+      // interno: só equipe (e plataforma continua coord-only via chamados)
+      if (papel !== "coordenacao" && papel !== "supervisor") return [];
+      return d.chamadoComentarios.filter((cm) =>
+        (linhas("chamados", papel) as Linha[]).some(
+          (c) => c.id === (cm as unknown as Linha).chamado_id
+        )
+      ) as unknown as Linha[];
+    case "chamado_anexos": {
+      const ehEquipe = papel === "coordenacao" || papel === "supervisor";
+      return d.chamadoAnexos.filter(
+        (a) =>
+          (!a.interno || ehEquipe) &&
+          (linhas("chamados", papel) as Linha[]).some(
+            (c) => c.id === (a as unknown as Linha).chamado_id
+          )
+      ) as unknown as Linha[];
+    }
+    case "devolutivas":
+      return d.devolutivas as unknown as Linha[];
+    case "profile_papeis":
+      return d.profilePapeis as unknown as Linha[];
     default:
+      avisarTabelaSemDataset(tabela);
       return [];
   }
+}
+
+// O default devolvia [] em silêncio — uma superfície nova (ex.: /chamados)
+// renderizaria vazia sem nenhum sinal de que faltava dataset. Agora avisa
+// uma vez por tabela no console; o fluxo segue sem quebrar.
+const tabelasAvisadas = new Set<string>();
+function avisarTabelaSemDataset(tabela: string) {
+  if (tabelasAvisadas.has(tabela)) return;
+  tabelasAvisadas.add(tabela);
+  console.warn(
+    `[demo] tabela "${tabela}" consultada sem dataset no stub — ` +
+      `devolvendo []. Adicionar em demo/data.ts + case em linhas() (client-stub.ts).`
+  );
 }
 
 /** Projeta o subselect do embed ("id, nome" / "*") sobre a linha achada;
@@ -250,29 +330,52 @@ function resolveEmbed(
         .replace(new RegExp(`^${tabelaOrigem}_`), "")
         .replace(/_fkey$/, "")
     : null;
-  const candidatos = [
+  // direcionados apontam pra tabela alvo pelo nome (a constraint explícita,
+  // <alias>_id ou <singular da tabela>_id); os genéricos só apontam pra
+  // algum lugar quando o alvo é profiles — created_by/autor_id/profile_id/
+  // user_id são sempre referência a usuário
+  const direcionados = [
     deFkey,
     `${spec.alias}_id`,
     `${spec.tabela.replace(/s$/, "")}_id`,
-    "created_by",
-    "autor_id",
-    "profile_id",
-    "user_id",
   ].filter((c): c is string => Boolean(c));
+  const candidatos = [
+    ...new Set([
+      ...direcionados,
+      "created_by",
+      "autor_id",
+      "profile_id",
+      "user_id",
+    ]),
+  ];
+  let fkPendurada = false;
   for (const c of candidatos) {
     const v = linha[c];
     if (typeof v === "string" && v) {
       const alvo = linhas(spec.tabela, papel).find((r) => r.id === v);
-      // FK preenchida sem linha correspondente -> embed to-one vira null,
-      // como no PostgREST
-      return alvo ? projetaAlvo(alvo as Linha, spec.sub) : null;
+      // FK resolvida → to-one projetado. Não achada, segue pros próximos
+      // candidatos e por fim pro ramo to-many — sem isso um `user_id` na
+      // linha pai engolia embeds filhos tipo `profile_papeis(papel)` (WP6b)
+      if (alvo) return projetaAlvo(alvo as Linha, spec.sub);
+      // preenchida e sem match: só conta como FK pendurada se a coluna de
+      // fato apontava pro alvo — direcionada sempre; genérica só quando o
+      // alvo é profiles (o user_id de uma linha de profiles não aponta pra
+      // profile_papeis — sem o filtro o embed to-many viraria null)
+      if (direcionados.includes(c) || spec.tabela === "profiles") {
+        fkPendurada = true;
+      }
     }
   }
   // to-many: filhas que apontam pra origem ("duplas" -> "dupla_id")
   const chavePai = `${tabelaOrigem.replace(/s$/, "")}_id`;
-  return linhas(spec.tabela, papel)
+  const filhas = linhas(spec.tabela, papel)
     .filter((r) => r[chavePai] === linha.id)
     .map((f) => projetaAlvo(f, spec.sub));
+  // to-many com filhas vence. Vazio + FK pendurada = to-one cujo alvo não
+  // existe — o PostgREST devolveria null (join sem match), não []; vazio
+  // sem nenhuma FK candidata é to-many sem filhas, [] mesmo
+  if (filhas.length > 0) return filhas;
+  return fkPendurada ? null : filhas;
 }
 
 /** A linha volta inteira (select do app é subset de colunas já presentes);
@@ -618,13 +721,28 @@ function canalDemo() {
  *  (aceitar_solicitacao...) — cai no default: a demo não grava. */
 async function rpcDemo(
   fn: string,
-  params?: Record<string, unknown>
+  params?: Record<string, unknown>,
+  papel: AppRole | null = null
 ): Promise<Resultado> {
   const token = String(params?.p_token ?? "");
   switch (fn) {
-    // jsonb ou null — null quando o token não existe
+    // jsonb array — as trilhas de especialista do mentorado de uma dupla DPP
+    // (0092, WP3): a definer valida mentor/supervisor da dupla ou coord e a
+    // RLS nunca alcançaria o DPP — o espelho demo aplica a mesma régua por
+    // papel (id inválido/fora do escopo → [], como o erro da real)
+    case "trilha_do_jovem": {
+      const id = String(params?.p_dupla_dpp_id ?? "");
+      const mapa = papel ? demoTrilhasDosJovens(papel, [id]) : {};
+      return { data: mapa[id] ?? [], error: null, count: null };
+    }
+    // jsonb ou null — null quando o token não existe; a identidade (0070)
+    // compara o destinatário com a persona do cookie, igual à RPC
     case "assinatura_por_token":
-      return { data: demoAssinaturaPorToken(token), error: null, count: null };
+      return {
+        data: papel ? demoAssinaturaPorToken(papel, token) : null,
+        error: null,
+        count: null,
+      };
     // objeto único ou null (0051+0053): o recorte AssinaturaVia só existe
     // depois de assinada; pendente/revogada/expirada devolve null
     case "assinatura_completa_por_token": {
@@ -652,7 +770,8 @@ export function createDemoClient() {
       new ConsultaDemo(linhas(tabela, papel), tabela, papel),
     storage: { from: bucketDemo },
     auth: authDemo(papel),
-    rpc: rpcDemo,
+    rpc: (fn: string, params?: Record<string, unknown>) =>
+      rpcDemo(fn, params, papel),
     channel: canalDemo,
     removeChannel: async () => "ok" as const,
     getChannels: () => [] as unknown[],

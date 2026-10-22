@@ -21,7 +21,8 @@ export function ResumoJornadaSection({
       className="resumo-jornada rounded-xl bg-card p-4 shadow-[var(--shadow-border)] print:shadow-none"
     >
       <div className="flex items-center justify-between gap-2">
-        <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+        <h2 className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+          <span aria-hidden className="size-1.5 rounded-full bg-[var(--brand-lime)]" />
           Resumo da jornada
         </h2>
         <ImprimirButton />
@@ -40,7 +41,7 @@ export function ResumoJornadaSection({
             : " · em andamento"}
       </p>
 
-      <dl className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <dl className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-5">
         <div className="rounded-lg bg-muted/40 px-3 py-2.5">
           <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
             Encontros
@@ -89,7 +90,32 @@ export function ResumoJornadaSection({
           </dd>
           <dd className="text-xs text-muted-foreground">últimos abaixo</dd>
         </div>
+        {resumo.pdm && (
+          <div className="rounded-lg bg-muted/40 px-3 py-2.5">
+            <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+              Metas do PDM
+            </dt>
+            <dd className="mt-0.5 font-mono text-sm tabular-nums">
+              {resumo.pdm.atingidas} de {resumo.pdm.total}
+            </dd>
+            <dd className="text-xs text-muted-foreground">atingidas</dd>
+          </div>
+        )}
       </dl>
+
+      {resumo.pdm && resumo.pdm.atingidasLista.length > 0 && (
+        <ul className="mt-3 space-y-1 border-t pt-3 text-xs text-muted-foreground">
+          {resumo.pdm.atingidasLista.map((m, i) => (
+            <li key={i} className="flex flex-wrap items-baseline gap-x-2">
+              <span aria-hidden className="text-[var(--ok)]">✓</span>
+              <span className="min-w-0 flex-1">{m.titulo}</span>
+              {m.atingidaEm && (
+                <span>atingida em {formatDate(m.atingidaEm)}</span>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
 
       {resumo.ultimosRegistros.length > 0 && (
         <ul className="mt-3 space-y-1 border-t pt-3 text-xs text-muted-foreground">

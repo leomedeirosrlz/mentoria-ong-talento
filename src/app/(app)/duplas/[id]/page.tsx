@@ -4,18 +4,12 @@ import type { Metadata } from "next";
 import {
   BookOpen,
   CalendarBlank,
-  CalendarPlus,
   CaretDown,
   ChatsCircle,
   ClockCounterClockwise,
-  DotsThree,
-  FlagCheckered,
   HandHeart,
-  PaperPlaneTilt,
-  UserPlus,
   VideoCamera,
 } from "@phosphor-icons/react/dist/ssr";
-import { Menu as MenuPrimitive } from "@base-ui/react/menu";
 import { Collapsible } from "@base-ui/react/collapsible";
 import {
   getCicloEventos,
@@ -34,6 +28,8 @@ import {
   type MentorProfile,
 } from "@/lib/queries";
 import {
+  getAvaliacaoEspDaDupla,
+  getDevolutivasDupla,
   getEspecialistas,
   getPropostas,
   getSlotsLivres,
@@ -47,6 +43,8 @@ import {
 } from "@/lib/queries-avaliacao";
 import { getSupervisoesDaDupla } from "@/lib/queries-supervisao";
 import { getFormularios, getInstrumentosDaDupla } from "@/lib/forms/queries";
+import { getTerceirosDaDupla } from "@/lib/terceiros/queries";
+import { getPdmDaDupla, getPdmResumo } from "@/lib/queries-pdm";
 import { dadosResumoJornada } from "@/lib/encerramento";
 import { getAnexosPorRegistros } from "@/lib/anexos";
 import { avatarPublicUrl } from "@/lib/avatar";
@@ -74,7 +72,7 @@ import {
   type PassoGuia,
 } from "@/lib/ciclo";
 import { msgsContato } from "@/lib/whatsapp-msgs";
-import { AvaliacaoBadge, SemaforoBadge, SemaforoDot } from "@/components/semaforo";
+import { AvaliacaoBadge, SemaforoBadge } from "@/components/semaforo";
 import { NudgeButton } from "@/components/nudge-button";
 import { CopiarChamada } from "@/components/copiar-chamada";
 import { WhatsAppRapido, type DestinoWA } from "@/components/whatsapp-rapido";
@@ -109,16 +107,16 @@ import { ResolverApoioButton } from "@/components/resolver-apoio-button";
 import { TrajetoriaAvaliacoes } from "@/components/trajetoria-avaliacoes";
 import { SolicitacaoStatusChip } from "@/components/solicitacao-status-chip";
 import { SolicitacaoNegociacao } from "@/components/solicitacao-negociacao";
-import { SolicitarEspecialistaDialog } from "@/components/solicitar-especialista-dialog";
-import { PdmUrlDialog } from "@/components/pdm-url-dialog";
+import { DevolutivaComposer } from "@/components/devolutivas-card";
 import { TrilhaJornada } from "@/components/trilha-jornada";
 import { TrilhaPrazoBadge } from "@/components/trilha-prazo-badge";
 import { TrilhaFechamento } from "@/components/trilha-fechamento";
-import { EncerrarTrilhaDialog } from "@/components/encerrar-trilha-dialog";
 import { EncerramentoDupla } from "@/components/encerramento-dupla";
-import { EnviarFormularioDialog } from "@/components/enviar-formulario-dialog";
 import { ResumoJornadaSection } from "@/components/resumo-jornada";
+import { PdmDupla } from "@/components/pdm-dupla";
 import { InstrumentosDupla } from "./instrumentos-dupla";
+import { TerceirosDupla } from "./terceiros-dupla";
+import { DuplaMaisMenu } from "./mais-menu";
 import { DevolutivaEspecialista } from "@/components/devolutiva-especialista";
 import { SupervisaoDialog } from "@/components/supervisao-dialog";
 import { SupervisoesSection } from "@/components/supervisoes-section";
@@ -127,11 +125,7 @@ import { AnexosRegistro } from "@/components/anexos-registro";
 import { RegistroView } from "@/components/registro-view";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { temPapel } from "@/lib/types";
 import type { AvaliacaoLink, Dupla, Encaminhamento, Encontro, Material, RegistroAnexo } from "@/lib/types";
 import { filaMentorados } from "@/lib/fila";
 import {
@@ -141,13 +135,6 @@ import {
   ranquearMentores,
 } from "@/lib/remanejo";
 import { cn } from "@/lib/utils";
-
-// mesma pele do DropdownMenuContent (ui/dropdown-menu), composta à mão aqui:
-// o overflow "Mais" precisa de Portal keepMounted — os itens do menu são os
-// próprios triggers dos dialogs, e o unmount do popup ao fechar derrubaria
-// qualquer dialog aberto a partir dele
-const MENU_POPUP =
-  "z-50 max-h-(--available-height) w-56 min-w-32 origin-(--transform-origin) overflow-x-hidden overflow-y-auto rounded-lg bg-popover p-1 text-popover-foreground shadow-[var(--shadow-overlay)] duration-150 ease-[cubic-bezier(0.2,0,0,1)] outline-none data-[side=bottom]:slide-in-from-top-1 data-[side=bottom]:slide-out-to-top-1 data-[side=left]:slide-in-from-right-1 data-[side=left]:slide-out-to-right-1 data-[side=right]:slide-in-from-left-1 data-[side=right]:slide-out-to-left-1 data-[side=top]:slide-in-from-bottom-1 data-[side=top]:slide-out-to-bottom-1 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:overflow-hidden data-closed:fade-out-0 data-closed:zoom-out-95";
 
 /** Pools da sugestão de remanejo (REALIZA-115): mentores do papel da
  *  trilha da dupla ranqueados por afinidade com o mentorado (cheios ficam
@@ -165,13 +152,13 @@ async function montarSugestaoRemanejo(dupla: Dupla) {
   const mpMap: Record<string, MentorProfile> = Object.fromEntries(
     mps.map((mp) => [mp.profile_id, mp])
   );
-  // a régua do trigger (0073): ativas + pausadas contam vaga. O uso do
-  // mentor já é o da própria pool — ele tem um papel só, então as duplas
-  // dele são todas da mesma trilha (filtrar por trilha seria identidade)
+  // a régua do trigger (0073): ativas + pausadas contam vaga, chaveadas
+  // por trilha (WP6b — a pool do híbrido é separada em cada trilha)
   const usadas: Record<string, number> = {};
   const ocupados = new Set<string>();
   for (const d of resumo) {
-    usadas[d.mentor_id] = (usadas[d.mentor_id] ?? 0) + 1;
+    const chave = `${d.mentor_id}:${d.trilha ?? "dpp"}`;
+    usadas[chave] = (usadas[chave] ?? 0) + 1;
     ocupados.add(d.mentorado_id);
   }
   const historico = new Set(resumoTodas.map((d) => d.mentorado_id));
@@ -221,7 +208,7 @@ export async function generateMetadata({
 
 export default async function DuplaPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [dupla, eventos, me, materiais, anexosPorRegistro, encerramento, supervisoes, instrumentos] =
+  const [dupla, eventos, me, materiais, anexosPorRegistro, encerramento, supervisoes, instrumentos, terceiros, pdm] =
     await Promise.all([
       getDupla(id),
       getCicloEventos(),
@@ -243,6 +230,15 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
       // instrumentos oficiais da jornada (0080) — RPC escopada: coord,
       // mentor e supervisor da dupla (e o próprio jovem, na área dele)
       getInstrumentosDaDupla(id),
+      // avaliação por terceiros (0103, guia sem. 1→2) — só trilha DPP; no
+      // paralelo do Promise.all via getDupla cacheado, sem +1 RTT serial
+      getDupla(id).then((d) =>
+        d?.trilha === "dpp" ? getTerceirosDaDupla(id) : null
+      ),
+      // o PDM vivo (0109) — uma RPC devolve o documento inteiro; só DPP
+      getDupla(id).then((d) =>
+        d?.trilha === "dpp" ? getPdmDaDupla(id) : null
+      ),
     ]);
   if (!dupla || !me) notFound();
 
@@ -275,6 +271,11 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
   // passos do guia da trilha — ciclo_eventos (DPP, com datas) ou os 5 passos
   // do especialista (sem data: a dupla combina dentro dos 3 meses)
   const espEventos = ehEsp ? await getEspecialistaEventos() : [];
+  // avaliação geral pós-fechamento (0104): a RPC entrega o token só pro
+  // especialista da trilha e o estado pra coord — a ficha é o caminho de
+  // volta quando a notificação se perde
+  const avaliacaoEsp =
+    ehEsp && dupla.encerrada_em ? await getAvaliacaoEspDaDupla(id) : null;
   // fluxo entre mentores do guia: a demanda de especialista nasce na dupla
   // DPP. O chip conta o estado a quem olha a ficha; o botão some enquanto uma
   // solicitação está aberta (re-pedir é pra quando a anterior se resolveu)
@@ -303,11 +304,17 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
   // avaliação estrela do jovem (0071): links tokenizados são coord-only
   // (policy), a média agregada só faz sentido pro mentor DPP e as estrelas
   // da trilha especialista vêm da view definer — cada leitura no seu papel
-  const [avaliacaoLinks, mediaJovem, espAvaliacoes] = await Promise.all([
-    souCoord ? getAvaliacaoLinks(id) : Promise.resolve([]),
-    souMentor && !ehEsp ? getAvaliacaoMediaDpp(id) : Promise.resolve(null),
-    souMentor && ehEsp ? getEspecialistaAvaliacoes(id) : Promise.resolve([]),
-  ]);
+  const [avaliacaoLinks, mediaJovem, espAvaliacoes, devolutivasFeed] =
+    await Promise.all([
+      souCoord ? getAvaliacaoLinks(id) : Promise.resolve([]),
+      souMentor && !ehEsp ? getAvaliacaoMediaDpp(id) : Promise.resolve(null),
+      souMentor && ehEsp ? getEspecialistaAvaliacoes(id) : Promise.resolve([]),
+      // WP6: feed datado da trilha esp — a policy lê pro autor (o
+      // especialista) e pra coord; supervisor/mentor DPP não veem a coluna
+      ehEsp && (souMentor || souCoord)
+        ? getDevolutivasDupla(id)
+        : Promise.resolve([]),
+    ]);
   const linkAvalPorEncontro = new Map(
     avaliacaoLinks.map((l) => [l.encontro_id, l])
   );
@@ -329,7 +336,16 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
     dupla.status === "ativa" &&
     !solEmAberto &&
     (souMentor || souCoord);
-  const especialistas = podeSolicitar ? await getEspecialistas() : [];
+  // WP6: a sugestão mentor→jovem é do DPP da dupla — e só uma pendente por
+  // vez (a RPC deduplica; aqui a gente some o gesto em vez de errar depois)
+  const sugestaoPendente = solicitacoes.some((s) => s.status === "sugerida");
+  const podeSugerir =
+    !ehEsp &&
+    dupla.status === "ativa" &&
+    souMentor &&
+    !sugestaoPendente;
+  const especialistas =
+    podeSolicitar || podeSugerir ? await getEspecialistas() : [];
   // calendário oficial DA DUPLA (0061): só os eventos do cronograma dela.
   // Especialista e dupla histórica sem vínculo caem em [] — especialista
   // usa os 5 passos próprios; histórica vive do que está gravado (fallback
@@ -342,7 +358,7 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
   // contraditório (o RPC também barra)
   const sugestaoRemanejo =
     souCoord &&
-    saude.semaforo === "risco" &&
+    (saude.semaforo === "risco" || saude.apoio.aberto) &&
     (dupla.status === "ativa" || dupla.status === "pausada")
       ? await montarSugestaoRemanejo(dupla)
       : null;
@@ -437,11 +453,15 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
     !dupla.encerrada_em;
   // resumo da jornada — gerado dos dados; o "fim" é o carimbo do fechamento
   // (decisão DPP ou encerrada_em da trilha especialista)
+  // recorte do PDM pro resumo — mesma RPC já cacheada, deriva sem +1 RTT
+  const pdmResumo = !ehEsp ? await getPdmResumo(id) : null;
   const resumoJornada = dadosResumoJornada(
     dupla,
     passos,
     eventosDaDupla,
-    encerramento?.created_at ?? dupla.encerrada_em ?? null
+    encerramento?.created_at ?? dupla.encerrada_em ?? null,
+    new Date(),
+    pdmResumo
   );
   // bloco só vale a pena com história — dupla zerada mostra a trilha, não um
   // relatório vazio
@@ -449,6 +469,11 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
     resumoJornada.realizados > 0 ||
     !!encerramento?.tipo ||
     !!dupla.encerrada_em;
+
+  // concluída pelo automático (0102) com o rito ainda pendente — o mentor
+  // segue podendo mexer no registro do último encontro e nos anexos dele
+  const ritoPendente =
+    dupla.status === "concluida" && encerramento != null && !encerramento.tipo;
 
   // encontros depois do oficial da semana ficam colapsados (página tem 16
   // linhas). Na trilha especialista não há "semana oficial" — os 5 passos
@@ -522,79 +547,6 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
         .sort((a, b) => a.numero - b.numero)[0] ?? null)
     : null;
 
-  // overflow — os dialogs entram pelo trigger custom (Menu.Item é o
-  // Dialog.Trigger de fato); o keepMounted do Portal segura o dialog montado
-  // quando o menu fecha no clique
-  const maisItens: React.ReactNode[] = [];
-  if (pendenteRegistro && podeAgendar) {
-    maisItens.push(
-      <AgendarEncontroDialog
-        key="agendar"
-        duplaId={dupla.id}
-        numero={proximoNumero}
-        atual={encontroAlvo}
-        sugerido={sugeridoProximo}
-        piso={dupla.iniciada_em ?? undefined}
-        jovemNome={primeiroNomeMentorado}
-        trigger={
-          <DropdownMenuItem render={<button type="button" />} nativeButton>
-            <CalendarPlus aria-hidden /> Agendar encontro
-          </DropdownMenuItem>
-        }
-      />
-    );
-  }
-  if (souCoord) {
-    maisItens.push(
-      <EnviarFormularioDialog
-        key="form"
-        formularios={formulariosAtivos}
-        duplaId={dupla.id}
-        mentor={{
-          id: dupla.mentor.id,
-          nome: dupla.mentor.nome,
-          whatsapp: dupla.mentor.whatsapp,
-        }}
-        mentorado={{
-          id: dupla.mentorado.id,
-          nome: dupla.mentorado.nome,
-          whatsapp: dupla.mentorado.whatsapp,
-        }}
-        trigger={
-          <DropdownMenuItem render={<button type="button" />} nativeButton>
-            <PaperPlaneTilt aria-hidden /> Enviar formulário
-          </DropdownMenuItem>
-        }
-      />
-    );
-  }
-  if (podeSolicitar) {
-    maisItens.push(
-      <SolicitarEspecialistaDialog
-        key="esp"
-        duplaId={dupla.id}
-        especialistas={especialistas}
-        trigger={
-          <DropdownMenuItem render={<button type="button" />} nativeButton>
-            <UserPlus aria-hidden /> Solicitar mentor especialista
-          </DropdownMenuItem>
-        }
-      />
-    );
-  }
-  if (podeEncerrarTrilha) {
-    maisItens.push(
-      <EncerrarTrilhaDialog
-        key="trilha"
-        duplaId={dupla.id}
-        trigger={
-          <DropdownMenuItem render={<button type="button" />} nativeButton>
-            <FlagCheckered aria-hidden /> Encerrar trilha
-          </DropdownMenuItem>
-        }
-      />
-    );
-  }
   const renderEncontro = (passo: PassoGuia) => {
     // DPP: numero é a identidade do passo. Especialista (0074): numero é a
     // TENTATIVA — o passo é o rank entre realizados; várias tentativas miram
@@ -620,14 +572,20 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
         tentativasFalhas={tentativasFalhas}
         duplaId={dupla.id}
         souMentor={souMentor}
-        podeEditar={souMentor && dupla.status === "ativa"}
-        podeMarcar={souMentor || souCoord}
+        // registro/anexos do mentor seguem abertos na concluída-com-rito-
+        // -pendente (0102): o fechamento automático pode nascer de um
+        // retroativo sem follow-up, e o registro do 16º continua editável
+        podeEditar={souMentor && (dupla.status === "ativa" || ritoPendente)}
+        podeMarcar={(souMentor || souCoord) && dupla.status === "ativa"}
         ativa={dupla.status === "ativa"}
+        jornadaViva={
+          dupla.status === "ativa" || dupla.status === "pausada"
+        }
         souCoord={souCoord}
         autorId={me.id}
         // evidência é do mentor — coord só remove (moderação), sup só lê
-        podeAnexar={souMentor && dupla.status === "ativa"}
-        podeRemoverAnexos={souCoord || (souMentor && dupla.status === "ativa")}
+        podeAnexar={souMentor && (dupla.status === "ativa" || ritoPendente)}
+        podeRemoverAnexos={souCoord || (souMentor && (dupla.status === "ativa" || ritoPendente))}
         anexos={(enc?.registro && anexosPorRegistro[enc.registro.id]) || []}
         materiais={materiaisPorNumero.get(passo.numero) ?? []}
         combinadosPendentes={combinadosPendentes}
@@ -657,7 +615,14 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
         <VoltarLink fallback="/duplas" />
       </div>
 
-      <header className="flex flex-wrap items-start justify-between gap-4">
+      {/* hero da ficha — a dupla como identidade visual: a faixa lime→amarelo
+          repete a ordem dos nomes (mentor→mentorado) e as cores de papel do
+          logo. No resto da página cada cor volta a significar seu eixo */}
+      <header className="relative flex flex-wrap items-start justify-between gap-4 overflow-hidden rounded-xl bg-card px-4 py-4 shadow-[var(--shadow-border)] sm:px-5">
+        <span
+          aria-hidden
+          className="absolute inset-x-0 top-0 h-1 bg-[linear-gradient(90deg,var(--brand-lime),var(--role-mentorado))]"
+        />
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-balance">
             {/* par de avatares sobrepostos — a dupla como unidade visual (§4);
@@ -668,24 +633,35 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
                 mentorado={dupla.mentorado}
                 size={40}
                 linkar
-                sobrePapel
               />
             </span>
             <DuplaNomes mentor={dupla.mentor.nome} mentorado={dupla.mentorado.nome} />
           </h1>
           <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-            {/* pro mentor o próprio pedido de apoio não é "risco" — é um
-                pedido já recebido; o tom é "avisamos, relaxa", não alarme */}
-            {souMentor && saude.pediuApoio ? (
-              <span className="inline-flex items-center gap-2">
-                <SemaforoDot nivel="atencao" />
-                <span className="font-medium text-foreground">
-                  Apoio solicitado
-                </span>
-                <span>a coordenação entra em contato com você</span>
+            <SemaforoBadge nivel={saude.semaforo} motivo={saude.motivo} />
+            {/* pro mentor o próprio pedido de apoio é eixo separado (WP2):
+                um chamado já recebido ao lado do semáforo real — o tom é
+                "avisamos, relaxa", não alarme */}
+            {souMentor && saude.pediuApoio && (
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--info-border)] bg-[var(--info-bg)] px-2.5 py-1 text-[11px] font-semibold text-[var(--info-text)]">
+                <HandHeart size={12} aria-hidden />
+                Apoio solicitado
+                <span className="font-normal">· a coordenação entra em contato</span>
               </span>
-            ) : (
-              <SemaforoBadge nivel={saude.semaforo} motivo={saude.motivo} />
+            )}
+            {/* apoio aberto é eixo separado do semáforo (WP2): pra equipe a
+                jornada pode estar em dia E ter chamado — o pill azul mostra
+                o trabalho sem fingir falha da dupla */}
+            {!souMentor && saude.apoio.aberto && (
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--info-border)] bg-[var(--info-bg)] px-2.5 py-1 text-[11px] font-semibold text-[var(--info-text)]">
+                <HandHeart size={12} aria-hidden />
+                Apoio aberto
+                {saude.apoio.origem === "mentorado"
+                  ? " · do mentorado"
+                  : saude.apoio.origem === "ambos"
+                    ? " · dos dois"
+                    : ""}
+              </span>
             )}
             {/* mono fica só no contador — "encontros" é prosa, volta pro sans */}
             <span><span className="font-mono">{saude.feitos}/{total}</span> encontros</span>
@@ -817,34 +793,70 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
             (dupla.status === "ativa" || dupla.status === "pausada") && (
               <RemanejarDuplaDialog dupla={dupla} />
             )}
-          {maisItens.length > 0 && (
-            <DropdownMenu>
-              <DropdownMenuTrigger
-                render={
-                  <Button variant="outline" size="sm">
-                    <DotsThree size={16} weight="bold" /> Mais
-                  </Button>
-                }
-              />
-              <MenuPrimitive.Portal keepMounted>
-                <MenuPrimitive.Positioner
-                  className="isolate z-50 outline-none"
-                  align="end"
-                  sideOffset={4}
-                >
-                  <MenuPrimitive.Popup className={MENU_POPUP}>
-                    {maisItens}
-                  </MenuPrimitive.Popup>
-                </MenuPrimitive.Positioner>
-              </MenuPrimitive.Portal>
-            </DropdownMenu>
-          )}
+          {/* overflow de segunda ordem — cada prop-grupo presente vira um
+              item; os dialogs moram dentro do componente, fora do popup
+              (REALIZA-157). Some sozinho quando nenhuma ação se aplica */}
+          <DuplaMaisMenu
+            duplaId={dupla.id}
+            agendar={
+              pendenteRegistro && podeAgendar
+                ? {
+                    numero: proximoNumero,
+                    atual: encontroAlvo,
+                    sugerido: sugeridoProximo,
+                    piso: dupla.iniciada_em ?? undefined,
+                    jovemNome: primeiroNomeMentorado,
+                  }
+                : null
+            }
+            formulario={
+              souCoord &&
+              (dupla.status === "ativa" || dupla.status === "pausada")
+                ? {
+                    formularios: formulariosAtivos,
+                    mentor: {
+                      id: dupla.mentor.id,
+                      nome: dupla.mentor.nome,
+                      whatsapp: dupla.mentor.whatsapp,
+                    },
+                    mentorado: {
+                      id: dupla.mentorado.id,
+                      nome: dupla.mentorado.nome,
+                      whatsapp: dupla.mentorado.whatsapp,
+                    },
+                  }
+                : null
+            }
+            solicitar={podeSolicitar ? { especialistas } : null}
+            sugerir={
+              podeSugerir
+                ? {
+                    mentoradoId: dupla.mentorado.id,
+                    nomeJovem: dupla.mentorado.nome,
+                    especialistas,
+                  }
+                : null
+            }
+            encerrar={podeEncerrarTrilha}
+          />
         </div>
       </header>
 
       {/* trilha da jornada — visível e read-only pra todos os papéis (é fato,
-          não placar); o brinde de marco é só do mentor */}
-      <section className="rounded-xl bg-card px-4 py-3.5 shadow-[var(--shadow-border)]">
+          não placar); o brinde de marco é só do mentor. A borda esquerda
+          carrega o semáforo — mesmo idioma do tomCard da lista de duplas */}
+      <section
+        className={cn(
+          "rounded-xl border-l-4 bg-card px-4 py-3.5 shadow-[var(--shadow-border)]",
+          dupla.status !== "ativa"
+            ? "border-l-muted-foreground/40"
+            : saude.semaforo === "risco"
+              ? "border-l-[var(--danger)]"
+              : saude.semaforo === "atencao" || saude.apoio.aberto
+                ? "border-l-[var(--warn)]"
+                : "border-l-[var(--ok)]"
+        )}
+      >
         <TrilhaJornada
           jornada={jornada}
           statusDupla={dupla.status}
@@ -862,7 +874,18 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
       {sugestaoRemanejo && (
         <RemanejoSugerido
           dupla={dupla}
-          motivo={saude.motivo}
+          // semáforo aceso explica pela jornada; apoio sozinho (dupla em
+          // dia + chamado) explica pelo eixo de trabalho — "Em dia." não
+          // sustenta a frase de remanejo
+          motivo={
+            saude.semaforo !== "ok"
+              ? saude.motivo
+              : saude.apoio.origem === "mentorado"
+                ? "Pedido de apoio aberto pelo mentorado"
+                : saude.apoio.origem === "ambos"
+                  ? "Pedidos de apoio abertos nos dois lados"
+                  : "Pedido de apoio aberto pelo mentor"
+          }
           mentores={sugestaoRemanejo.mentores}
           mentorados={sugestaoRemanejo.mentorados}
           agoraMs={sugestaoRemanejo.agoraMs}
@@ -879,11 +902,12 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
               antes do 1º encontro e pra coordenação acompanhar */}
           {ehEsp && (
             <section className="rounded-xl bg-card p-4 text-sm space-y-2 shadow-[var(--shadow-border)]">
-              <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+              <h2 className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                <span aria-hidden className="size-1.5 rounded-full bg-[var(--info)]" />
                 Contexto
               </h2>
               {dupla.demanda ? (
-                <p className="whitespace-pre-line text-muted-foreground">
+                <p className="whitespace-pre-line break-words text-muted-foreground">
                   {dupla.demanda}
                 </p>
               ) : (
@@ -897,13 +921,19 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
           )}
           {/* depois do fechamento a trilha conta o desfecho: motivo + a
               devolutiva que seguiu pro PDM do jovem */}
-          {ehEsp && <TrilhaFechamento dupla={dupla} />}
+          {ehEsp && (
+            <TrilhaFechamento dupla={dupla} avaliacao={avaliacaoEsp} />
+          )}
+          {/* sem combinados a seção não rende nada — some de vez (os links
+              #combinados só nascem quando existe pendente pra marcar) */}
+          {(dupla.encaminhamentos?.length ?? 0) > 0 && (
           <section
             id="combinados"
             className="scroll-mt-20 rounded-xl bg-card p-4 shadow-[var(--shadow-border)]"
           >
             <div className="mb-1 flex items-center justify-between gap-2">
-              <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+              <h2 className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                <span aria-hidden className="size-1.5 rounded-full bg-[var(--info)]" />
                 Combinados
               </h2>
               {/* sem WhatsApp o botão fica desabilitado com a razão visível —
@@ -920,22 +950,33 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
             </div>
             <p className="mb-2 text-xs text-muted-foreground">
               Tarefas que a dupla combinou nos encontros
-              {(souMentor || souCoord) && ". Marque quando forem feitas"}.
+              {(souMentor || souCoord) &&
+                (dupla.status === "ativa" || dupla.status === "pausada") &&
+                ". Marque quando forem feitas"}.
             </p>
             <EncaminhamentosList
               itens={dupla.encaminhamentos}
               duplaId={dupla.id}
-              podeEditar={souMentor}
-              podeMarcar={souMentor || souCoord}
+              podeEditar={
+                souMentor &&
+                (dupla.status === "ativa" || dupla.status === "pausada")
+              }
+              podeMarcar={
+                (souMentor || souCoord) &&
+                (dupla.status === "ativa" || dupla.status === "pausada")
+              }
               hoje={hojeStr}
               encontroNumeroPorRegistroId={encontroNumeroPorRegistroId}
             />
           </section>
+          )}
 
           <ArquivosDupla arquivos={arquivosDaDupla} />
 
           <section className="rounded-xl bg-card p-4 text-sm space-y-2 shadow-[var(--shadow-border)]">
-            <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+            <h2 className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+              {/* papel da pessoa no dot — amarelo do jovem, gramática da §1 */}
+              <span aria-hidden className="size-1.5 rounded-full bg-[var(--role-mentorado)]" />
               Mentorado
             </h2>
             {/* avatar+nome num link só (padrão da lista de pessoas) */}
@@ -1000,30 +1041,9 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
                 ]}
               />
             )}
-            {/* PDM do mentorado — o link é mantido pelo mentor da dupla (RPC
-                definir_pdm_url; UPDATE em duplas é coord-only) ou pela
-                coordenação. Preenchido vira saída direta pra todos os papéis */}
-            {(linkSeguro(dupla.pdm_url) ||
-              ((souMentor || souCoord) &&
-                (dupla.status === "ativa" || dupla.status === "pausada"))) && (
-              <div className="flex flex-wrap items-center gap-1 pt-1">
-                {linkSeguro(dupla.pdm_url) && (
-                  <a
-                    href={linkSeguro(dupla.pdm_url)!}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={buttonVariants({ variant: "outline", size: "sm" })}
-                  >
-                    <BookOpen />
-                    Abrir PDM
-                  </a>
-                )}
-                {(souMentor || souCoord) &&
-                  (dupla.status === "ativa" || dupla.status === "pausada") && (
-                    <PdmUrlDialog duplaId={dupla.id} atual={dupla.pdm_url ?? null} />
-                  )}
-              </div>
-            )}
+            {/* PDM vive no instrumento nativo (0080) — o link externo
+                (pdm_url, 0044) foi removido na 0098; PDMs antigos entram
+                por importação de materiais. */}
           </section>
 
           {/* voz do jovem (0071) — o recorte que cada papel pode ler:
@@ -1056,10 +1076,40 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
               itens={instrumentos}
               mentoradoNome={dupla.mentorado.nome}
               mentoradoWhatsapp={dupla.mentorado.whatsapp}
-              podeEnviar={
-                souCoord ||
-                (souMentor &&
-                  (dupla.status === "ativa" || dupla.status === "pausada"))
+              podeEnviar={souCoord || souMentor}
+              jornadaViva={
+                dupla.status === "ativa" || dupla.status === "pausada"
+              }
+            />
+          )}
+
+          {/* o PDM vivo (REALIZA-181) — logo depois dos instrumentos que o
+              alimentam: o mentor edita (a jovem edita na área dela), coord
+              e supervisor leem o mesmo documento */}
+          {!ehEsp && pdm && (
+            <PdmDupla
+              duplaId={dupla.id}
+              doc={pdm}
+              mentoradoNome={dupla.mentorado.nome}
+              podeEditar={
+                souMentor &&
+                (dupla.status === "ativa" || dupla.status === "pausada")
+              }
+            />
+          )}
+
+          {/* avaliação por terceiros (0103) — semana 1→2 do guia: convites
+              por link, respostas identificadas pro mentor, síntese anônima
+              pro jovem. Mesmo escopo dos instrumentos: DPP + jornada viva */}
+          {!ehEsp && terceiros && (
+            <TerceirosDupla
+              duplaId={dupla.id}
+              contatos={terceiros.contatos}
+              consolidacao={terceiros.consolidacao}
+              mentoradoNome={dupla.mentorado.nome_social ?? dupla.mentorado.nome}
+              podeGerenciar={souCoord || souMentor}
+              jornadaViva={
+                dupla.status === "ativa" || dupla.status === "pausada"
               }
             />
           )}
@@ -1109,15 +1159,29 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
             (solEmAberto.status_efetivo ?? solEmAberto.status) !==
               "aguardando_coord" && (
               <section className="rounded-xl bg-card p-4 text-sm space-y-3 shadow-[var(--shadow-border)]">
-                <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                <h2 className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                  <span aria-hidden className="size-1.5 rounded-full bg-[var(--info)]" />
                   Pedido de especialista
                 </h2>
+                {/* papel-no-contexto (WP6b): o componente só habilita o lado
+                    especialista quando o visitante é o alvo/desejado ou o
+                    pedido é broadcast — informar o papel efetivo é seguro e
+                    destrava o híbrido DPP-primário */}
                 <SolicitacaoNegociacao
                   s={solEmAberto}
                   propostas={propostasAberta}
                   slots={slotsEsp}
                   meuId={me.id}
-                  papel={me.role}
+                  papel={
+                    temPapel(me, "mentor_especialista")
+                      ? "mentor_especialista"
+                      : me.role
+                  }
+                  mentoradosProprios={
+                    souMentor && dupla.trilha !== "especialista"
+                      ? [dupla.mentorado.id]
+                      : undefined
+                  }
                 />
               </section>
             )}
@@ -1125,6 +1189,41 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
           {/* a trilha de especialista devolve o resultado pro PDM — chega ao
               mentor DPP pela solicitação que ele abriu */}
           {!ehEsp && <DevolutivaEspecialista solicitacoes={solicitacoes} />}
+
+          {/* WP6: feed datado das devolutivas da trilha esp — o especialista
+              posta ao longo do percurso e o jovem lê na página dele; a
+              entrega final segue na devolutiva_pdm do encerramento */}
+          {ehEsp && (devolutivasFeed.length > 0 || souMentor) && (
+            <section className="rounded-xl bg-card p-4 text-sm space-y-3 shadow-[var(--shadow-border)]">
+              <h2 className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                <span aria-hidden className="size-1.5 rounded-full bg-[var(--info)]" />
+                Devolutivas da trilha
+              </h2>
+              {devolutivasFeed.length > 0 && (
+                <ul className="space-y-3">
+                  {devolutivasFeed.map((v) => (
+                    <li key={v.id} className="space-y-1">
+                      <blockquote className="rounded-lg border-l-2 border-[var(--brand-lime)] bg-muted/30 px-3 py-2 text-muted-foreground">
+                        <p className="whitespace-pre-line break-words">{v.texto}</p>
+                      </blockquote>
+                      <p className="text-xs text-muted-foreground">
+                        {v.autor?.nome ?? "O especialista"} ·{" "}
+                        {formatDateTime(v.created_at)}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {/* o especialista da dupla posta enquanto a trilha segue
+                  aberta — depois do encerramento a devolutiva final é a
+                  devolutiva_pdm */}
+              {souMentor &&
+                (dupla.status === "ativa" || dupla.status === "pausada") &&
+                dupla.encerrada_em == null && (
+                  <DevolutivaComposer duplaId={dupla.id} />
+                )}
+            </section>
+          )}
 
           {/* o rito de fechamento do ciclo DPP: checklist da coordenação +
               decisão; a autoavaliação é a parte do mentor */}
@@ -1136,6 +1235,7 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
               souCoord={souCoord}
               formularios={formulariosAtivos}
               avaliacao360Em={avaliacao360Em}
+              realizadosCount={realizadosCount}
             />
           )}
         </aside>
@@ -1147,7 +1247,8 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
                 uma vez só: as datas das linhas são as do guia do ciclo —
                 a dupla confirma ou remarca (a real aparece como "agendado
                 {data}" na própria linha) */}
-            <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+            <h2 className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+              <span aria-hidden className="size-1.5 rounded-full bg-[var(--brand-lime)]" />
               Encontros
               <span className="font-normal normal-case tracking-normal">
                 {" "}
@@ -1230,6 +1331,7 @@ function EncontroRow({
   urlBase,
   jovemNome,
   jovemWhatsapp,
+  jornadaViva,
 }: {
   /** Passo do guia da trilha (data sugerida no DPP; sem data no especialista). */
   passo: PassoGuia;
@@ -1275,9 +1377,17 @@ function EncontroRow({
   urlBase: string;
   jovemNome: string;
   jovemWhatsapp: string | null;
+  /** Dupla viva (ativa|pausada) — destrava as ações de link da pendência
+   *  de avaliação; fechada deixa só o aviso como fato. */
+  jornadaViva: boolean;
 }) {
   const feito = encontro?.status === "realizado";
   const naoAconteceu = encontro?.status === "nao_aconteceu";
+  // agendado/remarcado com horário marcado = compromisso firmado — o disco
+  // ganha o tom da trilha; "a combinar" segue neutro (é só o passo do guia)
+  const marcado =
+    (encontro?.status === "agendado" || encontro?.status === "remarcado") &&
+    !!encontro.data_hora;
   const reg = encontro?.registro;
   // realizado sem registro — a dupla deve o follow-up; marca a linha em warn
   // suave. Em dupla pausada/encerrada ninguém pode registrar: a badge e a
@@ -1366,10 +1476,12 @@ function EncontroRow({
     <div
       id={encontro ? `registrar-${encontro.id}` : undefined}
       className={cn(
-        // border-transparent: a borda fica reservada pro estado de apoio; quem
-        // desenha a aresta no estado normal é o anel do shadow-border
+        // border-transparent: a borda fica reservada pro estado; quem desenha
+        // a aresta no estado normal é o anel do shadow-border
         "scroll-mt-20 overflow-hidden rounded-xl border border-transparent bg-card shadow-[var(--shadow-border)]",
-        reg?.precisa_apoio && "border-[var(--danger)]/50"
+        reg?.precisa_apoio
+          ? "border-[var(--danger)]/50"
+          : registroPendente && "border-[var(--warn)]/50"
       )}
     >
       <div
@@ -1381,14 +1493,17 @@ function EncontroRow({
         <div className="flex min-w-0 flex-1 items-center gap-4">
           <span
             className={cn(
-              // disco do nº do encontro — mesma gramática da agenda: lime cheio =
-              // aconteceu; muted = futuro/agendado; riscado = não aconteceu
+              // disco do nº do encontro — lime cheio = aconteceu; lime de
+              // contorno = compromisso firmado (agendado/remarcado); muted =
+              // passo do guia ainda sem data; riscado = não aconteceu
               "grid size-8 shrink-0 place-items-center rounded-full font-mono text-xs font-semibold tabular-nums",
               feito
                 ? "bg-[var(--brand-lime)] text-[var(--brand-ink)]"
                 : naoAconteceu
                   ? "bg-muted text-muted-foreground/60 line-through"
-                  : "bg-muted text-muted-foreground"
+                  : marcado
+                    ? "bg-[var(--brand-lime)]/20 text-[var(--brand-ink)] ring-1 ring-[var(--brand-lime)]/60"
+                    : "bg-muted text-muted-foreground"
             )}
           >
             {passo.numero}
@@ -1530,7 +1645,8 @@ function EncontroRow({
           className="border-t border-border/60 bg-muted/50 shadow-[var(--shadow-inset)]"
           summary={
             <>
-              <span className="shrink-0 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+              <span className="flex shrink-0 items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                <span aria-hidden className="size-1.5 rounded-full bg-[var(--brand-lime)]" />
                 Registro
               </span>
               {reg.precisa_apoio && (
@@ -1609,6 +1725,8 @@ function EncontroRow({
             jovemWhatsapp={jovemWhatsapp}
             numero={passo.numero}
             souCoord={souCoord}
+            duplaId={duplaId}
+            jornadaViva={jornadaViva}
           />
         )}
       {/* especialista: só a estrela — a view definer é o recorte inteiro */}

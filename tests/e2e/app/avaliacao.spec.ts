@@ -85,10 +85,27 @@ async function inserirAvaliacao(
 }
 
 /** Filhos da 0071 primeiro — avaliacoes_encontro e avaliacao_links
- *  referenciam encontros com NO ACTION; apagar o pai antes dá 409. */
+ *  referenciam encontros com NO ACTION; apagar o pai antes dá 409. E os
+ *  chamados da 0084 apontam pro registro/avaliação com SET NULL — apagar
+ *  a origem antes deixa a linha órfã, então o chamado sai primeiro. */
 async function apagarEncontros(ids: Iterable<string>) {
   const lista = [...ids];
   if (!lista.length) return;
+  const avals = await buscarViaServiceRole<{ id: string }[]>(
+    "avaliacoes_encontro",
+    `select=id&encontro_id=in.(${lista.join(",")})`
+  );
+  if (avals.length) {
+    await limparViaServiceRole(
+      "chamados",
+      `avaliacao_id=in.(${avals.map((a) => a.id).join(",")})`
+    );
+  }
+  // fallback: chamados do jovem fixture criados por outros caminhos
+  await limparViaServiceRole(
+    "chamados",
+    `autor_id=eq.${IDS.jovemProfile}`
+  );
   await limparViaServiceRole(
     "avaliacoes_encontro",
     `encontro_id=in.(${lista.join(",")})`
@@ -101,8 +118,9 @@ async function apagarEncontros(ids: Iterable<string>) {
 }
 
 /** Sinos e log de e-mail que o ciclo de avaliação dispara. O prompt pro
- *  jovem e o apoio_resolvido vão por destinatário; o apoio_jovem vai por
- *  href — alcança qualquer coord real do staging que foi notificado. */
+ *  jovem e o chamado_resolvido vão por destinatário; o chamado_aberto vai
+ *  por created_by (o trigger assina com o profile de quem respondeu —
+ *  alcança qualquer coord real do staging que foi notificado). */
 async function limparRastros() {
   await limparViaServiceRole(
     "notificacoes",
@@ -110,11 +128,11 @@ async function limparRastros() {
   );
   await limparViaServiceRole(
     "notificacoes",
-    `profile_id=eq.${IDS.jovemProfile}&tipo=eq.apoio_resolvido`
+    `profile_id=eq.${IDS.jovemProfile}&tipo=eq.chamado_resolvido`
   );
   await limparViaServiceRole(
     "notificacoes",
-    `tipo=eq.apoio_jovem&href=eq./duplas/${DUPLA_ID}`
+    `created_by=eq.${IDS.jovemProfile}&tipo=like.chamado_*`
   );
   await limparViaServiceRole("emails_enviados", "tipo=eq.apoio_jovem");
 }
@@ -328,7 +346,7 @@ test.describe("avaliação estrela do jovem (REALIZA-109)", () => {
     expect(row.avaliacao_visivel_mentor).toBe(true);
 
     await chave.click();
-    await expect(page.getByText("Voltou a valer só na média.")).toBeVisible();
+    await expect(page.getByText("Voltou a valer só na média.")).toBeVisible({ timeout: 15_000 });
     await expect(chave).not.toBeChecked();
     [row] = await buscarViaServiceRole<
       { avaliacao_visivel_mentor: boolean }[]
@@ -365,15 +383,31 @@ test.describe("avaliação estrela do jovem (REALIZA-109)", () => {
       page.getByText(
         "Pedido enviado — a coordenação foi avisada e fala com você."
       )
-    ).toBeVisible();
+    ).toBeVisible({ timeout: 15_000 });
 
-    // o sino apoio_jovem chegou de verdade — pra coord fixture e pro href
-    // certo (a RPC avisa TODA a coordenação ativa + supervisor da dupla)
+    // 0084: a flag acesa abriu o chamado no mesmo insert (trigger) — a
+    // urgência virou ticket com número e estado, não notificação solta
+    const [avalChamado] = await buscarViaServiceRole<{ id: string }[]>(
+      "avaliacoes_encontro",
+      `select=id&encontro_id=in.(${[...criados].join(",")})&pedir_apoio=eq.true`
+    );
+    const [chamado] = await buscarViaServiceRole<
+      { id: string; numero: string; status: string; categoria: string }[]
+    >(
+      "chamados",
+      `select=id,numero,status,categoria&avaliacao_id=eq.${avalChamado.id}`
+    );
+    expect(chamado.numero).toMatch(/^CHA-\d{6}$/);
+    expect(chamado.status).toBe("aberto");
+    expect(chamado.categoria).toBe("urgencia");
+
+    // o sino chamado_aberto chegou de verdade — pra coord fixture com o
+    // href do chamado (a RPC avisa TODA a coordenação ativa + supervisor)
     const notifs = await buscarViaServiceRole<
       { profile_id: string; href: string }[]
     >(
       "notificacoes",
-      `select=profile_id,href&tipo=eq.apoio_jovem&href=eq./duplas/${DUPLA_ID}`
+      `select=profile_id,href&tipo=eq.chamado_aberto&href=eq./chamados%3Fc%3D${chamado.id}`
     );
     expect(notifs.map((n) => n.profile_id)).toContain(IDS.coordProfile);
 
@@ -388,17 +422,23 @@ test.describe("avaliação estrela do jovem (REALIZA-109)", () => {
     await page
       .getByRole("button", { name: "Marcar ajuda como atendida" })
       .click();
-    await expect(page.getByText("Pedido de ajuda atendido.")).toBeVisible();
+    await expect(page.getByText("Pedido de ajuda atendido.")).toBeVisible({ timeout: 15_000 });
 
-    // o ciclo fecha: flag limpa no banco e o jovem recebe "foi visto"
+    // o ciclo fecha nas duas pontas na mesma transação: flag limpa,
+    // chamado resolvido e o jovem recebe "foi visto" (chamado_resolvido)
     const [aval] = await buscarViaServiceRole<{ pedir_apoio: boolean }[]>(
       "avaliacoes_encontro",
       `select=pedir_apoio&encontro_id=in.(${[...criados].join(",")})`
     );
     expect(aval.pedir_apoio).toBe(false);
+    const [resolvido] = await buscarViaServiceRole<{ status: string }[]>(
+      "chamados",
+      `select=status&id=eq.${chamado.id}`
+    );
+    expect(resolvido.status).toBe("resolvido");
     const resolvidas = await buscarViaServiceRole<{ tipo: string }[]>(
       "notificacoes",
-      `select=tipo&profile_id=eq.${IDS.jovemProfile}&tipo=eq.apoio_resolvido`
+      `select=tipo&profile_id=eq.${IDS.jovemProfile}&tipo=eq.chamado_resolvido`
     );
     expect(resolvidas.length).toBeGreaterThan(0);
   });

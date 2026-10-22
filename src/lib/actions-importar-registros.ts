@@ -54,7 +54,7 @@ async function universoRegistros(supabase: Supa): Promise<{
   universo: UniversoReg;
   encPorDuplaNumero: Map<string, EncontroInfo>;
 }> {
-  const [{ data: mentores }, { data: mentorados }, { data: duplas }, { data: encs }] =
+  const [{ data: mentoresRole }, { data: mentorados }, { data: duplas }, { data: encs }, { data: eventos }] =
     await Promise.all([
       supabase
         .from("profiles")
@@ -64,10 +64,28 @@ async function universoRegistros(supabase: Supa): Promise<{
       supabase
         .from("duplas")
         .select(
-          "id, mentor_id, mentorado_id, status, trilha, mentor:profiles!duplas_mentor_id_fkey(nome), mentorado:mentorados!duplas_mentorado_id_fkey(nome)"
+          "id, mentor_id, mentorado_id, status, trilha, cronograma_id, iniciada_em, mentor:profiles!duplas_mentor_id_fkey(nome), mentorado:mentorados!duplas_mentorado_id_fkey(nome)"
         ),
-      supabase.from("encontros").select("dupla_id, numero, status, registros(id)"),
+      supabase.from("encontros").select("dupla_id, numero, status, data_hora, registros(id)"),
+      supabase
+        .from("ciclo_eventos")
+        .select("cronograma_id, numero, data")
+        .eq("tipo", "encontro"),
     ]);
+  // mentor_id é FK nua — mentor com papel híbrido (coord/supervisor que
+  // também mentora) não aparece no filtro por role. Pool completo =
+  // roles + todo id referenciado em duplas, senão ele pontua 0 sempre.
+  const temMentor = new Set((mentoresRole ?? []).map((m) => m.id));
+  const faltam = [
+    ...new Set((duplas ?? []).map((d) => d.mentor_id).filter(Boolean)),
+  ].filter((id) => !temMentor.has(id!));
+  const { data: mentoresExtra } = faltam.length
+    ? await supabase
+        .from("profiles")
+        .select("id, nome, nome_social")
+        .in("id", faltam as string[])
+    : { data: [] as { id: string; nome: string; nome_social: string | null }[] };
+  const mentores = [...(mentoresRole ?? []), ...(mentoresExtra ?? [])];
   const norm = (v: unknown) => (Array.isArray(v) ? (v[0] ?? null) : v);
   const duplasRef: DuplaCandidata[] = (duplas ?? []).map((d) => {
     const mentor = norm(d.mentor) as { nome: string } | null;
@@ -78,11 +96,14 @@ async function universoRegistros(supabase: Supa): Promise<{
       mentorado_id: d.mentorado_id,
       status: d.status,
       trilha: d.trilha,
+      cronograma_id: d.cronograma_id,
+      iniciada_em: d.iniciada_em,
       mentorNome: mentor?.nome ?? "?",
       mentoradoNome: mentorado?.nome ?? "?",
     };
   });
   const encPorDuplaNumero = new Map<string, EncontroInfo>();
+  const encontros = new Map<string, Map<number, { status: string; data: string | null }>>();
   for (const e of encs ?? []) {
     const regs = e.registros as unknown;
     const temRegistro = Array.isArray(regs) ? regs.length > 0 : regs != null;
@@ -90,12 +111,24 @@ async function universoRegistros(supabase: Supa): Promise<{
       `${e.dupla_id}|${e.numero}`,
       temRegistro ? "atualiza" : "anexa"
     );
+    let porNumero = encontros.get(e.dupla_id);
+    if (!porNumero) encontros.set(e.dupla_id, (porNumero = new Map()));
+    porNumero.set(e.numero, { status: e.status, data: e.data_hora });
+  }
+  const calendario = new Map<string, Map<number, string>>();
+  for (const ev of eventos ?? []) {
+    if (ev.numero == null || !ev.data) continue;
+    let porNumero = calendario.get(ev.cronograma_id);
+    if (!porNumero) calendario.set(ev.cronograma_id, (porNumero = new Map()));
+    porNumero.set(ev.numero, ev.data);
   }
   return {
     universo: {
       mentores: mentores ?? [],
       mentorados: mentorados ?? [],
       duplas: duplasRef,
+      calendario,
+      encontros,
     },
     encPorDuplaNumero,
   };
@@ -123,15 +156,31 @@ export async function previewImportRegistros(csvText: string) {
   const { linhas, stats } = processaLinhas(cruas, universo);
   const enriquecidas: LinhaPrev[] = linhas.map((l) => ({
     ...l,
-    encontroInfo: l.duplaId
-      ? (encPorDuplaNumero.get(`${l.duplaId}|${l.numero}`) ?? "novo")
-      : null,
+    encontroInfo:
+      l.duplaId && l.numero != null
+        ? (encPorDuplaNumero.get(`${l.duplaId}|${l.numero}`) ?? "novo")
+        : null,
   }));
+  // mapa dupla → (nº → estado) pro client recomputar o tag quando a
+  // pessoa troca o Select — sem ele, linha manual nunca avisaria que a
+  // dupla escolhida já tem registro
+  const encPorDupla: Record<string, Record<number, EncontroInfo>> = {};
+  for (const [k, v] of encPorDuplaNumero) {
+    const [duplaId, numero] = k.split("|");
+    (encPorDupla[duplaId] ??= {})[Number(numero)] = v;
+  }
   // todas as duplas ordenadas pro Select das linhas 'revisar'
   const duplas = [...universo.duplas].sort((a, b) =>
     a.mentoradoNome.localeCompare(b.mentoradoNome, "pt-BR")
   );
-  return { ok: true as const, linhas: enriquecidas, duplas, stats, ignoradas };
+  return {
+    ok: true as const,
+    linhas: enriquecidas,
+    duplas,
+    encPorDupla,
+    stats,
+    ignoradas,
+  };
 }
 
 const UUID_RE =
@@ -156,7 +205,8 @@ export async function executarImportRegistros(linhas: LinhaReg[]) {
   if (eu.role !== "coordenacao") {
     return { error: "Só a coordenação importa registros." };
   }
-  const saneadas = (linhas ?? []).map(saneiaLinhaReg);
+  if (!Array.isArray(linhas)) return { error: "Lote inválido." };
+  const saneadas = linhas.map(saneiaLinhaReg);
   if (saneadas.length > MAX_IMPORT) {
     return {
       error: `O lote tem ${saneadas.length} respostas. Importe em lotes de até ${MAX_IMPORT}.`,
@@ -172,6 +222,9 @@ export async function executarImportRegistros(linhas: LinhaReg[]) {
 
   const itens: { linha: LinhaReg; item: NonNullable<ReturnType<typeof itemRpc>> }[] = [];
   const puladas: string[] = [];
+  // (dupla, numero) é unique — duas linhas apontando pro mesmo encontro
+  // na mesma leva faziam a segunda sobrescrever a primeira em silêncio
+  const vistos = new Map<string, number>();
   saneadas.forEach((l) => {
     const item = itemRpc(l);
     if (!item || !UUID_RE.test(l.duplaId ?? "") || !validas.has(l.duplaId!)) {
@@ -182,6 +235,15 @@ export async function executarImportRegistros(linhas: LinhaReg[]) {
       );
       return;
     }
+    const chave = `${l.duplaId}|${l.numero}`;
+    const colide = vistos.get(chave);
+    if (colide != null) {
+      puladas.push(
+        `Linha ${l.n}: mesma dupla e nº da linha ${colide} — só uma entra`
+      );
+      return;
+    }
+    vistos.set(chave, l.n);
     itens.push({ linha: l, item });
   });
   if (!itens.length) {

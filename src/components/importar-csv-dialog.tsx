@@ -19,7 +19,7 @@ import { parseCsvPares, type LinhaPar, type PreviewPar } from "@/lib/importar-du
 import { formatDate } from "@/lib/ciclo";
 import { Button } from "@/components/ui/button";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
+  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -44,7 +44,7 @@ const DICAS: Record<Tipo, string> = {
   mentorados:
     "Colunas: nome, whatsapp, email, ong, notas e a ficha opcional: nome_social, data_nascimento (dd/mm/aaaa), genero, cor_raca, cidade, uf, escolaridade, interesses (por vírgula), objetivos, motivacao, pref_genero_par, origem, disponibilidade (JSON {dias,periodos}) e form_bruto (JSON). Só o nome é obrigatório. Documentos pro termo: rg, cpf, cep, logradouro, numero, complemento, bairro; e do responsável: resp_nome, resp_parentesco, resp_rg, resp_cpf, resp_nascimento, resp_cidade, resp_uf, resp_cep, resp_logradouro, resp_numero, resp_complemento, resp_bairro.",
   duplas:
-    "Uma linha = uma dupla. Obrigatórias: mentor e mentorado (nome ou e-mail — nome resolve sem acento e aceita o nome de exibição, ex.: \"Juliana Novaes\" acha \"Juliana Novaes de Oliveira\"; apelido que não é pedaço do nome não resolve — prefira o e-mail). Opcionais: auxiliar executivo (nome ou e-mail — informado e não achado falha a linha), turma (label exato, ex.: \"T2 · 2026/2027\"; em branco só vale quando existe um único cronograma ativo), demanda/eixo e iniciada_em (dd/mm/aaaa ou aaaa-mm-dd). Cada linha vira uma dupla ativa: a trilha sai do papel do mentor, a demanda vai pro campo demanda e, sem iniciada_em, a dupla DPP nasce uma semana antes do 1º encontro do cronograma. Par já existente (ativo ou pausado), mentor sem vaga e nome ambíguo pulam a linha — nada é gravado antes da prévia.",
+    "Uma linha = uma dupla. Obrigatórias: mentor e mentorado (nome ou e-mail — nome resolve sem acento e aceita o nome de exibição, ex.: \"Juliana Novaes\" acha \"Juliana Novaes de Oliveira\"; apelido que não é pedaço do nome não resolve — prefira o e-mail). Opcionais: auxiliar executivo (nome ou e-mail — informado e não achado falha a linha), trilha (dpp ou especialista — obrigatória só quando o mentor tem os dois papéis; sem a coluna a trilha sai do papel dele), turma (label exato, ex.: \"T2 · 2026/2027\"; em branco só vale quando existe um único cronograma ativo), demanda/eixo e iniciada_em (dd/mm/aaaa ou aaaa-mm-dd). Cada linha vira uma dupla ativa: a demanda vai pro campo demanda e, sem iniciada_em, a dupla DPP nasce uma semana antes do 1º encontro do cronograma. Par já existente (ativo ou pausado), mentor sem vaga e nome ambíguo pulam a linha — nada é gravado antes da prévia.",
 };
 
 const MODELO: Record<Tipo, string> = {
@@ -53,7 +53,7 @@ const MODELO: Record<Tipo, string> = {
   mentorados:
     "nome;whatsapp;email;ong;notas;nome_social;data_nascimento;genero;cor_raca;cidade;uf;escolaridade;interesses;objetivos;motivacao;pref_genero_par;origem;disponibilidade;form_bruto;rg;cpf;cep;logradouro;numero;complemento;bairro;resp_nome;resp_parentesco;resp_rg;resp_cpf;resp_nascimento;resp_cidade;resp_uf;resp_cep;resp_logradouro;resp_numero;resp_complemento;resp_bairro",
   duplas:
-    "mentor;mentorado;auxiliar executivo;turma;demanda;iniciada_em",
+    "mentor;mentorado;trilha;auxiliar executivo;turma;demanda;iniciada_em",
 };
 
 /** Campos da ficha (0034) + civis (0046) reconhecidos na linha — pro resumo
@@ -285,6 +285,9 @@ export function ImportarCsvDialog({
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>Importar de planilha</DialogTitle>
+          <DialogDescription>
+            Cole ou suba o CSV — cada linha só é gravada depois da prévia.
+          </DialogDescription>
         </DialogHeader>
 
         {resultado ? (

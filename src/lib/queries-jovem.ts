@@ -3,6 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { comparaNome } from "./ciclo";
 import { demoRole } from "./demo/mode";
 import {
+  demoDevolutivas,
+  demoTrilhaEsp,
   demoJovemAssinaturas,
   demoJovemColegas,
   demoJovemContatos,
@@ -12,6 +14,8 @@ import {
   demoJovemEspecialistas,
   demoJovemPerfil,
 } from "./demo/queries";
+import { demoJovemJornada } from "./demo/forms-data";
+import type { JovemJornadaDados } from "./jornada";
 import { pedidoEmAberto } from "./jovem-especialista";
 import {
   getPropostasMap,
@@ -20,6 +24,7 @@ import {
 } from "./queries-especialista";
 import type {
   ColegaTurma,
+  Devolutiva,
   EncontroStatus,
   JovemAssinatura,
   JovemContato,
@@ -219,18 +224,18 @@ export const getJovemEspecialistas = cache(
     const supabase = await createClient();
     const { data, error } = await supabase
       .from("jovem_especialistas")
-      .select("id, nome, nome_social, avatar_path, areas")
+      .select(
+        "id, nome, nome_social, avatar_path, areas, bio, cargo, empresa, cidade, uf, voluntariado, experiencia_previa, formacao_externa, grade_resumo, vagas"
+      )
       .order("nome");
     if (error) {
       console.error("getJovemEspecialistas:", error);
       return [];
     }
-    type Row = {
+    type Row = Omit<JovemEspecialista, "id" | "nome" | "vagas"> & {
       id: string | null;
       nome: string | null;
-      nome_social: string | null;
-      avatar_path: string | null;
-      areas: string[] | null;
+      vagas: number | null;
     };
     // a collation do banco ordena acentos depois de Z — pt-BR no app
     return ((data ?? []) as Row[])
@@ -238,6 +243,7 @@ export const getJovemEspecialistas = cache(
         (e): e is Row & { id: string; nome: string } =>
           e.id != null && e.nome != null
       )
+      .map((e) => ({ ...e, vagas: e.vagas ?? 0 }))
       .sort((a, b) => comparaNome(a.nome, b.nome));
   }
 );
@@ -255,12 +261,22 @@ export const getJovemPedidosEspecialista = cache(
     propostas: Record<string, SolicitacaoProposta[]>;
     slotsPorEsp: Record<string, string[]>;
   }> => {
-    const [catalogo, solicitacoes] = await Promise.all([
+    const [catalogo, solicitacoes, contatos] = await Promise.all([
       getJovemEspecialistas(),
       getSolicitacoesVisiveis(),
+      getJovemContatos(),
     ]);
     const nomePorId = new Map(
       catalogo.map((e) => [e.id, e.nome_social || e.nome] as const)
+    );
+    // o autor de uma sugestão/pedido staff é adulto alcançável do jovem —
+    // a jovem_contatos já o expõe com nome (mentor das próprias duplas,
+    // supervisor, coordenação), então o mentorado vê "Otávio sugeriu" em
+    // vez do fallback "Seu mentor" — sem abrir leitura em profiles
+    const nomeContato = new Map(
+      contatos
+        .filter((c) => c.id != null && (c.nome_social || c.nome) != null)
+        .map((c) => [c.id!, (c.nome_social || c.nome)!] as const)
     );
 
     // o nome do direcionado entra como embed `desejado` — o que o rail e as
@@ -272,6 +288,11 @@ export const getJovemPedidosEspecialista = cache(
         (s.especialista_desejado_id &&
         nomePorId.has(s.especialista_desejado_id)
           ? { nome: nomePorId.get(s.especialista_desejado_id)! }
+          : null),
+      solicitante:
+        s.solicitante ??
+        (s.created_by && nomeContato.has(s.created_by)
+          ? { nome: nomeContato.get(s.created_by)! }
           : null),
     }));
 
@@ -311,5 +332,73 @@ export const getJovemPedidosEspecialista = cache(
     );
 
     return { catalogo, solicitacoes: sols, propostas, slotsPorEsp };
+  }
+);
+
+/** Devolutivas das trilhas do jovem (0086 — feed datado por dupla esp). A
+ *  RLS da tabela base escopa às duplas dele; aqui o caller passa os ids
+ *  das trilhas que já carregou, e o nome do autor vem do mentor da dupla
+ *  (mentorado não tem SELECT em profiles — se quem escreveu foi a
+ *  coordenação, cai no fallback "Equipe"). */
+export const getDevolutivas = cache(
+  async (duplaIds: string[]): Promise<Devolutiva[]> => {
+    if (duplaIds.length === 0) return [];
+    const demo = await demoRole();
+    if (demo) return demoDevolutivas(demo, duplaIds);
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("devolutivas")
+      .select("id, dupla_id, autor_id, texto, created_at")
+      .in("dupla_id", duplaIds)
+      .order("created_at", { ascending: true });
+    if (error) {
+      console.error("getDevolutivas:", error);
+      return [];
+    }
+    return (data ?? []) as Devolutiva[];
+  }
+);
+
+/** Os 5 passos do guia da trilha de especialista, projetados pro jovem pela
+ *  view definer 0088 (a tabela base não abre pro papel mentorado — 0065). */
+export const getJovemTrilhaEsp = cache(
+  async (): Promise<{ numero: number; titulo: string; foco: string | null }[]> => {
+    const demo = await demoRole();
+    if (demo) {
+      if (demo !== "mentorado") return [];
+      return demoTrilhaEsp();
+    }
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("jovem_trilha_esp")
+      .select("numero, titulo, foco")
+      .order("numero");
+    if (error) {
+      console.error("getJovemTrilhaEsp:", error);
+      return [];
+    }
+    return (data ?? []).filter(
+      (e): e is { numero: number; titulo: string; foco: string | null } =>
+        e.numero != null && e.titulo != null
+    );
+  }
+);
+
+/** O contrato da "Minha jornada" (WP7 — RPC `jovem_jornada`, 0096): a dupla
+ *  DPP mais recente do caller + cronograma da turma + os 4 instrumentos com
+ *  entregas + o 360º dela. Self-scoped por my_mentorado_id() — o jovem só
+ *  lê a própria jornada. Null (sem dupla DPP, erro de RPC) → a página cai
+ *  na biblioteca plana, que é o fallback do plano. */
+export const getJovemJornada = cache(
+  async (): Promise<JovemJornadaDados | null> => {
+    const demo = await demoRole();
+    if (demo) return demoJovemJornada(demo);
+    const supabase = await createClient();
+    const { data, error } = await supabase.rpc("jovem_jornada");
+    if (error) {
+      console.error("getJovemJornada:", error);
+      return null;
+    }
+    return (data ?? null) as JovemJornadaDados | null;
   }
 );

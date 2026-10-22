@@ -12,7 +12,7 @@ import { AfinidadePar } from "@/components/matching-afinidade";
 import { CapacidadeMentorDialog } from "@/components/capacidade-mentor-dialog";
 import { Button } from "@/components/ui/button";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
+  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,6 +21,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import type {
+  AppRole,
   Cronograma,
   Disponibilidade,
   Escolaridade,
@@ -33,6 +34,7 @@ type Opt = {
   id: string;
   nome: string;
   role?: string | null;
+  papeis?: AppRole[];
   interesses?: string[] | null;
   cidade?: string | null;
   uf?: string | null;
@@ -58,14 +60,26 @@ type Pessoal = {
 };
 const NENHUM = "__nenhum";
 
+/** Papéis efetivos com fallback no primário — embed `profile_papeis` vazio
+ *  ou ausente cai no `role` (a policy pode negar a linha alheia). O papel
+ *  de mentor pode existir SÓ em papeis (primário sup/coord): derivar a
+ *  trilha do primário mandaria "dpp" no hidden e o server recusaria sem
+ *  caminho de correção. */
+const papeisDe = (m: Opt | null | undefined): AppRole[] =>
+  m?.papeis?.length ? m.papeis : m?.role ? [m.role as AppRole] : [];
+
 export function NovaDuplaDialog() {
   const [open, setOpen] = useState(false);
   const [mentores, setMentores] = useState<Opt[]>([]);
   const [mentorados, setMentorados] = useState<MentoradoOpt[]>([]);
   const [supervisores, setSupervisores] = useState<Opt[]>([]);
   // vagas por mentor: quantas duplas ativas/pausadas já tem vs. capacidade
+  // vagas por mentor E trilha (WP6b): o híbrido tem duas pools — a contagem
+  // cruzada transbordava o teto da errada
   const [emUso, setEmUso] = useState<Record<string, number>>({});
-  const [capacidade, setCapacidade] = useState<Record<string, number>>({});
+  const [capacidade, setCapacidade] = useState<
+    Record<string, { dpp: number; esp: number }>
+  >({});
   // mentorado ocupado POR TRILHA — a de especialista convive com a DPP do
   // mesmo mentorado; só ocupa vaga de novo na trilha em que já está
   const [ocupacao, setOcupacao] = useState<Map<string, Set<string>>>(new Map());
@@ -81,8 +95,10 @@ export function NovaDuplaDialog() {
   // cronogramas do select (0061) — cada um é um calendário oficial por turma;
   // a dupla DPP nasce vinculada ao escolhido (o vigente é o default)
   const [cronogramas, setCronogramas] = useState<Cronograma[]>([]);
-  // mentor escolhido — a trilha da dupla nasce do papel dele
+  // mentor escolhido — a trilha da dupla nasce do papel dele; com os dois
+  // papéis a coordenação escolhe explicitamente (WP6b)
   const [mentorSel, setMentorSel] = useState<string | null>(null);
+  const [trilhaEsc, setTrilhaEsc] = useState<"dpp" | "especialista">("dpp");
   const [mentoradoSel, setMentoradoSel] = useState<string | null>(null);
   // fetch das opções tem estado explícito — select vazio após erro não pode
   // parecer "ninguém cadastrado"
@@ -104,7 +120,7 @@ export function NovaDuplaDialog() {
         const [perfis, ments, duplasRes, mps, cronsRes] = await Promise.all([
           supabase
             .from("profiles")
-            .select("id, nome, role, interesses, cidade, uf")
+            .select("id, nome, role, interesses, cidade, uf, profile_papeis(papel)")
             .in("role", ["mentor_dpp", "mentor_especialista", "supervisor", "coordenacao"])
             .eq("ativo", true)
             .order("nome"),
@@ -128,9 +144,26 @@ export function NovaDuplaDialog() {
         // mentor é papel explícito — a coordenação veio no fetch só porque
         // pode supervisionar (a equipe executiva supervisiona de fato);
         // nunca vira opção de mentor
-        setMentores((perfis.data ?? []).filter((p) =>
-          p.role === "mentor_dpp" || p.role === "mentor_especialista"
-        ));
+        // mentor é quem TEM o papel (WP6b) — o primário cobre o caso comum,
+        // o join em profile_papeis traz o híbrido dos dois lados
+        setMentores(
+          (perfis.data ?? [])
+            .map((p) => ({
+              ...p,
+              papeis: (p.profile_papeis ?? []).map(
+                (r: { papel: AppRole }) => r.papel
+              ),
+            }))
+            // papel EFETIVO decide a pool (WP6b) — a união com o primário
+            // cobre o embed vazio (RLS/linha faltando não tira o mentor
+            // DPP puro da lista) e o papel só-secundário entra
+            .filter((p) => {
+              const pp = papeisDe(p);
+              return (
+                pp.includes("mentor_dpp") || pp.includes("mentor_especialista")
+              );
+            })
+        );
         setSupervisores((perfis.data ?? []).filter((p) => podeSupervisionar(p.role)));
         // quem saiu do programa (0077) não é opção de par — o server também
         // barra; aqui some da lista pra não frustrar a escolha
@@ -145,7 +178,8 @@ export function NovaDuplaDialog() {
         for (const d of (duplasRes.data ?? []).filter((x) =>
           x.status === "ativa" || x.status === "pausada"
         )) {
-          contagem[d.mentor_id] = (contagem[d.mentor_id] ?? 0) + 1;
+          const chave = `${d.mentor_id}:${d.trilha ?? "dpp"}`;
+          contagem[chave] = (contagem[chave] ?? 0) + 1;
           const trilhas = ocup.get(d.mentorado_id) ?? new Set<string>();
           trilhas.add(d.trilha ?? "dpp");
           ocup.set(d.mentorado_id, trilhas);
@@ -154,18 +188,17 @@ export function NovaDuplaDialog() {
         setEmUso(contagem);
         setOcupacao(ocup);
         setEmSup(sup);
-        const porMentor: Record<string, number> = {};
+        const porMentor: Record<string, { dpp: number; esp: number }> = {};
         const fichas = new Map<
           string,
           { disponibilidade: Disponibilidade | null; areas: string[] | null }
         >();
         for (const mp of mps.data ?? []) {
-          // o teto exibido é o da trilha do papel (0073) — mentor tem um
-          // papel só, então todas as duplas dele já contam na mesma pool
-          porMentor[mp.profile_id] =
-            mp.tipo === "especialista"
-              ? (mp.capacidade_especialista ?? 1)
-              : mp.capacidade;
+          // pools separadas por trilha (0073/WP6b) — o híbrido tem as duas
+          porMentor[mp.profile_id] = {
+            dpp: mp.capacidade ?? 1,
+            esp: mp.capacidade_especialista ?? 1,
+          };
           fichas.set(mp.profile_id, {
             disponibilidade: (mp.disponibilidade as Disponibilidade | null) ?? null,
             areas: (mp.areas as string[] | null) ?? null,
@@ -210,16 +243,33 @@ export function NovaDuplaDialog() {
 
   const mentorSelObj = mentores.find((m) => m.id === mentorSel) ?? null;
   const mentoradoSelObj = mentorados.find((m) => m.id === mentoradoSel) ?? null;
-  const ehEsp = mentorSelObj?.role === "mentor_especialista";
+  // trilha nasce do papel EFETIVO (WP6b): quem tem papel de mentor só em
+  // profile_papeis (primário sup/coord) entra no pool — ler o primário
+  // aqui mandava "dpp" no hidden e o server recusava sem correção. Híbrido:
+  // os dois papéis de mentor — a trilha vira escolha explícita
+  const papeisSel = papeisDe(mentorSelObj);
+  const ehHibrido =
+    papeisSel.includes("mentor_dpp") && papeisSel.includes("mentor_especialista");
+  const trilhaSel: "dpp" | "especialista" | null = mentorSelObj
+    ? ehHibrido
+      ? trilhaEsc
+      : papeisSel.includes("mentor_especialista")
+        ? "especialista"
+        : "dpp"
+    : null;
+  const ehEsp = trilhaSel === "especialista";
+  const usoSel = mentorSel
+    ? (emUso[`${mentorSel}:${trilhaSel ?? "dpp"}`] ?? 0)
+    : 0;
+  const capSel = mentorSel
+    ? (trilhaSel === "especialista"
+        ? (capacidade[mentorSel]?.esp ?? 1)
+        : (capacidade[mentorSel]?.dpp ?? 1))
+    : 1;
   // mentor sem vaga: selecionável de propósito (a afinidade dele ainda
   // compara — às vezes a saída certa é dar mais uma vaga a quem já encaixa),
   // mas o submit bloqueia até a capacidade subir ou outro mentor entrar
-  const mentorLotado =
-    mentorSel != null &&
-    (emUso[mentorSel] ?? 0) >= (capacidade[mentorSel] ?? 1);
-  const trilhaSel: "dpp" | "especialista" | null = mentorSel
-    ? ehEsp ? "especialista" : "dpp"
-    : null;
+  const mentorLotado = mentorSel != null && usoSel >= capSel;
   // mentorado indisponível só na trilha em que já está — estar na DPP não
   // impede a de especialista (é exatamente o caso de uso dela)
   const ocupadoEm = (id: string) => {
@@ -236,10 +286,38 @@ export function NovaDuplaDialog() {
 
   // selects longos (>7): relevância antes de alfabética — quem pode ser
   // escolhido aparece primeiro, disabled afunda, nome (pt-BR) só desempata
+  // vagas livres somando as duas pools — o híbrido ranqueia pelo total
+  const livres = (id: string) =>
+    (capacidade[id]?.dpp ?? 1) - (emUso[`${id}:dpp`] ?? 0) +
+    (capacidade[id]?.esp ?? 0) - (emUso[`${id}:especialista`] ?? 0);
+  // rótulo de vagas: híbrido mostra as duas pools; "sem vaga" reflete a
+  // trilha que está sendo escolhida agora, não um pool abstrato
+  const vagasLabel = (m: Opt) => {
+    const uso = (t: string) => emUso[`${m.id}:${t}`] ?? 0;
+    const cap = capacidade[m.id];
+    // papel efetivo — quem tem mentor só secundário (primário sup/coord)
+    // conta na pool da trilha dele, não na do primário
+    const papeisM = papeisDe(m);
+    const hibrido =
+      papeisM.includes("mentor_dpp") && papeisM.includes("mentor_especialista");
+    if (hibrido) {
+      const d = `${uso("dpp")}/${cap?.dpp ?? 1}`;
+      const e = `${uso("especialista")}/${cap?.esp ?? 1}`;
+      const cheio =
+        m.id === mentorSel &&
+        (trilhaSel === "especialista"
+          ? uso("especialista") >= (cap?.esp ?? 1)
+          : uso("dpp") >= (cap?.dpp ?? 1));
+      return `DPP ${d} · esp ${e}${cheio ? " · sem vaga" : ""}`;
+    }
+    const esp = papeisM.includes("mentor_especialista");
+    const usadas = uso(esp ? "especialista" : "dpp");
+    const total = (esp ? cap?.esp : cap?.dpp) ?? 1;
+    return `${usadas}/${total}${esp ? " · especialista" : ""}${usadas >= total ? " · sem vaga" : ""}`;
+  };
   const mentoresOrd = [...mentores].sort(
     (a, b) =>
-      (capacidade[b.id] ?? 1) - (emUso[b.id] ?? 0) -
-        ((capacidade[a.id] ?? 1) - (emUso[a.id] ?? 0)) ||
+      livres(b.id) - livres(a.id) ||
       a.nome.localeCompare(b.nome, "pt-BR")
   );
   const mentoradosOrd = [...mentorados].sort(
@@ -297,9 +375,12 @@ export function NovaDuplaDialog() {
       }}
     >
       <DialogTrigger render={<Button size="sm" className="max-sm:w-full"><Plus size={16} /> Nova dupla</Button>} />
-      <DialogContent>
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Formar dupla</DialogTitle>
+          <DialogDescription>
+            Escolha o mentor e o mentorado pra formar a dupla de mentoria.
+          </DialogDescription>
         </DialogHeader>
         <form onSubmit={submit} className="space-y-4">
           {falha && !pronto ? (
@@ -349,40 +430,41 @@ export function NovaDuplaDialog() {
               name="mentor_id"
               required
               items={Object.fromEntries(mentoresOrd.map((m) => {
-                const usadas = emUso[m.id] ?? 0;
-                const total = capacidade[m.id] ?? 1;
-                const cheio = usadas >= total;
-                const rotulo = `${m.nome} · ${usadas}/${total}${
-                  m.role === "mentor_especialista" ? " · especialista" : ""
-                }${cheio ? " · sem vaga" : ""}`;
+                const rotulo = `${m.nome} · ${vagasLabel(m)}`;
                 return [m.id, rotulo];
               }))}
-              onValueChange={(v) => setMentorSel(v ? String(v) : null)}
+              onValueChange={(v) => {
+                const id = v ? String(v) : null;
+                setMentorSel(id);
+                // troca de mentor rederiva a trilha default dos papéis
+                // EFETIVOS dele — papel de mentor só secundário (primário
+                // sup/coord) já nasce na trilha certa; no híbrido o
+                // primário desempata
+                const novo = mentores.find((m) => m.id === id);
+                const papeisNovo = papeisDe(novo);
+                const soEsp =
+                  papeisNovo.includes("mentor_especialista") &&
+                  !papeisNovo.includes("mentor_dpp");
+                setTrilhaEsc(
+                  soEsp || novo?.role === "mentor_especialista"
+                    ? "especialista"
+                    : "dpp"
+                );
+              }}
             >
               <SelectTrigger id="mentor" aria-labelledby="mentor-label mentor"><SelectValue placeholder="Selecione" /></SelectTrigger>
               <SelectContent>
                 {mentores.length === 0 && (
                   <SelectItem value="__vazio" disabled>Nenhum mentor cadastrado</SelectItem>
                 )}
-                {mentoresOrd.map((m) => {
-                  const usadas = emUso[m.id] ?? 0;
-                  const total = capacidade[m.id] ?? 1;
-                  const cheio = usadas >= total;
-                  const esp = m.role === "mentor_especialista";
-                  return (
-                    // sem vaga segue selecionável — marcar é o convite pra
-                    // comparar a afinidade e abrir "aumentar capacidade";
-                    // esconder seria fingir que o mentor certo não existe
-                    <SelectItem
-                      key={m.id}
-                      value={m.id}
-                      className={cheio ? "text-muted-foreground" : undefined}
-                    >
-                      {m.nome} · {usadas}/{total}{esp ? " · especialista" : ""}
-                      {cheio ? " · sem vaga" : ""}
-                    </SelectItem>
-                  );
-                })}
+                {mentoresOrd.map((m) => (
+                  // sem vaga segue selecionável — marcar é o convite pra
+                  // comparar a afinidade e abrir "aumentar capacidade";
+                  // esconder seria fingir que o mentor certo não existe
+                  <SelectItem key={m.id} value={m.id}>
+                    {m.nome} · {vagasLabel(m)}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
             {mentorSelObj && mentorLotado && (
@@ -391,19 +473,30 @@ export function NovaDuplaDialog() {
                 className="rounded-lg border border-[var(--warn)]/40 bg-[var(--warn)]/5 px-3.5 py-3 text-sm"
               >
                 <p className="font-medium">
-                  {mentorSelObj.nome.split(" ")[0]} está sem vaga — já cuida
-                  de {emUso[mentorSel!]}/{capacidade[mentorSel!] ?? 1}{" "}
-                  {(capacidade[mentorSel!] ?? 1) === 1 ? "dupla" : "duplas"}.
+                  {mentorSelObj.nome.split(" ")[0]} está sem vaga
+                  {ehEsp ? " de especialista" : ""} — já cuida
+                  de {usoSel}/{capSel}{" "}
+                  {capSel === 1 ? "dupla" : "duplas"}.
                 </p>
                 <p className="mt-0.5 text-xs text-muted-foreground">
                   Se ela é o par certo, dá pra abrir mais uma vaga:{" "}
                   <CapacidadeMentorDialog
                     mentorId={mentorSelObj.id}
                     nome={mentorSelObj.nome}
-                    atual={capacidade[mentorSelObj.id] ?? 1}
-                    emUso={emUso[mentorSelObj.id] ?? 0}
+                    atual={capSel}
+                    emUso={usoSel}
+                    // pool da trilha em edição — sem ela o server escreve
+                    // a do papel primário e o híbrido ajusta a errada
+                    trilha={ehEsp ? "especialista" : "dpp"}
                     onSaved={(n) =>
-                      setCapacidade((c) => ({ ...c, [mentorSelObj.id]: n }))
+                      setCapacidade((c) => ({
+                        ...c,
+                        [mentorSelObj.id]: {
+                          dpp: c[mentorSelObj.id]?.dpp ?? 1,
+                          esp: c[mentorSelObj.id]?.esp ?? 1,
+                          [trilhaSel === "especialista" ? "esp" : "dpp"]: n,
+                        },
+                      }))
                     }
                     trigger={
                       <button
@@ -416,6 +509,37 @@ export function NovaDuplaDialog() {
                   />
                 </p>
               </div>
+            )}
+            {/* trilha explícita (WP6b): só aparece quando o mentor tem os
+                dois papéis — com um só, a trilha nasce do papel e o hidden
+                leva o valor pro server do mesmo jeito */}
+            {ehHibrido ? (
+              <div className="space-y-2">
+                <Label id="trilha-label">Tipo de mentoria</Label>
+                <Select
+                  name="trilha"
+                  value={trilhaEsc}
+                  items={{
+                    dpp: "Mentoria DPP (ciclo)",
+                    especialista: "Mentoria especialista",
+                  }}
+                  onValueChange={(v) =>
+                    setTrilhaEsc(v === "especialista" ? "especialista" : "dpp")
+                  }
+                >
+                  <SelectTrigger id="trilha" aria-labelledby="trilha-label trilha">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="dpp">Mentoria DPP (ciclo)</SelectItem>
+                    <SelectItem value="especialista">Mentoria especialista</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : (
+              mentorSelObj && (
+                <input type="hidden" name="trilha" value={trilhaSel ?? "dpp"} />
+              )
             )}
             {ehEsp && (
               <p className="text-xs text-muted-foreground">

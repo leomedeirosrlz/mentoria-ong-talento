@@ -26,11 +26,16 @@ export function EncerrarDuplaDialog({
   duplaId,
   encerramento,
   trigger,
+  somenteConclusao = false,
 }: {
   duplaId: string;
   /** Row atual (pode existir só com a autoavaliação do mentor). */
   encerramento: Encerramento | null;
   trigger?: React.ReactElement;
+  /** Dupla já 'concluida' pelo fechamento automático (0102) — o rito que
+   *  falta é só a conclusão; "encerrar antes do fim" deixaria de fazer
+   *  sentido (a jornada já terminou) */
+  somenteConclusao?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [tipo, setTipo] = useState<"concluida" | "encerrada">("concluida");
@@ -74,13 +79,13 @@ export function EncerrarDuplaDialog({
           )
         }
       />
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Registrar encerramento</DialogTitle>
           <DialogDescription>
-            O fechamento do ciclo do guia: o que foi feito, a decisão da
-            coordenação e o resumo da jornada, gerado na hora pra base do
-            relatório final.
+            {somenteConclusao
+              ? "O último encontro já aconteceu e a dupla concluiu a jornada. Complete o checklist do rito pra registrar o encerramento."
+              : "O fechamento do ciclo do guia: o que foi feito, a decisão da coordenação e o resumo da jornada, gerado na hora pra base do relatório final."}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={submit} className="space-y-4">
@@ -167,25 +172,27 @@ export function EncerrarDuplaDialog({
                 </span>
               </span>
             </label>
-            <label
-              className="flex cursor-pointer items-start gap-2.5 rounded-lg border border-border px-3 py-2.5 text-sm transition-colors has-checked:border-[var(--warn)]/60 has-checked:bg-[var(--warn)]/5"
-            >
-              <input
-                type="radio"
-                name="tipo"
-                value="encerrada"
-                checked={tipo === "encerrada"}
-                onChange={() => setTipo("encerrada")}
-                className="mt-0.5 accent-primary"
-              />
-              <span>
-                <span className="font-medium">Encerrar antes do fim</span>
-                <span className="block text-xs text-muted-foreground">
-                  A jornada termina antecipada. O que ficou marcado no
-                  checklist entra no registro.
+            {!somenteConclusao && (
+              <label
+                className="flex cursor-pointer items-start gap-2.5 rounded-lg border border-border px-3 py-2.5 text-sm transition-colors has-checked:border-[var(--warn)]/60 has-checked:bg-[var(--warn)]/5"
+              >
+                <input
+                  type="radio"
+                  name="tipo"
+                  value="encerrada"
+                  checked={tipo === "encerrada"}
+                  onChange={() => setTipo("encerrada")}
+                  className="mt-0.5 accent-primary"
+                />
+                <span>
+                  <span className="font-medium">Encerrar antes do fim</span>
+                  <span className="block text-xs text-muted-foreground">
+                    A jornada termina antecipada. O que ficou marcado no
+                    checklist entra no registro.
+                  </span>
                 </span>
-              </span>
-            </label>
+              </label>
+            )}
           </fieldset>
 
           <Button type="submit" className="w-full" disabled={pending}>

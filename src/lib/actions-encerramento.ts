@@ -11,6 +11,7 @@ import {
   dadosResumoJornada,
   textoResumoJornada,
 } from "./encerramento";
+import { getPdmResumo } from "./queries-pdm";
 import { erroAmigavel as erroAmigavelBase } from "./utils";
 import type {
   CicloEvento,
@@ -81,8 +82,21 @@ export async function registrarEncerramento(
       error: "A trilha de especialista encerra pelo próprio fluxo: motivo e devolutiva pro PDM.",
     };
   }
-  if (duplaRow.status !== "ativa" && duplaRow.status !== "pausada") {
+  // 'concluida' passa: o fechamento automático (0102) muda o status no
+  // último encontro e deixa a decisão pendente — o rito completa aqui.
+  if (
+    duplaRow.status !== "ativa" &&
+    duplaRow.status !== "pausada" &&
+    duplaRow.status !== "concluida"
+  ) {
     return { error: "Essa dupla já foi encerrada." };
+  }
+  // quem já concluiu pelo último encontro não "encerra antes do fim" —
+  // a decisão que falta é registrar a conclusão
+  if (duplaRow.status === "concluida" && tipo !== "concluida") {
+    return {
+      error: "A jornada já concluiu com o último encontro — registre a conclusão.",
+    };
   }
 
   // a row pode já existir com a autoavaliação do mentor — o item do
@@ -143,8 +157,11 @@ export async function registrarEncerramento(
   );
   const passos = passosDaTrilha("dpp", evsDaDupla);
   const agora = new Date();
+  // o PDM vivo entra no snapshot: as metas atingidas com datas já são a
+  // retro que o checklist "PDM revisado" pede (o item em si segue manual)
+  const pdmResumo = await getPdmResumo(duplaId).catch(() => null);
   const resumoJornada = textoResumoJornada(
-    dadosResumoJornada(duplaParaResumo, passos, evsDaDupla, agora.toISOString(), agora)
+    dadosResumoJornada(duplaParaResumo, passos, evsDaDupla, agora.toISOString(), agora, pdmResumo)
   );
 
   const { error: errEnc } = await supabase.from("encerramentos").upsert(
@@ -168,6 +185,9 @@ export async function registrarEncerramento(
   // quem vive a dupla precisa saber do desfecho — mentor e supervisor.
   // Reuso do tipo 'dupla_formada': é o ciclo de vida da dupla (mesma
   // convenção de pausa/encerramento no updateDupla).
+  // dupla que o automático já concluiu recebeu "concluiu a jornada" no
+  // ato — a notificação daqui vira o registro do rito, não repeteco
+  const jaConcluida = duplaRow.status === "concluida";
   const nomeMd = norm(duplaRow.mentorado)?.nome;
   await notificar(
     supabase,
@@ -175,8 +195,9 @@ export async function registrarEncerramento(
       {
         profile_id: duplaRow.mentor_id,
         tipo: "dupla_formada",
-        titulo:
-          tipo === "concluida"
+        titulo: jaConcluida
+          ? "Encerramento registrado"
+          : tipo === "concluida"
             ? "Sua dupla concluiu a jornada"
             : "Sua dupla foi encerrada",
         corpo: nomeMd
@@ -188,8 +209,9 @@ export async function registrarEncerramento(
         ? {
             profile_id: duplaRow.supervisor_id,
             tipo: "dupla_formada",
-            titulo:
-              tipo === "concluida"
+            titulo: jaConcluida
+              ? "Encerramento de dupla supervisionada registrado"
+              : tipo === "concluida"
                 ? "Dupla supervisionada concluída"
                 : "Dupla supervisionada encerrada",
             corpo: nomeMd

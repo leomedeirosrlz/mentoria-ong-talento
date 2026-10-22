@@ -40,6 +40,7 @@ import {
 } from "@/components/ui/select";
 import { normaliza } from "@/lib/utils";
 import { SISTEMA_LABEL, type FormularioSistema } from "@/lib/forms/schema";
+import { ehInstrumento } from "@/lib/forms/instrumentos";
 
 export type FormularioOpcao = {
   id: string;
@@ -66,6 +67,8 @@ export function EnviarFormularioDialog({
   mentorado,
   sugestao,
   trigger,
+  open: openProp,
+  onOpenChange: onOpenChangeProp,
 }: {
   formularios: FormularioOpcao[];
   duplaId: string;
@@ -74,23 +77,42 @@ export function EnviarFormularioDialog({
   /** trecho do título pra sugerir (ex.: "360") — os que casam vêm primeiro e
    *  o primeiro é pré-selecionado */
   sugestao?: string;
-  /** trigger custom — sem ela cai no botão padrão "Enviar formulário" */
-  trigger?: ReactElement;
+  /** trigger custom — sem ela cai no botão padrão "Enviar formulário".
+   *  `null` suprime: o menu "Mais" da ficha abre o dialog controlado. */
+  trigger?: ReactElement | null;
+  /** Modo controlado (opcional): o pai segura o estado — o overflow "Mais"
+   *  abre o dialog fora do popup (REALIZA-157). */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }) {
-  const [open, setOpen] = useState(false);
+  const [openInt, setOpenInt] = useState(false);
+  const open = openProp ?? openInt;
+  const setOpen = onOpenChangeProp ?? setOpenInt;
   // ids únicos por instância — o dialog aparece 2x na ficha (header + 360º)
   const uid = useId();
   const formLabelId = `${uid}-form`;
+  // os 4 instrumentos de jornada não são emissíveis por aqui — a entrega é
+  // do mentor pela seção Instrumentos da ficha (a action recusa também).
+  // avaliacao_especialista também sai: a emissão é automática no fechamento
+  // da trilha (0104) — um link manual confundiria o dedup da RPC.
+  // 360º/anamnese/autoavaliação seguem selecionáveis — a coord emite mesmo.
+  const selecionaveis = useMemo(
+    () =>
+      formularios.filter(
+        (f) => !ehInstrumento(f.sistema) && f.sistema !== "avaliacao_especialista"
+      ),
+    [formularios]
+  );
   const ordenados = useMemo(() => {
-    if (!sugestao) return formularios;
+    if (!sugestao) return selecionaveis;
     const n = normaliza(sugestao);
     // casa pelo título OU pelo selo do instrumento oficial ("360" acha a
     // avaliacao_360 mesmo que o título não traga o número)
     const casam = (f: FormularioOpcao) =>
       normaliza(f.titulo).includes(n) ||
       (f.sistema ? normaliza(SISTEMA_LABEL[f.sistema]).includes(n) : false);
-    return [...formularios].sort((a, b) => Number(casam(b)) - Number(casam(a)));
-  }, [formularios, sugestao]);
+    return [...selecionaveis].sort((a, b) => Number(casam(b)) - Number(casam(a)));
+  }, [selecionaveis, sugestao]);
   const [formId, setFormId] = useState("");
   const [para, setPara] = useState({ mentor: true, mentorado: true });
   const [validade, setValidade] = useState("0");
@@ -100,7 +122,7 @@ export function EnviarFormularioDialog({
   // WhatsApp com URL relativa e o absoluto entra na re-render seguinte
   const origem = useOrigem();
 
-  const formSel = formularios.find((f) => f.id === formId) ?? null;
+  const formSel = selecionaveis.find((f) => f.id === formId) ?? null;
   const nDestinos = Number(para.mentor) + Number(para.mentorado);
 
   const itensProntos = useMemo<LinkProntoItem[]>(
@@ -132,10 +154,13 @@ export function EnviarFormularioDialog({
     [links, mentor, mentorado, formSel, duplaId, origem]
   );
 
-  function aoAbrir(o: boolean) {
-    setOpen(o);
-    if (o) {
-      // reabre limpo, com a sugestão (ou o 1º ativo) pré-selecionada
+  // reabre limpo, com a sugestão (ou o 1º ativo) pré-selecionada — ajuste na
+  // borda de subida do `open`: no modo controlado a abertura vem da prop e o
+  // Base UI não reemite onOpenChange (mesmo padrão do RemanejarDuplaDialog)
+  const [abertoAntes, setAbertoAntes] = useState(open);
+  if (open !== abertoAntes) {
+    setAbertoAntes(open);
+    if (open) {
       setLinks(null);
       setFormId(ordenados[0]?.id ?? "");
       setPara({ mentor: true, mentorado: true });
@@ -175,17 +200,19 @@ export function EnviarFormularioDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={aoAbrir}>
-      <DialogTrigger
-        render={
-          trigger ?? (
-            <Button variant="outline" size="sm">
-              <PaperPlaneTilt aria-hidden />
-              Enviar formulário
-            </Button>
-          )
-        }
-      />
+    <Dialog open={open} onOpenChange={setOpen}>
+      {trigger !== null && (
+        <DialogTrigger
+          render={
+            trigger ?? (
+              <Button variant="outline" size="sm">
+                <PaperPlaneTilt aria-hidden />
+                Enviar formulário
+              </Button>
+            )
+          }
+        />
+      )}
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Enviar formulário</DialogTitle>
@@ -203,7 +230,7 @@ export function EnviarFormularioDialog({
                 onOutros={() => setLinks(null)}
               />
             </motion.div>
-          ) : formularios.length === 0 ? (
+          ) : selecionaveis.length === 0 ? (
             <motion.p
               key="vazio"
               {...fade}

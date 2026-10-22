@@ -113,7 +113,8 @@ export async function loginComSenha(
   await page.locator("#senha").fill(senha);
   await page.getByRole("button", { name: "Entrar" }).click();
   await page.waitForURL((url) => !url.pathname.startsWith("/login"), {
-    timeout: 15_000,
+    // login + redirect do middleware em preview frio passa dos 15s às vezes
+    timeout: 30_000,
   });
 }
 
@@ -211,6 +212,28 @@ export async function limparEncontrosDaDupla(duplaId: string): Promise<void> {
   );
   if (encs.length === 0) return;
   const lista = encs.map((e) => e.id).join(",");
+  // 0084: chamados apontam pra registro/avaliação com SET NULL — saem
+  // antes dos filhos pra não sobrar chamado órfão no staging
+  const regs = await buscarViaServiceRole<{ id: string }[]>(
+    "registros",
+    `select=id&encontro_id=in.(${lista})`
+  );
+  if (regs.length) {
+    await limparViaServiceRole(
+      "chamados",
+      `registro_id=in.(${regs.map((r) => r.id).join(",")})`
+    );
+  }
+  const avals = await buscarViaServiceRole<{ id: string }[]>(
+    "avaliacoes_encontro",
+    `select=id&encontro_id=in.(${lista})`
+  );
+  if (avals.length) {
+    await limparViaServiceRole(
+      "chamados",
+      `avaliacao_id=in.(${avals.map((a) => a.id).join(",")})`
+    );
+  }
   await limparViaServiceRole(
     "avaliacoes_encontro",
     `encontro_id=in.(${lista})`

@@ -12,9 +12,11 @@ import Link from "next/link";
 import {
   ArrowsClockwise,
   Bell,
+  CalendarCheck,
   CalendarDots,
   CalendarPlus,
   CalendarX,
+  ChatCircleText,
   ChatsCircle,
   Check,
   CheckCircle,
@@ -22,10 +24,14 @@ import {
   FlagCheckered,
   Funnel,
   HandHeart,
+  HourglassMedium,
+  Lifebuoy,
   Megaphone,
+  Sparkle,
   Star,
   ThumbsDown,
   UserCheck,
+  UserList,
   UserPlus,
   UsersThree,
   XCircle,
@@ -209,6 +215,8 @@ const ICONE: Record<Notificacao["tipo"], typeof Bell> = {
   pedido_apoio: HandHeart,
   apoio_resolvido: CheckCircle,
   dupla_formada: UsersThree,
+  // 0102 — a bandeira quadriculada é a reta final da jornada
+  dupla_reta_final: FlagCheckered,
   demanda_especialista: UserPlus,
   solicitacao_registrada: ClipboardText,
   especialista_aceitou: UserCheck,
@@ -228,6 +236,27 @@ const ICONE: Record<Notificacao["tipo"], typeof Bell> = {
   solicitacao_triagem: Funnel,
   solicitacao_proposta: ArrowsClockwise,
   solicitacao_recusada: ThumbsDown,
+  // 0084 — chamados: o lifebuoy é o canal; marco/ação ficam por tom textual
+  chamado_aberto: Lifebuoy,
+  chamado_atribuido: UserCheck,
+  chamado_atualizacao: ChatCircleText,
+  chamado_resposta_autor: ChatCircleText,
+  chamado_resolvido: CheckCircle,
+  chamado_reaberto: ArrowsClockwise,
+  chamado_mencao: ChatsCircle,
+  // 0093 — sugestão de trilha esp cai no sino do jovem; a devolutiva do
+  // encerramento, no do mentor DPP (a estrela é a trilha em toda a casa)
+  sugestao_especialista: Sparkle,
+  devolutiva_especialista: FlagCheckered,
+  // 0094 — o "Lembrar" (D5) cai no sino do destinatário
+  lembrete: ChatsCircle,
+  // 0103 — alguém do círculo do jovem respondeu a avaliação por terceiros
+  terceiro_respondeu: UserList,
+  // 0108 — lembretes do prazo de 3 meses da trilha esp (tick diário): a
+  // ampulheta é o mesmo glifo do TrilhaPrazoBadge; pro coord o check de
+  // calendário marca a tarefa (agendar o encerramento/§13)
+  trilha_prazo: HourglassMedium,
+  trilha_prazo_coord: CalendarCheck,
 };
 
 export function NotificacoesBell({

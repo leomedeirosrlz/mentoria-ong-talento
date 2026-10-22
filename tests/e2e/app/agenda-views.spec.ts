@@ -202,10 +202,13 @@ test.describe("agenda do mentor — visões Semana e Horários (REALIZA-25)", ()
   test("visão Semana: 7 colunas, tinta por dia e detalhe ao clicar", async ({
     page,
   }) => {
-    await page.goto("/agenda");
+    // WP3: o default do mentor virou "Minha agenda" — as visões do
+    // calendário (mes/semana/horários) vivem na aba ?aba=calendario
+    await page.goto("/agenda?aba=calendario");
 
-    // os três chips do mentor — mês/semana/horários (a lista é da coord)
-    for (const v of ["mes", "semana", "horarios"])
+    // os quatro chips do mentor — dia/mês/semana/horários (a lista é da
+    // coord; "dia" entrou no REALIZA-163)
+    for (const v of ["dia", "mes", "semana", "horarios"])
       await expect(
         page.locator(`input[name="agenda-visao"][value="${v}"]`)
       ).toBeAttached();
@@ -262,7 +265,7 @@ test.describe("agenda do mentor — visões Semana e Horários (REALIZA-25)", ()
   test("visão Horários: grade de horas, tinta por faixa e evento no topo", async ({
     page,
   }) => {
-    await page.goto("/agenda");
+    await page.goto("/agenda?aba=calendario");
     await abrirVisao(page, "horarios");
 
     // régua de horas no gutter — a janela cobre a noite inteira
@@ -305,7 +308,7 @@ test.describe("agenda do mentor — visões Semana e Horários (REALIZA-25)", ()
     // clicado entra como sugestão. A fixture volta no afterEach.
     await apagarEncontros([IDS.encontroFixture]);
 
-    await page.goto("/agenda");
+    await page.goto("/agenda?aba=calendario");
     await abrirVisao(page, "horarios");
 
     // a próxima semana é toda futura — clicar num dia passado cairia no
@@ -386,7 +389,7 @@ test.describe("agenda do mentor — visões Semana e Horários (REALIZA-25)", ()
       created_by: IDS.mentorProfile,
     });
 
-    await page.goto("/agenda");
+    await page.goto("/agenda?aba=calendario");
     await abrirVisao(page, "horarios");
 
     const bloco = page.getByRole("link", { name: /9º encontro/ });
@@ -401,18 +404,20 @@ test.describe("agenda do mentor — visões Semana e Horários (REALIZA-25)", ()
   });
 
   test("prev/next de semana navega nas duas visões novas", async ({ page }) => {
-    await page.goto("/agenda");
+    await page.goto("/agenda?aba=calendario");
     const rotulo = page.locator("#agenda-mes-rotulo");
 
     for (const visao of ["semana", "horarios"] as const) {
       await abrirVisao(page, visao);
       const inicial = await rotulo.innerText();
-      expect(inicial).toMatch(/\d+–\d+ \w+ \d{4}/);
+      // "12–18 jan 2026" no mesmo mês, "26 out–1 nov 2026" cruzando o mês —
+      // o label pinta o mês nas duas pontas quando a semana vira
+      expect(inicial).toMatch(/\d+( \w+)?–\d+ \w+ \d{4}/);
 
       await page.getByRole("button", { name: "Próxima semana" }).click();
       await expect(rotulo).not.toHaveText(inicial);
       const seguinte = await rotulo.innerText();
-      expect(seguinte).toMatch(/\d+–\d+ \w+ \d{4}/);
+      expect(seguinte).toMatch(/\d+( \w+)?–\d+ \w+ \d{4}/);
 
       await page.getByRole("button", { name: "Semana anterior" }).click();
       await expect(rotulo).toHaveText(inicial);
@@ -423,10 +428,10 @@ test.describe("agenda do mentor — visões Semana e Horários (REALIZA-25)", ()
     page,
   }) => {
     await relogar(page, COORD_EMAIL, COORD_SENHA);
-    await page.goto("/agenda");
+    await page.goto("/agenda?aba=calendario");
 
-    // chips da coord: Semana/Mês/Lista — "Horários" é só do mentor
-    for (const v of ["semana", "mes", "lista"])
+    // chips da coord: Dia/Semana/Mês/Lista — "Horários" é só do mentor
+    for (const v of ["dia", "semana", "mes", "lista"])
       await expect(
         page.locator(`input[name="agenda-visao"][value="${v}"]`)
       ).toBeAttached();

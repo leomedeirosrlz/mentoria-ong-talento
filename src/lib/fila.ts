@@ -5,7 +5,8 @@
 // contato) mora aqui.
 
 import { comparaNome, foraDoPrograma } from "./ciclo";
-import type { Mentorado, MentorProfile, Profile } from "./types";
+import { temPapel } from "./types";
+import type { Mentorado, MentorProfile, Profile, Trilha } from "./types";
 
 /** Item da fila — o mínimo pra linha: quem é, de onde veio, desde quando
  *  espera e como chamar no WhatsApp. */
@@ -24,8 +25,14 @@ export type FilaItem = {
   trilha?: "dpp" | "especialista";
 };
 
-const ehMentor = (p: Profile) =>
-  p.role === "mentor_dpp" || p.role === "mentor_especialista";
+/** Trilhas que o mentor serve — papel efetivo (WP6b): o híbrido devolve as
+ *  duas, cada uma com a própria pool de vagas. */
+const trilhasDe = (p: Pick<Profile, "role" | "papeis">): Trilha[] => {
+  const t: Trilha[] = [];
+  if (temPapel(p, "mentor_dpp")) t.push("dpp");
+  if (temPapel(p, "mentor_especialista")) t.push("especialista");
+  return t;
+};
 
 /** "Carimbo de data/hora" do Google Forms dentro de form_bruto — o intake
  *  (transformar-intake.py) guarda o valor cru da coluna: serial Excel
@@ -137,17 +144,19 @@ export function filaMentorados(
     .sort(porEspera);
 }
 
-/** Teto de vagas do mentor = a pool da trilha do papel dele (0073) —
- *  especialista conta contra capacidade_especialista, DPP contra
- *  capacidade. Sem linha em mentor_profiles vale 1, a mesma régua do
- *  trigger check_mentor_capacidade. Como cada mentor tem um papel só,
- *  a contagem de duplas ativas/pausadas dele já é o uso da própria trilha
- *  (a pool da outra trilha nunca é consumida por ninguém). */
+/** Teto de vagas do mentor = a pool da trilha pedida (0073) — especialista
+ *  conta contra capacidade_especialista, DPP contra capacidade. Sem linha
+ *  em mentor_profiles vale 1, a mesma régua do trigger check_mentor_capacidade.
+ *  Sem `trilha` explícita cai na do papel primário (o comportamento antigo;
+ *  quem decide pool passa a trilha — WP6b, o híbrido tem as duas). */
 export function tetoMentor(
-  p: Pick<Profile, "role">,
-  mp: MentorProfile | undefined
+  p: Pick<Profile, "role" | "papeis">,
+  mp: MentorProfile | undefined,
+  trilha?: Trilha
 ): number {
-  return p.role === "mentor_especialista"
+  const t =
+    trilha ?? (p.role === "mentor_especialista" ? "especialista" : "dpp");
+  return t === "especialista"
     ? (mp?.capacidade_especialista ?? 1)
     : (mp?.capacidade ?? 1);
 }
@@ -163,25 +172,26 @@ export function filaMentores(
   mentorProfiles: Record<string, MentorProfile>,
   contagem: Record<string, number>
 ): FilaItem[] {
-  return pessoas
-    .filter((p) => {
-      if (!ehMentor(p) || !p.ativo) return false;
-      return tetoMentor(p, mentorProfiles[p.id]) - (contagem[p.id] ?? 0) > 0;
-    })
-    .map((p) => {
-      const capacidade = tetoMentor(p, mentorProfiles[p.id]);
-      return {
+  // uma entrada por trilha com vaga — o híbrido (WP6b) aparece nas duas,
+  // `contagem` é chaveada por `${profile_id}:${trilha}`
+  const itens: FilaItem[] = [];
+  for (const p of pessoas) {
+    if (!p.ativo) continue;
+    for (const trilha of trilhasDe(p)) {
+      const teto = tetoMentor(p, mentorProfiles[p.id], trilha);
+      const usadas = contagem[`${p.id}:${trilha}`] ?? 0;
+      if (teto - usadas <= 0) continue;
+      itens.push({
         id: p.id,
         nome: p.nome,
         avatar_path: p.avatar_path,
         whatsapp: p.whatsapp,
         origem: p.origem ?? null,
         desde: esperaDesde(p),
-        vagas: capacidade - (contagem[p.id] ?? 0),
-        trilha: (p.role === "mentor_especialista"
-          ? "especialista"
-          : "dpp") as "dpp" | "especialista",
-      };
-    })
-    .sort(porEspera);
+        vagas: teto - usadas,
+        trilha,
+      });
+    }
+  }
+  return itens.sort(porEspera);
 }

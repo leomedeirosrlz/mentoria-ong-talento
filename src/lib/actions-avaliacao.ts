@@ -4,8 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { demoAtivo } from "./demo/mode";
 import { DEMO_MSG } from "./demo/shared";
-import { notificar } from "./notificar";
-import { enviarEmailsLote } from "./email";
+import { enviarEmailsLote, SITE_URL } from "./email";
 import { emailApoioJovem } from "./email-templates";
 import {
   AVANCEI_AVALIACAO_LABEL,
@@ -70,17 +69,24 @@ export type EnvioAvaliacao = {
   /** Só existe na trilha DPP — especialista nunca lê linha alguma, e um
    *  true gravado lá seria dado morto que a copy não prometeu. */
   visivelMentor?: boolean;
+  /** anti-spam — o campo `website` invisível do form; bot preenche, a
+   *  action finge sucesso e não grava (mesmo molde do /f e /t). */
+  honeypot?: string;
 };
 
 type RetornoSubmit = {
   ok: boolean;
   avaliacao_id: string;
   pedir_apoio: boolean;
+  chamado_id?: string | null;
+  chamado_numero?: string | null;
   destinatarios: { profile_id: string; email: string; nome: string }[];
 };
 
 export async function submeterAvaliacao(input: EnvioAvaliacao) {
   if (await demoAtivo()) return { error: DEMO_MSG };
+  // honeypot: bot preencheu o campo invisível — finge sucesso e não grava
+  if (input.honeypot?.trim()) return { ok: true, pedirApoio: false };
 
   // ---- saneamento de UX: o que um form honesto mandaria. A RPC revalida
   // tudo no banco — isto só poupa a ida e volta das respostas óbvias.
@@ -128,23 +134,23 @@ export async function submeterAvaliacao(input: EnvioAvaliacao) {
   } else {
     encontroId = (input.encontroId ?? "").trim();
     if (!UUID_RE.test(encontroId)) return { error: "Encontro inválido." };
-    // a trilha decide se o toggle do mentor vale algo — a sessão do jovem
-    // lê a própria dupla pela RLS (sem row = especialista ou alheio; nesse
-    // caso a RPC barra o submit e a trilha não importa)
+    // a trilha decide se o toggle do mentor vale algo. O embed em `duplas`
+    // voltava null pro jovem (ele não lê a base) — o oráculo certo é
+    // jovem_duplas, a view definer que ele lê de verdade. Sem row = alheio;
+    // nesse caso a RPC barra o submit e a trilha não importa.
     const { data: enc } = await supabase
       .from("encontros")
-      .select("dupla_id, dupla:duplas(trilha)")
+      .select("dupla_id")
       .eq("id", encontroId)
       .maybeSingle();
-    const d = enc?.dupla as
-      | { trilha: string }[]
-      | { trilha: string }
-      | null
-      | undefined;
-    const dd = Array.isArray(d) ? (d[0] ?? null) : d;
     if (enc) {
       duplaId = enc.dupla_id;
-      trilha = dd?.trilha ?? "dpp";
+      const { data: jd } = await supabase
+        .from("jovem_duplas")
+        .select("trilha")
+        .eq("id", enc.dupla_id)
+        .maybeSingle();
+      trilha = jd?.trilha === "especialista" ? "especialista" : "dpp";
     }
   }
 
@@ -212,6 +218,10 @@ export async function submeterAvaliacao(input: EnvioAvaliacao) {
           estrelas,
           comentario,
           duplaId,
+          chamadoHref: ret.chamado_id
+            ? `${SITE_URL}/chamados?c=${ret.chamado_id}`
+            : null,
+          chamadoNumero: ret.chamado_numero ?? null,
         });
         const envio = await enviarEmailsLote({ para: emails, assunto, html });
         // log coord-only por RPC definer — registra até a falha total:
@@ -265,11 +275,10 @@ export async function definirVisibilidadeAvaliacao(
   return { ok: true };
 }
 
-/** Atendimento do pedido de ajuda do jovem — o guard do banco garante que
- *  só a coordenação limpa a flag; a action gateia o papel antes e fecha o
- *  ciclo com o jovem que tem login ("seu pedido foi visto"). Jovem por
- *  token (sem respondido_por) recebe o cuidado por WhatsApp da coordenação,
- *  como no fluxo do mentor. */
+/** Atendimento do pedido de ajuda do jovem — 0084: resolve o chamado da
+ *  avaliação e limpa a flag na mesma transação (resolver_chamado_por_origem);
+ *  a notificação chamado_resolvido fecha o ciclo com o jovem que tem login.
+ *  Jovem por token recebe o cuidado por WhatsApp da coordenação, como antes. */
 export async function resolverApoioJovem(avaliacaoId: string, duplaId: string) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
@@ -278,33 +287,22 @@ export async function resolverApoioJovem(avaliacaoId: string, duplaId: string) {
     return { error: "Só a coordenação atende pedidos de ajuda." };
   if (!UUID_RE.test(avaliacaoId)) return { error: "Avaliação inválida." };
 
-  const { data, error } = await supabase
-    .from("avaliacoes_encontro")
-    .update({ pedir_apoio: false })
-    .eq("id", avaliacaoId)
-    .select("id, respondido_por_profile_id");
-  if (error) return { error: erroAmigavel(error) };
-  if (!data?.length) {
+  const { error } = await supabase.rpc("resolver_chamado_por_origem", {
+    p_registro_id: null,
+    p_avaliacao_id: avaliacaoId,
+    p_resumo: null,
+  });
+  if (error) {
     return {
-      error: "Não foi possível concluir. Recarregue a página e tente de novo.",
+      error:
+        error.code === "P0001" && error.message
+          ? error.message
+          : erroAmigavel(error),
     };
   }
-  await notificar(
-    supabase,
-    [
-      {
-        profile_id: data[0].respondido_por_profile_id,
-        tipo: "apoio_resolvido",
-        titulo: "Seu pedido de ajuda foi visto",
-        corpo:
-          "A coordenação recebeu o que você marcou na avaliação e vai falar com você.",
-        href: "/jovem",
-      },
-    ],
-    eu.id
-  );
   revalidatePath("/");
   revalidatePath("/duplas");
+  revalidatePath("/chamados");
   revalidatePath(`/duplas/${duplaId}`);
   return { ok: true };
 }

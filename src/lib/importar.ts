@@ -74,7 +74,8 @@ export type LinhaImportada = {
   bio: string;
   /** Link do currículo (Drive) do form de matching — vira curriculo_url. */
   curriculo: string;
-  /** JSON {"dias":["seg"],"periodos":["noite"]} — grade semanal. */
+  /** JSON da grade semanal — canônica {"celulas":[{"dia","periodo"}]};
+   *  a forma legada {"dias","periodos"} também entra (o parse expande). */
   disponibilidade: string;
   /** JSON objeto — payload integral do form de origem. */
   form_bruto: string;
