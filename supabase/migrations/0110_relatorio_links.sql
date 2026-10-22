@@ -53,7 +53,7 @@ create table if not exists public.relatorio_links (
   id uuid primary key default gen_random_uuid(),
   slug text not null unique
     check (slug ~ '^[A-Za-z0-9_-]{12,128}$')
-    default translate(encode(extensions.gen_random_bytes(18),'base64'),'+/=','-_')),
+    default translate(encode(extensions.gen_random_bytes(18),'base64'),'+/=','-_'),
   -- turma opcional desde já: o recorte mora em config — ciclo pode mirar um
   -- cronograma e assinaturas pode nem ter turma (a 0111 previa: "a 170
   -- pode torná-la nullable")
