@@ -98,9 +98,16 @@ export function demoTerceiroPorToken(token: string): TerceiroPublico | null {
   const c = CONTATOS.find((x) => x.token === token);
   if (!c) return null;
   // o status real viaja — o /t demo mostra "já respondeu"/"expirou" nos
-  // convites não-pendentes, igual ao banco
+  // convites não-pendentes, igual ao banco. E o flip lazy da RPC (0105):
+  // pendente com prazo vencido responde 'expirado' — na demo o dataset é
+  // imutável, então o flip é derivado (o Diego Fontes já nasce expirado;
+  // a régua vale pra qualquer fixture pendente com expira_em no passado)
+  const status =
+    c.status === "pendente" && new Date(c.expira_em).getTime() < Date.now()
+      ? "expirado"
+      : c.status;
   return {
-    status: c.status,
+    status,
     convidado: { nome: c.nome },
     alvo: { jovem_nome: "Ana Beatriz" },
   };

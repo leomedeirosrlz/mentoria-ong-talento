@@ -72,6 +72,11 @@ export async function updateSession(request: NextRequest) {
     // /resumo/<slug> — resumo compartilhável da turma por link obscuro
     // (slug fixo conferido na página; mismatch cai em 404)
     p.startsWith("/resumo/") ||
+    // /api/jobs/* — crons da Vercel (169/182/183) não têm sessão Supabase;
+    // sem isso o redirect pra /login devolvia 307 e o job nunca rodava. A
+    // autenticação é o bearer CRON_SECRET dentro da rota, que responde
+    // 401 JSON — nunca redirect.
+    p.startsWith("/api/jobs/") ||
     p === "/privacidade";
 
   if (!user && !isPublic) {

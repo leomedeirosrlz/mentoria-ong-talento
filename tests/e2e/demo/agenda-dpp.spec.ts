@@ -17,10 +17,15 @@ import { entrarNaDemo, expect, test } from "../helpers";
 //   · Matheus Gonçalves · T2 (d-t2c) — registro do encontro 2 pendente
 //     (warnrow deep-linkável), encontro 3 em limbo e o pedido de especialista
 //     aberto no mural (stepper Pedido → Mural → Aceite → Trilha)
+//   · Gustavo Batista · 2025/2026 (d-rito) — a concluída do Ricardo com o
+//     rito de encerramento aberto: o card sinaliza a peça que falta (a
+//     autoavaliação dele) e aponta pra ficha (REALIZA-172)
 // Público, sem writes: vale em qualquer deploy, produção inclusive.
 
 // a dupla D.t2c (0x060d) — id estável do dataset demo
 const DUPLA_T2C = "de000000-0000-4000-8000-000000001549";
+// uid(0x060e) — a concluída do Ricardo com o rito de encerramento aberto
+const DUPLA_RITO = "de000000-0000-4000-8000-000000001550";
 
 test.describe("agenda demo do mentor DPP — Minha agenda / Por mentorado / Calendário (WP3)", () => {
   test("Minha agenda é o default: tablist, chips de escopo e os dois jovens", async ({
@@ -51,6 +56,9 @@ test.describe("agenda demo do mentor DPP — Minha agenda / Por mentorado / Cale
     for (const chip of [
       "Bia · T1 · 2026/2027",
       "Matheus · T2 · 2026/2027",
+      // a concluída também tem chip — o escopo da agenda cobre a jornada
+      // inteira do mentor, não só o que corre
+      "Gustavo · 2025/2026",
       "Eu",
       "Tudo",
     ])
@@ -173,6 +181,41 @@ test.describe("agenda demo do mentor DPP — Minha agenda / Por mentorado / Cale
       "href",
       new RegExp(`^/duplas/${DUPLA_T2C}#registrar-`)
     );
+
+    // d-rito (Gustavo) — a concluída do Ricardo com o rito de encerramento
+    // aberto (REALIZA-172): a pendência sinaliza a peça que falta — a
+    // autoavaliação dele — e o CTA abre a ficha, onde o checklist vive
+    const cardGustavo = page
+      .locator("article")
+      .filter({ hasText: "Gustavo Batista" });
+    // o badge "concluída" do header (exact: "Jornada concluída" também
+    // carrega a palavra) + o rótulo do status — a mesma string é o título
+    // do bloco de próximo encontro (a dupla rende a legenda duas vezes),
+    // então o locator usa .first() como nas outras linhas do card
+    await expect(
+      cardGustavo.getByText("concluída", { exact: true })
+    ).toBeVisible();
+    await expect(cardGustavo.getByText("Jornada concluída").first()).toBeVisible();
+    const pendRito = cardGustavo.locator(
+      'section[aria-label="Pendências da dupla"]'
+    );
+    await expect(
+      pendRito.getByText("Rito de encerramento pendente")
+    ).toBeVisible();
+    await expect(
+      pendRito.getByText(/falta sua autoavaliação/)
+    ).toBeVisible();
+    await expect(
+      pendRito.getByRole("link", { name: "Abrir ficha" })
+    ).toHaveAttribute("href", `/duplas/${DUPLA_RITO}`);
+    // jornada fechada: sem Lembrar o jovem e sem "sugerir especialista" —
+    // o card não convida ação que a conclusão já tornou sem sentido
+    await expect(
+      cardGustavo.getByRole("button", { name: /^Lembrar/ })
+    ).toHaveCount(0);
+    await expect(
+      cardGustavo.getByRole("button", { name: /Sugerir especialista/ })
+    ).toHaveCount(0);
   });
 
   test("Calendário renderiza o AgendaCalendario de sempre", async ({ page }) => {

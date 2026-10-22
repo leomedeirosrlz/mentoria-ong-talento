@@ -342,6 +342,64 @@ export function emailApoioJovem({
   });
 }
 
+/** Link do instrumento da jornada pro JOVEM (REALIZA-51 — lote da
+ *  coordenação). O e-mail leva só nome + instrumento + link: o token é o
+ *  fator de posse, então nada de resposta/dado de outra pessoa no corpo.
+ *  Copy "sem senha, no seu tempo" — a entrega que antes ia por WhatsApp
+ *  agora tem canal próprio. */
+export function emailInstrumentoJovem({
+  primeiroNome,
+  instrumento,
+  link,
+}: {
+  primeiroNome: string;
+  instrumento: string;
+  link: string;
+}): string {
+  return emailLayout({
+    titulo: instrumento,
+    tagline: "Instrumento da jornada",
+    conteudoHtml:
+      `<p style="margin:0 0 14px;font-size:15px;line-height:1.55;color:${INK};">Oi${primeiroNome ? `, ${esc(primeiroNome)}` : ""}!</p>` +
+      `<p style="margin:0 0 14px;font-size:15px;line-height:1.55;color:${INK};">Chegou a sua vez de responder <strong>${esc(instrumento)}</strong> — um exercício da sua jornada de mentoria.</p>` +
+      `<p style="margin:0 0 14px;font-size:15px;line-height:1.55;color:${INK};">É só seu: responda no seu tempo, direto pelo botão abaixo. Não precisa de senha nem de cadastro.</p>`,
+    ctaLabel: "Responder agora",
+    ctaHref: link,
+    preheader: `${instrumento}: seu link chegou — responda no seu tempo, sem senha.`,
+    rodapeExtra: `Se o botão não abrir, copie este endereço no navegador:<br><span style="word-break:break-all;">${esc(link)}</span><br>Este link é pessoal e só seu.`,
+  });
+}
+
+/** Mesma entrega por repasse (decisão da issue): jovem sem e-mail
+ *  cadastrado → o link chega ao MENTOR pra repassar. O texto deixa claro
+ *  de quem é o exercício — o mentor é canal, não destinatário. */
+export function emailInstrumentoRepasseMentor({
+  mentorNome,
+  jovemNome,
+  instrumento,
+  link,
+}: {
+  mentorNome: string;
+  jovemNome: string;
+  instrumento: string;
+  link: string;
+}): string {
+  const primeiroMentor = mentorNome.trim().split(/\s+/)[0] ?? "";
+  const primeiroJovem = jovemNome.trim().split(/\s+/)[0] ?? "";
+  return emailLayout({
+    titulo: instrumento,
+    tagline: "Instrumento da jornada",
+    conteudoHtml:
+      `<p style="margin:0 0 14px;font-size:15px;line-height:1.55;color:${INK};">Oi${primeiroMentor ? `, ${esc(primeiroMentor)}` : ""}!</p>` +
+      `<p style="margin:0 0 14px;font-size:15px;line-height:1.55;color:${INK};"><strong>${esc(jovemNome)}</strong> não tem e-mail cadastrado, então o link de <strong>${esc(instrumento)}</strong> veio pra você.</p>` +
+      `<p style="margin:0 0 14px;font-size:15px;line-height:1.55;color:${INK};">Repasse pra ${esc(primeiroJovem) || "a jovem"} — o exercício faz parte da jornada de mentoria e a resposta é dela. O link abre direto, sem senha.</p>`,
+    ctaLabel: "Abrir o link",
+    ctaHref: link,
+    preheader: `${instrumento}: o link de ${jovemNome} veio pra você repassar.`,
+    rodapeExtra: `Se o botão não abrir, copie este endereço no navegador:<br><span style="word-break:break-all;">${esc(link)}</span><br>Este link é da jornada de ${esc(jovemNome)}.`,
+  });
+}
+
 // 0084 — chamados unificados: urgência/origem jovem avisa a equipe por
 // e-mail (o sino não é garantia pra canal de segurança) e atualização
 // pública chega ao autor também fora do app.

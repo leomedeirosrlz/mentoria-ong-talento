@@ -506,6 +506,63 @@ describe("paraAcompanhar", () => {
     ).toEqual([]);
     expect(paraAcompanhar([], EVENTOS, {}, AGORA)).toEqual([]);
   });
+
+  // REALIZA-172 — dupla concluída com a row do rito sem decisão entra na
+  // fila como pendência da coordenação: motivo próprio, contexto único e
+  // CTA de ficha (a fila desenha "Concluir rito", sem LembreteButton)
+  it("concluída com encerramento pendente entra com motivo 'encerramento'", () => {
+    const dRito = mkDupla({ id: "dR", status: "concluida" });
+    const [item] = paraAcompanhar(
+      [dRito],
+      EVENTOS,
+      {},
+      AGORA,
+      new Set(["dR"])
+    );
+    expect(item.motivos).toEqual(["encerramento"]);
+    expect(item.contexto).toBe(
+      "Rito de encerramento pendente — concluir na ficha"
+    );
+    expect(item.contextoPartes).toEqual([item.contexto]);
+    expect(item.rotuloLembrete).toBe("Concluir rito");
+    expect(item.bloqueadoAte).toBeNull();
+    // dimensões: só a operacional carrega a pendência — jornada fechada
+    // não tem atraso nem acompanhamento a cobrar
+    const dim = dimensoesDoItem(item);
+    expect(dim.operacional?.rotulo).toBe("encerramento pendente");
+    expect(dim.cronograma).toBeNull();
+    expect(dim.acompanhamento).toBeNull();
+  });
+
+  it("o motivo 'encerramento' não vaza pra ativa nem pra concluída sem pendência", () => {
+    // ativa com a row pendente (a autoavaliação chegou cedo) → nada cobra
+    // o rito enquanto a jornada corre. Ela pode entrar na fila por outros
+    // motivos (esta tem 3 oficiais vencidos e nada marcado) — a invariante
+    // é o motivo 'encerramento' nunca aparecer fora da concluída
+    const dAtiva = mkDupla({ id: "dAv" });
+    for (const item of paraAcompanhar(
+      [dAtiva],
+      EVENTOS,
+      {},
+      AGORA,
+      new Set(["dAv"])
+    )) {
+      expect(item.motivos).not.toContain("encerramento");
+      expect(item.contexto).not.toContain("Rito de encerramento");
+      expect(dimensoesDoItem(item).operacional?.rotulo).not.toBe(
+        "encerramento pendente"
+      );
+    }
+    // concluída SEM pendência registrada no set → segue fora da fila
+    const dConc = mkDupla({ id: "dC2", status: "concluida" });
+    expect(
+      paraAcompanhar([dConc], EVENTOS, {}, AGORA, new Set())
+    ).toEqual([]);
+    // decidida (sem row pendente) mesmo no set de outra dupla → nada
+    expect(
+      paraAcompanhar([dConc], EVENTOS, {}, AGORA, new Set(["dX"]))
+    ).toEqual([]);
+  });
 });
 
 // ============================================================

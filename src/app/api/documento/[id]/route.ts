@@ -4,6 +4,7 @@ import { demoRole } from "@/lib/demo/mode";
 import { getDemoData } from "@/lib/demo/data";
 import { demoPdf } from "@/lib/demo/pdf";
 import { DOCUMENTO_PESSOA_TIPO_LABELS } from "@/lib/ciclo";
+import { apiErro } from "@/lib/api-erro";
 
 // Download de documento: oficial (tipo=pessoa|mentorado — termo do mentor,
 // autorização do mentorado), do intake (tipo=doc — row de documentos_pessoa,
@@ -18,7 +19,7 @@ export async function GET(
   const { id } = await params;
   const tipo = new URL(request.url).searchParams.get("tipo");
   if (tipo !== "pessoa" && tipo !== "mentorado" && tipo !== "doc" && tipo !== "curriculo") {
-    return new NextResponse("Documento não encontrado.", { status: 404 });
+    return apiErro("Documento não encontrado.", { status: 404 });
   }
 
   // modo demo: documento oficial é restrito — só a coordenação baixa (a policy
@@ -36,7 +37,7 @@ export async function GET(
     const podeBaixar =
       demo === "coordenacao" || (tipo === "curriculo" && auxSupervisiona);
     if (!podeBaixar) {
-      return new NextResponse("Documento não encontrado.", { status: 404 });
+      return apiErro("Documento não encontrado.", { status: 404 });
     }
     // tipo=doc olha documentos_pessoa; curriculo lê o curriculo_path; os
     // demais apontam pro documento_path oficial (termo / autorização)
@@ -53,7 +54,7 @@ export async function GET(
             ? d.mentorados.find((x) => x.id === id)?.documento_path
             : d.profiles.find((x) => x.id === id)?.documento_path;
     if (!doc) {
-      return new NextResponse("Documento não encontrado.", { status: 404 });
+      return apiErro("Documento não encontrado.", { status: 404 });
     }
     const pdf = intake
       ? demoPdf(
@@ -81,7 +82,10 @@ export async function GET(
   // passa pelo layout (e redirect de login pra API não ajuda ninguém)
   const { data: claims } = await supabase.auth.getClaims();
   if (!claims?.claims?.sub) {
-    return new NextResponse("Sessão expirada. Entre de novo.", { status: 401 });
+    return apiErro("Sessão expirada. Entre de novo.", {
+      status: 401,
+      acao: { href: "/login", label: "Ir para o login" },
+    });
   }
 
   // tipo=doc: documento do intake — documentos_pessoa é coord-only pela RLS,
@@ -111,7 +115,10 @@ export async function GET(
         .eq("id", id)
         .maybeSingle();
   if (error) {
-    return new NextResponse("Não foi possível abrir o documento. Tente de novo.", { status: 500 });
+    return apiErro("Não foi possível abrir o documento. Tente de novo.", {
+      status: 500,
+      acao: { href: `/api/documento/${id}?tipo=${tipo}`, label: "Tentar de novo" },
+    });
   }
   const path = doc == null
     ? null
@@ -121,14 +128,14 @@ export async function GET(
         ? doc.curriculo_path
         : doc.documento_path;
   if (!path) {
-    return new NextResponse("Documento não encontrado.", { status: 404 });
+    return apiErro("Documento não encontrado.", { status: 404 });
   }
 
   const { data: signed, error: signError } = await supabase.storage
     .from("documentos")
     .createSignedUrl(path, 300);
   if (signError || !signed?.signedUrl) {
-    return new NextResponse("Não foi possível abrir o documento.", { status: 404 });
+    return apiErro("Não foi possível abrir o documento.", { status: 404 });
   }
 
   return NextResponse.redirect(signed.signedUrl);

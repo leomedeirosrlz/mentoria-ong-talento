@@ -134,7 +134,7 @@ export function JovemEspecialistaCard({
             sendo a linha editorial; aqui é o detalhe de currículo) */}
         {formacao.length > 0 && (
           <details className="group/exp rounded-lg border border-border/60">
-            <summary className="flex min-h-9 cursor-pointer list-none items-center gap-1.5 px-3 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
+            <summary className="flex min-h-11 cursor-pointer list-none items-center gap-1.5 px-3 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-8 [&::-webkit-details-marker]:hidden">
               Experiência e formação
               <CaretDown
                 size={12}

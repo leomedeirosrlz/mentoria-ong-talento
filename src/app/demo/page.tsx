@@ -65,8 +65,8 @@ export default async function DemoPage() {
     // flex + m-auto (não place-items-center): quando o conteúdo excede o
     // viewport o topo continua rolável — centraliza só quando há espaço.
     // flex, não grid: em grid o w-full do filho resolve contra o padding
-    // box e vaza os px-4
-    <main className="flex min-h-[100dvh] flex-col bg-background px-4 py-6">
+    // box e vaza o padding lateral (1rem ou o safe-area, o que for maior)
+    <main className="flex min-h-[100dvh] flex-col bg-background py-6 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))]">
       {/* animate-rise: mesma entrada suave do onboarding — coberta pelo guard
           global de prefers-reduced-motion */}
       <div className="m-auto w-full max-w-xl animate-rise">
@@ -106,7 +106,7 @@ export default async function DemoPage() {
             Já tem cadastro?{" "}
             <Link
               href="/login"
-              className="underline underline-offset-2 transition-colors hover:text-foreground"
+              className="inline-flex min-h-11 sm:min-h-8 items-center rounded-sm underline underline-offset-2 outline-none transition-colors hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
             >
               Entrar com magic link
             </Link>

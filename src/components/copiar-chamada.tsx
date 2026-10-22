@@ -72,17 +72,15 @@ export function CopiarChamada({
       >
         <LinkSimple
           className={cn(
-            `transition-all duration-150 ${EASE}`,
-            copiado && "scale-25 opacity-0 blur-[4px]"
+            `transition-[transform,opacity] duration-150 ${EASE}`,
+            copiado && "scale-25 opacity-0"
           )}
         />
         <Check
           weight="bold"
           className={cn(
-            `absolute text-[var(--ok)] transition-all duration-150 ${EASE}`,
-            copiado
-              ? "scale-100 opacity-100 blur-[0px]"
-              : "scale-25 opacity-0 blur-[4px]"
+            `absolute text-[var(--ok)] transition-[transform,opacity] duration-150 ${EASE}`,
+            copiado ? "scale-100 opacity-100" : "scale-25 opacity-0"
           )}
         />
       </span>

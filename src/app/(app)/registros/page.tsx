@@ -25,6 +25,10 @@ import {
   registroTardio,
 } from "@/lib/ciclo";
 import { RegistrosFiltros, type OrdemRegistros } from "@/components/registros-filtros";
+import {
+  agruparRegistros,
+  grupoRegistrosDe,
+} from "@/lib/registros";
 import { buttonVariants } from "@/components/ui/button";
 import { ImportarRegistrosDialog } from "@/components/importar-registros-dialog";
 import { PageHeader } from "@/components/page-header";
@@ -109,6 +113,9 @@ export default async function RegistrosPage({
       ? ordemParam
       : "recentes";
   const porPrioridade = ordem === "prioridade";
+  // ?grupo=dupla|semana|avaliacao — "dupla" é o default implícito e não
+  // viaja na URL; lixo no param cai no default (grupoRegistrosDe)
+  const grupo = grupoRegistrosDe(primeiro(params.grupo));
 
   const [{ itens, total }, duplas, alertas, espEventos] = await Promise.all([
     getRegistros(filtros),
@@ -206,6 +213,7 @@ export default async function RegistrosPage({
     if (filtros.dupla) p.set("dupla", filtros.dupla);
     if (filtros.q) p.set("q", filtros.q);
     if (ordem !== "recentes") p.set("ordem", ordem);
+    if (grupo !== "dupla") p.set("grupo", grupo);
     if (filtros.pagina > 1) p.set("pagina", String(filtros.pagina));
     for (const [k, v] of Object.entries(patch)) {
       if (v === null) p.delete(k);
@@ -215,6 +223,18 @@ export default async function RegistrosPage({
     return `/registros${qs ? `?${qs}` : ""}`;
   };
   const hrefPagina = (pagina: number) => hrefCom({ pagina: String(pagina) });
+  // "limpar filtros" zera só os filtros — ordem e agrupamento são
+  // preferência de leitura e sobrevivem (mesma regra do "Limpar tudo")
+  const hrefLimpo = hrefCom({
+    encontro: null,
+    avaliacao: null,
+    apoio: null,
+    tardio: null,
+    dificuldade: null,
+    dupla: null,
+    q: null,
+    pagina: null,
+  });
 
   /** Um item da timeline — extraído porque no modo prioridade a lista
    *  vira duas ("Precisam de olho" / "Sem sinais de atenção"). */
@@ -265,8 +285,57 @@ export default async function RegistrosPage({
     );
   }
 
+  /** Uma lista de registros particionada pelo `?grupo=` corrente — cada
+   *  bloco é cabeçalho + <ol> própria: o rail da timeline vive
+   *  dentro do grupo (o nó final de cada um fecha a linha, nada pendura
+   *  entre grupos). `Tag` desce o nível do cabeçalho quando a lista já está
+   *  sob a seção de prioridade ("Precisam de olho"). */
+  function listaAgrupada(lista: RegistroResumo[], Tag: "h2" | "h3") {
+    const grupos = agruparRegistros(lista, grupo);
+    return (
+      <div
+        className={cn(
+          "space-y-6",
+          // por dupla a grade em xl põe duas duplas lado a lado (o ganho de
+          // densidade da issue); semana/avaliação seguem sequenciais — a
+          // timeline conta a linha do tempo, não um board
+          grupo === "dupla" &&
+            "xl:grid xl:grid-cols-2 xl:items-start xl:gap-8 xl:space-y-0"
+        )}
+      >
+        {grupos.map((g) => (
+          // div, não <section>: 16 landmarks nomeados seriam ruído de
+          // navegação — o cabeçalho dentro já dá o nome ao grupo
+          <div
+            key={g.chave}
+            className={cn(
+              "border-t border-border/60 pt-5 first:border-t-0 first:pt-0",
+              // na grade o 1º da fila também ganha a hairline — sem ela a
+              // coluna da direita nasceria com borda e a da esquerda não
+              grupo === "dupla" && "xl:first:border-t xl:first:pt-5"
+            )}
+          >
+            <Tag className="text-[13px] font-semibold">
+              {g.rotulo}
+              <span className="font-normal text-muted-foreground">
+                {" · "}
+                {g.itens.length}{" "}
+                {g.itens.length === 1 ? "registro" : "registros"}
+              </span>
+            </Tag>
+            <ol className="mt-3">
+              {g.itens.map((r, i) =>
+                linhaRegistro(r, i, i === g.itens.length - 1)
+              )}
+            </ol>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="mx-auto max-w-5xl space-y-6">
       {/* respostas do form semanal externo → encontros + registros
           (só coord — é exceção à regra "o registro é do mentor") */}
       <PageHeader
@@ -285,7 +354,7 @@ export default async function RegistrosPage({
         <p className="text-sm text-muted-foreground" aria-live="polite">
           {temFiltro ? (
             <Link
-              href="/registros"
+              href={hrefLimpo}
               scroll={false}
               className="-my-1.5 py-1.5 font-medium text-foreground underline underline-offset-4 transition-colors hover:text-muted-foreground"
             >
@@ -348,6 +417,7 @@ export default async function RegistrosPage({
         duplas={duplas}
         maxEncontro={maxEncontro}
         ordem={ordem}
+        grupo={grupo}
       />
 
       {ordenados.length === 0 ? (
@@ -371,7 +441,7 @@ export default async function RegistrosPage({
           </p>
           {temFiltro && (
             <Link
-              href="/registros"
+              href={hrefLimpo}
               className={cn(
                 buttonVariants({ variant: "outline", size: "sm" }),
                 "mt-4"
@@ -387,30 +457,34 @@ export default async function RegistrosPage({
               linha conecta os nós — a página conta a sequência, não uma
               coleção genérica de cards */}
           {agrupado ? (
-            <>
-              <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                Precisam de olho ({atencao.length})
-              </h2>
-              <ol>
-                {atencao.map((r, i) =>
-                  linhaRegistro(r, i, i === atencao.length - 1)
-                )}
-              </ol>
-              <h2 className="pt-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                Sem sinais de atenção
-              </h2>
-              <ol>
-                {demais.map((r, i) =>
-                  linhaRegistro(r, i, i === demais.length - 1)
-                )}
-              </ol>
-            </>
+            // prioridade é um agrupamento de blocos — o `?grupo=` corrente
+            // particiona DENTRO de cada um (ex.: as duplas que pedem olho)
+            <div className="space-y-8">
+              <section aria-labelledby="reg-atencao-titulo">
+                <h2
+                  id="reg-atencao-titulo"
+                  className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground"
+                >
+                  Precisam de olho ({atencao.length})
+                </h2>
+                <div className="mt-4">
+                  {listaAgrupada(atencao, "h3")}
+                </div>
+              </section>
+              <section aria-labelledby="reg-demais-titulo">
+                <h2
+                  id="reg-demais-titulo"
+                  className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground"
+                >
+                  Sem sinais de atenção
+                </h2>
+                <div className="mt-4">
+                  {listaAgrupada(demais, "h3")}
+                </div>
+              </section>
+            </div>
           ) : (
-            <ol>
-              {ordenados.map((r, i) =>
-                linhaRegistro(r, i, i === ordenados.length - 1)
-              )}
-            </ol>
+            listaAgrupada(ordenados, "h2")
           )}
           {itens.length < total && (
             <div className="flex justify-center pt-1">

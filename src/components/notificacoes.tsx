@@ -12,6 +12,7 @@ import Link from "next/link";
 import {
   ArrowsClockwise,
   Bell,
+  CalendarCheck,
   CalendarDots,
   CalendarPlus,
   CalendarX,
@@ -23,6 +24,7 @@ import {
   FlagCheckered,
   Funnel,
   HandHeart,
+  HourglassMedium,
   Lifebuoy,
   Megaphone,
   Sparkle,
@@ -250,6 +252,11 @@ const ICONE: Record<Notificacao["tipo"], typeof Bell> = {
   lembrete: ChatsCircle,
   // 0103 — alguém do círculo do jovem respondeu a avaliação por terceiros
   terceiro_respondeu: UserList,
+  // 0108 — lembretes do prazo de 3 meses da trilha esp (tick diário): a
+  // ampulheta é o mesmo glifo do TrilhaPrazoBadge; pro coord o check de
+  // calendário marca a tarefa (agendar o encerramento/§13)
+  trilha_prazo: HourglassMedium,
+  trilha_prazo_coord: CalendarCheck,
 };
 
 export function NotificacoesBell({

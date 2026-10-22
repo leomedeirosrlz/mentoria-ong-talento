@@ -69,6 +69,7 @@ import type {
 import type { FormularioPublico } from "../forms/queries";
 import { getDemoFormularios } from "./forms-data";
 import type { Interacao } from "../interacoes";
+import type { InscricaoFilaTurma, RelatorioLinkItem } from "../relatorio";
 
 // Camada de leitura do modo demo: replica o escopo que o RLS aplicaria a
 // cada papel sobre o dataset fixo de getDemoData() — coordenação vê tudo,
@@ -1630,10 +1631,11 @@ export function demoAssinaturasPessoa(
 
 /** Público da demo: o que assinatura_por_token devolveria — usado pela
  *  página /assinar/<token> quando o cookie demo está ativo. */
-export function demoAssinaturaPorToken(token: string) {
+export function demoAssinaturaPorToken(role: AppRole, token: string) {
   const a = getDemoData().assinaturas.find((x) => x.token === token);
   if (!a) return null;
   const data = getDemoData();
+  const eu = data.personas[role];
   const profile = a.profile_id
     ? data.profiles.find((p) => p.id === a.profile_id)
     : null;
@@ -1653,6 +1655,40 @@ export function demoAssinaturaPorToken(token: string) {
     a.token_expira_em <= new Date().toISOString()
       ? "expirado"
       : a.status;
+  // identidade híbrida (0070, espelho demo — REALIZA-172): o cookie demo é
+  // a "sessão" — a persona logada só abre documento endereçado a ela; doc
+  // de outro profile/mentorado → 'outra_pessoa', como a RPC. Dois desvios
+  // honestos do espelho:
+  //  · 'anon' não existe aqui — quem navega a demo está sempre "logado";
+  //  · autorizacao-responsavel segue 'anon' (não 'signatario_externo'): o
+  //    signatário é o responsável, que nunca tem conta — tratar o link como
+  //    aberto por ele mantém o ÚNICO form de autorização da demo visível
+  //    (o card "encaminhe" continua existindo na real e no código).
+  const meuMentoradoId =
+    data.mentorados.find((m) => m.profile_id === eu.id)?.id ?? null;
+  const identidade =
+    slug === "autorizacao-responsavel"
+      ? ("anon" as const)
+      : a.profile_id != null
+        ? a.profile_id === eu.id
+          ? ("ok" as const)
+          : ("outra_pessoa" as const)
+        : a.mentorado_id != null && a.mentorado_id !== meuMentoradoId
+          ? ("outra_pessoa" as const)
+          : ("ok" as const);
+  // bloqueio de identidade: a RPC devolve o recorte mínimo — sem civis,
+  // como no card de bloqueio real (a PII não sai)
+  if (identidade === "outra_pessoa") {
+    return {
+      id: a.id,
+      status,
+      assinado_em: a.assinado_em,
+      identidade,
+      template: a.template ?? { slug: "", titulo: "", versao: 1 },
+      alvo: { nome: nome ?? "" },
+      civis: null,
+    };
+  }
   const assinavel =
     status === "pendente" &&
     (!a.token_expira_em || a.token_expira_em > new Date().toISOString());
@@ -1677,8 +1713,7 @@ export function demoAssinaturaPorToken(token: string) {
     id: a.id,
     status,
     assinado_em: a.assinado_em,
-    // 0070 — demo não tem sessão autenticada: o link sempre segue o fluxo
-    identidade: "anon" as const,
+    identidade,
     template: a.template ?? { slug: "", titulo: "", versao: 1 },
     alvo: { nome: nome ?? "" },
     civis,
@@ -2192,4 +2227,89 @@ export function demoChamadosSemDono(role: AppRole): number {
   return demoChamadosFila(role).filter(
     (c) => c.status === "aberto" && !c.atribuido_a && !c.restrito
   ).length;
+}
+
+/** Fila por turma (turma_inscricoes, 0111) — espelha a RLS: coord-only
+ *  integral; `status='aguardando'` é o filtro da query real, `turma` null
+ *  devolve todas. Normaliza pro shape discriminado que o montarLinhas
+ *  consome (o XOR do banco garante a coerência no dado demo também). */
+export function demoTurmaInscricoesAguardando(
+  role: AppRole,
+  turma: string | null
+): InscricaoFilaTurma[] {
+  if (role !== "coordenacao") return [];
+  return getDemoData()
+    .turmaInscricoes.filter(
+      (i) => i.status === "aguardando" && (!turma || i.turma === turma)
+    )
+    .flatMap((i): InscricaoFilaTurma[] => {
+      if (i.papel_esperado === "mentor" && i.profile_id)
+        return [
+          {
+            turma: i.turma,
+            papel_esperado: "mentor",
+            profile_id: i.profile_id,
+          },
+        ];
+      if (i.papel_esperado === "mentorado" && i.mentorado_id)
+        return [
+          {
+            turma: i.turma,
+            papel_esperado: "mentorado",
+            mentorado_id: i.mentorado_id,
+          },
+        ];
+      return [];
+    });
+}
+
+/** Painel de links públicos da coordenação (REALIZA-170) — fixture fixa:
+ *  o legado T2 (sem senha, "ativo") + um ciclo protegido. Mutations caem
+ *  no DEMO_MSG das actions — o card é navegável mas não grava. */
+export function demoRelatorioLinks(): RelatorioLinkItem[] {
+  const agora = new Date();
+  const ha = (dias: number) =>
+    new Date(agora.getTime() - dias * 86400e3).toISOString();
+  const em = (dias: number) =>
+    new Date(agora.getTime() + dias * 86400e3).toISOString();
+  return [
+    {
+      id: "de000000-0000-4000-8000-000000001701",
+      slug: "t2-x7k4m9qf2w8j",
+      titulo: "Resumo da turma — T2 · 2026/2027",
+      turma: "T2 · 2026/2027",
+      config: {
+        tipo: "grade",
+        turma: "T2 · 2026/2027",
+        granularidade: "pessoas",
+        expor_contato: false,
+      },
+      protegido: false,
+      criado_por_nome: "Camila Duarte",
+      created_at: ha(45),
+      expira_em: em(75),
+      revogado_em: null,
+      acessos: 12,
+      ultimo_acesso: ha(2),
+      falhas_24h: 0,
+    },
+    {
+      id: "de000000-0000-4000-8000-000000001702",
+      slug: "ciclo-dpp-k3w8f2m9xq7j4n5p",
+      titulo: "Prestação de contas — encontros DPP",
+      turma: "T2 · 2026/2027",
+      config: {
+        tipo: "ciclo",
+        turma: "T2 · 2026/2027",
+      },
+      protegido: true,
+      criado_por_nome: "Camila Duarte",
+      created_at: ha(10),
+      expira_em: null,
+      revogado_em: null,
+      acessos: 4,
+      ultimo_acesso: ha(1),
+      falhas_24h: 2,
+    },
+  ];
 }

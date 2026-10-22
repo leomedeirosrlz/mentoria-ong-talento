@@ -18,6 +18,7 @@ import {
   getSupervisoesRecentes,
 } from "@/lib/queries-supervisao";
 import { getUltimasInteracoes } from "@/lib/interacoes";
+import { getEncerramentosPendentes } from "@/lib/queries-encerramento";
 import {
   getEspecialistas,
   getMinhaGrade,
@@ -215,7 +216,7 @@ export default async function AgendaPage({
   // staff+mentor: ?visao=dpp é o escape explícito pra superfície de mentor
   if (souMentor && aba !== "calendario" && (!papelStaff || visao === "dpp")) {
     const idsDpp = duplasDpp.map((d) => d.id);
-    const [trilhas, supervisoes, solicitacoes, especialistas, nudges] =
+    const [trilhas, supervisoes, solicitacoes, especialistas, nudges, encerramentosPendentes] =
       await Promise.all([
         getTrilhasDosJovens(idsDpp),
         // as duas abas leem supervisões: "minha" pra linha cronológica,
@@ -230,6 +231,11 @@ export default async function AgendaPage({
         // cap de 48h do "Lembrar o jovem" — só o Por mentorado renderiza
         aba === "por-mentorado"
           ? getUltimasInteracoes(idsDpp, "nudge")
+          : Promise.resolve({}),
+        // rito de encerramento aberto (REALIZA-172) — o card do mentorado
+        // concluído sinaliza a peça que falta (autoavaliação do mentor)
+        aba === "por-mentorado"
+          ? getEncerramentosPendentes()
           : Promise.resolve({}),
       ]);
     // o strip "Sua semana" do Por mentorado mostra os MESMOS itens da Minha
@@ -284,7 +290,11 @@ export default async function AgendaPage({
             cronogramas={cronogramas}
             supervisoes={supervisoes}
             nudges={nudges}
+            encerramentosPendentes={encerramentosPendentes}
             itensSemana={itensSemana}
+            // staff+mentor também: o deep-link do dia no strip precisa do
+            // ?visao=dpp (mesma régua do AbasAgendaMentor no ramo calendário)
+            hibrido={duasVisoes || (papelStaff ?? false)}
             meuId={me!.id}
             meuNome={me!.nome.split(" ")[0]}
             hoje={hoje}
@@ -339,11 +349,15 @@ export default async function AgendaPage({
     abaParam !== "calendario" &&
     diaInicial == null
   ) {
-    const [nudgesCoord, supervisoesCoord] = await Promise.all([
-      getUltimasInteracoes(duplas.map((d) => d.id), "nudge"),
-      // a lib recorta a semana — trago margem (30) pra cobrir ciclos grandes
-      getSupervisoesRecentes(30),
-    ]);
+    const [nudgesCoord, supervisoesCoord, encerramentosPendentes] =
+      await Promise.all([
+        getUltimasInteracoes(duplas.map((d) => d.id), "nudge"),
+        // a lib recorta a semana — trago margem (30) pra cobrir ciclos grandes
+        getSupervisoesRecentes(30),
+        // rito de encerramento aberto — a pendência que vira linha "concluir
+        // na ficha" quando a dupla já concluiu (REALIZA-172)
+        getEncerramentosPendentes(),
+      ]);
     return (
       <div className="space-y-6">
         {avisoVisao}
@@ -355,6 +369,9 @@ export default async function AgendaPage({
           cronogramas={cronogramas}
           nudges={nudgesCoord}
           supervisoes={supervisoesCoord}
+          encerramentosPendentes={
+            new Set(Object.keys(encerramentosPendentes))
+          }
           meuNome={me.nome.split(" ")[0]}
           hoje={hoje}
         />
@@ -459,7 +476,7 @@ function AbasAgenda({ ativa }: { ativa: "dpp" | "especialista" }) {
   return (
     <nav
       aria-label="Visão da agenda"
-      className="flex w-fit items-center gap-1 rounded-lg bg-muted p-1"
+      className="scroll-fina flex w-fit max-w-full items-center gap-1 overflow-x-auto rounded-lg bg-muted p-1"
     >
       {(
         [
@@ -475,7 +492,7 @@ function AbasAgenda({ ativa }: { ativa: "dpp" | "especialista" }) {
           href={href}
           aria-current={ativa === v ? "page" : undefined}
           className={cn(
-            "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+            "inline-flex min-h-11 shrink-0 items-center rounded-md px-3 text-sm font-medium transition-colors sm:min-h-8",
             ativa === v
               ? "bg-card text-foreground shadow-sm"
               : "text-muted-foreground hover:text-foreground"
@@ -500,7 +517,7 @@ function AbasAgendaCoord({
     <div
       role="tablist"
       aria-label="Modos da agenda"
-      className="flex w-fit items-center gap-1 rounded-lg bg-muted p-1"
+      className="scroll-fina flex w-fit max-w-full items-center gap-1 overflow-x-auto rounded-lg bg-muted p-1"
     >
       {(
         [
@@ -514,7 +531,7 @@ function AbasAgendaCoord({
           aria-selected={ativa === v}
           href={href}
           className={cn(
-            "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+            "inline-flex min-h-11 shrink-0 items-center rounded-md px-3 text-sm font-medium transition-colors sm:min-h-8",
             ativa === v
               ? "bg-card text-foreground shadow-sm"
               : "text-muted-foreground hover:text-foreground"
@@ -544,7 +561,7 @@ function AbasAgendaMentor({
     <div
       role="tablist"
       aria-label="Modos da agenda"
-      className="flex w-fit items-center gap-1 rounded-lg bg-muted p-1"
+      className="scroll-fina flex w-fit max-w-full items-center gap-1 overflow-x-auto rounded-lg bg-muted p-1"
     >
       {(
         [
@@ -559,7 +576,7 @@ function AbasAgendaMentor({
           aria-selected={ativa === v}
           href={`${base}${v}`}
           className={cn(
-            "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+            "inline-flex min-h-11 shrink-0 items-center rounded-md px-3 text-sm font-medium transition-colors sm:min-h-8",
             ativa === v
               ? "bg-card text-foreground shadow-sm"
               : "text-muted-foreground hover:text-foreground"

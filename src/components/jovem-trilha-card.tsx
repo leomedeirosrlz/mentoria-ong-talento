@@ -256,7 +256,7 @@ export function JovemTrilhaCard({
                 </span>
                 <span
                   className={cn(
-                    "max-w-24 text-center text-[10px] leading-tight",
+                    "max-w-24 text-center text-[11px] leading-tight sm:max-w-none",
                     estado === "futuro"
                       ? "text-muted-foreground/60"
                       : "text-muted-foreground"
@@ -265,7 +265,7 @@ export function JovemTrilhaCard({
                   {p.titulo.split(",")[0]}
                 </span>
                 {encontro?.data_hora && estado !== "futuro" && (
-                  <span className="text-[10px] tabular-nums text-muted-foreground/70">
+                  <span className="text-[11px] tabular-nums text-muted-foreground/70">
                     {formatDateTime(encontro.data_hora)}
                   </span>
                 )}

@@ -37,18 +37,20 @@ export function SiteFooter({
           </p>
           <nav
             aria-label="Rodapé"
-            className="flex items-center gap-x-4 text-xs text-white/60"
+            className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-white/60"
           >
-            {/* --ring padrão falha sobre ink — o ring do foco usa lime */}
+            {/* --ring padrão falha sobre ink — o ring do foco usa lime.
+                min-h-11 mobile / min-h-8 desktop: o link text-xs sozinho
+                ficava abaixo até do mínimo AA (24px, WCAG 2.5.8) */}
             <Link
               href="/privacidade"
-              className="rounded-sm underline-offset-2 outline-none transition-colors hover:text-white hover:underline focus-visible:ring-2 focus-visible:ring-[var(--brand-lime)]"
+              className="inline-flex min-h-11 sm:min-h-8 items-center rounded-sm underline-offset-2 outline-none transition-colors hover:text-white hover:underline focus-visible:ring-2 focus-visible:ring-[var(--brand-lime)]"
             >
               Privacidade e LGPD
             </Link>
             <a
               href="mailto:mentoria@realiza.vc"
-              className="rounded-sm underline-offset-2 outline-none transition-colors hover:text-white hover:underline focus-visible:ring-2 focus-visible:ring-[var(--brand-lime)]"
+              className="inline-flex min-h-11 sm:min-h-8 items-center rounded-sm underline-offset-2 outline-none transition-colors hover:text-white hover:underline focus-visible:ring-2 focus-visible:ring-[var(--brand-lime)]"
             >
               mentoria@realiza.vc
             </a>
@@ -60,14 +62,17 @@ export function SiteFooter({
 
   return (
     <footer className={className}>
-      <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+      <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs text-muted-foreground">
         <span>Realiza.vc · Programa de Mentoria Social</span>
         <span aria-hidden className="text-border">·</span>
-        <Link href="/privacidade" className="underline-offset-2 transition-colors hover:text-foreground hover:underline">
+        {/* min-h-11 mobile / min-h-8 desktop: os links text-xs ficavam
+            abaixo até do mínimo AA (24px) — e a variante light não tinha
+            anel de foco explícito */}
+        <Link href="/privacidade" className="inline-flex min-h-11 sm:min-h-8 items-center rounded-sm underline-offset-2 outline-none transition-colors hover:text-foreground hover:underline focus-visible:ring-3 focus-visible:ring-ring/50">
           Privacidade e LGPD
         </Link>
         <span aria-hidden className="text-border">·</span>
-        <a href="mailto:mentoria@realiza.vc" className="underline-offset-2 transition-colors hover:text-foreground hover:underline">
+        <a href="mailto:mentoria@realiza.vc" className="inline-flex min-h-11 sm:min-h-8 items-center rounded-sm underline-offset-2 outline-none transition-colors hover:text-foreground hover:underline focus-visible:ring-3 focus-visible:ring-ring/50">
           mentoria@realiza.vc
         </a>
       </div>

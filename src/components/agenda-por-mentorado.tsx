@@ -87,8 +87,14 @@ export type AgendaPorMentoradoProps = {
   supervisoes: Supervisao[];
   /** Último contato por dupla — o "Lembrar o jovem" só conta tipo nudge. */
   nudges: Record<string, Interacao>;
+  /** Rito de encerramento aberto por dupla (getEncerramentosPendentes) —
+   *  dupla_id → a peça do mentor já chegou?. Só a concluída cobra. */
+  encerramentosPendentes: Record<string, { autoavaliacao: boolean }>;
   /** Os MESMOS itens da Minha agenda — o strip "Sua semana" os condensa. */
   itensSemana: AgendaItem[];
+  /** staff+mentor e DPP+esp chegam via ?visao=dpp — o strip repassa ao
+   *  deep-link do dia (mesma regra do AbasAgendaMentor). */
+  hibrido?: boolean;
   meuId: string;
   /** Primeiro nome do mentor — assina o check-in do Lembrar. */
   meuNome: string;
@@ -123,7 +129,9 @@ export function AgendaPorMentorado({
   cronogramas,
   supervisoes,
   nudges,
+  encerramentosPendentes,
   itensSemana,
+  hibrido = false,
   meuId,
   meuNome,
   hoje,
@@ -173,7 +181,7 @@ export function AgendaPorMentorado({
       {/* o strip da semana só aparece quando tem o que condensar — sem
           itens derivados ele seria 7 "livre" sem utilidade */}
       {itensSemana.length > 0 && (
-        <AgendaSuaSemana itens={itensSemana} hoje={hoje} />
+        <AgendaSuaSemana itens={itensSemana} hoje={hoje} hibrido={hibrido} />
       )}
       {/* >1 dupla: cards em 2 colunas em xl (mesma régua da home do
           mentor); com 1 só, a coluna única mantém a leitura confortável */}
@@ -190,6 +198,11 @@ export function AgendaPorMentorado({
             cronogramas={cronogramas}
             nudge={
               nudges[dupla.id]?.tipo === "nudge" ? nudges[dupla.id] : null
+            }
+            encerramentoPendente={
+              dupla.status === "concluida"
+                ? (encerramentosPendentes[dupla.id] ?? null)
+                : null
             }
             meuNome={meuNome}
             agora={agora}
@@ -220,6 +233,7 @@ function CardMentorado({
   eventos,
   cronogramas,
   nudge,
+  encerramentoPendente,
   meuNome,
   agora,
   agoraMs,
@@ -234,6 +248,9 @@ function CardMentorado({
   cronogramas: Cronograma[];
   /** Último `interacoes` tipo nudge da dupla — alimenta o cap de 48h. */
   nudge: Interacao | null;
+  /** Rito aberto desta dupla (só concluída) — a pendência que o card cobra:
+   *  a autoavaliação do mentor ainda não chegou, ou a decisão é da coord. */
+  encerramentoPendente: { autoavaliacao: boolean } | null;
   /** Primeiro nome do mentor — assina o check-in do Lembrar. */
   meuNome: string;
   agora: Date;
@@ -285,7 +302,9 @@ function CardMentorado({
     .filter((t) => t.status === "pendente" && t.prazo != null && t.prazo < hoje)
     .sort((a, b) => a.prazo!.localeCompare(b.prazo!));
   const semPendencia =
-    registrosPendentes.length === 0 && combinadosVencidos.length === 0;
+    registrosPendentes.length === 0 &&
+    combinadosVencidos.length === 0 &&
+    encerramentoPendente == null;
 
   // trilhas: ativa/pausada rendem bloco aberto; concluída/encerrada viram
   // histórico colapsado (até 3 por jovem no domínio — a lista cabe)
@@ -424,14 +443,19 @@ function CardMentorado({
           hoje={hoje}
         />
       )}
-      {trilhasVivas.length === 0 && !pedidoEmVoo && (
-        <SemTrilhaBlock
-          dupla={dupla}
-          especialistas={especialistas}
-          primeiroNome={primeiroNome}
-          tinhaHistorico={trilhasAnteriores.length > 0}
-        />
-      )}
+      {/* a porta de entrada "sugerir" só faz sentido com a jornada viva —
+          concluída/encerrada não abre trilha nova (a pendência que resta é
+          o rito, já cobrido acima) */}
+      {dupla.status === "ativa" &&
+        trilhasVivas.length === 0 &&
+        !pedidoEmVoo && (
+          <SemTrilhaBlock
+            dupla={dupla}
+            especialistas={especialistas}
+            primeiroNome={primeiroNome}
+            tinhaHistorico={trilhasAnteriores.length > 0}
+          />
+        )}
       {pedidosHistoricos.length > 0 && (
         <PedidosAnterioresLine solicitacoes={pedidosHistoricos} />
       )}
@@ -505,6 +529,35 @@ function CardMentorado({
                 </Link>
               </li>
             ))}
+            {/* rito de encerramento aberto (REALIZA-172): a jornada concluiu
+                mas o fechamento não — a peça que falta depende de quem lê:
+                autoavaliação do mentor ou a decisão da coordenação, ambas na
+                ficha da dupla */}
+            {encerramentoPendente && (
+              <li className="flex flex-wrap items-center gap-3 rounded-lg bg-[var(--warn)]/8 px-3 py-2.5">
+                <FlagCheckered
+                  size={18}
+                  aria-hidden
+                  className="shrink-0 text-[var(--warn-text)]"
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium">
+                    Rito de encerramento pendente
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {encerramentoPendente.autoavaliacao
+                      ? "sua autoavaliação já chegou — a coordenação conclui o rito na ficha"
+                      : "falta sua autoavaliação — o rito fecha na ficha da dupla"}
+                  </p>
+                </div>
+                <Link
+                  href={`/duplas/${dupla.id}`}
+                  className={buttonVariants({ variant: "outline", size: "sm" })}
+                >
+                  Abrir ficha
+                </Link>
+              </li>
+            )}
           </ul>
         )}
       </section>
@@ -584,18 +637,24 @@ function ProximoEncontro({
     detalhe = `${feitos} de ${total} encontros realizados`;
   } else if (limbo) {
     // limbo é honesto: a plataforma não sabe se rolou — a pergunta é da
-    // dupla, a correção acontece na ficha (remarcar/registrar)
+    // dupla, a correção acontece na ficha (remarcar/registrar). O CTA é a
+    // pill outline sm dos outros cartões de pendência — um link inline de
+    // texto tinha ~20px de alvo no toque.
     titulo = `Estava agendado ${formatDiaHora(limbo.data_hora)}`;
     detalhe = (
       <>
-        não aconteceu?{" "}
+        <span className="block">
+          não aconteceu? — se rolou, o registro também é na ficha
+        </span>
         <Link
           href={`/duplas/${dupla.id}`}
-          className="font-medium text-foreground underline underline-offset-4"
+          className={cn(
+            buttonVariants({ variant: "outline", size: "sm" }),
+            "mt-2"
+          )}
         >
-          remarcar na ficha
+          Remarcar na ficha
         </Link>
-        {" — se rolou, o registro também é lá"}
       </>
     );
   } else if (proximo?.data_hora) {

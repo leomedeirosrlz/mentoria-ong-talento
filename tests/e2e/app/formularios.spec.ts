@@ -32,8 +32,9 @@ test.describe("guarda — Enviar formulário não oferece instrumentos da jornad
     await loginComSenha(page, COORD_EMAIL, COORD_SENHA);
     await page.goto(`/duplas/${DUPLA_ID}`);
 
-    // o Enviar formulário mora no "Mais" do header da ficha — menuitem que
-    // é DialogTrigger (mesmo padrão do Solicitar especialista)
+    // o Enviar formulário mora no "Mais" do header da ficha — menuitem
+    // comum que abre o dialog controlado (mesmo padrão do Solicitar
+    // especialista; REALIZA-157 tirou o Dialog.Trigger de dentro do popup)
     const item = page.getByRole("menuitem", { name: "Enviar formulário" });
     await agirComConfirma(
       () => page.getByRole("button", { name: "Mais" }).click(),

@@ -1,7 +1,10 @@
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { demoRole } from "./demo/mode";
-import { demoEncerramentoDaDupla } from "./demo/encerramento-data";
+import {
+  demoEncerramentoDaDupla,
+  demoEncerramentosPendentes,
+} from "./demo/encerramento-data";
 import { demoAvaliacao360DaDupla } from "./demo/forms-data";
 import type { Encerramento } from "./types";
 
@@ -37,6 +40,36 @@ export const getEncerramentoDaDupla = cache(
       ...(row as unknown as Encerramento),
       decidido: (emb as { nome: string } | null) ?? null,
     };
+  }
+);
+
+/** Mapa dupla_id → peças do rito em aberto: rows de `encerramentos` sem
+ *  decisão (tipo/decidido_por null — o rito segue aberto). Alimenta a
+ *  agenda da coordenação (o motivo "encerramento" do paraAcompanhar) e o
+ *  espelho do mentor (a pendência "falta sua autoavaliação" no card do
+ *  mentorado). O filtro por status da dupla NÃO vai na query: quem
+ *  consome já tem a lista de duplas e decide o recorte (só 'concluida'
+ *  cobra o rito; a row pendente de dupla ativa é peça chegando cedo, não
+ *  pendência). RLS (encerramentos_select) faz o escopo: coord todas,
+ *  mentor/supervisor só os da própria dupla. Falha degrada pra {} com
+ *  log — mesma disciplina das leituras complementares. */
+export const getEncerramentosPendentes = cache(
+  async (): Promise<Record<string, { autoavaliacao: boolean }>> => {
+    const demo = await demoRole();
+    if (demo) return demoEncerramentosPendentes(demo);
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("encerramentos")
+      .select("dupla_id, autoavaliacao_mentor")
+      .is("tipo", null);
+    if (error) {
+      console.error("getEncerramentosPendentes:", error);
+      return {};
+    }
+    const out: Record<string, { autoavaliacao: boolean }> = {};
+    for (const r of data ?? [])
+      out[r.dupla_id] = { autoavaliacao: r.autoavaliacao_mentor != null };
+    return out;
   }
 );
 

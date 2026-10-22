@@ -18,6 +18,8 @@ import { FormularioAcoes, FormularioExcluir } from "../formulario-acoes";
 import { FormularioBuilder } from "../formulario-builder";
 import { FormularioLinks, type DestinoOpcao } from "../formulario-links";
 import { FormularioPreview } from "../formulario-preview";
+import { IntakeLinkSection } from "../intake-link-section";
+import { IntakeRespostas } from "../intake-respostas";
 import { RespostasSection } from "../respostas-section";
 
 const UUID_RE =
@@ -57,7 +59,11 @@ export default async function FormularioPage({
     getMentorados(),
   ]);
   if (!detalhe) notFound();
-  const { formulario: f, links } = detalhe;
+  const { formulario: f, links, anexos } = detalhe;
+  // forms oficiais de intake (0115): um link multi_uso recebe inscrições
+  // anônimas — UI própria (link de inscrição + fila de candidatos)
+  const ehIntake =
+    f.sistema === "intake_mentor" || f.sistema === "intake_mentorado";
 
   // elegíveis = todo mundo ativo menos a própria coordenação (ela opera o
   // form, nunca responde). O papel alimenta o agrupamento do dialog — por
@@ -84,13 +90,26 @@ export default async function FormularioPage({
     })),
   ];
 
-  const respondidos = links.filter((l) => l.resposta).length;
+  // conta respostas (não links respondidos): no intake um único link
+  // multi_uso carrega todas as inscrições recebidas
+  const respondidos = links.reduce((n, l) => n + l.respostas.length, 0);
   const status: Record<LinkStatus, number> = {
     pendente: 0,
     respondido: 0,
     expirado: 0,
   };
-  for (const l of links) status[linkStatus(l)]++;
+  for (const l of links) {
+    // link de intake vigente não é "pendente" no sentido manual (ninguém
+    // deve responder) — conta como link vivo, não como falta. usado_em é
+    // sempre null nele, então linkStatus já devolve expirado/pendente
+    // certinho (e mantém Date.now() fora do render — react-hooks/purity)
+    if (l.multi_uso) {
+      if (linkStatus(l) === "expirado") status.expirado++;
+      continue;
+    }
+    status[linkStatus(l)]++;
+  }
+  const inscricoes = respondidos;
 
   return (
     <div className="mx-auto max-w-3xl space-y-8">
@@ -153,28 +172,40 @@ export default async function FormularioPage({
           âncoras pras três seções — a página é longa e a coord entra aqui
           pra resolver uma coisa só */}
       <div className="space-y-1.5">
-        {links.length > 0 && (
-          <p className="text-sm text-muted-foreground">
-            <span className="font-medium text-foreground">
-              {status.respondido} de {links.length}{" "}
-              {status.respondido === 1 ? "respondeu" : "responderam"}
-            </span>
-            {" · "}
-            <span
-              className={
-                status.pendente > 0 && f.ativo
-                  ? "font-medium text-[var(--warn-text)]"
-                  : undefined
-              }
-            >
-              {status.pendente}{" "}
-              {status.pendente === 1 ? "pendente" : "pendentes"}
-            </span>
-            {" · "}
-            {status.expirado}{" "}
-            {status.expirado === 1 ? "expirado" : "expirados"}
-          </p>
-        )}
+        {links.length > 0 &&
+          (ehIntake ? (
+            <p className="text-sm text-muted-foreground">
+              <span className="font-medium text-foreground">
+                {inscricoes}{" "}
+                {inscricoes === 1
+                  ? "inscrição recebida"
+                  : "inscrições recebidas"}
+              </span>
+              {" · "}
+              {status.expirado === 0 ? "link de inscrição ativo" : "link desativado"}
+            </p>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              <span className="font-medium text-foreground">
+                {status.respondido} de {links.length}{" "}
+                {status.respondido === 1 ? "respondeu" : "responderam"}
+              </span>
+              {" · "}
+              <span
+                className={
+                  status.pendente > 0 && f.ativo
+                    ? "font-medium text-[var(--warn-text)]"
+                    : undefined
+                }
+              >
+                {status.pendente}{" "}
+                {status.pendente === 1 ? "pendente" : "pendentes"}
+              </span>
+              {" · "}
+              {status.expirado}{" "}
+              {status.expirado === 1 ? "expirado" : "expirados"}
+            </p>
+          ))}
         <nav
           aria-label="Seções do formulário"
           className="text-sm text-muted-foreground"
@@ -197,7 +228,7 @@ export default async function FormularioPage({
             href="#sec-respostas"
             className="underline underline-offset-2 transition-colors hover:text-foreground"
           >
-            Respostas ({respondidos})
+            {ehIntake ? "Inscrições" : "Respostas"} ({respondidos})
           </a>
         </nav>
       </div>
@@ -299,20 +330,30 @@ export default async function FormularioPage({
           id="sec-links"
           className="mb-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground"
         >
-          Links de resposta
+          {ehIntake ? "Link de inscrição" : "Links de resposta"}
         </h2>
-        <p className="mb-3 text-sm text-muted-foreground">
-          Cada link é único e de uso único. A pessoa responde sem login, num
-          endereço só dela.
-        </p>
-        <FormularioLinks
-          formularioId={f.id}
-          formularioTitulo={f.titulo}
-          formularioAtivo={f.ativo}
-          formularioSistema={f.sistema}
-          links={links}
-          destinatarios={destinatarios}
-        />
+        {ehIntake ? (
+          <IntakeLinkSection
+            formularioId={f.id}
+            formularioAtivo={f.ativo}
+            links={links}
+          />
+        ) : (
+          <>
+            <p className="mb-3 text-sm text-muted-foreground">
+              Cada link é único e de uso único. A pessoa responde sem login,
+              num endereço só dela.
+            </p>
+            <FormularioLinks
+              formularioId={f.id}
+              formularioTitulo={f.titulo}
+              formularioAtivo={f.ativo}
+              formularioSistema={f.sistema}
+              links={links}
+              destinatarios={destinatarios}
+            />
+          </>
+        )}
       </section>
 
       <section aria-labelledby="sec-respostas">
@@ -320,13 +361,18 @@ export default async function FormularioPage({
           id="sec-respostas"
           className="mb-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground"
         >
-          Respostas{respondidos > 0 && ` (${respondidos})`}
+          {ehIntake ? "Inscrições" : "Respostas"}
+          {respondidos > 0 && ` (${respondidos})`}
         </h2>
-        <RespostasSection
-          campos={f.campos}
-          links={links}
-          sistema={f.sistema ?? null}
-        />
+        {ehIntake ? (
+          <IntakeRespostas campos={f.campos} links={links} anexos={anexos} />
+        ) : (
+          <RespostasSection
+            campos={f.campos}
+            links={links}
+            sistema={f.sistema ?? null}
+          />
+        )}
       </section>
 
       {/* zona de perigo — destrutivo no fim da página, fora do header */}

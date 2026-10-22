@@ -263,6 +263,10 @@ export function CronogramaAcoes({
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Dados do cronograma</DialogTitle>
+            <DialogDescription>
+              Nome, turma e status — a agenda de encontros muda no editor
+              abaixo.
+            </DialogDescription>
           </DialogHeader>
           <form
             className="space-y-4"

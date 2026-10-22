@@ -13,6 +13,7 @@ import { cn, normaliza } from "@/lib/utils";
 import type { LembreteDestino } from "@/lib/actions-lembrete";
 import { LembreteButton } from "@/components/lembrete-button";
 import { PillTurma, Tag } from "@/components/agenda-partes";
+import { buttonVariants } from "@/components/ui/button";
 import { filterChipCls } from "@/components/ui/filter-chip";
 import { Input } from "@/components/ui/input";
 
@@ -38,6 +39,10 @@ export type LinhaFila = {
   /** WhatsApp do destinatário — null = o nudge sai só como notificação
    *  in-app. */
   telefone: string | null;
+  /** "ficha" = a pendência é da coordenação, não da dupla — o CTA vira
+   *  link pra ficha (rito de encerramento), sem LembreteButton. Default
+   *  "lembrete". */
+  acao?: "lembrete" | "ficha";
 };
 
 type LinhaComDimensoes = LinhaFila & { dimensoes: DimensoesItem };
@@ -222,26 +227,40 @@ function LinhaAcompanhar({ linha }: { linha: LinhaComDimensoes }) {
           </Tag>
         </span>
       ))}
-      <LembreteButton
-        duplaId={item.duplaId}
-        destino={linha.destino}
-        rotulo={linha.rotulo}
-        telefone={telefone}
-        titulo={lembrete.titulo}
-        corpo={lembrete.corpo}
-        href={
-          linha.destino === "mentorado"
-            ? "/jovem/agenda"
-            : `/duplas/${item.duplaId}`
-        }
-        bloqueadoAte={item.bloqueadoAte}
-      />
-      <Link
-        href={`/duplas/${item.duplaId}`}
-        className="inline-flex min-h-9 items-center rounded-lg px-2 text-xs font-semibold text-foreground/80 transition-colors hover:bg-muted hover:text-foreground"
-      >
-        Ver ficha ›
-      </Link>
+      {linha.acao === "ficha" ? (
+        // pendência da coordenação (rito de encerramento): o Lembrar seria
+        // nudge pra dupla errada — a ação mora na ficha, que já carrega o
+        // checklist inteiro. "Ver ficha ›" some pra não duplicar o destino
+        <Link
+          href={`/duplas/${item.duplaId}`}
+          className={buttonVariants({ size: "sm" })}
+        >
+          {linha.rotulo}
+        </Link>
+      ) : (
+        <>
+          <LembreteButton
+            duplaId={item.duplaId}
+            destino={linha.destino}
+            rotulo={linha.rotulo}
+            telefone={telefone}
+            titulo={lembrete.titulo}
+            corpo={lembrete.corpo}
+            href={
+              linha.destino === "mentorado"
+                ? "/jovem/agenda"
+                : `/duplas/${item.duplaId}`
+            }
+            bloqueadoAte={item.bloqueadoAte}
+          />
+          <Link
+            href={`/duplas/${item.duplaId}`}
+            className="inline-flex min-h-11 items-center rounded-lg px-2 text-xs font-semibold text-foreground/80 transition-colors hover:bg-muted hover:text-foreground sm:min-h-8"
+          >
+            Ver ficha ›
+          </Link>
+        </>
+      )}
     </li>
   );
 }

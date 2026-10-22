@@ -254,7 +254,9 @@ export function PedirEspecialistaDialog({
           }
         />
       )}
-      <DialogContent>
+      {/* lg: cards de alvo lado a lado + lista de especialistas com avatar —
+          abaixo disso a escolha dirigida ficava apertada */}
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Pedir apoio de um especialista</DialogTitle>
         </DialogHeader>
@@ -288,7 +290,7 @@ export function PedirEspecialistaDialog({
           {modo === "dirigido" && (
             <div className="space-y-2">
               <p className="text-sm font-medium">Quem você quer procurar?</p>
-              <ul className="max-h-52 space-y-1.5 overflow-y-auto pr-1">
+              <ul className="max-h-[40dvh] space-y-1.5 overflow-y-auto pr-1">
                 {especialistas.map((e) => {
                   const nome = e.nome_social || e.nome;
                   return (

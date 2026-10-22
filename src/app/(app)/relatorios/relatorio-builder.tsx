@@ -1,24 +1,25 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowSquareOut, Check, DownloadSimple, Link as LinkIcon, PencilSimple } from "@phosphor-icons/react";
+import { Check, DownloadSimple, Link as LinkIcon, PencilSimple } from "@phosphor-icons/react";
 import { RelatorioCanvas } from "@/components/relatorio-canvas";
+import { NovoLinkDialog } from "@/components/novo-link-dialog";
 import { salvarCampoRelatorio } from "@/lib/actions";
 import {
   catalogoDe,
-  configParaSearch,
   montarLinhas,
   textoCelula,
   type AlvoRelatorio,
   type DuplaFonte,
   type GranularidadeRelatorio,
+  type InscricaoFilaTurma,
   type PessoaFonte,
   type RelatorioConfig,
 } from "@/lib/relatorio";
-import { RESUMO_SLUG_T2 } from "@/lib/relatorio";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { filterChipCls } from "@/components/ui/filter-chip";
+import type { Cronograma } from "@/lib/types";
 
 function csvDownload(nome: string, header: string[], linhas: string[][]) {
   const esc = (v: string) => `"${v.replace(/"/g, '""')}"`;
@@ -55,13 +56,24 @@ export function RelatorioBuilder({
   duplas,
   profs,
   mentorados,
+  inscricoes,
+  cronogramas,
+  templates,
 }: {
   turmas: string[];
   duplas: DuplaFonte[];
   profs: PessoaFonte[];
   mentorados: PessoaFonte[];
+  // fila "Sem dupla" de todas as turmas (já `aguardando`); escopada pela
+  // turma selecionada aqui no cliente
+  inscricoes: InscricaoFilaTurma[];
+  // seletores dos recortes 'ciclo'/'assinaturas' do dialog de publicação
+  cronogramas: Pick<Cronograma, "id" | "nome" | "turma">[];
+  templates: { slug: string; titulo: string }[];
 }) {
-  const [turma, setTurma] = useState<string>("T2 · 2026/2027");
+  // turma inicial = a mais recente com dados (a página ordena desc); sem
+  // nenhuma, cai em "todas" — nada mais hardcoded a T2
+  const [turma, setTurma] = useState<string>(turmas[0] ?? "todas");
   const [gran, setGran] = useState<GranularidadeRelatorio>("pessoas");
   const [colunas, setColunas] = useState<string[]>(() => catalogoDe("pessoas").map((c) => c.id));
   // colunas em transição animada — "entrando" monta com fade+slide (a marca
@@ -70,7 +82,6 @@ export function RelatorioBuilder({
   const [entrando, setEntrando] = useState<ReadonlySet<string>>(new Set());
   const colTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
   const [editando, setEditando] = useState(false);
-  const [copiado, setCopiado] = useState(false);
   // edições gravadas aplicadas por cima dos dados do server — a célula
   // atualiza na hora e o overlay sobrevive até a revalidação trazer o
   // mesmo valor de volta (sobrescrever o server com o que acabou de gravar
@@ -103,9 +114,21 @@ export function RelatorioBuilder({
       ),
     [mentorados, editLocal]
   );
+  // fila "Sem dupla" da turma selecionada ("todas" junta as filas de todas —
+  // coerente com a grade de duplas, que também não filtra)
+  const fila = useMemo(
+    () =>
+      turma === "todas"
+        ? inscricoes
+        : inscricoes.filter((i) => i.turma === turma),
+    [inscricoes, turma]
+  );
   // ~60 linhas — reordenar/montar direto no render é ínfimo. paraApp traz os
   // metadados internos (__alvos/__links) que o resumo público nunca recebe.
-  const linhas = montarLinhas(cfg, duplas, profsMap, mentsMap, { paraApp: true });
+  const linhas = montarLinhas(cfg, duplas, profsMap, mentsMap, {
+    paraApp: true,
+    fila,
+  });
   const colVisiveis = catalogo.filter((c) => colunas.includes(c.id));
 
   // timers de transição de coluna pendentes morrem junto com o componente
@@ -184,14 +207,15 @@ export function RelatorioBuilder({
     }
   };
 
-  const linkCompartilhavel = `/resumo/${RESUMO_SLUG_T2}?${configParaSearch(cfg)}`;
-
-  const copiarLink = async () => {
-    try {
-      await navigator.clipboard.writeText(`${location.origin}${linkCompartilhavel}`);
-      setCopiado(true);
-      setTimeout(() => setCopiado(false), 1800);
-    } catch {}
+  // a publicação congela o recorte no config SALVO do link (170): o que o
+  // builder mostra agora é o que vira o relatório público — e nada além.
+  // A gestão (copiar URL, redefinir senha, revogar) mora no card de links
+  // acima do builder.
+  const configInicialLink = {
+    tipo: "grade" as const,
+    turma: cfg.turma,
+    granularidade: cfg.granularidade,
+    colunas: cfg.colunas,
   };
 
   /** Ponte canvas → action: devolve a mensagem de erro (toast na célula) ou
@@ -224,7 +248,7 @@ export function RelatorioBuilder({
       <div className="space-y-4">
         <div role="group" aria-labelledby="flt-turma" className="flex flex-wrap items-center gap-1.5">
           <GrupoLabel id="flt-turma">Turma</GrupoLabel>
-          {["T2 · 2026/2027", ...turmas.filter((t) => t !== "T2 · 2026/2027"), "todas"].map((t) => (
+          {[...turmas, "todas"].map((t) => (
             <button
               key={t}
               type="button"
@@ -286,7 +310,7 @@ export function RelatorioBuilder({
             size="sm"
             onClick={() =>
               csvDownload(
-                `relatorio-${turma === "todas" ? "todas" : "turma2"}-${gran}.csv`,
+                `relatorio-${turma.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${gran}.csv`,
                 colVisiveis.map((c) => c.label),
                 linhas.map((l) => colVisiveis.map((c) => textoCelula(l, c.id)))
               )
@@ -294,19 +318,17 @@ export function RelatorioBuilder({
           >
             <DownloadSimple size={14} aria-hidden /> Baixar CSV
           </Button>
-          <Button variant="outline" size="sm" onClick={copiarLink}>
-            {copiado ? <Check size={14} aria-hidden /> : <LinkIcon size={14} aria-hidden />}
-            {copiado ? "Link copiado" : "Copiar link de compartilhamento"}
-          </Button>
-          <Button
-            variant="link"
-            size="sm"
-            render={
-              <a href={linkCompartilhavel} target="_blank" rel="noreferrer" />
+          <NovoLinkDialog
+            turmas={turmas}
+            cronogramas={cronogramas}
+            templates={templates}
+            configInicial={configInicialLink}
+            trigger={
+              <Button variant="outline" size="sm">
+                <LinkIcon size={14} aria-hidden /> Publicar link
+              </Button>
             }
-          >
-            <ArrowSquareOut size={13} aria-hidden /> Abrir a versão pública
-          </Button>
+          />
           {/* modo edição: toggle no padrão chip de filtro, jogado pra direita
               como o "Ordenar" de /pessoas — separa "o que a grade mostra" de
               "o que ela deixa mexer". Ligado vira "Concluir edição" (chip

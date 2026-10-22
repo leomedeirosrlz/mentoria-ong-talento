@@ -27,7 +27,7 @@ import { temPapel } from "@/lib/types";
 import type { Disponibilidade, Profile } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle,
+  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
@@ -486,6 +486,9 @@ export function PessoaActions({
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Editar {primeiroNome}</DialogTitle>
+            <DialogDescription>
+              Os dados do cadastro em etapas — salve no fim.
+            </DialogDescription>
           </DialogHeader>
           <WizardFicha
             passos={passos}

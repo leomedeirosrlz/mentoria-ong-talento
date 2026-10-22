@@ -52,6 +52,7 @@ import { filterChipCls } from "@/components/ui/filter-chip";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -3572,6 +3573,10 @@ function EncontroDuplaRow({
               <DialogTitle>
                 Como foi o {encontro.numero}º encontro
               </DialogTitle>
+              <DialogDescription>
+                O follow-up do encontro: atividades, avaliação, dificuldades
+                e próximo passo.
+              </DialogDescription>
             </DialogHeader>
             <RegistroForm
               embutido
@@ -3660,7 +3665,7 @@ function MaterialDoEncontro({ m }: { m: Material }) {
       )}
     </>
   );
-  const classeRow = "flex min-w-0 items-center gap-2.5 rounded-lg px-2 py-2";
+  const classeRow = "flex min-h-11 min-w-0 items-center gap-2.5 rounded-lg px-2 py-2";
   return (
     <li>
       {href ? (
@@ -3801,7 +3806,7 @@ function LinhaSemEncontro({ dupla, numero }: { dupla: Dupla; numero: number }) {
     <li className="flex items-center gap-1 rounded-lg py-1 pr-1 pl-3 transition-colors hover:bg-muted/50 sm:pl-4">
       <Link
         href={`/duplas/${dupla.id}`}
-        className="min-w-0 flex-1 truncate rounded-sm py-1 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className="flex min-h-11 min-w-0 flex-1 items-center truncate rounded-sm text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
         <DuplaNomes
           mentor={dupla.mentor.nome}
@@ -4126,7 +4131,7 @@ function SemanaMentor({
     >
       <div
         role="region"
-        aria-label="Grade do mês — role horizontalmente"
+        aria-label="Grade da semana — role horizontalmente"
         tabIndex={0}
         className="scroll-fina overflow-x-auto"
       >

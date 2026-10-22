@@ -14,7 +14,7 @@ import { formatDate } from "@/lib/ciclo";
 import type { Encaminhamento } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import {
-  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
@@ -233,6 +233,9 @@ export function EncaminhamentosList({
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Editar combinado</DialogTitle>
+            <DialogDescription>
+              O que ficou combinado, quem faz e até quando.
+            </DialogDescription>
           </DialogHeader>
           {editando && (
             <form

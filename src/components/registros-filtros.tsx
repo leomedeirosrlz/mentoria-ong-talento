@@ -18,6 +18,11 @@ import {
   AVALIACAO_LABEL,
   DIFICULDADE_LABEL,
 } from "@/lib/ciclo";
+import {
+  GRUPOS_REGISTROS,
+  GRUPO_REGISTROS_OPCAO,
+  type GrupoRegistros,
+} from "@/lib/registros";
 import type { DuplaOpcao, FiltrosRegistro } from "@/lib/queries";
 import type { Dificuldade } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -188,6 +193,7 @@ export function RegistrosFiltros({
   duplas,
   maxEncontro,
   ordem = "recentes",
+  grupo = "dupla",
 }: {
   filtros: FiltrosRegistro;
   duplas: DuplaOpcao[];
@@ -195,6 +201,9 @@ export function RegistrosFiltros({
   /** `?ordem=` não faz parte de FiltrosRegistro; a prop mantém o modo
    *  ligado quando a coord aplica/limpa um filtro. */
   ordem?: OrdemRegistros;
+  /** `?grupo=` idem — o agrupamento da lista sobrevive a aplicar filtro,
+   *  tirar chip e limpar tudo. */
+  grupo?: GrupoRegistros;
 }) {
   const router = useRouter();
   const [q, setQ] = useState(filtros.q ?? "");
@@ -203,9 +212,11 @@ export function RegistrosFiltros({
   // valores velhos e reverteria um filtro aplicado dentro dos 350ms
   const filtrosRef = useRef(filtros);
   const ordemRef = useRef(ordem);
+  const grupoRef = useRef(grupo);
   useEffect(() => {
     filtrosRef.current = filtros;
     ordemRef.current = ordem;
+    grupoRef.current = grupo;
   });
 
   const [aberto, setAberto] = useState(false);
@@ -240,6 +251,7 @@ export function RegistrosFiltros({
       dupla: f.dupla,
       q: f.q,
       ordem: ordemRef.current !== "recentes" ? ordemRef.current : undefined,
+      grupo: grupoRef.current !== "dupla" ? grupoRef.current : undefined,
       ...patch,
     };
     for (const [k, v] of Object.entries(atual)) if (v) p.set(k, v);
@@ -283,6 +295,7 @@ export function RegistrosFiltros({
     if (draft.tardio) p.set("tardio", "1");
     if (filtrosRef.current.q) p.set("q", filtrosRef.current.q);
     if (draft.ordem !== "recentes") p.set("ordem", draft.ordem);
+    if (grupoRef.current !== "dupla") p.set("grupo", grupoRef.current);
     const qs = p.toString();
     router.replace(`/registros${qs ? `?${qs}` : ""}`, { scroll: false });
     setAberto(false);
@@ -300,6 +313,7 @@ export function RegistrosFiltros({
       dupla: filtros.dupla,
       q: filtros.q,
       ordem: ordem !== "recentes" ? ordem : undefined,
+      grupo: grupo !== "dupla" ? grupo : undefined,
     };
     delete atual[k];
     for (const [chave, v] of Object.entries(atual)) if (v) p.set(chave, v);
@@ -332,6 +346,38 @@ export function RegistrosFiltros({
   if (filtros.apoio) chips.push({ rotulo: "Apoio em aberto", href: sem("apoio") });
   if (filtros.tardio) chips.push({ rotulo: "Registros tardios", href: sem("tardio") });
   if (filtros.q) chips.push({ rotulo: `Busca: “${filtros.q}”`, href: sem("q") });
+
+  // trocar o agrupamento não é filtrar — preserva TODOS os params atuais,
+  // inclusive a pagina cumulativa (o conjunto de itens não muda, só a
+  // organização visual)
+  const hrefGrupo = (g: GrupoRegistros) => {
+    const p = new URLSearchParams();
+    const atual: Record<string, string | undefined> = {
+      encontro: filtros.encontro ? String(filtros.encontro) : undefined,
+      avaliacao: filtros.avaliacao,
+      apoio: filtros.apoio ? "1" : undefined,
+      tardio: filtros.tardio ? "1" : undefined,
+      dificuldade: filtros.dificuldade,
+      dupla: filtros.dupla,
+      q: filtros.q,
+      ordem: ordem !== "recentes" ? ordem : undefined,
+      grupo: g !== "dupla" ? g : undefined,
+      pagina: filtros.pagina > 1 ? String(filtros.pagina) : undefined,
+    };
+    for (const [chave, v] of Object.entries(atual)) if (v) p.set(chave, v);
+    const qs = p.toString();
+    return `/registros${qs ? `?${qs}` : ""}`;
+  };
+
+  // "Limpar tudo" zera filtros mas mantém os controles de visão (ordem +
+  // agrupamento) — são preferência de leitura, não filtro
+  const hrefLimpo = (() => {
+    const p = new URLSearchParams();
+    if (ordem !== "recentes") p.set("ordem", ordem);
+    if (grupo !== "dupla") p.set("grupo", grupo);
+    const qs = p.toString();
+    return `/registros${qs ? `?${qs}` : ""}`;
+  })();
 
   const sel = (k: keyof Omit<Draft, "apoio" | "tardio">) => (v: string) =>
     setDraft((d) => ({ ...d, [k]: v }));
@@ -387,6 +433,35 @@ export function RegistrosFiltros({
           </Button>
         </div>
 
+        {/* eixo de agrupamento da lista — links de verdade (?grupo=),
+            mesma gramática dos chips: Cmd+click, back/forward e
+            aria-current de graça; "por dupla" é o default implícito */}
+        <div
+          role="group"
+          aria-label="Agrupar registros"
+          className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5"
+        >
+          <span className="text-xs text-muted-foreground">Agrupar:</span>
+          <div className="inline-flex items-center gap-0.5 rounded-full border bg-card p-0.5">
+            {GRUPOS_REGISTROS.map((g) => (
+              <Link
+                key={g}
+                href={hrefGrupo(g)}
+                scroll={false}
+                aria-current={grupo === g ? "page" : undefined}
+                className={cn(
+                  "inline-flex min-h-11 items-center rounded-full px-3 text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-7",
+                  grupo === g
+                    ? "bg-muted font-semibold text-foreground"
+                    : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                )}
+              >
+                {GRUPO_REGISTROS_OPCAO[g]}
+              </Link>
+            ))}
+          </div>
+        </div>
+
         {chips.length > 0 && (
           <ul className="flex flex-wrap items-center gap-1.5" aria-label="Filtros ativos">
             {chips.map((c) => (
@@ -404,7 +479,7 @@ export function RegistrosFiltros({
             ))}
             <li>
               <Link
-                href={ordem !== "recentes" ? `/registros?ordem=${ordem}` : "/registros"}
+                href={hrefLimpo}
                 scroll={false}
                 className="inline-flex min-h-11 items-center px-2 text-xs text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline sm:min-h-7"
               >
@@ -416,7 +491,9 @@ export function RegistrosFiltros({
       </div>
 
       <Dialog open={aberto} onOpenChange={setAberto}>
-        <DialogContent className="sm:max-w-lg">
+        {/* md, não lg: o corpo são pílulas e checks em coluna — acima de md
+            sobrava fundo ocioso; o scroll interno já vem do DialogContent */}
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Filtros</DialogTitle>
             <DialogDescription>
@@ -587,7 +664,9 @@ export function RegistrosFiltros({
             </fieldset>
           </div>
 
-          <DialogFooter>
+          {/* sticky no pé da área rolante do DialogContent — em tela
+              baixa o "Aplicar" não fica escondido abaixo da lista */}
+          <DialogFooter className="sticky bottom-0 bg-popover">
             <Button
               type="button"
               variant="ghost"

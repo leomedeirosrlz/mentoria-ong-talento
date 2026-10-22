@@ -11,6 +11,7 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -146,6 +147,9 @@ export function EncontroDetalheDialog({
               />
             </span>
           </DialogTitle>
+          <DialogDescription>
+            Status, plano do mentor e o registro de follow-up.
+          </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 text-sm">
           <div className="flex flex-wrap items-center gap-2">
@@ -215,9 +219,11 @@ export function EncontroDetalheDialog({
                           target="_blank"
                           rel="noopener noreferrer"
                           title={a.nome}
-                          className="min-w-0 flex-1 truncate underline underline-offset-2 hover:text-foreground"
+                          className="flex min-h-11 min-w-0 flex-1 items-center rounded-sm underline underline-offset-2 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                         >
-                          {a.nome}
+                          {/* truncate mora no span filho — em container flex
+                              o ellipsis não pega o text node anônimo */}
+                          <span className="truncate">{a.nome}</span>
                         </a>
                       </span>
                       <span className="block pl-4.5 text-muted-foreground">

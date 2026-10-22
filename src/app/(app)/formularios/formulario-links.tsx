@@ -730,7 +730,7 @@ export function FormularioLinks({
               placeholder="Buscar por nome"
               value={buscaLink}
               onChange={(e) => setBuscaLink(e.target.value)}
-              className="h-8 pl-8 text-xs"
+              className="h-11 pl-8 text-base md:h-8 md:text-xs"
             />
           </div>
           {/* ordenar convive com o filtro de status — primeiro o que a

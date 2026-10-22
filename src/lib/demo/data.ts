@@ -60,6 +60,7 @@ import type {
   SolicitacaoEspecialista,
   SolicitacaoProposta,
   Supervisao,
+  TurmaInscricao,
 } from "@/lib/types";
 import type { Interacao } from "@/lib/interacoes";
 import { disponibilidadeDeConjuntos, toDateStr } from "../ciclo";
@@ -130,6 +131,9 @@ export type DemoData = {
   documentosPessoa: DocumentoPessoa[];
   avaliacoes: AvaliacaoEncontro[];
   avaliacaoLinks: AvaliacaoLink[];
+  /** turma_inscricoes (0111 · REALIZA-167) — quem é da turma sem estar em
+   *  dupla; alimenta a linha "Sem dupla" do relatório no modo demo. */
+  turmaInscricoes: TurmaInscricao[];
 };
 
 // ---------- ids ----------
@@ -149,7 +153,8 @@ const uid = (n: number): string =>
 // avaliacao_links: 42xx · avaliacoes_encontro: 44xx ·
 // documentos_pessoa: 46xx · cronogramas: 50xx · especialista_grade: 52xx ·
 // especialista_excecoes: 54xx · chamados: 58xx · chamado_atualizacoes: 60xx ·
-// chamado_comentarios: 62xx · chamado_anexos: 64xx · devolutivas: 66xx.
+// chamado_comentarios: 62xx · chamado_anexos: 64xx · devolutivas: 66xx ·
+// turma_inscricoes: 68xx.
 // user_id fake: f0xx.
 // especialista_eventos e profile_papeis não tem id.
 const P = {
@@ -196,6 +201,7 @@ const M = {
   rafael: 0x0409, // intake da T2, aguarda matching
   wendel: 0x040a, // veio pelo formulário, aguarda matching (fila)
   matheus: 0x040b, // T2 — a 2ª dupla DPP do Ricardo (WP3)
+  gustavo: 0x040c, // ciclo 2025/2026 — a concluída do Ricardo com rito aberto
 } as const;
 
 const D = {
@@ -212,6 +218,7 @@ const D = {
   t2a: 0x060b,
   t2b: 0x060c,
   t2c: 0x060d, // Ricardo × Matheus — a 2ª dupla DPP do híbrido (WP3)
+  rito: 0x060e, // Ricardo × Gustavo — concluída com o rito de encerramento aberto
 } as const;
 
 // cronogramas (0061) — um por turma; a T2 é a turma que começou um mês depois
@@ -1598,8 +1605,44 @@ function build(): DemoData {
     disponibilidade: disponibilidadeDeConjuntos(["ter", "qui"], ["noite"]),
     created_at: haDias(32),
   };
+  // o mentorado do ciclo 2025/2026 do Ricardo — concluiu a jornada e já
+  // consta "fora do programa", mas o rito de encerramento da dupla segue
+  // aberto (a pendência que a agenda da coordenação cobra, REALIZA-172:
+  // a linha "concluir na ficha" e a autoavaliação que o mentor ainda deve)
+  const gustavo: Mentorado = {
+    id: uid(M.gustavo), nome: "Gustavo Batista",
+    email: null, whatsapp: "5511976123012",
+    ong_origem: "Instituto Alavanca",
+    notas: "Ciclo 2025/2026 concluído com o Ricardo — a jornada fechou; o rito de encerramento segue aberto na ficha.",
+    avatar_path: null, documento_path: null,
+    nome_social: null, data_nascimento: "2007-08-02", genero: "masculino",
+    cidade: "São Paulo", uf: "SP",
+    interesses: ["elétrica", "curso técnico"],
+    motivacao: null, pref_genero_par: null, objetivos: null,
+    escolaridade: "medio", origem: "Instituto Alavanca",
+    disponibilidade: null,
+    created_at: haDias(390),
+    situacao: "concluido",
+    saiu_em: haDias(24, "18:00"),
+    motivo_saida: "Ciclo 2025/2026 — concluiu a jornada e o PDM",
+  };
 
-  const mentorados = [ana, caio, dandara, eduardo, isabela, kaua, laura, pedro, rafael, wendel, matheus];
+  const mentorados = [ana, caio, dandara, eduardo, isabela, kaua, laura, pedro, rafael, wendel, matheus, gustavo];
+
+  // ---------- fila por turma (0111 · REALIZA-167) ----------
+  // O Rafael e o Wendel são os dois mentorados da T2 que ainda não têm par —
+  // a inscrição `aguardando` é o que faz a linha "Sem dupla" deles aparecer
+  // no relatório da turma (antes era array hardcoded no código).
+  const turmaInscricoes: TurmaInscricao[] = [
+    { id: uid(0x6801), turma: "T2 · 2026/2027", profile_id: null,
+      mentorado_id: rafael.id, papel_esperado: "mentorado",
+      status: "aguardando", nota: "Veio na leva da ONG Cidadão Pró-Mundo",
+      created_by: marina.id, created_at: haDias(16) },
+    { id: uid(0x6802), turma: "T2 · 2026/2027", profile_id: null,
+      mentorado_id: wendel.id, papel_esperado: "mentorado",
+      status: "aguardando", nota: "Inscrição direta pelo formulário de matching",
+      created_by: marina.id, created_at: haDias(4) },
+  ];
 
   // ---------- solicitações de especialista (0074 — pedido por sessão) ----
   // (montadas antes das duplas: as duplas de especialista referenciam a
@@ -2444,6 +2487,46 @@ function build(): DemoData {
     notas: [],
   };
 
+  // d-rito · Ricardo × Gustavo — a outra dupla do ciclo 2025/2026 do
+  // Ricardo: entrou na metade do ciclo e a jornada esticou com remarcações,
+  // então o último encontro caiu semanas atrás — a dupla virou 'concluida'
+  // e o Gustavo já consta fora do programa, mas o rito de encerramento
+  // segue aberto (tipo null no encerramento-data). É o caso que a agenda
+  // da coordenação cobra (REALIZA-172): a pendência vira linha "concluir
+  // na ficha" no monitoramento e "falta sua autoavaliação" no card do
+  // mentor — a d-fim NÃO serve aqui porque o rito dela já foi decidido.
+  const FIM_DUPLA_RITO = addDias(HOJE, -24);
+  const encRito: Encontro[] = Array.from({ length: 16 }, (_, i) => {
+    const n = i + 1;
+    const enc = realizado(uid(D.rito), n, addDias(FIM_DUPLA_RITO, (n - 16) * 7), {
+      duracao: n % 4 === 0 ? 60 : 75,
+      origem: n % 5 === 0 ? "externo" : "plataforma",
+    });
+    return comRegistro(enc, ricardo, "Gustavo", "dpp", {});
+  });
+
+  const duplaRito: Dupla = {
+    id: uid(D.rito),
+    // histórica como a d-fim: sem cronograma vivo — a turma é só o label
+    turma: "2025/2026",
+    cronograma_id: null,
+    status: "concluida",
+    iniciada_em: ymd(addDias(FIM_DUPLA_RITO, -15 * 7 - 7)),
+    trilha: "dpp",
+    demanda: null,
+    solicitacao_id: null,
+    mentor: ricardo,
+    mentorado: gustavo,
+    supervisor: beatriz, // o Paulo supervisiona a d-fim; a Beatriz cobre esta
+    encontros: encRito,
+    encaminhamentos: [
+      encaminhamento(uid(D.rito), encRito[15].registro!.id,
+        "Manter o plano do curso de elétrica vivo depois do programa",
+        "mentorado", addDias(FIM_DUPLA_RITO, 30), "feito"),
+    ],
+    notas: [],
+  };
+
   // d-esp1 · Sofia × Ana Beatriz — trilha de especialista (5 passos, sem
   // calendário oficial), nascida da solicitação aceita do Ricardo.
   // numero = TENTATIVA (0074): a 2ª furou (a Bia teve prova surpresa e a
@@ -2774,7 +2857,7 @@ function build(): DemoData {
     notas: [],
   };
 
-  const duplas = [duplaOk, duplaPend, duplaRisco, duplaAtraso, duplaFim, duplaEsp1, duplaEsp2, duplaEsp3, duplaEsp4, duplaPausa, duplaT2a, duplaT2b, duplaT2c];
+  const duplas = [duplaOk, duplaPend, duplaRisco, duplaAtraso, duplaFim, duplaRito, duplaEsp1, duplaEsp2, duplaEsp3, duplaEsp4, duplaPausa, duplaT2a, duplaT2b, duplaT2c];
 
   // ---------- devolutivas (WP6) ----------
   // Feed datado por trilha — a última entrega continua sendo o que marca a
@@ -3029,16 +3112,19 @@ function build(): DemoData {
     { numero: 5, titulo: "Encerramento, reflexão e celebração", foco: "Reflexão sobre aprendizados; desafios futuros; feedback do jovem; registro final no PDM" },
   ];
 
-  // os 13 materiais do seed.sql verbatim — só os dois guias têm arquivo
-  // oficial (path): os demais são templates sem upload ou links, e renderizam
-  // "em breve" — estado legítimo no app (materiais chegam ao longo do ciclo)
+  // os 13 materiais do seed.sql verbatim — com uma diferença proposital:
+  // dois materiais de encontro têm path (servidos como PDF placeholder pela
+  // rota demo), senão a trilha de cobertura do /materiais (REALIZA-173) não
+  // teria nenhuma célula "com material" pra exibir. Os demais continuam sem
+  // destino e renderizam "em breve" — estado legítimo (materiais chegam ao
+  // longo do ciclo)
   const materiais: Material[] = [
     { id: uid(0x2001), titulo: "Guia do Mentor DPP", descricao: "Metodologia completa: jornada, 16 encontros, instrumentos e templates.", tipo: "guia", url: null, path: "materiais/guia-dpp.pdf", audiencia: "dpp", encontro_num: null, ordem: 1 },
     { id: uid(0x2002), titulo: "Guia do Mentor Especialista", descricao: "Metodologia da mentoria com especialista: 5 encontros e cinco funções.", tipo: "guia", url: null, path: "materiais/guia-especialista.pdf", audiencia: "especialista", encontro_num: null, ordem: 2 },
-    { id: uid(0x2003), titulo: "Mensagem de preparação do mentorado", descricao: "Modelo para enviar antes do 1º encontro: história de vida, Roda da Vida e contatos para avaliação.", tipo: "template", url: null, path: null, audiencia: "dpp", encontro_num: 1, ordem: 10 },
+    { id: uid(0x2003), titulo: "Mensagem de preparação do mentorado", descricao: "Modelo para enviar antes do 1º encontro: história de vida, Roda da Vida e contatos para avaliação.", tipo: "template", url: null, path: "materiais/preparacao-mentorado.pdf", audiencia: "dpp", encontro_num: 1, ordem: 10 },
     { id: uid(0x2004), titulo: "Instrumento: Construindo a sua Visão", descricao: "Tarefa individual entre o 1º e o 2º encontro; origina a Declaração de Visão.", tipo: "template", url: null, path: null, audiencia: "dpp", encontro_num: 1, ordem: 11 },
     { id: uid(0x2005), titulo: "Mensagem às pessoas indicadas", descricao: "Modelo de contato para a avaliação por terceiros (duas perguntas).", tipo: "template", url: null, path: null, audiencia: "dpp", encontro_num: 1, ordem: 12 },
-    { id: uid(0x2006), titulo: "Consolidação da avaliação por terceiros", descricao: "Quadro para agrupar pontos fortes e de melhoria sem identificar quem respondeu.", tipo: "template", url: null, path: null, audiencia: "dpp", encontro_num: 2, ordem: 13 },
+    { id: uid(0x2006), titulo: "Consolidação da avaliação por terceiros", descricao: "Quadro para agrupar pontos fortes e de melhoria sem identificar quem respondeu.", tipo: "template", url: null, path: "materiais/consolidacao-avaliacao.pdf", audiencia: "dpp", encontro_num: 2, ordem: 13 },
     { id: uid(0x2007), titulo: "Plano de Desenvolvimento do Mentorado (PDM)", descricao: "Documento central da dupla: visão, metas SMART, indicadores e mapa de submetas.", tipo: "template", url: null, path: null, audiencia: "dpp", encontro_num: 2, ordem: 14 },
     { id: uid(0x2008), titulo: "Mensagem de encaminhamento entre encontros", descricao: "Modelo curto para manter o vínculo e deixar a próxima tarefa clara.", tipo: "template", url: null, path: null, audiencia: "dpp", encontro_num: null, ordem: 15 },
     { id: uid(0x2009), titulo: "Roda da Vida: roteiro de aplicação", descricao: "Aplicação em três momentos a partir do 5º mês: explicação, discussão e validação.", tipo: "template", url: null, path: null, audiencia: "dpp", encontro_num: 12, ordem: 16 },
@@ -3350,7 +3436,10 @@ function build(): DemoData {
       template: tplTermo },
     // Isabela: é maior de idade — o doc dela é o termo de participação,
     // emitido em lote junto com a autorização do Kauã (0x3404). Sem
-    // dados_civis na ficha → pendência com "falta:" no checklist
+    // dados_civis na ficha → pendência com "falta:" no checklist.
+    // REALIZA-172: como ela não tem login (nenhuma persona aponta pra ela),
+    // o token 0x3407 resolve 'outra_pessoa' pra QUALQUER papel demo — é o
+    // token-fixture determinístico do ramo "Este link é de outra pessoa"
     { id: uid(0x3207), template_id: uid(0x3303), profile_id: null, mentorado_id: isabela.id,
       status: "pendente", dados_snapshot: null, token: uid(0x3407),
       token_expira_em: haDias(-28),
@@ -3792,6 +3881,7 @@ function build(): DemoData {
     documentosPessoa,
     avaliacoes,
     avaliacaoLinks,
+    turmaInscricoes,
     chamados,
     chamadoAtualizacoes,
     chamadoComentarios,

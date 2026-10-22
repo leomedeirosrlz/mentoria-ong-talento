@@ -14,6 +14,7 @@ import {
   extraiRodaDaVida,
   type FormularioCampo,
 } from "@/lib/forms/schema";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { RespostaApi } from "./use-resposta";
 import { RodaSvg } from "./roda-svg";
@@ -26,6 +27,13 @@ import { CampoGenerico, campoDomId, EntradaTextoLongo, ErroCampo } from "./campo
 // um jogo. A lista por quadrante embaixo é o caminho acessível: cada
 // área é um slider (setas/Home/End no teclado, toque/arraste na trilha)
 // com o número exato. Sem eixo algum acessível fica de fora.
+//
+// REALIZA-143 (variante A): no desktop (lg+) a roda veste a coroa de
+// nomes de área — as 16 áreas nomeadas de uma vez, como no PDF oficial
+// (`rotuloEixos` do RodaSvg, segundo render `hidden lg:block`). Abaixo
+// de lg fica a moldura compacta com números — mobile/média intocados.
+// A hierarquia dentro do cartão: título do eixo em fundo branco entre as
+// setas lime (linha própria, acima) → roda → −/+ lime (área de ajuste).
 
 export function RodaVida({
   campos,
@@ -132,42 +140,54 @@ export function RodaVida({
 
       {/* a roda + o eixo em foco — uma zona de interação só */}
       <div className="rounded-xl bg-card p-4 shadow-[var(--shadow-border)] sm:p-5">
-        {/* o eixo em foco EM CIMA da roda — a faixa verde é o destaque da
-            seção: setas pretas trocam de área, o título diz o que você
-            está pontuando antes de arrastar */}
-        <div className="flex items-center gap-1.5 rounded-xl bg-[var(--brand-lime)] px-1.5 py-1.5 text-[var(--brand-ink)]">
-          <button
+        {/* linha própria de navegação EM CIMA da roda, em fundo branco —
+            o título do eixo sai do cartão lime e fica legível entre as
+            setas; as setas são chips lime (ações primárias, ícone ink) */}
+        <div className="flex items-center gap-2">
+          <Button
             type="button"
+            size="icon-lg"
             onClick={() => passo(-1)}
             aria-label="Área anterior"
-            className="grid size-10 shrink-0 place-items-center rounded-lg transition-colors hover:bg-[var(--brand-ink)]/10 active:bg-[var(--brand-ink)]/15"
           >
             <CaretLeft size={20} weight="bold" aria-hidden />
-          </button>
+          </Button>
           <div className="min-w-0 flex-1 text-center">
-            <p className="text-[10px] font-semibold tracking-[0.08em] opacity-70">
+            <p className="text-[11px] font-semibold tracking-[0.08em] text-muted-foreground">
               {quadAtivo ? `${quadAtivo} · ` : ""}Área {ativo + 1} de {total}
             </p>
             <h3 className="truncate text-[15px] font-bold leading-snug">
               {areaAtiva.label}
             </h3>
           </div>
-          <button
+          <Button
             type="button"
+            size="icon-lg"
             onClick={() => passo(1)}
             aria-label="Próxima área"
-            className="grid size-10 shrink-0 place-items-center rounded-lg transition-colors hover:bg-[var(--brand-ink)]/10 active:bg-[var(--brand-ink)]/15"
           >
             <CaretRight size={20} weight="bold" aria-hidden />
-          </button>
+          </Button>
         </div>
 
+        {/* duas molduras do mesmo desenho: a compacta (números 1–16)
+            serve mobile e telas médias; a rotulada (coroa de nomes,
+            REALIZA-143) assume no desktop — display:none a tira da
+            árvore de a11y e dos eventos quando não está visível */}
         <RodaSvg
           roda={roda}
           ativo={ativo}
           onMudanca={escolher}
           onFim={fimGesto}
-          className="mt-3"
+          className="mt-3 md:max-w-[360px] lg:hidden"
+        />
+        <RodaSvg
+          roda={roda}
+          ativo={ativo}
+          onMudanca={escolher}
+          onFim={fimGesto}
+          rotuloEixos
+          className="mt-3 hidden lg:block lg:max-w-[500px]"
         />
         {/* anúncio do gesto pro leitor de tela — o svg é aria-hidden, a
             nota sai por aqui ao soltar o dedo */}
@@ -184,31 +204,33 @@ export function RodaVida({
               </span>{" "}
               de {total} áreas
             </p>
-            <div className="flex shrink-0 items-center gap-1">
-              <button
+            {/* −/+: chips lime — as ações primárias da área de ajuste,
+                mesma família das setas lá em cima */}
+            <div className="flex shrink-0 items-center gap-1.5">
+              <Button
                 type="button"
+                size="icon-lg"
                 aria-label={`Diminuir nota de ${areaAtiva.label}`}
                 disabled={!areaAtiva.nota || areaAtiva.nota <= 1}
                 onClick={() => escolher(ativo, (areaAtiva.nota ?? 2) - 1)}
-                className="grid size-11 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-muted disabled:opacity-40 sm:size-9"
               >
-                <Minus size={16} aria-hidden />
-              </button>
+                <Minus size={18} weight="bold" aria-hidden />
+              </Button>
               <span
                 aria-hidden
                 className="w-10 text-center text-xl font-bold tabular-nums"
               >
                 {areaAtiva.nota ?? "—"}
               </span>
-              <button
+              <Button
                 type="button"
+                size="icon-lg"
                 aria-label={`Aumentar nota de ${areaAtiva.label}`}
                 disabled={areaAtiva.nota === 10}
                 onClick={() => escolher(ativo, (areaAtiva.nota ?? 0) + 1)}
-                className="grid size-11 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-muted disabled:opacity-40 sm:size-9"
               >
-                <Plus size={16} aria-hidden />
-              </button>
+                <Plus size={18} weight="bold" aria-hidden />
+              </Button>
             </div>
           </div>
           {/* trilha da volta — enche conforme as áreas ganham nota */}

@@ -391,6 +391,28 @@ test.describe("mentorado — shell /jovem", () => {
       await expect(
         visao.getByText("rascunho salvo neste aparelho")
       ).toBeVisible();
+
+      // REALIZA-162 — a estação aberta saiu da trilha e virou o bloco de
+      // ação "A fazer agora" logo abaixo do hero: ela mora só nele, sem
+      // repetir título nem CTA no <ol> da trilha (recibos + trancadas)
+      const afazer = page.locator(
+        'section[aria-labelledby="afazer-titulo"]'
+      );
+      await expect(
+        afazer.getByRole("heading", { name: "A fazer agora" })
+      ).toBeVisible();
+      await expect(visao).toBeVisible();
+      const listaTrilha = trilha.locator("ol");
+      await expect(
+        listaTrilha.getByText("Construindo a sua Visão")
+      ).toHaveCount(0);
+      // a ordem física: o bloco de ação vem antes da trilha
+      const yAfazer = (await afazer.boundingBox())?.y;
+      const yTrilha = (await listaTrilha.boundingBox())?.y;
+      if (yAfazer == null || yTrilha == null) {
+        throw new Error("bloco da jornada sem bounding box");
+      }
+      expect(yAfazer).toBeLessThan(yTrilha);
     } finally {
       await limparViaServiceRole("formulario_links", `token=eq.${token}`);
     }

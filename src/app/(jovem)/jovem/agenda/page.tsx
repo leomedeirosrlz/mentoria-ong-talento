@@ -51,7 +51,7 @@ import {
   getJovemPerfil,
 } from "@/lib/queries-jovem";
 import { getSlotsLivres } from "@/lib/queries-especialista";
-import { getCicloEventos, getMe } from "@/lib/queries";
+import { getMe } from "@/lib/queries";
 import { getJovemAvaliacoes } from "@/lib/queries-avaliacao";
 import type { JovemEncontro } from "@/lib/queries-jovem";
 import type { Disponibilidade } from "@/lib/types";
@@ -83,13 +83,12 @@ const STATUS = {
 } as const;
 
 export default async function JovemAgenda() {
-  const [encontros, avaliacoes, me, duplas, eventos, contatos, pedidosEsp, perfil] =
+  const [encontros, avaliacoes, me, duplas, contatos, pedidosEsp, perfil] =
     await Promise.all([
       getJovemEncontros(),
       getJovemAvaliacoes(),
       getMe(),
       getJovemDuplas(),
-      getCicloEventos(),
       getJovemContatos(),
       getJovemPedidosEspecialista(),
       getJovemPerfil(),
@@ -126,30 +125,20 @@ export default async function JovemAgenda() {
   };
 
   // CTA "Agendar encontro" — só a dupla DPP ativa entra (a RPC recusa a
-  // trilha especialista). Os números livres são os sem row ainda: a data
-  // oficial sai como hint quando o calendário é legível — pro papel
-  // mentorado ciclo_eventos é filtrado a vazio pela RLS (0065) e o Select
-  // lista só o nº; a RPC mede o teto real contra o cronograma da dupla.
+  // trilha especialista). Os números livres são os sem row ainda: o Select
+  // lista só o nº (a data oficial não é legível pro papel mentorado — a
+  // RLS filtra o calendário a vazio); a RPC mede o teto real contra o
+  // cronograma da dupla.
   const duplaDpp =
     duplas.find((d) => d.status === "ativa" && d.trilha !== "especialista") ??
     null;
-  const oficialPorNumero = new Map(
-    eventos
-      .filter(
-        (ev) =>
-          ev.tipo === "encontro" &&
-          ev.numero != null &&
-          ev.cronograma_id === duplaDpp?.cronograma_id
-      )
-      .map((ev) => [ev.numero!, ev.data] as const)
-  );
   const ocupados = new Set(
     encontros.filter((e) => e.dupla_id === duplaDpp?.id).map((e) => e.numero)
   );
   const numerosLivres = duplaDpp
     ? Array.from({ length: maxEncontros("dpp") }, (_, i) => i + 1)
         .filter((n) => !ocupados.has(n))
-        .map((n) => ({ numero: n, data: oficialPorNumero.get(n) ?? null }))
+        .map((n) => ({ numero: n }))
     : [];
 
   // trilha especialista (111+112): a agenda real do especialista chega como
@@ -537,12 +526,17 @@ function EncontroLinha({
         )}
       </div>
       <div className="ms-auto flex flex-wrap items-center justify-end gap-2">
+        {/* Entrar é a ação decisiva na hora da chamada — por isso fica
+            em default enquanto Remarcar/Desmarcar ficam em outline/ghost.
+            (Overflow-menu pro Desmarcar ficou de fora: por estado só há um
+            ghost por vez e os Dialogs moram em jovem-encontro-acoes —
+            menu de item único só adicionaria um toque.) */}
         {futuro && linkSeguro(e.link) && (
           <a
             href={linkSeguro(e.link)!}
             target="_blank"
             rel="noopener noreferrer"
-            className={buttonVariants({ variant: "outline", size: "sm" })}
+            className={buttonVariants({ variant: "default", size: "sm" })}
           >
             <VideoCamera size={15} aria-hidden />
             Entrar

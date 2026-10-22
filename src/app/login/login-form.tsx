@@ -347,8 +347,8 @@ export function LoginForm() {
     // flex + m-auto (não place-items-center): com o teclado virtual
     // encolhendo o viewport (resizes-content), o topo continua rolável.
     // flex, não grid: em grid o w-full do filho resolve contra o padding
-    // box e vaza os px-4
-    <div className="flex min-h-[100dvh] flex-col bg-background px-4">
+    // box e vaza o padding lateral (1rem ou o safe-area, o que for maior)
+    <div className="flex min-h-[100dvh] flex-col bg-background pb-[calc(4rem+env(safe-area-inset-bottom))] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))]">
       <div className="m-auto w-full max-w-sm">
         <div className="mb-8">
           {/* eslint-disable-next-line @next/next/no-img-element */}

@@ -9,13 +9,12 @@ import {
   type MotivoAcompanhar,
   type ResumoTurmaCard,
 } from "@/lib/agenda-coordenacao";
-import { formatMesAbrev, semanaBounds } from "@/lib/ciclo";
+import { semanaBounds } from "@/lib/ciclo";
 import { rotuloDiaAgenda } from "@/lib/agenda-minha";
 import { msgsContato } from "@/lib/whatsapp-msgs";
 import type { Interacao } from "@/lib/interacoes";
 import type { CicloEvento, Cronograma, Dupla, Supervisao } from "@/lib/types";
 import { buttonVariants } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 import { FilaAcompanhar, type LinhaFila } from "@/components/fila-acompanhar";
 import {
   dowCurto,
@@ -27,12 +26,14 @@ import {
 } from "@/components/agenda-partes";
 
 /** Visão "Monitoramento" da coordenação (WP5 · mock v6 → dashboard
- *  REALIZA-161): faixa de síntese no topo (a leitura de 2s da fila), resumo
- *  da semana por cronograma (nunca misturado — cada turma corre o seu
- *  calendário) com a régua oficial linkada pro dia, e a fila "Para
- *  acompanhar" — badges por dimensão (vermelho só no acompanhamento),
- *  filtros/busca/grupos no client (fila-acompanhar) e o Lembrar universal.
- *  A coordenação NÃO agenda por ninguém: a única ação sobre dupla aqui é o
+ *  REALIZA-161 → densidade REALIZA-176): faixa de síntese no topo (a
+ *  leitura de 2s da fila) e depois a ordem operacional — 1º "Para
+ *  acompanhar" (a resposta dos 5s: badges por dimensão — vermelho só no
+ *  acompanhamento — filtros/busca/grupos no client e o Lembrar universal),
+ *  2º "Semana no programa" (o que o calendário oficial impõe) e 3º "Semana
+ *  do encontro" (o resumo por turma — nunca misturado — compactado em uma
+ *  linha por cronograma com a barra única lime/muted da casa). A
+ *  coordenação NÃO agenda por ninguém: a única ação sobre dupla aqui é o
  *  nudge. Toda a derivação mora em lib/agenda-coordenacao (pura); a página
  *  é quem busca os dados — este componente só compõe e renderiza. */
 export function AgendaCoordenacao({
@@ -41,6 +42,7 @@ export function AgendaCoordenacao({
   cronogramas,
   nudges,
   supervisoes,
+  encerramentosPendentes,
   meuNome,
   hoje,
 }: {
@@ -52,6 +54,9 @@ export function AgendaCoordenacao({
   nudges: Record<string, Interacao>;
   /** Supervisões recentes — a lib recorta a semana corrente. */
   supervisoes: Supervisao[];
+  /** dupla_ids com rito de encerramento aberto (getEncerramentosPendentes)
+   *  — a dupla concluída vira linha "concluir na ficha" na fila. */
+  encerramentosPendentes: ReadonlySet<string>;
   meuNome?: string;
   /** "YYYY-MM-DD" de hoje em São Paulo. */
   hoje: string;
@@ -59,7 +64,13 @@ export function AgendaCoordenacao({
   const agora = new Date();
   const { seg, dom } = semanaBounds(agora);
   const resumos = resumosPorCronograma(duplas, cronogramas, eventos, agora);
-  const acompanhar = paraAcompanhar(duplas, eventos, nudges, agora);
+  const acompanhar = paraAcompanhar(
+    duplas,
+    eventos,
+    nudges,
+    agora,
+    encerramentosPendentes
+  );
   const programa = itensDaSemanaPrograma(
     eventos,
     cronogramas,
@@ -93,26 +104,32 @@ export function AgendaCoordenacao({
       item.saude.apoio.aberto &&
       (item.saude.apoio.origem === "mentorado" ||
         item.saude.apoio.origem === "ambos");
+    // encerramento pendente: a pendência é da coordenação — a fila desenha
+    // o CTA "Concluir rito" (link pra ficha) no lugar do LembreteButton
+    const acaoFicha = item.motivos.includes("encerramento");
     return {
       item,
       destino: apoioDoJovem ? "mentorado" : "mentor",
       rotulo: apoioDoJovem ? "Chamar" : item.rotuloLembrete,
-      lembrete: apoioDoJovem
-        ? {
-            titulo: "A equipe quer te ouvir",
-            corpo:
-              msgsContato("apoio_jovem", {
-                mentoradoNome:
-                  dupla?.mentorado?.nome_social || dupla?.mentorado?.nome,
-                autorNome: meuNome,
-              }).mentorado ?? "",
-          }
-        : dupla
-          ? lembreteDaDupla(dupla, caso, eventos, meuNome)
-          : { titulo: "Lembrete da equipe", corpo: "" },
+      lembrete: acaoFicha
+        ? { titulo: "", corpo: "" } // sem nudge — o CTA é o link da ficha
+        : apoioDoJovem
+          ? {
+              titulo: "A equipe quer te ouvir",
+              corpo:
+                msgsContato("apoio_jovem", {
+                  mentoradoNome:
+                    dupla?.mentorado?.nome_social || dupla?.mentorado?.nome,
+                  autorNome: meuNome,
+                }).mentorado ?? "",
+            }
+          : dupla
+            ? lembreteDaDupla(dupla, caso, eventos, meuNome)
+            : { titulo: "Lembrete da equipe", corpo: "" },
       telefone: apoioDoJovem
         ? (dupla?.mentorado?.whatsapp ?? null)
         : (dupla?.mentor?.whatsapp ?? null),
+      acao: acaoFicha ? ("ficha" as const) : ("lembrete" as const),
     };
   });
 
@@ -161,9 +178,10 @@ export function AgendaCoordenacao({
             {sintese.criticas === 1 ? "crítica" : "críticas"}
           </b>
           {sintese.atencao > 0 && ` · ${sintese.atencao} atenção`}
-          {/* "sem agendamento" aqui = denominador dos cards (semAgendamento),
-              não o motivo sem_data da fila — o rótulo casa com a legenda da
-              barra hatch pra não parecer o mesmo número do chip do filtro */}
+          {/* "sem agendamento" aqui = denominador das linhas-resumo
+              (semAgendamento), não o motivo sem_data da fila — o rótulo
+              casa com o "N sem agendamento" delas pra não parecer o mesmo
+              número do chip do filtro */}
           {sintese.semData > 0 && ` · ${sintese.semData} sem agendamento`}
           {sintese.registrosPendentes > 0 &&
             ` · ${sintese.registrosPendentes} ${
@@ -183,7 +201,7 @@ export function AgendaCoordenacao({
               {" · "}
               <Link
                 href="/chamados"
-                className="font-medium text-foreground underline decoration-muted-foreground/40 underline-offset-2 transition-colors hover:text-primary"
+                className="-my-1 py-1 font-medium text-foreground underline decoration-muted-foreground/40 underline-offset-2 transition-colors hover:text-primary"
               >
                 {sintese.apoioAberto}{" "}
                 {sintese.apoioAberto === 1
@@ -195,51 +213,14 @@ export function AgendaCoordenacao({
         </p>
       )}
 
-      {/* ---- Semana do encontro, por cronograma ---- */}
-      <section aria-label="Semana do encontro por cronograma">
-        <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
-          <h2 className="text-base font-semibold">
-            Semana do encontro, por cronograma
-          </h2>
-          <Tag>resumo por turma — nunca global</Tag>
-        </div>
-        {resumos.length > 1 && (
-          <p className="mt-1.5 max-w-[78ch] text-xs leading-relaxed text-muted-foreground">
-            As turmas não começaram juntas — na mesma semana,{" "}
-            {resumos.map((r, i) => (
-              <span key={r.cronogramaId}>
-                {i > 0 && (i === resumos.length - 1 ? " e " : ", ")}
-                <b className="font-medium text-foreground">
-                  {r.turma} está no encontro {r.eventoNumero ?? "—"}
-                </b>
-              </span>
-            ))}
-            . Por isso o “X de Y realizaram” é por turma, nunca misturado.
-          </p>
-        )}
-        {resumos.length === 0 ? (
-          <p className="mt-3 rounded-xl border border-dashed px-4 py-3 text-sm text-muted-foreground">
-            Nenhum cronograma com duplas em curso — quando uma turma entrar,
-            o resumo dela aparece aqui.
-          </p>
-        ) : (
-          <div className="mt-3 grid items-start gap-4 lg:grid-cols-2">
-            {resumos.map((r) => (
-              <CardResumo key={r.cronogramaId} r={r} dom={dom} />
-            ))}
-          </div>
-        )}
-      </section>
-
-      {/* ---- Para acompanhar ---- */}
+      {/* ---- Para acompanhar (1º — a pergunta dos 5s: quem pede ação?) ---- */}
       <section aria-label="Duplas para acompanhar">
-        <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
-          <h2 className="text-base font-semibold">Para acompanhar</h2>
-          <Tag>
-            {acompanhar.length}{" "}
-            {acompanhar.length === 1 ? "dupla" : "duplas"}
-          </Tag>
-        </div>
+        <h2 className="text-base font-semibold">
+          Para acompanhar{" "}
+          <span className="font-normal text-muted-foreground">
+            · {acompanhar.length}
+          </span>
+        </h2>
         <p className="mt-1.5 max-w-[78ch] text-xs leading-relaxed text-muted-foreground">
           Sem agendamento ou atrasadas.{" "}
           <b className="font-medium text-foreground">Lembrar</b> envia um
@@ -255,7 +236,7 @@ export function AgendaCoordenacao({
         )}
       </section>
 
-      {/* ---- Semana no programa ---- */}
+      {/* ---- Semana no programa (2º — o que o calendário oficial cobra) ---- */}
       <section aria-label="Semana no programa">
         <h2 className="text-base font-semibold">Semana no programa</h2>
         {programa.length === 0 ? (
@@ -270,177 +251,123 @@ export function AgendaCoordenacao({
           </ul>
         )}
       </section>
+
+      {/* ---- Semana do encontro, por cronograma (3º — contexto compacto) ---- */}
+      <section aria-label="Semana do encontro por cronograma">
+        <h2 className="text-base font-semibold">
+          Semana do encontro, por cronograma
+        </h2>
+        <p className="mt-1.5 max-w-[78ch] text-xs leading-relaxed text-muted-foreground">
+          {resumos.length > 1 ? (
+            <>
+              As turmas não começaram juntas — na mesma semana,{" "}
+              {resumos.map((r, i) => (
+                <span key={r.cronogramaId}>
+                  {i > 0 && (i === resumos.length - 1 ? " e " : ", ")}
+                  <b className="font-medium text-foreground">
+                    {r.turma} está no encontro {r.eventoNumero ?? "—"}
+                  </b>
+                </span>
+              ))}
+              . Por isso o “X de Y realizaram” é por turma, nunca misturado.
+            </>
+          ) : (
+            "Resumo por turma — cada uma no seu encontro."
+          )}
+        </p>
+        {resumos.length === 0 ? (
+          <p className="mt-3 rounded-xl border border-dashed px-4 py-3 text-sm text-muted-foreground">
+            Nenhum cronograma com duplas em curso — quando uma turma entrar,
+            o resumo dela aparece aqui.
+          </p>
+        ) : (
+          <ul className="mt-3 divide-y divide-border/60 overflow-hidden rounded-xl border bg-card">
+            {resumos.map((r) => (
+              <LinhaResumo key={r.cronogramaId} r={r} />
+            ))}
+          </ul>
+        )}
+      </section>
     </div>
   );
 }
 
-// ---------- card "Encontro N · Tx" ----------
+// ---------- linha "Turma · Encontro N · dd/mm · X/Y" ----------
 
-function CardResumo({ r, dom }: { r: ResumoTurmaCard; dom: string }) {
-  const comData = r.regua.filter((p) => p.data != null);
-  const primeiro = comData[0];
-  const atual = r.regua.find((p) => p.estado === "atual") ?? null;
-  const ultimo = comData.at(-1);
-  const dm = (iso: string) =>
-    `${Number(iso.slice(8, 10))} ${formatMesAbrev(iso)}`;
+/** Uma linha por cronograma ativo (REALIZA-176): a mesma anatomia da
+ *  LinhaPrograma — pill da turma, título com o deep-link pro dia oficial
+ *  no calendário, sublinha com a contagem de duplas — e "X de Y
+ *  realizaram" com a barra única lime/muted (a gramática do progresso dos
+ *  outros painéis; "sem data" é fundo neutro, não erro). */
+function LinhaResumo({ r }: { r: ResumoTurmaCard }) {
+  const pct =
+    r.ativas > 0 ? Math.min((r.realizaram / r.ativas) * 100, 100) : 0;
+  const titulo =
+    r.eventoNumero != null
+      ? `Encontro ${r.eventoNumero}`
+      : "Semana sem encontro oficial";
   return (
-    <article className="rounded-xl border bg-card p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <PillTurma turma={r.meta ? `${r.turma} · ${r.meta}` : r.turma} />
-          <h3 className="mt-1.5 text-lg font-bold leading-snug">
-            {r.eventoNumero != null
-              ? `Encontro ${r.eventoNumero} · ${r.turma}`
-              : `Semana sem encontro oficial · ${r.turma}`}
-          </h3>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            {r.eventoData
-              ? `${dowCurto(r.eventoData)} ${Number(
-                  r.eventoData.slice(8, 10)
-                )} de ${mesLongo(r.eventoData)} · `
-              : ""}
-            {r.ativas} {r.ativas === 1 ? "dupla ativa" : "duplas ativas"}
-            {r.pausadas > 0
-              ? ` (+${r.pausadas} ${r.pausadas === 1 ? "pausada" : "pausadas"})`
-              : ""}
-          </p>
-        </div>
-        <div className="shrink-0 text-right">
-          <p className="text-3xl font-bold leading-none tabular-nums">
-            {r.realizaram}
-          </p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            de {r.ativas} realizaram
-          </p>
-        </div>
-      </div>
-
-      {/* barra 3 segmentos: fez / marcou / sem data — o tracejado danger é
-          o irmão do hatch-recesso do calendário */}
-      <div
-        role="img"
-        aria-label={`${r.realizaram} realizaram, ${r.agendadas} agendadas, ${r.semAgendamento} sem agendamento`}
-        className="mt-3 flex h-3 gap-0.5 overflow-hidden rounded-full bg-muted"
-      >
-        {r.realizaram > 0 && (
-          <i
-            className="min-w-1 bg-[var(--ok)]"
-            style={{ flexGrow: r.realizaram }}
-          />
-        )}
-        {r.agendadas > 0 && (
-          <i
-            className="min-w-1 bg-[var(--brand-lime)]/60"
-            style={{ flexGrow: r.agendadas }}
-          />
-        )}
-        {r.semAgendamento > 0 && (
-          <i
-            className="hatch-danger min-w-1"
-            style={{ flexGrow: r.semAgendamento }}
-          />
-        )}
-      </div>
-      <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-        <li className="flex items-center gap-1.5">
-          <i aria-hidden className="size-2.5 rounded-[3px] bg-[var(--ok)]" />
-          {r.realizaram} realizaram
-        </li>
-        <li className="flex items-center gap-1.5">
-          <i
-            aria-hidden
-            className="size-2.5 rounded-[3px] bg-[var(--brand-lime)]/60"
-          />
-          {r.agendadas} agendadas até {dowCurto(dom)}{" "}
-          {Number(dom.slice(8, 10))}
-        </li>
-        <li className="flex items-center gap-1.5">
-          <i
-            aria-hidden
-            className="hatch-danger size-2.5 rounded-[3px] ring-1 ring-inset ring-[var(--danger)]/30"
-          />
-          {r.semAgendamento} sem agendamento
-        </li>
-      </ul>
-
-      {/* régua oficial: círculos numerados — atual sai em tinta com anel
-          lime, feito em ok, futuro em traço. Cada círculo datado é link pro
-          dia no calendário (?aba=calendario&dia=) — o li segue wrapper pra
-          a contagem/estado continuar na régua */}
-      <ol
-        className="mt-3 flex flex-wrap gap-1"
-        aria-label={`Calendário oficial ${r.turma}: ${r.regua.length} encontros`}
-      >
-        {r.regua.map((p) => (
-          <li
-            key={p.numero}
-            title={`encontro ${p.numero} · ${r.turma}`}
-            className={cn(
-              "grid size-6 place-items-center rounded-full border text-[11px] font-semibold tabular-nums",
-              p.estado === "feito" &&
-                "border-transparent bg-[var(--ok)] text-white",
-              p.estado === "atual" &&
-                "border-transparent bg-foreground text-background ring-2 ring-[var(--brand-lime)] ring-offset-2 ring-offset-card",
-              p.estado === "futuro" && "border-border text-muted-foreground"
-            )}
-          >
-            {p.data != null ? (
-              <Link
-                href={`/agenda?aba=calendario&dia=${p.data}`}
-                aria-label={`encontro ${p.numero} · ${r.turma} — abrir o dia no calendário`}
-                className="grid size-full place-items-center rounded-full"
-              >
-                {p.numero}
-              </Link>
-            ) : (
-              p.numero
-            )}
-          </li>
-        ))}
-      </ol>
-      {/* legenda da régua — os swatches repetem os estados dos círculos
-          (ok, tinta+anel, contorno) */}
-      <p
-        role="note"
-        aria-label="Legenda da régua"
-        className="mt-2 flex items-center gap-3 text-[11px] text-muted-foreground"
-      >
-        <span className="inline-flex items-center gap-1">
-          <i aria-hidden className="size-2.5 rounded-full bg-[var(--ok)]" />
-          feito
-        </span>
-        <span className="inline-flex items-center gap-1">
-          <i
-            aria-hidden
-            className="size-2.5 rounded-full bg-foreground ring-1 ring-[var(--brand-lime)]"
-          />
-          atual
-        </span>
-        <span className="inline-flex items-center gap-1">
-          <i aria-hidden className="size-2.5 rounded-full border border-border" />
-          futuro
-        </span>
-      </p>
-      {primeiro && ultimo && (
-        <p className="mt-2 flex justify-between gap-2 text-xs text-muted-foreground">
-          <span>
-            enc. {primeiro.numero} · {dm(primeiro.data!)}
-          </span>
-          {/* o vigente já aparece como 1º/último quando é ponta — sem dupla
-              etiqueta idêntica ("enc. 1" duas vezes na turma nova) */}
-          {atual?.data &&
-            atual.numero !== primeiro.numero &&
-            atual.numero !== ultimo.numero && (
-              <span>
-                enc. {atual.numero} · {dm(atual.data)}
+    <li className="flex flex-wrap items-center gap-3 px-4 py-3">
+      {/* a "terças 19h" da meta é quando a turma se encontra — fica na
+          pill, junto do nome (meta "—" = semana sem evento oficial) */}
+      <PillTurma
+        turma={
+          r.meta && r.meta !== "—" ? `${r.turma} · ${r.meta}` : r.turma
+        }
+      />
+      <div className="min-w-0 flex-1 basis-52">
+        <p className="text-sm font-semibold leading-snug">
+          {r.eventoData != null ? (
+            <Link
+              href={`/agenda?aba=calendario&dia=${r.eventoData}`}
+              aria-label={`${titulo} · ${r.turma} — abrir o dia no calendário`}
+              className="-my-1 rounded-sm py-1 underline-offset-2 transition-colors hover:text-primary hover:underline"
+            >
+              {titulo}
+              <span className="font-normal text-muted-foreground">
+                {" "}
+                · {dowCurto(r.eventoData)}{" "}
+                {Number(r.eventoData.slice(8, 10))}/
+                {Number(r.eventoData.slice(5, 7))}
               </span>
-            )}
-          <span>
-            enc. {ultimo.numero} · {dm(ultimo.data!)}
+            </Link>
+          ) : (
+            titulo
+          )}
+        </p>
+        <p className="mt-0.5 text-xs leading-snug text-muted-foreground">
+          {r.ativas} {r.ativas === 1 ? "dupla ativa" : "duplas ativas"}
+          {r.pausadas > 0 &&
+            ` (+${r.pausadas} ${r.pausadas === 1 ? "pausada" : "pausadas"})`}
+          {r.agendadas > 0 &&
+            ` · ${r.agendadas} ${
+              r.agendadas === 1 ? "agendada" : "agendadas"
+            }`}
+          {r.semAgendamento > 0 && ` · ${r.semAgendamento} sem agendamento`}
+        </p>
+      </div>
+      <div className="flex items-center gap-2.5">
+        <p className="text-sm font-semibold tabular-nums">
+          {r.realizaram} de {r.ativas}
+          <span className="ml-1 text-xs font-normal text-muted-foreground">
+            realizaram
           </span>
         </p>
-      )}
-    </article>
+        <div
+          role="progressbar"
+          aria-valuenow={r.realizaram}
+          aria-valuemin={0}
+          aria-valuemax={Math.max(r.ativas, 1)}
+          aria-label={`${r.turma}: ${r.realizaram} realizaram, ${r.agendadas} agendadas, ${r.semAgendamento} sem agendamento`}
+          className="h-1.5 w-20 overflow-hidden rounded-full bg-muted sm:w-28"
+        >
+          <div
+            className="fill-grow h-full rounded-full bg-[var(--brand-lime)] transition-[width] duration-500 ease-snappy"
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+      </div>
+    </li>
   );
 }
 

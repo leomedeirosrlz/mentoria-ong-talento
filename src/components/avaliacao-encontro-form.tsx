@@ -250,7 +250,7 @@ export function AvaliacaoEncontroForm({
                 {SENTIMENTO_AVALIACAO.map((o) => (
                   <label
                     key={o.value}
-                    className="flex h-10 cursor-pointer items-center rounded-full bg-muted px-3.5 text-sm font-medium text-muted-foreground transition-colors select-none has-checked:bg-primary has-checked:text-primary-foreground has-focus-visible:ring-3 has-focus-visible:ring-ring/50"
+                    className="flex h-11 cursor-pointer items-center rounded-full bg-muted px-3.5 text-sm font-medium text-muted-foreground transition-colors select-none has-checked:bg-primary has-checked:text-primary-foreground has-focus-visible:ring-3 has-focus-visible:ring-ring/50 md:h-10"
                   >
                     <input
                       type="radio"
@@ -310,7 +310,7 @@ export function AvaliacaoEncontroForm({
                 {TEMAS_AVALIACAO.map((o) => (
                   <label
                     key={o.value}
-                    className="flex h-10 cursor-pointer items-center rounded-full bg-muted px-3.5 text-sm font-medium text-muted-foreground transition-colors select-none has-checked:bg-primary has-checked:text-primary-foreground has-focus-visible:ring-3 has-focus-visible:ring-ring/50"
+                    className="flex h-11 cursor-pointer items-center rounded-full bg-muted px-3.5 text-sm font-medium text-muted-foreground transition-colors select-none has-checked:bg-primary has-checked:text-primary-foreground has-focus-visible:ring-3 has-focus-visible:ring-ring/50 md:h-10"
                   >
                     <input
                       type="checkbox"
