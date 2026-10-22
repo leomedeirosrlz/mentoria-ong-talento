@@ -10,8 +10,10 @@
 //   mentorado fixture Mentorado V111            (pessoa da inscrição jovem)
 //   logins reais      e2e-coord@realiza.test (coord: CRUD integral),
 //                     e2e-mentor@realiza.test (mentor: lê [] nas duas)
-//   service/anon      apikeys do stack — `supabase status`
-//                     (ou envs PGRST_URL/PGRST_ANON_KEY/PGRST_SERVICE_KEY)
+//   service/anon      envs obrigatórias: PGRST_URL / PGRST_ANON_KEY /
+//                     PGRST_SERVICE_KEY. NÃO há fallback p/ `supabase
+//                     status` — um stack local descoberto em silêncio já
+//                     gerou falhas fantasma; sem env, o script aborta.
 //
 // O QUE VALIDA (acceptance.md):
 //   1) grants: anon negado nas duas tabelas; coord lê relatorio_links e
@@ -26,19 +28,26 @@
 //   6) inscrição 'aguardando' de T3 existe no escopo dela e não vaza no
 //      filtro de T2 (mesma query que a página roda)
 
-import { execSync } from "node:child_process";
-
-let BASE = process.env.PGRST_URL;
-let ANON_KEY = process.env.PGRST_ANON_KEY;
-let SVC_KEY = process.env.PGRST_SERVICE_KEY;
-if (!BASE || !ANON_KEY || !SVC_KEY) {
-  const out = execSync("pnpm exec supabase status -o json", {
-    encoding: "utf8",
-  });
-  const st = JSON.parse(out.slice(out.indexOf("{")));
-  BASE ??= st.API_URL;
-  ANON_KEY ??= st.PUBLISHABLE_KEY ?? st.ANON_KEY;
-  SVC_KEY ??= st.SECRET_KEY ?? st.SERVICE_ROLE_KEY;
+const BASE = process.env.PGRST_URL;
+const ANON_KEY = process.env.PGRST_ANON_KEY;
+const SVC_KEY = process.env.PGRST_SERVICE_KEY;
+{
+  const faltam = [
+    ["PGRST_URL", BASE],
+    ["PGRST_ANON_KEY", ANON_KEY],
+    ["PGRST_SERVICE_KEY", SVC_KEY],
+  ].filter(([, v]) => !v).map(([k]) => k);
+  if (faltam.length) {
+    console.error(
+      `abortado — faltam envs: ${faltam.join(", ")}. ` +
+      "Aponte o stack explicitamente (ex.: staging, com .env.staging " +
+      "carregado: PGRST_URL=$E2E_SUPABASE_URL " +
+      "PGRST_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY_STAGING " +
+      "PGRST_SERVICE_KEY=$E2E_SUPABASE_SERVICE_ROLE_KEY). Sem fallback " +
+      "pra `supabase status` de propósito: resolver o stack local em " +
+      "silêncio produziu falhas fantasma.");
+    process.exit(2);
+  }
 }
 const SENHAS = ["realiza123", "e2e-senha-teste"]; // demo | e2e
 
@@ -61,15 +70,21 @@ async function login(email) {
 }
 
 async function api(path, { method = "GET", token, key = ANON_KEY, body } = {}) {
+  // PostgREST hosted resolve o PAPEL pelo Bearer — apikey sozinha sempre
+  // vira `anon` (mesmo com a service_role JWT nela). O service portanto
+  // vai nos DOIS headers, como faz o seed-e2e-staging.mjs / supabase-js.
+  // body aceita objeto OU string pronta: stringify duplo mandava o JSON
+  // como literal string e o PostgREST rejeitava todo insert.
   const res = await fetch(`${BASE}/rest/v1/${path}`, {
     method,
     headers: {
       apikey: key,
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      Authorization: `Bearer ${token ?? key}`,
       "Content-Type": "application/json",
       ...(method !== "GET" ? { Prefer: "return=representation" } : {}),
     },
-    body: body ? JSON.stringify(body) : undefined,
+    body: body == null ? undefined
+      : typeof body === "string" ? body : JSON.stringify(body),
   });
   let data = null;
   const txt = await res.text();

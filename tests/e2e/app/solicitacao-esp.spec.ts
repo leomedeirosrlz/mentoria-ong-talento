@@ -719,6 +719,10 @@ test.describe("especialista global — turma não restringe (REALIZA-158)", () =
         p_novo_id: IDS.espProfile,
         p_motivo: "E2E-158: rematch cross-turma",
         p_registrar_nota: false,
+        // 0117: rematch esp exige a devolutiva pro PDM de quem sai — sem ela
+        // a RPC aborta (a dupla fechada não aceita o campo por nenhuma via)
+        p_devolutiva:
+          "E2E-171: sessões de escrita destravadas; manter o exercício semanal no PDM.",
       },
     });
     const remText = await rem.text();
@@ -730,6 +734,14 @@ test.describe("especialista global — turma não restringe (REALIZA-158)", () =
     expect(nova?.mentor_id).toBe(IDS.espProfile);
     expect(nova?.trilha).toBe("especialista");
     expect(nova?.status).toBe("ativa");
+
+    // a trilha encerrada carrega o rito completo: carimbo + devolutiva
+    const [fechada] = await buscarViaServiceRole<
+      { status: string; encerrada_em: string | null; devolutiva_pdm: string | null }[]
+    >("duplas", `select=status,encerrada_em,devolutiva_pdm&id=eq.${duplaId}`);
+    expect(fechada?.status).toBe("encerrada");
+    expect(fechada?.encerrada_em).toBeTruthy();
+    expect(fechada?.devolutiva_pdm).toContain("E2E-171");
   });
 });
 

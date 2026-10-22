@@ -1862,7 +1862,8 @@ export async function remanejarDupla(
   lado: string,
   novoId: string,
   motivo: string,
-  registrarNota: boolean
+  registrarNota: boolean,
+  devolutiva?: string
 ) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
@@ -1882,13 +1883,26 @@ export async function remanejarDupla(
   const { data: atual } = await supabase
     .from("duplas")
     .select(
-      `id, mentor_id, mentorado_id, supervisor_id, status,
+      `id, mentor_id, mentorado_id, supervisor_id, status, trilha,
        mentor:profiles!duplas_mentor_id_fkey(nome),
        mentorado:mentorados!duplas_mentorado_id_fkey(nome)`
     )
     .eq("id", duplaId)
     .maybeSingle();
   if (!atual) return { error: "Dupla não encontrada." };
+  // 0117: a trilha de especialista fecha com a devolutiva pro PDM na mesma
+  // transação — sem ela a dupla encerrava sem a entrega e nenhuma via grava
+  // depois. O RPC revalida; aqui o erro chega antes da ida.
+  const devolutivaTxt = devolutiva?.trim() ?? "";
+  if (
+    atual.trilha === "especialista" &&
+    (devolutivaTxt.length < 10 || devolutivaTxt.length > 4000)
+  ) {
+    return {
+      error:
+        "A devolutiva pro PDM precisa de 10 a 4.000 caracteres — é a entrega de quem sai da trilha.",
+    };
+  }
   const saiId = lado === "mentor" ? atual.mentor_id : atual.mentorado_id;
   if (novoId === saiId) {
     return {
@@ -1916,6 +1930,9 @@ export async function remanejarDupla(
     p_novo_id: novoId,
     p_motivo: motivo?.trim() || null,
     p_registrar_nota: registrarNota === true,
+    // repassa o que veio — em trilha DPP o RPC recusa devolutiva com erro
+    // claro em vez de descartar em silêncio
+    p_devolutiva: devolutivaTxt || null,
   });
   if (error) {
     // raise exception do RPC chega P0001 já em pt-BR — repassa direto;

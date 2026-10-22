@@ -4,7 +4,10 @@ import { demoRole } from "./demo/mode";
 import { demoUltimasInteracoes } from "./demo/queries";
 
 // tipos locais — interacoes ainda não entra em types.ts
-export type InteracaoTipo = "nudge" | "contato" | "apoio";
+// 'vinculo_resposta' (0116): reconciliação retroativa de resposta órfã —
+// entra na timeline da dupla mas nunca em cap/contagem de nudge (os
+// leitores filtram por tipo)
+export type InteracaoTipo = "nudge" | "contato" | "apoio" | "vinculo_resposta";
 // 0094 — 'in_app': o lembrete nasce na plataforma; o wa.me aberto junto é a
 // entrega, não um segundo contato
 export type InteracaoCanal = "whatsapp" | "email" | "outro" | "in_app";
