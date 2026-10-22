@@ -1,0 +1,653 @@
+{
+ "REALIZA-15": {
+  "summary": "F1: entidade cronogramas + escopo do semáforo/queries por dupla",
+  "description": "**Fix de correção disfarçado de feature.** A turma de 30 já opera 2 cronogramas na vida real; `ciclo_eventos`/`saudadeDaDupla`/`passosDaTrilha` são globais — o 2º cronograma corrompe semáforo e trilha no dia em que entrar.\n\nF1 mínimo do plano:\n\n* Entidade `cronogramas` (nome, datas, nº de encontros, turma)\n* `duplas.cronograma_id`; `ciclo_eventos` passa a ser por cronograma\n* Filtrar \\~20 pontos de leitura hoje globais\n\nFonte: `docs/planos/turmas-cronogramas.md`\n\n---\n\nMigrado do Linear: REALIZA-9 — https://linear.app/realizavc/issue/REALIZA-9",
+  "type": "Bug",
+  "priority": "Highest",
+  "labels": []
+ },
+ "REALIZA-16": {
+  "summary": "Preservação de dados do mentorado: identidade estável pra futura conta sem perda",
+  "description": "**Decisão (Thiago, 03/out/2026):** mentorado **não loga** por ora — mas toda informação coletada via token precisa persistir **vinculada à identidade do mentorado** pra futura conta sem regressão/perda.\n\nImplicação de schema: `formulario_links`, `atividade_links`, respostas de instrumentos, PDM, Roda — tudo precisa de `mentorado_id` (ou `dupla_id` que resolve pro mentorado) estável, não só `token`. Quando a conta do mentorado existir, o histórico inteiro migra por join — zero re-coleta.\n\nChecklist de cobertura: respostas forms, instrumentos interativos, anexos, assinaturas (já tem), dados de matching/intake.\n\n---\n\nMigrado do Linear: REALIZA-49 — https://linear.app/realizavc/issue/REALIZA-49/preservacao-de-dados-do-mentorado-identidade-estavel-pra-futura-conta",
+  "type": "Tarefa",
+  "priority": "High",
+  "labels": []
+ },
+ "REALIZA-17": {
+  "summary": "PDM: entidade documento-vivo com metas SMART → submetas recursivas",
+  "description": "PDM é o único **documento vivo** do ciclo (enc. 2→16): visão → metas SMART → submetas recursivas. Precisa de `pdm`/`pdm_itens` recursivo, não one-shot form.\n\nSensível: metas de menor — visibilidade coord em aberto.\n\nFonte: `docs/planos/atividades-interativas.md`\n\n---\n\nMigrado do Linear: REALIZA-21 — https://linear.app/realizavc/issue/REALIZA-21/pdm-entidade-documento-vivo-com-metas-smart-submetas-recursivas",
+  "type": "Tarefa",
+  "priority": "Medium",
+  "labels": []
+ },
+ "REALIZA-18": {
+  "summary": "Roda da Vida interativa: 16 eixos, radar, overlay antes/depois",
+  "description": "Radar com os **16 eixos fixos do guia** (4 quadrantes), aplicação em 2 momentos do ciclo com overlay antes/depois. Dados sensíveis de menor — visibilidade a definir (ver decisão de LGPD).\n\nFonte: Guia DPP + `docs/planos/atividades-interativas.md`\n\n---\n\nMigrado do Linear: REALIZA-20 — https://linear.app/realizavc/issue/REALIZA-20/roda-da-vida-interativa-16-eixos-radar-overlay-antesdepois",
+  "type": "Feature",
+  "priority": "Medium",
+  "labels": []
+ },
+ "REALIZA-19": {
+  "summary": "Instrumento-piloto: \"Construindo a Visão\" como atividade tokenizada",
+  "description": "Primeiro instrumento a pilotar — cabe 100% nos campos atuais do forms engine (zero schema novo), prova o fluxo link→mentorado→visível na ficha antes de instrumentos complexos.\n\nFonte: `docs/planos/atividades-interativas.md` (ordenação sugerida no README)\n\n---\n\nMigrado do Linear: REALIZA-19 — https://linear.app/realizavc/issue/REALIZA-19/instrumento-piloto-construindo-a-visao-como-atividade-tokenizada",
+  "type": "Feature",
+  "priority": "High",
+  "labels": []
+ },
+ "REALIZA-20": {
+  "summary": "atividade_links: link multi-sessão tokenizado (tipo form/pdf/roda/pdm) com rascunho",
+  "description": "Schema convergente dos planos de atividades + editor-pdf — **não criar tabelas paralelas**:\n\n* `atividade_links`: token, dupla_id, encontro_num?, instrumento, `tipo` ('form'|'pdf'|'roda'|'pdm'), rascunho server-side, status (enviado/aberto/iniciado/enviado/revisado/devolvido), expiração\n* Multi-sessão + autosave (diferente de `formulario_links` one-shot)\n* Resultado visível pro mentor + coord autorizada na ficha da dupla\n\nFonte: `docs/planos/atividades-interativas.md` + `docs/planos/editor-pdf.md`\n\n---\n\nMigrado do Linear: REALIZA-17 — https://linear.app/realizavc/issue/REALIZA-17/atividade-links-link-multi-sessao-tokenizado-tipo-formpdfrodapdm-com",
+  "type": "Feature",
+  "priority": "High",
+  "labels": []
+ },
+ "REALIZA-21": {
+  "summary": "Checklist de intenções por encontro (não só nota livre)",
+  "description": "O pedido real da análise: \"pontos específicos pendentes\" (ex.: \"enviar vídeo depois do encontro\") — um **checklist de intenções** por encontro, não só `NotaEncontro` livre. Mentor marca itens que precisam acontecer; itens pendentes aparecem no próximo encontro/nudge.\n\nFonte: `docs/analise-transcricao-mentor.md` §Sprint2\n\n---\n\nMigrado do Linear: REALIZA-61 — https://linear.app/realizavc/issue/REALIZA-61/checklist-de-intencoes-por-encontro-nao-so-nota-livre",
+  "type": "Feature",
+  "priority": "Low",
+  "labels": []
+ },
+ "REALIZA-22": {
+  "summary": "Polish de agendamento: posição estável do Agendar + dialog retroativo + microcopy",
+  "description": "Da análise da transcrição (Sprint 1/2):\n\n* **\"Agendar encontro\" nunca dentro do \"⋯ Mais\"** quando `podeAgendar` — a ação mais frequente muda de lugar conforme estado; posição estável sempre\n* **Dialog retroativo** — marcar data passada sinaliza no título (\"essa data já passou — entra como realizado\"); modo duplo silencioso confundiu a Kelyng na sessão real\n* **Microcopy** — \"datas oficiais são sugestões, a dupla combina a real\" na agenda; vocabulário consistente \"repôr\" (regra oficial: reposição na mesma semana)\n\nFonte: `docs/analise-transcricao-mentor.md`\n\n---\n\nMigrado do Linear: REALIZA-60 — https://linear.app/realizavc/issue/REALIZA-60/polish-de-agendamento-posicao-estavel-do-agendar-dialog-retroativo",
+  "type": "Tarefa",
+  "priority": "Medium",
+  "labels": []
+ },
+ "REALIZA-26": {
+  "summary": "Histórico append-only de remarcações (motivo + data original + quem)",
+  "description": "`motivo_reagendamento` hoje é **sobrescrito** — sem histórico. A motivação real: \"tenho que olhar no WhatsApp; não lembro por que tivemos uma semana com dois encontros\".\n\nImplementar como tabela append-only (`encontro_reagendamentos`: de_data, para_data, motivo, quem, created_at) — janela natural de escrita é a spec nova de agendamento. Pré-requisito dos relatórios de tendência.\n\nFonte: `docs/analise-transcricao-mentor.md` + `docs/planos/relatorios-inteligencia.md`\n\n---\n\nMigrado do Linear: REALIZA-7 — https://linear.app/realizavc/issue/REALIZA-7/historico-append-only-de-remarcacoes-motivo-data-original-quem",
+  "type": "Feature",
+  "priority": "High",
+  "labels": []
+ },
+ "REALIZA-27": {
+  "summary": "Ação de agendar dentro do card do encontro (número explícito)",
+  "description": "Kelyng verbalizou 3×: \"a telinha de dupla é a tela de trabalho do mentor\".\n\n* Quando há registro pendente, \"Agendar encontro\" desce pro menu ⋯ e o primário vira \"Registrar\" (`page.tsx:331-347`) — quem mais precisa agendar vê menos o botão\n* Clique no \"3\" da trilha = clique-morto (nó sem row linka pra `/duplas/{id}` pelado, `trilha-jornada.tsx:258-263`)\n* Pedido: **\"Agendar encontro N\"** dentro de cada card da trilha; remarcar pede alvo explícito\n\nFonte: `docs/analise-transcricao-mentor.md`\n\n---\n\nMigrado do Linear: REALIZA-6 — https://linear.app/realizavc/issue/REALIZA-6/acao-de-agendar-dentro-do-card-do-encontro-numero-explicito",
+  "type": "Tarefa",
+  "priority": "High",
+  "labels": []
+ },
+ "REALIZA-42": {
+  "summary": "DECISÃO: camada de IA — confirmar progressão determinística→agregados→NLP gated",
+  "description": "Progressão honesta (\\~30 duplas × 16 encontros → ML inviável por anos):\n\n1. Score de regras explicável\n2. Relatório narrativo LLM **só sobre agregados, zero PII**\n3. Decision support pra coord\n4. Recomendação de atividade por estado\n5. NLP em texto livre de registro: **só com parecer jurídico** (LGPD Art. 11+14)\n\nFonte: `docs/planos/relatorios-inteligencia.md`\n\n---\n\nMigrado do Linear: REALIZA-32 — https://linear.app/realizavc/issue/REALIZA-32/decisao-camada-de-ia-confirmar-progressao-deterministicaagregadosnlp",
+  "type": "Tarefa",
+  "priority": "High",
+  "labels": []
+ },
+ "REALIZA-46": {
+  "summary": "Wizard: coord cadastra cronograma dinamicamente (datas, nº de encontros, instrumentos)",
+  "description": "Cadastro dinâmico sem migração por coorte: coord define nome, data de início, dia da semana, nº de encontros, e o wizard gera `ciclo_eventos` + vincula instrumentos do `seed`.\n\nSuporta: múltiplos cronogramas simultâneos por turma, tamanhos diferentes, edição com snapshot histórico.\n\nFonte: `docs/planos/turmas-cronogramas.md`\n\n---\n\nMigrado do Linear: REALIZA-11 — https://linear.app/realizavc/issue/REALIZA-11/wizard-coord-cadastra-cronograma-dinamicamente-datas-no-de-encontros",
+  "type": "Feature",
+  "priority": "Medium",
+  "labels": []
+ },
+ "REALIZA-47": {
+  "summary": "F3: turma entidade plena — tabelas turmas/programas + filtros por turma em tudo",
+  "description": "Fase 3 do plano `turmas-cronogramas.md` (depois do F1/THI-9):\n\n* `turmas` e `programas` viram tabelas (promove `duplas.turma` text → FK)\n* `duplas.ciclo→turma_id`; filtro por turma em `/duplas`, `/pessoas`, `/registros`, exports\n* Comunicados/materiais opcionalmente por turma\n* Versionamento de formulários por turma (decidido na ata)\n\nSequência: F1 (THI-9) → F2 (wizard THI-11 + upload THI-45) → **F3 aqui** → F4 membership (THI-55 + THI-58).\n\n---\n\nMigrado do Linear: REALIZA-62 — https://linear.app/realizavc/issue/REALIZA-62/f3-turma-entidade-plena-tabelas-turmasprogramas-filtros-por-turma-em",
+  "type": "Tarefa",
+  "priority": "Medium",
+  "labels": []
+ },
+ "REALIZA-49": {
+  "summary": "Modos de visualização familiares: grade tipo planilha nas listagens de intake/respostas",
+  "description": "**Decisão (Thiago, 03/out/2026):** intake centralizado na plataforma substituindo Forms/Sheets — mas os usuários vêm desses processos, então precisa de **modos de visualização familiares**:\n\n* Lista de respostas/intake em **grade tipo planilha** (linhas=respondentes, colunas=campos, densidade alta, ordenar/filtrar por coluna)\n* Equivalente às abas \"Respostas ao formulário\" que a coord usa hoje\n* Alternância grade ↔ cards/detalhe por pessoa\n\nVale pra: respostas de formulários, lista de pessoas, matching board.\n\n---\n\nMigrado do Linear: REALIZA-50 — https://linear.app/realizavc/issue/REALIZA-50/modos-de-visualizacao-familiares-grade-tipo-planilha-nas-listagens-de",
+  "type": "Tarefa",
+  "priority": "Medium",
+  "labels": []
+ },
+ "REALIZA-51": {
+  "summary": "Distribuição de atividades: disparo em lote por e-mail + compartilhar WhatsApp deep link",
+  "description": "**Decisão (Thiago, 03/out/2026):** mentorado recebe atividade via mentor **ou coord**:\n\n* **Disparo em lote por e-mail** — coord seleciona duplas/filtra por turma → envia link tokenizado (Resend já integrado)\n* **Botão compartilhar WhatsApp** — deep link `wa.me` com mensagem pré-preenchida no card do link (padrão já usado em `waLink`)\n* Mentor encaminha direto pro próprio mentorado (catálogo curado, THI-18 ✅)\n\nCanais por `atividade_links` (THI-17).\n\n---\n\nMigrado do Linear: REALIZA-48 — https://linear.app/realizavc/issue/REALIZA-48/distribuicao-de-atividades-disparo-em-lote-por-e-mail-compartilhar",
+  "type": "Feature",
+  "priority": "Medium",
+  "labels": []
+ },
+ "REALIZA-52": {
+  "summary": "Feature: score determinístico + narrativa LLM em agregados sem PII",
+  "description": "Os dados de atividade geram **score de regras explicável** → relatório narrativo LLM **só em agregados, zero PII** → decision support. Fonte de dados: encontros, registros, atividade_links, PDM progresso, Roda antes/depois, 360. ML em texto livre = fase posterior gated por jurídico.\n\nFonte: `docs/planos/relatorios-inteligencia.md`\n\n---\n\nMigrado do Linear: REALIZA-44 — https://linear.app/realizavc/issue/REALIZA-44/feature-score-deterministico-narrativa-llm-em-agregados-sem-pii",
+  "type": "Feature",
+  "priority": "Low",
+  "labels": []
+ },
+ "REALIZA-53": {
+  "summary": "DECISÃO: acervo do Drive — mover pro Shared Drive org ou compartilhar item a item",
+  "description": "A conta `thiago@realiza.vc` só enxerga 6 arquivos; quase tudo mora no gmail pessoal.\n\n* Mover acervo pro **Shared Drive nonprofit** (6 TB da ata) → toda a org enxerga, eu leio via API\n* Ou compartilhar forms restantes individualmente com `thiago@realiza.vc`\n\nFonte: `docs/planos/forms-google-mapeamento.md`\n\n---\n\nMigrado do Linear: REALIZA-28 — https://linear.app/realizavc/issue/REALIZA-28/decisao-acervo-do-drive-mover-pro-shared-drive-org-ou-compartilhar",
+  "type": "Tarefa",
+  "priority": "Medium",
+  "labels": []
+ },
+ "REALIZA-54": {
+  "summary": "Arquivos da dupla: agregar PDM + empty state",
+  "description": "Aba \"Arquivos\" da dupla precisa incluir o PDM (hoje só `registro_anexos`) e ter **empty state** — \"ainda não há arquivos\" explicado, não lista vazia.\n\nFonte: `docs/analise-transcricao-mentor.md`\n\n---\n\nMigrado do Linear: REALIZA-39 — https://linear.app/realizavc/issue/REALIZA-39/arquivos-da-dupla-agregar-pdm-empty-state",
+  "type": "Tarefa",
+  "priority": "Low",
+  "labels": []
+ },
+ "REALIZA-55": {
+  "summary": "Editor de PDF: upload→link→overlay annotation→flatten→devolução",
+  "description": "Mentor upa PDF → vira `atividade_links` tipo='pdf' → mentorado edita no browser → autosave → envia → mentor revisa.\n\nStack do plano: **pdfjs raster + canvas overlay (perfect-freehand) + flatten pdf-lib** (já instalada nos termos). tldraw fora (licença comercial), mupdf fora (AGPL).\n\nFonte: `docs/planos/editor-pdf.md`\n\n---\n\nMigrado do Linear: REALIZA-33 — https://linear.app/realizavc/issue/REALIZA-33/editor-de-pdf-uploadlinkoverlay-annotationflattendevolucao",
+  "type": "Feature",
+  "priority": "Low",
+  "labels": []
+ },
+ "REALIZA-56": {
+  "summary": "Hub /relatorios: dashboards operacionais filtráveis",
+  "description": "Página `/relatorios` com dashboards operacionais: presença, completude, atrasos, remarcações, apoio, engajamento, instrumentos, termos/documentos. Filtros programa/turma/cronograma/dupla/status.\n\nFonte: `docs/planos/relatorios-inteligencia.md`\n\n---\n\nMigrado do Linear: REALIZA-30 — https://linear.app/realizavc/issue/REALIZA-30/hub-relatorios-dashboards-operacionais-filtraveis",
+  "type": "Feature",
+  "priority": "Medium",
+  "labels": []
+ },
+ "REALIZA-71": {
+  "summary": "Avaliação por encontro (mentor + mentorado) agregando na 360",
+  "description": "Decidido na ata: micro-avaliação dos **dois lados** por encontro, agregando na 360º no fim do ciclo. Mentorado responde via link tokenizado (encurtar: 2-3 perguntas no máximo).\n\nFonte: `docs/analise-transcricao-mentor.md` + ata\n\n---\n\nMigrado do Linear: REALIZA-23 — https://linear.app/realizavc/issue/REALIZA-23/avaliacao-por-encontro-mentor-mentorado-agregando-na-360",
+  "type": "Feature",
+  "priority": "Medium",
+  "labels": []
+ },
+ "REALIZA-72": {
+  "summary": "Badge de papel no shell + onboarding por papel (copy específica)",
+  "description": "Papel hoje é `text-xs` muted — invisível (Kelyng passou a reunião como coord sem ninguém notar; onboarding dizia \"a jornada da sua dupla\" pra coordenador). Badge visível no shell + copy de onboarding por papel.\n\nFonte: `docs/analise-transcricao-mentor.md`\n\n---\n\nMigrado do Linear: REALIZA-15 — https://linear.app/realizavc/issue/REALIZA-15/badge-de-papel-no-shell-onboarding-por-papel-copy-especifica",
+  "type": "Tarefa",
+  "priority": "Medium",
+  "labels": []
+ },
+ "REALIZA-73": {
+  "summary": "Hub de turmas na home coord + contexto de turma (?turma= + cookie)",
+  "description": "Filtro de contexto ativo pra coord: hub de turmas na home + `?turma=` na URL + cookie `turma_foco` (precedente `demo_role`). Todas as views operacionais (agenda, pessoas, duplas, relatórios) respeitam o contexto — sem contaminação global.\n\nFonte: `docs/planos/navegacao-turmas.md`\n\n---\n\nMigrado do Linear: REALIZA-12 — https://linear.app/realizavc/issue/REALIZA-12/hub-de-turmas-na-home-coord-contexto-de-turma-turma-cookie",
+  "type": "Tarefa",
+  "priority": "High",
+  "labels": []
+ },
+ "REALIZA-74": {
+  "summary": "Snapshot do semáforo (série temporal de risco)",
+  "description": "Semáforo é derivado na leitura — sem snapshot, relatório de tendência é impossível.\n\nGravar snapshot periódico (ou a cada mudança de estado) pra habilitar: série temporal de risco, digest semanal, score de regras.\n\nFonte: `docs/planos/relatorios-inteligencia.md`\n\n---\n\nMigrado do Linear: REALIZA-8 — https://linear.app/realizavc/issue/REALIZA-8/snapshot-do-semaforo-serie-temporal-de-risco",
+  "type": "Tarefa",
+  "priority": "Medium",
+  "labels": []
+ },
+ "REALIZA-75": {
+  "summary": "[TESTE] User Stories — camada de negócio sobre os work items",
+  "description": "Epic de teste pra avaliar o modelo: User Stories (Histórias) descrevem a funcionalidade em linguagem de negócio e linkam os work items técnicos que elas cobrem.\n\nFluxo proposto: Kelyng + Leo testam a US completa (In Test) → aprovam a US (Em análise → Concluído) → os itens técnicos linkados fecham junto.\n\nSe o modelo não funcionar, deletar este epic apaga a camada inteira — os work items técnicos ficam intactos nos epics de módulo.",
+  "type": "Epic",
+  "priority": "Medium",
+  "labels": []
+ },
+ "REALIZA-77": {
+  "summary": "Navegar e filtrar a plataforma por turma",
+  "description": "**Como** coordenadora,\n**quero** escolher uma turma e ver só as pessoas, duplas e telas dela,\n**pra** focar na turma certa sem contaminar a visão com dados de outras turmas.\n\n### O que se espera\n\n* Hub de turmas na home da coordenação; filtro persiste navegando entre telas\n* Aba Pessoas agrupada por turma com status de onboarding/documentos de cada um\n* Auxiliar executivo enxerga e edita só a turma dele (não o programa inteiro)\n* Cada papel vê a plataforma com cara dele — badge de papel visível e onboarding certo por papel\n* Mentor não-coord cai nas \"minhas duplas\", não na lista global\n\n### Cobre (itens técnicos)\n\nREALIZA-73, REALIZA-39, REALIZA-32, REALIZA-41, REALIZA-48, REALIZA-43, REALIZA-38, REALIZA-40, REALIZA-72",
+  "type": "História",
+  "priority": "Medium",
+  "labels": []
+ },
+ "REALIZA-78": {
+  "summary": "Mentor agenda e remarca encontros no calendário visual",
+  "description": "**Como** mentor,\n**quero** agendar e remarcar meus encontros num calendário estilo Google, vendo a disponibilidade do mentorado sobreposta à minha,\n**pra** combinar o horário sem troca de mensagens por fora.\n\n### O que se espera\n\n* Agenda com visão mês/semana e grade de horários; marcar direto na grade\n* Overlay: verde = mentor livre, amarelo = mentorado livre; sobreposição = horário bom pros dois\n* Encontro mostra estado visual claro (bolinha laranja → verde) e painel lateral com contexto\n* Remarcar pede motivo e guarda histórico — nunca perde a data original\n* Editar link do encontro sem remarcar; remarcar encontro já passado; copiar link\n* CTAs escritos na voz do mentor (\"Como vai o encontro?\")\n\n### Cobre (itens técnicos)\n\nREALIZA-25, REALIZA-24, REALIZA-28, REALIZA-27, REALIZA-23, REALIZA-22, REALIZA-21, REALIZA-26, REALIZA-61",
+  "type": "História",
+  "priority": "Medium",
+  "labels": []
+ },
+ "REALIZA-79": {
+  "summary": "Monitorar a saúde das duplas e agir a tempo",
+  "description": "**Como** coordenadora,\n**quero** ver o semáforo de risco das duplas com histórico e mandar nudge com prazo,\n**pra** agir antes que um atraso vire evasão.\n\n### O que se espera\n\n* Semáforo guarda série temporal — dá pra ver a tendência de risco da dupla ao longo do ciclo\n* Nudge mostra prazo concreto (\"até dia X\"), nunca \"a partir de —\"\n* A coordenação monitora e cobra; quem agenda é sempre a dupla\n\n### Cobre (itens técnicos)\n\nREALIZA-74, REALIZA-62",
+  "type": "História",
+  "priority": "Medium",
+  "labels": []
+ },
+ "REALIZA-80": {
+  "summary": "Mentorado responde atividades do guia por link, sem login",
+  "description": "**Como** mentorado,\n**quero** receber as atividades do programa (PDM, Roda da Vida, instrumentos, avaliações) por um link no WhatsApp/e-mail e preencher no celular,\n**pra** responder sem precisar criar conta ou instalar nada.\n\n### O que se espera\n\n* Link identifica quem eu sou (\"você é o mentorado da dupla X\") e funciona em várias sessões (salva rascunho)\n* PDM é documento vivo com metas que evoluem; Roda da Vida mostra antes/depois visual\n* Mentor emite o link de atividade do catálogo aprovado pela coordenação\n* Avaliação rápida pós-encontro dos dois lados alimenta a 360º do fim do ciclo\n* Se um dia eu criar conta, todo histórico vem junto — nada se perde\n\n### Cobre (itens técnicos)\n\nREALIZA-20, REALIZA-50, REALIZA-19, REALIZA-18, REALIZA-17, REALIZA-59, REALIZA-51, REALIZA-16, REALIZA-64, REALIZA-71",
+  "type": "História",
+  "priority": "Medium",
+  "labels": []
+ },
+ "REALIZA-81": {
+  "summary": "Receber inscrições de mentores e mentorados na plataforma",
+  "description": "**Como** coordenadora,\n**quero** receber as inscrições de mentores e mentorados por formulários dentro da plataforma (com upload de documentos e grade de disponibilidade),\n**pra** parar de depender do Google Forms e de importação manual.\n\n### O que se espera\n\n* Form de mentores (\\~26 campos) e de mentorados (17 campos) replicados fielmente aos oficiais\n* Tipos de campo novos: upload de arquivo, grade de disponibilidade (dias × horários), seções, pergunta condicional, opção \"Outro\" livre\n* Respostas aparecem em visualização de grade tipo planilha — familiar pra quem veio do Sheets\n* Decisão de transição: intake nativo, híbrido (Sheets→import) ou manter Forms\n\n### Cobre (itens técnicos)\n\nREALIZA-36, REALIZA-70, REALIZA-69, REALIZA-58, REALIZA-49",
+  "type": "História",
+  "priority": "Medium",
+  "labels": []
+ },
+ "REALIZA-124": {
+  "summary": "[IA] Chatbot público — leitura + RAG dos guias (fase 1)",
+  "description": "Drawer/página no app, acessível a todos os papéis com escopo do próprio perfil via JWT. Tools de leitura (resumo_semana, ficha_dupla, registros estruturados, aguardando_par, capacidade, pendencias_docs, instrumentos) + guia_consulta (RAG pgvector sobre os guias oficiais — zero PII, com citação de fonte). Tutoriais com deep-links. Escritas = card de confirmação (fase 3). Provider: API do opencode (requisito: retenção zero/DPA). Transcript não persiste por default — ia_eventos guarda a ação.",
+  "type": "Tarefa",
+  "priority": "Medium",
+  "labels": []
+ },
+ "REALIZA-125": {
+  "summary": "[IA] MCP server coord-only em /api/mcp (fase 2)",
+  "description": "Route handler Next stateless (Streamable HTTP). Auth = identidade real: OAuth Supabase ou PAT gerada no /perfil (revogável, último_uso_em). Gate my_role()='coordenacao' no handshake; expandir papel por papel depois. Read-only na fase inicial — mesmas tools do registry (fase 0), dois transportes. Decisão do Thiago: MCP só coord por ora.",
+  "type": "Tarefa",
+  "priority": "Medium",
+  "labels": []
+ },
+ "REALIZA-126": {
+  "summary": "[IA] Escritas com confirmação nos dois canais (fase 3)",
+  "description": "Tools de escrita delegando pras mesmas RPCs da UI: registrar_interacao, marcar_situacao_mentorado, emitir_link_instrumento, agendar_encontro (banco recusa coord — guard 'a dupla agenda' preservado), editar_campo_pessoa (allowlist curta: whatsapp, nome_social, obs interna). Confirmação explícita: card no chat / approve do client MCP. Nunca write silencioso.",
+  "type": "Tarefa",
+  "priority": "Medium",
+  "labels": []
+ },
+ "REALIZA-137": {
+  "summary": "Rodada de mockups: 3 variantes por tela afetada + juízes UX + relatório de decisão",
+  "description": "## Contexto\n\nAntes de implementar o redesign: **3 variantes materialmente diferentes por tela** — não 3 skins do mesmo layout. Juízes UX pontuam e a decisão sai do relatório. Plano: `docs/planos/ux-revisao-chamados.md` (seção mockups).\n\n## Escopo — Fase 1 (\\~15 mocks)\n\n| Tela | O que as variantes exploram |\n| --- | --- |\n| **Agenda (a mais rica)** | 3 direções de organização temporal: a) timeline semanal vertical tipo Google Cal · b) lista por-dupla com calendário compacto · c) cards por dia (hoje/amanhã/próximos). **Cada uma cobre o par de visões por papel**: mentor (\"Agenda do mentorado\" × \"Minha agenda\"), auxiliar executivo (\"Por turma\" × \"Consolidada\"), mentorado, coord, especialista — incluindo COMO se alterna entre as visões (tabs, seletor, vista dividida) |\n| Visão geral de duplas | categorias explicadas (subtitle vs. hover/popover vs. painel de legenda) |\n| Materiais (hub) | 3–4 cards grandes vs. grade por seção vs. trilha vertical |\n| Home do jovem + Especialistas | onde o catálogo mora + impacto na nav |\n| Fila de chamados + thread | lista vs. board por status vs. duas colunas; como a timeline de atualizações aparece |\n\nInstrumentos (metas com submetas recursivas, roda, forms-wizard) = Fase 2 ou variantes de componente. A árvore de submetas do Metas merece variantes próprias — é o componente mais delicado de UI.\n\n## Formato\n\n* HTML standalone em `docs/mockups/<tela>/v1..v3.html` — tokens do projeto (`--brand-lime` etc.), dados pt-BR realistas, desktop 1280 + mobile 390\n* Screenshots via Playwright nos dois tamanhos\n\n## Juízes\n\nAgentes UX pontuam: **clareza de hierarquia ×2, intuitividade ×2, densidade ×1, mobile ×1, marca ×1, acessibilidade ×1**. Por mock: notas, \"o que mudaria\", veredito. Relatório final: ranking por tela + ideias boas das perdedoras.\n\n## Aceite\n\n* \\~15 mocks + screenshots + relatório de decisão\n* Agenda mocka as duas visões E a alternância entre elas, por persona\n* Thiago aprova a vencedora de cada tela antes de virar implementação\n\n",
+  "type": "Tarefa",
+  "priority": "Medium",
+  "labels": []
+ },
+ "REALIZA-138": {
+  "summary": "Demo: switcher \"Alterar view\" (Agenda 1/2/3) — após decisão de mockups",
+  "description": "## Contexto\n\nPedido do Thiago: na `/demo` poder alternar entre organizações diferentes da agenda (\"Agenda 1 / 2 / 3\") pra comparar as variantes no produto real. Já existe padrão de cookie de demo (`demo_role`) — `demo_view` seguiria o mesmo caminho.\n\n## Escopo\n\n* Cookie `demo_view` + controle na `DemoBar` (\"Alterar view: Agenda 1 / 2 / 3\")\n* Cada view = organização diferente do MESMO dado (componentes ou layouts alternativos)\n\n## Decisão aberta (pergunta 11 do plano)\n\n* As 3 variantes viram modos reais mantidos no produto, ou o switcher expõe só durante a avaliação e depois só a vencedora fica? Se for temporário, o esforço de implementar 3 views reais pode ser alto demais — alternativa: os HTMLs do mockup já servem pra comparar e o switcher só entra se a decisão for manter os modos.\n\n## Dependências\n\n* REALIZA-137 (rodada de mockups) + decisão sobre modos reais\n\n## Aceite\n\n* Se modos reais: troca de view sem reload de dados, persiste por cookie, dataset demo cobre as 3\n\n",
+  "type": "Tarefa",
+  "priority": "Medium",
+  "labels": []
+ },
+ "REALIZA-140": {
+  "summary": "Materiais: \"Minha jornada\" — estações narrativas com data real + citação do jovem (anamnese fora)",
+  "description": "## Contexto\n\nO stakeholder escolheu a v3 narrativa: \"Minha jornada\" — estações por fase/encontro com a entrega como **recibo** (data real + citação \"você escreveu…\"). A \"estante\" virou a alternativa rejeitada: portais abstratos de armário de arquivo vs. eixo cronológico que o jovem entende como vida dele. Anamnese sai (fica em sistema externo — doc Novos Sistemas + decisão). **Avaliação por terceiros também sai** (decisão: o fluxo é todo do mentor fora da plataforma — não vira estação).\n\n## Escopo\n\n* **7 estações canônicas** derivadas do guia/`ciclo_eventos` (nunca do mock): Roda inicial (onboarding, leitura enc.1) → Visão (enc.1–2) → Metas (enc.2–3) → PDM vivo (enc.1–4, revisão \\~enc.9) → avaliação do encontro (recorrente) → Roda formal (enc.12–14) → 360º (**última atividade** — enc.16/mês 6, terminal)\n* **Estação = estado + data real + 1 ação honesta**: a fazer / em andamento (rascunho localStorage, só esse dispositivo) / feito (data + citação \"você escreveu…\") / bloqueado até encontro / aguardando coord. **Jovem nunca emite link** — texto diz \"seu mentor envia quando chegar a hora\". Na avaliação do encontro o toggle \"você escolhe se o André lê\" permanece — sem banner genérico \"Quem vê\" (era material de demo, não produto)\n* **Futuras dentro de** `<details>` com nomes+datas no summary — a jornada inteira visível sem scroll infinito\n* **Links sem expiração** (verificado: `emitir_link_instrumento` já nasce nulo — garantir que os 4 sistemas não passem por `gerarLinksFormulario` genérico)\n* **Acervo abaixo** intacto (docs oficiais, \"em breve\" real pra sem conteúdo); âncora/sub-nav pra não perder o acervo no fim da página\n* **Painel coord em** `/materiais`: progresso por instrumento×turma; auxiliar e coord leem o conteúdo dos instrumentos das duplas dele (D1 — `instrumentos_da_dupla` já devolve `respostas` ao `supervisor_id`, nenhuma projeção extra)\n\n## Aceite\n\n* Ana (enc.8) e Caio (enc.5) veem estados diferentes e coerentes com o guia\n* Jovem abre instrumento pendente em 1 toque — nunca botão que emite link\n* Nenhuma estação inventada (autoavaliação é do mentor, enc.16 — não do jovem; \"PDM construído no enc.6\" não existe)\n* Anamnese e avaliação por terceiros não aparecem\n* Mobile-first: estações empilham, details recolhe futuro, citação legível a 200% zoom\n* Demo: jovem com estações em estados variados + acervo\n\n## Dependências\n\n* Fixture e2e auxiliar (hoje não existe supervisor/auxiliar com auth)\n\n",
+  "type": "Tarefa",
+  "priority": "Medium",
+  "labels": []
+ },
+ "REALIZA-141": {
+  "summary": "Metas: reordenação = prioridade (persiste `meta_ordem`), remover `meta_principal` e sim/não finais",
+  "description": "## Contexto\n\nNo instrumento de metas, a posição já diz qual é mais importante — `meta_principal` é redundante e sai. Reordenar = repriorizar. As perguntas finais de sim/não (`rev_ajudam`, `rev_importantes`, `rev_claras`) viram texto-guia. Plano: `docs/planos/ux-revisao-chamados.md` (frente G1).\n\n## Escopo\n\n* Reordenação das metas (drag-and-drop ou ↑↓ — decidir no mockup; mobile precisa funcionar)\n* Persistir ordem como `meta_ordem` no JSONB — sem mexer nas chaves `meta_N`/`porque_N`\n* Remover `meta_principal` — UI mostra \"Meta 1 · a mais importante\" pela posição\n* Remover `rev_ajudam`, `rev_importantes`, `rev_claras` — o conteúdo vira copy de orientação\n* **Limite de metas: até \\~10** (decidido com a coord — alinhado à duração do programa; \"não adianta 20 metas em 3 meses\"). O form deixa de permitir meta_N infinito\n* `instrumento-resultado` renderiza na ordem persistida com hierarquia de prioridade\n\n## Aceite\n\n* Jovem reordena e persiste entre sessões/rascunho\n* Respostas antigas (com `meta_principal`/`rev_*`) continuam lendo sem quebrar\n* Copy pt-BR deixa claro \"a primeira é a mais importante\"\n* Tentar criar a 11ª meta → bloqueio com mensagem amigável\n\n## Dependências\n\n* Mesma tela da REALIZA-142 (submetas) — entregar juntas ou sequenciadas\n\n",
+  "type": "Tarefa",
+  "priority": "Medium",
+  "labels": []
+ },
+ "REALIZA-142": {
+  "summary": "Metas: submetas recursivas (~20 total), prazo_alvo + atingida_em, retrospectiva de encerramento",
+  "description": "## Contexto\n\nMetas viram instrumento de acompanhamento. Revisto no alinhamento (Kelyng, out/2026): submetas são **cascateadas** — \"pelo documento guia, uma submeta pode ter submetas\" (o caso real: o Daniel tem mais de 5 por meta). Plano: `docs/planos/ux-revisao-chamados.md` (frente G1).\n\n## Escopo\n\n* **Submetas recursivas**: submeta pode ter submeta, em qualquer profundidade — **\\~20 submetas no total por ficha** (limite flexível decidido). Nada de lista flat de 5.\n* **Modelo de dados**: a estrutura natural é a recursiva que `docs/planos/atividades-interativas.md` já propõe pro PDM — `pdm_itens` com `parent_id`. **Mesma estrutura pros dois instrumentos** — resolve a dúvida \"transcreve ou compartilha?\" a favor de compartilhar: as submetas do Metas e do PDM são o mesmo dado.\n* **UI é o ponto delicado**: árvore aninhada tem que ficar simples — indentação leve, collapse, \"adicionar dentro desta\", sem vira-lâmina de níveis. Variantes próprias na rodada de mockups.\n* **Duas datas por meta**: `prazo_alvo` + `atingida_em`; checkbox \"meta atingida\" → revela \"quando?\"\n* **Retrospectiva**: metas atingidas entram no resumo de encerramento\n* `instrumento-resultado` mostra árvore, prioridade, prazo vs. atingimento\n\n## Decisões abertas\n\n* Metas atingidas na retrospectiva: automático ou o jovem revisita antes?\n* Profundidade visual: limitar a exibição a N níveis com \"ver mais\" ou renderizar tudo?\n\n## Aceite\n\n* Jovem cria submeta dentro de submeta (sub-sub) sem se perder\n* Limite total de \\~20 submetas respeitado com feedback claro\n* Encerramento mostra metas atingidas com datas\n* Respostas antigas renderizam ok\n\n## Dependências\n\n* REALIZA-141 (reorder) — mesma tela\n* Se `pdm_itens` virar tabela real (plano atividades-interativas), esta task amarra Metas↔PDM no mesmo modelo\n\n",
+  "type": "Tarefa",
+  "priority": "Medium",
+  "labels": []
+ },
+ "REALIZA-143": {
+  "summary": "Roda da Vida: layout visual — labels de área no desktop, título separado, controles verdes",
+  "description": "## Contexto\n\nParte já foi feita (PR #50: nav verde, título acima, indicador de volta) — esta task cobre o que a reunião pediu a mais. Plano: `docs/planos/ux-revisao-chamados.md` (frente G2).\n\n## Escopo\n\n* **Desktop**: mostrar todos os 16 rótulos de área ao mesmo tempo, como no PDF oficial — a roda deixa de ser um eixo por vez só; pensar em roda SVG com labels ao redor ou grade de sliders em 2 colunas (decidir no mockup)\n* **Mobile**: mantém experiência focada (um eixo por vez / lista)\n* Título em fundo branco separado dos controles\n* Linha própria de navegação: setas anterior/próximo **acima** dos controles −/+\n* − / + / setas = verdes (tokens da marca, setas em ink) — são as ações primárias\n* Escalonamento responsivo da roda — hoje deve ter pontos de quebra em telas médias\n\n## Aceite\n\n* No desktop o respondente vê o mapa completo (16 áreas) como no PDF, sem perder a capacidade de ajustar cada eixo\n* Mobile não piora — continua navegável por eixo\n* Sem regressão no payload da resposta nem no `instrumento-resultado`\n\n## Dependências\n\n* Rodada de mockups (REALIZA-137) — Fase 2, variante de componente\n\n",
+  "type": "Tarefa",
+  "priority": "Medium",
+  "labels": []
+ },
+ "REALIZA-144": {
+  "summary": "Forms: experiência em seções/wizard com progresso e transições (instrumentos de jornada primeiro)",
+  "description": "## Contexto\n\nInstrumentos hoje são um formulário único de scroll — cara de form básico. Pedido: cara de site, em seções/etapas com progresso visível e transições animadas, tipo o wizard de onboarding do jovem. `motion/react` já está no projeto. Plano: `docs/planos/ux-revisao-chamados.md` (frente G3).\n\n## Escopo\n\n* Instrumentos de jornada primeiro (os respondidos em `/f/[token]` que já agrupam seções via `agrupaEmSecoes`): anamnese, metas, PDM, roda\n* Uma seção por vez (wizard com voltar/avançar) **ou** scroll animado por seção — decidir com mockup; progresso visível (ex.: \"seção 2 de 5\" + barra)\n* Transições suaves entre seções, feedback de validação por seção (não só no submit)\n* **Preservar**: payload da resposta, rascunho/draft, token público sem login — só muda a apresentação\n* Validar por seção sem bloquear navegação de volta\n\n## Decisões abertas\n\n* Wizard tradicional vs. scroll animado (pergunta 13)\n* Escopo: só instrumentos de jornada ou estende pro builder genérico da coord (`/formularios`)? — começar restrito, avaliar extensão\n\n## Aceite\n\n* Responder um instrumento parece fluxo de produto, não form genérico\n* Funciona bem no mobile (prioridade — jovem responde pelo celular)\n* Nenhuma resposta/rascunho existente quebra\n\n## Dependências\n\n* Rodada de mockups (REALIZA-137) — Fase 2\n\n",
+  "type": "Tarefa",
+  "priority": "Medium",
+  "labels": []
+ },
+ "REALIZA-147": {
+  "summary": "Trilha: avaliação geral final do especialista ao encerrar (guia-esp §12) — backlog",
+  "description": "## Contexto\n\nGuia do especialista §12: ao encerrar a trilha, o especialista faz uma **avaliação geral final** — separada do registro por sessão e da devolutiva ao mentor DPP. Hoje não existe no schema. Registrado como backlog na rodada de telas (`docs/planos/implementacao-telas-finais.md` §8 + `BACKLOG.md`).\n\n## Direção provável\n\n* Form sistêmico (`formularios` com `sistema=true`) + trigger em `encerrar_trilha_especialista` que gera o link pro especialista no encerramento\n* Resposta chega ao jovem/mentor DPP na mesma superfície das devolutivas (feed por trilha — REALIZA-139)\n* Relaciona com o feed de devolutivas: a avaliação geral pode ser a última entrada do feed ou instrumento separado — decidir na implementação\n\n## Aceite\n\n* Encerrar a trilha dispara a avaliação geral pro especialista\n* Jovem/mentor DPP veem o resultado na página da trilha\n* Não bloqueia o encerramento se o especialista não responder (lembrete honesto)\n\n",
+  "type": "Tarefa",
+  "priority": "Medium",
+  "labels": []
+ },
+ "REALIZA-152": {
+  "summary": "Materiais de acompanhamento dinâmicos no Acervo da jovem — por cronograma + jornada",
+  "description": "h3. Problema\n\nHoje a coordenação ou o mentor precisa gerar manualmente os links dos materiais de acompanhamento pro jovem — atrito alto e desnecessário: o cronograma oficial e os guias semanais já dizem **quando** cada material é necessário.\n\nh3. Comportamento desejado\n\nMateriais disponíveis **automática e dinamicamente** em `/jovem/materiais` (Acervo), guiados por duas fontes:\n\n1. **Cronograma oficial / guias semanais** — cada encontro do guia do programa declara seus instrumentos/materiais. Ex.: semana 1 exige **Roda da Vida** obrigatoriamente → ela fica disponível _antes mesmo do programa começar oficialmente_; semana 3 = \"Definindo minhas metas\" → fica desabilitado até a semana 3\n2. **Registros do mentor** — alternativa ou complemento do gate por data: material libera quando o mentor registra o encontro anterior (ex.: metas libera ao registrar o encontro 2)\n\nEstados por item: `disponível` / `bloqueado` (com hint \"libera no encontro N\" ou \"libera quando o mentor registrar o encontro N\") / `respondido`.\n\nh3. Critérios de aceite\n\n* Nenhum passo manual de \"gerar link\" pro material oficial do guia\n* Roda da Vida acessível desde o onboarding do jovem\n* Materiais futuros visíveis mas bloqueados com indicação de quando liberam\n* Funciona com o gate de dupla fechada (0097): dupla encerrada → não emite, só leitura\n\nh3. Contexto\n\n`src/app/(jovem)/jovem/materiais/page.tsx`, `src/components/.../InstrumentosDupla`, tabela `materiais` + `ciclo_eventos`, `encontros`. Feedback de uso real — prioridade alta: reduz atrito recorrente de TODA dupla.",
+  "type": "Tarefa",
+  "priority": "Medium",
+  "labels": []
+ },
+ "REALIZA-153": {
+  "summary": "Ficha da dupla: remanejo sugestivo vira dropdown recolhido",
+  "description": "Seção de remanejo sugestivo na ficha da dupla ocupa espaço demais — vira dropdown recolhido.",
+  "type": "Tarefa",
+  "priority": "Medium",
+  "labels": []
+ },
+ "REALIZA-154": {
+  "summary": "Ficha da dupla: ocultar seção Combinados quando vazia",
+  "description": "Seção Combinados aparece vazia — esconder quando não há itens.",
+  "type": "Tarefa",
+  "priority": "Medium",
+  "labels": []
+ },
+ "REALIZA-157": {
+  "summary": "Ficha da dupla: menu \"Mais\" com itens desalinhados (não-fill)",
+  "description": "Menu \"Mais\" da ficha da dupla renderiza itens desalinhados — itens devem preencher a largura do dropdown.",
+  "type": "Tarefa",
+  "priority": "Medium",
+  "labels": []
+ },
+ "REALIZA-28": {
+  "summary": "Spec de agendamento da ata: bolinha laranja→verde + popup + painel lateral por estado",
+  "description": "Decidido na ata (Novos sistemas Realiza.pdf):\n\n* Marcador oficial **laranja** com legenda \"Encontro pendente de agendamento\"\n* Clique no marcador → popup com nº do encontro, data, horário, link da chamada\n* Confirmar → marcador vira **verde** na data escolhida\n* Células **verde-pastel** onde mentor+mentorado têm `disponibilidade` em comum\n* Painel lateral por estado: pendente → info/materiais + \"Agendar\"; agendado → \"Remarcar\" + \"Entrar na chamada\" + \"Editar link\" + \"Registrar como foi\" + indicador de avaliação pendente\n* Visão estilo Google Calendar discutida, não decidida\n\n**Ressalva nossa:** clicar na bolinha infere o nº da data oficial — o caso Daniel (encontro atrasado caindo em semana com 2 oficiais) fica ambíguo; popup deve deixar o nº corrigível.\n\nFonte: `docs/analise-transcricao-mentor.md` + `docs/planos/_contexto.md`\n\n---\n\nMigrado do Linear: REALIZA-5 — https://linear.app/realizavc/issue/REALIZA-5/spec-de-agendamento-da-ata-bolinha-laranjaverde-popup-painel-lateral",
+  "type": "Feature",
+  "priority": "High",
+  "labels": []
+ },
+ "REALIZA-30": {
+  "summary": "Modelo de eventos do cronograma: tipo + fase metodológica + dia variável + regras",
+  "description": "Os PDFs reais mostram evento não é só \"encontro N na terça\":\n\n* `tipo`: `etapa_preparacao` (inscrições, triagem/matching, onboarding mentores/mentorados, início) | `encontro` (numerado 1–16) | `recesso` | `evento_encerramento`\n* `fase` metodológica no encontro (1–6; fase 5 = Roda da Vida, enc. 12–14) — instrumento deriva da fase\n* **Dia da semana variável** — T2 tem quintas duplas (05/11, 03/12, 10/12); nada hardcoded a terça\n* `observacao`/regras por etapa; regra \"reposição na mesma semana\"; feriados com nota municipal\n* Etapa pode ser **status** (\"Concluídos\" — triagem/matching feito pela ONG parceira), não só data\n\nFonte: `_contexto.md` § Cronogramas reais. Complementa THI-9.\n\n---\n\nMigrado do Linear: REALIZA-47 — https://linear.app/realizavc/issue/REALIZA-47/modelo-de-eventos-do-cronograma-tipo-fase-metodologica-dia-variavel",
+  "type": "Tarefa",
+  "priority": "High",
+  "labels": []
+ },
+ "REALIZA-31": {
+  "summary": "Cadastrar Turma 1 + Turma 2 reais (ciclo 2026/2027) com cronogramas dos PDFs",
+  "description": "**Urgente:** Turma 2 inicia **06/10/2026**. Dados dos PDFs oficiais (`~/Downloads`, transcritos em `_contexto.md` § Cronogramas reais):\n\n**Turma 1** (13 duplas): início 08/09, terças, intervalo 15d enc. 8º–9º, recesso 16/12–04/01, último 12/01.\n\n**Turma 2** (17 duplas, ONG Cidadão Pró-Mundo): início 06/10, terças + quintas duplas 05/11 · 03/12 · 10/12; **duplas pré-formadas pela ONG** (matching externo); mesmo recesso; encerramento compartilhado 15/01 c/ T1.\n\nDepende de THI-9 (entidade cronograma). Cadastro manual/scriptado primeiro; o upload (issue de criação por upload) cobre as próximas turmas.\n\n---\n\nMigrado do Linear: REALIZA-46 — https://linear.app/realizavc/issue/REALIZA-46/cadastrar-turma-1-turma-2-reais-ciclo-20262027-com-cronogramas-dos",
+  "type": "Tarefa",
+  "priority": "Highest",
+  "labels": []
+ },
+ "REALIZA-32": {
+  "summary": "Auxiliar por turma: escopo de leitura/escrita (RLS por turma, não por dupla)",
+  "description": "**Decisão (Thiago, 03/out/2026):** coordenação é **global**; **supervisor/auxiliar é por turma**.\n\nHoje `duplas.supervisor_id` ancora por dupla. Modelo novo: auxiliar designado à turma (via `turma_membros` ou `turmas.auxiliar_id`) — enxerga as duplas da turma. Implica RLS (`my_role()`/`my_profile_id()` + policies de leitura por turma).\n\n**Sub-pergunta em aberto:** auxiliar vê TODAS as duplas da turma ou só as designadas pela coord?\n\nRelacionada: THI-16 (rename), F4 membership no plano `turmas-cronogramas.md`.\n\n---\n\nMigrado do Linear: REALIZA-55 — https://linear.app/realizavc/issue/REALIZA-55/auxiliar-por-turma-escopo-de-leituraescrita-rls-por-turma-nao-por",
+  "type": "Tarefa",
+  "priority": "High",
+  "labels": []
+ },
+ "REALIZA-33": {
+  "summary": "Revisão LGPD estrutural: inventário de dados sensíveis + visibilidade + retenção",
+  "description": "Dados sensíveis de menores entrando na plataforma (PDM, Roda da Vida, dados civis, documentos) exigem revisão estruturada — antes era tudo no Drive/Docs da org.\n\nEscopo:\n\n* Inventário de dados sensíveis por tabela (Art. 11 LGPD: saúde, família, espiritualidade na Roda; dados civis em `dados_civis`)\n* Visibilidade: coord vê PDM/Roda? (recomendação registrada: só status/progresso)\n* Base legal + consentimento: termo do responsável cobre processamento na plataforma?\n* Retenção/anonimização pós-ciclo\n* Parecer jurídico como gate pra qualquer processamento novo (IA em texto livre, THI-32)\n\nFonte: decisões 03/out + `AGENTS.md`\n\n---\n\nMigrado do Linear: REALIZA-51 — https://linear.app/realizavc/issue/REALIZA-51/revisao-lgpd-estrutural-inventario-de-dados-sensiveis-visibilidade",
+  "type": "Tarefa",
+  "priority": "High",
+  "labels": []
+ },
+ "REALIZA-34": {
+  "summary": "Criar turma via upload de cronograma (PDF/planilha → normalização → revisão → persist)",
+  "description": "**Decisão (Thiago, 03/out/2026):** coord cria turma nova **upando o cronograma** — normalizado, robusto, multi-formato.\n\nFluxo: upload (PDF/planilha/docx/imagem) → extração → **normalização** → tela de revisão/editável → persiste `turma` + `cronograma` + `ciclo_eventos`.\n\nNormalização em camadas:\n\n1. Parser determinístico por formato (pdftotext/tabula, xlsx, docx)\n2. **Gemini API como fallback/normalizador** (autorizado por Thiago) — extrai o schema canônico de qualquer layout\n3. Revisão humana obrigatória antes de gravar (SLC: nunca gravar parse cego)\n\nSchema canônico alvo (visto nos 2 PDFs reais): etapas de preparação (nome, data/período, obs), encontros numerados (data, fase metodológica, dia-da-semana variável), recesso, evento de encerramento, observações/regras.\n\nRelacionada: THI-11 (wizard manual vira edição/criação do zero, caminho secundário). Depende de THI-9 + modelo de eventos (nova issue de schema).\n\n---\n\nMigrado do Linear: REALIZA-45 — https://linear.app/realizavc/issue/REALIZA-45/criar-turma-via-upload-de-cronograma-pdfplanilha-normalizacao-revisao",
+  "type": "Feature",
+  "priority": "High",
+  "labels": []
+ },
+ "REALIZA-35": {
+  "summary": "Primeiro acesso: copy de identidade do magic link + deliverability Hotmail/Outlook",
+  "description": "Primeiro acesso hoje entra sem a pessoa saber como quem. Copy precisa mostrar **qual identidade** o link abre (nome/papel) + instrução se o e-mail não estiver pré-cadastrado. Hotmail/Outlook filtram agressivamente (doc do Léo caiu em arquivo morto) — tratar remetente/deliverability.\n\nFonte: `docs/analise-transcricao-mentor.md`\n\n---\n\nMigrado do Linear: REALIZA-35 — https://linear.app/realizavc/issue/REALIZA-35/primeiro-acesso-copy-de-identidade-do-magic-link-deliverability",
+  "type": "Bug",
+  "priority": "High",
+  "labels": []
+ },
+ "REALIZA-36": {
+  "summary": "Forms engine: +5 tipos (arquivo, grid disponibilidade, seção, condicional, outro-livre)",
+  "description": "Gap exato vs. forms oficiais (verbatim em `docs/planos/forms-google-mapeamento.md`):\n\n* `arquivo` — upload 1 arq ≤10MB → bucket c/ signed URL\n* `grid_disponibilidade` — checkbox-grid hora×dia (Seg–Sex × 09h–20h)\n* `secao` — page-break/seção nomeada\n* `visible_if` — campo condicional\n* `select` com **\"Outro:\"** de texto livre\n\nSem isso, o intake não vira nativo.\n\n---\n\nMigrado do Linear: REALIZA-24 — https://linear.app/realizavc/issue/REALIZA-24/forms-engine-5-tipos-arquivo-grid-disponibilidade-secao-condicional",
+  "type": "Feature",
+  "priority": "High",
+  "labels": []
+ },
+ "REALIZA-37": {
+  "summary": "ViaCEP no cadastro de endereço",
+  "description": "CEP auto-preenche rua + cidade + UF (pedido da ata, ampliado: era só cidade/UF). Reduz fricção no cadastro civil.\n\nFonte: `docs/analise-transcricao-mentor.md`\n\n---\n\nMigrado do Linear: REALIZA-36 — https://linear.app/realizavc/issue/REALIZA-36/viacep-no-cadastro-de-endereco",
+  "type": "Tarefa",
+  "priority": "Low",
+  "labels": []
+ },
+ "REALIZA-38": {
+  "summary": "Perfil canônico rico: endereço completo + máximo de dados na pessoa (migrações futuras)",
+  "description": "**Decisão (Thiago, 03/out/2026):** endereço completo vai no **cadastro** — princípio: reunir o **máximo de dados no perfil canônico da pessoa** pra facilitar migrações futuras.\n\nImplicações:\n\n* `dados_civis` (coord-only) absorve endereço completo + documentos; termos/consentimento leem do perfil, não pedem de novo\n* Intake nativo (matching) já preenche o canônico — import de CSV/Sheets idem\n* ViaCEP (THI-36) compõe o campo\n\nFonte: `_contexto.md` § Decisões 3ª rodada\n\n---\n\nMigrado do Linear: REALIZA-64 — https://linear.app/realizavc/issue/REALIZA-64/perfil-canonico-rico-endereco-completo-maximo-de-dados-na-pessoa",
+  "type": "Tarefa",
+  "priority": "Medium",
+  "labels": []
+ },
+ "REALIZA-61": {
+  "summary": "Copy em voz do mentor nos CTAs de encontro (\"Como vai o encontro?\", \"Sem registros\")",
+  "description": "CTA \"Como vai o encontro?\" e card \"Sem registros\" — escrito pra **voz de quem executa** (mentor), não de quem só lê (coord). Fonte: `docs/analise-transcricao-mentor.md`\n\n---\n\nMigrado do Linear: REALIZA-43 — https://linear.app/realizavc/issue/REALIZA-43/copy-em-voz-do-mentor-nos-ctas-de-encontro-como-vai-o-encontro-sem",
+  "type": "Tarefa",
+  "priority": "Low",
+  "labels": []
+ },
+ "REALIZA-62": {
+  "summary": "Nudge com prazo preenchido (não \"a partir de —\")",
+  "description": "Nudge mostra \"a partir de —\" quando sem prazo — precisa de placeholder explicado (ex: \"sem prazo definido\"). Fonte: `docs/analise-transcricao-mentor.md`\n\n---\n\nMigrado do Linear: REALIZA-42 — https://linear.app/realizavc/issue/REALIZA-42/nudge-com-prazo-preenchido-nao-a-partir-de",
+  "type": "Tarefa",
+  "priority": "Medium",
+  "labels": []
+ },
+ "REALIZA-63": {
+  "summary": "Backlog: encerramento de ciclo + checklist + trilha mentor_especialista",
+  "description": "Pendente do AGENTS.md: encerramento (checklist, consentimento final, instrumento `sistema=true` Anamnese/360/Autoavaliação, link público responsável), `mentor_especialista`, matching fields + grid disponibilidade no matching, assinatura eletrônica, presença em formação, supervisão.\n\nFonte: `AGENTS.md`\n\n---\n\nMigrado do Linear: REALIZA-41 — https://linear.app/realizavc/issue/REALIZA-41/backlog-encerramento-de-ciclo-checklist-trilha-mentor-especialista",
+  "type": "Feature",
+  "priority": "Medium",
+  "labels": []
+ },
+ "REALIZA-64": {
+  "summary": "Copy de identidade em links tokenizados (mentorado sabe quem é/onde está)",
+  "description": "O token de link público precisa deixar claro **quem sou eu** ao abrir (nome da dupla, \"você é o mentorado\"), o que acontece se clicar em link alheio, e estado de expiração. Vale pra `/f/[token]`, `/assinar/[token]`, futuros `atividade_links`.\n\nFonte: `docs/analise-transcricao-mentor.md`\n\n---\n\nMigrado do Linear: REALIZA-40 — https://linear.app/realizavc/issue/REALIZA-40/copy-de-identidade-em-links-tokenizados-mentorado-sabe-quem-eonde-esta",
+  "type": "Tarefa",
+  "priority": "Medium",
+  "labels": []
+ },
+ "REALIZA-65": {
+  "summary": "DECISÃO: offload de arquivos frios pro Google Drive 6TB",
+  "description": "Decisão da ata: Drive 6 TB nonprofit pra arquivos frios, Supabase só pro que alimenta dados/IA. Precisa decidir quando ativar (Shared Drive ainda não existe na conta) e o que migra vs. fica.\n\nFonte: ata + `docs/planos/forms-google-mapeamento.md`\n\n---\n\nMigrado do Linear: REALIZA-38 — https://linear.app/realizavc/issue/REALIZA-38/decisao-offload-de-arquivos-frios-pro-google-drive-6tb",
+  "type": "Tarefa",
+  "priority": "Medium",
+  "labels": []
+ },
+ "REALIZA-66": {
+  "summary": "Upload: limite de tamanho + compressão client-side de imagem nas evidências",
+  "description": "Supabase free: 1 GB storage, max 50MB/arquivo. Evidência de câmera moderna = 3–8MB cada; ciclo com \\~50 duplas × 16 encontros estoura. Comprimir no client (canvas→webp \\~200KB) + cap explícito + hint de tamanho.\n\nFonte: `docs/analise-transcricao-mentor.md`\n\n---\n\nMigrado do Linear: REALIZA-37 — https://linear.app/realizavc/issue/REALIZA-37/upload-limite-de-tamanho-compressao-client-side-de-imagem-nas",
+  "type": "Tarefa",
+  "priority": "Medium",
+  "labels": []
+ },
+ "REALIZA-67": {
+  "summary": "DECISÃO: devolução do mentor sobre atividade entregue entra no MVP do editor?",
+  "description": "Se o mentorado devolve com correções/comentário — isso entra no MVP do editor ou fica pra v2? Afeta o ciclo de estados do `atividade_links` (enviado→revisado→devolvido).\n\nFonte: `docs/planos/editor-pdf.md`\n\n---\n\nMigrado do Linear: REALIZA-34 — https://linear.app/realizavc/issue/REALIZA-34/decisao-devolucao-do-mentor-sobre-atividade-entregue-entra-no-mvp-do",
+  "type": "Tarefa",
+  "priority": "Low",
+  "labels": []
+ },
+ "REALIZA-68": {
+  "summary": "Exports CSV por tipo (encontros, atividades, matching, presenças)",
+  "description": "Estender `/api/export?tipo=` existente: encontros, atividades, matching, presenças — CSV `;` + BOM + proteção de fórmula, filtrado por turma/cronograma (depende do F1).\n\nFonte: `docs/planos/relatorios-inteligencia.md`\n\n---\n\nMigrado do Linear: REALIZA-29 — https://linear.app/realizavc/issue/REALIZA-29/exports-csv-por-tipo-encontros-atividades-matching-presencas",
+  "type": "Feature",
+  "priority": "Medium",
+  "labels": []
+ },
+ "REALIZA-69": {
+  "summary": "Template nativo: \"Matching de Mentorados\" (intake)",
+  "description": "Versão leve (17 campos): dados pessoais, trajetória, contato, mentoria, CV. Sem grid disponibilidade/foto/documentos (fricção menor pro público jovem). Depende do THI-24.\n\nVerbatim em `docs/planos/forms-google-mapeamento.md`\n\n---\n\nMigrado do Linear: REALIZA-26 — https://linear.app/realizavc/issue/REALIZA-26/template-nativo-matching-de-mentorados-intake",
+  "type": "Feature",
+  "priority": "Medium",
+  "labels": []
+ },
+ "REALIZA-70": {
+  "summary": "Template nativo: \"Matching de Mentores\" (intake)",
+  "description": "Template nativo replicando o form oficial (\\~26 campos, 5 seções): dados pessoais, trajetória, trabalho, mentoria (Erlich/experiência), grid disponibilidade, comprovantes. Depende do THI-24 (tipos novos).\n\nVerbatim em `docs/planos/forms-google-mapeamento.md`\n\n---\n\nMigrado do Linear: REALIZA-25 — https://linear.app/realizavc/issue/REALIZA-25/template-nativo-matching-de-mentores-intake",
+  "type": "Feature",
+  "priority": "Medium",
+  "labels": []
+ },
+ "REALIZA-166": {
+  "summary": "E2E app no pipeline: push + nightly + check obrigatório",
+  "description": "Rodar suite e2e-app em push + nightly; tornar check obrigatório antes de merge. Hoje e2e-preview sai skipped pelo Ignored Build Step da Vercel; gate real é tsc/eslint/vitest + validadores REST. Decisão dos agents: Playwright contra staging real (fixtures seed-e2e + seed-demo), spec demo em prod nightly já existe — estender app.",
+  "type": "Tarefa",
+  "priority": "Medium",
+  "labels": []
+ },
+ "REALIZA-167": {
+  "summary": "Parametrizar turma/ciclo (T2→T3): resumo_links + turma_inscricoes",
+  "description": "Turma nova hoje = migration + código (FILA_T2, RESUMO_SLUG_T2, cronogramas, seeds hardcoded T2). Escopo mínimo sem refactor de ciclos: resumo_links (slug por turma, gerável/revocável — base da 170) + turma_inscricoes (quem pertence a qual turma pra papel/escopo). Modelo completo Programa→Turma→Cronograma fica pra 47 — aqui é o degrau mínimo pra T3 não ser código.",
+  "type": "Tarefa",
+  "priority": "Medium",
+  "labels": []
+ },
+ "REALIZA-168": {
+  "summary": "Migrar import semanal Google Form → RegistroForm nativo",
+  "description": "Import CSV semanal virou rotina manual. Migrar o intake semanal pro RegistroForm nativo: mentores respondem dentro da plataforma (link ou logado). `registros` já é a versão nativa fiel do form semanal — falta o canal de entrada pelo mentor + lembrete. Fecha o Google Form depois.",
+  "type": "Tarefa",
+  "priority": "Medium",
+  "labels": []
+ },
+ "REALIZA-169": {
+  "summary": "Lembretes de prazo da trilha especialista (pg_cron)",
+  "description": "Trilha esp tem prazo de 3 meses com badge urgente/vencido, mas ninguém é avisado. pg_cron diário → notificações fire-once (esp 15d/7d/vencido, coord no vencido). Sem auto-close — o rito de fechamento continua humano (encerrar_trilha_especialista + §13).",
+  "type": "Tarefa",
+  "priority": "Medium",
+  "labels": []
+ },
+ "REALIZA-170": {
+  "summary": "Relatórios públicos com senha — links revogáveis configurados pelos filtros do export CSV",
+  "description": "Direção do Thiago: /resumo vira relatório público com senha, não só por turma — coord monta o recorte pelos mesmos filtros do export CSV e compartilha link+senha. relatorio_links: slug + senha_hash + config jsonb (tipo/filtros/granularidade/colunas) + revogação + expiração + criado_por. Rate limit na senha. UI coord pra gerir. /resumo/[slug] lê relatorio_links — seed do atual. Auditoria via resumo_acessos (183).",
+  "type": "Tarefa",
+  "priority": "Medium",
+  "labels": []
+ },
+ "REALIZA-171": {
+  "summary": "Rematch esp não gera devolutiva_pdm do especialista que sai",
+  "description": "rematch_dupla encerra a dupla esp sem o especialista entregar devolutiva_pdm (a RPC não tem o campo; o §13 sai, mas a devolutiva pro PDM fica operacional). Fechar o rito: no rematch de trilha esp, emitir link §13 + devolutiva pro especialista que sai — mesma lógica do encerrar_trilha_especialista.",
+  "type": "Tarefa",
+  "priority": "Medium",
+  "labels": []
+ },
+ "REALIZA-172": {
+  "summary": "Débitos pequenos da revisão geral (7 itens)",
+  "description": "atribuido_nome morto no portal do jovem; getCicloEventos sem uso; agenda sem CTA de encerramento; /assinar/[token] sem faixa demo; dataset demo sem vínculo outra_pessoa; edição de evento esp apaga cronograma_id; card \"expirado\" de terceiros inalcançável na UI.",
+  "type": "Tarefa",
+  "priority": "Medium",
+  "labels": []
+ },
+ "REALIZA-173": {
+  "summary": "/materiais coord: virou catálogo com links automáticos — refactor",
+  "description": "A coord não manda mais links de materiais (disponíveis auto pelo cronograma) — a tela virou só catálogo com scroll pesado e copys redundantes. Redesenhar: hub compacto por seção/encontro, indicadores de cobertura (quais encontros têm material), ações de upload/contexto, sem repetição.",
+  "type": "Tarefa",
+  "priority": "Medium",
+  "labels": []
+ },
+ "REALIZA-174": {
+  "summary": "/duplas overview: compactar — linhas densas, footer morto, gráficos por tipo de dado",
+  "description": "Visão geral de duplas: densidade tabela (sem espaço entre linhas), sem footer quase vazio ao lado do botão WhatsApp, altura por dupla compacta, melhor agrupamento. Visualizações em gráficos otimizados por tipo de dado (semáforo=distribuição, encontros=linha do tempo, etc.).",
+  "type": "Tarefa",
+  "priority": "Medium",
+  "labels": []
+ },
+ "REALIZA-175": {
+  "summary": "/registros desktop: coluna única desperdiça — agrupar por dupla + modal filtro",
+  "description": "Uma coluna stackada de cards em desktop largo. Opções de agrupamento (por dupla, por semana, por avaliação), densidade em grade/colunas, busca. Modal de filtro com fundo maior que o conteúdo — revisar dimensões.",
+  "type": "Tarefa",
+  "priority": "Medium",
+  "labels": []
+ },
+ "REALIZA-176": {
+  "summary": "/agenda coord: sobrecarga visual — eyebrows demais, gráficos fora da identidade",
+  "description": "Muita informação, muitos eyebrow texts, gráficos que fogem da identidade visual. Redesenhar: elegante, legível, intuitivo — o que a coord precisa responder em 5s primeiro.",
+  "type": "Tarefa",
+  "priority": "Medium",
+  "labels": []
+ },
+ "REALIZA-177": {
+  "summary": "Sweep de TODOS os modais: fundo maior que conteúdo, densidade, consistência",
+  "description": "Auditar todos os Dialog/Modal do app: tamanho do overlay/fundo vs conteúdo, padding, scroll interno, largura, consistência visual entre eles. Padronizar.",
+  "type": "Tarefa",
+  "priority": "Medium",
+  "labels": []
+ },
+ "REALIZA-178": {
+  "summary": "Relatórios + inteligência por fases",
+  "description": "docs/planos/relatorios-inteligencia.md. Fase 0: snapshots semáforo (→182) + exports + /relatorios hub (→56). IA só em agregados sem PII, narrativa LLM gated por LGPD.",
+  "type": "Feature",
+  "priority": "Medium",
+  "labels": []
+ },
+ "REALIZA-179": {
+  "summary": "Chatbot público + MCP server + RAG dos guias",
+  "description": "docs/planos/ia-chatbot-mcp.md. Tools tipadas com JWT do usuário (RLS escopa), audit ia_eventos, chat público, MCP coord-only /api/mcp, provider retenção zero. Absorve 124/125/126.",
+  "type": "Feature",
+  "priority": "Medium",
+  "labels": []
+ },
+ "REALIZA-180": {
+  "summary": "Pipeline de importação inteligente — NL + revisão semântica + visão (CSV/PDF/turmas)",
+  "description": "Generaliza o import manual de hoje: extrair (visão obrigatória p/ PDF/imagem) → match determinístico (importar-registros segue primeiro filtro) → match semântico c/ confiança+razões → revisão humana em linguagem natural → escrita SÓ via RPCs existentes → audit ia_eventos. Casos reais: typo nome, \"Mentorada\" genérico, ano errado, renumeração via narrativa, par sem dupla → propor rematch. LGPD: mínimo ao provider, zero dados_civis.",
+  "type": "Feature",
+  "priority": "Medium",
+  "labels": []
+ },
+ "REALIZA-181": {
+  "summary": "PDM nativo na plataforma — metas SMART → submetas (decisão fechada: substitui link Drive)",
+  "description": "Decisão fechada: PDM deixa de ser só duplas.pdm_url. Modelo pdm_metas (SMART) + pdm_submetas com progresso; co-edição mentor+mentorado; coord lê tudo; superfícies na ficha/portal jovem/resumo jornada; pdm_url legado. Absorve 17/141/142. Insumo pra 178/180.",
+  "type": "Feature",
+  "priority": "Medium",
+  "labels": []
+ },
+ "REALIZA-182": {
+  "summary": "dupla_saude_snapshots — histórico diário do semáforo (fase 0 da 178)",
+  "description": "Tabela (dupla_id, dia, saude, motivo[]) 1 row/dupla/dia via pg_cron, upsert idempotente; motivo[] guarda gatilhos do semáforo. Só o job escreve; leitura coord/sup. Absorve 74.",
+  "type": "Tarefa",
+  "priority": "Medium",
+  "labels": []
+ },
+ "REALIZA-183": {
+  "summary": "resumo_acessos — log de acesso do /resumo público (independe do modelo de turmas)",
+  "description": "Fatia da 170 antecipada: tabela (slug, acessado_em, ip_hash, user_agent, params) append-only, escrita fire-and-forget no server component do /resumo via admin client. IP hasheado (LGPD).",
+  "type": "Tarefa",
+  "priority": "Medium",
+  "labels": []
+ },
+ "REALIZA-159": {
+  "summary": "Alumni→mentor: ex-mentorados podem assumir papel de mentor após concluir o programa",
+  "description": "Ex-mentorado que conclui o programa pode virar mentor. Hoje mentorados e profiles são identidades separadas — precisa: promoção de papel (mentorados→profiles com role mentor_dpp), preservação de histórico (a pessoa mantém o rastro de quando foi mentorada), RLS consciente (ela não deve ver dados da própria dupla antiga como coord faria).",
+  "type": "Tarefa",
+  "priority": "Medium",
+  "labels": []
+ },
+ "REALIZA-162": {
+  "summary": "Jovem: jornada/acervo em densidade desktop — estação ativa no topo, trilha compacta, grid no acervo",
+  "description": "Portal do jovem em desktop: jornada com estação ativa no topo + trilha compacta; acervo em grid denso em vez de coluna única.",
+  "type": "Tarefa",
+  "priority": "Medium",
+  "labels": []
+ },
+ "REALIZA-96": {
+  "summary": "CLONE - Checklist de intenções por encontro (não só nota livre)",
+  "description": "O pedido real da análise: \"pontos específicos pendentes\" (ex.: \"enviar vídeo depois do encontro\") — um **checklist de intenções** por encontro, não só `NotaEncontro` livre. Mentor marca itens que precisam acontecer; itens pendentes aparecem no próximo encontro/nudge.\n\nFonte: `docs/analise-transcricao-mentor.md` §Sprint2\n\n---\n\nMigrado do Linear: REALIZA-61 — https://linear.app/realizavc/issue/REALIZA-61/checklist-de-intencoes-por-encontro-nao-so-nota-livre",
+  "type": "Feature",
+  "priority": "Low",
+  "labels": []
+ },
+ "REALIZA-97": {
+  "summary": "CLONE - Polish de agendamento: posição estável do Agendar + dialog retroativo + microcopy",
+  "description": "Da análise da transcrição (Sprint 1/2):\n\n* **\"Agendar encontro\" nunca dentro do \"⋯ Mais\"** quando `podeAgendar` — a ação mais frequente muda de lugar conforme estado; posição estável sempre\n* **Dialog retroativo** — marcar data passada sinaliza no título (\"essa data já passou — entra como realizado\"); modo duplo silencioso confundiu a Kelyng na sessão real\n* **Microcopy** — \"datas oficiais são sugestões, a dupla combina a real\" na agenda; vocabulário consistente \"repôr\" (regra oficial: reposição na mesma semana)\n\nFonte: `docs/analise-transcricao-mentor.md`\n\n---\n\nMigrado do Linear: REALIZA-60 — https://linear.app/realizavc/issue/REALIZA-60/polish-de-agendamento-posicao-estavel-do-agendar-dialog-retroativo",
+  "type": "Tarefa",
+  "priority": "Medium",
+  "labels": []
+ },
+ "REALIZA-98": {
+  "summary": "Vínculo direto especialista→DPP: duplas.dupla_dpp_id (self-FK + backfill)",
+  "description": "Hoje a dupla de especialista aponta pra `solicitacao_id`, e a DPP-pai fica um hop a mais (`solicitacoes_especialista.dupla_dpp_id`). O vínculo hierárquico é indireto e a regra \"mesmo mentorado da DPP\" vive só no RPC de aceite.\n\nProposta (auditada — ver comentários):\n\n* `alter table duplas add dupla_dpp_id uuid references duplas(id)` + CHECK `dupla_dpp_id is null or trilha='especialista'` + partial index\n* Backfill via join em `solicitacoes_especialista`\n* Escrever/validar **no RPC** `aceitar_solicitacao`, não em trigger (erro controlado se a DPP-pai foi editada entre pedido e aceite)\n* `createDupla`: estender o lookup de turma pra capturar `id` da DPP e preencher (duplas criadas por coord sem solicitação)\n* `solicitacao_id` permanece como proveniência\n\nBenefício honesto: higiene de modelo + query direta — hoje só 1 traversal real no app (notificação de encerramento). Migration `0063`, depois do apply remoto da 0062 (REALIZA-30).",
+  "type": "Tarefa",
+  "priority": "Medium",
+  "labels": []
+ },
+ "REALIZA-99": {
+  "summary": "Supervisão operacional: coordenação pode ser supervisor_id em duplas",
+  "description": "Hoje `createDupla`/`updateDupla` rejeitam supervisor_id quando o profile não tem role='supervisor' — mas a supervisão real é feita pela equipe executiva (role='coordenacao'). Resultado: a distribuição dos 26 supervisores só foi possível via SQL.\n\nEscopo:\n\n* `createDupla` + `updateDupla`: aceitar role 'supervisor' OU 'coordenacao' como supervisor válido\n* `nova-dupla-dialog` + `editar-dupla-dialog`: incluir coordenacao no fetch (`.in(role,[mentor_dpp, mentor_especialista, supervisor, coordenacao])`) e no select de supervisores (hoje `role === 'supervisor'`); mentores continuam excluindo supervisor E coordenacao\n* Revisar qualquer outro lugar que assuma supervisor=role supervisor (queries/comments)\n* Sem migration: `duplas.supervisor_id` é FK pra profiles, RLS usa o id, não o role\n* Demo: dataset já mistura supervisores? garantir select populado em /demo\n* Teste: vitest no caminho de validação se houver função pura; e2e — coord atribui membro da coordenação como supervisor\n\n",
+  "type": "Tarefa",
+  "priority": "Medium",
+  "labels": []
+ },
+ "REALIZA-100": {
+  "summary": "Remanejamento atômico de dupla: encerrar + nova + nota + linhagem",
+  "description": "Hoje substituir um lado da dupla (desistência/remanejo) é 3 passos manuais: encerrar a dupla, criar outra, anotar a saída na ficha. Fizemos isso por SQL no caso Rafaela→Eduarda Barbosa.\n\nEscopo:\n\n* Action `remanejarDupla(duplaId, {lado: 'mentor'|'mentorado', novoId, motivo, registrarNota})` — coord-only: encerra a dupla atual (status='encerrada', sem encerrada_em em DPP por CHECK), cria nova herdando turma/cronograma/supervisor/demanda/trilha com iniciada_em=hoje, valida vaga do novo membro (sem dupla ativa/pausada da mesma trilha), opcionalmente grava nota em mentorados.notas/profiles\n* Migration 0063: `duplas.remanejada_de uuid references duplas(id)` — linhagem; ficha da dupla nova mostra \"originada de\", encerrada mostra \"substituída por\"\n* UI: botão \"Remanejar\" na ficha da dupla (coord), dialog: qual lado sai, novo membro do pool livre, motivo (desistência/remanejo/outro + texto), checkbox nota na ficha\n* Encontros/registros ficam na dupla encerrada (histórico correto); semáforo da nova começa limpo\n* Demo: dialog visível, action → DEMO_MSG\n* Aplicar 0063 em staging antes do push e em prod antes do merge (regra preview)\n\n",
+  "type": "Tarefa",
+  "priority": "Medium",
+  "labels": []
+ },
+ "REALIZA-101": {
+  "summary": "Fila de espera: visão \"aguardando par\" com tempo de espera e contato",
+  "description": "Mentorados e mentores sem par estão invisíveis — Vinícius e Wendel chegaram pelo formulário e ninguém os vê na plataforma. A reserva de mentores (9 inscritos sem matching) idem.\n\nEscopo:\n\n* Em /pessoas: seção/visão \"Aguardando par\" — mentorados sem dupla ativa + mentores sem dupla (ou com capacidade livre), com data de inscrição (criado_em/form_bruto timestamp), dias esperando, ong_origem/origem, WhatsApp rápido\n* Chip/contador na visão coord; hoje \"Livres para dupla\" já existe mas não dá contexto temporal nem operacional\n* Decidir: badge permanente no header de /pessoas ou filtro — o que couber melhor no padrão atual\n* Demo: dataset evergreen deve ter 1-2 pessoas sem par pra vitrine\n* Sem migration\n\n",
+  "type": "Tarefa",
+  "priority": "Medium",
+  "labels": []
+ },
+ "REALIZA-102": {
+  "summary": "Importar pareamento em lote: CSV mentor×mentorado → duplas",
+  "description": "As 26 duplas da T2 foram criadas por script — pessoas entram por CSV mas duplas nascem uma a uma no dialog.\n\nEscopo:\n\n* Novo tipo no `importar-csv-dialog`: \"Pareamento (duplas)\" — CSV com mentor (nome ou e-mail), mentorado (nome ou e-mail), turma?, eixo/demanda?, supervisor?\n* Action `importDuplas(rows)`: resolve cada lado por e-mail/nome normalizado (portar normNome de scripts/importar para src/lib), pulo idempotente de pares existentes, cria com turma/cronograma quando informado\n* Preview com resolvidos/não-resolvidos ANTES de aplicar (nunca cria pessoa nova — só pareia quem já existe; desconhecidos viram relatório de erro por linha)\n* Demo: preview funciona, apply → DEMO_MSG\n* Vitest: resolução de nomes com acentos/apelidos (casos reais: 'Nucolly Jesus', 'Stuanni', 'Adrielle Souza')\n\n",
+  "type": "Tarefa",
+  "priority": "Medium",
+  "labels": []
+ },
+ "REALIZA-103": {
+  "summary": "Builder de cronograma: criar turma + gerar/editar eventos do ciclo",
+  "description": "O cronograma da T2 (25 eventos: preparação, 16 encontros com quintas duplas, recesso, encerramento) só existe porque foi criado por script. Nova turma todo semestre → precisa de UI.\n\nEscopo:\n\n* Área coord de cronogramas/turmas: lista (turma, nome, período, status, n eventos, n duplas)\n* Criação em duas vias: (a) gerador — N encontros, dia da semana, data do 1º, datas duplas opcionais, recesso, evento de encerramento, etapas de preparação; (b) manual — evento a evento\n* Editor de eventos de ciclo_eventos: tipo (etapa_preparacao/encontro/recesso/formacao/evento_encerramento), numero, data, data_fim, titulo, fase, instrumentos, status, ordem — respeitando os CHECKs da 0062\n* Guard: cronograma com duplas vinculadas → edição de eventos com aviso/limite\n* Actions: createCronograma, upsertEvento, deleteEvento, gerarEncontros — tudo coord-only\n* Demo: cronograma do dataset renderiza, writes → DEMO_MSG\n* Vitest pesado no gerador (dias da semana, skip de recesso, numeração com duplas)\n* Dividir em sub-fases se crescer: 5a modelo+actions+lista, 5b builder/gerador+editor\n\n",
+  "type": "Tarefa",
+  "priority": "Medium",
+  "labels": []
+ }
+}
