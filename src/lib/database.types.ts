@@ -4452,6 +4452,10 @@ export type Database = {
       disponibilidade_ok: { Args: { d: Json }; Returns: boolean }
       eh_equipe: { Args: never; Returns: boolean }
       email_disponivel: { Args: { p_email: string }; Returns: boolean }
+      emitir_instrumento_lote: {
+        Args: { p_sistema: string; p_dupla_ids: string[] }
+        Returns: Json
+      }
       emitir_link_instrumento: {
         Args: { p_dupla_id: string; p_sistema: string }
         Returns: Json

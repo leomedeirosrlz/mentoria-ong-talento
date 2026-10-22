@@ -9,6 +9,7 @@ import {
 } from "@/lib/queries";
 import { getUltimasInteracoes } from "@/lib/interacoes";
 import { maxNumeroEncontro } from "@/lib/ciclo";
+import { EMAIL_ENVIO_LIBERADO } from "@/lib/email";
 import { temPapel } from "@/lib/types";
 import { FolderOpen } from "@phosphor-icons/react/dist/ssr";
 import { NovoMaterialDialog } from "@/components/novo-material-dialog";
@@ -55,6 +56,9 @@ export default async function MateriaisPage() {
   // whatsapp do mentor vem das duplas — o payload agregado não os carrega
   // e o Lembrar precisa dos dois (pausada não recebe nudge; o wa.me só
   // abre com telefone real). O cap de 48h lê só interações tipo nudge.
+  // REALIZA-51 — pra coord os flags "tem e-mail" alimentam a prévia do
+  // lote (o endereço em si nunca desce pro client; pro supervisor nem os
+  // flags são usados — o botão não renderiza pra ele).
   const vePainel =
     me != null && (temPapel(me, "coordenacao") || temPapel(me, "supervisor"));
   const [painel, duplasPainel] = vePainel
@@ -69,7 +73,12 @@ export default async function MateriaisPage() {
   const duplasInfo = new Map(
     duplasPainel.map((d) => [
       d.id,
-      { status: d.status, mentorWhatsapp: d.mentor?.whatsapp ?? null },
+      {
+        status: d.status,
+        mentorWhatsapp: d.mentor?.whatsapp ?? null,
+        jovemTemEmail: !!d.mentorado?.email?.trim(),
+        mentorTemEmail: !!d.mentor?.email?.trim(),
+      },
     ])
   );
 
@@ -95,6 +104,8 @@ export default async function MateriaisPage() {
           duplasInfo={duplasInfo}
           meuNome={me.nome_social || me.nome}
           ehSupervisor={!temPapel(me, "coordenacao")}
+          podeLote={temPapel(me, "coordenacao")}
+          envioLiberado={EMAIL_ENVIO_LIBERADO}
         />
       )}
 
