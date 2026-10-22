@@ -219,20 +219,6 @@
   );
 }
 
-/* hatch de "sem agendamento" (danger) — mesma gramática do hatch-recesso
-   (padrão semântico via background-image pra sobrepor o bg da célula), mas
-   com cor de alarme: o segmento de risco da barra por turma da agenda da
-   coordenação (WP5). A base clara vai no background-color — sobreposta
-   pelas listras; sem ela as faixas pareceriam sólidas demais. */
-.hatch-danger {
-  background-color: color-mix(in srgb, var(--danger) 14%, transparent);
-  background-image: repeating-linear-gradient(
-    45deg,
-    transparent 0 4px,
-    var(--danger) 4px 5px
-  );
-}
-
 /* varredura do sheen no Skeleton — com background-size 200% o ciclo fecha sem salto */
 @keyframes shimmer {
   from {

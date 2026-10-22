@@ -135,7 +135,7 @@ export type ReguaPasso = {
   estado: "feito" | "atual" | "futuro";
 };
 
-/** Card "Encontro N · Tx" — uma entrada por cronograma ATIVO. */
+/** Linha-resumo "Encontro N · Tx" — uma entrada por cronograma ATIVO. */
 export type ResumoTurmaCard = {
   cronogramaId: string;
   /** "T1" — `cronograma.turma`. */
@@ -154,7 +154,7 @@ export type ResumoTurmaCard = {
   regua: ReguaPasso[];
 };
 
-/** Um card por cronograma ativo — os três segmentos da barra são
+/** Um resumo por cronograma ativo — a linha da tela decompõe as ativas em
  *  realizaram / agendadas / semAgendamento (soma = ativas). `hoje` só vem
  *  de Date pra testes; internamente vira data SP. */
 export function resumosPorCronograma(
@@ -525,10 +525,10 @@ export type SinteseMonitoramento = {
   criticas: number;
   /** o resto da fila (não-críticas) — soma com `criticas` = `total`. */
   atencao: number;
-  /** duplas sem agendamento pro encontro vigente — o MESMO denominador da
-   *  barra hatch dos cards (soma de `semAgendamento`, não a contagem de
-   *  linhas com motivo sem_data: a faixa reconcilia com o que a coordenação
-   *  acabou de ler nos cards). */
+  /** duplas sem agendamento pro encontro vigente — o MESMO denominador das
+   *  linhas-resumo (soma de `semAgendamento`, não a contagem de linhas com
+   *  motivo sem_data: a faixa reconcilia com o que a coordenação lê nas
+   *  linhas). */
   semData: number;
   /** linhas com registro pendente. */
   registrosPendentes: number;
