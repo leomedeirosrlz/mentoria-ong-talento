@@ -20,7 +20,11 @@ export function temPapel(
  *  antecipado. Ambas liberam a vaga e congelam a trilha como a encerrada. */
 export type DuplaStatus = "ativa" | "pausada" | "concluida" | "encerrada";
 export type Trilha = "dpp" | "especialista";
+// remarcado/cancelado são legados do enum — nenhum writer os grava mais
+// (remarcação grava "agendado"; nao_aconteceu é reversível e cobre o cancel);
+// ficam no union porque rows antigas podem carregá-los e o read path trata.
 export type EncontroStatus = "agendado" | "realizado" | "remarcado" | "nao_aconteceu" | "cancelado";
+// idem 'atrasado' — valor-fantasma: o prazo vencido deriva de data, não se grava.
 export type EncaminhamentoStatus = "pendente" | "feito" | "atrasado";
 export type AvaliacaoJovem = "excelente" | "boa" | "regular" | "baixa";
 export type Dificuldade =

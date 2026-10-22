@@ -167,6 +167,7 @@ export function AvaliacaoPendenteLinha({
   jovemWhatsapp,
   numero,
   souCoord,
+  duplaId,
   jornadaViva = true,
 }: {
   link: AvaliacaoLink | null;
@@ -175,6 +176,9 @@ export function AvaliacaoPendenteLinha({
   jovemWhatsapp: string | null;
   numero: number;
   souCoord: boolean;
+  /** o ping da avaliação passa por /api/nudge — loga o contato em
+   *  interacoes como os demais canais (t=contato) */
+  duplaId: string;
   /** Dupla fechada (concluida/encerrada): a pendência fica como fato —
    *  copiar/enviar link morre junto com as demais ações de emissão. */
   jornadaViva?: boolean;
@@ -197,7 +201,7 @@ export function AvaliacaoPendenteLinha({
           <CopiarLinkAvaliacao url={url} />
           {wa && (
             <a
-              href={wa}
+              href={`/api/nudge?d=${encodeURIComponent(duplaId)}&to=${encodeURIComponent(wa)}&t=contato`}
               target="_blank"
               rel="noopener noreferrer"
               className={buttonVariants({ variant: "outline", size: "sm" })}

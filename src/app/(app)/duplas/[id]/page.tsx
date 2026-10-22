@@ -1787,6 +1787,7 @@ function EncontroRow({
             jovemWhatsapp={jovemWhatsapp}
             numero={passo.numero}
             souCoord={souCoord}
+            duplaId={duplaId}
             jornadaViva={jornadaViva}
           />
         )}
