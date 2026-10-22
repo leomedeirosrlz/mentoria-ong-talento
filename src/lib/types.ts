@@ -1145,3 +1145,23 @@ export type TrilhaJovem = {
   sessoes: TrilhaJovemSessao[];
   devolutivas: TrilhaJovemDevolutiva[];
 };
+
+/** turma_inscricoes (0111, REALIZA-167) — quem pertence à turma SEM estar em
+ *  dupla: mentor importado aguardando vaga, jovem inscrito sem matching. XOR
+ *  profile_id/mentorado_id é garantido por CHECK no banco; `papel_esperado`
+ *  denormaliza o lado pra leitura rápida. Não confundir com profile_papeis.
+ *  escopo_turma (papel de staff) nem duplas.turma (a dupla formada). */
+export type TurmaInscricao = {
+  id: string;
+  turma: string;
+  profile_id: string | null;
+  mentorado_id: string | null;
+  papel_esperado: "mentor" | "mentorado";
+  /** aguardando = o que a fila do relatório mostra; formada = entrou em
+   *  dupla (registro — a regra de exibição continua sendo "tem dupla ativa
+   *  → some"); desistiu = sai da fila mas fica no histórico. */
+  status: "aguardando" | "formada" | "desistiu";
+  nota: string | null;
+  created_by: string | null;
+  created_at: string;
+};

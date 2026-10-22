@@ -60,6 +60,7 @@ import type {
   SolicitacaoEspecialista,
   SolicitacaoProposta,
   Supervisao,
+  TurmaInscricao,
 } from "@/lib/types";
 import type { Interacao } from "@/lib/interacoes";
 import { disponibilidadeDeConjuntos, toDateStr } from "../ciclo";
@@ -130,6 +131,9 @@ export type DemoData = {
   documentosPessoa: DocumentoPessoa[];
   avaliacoes: AvaliacaoEncontro[];
   avaliacaoLinks: AvaliacaoLink[];
+  /** turma_inscricoes (0111 · REALIZA-167) — quem é da turma sem estar em
+   *  dupla; alimenta a linha "Sem dupla" do relatório no modo demo. */
+  turmaInscricoes: TurmaInscricao[];
 };
 
 // ---------- ids ----------
@@ -149,7 +153,8 @@ const uid = (n: number): string =>
 // avaliacao_links: 42xx · avaliacoes_encontro: 44xx ·
 // documentos_pessoa: 46xx · cronogramas: 50xx · especialista_grade: 52xx ·
 // especialista_excecoes: 54xx · chamados: 58xx · chamado_atualizacoes: 60xx ·
-// chamado_comentarios: 62xx · chamado_anexos: 64xx · devolutivas: 66xx.
+// chamado_comentarios: 62xx · chamado_anexos: 64xx · devolutivas: 66xx ·
+// turma_inscricoes: 68xx.
 // user_id fake: f0xx.
 // especialista_eventos e profile_papeis não tem id.
 const P = {
@@ -1623,6 +1628,21 @@ function build(): DemoData {
   };
 
   const mentorados = [ana, caio, dandara, eduardo, isabela, kaua, laura, pedro, rafael, wendel, matheus, gustavo];
+
+  // ---------- fila por turma (0111 · REALIZA-167) ----------
+  // O Rafael e o Wendel são os dois mentorados da T2 que ainda não têm par —
+  // a inscrição `aguardando` é o que faz a linha "Sem dupla" deles aparecer
+  // no relatório da turma (antes era array hardcoded no código).
+  const turmaInscricoes: TurmaInscricao[] = [
+    { id: uid(0x6801), turma: "T2 · 2026/2027", profile_id: null,
+      mentorado_id: rafael.id, papel_esperado: "mentorado",
+      status: "aguardando", nota: "Veio na leva da ONG Cidadão Pró-Mundo",
+      created_by: marina.id, created_at: haDias(16) },
+    { id: uid(0x6802), turma: "T2 · 2026/2027", profile_id: null,
+      mentorado_id: wendel.id, papel_esperado: "mentorado",
+      status: "aguardando", nota: "Inscrição direta pelo formulário de matching",
+      created_by: marina.id, created_at: haDias(4) },
+  ];
 
   // ---------- solicitações de especialista (0074 — pedido por sessão) ----
   // (montadas antes das duplas: as duplas de especialista referenciam a
@@ -3861,6 +3881,7 @@ function build(): DemoData {
     documentosPessoa,
     avaliacoes,
     avaliacaoLinks,
+    turmaInscricoes,
     chamados,
     chamadoAtualizacoes,
     chamadoComentarios,

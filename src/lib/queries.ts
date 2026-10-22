@@ -29,11 +29,15 @@ import {
   demoPessoaPerfil,
   demoPessoas,
   demoRegistros,
+  demoRelatorioLinks,
+  demoTurmaInscricoesAguardando,
 } from "./demo/queries";
+import { getDemoData } from "./demo/data";
 import { demoPainelInstrumentosJornada } from "./demo/forms-data";
 import type { PainelJornadaLinha } from "./jornada";
+import type { InscricaoFilaTurma, RelatorioLinkItem } from "./relatorio";
 import { temPapel } from "./types";
-import type { AppRole, AvaliacaoJovem, CicloEvento, Comunicado, CorRaca, Cronograma, DadosCivis, DocumentoPessoa, Dupla, DuplaResumo, DuplaStatus, Encontro, EncontroStatus, EspecialistaEvento, Genero, Material, Mentorado, MentorProfile, Notificacao, PessoaNota, PrefGeneroPar, Profile, Registro, ResponsavelCivis, Trilha } from "./types";
+import type { AppRole, AvaliacaoJovem, CicloEvento, Comunicado, CorRaca, Cronograma, DadosCivis, DocumentoPessoa, DocumentoTemplate, Dupla, DuplaResumo, DuplaStatus, Encontro, EncontroStatus, EspecialistaEvento, Genero, Material, Mentorado, MentorProfile, Notificacao, PessoaNota, PrefGeneroPar, Profile, Registro, ResponsavelCivis, Trilha } from "./types";
 
 /** mentor_profiles — re-export do tipo canônico (types.ts): os callers da
  *  página de pessoas/board importam daqui historicamente. */
@@ -71,8 +75,11 @@ const comPapeis = <T extends object>(
  *  SELECT table-level e voltou grant por coluna (as sensíveis ficam de fora).
  *  `select("*")` expandiria pras colunas revogadas e derrubaria a query
  *  inteira com permission denied — a lista é sempre explícita. */
+// profile_id (0066) ganhou grant só na 0112 — antes o select inteiro caía
+// em permission denied; com o grant ele fecha a história do vínculo
+// jovem↔conta na UI (promoção ex-mentorado → mentor)
 const MENTORADO_COLS_PUBLICAS =
-  "id, nome, email, whatsapp, ong_origem, notas, avatar_path, documento_path, created_at, nome_social, cidade, uf, interesses, objetivos, escolaridade, origem, disponibilidade, situacao, saiu_em, motivo_saida";
+  "id, nome, email, whatsapp, ong_origem, notas, avatar_path, documento_path, created_at, nome_social, cidade, uf, interesses, objetivos, escolaridade, origem, disponibilidade, situacao, saiu_em, motivo_saida, profile_id";
 
 /** Subconjunto do mentorado que vai no embed da dupla (0076): o que o par
  *  e a ficha consomem — notas e documento_path do jovem não saem no select
@@ -1043,6 +1050,100 @@ export const getPainelInstrumentosJornada = cache(
       return [];
     }
     return (data ?? []) as PainelJornadaLinha[];
+  }
+);
+
+// ---------- parametrização de turma (REALIZA-167, migration 0111) ----------
+
+/** Fila de espera por turma (turma_inscricoes): inscritos `aguardando` — a
+ *  linha "Sem dupla" do relatório deriva daqui pra qualquer turma (antes a
+ *  fila da T2 era um array de ids hardcoded no código). `turma` null devolve
+ *  todas as filas — o builder de /relatorios agrupa no cliente pra troca de
+ *  turma sem round-trip. RLS + gate por papel: pra não-coord devolve [] sem
+ *  disparar query. Falha de leitura → [] com log: a grade segue sem a seção
+ *  "Sem dupla" em vez de derrubar a página. */
+export const getTurmaInscricoesAguardando = cache(
+  async (turma: string | null = null): Promise<InscricaoFilaTurma[]> => {
+    // modo demo: replica a policy coord-only sobre o dataset fixo
+    const demo = await demoRole();
+    if (demo) return demoTurmaInscricoesAguardando(demo, turma);
+    const me = await getMe();
+    if (me?.role !== "coordenacao") return [];
+    const supabase = await createClient();
+    let q = supabase
+      .from("turma_inscricoes")
+      .select("turma, profile_id, mentorado_id, papel_esperado")
+      .eq("status", "aguardando");
+    if (turma) q = q.eq("turma", turma);
+    const { data, error } = await q;
+    if (error) {
+      console.error("getTurmaInscricoesAguardando:", error);
+      return [];
+    }
+    // normaliza pro shape discriminado do montarLinhas — o XOR +
+    // coerência papel×coluna são CHECK no banco; linha incoerente (só se o
+    // CHECK for removido) é descartada em vez de renderizar quebrada
+    return (data ?? []).flatMap((r): InscricaoFilaTurma[] => {
+      if (r.papel_esperado === "mentor" && r.profile_id)
+        return [
+          {
+            turma: r.turma,
+            papel_esperado: "mentor",
+            profile_id: r.profile_id,
+          },
+        ];
+      if (r.papel_esperado === "mentorado" && r.mentorado_id)
+        return [
+          {
+            turma: r.turma,
+            papel_esperado: "mentorado",
+            mentorado_id: r.mentorado_id,
+          },
+        ];
+      return [];
+    });
+  }
+);
+
+/** Painel de links públicos (relatorio_links, REALIZA-170) — metadados +
+ *  contadores de acesso via RPC relatorio_links_stats: senha_hash nunca sai
+ *  do banco (nem pra coordenação — `protegido` booleano resolve a UI). */
+export const getRelatorioLinks = cache(
+  async (): Promise<RelatorioLinkItem[]> => {
+    if (await demoRole()) return demoRelatorioLinks();
+    const me = await getMe();
+    if (me?.role !== "coordenacao") return [];
+    const supabase = await createClient();
+    const { data, error } = await supabase.rpc("relatorio_links_stats");
+    if (error) {
+      console.error("getRelatorioLinks:", error);
+      return [];
+    }
+    return (data ?? []) as RelatorioLinkItem[];
+  }
+);
+
+/** Templates de documento ativos — alimenta o seletor do recorte
+ *  'assinaturas' do NovoLinkDialog. Leitura authenticated (0033); quem não
+ *  é coordenador nem chama (a página já barra). */
+export const getDocumentoTemplates = cache(
+  async (): Promise<Pick<DocumentoTemplate, "slug" | "titulo">[]> => {
+    if (await demoRole()) {
+      return getDemoData().documentoTemplates
+        .filter((t) => t.ativo)
+        .map((t) => ({ slug: t.slug, titulo: t.titulo }));
+    }
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("documento_templates")
+      .select("slug, titulo")
+      .eq("ativo", true)
+      .order("titulo");
+    if (error) {
+      console.error("getDocumentoTemplates:", error);
+      return [];
+    }
+    return data ?? [];
   }
 );
 

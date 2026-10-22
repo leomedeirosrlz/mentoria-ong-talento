@@ -69,6 +69,7 @@ import type {
 import type { FormularioPublico } from "../forms/queries";
 import { getDemoFormularios } from "./forms-data";
 import type { Interacao } from "../interacoes";
+import type { InscricaoFilaTurma, RelatorioLinkItem } from "../relatorio";
 
 // Camada de leitura do modo demo: replica o escopo que o RLS aplicaria a
 // cada papel sobre o dataset fixo de getDemoData() — coordenação vê tudo,
@@ -2226,4 +2227,89 @@ export function demoChamadosSemDono(role: AppRole): number {
   return demoChamadosFila(role).filter(
     (c) => c.status === "aberto" && !c.atribuido_a && !c.restrito
   ).length;
+}
+
+/** Fila por turma (turma_inscricoes, 0111) — espelha a RLS: coord-only
+ *  integral; `status='aguardando'` é o filtro da query real, `turma` null
+ *  devolve todas. Normaliza pro shape discriminado que o montarLinhas
+ *  consome (o XOR do banco garante a coerência no dado demo também). */
+export function demoTurmaInscricoesAguardando(
+  role: AppRole,
+  turma: string | null
+): InscricaoFilaTurma[] {
+  if (role !== "coordenacao") return [];
+  return getDemoData()
+    .turmaInscricoes.filter(
+      (i) => i.status === "aguardando" && (!turma || i.turma === turma)
+    )
+    .flatMap((i): InscricaoFilaTurma[] => {
+      if (i.papel_esperado === "mentor" && i.profile_id)
+        return [
+          {
+            turma: i.turma,
+            papel_esperado: "mentor",
+            profile_id: i.profile_id,
+          },
+        ];
+      if (i.papel_esperado === "mentorado" && i.mentorado_id)
+        return [
+          {
+            turma: i.turma,
+            papel_esperado: "mentorado",
+            mentorado_id: i.mentorado_id,
+          },
+        ];
+      return [];
+    });
+}
+
+/** Painel de links públicos da coordenação (REALIZA-170) — fixture fixa:
+ *  o legado T2 (sem senha, "ativo") + um ciclo protegido. Mutations caem
+ *  no DEMO_MSG das actions — o card é navegável mas não grava. */
+export function demoRelatorioLinks(): RelatorioLinkItem[] {
+  const agora = new Date();
+  const ha = (dias: number) =>
+    new Date(agora.getTime() - dias * 86400e3).toISOString();
+  const em = (dias: number) =>
+    new Date(agora.getTime() + dias * 86400e3).toISOString();
+  return [
+    {
+      id: "de000000-0000-4000-8000-000000001701",
+      slug: "t2-x7k4m9qf2w8j",
+      titulo: "Resumo da turma — T2 · 2026/2027",
+      turma: "T2 · 2026/2027",
+      config: {
+        tipo: "grade",
+        turma: "T2 · 2026/2027",
+        granularidade: "pessoas",
+        expor_contato: false,
+      },
+      protegido: false,
+      criado_por_nome: "Camila Duarte",
+      created_at: ha(45),
+      expira_em: em(75),
+      revogado_em: null,
+      acessos: 12,
+      ultimo_acesso: ha(2),
+      falhas_24h: 0,
+    },
+    {
+      id: "de000000-0000-4000-8000-000000001702",
+      slug: "ciclo-dpp-k3w8f2m9xq7j4n5p",
+      titulo: "Prestação de contas — encontros DPP",
+      turma: "T2 · 2026/2027",
+      config: {
+        tipo: "ciclo",
+        turma: "T2 · 2026/2027",
+      },
+      protegido: true,
+      criado_por_nome: "Camila Duarte",
+      created_at: ha(10),
+      expira_em: null,
+      revogado_em: null,
+      acessos: 4,
+      ultimo_acesso: ha(1),
+      falhas_24h: 2,
+    },
+  ];
 }
