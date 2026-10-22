@@ -26,11 +26,20 @@ import { Textarea } from "@/components/ui/textarea";
 export function EncerrarTrilhaDialog({
   duplaId,
   trigger,
+  open: openProp,
+  onOpenChange: onOpenChangeProp,
 }: {
   duplaId: string;
-  trigger?: React.ReactElement;
+  /** Elemento do trigger — default é o botão padrão da casa. `null` suprime:
+   *  o menu "Mais" da ficha abre o dialog controlado (REALIZA-157). */
+  trigger?: React.ReactElement | null;
+  /** Modo controlado (opcional): o pai segura o estado. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }) {
-  const [open, setOpen] = useState(false);
+  const [openInt, setOpenInt] = useState(false);
+  const open = openProp ?? openInt;
+  const setOpen = onOpenChangeProp ?? setOpenInt;
   const [tipo, setTipo] = useState<"concluida" | "encerrada">("concluida");
   const [devolutivaLen, setDevolutivaLen] = useState(0);
   const [pending, start] = useTransition();
@@ -59,18 +68,32 @@ export function EncerrarTrilhaDialog({
     });
   }
 
+  // estado fresco por abertura — ajuste na borda de subida do `open`: no
+  // modo controlado a abertura vem da prop e o Base UI não reemite
+  // onOpenChange (mesmo padrão do RemanejarDuplaDialog)
+  const [abertoAntes, setAbertoAntes] = useState(open);
+  if (open !== abertoAntes) {
+    setAbertoAntes(open);
+    if (open) {
+      setTipo("concluida");
+      setDevolutivaLen(0);
+    }
+  }
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger
-        render={
-          trigger ?? (
-            <Button variant="outline" size="sm">
-              <FlagCheckered size={15} />
-              Encerrar trilha
-            </Button>
-          )
-        }
-      />
+      {trigger !== null && (
+        <DialogTrigger
+          render={
+            trigger ?? (
+              <Button variant="outline" size="sm">
+                <FlagCheckered size={15} />
+                Encerrar trilha
+              </Button>
+            )
+          }
+        />
+      )}
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Encerrar a trilha de especialista</DialogTitle>

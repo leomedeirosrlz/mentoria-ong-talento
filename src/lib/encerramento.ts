@@ -6,6 +6,7 @@ import {
   TRILHA_LABEL,
   type PassoGuia,
 } from "./ciclo";
+import type { PdmResumo } from "./pdm";
 import type {
   AvaliacaoJovem,
   CicloEvento,
@@ -85,6 +86,10 @@ export type ResumoJornada = {
   }[];
   combinadosFeitos: number;
   combinadosTotal: number;
+  /** Recorte do PDM vivo (REALIZA-181): totais de metas + a lista das
+   *  atingidas com datas — a retro que o guia pede, pronta. Null quando a
+   *  dupla não tem PDM (especialista, jornada anterior ao nativo). */
+  pdm: PdmResumo | null;
 };
 
 /** O que o resumo precisa da dupla — estrutural e estreito pra servir tanto
@@ -116,7 +121,8 @@ export function dadosResumoJornada(
   passos: PassoGuia[],
   eventos: CicloEvento[],
   fim: string | null,
-  hoje = new Date()
+  hoje = new Date(),
+  pdm: PdmResumo | null = null
 ): ResumoJornada {
   const realizados = dupla.encontros.filter(
     (e) => e.status === "realizado"
@@ -170,6 +176,7 @@ export function dadosResumoJornada(
     ultimosRegistros,
     combinadosFeitos,
     combinadosTotal: dupla.encaminhamentos.length,
+    pdm,
   };
 }
 
@@ -202,6 +209,17 @@ export function textoResumoJornada(r: ResumoJornada): string {
       : "Sem avaliações registradas",
     `Combinados cumpridos: ${r.combinadosFeitos} de ${r.combinadosTotal}`,
   ];
+  if (r.pdm) {
+    linhas.push(
+      `Metas do PDM: ${r.pdm.atingidas} de ${r.pdm.total} atingidas`
+    );
+    for (const m of r.pdm.atingidasLista) {
+      linhas.push(
+        `· ${m.titulo}` +
+          (m.atingidaEm ? ` — atingida em ${formatDate(m.atingidaEm)}` : "")
+      );
+    }
+  }
   if (r.ultimosRegistros.length) {
     linhas.push("Últimos registros:");
     for (const u of r.ultimosRegistros) {

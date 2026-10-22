@@ -2,12 +2,15 @@ import { createHash } from "node:crypto";
 import { headers } from "next/headers";
 import * as Sentry from "@sentry/nextjs";
 import { ipCliente } from "@/lib/ip";
-import { createAdminClient } from "@/lib/supabase/admin";
 
-// Log de acesso do /resumo público (REALIZA-183). O link por obscuridade
-// expõe dados de pessoas — esta é a trilha de auditoria de quem abriu.
-// SERVER ONLY: usa headers(), service role e env de salt — nunca importar
-// em client component.
+// Pseudônimo de acesso do /resumo público (REALIZA-170). Quem grava a
+// auditoria é a RPC abrir_relatorio (0110) — aqui só sai o rastro que ela
+// recebe: SHA-256(salt:ip) + user-agent truncado. O ip_hash é repassado
+// como argumento — forjável via REST direto, por isso o rate-limit tem o
+// cap global por slug como bound de verdade (o hash serve ao por-IP e à
+// leitura da trilha, não à decisão de segurança).
+// SERVER ONLY: usa headers() e env de salt — nunca importar em client
+// component.
 
 /** Salt fixo fora de produção — dev, preview e o stack local de e2e ficam
  *  funcionais sem env. Menos seguro (salt "público" permite dicionário de
@@ -21,20 +24,21 @@ let saltEmFaltaAvisado = false;
 
 /** Resolve o salt do pseudônimo de IP. Em produção sem a env devolve null —
  *  hash com salt público seria pseudônimo previsível (o espaço de IPv4 é
- *  pequeno pra dicionário): melhor perder a linha do log do que gravar um
- *  identificador quebrável. Decisão: docs/planos/issues/_decisoes.md. */
+ *  pequeno pra dicionário): melhor a linha de auditoria ir com ip_hash
+ *  null do que gravar um identificador quebrável.
+ *  Decisão: docs/planos/issues/_decisoes.md. */
 function saltAcesso(): string | null {
   const env = process.env.RESUMO_ACESSO_SALT;
   if (env) return env;
   if (process.env.VERCEL_ENV === "production") {
     console.error(
-      "[resumo_acessos] RESUMO_ACESSO_SALT não configurada em produção — acesso não registrado"
+      "[resumo_acessos] RESUMO_ACESSO_SALT não configurada em produção — ip_hash da auditoria vai nulo"
     );
     if (!saltEmFaltaAvisado) {
       saltEmFaltaAvisado = true;
       Sentry.captureException(
         new Error(
-          "RESUMO_ACESSO_SALT ausente em produção — /resumo rodando sem log de acesso"
+          "RESUMO_ACESSO_SALT ausente em produção — auditoria do /resumo sem ip_hash"
         )
       );
     }
@@ -49,35 +53,28 @@ export function hashIpAcesso(ip: string, salt: string): string {
   return createHash("sha256").update(`${salt}:${ip}`).digest("hex");
 }
 
-/** Insert append-only em resumo_acessos via service role (a tabela não tem
- *  writer com JWT — quem escreve é o servidor). Chamada fire-and-forget
- *  pelo server component: `void logAcessoResumo(slug, sp)` — o insert é
- *  awaited aqui dentro pra chegar ao banco de verdade, e qualquer falha
- *  morre no catch: auditoria nunca é gate da página. */
-export async function logAcessoResumo(
-  slug: string,
-  sp: Record<string, string | undefined>
-): Promise<void> {
-  try {
-    const salt = saltAcesso();
-    if (!salt) return; // prod sem env: a falha já saiu — não degrada quieto
-    const [h, ip] = await Promise.all([headers(), ipCliente()]);
-    // allowlist {turma,gran,col}: só o recorte pedido entra no log — query
-    // arbitrária não vira linha solta em jsonb
-    const params: Record<string, string> = {};
-    for (const k of ["turma", "gran", "col"] as const) {
-      const v = sp[k];
-      if (v !== undefined) params[k] = v;
-    }
-    await createAdminClient()
-      .from("resumo_acessos")
-      .insert({
-        slug,
-        ip_hash: ip ? hashIpAcesso(ip, salt) : null,
-        user_agent: h.get("user-agent")?.slice(0, 500) ?? null,
-        params,
-      });
-  } catch {
-    // log é auditoria, não gate — engole qualquer falha de banco/rede/env
-  }
+/** Cookie de desbloqueio do link com senha — o nome é por slug porque um
+ *  visitante pode guardar senhas de links diferentes. O valor é a própria
+ *  senha: não há sessão pra derrubar, o cookie é revalidado no bcrypt a
+ *  cada render (revogação/rotação do link quebram na hora). Mora aqui e
+ *  não em actions-resumo.ts porque arquivo "use server" só exporta async. */
+const COOKIE_PREFIX = "resumo_";
+
+export function resumoCookie(slug: string): string {
+  return COOKIE_PREFIX + slug;
+}
+
+/** O rastro que a RPC abrir_relatorio grava em resumo_acessos: ip_hash
+ *  pseudônimo (null quando o IP não é derivável ou o salt falta em prod —
+ *  a falha já saiu visível) e user-agent truncado no tamanho da coluna. */
+export async function rastroAcesso(): Promise<{
+  ipHash: string | null;
+  ua: string | null;
+}> {
+  const salt = saltAcesso();
+  const [h, ip] = await Promise.all([headers(), ipCliente()]);
+  return {
+    ipHash: salt && ip ? hashIpAcesso(ip, salt) : null,
+    ua: h.get("user-agent")?.slice(0, 500) ?? null,
+  };
 }

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import {
   Check,
   CircleDashed,
@@ -8,10 +9,15 @@ import {
   Warning,
 } from "@phosphor-icons/react/dist/ssr";
 import { LembreteButton } from "@/components/lembrete-button";
+import {
+  EnviarInstrumentoLote,
+  type DuplaLote,
+} from "@/components/enviar-instrumento-lote";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { lembreteBloqueadoAte, TRILHA_LEN } from "@/lib/ciclo";
 import type { Interacao } from "@/lib/interacoes";
+import type { InstrumentoSistema } from "@/lib/forms/schema";
 import {
   atrasadasPainel,
   ESTACAO_CHAVES,
@@ -46,6 +52,29 @@ const CELULA_LABEL: Record<EstacaoChave, string> = {
   avaliacao_360: "360º",
 };
 
+/** Estação → sistema emissível (REALIZA-51): os 4 instrumentos do core
+ *  ganham "Enviar em lote" pra coord. A avaliação de encontro nasce
+ *  sozinha no realizado e o 360º é emissão manual de encerramento — nenhum
+ *  dos dois é lote. As duas pontas da roda dividem `roda_vida`: o momento
+ *  certo por dupla é o que o core resolve (inicial sem resposta, formal
+ *  depois da primeira). */
+const SISTEMA_DA_ESTACAO: Partial<Record<EstacaoChave, InstrumentoSistema>> = {
+  roda_inicial: "roda_vida",
+  visao: "visao",
+  metas: "metas",
+  pdm: "pdm",
+  roda_formal: "roda_vida",
+};
+
+/** Estados que aceitam o lote — "a fazer" do painel: link vivo pra lembrar,
+ *  expirado pra reemitir, nunca enviado pra mintar. Respondido descansa
+ *  (re-emissão é gesto por dupla) e trancada espera a janela da dupla. */
+const ESTADOS_LOTE = new Set<EstacaoPainelEstado>([
+  "pendente",
+  "expirado",
+  "nao_enviado",
+]);
+
 type LinhaResolvida = {
   linha: PainelJornadaLinha;
   encVigente: number;
@@ -76,20 +105,19 @@ function CelulaEstacao({
     nao_enviado: "border border-dashed border-input text-muted-foreground",
     trancada: "bg-muted/60 text-muted-foreground",
   }[estado];
-  const titulo =
+  const detalhe =
     estado === "trancada"
-      ? `${label} · abre no enc. ${ESTACOES[chave].encIni}`
+      ? `abre no enc. ${ESTACOES[chave].encIni}`
       : atrasada
-        ? `${label} · fora da janela do guia`
-        : `${label} · ${
-            {
-              respondido: "respondido",
-              pendente: "link enviado, aguardando",
-              expirado: "link expirado",
-              nao_enviado: "ainda não enviado",
-              trancada: "ainda não abriu",
-            }[estado]
-          }`;
+        ? "fora da janela do guia"
+        : {
+            respondido: "respondido",
+            pendente: "link enviado, aguardando",
+            expirado: "link expirado",
+            nao_enviado: "ainda não enviado",
+            trancada: "ainda não abriu",
+          }[estado];
+  const titulo = `${label} · ${detalhe}`;
   return (
     <span
       title={titulo}
@@ -106,6 +134,9 @@ function CelulaEstacao({
       {estado === "trancada" && <LockSimple size={11} aria-hidden />}
       {atrasada && <Warning size={11} weight="fill" aria-hidden />}
       {label}
+      {/* o detalhe do estado não pode viver só no title — inalcançável
+          por toque/teclado/leitor de tela */}
+      <span className="sr-only"> · {detalhe}</span>
     </span>
   );
 }
@@ -115,9 +146,12 @@ function CelulaEstacao({
 function BarraEstacao({
   chave,
   linhasResolvidas,
+  acao,
 }: {
   chave: EstacaoChave;
   linhasResolvidas: LinhaResolvida[];
+  /** Ação da estação — "Enviar em lote" (coord, quando há pendentes). */
+  acao?: ReactNode;
 }) {
   const contas = { respondido: 0, pendente: 0, aberto: 0, trancada: 0, fora: 0 };
   let feitas = 0;
@@ -145,12 +179,15 @@ function BarraEstacao({
             janela {meta.chipLabel}
           </span>
         </p>
-        {contas.fora > 0 && (
-          <span className="inline-flex items-center gap-1 text-xs font-medium text-[var(--warn-text)]">
-            <Warning size={12} weight="fill" aria-hidden />
-            {contas.fora} fora da janela
-          </span>
-        )}
+        <span className="flex items-center gap-3">
+          {contas.fora > 0 && (
+            <span className="inline-flex items-center gap-1 text-xs font-medium text-[var(--warn-text)]">
+              <Warning size={12} weight="fill" aria-hidden />
+              {contas.fora} fora da janela
+            </span>
+          )}
+          {acao}
+        </span>
       </div>
       {chave === "avaliacao_encontro" ? (
         <p className="text-xs text-muted-foreground">
@@ -224,20 +261,32 @@ export function PainelJornada({
   duplasInfo,
   meuNome,
   ehSupervisor,
+  podeLote = false,
+  envioLiberado = false,
 }: {
   linhas: PainelJornadaLinha[];
   eventos: CicloEvento[];
   nudges: Record<string, Interacao>;
-  /** status + whatsapp do mentor por dupla — o painel agregado não traz
-   *  (fatos de jornada apenas); o Lembrar precisa dos dois pra ser honesto
-   *  (pausada não recebe nudge; o wa.me só abre com telefone real). */
+  /** status + whatsapp do mentor + flags de e-mail por dupla — o painel
+   *  agregado não traz (fatos de jornada apenas). O Lembrar precisa de
+   *  status/whatsapp pra ser honesto; o lote precisa dos flags pra a
+   *  prévia "quem recebe" sem vazar o endereço em si pro client. */
   duplasInfo: Map<
     string,
-    { status: string; mentorWhatsapp: string | null }
+    {
+      status: string;
+      mentorWhatsapp: string | null;
+      jovemTemEmail: boolean;
+      mentorTemEmail: boolean;
+    }
   >;
   meuNome: string;
   /** supervisor = escopo supervisionado; a copy explica a diferença. */
   ehSupervisor: boolean;
+  /** coord only (REALIZA-51) — liga o "Enviar em lote" nas estações. */
+  podeLote?: boolean;
+  /** espelho de EMAIL_ENVIO_LIBERADO — o dialog avisa quando desligado. */
+  envioLiberado?: boolean;
 }) {
   if (!linhas.length) return null;
 
@@ -302,9 +351,10 @@ export function PainelJornada({
               <strong className="text-foreground">Você vê:</strong> o estado
               de cada instrumento de todas as duplas DPP ativas e pausadas.{" "}
               <strong className="text-foreground">Você não vê aqui:</strong>{" "}
-              respostas e links — eles ficam na ficha da dupla, que é onde o
-              detalhe mora. A ação é lembrar o mentor; quem envia o link ao
-              jovem é ele.
+              respostas — elas ficam na ficha da dupla, que é onde o detalhe
+              mora. A ação é “Enviar em lote” nos instrumentos do guia
+              (o link sai por e-mail pro jovem, ou pro mentor repassar)
+              ou lembrar o mentor um a um nas duplas fora da janela.
             </>
           )}
         </p>
@@ -336,13 +386,40 @@ export function PainelJornada({
           Por instrumento
         </h3>
         <ul className="mt-2 space-y-3">
-          {ESTACAO_CHAVES.map((chave) => (
-            <BarraEstacao
-              key={chave}
-              chave={chave}
-              linhasResolvidas={resolvidas}
-            />
-          ))}
+          {ESTACAO_CHAVES.map((chave) => {
+            const sistema = SISTEMA_DA_ESTACAO[chave];
+            const elegiveis: DuplaLote[] = sistema
+              ? resolvidas
+                  .filter((r) => ESTADOS_LOTE.has(r.estados[chave]))
+                  .map((r) => {
+                    const info = duplasInfo.get(r.linha.dupla_id);
+                    return {
+                      duplaId: r.linha.dupla_id,
+                      jovemNome: r.linha.jovem_nome,
+                      mentorNome: r.linha.mentor_nome,
+                      jovemTemEmail: info?.jovemTemEmail ?? false,
+                      mentorTemEmail: info?.mentorTemEmail ?? false,
+                    };
+                  })
+              : [];
+            return (
+              <BarraEstacao
+                key={chave}
+                chave={chave}
+                linhasResolvidas={resolvidas}
+                acao={
+                  podeLote && sistema && elegiveis.length > 0 ? (
+                    <EnviarInstrumentoLote
+                      sistema={sistema}
+                      estacaoTitulo={ESTACOES[chave].titulo}
+                      linhas={elegiveis}
+                      envioLiberado={envioLiberado}
+                    />
+                  ) : undefined
+                }
+              />
+            );
+          })}
         </ul>
       </div>
 

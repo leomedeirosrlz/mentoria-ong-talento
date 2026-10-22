@@ -14,6 +14,7 @@ import {
   type RespostaValor,
 } from "./schema";
 import { erroAmigavel as erroAmigavelBase } from "../utils";
+import type { CorRaca, Genero, PrefGeneroPar } from "../types";
 
 // Actions da engine de formulários (0034).
 // · coordenação: salvar/ativar/excluir forms, gerar e revogar links
@@ -418,7 +419,7 @@ function traduzErroSubmit(message: string): string {
   if (/outra pessoa/i.test(message))
     return "Este link é de outra pessoa. Saia da conta atual e abra o link de novo.";
   if (
-    /^(Responda|Escolha|Marque|Opção inválida|Formato inválido|Use uma data)/i.test(
+    /^(Responda|Escolha|Marque|Opção inválida|Formato inválido|Use uma data|Anexe|Este link atingiu|Recebemos muitas)/i.test(
       message
     )
   )
@@ -456,4 +457,356 @@ export async function submeterRespostaFormulario(
   if (error) return { error: traduzErroSubmit(error.message) };
   if (!data) return { error: "Não foi possível enviar. Tente de novo." };
   return { ok: true };
+}
+
+// ---------- público: upload de anexo (intake, 0115) ----------
+
+/** Upload de arquivo do form público — dois passos: o RPC form_anexo_put
+ *  (security definer) valida o token vivo, confere que o campo é 'arquivo'
+ *  na definição e o mime/tamanho contra ela, e registra os metadados; só
+ *  então o service client grava o objeto no bucket privado. O anon nunca
+ *  ganha write no storage — a policy do bucket é coord-read apenas. */
+export async function subirAnexoFormulario(
+  token: string,
+  campoId: string,
+  fd: FormData
+) {
+  if (await demoAtivo()) return { error: DEMO_MSG };
+  if (!token || !TOKEN_RE.test(token))
+    return { error: "Este link não é válido." };
+  if (!campoId || campoId.length > 60)
+    return { error: "Campo inválido." };
+  const file = fd.get("file");
+  if (!(file instanceof File) || file.size === 0)
+    return { error: "Escolha um arquivo pra enviar." };
+  if (file.size > 20 * 1024 * 1024)
+    return { error: "O arquivo passa de 20 MB." };
+  const nome = (file.name || "anexo").slice(0, 200);
+  const ext = nome.toLowerCase().match(/\.([a-z0-9]+)$/)?.[1] ?? "";
+  if (["exe", "svg", "js", "html", "htm", "bat", "cmd", "sh"].includes(ext))
+    return { error: "Tipo de arquivo não aceito." };
+
+  const supabase = await createClient();
+  const { data: put, error: putErr } = await supabase.rpc("form_anexo_put", {
+    p_token: token,
+    p_campo_id: campoId,
+    p_nome: nome,
+    p_mime: file.type || "application/octet-stream",
+    p_tamanho: file.size,
+  });
+  if (putErr || !put?.path)
+    return {
+      error:
+        putErr?.code === "P0001" && putErr.message
+          ? putErr.message
+          : "Não foi possível enviar o arquivo. Tente de novo.",
+    };
+
+  const { createAdminClient } = await import("@/lib/supabase/admin");
+  const admin = createAdminClient();
+  const { error: upErr } = await admin.storage
+    .from("form-anexos")
+    .upload(put.path, file, { contentType: file.type, upsert: false });
+  if (upErr) {
+    // a linha de metadados órfã some junto — a resposta apontaria pra um
+    // objeto que não existe (o sanitizer confere a linha, não o objeto)
+    await admin.from("formulario_anexos").delete().eq("id", put.id);
+    return { error: "Não foi possível enviar o arquivo. Tente de novo." };
+  }
+  return {
+    ok: true,
+    arquivo: { path: put.path as string, nome, tamanho: file.size },
+  };
+}
+
+// ---------- link de inscrição (intake, 0115) ----------
+
+const SISTEMAS_INTAKE = new Set(["intake_mentor", "intake_mentorado"]);
+
+/** O link de inscrição do form oficial: UM link reutilizável por formulário
+ *  (origem='intake', multi_uso). Vigente = não expirado; a desativação é
+ *  expira_em=now() e gerar de novo cria um endereço novo. Devolve o token
+ *  — a URL pública é /f/<token>. */
+export async function gerarLinkIntake(formularioId: string) {
+  if (await demoAtivo()) return { error: DEMO_MSG };
+  const { supabase, eu, error } = await meCoord();
+  if (error || !eu) return { error: error! };
+  if (!UUID_RE.test(formularioId)) return { error: "Formulário inválido." };
+
+  const { data: form, error: fErr } = await supabase
+    .from("formularios")
+    .select("id, sistema")
+    .eq("id", formularioId)
+    .maybeSingle();
+  if (fErr) return { error: erroAmigavel(fErr) };
+  if (!form) return { error: "Formulário não encontrado." };
+  if (!SISTEMAS_INTAKE.has(form.sistema ?? ""))
+    return { error: "Link de inscrição só existe nos formulários oficiais de intake." };
+
+  const agora = new Date().toISOString();
+  const { data: vigente, error: vErr } = await supabase
+    .from("formulario_links")
+    .select("id, token")
+    .eq("formulario_id", formularioId)
+    .eq("origem", "intake")
+    .or(`expira_em.is.null,expira_em.gt.${agora}`)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (vErr) return { error: erroAmigavel(vErr) };
+  if (vigente) return { ok: true, token: vigente.token, id: vigente.id };
+
+  const { data: criado, error: insErr } = await supabase
+    .from("formulario_links")
+    .insert({
+      formulario_id: formularioId,
+      token: randomBytes(24).toString("base64url"),
+      multi_uso: true,
+      origem: "intake",
+      created_by: eu.id,
+    })
+    .select("id, token")
+    .single();
+  if (insErr) return { error: erroAmigavel(insErr) };
+  revalidatePath(`/formularios/${formularioId}`);
+  return { ok: true, token: criado.token, id: criado.id };
+}
+
+/** Desativa o link de inscrição — o token morre na hora (o público cai no
+ *  card de link expirado). Sem coluna `ativo`: expira_em=now() é o jeito
+ *  que o schema já suporta; gerar de novo cria endereço novo. */
+export async function desativarLinkIntake(linkId: string, formularioId: string) {
+  if (await demoAtivo()) return { error: DEMO_MSG };
+  const { supabase, error } = await meCoord();
+  if (error) return { error };
+  if (!UUID_RE.test(linkId)) return { error: "Link inválido." };
+  const { data, error: upErr } = await supabase
+    .from("formulario_links")
+    .update({ expira_em: new Date().toISOString() })
+    .eq("id", linkId)
+    .eq("origem", "intake")
+    .select("id");
+  if (upErr) return { error: erroAmigavel(upErr) };
+  if (!data?.length) return { error: "Link de inscrição não encontrado." };
+  revalidatePath(`/formularios/${formularioId}`);
+  return { ok: true };
+}
+
+// ---------- promoção: resposta → prefill do cadastro ----------
+
+/** Lê a resposta do intake e devolve o mapa de campos pra abrir o cadastro
+ *  de pessoa já preenchido (papel mentor_dpp). Não grava nada — o carimbo
+ *  promovido_profile_id só acontece depois que a pessoa é criada de fato
+ *  (createPessoa → finalizarPromocaoIntake). */
+export async function promoverRespostaIntake(respostaId: string) {
+  if (await demoAtivo()) return { error: DEMO_MSG };
+  const { supabase, error } = await meCoord();
+  if (error) return { error };
+  if (!UUID_RE.test(respostaId)) return { error: "Resposta inválida." };
+
+  const { data: r, error: rErr } = await supabase
+    .from("formulario_respostas")
+    .select(
+      `id, respostas, promovido_profile_id,
+       link:formulario_links!inner(origem, multi_uso,
+         formulario:formularios!inner(sistema))`
+    )
+    .eq("id", respostaId)
+    .maybeSingle();
+  if (rErr) return { error: erroAmigavel(rErr) };
+  if (!r) return { error: "Resposta não encontrada." };
+  const link = Array.isArray(r.link) ? r.link[0] : r.link;
+  const form = Array.isArray(link?.formulario)
+    ? link.formulario[0]
+    : link?.formulario;
+  if (link?.origem !== "intake" || link?.multi_uso !== true)
+    return { error: "Só respostas do link de inscrição viram cadastro por aqui." };
+  if (r.promovido_profile_id)
+    return { error: "Essa resposta já foi promovida a cadastro." };
+
+  const { prefillDoIntake } = await import("./intake");
+  const prefill = prefillDoIntake(
+    (r.respostas as Record<string, RespostaValor>) ?? {}
+  );
+  if (!prefill.nome || !prefill.email)
+    return {
+      error:
+        "A resposta não tem nome e e-mail preenchidos — cadastre pela ficha manual.",
+    };
+  // o sistema do form confirma a via de promoção (hoje só mentores; a 69
+  // adiciona a via de mentorado com o mesmo shape)
+  if (form?.sistema !== "intake_mentor" && form?.sistema !== "intake_mentorado")
+    return { error: "Esse formulário não é um intake oficial." };
+  return { ok: true, prefill, sistema: form.sistema as string };
+}
+
+/** Confirmação final da promoção (REALIZA-70): depois que a coordenação
+ *  revisa o prefill (promoverRespostaIntake) e confirma, a pessoa é criada
+ *  de verdade por aqui — profile mentor_dpp + mentor_profiles, ou
+ *  mentorado na via da 69. Tudo é re-derivado no servidor: o client só
+ *  manda o id da resposta, nunca os dados. O carimbo promovido_profile_id
+ *  é guard único (.is null) — duas confirmações simultâneas não criam
+ *  duas pessoas: a segunda desfaz o insert e avisa. */
+export async function finalizarPromocaoIntake(respostaId: string) {
+  if (await demoAtivo()) return { error: DEMO_MSG };
+  const { supabase, error } = await meCoord();
+  if (error) return { error };
+  if (!UUID_RE.test(respostaId)) return { error: "Resposta inválida." };
+
+  const { data: r, error: rErr } = await supabase
+    .from("formulario_respostas")
+    .select(
+      `id, respostas, promovido_profile_id,
+       link:formulario_links!inner(origem, multi_uso, formulario_id,
+         formulario:formularios!inner(sistema, campos))`
+    )
+    .eq("id", respostaId)
+    .maybeSingle();
+  if (rErr) return { error: erroAmigavel(rErr) };
+  if (!r) return { error: "Resposta não encontrada." };
+  const link = Array.isArray(r.link) ? r.link[0] : r.link;
+  const form = Array.isArray(link?.formulario)
+    ? link.formulario[0]
+    : link?.formulario;
+  if (link?.origem !== "intake" || link?.multi_uso !== true)
+    return { error: "Só respostas do link de inscrição viram cadastro por aqui." };
+  if (r.promovido_profile_id)
+    return { error: "Essa resposta já foi promovida a cadastro." };
+  const sistema = form?.sistema;
+  const formularioId = link?.formulario_id as string | undefined;
+  if (sistema !== "intake_mentor" && sistema !== "intake_mentorado")
+    return { error: "Esse formulário não é um intake oficial." };
+
+  const { prefillDoIntake, camposArquivo } = await import("./intake");
+  const respostas = (r.respostas as Record<string, RespostaValor>) ?? {};
+  const prefill = prefillDoIntake(respostas);
+  if (!prefill.nome || !prefill.email)
+    return {
+      error:
+        "A resposta não tem nome e e-mail preenchidos — cadastre pela ficha manual.",
+    };
+
+  const { createAdminClient } = await import("@/lib/supabase/admin");
+  const admin = createAdminClient();
+  const ficha = {
+    nome_social: prefill.nome_social || null,
+    data_nascimento: prefill.data_nascimento || null,
+    genero: (prefill.genero || null) as Genero | null,
+    cor_raca: (prefill.cor_raca || null) as CorRaca | null,
+    cidade: prefill.cidade || null,
+    uf: prefill.uf || null,
+    motivacao: prefill.motivacao || null,
+    pref_genero_par: (prefill.pref_genero_par || null) as PrefGeneroPar | null,
+    origem: prefill.origem,
+  };
+
+  let pessoaId: string | null = null;
+  let pessoaTabela: "profiles" | "mentorados" = "profiles";
+  if (sistema === "intake_mentor") {
+    const { data: p, error: insErr } = await supabase
+      .from("profiles")
+      .insert({
+        nome: prefill.nome,
+        email: prefill.email,
+        whatsapp: prefill.whatsapp || null,
+        role: "mentor_dpp",
+        cargo: prefill.cargo || null,
+        empresa: prefill.empresa || null,
+        ...ficha,
+      })
+      .select("id")
+      .single();
+    if (insErr || !p) {
+      return { error: erroAmigavel(insErr ?? { message: "Falha no cadastro." }) };
+    }
+    pessoaId = p.id;
+    const { error: mpErr } = await supabase.from("mentor_profiles").insert({
+      profile_id: p.id,
+      tipo: "dpp",
+      capacidade: 1,
+      experiencia_previa: prefill.experiencia_previa || null,
+      formacao_externa: prefill.formacao_externa || null,
+      disponibilidade: prefill.disponibilidade,
+    });
+    if (mpErr) {
+      await supabase.from("profiles").delete().eq("id", p.id);
+      return { error: erroAmigavel(mpErr) };
+    }
+  } else {
+    pessoaTabela = "mentorados";
+    const { data: m, error: insErr } = await supabase
+      .from("mentorados")
+      .insert({
+        nome: prefill.nome,
+        email: prefill.email || null,
+        whatsapp: prefill.whatsapp || null,
+        objetivos: prefill.motivacao || null,
+        disponibilidade: prefill.disponibilidade,
+        ...ficha,
+      })
+      .select("id")
+      .single();
+    if (insErr || !m) {
+      return { error: erroAmigavel(insErr ?? { message: "Falha no cadastro." }) };
+    }
+    pessoaId = m.id;
+  }
+
+  // foto da inscrição vira avatar — copia bucket privado → avatares
+  // (admin: anon não lê form-anexos). Falha aqui não derruba a promoção:
+  // a ficha abre sem foto, o original segue na resposta.
+  let aviso: string | null = null;
+  const campoFoto = camposArquivo(
+    (form?.campos as FormularioCampo[]) ?? []
+  ).find((c) => c.id === "foto");
+  const fotoVal = campoFoto ? respostas[campoFoto.id] : undefined;
+  const foto =
+    fotoVal && typeof fotoVal === "object" && !Array.isArray(fotoVal)
+      ? (fotoVal as { path?: string; nome?: string })
+      : null;
+  if (foto?.path) {
+    const { data: blob, error: dlErr } = await admin.storage
+      .from("form-anexos")
+      .download(foto.path);
+    if (!dlErr && blob) {
+      const ext =
+        (foto.nome ?? "").toLowerCase().match(/\.([a-z0-9]+)$/)?.[1] ?? "jpg";
+      const destino = `${pessoaId}/${crypto.randomUUID()}.${ext}`;
+      const { error: upErr } = await admin.storage
+        .from("avatares")
+        .upload(destino, blob, { upsert: false });
+      if (!upErr) {
+        const { error: avErr } = await supabase
+          .from(pessoaTabela)
+          .update({ avatar_path: destino })
+          .eq("id", pessoaId);
+        if (avErr) aviso = "Cadastro feito, mas a foto não entrou. Suba na edição.";
+      } else {
+        aviso = "Cadastro feito, mas a foto não entrou. Suba na edição.";
+      }
+    } else {
+      aviso = "Cadastro feito, mas a foto não entrou. Suba na edição.";
+    }
+  }
+
+  // carimbo único: ganha quem chegar primeiro; o perdedor desfaz a pessoa
+  // recém-criada pra não deixar cadastro órfão da resposta
+  const { data: marcada, error: markErr } = await admin
+    .from("formulario_respostas")
+    .update({ promovido_profile_id: pessoaId })
+    .eq("id", respostaId)
+    .is("promovido_profile_id", null)
+    .select("id");
+  if (markErr) {
+    await supabase.from(pessoaTabela).delete().eq("id", pessoaId);
+    return { error: erroAmigavel(markErr) };
+  }
+  if (!marcada?.length) {
+    await supabase.from(pessoaTabela).delete().eq("id", pessoaId);
+    return { error: "Essa resposta acabou de ser promovida em outra aba." };
+  }
+
+  revalidatePath(`/formularios/${formularioId}`);
+  revalidatePath("/pessoas");
+  return { ok: true, aviso, pessoaId, url: `/pessoas/${pessoaId}` };
 }

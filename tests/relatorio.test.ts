@@ -4,6 +4,7 @@ import {
   parseConfig,
   textoCelula,
   type DuplaFonte,
+  type InscricaoFila,
   type PessoaFonte,
   type RelatorioConfig,
 } from "@/lib/relatorio";
@@ -138,6 +139,164 @@ describe("montarLinhas · alvos de edição (paraApp)", () => {
     // contato = whatsapp + email, na ordem da célula
     expect(l.__alvos?.contato_mentor?.map((a) => a.campo)).toEqual(["whatsapp", "email"]);
     expect(l.__alvos?.contato_mentorado?.map((a) => a.campo)).toEqual(["whatsapp", "email"]);
+  });
+});
+
+describe("montarLinhas · fila de espera (turma_inscricoes, 0111)", () => {
+  // espelha a linha crua do banco — a query real filtra status='aguardando'
+  // e a turma pedida antes de chamar montarLinhas; o helper reproduz o
+  // mesmo pipeline pra exercitar a derivação de ponta a ponta
+  type InscricaoRow = {
+    turma: string;
+    status: "aguardando" | "formada" | "desistiu";
+    papel_esperado: "mentor" | "mentorado";
+    profile_id: string | null;
+    mentorado_id: string | null;
+  };
+  const escopoFila = (rows: InscricaoRow[], turma: string | null) =>
+    rows
+      .filter((i) => i.status === "aguardando" && (!turma || i.turma === turma))
+      .flatMap((i): InscricaoFila[] => {
+        if (i.papel_esperado === "mentor" && i.profile_id)
+          return [{ papel_esperado: "mentor", profile_id: i.profile_id }];
+        if (i.papel_esperado === "mentorado" && i.mentorado_id)
+          return [{ papel_esperado: "mentorado", mentorado_id: i.mentorado_id }];
+        return [];
+      });
+
+  const MENTOR_FILA: PessoaFonte = {
+    id: "m-fila",
+    user_id: null,
+    nome: "Carlos Nunes",
+    email: "carlos@ex.com",
+    whatsapp: null,
+    cidade: "Recife",
+    uf: "PE",
+  };
+  const JOVEM_FILA: PessoaFonte = {
+    id: "j-fila",
+    nome: "Bruno Reis",
+    email: "bruno@ex.com",
+    whatsapp: null,
+    cidade: null,
+    uf: null,
+  };
+  const JOVEM_T3: PessoaFonte = {
+    id: "j-t3",
+    nome: "Duda T3",
+    email: null,
+    whatsapp: null,
+    cidade: null,
+    uf: null,
+  };
+  const JOVEM_DESISTENTE: PessoaFonte = { ...JOVEM_FILA, id: "j-desist", nome: "Eva Saiu" };
+  const JOVEM_FORMADA: PessoaFonte = { ...JOVEM_FILA, id: "j-formada", nome: "Fê Formada" };
+
+  const ROWS: InscricaoRow[] = [
+    { turma: "T2 · 2026/2027", status: "aguardando", papel_esperado: "mentor", profile_id: "m-fila", mentorado_id: null },
+    { turma: "T2 · 2026/2027", status: "aguardando", papel_esperado: "mentorado", profile_id: null, mentorado_id: "j-fila" },
+    // já em dupla ativa (m-1 é o mentor de DUPLA) — some da fila
+    { turma: "T2 · 2026/2027", status: "aguardando", papel_esperado: "mentor", profile_id: "m-1", mentorado_id: null },
+    // outra turma — só aparece com recorte nulo
+    { turma: "T3 · 2027", status: "aguardando", papel_esperado: "mentorado", profile_id: null, mentorado_id: "j-t3" },
+    // saíram da fila — a query já não devolve (status ≠ aguardando)
+    { turma: "T2 · 2026/2027", status: "desistiu", papel_esperado: "mentorado", profile_id: null, mentorado_id: "j-desist" },
+    { turma: "T2 · 2026/2027", status: "formada", papel_esperado: "mentorado", profile_id: null, mentorado_id: "j-formada" },
+  ];
+  const profsTodas = mapa(MENTOR, MENTOR_FILA);
+  const mentsTodas = mapa(JOVEM, JOVEM_FILA, JOVEM_T3, JOVEM_DESISTENTE, JOVEM_FORMADA);
+
+  it("inscrito aguardando sem dupla vira linha 'Sem dupla' com os dados dele", () => {
+    const linhas = montarLinhas(
+      CFG_PESSOAS,
+      [DUPLA],
+      profsTodas,
+      mentsTodas,
+      { fila: escopoFila(ROWS, "T2 · 2026/2027") }
+    );
+    const semDupla = linhas.filter((l) => l.__status === "sem_dupla");
+    expect(semDupla).toHaveLength(2);
+    const mentor = semDupla.find((l) => l.__papel === "mentor")!;
+    expect(textoCelula(mentor, "nome")).toBe("Carlos Nunes");
+    expect(textoCelula(mentor, "status_dupla")).toBe("Sem dupla");
+    expect(textoCelula(mentor, "par")).toBe("");
+    const jovem = semDupla.find((l) => l.__papel === "mentorado")!;
+    expect(textoCelula(jovem, "nome")).toBe("Bruno Reis");
+  });
+
+  it("inscrito com dupla ativa não repete na fila (m-1 já tem a dele)", () => {
+    const linhas = montarLinhas(
+      CFG_PESSOAS,
+      [DUPLA],
+      profsTodas,
+      mentsTodas,
+      { fila: escopoFila(ROWS, "T2 · 2026/2027") }
+    );
+    expect(
+      linhas.filter((l) => textoCelula(l, "nome") === "Marta Souza")
+    ).toHaveLength(1); // só a linha da dupla ativa — nada de "Sem dupla" pra ela
+  });
+
+  it("fila de outra turma não vaza no recorte da T2", () => {
+    const linhas = montarLinhas(
+      CFG_PESSOAS,
+      [DUPLA],
+      profsTodas,
+      mentsTodas,
+      { fila: escopoFila(ROWS, "T2 · 2026/2027") }
+    );
+    expect(linhas.some((l) => textoCelula(l, "nome") === "Duda T3")).toBe(false);
+    // …mas aparece quando o recorte é "todas" (a query devolve sem filtro)
+    const todas = montarLinhas(
+      { ...CFG_PESSOAS, turma: null },
+      [DUPLA],
+      profsTodas,
+      mentsTodas,
+      { fila: escopoFila(ROWS, null) }
+    );
+    expect(todas.some((l) => textoCelula(l, "nome") === "Duda T3")).toBe(true);
+  });
+
+  it("desistiu/formada não chegam — o filtro status='aguardando' é da query", () => {
+    const linhas = montarLinhas(
+      CFG_PESSOAS,
+      [DUPLA],
+      profsTodas,
+      mentsTodas,
+      { fila: escopoFila(ROWS, "T2 · 2026/2027") }
+    );
+    for (const nome of ["Eva Saiu", "Fê Formada"]) {
+      expect(linhas.some((l) => textoCelula(l, "nome") === nome), nome).toBe(false);
+    }
+  });
+
+  it("granularidade 'duplas' ignora a fila (linha por dupla, não por pessoa)", () => {
+    const linhas = montarLinhas(
+      CFG_DUPLAS,
+      [DUPLA],
+      profsTodas,
+      mentsTodas,
+      { fila: escopoFila(ROWS, "T2 · 2026/2027") }
+    );
+    expect(linhas).toHaveLength(1);
+    expect(linhas.every((l) => l.__status !== "sem_dupla")).toBe(true);
+  });
+
+  it("paraApp marca os alvos de edição mas sem link de dupla (não há)", () => {
+    const linhas = montarLinhas(
+      CFG_PESSOAS,
+      [DUPLA],
+      profsTodas,
+      mentsTodas,
+      { paraApp: true, fila: escopoFila(ROWS, "T2 · 2026/2027") }
+    );
+    const mentor = linhas.find(
+      (l) => l.__status === "sem_dupla" && l.__papel === "mentor"
+    )!;
+    expect(mentor.__alvos?.nome).toEqual([
+      { tabela: "profiles", id: "m-fila", campo: "nome", valor: "Carlos Nunes" },
+    ]);
+    expect(mentor.__links).toBeUndefined();
   });
 });
 

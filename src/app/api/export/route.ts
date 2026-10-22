@@ -391,24 +391,36 @@ async function exportRespostas(
       | null;
   };
 
-  const linhas = ((links ?? []) as unknown as LinkRaw[])
-    .map((l): LinhaRespostaCsv | null => {
-      const r = norm(l.resposta);
-      if (!r) return null; // link sem resposta não vira linha
+  const linhas = ((links ?? []) as unknown as LinkRaw[]).flatMap(
+    (l): LinhaRespostaCsv[] => {
+      // link de intake (multi_uso) carrega TODAS as respostas — uma linha
+      // por inscrição, não por link
+      const todas = Array.isArray(l.resposta)
+        ? l.resposta
+        : l.resposta
+          ? [l.resposta]
+          : [];
+      if (!todas.length) return [];
       const p = norm(l.dest_profile);
       const m = norm(l.dest_mentorado);
       const dupla = norm(l.dupla);
-      return {
-        destinatario: p?.nome ?? m?.nome ?? "Link genérico",
+      return todas.map((r) => ({
+        // no link anônimo a identidade vem do conteúdo da resposta
+        destinatario:
+          p?.nome ??
+          m?.nome ??
+          (typeof r.respostas?.nome_civil === "string"
+            ? (r.respostas.nome_civil as string)
+            : "Link genérico"),
         tipo: p ? papelLabel(p.role) : m ? "Mentorado" : "Link genérico",
         dupla: dupla
           ? `${norm(dupla.mentor)?.nome ?? ""} ↔ ${norm(dupla.mentorado)?.nome ?? ""}`
           : "",
         respondido_em: r.respondido_em,
         respostas: r.respostas ?? {},
-      };
-    })
-    .filter((l): l is LinhaRespostaCsv => l !== null);
+      }));
+    }
+  );
 
   const campos = (f.campos as unknown as FormularioCampo[]) ?? [];
   return csvResponse(csvRespostas(campos, linhas), nomeCsvRespostas(f.titulo));
@@ -429,8 +441,10 @@ function exportRespostasDemo(
   const linhas: LinhaRespostaCsv[] = [];
   for (const l of links) {
     if (l.formulario_id !== f.id) continue;
-    const r = respostas.find((x) => x.link_id === l.id);
-    if (!r) continue;
+    // multi_uso (intake): TODAS as respostas do link viram linha — a
+    // identidade sai do conteúdo (nome_civil), igual à query real
+    const doLink = respostas.filter((x) => x.link_id === l.id);
+    if (!doLink.length) continue;
     const p = l.dest_profile_id
       ? d.profiles.find((x) => x.id === l.dest_profile_id)
       : null;
@@ -440,15 +454,22 @@ function exportRespostasDemo(
     const dupla = l.dupla_id
       ? d.duplas.find((x) => x.id === l.dupla_id)
       : null;
-    linhas.push({
-      destinatario: p?.nome ?? m?.nome ?? "Link genérico",
-      tipo: p ? papelLabel(p.role) : m ? "Mentorado" : "Link genérico",
-      dupla: dupla
-        ? `${dupla.mentor?.nome ?? ""} ↔ ${dupla.mentorado?.nome ?? ""}`
-        : "",
-      respondido_em: r.respondido_em,
-      respostas: r.respostas,
-    });
+    for (const r of doLink) {
+      linhas.push({
+        destinatario:
+          p?.nome ??
+          m?.nome ??
+          (typeof r.respostas.nome_civil === "string"
+            ? r.respostas.nome_civil
+            : "Link genérico"),
+        tipo: p ? papelLabel(p.role) : m ? "Mentorado" : "Link genérico",
+        dupla: dupla
+          ? `${dupla.mentor?.nome ?? ""} ↔ ${dupla.mentorado?.nome ?? ""}`
+          : "",
+        respondido_em: r.respondido_em,
+        respostas: r.respostas,
+      });
+    }
   }
   return csvResponse(csvRespostas(f.campos, linhas), nomeCsvRespostas(f.titulo));
 }
@@ -755,7 +776,14 @@ function celulaResposta(
   if (typeof valor === "boolean") return valor ? "Sim" : "Não";
   if (campo?.tipo === "sim_nao")
     return valor === "sim" ? "Sim" : valor === "nao" ? "Não" : String(valor);
-  if (campo?.tipo === "data") return respostaFormatada(campo, valor);
+  // objeto (arquivo {path,nome,tamanho}, grade {celulas,horas}) e data —
+  // respostaFormatada devolve o texto legível em vez de "[object Object]"
+  if (
+    campo?.tipo === "data" ||
+    campo?.tipo === "arquivo" ||
+    campo?.tipo === "grid_disponibilidade"
+  )
+    return respostaFormatada(campo, valor);
   return String(valor);
 }
 

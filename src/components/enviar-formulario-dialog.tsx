@@ -67,6 +67,8 @@ export function EnviarFormularioDialog({
   mentorado,
   sugestao,
   trigger,
+  open: openProp,
+  onOpenChange: onOpenChangeProp,
 }: {
   formularios: FormularioOpcao[];
   duplaId: string;
@@ -75,10 +77,17 @@ export function EnviarFormularioDialog({
   /** trecho do título pra sugerir (ex.: "360") — os que casam vêm primeiro e
    *  o primeiro é pré-selecionado */
   sugestao?: string;
-  /** trigger custom — sem ela cai no botão padrão "Enviar formulário" */
-  trigger?: ReactElement;
+  /** trigger custom — sem ela cai no botão padrão "Enviar formulário".
+   *  `null` suprime: o menu "Mais" da ficha abre o dialog controlado. */
+  trigger?: ReactElement | null;
+  /** Modo controlado (opcional): o pai segura o estado — o overflow "Mais"
+   *  abre o dialog fora do popup (REALIZA-157). */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }) {
-  const [open, setOpen] = useState(false);
+  const [openInt, setOpenInt] = useState(false);
+  const open = openProp ?? openInt;
+  const setOpen = onOpenChangeProp ?? setOpenInt;
   // ids únicos por instância — o dialog aparece 2x na ficha (header + 360º)
   const uid = useId();
   const formLabelId = `${uid}-form`;
@@ -145,10 +154,13 @@ export function EnviarFormularioDialog({
     [links, mentor, mentorado, formSel, duplaId, origem]
   );
 
-  function aoAbrir(o: boolean) {
-    setOpen(o);
-    if (o) {
-      // reabre limpo, com a sugestão (ou o 1º ativo) pré-selecionada
+  // reabre limpo, com a sugestão (ou o 1º ativo) pré-selecionada — ajuste na
+  // borda de subida do `open`: no modo controlado a abertura vem da prop e o
+  // Base UI não reemite onOpenChange (mesmo padrão do RemanejarDuplaDialog)
+  const [abertoAntes, setAbertoAntes] = useState(open);
+  if (open !== abertoAntes) {
+    setAbertoAntes(open);
+    if (open) {
       setLinks(null);
       setFormId(ordenados[0]?.id ?? "");
       setPara({ mentor: true, mentorado: true });
@@ -188,17 +200,19 @@ export function EnviarFormularioDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={aoAbrir}>
-      <DialogTrigger
-        render={
-          trigger ?? (
-            <Button variant="outline" size="sm">
-              <PaperPlaneTilt aria-hidden />
-              Enviar formulário
-            </Button>
-          )
-        }
-      />
+    <Dialog open={open} onOpenChange={setOpen}>
+      {trigger !== null && (
+        <DialogTrigger
+          render={
+            trigger ?? (
+              <Button variant="outline" size="sm">
+                <PaperPlaneTilt aria-hidden />
+                Enviar formulário
+              </Button>
+            )
+          }
+        />
+      )}
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Enviar formulário</DialogTitle>

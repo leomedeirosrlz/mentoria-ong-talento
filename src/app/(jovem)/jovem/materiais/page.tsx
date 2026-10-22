@@ -625,6 +625,19 @@ function EstacaoAcao({
   sistema,
   campos,
 }: Omit<EstacaoProps, "n">) {
+  // o PDM virou documento vivo (REALIZA-181): a estação dele sempre
+  // oferece o atalho pro plano — a resposta do instrumento alimenta o doc,
+  // mas é aqui que o jovem co-edita com o mentor
+  const linkPdm =
+    est.chave === "pdm" ? (
+      <Link
+        href="/jovem/pdm"
+        className={buttonVariants({ variant: "outline" })}
+      >
+        Abrir o plano
+        <ArrowRight size={15} data-icon="inline-end" aria-hidden />
+      </Link>
+    ) : null;
   // a estação recorrente usa o fluxo real de avaliação (0071): pendente →
   // dialog do form; feita → a última resposta (o toggle "meu mentor lê"
   // continua lá dentro, onde sempre morou)
@@ -649,13 +662,16 @@ function EstacaoAcao({
   }
   if (est.estado === "feito" && est.respostas && campos.length) {
     return (
-      <ReverRespostaDialog
-        titulo={est.titulo}
-        respondidoEm={est.respondidoEm}
-        sistema={sistema}
-        campos={campos}
-        respostas={est.respostas as Record<string, RespostaValor>}
-      />
+      <>
+        <ReverRespostaDialog
+          titulo={est.titulo}
+          respondidoEm={est.respondidoEm}
+          sistema={sistema}
+          campos={campos}
+          respostas={est.respostas as Record<string, RespostaValor>}
+        />
+        {linkPdm}
+      </>
     );
   }
   if (est.estado === "a_fazer" && est.token) {
@@ -679,10 +695,12 @@ function EstacaoAcao({
           Continuar
           <ArrowRight size={15} data-icon="inline-end" aria-hidden />
         </Link>
+        {linkPdm}
       </div>
     );
   }
-  return null;
+  // estação do PDM feita mas sem resposta/campos na mão: o atalho segue
+  return linkPdm;
 }
 
 /** O corpo do card — data, descrição, "Você escreveu…", detalhe honesto e
@@ -848,9 +866,13 @@ function TrancadasItem({
               {itens.length === 1 ? "estação" : "estações"}
             </span>
             <span className="mt-1 block text-sm font-medium">
+              {/* anti-extensão: 2 primeiros + "+N" — a lista cheia tá logo
+                  abaixo, no corpo expandido do details */}
               {itens
+                .slice(0, 2)
                 .map((l) => `${l.est.titulo} (${quandoAbre(l.est)})`)
                 .join(" · ")}
+              {itens.length > 2 && ` · +${itens.length - 2}`}
             </span>
             <span className="mt-0.5 block text-xs text-muted-foreground">
               Cada uma abre sozinha no encontro certo.
@@ -1151,8 +1173,10 @@ function MateriaisLista({
               </h3>
               <span className="mt-1 block text-sm font-medium">
                 {trancados
+                  .slice(0, 2)
                   .map((m) => `${m.titulo} (enc. ${m.encontro_num})`)
                   .join(" · ")}
+                {trancados.length > 2 && ` · +${trancados.length - 2}`}
               </span>
               <span className="mt-0.5 block text-xs text-muted-foreground">
                 Cada um abre sozinho quando a jornada chega no encontro.
