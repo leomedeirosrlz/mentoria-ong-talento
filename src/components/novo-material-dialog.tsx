@@ -9,7 +9,7 @@ import { TRILHA_LEN } from "@/lib/ciclo";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
+  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -162,9 +162,15 @@ export function NovoMaterialDialog({
       }}
     >
       <DialogTrigger render={<Button size="sm" variant={triggerVariant}><Plus size={16} /> {triggerLabel}</Button>} />
-      <DialogContent>
+      {/* lg: a linha tipo×encontro é grid de 2 colunas — abaixo disso
+          os selects lado a lado ficavam apertados */}
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Adicionar material</DialogTitle>
+          <DialogDescription>
+            O material entra na biblioteca e fica disponível pra quem
+            acompanha a trilha.
+          </DialogDescription>
         </DialogHeader>
         <form onSubmit={submit} className="space-y-4">
           <div className="space-y-2">

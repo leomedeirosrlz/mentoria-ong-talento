@@ -71,7 +71,7 @@ export function EncerrarTrilhaDialog({
           )
         }
       />
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Encerrar a trilha de especialista</DialogTitle>
           <DialogDescription>

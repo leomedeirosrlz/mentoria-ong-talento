@@ -51,7 +51,9 @@ export function ReverRespostaDialog({
           </Button>
         }
       />
-      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
+      {/* xl, não 2xl: a resposta estruturada (roda + áreas, metas) é
+          conteúdo de leitura, não prévia tabular; o scroll vem da base */}
+      <DialogContent className="sm:max-w-xl">
         <DialogHeader>
           <DialogTitle>{titulo}</DialogTitle>
           <DialogDescription>

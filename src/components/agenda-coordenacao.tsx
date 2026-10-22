@@ -42,6 +42,7 @@ export function AgendaCoordenacao({
   cronogramas,
   nudges,
   supervisoes,
+  encerramentosPendentes,
   meuNome,
   hoje,
 }: {
@@ -53,6 +54,9 @@ export function AgendaCoordenacao({
   nudges: Record<string, Interacao>;
   /** Supervisões recentes — a lib recorta a semana corrente. */
   supervisoes: Supervisao[];
+  /** dupla_ids com rito de encerramento aberto (getEncerramentosPendentes)
+   *  — a dupla concluída vira linha "concluir na ficha" na fila. */
+  encerramentosPendentes: ReadonlySet<string>;
   meuNome?: string;
   /** "YYYY-MM-DD" de hoje em São Paulo. */
   hoje: string;
@@ -60,7 +64,13 @@ export function AgendaCoordenacao({
   const agora = new Date();
   const { seg, dom } = semanaBounds(agora);
   const resumos = resumosPorCronograma(duplas, cronogramas, eventos, agora);
-  const acompanhar = paraAcompanhar(duplas, eventos, nudges, agora);
+  const acompanhar = paraAcompanhar(
+    duplas,
+    eventos,
+    nudges,
+    agora,
+    encerramentosPendentes
+  );
   const programa = itensDaSemanaPrograma(
     eventos,
     cronogramas,
@@ -94,26 +104,32 @@ export function AgendaCoordenacao({
       item.saude.apoio.aberto &&
       (item.saude.apoio.origem === "mentorado" ||
         item.saude.apoio.origem === "ambos");
+    // encerramento pendente: a pendência é da coordenação — a fila desenha
+    // o CTA "Concluir rito" (link pra ficha) no lugar do LembreteButton
+    const acaoFicha = item.motivos.includes("encerramento");
     return {
       item,
       destino: apoioDoJovem ? "mentorado" : "mentor",
       rotulo: apoioDoJovem ? "Chamar" : item.rotuloLembrete,
-      lembrete: apoioDoJovem
-        ? {
-            titulo: "A equipe quer te ouvir",
-            corpo:
-              msgsContato("apoio_jovem", {
-                mentoradoNome:
-                  dupla?.mentorado?.nome_social || dupla?.mentorado?.nome,
-                autorNome: meuNome,
-              }).mentorado ?? "",
-          }
-        : dupla
-          ? lembreteDaDupla(dupla, caso, eventos, meuNome)
-          : { titulo: "Lembrete da equipe", corpo: "" },
+      lembrete: acaoFicha
+        ? { titulo: "", corpo: "" } // sem nudge — o CTA é o link da ficha
+        : apoioDoJovem
+          ? {
+              titulo: "A equipe quer te ouvir",
+              corpo:
+                msgsContato("apoio_jovem", {
+                  mentoradoNome:
+                    dupla?.mentorado?.nome_social || dupla?.mentorado?.nome,
+                  autorNome: meuNome,
+                }).mentorado ?? "",
+            }
+          : dupla
+            ? lembreteDaDupla(dupla, caso, eventos, meuNome)
+            : { titulo: "Lembrete da equipe", corpo: "" },
       telefone: apoioDoJovem
         ? (dupla?.mentorado?.whatsapp ?? null)
         : (dupla?.mentor?.whatsapp ?? null),
+      acao: acaoFicha ? ("ficha" as const) : ("lembrete" as const),
     };
   });
 

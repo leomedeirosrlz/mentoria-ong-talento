@@ -190,6 +190,135 @@ test.describe("demo — Minha jornada do mentorado", () => {
       trancados.getByText(/Libera no encontro 16/)
     ).toBeVisible();
   });
+
+  // REALIZA-162 — a ordem física da página (hero → ação → trilha → acervo)
+  // e a trilha como histórico+futuro: a estação aberta NÃO se repete nela
+  // (decisão registrada em page.tsx). Com a janela da Ana toda feita o
+  // "A fazer agora" some de verdade — a prova do bloco com estação aberta
+  // fica no spec app (a fixture com link pendente é de lá).
+  test("ordem da página e trilha sem repetição", async ({ page }) => {
+    await entrarNaDemo(page, "mentorado");
+    await page.goto("/jovem/materiais");
+
+    const nav = page.getByRole("navigation", { name: "Nesta página" });
+    const jornada = page.locator("section#jornada");
+    const acervo = page.locator("section#acervo");
+    const yHero = (
+      await page
+        .getByRole("heading", { name: "Minha jornada", level: 1 })
+        .boundingBox()
+    )?.y;
+    const yNav = (await nav.boundingBox())?.y;
+    const yJornada = (await jornada.boundingBox())?.y;
+    const yAcervo = (await acervo.boundingBox())?.y;
+    if (
+      yHero == null ||
+      yNav == null ||
+      yJornada == null ||
+      yAcervo == null
+    ) {
+      throw new Error("bloco da página sem bounding box");
+    }
+    expect(yHero).toBeLessThan(yNav);
+    expect(yNav).toBeLessThan(yJornada);
+    expect(yJornada).toBeLessThan(yAcervo);
+
+    // "A fazer agora" é condicional: sem estação aberta a seção não
+    // renderiza — nem heading vazio, nem placeholder
+    await expect(
+      page.getByRole("heading", { name: "A fazer agora" })
+    ).toHaveCount(0);
+
+    // a trilha (o <ol> com recibos feitos + trancadas + a bandeira) nunca
+    // carrega estação aberta: sem pill "A fazer" e sem link de formulário
+    const listaTrilha = jornada.locator("ol");
+    await expect(listaTrilha).toHaveCount(1);
+    await expect(
+      listaTrilha.getByText("A fazer", { exact: true })
+    ).toHaveCount(0);
+    await expect(listaTrilha.locator('a[href^="/f/"]')).toHaveCount(0);
+  });
+
+  test("acervo em grade: 1 coluna no celular, 2 no tablet, 3 no desktop", async ({
+    page,
+  }) => {
+    await entrarNaDemo(page, "mentorado");
+    await page.goto("/jovem/materiais");
+
+    // a grade dos prontos — no dataset demo o grupo visível é "Links"
+    // (2 materiais); os demais entram nos mesmos contêineres de grid
+    const acervo = page.locator("section#acervo");
+    const grupoLinks = acervo.locator("section", {
+      has: page.getByRole("heading", { name: "Links", exact: true }),
+    });
+    const grade = grupoLinks.locator("div.grid");
+    await expect(grade).toHaveCount(1);
+    const trilhos = () =>
+      grade.evaluate(
+        (el) => getComputedStyle(el).gridTemplateColumns.split(" ").length
+      );
+
+    // o jovem usa celular — a coluna única é o estado base, nunca regrediu
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expect.poll(trilhos).toBe(1);
+    // o meio da faixa sm–xl (640–1279px): duas colunas com folga — o
+    // ~900px do "não fica apertado" da spec
+    await page.setViewportSize({ width: 900, height: 800 });
+    await expect.poll(trilhos).toBe(2);
+    // ≥1280px: três colunas — a densidade desktop da issue
+    await page.setViewportSize({ width: 1366, height: 900 });
+    await expect.poll(trilhos).toBe(3);
+
+    // prova de layout honesta: os dois cards dividem a mesma linha no
+    // desktop e voltam a empilhar no celular
+    const cards = grade.locator(":scope > *");
+    await expect(cards).toHaveCount(2);
+    const b1 = await cards.nth(0).boundingBox();
+    const b2 = await cards.nth(1).boundingBox();
+    if (!b1 || !b2) throw new Error("card do acervo sem bounding box");
+    expect(b1.x).toBeLessThan(b2.x);
+    expect(Math.abs(b1.y - b2.y)).toBeLessThan(4);
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    const m1 = await cards.nth(0).boundingBox();
+    const m2 = await cards.nth(1).boundingBox();
+    if (!m1 || !m2) throw new Error("card do acervo sem bounding box");
+    expect(m1.y).toBeLessThan(m2.y);
+
+    // "em breve" nunca entra na vitrine: mora no grupo apagado "A caminho"
+    await expect(
+      acervo.locator("div.grid").getByText("em breve")
+    ).toHaveCount(0);
+    await expect(acervo.getByText("A caminho")).toBeVisible();
+    await expect(acervo.getByText("em breve").first()).toBeVisible();
+  });
+
+  test("prefers-reduced-motion: a entrada não bloqueia a leitura", async ({
+    page,
+  }) => {
+    await entrarNaDemo(page, "mentorado");
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.goto("/jovem/materiais");
+
+    // o guard global de globals.css zera duração e delay do stagger — os
+    // cards pintam direto, sem janela de opacidade zero (o computed vem
+    // serializado em segundos: 0.01ms → "1e-05s")
+    const { dur, delay } = await page
+      .locator(".animate-enter")
+      .first()
+      .evaluate((el) => {
+        const cs = getComputedStyle(el);
+        return { dur: cs.animationDuration, delay: cs.animationDelay };
+      });
+    expect(parseFloat(dur)).toBeLessThan(0.05);
+    expect(parseFloat(delay)).toBeLessThan(0.05);
+    await expect(
+      page.getByRole("heading", { name: "Minha jornada", level: 1 })
+    ).toBeVisible();
+    await expect(
+      page.locator("section#acervo").getByRole("heading", { name: "Links" })
+    ).toBeVisible();
+  });
 });
 
 test.describe("demo — painel Progresso da jornada (staff)", () => {

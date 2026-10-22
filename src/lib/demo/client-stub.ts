@@ -735,9 +735,14 @@ async function rpcDemo(
       const mapa = papel ? demoTrilhasDosJovens(papel, [id]) : {};
       return { data: mapa[id] ?? [], error: null, count: null };
     }
-    // jsonb ou null — null quando o token não existe
+    // jsonb ou null — null quando o token não existe; a identidade (0070)
+    // compara o destinatário com a persona do cookie, igual à RPC
     case "assinatura_por_token":
-      return { data: demoAssinaturaPorToken(token), error: null, count: null };
+      return {
+        data: papel ? demoAssinaturaPorToken(papel, token) : null,
+        error: null,
+        count: null,
+      };
     // objeto único ou null (0051+0053): o recorte AssinaturaVia só existe
     // depois de assinada; pendente/revogada/expirada devolve null
     case "assinatura_completa_por_token": {

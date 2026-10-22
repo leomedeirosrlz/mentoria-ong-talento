@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -69,9 +70,13 @@ export function EventoCronogramaDialog({
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-lg">
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>{titulo}</DialogTitle>
+          <DialogDescription>
+            O evento oficial do ciclo — a data e o conteúdo valem pra todas
+            as duplas deste cronograma.
+          </DialogDescription>
         </DialogHeader>
         <FormularioEvento
           inicial={inicial}

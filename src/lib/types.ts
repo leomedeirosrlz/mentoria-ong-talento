@@ -597,7 +597,12 @@ export type Notificacao = {
     | "devolutiva_especialista"
     | "lembrete"
     // 0103 — resposta da avaliação por terceiros chegou (submit público)
-    | "terceiro_respondeu";
+    | "terceiro_respondeu"
+    // 0108 — lembretes do prazo de 3 meses da trilha esp (tick diário):
+    // trilha_prazo → especialista (15d/7d/vencida); trilha_prazo_coord →
+    // coordenação no escopo da turma (só vencida)
+    | "trilha_prazo"
+    | "trilha_prazo_coord";
   titulo: string;
   corpo: string | null;
   href: string | null;

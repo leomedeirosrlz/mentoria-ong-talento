@@ -31,12 +31,17 @@ import { entrarNaDemo, expect, test } from "../helpers";
 //     passo pendente — entra na fila como "Lembrar registro"; depois das
 //     19h30 o 2º passo cai em limbo e o rótulo vira "Lembrar" (a regex cobre
 //     os dois)
+//   · d-rito (Gustavo · Ricardo): a concluída com o rito de encerramento
+//     aberto — pendência da coordenação, CTA "Concluir rito" linkando a
+//     ficha (REALIZA-172)
 // Público, sem writes: o LembreteButton do modo demo responde o toast
 // "Modo demo — nada é enviado de verdade." — a superfície vale em qualquer
 // deploy, produção inclusive.
 
 // uid(0x0602) — dupla do Caio, id estável do dataset demo
 const DUPLA_PEND = "de000000-0000-4000-8000-000000001538";
+// uid(0x060e) — a concluída do Ricardo com o rito de encerramento aberto
+const DUPLA_RITO = "de000000-0000-4000-8000-000000001550";
 
 const TZ = "America/Sao_Paulo";
 /** "YYYY-MM-DD" de hoje em São Paulo — mesma régua do `hoje` da page. */
@@ -325,6 +330,24 @@ test.describe("agenda demo da coordenação — Monitoramento (WP5)", () => {
           .getByRole("button", { name: /^Lembrar( .*)?$/ })
       ).toBeEnabled();
 
+    // d-rito (Gustavo · Ricardo) — a concluída com o rito de encerramento
+    // aberto (REALIZA-172): pendência da coordenação, não da dupla — a
+    // linha leva o badge operacional e o CTA é link pra ficha, sem Lembrar
+    const rito = fila.locator("li", { hasText: "Gustavo · Ricardo" });
+    await expect(rito).toBeVisible();
+    await expect(
+      rito.getByText("Rito de encerramento pendente — concluir na ficha")
+    ).toBeVisible();
+    await expect(
+      rito.getByText("encerramento pendente", { exact: true })
+    ).toBeVisible();
+    await expect(
+      rito.getByRole("link", { name: "Concluir rito" })
+    ).toHaveAttribute("href", `/duplas/${DUPLA_RITO}`);
+    await expect(
+      rito.getByRole("button", { name: /^Lembrar/ })
+    ).toHaveCount(0);
+
     // chips de filtro — cada um conta o recorte; clicar isola as linhas e
     // desliga o agrupamento. A conta do chip casa com a síntese calculada
     // acima (mesma derivacao dos badges)
@@ -335,7 +358,7 @@ test.describe("agenda demo da coordenação — Monitoramento (WP5)", () => {
       chips.getByRole("button", { name: /^Todas · \d+$/ })
     ).toHaveAttribute("aria-pressed", "true");
     await expect(
-      chips.getByRole("button", { name: /^Críticas · 1$/ })
+      chips.getByRole("button", { name: new RegExp(`^Críticas · ${nCriticas}$`) })
     ).toBeVisible();
     const chipRegistro = chips.getByRole("button", {
       name: new RegExp(`^Registro pendente · ${nRegistros}$`),
@@ -355,7 +378,9 @@ test.describe("agenda demo da coordenação — Monitoramento (WP5)", () => {
     ).toHaveCount(0);
     await chips.getByRole("button", { name: /^Todas ·/ }).click();
     await expect(
-      fila.getByRole("heading", { name: "Precisam de intervenção (1)" })
+      fila.getByRole("heading", {
+        name: `Precisam de intervenção (${nCriticas})`,
+      })
     ).toBeVisible();
   });
 
@@ -385,12 +410,15 @@ test.describe("agenda demo da coordenação — Monitoramento (WP5)", () => {
     if (ancoraNaSemana)
       await expect(sec.getByText("turma 2", { exact: true })).toBeVisible();
 
-    // "Abrir chamada" só existe quando o evento de formação é HOJE (a roda
-    // de casos mora no domingo da semana corrente) — nos outros dias a
-    // linha leva só a etiqueta "oficial"
-    const ehDomingo = new Date(`${hojeSP()}T12:00:00`).getDay() === 0;
+    // "Abrir chamada" só existe quando um evento tipo 'formacao' é HOJE.
+    // Na semana corrente o dataset sempre tem três candidatos: a roda de
+    // casos (domingo) e, quando a terça-âncora roda pra semana que vem
+    // (de quarta em diante), os dois encontros de formação da T2 — a
+    // inicial na quinta e a final na sexta da semana corrente. Nos outros
+    // dias a linha leva só a etiqueta "oficial"
+    const chamadaHoje = dow === 0 || dow === 4 || dow === 5;
     const chamada = sec.getByRole("link", { name: "Abrir chamada" });
-    if (ehDomingo) {
+    if (chamadaHoje) {
       await expect(chamada).toHaveAttribute(
         "href",
         `/agenda?aba=calendario&dia=${hojeSP()}`

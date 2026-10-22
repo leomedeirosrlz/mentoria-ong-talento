@@ -12,7 +12,7 @@ import { AfinidadePar } from "@/components/matching-afinidade";
 import { CapacidadeMentorDialog } from "@/components/capacidade-mentor-dialog";
 import { Button } from "@/components/ui/button";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
+  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -375,9 +375,12 @@ export function NovaDuplaDialog() {
       }}
     >
       <DialogTrigger render={<Button size="sm" className="max-sm:w-full"><Plus size={16} /> Nova dupla</Button>} />
-      <DialogContent>
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Formar dupla</DialogTitle>
+          <DialogDescription>
+            Escolha o mentor e o mentorado pra formar a dupla de mentoria.
+          </DialogDescription>
         </DialogHeader>
         <form onSubmit={submit} className="space-y-4">
           {falha && !pronto ? (

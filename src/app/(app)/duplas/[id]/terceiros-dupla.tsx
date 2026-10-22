@@ -300,7 +300,7 @@ function EditarContatoDialog({
   }
 
   return (
-    <DialogContent>
+    <DialogContent className="sm:max-w-md">
       <DialogHeader>
         <DialogTitle>Editar contato</DialogTitle>
         <DialogDescription>
@@ -390,7 +390,7 @@ function NovoContatoDialog({
   }
 
   return (
-    <DialogContent>
+    <DialogContent className="sm:max-w-md">
       <DialogHeader>
         <DialogTitle>Indicar pessoa</DialogTitle>
         <DialogDescription>

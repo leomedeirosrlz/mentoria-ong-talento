@@ -136,7 +136,7 @@ export function SugestaoEspecialistaCard({
       </div>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Confirmar pedido de especialista</DialogTitle>
             <DialogDescription>

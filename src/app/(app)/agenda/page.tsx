@@ -18,6 +18,7 @@ import {
   getSupervisoesRecentes,
 } from "@/lib/queries-supervisao";
 import { getUltimasInteracoes } from "@/lib/interacoes";
+import { getEncerramentosPendentes } from "@/lib/queries-encerramento";
 import {
   getEspecialistas,
   getMinhaGrade,
@@ -215,7 +216,7 @@ export default async function AgendaPage({
   // staff+mentor: ?visao=dpp é o escape explícito pra superfície de mentor
   if (souMentor && aba !== "calendario" && (!papelStaff || visao === "dpp")) {
     const idsDpp = duplasDpp.map((d) => d.id);
-    const [trilhas, supervisoes, solicitacoes, especialistas, nudges] =
+    const [trilhas, supervisoes, solicitacoes, especialistas, nudges, encerramentosPendentes] =
       await Promise.all([
         getTrilhasDosJovens(idsDpp),
         // as duas abas leem supervisões: "minha" pra linha cronológica,
@@ -230,6 +231,11 @@ export default async function AgendaPage({
         // cap de 48h do "Lembrar o jovem" — só o Por mentorado renderiza
         aba === "por-mentorado"
           ? getUltimasInteracoes(idsDpp, "nudge")
+          : Promise.resolve({}),
+        // rito de encerramento aberto (REALIZA-172) — o card do mentorado
+        // concluído sinaliza a peça que falta (autoavaliação do mentor)
+        aba === "por-mentorado"
+          ? getEncerramentosPendentes()
           : Promise.resolve({}),
       ]);
     // o strip "Sua semana" do Por mentorado mostra os MESMOS itens da Minha
@@ -284,6 +290,7 @@ export default async function AgendaPage({
             cronogramas={cronogramas}
             supervisoes={supervisoes}
             nudges={nudges}
+            encerramentosPendentes={encerramentosPendentes}
             itensSemana={itensSemana}
             meuId={me!.id}
             meuNome={me!.nome.split(" ")[0]}
@@ -339,11 +346,15 @@ export default async function AgendaPage({
     abaParam !== "calendario" &&
     diaInicial == null
   ) {
-    const [nudgesCoord, supervisoesCoord] = await Promise.all([
-      getUltimasInteracoes(duplas.map((d) => d.id), "nudge"),
-      // a lib recorta a semana — trago margem (30) pra cobrir ciclos grandes
-      getSupervisoesRecentes(30),
-    ]);
+    const [nudgesCoord, supervisoesCoord, encerramentosPendentes] =
+      await Promise.all([
+        getUltimasInteracoes(duplas.map((d) => d.id), "nudge"),
+        // a lib recorta a semana — trago margem (30) pra cobrir ciclos grandes
+        getSupervisoesRecentes(30),
+        // rito de encerramento aberto — a pendência que vira linha "concluir
+        // na ficha" quando a dupla já concluiu (REALIZA-172)
+        getEncerramentosPendentes(),
+      ]);
     return (
       <div className="space-y-6">
         {avisoVisao}
@@ -355,6 +366,9 @@ export default async function AgendaPage({
           cronogramas={cronogramas}
           nudges={nudgesCoord}
           supervisoes={supervisoesCoord}
+          encerramentosPendentes={
+            new Set(Object.keys(encerramentosPendentes))
+          }
           meuNome={me.nome.split(" ")[0]}
           hoje={hoje}
         />

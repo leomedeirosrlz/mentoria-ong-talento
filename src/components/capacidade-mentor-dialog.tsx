@@ -89,7 +89,8 @@ export function CapacidadeMentorDialog({
       }}
     >
       <DialogTrigger render={trigger} />
-      <DialogContent className="sm:max-w-sm">
+      {/* sem override de largura — sm da base já é o degrau "1 campo" */}
+      <DialogContent>
         <DialogHeader>
           <DialogTitle>Capacidade de {primeiro}</DialogTitle>
           <DialogDescription>

@@ -87,6 +87,9 @@ export type AgendaPorMentoradoProps = {
   supervisoes: Supervisao[];
   /** Último contato por dupla — o "Lembrar o jovem" só conta tipo nudge. */
   nudges: Record<string, Interacao>;
+  /** Rito de encerramento aberto por dupla (getEncerramentosPendentes) —
+   *  dupla_id → a peça do mentor já chegou?. Só a concluída cobra. */
+  encerramentosPendentes: Record<string, { autoavaliacao: boolean }>;
   /** Os MESMOS itens da Minha agenda — o strip "Sua semana" os condensa. */
   itensSemana: AgendaItem[];
   meuId: string;
@@ -123,6 +126,7 @@ export function AgendaPorMentorado({
   cronogramas,
   supervisoes,
   nudges,
+  encerramentosPendentes,
   itensSemana,
   meuId,
   meuNome,
@@ -191,6 +195,11 @@ export function AgendaPorMentorado({
             nudge={
               nudges[dupla.id]?.tipo === "nudge" ? nudges[dupla.id] : null
             }
+            encerramentoPendente={
+              dupla.status === "concluida"
+                ? (encerramentosPendentes[dupla.id] ?? null)
+                : null
+            }
             meuNome={meuNome}
             agora={agora}
             agoraMs={agoraMs}
@@ -220,6 +229,7 @@ function CardMentorado({
   eventos,
   cronogramas,
   nudge,
+  encerramentoPendente,
   meuNome,
   agora,
   agoraMs,
@@ -234,6 +244,9 @@ function CardMentorado({
   cronogramas: Cronograma[];
   /** Último `interacoes` tipo nudge da dupla — alimenta o cap de 48h. */
   nudge: Interacao | null;
+  /** Rito aberto desta dupla (só concluída) — a pendência que o card cobra:
+   *  a autoavaliação do mentor ainda não chegou, ou a decisão é da coord. */
+  encerramentoPendente: { autoavaliacao: boolean } | null;
   /** Primeiro nome do mentor — assina o check-in do Lembrar. */
   meuNome: string;
   agora: Date;
@@ -285,7 +298,9 @@ function CardMentorado({
     .filter((t) => t.status === "pendente" && t.prazo != null && t.prazo < hoje)
     .sort((a, b) => a.prazo!.localeCompare(b.prazo!));
   const semPendencia =
-    registrosPendentes.length === 0 && combinadosVencidos.length === 0;
+    registrosPendentes.length === 0 &&
+    combinadosVencidos.length === 0 &&
+    encerramentoPendente == null;
 
   // trilhas: ativa/pausada rendem bloco aberto; concluída/encerrada viram
   // histórico colapsado (até 3 por jovem no domínio — a lista cabe)
@@ -424,14 +439,19 @@ function CardMentorado({
           hoje={hoje}
         />
       )}
-      {trilhasVivas.length === 0 && !pedidoEmVoo && (
-        <SemTrilhaBlock
-          dupla={dupla}
-          especialistas={especialistas}
-          primeiroNome={primeiroNome}
-          tinhaHistorico={trilhasAnteriores.length > 0}
-        />
-      )}
+      {/* a porta de entrada "sugerir" só faz sentido com a jornada viva —
+          concluída/encerrada não abre trilha nova (a pendência que resta é
+          o rito, já cobrido acima) */}
+      {dupla.status === "ativa" &&
+        trilhasVivas.length === 0 &&
+        !pedidoEmVoo && (
+          <SemTrilhaBlock
+            dupla={dupla}
+            especialistas={especialistas}
+            primeiroNome={primeiroNome}
+            tinhaHistorico={trilhasAnteriores.length > 0}
+          />
+        )}
       {pedidosHistoricos.length > 0 && (
         <PedidosAnterioresLine solicitacoes={pedidosHistoricos} />
       )}
@@ -505,6 +525,35 @@ function CardMentorado({
                 </Link>
               </li>
             ))}
+            {/* rito de encerramento aberto (REALIZA-172): a jornada concluiu
+                mas o fechamento não — a peça que falta depende de quem lê:
+                autoavaliação do mentor ou a decisão da coordenação, ambas na
+                ficha da dupla */}
+            {encerramentoPendente && (
+              <li className="flex flex-wrap items-center gap-3 rounded-lg bg-[var(--warn)]/8 px-3 py-2.5">
+                <FlagCheckered
+                  size={18}
+                  aria-hidden
+                  className="shrink-0 text-[var(--warn-text)]"
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium">
+                    Rito de encerramento pendente
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {encerramentoPendente.autoavaliacao
+                      ? "sua autoavaliação já chegou — a coordenação conclui o rito na ficha"
+                      : "falta sua autoavaliação — o rito fecha na ficha da dupla"}
+                  </p>
+                </div>
+                <Link
+                  href={`/duplas/${dupla.id}`}
+                  className={buttonVariants({ variant: "outline", size: "sm" })}
+                >
+                  Abrir ficha
+                </Link>
+              </li>
+            )}
           </ul>
         )}
       </section>

@@ -14,6 +14,7 @@ const uid = (n: number): string =>
 
 const D_FIM = uid(0x0605);
 const D_OK = uid(0x0601);
+const D_RITO = uid(0x060e); // Ricardo × Gustavo — a concluída com rito aberto
 const S_ACEITA1 = uid(0x2401); // Sofia × Bia — a solicitacao aceita da d-ok
 
 const haDias = (n: number) =>
@@ -36,7 +37,10 @@ function noEscopo(role: AppRole, duplaId: string): boolean {
 // um encerramento por dupla (unique(dupla_id)): a d-fim mostra o rito
 // completo e decidido; a d-ok está em andamento — checklist parcial (360º
 // carimbada pela resposta do Ricardo, revisão do PDM marcada), autoavaliação
-// do mentor e decisão ainda pendentes — a ficha mostra o rito vivo
+// do mentor e decisão ainda pendentes — a ficha mostra o rito vivo; a
+// d-rito é o caso que a agenda cobra (REALIZA-172): dupla JÁ concluída
+// com a decisão aberta — a fila da coordenação aponta pra ficha e o card
+// do mentor sinaliza que a autoavaliação dele ainda falta
 const ENCERRAMENTOS: Record<string, Encerramento> = {
   [D_FIM]: {
     id: uid(0x3201),
@@ -77,6 +81,20 @@ const ENCERRAMENTOS: Record<string, Encerramento> = {
     created_at: haDias(6),
     decidido: null,
   },
+  [D_RITO]: {
+    id: uid(0x4802),
+    dupla_id: D_RITO,
+    tipo: null, // decisão pendente — a linha "concluir na ficha" da agenda
+    checklist: {
+      avaliacao_360_enviada: true,
+    },
+    autoavaliacao_mentor: null, // a peça que o espelho do mentor cobra
+    disponivel_proximo_ciclo: null,
+    resumo_jornada: null,
+    decidido_por: null,
+    created_at: haDias(24),
+    decidido: null,
+  },
 };
 
 export function demoEncerramentoDaDupla(
@@ -85,6 +103,20 @@ export function demoEncerramentoDaDupla(
 ): Encerramento | null {
   if (!noEscopo(role, duplaId)) return null;
   return ENCERRAMENTOS[duplaId] ?? null;
+}
+
+/** Espelho do `.is("tipo", null)` real: ids das rows sem decisão no escopo
+ *  do papel + a peça do mentor (autoavaliação chegou?). A d-ok entra aqui
+ *  mas a dupla segue ativa — quem consome filtra o status, como na query. */
+export function demoEncerramentosPendentes(
+  role: AppRole
+): Record<string, { autoavaliacao: boolean }> {
+  const out: Record<string, { autoavaliacao: boolean }> = {};
+  for (const enc of Object.values(ENCERRAMENTOS)) {
+    if (enc.tipo != null || !noEscopo(role, enc.dupla_id)) continue;
+    out[enc.dupla_id] = { autoavaliacao: enc.autoavaliacao_mentor != null };
+  }
+  return out;
 }
 
 /** Fechamento da trilha de especialista atrelada a uma solicitação — a

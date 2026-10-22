@@ -9,7 +9,7 @@ import { deleteDupla, updateDupla } from "@/lib/actions";
 import type { Dupla, DuplaStatus } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
+  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
 import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
 import { Input } from "@/components/ui/input";
@@ -348,6 +348,10 @@ export function EditarDuplaDialog({ dupla }: { dupla: Dupla }) {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Editar dupla</DialogTitle>
+            <DialogDescription>
+              Os vínculos da dupla: mentor, mentorado, trilha, cronograma,
+              auxiliar executivo e status.
+            </DialogDescription>
           </DialogHeader>
           <form onSubmit={submit} className="space-y-4">
             {falha && !pronto ? (

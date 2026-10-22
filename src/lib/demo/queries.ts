@@ -1630,10 +1630,11 @@ export function demoAssinaturasPessoa(
 
 /** Público da demo: o que assinatura_por_token devolveria — usado pela
  *  página /assinar/<token> quando o cookie demo está ativo. */
-export function demoAssinaturaPorToken(token: string) {
+export function demoAssinaturaPorToken(role: AppRole, token: string) {
   const a = getDemoData().assinaturas.find((x) => x.token === token);
   if (!a) return null;
   const data = getDemoData();
+  const eu = data.personas[role];
   const profile = a.profile_id
     ? data.profiles.find((p) => p.id === a.profile_id)
     : null;
@@ -1653,6 +1654,40 @@ export function demoAssinaturaPorToken(token: string) {
     a.token_expira_em <= new Date().toISOString()
       ? "expirado"
       : a.status;
+  // identidade híbrida (0070, espelho demo — REALIZA-172): o cookie demo é
+  // a "sessão" — a persona logada só abre documento endereçado a ela; doc
+  // de outro profile/mentorado → 'outra_pessoa', como a RPC. Dois desvios
+  // honestos do espelho:
+  //  · 'anon' não existe aqui — quem navega a demo está sempre "logado";
+  //  · autorizacao-responsavel segue 'anon' (não 'signatario_externo'): o
+  //    signatário é o responsável, que nunca tem conta — tratar o link como
+  //    aberto por ele mantém o ÚNICO form de autorização da demo visível
+  //    (o card "encaminhe" continua existindo na real e no código).
+  const meuMentoradoId =
+    data.mentorados.find((m) => m.profile_id === eu.id)?.id ?? null;
+  const identidade =
+    slug === "autorizacao-responsavel"
+      ? ("anon" as const)
+      : a.profile_id != null
+        ? a.profile_id === eu.id
+          ? ("ok" as const)
+          : ("outra_pessoa" as const)
+        : a.mentorado_id != null && a.mentorado_id !== meuMentoradoId
+          ? ("outra_pessoa" as const)
+          : ("ok" as const);
+  // bloqueio de identidade: a RPC devolve o recorte mínimo — sem civis,
+  // como no card de bloqueio real (a PII não sai)
+  if (identidade === "outra_pessoa") {
+    return {
+      id: a.id,
+      status,
+      assinado_em: a.assinado_em,
+      identidade,
+      template: a.template ?? { slug: "", titulo: "", versao: 1 },
+      alvo: { nome: nome ?? "" },
+      civis: null,
+    };
+  }
   const assinavel =
     status === "pendente" &&
     (!a.token_expira_em || a.token_expira_em > new Date().toISOString());
@@ -1677,8 +1712,7 @@ export function demoAssinaturaPorToken(token: string) {
     id: a.id,
     status,
     assinado_em: a.assinado_em,
-    // 0070 — demo não tem sessão autenticada: o link sempre segue o fluxo
-    identidade: "anon" as const,
+    identidade,
     template: a.template ?? { slug: "", titulo: "", versao: 1 },
     alvo: { nome: nome ?? "" },
     civis,

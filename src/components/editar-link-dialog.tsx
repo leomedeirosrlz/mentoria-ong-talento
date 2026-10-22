@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -74,9 +75,12 @@ export function EditarLinkDialog({
           )
         }
       />
-      <DialogContent>
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Editar link da chamada</DialogTitle>
+          <DialogDescription>
+            O link da videochamada que a dupla usa pra entrar no encontro.
+          </DialogDescription>
         </DialogHeader>
         <form
           className="space-y-4"
