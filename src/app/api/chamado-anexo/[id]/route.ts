@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { demoRole } from "@/lib/demo/mode";
+import { apiErro } from "@/lib/api-erro";
 
 // Download de anexo de chamado: a RLS de chamado_anexos já corta quem não
 // vê o chamado (e anexo interno some do autor); o arquivo sai do bucket
@@ -16,18 +17,21 @@ export async function GET(
   const { id } = await params;
 
   if (await demoRole()) {
-    return new NextResponse("Anexo não disponível no modo demo.", {
+    return apiErro("Anexo não disponível no modo demo.", {
       status: 404,
     });
   }
   if (!UUID_RE.test(id)) {
-    return new NextResponse("Anexo não encontrado.", { status: 404 });
+    return apiErro("Anexo não encontrado.", { status: 404 });
   }
 
   const supabase = await createClient();
   const { data: claims } = await supabase.auth.getClaims();
   if (!claims?.claims?.sub) {
-    return new NextResponse("Sessão expirada. Entre de novo.", { status: 401 });
+    return apiErro("Sessão expirada. Entre de novo.", {
+      status: 401,
+      acao: { href: "/login", label: "Ir para o login" },
+    });
   }
 
   const { data: anexo, error } = await supabase
@@ -36,14 +40,14 @@ export async function GET(
     .eq("id", id)
     .maybeSingle();
   if (error || !anexo?.path) {
-    return new NextResponse("Anexo não encontrado.", { status: 404 });
+    return apiErro("Anexo não encontrado.", { status: 404 });
   }
 
   const { data: signed, error: errSign } = await supabase.storage
     .from("chamado-anexos")
     .createSignedUrl(anexo.path, 300);
   if (errSign || !signed?.signedUrl) {
-    return new NextResponse("Anexo não encontrado.", { status: 404 });
+    return apiErro("Anexo não encontrado.", { status: 404 });
   }
   return NextResponse.redirect(signed.signedUrl);
 }

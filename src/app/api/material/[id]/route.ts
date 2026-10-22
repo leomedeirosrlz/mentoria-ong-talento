@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { demoRole } from "@/lib/demo/mode";
 import { getDemoData } from "@/lib/demo/data";
 import { demoPdf } from "@/lib/demo/pdf";
+import { apiErro } from "@/lib/api-erro";
 
 // Download de material oficial: a RLS de materiais deixa qualquer papel ler a
 // row — a autorização de audiência mora na policy do storage.objects, que só
@@ -30,7 +31,7 @@ export async function GET(
       (m?.audiencia === "dpp" && demo === "mentor_dpp") ||
       (m?.audiencia === "especialista" && demo === "mentor_especialista");
     if (!m?.path || !autorizado) {
-      return new NextResponse("Material não encontrado.", { status: 404 });
+      return apiErro("Material não encontrado.", { status: 404 });
     }
     const pdf = demoPdf(m.titulo, m.descricao ?? undefined);
     return new NextResponse(new Uint8Array(pdf), {
@@ -43,7 +44,7 @@ export async function GET(
 
   // id cru no eq() — string malformada vira erro PostgREST (500); uuid ruim é 404
   if (!UUID_RE.test(id)) {
-    return new NextResponse("Material não encontrado.", { status: 404 });
+    return apiErro("Material não encontrado.", { status: 404 });
   }
 
   const supabase = await createClient();
@@ -52,7 +53,10 @@ export async function GET(
   // passa pelo layout (e redirect de login pra API não ajuda ninguém)
   const { data: claims } = await supabase.auth.getClaims();
   if (!claims?.claims?.sub) {
-    return new NextResponse("Sessão expirada. Entre de novo.", { status: 401 });
+    return apiErro("Sessão expirada. Entre de novo.", {
+      status: 401,
+      acao: { href: "/login", label: "Ir para o login" },
+    });
   }
 
   const { data: material, error } = await supabase
@@ -61,17 +65,20 @@ export async function GET(
     .eq("id", id)
     .maybeSingle();
   if (error) {
-    return new NextResponse("Não foi possível abrir o material. Tente de novo.", { status: 500 });
+    return apiErro("Não foi possível abrir o material. Tente de novo.", {
+      status: 500,
+      acao: { href: `/api/material/${id}`, label: "Tentar de novo" },
+    });
   }
   if (!material?.path) {
-    return new NextResponse("Material não encontrado.", { status: 404 });
+    return apiErro("Material não encontrado.", { status: 404 });
   }
 
   const { data: signed, error: signError } = await supabase.storage
     .from("materiais")
     .createSignedUrl(material.path, 300);
   if (signError || !signed?.signedUrl) {
-    return new NextResponse("Não foi possível abrir o material.", { status: 404 });
+    return apiErro("Não foi possível abrir o material.", { status: 404 });
   }
 
   return NextResponse.redirect(signed.signedUrl);

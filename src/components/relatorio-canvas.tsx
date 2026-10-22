@@ -402,12 +402,13 @@ export function RelatorioCanvas({
                       {ativo && <span aria-hidden className="text-[10px]">{ordem!.dir === 1 ? "↑" : "↓"}</span>}
                     </span>
                     {/* alça de redimensionamento — borda direita, como no Sheets;
-                        a linha lime aparece no hover pra entregar a affordance */}
+                        w-5 (20px) centrada na borda: alvo de toque decente no
+                        celular sem engordar a linha visual de 2px */}
                     <span
                       role="separator"
                       aria-orientation="vertical"
                       aria-label={`Redimensionar ${c.label}`}
-                      className="group/hdl absolute inset-y-0 -right-1.5 z-10 w-3 cursor-col-resize touch-none"
+                      className="group/hdl absolute inset-y-0 -right-2.5 z-10 w-5 cursor-col-resize touch-none"
                       onPointerDown={(e) => iniciarDrag(e, c.id)}
                       onClick={(e) => e.stopPropagation()}
                     >
@@ -563,7 +564,10 @@ export function RelatorioCanvas({
                                 }
                               }}
                               className={cn(
-                                "min-w-0 flex-1 rounded-sm bg-background px-1.5 py-0.5 outline-none ring-1 ring-[var(--brand-lime)] disabled:opacity-60",
+                                // text-base/min-h-11 no mobile: evita o auto-zoom
+                                // do iOS (a <table> força text-[13px]) e dá alvo
+                                // de toque; desktop volta ao compacto da grade
+                                "min-w-0 flex-1 rounded-sm bg-background px-1.5 py-0.5 text-base min-h-11 outline-none ring-1 ring-[var(--brand-lime)] disabled:opacity-60 md:min-h-0 md:text-[13px]",
                                 a.campo === "uf" && "w-12 flex-none uppercase"
                               )}
                             />
@@ -590,9 +594,17 @@ export function RelatorioCanvas({
         )}
       </div>
       <p className="mt-2 text-xs text-muted-foreground">
-        Arraste a borda de uma coluna pra redimensionar · clique no título pra ordenar ·
-        clique numa linha e Shift+clique em outra pra selecionar — Ctrl+C copia pra planilha.
-        {editavel && " Clique numa célula destacada pra editar — Enter confirma, Esc desfaz."}
+        {/* a grade rola na horizontal — no touch o gesto é deslizar; as
+            instruções de teclado (Shift/Ctrl/Enter/Esc) só fazem sentido
+            com teclado, então cada linha aparece no seu form factor */}
+        <span className="sm:hidden">
+          Deslize pra ver mais colunas · toque no título pra ordenar.
+        </span>
+        <span className="max-sm:hidden">
+          Arraste a borda de uma coluna pra redimensionar · clique no título pra ordenar ·
+          clique numa linha e Shift+clique em outra pra selecionar — Ctrl+C copia pra planilha.
+          {editavel && " Clique numa célula destacada pra editar — Enter confirma, Esc desfaz."}
+        </span>
       </p>
     </div>
   );

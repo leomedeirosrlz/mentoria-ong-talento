@@ -290,7 +290,7 @@ export function PedirEspecialistaDialog({
           {modo === "dirigido" && (
             <div className="space-y-2">
               <p className="text-sm font-medium">Quem você quer procurar?</p>
-              <ul className="max-h-52 space-y-1.5 overflow-y-auto pr-1">
+              <ul className="max-h-[40dvh] space-y-1.5 overflow-y-auto pr-1">
                 {especialistas.map((e) => {
                   const nome = e.nome_social || e.nome;
                   return (

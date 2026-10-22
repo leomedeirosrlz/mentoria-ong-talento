@@ -108,7 +108,9 @@ export function DadosCivisFields({
           defaultValue={e?.cep ? cepMask(e.cep) : ""}
         />
       </div>
-      <div className="sm:col-span-2 grid grid-cols-[1fr_100px] gap-4">
+      {/* a 320px o grid fixo [1fr_100px] espremia o Logradouro em ~124px —
+          número vira linha própria abaixo de 420px */}
+      <div className="sm:col-span-2 grid grid-cols-1 min-[420px]:grid-cols-[1fr_100px] gap-4">
         <div className="space-y-2">
           <Label htmlFor={n("logradouro")}>Logradouro</Label>
           <Input
@@ -304,7 +306,9 @@ export function AssinaturaForm({
         </p>
       )}
 
-      <Button type="submit" disabled={pending} className="justify-center">
+      {/* w-full no mobile como todo CTA público — no desktop volta ao
+          tamanho natural alinhado à esquerda do form */}
+      <Button type="submit" disabled={pending} className="w-full justify-center sm:w-auto sm:px-8">
         {pending ? (
           <CircleNotch size={16} className="animate-spin" aria-hidden />
         ) : (

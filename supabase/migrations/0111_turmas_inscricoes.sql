@@ -46,7 +46,7 @@ create table if not exists public.relatorio_links (
   -- Novos slugs saem do default: 18 bytes ~ 108 bits (~24c base64url).
   slug text not null unique
     check (slug ~ '^[A-Za-z0-9_-]{12,128}$')
-    default translate(encode(extensions.gen_random_bytes(18),'base64'),'+/=','-_')),
+    default translate(encode(extensions.gen_random_bytes(18),'base64'),'+/=','-_'),
   -- turma dona do link nesta versão; a 170 pode torná-la nullable quando o
   -- config guardar recortes não-por-turma
   turma text not null check (char_length(turma) between 1 and 80),

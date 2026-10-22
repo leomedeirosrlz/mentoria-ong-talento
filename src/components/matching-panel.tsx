@@ -170,7 +170,7 @@ export function MatchingPanel({
                 trigger={
                   <button
                     type="button"
-                    className="rounded-sm font-medium text-foreground underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className="-my-2 min-h-11 rounded-sm font-medium text-foreground underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:my-0 sm:min-h-0"
                   >
                     aumentar capacidade →
                   </button>

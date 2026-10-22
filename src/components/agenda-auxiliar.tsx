@@ -264,7 +264,7 @@ function AbasAuxiliar({ consolidada }: { consolidada: boolean }) {
     <div
       role="tablist"
       aria-label="Modos da agenda"
-      className="flex w-fit items-center gap-1 rounded-lg bg-muted p-1"
+      className="scroll-fina flex w-fit max-w-full items-center gap-1 overflow-x-auto rounded-lg bg-muted p-1"
     >
       {(
         [
@@ -280,7 +280,7 @@ function AbasAuxiliar({ consolidada }: { consolidada: boolean }) {
           }
           href={href}
           className={cn(
-            "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+            "inline-flex min-h-11 shrink-0 items-center rounded-md px-3 text-sm font-medium transition-colors sm:min-h-8",
             (v === "consolidada") === consolidada
               ? "bg-card text-foreground shadow-sm"
               : "text-muted-foreground hover:text-foreground"
@@ -400,7 +400,7 @@ function CardDuplaAux({
         )}
         <Link
           href={`/duplas/${d.id}`}
-          className="inline-flex min-h-9 items-center rounded-lg px-2 text-xs font-semibold text-foreground/80 transition-colors hover:bg-muted hover:text-foreground"
+          className="inline-flex min-h-11 items-center rounded-lg px-2 text-xs font-semibold text-foreground/80 transition-colors hover:bg-muted hover:text-foreground sm:min-h-8"
         >
           Ver ficha ›
         </Link>
@@ -598,7 +598,7 @@ function LinhaConsolidada({
                 {item.tipo === "encontro" && item.href && (
                   <Link
                     href={item.href}
-                    className="inline-flex min-h-9 items-center rounded-lg px-2 text-xs font-semibold text-foreground/80 transition-colors hover:bg-muted hover:text-foreground"
+                    className="inline-flex min-h-11 items-center rounded-lg px-2 text-xs font-semibold text-foreground/80 transition-colors hover:bg-muted hover:text-foreground sm:min-h-8"
                   >
                     Ver ficha ›
                   </Link>

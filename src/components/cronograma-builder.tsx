@@ -222,7 +222,7 @@ export function CronogramaBuilder({
     });
   }
 
-  const inputSm = "h-9";
+  const inputSm = "h-11 sm:h-9";
 
   if (etapa === "previa") {
     const editandoLinha = linhas.find((l) => l.key === editando) ?? null;

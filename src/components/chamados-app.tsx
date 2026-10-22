@@ -538,7 +538,9 @@ export function ChamadoDetalhe({
               </span>
               <span
                 className={cn(
-                  "truncate text-xs",
+                  // rótulo quebra em 2 linhas em tela estreita — truncar
+                  // cortava "Em atendimento" no mobile
+                  "whitespace-normal text-xs leading-tight",
                   p.atual ? "font-medium text-foreground" : "text-muted-foreground"
                 )}
               >

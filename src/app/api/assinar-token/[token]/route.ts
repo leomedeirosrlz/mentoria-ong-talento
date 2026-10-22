@@ -4,6 +4,7 @@ import { demoRole } from "@/lib/demo/mode";
 import { demoAssinaturaCompletaPorToken } from "@/lib/demo/queries";
 import { renderDocumentoAssinado } from "@/lib/documentos/pdf";
 import { nomeArquivoVia } from "@/lib/documentos/texto";
+import { apiErro } from "@/lib/api-erro";
 import type { AssinaturaVia } from "@/lib/types";
 
 // Via assinada do documento, por token — o "download" do fluxo sem login.
@@ -31,15 +32,24 @@ export async function GET(
 ) {
   const { token } = await params;
   if (!TOKEN_RE.test(token)) {
-    return new NextResponse("Link inválido.", { status: 400 });
+    return apiErro("Link inválido.", {
+      status: 400,
+      titulo: "Link inválido",
+      acao: {
+        href: "mailto:mentoria@realiza.vc",
+        label: "Falar com a equipe",
+      },
+    });
   }
 
   // modo demo: mesmo contrato da RPC — a via só existe depois de assinada
   if (await demoRole()) {
     const a = demoAssinaturaCompletaPorToken(token);
     if (!a) {
-      return new NextResponse("Documento não encontrado. A assinatura ainda não foi concluída.", {
+      return apiErro("Documento não encontrado. A assinatura ainda não foi concluída.", {
         status: 404,
+        titulo: "Documento não encontrado",
+        acao: { href: `/assinar/${token}`, label: "Voltar para a página de assinatura" },
       });
     }
     return pdfResponse(await renderDocumentoAssinado(a, null), nomeArquivoVia(a));
@@ -51,16 +61,19 @@ export async function GET(
     p_token: token,
   });
   if (error) {
-    return new NextResponse("Não foi possível abrir o documento. Tente de novo.", {
+    return apiErro("Não foi possível abrir o documento. Tente de novo.", {
       status: 500,
+      acao: { href: `/api/assinar-token/${token}`, label: "Tentar de novo" },
     });
   }
   // 0051: a RPC devolve o objeto único ou null; 0053: o objeto é o recorte
   // AssinaturaVia (evidência + template), não a row inteira
   const assinatura = (data ?? null) as AssinaturaVia | null;
   if (!assinatura) {
-    return new NextResponse("Documento não encontrado. A assinatura ainda não foi concluída.", {
+    return apiErro("Documento não encontrado. A assinatura ainda não foi concluída.", {
       status: 404,
+      titulo: "Documento não encontrado",
+      acao: { href: `/assinar/${token}`, label: "Voltar para a página de assinatura" },
     });
   }
 

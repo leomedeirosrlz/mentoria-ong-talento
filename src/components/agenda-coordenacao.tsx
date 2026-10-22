@@ -201,7 +201,7 @@ export function AgendaCoordenacao({
               {" · "}
               <Link
                 href="/chamados"
-                className="font-medium text-foreground underline decoration-muted-foreground/40 underline-offset-2 transition-colors hover:text-primary"
+                className="-my-1 py-1 font-medium text-foreground underline decoration-muted-foreground/40 underline-offset-2 transition-colors hover:text-primary"
               >
                 {sintese.apoioAberto}{" "}
                 {sintese.apoioAberto === 1
@@ -321,7 +321,7 @@ function LinhaResumo({ r }: { r: ResumoTurmaCard }) {
             <Link
               href={`/agenda?aba=calendario&dia=${r.eventoData}`}
               aria-label={`${titulo} · ${r.turma} — abrir o dia no calendário`}
-              className="rounded-sm underline-offset-2 transition-colors hover:text-primary hover:underline"
+              className="-my-1 rounded-sm py-1 underline-offset-2 transition-colors hover:text-primary hover:underline"
             >
               {titulo}
               <span className="font-normal text-muted-foreground">

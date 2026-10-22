@@ -664,7 +664,9 @@ export function RegistrosFiltros({
             </fieldset>
           </div>
 
-          <DialogFooter>
+          {/* sticky no pé da área rolante do DialogContent — em tela
+              baixa o "Aplicar" não fica escondido abaixo da lista */}
+          <DialogFooter className="sticky bottom-0 bg-popover">
             <Button
               type="button"
               variant="ghost"

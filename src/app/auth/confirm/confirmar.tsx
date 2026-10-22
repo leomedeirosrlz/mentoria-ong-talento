@@ -62,7 +62,7 @@ export function ConfirmarAqui({
 
   if (falhou) {
     return (
-      <div className="min-h-[100dvh] grid place-items-center bg-background px-4">
+      <div className="min-h-[100dvh] grid place-items-center bg-background px-4 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))]">
         <div className="max-w-xs text-center">
           <div
             role="alert"
@@ -87,7 +87,7 @@ export function ConfirmarAqui({
   }
 
   return (
-    <div className="min-h-[100dvh] grid place-items-center bg-background px-4">
+    <div className="min-h-[100dvh] grid place-items-center bg-background px-4 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))]">
       <div className="max-w-xs text-center">
         <div className="mx-auto grid size-10 place-items-center rounded-full bg-muted text-foreground">
           <SignIn size={20} weight="bold" aria-hidden="true" />

@@ -131,7 +131,7 @@ export function DefinirSenhaForm() {
   }
 
   return (
-    <div className="min-h-[100dvh] grid place-items-center bg-background px-4">
+    <div className="min-h-[100dvh] grid place-items-center bg-background px-4 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))]">
       <div className="w-full max-w-sm">
         <div className="mb-8">
           {/* eslint-disable-next-line @next/next/no-img-element */}

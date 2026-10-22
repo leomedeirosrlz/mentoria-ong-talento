@@ -297,6 +297,7 @@ export function MaterialActions({ material, maxEncontro }: { material: Material;
                 <Label htmlFor="mat-encontro">Encontro (nº, opcional)</Label>
                 <Input
                   id="mat-encontro" name="encontro_num" type="number"
+                  inputMode="numeric"
                   min={1} max={maxEncontroSel}
                   defaultValue={material.encontro_num ?? ""}
                 />
