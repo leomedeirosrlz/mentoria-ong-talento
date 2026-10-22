@@ -37,14 +37,23 @@ export function SugerirEspecialistaDialog({
   especialistas,
   nomeJovem,
   trigger,
+  open: openProp,
+  onOpenChange: onOpenChangeProp,
 }: {
   mentoradoId: string;
   duplaDppId: string;
   especialistas: { id: string; nome: string; areas: string[] | null }[];
   nomeJovem: string;
-  trigger?: React.ReactElement;
+  /** Elemento do trigger — default é o botão padrão da casa. `null` suprime:
+   *  o menu "Mais" da ficha abre o dialog controlado (REALIZA-157). */
+  trigger?: React.ReactElement | null;
+  /** Modo controlado (opcional): o pai segura o estado. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }) {
-  const [open, setOpen] = useState(false);
+  const [openInt, setOpenInt] = useState(false);
+  const open = openProp ?? openInt;
+  const setOpen = onOpenChangeProp ?? setOpenInt;
   const [pending, start] = useTransition();
   const [demandaLen, setDemandaLen] = useState(0);
   const [esp, setEsp] = useState(QUALQUER);
@@ -78,27 +87,32 @@ export function SugerirEspecialistaDialog({
     });
   }
 
+  // estado fresco por abertura — ajuste na borda de subida do `open`: no
+  // modo controlado a abertura vem da prop e o Base UI não reemite
+  // onOpenChange (mesmo padrão do RemanejarDuplaDialog)
+  const [abertoAntes, setAbertoAntes] = useState(open);
+  if (open !== abertoAntes) {
+    setAbertoAntes(open);
+    if (open) {
+      setDemandaLen(0);
+      setEsp(QUALQUER);
+    }
+  }
+
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(o) => {
-        setOpen(o);
-        if (o) {
-          setDemandaLen(0);
-          setEsp(QUALQUER);
-        }
-      }}
-    >
-      <DialogTrigger
-        render={
-          trigger ?? (
-            <Button variant="outline" size="sm">
-              <Sparkle size={16} />
-              Sugerir especialista
-            </Button>
-          )
-        }
-      />
+    <Dialog open={open} onOpenChange={setOpen}>
+      {trigger !== null && (
+        <DialogTrigger
+          render={
+            trigger ?? (
+              <Button variant="outline" size="sm">
+                <Sparkle size={16} />
+                Sugerir especialista
+              </Button>
+            )
+          }
+        />
+      )}
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Sugerir especialista pro jovem</DialogTitle>

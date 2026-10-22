@@ -91,9 +91,20 @@ function RodaResultado({
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-4 sm:grid-cols-[auto_1fr] sm:items-center">
+      {/* ≥lg: a roda veste a coroa de nomes de área (variante A —
+          REALIZA-143) e empilha com a lista; abaixo disso fica a
+          moldura compacta de sempre lado a lado com as notas */}
+      <div className="grid gap-4 sm:grid-cols-[auto_1fr] sm:items-center lg:grid-cols-1">
         <div className="text-center">
-          <RodaSvg roda={roda} className="max-w-[280px] sm:max-w-[300px]" />
+          <RodaSvg
+            roda={roda}
+            className="max-w-[280px] sm:max-w-[300px] lg:hidden"
+          />
+          <RodaSvg
+            roda={roda}
+            rotuloEixos
+            className="hidden lg:block lg:max-w-[460px]"
+          />
           <p className="mt-1 text-sm text-muted-foreground">
             {roda.media != null && (
               <>
@@ -110,7 +121,7 @@ function RodaResultado({
         </div>
         {/* nota por área agrupada por quadrante — a barra repete a leitura
             do polígono pra quem precisa do número exato */}
-        <div className="space-y-3">
+        <div className="space-y-3 lg:grid lg:grid-cols-2 lg:gap-x-6 lg:gap-y-4 lg:space-y-0 lg:self-start">
           {roda.quadrantes.map((q) => (
             <div key={q.nome || "geral"}>
               {q.nome && (

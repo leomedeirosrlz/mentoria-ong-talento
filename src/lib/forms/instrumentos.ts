@@ -143,6 +143,40 @@ export function rotuloQuadrante(
   };
 }
 
+/** Distância além do aro onde nasce a coroa de rótulos de área no modo
+ *  desktop (variante A — REALIZA-143): cada eixo ganha o nome da área no
+ *  lugar do número 1–16. */
+export const RODA_ROTULO_GAP = 16;
+
+/** Quebra o rótulo de uma área da roda em até 2 linhas curtas pra coroar
+ *  o desenho no desktop (REALIZA-143, mesmo corte do mock
+ *  instrumentos/v1: "Saúde e\ndisposição", "Escola /\nuniversidade").
+ *  Preenchimento guloso por palavra com teto de `max` caracteres por
+ *  linha; um "/" solto cola na linha corrente, nunca abre a próxima.
+ *  Palavra única maior que `max` fica inteira na sua linha; o excedente
+ *  de uma 3ª linha fecha na 2ª (rótulo editado gigante estoura a linha
+ *  em vez de sumir). */
+export function quebraRotuloEixo(label: string, max = 14): string[] {
+  const palavras = label.trim().split(/\s+/).filter(Boolean);
+  const linhas: string[] = [];
+  let atual = "";
+  for (const w of palavras) {
+    if (w === "/" && atual) {
+      atual = `${atual} /`;
+      continue;
+    }
+    const cand = atual ? `${atual} ${w}` : w;
+    if (!atual || cand.length <= max) {
+      atual = cand;
+      continue;
+    }
+    linhas.push(atual);
+    atual = w;
+  }
+  if (atual) linhas.push(atual);
+  return linhas.length <= 2 ? linhas : [linhas[0], linhas.slice(1).join(" ")];
+}
+
 export type AlvoPonteiro = {
   /** índice do eixo mais próximo do ângulo apontado */
   indice: number;
