@@ -6,6 +6,7 @@ import {
   type JobContext,
   type JobResult,
 } from "@/lib/jobs";
+import { rodarLembretesTrilha } from "@/lib/jobs-lembretes-trilha";
 
 export const dynamic = "force-dynamic";
 // o diário cabe folgado; a folga é pro backfill (dias corridos × duplas)
@@ -28,6 +29,9 @@ export const maxDuration = 60;
  */
 const JOBS: Record<string, (ctx: JobContext) => Promise<JobResult>> = {
   saude_snapshots: rodarSaudeSnapshots,
+  // REALIZA-169 — lembretes do prazo de 3 meses da trilha especialista
+  // (15d/7d/vencida; ledger 0108 torna o re-run inócuo)
+  lembretes_trilha: rodarLembretesTrilha,
 };
 
 async function tick(request: NextRequest): Promise<NextResponse> {
