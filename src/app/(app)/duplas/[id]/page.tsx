@@ -4,19 +4,12 @@ import type { Metadata } from "next";
 import {
   BookOpen,
   CalendarBlank,
-  CalendarPlus,
   CaretDown,
   ChatsCircle,
   ClockCounterClockwise,
-  DotsThree,
-  FlagCheckered,
   HandHeart,
-  PaperPlaneTilt,
-  Sparkle,
-  UserPlus,
   VideoCamera,
 } from "@phosphor-icons/react/dist/ssr";
-import { Menu as MenuPrimitive } from "@base-ui/react/menu";
 import { Collapsible } from "@base-ui/react/collapsible";
 import {
   getCicloEventos,
@@ -51,6 +44,7 @@ import {
 import { getSupervisoesDaDupla } from "@/lib/queries-supervisao";
 import { getFormularios, getInstrumentosDaDupla } from "@/lib/forms/queries";
 import { getTerceirosDaDupla } from "@/lib/terceiros/queries";
+import { getPdmDaDupla, getPdmResumo } from "@/lib/queries-pdm";
 import { dadosResumoJornada } from "@/lib/encerramento";
 import { getAnexosPorRegistros } from "@/lib/anexos";
 import { avatarPublicUrl } from "@/lib/avatar";
@@ -113,18 +107,16 @@ import { ResolverApoioButton } from "@/components/resolver-apoio-button";
 import { TrajetoriaAvaliacoes } from "@/components/trajetoria-avaliacoes";
 import { SolicitacaoStatusChip } from "@/components/solicitacao-status-chip";
 import { SolicitacaoNegociacao } from "@/components/solicitacao-negociacao";
-import { SolicitarEspecialistaDialog } from "@/components/solicitar-especialista-dialog";
-import { SugerirEspecialistaDialog } from "@/components/sugerir-especialista-dialog";
 import { DevolutivaComposer } from "@/components/devolutivas-card";
 import { TrilhaJornada } from "@/components/trilha-jornada";
 import { TrilhaPrazoBadge } from "@/components/trilha-prazo-badge";
 import { TrilhaFechamento } from "@/components/trilha-fechamento";
-import { EncerrarTrilhaDialog } from "@/components/encerrar-trilha-dialog";
 import { EncerramentoDupla } from "@/components/encerramento-dupla";
-import { EnviarFormularioDialog } from "@/components/enviar-formulario-dialog";
 import { ResumoJornadaSection } from "@/components/resumo-jornada";
+import { PdmDupla } from "@/components/pdm-dupla";
 import { InstrumentosDupla } from "./instrumentos-dupla";
 import { TerceirosDupla } from "./terceiros-dupla";
+import { DuplaMaisMenu } from "./mais-menu";
 import { DevolutivaEspecialista } from "@/components/devolutiva-especialista";
 import { SupervisaoDialog } from "@/components/supervisao-dialog";
 import { SupervisoesSection } from "@/components/supervisoes-section";
@@ -133,11 +125,6 @@ import { AnexosRegistro } from "@/components/anexos-registro";
 import { RegistroView } from "@/components/registro-view";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { temPapel } from "@/lib/types";
 import type { AvaliacaoLink, Dupla, Encaminhamento, Encontro, Material, RegistroAnexo } from "@/lib/types";
 import { filaMentorados } from "@/lib/fila";
@@ -148,13 +135,6 @@ import {
   ranquearMentores,
 } from "@/lib/remanejo";
 import { cn } from "@/lib/utils";
-
-// mesma pele do DropdownMenuContent (ui/dropdown-menu), composta à mão aqui:
-// o overflow "Mais" precisa de Portal keepMounted — os itens do menu são os
-// próprios triggers dos dialogs, e o unmount do popup ao fechar derrubaria
-// qualquer dialog aberto a partir dele
-const MENU_POPUP =
-  "z-50 max-h-(--available-height) w-56 min-w-32 origin-(--transform-origin) overflow-x-hidden overflow-y-auto rounded-lg bg-popover p-1 text-popover-foreground shadow-[var(--shadow-overlay)] duration-150 ease-[cubic-bezier(0.2,0,0,1)] outline-none data-[side=bottom]:slide-in-from-top-1 data-[side=bottom]:slide-out-to-top-1 data-[side=left]:slide-in-from-right-1 data-[side=left]:slide-out-to-right-1 data-[side=right]:slide-in-from-left-1 data-[side=right]:slide-out-to-left-1 data-[side=top]:slide-in-from-bottom-1 data-[side=top]:slide-out-to-bottom-1 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:overflow-hidden data-closed:fade-out-0 data-closed:zoom-out-95";
 
 /** Pools da sugestão de remanejo (REALIZA-115): mentores do papel da
  *  trilha da dupla ranqueados por afinidade com o mentorado (cheios ficam
@@ -228,7 +208,7 @@ export async function generateMetadata({
 
 export default async function DuplaPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [dupla, eventos, me, materiais, anexosPorRegistro, encerramento, supervisoes, instrumentos, terceiros] =
+  const [dupla, eventos, me, materiais, anexosPorRegistro, encerramento, supervisoes, instrumentos, terceiros, pdm] =
     await Promise.all([
       getDupla(id),
       getCicloEventos(),
@@ -254,6 +234,10 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
       // paralelo do Promise.all via getDupla cacheado, sem +1 RTT serial
       getDupla(id).then((d) =>
         d?.trilha === "dpp" ? getTerceirosDaDupla(id) : null
+      ),
+      // o PDM vivo (0109) — uma RPC devolve o documento inteiro; só DPP
+      getDupla(id).then((d) =>
+        d?.trilha === "dpp" ? getPdmDaDupla(id) : null
       ),
     ]);
   if (!dupla || !me) notFound();
@@ -469,11 +453,15 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
     !dupla.encerrada_em;
   // resumo da jornada — gerado dos dados; o "fim" é o carimbo do fechamento
   // (decisão DPP ou encerrada_em da trilha especialista)
+  // recorte do PDM pro resumo — mesma RPC já cacheada, deriva sem +1 RTT
+  const pdmResumo = !ehEsp ? await getPdmResumo(id) : null;
   const resumoJornada = dadosResumoJornada(
     dupla,
     passos,
     eventosDaDupla,
-    encerramento?.created_at ?? dupla.encerrada_em ?? null
+    encerramento?.created_at ?? dupla.encerrada_em ?? null,
+    new Date(),
+    pdmResumo
   );
   // bloco só vale a pena com história — dupla zerada mostra a trilha, não um
   // relatório vazio
@@ -559,95 +547,6 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
         .sort((a, b) => a.numero - b.numero)[0] ?? null)
     : null;
 
-  // overflow — os dialogs entram pelo trigger custom (Menu.Item é o
-  // Dialog.Trigger de fato); o keepMounted do Portal segura o dialog montado
-  // quando o menu fecha no clique
-  const maisItens: React.ReactNode[] = [];
-  if (pendenteRegistro && podeAgendar) {
-    maisItens.push(
-      <AgendarEncontroDialog
-        key="agendar"
-        duplaId={dupla.id}
-        numero={proximoNumero}
-        atual={encontroAlvo}
-        sugerido={sugeridoProximo}
-        piso={dupla.iniciada_em ?? undefined}
-        jovemNome={primeiroNomeMentorado}
-        trigger={
-          <DropdownMenuItem render={<button type="button" />} nativeButton>
-            <CalendarPlus aria-hidden /> Agendar encontro
-          </DropdownMenuItem>
-        }
-      />
-    );
-  }
-  if (souCoord && (dupla.status === "ativa" || dupla.status === "pausada")) {
-    maisItens.push(
-      <EnviarFormularioDialog
-        key="form"
-        formularios={formulariosAtivos}
-        duplaId={dupla.id}
-        mentor={{
-          id: dupla.mentor.id,
-          nome: dupla.mentor.nome,
-          whatsapp: dupla.mentor.whatsapp,
-        }}
-        mentorado={{
-          id: dupla.mentorado.id,
-          nome: dupla.mentorado.nome,
-          whatsapp: dupla.mentorado.whatsapp,
-        }}
-        trigger={
-          <DropdownMenuItem render={<button type="button" />} nativeButton>
-            <PaperPlaneTilt aria-hidden /> Enviar formulário
-          </DropdownMenuItem>
-        }
-      />
-    );
-  }
-  if (podeSolicitar) {
-    maisItens.push(
-      <SolicitarEspecialistaDialog
-        key="esp"
-        duplaId={dupla.id}
-        especialistas={especialistas}
-        trigger={
-          <DropdownMenuItem render={<button type="button" />} nativeButton>
-            <UserPlus aria-hidden /> Solicitar mentor especialista
-          </DropdownMenuItem>
-        }
-      />
-    );
-  }
-  if (podeSugerir) {
-    maisItens.push(
-      <SugerirEspecialistaDialog
-        key="sug"
-        mentoradoId={dupla.mentorado.id}
-        duplaDppId={dupla.id}
-        especialistas={especialistas}
-        nomeJovem={dupla.mentorado.nome}
-        trigger={
-          <DropdownMenuItem render={<button type="button" />} nativeButton>
-            <Sparkle aria-hidden /> Sugerir especialista pro jovem
-          </DropdownMenuItem>
-        }
-      />
-    );
-  }
-  if (podeEncerrarTrilha) {
-    maisItens.push(
-      <EncerrarTrilhaDialog
-        key="trilha"
-        duplaId={dupla.id}
-        trigger={
-          <DropdownMenuItem render={<button type="button" />} nativeButton>
-            <FlagCheckered aria-hidden /> Encerrar trilha
-          </DropdownMenuItem>
-        }
-      />
-    );
-  }
   const renderEncontro = (passo: PassoGuia) => {
     // DPP: numero é a identidade do passo. Especialista (0074): numero é a
     // TENTATIVA — o passo é o rank entre realizados; várias tentativas miram
@@ -894,28 +793,52 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
             (dupla.status === "ativa" || dupla.status === "pausada") && (
               <RemanejarDuplaDialog dupla={dupla} />
             )}
-          {maisItens.length > 0 && (
-            <DropdownMenu>
-              <DropdownMenuTrigger
-                render={
-                  <Button variant="outline" size="sm">
-                    <DotsThree size={16} weight="bold" /> Mais
-                  </Button>
-                }
-              />
-              <MenuPrimitive.Portal keepMounted>
-                <MenuPrimitive.Positioner
-                  className="isolate z-50 outline-none"
-                  align="end"
-                  sideOffset={4}
-                >
-                  <MenuPrimitive.Popup className={MENU_POPUP}>
-                    {maisItens}
-                  </MenuPrimitive.Popup>
-                </MenuPrimitive.Positioner>
-              </MenuPrimitive.Portal>
-            </DropdownMenu>
-          )}
+          {/* overflow de segunda ordem — cada prop-grupo presente vira um
+              item; os dialogs moram dentro do componente, fora do popup
+              (REALIZA-157). Some sozinho quando nenhuma ação se aplica */}
+          <DuplaMaisMenu
+            duplaId={dupla.id}
+            agendar={
+              pendenteRegistro && podeAgendar
+                ? {
+                    numero: proximoNumero,
+                    atual: encontroAlvo,
+                    sugerido: sugeridoProximo,
+                    piso: dupla.iniciada_em ?? undefined,
+                    jovemNome: primeiroNomeMentorado,
+                  }
+                : null
+            }
+            formulario={
+              souCoord &&
+              (dupla.status === "ativa" || dupla.status === "pausada")
+                ? {
+                    formularios: formulariosAtivos,
+                    mentor: {
+                      id: dupla.mentor.id,
+                      nome: dupla.mentor.nome,
+                      whatsapp: dupla.mentor.whatsapp,
+                    },
+                    mentorado: {
+                      id: dupla.mentorado.id,
+                      nome: dupla.mentorado.nome,
+                      whatsapp: dupla.mentorado.whatsapp,
+                    },
+                  }
+                : null
+            }
+            solicitar={podeSolicitar ? { especialistas } : null}
+            sugerir={
+              podeSugerir
+                ? {
+                    mentoradoId: dupla.mentorado.id,
+                    nomeJovem: dupla.mentorado.nome,
+                    especialistas,
+                  }
+                : null
+            }
+            encerrar={podeEncerrarTrilha}
+          />
         </div>
       </header>
 
@@ -1156,6 +1079,21 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
               podeEnviar={souCoord || souMentor}
               jornadaViva={
                 dupla.status === "ativa" || dupla.status === "pausada"
+              }
+            />
+          )}
+
+          {/* o PDM vivo (REALIZA-181) — logo depois dos instrumentos que o
+              alimentam: o mentor edita (a jovem edita na área dela), coord
+              e supervisor leem o mesmo documento */}
+          {!ehEsp && pdm && (
+            <PdmDupla
+              duplaId={dupla.id}
+              doc={pdm}
+              mentoradoNome={dupla.mentorado.nome}
+              podeEditar={
+                souMentor &&
+                (dupla.status === "ativa" || dupla.status === "pausada")
               }
             />
           )}

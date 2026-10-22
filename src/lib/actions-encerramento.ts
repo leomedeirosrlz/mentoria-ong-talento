@@ -11,6 +11,7 @@ import {
   dadosResumoJornada,
   textoResumoJornada,
 } from "./encerramento";
+import { getPdmResumo } from "./queries-pdm";
 import { erroAmigavel as erroAmigavelBase } from "./utils";
 import type {
   CicloEvento,
@@ -156,8 +157,11 @@ export async function registrarEncerramento(
   );
   const passos = passosDaTrilha("dpp", evsDaDupla);
   const agora = new Date();
+  // o PDM vivo entra no snapshot: as metas atingidas com datas já são a
+  // retro que o checklist "PDM revisado" pede (o item em si segue manual)
+  const pdmResumo = await getPdmResumo(duplaId).catch(() => null);
   const resumoJornada = textoResumoJornada(
-    dadosResumoJornada(duplaParaResumo, passos, evsDaDupla, agora.toISOString(), agora)
+    dadosResumoJornada(duplaParaResumo, passos, evsDaDupla, agora.toISOString(), agora, pdmResumo)
   );
 
   const { error: errEnc } = await supabase.from("encerramentos").upsert(
