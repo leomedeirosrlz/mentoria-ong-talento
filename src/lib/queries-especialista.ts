@@ -381,6 +381,9 @@ export const getTrilhasDosJovens = cache(
 export type AvaliacaoEspDupla = {
   respondido: boolean;
   respondido_em: string | null;
+  /** o form oficial — a coord usa pra linkar /formularios/[id] e chegar
+   *  nas respostas */
+  formulario_id?: string | null;
   /** vem só quando o caller é o especialista da trilha (o respondente) —
    *  a coord recebe o estado e opera o link por /formularios/[id]. */
   token?: string | null;

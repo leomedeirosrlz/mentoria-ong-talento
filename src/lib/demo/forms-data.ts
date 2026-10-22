@@ -1232,7 +1232,12 @@ export function demoInstrumentosDaDupla(
 export function demoAvaliacaoEspDaDupla(
   role: AppRole,
   duplaId: string
-): { respondido: boolean; respondido_em: string | null; token?: string } | null {
+): {
+  respondido: boolean;
+  respondido_em: string | null;
+  formulario_id?: string;
+  token?: string;
+} | null {
   const data = getDemoData();
   const dupla = data.duplas.find((d) => d.id === duplaId);
   if (!dupla || dupla.trilha !== "especialista") return null;
@@ -1249,6 +1254,7 @@ export function demoAvaliacaoEspDaDupla(
   return {
     respondido: link.usado_em != null,
     respondido_em: link.usado_em,
+    formulario_id: link.formulario_id,
     token: dupla.mentor?.id === eu.id ? link.token : undefined,
   };
 }

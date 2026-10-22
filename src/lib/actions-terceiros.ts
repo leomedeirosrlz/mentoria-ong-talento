@@ -132,7 +132,7 @@ export async function atualizarContatoTerceiro(
     .eq("id", contatoId);
   if (error) return { error: traduzErro(error.message) };
   if (!count)
-    return { error: "Só dá pra editar convite pendente da sua dupla." };
+    return { error: "Só dá pra editar convite pendente ou expirado da sua dupla." };
   return { ok: true as const };
 }
 

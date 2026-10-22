@@ -81,6 +81,7 @@ export function AvaliacaoEncontroForm({
         const r = await submeterAvaliacao({
           token,
           encontroId,
+          honeypot: String(fd.get("website") ?? ""),
           estrelas,
           sentimento: String(fd.get("sentimento") ?? "") || null,
           avancei: String(fd.get("avancei") ?? "") || null,
@@ -395,6 +396,23 @@ export function AvaliacaoEncontroForm({
             >
               {erro}
             </p>
+
+            {/* honeypot anti-spam — mesmo molde do /f e /t: bot preenche o
+                campo invisível, o servidor finge sucesso e não grava nada */}
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute -left-[9999px] h-0 w-0 overflow-hidden"
+            >
+              <label>
+                Site
+                <input
+                  type="text"
+                  name="website"
+                  tabIndex={-1}
+                  autoComplete="off"
+                />
+              </label>
+            </div>
 
             <Button
               type="submit"

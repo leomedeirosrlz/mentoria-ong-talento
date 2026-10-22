@@ -49,6 +49,16 @@ export function catalogoDe(g: GranularidadeRelatorio): ColunaRelatorio[] {
   return g === "duplas" ? COLUNAS_DUPLAS : COLUNAS_PESSOAS;
 }
 
+/** Colunas com contato direto — opt-in no link público (/resumo/[slug] é
+ *  compartilhável por obscuridade; o default não pode vazar telefone e
+ *  e-mail de menores). */
+const COLUNAS_CONTATO = new Set([
+  "email",
+  "whatsapp",
+  "contato_mentor",
+  "contato_mentorado",
+]);
+
 export function configPadrao(): RelatorioConfig {
   return {
     turma: "T2 · 2026/2027",
@@ -72,7 +82,12 @@ export function parseConfig(sp: {
   return {
     turma: sp.turma && sp.turma !== "todas" ? sp.turma : null,
     granularidade,
-    colunas: validas.length ? validas : cat.map((c) => c.id),
+    // sem ?col= explícito a URL pública mostra a grade operacional SEM
+    // contato — e-mail/WhatsApp (de mentorado menor incluso) só entram
+    // quando quem montou o link os escolheu de propósito
+    colunas: validas.length
+      ? validas
+      : cat.map((c) => c.id).filter((c) => !COLUNAS_CONTATO.has(c)),
   };
 }
 

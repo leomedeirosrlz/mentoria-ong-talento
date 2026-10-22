@@ -69,6 +69,9 @@ export type EnvioAvaliacao = {
   /** Só existe na trilha DPP — especialista nunca lê linha alguma, e um
    *  true gravado lá seria dado morto que a copy não prometeu. */
   visivelMentor?: boolean;
+  /** anti-spam — o campo `website` invisível do form; bot preenche, a
+   *  action finge sucesso e não grava (mesmo molde do /f e /t). */
+  honeypot?: string;
 };
 
 type RetornoSubmit = {
@@ -82,6 +85,8 @@ type RetornoSubmit = {
 
 export async function submeterAvaliacao(input: EnvioAvaliacao) {
   if (await demoAtivo()) return { error: DEMO_MSG };
+  // honeypot: bot preencheu o campo invisível — finge sucesso e não grava
+  if (input.honeypot?.trim()) return { ok: true, pedirApoio: false };
 
   // ---- saneamento de UX: o que um form honesto mandaria. A RPC revalida
   // tudo no banco — isto só poupa a ida e volta das respostas óbvias.
@@ -129,23 +134,23 @@ export async function submeterAvaliacao(input: EnvioAvaliacao) {
   } else {
     encontroId = (input.encontroId ?? "").trim();
     if (!UUID_RE.test(encontroId)) return { error: "Encontro inválido." };
-    // a trilha decide se o toggle do mentor vale algo — a sessão do jovem
-    // lê a própria dupla pela RLS (sem row = especialista ou alheio; nesse
-    // caso a RPC barra o submit e a trilha não importa)
+    // a trilha decide se o toggle do mentor vale algo. O embed em `duplas`
+    // voltava null pro jovem (ele não lê a base) — o oráculo certo é
+    // jovem_duplas, a view definer que ele lê de verdade. Sem row = alheio;
+    // nesse caso a RPC barra o submit e a trilha não importa.
     const { data: enc } = await supabase
       .from("encontros")
-      .select("dupla_id, dupla:duplas(trilha)")
+      .select("dupla_id")
       .eq("id", encontroId)
       .maybeSingle();
-    const d = enc?.dupla as
-      | { trilha: string }[]
-      | { trilha: string }
-      | null
-      | undefined;
-    const dd = Array.isArray(d) ? (d[0] ?? null) : d;
     if (enc) {
       duplaId = enc.dupla_id;
-      trilha = dd?.trilha ?? "dpp";
+      const { data: jd } = await supabase
+        .from("jovem_duplas")
+        .select("trilha")
+        .eq("id", enc.dupla_id)
+        .maybeSingle();
+      trilha = jd?.trilha === "especialista" ? "especialista" : "dpp";
     }
   }
 

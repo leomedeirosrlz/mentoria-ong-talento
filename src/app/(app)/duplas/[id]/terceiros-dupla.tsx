@@ -203,7 +203,12 @@ function LinhaContato({
               Reemitir link
             </Button>
           )}
-          {status === "pendente" && podeGerenciar && jornadaViva && (
+          {/* expirado também edita: o caminho de consertar indicação errada
+              é editar a row + reemitir (a delete policy segue só-pendente —
+              cancelar um expirado não tem efeito prático) */}
+          {(status === "pendente" || status === "expirado") &&
+            podeGerenciar &&
+            jornadaViva && (
             <>
               <Dialog open={editando} onOpenChange={setEditando}>
                 <DialogTrigger
@@ -220,14 +225,16 @@ function LinhaContato({
                   />
                 )}
               </Dialog>
-              <ConfirmDeleteButton
-                titulo={`Cancelar o convite de ${primeiroNome(contato.nome)}?`}
-                descricao="O link para de funcionar na hora — quem ainda não respondeu perde o acesso."
-                acao="Cancelar convite"
-                dica="Cancelar convite — o link morre"
-                onConfirm={() => cancelarContatoTerceiro(contato.id)}
-                sucesso={`Convite de ${primeiroNome(contato.nome)} cancelado.`}
-              />
+              {status === "pendente" && (
+                <ConfirmDeleteButton
+                  titulo={`Cancelar o convite de ${primeiroNome(contato.nome)}?`}
+                  descricao="O link para de funcionar na hora — quem ainda não respondeu perde o acesso."
+                  acao="Cancelar convite"
+                  dica="Cancelar convite — o link morre"
+                  onConfirm={() => cancelarContatoTerceiro(contato.id)}
+                  sucesso={`Convite de ${primeiroNome(contato.nome)} cancelado.`}
+                />
+              )}
             </>
           )}
         </div>
