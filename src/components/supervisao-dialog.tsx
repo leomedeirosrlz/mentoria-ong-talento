@@ -37,13 +37,20 @@ const GERAL = "__geral";
 export function SupervisaoDialog({
   alvos,
   trigger,
+  open,
+  onOpenChange,
 }: {
   /** Duplas ativas/pausadas supervisionadas (getSupervisaoAlvos) — ou um
    *  alvo único quando o dialog nasce na ficha da dupla. */
   alvos: SupervisaoAlvo[];
   trigger?: React.ReactElement;
+  /** controlado externamente (ex.: item de ⋯ menu — sem trigger próprio) */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }) {
-  const [open, setOpen] = useState(false);
+  const [interno, setInterno] = useState(false);
+  const isOpen = open ?? interno;
+  const setOpen = onOpenChange ?? setInterno;
   // mentores únicos na ordem das duplas — um mentor com 2 duplas vira 1 opção
   const mentores = [
     ...new Map(
@@ -89,7 +96,7 @@ export function SupervisaoDialog({
 
   return (
     <Dialog
-      open={open}
+      open={isOpen}
       onOpenChange={(o) => {
         setOpen(o);
         // reabrir recomeça do primeiro alvo — Select desmonta com o dialog e
@@ -101,16 +108,18 @@ export function SupervisaoDialog({
         }
       }}
     >
-      <DialogTrigger
-        render={
-          trigger ?? (
-            <Button variant="outline" size="sm">
-              <ChatsCircle size={15} />
-              Registrar supervisão
-            </Button>
-          )
-        }
-      />
+      {open === undefined && (
+        <DialogTrigger
+          render={
+            trigger ?? (
+              <Button variant="outline" size="sm">
+                <ChatsCircle size={15} />
+                Registrar supervisão
+              </Button>
+            )
+          }
+        />
+      )}
       <DialogContent size="xl">
         <DialogHeader>
           <DialogTitle>Registrar supervisão</DialogTitle>

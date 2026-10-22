@@ -3,7 +3,12 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "motion/react";
-import { DotsThree, ListChecks, PencilSimple, Trash } from "@phosphor-icons/react";
+import {
+  DotsThreeVertical,
+  ListChecks,
+  PencilSimple,
+  Trash,
+} from "@phosphor-icons/react";
 import { toast } from "sonner";
 import {
   editarEncaminhamento,
@@ -12,7 +17,7 @@ import {
 } from "@/lib/actions";
 import { formatDate } from "@/lib/ciclo";
 import type { Encaminhamento } from "@/lib/types";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
@@ -117,17 +122,22 @@ export function EncaminhamentosList({
           const menu = podeEditar && (
             <DropdownMenu>
               <DropdownMenuTrigger
-                aria-label={`Opções do combinado "${t.descricao}"`}
-                className="mt-0.5 grid size-11 shrink-0 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:size-9"
+                aria-label={`Ações do combinado "${t.descricao}"`}
+                className={cn(
+                  buttonVariants({ variant: "ghost", size: "icon" }),
+                  "mt-0.5 size-11 shrink-0 sm:size-8"
+                )}
               >
-                <DotsThree size={18} weight="bold" aria-hidden />
+                <DotsThreeVertical size={18} weight="bold" aria-hidden />
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-40">
+              <DropdownMenuContent align="end" className="w-56">
                 <DropdownMenuItem onClick={() => { setEditando(t); setDescLen(t.descricao.length); }}>
-                  <PencilSimple aria-hidden /> Editar
+                  <PencilSimple size={16} data-icon="inline-start" aria-hidden />{" "}
+                  Editar
                 </DropdownMenuItem>
                 <DropdownMenuItem variant="destructive" onClick={() => setExcluindo(t)}>
-                  <Trash aria-hidden /> Excluir
+                  <Trash size={16} data-icon="inline-start" aria-hidden />{" "}
+                  Excluir
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

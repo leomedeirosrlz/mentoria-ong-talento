@@ -38,6 +38,7 @@ import type {
 import { avatarPublicUrl } from "@/lib/avatar";
 import { cn } from "@/lib/utils";
 import { Avatar } from "@/components/avatar";
+import { AuxCardAcoes } from "@/components/aux-card-acoes";
 import { LembreteButton } from "@/components/lembrete-button";
 import { SupervisaoDialog } from "@/components/supervisao-dialog";
 import { Button } from "@/components/ui/button";
@@ -387,23 +388,8 @@ function CardDuplaAux({
         {contexto.texto}
       </p>
       <div className="mt-3 flex flex-wrap items-center gap-2">
-        {alvo && (
-          <SupervisaoDialog
-            alvos={[alvo]}
-            trigger={
-              <Button variant="outline" size="sm">
-                <ChatsCircle size={14} aria-hidden />
-                Registrar supervisão
-              </Button>
-            }
-          />
-        )}
-        <Link
-          href={`/duplas/${d.id}`}
-          className="inline-flex min-h-11 items-center rounded-lg px-2 text-xs font-semibold text-foreground/80 transition-colors hover:bg-muted hover:text-foreground sm:min-h-8"
-        >
-          Ver ficha ›
-        </Link>
+        {/* primária visível (REALIZA-186): Lembrar — mostra o cap de 48h
+            inline. Supervisão + ficha vão pro ⋯ quando as 3 existem */}
         {lembrete && (
           <LembreteButton
             duplaId={d.id}
@@ -416,6 +402,12 @@ function CardDuplaAux({
             bloqueadoAte={lembreteBloqueadoAte(nudge, agora)}
           />
         )}
+        <AuxCardAcoes
+          alvos={alvo ? [alvo] : undefined}
+          href={`/duplas/${d.id}`}
+          nome={nome}
+          menu={!!lembrete}
+        />
       </div>
     </article>
   );

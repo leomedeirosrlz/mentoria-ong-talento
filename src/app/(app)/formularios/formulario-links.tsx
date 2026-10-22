@@ -13,9 +13,12 @@ import { AnimatePresence, motion } from "motion/react";
 import {
   ArrowClockwise,
   CircleNotch,
+  DotsThreeVertical,
   Link as LinkIcon,
+  LinkSimple,
   MagnifyingGlass,
   Trash,
+  WhatsappLogo,
 } from "@phosphor-icons/react";
 import {
   excluirLinkFormulario,
@@ -32,9 +35,8 @@ import {
 } from "@/lib/forms/schema";
 import type { LinkResolvido } from "@/lib/forms/queries";
 import { ehInstrumento } from "@/lib/forms/instrumentos";
-import { comparaNome } from "@/lib/ciclo";
+import { comparaNome, waLink } from "@/lib/ciclo";
 import type { AppRole } from "@/lib/types";
-import { NudgeButton } from "@/components/nudge-button";
 import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
 import { CopiarLink } from "@/components/forms/copiar-link";
 import { DestinoCheckRow } from "@/components/forms/destino-check-row";
@@ -53,7 +55,14 @@ import { useOrigem } from "@/components/forms/use-origem";
 import { demoAtivoClient } from "@/lib/demo/shared";
 import { ExitItem, ExitList, fade, T } from "@/components/motion";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { filterChipCls } from "@/components/ui/filter-chip";
 import {
   Select,
@@ -197,6 +206,112 @@ function ReemitirLinkButton({
       )}
       Reemitir
     </Button>
+  );
+}
+
+/** ⋯ da linha do link (REALIZA-186) — as secundárias por estado: WhatsApp
+ *  no link vivo com destinatário (o genérico não tem telefone — diria
+ *  "sem WhatsApp", razão falsa), "Vincular a um jovem" no genérico legado
+ *  e Excluir por último. Vincular e excluir abrem dialogs controlados que
+ *  vivem fora do popup (padrão mais-menu/material-actions). */
+function LinkAcoes({
+  link,
+  status,
+  formularioAtivo,
+  formularioTitulo,
+  mentorados,
+  origem,
+  onExcluir,
+}: {
+  link: LinkResolvido;
+  status: LinkStatus;
+  formularioAtivo: boolean;
+  formularioTitulo: string;
+  mentorados: { id: string; nome: string }[];
+  origem: string;
+  onExcluir: () => Promise<{ error?: string; ok?: boolean }>;
+}) {
+  const [excluindo, setExcluindo] = useState(false);
+  const [vinculando, setVinculando] = useState(false);
+
+  const mostrarWa =
+    status === "pendente" &&
+    formularioAtivo &&
+    link.dest_tipo !== "generico";
+  const wa = mostrarWa
+    ? waLink(
+        link.dest_whatsapp,
+        msgLinkWhatsApp(formularioTitulo, link.dest_nome, link.token, origem)
+      )
+    : null;
+  const mostrarVincular = link.dest_tipo === "generico" && !link.multi_uso;
+
+  return (
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          aria-label={`Ações do link de "${nomeDe(link)}"`}
+          className={cn(
+            buttonVariants({ variant: "ghost", size: "icon" }),
+            "size-11 shrink-0 sm:size-8"
+          )}
+        >
+          <DotsThreeVertical size={18} weight="bold" aria-hidden />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-56">
+          {mostrarWa && (
+            <DropdownMenuItem
+              disabled={!wa}
+              render={
+                wa ? (
+                  <a href={wa} target="_blank" rel="noopener noreferrer" />
+                ) : undefined
+              }
+            >
+              <WhatsappLogo size={16} data-icon="inline-start" aria-hidden />
+              Enviar no WhatsApp
+              {!wa && (
+                <span className="ml-auto text-xs text-muted-foreground">
+                  sem número
+                </span>
+              )}
+            </DropdownMenuItem>
+          )}
+          {mostrarVincular && (
+            <DropdownMenuItem onClick={() => setVinculando(true)}>
+              <LinkSimple size={16} data-icon="inline-start" aria-hidden />
+              Vincular a um jovem
+            </DropdownMenuItem>
+          )}
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            variant="destructive"
+            onClick={() => setExcluindo(true)}
+          >
+            <Trash size={16} data-icon="inline-start" aria-hidden />
+            Excluir link
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      {mostrarVincular && (
+        <VincularResposta
+          open={vinculando}
+          onOpenChange={setVinculando}
+          linkId={link.id}
+          formularioTitulo={formularioTitulo}
+          respondidoEm={null}
+          mentorados={mentorados}
+        />
+      )}
+      <ConfirmDeleteButton
+        open={excluindo}
+        onOpenChange={setExcluindo}
+        titulo="Excluir link?"
+        descricao={`O link de ${link.dest_nome ?? "uso genérico"} deixa de funcionar na hora.`}
+        sucesso="Link excluído."
+        onConfirm={onExcluir}
+      />
+    </>
   );
 }
 
@@ -785,27 +900,11 @@ export function FormularioLinks({
                       })()}
                     </div>
                     <div className="flex basis-full items-center justify-end gap-1.5 sm:basis-auto">
-                      {/* Copiar/WhatsApp só em link vivo de form ativo —
-                          respondido copia link morto, expirado ganha Reemitir
-                          (token novo) e form encerrado não coleta. O genérico
-                          não tem destinatário — NudgeButton diria "sem
-                          WhatsApp", razão falsa */}
+                      {/* primária por estado (REALIZA-186): copiar no link
+                          vivo, reemitir no expirado — a linha respondida não
+                          tem ação nenhuma. O resto vai pro ⋯ */}
                       {status === "pendente" && formularioAtivo && (
-                        <>
-                          <CopiarLink token={l.token} />
-                          {l.dest_tipo !== "generico" && (
-                            <NudgeButton
-                              telefone={l.dest_whatsapp}
-                              mensagem={msgLinkWhatsApp(
-                                formularioTitulo,
-                                l.dest_nome,
-                                l.token,
-                                origem
-                              )}
-                              label="WhatsApp"
-                            />
-                          )}
-                        </>
+                        <CopiarLink token={l.token} />
                       )}
                       {status === "expirado" && (
                         <ReemitirLinkButton
@@ -813,41 +912,21 @@ export function FormularioLinks({
                           formularioId={formularioId}
                         />
                       )}
-                      {/* vincular cobre o genérico legado ainda vivo: ganha
-                          âncora antes de reemitir/responder — resposta
-                          respondida tem o mesmo botão na seção Respostas */}
-                      {l.dest_tipo === "generico" &&
-                        !l.multi_uso &&
-                        status !== "respondido" && (
-                          <VincularResposta
-                            linkId={l.id}
-                            formularioTitulo={formularioTitulo}
-                            respondidoEm={null}
-                            mentorados={mentoradosOpcoes}
-                          />
-                        )}
                       {status !== "respondido" && (
-                        <ConfirmDeleteButton
-                          titulo="Excluir link?"
-                          descricao={`O link de ${l.dest_nome ?? "uso genérico"} deixa de funcionar na hora.`}
-                          sucesso="Link excluído."
-                          onConfirm={() => {
+                        <LinkAcoes
+                          link={l}
+                          status={status}
+                          formularioAtivo={formularioAtivo}
+                          formularioTitulo={formularioTitulo}
+                          mentorados={mentoradosOpcoes}
+                          origem={origem}
+                          onExcluir={() => {
                             // dentro do start do ConfirmDeleteButton — vale
                             // como transição pro otimista; na demo a action
                             // sempre erra, então a linha nem sai
                             if (!demoAtivoClient()) removerLink(l.id);
                             return excluirLinkFormulario(l.id, formularioId);
                           }}
-                          trigger={
-                            <Button
-                              variant="ghost"
-                              size="icon-sm"
-                              aria-label={`Excluir link de ${l.dest_nome ?? "uso genérico"}`}
-                              className="text-muted-foreground hover:text-destructive"
-                            >
-                              <Trash aria-hidden />
-                            </Button>
-                          }
                         />
                       )}
                     </div>

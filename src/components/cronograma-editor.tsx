@@ -15,6 +15,7 @@ import {
   ArrowUp,
   CheckCircle,
   CircleNotch,
+  DotsThreeVertical,
   Flag,
   GraduationCap,
   PencilSimple,
@@ -39,7 +40,14 @@ import { formatDiaSemanaMes } from "@/lib/ciclo";
 import type { VinculoCronograma } from "@/lib/queries-cronogramas";
 import type { CicloEvento, Cronograma, DuplaStatus } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
 import { EventoCronogramaDialog } from "@/components/evento-cronograma-dialog";
 import {
@@ -60,11 +68,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
 const STATUS_LABEL: Record<Cronograma["status"], string> = {
@@ -442,6 +445,88 @@ function dataFormatada(e: CicloEvento): string {
   return ini;
 }
 
+/** Ações da linha do evento (REALIZA-186): o quarteto editar/↑/↓/excluir
+ *  saía como 4 ícones-fantasma com tooltip por linha — numa sequência de
+ *  ~20 eventos eram ~80 alvos. O ⋯ concentra tudo num alvo só; o excluir
+ *  abre o ConfirmDeleteButton controlado, que vive fora do popup (mesmo
+ *  padrão dos materiais/encaminhamentos — foco e animação vêm de graça). */
+function EventoAcoes({
+  cronogramaId,
+  evento,
+  primeiro,
+  ultimo,
+  pending,
+  onEditar,
+  onMover,
+}: {
+  cronogramaId: string;
+  evento: CicloEvento;
+  primeiro: boolean;
+  ultimo: boolean;
+  pending: boolean;
+  onEditar: () => void;
+  onMover: (dir: -1 | 1) => void;
+}) {
+  const [excluindo, setExcluindo] = useState(false);
+  return (
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          aria-label={`Ações de "${evento.titulo}"`}
+          aria-busy={pending || undefined}
+          className={cn(
+            buttonVariants({ variant: "ghost", size: "icon" }),
+            "size-11 shrink-0 sm:size-8"
+          )}
+        >
+          <DotsThreeVertical size={18} weight="bold" aria-hidden />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-56">
+          <DropdownMenuItem disabled={pending} onClick={onEditar}>
+            <PencilSimple size={16} data-icon="inline-start" aria-hidden />
+            Editar evento
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            disabled={pending || primeiro}
+            onClick={() => onMover(-1)}
+          >
+            <ArrowUp size={16} data-icon="inline-start" aria-hidden />
+            Mover para cima
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            disabled={pending || ultimo}
+            onClick={() => onMover(1)}
+          >
+            <ArrowDown size={16} data-icon="inline-start" aria-hidden />
+            Mover para baixo
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            variant="destructive"
+            disabled={pending}
+            onClick={() => setExcluindo(true)}
+          >
+            <Trash size={16} data-icon="inline-start" aria-hidden />
+            Excluir evento
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <ConfirmDeleteButton
+        open={excluindo}
+        onOpenChange={setExcluindo}
+        titulo={`Excluir "${evento.titulo}"?`}
+        descricao={
+          evento.tipo === "encontro"
+            ? "O encontro oficial sai do calendário da turma — o semáforo das duplas recalcula sem ele. A exclusão é definitiva."
+            : "O evento sai do calendário oficial da turma. A exclusão é definitiva."
+        }
+        sucesso={`"${evento.titulo}" removido do cronograma.`}
+        onConfirm={() => excluirEvento(cronogramaId, evento.id)}
+      />
+    </>
+  );
+}
+
 export function CronogramaEventos({
   cronograma,
   eventos,
@@ -470,6 +555,17 @@ export function CronogramaEventos({
   );
 
   const primeiroEncontro = eventos.findIndex((e) => e.tipo === "encontro");
+
+  // contagem por seção — os headers já separam (Preparação / Mentoria ativa /
+  // Encerramento), só faltava dizer quantos itens cada uma carrega
+  const secaoContagem = useMemo(() => {
+    const m = new Map<string, number>();
+    eventos.forEach((e, i) => {
+      const s = secaoDe(i, e, primeiroEncontro);
+      m.set(s, (m.get(s) ?? 0) + 1);
+    });
+    return m;
+  }, [eventos, primeiroEncontro]);
 
   /** Wrapper comum das mutations de evento: toast + refresh; devolve se
    *  deu certo pro caller fechar o dialog. */
@@ -585,6 +681,10 @@ export function CronogramaEventos({
                     )}
                   >
                     {secao}
+                    <span className="ml-1.5 font-normal normal-case tracking-normal">
+                      · {secaoContagem.get(secao)}{" "}
+                      {secaoContagem.get(secao) === 1 ? "evento" : "eventos"}
+                    </span>
                   </div>
                 )}
                 <div
@@ -619,77 +719,20 @@ export function CronogramaEventos({
                     </div>
                   </div>
                   {!readOnly && (
-                    <div className="flex shrink-0 items-center">
-                      <Tooltip>
-                        <TooltipTrigger
-                          render={
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              aria-label={`Editar "${e.titulo}"`}
-                              disabled={pending}
-                              onClick={() => setEditando(e)}
-                            >
-                              <PencilSimple size={15} />
-                            </Button>
-                          }
-                        />
-                        <TooltipContent>Editar evento</TooltipContent>
-                      </Tooltip>
-                      <Tooltip>
-                        <TooltipTrigger
-                          render={
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              aria-label={`Mover "${e.titulo}" para cima`}
-                              disabled={pending || i === 0}
-                              onClick={() =>
-                                agir(
-                                  () => moverEvento(cronograma.id, e.id, -1),
-                                  "Evento movido."
-                                )
-                              }
-                            >
-                              <ArrowUp size={15} />
-                            </Button>
-                          }
-                        />
-                        <TooltipContent>Mover para cima</TooltipContent>
-                      </Tooltip>
-                      <Tooltip>
-                        <TooltipTrigger
-                          render={
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              aria-label={`Mover "${e.titulo}" para baixo`}
-                              disabled={pending || i === eventos.length - 1}
-                              onClick={() =>
-                                agir(
-                                  () => moverEvento(cronograma.id, e.id, 1),
-                                  "Evento movido."
-                                )
-                              }
-                            >
-                              <ArrowDown size={15} />
-                            </Button>
-                          }
-                        />
-                        <TooltipContent>Mover para baixo</TooltipContent>
-                      </Tooltip>
-                      <ConfirmDeleteButton
-                        dica="Excluir evento"
-                        titulo={`Excluir "${e.titulo}"?`}
-                        descricao={
-                          e.tipo === "encontro"
-                            ? "O encontro oficial sai do calendário da turma — o semáforo das duplas recalcula sem ele. A exclusão é definitiva."
-                            : "O evento sai do calendário oficial da turma. A exclusão é definitiva."
-                        }
-                        sucesso={`"${e.titulo}" removido do cronograma.`}
-                        onConfirm={() => excluirEvento(cronograma.id, e.id)}
-                      />
-                    </div>
+                    <EventoAcoes
+                      cronogramaId={cronograma.id}
+                      evento={e}
+                      primeiro={i === 0}
+                      ultimo={i === eventos.length - 1}
+                      pending={pending}
+                      onEditar={() => setEditando(e)}
+                      onMover={(dir) =>
+                        agir(
+                          () => moverEvento(cronograma.id, e.id, dir),
+                          "Evento movido."
+                        )
+                      }
+                    />
                   )}
                 </div>
               </li>

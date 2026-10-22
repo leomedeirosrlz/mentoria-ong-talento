@@ -2,7 +2,12 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { DotsThree, PencilSimple, Prohibit, Trash } from "@phosphor-icons/react";
+import {
+  DotsThreeVertical,
+  PencilSimple,
+  Prohibit,
+  Trash,
+} from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { deletePessoa, setPessoaAtivo, updatePessoa } from "@/lib/actions";
 import { createClient } from "@/lib/supabase/client";
@@ -22,10 +27,10 @@ import {
   type PassoFicha,
 } from "@/components/campos-pessoais";
 import { AREAS_SUGESTOES, formatWhatsApp } from "@/lib/ciclo";
-import { maskWhatsApp } from "@/lib/utils";
+import { cn, maskWhatsApp } from "@/lib/utils";
 import { temPapel } from "@/lib/types";
 import type { Disponibilidade, Profile } from "@/lib/types";
-import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
@@ -411,15 +416,18 @@ export function PessoaActions({
     <>
       <DropdownMenu>
         <DropdownMenuTrigger
-          render={
-            <Button variant="ghost" size="icon" aria-label="Ações">
-              <DotsThree size={18} weight="bold" />
-            </Button>
-          }
-        />
-        <DropdownMenuContent align="end" className="w-44">
+          aria-label={`Ações de "${pessoa.nome}"`}
+          className={cn(
+            buttonVariants({ variant: "ghost", size: "icon" }),
+            "size-11 shrink-0 sm:size-8"
+          )}
+        >
+          <DotsThreeVertical size={18} weight="bold" aria-hidden />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-56">
           <DropdownMenuItem onClick={() => setEditOpen(true)}>
-            <PencilSimple /> Editar
+            <PencilSimple size={16} data-icon="inline-start" aria-hidden />{" "}
+            Editar
           </DropdownMenuItem>
           <DropdownMenuItem
             disabled={pending}
@@ -443,7 +451,8 @@ export function PessoaActions({
               })
             }
           >
-            <Prohibit /> {pessoa.ativo ? "Desativar" : "Reativar"}
+            <Prohibit size={16} data-icon="inline-start" aria-hidden />{" "}
+            {pessoa.ativo ? "Desativar" : "Reativar"}
           </DropdownMenuItem>
           {/* efeito declarado antes do clique — ação reversível mas de alto impacto */}
           <p className="px-2 pb-1 text-[11px] leading-snug text-muted-foreground">
@@ -457,7 +466,7 @@ export function PessoaActions({
             disabled={!podeExcluir}
             onClick={() => setDelOpen(true)}
           >
-            <Trash /> Excluir
+            <Trash size={16} data-icon="inline-start" aria-hidden /> Excluir
           </DropdownMenuItem>
           {!podeExcluir && (
             <p className="px-2 pb-1 text-[11px] leading-snug text-muted-foreground">

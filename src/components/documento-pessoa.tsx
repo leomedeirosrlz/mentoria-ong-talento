@@ -1,13 +1,27 @@
 "use client";
 
-import { useRef, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { CircleNotch, FileText, Paperclip } from "@phosphor-icons/react";
+import {
+  CircleNotch,
+  DotsThreeVertical,
+  FileText,
+  Paperclip,
+  Trash,
+} from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { definirDocumentoPessoa, removerDocumentoPessoa } from "@/lib/actions";
 import { createClient } from "@/lib/supabase/client";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { cn } from "@/lib/utils";
 
 const LIMITE_BYTES = 20 * 1024 * 1024;
 const BUCKET = "documentos";
@@ -23,6 +37,67 @@ function saneiaNome(nome: string): string {
     .replace(/[^a-zA-Z0-9._-]+/g, "-")
     .replace(/^-+|-+$/g, "");
   return limpo || "documento";
+}
+
+/** ⋯ do documento anexado (REALIZA-186): substituir e remover — a remoção
+ *  abre o ConfirmDeleteButton controlado fora do popup. */
+function DocumentoAcoes({
+  nomeDoc,
+  fem,
+  pending,
+  onSubstituir,
+  onRemover,
+}: {
+  nomeDoc: string;
+  /** feminino do nomeDoc ("a autorização…") — concordância do confirm */
+  fem: boolean;
+  pending: boolean;
+  onSubstituir: () => void;
+  onRemover: () => Promise<{ error?: string; ok?: boolean }>;
+}) {
+  const [removendo, setRemovendo] = useState(false);
+  return (
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          aria-label={`Ações d${fem ? "a" : "o"} ${nomeDoc}`}
+          aria-busy={pending || undefined}
+          className={cn(
+            buttonVariants({ variant: "ghost", size: "icon" }),
+            "size-11 shrink-0 sm:size-8"
+          )}
+        >
+          {pending ? (
+            <CircleNotch size={18} className="animate-spin" aria-hidden />
+          ) : (
+            <DotsThreeVertical size={18} weight="bold" aria-hidden />
+          )}
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-56">
+          <DropdownMenuItem disabled={pending} onClick={onSubstituir}>
+            <Paperclip size={16} data-icon="inline-start" aria-hidden />
+            {pending ? "Enviando…" : "Substituir documento"}
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            variant="destructive"
+            onClick={() => setRemovendo(true)}
+          >
+            <Trash size={16} data-icon="inline-start" aria-hidden />
+            Remover documento
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <ConfirmDeleteButton
+        open={removendo}
+        onOpenChange={setRemovendo}
+        titulo="Remover o documento?"
+        descricao={`${fem ? "A" : "O"} ${nomeDoc} é apagad${fem ? "a" : "o"} e a pessoa fica sem documento oficial.`}
+        sucesso={`${nomeDoc.charAt(0).toUpperCase()}${nomeDoc.slice(1)} removid${fem ? "a" : "o"}.`}
+        onConfirm={onRemover}
+      />
+    </>
+  );
 }
 
 /** Documento oficial da pessoa (termo do mentor, autorização do mentorado) —
@@ -126,6 +201,8 @@ export function DocumentoPessoa({
       />
       {documentoPath ? (
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+          {/* primária visível (REALIZA-186): abrir o documento — substituir
+              e remover (com confirm controlado) vão pro ⋯ */}
           <a
             href={`/api/documento/${id}?tipo=${tipoUrl}`}
             target="_blank"
@@ -135,27 +212,12 @@ export function DocumentoPessoa({
             <FileText size={14} className="shrink-0 text-muted-foreground" />
             Ver documento
           </a>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            disabled={pending}
-            aria-busy={pending}
-            onClick={() => fileRef.current?.click()}
-          >
-            {pending ? <CircleNotch size={14} className="animate-spin" /> : <Paperclip size={14} />}
-            {pending ? "Enviando…" : "Substituir"}
-          </Button>
-          <ConfirmDeleteButton
-            titulo="Remover o documento?"
-            descricao={`${fem ? "A" : "O"} ${nomeDoc} é apagad${fem ? "a" : "o"} e a pessoa fica sem documento oficial.`}
-            sucesso={`${nomeDoc.charAt(0).toUpperCase()}${nomeDoc.slice(1)} removid${fem ? "a" : "o"}.`}
-            onConfirm={remover}
-            trigger={
-              <Button type="button" variant="ghost" size="sm" className="text-muted-foreground">
-                Remover
-              </Button>
-            }
+          <DocumentoAcoes
+            nomeDoc={nomeDoc}
+            fem={fem}
+            pending={pending}
+            onSubstituir={() => fileRef.current?.click()}
+            onRemover={remover}
           />
         </div>
       ) : (

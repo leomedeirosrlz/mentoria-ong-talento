@@ -35,6 +35,8 @@ export function VincularResposta({
   formularioTitulo,
   respondidoEm,
   mentorados,
+  open,
+  onOpenChange,
 }: {
   linkId: string;
   formularioTitulo: string;
@@ -42,8 +44,13 @@ export function VincularResposta({
    *  vinculando ("form + quando + quem") */
   respondidoEm: string | null;
   mentorados: { id: string; nome: string }[];
+  /** controlado externamente (ex.: item de ⋯ menu — sem trigger próprio) */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }) {
-  const [open, setOpen] = useState(false);
+  const [interno, setInterno] = useState(false);
+  const isOpen = open ?? interno;
+  const setOpen = onOpenChange ?? setInterno;
   const [sel, setSel] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const router = useRouter();
@@ -69,18 +76,20 @@ export function VincularResposta({
 
   return (
     <Dialog
-      open={open}
+      open={isOpen}
       onOpenChange={(o) => {
         setOpen(o);
         if (!o) setSel(null);
       }}
     >
-      <DialogTrigger
-        render={<Button type="button" variant="outline" size="sm" />}
-      >
-        <LinkSimple aria-hidden />
-        Vincular a um jovem
-      </DialogTrigger>
+      {open === undefined && (
+        <DialogTrigger
+          render={<Button type="button" variant="outline" size="sm" />}
+        >
+          <LinkSimple aria-hidden />
+          Vincular a um jovem
+        </DialogTrigger>
+      )}
       <DialogContent size="md">
         <DialogHeader>
           <DialogTitle>Vincular resposta a um jovem</DialogTitle>

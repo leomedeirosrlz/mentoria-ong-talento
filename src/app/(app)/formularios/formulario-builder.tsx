@@ -12,6 +12,7 @@ import {
   Circle,
   CircleNotch,
   Copy,
+  DotsThreeVertical,
   Eye,
   FileArrowUp,
   Gauge,
@@ -43,7 +44,14 @@ import {
 } from "@/lib/forms/schema";
 import { FormularioPublico } from "@/app/f/[token]/formulario-publico";
 import { fade, T } from "@/components/motion";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -690,49 +698,61 @@ export function FormularioBuilder({
                   </div>
 
                   <div className="flex items-center justify-between gap-2 border-t border-border px-2 py-1.5 sm:px-3">
-                    <div className="flex items-center">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-sm"
-                        aria-label={`Duplicar pergunta ${i + 1}`}
-                        disabled={maxCampos}
-                        onClick={() => duplicar(i)}
+                    {/* REALIZA-186: duplicar/↑/↓/remover eram 4 ícones-
+                        fantasma por card — ⋯ por pergunta (padrão ⋯ do
+                        pdm-arvore). Tudo é estado local do builder; não há
+                        confirm pra preservar */}
+                    <DropdownMenu>
+                      <DropdownMenuTrigger
+                        aria-label={`Ações da pergunta ${i + 1}`}
+                        className={cn(
+                          buttonVariants({ variant: "ghost", size: "icon" }),
+                          "size-11 shrink-0 sm:size-8"
+                        )}
                       >
-                        <Copy aria-hidden />
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-sm"
-                        aria-label={`Mover pergunta ${i + 1} pra cima`}
-                        disabled={i === 0}
-                        onClick={() => move(i, -1)}
-                      >
-                        <CaretUp aria-hidden />
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-sm"
-                        aria-label={`Mover pergunta ${i + 1} pra baixo`}
-                        disabled={i === campos.length - 1}
-                        onClick={() => move(i, 1)}
-                      >
-                        <CaretDown aria-hidden />
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-sm"
-                        aria-label={`Remover pergunta ${i + 1}`}
-                        disabled={campos.length === 1}
-                        onClick={() => remove(i)}
-                        className="text-muted-foreground hover:text-destructive"
-                      >
-                        <Trash aria-hidden />
-                      </Button>
-                    </div>
+                        <DotsThreeVertical
+                          size={18}
+                          weight="bold"
+                          aria-hidden
+                        />
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-56">
+                        <DropdownMenuItem
+                          disabled={maxCampos}
+                          onClick={() => duplicar(i)}
+                        >
+                          <Copy size={16} data-icon="inline-start" aria-hidden />
+                          Duplicar pergunta
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          disabled={i === 0}
+                          onClick={() => move(i, -1)}
+                        >
+                          <CaretUp size={16} data-icon="inline-start" aria-hidden />
+                          Mover pra cima
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          disabled={i === campos.length - 1}
+                          onClick={() => move(i, 1)}
+                        >
+                          <CaretDown
+                            size={16}
+                            data-icon="inline-start"
+                            aria-hidden
+                          />
+                          Mover pra baixo
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          variant="destructive"
+                          disabled={campos.length === 1}
+                          onClick={() => remove(i)}
+                        >
+                          <Trash size={16} data-icon="inline-start" aria-hidden />
+                          Remover pergunta
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                     {c.tipo !== "secao" && (
                       <div className="flex items-center gap-2">
                         <Switch

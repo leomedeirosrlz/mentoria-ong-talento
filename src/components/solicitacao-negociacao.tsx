@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import {
   ArrowsClockwise,
   CheckCircle,
+  DotsThreeVertical,
   ThumbsDown,
   WhatsappLogo,
   XCircle,
@@ -32,6 +33,13 @@ import type {
   SolicitacaoProposta,
 } from "@/lib/types";
 import { Button, buttonVariants } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Select,
   SelectContent,
@@ -395,6 +403,8 @@ export function SolicitacaoNegociacao({
   const [abrindo, setAbrindo] = useState<"proposta" | "recusa" | null>(null);
   const [pendente, start] = useTransition();
   const [slotAceite, setSlotAceite] = useState<string | null>(null);
+  // cancelar via item do ⋯ (REALIZA-186) — o confirm é controlado
+  const [cancelando, setCancelando] = useState(false);
 
   const efetivo = s.status_efetivo ?? s.status;
   const emNegociacao = efetivo === "aberta" || efetivo === "contra_proposta";
@@ -583,29 +593,56 @@ export function SolicitacaoNegociacao({
                   </Button>
                 </>
               )}
-              {/* mesmo teto do lado autor: a RPC trava na 5ª proposta —
-                  o botão some antes de prometer um gesto impossível */}
-              {propostas.length < 4 && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={abrindo === "proposta"}
-                  onClick={() => setAbrindo("proposta")}
-                >
-                  <ArrowsClockwise size={15} />
-                  Propor outro horário
-                </Button>
-              )}
-              {podeRecusar(s, meuId) && (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="text-muted-foreground"
-                  onClick={() => setAbrindo("recusa")}
-                >
-                  <ThumbsDown size={15} />
-                  Recusar
-                </Button>
+              {/* REALIZA-186: propor/recusar saíram dos botões soltos pro
+                  ⋯ — o aceitar é a primária da vez. O item "Propor" some no
+                  teto da RPC (5ª proposta) como antes; recusar por último */}
+              {(propostas.length < 4 || podeRecusar(s, meuId)) && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger
+                    aria-label={`Ações do pedido de ${s.mentorado?.nome ?? "especialista"}`}
+                    className={cn(
+                      buttonVariants({ variant: "ghost", size: "icon" }),
+                      "size-11 shrink-0 sm:size-8"
+                    )}
+                  >
+                    <DotsThreeVertical
+                      size={18}
+                      weight="bold"
+                      aria-hidden
+                    />
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56">
+                    {propostas.length < 4 && (
+                      <DropdownMenuItem
+                        disabled={abrindo === "proposta"}
+                        onClick={() => setAbrindo("proposta")}
+                      >
+                        <ArrowsClockwise
+                          size={16}
+                          data-icon="inline-start"
+                          aria-hidden
+                        />
+                        Propor outro horário
+                      </DropdownMenuItem>
+                    )}
+                    {podeRecusar(s, meuId) && (
+                      <>
+                        {propostas.length < 4 && <DropdownMenuSeparator />}
+                        <DropdownMenuItem
+                          variant="destructive"
+                          onClick={() => setAbrindo("recusa")}
+                        >
+                          <ThumbsDown
+                            size={16}
+                            data-icon="inline-start"
+                            aria-hidden
+                          />
+                          Recusar pedido
+                        </DropdownMenuItem>
+                      </>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
               )}
             </div>
           )}
@@ -661,23 +698,63 @@ export function SolicitacaoNegociacao({
                   Aceitar {rotuloSlot(s.slot_proposto)}
                 </Button>
               )}
-              {/* a RPC trava na 5ª proposta ("combinem por outro canal") —
-                  o botão some no teto e a saída honesta é o canal humano.
-                  E coord é parte só pra aceitar/cancelar — a RPC de
-                  contra-proposta não tem ramo dela */}
+              {/* REALIZA-186: o aceitar fica visível; propor + cancelar vão
+                  pro ⋯. A RPC trava na 5ª proposta ("combinem por outro
+                  canal") — o item some no teto, a saída honesta é o canal
+                  humano. Coord é parte só pra aceitar/cancelar — a RPC de
+                  contra-proposta não tem ramo dela. Quando o ⋯ teria só o
+                  cancelar, o botão direto segue (menu de item único é
+                  camada morta) */}
               {s.especialista_id &&
-                propostas.length < 4 &&
-                papel !== "coordenacao" && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setAbrindo("proposta")}
+              propostas.length < 4 &&
+              papel !== "coordenacao" ? (
+                <DropdownMenu>
+                  <DropdownMenuTrigger
+                    aria-label={`Ações do pedido de ${s.mentorado?.nome ?? "especialista"}`}
+                    className={cn(
+                      buttonVariants({ variant: "ghost", size: "icon" }),
+                      "size-11 shrink-0 sm:size-8"
+                    )}
                   >
-                    <ArrowsClockwise size={15} />
-                    Propor outro horário
-                  </Button>
-                )}
+                    <DotsThreeVertical
+                      size={18}
+                      weight="bold"
+                      aria-hidden
+                    />
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56">
+                    <DropdownMenuItem onClick={() => setAbrindo("proposta")}>
+                      <ArrowsClockwise
+                        size={16}
+                        data-icon="inline-start"
+                        aria-hidden
+                      />
+                      Propor outro horário
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      variant="destructive"
+                      onClick={() => setCancelando(true)}
+                    >
+                      <XCircle size={16} data-icon="inline-start" aria-hidden />
+                      Cancelar pedido
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="text-muted-foreground"
+                  onClick={() => setCancelando(true)}
+                >
+                  <XCircle size={15} />
+                  Cancelar pedido
+                </Button>
+              )}
               <ConfirmDeleteButton
+                open={cancelando}
+                onOpenChange={setCancelando}
                 titulo="Cancelar pedido?"
                 descricao={
                   papel === "mentorado"
@@ -687,16 +764,6 @@ export function SolicitacaoNegociacao({
                 acao="Cancelar pedido"
                 sucesso="Pedido cancelado."
                 onConfirm={() => cancelarSolicitacao(s.id)}
-                trigger={
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="text-muted-foreground"
-                  >
-                    <XCircle size={15} />
-                    Cancelar pedido
-                  </Button>
-                }
               />
             </div>
           )}

@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowCounterClockwise,
-  DotsThree,
+  DotsThreeVertical,
   PencilSimple,
   SignOut,
   Trash,
@@ -27,9 +27,9 @@ import {
   type PassoFicha,
 } from "@/components/campos-pessoais";
 import { formatWhatsApp, foraDoPrograma } from "@/lib/ciclo";
-import { maskWhatsApp } from "@/lib/utils";
+import { cn, maskWhatsApp } from "@/lib/utils";
 import type { Disponibilidade, Mentorado } from "@/lib/types";
-import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
@@ -278,30 +278,40 @@ export function MentoradoActions({
     <>
       <DropdownMenu>
         <DropdownMenuTrigger
-          render={
-            <Button variant="ghost" size="icon" aria-label="Ações">
-              <DotsThree size={18} weight="bold" />
-            </Button>
-          }
-        />
-        <DropdownMenuContent align="end" className="w-48">
+          aria-label={`Ações de "${mentorado.nome}"`}
+          className={cn(
+            buttonVariants({ variant: "ghost", size: "icon" }),
+            "size-11 shrink-0 sm:size-8"
+          )}
+        >
+          <DotsThreeVertical size={18} weight="bold" aria-hidden />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-56">
           <DropdownMenuItem onClick={() => setEditOpen(true)}>
-            <PencilSimple /> Editar
+            <PencilSimple size={16} data-icon="inline-start" aria-hidden />{" "}
+            Editar
           </DropdownMenuItem>
           {fora ? (
             <DropdownMenuItem disabled={pending} onClick={reativar}>
-              <ArrowCounterClockwise /> Reativar
+              <ArrowCounterClockwise
+                size={16}
+                data-icon="inline-start"
+                aria-hidden
+              />{" "}
+              Reativar
             </DropdownMenuItem>
           ) : (
             <DropdownMenuItem onClick={() => setSaidaOpen(true)}>
-              <SignOut /> Marcar saída…
+              <SignOut size={16} data-icon="inline-start" aria-hidden /> Marcar
+              saída…
             </DropdownMenuItem>
           )}
           {/* alumni → mentor (REALIZA-159): só quem concluiu — desistente
               volta pelo Reativar e conclui primeiro */}
           {mentorado.situacao === "concluido" && (
             <DropdownMenuItem onClick={() => setPromoverOpen(true)}>
-              <UserSwitch /> Promover a mentor…
+              <UserSwitch size={16} data-icon="inline-start" aria-hidden />{" "}
+              Promover a mentor…
             </DropdownMenuItem>
           )}
           <DropdownMenuSeparator />
@@ -310,7 +320,7 @@ export function MentoradoActions({
             disabled={temDupla}
             onClick={() => setDelOpen(true)}
           >
-            <Trash /> Excluir
+            <Trash size={16} data-icon="inline-start" aria-hidden /> Excluir
           </DropdownMenuItem>
           {temDupla && (
             <p className="px-2 pb-1 text-[11px] leading-snug text-muted-foreground">
