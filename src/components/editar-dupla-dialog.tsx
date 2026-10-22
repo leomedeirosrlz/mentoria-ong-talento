@@ -602,7 +602,19 @@ export function EditarDuplaDialog({ dupla }: { dupla: Dupla }) {
                         Concluída
                       </SelectItem>
                     )}
-                    <SelectItem value="encerrada">Encerrada</SelectItem>
+                    {/* trilha de especialista fecha pelo rito próprio
+                        (EncerrarTrilhaDialog → RPC: motivo + devolutiva +
+                        link da avaliação geral, 0104) — aqui só mostra o
+                        estado atual, não oferece o bypass */}
+                    {trilhaEsc === "especialista" ? (
+                      dupla.status === "encerrada" && (
+                        <SelectItem value="encerrada" disabled>
+                          Encerrada
+                        </SelectItem>
+                      )
+                    ) : (
+                      <SelectItem value="encerrada">Encerrada</SelectItem>
+                    )}
                   </SelectContent>
                 </Select>
                 {/* alto impacto mas reversível: declara o efeito antes de salvar */}

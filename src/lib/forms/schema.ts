@@ -63,6 +63,7 @@ export type FormularioSistema =
   | "anamnese"
   | "avaliacao_360"
   | "autoavaliacao_mentor"
+  | "avaliacao_especialista"
   | "visao"
   | "metas"
   | "pdm"
@@ -72,6 +73,7 @@ export const SISTEMA_LABEL: Record<FormularioSistema, string> = {
   anamnese: "Anamnese",
   avaliacao_360: "360º",
   autoavaliacao_mentor: "Autoavaliação",
+  avaliacao_especialista: "Avaliação da trilha",
   visao: "Visão",
   metas: "Metas",
   pdm: "PDM",

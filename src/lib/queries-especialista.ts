@@ -14,6 +14,7 @@ import {
   demoTrilhasDosJovens,
 } from "./demo/queries";
 import { demoTrilhaFechamento } from "./demo/encerramento-data";
+import { demoAvaliacaoEspDaDupla } from "./demo/forms-data";
 import { getMe } from "./queries";
 import type {
   Devolutiva,
@@ -374,5 +375,33 @@ export const getTrilhasDosJovens = cache(
       })
     );
     return Object.fromEntries(pares);
+  }
+);
+
+export type AvaliacaoEspDupla = {
+  respondido: boolean;
+  respondido_em: string | null;
+  /** vem só quando o caller é o especialista da trilha (o respondente) —
+   *  a coord recebe o estado e opera o link por /formularios/[id]. */
+  token?: string | null;
+};
+
+/** Estado do link da avaliação geral da trilha esp (0104) — a RPC definer
+ *  atravessa o RLS coord-only de formulario_links só até onde o papel vai:
+ *  especialista da dupla ganha o token de volta (caminho quando a
+ *  notificação se perdeu), coord ganha o status. */
+export const getAvaliacaoEspDaDupla = cache(
+  async (duplaId: string): Promise<AvaliacaoEspDupla | null> => {
+    const demo = await demoRole();
+    if (demo) return demoAvaliacaoEspDaDupla(demo, duplaId);
+    const supabase = await createClient();
+    const { data, error } = await supabase.rpc("avaliacao_esp_da_dupla", {
+      p_dupla: duplaId,
+    });
+    if (error) {
+      console.error("getAvaliacaoEspDaDupla:", error);
+      return null;
+    }
+    return data as AvaliacaoEspDupla | null;
   }
 );
