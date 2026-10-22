@@ -80,6 +80,9 @@ export const DEMO_TOKENS = {
   matheusRoda: "demo-tok-roda-matheus-00001",
   pedroVisao: "demo-tok-visao-pedro-0000001",
   dandaraVisao: "demo-tok-visao-dandara-00001",
+  // avaliação geral da trilha de especialista (0104) — emitida no
+  // fechamento; Helena responde pelo link (especialista logada)
+  helenaAvaliacaoEsp: "demo-tok-avalesp-helena-0001",
 } as const;
 
 export type DemoFormularios = {
@@ -402,6 +405,34 @@ export function getDemoFormularios(): DemoFormularios {
     updated_at: haDias(240, "09:00"),
   };
 
+  // ---------- 11. avaliação geral da trilha de especialista (0104 —
+  // campos verbatim da migration; emitida sozinha no fechamento da
+  // trilha, respondida pelo especialista logado) ----------
+
+  const fAvaliacaoEsp: Formulario = {
+    id: uid(0x400b),
+    titulo: "Avaliação geral da trilha de especialista",
+    descricao:
+      "A avaliação final do guia do especialista (§13), respondida ao concluir o acompanhamento de um(a) jovem: como foi a trilha e percepções sobre o programa e o trabalho da coordenação.",
+    sistema: "avaliacao_especialista",
+    campos: [
+      { id: "s1", tipo: "secao", label: "A trilha", obrigatorio: false },
+      { id: "experiencia", tipo: "escala_1_5", label: "No geral, como você avalia a experiência desta mentoria especialista?", obrigatorio: true },
+      { id: "atendeu_demanda", tipo: "escala_1_5", label: "O quanto a trilha respondeu à demanda do(a) jovem?", obrigatorio: true },
+      { id: "resultados", tipo: "texto_longo", label: "Quais resultados ou avanços você percebeu no(a) jovem?", obrigatorio: true },
+      { id: "melhorar_trilha", tipo: "texto_longo", label: "O que poderia ter sido melhor na condução da trilha?", obrigatorio: false },
+      { id: "s2", tipo: "secao", label: "O programa e a coordenação", obrigatorio: false },
+      { id: "apoio_coordenacao", tipo: "escala_1_5", label: "Como você avalia o suporte da coordenação durante a trilha?", obrigatorio: true },
+      { id: "percepcoes", tipo: "texto_longo", label: "Percepções sobre o programa e o trabalho da coordenação — o que vale registrar?", obrigatorio: false },
+      { id: "participaria_outra", tipo: "sim_nao", label: "Você participaria de outra trilha como especialista?", obrigatorio: false },
+    ],
+    ativo: true,
+    versao: 1,
+    created_by: null,
+    created_at: haDias(240, "09:00"),
+    updated_at: haDias(240, "09:00"),
+  };
+
   // ---------- links ----------
   const links: FormularioLink[] = [
     // avaliação: ricardo e carlos já responderam; fernanda pendente;
@@ -607,6 +638,14 @@ export function getDemoFormularios(): DemoFormularios {
       dupla_id: duplaDe("André", "Pedro"), contexto: { origem: "instrumentos" },
       // venceu sem resposta — o painel mostra "expirado", a ficha "Reenviar"
       usado_em: null, expira_em: haDias(16), created_by: porNome("André"), created_at: haDias(30),
+    },
+    // avaliação geral da trilha de especialista (0104) — a trilha da
+    // Helena com a Bia concluiu há 5 dias; o link espera a resposta dela
+    {
+      id: uid(0x4229), formulario_id: fAvaliacaoEsp.id, token: DEMO_TOKENS.helenaAvaliacaoEsp,
+      dest_profile_id: porNome("Helena"), dest_mentorado_id: null,
+      dupla_id: duplaDe("Helena", "Ana"), contexto: { origem: "auto", trilha: "especialista" },
+      usado_em: null, expira_em: null, created_by: porNome("Helena"), created_at: haDias(5),
     },
   ];
 
@@ -841,6 +880,7 @@ export function getDemoFormularios(): DemoFormularios {
       fMetas,
       fPdm,
       fRodaVida,
+      fAvaliacaoEsp,
     ],
     links,
     respostas,
@@ -1183,4 +1223,32 @@ export function demoInstrumentosDaDupla(
     souMentorado;
   if (!podeVer) return [];
   return instrumentosDaDuplaRaw(dupla);
+}
+
+/** Estado do link da avaliação geral da trilha de especialista (0104) —
+ *  idem a RPC avaliacao_esp_da_dupla: a especialista recebe o token pra
+ *  responder de novo (a notificação pode se perder); a coord vê só o
+ *  estado. */
+export function demoAvaliacaoEspDaDupla(
+  role: AppRole,
+  duplaId: string
+): { respondido: boolean; respondido_em: string | null; token?: string } | null {
+  const data = getDemoData();
+  const dupla = data.duplas.find((d) => d.id === duplaId);
+  if (!dupla || dupla.trilha !== "especialista") return null;
+  const eu = data.personas[role];
+  if (role !== "coordenacao" && dupla.mentor?.id !== eu.id) return null;
+  const { formularios, links } = getDemoFormularios();
+  const formIds = new Set(
+    formularios.filter((f) => f.sistema === "avaliacao_especialista").map((f) => f.id)
+  );
+  const link = links.find(
+    (l) => l.dupla_id === duplaId && formIds.has(l.formulario_id)
+  );
+  if (!link) return null;
+  return {
+    respondido: link.usado_em != null,
+    respondido_em: link.usado_em,
+    token: dupla.mentor?.id === eu.id ? link.token : undefined,
+  };
 }

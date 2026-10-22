@@ -244,6 +244,9 @@ export async function gerarLinksFormulario(input: {
   // pela seção Instrumentos da ficha — o mentor entrega no tempo do guia e o
   // link já nasce com o contexto certo). O caminho genérico geraria um link
   // de fora da trilha. 360º/anamnese/autoavaliação seguem por aqui mesmo.
+  // A avaliação da trilha de especialista (0104) é emitida sozinha pelo
+  // encerramento — um link manual pra mesma (form, dest, dupla) seria
+  // absorvido pelo dedup da RPC e a notificação não sairia.
   if (
     (INSTRUMENTOS_SISTEMA as readonly string[]).includes(
       (form.sistema as FormularioSistema | null) ?? ""
@@ -252,6 +255,11 @@ export async function gerarLinksFormulario(input: {
     return {
       error:
         "Instrumento de jornada se emite pela ficha da dupla (Instrumentos → Enviar link).",
+    };
+  if (form.sistema === "avaliacao_especialista")
+    return {
+      error:
+        "A avaliação geral da trilha é emitida sozinha quando a trilha de especialista é encerrada.",
     };
 
   // links pendentes já emitidos — reenviar pro mesmo destinatário reutiliza o

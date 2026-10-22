@@ -1,7 +1,10 @@
-import { FlagCheckered } from "@phosphor-icons/react/dist/ssr";
+import Link from "next/link";
+import { FlagCheckered, Star } from "@phosphor-icons/react/dist/ssr";
 import { formatDateTime } from "@/lib/ciclo";
 import { Badge } from "@/components/ui/badge";
+import { buttonVariants } from "@/components/ui/button";
 import type { Dupla } from "@/lib/types";
+import type { AvaliacaoEspDupla } from "@/lib/queries-especialista";
 
 /** Fechamento registrado da trilha de especialista — motivo + devolutiva pro
  *  PDM + carimbo. Visível pra quem abre a ficha da dupla de especialista
@@ -9,11 +12,15 @@ import type { Dupla } from "@/lib/types";
  *  pela solicitação, na ficha da dupla dele). */
 export function TrilhaFechamento({
   dupla,
+  avaliacao,
 }: {
   dupla: Pick<
     Dupla,
     "status" | "encerrada_em" | "motivo_encerramento" | "devolutiva_pdm"
   >;
+  /** estado do link da avaliação geral (0104) — token só presente pro
+   *  especialista da trilha; a coord recebe o status. */
+  avaliacao?: AvaliacaoEspDupla | null;
 }) {
   if (!dupla.encerrada_em) return null;
   return (
@@ -47,6 +54,30 @@ export function TrilhaFechamento({
           <p className="whitespace-pre-line">{dupla.devolutiva_pdm}</p>
         </blockquote>
       )}
+      {/* avaliação geral (0104): a notificação pode se perder — a ficha é o
+          caminho de volta pro link (token só vem pro especialista) e o
+          estado visível pra coord */}
+      {avaliacao &&
+        (avaliacao.respondido ? (
+          <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <Star size={12} weight="fill" className="text-[var(--warn)]" aria-hidden />
+            Avaliação geral respondida em {formatDateTime(avaliacao.respondido_em)}
+          </p>
+        ) : avaliacao.token ? (
+          <Link
+            href={`/f/${avaliacao.token}`}
+            className={buttonVariants({ size: "sm" })}
+          >
+            <Star size={14} aria-hidden />
+            Responder a avaliação geral
+          </Link>
+        ) : (
+          <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <Star size={12} className="text-muted-foreground" aria-hidden />
+            Avaliação geral do especialista: pendente — o link seguiu por
+            notificação
+          </p>
+        ))}
       <p className="text-xs text-muted-foreground">
         Registrado em {formatDateTime(dupla.encerrada_em)}
       </p>

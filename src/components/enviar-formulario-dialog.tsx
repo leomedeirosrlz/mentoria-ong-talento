@@ -84,9 +84,14 @@ export function EnviarFormularioDialog({
   const formLabelId = `${uid}-form`;
   // os 4 instrumentos de jornada não são emissíveis por aqui — a entrega é
   // do mentor pela seção Instrumentos da ficha (a action recusa também).
+  // avaliacao_especialista também sai: a emissão é automática no fechamento
+  // da trilha (0104) — um link manual confundiria o dedup da RPC.
   // 360º/anamnese/autoavaliação seguem selecionáveis — a coord emite mesmo.
   const selecionaveis = useMemo(
-    () => formularios.filter((f) => !ehInstrumento(f.sistema)),
+    () =>
+      formularios.filter(
+        (f) => !ehInstrumento(f.sistema) && f.sistema !== "avaliacao_especialista"
+      ),
     [formularios]
   );
   const ordenados = useMemo(() => {

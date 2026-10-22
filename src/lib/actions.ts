@@ -1519,6 +1519,21 @@ export async function updateDupla(duplaId: string, formData: FormData) {
       return { error: "O tipo de mentoria não pode mudar: a dupla já tem encontros." };
     }
   }
+  // trilha de especialista só fecha pelo rito próprio (EncerrarTrilhaDialog →
+  // RPC: motivo + devolutiva + link da avaliação geral, 0104). O edit genérico
+  // não oferece "encerrada" pra esp (UI) e aqui recusa mesmo por request
+  // forjado — sem o rito a dupla fecharia sem link, sem motivo e sem
+  // devolutiva. Reabrir (ativa/pausada) segue livre.
+  if (
+    (trilhaNova === "especialista" ||
+      atualDupla?.trilha === "especialista") &&
+    (status === "encerrada" || status === "concluida") &&
+    status !== atualDupla?.status
+  )
+    return {
+      error:
+        "Trilha de especialista se encerra pelo botão 'Encerrar trilha' da ficha — é o rito que pede motivo e devolutiva e emite a avaliação geral.",
+    };
   // dupla de especialista não tem supervisor — null forçado, nunca confia no form
   const supervisorFinal = trilhaNova === "especialista" ? null : supervisor_id;
   if (supervisorFinal) {

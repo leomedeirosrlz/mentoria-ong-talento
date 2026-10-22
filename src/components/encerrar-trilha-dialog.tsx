@@ -48,8 +48,8 @@ export function EncerrarTrilhaDialog({
         }
         toast.success(
           tipo === "concluida"
-            ? "Trilha concluída. A devolutiva chegou ao PDM."
-            : "Trilha encerrada. A devolutiva chegou ao PDM."
+            ? "Trilha concluída. A devolutiva chegou ao PDM — a avaliação geral segue por notificação."
+            : "Trilha encerrada. A devolutiva chegou ao PDM — a avaliação geral segue por notificação."
         );
         setOpen(false);
         router.refresh();

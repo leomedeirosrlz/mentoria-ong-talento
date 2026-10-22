@@ -35,6 +35,7 @@ import {
   type MentorProfile,
 } from "@/lib/queries";
 import {
+  getAvaliacaoEspDaDupla,
   getDevolutivasDupla,
   getEspecialistas,
   getPropostas,
@@ -286,6 +287,11 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
   // passos do guia da trilha — ciclo_eventos (DPP, com datas) ou os 5 passos
   // do especialista (sem data: a dupla combina dentro dos 3 meses)
   const espEventos = ehEsp ? await getEspecialistaEventos() : [];
+  // avaliação geral pós-fechamento (0104): a RPC entrega o token só pro
+  // especialista da trilha e o estado pra coord — a ficha é o caminho de
+  // volta quando a notificação se perde
+  const avaliacaoEsp =
+    ehEsp && dupla.encerrada_em ? await getAvaliacaoEspDaDupla(id) : null;
   // fluxo entre mentores do guia: a demanda de especialista nasce na dupla
   // DPP. O chip conta o estado a quem olha a ficha; o botão some enquanto uma
   // solicitação está aberta (re-pedir é pra quando a anterior se resolveu)
@@ -992,7 +998,9 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
           )}
           {/* depois do fechamento a trilha conta o desfecho: motivo + a
               devolutiva que seguiu pro PDM do jovem */}
-          {ehEsp && <TrilhaFechamento dupla={dupla} />}
+          {ehEsp && (
+            <TrilhaFechamento dupla={dupla} avaliacao={avaliacaoEsp} />
+          )}
           {/* sem combinados a seção não rende nada — some de vez (os links
               #combinados só nascem quando existe pendente pra marcar) */}
           {(dupla.encaminhamentos?.length ?? 0) > 0 && (
