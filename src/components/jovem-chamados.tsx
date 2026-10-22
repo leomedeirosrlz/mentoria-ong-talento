@@ -87,6 +87,11 @@ export function JovemChamados({
                     <span className="text-xs text-muted-foreground">
                       {CHAMADO_CATEGORIA_LABEL[c.categoria]}
                     </span>
+                    {c.atribuido_nome && c.status !== "resolvido" && (
+                      <span className="text-xs text-muted-foreground">
+                        Responsável: {c.atribuido_nome.split(" ")[0]}
+                      </span>
+                    )}
                   </div>
                   <p className="mt-0.5 truncate text-sm">{c.assunto}</p>
                 </div>

@@ -683,7 +683,7 @@ export async function assinarTermo(formData: FormData) {
  *  jovem, ResponsavelCivis pra autorização. */
 export async function assinaturaPorToken(token: string) {
   const demo = await demoRole();
-  if (demo) return demoAssinaturaPorToken(token);
+  if (demo) return demoAssinaturaPorToken(demo, token);
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("assinatura_por_token", {
     p_token: token,

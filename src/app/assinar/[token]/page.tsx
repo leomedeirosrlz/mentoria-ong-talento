@@ -4,6 +4,7 @@ import {
   ClockCountdown,
   FileArrowDown,
   FileX,
+  Flask,
   LinkBreak,
   ShareNetwork,
   UserSwitch,
@@ -12,6 +13,7 @@ import {
 // quebraria a página (server component) se viesse como import de valor
 import type { Icon } from "@phosphor-icons/react";
 import { assinarComToken, assinaturaPorToken } from "@/lib/actions-assinaturas";
+import { demoRole } from "@/lib/demo/mode";
 import { AssinaturaForm } from "@/components/assinatura-form";
 import { SiteFooter } from "@/components/site-footer";
 import { TermoVoluntarioDoc } from "@/components/termo-doc";
@@ -62,15 +64,32 @@ export async function generateMetadata({
 // então qualquer outra coisa daria erro feio em vez de tela amigável)
 const TOKEN_RE = /^[0-9a-f-]{36}$/;
 
+/** Aviso do modo demo (REALIZA-172) — a mesma etiqueta das irmãs públicas
+ *  (/t, /f): discreta, sempre no topo, e honesta sobre o que a demo não
+ *  faz — aqui, nada é assinado de verdade. */
+function AvisoDemo({ className }: { className?: string }) {
+  return (
+    <p
+      className={`flex items-center justify-center gap-1.5 text-xs text-muted-foreground ${className ?? ""}`}
+    >
+      <Flask size={13} aria-hidden />
+      Demonstração — nada aqui é assinado de verdade.
+    </p>
+  );
+}
+
 /** Telas terminais do link (inválido, já assinado, revogado, expirado) — quem
  *  abre é o responsável pelo jovem, então a mensagem é direta e sem jargão. */
 function EstadoLink({
   icon: Icone,
   titulo,
+  demo,
   children,
 }: {
   icon: Icon;
   titulo: string;
+  /** cookie demo ativo — a etiqueta aparece no topo do card terminal. */
+  demo?: boolean;
   children: React.ReactNode;
 }) {
   return (
@@ -81,6 +100,7 @@ function EstadoLink({
       <div className="m-auto w-full max-w-sm animate-rise text-center">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/logo-realiza.png" alt="Realiza.vc" className="mx-auto h-6 w-auto" />
+        {demo && <AvisoDemo className="mt-6" />}
         <div className="mt-8 rounded-xl bg-card p-6 shadow-[var(--shadow-border)]">
           <Icone size={28} className="mx-auto text-muted-foreground" aria-hidden />
           <h1 className="mt-3 text-base font-semibold">{titulo}</h1>
@@ -101,12 +121,13 @@ export default async function AssinarTokenPage({
 }: {
   params: Promise<{ token: string }>;
 }) {
-  const { token } = await params;
+  const [{ token }, demoRoleAtivo] = await Promise.all([params, demoRole()]);
+  const demo = demoRoleAtivo != null;
   const info = TOKEN_RE.test(token) ? await assinaturaPorToken(token) : null;
 
   if (!info) {
     return (
-      <EstadoLink icon={LinkBreak} titulo="Link inválido">
+      <EstadoLink icon={LinkBreak} titulo="Link inválido" demo={demo}>
         <p>
           Este link de assinatura não é válido. Ele pode ter sido copiado
           incompleto ou substituído por um mais recente. Peça um novo link à
@@ -118,7 +139,7 @@ export default async function AssinarTokenPage({
 
   if (info.status === "assinado") {
     return (
-      <EstadoLink icon={CheckCircle} titulo="Documento assinado">
+      <EstadoLink icon={CheckCircle} titulo="Documento assinado" demo={demo}>
         <p>
           Este documento já foi assinado
           {info.assinado_em ? ` em ${formatDateTime(info.assinado_em)}` : ""}.
@@ -142,7 +163,7 @@ export default async function AssinarTokenPage({
 
   if (info.status === "revogado") {
     return (
-      <EstadoLink icon={FileX} titulo="Documento cancelado">
+      <EstadoLink icon={FileX} titulo="Documento cancelado" demo={demo}>
         <p>
           Este documento foi cancelado pela coordenação do programa e não pode
           mais ser assinado por este link. Se você acha que isso é um engano,
@@ -154,7 +175,7 @@ export default async function AssinarTokenPage({
 
   if (info.status === "expirado") {
     return (
-      <EstadoLink icon={ClockCountdown} titulo="Link expirado">
+      <EstadoLink icon={ClockCountdown} titulo="Link expirado" demo={demo}>
         <p>
           O prazo deste link de assinatura terminou. Peça um novo link à
           coordenação do programa; a assinatura leva poucos minutos.
@@ -168,7 +189,11 @@ export default async function AssinarTokenPage({
   // card de bloqueio)
   if (info.identidade === "outra_pessoa") {
     return (
-      <EstadoLink icon={UserSwitch} titulo="Este link é de outra pessoa">
+      <EstadoLink
+        icon={UserSwitch}
+        titulo="Este link é de outra pessoa"
+        demo={demo}
+      >
         <p>
           Você está conectado com uma conta que não é a de{" "}
           <strong className="font-semibold text-foreground">
@@ -186,6 +211,7 @@ export default async function AssinarTokenPage({
       <EstadoLink
         icon={ShareNetwork}
         titulo="Quem assina é o responsável"
+        demo={demo}
       >
         <p>
           A autorização de{" "}
@@ -231,6 +257,8 @@ export default async function AssinarTokenPage({
       <main className="mx-auto w-full max-w-2xl flex-1 px-4 py-10 sm:px-6">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/logo-realiza.png" alt="Realiza.vc" className="h-6 w-auto" />
+
+        {demo && <AvisoDemo className="mt-6" />}
 
         <p className="mt-8 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
           Assinatura eletrônica

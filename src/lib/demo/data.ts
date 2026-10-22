@@ -196,6 +196,7 @@ const M = {
   rafael: 0x0409, // intake da T2, aguarda matching
   wendel: 0x040a, // veio pelo formulário, aguarda matching (fila)
   matheus: 0x040b, // T2 — a 2ª dupla DPP do Ricardo (WP3)
+  gustavo: 0x040c, // ciclo 2025/2026 — a concluída do Ricardo com rito aberto
 } as const;
 
 const D = {
@@ -212,6 +213,7 @@ const D = {
   t2a: 0x060b,
   t2b: 0x060c,
   t2c: 0x060d, // Ricardo × Matheus — a 2ª dupla DPP do híbrido (WP3)
+  rito: 0x060e, // Ricardo × Gustavo — concluída com o rito de encerramento aberto
 } as const;
 
 // cronogramas (0061) — um por turma; a T2 é a turma que começou um mês depois
@@ -1598,8 +1600,29 @@ function build(): DemoData {
     disponibilidade: disponibilidadeDeConjuntos(["ter", "qui"], ["noite"]),
     created_at: haDias(32),
   };
+  // o mentorado do ciclo 2025/2026 do Ricardo — concluiu a jornada e já
+  // consta "fora do programa", mas o rito de encerramento da dupla segue
+  // aberto (a pendência que a agenda da coordenação cobra, REALIZA-172:
+  // a linha "concluir na ficha" e a autoavaliação que o mentor ainda deve)
+  const gustavo: Mentorado = {
+    id: uid(M.gustavo), nome: "Gustavo Batista",
+    email: null, whatsapp: "5511976123012",
+    ong_origem: "Instituto Alavanca",
+    notas: "Ciclo 2025/2026 concluído com o Ricardo — a jornada fechou; o rito de encerramento segue aberto na ficha.",
+    avatar_path: null, documento_path: null,
+    nome_social: null, data_nascimento: "2007-08-02", genero: "masculino",
+    cidade: "São Paulo", uf: "SP",
+    interesses: ["elétrica", "curso técnico"],
+    motivacao: null, pref_genero_par: null, objetivos: null,
+    escolaridade: "medio", origem: "Instituto Alavanca",
+    disponibilidade: null,
+    created_at: haDias(390),
+    situacao: "concluido",
+    saiu_em: haDias(24, "18:00"),
+    motivo_saida: "Ciclo 2025/2026 — concluiu a jornada e o PDM",
+  };
 
-  const mentorados = [ana, caio, dandara, eduardo, isabela, kaua, laura, pedro, rafael, wendel, matheus];
+  const mentorados = [ana, caio, dandara, eduardo, isabela, kaua, laura, pedro, rafael, wendel, matheus, gustavo];
 
   // ---------- solicitações de especialista (0074 — pedido por sessão) ----
   // (montadas antes das duplas: as duplas de especialista referenciam a
@@ -2444,6 +2467,46 @@ function build(): DemoData {
     notas: [],
   };
 
+  // d-rito · Ricardo × Gustavo — a outra dupla do ciclo 2025/2026 do
+  // Ricardo: entrou na metade do ciclo e a jornada esticou com remarcações,
+  // então o último encontro caiu semanas atrás — a dupla virou 'concluida'
+  // e o Gustavo já consta fora do programa, mas o rito de encerramento
+  // segue aberto (tipo null no encerramento-data). É o caso que a agenda
+  // da coordenação cobra (REALIZA-172): a pendência vira linha "concluir
+  // na ficha" no monitoramento e "falta sua autoavaliação" no card do
+  // mentor — a d-fim NÃO serve aqui porque o rito dela já foi decidido.
+  const FIM_DUPLA_RITO = addDias(HOJE, -24);
+  const encRito: Encontro[] = Array.from({ length: 16 }, (_, i) => {
+    const n = i + 1;
+    const enc = realizado(uid(D.rito), n, addDias(FIM_DUPLA_RITO, (n - 16) * 7), {
+      duracao: n % 4 === 0 ? 60 : 75,
+      origem: n % 5 === 0 ? "externo" : "plataforma",
+    });
+    return comRegistro(enc, ricardo, "Gustavo", "dpp", {});
+  });
+
+  const duplaRito: Dupla = {
+    id: uid(D.rito),
+    // histórica como a d-fim: sem cronograma vivo — a turma é só o label
+    turma: "2025/2026",
+    cronograma_id: null,
+    status: "concluida",
+    iniciada_em: ymd(addDias(FIM_DUPLA_RITO, -15 * 7 - 7)),
+    trilha: "dpp",
+    demanda: null,
+    solicitacao_id: null,
+    mentor: ricardo,
+    mentorado: gustavo,
+    supervisor: beatriz, // o Paulo supervisiona a d-fim; a Beatriz cobre esta
+    encontros: encRito,
+    encaminhamentos: [
+      encaminhamento(uid(D.rito), encRito[15].registro!.id,
+        "Manter o plano do curso de elétrica vivo depois do programa",
+        "mentorado", addDias(FIM_DUPLA_RITO, 30), "feito"),
+    ],
+    notas: [],
+  };
+
   // d-esp1 · Sofia × Ana Beatriz — trilha de especialista (5 passos, sem
   // calendário oficial), nascida da solicitação aceita do Ricardo.
   // numero = TENTATIVA (0074): a 2ª furou (a Bia teve prova surpresa e a
@@ -2774,7 +2837,7 @@ function build(): DemoData {
     notas: [],
   };
 
-  const duplas = [duplaOk, duplaPend, duplaRisco, duplaAtraso, duplaFim, duplaEsp1, duplaEsp2, duplaEsp3, duplaEsp4, duplaPausa, duplaT2a, duplaT2b, duplaT2c];
+  const duplas = [duplaOk, duplaPend, duplaRisco, duplaAtraso, duplaFim, duplaRito, duplaEsp1, duplaEsp2, duplaEsp3, duplaEsp4, duplaPausa, duplaT2a, duplaT2b, duplaT2c];
 
   // ---------- devolutivas (WP6) ----------
   // Feed datado por trilha — a última entrega continua sendo o que marca a
@@ -3353,7 +3416,10 @@ function build(): DemoData {
       template: tplTermo },
     // Isabela: é maior de idade — o doc dela é o termo de participação,
     // emitido em lote junto com a autorização do Kauã (0x3404). Sem
-    // dados_civis na ficha → pendência com "falta:" no checklist
+    // dados_civis na ficha → pendência com "falta:" no checklist.
+    // REALIZA-172: como ela não tem login (nenhuma persona aponta pra ela),
+    // o token 0x3407 resolve 'outra_pessoa' pra QUALQUER papel demo — é o
+    // token-fixture determinístico do ramo "Este link é de outra pessoa"
     { id: uid(0x3207), template_id: uid(0x3303), profile_id: null, mentorado_id: isabela.id,
       status: "pendente", dados_snapshot: null, token: uid(0x3407),
       token_expira_em: haDias(-28),

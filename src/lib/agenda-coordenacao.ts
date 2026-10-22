@@ -238,16 +238,20 @@ export type MotivoAcompanhar =
   | "sem_data"          // sem row do encontro vigente da turma
   | "atraso"            // sinal `atraso` do semáforo
   | "limbo"             // agendado vencido sem registro
-  | "registro_pendente";
+  | "registro_pendente"
+  | "encerramento";     // dupla concluída com o rito ainda aberto (0037)
 
 /** Ordem estável dos motivos dentro do item. A tela escolhe o `caso` do
  *  lembrete por prioridade própria (registro > limbo > atraso > sem_data) —
- *  não assumir que `motivos[0]` assina a mensagem. */
+ *  não assumir que `motivos[0]` assina a mensagem. "encerramento" nunca
+ *  divide item: a dupla concluída não carrega motivo operacional de
+ *  encontro, então a posição é só estabilidade de tipo. */
 const MOTIVO_ORDEM: Record<MotivoAcompanhar, number> = {
   atraso: 0,
   limbo: 1,
   sem_data: 2,
   registro_pendente: 3,
+  encerramento: 4,
 };
 
 export type ItemParaAcompanhar = {
@@ -371,7 +375,11 @@ export function paraAcompanhar(
   duplas: Dupla[],
   eventos: CicloEvento[],
   nudges: Record<string, Interacao>,
-  hoje: Date = new Date()
+  hoje: Date = new Date(),
+  /** dupla_ids com `encerramentos` sem decisão (tipo null) — a pendência
+   *  que vira o motivo "encerramento" quando a dupla já concluiu a jornada.
+   *  Vem de getEncerramentosPendentes (RLS já faz o escopo do papel). */
+  encerramentosPendentes: ReadonlySet<string> = new Set()
 ): ItemParaAcompanhar[] {
   const ativas = duplas.filter((d) => d.status === "ativa");
 
@@ -443,6 +451,39 @@ export function paraAcompanhar(
       bloqueadoAte: lembreteBloqueadoAte(ultimoNudge, hoje),
     });
   }
+  // Rito de encerramento pendente (REALIZA-172): o fechamento automático
+  // (0102) deixa a dupla 'concluida' com a row do rito sem decisão — sem
+  // ação da coordenação ele nunca fecha. A linha aponta pra ficha, onde o
+  // checklist inteiro já vive (EncerramentoDupla) — nada de duplicar o
+  // rito aqui, e nada de nudge: a pendência é da coordenação, não da dupla.
+  for (const d of duplas) {
+    if (d.status !== "concluida" || !encerramentosPendentes.has(d.id))
+      continue;
+    const saude = saudadeDaDupla(d, eventos, hoje);
+    const n1 = primeiroNomeDaDupla(d) || "Jovem";
+    const mentorNome = (
+      d.mentor?.nome_social ??
+      d.mentor?.nome ??
+      ""
+    ).split(/\s+/)[0];
+    const contexto = "Rito de encerramento pendente — concluir na ficha";
+    const ult = nudges[d.id];
+    const ultimoNudge = ult?.tipo === "nudge" ? ult : null;
+    itens.push({
+      duplaId: d.id,
+      nomes: mentorNome ? `${n1} · ${mentorNome}` : n1,
+      turma: d.turma,
+      saude,
+      motivos: ["encerramento"],
+      contexto,
+      contextoPartes: [contexto],
+      // o LembreteButton não renderiza pra motivo encerramento — o rótulo
+      // é o do CTA que a fila desenha no lugar
+      rotuloLembrete: "Concluir rito",
+      ultimoNudge,
+      bloqueadoAte: lembreteBloqueadoAte(ultimoNudge, hoje),
+    });
+  }
   return itens.sort(
     (a, b) =>
       ORDEM_SEMAFORO[a.saude.semaforo] - ORDEM_SEMAFORO[b.saude.semaforo] ||
@@ -492,8 +533,12 @@ export function dimensoesDoItem(item: ItemParaAcompanhar): DimensoesItem {
         : null;
 
   const atraso = Math.max(0, saude.esperado - saude.feitos);
-  const cronograma: DimensaoBadge | null =
-    atraso >= 1
+  // jornada concluída não tem "atraso" a correr — buracos do meio da régua
+  // deixaram de ser cobráveis quando o último encontro fechou a dupla; a
+  // única pendência que a linha carrega é o rito (dimensão operacional)
+  const cronograma: DimensaoBadge | null = motivos.includes("encerramento")
+    ? null
+    : atraso >= 1
       ? {
           tom: "warn",
           rotulo: `${atraso} ${atraso === 1 ? "encontro atrasado" : "encontros atrasados"}`,
@@ -506,13 +551,15 @@ export function dimensoesDoItem(item: ItemParaAcompanhar): DimensoesItem {
             ? { tom: "warn", rotulo: "estagnada" }
             : null;
 
-  const operacional: DimensaoBadge | null = motivos.includes(
-    "registro_pendente"
-  )
-    ? { tom: "muted", rotulo: "registro pendente" }
-    : temSinal("encaminhamento_vencido")
-      ? { tom: "muted", rotulo: "encaminhamento vencido" }
-      : null;
+  // o rito pendente é a única coisa que a dimensão operacional pode cobrar
+  // de uma dupla concluída — ela não corre mais a régua de encontro
+  const operacional: DimensaoBadge | null = motivos.includes("encerramento")
+    ? { tom: "muted", rotulo: "encerramento pendente" }
+    : motivos.includes("registro_pendente")
+      ? { tom: "muted", rotulo: "registro pendente" }
+      : temSinal("encaminhamento_vencido")
+        ? { tom: "muted", rotulo: "encaminhamento vencido" }
+        : null;
 
   return { acompanhamento, cronograma, operacional };
 }
