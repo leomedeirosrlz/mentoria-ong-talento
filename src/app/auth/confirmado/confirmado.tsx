@@ -30,7 +30,7 @@ export function Confirmado({ next }: { next: string }) {
   }, [supabase]);
 
   return (
-    <div className="min-h-[100dvh] grid place-items-center bg-background px-4">
+    <div className="min-h-[100dvh] grid place-items-center bg-background px-4 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))]">
       <div className="max-w-xs text-center">
         <div ref={statusRef} tabIndex={-1} role="status" className="outline-none">
           <svg viewBox="0 0 52 52" className="mx-auto h-16 w-16" aria-hidden="true">

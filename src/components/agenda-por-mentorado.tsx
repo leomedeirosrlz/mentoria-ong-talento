@@ -92,6 +92,9 @@ export type AgendaPorMentoradoProps = {
   encerramentosPendentes: Record<string, { autoavaliacao: boolean }>;
   /** Os MESMOS itens da Minha agenda — o strip "Sua semana" os condensa. */
   itensSemana: AgendaItem[];
+  /** staff+mentor e DPP+esp chegam via ?visao=dpp — o strip repassa ao
+   *  deep-link do dia (mesma regra do AbasAgendaMentor). */
+  hibrido?: boolean;
   meuId: string;
   /** Primeiro nome do mentor — assina o check-in do Lembrar. */
   meuNome: string;
@@ -128,6 +131,7 @@ export function AgendaPorMentorado({
   nudges,
   encerramentosPendentes,
   itensSemana,
+  hibrido = false,
   meuId,
   meuNome,
   hoje,
@@ -177,7 +181,7 @@ export function AgendaPorMentorado({
       {/* o strip da semana só aparece quando tem o que condensar — sem
           itens derivados ele seria 7 "livre" sem utilidade */}
       {itensSemana.length > 0 && (
-        <AgendaSuaSemana itens={itensSemana} hoje={hoje} />
+        <AgendaSuaSemana itens={itensSemana} hoje={hoje} hibrido={hibrido} />
       )}
       {/* >1 dupla: cards em 2 colunas em xl (mesma régua da home do
           mentor); com 1 só, a coluna única mantém a leitura confortável */}
@@ -633,18 +637,24 @@ function ProximoEncontro({
     detalhe = `${feitos} de ${total} encontros realizados`;
   } else if (limbo) {
     // limbo é honesto: a plataforma não sabe se rolou — a pergunta é da
-    // dupla, a correção acontece na ficha (remarcar/registrar)
+    // dupla, a correção acontece na ficha (remarcar/registrar). O CTA é a
+    // pill outline sm dos outros cartões de pendência — um link inline de
+    // texto tinha ~20px de alvo no toque.
     titulo = `Estava agendado ${formatDiaHora(limbo.data_hora)}`;
     detalhe = (
       <>
-        não aconteceu?{" "}
+        <span className="block">
+          não aconteceu? — se rolou, o registro também é na ficha
+        </span>
         <Link
           href={`/duplas/${dupla.id}`}
-          className="font-medium text-foreground underline underline-offset-4"
+          className={cn(
+            buttonVariants({ variant: "outline", size: "sm" }),
+            "mt-2"
+          )}
         >
-          remarcar na ficha
+          Remarcar na ficha
         </Link>
-        {" — se rolou, o registro também é lá"}
       </>
     );
   } else if (proximo?.data_hora) {

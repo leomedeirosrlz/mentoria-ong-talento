@@ -502,7 +502,7 @@ export function ImportarRegistrosDialog() {
                 manuais.length > 1 ? (
                   <button
                     type="button"
-                    className="text-xs font-normal text-muted-foreground underline-offset-2 hover:underline"
+                    className="-my-1 min-h-11 rounded-md px-2 text-xs font-normal text-muted-foreground underline-offset-2 hover:underline"
                     onClick={() => {
                       const m = new Map(escolhas);
                       for (const l of manuais) m.set(l.n, IGNORAR);
@@ -522,7 +522,7 @@ export function ImportarRegistrosDialog() {
                 <Collapsible.Root
                   defaultOpen={!manuais.length && !provaveis.length && !ignorCsv.length}
                 >
-                  <Collapsible.Trigger className="group mb-1.5 flex w-full cursor-pointer items-center gap-1.5 text-left text-xs font-semibold text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                  <Collapsible.Trigger className="group mb-1.5 flex min-h-11 w-full cursor-pointer items-center gap-1.5 text-left text-xs font-semibold text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                     {`Prontas — entram direto (${prontas.length})`}
                     <CaretDown
                       size={13}

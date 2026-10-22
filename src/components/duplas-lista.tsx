@@ -353,20 +353,25 @@ function LinhaDupla({
           (title carrega o texto inteiro, a ficha tem o detalhe) */}
       <div className={cn("min-w-0 text-[10.5px] leading-normal", tomSinais)}>
         <p className="truncate" title={tituloSinais}>
-          {apoioTxt && (
-            <span className="font-medium text-[var(--info-text)]">
-              {apoioTxt}
-              {" · "}
-            </span>
-          )}
-          {sinais.map((parte, j) => (
-            <span key={j}>
-              {j > 0 && " · "}
-              <span className={j === sinais.length - 1 && recencia ? "text-muted-foreground" : undefined}>
-                {parte}
+          {/* texto integral pro leitor de tela — o truncate é só visual e
+              o title não chega em toque/teclado */}
+          <span className="sr-only">{tituloSinais}</span>
+          <span aria-hidden>
+            {apoioTxt && (
+              <span className="font-medium text-[var(--info-text)]">
+                {apoioTxt}
+                {" · "}
               </span>
-            </span>
-          ))}
+            )}
+            {sinais.map((parte, j) => (
+              <span key={j}>
+                {j > 0 && " · "}
+                <span className={j === sinais.length - 1 && recencia ? "text-muted-foreground" : undefined}>
+                  {parte}
+                </span>
+              </span>
+            ))}
+          </span>
         </p>
       </div>
 
@@ -442,7 +447,7 @@ function LinhaMini({
       </span>
       <Link
         href={`/duplas/${d.id}`}
-        className="rounded px-1.5 py-2 text-xs font-semibold text-muted-foreground hover:text-foreground lg:py-1"
+        className="inline-flex min-h-11 items-center rounded px-1.5 py-2 text-xs font-semibold text-muted-foreground hover:text-foreground lg:min-h-0 lg:py-1"
       >
         Ver ficha ›
       </Link>

@@ -526,12 +526,17 @@ function EncontroLinha({
         )}
       </div>
       <div className="ms-auto flex flex-wrap items-center justify-end gap-2">
+        {/* Entrar é a ação decisiva na hora da chamada — por isso fica
+            em default enquanto Remarcar/Desmarcar ficam em outline/ghost.
+            (Overflow-menu pro Desmarcar ficou de fora: por estado só há um
+            ghost por vez e os Dialogs moram em jovem-encontro-acoes —
+            menu de item único só adicionaria um toque.) */}
         {futuro && linkSeguro(e.link) && (
           <a
             href={linkSeguro(e.link)!}
             target="_blank"
             rel="noopener noreferrer"
-            className={buttonVariants({ variant: "outline", size: "sm" })}
+            className={buttonVariants({ variant: "default", size: "sm" })}
           >
             <VideoCamera size={15} aria-hidden />
             Entrar

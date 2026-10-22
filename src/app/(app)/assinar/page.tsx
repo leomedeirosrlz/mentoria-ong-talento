@@ -87,7 +87,7 @@ export default async function AssinarPage() {
             <li>
               <a
                 href="#termo"
-                className="font-medium text-primary underline-offset-4 hover:underline"
+                className="inline-flex min-h-11 items-center rounded-lg font-medium text-primary underline-offset-4 outline-none transition-colors hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
               >
                 1 · Leia o termo
               </a>
@@ -95,7 +95,7 @@ export default async function AssinarPage() {
             <li>
               <a
                 href="#dados"
-                className="font-medium text-primary underline-offset-4 hover:underline"
+                className="inline-flex min-h-11 items-center rounded-lg font-medium text-primary underline-offset-4 outline-none transition-colors hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
               >
                 2 · Confira seus dados
               </a>
@@ -103,7 +103,7 @@ export default async function AssinarPage() {
             <li>
               <a
                 href="#assinar"
-                className="font-medium text-primary underline-offset-4 hover:underline"
+                className="inline-flex min-h-11 items-center rounded-lg font-medium text-primary underline-offset-4 outline-none transition-colors hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
               >
                 3 · Assine
               </a>

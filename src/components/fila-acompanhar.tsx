@@ -255,7 +255,7 @@ function LinhaAcompanhar({ linha }: { linha: LinhaComDimensoes }) {
           />
           <Link
             href={`/duplas/${item.duplaId}`}
-            className="inline-flex min-h-9 items-center rounded-lg px-2 text-xs font-semibold text-foreground/80 transition-colors hover:bg-muted hover:text-foreground"
+            className="inline-flex min-h-11 items-center rounded-lg px-2 text-xs font-semibold text-foreground/80 transition-colors hover:bg-muted hover:text-foreground sm:min-h-8"
           >
             Ver ficha ›
           </Link>

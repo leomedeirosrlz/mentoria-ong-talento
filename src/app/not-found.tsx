@@ -8,7 +8,7 @@ export const metadata: Metadata = {
 
 export default function NotFound() {
   return (
-    <div className="min-h-[100dvh] grid place-items-center px-4">
+    <div className="min-h-[100dvh] grid place-items-center px-4 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))]">
       <div className="max-w-sm rounded-xl bg-card shadow-[var(--shadow-border)] p-6 text-center">
         <Compass size={32} className="mx-auto text-muted-foreground" />
         <p className="mt-2 font-medium">Página não encontrada</p>
@@ -17,7 +17,7 @@ export default function NotFound() {
         </p>
         <Link
           href="/"
-          className="mt-4 inline-block text-sm underline text-muted-foreground hover:text-foreground transition-colors"
+          className="mt-4 inline-flex min-h-11 sm:min-h-8 items-center rounded-sm px-3 text-sm underline underline-offset-2 text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
         >
           Voltar para o início
         </Link>

@@ -167,7 +167,7 @@ export default function PrivacidadePage() {
   return (
     <div className="flex min-h-[100dvh] flex-col bg-background">
       <header className="border-b border-border">
-        <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-4 sm:px-6">
+        <div className="mx-auto flex max-w-3xl items-center justify-between py-4 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] sm:px-6">
           {/* convenção logo→home (cai no /login pra anônimo) */}
           <Link href="/" className="inline-flex min-h-11 items-center outline-none focus-visible:ring-3 focus-visible:ring-ring/50">
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -183,7 +183,7 @@ export default function PrivacidadePage() {
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-10 sm:px-6">
+      <main className="mx-auto w-full max-w-3xl flex-1 py-10 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] sm:px-6">
         <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
           Última atualização: setembro de 2026
         </p>
@@ -209,7 +209,7 @@ export default function PrivacidadePage() {
         </div>
       </main>
 
-      <div className="border-t border-border px-4 py-6 sm:px-6">
+      <div className="border-t border-border py-6 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] sm:px-6">
         <SiteFooter />
       </div>
     </div>

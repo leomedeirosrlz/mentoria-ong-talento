@@ -292,6 +292,9 @@ export default async function AgendaPage({
             nudges={nudges}
             encerramentosPendentes={encerramentosPendentes}
             itensSemana={itensSemana}
+            // staff+mentor também: o deep-link do dia no strip precisa do
+            // ?visao=dpp (mesma régua do AbasAgendaMentor no ramo calendário)
+            hibrido={duasVisoes || (papelStaff ?? false)}
             meuId={me!.id}
             meuNome={me!.nome.split(" ")[0]}
             hoje={hoje}
@@ -473,7 +476,7 @@ function AbasAgenda({ ativa }: { ativa: "dpp" | "especialista" }) {
   return (
     <nav
       aria-label="Visão da agenda"
-      className="flex w-fit items-center gap-1 rounded-lg bg-muted p-1"
+      className="scroll-fina flex w-fit max-w-full items-center gap-1 overflow-x-auto rounded-lg bg-muted p-1"
     >
       {(
         [
@@ -489,7 +492,7 @@ function AbasAgenda({ ativa }: { ativa: "dpp" | "especialista" }) {
           href={href}
           aria-current={ativa === v ? "page" : undefined}
           className={cn(
-            "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+            "inline-flex min-h-11 shrink-0 items-center rounded-md px-3 text-sm font-medium transition-colors sm:min-h-8",
             ativa === v
               ? "bg-card text-foreground shadow-sm"
               : "text-muted-foreground hover:text-foreground"
@@ -514,7 +517,7 @@ function AbasAgendaCoord({
     <div
       role="tablist"
       aria-label="Modos da agenda"
-      className="flex w-fit items-center gap-1 rounded-lg bg-muted p-1"
+      className="scroll-fina flex w-fit max-w-full items-center gap-1 overflow-x-auto rounded-lg bg-muted p-1"
     >
       {(
         [
@@ -528,7 +531,7 @@ function AbasAgendaCoord({
           aria-selected={ativa === v}
           href={href}
           className={cn(
-            "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+            "inline-flex min-h-11 shrink-0 items-center rounded-md px-3 text-sm font-medium transition-colors sm:min-h-8",
             ativa === v
               ? "bg-card text-foreground shadow-sm"
               : "text-muted-foreground hover:text-foreground"
@@ -558,7 +561,7 @@ function AbasAgendaMentor({
     <div
       role="tablist"
       aria-label="Modos da agenda"
-      className="flex w-fit items-center gap-1 rounded-lg bg-muted p-1"
+      className="scroll-fina flex w-fit max-w-full items-center gap-1 overflow-x-auto rounded-lg bg-muted p-1"
     >
       {(
         [
@@ -573,7 +576,7 @@ function AbasAgendaMentor({
           aria-selected={ativa === v}
           href={`${base}${v}`}
           className={cn(
-            "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+            "inline-flex min-h-11 shrink-0 items-center rounded-md px-3 text-sm font-medium transition-colors sm:min-h-8",
             ativa === v
               ? "bg-card text-foreground shadow-sm"
               : "text-muted-foreground hover:text-foreground"

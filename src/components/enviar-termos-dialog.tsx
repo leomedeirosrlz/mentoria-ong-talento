@@ -137,7 +137,7 @@ function TermoCheckRow({
           <Link
             href={fichaHref}
             title="Abrir a ficha pra completar os dados"
-            className="inline-flex min-h-8 items-center rounded-md px-1.5 text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline"
+            className="inline-flex min-h-11 items-center rounded-md px-1.5 text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline sm:min-h-8"
           >
             <span className="text-xs">ficha</span>
           </Link>

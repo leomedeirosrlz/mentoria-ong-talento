@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { demoRole } from "@/lib/demo/mode";
 import { getDemoData } from "@/lib/demo/data";
 import { demoPdf } from "@/lib/demo/pdf";
+import { apiErro } from "@/lib/api-erro";
 
 // Download de evidência: a RLS de registro_anexos já faz a autorização —
 // quem não pode ler o registro nem vê a row (404). O arquivo sai do bucket
@@ -19,7 +20,7 @@ export async function GET(
   if (demo) {
     const a = getDemoData().anexos.find((x) => x.id === id);
     if (!a) {
-      return new NextResponse("Anexo não encontrado.", { status: 404 });
+      return apiErro("Anexo não encontrado.", { status: 404 });
     }
     const pdf = demoPdf(
       a.nome,
@@ -35,7 +36,7 @@ export async function GET(
 
   // id cru no eq() — string malformada vira erro PostgREST (500); uuid ruim é 404
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
-    return new NextResponse("Anexo não encontrado.", { status: 404 });
+    return apiErro("Anexo não encontrado.", { status: 404 });
   }
   const supabase = await createClient();
 
@@ -43,7 +44,10 @@ export async function GET(
   // passa pelo layout (e redirect de login pra API não ajuda ninguém)
   const { data: claims } = await supabase.auth.getClaims();
   if (!claims?.claims?.sub) {
-    return new NextResponse("Sessão expirada. Entre de novo.", { status: 401 });
+    return apiErro("Sessão expirada. Entre de novo.", {
+      status: 401,
+      acao: { href: "/login", label: "Ir para o login" },
+    });
   }
 
   const { data: anexo, error } = await supabase
@@ -52,17 +56,20 @@ export async function GET(
     .eq("id", id)
     .maybeSingle();
   if (error) {
-    return new NextResponse("Não foi possível abrir o anexo. Tente de novo.", { status: 500 });
+    return apiErro("Não foi possível abrir o anexo. Tente de novo.", {
+      status: 500,
+      acao: { href: `/api/anexo/${id}`, label: "Tentar de novo" },
+    });
   }
   if (!anexo) {
-    return new NextResponse("Anexo não encontrado.", { status: 404 });
+    return apiErro("Anexo não encontrado.", { status: 404 });
   }
 
   const { data: signed, error: signError } = await supabase.storage
     .from("registro-anexos")
     .createSignedUrl(anexo.path, 300);
   if (signError || !signed?.signedUrl) {
-    return new NextResponse("Não foi possível abrir o anexo.", { status: 404 });
+    return apiErro("Não foi possível abrir o anexo.", { status: 404 });
   }
 
   return NextResponse.redirect(signed.signedUrl);

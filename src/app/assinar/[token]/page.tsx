@@ -95,8 +95,9 @@ function EstadoLink({
   return (
     // flex + m-auto (não place-items-center): em telas baixas o topo do card
     // continua rolável — centraliza só quando há espaço. flex, não grid: em
-    // grid o w-full do filho resolve contra o padding box e vaza os px-4
-    <div className="flex min-h-[100dvh] flex-col bg-background px-4 py-10">
+    // grid o w-full do filho resolve contra o padding box e vaza o padding
+    // lateral (1rem ou o safe-area, o que for maior)
+    <div className="flex min-h-[100dvh] flex-col bg-background py-10 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))]">
       <div className="m-auto w-full max-w-sm animate-rise text-center">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/logo-realiza.png" alt="Realiza.vc" className="mx-auto h-6 w-auto" />
@@ -254,7 +255,7 @@ export default async function AssinarTokenPage({
 
   return (
     <div className="flex min-h-[100dvh] flex-col bg-background">
-      <main className="mx-auto w-full max-w-2xl flex-1 px-4 py-10 sm:px-6">
+      <main className="mx-auto w-full max-w-2xl flex-1 py-10 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] sm:px-6">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/logo-realiza.png" alt="Realiza.vc" className="h-6 w-auto" />
 
@@ -303,7 +304,7 @@ export default async function AssinarTokenPage({
             <li>
               <a
                 href="#termo"
-                className="font-medium text-primary underline-offset-4 hover:underline"
+                className="inline-flex min-h-11 items-center rounded-lg font-medium text-primary underline-offset-4 outline-none transition-colors hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
               >
                 1 · Leia o documento
               </a>
@@ -311,7 +312,7 @@ export default async function AssinarTokenPage({
             <li>
               <a
                 href="#dados"
-                className="font-medium text-primary underline-offset-4 hover:underline"
+                className="inline-flex min-h-11 items-center rounded-lg font-medium text-primary underline-offset-4 outline-none transition-colors hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
               >
                 {ehVoluntario ? "2 · Confira seus dados" : "2 · Confira os dados"}
               </a>
@@ -319,7 +320,7 @@ export default async function AssinarTokenPage({
             <li>
               <a
                 href="#assinar"
-                className="font-medium text-primary underline-offset-4 hover:underline"
+                className="inline-flex min-h-11 items-center rounded-lg font-medium text-primary underline-offset-4 outline-none transition-colors hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
               >
                 3 · Assine
               </a>
@@ -414,7 +415,7 @@ export default async function AssinarTokenPage({
         </section>
       </main>
 
-      <div className="border-t border-border px-4 py-6 sm:px-6">
+      <div className="border-t border-border py-6 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] sm:px-6">
         <SiteFooter />
       </div>
     </div>

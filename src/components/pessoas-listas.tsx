@@ -630,7 +630,7 @@ export function PessoasListas({
           onOpenChange={setForaAberto}
           className="space-y-2"
         >
-          <Collapsible.Trigger className="group flex w-full items-center gap-1.5 rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          <Collapsible.Trigger className="group flex min-h-11 w-full items-center gap-1.5 rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:min-h-0">
             <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground tabular-nums">
               Fora do programa ({foraExibidos.length}
               {q && totalFora > foraExibidos.length ? ` de ${totalFora}` : ""})
@@ -673,7 +673,7 @@ export function PessoasListas({
           onOpenChange={setInativosAberto}
           className="space-y-2"
         >
-          <Collapsible.Trigger className="group flex w-full items-center gap-1.5 rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          <Collapsible.Trigger className="group flex min-h-11 w-full items-center gap-1.5 rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:min-h-0">
             <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground tabular-nums">
               Inativos ({inativasExibidas.length}
               {q && inativas.length > inativasExibidas.length
@@ -1024,7 +1024,7 @@ function PessoaRow({
                   trigger={
                     <button
                       type="button"
-                      className="rounded-sm font-medium text-foreground underline underline-offset-2 transition-colors hover:text-foreground/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      className="-my-2 min-h-11 rounded-sm font-medium text-foreground underline underline-offset-2 transition-colors hover:text-foreground/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:my-0 sm:min-h-0"
                     >
                       ajustar
                     </button>
@@ -1063,7 +1063,7 @@ function PessoaRow({
                           trigger={
                             <button
                               type="button"
-                              className="rounded-sm font-medium text-foreground underline underline-offset-2 transition-colors hover:text-foreground/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                              className="-my-2 min-h-11 rounded-sm font-medium text-foreground underline underline-offset-2 transition-colors hover:text-foreground/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:my-0 sm:min-h-0"
                             >
                               ajustar
                             </button>
