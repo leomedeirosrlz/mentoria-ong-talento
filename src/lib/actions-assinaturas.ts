@@ -13,6 +13,7 @@ import {
 } from "./documentos/texto";
 import { enviarEmailsIndividuais, SITE_URL } from "./email";
 import { emailDocumentoAssinatura } from "./email-templates";
+import { ipCliente } from "./ip";
 import { DEMO_MSG } from "./demo/shared";
 import { capitalizar, cpfValido, nomeProprio } from "./utils";
 import type { DadosCivis, Endereco, ResponsavelCivis } from "./types";
@@ -45,9 +46,8 @@ const UUID_RE =
  *  o par que for gravado junto (0053). */
 async function ipUa(): Promise<{ ip: string | null; ua: string | null }> {
   const h = await headers();
-  const fwd = h.get("x-forwarded-for")?.split(",")[0]?.trim();
   return {
-    ip: fwd || h.get("x-real-ip") || null,
+    ip: await ipCliente(),
     ua: h.get("user-agent"),
   };
 }
