@@ -55,11 +55,29 @@ export type LinkResolvido = FormularioLink & {
   dest_url: string | null;
   dupla: { id: string; mentor_nome: string; mentorado_nome: string } | null;
   resposta: FormularioResposta | null;
+  /** TODAS as respostas do link — em link manual é 0..1 (espelha
+   *  `resposta`); em link de intake (multi_uso) é a fila de candidatos */
+  respostas: FormularioResposta[];
+};
+
+/** Metadados de um upload do intake (0115) — path é o objeto no bucket
+ *  form-anexos; o download sai por /api/form-anexo/<id>. */
+export type FormularioAnexo = {
+  id: string;
+  link_id: string;
+  campo_id: string;
+  path: string;
+  nome: string;
+  tamanho: number;
+  created_at: string;
 };
 
 export type FormularioDetalhe = {
   formulario: Formulario;
   links: LinkResolvido[];
+  /** anexos de todas as respostas do form (só consultado quando a
+   *  definição tem campo 'arquivo' — senão fica vazio) */
+  anexos: FormularioAnexo[];
 };
 
 /** Payload público do /f/<token> — o que formulario_por_token devolve. */
@@ -96,7 +114,9 @@ export const getFormularios = cache(async (): Promise<FormularioListaItem[]> => 
       .order("created_at", { ascending: false }),
     supabase
       .from("formulario_links")
-      .select("formulario_id, usado_em, expira_em"),
+      .select(
+        "formulario_id, usado_em, expira_em, multi_uso, respostas:formulario_respostas(count)"
+      ),
   ]);
   if (error) throw error;
   if (e2) throw e2;
@@ -113,7 +133,14 @@ export const getFormularios = cache(async (): Promise<FormularioListaItem[]> => 
       ultima: null,
     };
     c.total++;
-    if (l.usado_em) {
+    // link de intake (multi_uso) nunca carimba usado_em — "respondidos"
+    // da lista conta as respostas recebidas, não o link
+    const nRespostas =
+      (l as { respostas?: { count: number }[] }).respostas?.[0]?.count ?? 0;
+    if (l.multi_uso) {
+      c.resp += nRespostas;
+      if (!l.expira_em || new Date(l.expira_em).getTime() > agora) c.pend++;
+    } else if (l.usado_em) {
       c.resp++;
       // ISO 8601 compara lexicograficamente — max(usado_em) sem Date
       if (!c.ultima || l.usado_em > c.ultima) c.ultima = l.usado_em;
@@ -149,7 +176,7 @@ export const getFormulario = cache(
       .from("formulario_links")
       .select(
         `*,
-        resposta:formulario_respostas(id, link_id, respostas, respondido_em),
+        resposta:formulario_respostas(id, link_id, respostas, respondido_em, promovido_profile_id),
         dest_profile:profiles!formulario_links_dest_profile_id_fkey(id, nome, role, avatar_path),
         dest_mentorado:mentorados!formulario_links_dest_mentorado_id_fkey(id, nome, whatsapp, avatar_path),
         dupla:duplas!formulario_links_dupla_id_fkey(
@@ -161,6 +188,23 @@ export const getFormulario = cache(
       .eq("formulario_id", id)
       .order("created_at", { ascending: true });
     if (e2) throw e2;
+
+    // metadados dos uploads — só faz a query quando a definição tem campo
+    // 'arquivo' (form comum não paga o join a mais); resolve path→id pra
+    // os links de download /api/form-anexo/<id> da ficha de resposta
+    const campos = (f.campos as unknown as FormularioCampo[]) ?? [];
+    let anexos: FormularioAnexo[] = [];
+    if (campos.some((c) => c.tipo === "arquivo") && (links ?? []).length) {
+      const { data: anx, error: eA } = await supabase
+        .from("formulario_anexos")
+        .select("id, link_id, campo_id, path, nome, tamanho, created_at")
+        .in(
+          "link_id",
+          (links ?? []).map((l) => l.id)
+        );
+      if (eA) throw eA;
+      anexos = (anx ?? []) as FormularioAnexo[];
+    }
 
     // whatsapp de destinatário profile não sai pelo embed (grant de coluna,
     // 0026) — vem da view escopada profiles_contato, que pra coord cobre todos
@@ -206,9 +250,15 @@ export const getFormulario = cache(
         const p = norm(l.dest_profile);
         const m = norm(l.dest_mentorado);
         const dupla = norm(l.dupla);
+        const todas = Array.isArray(l.resposta)
+          ? l.resposta
+          : l.resposta
+            ? [l.resposta]
+            : [];
         return {
           ...l,
           resposta: norm(l.resposta),
+          respostas: todas,
           dest_tipo: p ? "profile" : m ? "mentorado" : "generico",
           dest_nome: p?.nome ?? m?.nome ?? null,
           dest_whatsapp: m?.whatsapp ?? (p ? (contatos.get(p.id) ?? null) : null),
@@ -229,9 +279,10 @@ export const getFormulario = cache(
     return {
       formulario: {
         ...(f as Formulario),
-        campos: (f.campos as unknown as FormularioCampo[]) ?? [],
+        campos,
       },
       links: resolvidos,
+      anexos,
     };
   }
 );
@@ -393,14 +444,25 @@ export const formularioPorToken = cache(
 
 function demoLista(role: AppRole): FormularioListaItem[] {
   if (role !== "coordenacao") return [];
-  const { formularios, links } = getDemoFormularios();
+  const { formularios, links, respostas } = getDemoFormularios();
   const agora = Date.now();
   return formularios.map((f) => {
     const doForm = links.filter((l) => l.formulario_id === f.id);
     return {
       ...f,
       linksTotal: doForm.length,
-      respondidos: doForm.filter((l) => l.usado_em).length,
+      // link de intake (multi_uso) nunca carimba usado_em — "respondidos"
+      // conta as respostas recebidas, igual à query real acima
+      respondidos: doForm.reduce(
+        (n, l) =>
+          n +
+          (l.multi_uso
+            ? respostas.filter((r) => r.link_id === l.id).length
+            : l.usado_em
+              ? 1
+              : 0),
+        0
+      ),
       pendentes: doForm.filter(
         (l) =>
           !l.usado_em &&
@@ -417,7 +479,7 @@ function demoLista(role: AppRole): FormularioListaItem[] {
 
 function demoDetalhe(role: AppRole, id: string): FormularioDetalhe | null {
   if (role !== "coordenacao") return null;
-  const { formularios, links, respostas } = getDemoFormularios();
+  const { formularios, links, respostas, anexos } = getDemoFormularios();
   const f = formularios.find((x) => x.id === id);
   if (!f) return null;
   // nomes/whatsapp/dupla resolvem pelo dataset principal — a demo fala das
@@ -435,6 +497,7 @@ function demoDetalhe(role: AppRole, id: string): FormularioDetalhe | null {
       const dupla = l.dupla_id
         ? data.duplas.find((x) => x.id === l.dupla_id)
         : null;
+      const todas = respostas.filter((r) => r.link_id === l.id);
       return {
         ...l,
         dest_tipo: p ? "profile" : m ? "mentorado" : "generico",
@@ -450,8 +513,12 @@ function demoDetalhe(role: AppRole, id: string): FormularioDetalhe | null {
               mentorado_nome: dupla.mentorado?.nome ?? "",
             }
           : null,
-        resposta: respostas.find((r) => r.link_id === l.id) ?? null,
+        resposta: todas[0] ?? null,
+        respostas: todas,
       };
     });
-  return { formulario: f, links: resolvidos };
+  const anexosDoForm = (anexos ?? []).filter((a) =>
+    resolvidos.some((l) => l.id === a.link_id)
+  );
+  return { formulario: f, links: resolvidos, anexos: anexosDoForm };
 }

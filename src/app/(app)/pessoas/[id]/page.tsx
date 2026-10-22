@@ -33,6 +33,7 @@ import {
   Target,
   User,
   Users,
+  UserSwitch,
   Warning,
   WhatsappLogo,
 } from "@phosphor-icons/react/dist/ssr";
@@ -524,6 +525,18 @@ export default async function PessoaPerfilPage({
                     {SITUACAO_MENTORADO_LABEL[ment.situacao ?? "ativo"]}
                     {ment.saiu_em ? ` · ${formatDiaMes(ment.saiu_em)}` : ""}
                   </Badge>
+                )}
+                {/* conta vinculada (0066): após a promoção a mentor
+                    (REALIZA-159) é a porta pra ficha de equipe da mesma
+                    pessoa — a ficha de jovem segue sendo o histórico */}
+                {souCoord && ment?.profile_id && (
+                  <Link
+                    href={`/pessoas/${ment.profile_id}`}
+                    className="inline-flex items-center gap-1 text-xs text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+                  >
+                    <UserSwitch size={13} aria-hidden />
+                    conta na plataforma
+                  </Link>
                 )}
                 {"ong_origem" in p && p.ong_origem && <span>{p.ong_origem}</span>}
               </>

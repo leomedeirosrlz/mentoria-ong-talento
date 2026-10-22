@@ -13,7 +13,9 @@ import {
   CircleNotch,
   Copy,
   Eye,
+  FileArrowUp,
   Gauge,
+  GridFour,
   ListBullets,
   ListChecks,
   PencilSimple,
@@ -83,7 +85,18 @@ const CAMPO_TIPO_ICONE: Record<FormularioCampoTipo, Icon> = {
   checkbox: CheckSquare,
   sim_nao: RadioButton,
   secao: Rows,
+  arquivo: FileArrowUp,
+  grid_disponibilidade: GridFour,
 };
+
+/** Tipos nascidos no intake oficial (0115): o builder não configura
+ *  accept/max_mb do upload nem o fluxo privado do anexo, então forms
+ *  custom não oferecem — chegam à base via migration (catálogo oficial).
+ *  O ícone segue no mapa porque o picker itera CAMPO_TIPO_LABEL inteiro. */
+const TIPOS_SO_OFICIAL: ReadonlySet<FormularioCampoTipo> = new Set([
+  "arquivo",
+  "grid_disponibilidade",
+]);
 
 function paraDraft(c: FormularioCampo): DraftCampo {
   return {
@@ -568,19 +581,26 @@ export function FormularioBuilder({
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            {Object.entries(CAMPO_TIPO_LABEL).map(([v, l]) => {
-                              const Icone =
-                                CAMPO_TIPO_ICONE[v as FormularioCampoTipo];
-                              return (
-                                <SelectItem key={v} value={v}>
-                                  <Icone
-                                    className="text-muted-foreground"
-                                    aria-hidden
-                                  />
-                                  {l}
-                                </SelectItem>
-                              );
-                            })}
+                            {Object.entries(CAMPO_TIPO_LABEL)
+                              .filter(
+                                ([v]) =>
+                                  !TIPOS_SO_OFICIAL.has(
+                                    v as FormularioCampoTipo
+                                  )
+                              )
+                              .map(([v, l]) => {
+                                const Icone =
+                                  CAMPO_TIPO_ICONE[v as FormularioCampoTipo];
+                                return (
+                                  <SelectItem key={v} value={v}>
+                                    <Icone
+                                      className="text-muted-foreground"
+                                      aria-hidden
+                                    />
+                                    {l}
+                                  </SelectItem>
+                                );
+                              })}
                           </SelectContent>
                         </Select>
                       </div>

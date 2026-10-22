@@ -85,10 +85,23 @@ export const DEMO_TOKENS = {
   helenaAvaliacaoEsp: "demo-tok-avalesp-helena-0001",
 } as const;
 
+/** Metadados de upload do intake no dataset (mesma forma de
+ *  FormularioAnexo em forms/queries — tipo local pra não criar ciclo). */
+export type DemoFormularioAnexo = {
+  id: string;
+  link_id: string;
+  campo_id: string;
+  path: string;
+  nome: string;
+  tamanho: number;
+  created_at: string;
+};
+
 export type DemoFormularios = {
   formularios: Formulario[];
   links: FormularioLink[];
   respostas: FormularioResposta[];
+  anexos: DemoFormularioAnexo[];
 };
 
 /** Monta o trio formularios/links/respostas da demo. Os ids de destino e
@@ -433,6 +446,76 @@ export function getDemoFormularios(): DemoFormularios {
     updated_at: haDias(240, "09:00"),
   };
 
+  // ---------- 12. inscrição de mentores (intake oficial, 0115 — campos
+  // verbatim do seed: uma grade de horários só, "Outro" em cor/raça,
+  // pergunta condicional de experiência, uploads privados) ----------
+  const fIntakeMentor: Formulario = {
+    id: uid(0x400c),
+    titulo: "Inscrição de mentores · Matching de Mentores",
+    descricao:
+      "Inscrição pra quem quer ser mentor(a) no próximo ciclo. Recebemos a sua candidatura por um link público; a coordenação revisa cada inscrição antes do cadastro.",
+    sistema: "intake_mentor",
+    campos: [
+      { id: "sec_dados", tipo: "secao", label: "Dados pessoais", obrigatorio: false },
+      { id: "nome_civil", tipo: "texto", label: "Nome completo civil", obrigatorio: true },
+      { id: "nome_social", tipo: "texto", label: "Nome social", obrigatorio: false },
+      { id: "nascimento", tipo: "data", label: "Data de nascimento", obrigatorio: true },
+      {
+        id: "genero", tipo: "select", label: "Gênero", obrigatorio: true,
+        opcoes: ["Cisgênero feminino", "Cisgênero masculino", "Transgênero", "Não binário", "Prefiro não informar"],
+      },
+      {
+        id: "cor_raca", tipo: "select", label: "Cor/raça", obrigatorio: true,
+        opcoes: ["Negra", "Branca", "Amarela", "Parda", "Indígena"],
+        permite_outro: true,
+      },
+      { id: "cidade", tipo: "texto", label: "Estado/município de residência", obrigatorio: true },
+      { id: "sec_trajetoria", tipo: "secao", label: "Trajetória pessoal e profissional", obrigatorio: false },
+      { id: "hobbies", tipo: "texto_longo", label: "Hobbies", obrigatorio: true, descricao: "Até 3 hobbies" },
+      { id: "esportes", tipo: "texto_longo", label: "Esportes", obrigatorio: true, descricao: "Assistir ou praticar" },
+      { id: "inspiracoes", tipo: "texto_longo", label: "Inspirações", obrigatorio: true, descricao: "Até 3 inspirações" },
+      { id: "valores", tipo: "texto_longo", label: "Valores", obrigatorio: true, descricao: "Até 3 valores" },
+      { id: "realizacoes", tipo: "texto_longo", label: "Principais realizações", obrigatorio: true, descricao: "Pessoais ou profissionais" },
+      { id: "auto_descricao", tipo: "texto_longo", label: "Auto-descrição em parágrafo", obrigatorio: true },
+      { id: "companheiro", tipo: "texto_longo", label: "Como esposa/marido/companheiro(a) lhe descreveria?", obrigatorio: true },
+      { id: "sec_trabalho", tipo: "secao", label: "Trabalho e emprego", obrigatorio: false },
+      { id: "cargo", tipo: "texto", label: "Cargo", obrigatorio: true },
+      { id: "empresa", tipo: "texto", label: "Empresa/instituição", obrigatorio: true },
+      { id: "curriculo", tipo: "arquivo", label: "Currículo", obrigatorio: true, max_mb: 10 },
+      { id: "linkedin", tipo: "texto", label: "LinkedIn", obrigatorio: false, formato: "url" },
+      { id: "sec_contato", tipo: "secao", label: "Dados de contato", obrigatorio: false },
+      { id: "email", tipo: "texto", label: "E-mail", obrigatorio: true, formato: "email" },
+      { id: "telefone", tipo: "texto", label: "Telefone", obrigatorio: true, formato: "telefone" },
+      { id: "sec_mentoria", tipo: "secao", label: "A mentoria", obrigatorio: false },
+      { id: "formacao_erlich", tipo: "sim_nao", label: "Formação Erlich Mentoring", obrigatorio: true },
+      { id: "experiencia_previa", tipo: "sim_nao", label: "Experiência prévia como mentor", obrigatorio: true },
+      {
+        id: "experiencia_descricao", tipo: "texto_longo",
+        label: "Caso possua experiência prévia, descreva-a", obrigatorio: false,
+        visible_if: { campo: "experiencia_previa", em: ["sim"] },
+      },
+      { id: "objetivos", tipo: "texto_longo", label: "Objetivos/expectativa", obrigatorio: true },
+      {
+        id: "pref_genero_mentorado", tipo: "select", label: "Preferência de gênero do mentorado",
+        obrigatorio: true,
+        opcoes: ["Mentorado homem", "Mentorada mulher", "Sem preferência"],
+      },
+      { id: "foto", tipo: "arquivo", label: "Foto de perfil", obrigatorio: true, max_mb: 10 },
+      { id: "disponibilidade", tipo: "grid_disponibilidade", label: "Disponibilidade", obrigatorio: true },
+      {
+        id: "sec_comprovantes", tipo: "secao", label: "Comprovantes", obrigatorio: false,
+        descricao: "Documentos para conferência da coordenação — ficam privados na plataforma.",
+      },
+      { id: "doc_identidade", tipo: "arquivo", label: "Anexo do RG ou CNH", obrigatorio: true, max_mb: 10 },
+      { id: "comprovante_residencia", tipo: "arquivo", label: "Comprovante de residência", obrigatorio: true, max_mb: 10 },
+    ],
+    ativo: true,
+    versao: 1,
+    created_by: null,
+    created_at: haDias(20, "09:00"),
+    updated_at: haDias(20, "09:00"),
+  };
+
   // ---------- links ----------
   const links: FormularioLink[] = [
     // avaliação: ricardo e carlos já responderam; fernanda pendente;
@@ -646,6 +729,15 @@ export function getDemoFormularios(): DemoFormularios {
       dest_profile_id: porNome("Helena"), dest_mentorado_id: null,
       dupla_id: duplaDe("Helena", "Ana"), contexto: { origem: "auto", trilha: "especialista" },
       usado_em: null, expira_em: null, created_by: porNome("Helena"), created_at: haDias(5),
+    },
+    // link de inscrição do intake (0115): UM endereço público, N
+    // respostas anônimas — usado_em fica null pra sempre, a contagem sai
+    // das respostas. A identidade da candidata vem do conteúdo, não do link.
+    {
+      id: uid(0x4230), formulario_id: fIntakeMentor.id, token: "demo-tok-intake-mentores-001",
+      dest_profile_id: null, dest_mentorado_id: null, dupla_id: null,
+      contexto: {}, multi_uso: true, origem: "intake",
+      usado_em: null, expira_em: null, created_by: marina, created_at: haDias(18),
     },
   ];
 
@@ -866,6 +958,110 @@ export function getDemoFormularios(): DemoFormularios {
       },
       respondido_em: haDias(32, "20:15"),
     },
+    // candidata já promovida — a resposta carimba o profile criado (a
+    // Luiza, que hoje é mentora DPP na base demo)
+    {
+      id: uid(0x4416), link_id: uid(0x4230),
+      promovido_profile_id: porNome("Luiza"),
+      respostas: {
+        nome_civil: "Luiza Campos Ribeiro",
+        nome_social: "Luiza",
+        nascimento: "1989-03-14",
+        genero: "Cisgênero feminino",
+        cor_raca: "Branca",
+        cidade: "São Paulo/SP",
+        hobbies: "Corrida de rua, cerâmica e clubes de leitura",
+        esportes: "Corro 10km aos domingos",
+        inspiracoes: "Minha avó, que alfabetizou mulheres na roça",
+        valores: "Honestidade, curiosidade e presença",
+        realizacoes: "Abri duas clínicas de fisioterapia e formei 30 estagiários",
+        auto_descricao: "Sou objetiva, gosto de gente e acredito que constância pequena vence plano grande.",
+        companheiro: "Que sou teimosa no bom sentido — quando decido, vou até o fim.",
+        cargo: "Sócia-fundadora",
+        empresa: "Clínica Movimento",
+        curriculo: { path: `${uid(0x4230)}/cv-luiza.pdf`, nome: "curriculo-luiza.pdf", tamanho: 184320 },
+        linkedin: "linkedin.com/in/luizacampos",
+        email: "luiza.campos@exemplo.com",
+        telefone: "(11) 98877-1234",
+        formacao_erlich: "sim",
+        experiencia_previa: "sim",
+        experiencia_descricao: "Mentorei jovens da periferia por 2 anos num projeto da faculdade.",
+        objetivos: "Quero devolver pra um jovem o que a mentoria fez por mim na faculdade.",
+        pref_genero_mentorado: "Mentorada mulher",
+        foto: { path: `${uid(0x4230)}/foto-luiza.jpg`, nome: "foto-luiza.jpg", tamanho: 921600 },
+        disponibilidade: {
+          celulas: [
+            { dia: "seg", periodo: "noite" },
+            { dia: "qua", periodo: "noite" },
+            { dia: "sex", periodo: "tarde" },
+          ],
+          horas: [
+            { dia: "seg", hora: 18 }, { dia: "seg", hora: 19 },
+            { dia: "qua", hora: 18 }, { dia: "qua", hora: 19 },
+            { dia: "sex", hora: 14 }, { dia: "sex", hora: 15 },
+          ],
+        },
+        doc_identidade: { path: `${uid(0x4230)}/rg-luiza.pdf`, nome: "rg-luiza.pdf", tamanho: 512000 },
+        comprovante_residencia: { path: `${uid(0x4230)}/comprovante-luiza.pdf`, nome: "comprovante-luiza.pdf", tamanho: 402432 },
+      },
+      respondido_em: haDias(16, "20:41"),
+    },
+    // candidato na fila — ainda não revisado (o botão "Revisar e cadastrar"
+    // abre o prefill da promoção a partir dessa resposta)
+    {
+      id: uid(0x4417), link_id: uid(0x4230),
+      respostas: {
+        nome_civil: "Maurício Ferraz de Almeida",
+        nascimento: "1984-11-02",
+        genero: "Cisgênero masculino",
+        cor_raca: "Parda",
+        cidade: "Campinas - SP",
+        hobbies: "Xadrez e fotografia de rua",
+        esportes: "Futebol society às quintas",
+        inspiracoes: "Um professor que me tirou da reprovação",
+        valores: "Palavra dada, trabalho e família",
+        realizacoes: "Construí a área de dados da empresa do zero",
+        auto_descricao: "Engenheiro, pai de duas meninas, acredito em educação como alavanca.",
+        companheiro: "Que sou calmo por fora e competitivo por dentro.",
+        cargo: "Head de Dados",
+        empresa: "Varejo S.A.",
+        curriculo: { path: `${uid(0x4230)}/cv-mauricio.pdf`, nome: "cv-mauricio-ferraz.pdf", tamanho: 256000 },
+        email: "mauricio.ferraz@exemplo.com",
+        telefone: "(19) 97766-4321",
+        formacao_erlich: "nao",
+        experiencia_previa: "nao",
+        objetivos: "Ensinar um jovem a olhar pro futuro com método — foi o que faltou pra mim.",
+        pref_genero_mentorado: "Sem preferência",
+        foto: { path: `${uid(0x4230)}/foto-mauricio.jpg`, nome: "foto-mauricio.jpg", tamanho: 838860 },
+        disponibilidade: {
+          celulas: [
+            { dia: "ter", periodo: "noite" },
+            { dia: "qui", periodo: "noite" },
+          ],
+          horas: [
+            { dia: "ter", hora: 18 }, { dia: "ter", hora: 19 },
+            { dia: "qui", hora: 18 }, { dia: "qui", hora: 19 },
+          ],
+        },
+        doc_identidade: { path: `${uid(0x4230)}/rg-mauricio.pdf`, nome: "rg-mauricio.pdf", tamanho: 499712 },
+        comprovante_residencia: { path: `${uid(0x4230)}/comprovante-mauricio.pdf`, nome: "comprovante-mauricio.pdf", tamanho: 376832 },
+      },
+      respondido_em: haDias(6, "19:03"),
+    },
+  ];
+
+  // ---------- anexos do intake (0115) ----------
+  // metadados espelhando os {path} das respostas — /api/form-anexo/<id>
+  // serve PDF placeholder na demo, igual aos anexos de registro
+  const anexos: DemoFormularioAnexo[] = [
+    { id: uid(0x4601), link_id: uid(0x4230), campo_id: "curriculo", path: `${uid(0x4230)}/cv-luiza.pdf`, nome: "curriculo-luiza.pdf", tamanho: 184320, created_at: haDias(16, "20:40") },
+    { id: uid(0x4602), link_id: uid(0x4230), campo_id: "foto", path: `${uid(0x4230)}/foto-luiza.jpg`, nome: "foto-luiza.jpg", tamanho: 921600, created_at: haDias(16, "20:40") },
+    { id: uid(0x4603), link_id: uid(0x4230), campo_id: "doc_identidade", path: `${uid(0x4230)}/rg-luiza.pdf`, nome: "rg-luiza.pdf", tamanho: 512000, created_at: haDias(16, "20:40") },
+    { id: uid(0x4604), link_id: uid(0x4230), campo_id: "comprovante_residencia", path: `${uid(0x4230)}/comprovante-luiza.pdf`, nome: "comprovante-luiza.pdf", tamanho: 402432, created_at: haDias(16, "20:40") },
+    { id: uid(0x4605), link_id: uid(0x4230), campo_id: "curriculo", path: `${uid(0x4230)}/cv-mauricio.pdf`, nome: "cv-mauricio-ferraz.pdf", tamanho: 256000, created_at: haDias(6, "19:02") },
+    { id: uid(0x4606), link_id: uid(0x4230), campo_id: "foto", path: `${uid(0x4230)}/foto-mauricio.jpg`, nome: "foto-mauricio.jpg", tamanho: 838860, created_at: haDias(6, "19:02") },
+    { id: uid(0x4607), link_id: uid(0x4230), campo_id: "doc_identidade", path: `${uid(0x4230)}/rg-mauricio.pdf`, nome: "rg-mauricio.pdf", tamanho: 499712, created_at: haDias(6, "19:02") },
+    { id: uid(0x4608), link_id: uid(0x4230), campo_id: "comprovante_residencia", path: `${uid(0x4230)}/comprovante-mauricio.pdf`, nome: "comprovante-mauricio.pdf", tamanho: 376832, created_at: haDias(6, "19:02") },
   ];
 
   return {
@@ -881,9 +1077,11 @@ export function getDemoFormularios(): DemoFormularios {
       fPdm,
       fRodaVida,
       fAvaliacaoEsp,
+      fIntakeMentor,
     ],
     links,
     respostas,
+    anexos,
   };
 }
 

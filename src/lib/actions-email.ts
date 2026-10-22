@@ -1,8 +1,25 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
-import { enviarEmailsLote, rolesParaAudiencias, SITE_URL } from "@/lib/email";
-import { emailAviso, emailMaterial } from "@/lib/email-templates";
+import {
+  EMAIL_ENVIO_LIBERADO,
+  enviarEmailsIndividuais,
+  enviarEmailsLote,
+  rolesParaAudiencias,
+  SITE_URL,
+} from "@/lib/email";
+import {
+  emailAviso,
+  emailInstrumentoJovem,
+  emailInstrumentoRepasseMentor,
+  emailMaterial,
+} from "@/lib/email-templates";
+import { primeiroNome } from "@/components/forms/link-shared";
+import {
+  INSTRUMENTO_INFO,
+  INSTRUMENTOS_SISTEMA,
+  type InstrumentoSistema,
+} from "@/lib/forms/schema";
 import { erroAmigavel } from "@/lib/utils";
 import { demoAtivo } from "./demo/mode";
 import { DEMO_MSG } from "./demo/shared";
@@ -308,4 +325,288 @@ export async function reenviarComunicadoEmail(formData: FormData) {
     autorId: eu.id,
   });
   return resumoParaResposta(resumo);
+}
+
+// ---------- REALIZA-51 — disparo em lote do instrumento da jornada ----------
+// A RPC emitir_instrumento_lote (0114) emite/reusa os links em transação e
+// devolve o relatório por dupla com os destinatários; aqui o Resend faz o
+// fan-out individual (um e-mail por link — o token é dele) e o log por
+// destinatário vai pra emails_enviados tipo 'instrumento'.
+
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Linha do relatório da RPC — os e-mails/whatsapp ficam server-side: a
+ *  action os usa pro disparo e devolve só status/motivo (PII de contato
+ *  não atravessa pro client-state — revisão de segurança da issue). */
+type LinhaRpcLote = {
+  dupla_id: string;
+  ok: boolean;
+  motivo?: string;
+  erro?: string;
+  link_id?: string;
+  token?: string;
+  reutilizado?: boolean;
+  jovem?: { nome: string | null; email: string | null; whatsapp: string | null } | null;
+  mentor?: { nome: string | null; email: string | null; whatsapp: string | null } | null;
+};
+
+export type LoteInstrumentoStatus =
+  | "enviado"
+  | "falha"
+  | "pulado"
+  | "envio_desligado"
+  | "simulado";
+
+/** O que o dialog de lote recebe por dupla — sem e-mails nem nomes de
+ *  destinatário (o client já tem os nomes da dupla pelas props do painel). */
+export type LoteInstrumentoLinha = {
+  duplaId: string;
+  status: LoteInstrumentoStatus;
+  /** quem recebeu o e-mail — null quando nada foi disparado */
+  via: "jovem" | "mentor" | null;
+  /** motivo em pt-BR, pronto pra renderizar */
+  motivo: string | null;
+  /** o link já existia e foi reaproveitado (idempotência do core) */
+  reutilizado: boolean;
+  /** só nas linhas não-enviadas com link vivo — fallback WhatsApp manual */
+  token: string | null;
+  waFone: string | null;
+  waNome: string | null;
+};
+
+const MOTIVO_LOTE: Record<string, string> = {
+  dupla_nao_encontrada: "dupla não encontrada",
+  trilha_especialista: "trilha de especialista não usa os instrumentos da jornada",
+  dupla_encerrada: "jornada encerrada",
+  ja_respondido: "já respondeu este instrumento",
+  emit_falhou: "não foi possível emitir o link",
+  sem_email: "sem e-mail do jovem nem do mentor — entregue à mão",
+  email_falhou: "o provedor não aceitou este endereço",
+  simulado: "modo demonstração — nada é emitido nem enviado",
+};
+
+export async function enviarInstrumentoLote(input: {
+  sistema: string;
+  duplaIds: string[];
+}): Promise<
+  | { error: string }
+  | {
+      ok: true;
+      enviados: number;
+      falhas: number;
+      pulados: number;
+      envioLiberado: boolean;
+      linhas: LoteInstrumentoLinha[];
+    }
+> {
+  const sistema = String(input?.sistema ?? "");
+  if (!(INSTRUMENTOS_SISTEMA as readonly string[]).includes(sistema))
+    return { error: "Instrumento inválido." };
+  const ids = [
+    ...new Set(
+      (Array.isArray(input?.duplaIds) ? input.duplaIds : [])
+        .map(String)
+        .filter((id) => UUID_RE.test(id))
+    ),
+  ];
+  if (!ids.length) return { error: "Nenhuma dupla válida selecionada." };
+  if (ids.length > 100) return { error: "O lote aceita até 100 duplas." };
+
+  // demo: relatório fake — o dialog abre, o fluxo se mostra, nada sai
+  if (await demoAtivo()) {
+    return {
+      ok: true,
+      enviados: 0,
+      falhas: 0,
+      pulados: 0,
+      envioLiberado: false,
+      linhas: ids.map((duplaId) => ({
+        duplaId,
+        status: "simulado" as const,
+        via: null,
+        motivo: MOTIVO_LOTE.simulado,
+        reutilizado: false,
+        token: null,
+        waFone: null,
+        waNome: null,
+      })),
+    };
+  }
+
+  const { supabase, me: eu } = await me();
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
+  if (eu.role !== "coordenacao")
+    return { error: "Só a coordenação dispara o lote." };
+
+  const { data, error } = await supabase.rpc("emitir_instrumento_lote", {
+    p_sistema: sistema,
+    p_dupla_ids: ids,
+  });
+  if (error) return { error: erroAmigavel(error) };
+
+  const titulo = INSTRUMENTO_INFO[sistema as InstrumentoSistema].titulo;
+  const linhas: LoteInstrumentoLinha[] = [];
+  const mensagens: {
+    to: string;
+    subject: string;
+    html: string;
+    linha: LoteInstrumentoLinha;
+    linkId: string | null;
+    via: "jovem" | "mentor";
+  }[] = [];
+
+  for (const r of (data ?? []) as LinhaRpcLote[]) {
+    if (!r.ok) {
+      if (r.motivo === "emit_falhou")
+        console.error("emitir_instrumento_lote:", r.dupla_id, r.erro);
+      linhas.push({
+        duplaId: r.dupla_id,
+        status: "pulado",
+        via: null,
+        motivo:
+          (r.motivo ? MOTIVO_LOTE[r.motivo] : null) ??
+          "não elegível pro lote",
+        reutilizado: false,
+        token: null,
+        waFone: null,
+        waNome: null,
+      });
+      continue;
+    }
+
+    // destinatário (decisão da issue): o e-mail é do jovem; sem
+    // mentorados.email cai pro mentor com copy de repasse. Sem os dois,
+    // a linha sai "pulada" — o link emitido segue útil pra WhatsApp manual.
+    const emailJovem = r.jovem?.email?.trim() || null;
+    const emailMentor = r.mentor?.email?.trim() || null;
+    const via = emailJovem ? ("jovem" as const) : emailMentor ? ("mentor" as const) : null;
+    const waJovem = r.jovem?.whatsapp?.trim() || null;
+    const waMentor = r.mentor?.whatsapp?.trim() || null;
+    const waFone = waJovem ?? waMentor;
+    const waNome = waJovem
+      ? primeiroNome(r.jovem?.nome)
+      : primeiroNome(r.mentor?.nome);
+
+    if (!via) {
+      linhas.push({
+        duplaId: r.dupla_id,
+        status: "pulado",
+        via: null,
+        motivo: MOTIVO_LOTE.sem_email,
+        reutilizado: r.reutilizado === true,
+        token: r.token ?? null,
+        waFone,
+        waNome,
+      });
+      continue;
+    }
+
+    const link = `${SITE_URL}/f/${r.token}`;
+    const nomeDestino =
+      via === "jovem" ? primeiroNome(r.jovem?.nome) : primeiroNome(r.mentor?.nome);
+    const subject =
+      via === "jovem"
+        ? `${titulo} — chegou a sua vez na jornada`
+        : `${titulo} — link de ${primeiroNome(r.jovem?.nome) || "sua jovem"}`;
+    const html =
+      via === "jovem"
+        ? emailInstrumentoJovem({
+            primeiroNome: nomeDestino,
+            instrumento: titulo,
+            link,
+          })
+        : emailInstrumentoRepasseMentor({
+            mentorNome: r.mentor?.nome ?? "",
+            jovemNome: r.jovem?.nome ?? "",
+            instrumento: titulo,
+            link,
+          });
+    const linha: LoteInstrumentoLinha = {
+      duplaId: r.dupla_id,
+      status: "enviado",
+      via,
+      motivo: null,
+      reutilizado: r.reutilizado === true,
+      token: null, // enviado não precisa do bearer no client-state
+      waFone: null,
+      waNome: null,
+    };
+    linhas.push(linha);
+    mensagens.push({
+      to: via === "jovem" ? emailJovem! : emailMentor!,
+      subject,
+      html,
+      linha,
+      linkId: r.link_id ?? null,
+      via,
+    });
+  }
+
+  const envio = mensagens.length
+    ? await enviarEmailsIndividuais({ mensagens })
+    : { enviados: 0, falhas: [] as string[] };
+
+  // linha não-enviada ganha o kit do fallback manual — token do link já
+  // emitido + o melhor wa pra mandar à mão (jovem primeiro, senão mentor)
+  const kitFallback = (linha: LoteInstrumentoLinha) => {
+    const rpc = (data as LinhaRpcLote[]).find(
+      (x) => x.dupla_id === linha.duplaId
+    );
+    linha.token = rpc?.token ?? null;
+    linha.waFone =
+      rpc?.jovem?.whatsapp?.trim() || rpc?.mentor?.whatsapp?.trim() || null;
+    linha.waNome = rpc?.jovem?.whatsapp?.trim()
+      ? primeiroNome(rpc.jovem?.nome)
+      : primeiroNome(rpc?.mentor?.nome);
+  };
+
+  // kill-switch/config: nada foi tentado — marca envio_desligado e devolve
+  // o kit manual (design: o lote emite mesmo desligado)
+  if (envio.error) {
+    for (const m of mensagens) {
+      m.linha.status = "envio_desligado";
+      m.linha.motivo = envio.error;
+      kitFallback(m.linha);
+    }
+  } else {
+    const falhou = new Set(envio.falhas);
+    for (const m of mensagens) {
+      if (falhou.has(m.to)) {
+        m.linha.status = "falha";
+        m.linha.motivo = MOTIVO_LOTE.email_falhou;
+        kitFallback(m.linha);
+      }
+    }
+  }
+
+  // log por destinatário — memória do disparo (sem endereço nem token:
+  // ref_id é o uuid do link; falha registra o papel, não o e-mail)
+  if (mensagens.length && !envio.error) {
+    const falhou = new Set(envio.falhas);
+    const { error: errLog } = await supabase.from("emails_enviados").insert(
+      mensagens.map((m) => ({
+        autor_id: eu.id,
+        tipo: "instrumento",
+        ref_id: m.linkId,
+        assunto: m.subject,
+        audiencia: [m.via === "jovem" ? "mentorado" : "mentor"],
+        destinatarios: 1,
+        enviados: falhou.has(m.to) ? 0 : 1,
+        falhas: falhou.has(m.to)
+          ? [`${m.via === "jovem" ? "mentorado" : "mentor"}: endereço recusado pelo provedor`]
+          : null,
+      }))
+    );
+    if (errLog) console.error("enviarInstrumentoLote: log", errLog);
+  }
+
+  return {
+    ok: true,
+    enviados: linhas.filter((l) => l.status === "enviado").length,
+    falhas: linhas.filter((l) => l.status === "falha").length,
+    pulados: linhas.filter((l) => l.status === "pulado").length,
+    envioLiberado: EMAIL_ENVIO_LIBERADO,
+    linhas,
+  };
 }
