@@ -678,7 +678,7 @@ export function ChamadoDetalhe({
 
       {/* dialog resolver */}
       <Dialog open={resolveOpen} onOpenChange={setResolveOpen}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Resolver {chamado.numero}</DialogTitle>
             <DialogDescription>
@@ -716,7 +716,7 @@ export function ChamadoDetalhe({
 
       {/* dialog atribuir */}
       <Dialog open={atribuirOpen} onOpenChange={setAtribuirOpen}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Atribuir {chamado.numero}</DialogTitle>
             <DialogDescription>

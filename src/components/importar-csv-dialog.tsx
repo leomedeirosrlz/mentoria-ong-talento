@@ -19,7 +19,7 @@ import { parseCsvPares, type LinhaPar, type PreviewPar } from "@/lib/importar-du
 import { formatDate } from "@/lib/ciclo";
 import { Button } from "@/components/ui/button";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
+  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -285,6 +285,9 @@ export function ImportarCsvDialog({
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>Importar de planilha</DialogTitle>
+          <DialogDescription>
+            Cole ou suba o CSV — cada linha só é gravada depois da prévia.
+          </DialogDescription>
         </DialogHeader>
 
         {resultado ? (

@@ -94,7 +94,7 @@ export function SolicitarEspecialistaDialog({
           )
         }
       />
-      <DialogContent>
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Solicitar mentor especialista</DialogTitle>
           <DialogDescription>

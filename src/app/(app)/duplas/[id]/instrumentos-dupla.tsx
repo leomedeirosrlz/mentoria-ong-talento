@@ -210,7 +210,9 @@ function LinhaInstrumento({
                 </Button>
               }
             />
-            <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
+            {/* xl, não 2xl: leitura estruturada do instrumento, não prévia
+                tabular; o scroll vem da base do DialogContent */}
+            <DialogContent className="sm:max-w-xl">
               <DialogHeader>
                 <DialogTitle>{item.titulo}</DialogTitle>
                 <DialogDescription>

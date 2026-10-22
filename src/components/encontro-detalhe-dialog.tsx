@@ -11,6 +11,7 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -146,6 +147,9 @@ export function EncontroDetalheDialog({
               />
             </span>
           </DialogTitle>
+          <DialogDescription>
+            Status, plano do mentor e o registro de follow-up.
+          </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 text-sm">
           <div className="flex flex-wrap items-center gap-2">

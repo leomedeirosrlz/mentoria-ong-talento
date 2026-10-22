@@ -99,7 +99,7 @@ export function SugerirEspecialistaDialog({
           )
         }
       />
-      <DialogContent>
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Sugerir especialista pro jovem</DialogTitle>
           <DialogDescription>

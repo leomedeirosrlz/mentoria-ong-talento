@@ -17,7 +17,7 @@ import { Button } from "@/components/ui/button";
 import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
 import { EnviarEmailDialog } from "@/components/enviar-email-dialog";
 import {
-  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -232,6 +232,9 @@ export function MaterialActions({ material, maxEncontro }: { material: Material;
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Editar material</DialogTitle>
+            <DialogDescription>
+              Título, descrição, tipo e o encontro a que o material pertence.
+            </DialogDescription>
           </DialogHeader>
           <form
             className="space-y-4"

@@ -52,6 +52,7 @@ import { filterChipCls } from "@/components/ui/filter-chip";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -3572,6 +3573,10 @@ function EncontroDuplaRow({
               <DialogTitle>
                 Como foi o {encontro.numero}º encontro
               </DialogTitle>
+              <DialogDescription>
+                O follow-up do encontro: atividades, avaliação, dificuldades
+                e próximo passo.
+              </DialogDescription>
             </DialogHeader>
             <RegistroForm
               embutido

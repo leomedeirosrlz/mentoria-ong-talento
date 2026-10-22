@@ -79,7 +79,7 @@ export function EncerrarDuplaDialog({
           )
         }
       />
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Registrar encerramento</DialogTitle>
           <DialogDescription>
