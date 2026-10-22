@@ -19,6 +19,7 @@ import {
   podeSupervisionar,
 } from "@/lib/ciclo";
 import { capitalizar, cpfValido, erroAmigavel, nomeProprio } from "@/lib/utils";
+import { snapshotDuplaHoje } from "@/lib/jobs";
 import { temPapel } from "@/lib/types";
 import type { AppRole, ComunicadoPrioridade, CorRaca, Cronograma, DadosCivis, Disponibilidade, DocumentoPessoa, Endereco, Escolaridade, Genero, Notificacao, PrefGeneroPar, ResponsavelCivis, SituacaoMentorado, Trilha } from "@/lib/types";
 import {
@@ -2986,6 +2987,9 @@ export async function salvarRegistro(formData: FormData) {
     }
   }
 
+  // o dia ganha snapshot na hora do evento, não só no tick — fire-and-
+  // forget: a RPC é idempotente (unique dupla_id+dia, reescrever é inócuo)
+  void snapshotDuplaHoje(dupla_id).catch(() => {});
   revalidatePath("/");
   revalidatePath("/duplas");
   revalidatePath("/agenda");
@@ -3212,6 +3216,7 @@ export async function resolverApoio(registroId: string, duplaId: string) {
           : erroAmigavel(error),
     };
   }
+  void snapshotDuplaHoje(duplaId).catch(() => {});
   revalidatePath("/");
   revalidatePath("/duplas");
   revalidatePath("/registros");

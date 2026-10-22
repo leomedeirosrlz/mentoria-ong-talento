@@ -63,6 +63,7 @@ call PostgREST/RPC direta no staging com o JWT do papel. Fixtures:
 ## G. Regressão — respostas antigas
 
 38. Resposta `metas` de antes da 0106 (com `meta_principal`+`rev_*`) → `InstrumentoResultado` renderiza sem crash, metas + revisão legíveis (141 aceite).
+   - **Revisado (Thiago, 22/out/2026, REALIZA-191):** `meta_principal` legado segue renderizando (badge pela posição); `rev_*` **não renderiza de propósito** — o rito de revisão virou conversa do rito humano (`revisao_pdm` no checklist do encerramento), não checkbox. As chaves permanecem no jsonb da resposta.
 39. Resposta `pdm` antiga com `submetas_N` texto → segue renderizando o bloco "Desdobramento da meta N" no snapshot **e** a projeção/backfill mostra os filhos na árvore viva.
 40. `jornada_autoemit`/`jovem_jornada`/`instrumentos_da_dupla`/`painel_instrumentos_jornada` — suites existentes (`tests/instrumentos.test.ts`, e2e jornada) seguem verdes: a seção nova não quebra as entregas.
 

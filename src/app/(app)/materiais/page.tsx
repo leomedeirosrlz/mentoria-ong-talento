@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import Link from "next/link";
 import {
   getCicloEventos,
@@ -8,19 +9,22 @@ import {
   getPainelInstrumentosJornada,
 } from "@/lib/queries";
 import { getUltimasInteracoes } from "@/lib/interacoes";
-import { maxNumeroEncontro } from "@/lib/ciclo";
+import {
+  eventoDaSemana,
+  eventosDoCronograma,
+  maxNumeroEncontro,
+} from "@/lib/ciclo";
 import { EMAIL_ENVIO_LIBERADO } from "@/lib/email";
-import { temPapel } from "@/lib/types";
+import { temPapel, type Material } from "@/lib/types";
 import { FolderOpen } from "@phosphor-icons/react/dist/ssr";
 import { NovoMaterialDialog } from "@/components/novo-material-dialog";
 import { PainelJornada } from "@/components/painel-jornada";
 import { PageHeader } from "@/components/page-header";
+import { MateriaisBiblioteca } from "@/components/materiais-biblioteca";
 import {
-  CoberturaTrilha,
-  EncontroDetails,
   particionarMateriais,
+  temConteudo,
   titulosPorNumero,
-  TransversaisMateriais,
 } from "@/components/materiais-hub";
 
 export const metadata: Metadata = { title: "Materiais" };
@@ -50,6 +54,46 @@ export default async function MateriaisPage() {
     maxEncontro
   );
   const titulos = titulosPorNumero(eventos);
+
+  // REALIZA-184 — dashboard da biblioteca:
+  // · encontroAtual = o vigente do calendário oficial (eventoDaSemana por
+  //   cronograma — com duas turmas defasadas fica o MENOR nº: a semana em
+  //   que as duas ainda convivem); abre e marca a linha dele no desktop.
+  const agora = new Date();
+  const cronogramaIds = [...new Set(eventos.map((e) => e.cronograma_id))];
+  const numsVigentes = cronogramaIds
+    .map(
+      (c) => eventoDaSemana(eventosDoCronograma(eventos, c), agora)?.numero
+    )
+    .filter((n): n is number => n != null);
+  const encontroAtual = numsVigentes.length ? Math.min(...numsVigentes) : null;
+  // · KPI "último item": a tabela materiais tem created_at e o select("*")
+  //   devolve — o tipo Material é que ainda não declara (demora do schema).
+  const datasCriacao = (visiveis as (Material & { created_at?: string })[])
+    .map((m) => m.created_at)
+    .filter((d): d is string => Boolean(d))
+    .sort();
+  const ultimoIso = datasCriacao.at(-1) ?? null;
+  const stats = {
+    cobertos: nums.filter((n) =>
+      (porEncontro.get(n) ?? []).some(temConteudo)
+    ).length,
+    teto: nums.length,
+    publicados: visiveis.filter(temConteudo).length,
+    emBreve: visiveis.length - visiveis.filter(temConteudo).length,
+    ultimo: ultimoIso
+      ? new Intl.DateTimeFormat("pt-BR", {
+          day: "numeric",
+          month: "short",
+          timeZone: "America/Sao_Paulo",
+        }).format(new Date(ultimoIso))
+      : null,
+  };
+  // · default por viewport via UA — heurística de DEFAULT (quem receber
+  //   "errado" só desfaz com um toque), não detecção de feature: SSR sai no
+  //   estado certo sem flash de collapse pós-hidratação
+  const ua = (await headers()).get("user-agent") ?? "";
+  const mobile = /Android|iPhone|iPad|iPod|Mobile/i.test(ua);
 
   // WP7 — o painel "Progresso da jornada" é staff-only (a RPC valida
   // coord/supervisor; a chamada nem rola fora dos dois papéis). status +
@@ -140,38 +184,24 @@ export default async function MateriaisPage() {
           </div>
         </div>
       ) : (
-        <>
-          {/* hub por encontro (REALIZA-173): a trilha de cobertura responde
-              "o que falta" num olhar; cada célula ancora no <details> do
-              encontro. Mentor/especialista veem a mesma estrutura em leitura
-              — MaterialActions e NovoMaterialDialog só renderizam pra coord */}
-          {nums.length > 0 && (
-            <>
-              <CoberturaTrilha porEncontro={porEncontro} nums={nums} />
-              <section
-                aria-label="Materiais por encontro"
-                className="space-y-2"
-              >
-                {nums.map((n, i) => (
-                  <EncontroDetails
-                    key={n}
-                    n={n}
-                    titulo={titulos.get(n)}
-                    itens={porEncontro.get(n) ?? []}
-                    ehCoord={ehCoord}
-                    maxEncontro={maxEncontro}
-                    indice={i}
-                  />
-                ))}
-              </section>
-            </>
-          )}
-          <TransversaisMateriais
-            grupos={transversais}
-            ehCoord={ehCoord}
-            maxEncontro={maxEncontro}
-          />
-        </>
+        /* hub por encontro (REALIZA-173) com cara de dashboard (REALIZA-184):
+           a trilha de cobertura responde "o que falta" num olhar e ancora no
+           <details> do encontro; chips filtram por audiência/tipo sem reload.
+           Mentor/especialista veem a mesma estrutura em leitura —
+           MaterialActions e NovoMaterialDialog só renderizam pra coord */
+        <MateriaisBiblioteca
+          stats={stats}
+          encontros={nums.map((n) => ({
+            n,
+            titulo: titulos.get(n),
+            itens: porEncontro.get(n) ?? [],
+          }))}
+          transversais={transversais}
+          ehCoord={ehCoord}
+          maxEncontro={maxEncontro}
+          encontroAtual={encontroAtual}
+          mobile={mobile}
+        />
       )}
     </div>
   );

@@ -21,9 +21,12 @@ export function CelulaCobertura({
       title={rotulo}
       aria-label={rotulo}
       onClick={() => {
-        document
-          .getElementById(`mat-encontro-${n}`)
-          ?.setAttribute("open", "");
+        const alvo = document.getElementById(`mat-encontro-${n}`);
+        alvo?.setAttribute("open", "");
+        // o encontro mora dentro do grupo "Por encontro" (REALIZA-184) —
+        // fechado por padrão no mobile; sem abrir o pai o salto da âncora
+        // cai numa linha que continua escondida
+        alvo?.parentElement?.closest("details")?.setAttribute("open", "");
       }}
       className={cn(
         "grid size-9 place-items-center rounded-md text-xs font-semibold tabular-nums transition-colors",

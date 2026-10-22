@@ -2,7 +2,16 @@
 
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { CircleNotch, EnvelopeSimple, Paperclip, PencilSimple } from "@phosphor-icons/react";
+import {
+  ArrowSquareOut,
+  CircleNotch,
+  DotsThreeVertical,
+  EnvelopeSimple,
+  LinkSimple,
+  Paperclip,
+  PencilSimple,
+  Trash,
+} from "@phosphor-icons/react";
 import { toast } from "sonner";
 import {
   anexarArquivoMaterial,
@@ -10,24 +19,29 @@ import {
   editarMaterial,
   removerArquivoMaterial,
 } from "@/lib/actions";
-import { TRILHA_LEN } from "@/lib/ciclo";
+import { linkSeguro, TRILHA_LEN } from "@/lib/ciclo";
 import { createClient } from "@/lib/supabase/client";
 import type { Material } from "@/lib/types";
-import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
 import { EnviarEmailDialog } from "@/components/enviar-email-dialog";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import {
-  Tooltip, TooltipContent, TooltipTrigger,
-} from "@/components/ui/tooltip";
 
 const LIMITE_BYTES = 20 * 1024 * 1024;
 const BUCKET = "materiais";
@@ -58,16 +72,93 @@ const AUDIENCIA_LABEL = {
   coordenacao: "Coordenação",
 } as const;
 
+/** Destino do material — o mesmo das linhas/cards: o arquivo oficial ganha
+ *  da url externa; sem os dois não há link pra abrir/copiar. */
+function hrefMaterial(m: Material): string | null {
+  return m.path ? `/api/material/${m.id}` : linkSeguro(m.url);
+}
+
+/** Link compartilhável: material com path copia a rota interna absoluta
+ *  (ela 302→signed URL exige login do papel certo — compartilhar com quem
+ *  não é da audiência cai no 404 honesto); url externa copia como está.
+ *  Mesma régua de erro do CopiarLinkAvaliacao: sem clipboard API (contexto
+ *  não-seguro/permissão negada) ou falha → toast de erro, não silêncio. */
+async function copiarLinkMaterial(m: Material) {
+  const href = hrefMaterial(m);
+  if (!href) return;
+  const texto = m.path ? `${window.location.origin}${href}` : href;
+  if (!navigator.clipboard?.writeText) {
+    toast.error("Não consegui copiar o link.");
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(texto);
+    toast.success("Link copiado.");
+  } catch {
+    toast.error("Não consegui copiar o link.");
+  }
+}
+
+/** Gatilho ⋯ — padrão pdm-arvore: ghost icon size-11 (toque) → size-8. */
+function TriggerAcoes({ titulo, pending }: { titulo: string; pending?: boolean }) {
+  return (
+    <DropdownMenuTrigger
+      aria-label={`Ações de "${titulo}"`}
+      aria-busy={pending || undefined}
+      className={cn(
+        buttonVariants({ variant: "ghost", size: "icon" }),
+        "size-11 shrink-0 sm:size-8"
+      )}
+    >
+      {pending ? (
+        <CircleNotch size={18} className="animate-spin" aria-hidden />
+      ) : (
+        <DotsThreeVertical size={18} weight="bold" aria-hidden />
+      )}
+    </DropdownMenuTrigger>
+  );
+}
+
+/** ⋯ somente-leitura do material — mentor/supervisor/especialista no hub e
+ *  o jovem nos cards do acervo: a linha/card inteiro já é o "Abrir"; aqui
+ *  ficam os gestos secundários. Sem destino ("em breve") não renderiza —
+ *  não há link pra abrir nem copiar. */
+export function MaterialMenu({ material }: { material: Material }) {
+  const href = hrefMaterial(material);
+  if (!href) return null;
+  return (
+    <DropdownMenu>
+      <TriggerAcoes titulo={material.titulo} />
+      <DropdownMenuContent align="end" className="w-56">
+        <DropdownMenuItem
+          onClick={() => window.open(href, "_blank", "noopener,noreferrer")}
+        >
+          <ArrowSquareOut size={16} data-icon="inline-start" aria-hidden />
+          Abrir em nova aba
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => copiarLinkMaterial(material)}>
+          <LinkSimple size={16} data-icon="inline-start" aria-hidden />
+          Copiar link
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 export function MaterialActions({ material, maxEncontro }: { material: Material; maxEncontro?: number }) {
   const [pending, start] = useTransition();
   const [editOpen, setEditOpen] = useState(false);
   const [emailOpen, setEmailOpen] = useState(false);
+  // excluir via item do menu — o dialog de confirmação é controlado (mesmo
+  // padrão dos encaminhamentos: o ConfirmDeleteButton sem trigger próprio)
+  const [excluindo, setExcluindo] = useState(false);
   // audiência controlada — o teto de "encontro" segue a trilha dela
   const [audiencia, setAudiencia] = useState(material.audiencia);
   const maxEncontroSel =
     audiencia === "especialista" ? TRILHA_LEN.especialista : (maxEncontro ?? 99);
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
+  const href = hrefMaterial(material);
 
   function onPick(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -139,7 +230,7 @@ export function MaterialActions({ material, maxEncontro }: { material: Material;
   }
 
   return (
-    <div className="flex items-center">
+    <>
       <input
         ref={fileRef}
         type="file"
@@ -149,66 +240,58 @@ export function MaterialActions({ material, maxEncontro }: { material: Material;
         aria-hidden="true"
         onChange={onPick}
       />
-      <Tooltip>
-        <TooltipTrigger
-          render={
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              aria-label={`Editar "${material.titulo}"`}
-              onClick={() => setEditOpen(true)}
-            >
-              <PencilSimple size={15} />
-            </Button>
-          }
-        />
-        <TooltipContent>Editar material</TooltipContent>
-      </Tooltip>
-      <Tooltip>
-        <TooltipTrigger
-          render={
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              aria-label={
-                pending
-                  ? "Enviando arquivo"
-                  : material.path
-                    ? "Trocar arquivo"
-                    : "Anexar arquivo"
-              }
-              aria-busy={pending}
-              disabled={pending}
-              onClick={() => fileRef.current?.click()}
-            >
-              {pending ? <CircleNotch size={15} className="animate-spin" /> : <Paperclip size={15} />}
-            </Button>
-          }
-        />
-        <TooltipContent>
-          {material.path ? "Trocar arquivo" : "Anexar arquivo"}
-        </TooltipContent>
-      </Tooltip>
-      <Tooltip>
-        <TooltipTrigger
-          render={
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              aria-label={`Enviar "${material.titulo}" por e-mail`}
-              onClick={() => setEmailOpen(true)}
-            >
-              <EnvelopeSimple size={15} />
-            </Button>
-          }
-        />
-        <TooltipContent>Enviar por e-mail</TooltipContent>
-      </Tooltip>
+      {/* um ⋯ só no lugar da fileira de botões (REALIZA-185): a linha/card
+          já é o "Abrir"; as secundárias vivem aqui — mesmo padrão da árvore
+          do PDM (ação perigosa por último) */}
+      <DropdownMenu>
+        <TriggerAcoes titulo={material.titulo} pending={pending} />
+        <DropdownMenuContent align="end" className="w-56">
+          <DropdownMenuItem onClick={() => setEditOpen(true)}>
+            <PencilSimple size={16} data-icon="inline-start" aria-hidden />
+            Editar material
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            disabled={pending}
+            onClick={() => fileRef.current?.click()}
+          >
+            <Paperclip size={16} data-icon="inline-start" aria-hidden />
+            {material.path ? "Trocar arquivo" : "Anexar arquivo"}
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => setEmailOpen(true)}>
+            <EnvelopeSimple size={16} data-icon="inline-start" aria-hidden />
+            Enviar por e-mail
+          </DropdownMenuItem>
+          {href && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={() =>
+                  window.open(href, "_blank", "noopener,noreferrer")
+                }
+              >
+                <ArrowSquareOut size={16} data-icon="inline-start" aria-hidden />
+                Abrir em nova aba
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => copiarLinkMaterial(material)}>
+                <LinkSimple size={16} data-icon="inline-start" aria-hidden />
+                Copiar link
+              </DropdownMenuItem>
+            </>
+          )}
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            variant="destructive"
+            onClick={() => setExcluindo(true)}
+          >
+            <Trash size={16} data-icon="inline-start" aria-hidden />
+            Excluir
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+
       <ConfirmDeleteButton
-        dica="Excluir material"
+        open={excluindo}
+        onOpenChange={setExcluindo}
         titulo={`Excluir "${material.titulo}"?`}
         descricao={
           material.path
@@ -219,7 +302,7 @@ export function MaterialActions({ material, maxEncontro }: { material: Material;
         onConfirm={() => remover(material)}
       />
 
-      {/* metadados do material — o arquivo em si troca pelo clip */}
+      {/* metadados do material — o arquivo em si troca pelo clip do menu */}
       <Dialog
         open={editOpen}
         onOpenChange={(o) => {
@@ -338,6 +421,6 @@ export function MaterialActions({ material, maxEncontro }: { material: Material;
         open={emailOpen}
         onOpenChange={setEmailOpen}
       />
-    </div>
+    </>
   );
 }

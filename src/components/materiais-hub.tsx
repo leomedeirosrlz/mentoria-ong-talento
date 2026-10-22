@@ -12,7 +12,8 @@ import { linkSeguro } from "@/lib/ciclo";
 import type { CicloEvento, Material } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { CelulaCobertura } from "@/components/celula-cobertura";
-import { MaterialActions } from "@/components/material-actions";
+import { MaterialActions, MaterialMenu } from "@/components/material-actions";
+import { PreviewMaterial } from "@/components/material-preview-pdf";
 import { NovoMaterialDialog } from "@/components/novo-material-dialog";
 import { cn } from "@/lib/utils";
 
@@ -54,8 +55,9 @@ const GRUPO_TIPO = {
 
 /** Material com destino real: arquivo oficial no bucket ou link http(s)
  *  válido. Sem os dois é o "em breve" — estado legítimo (materiais chegam
- *  ao longo do ciclo), não erro. */
-function temConteudo(m: Material): boolean {
+ *  ao longo do ciclo), não erro. Exportada: a faixa de KPIs e a contagem
+ *  "com material" da trilha usam a mesma régua (REALIZA-184). */
+export function temConteudo(m: Material): boolean {
   return m.path != null || linkSeguro(m.url) != null;
 }
 
@@ -105,7 +107,10 @@ export function titulosPorNumero(eventos: CicloEvento[]): Map<number, string> {
 
 /** Faixa de cobertura 1..N — responde em um olhar "quais encontros já têm
  *  material": lime = tem conteúdo, amarelo = material marcado mas ainda
- *  "em breve", tracejado = vazio. Cada célula ancora no <details> do encontro. */
+ *  "em breve", tracejado = vazio. Cada célula ancora no <details> do encontro.
+ *  REALIZA-184 — virou o primeiro GRUPO colapsável da página (details +
+ *  summary com a contagem "x/y com material"); aberto por padrão em todo
+ *  viewport porque é o mapa de navegação da biblioteca. */
 export function CoberturaTrilha({
   porEncontro,
   nums,
@@ -113,36 +118,50 @@ export function CoberturaTrilha({
   porEncontro: Map<number, Material[]>;
   nums: number[];
 }) {
+  const cobertos = nums.filter((n) =>
+    (porEncontro.get(n) ?? []).some(temConteudo)
+  ).length;
   return (
-    <section
-      aria-labelledby="materiais-cobertura"
-      className="animate-enter rounded-xl bg-card px-4 py-4 shadow-[var(--shadow-border)] sm:px-5"
+    <details
+      open
+      className="group animate-enter rounded-xl bg-card px-4 py-4 shadow-[var(--shadow-border)] sm:px-5"
     >
-      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-        <h2 id="materiais-cobertura" className="text-sm font-semibold">
+      <summary className="flex min-h-8 cursor-pointer list-none items-center gap-x-2.5 rounded-lg select-none marker:hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
+        <CaretRight
+          size={14}
+          weight="bold"
+          aria-hidden
+          className="shrink-0 text-muted-foreground transition-transform group-open:rotate-90"
+        />
+        {/* role=heading no lugar de <h2>: o content model do summary não
+            admite heading — mesmo padrão do EncontroDetails */}
+        <span role="heading" aria-level={2} className="text-sm font-semibold">
           Cobertura por encontro
-        </h2>
-        {/* a legenda é a alternativa touch do title das células — sem ela o
-            código de cor não tem como ser lido no toque */}
-        <ul className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-          <li className="flex items-center gap-1.5">
-            <i aria-hidden className="size-2.5 rounded-sm bg-[var(--brand-lime)]" />
-            com material
-          </li>
-          <li className="flex items-center gap-1.5">
-            <i aria-hidden className="size-2.5 rounded-sm bg-[var(--warn)]" />
-            em breve
-          </li>
-          <li className="flex items-center gap-1.5">
-            <i
-              aria-hidden
-              className="size-2.5 rounded-sm border border-dashed border-muted-foreground/60"
-            />
-            sem material
-          </li>
-        </ul>
-      </div>
-      <ol className="mt-3 flex gap-1.5 overflow-x-auto pb-0.5">
+        </span>
+        <span className="ml-auto shrink-0 text-xs tabular-nums text-muted-foreground">
+          {cobertos}/{nums.length} com material
+        </span>
+      </summary>
+      {/* a legenda é a alternativa touch do title das células — sem ela o
+          código de cor não tem como ser lido no toque */}
+      <ul className="mt-3 flex flex-wrap items-center justify-end gap-x-3 gap-y-1 text-xs text-muted-foreground">
+        <li className="flex items-center gap-1.5">
+          <i aria-hidden className="size-2.5 rounded-sm bg-[var(--brand-lime)]" />
+          com material
+        </li>
+        <li className="flex items-center gap-1.5">
+          <i aria-hidden className="size-2.5 rounded-sm bg-[var(--warn)]" />
+          em breve
+        </li>
+        <li className="flex items-center gap-1.5">
+          <i
+            aria-hidden
+            className="size-2.5 rounded-sm border border-dashed border-muted-foreground/60"
+          />
+          sem material
+        </li>
+      </ul>
+      <ol className="mt-2.5 flex gap-1.5 overflow-x-auto pb-0.5">
         {nums.map((n) => {
           // estado/rótulo resolvidos no server — a célula client só cuida
           // do clique que abre o <details> de destino
@@ -164,13 +183,17 @@ export function CoberturaTrilha({
           );
         })}
       </ol>
-    </section>
+    </details>
   );
 }
 
 /** Linha do hub por encontro — <details> colapsado por padrão: o summary
  *  carrega o nº, a contagem e o pill do pior estado; abrindo, as linhas de
- *  material com MaterialActions e o atalho "adicionar neste encontro" (coord). */
+ *  material com MaterialActions e o atalho "adicionar neste encontro" (coord).
+ *  REALIZA-184 — `aberto` SSR resolve o default por viewport (encontro da
+ *  semana aberto no desktop); `oculto` esconde a linha quando o filtro de
+ *  chips zerou os itens dela; `total` é a contagem sem filtro, pro "x de y"
+ *  honesto no summary. */
 export function EncontroDetails({
   n,
   titulo,
@@ -178,6 +201,10 @@ export function EncontroDetails({
   ehCoord,
   maxEncontro,
   indice,
+  aberto,
+  oculto,
+  total,
+  atual,
 }: {
   n: number;
   titulo?: string;
@@ -185,11 +212,22 @@ export function EncontroDetails({
   ehCoord: boolean;
   maxEncontro: number;
   indice: number;
+  /** SSR `open` — usuário continua podendo abrir/fechar à mão (React só
+   *  reescreve o atributo se a prop mudar, e ela é estável por encontro). */
+  aberto?: boolean;
+  /** Filtro zerou os itens do encontro — linha fora da tela, estado mantido. */
+  oculto?: boolean;
+  /** Contagem sem filtro — summary mostra "x de total" enquanto filtrando. */
+  total?: number;
+  /** Encontro vigente do calendário — marcado no summary. */
+  atual?: boolean;
 }) {
   const k = itens.length;
   return (
     <details
       id={`mat-encontro-${n}`}
+      open={aberto}
+      hidden={oculto}
       className="group animate-enter scroll-mt-16 rounded-xl bg-card shadow-[var(--shadow-border)]"
       style={{ "--i": Math.min(indice, 10) } as CSSProperties}
     >
@@ -206,6 +244,16 @@ export function EncontroDetails({
         <span role="heading" aria-level={3} className="shrink-0 text-[13px] font-semibold">
           Encontro {n}
         </span>
+        {/* encontro vigente do calendário — explica por que a linha já vem
+            aberta no desktop */}
+        {atual && (
+          <Badge
+            variant="outline"
+            className="shrink-0 border-[var(--brand-lime)]/50 bg-[var(--brand-lime)]/15 text-[11px] font-semibold"
+          >
+            semana atual
+          </Badge>
+        )}
         {/* título do encontro visível em todo viewport — trunca em vez de
             sumir no mobile: "Encontro 7" sozinho não diz o tema da semana */}
         {titulo && (
@@ -216,7 +264,9 @@ export function EncontroDetails({
         {k > 0 ? (
           <span className="ml-auto flex shrink-0 items-center gap-2 pl-2">
             <span className="text-xs tabular-nums text-muted-foreground">
-              {k} {k === 1 ? "material" : "materiais"}
+              {total != null && k < total
+                ? `${k} de ${total}`
+                : `${k} ${k === 1 ? "material" : "materiais"}`}
             </span>
             <PillEstado itens={itens} />
           </span>
@@ -293,8 +343,10 @@ function PillEstado({ itens }: { itens: Material[] }) {
 }
 
 /** Bloco transversal — guias/modelos/conteúdos/links sem encontro_num, em
- *  seções por tipo (mesma anatomia de linha do hub). Sempre aberto: o Guia
- *  do Mentor é o material mais acessado da página. */
+ *  seções por tipo (mesma anatomia de linha do hub). O heading "Transversais"
+ *  mora no grupo colapsável do shell (REALIZA-184) — aqui ficam só as
+ *  seções. Grupo sem itens (filtro ativo) não renderiza — o pill de
+ *  contagem do grupo já avisa o zero. */
 export function TransversaisMateriais({
   grupos,
   ehCoord,
@@ -306,15 +358,9 @@ export function TransversaisMateriais({
 }) {
   if (grupos.length === 0) return null;
   return (
-    <section aria-labelledby="materiais-transversais" className="space-y-4">
-      <h2
-        id="materiais-transversais"
-        className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground"
-      >
-        Transversais
-      </h2>
-      <div className="space-y-5">
-        {grupos.map(({ tipo, itens }, i) => (
+    <div className="space-y-5">
+      {grupos.map(({ tipo, itens }, i) =>
+        itens.length === 0 ? null : (
           <div
             key={tipo}
             className="animate-enter space-y-2"
@@ -327,9 +373,9 @@ export function TransversaisMateriais({
               ))}
             </div>
           </div>
-        ))}
-      </div>
-    </section>
+        )
+      )}
+    </div>
   );
 }
 
@@ -354,9 +400,20 @@ function MaterialRow({
   // quebra internamente e a descrição já tem line-clamp
   const head = (
     <>
-      <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-muted/70 text-muted-foreground">
-        <Icone size={17} aria-hidden />
-      </span>
+      {/* REALIZA-185 — material com arquivo mostra a capa de verdade (1ª
+          página do PDF, lazy; imagem como <img>) no lugar do ícone do tipo.
+          O thumb portrait ~A4 fica dentro do link — é decorativo, o gesto
+          segue sendo a linha */}
+      <PreviewMaterial
+        m={m}
+        className="h-20 w-14 shrink-0 rounded-lg"
+        icone={18}
+        fallback={
+          <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-muted/70 text-muted-foreground">
+            <Icone size={17} aria-hidden />
+          </span>
+        }
+      />
       <div className="min-w-0 flex-1">
         <p className="text-sm font-medium">{m.titulo}</p>
         {m.descricao && <p className="line-clamp-2 text-xs text-muted-foreground mt-0.5">{m.descricao}</p>}
@@ -407,7 +464,14 @@ function MaterialRow({
             {ehCoord ? "sem conteúdo" : "em breve"}
           </Badge>
         )}
-        {ehCoord && <MaterialActions material={m} maxEncontro={maxEncontro} />}
+        {/* 1 gesto principal (a linha-link) + ⋯ pras secundárias: o menu
+            completo da coord (editar/anexar/e-mail/excluir) ou o de
+            leitura (abrir/copiar link) pros demais papéis */}
+        {ehCoord ? (
+          <MaterialActions material={m} maxEncontro={maxEncontro} />
+        ) : (
+          <MaterialMenu material={m} />
+        )}
       </div>
     </div>
   );

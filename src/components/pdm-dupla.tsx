@@ -141,10 +141,13 @@ export function PdmDupla({
     onNovaSubmeta: (pai: PdmNo) =>
       setItemDialog({ modo: "nova-submeta", pai }),
     onMover: (item: PdmNo, direcao: -1 | 1, irmaos: PdmNo[]) => {
-      const idx = irmaos.findIndex((i) => i.id === item.id);
+      // a RPC valida o conjunto exato de irmãos NÃO-descartados — a árvore
+      // mostra descartadas no histórico, mas elas não entram na ordem viva
+      const ativos = irmaos.filter((i) => i.status !== "descartada");
+      const idx = ativos.findIndex((i) => i.id === item.id);
       const alvo = idx + direcao;
-      if (idx < 0 || alvo < 0 || alvo >= irmaos.length) return;
-      const nova = [...irmaos];
+      if (idx < 0 || alvo < 0 || alvo >= ativos.length) return;
+      const nova = [...ativos];
       [nova[idx], nova[alvo]] = [nova[alvo], nova[idx]];
       executar(
         () => pdmReordenar(duplaId, item.parentId, nova.map((i) => i.id)),

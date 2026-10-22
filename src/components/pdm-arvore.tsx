@@ -278,20 +278,24 @@ function NoPdm({
                 <PencilSimple size={16} aria-hidden data-icon="inline-start" />
                 Editar
               </DropdownMenuItem>
-              <DropdownMenuItem
-                disabled={posicao === 0}
-                onClick={() => acoes.onMover(no, -1, irmaos)}
-              >
-                <ArrowUp size={16} aria-hidden data-icon="inline-start" />
-                Subir na prioridade
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                disabled={posicao === total - 1}
-                onClick={() => acoes.onMover(no, 1, irmaos)}
-              >
-                <ArrowDown size={16} aria-hidden data-icon="inline-start" />
-                Descer na prioridade
-              </DropdownMenuItem>
+              {!descartada && (
+                <>
+                  <DropdownMenuItem
+                    disabled={posicao === 0}
+                    onClick={() => acoes.onMover(no, -1, irmaos)}
+                  >
+                    <ArrowUp size={16} aria-hidden data-icon="inline-start" />
+                    Subir na prioridade
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    disabled={posicao === total - 1}
+                    onClick={() => acoes.onMover(no, 1, irmaos)}
+                  >
+                    <ArrowDown size={16} aria-hidden data-icon="inline-start" />
+                    Descer na prioridade
+                  </DropdownMenuItem>
+                </>
+              )}
               {podeAdicionarSub && !descartada && (
                 <DropdownMenuItem onClick={() => acoes.onNovaSubmeta(no)}>
                   <Plus size={16} aria-hidden data-icon="inline-start" />
