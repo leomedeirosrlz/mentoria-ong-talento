@@ -4,6 +4,8 @@ import {
   buscarViaServiceRole,
   expect,
   inserirViaServiceRole,
+  limparDuplas,
+  limparEncontrosDaDupla,
   limparViaServiceRole,
   loginComSenha,
   test,
@@ -63,7 +65,9 @@ async function limpar() {
   );
   await limparViaServiceRole("avaliacao_links", `dupla_id=eq.${DUPLA_COLEGA}`);
   await limparViaServiceRole("formulario_links", `dupla_id=eq.${DUPLA_COLEGA}`);
-  await limparViaServiceRole("encontros", `dupla_id=eq.${DUPLA_COLEGA}`);
+  // a varredura da 0071 apaga os filhos NO ACTION (registros→chamados,
+  // aval_*) antes do pai — o delete direto bateria 409 se a f2 crescer
+  await limparEncontrosDaDupla(DUPLA_COLEGA);
 }
 
 test.describe("jornada — auto-emissão de instrumentos (REALIZA-152)", () => {
@@ -144,16 +148,14 @@ test.describe("jornada — auto-emissão de instrumentos (REALIZA-152)", () => {
   });
 
   test("trigger da dupla emite no INSERT; respondida descansa; formal abre no enc. 12; encerrada expira", async () => {
-    // limpa qualquer dupla/link órfão de runs anteriores
+    // limpa qualquer dupla/link órfão de runs anteriores — limparDuplas
+    // cobre TODOS os filhos NO ACTION (formulario_links, encerramentos,
+    // remanejada_de…), não só encontros
     const antigas = await buscarViaServiceRole<{ id: string }[]>(
       "duplas",
       `mentorado_id=eq.${MENTORADO_LIVRE}&select=id`
     );
-    for (const d of antigas) {
-      await limparViaServiceRole("formulario_links", `dupla_id=eq.${d.id}`);
-      await limparViaServiceRole("encontros", `dupla_id=eq.${d.id}`);
-      await limparViaServiceRole("duplas", `id=eq.${d.id}`);
-    }
+    await limparDuplas(antigas.map((d) => d.id));
 
     // a) a dupla nasce → os 3 instrumentos do enc. 1 já estão no banco —
     //    zero page load, zero clique: é o trigger puro
@@ -231,10 +233,9 @@ test.describe("jornada — auto-emissão de instrumentos (REALIZA-152)", () => {
         expect(l.expira_em).not.toBeNull();
       }
     } finally {
-      await limparViaServiceRole("formulario_links", `dupla_id=eq.${duplaId}`);
-      await limparViaServiceRole("avaliacao_links", `dupla_id=eq.${duplaId}`);
-      await limparViaServiceRole("encontros", `dupla_id=eq.${duplaId}`);
-      await limparViaServiceRole("duplas", `id=eq.${duplaId}`);
+      // a dupla encerrada do teste leva encerramentos/links/avaliações
+      // junto — limparDuplas varre todos os filhos NO ACTION
+      await limparDuplas([duplaId]);
     }
   });
 

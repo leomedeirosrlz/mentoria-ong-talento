@@ -251,7 +251,9 @@ test.describe("demo — Minha jornada do mentorado", () => {
     const grupoLinks = acervo.locator("section", {
       has: page.getByRole("heading", { name: "Links", exact: true }),
     });
-    const grade = grupoLinks.locator("div.grid");
+    // :scope > — a capa do card de link (PreviewLink) também é div.grid;
+    // sem o filho direto o locator conta as 2 capas junto da grade
+    const grade = grupoLinks.locator(":scope > div.grid");
     await expect(grade).toHaveCount(1);
     const trilhos = () =>
       grade.evaluate(

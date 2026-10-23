@@ -52,9 +52,9 @@ permissions:
 jobs:
   e2e:
     runs-on: ubuntu-latest
-    # setup (install+build) ~3-4min + suite serial ~14min — mesma margem do
-    # e2e-preview; regressão de duração é o alarme natural do histórico
-    timeout-minutes: 25
+    # setup (install+build) ~3-4min + suite serial ~50min medida local
+    # (114 specs hoje) — 70 dá margem; regressão de duração é o alarme
+    timeout-minutes: 70
     steps:
       # O modo sai UMA vez daqui; todo step condicional usa o output.
       # Staging exige os 3 secrets E2E_* — faltando, FALHA (nunca skip:

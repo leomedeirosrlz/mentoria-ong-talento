@@ -2,6 +2,7 @@ import {
   appEnvOk,
   atualizarViaServiceRole,
   buscarViaServiceRole,
+  convergirDuplaAtiva,
   expect,
   jwtDoUsuario,
   loginComSenha,
@@ -39,6 +40,9 @@ const IDS = {
   jovem2Profile: "e2e00000-0000-4000-8000-0000000000f0",
   mentoradoSemDpp: "e2e00000-0000-4000-8000-0000000000d0", // a ficha do jovem2
   duplaColega: "e2e00000-0000-4000-8000-0000000000f2",
+  // a dupla DPP do jovem — o selo "mentoria <status>" vive dentro do link
+  // do mentor na mentoria-titulo: 'concluida' muda o nome acessível dele
+  duplaDpp: "e2e00000-0000-4000-8000-000000000030",
   mentorProfile: "e2e00000-0000-4000-8000-000000000010",
   espProfile: "e2e00000-0000-4000-8000-000000000060",
   esp2Profile: "e2e00000-0000-4000-8000-0000000000c0", // catálogo, sem dupla com o jovem
@@ -68,6 +72,9 @@ async function restaurarColega() {
     encerrada_em: null,
     motivo_encerramento: null,
   });
+  // a dupla do jovem tem que estar ativa — 'concluida' costura o selo
+  // "mentoria concluída" no link do mentor e o nome acessível muda
+  await convergirDuplaAtiva(IDS.duplaDpp);
 }
 
 test.describe("diretório do jovem (REALIZA-113 / 0076)", () => {

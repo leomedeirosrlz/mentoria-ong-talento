@@ -240,6 +240,9 @@ console.log(`cronograma: ${cron.id} (${cron.turma})`);
     // dupla↔solicitação de especialista é FK circular (0027/0028): zera a
     // aresta na dupla antes de varrer a solicitação e seus eventos
     await patch(`duplas?id=in.(${ids})`, { solicitacao_id: null });
+    // sucessora de remanejo aponta pra condenada (remanejada_de é NO
+    // ACTION da 0063) — solta a linhagem antes do delete
+    await patch(`duplas?remanejada_de=in.(${ids})`, { remanejada_de: null });
     const sols = await rest(
       `solicitacoes_especialista?select=id&or=(dupla_dpp_id.in.(${ids}),dupla_id.in.(${ids}))`
     );
@@ -255,6 +258,13 @@ console.log(`cronograma: ${cron.id} (${cron.turma})`);
     await del(`formulario_links?dupla_id=in.(${ids})`);
     await del(`supervisoes?dupla_id=in.(${ids})`);
     await del(`encerramentos?dupla_id=in.(${ids})`);
+    // 0084: chamados apontam pra dupla sem cascade — saem antes do pai
+    await del(`chamados?dupla_id=in.(${ids})`);
+    // 0071: aval_links/avaliacoes têm dupla_id espelhado NO ACTION — o
+    // sweep acima cobre por dupla_id, mas belt & suspenders pra quem só
+    // referenciou o encontro (registros/interações/notas vão em cascata)
+    await del(`avaliacoes_encontro?dupla_id=in.(${ids})`);
+    await del(`avaliacao_links?dupla_id=in.(${ids})`);
     await del(`encontros?dupla_id=in.(${ids})`);
     await del(`duplas?id=in.(${ids})`);
     console.log(`limpeza: ${condenadas.length} dupla(s) pendurada(s) removidas`);
@@ -1202,6 +1212,23 @@ if (!linkAval) {
   });
   console.log("link de avaliação re-convergido pra pendente");
 }
+
+// O realizado nº16 é o ÚLTIMO encontro do cronograma e2e — o insert acima
+// (ou um spec que o recriou no meio do run) dispara o auto-encerramento da
+// 0102: a dupla acorda 'concluida', uma row pendente nasce em encerramentos
+// e os sinos dupla_formada/dupla_reta_final tocam. As fixtures são de dupla
+// ATIVA (PDM editável, agenda com CTA, ficha sem selo de concluída) — o seed
+// devolve o status e desfaz o que o trigger mintou. Mesmo protocolo do
+// convergirDuplaAtiva dos specs (tests/e2e/helpers.ts).
+await patch(`duplas?id=eq.${IDS.dupla}`, {
+  status: "ativa",
+  encerrada_em: null,
+  motivo_encerramento: null,
+});
+await del(`encerramentos?dupla_id=eq.${IDS.dupla}`);
+await del(
+  `notificacoes?tipo=in.(dupla_formada,dupla_reta_final)&href=eq./duplas/${IDS.dupla}`
+);
 
 // ---- supervisor (auxiliar) — login próprio pras telas finais (WP9/WP1) ----
 // A home do auxiliar e a fila de chamados precisam de um supervisor

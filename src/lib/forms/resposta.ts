@@ -14,6 +14,7 @@ import {
   normalizaData,
   normalizaPorFormato,
   normalizaTexto,
+  normalizaTextoLongo,
   type NormResult,
 } from "./normaliza";
 
@@ -97,6 +98,7 @@ export function normalizaResposta(c: FormularioCampo, v: string): NormResult {
   const f = campoFormato(c);
   if (f) return normalizaPorFormato(f, v);
   if (c.tipo === "data") return normalizaData(v);
+  if (c.tipo === "texto_longo") return normalizaTextoLongo(v);
   return normalizaTexto(v);
 }
 

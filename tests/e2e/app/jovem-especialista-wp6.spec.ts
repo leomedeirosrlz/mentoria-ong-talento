@@ -1,6 +1,7 @@
 import {
   appEnvOk,
   buscarViaServiceRole,
+  convergirDuplaAtiva,
   expect,
   limparViaServiceRole,
   loginComSenha,
@@ -86,6 +87,9 @@ async function convergirWp6() {
     "notificacoes",
     `profile_id=in.(${PERFIS_SINO})&tipo=in.(${TIPOS_WP6})`
   );
+  // a ficha da dupla DPP hospedeira tem que estar ativa — 'concluida' ela
+  // fica read-only e o botão "Mais" (que abre a sugestão) nem renderiza
+  await convergirDuplaAtiva(IDS.duplaDpp);
 }
 
 /** Única sol do mentorado, na forma que os asserts esperam. */

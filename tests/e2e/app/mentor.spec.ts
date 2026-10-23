@@ -2,6 +2,7 @@ import type { Locator, Page } from "@playwright/test";
 import {
   appEnvOk,
   buscarViaServiceRole,
+  convergirDuplaAtiva,
   expect,
   inserirViaServiceRole,
   limparEncontrosDaDupla,
@@ -104,6 +105,10 @@ test.describe("mentor DPP — fluxos reais", () => {
     // rodado solto), a home mostraria "encontro agendado" e o CTA "Agendar
     // encontro" do teste abaixo sumiria — a limpeza prévia parte do zero
     if (DUPLA_ID) await limparEncontrosDaDupla(DUPLA_ID);
+    // quem recriou o encontro 16 'realizado' (a âncora de outros specs)
+    // disparou a 0102 → dupla 'concluida': o CTA "Agendar encontro" some
+    // e as RPCs de agenda recusam. O piso deste spec é dupla ativa.
+    if (DUPLA_ID) await convergirDuplaAtiva(DUPLA_ID);
     await loginComSenha(page, EMAIL, SENHA);
   });
 

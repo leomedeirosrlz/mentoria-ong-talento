@@ -3,8 +3,10 @@ import {
   appEnvOk,
   atualizarViaServiceRole,
   buscarViaServiceRole,
+  convergirDuplaAtiva,
   expect,
   inserirViaServiceRole,
+  limparDuplas,
   limparEncontrosDaDupla,
   limparViaServiceRole,
   loginComSenha,
@@ -85,13 +87,9 @@ async function convergirWp6R2() {
     "duplas",
     `select=id&mentorado_id=in.(${MENTORADOS_JOVEM})&trilha=eq.especialista&id=not.eq.${IDS.duplaEsp}`
   );
-  for (const d of espExtras) await limparEncontrosDaDupla(d.id);
-  if (espExtras.length) {
-    await limparViaServiceRole(
-      "duplas",
-      `id=in.(${espExtras.map((d) => d.id).join(",")})`
-    );
-  }
+  // limparDuplas cobre os filhos NO ACTION novos (formulario_links 0099,
+  // encerramentos da 0102, remanejada_de) que o delete direto 409ava
+  await limparDuplas(espExtras.map((d) => d.id));
   await limparEncontrosDaDupla(IDS.duplaEsp);
 
   // grade do esp2: fixture de quinta à noite (compat) + sábado de manhã
@@ -120,6 +118,9 @@ async function convergirWp6R2() {
     hora_inicio: "09:00",
     hora_fim: "11:00",
   });
+  // a dupla DPP hospedeira da contra-proposta tem que estar ativa — um
+  // spec vizinho que recriou a âncora 16 a deixou 'concluida' (0102)
+  await convergirDuplaAtiva(IDS.duplaDpp);
 }
 
 test.describe("WP6-R2 — encaixa, autor da sugestão e CTA de triagem", () => {
@@ -181,9 +182,21 @@ test.describe("WP6-R2 — encaixa, autor da sugestão e CTA de triagem", () => {
     await expect(
       item.getByText(/Negociando horário com Esp/)
     ).toBeVisible();
+    // REALIZA-186: "Propor outro horário" saiu do botão solto pro ⋯
+    // "Ações do pedido de …" — abre o menu, o item vem dele
     await agirComConfirma(
       () =>
-        item.getByRole("button", { name: "Propor outro horário" }).click(),
+        item.getByRole("button", { name: /Ações do pedido de / }).click(),
+      () =>
+        page
+          .getByRole("menuitem", { name: "Propor outro horário" })
+          .isVisible()
+    );
+    await agirComConfirma(
+      () =>
+        page
+          .getByRole("menuitem", { name: "Propor outro horário" })
+          .click(),
       () =>
         item
           .getByRole("radiogroup", {

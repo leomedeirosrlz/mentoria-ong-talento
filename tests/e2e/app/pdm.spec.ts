@@ -4,6 +4,7 @@ import {
   appEnvOk,
   atualizarViaServiceRole,
   buscarViaServiceRole,
+  convergirDuplaAtiva,
   expect,
   inserirViaServiceRole,
   jwtDoUsuario,
@@ -168,6 +169,11 @@ async function convergirPiso() {
       { status: "realizado", realizado_em: enc.realizado_em ?? ha2d }
     );
   }
+  // o realizado nº16 é o ÚLTIMO do cronograma e2e — o insert (ou o PATCH
+  // que o devolve a realizado) dispara a 0102 e a dupla vira 'concluida',
+  // o que mata o gate pdm_pode_editar. O piso da fixture é dupla ATIVA:
+  // devolve o status e tira o encerramento + sinos que o trigger mintou.
+  await convergirDuplaAtiva(DUPLA_ID);
 }
 
 test.describe("PDM vivo (REALIZA-181)", () => {
@@ -436,11 +442,17 @@ test.describe("PDM vivo (REALIZA-181)", () => {
         .locator('ul[role="tree"] > li[role="treeitem"]')
         .first()
     ).toContainText("Meta B — que sobe e2e", { timeout: 15_000 });
+    // escopo pelo pdm_id da fixture — sem ele o select varre as raízes de
+    // TODOS os docs do staging (a seed demo de… também planta metas)
+    const [docOrdem] = await buscarViaServiceRole<{ id: string }[]>(
+      "pdm",
+      `select=id&dupla_id=eq.${DUPLA_ID}`
+    );
     const ordem = await buscarViaServiceRole<
       { titulo: string; ordem: number }[]
     >(
       "pdm_itens",
-      "select=titulo,ordem&parent_id=is.null&order=ordem"
+      `select=titulo,ordem&pdm_id=eq.${docOrdem.id}&parent_id=is.null&order=ordem`
     );
     expect(ordem.map((i) => i.titulo)).toEqual([
       "Meta B — que sobe e2e",
@@ -685,14 +697,31 @@ test.describe("PDM vivo (REALIZA-181)", () => {
       .fill("Em 3 anos, serei uma profissional formada e independente.");
     await page.locator("#f-meta_1").fill("Conseguir um jovem aprendiz e2e");
     await page.locator("#f-porque_1").fill("Quero minha própria renda.");
-    await page
-      .locator("#f-submetas_1")
-      .fill("Montar o currículo e2e\nMe inscrever nos programas e2e");
+    // desdobramento (0118): submetas não é mais um textarea — o "+" abre
+    // uma linha por vez e cada input carrega "Submeta N da meta M"; o
+    // contrato texto_longo (join por \n) segue o mesmo no submit
+    const submetas1 = page.locator('fieldset[data-campo="submetas_1"]');
+    await submetas1
+      .getByRole("button", { name: "Adicionar submeta" })
+      .click();
+    await submetas1
+      .getByRole("textbox", { name: "Submeta 1 da meta 1" })
+      .fill("Montar o currículo e2e");
+    await submetas1
+      .getByRole("button", { name: "Adicionar submeta" })
+      .click();
+    await submetas1
+      .getByRole("textbox", { name: "Submeta 2 da meta 1" })
+      .fill("Me inscrever nos programas e2e");
     await page.locator("#f-meta_2").fill("Subir a média de matemática e2e");
     await page.locator("#f-porque_2").fill("É a matéria que me atrapalha.");
     await page.locator("#f-meta_3").fill("Fazer o simulado completo e2e");
     await page.locator("#f-porque_3").fill("É a porta da faculdade.");
-    await page.getByRole("button", { name: "Enviar resposta" }).click();
+    // o CTA do instrumento carrega o nome do exercício (flow.tsx — CTA
+    // por sistema), não o "Enviar resposta" genérico dos forms avulsos
+    await page
+      .getByRole("button", { name: "Salvar minhas metas" })
+      .click();
     await expect(
       page.getByRole("heading", { name: "Resposta enviada!" })
     ).toBeVisible({ timeout: 15_000 });
