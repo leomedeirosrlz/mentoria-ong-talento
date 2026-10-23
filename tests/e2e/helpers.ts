@@ -245,6 +245,73 @@ export async function limparEncontrosDaDupla(duplaId: string): Promise<void> {
   await limparViaServiceRole("encontros", `id=in.(${lista})`);
 }
 
+/** O encontro nº16 'realizado' da fixture (…00d2) é o ÚLTIMO do cronograma
+ *  e2e: inseri-lo dispara o auto-encerramento da 0102 — duplas.status →
+ *  'concluida', uma row pendente em encerramentos e os sinos
+ *  dupla_formada/dupla_reta_final. Uma dupla concluída derruba tudo que
+ *  assume o piso de sempre (PDM read-only, agenda sem "Agendar encontro",
+ *  ficha com selo "mentoria concluída", jornada sem "encontro N de 16").
+ *  Todo piso que recria a âncora — e todo spec que depende da dupla —
+ *  chama isto no final: devolve o status e desfaz o que o trigger mintou. */
+export async function convergirDuplaAtiva(duplaId: string): Promise<void> {
+  await atualizarViaServiceRole("duplas", `id=eq.${duplaId}`, {
+    status: "ativa",
+    encerrada_em: null,
+    motivo_encerramento: null,
+  });
+  await limparViaServiceRole(
+    "encerramentos",
+    `dupla_id=eq.${duplaId}`
+  );
+  await limparViaServiceRole(
+    "notificacoes",
+    `tipo=in.(dupla_formada,dupla_reta_final)&href=eq./duplas/${duplaId}`
+  );
+}
+
+/** DELETE de duplas com TODOS os filhos NO ACTION, não só encontros —
+ *  solicitações (thread de propostas + aresta duplas.solicitacao_id),
+ *  formulario_links (0099), encerramentos (0037/0102), supervisoes, os
+ *  avaliacao_* da dupla toda, chamados diretos e a linhagem remanejada_de.
+ *  Cascade (pdm, snapshots, lembretes, devolutivas, interacoes, notas,
+ *  encaminhamentos, mural) cuida do resto. Specs antigos que só limpavam
+ *  encontros começaram a 409 quando as FKs novas nasceram. */
+export async function limparDuplas(ids: string[]): Promise<void> {
+  if (!ids.length) return;
+  const csv = ids.join(",");
+  // sucessora de remanejo aponta pra cá (NO ACTION) — solta a linhagem
+  await atualizarViaServiceRole("duplas", `remanejada_de=in.(${csv})`, {
+    remanejada_de: null,
+  });
+  // sols que apontam pra cá (dupla esp e/ou dupla dpp) — propostas antes
+  // da sol (FK), a aresta reversa em duplas antes de apagar a row
+  const sols = await buscarViaServiceRole<{ id: string }[]>(
+    "solicitacoes_especialista",
+    `select=id&or=(dupla_id.in.(${csv}),dupla_dpp_id.in.(${csv}))`
+  );
+  if (sols.length) {
+    const scsv = sols.map((s) => s.id).join(",");
+    await atualizarViaServiceRole("duplas", `solicitacao_id=in.(${scsv})`, {
+      solicitacao_id: null,
+    });
+    await limparViaServiceRole(
+      "solicitacao_propostas",
+      `solicitacao_id=in.(${scsv})`
+    );
+    await limparViaServiceRole("solicitacoes_especialista", `id=in.(${scsv})`);
+  }
+  // encontros pela varredura da 0071 (registros→chamados, avaliacoes, links)
+  for (const id of ids) await limparEncontrosDaDupla(id);
+  // filhos NO ACTION diretos da dupla
+  await limparViaServiceRole("avaliacoes_encontro", `dupla_id=in.(${csv})`);
+  await limparViaServiceRole("avaliacao_links", `dupla_id=in.(${csv})`);
+  await limparViaServiceRole("formulario_links", `dupla_id=in.(${csv})`);
+  await limparViaServiceRole("encerramentos", `dupla_id=in.(${csv})`);
+  await limparViaServiceRole("supervisoes", `dupla_id=in.(${csv})`);
+  await limparViaServiceRole("chamados", `dupla_id=in.(${csv})`);
+  await limparViaServiceRole("duplas", `id=in.(${csv})`);
+}
+
 /** GET via service role — leitura auxiliar pra cleanup/verificação que a UI
  *  não expõe diretamente (ex.: id da row criada, turma da dupla fixture).
  *  Mesmo hard-stop do delete: spec app nunca fala com prod. */

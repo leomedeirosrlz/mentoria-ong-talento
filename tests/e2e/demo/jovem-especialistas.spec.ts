@@ -130,7 +130,13 @@ test.describe("mentorado — home, página e ciclo de vida", () => {
     // abrir a contra-proposta → grade de dias, radios (input sr-only no
     // label) — a grade da Helena é ter/qui à noite e a da Bia cobre os
     // dois dias no mesmo período: todos os slots "encaixam"
-    await item.getByRole("button", { name: "Propor outro horário" }).click();
+    // (REALIZA-186: o gesto saiu do botão solto pro ⋯ "Ações do pedido")
+    await item
+      .getByRole("button", { name: /Ações do pedido de / })
+      .click();
+    await page
+      .getByRole("menuitem", { name: "Propor outro horário" })
+      .click();
     const grupo = item.getByRole("radiogroup", {
       name: "Horários livres do especialista",
     });

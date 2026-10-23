@@ -3,10 +3,12 @@ import {
   appEnvOk,
   atualizarViaServiceRole,
   buscarViaServiceRole,
+  convergirDuplaAtiva,
   expect,
   inserirViaServiceRole,
   isoDoRotulo,
   jwtDoUsuario,
+  limparDuplas,
   limparEncontrosDaDupla,
   limparViaServiceRole,
   loginComSenha,
@@ -99,18 +101,14 @@ async function convergirSolicitacoes() {
     await limparViaServiceRole("solicitacoes_especialista", `id=in.(${csv})`);
   }
   // duplas esp fora da fixture — a que o aceite criou (mentorado2) e restos
-  // de runs mortos; a fixture …00e0 NUNCA entra aqui
+  // de runs mortos; a fixture …00e0 NUNCA entra aqui. limparDuplas cobre
+  // os filhos NO ACTION novos (formulario_links 0099, encerramentos da
+  // 0102, remanejada_de) que o delete direto agarrava em 409.
   const espExtras = await buscarViaServiceRole<{ id: string }[]>(
     "duplas",
     `select=id&mentorado_id=in.(${MENTORADOS_E2E})&trilha=eq.especialista&id=not.eq.${IDS.duplaEsp}`
   );
-  for (const d of espExtras) await limparEncontrosDaDupla(d.id);
-  if (espExtras.length) {
-    await limparViaServiceRole(
-      "duplas",
-      `id=in.(${espExtras.map((d) => d.id).join(",")})`
-    );
-  }
+  await limparDuplas(espExtras.map((d) => d.id));
   // a trilha fixture volta ao estado do seed — sem tentativa nenhuma
   await limparEncontrosDaDupla(IDS.duplaEsp);
   // sino limpo: a assert de recusa conta exatamente a notificação do teste
@@ -118,6 +116,10 @@ async function convergirSolicitacoes() {
     "notificacoes",
     `profile_id=in.(${IDS.mentorProfile},${IDS.coordProfile},${IDS.espProfile})&tipo=in.(solicitacao_recusada,solicitacao_proposta,especialista_aceitou,demanda_especialista,solicitacao_registrada)`
   );
+  // a dupla DPP hospedeira do pedido precisa estar ativa — um spec vizinho
+  // que recriou o encontro 16 a deixou 'concluida' e a ficha vira
+  // read-only (o "Mais" some, o menuitem de solicitar nem monta)
+  await convergirDuplaAtiva(IDS.dupla);
 }
 
 /** Mural do especialista — section rotulada da home. */
@@ -387,10 +389,21 @@ test.describe("solicitação de especialista v2 — fluxo staff (REALIZA-112)", 
     await expect(card.getByText("Direcionada a você")).toBeVisible();
     // a contra-proposta não é mais um Select: é a grade de dias do mock v6 —
     // cada horário livre do especialista vira um radio (input sr-only, o
-    // <label> pai recebe o clique e ativa a escolha)
+    // <label> pai recebe o clique e ativa a escolha).
+    // REALIZA-186: o gesto saiu do botão solto pro ⋯ "Ações do pedido de …"
     await agirComConfirma(
       () =>
-        card.getByRole("button", { name: "Propor outro horário" }).click(),
+        card.getByRole("button", { name: /Ações do pedido de / }).click(),
+      () =>
+        page
+          .getByRole("menuitem", { name: "Propor outro horário" })
+          .isVisible()
+    );
+    await agirComConfirma(
+      () =>
+        page
+          .getByRole("menuitem", { name: "Propor outro horário" })
+          .click(),
       () =>
         card
           .getByRole("radiogroup", { name: "Horários livres do especialista" })
@@ -536,9 +549,24 @@ test.describe("solicitação de especialista v2 — fluxo staff (REALIZA-112)", 
     await page.goto("/");
     const card = mural(page).locator("li", { hasText: DEMANDA_RECUSA });
     await expect(card.getByText("Direcionada a você")).toBeVisible();
-    // o form de recusa pede a justificativa — o botão destrava com ≥3 chars
+    // a recusa saiu do botão solto pro ⋯ "Ações do pedido" (REALIZA-186,
+    // mesmo gesto do demo): o menuitem "Recusar pedido" abre o form inline
+    // que pede a justificativa — o botão destrava com ≥3 chars
     await agirComConfirma(
-      () => card.getByRole("button", { name: "Recusar", exact: true }).click(),
+      async () => {
+        // retry-safe: form já aberto → não repete o gesto (o menuitem é um
+        // toggle e fecharia o form de novo); menu aberto → não reclica o
+        // gatilho (toggle também)
+        if (await card.getByLabel("Motivo da recusa").isVisible().catch(() => false))
+          return;
+        const item = page.getByRole("menuitem", { name: "Recusar pedido" });
+        if (!(await item.isVisible().catch(() => false))) {
+          await card
+            .getByRole("button", { name: /Ações do pedido de / })
+            .click();
+        }
+        await item.click();
+      },
       () => card.getByLabel("Motivo da recusa").isVisible()
     );
     const confirma = card.getByRole("button", { name: "Recusar pedido" });
@@ -628,13 +656,10 @@ async function limpar158() {
       `id=in.(${sols.map((s) => s.id).join(",")})`
     );
   }
-  for (const d of duplas) await limparEncontrosDaDupla(d.id);
-  if (duplas.length) {
-    await limparViaServiceRole(
-      "duplas",
-      `id=in.(${duplas.map((d) => d.id).join(",")})`
-    );
-  }
+  // a dupla fechada do rematch carrega encerramentos + a sucessora aponta
+  // remanejada_de — limparDuplas solta a linhagem e varre todos os filhos
+  // NO ACTION (era só encontros aqui e o delete batia 409)
+  await limparDuplas(duplas.map((d) => d.id));
   await limparViaServiceRole(
     "notificacoes",
     `profile_id=eq.${JOVEM2_PROFILE}&tipo=in.(solicitacao_registrada,solicitacao_triagem)`

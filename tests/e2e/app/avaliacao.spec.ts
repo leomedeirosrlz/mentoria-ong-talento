@@ -2,6 +2,7 @@ import {
   appEnvOk,
   atualizarViaServiceRole,
   buscarViaServiceRole,
+  convergirDuplaAtiva,
   expect,
   inserirViaServiceRole,
   limparViaServiceRole,
@@ -192,6 +193,10 @@ async function convergirPiso() {
     );
   }
   await limparRastros();
+  // a fixture é o ÚLTIMO encontro do cronograma — re-criá-la dispara a
+  // 0102 e a dupla acorda 'concluida' (PDM read-only, agenda sem CTA).
+  // Devolve o piso de sempre: status ativa, sem encerramento nem sinos.
+  await convergirDuplaAtiva(DUPLA_ID);
 }
 
 test.describe("avaliação estrela do jovem (REALIZA-109)", () => {

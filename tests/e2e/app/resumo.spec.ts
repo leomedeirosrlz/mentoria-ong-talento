@@ -139,8 +139,12 @@ test.describe("/resumo — gate por relatorio_links + fila turma_inscricoes", ()
   });
 
   test("slug inexistente → 404", async ({ page }) => {
+    // Next 16 streama notFound() como 200 no documento (o status real só
+    // fica 404 em build de produção servindo a página estática) — o assert
+    // honesto é a UI de 404, que é a mesma em dev/preview/prod
     const res = await page.goto("/resumo/e2e-slug-que-nao-existe-111");
-    expect(res?.status()).toBe(404);
+    expect(res?.status()).toBe(200);
+    await expect(page.getByText("Página não encontrada")).toBeVisible();
   });
 
   test("slug revogado → card neutro 'não está mais disponível' (170)", async ({
@@ -233,10 +237,9 @@ test.describe("/resumo — gate por relatorio_links + fila turma_inscricoes", ()
     await page.goto("/relatorios");
 
     // o painel de links lista os fixtures — o link sem senha mostra o
-    // badge de lembrete ("Sem senha" é o estado de migração do legado)
-    await expect(
-      page.getByRole("heading", { name: "Links públicos" })
-    ).toBeVisible();
+    // badge de lembrete ("Sem senha" é o estado de migração do legado).
+    // O título é um CardTitle (div, não heading) — o assert é no texto
+    await expect(page.getByText("Links públicos")).toBeVisible();
     await expect(page.getByText("Resumo E2E").first()).toBeVisible();
 
     // publica a grade como ela está — o dialog congela o recorte
