@@ -251,7 +251,9 @@ test.describe("demo — Minha jornada do mentorado", () => {
     const grupoLinks = acervo.locator("section", {
       has: page.getByRole("heading", { name: "Links", exact: true }),
     });
-    const grade = grupoLinks.locator("div.grid");
+    // :scope > — a capa do card de link (PreviewLink) também é div.grid;
+    // sem o filho direto o locator conta as 2 capas junto da grade
+    const grade = grupoLinks.locator(":scope > div.grid");
     await expect(grade).toHaveCount(1);
     const trilhos = () =>
       grade.evaluate(
@@ -386,7 +388,12 @@ test.describe("demo — painel Progresso da jornada (staff)", () => {
     await expect(
       painel.getByText(/· encontro \d+ do calendário/).first()
     ).toBeVisible();
-    // células das estações na linha da dupla — rótulo curto por estação
+    // células das estações na linha da dupla — cada <span> leva o rótulo
+    // curto + um sufixo sr-only com o estado (" · respondido", " · abre no
+    // enc. N"), então o texto normalizado da célula não é mais só o nome
+    // da estação (o exact:true que lia "Roda inicial" parou de casar). O
+    // title é o contrato "<rótulo> · <detalhe>" (CelulaEstacao em
+    // painel-jornada.tsx) — o prefixo ancora no label e tolera o estado.
     for (const celula of [
       "Roda inicial",
       "Visão",
@@ -396,7 +403,7 @@ test.describe("demo — painel Progresso da jornada (staff)", () => {
       "360º",
     ]) {
       await expect(
-        painel.getByText(celula, { exact: true }).first()
+        painel.getByTitle(new RegExp(`^${celula} ·`)).first()
       ).toBeVisible();
     }
 

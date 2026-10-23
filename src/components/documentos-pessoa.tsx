@@ -6,6 +6,7 @@ import { Collapsible } from "@base-ui/react/collapsible";
 import {
   ArrowSquareOut,
   CircleNotch,
+  DotsThreeVertical,
   FileImage,
   FilePdf,
   FileText,
@@ -21,8 +22,16 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { DOCUMENTO_PESSOA_TIPO_LABELS, DOCUMENTO_PESSOA_TIPOS } from "@/lib/ciclo";
 import type { DocumentoPessoa } from "@/lib/types";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { cn } from "@/lib/utils";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -52,6 +61,66 @@ function IconeDoc({ nome }: { nome: string | null }) {
     return <FileImage size={15} aria-hidden className={cls} />;
   }
   return <FileText size={15} aria-hidden className={cls} />;
+}
+
+/** ⋯ da linha do documento: abrir em nova aba (mesmo destino do título,
+ *  que já é link) e remover por último — confirm controlado fora do popup. */
+function DocPessoaAcoes({
+  docId,
+  label,
+  onRemover,
+}: {
+  docId: string;
+  label: string;
+  onRemover: () => Promise<{ error?: string; ok?: boolean }>;
+}) {
+  const [removendo, setRemovendo] = useState(false);
+  return (
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          aria-label={`Ações de "${label}"`}
+          className={cn(
+            buttonVariants({ variant: "ghost", size: "icon" }),
+            "size-11 shrink-0 sm:size-8"
+          )}
+        >
+          <DotsThreeVertical size={18} weight="bold" aria-hidden />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-56">
+          <DropdownMenuItem
+            render={
+              <a
+                href={`/api/documento/${docId}?tipo=doc`}
+                target="_blank"
+                rel="noopener noreferrer"
+              />
+            }
+          >
+            <ArrowSquareOut size={16} data-icon="inline-start" aria-hidden />
+            Abrir em nova aba
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            variant="destructive"
+            onClick={() => setRemovendo(true)}
+          >
+            <Trash size={16} data-icon="inline-start" aria-hidden />
+            Remover documento
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <ConfirmDeleteButton
+        open={removendo}
+        onOpenChange={setRemovendo}
+        titulo="Remover o documento?"
+        descricao={`${label} é apagado do arquivo e some da ficha da pessoa.`}
+        sucesso="Documento removido."
+        acao="Remover"
+        onConfirm={onRemover}
+      />
+    </>
+  );
 }
 
 /** Documentos do intake (RG, comprovante, currículo...) — documentos_pessoa
@@ -155,32 +224,13 @@ export function DocumentosPessoa({
                   </span>
                 )}
               </span>
-              <a
-                href={`/api/documento/${d.id}?tipo=doc`}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label={`Abrir ${DOCUMENTO_PESSOA_TIPO_LABELS[d.tipo]} em nova aba`}
-                className="-my-1.5 inline-flex min-h-11 shrink-0 items-center rounded-md px-1.5 text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:my-0 sm:min-h-6"
-              >
-                <ArrowSquareOut size={14} aria-hidden />
-              </a>
-              <ConfirmDeleteButton
-                titulo="Remover o documento?"
-                descricao={`${DOCUMENTO_PESSOA_TIPO_LABELS[d.tipo]} é apagado do arquivo e some da ficha da pessoa.`}
-                sucesso="Documento removido."
-                acao="Remover"
-                onConfirm={() => remover(d)}
-                trigger={
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon-xs"
-                    aria-label={`Remover ${DOCUMENTO_PESSOA_TIPO_LABELS[d.tipo]}`}
-                    className="-my-1.5 text-muted-foreground sm:my-0"
-                  >
-                    <Trash size={13} />
-                  </Button>
-                }
+              {/* REALIZA-186: abrir + remover eram 2 ícones-fantasma por
+                  linha (o "abrir" ainda duplicava o link do título) — um ⋯
+                  por documento; remover segue com confirm controlado */}
+              <DocPessoaAcoes
+                docId={d.id}
+                label={DOCUMENTO_PESSOA_TIPO_LABELS[d.tipo]}
+                onRemover={() => remover(d)}
               />
             </li>
           ))}

@@ -12,6 +12,7 @@ import {
   textoResumoJornada,
 } from "./encerramento";
 import { getPdmResumo } from "./queries-pdm";
+import { snapshotDuplaHoje } from "./jobs";
 import { erroAmigavel as erroAmigavelBase } from "./utils";
 import type {
   CicloEvento,
@@ -224,6 +225,7 @@ export async function registrarEncerramento(
     eu.id
   );
 
+  void snapshotDuplaHoje(duplaId).catch(() => {});
   revalidatePath("/");
   revalidatePath("/duplas");
   revalidatePath(`/duplas/${duplaId}`);
@@ -388,6 +390,7 @@ export async function encerrarTrilhaEspecialista(
     eu.id
   );
 
+  void snapshotDuplaHoje(duplaId).catch(() => {});
   revalidatePath("/");
   revalidatePath("/duplas");
   revalidatePath(`/duplas/${duplaId}`);

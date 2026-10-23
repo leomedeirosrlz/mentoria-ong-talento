@@ -296,7 +296,7 @@ export function NovaPessoaDialog() {
       }}
     >
       <DialogTrigger render={<Button size="sm"><UserPlus size={16} /> Nova pessoa</Button>} />
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent size="2xl">
         <DialogHeader>
           <DialogTitle>Cadastrar pessoa</DialogTitle>
           <DialogDescription>
@@ -460,7 +460,7 @@ export function NovoMentoradoDialog() {
       }}
     >
       <DialogTrigger render={<Button size="sm" variant="outline"><Plus size={16} /> Novo mentorado</Button>} />
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent size="2xl">
         <DialogHeader>
           <DialogTitle>Cadastrar mentorado</DialogTitle>
           <DialogDescription>

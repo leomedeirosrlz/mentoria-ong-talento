@@ -7,9 +7,13 @@ import {
   CheckCircle,
   CircleNotch,
   Clock,
+  DotsThreeVertical,
   PaperPlaneTilt,
+  PencilSimple,
   Plus,
   UserPlus,
+  WhatsappLogo,
+  XCircle,
 } from "@phosphor-icons/react";
 import {
   atualizarContatoTerceiro,
@@ -23,14 +27,20 @@ import type {
   TerceiroConsolidacao,
   TerceiroVinculo,
 } from "@/lib/terceiros/queries";
-import { formatDate } from "@/lib/ciclo";
+import { formatDate, waLink } from "@/lib/ciclo";
 import { CopiarLink } from "@/components/forms/copiar-link";
 import { primeiroNome, urlPublica } from "@/components/forms/link-shared";
 import { useOrigem } from "@/components/forms/use-origem";
 import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
-import { NudgeButton } from "@/components/nudge-button";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Dialog,
   DialogContent,
@@ -112,6 +122,8 @@ function LinhaContato({
   const router = useRouter();
   const [pending, start] = useTransition();
   const [editando, setEditando] = useState(false);
+  // cancelar via item do ⋯ — o confirm é controlado, sem trigger próprio
+  const [cancelando, setCancelando] = useState(false);
   const origem = useOrigem();
   const status = statusEfetivo(contato);
   const badge = STATUS_BADGE[status];
@@ -168,56 +180,108 @@ function LinhaContato({
           )}
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-2">
+          {/* primária por estado (REALIZA-186): copiar no pendente, reemitir
+              no expirado. Pendente leva ⋯ (WhatsApp/editar/cancelar); o
+              expirado fica com 2 botões mesmo (reemitir + editar) */}
           {status === "pendente" && podeGerenciar && jornadaViva && (
-            <>
-              <CopiarLink token={contato.token} caminho="/t" />
-              {contato.whatsapp && (
-                <NudgeButton
-                  telefone={contato.whatsapp}
-                  mensagem={msgConviteWhatsApp(
-                    contato.nome,
-                    jovemNome,
-                    contato.token,
-                    origem
-                  )}
-                  duplaId={duplaId}
-                  label="Enviar no WhatsApp"
-                  t="contato"
-                />
-              )}
-            </>
+            <CopiarLink token={contato.token} caminho="/t" />
           )}
           {status === "expirado" && podeGerenciar && jornadaViva && (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={reemitir}
-              disabled={pending}
-            >
-              {pending ? (
-                <CircleNotch className="animate-spin" aria-hidden />
-              ) : (
-                <PaperPlaneTilt aria-hidden />
-              )}
-              Reemitir link
-            </Button>
+            <>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={reemitir}
+                disabled={pending}
+              >
+                {pending ? (
+                  <CircleNotch className="animate-spin" aria-hidden />
+                ) : (
+                  <PaperPlaneTilt aria-hidden />
+                )}
+                Reemitir link
+              </Button>
+              {/* expirado também edita: o caminho de consertar indicação
+                  errada é editar a row + reemitir (a delete policy segue
+                  só-pendente — cancelar um expirado não tem efeito) */}
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-muted-foreground"
+                onClick={() => setEditando(true)}
+              >
+                Editar
+              </Button>
+            </>
           )}
-          {/* expirado também edita: o caminho de consertar indicação errada
-              é editar a row + reemitir (a delete policy segue só-pendente —
-              cancelar um expirado não tem efeito prático) */}
+          {status === "pendente" && podeGerenciar && jornadaViva && (
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                aria-label={`Ações do contato ${contato.nome}`}
+                className={cn(
+                  buttonVariants({ variant: "ghost", size: "icon" }),
+                  "size-11 shrink-0 sm:size-8"
+                )}
+              >
+                <DotsThreeVertical size={18} weight="bold" aria-hidden />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                {(() => {
+                  // mesmo href do NudgeButton: /api/nudge loga o contato
+                  // antes de saltar pro wa.me — sem telefone não há item
+                  const wa = waLink(
+                    contato.whatsapp,
+                    msgConviteWhatsApp(
+                      contato.nome,
+                      jovemNome,
+                      contato.token,
+                      origem
+                    )
+                  );
+                  return wa ? (
+                    <DropdownMenuItem
+                      render={
+                        <a
+                          href={`/api/nudge?d=${encodeURIComponent(duplaId)}&to=${encodeURIComponent(wa)}&t=contato`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        />
+                      }
+                    >
+                      <WhatsappLogo
+                        size={16}
+                        data-icon="inline-start"
+                        aria-hidden
+                      />
+                      Enviar no WhatsApp
+                    </DropdownMenuItem>
+                  ) : null;
+                })()}
+                <DropdownMenuItem onClick={() => setEditando(true)}>
+                  <PencilSimple
+                    size={16}
+                    data-icon="inline-start"
+                    aria-hidden
+                  />
+                  Editar contato
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  variant="destructive"
+                  onClick={() => setCancelando(true)}
+                >
+                  <XCircle size={16} data-icon="inline-start" aria-hidden />
+                  Cancelar convite
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
           {(status === "pendente" || status === "expirado") &&
             podeGerenciar &&
             jornadaViva && (
             <>
               <Dialog open={editando} onOpenChange={setEditando}>
-                <DialogTrigger
-                  render={
-                    <Button variant="ghost" size="sm" className="text-muted-foreground">
-                      Editar
-                    </Button>
-                  }
-                />
                 {editando && (
                   <EditarContatoDialog
                     contato={contato}
@@ -227,10 +291,11 @@ function LinhaContato({
               </Dialog>
               {status === "pendente" && (
                 <ConfirmDeleteButton
+                  open={cancelando}
+                  onOpenChange={setCancelando}
                   titulo={`Cancelar o convite de ${primeiroNome(contato.nome)}?`}
                   descricao="O link para de funcionar na hora — quem ainda não respondeu perde o acesso."
                   acao="Cancelar convite"
-                  dica="Cancelar convite — o link morre"
                   onConfirm={() => cancelarContatoTerceiro(contato.id)}
                   sucesso={`Convite de ${primeiroNome(contato.nome)} cancelado.`}
                 />
@@ -247,7 +312,7 @@ function LinhaContato({
           </summary>
           <div className="mt-2 space-y-2 rounded-lg bg-muted/50 p-3 text-sm">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
                 Pontos fortes
               </p>
               <p className="mt-0.5 whitespace-pre-wrap leading-relaxed">
@@ -255,7 +320,7 @@ function LinhaContato({
               </p>
             </div>
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
                 Aspectos a melhorar
               </p>
               <p className="mt-0.5 whitespace-pre-wrap leading-relaxed">
@@ -300,7 +365,7 @@ function EditarContatoDialog({
   }
 
   return (
-    <DialogContent className="sm:max-w-md">
+    <DialogContent size="xl">
       <DialogHeader>
         <DialogTitle>Editar contato</DialogTitle>
         <DialogDescription>
@@ -390,7 +455,7 @@ function NovoContatoDialog({
   }
 
   return (
-    <DialogContent className="sm:max-w-md">
+    <DialogContent size="xl">
       <DialogHeader>
         <DialogTitle>Indicar pessoa</DialogTitle>
         <DialogDescription>
@@ -485,7 +550,7 @@ function Consolidacao({
     return (
       <div className="rounded-lg bg-muted/50 p-3">
         <div className="flex items-center gap-2">
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
             Consolidação pro jovem
           </p>
           {publicado ? (
@@ -506,7 +571,7 @@ function Consolidacao({
   return (
     <div className="space-y-2 border-t border-border/60 pt-3">
       <div className="flex flex-wrap items-center gap-2">
-        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
           Consolidação pro jovem
         </p>
         {publicado ? (

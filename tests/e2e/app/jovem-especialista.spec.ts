@@ -3,9 +3,11 @@ import {
   appEnvOk,
   atualizarViaServiceRole,
   buscarViaServiceRole,
+  convergirDuplaAtiva,
   expect,
   inserirViaServiceRole,
   isoDoRotulo,
+  limparDuplas,
   limparEncontrosDaDupla,
   limparViaServiceRole,
   loginComSenha,
@@ -199,18 +201,14 @@ async function convergirSolicitacoes() {
     await limparViaServiceRole("solicitacoes_especialista", `id=in.(${csv})`);
   }
   // duplas esp fora da fixture — a que o aceite do teste criou (esp2 ×
-  // 0020) e restos de runs mortos; a fixture …00e0 NUNCA entra aqui
+  // 0020) e restos de runs mortos; a fixture …00e0 NUNCA entra aqui.
+  // limparDuplas cobre os filhos NO ACTION novos (formulario_links 0099,
+  // encerramentos da 0102, remanejada_de) que o delete direto 409ava.
   const espExtras = await buscarViaServiceRole<{ id: string }[]>(
     "duplas",
     `select=id&mentorado_id=in.(${MENTORADOS_JOVEM})&trilha=eq.especialista&id=not.eq.${IDS.duplaEsp}`
   );
-  for (const d of espExtras) await limparEncontrosDaDupla(d.id);
-  if (espExtras.length) {
-    await limparViaServiceRole(
-      "duplas",
-      `id=in.(${espExtras.map((d) => d.id).join(",")})`
-    );
-  }
+  await limparDuplas(espExtras.map((d) => d.id));
   // a trilha fixture volta ao estado do seed — sem tentativa nenhuma
   await limparEncontrosDaDupla(IDS.duplaEsp);
   // sino limpo: as asserts de notificação contam só o que o teste disparou
@@ -233,6 +231,9 @@ async function convergirSolicitacoes() {
       hora_fim: "21:00",
     });
   }
+  // a dupla DPP do jovem é a hospedeira dos pedidos — se um spec vizinho a
+  // deixou 'concluida' (trigger da âncora 16), a home e os gates mudam
+  await convergirDuplaAtiva(IDS.duplaDpp);
 }
 
 test.describe("pedido de especialista pelo jovem (REALIZA-112 PR2)", () => {

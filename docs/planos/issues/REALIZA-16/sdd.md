@@ -8,10 +8,15 @@ fato que já vive no link (deriva possível = divergência possível); toda
 escrita nova teria que lembrar de preencher. **Rejeitada** — a âncora via
 link já resolve com um join e é a única fonte.
 
-**B. Check constraint exigindo âncora em `formulario_links`** (escolhida).
-`num_nonnulls(dest_profile_id, dest_mentorado_id, dupla_id) >= 1` — barato,
-no banco, impossível de contornar por action futura. Contra: pode bloquear um
-caso de uso legítimo de link aberto — por isso depende do BLOCKER.
+**B. Check constraint exigindo âncora em `formulario_links`** (escolhida,
+com a correção da revisão dba §4). `num_nonnulls(...)>=1 or multi_uso or
+origem='intake'` — barato, no banco, impossível de contornar por action
+futura. A exceção cobre o único genérico legítimo respondido pelo BLOCKER:
+o link de campanha do intake (0115), anônimo por desenho e reconciliado por
+`promovido_profile_id`. Link genérico *manual* sai de cena de vez (emissão
+removida da action e da UI). Nasce `NOT VALID`: o histórico órfão não
+explode a migration e a resposta legada segue legível — o `validate` roda
+depois que a auditoria zerar (aceite #9).
 
 **C. Só auditoria, sem constraint** — detecta órfão mas não impede. Mantida
 como complemento (a auditoria cobre também as outras tabelas e históricos
@@ -22,17 +27,24 @@ anteriores à constraint).
 Sem tabela nova. Mudança proposta `[NOVO]`:
 
 ```sql
--- 010x (idempotente):
+-- 0116 (idempotente):
 alter table public.formulario_links
   drop constraint if exists formulario_links_tem_ancora;
 alter table public.formulario_links
   add constraint formulario_links_tem_ancora
-  check (num_nonnulls(dest_profile_id, dest_mentorado_id, dupla_id) >= 1);
+  check (
+    num_nonnulls(dest_profile_id, dest_mentorado_id, dupla_id) >= 1
+    or multi_uso or origem = 'intake'
+  ) not valid;
+-- + interacoes_tipo_check drop/add com 'vinculo_resposta' (trilha da
+--   reconciliação manual — CHECK fechado desde 0008)
 ```
 
 Semântica: um link sempre sabe **pra quem** (dest_*) ou **em que contexto**
-(`dupla_id`) a resposta pertence — nunca flutua. Links genéricos de
-divulgação, se mantidos, precisam `contexto.canal` + reconciliação (plano).
+(`dupla_id`) a resposta pertence — nunca flutua. A reconciliação dos órfãos
+legados é `vincularRespostaOrfa` (coord-only): carimba `dest_mentorado_id`
++ a dupla DPP quando houver e registra autor/timestamp (`interacoes.tipo`
+'vinculo_resposta' com dupla; `pessoa_notas` na ficha quando não há).
 
 ## RLS / security definer
 

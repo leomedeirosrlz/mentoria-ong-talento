@@ -20,7 +20,9 @@ import { Avatar } from "@/components/avatar";
 import { primeiroNome } from "@/components/forms/link-shared";
 import { InstrumentoResultado } from "@/components/instrumento-resultado";
 import { buttonVariants } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { VincularResposta } from "./vincular-resposta";
 
 // Seção "Respostas" da ficha do formulário — server component: o acordeão
 // por pessoa usa Collapsible animado (o "ver todas" interno segue <details>
@@ -138,12 +140,19 @@ export function RespostasSection({
   campos,
   links,
   sistema = null,
+  mentorados = [],
+  formularioTitulo = "",
 }: {
   campos: FormularioCampo[];
   links: LinkResolvido[];
   /** sistema oficial (0042/0080): instrumento de dupla renderiza o
    *  resultado estruturado (roda, metas, visão) no lugar da lista crua */
   sistema?: FormularioSistema | null;
+  /** opções do picker "Vincular a um jovem" (REALIZA-16) — só resposta de
+   *  link genérico legado oferece; fora da demo ação é coord-only */
+  mentorados?: { id: string; nome: string }[];
+  /** título do form — compõe a confirmação do vínculo ("o quê + quando") */
+  formularioTitulo?: string;
 }) {
   // mais recente primeiro — o retorno quente fica no topo dos accordions
   const respondidos = links
@@ -327,8 +336,21 @@ export function RespostasSection({
                 {/* truncate nos dois níveis: nome e meta cedem pro timestamp
                     shrink-0 — o corpo expandido mostra a resposta inteira */}
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-medium">
-                    {l.dest_nome ?? "Resposta anônima"}
+                  <span className="flex min-w-0 items-center gap-2">
+                    <span className="truncate text-sm font-medium">
+                      {l.dest_nome ?? "Resposta anônima"}
+                    </span>
+                    {/* órfã de identidade (REALIZA-16): link genérico legado
+                        sem as três âncoras — badge + ação de vincular no
+                        painel expandido */}
+                    {l.dest_tipo === "generico" && (
+                      <Badge
+                        variant="secondary"
+                        className="shrink-0 bg-[var(--warn)]/15 text-[var(--warn-text)]"
+                      >
+                        sem vínculo
+                      </Badge>
+                    )}
                   </span>
                   <span className="block truncate text-xs text-muted-foreground">
                     {metaDoLink(l)}
@@ -385,17 +407,34 @@ export function RespostasSection({
                 </dl>
                 )}
                 {/* a ficha abre fora do trigger (link dentro de button é
-                    duplo acionamento) — rodapé quieto, só quando há pessoa */}
-                {l.dest_url && l.dest_nome && (
-                  <div className="border-t border-border/60 px-4 py-2.5 sm:px-5">
-                    <Link
-                      href={l.dest_url}
-                      className="text-xs text-muted-foreground underline underline-offset-4 transition-colors hover:text-foreground"
-                    >
-                      Abrir ficha de {primeiroNome(l.dest_nome)}
-                    </Link>
+                    duplo acionamento) — rodapé quieto: ficha da pessoa, ou
+                    a reconciliação quando a resposta é órfã (REALIZA-16) */}
+                {(l.dest_url && l.dest_nome) ||
+                l.dest_tipo === "generico" ? (
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/60 px-4 py-2.5 sm:px-5">
+                    {l.dest_url && l.dest_nome ? (
+                      <Link
+                        href={l.dest_url}
+                        className="text-xs text-muted-foreground underline underline-offset-4 transition-colors hover:text-foreground"
+                      >
+                        Abrir ficha de {primeiroNome(l.dest_nome)}
+                      </Link>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">
+                        Link genérico de antes da exigência de vínculo — diga
+                        de quem é a resposta pra ela contar na jornada.
+                      </span>
+                    )}
+                    {l.dest_tipo === "generico" && (
+                      <VincularResposta
+                        linkId={l.id}
+                        formularioTitulo={formularioTitulo}
+                        respondidoEm={l.resposta?.respondido_em ?? null}
+                        mentorados={mentorados}
+                      />
+                    )}
                   </div>
-                )}
+                ) : null}
               </Collapsible.Panel>
             </Collapsible.Root>
           </li>

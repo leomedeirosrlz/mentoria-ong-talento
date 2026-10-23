@@ -31,7 +31,7 @@ import { ReverRespostaDialog } from "@/components/jornada-rever";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { formatDate, linkSeguro } from "@/lib/ciclo";
+import { formatDate, linkSeguro, TRILHA_LEN } from "@/lib/ciclo";
 import { formularioPorToken } from "@/lib/forms/queries";
 import {
   encCorrenteDe,
@@ -55,7 +55,11 @@ import {
   getJovemEncontros,
   getJovemJornada,
 } from "@/lib/queries-jovem";
-import { PreviewPdf } from "@/components/material-preview-pdf";
+import { MaterialMenu } from "@/components/material-actions";
+import {
+  PreviewLink,
+  PreviewMaterial,
+} from "@/components/material-preview-pdf";
 import type { Material } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -332,7 +336,7 @@ export default async function JovemMateriais() {
               </h1>
               <p className="mt-1 text-sm text-muted-foreground">
                 {dupla.turma ? `${dupla.turma} · ` : ""}
-                encontro {encontroCorrente} de 16
+                encontro {encontroCorrente} de {TRILHA_LEN.dpp}
               </p>
               {fase && (
                 <p className="mt-1.5">
@@ -803,7 +807,7 @@ function EstacaoFeita({
           {/* summary admite heading direto (phrasing + heading content) —
               o h3 mora na linha sem wrapper inválido; o caret vai pro fim
               com ml-auto e o meta data/detalhe quebra a linha no wrap */}
-          <summary className="flex cursor-pointer list-none flex-wrap items-center gap-x-2.5 gap-y-1 px-4 py-3 outline-none marker:hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset [&::-webkit-details-marker]:hidden">
+          <summary className="flex min-h-11 cursor-pointer list-none flex-wrap items-center gap-x-2.5 gap-y-1 px-4 py-3 outline-none marker:hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset [&::-webkit-details-marker]:hidden">
             <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
               Estação {n}
             </span>
@@ -950,36 +954,13 @@ function FimItem({
 
 // ---------- acervo (a página anterior, intacta como fallback e seção) ----------
 
-const EXT_IMG = /\.(png|jpe?g|webp|gif|avif|svg)$/i;
-const EXT_PDF = /\.pdf$/i;
-
-/** Capa do material — thumbnail borda-a-borda no topo do item (o arquivo
- *  vive no bucket privado; a URL assinada vem do /api/material/[id] de
- *  sempre). PDF vira iframe cortado na 1ª página (o leaf client-side cai
- *  pro ícone onde o browser não embute — Android); imagem vira
- *  <img> object-cover. Decorativo: o link da linha abaixo segue sendo o
- *  gesto — pointer-events-none pra thumbnail não roubar o toque. */
-function PreviewMaterial({ m }: { m: Material }) {
-  if (!m.path) return null;
-  const src = `/api/material/${m.id}`;
-  if (EXT_PDF.test(m.path)) return <PreviewPdf src={src} />;
-  if (EXT_IMG.test(m.path)) {
-    return (
-      <div aria-hidden className="h-36 overflow-hidden bg-muted/60">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={src}
-          alt=""
-          className="pointer-events-none h-full w-full object-cover object-top"
-        />
-      </div>
-    );
-  }
-  return null;
-}
-
-/** Card do acervo — a linha de sempre virada peça de grid: thumbnail no
- *  topo (quando o arquivo existe) e a linha clicável embaixo. */
+/** Card do acervo — a linha de sempre virada peça de grid: capa borda-a-
+ *  borda no topo (1ª página do PDF lazy / imagem / faixa de link externo
+ *  quando não há arquivo) e a linha embaixo. O card INTEIRO é o link
+ *  quando há destino — a capa parece clicável e antes era zona morta (o
+ *  iframe/img do preview já são pointer-events-none, não engolem o
+ *  toque). O ⋯ das secundárias fica fora do <a>, flutuando no canto da
+ *  capa — botão dentro de link seria HTML inválido e comeria o toque. */
 function MaterialCard({ m }: { m: Material }) {
   const Icone = TIPO_ICONE[m.tipo];
   const urlOk = linkSeguro(m.url);
@@ -1005,52 +986,61 @@ function MaterialCard({ m }: { m: Material }) {
               : ""}
         </span>
       </div>
+      {m.path ? (
+        <File
+          size={15}
+          className="shrink-0 text-muted-foreground"
+          aria-hidden
+        />
+      ) : urlOk ? (
+        <ArrowSquareOut
+          size={15}
+          className="shrink-0 text-muted-foreground transition-colors group-hover:text-foreground"
+          aria-hidden
+        />
+      ) : (
+        <Badge
+          variant="outline"
+          className="shrink-0 text-xs text-muted-foreground"
+        >
+          em breve
+        </Badge>
+      )}
     </>
   );
+  // a capa: arquivo → 1ª página do PDF/imagem; só url → faixa de link
+  // externo com o domínio; sem destino ("em breve") não chega aqui como
+  // card clicável — vive no grupo "A caminho" embaixo
+  const capa = m.path ? <PreviewMaterial m={m} /> : <PreviewLink m={m} />;
   return (
-    <div className="flex flex-col overflow-hidden rounded-xl bg-card shadow-[var(--shadow-border)]">
-      <PreviewMaterial m={m} />
-      <div
-        className={cn(
-          "flex flex-1 items-center pr-3 transition-colors",
-          href && "hover:bg-muted/50"
-        )}
-      >
-        {href ? (
-          <a
-            href={href}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex min-w-0 flex-1 items-center gap-x-4 px-5 py-3.5 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
-          >
-            {interno}
-          </a>
-        ) : (
-          <div className="flex min-w-0 flex-1 items-center gap-x-4 px-5 py-3.5">
+    <div className="relative overflow-hidden rounded-xl bg-card shadow-[var(--shadow-border)]">
+      {href ? (
+        <a
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="group flex h-full flex-col outline-none transition-colors hover:bg-muted/50 active:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+        >
+          {capa}
+          <div className="flex flex-1 items-center gap-x-4 px-5 py-3.5">
             {interno}
           </div>
-        )}
-        {m.path ? (
-          <File
-            size={15}
-            className="shrink-0 text-muted-foreground"
-            aria-hidden
-          />
-        ) : urlOk ? (
-          <ArrowSquareOut
-            size={15}
-            className="shrink-0 text-muted-foreground"
-            aria-hidden
-          />
-        ) : (
-          <Badge
-            variant="outline"
-            className="shrink-0 text-xs text-muted-foreground"
-          >
-            em breve
-          </Badge>
-        )}
-      </div>
+        </a>
+      ) : (
+        <div className="flex h-full flex-col">
+          {capa}
+          <div className="flex flex-1 items-center gap-x-4 px-5 py-3.5">
+            {interno}
+          </div>
+        </div>
+      )}
+      {/* ⋯ das secundárias — sibling do <a> (nada de botão dentro de
+          link): chip com backdrop pra ler sobre qualquer capa */}
+      {href && (
+        <div className="absolute right-2 top-2 z-10 rounded-lg bg-background/75 backdrop-blur-sm">
+          <MaterialMenu material={m} />
+        </div>
+      )}
     </div>
   );
 }

@@ -344,7 +344,7 @@ export function EnviarTermosDialog({
           </Button>
         }
       />
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent size="2xl">
         <DialogHeader>
           <DialogTitle>Enviar termos pra assinar</DialogTitle>
           <DialogDescription>

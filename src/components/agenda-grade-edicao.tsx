@@ -159,7 +159,7 @@ export function AgendaGradeEdicao({
         <span aria-hidden />
         {DIAS_SEMANA.map((dia) => (
           <div key={dia} className="px-1 py-1.5 text-center">
-            <b className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            <b className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
               {DIAS_SEMANA_CURTOS[dia]}
             </b>
           </div>

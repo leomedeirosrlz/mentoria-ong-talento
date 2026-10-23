@@ -9,8 +9,10 @@
 // personas:
 //   coordenacao e2e   e2e-coord@realiza.test
 //   mentor            mentor@realiza.test
-//   service/anon      apikeys do stack — `supabase status`
-//                     (ou envs PGRST_URL/PGRST_ANON_KEY/PGRST_SERVICE_KEY)
+//   service/anon      envs obrigatórias: PGRST_URL / PGRST_ANON_KEY /
+//                     PGRST_SERVICE_KEY. NÃO há fallback p/ `supabase
+//                     status` — um stack local descoberto em silêncio já
+//                     gerou falhas fantasma; sem env, o script aborta.
 //
 // O QUE VALIDA (aceite §Segurança/RLS/auditoria):
 //   · anon não lê relatorio_links (grant revogado) nem chama gestão
@@ -23,19 +25,26 @@
 //     texto), redefinir troca, revogar fecha (motivo 'revogado'), stats
 //     coord-only sem senha_hash no payload
 
-import { execSync } from "node:child_process";
-
-let BASE = process.env.PGRST_URL;
-let ANON_KEY = process.env.PGRST_ANON_KEY;
-let SVC_KEY = process.env.PGRST_SERVICE_KEY;
-if (!BASE || !ANON_KEY || !SVC_KEY) {
-  const out = execSync("pnpm exec supabase status -o json", {
-    encoding: "utf8",
-  });
-  const st = JSON.parse(out.slice(out.indexOf("{")));
-  BASE ??= st.API_URL;
-  ANON_KEY ??= st.PUBLISHABLE_KEY ?? st.ANON_KEY;
-  SVC_KEY ??= st.SECRET_KEY ?? st.SERVICE_ROLE_KEY;
+const BASE = process.env.PGRST_URL;
+const ANON_KEY = process.env.PGRST_ANON_KEY;
+const SVC_KEY = process.env.PGRST_SERVICE_KEY;
+{
+  const faltam = [
+    ["PGRST_URL", BASE],
+    ["PGRST_ANON_KEY", ANON_KEY],
+    ["PGRST_SERVICE_KEY", SVC_KEY],
+  ].filter(([, v]) => !v).map(([k]) => k);
+  if (faltam.length) {
+    console.error(
+      `abortado — faltam envs: ${faltam.join(", ")}. ` +
+      "Aponte o stack explicitamente (ex.: staging, com .env.staging " +
+      "carregado: PGRST_URL=$E2E_SUPABASE_URL " +
+      "PGRST_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY_STAGING " +
+      "PGRST_SERVICE_KEY=$E2E_SUPABASE_SERVICE_ROLE_KEY). Sem fallback " +
+      "pra `supabase status` de propósito: resolver o stack local em " +
+      "silêncio produziu falhas fantasma.");
+    process.exit(2);
+  }
 }
 
 const SLUG = "valida0110x1";
@@ -61,15 +70,19 @@ async function login(email) {
 }
 
 async function api(path, { method = "GET", token, key = ANON_KEY, body } = {}) {
+  // PostgREST hosted resolve o PAPEL pelo Bearer — apikey sozinha sempre
+  // vira `anon` (mesmo com a service_role JWT nela). O service portanto
+  // vai nos DOIS headers, como faz o seed-e2e-staging.mjs / supabase-js.
   const res = await fetch(`${BASE}/rest/v1/${path}`, {
     method,
     headers: {
       apikey: key,
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      Authorization: `Bearer ${token ?? key}`,
       "Content-Type": "application/json",
       ...(method !== "GET" ? { Prefer: "return=representation" } : {}),
     },
-    body: body ? JSON.stringify(body) : undefined,
+    body: body == null ? undefined
+      : typeof body === "string" ? body : JSON.stringify(body),
   });
   let data = null;
   const txt = await res.text();
@@ -80,7 +93,12 @@ async function api(path, { method = "GET", token, key = ANON_KEY, body } = {}) {
 const svc = (p, o) => api(p, { ...o, key: SVC_KEY });
 const as = (token) => (p, o) => api(p, { ...o, token });
 const rpc = (fn, args, o = {}) => api(`rpc/${fn}`, { method: "POST", body: args, ...o });
-const abrir = (slug, senha, ip = "ipA", ua = "valida-0110/1.0") =>
+// ip_hash tem CHECK char_length 16..128 (o app grava SHA-256 = 64 hex).
+// ips curtos ("ipA") reprovam o insert do log → rate-limit nunca conta e
+// os checks de auditoria falham — fixtures aqui imitam o shape real.
+const IP = { A: "a".repeat(64), LIM: "b".repeat(64), LIM2: "c".repeat(64),
+  B: "d".repeat(64), C: "e".repeat(64), D: "f".repeat(64) };
+const abrir = (slug, senha, ip = IP.A, ua = "valida-0110/1.0") =>
   rpc("abrir_relatorio", { p_slug: slug, p_senha: senha, p_ip_hash: ip, p_ua: ua });
 
 const run = async () => {
@@ -88,8 +106,11 @@ const run = async () => {
   // senha "valida110" — crypt compara, o claro nunca toca o banco)
   await svc(`resumo_acessos?slug=like.valida0110*`, { method: "DELETE" });
   await svc(`relatorio_links?slug=like.valida0110*`, { method: "DELETE" });
+  // bulk insert exige o MESMO set de chaves nos objetos (PGRST102) —
+  // senha_hash vai explícito como null no link livre
   const seed = await svc("relatorio_links", { method: "POST", body: [
     { slug: SLUG, turma: "Turma Valida 0110", titulo: "Valida 0110 livre",
+      senha_hash: null,
       config: { tipo: "grade", turma: "Turma Valida 0110", granularidade: "pessoas" } },
     // senha do fixture: "e2esenha" (bcrypt real — a RPC compara crypt e o
     // claro nunca é coluna)
@@ -142,18 +163,18 @@ const run = async () => {
     r.status === 200 && r.data?.some((a) => a.ok === true),
     JSON.stringify(r.data).slice(0, 160));
 
-  r = await abrir(SLUG_LIM, "senha-errada", "ipLim");
+  r = await abrir(SLUG_LIM, "senha-errada", IP.LIM);
   check("senha errada → motivo senha",
     r.status === 200 && r.data?.ok === false && r.data?.motivo === "senha",
     `status=${r.status} ${JSON.stringify(r.data).slice(0, 160)}`);
 
   // ─── rate-limit: 5 falhas/15min por (slug, ip_hash) ───────────────
-  for (let i = 0; i < 4; i++) await abrir(SLUG_LIM, "senha-errada", "ipLim");
-  r = await abrir(SLUG_LIM, "senha-errada", "ipLim");
+  for (let i = 0; i < 4; i++) await abrir(SLUG_LIM, "senha-errada", IP.LIM);
+  r = await abrir(SLUG_LIM, "senha-errada", IP.LIM);
   check("6ª falha mesmo ip → motivo limite",
     r.status === 200 && r.data?.ok === false && r.data?.motivo === "limite",
     `status=${r.status} ${JSON.stringify(r.data).slice(0, 160)}`);
-  r = await abrir(SLUG_LIM, "qualquer", "ipLim2");
+  r = await abrir(SLUG_LIM, "qualquer", IP.LIM2);
   check("ip diferente ainda passa (cap global são 50/24h)",
     r.status === 200 && r.data?.ok === false && r.data?.motivo === "senha",
     `status=${r.status} ${JSON.stringify(r.data).slice(0, 160)}`);
@@ -198,33 +219,36 @@ const run = async () => {
     r.status === 200 && r.data?.ok === true &&
     r.data?.config?.granularidade === "duplas",
     `status=${r.status} ${JSON.stringify(r.data).slice(0, 160)}`);
-  r = await abrir(slugCriado, "senha-errada", "ipB");
+  r = await abrir(slugCriado, "senha-errada", IP.B);
   check("senha errada no link novo → motivo senha",
     r.status === 200 && r.data?.ok === false && r.data?.motivo === "senha");
 
   // redefinir: nova senha funciona, a antiga morre
   const idCriado = (await svc(`relatorio_links?slug=eq.${slugCriado}&select=id`)).data?.[0]?.id;
+  check("resolveu id do link criado", typeof idCriado === "string");
+  // p_id SEMPRE presente no body — `undefined` serializa pra {} e a RPC
+  // cai no PGRST202 "sem parâmetros", escondendo o motivo real da falha
   r = await coordApi("rpc/redefinir_senha_relatorio_link", { method: "POST",
-    body: { p_id: idCriado } });
+    body: { p_id: idCriado ?? null } });
   check("redefinir devolve nova senha",
     r.status === 200 && r.data?.ok === true && /^[a-z2-9]{4}-[a-z2-9]{4}$/.test(r.data?.senha),
     `status=${r.status} ${JSON.stringify(r.data).slice(0, 160)}`);
   const senhaNova = r.data?.senha;
-  r = await abrir(slugCriado, senhaCriada, "ipC");
+  r = await abrir(slugCriado, senhaCriada, IP.C);
   check("senha antiga morreu na rotação",
     r.status === 200 && r.data?.ok === false && r.data?.motivo === "senha");
-  r = await abrir(slugCriado, senhaNova, "ipC");
+  r = await abrir(slugCriado, senhaNova, IP.C);
   check("senha nova abre", r.status === 200 && r.data?.ok === true);
 
   // revogar: motivo revogado, idempotente
   r = await coordApi("rpc/revogar_relatorio_link", { method: "POST",
-    body: { p_id: idCriado } });
+    body: { p_id: idCriado ?? null } });
   check("revogar ok", r.status === 200 && r.data?.ok === true);
-  r = await abrir(slugCriado, senhaNova, "ipD");
+  r = await abrir(slugCriado, senhaNova, IP.D);
   check("link revogado → motivo revogado",
     r.status === 200 && r.data?.ok === false && r.data?.motivo === "revogado");
   r = await coordApi("rpc/revogar_relatorio_link", { method: "POST",
-    body: { p_id: idCriado } });
+    body: { p_id: idCriado ?? null } });
   check("revogar idempotente", r.status === 200 && r.data?.ok === true);
 
   // ─── stats: coord vê painel sem senha_hash; mentor recebe [] ──────

@@ -39,13 +39,40 @@ function DialogOverlay({
   )
 }
 
+/** Larguras do popup a partir de `sm:` — em mobile todo dialog já fica
+ *  limitado por `max-w-[calc(100%-2rem)]`. O default subiu de `sm`
+ *  (384px, muito apertado pra forms no desktop) pra `md` (448px).
+ *  `size` entra ANTES do `className` no cn(): como `cn` é
+ *  tailwind-merge, um `sm:max-w-*` passado no call site sempre vence. */
+const DIALOG_SIZES = {
+  /** Confirmações/aviso com 1–2 linhas — o 384px antigo. */
+  sm: "sm:max-w-sm",
+  /** Default. Forms curtos (1–2 campos). */
+  md: "sm:max-w-md",
+  /** Forms com alguns campos empilhados. */
+  lg: "sm:max-w-lg",
+  /** Forms com textarea, grade de campos ou selects lado a lado. */
+  xl: "sm:max-w-xl",
+  /** Conteúdo largo: listas roláveis, grids, preview. */
+  "2xl": "sm:max-w-2xl",
+  /** Tabelas/builders/importação — quase viewport. */
+  "3xl": "sm:max-w-3xl",
+  /** Largura total disponível (viewport - 2rem). */
+  full: "sm:max-w-[calc(100%-2rem)]",
+} as const
+
+type DialogSize = keyof typeof DIALOG_SIZES
+
 function DialogContent({
   className,
   children,
   showCloseButton = true,
+  size = "md",
   ...props
 }: DialogPrimitive.Popup.Props & {
   showCloseButton?: boolean
+  /** Largura máxima no desktop. Default `md` (448px). */
+  size?: DialogSize
 }) {
   return (
     <DialogPortal>
@@ -53,7 +80,8 @@ function DialogContent({
       <DialogPrimitive.Popup
         data-slot="dialog-content"
         className={cn(
-          "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] max-h-[calc(100dvh-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 overflow-y-auto rounded-xl bg-popover p-4 text-sm text-popover-foreground shadow-[var(--shadow-modal)] duration-150 ease-[cubic-bezier(0.2,0,0,1)] outline-none sm:max-w-sm data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-open:slide-in-from-bottom-2 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95 data-closed:slide-out-to-bottom-2",
+          "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] max-h-[calc(100dvh-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 overflow-y-auto rounded-xl bg-popover p-4 text-sm text-popover-foreground shadow-[var(--shadow-modal)] duration-150 ease-[cubic-bezier(0.2,0,0,1)] outline-none data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-open:slide-in-from-bottom-2 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95 data-closed:slide-out-to-bottom-2",
+          DIALOG_SIZES[size],
           className
         )}
         {...props}

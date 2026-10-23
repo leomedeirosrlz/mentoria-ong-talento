@@ -75,7 +75,7 @@ export function EditarLinkDialog({
           )
         }
       />
-      <DialogContent className="sm:max-w-md">
+      <DialogContent size="md">
         <DialogHeader>
           <DialogTitle>Editar link da chamada</DialogTitle>
           <DialogDescription>

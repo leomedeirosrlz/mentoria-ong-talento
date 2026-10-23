@@ -252,20 +252,31 @@ const run = async () => {
 
   // ---------- 4) rematch especialista = rito completo ----------
 
+  // 0117: sem a devolutiva o rematch esp aborta — a dupla segue viva
   r = await rpc("rematch_dupla",
     { p_dupla_id: DUPLA_ESP, p_lado: "mentor", p_novo_id: ESP2_PROFILE,
       p_motivo: "mudou de cidade", p_registrar_nota: true },
+    { token: coord });
+  check("rematch esp sem devolutiva é barrado",
+    r.status >= 400 && JSON.stringify(r.data)?.includes("devolutiva"),
+    `status=${r.status} ${JSON.stringify(r.data)?.slice(0, 160)}`);
+
+  r = await rpc("rematch_dupla",
+    { p_dupla_id: DUPLA_ESP, p_lado: "mentor", p_novo_id: ESP2_PROFILE,
+      p_motivo: "mudou de cidade", p_registrar_nota: true,
+      p_devolutiva: "validacao 0117: metas de leitura atingidas; manter o clube no PDM" },
     { token: coord });
   const novaEsp = typeof r.data === "string" ? r.data : r.data?.rematch_dupla;
   check("rematch esp cria a sucessora", r.status === 200 && !!novaEsp,
     `status=${r.status} ${JSON.stringify(r.data)?.slice(0, 180)}`);
 
   const fechadaEsp = (await svc(
-    `duplas?id=eq.${DUPLA_ESP}&select=status,encerrada_em,motivo_encerramento`)).data?.[0];
-  check("esp rematada carimba status+data+motivo sistêmico",
+    `duplas?id=eq.${DUPLA_ESP}&select=status,encerrada_em,motivo_encerramento,devolutiva_pdm`)).data?.[0];
+  check("esp rematada carimba status+data+motivo sistêmico+devolutiva",
     fechadaEsp?.status === "encerrada" && !!fechadaEsp.encerrada_em &&
     fechadaEsp.motivo_encerramento?.includes("Remanejamento") &&
-    fechadaEsp.motivo_encerramento?.includes("especialista"),
+    fechadaEsp.motivo_encerramento?.includes("especialista") &&
+    fechadaEsp.devolutiva_pdm?.includes("validacao 0117"),
     JSON.stringify(fechadaEsp));
 
   const linkEsp = (await svc(

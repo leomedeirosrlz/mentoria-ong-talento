@@ -274,7 +274,7 @@ export function DemandasEspecialista({
       {aceitas.length > 0 && (
         <Card>
           <CardContent className="space-y-1 py-4">
-            <p className="pb-1 text-xs font-medium tracking-wide text-muted-foreground uppercase">
+            <p className="pb-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
               Sessões confirmadas
             </p>
             <ul className="divide-y divide-border/60">

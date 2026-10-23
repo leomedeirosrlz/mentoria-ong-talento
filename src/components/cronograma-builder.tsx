@@ -15,6 +15,7 @@ import {
   ArrowUp,
   CalendarBlank,
   CircleNotch,
+  DotsThreeVertical,
   PencilSimple,
   Plus,
   Trash,
@@ -33,7 +34,14 @@ import {
   rotuloCronograma,
 } from "@/lib/ciclo";
 import type { CicloEvento, Cronograma } from "@/lib/types";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -44,11 +52,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import { EventoCronogramaDialog } from "@/components/evento-cronograma-dialog";
 import { cn } from "@/lib/utils";
 
@@ -294,38 +297,51 @@ export function CronogramaBuilder({
                   )}
                 </div>
               </div>
-              <div className="flex shrink-0 items-center">
-                <IconButton
-                  dica="Editar detalhes"
-                  label={`Editar detalhes do item ${i + 1}`}
-                  onClick={() => setEditando(l.key)}
+              {/* REALIZA-186: editar/↑/↓/remover eram 4 ícones-fantasma com
+                  tooltip por linha — agora um ⋯ por item (mesmo padrão do
+                  editor). Remover não pede confirm: a prévia é rascunho,
+                  regenerável — comportamento preservado */}
+              <DropdownMenu>
+                <DropdownMenuTrigger
+                  aria-label={`Ações do item ${i + 1}`}
+                  className={cn(
+                    buttonVariants({ variant: "ghost", size: "icon" }),
+                    "size-11 shrink-0 sm:size-8"
+                  )}
                 >
-                  <PencilSimple size={15} />
-                </IconButton>
-                <IconButton
-                  dica="Mover para cima"
-                  label={`Mover item ${i + 1} para cima`}
-                  disabled={i === 0}
-                  onClick={() => mover(l.key, -1)}
-                >
-                  <ArrowUp size={15} />
-                </IconButton>
-                <IconButton
-                  dica="Mover para baixo"
-                  label={`Mover item ${i + 1} para baixo`}
-                  disabled={i === linhas.length - 1}
-                  onClick={() => mover(l.key, 1)}
-                >
-                  <ArrowDown size={15} />
-                </IconButton>
-                <IconButton
-                  dica="Remover da prévia"
-                  label={`Remover item ${i + 1} da prévia`}
-                  onClick={() => setLinhas((ls) => ls.filter((x) => x.key !== l.key))}
-                >
-                  <Trash size={15} />
-                </IconButton>
-              </div>
+                  <DotsThreeVertical size={18} weight="bold" aria-hidden />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuItem onClick={() => setEditando(l.key)}>
+                    <PencilSimple size={16} data-icon="inline-start" aria-hidden />
+                    Editar detalhes
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    disabled={i === 0}
+                    onClick={() => mover(l.key, -1)}
+                  >
+                    <ArrowUp size={16} data-icon="inline-start" aria-hidden />
+                    Mover para cima
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    disabled={i === linhas.length - 1}
+                    onClick={() => mover(l.key, 1)}
+                  >
+                    <ArrowDown size={16} data-icon="inline-start" aria-hidden />
+                    Mover para baixo
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    variant="destructive"
+                    onClick={() =>
+                      setLinhas((ls) => ls.filter((x) => x.key !== l.key))
+                    }
+                  >
+                    <Trash size={16} data-icon="inline-start" aria-hidden />
+                    Remover da prévia
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </li>
           ))}
         </ol>
@@ -731,35 +747,4 @@ function Marcador({ tipo }: { tipo: TipoEvento }) {
   );
 }
 
-function IconButton({
-  dica,
-  label,
-  disabled,
-  onClick,
-  children,
-}: {
-  dica: string;
-  label: string;
-  disabled?: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <Tooltip>
-      <TooltipTrigger
-        render={
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label={label}
-            disabled={disabled}
-            onClick={onClick}
-          >
-            {children}
-          </Button>
-        }
-      />
-      <TooltipContent>{dica}</TooltipContent>
-    </Tooltip>
-  );
-}
+

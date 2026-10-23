@@ -20,39 +20,47 @@ export default function Loading() {
         <Skeleton className="mt-3 h-4 w-3/4" />
       </div>
 
-      {/* trilha — nó à esquerda + card */}
+      {/* trilha — rail à esquerda (pl-12/left-5) + nó size-7 + recibo */}
       {[0, 1, 2].map((i) => (
-        <div key={i} className="relative pl-16">
-          <Skeleton className="absolute left-6 top-4 size-11 -translate-x-1/2 rounded-full" />
-          <div className="rounded-xl bg-card p-4 shadow-[var(--shadow-border)] sm:p-5">
-            <Skeleton className="h-3 w-36" />
-            <div className="mt-2 flex items-center gap-3">
-              <Skeleton className="h-5 w-48 max-w-full" />
-              <Skeleton className="h-5 w-16 rounded-full" />
+        <div key={i} className="relative pb-4 pl-12">
+          <Skeleton className="absolute left-5 top-4 size-7 -translate-x-1/2 rounded-full" />
+          <div className="rounded-xl bg-card px-4 py-3 shadow-[var(--shadow-border)]">
+            <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+              <Skeleton className="h-3 w-16" />
+              <Skeleton className="h-5 w-40 max-w-full" />
+              <Skeleton className="h-5 w-14 rounded-full" />
+              <Skeleton className="ml-auto size-4 rounded" />
             </div>
-            <Skeleton className="mt-3 h-4 w-4/5" />
-            <Skeleton className="mt-1.5 h-4 w-2/3" />
           </div>
         </div>
       ))}
 
-      {/* acervo */}
-      <section className="space-y-2">
-        <Skeleton className="h-5 w-24" />
-        <Skeleton className="h-4 w-72 max-w-full" />
-        <div className="divide-y divide-border/60 overflow-hidden rounded-xl bg-card shadow-[var(--shadow-border)]">
-          {[0, 1].map((i) => (
-            <div key={i} className="flex items-center pr-3">
-              <div className="flex min-w-0 flex-1 items-center gap-x-4 px-5 py-3.5">
-                <Skeleton className="size-9 shrink-0 rounded-lg" />
-                <div className="min-w-0 flex-1">
-                  <Skeleton className="h-4 w-2/5" />
-                  <Skeleton className="mt-1 h-3 w-3/5" />
+      {/* acervo — overline da seção + grid de cards (capa h-36 + linha) */}
+      <section className="space-y-4">
+        <div>
+          <Skeleton className="h-5 w-24" />
+          <Skeleton className="mt-1.5 h-4 w-72 max-w-full" />
+        </div>
+        <div className="space-y-2">
+          <Skeleton className="h-3 w-20" />
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {[0, 1, 2].map((i) => (
+              <div
+                key={i}
+                className="overflow-hidden rounded-xl bg-card shadow-[var(--shadow-border)]"
+              >
+                <Skeleton className="h-36 rounded-none" />
+                <div className="flex items-center gap-x-4 px-5 py-3.5">
+                  <Skeleton className="size-9 shrink-0 rounded-lg" />
+                  <div className="min-w-0 flex-1">
+                    <Skeleton className="h-4 w-3/5" />
+                    <Skeleton className="mt-1 h-3 w-4/5" />
+                  </div>
+                  <Skeleton className="size-4 shrink-0 rounded" />
                 </div>
               </div>
-              <Skeleton className="size-4 shrink-0 rounded" />
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       </section>
     </div>

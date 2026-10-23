@@ -53,7 +53,7 @@ export function ReverRespostaDialog({
       />
       {/* xl, não 2xl: a resposta estruturada (roda + áreas, metas) é
           conteúdo de leitura, não prévia tabular; o scroll vem da base */}
-      <DialogContent className="sm:max-w-xl">
+      <DialogContent size="xl">
         <DialogHeader>
           <DialogTitle>{titulo}</DialogTitle>
           <DialogDescription>

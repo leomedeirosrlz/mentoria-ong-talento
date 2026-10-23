@@ -78,6 +78,8 @@ export function RemanejarDuplaDialog({
   const [lado, setLado] = useState<LadoRemanejo>(preselecao?.lado ?? "mentor");
   const [novoId, setNovoId] = useState<string | null>(preselecao?.novoId ?? null);
   const [motivoSel, setMotivoSel] = useState<string>("desistencia");
+  // contador da devolutiva (0117) — a trilha de especialista só fecha com ela
+  const [devolutivaLen, setDevolutivaLen] = useState(0);
   const [mentores, setMentores] = useState<Opt[]>([]);
   const [mentorados, setMentorados] = useState<Opt[]>([]);
   // vagas por mentor: quantas duplas ativas/pausadas já tem vs. capacidade
@@ -107,6 +109,7 @@ export function RemanejarDuplaDialog({
       setLado(preselecao?.lado ?? "mentor");
       setNovoId(preselecao?.novoId ?? null);
       setMotivoSel("desistencia");
+      setDevolutivaLen(0);
       setErro(null);
       setFalha(false);
     }
@@ -278,6 +281,13 @@ export function RemanejarDuplaDialog({
       setErro("Conte o motivo da troca — ele vai pra ficha de quem sai.");
       return;
     }
+    const devolutiva = String(fd.get("devolutiva_pdm") ?? "").trim();
+    if (ehEsp && (devolutiva.length < 10 || devolutiva.length > 4000)) {
+      setErro(
+        "A devolutiva pro PDM precisa de 10 a 4.000 caracteres — é a entrega de quem sai da trilha."
+      );
+      return;
+    }
     const registrarNota = fd.get("registrar_nota") === "on";
     setErro(null);
     start(async () => {
@@ -287,7 +297,8 @@ export function RemanejarDuplaDialog({
           lado,
           novoId,
           motivo,
-          registrarNota
+          registrarNota,
+          devolutiva
         );
         if (res?.error) {
           setErro(res.error);
@@ -336,7 +347,7 @@ export function RemanejarDuplaDialog({
           }
         />
       )}
-      <DialogContent className="sm:max-w-md">
+      <DialogContent size="xl">
         <DialogHeader>
           <DialogTitle>Remanejar a dupla</DialogTitle>
           <DialogDescription>
@@ -516,6 +527,40 @@ export function RemanejarDuplaDialog({
                   />
                 </div>
               </div>
+
+              {ehEsp && (
+                // 0117: rematch fecha a trilha de especialista — a devolutiva
+                // pro PDM é parte do rito, não opcional. Sem o campo aqui a
+                // dupla encerrava sem a entrega e nenhuma via grava depois.
+                <div className="space-y-2">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <Label htmlFor="remanejo-devolutiva">
+                      Devolutiva pro PDM
+                    </Label>
+                    <span
+                      aria-hidden
+                      className="text-xs tabular-nums text-muted-foreground"
+                    >
+                      {devolutivaLen}/4.000
+                    </span>
+                  </div>
+                  <Textarea
+                    id="remanejo-devolutiva"
+                    name="devolutiva_pdm"
+                    required
+                    minLength={10}
+                    maxLength={4000}
+                    rows={4}
+                    onChange={(e) => setDevolutivaLen(e.target.value.length)}
+                    placeholder="Metas alcançadas, o que segue em aberto e recomendações pro plano do jovem"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    A entrega de quem sai da trilha — em remanejo de jovem, o
+                    especialista devolve a do jovem que sai. O mentor DPP lê na
+                    ficha da dupla dele.
+                  </p>
+                </div>
+              )}
 
               <label className="flex cursor-pointer items-start gap-2.5 rounded-lg bg-muted/40 px-3 py-2.5 text-sm transition-colors hover:bg-muted/70">
                 <input

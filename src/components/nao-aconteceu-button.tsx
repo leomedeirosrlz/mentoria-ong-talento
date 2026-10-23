@@ -27,7 +27,7 @@ export function NaoAconteceuButton({
           Não aconteceu
         </Button>
       } />
-      <DialogContent>
+      <DialogContent size="sm">
         <DialogHeader>
           <DialogTitle>O encontro não aconteceu?</DialogTitle>
         </DialogHeader>
@@ -83,7 +83,7 @@ export function DesfazerNaoAconteceuButton({
           Desfazer
         </Button>
       } />
-      <DialogContent>
+      <DialogContent size="sm">
         <DialogHeader>
           <DialogTitle>Desfazer &ldquo;não realizado&rdquo;?</DialogTitle>
         </DialogHeader>

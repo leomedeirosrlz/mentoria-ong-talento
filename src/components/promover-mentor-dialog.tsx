@@ -160,7 +160,7 @@ export function PromoverMentorDialog({
         }
       }}
     >
-      <DialogContent className="sm:max-w-md">
+      <DialogContent size="xl">
         <DialogHeader>
           <DialogTitle>Promover {primeiroNome} a mentor</DialogTitle>
           <DialogDescription>

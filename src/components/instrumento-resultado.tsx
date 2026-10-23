@@ -6,6 +6,7 @@ import {
   type FormularioSistema,
   type RespostaValor,
 } from "@/lib/forms/schema";
+import { parseSubmetasLinhas } from "@/lib/pdm";
 import { cn } from "@/lib/utils";
 import { RodaSvg } from "./instrumentos/roda-svg";
 
@@ -210,6 +211,24 @@ function MetasResultado({
     return { label: campo.label, ok: v === "sim" };
   }).filter((r): r is { label: string; ok: boolean } => r != null);
 
+  // desdobramento por meta — Metas (0118) e PDM: cada submetas_N respondido
+  // vira uma lista lida pelo mesmo parser que projeta pdm_itens
+  const desdobramentos = campos
+    .map((c) => ({
+      n: /^submetas_(\d+)$/.exec(c.id)?.[1],
+      valor: respostas[c.id],
+    }))
+    .filter(
+      (x): x is { n: string; valor: RespostaValor } =>
+        x.n != null && typeof x.valor === "string" && x.valor.trim() !== ""
+    )
+    .map((x) => ({
+      n: Number(x.n),
+      linhas: parseSubmetasLinhas(String(x.valor)),
+    }))
+    .filter((x) => x.linhas.length > 0)
+    .sort((a, b) => a.n - b.n);
+
   return (
     <div className="space-y-4">
       <Declaracao texto={declaracao} />
@@ -273,16 +292,23 @@ function MetasResultado({
         </ol>
       </Bloco>
 
-      {sistema === "pdm" &&
-        [1, 2, 3].map((n) => {
-          const v = valorDe(campos, respostas, `submetas_${n}`);
-          if (!v) return null;
-          return (
-            <Bloco key={n} titulo={`Desdobramento da meta ${n}`}>
-              <p className="text-sm leading-relaxed whitespace-pre-wrap">{v}</p>
-            </Bloco>
-          );
-        })}
+      {desdobramentos.map((d) => (
+        <Bloco key={d.n} titulo={`Desdobramento da meta ${d.n}`}>
+          <ol className="space-y-1">
+            {d.linhas.map((l, i) => (
+              <li key={i} className="flex gap-2 text-sm leading-relaxed">
+                <span
+                  aria-hidden
+                  className="w-5 shrink-0 text-right text-xs font-semibold tabular-nums text-muted-foreground"
+                >
+                  {i + 1}.
+                </span>
+                <span className="min-w-0">{l}</span>
+              </li>
+            ))}
+          </ol>
+        </Bloco>
+      ))}
 
       {revisao.length > 0 && (
         <Bloco titulo="Revisão">

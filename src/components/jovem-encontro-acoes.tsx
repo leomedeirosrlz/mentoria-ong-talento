@@ -24,7 +24,7 @@ export function NaoAconteceuJovem({ encontroId }: { encontroId: string }) {
           Não aconteceu
         </Button>
       } />
-      <DialogContent>
+      <DialogContent size="sm">
         <DialogHeader>
           <DialogTitle>O encontro não aconteceu?</DialogTitle>
         </DialogHeader>
@@ -78,7 +78,7 @@ export function DesmarcarEncontroJovem({ encontroId }: { encontroId: string }) {
           Desmarcar
         </Button>
       } />
-      <DialogContent>
+      <DialogContent size="sm">
         <DialogHeader>
           <DialogTitle>Desmarcar o encontro?</DialogTitle>
         </DialogHeader>

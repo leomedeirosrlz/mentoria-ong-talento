@@ -58,7 +58,7 @@ export function ConfirmDeleteButton({
           }
         />
       )}
-      <DialogContent>
+      <DialogContent size="sm">
         <DialogHeader>
           <DialogTitle>{titulo}</DialogTitle>
         </DialogHeader>

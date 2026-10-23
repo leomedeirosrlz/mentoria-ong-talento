@@ -212,7 +212,7 @@ function LinhaInstrumento({
             />
             {/* xl, não 2xl: leitura estruturada do instrumento, não prévia
                 tabular; o scroll vem da base do DialogContent */}
-            <DialogContent className="sm:max-w-xl">
+            <DialogContent size="xl">
               <DialogHeader>
                 <DialogTitle>{item.titulo}</DialogTitle>
                 <DialogDescription>

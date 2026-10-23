@@ -26,10 +26,10 @@ concurrency:
 jobs:
   e2e:
     runs-on: ubuntu-latest
-    # a suite passou de 80 specs (~89 hoje) em 1 worker — serial por desenho,
-    # os fixtures app compartilham estado no staging. Setup ~2min + suíte
-    # ~14min já cruzava 15; 25 dá margem pra crescer sem recisitar.
-    timeout-minutes: 25
+    # a suite passou de 100 specs (~114 hoje) em 1 worker — serial por
+    # desenho, os fixtures app compartilham estado no staging. Setup ~2min
+    # + suíte ~50min medida local; 70 dá margem pra crescer sem recisitar.
+    timeout-minutes: 70
     # O environment muda com o nº de projetos Vercel no repo: com dois era
     # 'Preview – realiza.vc' (o órfão 'realiza' foi deletado); com um só,
     # Vercel reporta 'Preview' a seco. Aceita os dois — se um segundo
@@ -52,6 +52,22 @@ jobs:
           fi
       - if: steps.check.outputs.skip != '1'
         uses: actions/checkout@v4
+      # probe antes da suíte: um commit só de testes/docs faz a Vercel
+      # ignorar o build, e o alias da branch passa a servir a página
+      # "Deployment was cancelled" — rodar 89 specs contra ela é wipeout
+      # garantido (61 vermelhas em ~25min, run 39882856332). Falha rápido
+      # com mensagem clara em vez de falso-vermelho na suíte toda.
+      - name: preview serve o app de verdade?
+        if: steps.check.outputs.skip != '1'
+        env:
+          B: ${{ secrets.VERCEL_AUTOMATION_BYPASS }}
+          TARGET: ${{ github.event.deployment_status.target_url }}
+        run: |
+          html=$(curl -sfL --max-time 30 -H "x-vercel-protection-bypass: $B" "$TARGET" || true)
+          if [ -z "$html" ] || grep -qiE 'instant-preview-site|Deployment was cancelled|update once the build' <<<"$html"; then
+            echo "::error::target_url não serve o app (deploy cancelado/placeholder): $TARGET"
+            exit 1
+          fi
       - if: steps.check.outputs.skip != '1'
         uses: pnpm/action-setup@v4
       - if: steps.check.outputs.skip != '1'

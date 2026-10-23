@@ -2,6 +2,7 @@ import {
   appEnvOk,
   atualizarViaServiceRole,
   buscarViaServiceRole,
+  convergirDuplaAtiva,
   expect,
   inserirViaServiceRole,
   limparViaServiceRole,
@@ -90,6 +91,11 @@ async function restaurarJovem() {
       status: "realizado",
     });
   }
+  // a âncora é o ÚLTIMO encontro do cronograma: re-criá-la (ou um spec
+  // vizinho que recriou) dispara o auto-encerramento da 0102 e a dupla
+  // acorda 'concluida' — a home troca o hero e a jornada muda. O piso da
+  // fixture é dupla ativa: desfaz o que o trigger mintou.
+  await convergirDuplaAtiva(DUPLA_ID);
 }
 
 test.describe("mentorado — shell /jovem", () => {

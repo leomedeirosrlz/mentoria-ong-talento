@@ -371,6 +371,8 @@ export default async function FormularioPage({
             campos={f.campos}
             links={links}
             sistema={f.sistema ?? null}
+            formularioTitulo={f.titulo}
+            mentorados={mentorados.map((m) => ({ id: m.id, nome: m.nome }))}
           />
         )}
       </section>

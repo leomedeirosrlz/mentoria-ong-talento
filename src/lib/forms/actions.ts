@@ -155,8 +155,12 @@ export async function excluirFormulario(id: string) {
 
 // ---------- links ----------
 
+// REALIZA-16: o destino é sempre nominado — "generico" saiu do union na
+// mesma mudança em que o banco passou a exigir âncora (0116). Divulgação
+// aberta usa o link de inscrição (origem='intake', multi_uso) dos forms
+// oficiais — é o único genérico que continua existindo, com reconciliação
+// por promoção em vez de identidade no link.
 export type DestinoLink =
-  | { tipo: "generico" }
   | { tipo: "profile"; id: string }
   | { tipo: "mentorado"; id: string };
 
@@ -170,7 +174,6 @@ async function duplaDoDestino(
   supabase: Awaited<ReturnType<typeof createClient>>,
   dest: DestinoLink
 ): Promise<string | null> {
-  if (dest.tipo === "generico") return null;
   const col = dest.tipo === "profile" ? "mentor_id" : "mentorado_id";
   const { data } = await supabase
     .from("duplas")
@@ -208,17 +211,29 @@ export async function gerarLinksFormulario(input: {
 
   if (!UUID_RE.test(input.formularioId))
     return { error: "Formulário inválido." };
+  // payload arbitrário: um "generico" solto (client antigo, POST manual)
+  // erra cedo com copy clara — o banco rejeitaria pelo check de âncora de
+  // qualquer jeito (0116), mas a explicação mora aqui, não no 23514
+  if (
+    (input.destinos ?? []).some(
+      (d) => (d as { tipo?: string })?.tipo === "generico"
+    )
+  )
+    return {
+      error:
+        "Links genéricos não são mais aceitos — escolha um destinatário. Pra divulgação aberta, use o link de inscrição do formulário oficial de intake.",
+    };
   const destinos = (input.destinos ?? []).filter(
     (d): d is DestinoLink =>
-      d &&
-      (d.tipo === "generico" ||
-        ((d.tipo === "profile" || d.tipo === "mentorado") && UUID_RE.test(d.id)))
+      !!d &&
+      (d.tipo === "profile" || d.tipo === "mentorado") &&
+      UUID_RE.test(d.id)
   );
   // dedupe do pedido — a UI manda Set, mas o payload é arbitrário: dois
   // destinos iguais no mesmo lote inseririam dois links vivos
   const chavesVistas = new Set<string>();
   const unicos = destinos.filter((d) => {
-    const k = d.tipo === "generico" ? "generico" : `${d.tipo}:${d.id}`;
+    const k = `${d.tipo}:${d.id}`;
     if (chavesVistas.has(k)) return false;
     chavesVistas.add(k);
     return true;
@@ -265,7 +280,8 @@ export async function gerarLinksFormulario(input: {
 
   // links pendentes já emitidos — reenviar pro mesmo destinatário reutiliza o
   // token existente (evita dois links válidos pra mesma pessoa). O genérico
-  // entra na mesma regra: um genérico pendente por form, não um por clique.
+  // legado (pré-0116) segue mapeado em "generico" — só pra não colidir com
+  // ninguém; nenhum destino novo chega com essa chave.
   const { data: existentes, error: exErr } = await supabase
     .from("formulario_links")
     .select("id, token, dest_profile_id, dest_mentorado_id, usado_em, expira_em")
@@ -283,8 +299,7 @@ export async function gerarLinksFormulario(input: {
   let criados = 0;
   let reutilizados = 0;
   for (const dest of unicos) {
-    const chave = dest.tipo === "generico" ? "generico" : dest.id;
-    if (pendentePorDest.has(chave)) {
+    if (pendentePorDest.has(dest.id)) {
       reutilizados++;
       continue;
     }
@@ -316,11 +331,10 @@ export async function gerarLinksFormulario(input: {
   const links: LinkEmitido[] = [];
   const vistos = new Set<string>();
   for (const dest of unicos) {
-    const l = vigentesDestes.find((v) =>
-      dest.tipo === "generico"
-        ? !v.dest_profile_id && !v.dest_mentorado_id
-        : v.dest_profile_id === (dest.tipo === "profile" ? dest.id : null) &&
-          v.dest_mentorado_id === (dest.tipo === "mentorado" ? dest.id : null)
+    const l = vigentesDestes.find(
+      (v) =>
+        v.dest_profile_id === (dest.tipo === "profile" ? dest.id : null) &&
+        v.dest_mentorado_id === (dest.tipo === "mentorado" ? dest.id : null)
     );
     if (!l || vistos.has(l.id)) continue;
     vistos.add(l.id);
@@ -402,6 +416,95 @@ export async function excluirLinkFormulario(linkId: string, formularioId: string
     return { error: "Esse link já foi respondido. A resposta iria junto." };
   revalidatePath(`/formularios/${formularioId}`);
   return { ok: true };
+}
+
+/** Reconciliação retroativa (REALIZA-16, plano B): um link genérico legado
+ *  (manual, sem as três âncoras — só existem os emitidos antes do check de
+ *  0116) ganha `dest_mentorado_id` + a dupla DPP dele quando houver — a
+ *  resposta passa a contar na jornada dessa pessoa. A trilha de quem
+ *  vinculou fica na timeline da dupla (interacoes 'vinculo_resposta') ou,
+ *  sem dupla, na caderneta da pessoa (pessoa_notas) — autor e timestamp em
+ *  qualquer caso. A resposta de intake não entra aqui: ela vira cadastro
+ *  pela promoção (promoverRespostaIntake). */
+export async function vincularRespostaOrfa(linkId: string, mentoradoId: string) {
+  if (await demoAtivo()) return { error: DEMO_MSG };
+  const { supabase, eu, error } = await meCoord();
+  if (error || !eu) return { error: error! };
+  if (!UUID_RE.test(linkId)) return { error: "Link inválido." };
+  if (!UUID_RE.test(mentoradoId)) return { error: "Mentorado inválido." };
+
+  const { data: link, error: lErr } = await supabase
+    .from("formulario_links")
+    .select(
+      `id, formulario_id, dest_profile_id, dest_mentorado_id, dupla_id,
+       multi_uso, origem,
+       formulario:formularios(titulo)`
+    )
+    .eq("id", linkId)
+    .maybeSingle();
+  if (lErr) return { error: erroAmigavel(lErr) };
+  if (!link) return { error: "Link não encontrado." };
+  if (link.multi_uso || link.origem === "intake")
+    return {
+      error:
+        "Resposta de inscrição não se vincula assim — ela vira cadastro pela revisão (Revisar e cadastrar).",
+    };
+  if (link.dest_profile_id || link.dest_mentorado_id || link.dupla_id)
+    return { error: "Esse link já está vinculado." };
+
+  const { data: m, error: mErr } = await supabase
+    .from("mentorados")
+    .select("id, nome")
+    .eq("id", mentoradoId)
+    .maybeSingle();
+  if (mErr) return { error: erroAmigavel(mErr) };
+  if (!m) return { error: "Mentorado não encontrado." };
+
+  const dupla_id = await duplaDoDestino(supabase, {
+    tipo: "mentorado",
+    id: mentoradoId,
+  });
+  // guards `.is null` nas três âncoras: dois coordenadores vinculando ao
+  // mesmo tempo não se sobrescrevem — o segundo re-lê a linha vazia
+  const { data: vinculado, error: upErr } = await supabase
+    .from("formulario_links")
+    .update({ dest_mentorado_id: mentoradoId, dupla_id })
+    .eq("id", linkId)
+    .is("dest_profile_id", null)
+    .is("dest_mentorado_id", null)
+    .is("dupla_id", null)
+    .select("id");
+  if (upErr) return { error: erroAmigavel(upErr) };
+  if (!vinculado?.length)
+    return { error: "Esse link acabou de ser vinculado por outra pessoa." };
+
+  const formTitulo = Array.isArray(link.formulario)
+    ? link.formulario[0]?.titulo
+    : (link.formulario as { titulo?: string } | null)?.titulo;
+  let aviso: string | null = null;
+  if (dupla_id) {
+    const { error: logErr } = await supabase.from("interacoes").insert({
+      dupla_id,
+      autor_id: eu.id,
+      canal: "in_app",
+      tipo: "vinculo_resposta",
+      nota: `Resposta de "${formTitulo ?? "formulário"}" vinculada retroativamente a ${m.nome}.`,
+    });
+    if (logErr) aviso = "Vinculado, mas o registro na timeline da dupla falhou.";
+  } else {
+    const { error: notaErr } = await supabase.from("pessoa_notas").insert({
+      mentorado_id: mentoradoId,
+      created_by: eu.id,
+      texto: `Resposta de "${formTitulo ?? "formulário"}" vinculada retroativamente a esta pessoa.`,
+    });
+    if (notaErr)
+      aviso = "Vinculado, mas o registro de auditoria na ficha falhou.";
+  }
+
+  revalidatePath(`/formularios/${link.formulario_id}`);
+  revalidatePath(`/pessoas/${mentoradoId}`);
+  if (dupla_id) revalidatePath(`/duplas/${dupla_id}`);
+  return { ok: true, aviso };
 }
 
 // ---------- público: envio de resposta ----------

@@ -96,7 +96,7 @@ export function AgendaGradeSemanal({ dias }: { dias: DiaGrade[] }) {
             >
               <i
                 className={cn(
-                  "block text-[10px] font-medium uppercase tracking-wider not-italic",
+                  "block text-[10px] font-medium uppercase tracking-[0.08em] not-italic",
                   d.ehHoje ? "text-white/80" : "text-muted-foreground"
                 )}
               >

@@ -375,7 +375,7 @@ export function NovaDuplaDialog() {
       }}
     >
       <DialogTrigger render={<Button size="sm" className="max-sm:w-full"><Plus size={16} /> Nova dupla</Button>} />
-      <DialogContent className="sm:max-w-md">
+      <DialogContent size="xl">
         <DialogHeader>
           <DialogTitle>Formar dupla</DialogTitle>
           <DialogDescription>

@@ -151,7 +151,7 @@ export function FormulariosLista({
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <h2 className="font-medium leading-snug">{f.titulo}</h2>
+                      <h2 className="font-semibold leading-snug">{f.titulo}</h2>
                       {f.sistema && (
                         <Badge
                           variant="outline"

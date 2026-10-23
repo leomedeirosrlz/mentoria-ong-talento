@@ -283,7 +283,10 @@ export default async function DuplaPage({ params }: { params: Promise<{ id: stri
   const solicitacao = solicitacoes[0] ?? null;
   // o pedido que ocupa a vaga agora (0074 — "em aberto" inclui triagem e
   // negociação; o status_efetivo já desconta o slot vencido, então um
-  // expirado NÃO bloqueia — bate com o dedup do criarSolicitacao)
+  // expirado NÃO bloqueia — bate com o dedup do criarSolicitacao).
+  // 'sugerida' fica de fora de propósito: é o estágio anterior ao pedido
+  // (aguarda o jovem confirmar na página de especialistas, fora dos tetos
+  // e do mural, 0086) — não ocupa a vaga nem esconde o "Solicitar".
   const STATUS_SOL_ABERTA = new Set([
     "aberta",
     "aguardando_coord",

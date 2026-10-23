@@ -45,7 +45,7 @@ function DialogoDados({ me }: { me: Profile }) {
           <BotaoLapis label="Editar seus dados" className="-mr-1.5 -my-1.5" />
         }
       />
-      <DialogContent className="sm:max-w-xl">
+      <DialogContent size="xl">
         <DialogHeader>
           <DialogTitle>Seus dados</DialogTitle>
           <DialogDescription>
@@ -218,7 +218,7 @@ export function DisponibilidadeCard({
               />
             }
           />
-          <DialogContent className="sm:max-w-xl">
+          <DialogContent size="2xl">
             <DialogHeader>
               <DialogTitle>Sua disponibilidade</DialogTitle>
               <DialogDescription>
