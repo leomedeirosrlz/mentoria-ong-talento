@@ -1,6 +1,9 @@
 import {
   appEnvOk,
+  atualizarViaServiceRole,
+  buscarViaServiceRole,
   expect,
+  inserirViaServiceRole,
   loginComSenha,
   relogar,
   test,
@@ -14,8 +17,25 @@ import {
 // Fixture do scripts/seed-e2e-staging.mjs: mentor …0010 com
 // mentor_profiles.disponibilidade {ter,qui,sab + noite} e a mentorada
 // …0020 da dupla ativa com {ter,qui + noite} — ter/qui pintam "ambos
-// livres", sábado "você livre". O seed converge as grades a cada run; o
-// spec só lê.
+// livres", sábado "você livre".
+//
+// O spec só lia e confiava na convergência do seed — piso quebrado: se a
+// grade de qualquer um dos lados (ou a dupla ativa) sai do estado
+// esperado — run manual com seed velho, fixture alterada por outro spec,
+// retry depois de cleanup — o overlay pinta "você livre" mas nenhuma
+// célula cruza os dois lados e "/, ambos livres$/" não casa nada. A
+// convenção de piso pede que quem depende de fixture compartilhada
+// re-crie o que precisa: o beforeEach abaixo converge as duas grades e a
+// dupla ativa via service role (mesmos PATCHes do seed — grade é dado
+// aditivo e o guard do mentor_profiles só trava validações).
+const IDS = {
+  mentor: "e2e00000-0000-4000-8000-000000000010",
+  mentorado: "e2e00000-0000-4000-8000-000000000020",
+  dupla: "e2e00000-0000-4000-8000-000000000030",
+};
+const GRADE_MENTOR = { dias: ["ter", "qui", "sab"], periodos: ["noite"] };
+const GRADE_MENTORADA = { dias: ["ter", "qui"], periodos: ["noite"] };
+
 const EMAIL = process.env.E2E_MENTOR_EMAIL ?? "";
 const SENHA = process.env.E2E_MENTOR_PASSWORD ?? "";
 const COORD_EMAIL = process.env.E2E_COORD_EMAIL ?? "e2e-coord@realiza.test";
@@ -25,6 +45,32 @@ test.skip(!appEnvOk(), "sem credenciais de teste (E2E_*) — pula specs de app")
 
 test.describe("agenda — overlay de disponibilidade do mentor (REALIZA-24)", () => {
   test.beforeEach(async ({ page }) => {
+    // piso da fixture (ver o cabeçalho): as grades dos dois lados + a
+    // dupla DPP ativa — sem elas o overlay não tem o que cruzar
+    const [mp] = await buscarViaServiceRole<{ profile_id: string }[]>(
+      "mentor_profiles",
+      `select=profile_id&profile_id=eq.${IDS.mentor}`
+    );
+    if (mp) {
+      await atualizarViaServiceRole(
+        "mentor_profiles",
+        `profile_id=eq.${IDS.mentor}`,
+        { disponibilidade: GRADE_MENTOR }
+      );
+    } else {
+      await inserirViaServiceRole("mentor_profiles", {
+        profile_id: IDS.mentor,
+        tipo: "dpp",
+        disponibilidade: GRADE_MENTOR,
+      });
+    }
+    await atualizarViaServiceRole("mentorados", `id=eq.${IDS.mentorado}`, {
+      disponibilidade: GRADE_MENTORADA,
+    });
+    await atualizarViaServiceRole("duplas", `id=eq.${IDS.dupla}`, {
+      status: "ativa",
+      trilha: "dpp",
+    });
     await loginComSenha(page, EMAIL, SENHA);
   });
 

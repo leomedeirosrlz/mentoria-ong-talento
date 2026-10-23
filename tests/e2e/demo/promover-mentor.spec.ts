@@ -6,6 +6,14 @@ import { entrarNaDemo, expect, test } from "../helpers";
 // turma de escopo) ou especialista, e o submit em demo volta a mensagem de
 // demonstração — nada é gravado. Spec de leitura: segura em qualquer
 // ambiente.
+//
+// Locators: o ⋮ da ficha não se chama mais "Ações" — a varredura de a11y
+// namespaciou os gatilhos por alvo e o botão lê 'Ações de "<nome>"'
+// (aria-label em mentorado-actions.tsx). Outros ⋮ da ficha dividem o
+// prefixo ("Ações de \"<documento>\"" em assinaturas/arquivos), então o
+// nome precisa ancorar na pessoa. Os itens do menu também mudaram pra
+// reticência "…" — /^Promover a mentor/ e /^Marcar saída/ cobrem o label
+// novo e o legado sem ela.
 
 const ISABELA = "de000000-0000-4000-8000-000000001029"; // concluída, com e-mail
 const GUSTAVO = "de000000-0000-4000-8000-000000001036"; // concluído, sem e-mail
@@ -17,11 +25,14 @@ test.describe("demo — promover ex-mentorado a mentor", () => {
   }) => {
     await entrarNaDemo(page, "coordenacao");
 
-    // ficha da concluída — o ⋮ dela oferece a promoção
+    // ficha da concluída — o ⋮ dela oferece a promoção (regex casa o
+    // 'Ações de "Isabela Ferreira"' atual e o "Ações" legado)
     await page.goto(`/pessoas/${ISABELA}`);
-    await page.getByRole("button", { name: "Ações" }).click();
+    await page
+      .getByRole("button", { name: /^Ações( de "Isabela Ferreira")?$/ })
+      .click();
     const popup = page.locator('[data-slot="dropdown-menu-content"]');
-    const item = popup.getByRole("menuitem", { name: "Promover a mentor" });
+    const item = popup.getByRole("menuitem", { name: /^Promover a mentor/ });
     await expect(item).toBeVisible();
     await item.click();
 
@@ -63,10 +74,12 @@ test.describe("demo — promover ex-mentorado a mentor", () => {
     // Gustavo concluiu mas nunca teve conta nem e-mail — o dialog trava o
     // submit e explica o que falta (a RPC confirmaria com erro claro)
     await page.goto(`/pessoas/${GUSTAVO}`);
-    await page.getByRole("button", { name: "Ações" }).click();
+    await page
+      .getByRole("button", { name: /^Ações( de "Gustavo Batista")?$/ })
+      .click();
     await page
       .locator('[data-slot="dropdown-menu-content"]')
-      .getByRole("menuitem", { name: "Promover a mentor" })
+      .getByRole("menuitem", { name: /^Promover a mentor/ })
       .click();
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
@@ -78,13 +91,15 @@ test.describe("demo — promover ex-mentorado a mentor", () => {
 
     // mentorado ativo: promoção não existe no menu — só saída
     await page.goto(`/pessoas/${KAUA}`);
-    await page.getByRole("button", { name: "Ações" }).click();
+    await page
+      .getByRole("button", { name: /^Ações( de "Kauã Rodrigues")?$/ })
+      .click();
     const popup = page.locator('[data-slot="dropdown-menu-content"]');
     await expect(
-      popup.getByRole("menuitem", { name: "Promover a mentor" })
+      popup.getByRole("menuitem", { name: /^Promover a mentor/ })
     ).toHaveCount(0);
     await expect(
-      popup.getByRole("menuitem", { name: "Marcar saída" })
+      popup.getByRole("menuitem", { name: /^Marcar saída/ })
     ).toBeVisible();
   });
 });
