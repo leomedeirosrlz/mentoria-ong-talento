@@ -312,7 +312,7 @@ function LinhaContato({
           </summary>
           <div className="mt-2 space-y-2 rounded-lg bg-muted/50 p-3 text-sm">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
                 Pontos fortes
               </p>
               <p className="mt-0.5 whitespace-pre-wrap leading-relaxed">
@@ -320,7 +320,7 @@ function LinhaContato({
               </p>
             </div>
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
                 Aspectos a melhorar
               </p>
               <p className="mt-0.5 whitespace-pre-wrap leading-relaxed">
@@ -550,7 +550,7 @@ function Consolidacao({
     return (
       <div className="rounded-lg bg-muted/50 p-3">
         <div className="flex items-center gap-2">
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
             Consolidação pro jovem
           </p>
           {publicado ? (
@@ -571,7 +571,7 @@ function Consolidacao({
   return (
     <div className="space-y-2 border-t border-border/60 pt-3">
       <div className="flex flex-wrap items-center gap-2">
-        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
           Consolidação pro jovem
         </p>
         {publicado ? (

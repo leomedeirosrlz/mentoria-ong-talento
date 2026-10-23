@@ -58,12 +58,30 @@ test.describe("REALIZA-163 — grade editável do especialista (demo)", () => {
     if (!box) throw new Error("coluna de quarta sem bounding box");
     const x = box.x + box.width / 2;
     const y10h = box.y + (10 - 8) * 48;
-    await page.mouse.move(x, y10h);
-    await page.mouse.down();
-    await page.mouse.move(x, y10h + 2 * 48, { steps: 6 });
+
+    // gesto real: move → down → arraste com steps. O pointerdown pode cair
+    // antes da hidratação ligar os handlers React da coluna (o <details>
+    // abre nativo mesmo sem JS, então a grade já se mostra "pronta") — o
+    // gesto inteiro vira no-op silencioso e o rascunho nunca nasce. Mesmo
+    // padrão do agirComConfirma/pularOnboarding: repete a pintura até o
+    // rascunho confirmar, sempre conferindo com o ponteiro AINDA segurado
+    // (soltar descarta um gesto <30min sem efeito, então a tentativa é
+    // segura de recomeçar). Sem isso o spec falhava no wait do draft em
+    // preview frio.
+    const rascunho = page.locator("[data-draft-janela]");
+    let segurando = false;
+    for (let tentativa = 0; tentativa < 8 && !segurando; tentativa++) {
+      await page.mouse.move(x, y10h);
+      await page.mouse.down();
+      await page.mouse.move(x, y10h + 2 * 48, { steps: 6 });
+      segurando = await rascunho
+        .waitFor({ state: "visible", timeout: 2_000 })
+        .then(() => true)
+        .catch(() => false);
+      if (!segurando) await page.mouse.up();
+    }
 
     // o rascunho aparece enquanto o ponteiro segura o gesto…
-    const rascunho = page.locator("[data-draft-janela]");
     await expect(rascunho).toBeVisible();
     await expect(rascunho).toContainText("10h–12h");
 

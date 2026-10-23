@@ -512,7 +512,7 @@ export function AssinaturasPessoa({
               <li key={a.id}>
                 <div className="flex items-center gap-2">
                   <st.Icone size={15} aria-hidden className={cn("shrink-0", st.icone)} />
-                  <span className="min-w-0 flex-1 truncate text-sm">
+                  <span className="min-w-0 flex-1 truncate text-sm font-medium">
                     {a.template?.titulo ?? "Documento"}
                   </span>
                   <Badge variant="outline" className={cn("shrink-0", st.badge)}>

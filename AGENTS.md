@@ -41,6 +41,29 @@ Plataforma operacional do Programa de Mentoria — vertical slice funcionando co
 - RLS inteiro via `my_role()` / `my_profile_id()`; mentor escreve só na própria dupla, supervisor lê as supervisionadas, coordenação tudo.
 - Auth: magic link **implícito** + **handoff** — `createOtpClient` (supabase-js solto, `flowType: "implicit"`, sem persist) manda o link sem PKCE porque o client ssr força pkce e o verifier morria no browser que pediu. O link pousa em **`/auth/link`** (client page dedicada — não `/login`: lá o middleware desvia usuário já logado antes da página rodar e o `#access_token` morria no redirect, quebrando o handoff quando o browser do e-mail tinha sessão). O pedido gera um nonce (`?h=`); a aba que abre o link publica os tokens em `login_handoffs` (RPC `registrar_login_handoff`, 0049) e cai em `/auth/confirmado`; a aba que pediu resgata via poll `pegar_login_handoff` (uso único, TTL 10min) → `setSession` → entra (primeiro acesso → `/auth/definir-senha`, dispensável via `user_metadata.senha_dispensada`). Sem nonce (links antigos) a aba do link entra direto; se a RPC falhar, idem (fallback). Link queimado/expirado (`#error=`): a aba do e-mail chama `falhar_login_handoff` (0050) e mostra card sem botão (pedir link ali abriria login no dispositivo errado); a aba que pediu recebe `{failed:true}` no poll e cai no mesmo card de erro — com botão, porque é o mesmo navegador. RPCs do postgrest são lazy: `void supabase.rpc(...)` não envia nada, precisa de `.then()`. `/login` ainda resolve `#access_token` solto pra links antigos/fallback do Site URL; `/auth/confirm` só atende `token_hash` e links pkce antigos — entra direto também. Profiles pré-cadastrados pela coordenação e o trigger `handle_new_user` vincula `user_id` no 1º login (sem papel → tela "cadastro recebido"). Login por senha existe só pra teste.
 
+## Hierarquia de texto
+
+Convenção: **classes Tailwind direto no JSX** — não existe nem deve existir componente de tipografia. Referências vivas: `src/components/page-header.tsx` (título/meta de página) e `src/components/ui/label.tsx` (label de campo).
+
+**Escala (papel → classes):**
+
+- **Título de página (h1):** `text-2xl font-semibold tracking-tight` (+`text-balance` no `PageHeader`). Kicker opcional acima do h1: `text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground`. Meta sob o h1: `mt-1.5 text-sm text-muted-foreground`.
+- **Título de seção/card:** `text-base font-semibold` (ou `font-semibold` a sós, que já é `text-base`); seções maiores de página chegam a `sm:text-lg` com `tracking-tight`. Sub-seção dentro de card/ficha: `text-sm font-semibold`.
+- **Rótulo de grupo (eyebrow):** `text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground` — padrão dominante (80+ usos); sempre caixa-alta, sempre muted.
+- **Título de item/linha:** `text-sm font-medium` em linhas de lista; `text-sm font-semibold` quando o item é o dado-âncora (nome da dupla, evento); `font-semibold` a sós em títulos de card-trabalho (cards de dupla/visão). Nunca peso normal nem `text-muted-foreground`.
+- **Corpo:** `text-sm` (ou o tamanho herdado do container). Texto explicativo/secundário: `text-sm text-muted-foreground`.
+- **Metadado** (data, contador, origem, info de apoio): `text-xs text-muted-foreground` — par dominante (500+ usos). Micro-meta de linha densa: `text-[11px] text-muted-foreground`.
+- **Label de campo:** `text-sm font-medium` (`ui/label`). Rótulo de dado em ficha (`<dt>`, "rótulo sobre valor"): `text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground`.
+- **Micro/badge:** `text-[10px]`–`text-[11px]` só em badges, indicadores e micro-UI — nunca em texto corrido.
+
+**Cor:** `text-foreground` é a camada primária (títulos, valores de dados, corpo). `text-muted-foreground` é a camada secundária — metadados, hints, labels e texto explicativo — **nunca** o valor principal de um dado. Não criar terceiro tom (`text-foreground/60` etc.) fora dos usos já estabelecidos.
+
+**Espaçamento:** irmãos dentro de card: `gap-2`/`gap-3` ou `space-y-2`; título de item → metadado: `mt-0.5` (linha) / `mt-1` (bloco); linhas tabulares: `divide-y divide-border/60`; itens soltos: `space-y-2`; entre seções de página: `space-y-4`–`space-y-6`/`mt-4`+; `PageHeader` resolve `gap-x-4 gap-y-3` e `mt-1.5` título→meta.
+
+**Truncate:** título de item não trunca. Metadado, legenda e linha única densa truncam — e quando o texto importa ele fica íntegro em `title`/`sr-only` ou na ficha de destino.
+
+**Exceções legítimas (não "consertar"):** linhas/tabelas densas usam `text-[13px]` de corpo base (lista de duplas, fila de acompanhamento, relatório canvas); forms/instrumentos usam `text-[15px]`→`sm:text-base` em perguntas e inputs `text-base`→`md:*` (anti-zoom iOS); badges/chips em `text-[10px]`–`[11px]`; células de calendário/grade com micro-labels próprios; cores semânticas (`--warn`, `--ok`, semáforo, destructive) sobrescrevem a camada de cor quando sinalizam estado.
+
 ## Modo demo (`/demo`)
 
 - Público, sem login: cookie `demo_role` (middleware libera) + `demo_onboarded` (gate do wizard). `DemoBar` troca de papel / re-rever onboarding / sai.

@@ -351,7 +351,7 @@ function LinhaDupla({
 
       {/* sinais — todos os critérios acesos, com recência; sempre 1 linha
           (title carrega o texto inteiro, a ficha tem o detalhe) */}
-      <div className={cn("min-w-0 text-[10.5px] leading-normal", tomSinais)}>
+      <div className={cn("min-w-0 text-[11px] leading-normal", tomSinais)}>
         <p className="truncate" title={tituloSinais}>
           {/* texto integral pro leitor de tela — o truncate é só visual e
               o title não chega em toque/teclado */}
@@ -380,7 +380,7 @@ function LinhaDupla({
         {ultimoReg?.avaliacao ? (
           <>
             <AvaliacaoBadge avaliacao={ultimoReg.avaliacao} />
-            <span className="text-[10.5px] leading-tight text-muted-foreground">
+            <span className="text-[11px] leading-tight text-muted-foreground">
               nota do mentor
               {encontroDoReg ? ` · ${encontroDoReg.numero}º encontro` : ""}
             </span>
@@ -464,7 +464,7 @@ function CabecalhoColunas() {
     <div
       aria-hidden
       className={cn(
-        "hidden border-b border-border px-5 py-2.5 text-[10.5px] font-bold uppercase tracking-[0.05em] text-muted-foreground lg:grid lg:gap-x-4",
+        "hidden border-b border-border px-5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground lg:grid lg:gap-x-4",
         GRID_COLS
       )}
     >
@@ -536,7 +536,7 @@ function CatChip({
         {cat.dot && (
           <span aria-hidden className={cn("size-2 shrink-0 rounded-full", cat.dot)} />
         )}
-        <span className="text-[13.5px] font-semibold">{cat.nome}</span>
+        <span className="text-sm font-semibold">{cat.nome}</span>
         <span
           className={cn(
             "ml-auto rounded-full px-2 py-0.5 text-[11px] font-bold tabular-nums",
@@ -548,7 +548,7 @@ function CatChip({
       </span>
       <span
         className={cn(
-          "text-[11.5px] leading-snug",
+          "text-xs leading-snug",
           ativo ? "text-background/60" : "text-muted-foreground"
         )}
       >
@@ -1062,7 +1062,7 @@ function VisaoCoordenacao({
               />
               <span
                 className={cn(
-                  "text-[13.5px] font-semibold",
+                  "text-sm font-semibold",
                   filtro !== "apoio" && "text-[var(--info-text)]"
                 )}
               >
@@ -1081,7 +1081,7 @@ function VisaoCoordenacao({
             </span>
             <span
               className={cn(
-                "text-[11.5px] leading-snug",
+                "text-xs leading-snug",
                 filtro === "apoio" ? "text-white/75" : "text-muted-foreground"
               )}
             >
@@ -1096,7 +1096,7 @@ function VisaoCoordenacao({
         <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
           {turmas.length > 1 && (
             <span className="flex flex-wrap items-center gap-1.5">
-              <span className="text-[11px] font-bold uppercase tracking-[0.05em] text-muted-foreground">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
                 Turma
               </span>
               <button
@@ -1130,7 +1130,7 @@ function VisaoCoordenacao({
           )}
           {supervisores.length > 0 && (
             <span className="flex items-center gap-1.5">
-              <span className="text-[11px] font-bold uppercase tracking-[0.05em] text-muted-foreground">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
                 Supervisão
               </span>
               <Select
@@ -1207,7 +1207,7 @@ function VisaoCoordenacao({
           </b>{" "}
           · ordenadas por prioridade
         </p>
-        <p className="text-[11.5px] text-muted-foreground">
+        <p className="text-xs text-muted-foreground">
           <span aria-hidden className="mx-1 inline-block size-2 rounded-full bg-[var(--role-mentorado)] align-[-1px] ring-1 ring-black/10" />
           mentorado(a)
           <span aria-hidden className="mx-1 ml-3 inline-block size-2 rounded-full bg-[var(--role-mentor)] align-[-1px] ring-1 ring-black/10" />
@@ -1245,7 +1245,7 @@ function VisaoCoordenacao({
               {antes.map((d) => linha(d, i++))}
               {usarMassa && (
                 <details className="group/massa border-t border-border/60">
-                  <summary className="flex min-h-11 cursor-pointer list-none items-center gap-1.5 px-5 py-3 text-[12.5px] font-semibold text-muted-foreground marker:hidden hover:text-foreground [&::-webkit-details-marker]:hidden">
+                  <summary className="flex min-h-11 cursor-pointer list-none items-center gap-1.5 px-5 py-3 text-sm font-semibold text-muted-foreground marker:hidden hover:text-foreground [&::-webkit-details-marker]:hidden">
                     <span
                       aria-hidden
                       className="text-[10px] transition-transform group-open/massa:rotate-90"
@@ -1364,7 +1364,7 @@ function VisaoSupervisor({
           </b>{" "}
           · agrupadas por turma
         </p>
-        <p className="text-[11.5px] text-muted-foreground">
+        <p className="text-xs text-muted-foreground">
           <span aria-hidden className="mx-1 inline-block size-2 rounded-full bg-[var(--role-mentorado)] align-[-1px] ring-1 ring-black/10" />
           mentorado(a)
           <span aria-hidden className="mx-1 ml-3 inline-block size-2 rounded-full bg-[var(--role-mentor)] align-[-1px] ring-1 ring-black/10" />
@@ -1425,7 +1425,7 @@ function VisaoSupervisor({
                             trigger={
                               <button
                                 type="button"
-                                className="inline-flex min-h-11 items-center whitespace-nowrap rounded-lg border border-border bg-card px-2.5 text-[11.5px] font-semibold text-muted-foreground hover:border-[var(--input)] hover:text-foreground sm:min-h-8"
+                                className="inline-flex min-h-11 items-center whitespace-nowrap rounded-lg border border-border bg-card px-2.5 text-xs font-semibold text-muted-foreground hover:border-[var(--input)] hover:text-foreground sm:min-h-8"
                               >
                                 Registrar supervisão
                               </button>
@@ -1627,7 +1627,7 @@ function VisaoMentor({
                 <div className="flex items-start gap-2.5 rounded-[10px] bg-muted px-3 py-2.5 text-sm">
                   <Clock size={15} aria-hidden className="mt-0.5 shrink-0" />
                   <div>
-                    <span className="block text-[11.5px] font-semibold uppercase tracking-[0.04em] text-muted-foreground">
+                    <span className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
                       Próximo passo
                     </span>
                     <b className="block">
@@ -1644,7 +1644,7 @@ function VisaoMentor({
 
                 {/* pendências dele */}
                 <div>
-                  <span className="block text-[11.5px] font-semibold uppercase tracking-[0.04em] text-muted-foreground">
+                  <span className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
                     Pendências
                   </span>
                   <ul className="mt-1 grid gap-1 text-sm">
@@ -1854,7 +1854,7 @@ function VisaoEspecialista({
                 <div className="flex items-start gap-2.5 rounded-[10px] bg-muted px-3 py-2.5 text-sm">
                   <Clock size={15} aria-hidden className="mt-0.5 shrink-0" />
                   <div>
-                    <span className="block text-[11.5px] font-semibold uppercase tracking-[0.04em] text-muted-foreground">
+                    <span className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
                       Próxima sessão
                     </span>
                     <b className="block">

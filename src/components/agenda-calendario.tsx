@@ -2274,7 +2274,7 @@ export function AgendaCalendario({
                 role="columnheader"
                 key={d}
                 aria-label={DIAS_SEMANA_COMPLETOS[i]}
-                className="py-2 text-center text-[11px] font-medium uppercase tracking-wider text-muted-foreground"
+                className="py-2 text-center text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground"
               >
                 {d}
               </span>
@@ -2413,7 +2413,7 @@ export function AgendaCalendario({
                             {dia}
                           </span>
                           {inicioRecesso && (
-                            <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                            <span className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
                               Recesso
                             </span>
                           )}
@@ -4222,7 +4222,7 @@ function SemanaMentor({
                   {/* header do dia — dow + número; hoje veste a pill ink,
                       mesma gramática das células do mês */}
                   <div className="flex items-center justify-between gap-1 px-2 pb-1 pt-2">
-                    <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                    <span className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
                       {DIAS_SEMANA[d.getDay()]}
                     </span>
                     <span
@@ -4477,7 +4477,7 @@ function HorariosMentor({
                 key={iso}
                 className="flex items-baseline justify-between gap-1 border-b border-l border-border/60 px-1.5 py-1.5 sm:px-2"
               >
-                <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                <span className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
                   {DIAS_SEMANA[d.getDay()]}
                 </span>
                 <span

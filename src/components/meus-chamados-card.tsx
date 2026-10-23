@@ -76,7 +76,7 @@ export function MeusChamadosCard({
                     <span className="font-mono text-xs text-muted-foreground">
                       {c.numero}
                     </span>
-                    <span className="min-w-0 flex-1 truncate text-sm">
+                    <span className="min-w-0 flex-1 truncate text-sm font-medium">
                       {c.assunto}
                     </span>
                     <Badge variant="outline" className="shrink-0 text-[10px] font-normal">
