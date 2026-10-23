@@ -1,4 +1,4 @@
-import { entrarNaDemo, expect, test } from "../helpers";
+import { agirComConfirma, entrarNaDemo, expect, test } from "../helpers";
 
 // WP5 — a agenda do auxiliar executivo (role "supervisor") no dataset demo:
 // "Por turma" agrupa as supervisionadas pelo calendário delas (a coord
@@ -101,24 +101,47 @@ test.describe("agenda demo do supervisor — Por turma / Consolidada (WP5)", () 
         cardCaio.getByText(/realizado|agendado já passou|pendente|atrasado/)
       ).toBeVisible();
     }
-    await expect(
-      cardCaio.getByRole("button", { name: "Registrar supervisão" })
-    ).toBeEnabled();
-    // o Lembrar só renderiza quando há pendência apontável (sinais > 0) —
-    // Caio em-dia não leva nudge; quando existe, está livre ("Lembrar") ou
-    // travada no cap ("Lembrada dd/mm")
-    const lembrarCaio = cardCaio.getByRole("button", { name: /^Lembrar/ });
-    if ((await lembrarCaio.count()) > 0) {
-      await expect(lembrarCaio.first()).toBeEnabled();
+    // REALIZA-186 — o rodapé do card muda de anatomia com o Lembrar: havendo
+    // pendência apontável (sinais > 0) o nudge vira a primária visível e
+    // supervisão + ficha recolhem no ⋯ "Mais ações da dupla de <nome>"; em
+    // dia (sem sinal) voltam os botões soltos. O ⋯ no DOM decide o ramo —
+    // a pendência do Caio drifta com o relógio, como o contexto acima.
+    const maisAcoesCaio = cardCaio.getByRole("button", {
+      name: "Mais ações da dupla de Caio Henrique Oliveira",
+    });
+    if ((await maisAcoesCaio.count()) > 0) {
+      // o Lembrar é a condição do ⋯ — livre ("Lembrar") ou travada no cap
+      // ("Lembrada dd/mm"), a primária está sempre no rodapé
+      await expect(
+        cardCaio.getByRole("button", { name: /^Lembrar/ }).first()
+      ).toBeEnabled();
+      // clique com confirmação: em preview frio o handler do trigger pode
+      // ainda não ter hidratado — repete até o popup abrir
+      await agirComConfirma(
+        () => maisAcoesCaio.click(),
+        () => page.getByRole("menu").isVisible()
+      );
+      const menuAcoes = page.getByRole("menu");
+      await expect(
+        menuAcoes.getByRole("menuitem", { name: "Registrar supervisão" })
+      ).toBeVisible();
+      await expect(
+        menuAcoes.getByRole("menuitem", { name: "Ver ficha" })
+      ).toHaveAttribute("href", `/duplas/${DUPLA_PEND}`);
+      await page.keyboard.press("Escape");
     } else {
+      // Caio em-dia hoje — sem sinal, sem Lembrar e sem ⋯ (botões soltos)
       test.info().annotations.push({
         type: "dataset",
-        description: "Caio em-dia hoje — sem sinal, sem botão Lembrar",
+        description: "Caio em-dia hoje — sem sinal, sem Lembrar e sem ⋯",
       });
+      await expect(
+        cardCaio.getByRole("button", { name: "Registrar supervisão" })
+      ).toBeEnabled();
+      await expect(
+        cardCaio.getByRole("link", { name: "Ver ficha ›" })
+      ).toHaveAttribute("href", `/duplas/${DUPLA_PEND}`);
     }
-    await expect(
-      cardCaio.getByRole("link", { name: "Ver ficha ›" })
-    ).toHaveAttribute("href", `/duplas/${DUPLA_PEND}`);
 
     // trilha esp supervisionada — sessão é "Sessão", não "Encontro"; a
     // supervisora é a mesma pessoa, o mentor é a especialista
