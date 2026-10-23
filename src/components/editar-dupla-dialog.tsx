@@ -345,7 +345,7 @@ export function EditarDuplaDialog({ dupla }: { dupla: Dupla }) {
         }}
       >
         <DialogTrigger render={<Button variant="outline" size="sm"><PencilSimple size={15} /> Editar</Button>} />
-        <DialogContent className="sm:max-w-md">
+        <DialogContent size="xl">
           <DialogHeader>
             <DialogTitle>Editar dupla</DialogTitle>
             <DialogDescription>

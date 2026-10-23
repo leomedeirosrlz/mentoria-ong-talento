@@ -49,6 +49,19 @@ export function normalizaTexto(s: string): NormResult {
   return { valor: v || null, mudou: v !== s.trim() };
 }
 
+/** Texto longo — mesmo trim/colapso POR LINHA, preservando as quebras:
+ *  a linha é unidade semântica (`submetas_N` serializa uma submeta por
+ *  linha e `pdm_parse_submetas` lê linha a linha — colapsar \n achatava
+ *  o mapa inteiro num item só). Vazio vira null. */
+export function normalizaTextoLongo(s: string): NormResult {
+  const v = s
+    .split("\n")
+    .map((l) => l.trim().replace(/\s+/g, " "))
+    .filter(Boolean)
+    .join("\n");
+  return { valor: v || null, mudou: v !== s.trim() };
+}
+
 // ---------- e-mail ----------
 
 /** Mesma régua do emailValido do import: um "@", domínio multi-label,

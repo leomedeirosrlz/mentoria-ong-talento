@@ -141,8 +141,10 @@ begin
 
   -- a dupla esp está "T2 · 2026/2027" (teste 3) e o Esp E2E tem papel só
   -- em "Turma E2E" — antes da 0101 o rematch falhava aqui
+  -- (0117: rematch esp exige a devolutiva pro PDM de quem sai — 6º parâmetro)
   nova := public.rematch_dupla(d1, 'mentor',
-    'e2e00000-0000-4000-8000-000000000060');
+    'e2e00000-0000-4000-8000-000000000060', null, true,
+    'validacao 0117: devolutiva da trilha encerrada no rematch');
   raise notice 'OK 5a: rematch esp cross-turma criou dupla %', nova;
 
   -- controle: papel mentor_dpp escopado em OUTRA turma segue insuficiente

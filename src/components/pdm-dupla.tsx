@@ -141,10 +141,13 @@ export function PdmDupla({
     onNovaSubmeta: (pai: PdmNo) =>
       setItemDialog({ modo: "nova-submeta", pai }),
     onMover: (item: PdmNo, direcao: -1 | 1, irmaos: PdmNo[]) => {
-      const idx = irmaos.findIndex((i) => i.id === item.id);
+      // a RPC valida o conjunto exato de irmãos NÃO-descartados — a árvore
+      // mostra descartadas no histórico, mas elas não entram na ordem viva
+      const ativos = irmaos.filter((i) => i.status !== "descartada");
+      const idx = ativos.findIndex((i) => i.id === item.id);
       const alvo = idx + direcao;
-      if (idx < 0 || alvo < 0 || alvo >= irmaos.length) return;
-      const nova = [...irmaos];
+      if (idx < 0 || alvo < 0 || alvo >= ativos.length) return;
+      const nova = [...ativos];
       [nova[idx], nova[alvo]] = [nova[alvo], nova[idx]];
       executar(
         () => pdmReordenar(duplaId, item.parentId, nova.map((i) => i.id)),
@@ -160,7 +163,7 @@ export function PdmDupla({
     <section
       aria-label="Plano de desenvolvimento"
       className={cn(
-        "rounded-xl bg-card p-4 shadow-[var(--shadow-border)] sm:p-6",
+        "rounded-xl bg-card p-4 shadow-[var(--shadow-border)] sm:p-6 lg:p-7",
         className
       )}
     >
@@ -183,7 +186,7 @@ export function PdmDupla({
       </div>
 
       {/* ---------- Declaração de Visão ---------- */}
-      <div className="mt-4 rounded-xl border border-[var(--brand-lime)]/40 bg-[var(--brand-lime)]/8 p-3.5">
+      <div className="mt-4 rounded-xl border border-[var(--brand-lime)]/40 bg-[var(--brand-lime)]/8 p-3.5 sm:p-4">
         <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--ok-text)]">
           <Compass size={13} aria-hidden />
           Declaração de Visão
@@ -266,7 +269,7 @@ export function PdmDupla({
       )}
 
       {/* ---------- a árvore ---------- */}
-      <div className="mt-4">
+      <div className="mt-4 sm:mt-5">
         {nosVisiveis.length === 0 && metasDescartadas.length === 0 ? (
           <div className="rounded-xl border border-dashed border-border px-4 py-6 text-center">
             <Lightbulb

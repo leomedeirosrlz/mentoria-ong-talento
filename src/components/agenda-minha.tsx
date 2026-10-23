@@ -300,7 +300,7 @@ function Secao({
         {secao.grupos.map((g) => (
           <div key={g.dia ?? "sem-data"}>
             {g.rotulo && (
-              <h3 className="mb-1.5 mt-4 text-xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">
+              <h3 className="mb-1.5 mt-4 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
                 {g.rotulo}
               </h3>
             )}

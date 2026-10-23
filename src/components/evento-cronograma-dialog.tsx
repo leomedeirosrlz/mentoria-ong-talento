@@ -70,7 +70,7 @@ export function EventoCronogramaDialog({
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent size="xl">
         <DialogHeader>
           <DialogTitle>{titulo}</DialogTitle>
           <DialogDescription>

@@ -4,6 +4,7 @@ import {
   buscarViaServiceRole,
   expect,
   inserirViaServiceRole,
+  limparDuplas,
   limparEncontrosDaDupla,
   limparViaServiceRole,
   loginComSenha,
@@ -70,17 +71,15 @@ async function limparCronogramasE2E() {
   await limparViaServiceRole("cronogramas", `id=in.(${ids})`);
 }
 
-/** DELETE de duplas com os links de instrumento que o trigger 0099 minta
- *  no INSERT — filho primeiro, FK depois (mesmo padrão do seed). */
+/** DELETE de duplas por filtro — limparDuplas cobre TODOS os filhos
+ *  NO ACTION de hoje (links do 0099, encerramentos, sols, chamados,
+ *  linhagem remanejada_de), não só os de quando o helper nasceu. */
 async function limparDuplasComLinks(filtro: string) {
   const rows = await buscarViaServiceRole<{ id: string }[]>(
     "duplas",
     `${filtro}&select=id`
   );
-  if (!rows.length) return;
-  const ids = rows.map((r) => r.id).join(",");
-  await limparViaServiceRole("formulario_links", `dupla_id=in.(${ids})`);
-  await limparViaServiceRole("duplas", `id=in.(${ids})`);
+  await limparDuplas(rows.map((r) => r.id));
 }
 
 /** Devolve o staging ao estado do seed — idempotente, vale tanto pro

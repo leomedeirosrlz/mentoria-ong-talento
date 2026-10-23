@@ -12,6 +12,7 @@ import {
   TEMA_AVALIACAO_LABEL,
 } from "./ciclo";
 import { avaliacaoPorToken, linkAvaliacaoMeta } from "./queries-avaliacao";
+import { snapshotDuplaHoje } from "./jobs";
 import { erroAmigavel } from "./utils";
 
 // Escrita da avaliação estrela do jovem (REALIZA-109 / D4, migration 0071).
@@ -301,6 +302,7 @@ export async function resolverApoioJovem(avaliacaoId: string, duplaId: string) {
     };
   }
   revalidatePath("/");
+  void snapshotDuplaHoje(duplaId).catch(() => {});
   revalidatePath("/duplas");
   revalidatePath("/chamados");
   revalidatePath(`/duplas/${duplaId}`);

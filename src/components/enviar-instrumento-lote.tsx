@@ -175,7 +175,7 @@ export function EnviarInstrumentoLote({
           </Button>
         }
       />
-      <DialogContent className="sm:max-w-md">
+      <DialogContent size="2xl">
         <DialogHeader>
           <DialogTitle>Enviar “{estacaoTitulo}” em lote</DialogTitle>
           <DialogDescription>

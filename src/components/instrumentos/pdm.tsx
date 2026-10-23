@@ -11,6 +11,7 @@ import { campoRespondido } from "@/lib/forms/resposta";
 import { type FormularioCampo } from "@/lib/forms/schema";
 import { cn } from "@/lib/utils";
 import type { RespostaApi } from "./use-resposta";
+import { SubmetasEditor } from "./submetas-editor";
 import {
   CampoGenerico,
   campoDomId,
@@ -23,9 +24,10 @@ import {
 // PDM — o "documento que se constrói". Os capítulos da definição viram
 // seções numeradas de uma folha contínua: hierarquia editorial (nº + título
 // + instrução), fichas de meta com os três campos do guia juntos (meta,
-// indicador de sucesso, prazo) e o mapa de submetas em blocos amplos. Em
-// telas largas um sumário lateral acompanha o preenchimento — cada
-// capítulo acende o check quando suas obrigatórias estão respondidas.
+// indicador de sucesso, prazo) e o mapa de submetas no editor de linhas
+// da 0118. Em telas extra-largas um sumário lateral acompanha o
+// preenchimento — cada capítulo acende o check quando suas obrigatórias
+// estão respondidas; abaixo disso o documento segue em coluna única.
 
 const META_RE = /^meta_\d+$/;
 
@@ -52,11 +54,12 @@ export function Pdm({
   }));
 
   return (
-    <div className="lg:grid lg:grid-cols-[180px_1fr] lg:items-start lg:gap-5">
-      {/* sumário lateral — só telas largas: o telefone segue em fluxo */}
+    <div className="xl:grid xl:grid-cols-[180px_1fr] xl:items-start xl:gap-5">
+      {/* sumário lateral — só telas extra-largas: até xl o documento fica
+          em fluxo único (o preview do form cabe inteiro assim) */}
       <nav
         aria-label="Capítulos do PDM"
-        className="sticky top-16 hidden self-start space-y-1 lg:block"
+        className="sticky top-16 hidden self-start space-y-1 xl:block"
       >
         <p className="px-2 pb-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
           Seu PDM
@@ -138,8 +141,19 @@ function CapituloDoc({
           {temMetas ? (
             <FichasPdm campos={bloco.campos} grupos={grupos} api={api} />
           ) : (
-            bloco.campos.map((c) =>
-              c.tipo === "texto_longo" ? (
+            bloco.campos.map((c) => {
+              // mapa de submetas (0080): o capítulo dedicado rende o
+              // editor de linhas — uma linha por submeta, mesmo
+              // contrato texto_longo de pdm_parse_submetas
+              const subN = /^submetas_(\d+)$/.exec(c.id)?.[1];
+              return c.tipo === "texto_longo" && subN ? (
+                <SubmetasEditor
+                  key={c.id}
+                  campo={c}
+                  api={api}
+                  metaN={Number(subN)}
+                />
+              ) : c.tipo === "texto_longo" ? (
                 <div key={c.id} data-campo={c.id} className="space-y-1.5">
                   <label
                     htmlFor={campoDomId(c)}
@@ -164,8 +178,8 @@ function CapituloDoc({
                 </div>
               ) : (
                 <CampoGenerico key={c.id} campo={c} api={api} sombra={false} />
-              )
-            )
+              );
+            })
           )}
         </div>
       </div>
@@ -195,6 +209,9 @@ function FichasPdm({
     (c) => !idsDeMeta.has(c.id) && c.id !== "declaracao_visao"
   );
   const declaracao = campos.find((c) => c.id === "declaracao_visao");
+  // ids declarados neste capítulo — o grupo é montado do template todo;
+  // um subcampo que mora em outro capítulo renderiza lá, não aqui
+  const nesteCapitulo = new Set(campos.map((c) => c.id));
 
   return (
     <>
@@ -264,7 +281,7 @@ function FichasPdm({
                 />
                 <ErroCampo campo={g.meta} msg={api.erros[g.meta.id]} />
               </div>
-              <div className="grid gap-3 sm:grid-cols-[1fr_180px]">
+              <div className="grid gap-3 md:grid-cols-[1fr_180px]">
                 {g.is && (
                   <div className="space-y-1.5" data-campo={g.is.id}>
                     <label
@@ -312,15 +329,30 @@ function FichasPdm({
                   </div>
                 )}
               </div>
-              {/* subcampos fora da convenção do capítulo (porque_/submetas_
-                  num form editado) — renderizados em vez de sumir */}
+              {/* subcampos do grupo declarados NESTE capítulo, fora da
+                  posição-convenção (ex.: submetas_N dentro de s_visao
+                  num form editado) — a filtragem por capítulo evita
+                  renderizar aqui o que vive no capítulo "Mapa de
+                  submetas" (era duplicado antes da 0118) */}
               {[g.porque, g.submetas]
-                .filter((c): c is FormularioCampo => c != null)
-                .map((c) => (
-                  <div key={c.id} data-campo={c.id}>
-                    <CampoGenerico campo={c} api={api} sombra={false} />
-                  </div>
-                ))}
+                .filter(
+                  (c): c is FormularioCampo =>
+                    c != null && nesteCapitulo.has(c.id)
+                )
+                .map((c) =>
+                  c === g.submetas ? (
+                    <SubmetasEditor
+                      key={c.id}
+                      campo={c}
+                      api={api}
+                      metaN={g.n}
+                    />
+                  ) : (
+                    <div key={c.id} data-campo={c.id}>
+                      <CampoGenerico campo={c} api={api} sombra={false} />
+                    </div>
+                  )
+                )}
             </div>
           </div>
         );

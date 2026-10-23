@@ -5454,6 +5454,7 @@ export type Database = {
       relatorio_links_stats: { Args: never; Returns: Json }
       rematch_dupla: {
         Args: {
+          p_devolutiva?: string
           p_dupla_id: string
           p_lado: string
           p_motivo?: string

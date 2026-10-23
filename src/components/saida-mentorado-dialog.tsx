@@ -126,7 +126,7 @@ export function SaidaMentoradoDialog({
         }
       }}
     >
-      <DialogContent className="sm:max-w-md">
+      <DialogContent size="xl">
         <DialogHeader>
           <DialogTitle>Marcar saída de {primeiroNome}</DialogTitle>
           <DialogDescription>

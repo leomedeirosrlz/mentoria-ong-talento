@@ -117,7 +117,7 @@ export async function gerarLinksParaDupla(input: {
   // lê de volta os links vigentes desses destinos — cobre os criados agora
   // e os reutilizados (pendente já existente vale como "enviado" aqui também)
   const destIds = destinos
-    .map((d) => (d.tipo === "generico" ? null : d.id))
+    .map((d) => d.id)
     .filter((x): x is string => typeof x === "string" && UUID_RE.test(x));
   if (!destIds.length)
     return { error: "Dupla sem destinatários válidos." };

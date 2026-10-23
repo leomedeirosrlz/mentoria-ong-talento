@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import {
   CircleNotch,
   Copy,
+  DotsThreeVertical,
   FilePdf,
   GearSix,
   PaperPlaneTilt,
@@ -31,8 +32,15 @@ import {
 import type { Assinatura, AssinaturaStatus } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Dialog,
   DialogContent,
@@ -161,7 +169,7 @@ function ContraAssinaturaDialog() {
       >
         <GearSix size={15} />
       </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent size="md">
         <DialogHeader>
           <DialogTitle>Contra-assinatura do presidente</DialogTitle>
           <DialogDescription className="leading-relaxed">
@@ -206,6 +214,85 @@ function ContraAssinaturaDialog() {
 
 // texto do wa.me vem de documentos/texto.ts (msgLinkAssinatura) — o termo
 // do voluntário fala com a própria pessoa, o do jovem com a família
+
+/** ⋯ da assinatura pendente (REALIZA-186) — WhatsApp (quando há telefone,
+ *  o wa.me vem pronto do pai), Reenviar e Revogar por último abrindo o
+ *  confirm controlado fora do popup. */
+function AssinaturaAcoes({
+  assinatura,
+  waUrl,
+  reenviando,
+  onReenviar,
+  confirmacao,
+  onRevogar,
+}: {
+  assinatura: Assinatura;
+  /** wa.me resolvido ou null (sem telefone — o item nem aparece) */
+  waUrl: string | null;
+  reenviando: boolean;
+  onReenviar: () => void;
+  confirmacao: { titulo: string; descricao: string };
+  onRevogar: () => Promise<{ error?: string; ok?: boolean }>;
+}) {
+  const [revogando, setRevogando] = useState(false);
+  return (
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          aria-label={`Ações de "${assinatura.template?.titulo ?? "Documento"}"`}
+          className={cn(
+            buttonVariants({ variant: "ghost", size: "icon" }),
+            "size-11 shrink-0 sm:size-8"
+          )}
+        >
+          <DotsThreeVertical size={18} weight="bold" aria-hidden />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-56">
+          {waUrl && (
+            <DropdownMenuItem
+              render={
+                <a href={waUrl} target="_blank" rel="noopener noreferrer" />
+              }
+            >
+              <WhatsappLogo size={16} data-icon="inline-start" aria-hidden />
+              Enviar no WhatsApp
+            </DropdownMenuItem>
+          )}
+          <DropdownMenuItem disabled={reenviando} onClick={onReenviar}>
+            {reenviando ? (
+              <CircleNotch
+                size={16}
+                className="animate-spin"
+                data-icon="inline-start"
+                aria-hidden
+              />
+            ) : (
+              <PaperPlaneTilt size={16} data-icon="inline-start" aria-hidden />
+            )}
+            {reenviando ? "Reenviando…" : "Reenviar link"}
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            variant="destructive"
+            onClick={() => setRevogando(true)}
+          >
+            <Prohibit size={16} data-icon="inline-start" aria-hidden />
+            Revogar assinatura
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <ConfirmDeleteButton
+        open={revogando}
+        onOpenChange={setRevogando}
+        titulo={confirmacao.titulo}
+        descricao={confirmacao.descricao}
+        sucesso="Assinatura revogada."
+        acao="Revogar"
+        onConfirm={onRevogar}
+      />
+    </>
+  );
+}
 
 /** Seção "Assinaturas" da ficha — irmã do DocumentoPessoa dentro dos dialogs
  *  de edição de /pessoas (que só a coordenação abre). O dialog desmonta o
@@ -425,7 +512,7 @@ export function AssinaturasPessoa({
               <li key={a.id}>
                 <div className="flex items-center gap-2">
                   <st.Icone size={15} aria-hidden className={cn("shrink-0", st.icone)} />
-                  <span className="min-w-0 flex-1 truncate text-sm">
+                  <span className="min-w-0 flex-1 truncate text-sm font-medium">
                     {a.template?.titulo ?? "Documento"}
                   </span>
                   <Badge variant="outline" className={cn("shrink-0", st.badge)}>
@@ -457,6 +544,8 @@ export function AssinaturasPessoa({
                   )}
                   {a.status === "pendente" && !vencido && (
                     <>
+                      {/* primária visível (REALIZA-186): copiar funciona pra
+                          qualquer canal — WhatsApp/reenviar/revogar vão pro ⋯ */}
                       <Button
                         type="button"
                         variant="ghost"
@@ -471,42 +560,26 @@ export function AssinaturasPessoa({
                         <Copy size={13} />
                         Copiar link
                       </Button>
-                      {(() => {
-                        const url = waLink(
+                      <AssinaturaAcoes
+                        assinatura={a}
+                        waUrl={waLink(
                           whatsapp,
                           msgLinkAssinatura(
                             a.template?.slug,
                             nome,
                             `${origem}/assinar/${a.token}`
                           )
-                        );
-                        return url ? (
-                          <a
-                            href={url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="-my-2 inline-flex min-h-11 items-center gap-1.5 rounded-[min(var(--radius-md),10px)] px-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:my-0 sm:min-h-6"
-                          >
-                            <WhatsappLogo size={13} />
-                            WhatsApp
-                          </a>
-                        ) : null;
-                      })()}
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="xs"
-                        disabled={reenviando === a.id}
-                        aria-busy={reenviando === a.id}
-                        onClick={() => reenviar(a)}
-                      >
-                        {reenviando === a.id ? (
-                          <CircleNotch size={13} className="animate-spin" />
-                        ) : (
-                          <PaperPlaneTilt size={13} />
                         )}
-                        Reenviar
-                      </Button>
+                        reenviando={reenviando === a.id}
+                        onReenviar={() => reenviar(a)}
+                        confirmacao={{
+                          titulo: `Revogar a assinatura de ${primeiroNome}?`,
+                          descricao: `"${a.template?.titulo ?? "Documento"}" fica marcada como revogada. ${
+                            tipo === "mentorado" ? "O responsável" : "A pessoa"
+                          } precisa assinar de novo pra regularizar.`,
+                        }}
+                        onRevogar={() => revogar(a)}
+                      />
                     </>
                   )}
                   {a.status === "assinado" && (
@@ -521,8 +594,10 @@ export function AssinaturasPessoa({
                     </a>
                   )}
                   {/* revogar só tem efeito em doc vivo — em linha terminal a
-                      ação útil é reemitir (acima), não revogar de novo */}
-                  {!terminal && (
+                      ação útil é reemitir (acima), não revogar de novo. No
+                      assinado a linha tem só 2 ações (PDF + revogar), fica
+                      fora do ⋯ mesmo */}
+                  {a.status === "assinado" && (
                     <ConfirmDeleteButton
                       titulo={`Revogar a assinatura de ${primeiroNome}?`}
                       descricao={`"${a.template?.titulo ?? "Documento"}" fica marcada como revogada. ${

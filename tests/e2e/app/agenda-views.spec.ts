@@ -3,6 +3,7 @@ import {
   appEnvOk,
   atualizarViaServiceRole,
   buscarViaServiceRole,
+  convergirDuplaAtiva,
   expect,
   inserirViaServiceRole,
   limparViaServiceRole,
@@ -154,6 +155,11 @@ async function convergirPiso() {
     "notificacoes",
     `profile_id=in.(${IDS.mentorProfile},${IDS.jovemProfile})&tipo=in.(${TIPOS_AGENDA})`
   );
+
+  // o d2 é o ÚLTIMO encontro do cronograma — re-criá-lo dispara a 0102 e
+  // a dupla acorda 'concluida' (a agenda inteira do mentor desconfigura).
+  // Devolve o piso de sempre: status ativa, sem encerramento nem sinos.
+  await convergirDuplaAtiva(DUPLA_ID);
 }
 
 // ---------- helpers de UI ----------

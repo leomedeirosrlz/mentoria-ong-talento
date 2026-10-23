@@ -76,7 +76,7 @@ export function RoleSelect({ profileId, role, nome }: { profileId: string; role:
       </Select>
 
       <Dialog open={confirmaCoord} onOpenChange={setConfirmaCoord}>
-        <DialogContent>
+        <DialogContent size="sm">
           <DialogHeader>
             <DialogTitle>
               {nome ? `Elevar ${nome} à coordenação?` : "Elevar à coordenação?"}

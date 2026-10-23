@@ -106,7 +106,7 @@ export function TrilhasCoordPanel({
             de trabalho: a coord não designa nem aceita pelo especialista */}
         {alertas.length > 0 && (
           <section aria-label="Pedidos parados">
-            <h3 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+            <h3 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
               Pedidos parados
             </h3>
             <ul className="mt-2 space-y-2">
@@ -147,7 +147,7 @@ export function TrilhasCoordPanel({
         )}
 
         <section aria-label="Trilhas de especialista em andamento">
-          <h3 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+          <h3 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
             Trilhas
           </h3>
           {trilhas.length === 0 ? (

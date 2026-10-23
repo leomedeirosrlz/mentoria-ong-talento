@@ -35,7 +35,9 @@ import { cn } from "@/lib/utils";
 // treeitem + group, caret com aria-expanded, checkbox do status com
 // rótulo falado. A partir do nível 4 o recuo para de crescer (mobile) e
 // um chip "nível N" marca a profundidade — o plano pede contexto, não
-// indentação infinita.
+// indentação infinita. Em lg cada meta veste uma ficha própria (mais
+// respiro entre seções do documento) e o indicador de sucesso deixa de
+// truncar — metadados do plano merecem ser lidos inteiros.
 
 export type PdmArvoreAcoes = {
   onStatus: (item: PdmNo, status: PdmItemStatus) => void;
@@ -67,7 +69,10 @@ export function PdmArvore({
 }) {
   const lista = irmaos ?? nos;
   return (
-    <ul role={nivel === 0 ? "tree" : "group"} className={cn(nivel === 0 && "space-y-2")}>
+    <ul
+      role={nivel === 0 ? "tree" : "group"}
+      className={cn(nivel === 0 && "space-y-2 lg:space-y-3")}
+    >
       {nos.map((no, i) => (
         <NoPdm
           key={no.id}
@@ -117,11 +122,16 @@ function NoPdm({
       role="treeitem"
       aria-expanded={temFilhos ? aberto : undefined}
       aria-selected={false}
-      className={cn(nivel > 0 && "mt-1")}
+      className={cn(
+        nivel > 0 && "mt-1 sm:mt-1.5",
+        // em telas largas a meta vira uma ficha — a seção do documento
+        // ganha respiro sem mexer na estrutura da árvore
+        ehMeta && "lg:rounded-xl lg:border lg:border-border/60 lg:px-3 lg:py-2.5"
+      )}
     >
       <div
         className={cn(
-          "group flex items-start gap-1 rounded-lg px-1.5 py-1.5 transition-colors",
+          "group flex items-start gap-1 rounded-lg px-1.5 py-1.5 transition-colors sm:gap-1.5 sm:px-2 sm:py-2",
           ehMeta ? "bg-muted/40" : "hover:bg-muted/40",
           descartada && "opacity-60"
         )}
@@ -200,7 +210,7 @@ function NoPdm({
           <p
             className={cn(
               "text-sm leading-snug",
-              ehMeta ? "font-semibold" : "font-medium",
+              ehMeta ? "font-semibold sm:text-[15px]" : "font-medium",
               (atingida || descartada) && "text-muted-foreground",
               descartada && "line-through decoration-muted-foreground/50"
             )}
@@ -217,7 +227,7 @@ function NoPdm({
               {no.porque}
             </p>
           )}
-          <span className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px] text-muted-foreground">
+          <span className="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px] text-muted-foreground sm:gap-x-3">
             {no.areaVida && (
               <Badge variant="outline" className="text-[10px] font-medium">
                 {no.areaVida}
@@ -226,7 +236,11 @@ function NoPdm({
             {no.indicador && (
               <span className="inline-flex items-center gap-1">
                 <Target size={12} aria-hidden className="shrink-0" />
-                <span className="max-w-64 truncate">{no.indicador}</span>
+                {/* cresce com a tela e em lg para de truncar — o IS é a
+                    prova da meta, não decoração */}
+                <span className="max-w-64 truncate sm:max-w-80 lg:max-w-none lg:whitespace-normal">
+                  {no.indicador}
+                </span>
               </span>
             )}
             {no.prazoAlvo && (
@@ -264,20 +278,24 @@ function NoPdm({
                 <PencilSimple size={16} aria-hidden data-icon="inline-start" />
                 Editar
               </DropdownMenuItem>
-              <DropdownMenuItem
-                disabled={posicao === 0}
-                onClick={() => acoes.onMover(no, -1, irmaos)}
-              >
-                <ArrowUp size={16} aria-hidden data-icon="inline-start" />
-                Subir na prioridade
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                disabled={posicao === total - 1}
-                onClick={() => acoes.onMover(no, 1, irmaos)}
-              >
-                <ArrowDown size={16} aria-hidden data-icon="inline-start" />
-                Descer na prioridade
-              </DropdownMenuItem>
+              {!descartada && (
+                <>
+                  <DropdownMenuItem
+                    disabled={posicao === 0}
+                    onClick={() => acoes.onMover(no, -1, irmaos)}
+                  >
+                    <ArrowUp size={16} aria-hidden data-icon="inline-start" />
+                    Subir na prioridade
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    disabled={posicao === total - 1}
+                    onClick={() => acoes.onMover(no, 1, irmaos)}
+                  >
+                    <ArrowDown size={16} aria-hidden data-icon="inline-start" />
+                    Descer na prioridade
+                  </DropdownMenuItem>
+                </>
+              )}
               {podeAdicionarSub && !descartada && (
                 <DropdownMenuItem onClick={() => acoes.onNovaSubmeta(no)}>
                   <Plus size={16} aria-hidden data-icon="inline-start" />
@@ -326,7 +344,9 @@ function NoPdm({
         <div
           className={cn(
             "border-l border-dashed border-border",
-            profundo ? "ml-8" : "ml-5"
+            // recuo um pouco mais generoso a partir de sm — a hierarquia
+            // do mapa lê melhor com folga na borda
+            profundo ? "ml-8 sm:ml-10" : "ml-5 sm:ml-7"
           )}
         >
           <PdmArvore

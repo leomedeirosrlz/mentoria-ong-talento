@@ -179,7 +179,7 @@ export function SolicitacoesCoordCard({
       <CardContent>
         {triagem.length > 0 && (
           <>
-            <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
               Aguardando triagem
             </p>
             <ul className="divide-y divide-border/60">

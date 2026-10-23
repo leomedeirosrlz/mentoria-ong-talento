@@ -1,5 +1,6 @@
 import {
   appEnvOk,
+  convergirDuplaAtiva,
   expect,
   loginComSenha,
   test,
@@ -28,6 +29,12 @@ const DUPLA_ID =
 test.skip(!appEnvOk(), "sem credenciais de teste (E2E_*) — pula specs de app");
 
 test.describe("coordenação — painel Progresso da jornada em /materiais", () => {
+  test.beforeEach(async () => {
+    // o painel só lista duplas DPP ativas/pausadas — um spec vizinho que
+    // recriou o encontro 16 deixou a fixture 'concluida' e a linha some
+    await convergirDuplaAtiva(DUPLA_ID);
+  });
+
   test("KPIs, barras por instrumento, fora-da-janela e a linha da dupla", async ({
     page,
   }) => {
@@ -104,6 +111,9 @@ test.describe("coordenação — painel Progresso da jornada em /materiais", () 
       .filter({ has: page.getByText(/Aval\. \d+\/\d+/) });
     await expect(linhaDupla).toBeVisible();
     await expect(linhaDupla.getByText(/mentor Mentor E2E/)).toBeVisible();
+    // as células ganharam um sufixo sr-only com o detalhe do estado
+    // (REALIZA-51) — o texto exato da estação quebraria; o title da célula
+    // é `${rótulo} · ${detalhe}` pra qualquer estado, âncora estável
     for (const celula of [
       "Roda inicial",
       "Visão",
@@ -113,7 +123,7 @@ test.describe("coordenação — painel Progresso da jornada em /materiais", () 
       "360º",
     ]) {
       await expect(
-        linhaDupla.getByText(celula, { exact: true })
+        linhaDupla.locator(`span[title^="${celula} ·"]`)
       ).toBeVisible();
     }
     await expect(linhaDupla.getByText(/Aval\. \d+\/\d+/)).toBeVisible();
@@ -134,12 +144,15 @@ test.describe("coordenação — painel Progresso da jornada em /materiais", () 
       ).toBeVisible();
     }
 
-    // a biblioteca continua abaixo do painel — grupos ou o vazio honesto
+    // a biblioteca continua abaixo do painel — REALIZA-160 virou o acervo
+    // progressivo por encontro: o landmark estável é o resumo dela + o
+    // grupo Transversais (o "Guias" virou h3 dentro dele e cada encontro
+    // fechado tem um "Nenhum material" escondido que pegava o .or().first)
     await expect(
-      page
-        .getByRole("heading", { name: "Guias" })
-        .or(page.getByText(/Nenhum material/))
-        .first()
+      page.getByRole("region", { name: "Resumo da biblioteca" })
+    ).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Transversais" })
     ).toBeVisible();
   });
 });

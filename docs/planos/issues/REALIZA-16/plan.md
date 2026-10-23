@@ -38,19 +38,19 @@ isso de forma executável e fechar o buraco dos links genéricos.
    de endurecer — prod precisa estar limpo ou saneado).
    Arquivos: `scripts/auditoria-identidade-mentorado.mjs` [NOVO].
 
-2. **Decisão sobre genéricos** (depende do BLOCKER do README):
-   - **Se genérico não é necessário**: migration `010x` adiciona
-     `check (num_nonnulls(dest_profile_id, dest_mentorado_id, dupla_id) >= 1)`
-     em `formulario_links` — todo link nasce com pelo menos um vínculo.
-     Impacto em `gerarLinksFormulario` (`src/lib/forms/actions.ts`): o ramo
-     `tipo === "generico"` passa a exigir `contexto.dupla_id` ou vira erro —
-     ajustar a UI de emissão (`src/app/(app)/formularios/`) pra exigir escopo.
-   - **Se genérico é necessário** (divulgação aberta): a resposta genérica fica
-     marcada e a **reconciliação** entra no fluxo — quando o respondente se
-     identificar (primeiro campo do form ou claim posterior), a coord vincula
-     `dupla_id`/`dest_mentorado_id` retroativamente numa action
-     `vincularRespostaOrfa(linkId, mentoradoId)` [NOVO] coord-only com log.
-   - Recomendação: primeira opção — mais simples e fiel à regra "nada órfão".
+2. **Decisão sobre genéricos** (BLOCKER respondido na revisão — dba §4):
+   genéricos SÃO necessários, mas só os de campanha. Migration `0116`
+   adiciona `check (num_nonnulls(dest_profile_id, dest_mentorado_id,
+   dupla_id) >= 1 or multi_uso or origem = 'intake')` **NOT VALID** em
+   `formulario_links` — a exceção cobre o link de intake (0115), reconciliado
+   por `promovido_profile_id`; o `validate` roda após a auditoria zerar.
+   `gerarLinksFormulario` perde o ramo `"generico"` (union `DestinoLink` sem
+   ele + guard de payload com erro amigável) e a UI deixa de oferecer o
+   "Copiar link genérico". Órfãos legados são saneados por
+   `vincularRespostaOrfa(linkId, mentoradoId)` [NOVO] coord-only — carimba
+   `dest_mentorado_id` + dupla DPP quando houver e registra trilha
+   (`interacoes.tipo` 'vinculo_resposta' — CHECK drop/add na 0116; sem dupla,
+   `pessoa_notas` na ficha).
 
 3. **Guard de futuro** — checklist de revisão em `CLAUDE.md`/PR template
    (ou comentário na migration): "toda tabela que guarda dado do jovem expõe

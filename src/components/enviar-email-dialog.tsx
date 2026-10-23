@@ -135,7 +135,7 @@ export function EnviarEmailDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent size="xl">
         <DialogHeader>
           <DialogTitle>Enviar material por e-mail</DialogTitle>
           <DialogDescription>

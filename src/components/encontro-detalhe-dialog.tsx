@@ -131,7 +131,7 @@ export function EncontroDetalheDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-xl">
+      <DialogContent size="2xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2.5">
             <DuplaAvatares

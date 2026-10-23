@@ -128,7 +128,7 @@ export function NovoChamadoDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger render={trigger as never} />
-      <DialogContent className="sm:max-w-md">
+      <DialogContent size="xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <HandHeart size={19} aria-hidden className="text-[var(--brand-ink)]" />

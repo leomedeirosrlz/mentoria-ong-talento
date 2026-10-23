@@ -31,3 +31,19 @@
 
 - Restringir links genéricos pode quebrar fluxo legado de divulgação de forms — verificar uso real antes do check constraint.
 - Dados históricos órfãos já podem existir — a auditoria precisa rodar antes de endurecer.
+
+## Implementação (corrigindo os motivos da reprovação)
+
+- **BLOCKER respondido** (revisão dba §4): links genéricos são necessários,
+  mas só os de campanha — o link de intake público (0115, `multi_uso` /
+  `origem='intake'`) é anônimo por desenho e reconcilia por
+  `promovido_profile_id`. O check de âncora (0116) exige
+  `num_nonnulls(...) >= 1` **com essa exceção** e nasce `NOT VALID`
+  (validate após a auditoria zerar — risco 2 coberto).
+- **Picker real** (revisão ux): reconciliação do órfão legado usa `Select`
+  de `src/components/ui/` (padrão `nova-dupla-dialog`), não `Command`.
+- Entregue: migration 0116 (check + `interacoes.tipo` 'vinculo_resposta'),
+  `vincularRespostaOrfa` coord-only com trilha, badge "sem vínculo" +
+  "Vincular a um jovem" na ficha do formulário, matriz
+  `src/lib/identidade-ancora.ts` + teste × `database.types.ts`, auditoria
+  `scripts/auditoria-identidade-mentorado.mjs` (`pnpm audit:identidade`).

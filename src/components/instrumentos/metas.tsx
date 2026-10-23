@@ -10,6 +10,7 @@ import { T } from "@/components/motion";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import type { RespostaApi } from "./use-resposta";
+import { SubmetasEditor } from "./submetas-editor";
 import {
   CampoGenerico,
   campoDomId,
@@ -21,7 +22,8 @@ import {
 } from "./campos";
 
 // Definindo Minhas Metas — metas como cards vivos: cada grupo meta_N +
-// porque_N é uma ficha que acende quando preenchida (número vira lime).
+// porque_N (+ submetas_N, o desdobramento da 0118) é uma ficha que
+// acende quando preenchida (número vira lime).
 // As metas opcionais (4–5) entram por "Adicionar meta" com animação de
 // altura e saem pelo X — o conjunto fixo da definição não muda, só a
 // apresentação. O fechamento (rev_* + meta_principal) vira revisão em
@@ -194,10 +196,13 @@ function CorpoMetas({
   // rascunho restaura DEPOIS do mount: meta_4 salva volta aberta sozinha)
   const [abertas, setAbertas] = useState<Set<number>>(new Set());
 
+  // conteúdo segura a ficha aberta — desdobramento/is/prazo também
+  // contam (a pessoa pode ter começado pelas submetas)
   const temConteudo = (g: (typeof grupos)[number]) =>
     campoRespondido(g.meta, api.valores[g.meta.id]) ||
-    (g.porque != null &&
-      campoRespondido(g.porque, api.valores[g.porque.id]));
+    [g.porque, g.is, g.prazo, g.submetas].some(
+      (c) => c != null && campoRespondido(c, api.valores[c.id])
+    );
 
   const obrigatorias = grupos.filter((g) => g.meta.obrigatorio);
   const opcionais = grupos.filter((g) => !g.meta.obrigatorio);
@@ -226,6 +231,7 @@ function CorpoMetas({
     if (g.porque) api.definir(g.porque.id, undefined);
     if (g.is) api.definir(g.is.id, undefined);
     if (g.prazo) api.definir(g.prazo.id, undefined);
+    if (g.submetas) api.definir(g.submetas.id, undefined);
     setAbertas((prev) => {
       const next = new Set(prev);
       next.delete(n);
@@ -268,9 +274,16 @@ function CorpoMetas({
         </button>
       )}
 
-      {fora.map((c) => (
-        <CampoGenerico key={c.id} campo={c} api={api} />
-      ))}
+      {fora.map((c) => {
+        // submetas_N órfão de meta (form editado) — mesmo editor de
+        // linhas, só sem o número da meta no rótulo falado
+        const subN = /^submetas_(\d+)$/.exec(c.id)?.[1];
+        return c.tipo === "texto_longo" && subN ? (
+          <SubmetasEditor key={c.id} campo={c} api={api} metaN={Number(subN)} />
+        ) : (
+          <CampoGenerico key={c.id} campo={c} api={api} />
+        );
+      })}
     </div>
   );
 }
@@ -393,9 +406,15 @@ function FichaMeta({
           </div>
         )}
 
-        {/* subcampos fora da convenção do instrumento (is_/prazo_/submetas_
-            num form editado) — renderizados em vez de sumir */}
-        {[g.is, g.prazo, g.submetas]
+        {/* desdobramento (0118): uma linha por submeta — o valor segue
+            texto_longo serializado no contrato de pdm_parse_submetas */}
+        {g.submetas && (
+          <SubmetasEditor campo={g.submetas} api={api} metaN={g.n} />
+        )}
+
+        {/* subcampos fora da convenção do instrumento (is_/prazo_ num
+            form de Metas editado) — renderizados em vez de sumir */}
+        {[g.is, g.prazo]
           .filter((c): c is FormularioCampo => c != null)
           .map((c) => (
             <div key={c.id} data-campo={c.id}>
@@ -416,6 +435,13 @@ function CampoRevisao({
   campo: FormularioCampo;
   api: RespostaApi;
 }) {
+  // um submetas_N fora do capítulo das metas (form editado) mantém o
+  // editor de linhas — a serialização é a mesma de qualquer lugar
+  const subN = /^submetas_(\d+)$/.exec(campo.id)?.[1];
+  if (campo.tipo === "texto_longo" && subN) {
+    return <SubmetasEditor campo={campo} api={api} metaN={Number(subN)} />;
+  }
+
   if (campo.tipo === "sim_nao") {
     return (
       <div

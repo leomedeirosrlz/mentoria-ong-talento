@@ -3,6 +3,7 @@ import {
   appEnvOk,
   atualizarViaServiceRole,
   buscarViaServiceRole,
+  convergirDuplaAtiva,
   expect,
   inserirViaServiceRole,
   limparEncontrosDaDupla,
@@ -149,6 +150,11 @@ async function convergirPiso() {
     "notificacoes",
     `profile_id=in.(${IDS.mentorProfile},${IDS.jovemProfile})&tipo=in.(${TIPOS_AGENDA.join(",")})`
   );
+
+  // o d2 é o ÚLTIMO encontro do cronograma — re-criá-lo dispara a 0102 e
+  // a dupla acorda 'concluida' (a RPC de agenda recusa e o CTA some).
+  // Devolve o piso de sempre: status ativa, sem encerramento nem sinos.
+  await convergirDuplaAtiva(DUPLA_ID);
 }
 
 /** Agendado direto no banco — piso dos fluxos que não exercitam o agendar

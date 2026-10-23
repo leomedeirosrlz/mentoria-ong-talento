@@ -116,7 +116,7 @@ export function PromoverIntakeButton({ respostaId }: { respostaId: string }) {
         Revisar e cadastrar
       </Button>
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent size="xl">
           <DialogHeader>
             <DialogTitle>
               {pronto ? "Cadastro criado" : "Cadastrar a partir da inscrição"}

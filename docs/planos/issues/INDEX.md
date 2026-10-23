@@ -55,7 +55,7 @@ revisão + checker automático). Fontes: `_manifest.md`, `_issues.json`,
 | 70 | dba | índice substituto em link_id + advisory lock no guard + conflitos 16/20 |
 | 159 | dba | 2 inserts em pessoa_notas (XOR); `profile_papeis` direto, `profiles.role` deriva |
 | 167 | dba | seed por email/nome (`insert...select`) não uuid literal de prod |
-| 171 | seg+dba | sem plano — README-stub criado com spec mínima |
+| 171 | seg+dba | implementada — 0117 (`p_devolutiva` no rematch esp); doc-set completo |
 
 ### Decisões externas (BLOCKERs legítimos pro Thiago)
 

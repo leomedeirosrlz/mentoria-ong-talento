@@ -465,7 +465,7 @@ function CardMentorado({
 
       {/* pendências acionáveis — deep link direto pro ponto da ficha */}
       <section aria-label="Pendências da dupla" className="space-y-2">
-        <h4 className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+        <h4 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
           Pendências da dupla
         </h4>
         {semPendencia ? (
@@ -707,7 +707,7 @@ function ProximoEncontro({
         )}
       />
       <div className="min-w-0">
-        <p className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+        <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
           Próximo encontro
         </p>
         <p className="mt-0.5 text-sm font-medium">{titulo}</p>
