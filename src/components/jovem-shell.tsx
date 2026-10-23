@@ -95,7 +95,11 @@ export function JovemShell({
 
   return (
     <NotificacoesProvider inicial={notificacoes}>
-      <div className="min-h-[100dvh] md:flex">
+      {/* coluna no mobile, linha no desktop — o flex sem gate estica a
+          coluna de conteúdo (flex-1) a 100dvh e ancora o footer na borda
+          inferior em página curta (mesmo fix do AppShell: o md:flex
+          deixava o footer flutuando no mobile) */}
+      <div className="flex min-h-dvh flex-col md:flex-row">
         {/* skip-link — mesmo contrato do shell de staff */}
         <a
           href="#conteudo"

@@ -1877,17 +1877,10 @@ function paraData(iso: string): Date {
 // o ciclo cruza a virada do ano ("2026/2027" = out→jun) — "15 de jan." sem
 // ano é ambíguo em registro e log, então os formatos de prosa levam ano
 // sempre; os compactos de grid/trilha (diaCompacto, formatDiaNum) ficam sem
-/** "T1 · 2026/2027" → { nome: "Turma 1", ano: "2026/2027" } — o rótulo
- *  curto vira o nome forte e o ano perde peso visual (decisão REALIZA-151).
- *  Turma sem o padrão ("2025/2026", texto livre) devolve o valor inteiro
- *  como nome — dado do usuário não é normalizado à força. */
-export function partesTurma(
-  turma: string
-): { nome: string; ano: string | null } {
-  const m = turma.match(/^T(\d+)\s*[·\-.]?\s*(.+)$/);
-  if (!m) return { nome: turma, ano: null };
-  return { nome: `Turma ${m[1]}`, ano: m[2].trim() };
-}
+// os labels de turma moram em ./turma (helper único — turmaCurta,
+// turmaLonga, turmaAno, turmaNumero); partesTurma segue importável daqui
+// por compat com quem já lia do ciclo
+export { partesTurma } from "./turma";
 
 export function formatDate(iso: string | null | undefined): string {
   if (!iso) return "a definir";

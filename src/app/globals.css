@@ -92,11 +92,61 @@
   --info-text: hsl(207 82% 33%);
   --info-bg: hsl(207 82% 96%);
   --info-border: hsl(207 82% 80%);
+  /* dupla pausada: fora do semáforo por congelamento (decisão da dupla), não
+     por falha — cinza da família do papel, mais escuro que --muted pra a
+     fatia/segmento ler como dado sobre o trilho. Mocks citavam --pausa e
+     --pausada com valores diferentes; --pausa é o nome canônico */
+  --pausa: hsl(75 4% 58%);
+  --pausa-text: hsl(75 4% 38%);
+  --pausa-bg: hsl(75 5% 94%);
+  --pausa-border: hsl(75 5% 78%);
   /* identidade de papel na dupla: mentor = lime do disco (quem age);
      mentorado = amarelo do ponto do logo (rgb 255,213,49) — sempre como
      marcador (dot/disco), nunca como cor de texto. Spec §1 */
   --role-mentor: var(--brand-lime);
   --role-mentorado: hsl(48 100% 60%);
+  /* identidade por instrumento oficial do programa (spec v5c de
+     /materiais): par cor-de-traço + tinta-do-emblema — os cards aplicam
+     --ic/--ict via instrumentoVars() e o InstrumentoIcone/Emblema lê daqui;
+     sempre marcador/fundo de emblema, nunca cor de texto solto */
+  --inst-roda: hsl(187 65% 36%);
+  --inst-roda-t: hsl(187 60% 92%);
+  --inst-visao: hsl(262 55% 52%);
+  --inst-visao-t: hsl(262 60% 94%);
+  --inst-metas: hsl(36 90% 40%);
+  --inst-metas-t: hsl(43 95% 91%);
+  --inst-pdm: hsl(212 75% 46%);
+  --inst-pdm-t: hsl(212 80% 94%);
+  --inst-terceiros: hsl(160 60% 30%);
+  --inst-terceiros-t: hsl(160 55% 91%);
+  --inst-avaliacao: hsl(340 65% 46%);
+  --inst-avaliacao-t: hsl(340 70% 94%);
+  --inst-roda-formal: hsl(200 60% 34%);
+  --inst-roda-formal-t: hsl(200 60% 92%);
+  --inst-360: hsl(24 85% 42%);
+  --inst-360-t: hsl(24 90% 93%);
+  /* sistemas fora da régua DPP (sem cor travada no mock) — mesma
+     gramática, matizes fora das faixas já ocupadas */
+  --inst-anamnese: hsl(300 40% 42%);
+  --inst-anamnese-t: hsl(300 45% 94%);
+  --inst-autoavaliacao: hsl(330 45% 42%);
+  --inst-autoavaliacao-t: hsl(330 50% 94%);
+  --inst-avaliacao-especialista: hsl(140 55% 28%);
+  --inst-avaliacao-especialista-t: hsl(140 45% 92%);
+  --inst-intake-mentor: hsl(95 55% 32%);
+  --inst-intake-mentor-t: hsl(95 55% 92%);
+  --inst-intake-mentorado: hsl(45 95% 34%);
+  --inst-intake-mentorado-t: hsl(45 95% 92%);
+  /* série categórica do mini-kit viz/ — 5 tons com distinção preattentiva
+     sobre o papel, sempre como preenchimento/marcador (nunca texto).
+     chart-1 e chart-2 herdam os tons ok×info (a gramática T1×T2 dos mocks
+     aprovados); chart-3 é o amarelo do mentorado aprofundado; 4–5 cobrem
+     séries extras sem pisar no vermelho/âmbar reservados ao semáforo */
+  --chart-1: hsl(78 58% 38%);
+  --chart-2: hsl(207 82% 45%);
+  --chart-3: hsl(48 92% 50%);
+  --chart-4: hsl(262 45% 48%);
+  --chart-5: hsl(174 62% 32%);
   --radius: 0.75rem;
   --sidebar: hsl(75 8% 96.5%);
   --sidebar-foreground: hsl(0 0% 15%);
@@ -216,6 +266,18 @@
     45deg,
     transparent 0 4px,
     hsl(75 5% 89%) 4px 5px
+  );
+}
+
+/* segmento neutro das barras do kit viz/ — "sem data"/"a fazer": afirma que
+   a posição existe no denominador mas ainda não é mensurável. Distinto do
+   trilho vazio (muted) e de toda cor de estado — a mesma gramática do hatch
+   da agenda v8b. Uso: cls omitido no SegmentoBarra vira este padrão. */
+.viz-hatch {
+  background-image: repeating-linear-gradient(
+    135deg,
+    hsl(75 7% 88%) 0 3px,
+    hsl(75 7% 80%) 3px 6px
   );
 }
 

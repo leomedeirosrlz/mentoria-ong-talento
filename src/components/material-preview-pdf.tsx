@@ -8,6 +8,18 @@ import { cn } from "@/lib/utils";
 
 const vazio = () => () => {};
 
+/** O browser embute PDF no iframe? Android/iOS não (`pdfViewerEnabled`
+ *  false) — lido via useSyncExternalStore: SSR hidrata no ícone (server
+ *  snapshot = false), sem mismatch. Compartilhado pelo preview grande e
+ *  pela thumb curta (material-thumb). */
+export function usePdfEmbute(): boolean {
+  return useSyncExternalStore(
+    vazio,
+    () => navigator.pdfViewerEnabled,
+    () => false
+  );
+}
+
 // extensões com capa — espelho do allowlist do upload (material-actions):
 // PDF embute no viewer do browser, imagem vira <img>. O que escapar disso
 // cai no fallback do tipo (não deveria existir — a coluna é escrita só pelo app)
@@ -21,7 +33,7 @@ const EXT_IMG = /\.(png|jpe?g|webp|gif|avif|svg)$/i;
  *  — o custo já foi pago e esconder/mostrar recarregaria o documento a
  *  cada scroll. Sem IO (browser antigo) monta direto — comportamento de
  *  antes, degradado e não quebrado. */
-function useMontarQuandoPerto() {
+export function useMontarQuandoPerto() {
   const ref = useRef<HTMLDivElement>(null);
   const [perto, setPerto] = useState(false);
   useEffect(() => {
@@ -64,11 +76,7 @@ export function PreviewPdf({
   /** tamanho do ícone-placeholder — menor no thumbnail de lista */
   icone?: number;
 }) {
-  const embute = useSyncExternalStore(
-    vazio,
-    () => navigator.pdfViewerEnabled,
-    () => false
-  );
+  const embute = usePdfEmbute();
   const { ref, perto } = useMontarQuandoPerto();
 
   return (

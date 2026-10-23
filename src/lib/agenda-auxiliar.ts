@@ -18,6 +18,7 @@ import {
 } from "./ciclo";
 import { primeiroNomeDaDupla } from "./agenda-minha";
 import { prazoTrilhaEspecialista } from "./encerramento";
+import { turmaCurta, turmaNumero } from "./turma";
 import type {
   CicloEvento,
   Cronograma,
@@ -32,8 +33,8 @@ import type {
 // Puro, mesma disciplina de fuso do agenda-coordenacao.
 // ============================================================
 
-// ---------- helpers de texto (mesmos de agenda-coordenacao — locais pra
-// não acoplar os dois módulos) ----------
+// ---------- helpers de texto (locais; os labels de turma são o
+// ./turma compartilhado — mesmo dos demais módulos) ----------
 
 const DOW_CURTO = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"] as const;
 const DOW_PLURAL: Record<DiaSemana, string> = {
@@ -64,11 +65,6 @@ function diaNum(iso: string): number {
 /** ISO instant → "19h" / "19h30" em São Paulo. */
 function horaCurta(iso: string): string {
   return fmtHoraMin.format(new Date(iso)).replace(":", "h").replace(/h00$/, "h");
-}
-
-/** Pill curta da turma — "T1 · 2026/2027" → "T1". */
-function turmaCurta(turma: string | null | undefined): string {
-  return (turma ?? "").split("·")[0]?.trim() ?? "";
 }
 
 /** "hoje, 19h" / "amanhã (qua 8), 19h" / "qua 8, 19h" — relativo a `hoje`. */
@@ -202,7 +198,7 @@ export function duplasPorTurma(
     if (!ds.length) continue;
     for (const d of ds) vistos.add(d.id);
     const vig = eventoDaSemana(eventosDoCronograma(eventos, c.id), hoje);
-    const curta = turmaCurta(c.turma).replace(/^t/i, "");
+    const curta = turmaNumero(c.turma);
     // cronograma sem eventos/vigente → meta vazia, rótulo é só "Turma N"
     const meta = vig
       ? ` · ${metaTurma(ds.filter((d) => d.status === "ativa"), vig)}`

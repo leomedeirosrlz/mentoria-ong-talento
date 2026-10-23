@@ -107,7 +107,11 @@ export function AppShell({
 
   return (
     <NotificacoesProvider inicial={notificacoes}>
-    <div className="min-h-[100dvh] md:flex">
+    {/* coluna no mobile, linha no desktop — o flex sem gate é o que estica
+        a coluna de conteúdo (flex-1) a 100dvh em qualquer viewport e põe o
+        footer encostado na borda inferior em página curta (antes o flex só
+        existia em md: e o footer flutuava no mobile) */}
+    <div className="flex min-h-dvh flex-col md:flex-row">
       {/* skip-link: invisível até o primeiro Tab — teclado pula top bar + nav
           inteira e cai direto no <main id="conteudo"> */}
       <a

@@ -20,6 +20,7 @@ import type {
   InstrumentoEntrega,
 } from "@/lib/forms/queries";
 import { formatDate } from "@/lib/ciclo";
+import { GUIA_ENCONTRO } from "@/lib/como-conduzir";
 import { InstrumentoResultado } from "@/components/instrumento-resultado";
 import { CopiarLink } from "@/components/forms/copiar-link";
 import { msgLinkWhatsApp } from "@/components/forms/link-shared";
@@ -44,35 +45,11 @@ import { cn } from "@/lib/utils";
 // /mandar de novo, respondido → "Ver resultado" abre a leitura estruturada
 // (a roda desenhada, as metas com IS/prazo, a declaração de visão).
 
-/** WP7 — a janela do guia por instrumento (as mesmas âncoras de ESTACOES
- *  na lib de jornada) + a condução em uma frase. O chip diz QUANDO entra;
- *  o "Como conduzir" diz como o mentor usa — nenhum dos dois muda o fluxo
- *  de envio, que continua o mesmo. */
-const GUIA_ENCONTRO: Record<
-  InstrumentoSistema,
-  { chip: string; conduzir: string }
-> = {
-  visao: {
-    chip: "Enc. 1–4",
-    conduzir:
-      "Entregue no 1º encontro (a janela do guia vai até o 4º). O exercício pede imaginação: o jovem narra o “filme” da vida ideal e fecha com a Declaração de Visão — uma frase no futuro, com prazo. Releiam juntos no encontro seguinte: a frase é o topo do PDM.",
-  },
-  metas: {
-    chip: "Enc. 2–3",
-    conduzir:
-      "Da Declaração de Visão saem 3 a 5 metas, cada uma com o porquê escrito pelo jovem. Antes de fechar, revisem com o modelo SMART: específica, mensurável, alcançável, relevante e com prazo. A meta prioritária abre o PDM.",
-  },
-  pdm: {
-    chip: "Construir 1–4 · revisão enc. 9",
-    conduzir:
-      "Documento vivo construído nos enc. 1–4: Visão no topo, metas com indicador de sucesso (IS) e prazo (P), depois o mapa de submetas — pra cada meta, “o que preciso fazer pra conseguir isso?”. Volta à mesa na revisão de meio de percurso (enc. 9).",
-  },
-  roda_vida: {
-    chip: "Leitura enc. 1 · aplicação enc. 12–14",
-    conduzir:
-      "Duas aplicações: a leitura inicial no enc. 1 — o ponto de partida — e a aplicação formal nos enc. 12–14, que se compara com a primeira. O jovem dá nota de 1 a 10 nas 16 áreas; o desenho vira a roda e orienta as metas das áreas prioritárias.",
-  },
-};
+/** WP7/REALIZA-202 — chip da janela + "Como conduzir" vêm de
+ *  `@/lib/como-conduzir` (módulo único compartilhado com a agenda do
+ *  mentor, o detalhe do encontro, os grupos de /materiais e o card da
+ *  semana da coordenação). O chip diz QUANDO entra; o "Como conduzir"
+ *  diz como o mentor usa — nenhum dos dois muda o fluxo de envio. */
 
 /** O estado que a ficha mostra: respondido ganha sempre (a resposta é o
  *  produto); depois pendente (tem link vivo pra mandar); expirado e "não

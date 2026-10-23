@@ -17,6 +17,7 @@ import {
   type SinalTipo,
 } from "./ciclo";
 import { primeiroNomeDaDupla } from "./agenda-minha";
+import { turmaCurta, turmaNumero } from "./turma";
 import type {
   CicloEvento,
   Cronograma,
@@ -32,7 +33,8 @@ import type { Interacao } from "./interacoes";
 // "YYYY-MM-DD" de São Paulo via toDateStr/UTC-date space.
 // ============================================================
 
-// ---------- helpers de texto (locais — mesma convenção de agenda-minha) ----------
+// ---------- helpers de texto (locais — mesma convenção de agenda-minha;
+// os labels de turma são o ./turma compartilhado) ----------
 
 const DOW_CURTO = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"] as const;
 const DOW_PLURAL: Record<DiaSemana, string> = {
@@ -64,11 +66,6 @@ function diaNum(iso: string): number {
 /** ISO instant → "19h" / "19h30" em São Paulo. */
 function horaCurta(iso: string): string {
   return fmtHoraMin.format(new Date(iso)).replace(":", "h").replace(/h00$/, "h");
-}
-
-/** Pill/etiqueta curta da turma — "T1 · 2026/2027" → "T1". */
-function turmaCurta(turma: string | null | undefined): string {
-  return (turma ?? "").split("·")[0]?.trim() ?? "";
 }
 
 /** "hoje, 19h" / "amanhã (qua 8), 19h" / "qua 8, 19h" — relativo a `hoje`. */
@@ -667,7 +664,7 @@ export function itensDaSemanaPrograma(
             : ev.titulo,
         detalhe: ev.observacao,
         tipo: "encontro_oficial",
-        etiqueta: turma ? `turma ${turma.replace(/^t/i, "")}` : "oficial",
+        etiqueta: turma ? `turma ${turmaNumero(turma)}` : "oficial",
         eventoId: null,
       });
     } else {
