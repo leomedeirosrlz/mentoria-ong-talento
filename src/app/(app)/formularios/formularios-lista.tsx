@@ -4,7 +4,7 @@ import { useState, type CSSProperties } from "react";
 import Link from "next/link";
 import { ArrowRight, Funnel } from "@phosphor-icons/react";
 import type { FormularioListaItem } from "@/lib/forms/queries";
-import { camposPerguntas, SISTEMA_LABEL } from "@/lib/forms/schema";
+import { camposPerguntas } from "@/lib/forms/schema";
 import { formatDate } from "@/lib/ciclo";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -36,7 +36,9 @@ const ORDEM_LABEL: Record<Ordem, string> = {
 };
 
 /** Lista de formulários da coordenação — filtro e ordenação vivem no
- *  cliente: o universo é pequeno e já veio inteiro do server. */
+ *  cliente: o universo é pequeno e já veio inteiro do server. Recebe só
+ *  forms custom (`sistema` null): os oficiais saíram daqui na REALIZA-199
+ *  — régua pra /materiais, bordo pra seção "Instrumentos do sistema". */
 export function FormulariosLista({
   formularios,
 }: {
@@ -152,14 +154,6 @@ export function FormulariosLista({
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <h2 className="font-semibold leading-snug">{f.titulo}</h2>
-                      {f.sistema && (
-                        <Badge
-                          variant="outline"
-                          className="border-[var(--brand-lime)]/60 bg-[var(--brand-lime)]/10"
-                        >
-                          oficial · {SISTEMA_LABEL[f.sistema]}
-                        </Badge>
-                      )}
                       {!f.ativo && (
                         <Badge variant="secondary">Encerrado</Badge>
                       )}

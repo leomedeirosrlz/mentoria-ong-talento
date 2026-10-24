@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import {
   CircleNotch,
   Eye,
+  ListChecks,
   PaperPlaneTilt,
 } from "@phosphor-icons/react";
 import { enviarInstrumentoMentorado } from "@/lib/actions-formularios";
@@ -21,6 +22,10 @@ import type {
 } from "@/lib/forms/queries";
 import { formatDate } from "@/lib/ciclo";
 import { GUIA_ENCONTRO } from "@/lib/como-conduzir";
+import {
+  ehInstrumentoChave,
+  InstrumentoEmblema,
+} from "@/components/instrumento-icone";
 import { InstrumentoResultado } from "@/components/instrumento-resultado";
 import { CopiarLink } from "@/components/forms/copiar-link";
 import { msgLinkWhatsApp } from "@/components/forms/link-shared";
@@ -132,48 +137,62 @@ function LinhaInstrumento({
 
   return (
     <li className="flex flex-col gap-2 py-3 first:pt-0 last:pb-0 sm:flex-row sm:items-start sm:gap-3 lg:flex-col lg:items-stretch">
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-2">
-          <p className="text-sm font-medium">{titulo}</p>
+      {/* emblema + texto na mesma coluna-flex: no mobile o par fica acima
+          das ações; em sm+ ocupa a esquerda — o símbolo do instrumento
+          (formularios.md item 2) é o mesmo da régua e da prateleira */}
+      <div className="flex min-w-0 flex-1 items-start gap-3">
+        {sistema && ehInstrumentoChave(sistema) ? (
+          <InstrumentoEmblema instrumento={sistema} size={36} />
+        ) : (
+          // item ainda não semeado (sistema null) ou valor novo do banco —
+          // o fallback neutro da prateleira, nunca quebra a linha
+          <span className="grid size-9 shrink-0 place-items-center rounded-[28%] bg-muted text-muted-foreground">
+            <ListChecks size={18} aria-hidden />
+          </span>
+        )}
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-sm font-medium">{titulo}</p>
+            {sistema && (
+              <Badge variant="outline" className="font-normal">
+                {GUIA_ENCONTRO[sistema].chip}
+              </Badge>
+            )}
+            {status === "respondido" && (
+              <Badge className="bg-[var(--ok)]/15 text-[var(--ok-text)]">
+                respondido
+              </Badge>
+            )}
+            {status === "pendente" && (
+              <Badge className="bg-[var(--warn)]/15 text-[var(--warn-text)]">
+                link enviado
+              </Badge>
+            )}
+            {status === "expirado" && (
+              <Badge variant="secondary">link expirado</Badge>
+            )}
+          </div>
+          {info && (
+            <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+              {info.resumo}
+            </p>
+          )}
           {sistema && (
-            <Badge variant="outline" className="font-normal">
-              {GUIA_ENCONTRO[sistema].chip}
-            </Badge>
+            <details className="group mt-1.5">
+              <summary className="cursor-pointer select-none text-xs font-medium text-muted-foreground underline-offset-2 outline-none transition-colors hover:text-foreground hover:underline focus-visible:ring-2 focus-visible:ring-ring">
+                Como conduzir
+              </summary>
+              <p className="mt-1 max-w-prose text-xs leading-relaxed text-muted-foreground">
+                {GUIA_ENCONTRO[sistema].conduzir}
+              </p>
+            </details>
           )}
-          {status === "respondido" && (
-            <Badge className="bg-[var(--ok)]/15 text-[var(--ok-text)]">
-              respondido
-            </Badge>
-          )}
-          {status === "pendente" && (
-            <Badge className="bg-[var(--warn)]/15 text-[var(--warn-text)]">
-              link enviado
-            </Badge>
-          )}
-          {status === "expirado" && (
-            <Badge variant="secondary">link expirado</Badge>
+          {status === "respondido" && entrega?.respondido_em && (
+            <p className="mt-1 text-xs tabular-nums text-muted-foreground">
+              Respondido em {formatDate(entrega.respondido_em)}
+            </p>
           )}
         </div>
-        {info && (
-          <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
-            {info.resumo}
-          </p>
-        )}
-        {sistema && (
-          <details className="group mt-1.5">
-            <summary className="cursor-pointer select-none text-xs font-medium text-muted-foreground underline-offset-2 outline-none transition-colors hover:text-foreground hover:underline focus-visible:ring-2 focus-visible:ring-ring">
-              Como conduzir
-            </summary>
-            <p className="mt-1 max-w-prose text-xs leading-relaxed text-muted-foreground">
-              {GUIA_ENCONTRO[sistema].conduzir}
-            </p>
-          </details>
-        )}
-        {status === "respondido" && entrega?.respondido_em && (
-          <p className="mt-1 text-xs tabular-nums text-muted-foreground">
-            Respondido em {formatDate(entrega.respondido_em)}
-          </p>
-        )}
       </div>
 
       <div className="flex shrink-0 flex-wrap items-center gap-2">
