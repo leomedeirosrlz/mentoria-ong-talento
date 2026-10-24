@@ -276,8 +276,11 @@ const depoisDe = (iso: string, horas: number): string =>
  *  locais dessa âncora volta a depender do fuso do servidor. */
 const HOJE = new Date(`${toDateStr(new Date())}T12:00:00Z`);
 
-/** Terça-feira da semana corrente — âncora do 5º encontro do ciclo. */
-const TERCA_ENCONTRO_5 = addDias(HOJE, ((2 - HOJE.getUTCDay()) + 7) % 7);
+/** Terça-feira da semana corrente (semana seg–dom) — âncora do 5º encontro
+ *  do ciclo. ((2 - dow + 7) % 7) mirava a PRÓXIMA terça: de quarta em
+ *  diante o enc. 5 caía na semana seguinte, a coluna "semana" do panorama
+ *  nunca acendia e a T2 inteira ficava futura (1º enc. dela é esta terça). */
+const TERCA_ENCONTRO_5 = addDias(HOJE, 1 - ((HOJE.getUTCDay() + 6) % 7));
 
 /** Dia oficial do encontro n do ciclo (espelha o seed/cronograma oficial):
  *  1–8 semanais a partir da âncora; 15 dias entre o 8º e o 9º (tempo de

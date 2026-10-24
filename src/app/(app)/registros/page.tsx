@@ -406,7 +406,7 @@ export default async function RegistrosPage({
             id="panorama-titulo"
             className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground"
           >
-            Panorama
+            Panorama do ciclo
           </h2>
           {turmasPainel.length > 1 && (
             <div
@@ -473,6 +473,9 @@ export default async function RegistrosPage({
               })}
             </div>
           </div>
+          <p className="text-[11px] text-muted-foreground">
+            os gráficos e a lista refletem o recorte ativo
+          </p>
         </div>
         <RegistrosPainel panorama={panorama} hoje={hoje} />
       </section>
@@ -485,7 +488,7 @@ export default async function RegistrosPage({
             <Link
               href={hrefLimpo}
               scroll={false}
-              className="-my-1.5 py-1.5 font-medium text-foreground underline underline-offset-4 transition-colors hover:text-muted-foreground"
+              className="-my-3 inline-flex min-h-11 items-center font-medium sm:-my-1.5 sm:min-h-8 text-foreground underline underline-offset-4 transition-colors hover:text-muted-foreground"
             >
               {total} {total === 1 ? "registro" : "registros"}
             </Link>
@@ -502,7 +505,7 @@ export default async function RegistrosPage({
                 href="/registros?apoio=1"
                 scroll={false}
                 aria-current={filtros.apoio ? "true" : undefined}
-                className="-my-1.5 py-1.5 font-medium text-[var(--danger)] underline underline-offset-4 transition-colors hover:text-[var(--danger)]/80"
+                className="-my-3 inline-flex min-h-11 items-center font-medium sm:-my-1.5 sm:min-h-8 text-[var(--danger)] underline underline-offset-4 transition-colors hover:text-[var(--danger)]/80"
               >
                 {alertas.apoio}{" "}
                 {alertas.apoio === 1 ? "apoio em aberto" : "apoios em aberto"}
@@ -516,7 +519,7 @@ export default async function RegistrosPage({
                 href="/registros?tardio=1"
                 scroll={false}
                 aria-current={filtros.tardio ? "true" : undefined}
-                className="-my-1.5 py-1.5 font-medium text-[var(--warn-text)] underline underline-offset-4 transition-colors hover:text-[var(--warn-text)]/80"
+                className="-my-3 inline-flex min-h-11 items-center font-medium sm:-my-1.5 sm:min-h-8 text-[var(--warn-text)] underline underline-offset-4 transition-colors hover:text-[var(--warn-text)]/80"
               >
                 {alertas.tardios}{" "}
                 {alertas.tardios === 1 ? "registro tardio" : "registros tardios"}
@@ -532,7 +535,7 @@ export default async function RegistrosPage({
               <Link
                 href={hrefCom({ ordem: ordem === "recentes" ? "prioridade" : null })}
                 scroll={false}
-                className="-my-1.5 py-1.5 font-medium text-foreground underline underline-offset-4 transition-colors hover:text-muted-foreground"
+                className="-my-3 inline-flex min-h-11 items-center font-medium sm:-my-1.5 sm:min-h-8 text-foreground underline underline-offset-4 transition-colors hover:text-muted-foreground"
               >
                 {ordem !== "recentes" ? "voltar a mais recentes" : "ordenar por prioridade"}
               </Link>

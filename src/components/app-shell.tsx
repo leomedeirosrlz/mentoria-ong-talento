@@ -116,7 +116,7 @@ export function AppShell({
           inteira e cai direto no <main id="conteudo"> */}
       <a
         href="#conteudo"
-        className="pointer-events-none fixed left-4 top-3 z-50 -translate-y-24 rounded-lg bg-[var(--brand-ink)] px-4 py-2.5 text-sm font-semibold text-[var(--brand-lime)] opacity-0 shadow-[var(--shadow-border)] transition-[transform,opacity] duration-200 focus:pointer-events-auto focus:translate-y-0 focus:opacity-100"
+        className="pointer-events-none fixed left-4 top-3 z-50 inline-flex min-h-11 -translate-y-24 items-center rounded-lg bg-[var(--brand-ink)] px-4 text-sm font-semibold text-[var(--brand-lime)] opacity-0 shadow-[var(--shadow-border)] transition-[transform,opacity] duration-200 focus:pointer-events-auto focus:translate-y-0 focus:opacity-100"
       >
         Pular pro conteúdo
       </a>

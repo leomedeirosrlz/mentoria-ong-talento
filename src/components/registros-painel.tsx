@@ -129,7 +129,7 @@ function SegLocal<T extends string>({
     <div
       role="group"
       aria-label={rotulo}
-      className="inline-flex items-center gap-0.5 rounded-full border border-border bg-background p-0.5"
+      className="scroll-fina inline-flex max-w-full items-center gap-0.5 overflow-x-auto rounded-full border border-border bg-background p-0.5"
     >
       {opcoes.map((o) => (
         <button
@@ -138,7 +138,7 @@ function SegLocal<T extends string>({
           aria-pressed={valor === o.id}
           onClick={() => onChange(o.id)}
           className={cn(
-            "min-h-11 rounded-full px-3 text-xs font-semibold whitespace-nowrap text-muted-foreground transition-colors sm:min-h-7 sm:px-2.5",
+            "min-h-11 rounded-full px-3 text-xs font-semibold whitespace-nowrap text-muted-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-7 sm:px-2.5",
             valor === o.id
               ? "bg-muted font-bold text-foreground"
               : "hover:text-foreground"
@@ -287,7 +287,9 @@ export function RegistrosPainel({
     }),
   }));
   const seriesMentor: SerieSpark[] = turmas.map((t, i) => ({
-    rotulo: t.rotulo,
+    // a narração do Sparkline nomeia a fonte ("visão do mentor") — o
+    // modo muda os dados mas o aria continuava dizendo só a turma
+    rotulo: `${t.rotulo} · visão do mentor`,
     cor: corTurma(i),
     valores: slots.map((s) => {
       const c = s.celulas.find((x) => x.cronogramaId === t.cronogramaId);
@@ -629,7 +631,7 @@ export function RegistrosPainel({
               {notaEsp && ` ${notaEsp}`}
             </p>
             <details className="mt-2 text-xs text-muted-foreground">
-              <summary className="inline-flex min-h-8 cursor-pointer items-center font-semibold text-foreground underline-offset-4 hover:underline">
+              <summary className="inline-flex min-h-11 cursor-pointer items-center font-semibold text-foreground underline-offset-4 hover:underline sm:min-h-8">
                 ver dados em tabela
               </summary>
               <div className="scroll-fina mt-2 overflow-x-auto">
