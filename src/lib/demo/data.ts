@@ -3049,7 +3049,8 @@ function build(): DemoData {
   // D5/WP5 — o "Para acompanhar" cobre os dois estados do lembrete (cap de
   // 48h por dupla, medido sobre o ÚLTIMO nudge — contato de outro tipo não
   //  destrava nem bloqueia):
-  //  · pend (sem_data + registro): nudge de 5d atrás → livre, "Lembrar"
+  //  · pend (sem_data + registro): nudge de 5d atrás → livre — e o pedido
+  //    de apoio do Caio troca a ação: "Chamar" pro mentorado, não Lembrar
   //  · atraso (limbo):             nudge de 4d atrás → livre
   //  · risco (atraso):             nudge de ~20h     → bloqueado ("Lembrada")
   //  · t2c  (limbo na T2):         nudge de 6d atrás → livre, turma nova

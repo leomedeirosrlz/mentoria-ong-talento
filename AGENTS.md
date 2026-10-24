@@ -64,6 +64,10 @@ Convenção: **classes Tailwind direto no JSX** — não existe nem deve existir
 
 **Exceções legítimas (não "consertar"):** linhas/tabelas densas usam `text-[13px]` de corpo base (lista de duplas, fila de acompanhamento, relatório canvas); forms/instrumentos usam `text-[15px]`→`sm:text-base` em perguntas e inputs `text-base`→`md:*` (anti-zoom iOS); badges/chips em `text-[10px]`–`[11px]`; células de calendário/grade com micro-labels próprios; cores semânticas (`--warn`, `--ok`, semáforo, destructive) sobrescrevem a camada de cor quando sinalizam estado.
 
+## Movimento
+
+Entrada de lista/card: `.animate-enter` + `--i` inline (stagger 0–10). **Troca de filtro, busca ou ordenação sempre anima** — re-key no container da lista remonta as linhas e re-roda a entrada (≤300ms, fade+slide); nunca um repaint seco de tabela inteira. O guard global de `prefers-reduced-motion` em `globals.css` já zera tudo — não adicionar media query por componente nem desligar a animação à mão.
+
 ## Modo demo (`/demo`)
 
 - Público, sem login: cookie `demo_role` (middleware libera) + `demo_onboarded` (gate do wizard). `DemoBar` troca de papel / re-rever onboarding / sai.
