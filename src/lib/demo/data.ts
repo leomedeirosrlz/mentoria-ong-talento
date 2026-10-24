@@ -2141,8 +2141,10 @@ function build(): DemoData {
   };
 
   const cronogramas: Cronograma[] = [
-    cronogramaDe(cronogramaT1, "Calendário oficial · T1", "T1 · 2026/2027", 60),
-    cronogramaDe(cronogramaT2, "Calendário oficial · T2", "T2 · 2026/2027", 32),
+    // mesmo nome pras duas, como em prod ("Calendário oficial" de cada
+    // turma) — a identidade visual vem do campo `turma`, não do nome
+    cronogramaDe(cronogramaT1, "Calendário oficial", "T1 · 2026/2027", 60),
+    cronogramaDe(cronogramaT2, "Calendário oficial", "T2 · 2026/2027", 32),
   ];
 
   // ---------- duplas ----------

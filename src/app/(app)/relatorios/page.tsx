@@ -12,7 +12,6 @@ import { createClient } from "@/lib/supabase/server";
 import { demoAtivo } from "@/lib/demo/mode";
 import { demoDuplas, demoMentorados, demoPessoas } from "@/lib/demo/queries";
 import { PageHeader } from "@/components/page-header";
-import { RelatorioLinksCard } from "@/components/relatorio-links-card";
 import { RelatorioBuilder } from "./relatorio-builder";
 import type { DuplaFonte, PessoaFonte } from "@/lib/relatorio";
 
@@ -26,8 +25,9 @@ export default async function RelatoriosPage() {
   let duplas: DuplaFonte[];
   let profs: PessoaFonte[];
   let mentorados: PessoaFonte[];
-  // fila "Sem dupla" de todas as turmas (turma_inscricoes) + o painel de
-  // links públicos (170) com os seletores dos recortes ciclo/assinaturas
+  // fila "Sem dupla" de todas as turmas (turma_inscricoes) + os links
+  // públicos (170) pro painel "Compartilhar" da toolbar do builder (201),
+  // com os seletores dos recortes ciclo/assinaturas
   const [inscricoes, links, cronogramas, templates] = await Promise.all([
     getTurmaInscricoesAguardando(null),
     getRelatorioLinks(),
@@ -138,12 +138,6 @@ export default async function RelatoriosPage() {
         title="Relatórios"
         meta="Escolha turma, granularidade e colunas — a grade abaixo é livre: redimensione, ordene e exporte"
       />
-      <RelatorioLinksCard
-        links={links}
-        turmas={turmas}
-        cronogramas={cronogramas}
-        templates={templates}
-      />
       <RelatorioBuilder
         turmas={turmas}
         duplas={duplas}
@@ -152,6 +146,7 @@ export default async function RelatoriosPage() {
         inscricoes={inscricoes}
         cronogramas={cronogramas}
         templates={templates}
+        links={links}
       />
     </div>
   );

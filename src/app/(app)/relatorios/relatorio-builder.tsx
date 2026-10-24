@@ -1,9 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Check, DownloadSimple, Link as LinkIcon, PencilSimple } from "@phosphor-icons/react";
+import { Check, DownloadSimple, PencilSimple } from "@phosphor-icons/react";
 import { RelatorioCanvas } from "@/components/relatorio-canvas";
-import { NovoLinkDialog } from "@/components/novo-link-dialog";
+import { RelatorioLinksMenu } from "@/components/relatorio-links-menu";
 import { salvarCampoRelatorio } from "@/lib/actions";
 import {
   catalogoDe,
@@ -15,7 +15,9 @@ import {
   type InscricaoFilaTurma,
   type PessoaFonte,
   type RelatorioConfig,
+  type RelatorioLinkItem,
 } from "@/lib/relatorio";
+import { turmaCurta } from "@/lib/turma";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { filterChipCls } from "@/components/ui/filter-chip";
@@ -59,6 +61,7 @@ export function RelatorioBuilder({
   inscricoes,
   cronogramas,
   templates,
+  links,
 }: {
   turmas: string[];
   duplas: DuplaFonte[];
@@ -70,6 +73,8 @@ export function RelatorioBuilder({
   // seletores dos recortes 'ciclo'/'assinaturas' do dialog de publicação
   cronogramas: Pick<Cronograma, "id" | "nome" | "turma">[];
   templates: { slug: string; titulo: string }[];
+  // painel "Compartilhar" (201) — os links publicados, do server via página
+  links: RelatorioLinkItem[];
 }) {
   // turma inicial = a mais recente com dados (a página ordena desc); sem
   // nenhuma, cai em "todas" — nada mais hardcoded a T2
@@ -207,15 +212,17 @@ export function RelatorioBuilder({
     }
   };
 
-  // a publicação congela o recorte no config SALVO do link (170): o que o
-  // builder mostra agora é o que vira o relatório público — e nada além.
-  // A gestão (copiar URL, redefinir senha, revogar) mora no card de links
-  // acima do builder.
+  // a publicação congela o recorte no config SALVO do link (170/201): o que
+  // o builder mostra agora é o que vira o relatório público — e nada além.
+  // O "Compartilhar" da toolbar lê este objeto a cada abertura do dialog —
+  // mudou a grade, muda o recorte importado (o form re-semeia no remount).
+  // `linhas` alimenta o chip de escopo no rodapé do dialog.
   const configInicialLink = {
     tipo: "grade" as const,
     turma: cfg.turma,
     granularidade: cfg.granularidade,
     colunas: cfg.colunas,
+    linhas: linhas.length,
   };
 
   /** Ponte canvas → action: devolve a mensagem de erro (toast na célula) ou
@@ -255,8 +262,9 @@ export function RelatorioBuilder({
               aria-pressed={turma === t}
               onClick={() => setTurma(t)}
               className={filterChipCls(turma === t)}
+              title={t !== "todas" ? t : undefined}
             >
-              {t === "todas" ? "Todas" : t}
+              {t === "todas" ? "Todas" : turmaCurta(t)}
             </button>
           ))}
         </div>
@@ -318,16 +326,15 @@ export function RelatorioBuilder({
           >
             <DownloadSimple size={14} aria-hidden /> Baixar CSV
           </Button>
-          <NovoLinkDialog
+          {/* Compartilhar (201): criar link do recorte atual + gerir os
+              existentes (copiar/redefinir/revogar/acessos) — era o card
+              permanente acima do builder, agora mora aqui na toolbar */}
+          <RelatorioLinksMenu
+            links={links}
             turmas={turmas}
             cronogramas={cronogramas}
             templates={templates}
             configInicial={configInicialLink}
-            trigger={
-              <Button variant="outline" size="sm">
-                <LinkIcon size={14} aria-hidden /> Publicar link
-              </Button>
-            }
           />
           {/* modo edição: toggle no padrão chip de filtro, jogado pra direita
               como o "Ordenar" de /pessoas — separa "o que a grade mostra" de

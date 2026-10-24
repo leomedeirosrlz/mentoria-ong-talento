@@ -434,13 +434,14 @@ const montaCronograma = (id, nome, turma, eventos, e1) => ({
   created_at: iso(new Date(`${somaDia(e1, -45)}T10:00:00-03:00`)),
 });
 
+// mesmo nome pras duas, como em prod — a identidade vem do campo `turma`
 const eventosT1 = montaEventosDpp(T1E1, dataT1, CRON1, 0x4f0);
 const cronogramaT1 = montaCronograma(
-  CRON1, "Calendário oficial · T1", T1_TURMA, eventosT1, T1E1);
+  CRON1, "Calendário oficial", T1_TURMA, eventosT1, T1E1);
 
 const eventosT2 = montaEventosDpp(T2E1, dataT2, CRON2, 0x510);
 const cronogramaT2 = montaCronograma(
-  CRON2, "Calendário oficial · T2", T2_TURMA, eventosT2, T2E1);
+  CRON2, "Calendário oficial", T2_TURMA, eventosT2, T2E1);
 
 // ---- duplas ----
 // 10 DPP ativas em semáforos variados + pausada/concluida/encerrada + trilhas
