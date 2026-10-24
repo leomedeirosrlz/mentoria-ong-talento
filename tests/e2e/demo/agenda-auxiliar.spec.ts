@@ -298,17 +298,20 @@ test.describe("agenda demo do supervisor — Por turma / Consolidada (WP5)", () 
     ).toBeVisible();
     await page.keyboard.press("Escape");
 
-    // sessão da trilha supervisionada (Sofia × Bia, sábado) — convidado:
-    // a tag âmbar marca e o item não tem nenhuma ação pro supervisor
-    const convidado = page
+    // sessões da trilha supervisionada (Sofia × Bia) — convidado: a tag
+    // âmbar marca e o item não tem nenhuma ação pro supervisor. A âncora
+    // nova da semana deixa MAIS de uma sessão da dupla na janela — o
+    // invariante vale pra todas (filter por nome só resolve 2 → strict).
+    const convidados = page
       .locator("article")
-      .filter({ hasText: /Bia × Sofia Nogueira/ });
-    await expect(convidado.getByText("só acompanhamento")).toBeVisible();
-    await expect(
-      convidado.getByText(/Trilha de especialista · sessão \d de 5/)
-    ).toBeVisible();
-    await expect(convidado.getByRole("button")).toHaveCount(0);
-    await expect(convidado.getByRole("link")).toHaveCount(0);
+      .filter({ hasText: /Bia × Sofia Nogueira/ })
+      .filter({ hasText: /Trilha de especialista · sessão \d de 5/ });
+    await expect(convidados.first()).toBeVisible();
+    for (const convidado of await convidados.all()) {
+      await expect(convidado.getByText("só acompanhamento")).toBeVisible();
+      await expect(convidado.getByRole("button")).toHaveCount(0);
+      await expect(convidado.getByRole("link")).toHaveCount(0);
+    }
 
     // evento oficial entra como convidado também — a roda de casos do
     // domingo (formação continuada da T1)
