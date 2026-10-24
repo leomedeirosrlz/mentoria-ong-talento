@@ -128,3 +128,122 @@ test.describe("mobile", () => {
     expect(Math.abs(b0!.x - b1!.x)).toBeLessThan(8);
   });
 });
+
+// ---------- painel "Panorama" (REALIZA-198) ----------
+// O dashboard é server-rendered acima da lista: pills de recorte navegam por
+// URL (?turma=/?periodo=), os toggles de métrica são estado local do client
+// component e a lista agrupada segue intacta embaixo.
+
+test.describe("panorama do ciclo", () => {
+  test("renderiza os três cards + pills de recorte acima da lista", async ({
+    page,
+  }) => {
+    await abreRegistros(page);
+
+    // seção nomeada + grupos de recorte acessíveis
+    await expect(
+      page.getByRole("heading", { name: "Panorama", exact: true })
+    ).toBeVisible();
+    const turma = page.getByRole("group", { name: "Recortar por turma" });
+    await expect(turma.getByRole("link", { name: "Todas" })).toHaveAttribute(
+      "aria-current",
+      "page"
+    );
+    // dataset demo tem T1 e T2 com duplas — as duas pills aparecem
+    await expect(
+      turma.getByRole("link", { name: "Turma 1" })
+    ).toBeVisible();
+    await expect(
+      turma.getByRole("link", { name: "Turma 2" })
+    ).toBeVisible();
+
+    const periodo = page.getByRole("group", { name: "Recortar por período" });
+    await expect(
+      periodo.getByRole("link", { name: "Ciclo todo" })
+    ).toHaveAttribute("aria-current", "page");
+    await expect(
+      periodo.getByRole("link", { name: "Últimas 8 semanas" })
+    ).toBeVisible();
+
+    // cards: cobertura (barras) + semáforo (donut) + linha ★
+    await expect(
+      page.getByRole("heading", { name: "Registros entregues por encontro" })
+    ).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Sinais no recorte" })
+    ).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Avaliação média do jovem" })
+    ).toBeVisible();
+    // as barras são uma imagem nomeada com os dados por extenso
+    await expect(
+      page.getByRole("img", { name: /Barras por encontro/ })
+    ).toBeVisible();
+
+    // a lista continua embaixo — o painel não substitui a timeline
+    await expect(
+      page.getByRole("heading", { name: DUPLA_HEAD }).first()
+    ).toBeVisible();
+  });
+
+  test("pill de turma filtra painel E lista (mesmo recorte na URL)", async ({
+    page,
+  }) => {
+    await abreRegistros(page);
+    const link = page
+      .getByRole("group", { name: "Recortar por turma" })
+      .getByRole("link", { name: "Turma 1" });
+    await expect(link).toHaveAttribute("href", /\?turma=/);
+    await link.click();
+    await page.waitForURL(/turma=/);
+
+    // chip removível + legenda do painel com uma turma só
+    await expect(page.getByText("Turma: T1")).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "Turma 1" })
+    ).toHaveAttribute("aria-current", "page");
+    await expect(
+      page.getByRole("heading", { name: DUPLA_HEAD }).first()
+    ).toBeVisible();
+  });
+
+  test("pill de período corta a janela e marca chip", async ({ page }) => {
+    await abreRegistros(page);
+    await page
+      .getByRole("group", { name: "Recortar por período" })
+      .getByRole("link", { name: "Últimas 4 semanas" })
+      .click();
+    await page.waitForURL(/periodo=4s/);
+    await expect(page.getByText("Últimas 4 semanas").last()).toBeVisible();
+  });
+
+  test("toggle de métrica das barras troca o headline sem navegar", async ({
+    page,
+  }) => {
+    await abreRegistros(page);
+    const grupo = page.getByRole("group", { name: "Métrica das barras" });
+    await grupo.getByRole("button", { name: "Realizados" }).click();
+    await expect(
+      page.getByRole("heading", { name: "Encontros realizados por encontro" })
+    ).toBeVisible();
+    await grupo.getByRole("button", { name: "Avaliações ★" }).click();
+    await expect(
+      page.getByRole("heading", { name: "Avaliações do jovem por encontro" })
+    ).toBeVisible();
+    // estado local — a URL continua limpa
+    expect(page.url()).not.toContain("metrica=");
+  });
+
+  test("modo 'visão do mentor' troca a linha pra escala 1–4", async ({
+    page,
+  }) => {
+    await abreRegistros(page);
+    await page
+      .getByRole("group", { name: "Modo da linha" })
+      .getByRole("button", { name: "Visão do mentor" })
+      .click();
+    await expect(
+      page.getByRole("heading", { name: "Nota média do mentor" })
+    ).toBeVisible();
+  });
+});

@@ -6,11 +6,13 @@ import { ClipboardText } from "@phosphor-icons/react/dist/ssr";
 import {
   getAlertasRegistros,
   getCicloEventos,
+  getCronogramas,
   getDuplasOpcoes,
   getEncontrosPorDuplas,
   getEspecialistaEventos,
   getMe,
   getRegistros,
+  getRegistrosPanorama,
   REGISTROS_PAGINA,
   type FiltrosRegistro,
   type RegistroResumo,
@@ -23,12 +25,17 @@ import {
   maxNumeroEncontro,
   passoEsp,
   registroTardio,
+  toDateStr,
 } from "@/lib/ciclo";
 import { RegistrosFiltros, type OrdemRegistros } from "@/components/registros-filtros";
+import { RegistrosPainel } from "@/components/registros-painel";
 import {
   agruparRegistros,
   grupoRegistrosDe,
+  PERIODO_REGISTROS_OPCOES,
+  periodoRegistrosDe,
 } from "@/lib/registros";
+import { turmaCurta, turmaLonga } from "@/lib/turma";
 import { buttonVariants } from "@/components/ui/button";
 import { ImportarRegistrosDialog } from "@/components/importar-registros-dialog";
 import { PageHeader } from "@/components/page-header";
@@ -67,6 +74,10 @@ function parseFiltros(
     f.dificuldade = dificuldade as Dificuldade | "com";
   const dupla = primeiro(p.dupla);
   if (dupla && UUID_RE.test(dupla)) f.dupla = dupla;
+  const turma = primeiro(p.turma);
+  if (turma && UUID_RE.test(turma)) f.turma = turma;
+  const periodo = periodoRegistrosDe(primeiro(p.periodo));
+  if (periodo !== "ciclo") f.periodo = periodo;
   const q = saneiaBusca(primeiro(p.q) ?? "");
   if (q) f.q = q.slice(0, 80);
   const pagina = Number(primeiro(p.pagina));
@@ -117,12 +128,15 @@ export default async function RegistrosPage({
   // viaja na URL; lixo no param cai no default (grupoRegistrosDe)
   const grupo = grupoRegistrosDe(primeiro(params.grupo));
 
-  const [{ itens, total }, duplas, alertas, espEventos] = await Promise.all([
-    getRegistros(filtros),
-    getDuplasOpcoes(),
-    getAlertasRegistros(),
-    getEspecialistaEventos(),
-  ]);
+  const [{ itens, total }, duplas, alertas, espEventos, panorama, cronogramas] =
+    await Promise.all([
+      getRegistros(filtros),
+      getDuplasOpcoes(),
+      getAlertasRegistros(),
+      getEspecialistaEventos(),
+      getRegistrosPanorama(filtros),
+      getCronogramas(),
+    ]);
 
   // trilha especialista (0074): encontro.numero é a TENTATIVA — o passo do
   // guia é o rank entre realizados, e derivá-lo exige o histórico da dupla
@@ -201,6 +215,8 @@ export default async function RegistrosPage({
     filtros.tardio ||
     filtros.dificuldade ||
     filtros.dupla ||
+    filtros.turma ||
+    filtros.periodo ||
     filtros.q
   );
   const hrefCom = (patch: Record<string, string | null>) => {
@@ -211,6 +227,8 @@ export default async function RegistrosPage({
     if (filtros.tardio) p.set("tardio", "1");
     if (filtros.dificuldade) p.set("dificuldade", filtros.dificuldade);
     if (filtros.dupla) p.set("dupla", filtros.dupla);
+    if (filtros.turma) p.set("turma", filtros.turma);
+    if (filtros.periodo) p.set("periodo", filtros.periodo);
     if (filtros.q) p.set("q", filtros.q);
     if (ordem !== "recentes") p.set("ordem", ordem);
     if (grupo !== "dupla") p.set("grupo", grupo);
@@ -223,8 +241,9 @@ export default async function RegistrosPage({
     return `/registros${qs ? `?${qs}` : ""}`;
   };
   const hrefPagina = (pagina: number) => hrefCom({ pagina: String(pagina) });
-  // "limpar filtros" zera só os filtros — ordem e agrupamento são
-  // preferência de leitura e sobrevivem (mesma regra do "Limpar tudo")
+  // "limpar filtros" zera TUDO — inclusive o recorte do panorama (turma/
+  // período), que também filtra a lista. Ordem e agrupamento são preferência
+  // de leitura e sobrevivem
   const hrefLimpo = hrefCom({
     encontro: null,
     avaliacao: null,
@@ -232,6 +251,8 @@ export default async function RegistrosPage({
     tardio: null,
     dificuldade: null,
     dupla: null,
+    turma: null,
+    periodo: null,
     q: null,
     pagina: null,
   });
@@ -334,6 +355,23 @@ export default async function RegistrosPage({
     );
   }
 
+  const hoje = toDateStr(new Date());
+  // pills de turma do panorama: só cronogramas com duplas no escopo do
+  // papel (o supervisor não vê pill de turma que não supervisiona)
+  const cronogramasComDuplas = new Set(
+    duplas.map((d) => d.cronograma_id).filter((x): x is string => !!x)
+  );
+  const turmasPainel = cronogramas.filter((c) =>
+    cronogramasComDuplas.has(c.id)
+  );
+  const pillCls = (ativo: boolean) =>
+    cn(
+      "inline-flex min-h-11 items-center rounded-full px-3 text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-7",
+      ativo
+        ? "bg-muted font-semibold text-foreground"
+        : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+    );
+
   return (
     <div className="mx-auto max-w-5xl space-y-6">
       {/* respostas do form semanal externo → encontros + registros
@@ -348,8 +386,99 @@ export default async function RegistrosPage({
         actions={souCoord ? <ImportarRegistrosDialog /> : undefined}
       />
 
-      {/* resumo operacional: o que pede ação vem antes da busca; clicar num
-          número aplica o filtro correspondente */}
+      <RegistrosFiltros
+        filtros={filtros}
+        duplas={duplas}
+        turmas={turmasPainel}
+        maxEncontro={maxEncontro}
+        ordem={ordem}
+        grupo={grupo}
+      />
+
+      {/* Panorama do ciclo (REALIZA-198): o recorte turma×período é param de
+          URL (links de verdade — Cmd+click, back/forward e aria-current de
+          graça, mesma gramática do "Agrupar"); métrica das barras e modo da
+          linha são estado local DENTRO do painel. Os gráficos leem o escopo
+          inteiro via getRegistrosPanorama — nunca a fatia paginada de 100 */}
+      <section aria-labelledby="panorama-titulo" className="space-y-3">
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+          <h2
+            id="panorama-titulo"
+            className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground"
+          >
+            Panorama
+          </h2>
+          {turmasPainel.length > 1 && (
+            <div
+              role="group"
+              aria-label="Recortar por turma"
+              className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5"
+            >
+              <span className="text-xs text-muted-foreground">Turma:</span>
+              <div className="inline-flex items-center gap-0.5 rounded-full border bg-card p-0.5">
+                <Link
+                  href={hrefCom({ turma: null, pagina: null })}
+                  scroll={false}
+                  aria-current={!filtros.turma ? "page" : undefined}
+                  className={pillCls(!filtros.turma)}
+                >
+                  Todas
+                </Link>
+                {turmasPainel.map((c) => {
+                  // WCAG 2.5.3 (label in name): o nome acessível precisa
+                  // conter o texto visível — "Turma 1 (T1)" cobre o chip
+                  // "T1"; quando sigla = nome (turma livre) não repete
+                  const curta = turmaCurta(c.turma);
+                  const longa = turmaLonga(c.turma);
+                  return (
+                    <Link
+                      key={c.id}
+                      href={hrefCom({ turma: c.id, pagina: null })}
+                      scroll={false}
+                      aria-label={longa === curta ? curta : `${longa} (${curta})`}
+                      aria-current={filtros.turma === c.id ? "page" : undefined}
+                      className={pillCls(filtros.turma === c.id)}
+                    >
+                      {curta}
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+          <div
+            role="group"
+            aria-label="Recortar por período"
+            className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5"
+          >
+            <span className="text-xs text-muted-foreground">Período:</span>
+            <div className="inline-flex items-center gap-0.5 rounded-full border bg-card p-0.5">
+              {PERIODO_REGISTROS_OPCOES.map((o) => {
+                const ativo =
+                  (filtros.periodo ?? "ciclo") === o.valor;
+                return (
+                  <Link
+                    key={o.valor}
+                    href={hrefCom({
+                      periodo: o.valor === "ciclo" ? null : o.valor,
+                      pagina: null,
+                    })}
+                    scroll={false}
+                    aria-current={ativo ? "page" : undefined}
+                    className={pillCls(ativo)}
+                  >
+                    {o.rotulo}
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+        <RegistrosPainel panorama={panorama} hoje={hoje} />
+      </section>
+
+      {/* resumo operacional: o que pede ação vem logo antes da lista; clicar
+          num número aplica o filtro correspondente */}
       {(total > 0 || alertas.apoio > 0 || alertas.tardios > 0) && (
         <p className="text-sm text-muted-foreground" aria-live="polite">
           {temFiltro ? (
@@ -411,14 +540,6 @@ export default async function RegistrosPage({
           )}
         </p>
       )}
-
-      <RegistrosFiltros
-        filtros={filtros}
-        duplas={duplas}
-        maxEncontro={maxEncontro}
-        ordem={ordem}
-        grupo={grupo}
-      />
 
       {ordenados.length === 0 ? (
         <div className="flex flex-col items-center rounded-xl bg-card px-6 py-10 text-center shadow-[var(--shadow-border)]">
