@@ -49,13 +49,13 @@ test.describe("agenda demo do mentor DPP — Minha agenda / Por mentorado / Cale
     ).toBeVisible();
 
     // o grupo de escopo (mockup v6: role=group aria-label="Escopo da agenda")
-    // — um chip por mentorado + Eu + Tudo. O rótulo carrega a turma cheia
-    // ("T1 · 2026/2027"), mais honesto que o "T1" solto do mock
+    // — um chip por mentorado + Eu + Tudo. O rótulo é compacto ("Bia · T1");
+    // a turma fora do padrão ("2025/2026", legacy) passa inteira
     const escopo = page.getByRole("group", { name: "Escopo da agenda" });
     await expect(escopo).toBeVisible();
     for (const chip of [
-      "Bia · T1 · 2026/2027",
-      "Matheus · T2 · 2026/2027",
+      "Bia · T1",
+      "Matheus · T2",
       // a concluída também tem chip — o escopo da agenda cobre a jornada
       // inteira do mentor, não só o que corre
       "Gustavo · 2025/2026",

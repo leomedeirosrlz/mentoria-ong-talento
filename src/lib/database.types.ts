@@ -7,6 +7,31 @@ export type Json =
   | Json[]
 
 export type Database = {
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       assinaturas: {
@@ -5203,7 +5228,13 @@ export type Database = {
         Returns: undefined
       }
       criar_relatorio_link: {
-        Args: { p_config: Json; p_titulo: string; p_validade?: string }
+        Args: {
+          p_config: Json
+          p_sem_senha?: boolean
+          p_senha?: string
+          p_titulo: string
+          p_validade?: string
+        }
         Returns: Json
       }
       dados_civis_ok: {
@@ -5698,6 +5729,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       app_role: [

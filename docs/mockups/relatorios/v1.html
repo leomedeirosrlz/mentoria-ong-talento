@@ -1,0 +1,525 @@
+<!-- MOCKUP relatorios v1 — "Compartilhar" concentra links públicos na toolbar; dialog nasce com o recorte da grade + prévia + senha -->
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Relatórios · Realiza.vc</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --brand-lime: hsl(78 56% 53%);
+    --brand-ink: hsl(0 0% 15%);
+    --background: hsl(75 10% 95%);
+    --card: hsl(0 0% 100%);
+    --muted: hsl(75 7% 93%);
+    --muted-foreground: hsl(75 4% 40%);
+    --accent: hsl(75 8% 91%);
+    --border: hsl(75 6% 87%);
+    --input: hsl(75 8% 54%);
+    --ok: hsl(78 58% 38%);
+    --ok-text: hsl(78 55% 30%);
+    --warn: hsl(43 95% 44%);
+    --warn-text: hsl(43 90% 30%);
+    --danger: hsl(0 80% 48%);
+    --role-mentor: var(--brand-lime);
+    --role-mentorado: hsl(48 100% 60%);
+    --radius: 0.75rem;
+  }
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  html{ -webkit-text-size-adjust:100%; }
+  body{ font-family:'Inter', system-ui, sans-serif; background:var(--background); color:var(--brand-ink); font-size:14px; line-height:1.45; -webkit-font-smoothing:antialiased; }
+  a{ color:inherit; } button{ font:inherit; color:inherit; }
+  :focus-visible{ outline:2px solid var(--input); outline-offset:2px; border-radius:6px; }
+  @media (prefers-reduced-motion:reduce){ *{transition:none!important} }
+
+  /* ---------- chrome do mockup ---------- */
+  .board-head{ background:var(--brand-ink); color:hsl(75 20% 88%); padding:12px 20px; display:flex; flex-wrap:wrap; align-items:center; gap:6px 18px; font-size:12.5px; }
+  .board-head b{ color:var(--brand-lime); font-weight:700; letter-spacing:.03em; }
+  .board-head .dir{ color:hsl(75 10% 62%); flex:1 1 320px; min-width:0; }
+  .board-head nav{ display:flex; gap:6px; flex-wrap:wrap; }
+  .board-head nav a{ font-size:12px; font-weight:600; padding:5px 12px; border-radius:99px; border:1px solid hsl(75 10% 38%); color:hsl(75 20% 85%); text-decoration:none; }
+  .board-head nav a:hover{ border-color:var(--brand-lime); color:var(--brand-lime); }
+  .rr{ position:absolute; opacity:0; pointer-events:none; }
+  .asrole{ background:#2b2b2b; padding:10px 20px; display:flex; flex-wrap:wrap; gap:8px 12px; align-items:center; position:sticky; top:0; z-index:30; }
+  .asrole>span{ color:hsl(75 10% 75%); font-size:12.5px; font-weight:600; }
+  .asrole label{ cursor:pointer; font-size:13px; font-weight:600; padding:9px 16px; min-height:40px; display:inline-flex; align-items:center; border-radius:99px; border:1px solid hsl(75 10% 42%); color:hsl(75 20% 88%); }
+  #e1:checked~.asrole label[for=e1],#e2:checked~.asrole label[for=e2],#e3:checked~.asrole label[for=e3]{ background:var(--brand-lime); color:var(--brand-ink); border-color:var(--brand-lime); }
+
+  /* ---------- os 3 estados do mock (radio + CSS, sem JS) ---------- */
+  .sharemenu,.backdrop,.dlg{ display:none; }
+  #e1:checked~.app .sharemenu{ display:block; }
+  #e1:checked~.backdrop{ display:block; }
+  #e2:checked~.dlg{ display:flex; }
+  #e1:checked~.app .btn-share,#e2:checked~.app .btn-share{ background:var(--accent); border-color:var(--input); }
+
+  /* ---------- topbar ---------- */
+  .topbar{ position:sticky; top:0; z-index:20; background:hsl(75 10% 95% / .88); backdrop-filter:blur(10px); border-bottom:1px solid var(--border); }
+  .topbar-in{ max-width:1120px; margin:0 auto; padding:.7rem 1.25rem; display:flex; align-items:center; gap:1.4rem; }
+  .brand{ display:flex; align-items:center; gap:.55rem; text-decoration:none; }
+  .brand-mark{ width:30px; height:30px; border-radius:9px; background:var(--brand-lime); display:grid; place-items:center; box-shadow:inset 0 0 0 1px hsl(78 55% 40% / .25); }
+  .brand-name{ font-size:17px; font-weight:800; letter-spacing:-.02em; }
+  .brand-name span{ color:var(--ok-text); font-weight:700; }
+  .topnav{ display:flex; gap:.15rem; }
+  .topnav a{ text-decoration:none; font-size:13.5px; font-weight:550; color:var(--muted-foreground); padding:.42rem .75rem; border-radius:999px; }
+  .topnav a:hover{ background:var(--accent); color:var(--brand-ink); }
+  .topnav a.is-on{ background:var(--brand-lime); color:hsl(78 60% 18%); font-weight:650; }
+  .user{ margin-left:auto; display:flex; align-items:center; gap:.6rem; }
+  .user-id{ text-align:right; line-height:1.15; }
+  .user-id b{ display:block; font-size:13px; font-weight:650; }
+  .user-id small{ font-size:11px; color:var(--muted-foreground); }
+  .uav{ width:32px; height:32px; border-radius:50%; background:var(--brand-ink); color:#fff; display:grid; place-items:center; font-size:11px; font-weight:700; }
+
+  /* ---------- página ---------- */
+  .wrap{ max-width:1120px; margin:0 auto; padding:1.6rem 1.25rem 4.5rem; }
+  .page-head{ margin-bottom:1.3rem; }
+  .kicker{ font-size:11.5px; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:var(--muted-foreground); }
+  .page-head h1{ font-size:26px; font-weight:750; letter-spacing:-.02em; margin-top:.15rem; }
+  .page-head .sub{ margin-top:.2rem; font-size:13px; color:var(--muted-foreground); }
+
+  /* ---------- toolbar do builder (mesma língua dos filtros de /duplas) ---------- */
+  .fgroup{ display:flex; flex-wrap:wrap; align-items:center; gap:.4rem; margin-bottom:.7rem; }
+  .fgroup>span.glab{ font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--muted-foreground); margin-right:.15rem; }
+  .fopt{ font-size:12.5px; font-weight:600; padding:.28rem .7rem; border-radius:999px; border:1px solid var(--border); background:var(--card); color:var(--muted-foreground); cursor:pointer; }
+  .fopt:hover{ border-color:var(--input); color:var(--brand-ink); }
+  .fopt.on{ background:var(--brand-ink); color:#fff; border-color:var(--brand-ink); }
+  .fopt.off{ border-style:dashed; }
+  .fopt .ck{ display:inline-grid; place-items:center; width:14px; height:14px; border-radius:4px; border:1px solid var(--border); margin-right:.3rem; vertical-align:-2px; font-size:9px; }
+  .fopt.on .ck{ border-color:hsl(0 0% 100% / .5); background:hsl(0 0% 100% / .18); color:#fff; }
+
+  .actions{ display:flex; flex-wrap:wrap; align-items:center; gap:.5rem; margin-top:.9rem; }
+  .btn{ display:inline-flex; align-items:center; gap:.4rem; font-size:13px; font-weight:600; padding:.5rem .9rem; border-radius:10px; border:1px solid var(--border); background:var(--card); color:var(--brand-ink); text-decoration:none; cursor:pointer; }
+  .btn:hover{ background:var(--accent); }
+  .btn.pri{ background:var(--brand-lime); border-color:var(--brand-lime); color:hsl(78 60% 17%); }
+  .btn.pri:hover{ filter:brightness(.96); }
+  .btn.ghost{ background:transparent; border-color:transparent; color:var(--muted-foreground); }
+  .btn.ghost:hover{ color:var(--brand-ink); background:var(--accent); }
+  .btn.danger{ color:var(--danger); border-color:hsl(0 80% 88%); }
+  .btn.danger:hover{ background:hsl(0 80% 96%); }
+  .btn svg{ flex:none; }
+  .share-wrap{ position:relative; display:inline-flex; }
+  .btn-share{ border-radius:10px; }
+  .edit-right{ margin-left:auto; display:flex; align-items:center; gap:.5rem; }
+
+  /* ---------- dropdown "Compartilhar" ---------- */
+  .backdrop{ position:fixed; inset:0; z-index:25; cursor:default; }
+  .sharemenu{ position:absolute; top:calc(100% + 8px); left:0; z-index:40; width:min(440px, calc(100vw - 32px)); background:var(--card); border:1px solid var(--border); border-radius:14px; box-shadow:0 18px 48px hsl(0 0% 15% / .18), 0 2px 8px hsl(0 0% 15% / .08); overflow:hidden; }
+  .sm-grip{ display:none; }
+  .sm-sec{ padding:6px; }
+  .sm-item{ display:flex; align-items:flex-start; gap:.65rem; width:100%; text-align:left; padding:.6rem .7rem; border-radius:10px; cursor:pointer; border:none; background:none; text-decoration:none; }
+  .sm-item:hover{ background:var(--accent); }
+  .sm-item .ic{ width:32px; height:32px; flex:none; border-radius:9px; background:var(--muted); display:grid; place-items:center; color:var(--brand-ink); }
+  .sm-item .tx{ min-width:0; }
+  .sm-item .tx b{ display:block; font-size:13.5px; font-weight:650; }
+  .sm-item .tx small{ display:block; font-size:12px; color:var(--muted-foreground); margin-top:.05rem; }
+  .sm-label{ padding:.55rem .75rem .3rem; font-size:10.5px; font-weight:700; letter-spacing:.07em; text-transform:uppercase; color:var(--muted-foreground); display:flex; align-items:center; justify-content:space-between; }
+  .sm-sep{ height:1px; background:var(--border); margin:2px 0; }
+
+  .lk{ border:1px solid var(--border); border-radius:11px; padding:.6rem .7rem .55rem; margin:0 6px 6px; }
+  .lk:last-child{ margin-bottom:2px; }
+  .lk-h{ display:flex; align-items:center; gap:.45rem; min-width:0; }
+  .lk-h b{ font-size:13px; font-weight:650; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; }
+  .lk-url{ display:block; font-family:ui-monospace, SFMono-Regular, Menlo, monospace; font-size:11px; color:var(--muted-foreground); background:var(--muted); border-radius:6px; padding:.18rem .45rem; margin-top:.35rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .lk-meta{ font-size:11.5px; color:var(--muted-foreground); margin-top:.35rem; line-height:1.5; }
+  .lk-meta .warn{ color:var(--warn-text); font-weight:600; }
+  .lk-acts{ display:flex; flex-wrap:wrap; gap:.35rem; margin-top:.45rem; }
+  .lk-acts .mini-act{ display:inline-flex; align-items:center; gap:.3rem; font-size:11.5px; font-weight:600; padding:.3rem .55rem; min-height:30px; border-radius:8px; border:1px solid var(--border); background:var(--card); color:var(--muted-foreground); cursor:pointer; text-decoration:none; }
+  .lk-acts .mini-act:hover{ border-color:var(--input); color:var(--brand-ink); }
+  .lk-acts .mini-act.danger{ color:var(--danger); }
+  .lk-acts .mini-act.danger:hover{ border-color:hsl(0 80% 60%); background:hsl(0 80% 97%); }
+
+  .pill{ display:inline-flex; align-items:center; gap:.3rem; font-size:10.5px; font-weight:700; padding:.16rem .5rem; border-radius:999px; white-space:nowrap; flex:none; }
+  .p-ativo{ background:hsl(78 58% 90%); color:var(--ok-text); }
+  .p-sem-senha{ background:hsl(43 95% 90%); color:var(--warn-text); }
+  .sm-foot{ padding:.45rem .8rem .65rem; font-size:11px; color:var(--muted-foreground); display:flex; align-items:center; gap:.4rem; }
+
+  /* ---------- canvas (grade livre) ---------- */
+  .canvas{ margin-top:1.2rem; border:1px solid var(--border); border-radius:var(--radius); background:var(--card); overflow:hidden; }
+  .cv-scroll{ overflow-x:auto; }
+  table.cv{ border-collapse:collapse; min-width:980px; width:100%; font-size:12.5px; }
+  .cv th{ text-align:left; font-size:10.5px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:var(--muted-foreground); padding:.55rem .7rem; border-bottom:1px solid var(--border); background:var(--card); white-space:nowrap; }
+  .cv td{ padding:.5rem .7rem; border-bottom:1px solid var(--border); white-space:nowrap; vertical-align:middle; }
+  .cv tr:last-child td{ border-bottom:none; }
+  .cv .g{ width:34px; text-align:right; color:var(--muted-foreground); font-size:10.5px; background:var(--muted); border-right:1px solid var(--border); position:sticky; left:0; }
+  .cv tbody tr:hover td{ background:hsl(75 8% 96%); }
+  .cv tbody tr:hover td.g{ background:var(--muted); }
+  .cv .nome{ font-weight:600; }
+  .cv .ct{ color:var(--muted-foreground); font-size:12px; }
+  .st{ font-size:11px; font-weight:650; padding:.18rem .55rem; border-radius:999px; border:1px solid; }
+  .st-ok{ color:var(--ok-text); border-color:hsl(78 58% 38% / .6); }
+  .st-pausa{ color:var(--muted-foreground); border-color:var(--border); }
+  .cv-foot{ padding:.45rem .8rem; font-size:11.5px; color:var(--muted-foreground); border-top:1px solid var(--border); display:flex; justify-content:space-between; gap:.6rem; flex-wrap:wrap; }
+
+  /* ---------- dialog "Novo link público" ---------- */
+  .dlg{ position:fixed; inset:0; z-index:60; align-items:center; justify-content:center; padding:16px; }
+  .dlg-scrim{ position:absolute; inset:0; background:hsl(0 0% 10% / .45); }
+  .dlg-panel{ position:relative; width:min(600px, 100%); max-height:calc(100vh - 40px); overflow-y:auto; background:var(--card); border-radius:16px; box-shadow:0 24px 64px hsl(0 0% 15% / .3); }
+  .dlg-head{ display:flex; align-items:flex-start; gap:.8rem; padding:1.1rem 1.25rem .4rem; }
+  .dlg-head h2{ font-size:17.5px; font-weight:750; letter-spacing:-.01em; }
+  .dlg-head p{ font-size:12.5px; color:var(--muted-foreground); margin-top:.2rem; }
+  .dlg-x{ margin-left:auto; flex:none; width:34px; height:34px; display:grid; place-items:center; border-radius:9px; color:var(--muted-foreground); cursor:pointer; }
+  .dlg-x:hover{ background:var(--accent); color:var(--brand-ink); }
+  .dlg-body{ padding:.5rem 1.25rem 1rem; display:grid; gap:.95rem; }
+  .dlg-foot{ display:flex; gap:.5rem; justify-content:space-between; align-items:center; padding:.85rem 1.25rem 1.1rem; border-top:1px solid var(--border); }
+  .dlg-foot .r{ display:flex; gap:.5rem; margin-left:auto; }
+
+  .recorte{ border:1px solid var(--border); border-radius:12px; overflow:hidden; }
+  .recorte-h{ display:flex; align-items:center; gap:.45rem; padding:.5rem .75rem; background:var(--muted); font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--muted-foreground); }
+  .recorte-h .imported{ margin-left:auto; font-weight:600; text-transform:none; letter-spacing:0; color:var(--ok-text); display:inline-flex; align-items:center; gap:.25rem; }
+  .chips{ display:flex; flex-wrap:wrap; gap:.35rem; padding:.65rem .75rem .35rem; }
+  .chip{ display:inline-flex; align-items:center; gap:.3rem; font-size:12px; font-weight:600; background:var(--brand-ink); color:#fff; padding:.3rem .65rem; border-radius:999px; }
+  .chip.lime{ background:var(--brand-lime); color:hsl(78 60% 17%); }
+  .chip.warn{ background:hsl(43 95% 90%); color:var(--warn-text); border:1px solid hsl(43 95% 70%); }
+  .chip.ghost{ background:var(--card); border:1px dashed var(--input); color:var(--muted-foreground); }
+  .recorte-note{ font-size:11.5px; color:var(--muted-foreground); padding:0 .75rem .6rem; }
+  details.ajustar{ border-top:1px dashed var(--border); }
+  details.ajustar>summary{ cursor:pointer; list-style:none; padding:.5rem .75rem; font-size:12px; font-weight:650; color:var(--muted-foreground); display:flex; align-items:center; gap:.4rem; }
+  details.ajustar>summary::-webkit-details-marker{ display:none; }
+  details.ajustar>summary::before{ content:"▸"; font-size:10px; transition:transform .15s; }
+  details.ajustar[open]>summary::before{ transform:rotate(90deg); }
+  details.ajustar>summary:hover{ color:var(--brand-ink); }
+  .ajustar-b{ padding:.2rem .75rem .8rem; display:grid; gap:.6rem; }
+  .mini-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(120px, 1fr)); gap:.35rem .8rem; font-size:12.5px; }
+  .mini-grid label{ display:flex; align-items:center; gap:.4rem; }
+  .fake-sel{ display:flex; align-items:center; justify-content:space-between; gap:.5rem; border:1px solid var(--border); border-radius:9px; padding:.42rem .6rem; font-size:12.5px; background:var(--card); color:var(--brand-ink); }
+  .fake-sel small{ color:var(--muted-foreground); }
+  .switch-row{ display:flex; align-items:center; justify-content:space-between; gap:.7rem; border:1px solid var(--border); border-radius:9px; padding:.5rem .65rem; }
+  .switch-row .t{ font-size:12.5px; font-weight:600; }
+  .switch-row .t small{ display:block; font-weight:400; font-size:11px; color:var(--muted-foreground); margin-top:.1rem; }
+  .sw{ flex:none; width:38px; height:22px; border-radius:999px; background:var(--brand-ink); position:relative; }
+  .sw::after{ content:""; position:absolute; top:3px; right:3px; width:16px; height:16px; border-radius:50%; background:#fff; }
+  .sw.off{ background:var(--border); } .sw.off::after{ right:auto; left:3px; }
+
+  .preview-cap{ font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--muted-foreground); display:flex; align-items:center; gap:.4rem; margin-bottom:.4rem; }
+  .preview{ border:1px solid var(--border); border-radius:12px; overflow:hidden; background:var(--background); }
+  .pv-bar{ display:flex; align-items:center; gap:.45rem; padding:.45rem .7rem; background:var(--card); border-bottom:1px solid var(--border); font-size:11px; color:var(--muted-foreground); font-family:ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .pv-bar .dots{ display:flex; gap:4px; margin-right:.2rem; }
+  .pv-bar .dots i{ width:8px; height:8px; border-radius:50%; background:var(--border); }
+  .pv-body{ padding:.7rem .8rem .8rem; }
+  .pv-title{ font-size:13px; font-weight:700; }
+  .pv-sub{ font-size:11px; color:var(--muted-foreground); margin:.1rem 0 .5rem; }
+  .pv-scroll{ overflow-x:auto; border:1px solid var(--border); border-radius:8px; }
+  table.pv{ border-collapse:collapse; min-width:560px; width:100%; font-size:10.5px; background:var(--card); }
+  .pv th{ text-align:left; font-size:9.5px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--muted-foreground); padding:.35rem .5rem; border-bottom:1px solid var(--border); white-space:nowrap; }
+  .pv td{ padding:.32rem .5rem; border-bottom:1px solid var(--border); white-space:nowrap; }
+  .pv .fade td{ border-bottom:none; color:var(--muted-foreground); text-align:center; font-size:10.5px; padding:.3rem; background:var(--muted); }
+  .pv-note{ font-size:10.5px; color:var(--muted-foreground); margin-top:.4rem; display:flex; align-items:center; gap:.35rem; }
+
+  .fld{ display:grid; gap:.3rem; }
+  .fld>span{ font-size:13px; font-weight:600; }
+  .fld>span small{ font-weight:400; color:var(--muted-foreground); }
+  .inp{ border:1px solid var(--border); border-radius:9px; padding:.5rem .65rem; font-size:13.5px; background:var(--card); color:var(--brand-ink); display:flex; align-items:center; justify-content:space-between; gap:.5rem; }
+  .inp .ph{ color:var(--muted-foreground); }
+  .hint{ font-size:11.5px; color:var(--muted-foreground); display:flex; align-items:flex-start; gap:.35rem; }
+  .hint svg{ flex:none; margin-top:1px; }
+  .fld2{ display:grid; gap:.75rem; grid-template-columns:1fr 1fr; }
+
+  /* ---------- notas do mock ---------- */
+  .notes{ display:grid; gap:8px; margin-top:36px; padding:16px 22px 18px; background:var(--brand-ink); color:hsl(75 14% 76%); border-radius:var(--radius); font-size:12.5px; line-height:1.6; }
+  .notes b{ color:var(--brand-lime); font-weight:700; }
+  .notes li{ margin-left:18px; }
+  .notes .warn{ color:hsl(48 100% 70%); }
+
+  /* ---------- responsivo ---------- */
+  @media (max-width: 1020px){
+    .topnav{ display:none; }
+  }
+  @media (max-width: 640px){
+    .wrap{ padding:1.2rem .9rem 4rem; }
+    .page-head h1{ font-size:22px; }
+    .user-id{ display:none; }
+    .asrole{ position:static; padding:8px 12px; }
+    .asrole label{ flex:1 1 calc(50% - 8px); justify-content:center; }
+    .fopt{ min-height:44px; display:inline-flex; align-items:center; }
+    .btn{ min-height:44px; }
+    .edit-right{ margin-left:0; width:100%; }
+
+    /* dropdown vira bottom sheet */
+    .sharemenu{ position:fixed; left:0; right:0; bottom:0; top:auto; width:100%; max-height:82vh; overflow-y:auto; border-radius:18px 18px 0 0; border:none; border-top:1px solid var(--border); box-shadow:0 -16px 48px hsl(0 0% 15% / .28); }
+    .sm-grip{ display:block; padding:.55rem 0 .15rem; }
+    .sm-grip i{ display:block; width:44px; height:5px; border-radius:99px; background:var(--border); margin:0 auto; }
+    #e1:checked~.backdrop{ background:hsl(0 0% 10% / .4); }
+    .lk-acts .mini-act{ min-height:40px; padding:.45rem .7rem; }
+
+    /* dialog vira sheet de baixo, sem overflow */
+    .dlg{ align-items:flex-end; padding:0; }
+    .dlg-panel{ width:100%; max-height:92vh; border-radius:18px 18px 0 0; }
+    .fld2{ grid-template-columns:1fr; }
+    .dlg-foot{ flex-wrap:wrap; }
+    .dlg-foot .r{ width:100%; }
+    .dlg-foot .r .btn{ flex:1; justify-content:center; }
+  }
+</style>
+</head>
+<body>
+
+<header class="board-head">
+  <span><b>MOCKUP</b> · relatórios · v1</span>
+  <span class="dir">Direção: a seção "Links públicos" sai da página e vira UM controle "Compartilhar" na toolbar — criar link (dialog já pré-cheio com o recorte da grade + prévia + senha no mesmo form), gerenciar e ver acessos ficam dentro do menu.</span>
+  <nav><a href="#notas">Notas</a></nav>
+</header>
+
+<!-- estados do mock (radio + CSS) -->
+<input class="rr" type="radio" name="estado" id="e1" checked aria-label="Menu Compartilhar aberto">
+<input class="rr" type="radio" name="estado" id="e2" aria-label="Dialog Novo link público aberto">
+<input class="rr" type="radio" name="estado" id="e3" aria-label="Página sem nada aberto">
+<div class="asrole" role="group" aria-label="Estado do mockup"><span>Estado:</span>
+  <label for="e1">Menu “Compartilhar”</label><label for="e2">Dialog “Novo link”</label><label for="e3">Página limpa</label>
+</div>
+
+<label class="backdrop" for="e3" aria-label="Fechar menu"></label>
+
+<div class="app">
+
+  <div class="topbar"><div class="topbar-in">
+    <a class="brand" href="#"><span class="brand-mark" aria-hidden="true"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="hsl(78 60% 20%)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21v-9"/><path d="M12 12c0-3.9 2.7-6.5 6.5-6.5 0 3.8-2.7 6.5-6.5 6.5z"/><path d="M12 12c0-3.9-2.7-6.5-6.5-6.5 0 3.8 2.7 6.5 6.5 6.5z"/></svg></span><span class="brand-name">realiza<span>.vc</span></span></a>
+    <nav class="topnav" aria-label="Principal"><a href="#">Início</a><a href="#">Agenda</a><a href="#">Duplas</a><a href="#">Pessoas</a><a href="#">Chamados</a><a href="#">Materiais</a><a href="#" class="is-on" aria-current="page">Relatórios</a></nav>
+    <div class="user"><div class="user-id"><b>Marina Costa</b><small>Coordenação</small></div><span class="uav" aria-hidden="true">MC</span></div>
+  </div></div>
+
+  <main class="wrap">
+    <div class="page-head">
+      <p class="kicker">Operação</p>
+      <h1>Relatórios</h1>
+      <p class="sub">Escolha turma, granularidade e colunas — a grade abaixo é livre: redimensione, ordene e exporte. Compartilhar gera um link público com o recorte congelado.</p>
+    </div>
+
+    <!-- ============ toolbar do builder ============ -->
+    <div class="fgroup" role="group" aria-label="Turma">
+      <span class="glab">Turma</span>
+      <button class="fopt" type="button">T1 · 2026/2027</button>
+      <button class="fopt on" type="button" aria-pressed="true">T2 · 2026/2027</button>
+      <button class="fopt" type="button">Todas</button>
+    </div>
+    <div class="fgroup" role="group" aria-label="Linhas">
+      <span class="glab">Linhas</span>
+      <button class="fopt" type="button">Uma por pessoa</button>
+      <button class="fopt on" type="button" aria-pressed="true">Uma por dupla</button>
+    </div>
+    <div class="fgroup" role="group" aria-label="Colunas">
+      <span class="glab">Colunas</span>
+      <button class="fopt on" type="button" aria-pressed="true"><span class="ck">✓</span>Mentor(a)</button>
+      <button class="fopt on" type="button" aria-pressed="true"><span class="ck">✓</span>Mentorado(a)</button>
+      <button class="fopt on" type="button" aria-pressed="true"><span class="ck">✓</span>Contato do mentor</button>
+      <button class="fopt on" type="button" aria-pressed="true"><span class="ck">✓</span>Contato do mentorado</button>
+      <button class="fopt on" type="button" aria-pressed="true"><span class="ck">✓</span>Status</button>
+      <button class="fopt on" type="button" aria-pressed="true"><span class="ck">✓</span>Início</button>
+      <button class="fopt on" type="button" aria-pressed="true"><span class="ck">✓</span>Demanda</button>
+      <button class="fopt on" type="button" aria-pressed="true"><span class="ck">✓</span>Auxiliar executivo</button>
+    </div>
+
+    <div class="actions">
+      <button class="btn" type="button"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v12m0 0 4.5-4.5M12 16l-4.5-4.5"/><path d="M4 20h16"/></svg>Baixar CSV</button>
+
+      <!-- ============ o ÚNICO controle de links públicos ============ -->
+      <span class="share-wrap">
+        <label class="btn btn-share" for="e1" aria-haspopup="menu" aria-expanded="true">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="6" r="2.6"/><circle cx="18" cy="18" r="2.6"/><path d="m8.4 10.8 7.2-3.6M8.4 13.2l7.2 3.6"/></svg>
+          Compartilhar
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+        </label>
+
+        <!-- o menu (estado 1) — no mobile vira bottom sheet -->
+        <div class="sharemenu" role="menu" aria-label="Compartilhar relatório">
+          <span class="sm-grip" aria-hidden="true"><i></i></span>
+
+          <div class="sm-sec">
+            <label class="sm-item" for="e2" role="menuitem">
+              <span class="ic"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span>
+              <span class="tx"><b>Novo link público</b><small>Usa o recorte da grade na tela — T2 · por dupla · 8 colunas</small></span>
+            </label>
+          </div>
+
+          <div class="sm-sep" role="separator"></div>
+
+          <p class="sm-label"><span>Links ativos · 2</span><span style="font-weight:600;text-transform:none;letter-spacing:0">revogar tira o ar na hora</span></p>
+
+          <!-- link 1 -->
+          <div class="lk">
+            <div class="lk-h">
+              <b>Resumo da turma — T2 · 2026/2027</b>
+              <span class="pill p-ativo">Ativo</span>
+              <span class="pill p-sem-senha"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="4.5" y="10.5" width="15" height="10" rx="2.4"/><path d="M8 10V7a4 4 0 0 1 7.9-.8"/></svg>Sem senha</span>
+            </div>
+            <code class="lk-url">realiza.vc/resumo/t2-x7k4m9qf2w8j</code>
+            <p class="lk-meta">Grade de pessoas · sem contato · criado 23/ago por Marina · <b style="color:var(--brand-ink)">12 acessos</b>, último 05/out · válido até 21/dez</p>
+            <div class="lk-acts">
+              <button class="mini-act" type="button"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg>Copiar link</button>
+              <button class="mini-act" type="button"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6"/><path d="M20 4 11 13"/><path d="M19 13.5V19a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5.5"/></svg>Abrir</button>
+              <button class="mini-act" type="button"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="15" r="4"/><path d="m10.9 12.1 8.6-8.6M18 5l2 2M15 8l1.6 1.6"/></svg>Definir senha</button>
+              <button class="mini-act danger" type="button"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 9-4.6 4.6a2 2 0 0 0 0 2.8l1.6 1.6a2 2 0 0 0 2.8 0L13.4 13"/><path d="m15 15 4.6-4.6a2 2 0 0 0 0-2.8L18 6a2 2 0 0 0-2.8 0L10.6 10.6"/><path d="m8 13 3 3"/></svg>Revogar</button>
+            </div>
+          </div>
+
+          <!-- link 2 -->
+          <div class="lk">
+            <div class="lk-h">
+              <b>Prestação de contas — encontros DPP</b>
+              <span class="pill p-ativo">Ativo</span>
+              <span class="pill" style="background:var(--muted);color:var(--muted-foreground)"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="4.5" y="10.5" width="15" height="10" rx="2.4"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/></svg>Com senha</span>
+            </div>
+            <code class="lk-url">realiza.vc/resumo/ciclo-dpp-k3w8f2m9xq7j4n5p</code>
+            <p class="lk-meta">Encontro a encontro · T2 · criado 27/set por Marina · <b style="color:var(--brand-ink)">4 acessos</b>, último 06/out · sem prazo · <span class="warn">2 falhas de senha em 24h</span></p>
+            <div class="lk-acts">
+              <button class="mini-act" type="button"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg>Copiar link</button>
+              <button class="mini-act" type="button"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6"/><path d="M20 4 11 13"/><path d="M19 13.5V19a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5.5"/></svg>Abrir</button>
+              <button class="mini-act" type="button"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="15" r="4"/><path d="m10.9 12.1 8.6-8.6M18 5l2 2M15 8l1.6 1.6"/></svg>Redefinir senha</button>
+              <button class="mini-act danger" type="button"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 9-4.6 4.6a2 2 0 0 0 0 2.8l1.6 1.6a2 2 0 0 0 2.8 0L13.4 13"/><path d="m15 15 4.6-4.6a2 2 0 0 0 0-2.8L18 6a2 2 0 0 0-2.8 0L10.6 10.6"/><path d="m8 13 3 3"/></svg>Revogar</button>
+            </div>
+          </div>
+
+          <div class="sm-sep" role="separator"></div>
+
+          <div class="sm-sec">
+            <button class="sm-item" type="button" role="menuitem">
+              <span class="ic"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></svg></span>
+              <span class="tx"><b>Ver acessos</b><small>Registro de aberturas e tentativas de senha — guardado por 13 meses</small></span>
+            </button>
+          </div>
+
+          <p class="sm-foot"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="4.5" y="10.5" width="15" height="10" rx="2.4"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/></svg>Só dados operacionais saem por link — respostas de instrumentos nunca.</p>
+        </div>
+      </span>
+
+      <span class="edit-right">
+        <button class="fopt" type="button" aria-pressed="false"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 3.5a2.1 2.1 0 0 1 3 3L8 19l-4.2 1.2L5 16z"/></svg>Editar cadastros</button>
+      </span>
+    </div>
+
+    <!-- ============ canvas livre ============ -->
+    <div class="canvas">
+      <div class="cv-scroll">
+        <table class="cv">
+          <thead><tr><th class="g" aria-hidden="true"></th><th>Mentor(a)</th><th>Mentorado(a)</th><th>Contato do mentor</th><th>Contato do mentorado</th><th>Status</th><th>Início</th><th>Demanda</th><th>Auxiliar executivo</th></tr></thead>
+          <tbody>
+            <tr><td class="g">1</td><td class="nome">André Lima</td><td>Caio Martins</td><td class="ct">(11) 98201-0001 · andre.lima@realiza.test</td><td class="ct">(11) 97321-0440 · caio.m@realiza.test</td><td><span class="st st-ok">Ativa</span></td><td>10/09/2026</td><td>finanças</td><td>Paula Nunes</td></tr>
+            <tr><td class="g">2</td><td class="nome">Camila Duarte</td><td>Lucas Ferreira</td><td class="ct">(11) 98877-1020 · camila.d@realiza.test</td><td class="ct">(11) 96655-8801 · lucas.f@realiza.test</td><td><span class="st st-ok">Ativa</span></td><td>10/09/2026</td><td></td><td></td></tr>
+            <tr><td class="g">3</td><td class="nome">Diego Oliveira</td><td>Clara Nunes</td><td class="ct">(11) 99120-3355 · diego.o@realiza.test</td><td class="ct">(11) 97701-2290 · clara.n@realiza.test</td><td><span class="st st-ok">Ativa</span></td><td>10/09/2026</td><td></td><td>Paula Nunes</td></tr>
+            <tr><td class="g">4</td><td class="nome">Fernando Costa</td><td>Gabriel Nunes</td><td class="ct">(11) 98430-7712 · fernando.c@realiza.test</td><td class="ct">(11) 96322-4108 · gabriel.n@realiza.test</td><td><span class="st st-pausa">Pausada</span></td><td>10/09/2026</td><td></td><td>Paula Nunes</td></tr>
+            <tr><td class="g">5</td><td class="nome">Patrícia Mendes</td><td>Beatriz Ramos</td><td class="ct">(11) 97564-0934 · patricia.m@realiza.test</td><td class="ct">(11) 98118-5567 · beatriz.r@realiza.test</td><td><span class="st st-ok">Ativa</span></td><td>10/09/2026</td><td></td><td>Paula Nunes</td></tr>
+            <tr><td class="g">6</td><td class="nome">Rafael Freitas</td><td>João Santos</td><td class="ct">(11) 98745-2210 · rafael.f@realiza.test</td><td class="ct">(11) 99413-7026 · joao.s@realiza.test</td><td><span class="st st-ok">Ativa</span></td><td>10/09/2026</td><td></td><td></td></tr>
+            <tr><td class="g">7</td><td class="nome">Renata Gomes</td><td>Pedro Ramos</td><td class="ct">(11) 99608-1147 · renata.g@realiza.test</td><td class="ct">(11) 97266-9340 · pedro.r@realiza.test</td><td><span class="st st-ok">Ativa</span></td><td>10/09/2026</td><td>carreira e portfólio</td><td></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="cv-foot"><span><b>7 linhas</b> · arraste a borda do cabeçalho pra redimensionar · clique no título da coluna pra ordenar</span><span>⌘C copia a seleção em TSV</span></div>
+    </div>
+
+    <ul class="notes" id="notas">
+      <li><b>O que mudou (feedback do Thiago):</b> a seção "Links públicos" sai da página — não existe mais card permanente. Toda a gestão (criar, listar, copiar, redefinir senha, revogar, ver acessos) mora no menu <b>Compartilhar</b> da toolbar, ao lado do "Baixar CSV". No mobile o menu vira <b>bottom sheet</b> com alça.</li>
+      <li><b>Form nasce pré-cheio:</b> "Novo link público" abre o dialog já com o recorte do builder importado — os chips resumem ("T2 · por dupla · 8 colunas · 7 linhas · com contato"). Ninguém re-escolhe turma/colunas; "Ajustar recorte" (recolhido) ainda permite mexer antes de publicar, inclusive trocar o tipo (ciclo, assinaturas) — que sai do recorte da grade.</li>
+      <li><b>Prévia no dialog:</b> miniatura da página pública como ela abre pra quem recebe (barra com o endereço, título e grade), atacando a queixa "sem preview de como seria".</li>
+      <li><b>Senha no mesmo form:</b> campo opcional ao lado da validade — em branco mantém o comportamento atual (senha gerada e mostrada uma vez na confirmação). <b>Atenção:</b> hoje <code>criar_relatorio_link</code> só aceita senha gerada — campo digitado exige mudar a RPC + action.</li>
+      <li><b>Contato importado = decisão delicada:</b> a grade na tela tem "Contato do mentor/mentorado" ligadas → o dialog importa <code>expor_contato</code> ligado (é o que o código já faz). Isso publica e-mail/WhatsApp de menor. Ver decisões em aberto.</li>
+      <li class="warn"><b>Matriz papel × acesso:</b> /relatorios é <b>só da coordenação</b> — qualquer outro papel é redirecionado ao abrir (nem a página, nem o menu existem pra mentor/auxiliar/jovem). Por isso o mock tem um seletor de <b>estado</b>, não de papel.</li>
+      <li class="warn"><b>Decisões em aberto:</b> (a) senha digitada — aceitar texto livre ou continuar só com a gerada? E o link "Sem senha" legado: o form novo oferece opção "sem senha" ou sempre protege? (b) "Ver acessos" abre o quê — um dialog com log (data/origem/senha ok?) ou página própria? Stats já existem (acessos, último, falhas 24h); log por evento talvez precise de RPC nova. (c) Revogar dentro do menu pede confirmação inline ou o ConfirmDeleteButton de sempre? (d) Com N links, o menu mostra os ~3 recentes + "ver todos" (pro dialog de gestão) ou lista completa com scroll? (e) Tipos ciclo/assinaturas ficam só em "Ajustar recorte" ou ganham item próprio no menu?</li>
+    </ul>
+  </main>
+</div>
+
+<!-- ============ dialog "Novo link público" (estado 2) ============ -->
+<div class="dlg" role="dialog" aria-modal="true" aria-labelledby="dlg-t">
+  <label class="dlg-scrim" for="e3" aria-label="Fechar"></label>
+  <div class="dlg-panel">
+    <div class="dlg-head">
+      <div>
+        <h2 id="dlg-t">Novo link público</h2>
+        <p>O recorte fica salvo no link: quem abre vê exatamente isto, e só isto. Mudar a grade depois não altera o link.</p>
+      </div>
+      <label class="dlg-x" for="e3" aria-label="Fechar dialog"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></label>
+    </div>
+
+    <div class="dlg-body">
+      <!-- recorte importado como chips -->
+      <div class="recorte">
+        <p class="recorte-h">Recorte do link<span class="imported"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m4.5 12.5 5 5 10-11"/></svg>importado da grade</span></p>
+        <div class="chips">
+          <span class="chip">Grade de duplas</span>
+          <span class="chip">T2 · 2026/2027</span>
+          <span class="chip lime">8 colunas</span>
+          <span class="chip lime">7 linhas</span>
+          <span class="chip warn"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8v5"/><circle cx="12" cy="16.6" r=".4" fill="currentColor"/><path d="M10.3 3.9 2.6 17.4A2 2 0 0 0 4.3 20.4h15.4a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>com contato</span>
+        </div>
+        <p class="recorte-note">"Com contato" inclui e-mail e WhatsApp dos dois lados — estão ligados na grade. Dados pessoais: confira se o destinatário precisa.</p>
+        <details class="ajustar">
+          <summary>Ajustar recorte antes de publicar</summary>
+          <div class="ajustar-b">
+            <div class="fld"><span>Tipo de relatório</span>
+              <div class="fake-sel">Grade operacional<small>▾</small></div>
+            </div>
+            <div class="fld2">
+              <div class="fld"><span>Turma</span><div class="fake-sel">T2 · 2026/2027<small>▾</small></div></div>
+              <div class="fld"><span>Linhas</span><div class="fake-sel">Uma por dupla<small>▾</small></div></div>
+            </div>
+            <div class="fld"><span>Colunas</span>
+              <div class="mini-grid">
+                <label><input type="checkbox" checked> Mentor(a)</label>
+                <label><input type="checkbox" checked> Mentorado(a)</label>
+                <label><input type="checkbox" checked> Contato do mentor</label>
+                <label><input type="checkbox" checked> Contato do mentorado</label>
+                <label><input type="checkbox" checked> Status</label>
+                <label><input type="checkbox" checked> Início</label>
+                <label><input type="checkbox" checked> Demanda</label>
+                <label><input type="checkbox" checked> Auxiliar executivo</label>
+              </div>
+            </div>
+            <div class="switch-row"><span class="t">Compartilhar contato<small>E-mail e WhatsApp — só marque se o destinatário precisar.</small></span><span class="sw" role="switch" aria-checked="true" aria-label="Compartilhar contato"></span></div>
+            <p class="hint"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M12 11.5V16"/></svg>Mudar aqui afeta só o link — a grade atrás fica como está. Os tipos "ciclo" e "assinaturas" saem do recorte da grade e usam os filtros próprios deles.</p>
+          </div>
+        </details>
+      </div>
+
+      <!-- prévia do público -->
+      <div>
+        <p class="preview-cap"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></svg>Prévia — como abre pra quem recebe</p>
+        <div class="preview">
+          <div class="pv-bar"><span class="dots" aria-hidden="true"><i></i><i></i><i></i></span><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><rect x="4.5" y="10.5" width="15" height="10" rx="2.4"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/></svg>realiza.vc/resumo/<b>novo-link</b></div>
+          <div class="pv-body">
+            <p class="pv-title">Grade operacional — T2 · 2026/2027</p>
+            <p class="pv-sub">Programa de Mentoria Realiza · uma linha por dupla · 7 linhas</p>
+            <div class="pv-scroll">
+            <table class="pv">
+              <thead><tr><th>Mentor(a)</th><th>Mentorado(a)</th><th>Contato do mentor</th><th>Contato do mentorado</th><th>Status</th><th>Início</th><th>Demanda</th><th>Auxiliar</th></tr></thead>
+              <tbody>
+                <tr><td>André Lima</td><td>Caio Martins</td><td>(11) 98201-0001 · andre.lima@…</td><td>(11) 97321-0440 · caio.m@…</td><td>Ativa</td><td>10/09/26</td><td>finanças</td><td>Paula Nunes</td></tr>
+                <tr><td>Camila Duarte</td><td>Lucas Ferreira</td><td>(11) 98877-1020 · camila.d@…</td><td>(11) 96655-8801 · lucas.f@…</td><td>Ativa</td><td>10/09/26</td><td></td><td></td></tr>
+                <tr><td>Fernando Costa</td><td>Gabriel Nunes</td><td>(11) 98430-7712 · fernando.c@…</td><td>(11) 96322-4108 · gabriel.n@…</td><td>Pausada</td><td>10/09/26</td><td></td><td>Paula Nunes</td></tr>
+                <tr class="fade"><td colspan="8">… mais 4 linhas</td></tr>
+              </tbody>
+            </table>
+            </div>
+            <p class="pv-note"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><rect x="4.5" y="10.5" width="15" height="10" rx="2.4"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/></svg>A página pública pede a senha antes de mostrar a grade.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- o form enxuto: título + senha + validade no MESMO form -->
+      <div class="fld"><span>Título do link</span>
+        <div class="inp">Grade operacional — T2 · 2026/2027</div>
+      </div>
+      <div class="fld2">
+        <div class="fld"><span>Senha de acesso <small>· opcional</small></span>
+          <div class="inp"><span class="ph">Ex.: realiza-diretoria-2026</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--muted-foreground)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="15" r="4"/><path d="m10.9 12.1 8.6-8.6M18 5l2 2M15 8l1.6 1.6"/></svg></div>
+          <p class="hint"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M12 11.5V16"/></svg>Em branco, geramos uma senha forte e mostramos uma vez na confirmação.</p>
+        </div>
+        <div class="fld"><span>Validade do link</span>
+          <div class="inp">Sem prazo<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--muted-foreground)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></div>
+          <p class="hint"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M12 11.5V16"/></svg>Revogável a qualquer momento no menu Compartilhar.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="dlg-foot">
+      <label class="btn ghost" for="e1" style="cursor:pointer">‹ Links ativos</label>
+      <div class="r">
+        <label class="btn" for="e3" style="cursor:pointer">Cancelar</label>
+        <button class="btn pri" type="button"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13.5a4.5 4.5 0 0 0 6.4.4l3-3a4.5 4.5 0 0 0-6.4-6.4l-1.7 1.7"/><path d="M14 10.5a4.5 4.5 0 0 0-6.4-.4l-3 3a4.5 4.5 0 0 0 6.4 6.4l1.7-1.7"/></svg>Criar link público</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

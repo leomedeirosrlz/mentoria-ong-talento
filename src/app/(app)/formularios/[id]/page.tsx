@@ -1,6 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import type { Metadata } from "next";
-import { CaretDown } from "@phosphor-icons/react/dist/ssr";
+import Link from "next/link";
 import { getMe, getMentorados, getPessoas } from "@/lib/queries";
 import { getFormulario } from "@/lib/forms/queries";
 import {
@@ -8,14 +8,19 @@ import {
   camposPerguntas,
   linkStatus,
   SISTEMA_LABEL,
+  SISTEMAS_REGUA,
   type LinkStatus,
 } from "@/lib/forms/schema";
 import { formatDate } from "@/lib/ciclo";
 import { Badge } from "@/components/ui/badge";
+import {
+  InstrumentoEmblema,
+  ehInstrumentoChave,
+} from "@/components/instrumento-icone";
 import { PageHeader } from "@/components/page-header";
 import { VoltarLink } from "@/components/voltar-link";
 import { FormularioAcoes, FormularioExcluir } from "../formulario-acoes";
-import { FormularioBuilder } from "../formulario-builder";
+import { FormularioBuilderDetails } from "../formulario-builder";
 import { FormularioLinks, type DestinoOpcao } from "../formulario-links";
 import { FormularioPreview } from "../formulario-preview";
 import { IntakeLinkSection } from "../intake-link-section";
@@ -115,6 +120,11 @@ export default async function FormularioPage({
     <div className="mx-auto max-w-3xl space-y-8">
       <PageHeader
         kicker={<VoltarLink fallback="/formularios" />}
+        media={
+          ehInstrumentoChave(f.sistema) ? (
+            <InstrumentoEmblema instrumento={f.sistema} size={44} />
+          ) : undefined
+        }
         title={
           <>
             {f.titulo}
@@ -245,11 +255,26 @@ export default async function FormularioPage({
         <div className="rounded-xl bg-card p-4 shadow-[var(--shadow-border)] sm:p-5">
           {f.sistema && (
             // instrumento oficial — a definição é catálogo (imutável via
-            // trigger, 0042)
+            // trigger, 0042). Os da régua (199) ganham a ponte de volta
+            // pra casa nova: a régua de "Instrumentos do programa" mora
+            // em /materiais e chega aqui pelo "Ver respostas"
             <p className="mb-3 text-xs text-muted-foreground">
               Formulário oficial do programa. As perguntas vêm do guia e não
               são editáveis. Pra mudar o instrumento, a definição passa por
               migração.
+              {SISTEMAS_REGUA.includes(f.sistema) && (
+                <>
+                  {" "}
+                  Ele também aparece na régua de{" "}
+                  <Link
+                    href="/materiais"
+                    className="font-medium underline underline-offset-2 hover:text-foreground"
+                  >
+                    Instrumentos do programa
+                  </Link>{" "}
+                  em Materiais.
+                </>
+              )}
             </p>
           )}
           <ol className="space-y-2">
@@ -303,25 +328,18 @@ export default async function FormularioPage({
           </ol>
         </div>
         {!f.sistema && (
-          <details className="group">
-            <summary className="flex min-h-11 cursor-pointer list-none items-center gap-1.5 rounded-lg py-3 text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
-              Editar formulário
-              <CaretDown
-                size={14}
-                aria-hidden
-                className="transition-transform group-open:rotate-180"
-              />
-            </summary>
-            <FormularioBuilder
-              formulario={{
-                id: f.id,
-                titulo: f.titulo,
-                descricao: f.descricao,
-                campos: f.campos,
-                versao: f.versao,
-              }}
-            />
-          </details>
+          // o builder monta lazy ao abrir o details — dentro de um details
+          // fechado os Reorder.Item medem 0×0 e o primeiro arraste sai
+          // errado (o mount adiado também poupa o form que nunca se edita)
+          <FormularioBuilderDetails
+            formulario={{
+              id: f.id,
+              titulo: f.titulo,
+              descricao: f.descricao,
+              campos: f.campos,
+              versao: f.versao,
+            }}
+          />
         )}
       </section>
 

@@ -21,10 +21,12 @@ import {
 import {
   GRUPOS_REGISTROS,
   GRUPO_REGISTROS_OPCAO,
+  PERIODO_REGISTROS_OPCOES,
   type GrupoRegistros,
 } from "@/lib/registros";
+import { turmaCurta } from "@/lib/turma";
 import type { DuplaOpcao, FiltrosRegistro } from "@/lib/queries";
-import type { Dificuldade } from "@/lib/types";
+import type { Cronograma, Dificuldade } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 const TODAS = "todas";
@@ -191,12 +193,15 @@ function OpcaoLinha({
 export function RegistrosFiltros({
   filtros,
   duplas,
+  turmas = [],
   maxEncontro,
   ordem = "recentes",
   grupo = "dupla",
 }: {
   filtros: FiltrosRegistro;
   duplas: DuplaOpcao[];
+  /** cronogramas do recorte `?turma=` — alimenta o chip removível. */
+  turmas?: Cronograma[];
   maxEncontro: number;
   /** `?ordem=` não faz parte de FiltrosRegistro; a prop mantém o modo
    *  ligado quando a coord aplica/limpa um filtro. */
@@ -231,6 +236,8 @@ export function RegistrosFiltros({
     filtros.tardio,
     filtros.dificuldade,
     filtros.dupla,
+    filtros.turma,
+    filtros.periodo,
     filtros.q,
   ]);
   const [sync, setSync] = useState(assinatura);
@@ -249,6 +256,10 @@ export function RegistrosFiltros({
       tardio: f.tardio ? "1" : undefined,
       dificuldade: f.dificuldade,
       dupla: f.dupla,
+      // recorte do panorama é filtro de verdade — sobrevive a busca/modal/
+      // chip como qualquer outro param
+      turma: f.turma,
+      periodo: f.periodo,
       q: f.q,
       ordem: ordemRef.current !== "recentes" ? ordemRef.current : undefined,
       grupo: grupoRef.current !== "dupla" ? grupoRef.current : undefined,
@@ -270,11 +281,15 @@ export function RegistrosFiltros({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- aplicar depende dos filtros; só q dispara
   }, [q]);
 
+  // turma/período contam no selo: são chips de verdade e o número do
+  // botão precisa bater com o que aparece na linha de filtros ativos
   const ativos =
     (filtros.encontro ? 1 : 0) +
     (filtros.avaliacao ? 1 : 0) +
     (filtros.dificuldade ? 1 : 0) +
     (filtros.dupla ? 1 : 0) +
+    (filtros.turma ? 1 : 0) +
+    (filtros.periodo ? 1 : 0) +
     (filtros.apoio ? 1 : 0) +
     (filtros.tardio ? 1 : 0);
   const draftAtivos =
@@ -293,6 +308,10 @@ export function RegistrosFiltros({
     if (draft.dupla !== TODAS) p.set("dupla", draft.dupla);
     if (draft.apoio) p.set("apoio", "1");
     if (draft.tardio) p.set("tardio", "1");
+    // recorte do panorama não mora no modal, mas é filtro de verdade —
+    // "Aplicar" não pode jogar fora o que as pills montaram
+    if (filtrosRef.current.turma) p.set("turma", filtrosRef.current.turma);
+    if (filtrosRef.current.periodo) p.set("periodo", filtrosRef.current.periodo);
     if (filtrosRef.current.q) p.set("q", filtrosRef.current.q);
     if (draft.ordem !== "recentes") p.set("ordem", draft.ordem);
     if (grupoRef.current !== "dupla") p.set("grupo", grupoRef.current);
@@ -311,6 +330,8 @@ export function RegistrosFiltros({
       tardio: filtros.tardio ? "1" : undefined,
       dificuldade: filtros.dificuldade,
       dupla: filtros.dupla,
+      turma: filtros.turma,
+      periodo: filtros.periodo,
       q: filtros.q,
       ordem: ordem !== "recentes" ? ordem : undefined,
       grupo: grupo !== "dupla" ? grupo : undefined,
@@ -343,6 +364,20 @@ export function RegistrosFiltros({
       href: sem("dupla"),
     });
   }
+  if (filtros.turma) {
+    const t = turmas.find((x) => x.id === filtros.turma);
+    chips.push({
+      rotulo: `Turma: ${t ? turmaCurta(t.turma) : "selecionada"}`,
+      href: sem("turma"),
+    });
+  }
+  if (filtros.periodo)
+    chips.push({
+      rotulo:
+        PERIODO_REGISTROS_OPCOES.find((o) => o.valor === filtros.periodo)
+          ?.rotulo ?? "Período",
+      href: sem("periodo"),
+    });
   if (filtros.apoio) chips.push({ rotulo: "Apoio em aberto", href: sem("apoio") });
   if (filtros.tardio) chips.push({ rotulo: "Registros tardios", href: sem("tardio") });
   if (filtros.q) chips.push({ rotulo: `Busca: “${filtros.q}”`, href: sem("q") });
@@ -359,6 +394,8 @@ export function RegistrosFiltros({
       tardio: filtros.tardio ? "1" : undefined,
       dificuldade: filtros.dificuldade,
       dupla: filtros.dupla,
+      turma: filtros.turma,
+      periodo: filtros.periodo,
       q: filtros.q,
       ordem: ordem !== "recentes" ? ordem : undefined,
       grupo: g !== "dupla" ? g : undefined,

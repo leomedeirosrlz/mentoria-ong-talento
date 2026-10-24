@@ -8,6 +8,8 @@ import {
   getMe,
   getPainelInstrumentosJornada,
 } from "@/lib/queries";
+import { getFormularios } from "@/lib/forms/queries";
+import type { FormularioSistema } from "@/lib/forms/schema";
 import { getUltimasInteracoes } from "@/lib/interacoes";
 import {
   eventoDaSemana,
@@ -16,11 +18,12 @@ import {
 } from "@/lib/ciclo";
 import { EMAIL_ENVIO_LIBERADO } from "@/lib/email";
 import { temPapel, type Material } from "@/lib/types";
-import { FolderOpen } from "@phosphor-icons/react/dist/ssr";
+import { FolderOpen, Info } from "@phosphor-icons/react/dist/ssr";
 import { NovoMaterialDialog } from "@/components/novo-material-dialog";
 import { PainelJornada } from "@/components/painel-jornada";
 import { PageHeader } from "@/components/page-header";
 import { MateriaisBiblioteca } from "@/components/materiais-biblioteca";
+import { InstrumentosPrograma } from "./instrumentos-programa";
 import {
   particionarMateriais,
   temConteudo,
@@ -102,12 +105,19 @@ export default async function MateriaisPage() {
   // abre com telefone real). O cap de 48h lê só interações tipo nudge.
   // REALIZA-51 — pra coord os flags "tem e-mail" alimentam a prévia do
   // lote (o endereço em si nunca desce pro client; pro supervisor nem os
-  // flags são usados — o botão não renderiza pra ele).
+  // flags são usados — o botão não renderiza pra ele). REALIZA-194 — a
+  // mesma lista de duplas alimenta o rodapé do mentor ("ficha da dupla")
+  // da seção Instrumentos do programa.
   const vePainel =
     me != null && (temPapel(me, "coordenacao") || temPapel(me, "supervisor"));
-  const [painel, duplasPainel] = vePainel
-    ? await Promise.all([getPainelInstrumentosJornada(), getDuplas()])
-    : [[], []];
+  const ehMentorDpp = me != null && temPapel(me, "mentor_dpp");
+  const [painel, duplasPainel] =
+    vePainel || ehMentorDpp
+      ? await Promise.all([
+          vePainel ? getPainelInstrumentosJornada() : Promise.resolve([]),
+          getDuplas(),
+        ])
+      : [[], []];
   const nudges = painel.length
     ? await getUltimasInteracoes(
         painel.map((l) => l.dupla_id),
@@ -125,6 +135,44 @@ export default async function MateriaisPage() {
       },
     ])
   );
+
+  // REALIZA-194 — "Instrumentos do programa": a régua oficial DPP sai da
+  // biblioteca genérica. Coord/supervisor/mentor DPP veem (especialista
+  // não — a trilha dele é outra); o mapa sistema→form_id monta o "Ver
+  // respostas" da coord (getFormularios é coord-only — nem chama pros
+  // outros) e as duplas DPP vivas do mentor viram os deep links de ficha.
+  const veInstrumentos =
+    me != null &&
+    (temPapel(me, "coordenacao") ||
+      temPapel(me, "supervisor") ||
+      ehMentorDpp);
+  const papelInstrumentos = ehCoord
+    ? ("coordenacao" as const)
+    : vePainel
+      ? ("supervisor" as const)
+      : ("mentor" as const);
+  const formIds = new Map<FormularioSistema, string>();
+  if (ehCoord) {
+    const forms = await getFormularios().catch((e) => {
+      console.error("materiais/getFormularios:", e);
+      return [];
+    });
+    for (const f of forms) {
+      if (f.sistema && !formIds.has(f.sistema)) formIds.set(f.sistema, f.id);
+    }
+  }
+  const fichasMentor = ehMentorDpp
+    ? duplasPainel
+        .filter(
+          (d) =>
+            d.trilha !== "especialista" &&
+            (d.status === "ativa" || d.status === "pausada")
+        )
+        .map((d) => ({
+          id: d.id,
+          jovemNome: d.mentorado.nome_social || d.mentorado.nome,
+        }))
+    : [];
 
   return (
     <div className="space-y-6">
@@ -144,6 +192,49 @@ export default async function MateriaisPage() {
         }
       />
 
+      {/* caixa de escopo (v5c) — o "você vê / você não vê" que antes morava
+          dentro do painel sobe pro topo da página e cobre as três seções */}
+      {veInstrumentos && (
+        <p className="flex items-start gap-2.5 rounded-xl border border-border/70 border-l-4 border-l-[var(--brand-lime)] bg-card px-4 py-3 text-xs leading-relaxed text-muted-foreground shadow-[var(--shadow-border)]">
+          <Info size={16} className="mt-0.5 shrink-0" aria-hidden />
+          <span>
+            {ehCoord ? (
+              <>
+                <strong className="font-semibold text-foreground">Você vê:</strong>{" "}
+                o estado dos instrumentos em todas as duplas e a biblioteca
+                inteira.{" "}
+                <strong className="font-semibold text-foreground">
+                  Você não faz:
+                </strong>{" "}
+                preencher instrumento pelo jovem — quem entrega é o mentor; a
+                sua ação é lembrar ou enviar em lote.
+              </>
+            ) : vePainel ? (
+              <>
+                <strong className="font-semibold text-foreground">Você vê:</strong>{" "}
+                o estado de cada instrumento nas duplas que você supervisiona e
+                a biblioteca.{" "}
+                <strong className="font-semibold text-foreground">
+                  Você não vê:
+                </strong>{" "}
+                o conteúdo das respostas, nem duplas de outros supervisores.
+              </>
+            ) : (
+              <>
+                <strong className="font-semibold text-foreground">Você vê:</strong>{" "}
+                os instrumentos oficiais da jornada e a biblioteca completa.{" "}
+                <strong className="font-semibold text-foreground">
+                  Você não vê:
+                </strong>{" "}
+                jovens de outros mentores. A avaliação por terceiros chega ao
+                jovem só como consolidado anonimizado — na ficha da dupla você
+                lê as respostas identificadas.
+              </>
+            )}
+          </span>
+        </p>
+      )}
+
       {painel.length > 0 && me && (
         <PainelJornada
           linhas={painel}
@@ -152,8 +243,22 @@ export default async function MateriaisPage() {
           duplasInfo={duplasInfo}
           meuNome={me.nome_social || me.nome}
           ehSupervisor={!temPapel(me, "coordenacao")}
-          podeLote={temPapel(me, "coordenacao")}
+        />
+      )}
+
+      {/* mentor: o acervo dele é o conteúdo útil da página — vem antes do
+          catálogo de instrumentos (renderizado depois do bloco abaixo);
+          coord/supervisor veem a régua primeiro porque é dela que sai a
+          ação (decisão do plano v5c) */}
+      {veInstrumentos && papelInstrumentos !== "mentor" && (
+        <InstrumentosPrograma
+          papel={papelInstrumentos}
+          linhas={painel}
+          eventos={eventos}
+          duplasInfo={duplasInfo}
+          formIds={formIds}
           envioLiberado={EMAIL_ENVIO_LIBERADO}
+          fichasMentor={fichasMentor}
         />
       )}
 
@@ -201,6 +306,23 @@ export default async function MateriaisPage() {
           maxEncontro={maxEncontro}
           encontroAtual={encontroAtual}
           mobile={mobile}
+          guiaPapel={
+            ehMentorDpp ? "mentor" : vePainel ? "staff" : null
+          }
+        />
+      )}
+
+      {/* mentor: catálogo por último — o acervo é o conteúdo útil pra ele;
+          os cards linkam pra seção de instrumentos da ficha de cada dupla */}
+      {veInstrumentos && papelInstrumentos === "mentor" && (
+        <InstrumentosPrograma
+          papel={papelInstrumentos}
+          linhas={painel}
+          eventos={eventos}
+          duplasInfo={duplasInfo}
+          formIds={formIds}
+          envioLiberado={EMAIL_ENVIO_LIBERADO}
+          fichasMentor={fichasMentor}
         />
       )}
     </div>

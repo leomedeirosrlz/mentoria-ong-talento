@@ -36,6 +36,11 @@ import { getDemoData } from "./demo/data";
 import { demoPainelInstrumentosJornada } from "./demo/forms-data";
 import type { PainelJornadaLinha } from "./jornada";
 import type { InscricaoFilaTurma, RelatorioLinkItem } from "./relatorio";
+import {
+  panoramaRegistros,
+  type PeriodoRegistros,
+  type RegistrosPanorama,
+} from "./registros";
 import { temPapel } from "./types";
 import type { AppRole, AvaliacaoJovem, CicloEvento, Comunicado, CorRaca, Cronograma, DadosCivis, DocumentoPessoa, DocumentoTemplate, Dupla, DuplaResumo, DuplaStatus, Encontro, EncontroStatus, EspecialistaEvento, Genero, Material, Mentorado, MentorProfile, Notificacao, PessoaNota, PrefGeneroPar, Profile, Registro, ResponsavelCivis, Trilha } from "./types";
 
@@ -854,6 +859,12 @@ export type FiltrosRegistro = {
   /** enum de dificuldade ou "com" = qualquer uma ≠ nenhuma. */
   dificuldade?: string;
   dupla?: string;
+  /** recorte de turma do panorama (0061) — cronograma_id, não o label: a
+   *  pill da T1 filtra lista E gráficos pelo mesmo calendário. */
+  turma?: string;
+  /** janela do panorama ("4s"/"8s") — na lista, corta por QUANDO o encontro
+   *  aconteceu (realizado_em ?? data_hora), a mesma régua da timeline. */
+  periodo?: PeriodoRegistros;
   /** busca em tema/reflexões/observações — já sanitizada. */
   q?: string;
   /** created_at > realizado_em ?? data_hora + 3d — PostgREST não compara
@@ -888,6 +899,18 @@ export async function getRegistros(
   const demo = await demoRole();
   if (demo) return demoRegistros(demo, f);
   const supabase = await createClient();
+  // recorte de turma = "registros de encontros das duplas daquele
+  // cronograma" — resolve os ids num select mínimo (RLS já escopa) e filtra
+  // por encontro.dupla_id: PostgREST não filtra neto-de-neto no !inner
+  let turmaIds: string[] | undefined;
+  if (f.turma) {
+    const { data: ds } = await supabase
+      .from("duplas")
+      .select("id")
+      .eq("cronograma_id", f.turma);
+    if ((ds ?? []).length === 0) return { itens: [], total: 0 };
+    turmaIds = (ds ?? []).map((d) => d.id);
+  }
   let q = supabase
     .from("registros")
     .select(REGISTRO_RESUMO_SELECT, { count: "exact" })
@@ -898,11 +921,12 @@ export async function getRegistros(
     .order("encontro(realizado_em)", { ascending: false, nullsFirst: false })
     .order("encontro(data_hora)", { ascending: false })
     .order("created_at", { ascending: false });
-  // com f.tardio o corte é em JS (comparação entre colunas não existe em
-  // PostgREST) — pedir range aqui paginaria o conjunto errado
-  if (!f.tardio) q = q.range(0, f.pagina * REGISTROS_PAGINA - 1);
+  // com f.tardio/f.periodo o corte é em JS (comparação entre colunas não
+  // existe em PostgREST) — pedir range aqui paginaria o conjunto errado
+  if (!f.tardio && !f.periodo) q = q.range(0, f.pagina * REGISTROS_PAGINA - 1);
   if (f.encontro) q = q.eq("encontro.numero", f.encontro);
   if (f.dupla) q = q.eq("encontro.dupla_id", f.dupla);
+  if (turmaIds) q = q.in("encontro.dupla_id", turmaIds);
   if (f.avaliacao) q = q.eq("avaliacao", f.avaliacao);
   if (f.apoio) q = q.eq("precisa_apoio", true);
   if (f.dificuldade === "com") q = q.neq("dificuldade", "nenhuma");
@@ -940,13 +964,56 @@ export async function getRegistros(
         : null,
     };
   });
-  if (f.tardio) {
-    itens = itens.filter((r) => registroTardio(r, r.encontro));
+  if (f.tardio || f.periodo) {
+    if (f.tardio) itens = itens.filter((r) => registroTardio(r, r.encontro));
+    if (f.periodo) {
+      // "últimas N semanas" pela data em que o encontro ACONTECEU —
+      // realizado_em ?? data_hora, a mesma régua da timeline
+      const lim = periodoLimite(f.periodo);
+      itens = itens.filter(
+        (r) =>
+          (r.encontro?.realizado_em ?? r.encontro?.data_hora ?? r.created_at) >=
+          lim
+      );
+    }
     // o count do PostgREST ignorou o filtro JS — o total real é o que sobrou
     return { itens, total: itens.length };
   }
   return { itens, total: count ?? 0 };
 }
+
+/** Limite do recorte "últimas N semanas" em ISO — corta por quando o
+ *  encontro aconteceu (mesma régua da timeline e das colunas do painel). */
+function periodoLimite(p: PeriodoRegistros): string {
+  const dias = p === "8s" ? 56 : 28;
+  return new Date(Date.now() - dias * 86400000).toISOString();
+}
+
+/** Painel "Panorama do ciclo" (REALIZA-198): agregação SERVER-SIDE sobre o
+ *  escopo inteiro do papel — nunca sobre a fatia paginada de 100 da lista.
+ *  A conta mora em `panoramaRegistros` (lib/registros.ts): as três fontes
+ *  já são as leituras cacheadas da ficha (duplas completas com encontros +
+ *  registro + avaliação do jovem; calendário oficial; cronogramas). */
+export const getRegistrosPanorama = cache(
+  async (f: FiltrosRegistro): Promise<RegistrosPanorama> => {
+    const [duplas, eventos, cronogramas] = await Promise.all([
+      getDuplas(), // RLS aplica o escopo do papel; demo devolve demoDuplas
+      getCicloEventos(),
+      getCronogramas(),
+    ]);
+    return panoramaRegistros({
+      duplas,
+      eventos,
+      cronogramas,
+      recorte: {
+        turma: f.turma,
+        periodo: f.periodo,
+        dupla: f.dupla,
+        encontro: f.encontro,
+      },
+    });
+  }
+);
 
 /** Contadores de triagem do topo — globais ao papel, não seguem os filtros. */
 export async function getAlertasRegistros(): Promise<{

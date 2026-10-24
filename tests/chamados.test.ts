@@ -3,6 +3,7 @@ import {
   demoChamadosFila,
   demoChamadoTimeline,
   demoChamadosSemDono,
+  demoEquipeChamados,
 } from "@/lib/demo/queries";
 import { getDemoData } from "@/lib/demo/data";
 import {
@@ -127,6 +128,22 @@ describe("demoChamadoTimeline — trilha pública × interna", () => {
     expect(tlStaff.some((t) => t.tipo === "anexo")).toBe(true);
     // o anexo da Ana é público — os dois veem; o interno seria filtrado
     expect(tlAutor.some((t) => t.tipo === "anexo")).toBe(true);
+  });
+});
+
+describe("demoEquipeChamados — equipe do autocomplete @", () => {
+  it("só coordenação e auxiliar executivo ativos, ordenados por nome", () => {
+    const eq = demoEquipeChamados();
+    expect(eq.map((p) => p.nome)).toEqual([
+      "Beatriz Lins",
+      "Marina Duarte",
+      "Paulo Serra",
+    ]);
+    expect(
+      eq.every(
+        (p) => p.role === "coordenacao" || p.role === "supervisor"
+      )
+    ).toBe(true);
   });
 });
 

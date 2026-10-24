@@ -1,0 +1,1132 @@
+<!-- MOCKUP materiais v5b — variante FUSÃO painel×instrumentos: o painel de progresso E a seção "Instrumentos do programa" viram uma coisa só — grid de cards onde cada card carrega a barra agregada + ações. Compartilha com v5a: biblioteca compacta (capa ~90px + título), pills com scroll lateral no mobile, condução por encontro. -->
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Materiais — Realiza (mockup v5b · fusão painel×instrumentos)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --brand-lime:hsl(78 56% 53%);--brand-ink:hsl(0 0% 15%);--background:hsl(75 10% 95%);--card:#fff;
+  --muted:hsl(75 7% 93%);--muted-foreground:hsl(75 4% 38%);--accent:hsl(75 8% 91%);--border:hsl(75 6% 87%);
+  --input:hsl(75 8% 54%);--ok:hsl(78 58% 38%);--ok-text:hsl(78 55% 28%);--warn:hsl(43 95% 44%);
+  --warn-text:hsl(43 90% 27%);--danger:hsl(0 80% 48%);--danger-text:hsl(0 70% 38%);
+  --role-mentorado:hsl(48 100% 60%);--radius:.75rem;
+  --lime-tint:hsl(78 56% 91%);--lime-deep:hsl(78 60% 18%);--amb-tint:hsl(48 100% 91%);
+  /* cores próprias por instrumento */
+  --c-roda:hsl(187 65% 36%);--c-roda-t:hsl(187 60% 92%);
+  --c-visao:hsl(262 55% 52%);--c-visao-t:hsl(262 60% 94%);
+  --c-metas:hsl(36 90% 40%);--c-metas-t:hsl(43 95% 91%);
+  --c-pdm:hsl(212 75% 46%);--c-pdm-t:hsl(212 80% 94%);
+  --c-terc:hsl(160 60% 30%);--c-terc-t:hsl(160 55% 91%);
+  --c-aval:hsl(340 65% 46%);--c-aval-t:hsl(340 70% 94%);
+  --c-rodaf:hsl(200 60% 34%);--c-rodaf-t:hsl(200 60% 92%);
+  --c-360:hsl(24 85% 42%);--c-360-t:hsl(24 90% 93%);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%;scroll-behavior:smooth}
+body{font:400 14px/1.5 "Inter",system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--background);color:var(--brand-ink);-webkit-font-smoothing:antialiased;overflow-x:hidden}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{transition:none!important;animation:none!important}}
+:focus-visible{outline:3px solid hsl(215 90% 42%);outline-offset:2px;border-radius:6px}
+b{font-weight:650}i{font-style:normal}
+code{font:12px ui-monospace,monospace;background:hsl(75 10% 22%);color:hsl(75 20% 88%);padding:1px 5px;border-radius:5px}
+small{font-size:12px}
+.rv{position:absolute;opacity:0;width:1px;height:1px;pointer-events:none}
+.ic{width:16px;height:16px;flex:none;vertical-align:-3px}.ic.lg{width:20px;height:20px}
+.wrap{width:min(1120px,100% - 28px);margin-inline:auto}
+@media (min-width:900px){.wrap{width:min(1120px,100% - 48px)}}
+
+/* ---------- chrome do mockup ---------- */
+.board-head{background:var(--brand-ink);color:hsl(75 20% 88%);padding:12px 20px;display:flex;flex-wrap:wrap;align-items:center;gap:8px 18px;font-size:13px}
+.board-head b{color:var(--brand-lime);font-weight:700;letter-spacing:.03em}
+.board-head .dir{color:hsl(75 10% 70%);flex:1 1 320px}.board-head .dir b.d{color:hsl(75 20% 88%)}
+.board-head nav{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap}
+.board-head nav a{font-size:12px;font-weight:600;padding:6px 12px;border-radius:999px;border:1px solid hsl(75 10% 40%);color:hsl(75 20% 88%);text-decoration:none;display:inline-flex;align-items:center;min-height:32px}
+.board-head nav a:hover{border-color:var(--brand-lime);color:var(--brand-lime)}
+.vbar{background:hsl(0 0% 100%/.96);backdrop-filter:blur(6px);border-bottom:1px solid var(--border);padding:8px 0;position:sticky;top:0;z-index:60}
+.vin{display:flex;align-items:center;gap:10px}
+.vin>span{font-weight:700;font-size:12.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted-foreground);white-space:nowrap}
+.vpills{display:flex;gap:6px;overflow-x:auto;max-width:100%;scrollbar-width:none;padding:2px}
+.vpills::-webkit-scrollbar{display:none}
+.vp{display:inline-flex;align-items:center;min-height:44px;padding:0 15px;border-radius:999px;border:1.5px solid var(--input);background:var(--card);font-weight:600;font-size:13.5px;cursor:pointer;white-space:nowrap;flex:none}
+.vp:hover{background:var(--accent)}
+.view{display:none}
+#r-coord:checked~.app .v-c,#r-aux:checked~.app .v-a,#r-dpp:checked~.app .v-d,#r-jov:checked~.app .v-j{display:block}
+#r-coord:checked~.vbar [for=r-coord],#r-aux:checked~.vbar [for=r-aux],#r-dpp:checked~.vbar [for=r-dpp],#r-jov:checked~.vbar [for=r-jov]{background:var(--brand-ink);color:#fff;border-color:var(--brand-ink)}
+#r-jov:checked~.vbar [for=r-jov]{background:var(--role-mentorado);color:var(--brand-ink)}
+#r-coord:focus-visible~.vbar [for=r-coord],#r-aux:focus-visible~.vbar [for=r-aux],#r-dpp:focus-visible~.vbar [for=r-dpp],#r-jov:focus-visible~.vbar [for=r-jov]{outline:3px solid hsl(215 90% 42%);outline-offset:2px}
+
+/* ---------- chrome do produto ---------- */
+.top{background:var(--card);border-bottom:1px solid var(--border)}
+.top-in{display:flex;align-items:center;gap:18px;height:58px}
+.brand{display:flex;align-items:center;gap:9px;font-weight:800;font-size:16.5px;letter-spacing:-.01em}
+.mark{width:30px;height:30px;border-radius:9px;background:var(--brand-lime);display:grid;place-items:center;font-weight:800;font-size:15px;color:var(--lime-deep)}
+.tnav{display:flex;gap:2px}
+.tnav a{display:inline-flex;align-items:center;min-height:40px;padding:0 12px;border-radius:99px;font-size:13.5px;font-weight:600;color:var(--muted-foreground);text-decoration:none}
+.tnav a.on{background:var(--lime-tint);color:var(--brand-ink)}
+.tnav a:hover{background:var(--accent)}
+.who{margin-left:auto;display:flex;align-items:center;gap:10px;text-align:right;line-height:1.25}
+.who b{display:block;font-size:13.5px;font-weight:650}.who small{font-size:12px;color:var(--muted-foreground)}
+.av{width:34px;height:34px;border-radius:50%;background:var(--lime-tint);color:var(--ok-text);display:grid;place-items:center;font-weight:700;font-size:13px;flex:none}
+.av.y{background:var(--role-mentorado);color:var(--brand-ink)}
+@media(max-width:900px){.tnav{display:none}.who .wt{display:none}.top-in{height:54px;gap:10px}}
+
+/* jovem: sidebar ≥1024, topbar+tabbar abaixo */
+.v-j .side{display:none}
+@media(min-width:1024px){
+  .v-j .jsh{display:grid;grid-template-columns:230px minmax(0,1fr)}
+  .v-j .top{display:none}
+  .v-j .side{display:flex;flex-direction:column;gap:3px;padding:18px 12px;background:var(--card);border-right:1px solid var(--border);min-height:80vh;position:sticky;top:0;align-self:start}
+  .v-j .side .brand{padding:4px 10px 16px}
+  .v-j .side a{display:flex;align-items:center;gap:11px;min-height:44px;padding:0 12px;border-radius:11px;font-size:14px;font-weight:600;color:var(--muted-foreground);text-decoration:none}
+  .v-j .side a.on{background:var(--role-mentorado);color:var(--brand-ink)}
+  .v-j .side .me{margin-top:auto;display:flex;align-items:center;gap:9px;padding:8px 10px;font-size:13px}
+  .v-j .side .me small{display:block;font-size:12px;color:var(--muted-foreground)}
+}
+.bnav{display:none;position:fixed;left:0;right:0;bottom:0;z-index:70;background:var(--card);border-top:1px solid var(--border);padding:4px 4px calc(4px + env(safe-area-inset-bottom))}
+.bnav a{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-height:50px;font-size:12px;font-weight:600;color:var(--muted-foreground);text-decoration:none}
+.bnav a i{width:44px;height:26px;border-radius:99px;display:grid;place-items:center}
+.bnav a.on{color:var(--brand-ink)}
+.bnav.ad a.on i{background:var(--brand-lime)}.bnav.jv a.on i{background:var(--role-mentorado)}
+@media(max-width:767px){.v-c .bnav.ad,.v-a .bnav.ad,.v-d .bnav.ad{display:flex}}
+@media(max-width:1023px){.v-j .bnav.jv{display:flex}}
+
+/* ---------- página ---------- */
+.pg{padding:22px 0 96px}
+@media(min-width:900px){.pg{padding-bottom:60px}}
+.phead{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:10px}
+.phead h1{font-size:25px;font-weight:800;letter-spacing:-.02em}
+.phead .psub{margin-top:2px;font-size:13.5px;color:var(--muted-foreground)}
+.scope{display:flex;gap:9px;align-items:flex-start;background:var(--card);border:1px solid var(--border);border-left:4px solid var(--brand-lime);border-radius:var(--radius);padding:9px 13px;font-size:12.5px;color:var(--muted-foreground);line-height:1.45;margin-bottom:14px}
+.scope.y{border-left-color:var(--role-mentorado)}
+.scope b{color:var(--brand-ink)}
+.h2{display:flex;align-items:center;gap:9px;font-size:16.5px;font-weight:800;letter-spacing:-.01em;margin:26px 0 3px}
+.h2::before{content:"";width:20px;height:6px;border-radius:99px;background:var(--brand-lime);flex:none}
+.h2 .tagx{margin-left:auto}
+.sub{font-size:13px;color:var(--muted-foreground);margin-bottom:12px;max-width:78ch}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:40px;padding:0 14px;border-radius:10px;border:1.5px solid var(--input);background:var(--card);color:var(--brand-ink);font:600 13px/1.2 "Inter",sans-serif;cursor:pointer;text-decoration:none;white-space:nowrap}
+.btn:hover{background:var(--accent)}
+.btn.pri{background:var(--brand-lime);border-color:hsl(78 56% 45%);color:var(--lime-deep)}
+.btn.pri:hover{background:hsl(78 56% 48%)}
+.btn.ink{background:var(--brand-ink);border-color:var(--brand-ink);color:#fff}
+.btn.sm{min-height:34px;padding:0 11px;font-size:12.5px}
+.btn.off{background:var(--muted);border-style:dashed;color:var(--muted-foreground);cursor:not-allowed;pointer-events:none}
+.tag{display:inline-flex;align-items:center;gap:5px;padding:2px 10px;border-radius:99px;font-size:12px;font-weight:650;white-space:nowrap;border:1px solid transparent}
+.tag.ok{background:var(--lime-tint);color:var(--ok-text)}
+.tag.warn{background:var(--amb-tint);color:var(--warn-text)}
+.tag.late{background:hsl(0 85% 95%);color:var(--danger-text)}
+.tag.lk{background:var(--muted);color:var(--muted-foreground)}
+.tag.line{background:var(--card);border-color:var(--input)}
+.chipe{background:var(--brand-ink);color:#fff;border-radius:8px;padding:2px 9px;font-size:12px;font-weight:700;white-space:nowrap}
+.chip{background:var(--muted);border-radius:8px;padding:2px 9px;font-size:12px;font-weight:650;white-space:nowrap;color:var(--brand-ink)}
+summary{list-style:none}summary::-webkit-details-marker{display:none}
+
+/* ---------- PAINEL v5a: faixa resumo ---------- */
+.px{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:14px 16px;box-shadow:0 1px 2px hsl(75 10% 20%/.05)}
+.px-h{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.px-h h2{font-size:15.5px;font-weight:800;letter-spacing:-.01em}
+.px-h .px-sub{font-size:12.5px;color:var(--muted-foreground)}
+.px-h .px-note{margin-left:auto;font-size:12px;color:var(--muted-foreground);display:flex;gap:6px;align-items:center}
+.strip{display:flex;gap:8px;margin-top:11px}
+.seg{flex:1 1 0;min-width:118px;border:1px solid var(--border);border-radius:12px;padding:9px 10px 10px;background:hsl(75 8% 98%)}
+.seg h4{font-size:12.5px;font-weight:700;line-height:1.25}
+.seg h4 small{display:block;font-weight:500;color:var(--muted-foreground);font-size:12px;margin-top:1px}
+.sbar{margin-top:8px;display:flex;height:9px;border-radius:99px;overflow:hidden;background:#fff;border:1px solid var(--border);gap:1px}
+.sbar i{display:block;height:100%}
+.sbar .f{background:var(--ok)}
+.sbar .p{background:var(--warn);background-image:repeating-linear-gradient(135deg,transparent 0 3px,hsl(0 0% 100%/.45) 3px 6px)}
+.sbar .o{background:var(--border)}
+.sn{margin-top:6px;font-size:12px;font-weight:650}
+.sn small{color:var(--muted-foreground);font-weight:500}
+.sf{margin-top:4px;font-size:12px;font-weight:700;color:var(--warn-text);display:flex;align-items:center;gap:4px}
+.sf .ic{width:13px;height:13px;stroke-width:2.4}
+.seg.lk{background:transparent;border-style:dashed;color:var(--muted-foreground)}
+.seg.lk .sl{margin-top:10px;font-size:12px;font-weight:700;display:flex;align-items:center;gap:5px}
+.seg.lk .sl .ic{width:14px;height:14px}
+@media(max-width:960px){
+  .strip{overflow-x:auto;padding-bottom:6px;scroll-snap-type:x proximity;scrollbar-width:thin}
+  .seg{flex:0 0 132px;scroll-snap-align:start}
+}
+.sleg{margin-top:9px;display:flex;gap:5px 16px;flex-wrap:wrap;font-size:12px;color:var(--muted-foreground)}
+.sleg span{display:inline-flex;align-items:center;gap:6px}
+.sleg i{width:12px;height:12px;border-radius:4px;flex:none}
+.sleg .l-f{background:var(--ok)}
+.sleg .l-p{background:var(--warn);background-image:repeating-linear-gradient(135deg,transparent 0 3px,hsl(0 0% 100%/.45) 3px 6px)}
+.sleg .l-o{background:#fff;border:1px solid var(--border)}
+.sleg .l-l{background:transparent;border:1.5px dashed var(--input)}
+.fsec{margin-top:12px;border-top:1px solid var(--border);padding-top:10px}
+.fsec>h3{font-size:13.5px;font-weight:800;color:var(--warn-text);display:flex;align-items:center;gap:7px}
+.fsec .fhint{font-size:12px;color:var(--muted-foreground);margin-top:2px}
+.frow{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:9px 0;border-top:1px dashed var(--border)}
+.frow:first-of-type{border-top:0;margin-top:6px}
+.frow .ft{flex:1 1 240px;min-width:0;font-size:13.5px;line-height:1.35}
+.frow .ft b{font-size:14px}
+.frow .ft small{display:block;font-size:12px;color:var(--muted-foreground)}
+.frow .ff{display:block;font-size:12.5px;color:var(--warn-text);font-weight:600;margin-top:1px}
+.frow .fa{display:flex;gap:7px;flex-wrap:wrap}
+.mtx{margin-top:10px;border-top:1px dashed var(--border)}
+.mtx>summary{display:flex;align-items:center;gap:9px;min-height:44px;cursor:pointer;font-weight:700;font-size:13.5px}
+.mtx>summary .ic:first-child{color:var(--muted-foreground)}
+.mtx>summary small{margin-left:auto;font-weight:500;color:var(--muted-foreground);font-size:12.5px}
+.mtx>summary .cx{transition:transform .15s;color:var(--muted-foreground)}
+.mtx[open]>summary .cx{transform:rotate(180deg)}
+.mtx-in{border-top:1px solid var(--border);padding-top:8px}
+.mt-t{font-size:13px;font-weight:750;margin:10px 0 2px;display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+.mt-t small{font-weight:500;color:var(--muted-foreground)}
+.drow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:7px 0;border-top:1px dotted var(--border)}
+.drow .dn{flex:0 0 200px;min-width:150px;font-size:13.5px}
+.drow .dn b{display:block;font-size:13.5px}
+.drow .dn small{font-size:12px;color:var(--muted-foreground)}
+.cells{display:flex;flex-wrap:wrap;gap:4px;flex:1;min-width:0}
+.cell{display:inline-flex;align-items:center;gap:4px;min-height:26px;padding:2px 8px;border-radius:8px;font-size:12px;font-weight:700;white-space:nowrap}
+.cell .ic{width:12px;height:12px;stroke-width:2.6;vertical-align:0}
+.cell.d{background:hsl(78 50% 90%);color:var(--ok-text)}
+.cell.p{background:hsl(43 92% 90%);color:var(--warn-text)}
+.cell.t{background:var(--card);border:1.5px solid var(--input);color:var(--muted-foreground);font-weight:600}
+.cell.l{background:var(--muted);color:var(--muted-foreground);font-weight:600}
+.cell.w{background:hsl(0 85% 95%);color:var(--danger-text)}
+.mt-more{font-size:12.5px;color:var(--muted-foreground);padding:7px 0;border-top:1px dotted var(--border)}
+.mleg{margin-top:8px;display:flex;gap:5px 14px;flex-wrap:wrap;font-size:12px;color:var(--muted-foreground);border-top:1px solid var(--border);padding-top:8px}
+.mleg span{display:inline-flex;align-items:center;gap:5px}
+.mleg .ic{width:13px;height:13px;stroke-width:2.4;vertical-align:-2px}
+
+/* ---------- instrumentos do programa ---------- */
+.igrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(295px,100%),1fr));gap:12px}
+.icard{--ic:var(--ok);--ict:var(--lime-tint);background:var(--card);border:1px solid var(--border);border-top:3px solid var(--ic);border-radius:14px;padding:13px 14px;display:flex;flex-direction:column;gap:8px}
+.icard .hd{display:flex;gap:10px;align-items:flex-start}
+.ig{width:40px;height:40px;border-radius:11px;background:var(--ict);color:var(--ic);display:grid;place-items:center;flex:none}
+.ig svg{width:23px;height:23px}
+.icard h3{font-size:14.5px;font-weight:750;line-height:1.25;letter-spacing:-.01em}
+.icard .jw{font-size:12px;color:var(--muted-foreground);margin-top:2px;display:flex;gap:5px;flex-wrap:wrap;align-items:center}
+.icard .dd{font-size:12.5px;color:var(--muted-foreground);line-height:1.4}
+.icard .stat{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.iacts{display:flex;flex-wrap:wrap;gap:7px;margin-top:auto;padding-top:6px;border-top:1px dashed var(--border)}
+.iacts .btn{white-space:normal;text-align:left;height:auto;line-height:1.3}
+.iacts .btn.off{align-items:flex-start}
+.icard.lk{border-top-color:var(--border);background:hsl(75 10% 97.5%)}
+.icard.lk .ig{background:var(--muted);color:var(--muted-foreground)}
+.icard.lk h3{color:var(--muted-foreground)}
+.quem{display:flex;gap:6px;align-items:flex-start;font-size:12px;line-height:1.4;color:var(--muted-foreground)}
+.quem .ic{width:13px;height:13px;margin-top:2px;stroke-width:2}
+.quem b{color:var(--brand-ink)}
+.snip{padding:9px 11px;border-radius:10px;background:hsl(78 56% 95%);border-left:3px solid var(--brand-lime);font-size:12.5px;line-height:1.45}
+.snip small{display:block;font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--ok-text);margin-bottom:2px}
+.snip q{quotes:"“" "”";font-weight:500}
+.mini{height:7px;border-radius:99px;background:var(--muted);overflow:hidden}.mini i{display:block;height:100%;background:var(--brand-ink);border-radius:99px}
+
+/* progresso agregado dentro do card (v5b) */
+.iprog{margin-top:2px}
+.ibar{display:flex;height:9px;border-radius:99px;overflow:hidden;background:#fff;border:1px solid var(--border);gap:1px}
+.ibar i{display:block;height:100%}
+.ibar .f{background:var(--ok)}
+.ibar .p{background:var(--warn);background-image:repeating-linear-gradient(135deg,transparent 0 3px,hsl(0 0% 100%/.45) 3px 6px)}
+.ibar .o{background:var(--border)}
+.inum{margin-top:5px;font-size:12px;color:var(--muted-foreground);display:flex;gap:4px 10px;flex-wrap:wrap;align-items:center}
+.inum b{color:var(--brand-ink)}
+.inum .ifora{color:var(--warn-text);font-weight:700;display:inline-flex;align-items:center;gap:4px}
+.inum .ifora .ic{width:12px;height:12px;stroke-width:2.4;vertical-align:0}
+.ibar.lkbar{background:var(--muted);border-style:dashed}
+
+/* ---------- biblioteca ---------- */
+.lib-head{display:flex;align-items:flex-end;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.stats{font-size:13px;color:var(--muted-foreground);display:flex;gap:4px 14px;flex-wrap:wrap;margin-top:4px}
+.stats b{color:var(--brand-ink)}
+.cov{list-style:none;display:flex;gap:5px;overflow-x:auto;padding:3px 1px 8px;margin-top:10px;scrollbar-width:thin}
+.cov a{width:37px;height:37px;display:grid;place-items:center;border-radius:10px;font-size:12.5px;font-weight:800;border:1.5px solid var(--border);background:var(--card);text-decoration:none;flex:none}
+.cov a.ok{background:var(--brand-lime);border-color:hsl(78 56% 45%)}
+.cov a.part{background:hsl(43 92% 88%);border-color:hsl(43 92% 70%);color:var(--warn-text)}
+.cov a.emp{border-style:dashed;color:var(--muted-foreground)}
+.cov-leg{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--muted-foreground);margin-top:2px}
+.cov-leg span{display:inline-flex;gap:5px;align-items:center}
+.cov-leg i{width:10px;height:10px;border-radius:3px}
+.filters{display:flex;flex-wrap:wrap;gap:7px 18px;align-items:center;margin-top:14px}
+.fg{display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+.fg>span{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--muted-foreground);flex:none}
+.fp{display:inline-flex;align-items:center;min-height:34px;padding:0 12px;border-radius:99px;border:1.5px solid var(--border);background:var(--card);font-size:12.5px;font-weight:600;white-space:nowrap;cursor:pointer}
+.fp.on{background:var(--brand-ink);color:#fff;border-color:var(--brand-ink)}
+.fp small{margin-left:5px;font-size:12px;opacity:.6}
+@media(max-width:767px){
+  .filters{flex-wrap:nowrap;overflow-x:auto;margin-left:-14px;margin-right:-14px;padding:2px 14px 8px;scrollbar-width:none;-webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 26px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 26px),transparent)}
+  .filters::-webkit-scrollbar{display:none}
+  .fg{flex:none;flex-wrap:nowrap}
+  .fp{min-height:40px}
+}
+.grp{margin-top:14px}
+.grp>summary{display:flex;align-items:center;gap:9px;min-height:46px;cursor:pointer;padding:4px 8px;border-radius:12px;font-size:14.5px;font-weight:800}
+.grp>summary:hover{background:var(--card)}
+.grp>summary .cv{color:var(--muted-foreground);transition:transform .15s}
+.grp[open]>summary .cv{transform:rotate(90deg)}
+.grp>summary .gn{margin-left:auto;font-size:12px;font-weight:500;color:var(--muted-foreground)}
+.enc{background:var(--card);border:1px solid var(--border);border-radius:14px;margin-top:6px}
+.enc>summary{display:flex;align-items:center;gap:9px;min-height:48px;padding:6px 14px;cursor:pointer}
+.enc>summary:hover{background:hsl(75 8% 98%)}
+.enc>summary .cv{color:var(--muted-foreground);transition:transform .15s;flex:none}
+.enc[open]>summary .cv{transform:rotate(90deg)}
+.enc .en{font-weight:750;font-size:13.5px;flex:none}
+.enc .et{font-size:12.5px;color:var(--muted-foreground);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.enc .ec{margin-left:auto;display:flex;align-items:center;gap:7px;flex:none;padding-left:8px;min-width:0}
+.enc .ec .cnt{font-size:12px;color:var(--muted-foreground);white-space:nowrap}
+@media(max-width:560px){.enc .ec .cnt{display:none}}
+.enc-body{border-top:1px solid var(--border);padding:11px 14px 13px}
+.enc-note{display:flex;gap:9px;align-items:flex-start;font-size:12.5px;color:var(--muted-foreground);background:hsl(75 8% 97%);border:1px solid var(--border);border-radius:11px;padding:9px 12px;margin-bottom:11px;line-height:1.5}
+.enc-note .ic{margin-top:1px;color:var(--brand-ink)}
+.enc-note b{color:var(--brand-ink)}
+.enc-note .ht{margin-top:6px}
+.enc-note .ht>summary{display:inline-flex;align-items:center;gap:6px;font-weight:700;color:var(--brand-ink);cursor:pointer;min-height:30px;font-size:12.5px}
+.enc-note .ht>summary .ic{transition:transform .15s}
+.enc-note .ht[open]>summary .ic{transform:rotate(180deg)}
+.enc-note .ht p{margin-top:4px}
+.mgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(158px,1fr));gap:11px}
+@media(max-width:520px){.mgrid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}}
+.mc{background:var(--card);border:1px solid var(--border);border-radius:13px;overflow:hidden;display:flex;flex-direction:column;text-decoration:none;transition:border-color .15s}
+a.mc:hover{border-color:var(--input)}
+.mc-capa{height:90px;position:relative;overflow:hidden;background:hsl(75 8% 96%);border-bottom:1px solid var(--border)}
+.pg1{position:absolute;left:9px;right:9px;top:8px;background:#fff;border:1px solid var(--border);border-bottom:0;border-radius:7px 7px 0 0;padding:8px 9px;box-shadow:0 -1px 4px hsl(75 10% 40%/.06)}
+.pg1 .pb{display:block;height:7px;border-radius:3px;margin-bottom:6px}
+.pg1 .pt{display:block;font-size:9.5px;font-weight:800;line-height:1.25;letter-spacing:.01em;color:var(--brand-ink);margin-bottom:5px}
+.pg1 .pl{display:block;height:4px;border-radius:2px;background:var(--border);margin-top:3.5px}
+.mc-capa.ico{display:grid;place-items:center}
+.mc-capa.ico svg{width:30px;height:30px;color:var(--muted-foreground)}
+.mc-capa.soon{background:repeating-linear-gradient(135deg,hsl(75 8% 96%) 0 8px,hsl(75 8% 93%) 8px 16px)}
+.mc-capa .adm{position:absolute;top:6px;right:6px;width:30px;height:30px;border-radius:9px;background:hsl(0 0% 100%/.92);border:1px solid var(--border);display:grid;place-items:center;color:var(--muted-foreground)}
+.mc-body{padding:8px 10px 10px;display:grid;gap:3px;align-content:start}
+.mc-t{font-size:13px;font-weight:650;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.mc-m{font-size:12px;color:var(--muted-foreground);display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+.grp-t{font-size:13.5px;font-weight:750;margin:14px 0 7px}
+.grp-t small{font-weight:500;color:var(--muted-foreground)}
+
+/* ---------- mentor ---------- */
+.segp{display:flex;gap:5px;flex-wrap:wrap;margin:12px 0 4px}
+.segp label{display:inline-flex;align-items:center;min-height:44px;padding:0 15px;border-radius:99px;border:1.5px solid var(--input);background:var(--card);font-size:13.5px;font-weight:600;cursor:pointer}
+#w-ana:checked~.segp [for=w-ana],#w-caio:checked~.segp [for=w-caio]{background:var(--brand-ink);border-color:var(--brand-ink);color:#fff}
+#w-ana:focus-visible~.segp [for=w-ana],#w-caio:focus-visible~.segp [for=w-caio]{outline:3px solid hsl(215 90% 42%);outline-offset:2px}
+.jan,.jca{display:none}
+#w-ana:checked~.jan{display:block}
+#w-caio:checked~.jca{display:block}
+.jcard{margin-top:12px;display:flex;gap:13px;align-items:center;flex-wrap:wrap;background:var(--card);border:1px solid var(--border);border-radius:16px;padding:13px 15px}
+.jcard .t{flex:1 1 240px;font-size:13.5px;line-height:1.4}.jcard .t b{display:block;font-size:15.5px}
+.jcard .t span{color:var(--muted-foreground)}
+.grplab{margin:20px 0 7px;font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--muted-foreground)}
+.como{margin-top:16px;background:var(--card);border:1px solid var(--border);border-top:4px solid var(--brand-lime);border-radius:16px;padding:4px 15px 13px}
+.como>summary{display:flex;align-items:center;gap:10px;min-height:48px;cursor:pointer;font-weight:800;font-size:14.5px}
+.como>summary .ic:last-child{margin-left:auto;transition:transform .15s}
+.como[open]>summary .ic:last-child{transform:rotate(180deg)}
+.como ol{margin:6px 0 0 20px;display:grid;gap:6px;font-size:13px;line-height:1.5}
+.como .apoio{margin-top:12px;display:flex;gap:7px;flex-wrap:wrap}
+
+/* ---------- jovem ---------- */
+.hero2{margin-top:14px;background:linear-gradient(115deg,var(--brand-lime),hsl(70 62% 56%));border-radius:20px;padding:18px 18px 14px;box-shadow:0 18px 40px -20px hsl(78 55% 32%/.45)}
+.hero2 .eyebrow{font-size:12px;font-weight:800;letter-spacing:.11em;text-transform:uppercase;color:hsl(0 0% 15%/.62)}
+.hero2 h2{font-size:21px;font-weight:800;letter-spacing:-.02em;margin-top:2px}
+.hero2 .hsub{font-size:13px;color:hsl(0 0% 15%/.75);margin-top:3px;max-width:60ch}
+.hero2-top{display:flex;justify-content:space-between;gap:14px;align-items:flex-start;flex-wrap:wrap}
+.hprog{display:flex;align-items:center;gap:11px}
+.hprog strong{display:block;font-size:14.5px;font-weight:800}
+.hprog span{font-size:12px;color:hsl(0 0% 15%/.68)}
+.dots16{display:flex;gap:5px;flex-wrap:wrap;margin-top:14px}
+.d16{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;background:#fff;font-size:12px;font-weight:800;position:relative}
+.d16 .ic{width:14px;height:14px;stroke-width:3;color:var(--ok);vertical-align:0}
+.d16.now{background:var(--brand-ink);color:#fff;box-shadow:0 0 0 3.5px hsl(0 0% 100%/.5)}
+.d16.fut{background:transparent;border:1.5px dashed hsl(0 0% 15%/.55);color:hsl(0 0% 15%/.7);font-weight:700}
+.d16grp{display:grid;gap:5px}
+.d16grp small{font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:hsl(0 0% 15%/.6);padding-left:2px}
+.next2{margin-top:13px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:#fff;border-radius:14px;padding:10px 13px}
+.next2 .tx{flex:1 1 200px;font-size:13px;line-height:1.35}.next2 .tx b{display:block;font-size:14px}
+.next2 .tx span{color:var(--muted-foreground)}
+
+/* ---------- notas ---------- */
+.notes{width:min(1120px,100% - 28px);margin:14px auto 110px;padding:20px 22px;background:var(--brand-ink);color:hsl(75 14% 78%);border-radius:14px;display:grid;gap:10px;font-size:13px;line-height:1.6}
+@media(min-width:900px){.notes{margin-bottom:60px}}
+.notes h2{font-size:17px;color:#fff}
+.notes h3{font-size:14px;color:var(--brand-lime);margin-top:8px;letter-spacing:.04em;text-transform:uppercase}
+.notes b{color:hsl(75 20% 96%)}
+.notes ul{display:grid;gap:7px;padding-left:18px}
+.notes .open{color:hsl(48 100% 72%)}
+.mx{display:grid;border:1px solid hsl(75 6% 30%);border-radius:12px;overflow:hidden}
+.mxh,.mxr{display:grid;grid-template-columns:1fr;gap:4px;padding:10px 12px;border-bottom:1px solid hsl(75 6% 30%)}
+.mxh{display:none;background:hsl(75 6% 22%);font-weight:700;color:#fff}
+.mxr:last-child{border-bottom:0}
+.mxr>b{font-size:13.5px}
+.mxr span::before{content:attr(data-l) ": ";font-weight:700;color:hsl(75 20% 96%)}
+@media(min-width:900px){.mxh,.mxr{grid-template-columns:150px 1.2fr 1fr 1fr;gap:14px}.mxh{display:grid}.mxr span::before{content:none}}
+body::after{content:"";display:block;height:20px}
+</style>
+</head>
+<body>
+
+<!-- sprite de ícones -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+<symbol id="i-check" viewBox="0 0 24 24"><path d="m5.5 12.5 4.2 4.2L18.5 8"/></symbol>
+<symbol id="i-half" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 3.5a8.5 8.5 0 0 1 0 17z" fill="currentColor"/></symbol>
+<symbol id="i-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/></symbol>
+<symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="10" rx="2.5"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/></symbol>
+<symbol id="i-warn" viewBox="0 0 24 24"><path d="M12 4 21 19.5H3z"/><path d="M12 10v4.5M12 17.2v.1"/></symbol>
+<symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+<symbol id="i-send" viewBox="0 0 24 24"><path d="M21 3 10.5 13.5M21 3l-6.5 18-4-7.5L3 9.5z"/></symbol>
+<symbol id="i-pen" viewBox="0 0 24 24"><path d="M4 20h4L19.5 8.5a2.1 2.1 0 0 0-3-3L5 17z"/><path d="m14.5 7.5 3 3"/></symbol>
+<symbol id="i-doc" viewBox="0 0 24 24"><path d="M6 3.5h8l4.5 4.5v12.5H6z"/><path d="M14 3.5V8h4.5M9 13h6M9 16.5h6"/></symbol>
+<symbol id="i-roda" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="1.6"/><path d="M12 3.5v17M3.5 12h17M6 6l12 12M18 6 6 18"/></symbol>
+<symbol id="i-visao" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="m14.8 9.2-2 5.6-5.6 2 2-5.6z"/><path d="M12 3.5v1.6M20.5 12h-1.6"/></symbol>
+<symbol id="i-metas" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1" fill="currentColor"/></symbol>
+<symbol id="i-pdm" viewBox="0 0 24 24"><circle cx="5.5" cy="18.5" r="2.2"/><circle cx="18.5" cy="5.5" r="2.2"/><path d="M6.8 16.3c4.6-.5 2.4-6.4 8.6-7.9" stroke-dasharray="3 2.6"/><path d="M18.5 3.5v4M18.5 5.5h4" opacity=".5"/></symbol>
+<symbol id="i-terc" viewBox="0 0 24 24"><circle cx="8" cy="8.5" r="3"/><path d="M2.8 19.5c.5-3.2 2.7-4.8 5.2-4.8s4.7 1.6 5.2 4.8"/><path d="M15 3.8h6.5v6.3l-3-.9-1.5.9v-2.6l-2-.6z" fill="none"/></symbol>
+<symbol id="i-aval" viewBox="0 0 24 24"><path d="m12 3.8 2.5 5.2 5.7.8-4.1 4 1 5.7L12 16.8l-5.1 2.7 1-5.7-4.1-4 5.7-.8z"/></symbol>
+<symbol id="i-rodaf" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="1.6"/><path d="M12 3.5v17M3.5 12h17"/><path d="M8.5 9.5 6 12l2.5 2.5M15.5 9.5 18 12l-2.5 2.5"/></symbol>
+<symbol id="i-360" viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.6"/><path d="M20 4v4.2h-4.2"/><circle cx="12" cy="12" r="2.4"/></symbol>
+<symbol id="i-book" viewBox="0 0 24 24"><path d="M4 5.5C4 4.7 4.7 4 5.5 4H11a1 1 0 0 1 1 1v15a2 2 0 0 0-2-1.5H5.5A1.5 1.5 0 0 1 4 17zM20 5.5c0-.8-.7-1.5-1.5-1.5H13a1 1 0 0 0-1 1v15a2 2 0 0 1 2-1.5h4.5a1.5 1.5 0 0 0 1.5-1.5z"/></symbol>
+<symbol id="i-chat" viewBox="0 0 24 24"><path d="M4 5.5h16v10.5H9.5L5 20v-4H4z"/><path d="M8 9.5h8M8 12.5h5"/></symbol>
+<symbol id="i-arrow" viewBox="0 0 24 24"><path d="M4.5 12h14.5m0 0-4.8-4.8M19 12l-4.8 4.8"/></symbol>
+<symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 15.5V4.5M7.5 9 12 4.5 16.5 9M4.5 15.5v3a1.5 1.5 0 0 0 1.5 1.5h12a1.5 1.5 0 0 0 1.5-1.5v-3"/></symbol>
+<symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 11v5M12 8v.1"/></symbol>
+<symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 17.5V11a6 6 0 0 1 12 0v6.5l1.5 1.5h-15zM10 21h4"/></symbol>
+<symbol id="i-home" viewBox="0 0 24 24"><path d="M4 11 12 4l8 7v8.5a1 1 0 0 1-1 1h-4.5v-6h-5v6H5a1 1 0 0 1-1-1z"/></symbol>
+<symbol id="i-cal" viewBox="0 0 24 24"><rect x="4" y="5.5" width="16" height="14.5" rx="2.5"/><path d="M4 10h16M8.5 3.5v4M15.5 3.5v4"/></symbol>
+<symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.8"/><path d="M4.5 20c.8-3.8 3.7-5.7 7.5-5.7s6.7 1.9 7.5 5.7"/></symbol>
+<symbol id="i-grid" viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="2"/><rect x="13" y="4" width="7" height="7" rx="2"/><rect x="4" y="13" width="7" height="7" rx="2"/><rect x="13" y="13" width="7" height="7" rx="2"/></symbol>
+<symbol id="i-chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+<symbol id="i-chev-r" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></symbol>
+<symbol id="i-link" viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3A4 4 0 0 0 11 18.7l1-1"/></symbol>
+<symbol id="i-people" viewBox="0 0 24 24"><circle cx="9" cy="8.5" r="3.2"/><path d="M3 19.5c.6-3.3 3-5 6-5s5.4 1.7 6 5"/><path d="M16 5.6a3 3 0 0 1 0 5.8M18 14.8c1.7.6 2.7 2.1 3 4.2"/></symbol>
+<symbol id="i-table" viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M3.5 9.5h17M3.5 14.5h17M9.5 9.5v10M15.5 9.5v10"/></symbol>
+<symbol id="i-dots" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.4" fill="currentColor"/><circle cx="12" cy="12" r="1.4" fill="currentColor"/><circle cx="19" cy="12" r="1.4" fill="currentColor"/></symbol>
+<symbol id="i-star" viewBox="0 0 24 24"><path d="m12 3.8 2.5 5.2 5.7.8-4.1 4 1 5.7L12 16.8l-5.1 2.7 1-5.7-4.1-4 5.7-.8z"/></symbol>
+<symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+</defs></svg>
+
+<input class="rv" type="radio" name="role" id="r-coord" checked aria-label="Ver como Coordenação">
+<input class="rv" type="radio" name="role" id="r-aux" aria-label="Ver como Auxiliar executivo">
+<input class="rv" type="radio" name="role" id="r-dpp" aria-label="Ver como Mentor DPP">
+<input class="rv" type="radio" name="role" id="r-jov" aria-label="Ver como Mentorado">
+
+<header class="board-head">
+  <span><b>MOCKUP</b> · materiais · <b>v5b — fusão painel×instrumentos</b></span>
+  <span class="dir">Direção: painel de jornada e seção de instrumentos <b class="d">viram uma coisa só</b> — cada card carrega a barra agregada (x de 26) + ações. Menos seções, mais denso. Lista “fora da janela” e matriz por dupla seguem abaixo. Biblioteca compacta (capa ~90px + título).</span>
+  <nav><a href="#topo">Tela</a><a href="#notas">Notas</a></nav>
+</header>
+
+<div class="vbar" id="topo"><div class="vin wrap">
+  <span>Ver como:</span>
+  <div class="vpills" role="group" aria-label="Ver como">
+    <label class="vp" for="r-coord">Coordenação · Marina</label>
+    <label class="vp" for="r-aux">Auxiliar executivo · Paula</label>
+    <label class="vp" for="r-dpp">Mentor DPP · André</label>
+    <label class="vp" for="r-jov">Mentorado · Ana</label>
+  </div>
+</div></div>
+
+<div class="app">
+
+<!-- ============================ COORDENAÇÃO ============================ -->
+<section class="view v-c">
+  <div class="top"><div class="top-in wrap">
+    <div class="brand"><span class="mark">R</span>Realiza</div>
+    <nav class="tnav" aria-label="Principal"><a href="#">Início</a><a href="#">Agenda</a><a href="#">Duplas</a><a href="#">Pessoas</a><a href="#" class="on" aria-current="page">Materiais</a><a href="#">Chamados</a><a href="#">Formulários</a></nav>
+    <div class="who"><div class="wt"><b>Marina Costa</b><small>Coordenação</small></div><span class="av">M</span></div>
+  </div></div>
+
+  <main class="pg wrap">
+    <div class="phead">
+      <div><h1>Materiais</h1><p class="psub">Os instrumentos do programa, o progresso nas 26 duplas e a biblioteca oficial.</p></div>
+      <a class="btn pri" href="#"><svg class="ic"><use href="#i-plus"/></svg>Novo material</a>
+    </div>
+    <div class="scope"><svg class="ic"><use href="#i-info"/></svg><span><b>Você vê:</b> o estado dos instrumentos em todas as duplas e a biblioteca inteira. <b>Você não faz:</b> preencher instrumento pelo jovem — quem entrega é o mentor; a sua ação é lembrar (nudge) ou enviar em lote.</span></div>
+
+    <!-- INSTRUMENTOS = painel (fusão) -->
+    <section class="px" aria-label="Instrumentos do programa e progresso da jornada">
+      <div class="px-h">
+        <h2>Instrumentos do programa</h2>
+        <span class="px-sub">26 duplas · Turma 1 no encontro 8 · Turma 2 no encontro 5</span>
+        <span class="px-note"><svg class="ic" style="width:14px;height:14px"><use href="#i-eye"/></svg>cada card carrega a cobertura — detalhe e respostas na ficha da dupla</span>
+      </div>
+
+      <div class="igrid" style="margin-top:12px" role="img" aria-label="Cobertura por instrumento: Roda inicial 24 de 26, Visão 21 de 26, Metas 17 de 26, PDM 16 de 26, avaliações de encontro 148 de 171, Roda formal e 360º ainda não abriram">
+        <article class="icard" style="--ic:var(--c-roda);--ict:var(--c-roda-t)">
+          <div class="hd"><span class="ig"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><use href="#i-roda"/></svg></span>
+            <div><h3>Roda da Vida · leitura inicial</h3><p class="jw"><span class="chipe">Enc. 1</span><span class="tag ok">janela aberta</span></p></div></div>
+          <div class="iprog"><div class="ibar"><i class="f" style="flex:24"></i><i class="p" style="flex:2"></i></div><p class="inum"><span><b>24</b> de 26 responderam</span><span>2 esperando</span></p></div>
+          <div class="iacts"><a class="btn sm pri" href="#"><svg class="ic"><use href="#i-send"/></svg>Enviar em lote · 2</a><a class="btn sm" href="#"><svg class="ic"><use href="#i-eye"/></svg>Ver respostas</a></div>
+        </article>
+        <article class="icard" style="--ic:var(--c-visao);--ict:var(--c-visao-t)">
+          <div class="hd"><span class="ig"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><use href="#i-visao"/></svg></span>
+            <div><h3>Construindo a sua Visão</h3><p class="jw"><span class="chipe">Enc. 1–4</span><span class="tag ok">janela aberta</span></p></div></div>
+          <div class="iprog"><div class="ibar"><i class="f" style="flex:21"></i><i class="p" style="flex:4"></i><i class="o" style="flex:1"></i></div><p class="inum"><span><b>21</b> de 26 responderam</span><span class="ifora"><svg class="ic"><use href="#i-warn"/></svg>1 fora da janela</span></p></div>
+          <div class="iacts"><a class="btn sm pri" href="#"><svg class="ic"><use href="#i-send"/></svg>Enviar em lote · 5</a><a class="btn sm" href="#"><svg class="ic"><use href="#i-eye"/></svg>Ver respostas</a></div>
+        </article>
+        <article class="icard" style="--ic:var(--c-metas);--ict:var(--c-metas-t)">
+          <div class="hd"><span class="ig"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><use href="#i-metas"/></svg></span>
+            <div><h3>Definindo minhas metas</h3><p class="jw"><span class="chipe">Enc. 2–3</span><span class="tag ok">janela aberta</span></p></div></div>
+          <div class="iprog"><div class="ibar"><i class="f" style="flex:17"></i><i class="p" style="flex:6"></i><i class="o" style="flex:3"></i></div><p class="inum"><span><b>17</b> de 26 responderam</span><span class="ifora"><svg class="ic"><use href="#i-warn"/></svg>3 fora da janela</span></p></div>
+          <div class="iacts"><a class="btn sm pri" href="#"><svg class="ic"><use href="#i-send"/></svg>Enviar em lote · 9</a><a class="btn sm" href="#"><svg class="ic"><use href="#i-eye"/></svg>Ver respostas</a></div>
+        </article>
+        <article class="icard" style="--ic:var(--c-pdm);--ict:var(--c-pdm-t)">
+          <div class="hd"><span class="ig"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><use href="#i-pdm"/></svg></span>
+            <div><h3>PDM · Plano de Desenvolvimento</h3><p class="jw"><span class="chipe">Construir 1–4</span><span class="chipe">Revisar enc. 9</span><span class="tag ok">janela aberta</span></p></div></div>
+          <div class="iprog"><div class="ibar"><i class="f" style="flex:16"></i><i class="p" style="flex:8"></i><i class="o" style="flex:2"></i></div><p class="inum"><span><b>16</b> de 26 com PDM montado</span><span class="ifora"><svg class="ic"><use href="#i-warn"/></svg>3 fora da janela</span></p></div>
+          <div class="iacts"><a class="btn sm pri" href="#"><svg class="ic"><use href="#i-send"/></svg>Enviar em lote · 10</a><a class="btn sm" href="#"><svg class="ic"><use href="#i-eye"/></svg>Ver respostas</a></div>
+        </article>
+        <article class="icard" style="--ic:var(--c-terc);--ict:var(--c-terc-t)">
+          <div class="hd"><span class="ig"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><use href="#i-terc"/></svg></span>
+            <div><h3>Avaliação por terceiros</h3><p class="jw"><span class="chipe">Antes do enc. 1</span><span class="chipe">Devolutiva enc. 2</span><span class="tag ok">janela aberta</span></p></div></div>
+          <div class="iprog"><div class="ibar"><i class="f" style="flex:20"></i><i class="p" style="flex:4"></i><i class="o" style="flex:2"></i></div><p class="inum"><span><b>20</b> de 26 com devolutiva</span><span>fora do painel — acompanhada na ficha</span></p></div>
+          <div class="iacts"><a class="btn sm" href="#"><svg class="ic"><use href="#i-eye"/></svg>Ver consolidados</a></div>
+        </article>
+        <article class="icard" style="--ic:var(--c-aval);--ict:var(--c-aval-t)">
+          <div class="hd"><span class="ig"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><use href="#i-aval"/></svg></span>
+            <div><h3>Avaliação do encontro</h3><p class="jw"><span class="chipe">Todo encontro</span><span class="tag ok">recorrente</span></p></div></div>
+          <div class="iprog"><div class="ibar"><i class="f" style="flex:148"></i><i class="o" style="flex:23"></i></div><p class="inum"><span><b>148</b> de 171 respondidas</span><span>o link nasce no encontro realizado</span></p></div>
+          <div class="iacts"><a class="btn sm" href="#"><svg class="ic"><use href="#i-eye"/></svg>Ver respostas da semana</a></div>
+        </article>
+        <article class="icard lk" style="--ic:var(--c-rodaf);--ict:var(--c-rodaf-t)">
+          <div class="hd"><span class="ig"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><use href="#i-rodaf"/></svg></span>
+            <div><h3>Roda da Vida · aplicação formal</h3><p class="jw"><span class="chipe">Enc. 12–14</span><span class="tag lk"><svg class="ic" style="width:12px;height:12px"><use href="#i-lock"/></svg>trancado</span></p></div></div>
+          <div class="iprog"><div class="ibar lkbar"></div><p class="inum"><span>0 de 26 — nenhuma dupla chegou ao enc. 12</span></p></div>
+          <div class="iacts"><span class="btn sm off" aria-disabled="true"><svg class="ic"><use href="#i-lock"/></svg>libera no encontro 12 · T1 em 4 nov · T2 em 26 nov</span></div>
+        </article>
+        <article class="icard lk" style="--ic:var(--c-360);--ict:var(--c-360-t)">
+          <div class="hd"><span class="ig"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><use href="#i-360"/></svg></span>
+            <div><h3>Avaliação 360º e autoavaliação</h3><p class="jw"><span class="chipe">Enc. 16</span><span class="tag lk"><svg class="ic" style="width:12px;height:12px"><use href="#i-lock"/></svg>trancado</span></p></div></div>
+          <div class="iprog"><div class="ibar lkbar"></div><p class="inum"><span>0 de 26 — nenhuma dupla chegou ao enc. 16</span></p></div>
+          <div class="iacts"><span class="btn sm off" aria-disabled="true"><svg class="ic"><use href="#i-lock"/></svg>libera no encontro 16 · T1 em 2 dez · T2 em 24 dez</span></div>
+        </article>
+      </div>
+      <p class="sleg" aria-label="Legenda">
+        <span><i class="l-f"></i>respondido</span>
+        <span><i class="l-p"></i>link enviado, esperando resposta</span>
+        <span><i class="l-o"></i>a fazer / não enviado</span>
+        <span><i class="l-l"></i>ainda não abriu na turma</span>
+        <span><svg class="ic" style="width:13px;height:13px;stroke-width:2.4;color:var(--warn-text)"><use href="#i-warn"/></svg>fora da janela do guia</span>
+      </p>
+
+      <div class="fsec">
+        <h3><svg class="ic"><use href="#i-warn"/></svg>3 duplas com instrumento fora da janela</h3>
+        <p class="fhint">O instrumento não se fecha sozinho — quem envia o link ao jovem é o mentor, na ficha da dupla. Você lembra.</p>
+        <div class="frow">
+          <span class="av y">C</span>
+          <div class="ft"><b>Caio Martins</b><small>Turma 2 · enc. 5 · mentor André Lima</small><span class="ff">Definindo metas (enc. 2–3) · PDM (enc. 1–4)</span></div>
+          <div class="fa"><a class="btn sm" href="#"><svg class="ic"><use href="#i-eye"/></svg>Ver ficha</a><a class="btn sm pri" href="#"><svg class="ic"><use href="#i-bell"/></svg>Lembrar André</a></div>
+        </div>
+        <div class="frow">
+          <span class="av y">J</span>
+          <div class="ft"><b>Jovem figurante 1</b><small>Turma 1 · enc. 8 · mentor figurante</small><span class="ff">Definindo metas (enc. 2–3) · PDM (enc. 1–4)</span></div>
+          <div class="fa"><a class="btn sm" href="#"><svg class="ic"><use href="#i-eye"/></svg>Ver ficha</a><span class="btn sm off" aria-disabled="true"><svg class="ic"><use href="#i-bell"/></svg>Lembrado ontem · libera 9/out</span></div>
+        </div>
+        <div class="frow">
+          <span class="av y">J</span>
+          <div class="ft"><b>Jovem figurante 2</b><small>Turma 2 · enc. 5 · mentor figurante</small><span class="ff">Construindo a Visão (enc. 1–4) · Metas · PDM</span></div>
+          <div class="fa"><a class="btn sm" href="#"><svg class="ic"><use href="#i-eye"/></svg>Ver ficha</a><a class="btn sm pri" href="#"><svg class="ic"><use href="#i-bell"/></svg>Lembrar mentor</a></div>
+        </div>
+      </div>
+
+      <details class="mtx">
+        <summary><svg class="ic"><use href="#i-table"/></svg>Ver a matriz por dupla<small>26 duplas · agrupadas por turma</small><svg class="ic cx"><use href="#i-chev"/></svg></summary>
+        <div class="mtx-in">
+          <p class="mt-t">Turma 1 <small>terças 19h · encontro 8 · 14 duplas</small></p>
+          <div class="drow">
+            <div class="dn"><b>Ana Souza</b><small>mentor André Lima</small></div>
+            <div class="cells"><span class="cell d"><svg class="ic"><use href="#i-check"/></svg>Roda</span><span class="cell d"><svg class="ic"><use href="#i-check"/></svg>Visão</span><span class="cell d"><svg class="ic"><use href="#i-check"/></svg>Metas</span><span class="cell d"><svg class="ic"><use href="#i-check"/></svg>PDM</span><span class="cell p"><svg class="ic"><use href="#i-half"/></svg>Aval 6/7</span><span class="cell l"><svg class="ic"><use href="#i-lock"/></svg>Roda F</span><span class="cell l"><svg class="ic"><use href="#i-lock"/></svg>360º</span><a class="btn sm" href="#">Ver ficha</a></div>
+          </div>
+          <div class="drow">
+            <div class="dn"><b>Sofia</b><small>mentor Ricardo</small></div>
+            <div class="cells"><span class="cell d"><svg class="ic"><use href="#i-check"/></svg>Roda</span><span class="cell d"><svg class="ic"><use href="#i-check"/></svg>Visão</span><span class="cell d"><svg class="ic"><use href="#i-check"/></svg>Metas</span><span class="cell d"><svg class="ic"><use href="#i-check"/></svg>PDM</span><span class="cell d"><svg class="ic"><use href="#i-check"/></svg>Aval em dia</span><span class="cell l"><svg class="ic"><use href="#i-lock"/></svg>Roda F</span><span class="cell l"><svg class="ic"><use href="#i-lock"/></svg>360º</span><a class="btn sm" href="#">Ver ficha</a></div>
+          </div>
+          <div class="drow">
+            <div class="dn"><b>Jovem figurante 1</b><small>mentor figurante</small></div>
+            <div class="cells"><span class="cell d"><svg class="ic"><use href="#i-check"/></svg>Roda</span><span class="cell d"><svg class="ic"><use href="#i-check"/></svg>Visão</span><span class="cell w"><svg class="ic"><use href="#i-warn"/></svg>Metas</span><span class="cell w"><svg class="ic"><use href="#i-warn"/></svg>PDM</span><span class="cell d"><svg class="ic"><use href="#i-check"/></svg>Aval em dia</span><span class="cell l"><svg class="ic"><use href="#i-lock"/></svg>Roda F</span><span class="cell l"><svg class="ic"><use href="#i-lock"/></svg>360º</span><a class="btn sm" href="#">Ver ficha</a></div>
+          </div>
+          <p class="mt-t" style="margin-top:14px">Turma 2 <small>quartas 19h · encontro 5 · 12 duplas</small></p>
+          <div class="drow">
+            <div class="dn"><b>Caio Martins</b><small>mentor André Lima</small></div>
+            <div class="cells"><span class="cell d"><svg class="ic"><use href="#i-check"/></svg>Roda</span><span class="cell d"><svg class="ic"><use href="#i-check"/></svg>Visão</span><span class="cell w"><svg class="ic"><use href="#i-warn"/></svg>Metas</span><span class="cell w"><svg class="ic"><use href="#i-warn"/></svg>PDM</span><span class="cell d"><svg class="ic"><use href="#i-check"/></svg>Aval 4/4</span><span class="cell l"><svg class="ic"><use href="#i-lock"/></svg>Roda F</span><span class="cell l"><svg class="ic"><use href="#i-lock"/></svg>360º</span><a class="btn sm" href="#">Ver ficha</a></div>
+          </div>
+          <div class="drow">
+            <div class="dn"><b>Pedro Ramos</b><small>mentora Renata Gomes</small></div>
+            <div class="cells"><span class="cell d"><svg class="ic"><use href="#i-check"/></svg>Roda</span><span class="cell d"><svg class="ic"><use href="#i-check"/></svg>Visão</span><span class="cell d"><svg class="ic"><use href="#i-check"/></svg>Metas</span><span class="cell d"><svg class="ic"><use href="#i-check"/></svg>PDM</span><span class="cell d"><svg class="ic"><use href="#i-check"/></svg>Aval em dia</span><span class="cell l"><svg class="ic"><use href="#i-lock"/></svg>Roda F</span><span class="cell l"><svg class="ic"><use href="#i-lock"/></svg>360º</span><a class="btn sm" href="#">Ver ficha</a></div>
+          </div>
+          <div class="drow">
+            <div class="dn"><b>Jovem figurante 2</b><small>mentor figurante</small></div>
+            <div class="cells"><span class="cell d"><svg class="ic"><use href="#i-check"/></svg>Roda</span><span class="cell w"><svg class="ic"><use href="#i-warn"/></svg>Visão</span><span class="cell w"><svg class="ic"><use href="#i-warn"/></svg>Metas</span><span class="cell w"><svg class="ic"><use href="#i-warn"/></svg>PDM</span><span class="cell d"><svg class="ic"><use href="#i-check"/></svg>Aval em dia</span><span class="cell l"><svg class="ic"><use href="#i-lock"/></svg>Roda F</span><span class="cell l"><svg class="ic"><use href="#i-lock"/></svg>360º</span><a class="btn sm" href="#">Ver ficha</a></div>
+          </div>
+          <p class="mt-more">… e as outras 20 duplas, na mesma anatomia.</p>
+          <p class="mleg"><span><svg class="ic" style="color:var(--ok-text)"><use href="#i-check"/></svg>respondido</span><span><svg class="ic" style="color:var(--warn-text)"><use href="#i-half"/></svg>em andamento / esperando resposta</span><span><svg class="ic"><use href="#i-circle"/></svg>a fazer</span><span><svg class="ic"><use href="#i-lock"/></svg>ainda não abriu</span><span><svg class="ic" style="color:var(--danger-text)"><use href="#i-warn"/></svg>fora da janela do guia</span></p>
+        </div>
+      </details>
+    </section>
+
+    <!-- BIBLIOTECA -->
+    <h2 class="h2">Biblioteca de materiais</h2>
+    <p class="sub">Guias, modelos e conteúdos por encontro. Material sem arquivo aparece como “em breve” pra quem tem acesso.</p>
+    <div class="stats"><span><b>7 de 16</b> encontros com material</span><span><b>20 de 24</b> publicados</span><span><b>4</b> em breve</span><span>último item <b>3 out</b></span></div>
+
+    <ol class="cov" aria-label="Cobertura por encontro">
+      <li><a class="ok" href="#c-e1" title="Encontro 1 · 3 materiais">1</a></li><li><a class="ok" href="#c-e2" title="Encontro 2 · 2 materiais">2</a></li><li><a class="ok" href="#c-e3" title="Encontro 3 · 1 material">3</a></li><li><a class="emp" href="#c-e4" title="Encontro 4 · sem material">4</a></li><li><a class="ok" href="#c-e5" title="Encontro 5 · 1 material">5</a></li><li><a class="ok" href="#c-e6" title="Encontro 6 · 1 material">6</a></li><li><a class="ok" href="#c-e7" title="Encontro 7 · 1 material">7</a></li><li><a class="ok" href="#c-e8" title="Encontro 8 · 2 materiais">8</a></li><li><a class="part" href="#c-e9" title="Encontro 9 · 1 em breve">9</a></li><li><a class="emp" href="#c-e10" title="Encontro 10 · sem material">10</a></li><li><a class="emp" href="#c-e11" title="Encontro 11 · sem material">11</a></li><li><a class="part" href="#c-e12" title="Encontro 12 · 1 em breve">12</a></li><li><a class="emp" href="#c-e13" title="Encontro 13 · sem material">13</a></li><li><a class="emp" href="#c-e14" title="Encontro 14 · sem material">14</a></li><li><a class="emp" href="#c-e15" title="Encontro 15 · sem material">15</a></li><li><a class="emp" href="#c-e16" title="Encontro 16 · sem material">16</a></li>
+    </ol>
+    <p class="cov-leg"><span><i style="background:var(--brand-lime)"></i>com material</span><span><i style="background:hsl(43 92% 80%)"></i>em breve</span><span><i style="border:1.5px dashed var(--input)"></i>sem material</span></p>
+
+    <div class="filters" role="group" aria-label="Filtrar materiais">
+      <div class="fg"><span>Audiência</span><button class="fp on" type="button">Todas<small>24</small></button><button class="fp" type="button">Mentorados<small>8</small></button><button class="fp" type="button">Mentores DPP<small>11</small></button><button class="fp" type="button">Especialistas<small>3</small></button><button class="fp" type="button">Coordenação<small>4</small></button></div>
+      <div class="fg"><span>Tipo</span><button class="fp on" type="button">Todos<small>24</small></button><button class="fp" type="button">Guias<small>9</small></button><button class="fp" type="button">Modelos<small>4</small></button><button class="fp" type="button">Conteúdos<small>7</small></button><button class="fp" type="button">Links<small>4</small></button></div>
+    </div>
+
+    <details class="grp" open>
+      <summary><svg class="ic cv"><use href="#i-chev-r"/></svg>Por encontro<span class="gn">13 materiais</span></summary>
+      <div>
+        <details class="enc" id="c-e1">
+          <summary><svg class="ic cv"><use href="#i-chev-r"/></svg><span class="en">Encontro 1</span><span class="et">Abertura e combinados da dupla</span><span class="ec"><span class="cnt">3 materiais</span><span class="tag ok">no ar</span></span></summary>
+          <div class="enc-body">
+            <div class="enc-note"><svg class="ic"><use href="#i-info"/></svg><div><b>O que o encontro cobre:</b> abertura do ciclo — a dupla se apresenta, fecha os combinados (dia, hora, canal) e aplica a Roda da Vida leitura inicial. A Visão abre aqui e segue até o enc. 4.
+              <details class="ht"><summary><svg class="ic"><use href="#i-book"/></svg>O que o guia sugere ao mentor<svg class="ic"><use href="#i-chev"/></svg></summary><p>Apresentar-se, alinhar os combinados do encontro (dia/hora/canal), aplicar a Roda com o jovem e entregar a Visão como tarefa — a Declaração volta à mesa no enc. 2.</p></details></div></div>
+            <div class="mgrid">
+              <a class="mc" href="#"><span class="mc-capa"><span class="pg1"><i class="pb" style="background:var(--brand-lime);width:38%"></i><b class="pt">Roteiro do encontro 1</b><i class="pl" style="width:86%"></i><i class="pl" style="width:70%"></i><i class="pl" style="width:78%"></i><i class="pl" style="width:52%"></i></span><span class="adm"><svg class="ic" style="width:15px;height:15px"><use href="#i-dots"/></svg></span></span><span class="mc-body"><span class="mc-t">Roteiro do encontro 1</span><span class="mc-m">Guia · PDF · 620 KB</span></span></a>
+              <a class="mc" href="#"><span class="mc-capa"><span class="pg1"><i class="pb" style="background:var(--c-roda);width:30%"></i><b class="pt">Roda da Vida — folha de marcação</b><i class="pl" style="width:80%"></i><i class="pl" style="width:64%"></i><i class="pl" style="width:72%"></i></span><span class="adm"><svg class="ic" style="width:15px;height:15px"><use href="#i-dots"/></svg></span></span><span class="mc-body"><span class="mc-t">Roda da Vida — folha de marcação</span><span class="mc-m">Modelo · PDF</span></span></a>
+              <a class="mc" href="#"><span class="mc-capa ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><use href="#i-link"/></svg><span class="adm"><svg class="ic" style="width:15px;height:15px"><use href="#i-dots"/></svg></span></span><span class="mc-body"><span class="mc-t">Boas-vindas em vídeo</span><span class="mc-m">Link · 3 min</span></span></a>
+            </div>
+          </div>
+        </details>
+        <details class="enc" id="c-e2"><summary><svg class="ic cv"><use href="#i-chev-r"/></svg><span class="en">Encontro 2</span><span class="et">Visão e primeiras metas</span><span class="ec"><span class="cnt">2 materiais</span><span class="tag ok">no ar</span></span></summary>
+          <div class="enc-body"><div class="mgrid">
+            <a class="mc" href="#"><span class="mc-capa"><span class="pg1"><i class="pb" style="background:var(--brand-lime);width:38%"></i><b class="pt">Roteiro do encontro 2</b><i class="pl" style="width:84%"></i><i class="pl" style="width:66%"></i><i class="pl" style="width:74%"></i></span><span class="adm"><svg class="ic" style="width:15px;height:15px"><use href="#i-dots"/></svg></span></span><span class="mc-body"><span class="mc-t">Roteiro do encontro 2</span><span class="mc-m">Guia · PDF</span></span></a>
+            <a class="mc" href="#"><span class="mc-capa"><span class="pg1"><i class="pb" style="background:var(--c-visao);width:30%"></i><b class="pt">Cartão de perguntas da Visão</b><i class="pl" style="width:78%"></i><i class="pl" style="width:60%"></i></span><span class="adm"><svg class="ic" style="width:15px;height:15px"><use href="#i-dots"/></svg></span></span><span class="mc-body"><span class="mc-t">Cartão de perguntas da Visão</span><span class="mc-m">Modelo · PDF</span></span></a>
+          </div></div>
+        </details>
+        <details class="enc" id="c-e3"><summary><svg class="ic cv"><use href="#i-chev-r"/></svg><span class="en">Encontro 3</span><span class="et">Metas SMART na prática</span><span class="ec"><span class="cnt">1 material</span><span class="tag ok">no ar</span></span></summary>
+          <div class="enc-body"><div class="mgrid">
+            <a class="mc" href="#"><span class="mc-capa"><span class="pg1"><i class="pb" style="background:var(--brand-lime);width:38%"></i><b class="pt">Roteiro do encontro 3</b><i class="pl" style="width:82%"></i><i class="pl" style="width:68%"></i></span><span class="adm"><svg class="ic" style="width:15px;height:15px"><use href="#i-dots"/></svg></span></span><span class="mc-body"><span class="mc-t">Roteiro do encontro 3</span><span class="mc-m">Guia · PDF</span></span></a>
+          </div></div>
+        </details>
+        <details class="enc" id="c-e4"><summary><svg class="ic cv"><use href="#i-chev-r"/></svg><span class="en">Encontro 4</span><span class="et">PDM: do sonho ao plano</span><span class="ec"><span class="cnt">sem material ainda</span></span></summary>
+          <div class="enc-body"><p class="sub" style="margin:0">Nenhum material nesse encontro ainda. <a href="#" style="text-decoration:underline;font-weight:600">Adicionar neste encontro</a></p></div>
+        </details>
+        <details class="enc" id="c-e5"><summary><svg class="ic cv"><use href="#i-chev-r"/></svg><span class="en">Encontro 5</span><span class="et">Ritmo e escuta</span><span class="tag line" style="border-color:hsl(78 56% 45%);background:var(--lime-tint);color:var(--ok-text)">semana atual · T2</span><span class="ec"><span class="cnt">1 material</span><span class="tag ok">no ar</span></span></summary>
+          <div class="enc-body"><div class="mgrid">
+            <a class="mc" href="#"><span class="mc-capa"><span class="pg1"><i class="pb" style="background:var(--brand-lime);width:38%"></i><b class="pt">Roteiro do encontro 5</b><i class="pl" style="width:80%"></i><i class="pl" style="width:62%"></i></span><span class="adm"><svg class="ic" style="width:15px;height:15px"><use href="#i-dots"/></svg></span></span><span class="mc-body"><span class="mc-t">Roteiro do encontro 5</span><span class="mc-m">Guia · PDF</span></span></a>
+          </div></div>
+        </details>
+        <details class="enc" id="c-e6"><summary><svg class="ic cv"><use href="#i-chev-r"/></svg><span class="en">Encontro 6</span><span class="et">Comunicação que conecta</span><span class="ec"><span class="cnt">1 material</span><span class="tag ok">no ar</span></span></summary>
+          <div class="enc-body"><div class="mgrid">
+            <a class="mc" href="#"><span class="mc-capa"><span class="pg1"><i class="pb" style="background:var(--brand-lime);width:38%"></i><b class="pt">Roteiro do encontro 6</b><i class="pl" style="width:84%"></i><i class="pl" style="width:58%"></i></span><span class="adm"><svg class="ic" style="width:15px;height:15px"><use href="#i-dots"/></svg></span></span><span class="mc-body"><span class="mc-t">Roteiro do encontro 6</span><span class="mc-m">Guia · PDF</span></span></a>
+          </div></div>
+        </details>
+        <details class="enc" id="c-e7"><summary><svg class="ic cv"><use href="#i-chev-r"/></svg><span class="en">Encontro 7</span><span class="et">Checagem das ações</span><span class="ec"><span class="cnt">1 material</span><span class="tag ok">no ar</span></span></summary>
+          <div class="enc-body"><div class="mgrid">
+            <a class="mc" href="#"><span class="mc-capa"><span class="pg1"><i class="pb" style="background:var(--brand-lime);width:38%"></i><b class="pt">Roteiro do encontro 7</b><i class="pl" style="width:76%"></i><i class="pl" style="width:66%"></i></span><span class="adm"><svg class="ic" style="width:15px;height:15px"><use href="#i-dots"/></svg></span></span><span class="mc-body"><span class="mc-t">Roteiro do encontro 7</span><span class="mc-m">Guia · PDF</span></span></a>
+          </div></div>
+        </details>
+        <details class="enc" id="c-e8" open>
+          <summary><svg class="ic cv"><use href="#i-chev-r"/></svg><span class="en">Encontro 8</span><span class="et">Ritmo de ação e PDM</span><span class="tag line" style="border-color:hsl(78 56% 45%);background:var(--lime-tint);color:var(--ok-text)">semana atual · T1</span><span class="ec"><span class="cnt">2 materiais</span><span class="tag ok">no ar</span></span></summary>
+          <div class="enc-body">
+            <div class="enc-note"><svg class="ic"><use href="#i-info"/></svg><div><b>O que o encontro cobre:</b> meio da fase 2 — acompanhamento das ações do PDM (o que avançou, o que travou) e preparação pra revisão formal do enc. 9.
+              <details class="ht"><summary><svg class="ic"><use href="#i-book"/></svg>O que o guia sugere ao mentor<svg class="ic"><use href="#i-chev"/></svg></summary><p>Começar pelo que avançou, revisar submetas com prazo vencido sem cobrar e fechar com um combinado pro enc. 9 — que já é a revisão de meio de percurso.</p></details></div></div>
+            <div class="mgrid">
+              <a class="mc" href="#"><span class="mc-capa"><span class="pg1"><i class="pb" style="background:var(--brand-lime);width:38%"></i><b class="pt">Roteiro do encontro 8</b><i class="pl" style="width:88%"></i><i class="pl" style="width:72%"></i><i class="pl" style="width:64%"></i></span><span class="adm"><svg class="ic" style="width:15px;height:15px"><use href="#i-dots"/></svg></span></span><span class="mc-body"><span class="mc-t">Roteiro do encontro 8</span><span class="mc-m">Guia · PDF · 540 KB</span></span></a>
+              <a class="mc" href="#"><span class="mc-capa"><span class="pg1"><i class="pb" style="background:var(--c-pdm);width:30%"></i><b class="pt">Planilha de metas — acompanhamento</b><i class="pl" style="width:82%"></i><i class="pl" style="width:60%"></i></span><span class="adm"><svg class="ic" style="width:15px;height:15px"><use href="#i-dots"/></svg></span></span><span class="mc-body"><span class="mc-t">Planilha de metas — acompanhamento</span><span class="mc-m">Modelo · Planilha</span></span></a>
+            </div>
+          </div>
+        </details>
+        <details class="enc" id="c-e9"><summary><svg class="ic cv"><use href="#i-chev-r"/></svg><span class="en">Encontro 9</span><span class="et">Revisão de meio de percurso do PDM</span><span class="ec"><span class="cnt">1 material</span><span class="tag warn">em breve</span></span></summary>
+          <div class="enc-body"><div class="mgrid">
+            <span class="mc"><span class="mc-capa soon"><span class="adm" style="position:static;display:inline-grid;width:30px;height:30px;border-radius:9px;background:#fff;border:1px solid var(--border);margin:30px auto 0"><svg class="ic" style="width:15px;height:15px"><use href="#i-lock"/></svg></span></span><span class="mc-body"><span class="mc-t">Roteiro do encontro 9</span><span class="mc-m">Em breve · a coordenação publica até 10 out</span></span></span>
+          </div></div>
+        </details>
+        <details class="enc" id="c-e10"><summary><svg class="ic cv"><use href="#i-chev-r"/></svg><span class="en">Encontro 10</span><span class="et">—</span><span class="ec"><span class="cnt">sem material ainda</span></span></summary></details>
+        <details class="enc" id="c-e11"><summary><svg class="ic cv"><use href="#i-chev-r"/></svg><span class="en">Encontro 11</span><span class="et">—</span><span class="ec"><span class="cnt">sem material ainda</span></span></summary></details>
+        <details class="enc" id="c-e12"><summary><svg class="ic cv"><use href="#i-chev-r"/></svg><span class="en">Encontro 12</span><span class="et">Roda da Vida — aplicação formal</span><span class="ec"><span class="cnt">1 material</span><span class="tag warn">em breve</span></span></summary></details>
+        <details class="enc" id="c-e13"><summary><svg class="ic cv"><use href="#i-chev-r"/></svg><span class="en">Encontro 13</span><span class="et">—</span><span class="ec"><span class="cnt">sem material ainda</span></span></summary></details>
+        <details class="enc" id="c-e14"><summary><svg class="ic cv"><use href="#i-chev-r"/></svg><span class="en">Encontro 14</span><span class="et">—</span><span class="ec"><span class="cnt">sem material ainda</span></span></summary></details>
+        <details class="enc" id="c-e15"><summary><svg class="ic cv"><use href="#i-chev-r"/></svg><span class="en">Encontro 15</span><span class="et">Preparando o encerramento</span><span class="ec"><span class="cnt">sem material ainda</span></span></summary></details>
+        <details class="enc" id="c-e16"><summary><svg class="ic cv"><use href="#i-chev-r"/></svg><span class="en">Encontro 16</span><span class="et">Encerramento e celebração</span><span class="ec"><span class="cnt">sem material ainda</span></span></summary></details>
+      </div>
+    </details>
+
+    <details class="grp" open>
+      <summary><svg class="ic cv"><use href="#i-chev-r"/></svg>Transversais<span class="gn">11 itens</span></summary>
+      <div>
+        <p class="grp-t">Guias <small>oficiais do programa</small></p>
+        <div class="mgrid">
+          <a class="mc" href="#"><span class="mc-capa"><span class="pg1"><i class="pb" style="background:var(--brand-lime);width:42%"></i><b class="pt">Guia do Mentorado — Programa de Mentoria</b><i class="pl" style="width:80%"></i><i class="pl" style="width:66%"></i><i class="pl" style="width:74%"></i></span><span class="adm"><svg class="ic" style="width:15px;height:15px"><use href="#i-dots"/></svg></span></span><span class="mc-body"><span class="mc-t">Guia do Mentorado</span><span class="mc-m">PDF · 1,8 MB · mentorados + mentores</span></span></a>
+          <a class="mc" href="#"><span class="mc-capa"><span class="pg1"><i class="pb" style="background:var(--brand-ink);width:42%"></i><b class="pt">Guia do Mentor DPP — Programa de Mentoria</b><i class="pl" style="width:84%"></i><i class="pl" style="width:60%"></i><i class="pl" style="width:70%"></i></span><span class="adm"><svg class="ic" style="width:15px;height:15px"><use href="#i-dots"/></svg></span></span><span class="mc-body"><span class="mc-t">Guia do Mentor DPP</span><span class="mc-m">PDF · 3,4 MB · mentores + coord</span></span></a>
+          <span class="mc"><span class="mc-capa soon"><span class="adm" style="position:static;display:inline-grid;width:30px;height:30px;border-radius:9px;background:#fff;border:1px solid var(--border);margin:30px auto 0"><svg class="ic" style="width:15px;height:15px"><use href="#i-lock"/></svg></span></span><span class="mc-body"><span class="mc-t">Guia do Especialista</span><span class="mc-m">Em breve</span></span></span>
+        </div>
+        <p class="grp-t">Modelos e conteúdos</p>
+        <div class="mgrid">
+          <a class="mc" href="#"><span class="mc-capa"><span class="pg1"><i class="pb" style="background:var(--c-terc);width:34%"></i><b class="pt">Mensagens-modelo da dupla</b><i class="pl" style="width:82%"></i><i class="pl" style="width:64%"></i></span><span class="adm"><svg class="ic" style="width:15px;height:15px"><use href="#i-dots"/></svg></span></span><span class="mc-body"><span class="mc-t">Mensagens-modelo</span><span class="mc-m">Conteúdo · mentores</span></span></a>
+          <a class="mc" href="#"><span class="mc-capa"><span class="pg1"><i class="pb" style="background:var(--c-metas);width:34%"></i><b class="pt">Perguntas Eficazes</b><i class="pl" style="width:86%"></i><i class="pl" style="width:58%"></i></span><span class="adm"><svg class="ic" style="width:15px;height:15px"><use href="#i-dots"/></svg></span></span><span class="mc-body"><span class="mc-t">Perguntas Eficazes</span><span class="mc-m">Conteúdo · todos</span></span></a>
+          <a class="mc" href="#"><span class="mc-capa"><span class="pg1"><i class="pb" style="background:var(--c-aval);width:34%"></i><b class="pt">Escuta Ativa — guia de bolso</b><i class="pl" style="width:80%"></i><i class="pl" style="width:62%"></i></span><span class="adm"><svg class="ic" style="width:15px;height:15px"><use href="#i-dots"/></svg></span></span><span class="mc-body"><span class="mc-t">Escuta Ativa</span><span class="mc-m">Conteúdo · mentores</span></span></a>
+          <a class="mc" href="#"><span class="mc-capa"><span class="pg1"><i class="pb" style="background:var(--c-visao);width:34%"></i><b class="pt">Comunicação Não Violenta (CNV)</b><i class="pl" style="width:78%"></i><i class="pl" style="width:66%"></i></span><span class="adm"><svg class="ic" style="width:15px;height:15px"><use href="#i-dots"/></svg></span></span><span class="mc-body"><span class="mc-t">Comunicação Não Violenta</span><span class="mc-m">Conteúdo · mentores</span></span></a>
+          <a class="mc" href="#"><span class="mc-capa ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><use href="#i-link"/></svg><span class="adm"><svg class="ic" style="width:15px;height:15px"><use href="#i-dots"/></svg></span></span><span class="mc-body"><span class="mc-t">Canal de formação no YouTube</span><span class="mc-m">Link externo · todos</span></span></a>
+          <span class="mc"><span class="mc-capa soon"><span class="adm" style="position:static;display:inline-grid;width:30px;height:30px;border-radius:9px;background:#fff;border:1px solid var(--border);margin:30px auto 0"><svg class="ic" style="width:15px;height:15px"><use href="#i-lock"/></svg></span></span><span class="mc-body"><span class="mc-t">Feedback Construtivo</span><span class="mc-m">Em breve</span></span></span>
+        </div>
+      </div>
+    </details>
+  </main>
+
+  <nav class="bnav ad" aria-label="Menu"><a href="#"><i><svg class="ic lg"><use href="#i-home"/></svg></i>Início</a><a href="#"><i><svg class="ic lg"><use href="#i-people"/></svg></i>Duplas</a><a href="#"><i><svg class="ic lg"><use href="#i-cal"/></svg></i>Agenda</a><a href="#" class="on" aria-current="page"><i><svg class="ic lg"><use href="#i-grid"/></svg></i>Materiais</a><a href="#"><i><svg class="ic lg"><use href="#i-chat"/></svg></i>Chamados</a></nav>
+</section>
+
+<!-- ============================ AUXILIAR EXECUTIVO ============================ -->
+<section class="view v-a">
+  <div class="top"><div class="top-in wrap">
+    <div class="brand"><span class="mark">R</span>Realiza</div>
+    <nav class="tnav" aria-label="Principal"><a href="#">Início</a><a href="#">Agenda</a><a href="#">Duplas</a><a href="#" class="on" aria-current="page">Materiais</a><a href="#">Chamados</a></nav>
+    <div class="who"><div class="wt"><b>Paula Nunes</b><small>Auxiliar executivo</small></div><span class="av">P</span></div>
+  </div></div>
+
+  <main class="pg wrap">
+    <div class="phead"><div><h1>Materiais</h1><p class="psub">O que as 6 duplas que você supervisiona já responderam — e a biblioteca oficial.</p></div></div>
+    <div class="scope"><svg class="ic"><use href="#i-info"/></svg><span><b>Você vê:</b> o <b>estado</b> de cada instrumento nas suas 6 duplas e a biblioteca. <b>Você não vê:</b> o conteúdo das respostas, nem duplas de outros. Sem botão de enviar ou preencher — quem entrega é o mentor.</span></div>
+
+    <section class="px" aria-label="Instrumentos do programa nas suas duplas">
+      <div class="px-h">
+        <h2>Instrumentos do programa</h2>
+        <span class="px-sub">estado nas suas 6 duplas · 3 na Turma 1 (enc. 8) · 3 na Turma 2 (enc. 5)</span>
+        <span class="px-note"><svg class="ic" style="width:14px;height:14px"><use href="#i-eye"/></svg>só o estado — as respostas não aparecem pra você</span>
+      </div>
+      <div class="igrid" style="margin-top:12px" role="img" aria-label="Cobertura por instrumento nas suas 6 duplas">
+        <article class="icard" style="--ic:var(--c-roda);--ict:var(--c-roda-t)">
+          <div class="hd"><span class="ig"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><use href="#i-roda"/></svg></span>
+            <div><h3>Roda da Vida · leitura inicial</h3><p class="jw"><span class="chipe">Enc. 1</span></p></div></div>
+          <div class="iprog"><div class="ibar"><i class="f" style="flex:6"></i></div><p class="inum"><span><b>6</b> de 6 responderam</span></p></div>
+        </article>
+        <article class="icard" style="--ic:var(--c-visao);--ict:var(--c-visao-t)">
+          <div class="hd"><span class="ig"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><use href="#i-visao"/></svg></span>
+            <div><h3>Construindo a sua Visão</h3><p class="jw"><span class="chipe">Enc. 1–4</span></p></div></div>
+          <div class="iprog"><div class="ibar"><i class="f" style="flex:5"></i><i class="o" style="flex:1"></i></div><p class="inum"><span><b>5</b> de 6 responderam</span><span class="ifora"><svg class="ic"><use href="#i-warn"/></svg>1 fora da janela</span></p></div>
+        </article>
+        <article class="icard" style="--ic:var(--c-metas);--ict:var(--c-metas-t)">
+          <div class="hd"><span class="ig"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><use href="#i-metas"/></svg></span>
+            <div><h3>Definindo minhas metas</h3><p class="jw"><span class="chipe">Enc. 2–3</span></p></div></div>
+          <div class="iprog"><div class="ibar"><i class="f" style="flex:3"></i><i class="p" style="flex:2"></i><i class="o" style="flex:1"></i></div><p class="inum"><span><b>3</b> de 6 responderam</span><span class="ifora"><svg class="ic"><use href="#i-warn"/></svg>3 fora da janela</span></p></div>
+        </article>
+        <article class="icard" style="--ic:var(--c-pdm);--ict:var(--c-pdm-t)">
+          <div class="hd"><span class="ig"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><use href="#i-pdm"/></svg></span>
+            <div><h3>PDM · Plano de Desenvolvimento</h3><p class="jw"><span class="chipe">Construir 1–4</span><span class="chipe">Revisar enc. 9</span></p></div></div>
+          <div class="iprog"><div class="ibar"><i class="f" style="flex:3"></i><i class="p" style="flex:2"></i><i class="o" style="flex:1"></i></div><p class="inum"><span><b>3</b> de 6 com PDM montado</span><span class="ifora"><svg class="ic"><use href="#i-warn"/></svg>3 fora da janela</span></p></div>
+        </article>
+        <article class="icard" style="--ic:var(--c-terc);--ict:var(--c-terc-t)">
+          <div class="hd"><span class="ig"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><use href="#i-terc"/></svg></span>
+            <div><h3>Avaliação por terceiros</h3><p class="jw"><span class="chipe">Antes do enc. 1</span><span class="chipe">Devolutiva enc. 2</span></p></div></div>
+          <div class="iprog"><div class="ibar"><i class="f" style="flex:4"></i><i class="p" style="flex:1"></i><i class="o" style="flex:1"></i></div><p class="inum"><span><b>4</b> de 6 com devolutiva</span></p></div>
+        </article>
+        <article class="icard" style="--ic:var(--c-aval);--ict:var(--c-aval-t)">
+          <div class="hd"><span class="ig"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><use href="#i-aval"/></svg></span>
+            <div><h3>Avaliação do encontro</h3><p class="jw"><span class="chipe">Todo encontro</span></p></div></div>
+          <div class="iprog"><div class="ibar"><i class="f" style="flex:32"></i><i class="o" style="flex:3"></i></div><p class="inum"><span><b>32</b> de 35 respondidas</span></p></div>
+        </article>
+        <article class="icard lk" style="--ic:var(--c-rodaf);--ict:var(--c-rodaf-t)">
+          <div class="hd"><span class="ig"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><use href="#i-rodaf"/></svg></span>
+            <div><h3>Roda da Vida · aplicação formal</h3><p class="jw"><span class="chipe">Enc. 12–14</span></p></div></div>
+          <div class="iprog"><div class="ibar lkbar"></div><p class="inum"><span>0 de 6 — nenhuma chegou ao enc. 12</span></p></div>
+        </article>
+        <article class="icard lk" style="--ic:var(--c-360);--ict:var(--c-360-t)">
+          <div class="hd"><span class="ig"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><use href="#i-360"/></svg></span>
+            <div><h3>Avaliação 360º e autoavaliação</h3><p class="jw"><span class="chipe">Enc. 16</span></p></div></div>
+          <div class="iprog"><div class="ibar lkbar"></div><p class="inum"><span>0 de 6 — nenhuma chegou ao enc. 16</span></p></div>
+        </article>
+      </div>
+      <p class="sleg"><span><i class="l-f"></i>respondido</span><span><i class="l-p"></i>esperando resposta</span><span><i class="l-o"></i>a fazer</span><span><i class="l-l"></i>ainda não abriu</span><span><svg class="ic" style="width:13px;height:13px;stroke-width:2.4;color:var(--warn-text)"><use href="#i-warn"/></svg>fora da janela</span></p>
+
+      <div class="fsec">
+        <h3><svg class="ic"><use href="#i-warn"/></svg>3 duplas com instrumento fora da janela</h3>
+        <p class="fhint">Você acompanha — lembrar o mentor é gesto da coordenação (decisão em aberto, ver notas).</p>
+        <div class="frow"><span class="av y">C</span><div class="ft"><b>Caio Martins</b><small>Turma 2 · enc. 5 · mentor André Lima</small><span class="ff">Definindo metas · PDM</span></div><div class="fa"><a class="btn sm" href="#"><svg class="ic"><use href="#i-eye"/></svg>Ver ficha</a></div></div>
+        <div class="frow"><span class="av y">J</span><div class="ft"><b>Jovem figurante 1</b><small>Turma 1 · enc. 8 · mentor figurante</small><span class="ff">Definindo metas · PDM</span></div><div class="fa"><a class="btn sm" href="#"><svg class="ic"><use href="#i-eye"/></svg>Ver ficha</a></div></div>
+        <div class="frow"><span class="av y">J</span><div class="ft"><b>Jovem figurante 2</b><small>Turma 2 · enc. 5 · mentor figurante</small><span class="ff">Visão · Metas · PDM</span></div><div class="fa"><a class="btn sm" href="#"><svg class="ic"><use href="#i-eye"/></svg>Ver ficha</a></div></div>
+      </div>
+
+      <details class="mtx">
+        <summary><svg class="ic"><use href="#i-table"/></svg>Ver a matriz por dupla<small>6 duplas · por turma</small><svg class="ic cx"><use href="#i-chev"/></svg></summary>
+        <div class="mtx-in">
+          <p class="mt-t">Turma 1 <small>terças 19h · encontro 8 · 3 duplas</small></p>
+          <div class="drow"><div class="dn"><b>Ana Souza</b><small>mentor André Lima</small></div><div class="cells"><span class="cell d"><svg class="ic"><use href="#i-check"/></svg>Roda</span><span class="cell d"><svg class="ic"><use href="#i-check"/></svg>Visão</span><span class="cell d"><svg class="ic"><use href="#i-check"/></svg>Metas</span><span class="cell d"><svg class="ic"><use href="#i-check"/></svg>PDM</span><span class="cell p"><svg class="ic"><use href="#i-half"/></svg>Aval 6/7</span><span class="cell l"><svg class="ic"><use href="#i-lock"/></svg>Roda F</span><span class="cell l"><svg class="ic"><use href="#i-lock"/></svg>360º</span><a class="btn sm" href="#">Ver ficha</a></div></div>
+          <div class="drow"><div class="dn"><b>Sofia</b><small>mentor Ricardo</small></div><div class="cells"><span class="cell d"><svg class="ic"><use href="#i-check"/></svg>Roda</span><span class="cell d"><svg class="ic"><use href="#i-check"/></svg>Visão</span><span class="cell d"><svg class="ic"><use href="#i-check"/></svg>Metas</span><span class="cell d"><svg class="ic"><use href="#i-check"/></svg>PDM</span><span class="cell d"><svg class="ic"><use href="#i-check"/></svg>Aval em dia</span><span class="cell l"><svg class="ic"><use href="#i-lock"/></svg>Roda F</span><span class="cell l"><svg class="ic"><use href="#i-lock"/></svg>360º</span><a class="btn sm" href="#">Ver ficha</a></div></div>
+          <div class="drow"><div class="dn"><b>Jovem figurante 1</b><small>mentor figurante</small></div><div class="cells"><span class="cell d"><svg class="ic"><use href="#i-check"/></svg>Roda</span><span class="cell d"><svg class="ic"><use href="#i-check"/></svg>Visão</span><span class="cell w"><svg class="ic"><use href="#i-warn"/></svg>Metas</span><span class="cell w"><svg class="ic"><use href="#i-warn"/></svg>PDM</span><span class="cell d"><svg class="ic"><use href="#i-check"/></svg>Aval em dia</span><span class="cell l"><svg class="ic"><use href="#i-lock"/></svg>Roda F</span><span class="cell l"><svg class="ic"><use href="#i-lock"/></svg>360º</span><a class="btn sm" href="#">Ver ficha</a></div></div>
+          <p class="mt-t" style="margin-top:14px">Turma 2 <small>quartas 19h · encontro 5 · 3 duplas</small></p>
+          <div class="drow"><div class="dn"><b>Caio Martins</b><small>mentor André Lima</small></div><div class="cells"><span class="cell d"><svg class="ic"><use href="#i-check"/></svg>Roda</span><span class="cell d"><svg class="ic"><use href="#i-check"/></svg>Visão</span><span class="cell w"><svg class="ic"><use href="#i-warn"/></svg>Metas</span><span class="cell w"><svg class="ic"><use href="#i-warn"/></svg>PDM</span><span class="cell d"><svg class="ic"><use href="#i-check"/></svg>Aval 4/4</span><span class="cell l"><svg class="ic"><use href="#i-lock"/></svg>Roda F</span><span class="cell l"><svg class="ic"><use href="#i-lock"/></svg>360º</span><a class="btn sm" href="#">Ver ficha</a></div></div>
+          <div class="drow"><div class="dn"><b>Pedro Ramos</b><small>mentora Renata Gomes</small></div><div class="cells"><span class="cell d"><svg class="ic"><use href="#i-check"/></svg>Roda</span><span class="cell d"><svg class="ic"><use href="#i-check"/></svg>Visão</span><span class="cell d"><svg class="ic"><use href="#i-check"/></svg>Metas</span><span class="cell d"><svg class="ic"><use href="#i-check"/></svg>PDM</span><span class="cell d"><svg class="ic"><use href="#i-check"/></svg>Aval em dia</span><span class="cell l"><svg class="ic"><use href="#i-lock"/></svg>Roda F</span><span class="cell l"><svg class="ic"><use href="#i-lock"/></svg>360º</span><a class="btn sm" href="#">Ver ficha</a></div></div>
+          <div class="drow"><div class="dn"><b>Jovem figurante 2</b><small>mentor figurante</small></div><div class="cells"><span class="cell d"><svg class="ic"><use href="#i-check"/></svg>Roda</span><span class="cell w"><svg class="ic"><use href="#i-warn"/></svg>Visão</span><span class="cell w"><svg class="ic"><use href="#i-warn"/></svg>Metas</span><span class="cell w"><svg class="ic"><use href="#i-warn"/></svg>PDM</span><span class="cell d"><svg class="ic"><use href="#i-check"/></svg>Aval em dia</span><span class="cell l"><svg class="ic"><use href="#i-lock"/></svg>Roda F</span><span class="cell l"><svg class="ic"><use href="#i-lock"/></svg>360º</span><a class="btn sm" href="#">Ver ficha</a></div></div>
+        </div>
+      </details>
+    </section>
+
+    <h2 class="h2">Biblioteca de materiais</h2>
+    <div class="stats"><span><b>7 de 16</b> encontros com material</span><span><b>20 de 24</b> publicados</span><span><b>4</b> em breve</span></div>
+    <ol class="cov" aria-label="Cobertura por encontro"><li><a class="ok" href="#a-e1">1</a></li><li><a class="ok" href="#a-e8">2</a></li><li><a class="ok" href="#a-e8">3</a></li><li><a class="emp" href="#a-e8">4</a></li><li><a class="ok" href="#a-e8">5</a></li><li><a class="ok" href="#a-e8">6</a></li><li><a class="ok" href="#a-e8">7</a></li><li><a class="ok" href="#a-e8">8</a></li><li><a class="part" href="#a-e8">9</a></li><li><a class="emp" href="#a-e8">10</a></li><li><a class="emp" href="#a-e8">11</a></li><li><a class="part" href="#a-e8">12</a></li><li><a class="emp" href="#a-e8">13</a></li><li><a class="emp" href="#a-e8">14</a></li><li><a class="emp" href="#a-e8">15</a></li><li><a class="emp" href="#a-e8">16</a></li></ol>
+    <div class="filters" role="group" aria-label="Filtrar materiais">
+      <div class="fg"><span>Audiência</span><button class="fp on" type="button">Todas<small>19</small></button><button class="fp" type="button">Mentorados<small>8</small></button><button class="fp" type="button">Mentores DPP<small>11</small></button><button class="fp" type="button">Especialistas<small>3</small></button></div>
+      <div class="fg"><span>Tipo</span><button class="fp on" type="button">Todos<small>19</small></button><button class="fp" type="button">Guias<small>8</small></button><button class="fp" type="button">Modelos<small>4</small></button><button class="fp" type="button">Conteúdos<small>5</small></button><button class="fp" type="button">Links<small>2</small></button></div>
+    </div>
+    <details class="grp" open>
+      <summary><svg class="ic cv"><use href="#i-chev-r"/></svg>Por encontro<span class="gn">13 materiais</span></summary>
+      <div>
+        <details class="enc" id="a-e1"><summary><svg class="ic cv"><use href="#i-chev-r"/></svg><span class="en">Encontro 1</span><span class="et">Abertura e combinados da dupla</span><span class="ec"><span class="cnt">3 materiais</span><span class="tag ok">no ar</span></span></summary>
+          <div class="enc-body">
+            <div class="enc-note"><svg class="ic"><use href="#i-info"/></svg><div><b>O que o encontro cobre:</b> abertura do ciclo — apresentação, combinados (dia, hora, canal) e Roda da Vida leitura inicial. A Visão abre aqui e segue até o enc. 4.</div></div>
+            <div class="mgrid">
+              <a class="mc" href="#"><span class="mc-capa"><span class="pg1"><i class="pb" style="background:var(--brand-lime);width:38%"></i><b class="pt">Roteiro do encontro 1</b><i class="pl" style="width:86%"></i><i class="pl" style="width:70%"></i><i class="pl" style="width:78%"></i></span></span><span class="mc-body"><span class="mc-t">Roteiro do encontro 1</span><span class="mc-m">Guia · PDF</span></span></a>
+              <a class="mc" href="#"><span class="mc-capa"><span class="pg1"><i class="pb" style="background:var(--c-roda);width:30%"></i><b class="pt">Roda da Vida — folha de marcação</b><i class="pl" style="width:80%"></i><i class="pl" style="width:64%"></i></span></span><span class="mc-body"><span class="mc-t">Roda da Vida — folha de marcação</span><span class="mc-m">Modelo · PDF</span></span></a>
+              <a class="mc" href="#"><span class="mc-capa ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><use href="#i-link"/></svg></span><span class="mc-body"><span class="mc-t">Boas-vindas em vídeo</span><span class="mc-m">Link · 3 min</span></span></a>
+            </div>
+          </div>
+        </details>
+        <details class="enc"><summary><svg class="ic cv"><use href="#i-chev-r"/></svg><span class="en">Encontros 2–7</span><span class="et">Visão, Metas SMART, ritmo e escuta, comunicação, checagem</span><span class="ec"><span class="cnt">7 materiais</span><span class="tag ok">no ar</span></span></summary></details>
+        <details class="enc" id="a-e8" open><summary><svg class="ic cv"><use href="#i-chev-r"/></svg><span class="en">Encontro 8</span><span class="et">Ritmo de ação e PDM</span><span class="tag line" style="border-color:hsl(78 56% 45%);background:var(--lime-tint);color:var(--ok-text)">semana atual · T1</span><span class="ec"><span class="cnt">2 materiais</span><span class="tag ok">no ar</span></span></summary>
+          <div class="enc-body">
+            <div class="enc-note"><svg class="ic"><use href="#i-info"/></svg><div><b>O que o encontro cobre:</b> acompanhamento das ações do PDM (o que avançou, o que travou) e preparação pra revisão formal do enc. 9.</div></div>
+            <div class="mgrid">
+              <a class="mc" href="#"><span class="mc-capa"><span class="pg1"><i class="pb" style="background:var(--brand-lime);width:38%"></i><b class="pt">Roteiro do encontro 8</b><i class="pl" style="width:88%"></i><i class="pl" style="width:72%"></i></span></span><span class="mc-body"><span class="mc-t">Roteiro do encontro 8</span><span class="mc-m">Guia · PDF · 540 KB</span></span></a>
+              <a class="mc" href="#"><span class="mc-capa"><span class="pg1"><i class="pb" style="background:var(--c-pdm);width:30%"></i><b class="pt">Planilha de metas — acompanhamento</b><i class="pl" style="width:82%"></i><i class="pl" style="width:60%"></i></span></span><span class="mc-body"><span class="mc-t">Planilha de metas — acompanhamento</span><span class="mc-m">Modelo · Planilha</span></span></a>
+            </div>
+          </div>
+        </details>
+        <details class="enc"><summary><svg class="ic cv"><use href="#i-chev-r"/></svg><span class="en">Encontros 9–16</span><span class="et">Revisão do PDM, Roda formal, encerramento</span><span class="ec"><span class="cnt">2 materiais</span><span class="tag warn">em breve</span></span></summary></details>
+      </div>
+    </details>
+    <details class="grp" open>
+      <summary><svg class="ic cv"><use href="#i-chev-r"/></svg>Transversais<span class="gn">9 itens</span></summary>
+      <div class="mgrid" style="margin-top:8px">
+        <a class="mc" href="#"><span class="mc-capa"><span class="pg1"><i class="pb" style="background:var(--brand-lime);width:42%"></i><b class="pt">Guia do Mentorado — Programa de Mentoria</b><i class="pl" style="width:80%"></i><i class="pl" style="width:66%"></i></span></span><span class="mc-body"><span class="mc-t">Guia do Mentorado</span><span class="mc-m">PDF · 1,8 MB</span></span></a>
+        <a class="mc" href="#"><span class="mc-capa"><span class="pg1"><i class="pb" style="background:var(--brand-ink);width:42%"></i><b class="pt">Guia do Mentor DPP — Programa de Mentoria</b><i class="pl" style="width:84%"></i><i class="pl" style="width:60%"></i></span></span><span class="mc-body"><span class="mc-t">Guia do Mentor DPP</span><span class="mc-m">PDF · 3,4 MB</span></span></a>
+        <a class="mc" href="#"><span class="mc-capa"><span class="pg1"><i class="pb" style="background:var(--c-terc);width:34%"></i><b class="pt">Mensagens-modelo da dupla</b><i class="pl" style="width:82%"></i><i class="pl" style="width:64%"></i></span></span><span class="mc-body"><span class="mc-t">Mensagens-modelo</span><span class="mc-m">Conteúdo</span></span></a>
+        <a class="mc" href="#"><span class="mc-capa"><span class="pg1"><i class="pb" style="background:var(--c-metas);width:34%"></i><b class="pt">Perguntas Eficazes</b><i class="pl" style="width:86%"></i><i class="pl" style="width:58%"></i></span></span><span class="mc-body"><span class="mc-t">Perguntas Eficazes</span><span class="mc-m">Conteúdo</span></span></a>
+        <a class="mc" href="#"><span class="mc-capa"><span class="pg1"><i class="pb" style="background:var(--c-aval);width:34%"></i><b class="pt">Escuta Ativa — guia de bolso</b><i class="pl" style="width:80%"></i><i class="pl" style="width:62%"></i></span></span><span class="mc-body"><span class="mc-t">Escuta Ativa</span><span class="mc-m">Conteúdo</span></span></a>
+        <a class="mc" href="#"><span class="mc-capa"><span class="pg1"><i class="pb" style="background:var(--c-visao);width:34%"></i><b class="pt">Comunicação Não Violenta (CNV)</b><i class="pl" style="width:78%"></i><i class="pl" style="width:66%"></i></span></span><span class="mc-body"><span class="mc-t">Comunicação Não Violenta</span><span class="mc-m">Conteúdo</span></span></a>
+      </div>
+    </details>
+  </main>
+
+  <nav class="bnav ad" aria-label="Menu"><a href="#"><i><svg class="ic lg"><use href="#i-home"/></svg></i>Início</a><a href="#"><i><svg class="ic lg"><use href="#i-people"/></svg></i>Duplas</a><a href="#"><i><svg class="ic lg"><use href="#i-cal"/></svg></i>Agenda</a><a href="#" class="on" aria-current="page"><i><svg class="ic lg"><use href="#i-grid"/></svg></i>Materiais</a><a href="#"><i><svg class="ic lg"><use href="#i-chat"/></svg></i>Chamados</a></nav>
+</section>
+
+<!-- ============================ MENTOR DPP ============================ -->
+<section class="view v-d">
+  <div class="top"><div class="top-in wrap">
+    <div class="brand"><span class="mark">R</span>Realiza</div>
+    <nav class="tnav" aria-label="Principal"><a href="#">Início</a><a href="#">Minhas duplas</a><a href="#">Agenda</a><a href="#" class="on" aria-current="page">Materiais</a><a href="#">Chamados</a></nav>
+    <div class="who"><div class="wt"><b>André Lima</b><small>Mentor DPP</small></div><span class="av">A</span></div>
+  </div></div>
+
+  <main class="pg wrap">
+    <input class="rv" type="radio" name="jv" id="w-ana" checked aria-label="Ana Souza"><input class="rv" type="radio" name="jv" id="w-caio" aria-label="Caio Martins">
+    <div class="phead"><div><h1>Materiais</h1><p class="psub">Os instrumentos do guia por jovem: o que enviar, o que preencher junto, o que já voltou — e o acervo de apoio.</p></div></div>
+    <div class="scope"><svg class="ic"><use href="#i-info"/></svg><span><b>Você vê:</b> instrumentos e respostas das suas duplas e o acervo completo. <b>Você não vê:</b> jovens de outros mentores. Avaliação por terceiros: só o consolidado anonimizado.</span></div>
+    <div class="segp" role="group" aria-label="Jovem"><label for="w-ana">Ana · T1 · enc. 8</label><label for="w-caio">Caio · T2 · enc. 5</label></div>
+
+    <!-- ANA -->
+    <div class="jan">
+      <div class="jv"><span class="av y">A</span><div class="t"><b>Ana Souza · Turma 1 · encontro 8 de 16</b><span>Encontro hoje 19h (Meet). Próxima etapa do guia: revisão do PDM no encontro 9 (ter 14 out).</span></div><span class="tag ok"><svg class="ic" style="width:13px;height:13px"><use href="#i-check"/></svg>4 de 8 feitos</span></div>
+
+      <div class="grplab">Instrumentos do programa — Ana</div>
+      <div class="igrid">
+        <article class="icard" style="--ic:var(--c-roda);--ict:var(--c-roda-t)"><div class="hd"><span class="ig"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><use href="#i-roda"/></svg></span><div><h3>Roda da Vida · leitura inicial</h3><p class="jw"><span class="chipe">Enc. 1</span><span class="tag ok"><svg class="ic" style="width:12px;height:12px"><use href="#i-check"/></svg>Feito · 17 ago</span></p></div></div>
+          <p class="dd">Maior distância: carreira (4) e finanças (3); família em 8.</p>
+          <div class="quem"><svg class="ic"><use href="#i-eye"/></svg><span><b>Quem vê:</b> Ana · você · coordenação</span></div>
+          <div class="iacts"><a class="btn sm" href="../instrumentos/v1.html#roda"><svg class="ic"><use href="#i-eye"/></svg>Ver resposta</a></div>
+        </article>
+        <article class="icard" style="--ic:var(--c-visao);--ict:var(--c-visao-t)"><div class="hd"><span class="ig"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><use href="#i-visao"/></svg></span><div><h3>Construindo a sua Visão</h3><p class="jw"><span class="chipe">Enc. 1–4</span><span class="tag ok"><svg class="ic" style="width:12px;height:12px"><use href="#i-check"/></svg>Feito · 22 ago</span></p></div></div>
+          <p class="dd">Declaração já alimenta o topo do PDM.</p>
+          <div class="quem"><svg class="ic"><use href="#i-eye"/></svg><span><b>Quem vê:</b> Ana · você · coordenação</span></div>
+          <div class="iacts"><a class="btn sm" href="../instrumentos/v1.html#visao"><svg class="ic"><use href="#i-eye"/></svg>Ver resposta</a></div>
+        </article>
+        <article class="icard" style="--ic:var(--c-metas);--ict:var(--c-metas-t)"><div class="hd"><span class="ig"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><use href="#i-metas"/></svg></span><div><h3>Definindo minhas metas</h3><p class="jw"><span class="chipe">Enc. 2–3</span><span class="tag ok"><svg class="ic" style="width:12px;height:12px"><use href="#i-check"/></svg>Feito · 30 ago</span></p></div></div>
+          <p class="dd">Meta prioritária: portfólio com 5 projetos até 19 dez.</p>
+          <div class="quem"><svg class="ic"><use href="#i-eye"/></svg><span><b>Quem vê:</b> Ana · você · coordenação</span></div>
+          <div class="iacts"><a class="btn sm" href="../instrumentos/v1.html#metas"><svg class="ic"><use href="#i-eye"/></svg>Ver resposta</a></div>
+        </article>
+        <article class="icard" style="--ic:var(--c-pdm);--ict:var(--c-pdm-t)"><div class="hd"><span class="ig"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><use href="#i-pdm"/></svg></span><div><h3>PDM · Plano de Desenvolvimento</h3><p class="jw"><span class="chipe">Construir 1–4</span><span class="chipe">Revisar enc. 9</span><span class="tag warn"><svg class="ic" style="width:12px;height:12px"><use href="#i-half"/></svg>revisão em 14 out</span></p></div></div>
+          <p class="dd">4 metas · 9 de 20 submetas · 2 atingidas. Revisar prioridades e prazos no encontro 9.</p>
+          <div class="mini" role="img" aria-label="9 de 20 submetas"><i style="width:45%"></i></div>
+          <div class="quem"><svg class="ic"><use href="#i-eye"/></svg><span><b>Quem vê:</b> Ana · você · coordenação · auxiliar só o estado</span></div>
+          <div class="iacts"><a class="btn sm pri" href="../instrumentos/v1.html#pdm"><svg class="ic"><use href="#i-pen"/></svg>Preencher junto no enc. 9</a><a class="btn sm" href="#"><svg class="ic"><use href="#i-send"/></svg>Enviar rodada à Ana</a><a class="btn sm" href="../instrumentos/v1.html#pdm"><svg class="ic"><use href="#i-eye"/></svg>Ver PDM</a></div>
+        </article>
+        <article class="icard" style="--ic:var(--c-terc);--ict:var(--c-terc-t)"><div class="hd"><span class="ig"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><use href="#i-terc"/></svg></span><div><h3>Avaliação por terceiros</h3><p class="jw"><span class="chipe">Antes do enc. 1</span><span class="tag ok"><svg class="ic" style="width:12px;height:12px"><use href="#i-check"/></svg>6 de 6 · devolutiva no enc. 2</span></p></div></div>
+          <p class="dd">Ponto forte mais citado: criatividade (5 de 6 pessoas).</p>
+          <div class="quem"><svg class="ic"><use href="#i-eye"/></svg><span><b>Quem vê:</b> consolidado anonimizado — <b>nunca quem disse o quê</b></span></div>
+          <div class="iacts"><a class="btn sm" href="../instrumentos/v1.html#terceiros"><svg class="ic"><use href="#i-eye"/></svg>Ver consolidado</a></div>
+        </article>
+        <article class="icard" style="--ic:var(--c-aval);--ict:var(--c-aval-t)"><div class="hd"><span class="ig"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><use href="#i-aval"/></svg></span><div><h3>Avaliação do encontro</h3><p class="jw"><span class="chipe">Todo encontro</span><span class="tag warn"><svg class="ic" style="width:12px;height:12px"><use href="#i-half"/></svg>6 de 7 · enc. 7 pendente</span></p></div></div>
+          <p class="dd">A avaliação da Ana sobre o enc. 7 fecha sex 10/out, 23h59. Enviada em 1 out, não aberta.</p>
+          <div class="quem"><svg class="ic"><use href="#i-eye"/></svg><span><b>Quem vê:</b> você · coordenação · comentário: decisão em aberto</span></div>
+          <div class="iacts"><a class="btn sm pri" href="#"><svg class="ic"><use href="#i-send"/></svg>Reenviar link à Ana</a><a class="btn sm" href="#"><svg class="ic"><use href="#i-eye"/></svg>Ver as 6 respostas</a></div>
+        </article>
+        <article class="icard lk" style="--ic:var(--c-rodaf);--ict:var(--c-rodaf-t)"><div class="hd"><span class="ig"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><use href="#i-rodaf"/></svg></span><div><h3>Roda da Vida · aplicação formal</h3><p class="jw"><span class="chipe">Enc. 12–14</span><span class="tag lk"><svg class="ic" style="width:12px;height:12px"><use href="#i-lock"/></svg>trancado</span></p></div></div>
+          <p class="dd">Aplicada com você no encontro; compara com a leitura inicial de 17 ago.</p>
+          <div class="iacts"><span class="btn sm off" aria-disabled="true"><svg class="ic"><use href="#i-lock"/></svg>libera no encontro 12 · 4 nov</span></div>
+        </article>
+        <article class="icard lk" style="--ic:var(--c-360);--ict:var(--c-360-t)"><div class="hd"><span class="ig"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><use href="#i-360"/></svg></span><div><h3>Avaliação 360º e autoavaliação</h3><p class="jw"><span class="chipe">Enc. 16</span><span class="tag lk"><svg class="ic" style="width:12px;height:12px"><use href="#i-lock"/></svg>trancado</span></p></div></div>
+          <p class="dd">Fecha o ciclo e marca o checklist de encerramento.</p>
+          <div class="iacts"><span class="btn sm off" aria-disabled="true"><svg class="ic"><use href="#i-lock"/></svg>libera no encontro 16 · 2 dez</span></div>
+        </article>
+      </div>
+
+      <details class="como" open>
+        <summary><svg class="ic"><use href="#i-book"/></svg>Como conduzir · revisão do PDM no encontro 9<svg class="ic"><use href="#i-chev"/></svg></summary>
+        <ol>
+          <li>Abra o PDM com a Declaração de Visão da Ana e leia em voz alta: ainda faz sentido?</li>
+          <li>Percorra as metas na ordem de prioridade — meta atingida vira retrospectiva.</li>
+          <li>Reveja os prazos das submetas que venceram; ajuste, não cobre.</li>
+          <li>Feche com um combinado para o encontro 10 e registre no follow-up.</li>
+        </ol>
+        <div class="apoio"><a class="btn sm" href="#"><svg class="ic"><use href="#i-chat"/></svg>Perguntas Eficazes</a><a class="btn sm" href="#"><svg class="ic"><use href="#i-chat"/></svg>Escuta Ativa</a><a class="btn sm" href="#"><svg class="ic"><use href="#i-doc"/></svg>Mensagens-modelo</a></div>
+      </details>
+    </div>
+
+    <!-- CAIO -->
+    <div class="jca">
+      <div class="jv"><span class="av y">C</span><div class="t"><b>Caio Martins · Turma 2 · encontro 5 de 16</b><span>Encontro amanhã (qua) 19h, presencial. T2 começou 3 semanas depois de T1: a janela dele é outra — e já passou pra Metas e PDM.</span></div><span class="tag ok"><svg class="ic" style="width:13px;height:13px"><use href="#i-check"/></svg>2 de 8 feitos</span></div>
+
+      <div class="grplab">Instrumentos do programa — Caio</div>
+      <div class="igrid">
+        <article class="icard" style="--ic:var(--c-roda);--ict:var(--c-roda-t)"><div class="hd"><span class="ig"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><use href="#i-roda"/></svg></span><div><h3>Roda da Vida · leitura inicial</h3><p class="jw"><span class="chipe">Enc. 1</span><span class="tag ok"><svg class="ic" style="width:12px;height:12px"><use href="#i-check"/></svg>Feito · 9 set</span></p></div></div>
+          <div class="iacts"><a class="btn sm" href="../instrumentos/v1.html#roda"><svg class="ic"><use href="#i-eye"/></svg>Ver resposta</a></div>
+        </article>
+        <article class="icard" style="--ic:var(--c-visao);--ict:var(--c-visao-t)"><div class="hd"><span class="ig"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><use href="#i-visao"/></svg></span><div><h3>Construindo a sua Visão</h3><p class="jw"><span class="chipe">Enc. 1–4</span><span class="tag ok"><svg class="ic" style="width:12px;height:12px"><use href="#i-check"/></svg>Feito · 14 set</span></p></div></div>
+          <div class="iacts"><a class="btn sm" href="../instrumentos/v1.html#visao"><svg class="ic"><use href="#i-eye"/></svg>Ver resposta</a></div>
+        </article>
+        <article class="icard" style="--ic:var(--c-metas);--ict:var(--c-metas-t);border-color:var(--warn)"><div class="hd"><span class="ig"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><use href="#i-metas"/></svg></span><div><h3>Definindo minhas metas</h3><p class="jw"><span class="chipe">Enc. 2–3</span><span class="tag late"><svg class="ic" style="width:12px;height:12px"><use href="#i-warn"/></svg>fora da janela</span></p></div></div>
+          <p class="dd">Link enviado em 18 set. Rascunho salvo: 3 de 5 metas, sem checagem SMART.</p>
+          <div class="quem"><svg class="ic"><use href="#i-eye"/></svg><span><b>Quem vê:</b> Caio · você · coordenação</span></div>
+          <div class="iacts"><a class="btn sm pri" href="../instrumentos/v1.html#metas"><svg class="ic"><use href="#i-pen"/></svg>Preencher junto agora</a><a class="btn sm" href="#"><svg class="ic"><use href="#i-send"/></svg>Reenviar link ao Caio</a><a class="btn sm" href="../instrumentos/v1.html#metas"><svg class="ic"><use href="#i-eye"/></svg>Ver rascunho</a></div>
+        </article>
+        <article class="icard" style="--ic:var(--c-pdm);--ict:var(--c-pdm-t);border-color:var(--warn)"><div class="hd"><span class="ig"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><use href="#i-pdm"/></svg></span><div><h3>PDM · construção</h3><p class="jw"><span class="chipe">Enc. 1–4</span><span class="tag late"><svg class="ic" style="width:12px;height:12px"><use href="#i-warn"/></svg>fora da janela</span></p></div></div>
+          <p class="dd">2 metas e 1 submeta; a Declaração já está no topo. Termine as metas antes da revisão (enc. 9 · 5 nov).</p>
+          <div class="quem"><svg class="ic"><use href="#i-eye"/></svg><span><b>Quem vê:</b> Caio · você · coordenação</span></div>
+          <div class="iacts"><a class="btn sm pri" href="../instrumentos/v1.html#pdm"><svg class="ic"><use href="#i-pen"/></svg>Preencher junto agora</a><a class="btn sm" href="../instrumentos/v1.html#pdm"><svg class="ic"><use href="#i-eye"/></svg>Ver PDM</a></div>
+        </article>
+        <article class="icard" style="--ic:var(--c-terc);--ict:var(--c-terc-t);border-color:var(--warn)"><div class="hd"><span class="ig"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><use href="#i-terc"/></svg></span><div><h3>Avaliação por terceiros</h3><p class="jw"><span class="chipe">Antes do enc. 1</span><span class="tag late"><svg class="ic" style="width:12px;height:12px"><use href="#i-warn"/></svg>2 de 6 · fora da janela</span></p></div></div>
+          <p class="dd">Pedido enviado em 12 set; devolutiva ainda não pôde ser feita.</p>
+          <div class="iacts"><a class="btn sm pri" href="#"><svg class="ic"><use href="#i-send"/></svg>Enviar link aos respondentes</a><a class="btn sm" href="#"><svg class="ic"><use href="#i-eye"/></svg>Ver parcial</a></div>
+        </article>
+        <article class="icard" style="--ic:var(--c-aval);--ict:var(--c-aval-t)"><div class="hd"><span class="ig"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><use href="#i-aval"/></svg></span><div><h3>Avaliação do encontro</h3><p class="jw"><span class="chipe">Todo encontro</span><span class="tag ok"><svg class="ic" style="width:12px;height:12px"><use href="#i-check"/></svg>4 de 4 · em dia</span></p></div></div>
+          <p class="dd">O registro do enc. 4 (o seu follow-up) segue pendente — é outro fluxo.</p>
+          <div class="iacts"><a class="btn sm" href="#"><svg class="ic"><use href="#i-eye"/></svg>Ver respostas</a></div>
+        </article>
+        <article class="icard lk" style="--ic:var(--c-pdm);--ict:var(--c-pdm-t)"><div class="hd"><span class="ig"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><use href="#i-pdm"/></svg></span><div><h3>PDM · revisão de meio de percurso</h3><p class="jw"><span class="chipe">Enc. 9</span><span class="tag lk"><svg class="ic" style="width:12px;height:12px"><use href="#i-lock"/></svg>trancado</span></p></div></div>
+          <p class="dd">Só faz sentido com o PDM construído — priorize a construção antes.</p>
+          <div class="iacts"><span class="btn sm off" aria-disabled="true"><svg class="ic"><use href="#i-lock"/></svg>libera no encontro 9 · 5 nov</span></div>
+        </article>
+        <article class="icard lk" style="--ic:var(--c-rodaf);--ict:var(--c-rodaf-t)"><div class="hd"><span class="ig"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><use href="#i-rodaf"/></svg></span><div><h3>Roda da Vida · aplicação formal</h3><p class="jw"><span class="chipe">Enc. 12–14</span><span class="tag lk"><svg class="ic" style="width:12px;height:12px"><use href="#i-lock"/></svg>trancado</span></p></div></div>
+          <div class="iacts"><span class="btn sm off" aria-disabled="true"><svg class="ic"><use href="#i-lock"/></svg>libera no encontro 12 · 26 nov</span></div>
+        </article>
+      </div>
+
+      <details class="como" open>
+        <summary><svg class="ic"><use href="#i-book"/></svg>Como conduzir · encontro 5 de amanhã: fechar Metas e PDM<svg class="ic"><use href="#i-chev"/></svg></summary>
+        <ol>
+          <li>Comece perguntando como foram as semanas; só depois abra o rascunho de metas — sem cobrar o atraso.</li>
+          <li>Use “preencher junto agora” para completar as 2 metas que faltam e fazer a checagem SMART com ele.</li>
+          <li>Pergunte: <i>“o que precisa acontecer primeiro para essa meta andar?”</i> — as respostas viram submetas no PDM.</li>
+          <li>Combine o link da avaliação por terceiros: quem ele convida esta semana?</li>
+        </ol>
+        <div class="apoio"><a class="btn sm" href="#"><svg class="ic"><use href="#i-chat"/></svg>Perguntas Eficazes</a><a class="btn sm" href="#"><svg class="ic"><use href="#i-chat"/></svg>Escuta Ativa</a><a class="btn sm" href="#"><svg class="ic"><use href="#i-doc"/></svg>Mensagens-modelo</a></div>
+      </details>
+    </div>
+
+    <!-- biblioteca do mentor -->
+    <h2 class="h2">Biblioteca de materiais</h2>
+    <p class="sub">Acervo de apoio — leitura e consulta. Não conta no progresso do jovem.</p>
+    <ol class="cov" aria-label="Cobertura por encontro"><li><a class="ok" href="#m-e1">1</a></li><li><a class="ok" href="#m-e8">2</a></li><li><a class="ok" href="#m-e8">3</a></li><li><a class="emp" href="#m-e8">4</a></li><li><a class="ok" href="#m-e5">5</a></li><li><a class="ok" href="#m-e8">6</a></li><li><a class="ok" href="#m-e8">7</a></li><li><a class="ok" href="#m-e8">8</a></li><li><a class="part" href="#m-e8">9</a></li><li><a class="emp" href="#m-e8">10</a></li><li><a class="emp" href="#m-e8">11</a></li><li><a class="part" href="#m-e8">12</a></li><li><a class="emp" href="#m-e8">13</a></li><li><a class="emp" href="#m-e8">14</a></li><li><a class="emp" href="#m-e8">15</a></li><li><a class="emp" href="#m-e8">16</a></li></ol>
+    <div class="filters" role="group" aria-label="Filtrar materiais">
+      <div class="fg"><span>Audiência</span><button class="fp on" type="button">Todas<small>17</small></button><button class="fp" type="button">Mentorados<small>8</small></button><button class="fp" type="button">Mentores DPP<small>11</small></button></div>
+      <div class="fg"><span>Tipo</span><button class="fp on" type="button">Todos<small>17</small></button><button class="fp" type="button">Guias<small>8</small></button><button class="fp" type="button">Modelos<small>4</small></button><button class="fp" type="button">Conteúdos<small>4</small></button><button class="fp" type="button">Links<small>1</small></button></div>
+    </div>
+    <details class="grp" open>
+      <summary><svg class="ic cv"><use href="#i-chev-r"/></svg>Por encontro<span class="gn">13 materiais</span></summary>
+      <div>
+        <details class="enc"><summary><svg class="ic cv"><use href="#i-chev-r"/></svg><span class="en">Encontros 1–4</span><span class="et">Abertura, Visão, Metas SMART, PDM</span><span class="ec"><span class="cnt">6 materiais</span><span class="tag ok">no ar</span></span></summary></details>
+        <details class="enc" id="m-e5"><summary><svg class="ic cv"><use href="#i-chev-r"/></svg><span class="en">Encontro 5</span><span class="et">Ritmo e escuta</span><span class="tag line" style="border-color:hsl(48 80% 50%);background:var(--amb-tint);color:var(--warn-text)">amanhã · Caio (T2)</span><span class="ec"><span class="cnt">1 material</span><span class="tag ok">no ar</span></span></summary>
+          <div class="enc-body">
+            <div class="enc-note"><svg class="ic"><use href="#i-info"/></svg><div><b>Como conduzir:</b> ritmo consolidado — revise o andamento das metas do PDM (o que avançou, o que travou) e pratique escuta ativa. Nenhum instrumento novo entra; a janela vigente é fechar Metas e PDM (enc. 1–4).</div></div>
+            <div class="mgrid">
+              <a class="mc" href="#"><span class="mc-capa"><span class="pg1"><i class="pb" style="background:var(--brand-lime);width:38%"></i><b class="pt">Roteiro do encontro 5</b><i class="pl" style="width:80%"></i><i class="pl" style="width:62%"></i></span></span><span class="mc-body"><span class="mc-t">Roteiro do encontro 5</span><span class="mc-m">Guia · PDF</span></span></a>
+            </div>
+          </div>
+        </details>
+        <details class="enc"><summary><svg class="ic cv"><use href="#i-chev-r"/></svg><span class="en">Encontros 6–7</span><span class="et">Comunicação que conecta, checagem das ações</span><span class="ec"><span class="cnt">2 materiais</span><span class="tag ok">no ar</span></span></summary></details>
+        <details class="enc" id="m-e8" open><summary><svg class="ic cv"><use href="#i-chev-r"/></svg><span class="en">Encontro 8</span><span class="et">Ritmo de ação e PDM</span><span class="tag line" style="border-color:hsl(78 56% 45%);background:var(--lime-tint);color:var(--ok-text)">hoje 19h · Ana (T1)</span><span class="ec"><span class="cnt">2 materiais</span><span class="tag ok">no ar</span></span></summary>
+          <div class="enc-body">
+            <div class="enc-note"><svg class="ic"><use href="#i-info"/></svg><div><b>Como conduzir:</b> comece pelo que avançou nas metas; revise submetas com prazo vencido sem cobrar; anuncie que o enc. 9 é a revisão formal do PDM — chegue com o documento aberto.
+              <details class="ht"><summary><svg class="ic"><use href="#i-book"/></svg>Roteiro sugerido pelo guia<svg class="ic"><use href="#i-chev"/></svg></summary><p>1) Como a semana entrou na meta · 2) Submeta a submeta, o que destrava · 3) Combinado pro enc. 9 · 4) Follow-up no app.</p></details></div></div>
+            <div class="mgrid">
+              <a class="mc" href="#"><span class="mc-capa"><span class="pg1"><i class="pb" style="background:var(--brand-lime);width:38%"></i><b class="pt">Roteiro do encontro 8</b><i class="pl" style="width:88%"></i><i class="pl" style="width:72%"></i></span></span><span class="mc-body"><span class="mc-t">Roteiro do encontro 8</span><span class="mc-m">Guia · PDF · 540 KB</span></span></a>
+              <a class="mc" href="#"><span class="mc-capa"><span class="pg1"><i class="pb" style="background:var(--c-pdm);width:30%"></i><b class="pt">Planilha de metas — acompanhamento</b><i class="pl" style="width:82%"></i><i class="pl" style="width:60%"></i></span></span><span class="mc-body"><span class="mc-t">Planilha de metas — acompanhamento</span><span class="mc-m">Modelo · Planilha</span></span></a>
+            </div>
+          </div>
+        </details>
+        <details class="enc"><summary><svg class="ic cv"><use href="#i-chev-r"/></svg><span class="en">Encontros 9–16</span><span class="et">Revisão do PDM, Roda formal, encerramento</span><span class="ec"><span class="cnt">2 materiais</span><span class="tag warn">em breve</span></span></summary></details>
+      </div>
+    </details>
+    <details class="grp" open>
+      <summary><svg class="ic cv"><use href="#i-chev-r"/></svg>Transversais<span class="gn">7 itens</span></summary>
+      <div class="mgrid" style="margin-top:8px">
+        <a class="mc" href="#"><span class="mc-capa"><span class="pg1"><i class="pb" style="background:var(--brand-ink);width:42%"></i><b class="pt">Guia do Mentor DPP — Programa de Mentoria</b><i class="pl" style="width:84%"></i><i class="pl" style="width:60%"></i></span></span><span class="mc-body"><span class="mc-t">Guia do Mentor DPP</span><span class="mc-m">PDF · 3,4 MB</span></span></a>
+        <a class="mc" href="#"><span class="mc-capa"><span class="pg1"><i class="pb" style="background:var(--brand-lime);width:42%"></i><b class="pt">Guia do Mentorado — Programa de Mentoria</b><i class="pl" style="width:80%"></i><i class="pl" style="width:66%"></i></span></span><span class="mc-body"><span class="mc-t">Guia do Mentorado</span><span class="mc-m">PDF · 1,8 MB · pra indicar ao jovem</span></span></a>
+        <a class="mc" href="#"><span class="mc-capa"><span class="pg1"><i class="pb" style="background:var(--c-terc);width:34%"></i><b class="pt">Mensagens-modelo da dupla</b><i class="pl" style="width:82%"></i><i class="pl" style="width:64%"></i></span></span><span class="mc-body"><span class="mc-t">Mensagens-modelo</span><span class="mc-m">Conteúdo</span></span></a>
+        <a class="mc" href="#"><span class="mc-capa"><span class="pg1"><i class="pb" style="background:var(--c-metas);width:34%"></i><b class="pt">Perguntas Eficazes</b><i class="pl" style="width:86%"></i><i class="pl" style="width:58%"></i></span></span><span class="mc-body"><span class="mc-t">Perguntas Eficazes</span><span class="mc-m">Conteúdo</span></span></a>
+        <a class="mc" href="#"><span class="mc-capa"><span class="pg1"><i class="pb" style="background:var(--c-aval);width:34%"></i><b class="pt">Escuta Ativa — guia de bolso</b><i class="pl" style="width:80%"></i><i class="pl" style="width:62%"></i></span></span><span class="mc-body"><span class="mc-t">Escuta Ativa</span><span class="mc-m">Conteúdo</span></span></a>
+        <a class="mc" href="#"><span class="mc-capa"><span class="pg1"><i class="pb" style="background:var(--c-visao);width:34%"></i><b class="pt">Comunicação Não Violenta (CNV)</b><i class="pl" style="width:78%"></i><i class="pl" style="width:66%"></i></span></span><span class="mc-body"><span class="mc-t">Comunicação Não Violenta</span><span class="mc-m">Conteúdo</span></span></a>
+        <span class="mc"><span class="mc-capa soon"><span class="adm" style="position:static;display:inline-grid;width:30px;height:30px;border-radius:9px;background:#fff;border:1px solid var(--border);margin:30px auto 0"><svg class="ic" style="width:15px;height:15px"><use href="#i-lock"/></svg></span></span><span class="mc-body"><span class="mc-t">Feedback Construtivo</span><span class="mc-m">Em breve</span></span></span>
+      </div>
+    </details>
+  </main>
+
+  <nav class="bnav ad" aria-label="Menu"><a href="#"><i><svg class="ic lg"><use href="#i-home"/></svg></i>Início</a><a href="#"><i><svg class="ic lg"><use href="#i-people"/></svg></i>Duplas</a><a href="#"><i><svg class="ic lg"><use href="#i-cal"/></svg></i>Agenda</a><a href="#" class="on" aria-current="page"><i><svg class="ic lg"><use href="#i-grid"/></svg></i>Materiais</a><a href="#"><i><svg class="ic lg"><use href="#i-chat"/></svg></i>Chamados</a></nav>
+</section>
+
+<!-- ============================ MENTORADO ============================ -->
+<section class="view v-j">
+  <div class="jsh">
+    <aside class="side" aria-label="Menu do mentorado">
+      <div class="brand"><span class="mark">R</span>Realiza</div>
+      <a href="#"><svg class="ic lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><use href="#i-home"/></svg>Início</a>
+      <a href="#"><svg class="ic lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><use href="#i-cal"/></svg>Agenda</a>
+      <a href="#"><svg class="ic lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><use href="#i-people"/></svg>Pessoas</a>
+      <a href="#" class="on" aria-current="page"><svg class="ic lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><use href="#i-grid"/></svg>Materiais</a>
+      <a href="#"><svg class="ic lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><use href="#i-user"/></svg>Perfil</a>
+      <div class="me"><span class="av y">A</span><div><b>Ana Souza</b><small>Mentorada · Turma 1</small></div></div>
+    </aside>
+    <div>
+      <div class="top"><div class="top-in wrap">
+        <div class="brand"><span class="mark">R</span>Realiza</div>
+        <div class="who"><div class="wt"><b>Ana Souza</b><small>Mentorada · Turma 1</small></div><span class="av y">A</span></div>
+      </div></div>
+      <main class="pg wrap">
+        <div class="phead"><div><h1>Materiais</h1><p class="psub">Seus instrumentos, o que você já respondeu e o que vem pela frente.</p></div></div>
+        <div class="scope y"><svg class="ic"><use href="#i-info"/></svg><span><b>Você vê:</b> os seus instrumentos, as suas respostas e o acervo de apoio. <b>Você não vê:</b> respostas de outros jovens, nem quem disse o quê na avaliação por terceiros.</span></div>
+
+        <section class="hero2" aria-label="Minha jornada">
+          <div class="hero2-top">
+            <div><span class="eyebrow">Turma 1 · encontro 8 de 16</span><h2>Minha jornada</h2><p class="hsub">Os 16 encontros em 4 fases — e o instrumento que entra em cada uma.</p></div>
+            <div class="hprog">
+              <svg viewBox="0 0 44 44" width="46" height="46" aria-hidden="true"><circle cx="22" cy="22" r="18" fill="none" stroke="hsl(0 0% 100%/.55)" stroke-width="5"/><circle cx="22" cy="22" r="18" fill="none" stroke="hsl(0 0% 15%)" stroke-width="5" stroke-linecap="round" stroke-dasharray="56.5 113.1" transform="rotate(-90 22 22)"/><text x="22" y="26" text-anchor="middle" font-size="10.5" font-weight="800" fill="hsl(0 0% 15%)" font-family="Inter,sans-serif">4/8</text></svg>
+              <div><strong>4 de 8 instrumentos</strong><span>2 em andamento · 2 por vir</span></div>
+            </div>
+          </div>
+          <div class="dots16" aria-label="Os 16 encontros">
+            <div class="d16grp"><div style="display:flex;gap:5px"><span class="d16"><svg class="ic"><use href="#i-check"/></svg></span><span class="d16"><svg class="ic"><use href="#i-check"/></svg></span><span class="d16"><svg class="ic"><use href="#i-check"/></svg></span><span class="d16"><svg class="ic"><use href="#i-check"/></svg></span></div><small>Fase 1</small></div>
+            <div class="d16grp"><div style="display:flex;gap:5px"><span class="d16"><svg class="ic"><use href="#i-check"/></svg></span><span class="d16"><svg class="ic"><use href="#i-check"/></svg></span><span class="d16"><svg class="ic"><use href="#i-check"/></svg></span><span class="d16 now">8</span></div><small>Fase 2 · hoje 19h</small></div>
+            <div class="d16grp"><div style="display:flex;gap:5px"><span class="d16 fut">9</span><span class="d16 fut">10</span><span class="d16 fut">11</span></div><small>Fase 3</small></div>
+            <div class="d16grp"><div style="display:flex;gap:5px"><span class="d16 fut">12</span><span class="d16 fut">13</span><span class="d16 fut">14</span><span class="d16 fut">15</span><span class="d16 fut">16</span></div><small>Fase 4</small></div>
+          </div>
+          <div class="next2">
+            <svg class="ic lg" style="color:var(--warn-text)"><use href="#i-star"/></svg>
+            <div class="tx"><b>Falta avaliar o encontro 7</b><span>Leva 1 minuto · fecha sexta 10/out às 23h59.</span></div>
+            <a class="btn ink" href="../instrumentos/v1.html#avaliacao-encontro">Avaliar encontro 7</a>
+          </div>
+        </section>
+
+        <h2 class="h2">Meus instrumentos</h2>
+        <p class="sub">Cada instrumento tem um encontro-alvo no guia. O que está em andamento você pode abrir e continuar; o que está por vir abre sozinho no encontro certo.</p>
+        <div class="igrid">
+          <article class="icard" style="--ic:var(--c-roda);--ict:var(--c-roda-t)"><div class="hd"><span class="ig"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><use href="#i-roda"/></svg></span><div><h3>Roda da Vida · leitura inicial</h3><p class="jw"><span class="chipe">Enc. 1</span><span class="tag ok"><svg class="ic" style="width:12px;height:12px"><use href="#i-check"/></svg>Feito · 17 ago</span></p></div></div>
+            <div class="snip"><small>Você marcou</small><q>Carreira 4 · Finanças 3 · Família 8 — a maior distância está na carreira.</q></div>
+            <div class="quem"><svg class="ic"><use href="#i-eye"/></svg><span><b>Quem vê:</b> você · André · coordenação</span></div>
+            <div class="iacts"><a class="btn sm" href="../instrumentos/v1.html#roda">Ver minha Roda</a></div>
+          </article>
+          <article class="icard" style="--ic:var(--c-visao);--ict:var(--c-visao-t)"><div class="hd"><span class="ig"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><use href="#i-visao"/></svg></span><div><h3>Construindo a sua Visão</h3><p class="jw"><span class="chipe">Enc. 1–4</span><span class="tag ok"><svg class="ic" style="width:12px;height:12px"><use href="#i-check"/></svg>Feito · 22 ago</span></p></div></div>
+            <div class="snip"><small>Você escreveu</small><q>Até dezembro de 2027, estarei cursando design gráfico e terei um portfólio com cinco projetos meus.</q></div>
+            <div class="quem"><svg class="ic"><use href="#i-eye"/></svg><span><b>Quem vê:</b> você · André · coordenação</span></div>
+            <div class="iacts"><a class="btn sm" href="../instrumentos/v1.html#visao">Ver minha Visão</a></div>
+          </article>
+          <article class="icard" style="--ic:var(--c-metas);--ict:var(--c-metas-t)"><div class="hd"><span class="ig"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><use href="#i-metas"/></svg></span><div><h3>Definindo minhas metas</h3><p class="jw"><span class="chipe">Enc. 2–3</span><span class="tag ok"><svg class="ic" style="width:12px;height:12px"><use href="#i-check"/></svg>Feito · 30 ago</span></p></div></div>
+            <div class="snip"><small>Sua meta prioritária</small><q>Montar meu portfólio com 5 projetos até 19 de dezembro.</q></div>
+            <div class="quem"><svg class="ic"><use href="#i-eye"/></svg><span><b>Quem vê:</b> você · André · coordenação</span></div>
+            <div class="iacts"><a class="btn sm" href="../instrumentos/v1.html#metas">Ver minhas metas</a></div>
+          </article>
+          <article class="icard" style="--ic:var(--c-pdm);--ict:var(--c-pdm-t)"><div class="hd"><span class="ig"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><use href="#i-pdm"/></svg></span><div><h3>PDM · Plano de Desenvolvimento</h3><p class="jw"><span class="chipe">Construir 1–4</span><span class="chipe">Revisar enc. 9</span><span class="tag warn"><svg class="ic" style="width:12px;height:12px"><use href="#i-half"/></svg>Em andamento</span></p></div></div>
+            <p class="dd">Documento vivo — a revisão de meio de percurso é na <b>terça 14 out (enc. 9)</b>.</p>
+            <div class="mini" role="img" aria-label="9 de 20 submetas"><i style="width:45%"></i></div>
+            <p class="dd" style="font-size:12px">4 metas · 9 de 20 submetas · 2 atingidas</p>
+            <div class="quem"><svg class="ic"><use href="#i-eye"/></svg><span><b>Quem vê:</b> você · André · coordenação</span></div>
+            <div class="iacts"><a class="btn sm pri" href="../instrumentos/v1.html#pdm">Continuar meu PDM</a></div>
+          </article>
+          <article class="icard" style="--ic:var(--c-terc);--ict:var(--c-terc-t)"><div class="hd"><span class="ig"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><use href="#i-terc"/></svg></span><div><h3>Avaliação por terceiros</h3><p class="jw"><span class="chipe">Antes do enc. 1</span><span class="tag ok"><svg class="ic" style="width:12px;height:12px"><use href="#i-check"/></svg>Feito · 6 de 6</span></p></div></div>
+            <div class="snip"><small>O que mais apareceu como ponto forte</small><q>Criatividade — citada por 5 das 6 pessoas.</q></div>
+            <div class="quem"><svg class="ic"><use href="#i-eye"/></svg><span><b>Quem vê:</b> você, André e a coordenação veem só o consolidado</span></div>
+            <div class="iacts"><a class="btn sm" href="../instrumentos/v1.html#terceiros">Ver a devolutiva</a></div>
+          </article>
+          <article class="icard" style="--ic:var(--c-aval);--ict:var(--c-aval-t)"><div class="hd"><span class="ig"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><use href="#i-aval"/></svg></span><div><h3>Avaliação do encontro</h3><p class="jw"><span class="chipe">Todo encontro</span><span class="tag warn"><svg class="ic" style="width:12px;height:12px"><use href="#i-half"/></svg>6 de 7 · falta o enc. 7</span></p></div></div>
+            <p class="dd">Depois de cada encontro, uma nota de 1 a 5 e um comentário. A do enc. 7 fecha <b>sexta 10/out, 23h59</b>.</p>
+            <div class="quem"><svg class="ic"><use href="#i-eye"/></svg><span><b>Quem vê:</b> você · André · coordenação</span></div>
+            <div class="iacts"><a class="btn sm pri" href="../instrumentos/v1.html#avaliacao-encontro">Avaliar encontro 7</a></div>
+          </article>
+          <article class="icard lk" style="--ic:var(--c-rodaf);--ict:var(--c-rodaf-t)"><div class="hd"><span class="ig"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><use href="#i-rodaf"/></svg></span><div><h3>Roda da Vida · aplicação formal</h3><p class="jw"><span class="chipe">Enc. 12–14</span><span class="tag lk"><svg class="ic" style="width:12px;height:12px"><use href="#i-lock"/></svg>trancado</span></p></div></div>
+            <p class="dd">Você refaz a Roda e vê o antes × depois sobre a leitura inicial.</p>
+            <div class="iacts"><span class="btn sm off" aria-disabled="true"><svg class="ic"><use href="#i-lock"/></svg>libera no encontro 12 · 4 nov</span></div>
+          </article>
+          <article class="icard lk" style="--ic:var(--c-360);--ict:var(--c-360-t)"><div class="hd"><span class="ig"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><use href="#i-360"/></svg></span><div><h3>Avaliação 360º e autoavaliação</h3><p class="jw"><span class="chipe">Enc. 16</span><span class="tag lk"><svg class="ic" style="width:12px;height:12px"><use href="#i-lock"/></svg>trancado</span></p></div></div>
+            <p class="dd">O fechamento do ciclo: como você se vê e como te veem.</p>
+            <div class="iacts"><span class="btn sm off" aria-disabled="true"><svg class="ic"><use href="#i-lock"/></svg>libera no encontro 16 · 2 dez</span></div>
+          </article>
+        </div>
+
+        <h2 class="h2">Acervo de apoio</h2>
+        <p class="sub">Pra ler e consultar quando quiser. Não são atividades — nada aqui conta no seu progresso.</p>
+        <div class="mgrid">
+          <a class="mc" href="#"><span class="mc-capa"><span class="pg1"><i class="pb" style="background:var(--brand-lime);width:42%"></i><b class="pt">Guia do Mentorado — Programa de Mentoria</b><i class="pl" style="width:80%"></i><i class="pl" style="width:66%"></i><i class="pl" style="width:74%"></i></span></span><span class="mc-body"><span class="mc-t">Guia do Mentorado</span><span class="mc-m">PDF · como funciona, encontro a encontro</span></span></a>
+          <a class="mc" href="#"><span class="mc-capa"><span class="pg1"><i class="pb" style="background:var(--c-metas);width:34%"></i><b class="pt">Perguntas Eficazes</b><i class="pl" style="width:86%"></i><i class="pl" style="width:58%"></i></span></span><span class="mc-body"><span class="mc-t">Perguntas Eficazes</span><span class="mc-m">Leitura · perguntar e ouvir melhor</span></span></a>
+          <a class="mc" href="#"><span class="mc-capa"><span class="pg1"><i class="pb" style="background:var(--c-aval);width:34%"></i><b class="pt">Escuta Ativa — guia de bolso</b><i class="pl" style="width:80%"></i><i class="pl" style="width:62%"></i></span></span><span class="mc-body"><span class="mc-t">Escuta Ativa</span><span class="mc-m">Leitura</span></span></a>
+          <a class="mc" href="#"><span class="mc-capa"><span class="pg1"><i class="pb" style="background:var(--c-visao);width:34%"></i><b class="pt">Comunicação Não Violenta (CNV)</b><i class="pl" style="width:78%"></i><i class="pl" style="width:66%"></i></span></span><span class="mc-body"><span class="mc-t">Comunicação Não Violenta</span><span class="mc-m">Leitura</span></span></a>
+          <a class="mc" href="#"><span class="mc-capa ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><use href="#i-link"/></svg></span><span class="mc-body"><span class="mc-t">Boas-vindas em vídeo</span><span class="mc-m">Link · 3 min</span></span></a>
+          <span class="mc"><span class="mc-capa soon"><span class="adm" style="position:static;display:inline-grid;width:30px;height:30px;border-radius:9px;background:#fff;border:1px solid var(--border);margin:30px auto 0"><svg class="ic" style="width:15px;height:15px"><use href="#i-lock"/></svg></span></span><span class="mc-body"><span class="mc-t">Feedback Construtivo</span><span class="mc-m">Em breve</span></span></span>
+        </div>
+      </main>
+    </div>
+  </div>
+  <nav class="bnav jv" aria-label="Menu do mentorado"><a href="#"><i><svg class="ic lg"><use href="#i-home"/></svg></i>Início</a><a href="#"><i><svg class="ic lg"><use href="#i-cal"/></svg></i>Agenda</a><a href="#"><i><svg class="ic lg"><use href="#i-people"/></svg></i>Pessoas</a><a href="#" class="on" aria-current="page"><i><svg class="ic lg"><use href="#i-grid"/></svg></i>Materiais</a><a href="#"><i><svg class="ic lg"><use href="#i-user"/></svg></i>Perfil</a></nav>
+</section>
+
+</div><!-- /app -->
+
+<!-- ============================ NOTAS ============================ -->
+<section class="notes" id="notas" aria-label="Notas da prancheta">
+  <h2>Notas da prancheta · materiais v5b “fusão painel×instrumentos”</h2>
+  <h3>Matriz · papel × o que vê × o que pode fazer</h3>
+  <div class="mx">
+    <div class="mxh"><span>Papel</span><span>O que vê</span><span>Pode fazer</span><span>NÃO pode</span></div>
+    <div class="mxr"><b>Coordenação · Marina</b><span data-l="Vê">Grid dos 8 instrumentos já com a cobertura agregada (barra + x de 26) em cada card, lista fora-da-janela, matriz por dupla (colapsada), biblioteca inteira</span><span data-l="Pode">Enviar instrumento em lote (4 do core), ver respostas, lembrar mentor (nudge, cap 48h), publicar/editar material</span><span data-l="Não pode">Preencher pelo jovem; enviar link em nome do mentor; ver quem respondeu o quê em terceiros</span></div>
+    <div class="mxr"><b>Auxiliar executivo · Paula</b><span data-l="Vê">O mesmo grid com escopo das 6 duplas supervisionadas (barras “x de 6”, sem ações); matriz das 6; biblioteca</span><span data-l="Pode">Abrir a ficha da dupla (leitura)</span><span data-l="Não pode">Respostas (só o estado); enviar, preencher, nudge, upload — nudge da auxiliar é decisão em aberto</span></div>
+    <div class="mxr"><b>Mentor DPP · André</b><span data-l="Vê">Instrumentos e respostas das próprias duplas (seletor Ana · Caio); acervo completo; “como conduzir” por encontro</span><span data-l="Pode">Enviar link ao jovem, reenviar, preencher junto, ver resposta</span><span data-l="Não pode">Jovens de outros mentores; identidade de respondentes de terceiros</span></div>
+    <div class="mxr"><b>Mentorado · Ana</b><span data-l="Vê">Só os próprios instrumentos/respostas; acervo da audiência dela; trilha de 16 encontros</span><span data-l="Pode">Abrir/continuar instrumento em andamento, avaliar encontro, ver devolutiva consolidada</span><span data-l="Não pode">Dados de outros jovens; saber quem respondeu o quê em terceiros</span></div>
+    <div class="mxr"><b>Mentor especialista</b><span data-l="Vê">Tela inexistente pro papel (instrumentos pertencem à jornada DPP)</span><span data-l="Pode">—</span><span data-l="Não pode">—</span></div>
+  </div>
+
+  <h3>O que muda nesta rodada (feedback do Thiago)</h3>
+  <ul>
+    <li><b>“Estação” sumiu</b> — toda a copy usa <b>instrumento</b> (o vocabulário do guia). “Pendências na janela” virou texto falado (“link enviado, esperando resposta”).</li>
+    <li><b>KPIs → barra dentro do card</b>: os 4 cards quadrados e a faixa segmentada da v5a viraram <b>a própria grade de instrumentos</b> — cada card carrega a barra empilhada agregada + “x de 26” + ações. Nenhum número aparece sem proporção visual.</li>
+    <li><b>v5a × v5b</b>: aqui, <b>painel e instrumentos são uma coisa só</b> — um único bloco com 8 cards (leitura + ação juntas), seguido da lista “fora da janela” e da matriz colapsada. Uma seção a menos, mais denso; o preço é perder a leitura horizontal comparada da faixa da v5a.</li>
+    <li><b>Matriz por dupla atrás de gesto</b> — <code>&lt;details&gt;</code> “Ver a matriz por dupla”, agrupada por <b>Turma 1 / Turma 2</b> (a label “2026/2027” que lia como período saiu — confusão registrada em <code>turmas.md</code>).</li>
+    <li><b>“Você vê / você não vê”</b> saiu do painel — virou 1 linha de microcopy (“estado por instrumento — detalhe e respostas na ficha”). O escopo por papel fica na caixa do topo da página.</li>
+    <li><b>Instrumentos do programa</b>: saíram de /formularios e viraram seção própria — card visual por instrumento (símbolo SVG + cor próprios), janela do guia, ações do papel. Fora da janela = card desabilitado com <b>“libera no encontro N · data por turma”</b>, nunca card mudo.</li>
+    <li><b>Biblioteca compacta</b>: card = <b>capa curta ~90px (topo da 1ª página do PDF, título legível, sem scroll interno) + título + meta</b>. Morreu a faixa vazia de ~30% onde ficavam botões. “Em breve” é estado legítimo (hachurado + cadeado). O ⋯ da coord mora no canto da capa.</li>
+    <li><b>Pills de filtro</b>: desktop segue wrap; &lt;768px viram <b>uma linha com scroll lateral</b> (fade na borda direita sinaliza overflow).</li>
+    <li><b>“O que trata / como conduzir” nos grupos de encontro</b>: dentro do <code>&lt;details&gt;</code> de cada encontro — coord/auxiliar leem “o que o encontro cobre” (+ detalhe “o que o guia sugere ao mentor”), mentor lê “como conduzir” direto. Mesma fonte única do <code>GUIA_ENCONTRO</code> da ficha e da agenda.</li>
+    <li><b>Thumbnail de PDF é global</b>: a capa curta vale pra toda superfície (coord, mentor, jovem, ficha) — mock assume <b>imagem estática gerada</b> (crop da 1ª página); quem não tiver thumb cai no ícone do tipo, sem regressão.</li>
+  </ul>
+
+  <h3>Rastreabilidade</h3>
+  <ul>
+    <li><b>Base v4</b> (que por sua vez é base v2 + resgates v3/v1): hero “Minha jornada” do mentorado (compactado: 16 dots em 4 fases + faixa de próxima ação), snippets “você escreveu…”, “quem vê” por instrumento, listagem por jovem do mentor com “como conduzir”.</li>
+    <li><b>Do código atual</b> (<code>painel-jornada.tsx</code>): a <code>BarraEstacao</code> empilhada é a visualização certa — virou a barra dentro de cada card; a lista “fora da janela” com Lembrar + cap de 48h é a única parte acionável (mantida); a matriz por turma continua existindo, só que colapsada.</li>
+    <li><b>Da v4 coord</b>: contagens por instrumento (adaptadas: terceiros não é estação do painel — entra no grid com a própria barra, marcado “fora do painel”) e a biblioteca admin (upload, audiência, “em breve”).</li>
+    <li><b>Novo na v5</b>: símbolo SVG + cor por instrumento (roda, bússola, alvo, rota, pessoas, estrela, roda-comparada, 360º); seção única “Instrumentos do programa”; capa de PDF curta; filtros em scroll lateral; condução por encontro nos grupos.</li>
+  </ul>
+
+  <h3 class="open">Decisões em aberto</h3>
+  <ul>
+    <li class="open"><b>1 · v5a × v5b</b> — a escolha é do Thiago: faixa resumo + seção de instrumentos separadas (v5a), ou fusão num grid só com progresso dentro de cada card (v5b).</li>
+    <li class="open"><b>2 · Privacidade (“quem vê”)</b> — proposta: conteúdo visível ao jovem, ao mentor da dupla e à coordenação; auxiliar executivo só o estado; terceiros sempre consolidado anonimizado. Validar com a coordenação.</li>
+    <li class="open"><b>3 · Comentário da avaliação do encontro</b> — o mentor lê o texto livre do jovem sobre ele? Risco de inibir resposta honesta; alternativa: nota ao mentor, comentário só à coordenação.</li>
+    <li class="open"><b>4 · Auxiliar com nudge?</b> — aqui a auxiliar vê “fora da janela” sem Lembrar (gesto da coordenação). Confirmar se a supervisão também lembra.</li>
+    <li class="open"><b>5 · Terceiros no grid</b> — o painel (<code>painel_instrumentos_jornada</code>) cobre 7 estações e terceiros não é uma delas; aqui virou o 8º card com barra própria, marcado “fora do painel”. Decidir: vira estação do painel ou segue fora.</li>
+    <li class="open"><b>6 · Copy de condução e títulos dos encontros</b> — redação ilustrativa baseada no <code>GUIA_ENCONTRO</code>; o texto definitivo sai dos guias oficiais (PDFs), módulo único compartilhado com agenda e ficha.</li>
+    <li class="open"><b>7 · Thumb de PDF</b> — implementação em aberto: imagem gerada no upload (server) × crop client-side com <code>iframe#view=Fit</code> + <code>overflow:hidden</code>. O mock assume imagem estática.</li>
+    <li class="open"><b>8 · PDM “documento vivo” × “respondido”</b> — no painel conta como respondido quando construído (enc. 1–4); pro jovem/mentor segue “em andamento” até a revisão. Confirmar que essa nuance de estado é a certa.</li>
+    <li class="open"><b>9 · Números agregados</b> — 14 T1 + 12 T2 e as contagens por instrumento são ilustrativos (canônico: 26 duplas, 1 pausada, semáforo do dataset). A pausada aparece na matriz sem células acionáveis.</li>
+  </ul>
+</section>
+
+</body>
+</html>

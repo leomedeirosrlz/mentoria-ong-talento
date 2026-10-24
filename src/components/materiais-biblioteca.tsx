@@ -10,6 +10,7 @@ import {
   CoberturaTrilha,
   EncontroDetails,
   TransversaisMateriais,
+  type GuiaPapel,
 } from "@/components/materiais-hub";
 
 // REALIZA-184 — o hub da biblioteca como dashboard: faixa de KPIs, trilha
@@ -46,6 +47,35 @@ export type MateriaisStats = {
 
 type AudienciaFiltro = "todas" | Material["audiencia"];
 type TipoFiltro = "todos" | Material["tipo"];
+
+/** Fade lateral dos trilhos de chips — só quando de fato rola (no wrap do
+ *  sm+ o conteúdo cabe e a máscara sai; o ResizeObserver decide sem media
+ *  query). mask-image inline porque utilidade nova em globals é fora de
+ *  escopo — mesmo padrão do scroller da semana-do-programa. */
+const FADE_CHIPS =
+  "linear-gradient(to right, transparent, black 20px, black calc(100% - 20px), transparent)";
+
+function useFadeQuandoRola<T extends HTMLElement>() {
+  const ref = useRef<T | null>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const aplicar = () => {
+      if (el.scrollWidth > el.clientWidth + 1) {
+        el.style.setProperty("-webkit-mask-image", FADE_CHIPS);
+        el.style.setProperty("mask-image", FADE_CHIPS);
+      } else {
+        el.style.removeProperty("-webkit-mask-image");
+        el.style.removeProperty("mask-image");
+      }
+    };
+    aplicar();
+    const ro = new ResizeObserver(aplicar);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  return ref;
+}
 
 const AUD_ORDEM: Material["audiencia"][] = [
   "todos",
@@ -126,6 +156,7 @@ export function MateriaisBiblioteca({
   maxEncontro,
   encontroAtual,
   mobile,
+  guiaPapel,
 }: {
   stats: MateriaisStats;
   /** encontros 1..N já com título do calendário e itens — inclui os vazios
@@ -140,10 +171,16 @@ export function MateriaisBiblioteca({
    *  encontro" por padrão — a lista de 16 linhas é o maior scroll da tela.
    *  Trilha e Transversais seguem abertas (o mapa e o Guia do Mentor). */
   mobile: boolean;
+  /** quem lê a nota do guia dentro de cada encontro (v5c): "staff" lê
+   *  "o que o encontro cobre", "mentor" lê "como conduzir"; null some
+   *  (especialista — a trilha dele não passa pelas janelas DPP). */
+  guiaPapel?: GuiaPapel | null;
 }) {
   const [aud, setAud] = useState<AudienciaFiltro>("todas");
   const [tipoF, setTipoF] = useState<TipoFiltro>("todos");
   const filtrando = aud !== "todas" || tipoF !== "todos";
+  const refAud = useFadeQuandoRola<HTMLDivElement>();
+  const refTipo = useFadeQuandoRola<HTMLDivElement>();
 
   const todos = useMemo(
     () => [
@@ -224,7 +261,7 @@ export function MateriaisBiblioteca({
         type="button"
         aria-pressed={ativo}
         onClick={onClick}
-        className={filterChipCls(ativo)}
+        className={cn(filterChipCls(ativo), "shrink-0")}
       >
         {rotulo}
         <span
@@ -284,12 +321,17 @@ export function MateriaisBiblioteca({
           className="animate-enter flex flex-wrap items-center gap-x-5 gap-y-2"
         >
           {auds.length > 1 && (
+            // v5c — no mobile os chips ficam numa linha só com scroll
+            // lateral (o bleed -mx/px deixa o último chip respirar na borda
+            // e o fade de borda anuncia que há mais); a partir de sm volta
+            // a quebrar normalmente — scroll-fina afina o trilho
             <div
+              ref={refAud}
               role="group"
               aria-label="Filtrar por audiência"
-              className="flex flex-wrap items-center gap-1.5"
+              className="scroll-fina -mx-4 flex flex-nowrap items-center gap-1.5 overflow-x-auto px-4 pb-0.5 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0"
             >
-              <span className="text-xs font-medium text-muted-foreground">
+              <span className="shrink-0 text-xs font-medium text-muted-foreground">
                 Audiência
               </span>
               {chip(aud === "todas", () => setAud("todas"), "Todas", todos.filter(matchTipo).length)}
@@ -300,11 +342,12 @@ export function MateriaisBiblioteca({
           )}
           {tipos.length > 1 && (
             <div
+              ref={refTipo}
               role="group"
               aria-label="Filtrar por tipo"
-              className="flex flex-wrap items-center gap-1.5"
+              className="scroll-fina -mx-4 flex flex-nowrap items-center gap-1.5 overflow-x-auto px-4 pb-0.5 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0"
             >
-              <span className="text-xs font-medium text-muted-foreground">
+              <span className="shrink-0 text-xs font-medium text-muted-foreground">
                 Tipo
               </span>
               {chip(tipoF === "todos", () => setTipoF("todos"), "Todos", todos.filter(matchAud).length)}
@@ -366,6 +409,7 @@ export function MateriaisBiblioteca({
                 aberto={e.n === encontroAtual}
                 atual={e.n === encontroAtual}
                 oculto={filtrando && e.visiveis.length === 0}
+                guiaPapel={guiaPapel}
               />
             ))}
           </div>

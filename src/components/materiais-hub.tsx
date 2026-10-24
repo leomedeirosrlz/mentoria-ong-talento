@@ -2,18 +2,21 @@ import type { CSSProperties } from "react";
 import {
   ArrowSquareOut,
   BookOpen,
+  CaretDown,
   CaretRight,
   File,
   FileText,
+  Info,
   LinkSimple,
   PuzzlePiece,
 } from "@phosphor-icons/react/dist/ssr";
 import { linkSeguro } from "@/lib/ciclo";
+import { guiaDoEncontro } from "@/lib/como-conduzir";
 import type { CicloEvento, Material } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { CelulaCobertura } from "@/components/celula-cobertura";
 import { MaterialActions, MaterialMenu } from "@/components/material-actions";
-import { PreviewMaterial } from "@/components/material-preview-pdf";
+import { MaterialThumb } from "@/components/material-thumb";
 import { NovoMaterialDialog } from "@/components/novo-material-dialog";
 import { cn } from "@/lib/utils";
 
@@ -21,6 +24,10 @@ import { cn } from "@/lib/utils";
 // por encontro + o bloco transversal (guias/modelos/conteúdos sem encontro).
 // A coord responde "o que falta" sem scroll; os demais papéis veem a mesma
 // estrutura em leitura (sem MaterialActions/NovoMaterialDialog).
+// REALIZA-194 (v5c): cada <details> de encontro abre com a nota do guia —
+// "o que o encontro cobre" pra staff × "como conduzir" pro mentor, mesma
+// fonte de como-conduzir.ts da ficha da dupla (o staff lê a sugestão ao
+// mentor atrás de um <details> aninhado, sem poluir a leitura dele).
 
 const TIPO_ICONE = {
   guia: BookOpen,
@@ -126,7 +133,7 @@ export function CoberturaTrilha({
       open
       className="group animate-enter rounded-xl bg-card px-4 py-4 shadow-[var(--shadow-border)] sm:px-5"
     >
-      <summary className="flex min-h-8 cursor-pointer list-none items-center gap-x-2.5 rounded-lg select-none marker:hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
+      <summary className="flex min-h-11 sm:min-h-8 cursor-pointer list-none items-center gap-x-2.5 rounded-lg select-none marker:hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
         <CaretRight
           size={14}
           weight="bold"
@@ -187,13 +194,62 @@ export function CoberturaTrilha({
   );
 }
 
-/** Linha do hub por encontro — <details> colapsado por padrão: o summary
- *  carrega o nº, a contagem e o pill do pior estado; abrindo, as linhas de
- *  material com MaterialActions e o atalho "adicionar neste encontro" (coord).
- *  REALIZA-184 — `aberto` SSR resolve o default por viewport (encontro da
- *  semana aberto no desktop); `oculto` esconde a linha quando o filtro de
- *  chips zerou os itens dela; `total` é a contagem sem filtro, pro "x de y"
- *  honesto no summary. */
+/** A nota do guia no corpo do <details> (v5c) — uma fonte só em
+ *  `guiaDoEncontro` (como-conduzir.ts): o mentor lê "como conduzir" em
+ *  voz de ação; a staff lê "o que o encontro cobre" em voz de cobertura e
+ *  a sugestão ao mentor atrás de gesto. Sem guia pro nº (cronograma
+ *  estendido/trilha especialista) não renderiza — regra "não inventar". */
+export type GuiaPapel = "staff" | "mentor";
+
+function GuiaNota({
+  n,
+  guiaPapel,
+}: {
+  n: number;
+  guiaPapel?: GuiaPapel | null;
+}) {
+  const guia = guiaPapel ? guiaDoEncontro(n) : null;
+  if (!guia) return null;
+  return (
+    <div className="border-t border-border/60 bg-muted/30 px-5 py-3 text-xs leading-relaxed text-muted-foreground">
+      {guiaPapel === "mentor" ? (
+        <p className="flex items-start gap-2">
+          <Info size={14} className="mt-0.5 shrink-0" aria-hidden />
+          <span>
+            <strong className="font-semibold text-foreground">
+              Como conduzir:
+            </strong>{" "}
+            {guia.conduzir}
+          </span>
+        </p>
+      ) : (
+        <div className="flex items-start gap-2">
+          <Info size={14} className="mt-0.5 shrink-0" aria-hidden />
+          <div>
+            <p>
+              <strong className="font-semibold text-foreground">
+                O que o encontro cobre:
+              </strong>{" "}
+              {guia.cobre}
+            </p>
+            <details className="group mt-1">
+              <summary className="inline-flex min-h-11 sm:min-h-8 cursor-pointer list-none items-center gap-1 font-medium underline-offset-2 outline-none transition-colors select-none marker:hidden hover:text-foreground hover:underline focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
+                O que o guia sugere ao mentor
+                <CaretDown
+                  size={12}
+                  aria-hidden
+                  className="transition-transform group-open:rotate-180"
+                />
+              </summary>
+              <p className="mt-1">{guia.conduzir}</p>
+            </details>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function EncontroDetails({
   n,
   titulo,
@@ -205,6 +261,7 @@ export function EncontroDetails({
   oculto,
   total,
   atual,
+  guiaPapel,
 }: {
   n: number;
   titulo?: string;
@@ -221,7 +278,15 @@ export function EncontroDetails({
   total?: number;
   /** Encontro vigente do calendário — marcado no summary. */
   atual?: boolean;
+  /** Quem lê a nota do guia (v5c): staff vê "o que cobre", mentor vê
+   *  "como conduzir"; null não renderiza (especialista — a trilha dele
+   *  não passa pelas janelas DPP). */
+  guiaPapel?: GuiaPapel | null;
 }) {
+  /* Linha do hub por encontro — <details> colapsado por padrão: o summary
+     carrega o nº, a contagem e o pill do pior estado; abrindo, a nota do
+     guia + as linhas de material com MaterialActions e o atalho "adicionar
+     neste encontro" (coord). */
   const k = itens.length;
   return (
     <details
@@ -231,7 +296,7 @@ export function EncontroDetails({
       className="group animate-enter scroll-mt-16 rounded-xl bg-card shadow-[var(--shadow-border)]"
       style={{ "--i": Math.min(indice, 10) } as CSSProperties}
     >
-      <summary className="flex min-h-11 cursor-pointer list-none items-center gap-x-2.5 rounded-xl px-4 py-2 text-sm transition-colors marker:hidden select-none hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring group-open:rounded-b-none [&::-webkit-details-marker]:hidden">
+      <summary className="flex min-h-11 cursor-pointer list-none flex-wrap items-center gap-x-2.5 rounded-xl px-4 py-2 text-sm transition-colors marker:hidden select-none hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring group-open:rounded-b-none [&::-webkit-details-marker]:hidden">
         <CaretRight
           size={14}
           weight="bold"
@@ -262,7 +327,10 @@ export function EncontroDetails({
           </span>
         )}
         {k > 0 ? (
-          <span className="ml-auto flex shrink-0 items-center gap-2 pl-2">
+          // o cluster de status não disputa linha no mobile: basis-full o
+          // manda pra linha 2 encostado à direita (padrão do MaterialRow);
+          // no desktop volta a dividir a linha do summary
+          <span className="ml-auto flex basis-full shrink-0 flex-wrap items-center justify-end gap-2 pl-2 lg:basis-auto">
             <span className="text-xs tabular-nums text-muted-foreground">
               {total != null && k < total
                 ? `${k} de ${total}`
@@ -271,11 +339,14 @@ export function EncontroDetails({
             <PillEstado itens={itens} />
           </span>
         ) : (
-          <span className="ml-auto shrink-0 pl-2 text-xs text-muted-foreground">
+          <span className="ml-auto basis-full shrink-0 pl-2 text-right text-xs text-muted-foreground lg:basis-auto">
             sem material ainda
           </span>
         )}
       </summary>
+      {/* a nota do guia abre o corpo — contexto do encontro antes da
+          lista de materiais, nos dois estados (com e sem material) */}
+      <GuiaNota n={n} guiaPapel={guiaPapel} />
       {k > 0 ? (
         <div className="border-t border-border/60">
           {ehCoord && (
@@ -400,11 +471,13 @@ function MaterialRow({
   // quebra internamente e a descrição já tem line-clamp
   const head = (
     <>
-      {/* REALIZA-185 — material com arquivo mostra a capa de verdade (1ª
-          página do PDF, lazy; imagem como <img>) no lugar do ícone do tipo.
-          O thumb portrait ~A4 fica dentro do link — é decorativo, o gesto
-          segue sendo a linha */}
-      <PreviewMaterial
+      {/* REALIZA-185/194 — material com arquivo mostra a capa de verdade
+          (1ª página do PDF, lazy; imagem como <img>) no lugar do ícone do
+          tipo — agora a thumb CURTA global (material-thumb: crop do topo,
+          sem scroll interno), não o preview grande de leitura. O thumb
+          portrait ~A4 fica dentro do link — é decorativo, o gesto segue
+          sendo a linha */}
+      <MaterialThumb
         m={m}
         className="h-20 w-14 shrink-0 rounded-lg"
         icone={18}

@@ -117,6 +117,32 @@ export const INSTRUMENTOS_SISTEMA = [
 
 export type InstrumentoSistema = (typeof INSTRUMENTOS_SISTEMA)[number];
 
+/** Sistemas da régua de instrumentos do programa (REALIZA-199): os 5 cujos
+ *  cards moram na seção "Instrumentos do programa" de /materiais (194) —
+ *  saíram da listagem de /formularios. As respostas/links seguem no
+ *  /formularios/<id> de cada um (o card da régua faz deep-link). */
+export const SISTEMAS_REGUA: readonly FormularioSistema[] = [
+  "visao",
+  "metas",
+  "pdm",
+  "roda_vida",
+  "avaliacao_360",
+];
+
+/** Sistemas "de bordo" — oficiais que NÃO são a régua DPP: seguem
+ *  acessíveis de /formularios na seção "Instrumentos do sistema"
+ *  (read-only — catálogo imutável, sem builder). A ordem de exibição é a
+ *  do ciclo de vida: inscrição → anamnese → fechamentos da jornada. Um
+ *  sistema novo que não estiver aqui nem na régua aparece no fim da seção
+ *  (complemento defensivo — nunca fica órfão). */
+export const SISTEMAS_BORDO: readonly FormularioSistema[] = [
+  "intake_mentor",
+  "intake_mentorado",
+  "anamnese",
+  "autoavaliacao_mentor",
+  "avaliacao_especialista",
+];
+
 /** Resumo de uma linha da ficha da dupla — o que o instrumento é e quando
  *  entra na jornada (guias DPP). */
 export const INSTRUMENTO_INFO: Record<

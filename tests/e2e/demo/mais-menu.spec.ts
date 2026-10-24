@@ -33,13 +33,21 @@ test.describe("demo — menu Mais da ficha", () => {
     await expect(itens).toHaveCount(2);
 
     // assert positivo do fix: cada item é a linha inteira do popup —
-    // p-1 do container desconta os 8px de respiro lateral
-    const box = await popup.boundingBox();
-    expect(box).not.toBeNull();
-    for (const item of await itens.all()) {
-      const b = await item.boundingBox();
-      expect(Math.abs(b!.width - (box!.width - 8))).toBeLessThan(2);
-    }
+    // p-1 do container desconta os 8px de respiro lateral. A medição é uma
+    // evaluate só: o popup entra com zoom-in-95 (~150ms) e medir popup e
+    // item em awaits separados lia dois scales da animação (a diferença
+    // entre as fases estourava a régua de 2px em preview frio). Na mesma
+    // chamada o scale cancela exato — 8·(1-s) nunca passa de 0.4px.
+    const diffs = await popup.evaluate((el) =>
+      [...el.querySelectorAll('[role="menuitem"]')].map((item) =>
+        Math.abs(
+          item.getBoundingClientRect().width -
+            (el.getBoundingClientRect().width - 8)
+        )
+      )
+    );
+    expect(diffs).toHaveLength(2);
+    for (const d of diffs) expect(d).toBeLessThan(2);
 
     // a largura vira hit-target: o clique abre o dialog controlado e o
     // Esc devolve o foco pro "Mais" — o ciclo que o keepMounted quebrava

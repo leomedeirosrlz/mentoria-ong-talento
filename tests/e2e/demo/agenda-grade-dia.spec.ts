@@ -1,4 +1,4 @@
-import { entrarNaDemo, expect, test } from "../helpers";
+import { agirComConfirma, entrarNaDemo, expect, test } from "../helpers";
 
 // REALIZA-163 (superfície demo) — a grade semanal do especialista vira
 // editor "pinta e clica" dentro do <details> "Editar grade" (arrastar no
@@ -49,11 +49,37 @@ test.describe("REALIZA-163 — grade editável do especialista (demo)", () => {
       page.getByText("Toda semana", { exact: true })
     ).toBeVisible();
 
+    // barreira de hidratação antes do gesto: o <details> abre nativo e a
+    // grade "parece pronta" sem JS nenhum — a prova de que os handlers
+    // React estão ligados é uma ação que só existe neles. O clique de
+    // remover dispara a action stub (toast demo), então esperar o toast
+    // marca o fim da hidratação. Sem isso, em preview frio os 8 retries da
+    // pintura podiam cair todos antes dos handlers existirem.
+    await agirComConfirma(
+      () =>
+        editor
+          .getByRole("button", { name: /Remover janela de Quinta/ })
+          .click(),
+      () => page.getByText(DEMO_MSG).first().isVisible()
+    );
+    // a action em voo põe `pending` (botões desabilitam e o gesto ignora o
+    // pointerdown) — espera destravar antes de pintar
+    await expect(
+      editor.getByRole("button", { name: /Remover janela de Terça/ })
+    ).toBeEnabled();
+
     // arrasto na coluna vazia de quarta: ~10h → ~12h (o eixo começa às 8h;
     // 1h = 48px). Nome curto sem "-feira" — a coluna da grade de leitura
-    // usa o dia por extenso e não colide no seletor
+    // usa o dia por extenso e não colide no seletor. A coluna tem 576px e
+    // mora abaixo da dobra: centraliza no viewport antes de medir —
+    // coordenadas fora da área visível não geram pointer event na coluna
+    // (o handler exige e.target === e.currentTarget) e o gesto morria
+    // silencioso nos retries.
     const quarta = editor.getByRole("group", { name: "Quarta", exact: true });
     await expect(quarta).toBeVisible();
+    await quarta.evaluate((el) =>
+      el.scrollIntoView({ block: "center", inline: "center" })
+    );
     const box = await quarta.boundingBox();
     if (!box) throw new Error("coluna de quarta sem bounding box");
     const x = box.x + box.width / 2;

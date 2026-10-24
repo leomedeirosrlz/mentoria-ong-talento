@@ -1,7 +1,9 @@
+import { Fragment } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 
-// Espelho da ficha da dupla: voltar + header (dois nomes + meta + ações),
-// coluna de encontros (cards com disco numerado) e aside com 2 cards.
+// Espelho da ficha da dupla: voltar + hero-card (dois nomes + meta +
+// ações), trilha da jornada (card border-l-4, rail de 16 paradas),
+// coluna de encontros (cards com disco numerado) e aside com cards.
 export default function Loading() {
   return (
     <div role="status" aria-label="Carregando" className="space-y-6">
@@ -28,6 +30,34 @@ export default function Loading() {
           <Skeleton className="h-11 w-36 rounded-lg md:h-7" />
         </div>
       </header>
+
+      {/* trilha da jornada — card border-l-4 com overline + contagem,
+          rail de 16 discos conectados (rola no mobile) e legenda */}
+      <section className="rounded-xl border-l-4 bg-card px-4 py-3.5 shadow-[var(--shadow-border)]">
+        <div className="flex items-center justify-between gap-2">
+          <Skeleton className="h-3 w-16" />
+          <Skeleton className="h-3 w-10" />
+        </div>
+        <div className="mt-1 flex items-center overflow-hidden pt-2.5 pb-1">
+          {Array.from({ length: 16 }, (_, i) => (
+            <Fragment key={i}>
+              {i > 0 && (
+                <span aria-hidden className="h-px min-w-1 flex-1 bg-border" />
+              )}
+              <Skeleton className="size-6 shrink-0 rounded-full sm:size-7" />
+            </Fragment>
+          ))}
+        </div>
+        <Skeleton className="mt-1 h-3 w-64 max-w-full" />
+        <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="flex items-center gap-1.5">
+              <Skeleton className="size-2 rounded-full" />
+              <Skeleton className="h-2.5 w-14" />
+            </div>
+          ))}
+        </div>
+      </section>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
         {/* ===== timeline de encontros ===== */}

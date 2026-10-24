@@ -58,6 +58,21 @@ test.describe("agenda demo do supervisor — Por turma / Consolidada (WP5)", () 
       abas.getByRole("tab", { name: "Consolidada" })
     ).toHaveAttribute("aria-selected", "false");
 
+    // a faixa "Semana do programa" existe no escopo das supervisionadas —
+    // mas é leitura pura: o supervisor sem papel mentor não tem superfície
+    // de dia, então os títulos não podem linkar ?dia= (o param cairia no
+    // ramo errado do page.tsx) e a nota não promete link
+    const faixa = page.locator('section[aria-label="Semana do programa"]');
+    await expect(faixa).toBeVisible();
+    await expect(
+      faixa.getByText(/O que a semana cobra no escopo das suas duplas\.?$/)
+    ).toBeVisible();
+    await expect(faixa.locator('a[href*="dia="]')).toHaveCount(0);
+    // e nunca tem "Abrir chamada" — presença é painel da coordenação
+    await expect(
+      faixa.getByRole("link", { name: "Abrir chamada" })
+    ).toHaveCount(0);
+
     // o desencontro das turmas — 3 grupos (T1, T2 e "Trilhas de
     // especialista", o rótulo honesto do grupo sem cronograma)
     await expect(
@@ -66,8 +81,8 @@ test.describe("agenda demo do supervisor — Por turma / Consolidada (WP5)", () 
 
     // grupos por cronograma: T1 com Bia e Caio, T2 com Laura e Matheus, e
     // o grupo sem cronograma da trilha esp supervisionada
-    const t1 = page.locator('section[aria-label="Duplas da T1 · 2026/2027"]');
-    const t2 = page.locator('section[aria-label="Duplas da T2 · 2026/2027"]');
+    const t1 = page.locator('section[aria-label="Duplas da Turma 1"]');
+    const t2 = page.locator('section[aria-label="Duplas da Turma 2"]');
     await expect(t1).toBeVisible();
     await expect(t1.getByRole("heading", { name: /Turma 1/ })).toBeVisible();
     await expect(t2).toBeVisible();
@@ -81,12 +96,39 @@ test.describe("agenda demo do supervisor — Por turma / Consolidada (WP5)", () 
       semTurma.getByRole("heading", { name: "Trilhas de especialista" })
     ).toBeVisible();
 
-    // card da Bia (d-ok) — nome_social no título, o mentor no contexto
+    // card da Bia (d-ok) — nome_social no título, o mentor no contexto.
+    // Mesmo drift do Caio abaixo: com pendência apontável o "Lembrar"
+    // vira primária e "Ver ficha" recolhe no ⋯ "Mais ações" (REALIZA-186);
+    // em dia o link solto segue no rodapé. O ⋯ no DOM decide o ramo.
     const cardBia = t1.locator("article", { hasText: "Bia" });
     await expect(cardBia.getByText("mentor: Ricardo Tavares")).toBeVisible();
-    await expect(
-      cardBia.getByRole("link", { name: "Ver ficha ›" })
-    ).toBeVisible();
+    const maisAcoesBia = cardBia.getByRole("button", {
+      name: "Mais ações da dupla de Bia",
+    });
+    if ((await maisAcoesBia.count()) > 0) {
+      // o menu é nomeado pelo trigger — o card do Caio pode montar um ⋯
+      // idêntico no mesmo view, então nunca pesquisa "menu" a seco
+      const menuBia = page.getByRole("menu", {
+        name: "Mais ações da dupla de Bia",
+      });
+      await agirComConfirma(
+        () => maisAcoesBia.click(),
+        () => menuBia.isVisible()
+      );
+      await expect(
+        menuBia.getByRole("menuitem", { name: "Ver ficha" })
+      ).toBeVisible();
+      // fecha de verdade antes de seguir — menu aberto segue na árvore
+      // de a11y e colide com o ⋯ do Caio logo abaixo
+      await agirComConfirma(
+        () => page.keyboard.press("Escape"),
+        () => menuBia.isHidden()
+      );
+    } else {
+      await expect(
+        cardBia.getByRole("link", { name: "Ver ficha ›" })
+      ).toBeVisible();
+    }
 
     // card do Caio (d-pend) — o contexto drifta com o relógio do enc. 4:
     // "sem encontro agendado" quando o vigente não tem row (seg/ter de
@@ -116,12 +158,16 @@ test.describe("agenda demo do supervisor — Por turma / Consolidada (WP5)", () 
         cardCaio.getByRole("button", { name: /^Lembrar/ }).first()
       ).toBeEnabled();
       // clique com confirmação: em preview frio o handler do trigger pode
-      // ainda não ter hidratado — repete até o popup abrir
+      // ainda não ter hidratado — repete até o popup abrir. O menu é
+      // nomeado pelo trigger: o card da Bia pode montar um ⋯ no mesmo
+      // view, então nunca pesquisa "menu" a seco.
+      const menuAcoes = page.getByRole("menu", {
+        name: "Mais ações da dupla de Caio Henrique Oliveira",
+      });
       await agirComConfirma(
         () => maisAcoesCaio.click(),
-        () => page.getByRole("menu").isVisible()
+        () => menuAcoes.isVisible()
       );
-      const menuAcoes = page.getByRole("menu");
       await expect(
         menuAcoes.getByRole("menuitem", { name: "Registrar supervisão" })
       ).toBeVisible();
@@ -158,7 +204,7 @@ test.describe("agenda demo do supervisor — Por turma / Consolidada (WP5)", () 
         page.getByText("Sem encontro agendado (1)")
       ).toBeVisible();
       await expect(
-        page.getByText(/Caio \(T1 · 2026\/2027\).*Use/)
+        page.getByText(/Caio \(T1\).*Use/)
       ).toBeVisible();
     } else {
       test.info().annotations.push({
@@ -216,7 +262,7 @@ test.describe("agenda demo do supervisor — Por turma / Consolidada (WP5)", () 
       ).toBeVisible();
       await expect(aAgendar).toContainText("A agendar");
       await expect(
-        aAgendar.getByText(/Caio com Carlos Menezes · T1 · 2026\/2027/)
+        aAgendar.getByText(/Caio com Carlos Menezes · T1/)
       ).toBeVisible();
       await aAgendar
         .getByRole("button", { name: "Lembrar", exact: true })
@@ -252,17 +298,20 @@ test.describe("agenda demo do supervisor — Por turma / Consolidada (WP5)", () 
     ).toBeVisible();
     await page.keyboard.press("Escape");
 
-    // sessão da trilha supervisionada (Sofia × Bia, sábado) — convidado:
-    // a tag âmbar marca e o item não tem nenhuma ação pro supervisor
-    const convidado = page
+    // sessões da trilha supervisionada (Sofia × Bia) — convidado: a tag
+    // âmbar marca e o item não tem nenhuma ação pro supervisor. A âncora
+    // nova da semana deixa MAIS de uma sessão da dupla na janela — o
+    // invariante vale pra todas (filter por nome só resolve 2 → strict).
+    const convidados = page
       .locator("article")
-      .filter({ hasText: /Bia × Sofia Nogueira/ });
-    await expect(convidado.getByText("só acompanhamento")).toBeVisible();
-    await expect(
-      convidado.getByText(/Trilha de especialista · sessão \d de 5/)
-    ).toBeVisible();
-    await expect(convidado.getByRole("button")).toHaveCount(0);
-    await expect(convidado.getByRole("link")).toHaveCount(0);
+      .filter({ hasText: /Bia × Sofia Nogueira/ })
+      .filter({ hasText: /Trilha de especialista · sessão \d de 5/ });
+    await expect(convidados.first()).toBeVisible();
+    for (const convidado of await convidados.all()) {
+      await expect(convidado.getByText("só acompanhamento")).toBeVisible();
+      await expect(convidado.getByRole("button")).toHaveCount(0);
+      await expect(convidado.getByRole("link")).toHaveCount(0);
+    }
 
     // evento oficial entra como convidado também — a roda de casos do
     // domingo (formação continuada da T1)

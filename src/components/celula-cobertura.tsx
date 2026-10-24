@@ -29,7 +29,7 @@ export function CelulaCobertura({
         alvo?.parentElement?.closest("details")?.setAttribute("open", "");
       }}
       className={cn(
-        "grid size-9 place-items-center rounded-md text-xs font-semibold tabular-nums transition-colors",
+        "grid size-11 sm:size-9 place-items-center rounded-md text-xs font-semibold tabular-nums transition-colors",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
         estado === "coberto" && "bg-[var(--brand-lime)] text-[var(--brand-ink)]",
         estado === "parcial" &&

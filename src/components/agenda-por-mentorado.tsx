@@ -41,6 +41,7 @@ import {
   TRILHA_LEN,
   foraDoPrograma,
 } from "@/lib/ciclo";
+import { turmaCurta, turmaLonga } from "@/lib/turma";
 import type {
   CicloEvento,
   Cronograma,
@@ -99,6 +100,9 @@ export type AgendaPorMentoradoProps = {
   /** Primeiro nome do mentor — assina o check-in do Lembrar. */
   meuNome: string;
   hoje: string;
+  /** epoch ms do mesmo "agora" da page — semáforo/limbo/cap ancoram no
+   *  snapshot do request, não num segundo `new Date()` do RSC. */
+  agora: number;
 };
 
 /** Aba "Por mentorado" da agenda DPP (WP3, mock v6) — um card por jovem com
@@ -135,9 +139,9 @@ export function AgendaPorMentorado({
   meuId,
   meuNome,
   hoje,
+  agora: agoraMs,
 }: AgendaPorMentoradoProps) {
-  const agora = new Date();
-  const agoraMs = agora.getTime();
+  const agora = new Date(agoraMs);
   // o dialog pede areas:string[]|null — a página projeta só {id,nome}; o
   // select dele já cai no ramo sem áreas quando null
   const especialistasDialog = especialistas.map((e) => ({
@@ -360,7 +364,7 @@ function CardMentorado({
         <div className="min-w-28 flex-1">
           <h3 className="flex flex-wrap items-center gap-x-2 gap-y-1 font-semibold leading-snug">
             <span className="truncate">{nome}</span>
-            <Badge variant="secondary">{dupla.turma}</Badge>
+            <Badge variant="secondary">{turmaLonga(dupla.turma)}</Badge>
             {dupla.status !== "ativa" && (
               <Badge variant="outline" className="text-muted-foreground">
                 {dupla.status === "pausada"
@@ -394,7 +398,10 @@ function CardMentorado({
             {jornada.completa
               ? `${total} de ${total} encontros`
               : `Encontro ${alvo.proximoNumero} de ${total}`}
-            <span className="text-muted-foreground"> · {dupla.turma}</span>
+            <span className="text-muted-foreground">
+              {" "}
+              · {turmaCurta(dupla.turma)}
+            </span>
           </p>
           <span className="tabular-nums text-muted-foreground">{pct}%</span>
         </div>

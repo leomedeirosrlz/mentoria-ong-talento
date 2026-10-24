@@ -15,6 +15,8 @@ import {
   itensConsolidados,
   type ItemConsolidado,
 } from "@/lib/agenda-auxiliar";
+import { itensDaSemanaPrograma } from "@/lib/agenda-coordenacao";
+import { turmaCurta, turmaLonga } from "@/lib/turma";
 import {
   lembreteBloqueadoAte,
   saudadeDaDupla,
@@ -41,6 +43,7 @@ import { Avatar } from "@/components/avatar";
 import { AuxCardAcoes } from "@/components/aux-card-acoes";
 import { LembreteButton } from "@/components/lembrete-button";
 import { SupervisaoDialog } from "@/components/supervisao-dialog";
+import { SemanaDoPrograma } from "@/components/semana-do-programa";
 import { Button } from "@/components/ui/button";
 import {
   lembreteDaDupla,
@@ -73,6 +76,8 @@ export function AgendaAuxiliar({
   nudges,
   meuNome,
   hoje,
+  agora: agoraMs,
+  comLinkDia,
   consolidada,
 }: {
   /** Só as duplas que eu supervisiono (a página filtra). */
@@ -89,10 +94,17 @@ export function AgendaAuxiliar({
   meuNome: string;
   /** "YYYY-MM-DD" de hoje (São Paulo). */
   hoje: string;
+  /** epoch ms do mesmo "agora" da page — semáforo/limbo/cap ancoram no
+   *  snapshot do request, não num segundo `new Date()` do RSC. */
+  agora: number;
+  /** supervisor+mentor tem superfície de dia (o guard da page escapa o
+   *  `?dia=` pro calendário DPP dele); pro supervisor puro o card não
+   *  pode prometer um link que o ramo dele engole. */
+  comLinkDia: boolean;
   /** Aba ativa — default "Por turma". */
   consolidada: boolean;
 }) {
-  const agora = new Date();
+  const agora = new Date(agoraMs);
   const { seg, dom } = semanaBounds(agora);
   const grupos = duplasPorTurma(duplas, cronogramas, eventos, agora);
   const itens = itensConsolidados(duplas, supervisoes, eventos, agora);
@@ -100,6 +112,10 @@ export function AgendaAuxiliar({
     duplas.map((d) => [d.id, saudadeDaDupla(d, eventos, agora)])
   );
   const duplasPorId = new Map(duplas.map((d) => [d.id, d]));
+  // cronogramas das supervisionadas — recorte da faixa "Semana do programa"
+  const cronosDelas = new Set(
+    duplas.flatMap((d) => (d.cronograma_id ? [d.cronograma_id] : []))
+  );
   // a lista só exibe ativa/pausada (mesmo filtro da lib) — encerradas entram
   // na supervisão histórica mas não na agenda; o cabeçalho conta as duas
   // coisas separadas pra não prometer card que não renderiza
@@ -107,7 +123,13 @@ export function AgendaAuxiliar({
     (d) => d.status === "ativa" || d.status === "pausada"
   );
   const encerradas = duplas.length - correndo.length;
-  const turmas = [...new Set(correndo.map((d) => d.turma))];
+  // cabeçalho cita as turmas na forma narrativa — dedup já no label
+  // ("T1" e "T1 · 2026/2027" exibem a mesma "Turma 1")
+  const turmasTxt = [
+    ...new Set(
+      correndo.map((d) => turmaLonga(d.turma)).filter(Boolean)
+    ),
+  ];
   // a explicação do desencontro só cita turmas com encontro vigente —
   // trilhas de especialista não têm cronograma e cairiam como "—"
   const gruposTurma = grupos.filter((g) => g.encontroVigente != null);
@@ -124,7 +146,7 @@ export function AgendaAuxiliar({
           return [
             i.duplaId!,
             d
-              ? `${primeiroNomeDaDupla(d) || d.mentorado.nome.split(" ")[0]} (${d.turma})`
+              ? `${primeiroNomeDaDupla(d) || d.mentorado.nome.split(" ")[0]} (${turmaCurta(d.turma)})`
               : null,
           ] as const;
         })
@@ -143,13 +165,40 @@ export function AgendaAuxiliar({
           {correndo.length === 1 ? "dupla supervisionada" : "duplas supervisionadas"}
           {encerradas > 0 &&
             ` · ${encerradas} encerrada${encerradas === 1 ? "" : "s"}`}
-          {turmas.length > 0 ? ` · ${turmas.join(" e ")}` : ""}
+          {turmasTxt.length > 0 ? ` · ${turmasTxt.join(" e ")}` : ""}
           {correndo.length > 0 &&
             ` · semana ${semanaIso(hoje)}, ${Number(seg.slice(8, 10))} a ${Number(dom.slice(8, 10))} de ${mesLongo(dom)}`}
         </p>
       </header>
 
-      <AbasAuxiliar consolidada={consolidada} />
+      <AbasAuxiliar consolidada={consolidada} temCalendario={comLinkDia} />
+
+      {/* a mesma faixa "Semana do programa" da coordenação (v8b), com o
+          denominador do escopo do auxiliar: os oficiais dos cronogramas
+          das supervisionadas + as supervisões dela. "o que cobre" porque
+          quem lê monitora — o card não agenda nada. */}
+      <SemanaDoPrograma
+        itens={itensDaSemanaPrograma(
+          // recorte do escopo: só eventos dos cronogramas das
+          // supervisionadas — a faixa da aux nunca mostra turma alheia
+          eventos.filter((e) => cronosDelas.has(e.cronograma_id)),
+          cronogramas.filter((c) => cronosDelas.has(c.id)),
+          supervisoes,
+          agora,
+          // meta "N duplas" conta as supervisionadas daquele cronograma
+          duplas
+        )}
+        hoje={hoje}
+        modo="coord"
+        comLinkDia={comLinkDia}
+        titulo="Semana do programa"
+        ariaLabel="Semana do programa"
+        nota={
+          comLinkDia
+            ? "O que a semana cobra no escopo das suas duplas — cada card abre o dia no calendário."
+            : "O que a semana cobra no escopo das suas duplas."
+        }
+      />
 
       {!consolidada ? (
         <div className="space-y-6">
@@ -166,7 +215,8 @@ export function AgendaAuxiliar({
                   <span key={g.cronogramaId ?? g.turma}>
                     {i > 0 && (i === gruposTurma.length - 1 ? " e " : ", ")}
                     <b className="font-medium text-foreground">
-                      {g.turma} está no encontro {g.encontroVigente ?? "—"}
+                      {turmaLonga(g.turma)} está no encontro{" "}
+                      {g.encontroVigente ?? "—"}
                     </b>
                   </span>
                 ))}
@@ -192,7 +242,7 @@ export function AgendaAuxiliar({
               return (
               <section
                 key={g.cronogramaId ?? "sem-turma"}
-                aria-label={`Duplas da ${g.turma || "trilha de especialista"}`}
+                aria-label={`Duplas da ${g.turma ? turmaLonga(g.turma) : "trilha de especialista"}`}
                 className="space-y-3"
               >
                 <div className="flex flex-wrap items-center gap-2.5">
@@ -252,6 +302,7 @@ export function AgendaAuxiliar({
           eventos={eventos}
           meuNome={meuNome}
           hoje={hoje}
+          agora={agora}
         />
       )}
     </div>
@@ -260,7 +311,16 @@ export function AgendaAuxiliar({
 
 // ---------- abas ----------
 
-function AbasAuxiliar({ consolidada }: { consolidada: boolean }) {
+function AbasAuxiliar({
+  consolidada,
+  temCalendario,
+}: {
+  consolidada: boolean;
+  /** supervisor+mentor tem a superfície de calendário dele atrás de
+   *  ?aba=calendario — sem a aba o guard da page existe sem porta de
+   *  entrada (o supervisor puro nunca a vê: calendário não é dele). */
+  temCalendario: boolean;
+}) {
   return (
     <div
       role="tablist"
@@ -271,6 +331,9 @@ function AbasAuxiliar({ consolidada }: { consolidada: boolean }) {
         [
           ["turma", "Por turma", "/agenda"],
           ["consolidada", "Consolidada", "/agenda?aba=consolidada"],
+          ...(temCalendario
+            ? [["calendario", "Calendário", "/agenda?aba=calendario"] as const]
+            : []),
         ] as const
       ).map(([v, label, href]) => (
         <Link
@@ -439,6 +502,7 @@ function ConsolidadaAux({
   eventos,
   meuNome,
   hoje,
+  agora,
 }: {
   itens: ItemConsolidado[];
   alvos: SupervisaoAlvo[];
@@ -447,6 +511,7 @@ function ConsolidadaAux({
   eventos: CicloEvento[];
   meuNome: string;
   hoje: string;
+  agora: Date;
 }) {
   // UTC-noon — meio-dia local anda um dia em fusos a frente de SP
   const amanha = toDateStr(
@@ -495,6 +560,7 @@ function ConsolidadaAux({
                   }
                   eventos={eventos}
                   meuNome={meuNome}
+                  agora={agora}
                 />
               ))}
             </ul>
@@ -512,6 +578,7 @@ function LinhaConsolidada({
   nudge,
   eventos,
   meuNome,
+  agora,
 }: {
   item: ItemConsolidado;
   alvos: SupervisaoAlvo[];
@@ -519,6 +586,7 @@ function LinhaConsolidada({
   nudge: Interacao | null;
   eventos: CicloEvento[];
   meuNome: string;
+  agora: Date;
 }) {
   const Icone = ICONE_TIPO[item.tipo];
   // o dialog nasce com a dupla do item quando existe — o select abre já no
@@ -528,16 +596,16 @@ function LinhaConsolidada({
     : alvos;
   const lembrete =
     item.tipo === "a_agendar" && dupla
-      ? lembreteDaDupla(dupla, "sem_data", eventos, meuNome)
+      ? lembreteDaDupla(dupla, "sem_data", eventos, meuNome, agora)
       : null;
   return (
     <li>
       <article
         className={cn(
           "rounded-xl border bg-card px-3.5 py-3",
-          (item.convidado || item.tipo === "a_agendar") && "border-dashed",
-          item.convidado &&
-            "border-[var(--warn)]/60 bg-[var(--warn)]/[0.04]"
+          // convidado/a_agendar: tracejada é o único marcador — "só
+          // acompanhamento" é info, não alerta (warn mentia urgência)
+          (item.convidado || item.tipo === "a_agendar") && "border-dashed"
         )}
       >
         <div className="flex gap-3">
@@ -569,7 +637,7 @@ function LinhaConsolidada({
             )}
             {item.convidado ? (
               <p className="mt-1.5">
-                <Tag tom="warn">
+                <Tag tom="info">
                   <Eye size={11} aria-hidden />
                   só acompanhamento
                 </Tag>
@@ -604,7 +672,7 @@ function LinhaConsolidada({
                     titulo={lembrete.titulo}
                     corpo={lembrete.corpo}
                     href={item.href ?? `/duplas/${item.duplaId}`}
-                    bloqueadoAte={lembreteBloqueadoAte(nudge)}
+                    bloqueadoAte={lembreteBloqueadoAte(nudge, agora)}
                   />
                 )}
               </div>

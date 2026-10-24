@@ -808,7 +808,7 @@ export function CronogramaDuplas({ vinculos }: { vinculos: VinculoCronograma[] }
           <li key={v.duplaId}>
             <Link
               href={`/duplas/${v.duplaId}`}
-              className="flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-muted/50 sm:px-5"
+              className="flex min-h-11 items-center gap-3 px-4 py-2.5 transition-colors hover:bg-muted/50 sm:min-h-10 sm:px-5"
             >
               <span className="min-w-0 flex-1 truncate text-sm">
                 {v.mentoradoNome} <span className="text-muted-foreground">com</span>{" "}

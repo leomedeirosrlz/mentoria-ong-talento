@@ -237,6 +237,52 @@ export async function comentarChamado(
   });
 }
 
+/** Compensação do pipeline de anexo: a policy do storage exige a row de
+ *  chamado_anexos ANTES do upload (mesmo molde de registro_anexos) — se o
+ *  binário falha no meio, a metadata vira órfã ("anexo que não abre"). O
+ *  usuário não tem DELETE na tabela, então a limpeza é admin — mas escopada:
+ *  o select de conferência corre sob a RLS do caller (só vê o que pode ver)
+ *  e a row só sai se foi ele quem anexou, ou se é equipe. Já o OBJETO do
+ *  bucket só sai pra coordenação: a policy de delete do storage é
+ *  coord-only (0084) e o admin a bypassaria — alinhar evita dar ao auxiliar
+ *  um delete que o banco não lhe concede. No fluxo real isso não deixa
+ *  resto: o descarte corre quando o upload FALHOU (não há binário); se um
+ *  upload parcial existir, a remoção do objeto fica com a coordenação. */
+export async function descartarChamadoAnexo(
+  anexoId: string
+): Promise<{ ok?: boolean; error?: string }> {
+  if (await demoRole()) return { error: DEMO_MSG };
+  const { supabase, me: profile } = await me();
+  if (!profile) return { error: "Sem sessão ativa. Entre de novo." };
+  if (!UUID_RE.test(anexoId)) return { error: "Anexo inválido." };
+  const { data: row } = await supabase
+    .from("chamado_anexos")
+    .select("id, path, created_by")
+    .eq("id", anexoId)
+    .maybeSingle();
+  if (!row) return { ok: true }; // nada a limpar — ou fora do escopo da RLS
+  const equipe = profile.role === "coordenacao" || profile.role === "supervisor";
+  if (row.created_by !== profile.id && !equipe) {
+    return { error: "Só quem anexou pode remover o arquivo." };
+  }
+  const { createAdminClient } = await import("./supabase/admin");
+  const admin = createAdminClient();
+  const { error } = await admin
+    .from("chamado_anexos")
+    .delete()
+    .eq("id", row.id);
+  if (error) {
+    console.error("descartarChamadoAnexo:", error);
+    return { error: "Não foi possível descartar o anexo." };
+  }
+  // objeto só pra coordenação — espelha a delete policy coord-only do bucket
+  if (profile.role === "coordenacao") {
+    await admin.storage.from("chamado-anexos").remove([row.path]);
+  }
+  revalidaChamado();
+  return { ok: true };
+}
+
 export async function acrescentarInfoChamado(id: string, texto: string) {
   if (!texto?.trim() || texto.length > 4000) {
     return { error: "Escreva a informação (até 4000 caracteres)." };

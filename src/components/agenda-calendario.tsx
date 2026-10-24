@@ -103,6 +103,7 @@ import {
   type PassoGuia,
 } from "@/lib/ciclo";
 import { limboAberto } from "@/lib/agenda-minha";
+import { turmaLonga } from "@/lib/turma";
 import type { MentorChamada } from "@/lib/queries-presenca";
 import { temPapel } from "@/lib/types";
 import type {
@@ -116,8 +117,12 @@ import type {
   EspecialistaEvento,
   Material,
 } from "@/lib/types";
+import { guiaDoEncontro } from "@/lib/como-conduzir";
 import { msgsContato } from "@/lib/whatsapp-msgs";
 import { cn, normaliza } from "@/lib/utils";
+import { BarraSegmentada } from "@/components/viz";
+import { itensDaSemanaPrograma } from "@/lib/agenda-coordenacao";
+import { SemanaDoPrograma } from "@/components/semana-do-programa";
 
 const DIAS_SEMANA = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
 const DIAS_SEMANA_COMPLETOS = [
@@ -401,15 +406,6 @@ function MarcadorTipo({ tipo, nome }: { tipo: CicloEvento["tipo"]; nome: string 
   }
 }
 
-/** Cores dos segmentos da barra-resumo — mesma semântica dos dots/legenda;
- *  "agendado" é o anel vazio do dot virado segmento claro. */
-const COR_SEGMENTO_ENCONTRO = {
-  ok: "bg-[var(--ok)]",
-  warn: "bg-[var(--warn)]",
-  agendado: "bg-muted-foreground/30",
-  apagado: "bg-muted-foreground/50",
-} as const;
-
 /** Contagem por segmento da barra-resumo — a mesma leitura dos buckets (limbo
  *  conta no âmbar: pendência de registro, não "agendado"). Extraída pra a
  *  legenda nomear exatamente os números que a barra pinta. */
@@ -426,43 +422,72 @@ function contagemEncontros(itens: ItemDupla[], agora: number) {
 }
 
 /** Barra segmentada por status — a cobertura visual do encontro oficial no
- *  board da semana e na lista do ciclo. O total saiu daqui: número solto sem
- *  rótulo não diz nada (o "N de N" falado já mora na frase de cobertura). */
+ *  board da semana e na lista do ciclo. Delegada à BarraSegmentada do kit:
+ *  `total` é o denominador LITERAL (as ativas do cronograma) — quem não tem
+ *  row do número aparece como segmento neutro "sem data" em vez de sumir
+ *  do trilho (a barra mentia ~90% cheia no "4/10" — o bug que a
+ *  BarraSegmentada nasceu pra matar). Sem `total` (leitura por data, sem
+ *  encontro oficial) o denominador segue sendo os itens exibidos. */
 function ResumoEncontrosDupla({
   itens,
+  total,
   agora,
 }: {
   itens: ItemDupla[];
+  /** denominador único — as ativas do recorte (resumoSemanaDe.total). */
+  total?: number;
   /** Date.now() congelado na montagem do calendário — mesma régua dos buckets. */
   agora: number;
 }) {
   const cont = contagemEncontros(itens, agora);
+  const semData = total != null ? Math.max(0, total - itens.length) : 0;
   return (
-    <span className="flex h-2 min-w-4 flex-1 overflow-hidden rounded-full">
-      {(Object.keys(cont) as (keyof typeof cont)[]).map(
-        (k) =>
-          cont[k] > 0 && (
-            <span
-              key={k}
-              className={COR_SEGMENTO_ENCONTRO[k]}
-              style={{ width: `${(cont[k] / itens.length) * 100}%` }}
-            />
-          )
-      )}
-    </span>
+    <BarraSegmentada
+      className="min-w-4 flex-1"
+      altura="sm"
+      denominador={total ?? itens.length}
+      segmentos={[
+        {
+          valor: cont.ok,
+          rotulo: "realizados com registro",
+          cls: "bg-[var(--ok)]",
+        },
+        {
+          valor: cont.warn,
+          rotulo: "pendentes de registro",
+          cls: "bg-[var(--warn)]",
+        },
+        {
+          valor: cont.agendado,
+          rotulo: "agendados",
+          cls: "bg-muted-foreground/30",
+        },
+        {
+          valor: cont.apagado,
+          rotulo: "não aconteceram",
+          cls: "bg-muted-foreground/50",
+        },
+        { valor: semData, rotulo: "sem data" },
+      ]}
+    />
   );
 }
 
 /** Legenda nomeada da barra-resumo — cor → significado → número, só os
- *  segmentos não-zero, na mesma ordem do Object.keys(cont) da barra. */
+ *  segmentos não-zero, na mesma ordem do Object.keys(cont) da barra. O
+ *  "sem data" fecha a conta do denominador (`total`) com swatch neutro. */
 function LegendaEncontrosDupla({
   itens,
+  total,
   agora,
 }: {
   itens: ItemDupla[];
+  /** denominador único — quando declarado, "N sem data" entra na legenda. */
+  total?: number;
   agora: number;
 }) {
   const cont = contagemEncontros(itens, agora);
+  const semData = total != null ? Math.max(0, total - itens.length) : 0;
   const item = "inline-flex items-center gap-1.5";
   return (
     <span className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
@@ -494,6 +519,12 @@ function LegendaEncontrosDupla({
             className="size-2 rounded-full bg-muted-foreground/50"
           />
           {cont.apagado} não {cont.apagado === 1 ? "aconteceu" : "aconteceram"}
+        </span>
+      )}
+      {semData > 0 && (
+        <span className={item}>
+          <span aria-hidden className="viz-hatch size-2 rounded-full" />
+          {semData} sem data
         </span>
       )}
     </span>
@@ -581,6 +612,7 @@ export function AgendaCalendario({
   hoje,
   semanaId,
   diaInicial,
+  janelaInicial = null,
   duplas,
   role,
   mentores = [],
@@ -603,6 +635,12 @@ export function AgendaCalendario({
   semanaId: string | null;
   /** ?dia= da URL — sobrepõe a heurística "semana atual senão hoje". */
   diaInicial: string | null;
+  /** ?jw= da URL (REALIZA-195): a janela temporal de coord/sup —
+   *  "semana" (lista detalhada), "mes" (a grade atual) ou "ciclo"
+   *  (timeline agregada). Param PRÓPRIO — `?visao=` é a troca de
+   *  superfície entre papéis e não se recicla; `?dia=` continua
+   *  forçando contexto mês quando presente. */
+  janelaInicial?: "semana" | "mes" | "ciclo" | null;
   duplas: Dupla[];
   role: AppRole | null;
   /** Mentores ativos do ciclo — a lista da chamada de formação. Só vem
@@ -625,6 +663,12 @@ export function AgendaCalendario({
     temPapel({ role, papeis }, "mentor_especialista");
   const ehCoordSup = role === "coordenacao" || role === "supervisor";
   const ehCoord = role === "coordenacao";
+  // staff+mentor: a superfície de equipe vence dentro do calendário — os
+  // recursos de mentor (linhas de dupla com ação, "Sua dupla", grade de
+  // horários, voz do guia, cronogramas filtrados pelas dele) são da visão
+  // mentor e ficam atrás do ?visao=dpp; na aba de equipe seria vazamento
+  // de coorte (blocker REALIZA-195: papel staff decide o vocabulário)
+  const ehMentorUi = ehMentor && !ehCoordSup;
   const router = useRouter();
 
   // ===== cronograma selecionado (0061) =====
@@ -633,7 +677,9 @@ export function AgendaCalendario({
   // que ele já veria). Um cronograma só = sem seletor, a tela segue direta.
   const opcoesCron = useMemo(() => {
     const ordenados = cronogramasOpcoes(cronogramas);
-    if (!ehMentor) return ordenados;
+    // staff+mentor na superfície de equipe: todos os cronogramas, não o
+    // recorte das duplas dele (a filtragem é recurso da visão mentor)
+    if (!ehMentorUi) return ordenados;
     const meus = new Set(
       duplas
         .filter((d) => d.trilha !== "especialista")
@@ -641,7 +687,7 @@ export function AgendaCalendario({
     );
     const dasDuplas = ordenados.filter((c) => meus.has(c.id));
     return dasDuplas.length ? dasDuplas : ordenados;
-  }, [cronogramas, duplas, ehMentor]);
+  }, [cronogramas, duplas, ehMentorUi]);
   // turma duplicada no seletor (ex.: dois cronogramas "T1 · 2026/2027") → o
   // nome do calendário entra como sufixo pra desambiguar
   const turmasRepetidas = useMemo(() => {
@@ -856,25 +902,32 @@ export function AgendaCalendario({
   const [direcao, setDirecao] = useState<1 | -1>(1);
 
   // ===== visão da agenda =====
-  // coord/sup: dia | semana | mes | lista — a unidade de trabalho delas é a
-  // semana do encontro oficial, por isso abrem lá; o "dia" (REALIZA-163) é
-  // o detalhe do dia selecionado promovido a visão cheia. Mentor (REALIZA-25
-  // +163): mes | semana | horarios + dia — a grade estilo calendário onde
-  // marcar o encontro vira gesto primário. Jovem/papel sem grade própria
-  // fica sempre no mês.
+  // coord/sup (REALIZA-195): dia | semana | mes | ciclo — as três janelas
+  // temporais do v8b ("Semana" é a lista detalhada do board, "Mês" a
+  // grade atual preservada, "Ciclo" a timeline agregada) + o "dia"
+  // (REALIZA-163) é o detalhe do dia selecionado promovido a visão
+  // cheia. Mentor (REALIZA-25+163): mes | semana | horarios + dia —
+  // a grade estilo calendário onde marcar o encontro vira gesto
+  // primário. Jovem/papel sem grade própria fica sempre no mês.
   // ?dia= aponta um dia específico → todos abrem no mês (o deep-link pede
-  // a célula do dia).
+  // a célula do dia); ?jw= escolhe a janela inicial de coord/sup.
   const [visao, setVisao] = useState<
-    "dia" | "semana" | "mes" | "lista" | "horarios"
-  >(() => (diaInicial || !ehCoordSup ? "mes" : "semana"));
+    "dia" | "semana" | "mes" | "ciclo" | "horarios"
+  >(() =>
+    diaInicial || !ehCoordSup
+      ? "mes"
+      : janelaInicial === "ciclo" || janelaInicial === "mes"
+        ? janelaInicial
+        : "semana"
+  );
   // sanitiza pro conjunto do papel — os chips só emitem valores válidos, mas
   // o estado sobreviveria a uma troca de contexto (defesa, não caminho real)
   const visaoEfetiva = ehCoordSup
     ? visao === "horarios"
       ? "mes"
       : visao
-    : ehMentor
-      ? visao === "lista"
+    : ehMentorUi
+      ? visao === "ciclo"
         ? "mes"
         : visao
       : "mes";
@@ -889,7 +942,7 @@ export function AgendaCalendario({
   // lista da coordenação é full-width — nenhum dos dois o usa. A visão "dia"
   // também não: ela É o próprio detalhe ampliado
   const comDetalheDia =
-    visaoEfetiva === "mes" || (ehMentor && visaoEfetiva === "semana");
+    visaoEfetiva === "mes" || (ehMentorUi && visaoEfetiva === "semana");
 
   // "agora" congelado na montagem — a mesma régua de limbo pros buckets, a
   // contagem da célula e o resumo falado (Date.now() solto no render viola
@@ -1186,7 +1239,7 @@ export function AgendaCalendario({
   );
   const idsNoDia = new Set(duplasDoDia.map((i) => i.encontro.id));
   const itensDupla =
-    ehMentor && numerosOficiais.size > 0
+    ehMentorUi && numerosOficiais.size > 0
       ? [
           ...duplasDoDia,
           ...duplas
@@ -1209,7 +1262,7 @@ export function AgendaCalendario({
   // (âncora no nº — aparece no dia oficial mesmo com a dupla remarcada).
   // Só DPP: a especialista não tem encontro oficial pra ancorar a nota —
   // a dela aparece sob a própria linha em "Sua dupla"
-  const duplasAtivas = ehMentor ? duplas.filter((d) => d.status === "ativa") : [];
+  const duplasAtivas = ehMentorUi ? duplas.filter((d) => d.status === "ativa") : [];
   const duplasAtivasDpp = duplasAtivas.filter((d) => d.trilha !== "especialista");
 
   // alvos de agendamento por dupla ativa — proximoNumero + row alvo que a
@@ -1218,13 +1271,13 @@ export function AgendaCalendario({
   // recorta pelo cronograma DA DUPLA internamente
   const alvosPorDupla = useMemo(() => {
     const mapa = new Map<string, AlvoAgendamento>();
-    if (!ehMentor) return mapa;
+    if (!ehMentorUi) return mapa;
     const base = parseDia(hoje);
     for (const d of duplas)
       if (d.status === "ativa")
         mapa.set(d.id, alvoAgendamento(d, eventos, base));
     return mapa;
-  }, [ehMentor, duplas, eventos, hoje]);
+  }, [ehMentorUi, duplas, eventos, hoje]);
   // o clique numa coluna vazia só propõe slot pra dupla com encontro
   // pendente — cicloCompleto apaga a dupla do gesto; na trilha especialista
   // sem row alvo a action recusaria criar do zero (a sessão nasce de pedido
@@ -1419,9 +1472,13 @@ export function AgendaCalendario({
 
   // itens encontro↔dupla por número oficial — a unidade do board e da lista.
   // Só trilha DPP e só do cronograma selecionado: o nº 1–5 da especialista
-  // colidiria com os oficiais, e o encontro 5 de outra turma não é o desta.
-  // Dupla DPP sem cronograma (dado inválido pré-0061) entra em qualquer
-  // recorte — invisível pra coordenação seria pior que duplicada
+  // colidiria com os oficiais, e o encontro 5 de outra turma não é o desta —
+  // unir itensPorNumero de todas as turmas misturaria "encontro 5" de T1
+  // com "encontro 5" de T2 no mesmo balde (decisão v8b: o board "semana" e
+  // a timeline "ciclo" leem UM calendário oficial por vez, como o mês — a
+  // turma troca no seletor, nunca se mistura). Dupla DPP sem cronograma
+  // (dado inválido pré-0061) entra em qualquer recorte — invisível pra
+  // coordenação seria pior que duplicada
   const itensPorNumero = useMemo(() => {
     const mapa = new Map<number, ItemDupla[]>();
     for (const dupla of duplas) {
@@ -1486,6 +1543,44 @@ export function AgendaCalendario({
     (d) => d.status === "ativa" && d.trilha === "especialista"
   ).length;
 
+  // ===== janela "ciclo" (REALIZA-195): timeline dos encontros oficiais +
+  // acumulado honesto. Só conta o que já era pra ter acontecido: eventos
+  // `encontro` com data oficial <= hoje (a âncora `hoje` do server — a
+  // mesma régua do agoraMs). Recesso estende por data_fim na janela
+  // navegável e etapa de preparação sem data nunca vira célula — ambos
+  // ficam de fora do agregado por não serem encontro.
+  const encontrosCiclo = useMemo(
+    () =>
+      eventosSel
+        .filter((e) => e.tipo === "encontro" && e.numero != null)
+        .sort((a, b) => a.ordem - b.ordem),
+    [eventosSel]
+  );
+  const acumCiclo = useMemo(() => {
+    const a = {
+      esperados: 0,
+      comRegistro: 0,
+      aguardando: 0,
+      agendados: 0,
+      naoAconteceram: 0,
+      semData: 0,
+    };
+    for (const e of encontrosCiclo) {
+      if (e.data == null || e.data > hoje) continue; // acumulado = passado
+      const resumoN = resumoSemanaDe(duplas, e);
+      const itensN = itensPorNumero.get(e.numero!) ?? [];
+      const b = bucketsDoEncontro(itensN, agoraMs);
+      const total = resumoN?.total ?? 0;
+      a.esperados += total;
+      a.comRegistro += b.realizados.length;
+      a.aguardando += b.pendentes.length;
+      a.agendados += b.agendados.length;
+      a.naoAconteceram += b.naoAconteceram.length;
+      a.semData += Math.max(0, total - itensN.length);
+    }
+    return a;
+  }, [encontrosCiclo, itensPorNumero, duplas, hoje, agoraMs]);
+
   // painel do dia: encontro oficial do dia selecionado + a mesma coorte
   // invisível (seção "Sem encontro do Nº" — só coord/sup)
   const oficialDoDia =
@@ -1507,7 +1602,7 @@ export function AgendaCalendario({
       item={item}
       selecionado={sel}
       agora={agoraMs}
-      ehMentor={ehMentor}
+      ehMentor={ehMentorUi}
       souCoord={ehCoord}
       indice={i}
       evento={passoDe(item.dupla, item.encontro.numero)}
@@ -1576,7 +1671,7 @@ export function AgendaCalendario({
           {itensDupla.length > 0 && (
             <>
               <h3 className="px-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                {ehMentor ? "Sua dupla" : "Duplas"}
+                {ehMentorUi ? "Sua dupla" : "Duplas"}
               </h3>
               {/* chave dos dots de status — contextual, junto de onde eles aparecem */}
               <ChaveDotsDupla className="mt-1 px-2" />
@@ -1599,7 +1694,7 @@ export function AgendaCalendario({
           {/* encontro agendado fora do dia oficial (nº sem evento do ciclo
               aqui) não tem bloco próprio acima — a anotação mora sob a
               linha, rotulada pelo nº (v1: só o mentor escreve) */}
-          {ehMentor &&
+          {ehMentorUi &&
             itensDupla
               // na trilha especialista o nº nunca tem "dia oficial" — a
               // nota mora sempre sob a linha do encontro dela. DPP
@@ -1756,6 +1851,36 @@ export function AgendaCalendario({
                   </span>
                 </p>
               )}
+              {/* guia do encontro (REALIZA-195): "como conduzir" pra quem
+                  conduz (mentor), "o que cobre" pra quem monitora (coord/
+                  sup/aux) — <details> nativo, a mesma gramática do card
+                  da faixa. Null fora da trilha DPP canônica (1..16) */}
+              {e.tipo === "encontro" &&
+                e.numero != null &&
+                (() => {
+                  const guia = guiaDoEncontro(e.numero);
+                  if (!guia) return null;
+                  // staff+mentor na superfície de equipe lê a voz do
+                  // monitor ("o que cobre") — "como conduzir" é da visão
+                  // mentor dele, atrás do ?visao=dpp
+                  const texto = ehMentorUi ? guia.conduzir : guia.cobre;
+                  const rotulo = ehMentorUi ? "Como conduzir" : "O que cobre";
+                  return (
+                    <details className="group rounded-lg transition-colors hover:bg-muted/40">
+                      <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 rounded-md px-1 text-sm font-medium text-muted-foreground select-none hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-8 [&::-webkit-details-marker]:hidden">
+                        <CaretDown
+                          aria-hidden
+                          size={14}
+                          className="shrink-0 transition-transform group-open:rotate-180"
+                        />
+                        {rotulo}
+                      </summary>
+                      <p className="px-1 pb-1 text-sm leading-relaxed text-muted-foreground">
+                        {texto}
+                      </p>
+                    </details>
+                  );
+                })()}
               {/* materiais que o guia pede pro encontro — sem material,
                   o bloco não renderiza (nada de seção vazia) */}
               {materiaisDoEncontro.length > 0 && (
@@ -1836,15 +1961,46 @@ export function AgendaCalendario({
   if (eventosSel.length === 0) return null;
 
   return (
-    <div
-      className={cn(
-        "space-y-4",
-        // o grid de duas colunas (calendário + painel) existe nas visões com
-        // detalhe do dia; horarios e lista são coluna única full-width
-        comDetalheDia &&
-          "lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(300px,340px)] lg:items-start lg:gap-5 lg:space-y-0"
+    <div className="space-y-4">
+      {/* faixa "Semana do programa" compartilhada (REALIZA-195 · v8b) — a
+          mesma estrutura do monitoramento; no calendário o recorte é o
+          cronograma selecionado (o board é por turma) e supervisões ficam
+          na mesa de monitoramento — aqui só os oficiais. A faixa NÃO
+          depende de `materiais` (fetch tardio) — usa o evento + guia.
+          Fora do grid do painel pra não disputar a linha 1 */}
+      {ehCoordSup && (
+        <SemanaDoPrograma
+          itens={itensDaSemanaPrograma(
+            eventos.filter(
+              (e) =>
+                cronogramaSel == null || e.cronograma_id === cronogramaSel
+            ),
+            cronogramas,
+            [],
+            new Date(agoraMs),
+            // meta "N duplas" do encontro — o escopo que o RLS entrega
+            // (coorte pra coord; supervisionadas + própria pro híbrido)
+            duplas
+          )}
+          hoje={hoje}
+          modo="coord"
+          // "Abrir chamada" é da coordenação — o painel de presença é dela
+          // (sup+mentor lê a faixa mas nunca tem o CTA)
+          podeChamada={ehCoord}
+          titulo="Semana do programa"
+          ariaLabel="Semana do programa"
+        />
       )}
-    >
+
+      <div
+        className={cn(
+          "space-y-4",
+          // o grid de duas colunas (calendário + painel) existe nas visões
+          // com detalhe do dia; horarios e ciclo são coluna única full-width
+          comDetalheDia &&
+            "lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(300px,340px)] lg:items-start lg:gap-5 lg:space-y-0"
+        )}
+      >
       {/* ===== calendário / board da semana / lista do ciclo ===== */}
       <div className="overflow-hidden rounded-xl bg-card shadow-[var(--shadow-border)] lg:col-start-1 lg:row-start-1">
         {/* etapas de preparação (0062) — contexto do cronograma, não
@@ -1852,7 +2008,7 @@ export function AgendaCalendario({
             data (ONG parceira) só existem aqui — fora da grade e da semana */}
         {etapasPreparacao.length > 0 && (
           <details className="group border-b">
-            <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-2.5 text-sm text-muted-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:px-5 [&::-webkit-details-marker]:hidden">
+            <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 px-4 py-2.5 text-sm text-muted-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:min-h-8 sm:px-5 [&::-webkit-details-marker]:hidden">
               <CaretDown
                 aria-hidden
                 size={14}
@@ -1903,11 +2059,11 @@ export function AgendaCalendario({
           </details>
         )}
         {/* chrome do card, uma faixa só: "como olhar" à esquerda (visão —
-            coord/sup alternam dia/semana/mês/lista, a unidade de trabalho
+            coord/sup alternam dia/semana/mês/ciclo — a unidade de trabalho
             delas é a semana; o mentor alterna dia/mês/semana/horários,
             REALIZA-25/163) + "o que olhar" à direita (turma, quando há
             mais de um cronograma aplicável) */}
-        {(ehCoordSup || ehMentor || opcoesCron.length > 1) && (
+        {(ehCoordSup || ehMentorUi || opcoesCron.length > 1) && (
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-b px-2 py-1.5 sm:px-3">
             {/* escolha exclusiva → radio nativo (padrão OpcaoPilula): setas do
                 teclado e "selecionado" na leitura de tela saem de graça; a
@@ -1921,7 +2077,7 @@ export function AgendaCalendario({
                     ["dia", "Dia"],
                     ["semana", "Semana"],
                     ["mes", "Mês"],
-                    ["lista", "Lista"],
+                    ["ciclo", "Ciclo"],
                   ] as const
                 ).map(([v, rotulo]) => (
                   <label
@@ -1947,7 +2103,7 @@ export function AgendaCalendario({
                 ))}
               </fieldset>
             )}
-            {ehMentor && (
+            {ehMentorUi && (
               <fieldset className="flex items-center gap-1">
                 <legend className="sr-only">Visão da agenda</legend>
                 {(
@@ -1983,8 +2139,10 @@ export function AgendaCalendario({
             {/* seletor de turma (0061) — com duas turmas ativas, cada uma tem
                 seu calendário oficial: a agenda mostra uma por vez, nunca a
                 união. Vale pra coord/sup e pro mentor com duplas em turmas
-                diferentes. O valor é a turma ("T1 · 2026/2027", nunca
-                trunca); o item carrega a posição da turma no ciclo */}
+                diferentes. O VALUE é o id do cronograma (nunca a string de
+                turma — duplicatas não colidem); o label vai na forma
+                narrativa canônica e o nome do calendário desambigua quando
+                duas opções têm a mesma turma */}
             {opcoesCron.length > 1 && (
               <div className="ms-auto flex items-center gap-2">
                 <Label
@@ -2000,8 +2158,8 @@ export function AgendaCalendario({
                     opcoesCron.map((c) => [
                       c.id,
                       turmasRepetidas.has(c.turma)
-                        ? `${c.turma} · ${c.nome}`
-                        : c.turma,
+                        ? `${turmaLonga(c.turma)} · ${c.nome}`
+                        : turmaLonga(c.turma),
                     ])
                   )}
                 >
@@ -2019,7 +2177,7 @@ export function AgendaCalendario({
                       <SelectItem key={c.id} value={c.id}>
                         <span className="flex flex-col">
                           <span className="font-medium">
-                            {c.turma}
+                            {turmaLonga(c.turma)}
                             {turmasRepetidas.has(c.turma) && ` · ${c.nome}`}
                           </span>
                           <span className="text-xs text-muted-foreground">
@@ -2036,9 +2194,9 @@ export function AgendaCalendario({
         )}
 
         {/* chrome de navegação — por-visão: dias na "dia", meses no "mes",
-            semanas na "semana" e nos "horarios"; a "lista" é a visão geral
+            semanas na "semana" e nos "horarios"; o "ciclo" é a visão geral
             e não navega */}
-        {visaoEfetiva !== "lista" && (
+        {visaoEfetiva !== "ciclo" && (
           <div className="flex items-center gap-1 border-b px-2 py-1.5 sm:px-3">
             <button
               type="button"
@@ -2158,7 +2316,7 @@ export function AgendaCalendario({
             de disco das células, conector lime só no trecho já percorrido.
             No "mes" o toque abre o dia; nas visões de semana ("semana",
             "horarios") navega pra semana dele; na "dia", pro dia dele. */}
-        {visaoEfetiva !== "lista" && encontrosRail.length >= 2 && (
+        {visaoEfetiva !== "ciclo" && encontrosRail.length >= 2 && (
           <nav
             aria-label="Encontros da jornada"
             className="border-b px-3 pb-1.5 pt-2 sm:px-4"
@@ -2381,6 +2539,9 @@ export function AgendaCalendario({
                         {tintaDispo !== "nenhum" && (
                           <span
                             aria-hidden
+                            // locator estável das specs — o gradiente inline
+                            // era o único jeito de achar a tinta "ambos"
+                            data-tinta={tintaDispo}
                             className={cn(
                               "absolute inset-0 rounded-lg",
                               tintaDispo === "ambos"
@@ -2523,7 +2684,7 @@ export function AgendaCalendario({
         {/* ===== visão "semana" do mentor (REALIZA-25): a semana em grade
             compacta — blocos empilhados por hora + o mesmo painel de
             detalhe do dia embaixo/ao lado ===== */}
-        {visaoEfetiva === "semana" && ehMentor && (
+        {visaoEfetiva === "semana" && ehMentorUi && (
           <SemanaMentor
             semanaIso={semanaIso}
             selecionado={selecionado}
@@ -2536,7 +2697,7 @@ export function AgendaCalendario({
 
         {/* ===== visão "horarios" do mentor (REALIZA-25): a grade estilo
             calendário — clicar no vazio agenda, blocos levam à ficha ===== */}
-        {visaoEfetiva === "horarios" && ehMentor && (
+        {visaoEfetiva === "horarios" && ehMentorUi && (
           <HorariosMentor
             semanaIso={semanaIso}
             direcao={direcao}
@@ -2570,7 +2731,7 @@ export function AgendaCalendario({
               {/* atalho de agendamento do mentor: cai na grade de horários
                   ancorada na semana deste dia — a mesma troca do chip, com
                   a intenção no rótulo */}
-              {ehMentor && duplasAgendaveis.length > 0 && (
+              {ehMentorUi && duplasAgendaveis.length > 0 && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -2699,10 +2860,20 @@ export function AgendaCalendario({
                   </p>
                   <div className="mt-1.5">
                     <div className="flex items-center gap-2">
-                      <ResumoEncontrosDupla itens={itensBoard} agora={agoraMs} />
+                      {/* denominador único: as ativas do cronograma — quem
+                          não tem row do oficial vira segmento "sem data" */}
+                      <ResumoEncontrosDupla
+                        itens={itensBoard}
+                        total={resumoOficial?.total}
+                        agora={agoraMs}
+                      />
                     </div>
                     {/* legenda nomeada — nenhum dígito solto perto da barra */}
-                    <LegendaEncontrosDupla itens={itensBoard} agora={agoraMs} />
+                    <LegendaEncontrosDupla
+                      itens={itensBoard}
+                      total={resumoOficial?.total}
+                      agora={agoraMs}
+                    />
                   </div>
                 </div>
               )}
@@ -2748,12 +2919,150 @@ export function AgendaCalendario({
           </div>
         )}
 
-        {/* ===== visão "lista" (coord/sup): cobertura do ciclo inteiro ===== */}
-        {visaoEfetiva === "lista" && (
+        {/* ===== visão "ciclo" (coord/sup · v8b): timeline dos encontros
+            oficiais (altura da célula = cobertura) + acumulado honesto
+            dos passados + a linha-a-linha completa atrás de <details>.
+            Não navega no tempo — o clique na célula/linha salta pra
+            semana do encontro ===== */}
+        {visaoEfetiva === "ciclo" && (
           <div>
             <p className="px-4 pb-1 pt-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground sm:px-5">
-              Cobertura do ciclo
+              Encontros do ciclo — cobertura por número
             </p>
+            {/* timeline: uma célula por encontro oficial, altura = fração
+                realizada sobre as ativas daquela semana (denominador do
+                resumoSemanaDe — honesto por semana). Futuras = contorno
+                tracejado sem preenchimento */}
+            <div
+              role="region"
+              aria-label="Timeline dos encontros do ciclo — role horizontalmente"
+              tabIndex={0}
+              className="scroll-fina overflow-x-auto px-4 pt-2 sm:px-5"
+            >
+              <ol className="flex min-w-[34rem] items-end gap-1">
+                {encontrosCiclo.map((e) => {
+                  const resumoN = resumoSemanaDe(duplas, e);
+                  const passouN = e.data != null && e.data <= hoje;
+                  const total = resumoN?.total ?? 0;
+                  const feitos = resumoN?.realizaram ?? 0;
+                  const pct =
+                    passouN && total > 0
+                      ? Math.min(100, Math.round((feitos / total) * 100))
+                      : 0;
+                  const rotulo = `${e.numero}º encontro${
+                    e.data ? `, ${diaCompacto(e.data)}` : ", sem data"
+                  } — ${
+                    passouN
+                      ? `${feitos} de ${total} realizaram`
+                      : "ainda não chegou"
+                  }`;
+                  return (
+                    <li key={e.id} className="flex-1">
+                      <button
+                        type="button"
+                        disabled={e.data == null}
+                        onClick={() => {
+                          if (e.data == null) return;
+                          irParaSemana(semanaBounds(parseDia(e.data)).seg);
+                          setVisao("semana");
+                        }}
+                        aria-label={rotulo}
+                        className={cn(
+                          "flex w-full flex-col items-stretch gap-1 rounded-md p-1 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                          e.data != null && "hover:bg-muted/50"
+                        )}
+                      >
+                        <span
+                          aria-hidden
+                          className={cn(
+                            "relative h-16 overflow-hidden rounded-[4px] bg-muted",
+                            // encontro futuro: moldura tracejada via border
+                            // (ring-dashed não existe no Tailwind v4 — o
+                            // tracejado sumia e o slot futuro ficava nu)
+                            !passouN &&
+                              "border border-dashed border-muted-foreground/35 bg-transparent"
+                          )}
+                        >
+                          {passouN && (
+                            <span
+                              className="absolute inset-x-0 bottom-0 bg-[var(--brand-lime)] transition-[height] duration-500 ease-snappy"
+                              style={{ height: `${pct}%` }}
+                            />
+                          )}
+                          {passouN && total > 0 && feitos < total && (
+                            <span className="viz-hatch absolute inset-x-0 top-0" style={{ height: `${100 - pct}%` }} />
+                          )}
+                        </span>
+                        <span
+                          className={cn(
+                            "text-center text-[10px] font-medium tabular-nums",
+                            passouN
+                              ? "text-muted-foreground"
+                              : "text-muted-foreground/60"
+                          )}
+                        >
+                          {e.numero}
+                        </span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ol>
+            </div>
+
+            {/* acumulado do ciclo — soma das semanas já passadas, um
+                denominador só (Σ das ativas de cada semana oficial) */}
+            <div className="mx-4 mt-3 rounded-lg bg-muted/40 px-3 py-2.5 sm:mx-5">
+              <p className="text-xs text-muted-foreground">
+                <b className="font-semibold text-foreground tabular-nums">
+                  {acumCiclo.comRegistro} de {acumCiclo.esperados}
+                </b>{" "}
+                encontros oficiais com registro — acumulado do ciclo
+              </p>
+              {acumCiclo.esperados > 0 && (
+                <BarraSegmentada
+                  className="mt-1.5"
+                  altura="md"
+                  denominador={acumCiclo.esperados}
+                  legenda
+                  segmentos={[
+                    {
+                      valor: acumCiclo.comRegistro,
+                      rotulo: "com registro",
+                      cls: "bg-[var(--ok)]",
+                    },
+                    {
+                      valor: acumCiclo.aguardando,
+                      rotulo: "pendentes de registro",
+                      cls: "bg-[var(--warn)]",
+                    },
+                    {
+                      valor: acumCiclo.agendados,
+                      rotulo: "agendados",
+                      cls: "bg-muted-foreground/40",
+                    },
+                    {
+                      valor: acumCiclo.naoAconteceram,
+                      rotulo: "não aconteceram",
+                      cls: "bg-muted-foreground/25",
+                    },
+                    { valor: acumCiclo.semData, rotulo: "sem data" },
+                  ]}
+                />
+              )}
+            </div>
+
+            {/* a linha-a-linha completa fica atrás de <details> — a
+                timeline responde "e o ciclo?", a lista prova cada número */}
+            <details className="group mt-2" open>
+              <summary className="mx-4 flex min-h-11 cursor-pointer list-none items-center gap-2 rounded-md py-2 text-xs font-medium text-muted-foreground select-none hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:mx-5 sm:min-h-8 [&::-webkit-details-marker]:hidden">
+                <CaretDown
+                  aria-hidden
+                  size={13}
+                  className="shrink-0 transition-transform group-open:rotate-180"
+                />
+                Linha a linha do ciclo
+              </summary>
             <ul className="divide-y divide-border/60 pb-1">
               {[...eventosSel]
                 // a sequência do PDF é `ordem` (0062), não a data — etapa
@@ -2822,6 +3131,7 @@ export function AgendaCalendario({
                             {itensN.length > 0 ? (
                               <ResumoEncontrosDupla
                                 itens={itensN}
+                                total={resumoN?.total}
                                 agora={agoraMs}
                               />
                             ) : (
@@ -2865,6 +3175,7 @@ export function AgendaCalendario({
                   );
                 })}
             </ul>
+            </details>
           </div>
         )}
 
@@ -2938,8 +3249,9 @@ export function AgendaCalendario({
       )}
 
       {/* ===== lista do mês — acompanhamento empilhado da visão "mes"; pra
-          coord/sup ela virou a visão "Lista" (cobertura do ciclo, dentro do
-          card), e nas grades do mentor ela não repete o que a grade mostra */}
+          coord/sup a leitura de conjunto virou a visão "Ciclo" (timeline
+          dentro do card), e nas grades do mentor ela não repete o que a
+          grade mostra */}
       {!ehCoordSup && visaoEfetiva === "mes" && (
       <section
         aria-label={`Todos os eventos de ${rotuloMes}`}
@@ -3061,6 +3373,7 @@ export function AgendaCalendario({
         </div>
       </section>
       )}
+      </div>
     </div>
   );
 }
@@ -4189,6 +4502,7 @@ function SemanaMentor({
                 {tintaDispo !== "nenhum" && (
                   <span
                     aria-hidden
+                    data-tinta={tintaDispo}
                     className={cn(
                       "pointer-events-none absolute inset-0",
                       tintaDispo === "ambos"
@@ -4728,6 +5042,7 @@ function ColunaHorario({
               <span
                 key={h}
                 aria-hidden
+                data-tinta={tinta}
                 className={cn(
                   "pointer-events-none absolute inset-x-0",
                   tinta === "ambos" ? undefined : TINTA_DISPONIBILIDADE[tinta]

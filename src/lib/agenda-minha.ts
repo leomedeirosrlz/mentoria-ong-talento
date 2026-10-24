@@ -30,6 +30,7 @@ import type {
   Supervisao,
   TrilhaJovem,
 } from "./types";
+import { turmaCurta } from "./turma";
 
 // ---------- escopo ----------
 
@@ -238,10 +239,13 @@ export function primeiroNomeDaDupla(d: Dupla): string {
     .split(/\s+/)[0] ?? "";
 }
 
-/** Rótulo do chip do jovem: "Ana · 2026/2027" — 1º nome + turma da dupla. */
+/** Rótulo do chip do jovem: "Ana · T1" — 1º nome + sigla da turma (a forma
+ *  compacta canônica; o cru "T1 · 2026/2027" quebrava o chip). Dupla sem
+ *  turma fica só o nome — nada de separador pendurado ("Ana · "). */
 export function rotuloChipDupla(d: Dupla): string {
   const nome = primeiroNomeDaDupla(d) || "Jovem";
-  return `${nome} · ${d.turma}`;
+  const turma = turmaCurta(d.turma);
+  return turma ? `${nome} · ${turma}` : nome;
 }
 
 // ---------- derivações ----------
@@ -317,7 +321,7 @@ function avisosDaDupla(d: Dupla, hoje: string, agoraMs: number): AvisoAgenda[] {
       escopo,
       duplaId: d.id,
       encontro: e,
-      titulo: `Registro do encontro ${e.numero} · ${nome1} · ${d.turma}`,
+      titulo: `Registro do encontro ${e.numero} · ${nome1} · ${turmaCurta(d.turma)}`,
       detalhe: limbo
         ? `Marcado para ${formatDiaHora(e.data_hora)} e sem registro — aconteceu? Confirme como foi ou remarque.`
         : "Pendente — preencha atividades, avaliação e próximo passo.",
@@ -340,7 +344,7 @@ function avisosDaDupla(d: Dupla, hoje: string, agoraMs: number): AvisoAgenda[] {
       escopo,
       duplaId: d.id,
       encontro: null,
-      titulo: `Combinado vencido · ${nome1} · ${d.turma}`,
+      titulo: `Combinado vencido · ${nome1} · ${turmaCurta(d.turma)}`,
       detalhe: `${enc.descricao} — o prazo era ${formatDiaMes(enc.prazo)}${
         enc.responsavel === "mentor" ? "" : " (combinado do mentorado)"
       }.`,
@@ -394,7 +398,7 @@ function itensDaDupla(
         ts: null,
         hora: null,
         fim: null,
-        rotulo: `Encontro ${e.numero} · ${d.turma}`,
+        rotulo: `Encontro ${e.numero} · ${turmaCurta(d.turma)}`,
         titulo: `Encontro ${e.numero} de ${total} com ${nomeCompleto}`,
         estado: "a agendar",
         meta: ["marcado sem horário — escolha uma nova data"],
@@ -455,7 +459,7 @@ function itensDaDupla(
       ts: inicio,
       hora: inicio != null ? fmtHora.format(new Date(inicio)) : null,
       fim: fim ? fmtHora.format(fim) : null,
-      rotulo: `Encontro ${e.numero} · ${d.turma}`,
+      rotulo: `Encontro ${e.numero} · ${turmaCurta(d.turma)}`,
       titulo: `Encontro ${e.numero} de ${total} com ${nomeCompleto}`,
       estado: STATUS_ENCONTRO_LABEL[e.status],
       meta,
@@ -524,7 +528,7 @@ function itensDaDupla(
         ts: null,
         hora: null,
         fim: null,
-        rotulo: `Encontro ${numero} · ${d.turma}`,
+        rotulo: `Encontro ${numero} · ${turmaCurta(d.turma)}`,
         titulo: `Encontro ${numero} de ${total} com ${nomeCompleto}`,
         estado: "a agendar",
         meta,
@@ -568,7 +572,7 @@ function itensDaDupla(
         ts: inicio,
         hora: inicio != null ? fmtHora.format(new Date(inicio)) : null,
         fim: fim ? fmtHora.format(fim) : null,
-        rotulo: `Trilha de especialista · sessão ${passo} de ${TRILHA_LEN.especialista} · ${d.turma}`,
+        rotulo: `Trilha de especialista · sessão ${passo} de ${TRILHA_LEN.especialista} · ${turmaCurta(d.turma)}`,
         titulo: trilha.especialista_nome
           ? `Sessão com ${trilha.especialista_nome}`
           : "Sessão de especialista",
@@ -686,7 +690,7 @@ function itensPrograma(
         escopo: "eu",
         tipo: "programa",
         rotulo: "Formação de mentores",
-        meta: turma ? [turma] : [],
+        meta: turma ? [turmaCurta(turma)] : [],
         convidado: false,
         notaConvidado: null,
       });
@@ -698,7 +702,7 @@ function itensPrograma(
           id: `prog-${ev.id}-${d.id}`,
           escopo: `dupla:${d.id}`,
           tipo: "programa",
-          rotulo: `Evento oficial do ciclo · ${d.turma}`,
+          rotulo: `Evento oficial do ciclo · ${turmaCurta(d.turma)}`,
           meta: [],
           convidado: true,
           notaConvidado: `agenda de ${nome1} · evento oficial`,
@@ -831,7 +835,7 @@ function resumoDaSemana(
         .map(({ e, d }) => {
           const iso = isoDoEncontro(e)!;
           const dia = diaDoIso(iso)!;
-          return `${diaSemanaCurto(dia)} ${fmtHora.format(new Date(iso))} (${d.turma})`;
+          return `${diaSemanaCurto(dia)} ${fmtHora.format(new Date(iso))} (${turmaCurta(d.turma)})`;
         })
         .join(", ") || null,
     sessoesEsp: sessoes.length,

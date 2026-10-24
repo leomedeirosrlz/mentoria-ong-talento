@@ -5,6 +5,7 @@ import {
   papelLabel,
   TRILHA_LABEL,
 } from "@/lib/ciclo";
+import { turmaLonga } from "@/lib/turma";
 import type { EncontroStatus, Trilha } from "@/lib/types";
 
 // ---------- config ----------
@@ -807,11 +808,11 @@ export function resumoRecorteLink(cfg: RelatorioLinkConfig): string {
     partes.push(
       cfg.granularidade === "duplas" ? "Grade de duplas" : "Grade de pessoas"
     );
-    if (cfg.turma) partes.push(cfg.turma);
+    if (cfg.turma) partes.push(turmaLonga(cfg.turma));
     partes.push(cfg.expor_contato ? "com contato" : "sem contato");
   } else if (cfg.tipo === "ciclo") {
     partes.push("Encontro a encontro");
-    if (cfg.turma) partes.push(cfg.turma);
+    if (cfg.turma) partes.push(turmaLonga(cfg.turma));
     if (cfg.cronograma_id) partes.push("1 cronograma");
   } else {
     partes.push("Assinaturas");
@@ -821,3 +822,26 @@ export function resumoRecorteLink(cfg: RelatorioLinkConfig): string {
   }
   return partes.join(" · ");
 }
+
+/** Evento do log de acesso (resumo_acessos, 0106+0110) como o painel "Ver
+ *  acessos" consome — `origem` é o ip_hash truncado (pseudônimo: serve pra
+ *  distinguir "mesma origem?" sem virar identificador). */
+export type ResumoAcessoItem = {
+  slug: string;
+  acessado_em: string;
+  ok: boolean;
+  motivo: string | null;
+  user_agent: string | null;
+  origem: string | null;
+};
+
+/** Rótulos do motivo interno da falha (enum do check em resumo_acessos,
+ *  0110) — o visitante nunca os vê; são pra auditoria da coordenação. */
+export const MOTIVO_ACESSO_LABEL: Record<string, string> = {
+  senha: "Senha incorreta",
+  limite: "Limite de tentativas",
+  revogado: "Link revogado",
+  expirado: "Link expirado",
+  sem_link: "Link inexistente",
+  config: "Recorte inválido",
+};

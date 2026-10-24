@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import { promoverMentorado, type PapelMentorAlvo } from "@/lib/actions-promocao";
 import type { Cronograma, Mentorado } from "@/lib/types";
+import { turmaLonga } from "@/lib/turma";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -206,7 +207,10 @@ export function PromoverMentorDialog({
               </Label>
               <Select
                 value={turma}
-                items={Object.fromEntries(turmas.map((t) => [t, t]))}
+                items={Object.fromEntries(
+                  // value cru = o escopo gravado; label narrativo (Turma 2)
+                  turmas.map((t) => [t, turmaLonga(t)])
+                )}
                 onValueChange={(v) => {
                   setTurma(v ?? null);
                   setErro(null);
@@ -221,7 +225,7 @@ export function PromoverMentorDialog({
                 <SelectContent>
                   {turmas.map((t) => (
                     <SelectItem key={t} value={t}>
-                      {t}
+                      {turmaLonga(t)}
                     </SelectItem>
                   ))}
                 </SelectContent>

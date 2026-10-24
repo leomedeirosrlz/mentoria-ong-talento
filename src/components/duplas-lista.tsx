@@ -3,7 +3,10 @@
 import { type CSSProperties, useState } from "react";
 import Link from "next/link";
 import {
+  CaretRight,
+  ChatsCircle,
   Clock,
+  DotsThreeVertical,
   DownloadSimple,
   Funnel,
   Lifebuoy,
@@ -26,6 +29,8 @@ import {
   ultimoRegistro,
 } from "@/lib/ciclo";
 import { prazoTrilhaEspecialista } from "@/lib/encerramento";
+import { turmaCurta, turmaLonga } from "@/lib/turma";
+import { rotuloDiaAgenda } from "@/lib/agenda-minha";
 import { msgsContato } from "@/lib/whatsapp-msgs";
 import type { Interacao } from "@/lib/interacoes";
 import type { SupervisaoAlvo } from "@/lib/queries-supervisao";
@@ -40,9 +45,15 @@ import { DuplaNomes } from "@/components/dupla-nomes";
 import { AvaliacaoBadge } from "@/components/semaforo";
 import { NovaDuplaDialog } from "@/components/nova-dupla-dialog";
 import { ImportarCsvDialog } from "@/components/importar-csv-dialog";
-import { LembreteButton } from "@/components/lembrete-button";
+import { DuplaWaAcao } from "@/components/dupla-wa-acao";
 import { SupervisaoDialog } from "@/components/supervisao-dialog";
 import { Button, buttonVariants } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { filterChipCls } from "@/components/ui/filter-chip";
 import { Input } from "@/components/ui/input";
 import {
@@ -164,13 +175,19 @@ function encontroPendente(d: Dupla, hoje: Date) {
 }
 
 /** A linha de sinais da coluna: cada critério aceso com seu detalhe,
- *  mais a recência do último encontro; "jornada em dia" quando nada aceso. */
+ *  mais a recência do último encontro; "jornada em dia" quando nada aceso.
+ *  Fora da régua (pausada/concluída/encerrada) s.sinais é [] por definição —
+ *  o texto é o rótulo do status em saude.motivos, nunca um "em dia" que
+ *  contradiz a pill ao lado. */
 function textoSinais(d: Dupla, saude: Saude, hojeStr: string) {
-  const partes = saude.sinais.map(
-    (s) =>
-      s.texto +
-      (s.detalhe ? (s.detalhe.startsWith("há") ? ` ${s.detalhe}` : ` (${s.detalhe})`) : "")
-  );
+  const partes =
+    d.status !== "ativa"
+      ? [...saude.motivos]
+      : saude.sinais.map(
+          (s) =>
+            s.texto +
+            (s.detalhe ? (s.detalhe.startsWith("há") ? ` ${s.detalhe}` : ` (${s.detalhe})`) : "")
+        );
   if (partes.length === 0) {
     partes.push(saude.proximo ? "em dia" : "em dia, nada agendado");
     if (saude.proximo)
@@ -198,7 +215,8 @@ function LinhaDupla({
   eventos,
   hojeStr,
   mostrarSupervisor,
-  acao,
+  wa,
+  menu,
   i,
 }: {
   d: Dupla;
@@ -206,9 +224,13 @@ function LinhaDupla({
   eventos: CicloEvento[];
   hojeStr: string;
   mostrarSupervisor: boolean;
-  /** o botão da linha que não é "Ver ficha" — Lembrar (coord, só com
-   *  pendência) ou Registrar supervisão (auxiliar). */
-  acao?: React.ReactNode;
+  /** ação WhatsApp sempre visível — "Lembrar" onde há pendência apontável
+   *  em dupla ativa, "Chamar" nas demais (o DuplaWaAcao resolve o resto:
+   *  menu ▾, cap 48h, sem telefone). */
+  wa: React.ReactNode;
+  /** menu ⋮ das ações secundárias do papel — ex.: "Registrar supervisão"
+   *  (auxiliar). A coord não tem secundária: a linha fica WA + Ver ficha. */
+  menu?: React.ReactNode;
   i: number;
 }) {
   const estado = estadoDaDupla(d, saude);
@@ -219,6 +241,9 @@ function LinhaDupla({
   );
   const ehEsp = d.trilha === "especialista";
   const esperadoPct = !ehEsp && total > 0 ? Math.min(saude.esperado / total, 1) : null;
+  const realizados = new Set(
+    d.encontros.filter((e) => e.status === "realizado").map((e) => e.numero)
+  );
   const ultimoReg = ultimoRegistro(d);
   const encontroDoReg = ultimoReg
     ? d.encontros.find((e) => e.registro?.id === ultimoReg.id)
@@ -241,46 +266,73 @@ function LinhaDupla({
         : d.status !== "ativa"
           ? "text-muted-foreground"
           : "text-foreground/80";
+  // cor dos segmentos preenchidos — segue o semáforo da linha (mock:
+  // .s-risco/.s-atencao/.s-pausa recolorem os "on", não a trilha inteira)
+  const segOn =
+    estado.tom === "risco"
+      ? "bg-[var(--danger)] shadow-none"
+      : estado.tom === "atencao"
+        ? "bg-[var(--warn)] shadow-none"
+        : d.status !== "ativa"
+          ? "bg-muted-foreground/40 shadow-none"
+          : "bg-[var(--ok)] shadow-none";
 
   return (
     <div
       style={{ "--i": Math.min(i, 10) } as CSSProperties}
       className={cn(
         "animate-enter transition-colors",
-        // desktop: a grade densa; mobile: vira card empilhado
-        "flex flex-col gap-2 rounded-xl border border-border bg-card p-3 lg:grid lg:items-center lg:gap-x-4 lg:gap-y-0 lg:rounded-none lg:border-0 lg:px-5 lg:py-2.5 lg:hover:bg-muted/50",
+        // mobile: card wrap — pílulas e ações no TOPO (order), conteúdo
+        // embaixo. Nunca uma faixa de ações no fim do card (a faixa-footer
+        // morta que o Léo marcou no screenshot)
+        "flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-border bg-card p-3",
+        // desktop: a grade densa (as orders viram grid em ordem de DOM)
+        "lg:grid lg:items-center lg:gap-x-4 lg:gap-y-0 lg:rounded-none lg:border-0 lg:px-5 lg:py-2.5 lg:hover:bg-muted/50",
         GRID_COLS,
         saude.apoio.aberto && "bg-[var(--info-bg)]/60 lg:hover:bg-[var(--info-bg)]"
       )}
     >
-      {/* estado + apoio (eixo separado — pill azul sobre o estado real);
-          no mobile, "Ver ficha" mora aqui quando não há ação — nada de
-          rodapé com um link solto no fim do card */}
-      <div className="flex flex-wrap items-center gap-1.5 lg:flex-col lg:items-start lg:gap-1">
+      {/* estado + apoio (eixo separado — pill azul sobre o estado real) */}
+      <div className="order-1 flex flex-wrap items-center gap-1.5 lg:order-none lg:flex-col lg:items-start lg:gap-1">
         <Pill tom={estado.tom}>
           <span aria-hidden className="size-1.5 rounded-full bg-current" />
           {estado.label}
         </Pill>
         {saude.apoio.aberto && (
-          <Link href={`/duplas/${d.id}`} className="rounded-full">
+          <Link
+            href={`/duplas/${d.id}`}
+            className="inline-flex min-h-11 items-center rounded-full focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50 lg:min-h-0"
+          >
             <Pill tom="apoio">
               <Lifebuoy size={12} aria-hidden />
               Apoio
             </Pill>
           </Link>
         )}
-        {!acao && (
+      </div>
+
+      {/* ações consolidadas: WhatsApp sempre + ⋮ quando há secundária +
+          "Ver ficha". No mobile ficam no topo à direita; no desktop a
+          célula empilha WA sobre [⋮ + Ver ficha] — ~2 linhas de altura
+          dentro da própria linha, sem faixa-footer */}
+      <div className="order-2 ml-auto flex items-center gap-1.5 lg:order-6 lg:ml-0 lg:flex-col lg:items-end lg:justify-center lg:gap-0.5">
+        {wa}
+        <span className="contents lg:flex lg:items-center lg:gap-1 lg:justify-end">
+          {menu}
           <Link
             href={`/duplas/${d.id}`}
-            className="ml-auto inline-flex min-h-11 items-center whitespace-nowrap rounded-lg px-2 text-xs font-semibold text-foreground/80 hover:bg-muted hover:text-foreground lg:hidden"
+            aria-label={`Ver ficha da dupla de ${d.mentorado.nome.split(" ")[0]}`}
+            title="Ver ficha"
+            className="inline-grid size-11 shrink-0 place-items-center rounded-xl border border-border bg-card text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50 md:size-auto md:h-8 md:min-w-0 md:rounded-lg md:border-0 md:bg-transparent md:px-1.5 md:text-xs md:font-semibold md:text-foreground/80 md:hover:bg-muted md:hover:text-foreground lg:h-auto lg:py-0.5"
           >
-            Ver ficha ›
+            <span className="hidden md:inline whitespace-nowrap">Ver ficha ›</span>
+            <CaretRight size={15} weight="bold" aria-hidden className="md:hidden" />
           </Link>
-        )}
+        </span>
       </div>
 
       {/* a dupla */}
-      <div className="flex min-w-0 items-center gap-2.5">
+      <div className="order-3 flex min-w-0 basis-full items-center gap-2.5 lg:order-none lg:basis-auto">
         <DuplaAvatares mentor={d.mentor} mentorado={d.mentorado} size={32} />
         <div className="min-w-0">
           <p className="flex min-w-0 items-center gap-1 text-sm font-semibold">
@@ -293,7 +345,7 @@ function LinhaDupla({
           </p>
           <p className="mt-0.5 truncate text-xs text-muted-foreground">
             {[
-              d.turma || null,
+              d.turma ? turmaLonga(d.turma) : null,
               mostrarSupervisor &&
                 (d.supervisor ? `sup. ${d.supervisor.nome}` : "sem supervisor"),
             ]
@@ -303,8 +355,10 @@ function LinhaDupla({
         </div>
       </div>
 
-      {/* feito × esperado — o traço marca onde o calendário esperava estar */}
-      <div className="min-w-0">
+      {/* encontros em segmentos 1–N — cada quadrado é um encontro do
+          ciclo; o traço marca onde o calendário da turma já esperava
+          estar. "4/16" nunca aparece como texto solto (mock v6a) */}
+      <div className="order-4 min-w-0 basis-full max-w-md lg:order-none lg:basis-auto lg:max-w-none">
         <div className="mb-1 flex items-baseline justify-between text-[11px] text-muted-foreground">
           <b className="text-xs font-semibold text-foreground">
             {feitos} de {total}
@@ -317,32 +371,32 @@ function LinhaDupla({
                 : `esperado: ${saude.esperado}`}
           </span>
         </div>
-        <div
-          role="progressbar"
-          aria-valuenow={feitos}
-          aria-valuemin={0}
-          aria-valuemax={total}
-          aria-label={`${feitos} de ${total} encontros`}
-          className="relative h-1.5 overflow-visible rounded-full bg-muted"
-        >
+        <div className="relative">
           <div
-            className={cn(
-              "fill-grow h-full rounded-full transition-[width] duration-500 ease-snappy",
-              estado.tom === "risco"
-                ? "bg-[var(--danger)]"
-                : estado.tom === "atencao"
-                  ? "bg-[var(--warn)]"
-                  : d.status !== "ativa"
-                    ? "bg-muted-foreground/40"
-                    : "bg-[var(--ok)]"
-            )}
-            style={{ width: `${total > 0 ? Math.min((feitos / total) * 100, 100) : 0}%` }}
-          />
-          {/* o tick do esperado — "está aqui, devia estar ali" */}
-          {esperadoPct != null && (
+            role="img"
+            aria-label={`${feitos} de ${total} encontros realizados${
+              esperadoPct != null ? `, esperados ${saude.esperado} até hoje` : ""
+            }`}
+            className="flex h-2 gap-px"
+          >
+            {Array.from({ length: total }, (_, n) => (
+              <span
+                key={n}
+                className={cn(
+                  "min-w-0 flex-1 rounded-[2px] bg-muted shadow-[inset_0_0_0_1px_hsl(75_6%_84%)]",
+                  realizados.has(n + 1) && segOn
+                )}
+              />
+            ))}
+          </div>
+          {/* o traço do esperado só corre em dupla ativa — fora da régua
+              não existe "onde o calendário esperava estar". O -translate-x-1/2
+              centraliza o marcador na posição (sem ele o tick sobrava 2px
+              pra direita do ponto real) */}
+          {esperadoPct != null && d.status === "ativa" && (
             <span
               aria-hidden
-              className="absolute -top-1 -bottom-1 w-0.5 rounded bg-foreground/50"
+              className="absolute -top-1 -bottom-1 w-0.5 -translate-x-1/2 rounded bg-foreground/50"
               style={{ left: `${esperadoPct * 100}%` }}
             />
           )}
@@ -351,7 +405,12 @@ function LinhaDupla({
 
       {/* sinais — todos os critérios acesos, com recência; sempre 1 linha
           (title carrega o texto inteiro, a ficha tem o detalhe) */}
-      <div className={cn("min-w-0 text-[11px] leading-normal", tomSinais)}>
+      <div
+        className={cn(
+          "order-5 min-w-0 basis-[55%] text-[11px] leading-normal lg:order-none lg:basis-auto",
+          tomSinais
+        )}
+      >
         <p className="truncate" title={tituloSinais}>
           {/* texto integral pro leitor de tela — o truncate é só visual e
               o title não chega em toque/teclado */}
@@ -376,7 +435,12 @@ function LinhaDupla({
       </div>
 
       {/* última avaliação do mentor */}
-      <div className={cn("flex items-center gap-2 lg:flex-col lg:items-start lg:gap-1", d.status !== "ativa" && "opacity-60")}>
+      <div
+        className={cn(
+          "order-6 ml-auto flex items-center gap-2 lg:order-none lg:ml-0 lg:flex-col lg:items-start lg:gap-1",
+          d.status !== "ativa" && "opacity-60"
+        )}
+      >
         {ultimoReg?.avaliacao ? (
           <>
             <AvaliacaoBadge avaliacao={ultimoReg.avaliacao} />
@@ -389,68 +453,100 @@ function LinhaDupla({
           <span className="text-[11px] text-muted-foreground/70">—</span>
         )}
       </div>
-
-      {/* ações explícitas: a linha não é um link inteiro — "Ver ficha" é o
-          destino, a ação é separada (v5: nada de <a> aninhando botões).
-          Mobile sem ação: o bloco some — "Ver ficha" já está no topo do
-          card, rodapé com link solto é footer morto */}
-      <div
-        className={cn(
-          "items-center gap-2 lg:flex lg:justify-end",
-          acao ? "flex" : "hidden"
-        )}
-      >
-        {acao}
-        <Link
-          href={`/duplas/${d.id}`}
-          className="inline-flex min-h-11 items-center whitespace-nowrap rounded-lg px-2 text-xs font-semibold text-foreground/80 hover:bg-muted hover:text-foreground sm:min-h-8 lg:min-h-8"
-        >
-          Ver ficha ›
-        </Link>
-      </div>
     </div>
   );
 }
 
-/** Linha mínima da massa saudável — nomes + "7×7 em dia" + recência + link. */
+/** Linha mínima da massa saudável — nomes + mini-barra de encontros +
+ *  recência + WhatsApp ("Chamar" — toda dupla tem contato em 1 toque,
+ *  mesmo colapsada) + link. */
 function LinhaMini({
   d,
   saude,
+  eventos,
   hojeStr,
+  wa,
   i,
 }: {
   d: Dupla;
   saude: Saude;
+  eventos: CicloEvento[];
   hojeStr: string;
+  wa: React.ReactNode;
   i: number;
 }) {
   const feitos = d.encontros.filter((e) => e.status === "realizado").length;
+  const total = totalDaTrilha(
+    d.trilha,
+    eventosDoCronograma(eventos, d.cronograma_id)
+  );
+  const ehEsp = d.trilha === "especialista";
   const rec = recenciaUltimo(d, hojeStr);
   return (
     <div
       style={{ "--i": Math.min(i, 10) } as CSSProperties}
-      className="animate-enter grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 border-t border-border/60 px-5 py-2.5 text-[13px] lg:grid-cols-[minmax(190px,1.4fr)_110px_minmax(150px,1fr)_auto]"
+      className="animate-enter grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 border-t border-border/60 px-3 py-2 text-[13px] lg:grid-cols-[minmax(190px,1.4fr)_150px_minmax(150px,1fr)_auto_auto] lg:px-5 lg:py-2.5"
     >
       <span className="flex min-w-0 items-center gap-1.5 font-medium">
         <DuplaNomes truncar mentor={d.mentor.nome} mentorado={d.mentorado.nome} />
         {d.turma && (
-          <span className="rounded border border-border px-1 text-[10px] font-bold text-muted-foreground">
-            {d.turma}
+          <span
+            title={d.turma}
+            className="rounded border border-border px-1 text-[10px] font-bold text-muted-foreground"
+          >
+            {turmaCurta(d.turma)}
           </span>
         )}
       </span>
-      <span className="hidden text-xs font-semibold text-[var(--ok-text)] lg:inline">
-        {feitos}×{saude.esperado} em dia
+      <span className="hidden items-center gap-1.5 lg:inline-flex">
+        {/* mini-barra com o tick do esperado — substitui o "7×7 em dia"
+            solto (mock: .m-prog); o número fica no texto ao lado */}
+        <span
+          role="img"
+          aria-label={`${feitos} de ${total} encontros realizados`}
+          className="relative h-1.5 w-14 rounded-full bg-muted"
+        >
+          <span
+            aria-hidden
+            className="absolute inset-y-0 left-0 rounded-full bg-[var(--ok)]"
+            style={{
+              width: `${total > 0 ? Math.min((feitos / total) * 100, 100) : 0}%`,
+            }}
+          />
+          {/* idem barra cheia: tick centralizado (-translate-x-1/2) e só
+              em dupla ativa — fora da régua não há "esperado até hoje" */}
+          {!ehEsp && d.status === "ativa" && (
+            <span
+              aria-hidden
+              className="absolute -top-0.5 -bottom-0.5 w-0.5 -translate-x-1/2 rounded bg-foreground/50"
+              style={{
+                left: `${total > 0 ? Math.min((saude.esperado / total) * 100, 100) : 0}%`,
+              }}
+            />
+          )}
+        </span>
+        <span className="whitespace-nowrap text-xs font-semibold text-[var(--ok-text)]">
+          {feitos}/{total} · esp. {saude.esperado}
+        </span>
       </span>
       <span className="hidden truncate text-xs text-muted-foreground lg:inline">
         {rec}
       </span>
-      <Link
-        href={`/duplas/${d.id}`}
-        className="inline-flex min-h-11 items-center rounded px-1.5 py-2 text-xs font-semibold text-muted-foreground hover:text-foreground lg:min-h-0 lg:py-1"
-      >
-        Ver ficha ›
-      </Link>
+      {/* no desktop o span some (lg:contents) e WA+ficha ocupam as duas
+          colunas `auto` do fim do grid; no mobile ele é a célula de
+          ações inteira (nomes à esquerda, ações à direita) */}
+      <span className="flex items-center gap-1.5 lg:contents">
+        {wa}
+        <Link
+          href={`/duplas/${d.id}`}
+          aria-label={`Ver ficha da dupla de ${d.mentorado.nome.split(" ")[0]}`}
+          title="Ver ficha"
+          className="inline-grid size-11 shrink-0 place-items-center rounded-xl border border-border bg-card text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50 md:size-auto md:h-8 md:rounded md:border-0 md:bg-transparent md:px-1 md:py-1 md:text-xs md:font-semibold md:hover:bg-muted md:hover:text-foreground lg:h-7 lg:py-0.5"
+        >
+          <span className="hidden md:inline whitespace-nowrap">Ver ficha ›</span>
+          <CaretRight size={15} weight="bold" aria-hidden className="md:hidden" />
+        </Link>
+      </span>
     </div>
   );
 }
@@ -470,8 +566,8 @@ function CabecalhoColunas() {
     >
       <span>Status</span>
       <span>Dupla</span>
-      <span title="O traço na barra marca quantos encontros o calendário da turma já esperava até hoje">
-        Feito × esperado
+      <span title="Cada quadrado é um encontro do ciclo; o traço marca quantos o calendário da turma já esperava até hoje">
+        Encontros
       </span>
       <span>Sinais</span>
       <span>Avaliação do mentor</span>
@@ -526,7 +622,7 @@ function CatChip({
       aria-pressed={ativo}
       onClick={onClick}
       className={cn(
-        "flex min-h-11 flex-1 basis-[150px] flex-col gap-1 rounded-xl border p-3 text-left transition-[border-color,transform] hover:-translate-y-px hover:border-[var(--input)]",
+        "flex min-h-11 flex-1 basis-[150px] flex-col gap-1 rounded-xl border p-3 text-left transition-[border-color,transform] hover:-translate-y-px hover:border-[var(--input)] focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
         ativo
           ? "border-foreground bg-foreground text-background shadow-md"
           : "border-border bg-card"
@@ -598,6 +694,198 @@ function ResumoLinha({ resumo }: { resumo: ReturnType<typeof resumoDaLista> }) {
         </span>
       ))}
     </p>
+  );
+}
+
+// ---------- resumo agregado no topo (v6a: .sum) ----------
+
+/** Barra proporcional do semáforo + posição de cada turma no cronograma.
+ *  Na coordenação os segmentos são botões que filtram a lista (espelham os
+ *  chips de categoria); na auxiliar ficam informativos — ela não tem chips.
+ *  Concluída/encerrada somam na barra mas não filtram: não existe chip
+ *  "encerrada" pra espelhar. */
+function ResumoSemaforo({
+  lista,
+  saudePorId,
+  eventos,
+  hojeStr,
+  titulo,
+  onFiltrar,
+}: {
+  lista: Dupla[];
+  saudePorId: Map<string, Saude>;
+  eventos: CicloEvento[];
+  hojeStr: string;
+  /** "Semáforo — 26 duplas" · "Semáforo — 6 supervisionadas" */
+  titulo: string;
+  onFiltrar?: (cat: FiltroCat) => void;
+}) {
+  const cont = { risco: 0, atencao: 0, andamento: 0, pausada: 0, concluida: 0, encerrada: 0, apoio: 0 };
+  for (const d of lista) {
+    const s = saudePorId.get(d.id)!;
+    if (s.apoio.aberto) cont.apoio++;
+    if (d.status === "ativa")
+      cont[s.semaforo === "ok" ? "andamento" : s.semaforo]++;
+    else if (d.status === "pausada") cont.pausada++;
+    else if (d.status === "concluida") cont.concluida++;
+    else cont.encerrada++;
+  }
+
+  const segs = [
+    { n: cont.risco, cls: "bg-[var(--danger)]", dot: "bg-[var(--danger)]", label: `${cont.risco} em risco`, cat: "risco" as const },
+    { n: cont.atencao, cls: "bg-[var(--warn)]", dot: "bg-[var(--warn)]", label: `${cont.atencao} em atenção`, cat: "atencao" as const },
+    { n: cont.andamento, cls: "bg-[var(--ok)]", dot: "bg-[var(--ok)]", label: `${cont.andamento} em andamento`, cat: "andamento" as const },
+    { n: cont.pausada, cls: "bg-muted-foreground/50", dot: "bg-muted-foreground/50", label: `${cont.pausada} pausada${cont.pausada > 1 ? "s" : ""}`, cat: "pausada" as const },
+    { n: cont.concluida, cls: "bg-muted-foreground/40", dot: "bg-muted-foreground/40", label: `${cont.concluida} concluída${cont.concluida > 1 ? "s" : ""}`, cat: null },
+    { n: cont.encerrada, cls: "bg-muted-foreground/30", dot: "bg-muted-foreground/30", label: `${cont.encerrada} encerrada${cont.encerrada > 1 ? "s" : ""}`, cat: null },
+  ].filter((s) => s.n > 0);
+
+  // posição de cada turma no próprio cronograma — encontros que o
+  // calendário já esperava até hoje (T2 começa depois e não é atraso)
+  const porCron = new Map<string, { turma: string; n: number; evs: CicloEvento[] }>();
+  for (const d of lista) {
+    if (!d.cronograma_id) continue; // trilha especialista não corre o calendário
+    const g = porCron.get(d.cronograma_id);
+    if (g) g.n++;
+    else
+      porCron.set(d.cronograma_id, {
+        turma: d.turma || "Sem turma",
+        n: 1,
+        evs: eventosDoCronograma(eventos, d.cronograma_id),
+      });
+  }
+  const crons = [...porCron.values()].map((g) => {
+    const esperados = g.evs.filter(
+      (e) => e.tipo === "encontro" && e.data != null && e.data <= hojeStr
+    ).length;
+    const total = g.evs.filter((e) => e.tipo === "encontro").length;
+    const inicio = g.evs
+      .filter((e) => e.data != null)
+      .map((e) => e.data as string)
+      .sort()[0];
+    return { ...g, esperados, total, inicio: inicio ?? null };
+  });
+  crons.sort((a, b) => a.turma.localeCompare(b.turma, "pt-BR"));
+  const primeiroInicio = crons
+    .map((c) => c.inicio)
+    .filter((v): v is string => v != null)
+    .sort()[0];
+  // "T2 começou N semanas depois" — o contexto que impede ler defasagem
+  // como atraso
+  const notasAtraso: string[] = [];
+  if (primeiroInicio) {
+    for (const c of crons) {
+      if (!c.inicio) continue;
+      const dias = diffDias(c.inicio, primeiroInicio);
+      if (dias >= 7)
+        notasAtraso.push(
+          `${turmaLonga(c.turma)} começou ${Math.round(dias / 7)} sem. depois — não é atraso`
+        );
+    }
+  }
+
+  const labelBarra = `${lista.length} ${lista.length === 1 ? "dupla" : "duplas"}: ${segs.map((s) => s.label).join(", ")}`;
+
+  return (
+    <section
+      aria-label="Resumo do semáforo e do cronograma"
+      className="mt-5 grid gap-2.5 rounded-xl border border-border bg-card px-4 py-3 sm:grid-cols-[minmax(0,1.55fr)_minmax(230px,0.9fr)] sm:gap-x-6"
+    >
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5 text-[11px] font-bold uppercase tracking-[0.05em] text-muted-foreground">
+          <span>{titulo}</span>
+          {cont.apoio > 0 && (
+            <span className="inline-flex items-center gap-1 font-semibold normal-case tracking-normal text-[var(--info-text)]">
+              <Lifebuoy size={12} aria-hidden />+ {cont.apoio} apoio aberto
+              (eixo separado)
+            </span>
+          )}
+        </div>
+        {/* o resumo da barra vive em texto sr-only (a linha de legenda
+            abaixo agrega o mesmo pros olhos) — role="img" no container
+            interativo podava os segmentos da árvore mas eles seguiam
+            focáveis: o teclado pousava em controle sem nome */}
+        <span className="sr-only">{labelBarra}</span>
+        <div className="mt-1.5 flex h-11 gap-0.5 overflow-hidden rounded-full sm:h-5">
+          {segs.map((seg) =>
+            seg.cat && onFiltrar ? (
+              <button
+                key={seg.label}
+                type="button"
+                onClick={() => seg.cat && onFiltrar(seg.cat)}
+                aria-label={`${seg.label} — filtrar a lista`}
+                title={`${seg.label} — filtrar a lista`}
+                style={{ flexGrow: seg.n }}
+                className={cn(
+                  "grid min-w-5 place-items-center text-[10px] font-bold text-white transition-[filter] hover:brightness-110 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+                  seg.cls
+                )}
+              >
+                {seg.n}
+              </button>
+            ) : (
+              <span
+                key={seg.label}
+                aria-hidden
+                title={seg.label}
+                style={{ flexGrow: seg.n }}
+                className={cn(
+                  "grid min-w-5 place-items-center text-[10px] font-bold text-white",
+                  seg.cls
+                )}
+              >
+                {seg.n}
+              </span>
+            )
+          )}
+        </div>
+        <p className="mt-1.5 flex flex-wrap gap-x-3.5 gap-y-0.5 text-[11px] text-muted-foreground">
+          {segs.map((seg) => (
+            <span key={seg.label}>
+              <span
+                aria-hidden
+                className={cn("mr-1 inline-block size-2 rounded-full", seg.dot)}
+              />
+              <b className="font-semibold text-foreground">{seg.n}</b>{" "}
+              {seg.label.replace(/^\d+ /, "")}
+            </span>
+          ))}
+        </p>
+      </div>
+      {crons.length > 0 && (
+        <div className="grid min-w-0 content-center gap-1.5 sm:border-l sm:border-border sm:pl-5">
+          {crons.map((c) => (
+            <span
+              key={c.turma}
+              className="flex items-center gap-2 text-xs text-muted-foreground"
+            >
+              <span className="font-bold text-foreground">
+                {turmaLonga(c.turma)}
+              </span>
+              encontro{" "}
+              <b className="font-semibold text-foreground">
+                {c.esperados} de {c.total}
+              </b>
+              <span className="relative h-[7px] max-w-28 flex-1 overflow-hidden rounded-full bg-muted">
+                <span
+                  aria-hidden
+                  className="absolute inset-y-0 left-0 rounded-full bg-[var(--ok)]"
+                  style={{
+                    width: `${c.total > 0 ? Math.min((c.esperados / c.total) * 100, 100) : 0}%`,
+                  }}
+                />
+              </span>
+              {c.n} {c.n === 1 ? "dupla" : "duplas"}
+            </span>
+          ))}
+          {notasAtraso.map((n) => (
+            <span key={n} className="text-[11px] text-muted-foreground">
+              {n}
+            </span>
+          ))}
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -685,14 +973,32 @@ function EstadoVazio({
 
 // ---------- nudge da coordenação ----------
 
-function casoLembrete(d: Dupla, s: Saude, hoje: Date): string {
+function casoLembrete(
+  d: Dupla,
+  s: Saude,
+  hoje: Date,
+  origem?: string
+): string {
+  // pedido de apoio do mentor: responde o pedido antes da régua (a mesma
+  // prioridade do card do dashboard) — o do jovem nem chega aqui: troca
+  // a ponta inteira no waAcaoDaDupla
+  if (s.pediuApoio)
+    return "Vi seu pedido de apoio no registro. O que está rolando? Pode contar comigo.";
   const pendente = encontroPendente(d, hoje);
-  const link = pendente
-    ? `/duplas/${d.id}#registrar-${pendente.id}`
-    : null;
+  // o texto vai pro WhatsApp e pra notificação — path relativo ali é texto
+  // morto: o link só entra ABSOLUTO (origem = proto+host via headers na
+  // page, mesma técnica do dashboard); sem origem, omite o trecho
+  const link =
+    pendente && origem
+      ? `${origem}/duplas/${d.id}#registrar-${pendente.id}`
+      : null;
   const tipo = s.sinais[0]?.tipo;
   if (pendente?.status === "agendado")
-    return `O ${pendente.numero}º encontro estava agendado e já passou. Rolou? Se rolou, o registro é por aqui: ${link}`;
+    return `O ${pendente.numero}º encontro estava agendado e já passou. Rolou?${
+      link
+        ? ` Se rolou, o registro é por aqui: ${link}`
+        : " Se rolou, o registro é na ficha da dupla."
+    }`;
   if (tipo === "registro_pendente")
     return `Vi que o último encontro rolou, mas ainda falta o registro. Consegue preencher hoje?${link ? ` É direto por aqui: ${link}` : ""}`;
   if (tipo === "atraso")
@@ -700,6 +1006,88 @@ function casoLembrete(d: Dupla, s: Saude, hoje: Date): string {
   if (tipo === "preventivo")
     return "O próximo encontro do calendário já está perto e ainda não foi agendado. Posso ajudar a encaixar?";
   return "Vi que o último encontro teve pontos de atenção. Posso ajudar em algo?";
+}
+
+/** O WhatsApp sempre visível da linha (v6a): "Lembrar" só onde há
+ *  pendência apontável em dupla ativa — aí é nudge de verdade
+ *  (notificação + wa.me, cap 48h). Toda as outras — em dia, pausada,
+ *  encerrada — viram "Chamar": contato direto, sem sino e sem cap.
+ *  A mesma mensagem serve de notificação, wa.me, cópia e "ver texto".
+ *  O destino é por contexto: pendência operacional vai pro mentor (a
+ *  operação é dever dele — o mentorado nunca é cobrado por agendar ou
+ *  registrar), mas o pedido de apoio do JOVEM troca a ponta inteira —
+ *  pode ser sobre o próprio mentor, então a resposta é chamar ele com a
+ *  mensagem `apoio_jovem` (o caso que a fila-acompanhar sempre tratou). */
+function waAcaoDaDupla({
+  d,
+  s,
+  hoje,
+  ultimoNudge,
+  meuNome,
+  tituloNudge,
+  origem,
+}: {
+  d: Dupla;
+  s: Saude;
+  hoje: Date;
+  /** última interação `nudge` da dupla — alimenta o cap de 48h */
+  ultimoNudge: Interacao | null;
+  /** primeiro nome de quem opera — assina o texto */
+  meuNome?: string;
+  /** título da notificação do Lembrar (coord × supervisão) */
+  tituloNudge: string;
+  /** proto+host do deploy — monta o link absoluto dentro do texto do
+   *  lembrete; sem ele o trecho de link sai da mensagem */
+  origem?: string;
+}) {
+  // pedido de apoio que partiu do jovem (avaliacao_jovem.pedir_apoio) —
+  // origem "ambos" também resolve pra ele: o canal de segurança do jovem
+  // é o que não pode esperar
+  const apoioJovem =
+    s.apoio.aberto &&
+    (s.apoio.origem === "mentorado" || s.apoio.origem === "ambos");
+  const nomeMentorado = d.mentorado.nome_social || d.mentorado.nome;
+  // apoio aberto É pendência apontável (trabalho a fazer, não falha da
+  // dupla) — entra no CTA junto com os sinais da régua
+  const temPendencia =
+    d.status === "ativa" && (s.sinais.length > 0 || s.apoio.aberto);
+  const mensagem = apoioJovem
+    ? (msgsContato("apoio_jovem", {
+        mentoradoNome: nomeMentorado,
+        autorNome: meuNome,
+      }).mentorado ?? "")
+    : (msgsContato(
+        {
+          eu: meuNome,
+          mentorNome: d.mentor.nome.split(" ")[0],
+          mentoradoNome: nomeMentorado,
+        },
+        temPendencia
+          ? { casoMentor: casoLembrete(d, s, hoje, origem) }
+          : // sem caso: o fecho neutro "Como estão as coisas?" (contato livre)
+            {}
+      ).mentor ?? "");
+  return (
+    <DuplaWaAcao
+      duplaId={d.id}
+      destNome={apoioJovem ? nomeMentorado : d.mentor.nome}
+      telefone={apoioJovem ? d.mentorado.whatsapp : d.mentor.whatsapp}
+      mensagem={mensagem}
+      nudge={
+        temPendencia
+          ? {
+              destino: apoioJovem ? "mentorado" : "mentor",
+              titulo: apoioJovem ? "A equipe quer te ouvir" : tituloNudge,
+              href: apoioJovem ? "/jovem/agenda" : `/duplas/${d.id}`,
+              // responder um pedido do jovem é "Chamar", nunca cobrança —
+              // a mesma etiqueta que a fila-acompanhar dá a esse caso
+              rotulo: apoioJovem ? "Chamar" : undefined,
+              bloqueadoAte: lembreteBloqueadoAte(ultimoNudge, hoje),
+            }
+          : undefined
+      }
+    />
+  );
 }
 
 // =====================================================================
@@ -715,6 +1103,7 @@ export function DuplasLista({
   supervisaoAlvos = [],
   especialistaEventos = [],
   nudges = {},
+  origem,
 }: {
   lista: Dupla[];
   eventos: CicloEvento[];
@@ -729,6 +1118,9 @@ export function DuplasLista({
   especialistaEventos?: EspecialistaEvento[];
   /** último contato por dupla — a coordenação lê o cap de 48h do Lembrar */
   nudges?: Record<string, Interacao>;
+  /** proto+host do deploy (headers da page) — o texto do Lembrar embute
+   *  link de registro ABSOLUTO; sem ele o trecho sai da mensagem */
+  origem?: string;
 }) {
   const hoje = new Date(agora);
   const hojeStr = toDateStr(hoje);
@@ -745,9 +1137,9 @@ export function DuplasLista({
         hoje={hoje}
         hojeStr={hojeStr}
         saudePorId={saudePorId}
-        resumo={resumo}
         meuNome={meuNome}
         nudges={nudges}
+        origem={origem}
       />
     );
   if (visao === "supervisor")
@@ -758,8 +1150,10 @@ export function DuplasLista({
         hoje={hoje}
         hojeStr={hojeStr}
         saudePorId={saudePorId}
-        resumo={resumo}
         alvos={supervisaoAlvos}
+        meuNome={meuNome}
+        nudges={nudges}
+        origem={origem}
       />
     );
   if (visao === "especialista")
@@ -846,18 +1240,18 @@ function VisaoCoordenacao({
   hoje,
   hojeStr,
   saudePorId,
-  resumo,
   meuNome,
   nudges,
+  origem,
 }: {
   lista: Dupla[];
   eventos: CicloEvento[];
   hoje: Date;
   hojeStr: string;
   saudePorId: Map<string, Saude>;
-  resumo: ReturnType<typeof resumoDaLista>;
   meuNome?: string;
   nudges: Record<string, Interacao>;
+  origem?: string;
 }) {
   const [busca, setBusca] = useState("");
   const [filtro, setFiltro] = useState<FiltroCat>("todas");
@@ -950,35 +1344,23 @@ function VisaoCoordenacao({
   // entra antes das pausadas/encerradas (a fila continua debaixo dele)
   const idxForaDaRegua = visiveis.findIndex((d) => d.status !== "ativa");
 
+  // a mesma linha monta a ação WhatsApp uma vez e reusa na linha cheia e
+  // na mínima da massa (WhatsApp visível pra TODA dupla — decisão travada)
+  const waDa = (d: Dupla, s: Saude) =>
+    waAcaoDaDupla({
+      d,
+      s,
+      hoje,
+      // o cap de 48h conta só interações tipo nudge — um "contato" manual
+      // (Chamar) nunca bloqueia o Lembrar
+      ultimoNudge: nudges[d.id]?.tipo === "nudge" ? nudges[d.id] : null,
+      meuNome,
+      tituloNudge: "Lembrete da coordenação",
+      origem,
+    });
+
   const linha = (d: Dupla, i: number) => {
     const s = saudePorId.get(d.id)!;
-    // "Lembrar" só existe quando há pendência apontável — dupla em dia não
-    // leva nudge (e a fora da régua não tem o que lembrar). O cap de 48h
-    // conta só interações tipo nudge — um "contato" manual não bloqueia
-    const ultimoNudge =
-      nudges[d.id]?.tipo === "nudge" ? nudges[d.id] : null;
-    const lembrar =
-      d.status === "ativa" && s.sinais.length > 0 ? (
-        <LembreteButton
-          duplaId={d.id}
-          destino="mentor"
-          rotulo="Lembrar"
-          telefone={d.mentor.whatsapp}
-          titulo="Lembrete da coordenação"
-          corpo={
-            msgsContato(
-              {
-                eu: meuNome,
-                mentorNome: d.mentor.nome.split(" ")[0],
-                mentoradoNome: d.mentorado.nome.split(" ")[0],
-              },
-              { casoMentor: casoLembrete(d, s, hoje) }
-            ).mentor ?? ""
-          }
-          href={`/duplas/${d.id}`}
-          bloqueadoAte={lembreteBloqueadoAte(ultimoNudge, hoje)}
-        />
-      ) : undefined;
     return (
       <LinhaDupla
         key={d.id}
@@ -987,7 +1369,7 @@ function VisaoCoordenacao({
         eventos={eventos}
         hojeStr={hojeStr}
         mostrarSupervisor
-        acao={lembrar}
+        wa={waDa(d, s)}
         i={i}
       />
     );
@@ -999,7 +1381,11 @@ function VisaoCoordenacao({
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Duplas</h1>
-          <ResumoLinha resumo={resumo} />
+          {/* contexto temporal (o "quando" da leitura) — as contagens já
+              moram no ResumoSemaforo logo abaixo; repeti-las aqui era eco */}
+          <p className="mt-1 text-sm text-muted-foreground">
+            hoje, {rotuloDiaAgenda(hojeStr).toLowerCase()}
+          </p>
         </div>
         <div className="flex flex-wrap items-center gap-2 max-sm:w-full">
           <div className="relative min-w-0 flex-1 sm:max-w-xs sm:flex-none">
@@ -1029,6 +1415,19 @@ function VisaoCoordenacao({
         </div>
       </header>
 
+      {/* resumo agregado no topo (v6a .sum): barra proporcional do semáforo
+          clicável (espelha os chips) + posição de cada turma no calendário */}
+      {lista.length > 0 && (
+        <ResumoSemaforo
+          lista={lista}
+          saudePorId={saudePorId}
+          eventos={eventos}
+          hojeStr={hojeStr}
+          titulo={`Semáforo — ${lista.length} ${lista.length === 1 ? "dupla" : "duplas"}`}
+          onFiltrar={setFiltro}
+        />
+      )}
+
       {/* chips de categoria com a régua de cada estado; apoio vem depois do
           divisor — é eixo separado, não grau do semáforo */}
       {lista.length > 0 && (
@@ -1048,7 +1447,7 @@ function VisaoCoordenacao({
             aria-pressed={filtro === "apoio"}
             onClick={() => setFiltro(filtro === "apoio" ? "todas" : "apoio")}
             className={cn(
-              "flex min-h-11 flex-[1.15] basis-[165px] flex-col gap-1 rounded-xl border p-3 text-left transition-[border-color,transform] hover:-translate-y-px max-sm:col-span-2",
+              "flex min-h-11 flex-[1.15] basis-[165px] flex-col gap-1 rounded-xl border p-3 text-left transition-[border-color,transform] hover:-translate-y-px focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50 max-sm:col-span-2",
               filtro === "apoio"
                 ? "border-[var(--info-text)] bg-[var(--info-text)] text-white shadow-md"
                 : "border-[var(--info-border)] bg-[var(--info-bg)] hover:border-[var(--info)]"
@@ -1114,8 +1513,12 @@ function VisaoCoordenacao({
                   aria-pressed={turmaSel === t}
                   onClick={() => setTurmaSel(turmaSel === t ? null : t)}
                   className={filterChipCls(turmaSel === t)}
+                  /* chip mostra a sigla; o valor cru segue no estado/
+                     comparação e vai no title pra desambiguar colisões
+                     ("T1" vs "T1 · 2026/2027") */
+                  title={t}
                 >
-                  {t}
+                  {turmaCurta(t)}
                   <span
                     className={cn(
                       "text-[11px] tabular-nums",
@@ -1241,7 +1644,15 @@ function VisaoCoordenacao({
             className="overflow-hidden rounded-xl bg-card shadow-[var(--shadow-border)] max-sm:contents"
           >
             <CabecalhoColunas />
-            <div className="divide-y divide-border/60 max-sm:space-y-3 max-sm:divide-y-0">
+            {/* filtros DISCRETOS sempre animam (convenção registrada no
+                AGENTS.md): a re-key remonta as linhas e o animate-enter
+                re-roda com o stagger do --i. A busca fica fora da key de
+                propósito — cada tecla remontava ~26 linhas, recolhia o
+                <details> da massa e matava dialogs abertos */}
+            <div
+              key={`${filtro}|${turmaSel ?? ""}|${supSel}|${mentorSel ?? ""}`}
+              className="divide-y divide-border/60 max-sm:space-y-3 max-sm:divide-y-0"
+            >
               {antes.map((d) => linha(d, i++))}
               {usarMassa && (
                 <details className="group/massa border-t border-border/60">
@@ -1256,15 +1667,20 @@ function VisaoCoordenacao({
                     {massa.length === 1 ? "dupla em andamento" : "duplas em andamento"}
                   </summary>
                   <div>
-                    {massa.map((d) => (
-                      <LinhaMini
-                        key={d.id}
-                        d={d}
-                        saude={saudePorId.get(d.id)!}
-                        hojeStr={hojeStr}
-                        i={i++}
-                      />
-                    ))}
+                    {massa.map((d) => {
+                      const s = saudePorId.get(d.id)!;
+                      return (
+                        <LinhaMini
+                          key={d.id}
+                          d={d}
+                          saude={s}
+                          eventos={eventos}
+                          hojeStr={hojeStr}
+                          wa={waDa(d, s)}
+                          i={i++}
+                        />
+                      );
+                    })}
                   </div>
                 </details>
               )}
@@ -1287,16 +1703,23 @@ function VisaoSupervisor({
   hoje,
   hojeStr,
   saudePorId,
-  resumo,
   alvos,
+  meuNome,
+  nudges,
+  origem,
 }: {
   lista: Dupla[];
   eventos: CicloEvento[];
   hoje: Date;
   hojeStr: string;
   saudePorId: Map<string, Saude>;
-  resumo: ReturnType<typeof resumoDaLista>;
   alvos: SupervisaoAlvo[];
+  /** primeiro nome de quem opera — assina o texto do Lembrar/Chamar */
+  meuNome?: string;
+  /** último nudge por dupla — o mesmo cap de 48h da coordenação; a RPC
+   *  `enviar_lembrete` já autoriza o supervisor da dupla */
+  nudges: Record<string, Interacao>;
+  origem?: string;
 }) {
   const [busca, setBusca] = useState("");
 
@@ -1338,7 +1761,11 @@ function VisaoSupervisor({
           <h1 className="text-2xl font-semibold tracking-tight">
             Duplas que você supervisiona
           </h1>
-          <ResumoLinha resumo={resumo} />
+          {/* idem coordenação: contexto temporal — a contagem já está no
+              "Semáforo — N supervisionadas" logo abaixo */}
+          <p className="mt-1 text-sm text-muted-foreground">
+            hoje, {rotuloDiaAgenda(hojeStr).toLowerCase()}
+          </p>
         </div>
         <div className="relative min-w-0 flex-1 sm:max-w-xs sm:flex-none">
           <MagnifyingGlass
@@ -1356,6 +1783,18 @@ function VisaoSupervisor({
           />
         </div>
       </header>
+
+      {/* resumo agregado (v6a .sum) — semáforo das supervisionadas; a
+          auxiliar não tem chips de categoria, a barra é só informativa */}
+      {lista.length > 0 && (
+        <ResumoSemaforo
+          lista={lista}
+          saudePorId={saudePorId}
+          eventos={eventos}
+          hojeStr={hojeStr}
+          titulo={`Semáforo — ${lista.length} supervisionada${lista.length > 1 ? "s" : ""}`}
+        />
+      )}
 
       <div className="mb-2 mt-5 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <p className="text-[13px] text-muted-foreground">
@@ -1388,6 +1827,9 @@ function VisaoSupervisor({
           className="overflow-hidden rounded-xl bg-card shadow-[var(--shadow-border)] max-sm:contents"
         >
           <CabecalhoColunas />
+          {/* sem re-key por busca — remontar a cada tecla recolhia os
+                grupos e matava o dialog de supervisão aberto */}
+          <div>
           {gruposOrdenados.map(([turma, duplas], gi) => {
               // o próximo encontro oficial do calendário da turma — o "esta
               // semana é o N" do sub-header (duplas da turma correm o mesmo
@@ -1407,7 +1849,7 @@ function VisaoSupervisor({
                       gi > 0 && "border-t border-border"
                     )}
                   >
-                    {turma}
+                    {turma === "Sem turma" ? turma : turmaLonga(turma)}
                     <small className="font-medium text-muted-foreground">
                       {oficial?.numero != null
                         ? `encontro ${oficial.numero} ${formatDiaSemanaMes(oficial.data)}`
@@ -1418,18 +1860,14 @@ function VisaoSupervisor({
                     {duplas.map((d) => {
                       const s = saudePorId.get(d.id)!;
                       const alvo = alvos.find((a) => a.dupla_id === d.id);
-                      const acao =
+                      // supervisão registrável em ativa ou pausada; com o
+                      // WhatsApp sempre visível a secundária vai pro ⋮ —
+                      // mesmo padrão do card de atenção da agenda (186)
+                      const menu =
                         (d.status === "ativa" || d.status === "pausada") && alvo ? (
-                          <SupervisaoDialog
-                            alvos={[alvo]}
-                            trigger={
-                              <button
-                                type="button"
-                                className="inline-flex min-h-11 items-center whitespace-nowrap rounded-lg border border-border bg-card px-2.5 text-xs font-semibold text-muted-foreground hover:border-[var(--input)] hover:text-foreground sm:min-h-8"
-                              >
-                                Registrar supervisão
-                              </button>
-                            }
+                          <AcoesSupervisor
+                            alvo={alvo}
+                            nomeDupla={d.mentorado.nome}
                           />
                         ) : undefined;
                       return (
@@ -1440,7 +1878,19 @@ function VisaoSupervisor({
                           eventos={eventos}
                           hojeStr={hojeStr}
                           mostrarSupervisor={false}
-                          acao={acao}
+                          wa={waAcaoDaDupla({
+                            d,
+                            s,
+                            hoje,
+                            ultimoNudge:
+                              nudges[d.id]?.tipo === "nudge"
+                                ? nudges[d.id]
+                                : null,
+                            meuNome,
+                            tituloNudge: "Lembrete da supervisão",
+                            origem,
+                          })}
+                          menu={menu}
                           i={i++}
                         />
                       );
@@ -1449,8 +1899,42 @@ function VisaoSupervisor({
                 </div>
               );
             })}
+          </div>
         </section>
       )}
+    </>
+  );
+}
+
+/** ⋮ da linha supervisionada — "Registrar supervisão" abre o dialog
+ *  controlado fora do popup (o Select interno recomeça do alvo a cada
+ *  abertura — mesmo contrato do ⋯ do card de atenção da agenda). */
+function AcoesSupervisor({
+  alvo,
+  nomeDupla,
+}: {
+  alvo: SupervisaoAlvo;
+  nomeDupla: string;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          aria-label={`Mais ações da dupla de ${nomeDupla.split(" ")[0]}`}
+          title="Mais ações"
+          className="grid size-11 shrink-0 place-items-center rounded-xl border border-border bg-card text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:size-7 md:rounded-lg lg:size-6"
+        >
+          <DotsThreeVertical size={18} weight="bold" aria-hidden />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-56">
+          <DropdownMenuItem onClick={() => setOpen(true)}>
+            <ChatsCircle size={16} data-icon="inline-start" aria-hidden />
+            Registrar supervisão
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <SupervisaoDialog alvos={[alvo]} open={open} onOpenChange={setOpen} />
     </>
   );
 }
@@ -1560,13 +2044,16 @@ function VisaoMentor({
                     <DuplaAvatares mentor={d.mentor} mentorado={d.mentorado} size={28} />
                     <DuplaNomes truncar mentor={d.mentor.nome} mentorado={d.mentorado.nome} />
                     {d.turma && (
-                      <span className="rounded border border-border px-1 text-[10px] font-bold text-muted-foreground">
-                        {d.turma}
+                      <span
+                        title={d.turma}
+                        className="rounded border border-border px-1 text-[10px] font-bold text-muted-foreground"
+                      >
+                        {turmaCurta(d.turma)}
                       </span>
                     )}
                   </p>
-                  {/* sem pendência, "Abrir ficha" é a única ação — fica
-                      inline no header em vez de um footer com botão só */}
+                  {/* "Abrir ficha" sempre no header — nada de footer de
+                      ações; a pendência ganha botão no "Próximo passo" */}
                   <span className="flex items-center gap-2">
                     {apoioProprio ? (
                       <Pill tom="atencao">
@@ -1579,14 +2066,12 @@ function VisaoMentor({
                         {estado.label}
                       </Pill>
                     )}
-                    {!pendente && (
-                      <Link
-                        href={`/duplas/${d.id}`}
-                        className={buttonVariants({ size: "sm" })}
-                      >
-                        Abrir ficha
-                      </Link>
-                    )}
+                    <Link
+                      href={`/duplas/${d.id}`}
+                      className={buttonVariants({ size: "sm" })}
+                    >
+                      Abrir ficha
+                    </Link>
                   </span>
                 </header>
 
@@ -1623,10 +2108,12 @@ function VisaoMentor({
                   </span>
                 </div>
 
-                {/* próximo passo */}
+                {/* próximo passo — a pendência ganha o botão aqui dentro:
+                    o passo descrito e a ação dele moram no mesmo bloco,
+                    sem faixa-footer no fim do card (v6a) */}
                 <div className="flex items-start gap-2.5 rounded-[10px] bg-muted px-3 py-2.5 text-sm">
                   <Clock size={15} aria-hidden className="mt-0.5 shrink-0" />
-                  <div>
+                  <div className="min-w-0 flex-1">
                     <span className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
                       Próximo passo
                     </span>
@@ -1639,6 +2126,14 @@ function VisaoMentor({
                             ? "Agendar o próximo encontro"
                             : estado.label}
                     </b>
+                    {pendente && (
+                      <Link
+                        href={`/duplas/${d.id}#registrar-${pendente.id}`}
+                        className={cn(buttonVariants({ size: "sm" }), "mt-2")}
+                      >
+                        Registrar encontro {pendente.numero}
+                      </Link>
+                    )}
                   </div>
                 </div>
 
@@ -1672,25 +2167,9 @@ function VisaoMentor({
                   </ul>
                 </div>
 
-                {/* footer só com par de ações — pendência abre "Registrar"
-                    ao lado do "Abrir ficha"; sem ela, a ação única já está
-                    no header e o border-t vazio não renderiza */}
-                {pendente && (
-                  <div className="flex flex-wrap justify-start gap-2 border-t border-dashed border-border pt-2">
-                    <Link
-                      href={`/duplas/${d.id}#registrar-${pendente.id}`}
-                      className={buttonVariants({ size: "sm" })}
-                    >
-                      Registrar encontro {pendente.numero}
-                    </Link>
-                    <Link
-                      href={`/duplas/${d.id}`}
-                      className={buttonVariants({ variant: "outline", size: "sm" })}
-                    >
-                      Abrir ficha
-                    </Link>
-                  </div>
-                )}
+                {/* sem footer de ações — "Registrar" mora no "Próximo
+                    passo", "Abrir ficha" no header (a faixa inferior do
+                    item morreu na v6a; o rodapé global é outra coisa) */}
               </article>
             );
           })}
@@ -1781,8 +2260,11 @@ function VisaoEspecialista({
                     />
                     <span className="truncate">{d.mentorado.nome}</span>
                     {d.turma && (
-                      <span className="rounded border border-border px-1 text-[10px] font-bold text-muted-foreground">
-                        {d.turma}
+                      <span
+                        title={d.turma}
+                        className="rounded border border-border px-1 text-[10px] font-bold text-muted-foreground"
+                      >
+                        {turmaCurta(d.turma)}
                       </span>
                     )}
                   </p>

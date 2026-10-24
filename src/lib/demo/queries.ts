@@ -1,5 +1,5 @@
 import { getDemoData, type DemoData } from "./data";
-import { registroTardio, semanaBounds } from "../ciclo";
+import { comparaNome, registroTardio, semanaBounds } from "../ciclo";
 import { slotsLivresEspecialista } from "./agenda";
 import { normaliza } from "../utils";
 import type {
@@ -69,7 +69,11 @@ import type {
 import type { FormularioPublico } from "../forms/queries";
 import { getDemoFormularios } from "./forms-data";
 import type { Interacao } from "../interacoes";
-import type { InscricaoFilaTurma, RelatorioLinkItem } from "../relatorio";
+import type {
+  InscricaoFilaTurma,
+  RelatorioLinkItem,
+  ResumoAcessoItem,
+} from "../relatorio";
 
 // Camada de leitura do modo demo: replica o escopo que o RLS aplicaria a
 // cada papel sobre o dataset fixo de getDemoData() — coordenação vê tudo,
@@ -152,7 +156,13 @@ export function demoContatosMap(role: AppRole): Map<string, Contato> {
     for (const p of data.profiles) ids.add(p.id);
   } else if (role === "supervisor") {
     for (const d of data.duplas) {
-      if (d.supervisor?.id === eu.id && d.status !== "encerrada" && d.mentor) {
+      // idem à view profiles_contato: só dupla ativa/pausada expõe o
+      // contato do mentor — concluída/encerrada é capítulo fechado
+      if (
+        d.supervisor?.id === eu.id &&
+        (d.status === "ativa" || d.status === "pausada") &&
+        d.mentor
+      ) {
         ids.add(d.mentor.id);
       }
     }
@@ -1008,7 +1018,6 @@ export function demoRegistros(
   for (const a of data.anexos) {
     (anexosPorRegistro[a.registro_id] ??= []).push({ id: a.id });
   }
-
   let itens: RegistroResumo[] = [];
   for (const d of duplasDoPapel(data, role)) {
     for (const e of d.encontros ?? []) {
@@ -1055,6 +1064,9 @@ export function demoRegistros(
   // mesmos filtros da query real
   if (f.encontro) itens = itens.filter((r) => r.encontro?.numero === f.encontro);
   if (f.dupla) itens = itens.filter((r) => r.encontro?.dupla?.id === f.dupla);
+  // recorte de turma do panorama = cronograma_id da dupla (0061)
+  if (f.turma)
+    itens = itens.filter((r) => r.encontro?.dupla?.cronograma_id === f.turma);
   if (f.avaliacao) itens = itens.filter((r) => r.avaliacao === f.avaliacao);
   if (f.apoio) itens = itens.filter((r) => r.precisa_apoio);
   // neq do PostgREST exclui NULL — "com dificuldade" não conta registro sem o campo
@@ -1082,10 +1094,23 @@ export function demoRegistros(
       ) || b.created_at.localeCompare(a.created_at)
   );
 
-  if (f.tardio) {
-    // comparação entre colunas não existe em PostgREST — na real o corte é
-    // em JS sem range; aqui igual, e o total é o que sobrou do filtro
-    itens = itens.filter((r) => registroTardio(r, r.encontro));
+  if (f.tardio || f.periodo) {
+    if (f.tardio)
+      // comparação entre colunas não existe em PostgREST — na real o corte é
+      // em JS sem range; aqui igual, e o total é o que sobrou do filtro
+      itens = itens.filter((r) => registroTardio(r, r.encontro));
+    if (f.periodo) {
+      // janela do panorama corta por quando o encontro aconteceu
+      // (realizado_em ?? data_hora) — a régua da timeline, como na real
+      const lim = new Date(
+        Date.now() - (f.periodo === "8s" ? 56 : 28) * 86400000
+      ).toISOString();
+      itens = itens.filter(
+        (r) =>
+          (r.encontro?.realizado_em ?? r.encontro?.data_hora ?? r.created_at) >=
+          lim
+      );
+    }
     return { itens, total: itens.length };
   }
   // paginação cumulativa: página N devolve as N primeiras páginas
@@ -2229,6 +2254,28 @@ export function demoChamadosSemDono(role: AppRole): number {
   ).length;
 }
 
+/** Equipe elegível pra menção/comentário interno (espelha o filtro da query
+ *  real em getChamadoDetalhe): coordenação + auxiliar executivo ativos,
+ *  ordenados por nome — é o dataset do autocomplete "@" do composer. */
+export function demoEquipeChamados(): Pick<
+  Profile,
+  "id" | "nome" | "nome_social" | "role"
+>[] {
+  return getDemoData()
+    .profiles.filter(
+      (p) => p.ativo && (p.role === "coordenacao" || p.role === "supervisor")
+    )
+    .map((p) => ({
+      id: p.id,
+      nome: p.nome,
+      nome_social: p.nome_social,
+      role: p.role,
+    }))
+    .sort((a, b) =>
+      comparaNome(a.nome_social || a.nome, b.nome_social || b.nome)
+    );
+}
+
 /** Fila por turma (turma_inscricoes, 0111) — espelha a RLS: coord-only
  *  integral; `status='aguardando'` é o filtro da query real, `turma` null
  *  devolve todas. Normaliza pro shape discriminado que o montarLinhas
@@ -2263,9 +2310,10 @@ export function demoTurmaInscricoesAguardando(
     });
 }
 
-/** Painel de links públicos da coordenação (REALIZA-170) — fixture fixa:
- *  o legado T2 (sem senha, "ativo") + um ciclo protegido. Mutations caem
- *  no DEMO_MSG das actions — o card é navegável mas não grava. */
+/** Painel de links públicos da coordenação (REALIZA-170/201) — fixture
+ *  fixa: o legado T2 (sem senha, "ativo") + um ciclo protegido. Mutations
+ *  caem no DEMO_MSG das actions — o menu "Compartilhar" é navegável mas
+ *  não grava. */
 export function demoRelatorioLinks(): RelatorioLinkItem[] {
   const agora = new Date();
   const ha = (dias: number) =>
@@ -2310,6 +2358,57 @@ export function demoRelatorioLinks(): RelatorioLinkItem[] {
       acessos: 4,
       ultimo_acesso: ha(1),
       falhas_24h: 2,
+    },
+  ];
+}
+
+/** Log de acessos do painel "Ver acessos" (REALIZA-201) — fixture coerente
+ *  com demoRelatorioLinks: os slugs batem pra o título resolver. `origem` é
+ *  o ip_hash truncado como na action real. */
+export function demoResumoAcessos(): ResumoAcessoItem[] {
+  const agora = new Date();
+  const haH = (horas: number) =>
+    new Date(agora.getTime() - horas * 3600e3).toISOString();
+  return [
+    {
+      slug: "t2-x7k4m9qf2w8j",
+      acessado_em: haH(3),
+      ok: true,
+      motivo: null,
+      user_agent: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)",
+      origem: "a1b2c3d4e5",
+    },
+    {
+      slug: "ciclo-dpp-k3w8f2m9xq7j4n5p",
+      acessado_em: haH(9),
+      ok: false,
+      motivo: "senha",
+      user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+      origem: "f6e5d4c3b2",
+    },
+    {
+      slug: "ciclo-dpp-k3w8f2m9xq7j4n5p",
+      acessado_em: haH(26),
+      ok: false,
+      motivo: "senha",
+      user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+      origem: "f6e5d4c3b2",
+    },
+    {
+      slug: "ciclo-dpp-k3w8f2m9xq7j4n5p",
+      acessado_em: haH(27),
+      ok: true,
+      motivo: null,
+      user_agent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)",
+      origem: "0f1e2d3c4b",
+    },
+    {
+      slug: "t2-x7k4m9qf2w8j",
+      acessado_em: haH(50),
+      ok: true,
+      motivo: null,
+      user_agent: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)",
+      origem: "a1b2c3d4e5",
     },
   ];
 }

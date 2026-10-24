@@ -276,8 +276,11 @@ const depoisDe = (iso: string, horas: number): string =>
  *  locais dessa âncora volta a depender do fuso do servidor. */
 const HOJE = new Date(`${toDateStr(new Date())}T12:00:00Z`);
 
-/** Terça-feira da semana corrente — âncora do 5º encontro do ciclo. */
-const TERCA_ENCONTRO_5 = addDias(HOJE, ((2 - HOJE.getUTCDay()) + 7) % 7);
+/** Terça-feira da semana corrente (semana seg–dom) — âncora do 5º encontro
+ *  do ciclo. ((2 - dow + 7) % 7) mirava a PRÓXIMA terça: de quarta em
+ *  diante o enc. 5 caía na semana seguinte, a coluna "semana" do panorama
+ *  nunca acendia e a T2 inteira ficava futura (1º enc. dela é esta terça). */
+const TERCA_ENCONTRO_5 = addDias(HOJE, 1 - ((HOJE.getUTCDay() + 6) % 7));
 
 /** Dia oficial do encontro n do ciclo (espelha o seed/cronograma oficial):
  *  1–8 semanais a partir da âncora; 15 dias entre o 8º e o 9º (tempo de
@@ -2141,8 +2144,10 @@ function build(): DemoData {
   };
 
   const cronogramas: Cronograma[] = [
-    cronogramaDe(cronogramaT1, "Calendário oficial · T1", "T1 · 2026/2027", 60),
-    cronogramaDe(cronogramaT2, "Calendário oficial · T2", "T2 · 2026/2027", 32),
+    // mesmo nome pras duas, como em prod ("Calendário oficial" de cada
+    // turma) — a identidade visual vem do campo `turma`, não do nome
+    cronogramaDe(cronogramaT1, "Calendário oficial", "T1 · 2026/2027", 60),
+    cronogramaDe(cronogramaT2, "Calendário oficial", "T2 · 2026/2027", 32),
   ];
 
   // ---------- duplas ----------
@@ -3049,7 +3054,8 @@ function build(): DemoData {
   // D5/WP5 — o "Para acompanhar" cobre os dois estados do lembrete (cap de
   // 48h por dupla, medido sobre o ÚLTIMO nudge — contato de outro tipo não
   //  destrava nem bloqueia):
-  //  · pend (sem_data + registro): nudge de 5d atrás → livre, "Lembrar"
+  //  · pend (sem_data + registro): nudge de 5d atrás → livre — e o pedido
+  //    de apoio do Caio troca a ação: "Chamar" pro mentorado, não Lembrar
   //  · atraso (limbo):             nudge de 4d atrás → livre
   //  · risco (atraso):             nudge de ~20h     → bloqueado ("Lembrada")
   //  · t2c  (limbo na T2):         nudge de 6d atrás → livre, turma nova

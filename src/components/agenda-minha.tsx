@@ -34,6 +34,9 @@ import {
   type EscopoAgenda,
   type AgendaSecao,
 } from "@/lib/agenda-minha";
+import { itensSemanaProgramaMentor } from "@/lib/agenda-coordenacao";
+import { turmaCurta } from "@/lib/turma";
+import { SemanaDoPrograma } from "@/components/semana-do-programa";
 import type {
   CicloEvento,
   Cronograma,
@@ -163,8 +166,9 @@ function LinhaItem({
       <article
         className={cn(
           "rounded-xl border bg-card px-3.5 py-3",
-          (item.convidado || item.tipo === "a_agendar") && "border-dashed",
-          item.convidado && "bg-[var(--warn)]/[0.03]"
+          // convidado/a_agendar: tracejada é o marcador — "você não
+          // participa" é info, não alerta (warn mentia urgência)
+          (item.convidado || item.tipo === "a_agendar") && "border-dashed"
         )}
       >
         <div className="flex gap-3">
@@ -199,7 +203,7 @@ function LinhaItem({
             <div className="mt-1 flex flex-wrap items-center gap-1.5">
               {item.estado && <Tag tom={item.tom}>{item.estado}</Tag>}
               {item.notaConvidado && (
-                <Tag tom="warn">
+                <Tag tom="info">
                   <Eye size={11} aria-hidden />
                   {item.notaConvidado}
                 </Tag>
@@ -439,7 +443,7 @@ function Rail({ agenda }: { agenda: AgendaMinhaDerivada }) {
                     <span className="block truncate text-sm font-medium">
                       {d.nome}{" "}
                       <span className="text-xs font-normal text-muted-foreground">
-                        · {d.turma}
+                        · {turmaCurta(d.turma)}
                       </span>
                     </span>
                     <span
@@ -487,6 +491,8 @@ export type AgendaMinhaProps = {
    *  usaria Date.now() no cliente e SSR×hidratação podiam discordar na
    *  janela de 15min do "Entrar" (hydration mismatch). */
   agora: number;
+  /** usuário híbrido — os links da faixa precisam preservar `&visao=dpp`. */
+  hibrido?: boolean;
 };
 
 export function AgendaMinha({
@@ -498,6 +504,7 @@ export function AgendaMinha({
   meuId,
   hoje,
   agora,
+  hibrido = false,
 }: AgendaMinhaProps) {
   const [escopo, setEscopo] = useState<EscopoAgenda>("tudo");
   const agenda = useMemo(
@@ -537,6 +544,31 @@ export function AgendaMinha({
 
   return (
     <div className="space-y-4">
+      {/* faixa "Minha agenda" (v8b): a semana do programa recortada na
+          agenda dele — um card por encontro×dupla, formações e eventos
+          oficiais dos cronogramas dele e as supervisões sobre ele. Some
+          quando um chip de escopo filtra uma dupla só — a faixa é a
+          leitura da agenda inteira, não do recorte */}
+      {escopo === "tudo" && (
+        <SemanaDoPrograma
+          itens={itensSemanaProgramaMentor(
+            duplas,
+            eventos,
+            cronogramas,
+            supervisoes,
+            meuId,
+            new Date(hoje + "T12:00:00"),
+            agora
+          )}
+          hoje={hoje}
+          modo="mentor"
+          titulo="Minha agenda"
+          ariaLabel="Minha agenda — semana do programa"
+          sufixoVisao={hibrido ? "&visao=dpp" : ""}
+          nota="A semana do seu lado — encontros das suas duplas, formações e supervisões."
+        />
+      )}
+
       {/* escopo interno — estado local, nunca URL: é um recorte de leitura,
           não um endereço compartilhável */}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">

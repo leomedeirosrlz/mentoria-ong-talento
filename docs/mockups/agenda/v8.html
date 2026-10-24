@@ -1,0 +1,838 @@
+<!-- MOCKUP agenda v8 — visão Coordenação: aba Monitoramento vira DASHBOARD operacional (fila acionável com filtros vivos + cobertura grande honesta + semáforo agregado em rosca + pulso da semana, tudo com toggle T1/T2/Todas); aba Agenda consolida por JANELA temporal (Semana · Mês · Ciclo) com a mesma cobertura honesta do v7. Cards "Semana do programa" do v7 preservados nas duas abas. -->
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agenda — Realiza.vc (mockup v8 · dashboard + janelas temporais)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --brand-lime:hsl(78 56% 53%);--brand-ink:hsl(0 0% 15%);--background:hsl(75 10% 95%);--card:#fff;
+  --muted:hsl(75 7% 93%);--muted-foreground:hsl(75 4% 38%);--accent:hsl(75 8% 91%);--border:hsl(75 6% 87%);
+  --input:hsl(75 8% 54%);--ok:hsl(78 58% 38%);--ok-text:hsl(78 55% 28%);--warn:hsl(43 95% 44%);
+  --warn-text:hsl(43 90% 27%);--danger:hsl(0 80% 48%);--danger-text:hsl(0 70% 38%);
+  --role-mentorado:hsl(48 100% 60%);--radius:.75rem;
+  --lime-tint:hsl(78 56% 91%);--lime-deep:hsl(78 60% 18%);--amb-tint:hsl(48 100% 90%);--amb-line:hsl(48 60% 62%);
+  --amb-bg:hsl(48 100% 96.5%);--red-tint:hsl(0 80% 96%);--topbar:60px;
+  /* matiz por tipo de evento (da v7) + azul de "apoio" proposto na v8 (eixo separado do semáforo) */
+  --roda:hsl(190 55% 42%);--roda-tint:hsl(190 55% 93%);--roda-text:hsl(190 60% 23%);
+  --info:hsl(213 75% 46%);--info-tint:hsl(213 80% 94%);--info-text:hsl(213 70% 30%);
+  --pausada:hsl(75 5% 72%);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%;scroll-behavior:smooth}
+body{font:400 14px/1.5 "Inter",system-ui,-apple-system,sans-serif;background:var(--background);color:var(--brand-ink);overflow-x:hidden}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{transition:none!important;animation:none!important}}
+:focus-visible{outline:3px solid hsl(215 90% 42%);outline-offset:2px}
+::selection{background:var(--brand-lime)}
+b{font-weight:650}i{font-style:normal}
+.wrap{width:min(1120px,100% - 32px);margin-inline:auto}
+@media (min-width:900px){.wrap{width:min(1120px,100% - 48px)}}
+.ic{width:16px;height:16px;flex:none;vertical-align:-3px}.ic.lg{width:20px;height:20px}
+.rv{position:absolute;opacity:0;width:1px;height:1px;pointer-events:none}
+code{font:12px ui-monospace,monospace;background:var(--muted);padding:1px 5px;border-radius:5px}
+
+/* ---- chrome do mockup ---- */
+.board-head{background:var(--brand-ink);color:hsl(75 20% 88%);padding:12px 20px;display:flex;flex-wrap:wrap;align-items:center;gap:8px 18px;font-size:13px}
+.board-head b{color:var(--brand-lime);font-weight:700;letter-spacing:.03em}
+.board-head .dir{color:hsl(75 10% 70%);flex:1 1 320px}.board-head .dir b.d{color:hsl(75 20% 88%)}
+.board-head nav{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap}
+.board-head nav a{font-size:12px;font-weight:600;padding:6px 12px;border-radius:999px;border:1px solid hsl(75 10% 40%);color:hsl(75 20% 88%);text-decoration:none;display:inline-flex;align-items:center;min-height:32px}
+.board-head nav a:hover{border-color:var(--brand-lime);color:var(--brand-lime)}
+.vbar{background:var(--card);border-bottom:1px solid var(--border);padding:10px 0;position:relative;z-index:60}
+.vin{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.vl{font-weight:700;font-size:13px}
+.vpills{display:flex;gap:6px;flex-wrap:wrap}
+.vp{display:inline-flex;align-items:center;min-height:44px;padding:0 16px;border-radius:999px;border:1px solid var(--input);font-weight:600;font-size:13.5px;cursor:pointer;background:var(--card)}
+.vp:hover{background:var(--accent)}
+.vnote{font-size:12px;color:var(--muted-foreground)}
+.view{display:none}
+#r-coord:checked ~ #v-coord{display:block}
+#r-coord:checked ~ .vbar [for=r-coord]{background:var(--brand-ink);color:#fff;border-color:var(--brand-ink)}
+#r-coord:focus-visible ~ .vbar [for=r-coord]{outline:3px solid hsl(215 90% 42%);outline-offset:2px}
+
+/* ---- topbar / bnav ---- */
+.top{position:sticky;top:0;z-index:50;height:var(--topbar);background:hsl(0 0% 100%/.92);backdrop-filter:blur(10px);border-bottom:1px solid var(--border)}
+.top-in{height:100%;display:flex;align-items:center;gap:22px}
+.brand{display:flex;align-items:center;gap:9px}
+.mark{width:30px;height:30px;border-radius:9px;background:var(--brand-lime);display:grid;place-items:center;font-weight:800;font-size:16px;color:var(--lime-deep)}
+.bname{font-weight:800;font-size:17px;letter-spacing:-.02em}.bname em{font-style:normal;color:var(--muted-foreground);font-weight:600}
+.nav{display:none;gap:2px;margin-left:8px}
+.nav a{position:relative;padding:8px 12px;border-radius:9px;text-decoration:none;color:var(--muted-foreground);font-weight:550;font-size:14px}
+.nav a:hover{background:var(--accent);color:var(--brand-ink)}
+.nav a.on{color:var(--brand-ink);font-weight:700}
+.nav a.on::after{content:"";position:absolute;left:12px;right:12px;bottom:2px;height:3px;border-radius:3px;background:var(--brand-lime)}
+.me{margin-left:auto;display:flex;align-items:center;gap:10px}
+.bell{position:relative;width:34px;height:34px;border-radius:10px;border:1px solid var(--border);background:var(--card);display:none;place-items:center;color:var(--muted-foreground)}
+.bell i{position:absolute;top:7px;right:8px;width:7px;height:7px;border-radius:50%;background:var(--brand-lime);border:2px solid #fff}
+.me-t{line-height:1.2;display:none}.me-t b{display:block;font-size:13px}.me-t i{font-size:12px;color:var(--muted-foreground)}
+.av{width:28px;height:28px;border-radius:50%;display:inline-grid;place-items:center;font-size:12px;font-weight:700;flex:none}
+.av.ink{background:var(--brand-ink);color:#fff;width:34px;height:34px}
+.bnav{position:fixed;left:0;right:0;bottom:0;z-index:70;display:flex;background:#fff;border-top:1px solid var(--border);padding-bottom:env(safe-area-inset-bottom)}
+.bnav a{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-height:58px;font-size:12px;font-weight:600;color:var(--muted-foreground);text-decoration:none}
+.bnav a.on{color:var(--brand-ink);font-weight:700}
+.bnav a.on svg{color:var(--lime-deep)}
+.bnav a.on::before{content:"";position:absolute;margin-top:-58px;width:36px;height:3px;border-radius:3px;background:var(--brand-lime)}
+@media (min-width:900px){.nav{display:flex}.bell{display:grid}.me-t{display:block}.bnav{display:none}}
+
+/* ---- página ---- */
+.pg{padding:22px 0 110px}
+@media (min-width:900px){.pg{padding-bottom:80px}}
+h1{font-size:26px;font-weight:800;letter-spacing:-.025em}
+.psub{margin-top:3px;font-size:13.5px;color:var(--muted-foreground)}
+.phead{display:flex;align-items:flex-end;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:14px}
+.legend-pill{display:inline-flex;gap:6px;align-items:center;font-size:12.5px;font-weight:600;padding:6px 12px;border-radius:99px;background:var(--lime-tint);color:var(--ok-text)}
+.sbox{border:1px solid var(--border);border-left:4px solid var(--brand-lime);background:var(--card);border-radius:var(--radius);padding:10px 14px;display:grid;gap:4px;font-size:13px;line-height:1.5;margin-bottom:6px}
+.sbox b.y{color:var(--ok-text)}.sbox b.n{color:var(--danger-text)}
+.sintese{font-size:13px;color:var(--muted-foreground);margin:14px 0 0;display:flex;gap:5px;flex-wrap:wrap;align-items:baseline}
+.sintese b{color:var(--brand-ink)}.sintese b.crit{color:var(--danger-text)}
+.sintese a{color:var(--brand-ink);text-underline-offset:2px}
+.sec{font-size:17px;font-weight:750;letter-spacing:-.01em;margin:26px 0 8px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.sec:first-of-type{margin-top:18px}
+.hint{font-size:13px;color:var(--muted-foreground);margin:6px 0 12px;max-width:78ch}
+.foot-mini{font-size:12px;color:var(--muted-foreground);line-height:1.45}
+.card{background:var(--card);border:1px solid var(--border);border-radius:14px}
+.pill{display:inline-flex;align-items:center;padding:1px 9px;border-radius:99px;background:var(--muted);font-size:12px;font-weight:650;color:var(--muted-foreground);vertical-align:1px}
+.pill.lime{background:var(--lime-tint);color:var(--ok-text)}.pill.amb{background:var(--amb-tint);color:var(--warn-text)}
+.tag{display:inline-flex;align-items:center;gap:5px;padding:2px 9px;border-radius:99px;font-size:12px;font-weight:650;background:var(--muted);color:var(--muted-foreground);white-space:normal}
+.tag.ok{background:var(--lime-tint);color:var(--ok-text)}.tag.warn{background:var(--amb-tint);color:var(--warn-text)}
+.tag.danger{background:var(--red-tint);color:var(--danger-text)}.tag.mut{background:var(--muted);color:var(--muted-foreground)}
+.tag.info{background:var(--info-tint);color:var(--info-text)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:40px;padding:0 14px;border-radius:10px;border:1px solid var(--input);background:#fff;color:var(--brand-ink);font:600 13.5px/1.2 "Inter",sans-serif;cursor:pointer;text-decoration:none;list-style:none}
+.btn:hover{background:var(--accent)}
+summary::-webkit-details-marker{display:none}
+.rt{color:var(--danger-text);font-weight:650}
+
+/* abas do produto (Monitoramento | Agenda) */
+.tabs{display:flex;gap:4px;background:var(--muted);border:1px solid var(--border);padding:4px;border-radius:12px;width:max-content;max-width:100%;margin:14px 0 4px}
+.tab{display:inline-flex;align-items:center;gap:7px;min-height:44px;padding:0 18px;border-radius:9px;font-weight:650;font-size:14px;color:var(--muted-foreground);cursor:pointer}
+.tab:hover{background:var(--accent)}
+#tc-mon:checked ~ .pg .tab[for=tc-mon],#tc-cal:checked ~ .pg .tab[for=tc-cal]{background:#fff;color:var(--brand-ink);box-shadow:0 1px 3px hsl(0 0% 0%/.14)}
+#tc-mon:focus-visible ~ .pg .tab[for=tc-mon],#tc-cal:focus-visible ~ .pg .tab[for=tc-cal]{outline:3px solid hsl(215 90% 42%);outline-offset:2px}
+#tc-mon:checked ~ .pg .pane-cal,#tc-cal:checked ~ .pg .pane-mon{display:none}
+@media (max-width:520px){.tabs{width:100%}.tab{flex:1;justify-content:center;padding:0 8px}}
+
+/* ============ FAIXA "Semana do programa" — aprovada na v7, intacta ============ */
+.wk{display:flex;gap:10px;overflow-x:auto;scroll-snap-type:x proximity;padding:4px 2px 12px;margin:8px -2px 0;
+    -webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 34px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 34px),transparent)}
+.wkc{scroll-snap-align:start;flex:0 0 min(248px,74vw);display:grid;grid-template-columns:58px 1fr;background:#fff;
+     border:1px solid var(--border);border-radius:14px;overflow:hidden;align-content:start;transition:box-shadow .15s}
+.wkc:hover{box-shadow:0 2px 10px hsl(0 0% 0%/.07)}
+.wkd{display:grid;place-content:center;justify-items:center;gap:0;line-height:1.1;padding:12px 4px;text-align:center}
+.wkd i{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;opacity:.75}
+.wkd b{font-size:26px;font-weight:800;letter-spacing:-.03em}
+.wkd i.m{text-transform:none;font-size:12px}
+.tp-encontro .wkd{background:var(--lime-tint);color:var(--lime-deep)}
+.tp-formacao .wkd{background:var(--amb-tint);color:var(--warn-text)}
+.tp-roda .wkd{background:var(--roda-tint);color:var(--roda-text)}
+.tp-supervisao .wkd{background:var(--muted);color:var(--muted-foreground)}
+.wkc.hoje{border:1.5px solid var(--brand-ink)}
+.wkb{padding:11px 12px 12px;min-width:0;display:grid;gap:5px;align-content:start}
+.wkt{display:flex;gap:5px;flex-wrap:wrap;align-items:center}
+.tpill{display:inline-flex;align-items:center;gap:5px;padding:2px 9px;border-radius:99px;font-size:11.5px;font-weight:700;white-space:nowrap}
+.tpill .ic{width:13px;height:13px;vertical-align:0}
+.t-enc{background:var(--lime-tint);color:var(--ok-text)}
+.t-for{background:var(--amb-tint);color:var(--warn-text)}
+.t-roda{background:var(--roda-tint);color:var(--roda-text)}
+.t-sup{background:var(--muted);color:var(--muted-foreground);border:1px dashed var(--input)}
+.etag{margin-left:auto;font-size:11.5px;font-weight:700;padding:2px 9px;border-radius:99px}
+.etag.hj{background:var(--warn);color:#fff}
+.etag.sem{background:var(--muted);color:var(--muted-foreground)}
+.wkb h3{font-size:15px;font-weight:750;letter-spacing:-.01em;line-height:1.25}
+.wkmeta{font-size:12.5px;color:var(--muted-foreground);line-height:1.4}
+.wkmeta b{color:var(--brand-ink);font-weight:600}
+.guia{border-top:1px dashed var(--border);padding-top:6px;margin-top:2px}
+.guia summary{display:flex;align-items:center;gap:6px;min-height:34px;font-size:12.5px;font-weight:650;color:var(--ok-text);cursor:pointer;list-style:none;border-radius:8px}
+.guia summary svg{transition:transform .15s}
+.guia[open] summary svg{transform:rotate(90deg)}
+.guia .gbody{display:grid;gap:7px;font-size:12.5px;color:var(--muted-foreground);line-height:1.45;padding:2px 0 4px}
+.guia .gbody b{color:var(--brand-ink);font-weight:650;display:block;font-size:12px}
+.inst{display:flex;gap:4px;flex-wrap:wrap}
+.inst span{font-size:11.5px;font-weight:650;background:var(--muted);color:var(--brand-ink);border-radius:6px;padding:1px 7px}
+.wkfoot{font-size:12px;color:var(--muted-foreground);border-top:1px dashed var(--border);padding-top:6px}
+@media (min-width:900px){
+  .wk{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);overflow:visible;mask-image:none;-webkit-mask-image:none;padding-bottom:4px}
+  .wkc{flex:none;min-width:0}
+  .wkd b{font-size:24px}
+}
+
+/* ---- linhas da fila ---- */
+.lrow{display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--border);flex-wrap:wrap}
+.lrow:last-child{border-bottom:0}
+.lmain{flex:1 1 220px;min-width:0}.lmain small{display:block;font-size:13px;color:var(--muted-foreground);margin-top:1px}
+.lsig{flex:none}
+
+/* ============ v8 · DASHBOARD (aba Monitoramento) ============ */
+/* toggle de turma dos agregados — radios ficam antes do cabeçalho+grid (CSS puro) */
+.dashhead{display:flex;align-items:center;gap:10px 14px;flex-wrap:wrap;margin:24px 0 4px}
+.dashhead .sec{margin:0}
+.agbar{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-left:auto}
+.dashhead .lb,.calbar .lb{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted-foreground);margin-right:2px}
+.agp{display:inline-flex;align-items:center;min-height:34px;padding:0 13px;border-radius:99px;border:1px solid var(--input);background:#fff;font-size:12.5px;font-weight:650;color:var(--muted-foreground);cursor:pointer}
+.agp:hover{background:var(--accent)}
+#ag-todas:checked ~ .dashhead label[for=ag-todas],#ag-t1:checked ~ .dashhead label[for=ag-t1],#ag-t2:checked ~ .dashhead label[for=ag-t2]{background:var(--brand-ink);color:#fff;border-color:var(--brand-ink)}
+#ag-todas:focus-visible ~ .dashhead label[for=ag-todas],#ag-t1:focus-visible ~ .dashhead label[for=ag-t1],#ag-t2:focus-visible ~ .dashhead label[for=ag-t2]{outline:3px solid hsl(215 90% 42%);outline-offset:2px}
+.dash{display:grid;gap:14px;margin-top:6px}
+.dcards{display:grid;gap:14px}
+@media (min-width:900px){.dcards{grid-template-columns:minmax(0,1.45fr) minmax(0,1fr) minmax(0,1fr)}}
+.dcard{background:#fff;border:1px solid var(--border);border-radius:14px;padding:14px 16px;display:grid;gap:10px;align-content:start;min-width:0}
+.dc-h{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.dc-h h3{font-size:15px;font-weight:750;letter-spacing:-.01em;display:flex;align-items:center;gap:7px}
+.dc-h h3 .ic{width:15px;height:15px;color:var(--muted-foreground)}
+.dc-h .mut{font-size:12px;color:var(--muted-foreground);margin-left:auto}
+/* variantes por turma — semáforo/pulso recomputam; cobertura esconde o bloco da outra turma */
+.agv{display:none;min-width:0}
+#ag-todas:checked ~ .dash .agv-todas,#ag-t1:checked ~ .dash .agv-t1,#ag-t2:checked ~ .dash .agv-t2{display:block}
+#ag-t1:checked ~ .dash .h-t2,#ag-t2:checked ~ .dash .h-t1{display:none}
+/* fila "Para acompanhar" como card — chips de filtro são labels de radios (filtram de verdade) */
+.fila .fin{display:grid;gap:10px}
+.fchips{display:flex;gap:6px;flex-wrap:wrap}
+.fchip{display:inline-flex;align-items:center;gap:6px;min-height:34px;padding:0 12px;border-radius:99px;border:1px solid var(--input);background:#fff;font-size:12.5px;font-weight:650;color:var(--muted-foreground);cursor:pointer}
+.fchip:hover{background:var(--accent)}
+#fq-all:checked ~ .fin .fchips label[for=fq-all],#fq-crit:checked ~ .fin .fchips label[for=fq-crit],
+#fq-sem:checked ~ .fin .fchips label[for=fq-sem],#fq-reg:checked ~ .fin .fchips label[for=fq-reg]{background:var(--brand-ink);color:#fff;border-color:var(--brand-ink)}
+#fq-all:focus-visible ~ .fin .fchips label[for=fq-all],#fq-crit:focus-visible ~ .fin .fchips label[for=fq-crit],
+#fq-sem:focus-visible ~ .fin .fchips label[for=fq-sem],#fq-reg:focus-visible ~ .fin .fchips label[for=fq-reg]{outline:3px solid hsl(215 90% 42%);outline-offset:2px}
+#fq-crit:checked ~ .fin .flist .lrow:not(.f-crit),#fq-sem:checked ~ .fin .flist .lrow:not(.f-sem),#fq-reg:checked ~ .fin .flist .lrow:not(.f-reg){display:none}
+.flist{border-top:1px solid var(--border)}
+.flist .lrow{padding:11px 0}
+.fila-foot{font-size:12.5px;color:var(--muted-foreground);border-top:1px dashed var(--border);padding-top:9px;display:flex;gap:7px;align-items:baseline;flex-wrap:wrap}
+.fila-foot a{color:var(--info-text);font-weight:600;text-underline-offset:2px}
+.fila-foot .ic{color:var(--info)}
+/* barra honesta grande — mesma gramática da v7: segmentos sobre o total da turma; "sem data" = trilho tracejado */
+.hbar{position:relative;height:14px;border-radius:99px;overflow:hidden;
+      background:repeating-linear-gradient(135deg,hsl(75 7% 90%) 0 5px,hsl(75 7% 84%) 5px 10px)}
+.hbar i{position:absolute;top:0;bottom:0}
+.hbar.sm{height:9px}
+.s-ok{background:var(--ok)}.s-wn{background:var(--warn)}.s-ag{background:hsl(75 4% 40%/.3)}
+.s-no{background:hsl(75 4% 40%/.55)}.s-ap{background:var(--info)}.s-star{background:var(--role-mentorado)}
+.covblk{display:grid;gap:7px;padding:12px 0;border-top:1px dashed var(--border)}
+.covblk:first-of-type{border-top:0;padding-top:2px}
+.covt{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.covt b{font-size:14.5px;font-weight:700}
+.covt small{font-size:12px;color:var(--muted-foreground)}
+.covn{margin-left:auto;font:800 18px/1 "Inter",sans-serif;white-space:nowrap;font-variant-numeric:tabular-nums}
+.covn span{font-size:12px;font-weight:400;color:var(--muted-foreground)}
+.bleg{display:flex;flex-wrap:wrap;gap:5px 16px;list-style:none;font-size:12.5px;color:var(--muted-foreground)}
+.bleg i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:6px;vertical-align:-2px}
+.sw-ok{background:var(--ok)}.sw-wn{background:var(--warn)}.sw-ag{background:hsl(75 4% 40%/.3)}
+.sw-no{background:hsl(75 4% 40%/.55)}.sw-ap{background:var(--info)}.sw-pa{background:var(--pausada)}
+.sw-star{background:var(--role-mentorado)}
+.sw-sd{background:repeating-linear-gradient(135deg,hsl(75 7% 88%) 0 3px,hsl(75 7% 80%) 3px 6px)}
+.cvsub{display:flex;gap:5px 14px;flex-wrap:wrap;list-style:none;font-size:12px;color:var(--muted-foreground)}
+.cvsub i{display:inline-block;width:9px;height:9px;border-radius:2.5px;margin-right:5px;vertical-align:-1px}
+/* semáforo agregado — rosca + legenda com contagens (apoio = eixo azul à parte) */
+.semwrap{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+.donut{position:relative;width:126px;height:126px;flex:none;margin-inline:auto}
+.donut svg{width:100%;height:100%;display:block}
+.donut-c{position:absolute;inset:0;display:grid;place-content:center;justify-items:center;text-align:center;line-height:1.15}
+.donut-c b{font-size:27px;font-weight:800;letter-spacing:-.03em}
+.donut-c span{font-size:11px;color:var(--muted-foreground)}
+.dleg{list-style:none;display:grid;gap:6px;font-size:12.5px;flex:1;min-width:170px}
+.dleg li{display:flex;align-items:center;gap:8px;color:var(--muted-foreground)}
+.dleg i.sw{width:10px;height:10px;border-radius:3px;flex:none}
+.dleg b{color:var(--brand-ink);font-variant-numeric:tabular-nums;min-width:16px}
+.dleg .c{cursor:pointer;font-weight:650;color:var(--danger-text)}
+.dleg a{color:var(--info-text);font-weight:600;text-underline-offset:2px}
+/* pulso — cada sinal com sua escala (denominador ao lado, nunca número solto) */
+.pm{display:grid;gap:4px;padding:8px 0;border-top:1px dashed var(--border)}
+.pm:first-of-type{border-top:0;padding-top:0}
+.pm-t{display:flex;align-items:baseline;gap:8px}
+.pm-t>span{font-size:12.5px;color:var(--muted-foreground)}
+.pm-t b{margin-left:auto;font-size:15px;font-weight:750;white-space:nowrap;font-variant-numeric:tabular-nums}
+.pm-t b span{font-size:11.5px;font-weight:400;color:var(--muted-foreground)}
+.pm small{font-size:11.5px;color:var(--muted-foreground)}
+.pm-t .st{color:var(--warn-text)}
+
+/* ============ v8 · ABA AGENDA — consolidação por janela temporal ============ */
+.calbar{display:flex;gap:8px 16px;align-items:center;flex-wrap:wrap;margin:16px 0 10px}
+.jwsel{display:flex;gap:4px;background:var(--muted);border:1px solid var(--border);padding:4px;border-radius:12px}
+.jwp{display:inline-flex;align-items:center;min-height:38px;padding:0 16px;border-radius:9px;font-weight:650;font-size:13.5px;color:var(--muted-foreground);cursor:pointer}
+.jwp:hover{background:var(--accent)}
+#jw-sem:checked ~ .calbar label[for=jw-sem],#jw-mes:checked ~ .calbar label[for=jw-mes],#jw-ciclo:checked ~ .calbar label[for=jw-ciclo]{background:#fff;color:var(--brand-ink);box-shadow:0 1px 3px hsl(0 0% 0%/.14)}
+#jw-sem:focus-visible ~ .calbar label[for=jw-sem],#jw-mes:focus-visible ~ .calbar label[for=jw-mes],#jw-ciclo:focus-visible ~ .calbar label[for=jw-ciclo]{outline:3px solid hsl(215 90% 42%);outline-offset:2px}
+.ctsel{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-left:auto}
+.ctp{display:inline-flex;align-items:center;min-height:34px;padding:0 13px;border-radius:99px;border:1px solid var(--input);background:#fff;font-size:12.5px;font-weight:650;color:var(--muted-foreground);cursor:pointer}
+.ctp:hover{background:var(--accent)}
+#ct-todas:checked ~ .calbar label[for=ct-todas],#ct-t1:checked ~ .calbar label[for=ct-t1],#ct-t2:checked ~ .calbar label[for=ct-t2]{background:var(--brand-ink);color:#fff;border-color:var(--brand-ink)}
+#ct-todas:focus-visible ~ .calbar label[for=ct-todas],#ct-t1:focus-visible ~ .calbar label[for=ct-t1],#ct-t2:focus-visible ~ .calbar label[for=ct-t2]{outline:3px solid hsl(215 90% 42%);outline-offset:2px}
+.jwpan{display:none}
+#jw-sem:checked ~ .jwpan.jw-sem,#jw-mes:checked ~ .jwpan.jw-mes,#jw-ciclo:checked ~ .jwpan.jw-ciclo{display:block}
+#ct-t1:checked ~ .jwpan .h-t2,#ct-t2:checked ~ .jwpan .h-t1{display:none}
+.calcard{background:#fff;border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-top:10px;min-width:0}
+.covh{padding:12px 16px 10px;border-bottom:1px solid var(--border)}
+.covh .lb{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted-foreground)}
+.covh p{font-size:12.5px;color:var(--muted-foreground);margin-top:3px;max-width:90ch}
+.covh .bleg{margin-top:8px}
+.covbody{padding:4px 16px 14px}
+/* linhas de contexto / de encontro — mesma anatomia da v7 */
+.cvrow{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;padding:10px 16px;border-bottom:1px solid var(--border);font-size:13.5px}
+.cvrow:last-child{border-bottom:0}
+.cvd{flex:none;width:76px;font-size:12.5px;color:var(--muted-foreground);font-variant-numeric:tabular-nums;white-space:nowrap}
+.cvm{flex:1 1 210px;min-width:0}
+.cvm b{display:block;font-size:14px;font-weight:600;line-height:1.3}
+.cvm small{display:block;font-size:12px;color:var(--muted-foreground);margin-top:1px}
+.cvb{flex:1 1 100%;display:flex;align-items:center;gap:10px;order:5}
+@media (min-width:760px){.cvb{flex:0 0 300px;order:0}}
+.cvbar{position:relative;flex:1;height:9px;border-radius:99px;overflow:hidden;
+       background:repeating-linear-gradient(135deg,hsl(75 7% 90%) 0 5px,hsl(75 7% 84%) 5px 10px)}
+.cvbar i{position:absolute;top:0;bottom:0}
+.cvn{font:700 12.5px ui-monospace,monospace;color:var(--brand-ink);white-space:nowrap}
+.cvn span{color:var(--muted-foreground);font-weight:500}
+.cvt{flex:none;font-size:12px;color:var(--muted-foreground);display:inline-flex;align-items:center;gap:6px}
+.cvt .dot{width:7px;height:7px;border-radius:50%;background:var(--brand-lime)}
+.cvt .ic{width:13px;height:13px;color:var(--warn-text)}
+.cvt.roda .ic{color:var(--roda-text)}
+.cvt.sup .ic{color:var(--muted-foreground)}
+.cvrow.cur{background:hsl(78 56% 53%/.09)}
+.cvrow.cur .cvt .dot{box-shadow:0 0 0 3px var(--lime-tint)}
+.cvrow .cvsub{flex:1 1 100%;order:6;padding:0}
+/* agregado do mês — cabeçalho com a conta do mês inteiro */
+.roll{display:grid;gap:7px;padding:13px 16px;border-bottom:1px solid var(--border)}
+.roll-t{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.roll-t b{font-size:17px;font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.roll-t b span{font-size:12.5px;font-weight:400;color:var(--muted-foreground)}
+.roll-t small{font-size:12.5px;color:var(--muted-foreground)}
+/* linha do tempo do ciclo — 16 células, altura = cobertura real do encontro */
+.tlcard{padding:14px 16px}
+.tlcard h3{font-size:15px;font-weight:750;letter-spacing:-.01em}
+.tlcard .tlsub{font-size:12.5px;color:var(--muted-foreground);margin-top:2px}
+.tl{display:grid;grid-template-columns:repeat(16,minmax(0,1fr));gap:5px;align-items:end;margin-top:12px}
+.tlc{display:grid;gap:5px;justify-items:center;min-width:0}
+.tlb{position:relative;width:100%;height:56px;border-radius:6px;background:hsl(75 7% 92%);overflow:hidden}
+.tlb i{position:absolute;left:0;right:0;bottom:0;background:var(--ok)}
+.tlb.cur{outline:2px solid var(--brand-ink);outline-offset:1px}
+.tlb.fut{background:transparent;border:1.5px dashed var(--input)}
+.tln{font-size:10.5px;color:var(--muted-foreground);font-variant-numeric:tabular-nums}
+.tlc.cur .tln{color:var(--brand-ink);font-weight:700}
+.tlleg{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:11.5px;color:var(--muted-foreground);margin-top:8px}
+.tlleg i{display:inline-block;width:10px;height:10px;border-radius:2.5px;vertical-align:-1px;margin-right:5px}
+.tlleg i.e{background:transparent;border:1.5px dashed var(--input)}
+.acc{display:grid;gap:7px;border-top:1px dashed var(--border);margin-top:12px;padding-top:12px}
+.acc-t{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.acc-t b{font-size:17px;font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.acc-t b span{font-size:12.5px;font-weight:400;color:var(--muted-foreground)}
+.acc-t small{font-size:12.5px;color:var(--muted-foreground)}
+.clst{border-top:1px dashed var(--border);margin-top:12px;padding-top:2px}
+.clst summary{display:flex;align-items:center;gap:6px;min-height:38px;font-size:12.5px;font-weight:650;color:var(--ok-text);cursor:pointer;list-style:none}
+.clst summary svg{transition:transform .15s}
+.clst[open] summary svg{transform:rotate(90deg)}
+.clst ul{list-style:none;margin:0 -16px -14px;border-top:1px solid var(--border)}
+.foot-note{font-size:12.5px;color:var(--muted-foreground);margin-top:10px}
+.mockfix{display:flex;gap:10px;align-items:flex-start;margin:14px 0 4px;padding:12px 14px;border:1.5px dashed var(--amb-line);background:var(--amb-bg);border-radius:12px;font-size:13px;color:var(--warn-text)}
+.mockfix div{display:grid;gap:2px}.mockfix b{color:var(--brand-ink)}.mockfix span{color:var(--muted-foreground)}
+
+/* notas */
+.notes{width:min(1120px,100% - 28px);margin:10px auto 130px;padding:20px;background:#fff;border:1px solid var(--border);border-radius:14px;display:grid;gap:10px;font-size:13.5px;line-height:1.6;color:var(--muted-foreground);scroll-margin-top:12px}
+@media (min-width:900px){.notes{margin-bottom:70px}}
+.notes h2{font-size:18px;color:var(--brand-ink)}.notes h3{font-size:14.5px;color:var(--brand-ink);margin-top:10px;scroll-margin-top:12px}
+.notes b{color:var(--brand-ink)}.notes ul{display:grid;gap:7px;padding-left:20px}
+.notes ul.open li::marker{color:var(--warn)}
+.mx{display:grid;gap:0;border:1px solid var(--border);border-radius:12px;overflow:hidden}
+.mxh,.mxr{display:grid;grid-template-columns:1fr;gap:4px;padding:10px 12px;border-bottom:1px solid var(--border)}
+.mxh{display:none;background:var(--muted);font-weight:700;color:var(--brand-ink)}
+.mxr:last-child{border-bottom:0}.mxr>b{font-size:14px}
+.mxr span::before{content:attr(data-l) ": ";font-weight:700;color:var(--brand-ink)}
+@media (min-width:900px){.mxh,.mxr{grid-template-columns:170px 1fr 1fr 1fr;gap:14px}.mxh{display:grid}.mxr span::before{content:none}}
+
+@media (max-width:899px){
+  .btn{min-height:44px}
+  .board-head nav a{min-height:44px}
+  .lrow .btn{flex:1 1 auto}
+}
+@media (max-width:420px){.phead h1{font-size:23px}.lrow>.btn{flex:1 1 100%}}
+</style>
+</head>
+<body>
+<div class="board-head"><b>MOCKUP · agenda · v8</b><span>Feedback out/2026 — dashboard de monitoramento + consolidação por janela</span>
+  <span class="dir"><b class="d">Direção:</b> Monitoramento vira dashboard operacional (fila acionável filtrável + agregados com toggle de turma); a aba Agenda consolida a mesma cobertura honesta por janela — Semana · Mês · Ciclo.</span>
+  <nav aria-label="Âncoras"><a href="#notas">Notas</a><a href="#matriz">Matriz papel × ação</a><a href="#rastro">Rastreabilidade</a><a href="#abertas">Decisões em aberto</a></nav></div>
+
+<input class="rv" type="radio" name="papel" id="r-coord" checked>
+<div class="vbar"><div class="vin wrap"><span class="vl">Ver como:</span><div class="vpills" role="group" aria-label="Papel"><label for="r-coord" class="vp">Coordenação</label></div><span class="vnote">Auxiliar executivo: mesmo desenho com o denominador das 6 supervisionadas (como na v7).</span></div></div>
+
+<!-- ================= COORDENAÇÃO ================= -->
+<section class="view" id="v-coord" aria-label="Visão Coordenação">
+<header class="top"><div class="top-in wrap">
+  <div class="brand"><span class="mark">R</span><span class="bname">Realiza<em>.vc</em></span></div>
+  <nav class="nav" aria-label="Principal"><a href="#">Início</a><a href="#" class="on">Agenda</a><a href="#">Duplas</a><a href="#">Pessoas</a><a href="#">Chamados</a><a href="#">Materiais</a></nav>
+  <div class="me"><span class="bell" aria-label="Notificações"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 1.5h-15z"/><path d="M10 20.5h4"/></svg><i></i></span><span class="me-t"><b>Marina Costa</b><i>Coordenação</i></span><span class="av ink">MC</span></div>
+</div></header>
+<input class="rv" type="radio" name="tabc" id="tc-mon" checked><input class="rv" type="radio" name="tabc" id="tc-cal">
+<div class="wrap pg">
+  <div class="phead"><div><h1>Agenda do programa</h1><p class="psub">Semana 41 · 6 a 12 de outubro · hoje, terça 7 de outubro</p></div>
+    <div class="legend-pill"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.8 12S6.3 5.8 12 5.8 21.2 12 21.2 12 17.7 18.2 12 18.2 2.8 12 2.8 12z"/><circle cx="12" cy="12" r="2.7"/></svg> Monitoramento — a agenda de cada dupla é da dupla</div></div>
+  <div class="sbox"><p><b class="y"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.8 12S6.3 5.8 12 5.8 21.2 12 21.2 12 17.7 18.2 12 18.2 2.8 12 2.8 12z"/><circle cx="12" cy="12" r="2.7"/></svg> Você vê:</b> a semana do calendário oficial, o painel operacional das 26 duplas (T1 e T2) e a consolidação por janela na aba Agenda.</p><p><b class="n"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5.5" y="10.5" width="13" height="9.5" rx="2.2"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/></svg> Você NÃO vê:</b> um botão “agendar encontro” — quem marca data, formato e local é a dupla. Aqui a coordenação acompanha e faz <b>lembrar</b>.</p></div>
+
+  <div class="tabs" role="tablist" aria-label="Visão da agenda"><label for="tc-mon" class="tab"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 20V10M9.5 20V4M16 20v-8M21.5 20H2"/></svg>Monitoramento</label><label for="tc-cal" class="tab"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5.5" width="16" height="15" rx="2.2"/><path d="M4 10.5h16M8.5 3.5v4M15.5 3.5v4"/></svg>Agenda</label></div>
+
+  <!-- ============ ABA MONITORAMENTO = dashboard operacional ============ -->
+  <div class="pane pane-mon">
+    <p class="sintese" role="note"><b>5 para acompanhar</b> · <b class="crit">2 críticas</b> · 3 atenção · 6 sem agendamento · 1 registro pendente · 1 lembrete em 48h · <a href="#"><u>1 pedido de apoio</u></a></p>
+
+    <h2 class="sec">Semana do programa <span class="tag mut">o que o calendário oficial pede esta semana</span></h2>
+    <div class="wk" aria-label="Eventos oficiais da semana 41">
+      <article class="wkc tp-supervisao hoje">
+        <div class="wkd"><i>ter</i><b>07</b><i class="m">out</i></div>
+        <div class="wkb">
+          <div class="wkt"><span class="tpill t-sup"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 7A2.5 2.5 0 0 1 7 4.5h10A2.5 2.5 0 0 1 19.5 7v7a2.5 2.5 0 0 1-2.5 2.5h-7l-4 3.5v-3.5A2.5 2.5 0 0 1 4.5 14z"/></svg>supervisão</span><span class="etag hj">hoje</span></div>
+          <h3>Paula Nunes × André Lima</h3>
+          <p class="wkmeta"><b>12h30</b> · online · “rotina das duplas” — acompanhamento da equipe</p>
+        </div>
+      </article>
+      <article class="wkc tp-encontro hoje">
+        <div class="wkd"><i>ter</i><b>07</b><i class="m">out</i></div>
+        <div class="wkb">
+          <div class="wkt"><span class="tpill t-enc"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9.5" cy="8" r="3.2"/><path d="M3.6 19.2c.7-3.3 3-5.2 5.9-5.2s5.2 1.9 5.9 5.2"/><path d="M15.2 5.3a3.2 3.2 0 0 1 0 5.5"/><path d="M17 14.4c2 .7 3.2 2.4 3.6 4.8"/></svg>encontro</span><span class="pill lime">T1</span><span class="etag hj">hoje</span></div>
+          <h3>Encontro 8 · T1</h3>
+          <p class="wkmeta"><b>19h–20h</b> · 10 duplas — cada uma marca a sua</p>
+          <details class="guia"><summary><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 5.5 6.5 6.5L9 18.5"/></svg>O que o encontro cobre · como conduzir</summary>
+            <div class="gbody">
+              <p><b>O que o encontro cobre</b>“Monitoramento e responsabilidade” — fase <i>Consolidar a autonomia</i>. Instrumentos do guia:</p>
+              <p class="inst"><span>PDM</span><span>Escuta Ativa</span></p>
+              <p><b>Como conduzir</b>Revisar as submetas em andamento no PDM, nomear o que destravou e combinar o próximo passo com prazo.</p>
+            </div>
+          </details>
+        </div>
+      </article>
+      <article class="wkc tp-encontro">
+        <div class="wkd"><i>qua</i><b>08</b><i class="m">out</i></div>
+        <div class="wkb">
+          <div class="wkt"><span class="tpill t-enc"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9.5" cy="8" r="3.2"/><path d="M3.6 19.2c.7-3.3 3-5.2 5.9-5.2s5.2 1.9 5.9 5.2"/><path d="M15.2 5.3a3.2 3.2 0 0 1 0 5.5"/><path d="M17 14.4c2 .7 3.2 2.4 3.6 4.8"/></svg>encontro</span><span class="pill amb">T2</span><span class="etag sem">esta semana</span></div>
+          <h3>Encontro 5 · T2</h3>
+          <p class="wkmeta"><b>19h–20h</b> · 15 duplas — cada uma marca a sua</p>
+          <details class="guia"><summary><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 5.5 6.5 6.5L9 18.5"/></svg>O que o encontro cobre · como conduzir</summary>
+            <div class="gbody">
+              <p><b>O que o encontro cobre</b>“Acompanhamento das primeiras submetas” — fase <i>Colocar o plano em prática</i>. Instrumentos do guia:</p>
+              <p class="inst"><span>PDM</span><span>Feedback Construtivo</span></p>
+              <p><b>Como conduzir</b>Passar pelas primeiras submetas entregues, dar feedback construtivo e ajustar o que travou.</p>
+            </div>
+          </details>
+        </div>
+      </article>
+      <article class="wkc tp-roda">
+        <div class="wkd"><i>qui</i><b>09</b><i class="m">out</i></div>
+        <div class="wkb">
+          <div class="wkt"><span class="tpill t-roda"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 21V4.2"/><path d="M6 4.5c3.8-1.9 7.7 1.9 12 0v8.6c-4.3 1.9-8.2-1.9-12 0"/></svg>roda de conversa</span><span class="pill lime">T1</span><span class="etag sem">esta semana</span></div>
+          <h3>Roda de conversa com as famílias</h3>
+          <p class="wkmeta"><b>19h30–20h30</b> · online · evento oficial com as famílias da T1</p>
+        </div>
+      </article>
+      <article class="wkc tp-formacao">
+        <div class="wkd"><i>sáb</i><b>11</b><i class="m">out</i></div>
+        <div class="wkb">
+          <div class="wkt"><span class="tpill t-for"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 4.5 10 4.5-10 4.5L2 9z"/><path d="M6.5 11.5v4.8c0 1.4 2.5 2.7 5.5 2.7s5.5-1.3 5.5-2.7v-4.8"/><path d="M22 9v6"/></svg>formação</span><span class="etag sem">esta semana</span></div>
+          <h3>Formação de mentores</h3>
+          <p class="wkmeta"><b>10h–12h</b> · Sede Realiza · todos os mentores, T1 e T2</p>
+          <p class="wkfoot">No sábado, este card mostra <b>Abrir chamada</b>.</p>
+        </div>
+      </article>
+    </div>
+
+    <!-- toggle de turma dos agregados (radios CSS) -->
+    <input class="rv" type="radio" name="agt" id="ag-todas" checked><input class="rv" type="radio" name="agt" id="ag-t1"><input class="rv" type="radio" name="agt" id="ag-t2">
+    <div class="dashhead">
+      <h2 class="sec">Painel da semana <span class="tag mut">o que pede ação primeiro — agregados reagem à turma</span></h2>
+      <div class="agbar" role="group" aria-label="Turma dos agregados"><span class="lb">Turma</span><label for="ag-todas" class="agp">Todas · 26</label><label for="ag-t1" class="agp">T1 · 11</label><label for="ag-t2" class="agp">T2 · 15</label></div>
+    </div>
+    <div class="dash">
+
+      <!-- (d) fila acionável — primeiro: é o que exige ação -->
+      <section class="dcard fila" aria-label="Para acompanhar">
+        <input class="rv" type="radio" name="fq" id="fq-all" checked><input class="rv" type="radio" name="fq" id="fq-crit"><input class="rv" type="radio" name="fq" id="fq-sem"><input class="rv" type="radio" name="fq" id="fq-reg">
+        <div class="fin">
+          <div class="dc-h"><h3><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8.6 3.8h6.8l4.8 4.8v6.8l-4.8 4.8H8.6l-4.8-4.8V8.6z"/><path d="M12 8.2v4.6M12 15.6v.1"/></svg>Para acompanhar</h3><span class="mut">5 duplas · <b>Lembrar</b> avisa — quem agenda é a dupla</span></div>
+          <div class="fchips" role="group" aria-label="Filtrar a fila"><label for="fq-all" class="fchip">Todas · 5</label><label for="fq-crit" class="fchip">Críticas · 2</label><label for="fq-sem" class="fchip">Sem data · 4</label><label for="fq-reg" class="fchip">Registro pendente · 1</label></div>
+          <div class="flist">
+            <div class="lrow f-crit f-sem"><div class="lmain"><b>Dupla T1 · exemplo</b> <span class="pill">T1</span><small>2 encontros atrasados (enc. 6 e 7 · T1) — sem data para o 8</small></div><div class="lsig"><span class="tag danger"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8.6 3.8h6.8l4.8 4.8v6.8l-4.8 4.8H8.6l-4.8-4.8V8.6z"/><path d="M12 8.2v4.6M12 15.6v.1"/></svg>Risco</span></div><button class="btn" type="button"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11.8a7.8 7.8 0 0 1-7.8 7.8c-1.4 0-2.7-.3-3.8-.9L4 20l1.3-4.2a7.8 7.8 0 1 1 14.7-4z"/></svg>Lembrar</button></div>
+            <div class="lrow f-crit f-sem"><div class="lmain"><b>Dupla T2 · exemplo B</b> <span class="pill">T2</span><small>2 encontros atrasados (enc. 3 e 4 · T2) — sem data para o 5</small></div><div class="lsig"><span class="tag danger"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8.6 3.8h6.8l4.8 4.8v6.8l-4.8 4.8H8.6l-4.8-4.8V8.6z"/><path d="M12 8.2v4.6M12 15.6v.1"/></svg>Risco</span></div><button class="btn" type="button"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11.8a7.8 7.8 0 0 1-7.8 7.8c-1.4 0-2.7-.3-3.8-.9L4 20l1.3-4.2a7.8 7.8 0 1 1 14.7-4z"/></svg>Lembrar</button></div>
+            <div class="lrow f-sem"><div class="lmain"><b>Sofia · Ricardo</b> <span class="pill">T1</span><small>Encontro 8 · T1 — ainda sem data na semana 41 (prazo: dom 12)</small></div><div class="lsig"><span class="tag mut"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.2"/><path d="M12 7.2V12l3.3 1.9"/></svg>em andamento</span></div><button class="btn" type="button"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11.8a7.8 7.8 0 0 1-7.8 7.8c-1.4 0-2.7-.3-3.8-.9L4 20l1.3-4.2a7.8 7.8 0 1 1 14.7-4z"/></svg>Lembrar</button></div>
+            <div class="lrow f-sem"><div class="lmain"><b>Dupla T2 · exemplo A</b> <span class="pill">T2</span><small>Encontro 5 · T2 — sem data na semana 41 · 1 encontro atrasado</small></div><div class="lsig"><span class="tag warn"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4.2 21 19.5H3z"/><path d="M12 10v4.2M12 16.8v.1"/></svg>Atenção</span></div><button class="btn" type="button"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11.8a7.8 7.8 0 0 1-7.8 7.8c-1.4 0-2.7-.3-3.8-.9L4 20l1.3-4.2a7.8 7.8 0 1 1 14.7-4z"/></svg>Lembrar</button></div>
+            <div class="lrow f-reg"><div class="lmain"><b>Caio Martins · André Lima</b> <span class="pill">T2</span><small>Encontro 5 · T2 amanhã, 19h — local a confirmar · registro do encontro 4 pendente</small></div><div class="lsig"><span class="tag warn"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4.2 21 19.5H3z"/><path d="M12 10v4.2M12 16.8v.1"/></svg>Atenção</span></div><button class="btn" type="button"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11.8a7.8 7.8 0 0 1-7.8 7.8c-1.4 0-2.7-.3-3.8-.9L4 20l1.3-4.2a7.8 7.8 0 1 1 14.7-4z"/></svg>Lembrar registro</button></div>
+          </div>
+          <p class="fila-foot"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.2"/><path d="M12 11v4.8M12 7.6v.1"/></svg><span>Além destas, <b>1 pedido de apoio</b> segue aberto — eixo à parte, atendimento na fila de <a href="#">Chamados</a>.</span></p>
+        </div>
+      </section>
+
+      <div class="dcards">
+        <!-- (a) cobertura do encontro da semana, por turma — barras honestas grandes -->
+        <section class="dcard" aria-label="Cobertura do encontro da semana">
+          <div class="dc-h"><h3><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/></svg>Cobertura do encontro da semana</h3><span class="mut">quem já realizou</span></div>
+          <div class="covblk h-t1">
+            <div class="covt"><span class="pill lime">T1</span><b>Encontro 8</b><small>hoje, ter 19h</small><span class="covn">4<span> de 10</span></span></div>
+            <div class="hbar" role="img" aria-label="Encontro 8, T1: 4 de 10 realizaram — 3 com registro, 1 aguardando, 3 agendadas, 1 não aconteceu, 2 sem data"><i class="s-ok" style="left:0;width:30%"></i><i class="s-wn" style="left:30%;width:10%"></i><i class="s-ag" style="left:40%;width:30%"></i><i class="s-no" style="left:70%;width:10%"></i></div>
+            <ul class="cvsub"><li><i class="sw-ok"></i>3 com registro</li><li><i class="sw-wn"></i>1 aguardando registro</li><li><i class="sw-ag"></i>3 agendadas</li><li><i class="sw-no"></i>1 não aconteceu</li><li><i class="sw-sd"></i>2 sem data</li></ul>
+          </div>
+          <div class="covblk h-t2">
+            <div class="covt"><span class="pill amb">T2</span><b>Encontro 5</b><small>amanhã, qua 19h</small><span class="covn">2<span> de 15</span></span></div>
+            <div class="hbar" role="img" aria-label="Encontro 5, T2: 2 de 15 realizaram — 2 com registro, 9 agendadas, 4 sem data"><i class="s-ok" style="left:0;width:13.3%"></i><i class="s-ag" style="left:13.3%;width:60%"></i></div>
+            <ul class="cvsub"><li><i class="sw-ok"></i>2 com registro</li><li><i class="sw-ag"></i>9 agendadas p/ amanhã</li><li><i class="sw-sd"></i>4 sem data</li></ul>
+          </div>
+          <ul class="bleg" aria-label="Legenda da barra de cobertura">
+            <li><i class="sw-ok"></i>realizaram · registro entregue</li>
+            <li><i class="sw-wn"></i>aguardando registro</li>
+            <li><i class="sw-ag"></i>agendado</li>
+            <li><i class="sw-no"></i>não aconteceu</li>
+            <li><i class="sw-sd"></i>sem encontro marcado</li>
+          </ul>
+          <p class="foot-mini">Denominador = duplas ativas da turma — a proporção pintada e o “N/M” contam a mesma história. Turmas nunca misturadas: T1 e T2 estão em encontros diferentes na mesma semana.</p>
+        </section>
+
+        <!-- (b) semáforo agregado — rosca 26 com apoio em eixo separado -->
+        <section class="dcard" aria-label="Semáforo das duplas">
+          <div class="dc-h"><h3><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.2"/><circle cx="12" cy="12" r="3.2"/></svg>Semáforo das duplas</h3><span class="mut agv agv-todas">26 no ciclo</span><span class="mut agv agv-t1">11 na T1</span><span class="mut agv agv-t2">15 na T2</span></div>
+          <div class="agv agv-todas"><div class="semwrap">
+            <div class="donut"><svg viewBox="0 0 140 140" role="img" aria-label="Semáforo: 2 em risco, 3 em atenção, 19 em andamento, 1 com apoio aberto, 1 pausada — 26 duplas"><circle cx="70" cy="70" r="54" fill="none" stroke="var(--muted)" stroke-width="20"/><circle cx="70" cy="70" r="54" fill="none" stroke="var(--danger)" stroke-width="20" stroke-dasharray="26.1 313.19" transform="rotate(-90 70 70)"/><circle cx="70" cy="70" r="54" fill="none" stroke="var(--warn)" stroke-width="20" stroke-dasharray="39.15 300.14" stroke-dashoffset="-26.1" transform="rotate(-90 70 70)"/><circle cx="70" cy="70" r="54" fill="none" stroke="var(--ok)" stroke-width="20" stroke-dasharray="247.94 91.35" stroke-dashoffset="-65.25" transform="rotate(-90 70 70)"/><circle cx="70" cy="70" r="54" fill="none" stroke="var(--info)" stroke-width="20" stroke-dasharray="13.05 326.24" stroke-dashoffset="-313.19" transform="rotate(-90 70 70)"/><circle cx="70" cy="70" r="54" fill="none" stroke="var(--pausada)" stroke-width="20" stroke-dasharray="13.05 326.24" stroke-dashoffset="-326.24" transform="rotate(-90 70 70)"/></svg><div class="donut-c"><b>26</b><span>duplas</span></div></div>
+            <ul class="dleg"><li class="c"><i class="sw" style="background:var(--danger)"></i><b>2</b> em risco — agir hoje</li><li><i class="sw" style="background:var(--warn)"></i><b>3</b> em atenção</li><li><i class="sw" style="background:var(--ok)"></i><b>19</b> em andamento</li><li><i class="sw" style="background:var(--info)"></i><b>1</b> com apoio aberto <a href="#">→ Chamados</a></li><li><i class="sw" style="background:var(--pausada)"></i><b>1</b> pausada</li></ul>
+          </div></div>
+          <div class="agv agv-t1"><div class="semwrap">
+            <div class="donut"><svg viewBox="0 0 140 140" role="img" aria-label="Semáforo T1: 1 em risco, 1 em atenção, 8 em andamento, 1 pausada — 11 duplas"><circle cx="70" cy="70" r="54" fill="none" stroke="var(--muted)" stroke-width="20"/><circle cx="70" cy="70" r="54" fill="none" stroke="var(--danger)" stroke-width="20" stroke-dasharray="30.85 308.44" transform="rotate(-90 70 70)"/><circle cx="70" cy="70" r="54" fill="none" stroke="var(--warn)" stroke-width="20" stroke-dasharray="30.85 308.44" stroke-dashoffset="-30.85" transform="rotate(-90 70 70)"/><circle cx="70" cy="70" r="54" fill="none" stroke="var(--ok)" stroke-width="20" stroke-dasharray="246.76 92.53" stroke-dashoffset="-61.69" transform="rotate(-90 70 70)"/><circle cx="70" cy="70" r="54" fill="none" stroke="var(--pausada)" stroke-width="20" stroke-dasharray="30.85 308.44" stroke-dashoffset="-308.45" transform="rotate(-90 70 70)"/></svg><div class="donut-c"><b>11</b><span>duplas T1</span></div></div>
+            <ul class="dleg"><li class="c"><i class="sw" style="background:var(--danger)"></i><b>1</b> em risco — agir hoje</li><li><i class="sw" style="background:var(--warn)"></i><b>1</b> em atenção</li><li><i class="sw" style="background:var(--ok)"></i><b>8</b> em andamento</li><li><i class="sw" style="background:var(--info)"></i><b>0</b> com apoio aberto</li><li><i class="sw" style="background:var(--pausada)"></i><b>1</b> pausada</li></ul>
+          </div></div>
+          <div class="agv agv-t2"><div class="semwrap">
+            <div class="donut"><svg viewBox="0 0 140 140" role="img" aria-label="Semáforo T2: 1 em risco, 2 em atenção, 11 em andamento, 1 com apoio aberto — 15 duplas"><circle cx="70" cy="70" r="54" fill="none" stroke="var(--muted)" stroke-width="20"/><circle cx="70" cy="70" r="54" fill="none" stroke="var(--danger)" stroke-width="20" stroke-dasharray="22.62 316.67" transform="rotate(-90 70 70)"/><circle cx="70" cy="70" r="54" fill="none" stroke="var(--warn)" stroke-width="20" stroke-dasharray="45.24 294.05" stroke-dashoffset="-22.62" transform="rotate(-90 70 70)"/><circle cx="70" cy="70" r="54" fill="none" stroke="var(--ok)" stroke-width="20" stroke-dasharray="248.81 90.48" stroke-dashoffset="-67.86" transform="rotate(-90 70 70)"/><circle cx="70" cy="70" r="54" fill="none" stroke="var(--info)" stroke-width="20" stroke-dasharray="22.62 316.67" stroke-dashoffset="-316.67" transform="rotate(-90 70 70)"/></svg><div class="donut-c"><b>15</b><span>duplas T2</span></div></div>
+            <ul class="dleg"><li class="c"><i class="sw" style="background:var(--danger)"></i><b>1</b> em risco — agir hoje</li><li><i class="sw" style="background:var(--warn)"></i><b>2</b> em atenção</li><li><i class="sw" style="background:var(--ok)"></i><b>11</b> em andamento</li><li><i class="sw" style="background:var(--info)"></i><b>1</b> com apoio aberto <a href="#">→ Chamados</a></li><li><i class="sw" style="background:var(--pausada)"></i><b>0</b> pausadas</li></ul>
+          </div></div>
+          <p class="foot-mini">Apoio é eixo à parte (não é nota de saúde): a dupla segue no estado dela e o atendimento corre em Chamados — aparece contado aqui pra fechar as 26.</p>
+        </section>
+
+        <!-- (c) pulso da semana — sinais dos encontros recentes, sempre com escala -->
+        <section class="dcard" aria-label="Pulso da semana">
+          <div class="dc-h"><h3><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg>Pulso da semana</h3><span class="mut">encontros recentes</span></div>
+          <div class="agv agv-todas">
+            <div class="pm"><div class="pm-t"><span>registros entregues</span><b>15<span> /19</span></b></div><div class="hbar sm" role="img" aria-label="15 de 19 registros entregues"><i class="s-ok" style="width:79%"></i></div></div>
+            <div class="pm"><div class="pm-t"><span>aguardando registro</span><b>4<span> /19</span></b></div><div class="hbar sm" role="img" aria-label="4 de 19 aguardando registro"><i class="s-wn" style="width:21%"></i></div></div>
+            <div class="pm"><div class="pm-t"><span>avaliação média dos jovens</span><b class="st">★ 4,3<span> /5</span></b></div><div class="hbar sm" role="img" aria-label="avaliação média 4,3 de 5"><i class="s-star" style="width:86%"></i></div><small>12 avaliações · encontros realizados nos últimos 14 dias</small></div>
+            <p class="foot-mini">+ 1 lembrete enviado nas últimas 48h</p>
+          </div>
+          <div class="agv agv-t1">
+            <div class="pm"><div class="pm-t"><span>registros entregues</span><b>6<span> /8</span></b></div><div class="hbar sm" role="img" aria-label="6 de 8 registros entregues"><i class="s-ok" style="width:75%"></i></div></div>
+            <div class="pm"><div class="pm-t"><span>aguardando registro</span><b>2<span> /8</span></b></div><div class="hbar sm" role="img" aria-label="2 de 8 aguardando registro"><i class="s-wn" style="width:25%"></i></div></div>
+            <div class="pm"><div class="pm-t"><span>avaliação média dos jovens</span><b class="st">★ 4,1<span> /5</span></b></div><div class="hbar sm" role="img" aria-label="avaliação média 4,1 de 5"><i class="s-star" style="width:82%"></i></div><small>7 avaliações · encontro 7 · T1</small></div>
+            <p class="foot-mini">nenhum lembrete em 48h</p>
+          </div>
+          <div class="agv agv-t2">
+            <div class="pm"><div class="pm-t"><span>registros entregues</span><b>9<span> /11</span></b></div><div class="hbar sm" role="img" aria-label="9 de 11 registros entregues"><i class="s-ok" style="width:82%"></i></div></div>
+            <div class="pm"><div class="pm-t"><span>aguardando registro</span><b>2<span> /11</span></b></div><div class="hbar sm" role="img" aria-label="2 de 11 aguardando registro"><i class="s-wn" style="width:18%"></i></div></div>
+            <div class="pm"><div class="pm-t"><span>avaliação média dos jovens</span><b class="st">★ 4,5<span> /5</span></b></div><div class="hbar sm" role="img" aria-label="avaliação média 4,5 de 5"><i class="s-star" style="width:90%"></i></div><small>5 avaliações · encontro 4 · T2</small></div>
+            <p class="foot-mini">+ 1 lembrete enviado nas últimas 48h</p>
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ ABA AGENDA = consolidação por janela temporal ============ -->
+  <div class="pane pane-cal">
+    <h2 class="sec">Semana do programa <span class="tag mut">o mesmo cartão da aba Monitoramento — um componente, duas montagens</span></h2>
+    <div class="wk" aria-label="Eventos oficiais da semana 41">
+      <article class="wkc tp-supervisao hoje">
+        <div class="wkd"><i>ter</i><b>07</b><i class="m">out</i></div>
+        <div class="wkb">
+          <div class="wkt"><span class="tpill t-sup"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 7A2.5 2.5 0 0 1 7 4.5h10A2.5 2.5 0 0 1 19.5 7v7a2.5 2.5 0 0 1-2.5 2.5h-7l-4 3.5v-3.5A2.5 2.5 0 0 1 4.5 14z"/></svg>supervisão</span><span class="etag hj">hoje</span></div>
+          <h3>Paula Nunes × André Lima</h3>
+          <p class="wkmeta"><b>12h30</b> · online · “rotina das duplas” — acompanhamento da equipe</p>
+        </div>
+      </article>
+      <article class="wkc tp-encontro hoje">
+        <div class="wkd"><i>ter</i><b>07</b><i class="m">out</i></div>
+        <div class="wkb">
+          <div class="wkt"><span class="tpill t-enc"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9.5" cy="8" r="3.2"/><path d="M3.6 19.2c.7-3.3 3-5.2 5.9-5.2s5.2 1.9 5.9 5.2"/><path d="M15.2 5.3a3.2 3.2 0 0 1 0 5.5"/><path d="M17 14.4c2 .7 3.2 2.4 3.6 4.8"/></svg>encontro</span><span class="pill lime">T1</span><span class="etag hj">hoje</span></div>
+          <h3>Encontro 8 · T1</h3>
+          <p class="wkmeta"><b>19h–20h</b> · 10 duplas — cada uma marca a sua</p>
+          <details class="guia"><summary><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 5.5 6.5 6.5L9 18.5"/></svg>O que o encontro cobre · como conduzir</summary>
+            <div class="gbody">
+              <p><b>O que o encontro cobre</b>“Monitoramento e responsabilidade” — fase <i>Consolidar a autonomia</i>. Instrumentos do guia:</p>
+              <p class="inst"><span>PDM</span><span>Escuta Ativa</span></p>
+              <p><b>Como conduzir</b>Revisar as submetas em andamento no PDM, nomear o que destravou e combinar o próximo passo com prazo.</p>
+            </div>
+          </details>
+        </div>
+      </article>
+      <article class="wkc tp-encontro">
+        <div class="wkd"><i>qua</i><b>08</b><i class="m">out</i></div>
+        <div class="wkb">
+          <div class="wkt"><span class="tpill t-enc"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9.5" cy="8" r="3.2"/><path d="M3.6 19.2c.7-3.3 3-5.2 5.9-5.2s5.2 1.9 5.9 5.2"/><path d="M15.2 5.3a3.2 3.2 0 0 1 0 5.5"/><path d="M17 14.4c2 .7 3.2 2.4 3.6 4.8"/></svg>encontro</span><span class="pill amb">T2</span><span class="etag sem">esta semana</span></div>
+          <h3>Encontro 5 · T2</h3>
+          <p class="wkmeta"><b>19h–20h</b> · 15 duplas — cada uma marca a sua</p>
+          <details class="guia"><summary><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 5.5 6.5 6.5L9 18.5"/></svg>O que o encontro cobre · como conduzir</summary>
+            <div class="gbody">
+              <p><b>O que o encontro cobre</b>“Acompanhamento das primeiras submetas” — fase <i>Colocar o plano em prática</i>. Instrumentos do guia:</p>
+              <p class="inst"><span>PDM</span><span>Feedback Construtivo</span></p>
+              <p><b>Como conduzir</b>Passar pelas primeiras submetas entregues, dar feedback construtivo e ajustar o que travou.</p>
+            </div>
+          </details>
+        </div>
+      </article>
+      <article class="wkc tp-roda">
+        <div class="wkd"><i>qui</i><b>09</b><i class="m">out</i></div>
+        <div class="wkb">
+          <div class="wkt"><span class="tpill t-roda"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 21V4.2"/><path d="M6 4.5c3.8-1.9 7.7 1.9 12 0v8.6c-4.3 1.9-8.2-1.9-12 0"/></svg>roda de conversa</span><span class="pill lime">T1</span><span class="etag sem">esta semana</span></div>
+          <h3>Roda de conversa com as famílias</h3>
+          <p class="wkmeta"><b>19h30–20h30</b> · online · evento oficial com as famílias da T1</p>
+        </div>
+      </article>
+      <article class="wkc tp-formacao">
+        <div class="wkd"><i>sáb</i><b>11</b><i class="m">out</i></div>
+        <div class="wkb">
+          <div class="wkt"><span class="tpill t-for"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 4.5 10 4.5-10 4.5L2 9z"/><path d="M6.5 11.5v4.8c0 1.4 2.5 2.7 5.5 2.7s5.5-1.3 5.5-2.7v-4.8"/><path d="M22 9v6"/></svg>formação</span><span class="etag sem">esta semana</span></div>
+          <h3>Formação de mentores</h3>
+          <p class="wkmeta"><b>10h–12h</b> · Sede Realiza · todos os mentores, T1 e T2</p>
+          <p class="wkfoot">No sábado, este card mostra <b>Abrir chamada</b>.</p>
+        </div>
+      </article>
+    </div>
+
+    <!-- seletores: janela temporal + turma (radios CSS) -->
+    <input class="rv" type="radio" name="jw" id="jw-sem" checked><input class="rv" type="radio" name="jw" id="jw-mes"><input class="rv" type="radio" name="jw" id="jw-ciclo">
+    <input class="rv" type="radio" name="ct" id="ct-todas" checked><input class="rv" type="radio" name="ct" id="ct-t1"><input class="rv" type="radio" name="ct" id="ct-t2">
+    <div class="calbar">
+      <div class="jwsel" role="group" aria-label="Janela temporal"><label for="jw-sem" class="jwp">Semana</label><label for="jw-mes" class="jwp">Mês</label><label for="jw-ciclo" class="jwp">Ciclo</label></div>
+      <div class="ctsel" role="group" aria-label="Turma"><span class="lb">Turma</span><label for="ct-todas" class="ctp">Todas</label><label for="ct-t1" class="ctp">T1</label><label for="ct-t2" class="ctp">T2</label></div>
+    </div>
+
+    <!-- ---- JANELA: SEMANA — detalhe da v7, mesmas barras honestas ---- -->
+    <div class="jwpan jw-sem">
+      <div class="calcard">
+        <div class="covh">
+          <span class="lb">Cobertura da semana 41 — o encontro oficial da semana, por turma</span>
+          <p>Mesmo denominador do painel: a proporção pintada e o “N/M” contam a mesma história. O tracejado é quem ainda não marcou encontro nenhum daquele número.</p>
+          <ul class="bleg" aria-label="Legenda da barra de cobertura">
+            <li><i class="sw-ok"></i>realizaram · registro entregue</li>
+            <li><i class="sw-wn"></i>aguardando registro</li>
+            <li><i class="sw-ag"></i>agendado</li>
+            <li><i class="sw-no"></i>não aconteceu</li>
+            <li><i class="sw-sd"></i>sem encontro marcado</li>
+          </ul>
+        </div>
+        <div class="covbody">
+          <div class="covblk h-t1">
+            <div class="covt"><span class="pill lime">T1 · terças 19h</span><b>Encontro 8 · Monitoramento e responsabilidade</b><small>hoje, ter 7 out</small><span class="covn">4<span> de 10</span></span></div>
+            <div class="hbar" role="img" aria-label="Encontro 8, T1: 4 de 10 realizaram"><i class="s-ok" style="left:0;width:30%"></i><i class="s-wn" style="left:30%;width:10%"></i><i class="s-ag" style="left:40%;width:30%"></i><i class="s-no" style="left:70%;width:10%"></i></div>
+            <ul class="cvsub"><li><i class="sw-ok"></i>3 com registro</li><li><i class="sw-wn"></i>1 aguardando registro</li><li><i class="sw-ag"></i>3 agendadas p/ a semana</li><li><i class="sw-no"></i>1 não aconteceu</li><li><i class="sw-sd"></i>2 sem data</li></ul>
+          </div>
+          <div class="covblk h-t2">
+            <div class="covt"><span class="pill amb">T2 · quartas 19h</span><b>Encontro 5 · Acompanhamento das primeiras submetas</b><small>amanhã, qua 8 out</small><span class="covn">2<span> de 15</span></span></div>
+            <div class="hbar" role="img" aria-label="Encontro 5, T2: 2 de 15 realizaram"><i class="s-ok" style="left:0;width:13.3%"></i><i class="s-ag" style="left:13.3%;width:60%"></i></div>
+            <ul class="cvsub"><li><i class="sw-ok"></i>2 com registro</li><li><i class="sw-ag"></i>9 agendadas p/ amanhã</li><li><i class="sw-sd"></i>4 sem data</li></ul>
+          </div>
+        </div>
+        <ul>
+          <li class="cvrow"><span class="cvd">hoje 12h30</span><span class="cvm"><b>Supervisão — Paula × André</b><small>online · “rotina das duplas”</small></span><span class="cvt sup"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 7A2.5 2.5 0 0 1 7 4.5h10A2.5 2.5 0 0 1 19.5 7v7a2.5 2.5 0 0 1-2.5 2.5h-7l-4 3.5v-3.5A2.5 2.5 0 0 1 4.5 14z"/></svg>acompanhamento da equipe</span></li>
+          <li class="cvrow"><span class="cvd">qui 9 out</span><span class="cvm"><b>Roda de conversa com as famílias</b><small>19h30 · online · famílias da T1</small></span><span class="cvt roda"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 21V4.2"/><path d="M6 4.5c3.8-1.9 7.7 1.9 12 0v8.6c-4.3 1.9-8.2-1.9-12 0"/></svg>evento oficial</span></li>
+          <li class="cvrow"><span class="cvd">sáb 11 out</span><span class="cvm"><b>Formação de mentores</b><small>10h–12h · Sede Realiza · a chamada abre no dia</small></span><span class="cvt"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 4.5 10 4.5-10 4.5L2 9z"/><path d="M6.5 11.5v4.8c0 1.4 2.5 2.7 5.5 2.7s5.5-1.3 5.5-2.7v-4.8"/><path d="M22 9v6"/></svg>formação</span></li>
+        </ul>
+      </div>
+      <p class="foot-note">Na janela Semana o detalhe por segmento aparece embaixo de cada barra — é a mesma leitura do painel, uma semana por vez.</p>
+    </div>
+
+    <!-- ---- JANELA: MÊS — encontros de outubro agregados ---- -->
+    <div class="jwpan jw-mes">
+      <div class="calcard h-t1">
+        <div class="roll">
+          <div class="roll-t"><span class="pill lime">T1</span><b>Outubro — encontros 8 a 11</b><small>4 encontros oficiais no mês</small><b style="margin-left:auto">4<span> de 40</span></b></div>
+          <div class="hbar" role="img" aria-label="T1 em outubro: 4 de 40 realizaram, 13 agendadas"><i class="s-ok" style="left:0;width:7.5%"></i><i class="s-wn" style="left:7.5%;width:2.5%"></i><i class="s-ag" style="left:10%;width:32.5%"></i><i class="s-no" style="left:42.5%;width:2.5%"></i></div>
+          <ul class="cvsub"><li><i class="sw-ok"></i>4 realizaram (3 c/ registro · 1 aguardando)</li><li><i class="sw-ag"></i>13 agendadas</li><li><i class="sw-no"></i>1 não aconteceu</li><li><i class="sw-sd"></i>22 sem data — normal: os encontros futuros quase não têm agenda ainda</li></ul>
+        </div>
+        <ul>
+          <li class="cvrow cur"><span class="cvd">ter 7 out</span><span class="cvm"><b>8º encontro · Monitoramento e responsabilidade</b><small>Consolidar a autonomia · esta semana</small></span><span class="cvb"><span class="cvbar" role="img" aria-label="4 de 10 realizaram"><i class="s-ok" style="left:0;width:30%"></i><i class="s-wn" style="left:30%;width:10%"></i><i class="s-ag" style="left:40%;width:30%"></i><i class="s-no" style="left:70%;width:10%"></i></span><b class="cvn">4<span>/10</span></b></span><span class="cvt"><span class="dot"></span><b>esta semana</b></span></li>
+          <li class="cvrow"><span class="cvd">ter 14 out</span><span class="cvm"><b>9º encontro · Revisão de meio de percurso</b><small>Consolidar a autonomia</small></span><span class="cvb"><span class="cvbar" role="img" aria-label="6 de 10 agendaram"><i class="s-ag" style="left:0;width:60%"></i></span><b class="cvn">6<span>/10</span></b></span><span class="cvt"><span class="dot"></span>agendadas</span></li>
+          <li class="cvrow"><span class="cvd">ter 21 out</span><span class="cvm"><b>10º encontro · O mentor como espelho</b><small>Aprofundar o vínculo e o aprendizado</small></span><span class="cvb"><span class="cvbar" role="img" aria-label="3 de 10 agendaram"><i class="s-ag" style="left:0;width:30%"></i></span><b class="cvn">3<span>/10</span></b></span><span class="cvt"><span class="dot"></span>agendadas</span></li>
+          <li class="cvrow"><span class="cvd">ter 28 out</span><span class="cvm"><b>11º encontro · Rede de apoio e novos espaços</b><small>Aprofundar o vínculo e o aprendizado</small></span><span class="cvb"><span class="cvbar" role="img" aria-label="1 de 10 agendou"><i class="s-ag" style="left:0;width:10%"></i></span><b class="cvn">1<span>/10</span></b></span><span class="cvt"><span class="dot"></span>agendadas</span></li>
+        </ul>
+      </div>
+      <div class="calcard h-t2">
+        <div class="roll">
+          <div class="roll-t"><span class="pill amb">T2</span><b>Outubro — encontros 4 a 8</b><small>5 encontros oficiais no mês</small><b style="margin-left:auto">13<span> de 75</span></b></div>
+          <div class="hbar" role="img" aria-label="T2 em outubro: 13 de 75 realizaram, 14 agendadas"><i class="s-ok" style="left:0;width:14.7%"></i><i class="s-wn" style="left:14.7%;width:2.7%"></i><i class="s-ag" style="left:17.4%;width:18.7%"></i><i class="s-no" style="left:36.1%;width:2.7%"></i></div>
+          <ul class="cvsub"><li><i class="sw-ok"></i>13 realizaram (11 c/ registro · 2 aguardando)</li><li><i class="sw-ag"></i>14 agendadas</li><li><i class="sw-no"></i>2 não aconteceram</li><li><i class="sw-sd"></i>46 sem data — encontros futuros</li></ul>
+        </div>
+        <ul>
+          <li class="cvrow"><span class="cvd">qua 1 out</span><span class="cvm"><b>4º encontro · Fechamento da construção do PDM</b><small>Criar vínculo e construir o PDM</small></span><span class="cvb"><span class="cvbar" role="img" aria-label="11 de 15 realizaram"><i class="s-ok" style="left:0;width:60%"></i><i class="s-wn" style="left:60%;width:13.3%"></i><i class="s-no" style="left:73.3%;width:13.3%"></i></span><b class="cvn">11<span>/15</span></b></span><span class="cvt"><span class="dot"></span>encontro</span></li>
+          <li class="cvrow cur"><span class="cvd">qua 8 out</span><span class="cvm"><b>5º encontro · Acompanhamento das primeiras submetas</b><small>Colocar o plano em prática · esta semana</small></span><span class="cvb"><span class="cvbar" role="img" aria-label="2 de 15 realizaram"><i class="s-ok" style="left:0;width:13.3%"></i><i class="s-ag" style="left:13.3%;width:60%"></i></span><b class="cvn">2<span>/15</span></b></span><span class="cvt"><span class="dot"></span><b>esta semana</b></span></li>
+          <li class="cvrow"><span class="cvd">qua 15 out</span><span class="cvm"><b>6º encontro · Superação de obstáculos</b><small>Colocar o plano em prática</small></span><span class="cvb"><span class="cvbar" role="img" aria-label="4 de 15 agendaram"><i class="s-ag" style="left:0;width:26.7%"></i></span><b class="cvn">4<span>/15</span></b></span><span class="cvt"><span class="dot"></span>agendadas</span></li>
+          <li class="cvrow"><span class="cvd">qua 22 out</span><span class="cvm"><b>7º encontro · Ajustes de prazos e desdobramentos</b><small>Colocar o plano em prática</small></span><span class="cvb"><span class="cvbar" role="img" aria-label="1 de 15 agendou"><i class="s-ag" style="left:0;width:6.7%"></i></span><b class="cvn">1<span>/15</span></b></span><span class="cvt"><span class="dot"></span>agendadas</span></li>
+          <li class="cvrow"><span class="cvd">qua 29 out</span><span class="cvm"><b>8º encontro · Monitoramento e responsabilidade</b><small>Consolidar a autonomia</small></span><span class="cvb"><span class="cvbar" role="img" aria-label="0 de 15 — nenhuma dupla agendou ainda"></span><b class="cvn">0<span>/15</span></b></span><span class="cvt"><span class="dot"></span>encontro</span></li>
+        </ul>
+      </div>
+      <div class="calcard">
+        <div class="covh"><span class="lb">Também em outubro — eventos do programa</span></div>
+        <ul>
+          <li class="cvrow"><span class="cvd">qui 9 out</span><span class="cvm"><b>Roda de conversa com as famílias</b><small>19h30 · online · famílias da T1</small></span><span class="cvt roda"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 21V4.2"/><path d="M6 4.5c3.8-1.9 7.7 1.9 12 0v8.6c-4.3 1.9-8.2-1.9-12 0"/></svg>evento oficial</span></li>
+          <li class="cvrow"><span class="cvd">sáb 11 out</span><span class="cvm"><b>Formação de mentores</b><small>10h–12h · Sede Realiza · a chamada abre no dia</small></span><span class="cvt"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 4.5 10 4.5-10 4.5L2 9z"/><path d="M6.5 11.5v4.8c0 1.4 2.5 2.7 5.5 2.7s5.5-1.3 5.5-2.7v-4.8"/><path d="M22 9v6"/></svg>formação</span></li>
+          <li class="cvrow"><span class="cvd">ter 7 · 21 out</span><span class="cvm"><b>Supervisões quinzenais</b><small>Paula × mentores supervisionados — agenda da equipe</small></span><span class="cvt sup"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 7A2.5 2.5 0 0 1 7 4.5h10A2.5 2.5 0 0 1 19.5 7v7a2.5 2.5 0 0 1-2.5 2.5h-7l-4 3.5v-3.5A2.5 2.5 0 0 1 4.5 14z"/></svg>acompanhamento</span></li>
+        </ul>
+      </div>
+      <p class="foot-note">Janela Mês: cada linha é um encontro oficial do mês com a sua barra honesta; o cabeçalho soma o mês inteiro (slots = encontros × duplas ativas da turma).</p>
+    </div>
+
+    <!-- ---- JANELA: CICLO — linha do tempo dos 16 + cobertura acumulada ---- -->
+    <div class="jwpan jw-ciclo">
+      <div class="calcard tlcard h-t1">
+        <h3><span class="pill lime">T1</span> Linha do tempo do ciclo 2026/27</h3>
+        <p class="tlsub">16 encontros · terças 19h · a turma está na semana do <b>encontro 8</b> — cada célula desenha a cobertura real daquele encontro (altura = N/10).</p>
+        <div class="tl" role="img" aria-label="T1: cobertura por encontro — 1º 10/10, 2º 9/10, 3º 8/10, 4º 9/10, 5º 9/10, 6º 9/10, 7º 8/10, 8º 4/10 (esta semana), 9º a 16º ainda não chegaram">
+          <div class="tlc"><div class="tlb"><i style="height:100%"></i></div><span class="tln">1</span></div>
+          <div class="tlc"><div class="tlb"><i style="height:90%"></i></div><span class="tln">2</span></div>
+          <div class="tlc"><div class="tlb"><i style="height:80%"></i></div><span class="tln">3</span></div>
+          <div class="tlc"><div class="tlb"><i style="height:90%"></i></div><span class="tln">4</span></div>
+          <div class="tlc"><div class="tlb"><i style="height:90%"></i></div><span class="tln">5</span></div>
+          <div class="tlc"><div class="tlb"><i style="height:90%"></i></div><span class="tln">6</span></div>
+          <div class="tlc"><div class="tlb"><i style="height:80%"></i></div><span class="tln">7</span></div>
+          <div class="tlc cur"><div class="tlb cur"><i style="height:40%"></i></div><span class="tln">8</span></div>
+          <div class="tlc"><div class="tlb fut"></div><span class="tln">9</span></div>
+          <div class="tlc"><div class="tlb fut"></div><span class="tln">10</span></div>
+          <div class="tlc"><div class="tlb fut"></div><span class="tln">11</span></div>
+          <div class="tlc"><div class="tlb fut"></div><span class="tln">12</span></div>
+          <div class="tlc"><div class="tlb fut"></div><span class="tln">13</span></div>
+          <div class="tlc"><div class="tlb fut"></div><span class="tln">14</span></div>
+          <div class="tlc"><div class="tlb fut"></div><span class="tln">15</span></div>
+          <div class="tlc"><div class="tlb fut"></div><span class="tln">16</span></div>
+        </div>
+        <div class="tlleg"><span><i style="background:var(--ok)"></i>altura = N/10 realizaram</span><span><i class="e"></i>encontro ainda não chegou</span><span>▸ moldura escura = esta semana (encontro 8)</span><span>ago — dez</span></div>
+        <div class="acc">
+          <div class="acc-t"><b>66<span> de 80</span></b><small>encontros esperados aconteceram até hoje — 82%</small></div>
+          <div class="hbar" role="img" aria-label="T1 acumulado: 66 de 80 aconteceram — 61 com registro, 5 aguardando, 3 agendadas, 5 não aconteceram, 6 sem data"><i class="s-ok" style="left:0;width:76.25%"></i><i class="s-wn" style="left:76.25%;width:6.25%"></i><i class="s-ag" style="left:82.5%;width:3.75%"></i><i class="s-no" style="left:86.25%;width:6.25%"></i></div>
+          <ul class="cvsub"><li><i class="sw-ok"></i>61 com registro</li><li><i class="sw-wn"></i>5 aguardando registro</li><li><i class="sw-ag"></i>3 agendadas (enc. 8)</li><li><i class="sw-no"></i>5 não aconteceram</li><li><i class="sw-sd"></i>6 sem data</li></ul>
+        </div>
+        <details class="clst"><summary><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 5.5 6.5 6.5L9 18.5"/></svg>Linha a linha do ciclo — a Lista completa da v7</summary>
+          <ul>
+            <li class="cvrow"><span class="cvd">Concluída</span><span class="cvm"><b>Inscrições</b><small>30 jul – 19 ago</small></span><span class="cvt"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>etapa de preparação</span></li>
+            <li class="cvrow"><span class="cvd">Concluída</span><span class="cvm"><b>Triagem e matching</b><small>20 ago – 2 set</small></span><span class="cvt"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>etapa de preparação</span></li>
+            <li class="cvrow"><span class="cvd">qua 3 set</span><span class="cvm"><b>Encontro inicial de formação de mentores</b></span><span class="cvt"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 4.5 10 4.5-10 4.5L2 9z"/><path d="M6.5 11.5v4.8c0 1.4 2.5 2.7 5.5 2.7s5.5-1.3 5.5-2.7v-4.8"/><path d="M22 9v6"/></svg>formação</span></li>
+            <li class="cvrow"><span class="cvd">qui 4 set</span><span class="cvm"><b>Onboarding de mentorados</b><small>encontro de abertura com a coordenação</small></span><span class="cvt"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 4.5 10 4.5-10 4.5L2 9z"/><path d="M6.5 11.5v4.8c0 1.4 2.5 2.7 5.5 2.7s5.5-1.3 5.5-2.7v-4.8"/><path d="M22 9v6"/></svg>etapa de preparação</span></li>
+            <li class="cvrow"><span class="cvd">ter 19 ago</span><span class="cvm"><b>1º encontro · Boas-vindas, histórias de vida e abertura</b><small>Criar vínculo e construir o PDM</small></span><span class="cvb"><span class="cvbar" role="img" aria-label="10 de 10 realizaram"><i class="s-ok" style="left:0;width:100%"></i></span><b class="cvn">10<span>/10</span></b></span><span class="cvt"><span class="dot"></span>encontro</span></li>
+            <li class="cvrow"><span class="cvd">ter 26 ago</span><span class="cvm"><b>2º encontro · Avaliação por terceiros e visão de futuro</b><small>Criar vínculo e construir o PDM</small></span><span class="cvb"><span class="cvbar" role="img" aria-label="9 de 10 realizaram, 1 não aconteceu"><i class="s-ok" style="left:0;width:90%"></i><i class="s-no" style="left:90%;width:10%"></i></span><b class="cvn">9<span>/10</span></b></span><span class="cvt"><span class="dot"></span>encontro</span></li>
+            <li class="cvrow"><span class="cvd">ter 2 set</span><span class="cvm"><b>3º encontro · Declaração de Visão e metas SMART</b><small>Criar vínculo e construir o PDM</small></span><span class="cvb"><span class="cvbar" role="img" aria-label="8 de 10 realizaram"><i class="s-ok" style="left:0;width:70%"></i><i class="s-wn" style="left:70%;width:10%"></i><i class="s-no" style="left:80%;width:10%"></i></span><b class="cvn">8<span>/10</span></b></span><span class="cvt"><span class="dot"></span>encontro</span></li>
+            <li class="cvrow"><span class="cvd">ter 9 set</span><span class="cvm"><b>4º encontro · Fechamento da construção do PDM</b><small>Criar vínculo e construir o PDM</small></span><span class="cvb"><span class="cvbar" role="img" aria-label="9 de 10 realizaram"><i class="s-ok" style="left:0;width:90%"></i></span><b class="cvn">9<span>/10</span></b></span><span class="cvt"><span class="dot"></span>encontro</span></li>
+            <li class="cvrow"><span class="cvd">ter 16 set</span><span class="cvm"><b>5º encontro · Acompanhamento das primeiras submetas</b><small>Colocar o plano em prática</small></span><span class="cvb"><span class="cvbar" role="img" aria-label="9 de 10 realizaram"><i class="s-ok" style="left:0;width:80%"></i><i class="s-wn" style="left:80%;width:10%"></i></span><b class="cvn">9<span>/10</span></b></span><span class="cvt"><span class="dot"></span>encontro</span></li>
+            <li class="cvrow"><span class="cvd">ter 23 set</span><span class="cvm"><b>6º encontro · Superação de obstáculos</b><small>Colocar o plano em prática</small></span><span class="cvb"><span class="cvbar" role="img" aria-label="9 de 10 realizaram"><i class="s-ok" style="left:0;width:90%"></i><i class="s-no" style="left:90%;width:10%"></i></span><b class="cvn">9<span>/10</span></b></span><span class="cvt"><span class="dot"></span>encontro</span></li>
+            <li class="cvrow"><span class="cvd">ter 30 set</span><span class="cvm"><b>7º encontro · Ajustes de prazos e desdobramentos</b><small>Colocar o plano em prática</small></span><span class="cvb"><span class="cvbar" role="img" aria-label="8 de 10 realizaram"><i class="s-ok" style="left:0;width:60%"></i><i class="s-wn" style="left:60%;width:20%"></i><i class="s-no" style="left:80%;width:10%"></i></span><b class="cvn">8<span>/10</span></b></span><span class="cvt"><span class="dot"></span>encontro</span></li>
+            <li class="cvrow cur"><span class="cvd">ter 7 out</span><span class="cvm"><b>8º encontro · Monitoramento e responsabilidade</b><small>Consolidar a autonomia</small></span><span class="cvb"><span class="cvbar" role="img" aria-label="4 de 10 realizaram"><i class="s-ok" style="left:0;width:30%"></i><i class="s-wn" style="left:30%;width:10%"></i><i class="s-ag" style="left:40%;width:30%"></i><i class="s-no" style="left:70%;width:10%"></i></span><b class="cvn">4<span>/10</span></b></span><span class="cvt"><span class="dot"></span><b>esta semana</b></span>
+              <p class="cvsub"><span><i class="sw-ok"></i>3 com registro</span><span><i class="sw-wn"></i>1 aguardando registro</span><span><i class="sw-ag"></i>3 agendadas p/ a semana</span><span><i class="sw-no"></i>1 não aconteceu</span><span><i class="sw-sd"></i>2 sem encontro marcado</span></p></li>
+            <li class="cvrow"><span class="cvd">qui 9 out</span><span class="cvm"><b>Roda de conversa com as famílias</b><small>19h30 · famílias da T1</small></span><span class="cvt roda"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 21V4.2"/><path d="M6 4.5c3.8-1.9 7.7 1.9 12 0v8.6c-4.3 1.9-8.2-1.9-12 0"/></svg>evento oficial</span></li>
+            <li class="cvrow"><span class="cvd">sáb 11 out</span><span class="cvm"><b>Formação de mentores</b><small>10h–12h · Sede Realiza · a chamada abre no dia</small></span><span class="cvt"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 4.5 10 4.5-10 4.5L2 9z"/><path d="M6.5 11.5v4.8c0 1.4 2.5 2.7 5.5 2.7s5.5-1.3 5.5-2.7v-4.8"/><path d="M22 9v6"/></svg>formação</span></li>
+            <li class="cvrow"><span class="cvd">ter 14 out</span><span class="cvm"><b>9º encontro · Revisão de meio de percurso</b><small>Consolidar a autonomia</small></span><span class="cvb"><span class="cvbar" role="img" aria-label="6 de 10 agendaram"><i class="s-ag" style="left:0;width:60%"></i></span><b class="cvn">6<span>/10</span></b></span><span class="cvt"><span class="dot"></span>encontro</span></li>
+            <li class="cvrow"><span class="cvd">ter 21 out</span><span class="cvm"><b>10º encontro · O mentor como espelho</b><small>Aprofundar o vínculo e o aprendizado</small></span><span class="cvb"><span class="cvbar" role="img" aria-label="3 de 10 agendaram"><i class="s-ag" style="left:0;width:30%"></i></span><b class="cvn">3<span>/10</span></b></span><span class="cvt"><span class="dot"></span>encontro</span></li>
+            <li class="cvrow"><span class="cvd">ter 28 out</span><span class="cvm"><b>11º encontro · Rede de apoio e novos espaços</b><small>Aprofundar o vínculo e o aprendizado</small></span><span class="cvb"><span class="cvbar" role="img" aria-label="1 de 10 agendou"><i class="s-ag" style="left:0;width:10%"></i></span><b class="cvn">1<span>/10</span></b></span><span class="cvt"><span class="dot"></span>encontro</span></li>
+            <li class="cvrow"><span class="cvd">ter 4 nov</span><span class="cvm"><b>12º encontro · Aplicação e leitura da Roda da Vida</b><small>Roda da Vida</small></span><span class="cvb"><span class="cvbar" role="img" aria-label="0 de 10 — todas sem encontro marcado"></span><b class="cvn">0<span>/10</span></b></span><span class="cvt"><span class="dot"></span>encontro</span></li>
+            <li class="cvrow"><span class="cvd">ter 11 nov</span><span class="cvm"><b>13º encontro · Metas das áreas prioritárias</b><small>Roda da Vida</small></span><span class="cvb"><span class="cvbar" role="img" aria-label="0 de 10 — todas sem encontro marcado"></span><b class="cvn">0<span>/10</span></b></span><span class="cvt"><span class="dot"></span>encontro</span></li>
+            <li class="cvrow"><span class="cvd">ter 18 nov</span><span class="cvm"><b>14º encontro · Desdobramento e plano de continuidade</b><small>Roda da Vida</small></span><span class="cvb"><span class="cvbar" role="img" aria-label="0 de 10 — todas sem encontro marcado"></span><b class="cvn">0<span>/10</span></b></span><span class="cvt"><span class="dot"></span>encontro</span></li>
+            <li class="cvrow"><span class="cvd">ter 25 nov</span><span class="cvm"><b>15º encontro · Reflexão e reconhecimento</b><small>Encerrar e celebrar</small></span><span class="cvb"><span class="cvbar" role="img" aria-label="0 de 10 — todas sem encontro marcado"></span><b class="cvn">0<span>/10</span></b></span><span class="cvt"><span class="dot"></span>encontro</span></li>
+            <li class="cvrow"><span class="cvd">ter 2 dez</span><span class="cvm"><b>16º encontro · Encerramento e celebração</b><small>Encerrar e celebrar</small></span><span class="cvb"><span class="cvbar" role="img" aria-label="0 de 10 — todas sem encontro marcado"></span><b class="cvn">0<span>/10</span></b></span><span class="cvt"><span class="dot"></span>encontro</span></li>
+            <li class="cvrow"><span class="cvd">16 dez – 4 jan</span><span class="cvm"><b>Recesso de fim de ano</b><small>sem encontros — retomada na 1ª terça de janeiro</small></span><span class="cvt"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v3M18.4 5.6l-2.1 2.1M21 12h-3M5.6 5.6l2.1 2.1M3 12h3"/><path d="M7 21a5 5 0 0 1 10 0"/></svg>recesso</span></li>
+            <li class="cvrow"><span class="cvd">qui 15 jan</span><span class="cvm"><b>Evento de encerramento do programa</b></span><span class="cvt"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 21V4.2"/><path d="M6 4.5c3.8-1.9 7.7 1.9 12 0v8.6c-4.3 1.9-8.2-1.9-12 0"/></svg>encerramento</span></li>
+          </ul>
+        </details>
+      </div>
+      <div class="calcard tlcard h-t2">
+        <h3><span class="pill amb">T2</span> Linha do tempo do ciclo 2026/27</h3>
+        <p class="tlsub">16 encontros · quartas 19h · começou 3 semanas depois — a turma está na semana do <b>encontro 5</b> (altura = N/15).</p>
+        <div class="tl" role="img" aria-label="T2: cobertura por encontro — 1º 14/15, 2º 13/15, 3º 12/15, 4º 11/15, 5º 2/15 (esta semana), 6º a 16º ainda não chegaram">
+          <div class="tlc"><div class="tlb"><i style="height:93%"></i></div><span class="tln">1</span></div>
+          <div class="tlc"><div class="tlb"><i style="height:87%"></i></div><span class="tln">2</span></div>
+          <div class="tlc"><div class="tlb"><i style="height:80%"></i></div><span class="tln">3</span></div>
+          <div class="tlc"><div class="tlb"><i style="height:73%"></i></div><span class="tln">4</span></div>
+          <div class="tlc cur"><div class="tlb cur"><i style="height:13%"></i></div><span class="tln">5</span></div>
+          <div class="tlc"><div class="tlb fut"></div><span class="tln">6</span></div>
+          <div class="tlc"><div class="tlb fut"></div><span class="tln">7</span></div>
+          <div class="tlc"><div class="tlb fut"></div><span class="tln">8</span></div>
+          <div class="tlc"><div class="tlb fut"></div><span class="tln">9</span></div>
+          <div class="tlc"><div class="tlb fut"></div><span class="tln">10</span></div>
+          <div class="tlc"><div class="tlb fut"></div><span class="tln">11</span></div>
+          <div class="tlc"><div class="tlb fut"></div><span class="tln">12</span></div>
+          <div class="tlc"><div class="tlb fut"></div><span class="tln">13</span></div>
+          <div class="tlc"><div class="tlb fut"></div><span class="tln">14</span></div>
+          <div class="tlc"><div class="tlb fut"></div><span class="tln">15</span></div>
+          <div class="tlc"><div class="tlb fut"></div><span class="tln">16</span></div>
+        </div>
+        <div class="tlleg"><span><i style="background:var(--ok)"></i>altura = N/15 realizaram</span><span><i class="e"></i>encontro ainda não chegou</span><span>▸ moldura escura = esta semana (encontro 5)</span><span>set — jan</span></div>
+        <div class="acc">
+          <div class="acc-t"><b>52<span> de 75</span></b><small>encontros esperados aconteceram até hoje — 69%</small></div>
+          <div class="hbar" role="img" aria-label="T2 acumulado: 52 de 75 aconteceram — 47 com registro, 5 aguardando, 9 agendadas, 5 não aconteceram, 9 sem data"><i class="s-ok" style="left:0;width:62.67%"></i><i class="s-wn" style="left:62.67%;width:6.67%"></i><i class="s-ag" style="left:69.34%;width:12%"></i><i class="s-no" style="left:81.34%;width:6.67%"></i></div>
+          <ul class="cvsub"><li><i class="sw-ok"></i>47 com registro</li><li><i class="sw-wn"></i>5 aguardando registro</li><li><i class="sw-ag"></i>9 agendadas (enc. 5)</li><li><i class="sw-no"></i>5 não aconteceram</li><li><i class="sw-sd"></i>9 sem data</li></ul>
+        </div>
+        <details class="clst"><summary><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 5.5 6.5 6.5L9 18.5"/></svg>Linha a linha do ciclo — T2 (quartas, começou 3 semanas depois)</summary>
+          <ul>
+            <li class="cvrow"><span class="cvd">Concluída</span><span class="cvm"><b>Inscrições + triagem e matching</b><small>jul – início de set · mesmas etapas da T1</small></span><span class="cvt"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>etapa de preparação</span></li>
+            <li class="cvrow"><span class="cvd">qua 10 set</span><span class="cvm"><b>1º encontro · Boas-vindas, histórias de vida e abertura</b><small>Criar vínculo e construir o PDM</small></span><span class="cvb"><span class="cvbar" role="img" aria-label="14 de 15 realizaram"><i class="s-ok" style="left:0;width:93.3%"></i><i class="s-no" style="left:93.3%;width:6.7%"></i></span><b class="cvn">14<span>/15</span></b></span><span class="cvt"><span class="dot"></span>encontro</span></li>
+            <li class="cvrow"><span class="cvd">qua 17 set</span><span class="cvm"><b>2º encontro · Avaliação por terceiros e visão de futuro</b><small>Criar vínculo e construir o PDM</small></span><span class="cvb"><span class="cvbar" role="img" aria-label="13 de 15 realizaram"><i class="s-ok" style="left:0;width:80%"></i><i class="s-wn" style="left:80%;width:6.7%"></i><i class="s-no" style="left:86.7%;width:6.7%"></i></span><b class="cvn">13<span>/15</span></b></span><span class="cvt"><span class="dot"></span>encontro</span></li>
+            <li class="cvrow"><span class="cvd">qua 24 set</span><span class="cvm"><b>3º encontro · Declaração de Visão e metas SMART</b><small>Criar vínculo e construir o PDM</small></span><span class="cvb"><span class="cvbar" role="img" aria-label="12 de 15 realizaram"><i class="s-ok" style="left:0;width:66.7%"></i><i class="s-wn" style="left:66.7%;width:13.3%"></i><i class="s-no" style="left:80%;width:6.7%"></i></span><b class="cvn">12<span>/15</span></b></span><span class="cvt"><span class="dot"></span>encontro</span></li>
+            <li class="cvrow"><span class="cvd">qua 1 out</span><span class="cvm"><b>4º encontro · Fechamento da construção do PDM</b><small>Criar vínculo e construir o PDM</small></span><span class="cvb"><span class="cvbar" role="img" aria-label="11 de 15 realizaram"><i class="s-ok" style="left:0;width:60%"></i><i class="s-wn" style="left:60%;width:13.3%"></i><i class="s-no" style="left:73.3%;width:13.3%"></i></span><b class="cvn">11<span>/15</span></b></span><span class="cvt"><span class="dot"></span>encontro</span></li>
+            <li class="cvrow cur"><span class="cvd">qua 8 out</span><span class="cvm"><b>5º encontro · Acompanhamento das primeiras submetas</b><small>Colocar o plano em prática</small></span><span class="cvb"><span class="cvbar" role="img" aria-label="2 de 15 realizaram"><i class="s-ok" style="left:0;width:13.3%"></i><i class="s-ag" style="left:13.3%;width:60%"></i></span><b class="cvn">2<span>/15</span></b></span><span class="cvt"><span class="dot"></span><b>esta semana</b></span>
+              <p class="cvsub"><span><i class="sw-ok"></i>2 com registro</span><span><i class="sw-ag"></i>9 agendadas p/ amanhã</span><span><i class="sw-sd"></i>4 sem encontro marcado</span></p></li>
+            <li class="cvrow"><span class="cvd">sáb 11 out</span><span class="cvm"><b>Formação de mentores</b><small>10h–12h · Sede Realiza · a chamada abre no dia</small></span><span class="cvt"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 4.5 10 4.5-10 4.5L2 9z"/><path d="M6.5 11.5v4.8c0 1.4 2.5 2.7 5.5 2.7s5.5-1.3 5.5-2.7v-4.8"/><path d="M22 9v6"/></svg>formação</span></li>
+            <li class="cvrow"><span class="cvd">qua 15 out</span><span class="cvm"><b>6º encontro · Superação de obstáculos</b><small>Colocar o plano em prática</small></span><span class="cvb"><span class="cvbar" role="img" aria-label="4 de 15 agendaram"><i class="s-ag" style="left:0;width:26.7%"></i></span><b class="cvn">4<span>/15</span></b></span><span class="cvt"><span class="dot"></span>encontro</span></li>
+            <li class="cvrow"><span class="cvd">qua 22 out</span><span class="cvm"><b>7º encontro · Ajustes de prazos e desdobramentos</b><small>Colocar o plano em prática</small></span><span class="cvb"><span class="cvbar" role="img" aria-label="1 de 15 agendou"><i class="s-ag" style="left:0;width:6.7%"></i></span><b class="cvn">1<span>/15</span></b></span><span class="cvt"><span class="dot"></span>encontro</span></li>
+            <li class="cvrow"><span class="cvd">qua 29 out</span><span class="cvm"><b>8º encontro · Monitoramento e responsabilidade</b><small>Consolidar a autonomia</small></span><span class="cvb"><span class="cvbar" role="img" aria-label="0 de 15 — todas sem encontro marcado"></span><b class="cvn">0<span>/15</span></b></span><span class="cvt"><span class="dot"></span>encontro</span></li>
+            <li class="cvrow"><span class="cvd">qua 5 nov</span><span class="cvm"><b>9º encontro · Revisão de meio de percurso</b><small>Consolidar a autonomia</small></span><span class="cvb"><span class="cvbar" role="img" aria-label="0 de 15 — todas sem encontro marcado"></span><b class="cvn">0<span>/15</span></b></span><span class="cvt"><span class="dot"></span>encontro</span></li>
+            <li class="cvrow"><span class="cvd">qua 12 nov</span><span class="cvm"><b>10º encontro · O mentor como espelho</b><small>Aprofundar o vínculo e o aprendizado</small></span><span class="cvb"><span class="cvbar" role="img" aria-label="0 de 15 — todas sem encontro marcado"></span><b class="cvn">0<span>/15</span></b></span><span class="cvt"><span class="dot"></span>encontro</span></li>
+            <li class="cvrow"><span class="cvd">qua 19 nov</span><span class="cvm"><b>11º encontro · Rede de apoio e novos espaços</b><small>Aprofundar o vínculo e o aprendizado</small></span><span class="cvb"><span class="cvbar" role="img" aria-label="0 de 15 — todas sem encontro marcado"></span><b class="cvn">0<span>/15</span></b></span><span class="cvt"><span class="dot"></span>encontro</span></li>
+            <li class="cvrow"><span class="cvd">qua 26 nov</span><span class="cvm"><b>12º encontro · Aplicação e leitura da Roda da Vida</b><small>Roda da Vida</small></span><span class="cvb"><span class="cvbar" role="img" aria-label="0 de 15 — todas sem encontro marcado"></span><b class="cvn">0<span>/15</span></b></span><span class="cvt"><span class="dot"></span>encontro</span></li>
+            <li class="cvrow"><span class="cvd">qua 3 dez</span><span class="cvm"><b>13º encontro · Metas das áreas prioritárias</b><small>Roda da Vida</small></span><span class="cvb"><span class="cvbar" role="img" aria-label="0 de 15 — todas sem encontro marcado"></span><b class="cvn">0<span>/15</span></b></span><span class="cvt"><span class="dot"></span>encontro</span></li>
+            <li class="cvrow"><span class="cvd">qua 10 dez</span><span class="cvm"><b>14º encontro · Desdobramento e plano de continuidade</b><small>Roda da Vida</small></span><span class="cvb"><span class="cvbar" role="img" aria-label="0 de 15 — todas sem encontro marcado"></span><b class="cvn">0<span>/15</span></b></span><span class="cvt"><span class="dot"></span>encontro</span></li>
+            <li class="cvrow"><span class="cvd">qua 17 dez</span><span class="cvm"><b>15º encontro · Reflexão e reconhecimento</b><small>Encerrar e celebrar</small></span><span class="cvb"><span class="cvbar" role="img" aria-label="0 de 15 — todas sem encontro marcado"></span><b class="cvn">0<span>/15</span></b></span><span class="cvt"><span class="dot"></span>encontro</span></li>
+            <li class="cvrow"><span class="cvd">16 dez – 4 jan</span><span class="cvm"><b>Recesso de fim de ano</b><small>o 16º encontro da T2 cairia em 24 dez — desliza pra janeiro</small></span><span class="cvt"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v3M18.4 5.6l-2.1 2.1M21 12h-3M5.6 5.6l2.1 2.1M3 12h3"/><path d="M7 21a5 5 0 0 1 10 0"/></svg>recesso</span></li>
+            <li class="cvrow"><span class="cvd">qua 7 jan</span><span class="cvm"><b>16º encontro · Encerramento e celebração</b><small>Encerrar e celebrar · após o recesso</small></span><span class="cvb"><span class="cvbar" role="img" aria-label="0 de 15 — todas sem encontro marcado"></span><b class="cvn">0<span>/15</span></b></span><span class="cvt"><span class="dot"></span>encontro</span></li>
+            <li class="cvrow"><span class="cvd">qui 15 jan</span><span class="cvm"><b>Evento de encerramento do programa</b></span><span class="cvt"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 21V4.2"/><path d="M6 4.5c3.8-1.9 7.7 1.9 12 0v8.6c-4.3 1.9-8.2-1.9-12 0"/></svg>encerramento</span></li>
+          </ul>
+        </details>
+      </div>
+      <p class="foot-note">Janela Ciclo: a linha do tempo mostra os 16 encontros da turma — altura = cobertura real — e o acumulado soma só os encontros cuja data oficial já passou (esperados), nunca os futuros.</p>
+      <div class="mockfix"><svg class="ic lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4.2 21 19.5H3z"/><path d="M12 10v4.2M12 16.8v.1"/></svg><div><b>Nota de mockup — mesmo denominador em toda janela.</b><span>Semana, Mês e Ciclo pintam sempre a fração do mesmo total que o “N/M” ao lado (ativas da turma); quem não marcou fica visível como trilho tracejado. A Lista completa da v7 segue disponível — recolhida em “Linha a linha do ciclo”.</span></div></div>
+    </div>
+  </div>
+</div>
+<nav class="bnav" aria-label="Navegação principal"><a href="#"><svg class="ic lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m4 10.5 8-7 8 7"/><path d="M6 9.3V20h12V9.3"/></svg>Início</a><a href="#" class="on" aria-current="page"><svg class="ic lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5.5" width="16" height="15" rx="2.2"/><path d="M4 10.5h16M8.5 3.5v4M15.5 3.5v4"/></svg>Agenda</a><a href="#"><svg class="ic lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9.5" cy="8" r="3.2"/><path d="M3.6 19.2c.7-3.3 3-5.2 5.9-5.2s5.2 1.9 5.9 5.2"/><path d="M15.2 5.3a3.2 3.2 0 0 1 0 5.5"/><path d="M17 14.4c2 .7 3.2 2.4 3.6 4.8"/></svg>Duplas</a><a href="#"><svg class="ic lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 13.5 6.5 5.5h11l2.5 8v5H4z"/><path d="M4 13.5h5l1 2h4l1-2h5"/></svg>Chamados</a><a href="#"><svg class="ic lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.2"/><circle cx="12" cy="9.8" r="2.7"/><path d="M6.6 18.3c1-2.4 3-3.6 5.4-3.6s4.4 1.2 5.4 3.6"/></svg>Perfil</a></nav>
+</section>
+
+<section class="notes" id="notas" aria-label="Notas da prancheta">
+  <h2>Notas da prancheta</h2>
+  <h3 id="matriz">Matriz papel × o que vê × o que pode fazer</h3>
+  <div class="mx">
+    <div class="mxh"><span>Papel</span><span>O que vê</span><span>Pode fazer</span><span>NÃO pode</span></div>
+    <div class="mxr"><b>Coordenação · Marina</b><span data-l="Vê">Semana do programa em cards (as duas abas); dashboard: fila acionável filtrável, cobertura do encontro da semana, semáforo agregado e pulso — tudo com toggle T1/T2/Todas; na aba Agenda a mesma cobertura por janela Semana/Mês/Ciclo</span><span data-l="Pode">Lembrar (nudge), filtrar a fila e os agregados por turma, abrir a chamada da formação no dia, ler “como conduzir”, ir pra fila de Chamados</span><span data-l="Não pode">Agendar/remarcar encontro de dupla; agendar sessão de especialista</span></div>
+    <div class="mxr"><b>Auxiliar executivo · Paula</b><span data-l="Vê">Fora do corte desta revisão — na v7 ela tem a mesma estrutura com o denominador das suas 6 duplas</span><span data-l="Pode">Lembrar, registrar supervisão, ver ficha</span><span data-l="Não pode">Agendar por ninguém; ver duplas de outros auxiliares</span></div>
+    <div class="mxr"><b>Mentor DPP / especialista / mentorado</b><span data-l="Vê">Fora desta iteração — as visões deles ficam em v6</span><span data-l="Pode">—</span><span data-l="Não pode">—</span></div>
+  </div>
+  <p>Só a visão Coordenação nesta rodada — o feedback é sobre a tela dela. Auxiliar executivo e demais papéis seguem os desenhos da v7/v6.</p>
+
+  <h3>O que mudou vs. v7 (rastreável ao feedback)</h3>
+  <ul>
+    <li><b>Monitoramento virou dashboard.</b> Deixou de ser 3 seções de lista e virou grade de painel: a <b>fila “Para acompanhar” é o primeiro cartão</b> (o que exige ação vem primeiro) e os agregados formam a segunda fileira — cobertura, semáforo, pulso. Cada número tem proporção ao lado; nenhum KPI solto.</li>
+    <li><b>Fila com filtro vivo.</b> Os chips Críticas · Sem data · Registro pendente são labels de radio inputs — filtram a fila de verdade em CSS puro (contagens ao lado: 2 · 4 · 1 de 5). O pedido de apoio ganhou linha de rodapé própria apontando pra Chamados (eixo à parte).</li>
+    <li><b>Cobertura do encontro da semana em barra grande.</b> A mesma gramática aprovada da v7 — 5 segmentos sobre o total de ativas da turma — agora em trilho de 14px dentro do painel: “4 de 10” desenha 40%, “2 de 15” desenha 13%, legenda completa embaixo.</li>
+    <li><b>Semáforo agregado em rosca.</b> 2 risco / 3 atenção / 19 andamento / 1 apoio / 1 pausada = 26. Apoio é desenhado em azul próprio e explicado como eixo separado (não é nota de saúde; a dupla segue no estado dela) — alternativa documentada nas decisões.</li>
+    <li><b>Pulso da semana.</b> Três mini-sinais com escala: registros entregues 15/19, aguardando 4/19, avaliação média ★4,3/5 (12 avaliações) + lembretes em 48h — todos com barra proporcional.</li>
+    <li><b>Toggle T1/T2/Todas nos agregados.</b> Um radio-group no cabeçalho do painel recomputa cobertura (esconde o bloco da outra turma), rosca (T1=11, T2=15) e pulso — interatividade real, sem JS.</li>
+    <li><b>Aba Agenda consolidada por janela.</b> Semana (detalhe da v7: barras grandes + contexto) · Mês (encontros de outubro agregados — “4 de 40”, “13 de 75” no cabeçalho — + eventos do programa) · Ciclo (linha do tempo dos 16 encontros com altura = cobertura real + acumulado “66 de 80 · 82%” / “52 de 75 · 69%” + a Lista completa da v7 recolhida em details). Seletor de turma próprio da aba.</li>
+    <li><b>Aba renomeada “Agenda”</b> (era “Calendário” na v7) — segue o rótulo do feedback; registrado como decisão em aberto.</li>
+    <li><b>Preservado da v7:</b> cards “Semana do programa” intactos nas duas abas (um componente, duas montagens), caixa “Você vê / NÃO vê”, síntese de uma linha, legenda de 5 estágios, regra da chamada da formação no sábado.</li>
+  </ul>
+
+  <h3 id="rastro">Rastreabilidade das variantes e das referências</h3>
+  <ul>
+    <li><b>Base v7</b> — cards da semana, barra de cobertura honesta (5 segmentos, denominador único), fila “Para acompanhar”, síntese, chrome.</li>
+    <li><b>Da v6</b> — caixa “Você vê / NÃO vê”, Lembrar universal.</li>
+    <li><b>Referências aplicadas</b> — Linear cycle graph (o total desenhado no trilho → barras e acumulado), Primer ProgressBar (segmentos + texto “4 de 10” + legenda embutida), “número sempre com escala” (pulso: 15/19, ★4,3/5), falha no topo (fila antes dos agregados), “gray out” do futuro (células tracejadas na timeline), GitHub status (falhas primeiro na fila).</li>
+    <li><b>Novo na v8</b> — grade de dashboard, filtros vivos por radio, rosca do semáforo com eixo de apoio, pulso, seletor de janela temporal, timeline de 16 células por turma, acumulado do ciclo.</li>
+  </ul>
+
+  <h3 id="abertas">Decisões em aberto</h3>
+  <ul class="open">
+    <li><b>Aberta · rosca × barra empilhada no semáforo.</b> Escolhi rosca (lê-se a proporção de 26 num relance, centro carrega o total). A alternativa Linear-seria uma barra única empilhada de 5 segmentos — mais alinhada à gramática das outras barras. Se a rosca parecer “decorativa demais”, trocar é trivial.</li>
+    <li><b>Aberta · apoio dentro da rosca.</b> O domínio diz “apoio é eixo separado” — desenhei como segmento azul próprio pra fechar as 26 (a dupla segue no estado dela). Alternativa: rosca só com os 4 estados de saúde (25) + apoio como contador fora. Preferi somar 26 pra nenhuma dupla “sumir” do gráfico.</li>
+    <li><b>Aberta · nome da aba.</b> “Agenda” (rótulo do feedback) × “Calendário” (rótulo atual do produto). Se ficar “Agenda”, distinguir do título da página.</li>
+    <li><b>Aberta · janela do pulso.</b> “Encontros recentes” = últimos 14 dias no mock — definir a janela real (7d? desde o último encontro oficial?).</li>
+    <li><b>Aberta · toggle de turma afeta a fila?</b> Hoje o toggle T1/T2 só reage nos agregados (contagens fixas dos chips da fila conflitariam). Filtrar a fila por turma também — com chip próprio ou recomputando contagens?</li>
+    <li><b>Aberta · janela Ciclo: timeline primeiro.</b> Mostrei timeline+acumulado como default e a Lista da v7 recolhida. Alternativa: Lista aberta por padrão, timeline como resumo no topo.</li>
+    <li><b>Aberta · azul “apoio” (--info).</b> Token novo pra casar com a “pill azul” de duplas/v5 — confirmar matiz dentro da paleta.</li>
+    <li><b>Aberta · T2 pós-recesso.</b> O 16º encontro da T2 cairia em 24 dez — ilustrei deslizando pra 7 jan; a regra real de deslocamento do calendário oficial é da coordenação.</li>
+    <li><b>Aberta · pulso T1×T2.</b> ★ médio por turma (4,1 / 4,5) é ilustrativo; a agregação real pondera por nº de avaliações (7 e 5 → 4,3).</li>
+  </ul>
+</section>
+</body>
+</html>

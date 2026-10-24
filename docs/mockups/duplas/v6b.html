@@ -1,0 +1,726 @@
+<!-- MOCKUP duplas v6b — mini-card dashboard: ~2 colunas no desktop, indicador
+     lateral colorido + motivo em texto corrido + mini-barra de encontros.
+     Mesma informação da v6a, leitura mais visual. Sem faixa-footer. -->
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Duplas · Realiza.vc</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --brand-lime: hsl(78 56% 53%);
+    --brand-ink: hsl(0 0% 15%);
+    --background: hsl(75 10% 95%);
+    --card: hsl(0 0% 100%);
+    --muted: hsl(75 7% 93%);
+    --muted-foreground: hsl(75 4% 40%);
+    --accent: hsl(75 8% 91%);
+    --border: hsl(75 6% 87%);
+    --input: hsl(75 8% 54%);
+    --ok: hsl(78 58% 38%);
+    --ok-text: hsl(78 55% 30%);
+    --warn: hsl(43 95% 44%);
+    --warn-text: hsl(43 90% 30%);
+    --danger: hsl(0 80% 48%);
+    --role-mentorado: hsl(48 100% 60%);
+    --info: hsl(207 82% 45%);
+    --info-text: hsl(207 82% 33%);
+    --info-bg: hsl(207 82% 96%);
+    --info-border: hsl(207 82% 80%);
+    --wa: #25D366;
+    --wa-ink: hsl(151 68% 25%);
+    --wa-soft: hsl(151 60% 42% / .12);
+    --wa-bd: hsl(151 55% 40% / .38);
+    --radius: 0.75rem;
+  }
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  html{ -webkit-text-size-adjust:100%; }
+  body{ font-family:'Inter', system-ui, sans-serif; background:var(--background); color:var(--brand-ink); font-size:14px; line-height:1.45; -webkit-font-smoothing:antialiased; }
+  a{ color:inherit; } button{ font:inherit; color:inherit; }
+  :focus-visible{ outline:2px solid var(--input); outline-offset:2px; border-radius:6px; }
+  .ic{ fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+
+  /* ---------- chrome do mockup ---------- */
+  .board-head{ background:var(--brand-ink); color:hsl(75 20% 88%); padding:12px 20px; display:flex; flex-wrap:wrap; align-items:center; gap:6px 18px; font-size:12.5px; }
+  .board-head b{ color:var(--brand-lime); font-weight:700; letter-spacing:.03em; }
+  .board-head .dir{ color:hsl(75 10% 62%); flex:1 1 340px; min-width:0; }
+  .board-head nav{ display:flex; gap:6px; flex-wrap:wrap; }
+  .board-head nav a{ font-size:12px; font-weight:600; padding:5px 12px; border-radius:99px; border:1px solid hsl(75 10% 38%); color:hsl(75 20% 85%); text-decoration:none; }
+  .board-head nav a:hover{ border-color:var(--brand-lime); color:var(--brand-lime); }
+  .rr{ position:absolute; opacity:0; pointer-events:none; }
+  .asrole{ background:#2b2b2b; padding:10px 20px; display:flex; flex-wrap:wrap; gap:8px 12px; align-items:center; position:sticky; top:0; z-index:30; }
+  .asrole>span{ color:hsl(75 10% 75%); font-size:12.5px; font-weight:600; }
+  .asrole label{ cursor:pointer; font-size:13px; font-weight:600; padding:9px 16px; min-height:40px; display:inline-flex; align-items:center; border-radius:99px; border:1px solid hsl(75 10% 42%); color:hsl(75 20% 88%); }
+  #r1:checked~.asrole label[for=r1],#r2:checked~.asrole label[for=r2]{ background:var(--brand-lime); color:var(--brand-ink); border-color:var(--brand-lime); }
+  #r1:not(:checked)~.app .v1,#r2:not(:checked)~.app .v2{ display:none; }
+
+  /* ---------- topbar ---------- */
+  .topbar{ position:sticky; top:0; z-index:10; background:hsl(75 10% 95% / .9); backdrop-filter:blur(10px); border-bottom:1px solid var(--border); }
+  .topbar-in{ max-width:1120px; margin:0 auto; padding:.7rem 1.25rem; display:flex; align-items:center; gap:1.4rem; }
+  .brand{ display:flex; align-items:center; gap:.55rem; text-decoration:none; }
+  .brand-mark{ width:30px; height:30px; border-radius:9px; background:var(--brand-lime); display:grid; place-items:center; box-shadow:inset 0 0 0 1px hsl(78 55% 40% / .25); }
+  .brand-name{ font-size:17px; font-weight:800; letter-spacing:-.02em; }
+  .brand-name span{ color:var(--ok-text); font-weight:700; }
+  .topnav{ display:flex; gap:.15rem; }
+  .topnav a{ text-decoration:none; font-size:13.5px; font-weight:550; color:var(--muted-foreground); padding:.42rem .75rem; border-radius:999px; }
+  .topnav a:hover{ background:var(--accent); color:var(--brand-ink); }
+  .topnav a.is-on{ background:var(--brand-lime); color:hsl(78 60% 18%); font-weight:650; }
+  .user{ margin-left:auto; display:flex; align-items:center; gap:.6rem; }
+  .user-id{ text-align:right; line-height:1.15; }
+  .user-id b{ display:block; font-size:13px; font-weight:650; }
+  .user-id small{ font-size:11px; color:var(--muted-foreground); }
+  .uav{ width:32px; height:32px; border-radius:50%; background:var(--brand-ink); color:#fff; display:grid; place-items:center; font-size:11px; font-weight:700; }
+
+  /* ---------- bottom nav (chrome mobile) ---------- */
+  .bnav{ display:none; }
+
+  /* ---------- página ---------- */
+  .wrap{ max-width:1120px; margin:0 auto; padding:1.5rem 1.25rem 4.5rem; }
+  .page-head{ display:flex; align-items:flex-end; justify-content:space-between; gap:1rem; flex-wrap:wrap; }
+  .page-head h1{ font-size:26px; font-weight:750; letter-spacing:-.02em; }
+  .page-head .sub{ margin-top:.15rem; font-size:13px; color:var(--muted-foreground); }
+  .page-head .sub b{ color:var(--brand-ink); }
+  .head-actions{ display:flex; align-items:center; gap:.6rem; }
+  .search{ display:flex; align-items:center; gap:.5rem; background:var(--card); border:1px solid var(--border); border-radius:999px; padding:.5rem .9rem; min-width:230px; color:var(--muted-foreground); font-size:13px; }
+  .btn-new{ display:inline-flex; align-items:center; gap:.45rem; background:var(--brand-lime); color:hsl(78 60% 17%); border:none; border-radius:999px; padding:.55rem 1.05rem; font-size:13.5px; font-weight:650; cursor:pointer; box-shadow:inset 0 0 0 1px hsl(78 55% 40% / .3); }
+  .btn-new:hover{ filter:brightness(.96); }
+
+  /* ---------- resumo do semáforo (agregado no topo — item 5 do feedback) ---------- */
+  .sum{ margin-top:1.15rem; background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:.75rem 1rem .9rem; display:grid; grid-template-columns:minmax(0,1.55fr) minmax(230px,.9fr); gap:.55rem 1.5rem; }
+  .s-l{ min-width:0; }
+  .s-t{ display:flex; justify-content:space-between; align-items:baseline; gap:.5rem; font-size:11px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:var(--muted-foreground); }
+  .s-t .apoio-mini{ display:inline-flex; align-items:center; gap:.3rem; color:var(--info-text); text-transform:none; letter-spacing:0; font-size:11.5px; }
+  .sbar{ display:flex; gap:2px; height:20px; border-radius:999px; overflow:hidden; margin-top:.45rem; }
+  .sbar a{ display:grid; place-items:center; min-width:20px; font-size:10.5px; font-weight:750; color:#fff; text-decoration:none; }
+  .sbar a:hover{ filter:brightness(1.1); }
+  .sb-r{ background:var(--danger); flex:2; }
+  .sb-a{ background:var(--warn); flex:3; }
+  .sb-o{ background:var(--ok); flex:19; }
+  .sb-p{ background:hsl(75 4% 60%); flex:1; }
+  .s-cap{ margin-top:.4rem; font-size:11.5px; color:var(--muted-foreground); display:flex; flex-wrap:wrap; gap:.1rem .85rem; }
+  .s-cap b{ color:var(--brand-ink); font-weight:650; }
+  .s-cap .d{ display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:.28rem; }
+  .s-r{ border-left:1px solid var(--border); padding-left:1.4rem; display:grid; gap:.42rem; align-content:center; }
+  .cron{ display:flex; align-items:center; gap:.5rem; font-size:12px; color:var(--muted-foreground); }
+  .cron .tt{ font-weight:700; color:var(--brand-ink); }
+  .cron .cbar{ position:relative; flex:1; max-width:120px; height:7px; background:var(--muted); border-radius:99px; overflow:hidden; }
+  .cron .cbar i{ position:absolute; inset:0 auto 0 0; background:var(--ok); border-radius:inherit; }
+  .cron b{ color:var(--brand-ink); font-weight:650; }
+  .cron-note{ font-size:11px; color:var(--muted-foreground); }
+
+  /* ---------- chips de categoria com régua (assinatura da v1) ---------- */
+  .cats{ display:flex; flex-wrap:wrap; gap:.6rem; margin-top:1.15rem; }
+  .cat{ flex:1 1 150px; display:flex; flex-direction:column; gap:.35rem; text-align:left; cursor:pointer; background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:.7rem .85rem .75rem; transition:border-color .15s, transform .15s; }
+  .cat:hover{ border-color:var(--input); transform:translateY(-1px); }
+  .cat-top{ display:flex; align-items:center; gap:.45rem; }
+  .cat-dot{ width:9px; height:9px; border-radius:50%; flex:none; }
+  .cat-name{ font-size:13.5px; font-weight:650; }
+  .cat-count{ margin-left:auto; font-size:11px; font-weight:700; background:var(--muted); color:var(--muted-foreground); padding:.08rem .5rem; border-radius:999px; }
+  .cat-rule{ font-size:11.5px; line-height:1.4; color:var(--muted-foreground); display:block; }
+  .cat-all .cat-dot{ background:var(--brand-lime); }
+  .cat-risco .cat-dot{ background:var(--danger); }
+  .cat-atencao .cat-dot{ background:var(--warn); }
+  .cat-ok .cat-dot{ background:var(--ok); }
+  .cat-pausa .cat-dot{ background:hsl(75 4% 58%); }
+  .cat.is-active{ background:var(--brand-ink); border-color:var(--brand-ink); color:#fff; box-shadow:0 6px 18px hsl(0 0% 15% / .18); }
+  .cat.is-active .cat-rule{ color:hsl(0 0% 100% / .62); }
+  .cat.is-active .cat-count{ background:hsl(0 0% 100% / .16); color:#fff; }
+  .cat-sep{ width:1px; align-self:stretch; background:var(--border); margin:.25rem .15rem; flex:none; }
+  .cat-apoio{ flex:1.15 1 165px; background:var(--info-bg); border-color:var(--info-border); }
+  .cat-apoio:hover{ border-color:var(--info); }
+  .cat-apoio .cat-name{ display:flex; align-items:center; gap:.35rem; color:var(--info-text); }
+  .cat-apoio .cat-count{ background:hsl(207 82% 88%); color:var(--info-text); }
+
+  /* ---------- filtros compactos ---------- */
+  .filters{ display:flex; flex-wrap:wrap; align-items:center; gap:.45rem .9rem; margin-top:.9rem; }
+  .fgroup{ display:flex; align-items:center; gap:.4rem; }
+  .fgroup>span{ font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--muted-foreground); }
+  .fopt{ font-size:12.5px; font-weight:600; padding:.28rem .7rem; border-radius:999px; border:1px solid var(--border); background:var(--card); color:var(--muted-foreground); cursor:pointer; text-decoration:none; }
+  .fopt:hover{ border-color:var(--input); color:var(--brand-ink); }
+  .fopt.on{ background:var(--brand-ink); color:#fff; border-color:var(--brand-ink); }
+  .more-f{ font-size:12.5px; font-weight:600; color:var(--muted-foreground); background:none; border:none; cursor:pointer; padding:.28rem .4rem; text-decoration:underline; text-underline-offset:3px; }
+  .more-f:hover{ color:var(--brand-ink); }
+
+  /* ---------- barra da lista ---------- */
+  .list-bar{ display:flex; align-items:baseline; justify-content:space-between; gap:1rem; margin:1.3rem 0 .55rem; }
+  .list-count{ font-size:13px; color:var(--muted-foreground); }
+  .list-count b{ color:var(--brand-ink); font-weight:650; }
+  .legend{ font-size:11.5px; color:var(--muted-foreground); white-space:nowrap; }
+  .legend .d{ display:inline-block; width:9px; height:9px; border-radius:50%; margin:0 .3rem 0 .7rem; vertical-align:-1px; border:1px solid hsl(0 0% 0% / .14); }
+  .legend .d:first-child{ margin-left:0; }
+  .d-j{ background:var(--role-mentorado); }
+  .d-m{ background:var(--brand-lime); }
+
+  /* ---------- mini-cards dashboard (v6b) ---------- */
+  .dgrid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,430px),1fr)); gap:.65rem; }
+  .dcard{ position:relative; display:grid; gap:.42rem; background:var(--card); border:1px solid var(--border); border-left:5px solid var(--ok); border-radius:var(--radius); padding:.68rem .8rem .75rem .95rem; transition:border-color .15s, transform .15s; }
+  .dcard:hover{ border-color:var(--input); transform:translateY(-1px); }
+  .dcard.s-risco{ border-left-color:var(--danger); }
+  .dcard.s-atencao{ border-left-color:var(--warn); }
+  .dcard.s-pausa{ border-left-color:hsl(75 4% 62%); }
+  .dcard.s-apoio{ border-left-color:var(--info); }
+
+  .dhead{ display:flex; align-items:center; gap:.55rem; min-width:0; }
+  .avas{ display:flex; flex:none; }
+  .av{ width:30px; height:30px; border-radius:50%; display:grid; place-items:center; background:var(--card); font-size:10px; font-weight:750; }
+  .av-j{ border:2px solid var(--role-mentorado); }
+  .av-m{ border:2px solid var(--brand-lime); margin-left:-9px; }
+  .dn{ min-width:0; flex:1; }
+  .dn .nm{ font-size:14px; display:flex; align-items:center; gap:.3rem; flex-wrap:wrap; }
+  .dn .nm b{ font-weight:650; }
+  .dn .amp{ color:var(--muted-foreground); font-weight:500; }
+  .dn small{ display:block; font-size:11.5px; color:var(--muted-foreground); margin-top:.02rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .tur{ font-size:10.5px; font-weight:700; border:1px solid var(--muted-foreground); border-radius:6px; padding:0 6px; color:var(--muted-foreground); white-space:nowrap; }
+  .tchip{ display:inline-flex; align-items:center; font-size:10px; font-weight:700; background:hsl(78 56% 53% / .22); color:hsl(78 55% 25%); border-radius:5px; padding:.06rem .35rem; white-space:nowrap; }
+  .tchip.info{ background:var(--info-bg); color:var(--info-text); box-shadow:inset 0 0 0 1px var(--info-border); }
+  .dacts{ display:flex; align-items:center; gap:.4rem; flex:none; align-self:flex-start; }
+
+  .why{ display:flex; gap:.45rem; align-items:baseline; font-size:12.5px; line-height:1.45; color:hsl(75 5% 30%); min-width:0; }
+  .why .sd{ width:9px; height:9px; border-radius:50%; flex:none; transform:translateY(-1px); }
+  .why b{ font-weight:700; }
+  .s-risco .why{ color:hsl(0 62% 36%); } .s-risco .why b,.s-risco .why .sd{ color:var(--danger); } .s-risco .why .sd{ background:var(--danger); }
+  .s-atencao .why{ color:hsl(40 88% 27%); } .s-atencao .why b{ color:var(--warn-text); } .s-atencao .why .sd{ background:var(--warn); }
+  .s-ok .why{ color:hsl(75 5% 30%); } .s-ok .why b{ color:var(--ok-text); } .s-ok .why .sd{ background:var(--ok); }
+  .s-pausa .why{ color:var(--muted-foreground); } .s-pausa .why .sd{ background:hsl(75 4% 60%); }
+  .s-apoio .why{ color:hsl(207 70% 33%); } .s-apoio .why b{ color:var(--info-text); } .s-apoio .why .sd{ background:var(--info); }
+  .why .rec{ color:var(--muted-foreground); }
+  .s-risco .why .rec{ color:hsl(0 45% 45%); } .s-atencao .why .rec{ color:hsl(40 60% 38%); }
+  .cha{ display:inline-block; font-size:10.5px; font-weight:700; letter-spacing:.02em; background:hsl(207 82% 90%); color:var(--info-text); padding:.05rem .4rem; border-radius:.4rem; vertical-align:1px; }
+
+  .dmeta{ display:flex; align-items:center; gap:.35rem .7rem; flex-wrap:wrap; }
+  .dmeta .segwrap{ position:relative; flex:1 1 110px; max-width:190px; }
+  .segs{ display:flex; gap:2px; height:9px; }
+  .segs i{ flex:1 1 0; min-width:0; border-radius:2px; background:var(--muted); box-shadow:inset 0 0 0 1px hsl(75 6% 84%); }
+  .segs i.on{ background:var(--ok); box-shadow:none; }
+  .s-risco .segs i.on{ background:var(--danger); }
+  .s-atencao .segs i.on{ background:var(--warn); }
+  .s-pausa .segs i.on{ background:hsl(75 4% 62%); }
+  .segwrap>em{ position:absolute; top:-3px; bottom:-3px; width:2px; border-radius:1px; background:hsl(0 0% 15% / .55); }
+  .frac{ font-size:12px; font-weight:700; white-space:nowrap; }
+  .esp{ font-size:11px; color:var(--muted-foreground); white-space:nowrap; }
+  .badge{ font-size:11.5px; font-weight:650; padding:.24rem .6rem; border-radius:.55rem; white-space:nowrap; }
+  .b-exc{ background:var(--brand-lime); color:hsl(78 58% 20%); }
+  .b-boa{ background:hsl(78 45% 90%); color:var(--ok-text); }
+  .b-reg{ background:hsl(43 70% 90%); color:var(--warn-text); }
+  .b-baixa{ background:hsl(0 80% 94%); color:var(--danger); }
+
+  .pill{ display:inline-flex; align-items:center; gap:.35rem; font-size:11px; font-weight:650; padding:.22rem .55rem; border-radius:999px; white-space:nowrap; }
+  .p-apoio{ background:hsl(207 82% 90%); color:var(--info-text); }
+
+  /* ações no topo do card — sem faixa-footer */
+  .ficha{ display:inline-flex; align-items:center; gap:.15rem; font-size:11.5px; font-weight:650; color:var(--muted-foreground); text-decoration:none; white-space:nowrap; padding:.1rem .15rem; }
+  .ficha:hover{ color:var(--brand-ink); }
+  .ficha svg{ width:11px; height:11px; }
+
+  .wa{ position:relative; display:inline-flex; }
+  .wa-b{ position:relative; display:inline-flex; align-items:center; gap:.32rem; height:30px; padding:0 .55rem; background:var(--wa-soft); border:1px solid var(--wa-bd); border-radius:8px; color:var(--wa-ink); font-size:12px; font-weight:700; text-decoration:none; cursor:pointer; white-space:nowrap; }
+  .wa-b:hover{ background:hsl(151 60% 42% / .2); }
+  .wa-g{ width:15px; height:15px; fill:currentColor; flex:none; }
+  .wa-ct{ width:10px; height:10px; fill:none; stroke:currentColor; stroke-width:2.4; stroke-linecap:round; stroke-linejoin:round; opacity:.75; flex:none; }
+  .wa-menu{ position:absolute; right:0; top:calc(100% + 5px); z-index:25; width:238px; background:var(--card); border:1px solid var(--border); border-radius:10px; box-shadow:0 12px 30px rgb(0 0 0 / .17); padding:5px; text-align:left; }
+  .wa-menu .mi{ display:flex; align-items:center; gap:.55rem; width:100%; padding:.5rem .6rem; border:none; background:none; border-radius:7px; font-size:12.5px; font-weight:600; color:var(--brand-ink); text-decoration:none; cursor:pointer; }
+  .wa-menu .mi:hover{ background:var(--accent); }
+  .wa-menu .mi svg{ width:15px; height:15px; flex:none; color:var(--muted-foreground); }
+  .wa-menu .cap{ padding:.45rem .6rem .35rem; font-size:10.5px; line-height:1.4; color:var(--muted-foreground); border-top:1px solid var(--border); margin-top:4px; }
+  .wa-menu .cap b{ color:var(--brand-ink); font-weight:600; }
+
+  .supv{ display:inline-flex; align-items:center; gap:.32rem; height:30px; padding:0 .6rem; font-size:12px; font-weight:650; border:1px solid var(--border); border-radius:8px; background:var(--card); color:var(--muted-foreground); text-decoration:none; white-space:nowrap; cursor:pointer; }
+  .supv:hover{ border-color:var(--input); color:var(--brand-ink); }
+  .supv svg{ width:14px; height:14px; }
+  .supv .sv-s{ display:none; }
+  .act-info{ display:inline-flex; align-items:center; gap:.32rem; height:30px; padding:0 .6rem; font-size:12px; font-weight:650; border:1px solid var(--info-border); border-radius:8px; background:var(--info-bg); color:var(--info-text); text-decoration:none; white-space:nowrap; }
+  .act-info:hover{ border-color:var(--info); }
+  .act-info svg{ width:14px; height:14px; }
+
+  /* cabeçalho de grupo (turma) entre grids — auxiliar */
+  .ghead{ display:flex; align-items:baseline; gap:.6rem; margin:1.15rem 0 .55rem; font-size:12.5px; font-weight:700; color:var(--brand-ink); }
+  .ghead small{ font-weight:500; color:var(--muted-foreground); }
+
+  /* massa saudável colapsada — mesma linha mínima, com mini-barra proporcional */
+  details.massa{ margin-top:.65rem; background:var(--card); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; }
+  details.massa>summary{ cursor:pointer; list-style:none; padding:.7rem 1rem; font-size:12.5px; font-weight:600; color:var(--muted-foreground); display:flex; align-items:center; gap:.45rem; }
+  details.massa>summary::-webkit-details-marker{ display:none; }
+  details.massa>summary::before{ content:"▸"; transition:transform .15s; font-size:10px; }
+  details.massa[open]>summary::before{ transform:rotate(90deg); }
+  details.massa>summary:hover{ color:var(--brand-ink); }
+  .mini{ display:grid; grid-template-columns:minmax(185px,1.3fr) minmax(118px,.6fr) minmax(140px,.9fr) auto; gap:.4rem .9rem; align-items:center; padding:.5rem 1rem; font-size:12.5px; border-top:1px solid var(--border); }
+  .mini b{ font-weight:600; }
+  .mini .tur2{ font-size:10.5px; font-weight:700; border:1px solid var(--border); border-radius:5px; padding:0 .3rem; color:var(--muted-foreground); margin-left:.35rem; }
+  .m-prog{ display:inline-flex; align-items:center; gap:.45rem; font-size:11.5px; font-weight:650; color:var(--ok-text); }
+  .mbar{ position:relative; display:inline-block; width:72px; height:6px; background:var(--muted); border-radius:99px; flex:none; }
+  .mbar i{ position:absolute; inset:0 auto 0 0; background:var(--ok); border-radius:inherit; }
+  .mbar em{ position:absolute; top:-3px; bottom:-3px; width:2px; border-radius:1px; background:hsl(0 0% 15% / .45); }
+  .mini .m-r{ color:var(--muted-foreground); font-size:12px; }
+  .mini .m-l{ font-size:12px; font-weight:600; color:var(--muted-foreground); text-decoration:none; padding:.3rem .4rem; white-space:nowrap; }
+  .mini .m-l:hover{ color:var(--brand-ink); }
+
+  /* legenda sob demanda */
+  details.leg{ margin-top:1.1rem; background:var(--card); border:1px solid var(--border); border-radius:var(--radius); }
+  details.leg>summary{ cursor:pointer; list-style:none; min-height:42px; display:flex; align-items:center; gap:.45rem; padding:.55rem 1rem; font-weight:600; font-size:13px; }
+  details.leg>summary::-webkit-details-marker{ display:none; }
+  details.leg>summary::before{ content:"▸"; transition:transform .15s; font-size:10px; color:var(--muted-foreground); }
+  details.leg[open]>summary::before{ transform:rotate(90deg); }
+  .leg-b{ padding:.2rem 1.1rem 1rem; display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:.8rem; }
+  .leg-b div{ border-left:4px solid var(--border); padding:2px 0 2px 11px; font-size:12.5px; }
+  .leg-b h3{ font-size:13px; margin-bottom:2px; }
+  .leg-b p{ color:var(--muted-foreground); }
+  .leg-b .l-r{ border-color:var(--danger); } .leg-b .l-a{ border-color:var(--warn); }
+  .leg-b .l-o{ border-color:var(--ok); } .leg-b .l-p{ border-color:var(--info); }
+
+  /* ---------- notas do mock ---------- */
+  .notes{ display:grid; gap:8px; margin-top:36px; padding:16px 22px 18px; background:var(--brand-ink); color:hsl(75 14% 76%); border-radius:var(--radius); font-size:12.5px; line-height:1.6; }
+  .notes b{ color:var(--brand-lime); font-weight:700; }
+  .notes li{ margin-left:18px; }
+  .notes .warn{ color:hsl(48 100% 70%); }
+
+  /* ---------- responsivo ---------- */
+  @media (max-width:1020px){
+    .topnav{ display:none; }
+    .bnav{ display:grid; grid-template-columns:repeat(5,1fr); position:fixed; left:0; right:0; bottom:0; z-index:40; background:#fff; border-top:1px solid var(--border); padding:4px 4px calc(4px + env(safe-area-inset-bottom)); }
+    .bnav a{ display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; min-height:54px; font-size:11.5px; font-weight:600; color:var(--muted-foreground); text-decoration:none; border-radius:12px; }
+    .bnav a.on{ color:var(--brand-ink); font-weight:700; background:hsl(78 56% 53% / .28); }
+    .bnav .ic{ width:21px; height:21px; }
+    .wrap{ padding-bottom:5.5rem; }
+    .dgrid{ grid-template-columns:1fr; }
+    .mini{ grid-template-columns:minmax(0,1fr) auto; }
+    .mini .m-prog,.mini .m-r{ display:none; }
+  }
+  @media (max-width:767px){
+    /* WhatsApp compacto: quadrado verde, só símbolo + chevron (item 3) */
+    .wa-b{ width:44px; height:44px; padding:0; justify-content:center; background:var(--wa); border-color:var(--wa); color:#fff; border-radius:12px; }
+    .wa-g{ width:20px; height:20px; }
+    .wa-t{ display:none; }
+    .wa-ct{ position:absolute; right:4px; bottom:3px; width:9px; height:9px; opacity:.95; }
+    .ficha{ width:44px; height:44px; padding:0; justify-content:center; border:1px solid var(--border); border-radius:12px; background:var(--card); color:var(--muted-foreground); }
+    .ficha .ft{ display:none; }
+    .ficha svg{ width:14px; height:14px; }
+    .supv{ height:44px; padding:0 .7rem; }
+    .supv .sv-l{ display:none; } .supv .sv-s{ display:inline; }
+    .act-info{ height:44px; }
+    .wa-menu{ right:0; width:min(238px,78vw); }
+    .cat,.fopt,.more-f,.ficha,.wa-b{ min-height:44px; }
+  }
+  @media (max-width:640px){
+    .page-head h1{ font-size:22px; }
+    .head-actions{ width:100%; flex-direction:column; align-items:stretch; }
+    .search{ min-width:0; }
+    .btn-new{ justify-content:center; min-height:44px; }
+    .sum{ grid-template-columns:1fr; }
+    .s-r{ border-left:none; padding-left:0; }
+    .cats{ display:grid; grid-template-columns:1fr 1fr; }
+    .cat{ flex:none; }
+    .cat-sep{ display:none; }
+    .cat-apoio{ grid-column:1 / -1; }
+    .list-bar{ flex-direction:column; gap:.15rem; }
+    .user-id{ display:none; }
+    .asrole{ position:static; padding:8px 12px; }
+    .asrole label{ flex:1 1 calc(50% - 8px); justify-content:center; }
+    .fgroup{ flex-wrap:wrap; }
+    details.leg>summary{ min-height:44px; }
+    .dmeta .segwrap{ max-width:none; flex:1 1 100%; order:-1; margin-bottom:.15rem; }
+  }
+</style>
+</head>
+<body>
+
+<header class="board-head">
+  <span><b>MOCKUP</b> · duplas · v6b — mini-card dashboard</span>
+  <span class="dir">Direção: mesma informação da v6a em cards de ~2 colunas — indicador lateral colorido + motivo em texto corrido + mini-barra de encontros, compacto. <b>Sem faixa-footer</b>: WhatsApp no topo do card (mobile: quadrado verde só com símbolo + chevron).</span>
+  <nav><a href="#notas">Notas</a></nav>
+</header>
+
+<input class="rr" type="radio" name="role" id="r1" checked aria-label="Coordenação">
+<input class="rr" type="radio" name="role" id="r2" aria-label="Auxiliar executivo">
+<div class="asrole" role="group" aria-label="Ver como"><span>Ver como:</span>
+  <label for="r1">Coordenação</label><label for="r2">Auxiliar executivo</label>
+</div>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <symbol id="i-home" viewBox="0 0 24 24"><path d="M4 11l8-7 8 7v9H4z"/></symbol>
+  <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0113 0M16 5a3.5 3.5 0 010 7M18 14a6.5 6.5 0 013.5 6"/></symbol>
+  <symbol id="i-cal" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/></symbol>
+  <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"/></symbol>
+  <symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.5"/><path d="M5.6 5.6l3.9 3.9M14.5 14.5l3.9 3.9M18.4 5.6l-3.9 3.9M9.5 14.5l-3.9 3.9"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></symbol>
+  <symbol id="i-caret" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="i-clip" viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4a3 3 0 016 0M9 11h6M9 15h4"/></symbol>
+  <symbol id="i-ext" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4L11 13M9 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-3"/></symbol>
+</defs></svg>
+
+<div class="app">
+
+  <!-- ============================ COORDENAÇÃO ============================ -->
+  <div class="topbar v1"><div class="topbar-in">
+    <a class="brand" href="#"><span class="brand-mark" aria-hidden="true"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="hsl(78 60% 20%)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21v-9"/><path d="M12 12c0-3.9 2.7-6.5 6.5-6.5 0 3.8-2.7 6.5-6.5 6.5z"/><path d="M12 12c0-3.9-2.7-6.5-6.5-6.5 0 3.8 2.7 6.5 6.5 6.5z"/></svg></span><span class="brand-name">realiza<span>.vc</span></span></a>
+    <nav class="topnav" aria-label="Principal"><a href="#">Agenda</a><a href="#" class="is-on" aria-current="page">Duplas</a><a href="#">Pessoas</a><a href="#">Chamados</a><a href="#">Materiais</a></nav>
+    <div class="user"><div class="user-id"><b>Marina Costa</b><small>Coordenação</small></div><span class="uav" aria-hidden="true">MC</span></div>
+  </div></div>
+
+  <main class="wrap v1">
+    <div class="page-head">
+      <div>
+        <h1>Duplas</h1>
+        <p class="sub">26 duplas no ciclo · semana 41 · hoje é terça, 7 de outubro</p>
+      </div>
+      <div class="head-actions">
+        <div class="search" role="search"><svg class="ic" width="15" height="15" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>Buscar dupla, mentor ou mentorada…</div>
+        <button class="btn-new" type="button"><svg class="ic" width="13" height="13" viewBox="0 0 24 24" stroke-width="2.4"><path d="M12 5v14M5 12h14"/></svg>Nova dupla</button>
+      </div>
+    </div>
+
+    <!-- resumo agregado do semáforo: uma barra proporcional + cronograma por turma -->
+    <section class="sum" aria-label="Resumo do semáforo e do cronograma">
+      <div class="s-l">
+        <div class="s-t"><span>Semáforo — 26 duplas</span><span class="apoio-mini"><svg class="ic" width="12" height="12" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.5"/><path d="M5.6 5.6l3.9 3.9M14.5 14.5l3.9 3.9M18.4 5.6l-3.9 3.9M9.5 14.5l-3.9 3.9"/></svg>+ 1 apoio aberto (eixo separado)</span></div>
+        <div class="sbar" role="img" aria-label="26 duplas: 2 em risco, 3 em atenção, 19 em andamento, 1 pausada">
+          <a class="sb-r" href="#" title="Em risco — 2 duplas (filtra a lista)">2</a>
+          <a class="sb-a" href="#" title="Atenção — 3 duplas (filtra a lista)">3</a>
+          <a class="sb-o" href="#" title="Em andamento — 19 duplas (filtra a lista)">19</a>
+          <a class="sb-p" href="#" title="Pausada — 1 dupla (filtra a lista)">1</a>
+        </div>
+        <p class="s-cap"><span><i class="d" style="background:var(--danger)"></i><b>2</b> em risco</span><span><i class="d" style="background:var(--warn)"></i><b>3</b> em atenção</span><span><i class="d" style="background:var(--ok)"></i><b>19</b> em andamento</span><span><i class="d" style="background:hsl(75 4% 60%)"></i><b>1</b> pausada</span></p>
+      </div>
+      <div class="s-r">
+        <span class="cron"><span class="tt">T1</span> encontro <b>8 de 16</b> <span class="cbar"><i style="width:50%"></i></span> terças 19h</span>
+        <span class="cron"><span class="tt">T2</span> encontro <b>5 de 16</b> <span class="cbar"><i style="width:31%"></i></span> quartas 19h</span>
+        <span class="cron-note">T2 começou 3 semanas depois — mesma semana, números diferentes.</span>
+      </div>
+    </section>
+
+    <section class="cats" aria-label="Filtrar por categoria">
+      <button class="cat cat-all is-active" type="button" aria-pressed="true">
+        <span class="cat-top"><i class="cat-dot"></i><span class="cat-name">Todas</span><span class="cat-count">26</span></span>
+        <span class="cat-rule">todas as duplas do ciclo, em qualquer estado</span>
+      </button>
+      <button class="cat cat-risco" type="button" aria-pressed="false">
+        <span class="cat-top"><i class="cat-dot"></i><span class="cat-name">Em risco</span><span class="cat-count">2</span></span>
+        <span class="cat-rule">2+ encontros atrasados, ou avaliação baixa + dificuldade</span>
+      </button>
+      <button class="cat cat-atencao" type="button" aria-pressed="false">
+        <span class="cat-top"><i class="cat-dot"></i><span class="cat-name">Atenção</span><span class="cat-count">3</span></span>
+        <span class="cat-rule">1 atraso, avaliação baixa ou registro/encaminhamento pendente</span>
+      </button>
+      <button class="cat cat-ok" type="button" aria-pressed="false">
+        <span class="cat-top"><i class="cat-dot"></i><span class="cat-name">Em andamento</span><span class="cat-count">19</span></span>
+        <span class="cat-rule">jornada dentro do previsto, sem pendências</span>
+      </button>
+      <button class="cat cat-pausa" type="button" aria-pressed="false">
+        <span class="cat-top"><i class="cat-dot"></i><span class="cat-name">Pausadas</span><span class="cat-count">1</span></span>
+        <span class="cat-rule">jornada congelada — sem encontros nem cobrança</span>
+      </button>
+      <span class="cat-sep" aria-hidden="true"></span>
+      <button class="cat cat-apoio" type="button" aria-pressed="false">
+        <span class="cat-top"><i class="cat-dot" style="background:var(--info)"></i><span class="cat-name"><svg class="ic" width="14" height="14" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="M5.6 5.6 9.2 9.2M18.4 5.6 14.8 9.2M5.6 18.4 9.2 14.8M18.4 18.4 14.8 14.8"/></svg>Apoio</span><span class="cat-count">1</span></span>
+        <span class="cat-rule">chamado aberto — não é falha da dupla</span>
+      </button>
+    </section>
+
+    <div class="filters" aria-label="Filtros">
+      <span class="fgroup"><span>Turma</span>
+        <a class="fopt on" href="#">Todas</a><a class="fopt" href="#">T1 · terças</a><a class="fopt" href="#">T2 · quartas</a>
+      </span>
+      <span class="fgroup"><span>Supervisão</span>
+        <a class="fopt on" href="#">Todas</a><a class="fopt" href="#">Paula Nunes</a><a class="fopt" href="#">Sem supervisor</a>
+      </span>
+      <button class="more-f" type="button">+ mentor</button>
+    </div>
+
+    <div class="list-bar">
+      <p class="list-count"><b>26 duplas</b> · ordenadas por prioridade</p>
+      <p class="legend"><i class="d d-j"></i>mentorado(a)<i class="d d-m"></i>mentor(a)</p>
+    </div>
+
+    <div class="dgrid">
+      <!-- APOIO primeiro: trabalho a fazer; a ação mora no chamado -->
+      <article class="dcard s-apoio">
+        <div class="dhead">
+          <div class="avas" aria-hidden="true"><span class="av av-j">SM</span><span class="av av-m">RT</span></div>
+          <div class="dn"><div class="nm"><b>Sofia Martins</b><span class="amp">&amp;</span><b>Ricardo Torres</b><span class="tur">T1</span></div><small>encontros ter 19h · sup. Paula Nunes</small></div>
+          <div class="dacts"><a class="act-info" href="../chamados/v4.html"><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="M5.6 5.6 9.2 9.2M18.4 5.6 14.8 9.2M5.6 18.4 9.2 14.8M18.4 18.4 14.8 14.8"/></svg>Abrir chamado</a><a class="ficha" href="#" aria-label="Ver ficha"><span class="ft">Ver ficha</span><svg class="ic" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></a></div>
+        </div>
+        <p class="why"><i class="sd"></i><span><b>Em andamento</b> · <span class="pill p-apoio"><svg class="ic" width="10" height="10" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="M5.6 5.6 9.2 9.2M18.4 5.6 14.8 9.2M5.6 18.4 9.2 14.8M18.4 18.4 14.8 14.8"/></svg>Apoio</span> chamado <span class="cha">CHA-000142</span> · metodologia · aberto há 2 dias, sem dono</span></p>
+        <div class="dmeta"><span class="segwrap"><span class="segs" role="img" aria-label="8 de 16 encontros"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><em style="left:50%"></em></span><b class="frac">8/16</b><span class="esp">esp. 8</span><span class="badge b-boa">Boa</span></div>
+      </article>
+
+      <!-- EM RISCO — 1º card mostra o menu do WhatsApp aberto (estado forçado do mock) -->
+      <article class="dcard s-risco">
+        <div class="dhead">
+          <div class="avas" aria-hidden="true"><span class="av av-j">ML</span><span class="av av-m">RA</span></div>
+          <div class="dn"><div class="nm"><b>Mariana Lopes</b><span class="amp">&amp;</span><b>Roberto Alves</b><span class="tur">T1</span></div><small>encontros ter 19h · sup. Paula Nunes</small></div>
+          <div class="dacts">
+            <span class="wa">
+              <button class="wa-b" type="button" aria-haspopup="menu" aria-expanded="true" aria-label="Lembrar Roberto Alves — notificação + WhatsApp"><svg class="wa-g" viewBox="0 0 24 24"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91S17.5 2 12.04 2zm0 18.15a8.2 8.2 0 01-4.19-1.15l-.3-.18-3.12.82.83-3.04-.2-.31a8.22 8.22 0 116.98 3.86zm4.52-6.14c-.25-.12-1.47-.72-1.7-.8-.23-.09-.39-.13-.56.12-.16.24-.64.8-.78.97-.14.16-.29.18-.54.06-.25-.12-1.05-.39-1.99-1.23-.74-.66-1.23-1.47-1.38-1.72-.14-.25-.02-.38.11-.51.11-.11.25-.29.37-.43.12-.14.16-.25.25-.41.08-.17.04-.31-.02-.43-.06-.12-.56-1.34-.76-1.84-.2-.48-.41-.42-.56-.43h-.48c-.16 0-.43.06-.66.31-.22.25-.86.85-.86 2.07 0 1.22.89 2.4 1.01 2.56.12.17 1.75 2.67 4.23 3.74.59.26 1.05.41 1.41.52.59.19 1.13.16 1.56.1.48-.07 1.47-.6 1.67-1.18.21-.58.21-1.07.15-1.18-.06-.1-.23-.16-.48-.28z"/></svg><span class="wa-t">Lembrar</span><svg class="wa-ct" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button>
+              <span class="wa-menu" role="menu" aria-label="Opções da mensagem">
+                <a class="mi" role="menuitem" href="#"><svg class="ic" viewBox="0 0 24 24"><use href="#i-ext"/></svg>Abrir wa.me com a mensagem</a>
+                <button class="mi" role="menuitem" type="button"><svg class="ic" viewBox="0 0 24 24"><use href="#i-copy"/></svg>Copiar mensagem</button>
+                <button class="mi" role="menuitem" type="button"><svg class="ic" viewBox="0 0 24 24"><use href="#i-eye"/></svg>Ver texto da mensagem</button>
+                <span class="cap"><b>Lembrar</b> envia a notificação no app e abre a conversa — cap de 1 a cada 48h por dupla.</span>
+              </span>
+            </span>
+            <a class="ficha" href="#" aria-label="Ver ficha"><span class="ft">Ver ficha</span><svg class="ic" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></a>
+          </div>
+        </div>
+        <p class="why"><i class="sd"></i><span><b>Em risco</b> — 2 encontros atrasados (6º e 7º) · registro do 5º pendente · <span class="rec">último encontro há 26 dias</span></span></p>
+        <div class="dmeta"><span class="segwrap"><span class="segs" role="img" aria-label="5 de 16 encontros"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><em style="left:44%"></em></span><b class="frac">5/16</b><span class="esp">esp. 7</span><span class="badge b-reg">Regular</span></div>
+      </article>
+
+      <article class="dcard s-risco">
+        <div class="dhead">
+          <div class="avas" aria-hidden="true"><span class="av av-j">LF</span><span class="av av-m">CD</span></div>
+          <div class="dn"><div class="nm"><b>Lucas Ferreira</b><span class="amp">&amp;</span><b>Camila Duarte</b><span class="tur">T2</span></div><small>encontros qua 19h · sem supervisor</small></div>
+          <div class="dacts"><span class="wa"><button class="wa-b" type="button" aria-haspopup="menu" aria-label="Lembrar Camila Duarte — notificação + WhatsApp"><svg class="wa-g" viewBox="0 0 24 24"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91S17.5 2 12.04 2zm0 18.15a8.2 8.2 0 01-4.19-1.15l-.3-.18-3.12.82.83-3.04-.2-.31a8.22 8.22 0 116.98 3.86zm4.52-6.14c-.25-.12-1.47-.72-1.7-.8-.23-.09-.39-.13-.56.12-.16.24-.64.8-.78.97-.14.16-.29.18-.54.06-.25-.12-1.05-.39-1.99-1.23-.74-.66-1.23-1.47-1.38-1.72-.14-.25-.02-.38.11-.51.11-.11.25-.29.37-.43.12-.14.16-.25.25-.41.08-.17.04-.31-.02-.43-.06-.12-.56-1.34-.76-1.84-.2-.48-.41-.42-.56-.43h-.48c-.16 0-.43.06-.66.31-.22.25-.86.85-.86 2.07 0 1.22.89 2.4 1.01 2.56.12.17 1.75 2.67 4.23 3.74.59.26 1.05.41 1.41.52.59.19 1.13.16 1.56.1.48-.07 1.47-.6 1.67-1.18.21-.58.21-1.07.15-1.18-.06-.1-.23-.16-.48-.28z"/></svg><span class="wa-t">Lembrar</span><svg class="wa-ct" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button></span><a class="ficha" href="#" aria-label="Ver ficha"><span class="ft">Ver ficha</span><svg class="ic" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></a></div>
+        </div>
+        <p class="why"><i class="sd"></i><span><b>Em risco</b> — avaliação baixa + dificuldade: "mentorado não responde" · 1 atrasado · <span class="rec">último há 19 dias</span></span></p>
+        <div class="dmeta"><span class="segwrap"><span class="segs" role="img" aria-label="3 de 16 encontros"><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><em style="left:25%"></em></span><b class="frac">3/16</b><span class="esp">esp. 4</span><span class="badge b-baixa">Baixa</span></div>
+      </article>
+
+      <article class="dcard s-atencao">
+        <div class="dhead">
+          <div class="avas" aria-hidden="true"><span class="av av-j">CM</span><span class="av av-m">AL</span></div>
+          <div class="dn"><div class="nm"><b>Caio Martins</b><span class="amp">&amp;</span><b>André Lima</b><span class="tur">T2</span><span class="tchip info">pedido no mural</span></div><small>encontros qua 19h · sup. Paula Nunes</small></div>
+          <div class="dacts"><span class="wa"><button class="wa-b" type="button" aria-haspopup="menu" aria-label="Lembrar André Lima — notificação + WhatsApp"><svg class="wa-g" viewBox="0 0 24 24"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91S17.5 2 12.04 2zm0 18.15a8.2 8.2 0 01-4.19-1.15l-.3-.18-3.12.82.83-3.04-.2-.31a8.22 8.22 0 116.98 3.86zm4.52-6.14c-.25-.12-1.47-.72-1.7-.8-.23-.09-.39-.13-.56.12-.16.24-.64.8-.78.97-.14.16-.29.18-.54.06-.25-.12-1.05-.39-1.99-1.23-.74-.66-1.23-1.47-1.38-1.72-.14-.25-.02-.38.11-.51.11-.11.25-.29.37-.43.12-.14.16-.25.25-.41.08-.17.04-.31-.02-.43-.06-.12-.56-1.34-.76-1.84-.2-.48-.41-.42-.56-.43h-.48c-.16 0-.43.06-.66.31-.22.25-.86.85-.86 2.07 0 1.22.89 2.4 1.01 2.56.12.17 1.75 2.67 4.23 3.74.59.26 1.05.41 1.41.52.59.19 1.13.16 1.56.1.48-.07 1.47-.6 1.67-1.18.21-.58.21-1.07.15-1.18-.06-.1-.23-.16-.48-.28z"/></svg><span class="wa-t">Lembrar</span><svg class="wa-ct" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button></span><a class="ficha" href="#" aria-label="Ver ficha"><span class="ft">Ver ficha</span><svg class="ic" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></a></div>
+        </div>
+        <p class="why"><i class="sd"></i><span><b>Atenção</b> — registro do 4º pendente <span class="rec">há 6 dias</span> · próximo amanhã (qua) 19h · trilha "Finanças" no mural há 7 dias</span></p>
+        <div class="dmeta"><span class="segwrap"><span class="segs" role="img" aria-label="4 de 16 encontros"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><em style="left:25%"></em></span><b class="frac">4/16</b><span class="esp">esp. 4</span><span class="badge b-boa">Boa</span></div>
+      </article>
+
+      <article class="dcard s-atencao">
+        <div class="dhead">
+          <div class="avas" aria-hidden="true"><span class="av av-j">PS</span><span class="av av-m">JM</span></div>
+          <div class="dn"><div class="nm"><b>Pedro Santos</b><span class="amp">&amp;</span><b>Juliana Matos</b><span class="tur">T1</span></div><small>encontros ter 19h · sup. Paula Nunes</small></div>
+          <div class="dacts"><span class="wa"><button class="wa-b" type="button" aria-haspopup="menu" aria-label="Lembrar Juliana Matos — notificação + WhatsApp"><svg class="wa-g" viewBox="0 0 24 24"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91S17.5 2 12.04 2zm0 18.15a8.2 8.2 0 01-4.19-1.15l-.3-.18-3.12.82.83-3.04-.2-.31a8.22 8.22 0 116.98 3.86zm4.52-6.14c-.25-.12-1.47-.72-1.7-.8-.23-.09-.39-.13-.56.12-.16.24-.64.8-.78.97-.14.16-.29.18-.54.06-.25-.12-1.05-.39-1.99-1.23-.74-.66-1.23-1.47-1.38-1.72-.14-.25-.02-.38.11-.51.11-.11.25-.29.37-.43.12-.14.16-.25.25-.41.08-.17.04-.31-.02-.43-.06-.12-.56-1.34-.76-1.84-.2-.48-.41-.42-.56-.43h-.48c-.16 0-.43.06-.66.31-.22.25-.86.85-.86 2.07 0 1.22.89 2.4 1.01 2.56.12.17 1.75 2.67 4.23 3.74.59.26 1.05.41 1.41.52.59.19 1.13.16 1.56.1.48-.07 1.47-.6 1.67-1.18.21-.58.21-1.07.15-1.18-.06-.1-.23-.16-.48-.28z"/></svg><span class="wa-t">Lembrar</span><svg class="wa-ct" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button></span><a class="ficha" href="#" aria-label="Ver ficha"><span class="ft">Ver ficha</span><svg class="ic" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></a></div>
+        </div>
+        <p class="why"><i class="sd"></i><span><b>Atenção</b> — encaminhamento vencido <span class="rec">há 5 dias</span> · encontros em dia</span></p>
+        <div class="dmeta"><span class="segwrap"><span class="segs" role="img" aria-label="7 de 16 encontros"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><em style="left:44%"></em></span><b class="frac">7/16</b><span class="esp">esp. 7</span><span class="badge b-reg">Regular</span></div>
+      </article>
+
+      <article class="dcard s-atencao">
+        <div class="dhead">
+          <div class="avas" aria-hidden="true"><span class="av av-j">TA</span><span class="av av-m">BR</span></div>
+          <div class="dn"><div class="nm"><b>Tainá Alves</b><span class="amp">&amp;</span><b>Bruno Reis</b><span class="tur">T1</span></div><small>encontros ter 19h · sup. Paula Nunes</small></div>
+          <div class="dacts"><span class="wa"><button class="wa-b" type="button" aria-haspopup="menu" aria-label="Lembrar Bruno Reis — notificação + WhatsApp"><svg class="wa-g" viewBox="0 0 24 24"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91S17.5 2 12.04 2zm0 18.15a8.2 8.2 0 01-4.19-1.15l-.3-.18-3.12.82.83-3.04-.2-.31a8.22 8.22 0 116.98 3.86zm4.52-6.14c-.25-.12-1.47-.72-1.7-.8-.23-.09-.39-.13-.56.12-.16.24-.64.8-.78.97-.14.16-.29.18-.54.06-.25-.12-1.05-.39-1.99-1.23-.74-.66-1.23-1.47-1.38-1.72-.14-.25-.02-.38.11-.51.11-.11.25-.29.37-.43.12-.14.16-.25.25-.41.08-.17.04-.31-.02-.43-.06-.12-.56-1.34-.76-1.84-.2-.48-.41-.42-.56-.43h-.48c-.16 0-.43.06-.66.31-.22.25-.86.85-.86 2.07 0 1.22.89 2.4 1.01 2.56.12.17 1.75 2.67 4.23 3.74.59.26 1.05.41 1.41.52.59.19 1.13.16 1.56.1.48-.07 1.47-.6 1.67-1.18.21-.58.21-1.07.15-1.18-.06-.1-.23-.16-.48-.28z"/></svg><span class="wa-t">Lembrar</span><svg class="wa-ct" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button></span><a class="ficha" href="#" aria-label="Ver ficha"><span class="ft">Ver ficha</span><svg class="ic" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></a></div>
+        </div>
+        <p class="why"><i class="sd"></i><span><b>Atenção</b> — 1 encontro atrasado (7º) · <span class="rec">último encontro há 13 dias</span></span></p>
+        <div class="dmeta"><span class="segwrap"><span class="segs" role="img" aria-label="6 de 16 encontros"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><em style="left:44%"></em></span><b class="frac">6/16</b><span class="esp">esp. 7</span><span class="badge b-boa">Boa</span></div>
+      </article>
+
+      <!-- EM ANDAMENTO — destaques -->
+      <article class="dcard s-ok">
+        <div class="dhead">
+          <div class="avas" aria-hidden="true"><span class="av av-j">AS</span><span class="av av-m">AL</span></div>
+          <div class="dn"><div class="nm"><b>Ana Souza</b><span class="amp">&amp;</span><b>André Lima</b><span class="tur">T1</span><span class="tchip">Trilha 3/5</span></div><small>encontros ter 19h · sup. Paula Nunes</small></div>
+          <div class="dacts"><span class="wa"><button class="wa-b" type="button" aria-haspopup="menu" aria-label="Chamar André Lima no WhatsApp"><svg class="wa-g" viewBox="0 0 24 24"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91S17.5 2 12.04 2zm0 18.15a8.2 8.2 0 01-4.19-1.15l-.3-.18-3.12.82.83-3.04-.2-.31a8.22 8.22 0 116.98 3.86zm4.52-6.14c-.25-.12-1.47-.72-1.7-.8-.23-.09-.39-.13-.56.12-.16.24-.64.8-.78.97-.14.16-.29.18-.54.06-.25-.12-1.05-.39-1.99-1.23-.74-.66-1.23-1.47-1.38-1.72-.14-.25-.02-.38.11-.51.11-.11.25-.29.37-.43.12-.14.16-.25.25-.41.08-.17.04-.31-.02-.43-.06-.12-.56-1.34-.76-1.84-.2-.48-.41-.42-.56-.43h-.48c-.16 0-.43.06-.66.31-.22.25-.86.85-.86 2.07 0 1.22.89 2.4 1.01 2.56.12.17 1.75 2.67 4.23 3.74.59.26 1.05.41 1.41.52.59.19 1.13.16 1.56.1.48-.07 1.47-.6 1.67-1.18.21-.58.21-1.07.15-1.18-.06-.1-.23-.16-.48-.28z"/></svg><span class="wa-t">Chamar</span><svg class="wa-ct" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button></span><a class="ficha" href="#" aria-label="Ver ficha"><span class="ft">Ver ficha</span><svg class="ic" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></a></div>
+        </div>
+        <p class="why"><i class="sd"></i><span><b>Em andamento</b> — em dia · enc. 8 hoje 19h (Meet) · trilha com Luísa Prado: sessão 3 de 5 sex 16h</span></p>
+        <div class="dmeta"><span class="segwrap"><span class="segs" role="img" aria-label="7 de 16 encontros"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><em style="left:44%"></em></span><b class="frac">7/16</b><span class="esp">esp. 7</span><span class="badge b-exc">Excelente</span></div>
+      </article>
+
+      <article class="dcard s-ok">
+        <div class="dhead">
+          <div class="avas" aria-hidden="true"><span class="av av-j">PR</span><span class="av av-m">RG</span></div>
+          <div class="dn"><div class="nm"><b>Pedro Ramos</b><span class="amp">&amp;</span><b>Renata Gomes</b><span class="tur">T2</span><span class="tchip">Trilha 1/5</span></div><small>encontros qua 19h · sem supervisor</small></div>
+          <div class="dacts"><span class="wa"><button class="wa-b" type="button" aria-haspopup="menu" aria-label="Chamar Renata Gomes no WhatsApp"><svg class="wa-g" viewBox="0 0 24 24"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91S17.5 2 12.04 2zm0 18.15a8.2 8.2 0 01-4.19-1.15l-.3-.18-3.12.82.83-3.04-.2-.31a8.22 8.22 0 116.98 3.86zm4.52-6.14c-.25-.12-1.47-.72-1.7-.8-.23-.09-.39-.13-.56.12-.16.24-.64.8-.78.97-.14.16-.29.18-.54.06-.25-.12-1.05-.39-1.99-1.23-.74-.66-1.23-1.47-1.38-1.72-.14-.25-.02-.38.11-.51.11-.11.25-.29.37-.43.12-.14.16-.25.25-.41.08-.17.04-.31-.02-.43-.06-.12-.56-1.34-.76-1.84-.2-.48-.41-.42-.56-.43h-.48c-.16 0-.43.06-.66.31-.22.25-.86.85-.86 2.07 0 1.22.89 2.4 1.01 2.56.12.17 1.75 2.67 4.23 3.74.59.26 1.05.41 1.41.52.59.19 1.13.16 1.56.1.48-.07 1.47-.6 1.67-1.18.21-.58.21-1.07.15-1.18-.06-.1-.23-.16-.48-.28z"/></svg><span class="wa-t">Chamar</span><svg class="wa-ct" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button></span><a class="ficha" href="#" aria-label="Ver ficha"><span class="ft">Ver ficha</span><svg class="ic" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></a></div>
+        </div>
+        <p class="why"><i class="sd"></i><span><b>Em andamento</b> — em dia · enc. 5 amanhã (qua) 19h · trilha com Luísa: sessão 1 a confirmar</span></p>
+        <div class="dmeta"><span class="segwrap"><span class="segs" role="img" aria-label="4 de 16 encontros"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><em style="left:25%"></em></span><b class="frac">4/16</b><span class="esp">esp. 4</span><span class="badge b-boa">Boa</span></div>
+      </article>
+
+      <article class="dcard s-ok">
+        <div class="dhead">
+          <div class="avas" aria-hidden="true"><span class="av av-j">BR</span><span class="av av-m">PM</span></div>
+          <div class="dn"><div class="nm"><b>Beatriz Ramos</b><span class="amp">&amp;</span><b>Patrícia Mendes</b><span class="tur">T2</span></div><small>encontros qua 19h · sup. Paula Nunes</small></div>
+          <div class="dacts"><span class="wa"><button class="wa-b" type="button" aria-haspopup="menu" aria-label="Chamar Patrícia Mendes no WhatsApp"><svg class="wa-g" viewBox="0 0 24 24"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91S17.5 2 12.04 2zm0 18.15a8.2 8.2 0 01-4.19-1.15l-.3-.18-3.12.82.83-3.04-.2-.31a8.22 8.22 0 116.98 3.86zm4.52-6.14c-.25-.12-1.47-.72-1.7-.8-.23-.09-.39-.13-.56.12-.16.24-.64.8-.78.97-.14.16-.29.18-.54.06-.25-.12-1.05-.39-1.99-1.23-.74-.66-1.23-1.47-1.38-1.72-.14-.25-.02-.38.11-.51.11-.11.25-.29.37-.43.12-.14.16-.25.25-.41.08-.17.04-.31-.02-.43-.06-.12-.56-1.34-.76-1.84-.2-.48-.41-.42-.56-.43h-.48c-.16 0-.43.06-.66.31-.22.25-.86.85-.86 2.07 0 1.22.89 2.4 1.01 2.56.12.17 1.75 2.67 4.23 3.74.59.26 1.05.41 1.41.52.59.19 1.13.16 1.56.1.48-.07 1.47-.6 1.67-1.18.21-.58.21-1.07.15-1.18-.06-.1-.23-.16-.48-.28z"/></svg><span class="wa-t">Chamar</span><svg class="wa-ct" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button></span><a class="ficha" href="#" aria-label="Ver ficha"><span class="ft">Ver ficha</span><svg class="ic" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></a></div>
+        </div>
+        <p class="why"><i class="sd"></i><span><b>Em andamento</b> — em dia · PDM entregue no 3º encontro</span></p>
+        <div class="dmeta"><span class="segwrap"><span class="segs" role="img" aria-label="4 de 16 encontros"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><em style="left:25%"></em></span><b class="frac">4/16</b><span class="esp">esp. 4</span><span class="badge b-exc">Excelente</span></div>
+      </article>
+    </div>
+
+    <!-- massa saudável colapsada -->
+    <details class="massa">
+      <summary>Mostrar as outras 16 duplas em andamento</summary>
+      <div class="mini"><span><b>Dupla T1-02</b><span class="tur2">T1</span></span><span class="m-prog"><span class="mbar"><i style="width:44%"></i><em style="left:44%"></em></span>7/16 · esp. 7</span><span class="m-r">último há 6 dias</span><a class="m-l" href="#">Ver ficha ›</a></div>
+      <div class="mini"><span><b>Dupla T1-04</b><span class="tur2">T1</span></span><span class="m-prog"><span class="mbar"><i style="width:44%"></i><em style="left:44%"></em></span>7/16 · esp. 7</span><span class="m-r">último há 7 dias</span><a class="m-l" href="#">Ver ficha ›</a></div>
+      <div class="mini"><span><b>Dupla T1-06</b><span class="tur2">T1</span></span><span class="m-prog"><span class="mbar"><i style="width:44%"></i><em style="left:44%"></em></span>7/16 · esp. 7</span><span class="m-r">último há 7 dias</span><a class="m-l" href="#">Ver ficha ›</a></div>
+      <div class="mini"><span><b>Dupla T1-08</b><span class="tur2">T1</span></span><span class="m-prog"><span class="mbar"><i style="width:44%"></i><em style="left:44%"></em></span>7/16 · esp. 7</span><span class="m-r">último há 8 dias</span><a class="m-l" href="#">Ver ficha ›</a></div>
+      <div class="mini"><span><b>Dupla T1-10</b><span class="tur2">T1</span></span><span class="m-prog"><span class="mbar"><i style="width:38%"></i><em style="left:44%"></em></span>6/16 · esp. 7</span><span class="m-r">último há 6 dias</span><a class="m-l" href="#">Ver ficha ›</a></div>
+      <div class="mini"><span><b>Dupla T1-12</b><span class="tur2">T1</span></span><span class="m-prog"><span class="mbar"><i style="width:44%"></i><em style="left:44%"></em></span>7/16 · esp. 7</span><span class="m-r">último há 7 dias</span><a class="m-l" href="#">Ver ficha ›</a></div>
+      <div class="mini"><span><b>Dupla T1-14</b><span class="tur2">T1</span></span><span class="m-prog"><span class="mbar"><i style="width:44%"></i><em style="left:44%"></em></span>7/16 · esp. 7</span><span class="m-r">último há 7 dias</span><a class="m-l" href="#">Ver ficha ›</a></div>
+      <div class="mini"><span><b>Dupla T1-15</b><span class="tur2">T1</span></span><span class="m-prog"><span class="mbar"><i style="width:44%"></i><em style="left:44%"></em></span>7/16 · esp. 7</span><span class="m-r">último há 7 dias</span><a class="m-l" href="#">Ver ficha ›</a></div>
+      <div class="mini"><span><b>Dupla T2-01</b><span class="tur2">T2</span></span><span class="m-prog"><span class="mbar"><i style="width:25%"></i><em style="left:25%"></em></span>4/16 · esp. 4</span><span class="m-r">último há 5 dias</span><a class="m-l" href="#">Ver ficha ›</a></div>
+      <div class="mini"><span><b>Dupla T2-03</b><span class="tur2">T2</span></span><span class="m-prog"><span class="mbar"><i style="width:25%"></i><em style="left:25%"></em></span>4/16 · esp. 4</span><span class="m-r">último há 6 dias</span><a class="m-l" href="#">Ver ficha ›</a></div>
+      <div class="mini"><span><b>Dupla T2-05</b><span class="tur2">T2</span></span><span class="m-prog"><span class="mbar"><i style="width:25%"></i><em style="left:25%"></em></span>4/16 · esp. 4</span><span class="m-r">último há 6 dias</span><a class="m-l" href="#">Ver ficha ›</a></div>
+      <div class="mini"><span><b>Dupla T2-07</b><span class="tur2">T2</span></span><span class="m-prog"><span class="mbar"><i style="width:25%"></i><em style="left:25%"></em></span>4/16 · esp. 4</span><span class="m-r">último há 6 dias</span><a class="m-l" href="#">Ver ficha ›</a></div>
+      <div class="mini"><span><b>Dupla T2-08</b><span class="tur2">T2</span></span><span class="m-prog"><span class="mbar"><i style="width:25%"></i><em style="left:25%"></em></span>4/16 · esp. 4</span><span class="m-r">último há 6 dias</span><a class="m-l" href="#">Ver ficha ›</a></div>
+      <div class="mini"><span><b>Dupla T2-09</b><span class="tur2">T2</span></span><span class="m-prog"><span class="mbar"><i style="width:25%"></i><em style="left:25%"></em></span>4/16 · esp. 4</span><span class="m-r">último há 7 dias</span><a class="m-l" href="#">Ver ficha ›</a></div>
+      <div class="mini"><span><b>Dupla T2-11</b><span class="tur2">T2</span></span><span class="m-prog"><span class="mbar"><i style="width:25%"></i><em style="left:25%"></em></span>4/16 · esp. 4</span><span class="m-r">último há 7 dias</span><a class="m-l" href="#">Ver ficha ›</a></div>
+      <div class="mini"><span><b>Dupla T2-13</b><span class="tur2">T2</span></span><span class="m-prog"><span class="mbar"><i style="width:25%"></i><em style="left:25%"></em></span>4/16 · esp. 4</span><span class="m-r">último há 7 dias</span><a class="m-l" href="#">Ver ficha ›</a></div>
+    </details>
+
+    <div class="dgrid" style="margin-top:.65rem">
+      <article class="dcard s-pausa">
+        <div class="dhead">
+          <div class="avas" aria-hidden="true"><span class="av av-j">GN</span><span class="av av-m">FC</span></div>
+          <div class="dn"><div class="nm"><b>Gabriel Nunes</b><span class="amp">&amp;</span><b>Fernando Costa</b><span class="tur">T2</span></div><small>encontros qua 19h · sup. Paula Nunes</small></div>
+          <div class="dacts"><a class="ficha" href="#" aria-label="Ver ficha"><span class="ft">Ver ficha</span><svg class="ic" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></a></div>
+        </div>
+        <p class="why"><i class="sd"></i><span><b>Pausada</b> — no 3º encontro desde 12/set · retorno a combinar</span></p>
+        <div class="dmeta"><span class="segwrap"><span class="segs" role="img" aria-label="3 de 16 encontros"><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span></span><b class="frac">3/16</b><span class="esp">em pausa</span><span class="badge b-boa">Boa</span></div>
+      </article>
+    </div>
+
+    <details class="leg">
+      <summary>Como o semáforo é calculado</summary>
+      <div class="leg-b">
+        <div class="l-r"><h3>Em risco</h3><p>2+ encontros atrasados, <b>ou</b> avaliação baixa + dificuldade.</p></div>
+        <div class="l-a"><h3>Atenção</h3><p>1 atraso, avaliação baixa, dificuldade, registro pendente ou encaminhamento vencido.</p></div>
+        <div class="l-o"><h3>Em andamento</h3><p>Encontros em dia, sem sinais abertos. Pausada sai da conta.</p></div>
+        <div class="l-p"><h3>Apoio — eixo separado</h3><p>Pedido de apoio é chamado à coordenação: <b>trabalho a fazer, não falha</b>.</p></div>
+        <div><h3>Segmentos de encontros</h3><p>Cada quadradinho = 1 encontro do ciclo (16). O traço marca onde o calendário da turma já esperava estar — T2 começou 3 semanas depois.</p></div>
+      </div>
+    </details>
+
+    <ul class="notes" id="notas">
+      <li><b>Variante mini-card (v6b):</b> mesma informação da v6a, leitura mais visual — cards de ~2 colunas no desktop. Anatomia: faixa lateral colorida no estado + avatares/nomes/turma + ações no topo do card (WhatsApp + ficha) + linha de status em texto corrido ("Em risco — 2 encontros atrasados…") + meta-line com mini-barra de segmentos 1–16, fração "5/16", esperado e avaliação. Altura ~3 linhas, compacto — não virou card gigante.</li>
+      <li><b>Do feedback de out/2026</b> (<code>docs/planos/feedback-ux-2026-10/visao-geral-duplas.md</code>): (a) <b>sem faixa-footer</b> — a ação WhatsApp mora no topo-direita do card; (b) <b>resumo agregado no topo</b> — barra proporcional 2/3/19/1 + apoio como eixo separado + cronograma T1/T2; (c) encontros em <b>segmentos 1–16</b> com marca do esperado — "4/16" nunca texto solto; (d) WhatsApp mobile = <b>quadrado verde #25D366 só com símbolo + chevron</b>.</li>
+      <li><b>Convenção "filtros sempre animam" (requisito de implementação — o mock é estático):</b> trocar chip, filtro ou digitar na busca NUNCA repinta a lista seco — itens entram/saem com FLIP ou fade+slide escalonado (≤300ms, stagger ~20–30ms); na grade de cards o FLIP reordena suave. <code>prefers-reduced-motion</code> desliga. Registrar em <code>AGENTS.md</code>.</li>
+      <li><b>SiteFooter real (fora deste mock, mas decidido):</b> o rodapé do app fica — o que morre é a faixa inferior do item. Shell das rotas <code>(app)</code> com <code>min-h-dvh</code> + conteúdo <code>flex-1</code>: footer sempre encostado na borda inferior do viewport ou abaixo da dobra, nunca flutuando em página vazia.</li>
+      <li><b>Contrato do botão WhatsApp:</b> "Lembrar" (só onde há pendência apontável) = notificação in-app + abre wa.me; cap de 48h → "Lembrada dd/mm" desabilitado. Nas duplas em dia vira "Chamar" (contato sem nudge). Chevron abre o menu: <b>Abrir wa.me / Copiar mensagem / Ver texto</b> (menu aberto de propósito no 1º card). Sem telefone → ícone desabilitado.</li>
+      <li><b>Apoio é eixo separado:</b> primeiro na fila, spine azul + pill "Apoio" junto do estado real; ação = "Abrir chamado".</li>
+      <li class="warn"><b>Escopo por papel (não vai pra tela):</b> coordenação = 26 duplas, todos os filtros, Nova dupla, Lembrar/Chamar e link pro chamado · auxiliar = só as 6 supervisionadas agrupadas por turma, "Registrar supervisão", sem Nova dupla nem nudge/WA. Mentor DPP e especialista já têm visões resolvidas na v5 e não entram nesta rodada.</li>
+      <li class="warn"><b>Decisões em aberto:</b> (a) segmentos da barra-resumo filtram ao clicar ou ficam só informativos?; (b) "Chamar" sempre visível nas duplas em dia × esconder até haver pendência; (c) sem cabeçalho de colunas, o rótulo de cada dado fica implícito — se faltar clareza, a v6a (tabela) é a resposta; (d) na massa saudável a mini-barra substitui "7×7 em dia"; (e) "Ver texto da mensagem" abre popover ou sheet.</li>
+    </ul>
+  </main>
+
+  <nav class="bnav v1" aria-label="Navegação">
+    <a href="#"><svg class="ic"><use href="#i-cal"/></svg>Agenda</a>
+    <a href="#" class="on" aria-current="page"><svg class="ic"><use href="#i-users"/></svg>Duplas</a>
+    <a href="#"><svg class="ic"><use href="#i-users"/></svg>Pessoas</a>
+    <a href="#"><svg class="ic"><use href="#i-help"/></svg>Chamados</a>
+    <a href="#"><svg class="ic"><use href="#i-folder"/></svg>Materiais</a>
+  </nav>
+
+  <!-- ============================ AUXILIAR EXECUTIVO ============================ -->
+  <div class="topbar v2"><div class="topbar-in">
+    <a class="brand" href="#"><span class="brand-mark" aria-hidden="true"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="hsl(78 60% 20%)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21v-9"/><path d="M12 12c0-3.9 2.7-6.5 6.5-6.5 0 3.8-2.7 6.5-6.5 6.5z"/><path d="M12 12c0-3.9-2.7-6.5-6.5-6.5 0 3.8 2.7 6.5 6.5 6.5z"/></svg></span><span class="brand-name">realiza<span>.vc</span></span></a>
+    <nav class="topnav" aria-label="Principal"><a href="#">Início</a><a href="#" class="is-on" aria-current="page">Duplas</a><a href="#">Agenda</a><a href="#">Chamados</a><a href="#">Supervisões</a></nav>
+    <div class="user"><div class="user-id"><b>Paula Nunes</b><small>Auxiliar executivo</small></div><span class="uav" aria-hidden="true">PN</span></div>
+  </div></div>
+
+  <main class="wrap v2">
+    <div class="page-head">
+      <div>
+        <h1>Duplas que você supervisiona</h1>
+        <p class="sub">6 duplas · semana 41 · hoje é terça, 7 de outubro</p>
+      </div>
+      <div class="head-actions">
+        <div class="search" role="search"><svg class="ic" width="15" height="15" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>Buscar dupla…</div>
+      </div>
+    </div>
+
+    <section class="sum" aria-label="Resumo do semáforo das supervisionadas">
+      <div class="s-l">
+        <div class="s-t"><span>Semáforo — 6 supervisionadas</span></div>
+        <div class="sbar" role="img" aria-label="6 duplas: 1 em risco, 2 em atenção, 3 em andamento">
+          <a class="sb-r" style="flex:1" href="#" title="Em risco — 1 dupla">1</a>
+          <a class="sb-a" style="flex:2" href="#" title="Atenção — 2 duplas">2</a>
+          <a class="sb-o" style="flex:3" href="#" title="Em andamento — 3 duplas">3</a>
+        </div>
+        <p class="s-cap"><span><i class="d" style="background:var(--danger)"></i><b>1</b> em risco</span><span><i class="d" style="background:var(--warn)"></i><b>2</b> em atenção</span><span><i class="d" style="background:var(--ok)"></i><b>3</b> em andamento</span></p>
+      </div>
+      <div class="s-r">
+        <span class="cron"><span class="tt">T1</span> encontro <b>8 de 16</b> <span class="cbar"><i style="width:50%"></i></span> 3 duplas</span>
+        <span class="cron"><span class="tt">T2</span> encontro <b>5 de 16</b> <span class="cbar"><i style="width:31%"></i></span> 3 duplas</span>
+        <span class="cron-note">T2 começou 3 semanas depois — não é atraso.</span>
+      </div>
+    </section>
+
+    <div class="ghead">Turma 1 · terças <small>encontro 8 é esta semana (hoje, ter 7/out)</small></div>
+    <div class="dgrid">
+      <article class="dcard s-risco">
+        <div class="dhead">
+          <div class="avas" aria-hidden="true"><span class="av av-j">ML</span><span class="av av-m">RA</span></div>
+          <div class="dn"><div class="nm"><b>Mariana Lopes</b><span class="amp">&amp;</span><b>Roberto Alves</b><span class="tur">T1</span></div><small>encontros ter 19h</small></div>
+          <div class="dacts"><a class="supv" href="#"><svg class="ic" viewBox="0 0 24 24"><use href="#i-clip"/></svg><span class="sv-l">Registrar supervisão</span><span class="sv-s">Supervisão</span></a><a class="ficha" href="#" aria-label="Ver ficha"><span class="ft">Ver ficha</span><svg class="ic" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></a></div>
+        </div>
+        <p class="why"><i class="sd"></i><span><b>Em risco</b> — 2 encontros atrasados (6º e 7º) · registro do 5º pendente · <span class="rec">último há 26 dias</span></span></p>
+        <div class="dmeta"><span class="segwrap"><span class="segs" role="img" aria-label="5 de 16 encontros"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><em style="left:44%"></em></span><b class="frac">5/16</b><span class="esp">esp. 7</span><span class="badge b-reg">Regular</span></div>
+      </article>
+
+      <article class="dcard s-ok">
+        <div class="dhead">
+          <div class="avas" aria-hidden="true"><span class="av av-j">AS</span><span class="av av-m">AL</span></div>
+          <div class="dn"><div class="nm"><b>Ana Souza</b><span class="amp">&amp;</span><b>André Lima</b><span class="tur">T1</span><span class="tchip">Trilha 3/5</span></div><small>encontros ter 19h</small></div>
+          <div class="dacts"><a class="supv" href="#"><svg class="ic" viewBox="0 0 24 24"><use href="#i-clip"/></svg><span class="sv-l">Registrar supervisão</span><span class="sv-s">Supervisão</span></a><a class="ficha" href="#" aria-label="Ver ficha"><span class="ft">Ver ficha</span><svg class="ic" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></a></div>
+        </div>
+        <p class="why"><i class="sd"></i><span><b>Em andamento</b> — em dia · enc. 8 hoje 19h (Meet) · trilha com Luísa: sessão 3 de 5</span></p>
+        <div class="dmeta"><span class="segwrap"><span class="segs" role="img" aria-label="7 de 16 encontros"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><em style="left:44%"></em></span><b class="frac">7/16</b><span class="esp">esp. 7</span><span class="badge b-exc">Excelente</span></div>
+      </article>
+
+      <article class="dcard s-ok">
+        <div class="dhead">
+          <div class="avas" aria-hidden="true"><span class="av av-j">LA</span><span class="av av-m">MS</span></div>
+          <div class="dn"><div class="nm"><b>Laura Almeida</b><span class="amp">&amp;</span><b>Marcos Silva</b><span class="tur">T1</span></div><small>encontros ter 19h</small></div>
+          <div class="dacts"><a class="supv" href="#"><svg class="ic" viewBox="0 0 24 24"><use href="#i-clip"/></svg><span class="sv-l">Registrar supervisão</span><span class="sv-s">Supervisão</span></a><a class="ficha" href="#" aria-label="Ver ficha"><span class="ft">Ver ficha</span><svg class="ic" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></a></div>
+        </div>
+        <p class="why"><i class="sd"></i><span><b>Em andamento</b> — em dia · <span class="rec">último encontro há 6 dias</span></span></p>
+        <div class="dmeta"><span class="segwrap"><span class="segs" role="img" aria-label="7 de 16 encontros"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><em style="left:44%"></em></span><b class="frac">7/16</b><span class="esp">esp. 7</span><span class="badge b-boa">Boa</span></div>
+      </article>
+    </div>
+
+    <div class="ghead">Turma 2 · quartas <small>começou 3 semanas depois — esta semana é o encontro 5 (amanhã, qua 8/out)</small></div>
+    <div class="dgrid">
+      <article class="dcard s-atencao">
+        <div class="dhead">
+          <div class="avas" aria-hidden="true"><span class="av av-j">CM</span><span class="av av-m">AL</span></div>
+          <div class="dn"><div class="nm"><b>Caio Martins</b><span class="amp">&amp;</span><b>André Lima</b><span class="tur">T2</span><span class="tchip info">pedido no mural</span></div><small>encontros qua 19h</small></div>
+          <div class="dacts"><a class="supv" href="#"><svg class="ic" viewBox="0 0 24 24"><use href="#i-clip"/></svg><span class="sv-l">Registrar supervisão</span><span class="sv-s">Supervisão</span></a><a class="ficha" href="#" aria-label="Ver ficha"><span class="ft">Ver ficha</span><svg class="ic" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></a></div>
+        </div>
+        <p class="why"><i class="sd"></i><span><b>Atenção</b> — registro do 4º pendente <span class="rec">há 6 dias</span> · próximo amanhã 19h · pedido "Finanças" no mural há 7 dias</span></p>
+        <div class="dmeta"><span class="segwrap"><span class="segs" role="img" aria-label="4 de 16 encontros"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><em style="left:25%"></em></span><b class="frac">4/16</b><span class="esp">esp. 4</span><span class="badge b-boa">Boa</span></div>
+      </article>
+
+      <article class="dcard s-atencao">
+        <div class="dhead">
+          <div class="avas" aria-hidden="true"><span class="av av-j">JS</span><span class="av av-m">RF</span></div>
+          <div class="dn"><div class="nm"><b>João Santos</b><span class="amp">&amp;</span><b>Rafael Freitas</b><span class="tur">T2</span></div><small>encontros qua 19h</small></div>
+          <div class="dacts"><a class="supv" href="#"><svg class="ic" viewBox="0 0 24 24"><use href="#i-clip"/></svg><span class="sv-l">Registrar supervisão</span><span class="sv-s">Supervisão</span></a><a class="ficha" href="#" aria-label="Ver ficha"><span class="ft">Ver ficha</span><svg class="ic" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></a></div>
+        </div>
+        <p class="why"><i class="sd"></i><span><b>Atenção</b> — encaminhamento da coordenação vencido <span class="rec">há 5 dias</span> · encontros em dia</span></p>
+        <div class="dmeta"><span class="segwrap"><span class="segs" role="img" aria-label="4 de 16 encontros"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><em style="left:25%"></em></span><b class="frac">4/16</b><span class="esp">esp. 4</span><span class="badge b-boa">Boa</span></div>
+      </article>
+
+      <article class="dcard s-ok">
+        <div class="dhead">
+          <div class="avas" aria-hidden="true"><span class="av av-j">CN</span><span class="av av-m">DO</span></div>
+          <div class="dn"><div class="nm"><b>Clara Nunes</b><span class="amp">&amp;</span><b>Diego Oliveira</b><span class="tur">T2</span></div><small>encontros qua 19h</small></div>
+          <div class="dacts"><a class="supv" href="#"><svg class="ic" viewBox="0 0 24 24"><use href="#i-clip"/></svg><span class="sv-l">Registrar supervisão</span><span class="sv-s">Supervisão</span></a><a class="ficha" href="#" aria-label="Ver ficha"><span class="ft">Ver ficha</span><svg class="ic" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></a></div>
+        </div>
+        <p class="why"><i class="sd"></i><span><b>Em andamento</b> — em dia · <span class="rec">último encontro há 6 dias</span></span></p>
+        <div class="dmeta"><span class="segwrap"><span class="segs" role="img" aria-label="4 de 16 encontros"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><em style="left:25%"></em></span><b class="frac">4/16</b><span class="esp">esp. 4</span><span class="badge b-boa">Boa</span></div>
+      </article>
+    </div>
+
+    <ul class="notes">
+      <li><b>Escopo da auxiliar (não vai pra tela):</b> só as 6 duplas supervisionadas — as outras 20 não aparecem nem em busca (RLS). Ação própria: <b>Registrar supervisão</b>; "Lembrar"/nudge é da coordenação — a área de ações dela não tem WhatsApp (mesmo padrão de compactação: botão curto no topo, sem faixa-footer).</li>
+      <li><b>Mesmas convenções da visão da coordenação:</b> segmentos 1–16 com marca do esperado, resumo agregado no topo (1/2/3), animação de filtragem ≤300ms e SiteFooter com shell <code>min-h-dvh</code>.</li>
+    </ul>
+  </main>
+
+  <nav class="bnav v2" aria-label="Navegação">
+    <a href="#"><svg class="ic"><use href="#i-home"/></svg>Início</a>
+    <a href="#" class="on" aria-current="page"><svg class="ic"><use href="#i-users"/></svg>Duplas</a>
+    <a href="#"><svg class="ic"><use href="#i-cal"/></svg>Agenda</a>
+    <a href="#"><svg class="ic"><use href="#i-help"/></svg>Chamados</a>
+    <a href="#"><svg class="ic"><use href="#i-clip"/></svg>Supervisões</a>
+  </nav>
+
+</div>
+</body>
+</html>

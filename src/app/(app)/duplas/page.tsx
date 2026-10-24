@@ -1,3 +1,4 @@
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import {
@@ -40,7 +41,7 @@ export default async function DuplasPage() {
   // sem baixar o ciclo inteiro pra filtrar em JS). Os extras são por visão:
   // alvos do dialog de supervisão (auxiliar) e os 5 passos da trilha
   // (especialista) — os demais não pagam essa leitura
-  const [lista, eventos, alvos, espEventos] = await Promise.all([
+  const [lista, eventos, alvos, espEventos, h] = await Promise.all([
     me.role === "coordenacao"
       ? getDuplas()
       : me.role === "supervisor"
@@ -56,13 +57,20 @@ export default async function DuplasPage() {
     visao === "especialista" || visao === "hibrido"
       ? getEspecialistaEventos()
       : Promise.resolve([]),
+    headers(),
   ]);
-  // o "Lembrar" da coordenação lê o cap de 48h (último nudge da dupla) —
-  // só ela renderiza o botão, os demais não pagam a leitura
+  // o "Lembrar" lê o cap de 48h (último nudge da dupla) — coordenação e
+  // auxiliar executivo renderizam o botão no próprio escopo (a RPC
+  // `enviar_lembrete` já autoriza o supervisor da dupla); os demais
+  // papéis não pagam a leitura
   const nudges =
-    visao === "coordenacao"
+    visao === "coordenacao" || visao === "supervisor"
       ? await getUltimasInteracoes(lista.map((d) => d.id), "nudge")
       : {};
+  // proto+host do deploy — o texto do Lembrar embute o link de registro
+  // ABSOLUTO (o wa.me/notificação sai do app; path relativo seria texto
+  // morto). Mesma técnica do dashboard: x-forwarded-proto + host
+  const origem = `${h.get("x-forwarded-proto") ?? "https"}://${h.get("host")}`;
 
   return (
     <DuplasLista
@@ -74,6 +82,7 @@ export default async function DuplasPage() {
       supervisaoAlvos={alvos}
       especialistaEventos={espEventos}
       nudges={nudges}
+      origem={origem}
     />
   );
 }

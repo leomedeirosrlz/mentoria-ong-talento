@@ -1,13 +1,23 @@
-// Domínio puro de /registros — o agrupamento da timeline (?grupo=). Roda no
-// server render e no vitest; os itens já chegam completos da query, então o
-// custo é só o particionamento em memória (zero round-trip a mais).
+// Domínio puro de /registros — o agrupamento da timeline (?grupo=) e o
+// panorama do ciclo (REALIZA-198). Roda no server render e no vitest; os
+// itens já chegam completos da query, então o custo é só o particionamento
+// em memória (zero round-trip a mais).
 
 import {
   AVALIACAO_LABEL,
+  eventosDoCronograma,
   formatDiaMes,
+  saudadeDaDupla,
   semanaBounds,
+  toDateStr,
 } from "@/lib/ciclo";
-import type { AvaliacaoJovem } from "@/lib/types";
+import { turmaCurta, turmaLonga } from "@/lib/turma";
+import type {
+  AvaliacaoJovem,
+  CicloEvento,
+  Cronograma,
+  Dupla,
+} from "@/lib/types";
 
 /** Eixos de agrupamento do `?grupo=` — "dupla" é o default implícito e não
  *  viaja na URL. */
@@ -128,4 +138,332 @@ export function agruparRegistros<T extends RegistroAgrupavel>(
   const residual = (b: BlocoRegistros<T>) =>
     b.chave === SEM_DUPLA || b.chave === SEM_DATA ? 1 : 0;
   return [...blocos.values()].sort((a, b) => residual(a) - residual(b));
+}
+
+// ---------- panorama do ciclo (dashboard v2, REALIZA-198) ----------
+// As regras abaixo vêm do mock aprovado (docs/mockups/registros/v2.html) e
+// do plano feedback-ux-2026-10/registros-dashboards.md. Resumo das decisões:
+//  - denominador por célula (cronograma × nº) = duplas que o encontro cobra:
+//    ativas lançadas até a data oficial OU com a linha do encontro criada
+//    (quem pausou/encerrou depois de fazê-lo continua contando; quem saiu
+//    antes de chegar ali não é cobrado — por isso o trilho "encolhe");
+//  - data oficial ANTERIOR a hoje → "vencido" (o buraco é falta real); de
+//    hoje até domingo → "semana" (hachurado "a acontecer", nunca é falta —
+//    o encontro de hoje não é falta, regra do mock); além dela → "futuro"
+//    (fora do trilho — coluna vira fantasma tracejado quando nenhuma turma
+//    chegou lá);
+//  - a linha ★ usa avaliacoes_encontro.estrelas (1–5, do jovem) — NÃO o
+//    registros.avaliacao (4-pt qualitativo do mentor, que segue nos cards);
+//  - o donut é o semáforo das duplas (saudadeDaDupla), não contagem de
+//    registros; "apoio aberto" é eixo separado: entra como fatia só quando
+//    a dupla não está em atenção/risco (precedência de leitura, uma dupla
+//    por fatia — o total sempre bate com o universo).
+
+/** Recorte de período do painel: "ciclo" é o default implícito e não viaja
+ *  na URL; "8s"/"4s" cortam as últimas N semanas pela DATA OFICIAL do
+ *  encontro (a mesma régua das colunas — não a data de entrega do registro). */
+export type PeriodoRegistros = "4s" | "8s";
+
+export const PERIODO_REGISTROS_OPCOES: {
+  valor: "ciclo" | PeriodoRegistros;
+  rotulo: string;
+}[] = [
+  { valor: "ciclo", rotulo: "Ciclo todo" },
+  { valor: "8s", rotulo: "Últimas 8 semanas" },
+  { valor: "4s", rotulo: "Últimas 4 semanas" },
+];
+
+/** `?periodo=` validado — lixo na URL cai no "ciclo" em vez de quebrar. */
+export function periodoRegistrosDe(
+  v: string | undefined
+): "ciclo" | PeriodoRegistros {
+  return v === "4s" || v === "8s" ? v : "ciclo";
+}
+
+/** Corte inferior do período em ISO date ("YYYY-MM-DD") — comparável com a
+ *  data oficial do ciclo_evento. "ciclo" não corta. */
+export function cortePeriodo(
+  p: "ciclo" | PeriodoRegistros,
+  hoje: Date
+): string | null {
+  if (p === "ciclo") return null;
+  const dias = p === "8s" ? 56 : 28;
+  return toDateStr(new Date(hoje.getTime() - dias * 86400000));
+}
+
+/** Estado da célula (cronograma × encontro) no calendário — decide entre
+ *  "falta de verdade" e "ainda não chegou": `vencido` = data oficial
+ *  anterior a hoje; `semana` = de hoje até o domingo corrente; `futuro` =
+ *  além da semana. */
+export type PanoramaEstado = "vencido" | "semana" | "futuro";
+
+export type PanoramaCelula = {
+  cronogramaId: string;
+  estado: PanoramaEstado;
+  /** data oficial do encontro neste cronograma (YYYY-MM-DD). */
+  dataOficial: string;
+  /** denominador honesto — duplas cobradas por este encontro (regra acima). */
+  esperadas: number;
+  /** com registro entregue (a métrica default das barras). */
+  entregues: number;
+  /** status realizado — aconteceu, com ou sem registro. */
+  realizados: number;
+  /** com a avaliação-estrela do jovem. */
+  avaliados: number;
+  /** notas 1–5 individuais do jovem — alimenta a nuvem "por avaliação". */
+  estrelas: number[];
+  /** avaliação qualitativa do mentor mapeada p/ número (baixa 1 …
+   *  excelente 4) — a segunda métrica da linha. */
+  notasMentor: number[];
+  /** "Mentor × Jovem" de quem devia e não entregou (só em célula vencida —
+   *  no futuro ninguém deve). Pendente = sem registro E sem fechamento do
+   *  encontro: `nao_aconteceu`/`cancelado` já encerraram o caso (o buraco
+   *  vira "encontro não realizado", não dívida de registro). Cortada em 3
+   *  pro tooltip. */
+  pendentes: string[];
+  totalPendentes: number;
+};
+
+export type PanoramaSlot = {
+  numero: number;
+  /** uma célula por cronograma que cobre este número (ordem de `turmas`). */
+  celulas: PanoramaCelula[];
+};
+
+export type PanoramaTurma = {
+  cronogramaId: string;
+  /** "T1" — sigla curta (legenda, tooltip). */
+  rotulo: string;
+  /** "Turma 1" — leitura longa (títulos, aria). */
+  longa: string;
+};
+
+/** Semáforo das duplas do recorte — uma dupla por fatia, o total bate com
+ *  o universo. `apoioTotal` é a contagem REAL do eixo apoio (pode exceder a
+ *  fatia quando quem pede apoio já está em atenção/risco). */
+export type PanoramaDonut = {
+  andamento: number;
+  atencao: number;
+  risco: number;
+  apoio: number;
+  pausada: number;
+  concluida: number;
+  encerrada: number;
+  apoioTotal: number;
+  total: number;
+};
+
+export type RegistrosPanorama = {
+  /** colunas do gráfico por nº de encontro, já no recorte (período/turma/
+   *  dupla/encontro da URL). Vazio = nenhum encontro oficial no recorte. */
+  slots: PanoramaSlot[];
+  /** cronogramas que formam o eixo (ordem do banco — T1 antes da T2). */
+  turmas: PanoramaTurma[];
+  donut: PanoramaDonut;
+  /** trilhas de especialista no recorte — sem calendário oficial, ficam
+   *  fora das colunas e da linha (mas entram no donut). */
+  espNoRecorte: number;
+};
+
+/** avaliação qualitativa do mentor → eixo numérico 1–4 pra linha "do
+ *  mentor". A escala oficial é texto; o número é só a régua do gráfico. */
+export const NOTA_MENTOR: Record<string, number> = {
+  baixa: 1,
+  regular: 2,
+  boa: 3,
+  excelente: 4,
+};
+
+const nomeCurto = (nome: string | null | undefined): string =>
+  nome?.split(" ")[0] ?? "—";
+
+/** Agrega o painel "Panorama do ciclo" sobre o escopo já resolvido pela
+ *  query (RLS: coord = todas as duplas; supervisor = as que supervisiona).
+ *  Tudo é derivado de `duplas` + `eventos`/`cronogramas` — mesma fonte da
+ *  ficha e do semáforo, zero query extra de agregação.
+ *
+ *  O recorte estrutural da página (turma, período, dupla, encontro) entra
+ *  inteiro; os filtros de CONTEÚDO (busca, avaliação, apoio, dificuldade,
+ *  tardio) não fazem sentido num gráfico de cobertura — eles só afunilam a
+ *  lista abaixo (decisão registrada no plano da issue). */
+export function panoramaRegistros({
+  duplas,
+  eventos,
+  cronogramas,
+  recorte,
+  hoje = new Date(),
+}: {
+  duplas: Dupla[];
+  eventos: CicloEvento[];
+  cronogramas: Cronograma[];
+  recorte: {
+    /** cronograma_id da pill de turma. */
+    turma?: string;
+    periodo?: PeriodoRegistros;
+    /** ?dupla= da lista — o painel vira o resumo dela. */
+    dupla?: string;
+    /** ?encontro= da lista — o painel zomba no slot. */
+    encontro?: number;
+  };
+  hoje?: Date;
+}): RegistrosPanorama {
+  const hojeStr = toDateStr(hoje);
+  const { dom } = semanaBounds(hoje);
+  const corte = recorte.periodo ? cortePeriodo(recorte.periodo, hoje) : null;
+
+  const escopo = duplas.filter(
+    (d) =>
+      (!recorte.dupla || d.id === recorte.dupla) &&
+      (!recorte.turma || d.cronograma_id === recorte.turma)
+  );
+
+  // legenda = cronogramas com dupla no escopo: turma sem ninguém cobrado
+  // não pode ocupar cor nem pill de legenda (eixo de barras/linha é o
+  // mesmo — sem célula ela já não desenharia nada)
+  const turmas: PanoramaTurma[] = cronogramas
+    .filter(
+      (c) =>
+        (!recorte.turma || c.id === recorte.turma) &&
+        escopo.some((d) => d.cronograma_id === c.id)
+    )
+    .map((c) => ({
+      cronogramaId: c.id,
+      rotulo: turmaCurta(c.turma),
+      longa: turmaLonga(c.turma),
+    }));
+
+  const slotsPorNumero = new Map<number, PanoramaSlot>();
+  for (const t of turmas) {
+    const eventosC = eventosDoCronograma(eventos, t.cronogramaId).filter(
+      (e) => e.tipo === "encontro" && e.numero != null && e.data != null
+    );
+    const duplasC = escopo.filter((d) => d.cronograma_id === t.cronogramaId);
+    for (const ev of eventosC) {
+      const numero = ev.numero!;
+      if (recorte.encontro && numero !== recorte.encontro) continue;
+      const data = ev.data!;
+      // hoje já é "semana" (a acontecer): vencido = data ANTES de hoje —
+      // cobrar o encontro do dia como falta mostraria buraco + pendente
+      // num encontro que nem aconteceu ainda (regra do mock v2)
+      const estado: PanoramaEstado =
+        data < hojeStr ? "vencido" : data <= dom ? "semana" : "futuro";
+      // janela "últimas N semanas": corta o que ficou antes do corte e o
+      // futuro além da semana corrente (que segue hachurada, "a acontecer")
+      if (corte && (data < corte || data > dom)) continue;
+      // elegível = a dupla ativa já lançada quando a data oficial chegou,
+      // OU quem tem a linha do encontro (fez antes de pausar/encerrar — a
+      // linha é a prova de que o encontro era dela)
+      const elegiveis = duplasC.filter(
+        (d) =>
+          (d.encontros ?? []).some((e) => e.numero === numero) ||
+          (d.status === "ativa" &&
+            (!d.iniciada_em || d.iniciada_em <= data))
+      );
+      let entregues = 0,
+        realizados = 0,
+        avaliados = 0;
+      const estrelas: number[] = [],
+        notasMentor: number[] = [],
+        pendentes: string[] = [];
+      for (const d of elegiveis) {
+        const enc = (d.encontros ?? []).find((e) => e.numero === numero);
+        if (enc?.status === "realizado") realizados++;
+        if (enc?.registro) {
+          entregues++;
+          const nota = NOTA_MENTOR[enc.registro.avaliacao ?? ""];
+          if (nota != null) notasMentor.push(nota);
+        } else if (
+          estado === "vencido" &&
+          // a falta nomeada é "registro devido e não entregue": sem row
+          // nenhuma, ou row ainda aberta (agendado/remarcado/realizado sem
+          // registro). nao_aconteceu/cancelado fecharam o encontro — o
+          // buraco fica no "não realizado" do trilho, não vira pendência
+          (enc == null ||
+            enc.status === "agendado" ||
+            enc.status === "remarcado" ||
+            enc.status === "realizado")
+        ) {
+          pendentes.push(
+            `${nomeCurto(d.mentor?.nome)} × ${nomeCurto(d.mentorado?.nome)}`
+          );
+        }
+        if (enc?.avaliacao_jovem) {
+          avaliados++;
+          if (enc.avaliacao_jovem.estrelas >= 1)
+            estrelas.push(enc.avaliacao_jovem.estrelas);
+        }
+      }
+      // célula sem ninguém cobrado (turma sem duplas naquele ponto) não
+      // desenha nada — nem trilho vazio
+      if (elegiveis.length === 0) continue;
+      const slot =
+        slotsPorNumero.get(numero) ?? { numero, celulas: [] };
+      slot.celulas.push({
+        cronogramaId: t.cronogramaId,
+        estado,
+        dataOficial: data,
+        esperadas: elegiveis.length,
+        entregues,
+        realizados,
+        avaliados,
+        estrelas,
+        notasMentor,
+        pendentes: pendentes.slice(0, 3),
+        totalPendentes: pendentes.length,
+      });
+      slotsPorNumero.set(numero, slot);
+    }
+  }
+  const slots = [...slotsPorNumero.values()].sort(
+    (a, b) => a.numero - b.numero
+  );
+
+  // ---- donut: semáforo das duplas do recorte ----
+  // "todas" cobre o ciclo VIGENTE: duplas de qualquer cronograma + trilhas
+  // de especialista (sem cronograma por desenho). DPP sem cronograma é
+  // histórica de outro ciclo (turma é texto legado) e fica de fora — ela
+  // responderia o panorama do ciclo DELA, não deste.
+  // turma × dupla INTERSECTAM como nos filtros da lista (?turma=T2&dupla=
+  // <id da T1> esvazia a lista): combinação divergente zera o universo e o
+  // donut zera junto — ignorar a turma e mostrar a dupla leria um recorte
+  // que a própria página não mostra.
+  const duplasDonut = duplas.filter((d) => {
+    if (recorte.dupla && d.id !== recorte.dupla) return false;
+    if (recorte.turma && d.cronograma_id !== recorte.turma) return false;
+    if (!recorte.dupla && !recorte.turma)
+      return d.trilha === "especialista" || d.cronograma_id != null;
+    return true;
+  });
+  const donut: PanoramaDonut = {
+    andamento: 0,
+    atencao: 0,
+    risco: 0,
+    apoio: 0,
+    pausada: 0,
+    concluida: 0,
+    encerrada: 0,
+    apoioTotal: 0,
+    total: duplasDonut.length,
+  };
+  for (const d of duplasDonut) {
+    const saude = saudadeDaDupla(d, eventos, hoje);
+    // precedência de leitura: quem está mal sai na frente; apoio aberto só
+    // vira fatia quando a dupla está "bem" (em atenção/risco o chamado já é
+    // visível pelo sinal) — uma dupla por fatia mantém a soma honesta
+    if (saude.semaforo === "risco") donut.risco++;
+    else if (saude.semaforo === "atencao") donut.atencao++;
+    else if (saude.apoio.aberto) donut.apoio++;
+    else if (d.status === "pausada") donut.pausada++;
+    else if (d.status === "concluida") donut.concluida++;
+    else if (d.status === "encerrada") donut.encerrada++;
+    else donut.andamento++;
+    if (saude.apoio.aberto) donut.apoioTotal++;
+  }
+
+  return {
+    slots,
+    turmas,
+    donut,
+    espNoRecorte: escopo.filter((d) => d.trilha === "especialista").length,
+  };
 }

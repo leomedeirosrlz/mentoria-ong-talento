@@ -15,7 +15,8 @@ import {
 // REALIZA-25 — as visões novas da agenda do mentor: "Semana" (grade compacta
 // seg–dom com tinta de disponibilidade por dia + detalhe) e "Horários" (grade
 // horária estilo calendário com tinta por hora, clique-no-vazio que agenda e
-// blocos que são links pra ficha). Coord/sup segue Semana/Mês/Lista.
+// blocos que são links pra ficha). Coord/sup segue Dia/Semana/Mês/Ciclo
+// (as janelas temporais do v8b — REALIZA-195).
 //
 // Fixture (scripts/seed-e2e-staging.mjs): mentor E2E com grade
 // {ter,qui,sab}/{noite} × mentorada da dupla …0030 com {ter,qui}/{noite} —
@@ -190,8 +191,8 @@ function colunaHorarios(page: Page, iso: string): Locator {
 
 /** O grid horário — seletor pelo template de colunas (o rail de encontros e
  *  a grade compacta também são .scroll-fina; esse minmax é só da de horas).
- *  Dentro dele, a tinta "ambos" assina com `linear-gradient(135deg` — a trama
- *  de linhas usa `repeating-linear-gradient` e não pode colar no filtro. */
+ *  Dentro dele, a tinta marca com `data-tinta` — o gradiente inline é
+ *  detalhe de render que o spec não conhece. */
 const gradeHorarios = (page: Page) =>
   page.locator("div[class*='grid-cols-[2.5rem']");
 
@@ -212,15 +213,17 @@ test.describe("agenda do mentor — visões Semana e Horários (REALIZA-25)", ()
     // calendário (mes/semana/horários) vivem na aba ?aba=calendario
     await page.goto("/agenda?aba=calendario");
 
-    // os quatro chips do mentor — dia/mês/semana/horários (a lista é da
-    // coord; "dia" entrou no REALIZA-163)
+    // os quatro chips do mentor — dia/mês/semana/horários (ciclo é da
+    // coord desde REALIZA-195; "dia" entrou no REALIZA-163)
     for (const v of ["dia", "mes", "semana", "horarios"])
       await expect(
         page.locator(`input[name="agenda-visao"][value="${v}"]`)
       ).toBeAttached();
-    await expect(
-      page.locator('input[name="agenda-visao"][value="lista"]')
-    ).toHaveCount(0);
+    // "ciclo" é exclusiva do staff — o mentor não tem a timeline agregada
+    for (const v of ["ciclo"])
+      await expect(
+        page.locator(`input[name="agenda-visao"][value="${v}"]`)
+      ).toHaveCount(0);
 
     await abrirVisao(page, "semana");
 
@@ -243,9 +246,7 @@ test.describe("agenda do mentor — visões Semana e Horários (REALIZA-25)", ()
       page.getByRole("button", { name: /, você livre$/ })
     ).toHaveCount(1);
     await expect(
-      grade.locator(
-        'div[role="gridcell"] > span[style*="linear-gradient(135deg"]'
-      )
+      grade.locator('div[role="gridcell"] > span[data-tinta="ambos"]')
     ).toHaveCount(2);
 
     // clicar na quinta seleciona o dia — o detalhe mostra "quinta · 15 · outubro"
@@ -280,15 +281,11 @@ test.describe("agenda do mentor — visões Semana e Horários (REALIZA-25)", ()
     await expect(grade.getByText("20h", { exact: true })).toBeVisible();
 
     // tinta por hora (JANELA_PERIODO noite = 18–22h): ter e qui pintam o
-    // split "ambos" 18–21h (4 faixas × 2 dias); sáb é mentor-only. O filtro
-    // de gradiente exige a assinatura 135deg — a trama das linhas de hora é
-    // repeating-linear-gradient e casaria num contains largo.
-    await expect(
-      grade.locator('span[style*="linear-gradient(135deg"]')
-    ).toHaveCount(8);
-    await expect(
-      grade.locator('span[class*="bg-[var(--ok)]/8"]')
-    ).toHaveCount(4);
+    // split "ambos" 18–21h (4 faixas × 2 dias); sáb é mentor-only. O
+    // marcador estável é data-tinta — o style de gradiente é detalhe de
+    // render que o spec não deveria conhecer
+    await expect(grade.locator('span[data-tinta="ambos"]')).toHaveCount(8);
+    await expect(grade.locator('span[data-tinta="mentor"]')).toHaveCount(4);
 
     // evento oficial da semana (sempre há um no ciclo vigente) vira marcador
     // fino na faixa de topo — nunca um bloco na grade
@@ -436,8 +433,9 @@ test.describe("agenda do mentor — visões Semana e Horários (REALIZA-25)", ()
     await relogar(page, COORD_EMAIL, COORD_SENHA);
     await page.goto("/agenda?aba=calendario");
 
-    // chips da coord: Dia/Semana/Mês/Lista — "Horários" é só do mentor
-    for (const v of ["dia", "semana", "mes", "lista"])
+    // chips da coord (REALIZA-195): Dia/Semana/Mês/Ciclo — "Horários" é
+    // só do mentor; "Ciclo" é a timeline agregada nova do v8b
+    for (const v of ["dia", "semana", "mes", "ciclo"])
       await expect(
         page.locator(`input[name="agenda-visao"][value="${v}"]`)
       ).toBeAttached();

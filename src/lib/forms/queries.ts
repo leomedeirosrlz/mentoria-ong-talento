@@ -139,7 +139,9 @@ export const getFormularios = cache(async (): Promise<FormularioListaItem[]> => 
       (l as { respostas?: { count: number }[] }).respostas?.[0]?.count ?? 0;
     if (l.multi_uso) {
       c.resp += nRespostas;
-      if (!l.expira_em || new Date(l.expira_em).getTime() > agora) c.pend++;
+      // link de intake vigente é o estado desejado (ninguém "deve" uma
+      // resposta ao link de inscrição) — a ficha conta "link vivo, não
+      // falta" e a prateleira espelha a mesma régua
     } else if (l.usado_em) {
       c.resp++;
       // ISO 8601 compara lexicograficamente — max(usado_em) sem Date
@@ -465,6 +467,9 @@ function demoLista(role: AppRole): FormularioListaItem[] {
       ),
       pendentes: doForm.filter(
         (l) =>
+          // multi_uso vigente é link de intake vivo, não falta — a régua
+          // é a da query real acima (e da ficha do form)
+          !l.multi_uso &&
           !l.usado_em &&
           (!l.expira_em || new Date(l.expira_em).getTime() > agora)
       ).length,

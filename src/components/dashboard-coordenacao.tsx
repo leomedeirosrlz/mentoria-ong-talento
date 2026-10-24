@@ -20,6 +20,7 @@ import {
   type Semaforo,
   ORDEM_SEMAFORO,
 } from "@/lib/ciclo";
+import { turmaLonga } from "@/lib/turma";
 import type { CicloEvento, Comunicado, Cronograma, Dupla, SolicitacaoEspecialista, Supervisao } from "@/lib/types";
 import type { Interacao } from "@/lib/interacoes";
 import type { SupervisaoAlvo } from "@/lib/queries-supervisao";
@@ -35,6 +36,7 @@ import { TrilhasCoordPanel } from "@/components/trilhas-coord-panel";
 import { SupervisaoDialog } from "@/components/supervisao-dialog";
 import { SupervisoesSection } from "@/components/supervisoes-section";
 import { WhatsAppRapido, type DestinoWA } from "@/components/whatsapp-rapido";
+import { BarraSegmentada } from "@/components/viz";
 import { msgsContato } from "@/lib/whatsapp-msgs";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -228,7 +230,7 @@ export function DashboardCoordenacao({
         return (
           <section
             key={cronograma?.id ?? "todos"}
-            aria-label={`Semana do ${resumo.evento.numero}º encontro${cronograma ? ` — ${cronograma.turma}` : ""}`}
+            aria-label={`Semana do ${resumo.evento.numero}º encontro${cronograma ? ` — ${turmaLonga(cronograma.turma)}` : ""}`}
             className="animate-enter rounded-xl bg-card px-4 py-4 shadow-[var(--shadow-border)] sm:px-5"
           >
             {/* turma é contexto tipográfico (overline), não pill — e só faz
@@ -236,7 +238,7 @@ export function DashboardCoordenacao({
                 o valor é o mesmo do seletor "Turma" da agenda */}
             {multiplos && cronograma && (
               <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                {cronograma.turma}
+                {turmaLonga(cronograma.turma)}
               </p>
             )}
             <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1.5">
@@ -280,44 +282,18 @@ export function DashboardCoordenacao({
               {resumo.comRegistro > 0 &&
                 ` · ${resumo.comRegistro} ${resumo.comRegistro === 1 ? "registro entregue" : "registros entregues"}`}
             </p>
-            <div
-              role="img"
-              aria-label={`${resumo.comRegistro} com registro, ${resumo.aguardandoRegistro} aguardando registro, ${resumo.reposicao} em reposição, ${semEncontro} sem encontro`}
-              className="mt-2 flex h-2.5 w-full overflow-hidden rounded-full bg-muted"
-            >
-              <Seg n={resumo.comRegistro} total={resumo.total} cls="bg-[var(--ok)]" />
-              <Seg n={resumo.aguardandoRegistro} total={resumo.total} cls="bg-[var(--warn)]" />
-              <Seg n={resumo.reposicao} total={resumo.total} cls="bg-[var(--brand-lime)]" />
-              <Seg n={semEncontro} total={resumo.total} cls="bg-muted-foreground/40" />
-            </div>
-            {resumo.total > 0 && (
-              <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                {resumo.comRegistro > 0 && (
-                  <span className="inline-flex items-center gap-1">
-                    <span aria-hidden className="size-2 rounded-full bg-[var(--ok)]" />
-                    {resumo.comRegistro} com registro
-                  </span>
-                )}
-                {resumo.aguardandoRegistro > 0 && (
-                  <span className="inline-flex items-center gap-1">
-                    <span aria-hidden className="size-2 rounded-full bg-[var(--warn)]" />
-                    {resumo.aguardandoRegistro} aguardando registro
-                  </span>
-                )}
-                {resumo.reposicao > 0 && (
-                  <span className="inline-flex items-center gap-1">
-                    <span aria-hidden className="size-2 rounded-full bg-[var(--brand-lime)]" />
-                    {resumo.reposicao} em reposição
-                  </span>
-                )}
-                {semEncontro > 0 && (
-                  <span className="inline-flex items-center gap-1">
-                    <span aria-hidden className="size-2 rounded-full bg-muted-foreground/40" />
-                    {semEncontro} sem encontro
-                  </span>
-                )}
-              </p>
-            )}
+            <BarraSegmentada
+              segmentos={[
+                { valor: resumo.comRegistro, rotulo: "com registro", cls: "bg-[var(--ok)]" },
+                { valor: resumo.aguardandoRegistro, rotulo: "aguardando registro", cls: "bg-[var(--warn)]" },
+                { valor: resumo.reposicao, rotulo: "em reposição", cls: "bg-[var(--brand-lime)]" },
+                { valor: semEncontro, rotulo: "sem encontro", cls: "bg-muted-foreground/40" },
+              ]}
+              denominador={resumo.total}
+              legenda
+              ariaLabel={`${resumo.comRegistro} com registro, ${resumo.aguardandoRegistro} aguardando registro, ${resumo.reposicao} em reposição, ${semEncontro} sem encontro`}
+              className="mt-2"
+            />
             {resumo.reposicao > 0 && (
               // o significado de "em reposição" fica visível — tooltip/title
               // não existe no toque
@@ -394,37 +370,17 @@ export function DashboardCoordenacao({
                 {ativas}
               </p>
             </div>
-            <div
-              role="img"
-              aria-label={`${emDia} em dia, ${atencao} em atenção, ${risco} em risco`}
-              className="mt-3 flex h-2.5 overflow-hidden rounded-full bg-muted"
-            >
-              <Seg n={emDia} total={saude.length} cls="bg-[var(--ok)]" />
-              <Seg n={atencao} total={saude.length} cls="bg-[var(--warn)]" />
-              <Seg n={risco} total={saude.length} cls="bg-[var(--danger)]" />
-            </div>
-            {saude.length > 0 && (
-              <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                {emDia > 0 && (
-                  <span className="inline-flex items-center gap-1">
-                    <span aria-hidden className="size-2 rounded-full bg-[var(--ok)]" />
-                    {emDia} em dia
-                  </span>
-                )}
-                {atencao > 0 && (
-                  <span className="inline-flex items-center gap-1">
-                    <span aria-hidden className="size-2 rounded-full bg-[var(--warn)]" />
-                    {atencao} em atenção
-                  </span>
-                )}
-                {risco > 0 && (
-                  <span className="inline-flex items-center gap-1">
-                    <span aria-hidden className="size-2 rounded-full bg-[var(--danger)]" />
-                    {risco} em risco
-                  </span>
-                )}
-              </p>
-            )}
+            <BarraSegmentada
+              segmentos={[
+                { valor: emDia, rotulo: "em dia", cls: "bg-[var(--ok)]" },
+                { valor: atencao, rotulo: "em atenção", cls: "bg-[var(--warn)]" },
+                { valor: risco, rotulo: "em risco", cls: "bg-[var(--danger)]" },
+              ]}
+              denominador={saude.length}
+              legenda
+              ariaLabel={`${emDia} em dia, ${atencao} em atenção, ${risco} em risco`}
+              className="mt-3"
+            />
             {/* chips são links de verdade — Cmd+click, back/forward e
                 aria-current de graça; o dot interno fala a língua do
                 semáforo (pendente é oco: "falta algo") */}
@@ -653,15 +609,6 @@ function motivoCurto(s: DuplaSaude): string {
   if (!risco) return s.motivo;
   if (risco.tipo === "atraso") return `${s.esperado - s.feitos} atrasos`;
   return "avaliação baixa + dificuldade";
-}
-
-/** Segmento proporcional das barras-resumo (semana e saúde das duplas) —
- *  some quando zero (a legenda nomeada também omite zeros); denominador 0
- *  deixa a faixa só no track muted. Gramática do ResumoEncontrosDupla da
- *  agenda: width percentual, sem rótulo interno — o número mora na legenda. */
-function Seg({ n, total, cls }: { n: number; total: number; cls: string }) {
-  if (n <= 0 || total <= 0) return null;
-  return <span className={cls} style={{ width: `${(n / total) * 100}%` }} />;
 }
 
 function DuplaCard({

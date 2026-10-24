@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   dimensoesDoItem,
   itensDaSemanaPrograma,
+  itensSemanaProgramaMentor,
   paraAcompanhar,
   resumosPorCronograma,
   sinteseMonitoramento,
@@ -874,7 +875,7 @@ describe("itensDaSemanaPrograma", () => {
     { id: "s2", data: "2026-10-12", supervisor: { nome: "Paula Nunes" }, mentor: { nome: "Bruno Paz" } }, // fora da semana
   ];
 
-  it("encontro oficial, formação, evento e supervisão — tipos e etiquetas certos", () => {
+  it("encontro oficial, formação, evento e supervisão — tipoItem e turma certos", () => {
     const itens = itensDaSemanaPrograma(
       programacao,
       [C1, C2],
@@ -883,25 +884,71 @@ describe("itensDaSemanaPrograma", () => {
     );
     const porTitulo = Object.fromEntries(itens.map((i) => [i.titulo, i]));
     expect(porTitulo["Encontro 8 · T1"]).toMatchObject({
-      tipo: "encontro_oficial",
-      etiqueta: "turma 1",
+      tipoItem: "encontro",
+      turma: "T1",
       eventoId: null,
       diaKey: "2026-10-06",
     });
-    expect(porTitulo["Encontro 5 · T2"].etiqueta).toBe("turma 2");
+    expect(porTitulo["Encontro 5 · T2"].turma).toBe("T2");
     expect(porTitulo["Formação de mentores"]).toMatchObject({
-      tipo: "formacao",
-      etiqueta: "oficial",
+      tipoItem: "formacao",
       detalhe: "10h–12h · Sede",
       diaKey: "2026-10-10",
     });
     expect(porTitulo["Formação de mentores"].eventoId).toBeTruthy();
-    expect(porTitulo["Festa de encerramento"].tipo).toBe("evento");
+    expect(porTitulo["Festa de encerramento"].tipoItem).toBe("evento");
     expect(porTitulo["Festa de encerramento"].eventoId).toBeNull();
-    expect(porTitulo["Recesso de outubro"].tipo).toBe("evento");
+    expect(porTitulo["Recesso de outubro"].tipoItem).toBe("evento");
   });
 
-  it("supervisão da semana entra com nomes, etiqueta 'hoje' no dia corrente e resumo truncado", () => {
+  it("encontro oficial carrega o meta 'N duplas — cada uma marca a sua'", () => {
+    const itens = itensDaSemanaPrograma(
+      programacao,
+      [C1, C2],
+      [],
+      AGORA,
+      // c1: dA/dB/dC ativas (dD pausada não conta); c2: só dE
+      [dA, dB, dC, dD, dE]
+    );
+    const porTitulo = Object.fromEntries(itens.map((i) => [i.titulo, i]));
+    expect(porTitulo["Encontro 8 · T1"].detalhe).toBe(
+      "3 duplas — cada uma marca a sua"
+    );
+    expect(porTitulo["Encontro 5 · T2"].detalhe).toBe(
+      "1 dupla — cada uma marca a sua"
+    );
+    // sem a coorte, o meta some — a observação (se houver) segue valendo
+    const semCoorte = itensDaSemanaPrograma(programacao, [C1, C2], [], AGORA);
+    expect(
+      Object.fromEntries(semCoorte.map((i) => [i.titulo, i]))["Encontro 8 · T1"]
+        .detalhe
+    ).toBeNull();
+  });
+
+  it("evento multi-dia em curso na semana entra no dia de início", () => {
+    const itens = itensDaSemanaPrograma(
+      [
+        // começou sábado anterior mas corre até quinta da semana — a faixa
+        // mostra o evento REAL da semana, não só o que nasce seg–dom
+        mkEvento(null, "2026-10-03", "recesso", "c1", {
+          data_fim: "2026-10-08",
+          titulo: "Retiro de outubro",
+        }),
+        // já terminou antes da semana — não entra
+        mkEvento(null, "2026-09-28", "recesso", "c1", {
+          data_fim: "2026-10-02",
+          titulo: "Recesso passado",
+        }),
+      ],
+      [C1],
+      [],
+      AGORA
+    );
+    expect(itens.map((i) => i.titulo)).toEqual(["Retiro de outubro"]);
+    expect(itens[0].diaKey).toBe("2026-10-03");
+  });
+
+  it("supervisão da semana entra com nomes e resumo truncado", () => {
     const itens = itensDaSemanaPrograma(
       programacao,
       [C1, C2],
@@ -910,10 +957,9 @@ describe("itensDaSemanaPrograma", () => {
     );
     const sup = itens.find((i) => i.id === "sup-s1")!;
     expect(sup).toMatchObject({
-      tipo: "supervisao",
+      tipoItem: "supervisao",
       diaKey: "2026-10-07",
       titulo: "Supervisão · Paula Nunes × André Lima",
-      etiqueta: "hoje",
       eventoId: null,
     });
     expect(sup.detalhe!.endsWith("…")).toBe(true);
@@ -955,5 +1001,187 @@ describe("itensDaSemanaPrograma", () => {
       "Encontro 3 · T1",
       "Encontro 4 · T1",
     ]);
+  });
+});
+
+// ============================================================
+describe("itensSemanaProgramaMentor", () => {
+  const EV_M = [mkEvento(8, "2026-10-06")];
+  // aviso compõe "registro pendente · local a confirmar": as duas
+  // pendências do mesmo encontro aparecem juntas, uma não apaga a outra
+  const dSemLocal = mkDupla({
+    id: "dSL",
+    encontros: [
+      mkEncontro({
+        dupla_id: "dSL",
+        numero: 8,
+        status: "agendado",
+        data_hora: "2026-10-08T22:00:00Z",
+        link: null,
+      }),
+    ],
+  });
+  const dComLink = mkDupla({
+    id: "dCL",
+    encontros: [
+      mkEncontro({
+        dupla_id: "dCL",
+        numero: 8,
+        status: "agendado",
+        data_hora: "2026-10-08T22:00:00Z",
+        link: "https://meet.example/abc",
+      }),
+    ],
+  });
+  const dRegistro = mkDupla({
+    id: "dRG",
+    encontros: [
+      mkEncontro({
+        dupla_id: "dRG",
+        numero: 8,
+        status: "realizado",
+        data_hora: "2026-10-06T22:00:00Z",
+        realizado_em: "2026-10-06T22:00:00Z",
+        link: null,
+      }),
+    ],
+  });
+  const dLimbo = mkDupla({
+    id: "dLB",
+    encontros: [
+      mkEncontro({
+        dupla_id: "dLB",
+        numero: 8,
+        status: "agendado",
+        // agendado pra segunda — já passou no "agora" do teste
+        data_hora: "2026-10-05T22:00:00Z",
+        link: null,
+      }),
+    ],
+  });
+
+  it("um card por encontro oficial × dupla — cada uma marca o seu", () => {
+    const itens = itensSemanaProgramaMentor(
+      [dSemLocal, dComLink],
+      EV_M,
+      [C1],
+      [],
+      "p-qualquer",
+      AGORA,
+      AGORA.getTime()
+    );
+    expect(itens).toHaveLength(2);
+    expect(itens.every((i) => i.numero === 8 && i.turma === "T1")).toBe(true);
+  });
+
+  it("agendado sem link → 'local a confirmar'; com link → sem aviso", () => {
+    const itens = itensSemanaProgramaMentor(
+      [dSemLocal, dComLink],
+      EV_M,
+      [C1],
+      [],
+      "p-qualquer",
+      AGORA,
+      AGORA.getTime()
+    );
+    const porId = Object.fromEntries(
+      itens.map((i) => [i.id.split("-").pop(), i])
+    );
+    expect(porId.dSL.aviso).toBe("local a confirmar");
+    expect(porId.dCL.aviso).toBeNull();
+    expect(porId.dCL.detalhe).toContain("chamada de vídeo");
+    expect(porId.dSL.detalhe).toContain("local a combinar");
+  });
+
+  it("realizado sem registro → 'registro pendente' (local não se soma)", () => {
+    const [item] = itensSemanaProgramaMentor(
+      [dRegistro],
+      EV_M,
+      [C1],
+      [],
+      "p-qualquer",
+      AGORA,
+      AGORA.getTime()
+    );
+    expect(item.aviso).toBe("registro pendente");
+  });
+
+  it("limbo → 'registro pendente' sozinho (o local já venceu junto)", () => {
+    const [item] = itensSemanaProgramaMentor(
+      [dLimbo],
+      EV_M,
+      [C1],
+      [],
+      "p-qualquer",
+      AGORA,
+      AGORA.getTime()
+    );
+    expect(item.aviso).toBe("registro pendente");
+  });
+
+  it("sem row do encontro → 'por agendar'", () => {
+    const [item] = itensSemanaProgramaMentor(
+      [mkDupla({ id: "dSA" })],
+      EV_M,
+      [C1],
+      [],
+      "p-qualquer",
+      AGORA,
+      AGORA.getTime()
+    );
+    expect(item.aviso).toBe("por agendar");
+    expect(item.diaKey).toBe("2026-10-06");
+  });
+
+  it("formação chama presença; encerramento é convidado; recesso não promete nada", () => {
+    const evs = [
+      mkEvento(null, "2026-10-10", "formacao", "c1", {
+        titulo: "Formação",
+      }),
+      mkEvento(null, "2026-10-09", "evento_encerramento", "c1", {
+        titulo: "Roda de casos",
+      }),
+      mkEvento(null, "2026-10-11", "recesso", "c1", {
+        titulo: "Recesso",
+      }),
+      mkEvento(null, "2026-10-08", "etapa_preparacao", "c1", {
+        titulo: "Etapa",
+      }),
+    ];
+    const itens = itensSemanaProgramaMentor(
+      [mkDupla({ id: "dSA" })],
+      evs,
+      [C1],
+      [],
+      "p-qualquer",
+      AGORA,
+      AGORA.getTime()
+    );
+    const porTitulo = Object.fromEntries(itens.map((i) => [i.titulo.split(" ·")[0], i]));
+    expect(porTitulo["Formação"].nota).toBe("você participa");
+    expect(porTitulo["Formação"].convidado).toBe(false);
+    expect(porTitulo["Roda de casos"].nota).toBe("você não participa");
+    expect(porTitulo["Roda de casos"].convidado).toBe(true);
+    expect(porTitulo["Recesso"].nota).toBeNull();
+    expect(porTitulo["Etapa"].nota).toBeNull();
+  });
+
+  it("recesso multi-dia que atravessa a semana entra no dia de início", () => {
+    const itens = itensSemanaProgramaMentor(
+      [mkDupla({ id: "dSA" })],
+      [
+        mkEvento(null, "2026-10-03", "recesso", "c1", {
+          data_fim: "2026-10-08",
+          titulo: "Retiro",
+        }),
+      ],
+      [C1],
+      [],
+      "p-qualquer",
+      AGORA,
+      AGORA.getTime()
+    );
+    expect(itens.map((i) => i.titulo)).toEqual(["Retiro · T1"]);
+    expect(itens[0].diaKey).toBe("2026-10-03");
   });
 });

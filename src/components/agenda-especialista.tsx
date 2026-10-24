@@ -52,6 +52,7 @@ export function AgendaEspecialista({
   slots,
   sessoes,
   hojeIso,
+  agoraMs,
 }: {
   duplas: Dupla[];
   espEventos: EspecialistaEvento[];
@@ -63,8 +64,11 @@ export function AgendaEspecialista({
   sessoes: SessaoEntrada[];
   /** "YYYY-MM-DD" âncora da semana que a grade desenha. */
   hojeIso: string;
+  /** epoch ms do `agora` da página — jornada/fila leem o MESMO snapshot do
+   *  request, não um segundo `new Date()` do RSC. */
+  agoraMs: number;
 }) {
-  const agora = new Date();
+  const agora = new Date(agoraMs);
   return (
     // >1 dupla: em xl os cards abrem 2 colunas, como na home do mentor — o
     // header e o card de disponibilidade cravam col-span-2 pra seguir full-width

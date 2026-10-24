@@ -1,6 +1,6 @@
 import Link from "next/link";
-import type { ReactNode } from "react";
 import {
+  CaretDown,
   Check,
   CircleDashed,
   Clock,
@@ -9,25 +9,25 @@ import {
   Warning,
 } from "@phosphor-icons/react/dist/ssr";
 import { LembreteButton } from "@/components/lembrete-button";
-import {
-  EnviarInstrumentoLote,
-  type DuplaLote,
-} from "@/components/enviar-instrumento-lote";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
-import { lembreteBloqueadoAte, TRILHA_LEN } from "@/lib/ciclo";
+import { BarraSegmentada } from "@/components/viz/barra-segmentada";
+import { lembreteBloqueadoAte } from "@/lib/ciclo";
 import type { Interacao } from "@/lib/interacoes";
-import type { InstrumentoSistema } from "@/lib/forms/schema";
 import {
-  atrasadasPainel,
+  agrupaPorTurma,
+  diaMesEvento,
   ESTACAO_CHAVES,
   ESTACOES,
-  estacoesPainelDupla,
-  painelTurmaCtx,
+  liberaCopia,
+  resolveLinhasPainel,
   type EstacaoChave,
   type EstacaoPainelEstado,
+  type GrupoTurma,
+  type LinhaResolvida,
   type PainelJornadaLinha,
 } from "@/lib/jornada";
+import { turmaCurta } from "@/lib/turma";
 import type { CicloEvento } from "@/lib/types";
 import { msgsContato } from "@/lib/whatsapp-msgs";
 import { cn } from "@/lib/utils";
@@ -39,6 +39,14 @@ import { cn } from "@/lib/utils";
 // jovem). A ficha da dupla continua sendo o detalhe (link, resposta,
 // "Ver ficha" leva lá); quem entrega o instrumento é o mentor — a única
 // ação daqui é lembrá-lo, respeitando o cap de 48h do enviar_lembrete.
+//
+// Layout v5c (feedback-ux-2026-10/materiais-coord.md): KPIs quadrados e a
+// lista "por instrumento" viraram UMA faixa rolável com um segmento por
+// instrumento, cada segmento carregando uma mini-barra por turma (o "14
+// de 14 · T1" × "10 de 12 · T2" do mock — denominador honesto por turma,
+// nunca um agregado que mistura as duas). A matriz por dupla e a lista
+// de ação ficam atrás de gesto: a matriz num <details> agrupado por
+// turma e a lista "fora da janela" com teto de 5 + "ver as outras".
 
 /** Rótulo curto da célula por estação — a linha já traz o estado, então o
  *  texto diz O QUE é, não o estado (esse fica no ícone/cor). */
@@ -52,35 +60,50 @@ const CELULA_LABEL: Record<EstacaoChave, string> = {
   avaliacao_360: "360º",
 };
 
-/** Estação → sistema emissível (REALIZA-51): os 4 instrumentos do core
- *  ganham "Enviar em lote" pra coord. A avaliação de encontro nasce
- *  sozinha no realizado e o 360º é emissão manual de encerramento — nenhum
- *  dos dois é lote. As duas pontas da roda dividem `roda_vida`: o momento
- *  certo por dupla é o que o core resolve (inicial sem resposta, formal
- *  depois da primeira). */
-const SISTEMA_DA_ESTACAO: Partial<Record<EstacaoChave, InstrumentoSistema>> = {
-  roda_inicial: "roda_vida",
-  visao: "visao",
-  metas: "metas",
-  pdm: "pdm",
-  roda_formal: "roda_vida",
-};
+/** Teto da lista "fora da janela" (v5c): as mais críticas primeiro —
+ *  mais instrumentos parados; o resto entra num <details> pra não esticar
+ *  a página. A matemática de resolução (linhas, turmas, lote, liberação)
+ *  mora em src/lib/jornada.ts — a faixa e os cards de instrumento leem o
+ *  mesmo cálculo. */
+const TETO_FORA = 5;
 
-/** Estados que aceitam o lote — "a fazer" do painel: link vivo pra lembrar,
- *  expirado pra reemitir, nunca enviado pra mintar. Respondido descansa
- *  (re-emissão é gesto por dupla) e trancada espera a janela da dupla. */
-const ESTADOS_LOTE = new Set<EstacaoPainelEstado>([
-  "pendente",
-  "expirado",
-  "nao_enviado",
-]);
-
-type LinhaResolvida = {
-  linha: PainelJornadaLinha;
-  encVigente: number;
-  estados: Record<EstacaoChave, EstacaoPainelEstado>;
-  atrasadas: Set<EstacaoChave>;
-};
+/** Contas do retrato por estação dentro de um recorte de linhas — a
+ *  mini-barra por turma e a contagem agregada leem a mesma tabela. */
+function contasEstacao(
+  chave: EstacaoChave,
+  linhas: LinhaResolvida[]
+): {
+  respondido: number;
+  pendente: number;
+  aberto: number;
+  trancada: number;
+  fora: number;
+  feitas: number;
+  realizados: number;
+} {
+  const c = {
+    respondido: 0,
+    pendente: 0,
+    aberto: 0,
+    trancada: 0,
+    fora: 0,
+    feitas: 0,
+    realizados: 0,
+  };
+  for (const r of linhas) {
+    if (chave === "avaliacao_encontro") {
+      c.feitas += r.linha.avaliacoes_encontro.feitas;
+      c.realizados += r.linha.avaliacoes_encontro.realizados;
+    }
+    const e = r.estados[chave];
+    if (e === "respondido") c.respondido++;
+    else if (e === "pendente") c.pendente++;
+    else if (e === "trancada") c.trancada++;
+    else c.aberto++;
+    if (r.atrasadas.has(chave)) c.fora++;
+  }
+  return c;
+}
 
 /** Uma célula de estação — ícone + nome, colorido pelo estado. Atraso é
  *  anel âmbar + title: a linha da dupla carrega o detalhe na lista "fora
@@ -141,115 +164,232 @@ function CelulaEstacao({
   );
 }
 
-/** Barra empilhada "feitos × em andamento × a fazer × trancada" — o
- *  retrato agregado da estação entre as duplas do escopo. */
-function BarraEstacao({
+/** A mini-barra por turma do segmento — "T1 · 14/14" com a barra
+ *  segmentada honesta (feitos × em andamento × a fazer; ainda não aberta
+ *  fica neutro-hachurado, a posição existe no denominador). A avaliação
+ *  do encontro é recorrente: conta feitas/realizados, nunca "fecha". */
+function MiniBarraTurma({
   chave,
-  linhasResolvidas,
-  acao,
+  grupo,
 }: {
   chave: EstacaoChave;
-  linhasResolvidas: LinhaResolvida[];
-  /** Ação da estação — "Enviar em lote" (coord, quando há pendentes). */
-  acao?: ReactNode;
+  grupo: GrupoTurma;
 }) {
-  const contas = { respondido: 0, pendente: 0, aberto: 0, trancada: 0, fora: 0 };
-  let feitas = 0;
-  let realizados = 0;
-  for (const r of linhasResolvidas) {
-    if (chave === "avaliacao_encontro") {
-      feitas += r.linha.avaliacoes_encontro.feitas;
-      realizados += r.linha.avaliacoes_encontro.realizados;
-    }
-    const e = r.estados[chave];
-    if (e === "respondido") contas.respondido++;
-    else if (e === "pendente") contas.pendente++;
-    else if (e === "trancada") contas.trancada++;
-    else contas.aberto++; // expirado + nao_enviado = "a fazer"
-    if (r.atrasadas.has(chave)) contas.fora++;
-  }
-  const meta = ESTACOES[chave];
-  const total = linhasResolvidas.length;
+  const c = contasEstacao(chave, grupo.linhas);
+  const total = grupo.linhas.length;
+  const todasTrancadas =
+    chave !== "avaliacao_encontro" && c.trancada === total;
   return (
-    <li className="space-y-1.5">
-      <div className="flex flex-wrap items-baseline justify-between gap-x-3">
-        <p className="text-sm font-medium">
-          {meta.titulo}
-          <span className="ml-2 text-xs font-normal text-muted-foreground">
-            janela {meta.chipLabel}
-          </span>
-        </p>
-        <span className="flex items-center gap-3">
-          {contas.fora > 0 && (
-            <span className="inline-flex items-center gap-1 text-xs font-medium text-[var(--warn-text)]">
-              <Warning size={12} weight="fill" aria-hidden />
-              {contas.fora} fora da janela
-            </span>
-          )}
-          {acao}
+    <div>
+      <p className="flex items-baseline justify-between gap-2 text-[11px]">
+        <span className="font-semibold text-muted-foreground">
+          {grupo.sigla}
         </span>
-      </div>
-      {chave === "avaliacao_encontro" ? (
-        <p className="text-xs text-muted-foreground">
-          <strong className="font-semibold text-foreground">
-            {feitas} de {realizados}
-          </strong>{" "}
-          avaliações de encontro respondidas — recorrente, nunca “fecha”
-        </p>
-      ) : contas.trancada === total ? (
-        <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          <LockSimple size={12} aria-hidden />
-          Ainda não abriu — a primeira janela é o enc. {meta.encIni}
+        {chave === "avaliacao_encontro" ? (
+          <span className="tabular-nums text-muted-foreground">
+            {c.realizados === 0
+              ? "a partir do enc. 1"
+              : `${c.feitas}/${c.realizados}`}
+          </span>
+        ) : (
+          <span className="tabular-nums font-semibold">
+            {c.respondido}/{total}
+          </span>
+        )}
+      </p>
+      {todasTrancadas ? (
+        <p className="mt-0.5 flex items-center gap-1 text-[11px] text-muted-foreground">
+          <LockSimple size={11} aria-hidden />
+          {diaMesEvento(grupo.ctx.dataEnc(ESTACOES[chave].encIni)) ??
+            `enc. ${ESTACOES[chave].encIni}`}
         </p>
       ) : (
         <>
-          <div
-            className="flex h-2.5 overflow-hidden rounded-full bg-muted"
-            role="img"
-            aria-label={`${contas.respondido} feitos, ${contas.pendente} em andamento, ${contas.aberto} a fazer${contas.trancada ? `, ${contas.trancada} ainda não abertas` : ""}`}
-          >
-            {contas.respondido > 0 && (
-              <span
-                className="h-full bg-[var(--ok)]"
-                style={{ flex: contas.respondido }}
-              />
-            )}
-            {contas.pendente > 0 && (
-              <span
-                className="h-full bg-[var(--warn)]"
-                style={{ flex: contas.pendente }}
-              />
-            )}
-            {contas.aberto > 0 && (
-              <span
-                className="h-full bg-border"
-                style={{ flex: contas.aberto }}
-              />
-            )}
-            {contas.trancada > 0 && (
-              <span
-                className="h-full bg-muted"
-                style={{ flex: contas.trancada }}
-              />
-            )}
-          </div>
-          <p className="text-xs text-muted-foreground">
-            <strong className="font-semibold text-foreground">
-              {contas.respondido}
-            </strong>{" "}
-            feitos ·{" "}
-            <strong className="font-semibold text-foreground">
-              {contas.pendente}
-            </strong>{" "}
-            em andamento ·{" "}
-            <strong className="font-semibold text-foreground">
-              {contas.aberto}
-            </strong>{" "}
-            a fazer
-            {contas.trancada > 0 && ` · ${contas.trancada} ainda não abriu`}
-          </p>
+          {/* a recorrente mede avaliações de encontro — o denominador é
+              `realizados` (encontros da turma realizados), não o nº de
+              duplas: "0/0" seria 0%, mas sem realizado não há nem trilho
+              — a linha "a partir do enc. 1" substitui a barra */}
+          {chave === "avaliacao_encontro" && c.realizados === 0 ? null : (
+            <BarraSegmentada
+              altura="sm"
+              className="mt-1"
+              denominador={
+                chave === "avaliacao_encontro" ? c.realizados : total
+              }
+              ariaLabel={
+                chave === "avaliacao_encontro"
+                  ? `${grupo.nome}: ${c.feitas} de ${c.realizados} avaliações de encontro`
+                  : `${grupo.nome}: ${c.respondido} feitos, ${c.pendente} em andamento, ${c.aberto} a fazer${c.trancada ? `, ${c.trancada} ainda não abertas` : ""}`
+              }
+              segmentos={
+                chave === "avaliacao_encontro"
+                  ? [
+                      {
+                        valor: c.feitas,
+                        rotulo: "avaliações respondidas",
+                        cls: "bg-[var(--ok)]",
+                      },
+                    ]
+                  : [
+                      {
+                        valor: c.respondido,
+                        rotulo: "feitos",
+                        cls: "bg-[var(--ok)]",
+                      },
+                      {
+                        valor: c.pendente,
+                        rotulo: "em andamento",
+                        cls: "bg-[var(--warn)]",
+                      },
+                      {
+                        valor: c.aberto,
+                        rotulo: "a fazer",
+                        cls: "bg-border",
+                      },
+                      // trancada fica de fora como posição neutra — o
+                      // denominador deixa o buraco honesto no trilho
+                    ]
+              }
+            />
+          )}
+          {c.fora > 0 && (
+            <p className="mt-1 inline-flex items-center gap-1 text-[11px] font-medium text-[var(--warn-text)]">
+              <Warning size={11} weight="fill" aria-hidden />
+              {c.fora} fora da janela
+            </p>
+          )}
         </>
       )}
+    </div>
+  );
+}
+
+/** A estação inteira trancada em TODAS as turmas — o segmento mostra a
+ *  previsão de abertura em vez de barras vazias (a mesma honestidade do
+ *  card trancado: a forma fica visível, a cópia diz quando abre). */
+function estacaoTrancadaToda(
+  chave: EstacaoChave,
+  resolvidas: LinhaResolvida[]
+): boolean {
+  return (
+    chave !== "avaliacao_encontro" &&
+    resolvidas.length > 0 &&
+    resolvidas.every((r) => r.estados[chave] === "trancada")
+  );
+}
+
+/** O segmento da faixa — um por instrumento: título + janela do guia +
+ *  uma mini-barra por turma (T1 × T2 com fração própria). ≤960px a faixa
+ *  rola na horizontal (v5c): min-w e snap no item, não quebra de linha. */
+function SegmentoInstrumento({
+  chave,
+  grupos,
+  resolvidas,
+}: {
+  chave: EstacaoChave;
+  grupos: GrupoTurma[];
+  resolvidas: LinhaResolvida[];
+}) {
+  const meta = ESTACOES[chave];
+  const trancadaToda = estacaoTrancadaToda(chave, resolvidas);
+  return (
+    <li className="w-44 shrink-0 snap-start rounded-lg border border-border/70 p-3 lg:w-auto lg:min-w-0 lg:flex-1">
+      <p className="text-xs font-semibold leading-snug">{meta.titulo}</p>
+      <p className="mt-0.5 text-[11px] text-muted-foreground">
+        {meta.chipLabel}
+      </p>
+      {trancadaToda ? (
+        <p className="mt-3 flex items-start gap-1.5 text-[11px] font-medium leading-snug text-muted-foreground">
+          <LockSimple size={12} aria-hidden className="mt-px shrink-0" />
+          {liberaCopia(chave, grupos)}
+        </p>
+      ) : (
+        <div className="mt-2.5 space-y-2.5">
+          {grupos.map((g) => (
+            <MiniBarraTurma key={g.cronogramaId} chave={chave} grupo={g} />
+          ))}
+        </div>
+      )}
+    </li>
+  );
+}
+
+/** Linha da lista "fora da janela" — a única parte acionável do painel
+ *  (v5c): quem a dupla é, o que ficou pra trás e o gesto (Ver ficha +
+ *  Lembrar mentor dentro do cap de 48h, ou o badge de dupla pausada). */
+function ForaItem({
+  r,
+  duplasInfo,
+  nudges,
+  meuNome,
+}: {
+  r: LinhaResolvida;
+  duplasInfo: Map<
+    string,
+    { status: string; mentorWhatsapp: string | null }
+  >;
+  nudges: Record<string, Interacao>;
+  meuNome: string;
+}) {
+  const { linha } = r;
+  const info = duplasInfo.get(linha.dupla_id);
+  const nudge =
+    nudges[linha.dupla_id]?.tipo === "nudge" ? nudges[linha.dupla_id] : null;
+  const falta = ESTACAO_CHAVES.filter((c) => r.atrasadas.has(c))
+    .map((c) =>
+      c === "avaliacao_encontro"
+        ? `avaliação de encontro (${linha.avaliacoes_encontro.feitas} de ${linha.avaliacoes_encontro.realizados})`
+        : ESTACOES[c].titulo
+    )
+    .join(" · ");
+  const turma = linha.turma ? turmaCurta(linha.turma) : null;
+  return (
+    <li className="flex flex-wrap items-center gap-x-4 gap-y-2 py-2.5">
+      <div className="min-w-40 flex-1">
+        <p className="text-sm font-medium">
+          {linha.jovem_nome}
+          <span className="ml-2 text-xs font-normal text-muted-foreground">
+            {[turma, `enc. ${r.encCorrDupla}`, `mentor ${linha.mentor_nome}`]
+              .filter(Boolean)
+              .join(" · ")}
+          </span>
+        </p>
+        <p className="mt-0.5 text-xs text-muted-foreground">{falta}</p>
+      </div>
+      <div className="flex items-center gap-2">
+        <Link
+          href={`/duplas/${linha.dupla_id}`}
+          className={buttonVariants({ variant: "outline", size: "sm" })}
+        >
+          <Eye aria-hidden />
+          Ver ficha
+        </Link>
+        {info?.status === "ativa" ? (
+          <LembreteButton
+            duplaId={linha.dupla_id}
+            destino="mentor"
+            rotulo={`Lembrar ${linha.mentor_nome.split(" ")[0]}`}
+            telefone={info?.mentorWhatsapp ?? null}
+            titulo="Instrumentos da jornada"
+            corpo={
+              msgsContato(
+                {
+                  eu: meuNome,
+                  mentorNome: linha.mentor_nome,
+                  mentoradoNome: linha.jovem_nome,
+                },
+                {
+                  casoMentor: `A jornada de ${linha.jovem_nome.split(" ")[0]} tem pendências fora da janela do guia (${falta}). O link vai pro jovem pela ficha da dupla.`,
+                }
+              ).mentor ?? ""
+            }
+            href={`/duplas/${linha.dupla_id}`}
+            bloqueadoAte={lembreteBloqueadoAte(nudge)}
+          />
+        ) : (
+          <Badge variant="secondary">dupla pausada</Badge>
+        )}
+      </div>
     </li>
   );
 }
@@ -261,16 +401,13 @@ export function PainelJornada({
   duplasInfo,
   meuNome,
   ehSupervisor,
-  podeLote = false,
-  envioLiberado = false,
 }: {
   linhas: PainelJornadaLinha[];
   eventos: CicloEvento[];
   nudges: Record<string, Interacao>;
   /** status + whatsapp do mentor + flags de e-mail por dupla — o painel
    *  agregado não traz (fatos de jornada apenas). O Lembrar precisa de
-   *  status/whatsapp pra ser honesto; o lote precisa dos flags pra a
-   *  prévia "quem recebe" sem vazar o endereço em si pro client. */
+   *  status/whatsapp pra ser honesto. */
   duplasInfo: Map<
     string,
     {
@@ -283,51 +420,30 @@ export function PainelJornada({
   meuNome: string;
   /** supervisor = escopo supervisionado; a copy explica a diferença. */
   ehSupervisor: boolean;
-  /** coord only (REALIZA-51) — liga o "Enviar em lote" nas estações. */
-  podeLote?: boolean;
-  /** espelho de EMAIL_ENVIO_LIBERADO — o dialog avisa quando desligado. */
-  envioLiberado?: boolean;
 }) {
   if (!linhas.length) return null;
 
-  const resolvidas: LinhaResolvida[] = linhas.map((linha) => {
-    const ctx = painelTurmaCtx(eventos, linha.cronograma_id);
-    // a régua "janela aberta / fora da janela" é a da dupla, não só a da
-    // coorte — dupla tardia/atrasada tem a janela ainda aberta do lado dela
-    const encCorrDupla = Math.min(
-      TRILHA_LEN.dpp,
-      (linha.avaliacoes_encontro.max_numero ?? 0) + 1
+  const resolvidas = resolveLinhasPainel(linhas, eventos);
+  const grupos = agrupaPorTurma(resolvidas);
+
+  // a lista de ação, ordenada por criticidade (v5c): mais instrumentos
+  // parados primeiro, depois ordem alfabética — determinística
+  const foraLista = resolvidas
+    .filter((r) => r.atrasadas.size > 0)
+    .sort(
+      (a, b) =>
+        b.atrasadas.size - a.atrasadas.size ||
+        a.linha.jovem_nome.localeCompare(b.linha.jovem_nome)
     );
-    const estados = estacoesPainelDupla(linha, ctx, encCorrDupla);
-    return {
-      linha,
-      encVigente: ctx.encVigente,
-      estados,
-      atrasadas: new Set(atrasadasPainel(estados, ctx, encCorrDupla)),
-    };
-  });
+  const foraTopo = foraLista.slice(0, TETO_FORA);
+  const foraResto = foraLista.slice(TETO_FORA);
 
-  // KPIs — contagens honestas: pendência é tudo que a janela já abriu e
-  // não foi respondido (link vivo, expirado ou nem enviado + avaliação)
-  let respondidas = 0;
-  let pendencias = 0;
-  let foraDaJanela = 0;
-  for (const r of resolvidas) {
-    for (const chave of ESTACAO_CHAVES) {
-      const e = r.estados[chave];
-      if (e === "respondido") respondidas++;
-      else if (e !== "trancada") pendencias++;
-    }
-    foraDaJanela += r.atrasadas.size;
-  }
-
-  // agrupa por turma (o texto já vem da linha; "Sem turma" defensivo)
-  const turmas = new Map<string, LinhaResolvida[]>();
-  for (const r of resolvidas) {
-    const t = r.linha.turma ?? "Sem turma";
-    turmas.set(t, [...(turmas.get(t) ?? []), r]);
-  }
-  const foraLista = resolvidas.filter((r) => r.atrasadas.size > 0);
+  const resumoTurmas = grupos
+    .map(
+      (g) =>
+        `${g.nome}: ${g.linhas.length} ${g.linhas.length === 1 ? "dupla" : "duplas"}, encontro ${g.ctx.encVigente || "—"}`
+    )
+    .join(" · ");
 
   return (
     <section className="space-y-5 rounded-xl bg-card p-4 shadow-[var(--shadow-border)] sm:p-5">
@@ -335,242 +451,48 @@ export function PainelJornada({
         <h2 className="flex items-center gap-2 font-semibold">
           Progresso da jornada
         </h2>
+        <p className="mt-1 text-xs text-muted-foreground">
+          {resumoTurmas}
+        </p>
+        {/* o "você vê / você não vê" mora na caixa do topo da página — aqui
+            fica a linha de uso do painel (v5c) */}
         <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-          {ehSupervisor ? (
-            <>
-              <strong className="text-foreground">Você vê:</strong> o estado
-              de cada instrumento — feito, em andamento, a fazer — nas duplas
-              DPP que você supervisiona.{" "}
-              <strong className="text-foreground">Você não vê:</strong> o
-              conteúdo das respostas, os links, nem duplas de outros
-              supervisores. Não há botão de enviar ou preencher — quem
-              entrega o instrumento ao jovem é o mentor.
-            </>
-          ) : (
-            <>
-              <strong className="text-foreground">Você vê:</strong> o estado
-              de cada instrumento de todas as duplas DPP ativas e pausadas.{" "}
-              <strong className="text-foreground">Você não vê aqui:</strong>{" "}
-              respostas — elas ficam na ficha da dupla, que é onde o detalhe
-              mora. A ação é “Enviar em lote” nos instrumentos do guia
-              (o link sai por e-mail pro jovem, ou pro mentor repassar)
-              ou lembrar o mentor um a um nas duplas fora da janela.
-            </>
-          )}
+          {ehSupervisor
+            ? "O estado por instrumento nas duplas que você supervisiona — sem respostas e sem ações por aqui: a ficha da dupla é o detalhe."
+            : "O estado por instrumento, turma a turma — detalhe, respostas e envio por dupla ficam na ficha."}
         </p>
       </div>
 
-      {/* KPIs */}
-      <ul className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        {[
-          { n: String(linhas.length), l: "duplas no painel" },
-          { n: String(respondidas), l: "estações respondidas" },
-          { n: String(pendencias), l: "pendências na janela" },
-          { n: String(foraDaJanela), l: "fora da janela do guia" },
-        ].map((k) => (
-          <li
-            key={k.l}
-            className="rounded-lg border border-border/70 px-3 py-2.5"
-          >
-            <p className="text-xl font-bold tabular-nums leading-none">
-              {k.n}
-            </p>
-            <p className="mt-1 text-xs text-muted-foreground">{k.l}</p>
-          </li>
+      {/* a faixa por instrumento — 7 segmentos em trilho rolável (mobile)
+          que vira linha única esticada no desktop, cada um com uma
+          mini-barra por turma (fração própria por turma, nunca "x de 26"
+          agregado). O próprio trilho é região focável: scroll por
+          teclado alcança os segmentos escondidos */}
+      <ul
+        role="region"
+        aria-label="Cobertura por instrumento"
+        tabIndex={0}
+        className="-mx-1 flex snap-x snap-mandatory gap-2.5 overflow-x-auto px-1 pb-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring lg:flex-nowrap lg:overflow-visible"
+      >
+        {ESTACAO_CHAVES.map((chave) => (
+          <SegmentoInstrumento
+            key={chave}
+            chave={chave}
+            grupos={grupos}
+            resolvidas={resolvidas}
+          />
         ))}
       </ul>
 
-      {/* progresso por instrumento */}
-      <div>
-        <h3 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-          Por instrumento
-        </h3>
-        <ul className="mt-2 space-y-3">
-          {ESTACAO_CHAVES.map((chave) => {
-            const sistema = SISTEMA_DA_ESTACAO[chave];
-            const elegiveis: DuplaLote[] = sistema
-              ? resolvidas
-                  .filter((r) => ESTADOS_LOTE.has(r.estados[chave]))
-                  .map((r) => {
-                    const info = duplasInfo.get(r.linha.dupla_id);
-                    return {
-                      duplaId: r.linha.dupla_id,
-                      jovemNome: r.linha.jovem_nome,
-                      mentorNome: r.linha.mentor_nome,
-                      jovemTemEmail: info?.jovemTemEmail ?? false,
-                      mentorTemEmail: info?.mentorTemEmail ?? false,
-                    };
-                  })
-              : [];
-            return (
-              <BarraEstacao
-                key={chave}
-                chave={chave}
-                linhasResolvidas={resolvidas}
-                acao={
-                  podeLote && sistema && elegiveis.length > 0 ? (
-                    <EnviarInstrumentoLote
-                      sistema={sistema}
-                      estacaoTitulo={ESTACOES[chave].titulo}
-                      linhas={elegiveis}
-                      envioLiberado={envioLiberado}
-                    />
-                  ) : undefined
-                }
-              />
-            );
-          })}
-        </ul>
-      </div>
-
-      {/* a lista de ação — fora da janela do guia */}
-      {foraLista.length > 0 && (
-        <div>
-          <h3 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--warn-text)]">
-            Fora da janela do guia
-          </h3>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            O instrumento não fecha sozinho — vale lembrar o mentor de
-            enviar o link na ficha da dupla. A avaliação do encontro é da
-            jovem: o link nasce sozinho quando o encontro vira realizado.
-          </p>
-          <ul className="mt-2 divide-y divide-border/60">
-            {foraLista.map((r) => {
-              const { linha } = r;
-              const info = duplasInfo.get(linha.dupla_id);
-              const nudge =
-                nudges[linha.dupla_id]?.tipo === "nudge"
-                  ? nudges[linha.dupla_id]
-                  : null;
-              const falta = ESTACAO_CHAVES.filter((c) =>
-                r.atrasadas.has(c)
-              )
-                .map((c) =>
-                  c === "avaliacao_encontro"
-                    ? `avaliação de encontro (${linha.avaliacoes_encontro.feitas} de ${linha.avaliacoes_encontro.realizados})`
-                    : ESTACOES[c].titulo
-                )
-                .join(" · ");
-              const lembrar =
-                info?.status === "ativa" ? (
-                  <LembreteButton
-                    duplaId={linha.dupla_id}
-                    destino="mentor"
-                    rotulo={`Lembrar ${linha.mentor_nome.split(" ")[0]}`}
-                    telefone={info?.mentorWhatsapp ?? null}
-                    titulo="Instrumentos da jornada"
-                    corpo={
-                      msgsContato(
-                        {
-                          eu: meuNome,
-                          mentorNome: linha.mentor_nome,
-                          mentoradoNome: linha.jovem_nome,
-                        },
-                        {
-                          casoMentor: `A jornada de ${linha.jovem_nome.split(" ")[0]} tem pendências fora da janela do guia (${falta}). O link vai pro jovem pela ficha da dupla.`,
-                        }
-                      ).mentor ?? ""
-                    }
-                    href={`/duplas/${linha.dupla_id}`}
-                    bloqueadoAte={lembreteBloqueadoAte(nudge)}
-                  />
-                ) : (
-                  <Badge variant="secondary">dupla pausada</Badge>
-                );
-              return (
-                <li
-                  key={linha.dupla_id}
-                  className="flex flex-wrap items-center gap-x-4 gap-y-2 py-2.5"
-                >
-                  <div className="min-w-40 flex-1">
-                    <p className="text-sm font-medium">
-                      {linha.jovem_nome}
-                      <span className="ml-2 text-xs font-normal text-muted-foreground">
-                        {linha.turma} · enc. {r.encVigente || "—"} · mentor{" "}
-                        {linha.mentor_nome}
-                      </span>
-                    </p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
-                      {falta}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Link
-                      href={`/duplas/${linha.dupla_id}`}
-                      className={buttonVariants({
-                        variant: "outline",
-                        size: "sm",
-                      })}
-                    >
-                      <Eye aria-hidden />
-                      Ver ficha
-                    </Link>
-                    {lembrar}
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      )}
-
-      {/* o retrato por turma — as células de estado por dupla */}
-      {[...turmas.entries()].map(([turma, rs]) => (
-        <div key={turma}>
-          <h3 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-            {turma}
-            <span className="ml-2 font-normal normal-case tracking-normal">
-              · encontro {rs[0]?.encVigente ?? 0} do calendário
-            </span>
-          </h3>
-          <ul className="mt-2 divide-y divide-border/60">
-            {rs.map((r) => (
-              <li
-                key={r.linha.dupla_id}
-                className="flex flex-wrap items-center gap-x-4 gap-y-2 py-2.5"
-              >
-                <div className="min-w-40 flex-1">
-                  <p className="text-sm font-medium">{r.linha.jovem_nome}</p>
-                  <p className="text-xs text-muted-foreground">
-                    mentor {r.linha.mentor_nome}
-                  </p>
-                </div>
-                <div className="flex flex-wrap items-center gap-1.5">
-                  {ESTACAO_CHAVES.map((c) => (
-                    <CelulaEstacao
-                      key={c}
-                      chave={c}
-                      estado={r.estados[c]}
-                      atrasada={r.atrasadas.has(c)}
-                      aval={
-                        c === "avaliacao_encontro"
-                          ? r.linha.avaliacoes_encontro.realizados > 0
-                            ? `Aval. ${r.linha.avaliacoes_encontro.feitas}/${r.linha.avaliacoes_encontro.realizados}`
-                            : "Aval. —"
-                          : null
-                      }
-                    />
-                  ))}
-                  <Link
-                    href={`/duplas/${r.linha.dupla_id}`}
-                    className={buttonVariants({
-                      variant: "ghost",
-                      size: "sm",
-                    })}
-                  >
-                    Ver ficha
-                  </Link>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </div>
-      ))}
-
-      {/* legenda */}
-      <p className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-border/60 pt-3 text-[11px] text-muted-foreground">
+      {/* legenda — os mesmos 5 estados da matriz */}
+      <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
         <span className="inline-flex items-center gap-1">
-          <Check size={11} weight="bold" className="text-[var(--ok-text)]" aria-hidden />
+          <Check
+            size={11}
+            weight="bold"
+            className="text-[var(--ok-text)]"
+            aria-hidden
+          />
           respondido
         </span>
         <span className="inline-flex items-center gap-1">
@@ -578,18 +500,155 @@ export function PainelJornada({
           link enviado, aguardando
         </span>
         <span className="inline-flex items-center gap-1">
-          <CircleDashed size={11} aria-hidden />
-          a fazer / link expirado
+          <Clock size={11} className="text-muted-foreground" aria-hidden />
+          link expirado
+        </span>
+        <span className="inline-flex items-center gap-1">
+          <CircleDashed size={11} aria-hidden />a fazer
         </span>
         <span className="inline-flex items-center gap-1">
           <LockSimple size={11} aria-hidden />
           ainda não abriu na turma
         </span>
         <span className="inline-flex items-center gap-1">
-          <Warning size={11} weight="fill" className="text-[var(--warn-text)]" aria-hidden />
+          <Warning
+            size={11}
+            weight="fill"
+            className="text-[var(--warn-text)]"
+            aria-hidden
+          />
           fora da janela do guia
         </span>
       </p>
+
+      {/* a lista de ação — fora da janela do guia, com teto (v5c): as 5
+          mais críticas + <details> pro resto */}
+      {foraLista.length > 0 && (
+        <div>
+          <h3 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--warn-text)]">
+            Fora da janela do guia
+          </h3>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            {foraLista.length}{" "}
+            {foraLista.length === 1
+              ? "dupla tem instrumento"
+              : "duplas têm instrumentos"}{" "}
+            que já passaram do ponto do guia sem resposta — o instrumento
+            não fecha sozinho, vale lembrar o mentor de enviar o link na
+            ficha. A avaliação do encontro é da jovem: o link nasce sozinho
+            quando o encontro vira realizado.
+          </p>
+          <ul className="mt-2 divide-y divide-border/60">
+            {foraTopo.map((r) => (
+              <ForaItem
+                key={r.linha.dupla_id}
+                r={r}
+                duplasInfo={duplasInfo}
+                nudges={nudges}
+                meuNome={meuNome}
+              />
+            ))}
+          </ul>
+          {foraResto.length > 0 && (
+            <details className="group">
+              <summary className="flex min-h-11 cursor-pointer list-none items-center gap-1.5 text-xs font-medium text-muted-foreground underline-offset-2 outline-none transition-colors select-none marker:hidden hover:text-foreground hover:underline focus-visible:ring-2 focus-visible:ring-ring sm:min-h-8 [&::-webkit-details-marker]:hidden">
+                <CaretDown
+                  size={13}
+                  aria-hidden
+                  className="shrink-0 transition-transform group-open:rotate-180"
+                />
+                Ver as outras {foraResto.length}{" "}
+                {foraResto.length === 1 ? "dupla" : "duplas"}
+              </summary>
+              <ul className="divide-y divide-border/60 border-t border-border/60">
+                {foraResto.map((r) => (
+                  <ForaItem
+                    key={r.linha.dupla_id}
+                    r={r}
+                    duplasInfo={duplasInfo}
+                    nudges={nudges}
+                    meuNome={meuNome}
+                  />
+                ))}
+              </ul>
+            </details>
+          )}
+        </div>
+      )}
+
+      {/* a matriz por dupla atrás de gesto (v5c) — agrupada por Turma
+          1/Turma 2 com o encontro vigente de cada calendário */}
+      <details className="group border-t border-border/60 pt-3">
+        <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 text-sm font-medium select-none marker:hidden transition-colors hover:text-foreground/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-9 [&::-webkit-details-marker]:hidden">
+          <CaretDown
+            size={15}
+            aria-hidden
+            className="shrink-0 text-muted-foreground transition-transform group-open:rotate-180"
+          />
+          Ver a matriz por dupla
+          <span className="ml-auto text-xs font-normal tabular-nums text-muted-foreground">
+            {resolvidas.length}{" "}
+            {resolvidas.length === 1 ? "dupla" : "duplas"} · por turma
+          </span>
+        </summary>
+        <div className="mt-2 space-y-5">
+          {grupos.map((g) => (
+            <div key={g.cronogramaId}>
+              <h3 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                {g.nome}
+                <span className="ml-2 font-normal normal-case tracking-normal">
+                  · encontro {g.ctx.encVigente || "—"} do calendário ·{" "}
+                  {g.linhas.length}{" "}
+                  {g.linhas.length === 1 ? "dupla" : "duplas"}
+                </span>
+              </h3>
+              <ul className="mt-2 divide-y divide-border/60">
+                {g.linhas.map((r) => (
+                  <li
+                    key={r.linha.dupla_id}
+                    className="flex flex-wrap items-center gap-x-4 gap-y-2 py-2.5"
+                  >
+                    <div className="min-w-40 flex-1">
+                      <p className="text-sm font-medium">
+                        {r.linha.jovem_nome}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        mentor {r.linha.mentor_nome}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {ESTACAO_CHAVES.map((c) => (
+                        <CelulaEstacao
+                          key={c}
+                          chave={c}
+                          estado={r.estados[c]}
+                          atrasada={r.atrasadas.has(c)}
+                          aval={
+                            c === "avaliacao_encontro"
+                              ? r.linha.avaliacoes_encontro.realizados > 0
+                                ? `Aval. ${r.linha.avaliacoes_encontro.feitas}/${r.linha.avaliacoes_encontro.realizados}`
+                                : "Aval. —"
+                              : null
+                          }
+                        />
+                      ))}
+                      <Link
+                        href={`/duplas/${r.linha.dupla_id}`}
+                        className={buttonVariants({
+                          variant: "ghost",
+                          size: "sm",
+                        })}
+                      >
+                        Ver ficha
+                      </Link>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      </details>
     </section>
   );
 }
