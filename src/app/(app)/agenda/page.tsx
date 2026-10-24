@@ -49,13 +49,22 @@ export const metadata: Metadata = { title: "Agenda" };
 export default async function AgendaPage({
   searchParams,
 }: {
-  searchParams: Promise<{ dia?: string; visao?: string; aba?: string }>;
+  searchParams: Promise<{
+    dia?: string;
+    visao?: string;
+    aba?: string;
+    jw?: string;
+  }>;
 }) {
   // ?dia=YYYY-MM-DD abre a agenda já no dia (deep-link da ficha/notificações);
   // ?visao=dpp|especialista abre a aba correspondente do híbrido (WP6b);
   // ?aba=minha|por-mentorado|calendario abre o modo dentro da visão DPP (WP3)
-  const { dia, visao: visaoParam, aba: abaParam } = await searchParams;
+  // ?jw=semana|mes|ciclo — a janela temporal de coord/sup (REALIZA-195);
+  // é param próprio, nunca recicla o ?visao= de papel
+  const { dia, visao: visaoParam, aba: abaParam, jw } = await searchParams;
   const diaInicial = dia && /^\d{4}-\d{2}-\d{2}$/.test(dia) ? dia : null;
+  const janelaInicial =
+    jw === "semana" || jw === "mes" || jw === "ciclo" ? jw : null;
   // valor fora do vocabulário vale como param ausente — cai no default do
   // papel primário em vez de forçar a visão DPP
   const visao =
@@ -176,6 +185,7 @@ export default async function AgendaPage({
           slots={slots}
           sessoes={sessoes}
           hojeIso={hoje}
+          agoraMs={agora.getTime()}
         />
       );
     return duasVisoes ? (
@@ -198,12 +208,14 @@ export default async function AgendaPage({
   // "acompanha, não participa") e Calendário (o AgendaCalendario atual,
   // preservado inteiro). Coord/sup ficam no calendário — os modos novos são
   // do mentor. Param inválido cai em "minha" — default da v6, não do papel.
-  // ?dia= sem ?aba= explícita mira o calendário — o deep-link é dele.
+  // ?dia= sem ?aba= explícita mira o calendário — o deep-link é dele;
+  // ?jw= também (é o seletor temporal das visões do calendário — implica
+  // aba=calendario pra quem tem a superfície)
   const souMentor = temPapel(me, "mentor_dpp");
   const aba =
     abaParam === "por-mentorado" || abaParam === "calendario"
       ? abaParam
-      : diaInicial != null
+      : diaInicial != null || janelaInicial != null
         ? "calendario"
         : "minha";
   // "Minhas duplas" = as que eu mentoro — pra staff+mentor o escopo RLS traz
@@ -265,7 +277,13 @@ export default async function AgendaPage({
           </p>
         </header>
         {duasVisoes && <AbasAgenda ativa="dpp" />}
-        <AbasAgendaMentor ativa={aba} hibrido={duasVisoes} />
+        {/* staff+mentor também é híbrido aqui: sem o ?visao=dpp as tabs
+            "minha/por mentorado" derrubam de volta na superfície de equipe
+            (mesma régua das chamadas lá de baixo) */}
+        <AbasAgendaMentor
+          ativa={aba}
+          hibrido={duasVisoes || (papelStaff ?? false)}
+        />
         {aba === "minha" ? (
           <AgendaMinha
             duplas={duplasDpp}
@@ -276,6 +294,10 @@ export default async function AgendaPage({
             meuId={me!.id}
             hoje={hoje}
             agora={agora.getTime()}
+            // staff+mentor híbrido: os cards da faixa linkam pro dia no
+            // calendário — precisam carregar a visão certa (regra do
+            // hibrido do PorMentorado)
+            hibrido={duasVisoes || (papelStaff ?? false)}
           />
         ) : (
           <AgendaPorMentorado
@@ -298,6 +320,7 @@ export default async function AgendaPage({
             meuId={me!.id}
             meuNome={me!.nome.split(" ")[0]}
             hoje={hoje}
+            agora={agora.getTime()}
           />
         )}
       </div>
@@ -310,11 +333,16 @@ export default async function AgendaPage({
   // nunca agenda por dupla — então o calendário do ciclo não é superfície
   // dele; `?dia=` cai na mesma vista (sem painel de dia)
   // supervisor+mentor tem o calendário DPP dele atrás de ?aba=calendario e
-  // do deep-link ?dia= — sem o guard, o ramo da auxiliar captura a aba e o
-  // dia que não são dela
+  // dos deep-links ?dia=/?jw= — sem o guard, o ramo da auxiliar captura a
+  // aba e a janela que não são dela
   if (
     me?.role === "supervisor" &&
-    !((abaParam === "calendario" || diaInicial != null) && souMentor)
+    !(
+      (abaParam === "calendario" ||
+        diaInicial != null ||
+        janelaInicial != null) &&
+      souMentor
+    )
   ) {
     const supervisionadas = duplas.filter((d) => d.supervisor?.id === me.id);
     const [alvos, supervisoesAux, nudgesAux] = await Promise.all([
@@ -335,6 +363,11 @@ export default async function AgendaPage({
           nudges={nudgesAux}
           meuNome={me.nome.split(" ")[0]}
           hoje={hoje}
+          agora={agora.getTime()}
+          // supervisor+mentor tem superfície de dia própria — os cards da
+          // faixa linkam `?aba=calendario&dia=` (o guard acima escapa esse
+          // param do ramo auxiliar); pro supervisor puro o link seria engolido
+          comLinkDia={souMentor}
           consolidada={abaParam === "consolidada"}
         />
       </div>
@@ -342,12 +375,13 @@ export default async function AgendaPage({
   }
 
   // ---- ramo coordenação (WP5) — "Monitoramento" é a aterrissagem; o
-  // calendário oficial vira a segunda aba (?aba=calendario ou o
-  // deep-link ?dia= da ficha/notificação)
+  // calendário oficial vira a segunda aba (?aba=calendario ou os
+  // deep-links ?dia=/?jw= da ficha/notificação)
   if (
     me?.role === "coordenacao" &&
     abaParam !== "calendario" &&
-    diaInicial == null
+    diaInicial == null &&
+    janelaInicial == null
   ) {
     const [nudgesCoord, supervisoesCoord, encerramentosPendentes] =
       await Promise.all([
@@ -374,12 +408,13 @@ export default async function AgendaPage({
           }
           meuNome={me.nome.split(" ")[0]}
           hoje={hoje}
+          agora={agora.getTime()}
         />
       </div>
     );
   }
 
-  // ---- ramo calendário (aba da coord, visão do mentor e ?dia=) ----
+  // ---- ramo calendário (aba da coord, visão do mentor e ?dia=/?jw=) ----
   // Busca tardia: materiais, grade do mentor (overlay de disponibilidade),
   // chamada da coordenação e o catálogo de sessões esp só valem aqui.
   const [materiais, meuMentorProfile, espEventos] = await Promise.all([
@@ -449,17 +484,19 @@ export default async function AgendaPage({
           hoje={hoje}
           semanaId={semana?.id ?? null}
           diaInicial={diaInicial}
+          janelaInicial={janelaInicial}
           duplas={duplas}
           role={me?.role ?? null}
           papeis={me?.papeis ?? null}
           mentores={mentoresChamada}
           presencas={presencasPorEvento}
-          // Overlay "quem pode nesse dia" — só o mentor DPP (REALIZA-24):
-          // coord/sup veem TODAS as duplas (uma tinta por dupla seria
-          // ambígua) e o especialista tem o próprio sistema de slots
-          // (0073, AgendaEspecialista), não a grade dow×período
+          // Overlay "quem pode nesse dia" — só o mentor DPP puro
+          // (REALIZA-24): coord/sup veem TODAS as duplas (uma tinta por
+          // dupla seria ambígua) e pro staff+mentor a grade dele seria
+          // vazamento de coorte na superfície de equipe — a visão mentor
+          // dele fica atrás do ?visao=dpp
           mentorDisponibilidade={
-            temPapel(me, "mentor_dpp")
+            temPapel(me, "mentor_dpp") && !papelStaff
               ? (meuMentorProfile?.disponibilidade ?? null)
               : undefined
           }

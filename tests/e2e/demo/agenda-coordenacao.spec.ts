@@ -1,16 +1,17 @@
 import { entrarNaDemo, expect, test } from "../helpers";
 
-// WP5 → REALIZA-161 → REALIZA-176 — a agenda da coordenação no modo
-// "Monitoramento" virou dashboard operacional (DOM real): faixa de síntese
-// no topo (a leitura de 2s) e depois a ordem operacional — 1º "Para
-// acompanhar" (a fila com badges por dimensão — vermelho só no
-// acompanhamento — filtros em chips, agrupamento críticas × demais e o
-// Lembrar universal; o cap D5 de 48h por dupla já chega computado), 2º
-// "Semana no programa" (os oficiais do seg–dom + supervisões da equipe) e
-// 3º "Semana do encontro, por cronograma" (uma linha por turma — nunca
-// misturado — com o deep-link pro dia oficial e a barra única lime/muted;
-// sem barra segmentada nem número gigante). A coordenação NÃO agenda por
-// ninguém: a única ação sobre dupla aqui é o nudge.
+// WP5 → REALIZA-161 → REALIZA-176 → REALIZA-195 (v8b) — a agenda da
+// coordenação no modo "Monitoramento": faixa de síntese no topo (a leitura
+// de 2s), 1º "Semana do programa" (os oficiais do seg–dom em cards de
+// scroll lateral — tema, instrumentos e "o que cobre" atrás de <details>),
+// 2º "Números da semana" (cobertura honesta por turma — denominador
+// literal com "sem data" visível — semáforo com o eixo azul do apoio e o
+// pulso de registro com a ★ do jovem; o recorte T1/T2/Todas é estado
+// próprio da seção), e por último o "Painel da semana" — a fila "Para
+// acompanhar" (badges por dimensão — vermelho só no acompanhamento —,
+// chips que filtram de verdade, agrupamento críticas × demais e o Lembrar
+// universal com o cap D5 de 48h). A coordenação NÃO agenda por ninguém:
+// a única ação sobre dupla aqui é o nudge.
 //
 // Dataset demo (src/lib/demo/data.ts):
 //   · vigentes da semana: enc. 5 da T1 e enc. 1 da T2 — as duas turmas rolam
@@ -79,102 +80,161 @@ test.describe("agenda demo da coordenação — Monitoramento (WP5)", () => {
       "/agenda?aba=calendario"
     );
 
-    // as três seções do modo — as labels acessíveis são o contrato, e a
-    // primeira é a fila operacional (REALIZA-176: a resposta dos 5s no topo)
+    // as seções do modo na ordem do v8b (REALIZA-195): orientação do
+    // programa ANTES do detalhe operacional — 1º "Semana do programa",
+    // 2º "Números da semana", por último o "Painel da semana" que abriga a
+    // fila "Duplas para acompanhar" (role=group, a resposta dos 5s)
     await expect(page.locator("section[aria-label]").first()).toHaveAttribute(
       "aria-label",
-      "Duplas para acompanhar"
+      "Semana do programa"
     );
     for (const label of [
-      "Semana do encontro por cronograma",
-      "Duplas para acompanhar",
-      "Semana no programa",
+      "Semana do programa",
+      "Números da semana",
+      "Painel da semana",
     ])
       await expect(
         page.locator(`section[aria-label="${label}"]`)
       ).toBeVisible();
+    await expect(
+      page.locator('[role="group"][aria-label="Duplas para acompanhar"]')
+    ).toBeVisible();
   });
 
-  test("semana do encontro por cronograma — uma linha por turma", async ({
+  test("números da semana — cobertura honesta por turma, semáforo e recorte", async ({
     page,
   }) => {
-    const sec = page.locator(
-      'section[aria-label="Semana do encontro por cronograma"]'
-    );
+    const sec = page.locator('section[aria-label="Números da semana"]');
+    await expect(
+      sec.getByRole("heading", { name: "Números da semana" })
+    ).toBeVisible();
 
-    // REALIZA-176 — a seção compactou: uma linha por cronograma ativo (não
-    // cards 2×n), todas com a mesma anatomia — pill da turma, título com o
-    // deep-link pro dia oficial, sublinha de contagem e a barra única
-    const linhas = sec.getByRole("listitem");
-    await expect(linhas).toHaveCount(2);
+    // os três eixos do mock: cobertura do vigente por turma, semáforo das
+    // duplas (rosca) e pulso de registro
+    await expect(
+      sec.getByRole("heading", { name: "Cobertura do encontro da semana" })
+    ).toBeVisible();
+    await expect(
+      sec.getByRole("heading", { name: "Semáforo das duplas" })
+    ).toBeVisible();
+    await expect(
+      sec.getByRole("heading", { name: "Pulso da semana" })
+    ).toBeVisible();
+
+    // (a) cobertura — uma linha por cronograma ativo: pill da turma, link
+    // pro dia oficial, "N de M com registro" e a barra honesta (role=img,
+    // denominador literal — "sem data" é fatia nomeada, nunca omissão)
+    const linhaT1 = sec.locator("li", { hasText: "Turma 1" }).first();
+    const linhaT2 = sec.locator("li", { hasText: "Turma 2" }).first();
+    await expect(linhaT1).toBeVisible();
+    await expect(linhaT2).toBeVisible();
 
     // o vigente da T1 anda com o dia da semana: seg/ter é o enc. 5 (a âncora
     // do dataset mira a terça que vem); de qua a dom o 5 já saltou pra
-    // semana seguinte e o vigente é o 4 — a história é a mesma
-    const linkT1 = sec.getByRole("link", {
-      name: /Encontro [45] · T1 · 2026\/2027 — abrir o dia no calendário/,
-    });
+    // semana seguinte e o vigente é o 4 — a T2 é estável no enc. 1
+    const linkT1 = linhaT1.getByRole("link", { name: /^Encontro [45]$/ });
     await expect(linkT1).toBeVisible();
     await expect(linkT1).toHaveAttribute(
       "href",
       /^\/agenda\?aba=calendario&dia=\d{4}-\d{2}-\d{2}$/
     );
     await expect(
-      sec.getByRole("link", {
-        name: "Encontro 1 · T2 · 2026/2027 — abrir o dia no calendário",
-      })
+      linhaT2.getByRole("link", { name: "Encontro 1" })
     ).toBeVisible();
 
-    // "X de Y realizaram" em texto corrido — sem número gigante. T1: 0 ou 2
-    // de 4 conforme o vigente; T2 estável em 1 de 3 (só o Matheus realizou)
-    const linhaT1 = linhas.filter({ hasText: "Turma 1" });
-    await expect(linhaT1).toContainText(/[02] de 4/);
-    await expect(linhaT1).toContainText("realizaram");
-    await expect(
-      linhas.filter({ hasText: "Turma 2" })
-    ).toContainText(/1 de 3/);
+    // "N de M com registro" — denominador das ATIVAS da turma. T1: enc. 5
+    // futuro (0) ou enc. 4 passado (1: Caio realizou sem registro, Eduardo
+    // não-aconteceu, Dandara sem row); T2: o Matheus entregou o do enc. 1
+    const dowHoje = new Date(`${hojeSP()}T12:00:00Z`).getUTCDay();
+    const ancoraNaSemana = dowHoje === 1 || dowHoje === 2;
+    await expect(linhaT1).toContainText(
+      ancoraNaSemana ? "0 de 4 com registro" : "1 de 4 com registro"
+    );
+    await expect(linhaT2).toContainText("1 de 3 com registro");
 
-    // o hint do desencontro — as turmas não começaram juntas (a nota "por
-    // turma" vive dentro da seção, não ao lado do título)
+    // a barra segmentada lê o MESMO denominador do "N de M" ao lado:
+    // seg–ter<19h "3 agendadas, 1 sem data" (Caio sem row); depois das 19h
+    // os agendados caem em limbo ("aguardando registro"); qua–dom o
+    // vigente é o enc. 4: 1 com registro, 1 aguardando (Caio), 1 não
+    // aconteceu (Eduardo), 1 sem data (Dandara)
+    const barraT1 = linhaT1.getByRole("img");
+    if (ancoraNaSemana) {
+      await expect(barraT1).toHaveAttribute(
+        "aria-label",
+        /3 (agendadas|aguardando registro), 1 sem data — total 4/
+      );
+    } else {
+      await expect(barraT1).toHaveAttribute(
+        "aria-label",
+        "1 com registro, 1 aguardando registro, 1 não aconteceu, 1 sem data — total 4"
+      );
+    }
+    await expect(linhaT2.getByRole("img")).toHaveAttribute(
+      "aria-label",
+      /1 com registro, 2 agendadas|1 com registro, 2 aguardando registro/
+    );
+
+    // o hint do desencontro vive na intro do Painel da semana — "por
+    // turma, nunca misturado" continua sendo o contrato
+    const painel = page.locator('section[aria-label="Painel da semana"]');
     await expect(
-      sec.getByText(/As turmas não começaram juntas/)
+      painel.getByText(/As turmas não começaram juntas/)
     ).toBeVisible();
     await expect(
-      sec.getByText(/T1 · 2026\/2027 está no encontro [45]/)
+      painel.getByText(/T1 · 2026\/2027 está no encontro [45]/)
     ).toBeVisible();
     await expect(
-      sec.getByText(/T2 · 2026\/2027 está no encontro 1/)
+      painel.getByText(/T2 · 2026\/2027 está no encontro 1/)
     ).toBeVisible();
 
-    // a barra única por turma — progressbar lime/muted (a gramática dos
-    // outros painéis), com o detalhe completo no aria-label. Seg/ter (enc.
-    // 5 vigente): "0 realizaram, 3 agendadas, 1 sem agendamento" (o Caio
-    // não tem row); qua–dom (enc. 4 vigente): "2 realizaram, 0 agendadas,
-    // 2 sem agendamento" (Dandara sem row do 4, Eduardo marcou
-    // não-aconteceu). A T2 é estável: só o Matheus realizou o enc. 1
+    // (b) semáforo — a rosca inclui o eixo azul do apoio (trabalho a
+    // fazer, não estado) e a nota aponta a fila certa (/chamados)
+    await expect(sec.getByText(/com apoio aberto/)).toBeVisible();
     await expect(
-      sec.getByRole("progressbar", {
-        name: /realizaram, \d+ agendadas, \d+ sem agendamento/,
-      })
-    ).toHaveCount(2);
-    await expect(
-      sec.getByRole("progressbar", {
-        name: /0 realizaram, 3 agendadas, 1 sem agendamento|2 realizaram, 0 agendadas, 2 sem agendamento/,
-      })
+      sec.getByText(/Apoio aberto é trabalho, não estado da dupla/)
     ).toBeVisible();
     await expect(
-      sec.getByRole("progressbar", {
-        name: /1 realizaram, 2 agendadas, 0 sem agendamento/,
-      })
+      sec.getByRole("link", { name: "Chamados →" })
+    ).toHaveAttribute("href", "/chamados");
+
+    // (c) pulso — "N de M registros entregues" + a média ★ do jovem +
+    // lembretes nas últimas 48h (o do Dandara foi há ~20h — é ele que
+    // trava o botão dela; a métrica conta enviados na janela, não "presos")
+    await expect(sec.getByText(/registros entregues/)).toBeVisible();
+    // o contador do pulso — "N aguardando" (a barra de cobertura também
+    // tem "aguardando registro" na legenda; o dígito desambigua)
+    await expect(sec.getByText(/\d+ aguardando$/)).toBeVisible();
+    await expect(
+      sec.getByText(/1 lembrete enviado nas últimas 48h/)
     ).toBeVisible();
+
+    // o recorte T1/T2/Todas é estado próprio da seção — clicar "Turma 2"
+    // reduz a cobertura a uma linha sem trocar de página nem de ?visao=
+    const recorte = sec.getByRole("group", {
+      name: "Recortar os números por turma",
+    });
+    await expect(
+      recorte.getByRole("button", { name: "Todas as turmas" })
+    ).toHaveAttribute("aria-pressed", "true");
+    const chipT2 = recorte.getByRole("button", { name: "Turma 2" });
+    await chipT2.click();
+    await expect(chipT2).toHaveAttribute("aria-pressed", "true");
+    await expect(linhaT1).toHaveCount(0);
+    await expect(linhaT2).toBeVisible();
+    await recorte.getByRole("button", { name: "Todas as turmas" }).click();
+    await expect(linhaT1).toBeVisible();
   });
 
   test("para acompanhar — síntese, dimensões por linha, filtros e cap 48h", async ({
     page,
   }) => {
-    const fila = page.locator('section[aria-label="Duplas para acompanhar"]');
+    // a fila mora dentro do "Painel da semana" como role=group nomeado
+    // (REALIZA-195): o heading leva a contagem viva "Para acompanhar · N"
+    const fila = page.locator(
+      '[role="group"][aria-label="Duplas para acompanhar"]'
+    );
     await expect(
-      fila.getByRole("heading", { name: "Para acompanhar" })
+      fila.getByRole("heading", { name: /^Para acompanhar/ })
     ).toBeVisible();
     await expect(fila.getByText(/Sem agendamento ou atrasadas/)).toBeVisible();
 
@@ -384,38 +444,78 @@ test.describe("agenda demo da coordenação — Monitoramento (WP5)", () => {
     ).toBeVisible();
   });
 
-  test("semana no programa — oficiais, supervisão e 'Abrir chamada' só no dia", async ({
+  test("semana do programa — oficiais em cards, supervisão e 'Abrir chamada' só no dia", async ({
     page,
   }) => {
-    const sec = page.locator('section[aria-label="Semana no programa"]');
+    const sec = page.locator('section[aria-label="Semana do programa"]');
 
-    // os oficiais datados do seg–dom. A terça-âncora carrega o enc. 5 da
-    // T1 E o enc. 1 da T2 (mesma data) — seg/ter eles caem NA semana
-    // corrente; de quarta em diante a âncora roda pra próxima terça e a
-    // semana mostra o enc. 4 da T1 e nenhum evento da T2
+    // os oficiais datados do seg–dom em cards com tag de tipo + pill de
+    // turma. A terça-âncora carrega o enc. 5 da T1 E o enc. 1 da T2 (mesma
+    // data) — seg/ter eles caem NA semana corrente; de quarta em diante a
+    // âncora roda pra próxima terça e a semana mostra o enc. 4 da T1 e
+    // nenhum evento da T2
     const dow = new Date(`${hojeSP()}T12:00:00Z`).getUTCDay();
     const ancoraNaSemana = dow === 1 || dow === 2;
     await expect(
-      sec.getByText(`Encontro ${ancoraNaSemana ? 5 : 4} · T1`)
+      sec.getByRole("link", {
+        name: `Encontro ${ancoraNaSemana ? 5 : 4} · T1`,
+      })
     ).toBeVisible();
     if (ancoraNaSemana)
-      await expect(sec.getByText("Encontro 1 · T2")).toBeVisible();
+      await expect(
+        sec.getByRole("link", { name: "Encontro 1 · T2" })
+      ).toBeVisible();
     await expect(
-      sec.getByText("Roda de casos — formação continuada de mentores")
+      sec.getByRole("link", {
+        name: "Roda de casos — formação continuada de mentores",
+      })
     ).toBeVisible();
     await expect(
-      sec.getByText("Supervisão · Paulo Serra × Ricardo Tavares")
+      sec.getByRole("link", {
+        name: "Supervisão · Paulo Serra × Ricardo Tavares",
+      })
     ).toBeVisible();
-    await expect(sec.getByText("turma 1", { exact: true })).toBeVisible();
+    // a pill de turma marca o card do encontro E o da formação da mesma
+    // turma — a faixa tem os dois, então a asserção ancora no primeiro
+    await expect(
+      sec.getByText("Turma 1", { exact: true }).first()
+    ).toBeVisible();
     if (ancoraNaSemana)
-      await expect(sec.getByText("turma 2", { exact: true })).toBeVisible();
+      await expect(
+        sec.getByText("Turma 2", { exact: true }).first()
+      ).toBeVisible();
+
+    // os cards carregam o "O que cobre" do guia atrás de <details> nativo
+    // — a voz da coordenação (o mentor lê "Como conduzir" na dele). O
+    // summary é alvo de toque de verdade (min-h-11 no mobile) e abre de
+    // verdade: o texto do guia aparece depois do clique
+    const guia = sec
+      .locator("summary", { hasText: "O que cobre" })
+      .first();
+    await expect(guia).toBeVisible();
+    const details = guia.locator("xpath=..");
+    await expect(details).not.toHaveJSProperty("open", true);
+    await guia.click();
+    await expect(details).toHaveJSProperty("open", true);
+    await expect(
+      details.locator("p", { hasText: /[a-zá-ú]{4}/ }).last()
+    ).toBeVisible();
+
+    // o encontro oficial carrega o meta da coorte no detalhe — "N duplas
+    // — cada uma marca a sua" (a coordenação nunca agenda pela dupla)
+    const cardEncontro = sec.locator("li", {
+      hasText: `Encontro ${ancoraNaSemana ? 5 : 4} · T1`,
+    });
+    await expect(
+      cardEncontro.getByText(/\d+ duplas — cada uma marca a sua/)
+    ).toBeVisible();
 
     // "Abrir chamada" só existe quando um evento tipo 'formacao' é HOJE.
     // Na semana corrente o dataset sempre tem três candidatos: a roda de
     // casos (domingo) e, quando a terça-âncora roda pra semana que vem
     // (de quarta em diante), os dois encontros de formação da T2 — a
     // inicial na quinta e a final na sexta da semana corrente. Nos outros
-    // dias a linha leva só a etiqueta "oficial"
+    // dias os cards levam só a tag do tipo (Formação/Encontro/…)
     const chamadaHoje = dow === 0 || dow === 4 || dow === 5;
     const chamada = sec.getByRole("link", { name: "Abrir chamada" });
     if (chamadaHoje) {
@@ -425,7 +525,9 @@ test.describe("agenda demo da coordenação — Monitoramento (WP5)", () => {
       );
     } else {
       await expect(chamada).toHaveCount(0);
-      await expect(sec.getByText("oficial", { exact: true }).first()).toBeVisible();
+      await expect(
+        sec.getByText("Formação", { exact: true }).first()
+      ).toBeVisible();
     }
   });
 
@@ -443,7 +545,7 @@ test.describe("agenda demo da coordenação — Monitoramento (WP5)", () => {
 
     // a aba Calendário é a porta pro board oficial — navega e renderiza o
     // acompanhamento por encontro da jornada (a grade de horários é só do
-    // mentor — a coord vê Semana/Mês/Lista, coberto no agenda-views.spec)
+    // mentor — a coord vê Dia/Semana/Mês/Ciclo, coberto no agenda-views.spec)
     await page.getByRole("tab", { name: "Calendário" }).click();
     await page.waitForURL(/aba=calendario/);
     await expect(

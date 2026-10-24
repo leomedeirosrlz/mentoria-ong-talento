@@ -12,15 +12,38 @@ export default function Loading() {
         <Skeleton className="mt-2 h-4 w-72 max-w-full" />
       </header>
 
+      {/* faixa "Semana do programa" — heading + cards de scroll lateral
+          (coord/sup no topo do calendário, "Minha agenda" do mentor) */}
+      <div>
+        <Skeleton className="h-5 w-44" />
+        <Skeleton className="mt-1.5 h-3 w-72 max-w-full" />
+        <div className="mt-3 flex gap-3 overflow-hidden">
+          {[0, 1, 2].map((i) => (
+            <div
+              key={i}
+              className="w-[236px] shrink-0 rounded-xl border border-t-2 bg-card p-3.5"
+            >
+              <div className="flex items-center gap-1.5">
+                <Skeleton className="h-5 w-14 rounded-md" />
+                <Skeleton className="h-5 w-20 rounded-md" />
+              </div>
+              <Skeleton className="mt-2 h-4 w-4/5" />
+              <Skeleton className="mt-1.5 h-3 w-3/5" />
+            </div>
+          ))}
+        </div>
+      </div>
+
       <div className="space-y-4 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(300px,340px)] lg:items-start lg:gap-5 lg:space-y-0">
         {/* ===== calendário mensal ===== */}
         <div className="overflow-hidden rounded-xl bg-card shadow-[var(--shadow-border)] lg:col-start-1 lg:row-start-1">
-          {/* faixa de chrome fundida — abas de visão (Semana | Mês | Lista,
-              coord/sup) + seletor Turma à direita; mentor com um cronograma
-              não tem a faixa e o card começa direto na nav */}
+          {/* faixa de chrome fundida — chips de visão (Dia | Semana | Mês |
+              Ciclo no staff; Dia | Semana | Mês | Horários no mentor) +
+              seletor Turma à direita; mentor com um cronograma não tem a
+              faixa e o card começa direto na nav */}
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-b px-2 py-1.5 sm:px-3">
             <div className="flex items-center gap-1">
-              {[0, 1, 2].map((i) => (
+              {[0, 1, 2, 3].map((i) => (
                 <Skeleton
                   key={i}
                   className="h-11 w-20 rounded-full sm:h-8"

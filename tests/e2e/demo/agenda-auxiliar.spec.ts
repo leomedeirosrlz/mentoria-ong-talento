@@ -58,6 +58,21 @@ test.describe("agenda demo do supervisor — Por turma / Consolidada (WP5)", () 
       abas.getByRole("tab", { name: "Consolidada" })
     ).toHaveAttribute("aria-selected", "false");
 
+    // a faixa "Semana do programa" existe no escopo das supervisionadas —
+    // mas é leitura pura: o supervisor sem papel mentor não tem superfície
+    // de dia, então os títulos não podem linkar ?dia= (o param cairia no
+    // ramo errado do page.tsx) e a nota não promete link
+    const faixa = page.locator('section[aria-label="Semana do programa"]');
+    await expect(faixa).toBeVisible();
+    await expect(
+      faixa.getByText(/O que a semana cobra no escopo das suas duplas\.?$/)
+    ).toBeVisible();
+    await expect(faixa.locator('a[href*="dia="]')).toHaveCount(0);
+    // e nunca tem "Abrir chamada" — presença é painel da coordenação
+    await expect(
+      faixa.getByRole("link", { name: "Abrir chamada" })
+    ).toHaveCount(0);
+
     // o desencontro das turmas — 3 grupos (T1, T2 e "Trilhas de
     // especialista", o rótulo honesto do grupo sem cronograma)
     await expect(

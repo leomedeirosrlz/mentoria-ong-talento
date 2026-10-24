@@ -99,6 +99,9 @@ export type AgendaPorMentoradoProps = {
   /** Primeiro nome do mentor — assina o check-in do Lembrar. */
   meuNome: string;
   hoje: string;
+  /** epoch ms do mesmo "agora" da page — semáforo/limbo/cap ancoram no
+   *  snapshot do request, não num segundo `new Date()` do RSC. */
+  agora: number;
 };
 
 /** Aba "Por mentorado" da agenda DPP (WP3, mock v6) — um card por jovem com
@@ -135,9 +138,9 @@ export function AgendaPorMentorado({
   meuId,
   meuNome,
   hoje,
+  agora: agoraMs,
 }: AgendaPorMentoradoProps) {
-  const agora = new Date();
-  const agoraMs = agora.getTime();
+  const agora = new Date(agoraMs);
   // o dialog pede areas:string[]|null — a página projeta só {id,nome}; o
   // select dele já cai no ramo sem áreas quando null
   const especialistasDialog = especialistas.map((e) => ({

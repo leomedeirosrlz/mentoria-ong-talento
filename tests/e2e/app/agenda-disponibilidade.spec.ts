@@ -106,10 +106,11 @@ test.describe("agenda — overlay de disponibilidade do mentor (REALIZA-24)", ()
     await expect(celAmbos).toBeVisible();
 
     // o split "ambos" desenha um gradiente diagonal inline na célula —
-    // o swatch da legenda também usa gradiente, então o filtro é a célula
+    // o marcador estável é data-tinta (o swatch da legenda não é célula,
+    // então o filtro fica dentro do gridcell)
     await expect(
       page
-        .locator('div[role="gridcell"] button span[style*="linear-gradient"]')
+        .locator('div[role="gridcell"] button span[data-tinta="ambos"]')
         .first()
     ).toBeAttached();
 
@@ -155,7 +156,7 @@ test.describe("agenda — overlay de disponibilidade do mentor (REALIZA-24)", ()
       page.getByRole("button", { name: /livre/ })
     ).toHaveCount(0);
     await expect(
-      page.locator('div[role="gridcell"] button span[style*="linear-gradient"]')
+      page.locator('div[role="gridcell"] button span[data-tinta]')
     ).toHaveCount(0);
   });
 });
