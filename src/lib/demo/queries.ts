@@ -1,5 +1,5 @@
 import { getDemoData, type DemoData } from "./data";
-import { registroTardio, semanaBounds } from "../ciclo";
+import { comparaNome, registroTardio, semanaBounds } from "../ciclo";
 import { slotsLivresEspecialista } from "./agenda";
 import { normaliza } from "../utils";
 import type {
@@ -152,7 +152,13 @@ export function demoContatosMap(role: AppRole): Map<string, Contato> {
     for (const p of data.profiles) ids.add(p.id);
   } else if (role === "supervisor") {
     for (const d of data.duplas) {
-      if (d.supervisor?.id === eu.id && d.status !== "encerrada" && d.mentor) {
+      // idem à view profiles_contato: só dupla ativa/pausada expõe o
+      // contato do mentor — concluída/encerrada é capítulo fechado
+      if (
+        d.supervisor?.id === eu.id &&
+        (d.status === "ativa" || d.status === "pausada") &&
+        d.mentor
+      ) {
         ids.add(d.mentor.id);
       }
     }
@@ -2227,6 +2233,28 @@ export function demoChamadosSemDono(role: AppRole): number {
   return demoChamadosFila(role).filter(
     (c) => c.status === "aberto" && !c.atribuido_a && !c.restrito
   ).length;
+}
+
+/** Equipe elegível pra menção/comentário interno (espelha o filtro da query
+ *  real em getChamadoDetalhe): coordenação + auxiliar executivo ativos,
+ *  ordenados por nome — é o dataset do autocomplete "@" do composer. */
+export function demoEquipeChamados(): Pick<
+  Profile,
+  "id" | "nome" | "nome_social" | "role"
+>[] {
+  return getDemoData()
+    .profiles.filter(
+      (p) => p.ativo && (p.role === "coordenacao" || p.role === "supervisor")
+    )
+    .map((p) => ({
+      id: p.id,
+      nome: p.nome,
+      nome_social: p.nome_social,
+      role: p.role,
+    }))
+    .sort((a, b) =>
+      comparaNome(a.nome_social || a.nome, b.nome_social || b.nome)
+    );
 }
 
 /** Fila por turma (turma_inscricoes, 0111) — espelha a RLS: coord-only

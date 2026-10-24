@@ -1,10 +1,12 @@
 import { cache } from "react";
 import { createClient } from "./supabase/server";
 import { demoRole } from "./demo/mode";
+import { getDemoData } from "./demo/data";
 import {
   demoChamadosFila,
   demoChamadoTimeline,
   demoChamadosSemDono,
+  demoEquipeChamados,
 } from "./demo/queries";
 import { comparaNome } from "./ciclo";
 import type {
@@ -257,9 +259,11 @@ export const getChamadoDetalhe = cache(
         // a demo replica. Sem isso vazaria até o nome do autor no sistema.
         timeline:
           chamado && !chamado.restrito ? demoChamadoTimeline(id, staff) : [],
-        equipe: [],
+        // a equipe alimenta o autocomplete "@" do composer interno — o autor
+        // não menciona ninguém (o composer dele nem mostra a lista)
+        equipe: staff ? demoEquipeChamados() : [],
         papel: demo,
-        meuId: null,
+        meuId: getDemoData().personas[demo]?.id ?? null,
       };
     }
     const supabase = await createClient();

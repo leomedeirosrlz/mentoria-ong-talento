@@ -2,7 +2,17 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { CircleNotch, HandHeart, Warning } from "@phosphor-icons/react";
+import {
+  CalendarBlank,
+  CircleNotch,
+  GraduationCap,
+  HandHeart,
+  Info,
+  Lightning,
+  Monitor,
+  Tag,
+  Warning,
+} from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { abrirChamado } from "@/lib/actions-chamados";
 import { CHAMADO_CATEGORIA_LABEL } from "@/lib/ciclo";
@@ -39,6 +49,33 @@ const CATS_STAFF: ChamadoCategoria[] = [
   "urgencia",
   "outro",
 ];
+
+/** Grade de categorias do mock v5: card com ícone + rótulo + dica curta, e a
+ *  linha de contexto muda conforme a escolha (urgência avisa todo mundo,
+ *  plataforma fica com a coordenação). */
+const CAT_DICA: Record<ChamadoCategoria, string> = {
+  agenda: "encontro, remarcação, local",
+  metodologia: "condução, guia, materiais",
+  plataforma: "algo no app não funciona",
+  urgencia: "precisa de resposta hoje",
+  outro: "qualquer outro assunto",
+};
+
+const CAT_ICONE = {
+  agenda: CalendarBlank,
+  metodologia: GraduationCap,
+  plataforma: Monitor,
+  urgencia: Lightning,
+  outro: Tag,
+} as const;
+
+const CAT_AVISO: Record<ChamadoCategoria, string> = {
+  agenda: "Entra na fila — quem assumir primeiro trata.",
+  metodologia: "Entra na fila — quem assumir primeiro trata.",
+  plataforma: "Vai direto pra coordenação — conteúdo técnico não passa pela supervisão.",
+  urgencia: "Coordenação e supervisão são avisadas na hora.",
+  outro: "Entra na fila — quem assumir primeiro trata.",
+};
 
 type OpcaoJovem = "mentor" | "plataforma" | "outra" | "urgente";
 const OPCOES_JOVEM: { v: OpcaoJovem; rotulo: string; dica: string }[] = [
@@ -173,24 +210,53 @@ export function NovoChamadoDialog({
               </div>
             </fieldset>
           ) : (
-            <div className="space-y-1.5">
-              <Label htmlFor="chamado-categoria">Categoria</Label>
-              <Select
-                value={cat}
-                onValueChange={(v) => setCat(v as ChamadoCategoria)}
-              >
-                <SelectTrigger id="chamado-categoria" className="w-full">
-                  <SelectValue placeholder="Escolha a categoria" />
-                </SelectTrigger>
-                <SelectContent>
-                  {CATS_STAFF.map((c) => (
-                    <SelectItem key={c} value={c}>
-                      {CHAMADO_CATEGORIA_LABEL[c]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <fieldset>
+              <legend className="text-sm font-medium">Categoria</legend>
+              <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                {CATS_STAFF.map((c) => {
+                  const Icone = CAT_ICONE[c];
+                  const urg = c === "urgencia";
+                  return (
+                    <label
+                      key={c}
+                      className={cn(
+                        "relative flex min-h-20 cursor-pointer flex-col gap-0.5 rounded-xl border px-3 py-2.5 transition-colors focus-within:ring-2 focus-within:ring-ring",
+                        cat === c
+                          ? urg
+                            ? "border-destructive/50 bg-destructive/5"
+                            : "border-foreground/40 bg-muted/60"
+                          : "border-border bg-card hover:bg-muted/40"
+                      )}
+                    >
+                      <input
+                        type="radio"
+                        name="chamado-cat"
+                        value={c}
+                        checked={cat === c}
+                        onChange={() => setCat(c)}
+                        className="sr-only"
+                      />
+                      <span className="flex items-center gap-1.5 text-xs font-medium">
+                        <Icone
+                          size={14}
+                          aria-hidden
+                          className={urg ? "text-destructive" : "text-muted-foreground"}
+                        />
+                        {CHAMADO_CATEGORIA_LABEL[c]}
+                      </span>
+                      <span className="text-[11px] leading-tight text-muted-foreground">
+                        {CAT_DICA[c]}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+              {cat && (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {CAT_AVISO[cat]}
+                </p>
+              )}
+            </fieldset>
           )}
 
           {categoriaFinal === "outro" && (!jovem || opcaoJovem === "outra") && (
@@ -256,6 +322,21 @@ export function NovoChamadoDialog({
               }
             />
           </div>
+
+          {/* autonote do mock — anti-duplicidade: quem escreve registro de
+              encontro (o mentor) não precisa abrir chamado à mão pra pedir
+              apoio — o flag já abre um sozinho */}
+          {papel === "mentor_dpp" && (
+            <p className="flex items-start gap-2.5 rounded-lg border border-[var(--info-border)] bg-[var(--info-bg)] px-3.5 py-2.5 text-xs leading-relaxed text-[var(--info-text)]">
+              <Info size={14} aria-hidden className="mt-0.5 shrink-0" />
+              <span>
+                <strong>Dica:</strong> ao marcar{" "}
+                <strong>“Preciso de apoio”</strong> no registro de um
+                encontro, um chamado é aberto automaticamente — você não
+                precisa abrir outro.
+              </span>
+            </p>
+          )}
         </div>
 
         <DialogFooter>
