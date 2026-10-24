@@ -278,8 +278,9 @@ export function InstrumentosDupla({
   const porSistema = new Map(itens.map((i) => [i.sistema, i]));
   return (
     <section
+      id="instrumentos"
       className={cn(
-        "rounded-xl bg-card p-4 shadow-[var(--shadow-border)]",
+        "scroll-mt-20 rounded-xl bg-card p-4 shadow-[var(--shadow-border)]",
         className
       )}
     >

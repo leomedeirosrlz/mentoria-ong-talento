@@ -1,16 +1,22 @@
 import { entrarNaDemo, expect, test } from "../helpers";
 
 // WP7 (REALIZA-140) — "Minha jornada" em /jovem/materiais, espelhada no
-// modo demo (specs demo não escrevem em backend nenhum).
+// modo demo (specs demo não escrevem em backend nenhum). REALIZA-194
+// (v5c): a trilha virou a estante "Meus instrumentos" — um card-produto
+// por instrumento da régua + a devolutiva de terceiros; trancados ficam
+// visíveis dessaturados com a data de liberação (não há mais <details>
+// "Daqui pra frente" nem bloco "A fazer agora" — a ação é o próprio
+// card). Snippets de resposta saíram dos cards por desenho: a resposta
+// mora no "Rever resposta", não na estante.
 //
 // A fixture da persona mentorado (Ana × Ricardo, dupla d-ok na T1) tem a
 // jornada da janela aberta INTEIRA feita: roda inicial, visão, metas e PDM
 // respondidos e a avaliação de encontro em dia (4 dos 4 realizados). O que
-// sobra são as duas estações futuras — roda formal (abre no enc. 12) e
-// 360º (enc. 16) — recolhidas no <details> "Daqui pra frente".
+// sobra são os dois instrumentos futuros — roda formal (abre no enc. 12) e
+// 360º (enc. 16) — como cards trancados.
 //
-// O recorte "estação a_fazer com token → CTA Continuar → /f/<token> +
-// pill Em andamento (rascunho localStorage)" NÃO existe nessa fixture — a
+// O recorte "a_fazer com token → card inteiro link /f/<token> +
+// tag Em andamento (rascunho localStorage)" NÃO existe nessa fixture — a
 // jornada da Ana está completa dentro da janela por desenho. A cobertura
 // desse estado fica no spec app (jovem.spec.ts), onde o link pendente é
 // semeado via service role. Registrado aqui pra não parecer esquecimento.
@@ -43,45 +49,42 @@ test.describe("demo — Minha jornada do mentorado", () => {
       )
     ).toBeVisible();
 
-    // trilha — as 5 estações visíveis, todas feitas
-    const trilha = page.locator('section[aria-label="Sua jornada"]');
+    // a estante — os 5 instrumentos da janela como cards-produto, todos
+    // com a tag "Feito" + a data; a devolutiva de terceiros mora entre eles
+    const trilha = page.locator(
+      'section[aria-labelledby="meus-instrumentos-titulo"]'
+    );
     for (const titulo of [
       "Roda da Vida · leitura inicial",
       "Construindo a sua Visão",
       "Definindo minhas metas",
       "PDM · Plano de Desenvolvimento",
       "Avaliação do encontro",
+      "Avaliação por terceiros",
     ]) {
       await expect(
         trilha.getByRole("heading", { name: titulo })
       ).toBeVisible();
     }
-    await expect(trilha.getByText(/Estação 1/)).toBeVisible();
+    // o chip da janela do guia mora em cada card — a régua 1–7 segue na
+    // ordem do guia, sem numeração "Estação N" (v5c tirou o termo)
+    await expect(trilha.getByText("Enc. 1–4").first()).toBeVisible();
     await expect(trilha.getByText("Feito", { exact: true })).toHaveCount(5);
     await expect(trilha.getByText(/Respondido em /).first()).toBeVisible();
 
-    // as feitas são recibos fechados por padrão na trilha compacta
-    // (REALIZA-162): o conteúdo só aparece ao expandir
-    await expect(trilha.getByText("Você escreveu")).toBeHidden();
-    await expect(
-      trilha.getByRole("button", { name: "Rever última avaliação" })
-    ).toBeHidden();
-    for (const summary of await trilha.locator("article summary").all()) {
-      await summary.click();
-    }
-
-    // o "Você escreveu…" da visão — a declaração real da resposta demo
-    await expect(trilha.getByText("Você escreveu")).toBeVisible();
+    // snippets de resposta saíram da estante por desenho (v5c): o texto
+    // da visão NÃO aparece no card — a resposta vive no "Rever resposta"
+    await expect(trilha.getByText("Você escreveu")).toHaveCount(0);
     await expect(
       trilha.getByText(/Em até 3 anos, serei uma profissional formada/)
-    ).toBeVisible();
+    ).toHaveCount(0);
     // a recorrente nunca "fecha": em dia conta X de Y, com rever última
     await expect(trilha.getByText("em dia · 4 de 4")).toBeVisible();
     await expect(
       trilha.getByRole("button", { name: "Rever última avaliação" })
     ).toBeVisible();
 
-    // a bandeira terminal fecha a trilha com a data do enc. 16 da turma
+    // a bandeira terminal fecha a estante com a data do enc. 16 da turma
     await expect(trilha.getByText("Celebração da jornada")).toBeVisible();
     await expect(trilha.getByText(/Encontro 16 · /)).toBeVisible();
   });
@@ -92,14 +95,15 @@ test.describe("demo — Minha jornada do mentorado", () => {
     await entrarNaDemo(page, "mentorado");
     await page.goto("/jovem/materiais");
 
-    // qualquer estação feita com resposta+campos ganha o botão — a primeira
-    // da trilha é a leitura inicial da roda. No layout compacto o botão
-    // mora dentro do recibo fechado: abre a linha primeiro (REALIZA-162)
-    const trilha = page.locator('section[aria-label="Sua jornada"]');
-    await trilha.locator("article summary").first().click();
+    // qualquer instrumento feito com resposta+campos ganha o botão — na
+    // estante v5c ele mora direto no card feito, sem recibo fechado
+    const trilha = page.locator(
+      'section[aria-labelledby="meus-instrumentos-titulo"]'
+    );
+    // o card feito inteiro é o gatilho do Rever (v5c — render prop com
+    // role=button): clicar no card da roda inicial abre o dialog
     await trilha
-      .getByRole("button", { name: "Rever resposta" })
-      .first()
+      .getByRole("button", { name: /Roda da Vida · leitura inicial/ })
       .click();
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
@@ -111,35 +115,34 @@ test.describe("demo — Minha jornada do mentorado", () => {
     await expect(dialog).not.toBeVisible();
   });
 
-  test("estações trancadas ficam recolhidas, sem CTA", async ({ page }) => {
+  test("instrumentos trancados ficam visíveis, dessaturados e sem CTA", async ({
+    page,
+  }) => {
     await entrarNaDemo(page, "mentorado");
     await page.goto("/jovem/materiais");
 
-    // <details> "Daqui pra frente" — as duas estações futuras da Ana
-    const det = page.locator("details", { hasText: "Daqui pra frente" });
-    await expect(
-      det.getByText(/Daqui pra frente · 2 estações/)
-    ).toBeVisible();
-    // o summary já dá nome + janela de cada uma, sem abrir
-    await expect(
-      det.getByText(/Cada uma abre sozinha no encontro certo\./)
-    ).toBeVisible();
-
-    await det.locator("summary").click();
-    await expect(det.getByText("Estação 6")).toBeVisible();
-    await expect(
-      det.getByText("Roda da Vida · aplicação formal").first()
-    ).toBeVisible();
-    await expect(det.getByText("Estação 7")).toBeVisible();
-    await expect(det.getByText("Avaliação 360º").first()).toBeVisible();
-    await expect(det.getByText(/libera no enc\. \d+/)).toHaveCount(2);
-
-    // trancada nunca tem CTA — nem link /f/, nem botão dentro do details
-    await expect(det.locator('a[href^="/f/"]')).toHaveCount(0);
-    await expect(det.getByRole("link", { name: /Continuar/ })).toHaveCount(
-      0
+    // v5c — os dois instrumentos futuros da Ana são cards trancados na
+    // própria estante: nome + janela + data de liberação, nunca card mudo
+    const trilha = page.locator(
+      'section[aria-labelledby="meus-instrumentos-titulo"]'
     );
-    await expect(det.getByRole("button")).toHaveCount(0);
+    for (const titulo of [
+      "Roda da Vida · aplicação formal",
+      "Avaliação 360º",
+    ]) {
+      const card = trilha.locator("article", { hasText: titulo });
+      await expect(card).toBeVisible();
+      await expect(card.getByText("trancada")).toBeVisible();
+    }
+    await expect(trilha.getByText(/libera no enc\. \d+/)).toHaveCount(2);
+
+    // trancado nunca tem gesto — nem link /f/, nem botão nesses cards
+    await expect(trilha.locator('a[href^="/f/"]')).toHaveCount(0);
+    const rodaFormal = trilha.locator("article", {
+      hasText: "Roda da Vida · aplicação formal",
+    });
+    await expect(rodaFormal.getByRole("button")).toHaveCount(0);
+    await expect(rodaFormal.getByRole("link")).toHaveCount(0);
   });
 
   test("sub-nav Jornada → Acervo e o acervo com 'em breve'", async ({
@@ -191,12 +194,12 @@ test.describe("demo — Minha jornada do mentorado", () => {
     ).toBeVisible();
   });
 
-  // REALIZA-162 — a ordem física da página (hero → ação → trilha → acervo)
-  // e a trilha como histórico+futuro: a estação aberta NÃO se repete nela
-  // (decisão registrada em page.tsx). Com a janela da Ana toda feita o
-  // "A fazer agora" some de verdade — a prova do bloco com estação aberta
-  // fica no spec app (a fixture com link pendente é de lá).
-  test("ordem da página e trilha sem repetição", async ({ page }) => {
+  // REALIZA-162/194 — a ordem física da página (hero → sub-nav → estante
+  // → acervo). O v5c aposentou o bloco "A fazer agora": o instrumento
+  // aberto é um card-link na própria estante, sem seção extra. Com a
+  // janela da Ana toda feita não há link /f/ nenhum — a prova do card
+  // aberto fica no spec app (a fixture com link pendente é de lá).
+  test("ordem da página e estante sem bloco duplicado", async ({ page }) => {
     await entrarNaDemo(page, "mentorado");
     await page.goto("/jovem/materiais");
 
@@ -223,20 +226,16 @@ test.describe("demo — Minha jornada do mentorado", () => {
     expect(yNav).toBeLessThan(yJornada);
     expect(yJornada).toBeLessThan(yAcervo);
 
-    // "A fazer agora" é condicional: sem estação aberta a seção não
-    // renderiza — nem heading vazio, nem placeholder
+    // "A fazer agora" não existe mais (v5c): o instrumento aberto seria
+    // um card-link na estante — sem janela aberta, nenhum link /f/ e
+    // nenhuma tag "A fazer" aparece
     await expect(
       page.getByRole("heading", { name: "A fazer agora" })
     ).toHaveCount(0);
-
-    // a trilha (o <ol> com recibos feitos + trancadas + a bandeira) nunca
-    // carrega estação aberta: sem pill "A fazer" e sem link de formulário
-    const listaTrilha = jornada.locator("ol");
-    await expect(listaTrilha).toHaveCount(1);
     await expect(
-      listaTrilha.getByText("A fazer", { exact: true })
+      jornada.getByText("A fazer", { exact: true })
     ).toHaveCount(0);
-    await expect(listaTrilha.locator('a[href^="/f/"]')).toHaveCount(0);
+    await expect(jornada.locator('a[href^="/f/"]')).toHaveCount(0);
   });
 
   test("acervo em grade: 1 coluna no celular, 2 no tablet, 3 no desktop", async ({
@@ -337,32 +336,36 @@ test.describe("demo — painel Progresso da jornada (staff)", () => {
       }),
     });
     await expect(painel).toBeVisible();
-    // o disclaimer honesto do recorte (sem respostas e sem links aqui)
-    await expect(painel.getByText(/Você vê:/)).toBeVisible();
+    // o "Você vê / você não vê" (v5c) subiu pro topo da página — a caixa
+    // de escopo cobre painel + instrumentos + biblioteca de uma vez
+    await expect(page.getByText(/Você vê:/).first()).toBeVisible();
 
-    // KPIs — o 4º rótulo ("fora da janela do guia") repete no heading da
-    // lista de ação e na legenda; a prova do KPI fica pelos três únicos +
-    // o heading da lista, que também é assertado abaixo
-    for (const label of [
-      "duplas no painel",
-      "estações respondidas",
-      "pendências na janela",
-    ]) {
-      await expect(painel.getByText(label)).toBeVisible();
-    }
-
-    // barras empilhadas por instrumento — rótulo acessível com as contagens
+    // a faixa segmentada (v5c) — um segmento por instrumento com as
+    // mini-barras por turma; denominadores honestos, nunca "x de 26"
+    // agregado (o KPI quadrado virou esta faixa rolável)
+    // a faixa é região focável (scroll por teclado, v5c) — o nome vem do
+    // aria-label e os segmentos continuam filhos dela
     await expect(
-      painel.getByRole("heading", { name: "Por instrumento" })
+      painel.getByRole("region", { name: "Cobertura por instrumento" })
     ).toBeVisible();
     await expect(
       painel.getByText("Roda da Vida · leitura inicial").first()
     ).toBeVisible();
+    // fração honesta por turma — "feitos/duplas da turma" com a sigla
+    await expect(
+      painel.getByText(/T1|T2/).first()
+    ).toBeVisible();
+    await expect(
+      painel.getByText(/\d+\/\d+/).first()
+    ).toBeVisible();
     await expect(
       painel.locator('[role="img"][aria-label*="feitos"]').first()
     ).toBeVisible();
+    // a recorrente conta feitas/realizados por turma, sem "fechar"
     await expect(
-      painel.getByText(/avaliações de encontro respondidas — recorrente/)
+      painel
+        .locator('[role="img"][aria-label*="avaliações de encontro"]')
+        .first()
     ).toBeVisible();
 
     // a lista de ação — a fixture demo tem duplas com instrumento fora da
@@ -383,6 +386,10 @@ test.describe("demo — painel Progresso da jornada (staff)", () => {
       .or(painel.getByText("dupla pausada"))
       .first();
     await expect(lembreteOuPausa).toBeVisible();
+
+    // a matriz por dupla ficou atrás de gesto (v5c) — abre o <details>
+    // agrupado por turma antes de conferir células
+    await painel.getByText("Ver a matriz por dupla").click();
 
     // agrupamento por turma com o encontro vigente do calendário oficial
     await expect(
@@ -419,6 +426,58 @@ test.describe("demo — painel Progresso da jornada (staff)", () => {
       ).toBeVisible();
     }
 
+    // a régua oficial separada da biblioteca (v5c): os 8 instrumentos do
+    // programa em cards próprios — a devolutiva de terceiros entre eles,
+    // nunca material solto de acervo
+    const instrumentos = page.locator("section", {
+      has: page.getByRole("heading", {
+        name: "Instrumentos do programa",
+        level: 2,
+      }),
+    });
+    await expect(instrumentos).toBeVisible();
+    for (const titulo of [
+      "Roda da Vida · leitura inicial",
+      "Avaliação por terceiros",
+      "Avaliação 360º e autoavaliação",
+    ]) {
+      await expect(
+        instrumentos.getByRole("heading", { name: titulo })
+      ).toBeVisible();
+    }
+    // coord tem ação onde há o que emitir — o lote abre o dialog; o 360º
+    // (emissão manual de encerramento) nunca é lote
+    await expect(
+      instrumentos.getByRole("button", { name: /Enviar em lote/ }).first()
+    ).toBeVisible();
+    // ...e lê as respostas no formulário oficial — o link navega pra
+    // /formularios/<id> (coord-only; supervisor nem vê)
+    const verRespostas = instrumentos
+      .getByRole("link", { name: "Ver respostas" })
+      .first();
+    await expect(verRespostas).toBeVisible();
+    await expect(verRespostas).toHaveAttribute(
+      "href",
+      /^\/formularios\//
+    );
+    await verRespostas.click();
+    await expect(page).toHaveURL(/\/formularios\/[^/]+/);
+    await page.goBack();
+
+    // card trancado é leitura pura pra TODO staff — o pill de liberação
+    // não é gesto: zero link, zero botão dentro dele
+    const cardTrancado = instrumentos.locator("article", {
+      hasText: "Avaliação 360º",
+    });
+    await expect(cardTrancado.getByText("trancado")).toBeVisible();
+    await expect(cardTrancado.getByRole("link")).toHaveCount(0);
+    await expect(cardTrancado.getByRole("button")).toHaveCount(0);
+
+    // rodapé coord-only: os forms de bordo apontam pra /formularios
+    await expect(
+      instrumentos.getByRole("link", { name: "Formulários" })
+    ).toBeVisible();
+
     // a biblioteca continua abaixo do painel — grupos + badge "sem
     // conteúdo" (rótulo staff; pro jovem o mesmo estado diz "em breve").
     // Com o hub por encontro (REALIZA-173) parte desses badges mora em
@@ -428,5 +487,130 @@ test.describe("demo — painel Progresso da jornada (staff)", () => {
     await expect(
       page.getByText("sem conteúdo").filter({ visible: true }).first()
     ).toBeVisible();
+  });
+
+  // REALIZA-194 — fronteira de papel: o supervisor lê a régua escopada
+  // (e a data de liberação dos trancados, que é leitura do programa) sem
+  // herdar ação nenhuma da coord — Lembrar nas duplas dele segue, que é
+  // a ação do auxiliar decidida no plano.
+  test("supervisor vê a régua escopada sem emitir nem ler respostas", async ({
+    page,
+  }) => {
+    await entrarNaDemo(page, "supervisor");
+    await page.goto("/materiais");
+
+    const painel = page.locator("section", {
+      has: page.getByRole("heading", {
+        name: "Progresso da jornada",
+        level: 2,
+      }),
+    });
+    await expect(painel).toBeVisible();
+    // Lembrar fica — supervisor nudge nas duplas que supervisiona
+    // (decisão mantida do v5c: é a ação do auxiliar, não da coord)
+    await expect(
+      painel
+        .getByRole("button", { name: /^Lembrar / })
+        .or(painel.getByRole("button", { name: /Lembrada / }))
+        .or(painel.getByText("dupla pausada"))
+        .first()
+    ).toBeVisible();
+
+    const instrumentos = page.locator("section", {
+      has: page.getByRole("heading", {
+        name: "Instrumentos do programa",
+        level: 2,
+      }),
+    });
+    await expect(instrumentos).toBeVisible();
+    // a data de liberação é leitura de todo staff — o pill trancado
+    // aparece pro supervisor igual
+    await expect(
+      instrumentos.getByText(/libera/).first()
+    ).toBeVisible();
+    // ...mas emitir e ler respostas são coord-only: nenhum dos dois
+    // gestos pode existir na régua dele
+    await expect(
+      instrumentos.getByRole("button", { name: /Enviar em lote/ })
+    ).toHaveCount(0);
+    await expect(
+      instrumentos.getByRole("link", { name: "Ver respostas" })
+    ).toHaveCount(0);
+    // card trancado: zero gesto dentro (pill informativo, não link/botão)
+    const trancado = instrumentos.locator("article", {
+      hasText: "Avaliação 360º",
+    });
+    await expect(trancado.getByRole("link")).toHaveCount(0);
+    await expect(trancado.getByRole("button")).toHaveCount(0);
+    // o rodapé "Anamnese… → Formulários" é coord-only
+    await expect(
+      instrumentos.getByRole("link", { name: "Formulários" })
+    ).toHaveCount(0);
+  });
+
+  // REALIZA-194 — o mentor lê catálogo + deep link, não espelho da ficha:
+  // os cards linkam pra seção de instrumentos da ficha de cada dupla dele
+  // e o acervo (o conteúdo útil) vem ANTES do catálogo na página.
+  test("mentor vê acervo primeiro, catálogo com links pra ficha depois", async ({
+    page,
+  }) => {
+    await entrarNaDemo(page, "mentor_dpp");
+    await page.goto("/materiais");
+
+    // o painel staff-only não renderiza pro mentor — a régua dele é o
+    // catálogo "Instrumentos do programa"
+    await expect(
+      page.getByRole("heading", { name: "Progresso da jornada" })
+    ).toHaveCount(0);
+    const instrumentos = page.locator("section", {
+      has: page.getByRole("heading", {
+        name: "Instrumentos do programa",
+        level: 2,
+      }),
+    });
+    await expect(instrumentos).toBeVisible();
+
+    // ordem v5c: a biblioteca (Resumo) vem ANTES do catálogo — o acervo
+    // é o conteúdo útil pro mentor
+    const yAcervo = (
+      await page
+        .getByRole("region", { name: "Resumo da biblioteca" })
+        .boundingBox()
+    )?.y;
+    const yCatalogo = (await instrumentos.boundingBox())?.y;
+    if (yAcervo == null || yCatalogo == null) {
+      throw new Error("seção sem bounding box");
+    }
+    expect(yAcervo).toBeLessThan(yCatalogo);
+
+    // cada card linka a ficha específica (âncora #instrumentos) — a
+    // fixture do Ricardo tem 2 duplas DPP vivas (Bia e Matheus), então
+    // cada card carrega um link por jovem, rotulado pelo nome social
+    await expect(
+      instrumentos
+        .locator('a[href^="/duplas/"][href$="#instrumentos"]')
+        .first()
+    ).toHaveAttribute("href", /^\/duplas\/.+#instrumentos$/);
+    for (const jovem of ["Bia", "Matheus Gonçalves"]) {
+      await expect(
+        instrumentos
+          .locator("article")
+          .first()
+          .getByRole("link", { name: jovem })
+      ).toBeVisible();
+    }
+    // o rodapé lista a ficha de cada dupla dele
+    await expect(
+      instrumentos.getByText(
+        /O estado e o envio de cada instrumento ficam na ficha da dupla:/
+      )
+    ).toBeVisible();
+    // mentor nunca vê gesto de coord
+    await expect(
+      instrumentos.getByRole("button", { name: /Enviar em lote/ })
+    ).toHaveCount(0);
+    await expect(
+      instrumentos.getByRole("link", { name: "Ver respostas" })
+    ).toHaveCount(0);
   });
 });

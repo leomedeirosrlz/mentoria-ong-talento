@@ -11,9 +11,9 @@ import { cn } from "@/lib/utils";
 // Capa CURTA do material (rodada feedback-ux-2026-10, materiais-coord.md
 // item 7) — a versão compacta e estática do material-preview-pdf: só o
 // topo da 1ª página, ≤96px de altura, sem scroll interno, título
-// discernível. Global por contrato: acervo do jovem, mentor, ficha da
-// dupla e biblioteca da coord usam a mesma thumb. O preview grande
-// (h-36) continua existindo pra superfícies de leitura.
+// discernível. Global por contrato — acervo do jovem (REALIZA-194),
+// biblioteca da coord e a ficha da dupla usam a mesma thumb; o preview
+// grande (h-36) continua existindo pra superfícies de leitura.
 
 // mesmos allowlists do preview — a coluna é escrita só pelo app
 const EXT_PDF = /\.pdf$/i;

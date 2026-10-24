@@ -5,7 +5,6 @@ import {
   estacoesPainelDupla,
   resumoJornada,
   type PainelJornadaLinha,
-  type PainelTurmaCtx,
   type Entrega360,
   type EntregaJornada,
   type EncontroJornada,
@@ -907,11 +906,6 @@ describe("regressão — re-emissão depois de respondida reabre a estação (M3
 // ---------- painel coord/supervisor (B5 — paridade com a jornada) ----------
 
 describe("painel — estacoesPainelDupla + atrasadasPainel", () => {
-  const ctxPainel = (encVigente: number): PainelTurmaCtx => ({
-    encVigente,
-    dataEnc: (n) => dataEnc(n),
-  });
-
   const linha = (over: Partial<PainelJornadaLinha> = {}): PainelJornadaLinha => ({
     dupla_id: "d1",
     turma: "T1",
@@ -934,7 +928,7 @@ describe("painel — estacoesPainelDupla + atrasadasPainel", () => {
           ],
         },
       });
-    const estados = estacoesPainelDupla(l, ctxPainel(13), 13);
+    const estados = estacoesPainelDupla(l, 13);
     expect(estados.roda_inicial).toBe("respondido");
     expect(estados.roda_formal).toBe("pendente");
   });
@@ -948,7 +942,6 @@ describe("painel — estacoesPainelDupla + atrasadasPainel", () => {
           ],
         },
       }),
-      ctxPainel(13),
       13
     );
     expect(estados.roda_inicial).toBe("respondido");
@@ -964,7 +957,6 @@ describe("painel — estacoesPainelDupla + atrasadasPainel", () => {
           ],
         },
       }),
-      ctxPainel(13),
       13
     );
     expect(estados.roda_inicial).toBe("respondido");
@@ -980,20 +972,19 @@ describe("painel — estacoesPainelDupla + atrasadasPainel", () => {
           ],
         },
       }),
-      ctxPainel(3),
       3
     );
     expect(estados.visao).not.toBe("respondido");
   });
 
   it("régua da dupla: dupla recém-emparelhada não fica 'fora da janela' pela coorte", () => {
-    const estados = estacoesPainelDupla(linha(), ctxPainel(10), 1);
+    const estados = estacoesPainelDupla(linha(), 1);
     // coorte no enc. 10, dupla ainda sem encontro realizado (max_numero null → posição 1)
-    const atrasadas = atrasadasPainel(estados, ctxPainel(10), 1);
+    const atrasadas = atrasadasPainel(estados, 1);
     expect(atrasadas).not.toContain("visao");
     expect(atrasadas).not.toContain("metas");
     // coorte no enc. 10, dupla acompanhando (posição 10): visao/metas fora da janela
-    const atrasadas2 = atrasadasPainel(estados, ctxPainel(10), 10);
+    const atrasadas2 = atrasadasPainel(estados, 10);
     expect(atrasadas2).toContain("visao");
     expect(atrasadas2).toContain("metas");
   });
@@ -1010,7 +1001,7 @@ describe("painel — estacoesPainelDupla + atrasadasPainel", () => {
       });
     // janela aberta pra dupla (regua 9 ≥ encIni 1) → pendente: a coord vê
     // que há link novo esperando a jovem
-    expect(estacoesPainelDupla(mk(), ctxPainel(9), 9).pdm).toBe("pendente");
+    expect(estacoesPainelDupla(mk(), 9).pdm).toBe("pendente");
     // janela ainda não abriu pra ela (dupla em 0, estação encIni 12) —
     // resposta anterior continua sendo o fato (paridade com a jornada)
     const mk2 = () =>
@@ -1023,26 +1014,24 @@ describe("painel — estacoesPainelDupla + atrasadasPainel", () => {
           ],
         },
       });
-    expect(estacoesPainelDupla(mk2(), ctxPainel(13), 1).roda_formal).toBe("respondido");
+    expect(estacoesPainelDupla(mk2(), 1).roda_formal).toBe("respondido");
   });
 
   it("avaliação recorrente: realizados=0 trancada, feitas=realizados em dia, senão pendente", () => {
     const base_ = { realizados: 0, feitas: 0, max_numero: null };
     expect(
-      estacoesPainelDupla(linha({ avaliacoes_encontro: base_ }), ctxPainel(5), 5)
+      estacoesPainelDupla(linha({ avaliacoes_encontro: base_ }), 5)
         .avaliacao_encontro
     ).toBe("trancada");
     expect(
       estacoesPainelDupla(
         linha({ avaliacoes_encontro: { realizados: 3, feitas: 3, max_numero: 3 } }),
-        ctxPainel(5),
         4
       ).avaliacao_encontro
     ).toBe("respondido");
     expect(
       estacoesPainelDupla(
         linha({ avaliacoes_encontro: { realizados: 3, feitas: 1, max_numero: 3 } }),
-        ctxPainel(5),
         4
       ).avaliacao_encontro
     ).toBe("pendente");

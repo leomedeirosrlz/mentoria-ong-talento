@@ -47,7 +47,7 @@ import {
   INSTRUMENTOS_SISTEMA,
   type InstrumentoSistema,
 } from "./forms/schema";
-import { ESTACOES, type EstacaoChave } from "./jornada";
+import { ESTACOES, SISTEMA_DA_ESTACAO, type EstacaoChave } from "./jornada";
 
 /** Entrada de guia por instrumento — `chip` alimenta o badge da janela,
  *  `conduzir` o <details> do mentor e `cobre` a leitura da coordenação. */
@@ -241,16 +241,9 @@ const NOME_INSTRUMENTO: Record<string, InstrumentoSistema> = {
   roda_vida: "roda_vida",
 };
 
-/** Estação → instrumento de sistema — espelha SISTEMA_DA_ESTACAO de
- *  painel-jornada.tsx (roda inicial e formal dividem `roda_vida`;
- *  avaliacao_encontro e avaliacao_360 não são instrumentos da dupla). */
-const SISTEMA_DA_ESTACAO: Partial<Record<EstacaoChave, InstrumentoSistema>> = {
-  roda_inicial: "roda_vida",
-  visao: "visao",
-  metas: "metas",
-  pdm: "pdm",
-  roda_formal: "roda_vida",
-};
+// estação → sistema vem do canônico SISTEMA_DA_ESTACAO (jornada.ts) —
+// roda inicial e formal dividem `roda_vida`; avaliacao_encontro e
+// avaliacao_360 não são instrumentos da dupla (sem entrada no mapa).
 
 function normaNome(nome: string): string {
   return nome

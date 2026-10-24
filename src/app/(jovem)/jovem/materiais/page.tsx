@@ -7,10 +7,9 @@ import {
   BookOpen,
   CalendarCheck,
   CaretDown,
-  Check,
+  CaretRight,
   CheckCircle,
   CircleDashed,
-  Clock,
   File,
   FileText,
   Flag,
@@ -26,6 +25,10 @@ import {
   type AvaliacaoFeita,
   type AvaliacaoPendente,
 } from "@/components/jovem-avaliacoes";
+import {
+  InstrumentoIcone,
+  instrumentoVars,
+} from "@/components/instrumento-icone";
 import { JornadaRascunho } from "@/components/jornada-rascunho";
 import { ReverRespostaDialog } from "@/components/jornada-rever";
 import { Badge } from "@/components/ui/badge";
@@ -38,6 +41,7 @@ import {
   estacoesJornada,
   materialLiberadoParaJovem,
   resumoJornada,
+  SISTEMA_DA_ESTACAO,
   type Estacao,
   type EstacaoChave,
   type EventoJornada,
@@ -45,7 +49,6 @@ import {
 import type {
   FormularioCampo,
   FormularioSistema,
-  InstrumentoSistema,
   RespostaValor,
 } from "@/lib/forms/schema";
 import { getMateriais, getMe } from "@/lib/queries";
@@ -55,19 +58,19 @@ import {
   getJovemEncontros,
   getJovemJornada,
 } from "@/lib/queries-jovem";
+import { getConsolidadoTerceirosJovem } from "@/lib/terceiros/queries";
 import { MaterialMenu } from "@/components/material-actions";
-import {
-  PreviewLink,
-  PreviewMaterial,
-} from "@/components/material-preview-pdf";
+import { PreviewLink } from "@/components/material-preview-pdf";
+import { MaterialThumb } from "@/components/material-thumb";
 import type { Material } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Minha jornada" };
 
-// WP7 (REALIZA-140, mock v3 narrativa + semântica v4): /jovem/materiais vira
-// o hub "Minha jornada" — as 7 estações canônicas do guia numa trilha
-// vertical (entregas como recibos com data + a caligrafia do jovem), e a
+// WP7 (REALIZA-140) + REALIZA-194 (spec v5c): /jovem/materiais é o hub
+// "Minha jornada" — os 7 instrumentos oficiais da régua do guia viram a
+// estante de cards-produto (capa símbolo + janela + estado honesto, o
+// card inteiro = gesto) com a devolutiva de terceiros entre eles, e a
 // biblioteca de sempre continua embaixo como "Acervo". As datas saem do
 // cronograma da turma DELA (RPC jovem_jornada, 0096) — T1 e T2 veem janelas
 // diferentes pro mesmo encontro. Fallback decidido no plano: RPC fora,
@@ -94,16 +97,10 @@ const GRUPO_TIPO = {
   link: "Links",
 } as const;
 
-/** Estação → o sistema de instrumento que respalda a resposta (0080/0096).
- *  avaliacao_encontro vive no fluxo próprio (0071) e o 360º chega por
- *  `jornada.avaliacao_360` — os dois não têm item em `instrumentos`. */
-const SISTEMA_DA_ESTACAO: Partial<Record<EstacaoChave, InstrumentoSistema>> = {
-  roda_inicial: "roda_vida",
-  visao: "visao",
-  metas: "metas",
-  pdm: "pdm",
-  roda_formal: "roda_vida",
-};
+// estação → sistema do instrumento: SISTEMA_DA_ESTACAO canônico
+// (jornada.ts, 0080/0096) — avaliacao_encontro vive no fluxo próprio
+// (0071) e o 360º chega por `jornada.avaliacao_360`: os dois não têm
+// item em `instrumentos`.
 
 function agrupar(materiais: Material[]): [string, Material[]][] {
   const mapa = new Map<string, Material[]>();
@@ -139,17 +136,8 @@ function diaMesCurto(iso: string | null | undefined): string {
   });
 }
 
-/** Quando a estação trancada abre — data da turma quando existe, senão o
- *  número do encontro do guia (turma encurtada pode não cobrir o passo). */
-function quandoAbre(e: Estacao): string {
-  return (
-    diaMesCurto(e.janela.dataIni) ||
-    `enc. ${e.janela.encIni}`
-  );
-}
-
 export default async function JovemMateriais() {
-  const [me, jornada, encontros, avaliacoes, duplas, materiais] =
+  const [me, jornada, encontros, avaliacoes, duplas, materiais, consolidadoTerc] =
     await Promise.all([
       getMe(),
       // a RPC fora do ar devolve a página ao formato anterior — nunca quebra
@@ -158,6 +146,8 @@ export default async function JovemMateriais() {
       getJovemAvaliacoes(),
       getJovemDuplas(),
       getMateriais(),
+      // o consolidado de terceiros publicado — cache()ada, a home já chama
+      getConsolidadoTerceirosJovem().catch(() => null),
     ]);
   if (!me) return null; // o layout já barra — convenção das páginas
 
@@ -293,17 +283,6 @@ export default async function JovemMateriais() {
     }
   }
 
-  const lista = estacoes.map((e, i) => ({ est: e, n: i + 1 }));
-  // REALIZA-162 (densidade desktop): as abertas saem da trilha e viram o
-  // bloco de ação "A fazer agora" logo abaixo do hero — na trilha elas NÃO
-  // repetem nem marcador (decisão registrada no PR): duplicar o título
-  // criaria heading/texto duplicado na mesma seção e um segundo foco de
-  // atenção sem informação nova. A trilha fica sendo o histórico (feitas
-  // recolhidas em recibo) + o futuro (trancadas) + a bandeira.
-  const afazer = lista.filter((l) => l.est.estado === "a_fazer");
-  const feitas = lista.filter((l) => l.est.estado === "feito");
-  const trancadas = lista.filter((l) => l.est.estado === "trancada");
-
   /** Props da ação de cada estação — o mesmo recorte por chave que o mapa
    *  antigo fazia inline (avaliação do encontro usa o fluxo 0071; 360º lê
    *  os campos pelo token; os 4 instrumentos pelos campos do sistema). */
@@ -391,7 +370,7 @@ export default async function JovemMateriais() {
                 aria-hidden
               />
               <span>
-                Você completou as {resumo.total} estações da jornada —{" "}
+                Você completou os {resumo.total} instrumentos da jornada —{" "}
                 <strong className="font-semibold text-foreground">
                   parabéns por chegar até aqui.
                 </strong>
@@ -420,66 +399,74 @@ export default async function JovemMateriais() {
         </a>
       </nav>
 
-      {/* ---------- a jornada: ação primeiro, histórico depois ----------
-          Fica tudo dentro da mesma <section aria-label="Sua jornada"> —
-          contrato dos specs e2e (article = estação, details = trancadas). */}
+      {/* ---------- "Meus instrumentos" — os cards-produto do v5c ----------
+          Cada instrumento da régua vira um card com capa símbolo + janela +
+          estado honesto; o card inteiro é o gesto (link pro /f/<token>
+          quando há o que continuar — sem botão redundante). Trancados
+          seguem visíveis dessaturados com a data de liberação, nunca
+          card mudo. Sem snippets de resposta — a resposta mora na tela
+          do instrumento e no Rever, não na estante. */}
       <section
         id="jornada"
-        aria-label="Sua jornada"
-        className="scroll-mt-28 space-y-6 md:scroll-mt-14"
+        aria-labelledby="meus-instrumentos-titulo"
+        className="scroll-mt-28 space-y-4 md:scroll-mt-14"
       >
-        {/* "A fazer agora" — as estações abertas em cards de ação de linha
-            inteira. Some a seção inteira quando não há nada aberto. */}
-        {afazer.length > 0 && (
-          <section aria-labelledby="afazer-titulo">
-            <h2
-              id="afazer-titulo"
-              className="flex items-center gap-2 font-semibold"
-            >
-              <CircleDashed
-                size={18}
-                className="text-muted-foreground"
-                aria-hidden
-              />
-              A fazer agora
-            </h2>
-            <div className="mt-3 space-y-4">
-              {afazer.map((l) => (
-                <EstacaoAberta
-                  key={l.est.chave}
-                  est={l.est}
-                  n={l.n}
-                  primeiroNome={primeiroNome}
-                  {...propsEstacao(l.est.chave)}
-                />
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* a trilha compacta — rail esquerdo único (o zigzag saiu na
-            densidade): recibos fechados das feitas, o <details> das
-            trancadas e a bandeira do enc. 16 */}
-        <ol>
-          {feitas.map((l, i) => (
-            <EstacaoFeita
-              key={l.est.chave}
-              est={l.est}
-              n={l.n}
-              primeiro={i === 0}
+        <div>
+          <h2 id="meus-instrumentos-titulo" className="font-semibold">
+            Meus instrumentos
+          </h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Cada instrumento tem um encontro-alvo no guia — toque no card
+            pra abrir ou continuar. O que está por vir abre sozinho no
+            encontro certo.
+          </p>
+          {/* escopo honesto do v5c — o que a jovem vê e o que ela não vê,
+              dito antes da estante (privacidade por desenho, explicada) */}
+          <div className="mt-3 rounded-xl border border-border bg-muted/40 px-4 py-3 text-sm">
+            <p>
+              <strong className="font-semibold">Você vê:</strong> os seus
+              instrumentos, as suas respostas e o acervo de apoio.
+            </p>
+            <p className="mt-1 text-muted-foreground">
+              <strong className="font-semibold text-foreground">
+                Você não vê:
+              </strong>{" "}
+              respostas de outros jovens, nem quem disse o quê na avaliação
+              por terceiros — ela chega como consolidado anônimo.
+            </p>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          {/* ordem do guia: as 4 de construção, a devolutiva de terceiros,
+              a recorrente e as duas de fechamento */}
+          {estacoes.slice(0, 4).map((est) => (
+            <InstrumentoCard
+              key={est.chave}
+              est={est}
               primeiroNome={primeiroNome}
-              {...propsEstacao(l.est.chave)}
+              {...propsEstacao(est.chave)}
             />
           ))}
-          {trancadas.length > 0 && (
-            <TrancadasItem itens={trancadas} primeiro={feitas.length === 0} />
-          )}
-          <FimItem
-            numero={eventoFim?.numero ?? null}
-            data={eventoFim?.data ?? null}
-            primeiro={feitas.length === 0 && trancadas.length === 0}
-          />
-        </ol>
+          <TerceirosCard consolidado={consolidadoTerc != null} />
+          {estacoes.slice(4).map((est) => (
+            <InstrumentoCard
+              key={est.chave}
+              est={est}
+              primeiroNome={primeiroNome}
+              {...propsEstacao(est.chave)}
+            />
+          ))}
+        </div>
+        {/* a bandeira terminal — o encontro 16 da turma dela */}
+        <p className="flex items-center gap-2 pt-1 text-xs text-muted-foreground">
+          <Flag size={14} className="shrink-0" aria-hidden />
+          {eventoFim?.numero != null && eventoFim.data != null
+            ? `Encontro ${eventoFim.numero} · ${formatDate(eventoFim.data)}`
+            : "Encontro 16"}
+          <span className="font-semibold text-foreground">
+            Celebração da jornada
+          </span>
+        </p>
       </section>
 
       {/* ---------- acervo: a biblioteca, agora progressiva (REALIZA-160 —
@@ -515,14 +502,24 @@ export default async function JovemMateriais() {
   );
 }
 
-// ---------- a trilha ----------
+// ---------- "Meus instrumentos" — os cards-produto (v5c) ----------
 
-/** Props compartilhadas das estações — o que a página resolve por chave
- *  (avaliação do encontro × instrumentos × 360º) e passa igual pros dois
- *  formatos: o card de ação ("A fazer agora") e o recibo fechado. */
+/** Sub-rótulo do título — a linha curta do mock v5c que situa o formato
+ *  sem repetir o nome ("leitura inicial", "modelo SMART"). */
+const SUB_ESTACAO: Record<EstacaoChave, string> = {
+  roda_inicial: "leitura inicial",
+  visao: "5 perguntas",
+  metas: "modelo SMART",
+  pdm: "Plano de Desenvolvimento",
+  avaliacao_encontro: "nota + comentário",
+  roda_formal: "aplicação formal",
+  avaliacao_360: "e autoavaliação",
+};
+
+/** Props compartilhadas dos cards — o que a página resolve por chave
+ *  (avaliação do encontro × instrumentos × 360º) e passa pra estante. */
 type EstacaoProps = {
   est: Estacao;
-  n: number;
   pendenteAvaliacao: AvaliacaoPendente | null;
   ultimaAvaliacao: AvaliacaoFeita | null;
   primeiroNome: string;
@@ -530,64 +527,7 @@ type EstacaoProps = {
   campos: FormularioCampo[];
 };
 
-/** Segmento vertical da linha — cada <li> desenha o seu, então a linha muda
- *  de estado junto com a estação: lime sólido no percorrido e tracejado no
- *  que está por vir. Rail único à esquerda em todo breakpoint (o zigzag do
- *  desktop saiu na densidade REALIZA-162). */
-function SegmentoLinha({
-  trancada,
-  primeiro,
-}: {
-  trancada?: boolean;
-  primeiro?: boolean;
-}) {
-  return (
-    <span
-      aria-hidden
-      className={cn(
-        "absolute inset-y-0 left-5 -translate-x-1/2 border-l-2",
-        primeiro && "top-11",
-        trancada ? "border-dashed border-border" : "border-[var(--brand-lime)]"
-      )}
-    />
-  );
-}
-
-/** Nó numerado — a mesma linguagem de antes, menor (size-7) pra trilha
- *  compacta: o número identifica a estação, o check lateral o feito. */
-function NoEstacao({
-  n,
-  estado,
-}: {
-  n: number;
-  estado: Estacao["estado"];
-}) {
-  if (estado === "trancada") {
-    return (
-      <span
-        aria-hidden
-        className="absolute left-5 top-4 z-10 grid size-7 -translate-x-1/2 place-items-center rounded-full border-2 border-dashed border-border bg-card text-muted-foreground"
-      >
-        <LockSimple size={13} aria-hidden />
-      </span>
-    );
-  }
-  return (
-    <span
-      aria-hidden
-      className="absolute left-5 top-4 z-10 grid size-7 -translate-x-1/2 place-items-center rounded-full bg-[var(--brand-lime)] text-[var(--brand-ink)] ring-4 ring-background"
-    >
-      <span className="text-xs font-bold">{n}</span>
-      {estado === "feito" && (
-        <span className="absolute -bottom-0.5 -right-0.5 grid size-3.5 place-items-center rounded-full border-2 border-[var(--brand-lime)] bg-card text-[var(--ok-text)]">
-          <Check size={8} weight="bold" aria-hidden />
-        </span>
-      )}
-    </span>
-  );
-}
-
-function PillAFazer() {
+function TagAFazer() {
   return (
     <Badge variant="outline" className="border-[var(--input)]">
       <CircleDashed data-icon="inline-start" aria-hidden />
@@ -596,10 +536,10 @@ function PillAFazer() {
   );
 }
 
-/** O pill de estado — "Feito" verdinho ou "A fazer" (com a troca "Em
- *  andamento" do rascunho local quando há token). Mesmo nos dois formatos
- *  de estação; no recibo fechado ele mora na linha do summary. */
-function EstadoPill({ est }: { est: Estacao }) {
+/** A tag de estado do card — "Feito" verdinho, "A fazer" (com a troca
+ *  "Em andamento" do rascunho local quando há token) ou "trancada" nos
+ *  que ainda não abriram. Mesmo componente nos dois formatos de card. */
+function EstadoTag({ est }: { est: Estacao }) {
   if (est.estado === "feito") {
     return (
       <Badge className="bg-[var(--ok)]/15 text-[var(--ok-text)]">
@@ -608,19 +548,28 @@ function EstadoPill({ est }: { est: Estacao }) {
       </Badge>
     );
   }
+  if (est.estado === "trancada") {
+    return (
+      <Badge variant="outline" className="text-muted-foreground">
+        <LockSimple data-icon="inline-start" aria-hidden />
+        trancada
+      </Badge>
+    );
+  }
   return est.token ? (
     // "em andamento" é overlay client-side: o rascunho vive no
-    // localStorage deste aparelho — o pill troca depois do mount
+    // localStorage deste aparelho — a tag troca depois do mount
     <JornadaRascunho token={est.token}>
-      <PillAFazer />
+      <TagAFazer />
     </JornadaRascunho>
   ) : (
-    <PillAFazer />
+    <TagAFazer />
   );
 }
 
-/** A ação da estação — o que muda por estado/chave (a mesma regra do card
- *  antigo, agora compartilhada pelo "A fazer agora" e pelo recibo aberto). */
+/** A ação dos cards-article (feito, a fazer sem gesto único, avaliação) —
+ *  quando o card inteiro já é o link pro /f/<token> nada aqui renderiza:
+ *  dois gestos no mesmo card seria redundância, não clareza. */
 function EstacaoAcao({
   est,
   pendenteAvaliacao,
@@ -628,7 +577,7 @@ function EstacaoAcao({
   primeiroNome,
   sistema,
   campos,
-}: Omit<EstacaoProps, "n">) {
+}: EstacaoProps) {
   // o PDM virou documento vivo (REALIZA-181): a estação dele sempre
   // oferece o atalho pro plano — a resposta do instrumento alimenta o doc,
   // mas é aqui que o jovem co-edita com o mentor
@@ -636,7 +585,7 @@ function EstacaoAcao({
     est.chave === "pdm" ? (
       <Link
         href="/jovem/pdm"
-        className={buttonVariants({ variant: "outline" })}
+        className={buttonVariants({ variant: "outline", size: "sm" })}
       >
         Abrir o plano
         <ArrowRight size={15} data-icon="inline-end" aria-hidden />
@@ -664,28 +613,17 @@ function EstacaoAcao({
     }
     return null;
   }
-  if (est.estado === "feito" && est.respostas && campos.length) {
+  // "feito" com resposta na mão vira gatilho no card inteiro
+  // (InstrumentoCard) — aqui só sobra o feito sem resposta, que cai no
+  // `return linkPdm` do fim
+  if (est.estado === "a_fazer" && est.token) {
+    // re-emissão (revisão do PDM): o card continua clicável — mas com a
+    // resposta anterior consultável o gesto único quebraria: aqui o card
+    // vira article com o Rever + o Continuar lado a lado. `campos` vazio
+    // não impede o Rever — a leitura degrada pro recorte cru da resposta
     return (
       <>
-        <ReverRespostaDialog
-          titulo={est.titulo}
-          respondidoEm={est.respondidoEm}
-          sistema={sistema}
-          campos={campos}
-          respostas={est.respostas as Record<string, RespostaValor>}
-        />
-        {linkPdm}
-      </>
-    );
-  }
-  if (est.estado === "a_fazer" && est.token) {
-    return (
-      // re-emissão (revisão do PDM): a rodada aberta tem CTA, mas a
-      // resposta anterior segue acessível — a estação diz "segue salva"
-      // e o Rever prova. (0097: resolveEstacao devolve respostas da
-      // última respondida também no a_fazer)
-      <div className="flex flex-wrap items-center gap-2">
-        {est.respostas && campos.length > 0 && (
+        {est.respostas && (
           <ReverRespostaDialog
             titulo={est.titulo}
             respondidoEm={est.respondidoEm}
@@ -695,260 +633,254 @@ function EstacaoAcao({
             label="Rever resposta anterior"
           />
         )}
-        <Link href={`/f/${est.token}`} className={buttonVariants()}>
+        <Link
+          href={`/f/${est.token}`}
+          className={buttonVariants({ size: "sm" })}
+        >
           Continuar
           <ArrowRight size={15} data-icon="inline-end" aria-hidden />
         </Link>
         {linkPdm}
-      </div>
+      </>
     );
   }
   // estação do PDM feita mas sem resposta/campos na mão: o atalho segue
   return linkPdm;
 }
 
-/** O corpo do card — data, descrição, "Você escreveu…", detalhe honesto e
- *  ação. No recibo fechado a linha do summary já carrega data+detalhe,
- *  então o corpo aberto os omite (um texto só — duplicar quebraria a
- *  contagem exata dos specs e2e e repetiria informação na tela). */
-function EstacaoCorpo({
-  est,
-  acao,
-  mostrarData = true,
-  mostrarDetalhe = true,
-}: {
-  est: Estacao;
-  acao: React.ReactNode;
-  mostrarData?: boolean;
-  mostrarDetalhe?: boolean;
-}) {
-  return (
+/** O card-produto do instrumento (o `.pcard` do v5c): capa símbolo na cor
+ *  do instrumento, título + sub, descrição curta e a linha de estado —
+ *  chip da janela do guia + tag + chevron quando o card inteiro é o link.
+ *  Trancada é dessaturada e explica a data de liberação; nunca card mudo. */
+function InstrumentoCard(props: EstacaoProps) {
+  const { est, campos, sistema } = props;
+  const trancada = est.estado === "trancada";
+  // gesto único: a_fazer + token vira <a> inteiro — a menos que haja uma
+  // resposta anterior pra rever (re-emissão): aí o card é article com os
+  // dois gestos listados, porque <button> dentro de <a> é HTML inválido
+  const linkavel =
+    est.estado === "a_fazer" && !!est.token && !est.respostas;
+  // "feito" com a resposta na mão: o card INTEIRO é o gatilho do Rever —
+  // a estante clicável do v5c (44px sem depender de botão miúdo). A
+  // recorrente fica de fora: o gesto dela é o "Rever última avaliação"
+  // do fluxo próprio (0071). `campos` vazio não segura: o dialog degrada
+  // pro recorte cru das respostas
+  const reveravel =
+    est.estado === "feito" &&
+    !!est.respostas &&
+    est.chave !== "avaliacao_encontro";
+  const acao =
+    linkavel || trancada || reveravel ? null : <EstacaoAcao {...props} />;
+
+  const conteudo = (
     <>
-      {mostrarData && est.respondidoEm && (
-        <p className="mt-2 flex items-center gap-1.5 text-xs font-medium text-[var(--ok-text)]">
-          <CalendarCheck size={14} aria-hidden />
-          Respondido em {formatDate(est.respondidoEm)}
-        </p>
-      )}
-      <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-        {est.descricao}
-      </p>
-      {est.snippet && est.snippet.texto !== est.detalhe && (
-        <div className="mt-3 rounded-r-xl border-l-[3px] border-[var(--brand-lime)] bg-[var(--brand-lime)]/10 px-3.5 py-3">
-          <span className="block text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--ok-text)]">
-            {est.snippet.tag}
+      {/* capa símbolo — tinta do instrumento de fundo, glifo grande no
+          centro; trancada troca a tinta pelo neutro (o glifo já sai
+          neutro) e ganha o cadeado flutuante */}
+      <span
+        className={cn(
+          "relative grid h-24 shrink-0 place-items-center",
+          trancada
+            ? "bg-muted text-muted-foreground"
+            : "bg-[var(--ict)] text-[var(--ic)]"
+        )}
+      >
+        <InstrumentoIcone
+          instrumento={est.chave}
+          size={44}
+          neutro={trancada}
+        />
+        {trancada && (
+          <span className="absolute right-2 top-2 grid size-6 place-items-center rounded-md bg-card/90 text-muted-foreground">
+            <LockSimple size={13} aria-hidden />
           </span>
-          <blockquote className="mt-1 text-sm italic leading-relaxed">
-            “{est.snippet.texto}”
-          </blockquote>
-        </div>
-      )}
-      {mostrarDetalhe && est.detalhe && (
-        <p className="mt-3 flex items-start gap-1.5 rounded-lg bg-muted px-3 py-2 text-xs leading-relaxed text-muted-foreground">
-          {est.estado === "feito" ? (
-            <CheckCircle
-              size={14}
-              className="mt-0.5 shrink-0 text-[var(--ok)]"
-              aria-hidden
-            />
-          ) : (
-            <Clock size={14} className="mt-0.5 shrink-0" aria-hidden />
-          )}
-          <span>{est.detalhe}</span>
+        )}
+      </span>
+      <span className="flex flex-1 flex-col gap-1.5 p-3.5">
+        <h3 className="text-sm font-semibold leading-snug tracking-tight">
+          {est.titulo}
+          <span className="block text-[11px] font-normal text-muted-foreground">
+            {SUB_ESTACAO[est.chave]}
+          </span>
+        </h3>
+        <p className="line-clamp-3 text-xs leading-relaxed text-muted-foreground">
+          {est.descricao}
         </p>
-      )}
-      {acao && (
-        <div className="mt-4 flex flex-wrap items-center gap-2">{acao}</div>
-      )}
+        <span className="mt-auto flex flex-wrap items-center gap-x-2 gap-y-1 pt-2">
+          <span className="rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">
+            {est.janela.label}
+          </span>
+          <EstadoTag est={est} />
+          {(linkavel || reveravel) && (
+            <CaretRight
+              size={16}
+              aria-hidden
+              className="ml-auto shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-foreground"
+            />
+          )}
+        </span>
+        {est.respondidoEm && (
+          <span className="flex items-center gap-1.5 text-[11px] font-medium text-[var(--ok-text)]">
+            <CalendarCheck size={12} aria-hidden />
+            Respondido em {formatDate(est.respondidoEm)}
+          </span>
+        )}
+        {est.detalhe && (
+          <span className="text-[11px] leading-snug text-muted-foreground">
+            {est.detalhe}
+          </span>
+        )}
+        {acao && (
+          <span className="mt-1 flex flex-wrap items-center gap-2">
+            {acao}
+          </span>
+        )}
+      </span>
     </>
   );
-}
 
-/** Estação aberta no "A fazer agora" — card de ação de linha inteira (o
- *  conteúdo do card da trilha antiga, sem o <li> do zigzag): o CTA é o
- *  protagonista e o resto explica o que falta. */
-function EstacaoAberta(props: EstacaoProps) {
-  const { est, n } = props;
+  const shell = cn(
+    "group relative flex flex-col overflow-hidden rounded-xl bg-card shadow-[var(--shadow-border)]",
+    trancada && "border border-dashed border-border bg-card/60 text-muted-foreground"
+  );
+  if (linkavel) {
+    return (
+      <Link
+        href={`/f/${est.token}`}
+        style={instrumentoVars(est.chave)}
+        className={cn(
+          shell,
+          "outline-none transition-shadow hover:ring-2 hover:ring-[var(--ic)]/50 focus-visible:ring-2 focus-visible:ring-ring"
+        )}
+      >
+        {conteudo}
+      </Link>
+    );
+  }
+  if (reveravel) {
+    // o card é o gatilho (render prop + nativeButton=false dentro do
+    // ReverRespostaDialog): role=button + tabstop pela base. Nada
+    // interativo pode morar dentro — por isso `acao` é null aqui e o
+    // atalho do PDM vive embaixo do card, não dentro dele
+    const card = (
+      <article
+        style={instrumentoVars(est.chave)}
+        aria-label={`Rever resposta — ${est.titulo}`}
+        className={cn(
+          shell,
+          "w-full cursor-pointer text-left outline-none transition-shadow hover:ring-2 hover:ring-[var(--ic)]/50 focus-visible:ring-2 focus-visible:ring-ring"
+        )}
+      >
+        {conteudo}
+      </article>
+    );
+    const dialog = (
+      <ReverRespostaDialog
+        titulo={est.titulo}
+        respondidoEm={est.respondidoEm}
+        sistema={sistema}
+        campos={campos}
+        respostas={est.respostas as Record<string, RespostaValor>}
+        trigger={card}
+      />
+    );
+    if (est.chave === "pdm") {
+      return (
+        <div className="flex flex-col gap-2">
+          {dialog}
+          <Link
+            href="/jovem/pdm"
+            className={buttonVariants({ variant: "outline", size: "sm" })}
+          >
+            Abrir o plano
+            <ArrowRight size={15} data-icon="inline-end" aria-hidden />
+          </Link>
+        </div>
+      );
+    }
+    return dialog;
+  }
   return (
-    <article className="rounded-xl bg-card p-4 shadow-[var(--shadow-border)] sm:p-6">
-      <p className="flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-        Estação {n}
-        <span className="rounded-md bg-[var(--brand-ink)] px-1.5 py-0.5 text-[10px] font-semibold normal-case tracking-normal text-white">
-          {est.janela.label}
-        </span>
-      </p>
-      <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1.5">
-        <h3 className="text-base font-semibold tracking-tight">
-          {est.titulo}
-        </h3>
-        <EstadoPill est={est} />
-      </div>
-      <EstacaoCorpo est={est} acao={<EstacaoAcao {...props} />} />
+    <article style={instrumentoVars(est.chave)} className={shell}>
+      {conteudo}
     </article>
   );
 }
 
-/** Recibo da estação feita — a linha compacta da trilha (nó + Estação N +
- *  título + "Feito" + data/detalhe) que abre no próprio lugar: o <details>
- *  revela a descrição, o "Você escreveu…" e o Rever resposta. O estado
- *  expandido é nativo do elemento — leitor de tela anuncia aberto/fechado
- *  sem aria-expanded manual. */
-function EstacaoFeita({
-  primeiro,
-  ...props
-}: EstacaoProps & { primeiro: boolean }) {
-  const { est, n } = props;
-  return (
-    <li className="relative pb-4 pl-12">
-      <SegmentoLinha primeiro={primeiro} />
-      <NoEstacao n={n} estado={est.estado} />
-      <article className="overflow-hidden rounded-xl bg-card shadow-[var(--shadow-border)]">
-        <details className="group">
-          {/* summary admite heading direto (phrasing + heading content) —
-              o h3 mora na linha sem wrapper inválido; o caret vai pro fim
-              com ml-auto e o meta data/detalhe quebra a linha no wrap */}
-          <summary className="flex min-h-11 cursor-pointer list-none flex-wrap items-center gap-x-2.5 gap-y-1 px-4 py-3 outline-none marker:hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset [&::-webkit-details-marker]:hidden">
-            <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-              Estação {n}
-            </span>
-            <span className="rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">
-              {est.janela.label}
-            </span>
-            <h3 className="text-sm font-semibold tracking-tight">
-              {est.titulo}
-            </h3>
-            <EstadoPill est={est} />
-            {(est.respondidoEm || est.detalhe) && (
-              <span className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
-                {est.respondidoEm && (
-                  <span className="inline-flex items-center gap-1">
-                    <CalendarCheck size={12} aria-hidden />
-                    Respondido em {formatDate(est.respondidoEm)}
-                  </span>
-                )}
-                {est.detalhe && <span>{est.detalhe}</span>}
-              </span>
-            )}
-            <CaretDown
-              size={15}
-              className="ml-auto shrink-0 text-muted-foreground transition-transform group-open:rotate-180"
-              aria-hidden
-            />
-          </summary>
-          <div className="border-t border-border/60 px-4 pb-4 pt-1">
-            <EstacaoCorpo
-              est={est}
-              mostrarData={false}
-              mostrarDetalhe={false}
-              acao={<EstacaoAcao {...props} />}
-            />
-          </div>
-        </details>
-      </article>
-    </li>
-  );
-}
-
-/** Estações trancadas — nunca cards normais: ficam recolhidas no <details>
- *  "Daqui pra frente", com nomes+datas no summary (anti-extensão mobile). */
-function TrancadasItem({
-  itens,
-  primeiro,
-}: {
-  itens: { est: Estacao; n: number }[];
-  primeiro: boolean;
-}) {
-  return (
-    <li className="relative pb-4 pl-12">
-      <SegmentoLinha trancada primeiro={primeiro} />
-      <NoEstacao n={0} estado="trancada" />
-      <details className="group rounded-xl border border-dashed border-border bg-card/60">
-        <summary className="flex cursor-pointer list-none flex-wrap items-center gap-x-3 gap-y-1 p-4 outline-none marker:hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset sm:p-5 [&::-webkit-details-marker]:hidden">
-          <span className="min-w-0 flex-1">
-            <span className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-              Daqui pra frente · {itens.length}{" "}
-              {itens.length === 1 ? "estação" : "estações"}
-            </span>
-            <span className="mt-1 block text-sm font-medium">
-              {/* anti-extensão: 2 primeiros + "+N" — a lista cheia tá logo
-                  abaixo, no corpo expandido do details */}
-              {itens
-                .slice(0, 2)
-                .map((l) => `${l.est.titulo} (${quandoAbre(l.est)})`)
-                .join(" · ")}
-              {itens.length > 2 && ` · +${itens.length - 2}`}
-            </span>
-            <span className="mt-0.5 block text-xs text-muted-foreground">
-              Cada uma abre sozinha no encontro certo.
-            </span>
-          </span>
-          <CaretDown
-            size={16}
-            className="shrink-0 text-muted-foreground transition-transform group-open:rotate-180"
-            aria-hidden
-          />
-        </summary>
-        <ul className="divide-y divide-border/60 border-t border-dashed border-border px-4 sm:px-5">
-          {itens.map((l) => (
-            <li key={l.est.chave} className="py-3">
-              <p className="flex flex-wrap items-baseline gap-x-2">
-                <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                  Estação {l.n}
-                </span>
-                <span className="text-sm font-medium">{l.est.titulo}</span>
-                <span className="rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">
-                  {l.est.janela.label}
-                </span>
-              </p>
-              <p className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
-                <LockSimple size={13} aria-hidden className="shrink-0" />
-                {l.est.detalhe ?? `Abre no encontro ${l.est.janela.encIni}.`}
-              </p>
-            </li>
-          ))}
-        </ul>
-      </details>
-    </li>
-  );
-}
-
-/** A bandeira terminal — o encontro 16 da turma dela fecha a trilha. */
-function FimItem({
-  numero,
-  data,
-  primeiro,
-}: {
-  numero: number | null;
-  data: string | null;
-  primeiro: boolean;
-}) {
-  return (
-    <li className="relative pl-12">
-      <span
-        aria-hidden
-        className={cn(
-          "absolute left-5 top-0 h-6 -translate-x-1/2 border-l-2 border-dashed border-border",
-          primeiro && "h-0"
-        )}
-      />
-      <span
-        aria-hidden
-        className="absolute left-5 top-0 z-10 grid size-8 -translate-x-1/2 place-items-center rounded-full border-2 border-dashed border-border bg-card text-muted-foreground"
-      >
-        <Flag size={14} aria-hidden />
+/** O card de terceiros (0103) — instrumento oficial que não é estação da
+ *  régua: a jovem nunca emite link e nunca vê respostas individuais; o
+ *  card explica o formato e, com o consolidado publicado, vira o link
+ *  pra síntese anonimizada na home. */
+function TerceirosCard({ consolidado }: { consolidado: boolean }) {
+  const conteudo = (
+    <>
+      <span className="relative grid h-24 shrink-0 place-items-center bg-[var(--ict)] text-[var(--ic)]">
+        <InstrumentoIcone instrumento="avaliacao_terceiros" size={44} />
       </span>
-      <p className="pt-10 text-xs leading-relaxed text-muted-foreground">
-        {numero != null && data && (
-          <>
-            Encontro {numero} · {formatDate(data)}
-            <br />
-          </>
+      <span className="flex flex-1 flex-col gap-1.5 p-3.5">
+        <h3 className="text-sm font-semibold leading-snug tracking-tight">
+          Avaliação por terceiros
+          <span className="block text-[11px] font-normal text-muted-foreground">
+            devolutiva
+          </span>
+        </h3>
+        <p className="line-clamp-3 text-xs leading-relaxed text-muted-foreground">
+          Pessoas próximas respondem 2 perguntas — vira um consolidado,
+          sem quem disse o quê.
+        </p>
+        <span className="mt-auto flex flex-wrap items-center gap-x-2 gap-y-1 pt-2">
+          <span className="rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">
+            Antes do enc. 1 · devolutiva enc. 2
+          </span>
+          {consolidado ? (
+            <Badge className="bg-[var(--ok)]/15 text-[var(--ok-text)]">
+              <CheckCircle data-icon="inline-start" aria-hidden />
+              Devolutiva no ar
+            </Badge>
+          ) : (
+            <Badge variant="outline" className="text-muted-foreground">
+              em coleta
+            </Badge>
+          )}
+          {consolidado && (
+            <CaretRight
+              size={16}
+              aria-hidden
+              className="ml-auto shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-foreground"
+            />
+          )}
+        </span>
+        <span className="text-[11px] leading-snug text-muted-foreground">
+          {consolidado
+            ? "Síntese que seu mentor publicou — quem respondeu fica anônimo."
+            : "Seu mentor publica a síntese no encontro 2."}
+        </span>
+      </span>
+    </>
+  );
+  const shell =
+    "group relative flex flex-col overflow-hidden rounded-xl bg-card shadow-[var(--shadow-border)]";
+  if (consolidado) {
+    return (
+      <Link
+        href="/jovem#terceiros-titulo"
+        style={instrumentoVars("avaliacao_terceiros")}
+        className={cn(
+          shell,
+          "outline-none transition-shadow hover:ring-2 hover:ring-[var(--ic)]/50 focus-visible:ring-2 focus-visible:ring-ring"
         )}
-        <strong className="font-semibold text-foreground">
-          Celebração da jornada
-        </strong>
-      </p>
-    </li>
+      >
+        {conteudo}
+      </Link>
+    );
+  }
+  return (
+    <article
+      style={instrumentoVars("avaliacao_terceiros")}
+      className={shell}
+    >
+      {conteudo}
+    </article>
   );
 }
 
@@ -1008,10 +940,12 @@ function MaterialCard({ m }: { m: Material }) {
       )}
     </>
   );
-  // a capa: arquivo → 1ª página do PDF/imagem; só url → faixa de link
-  // externo com o domínio; sem destino ("em breve") não chega aqui como
-  // card clicável — vive no grupo "A caminho" embaixo
-  const capa = m.path ? <PreviewMaterial m={m} /> : <PreviewLink m={m} />;
+  // a capa: arquivo → thumb curta (crop do topo da 1ª página, ≤96px —
+  // MaterialThumb é o contrato global; o preview grande h-36 é de
+  // leitura, não de estante); só url → faixa de link externo com o
+  // domínio; sem destino ("em breve") não chega aqui como card
+  // clicável — vive no grupo "A caminho" embaixo
+  const capa = m.path ? <MaterialThumb m={m} /> : <PreviewLink m={m} />;
   return (
     <div className="relative overflow-hidden rounded-xl bg-card shadow-[var(--shadow-border)]">
       {href ? (

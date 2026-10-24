@@ -47,8 +47,10 @@ import {
 // da ficha da dupla.
 
 /** Dupla elegível do painel — nomes já vêm da linha; e-mail/whatsapp do
- *  destinatário NÃO atravessam pro client (revisão de segurança): aqui
- *  só os flags que montam a prévia "quem recebe". */
+ *  destinatário não atravessam pelas PROPS (revisão de segurança): aqui
+ *  só os flags que montam a prévia "quem recebe". O retorno da server
+ *  action, esse sim, traz `waFone`/token no relatório por linha — ok
+ *  porque o componente é coord-only. */
 export type DuplaLote = {
   duplaId: string;
   jovemNome: string;
@@ -74,6 +76,7 @@ export function EnviarInstrumentoLote({
   estacaoTitulo,
   linhas,
   envioLiberado,
+  contador,
 }: {
   sistema: InstrumentoSistema;
   /** Nome da estação do painel ("Visão", "Roda formal") — o cabeçalho diz
@@ -81,6 +84,9 @@ export function EnviarInstrumentoLote({
   estacaoTitulo: string;
   linhas: DuplaLote[];
   envioLiberado: boolean;
+  /** Contagem de elegíveis no gatilho ("Enviar em lote · N") — o icard do
+   *  v5c traz o número de cara; sem ele o gatilho fica só o rótulo. */
+  contador?: number;
 }) {
   const uid = useId();
   const listaId = `${uid}-duplas`;
@@ -172,6 +178,9 @@ export function EnviarInstrumentoLote({
           <Button variant="outline" size="sm">
             <PaperPlaneTilt aria-hidden />
             Enviar em lote
+            {contador != null && (
+              <span className="tabular-nums"> · {contador}</span>
+            )}
           </Button>
         }
       />
