@@ -35,6 +35,7 @@ import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { formatDate, linkSeguro, TRILHA_LEN } from "@/lib/ciclo";
+import { turmaLonga } from "@/lib/turma";
 import { formularioPorToken } from "@/lib/forms/queries";
 import {
   encCorrenteDe,
@@ -314,7 +315,7 @@ export default async function JovemMateriais() {
                 Minha jornada
               </h1>
               <p className="mt-1 text-sm text-muted-foreground">
-                {dupla.turma ? `${dupla.turma} · ` : ""}
+                {dupla.turma ? `${turmaLonga(dupla.turma)} · ` : ""}
                 encontro {encontroCorrente} de {TRILHA_LEN.dpp}
               </p>
               {fase && (
@@ -607,7 +608,7 @@ function EstacaoAcao({
       return (
         <VerAvaliacaoButton
           avaliacao={ultimaAvaliacao}
-          label="Rever última avaliação"
+          label="Ver resposta"
         />
       );
     }

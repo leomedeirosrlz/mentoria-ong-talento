@@ -103,6 +103,7 @@ import {
   type PassoGuia,
 } from "@/lib/ciclo";
 import { limboAberto } from "@/lib/agenda-minha";
+import { turmaLonga } from "@/lib/turma";
 import type { MentorChamada } from "@/lib/queries-presenca";
 import { temPapel } from "@/lib/types";
 import type {
@@ -2138,8 +2139,10 @@ export function AgendaCalendario({
             {/* seletor de turma (0061) — com duas turmas ativas, cada uma tem
                 seu calendário oficial: a agenda mostra uma por vez, nunca a
                 união. Vale pra coord/sup e pro mentor com duplas em turmas
-                diferentes. O valor é a turma ("T1 · 2026/2027", nunca
-                trunca); o item carrega a posição da turma no ciclo */}
+                diferentes. O VALUE é o id do cronograma (nunca a string de
+                turma — duplicatas não colidem); o label vai na forma
+                narrativa canônica e o nome do calendário desambigua quando
+                duas opções têm a mesma turma */}
             {opcoesCron.length > 1 && (
               <div className="ms-auto flex items-center gap-2">
                 <Label
@@ -2155,8 +2158,8 @@ export function AgendaCalendario({
                     opcoesCron.map((c) => [
                       c.id,
                       turmasRepetidas.has(c.turma)
-                        ? `${c.turma} · ${c.nome}`
-                        : c.turma,
+                        ? `${turmaLonga(c.turma)} · ${c.nome}`
+                        : turmaLonga(c.turma),
                     ])
                   )}
                 >
@@ -2174,7 +2177,7 @@ export function AgendaCalendario({
                       <SelectItem key={c.id} value={c.id}>
                         <span className="flex flex-col">
                           <span className="font-medium">
-                            {c.turma}
+                            {turmaLonga(c.turma)}
                             {turmasRepetidas.has(c.turma) && ` · ${c.nome}`}
                           </span>
                           <span className="text-xs text-muted-foreground">

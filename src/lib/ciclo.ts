@@ -20,6 +20,7 @@ import type {
   SituacaoMentorado,
   Trilha,
 } from "./types";
+import { turmaLonga } from "./turma";
 
 export type Semaforo = "ok" | "atencao" | "risco";
 
@@ -939,9 +940,12 @@ export function cronogramasOpcoes(cronogramas: Cronograma[]): Cronograma[] {
   );
 }
 
-/** Label curto do seletor: "2026/2027 · Calendário oficial". */
+/** Label do cronograma em seletores e títulos: "Turma 1 · Calendário
+ *  oficial" — a turma entra na forma narrativa canônica (turmaLonga) e o
+ *  nome do calendário desambigua quando a mesma turma tem dois
+ *  cronogramas. Exibição pura: `c.turma` segue sendo o valor cru. */
 export function rotuloCronograma(c: Cronograma): string {
-  return `${c.turma} · ${c.nome}`;
+  return `${turmaLonga(c.turma)} · ${c.nome}`;
 }
 
 /** Encontros esperados = datas de encontro já passadas (ou hoje) desde o início da dupla. */

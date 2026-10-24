@@ -9,6 +9,7 @@ import {
   type MotivoAcompanhar,
 } from "@/lib/agenda-coordenacao";
 import { semanaBounds } from "@/lib/ciclo";
+import { turmaLonga } from "@/lib/turma";
 import { rotuloDiaAgenda } from "@/lib/agenda-minha";
 import { msgsContato } from "@/lib/whatsapp-msgs";
 import type { Interacao } from "@/lib/interacoes";
@@ -252,7 +253,8 @@ export function AgendaCoordenacao({
                 <span key={r.cronogramaId}>
                   {i > 0 && (i === resumos.length - 1 ? " e " : ", ")}
                   <b className="font-medium text-foreground">
-                    {r.turma} está no encontro {r.eventoNumero ?? "—"}
+                    {turmaLonga(r.turma)} está no encontro{" "}
+                    {r.eventoNumero ?? "—"}
                   </b>
                 </span>
               ))}

@@ -29,6 +29,7 @@ import {
   ultimoRegistro,
 } from "@/lib/ciclo";
 import { prazoTrilhaEspecialista } from "@/lib/encerramento";
+import { turmaCurta, turmaLonga } from "@/lib/turma";
 import { rotuloDiaAgenda } from "@/lib/agenda-minha";
 import { msgsContato } from "@/lib/whatsapp-msgs";
 import type { Interacao } from "@/lib/interacoes";
@@ -300,7 +301,7 @@ function LinhaDupla({
         {saude.apoio.aberto && (
           <Link
             href={`/duplas/${d.id}`}
-            className="rounded-full focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+            className="inline-flex min-h-11 items-center rounded-full focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50 lg:min-h-0"
           >
             <Pill tom="apoio">
               <Lifebuoy size={12} aria-hidden />
@@ -344,7 +345,7 @@ function LinhaDupla({
           </p>
           <p className="mt-0.5 truncate text-xs text-muted-foreground">
             {[
-              d.turma || null,
+              d.turma ? turmaLonga(d.turma) : null,
               mostrarSupervisor &&
                 (d.supervisor ? `sup. ${d.supervisor.nome}` : "sem supervisor"),
             ]
@@ -489,8 +490,11 @@ function LinhaMini({
       <span className="flex min-w-0 items-center gap-1.5 font-medium">
         <DuplaNomes truncar mentor={d.mentor.nome} mentorado={d.mentorado.nome} />
         {d.turma && (
-          <span className="rounded border border-border px-1 text-[10px] font-bold text-muted-foreground">
-            {d.turma}
+          <span
+            title={d.turma}
+            className="rounded border border-border px-1 text-[10px] font-bold text-muted-foreground"
+          >
+            {turmaCurta(d.turma)}
           </span>
         )}
       </span>
@@ -775,7 +779,7 @@ function ResumoSemaforo({
       const dias = diffDias(c.inicio, primeiroInicio);
       if (dias >= 7)
         notasAtraso.push(
-          `${c.turma} começou ${Math.round(dias / 7)} sem. depois — não é atraso`
+          `${turmaLonga(c.turma)} começou ${Math.round(dias / 7)} sem. depois — não é atraso`
         );
     }
   }
@@ -802,7 +806,7 @@ function ResumoSemaforo({
             interativo podava os segmentos da árvore mas eles seguiam
             focáveis: o teclado pousava em controle sem nome */}
         <span className="sr-only">{labelBarra}</span>
-        <div className="mt-1.5 flex h-5 gap-0.5 overflow-hidden rounded-full">
+        <div className="mt-1.5 flex h-11 gap-0.5 overflow-hidden rounded-full sm:h-5">
           {segs.map((seg) =>
             seg.cat && onFiltrar ? (
               <button
@@ -855,7 +859,9 @@ function ResumoSemaforo({
               key={c.turma}
               className="flex items-center gap-2 text-xs text-muted-foreground"
             >
-              <span className="font-bold text-foreground">{c.turma}</span>
+              <span className="font-bold text-foreground">
+                {turmaLonga(c.turma)}
+              </span>
               encontro{" "}
               <b className="font-semibold text-foreground">
                 {c.esperados} de {c.total}
@@ -1507,8 +1513,12 @@ function VisaoCoordenacao({
                   aria-pressed={turmaSel === t}
                   onClick={() => setTurmaSel(turmaSel === t ? null : t)}
                   className={filterChipCls(turmaSel === t)}
+                  /* chip mostra a sigla; o valor cru segue no estado/
+                     comparação e vai no title pra desambiguar colisões
+                     ("T1" vs "T1 · 2026/2027") */
+                  title={t}
                 >
-                  {t}
+                  {turmaCurta(t)}
                   <span
                     className={cn(
                       "text-[11px] tabular-nums",
@@ -1839,7 +1849,7 @@ function VisaoSupervisor({
                       gi > 0 && "border-t border-border"
                     )}
                   >
-                    {turma}
+                    {turma === "Sem turma" ? turma : turmaLonga(turma)}
                     <small className="font-medium text-muted-foreground">
                       {oficial?.numero != null
                         ? `encontro ${oficial.numero} ${formatDiaSemanaMes(oficial.data)}`
@@ -2034,8 +2044,11 @@ function VisaoMentor({
                     <DuplaAvatares mentor={d.mentor} mentorado={d.mentorado} size={28} />
                     <DuplaNomes truncar mentor={d.mentor.nome} mentorado={d.mentorado.nome} />
                     {d.turma && (
-                      <span className="rounded border border-border px-1 text-[10px] font-bold text-muted-foreground">
-                        {d.turma}
+                      <span
+                        title={d.turma}
+                        className="rounded border border-border px-1 text-[10px] font-bold text-muted-foreground"
+                      >
+                        {turmaCurta(d.turma)}
                       </span>
                     )}
                   </p>
@@ -2247,8 +2260,11 @@ function VisaoEspecialista({
                     />
                     <span className="truncate">{d.mentorado.nome}</span>
                     {d.turma && (
-                      <span className="rounded border border-border px-1 text-[10px] font-bold text-muted-foreground">
-                        {d.turma}
+                      <span
+                        title={d.turma}
+                        className="rounded border border-border px-1 text-[10px] font-bold text-muted-foreground"
+                      >
+                        {turmaCurta(d.turma)}
                       </span>
                     )}
                   </p>

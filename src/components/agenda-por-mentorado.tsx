@@ -41,6 +41,7 @@ import {
   TRILHA_LEN,
   foraDoPrograma,
 } from "@/lib/ciclo";
+import { turmaCurta, turmaLonga } from "@/lib/turma";
 import type {
   CicloEvento,
   Cronograma,
@@ -363,7 +364,7 @@ function CardMentorado({
         <div className="min-w-28 flex-1">
           <h3 className="flex flex-wrap items-center gap-x-2 gap-y-1 font-semibold leading-snug">
             <span className="truncate">{nome}</span>
-            <Badge variant="secondary">{dupla.turma}</Badge>
+            <Badge variant="secondary">{turmaLonga(dupla.turma)}</Badge>
             {dupla.status !== "ativa" && (
               <Badge variant="outline" className="text-muted-foreground">
                 {dupla.status === "pausada"
@@ -397,7 +398,10 @@ function CardMentorado({
             {jornada.completa
               ? `${total} de ${total} encontros`
               : `Encontro ${alvo.proximoNumero} de ${total}`}
-            <span className="text-muted-foreground"> · {dupla.turma}</span>
+            <span className="text-muted-foreground">
+              {" "}
+              · {turmaCurta(dupla.turma)}
+            </span>
           </p>
           <span className="tabular-nums text-muted-foreground">{pct}%</span>
         </div>

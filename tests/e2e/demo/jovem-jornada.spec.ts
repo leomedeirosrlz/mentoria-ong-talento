@@ -36,7 +36,8 @@ test.describe("demo — Minha jornada do mentorado", () => {
       page.getByRole("heading", { name: "Minha jornada", level: 1 })
     ).toBeVisible();
     await expect(page.getByText(/encontro 5 de 16/)).toBeVisible();
-    await expect(page.getByText(/T1 · 2026\/2027/)).toBeVisible();
+    // a turma entra na forma narrativa ("Turma 1"), nunca o cru "T1 · 2026/2027"
+    await expect(page.getByText(/Turma 1 · encontro 5 de 16/)).toBeVisible();
     await expect(page.getByText(/Fase · /)).toBeVisible();
     await expect(
       page.getByRole("img", { name: "5 de 7 entregas feitas" })

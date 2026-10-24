@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowRight, Eye, Warning } from "@phosphor-icons/react/dist/ssr";
 import { formatDiaHora, formatDiaMes } from "@/lib/ciclo";
 import { painelTrilhasCoord, type PainelTrilhas } from "@/lib/trilhas-coord";
+import { turmaCurta } from "@/lib/turma";
 import type { Dupla, SolicitacaoEspecialista } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -123,7 +124,7 @@ export function TrilhasCoordPanel({
                   <div className="min-w-0">
                     <p className="text-sm">
                       <span className="font-medium">{a.jovemNome}</span>
-                      {a.turma ? ` · ${a.turma}` : ""}
+                      {a.turma ? ` · ${turmaCurta(a.turma)}` : ""}
                       {a.demanda ? ` · ${corta(a.demanda)}` : ""}
                     </p>
                     <p className="mt-0.5 text-xs text-muted-foreground">

@@ -81,8 +81,8 @@ test.describe("agenda demo do supervisor — Por turma / Consolidada (WP5)", () 
 
     // grupos por cronograma: T1 com Bia e Caio, T2 com Laura e Matheus, e
     // o grupo sem cronograma da trilha esp supervisionada
-    const t1 = page.locator('section[aria-label="Duplas da T1 · 2026/2027"]');
-    const t2 = page.locator('section[aria-label="Duplas da T2 · 2026/2027"]');
+    const t1 = page.locator('section[aria-label="Duplas da Turma 1"]');
+    const t2 = page.locator('section[aria-label="Duplas da Turma 2"]');
     await expect(t1).toBeVisible();
     await expect(t1.getByRole("heading", { name: /Turma 1/ })).toBeVisible();
     await expect(t2).toBeVisible();
@@ -173,7 +173,7 @@ test.describe("agenda demo do supervisor — Por turma / Consolidada (WP5)", () 
         page.getByText("Sem encontro agendado (1)")
       ).toBeVisible();
       await expect(
-        page.getByText(/Caio \(T1 · 2026\/2027\).*Use/)
+        page.getByText(/Caio \(T1\).*Use/)
       ).toBeVisible();
     } else {
       test.info().annotations.push({
@@ -231,7 +231,7 @@ test.describe("agenda demo do supervisor — Por turma / Consolidada (WP5)", () 
       ).toBeVisible();
       await expect(aAgendar).toContainText("A agendar");
       await expect(
-        aAgendar.getByText(/Caio com Carlos Menezes · T1 · 2026\/2027/)
+        aAgendar.getByText(/Caio com Carlos Menezes · T1/)
       ).toBeVisible();
       await aAgendar
         .getByRole("button", { name: "Lembrar", exact: true })

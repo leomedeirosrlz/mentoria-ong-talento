@@ -16,6 +16,7 @@ import {
   type ItemConsolidado,
 } from "@/lib/agenda-auxiliar";
 import { itensDaSemanaPrograma } from "@/lib/agenda-coordenacao";
+import { turmaCurta, turmaLonga } from "@/lib/turma";
 import {
   lembreteBloqueadoAte,
   saudadeDaDupla,
@@ -122,7 +123,13 @@ export function AgendaAuxiliar({
     (d) => d.status === "ativa" || d.status === "pausada"
   );
   const encerradas = duplas.length - correndo.length;
-  const turmas = [...new Set(correndo.map((d) => d.turma))];
+  // cabeçalho cita as turmas na forma narrativa — dedup já no label
+  // ("T1" e "T1 · 2026/2027" exibem a mesma "Turma 1")
+  const turmasTxt = [
+    ...new Set(
+      correndo.map((d) => turmaLonga(d.turma)).filter(Boolean)
+    ),
+  ];
   // a explicação do desencontro só cita turmas com encontro vigente —
   // trilhas de especialista não têm cronograma e cairiam como "—"
   const gruposTurma = grupos.filter((g) => g.encontroVigente != null);
@@ -139,7 +146,7 @@ export function AgendaAuxiliar({
           return [
             i.duplaId!,
             d
-              ? `${primeiroNomeDaDupla(d) || d.mentorado.nome.split(" ")[0]} (${d.turma})`
+              ? `${primeiroNomeDaDupla(d) || d.mentorado.nome.split(" ")[0]} (${turmaCurta(d.turma)})`
               : null,
           ] as const;
         })
@@ -158,7 +165,7 @@ export function AgendaAuxiliar({
           {correndo.length === 1 ? "dupla supervisionada" : "duplas supervisionadas"}
           {encerradas > 0 &&
             ` · ${encerradas} encerrada${encerradas === 1 ? "" : "s"}`}
-          {turmas.length > 0 ? ` · ${turmas.join(" e ")}` : ""}
+          {turmasTxt.length > 0 ? ` · ${turmasTxt.join(" e ")}` : ""}
           {correndo.length > 0 &&
             ` · semana ${semanaIso(hoje)}, ${Number(seg.slice(8, 10))} a ${Number(dom.slice(8, 10))} de ${mesLongo(dom)}`}
         </p>
@@ -208,7 +215,8 @@ export function AgendaAuxiliar({
                   <span key={g.cronogramaId ?? g.turma}>
                     {i > 0 && (i === gruposTurma.length - 1 ? " e " : ", ")}
                     <b className="font-medium text-foreground">
-                      {g.turma} está no encontro {g.encontroVigente ?? "—"}
+                      {turmaLonga(g.turma)} está no encontro{" "}
+                      {g.encontroVigente ?? "—"}
                     </b>
                   </span>
                 ))}
@@ -234,7 +242,7 @@ export function AgendaAuxiliar({
               return (
               <section
                 key={g.cronogramaId ?? "sem-turma"}
-                aria-label={`Duplas da ${g.turma || "trilha de especialista"}`}
+                aria-label={`Duplas da ${g.turma ? turmaLonga(g.turma) : "trilha de especialista"}`}
                 className="space-y-3"
               >
                 <div className="flex flex-wrap items-center gap-2.5">

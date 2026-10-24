@@ -20,6 +20,7 @@ import {
   type Semaforo,
   ORDEM_SEMAFORO,
 } from "@/lib/ciclo";
+import { turmaLonga } from "@/lib/turma";
 import type { CicloEvento, Comunicado, Cronograma, Dupla, SolicitacaoEspecialista, Supervisao } from "@/lib/types";
 import type { Interacao } from "@/lib/interacoes";
 import type { SupervisaoAlvo } from "@/lib/queries-supervisao";
@@ -229,7 +230,7 @@ export function DashboardCoordenacao({
         return (
           <section
             key={cronograma?.id ?? "todos"}
-            aria-label={`Semana do ${resumo.evento.numero}º encontro${cronograma ? ` — ${cronograma.turma}` : ""}`}
+            aria-label={`Semana do ${resumo.evento.numero}º encontro${cronograma ? ` — ${turmaLonga(cronograma.turma)}` : ""}`}
             className="animate-enter rounded-xl bg-card px-4 py-4 shadow-[var(--shadow-border)] sm:px-5"
           >
             {/* turma é contexto tipográfico (overline), não pill — e só faz
@@ -237,7 +238,7 @@ export function DashboardCoordenacao({
                 o valor é o mesmo do seletor "Turma" da agenda */}
             {multiplos && cronograma && (
               <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                {cronograma.turma}
+                {turmaLonga(cronograma.turma)}
               </p>
             )}
             <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1.5">

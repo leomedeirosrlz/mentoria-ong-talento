@@ -8,6 +8,7 @@ import {
   reconhecerSolicitacao,
 } from "@/lib/actions-especialista";
 import type { SolicitacaoEspecialista } from "@/lib/types";
+import { turmaLonga } from "@/lib/turma";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -100,7 +101,10 @@ function TriagemItem({
           <Select
             value={turma}
             onValueChange={(v) => setTurma(v as string)}
-            items={Object.fromEntries(turmas.map((t) => [t, t]))}
+            items={Object.fromEntries(
+              // value cru (escopo gravado na solicitação); label narrativo
+              turmas.map((t) => [t, turmaLonga(t)])
+            )}
           >
             <SelectTrigger size="sm" aria-label="Turma da sessão">
               <SelectValue placeholder="Turma (opcional)" />
@@ -108,7 +112,7 @@ function TriagemItem({
             <SelectContent>
               {turmas.map((t) => (
                 <SelectItem key={t} value={t}>
-                  {t}
+                  {turmaLonga(t)}
                 </SelectItem>
               ))}
             </SelectContent>

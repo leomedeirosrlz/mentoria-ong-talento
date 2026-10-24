@@ -18,7 +18,7 @@ import {
 } from "./ciclo";
 import { primeiroNomeDaDupla } from "./agenda-minha";
 import { prazoTrilhaEspecialista } from "./encerramento";
-import { turmaCurta, turmaNumero } from "./turma";
+import { turmaCurta, turmaLonga } from "./turma";
 import type {
   CicloEvento,
   Cronograma,
@@ -198,15 +198,17 @@ export function duplasPorTurma(
     if (!ds.length) continue;
     for (const d of ds) vistos.add(d.id);
     const vig = eventoDaSemana(eventosDoCronograma(eventos, c.id), hoje);
-    const curta = turmaNumero(c.turma);
-    // cronograma sem eventos/vigente → meta vazia, rótulo é só "Turma N"
+    // cronograma sem eventos/vigente → meta vazia, rótulo é só a turma
     const meta = vig
       ? ` · ${metaTurma(ds.filter((d) => d.status === "ativa"), vig)}`
       : "";
     grupos.push({
       cronogramaId: c.id,
       turma: c.turma,
-      rotulo: `Turma ${curta || c.turma}${meta}`,
+      // turmaLonga cobre os 3 formatos: "T1" → "Turma 1", legacy
+      // "2025/2026" e texto livre passam inteiros ("Turma 2025/2026"
+      // seria mentira — era o que a montagem manual fazia)
+      rotulo: `${turmaLonga(c.turma)}${meta}`,
       encontroVigente: vig?.numero ?? null,
       duplas: ordena(ds),
     });
@@ -294,7 +296,7 @@ export function itensConsolidados(
           : `${nomeJovem} com ${mentor1 || "mentor"}`,
         detalhe: esp
           ? `Trilha de especialista · sessão ${passoEsp(e, d.encontros)} de ${TRILHA_LEN.especialista}`
-          : `Encontro ${e.numero} · ${d.turma}`,
+          : `Encontro ${e.numero} · ${turmaCurta(d.turma)}`,
         convidado: esp,
         duplaId: d.id,
         pill: esp ? "Esp" : turmaCurta(d.turma),
@@ -362,7 +364,7 @@ export function itensConsolidados(
         inicio: vig.data,
         tipo: "a_agendar",
         titulo: nova ? `enc. ${vig.numero} — dupla nova, a agendar` : `enc. ${vig.numero} a agendar`,
-        detalhe: `${nome1} com ${d.mentor?.nome ?? "mentor"} · ${d.turma}`,
+        detalhe: `${nome1} com ${d.mentor?.nome ?? "mentor"} · ${turmaCurta(d.turma)}`,
         convidado: false,
         duplaId: d.id,
         pill: turmaCurta(d.turma),
@@ -399,7 +401,7 @@ export function contextoDuplaAux(
   if (dupla.status !== "ativa")
     return { texto: saude.motivo, problema: false };
 
-  const turma = dupla.turma;
+  const turma = turmaCurta(dupla.turma);
   const tag = (n: number) => `Encontro ${n}${turma ? ` · ${turma}` : ""}`;
   const agoraMs = hoje.getTime();
   const vig = eventoDaSemana(evs, hoje);

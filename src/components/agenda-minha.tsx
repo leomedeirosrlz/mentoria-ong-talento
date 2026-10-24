@@ -35,6 +35,7 @@ import {
   type AgendaSecao,
 } from "@/lib/agenda-minha";
 import { itensSemanaProgramaMentor } from "@/lib/agenda-coordenacao";
+import { turmaCurta } from "@/lib/turma";
 import { SemanaDoPrograma } from "@/components/semana-do-programa";
 import type {
   CicloEvento,
@@ -442,7 +443,7 @@ function Rail({ agenda }: { agenda: AgendaMinhaDerivada }) {
                     <span className="block truncate text-sm font-medium">
                       {d.nome}{" "}
                       <span className="text-xs font-normal text-muted-foreground">
-                        · {d.turma}
+                        · {turmaCurta(d.turma)}
                       </span>
                     </span>
                     <span

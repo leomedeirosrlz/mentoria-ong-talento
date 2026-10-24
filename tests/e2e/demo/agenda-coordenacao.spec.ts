@@ -181,10 +181,10 @@ test.describe("agenda demo da coordenação — Monitoramento (WP5)", () => {
       painel.getByText(/As turmas não começaram juntas/)
     ).toBeVisible();
     await expect(
-      painel.getByText(/T1 · 2026\/2027 está no encontro [45]/)
+      painel.getByText(/Turma 1 está no encontro [45]/)
     ).toBeVisible();
     await expect(
-      painel.getByText(/T2 · 2026\/2027 está no encontro 1/)
+      painel.getByText(/Turma 2 está no encontro 1/)
     ).toBeVisible();
 
     // (b) semáforo — a rosca inclui o eixo azul do apoio (trabalho a
