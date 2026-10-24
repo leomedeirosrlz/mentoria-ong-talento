@@ -258,9 +258,10 @@ test.describe("/resumo — gate por relatorio_links + fila turma_inscricoes", ()
 
     // o dialog importa o recorte DA TELA — a turma clicada no builder é a
     // do seletor aqui dentro (a reabertura re-semeia: não é o mount da
-    // página que manda, é o estado atual da grade)
+    // página que manda, é o estado atual da grade). O seletor é um Select
+    // do Base UI → role combobox com nome vindo do Label "Turma".
     await expect(
-      dialog.getByRole("button", { name: "Turma", exact: true })
+      dialog.getByRole("combobox", { name: "Turma" })
     ).toContainText(TURMA);
     await expect(dialog.getByText("Recorte do link")).toBeVisible();
     await expect(
@@ -271,10 +272,15 @@ test.describe("/resumo — gate por relatorio_links + fila turma_inscricoes", ()
     // senha em branco → a RPC gera a forte de sempre e devolve 1×
     await dialog.getByRole("button", { name: "Criar link" }).click();
 
-    // a senha aparece UMA vez na tela de sucesso — extrai slug + senha
-    await expect(dialog.getByText("Link público")).toBeVisible({
-      timeout: 15_000,
-    });
+    // a senha aparece UMA vez na tela de sucesso — extrai slug + senha.
+    // O marcador de estágio é o heading "Link criado": "Link público" como
+    // substring case-insensitive resolve o h2 "Novo link público" + o aviso
+    // LGPD ("…menor em link público") enquanto a RPC ainda voa (30s — a
+    // action + router.refresh() passam de 15s em runner frio).
+    await expect(
+      dialog.getByRole("heading", { name: "Link criado" })
+    ).toBeVisible({ timeout: 30_000 });
+    await expect(dialog.getByText("Link público")).toBeVisible();
     const url = await dialog.locator("code").nth(0).innerText();
     const slug = url.split("/resumo/")[1]?.trim() ?? "";
     const senha = (await dialog.locator("code").nth(1).innerText()).trim();
@@ -322,9 +328,9 @@ test.describe("/resumo — gate por relatorio_links + fila turma_inscricoes", ()
     await dialog.getByLabel("Senha de acesso").fill("secreta-2026");
     await dialog.getByRole("button", { name: "Criar link" }).click();
 
-    await expect(dialog.getByText("Link público")).toBeVisible({
-      timeout: 15_000,
-    });
+    await expect(
+      dialog.getByRole("heading", { name: "Link criado" })
+    ).toBeVisible({ timeout: 30_000 });
     const url = await dialog.locator("code").nth(0).innerText();
     const slug = url.split("/resumo/")[1]?.trim() ?? "";
     const senhaVolta = (
@@ -405,8 +411,11 @@ test.describe("/resumo — gate por relatorio_links + fila turma_inscricoes", ()
 
     // sucesso sem segredo: só o link, sem código de senha
     await expect(
+      dialog.getByRole("heading", { name: "Link criado" })
+    ).toBeVisible({ timeout: 30_000 });
+    await expect(
       dialog.getByText("ele abre direto, sem senha")
-    ).toBeVisible({ timeout: 15_000 });
+    ).toBeVisible();
     const url = await dialog.locator("code").nth(0).innerText();
     const slug = url.split("/resumo/")[1]?.trim() ?? "";
     expect(slug.length).toBeGreaterThanOrEqual(12);
