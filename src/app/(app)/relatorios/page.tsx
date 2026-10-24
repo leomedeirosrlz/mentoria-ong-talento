@@ -17,7 +17,11 @@ import type { DuplaFonte, PessoaFonte } from "@/lib/relatorio";
 
 export const metadata: Metadata = { title: "Relatórios" };
 
-export default async function RelatoriosPage() {
+export default async function RelatoriosPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const me = await getMe();
   if (me?.role !== "coordenacao") redirect("/");
 
@@ -131,6 +135,16 @@ export default async function RelatoriosPage() {
   turmas = [...new Set([...turmas, ...inscricoes.map((i) => i.turma)])].sort(
     (a, b) => b.localeCompare(a, "pt-BR")
   );
+
+  // deep-link ?turma=<valor cru> — só vira recorte se a turma existir;
+  // valor estranho cai no default (turma mais recente) sem quebrar a URL
+  const { turma: turmaParam } = await searchParams;
+  const turmaInicial =
+    typeof turmaParam === "string" &&
+    (turmaParam === "todas" || turmas.includes(turmaParam))
+      ? turmaParam
+      : undefined;
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -140,6 +154,7 @@ export default async function RelatoriosPage() {
       />
       <RelatorioBuilder
         turmas={turmas}
+        turmaInicial={turmaInicial}
         duplas={duplas}
         profs={profs}
         mentorados={mentorados}

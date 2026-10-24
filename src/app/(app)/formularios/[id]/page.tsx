@@ -13,6 +13,10 @@ import {
 } from "@/lib/forms/schema";
 import { formatDate } from "@/lib/ciclo";
 import { Badge } from "@/components/ui/badge";
+import {
+  InstrumentoEmblema,
+  ehInstrumentoChave,
+} from "@/components/instrumento-icone";
 import { PageHeader } from "@/components/page-header";
 import { VoltarLink } from "@/components/voltar-link";
 import { FormularioAcoes, FormularioExcluir } from "../formulario-acoes";
@@ -116,6 +120,11 @@ export default async function FormularioPage({
     <div className="mx-auto max-w-3xl space-y-8">
       <PageHeader
         kicker={<VoltarLink fallback="/formularios" />}
+        media={
+          ehInstrumentoChave(f.sistema) ? (
+            <InstrumentoEmblema instrumento={f.sistema} size={44} />
+          ) : undefined
+        }
         title={
           <>
             {f.titulo}

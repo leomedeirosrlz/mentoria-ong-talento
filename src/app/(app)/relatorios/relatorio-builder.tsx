@@ -62,8 +62,11 @@ export function RelatorioBuilder({
   cronogramas,
   templates,
   links,
+  turmaInicial,
 }: {
   turmas: string[];
+  /** deep-link ?turma= — já validada contra `turmas` pela página. */
+  turmaInicial?: string;
   duplas: DuplaFonte[];
   profs: PessoaFonte[];
   mentorados: PessoaFonte[];
@@ -76,9 +79,11 @@ export function RelatorioBuilder({
   // painel "Compartilhar" (201) — os links publicados, do server via página
   links: RelatorioLinkItem[];
 }) {
-  // turma inicial = a mais recente com dados (a página ordena desc); sem
-  // nenhuma, cai em "todas" — nada mais hardcoded a T2
-  const [turma, setTurma] = useState<string>(turmas[0] ?? "todas");
+  // turma inicial = deep-link ?turma= quando válido, senão a mais recente
+  // com dados (a página ordena desc); sem nenhuma, cai em "todas"
+  const [turma, setTurma] = useState<string>(
+    turmaInicial ?? turmas[0] ?? "todas"
+  );
   const [gran, setGran] = useState<GranularidadeRelatorio>("pessoas");
   const [colunas, setColunas] = useState<string[]>(() => catalogoDe("pessoas").map((c) => c.id));
   // colunas em transição animada — "entrando" monta com fade+slide (a marca
