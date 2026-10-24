@@ -330,7 +330,7 @@ export function ChamadosApp({
     >
       <section
         aria-label={staff ? "Fila de chamados" : "Seus chamados"}
-        className={cn(sel && staff ? "hidden lg:block" : undefined)}
+        className={cn("min-w-0", sel && staff && "hidden lg:block")}
       >
         {staff && (
           <div className="mb-3 space-y-2.5">

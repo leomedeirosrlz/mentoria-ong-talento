@@ -296,7 +296,7 @@ export function EncontroDetails({
       className="group animate-enter scroll-mt-16 rounded-xl bg-card shadow-[var(--shadow-border)]"
       style={{ "--i": Math.min(indice, 10) } as CSSProperties}
     >
-      <summary className="flex min-h-11 cursor-pointer list-none items-center gap-x-2.5 rounded-xl px-4 py-2 text-sm transition-colors marker:hidden select-none hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring group-open:rounded-b-none [&::-webkit-details-marker]:hidden">
+      <summary className="flex min-h-11 cursor-pointer list-none flex-wrap items-center gap-x-2.5 rounded-xl px-4 py-2 text-sm transition-colors marker:hidden select-none hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring group-open:rounded-b-none [&::-webkit-details-marker]:hidden">
         <CaretRight
           size={14}
           weight="bold"
@@ -327,7 +327,10 @@ export function EncontroDetails({
           </span>
         )}
         {k > 0 ? (
-          <span className="ml-auto flex shrink-0 items-center gap-2 pl-2">
+          // o cluster de status não disputa linha no mobile: basis-full o
+          // manda pra linha 2 encostado à direita (padrão do MaterialRow);
+          // no desktop volta a dividir a linha do summary
+          <span className="ml-auto flex basis-full shrink-0 flex-wrap items-center justify-end gap-2 pl-2 lg:basis-auto">
             <span className="text-xs tabular-nums text-muted-foreground">
               {total != null && k < total
                 ? `${k} de ${total}`
@@ -336,7 +339,7 @@ export function EncontroDetails({
             <PillEstado itens={itens} />
           </span>
         ) : (
-          <span className="ml-auto shrink-0 pl-2 text-xs text-muted-foreground">
+          <span className="ml-auto basis-full shrink-0 pl-2 text-right text-xs text-muted-foreground lg:basis-auto">
             sem material ainda
           </span>
         )}
