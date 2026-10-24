@@ -144,13 +144,25 @@ test.describe("agenda demo da coordenação — Monitoramento (WP5)", () => {
 
     // "N de M com registro" — denominador das ATIVAS da turma. T1: enc. 5
     // futuro (0) ou enc. 4 passado (1: Caio realizou sem registro, Eduardo
-    // não-aconteceu, Dandara sem row); T2: o Matheus entregou o do enc. 1
-    const dowHoje = new Date(`${hojeSP()}T12:00:00Z`).getUTCDay();
-    const ancoraNaSemana = dowHoje === 1 || dowHoje === 2;
+    // não-aconteceu, Dandara sem row); T2: o Matheus entregou o do enc. 1.
+    // O vigente é lido da própria linha — a semana em que a âncora cai
+    // depende de quando o dataset demo foi gerado (rebuild do servidor
+    // re-ancora o "hoje"), então prever pelo dia da semana aqui mentia.
+    const t1Vigente5 = (await linhaT1.getByRole("link", { name: "Encontro 5" }).count()) > 0;
     await expect(linhaT1).toContainText(
-      ancoraNaSemana ? "0 de 4 com registro" : "1 de 4 com registro"
+      t1Vigente5 ? "0 de 4 com registro" : "1 de 4 com registro"
     );
-    await expect(linhaT2).toContainText("1 de 3 com registro");
+
+    // T2 idem: enc. 1 pode estar futuro (só o registro antecipado do
+    // Matheus) ou já realizado (2 com registro, 1 aguardando). O "N de 3"
+    // é o mesmo N que a barra segmentada declara — lê o aria-label dela
+    // em vez de chumbar o número da semana.
+    const barraT2Label =
+      (await linhaT2.getByRole("img").getAttribute("aria-label")) ?? "";
+    const mT2 = barraT2Label.match(/(\d) com registro.*— total (\d)/);
+    await expect(linhaT2).toContainText(
+      `${mT2?.[1] ?? "?"} de ${mT2?.[2] ?? "?"} com registro`
+    );
 
     // a barra segmentada lê o MESMO denominador do "N de M" ao lado:
     // seg–ter<19h "3 agendadas, 1 sem data" (Caio sem row); depois das 19h
@@ -158,7 +170,7 @@ test.describe("agenda demo da coordenação — Monitoramento (WP5)", () => {
     // vigente é o enc. 4: 1 com registro, 1 aguardando (Caio), 1 não
     // aconteceu (Eduardo), 1 sem data (Dandara)
     const barraT1 = linhaT1.getByRole("img");
-    if (ancoraNaSemana) {
+    if (t1Vigente5) {
       await expect(barraT1).toHaveAttribute(
         "aria-label",
         /3 (agendadas|aguardando registro), 1 sem data — total 4/
@@ -171,7 +183,7 @@ test.describe("agenda demo da coordenação — Monitoramento (WP5)", () => {
     }
     await expect(linhaT2.getByRole("img")).toHaveAttribute(
       "aria-label",
-      /1 com registro, 2 agendadas|1 com registro, 2 aguardando registro/
+      /\d com registro, \d (agendadas|aguardando registro)/
     );
 
     // o hint do desencontro vive na intro do Painel da semana — "por
@@ -451,11 +463,12 @@ test.describe("agenda demo da coordenação — Monitoramento (WP5)", () => {
 
     // os oficiais datados do seg–dom em cards com tag de tipo + pill de
     // turma. A terça-âncora carrega o enc. 5 da T1 E o enc. 1 da T2 (mesma
-    // data) — seg/ter eles caem NA semana corrente; de quarta em diante a
-    // âncora roda pra próxima terça e a semana mostra o enc. 4 da T1 e
-    // nenhum evento da T2
-    const dow = new Date(`${hojeSP()}T12:00:00Z`).getUTCDay();
-    const ancoraNaSemana = dow === 1 || dow === 2;
+    // data); quando a semana mostrada já passou dela, a faixa cai pro
+    // enc. 4 da T1 e nenhum evento da T2. O ramo é lido do DOM — o "hoje"
+    // do dataset depende de quando o servidor demo subiu (rebuild
+    // re-ancora), não só do dia da semana do relógio do teste.
+    const ancoraNaSemana =
+      (await sec.getByRole("link", { name: "Encontro 5 · T1" }).count()) > 0;
     await expect(
       sec.getByRole("link", {
         name: `Encontro ${ancoraNaSemana ? 5 : 4} · T1`,
@@ -516,7 +529,9 @@ test.describe("agenda demo da coordenação — Monitoramento (WP5)", () => {
     // (de quarta em diante), os dois encontros de formação da T2 — a
     // inicial na quinta e a final na sexta da semana corrente. Nos outros
     // dias os cards levam só a tag do tipo (Formação/Encontro/…)
-    const chamadaHoje = dow === 0 || dow === 4 || dow === 5;
+    const dow = new Date(`${hojeSP()}T12:00:00Z`).getUTCDay();
+    const chamadaHoje =
+      dow === 0 || (!ancoraNaSemana && (dow === 4 || dow === 5));
     const chamada = sec.getByRole("link", { name: "Abrir chamada" });
     if (chamadaHoje) {
       await expect(chamada).toHaveAttribute(

@@ -96,12 +96,39 @@ test.describe("agenda demo do supervisor — Por turma / Consolidada (WP5)", () 
       semTurma.getByRole("heading", { name: "Trilhas de especialista" })
     ).toBeVisible();
 
-    // card da Bia (d-ok) — nome_social no título, o mentor no contexto
+    // card da Bia (d-ok) — nome_social no título, o mentor no contexto.
+    // Mesmo drift do Caio abaixo: com pendência apontável o "Lembrar"
+    // vira primária e "Ver ficha" recolhe no ⋯ "Mais ações" (REALIZA-186);
+    // em dia o link solto segue no rodapé. O ⋯ no DOM decide o ramo.
     const cardBia = t1.locator("article", { hasText: "Bia" });
     await expect(cardBia.getByText("mentor: Ricardo Tavares")).toBeVisible();
-    await expect(
-      cardBia.getByRole("link", { name: "Ver ficha ›" })
-    ).toBeVisible();
+    const maisAcoesBia = cardBia.getByRole("button", {
+      name: "Mais ações da dupla de Bia",
+    });
+    if ((await maisAcoesBia.count()) > 0) {
+      // o menu é nomeado pelo trigger — o card do Caio pode montar um ⋯
+      // idêntico no mesmo view, então nunca pesquisa "menu" a seco
+      const menuBia = page.getByRole("menu", {
+        name: "Mais ações da dupla de Bia",
+      });
+      await agirComConfirma(
+        () => maisAcoesBia.click(),
+        () => menuBia.isVisible()
+      );
+      await expect(
+        menuBia.getByRole("menuitem", { name: "Ver ficha" })
+      ).toBeVisible();
+      // fecha de verdade antes de seguir — menu aberto segue na árvore
+      // de a11y e colide com o ⋯ do Caio logo abaixo
+      await agirComConfirma(
+        () => page.keyboard.press("Escape"),
+        () => menuBia.isHidden()
+      );
+    } else {
+      await expect(
+        cardBia.getByRole("link", { name: "Ver ficha ›" })
+      ).toBeVisible();
+    }
 
     // card do Caio (d-pend) — o contexto drifta com o relógio do enc. 4:
     // "sem encontro agendado" quando o vigente não tem row (seg/ter de
@@ -131,12 +158,16 @@ test.describe("agenda demo do supervisor — Por turma / Consolidada (WP5)", () 
         cardCaio.getByRole("button", { name: /^Lembrar/ }).first()
       ).toBeEnabled();
       // clique com confirmação: em preview frio o handler do trigger pode
-      // ainda não ter hidratado — repete até o popup abrir
+      // ainda não ter hidratado — repete até o popup abrir. O menu é
+      // nomeado pelo trigger: o card da Bia pode montar um ⋯ no mesmo
+      // view, então nunca pesquisa "menu" a seco.
+      const menuAcoes = page.getByRole("menu", {
+        name: "Mais ações da dupla de Caio Henrique Oliveira",
+      });
       await agirComConfirma(
         () => maisAcoesCaio.click(),
-        () => page.getByRole("menu").isVisible()
+        () => menuAcoes.isVisible()
       );
-      const menuAcoes = page.getByRole("menu");
       await expect(
         menuAcoes.getByRole("menuitem", { name: "Registrar supervisão" })
       ).toBeVisible();

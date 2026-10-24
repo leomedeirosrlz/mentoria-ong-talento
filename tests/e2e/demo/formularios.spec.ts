@@ -93,9 +93,11 @@ test.describe("demo — builder: numeração e reordenação", () => {
   }) => {
     await montaForm(page);
 
-    // o campo 2 vira seção — sai da régua de perguntas e entra na dela
+    // o campo 2 vira seção — sai da régua de perguntas e entra na dela.
+    // O seletor de tipo é um Base UI Select: o trigger é role=combobox,
+    // não button (ARIA 1.2 — select é combobox).
     await page
-      .getByRole("button", { name: "Tipo da pergunta 2" })
+      .getByRole("combobox", { name: "Tipo da pergunta 2" })
       .click();
     await page
       .getByRole("option", { name: /Seção \(rótulo de estrutura\)/ })
@@ -147,6 +149,10 @@ test.describe("demo — builder: numeração e reordenação", () => {
   test("alça arrasta o card e a numeração reordena ao vivo", async ({
     page,
   }) => {
+    // viewport com folga: alça da 3ª e input da 1ª ficam ~500px distantes;
+    // nos 720px default o alvo caía fora da área visível e o drop morria
+    // no snap-back do Reorder
+    await page.setViewportSize({ width: 1280, height: 960 });
     await montaForm(page);
 
     // alça dedicada por card — o ⋯ ao lado segue como caminho de menu
@@ -154,22 +160,35 @@ test.describe("demo — builder: numeração e reordenação", () => {
       name: "Reordenar a pergunta 3",
     });
     await expect(alcaGama).toBeVisible();
-    const alvo = page.getByLabel("Texto da pergunta 1");
-    const bAlca = await alcaGama.boundingBox();
-    const bAlvo = await alvo.boundingBox();
-    expect(bAlca).not.toBeNull();
-    expect(bAlvo).not.toBeNull();
+
+    // boundingBox() auto-rola cada elemento pra dentro da tela — medir o
+    // alvo DEPOIS da alça re-rolava a página e invalidava as coordenadas
+    // do agarramento (o pointerdown caía fora da alça, drag nem começava).
+    // Mede os dois num único passe por getBoundingClientRect, sem scroll.
+    await alcaGama.scrollIntoViewIfNeeded();
+    const rect = await page.evaluate(() => {
+      const alca = document.querySelector('[aria-label="Reordenar a pergunta 3"]');
+      const alvo = document
+        .querySelector('[aria-label="Texto da pergunta 1"]')
+        ?.closest("li");
+      if (!alca || !alvo) return null;
+      const a = alca.getBoundingClientRect();
+      const b = alvo.getBoundingClientRect();
+      return {
+        ax: a.x + a.width / 2,
+        ay: a.y + a.height / 2,
+        bx: b.x + b.width / 2,
+        by: b.y + b.height / 2,
+      };
+    });
+    expect(rect).not.toBeNull();
+    const { ax, ay, bx, by } = rect!;
 
     // arrasta Gama (3ª) pra cima de Alpha (1ª): o centro do card arrastado
     // tem que cruzar o centro do irmão — mira o meio do input da 1ª
-    await page.mouse.move(
-      bAlca!.x + bAlca!.width / 2,
-      bAlca!.y + bAlca!.height / 2
-    );
+    await page.mouse.move(ax, ay);
     await page.mouse.down();
-    await page.mouse.move(bAlvo!.x + bAlvo!.width / 2, bAlvo!.y, {
-      steps: 15,
-    });
+    await page.mouse.move(bx, by, { steps: 15 });
     await page.mouse.up();
 
     await expect(page.getByLabel("Texto da pergunta 1")).toHaveValue("Gama");

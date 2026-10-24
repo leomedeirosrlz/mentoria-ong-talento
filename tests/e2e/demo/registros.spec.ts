@@ -142,7 +142,7 @@ test.describe("panorama do ciclo", () => {
 
     // seção nomeada + grupos de recorte acessíveis
     await expect(
-      page.getByRole("heading", { name: "Panorama", exact: true })
+      page.getByRole("heading", { name: "Panorama do ciclo", exact: true })
     ).toBeVisible();
     const turma = page.getByRole("group", { name: "Recortar por turma" });
     await expect(turma.getByRole("link", { name: "Todas" })).toHaveAttribute(

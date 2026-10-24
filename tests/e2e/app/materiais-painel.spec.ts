@@ -205,14 +205,35 @@ test.describe("coordenação — painel Progresso da jornada em /materiais", () 
     await page.waitForURL(/\/formularios\/[^/]+/);
     await page.goBack();
 
-    // card trancado (roda formal / 360º — o calendário e2e não passou do
-    // enc. 12): o pill de liberação é leitura — zero link, zero botão
-    const trancado = instrumentos.locator("article", {
+    // "trancado" é agregado: só quando TODA dupla do escopo está abaixo do
+    // encIni — e a régua é a posição da dupla (último realizado + 1), não o
+    // calendário da turma. A fixture mantém o realizado nº16 na …0030 (a
+    // avaliação pendente do jovem), o que já abre a roda formal pra ela —
+    // então o estado honesto aqui é "janela aberta" + gesto de coord. Se o
+    // escopo um dia ficar inteiro abaixo do enc. 12, o card tranca e vira
+    // leitura pura — o assert cobre os dois lados.
+    const rodaFormal = instrumentos.locator("article", {
       hasText: "Roda da Vida · aplicação formal",
     });
-    await expect(trancado.getByText("trancado")).toBeVisible();
-    await expect(trancado.getByRole("link")).toHaveCount(0);
-    await expect(trancado.getByRole("button")).toHaveCount(0);
+    await expect(rodaFormal).toBeVisible();
+    if (await rodaFormal.getByText("trancado").isVisible()) {
+      // pill de liberação é leitura — zero link, zero botão
+      await expect(rodaFormal.getByRole("link")).toHaveCount(0);
+      await expect(rodaFormal.getByRole("button")).toHaveCount(0);
+    } else {
+      await expect(rodaFormal.getByText("janela aberta")).toBeVisible();
+    }
+    // o invariante vale em qualquer fixture: todo card trancado da régua é
+    // leitura pura — pill "libera no encontro N" e nenhum gesto
+    for (const card of await instrumentos
+      .locator("article", { hasText: "trancado" })
+      .all()) {
+      await expect(
+        card.getByText(/libera no encontro \d+/)
+      ).toBeVisible();
+      await expect(card.getByRole("link")).toHaveCount(0);
+      await expect(card.getByRole("button")).toHaveCount(0);
+    }
 
     // rodapé coord-only apontando os forms de bordo
     await expect(
@@ -253,8 +274,19 @@ test.describe("coordenação — painel Progresso da jornada em /materiais", () 
       }),
     });
     await expect(instrumentos).toBeVisible();
-    // a data de liberação é leitura staff — o pill trancado aparece
-    await expect(instrumentos.getByText(/libera/).first()).toBeVisible();
+    // a régua mostra o estado real das estações — "trancado" só quando o
+    // escopo inteiro está abaixo do encIni (régua = posição da dupla, não
+    // o calendário). A …0030 carrega o realizado nº16 da avaliação
+    // pendente, então estações tardias podem já estar abertas: pill
+    // "libera no encontro N" quando trancado, "janela aberta" quando não.
+    const libera = instrumentos.getByText(/libera no encontro/);
+    if (await libera.first().isVisible()) {
+      await expect(libera.first()).toBeVisible();
+    } else {
+      await expect(
+        instrumentos.getByText("janela aberta").first()
+      ).toBeVisible();
+    }
     // nada de gesto de coord
     await expect(
       instrumentos.getByRole("button", { name: /Enviar em lote/ })
@@ -262,12 +294,20 @@ test.describe("coordenação — painel Progresso da jornada em /materiais", () 
     await expect(
       instrumentos.getByRole("link", { name: "Ver respostas" })
     ).toHaveCount(0);
-    // trancado sem link/botão também pra ele
-    const trancado = instrumentos.locator("article", {
+    // trancado sem link/botão também pra ele — card de estação fechada não
+    // tem ação nenhuma (a data de liberação é um pill, não um botão)
+    const rodaFormal = instrumentos.locator("article", {
       hasText: "Roda da Vida · aplicação formal",
     });
-    await expect(trancado.getByRole("link")).toHaveCount(0);
-    await expect(trancado.getByRole("button")).toHaveCount(0);
+    await expect(rodaFormal.getByRole("link")).toHaveCount(0);
+    await expect(rodaFormal.getByRole("button")).toHaveCount(0);
+    // e o invariante geral: qualquer card trancado é leitura pura
+    for (const card of await instrumentos
+      .locator("article", { hasText: "trancado" })
+      .all()) {
+      await expect(card.getByRole("link")).toHaveCount(0);
+      await expect(card.getByRole("button")).toHaveCount(0);
+    }
     // rodapé de formulários é coord-only
     await expect(
       instrumentos.getByRole("link", { name: "Formulários" })

@@ -79,10 +79,11 @@ test.describe("demo — Minha jornada do mentorado", () => {
     await expect(
       trilha.getByText(/Em até 3 anos, serei uma profissional formada/)
     ).toHaveCount(0);
-    // a recorrente nunca "fecha": em dia conta X de Y, com rever última
+    // a recorrente nunca "fecha": em dia conta X de Y, com "Ver resposta"
+    // (exact — os cards feitos respondem como "Rever resposta — <título>")
     await expect(trilha.getByText("em dia · 4 de 4")).toBeVisible();
     await expect(
-      trilha.getByRole("button", { name: "Rever última avaliação" })
+      trilha.getByRole("button", { name: "Ver resposta", exact: true })
     ).toBeVisible();
 
     // a bandeira terminal fecha a estante com a data do enc. 16 da turma
