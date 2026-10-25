@@ -17,6 +17,7 @@ import {
   maxNumeroEncontro,
 } from "@/lib/ciclo";
 import { EMAIL_ENVIO_LIBERADO } from "@/lib/email";
+import { turmaLonga } from "@/lib/turma";
 import { temPapel, type Material } from "@/lib/types";
 import { FolderOpen } from "@phosphor-icons/react/dist/ssr";
 import { NovoMaterialDialog } from "@/components/novo-material-dialog";
@@ -34,6 +35,11 @@ import {
   temConteudo,
   titulosPorNumero,
 } from "@/components/materiais-hub";
+import {
+  MateriaisMentorBiblioteca,
+  type EncontroResumo,
+  type TurmaMateriais,
+} from "@/components/materiais-mentor-biblioteca";
 
 export const metadata: Metadata = { title: "Materiais" };
 
@@ -187,6 +193,76 @@ export default async function MateriaisPage({
         }))
     : [];
 
+  // biblioteca do mentor/especialista (rodada dores-ux-2026-10): estrutura
+  // própria, sem cobertura/filtros/selo de público — o encontro da semana
+  // DA TURMA ancora a página. Uma turma por cronograma DPP vivo das duplas
+  // DELE (d.mentor, não o escopo do supervisor no híbrido) — com turmas
+  // defasadas cada uma tem sua semana. Sem dupla viva (entre ciclos ou
+  // ainda sem par), o calendário vigente do programa responde sozinho,
+  // sem rótulo de turma. Especialista sem papel DPP não tem cronograma:
+  // turmas vazia → a biblioteca vira a lista plana dos materiais dele.
+  const ehMentor =
+    me != null &&
+    !ehCoord &&
+    (temPapel(me, "mentor_dpp") || temPapel(me, "mentor_especialista"));
+  const turmasMentor: TurmaMateriais[] = [];
+  if (ehMentor && ehMentorDpp && me) {
+    const cronTurma = new Map<string, string>();
+    for (const d of duplasPainel) {
+      if (
+        d.trilha === "dpp" &&
+        d.cronograma_id != null &&
+        (d.status === "ativa" || d.status === "pausada") &&
+        d.mentor?.id === me.id &&
+        !cronTurma.has(d.cronograma_id)
+      ) {
+        cronTurma.set(d.cronograma_id, d.turma);
+      }
+    }
+    const varias = cronTurma.size > 1;
+    for (const [cronId, turma] of [...cronTurma.entries()].sort((a, b) =>
+      a[1].localeCompare(b[1], "pt-BR")
+    )) {
+      const evs = eventosDoCronograma(eventos, cronId);
+      turmasMentor.push({
+        rotulo: varias ? turmaLonga(turma) : null,
+        vigente: eventoDaSemana(evs, agora)?.numero ?? null,
+        encontros: evs
+          .filter((e) => e.tipo === "encontro" && e.numero != null)
+          .map((e) => ({
+            numero: e.numero!,
+            titulo: e.titulo,
+            data: e.data,
+          }))
+          .sort((a, b) => a.numero - b.numero),
+      });
+    }
+    if (turmasMentor.length === 0) {
+      // sem dupla viva: o programa todo é a referência — vigente global e
+      // títulos já acordados por número (o titulo divergente entre turmas
+      // não desce pro card)
+      const porNum = new Map<number, EncontroResumo>();
+      for (const e of eventos) {
+        if (
+          e.tipo === "encontro" &&
+          e.numero != null &&
+          !porNum.has(e.numero)
+        ) {
+          porNum.set(e.numero, {
+            numero: e.numero,
+            titulo: titulos.get(e.numero),
+            data: e.data,
+          });
+        }
+      }
+      turmasMentor.push({
+        rotulo: null,
+        vigente: encontroAtual,
+        encontros: [...porNum.values()].sort((a, b) => a.numero - b.numero),
+      });
+    }
+  }
+
   // abas por papel: coord/supervisor abrem na Jornada; mentor e especialista
   // abrem na Biblioteca (o acervo é o que eles mais usam)
   const abas: AbaMaterialItem[] = [
@@ -270,12 +346,25 @@ export default async function MateriaisPage({
               )}
             </div>
           </div>
+        ) : ehMentor ? (
+          /* mentor/especialista: biblioteca própria — a semana da turma
+             ancora a página, o resto do ciclo fica recolhido; o especialista
+             (sem cronograma) lê a lista plana */
+          <MateriaisMentorBiblioteca
+            turmas={turmasMentor}
+            porEncontro={porEncontro}
+            referenciais={
+              turmasMentor.length > 0
+                ? transversais.flatMap((g) => g.itens)
+                : visiveis
+            }
+          />
         ) : (
           /* hub por encontro (REALIZA-173) com cara de dashboard (REALIZA-184):
              a trilha de cobertura responde "o que falta" num olhar e ancora no
              <details> do encontro; chips filtram por audiência/tipo sem reload.
-             Mentor/especialista veem a mesma estrutura em leitura —
-             MaterialActions e NovoMaterialDialog só renderizam pra coord */
+             Só staff chega aqui agora — MaterialActions e NovoMaterialDialog
+             continuam renderizando só pra coord via ehCoord */
           <MateriaisBiblioteca
             stats={stats}
             encontros={nums.map((n) => ({
@@ -288,7 +377,7 @@ export default async function MateriaisPage({
             maxEncontro={maxEncontro}
             encontroAtual={encontroAtual}
             mobile={mobile}
-            guiaPapel={ehMentorDpp ? "mentor" : vePainel ? "staff" : null}
+            guiaPapel={vePainel ? "staff" : null}
           />
         )}
       </MateriaisAbas>

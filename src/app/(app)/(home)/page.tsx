@@ -195,15 +195,16 @@ export default async function HomePage() {
     <div className="space-y-8">
       {/* contexto próprio → fila de pedidos → avisos: a saudação abre a
           página; o mural do especialista vem antes dos comunicados */}
-      {/* termo logo após a primeira dupla (sem sumir). null = nunca assinou —
-          qualquer estado ≠ assinado pede a assinatura */}
+      {/* termo em faixa de largura total logo abaixo da saudação, antes das
+          duplas. null = nunca assinou — qualquer estado ≠ assinado pede a
+          assinatura */}
       <MentorHome
         duplas={duplas}
         eventos={eventos}
         espEventos={espEventos}
         cronogramas={cronogramas}
         me={me!}
-        aposPrimeiraDupla={assinatura?.status !== "assinado" ? <TermoBanner /> : null}
+        termo={assinatura?.status !== "assinado" ? <TermoBanner /> : null}
       />
       <MeusChamadosCard
         chamados={meusChamados.itens}

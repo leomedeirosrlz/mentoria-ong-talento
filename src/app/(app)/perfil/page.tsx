@@ -2,7 +2,10 @@ import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { getMe, getMeuMentorProfile, getMeusDadosPessoais } from "@/lib/queries";
 import { getMinhaAssinaturaTermo } from "@/lib/queries-assinaturas";
+import { getMinhaGrade, getMinhasExcecoes } from "@/lib/queries-especialista";
 import { avatarPublicUrl, gravatarUrl } from "@/lib/avatar";
+import { temPapel } from "@/lib/types";
+import { EspecialistaHorarios } from "@/components/especialista-horarios";
 import { PerfilForm } from "./perfil-form";
 
 export const metadata: Metadata = {
@@ -22,6 +25,12 @@ export default async function PerfilPage() {
     getMinhaAssinaturaTermo(),
   ]);
   if (!me) redirect("/login");
+  // a agenda do especialista (grade semanal + exceções) edita no perfil
+  // (REALIZA-207) — só se busca pra quem tem o papel, híbrido incluso
+  const souEspecialista = temPapel(me, "mentor_especialista");
+  const [grade, excecoes] = souEspecialista
+    ? await Promise.all([getMinhaGrade(), getMinhasExcecoes()])
+    : [[], []];
   const perfil = pessoal ? { ...me, ...pessoal } : me;
   return (
     <PerfilForm
@@ -30,6 +39,11 @@ export default async function PerfilPage() {
       avatarUrl={me.avatar_path ? avatarPublicUrl(me.avatar_path) : null}
       gravatarUrl={gravatarUrl(me.email)}
       assinaturaTermo={assinaturaTermo}
+      horarios={
+        souEspecialista ? (
+          <EspecialistaHorarios grade={grade} excecoes={excecoes} />
+        ) : undefined
+      }
     />
   );
 }

@@ -916,6 +916,7 @@ export function PerfilForm({
   avatarUrl,
   gravatarUrl,
   assinaturaTermo,
+  horarios,
 }: {
   me: Profile;
   mentorProfile: MentorProfile | null;
@@ -924,6 +925,9 @@ export function PerfilForm({
   /** Termo de voluntariado do próprio usuário — pendência do cadastro que
    *  não é campo de form (a assinatura é outra página, /assinar). */
   assinaturaTermo: Assinatura | null;
+  /** Seção "Quando você pode atender" — node pronto da page, só existe pra
+   *  quem tem o papel de especialista (inclusive o híbrido DPP+esp). */
+  horarios?: React.ReactNode;
 }) {
   const supabase = useMemo(() => createClient(), []);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -1369,6 +1373,10 @@ export function PerfilForm({
               </div>
             </details>
           )}
+
+          {/* horários do especialista — seção própria, vem montada da page
+              (undefined pros demais papéis) */}
+          {horarios}
         </div>
 
         {/* rail — o burocrático (cadastro + termo) e a conta */}

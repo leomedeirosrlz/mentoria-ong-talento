@@ -547,21 +547,21 @@ test.describe("agenda demo da coordenação — Monitoramento (WP5)", () => {
         sec.getByText("Turma 2", { exact: true }).first()
       ).toBeVisible();
 
-    // os cards carregam o "O que cobre" do guia atrás de <details> nativo
-    // — a voz da coordenação (o mentor lê "Como conduzir" na dele). O
-    // summary é alvo de toque de verdade (min-h-11 no mobile) e abre de
-    // verdade: o texto do guia aparece depois do clique
-    const guia = sec
-      .locator("summary", { hasText: "O que cobre" })
-      .first();
+    // os cards carregam o "O que cobre" do guia num popover — a voz da
+    // coordenação (o mentor lê "Como conduzir" na dele). O gatilho é alvo
+    // de toque de verdade (min-h-11 no mobile) e o texto do guia abre fora
+    // do card, que não muda de altura
+    const guia = sec.getByRole("button", { name: /O que cobre/ }).first();
     await expect(guia).toBeVisible();
-    const details = guia.locator("xpath=..");
-    await expect(details).not.toHaveJSProperty("open", true);
+    const card = guia.locator("xpath=ancestor::li[1]");
+    const altura = (await card.boundingBox())!.height;
     await guia.click();
-    await expect(details).toHaveJSProperty("open", true);
-    await expect(
-      details.locator("p", { hasText: /[a-zá-ú]{4}/ }).last()
-    ).toBeVisible();
+    const pop = page.getByRole("dialog", { name: "O que cobre" });
+    await expect(pop).toBeVisible();
+    await expect(pop.locator("p", { hasText: /[a-zá-ú]{4}/ }).last()).toBeVisible();
+    expect((await card.boundingBox())!.height).toBe(altura);
+    await page.keyboard.press("Escape");
+    await expect(pop).toBeHidden();
 
     // o encontro oficial carrega o meta da coorte no detalhe — "N duplas,
     // cada uma marca o seu" (a coordenação nunca agenda pela dupla)

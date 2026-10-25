@@ -23,7 +23,6 @@ import {
   getEspecialistas,
   getMinhaGrade,
   getMinhasExcecoes,
-  getSlotsLivres,
   getSolicitacoesDaDupla,
   getTrilhasDosJovens,
 } from "@/lib/queries-especialista";
@@ -34,13 +33,12 @@ import {
   eventosDoCronograma,
   toDateStr,
 } from "@/lib/ciclo";
-import { sessoesDaGrade } from "@/lib/agenda-especialista";
 import { deriveAgendaMinha } from "@/lib/agenda-minha";
 import { AgendaAuxiliar } from "@/components/agenda-auxiliar";
 import { AgendaCalendario } from "@/components/agenda-calendario";
 import { AgendaCoordenacao } from "@/components/agenda-coordenacao";
-import { AgendaDisponibilidade } from "@/components/agenda-disponibilidade";
 import { AgendaEspecialista } from "@/components/agenda-especialista";
+import { AgendaEspHorarios } from "@/components/agenda-especialista-horarios";
 import { AgendaMinha } from "@/components/agenda-minha";
 import { AgendaPorMentorado } from "@/components/agenda-por-mentorado";
 
@@ -97,11 +95,21 @@ export default async function AgendaPage({
   // vale pra todo mundo menos o especialista puro — o híbrido vê as duas
   // em abas (?visao=), aterrissando na do papel primário
   const souEsp = temPapel(me, "mentor_especialista");
+  // a visão esp é "minha agenda" — filtra pelas duplas do próprio mentor
+  // antes de derivar as abas: pra staff+esp o escopo RLS traz duplas de
+  // outros mentores junto
+  const minhasDuplas = duplas.filter((d) => d.mentor?.id === me?.id);
+  const duplasEsp = minhasDuplas.filter((d) => d.trilha === "especialista");
   const mostraDpp =
     !souEsp ||
     temPapel(me, "mentor_dpp") ||
     duplas.some((d) => d.trilha !== "especialista");
-  const duasVisoes = souEsp && mostraDpp;
+  // a aba Especialista só existe com trilha pra mostrar (REALIZA-207): o
+  // híbrido sem trilha perde a aba e ?visao=especialista cai mudo na visão
+  // DPP. O especialista puro sem dupla segue na própria superfície — é a
+  // única que ele tem (lá mora o estado vazio).
+  const temVisaoEsp = souEsp && (!mostraDpp || duplasEsp.length > 0);
+  const duasVisoes = souEsp && mostraDpp && temVisaoEsp;
   // o papel PRIMÁRIO decide a aterrissagem: quem é supervisor/coordenação
   // com papel de mentor/especialista por cima cai na superfície de equipe
   // (monitoramento/auxiliar) — o lado mentor/esp fica atrás de ?visao=
@@ -109,15 +117,16 @@ export default async function AgendaPage({
   const papelStaff =
     me?.role === "coordenacao" || me?.role === "supervisor";
   const visaoEsp =
-    souEsp &&
+    temVisaoEsp &&
     (!papelStaff || visao === "especialista") &&
     (!duasVisoes ||
       (visao ? visao === "especialista" : me?.role === "mentor_especialista"));
 
   // ?visao= pedida mas inaplicável degradava mudo — o banner explica o que
-  // a tela está mostrando (SSR, sem estado: some na próxima navegação)
+  // a tela está mostrando (SSR, sem estado: some na próxima navegação).
+  // Esp sem trilha NÃO avisa: a queda na visão DPP é o comportamento certo.
   const avisoVisao =
-    visao === "especialista" && !visaoEsp ? (
+    visao === "especialista" && !visaoEsp && !souEsp ? (
       <p className="rounded-lg border border-border bg-muted/50 px-4 py-2.5 text-sm text-muted-foreground">
         A visão de especialista não se aplica ao seu papel. Mostrando a
         agenda normal.
@@ -130,51 +139,32 @@ export default async function AgendaPage({
     ) : null;
 
   if (visaoEsp) {
-    // agenda real do especialista (0073): grade semanal + exceções + a
-    // projeção de slots que os jovens veem — buscadas sempre, mesmo sem
-    // dupla (configurar a oferta é justamente o estado vazio ideal)
-    const [grade, excecoes, slots, espEventos] = await Promise.all([
+    // grade e exceções alimentam o "Quando você atende" (só leitura — a
+    // edição mora no perfil); espEventos dá título/foco dos passos da trilha
+    const [grade, excecoes, espEventos] = await Promise.all([
       getMinhaGrade(),
       getMinhasExcecoes(),
-      getSlotsLivres(me!.id),
-      temEspecialista ? getEspecialistaEventos() : Promise.resolve([]),
+      duplasEsp.length > 0 ? getEspecialistaEventos() : Promise.resolve([]),
     ]);
-    // sem dupla ainda: cabeçalho + a agenda editável + o estado vazio — a
-    // grade de terças DPP não se aplica a ele. No híbrido, a fila usa só as
-    // trilhas esp — a DPP tem a própria aba de calendário.
-    // `duplas` vem no escopo do RLS — pra supervisor/coord que TAMBÉM é
-    // mentor_especialista ele traz duplas de outros mentores; a visão esp é
-    // "minha agenda", então filtra pelas do próprio mentor antes de derivar.
-    const minhasDuplas = duplas.filter((d) => d.mentor?.id === me!.id);
-    const duplasEsp = minhasDuplas.filter((d) => d.trilha === "especialista");
-    // Blocos de sessão da grade visual: todas as duplas do mentor — os
-    // encontros DPP do híbrido ocupam a agenda física (a projeção de slots
-    // já os desconta), então aparecem muted pra não fingir horário livre
-    const sessoes = sessoesDaGrade(minhasDuplas);
+    // especialista puro sem trilha: cabeçalho + estado vazio curto + a
+    // disponibilidade em leitura (o híbrido sem trilha nem chega aqui —
+    // caiu na visão DPP acima)
     const conteudoEsp =
       duplasEsp.length === 0 ? (
         <div className="space-y-6">
           <header>
             <h1 className="text-2xl font-semibold tracking-tight">Agenda</h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Mentoria especializada · até 5 encontros de 1h em até 3 meses. As
-              datas são combinadas por vocês, sem terça oficial.
+              Mentoria especializada · até 5 sessões de 1h em até 3 meses
             </p>
           </header>
-          <AgendaDisponibilidade
-            grade={grade}
-            excecoes={excecoes}
-            slots={slots}
-            sessoes={sessoes}
-            hojeIso={hoje}
-          />
-          <div className="rounded-xl bg-card px-5 py-10 text-center shadow-[var(--shadow-border)]">
+          <div className="rounded-xl bg-card px-5 py-6 text-center shadow-[var(--shadow-border)]">
             <p className="text-sm text-muted-foreground">
-              {duasVisoes
-                ? "Você ainda não tem trilhas de especialista. Quando a coordenação formar uma, os encontros combinados aparecem aqui."
-                : "Você ainda não está em nenhuma dupla. Quando a coordenação formar uma, os encontros combinados aparecem aqui."}
+              Você ainda não tem trilhas. Quando um pedido for aceito, as
+              sessões aparecem aqui.
             </p>
           </div>
+          <AgendaEspHorarios grade={grade} excecoes={excecoes} />
         </div>
       ) : (
         <AgendaEspecialista
@@ -182,8 +172,6 @@ export default async function AgendaPage({
           espEventos={espEventos}
           grade={grade}
           excecoes={excecoes}
-          slots={slots}
-          sessoes={sessoes}
           hojeIso={hoje}
           agoraMs={agora.getTime()}
         />
@@ -271,10 +259,6 @@ export default async function AgendaPage({
         {avisoVisao}
         <header>
           <h1 className="text-2xl font-semibold tracking-tight">Agenda</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Os encontros do ciclo, os que você marcou com suas duplas e o que
-            seus jovens fazem com os especialistas.
-          </p>
         </header>
         {duasVisoes && <AbasAgenda ativa="dpp" />}
         {/* staff+mentor também é híbrido aqui: sem o ?visao=dpp as tabs

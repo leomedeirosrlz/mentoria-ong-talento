@@ -122,8 +122,8 @@ export function TrilhaJornada({
   const refStrip = useRef<HTMLOListElement | null>(null);
 
   // fade de 16px nas bordas do scroll horizontal — só quando há overflow de
-  // fato; trilha que cabe inteira (desktop largo, os 5 nós da especialista)
-  // não pode esmaecer os nós das pontas
+  // fato (mobile: os 16 nós não cabem); no sm+ a trilha preenche o card sem
+  // rolar e a máscara sai, senão esmaecia os nós das pontas
   useEffect(() => {
     const el = refStrip.current;
     if (!el) return;
@@ -145,10 +145,11 @@ export function TrilhaJornada({
     return () => ro.disconnect();
   }, []);
 
-  // strip rola horizontal no mobile (16 nós ≈ 470px > 375px) — sem o scroll
-  // o passo atual sairia da tela; mesmo padrão do rail da agenda. Rola o ol
-  // direto (nunca o documento): scrollIntoView agiria no scrollport mais
-  // próximo, que é a página inteira — ela descia até o nó ao carregar
+  // strip rola horizontal só no mobile (16 alvos de 44px ≈ 800px > 375px) —
+  // sem o scroll o passo atual sairia da tela; mesmo padrão do rail da
+  // agenda. Rola o ol direto (nunca o documento): scrollIntoView agiria no
+  // scrollport mais próximo, que é a página inteira — ela descia até o nó
+  // ao carregar
   useEffect(() => {
     const el = refAtual.current;
     const strip = el?.closest("ol");
@@ -202,10 +203,12 @@ export function TrilhaJornada({
         </p>
       </div>
 
-      {/* pt-2.5 abre espaço pro marcador de marco que flutua acima do disco */}
+      {/* pt-2.5 abre espaço pro marcador de marco que flutua acima do disco.
+          Barra oculta sempre: quando rola (mobile) a máscara de fade é o
+          indicador de continuação, não a barra */}
       <ol
         ref={refStrip}
-        className="scroll-fina mt-1 flex items-center overflow-x-auto pt-2.5 pb-1"
+        className="mt-1 flex items-center overflow-x-auto pt-2.5 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {jornada.nos.map((no, i) => {
           const atual = no.numero === jornada.proximoNumero;
@@ -224,17 +227,20 @@ export function TrilhaJornada({
                   className={cn(
                     "h-px flex-1",
                     // gap maior na virada de fase — os grupos ficam implícitos,
-                    // o nome da fase corrente vive na caption
-                    viradaFase ? "min-w-3" : "min-w-1.5",
+                    // o nome da fase corrente vive na caption. No sm+ o mínimo
+                    // encolhe: 16 nós de 24px + mínimos precisam caber no card
+                    // de ~448px (xl com 2 colunas) sem rolar
+                    viradaFase ? "min-w-3 sm:min-w-2" : "min-w-1.5 sm:min-w-0.5",
                     percorrido(jornada.nos[i - 1]) && percorrido(no)
                       ? "bg-[var(--brand-lime)]"
                       : "bg-border"
                   )}
                 />
               )}
-                {/* size-11→sm:size-9 = hit area de 44px (mobile) / 36px (sm+)
-                    em volta do disco de 24–28px — tocar o passo abre o card
-                    dele na ficha */}
+                {/* size-11→sm:size-6 = hit area de 44px (mobile, por isso a
+                    trilha rola) / 24px (sm+, mínimo de alvo pointer — assim os
+                    16 nós cabem no card sem rolagem). Tocar o passo abre o
+                    card dele na ficha */}
                 <Link
                   // o nó abre a aba Encontros; com encontro, leva ao card dele
                   href={
@@ -245,7 +251,7 @@ export function TrilhaJornada({
                   aria-label={rotulo}
                   title={rotulo}
                   aria-current={atual ? "step" : undefined}
-                  className="group grid size-11 place-items-center rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring sm:size-9"
+                  className="group grid size-11 place-items-center rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring sm:size-6"
                 >
                   <span className="relative">
                     {atual && (
@@ -262,7 +268,7 @@ export function TrilhaJornada({
                     )}
                     <span
                       className={cn(
-                        "relative grid size-6 place-items-center rounded-full font-mono text-[11px] font-semibold leading-none tabular-nums transition-transform group-hover:scale-110 sm:size-7",
+                        "relative grid size-6 place-items-center rounded-full font-mono text-[11px] font-semibold leading-none tabular-nums transition-transform group-hover:scale-110",
                         DISCO[no.estado]
                       )}
                     >
