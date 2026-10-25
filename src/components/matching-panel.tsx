@@ -8,6 +8,7 @@ import type { Mentorado, Profile } from "@/lib/types";
 import { AfinidadePar } from "@/components/matching-afinidade";
 import { CapacidadeMentorDialog } from "@/components/capacidade-mentor-dialog";
 import { NovaDuplaDialog } from "@/components/nova-dupla-dialog";
+import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -168,12 +169,14 @@ export function MatchingPanel({
                 emUso={usadasDe(mentor.id)}
                 trilha="dpp"
                 trigger={
-                  <button
+                  <Button
                     type="button"
-                    className="-my-2 min-h-11 rounded-sm font-medium text-foreground underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:my-0 sm:min-h-0"
+                    variant="link"
+                    size="sm"
+                    className="-my-2 sm:my-0"
                   >
                     aumentar capacidade →
-                  </button>
+                  </Button>
                 }
               />
             </p>

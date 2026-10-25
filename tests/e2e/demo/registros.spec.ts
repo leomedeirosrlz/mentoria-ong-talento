@@ -5,12 +5,10 @@ import { entrarNaDemo, expect, test } from "../helpers";
 // Demo como coordenação vê todas as 16 duplas — ~94 registros com
 // avaliações variadas (baixa/regular/boa/excelente no dataset).
 // O default é `grupo=dupla` implícito (param ausente == dupla).
-// Layout: mestre/detalhe no lg+ (lista compacta à esquerda, registro
-// aberto à direita, seleção em ?r=); a timeline antiga segue no mobile.
+// Layout: lista compacta + registro (seleção em ?r=) — no lg+ o registro
+// fica à direita; no celular abre numa folha (REALIZA-211).
 
-// cabeçalho de grupo por dupla na timeline (mobile): "Dupla: X × Y · K"
-const DUPLA_HEAD = /^Dupla: .+ × .+ · \d+ registros?$/;
-// no mestre/detalhe (lg+) o cabeçalho usa o lockup DuplaNomes:
+// o cabeçalho de grupo usa o lockup DuplaNomes:
 // "Mentor e Mentorado · K registros", sem o prefixo "Dupla:"
 const DUPLA_HEAD_LG = /^.+ e .+ · \d+ registros?$/;
 const SEMANA_HEAD = /^Semana de \d{2}\/\d{2}\//;
@@ -144,15 +142,27 @@ test("dialog Filtros é right-sized (~max-w-md)", async ({ page }) => {
 test.describe("mobile", () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
-  test("grupos por dupla empilham em coluna única", async ({ page }) => {
+  test("lista compacta; o registro abre numa folha e fecha de volta", async ({
+    page,
+  }) => {
     await abreRegistros(page);
-    const headers = page.getByRole("heading", { name: DUPLA_HEAD });
+    // REALIZA-211: a mesma lista do desktop, sem registro aberto ao lado
+    const headers = page.getByRole("heading", { name: DUPLA_HEAD_LG });
     expect(await headers.count()).toBeGreaterThanOrEqual(2);
-    const b0 = await headers.nth(0).boundingBox();
-    const b1 = await headers.nth(1).boundingBox();
-    // sem grade xl: o 2º grupo nasce abaixo do 1º
-    expect(b1!.y).toBeGreaterThan(b0!.y + 100);
-    expect(Math.abs(b0!.x - b1!.x)).toBeLessThan(8);
+    await expect(page.getByRole("article", { name: /\d+º (encontro|passo)/ })).toHaveCount(0);
+    const largura = await page.evaluate(() => document.documentElement.scrollWidth);
+    expect(largura).toBeLessThanOrEqual(390);
+
+    const linha = page.locator("a[data-registro]").first();
+    const id = await linha.getAttribute("data-registro");
+    await linha.click();
+    await page.waitForURL(new RegExp(`r=${id}`));
+    const folha = page.getByRole("dialog", { name: "Registro do encontro" });
+    await expect(folha).toBeVisible();
+    await expect(folha.getByRole("article")).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(folha).toBeHidden();
+    await expect(page).not.toHaveURL(/r=/);
   });
 });
 
@@ -194,7 +204,7 @@ test.describe("panorama do ciclo", () => {
 
     // cards: cobertura (barras) + situação das duplas + linha ★
     await expect(
-      page.getByRole("heading", { name: "Registros entregues por encontro" })
+      page.getByRole("heading", { name: "Encontros realizados e registrados" })
     ).toBeVisible();
     await expect(
       page.getByRole("heading", { name: "Situação das duplas", exact: true })
@@ -254,10 +264,13 @@ test.describe("panorama do ciclo", () => {
   }) => {
     await abreRegistros(page);
     const grupo = page.getByRole("group", { name: "Métrica das barras" });
-    await grupo.getByRole("button", { name: "Realizados" }).click();
+    // REALIZA-211: realizado e registrado moram no mesmo gráfico (cor
+    // cheia × clara) — não existe mais a métrica "Realizados" à parte
     await expect(
-      page.getByRole("heading", { name: "Encontros realizados por encontro" })
+      page.getByRole("heading", { name: "Encontros realizados e registrados" })
     ).toBeVisible();
+    await expect(grupo.getByRole("button", { name: "Realizados" })).toHaveCount(0);
+    await expect(page.getByText("aconteceu, falta o registro")).toBeVisible();
     await grupo.getByRole("button", { name: "Avaliações ★" }).click();
     await expect(
       page.getByRole("heading", { name: "Avaliações do jovem por encontro" })

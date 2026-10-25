@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition, type KeyboardEvent } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { CircleNotch, Plus, X } from "@phosphor-icons/react";
@@ -11,29 +11,113 @@ import {
   removerJanela,
 } from "@/lib/actions-especialista";
 import { DIAS_SEMANA, DIAS_SEMANA_LABELS, toDateStr } from "@/lib/ciclo";
+import { cn } from "@/lib/utils";
 import { diaPlural, faixa, resumoExcecao } from "@/lib/horarios-especialista";
 import type { ExcecaoEspecialista, GradeJanela } from "@/lib/types";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { FaixaHorario } from "@/components/roda-horario";
 
-/** Select "Dia" — o valor é o dow do Postgres (0=domingo … 6=sábado) mas a
- *  ordem de leitura é a da semana brasileira: DIAS_SEMANA abre em seg. */
-const DIAS_OPCOES: [string, string][] = DIAS_SEMANA.map((d, i) => [
-  String((i + 1) % 7),
-  DIAS_SEMANA_LABELS[d],
-]);
-const DIAS_MAP = Object.fromEntries(DIAS_OPCOES);
+/** Dias da semana como botões — o valor é o dow do Postgres (0=domingo …
+ *  6=sábado) mas a ordem de leitura é a brasileira: DIAS_SEMANA abre em seg. */
+const DIAS_OPCOES = DIAS_SEMANA.map((d, i) => ({
+  dow: (i + 1) % 7,
+  curto: d === "sab" ? "sáb" : d,
+  longo: DIAS_SEMANA_LABELS[d],
+}));
 
-/** step do input `time` é em segundos — meia hora, a régua da agenda. */
-const PASSO_SEGUNDOS = 30 * 60;
+/** Janela da faixa de datas das exceções: as próximas 8 semanas. */
+const DIAS_FAIXA_DATAS = 56;
+const DOW_CURTO = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
+const MES_CURTO = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+
+/** Faixa horizontal de dias (deslizar no toque, setas no teclado) — um
+ *  radiogroup: um tab stop, ←/→ movem e escolhem. */
+function FaixaDatas({
+  inicio,
+  valor,
+  onChange,
+  disabled,
+}: {
+  /** "YYYY-MM-DD" de hoje. */
+  inicio: string;
+  valor: string;
+  onChange: (iso: string) => void;
+  disabled?: boolean;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const base = new Date(`${inicio}T12:00:00`);
+  const dias = Array.from({ length: DIAS_FAIXA_DATAS }, (_, i) => {
+    const d = new Date(base);
+    d.setDate(base.getDate() + i);
+    return {
+      iso: toDateStr(d),
+      dow: DOW_CURTO[d.getDay()]!,
+      dia: d.getDate(),
+      mes: MES_CURTO[d.getMonth()]!,
+      // o mês aparece no 1º chip e na virada — o resto lê só o dia
+      comMes: i === 0 || d.getDate() === 1,
+    };
+  });
+  const iSel = dias.findIndex((d) => d.iso === valor);
+
+  function aoTeclar(e: KeyboardEvent<HTMLDivElement>) {
+    const passo = { ArrowRight: 1, ArrowLeft: -1, ArrowDown: 7, ArrowUp: -7 }[
+      e.key
+    ];
+    if (passo == null) return;
+    e.preventDefault();
+    const alvo = Math.min(dias.length - 1, Math.max(0, (iSel < 0 ? 0 : iSel) + passo));
+    onChange(dias[alvo]!.iso);
+    const el = ref.current?.querySelectorAll<HTMLButtonElement>("[role=radio]")[alvo];
+    el?.focus();
+    el?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }
+
+  return (
+    <div
+      ref={ref}
+      role="radiogroup"
+      aria-label="Data"
+      onKeyDown={aoTeclar}
+      className="scroll-fina -mx-1 flex snap-x snap-proximity gap-1.5 overflow-x-auto px-1 pb-1.5"
+    >
+      {dias.map((d, i) => {
+        const sel = d.iso === valor;
+        return (
+          <button
+            key={d.iso}
+            type="button"
+            role="radio"
+            aria-checked={sel}
+            aria-label={`${d.dow}, ${d.dia} de ${d.mes}`}
+            tabIndex={sel || (iSel < 0 && i === 0) ? 0 : -1}
+            disabled={disabled}
+            onClick={() => onChange(d.iso)}
+            className={cn(
+              "flex w-12 shrink-0 snap-start flex-col items-center rounded-xl border py-1.5 transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+              sel
+                ? "border-transparent bg-primary text-primary-foreground"
+                : "border-border bg-card hover:bg-muted"
+            )}
+          >
+            <span className={cn("text-[11px]", !sel && "text-muted-foreground")}>
+              {d.dow}
+            </span>
+            <span className="text-base font-semibold leading-tight tabular-nums">
+              {d.dia}
+            </span>
+            <span className={cn("h-3.5 text-[10px] leading-none", !sel && "text-muted-foreground")}>
+              {d.comMes ? d.mes : ""}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+const DE_PADRAO = "18:00";
+const ATE_PADRAO = "20:00";
 
 /** Editor "Quando você pode atender" do /perfil (REALIZA-207): as faixas
  *  fixas da semana e as exceções datadas em frases — a grade de horas ficou
@@ -51,16 +135,16 @@ export function EspecialistaHorarios({
   const [pending, start] = useTransition();
 
   // faixa recorrente
-  const [dia, setDia] = useState<string | null>(null);
-  const [deFaixa, setDeFaixa] = useState("");
-  const [ateFaixa, setAteFaixa] = useState("");
+  const [dias, setDias] = useState<number[]>([]);
+  const [deFaixa, setDeFaixa] = useState(DE_PADRAO);
+  const [ateFaixa, setAteFaixa] = useState(ATE_PADRAO);
   const [erroFaixa, setErroFaixa] = useState<string | null>(null);
 
   // exceção datada — bloqueio é o caso comum, já vem marcado
   const [tipo, setTipo] = useState<"bloqueio" | "extra">("bloqueio");
   const [data, setData] = useState("");
-  const [deExc, setDeExc] = useState("");
-  const [ateExc, setAteExc] = useState("");
+  const [deExc, setDeExc] = useState(DE_PADRAO);
+  const [ateExc, setAteExc] = useState(ATE_PADRAO);
   const [erroExc, setErroExc] = useState<string | null>(null);
 
   // "hoje" no fuso do programa — piso do date e da validação de exceção
@@ -76,8 +160,8 @@ export function EspecialistaHorarios({
 
   function submitFaixa(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (dia == null || !deFaixa || !ateFaixa) {
-      setErroFaixa("Escolha o dia e os dois horários.");
+    if (dias.length === 0) {
+      setErroFaixa("Escolha ao menos um dia.");
       return;
     }
     if (ateFaixa <= deFaixa) {
@@ -85,21 +169,23 @@ export function EspecialistaHorarios({
       return;
     }
     setErroFaixa(null);
-    const fd = new FormData();
-    fd.set("dia_semana", dia);
-    fd.set("hora_inicio", deFaixa);
-    fd.set("hora_fim", ateFaixa);
     start(async () => {
       try {
-        const res = await adicionarJanela(fd);
-        if ("error" in res) {
-          toast.error(res.error);
-          return;
+        // um dia por chamada — a action valida sobreposição por dia
+        for (const dow of dias) {
+          const fd = new FormData();
+          fd.set("dia_semana", String(dow));
+          fd.set("hora_inicio", deFaixa);
+          fd.set("hora_fim", ateFaixa);
+          const res = await adicionarJanela(fd);
+          if ("error" in res) {
+            toast.error(res.error);
+            router.refresh();
+            return;
+          }
         }
-        toast.success("Horário adicionado.");
-        setDia(null);
-        setDeFaixa("");
-        setAteFaixa("");
+        toast.success(dias.length > 1 ? "Horários adicionados." : "Horário adicionado.");
+        setDias([]);
         router.refresh();
       } catch {
         toast.error("Sem conexão. Tente de novo.");
@@ -109,8 +195,8 @@ export function EspecialistaHorarios({
 
   function submitExcecao(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (!data || !deExc || !ateExc) {
-      setErroExc("Escolha a data e os dois horários.");
+    if (!data) {
+      setErroExc("Escolha a data.");
       return;
     }
     if (data < hoje) {
@@ -139,10 +225,9 @@ export function EspecialistaHorarios({
             ? "Bloqueio adicionado."
             : "Horário extra adicionado."
         );
-        // o tipo fica — quem cadastra exceções costuma mandar várias do mesmo
+        // tipo e horário ficam — quem cadastra exceções costuma mandar
+        // várias parecidas
         setData("");
-        setDeExc("");
-        setAteExc("");
         router.refresh();
       } catch {
         toast.error("Sem conexão. Tente de novo.");
@@ -230,60 +315,47 @@ export function EspecialistaHorarios({
               })}
             </ul>
           )}
-          <form onSubmit={submitFaixa} className="mt-3 space-y-2.5">
-            <div className="grid grid-cols-2 items-end gap-x-2 gap-y-3 sm:flex sm:gap-2.5">
-              <div className="col-span-2 grid gap-1.5 sm:flex-1">
-                <Label id="horarios-dia-label">Dia</Label>
-                <Select
-                  name="dia_semana"
-                  value={dia}
-                  onValueChange={(v) => setDia(v)}
-                  items={DIAS_MAP}
-                  disabled={pending}
-                >
-                  <SelectTrigger
-                    id="horarios-dia"
-                    aria-labelledby="horarios-dia-label horarios-dia"
+          <form onSubmit={submitFaixa} className="mt-4 space-y-3">
+            <div
+              role="group"
+              aria-label="Dias da semana"
+              className="flex flex-wrap gap-1.5"
+            >
+              {DIAS_OPCOES.map((d) => {
+                const on = dias.includes(d.dow);
+                return (
+                  <button
+                    key={d.dow}
+                    type="button"
+                    aria-pressed={on}
+                    aria-label={d.longo}
+                    disabled={pending}
+                    onClick={() =>
+                      setDias((v) =>
+                        on ? v.filter((x) => x !== d.dow) : [...v, d.dow]
+                      )
+                    }
+                    className={cn(
+                      "h-11 min-w-12 rounded-xl border px-2 text-sm font-medium transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50 md:h-9",
+                      on
+                        ? "border-transparent bg-primary text-primary-foreground"
+                        : "border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground"
+                    )}
                   >
-                    <SelectValue placeholder="Escolha" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {DIAS_OPCOES.map(([v, l]) => (
-                      <SelectItem key={v} value={v}>
-                        {l}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1.5 sm:w-28">
-                <Label htmlFor="horarios-de">De</Label>
-                <Input
-                  id="horarios-de"
-                  type="time"
-                  step={PASSO_SEGUNDOS}
-                  value={deFaixa}
-                  onChange={(e) => setDeFaixa(e.target.value)}
-                  disabled={pending}
-                />
-              </div>
-              <div className="space-y-1.5 sm:w-28">
-                <Label htmlFor="horarios-ate">Até</Label>
-                <Input
-                  id="horarios-ate"
-                  type="time"
-                  step={PASSO_SEGUNDOS}
-                  value={ateFaixa}
-                  onChange={(e) => setAteFaixa(e.target.value)}
-                  disabled={pending}
-                />
-              </div>
-              <Button
-                type="submit"
-                variant="outline"
+                    {d.curto}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+              <FaixaHorario
+                de={deFaixa}
+                ate={ateFaixa}
+                onDe={setDeFaixa}
+                onAte={setAteFaixa}
                 disabled={pending}
-                className="col-span-2"
-              >
+              />
+              <Button type="submit" variant="outline" disabled={pending}>
                 {pending ? (
                   <CircleNotch className="animate-spin" aria-hidden />
                 ) : (
@@ -331,7 +403,7 @@ export function EspecialistaHorarios({
               })}
             </ul>
           )}
-          <form onSubmit={submitExcecao} className="mt-3 space-y-2.5">
+          <form onSubmit={submitExcecao} className="mt-4 space-y-3">
             {/* segmentado — radios nativos com a barra conectada do app:
                 um tab stop, setas movem (mesmo padrão dos instrumentos) */}
             <div
@@ -362,47 +434,21 @@ export function EspecialistaHorarios({
                 </label>
               ))}
             </div>
-            <div className="grid grid-cols-2 items-end gap-x-2 gap-y-3 sm:flex sm:gap-2.5">
-              <div className="col-span-2 space-y-1.5 sm:flex-1">
-                <Label htmlFor="horarios-exc-data">Data</Label>
-                <Input
-                  id="horarios-exc-data"
-                  type="date"
-                  min={hoje}
-                  max="9999-12-31"
-                  value={data}
-                  onChange={(e) => setData(e.target.value)}
-                  disabled={pending}
-                />
-              </div>
-              <div className="space-y-1.5 sm:w-28">
-                <Label htmlFor="horarios-exc-de">De</Label>
-                <Input
-                  id="horarios-exc-de"
-                  type="time"
-                  step={PASSO_SEGUNDOS}
-                  value={deExc}
-                  onChange={(e) => setDeExc(e.target.value)}
-                  disabled={pending}
-                />
-              </div>
-              <div className="space-y-1.5 sm:w-28">
-                <Label htmlFor="horarios-exc-ate">Até</Label>
-                <Input
-                  id="horarios-exc-ate"
-                  type="time"
-                  step={PASSO_SEGUNDOS}
-                  value={ateExc}
-                  onChange={(e) => setAteExc(e.target.value)}
-                  disabled={pending}
-                />
-              </div>
-              <Button
-                type="submit"
-                variant="outline"
+            <FaixaDatas
+              inicio={hoje}
+              valor={data}
+              onChange={setData}
+              disabled={pending}
+            />
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+              <FaixaHorario
+                de={deExc}
+                ate={ateExc}
+                onDe={setDeExc}
+                onAte={setAteExc}
                 disabled={pending}
-                className="col-span-2"
-              >
+              />
+              <Button type="submit" variant="outline" disabled={pending}>
                 {pending ? (
                   <CircleNotch className="animate-spin" aria-hidden />
                 ) : (

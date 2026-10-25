@@ -216,13 +216,15 @@ export function DefinirSenhaForm() {
                 {loading ? "Salvando…" : "Salvar senha e entrar"}
               </Button>
               {!recovery && (
-                <button
+                <Button
                   type="button"
+                  variant="link"
+                  size="sm"
+                  className="w-full"
                   onClick={() => void pular()}
-                  className="w-full min-h-11 text-xs text-muted-foreground hover:text-foreground transition-colors"
                 >
                   Prefiro entrar só pelo link
-                </button>
+                </Button>
               )}
             </motion.form>
           ) : (

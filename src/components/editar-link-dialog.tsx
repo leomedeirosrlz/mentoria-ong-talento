@@ -64,14 +64,16 @@ export function EditarLinkDialog({
       <DialogTrigger
         render={
           trigger ?? (
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="icon-sm"
               aria-label="Editar link da chamada"
               title="Editar link da chamada"
-              className="grid size-11 shrink-0 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:size-8"
+              className="shrink-0 text-muted-foreground"
             >
-              <PencilSimple size={16} aria-hidden />
-            </button>
+              <PencilSimple aria-hidden />
+            </Button>
           )
         }
       />

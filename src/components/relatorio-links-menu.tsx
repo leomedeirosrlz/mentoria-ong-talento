@@ -40,7 +40,7 @@ import { formatDate, formatDateTime } from "@/lib/ciclo";
 import { turmaLonga } from "@/lib/turma";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -68,11 +68,6 @@ const itemCls =
 
 const itemIconCls =
   "mt-0.5 grid size-7 shrink-0 place-items-center rounded-md bg-muted text-foreground";
-
-/** Mini-ação da linha de link (copiar/abrir/senha/revogar) — chip pequeno
- *  com borda; ≥44px no mobile, compacta no desktop. */
-const miniActCls =
-  "inline-flex min-h-11 sm:min-h-8 items-center gap-1.5 rounded-md border border-border bg-card px-2.5 py-1 text-xs font-medium text-muted-foreground transition-colors outline-none hover:border-input hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50";
 
 /** Painel "Compartilhar" da toolbar do builder (REALIZA-201): concentra
  *  criar link (com o recorte da grade na tela), listar/gerir os links
@@ -272,25 +267,27 @@ export function RelatorioLinksMenu({
                     </p>
                     {est === "ativo" && (
                       <div className="mt-2 flex flex-wrap gap-1.5">
-                        <button
+                        <Button
                           type="button"
-                          className={miniActCls}
+                          variant="outline"
+                          size="xs"
                           onClick={() => copiar(l.slug)}
                         >
-                          <Copy size={12} aria-hidden /> Copiar link
-                        </button>
+                          <Copy aria-hidden /> Copiar link
+                        </Button>
                         <a
                           href={`/resumo/${l.slug}`}
                           target="_blank"
                           rel="noreferrer"
                           aria-label={`Abrir “${l.titulo}” em nova aba`}
-                          className={miniActCls}
+                          className={buttonVariants({ variant: "outline", size: "xs" })}
                         >
-                          <ArrowSquareOut size={12} aria-hidden /> Abrir
+                          <ArrowSquareOut aria-hidden /> Abrir
                         </a>
-                        <button
+                        <Button
                           type="button"
-                          className={miniActCls}
+                          variant="outline"
+                          size="xs"
                           title={
                             l.protegido
                               ? "A senha atual para de valer na hora"
@@ -298,27 +295,29 @@ export function RelatorioLinksMenu({
                           }
                           onClick={() => setRedefinindo(l.id)}
                         >
-                          <Key size={12} aria-hidden />{" "}
+                          <Key aria-hidden />{" "}
                           {l.protegido ? "Redefinir senha" : "Definir senha"}
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                           type="button"
-                          className={cn(miniActCls, "text-destructive hover:border-destructive/50 hover:text-destructive")}
+                          variant="destructive"
+                          size="xs"
                           onClick={() => setRevogando(l.id)}
                         >
-                          <LinkBreak size={12} aria-hidden /> Revogar
-                        </button>
+                          <LinkBreak aria-hidden /> Revogar
+                        </Button>
                       </div>
                     )}
                     {est !== "ativo" && (
                       <div className="mt-2">
-                        <button
+                        <Button
                           type="button"
-                          className={miniActCls}
+                          variant="outline"
+                          size="xs"
                           onClick={() => copiar(l.slug)}
                         >
-                          <Copy size={12} aria-hidden /> Copiar link
-                        </button>
+                          <Copy aria-hidden /> Copiar link
+                        </Button>
                       </div>
                     )}
                     <ConfirmDeleteButton

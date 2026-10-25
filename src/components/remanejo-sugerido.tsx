@@ -174,12 +174,14 @@ export function RemanejoSugerido({
                     // a do papel primário e o híbrido ajusta a errada
                     trilha={ehEsp ? "especialista" : "dpp"}
                     trigger={
-                      <button
+                      <Button
                         type="button"
-                        className="shrink-0 rounded-sm text-xs font-medium text-foreground underline underline-offset-2 transition-colors hover:text-foreground/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        variant="link"
+                        size="xs"
+                        className="shrink-0"
                       >
                         aumentar capacidade →
-                      </button>
+                      </Button>
                     }
                   />
                 </li>
@@ -248,13 +250,14 @@ export function RemanejoSugerido({
 
       <p className="mt-3 border-t border-border/50 pt-2.5 text-xs text-muted-foreground">
         Nenhum candidato convence?{" "}
-        <button
+        <Button
           type="button"
+          variant="link"
+          size="xs"
           onClick={() => abrir("mentor", null)}
-          className="rounded-sm font-medium text-foreground underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           Remaneje manualmente
-        </button>.{" "}
+        </Button>.{" "}
         O dialog lista todo mundo.
       </p>
           </div>
