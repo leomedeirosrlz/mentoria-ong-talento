@@ -137,7 +137,7 @@ export function JovemAgendarDialog({
     conflitos.length > 0
       ? `Você tem ${rotuloConflito(conflitos[0])} marcada pra ${formatDiaHora(
           conflitos[0].data_hora
-        )}${conflitos.length > 1 ? ` (e mais ${conflitos.length - 1})` : ""} — confirme antes de seguir.`
+        )}${conflitos.length > 1 ? ` (e mais ${conflitos.length - 1})` : ""}. Confirme antes de seguir.`
       : null;
 
   return (
@@ -189,7 +189,7 @@ export function JovemAgendarDialog({
                   numeros.map((x) => [
                     String(x.numero),
                     x.data
-                      ? `${x.numero}º encontro — previsto ${formatDate(x.data)}`
+                      ? `${x.numero}º encontro · previsto ${formatDate(x.data)}`
                       : `${x.numero}º encontro`,
                   ])
                 )}
@@ -201,7 +201,7 @@ export function JovemAgendarDialog({
                   {numeros.map((x) => (
                     <SelectItem key={x.numero} value={String(x.numero)}>
                       {x.data
-                        ? `${x.numero}º encontro — previsto ${formatDate(x.data)}`
+                        ? `${x.numero}º encontro · previsto ${formatDate(x.data)}`
                         : `${x.numero}º encontro`}
                     </SelectItem>
                   ))}
@@ -224,7 +224,7 @@ export function JovemAgendarDialog({
               }}
             />
             <p className="text-xs text-muted-foreground">
-              Combinem a data juntos — seu mentor é avisado da marcação.
+              Combinem a data juntos. Seu mentor é avisado da marcação.
             </p>
             {avisoConflito && (
               <p className="flex items-start gap-1.5 text-xs leading-relaxed text-[var(--warn-text)]">

@@ -89,7 +89,7 @@ export function AgendaSuaSemana({
             <li key={d.iso} className="min-w-0">
               <Link
                 href={`${baseAgenda}aba=calendario&dia=${d.iso}`}
-                aria-label={`${d.dow} ${d.diaNum}: ${resumo} — abrir o dia no calendário`}
+                aria-label={`${d.dow} ${d.diaNum}: ${resumo}. Abrir o dia no calendário`}
                 className={cn(
                   "grid h-full min-h-[68px] content-start justify-items-center gap-0.5 rounded-xl border bg-card px-1 py-2 text-center transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:min-h-[104px] md:px-2 md:py-2.5",
                   d.ehHoje && "border-foreground ring-1 ring-foreground/60"

@@ -160,12 +160,12 @@ test.describe("coordenação — fluxos operacionais", () => {
     // — combinada com restore+login+dialog isso passa dos 60s do projeto
     test.setTimeout(90_000);
     await page.goto(`/duplas/${DUPLA2_ID}`);
-    // o "Remanejar" do header é o trigger do dialog (data-slot próprio) —
-    // quando a dupla está em risco a sugestão da 115 adiciona botões com
-    // o mesmo rótulo por candidato, então role+name sozinhos não bastam
-    await page
-      .locator('button[data-slot="dialog-trigger"]', { hasText: "Remanejar" })
-      .click();
+    // REALIZA-157: "Remanejar" saiu do header pro overflow "Mais" — o
+    // menuitem abre o dialog de sempre. Quando a dupla está em risco a
+    // sugestão da 115 também cria botões "Remanejar" por candidato, mas o
+    // item do menu é único
+    await page.getByRole("button", { name: "Mais ações da dupla" }).click();
+    await page.getByRole("menuitem", { name: "Remanejar dupla" }).click();
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
 
@@ -242,10 +242,20 @@ test.describe("coordenação — fluxos operacionais", () => {
     await expect(
       page.getByText("Dupla encerrada", { exact: true })
     ).toBeVisible({ timeout: 15_000 });
-    // remanejo é de dupla viva — a encerrada não oferece o botão de novo
+    // remanejo é de dupla viva — a encerrada não oferece o gesto de novo:
+    // nem botão solto, nem item no "Mais" (que sequer renderiza se nenhum
+    // item couber no menu)
+    const mais = page.getByRole("button", { name: "Mais ações da dupla" });
+    if (await mais.isVisible().catch(() => false)) {
+      await mais.click();
+      await expect(
+        page.getByRole("menuitem", { name: /Remanejar/ })
+      ).toHaveCount(0);
+      await page.keyboard.press("Escape");
+    }
     await expect(
       page.getByRole("button", { name: "Remanejar", exact: true })
-    ).not.toBeVisible();
+    ).toHaveCount(0);
   });
 
   test("import CSV de pareamento resolve a prévia e cria a dupla", async ({

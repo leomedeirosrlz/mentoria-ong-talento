@@ -77,7 +77,7 @@ export function SugerirEspecialistaDialog({
           return;
         }
         toast.success(
-          `Sugestão registrada — ${primeiro} confirma ou ajusta na página de especialistas.`
+          `Sugestão registrada. ${primeiro} confirma ou ajusta na página de especialistas.`
         );
         setOpen(false);
         router.refresh();
@@ -117,7 +117,7 @@ export function SugerirEspecialistaDialog({
         <DialogHeader>
           <DialogTitle>Sugerir especialista pro jovem</DialogTitle>
           <DialogDescription>
-            A sugestão chega pra {primeiro} primeiro — a trilha só nasce se a
+            A sugestão chega pra {primeiro} primeiro. A trilha só nasce se a
             pessoa confirmar que faz sentido.
           </DialogDescription>
         </DialogHeader>
@@ -143,7 +143,7 @@ export function SugerirEspecialistaDialog({
               placeholder="ex.: vai concorrer a uma vaga e trava na entrevista"
             />
             <p className="text-xs text-muted-foreground">
-              Escreva como quem conversou com {primeiro} — é o que ela/ele lê
+              Escreva como quem conversou com {primeiro}: é o que ela/ele lê
               ao decidir.
             </p>
           </div>

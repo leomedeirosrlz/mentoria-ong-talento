@@ -100,7 +100,7 @@ describe("agrupaPorTurma", () => {
       EVENTOS
     );
     const grupos = agrupaPorTurma(resolvidas);
-    expect(grupos.map((g) => g.sigla)).toEqual(["T1", "T2", "—"]);
+    expect(grupos.map((g) => g.sigla)).toEqual(["T1", "T2", ""]);
     expect(grupos[0].nome).toBe("Turma 1");
     expect(grupos[1].nome).toBe("Turma 2");
     expect(grupos[2].nome).toBe("Sem turma");

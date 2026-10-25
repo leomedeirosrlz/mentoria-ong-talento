@@ -18,11 +18,16 @@ import {
 } from "@/lib/ciclo";
 import { EMAIL_ENVIO_LIBERADO } from "@/lib/email";
 import { temPapel, type Material } from "@/lib/types";
-import { FolderOpen, Info } from "@phosphor-icons/react/dist/ssr";
+import { FolderOpen } from "@phosphor-icons/react/dist/ssr";
 import { NovoMaterialDialog } from "@/components/novo-material-dialog";
 import { PainelJornada } from "@/components/painel-jornada";
 import { PageHeader } from "@/components/page-header";
 import { MateriaisBiblioteca } from "@/components/materiais-biblioteca";
+import {
+  MateriaisAbas,
+  type AbaMateriais,
+  type AbaMaterialItem,
+} from "@/components/materiais-abas";
 import { InstrumentosPrograma } from "./instrumentos-programa";
 import {
   particionarMateriais,
@@ -32,23 +37,31 @@ import {
 
 export const metadata: Metadata = { title: "Materiais" };
 
-export default async function MateriaisPage() {
+export default async function MateriaisPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ aba?: string }>;
+}) {
+  const { aba: abaParam } = await searchParams;
   const [materiais, me, eventos] = await Promise.all([
     getMateriais(),
     getMe(),
     getCicloEventos(),
   ]);
 
+  // coordenação por papel (não só o primário): o híbrido supervisor+coord
+  // vê e faz o que a RLS (has_papel) e a RPC de lote já autorizam
+  const ehCoord = temPapel(me, "coordenacao");
+
   const visiveis = materiais.filter((m) => {
     if (m.audiencia === "todos") return true;
-    if (me?.role === "coordenacao") return true;
+    if (ehCoord) return true;
     if (m.audiencia === "dpp") return temPapel(me, "mentor_dpp");
     if (m.audiencia === "especialista")
       return temPapel(me, "mentor_especialista");
     return false;
   });
 
-  const ehCoord = me?.role === "coordenacao";
   // encontro_num do material é por programa (o guia do 5º vale pras duas
   // turmas) — o teto do hub é o maior nº que existe, não a soma das linhas
   const maxEncontro = maxNumeroEncontro(eventos);
@@ -107,7 +120,7 @@ export default async function MateriaisPage() {
   // lote (o endereço em si nunca desce pro client; pro supervisor nem os
   // flags são usados — o botão não renderiza pra ele). REALIZA-194 — a
   // mesma lista de duplas alimenta o rodapé do mentor ("ficha da dupla")
-  // da seção Instrumentos do programa.
+  // da aba Instrumentos.
   const vePainel =
     me != null && (temPapel(me, "coordenacao") || temPapel(me, "supervisor"));
   const ehMentorDpp = me != null && temPapel(me, "mentor_dpp");
@@ -174,6 +187,23 @@ export default async function MateriaisPage() {
         }))
     : [];
 
+  // abas por papel: coord/supervisor abrem na Jornada; mentor e especialista
+  // abrem na Biblioteca (o acervo é o que eles mais usam)
+  const abas: AbaMaterialItem[] = [
+    ...(painel.length > 0 && me
+      ? [{ id: "jornada" as const, rotulo: "Jornada" }]
+      : []),
+    ...(veInstrumentos
+      ? [{ id: "instrumentos" as const, rotulo: "Instrumentos" }]
+      : []),
+    { id: "biblioteca" as const, rotulo: "Biblioteca" },
+  ];
+  const padrao: AbaMateriais =
+    painel.length > 0 && me ? "jornada" : "biblioteca";
+  const ativa: AbaMateriais = abas.some((a) => a.id === abaParam)
+    ? (abaParam as AbaMateriais)
+    : padrao;
+
   return (
     <div className="space-y-6">
       {/* biblioteca vazia: o CTA mora dentro do card de estado vazio, não
@@ -182,8 +212,8 @@ export default async function MateriaisPage() {
         title="Materiais"
         meta={
           ehCoord
-            ? "A biblioteca oficial do programa — publique por encontro; a trilha de cobertura mostra o que falta"
-            : "A biblioteca oficial do programa. A coordenação publica conforme a jornada avança"
+            ? "Guias, modelos e instrumentos do programa, publicados por encontro"
+            : "Guias e instrumentos do programa. A coordenação publica conforme a jornada avança"
         }
         actions={
           ehCoord && visiveis.length > 0 ? (
@@ -192,139 +222,76 @@ export default async function MateriaisPage() {
         }
       />
 
-      {/* caixa de escopo (v5c) — o "você vê / você não vê" que antes morava
-          dentro do painel sobe pro topo da página e cobre as três seções */}
-      {veInstrumentos && (
-        <p className="flex items-start gap-2.5 rounded-xl border border-border/70 border-l-4 border-l-[var(--brand-lime)] bg-card px-4 py-3 text-xs leading-relaxed text-muted-foreground shadow-[var(--shadow-border)]">
-          <Info size={16} className="mt-0.5 shrink-0" aria-hidden />
-          <span>
-            {ehCoord ? (
-              <>
-                <strong className="font-semibold text-foreground">Você vê:</strong>{" "}
-                o estado dos instrumentos em todas as duplas e a biblioteca
-                inteira.{" "}
-                <strong className="font-semibold text-foreground">
-                  Você não faz:
-                </strong>{" "}
-                preencher instrumento pelo jovem — quem entrega é o mentor; a
-                sua ação é lembrar ou enviar em lote.
-              </>
-            ) : vePainel ? (
-              <>
-                <strong className="font-semibold text-foreground">Você vê:</strong>{" "}
-                o estado de cada instrumento nas duplas que você supervisiona e
-                a biblioteca.{" "}
-                <strong className="font-semibold text-foreground">
-                  Você não vê:
-                </strong>{" "}
-                o conteúdo das respostas, nem duplas de outros supervisores.
-              </>
-            ) : (
-              <>
-                <strong className="font-semibold text-foreground">Você vê:</strong>{" "}
-                os instrumentos oficiais da jornada e a biblioteca completa.{" "}
-                <strong className="font-semibold text-foreground">
-                  Você não vê:
-                </strong>{" "}
-                jovens de outros mentores. A avaliação por terceiros chega ao
-                jovem só como consolidado anonimizado — na ficha da dupla você
-                lê as respostas identificadas.
-              </>
-            )}
-          </span>
-        </p>
-      )}
-
-      {painel.length > 0 && me && (
-        <PainelJornada
-          linhas={painel}
-          eventos={eventos}
-          nudges={nudges}
-          duplasInfo={duplasInfo}
-          meuNome={me.nome_social || me.nome}
-          ehSupervisor={!temPapel(me, "coordenacao")}
-        />
-      )}
-
-      {/* mentor: o acervo dele é o conteúdo útil da página — vem antes do
-          catálogo de instrumentos (renderizado depois do bloco abaixo);
-          coord/supervisor veem a régua primeiro porque é dela que sai a
-          ação (decisão do plano v5c) */}
-      {veInstrumentos && papelInstrumentos !== "mentor" && (
-        <InstrumentosPrograma
-          papel={papelInstrumentos}
-          linhas={painel}
-          eventos={eventos}
-          duplasInfo={duplasInfo}
-          formIds={formIds}
-          envioLiberado={EMAIL_ENVIO_LIBERADO}
-          fichasMentor={fichasMentor}
-        />
-      )}
-
-      {visiveis.length === 0 ? (
-        <div className="flex flex-col items-center gap-1.5 rounded-xl bg-card px-5 py-10 text-center shadow-[var(--shadow-border)]">
-          <span className="grid size-11 place-items-center rounded-full bg-muted text-muted-foreground">
-            <FolderOpen size={18} aria-hidden />
-          </span>
-          <p className="text-sm font-medium">
-            {ehCoord ? "Nenhum material publicado ainda" : "Nenhum material disponível para o seu perfil"}
-          </p>
-          <p className="text-sm text-muted-foreground">
-            {ehCoord
-              ? "Publique o primeiro guia, modelo ou instrumento do programa."
-              : "Os guias e instrumentos do programa aparecem aqui quando a coordenação publicar."}
-          </p>
-          <div className="mt-3">
-            {ehCoord ? (
-              <NovoMaterialDialog maxEncontro={maxEncontro} />
-            ) : (
-              <Link
-                href="/agenda"
-                className="inline-flex min-h-11 items-center text-sm font-medium underline underline-offset-2 transition-colors hover:text-muted-foreground sm:min-h-8"
-              >
-                Ver a agenda
-              </Link>
-            )}
+      <MateriaisAbas abas={abas} ativa={ativa}>
+        {ativa === "jornada" && me && painel.length > 0 ? (
+          <PainelJornada
+            linhas={painel}
+            eventos={eventos}
+            nudges={nudges}
+            duplasInfo={duplasInfo}
+            meuNome={me.nome_social || me.nome}
+            ehSupervisor={!ehCoord}
+          />
+        ) : ativa === "instrumentos" && veInstrumentos ? (
+          <InstrumentosPrograma
+            papel={papelInstrumentos}
+            linhas={painel}
+            eventos={eventos}
+            duplasInfo={duplasInfo}
+            formIds={formIds}
+            envioLiberado={EMAIL_ENVIO_LIBERADO}
+            fichasMentor={fichasMentor}
+          />
+        ) : visiveis.length === 0 ? (
+          <div className="flex flex-col items-center gap-1.5 rounded-xl bg-card px-5 py-10 text-center shadow-[var(--shadow-border)]">
+            <span className="grid size-11 place-items-center rounded-full bg-muted text-muted-foreground">
+              <FolderOpen size={18} aria-hidden />
+            </span>
+            <p className="text-sm font-medium">
+              {ehCoord
+                ? "Nenhum material publicado ainda"
+                : "Nenhum material disponível para o seu perfil"}
+            </p>
+            <p className="text-sm text-muted-foreground">
+              {ehCoord
+                ? "Publique o primeiro guia, modelo ou instrumento do programa."
+                : "Os guias e instrumentos do programa aparecem aqui quando a coordenação publicar."}
+            </p>
+            <div className="mt-3">
+              {ehCoord ? (
+                <NovoMaterialDialog maxEncontro={maxEncontro} />
+              ) : (
+                <Link
+                  href="/agenda"
+                  className="inline-flex min-h-11 items-center text-sm font-medium underline underline-offset-2 transition-colors hover:text-muted-foreground sm:min-h-8"
+                >
+                  Ver a agenda
+                </Link>
+              )}
+            </div>
           </div>
-        </div>
-      ) : (
-        /* hub por encontro (REALIZA-173) com cara de dashboard (REALIZA-184):
-           a trilha de cobertura responde "o que falta" num olhar e ancora no
-           <details> do encontro; chips filtram por audiência/tipo sem reload.
-           Mentor/especialista veem a mesma estrutura em leitura —
-           MaterialActions e NovoMaterialDialog só renderizam pra coord */
-        <MateriaisBiblioteca
-          stats={stats}
-          encontros={nums.map((n) => ({
-            n,
-            titulo: titulos.get(n),
-            itens: porEncontro.get(n) ?? [],
-          }))}
-          transversais={transversais}
-          ehCoord={ehCoord}
-          maxEncontro={maxEncontro}
-          encontroAtual={encontroAtual}
-          mobile={mobile}
-          guiaPapel={
-            ehMentorDpp ? "mentor" : vePainel ? "staff" : null
-          }
-        />
-      )}
-
-      {/* mentor: catálogo por último — o acervo é o conteúdo útil pra ele;
-          os cards linkam pra seção de instrumentos da ficha de cada dupla */}
-      {veInstrumentos && papelInstrumentos === "mentor" && (
-        <InstrumentosPrograma
-          papel={papelInstrumentos}
-          linhas={painel}
-          eventos={eventos}
-          duplasInfo={duplasInfo}
-          formIds={formIds}
-          envioLiberado={EMAIL_ENVIO_LIBERADO}
-          fichasMentor={fichasMentor}
-        />
-      )}
+        ) : (
+          /* hub por encontro (REALIZA-173) com cara de dashboard (REALIZA-184):
+             a trilha de cobertura responde "o que falta" num olhar e ancora no
+             <details> do encontro; chips filtram por audiência/tipo sem reload.
+             Mentor/especialista veem a mesma estrutura em leitura —
+             MaterialActions e NovoMaterialDialog só renderizam pra coord */
+          <MateriaisBiblioteca
+            stats={stats}
+            encontros={nums.map((n) => ({
+              n,
+              titulo: titulos.get(n),
+              itens: porEncontro.get(n) ?? [],
+            }))}
+            transversais={transversais}
+            ehCoord={ehCoord}
+            maxEncontro={maxEncontro}
+            encontroAtual={encontroAtual}
+            mobile={mobile}
+            guiaPapel={ehMentorDpp ? "mentor" : vePainel ? "staff" : null}
+          />
+        )}
+      </MateriaisAbas>
     </div>
   );
 }

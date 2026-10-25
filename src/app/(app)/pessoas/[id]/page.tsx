@@ -574,8 +574,8 @@ export default async function PessoaPerfilPage({
           experiência e formação externa vão como linhas secundárias */}
       {mp && ehStaff && (
         <section className="rounded-xl bg-card px-4 py-4 shadow-[var(--shadow-border)] sm:px-5">
-          <h2 className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-            <Handshake size={15} aria-hidden className="shrink-0" />
+          <h2 className="flex items-center gap-2 text-base font-semibold">
+            <Handshake size={15} aria-hidden className="shrink-0 text-muted-foreground" />
             {ehMentorHibrido
               ? "Mentoria"
               : trilhasMentor[0] === "especialista"
@@ -691,12 +691,12 @@ export default async function PessoaPerfilPage({
               redes; o link de LinkedIn subiu pros chips de contato */}
           {perfilPro && temPerfilPro && (
             <section className="rounded-xl bg-card p-4 text-sm shadow-[var(--shadow-border)] sm:p-5">
-              <h2 className="flex items-center gap-1.5 text-sm font-semibold">
+              <h2 className="flex items-center gap-2 text-base font-semibold">
                 <User size={15} aria-hidden className="shrink-0 text-muted-foreground" />
                 Sobre
               </h2>
               {perfilPro.bio && (
-                <p className="mt-2 whitespace-pre-wrap break-words">
+                <p className="mt-3 whitespace-pre-wrap break-words">
                   {perfilPro.bio}
                 </p>
               )}
@@ -1022,7 +1022,7 @@ export default async function PessoaPerfilPage({
               o que mostrar */}
           {(souCoord || perfil.duplas.length > 0) && (
             <section className="rounded-xl bg-card p-4 text-sm shadow-[var(--shadow-border)] sm:p-5">
-              <h2 className="flex items-center gap-1.5 text-sm font-semibold">
+              <h2 className="flex items-center gap-2 text-base font-semibold">
                 <DuplaIcone />
                 Duplas
               </h2>
@@ -1146,13 +1146,13 @@ export default async function PessoaPerfilPage({
               pra escrever (ficha de colega) */}
           {(podeAnotar || notas.length > 0) && (
             <section className="rounded-xl bg-card p-4 shadow-[var(--shadow-border)] sm:p-5">
-              <h2 className="mb-3 flex items-center gap-1.5 text-sm font-semibold">
+              <h2 className="mb-3 flex items-center gap-2 text-base font-semibold">
                 <NotePencil size={15} aria-hidden className="shrink-0 text-muted-foreground" />
                 Notas
                 <LockSimple
                   size={13}
                   role="img"
-                  aria-label="Privadas — só você vê"
+                  aria-label="Privadas: só você vê"
                   className="text-muted-foreground"
                 />
               </h2>

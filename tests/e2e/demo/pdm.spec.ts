@@ -19,7 +19,8 @@ test.describe("demo — PDM vivo (REALIZA-181)", () => {
     page,
   }) => {
     await entrarNaDemo(page, "mentor_dpp");
-    await page.goto(`/duplas/${DUPLA_OK}`);
+    // o PDM vivo mora na aba Instrumentos da ficha (?aba=instrumentos)
+    await page.goto(`/duplas/${DUPLA_OK}?aba=instrumentos`);
 
     const secao = page.locator(SECAO);
     await expect(
@@ -73,7 +74,7 @@ test.describe("demo — PDM vivo (REALIZA-181)", () => {
       hasText: "meta descartada",
     });
     await expect(
-      historico.getByText(/1 meta descartada — fora do plano/)
+      historico.getByText(/1 meta descartada · fora do plano/)
     ).toBeVisible();
     await historico.locator("summary").click();
     await expect(
@@ -169,7 +170,7 @@ test.describe("demo — PDM vivo (REALIZA-181)", () => {
     page,
   }) => {
     await entrarNaDemo(page, "coordenacao");
-    await page.goto(`/duplas/${DUPLA_OK}`);
+    await page.goto(`/duplas/${DUPLA_OK}?aba=instrumentos`);
 
     const secao = page.locator(SECAO);
     await expect(
@@ -179,7 +180,7 @@ test.describe("demo — PDM vivo (REALIZA-181)", () => {
       secao.getByText("30 min de exercícios toda terça e quinta")
     ).toBeVisible();
     await expect(
-      secao.getByText(/1 meta descartada — fora do plano/)
+      secao.getByText(/1 meta descartada · fora do plano/)
     ).toBeVisible();
 
     await expect(secao.getByRole("checkbox")).toHaveCount(0);
@@ -207,7 +208,7 @@ test.describe("demo — PDM vivo (REALIZA-181)", () => {
     page,
   }) => {
     await entrarNaDemo(page, "coordenacao");
-    await page.goto(`/duplas/${DUPLA_RISCO}`);
+    await page.goto(`/duplas/${DUPLA_RISCO}?aba=instrumentos`);
 
     const secao = page.locator(SECAO);
     await expect(

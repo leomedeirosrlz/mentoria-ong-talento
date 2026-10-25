@@ -108,8 +108,10 @@ test.describe("agenda da coordenação — monitoramento e lembrete real (WP5/D5
     await expect(
       page.getByRole("heading", { name: "Agenda do programa" })
     ).toBeVisible();
+    // a postura da página virou a linha da semana (redesign sem parágrafo
+    // explicativo): "Semana N · D a D de Mês · hoje, {dia da semana}"
     await expect(
-      page.getByText("Monitoramento — a agenda de cada dupla é da dupla")
+      page.getByText(/Semana \d+ · \d+ a \d+ de .+ · hoje,/)
     ).toBeVisible();
 
     // abas links role=tab — Monitoramento selecionado por default

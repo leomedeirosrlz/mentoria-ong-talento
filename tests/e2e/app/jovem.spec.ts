@@ -178,12 +178,13 @@ test.describe("mentorado — shell /jovem", () => {
     page,
   }) => {
     await page.goto("/jovem");
+    // o hero "Seu próximo encontro" (redesign) é o card de abertura — a
+    // home mostra só o PRÓXIMO encontro (futuros[0]); em run paralelo a
+    // trilha esp ou outro spec pode pôr um mais perto, então o assert é
+    // "o card de próximo existe", não "é o nº 8"
     const encontros = page.locator(
-      'section[aria-labelledby="encontros-titulo"]'
+      'section[aria-labelledby="proximo-titulo"]'
     );
-    // a home mostra só o PRÓXIMO encontro (futuros[0]) — em run paralelo a
-    // trilha esp ou outro spec pode pôr um mais perto; o assert é "o card de
-    // próximo existe", não "é o nº 8"
     await expect(encontros.getByText(/\d+º encontro/)).toBeVisible();
 
     const docs = page.locator('section[aria-labelledby="docs-titulo"]');

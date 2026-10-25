@@ -76,7 +76,7 @@ export function MatchingPanel({
   return (
     <section className="space-y-3 rounded-xl bg-card px-4 py-3.5 shadow-[var(--shadow-border)] sm:px-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+        <h2 className="text-base font-semibold">
           Parear
         </h2>
         <NovaDuplaDialog />
@@ -150,7 +150,7 @@ export function MatchingPanel({
               </Select>
               {comVaga.length === 0 && (
                 <p className="text-xs text-muted-foreground">
-                  Todos os mentores estão sem vaga — aumente a capacidade de
+                  Todos os mentores estão sem vaga. Aumente a capacidade de
                   um deles pra parear.
                 </p>
               )}

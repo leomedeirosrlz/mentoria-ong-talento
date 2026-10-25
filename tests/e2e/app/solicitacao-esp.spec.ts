@@ -206,12 +206,15 @@ test.describe("solicitação de especialista v2 — fluxo staff (REALIZA-112)", 
     ).toBeVisible();
     await expect(mural(page).getByText(DEMANDA_EXPIRADA)).toHaveCount(0);
 
-    // ficha DPP do autor: o chip conta o que houve, sem rail de negociação
+    // ficha DPP do autor: o chip conta o que houve (header, toda aba), sem
+    // rail de negociação — o card "Mentor especialista" só nasce com
+    // pedido em aberto dentro de "Pedidos em aberto"
     await relogar(page, MENTOR_EMAIL, SENHA);
     await page.goto(`/duplas/${IDS.dupla}`);
     await expect(page.getByText("Horário expirado")).toBeVisible();
+    await expect(page.getByText("Mentor especialista")).toHaveCount(0);
     await expect(
-      page.getByRole("heading", { name: "Pedido de especialista", exact: true })
+      page.getByRole("button", { name: /^Aceitar / })
     ).toHaveCount(0);
   });
 
@@ -229,7 +232,8 @@ test.describe("solicitação de especialista v2 — fluxo staff (REALIZA-112)", 
       name: "Solicitar mentor especialista",
     });
     await agirComConfirma(
-      () => page.getByRole("button", { name: "Mais" }).click(),
+      () =>
+        page.getByRole("button", { name: "Mais ações da dupla" }).click(),
       () => item.isVisible()
     );
     const dialog = page.getByRole("dialog");
@@ -465,13 +469,11 @@ test.describe("solicitação de especialista v2 — fluxo staff (REALIZA-112)", 
     // a última proposta da mesa é do especialista
     await relogar(page, COORD_EMAIL, SENHA_COORD);
     await page.goto(`/duplas/${IDS.dupla2}`);
-    const rail = page.locator("section", {
-      has: page.getByRole("heading", {
-        name: "Pedido de especialista",
-        exact: true,
-      }),
-    });
+    // o rail virou o card "Mentor especialista" dentro de "Pedidos em
+    // aberto" (aba Agora) — mesma mesa de propostas, outra moldura
+    const rail = page.locator('section[aria-labelledby="pedidos-abertos"]');
     await expect(rail).toBeVisible();
+    await expect(rail.getByText("Mentor especialista")).toBeVisible();
     await agirComConfirma(
       () => rail.getByRole("button", { name: /^Aceitar / }).click(),
       async () => {

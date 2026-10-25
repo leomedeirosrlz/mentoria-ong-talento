@@ -30,7 +30,7 @@ export async function generateMetadata({
   const jovem = r?.kind === "ok" ? r.info.alvo?.jovem_nome : null;
   const titulo = "Como foi o encontro?";
   const descricao =
-    "Sua avaliação ajuda a mentoria a melhorar — leva menos de 1 minuto.";
+    "Sua avaliação ajuda a mentoria a melhorar. Leva menos de 1 minuto.";
   return {
     title: jovem ? `${titulo} · ${jovem.split(/\s+/)[0]}` : titulo,
     description: descricao,
@@ -120,7 +120,7 @@ export default async function AvaliarTokenPage({
                 ) : (
                   "quem recebeu este link"
                 )}
-                . Saia da conta atual e abra o link de novo — ou responda
+                . Saia da conta atual e abra o link de novo, ou responda
                 pela sua página quando entrar.
               </p>
             </EstadoCard>
@@ -132,7 +132,7 @@ export default async function AvaliarTokenPage({
             >
               <p>
                 O prazo pra avaliar este encontro terminou. Peça um novo
-                link à equipe Realiza.vc — sua opinião continua valendo.
+                link à equipe Realiza.vc. Sua opinião continua valendo.
               </p>
             </EstadoCard>
           ) : (

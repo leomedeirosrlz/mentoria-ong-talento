@@ -474,7 +474,7 @@ export function NovaDuplaDialog() {
               >
                 <p className="font-medium">
                   {mentorSelObj.nome.split(" ")[0]} está sem vaga
-                  {ehEsp ? " de especialista" : ""} — já cuida
+                  {ehEsp ? " de especialista" : ""}: já cuida
                   de {usoSel}/{capSel}{" "}
                   {capSel === 1 ? "dupla" : "duplas"}.
                 </p>
@@ -677,7 +677,7 @@ export function NovaDuplaDialog() {
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
-                O calendário oficial que a dupla segue — datas e o semáforo saem dele.
+                O calendário oficial que a dupla segue: datas e a situação saem dele.
               </p>
             </div>
           )}

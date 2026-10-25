@@ -225,10 +225,14 @@ test.describe("WP6-R2 — encaixa, autor da sugestão e CTA de triagem", () => {
 
     await page.goto("/jovem");
     const card = cardHome(page);
+    // o card inteiro é o link — título "1 sugestão esperando você", sub
+    // com o primeiro nome do autor resolvido via jovem_contatos
     await expect(
-      card.getByText("Sugestão esperando sua resposta")
+      card.getByText("1 sugestão esperando você")
     ).toBeVisible();
-    await expect(card.getByText(/Otávio sugeriu/)).toBeVisible();
+    await expect(
+      card.getByText(/Otávio sugeriu um especialista pra você/)
+    ).toBeVisible();
 
     await page.goto("/jovem/especialistas");
     const sugestoes = page.locator(
@@ -258,13 +262,20 @@ test.describe("WP6-R2 — encaixa, autor da sugestão e CTA de triagem", () => {
     });
 
     await loginComSenha(page, JOVEM2_EMAIL, SENHA);
+    // home: a seção de especialistas só abre com ação — pedido em triagem
+    // não gera card; a linha honesta "com a coordenação" mora na mesa de
+    // pedidos da página
     await page.goto("/jovem");
-    const card = cardHome(page);
+    await expect(cardHome(page)).toHaveCount(0);
+    await page.goto("/jovem/especialistas");
+    const item = secaoPedidos(page).locator("li").first();
     await expect(
-      card.getByText("Seu pedido está em triagem")
+      item.getByText("A coordenação tá olhando seu pedido antes de liberar.")
     ).toBeVisible();
     await expect(
-      card.getByRole("link", { name: "Ver meu pedido" })
-    ).toHaveAttribute("href", "/jovem/especialistas#pedidos");
+      item.getByText(
+        "A coordenação libera o pedido pra ele chegar aos especialistas."
+      )
+    ).toBeVisible();
   });
 });

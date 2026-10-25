@@ -27,12 +27,12 @@ export function InstrumentosSistemaLista({
     <section aria-labelledby="sec-instrumentos-sistema">
       <h2
         id="sec-instrumentos-sistema"
-        className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground"
+        className="text-base font-semibold"
       >
         Instrumentos do sistema
       </h2>
       <p className="mt-1 text-sm text-muted-foreground">
-        Catálogo oficial do programa — as perguntas vêm do guia e não são
+        Catálogo oficial do programa: as perguntas vêm do guia e não são
         editáveis. Links e respostas ficam dentro de cada instrumento.
       </p>
       <ul className="mt-3 space-y-2">
@@ -102,8 +102,8 @@ export function InstrumentosSistemaLista({
       {/* a régua saiu daqui de propósito — a nota aponta a casa nova em vez
           de deixar a coord procurando os instrumentos da jornada */}
       <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
-        Visão, Metas, PDM, Roda da Vida e Avaliação 360º — os instrumentos
-        da jornada — ficam em{" "}
+        Visão, Metas, PDM, Roda da Vida e Avaliação 360º, os instrumentos
+        da jornada, ficam em{" "}
         <Link
           href="/materiais"
           className="font-medium underline underline-offset-2 hover:text-foreground"

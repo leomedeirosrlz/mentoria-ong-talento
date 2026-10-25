@@ -5,12 +5,13 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import {
   ArrowRight,
+  CaretDown,
   CheckCircle,
   HandHeart,
   MagnifyingGlass,
 } from "@phosphor-icons/react";
 import { formatDate, rotuloSlot } from "@/lib/ciclo";
-import { ERRO_JA_ACEITA } from "@/lib/utils";
+import { cn, ERRO_JA_ACEITA } from "@/lib/utils";
 import type {
   SolicitacaoEspecialista,
   SolicitacaoProposta,
@@ -124,189 +125,212 @@ export function DemandasEspecialista({
     router.refresh();
   };
 
+  const resumo =
+    aceitas.length > 0
+      ? `${aceitas.length} ${aceitas.length === 1 ? "sessão confirmada" : "sessões confirmadas"}`
+      : null;
+
+  // recolhido por padrão: o mural é trabalho do especialista, a coordenação
+  // e o supervisor só abrem quando precisam. O contador no título resume
   return (
-    <section aria-label="Pedidos de mentoria especializada" className="space-y-3">
-      <h2 className="flex items-center gap-2 text-lg font-semibold tracking-tight">
-        <HandHeart aria-hidden className="size-5 text-muted-foreground" />
-        Pedidos de especialista
-      </h2>
-
-      {/* a busca é o filtro principal — demanda/motivo são texto livre, então
-          chip algum descreve o mural melhor do que o que o especialista
-          digitou. Os chips são atalhos honestos: as próprias áreas dele. */}
-      {emAberto.length > 0 && (
-        <div className="space-y-2">
-          <div className="relative">
-            <MagnifyingGlass
-              aria-hidden
-              size={15}
-              className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground"
-            />
-            <Input
-              value={busca}
-              onChange={(e) => setBusca(e.currentTarget.value)}
-              placeholder="Buscar por jovem, demanda ou motivo…"
-              aria-label="Buscar pedidos"
-              className="pl-8"
-            />
-          </div>
-          {areas.length > 0 && (
-            <div
-              role="group"
-              aria-label="Filtrar pedidos"
-              className="flex flex-wrap gap-1.5"
-            >
-              <button
-                type="button"
-                onClick={() => setFiltro("todos")}
-                className={filterChipCls(filtro === "todos")}
-              >
-                Todos
-              </button>
-              <button
-                type="button"
-                onClick={() => setFiltro("combina")}
-                className={filterChipCls(filtro === "combina")}
-              >
-                Combina com você
-              </button>
-              {areas.map((a) => (
-                <button
-                  key={a}
-                  type="button"
-                  onClick={() => setFiltro(a)}
-                  className={filterChipCls(filtro === a)}
-                >
-                  {a}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {emAberto.length === 0 && aceitas.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center gap-2 py-8 text-center">
-            <span className="grid size-11 place-items-center rounded-full bg-muted text-muted-foreground">
-              <HandHeart aria-hidden size={18} />
+    <section aria-label="Pedidos de mentoria especializada">
+      <details id="mural-especialista" className="group scroll-mt-20">
+        <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 rounded-lg py-2 pr-1 outline-none focus-visible:ring-3 focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden">
+          <h2 className="text-base font-semibold">
+            Pedidos de especialista{" "}
+            <span className="text-sm font-normal tabular-nums text-muted-foreground">
+              ({emAberto.length})
             </span>
-            <p className="text-sm text-muted-foreground">
-              Nenhum pedido aberto no momento.
-            </p>
-          </CardContent>
-        </Card>
-      ) : emAberto.length > 0 && visiveis.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          Nenhum pedido bate com a busca — limpa o filtro pra ver o mural
-          inteiro.
-        </p>
-      ) : (
-        <ul className="space-y-3">
-          {visiveis.map((s) => {
-            const praMim = s.especialista_desejado_id === meuId;
-            const negociando =
-              (s.status_efetivo ?? s.status) === "contra_proposta";
-            const tomada = tomadas.has(s.id);
-            return (
-              <li key={s.id}>
-                <Card>
-                  <CardContent className="space-y-3 py-4">
-                    <div className="min-w-0 space-y-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-medium">
-                          {/* nome vem sempre — a view solicitacoes_mural dá
-                              mentorado_nome no escopo do papel */}
-                          {s.mentorado?.nome}
-                        </span>
-                        {praMim && (
-                          <Badge
-                            variant="outline"
-                            className="border-[var(--warn)]/60 text-[var(--warn-text)]"
-                          >
-                            Direcionada a você
-                          </Badge>
-                        )}
-                        {s.origem === "jovem" && (
-                          <Badge variant="secondary">pedido do jovem</Badge>
-                        )}
-                        {negociando && (
-                          <Badge variant="secondary">em negociação</Badge>
-                        )}
-                      </div>
-                      {(s.demanda ?? s.motivo) && (
-                        <p className="text-sm">{s.demanda ?? s.motivo}</p>
-                      )}
-                      <p className="text-xs text-muted-foreground">
-                        Solicitado por {s.solicitante?.nome ?? "—"} ·{" "}
-                        {formatDate(s.created_at)}
-                      </p>
-                    </div>
-                    {/* a corrida de aceite termina no servidor — quando a RPC
-                        responde "não está mais aberta", o card fica honesto e
-                        sem ações até o refresh tirá-lo do mural */}
-                    {tomada ? (
-                      <p className="text-sm text-muted-foreground">
-                        Já foi aceita por outro especialista.
-                      </p>
-                    ) : (
-                      <SolicitacaoNegociacao
-                        s={s}
-                        propostas={propostas[s.id] ?? []}
-                        slots={slots}
-                        meuId={meuId}
-                        papel="mentor_especialista"
-                        mentoradosProprios={mentoradosProprios}
-                        onAceito={(duplaId) => {
-                          if (duplaId) router.push(`/duplas/${duplaId}`);
-                        }}
-                        onErro={marcarTomada(s.id)}
-                      />
-                    )}
-                  </CardContent>
-                </Card>
-              </li>
-            );
-          })}
-        </ul>
-      )}
-
-      {aceitas.length > 0 && (
-        <Card>
-          <CardContent className="space-y-1 py-4">
-            <p className="pb-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-              Sessões confirmadas
-            </p>
-            <ul className="divide-y divide-border/60">
-              {aceitas.slice(0, 3).map((s) => (
-                <li key={s.id} className="py-2 first:pt-0 last:pb-0">
-                  <Link
-                    href={s.dupla_id ? `/duplas/${s.dupla_id}` : "/agenda"}
-                    className="group flex items-center gap-2 text-sm"
+          </h2>
+          {resumo && <span className="ms-auto truncate text-xs text-muted-foreground">{resumo}</span>}
+          <CaretDown
+            size={14}
+            aria-hidden
+            className={cn(
+              "shrink-0 text-muted-foreground transition-transform duration-200 group-open:rotate-180",
+              !resumo && "ms-auto"
+            )}
+          />
+        </summary>
+        <div className="mt-3 space-y-3">
+        {/* a busca é o filtro principal — demanda/motivo são texto livre, então
+            chip algum descreve o mural melhor do que o que o especialista
+            digitou. Os chips são atalhos honestos: as próprias áreas dele. */}
+        {emAberto.length > 0 && (
+          <div className="space-y-2">
+            <div className="relative">
+              <MagnifyingGlass
+                aria-hidden
+                size={15}
+                className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground"
+              />
+              <Input
+                value={busca}
+                onChange={(e) => setBusca(e.currentTarget.value)}
+                placeholder="Buscar por jovem, demanda ou motivo…"
+                aria-label="Buscar pedidos"
+                className="pl-8"
+              />
+            </div>
+            {areas.length > 0 && (
+              <div
+                role="group"
+                aria-label="Filtrar pedidos"
+                className="flex flex-wrap gap-1.5"
+              >
+                <button
+                  type="button"
+                  onClick={() => setFiltro("todos")}
+                  className={filterChipCls(filtro === "todos")}
+                >
+                  Todos
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFiltro("combina")}
+                  className={filterChipCls(filtro === "combina")}
+                >
+                  Combina com você
+                </button>
+                {areas.map((a) => (
+                  <button
+                    key={a}
+                    type="button"
+                    onClick={() => setFiltro(a)}
+                    className={filterChipCls(filtro === a)}
                   >
-                    <CheckCircle
-                      aria-hidden
-                      size={15}
-                      className="shrink-0 text-[var(--ok-text)]"
-                    />
-                    <span className="min-w-0 flex-1">
-                      Sessão com {s.mentorado?.nome ?? "o jovem"}
-                      {s.slot_proposto
-                        ? ` · ${rotuloSlot(s.slot_proposto)}`
-                        : ""}
-                    </span>
-                    <ArrowRight
-                      aria-hidden
-                      size={14}
-                      className="shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5"
-                    />
-                  </Link>
+                    {a}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {emAberto.length === 0 && aceitas.length === 0 ? (
+          <Card>
+            <CardContent className="flex flex-col items-center gap-2 py-8 text-center">
+              <span className="grid size-11 place-items-center rounded-full bg-muted text-muted-foreground">
+                <HandHeart aria-hidden size={18} />
+              </span>
+              <p className="text-sm text-muted-foreground">
+                Nenhum pedido aberto no momento.
+              </p>
+            </CardContent>
+          </Card>
+        ) : emAberto.length > 0 && visiveis.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            Nenhum pedido bate com a busca. Limpa o filtro pra ver o mural
+            inteiro.
+          </p>
+        ) : (
+          <ul className="space-y-3">
+            {visiveis.map((s) => {
+              const praMim = s.especialista_desejado_id === meuId;
+              const negociando =
+                (s.status_efetivo ?? s.status) === "contra_proposta";
+              const tomada = tomadas.has(s.id);
+              return (
+                <li key={s.id}>
+                  <Card>
+                    <CardContent className="space-y-3 py-4">
+                      <div className="min-w-0 space-y-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-medium">
+                            {/* nome vem sempre — a view solicitacoes_mural dá
+                                mentorado_nome no escopo do papel */}
+                            {s.mentorado?.nome}
+                          </span>
+                          {praMim && (
+                            <Badge
+                              variant="outline"
+                              className="border-[var(--warn)]/60 text-[var(--warn-text)]"
+                            >
+                              Direcionada a você
+                            </Badge>
+                          )}
+                          {s.origem === "jovem" && (
+                            <Badge variant="secondary">pedido do jovem</Badge>
+                          )}
+                          {negociando && (
+                            <Badge variant="secondary">em negociação</Badge>
+                          )}
+                        </div>
+                        {(s.demanda ?? s.motivo) && (
+                          <p className="text-sm">{s.demanda ?? s.motivo}</p>
+                        )}
+                        <p className="text-xs text-muted-foreground">
+                          Solicitado por {s.solicitante?.nome ?? "—"} ·{" "}
+                          {formatDate(s.created_at)}
+                        </p>
+                      </div>
+                      {/* a corrida de aceite termina no servidor — quando a RPC
+                          responde "não está mais aberta", o card fica honesto e
+                          sem ações até o refresh tirá-lo do mural */}
+                      {tomada ? (
+                        <p className="text-sm text-muted-foreground">
+                          Já foi aceita por outro especialista.
+                        </p>
+                      ) : (
+                        <SolicitacaoNegociacao
+                          s={s}
+                          propostas={propostas[s.id] ?? []}
+                          slots={slots}
+                          meuId={meuId}
+                          papel="mentor_especialista"
+                          mentoradosProprios={mentoradosProprios}
+                          onAceito={(duplaId) => {
+                            if (duplaId) router.push(`/duplas/${duplaId}`);
+                          }}
+                          onErro={marcarTomada(s.id)}
+                        />
+                      )}
+                    </CardContent>
+                  </Card>
                 </li>
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
-      )}
+              );
+            })}
+          </ul>
+        )}
+
+        {aceitas.length > 0 && (
+          <Card>
+            <CardContent className="space-y-1 py-4">
+              <p className="pb-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                Sessões confirmadas
+              </p>
+              <ul className="divide-y divide-border/60">
+                {aceitas.slice(0, 3).map((s) => (
+                  <li key={s.id} className="py-2 first:pt-0 last:pb-0">
+                    <Link
+                      href={s.dupla_id ? `/duplas/${s.dupla_id}` : "/agenda"}
+                      className="group flex items-center gap-2 text-sm"
+                    >
+                      <CheckCircle
+                        aria-hidden
+                        size={15}
+                        className="shrink-0 text-[var(--ok-text)]"
+                      />
+                      <span className="min-w-0 flex-1">
+                        Sessão com {s.mentorado?.nome ?? "o jovem"}
+                        {s.slot_proposto
+                          ? ` · ${rotuloSlot(s.slot_proposto)}`
+                          : ""}
+                      </span>
+                      <ArrowRight
+                        aria-hidden
+                        size={14}
+                        className="shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5"
+                      />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
+        )}
+        </div>
+      </details>
     </section>
   );
 }

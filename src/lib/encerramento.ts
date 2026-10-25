@@ -216,7 +216,7 @@ export function textoResumoJornada(r: ResumoJornada): string {
     for (const m of r.pdm.atingidasLista) {
       linhas.push(
         `· ${m.titulo}` +
-          (m.atingidaEm ? ` — atingida em ${formatDate(m.atingidaEm)}` : "")
+          (m.atingidaEm ? ` (atingida em ${formatDate(m.atingidaEm)})` : "")
       );
     }
   }

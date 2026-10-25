@@ -292,11 +292,11 @@ export function itensConsolidados(
         inicio: iso,
         tipo: esp ? "sessao_esp" : "encontro",
         titulo: esp
-          ? `${nomeJovem} × ${mentorNome}${d.demanda ? ` — ${d.demanda}` : ""}`
+          ? `${nomeJovem} × ${mentorNome}${d.demanda ? `: ${d.demanda}` : ""}`
           : `${nomeJovem} com ${mentor1 || "mentor"}`,
         detalhe: esp
           ? `Trilha de especialista · sessão ${passoEsp(e, d.encontros)} de ${TRILHA_LEN.especialista}`
-          : `Encontro ${e.numero} · ${turmaCurta(d.turma)}`,
+          : `Encontro ${e.numero} · ${turmaLonga(d.turma)}`,
         convidado: esp,
         duplaId: d.id,
         pill: esp ? "Esp" : turmaCurta(d.turma),
@@ -363,8 +363,8 @@ export function itensConsolidados(
         diaKey: vig.data,
         inicio: vig.data,
         tipo: "a_agendar",
-        titulo: nova ? `enc. ${vig.numero} — dupla nova, a agendar` : `enc. ${vig.numero} a agendar`,
-        detalhe: `${nome1} com ${d.mentor?.nome ?? "mentor"} · ${turmaCurta(d.turma)}`,
+        titulo: nova ? `Encontro ${vig.numero}: dupla nova, a agendar` : `Encontro ${vig.numero} a agendar`,
+        detalhe: `${nome1} com ${d.mentor?.nome ?? "mentor"} · ${turmaLonga(d.turma)}`,
         convidado: false,
         duplaId: d.id,
         pill: turmaCurta(d.turma),
@@ -401,8 +401,9 @@ export function contextoDuplaAux(
   if (dupla.status !== "ativa")
     return { texto: saude.motivo, problema: false };
 
-  const turma = turmaCurta(dupla.turma);
-  const tag = (n: number) => `Encontro ${n}${turma ? ` · ${turma}` : ""}`;
+  const turma = turmaLonga(dupla.turma);
+  const turmaDa = turma ? ` da ${turma}` : "";
+  const tag = (n: number) => `Encontro ${n}${turmaDa}`;
   const agoraMs = hoje.getTime();
   const vig = eventoDaSemana(evs, hoje);
   const pend = pendenciaDeRegistro(dupla, agoraMs);
@@ -417,24 +418,24 @@ export function contextoDuplaAux(
       ? `O ${p.numero}º agendado passou sem registro.`
       : `Registro do encontro ${p.numero} pendente.`;
 
-  // atraso domina a linha — "Encontros 3 e 4 · T2 atrasados (2 encontros)"
+  // atraso domina a linha — "Encontros 3 e 4 da Turma 2 atrasados (2 encontros)"
   if (atraso > 0) {
     const falt = encontrosFaltantes(dupla, evs, hoje);
     const nums = falt.length === atraso ? falt : [];
     const lead =
       atraso === 1
         ? `${tag(nums[0] ?? falt[0] ?? vig?.numero ?? saude.esperado)} atrasado`
-        : `Encontros ${juntaNums(nums)}${turma ? ` · ${turma}` : ""} atrasados`;
+        : `Encontros ${juntaNums(nums)}${turmaDa} atrasados`;
     const tail =
       pend?.status === "agendado"
-        ? `o ${pend.numero}º agendado já passou sem registro`
+        ? `O ${pend.numero}º agendado já passou sem registro`
         : prox?.data_hora
-          ? `o ${prox.numero}º está agendado para ${quandoTxt(prox.data_hora, hoje)}`
+          ? `O ${prox.numero}º está agendado para ${quandoTxt(prox.data_hora, hoje)}`
           : vig?.numero != null
-            ? `sem encontro agendado para o ${vig.numero}`
-            : "sem encontro agendado";
+            ? `Sem encontro agendado para o ${vig.numero}`
+            : "Sem encontro agendado";
     return {
-      texto: `${lead} (${atraso} ${atraso === 1 ? "encontro" : "encontros"}) — ${tail}.`,
+      texto: `${lead} (${atraso} ${atraso === 1 ? "encontro" : "encontros"}). ${tail}.`,
       problema: true,
     };
   }
@@ -443,7 +444,7 @@ export function contextoDuplaAux(
   if (pend?.status === "agendado")
     return {
       texto:
-        `${tag(pend.numero)} — agendado já passou e segue sem registro (rolou?).` +
+        `${tag(pend.numero)}: agendado já passou e segue sem registro. Aconteceu?` +
         (semData && vig?.numero != null
           ? ` E o ${vig.numero}º ainda não tem data.`
           : ""),
@@ -456,7 +457,7 @@ export function contextoDuplaAux(
     const nestaSemana = vig.data >= seg && vig.data <= domCorrente;
     return {
       texto:
-        `${tag(vig.numero)} — sem encontro agendado${
+        `${tag(vig.numero)}. Sem encontro agendado${
           nestaSemana ? " nesta semana" : ""
         } (prazo: ${dowCurto(dom)} ${diaNum(dom)}).` +
         (pend ? ` ${pendTxt(pend)}` : ""),
@@ -468,7 +469,7 @@ export function contextoDuplaAux(
   // vigente já realizado — e a pendência de registro como fecho quando há
   let t: string;
   if (prox?.data_hora) {
-    t = `${tag(prox.numero)} — ${quandoTxt(prox.data_hora, hoje)}${linkSeguro(prox.link) ? ", online" : ""}.`;
+    t = `${tag(prox.numero)}: ${quandoTxt(prox.data_hora, hoje)}${linkSeguro(prox.link) ? ", online" : ""}.`;
     const proxEv = evs
       .filter(
         (e): e is EventoDatado =>
@@ -479,13 +480,13 @@ export function contextoDuplaAux(
       )
       .sort((a, b) => a.ordem - b.ordem)[0];
     if (proxEv)
-      t += ` Próximo previsto: enc. ${proxEv.numero} em ${dowCurto(proxEv.data)} ${diaNum(proxEv.data)}.`;
+      t += ` Próximo previsto: encontro ${proxEv.numero} em ${dowCurto(proxEv.data)} ${diaNum(proxEv.data)}.`;
   } else if (vig?.numero != null) {
     const rowVig = dupla.encontros.find((e) => e.numero === vig.numero);
     t =
       rowVig?.status === "realizado"
-        ? `${tag(vig.numero)} — realizado.`
-        : `${tag(vig.numero)} — previsto para ${dowCurto(vig.data)} ${diaNum(vig.data)}.`;
+        ? `${tag(vig.numero)}: realizado.`
+        : `${tag(vig.numero)}: previsto para ${dowCurto(vig.data)} ${diaNum(vig.data)}.`;
   } else {
     t = saude.motivo;
   }
@@ -524,29 +525,29 @@ function contextoEspecialistaAux(
 
   if (feitas >= teto)
     return {
-      texto: `Trilha completa — ${feitas} de ${teto} sessões.`,
+      texto: `Trilha completa: ${feitas} de ${teto} sessões.`,
       problema: false,
     };
   if (prazo?.estado === "passou")
     return {
-      texto: `Prazo de 3 meses encerrado com ${feitas} de ${teto} sessões — levar à coordenação.`,
+      texto: `Prazo de 3 meses encerrado com ${feitas} de ${teto} sessões. Levar à coordenação.`,
       problema: true,
     };
   if (pend)
     return {
       texto:
         pend.status === "agendado"
-          ? `Sessão ${passoEsp(pend, dupla.encontros)} — agendada já passou e segue sem registro (rolou?).`
-          : `Sessão ${passoEsp(pend, dupla.encontros)} — registro pendente.`,
+          ? `Sessão ${passoEsp(pend, dupla.encontros)}: agendada já passou e segue sem registro. Aconteceu?`
+          : `Sessão ${passoEsp(pend, dupla.encontros)}: registro pendente.`,
       problema: true,
     };
   if (prox?.data_hora)
     return {
-      texto: `Sessão ${passoEsp(prox, dupla.encontros)} — ${quandoTxt(prox.data_hora, hoje)}${linkSeguro(prox.link) ? ", online" : ""}.`,
+      texto: `Sessão ${passoEsp(prox, dupla.encontros)}: ${quandoTxt(prox.data_hora, hoje)}${linkSeguro(prox.link) ? ", online" : ""}.`,
       problema: false,
     };
   return {
-    texto: `Sessões ${feitas} de ${teto} — próxima a agendar${prazo ? ` (prazo: ${formatDiaNum(prazo.fim)})` : ""}.`,
+    texto: `Sessões ${feitas} de ${teto}. Próxima a agendar${prazo ? ` (prazo: ${formatDiaNum(prazo.fim)})` : ""}.`,
     problema: false,
   };
 }

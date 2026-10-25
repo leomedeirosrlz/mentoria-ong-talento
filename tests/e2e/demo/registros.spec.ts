@@ -5,8 +5,14 @@ import { entrarNaDemo, expect, test } from "../helpers";
 // Demo como coordenação vê todas as 16 duplas — ~94 registros com
 // avaliações variadas (baixa/regular/boa/excelente no dataset).
 // O default é `grupo=dupla` implícito (param ausente == dupla).
+// Layout: mestre/detalhe no lg+ (lista compacta à esquerda, registro
+// aberto à direita, seleção em ?r=); a timeline antiga segue no mobile.
 
+// cabeçalho de grupo por dupla na timeline (mobile): "Dupla: X × Y · K"
 const DUPLA_HEAD = /^Dupla: .+ × .+ · \d+ registros?$/;
+// no mestre/detalhe (lg+) o cabeçalho usa o lockup DuplaNomes:
+// "Mentor e Mentorado · K registros", sem o prefixo "Dupla:"
+const DUPLA_HEAD_LG = /^.+ e .+ · \d+ registros?$/;
 const SEMANA_HEAD = /^Semana de \d{2}\/\d{2}\//;
 const AVAL_HEAD =
   /^(Avaliação: (Baixa|Regular|Boa|Excelente)|Sem avaliação) · \d+ registros?$/;
@@ -21,7 +27,9 @@ async function abreRegistros(page: Page, qs = "") {
   ).toBeVisible();
 }
 
-test("default: agrupa por dupla em 2 colunas no xl", async ({ page }) => {
+test("default: agrupa por dupla em mestre/detalhe no lg", async ({
+  page,
+}) => {
   await abreRegistros(page);
 
   // switcher presente com a opção ativa correta
@@ -31,18 +39,32 @@ test("default: agrupa por dupla em 2 colunas no xl", async ({ page }) => {
     switcher.getByRole("link", { name: "por dupla" })
   ).toHaveAttribute("aria-current", "page");
 
-  // headers de dupla no formato "Dupla: X × Y · K registros"
-  const headers = page.getByRole("heading", { name: DUPLA_HEAD });
+  // headers de dupla no formato "Mentor e Mentorado · K registros"
+  const headers = page.getByRole("heading", { name: DUPLA_HEAD_LG });
   expect(await headers.count()).toBeGreaterThanOrEqual(3);
 
-  // xl (1280 default): os dois primeiros grupos ficam lado a lado —
-  // mesma linha de topo, colunas distintas
-  const b0 = await headers.nth(0).boundingBox();
-  const b1 = await headers.nth(1).boundingBox();
-  expect(b0).not.toBeNull();
-  expect(b1).not.toBeNull();
-  expect(Math.abs(b0!.y - b1!.y)).toBeLessThan(8);
-  expect(b1!.x).toBeGreaterThan(b0!.x + 200);
+  // lg (1280 default): a lista fica à esquerda e o registro aberto à
+  // direita — mesma linha de topo, colunas distintas
+  const detalhe = page.getByRole("article", {
+    name: /\d+º (encontro|passo)/,
+  });
+  await expect(detalhe).toBeVisible();
+  const bh = await headers.first().boundingBox();
+  const bd = await detalhe.boundingBox();
+  expect(bh).not.toBeNull();
+  expect(bd).not.toBeNull();
+  expect(Math.abs(bh!.y - bd!.y)).toBeLessThan(16);
+  expect(bd!.x).toBeGreaterThan(bh!.x + 200);
+
+  // clicar numa linha troca a seleção via ?r= — a lista marca o ativo
+  const linha = page.locator("a[data-registro]").nth(1);
+  const id = await linha.getAttribute("data-registro");
+  await linha.click();
+  await page.waitForURL(new RegExp(`r=${id}`));
+  await expect(page.locator(`a[data-registro="${id}"]`)).toHaveAttribute(
+    "aria-current",
+    "true"
+  );
 });
 
 test("?grupo=semana: cabeçalhos 'Semana de dd/mm/aaaa'", async ({ page }) => {
@@ -77,7 +99,12 @@ test("?grupo=avaliacao: severidade primeiro, balde vazio some", async ({
 test("?grupo=<lixo> cai no default dupla", async ({ page }) => {
   await abreRegistros(page, "?grupo=nao-existe");
   await expect(
-    page.getByRole("heading", { name: DUPLA_HEAD }).first()
+    page
+      .getByRole("group", { name: "Agrupar registros" })
+      .getByRole("link", { name: "por dupla" })
+  ).toHaveAttribute("aria-current", "page");
+  await expect(
+    page.getByRole("heading", { name: DUPLA_HEAD_LG }).first()
   ).toBeVisible();
 });
 
@@ -87,7 +114,7 @@ test("busca + agrupamento combinam (?q=…&grupo=dupla)", async ({ page }) => {
 
   // chip de busca ativo + agrupamento segue aplicado sobre os filtrados
   await expect(page.getByText(/Busca: “Roda”/)).toBeVisible();
-  const headers = page.getByRole("heading", { name: DUPLA_HEAD });
+  const headers = page.getByRole("heading", { name: DUPLA_HEAD_LG });
   expect(await headers.count()).toBeGreaterThanOrEqual(1);
   // o switcher marca o grupo ativo e os links preservam a busca
   const porSemana = page.getByRole("link", { name: "por semana" });
@@ -165,24 +192,29 @@ test.describe("panorama do ciclo", () => {
       periodo.getByRole("link", { name: "Últimas 8 semanas" })
     ).toBeVisible();
 
-    // cards: cobertura (barras) + semáforo (donut) + linha ★
+    // cards: cobertura (barras) + situação das duplas + linha ★
     await expect(
       page.getByRole("heading", { name: "Registros entregues por encontro" })
     ).toBeVisible();
     await expect(
-      page.getByRole("heading", { name: "Sinais no recorte" })
+      page.getByRole("heading", { name: "Situação das duplas", exact: true })
     ).toBeVisible();
     await expect(
       page.getByRole("heading", { name: "Avaliação média do jovem" })
+    ).toBeVisible();
+    // a situação é uma barra segmentada nomeada com os números por
+    // extenso (o mesmo resumo de /duplas e da agenda, não um donut)
+    await expect(
+      page.getByRole("img", { name: /em andamento: \d+ em risco/ })
     ).toBeVisible();
     // as barras são uma imagem nomeada com os dados por extenso
     await expect(
       page.getByRole("img", { name: /Barras por encontro/ })
     ).toBeVisible();
 
-    // a lista continua embaixo — o painel não substitui a timeline
+    // a lista continua embaixo — o painel não substitui a lista
     await expect(
-      page.getByRole("heading", { name: DUPLA_HEAD }).first()
+      page.getByRole("heading", { name: DUPLA_HEAD_LG }).first()
     ).toBeVisible();
   });
 
@@ -203,7 +235,7 @@ test.describe("panorama do ciclo", () => {
       page.getByRole("link", { name: "Turma 1" })
     ).toHaveAttribute("aria-current", "page");
     await expect(
-      page.getByRole("heading", { name: DUPLA_HEAD }).first()
+      page.getByRole("heading", { name: DUPLA_HEAD_LG }).first()
     ).toBeVisible();
   });
 

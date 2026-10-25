@@ -488,7 +488,7 @@ export function ChamadosApp({
                     {c.numero}
                   </span>
                   <CategoriaBadge categoria={c.categoria} />
-                  <span className="ml-auto flex shrink-0 items-center gap-1 text-[11px] text-muted-foreground">
+                  <span className="ml-auto flex shrink-0 items-center gap-1 text-xs sm:text-[11px] text-muted-foreground">
                     <time dateTime={c.created_at}>{relTempo(c.created_at)}</time>
                     <CaretRight size={12} aria-hidden />
                   </span>
@@ -746,7 +746,7 @@ export function ChamadoDetalhe({
                     <IconePasso size={13} aria-hidden className={iconeCor} />
                     {p.rotulo}
                   </span>
-                  <span className="mt-0.5 block truncate text-[10px] text-muted-foreground">
+                  <span className="mt-0.5 block truncate text-xs sm:text-[10px] text-muted-foreground">
                     {p.detalhe}
                   </span>
                 </li>
@@ -802,7 +802,7 @@ export function ChamadoDetalhe({
         {/* pedido original — a mensagem que abriu o chamado não aparecia */}
         {!chamado.restrito && chamado.mensagem && (
           <div className="mt-3.5 rounded-lg border border-border bg-muted/30 px-3.5 py-3">
-            <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            <h3 className="text-xs sm:text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
               {staff
                 ? `Pedido original · ${chamado.autor_nome ?? "autor"}`
                 : "Você escreveu"}
@@ -823,7 +823,7 @@ export function ChamadoDetalhe({
                 <Button
                   size="sm"
                   disabled={pending}
-                  onClick={() => acao(() => assumirChamado(chamado.id), "Chamado assumido — é com você.")}
+                  onClick={() => acao(() => assumirChamado(chamado.id), "Chamado assumido. É com você.")}
                 >
                   {chamado.atribuido_nome
                     ? `Assumir de ${chamado.atribuido_nome}`
@@ -879,7 +879,7 @@ export function ChamadoDetalhe({
           <Lock size={15} aria-hidden className="shrink-0" />
           <span>
             <strong className="text-foreground">Chamado restrito à coordenação.</strong>{" "}
-            Chamados de plataforma são tratados pela coordenação — assunto,
+            Chamados de plataforma são tratados pela coordenação: assunto,
             autor e conversa não aparecem pra supervisão.
           </span>
         </div>
@@ -893,23 +893,23 @@ export function ChamadoDetalhe({
             <div
               role="group"
               aria-label="Legenda da trilha"
-              className="flex flex-wrap items-center gap-x-3.5 gap-y-1 border-b border-border/60 px-4 py-2.5 text-[11px] text-muted-foreground sm:px-5"
+              className="flex flex-wrap items-center gap-x-3.5 gap-y-1 border-b border-border/60 px-4 py-2.5 text-xs sm:text-[11px] text-muted-foreground sm:px-5"
             >
               <span className="font-medium text-foreground/80">Legenda</span>
               <span className="flex items-center gap-1">
-                <Eye size={12} aria-hidden /> Pública — o autor vê
+                <Eye size={12} aria-hidden /> Pública: o autor vê
               </span>
               <span className="flex items-center gap-1">
-                <EyeSlash size={12} aria-hidden /> Interna — só a equipe
+                <EyeSlash size={12} aria-hidden /> Interna: só a equipe
               </span>
               <span className="flex items-center gap-1">
-                <Sparkle size={12} aria-hidden /> Automática — do sistema
+                <Sparkle size={12} aria-hidden /> Automática: do sistema
               </span>
             </div>
           )}
           {!staff && timeline.length > 0 && (
-            <p className="border-b border-border/60 px-4 py-2.5 text-[11px] text-muted-foreground sm:px-5">
-              Você vê o que a equipe publica pra você — e o que acrescentou.
+            <p className="border-b border-border/60 px-4 py-2.5 text-xs sm:text-[11px] text-muted-foreground sm:px-5">
+              Você vê o que a equipe publica pra você e o que acrescentou.
             </p>
           )}
           <ol className="divide-y divide-border/60 px-4 sm:px-5" aria-label="Conversa">
@@ -966,7 +966,7 @@ export function ChamadoDetalhe({
           {chamado.status === "resolvido" ? (
             <div className="space-y-3">
               <p className="text-sm text-muted-foreground">
-                Ainda precisa de ajuda com isso? Peça a reabertura — a equipe é
+                Ainda precisa de ajuda com isso? Peça a reabertura. A equipe é
                 avisada e o chamado volta pra fila.
               </p>
               <Button
@@ -974,7 +974,7 @@ export function ChamadoDetalhe({
                 size="sm"
                 disabled={pending}
                 onClick={() =>
-                  acao(() => pedirReaberturaChamado(chamado.id), "Pedido enviado — a equipe retoma o chamado.")
+                  acao(() => pedirReaberturaChamado(chamado.id), "Pedido enviado. A equipe retoma o chamado.")
                 }
               >
                 Pedir reabertura
@@ -1120,7 +1120,7 @@ function TagTrilha({ tipo }: { tipo: "publica" | "interno" | "sistema" }) {
   return (
     <span
       className={cn(
-        "inline-flex shrink-0 items-center gap-1 rounded-full border px-1.5 py-px text-[9px] font-semibold uppercase tracking-wider",
+        "inline-flex shrink-0 items-center gap-1 rounded-full border px-1.5 py-px text-[10px] font-semibold uppercase tracking-wider",
         conf.cls
       )}
     >
@@ -1159,13 +1159,13 @@ function TimelineItem({
   const quando = (
     <time
       dateTime={entry.item.created_at}
-      className="shrink-0 text-[11px] text-muted-foreground"
+      className="shrink-0 text-xs sm:text-[11px] text-muted-foreground"
     >
       {relTempo(entry.item.created_at)}
     </time>
   );
   const chipAgora = recente && (
-    <span className="inline-flex shrink-0 items-center rounded-full bg-[var(--ok)]/15 px-1.5 py-px text-[9px] font-bold uppercase tracking-wider text-[var(--ok-text)]">
+    <span className="inline-flex shrink-0 items-center rounded-full bg-[var(--ok)]/15 px-1.5 py-px text-[10px] font-bold uppercase tracking-wider text-[var(--ok-text)]">
       agora
     </span>
   );
@@ -1220,7 +1220,7 @@ function TimelineItem({
           <AnexoThumb src={href} mime={a.mime} />
           <span className="min-w-0 flex-1">
             <span className="block truncate text-xs font-medium">{a.nome}</span>
-            <span className="block truncate text-[11px] text-muted-foreground">
+            <span className="block truncate text-xs sm:text-[11px] text-muted-foreground">
               {ROTULO_ANEXO[tipo]}
               {a.tamanho ? ` · ${formatTamanho(a.tamanho)}` : ""}
               {" · "}abre em nova aba
@@ -1511,8 +1511,8 @@ function ChamadoComposer({
         if (falhas) {
           toast.error(
             falhas === 1
-              ? "Um anexo não subiu — ele continua na lista pra você tentar de novo."
-              : `${falhas} anexos não subiram — eles continuam na lista pra você tentar de novo.`
+              ? "Um anexo não subiu. Ele continua na lista pra você tentar de novo."
+              : `${falhas} anexos não subiram. Eles continuam na lista pra você tentar de novo.`
           );
           falhou = true;
         }
@@ -1528,10 +1528,10 @@ function ChamadoComposer({
       toast.success(
         t
           ? modo === "interno"
-            ? "Comentário interno registrado — só a equipe vê."
+            ? "Comentário interno registrado. Só a equipe vê."
             : "Atualização enviada ao autor."
           : modo === "interno"
-            ? "Anexo enviado — só a equipe vê."
+            ? "Anexo enviado. Só a equipe vê."
             : "Anexo enviado ao autor."
       );
       setEnviado(t ? "texto" : "anexo");
@@ -1605,7 +1605,7 @@ function ChamadoComposer({
               </button>
             </span>
           ))}
-          <span className="text-[11px] text-[var(--warn-text)]">
+          <span className="text-xs sm:text-[11px] text-[var(--warn-text)]">
             {mencoes.length === 1
               ? "1 pessoa será notificada no app"
               : `${mencoes.length} pessoas serão notificadas no app`}
@@ -1635,7 +1635,7 @@ function ChamadoComposer({
           }
           placeholder={
             modo === "interno"
-              ? `Só a equipe vê — ${autorNome} não é notificado. Digite @ pra marcar alguém da equipe.`
+              ? `Só a equipe vê. ${autorNome} não é notificado. Digite @ pra marcar alguém da equipe.`
               : `Escreva a resposta que vai pra ${autorNome}…`
           }
         />
@@ -1650,9 +1650,9 @@ function ChamadoComposer({
             >
               <li
                 role="presentation"
-                className="px-3 pb-1 pt-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground"
+                className="px-3 pb-1 pt-1.5 text-xs sm:text-[10px] font-semibold uppercase tracking-wider text-muted-foreground"
               >
-                Marcar alguém — continue digitando pra filtrar
+                Marcar alguém. Continue digitando pra filtrar
               </li>
               {linhasMencao.map((l) => {
                 const nome = nomeDe(l.pessoa);
@@ -1681,7 +1681,7 @@ function ChamadoComposer({
                     <span className="min-w-0 flex-1 truncate font-medium">
                       {nome}
                     </span>
-                    <span className="shrink-0 text-[11px] text-muted-foreground">
+                    <span className="shrink-0 text-xs sm:text-[11px] text-muted-foreground">
                       {l.estado === "voce"
                         ? "você"
                         : l.estado === "autor"
@@ -1706,7 +1706,7 @@ function ChamadoComposer({
               <li
                 role="presentation"
                 aria-hidden
-                className="border-t border-border/60 px-3 py-1.5 text-[10px] text-muted-foreground"
+                className="border-t border-border/60 px-3 py-1.5 text-xs sm:text-[10px] text-muted-foreground"
               >
                 <kbd className="rounded border border-border bg-muted px-1">↑↓</kbd>{" "}
                 navega ·{" "}
@@ -1720,17 +1720,17 @@ function ChamadoComposer({
         )}
       </div>
 
-      <p className="mt-1.5 text-[11px] text-muted-foreground">
+      <p className="mt-1.5 text-xs sm:text-[11px] text-muted-foreground">
         {modo === "interno" ? (
           <>
             Só a equipe vê. {autorNome} não é notificado. Digite{" "}
             <kbd className="rounded border border-border bg-muted px-1">@</kbd>{" "}
-            pra marcar alguém — ou use “+ pessoas”. Marcados recebem
+            pra marcar alguém ou use “+ pessoas”. Marcados recebem
             notificação no app.
           </>
         ) : (
           <>
-            Visível para {autorNome} — recebe notificação por e-mail e no app.
+            Visível para {autorNome}: recebe notificação por e-mail e no app.
             Evite dados sensíveis de terceiros.
           </>
         )}
@@ -1749,13 +1749,13 @@ function ChamadoComposer({
             <Popover>
               <PopoverTrigger
                 // Label-in-Name: o nome acessível começa pelo rótulo visível
-                aria-label="+ pessoas — marcar alguém da equipe"
+                aria-label="+ pessoas: marcar alguém da equipe"
                 className="flex min-h-11 items-center gap-1.5 rounded-lg px-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:min-h-9"
               >
                 <UserPlus size={15} aria-hidden />+ pessoas
               </PopoverTrigger>
               <PopoverContent side="top" align="start" className="w-72 max-w-[calc(100vw-2rem)] p-1.5">
-                <p className="px-2.5 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                <p className="px-2.5 pb-1 pt-2 text-xs sm:text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                   Marcar alguém da equipe
                 </p>
                 <ul>
@@ -1790,7 +1790,7 @@ function ChamadoComposer({
                           <span className="min-w-0 flex-1 truncate font-medium">
                             {nome}
                           </span>
-                          <span className="shrink-0 text-[11px] text-muted-foreground">
+                          <span className="shrink-0 text-xs sm:text-[11px] text-muted-foreground">
                             {souEu
                               ? "você"
                               : eAutor
@@ -1804,9 +1804,9 @@ function ChamadoComposer({
                     );
                   })}
                 </ul>
-                <p className="border-t border-border/60 px-2.5 py-2 text-[10px] text-muted-foreground">
+                <p className="border-t border-border/60 px-2.5 py-2 text-xs sm:text-[10px] text-muted-foreground">
                   Marcados viram chips acima do campo e recebem notificação no
-                  app — nunca e-mail.
+                  app, nunca por e-mail.
                 </p>
               </PopoverContent>
             </Popover>
@@ -1915,8 +1915,8 @@ function AutorComposer({
         if (falhas) {
           toast.error(
             falhas === 1
-              ? "Um anexo não subiu — ele continua na lista pra você tentar de novo."
-              : `${falhas} anexos não subiram — eles continuam na lista pra você tentar de novo.`
+              ? "Um anexo não subiu. Ele continua na lista pra você tentar de novo."
+              : `${falhas} anexos não subiram. Eles continuam na lista pra você tentar de novo.`
           );
           falhou = true;
         }
@@ -1949,8 +1949,8 @@ function AutorComposer({
         className="mt-1.5"
         placeholder={`${meuNome.split(" ")[0]}, conte pra equipe se algo mudou ou se faltou detalhe…`}
       />
-      <p className="mt-1.5 text-[11px] text-muted-foreground">
-        Só você e a equipe veem — ninguém mais recebe cópia.
+      <p className="mt-1.5 text-xs sm:text-[11px] text-muted-foreground">
+        Só você e a equipe veem. Ninguém mais recebe cópia.
       </p>
       <AnexosPendentes
         itens={anexos.pendentes}

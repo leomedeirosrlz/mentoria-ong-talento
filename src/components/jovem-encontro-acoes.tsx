@@ -29,8 +29,8 @@ export function NaoAconteceuJovem({ encontroId }: { encontroId: string }) {
           <DialogTitle>O encontro não aconteceu?</DialogTitle>
         </DialogHeader>
         <DialogDescription className="leading-relaxed">
-          O encontro ficará marcado como não realizado. Se rolou de verdade —
-          ou foi engano — seu mentor registra como foi na ficha dele.
+          O encontro ficará marcado como não realizado. Se rolou de verdade
+          ou foi engano, seu mentor registra como foi na ficha dele.
         </DialogDescription>
         <DialogFooter>
           <Button variant="outline" onClick={() => setOpen(false)}>
@@ -83,7 +83,7 @@ export function DesmarcarEncontroJovem({ encontroId }: { encontroId: string }) {
           <DialogTitle>Desmarcar o encontro?</DialogTitle>
         </DialogHeader>
         <DialogDescription className="leading-relaxed">
-          O encontro sai da agenda de vocês dois — e pode ser marcado de novo
+          O encontro sai da agenda de vocês dois e pode ser marcado de novo
           quando combinarem uma nova data.
         </DialogDescription>
         <DialogFooter>

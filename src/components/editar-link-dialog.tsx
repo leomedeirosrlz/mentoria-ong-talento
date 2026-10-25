@@ -102,7 +102,7 @@ export function EditarLinkDialog({
               defaultValue={linkAtual ?? ""}
             />
             <p className="text-xs text-muted-foreground">
-              O horário continua o mesmo — só o link muda.
+              O horário continua o mesmo. Só o link muda.
             </p>
           </div>
           <Button type="submit" className="w-full" disabled={pending}>

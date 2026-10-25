@@ -605,7 +605,7 @@ export function FormularioBuilder({
 
         <p className="sr-only">
           Pra reordenar pelo teclado, foque a alça no rodapé do campo e
-          use as setas pra cima e pra baixo — ou abra o menu de ações e
+          use as setas pra cima e pra baixo, ou abra o menu de ações e
           escolha Mover pra cima ou Mover pra baixo. Pelo ponteiro,
           arraste pela alça.
         </p>
@@ -674,7 +674,7 @@ export function FormularioBuilder({
                   onDragStart={() => {
                     antesDoArraste.current = campos;
                     setDragMsg(
-                      `Arrastando ${rotulo} — solte na nova posição.`
+                      `Arrastando ${rotulo}. Solte na nova posição.`
                     );
                   }}
                   onDragEnd={() => {
@@ -826,7 +826,7 @@ export function FormularioBuilder({
                           </div>
                           {c.formato && (
                             <span className="text-xs leading-snug text-muted-foreground">
-                              — a resposta é normalizada na entrada
+                              A resposta é normalizada na entrada
                             </span>
                           )}
                         </div>
@@ -842,7 +842,7 @@ export function FormularioBuilder({
                         }
                         rows={2}
                         maxLength={1000}
-                        placeholder="Texto de apoio sob o título (opcional) — instruções do bloco."
+                        placeholder="Texto de apoio sob o título (opcional): instruções do bloco."
                       />
                     ) : (
                       <MockTipo tipo={c.tipo} />
@@ -1126,7 +1126,7 @@ function AlcaArraste({
       type="button"
       aria-label={`Reordenar ${rotulo}`}
       aria-keyshortcuts="ArrowUp ArrowDown"
-      title="Arraste pra reordenar — pelo teclado, as setas ↑/↓ movem"
+      title="Arraste pra reordenar. Pelo teclado, as setas ↑/↓ movem"
       onPointerDown={(e) => controls?.start(e)}
       onKeyDown={(e) => {
         if (e.key === "ArrowUp" || e.key === "ArrowDown") {
@@ -1263,7 +1263,7 @@ function MockTipo({ tipo }: { tipo: FormularioCampoTipo }) {
       {tipo === "secao" && (
         <span className="flex items-center gap-2.5 text-sm text-muted-foreground">
           <Rows aria-hidden className="size-4 shrink-0" />
-          Título de bloco — organiza as perguntas, não espera resposta
+          Título de bloco · organiza as perguntas, não espera resposta
         </span>
       )}
       {tipo === "sim_nao" && (

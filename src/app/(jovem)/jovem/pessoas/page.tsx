@@ -115,7 +115,7 @@ export default async function JovemPessoas() {
         <section key={g.id} aria-labelledby={`${g.id}-titulo`}>
           <h2
             id={`${g.id}-titulo`}
-            className="mb-3 flex items-center gap-2 font-semibold"
+            className="mb-3 flex items-center gap-2 text-base font-semibold"
           >
             <g.icon
               size={18}
@@ -153,7 +153,7 @@ export default async function JovemPessoas() {
       <section aria-labelledby="colegas-titulo">
         <h2
           id="colegas-titulo"
-          className="mb-3 flex items-center gap-2 font-semibold"
+          className="mb-3 flex items-center gap-2 text-base font-semibold"
         >
           <Users size={18} className="text-muted-foreground" aria-hidden />
           Colegas da turma

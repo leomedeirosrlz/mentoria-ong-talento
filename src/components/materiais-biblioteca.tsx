@@ -9,6 +9,7 @@ import { filterChipCls } from "@/components/ui/filter-chip";
 import {
   CoberturaTrilha,
   EncontroDetails,
+  EncontrosVaziosLinha,
   TransversaisMateriais,
   type GuiaPapel,
 } from "@/components/materiais-hub";
@@ -138,7 +139,7 @@ function GrupoSummary({
             : "group-open/gtr:rotate-90"
         )}
       />
-      <span role="heading" aria-level={2} className="text-[13px] font-semibold">
+      <span role="heading" aria-level={2} className="text-base font-semibold">
         {titulo}
       </span>
       <span className="ml-auto shrink-0 pl-2 text-xs tabular-nums text-muted-foreground">
@@ -146,6 +147,37 @@ function GrupoSummary({
       </span>
     </summary>
   );
+}
+
+type EncontroFiltrado = EncontroGrupo & { visiveis: Material[] };
+
+type BlocoEncontro =
+  | { tipo: "encontro"; e: EncontroFiltrado }
+  | { tipo: "vazios"; nums: number[] };
+
+/** Encontros sem nenhum material viram UMA faixa (1 linha), inclusive o
+ *  encontro vigente — esse fica de fora da faixa e segue como acordeão
+ *  aberto, com a nota do guia e o "adicionar". */
+function agrupaEncontros(
+  lista: EncontroFiltrado[],
+  atual: number | null
+): BlocoEncontro[] {
+  const blocos: BlocoEncontro[] = [];
+  let faixa: number[] = [];
+  const fecha = () => {
+    if (faixa.length) blocos.push({ tipo: "vazios", nums: faixa });
+    faixa = [];
+  };
+  for (const e of lista) {
+    if (e.itens.length === 0 && e.n !== atual) {
+      faixa.push(e.n);
+      continue;
+    }
+    fecha();
+    blocos.push({ tipo: "encontro", e });
+  }
+  fecha();
+  return blocos;
 }
 
 export function MateriaisBiblioteca({
@@ -266,7 +298,7 @@ export function MateriaisBiblioteca({
         {rotulo}
         <span
           className={cn(
-            "font-mono text-[11px] tabular-nums",
+            "font-mono text-xs tabular-nums",
             ativo ? "text-background/70" : "text-muted-foreground/70"
           )}
         >
@@ -396,22 +428,32 @@ export function MateriaisBiblioteca({
             {totEnc === 1 ? "material" : "materiais"}
           </GrupoSummary>
           <div className="mt-1 space-y-2">
-            {encontrosF.map((e, i) => (
-              <EncontroDetails
-                key={e.n}
-                n={e.n}
-                titulo={e.titulo}
-                itens={e.visiveis}
-                total={e.itens.length}
-                ehCoord={ehCoord}
-                maxEncontro={maxEncontro}
-                indice={i}
-                aberto={e.n === encontroAtual}
-                atual={e.n === encontroAtual}
-                oculto={filtrando && e.visiveis.length === 0}
-                guiaPapel={guiaPapel}
-              />
-            ))}
+            {agrupaEncontros(encontrosF, encontroAtual).map((b, i) =>
+              b.tipo === "encontro" ? (
+                <EncontroDetails
+                  key={b.e.n}
+                  n={b.e.n}
+                  titulo={b.e.titulo}
+                  itens={b.e.visiveis}
+                  total={b.e.itens.length}
+                  ehCoord={ehCoord}
+                  maxEncontro={maxEncontro}
+                  indice={i}
+                  aberto={b.e.n === encontroAtual}
+                  atual={b.e.n === encontroAtual}
+                  oculto={filtrando && b.e.visiveis.length === 0}
+                  guiaPapel={guiaPapel}
+                />
+              ) : filtrando ? null : (
+                <EncontrosVaziosLinha
+                  key={`vazios-${b.nums[0]}`}
+                  nums={b.nums}
+                  ehCoord={ehCoord}
+                  maxEncontro={maxEncontro}
+                  indice={i}
+                />
+              )
+            )}
           </div>
         </details>
       )}

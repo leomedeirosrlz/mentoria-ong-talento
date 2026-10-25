@@ -128,8 +128,8 @@ function LinhaInstrumento({
       setEnviado(r.token);
       toast.success(
         r.reutilizado
-          ? "Este link já estava pendente — reaproveitado."
-          : "Link gerado — copie ou envie pelo WhatsApp."
+          ? "Este link já estava pendente. Reaproveitado."
+          : "Link gerado. Copie ou envie pelo WhatsApp."
       );
       router.refresh();
     });
@@ -303,12 +303,9 @@ export function InstrumentosDupla({
         className
       )}
     >
-      <h2 className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-        <span aria-hidden className="size-1.5 rounded-full bg-[var(--brand-lime)]" />
-        Instrumentos da jornada
-      </h2>
+      <h2 className="text-base font-semibold">Instrumentos da jornada</h2>
       <p className="mt-1 text-xs text-muted-foreground">
-        Os exercícios oficiais do guia — o jovem responde por link único, sem
+        Os exercícios oficiais do guia: o jovem responde por link único, sem
         login, e o resultado volta estruturado aqui.
       </p>
       <ul className="mt-2 divide-y divide-border/60">

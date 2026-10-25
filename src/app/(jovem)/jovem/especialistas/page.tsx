@@ -160,12 +160,12 @@ export default async function JovemEspecialistasPage() {
         <header>
           <h1 className="text-xl font-semibold">Especialistas</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Mentores pra temas pontuais — entrevista, prova, projeto, decisão.
+            Mentores pra temas pontuais: entrevista, prova, projeto, decisão.
           </p>
         </header>
         <Card>
           <CardContent className="py-5 text-sm text-muted-foreground">
-            Seu cadastro ainda não está completo — quando a equipe vincular
+            Seu cadastro ainda não está completo. Quando a equipe vincular
             sua ficha, você pede um especialista por aqui.
           </CardContent>
         </Card>
@@ -174,11 +174,11 @@ export default async function JovemEspecialistasPage() {
   }
 
   return (
-    <div className="grid gap-8">
+    <div className="grid gap-6">
       <header>
         <h1 className="text-xl font-semibold">Especialistas</h1>
         <p className="mt-1 max-w-lg text-sm leading-relaxed text-muted-foreground">
-          Mentores pra temas pontuais — entrevista, prova, projeto, decisão.
+          Mentores pra temas pontuais: entrevista, prova, projeto, decisão.
           Você pede, a pessoa responde e vocês marcam a sessão juntos.
         </p>
       </header>
@@ -191,26 +191,25 @@ export default async function JovemEspecialistasPage() {
         aria-label="Três coisas diferentes"
         className="grid gap-2 text-xs leading-relaxed text-muted-foreground sm:grid-cols-3"
       >
-        <p className="rounded-lg border border-[var(--role-mentorado)]/50 bg-[var(--role-mentorado)]/10 p-3">
-          <span className="mb-0.5 block font-semibold text-foreground">
+        <p className="rounded-lg border border-[var(--role-mentorado)]/50 bg-[var(--role-mentorado)]/10 px-3 py-2.5">
+          <span className="block font-semibold text-foreground">
             Pedir uma trilha
           </span>
-          É o que esta página faz. Seu pedido vai ao mural e um
-          especialista aceita — não passa pela coordenação.
+          Ela é o que esta página faz. O pedido vai ao mural e um
+          especialista aceita.
         </p>
-        <p className="rounded-lg border border-border p-3">
-          <span className="mb-0.5 block font-semibold text-foreground">
+        <p className="rounded-lg border border-border px-3 py-2.5">
+          <span className="block font-semibold text-foreground">
             Agendar uma sessão
           </span>
-          Só existe dentro de uma trilha ativa, nos horários da grade do
-          especialista.
+          Só dentro de uma trilha ativa, nos horários do especialista.
         </p>
-        <p className="rounded-lg border border-border p-3">
-          <span className="mb-0.5 block font-semibold text-foreground">
+        <p className="rounded-lg border border-border px-3 py-2.5">
+          <span className="block font-semibold text-foreground">
             Pedir apoio à coordenação
           </span>
-          Outra coisa: é um chamado (agenda, metodologia, urgência…). Link
-          no fim da página.
+          É um chamado sobre agenda, método ou urgência. O link fica no fim
+          da página.
         </p>
       </div>
 
@@ -229,18 +228,21 @@ export default async function JovemEspecialistasPage() {
           aria-labelledby="trilhas-titulo"
           className="space-y-3"
         >
-          <h2
-            id="trilhas-titulo"
-            className="flex items-center gap-2 font-semibold"
-          >
+          <h2 id="trilhas-titulo" className="text-base font-semibold">
             Suas trilhas
           </h2>
           <div className="grid gap-4">
-            {trilhas.map((d) => (
+            {trilhas.map((d, i) => (
               <JovemTrilhaCard
                 key={d.id}
+                indice={i}
                 dupla={d}
                 solicitacao={solDaTrilha(d)}
+                pedidoAberto={
+                  solicitacoes.find(
+                    (s) => s.dupla_id === d.id && pedidoEmAberto(s)
+                  ) ?? null
+                }
                 passos={passos}
                 encontros={encontros}
                 devolutivas={feedComAutor}
@@ -256,7 +258,7 @@ export default async function JovemEspecialistasPage() {
         <section id="pedidos" aria-labelledby="pedidos-titulo">
           <h2
             id="pedidos-titulo"
-            className="mb-3 flex items-center gap-2 font-semibold"
+            className="mb-3 text-base font-semibold"
           >
             Pedidos em aberto
           </h2>
@@ -295,7 +297,7 @@ export default async function JovemEspecialistasPage() {
       <section aria-labelledby="catalogo-titulo">
         <h2
           id="catalogo-titulo"
-          className="mb-3 flex items-center gap-2 font-semibold"
+          className="mb-3 flex items-center gap-2 text-base font-semibold"
         >
           <Sparkle size={18} className="text-muted-foreground" aria-hidden />
           Quem pode te ajudar

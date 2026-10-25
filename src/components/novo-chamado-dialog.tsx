@@ -70,11 +70,11 @@ const CAT_ICONE = {
 } as const;
 
 const CAT_AVISO: Record<ChamadoCategoria, string> = {
-  agenda: "Entra na fila — quem assumir primeiro trata.",
-  metodologia: "Entra na fila — quem assumir primeiro trata.",
-  plataforma: "Vai direto pra coordenação — conteúdo técnico não passa pela supervisão.",
+  agenda: "Entra na fila: quem assumir primeiro trata.",
+  metodologia: "Entra na fila: quem assumir primeiro trata.",
+  plataforma: "Vai direto pra coordenação. Conteúdo técnico não passa pela supervisão.",
   urgencia: "Coordenação e supervisão são avisadas na hora.",
-  outro: "Entra na fila — quem assumir primeiro trata.",
+  outro: "Entra na fila: quem assumir primeiro trata.",
 };
 
 type OpcaoJovem = "mentor" | "plataforma" | "outra" | "urgente";
@@ -150,8 +150,8 @@ export function NovoChamadoDialog({
       }
       toast.success(
         jovem
-          ? "Pedido enviado — a equipe foi avisada e responde em até 1 dia útil."
-          : `Chamado ${r.numero ?? ""} aberto — a equipe foi avisada.`
+          ? "Pedido enviado. A equipe foi avisada e responde em até 1 dia útil."
+          : `Chamado ${r.numero ?? ""} aberto. A equipe foi avisada.`
       );
       setOpen(false);
       setCat(""); setOpcaoJovem(""); setDescricaoOutro("");
@@ -173,7 +173,7 @@ export function NovoChamadoDialog({
           </DialogTitle>
           <DialogDescription>
             {jovem
-              ? "Conta pra equipe o que tá acontecendo. Eles respondem em até 1 dia útil — se for urgente, marca a opção."
+              ? "Conta pra equipe o que tá acontecendo. A equipe recebe na hora e responde em até 1 dia útil."
               : "O pedido entra na fila da equipe com dono e trilha de resposta."}
           </DialogDescription>
         </DialogHeader>
@@ -208,6 +208,16 @@ export function NovoChamadoDialog({
                   </button>
                 ))}
               </div>
+              {opcaoJovem === "mentor" && (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Seu mentor não vê este pedido. Só a equipe da Realiza.vc.
+                </p>
+              )}
+              {opcaoJovem === "urgente" && (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {CAT_AVISO.urgencia}
+                </p>
+              )}
             </fieldset>
           ) : (
             <fieldset>
@@ -317,7 +327,7 @@ export function NovoChamadoDialog({
               maxLength={5000}
               placeholder={
                 jovem
-                  ? "Escreve com suas palavras — a equipe lê tudo."
+                  ? "Escreve com suas palavras. A equipe lê tudo."
                   : "Contexto, o que já tentou, o que espera…"
               }
             />
@@ -332,7 +342,7 @@ export function NovoChamadoDialog({
               <span>
                 <strong>Dica:</strong> ao marcar{" "}
                 <strong>“Preciso de apoio”</strong> no registro de um
-                encontro, um chamado é aberto automaticamente — você não
+                encontro, um chamado é aberto automaticamente: você não
                 precisa abrir outro.
               </span>
             </p>

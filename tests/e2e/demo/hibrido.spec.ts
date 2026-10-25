@@ -14,11 +14,18 @@ test("home do híbrido: mural de especialista monta junto com a visão DPP", asy
   await page.goto("/");
 
   // o mural que só existia pro especialista puro — o híbrido recebe e
-  // responde pedidos (a pedido broadcast da Dandara é visível pra ele)
+  // responde pedidos. Na home nova ele vem recolhido com o contador de
+  // abertos no título — abrir mostra os cards (o broadcast da Dandara
+  // chega pra ele)
+  const mural = page.locator("details#mural-especialista");
+  await expect(mural).toBeAttached();
   await expect(
-    page.getByRole("heading", { name: "Pedidos de especialista" })
+    mural.getByRole("heading", { name: /Pedidos de especialista \(\d+\)/ })
   ).toBeVisible();
-  await expect(page.getByText(/Dandara/).first()).toBeVisible();
+  await expect(mural).not.toHaveJSProperty("open", true);
+  await mural.locator("summary").click();
+  await expect(mural).toHaveJSProperty("open", true);
+  await expect(mural.getByText(/Dandara/).first()).toBeVisible();
 });
 
 test("agenda do híbrido: duas abas — Ciclo DPP + Especialista com grade editável", async ({

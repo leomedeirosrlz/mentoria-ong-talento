@@ -150,7 +150,7 @@ export default async function RelatoriosPage({
       <PageHeader
         kicker="Operação"
         title="Relatórios"
-        meta="Escolha turma, granularidade e colunas — a grade abaixo é livre: redimensione, ordene e exporte"
+        meta="Escolha turma, granularidade e colunas. A grade abaixo é livre: redimensione, ordene e exporte"
       />
       <RelatorioBuilder
         turmas={turmas}

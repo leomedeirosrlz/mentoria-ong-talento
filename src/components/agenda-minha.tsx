@@ -357,7 +357,7 @@ function Rail({ agenda }: { agenda: AgendaMinhaDerivada }) {
                   {semana.encontros}{" "}
                   {semana.encontros === 1 ? "encontro" : "encontros"}
                 </b>
-                {semana.encontrosDetalhe ? ` — ${semana.encontrosDetalhe}` : ""}
+                {semana.encontrosDetalhe ? ` · ${semana.encontrosDetalhe}` : ""}
                 {semana.realizados > 0 && (
                   <span className="text-[var(--ok-text)]">
                     {" "}
@@ -376,7 +376,7 @@ function Rail({ agenda }: { agenda: AgendaMinhaDerivada }) {
                   {semana.sessoesEsp}{" "}
                   {semana.sessoesEsp === 1 ? "sessão de especialista" : "sessões de especialista"}
                 </b>
-                {semana.sessoesEspDetalhe ? ` — ${semana.sessoesEspDetalhe}` : ""}{" "}
+                {semana.sessoesEspDetalhe ? ` · ${semana.sessoesEspDetalhe}` : ""}{" "}
                 <span className="text-muted-foreground">(você acompanha)</span>
               </span>
             </p>
@@ -411,7 +411,7 @@ function Rail({ agenda }: { agenda: AgendaMinhaDerivada }) {
                   {semana.pendencias}{" "}
                   {semana.pendencias === 1 ? "pendência" : "pendências"}
                 </b>{" "}
-                — {semana.pendencias === 1 ? "está" : "estão"} no topo de hoje
+                {semana.pendencias === 1 ? "está" : "estão"} no topo de hoje
               </span>
             </p>
           )}
@@ -535,7 +535,7 @@ export function AgendaMinha({
       <div className="rounded-xl bg-card px-5 py-10 text-center shadow-[var(--shadow-border)]">
         <p className="text-sm text-muted-foreground">
           Você ainda não está em nenhuma dupla. Quando a coordenação formar
-          uma, seus encontros aparecem aqui — junto com a agenda que seu
+          uma, seus encontros aparecem aqui, junto com a agenda que seu
           mentorado tem com os especialistas.
         </p>
       </div>
@@ -563,9 +563,9 @@ export function AgendaMinha({
           hoje={hoje}
           modo="mentor"
           titulo="Minha agenda"
-          ariaLabel="Minha agenda — semana do programa"
+          ariaLabel="Minha agenda · semana do programa"
           sufixoVisao={hibrido ? "&visao=dpp" : ""}
-          nota="A semana do seu lado — encontros das suas duplas, formações e supervisões."
+          nota="A semana do seu lado: encontros das suas duplas, formações e supervisões."
         />
       )}
 
@@ -590,7 +590,7 @@ export function AgendaMinha({
         </div>
       </div>
       <p className="text-xs leading-relaxed text-muted-foreground">
-        “Tudo” inclui o que seus jovens têm marcado — itens que não são seus
+        “Tudo” inclui o que seus jovens têm marcado. Itens que não são seus
         vêm sinalizados “você não participa”.
       </p>
 

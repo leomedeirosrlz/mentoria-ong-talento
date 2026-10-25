@@ -17,14 +17,21 @@ import {
   useSpring,
   useTransform,
 } from "motion/react";
-import { Donut, type FatiaDonut } from "@/components/viz";
+import { Info } from "@phosphor-icons/react";
 import { Sparkline, type SerieSpark } from "@/components/viz/sparkline";
+import { SaudePrograma } from "@/components/saude-programa";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   DIAS_SEMANA_CURTOS,
   diaSemanaDe,
   formatDiaMes,
   toDateStr,
 } from "@/lib/ciclo";
+import type { SaudeRecorte } from "@/lib/agenda-coordenacao";
 import { cn } from "@/lib/utils";
 import type {
   PanoramaCelula,
@@ -140,7 +147,7 @@ function SegLocal<T extends string>({
           className={cn(
             "min-h-11 rounded-full px-3 text-xs font-semibold whitespace-nowrap text-muted-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-7 sm:px-2.5",
             valor === o.id
-              ? "bg-muted font-bold text-foreground"
+              ? "bg-muted text-foreground"
               : "hover:text-foreground"
           )}
         >
@@ -151,18 +158,50 @@ function SegLocal<T extends string>({
   );
 }
 
+/** "Como calculamos": as regras da leitura ficam atrás de um popover, não no
+ *  corpo do card. */
+function ComoCalculamos({
+  itens,
+}: {
+  itens: { termo: string; texto: string }[];
+}) {
+  return (
+    <Popover>
+      <PopoverTrigger className="inline-flex min-h-11 items-center gap-1.5 rounded-lg px-2 text-xs font-semibold text-foreground/80 transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50 sm:min-h-8">
+        <Info size={14} aria-hidden />
+        Como calculamos
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-[min(22rem,calc(100vw-2rem))] p-4">
+        <p className="text-sm font-semibold">Como calculamos</p>
+        <dl className="mt-3 grid gap-3 text-sm">
+          {itens.map((r) => (
+            <div key={r.termo}>
+              <dt className="font-semibold">{r.termo}</dt>
+              <dd className="mt-0.5 text-muted-foreground">{r.texto}</dd>
+            </div>
+          ))}
+        </dl>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 export function RegistrosPainel({
   panorama,
   hoje,
+  saude,
 }: {
   panorama: RegistrosPanorama;
   /** "YYYY-MM-DD" do servidor — a régua de hoje/semana não depende do fuso
    *  da máquina cliente nem difere entre SSR e hidratação. */
   hoje: string;
+  /** situação das duplas no recorte: `saudeDoRecorte` no servidor, o mesmo
+   *  resumo de /duplas, /agenda e da home */
+  saude: SaudeRecorte;
 }) {
   const [metrica, setMetrica] = useState<MetricaBarra>("entregues");
   const [modoLinha, setModoLinha] = useState<ModoLinha>("media");
-  const { slots, turmas, donut, espNoRecorte } = panorama;
+  const { slots, turmas, espNoRecorte } = panorama;
   const met = METRICAS_BARRA.find((m) => m.id === metrica)!;
 
   const corDe = useMemo(
@@ -174,7 +213,7 @@ export function RegistrosPainel({
   );
 
   // ---------- cobertura: colunas por encontro ----------
-  const PLOT_H = 176;
+  const PLOT_H = 150;
   // escala por denominador: a coluna mais alta (soma das esperadas do slot)
   // encosta no topo do plot — o trilho ENCOLHE com o esperado (pausas,
   // turma ainda não chegou) em vez de normalizar pro mesmo tamanho
@@ -236,13 +275,13 @@ export function RegistrosPainel({
         return `${nome} ainda não chegou (${formatDiaMes(c.dataOficial)})`;
       const base = `${nome} ${feitoDe(c, metrica)} de ${c.esperadas} ${met.ariaFeito}`;
       if (c.estado === "semana")
-        return `${base} — ${rotuloQuando(c.dataOficial, hoje)}`;
+        return `${base}, ${rotuloQuando(c.dataOficial, hoje)}`;
       if (c.totalPendentes > 0)
         // a lista é sempre "quem não entregou o registro" — fora do modo
         // entregues o prefixo nomeia a métrica certa em vez de insinuar
         // que a falta é do indicador ligado (realizado/avaliação)
         return (
-          `${base} — ${metrica === "entregues" ? "falta" : "registro pendente"}: ${c.pendentes.join(", ")}` +
+          `${base}, ${metrica === "entregues" ? "falta" : "registro pendente"}: ${c.pendentes.join(", ")}` +
           (c.totalPendentes > c.pendentes.length
             ? ` +${c.totalPendentes - c.pendentes.length}`
             : "")
@@ -271,7 +310,7 @@ export function RegistrosPainel({
             } ainda não chegou`
         );
       return `${s.numero}º ${feito} de ${esp}${semana ? " (a acontecer)" : ""}${
-        futuras.length ? ` — ${futuras.join(", ")}` : ""
+        futuras.length ? `, ${futuras.join(", ")}` : ""
       }`;
     })
     .join("; ")}`;
@@ -326,7 +365,7 @@ export function RegistrosPainel({
   // recorte não tem encontro nenhum: é justamente o caso que mais confunde)
   const notaEsp =
     espNoRecorte > 0
-      ? `${espNoRecorte} ${espNoRecorte === 1 ? "trilha" : "trilhas"} de especialista segue${espNoRecorte === 1 ? "" : "m"} calendário próprio — fora das colunas.`
+      ? `${espNoRecorte} ${espNoRecorte === 1 ? "trilha" : "trilhas"} de especialista segue${espNoRecorte === 1 ? "" : "m"} calendário próprio, fora das colunas.`
       : null;
   // o gráfico da linha tem dado pra mostrar? — espelho das condições de
   // empty state abaixo: a legenda do card só faz sentido junto do plot
@@ -336,34 +375,6 @@ export function RegistrosPainel({
       : temDados &&
         (modoLinha === "media" ? todasEstrelas : todasNotasMentor).length >
           0;
-
-  // ---------- donut: semáforo ----------
-  const fatias: FatiaDonut[] = [
-    { valor: donut.andamento, rotulo: "Em andamento", cor: "var(--ok)" },
-    { valor: donut.atencao, rotulo: "Atenção", cor: "var(--warn)" },
-    { valor: donut.risco, rotulo: "Risco", cor: "var(--danger)" },
-    { valor: donut.pausada, rotulo: "Pausada", cor: "var(--pausa)" },
-    { valor: donut.apoio, rotulo: "Apoio aberto", cor: "var(--info)" },
-    ...(donut.concluida > 0
-      ? [
-          {
-            valor: donut.concluida,
-            rotulo: "Concluída",
-            cor: "var(--chart-5)",
-          },
-        ]
-      : []),
-    ...(donut.encerrada > 0
-      ? [
-          {
-            valor: donut.encerrada,
-            rotulo: "Encerrada",
-            cor: "var(--muted-foreground)",
-          },
-        ]
-      : []),
-  ];
-  const pedemOlho = donut.atencao + donut.risco;
 
   const vazio = (msg: string) => (
     <div className="flex flex-1 items-center justify-center rounded-lg border border-dashed border-border py-10 text-center">
@@ -383,18 +394,37 @@ export function RegistrosPainel({
       >
         <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
           <div className="min-w-0">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+            <p className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground sm:text-[11px]">
               Cobertura
             </p>
-            <h3 id="pan-bar-t" className="mt-0.5 text-sm font-bold">
+            <h3 id="pan-bar-t" className="mt-0.5 text-base font-semibold">
               {met.titulo}
             </h3>
-            <div className="mt-2">
+            <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1">
               <SegLocal
                 rotulo="Métrica das barras"
                 opcoes={METRICAS_BARRA}
                 valor={metrica}
                 onChange={setMetrica}
+              />
+              <ComoCalculamos
+                itens={[
+                  {
+                    termo: "Esperado",
+                    texto:
+                      "Duplas ativas que deviam estar no encontro. Pausada ou encerrada encolhe o trilho, não vira falta.",
+                  },
+                  {
+                    termo: "Parte vazia do trilho",
+                    texto:
+                      metrica === "realizados"
+                        ? "Encontro que ainda não aconteceu."
+                        : metrica === "avaliados"
+                          ? "Encontro sem a avaliação do jovem."
+                          : "Registro pendente ou encontro não realizado.",
+                  },
+                  ...(notaEsp ? [{ termo: "Trilhas de especialista", texto: notaEsp }] : []),
+                ]}
               />
             </div>
           </div>
@@ -407,7 +437,7 @@ export function RegistrosPainel({
                   "—"
                 )}
               </b>
-              <span className="mt-1 block text-[11px] font-semibold text-muted-foreground">
+              <span className="mt-1 block text-xs font-semibold text-muted-foreground sm:text-[11px]">
                 {met.legendaFeito}
                 {totEsp > 0 && ` · ${totFeito} de ${totEsp}`}
                 {totSemana > 0 && ` · ${totSemana} a acontecer`}
@@ -417,16 +447,7 @@ export function RegistrosPainel({
         </div>
 
         {!temDados ? (
-          <>
-            {vazio(
-              "Nenhum encontro oficial no recorte — ajuste turma ou período."
-            )}
-            {notaEsp && (
-              <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
-                {notaEsp}
-              </p>
-            )}
-          </>
+          vazio("Nenhum encontro oficial no recorte. Ajuste turma ou período.")
         ) : (
           <>
             <div
@@ -532,7 +553,7 @@ export function RegistrosPainel({
                 <span
                   key={t}
                   aria-hidden
-                  className="absolute left-0 -translate-y-1/2 text-[9.5px] font-semibold tabular-nums text-muted-foreground"
+                  className="absolute left-0 -translate-y-1/2 text-[10px] font-semibold tabular-nums text-muted-foreground"
                   style={{ bottom: t * escala }}
                 >
                   {t}
@@ -558,7 +579,7 @@ export function RegistrosPainel({
                         // como texto de 9px não tem contraste (T3 < 2:1)
                         <em
                           key={c.cronogramaId}
-                          className="block text-[9px] font-semibold not-italic leading-tight"
+                          className="block text-[10px] font-semibold not-italic leading-tight"
                         >
                           <i
                             aria-hidden
@@ -577,7 +598,7 @@ export function RegistrosPainel({
               })}
             </div>
 
-            <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[11px] text-muted-foreground">
+            <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground sm:text-[11px]">
               {turmas.map((t, i) => (
                 <span key={t.cronogramaId} className="inline-flex items-center gap-1.5">
                   <i
@@ -619,17 +640,6 @@ export function RegistrosPainel({
                 </span>
               )}
             </div>
-            <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
-              A parte vazia do trilho é{" "}
-              {metrica === "realizados"
-                ? "encontro que ainda não aconteceu"
-                : metrica === "avaliados"
-                  ? "encontro sem a avaliação do jovem"
-                  : "registro pendente ou encontro não realizado"}{" "}
-              — o esperado só conta duplas que deviam estar ali (pausada ou
-              encerrada encolhe o trilho, não vira falta).
-              {notaEsp && ` ${notaEsp}`}
-            </p>
             <details className="mt-2 text-xs text-muted-foreground">
               <summary className="inline-flex min-h-11 cursor-pointer items-center font-semibold text-foreground underline-offset-4 hover:underline sm:min-h-8">
                 ver dados em tabela
@@ -719,20 +729,44 @@ export function RegistrosPainel({
       >
         <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
           <div className="min-w-0">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+            <p className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground sm:text-[11px]">
               Avaliação por encontro
             </p>
-            <h3 id="pan-lin-t" className="mt-0.5 text-sm font-bold">
+            <h3 id="pan-lin-t" className="mt-0.5 text-base font-semibold">
               {modoLinha === "mentor"
                 ? "Nota média do mentor"
                 : "Avaliação média do jovem"}
             </h3>
-            <div className="mt-2">
+            <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1">
               <SegLocal
                 rotulo="Modo da linha"
                 opcoes={MODOS_LINHA}
                 valor={modoLinha}
                 onChange={setModoLinha}
+              />
+              <ComoCalculamos
+                itens={
+                  modoLinha === "mentor"
+                    ? [
+                        {
+                          termo: "Nota do mentor",
+                          texto:
+                            "A nota qualitativa (excelente, boa, regular, baixa) convertida para escala de 4 a 1. É a régua dele, não a do jovem.",
+                        },
+                      ]
+                    : [
+                        {
+                          termo: "Fonte",
+                          texto:
+                            "Avaliações do jovem por encontro, na escala de 1 a 5.",
+                        },
+                        {
+                          termo: "Encontro sem média",
+                          texto:
+                            "Encontro que ainda não aconteceu não entra na média, então a linha fica interrompida.",
+                        },
+                      ]
+                }
               />
             </div>
           </div>
@@ -752,14 +786,14 @@ export function RegistrosPainel({
                 "—"
               )}
             </b>
-            <span className="mt-1 block text-[11px] font-semibold text-muted-foreground">
+            <span className="mt-1 block text-xs font-semibold text-muted-foreground sm:text-[11px]">
               {modoLinha === "individual"
                 ? `${todasEstrelas.length === 1 ? "avaliação" : "avaliações"} no recorte`
                 : modoLinha === "mentor"
                   ? "média 1–4 · baixa→excelente"
                   : `média 1–5`}
               {modoLinha === "media" && atencaoLinha && (
-                <em className="not-italic font-bold" style={{ color: "var(--warn-text)" }}>
+                <em className="not-italic font-semibold" style={{ color: "var(--warn-text)" }}>
                   {" "}
                   · atenção: {fmt1(atencaoLinha.v)} no {atencaoLinha.slot}º{" "}
                   {atencaoLinha.turma}
@@ -799,14 +833,14 @@ export function RegistrosPainel({
               labelsX={labelsX}
               atencaoAbaixoDe={modoLinha === "media" ? 3.8 : 2.5}
               area={turmas.length === 1}
-              altura={170}
+              altura={140}
               animate
             />
           </div>
         )}
 
         {linhaTemDados && (
-          <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[11px] text-muted-foreground">
+          <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground sm:text-[11px]">
             {turmas.map((t, i) => (
               <span key={t.cronogramaId} className="inline-flex items-center gap-1.5">
                 <i
@@ -832,56 +866,16 @@ export function RegistrosPainel({
             )}
           </div>
         )}
-        <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
-          {modoLinha === "mentor"
-            ? "A nota qualitativa do mentor (excelente/boa/regular/baixa) convertida pra 4–1 — é a régua dele, não a do jovem."
-            : "Fonte: avaliações do jovem por encontro (escala 1–5). Encontro que ainda não aconteceu não entra na média — o buraco na linha é honesto."}
-        </p>
       </section>
 
-      {/* ==================== semáforo ==================== */}
-      <section
-        aria-labelledby="pan-don-t"
+      {/* ==================== situação das duplas ==================== */}
+      {/* o mesmo resumo de /duplas, /agenda e da home (saudeDoRecorte) */}
+      <div
         className="animate-enter flex min-w-0 flex-col rounded-xl bg-card p-5 shadow-[var(--shadow-border)] lg:col-span-5 lg:col-start-8 lg:row-start-1"
         style={{ "--i": 2 } as CSSProperties}
       >
-        <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-              Semáforo
-            </p>
-            <h3 id="pan-don-t" className="mt-0.5 text-sm font-bold">
-              Sinais no recorte
-            </h3>
-          </div>
-          <div className="text-right">
-            <b className="block text-3xl font-extrabold leading-none tracking-tight tabular-nums">
-              <NumeroVivo valor={pedemOlho} />
-            </b>
-            <span className="mt-1 block text-[11px] font-semibold text-muted-foreground">
-              pedem olho · {donut.atencao} atenção + {donut.risco} risco
-            </span>
-          </div>
-        </div>
-        <div className="mt-4 flex flex-1 items-center">
-          <Donut
-            fatias={fatias}
-            rotuloCentro="duplas"
-            tamanho={160}
-            animate
-            notaLegenda={
-              <>
-                Semáforo das duplas, não contagem de registros. Apoio é eixo
-                separado: chamado a tratar, não falha
-                {donut.apoioTotal > donut.apoio &&
-                  ` — ${donut.apoioTotal} ${donut.apoioTotal === 1 ? "chamado" : "chamados"} abertos no total (inclui quem já está em atenção/risco)`}
-                .
-              </>
-            }
-            className="w-full"
-          />
-        </div>
-      </section>
+        <SaudePrograma saude={saude} nivel="h3" className="flex-1" />
+      </div>
     </div>
   );
 }
@@ -902,7 +896,7 @@ function ScatterEstrelas({
   labelsX: string[];
   turmas: RegistrosPanorama["turmas"];
 }) {
-  const H = 170;
+  const H = 140;
   const PAD = 8; // % — mesma régua da Sparkline
   const n = Math.max(slots.length, 1);
   const y = (v: number) =>
@@ -978,7 +972,7 @@ function ScatterEstrelas({
           <span
             key={t}
             aria-hidden
-            className="absolute left-0 -translate-y-1/2 text-[9.5px] font-semibold tabular-nums text-muted-foreground"
+            className="absolute left-0 -translate-y-1/2 text-[10px] font-semibold tabular-nums text-muted-foreground"
             style={{ top: `${y(t)}%` }}
           >
             {t}

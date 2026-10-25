@@ -225,7 +225,7 @@ function ContraPropostaForm({
                     checked={slot === sl}
                     onChange={() => setSlot(sl)}
                     className="peer sr-only"
-                    aria-label={`${rotuloSlot(sl)}${compat ? " — encaixa com você" : ""}`}
+                    aria-label={`${rotuloSlot(sl)}${compat ? " · encaixa com você" : ""}`}
                   />
                   <span
                     title={compat ? "encaixa com você" : undefined}
@@ -253,7 +253,7 @@ function ContraPropostaForm({
         ))}
       </div>
       {algumCompat && (
-        <p className="text-[11px] text-muted-foreground">
+        <p className="text-xs text-muted-foreground sm:text-[11px]">
           <span
             aria-hidden
             className="mr-1 inline-block size-2 rounded-full bg-[var(--warn)] align-middle"
@@ -337,7 +337,7 @@ function RecusaForm({
                 onErro?.(r.error);
               }
               else {
-                toast.success("Pedido recusado — o autor foi avisado.");
+                toast.success("Pedido recusado. O autor foi avisado.");
                 onFechar();
               }
             })
@@ -434,12 +434,12 @@ export function SolicitacaoNegociacao({
       const quem = s.especialista?.nome ?? s.desejado?.nome;
       return papel === "mentorado" ? (
         <p className="text-sm text-muted-foreground">
-          {quem ? `${quem} não pôde pegar o pedido` : "O pedido não rolou"} —
+          {quem ? `${quem} não pôde pegar o pedido` : "O pedido não rolou"}:
           “{s.justificativa_recusa}”. Você pode fazer um novo pedido.
         </p>
       ) : (
         <p className="text-sm text-muted-foreground">
-          Recusado{quemRecusou(s)} — “{s.justificativa_recusa}”
+          Recusado{quemRecusou(s)}: “{s.justificativa_recusa}”
         </p>
       );
     }
@@ -451,8 +451,8 @@ export function SolicitacaoNegociacao({
         <div className="space-y-2">
           <p className="text-sm text-muted-foreground">
             {papel === "mentorado"
-              ? "O horário proposto passou e o pedido expirou — cancela esse pra pedir de novo, ou fala com a coordenação."
-              : "O horário proposto passou — o pedido expirou. Um novo pedido precisa ser feito."}
+              ? "O horário proposto passou e o pedido expirou. Cancela esse pra pedir de novo, ou fala com a coordenação."
+              : "O horário proposto passou e o pedido expirou. Um novo pedido precisa ser feito."}
           </p>
           <div className="flex flex-wrap items-center gap-2">
             {souAutorAqui && (
@@ -517,7 +517,7 @@ export function SolicitacaoNegociacao({
 
       {espereOutro ? (
         <p className="text-xs text-muted-foreground">
-          Aguardando resposta — sua proposta é a última da mesa.
+          Aguardando resposta. Sua proposta é a última da mesa.
         </p>
       ) : souEsp ? (
         <div className="space-y-2">
@@ -536,7 +536,7 @@ export function SolicitacaoNegociacao({
                         toastErro(r.error);
                         onErro?.(r.error);
                       } else {
-                        toast.success("Pedido aceito — sessão marcada.");
+                        toast.success("Pedido aceito. Sessão marcada.");
                         onAceito?.(r.duplaId);
                       }
                     })
@@ -547,8 +547,8 @@ export function SolicitacaoNegociacao({
                 </Button>
               ) : slots.length === 0 ? (
                 <p className="text-xs text-muted-foreground">
-                  Sem horário livre na sua agenda nas próximas semanas —
-                  abra janelas na sua agenda pra aceitar.
+                  Sem horário livre na sua agenda nas próximas semanas.
+                  Abra horários na sua agenda pra aceitar.
                 </p>
               ) : (
                 <>
@@ -582,7 +582,7 @@ export function SolicitacaoNegociacao({
                           toastErro(r.error);
                           onErro?.(r.error);
                         } else {
-                          toast.success("Pedido aceito — sessão marcada.");
+                          toast.success("Pedido aceito. Sessão marcada.");
                           onAceito?.(r.duplaId);
                         }
                       })
@@ -666,7 +666,7 @@ export function SolicitacaoNegociacao({
               costuma propor mais; sem ele a mesa parecia bugada */}
           {propostas.length >= 4 && (
             <p className="text-xs text-muted-foreground">
-              Limite de propostas na mesa — combinem o horário por outro
+              Limite de propostas na mesa. Combinem o horário por outro
               canal.
             </p>
           )}
@@ -688,7 +688,7 @@ export function SolicitacaoNegociacao({
                         toastErro(r.error);
                         onErro?.(r.error);
                       } else {
-                        toast.success("Horário aceito — sessão marcada.");
+                        toast.success("Horário aceito. Sessão marcada.");
                         onAceito?.(r.duplaId);
                       }
                     })
@@ -780,8 +780,8 @@ export function SolicitacaoNegociacao({
             <div className="space-y-1.5">
               <p className="text-xs text-muted-foreground">
                 {papel === "mentorado"
-                  ? "Já foram muitas idas e vindas — se o horário não fechar, fala com a coordenação."
-                  : "Limite de propostas na mesa — combinem o horário por outro canal."}
+                  ? "Já foram muitas idas e vindas. Se o horário não fechar, fala com a coordenação."
+                  : "Limite de propostas na mesa. Combinem o horário por outro canal."}
               </p>
               {papel === "mentorado" && waCoord && (
                 <a
@@ -819,7 +819,7 @@ export function SolicitacaoNegociacao({
         // pedido aberto pela equipe no nome do jovem — ele enxerga, mas
         // quem senta na mesa é o staff
         <p className="text-xs text-muted-foreground">
-          Esse pedido foi aberto pela equipe pra você — quem combina o
+          Esse pedido foi aberto pela equipe pra você. Quem combina o
           horário é ela com {s.especialista?.nome ?? "o especialista"}.
         </p>
       ) : (

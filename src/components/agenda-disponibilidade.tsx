@@ -185,7 +185,7 @@ export function AgendaDisponibilidade({
         <CardTitle className="text-lg font-semibold">Sua agenda</CardTitle>
         <CardDescription className="mt-0.5">
           Os jovens com trilha ativa veem esses horários pra combinar as
-          sessões de 1h com você — quem marca o encontro é sempre a dupla;
+          sessões de 1h com você. Quem marca o encontro é sempre a dupla;
           aqui é a oferta, não o compromisso.
         </CardDescription>
       </CardHeader>
@@ -259,7 +259,7 @@ export function AgendaDisponibilidade({
                               type="button"
                               disabled={pending}
                               onClick={() => remover(removerJanela, j.id)}
-                              aria-label={`Remover janela de ${label} das ${horaCurta(j.hora_inicio)}`}
+                              aria-label={`Remover horário de ${label} das ${horaCurta(j.hora_inicio)}`}
                               className="-m-2.5 grid size-11 shrink-0 place-items-center rounded text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 sm:-m-1 sm:size-7"
                             >
                               <X size={11} aria-hidden />
@@ -298,7 +298,7 @@ export function AgendaDisponibilidade({
                     name="hora_inicio"
                     type="time"
                     required
-                    aria-label="Início da janela"
+                    aria-label="Início do horário"
                   />
                 </div>
                 <div className="w-28">
@@ -306,7 +306,7 @@ export function AgendaDisponibilidade({
                     name="hora_fim"
                     type="time"
                     required
-                    aria-label="Fim da janela"
+                    aria-label="Fim do horário"
                   />
                 </div>
                 <Button type="submit" size="sm" disabled={pending}>
@@ -406,8 +406,8 @@ export function AgendaDisponibilidade({
           {slots.length === 0 ? (
             <p className="text-sm text-muted-foreground">
               {grade.length === 0 && excecoes.length === 0
-                ? "Cadastre uma janela semanal ou um horário extra pra aparecerem horários aqui — é o que os jovens veem na agenda deles."
-                : "Nenhum horário livre nas próximas 3 semanas — está tudo bloqueado ou já marcado."}
+                ? "Cadastre um horário fixo por semana ou um horário extra pra aparecerem horários aqui. É o que os jovens veem na agenda deles."
+                : "Nenhum horário livre nas próximas 3 semanas: está tudo bloqueado ou já marcado."}
             </p>
           ) : (
             <>

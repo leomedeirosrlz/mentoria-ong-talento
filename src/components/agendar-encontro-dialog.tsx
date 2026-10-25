@@ -217,8 +217,8 @@ export function AgendarEncontroDialog({
         else {
           toast.success(
             atual
-              ? `Remarcação confirmada — ${nome}.`
-              : `Agendamento confirmado — ${nome}.`
+              ? `Remarcação confirmada: ${nome}.`
+              : `Agendamento confirmado: ${nome}.`
           );
           mudaOpen(false);
           router.refresh();
@@ -252,7 +252,7 @@ export function AgendarEncontroDialog({
         <DialogHeader>
           <DialogTitle>{nome}</DialogTitle>
           <DialogDescription>
-            Marque a data e o horário — se a data mudou, conte o motivo da
+            Marque a data e o horário. Se a data mudou, conte o motivo da
             remarcação.
           </DialogDescription>
         </DialogHeader>
@@ -284,8 +284,8 @@ export function AgendarEncontroDialog({
                   ? "sessão de especialista"
                   : "encontro de mentoria"}{" "}
                 marcada pra {formatDiaHora(conflitos[0].data_hora)}
-                {conflitos.length > 1 && ` (e mais ${conflitos.length - 1})`} —
-                confirme antes de seguir.
+                {conflitos.length > 1 && ` (e mais ${conflitos.length - 1})`}.
+                Confirme antes de seguir.
               </p>
             )}
           </div>
@@ -344,7 +344,7 @@ export function AgendarEncontroDialog({
             new Date(atual.data_hora) > new Date() && (
             <ConfirmDeleteButton
               titulo={`Desmarcar ${rotulo ? "a " : "o "}${nome}?`}
-              descricao="O encontro sai da agenda — vocês podem marcar de novo quando combinarem."
+              descricao="O encontro sai da agenda. Vocês podem marcar de novo quando combinarem."
               acao="Desmarcar"
               sucesso="Encontro desmarcado."
               onConfirm={async () => {

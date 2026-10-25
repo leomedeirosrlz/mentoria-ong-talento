@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { Eye } from "@phosphor-icons/react/dist/ssr";
 import {
   itensDaSemanaPrograma,
   numerosDaSemana,
@@ -8,8 +7,11 @@ import {
   sinteseMonitoramento,
   type MotivoAcompanhar,
 } from "@/lib/agenda-coordenacao";
-import { semanaBounds } from "@/lib/ciclo";
-import { turmaLonga } from "@/lib/turma";
+import {
+  eventosDoCronograma,
+  semanaBounds,
+  totalDaTrilha,
+} from "@/lib/ciclo";
 import { rotuloDiaAgenda } from "@/lib/agenda-minha";
 import { msgsContato } from "@/lib/whatsapp-msgs";
 import type { Interacao } from "@/lib/interacoes";
@@ -18,6 +20,12 @@ import { FilaAcompanhar, type LinhaFila } from "@/components/fila-acompanhar";
 import { NumerosSemanaSecao } from "@/components/numeros-semana";
 import { SemanaDoPrograma } from "@/components/semana-do-programa";
 import { lembreteDaDupla, mesLongo, semanaIso } from "@/components/agenda-partes";
+
+/** A pessoa como a linha canônica lê — sem o e-mail, que não precisa cruzar
+ *  a boundary da fila. */
+function pessoaDaFila(p: { id: string; nome: string; avatar_path?: string | null }) {
+  return { id: p.id, nome: p.nome, avatar_path: p.avatar_path ?? null };
+}
 
 /** Visão "Monitoramento" da coordenação (REALIZA-195 · mock v8b): faixa
  *  de síntese no topo (a leitura de 2s da fila), a faixa "Semana do
@@ -94,8 +102,9 @@ export function AgendaCoordenacao({
   // as linhas saem daqui já prontas pra boundary client da fila: destino,
   // rótulo, texto do lembrete e telefone resolvem no server — Dupla/
   // CicloEvento não cruzam pra lá
-  const linhas: LinhaFila[] = acompanhar.map((item) => {
+  const linhas: LinhaFila[] = acompanhar.flatMap((item) => {
     const dupla = duplasPorId.get(item.duplaId);
+    if (!dupla) return [];
     // o caso que assina a mensagem: registro > limbo > atraso > sem data —
     // prioridade própria do lembrete, não a ordem que a lib escolheu
     const caso: MotivoAcompanhar = item.motivos.includes("registro_pendente")
@@ -115,7 +124,7 @@ export function AgendaCoordenacao({
     // encerramento pendente: a pendência é da coordenação — a fila desenha
     // o CTA "Concluir rito" (link pra ficha) no lugar do LembreteButton
     const acaoFicha = item.motivos.includes("encerramento");
-    return {
+    return [{
       item,
       destino: apoioDoJovem ? "mentorado" : "mentor",
       rotulo: apoioDoJovem ? "Chamar" : item.rotuloLembrete,
@@ -138,7 +147,22 @@ export function AgendaCoordenacao({
         ? (dupla?.mentorado?.whatsapp ?? null)
         : (dupla?.mentor?.whatsapp ?? null),
       acao: acaoFicha ? ("ficha" as const) : ("lembrete" as const),
-    };
+      // a mesma linha canônica de /duplas: pessoas, progresso n/total e a
+      // esperada até hoje (fila sempre ativa, exceto o rito de encerramento)
+      mentor: pessoaDaFila(dupla.mentor),
+      mentorado: pessoaDaFila(dupla.mentorado),
+      progresso: {
+        total: totalDaTrilha(
+          dupla.trilha,
+          eventosDoCronograma(eventos, dupla.cronograma_id)
+        ),
+        realizados: dupla.encontros
+          .filter((e) => e.status === "realizado")
+          .map((e) => e.numero),
+        esperado: acaoFicha ? null : item.saude.esperado,
+        legenda: acaoFicha ? "jornada fechada" : `esperado ${item.saude.esperado}`,
+      },
+    }];
   });
 
   return (
@@ -154,12 +178,6 @@ export function AgendaCoordenacao({
             {rotuloHoje.charAt(0).toLowerCase() + rotuloHoje.slice(1)}
           </p>
         </div>
-        {/* o sbox "Você vê/NÃO vê" do mock foi cortado no desenho — fica
-            só a etiqueta discreta da postura */}
-        <p className="inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground">
-          <Eye size={14} aria-hidden />
-          Monitoramento — a agenda de cada dupla é da dupla
-        </p>
       </header>
 
       {/* faixa de síntese — leitura de 2s do estado da fila antes dos cards.
@@ -174,18 +192,15 @@ export function AgendaCoordenacao({
           <b className="font-semibold text-foreground">
             {sintese.total} para acompanhar
           </b>
-          {" · "}
-          <b
-            className={
-              sintese.criticas > 0
-                ? "font-semibold text-destructive"
-                : "font-medium"
-            }
-          >
-            {sintese.criticas}{" "}
-            {sintese.criticas === 1 ? "crítica" : "críticas"}
-          </b>
-          {sintese.atencao > 0 && ` · ${sintese.atencao} atenção`}
+          {sintese.criticas > 0 && (
+            <>
+              {" · "}
+              <b className="font-semibold text-foreground">
+                {sintese.criticas}{" "}
+                {sintese.criticas === 1 ? "urgente" : "urgentes"}
+              </b>
+            </>
+          )}
           {/* "sem agendamento" aqui = denominador das linhas-resumo
               (semAgendamento), não o motivo sem_data da fila — o rótulo
               casa com o "N sem agendamento" delas pra não parecer o mesmo
@@ -233,11 +248,10 @@ export function AgendaCoordenacao({
         podeChamada
         titulo="Semana do programa"
         ariaLabel="Semana do programa"
-        nota="O que a semana cobra — cada card abre o dia no calendário."
       />
 
       {/* ---- Números da semana (v8b): cobertura honesta por encontro +
-          semáforo com apoio em eixo separado + pulso com a ★ do jovem.
+          situação das duplas (a mesma de /duplas) + pulso com a ★ do jovem.
           O toggle T1/T2/Todas é estado próprio da seção ---- */}
       <NumerosSemanaSecao opcoes={numeros.opcoes} agregados={numeros.agregados} />
 
@@ -245,42 +259,21 @@ export function AgendaCoordenacao({
           quem pede ação. Chips filtram de verdade (FilaAcompanhar). ---- */}
       <section aria-label="Painel da semana">
         <h2 className="text-base font-semibold">Painel da semana</h2>
-        <p className="mt-1.5 max-w-[78ch] text-xs leading-relaxed text-muted-foreground">
-          {resumos.length > 1 ? (
-            <>
-              As turmas não começaram juntas — na mesma semana,{" "}
-              {resumos.map((r, i) => (
-                <span key={r.cronogramaId}>
-                  {i > 0 && (i === resumos.length - 1 ? " e " : ", ")}
-                  <b className="font-medium text-foreground">
-                    {turmaLonga(r.turma)} está no encontro{" "}
-                    {r.eventoNumero ?? "—"}
-                  </b>
-                </span>
-              ))}
-              . Por isso os números acima são por turma, nunca misturados.
-            </>
-          ) : (
-            "A operação da semana — quem pede atenção primeiro."
-          )}
-        </p>
-
-        <div className="mt-4" role="group" aria-label="Duplas para acompanhar">
+        <div
+          className="mt-4"
+          role="group"
+          aria-label="Duplas para acompanhar"
+          title="Sem agendamento ou atrasadas. Lembrar envia um aviso à dupla (notificação + WhatsApp se houver). A coordenação não marca o encontro por ela."
+        >
           <h3 className="text-sm font-semibold">
             Para acompanhar{" "}
             <span className="font-normal text-muted-foreground">
               · {acompanhar.length}
             </span>
           </h3>
-          <p className="mt-1.5 max-w-[78ch] text-xs leading-relaxed text-muted-foreground">
-            Sem agendamento ou atrasadas.{" "}
-            <b className="font-medium text-foreground">Lembrar</b> envia um
-            aviso à dupla (notificação + WhatsApp se houver) — a coordenação
-            não marca o encontro por ela.
-          </p>
           {acompanhar.length === 0 ? (
             <p className="mt-3 rounded-xl border border-dashed px-4 py-3 text-sm text-muted-foreground">
-              Tudo em dia — nenhuma dupla pede atenção.
+              Tudo em dia. Nenhuma dupla pede atenção.
             </p>
           ) : (
             <FilaAcompanhar linhas={linhas} />

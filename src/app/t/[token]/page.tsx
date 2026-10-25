@@ -17,7 +17,7 @@ import { TerceiroPublico } from "./terceiro-publico";
 const TOKEN_RE = /^[A-Za-z0-9_-]{20,128}$/;
 const TITULO = "Avaliação por terceiros";
 const DESCRICAO =
-  "Duas perguntas rápidas sobre a pessoa que te indicou — sua resposta é confidencial e ajuda a mentoria dela.";
+  "Duas perguntas rápidas sobre a pessoa que te indicou. Sua resposta é confidencial e ajuda a mentoria dela.";
 
 // link individual por WhatsApp — og genérico de propósito: o nome do jovem
 // não vai no preview (a página já mostra quando a pessoa abre)
@@ -119,7 +119,7 @@ export default async function TerceiroTokenPage({
               {demo && (
                 <p className="mb-4 flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
                   <Flask size={13} aria-hidden />
-                  Modo demonstração — respostas não são gravadas.
+                  Modo demonstração: respostas não são gravadas.
                 </p>
               )}
               <TerceiroPublico

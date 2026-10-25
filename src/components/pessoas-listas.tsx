@@ -446,7 +446,7 @@ export function PessoasListas({
       )}
 
       <section className="space-y-2">
-        <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground tabular-nums">
+        <h2 className="text-base font-semibold tabular-nums">
           {souCoord ? "Com acesso" : "Mentores e equipe"} ({filtrando ? `${pessoasExibidas.length} de ${totalPessoasSecao}` : totalPessoasSecao})
         </h2>
         <div className="rounded-xl bg-card shadow-[var(--shadow-border)] divide-y divide-border/60 overflow-hidden">
@@ -530,7 +530,7 @@ export function PessoasListas({
           mentorados das próprias duplas) — vazia, a seção se resume a uma
           linha discreta em vez do empty state de cadastro */}
       <section className="space-y-2">
-        <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground tabular-nums">
+        <h2 className="text-base font-semibold tabular-nums">
           {verFora ? "Fora do programa" : "Mentorados"} ({filtrando ? `${mentoradosExibidos.length} de ${totalMentoradosSecao}` : totalMentoradosSecao})
         </h2>
         <div className="rounded-xl bg-card shadow-[var(--shadow-border)] divide-y divide-border/60 overflow-hidden">
@@ -631,7 +631,7 @@ export function PessoasListas({
           className="space-y-2"
         >
           <Collapsible.Trigger className="group flex min-h-11 w-full items-center gap-1.5 rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:min-h-0">
-            <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground tabular-nums">
+            <h2 className="text-sm font-semibold tabular-nums">
               Fora do programa ({foraExibidos.length}
               {q && totalFora > foraExibidos.length ? ` de ${totalFora}` : ""})
             </h2>
@@ -674,7 +674,7 @@ export function PessoasListas({
           className="space-y-2"
         >
           <Collapsible.Trigger className="group flex min-h-11 w-full items-center gap-1.5 rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:min-h-0">
-            <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground tabular-nums">
+            <h2 className="text-sm font-semibold tabular-nums">
               Inativos ({inativasExibidas.length}
               {q && inativas.length > inativasExibidas.length
                 ? ` de ${inativas.length}`
@@ -1009,7 +1009,7 @@ function PessoaRow({
             )}
             {usoPrimario === 0
               ? temHistorico
-                ? `Sem dupla em andamento · ${capacidade === 1 ? "1 vaga" : `${capacidade} vagas`} — histórico na ficha`
+                ? `Sem dupla em andamento · ${capacidade === 1 ? "1 vaga" : `${capacidade} vagas`} · histórico na ficha`
                 : `Sem dupla em andamento · ${capacidade === 1 ? "1 vaga" : `${capacidade} vagas`} pra parear`
               : `${usoPrimario}/${capacidade} ${capacidade === 1 ? "dupla" : "duplas"} em andamento${usoPrimario >= capacidade ? " · sem vaga" : ""}`}
             {p.ativo && (
@@ -1101,7 +1101,7 @@ function PessoaRow({
               completar antes de mandar */}
           {!termoOk && faltantesTermo.length > 0 && (
             <ItemDetalhe icone={FileText} warn>
-              {`Civis incompletos pro termo (falta: ${faltantesTermo.join(" · ")}) — quem assina completa na hora`}
+              {`Civis incompletos pro termo (falta: ${faltantesTermo.join(" · ")}) · quem assina completa na hora`}
             </ItemDetalhe>
           )}
         </DetalhesRegiao>
@@ -1263,7 +1263,7 @@ function MentoradoRow({
                 m.motivo_saida,
               ]
                 .filter(Boolean)
-                .join(" — ")}
+                .join(" · ")}
             </ItemDetalhe>
           )}
           {menor && (
@@ -1298,7 +1298,7 @@ function MentoradoRow({
           )}
           {!docOk && faltantesDoc.length > 0 && (
             <ItemDetalhe icone={FileText} warn>
-              {`Civis incompletos pro documento (falta: ${faltantesDoc.join(" · ")}) — quem assina completa na hora`}
+              {`Civis incompletos pro documento (falta: ${faltantesDoc.join(" · ")}) · quem assina completa na hora`}
             </ItemDetalhe>
           )}
         </DetalhesRegiao>

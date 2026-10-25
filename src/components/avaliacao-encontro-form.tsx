@@ -10,6 +10,7 @@ import {
   Star,
 } from "@phosphor-icons/react";
 import { submeterAvaliacao } from "@/lib/actions-avaliacao";
+import { privacidadeAvaliacao } from "@/lib/avaliacao-privacidade";
 import {
   AVANCEI_AVALIACAO,
   SENTIMENTO_AVALIACAO,
@@ -38,6 +39,7 @@ export function AvaliacaoEncontroForm({
   encontroId,
   trilha,
   primeiroNome,
+  embutido = false,
   onEnviado,
 }: {
   /** Caminho público /avaliar/<token>. */
@@ -47,6 +49,9 @@ export function AvaliacaoEncontroForm({
   /** 'dpp' | 'especialista' — decide o toggle de visibilidade do mentor. */
   trilha: string;
   primeiroNome?: string | null;
+  /** Dentro de diálogo, o título já diz o encontro e a privacidade: o cabeçalho
+   *  de contexto (saudação, título, privacidade) some e a pergunta 1 vem primeiro. */
+  embutido?: boolean;
   /** Dispara depois do sucesso — o host de dialog usa pra fechar; o envio
    *  em si já foi gravado quando ele roda. */
   onEnviado?: (resultado: { pedirApoio: boolean }) => void;
@@ -131,10 +136,8 @@ export function AvaliacaoEncontroForm({
           </h1>
           <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-muted-foreground">
             {pedidoAjuda
-              ? `Obrigado${primeiroNome ? `, ${primeiroNome}` : ""} por contar. A coordenação foi avisada na hora e fala com você — o combinado do programa é responder em 1 dia útil.`
-              : trilha === "dpp"
-                ? `Obrigado${primeiroNome ? `, ${primeiroNome}` : ""}. Suas respostas ficam entre você e a equipe da Realiza.vc — pro seu mentor só aparece a média. Pode fechar esta página.`
-                : `Obrigado${primeiroNome ? `, ${primeiroNome}` : ""}. Suas respostas ficam entre você e a equipe da Realiza.vc — seu mentor vê só as estrelas desta sessão. Pode fechar esta página.`}
+              ? `Obrigado${primeiroNome ? `, ${primeiroNome}` : ""} por contar. A coordenação foi avisada na hora e fala com você. O combinado do programa é responder em 1 dia útil.`
+              : `Obrigado${primeiroNome ? `, ${primeiroNome}` : ""}. ${privacidadeAvaliacao(trilha)} Pode fechar esta página.`}
           </p>
         </motion.div>
       ) : (
@@ -145,28 +148,29 @@ export function AvaliacaoEncontroForm({
           className="space-y-3"
         >
           {/* card de contexto — a linha de privacidade É o argumento que
-              faz o jovem responder de verdade (D4) */}
-          <div className="overflow-hidden rounded-xl bg-card shadow-[var(--shadow-border)]">
-            <div aria-hidden className="h-1.5 bg-[var(--brand-lime)]" />
-            <div className="p-5 sm:p-7">
-              {primeiroNome && (
-                <p className="text-sm font-medium text-[var(--ok-text)]">
-                  Olá, {primeiroNome}!
+              faz o jovem responder de verdade (D4). Dentro do diálogo o
+              título e a privacidade já estão no cabeçalho dele */}
+          {!embutido && (
+            <div className="overflow-hidden rounded-xl bg-card shadow-[var(--shadow-border)]">
+              <div aria-hidden className="h-1.5 bg-[var(--brand-lime)]" />
+              <div className="p-5 sm:p-7">
+                {primeiroNome && (
+                  <p className="text-sm font-medium text-[var(--ok-text)]">
+                    Olá, {primeiroNome}!
+                  </p>
+                )}
+                <h1 className="mt-1 text-xl font-semibold tracking-tight">
+                  Como foi o encontro?
+                </h1>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  1 minuto · só a nota é obrigatória
                 </p>
-              )}
-              <h1 className="mt-1 text-xl font-semibold tracking-tight">
-                Como foi o encontro?
-              </h1>
-              <p className="mt-1 text-xs text-muted-foreground">
-                1 minuto · só a nota é obrigatória
-              </p>
-              <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-                {trilha === "dpp"
-                  ? "Pro seu mentor, a nota só aparece na média junto com outras avaliações — nunca uma resposta sozinha. Se quiser que ele leia esta, marque lá embaixo. Só a equipe da Realiza.vc lê as respostas completas."
-                  : "Seu mentor vê só as estrelas desta sessão — sem comentário nem temas. Só a equipe da Realiza.vc lê as respostas completas."}
-              </p>
+                <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+                  {privacidadeAvaliacao(trilha)}
+                </p>
+              </div>
             </div>
-          </div>
+          )}
 
           <form onSubmit={onSubmit} noValidate className="space-y-3">
             {/* estrelas — radios de verdade (teclado/leitor) com o visual
@@ -343,7 +347,7 @@ export function AvaliacaoEncontroForm({
                 name="comentario"
                 rows={3}
                 maxLength={COMENTARIO_MAX}
-                placeholder="Pode escrever do jeito que quiser — só a equipe lê."
+                placeholder="Pode escrever do jeito que quiser. Só a equipe lê."
               />
             </div>
 
@@ -380,7 +384,7 @@ export function AvaliacaoEncontroForm({
               <span>
                 <span className="font-medium">Preciso de ajuda</span> · a
                 coordenação e o auxiliar executivo são avisados na hora e falam com
-                você — pode ser sobre qualquer coisa, inclusive sobre o
+                você. Pode ser sobre qualquer coisa, inclusive sobre o
                 encontro ou o mentor.
               </span>
             </label>

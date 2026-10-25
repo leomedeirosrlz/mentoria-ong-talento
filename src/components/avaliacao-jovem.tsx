@@ -90,7 +90,7 @@ export function AvaliacaoJovemCard({
 
       {liberadaProMentor && (
         <p className="mt-1.5 text-xs text-muted-foreground">
-          O jovem ligou “meu mentor pode ler esta” — normalmente você só vê
+          O jovem ligou “meu mentor pode ler esta”. Normalmente você só vê
           a média das avaliações.
         </p>
       )}
@@ -213,7 +213,7 @@ export function AvaliacaoPendenteLinha({
       )}
       {souCoord && link?.status === "expirado" && (
         <span className="italic">
-          o link expirou — o jovem responde pela página dele
+          o link expirou · o jovem responde pela página dele
         </span>
       )}
     </div>
@@ -265,7 +265,7 @@ export function VozDoJovemCard({
 
   return (
     <section className="rounded-xl bg-card p-4 text-sm space-y-2 shadow-[var(--shadow-border)]">
-      <h2 className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+      <h2 className="flex items-center gap-2 text-base font-semibold">
         <span aria-hidden className="size-1.5 rounded-full bg-[var(--role-mentorado)]" />
         Voz do jovem
       </h2>
@@ -285,7 +285,7 @@ export function VozDoJovemCard({
               </span>
             </p>
             <p className="text-xs text-muted-foreground">
-              {media.n} recebidas no total — cada resposta é anônima pra
+              {media.n} recebidas no total. Cada resposta é anônima pra
               você e a média abre em lotes de 3, pra nenhuma ficar
               identificável. Quando o jovem quiser, ele libera uma
               avaliação inteira pra você ler na linha do encontro.
@@ -294,8 +294,8 @@ export function VozDoJovemCard({
         ) : (
           <p className="text-xs text-muted-foreground">
             {media && media.n > 0
-              ? `${media.n} ${media.n === 1 ? "avaliação recebida" : "avaliações recebidas"} — a média aparece pra você a partir de 3, pra nenhuma resposta ficar identificável.`
-              : "Ainda nenhuma avaliação do jovem. Ele recebe o link após cada encontro realizado — e cada resposta chega a você só como média."}
+              ? `${media.n} ${media.n === 1 ? "avaliação recebida" : "avaliações recebidas"}. A média aparece pra você a partir de 3, pra nenhuma resposta ficar identificável.`
+              : "Ainda nenhuma avaliação do jovem. Ele recebe o link após cada encontro realizado. Cada resposta chega a você só como média."}
           </p>
         )
       ) : (
@@ -321,14 +321,14 @@ export function VozDoJovemCard({
             <p className="text-xs text-muted-foreground">
               <span className="font-mono tabular-nums">{pendentes}</span> de{" "}
               <span className="font-mono tabular-nums">{realizados}</span>{" "}
-              realizados aguardando a resposta dele — o link sai na linha de
+              realizados aguardando a resposta dele · o link sai na linha de
               cada encontro.
             </p>
           )}
           {pedidoAjuda && (
             <p className="inline-flex items-center gap-1.5 text-xs font-medium text-[var(--danger)]">
               <HandHeart size={13} aria-hidden />
-              Pedido de ajuda em aberto — o atendimento é da coordenação.
+              Pedido de ajuda em aberto: o atendimento é da coordenação.
             </p>
           )}
         </div>
@@ -347,7 +347,7 @@ export function VozDoJovemEspecialista({
   if (!itens.length) return null;
   return (
     <section className="rounded-xl bg-card p-4 text-sm space-y-2 shadow-[var(--shadow-border)]">
-      <h2 className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+      <h2 className="flex items-center gap-2 text-base font-semibold">
         <span aria-hidden className="size-1.5 rounded-full bg-[var(--role-mentorado)]" />
         Voz do jovem
       </h2>
@@ -366,7 +366,7 @@ export function VozDoJovemEspecialista({
         ))}
       </ul>
       <p className="text-xs text-muted-foreground">
-        Só a nota chega até você — o que o jovem escreveu fica com a equipe.
+        Só a nota chega até você. O que o jovem escreveu fica com a equipe.
       </p>
     </section>
   );

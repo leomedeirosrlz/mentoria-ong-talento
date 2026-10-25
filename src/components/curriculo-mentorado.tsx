@@ -156,7 +156,7 @@ export function CurriculoMentorado({
         <LockSimple
           size={13}
           role="img"
-          aria-label="Confidencial — só coordenação e auxiliar executivo"
+          aria-label="Confidencial: só coordenação e auxiliar executivo"
           className="text-muted-foreground"
         />
       </h2>
@@ -175,7 +175,7 @@ export function CurriculoMentorado({
                 Ver currículo
               </a>
               <span className="block text-xs text-muted-foreground">
-                Arquivo PDF/imagem — abre em nova aba
+                Arquivo PDF/imagem · abre em nova aba
               </span>
             </span>
             <a
@@ -219,7 +219,7 @@ export function CurriculoMentorado({
         {!temAlgo && (
           <p className="text-xs text-muted-foreground">
             {podeEditar
-              ? "Nenhum currículo cadastrado — anexe o arquivo ou cole o link que veio do form."
+              ? "Nenhum currículo cadastrado. Anexe o arquivo ou cole o link que veio do form."
               : "Nenhum currículo cadastrado."}
           </p>
         )}

@@ -82,7 +82,7 @@ test.describe("demo — chamados (WP1)", () => {
     await page.goto(`/chamados?c=${CH_PLATAFORMA}`);
     await expect(
       page.getByText(
-        "Chamados de plataforma são tratados pela coordenação — assunto, autor e conversa não aparecem pra supervisão."
+        "Chamados de plataforma são tratados pela coordenação: assunto, autor e conversa não aparecem pra supervisão."
       )
     ).toBeVisible();
     await expect(linhaPlataforma.getByText(/Ana Beatriz/)).toHaveCount(0);
@@ -184,7 +184,7 @@ test.describe("demo — chamados (WP1)", () => {
 
     // o seletor sob demanda cobre quem não usa "@"
     await page
-      .getByRole("button", { name: "+ pessoas — marcar alguém da equipe" })
+      .getByRole("button", { name: "+ pessoas: marcar alguém da equipe" })
       .click();
     const pop = page.locator('[data-slot="popover-content"]');
     await pop.getByRole("checkbox").first().check();
@@ -235,7 +235,7 @@ test.describe("demo — chamados (WP1)", () => {
       page.getByRole("listbox", { name: "Marcar alguém da equipe" })
     ).toHaveCount(0);
     await expect(
-      page.getByRole("button", { name: "+ pessoas — marcar alguém da equipe" })
+      page.getByRole("button", { name: "+ pessoas: marcar alguém da equipe" })
     ).toHaveCount(0);
     await expect(page.getByText(/interno/i)).toHaveCount(0);
   });

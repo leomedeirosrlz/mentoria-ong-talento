@@ -135,7 +135,7 @@ function CardPrograma({
             “{item.tema.titulo}”
           </p>
           {item.tema.fase && (
-            <p className="mt-0.5 text-[11px] text-muted-foreground">
+            <p className="mt-0.5 text-xs text-muted-foreground sm:text-[11px]">
               {item.tema.fase}
             </p>
           )}
@@ -233,7 +233,7 @@ export function SemanaDoPrograma({
       ) : (
         <div
           role="region"
-          aria-label={`${titulo} — role horizontalmente`}
+          aria-label={`${titulo}. Role horizontalmente`}
           tabIndex={0}
           className="scroll-fina -mx-4 mt-3 overflow-x-auto px-4 pb-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           style={FADE_LATERAL}

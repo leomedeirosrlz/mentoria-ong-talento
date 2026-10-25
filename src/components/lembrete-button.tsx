@@ -57,7 +57,7 @@ export function LembreteButton({
         variant="outline"
         size={size}
         disabled
-        title={`1 lembrete a cada 48h por dupla — destrava ${formatDiaMes(ate.toISOString()).replace(/\/\d{4}$/, "")}`}
+        title={`1 lembrete a cada 48h por dupla. Destrava ${formatDiaMes(ate.toISOString()).replace(/\/\d{4}$/, "")}`}
       >
         <ChatsCircle size={14} aria-hidden />
         Lembrada {formatDiaMes(enviado.toISOString()).replace(/\/\d{4}$/, "")}
@@ -80,7 +80,7 @@ export function LembreteButton({
         if (res.demo) {
           // no demo o número é fictício — a mensagem não abre o wa.me de
           // verdade, só a notificação simulada
-          toast.success("Modo demo — nada é enviado de verdade.");
+          toast.success("Modo demo: nada é enviado de verdade.");
         } else {
           toast.success("Lembrete enviado.");
           const wa = waLink(telefone, corpo);

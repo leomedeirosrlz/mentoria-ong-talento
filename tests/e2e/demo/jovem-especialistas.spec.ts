@@ -36,14 +36,15 @@ test.describe("mentorado — home, página e ciclo de vida", () => {
       card.getByRole("heading", { name: "Especialistas" })
     ).toBeVisible();
     // sugestão > trilha > pedido > convite: a do Ricardo está esperando
-    // resposta — ganha do "em andamento" da Sofia
-    await expect(
-      card.getByText("Sugestão esperando sua resposta")
-    ).toBeVisible();
+    // resposta — ganha do "em andamento" da Sofia. O card inteiro é o
+    // link (uma ação por contexto): o título conta o N e o corpo diz quem
+    const link = card.getByRole("link", {
+      name: /1 sugestão esperando você/,
+    });
+    await expect(link).toBeVisible();
     await expect(
       card.getByText(/Ricardo sugeriu um especialista pra você/)
     ).toBeVisible();
-    const link = card.getByRole("link", { name: "Ver a sugestão" });
     await expect(link).toHaveAttribute("href", "/jovem/especialistas");
 
     // o clique leva pra página — a sugestão aparece na seção própria
@@ -78,6 +79,28 @@ test.describe("mentorado — home, página e ciclo de vida", () => {
     await expect(
       trilhas.getByRole("heading", { name: "Suas trilhas" })
     ).toBeVisible();
+
+    // rodada out/2026: a trilha virou cartão compacto — progresso "N de 5
+    // sessões" com barra, "Próximo passo" e a devolutiva mais recente em
+    // prévia ficam à vista. O ciclo de vida, a linha do tempo das sessões
+    // e o feed completo moram no <details> "Ver trilha completa" (fechado
+    // por padrão) — abre os dois antes de conferir o recolhível.
+    await expect(trilhas.getByRole("progressbar")).toHaveCount(2);
+    // exact: uma devolutiva da Helena traz "Próximo passo —" no corpo —
+    // getByText casa texto dentro do <details> fechado também
+    await expect(
+      trilhas.getByText("Próximo passo", { exact: true })
+    ).toHaveCount(2);
+    await expect(
+      trilhas.getByText("Última devolutiva", { exact: true })
+    ).toHaveCount(2);
+    await expect(trilhas.getByText(/Trilha concluída em/)).toBeVisible();
+
+    const completas = trilhas.getByText("Ver trilha completa");
+    await expect(completas).toHaveCount(2);
+    for (const summary of await completas.all()) {
+      await summary.click();
+    }
 
     // as duas trilhas (Sofia ativa + Helena concluída) trazem o ciclo de
     // vida em 5 passos e o stepper do guia — dois lists por card
@@ -144,7 +167,7 @@ test.describe("mentorado — home, página e ciclo de vida", () => {
     const radios = grupo.getByRole("radio", { name: / às \d{2}:\d{2}/ });
     expect(await radios.count()).toBeGreaterThan(0);
     const encaixados = grupo.getByRole("radio", {
-      name: /— encaixa com você/,
+      name: /· encaixa com você/,
     });
     expect(await encaixados.count()).toBe(await radios.count());
     // selecionar um ativa o botão Propor — estado da escolha fica no radio
@@ -172,14 +195,14 @@ test.describe("mentorado — home, página e ciclo de vida", () => {
     await expect(catalogo.getByText("Camila Ferraz")).toBeVisible();
     await expect(catalogo.getByText("Sem vagas")).toBeVisible();
     await expect(
-      catalogo.getByText("Agenda cheia no momento — seu pedido vai pro mural.")
+      catalogo.getByText("Agenda cheia no momento. Seu pedido vai pro mural.")
     ).toBeVisible();
     // Marcos — alvo da sugestão; nunca abriu grade → "Agenda não aberta"
     await expect(catalogo.getByText("Marcos Vinícius")).toBeVisible();
     await expect(catalogo.getByText("Agenda não aberta")).toBeVisible();
     await expect(
       catalogo.getByText(
-        "Ainda não liberou horários — seu pedido vai pro mural."
+        "Ainda não liberou horários. Seu pedido vai pro mural."
       )
     ).toBeVisible();
     // Sofia — a especialista da Bia: variante "sua" com os dois gestos
@@ -259,6 +282,9 @@ test.describe("especialista — mural com busca e filtros", () => {
     await expect(
       secao.getByRole("heading", { name: "Pedidos de especialista" })
     ).toBeVisible();
+    // o mural fica recolhido com o contador no título — a lista de
+    // trabalho abre sob gesto (home enxuta por desenho)
+    await secao.locator("summary").click();
     // a lista de pedidos é a primeira da região (a segunda é "Sessões
     // confirmadas" — fora do filtro)
     const lista = secao.getByRole("list").first();
@@ -321,6 +347,12 @@ test.describe("coordenação — painel de trilhas e pedidos parados", () => {
     await expect(
       page.getByText("Trilhas de especialista").first()
     ).toBeVisible();
+    // painel somente-leitura recolhido com contador (a home virou fila
+    // de trabalho: "Precisa de você hoje") — abre sob gesto
+    await page
+      .locator("#trilhas-especialista")
+      .locator("summary")
+      .click();
     await expect(page.getByText("Somente leitura").first()).toBeVisible();
 
     // alerta operacional — o pedido do Wendel espera triagem há 6 dias

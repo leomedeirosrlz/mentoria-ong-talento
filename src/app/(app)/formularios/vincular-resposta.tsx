@@ -131,7 +131,7 @@ export function VincularResposta({
           {escolhido && (
             <p className="rounded-lg bg-muted px-3 py-2 text-xs text-muted-foreground">
               Vincular esta resposta a {escolhido.nome}? Todo o histórico dela
-              passa a contar na jornada dessa pessoa — e quem vinculou fica
+              passa a contar na jornada dessa pessoa. Quem vinculou fica
               registrado.
             </p>
           )}

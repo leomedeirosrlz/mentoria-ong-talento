@@ -230,7 +230,7 @@ export const ESTACOES: Record<
   avaliacao_encontro: {
     titulo: "Avaliação do encontro",
     descricao:
-      "Depois de cada encontro, uma nota de 1 a 5 e um comentário. É recorrente — acompanha o ciclo inteiro.",
+      "Depois de cada encontro, uma nota de 1 a 5 e um comentário. É recorrente: acompanha o ciclo inteiro.",
     encIni: 1,
     encFim: 16,
     chipLabel: "Todo encontro",
@@ -450,7 +450,7 @@ function resolveEstacao<
       respondidoEm: ultima!.respondido_em ?? ultima!.usado_em ?? null,
       token: reemissao.token,
       snippet: null,
-      detalhe: "o mentor enviou uma nova rodada — a resposta anterior segue salva",
+      detalhe: "o mentor enviou uma nova rodada: a resposta anterior segue salva",
       respostas: ultima!.respostas,
     };
   }
@@ -476,7 +476,7 @@ function resolveEstacao<
       respondidoEm: null,
       token: null,
       snippet: null,
-      detalhe: `libera no enc. ${ESTACOES[chave].encIni}${dm ? ` (${dm})` : ""}`,
+      detalhe: `libera no encontro ${ESTACOES[chave].encIni}${dm ? ` (${dm})` : ""}`,
       respostas: null,
     };
   }
@@ -504,12 +504,12 @@ function resolveEstacao<
   const passou = ctx.encCorrente > ctx.encFim;
   const detalhe = expirada
     ? ctx.emissor === "mentor"
-      ? "o link expirou — peça ao mentor pra reenviar"
-      : "o link expirou — peça à coordenação pra reenviar"
+      ? "o link expirou: peça ao mentor pra reenviar"
+      : "o link expirou: peça à coordenação pra reenviar"
     : passou
       ? ctx.emissor === "mentor"
-        ? "o link ainda não chegou — fala com teu mentor"
-        : "o link ainda não chegou — a coordenação pode ajudar"
+        ? "o link ainda não chegou: fala com teu mentor"
+        : "o link ainda não chegou: a coordenação pode ajudar"
       : ctx.emissor === "mentor"
         ? "o mentor envia quando chegar a hora"
         : "a coordenação envia quando chegar a hora";
@@ -1004,7 +1004,7 @@ export function agrupaPorTurma(resolvidas: LinhaResolvida[]): GrupoTurma[] {
       return {
         cronogramaId,
         nome: turma ? turmaLonga(turma) : "Sem turma",
-        sigla: turma ? turmaCurta(turma) : "—",
+        sigla: turma ? turmaCurta(turma) : "",
         ctx: linhas[0]!.ctx,
         linhas,
       };

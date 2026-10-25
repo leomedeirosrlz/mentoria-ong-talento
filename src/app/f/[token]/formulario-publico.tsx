@@ -627,7 +627,7 @@ function CampoOutro({ campo, ativo }: { campo: FormularioCampo; ativo: boolean }
         placeholder="Qual?"
         maxLength={120}
         required
-        aria-label={`${campo.label} — outro`}
+        aria-label={`${campo.label}: outro`}
       />
     </div>
   );
@@ -660,7 +660,7 @@ function CampoArquivo({
     if (!file || pending) return;
     const maxMb = campo.max_mb ?? ARQUIVO_MAX_MB;
     if (file.size > maxMb * 1024 * 1024) {
-      setErroUp(`Arquivo grande demais — máximo ${maxMb} MB.`);
+      setErroUp(`Arquivo grande demais. Máximo ${maxMb} MB.`);
       return;
     }
     const fd = new FormData();

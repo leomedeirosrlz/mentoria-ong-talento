@@ -77,7 +77,7 @@ export function AgendaEspecialista({
         <h1 className="text-2xl font-semibold tracking-tight">Agenda</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Mentoria especializada · até 5 sessões de 1h em até 3 meses. Cada
-          sessão nasce de um pedido aceito — sem terça oficial.
+          sessão nasce de um pedido aceito, sem terça oficial.
         </p>
       </header>
 
@@ -128,7 +128,7 @@ export function AgendaEspecialista({
             <CardHeader className="border-b bg-muted/30">
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                  <p className="text-xs sm:text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
                     Mentoria especializada
                   </p>
                   <CardTitle className="mt-1 text-lg font-semibold">
@@ -155,7 +155,7 @@ export function AgendaEspecialista({
 
               {porVir.length > 0 && (
                 <div>
-                  <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                  <p className="mb-1.5 text-xs sm:text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
                     Próximos
                   </p>
                   <ul className="divide-y divide-border rounded-lg border border-border">
@@ -173,7 +173,7 @@ export function AgendaEspecialista({
 
               {passados.length > 0 && (
                 <div>
-                  <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                  <p className="mb-1.5 text-xs sm:text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
                     Já passaram
                   </p>
                   <ul className="divide-y divide-border rounded-lg border border-border">
@@ -204,7 +204,7 @@ export function AgendaEspecialista({
                     />
                   ) : (
                     <p className="text-xs text-muted-foreground">
-                      Sessão nova nasce de um pedido aceito — do jovem ou da
+                      Sessão nova nasce de um pedido aceito: do jovem ou da
                       coordenação. Quando um chegar, ela aparece aqui.
                     </p>
                   )}

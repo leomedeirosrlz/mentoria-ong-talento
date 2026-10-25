@@ -89,7 +89,7 @@ test.describe("agenda demo do mentor DPP — Sua semana / Do programa / Lembrar 
     await expect(lembrarBia).toBeEnabled();
     await lembrarBia.click();
     await expect(
-      page.getByText("Modo demo — nada é enviado de verdade.")
+      page.getByText("Modo demo: nada é enviado de verdade.")
     ).toBeVisible();
 
     const cardMatheus = page
@@ -104,7 +104,7 @@ test.describe("agenda demo do mentor DPP — Sua semana / Do programa / Lembrar 
     page,
   }) => {
     const trilha = page.locator(
-      'section[aria-label="Trilha de especialista — Sofia Nogueira"]'
+      'section[aria-label="Trilha de especialista · Sofia Nogueira"]'
     );
     await expect(trilha).toBeVisible();
     // o selo exato do mock v6 — o DPP não entra na sessão do especialista

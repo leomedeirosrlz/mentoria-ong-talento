@@ -40,7 +40,7 @@ export function AvaliarTokenFlow({
     return (
       <EstadoCard icon={CheckCircle} titulo="Avaliação já registrada" ok>
         <p>
-          Você já contou como foi este encontro. Obrigado — suas respostas
+          Você já contou como foi este encontro. Obrigado. Suas respostas
           ficam entre você e a equipe da Realiza.vc.
         </p>
       </EstadoCard>
@@ -67,7 +67,7 @@ export function AvaliarTokenFlow({
       {demo && (
         <p className="mb-4 flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
           <Flask size={13} aria-hidden />
-          Modo demonstração — respostas não são gravadas.
+          Modo demonstração: respostas não são gravadas.
         </p>
       )}
       {contexto && (

@@ -144,7 +144,7 @@ export function Sparkline({
         if (v != null && atencaoAbaixoDe != null && v < atencaoAbaixoDe)
           atencios.push({ serie: s.rotulo, slot: nomeSlot(i), v });
       });
-      return `${s.rotulo} — ${pontos}`;
+      return `${s.rotulo}: ${pontos}`;
     })
     .join(". ");
   const rotulo =
@@ -278,7 +278,7 @@ export function Sparkline({
           <span
             key={t}
             aria-hidden="true"
-            className="absolute left-0 -translate-y-1/2 text-[9.5px] font-semibold tabular-nums text-muted-foreground"
+            className="absolute left-0 -translate-y-1/2 text-[10px] font-semibold tabular-nums text-muted-foreground"
             style={{ top: `${y(t)}%` }}
           >
             {formatarValor(t)}

@@ -59,7 +59,32 @@ export default function Loading() {
         </div>
       </div>
       <Skeleton className="h-4 w-72 max-w-full" />
-      <ol>
+      {/* desktop: lista compacta à esquerda, registro aberto à direita */}
+      <div className="hidden gap-4 lg:grid lg:grid-cols-[minmax(17rem,2fr)_minmax(0,3fr)]">
+        <div className="space-y-1 rounded-xl bg-card p-2 shadow-[var(--shadow-border)]">
+          {[0, 1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className="grid grid-cols-[3.25rem_minmax(0,1fr)_auto] items-center gap-3 px-3 py-2.5">
+              <div className="space-y-1.5">
+                <Skeleton className="h-4 w-8" />
+                <Skeleton className="h-3 w-10" />
+              </div>
+              <Skeleton className="h-4 w-3/4" />
+              <Skeleton className="h-3 w-12" />
+            </div>
+          ))}
+        </div>
+        <div className="rounded-xl bg-card p-6 shadow-[var(--shadow-border)]">
+          <Skeleton className="h-5 w-3/5" />
+          <Skeleton className="mt-3 h-4 w-2/5" />
+          <Skeleton className="mt-3 h-3 w-1/2" />
+          <div className="mt-5 space-y-2 border-t pt-5">
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-4 w-11/12" />
+            <Skeleton className="h-4 w-4/5" />
+          </div>
+        </div>
+      </div>
+      <ol className="lg:hidden">
         {[0, 1, 2].map((i) => (
           <li key={i} className="flex gap-3 sm:gap-4">
             <div className="flex w-10 shrink-0 flex-col items-center sm:w-12">

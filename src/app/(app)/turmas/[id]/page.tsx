@@ -101,7 +101,7 @@ export default async function TurmaPage({
 
       {demo && (
         <p className="rounded-lg bg-muted/60 px-4 py-2.5 text-sm text-muted-foreground">
-          Modo demonstração — este cronograma é só leitura.
+          Modo demonstração: este cronograma é só leitura.
         </p>
       )}
 

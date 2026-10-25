@@ -42,46 +42,17 @@ const DISCO: Record<EstadoNoJornada, string> = {
   futuro: "bg-muted text-muted-foreground",
 };
 
-/** Mini-chave da legenda — mesmo código visual do DISCO, em ponto de 8px.
- *  Só entram na legenda os estados presentes na jornada (a chave explica o
- *  que existe naquela trilha, não o universo possível). */
-const CHAVE_ORDEM: EstadoNoJornada[] = [
-  "realizado_completo",
-  "pendente_registro",
-  "limbo",
-  "agendado",
-  "nao_aconteceu",
-  "futuro",
-];
-
-const CHAVE_LABEL: Record<EstadoNoJornada, string> = {
-  realizado_completo: "com registro",
-  pendente_registro: "registro pendente",
-  limbo: "a confirmar",
-  agendado: "agendado",
-  nao_aconteceu: "não aconteceu",
-  futuro: "a caminho",
-};
-
-function chaveDot(estado: EstadoNoJornada): React.ReactNode {
+/** Legenda visível só com o que o mentor precisa ler: feito, pendente e o
+ *  próximo passo. Os demais estados (agendado, a confirmar, não aconteceu,
+ *  a caminho) seguem no aria-label/title de cada bolinha. */
+function chaveDot(estado: "realizado_completo" | "pendente_registro" | "proximo"): React.ReactNode {
   switch (estado) {
     case "realizado_completo":
       return <span aria-hidden className="size-2 rounded-full bg-[var(--brand-lime)]" />;
     case "pendente_registro":
       return <span aria-hidden className="size-2 rounded-full bg-[var(--warn)]" />;
-    case "limbo":
-      return <span aria-hidden className="size-2 rounded-full ring-1 ring-inset ring-[var(--warn)]/70" />;
-    case "agendado":
-      return <span aria-hidden className="size-2 rounded-full bg-[var(--brand-lime)]/20 ring-1 ring-inset ring-[var(--brand-lime)]/60" />;
-    case "nao_aconteceu":
-      // disco apagado e riscado, como o nó na trilha
-      return (
-        <span aria-hidden className="relative size-2 rounded-full bg-muted">
-          <span className="absolute inset-x-[-1px] top-1/2 h-px -translate-y-1/2 -rotate-45 bg-muted-foreground/70" />
-        </span>
-      );
-    case "futuro":
-      return <span aria-hidden className="size-2 rounded-full bg-muted" />;
+    case "proximo":
+      return <span aria-hidden className="size-2 rounded-full ring-2 ring-[var(--brand-lime)]" />;
   }
 }
 
@@ -197,6 +168,15 @@ export function TrilhaJornada({
 
   const noAtual = jornada.nos.find((n) => n.numero === jornada.proximoNumero);
   const estadosPresentes = new Set(jornada.nos.map((n) => n.estado));
+  const legenda: { chave: "realizado_completo" | "pendente_registro" | "proximo"; texto: string }[] = [
+    ...(estadosPresentes.has("realizado_completo")
+      ? [{ chave: "realizado_completo" as const, texto: "feito" }]
+      : []),
+    ...(estadosPresentes.has("pendente_registro")
+      ? [{ chave: "pendente_registro" as const, texto: "pendente" }]
+      : []),
+    ...(noAtual ? [{ chave: "proximo" as const, texto: "próximo" }] : []),
+  ];
   const percorrido = (n: NoJornada) =>
     n.estado === "realizado_completo" ||
     n.estado === "pendente_registro" ||
@@ -216,9 +196,7 @@ export function TrilhaJornada({
   return (
     <section aria-label="Jornada da dupla">
       <div className="flex items-center justify-between gap-2">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-          Jornada
-        </p>
+        <h2 className="text-base font-semibold">Jornada</h2>
         <p className="text-xs font-medium text-muted-foreground tabular-nums">
           {jornada.feitos} de {jornada.total}
         </p>
@@ -258,10 +236,11 @@ export function TrilhaJornada({
                     em volta do disco de 24–28px — tocar o passo abre o card
                     dele na ficha */}
                 <Link
+                  // o nó abre a aba Encontros; com encontro, leva ao card dele
                   href={
                     no.encontro
-                      ? `/duplas/${duplaId}#registrar-${no.encontro.id}`
-                      : `/duplas/${duplaId}`
+                      ? `/duplas/${duplaId}?aba=encontros#registrar-${no.encontro.id}`
+                      : `/duplas/${duplaId}?aba=encontros`
                   }
                   aria-label={rotulo}
                   title={rotulo}
@@ -330,14 +309,16 @@ export function TrilhaJornada({
       {/* mini-chave junto dos dots — só os estados presentes na jornada:
           trilha no início não fala de pendência, trilha limpa não fala de
           "não aconteceu" (chave explica o que existe, não o universo) */}
-      <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-        {CHAVE_ORDEM.filter((e) => estadosPresentes.has(e)).map((e) => (
-          <span key={e} className="flex items-center gap-1.5">
-            {chaveDot(e)}
-            {CHAVE_LABEL[e]}
-          </span>
-        ))}
-      </p>
+      {legenda.length > 0 && (
+        <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+          {legenda.map((item) => (
+            <span key={item.chave} className="flex items-center gap-1.5">
+              {chaveDot(item.chave)}
+              {item.texto}
+            </span>
+          ))}
+        </p>
+      )}
     </section>
   );
 }

@@ -101,7 +101,7 @@ test.describe("jornada — auto-emissão de instrumentos (REALIZA-152)", () => {
     });
     await expect(metas).toBeVisible();
     await expect(metas.getByText("trancada")).toBeVisible();
-    await expect(metas.getByText(/libera no enc\. \d+/)).toBeVisible();
+    await expect(metas.getByText(/libera no encontro \d+/)).toBeVisible();
     await expect(metas.locator('a[href^="/f/"]')).toHaveCount(0);
 
     // emissão automática é auditável: um link por instrumento, origem 'auto'

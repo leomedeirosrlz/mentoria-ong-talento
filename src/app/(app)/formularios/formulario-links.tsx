@@ -560,13 +560,13 @@ export function FormularioLinks({
     <div className="space-y-4">
       {instrumento && (
         <p className="rounded-lg bg-muted px-3 py-2 text-xs text-muted-foreground">
-          Instrumento oficial da jornada — os links são emitidos pela ficha
+          Instrumento oficial da jornada: os links são emitidos pela ficha
           da dupla, em <em>Instrumentos da dupla</em>.
         </p>
       )}
       {avaliacaoTrilha && (
         <p className="rounded-lg bg-muted px-3 py-2 text-xs text-muted-foreground">
-          Avaliação oficial da trilha — o link é emitido sozinho quando a
+          Avaliação oficial da trilha: o link é emitido sozinho quando a
           trilha de especialista é encerrada.
         </p>
       )}
@@ -830,7 +830,7 @@ export function FormularioLinks({
 
       {links.length === 0 ? (
         <p className="rounded-lg border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
-          Nenhum link gerado ainda. Gere links individuais — cada resposta
+          Nenhum link gerado ainda. Gere links individuais: cada resposta
           precisa de um destinatário.
         </p>
       ) : linksVisiveis.length === 0 && linksView.length === links.length ? (

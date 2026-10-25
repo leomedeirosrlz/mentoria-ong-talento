@@ -106,7 +106,7 @@ export function DuplaWaAcao({
   // 13/10" (a dupla foi lembrada/chamada naquela data)
   const rotuloPassado = rotulo === "Chamar" ? "Chamada" : "Lembrada";
   const rotuloLongo = nudge
-    ? `${rotulo} ${nomeCurto} — notificação + WhatsApp`
+    ? `${rotulo} ${nomeCurto}: notificação + WhatsApp`
     : `Chamar ${nomeCurto} no WhatsApp`;
 
   function lembrar() {
@@ -125,7 +125,7 @@ export function DuplaWaAcao({
         if (res.demo) {
           // no demo o número é fictício — a mensagem não abre o wa.me de
           // verdade, só a notificação simulada
-          toast.success("Modo demo — nada é enviado de verdade.");
+          toast.success("Modo demo: nada é enviado de verdade.");
         } else {
           toast.success("Lembrete enviado.");
           if (wa) window.open(wa, "_blank", "noopener,noreferrer");
@@ -226,7 +226,7 @@ export function DuplaWaAcao({
         {nudge && (
           <div className="mt-1 border-t border-border px-1.5 pt-1.5 pb-0.5 text-[11px] leading-snug text-muted-foreground">
             <b className="font-semibold text-foreground">{rotulo}</b> envia a
-            notificação no app e abre a conversa — no máx. 1 a cada 48h por
+            notificação no app e abre a conversa. No máx. 1 a cada 48h por
             dupla.
           </div>
         )}
@@ -244,7 +244,7 @@ export function DuplaWaAcao({
           {bloqueado ? (
             <span
               aria-disabled="true"
-              title={`1 lembrete a cada 48h por dupla — destrava ${destravaEm}`}
+              title={`1 lembrete a cada 48h por dupla. Destrava ${destravaEm}`}
               className="inline-flex h-7 cursor-not-allowed items-center gap-1 rounded-l-lg border border-dashed border-border bg-card px-2 text-xs font-semibold text-muted-foreground/60"
             >
               <ChatsCircle size={13} aria-hidden />
@@ -262,7 +262,7 @@ export function DuplaWaAcao({
               title={
                 wa
                   ? rotuloLongo
-                  : `${rotulo} ${nomeCurto} — só notificação (sem WhatsApp cadastrado)`
+                  : `${rotulo} ${nomeCurto}: só notificação (sem WhatsApp cadastrado)`
               }
               className={cn(
                 "inline-flex h-7 items-center gap-1 rounded-l-lg border px-2 text-xs font-bold transition-colors focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-60",
@@ -321,7 +321,7 @@ export function DuplaWaAcao({
         {/* ── mobile (<sm): quadrado verde 44px — o menu carrega a ação ── */}
         <DropdownMenu>
           <DropdownMenuTrigger
-            aria-label={`${rotuloLongo} — opções da mensagem`}
+            aria-label={`${rotuloLongo}: opções da mensagem`}
             className={cn(
               "relative grid size-11 shrink-0 place-items-center rounded-xl transition-colors focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50 md:hidden",
               WA_SOLID,

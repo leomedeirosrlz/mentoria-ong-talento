@@ -340,7 +340,7 @@ describe("itensConsolidados", () => {
       tipo: "encontro",
       diaKey: "2026-10-06",
       titulo: "Ana com André",
-      detalhe: "Encontro 8 · T1",
+      detalhe: "Encontro 8 · Turma 1",
       convidado: false,
       pill: "T1",
       href: "/duplas/dOk",
@@ -351,7 +351,7 @@ describe("itensConsolidados", () => {
     const esp = consolidada().find((i) => i.tipo === "sessao_esp")!;
     expect(esp).toMatchObject({
       diaKey: "2026-10-09",
-      titulo: "Bia × Luísa Prado — Transição de carreira",
+      titulo: "Bia × Luísa Prado: Transição de carreira",
       detalhe: "Trilha de especialista · sessão 1 de 5",
       convidado: true,
       pill: "Esp",
@@ -395,7 +395,7 @@ describe("itensConsolidados", () => {
     ]);
     const sem = ags.find((a) => a.duplaId === "dSem")!;
     expect(sem).toMatchObject({
-      titulo: "enc. 8 a agendar",
+      titulo: "Encontro 8 a agendar",
       convidado: false,
       pill: "T1",
       href: "/duplas/dSem",
@@ -466,7 +466,7 @@ describe("contextoDuplaAux", () => {
     });
     expect(contextoDuplaAux(d, EVENTOS, AGORA_SEG)).toEqual({
       texto:
-        "Encontro 8 · T1 — hoje, 19h, online. Próximo previsto: enc. 9 em ter 13.",
+        "Encontro 8 da Turma 1: hoje, 19h, online. Próximo previsto: encontro 9 em ter 13.",
       problema: false,
     });
   });
@@ -481,36 +481,36 @@ describe("contextoDuplaAux", () => {
     });
     const { texto, problema } = contextoDuplaAux(d, EVENTOS, AGORA_SEG);
     expect(texto).toBe(
-      "Encontro 8 · T1 — amanhã (ter 6), 19h. Próximo previsto: enc. 9 em ter 13."
+      "Encontro 8 da Turma 1: amanhã (ter 6), 19h. Próximo previsto: encontro 9 em ter 13."
     );
     expect(problema).toBe(false);
   });
 
-  it("sem data do vigente (em dia até agora): 'sem encontro agendado nesta semana'", () => {
+  it("sem data do vigente (em dia até agora): 'Sem encontro agendado nesta semana'", () => {
     const d = mkDupla({
       encontros: [realizado("d1", 6, "09-22"), realizado("d1", 7, "09-29")],
     });
     expect(contextoDuplaAux(d, EVENTOS, AGORA_SEG)).toEqual({
       texto:
-        "Encontro 8 · T1 — sem encontro agendado nesta semana (prazo: dom 11).",
+        "Encontro 8 da Turma 1. Sem encontro agendado nesta semana (prazo: dom 11).",
       problema: true,
     });
   });
 
-  it("atraso de 1 encontro: 'Encontro 7 · T1 atrasado (1 encontro)'", () => {
+  it("atraso de 1 encontro: 'Encontro 7 da Turma 1 atrasado (1 encontro)'", () => {
     const d = mkDupla({ encontros: [realizado("d1", 6, "09-22")] });
     expect(contextoDuplaAux(d, EVENTOS, AGORA_SEG)).toEqual({
       texto:
-        "Encontro 7 · T1 atrasado (1 encontro) — sem encontro agendado para o 8.",
+        "Encontro 7 da Turma 1 atrasado (1 encontro). Sem encontro agendado para o 8.",
       problema: true,
     });
   });
 
-  it("atraso de 2+: lista os números — 'Encontros 6 e 7 · T1 atrasados'", () => {
+  it("atraso de 2+: lista os números — 'Encontros 6 e 7 da Turma 1 atrasados'", () => {
     const d = mkDupla({ id: "dZ" });
     expect(contextoDuplaAux(d, EVENTOS, AGORA_SEG)).toEqual({
       texto:
-        "Encontros 6 e 7 · T1 atrasados (2 encontros) — sem encontro agendado para o 8.",
+        "Encontros 6 e 7 da Turma 1 atrasados (2 encontros). Sem encontro agendado para o 8.",
       problema: true,
     });
   });
@@ -525,7 +525,7 @@ describe("contextoDuplaAux", () => {
     });
     const { texto, problema } = contextoDuplaAux(d, EVENTOS, AGORA_SEG);
     expect(texto).toBe(
-      "Encontro 7 · T1 — agendado já passou e segue sem registro (rolou?)."
+      "Encontro 7 da Turma 1: agendado já passou e segue sem registro. Aconteceu?"
     );
     expect(problema).toBe(true);
   });
@@ -545,7 +545,7 @@ describe("contextoDuplaAux", () => {
     });
     const { texto, problema } = contextoDuplaAux(d, EVENTOS, AGORA_SEG);
     expect(texto).toBe(
-      "Encontro 8 · T1 — amanhã (ter 6), 19h. Próximo previsto: enc. 9 em ter 13. Registro do encontro 6 pendente."
+      "Encontro 8 da Turma 1: amanhã (ter 6), 19h. Próximo previsto: encontro 9 em ter 13. Registro do encontro 6 pendente."
     );
     expect(problema).toBe(false);
   });

@@ -79,11 +79,11 @@ export function RemanejoSugerido({
       {/* recolhido por padrão (REALIZA-153): o risco já aparece no semáforo,
           a lista de candidatos é ação de segunda ordem — abre sob demanda */}
       <Collapsible.Root>
-        <h2 id="remanejo-sugerido-titulo">
-          <Collapsible.Trigger className="group flex w-full cursor-pointer items-center gap-1.5 rounded-xl px-4 py-3.5 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:px-5">
-            <ArrowsLeftRight size={15} aria-hidden className="shrink-0" />
+        <h2 id="remanejo-sugerido-titulo" className="text-base font-semibold">
+          <Collapsible.Trigger className="group flex w-full cursor-pointer items-center gap-2 rounded-xl px-4 py-3.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:px-5">
+            <ArrowsLeftRight size={15} aria-hidden className="shrink-0 text-muted-foreground" />
             Sugerir remanejamento
-            <span className="min-w-0 flex-1 truncate font-normal normal-case tracking-normal">
+            <span className="min-w-0 flex-1 truncate text-sm font-normal text-muted-foreground">
               · {motivo}
             </span>
             <CaretDown
@@ -97,14 +97,14 @@ export function RemanejoSugerido({
           <div className="px-4 pb-3.5 sm:px-5">
       <p className="text-sm text-muted-foreground">
         {motivo}. Se a conversa não destravar, dá pra trocar um lado sem
-        perder o histórico — sugestões por afinidade, a decisão é sua.
+        perder o histórico. Sugestões por afinidade, a decisão é sua.
       </p>
 
       <div className="mt-3 grid gap-x-6 gap-y-4 sm:grid-cols-2">
         {/* ---- trocar o mentor: pool do papel da trilha, livres primeiro ---- */}
         <div>
           <p className="text-xs font-medium">
-            Se o mentor sair — quem pode assumir{" "}
+            Se o mentor sair, quem pode assumir{" "}
             {primeiroNome(dupla.mentorado.nome)}:
           </p>
           {mentores.length === 0 ? (
@@ -196,11 +196,11 @@ export function RemanejoSugerido({
         {/* ---- trocar o mentorado: a fila "Aguardando par" ranqueada ---- */}
         <div>
           <p className="text-xs font-medium">
-            Se o mentorado sair — quem espera na fila:
+            Se o mentorado sair, quem espera na fila:
           </p>
           {mentorados.length === 0 ? (
             <p className="mt-1.5 text-xs text-muted-foreground">
-              A fila “Aguardando par” está vazia — ninguém esperando o
+              A fila “Aguardando par” está vazia, ninguém esperando o
               primeiro par.
             </p>
           ) : (
@@ -254,8 +254,8 @@ export function RemanejoSugerido({
           className="rounded-sm font-medium text-foreground underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           Remaneje manualmente
-        </button>{" "}
-        — o dialog lista todo mundo.
+        </button>.{" "}
+        O dialog lista todo mundo.
       </p>
           </div>
         </Collapsible.Panel>

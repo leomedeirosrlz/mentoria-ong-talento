@@ -274,7 +274,7 @@ export function AnexosPendentes({
                 {a.status === "erro" ? (
                   <>
                     <WarningCircle size={11} aria-hidden className="mr-1 inline-block -translate-y-px" />
-                    Não subiu — tente enviar de novo
+                    Não subiu. Tente enviar de novo
                   </>
                 ) : (
                   `${ROTULO_ANEXO[tipo]} · ${formatTamanho(a.file.size)} · ${quem}`

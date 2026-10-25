@@ -214,7 +214,7 @@ export function AnexosRegistro({
           </Button>
           <p className="text-xs text-muted-foreground">
             Foto ou arquivo que ajude a contar o encontro (PDF, PNG, JPG ou
-            WebP) — fica salvo no registro e aparece em “Arquivos da dupla”.
+            WebP): fica salvo no registro e aparece em “Arquivos da dupla”.
           </p>
         </div>
       )}

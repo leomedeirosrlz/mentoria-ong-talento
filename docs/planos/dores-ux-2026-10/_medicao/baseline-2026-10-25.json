@@ -1,0 +1,578 @@
+[
+ {
+  "papel": "coordenacao",
+  "vp": "mobile",
+  "rota": "/",
+  "overflowX": 0,
+  "textoAbaixo12px": 22,
+  "alvosAbaixo44": 6
+ },
+ {
+  "papel": "coordenacao",
+  "vp": "mobile",
+  "rota": "/agenda",
+  "overflowX": 0,
+  "textoAbaixo12px": 48,
+  "alvosAbaixo44": 12
+ },
+ {
+  "papel": "coordenacao",
+  "vp": "mobile",
+  "rota": "/duplas",
+  "overflowX": 0,
+  "textoAbaixo12px": 155,
+  "alvosAbaixo44": 3
+ },
+ {
+  "papel": "coordenacao",
+  "vp": "mobile",
+  "rota": "/registros",
+  "overflowX": 0,
+  "textoAbaixo12px": 125,
+  "alvosAbaixo44": 2
+ },
+ {
+  "papel": "coordenacao",
+  "vp": "mobile",
+  "rota": "/materiais",
+  "overflowX": 0,
+  "textoAbaixo12px": 193,
+  "alvosAbaixo44": 1
+ },
+ {
+  "papel": "coordenacao",
+  "vp": "mobile",
+  "rota": "/pessoas",
+  "overflowX": 220,
+  "textoAbaixo12px": 14,
+  "alvosAbaixo44": 20
+ },
+ {
+  "papel": "coordenacao",
+  "vp": "mobile",
+  "rota": "/formularios",
+  "overflowX": 0,
+  "textoAbaixo12px": 12,
+  "alvosAbaixo44": 2
+ },
+ {
+  "papel": "coordenacao",
+  "vp": "mobile",
+  "rota": "/chamados",
+  "overflowX": 0,
+  "textoAbaixo12px": 27,
+  "alvosAbaixo44": 2
+ },
+ {
+  "papel": "coordenacao",
+  "vp": "mobile",
+  "rota": "/turmas",
+  "overflowX": 0,
+  "textoAbaixo12px": 27,
+  "alvosAbaixo44": 0
+ },
+ {
+  "papel": "coordenacao",
+  "vp": "mobile",
+  "rota": "/relatorios",
+  "overflowX": 0,
+  "textoAbaixo12px": 18,
+  "alvosAbaixo44": 14
+ },
+ {
+  "papel": "coordenacao",
+  "vp": "mobile",
+  "rota": "/perfil",
+  "overflowX": 0,
+  "textoAbaixo12px": 9,
+  "alvosAbaixo44": 1
+ },
+ {
+  "papel": "coordenacao",
+  "vp": "desktop",
+  "rota": "/",
+  "overflowX": 0,
+  "textoAbaixo12px": 19,
+  "alvosAbaixo44": 54
+ },
+ {
+  "papel": "coordenacao",
+  "vp": "desktop",
+  "rota": "/agenda",
+  "overflowX": 0,
+  "textoAbaixo12px": 45,
+  "alvosAbaixo44": 50
+ },
+ {
+  "papel": "coordenacao",
+  "vp": "desktop",
+  "rota": "/duplas",
+  "overflowX": 0,
+  "textoAbaixo12px": 157,
+  "alvosAbaixo44": 72
+ },
+ {
+  "papel": "coordenacao",
+  "vp": "desktop",
+  "rota": "/registros",
+  "overflowX": 0,
+  "textoAbaixo12px": 122,
+  "alvosAbaixo44": 35
+ },
+ {
+  "papel": "coordenacao",
+  "vp": "desktop",
+  "rota": "/materiais",
+  "overflowX": 0,
+  "textoAbaixo12px": 190,
+  "alvosAbaixo44": 98
+ },
+ {
+  "papel": "coordenacao",
+  "vp": "desktop",
+  "rota": "/pessoas",
+  "overflowX": 0,
+  "textoAbaixo12px": 11,
+  "alvosAbaixo44": 125
+ },
+ {
+  "papel": "coordenacao",
+  "vp": "desktop",
+  "rota": "/formularios",
+  "overflowX": 0,
+  "textoAbaixo12px": 9,
+  "alvosAbaixo44": 22
+ },
+ {
+  "papel": "coordenacao",
+  "vp": "desktop",
+  "rota": "/chamados",
+  "overflowX": 0,
+  "textoAbaixo12px": 24,
+  "alvosAbaixo44": 25
+ },
+ {
+  "papel": "coordenacao",
+  "vp": "desktop",
+  "rota": "/turmas",
+  "overflowX": 0,
+  "textoAbaixo12px": 24,
+  "alvosAbaixo44": 14
+ },
+ {
+  "papel": "coordenacao",
+  "vp": "desktop",
+  "rota": "/relatorios",
+  "overflowX": 0,
+  "textoAbaixo12px": 15,
+  "alvosAbaixo44": 47
+ },
+ {
+  "papel": "coordenacao",
+  "vp": "desktop",
+  "rota": "/perfil",
+  "overflowX": 0,
+  "textoAbaixo12px": 6,
+  "alvosAbaixo44": 22
+ },
+ {
+  "papel": "supervisor",
+  "vp": "mobile",
+  "rota": "/",
+  "overflowX": 0,
+  "textoAbaixo12px": 14,
+  "alvosAbaixo44": 0
+ },
+ {
+  "papel": "supervisor",
+  "vp": "mobile",
+  "rota": "/agenda",
+  "overflowX": 0,
+  "textoAbaixo12px": 38,
+  "alvosAbaixo44": 0
+ },
+ {
+  "papel": "supervisor",
+  "vp": "mobile",
+  "rota": "/duplas",
+  "overflowX": 0,
+  "textoAbaixo12px": 75,
+  "alvosAbaixo44": 0
+ },
+ {
+  "papel": "supervisor",
+  "vp": "mobile",
+  "rota": "/registros",
+  "overflowX": 0,
+  "textoAbaixo12px": 100,
+  "alvosAbaixo44": 2
+ },
+ {
+  "papel": "supervisor",
+  "vp": "mobile",
+  "rota": "/materiais",
+  "overflowX": 0,
+  "textoAbaixo12px": 132,
+  "alvosAbaixo44": 0
+ },
+ {
+  "papel": "supervisor",
+  "vp": "mobile",
+  "rota": "/pessoas",
+  "overflowX": 0,
+  "textoAbaixo12px": 9,
+  "alvosAbaixo44": 0
+ },
+ {
+  "papel": "supervisor",
+  "vp": "mobile",
+  "rota": "/chamados",
+  "overflowX": 0,
+  "textoAbaixo12px": 27,
+  "alvosAbaixo44": 2
+ },
+ {
+  "papel": "supervisor",
+  "vp": "desktop",
+  "rota": "/",
+  "overflowX": 0,
+  "textoAbaixo12px": 11,
+  "alvosAbaixo44": 26
+ },
+ {
+  "papel": "supervisor",
+  "vp": "desktop",
+  "rota": "/agenda",
+  "overflowX": 0,
+  "textoAbaixo12px": 35,
+  "alvosAbaixo44": 23
+ },
+ {
+  "papel": "supervisor",
+  "vp": "desktop",
+  "rota": "/duplas",
+  "overflowX": 0,
+  "textoAbaixo12px": 77,
+  "alvosAbaixo44": 38
+ },
+ {
+  "papel": "supervisor",
+  "vp": "desktop",
+  "rota": "/registros",
+  "overflowX": 0,
+  "textoAbaixo12px": 97,
+  "alvosAbaixo44": 30
+ },
+ {
+  "papel": "supervisor",
+  "vp": "desktop",
+  "rota": "/materiais",
+  "overflowX": 0,
+  "textoAbaixo12px": 129,
+  "alvosAbaixo44": 40
+ },
+ {
+  "papel": "supervisor",
+  "vp": "desktop",
+  "rota": "/pessoas",
+  "overflowX": 0,
+  "textoAbaixo12px": 6,
+  "alvosAbaixo44": 13
+ },
+ {
+  "papel": "supervisor",
+  "vp": "desktop",
+  "rota": "/chamados",
+  "overflowX": 0,
+  "textoAbaixo12px": 24,
+  "alvosAbaixo44": 22
+ },
+ {
+  "papel": "mentor_dpp",
+  "vp": "mobile",
+  "rota": "/",
+  "overflowX": 0,
+  "textoAbaixo12px": 54,
+  "alvosAbaixo44": 0
+ },
+ {
+  "papel": "mentor_dpp",
+  "vp": "mobile",
+  "rota": "/agenda",
+  "overflowX": 0,
+  "textoAbaixo12px": 27,
+  "alvosAbaixo44": 5
+ },
+ {
+  "papel": "mentor_dpp",
+  "vp": "mobile",
+  "rota": "/duplas",
+  "overflowX": 0,
+  "textoAbaixo12px": 19,
+  "alvosAbaixo44": 0
+ },
+ {
+  "papel": "mentor_dpp",
+  "vp": "mobile",
+  "rota": "/materiais",
+  "overflowX": 0,
+  "textoAbaixo12px": 41,
+  "alvosAbaixo44": 18
+ },
+ {
+  "papel": "mentor_dpp",
+  "vp": "mobile",
+  "rota": "/chamados",
+  "overflowX": 0,
+  "textoAbaixo12px": 10,
+  "alvosAbaixo44": 0
+ },
+ {
+  "papel": "mentor_dpp",
+  "vp": "desktop",
+  "rota": "/",
+  "overflowX": 0,
+  "textoAbaixo12px": 50,
+  "alvosAbaixo44": 51
+ },
+ {
+  "papel": "mentor_dpp",
+  "vp": "desktop",
+  "rota": "/agenda",
+  "overflowX": 0,
+  "textoAbaixo12px": 23,
+  "alvosAbaixo44": 30
+ },
+ {
+  "papel": "mentor_dpp",
+  "vp": "desktop",
+  "rota": "/duplas",
+  "overflowX": 0,
+  "textoAbaixo12px": 15,
+  "alvosAbaixo44": 14
+ },
+ {
+  "papel": "mentor_dpp",
+  "vp": "desktop",
+  "rota": "/materiais",
+  "overflowX": 0,
+  "textoAbaixo12px": 37,
+  "alvosAbaixo44": 57
+ },
+ {
+  "papel": "mentor_dpp",
+  "vp": "desktop",
+  "rota": "/chamados",
+  "overflowX": 0,
+  "textoAbaixo12px": 6,
+  "alvosAbaixo44": 11
+ },
+ {
+  "papel": "mentor_especialista",
+  "vp": "mobile",
+  "rota": "/",
+  "overflowX": 0,
+  "textoAbaixo12px": 28,
+  "alvosAbaixo44": 6
+ },
+ {
+  "papel": "mentor_especialista",
+  "vp": "mobile",
+  "rota": "/agenda",
+  "overflowX": 0,
+  "textoAbaixo12px": 40,
+  "alvosAbaixo44": 2
+ },
+ {
+  "papel": "mentor_especialista",
+  "vp": "mobile",
+  "rota": "/duplas",
+  "overflowX": 0,
+  "textoAbaixo12px": 12,
+  "alvosAbaixo44": 0
+ },
+ {
+  "papel": "mentor_especialista",
+  "vp": "mobile",
+  "rota": "/materiais",
+  "overflowX": 0,
+  "textoAbaixo12px": 14,
+  "alvosAbaixo44": 0
+ },
+ {
+  "papel": "mentor_especialista",
+  "vp": "desktop",
+  "rota": "/",
+  "overflowX": 0,
+  "textoAbaixo12px": 24,
+  "alvosAbaixo44": 50
+ },
+ {
+  "papel": "mentor_especialista",
+  "vp": "desktop",
+  "rota": "/agenda",
+  "overflowX": 0,
+  "textoAbaixo12px": 83,
+  "alvosAbaixo44": 51
+ },
+ {
+  "papel": "mentor_especialista",
+  "vp": "desktop",
+  "rota": "/duplas",
+  "overflowX": 0,
+  "textoAbaixo12px": 8,
+  "alvosAbaixo44": 11
+ },
+ {
+  "papel": "mentor_especialista",
+  "vp": "desktop",
+  "rota": "/materiais",
+  "overflowX": 0,
+  "textoAbaixo12px": 10,
+  "alvosAbaixo44": 35
+ },
+ {
+  "papel": "mentorado",
+  "vp": "mobile",
+  "rota": "/jovem",
+  "overflowX": 0,
+  "textoAbaixo12px": 6,
+  "alvosAbaixo44": 14
+ },
+ {
+  "papel": "mentorado",
+  "vp": "mobile",
+  "rota": "/jovem/agenda",
+  "overflowX": 0,
+  "textoAbaixo12px": 9,
+  "alvosAbaixo44": 2
+ },
+ {
+  "papel": "mentorado",
+  "vp": "mobile",
+  "rota": "/jovem/especialistas",
+  "overflowX": 0,
+  "textoAbaixo12px": 52,
+  "alvosAbaixo44": 2
+ },
+ {
+  "papel": "mentorado",
+  "vp": "mobile",
+  "rota": "/jovem/pessoas",
+  "overflowX": 0,
+  "textoAbaixo12px": 6,
+  "alvosAbaixo44": 18
+ },
+ {
+  "papel": "mentorado",
+  "vp": "mobile",
+  "rota": "/jovem/materiais",
+  "overflowX": 0,
+  "textoAbaixo12px": 36,
+  "alvosAbaixo44": 1
+ },
+ {
+  "papel": "mentorado",
+  "vp": "mobile",
+  "rota": "/jovem/perfil",
+  "overflowX": 0,
+  "textoAbaixo12px": 12,
+  "alvosAbaixo44": 2
+ },
+ {
+  "papel": "mentorado",
+  "vp": "desktop",
+  "rota": "/jovem",
+  "overflowX": 0,
+  "textoAbaixo12px": 2,
+  "alvosAbaixo44": 43
+ },
+ {
+  "papel": "mentorado",
+  "vp": "desktop",
+  "rota": "/jovem/agenda",
+  "overflowX": 0,
+  "textoAbaixo12px": 5,
+  "alvosAbaixo44": 34
+ },
+ {
+  "papel": "mentorado",
+  "vp": "desktop",
+  "rota": "/jovem/especialistas",
+  "overflowX": 0,
+  "textoAbaixo12px": 48,
+  "alvosAbaixo44": 24
+ },
+ {
+  "papel": "mentorado",
+  "vp": "desktop",
+  "rota": "/jovem/pessoas",
+  "overflowX": 0,
+  "textoAbaixo12px": 2,
+  "alvosAbaixo44": 29
+ },
+ {
+  "papel": "mentorado",
+  "vp": "desktop",
+  "rota": "/jovem/materiais",
+  "overflowX": 0,
+  "textoAbaixo12px": 32,
+  "alvosAbaixo44": 16
+ },
+ {
+  "papel": "mentorado",
+  "vp": "desktop",
+  "rota": "/jovem/perfil",
+  "overflowX": 0,
+  "textoAbaixo12px": 8,
+  "alvosAbaixo44": 18
+ },
+ {
+  "papel": "publico",
+  "vp": "mobile",
+  "rota": "/login",
+  "overflowX": 0,
+  "textoAbaixo12px": 0,
+  "alvosAbaixo44": 2
+ },
+ {
+  "papel": "publico",
+  "vp": "mobile",
+  "rota": "/demo",
+  "overflowX": 0,
+  "textoAbaixo12px": 1,
+  "alvosAbaixo44": 0
+ },
+ {
+  "papel": "publico",
+  "vp": "mobile",
+  "rota": "/privacidade",
+  "overflowX": 0,
+  "textoAbaixo12px": 1,
+  "alvosAbaixo44": 1
+ },
+ {
+  "papel": "publico",
+  "vp": "desktop",
+  "rota": "/login",
+  "overflowX": 0,
+  "textoAbaixo12px": 0,
+  "alvosAbaixo44": 6
+ },
+ {
+  "papel": "publico",
+  "vp": "desktop",
+  "rota": "/demo",
+  "overflowX": 0,
+  "textoAbaixo12px": 1,
+  "alvosAbaixo44": 1
+ },
+ {
+  "papel": "publico",
+  "vp": "desktop",
+  "rota": "/privacidade",
+  "overflowX": 0,
+  "textoAbaixo12px": 1,
+  "alvosAbaixo44": 3
+ }
+]

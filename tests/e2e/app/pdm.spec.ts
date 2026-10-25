@@ -188,7 +188,7 @@ test.describe("PDM vivo (REALIZA-181)", () => {
     page,
   }) => {
     await loginComSenha(page, MENTOR_EMAIL, SENHA);
-    await page.goto(`/duplas/${DUPLA_ID}`);
+    await page.goto(`/duplas/${DUPLA_ID}?aba=instrumentos`);
 
     const secao = page.locator(SECAO);
     await expect(
@@ -348,7 +348,7 @@ test.describe("PDM vivo (REALIZA-181)", () => {
 
     // o mentor recarrega a ficha e lê a edição dela — mesmo documento
     await relogar(page, MENTOR_EMAIL, SENHA);
-    await page.goto(`/duplas/${DUPLA_ID}`);
+    await page.goto(`/duplas/${DUPLA_ID}?aba=instrumentos`);
     const secao = page.locator(SECAO);
     await expect(
       secao.getByText("Meta da dupla e2e — revista pela jovem")
@@ -528,7 +528,7 @@ test.describe("PDM vivo (REALIZA-181)", () => {
     // …mas dentro do <details> do histórico, com o rótulo "Descartada"
     const historico = secao.locator("details", { hasText: "descartada" });
     await expect(
-      historico.getByText(/1 meta descartada — fora do plano/)
+      historico.getByText(/1 meta descartada · fora do plano/)
     ).toBeVisible();
     await historico.locator("summary").click();
     await expect(
@@ -639,7 +639,7 @@ test.describe("PDM vivo (REALIZA-181)", () => {
     for (let i = 1; i <= 10; i++) await criarMeta(`Meta ${i} do teto e2e`);
 
     await loginComSenha(page, MENTOR_EMAIL, SENHA);
-    await page.goto(`/duplas/${DUPLA_ID}`);
+    await page.goto(`/duplas/${DUPLA_ID}?aba=instrumentos`);
     const secao = page.locator(SECAO);
     await expect(
       secao.locator('ul[role="tree"] > li[role="treeitem"]')
@@ -728,7 +728,7 @@ test.describe("PDM vivo (REALIZA-181)", () => {
 
     // a projeção já aconteceu no submit — a ficha lê o documento vivo
     await loginComSenha(page, MENTOR_EMAIL, SENHA);
-    await page.goto(`/duplas/${DUPLA_ID}`);
+    await page.goto(`/duplas/${DUPLA_ID}?aba=instrumentos`);
     const secao = page.locator(SECAO);
     await expect(
       secao.getByText("Conseguir um jovem aprendiz e2e")
@@ -791,7 +791,7 @@ test.describe("PDM vivo (REALIZA-181)", () => {
     await criarSubmeta(emCurso, "Passo em andamento e2e");
 
     await loginComSenha(page, COORD_EMAIL, COORD_SENHA);
-    await page.goto(`/duplas/${DUPLA_ID}`);
+    await page.goto(`/duplas/${DUPLA_ID}?aba=instrumentos`);
     const secao = page.locator(SECAO);
     await expect(
       secao.getByRole("heading", { name: "Plano de desenvolvimento" })
@@ -824,7 +824,9 @@ test.describe("PDM vivo (REALIZA-181)", () => {
     ).toHaveCount(0);
 
     // §E.32 — "Metas do PDM" no Resumo da jornada: X de Y + a lista das
-    // atingidas com data (o encontro realizado da fixture liga o bloco)
+    // atingidas com data (o encontro realizado da fixture liga o bloco).
+    // O bloco mora na aba Encontros da ficha
+    await page.goto(`/duplas/${DUPLA_ID}?aba=encontros`);
     const resumo = page.locator('section[aria-label="Resumo da jornada"]');
     await expect(
       resumo.getByRole("heading", { name: "Resumo da jornada" })

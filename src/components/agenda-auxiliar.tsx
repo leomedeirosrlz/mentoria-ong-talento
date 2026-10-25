@@ -1,6 +1,5 @@
 import Link from "next/link";
 import {
-  ArrowsClockwise,
   CalendarPlus,
   ChatsCircle,
   Eye,
@@ -15,7 +14,7 @@ import {
   itensConsolidados,
   type ItemConsolidado,
 } from "@/lib/agenda-auxiliar";
-import { itensDaSemanaPrograma } from "@/lib/agenda-coordenacao";
+import { itensDaSemanaPrograma, saudeDoRecorte } from "@/lib/agenda-coordenacao";
 import { turmaCurta, turmaLonga } from "@/lib/turma";
 import {
   lembreteBloqueadoAte,
@@ -44,6 +43,7 @@ import { AuxCardAcoes } from "@/components/aux-card-acoes";
 import { LembreteButton } from "@/components/lembrete-button";
 import { SupervisaoDialog } from "@/components/supervisao-dialog";
 import { SemanaDoPrograma } from "@/components/semana-do-programa";
+import { SaudePrograma } from "@/components/saude-programa";
 import { Button } from "@/components/ui/button";
 import {
   lembreteDaDupla,
@@ -117,12 +117,10 @@ export function AgendaAuxiliar({
     duplas.flatMap((d) => (d.cronograma_id ? [d.cronograma_id] : []))
   );
   // a lista só exibe ativa/pausada (mesmo filtro da lib) — encerradas entram
-  // na supervisão histórica mas não na agenda; o cabeçalho conta as duas
-  // coisas separadas pra não prometer card que não renderiza
+  // na supervisão histórica mas não na agenda
   const correndo = duplas.filter(
     (d) => d.status === "ativa" || d.status === "pausada"
   );
-  const encerradas = duplas.length - correndo.length;
   // cabeçalho cita as turmas na forma narrativa — dedup já no label
   // ("T1" e "T1 · 2026/2027" exibem a mesma "Turma 1")
   const turmasTxt = [
@@ -130,10 +128,6 @@ export function AgendaAuxiliar({
       correndo.map((d) => turmaLonga(d.turma)).filter(Boolean)
     ),
   ];
-  // a explicação do desencontro só cita turmas com encontro vigente —
-  // trilhas de especialista não têm cronograma e cairiam como "—"
-  const gruposTurma = grupos.filter((g) => g.encontroVigente != null);
-  const desencontro = gruposTurma.length > 1;
 
   // coorte "sem encontro agendado" — as duplas atrás dos itens a_agendar
   // da consolidada (uma por dupla, na ordem da fila)
@@ -161,13 +155,9 @@ export function AgendaAuxiliar({
           Agenda das minhas duplas
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          {correndo.length}{" "}
-          {correndo.length === 1 ? "dupla supervisionada" : "duplas supervisionadas"}
-          {encerradas > 0 &&
-            ` · ${encerradas} encerrada${encerradas === 1 ? "" : "s"}`}
-          {turmasTxt.length > 0 ? ` · ${turmasTxt.join(" e ")}` : ""}
+          {turmasTxt.join(" e ")}
           {correndo.length > 0 &&
-            ` · semana ${semanaIso(hoje)}, ${Number(seg.slice(8, 10))} a ${Number(dom.slice(8, 10))} de ${mesLongo(dom)}`}
+            `${turmasTxt.length > 0 ? " · " : ""}semana ${semanaIso(hoje)}, ${Number(seg.slice(8, 10))} a ${Number(dom.slice(8, 10))} de ${mesLongo(dom)}`}
         </p>
       </header>
 
@@ -193,41 +183,22 @@ export function AgendaAuxiliar({
         comLinkDia={comLinkDia}
         titulo="Semana do programa"
         ariaLabel="Semana do programa"
-        nota={
-          comLinkDia
-            ? "O que a semana cobra no escopo das suas duplas — cada card abre o dia no calendário."
-            : "O que a semana cobra no escopo das suas duplas."
-        }
       />
 
       {!consolidada ? (
         <div className="space-y-6">
-          {desencontro && (
-            <p className="flex max-w-[78ch] items-start gap-2 text-xs leading-relaxed text-muted-foreground">
-              <ArrowsClockwise
-                size={16}
-                aria-hidden
-                className="mt-0.5 shrink-0"
+          {correndo.length > 0 && (
+            <div className="rounded-xl border bg-card p-4">
+              <SaudePrograma
+                saude={saudeDoRecorte(duplas, eventos, agora)}
+                nivel="h2"
               />
-              <span>
-                As turmas não começaram juntas — na mesma semana,{" "}
-                {gruposTurma.map((g, i) => (
-                  <span key={g.cronogramaId ?? g.turma}>
-                    {i > 0 && (i === gruposTurma.length - 1 ? " e " : ", ")}
-                    <b className="font-medium text-foreground">
-                      {turmaLonga(g.turma)} está no encontro{" "}
-                      {g.encontroVigente ?? "—"}
-                    </b>
-                  </span>
-                ))}
-                . Nunca compare os números sem a turma.
-              </span>
-            </p>
+            </div>
           )}
 
           {grupos.length === 0 ? (
             <p className="rounded-xl border border-dashed px-4 py-3 text-sm text-muted-foreground">
-              Você ainda não supervisiona nenhuma dupla — quando a coordenação
+              Você ainda não supervisiona nenhuma dupla. Quando a coordenação
               atribuir, elas aparecem aqui por turma.
             </p>
           ) : (
@@ -245,10 +216,7 @@ export function AgendaAuxiliar({
                 aria-label={`Duplas da ${g.turma ? turmaLonga(g.turma) : "trilha de especialista"}`}
                 className="space-y-3"
               >
-                <div className="flex flex-wrap items-center gap-2.5">
-                  {g.turma && <PillTurma turma={g.turma} />}
-                  <h2 className="text-lg font-bold">{rotuloGrupo}</h2>
-                </div>
+                <h2 className="text-base font-semibold">{rotuloGrupo}</h2>
                 <div className="grid items-start gap-4 lg:grid-cols-2">
                   {g.duplas.map((d) => (
                     <CardDuplaAux
@@ -286,8 +254,8 @@ export function AgendaAuxiliar({
                 </p>
                 <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
                   {semAgenda.join(", ")}. Use{" "}
-                  <b className="font-medium text-foreground">Lembrar</b> —
-                  quem agenda é a dupla.
+                  <b className="font-medium text-foreground">Lembrar</b>. Quem
+                  agenda é a dupla.
                 </p>
               </div>
             </div>
@@ -360,7 +328,8 @@ function AbasAuxiliar({
 // ---------- card da dupla (aba Por turma) ----------
 
 const SEM_CARD: Record<Semaforo, { tom: TomTag; rotulo: string }> = {
-  ok: { tom: "ok", rotulo: "Em dia" },
+  // dupla em dia é neutra: sem cor de status
+  ok: { tom: "muted", rotulo: "Em dia" },
   atencao: { tom: "warn", rotulo: "Atenção" },
   risco: { tom: "danger", rotulo: "Risco" },
 };
@@ -530,11 +499,11 @@ function ConsolidadaAux({
     <div className="space-y-5">
       <p className="max-w-[78ch] text-xs leading-relaxed text-muted-foreground">
         Uma só lista, em ordem de data. Cada item mostra <b>turma</b> e{" "}
-        <b>dupla</b> — o número do encontro é sempre “enc. N · turma”.
+        <b>dupla</b>. O número do encontro é sempre “enc. N · turma”.
       </p>
       {dias.length === 0 ? (
         <p className="rounded-xl border border-dashed px-4 py-3 text-sm text-muted-foreground">
-          Semana vazia por aqui — nada nas duplas que você supervisiona
+          Semana vazia por aqui. Nada nas duplas que você supervisiona
           nem no calendário do programa.
         </p>
       ) : (

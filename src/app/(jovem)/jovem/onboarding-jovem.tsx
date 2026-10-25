@@ -38,7 +38,7 @@ const RECURSOS: Recurso[] = [
   {
     icon: Handshake,
     texto:
-      "Um mentor ou mentora que caminha com você — encontros pra conversar sobre estudos, planos e o que você quiser construir.",
+      "Um mentor ou mentora que caminha com você: encontros pra conversar sobre estudos, planos e o que você quiser construir.",
   },
   {
     icon: CalendarCheck,
@@ -48,7 +48,7 @@ const RECURSOS: Recurso[] = [
   {
     icon: HandHeart,
     texto:
-      "Um botão de ajuda sempre à mão — avisa a equipe e alguém responde quando você precisar.",
+      "Um botão de ajuda sempre à mão: avisa a equipe e alguém responde quando você precisar.",
   },
 ];
 
@@ -162,7 +162,7 @@ export function OnboardingJovem({
   const hint = (() => {
     switch (step) {
       case 0:
-        return "O Programa de Mentoria Social te conecta com um mentor pra caminhar junto — encontros, planos e o que você quiser construir. Três passos rápidos e você entra.";
+        return "O Programa de Mentoria Social te conecta com um mentor pra caminhar junto: encontros, planos e o que você quiser construir. Três passos rápidos e você entra.";
       case 1:
         return "Marque os dias e períodos em que costuma ter tempo livre. A agenda cruza a sua grade com a do seu mentor pra achar horários em comum.";
       default:
@@ -203,7 +203,7 @@ export function OnboardingJovem({
           <CampoDisponibilidade value={grade} onChange={setGrade} />
         ) : (
           <p className="rounded-2xl border border-border bg-card px-4 py-3 text-sm leading-relaxed text-muted-foreground">
-            Sua ficha ainda não foi conectada à sua conta — a coordenação faz
+            Sua ficha ainda não foi conectada à sua conta. A coordenação faz
             esse vínculo. Quando ela estiver no lugar, você conta seus
             horários em Perfil.
           </p>
@@ -221,7 +221,7 @@ export function OnboardingJovem({
                   <dd className="truncate text-sm font-medium">
                     {perfil?.whatsapp
                       ? formatWhatsApp(perfil.whatsapp)
-                      : "Ainda não cadastrado — a coordenação inclui"}
+                      : "Ainda não cadastrado. A coordenação inclui"}
                   </dd>
                 </div>
               </div>
@@ -257,8 +257,8 @@ export function OnboardingJovem({
                     </span>{" "}
                     <span className="text-muted-foreground">
                       {temWhatsapp
-                        ? "— ligado, os colegas da sua turma que têm conta na plataforma veem seu número em Pessoas; desligado, ninguém vê."
-                        : "— seu cadastro ainda não tem WhatsApp. Quando ele estiver lá, ligar aqui compartilha com os colegas."}
+                        ? "(ligado, os colegas da sua turma que têm conta na plataforma veem seu número em Pessoas; desligado, ninguém vê)"
+                        : "(seu cadastro ainda não tem WhatsApp; quando ele estiver lá, ligar aqui compartilha com os colegas)"}
                     </span>
                   </span>
                 </label>

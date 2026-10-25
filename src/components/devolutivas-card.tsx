@@ -25,7 +25,7 @@ export function DevolutivaComposer({ duplaId }: { duplaId: string }) {
           toast.error(res.error);
           return;
         }
-        toast.success("Devolutiva registrada — o jovem já vê na trilha dele.");
+        toast.success("Devolutiva registrada. O jovem já vê na trilha dele.");
         setTexto("");
         router.refresh();
       } catch {

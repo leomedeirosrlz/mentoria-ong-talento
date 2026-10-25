@@ -142,7 +142,7 @@ export function CoberturaTrilha({
         />
         {/* role=heading no lugar de <h2>: o content model do summary não
             admite heading — mesmo padrão do EncontroDetails */}
-        <span role="heading" aria-level={2} className="text-sm font-semibold">
+        <span role="heading" aria-level={2} className="text-base font-semibold">
           Cobertura por encontro
         </span>
         <span className="ml-auto shrink-0 text-xs tabular-nums text-muted-foreground">
@@ -306,7 +306,7 @@ export function EncontroDetails({
         {/* role=heading no lugar de <h3>: o content model do summary não
             admite heading misturado a phrasing — o span com role preserva a
             mesma semântica pros leitores de tela e pros specs */}
-        <span role="heading" aria-level={3} className="shrink-0 text-[13px] font-semibold">
+        <span role="heading" aria-level={3} className="shrink-0 text-sm font-semibold">
           Encontro {n}
         </span>
         {/* encontro vigente do calendário — explica por que a linha já vem
@@ -314,7 +314,7 @@ export function EncontroDetails({
         {atual && (
           <Badge
             variant="outline"
-            className="shrink-0 border-[var(--brand-lime)]/50 bg-[var(--brand-lime)]/15 text-[11px] font-semibold"
+            className="shrink-0 border-[var(--brand-lime)]/50 bg-[var(--brand-lime)]/15 font-semibold"
           >
             semana atual
           </Badge>
@@ -388,6 +388,53 @@ export function EncontroDetails({
   );
 }
 
+/** Faixa de encontros vazios consecutivos (1 linha em vez de N acordeões
+ *  "sem material ainda"). Cada nº da faixa ganha uma âncora invisível pra
+ *  célula da trilha continuar levando até aqui. "Adicionar" abre o form já
+ *  com o 1º encontro da faixa — a coord ajusta se for outro. */
+export function EncontrosVaziosLinha({
+  nums,
+  ehCoord,
+  maxEncontro,
+  indice,
+}: {
+  nums: number[];
+  ehCoord: boolean;
+  maxEncontro: number;
+  indice: number;
+}) {
+  const primeiro = nums[0]!;
+  const ultimo = nums[nums.length - 1]!;
+  const titulo =
+    primeiro === ultimo
+      ? `Encontro ${primeiro}: sem material ainda`
+      : `Encontros ${primeiro} a ${ultimo}: sem material ainda`;
+  return (
+    <div
+      className="animate-enter relative flex flex-wrap items-center justify-between gap-x-3 gap-y-2 rounded-xl border border-dashed border-border px-4 py-3"
+      style={{ "--i": Math.min(indice, 10) } as CSSProperties}
+    >
+      {nums.map((n) => (
+        <span
+          key={n}
+          id={`mat-encontro-${n}`}
+          aria-hidden
+          className="absolute inset-x-0 top-0 scroll-mt-16"
+        />
+      ))}
+      <p className="text-sm font-medium">{titulo}</p>
+      {ehCoord && (
+        <NovoMaterialDialog
+          maxEncontro={maxEncontro}
+          defaultEncontro={primeiro}
+          triggerLabel="Adicionar"
+          triggerVariant="outline"
+        />
+      )}
+    </div>
+  );
+}
+
 /** Pill do pior estado no summary: lime quando todo material do encontro tem
  *  conteúdo; amarelo (warn) quando algo ainda está "em breve" — com a contagem
  *  quando só uma parte falta. Encontro vazio não tem pill. */
@@ -437,7 +484,7 @@ export function TransversaisMateriais({
             className="animate-enter space-y-2"
             style={{ "--i": Math.min(i, 10) } as CSSProperties}
           >
-            <h3 className="text-[13px] font-semibold">{GRUPO_TIPO[tipo]}</h3>
+            <h3 className="text-sm font-semibold">{GRUPO_TIPO[tipo]}</h3>
             <div className="divide-y divide-border/60 overflow-hidden rounded-xl bg-card shadow-[var(--shadow-border)]">
               {itens.map((m) => (
                 <MaterialRow key={m.id} m={m} ehCoord={ehCoord} maxEncontro={maxEncontro} />

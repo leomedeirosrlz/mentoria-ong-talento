@@ -61,7 +61,7 @@ test("fluxo completo: convite → resposta pública → consolidado pro jovem", 
 }) => {
   // ── mentor abre a ficha e indica a pessoa ──────────────────────────
   await loginComSenha(page, MENTOR_EMAIL, SENHA);
-  await page.goto(`/duplas/${DUPLA_ID}`);
+  await page.goto(`/duplas/${DUPLA_ID}?aba=instrumentos`);
   const secao = page.getByRole("heading", {
     name: "Avaliação por terceiros",
   });
@@ -99,7 +99,7 @@ test("fluxo completo: convite → resposta pública → consolidado pro jovem", 
   });
 
   // ── de volta à ficha: resposta identificada + consolidado ──────────
-  await page.goto(`/duplas/${DUPLA_ID}`);
+  await page.goto(`/duplas/${DUPLA_ID}?aba=instrumentos`);
   await expect(page.getByText("respondeu", { exact: true })).toBeVisible({ timeout: 15_000 });
   await page.getByText(`Ver resposta de ${CONVIDADO.split(" ")[0]}`).click();
   await expect(page.getByText(RESPOSTA_FORTES)).toBeVisible();
@@ -113,8 +113,10 @@ test("fluxo completo: convite → resposta pública → consolidado pro jovem", 
   await expect(page.getByText("publicada")).toBeVisible({ timeout: 15_000 });
 
   // ── o jovem lê SÓ a síntese — nome da pessoa indicada nunca aparece ─
+  // (o consolidado saiu da home e mora em /jovem/materiais, junto da
+  // devolutiva de terceiros que o origina)
   await relogar(page, JOVEM_EMAIL, SENHA);
-  await page.goto("/jovem");
+  await page.goto("/jovem/materiais");
   await expect(
     page.getByRole("heading", { name: "Como as pessoas próximas te veem" })
   ).toBeVisible({ timeout: 15_000 });

@@ -19,6 +19,7 @@ import {
 } from "@phosphor-icons/react";
 import { papelCurto, papelLabel } from "@/lib/ciclo";
 import { Avatar } from "@/components/avatar";
+import { DemoSlotProvider } from "@/components/demo-bar";
 import { T } from "@/components/motion";
 import { NotificacoesBell, NotificacoesProvider } from "@/components/notificacoes";
 import { SignOutButton } from "@/components/signout-button";
@@ -31,20 +32,41 @@ import {
 import type { Notificacao, Profile } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
+/** Seção de trabalho da sidebar. Visão geral fica sem grupo (null). */
+type Grupo = "Acompanhar" | "Programa" | "Dados";
+
+// a ordem do array é a ordem de exibição dentro de cada grupo
 const NAV = [
-  { href: "/", label: "Visão geral", curto: "Início", icon: ChartLineUp, roles: null },
-  { href: "/duplas", label: "Duplas", curto: "Duplas", icon: UserCircle, roles: ["coordenacao", "supervisor", "mentor_dpp", "mentor_especialista"] },
+  { href: "/", label: "Visão geral", curto: "Início", icon: ChartLineUp, roles: null, grupo: null },
+  { href: "/duplas", label: "Duplas", curto: "Duplas", icon: UserCircle, roles: ["coordenacao", "supervisor", "mentor_dpp", "mentor_especialista"], grupo: "Acompanhar" },
+  { href: "/agenda", label: "Agenda", curto: "Agenda", icon: CalendarDots, roles: null, grupo: "Acompanhar" },
   // 0084: a fila de chamados é casa nova da coordenação/auxiliar — badge =
   // chamados sem dono (quem assumir primeiro trata)
-  { href: "/chamados", label: "Chamados", curto: "Chamados", icon: Lifebuoy, roles: ["coordenacao", "supervisor"] },
-  { href: "/registros", label: "Registros", curto: "Registros", icon: ClipboardText, roles: ["coordenacao", "supervisor"] },
-  { href: "/agenda", label: "Agenda", curto: "Agenda", icon: CalendarDots, roles: null },
-  { href: "/materiais", label: "Materiais", curto: "Materiais", icon: FolderOpen, roles: null },
-  { href: "/formularios", label: "Formulários", curto: "Forms", icon: ListChecks, roles: ["coordenacao"] },
-  { href: "/turmas", label: "Turmas", curto: "Turmas", icon: ChalkboardTeacher, roles: ["coordenacao"] },
-  { href: "/relatorios", label: "Relatórios", curto: "Relatórios", icon: Table, roles: ["coordenacao"] },
-  { href: "/pessoas", label: "Pessoas", curto: "Pessoas", icon: UsersThree, roles: ["coordenacao", "supervisor", "mentor_dpp", "mentor_especialista"] },
+  { href: "/chamados", label: "Chamados", curto: "Chamados", icon: Lifebuoy, roles: ["coordenacao", "supervisor"], grupo: "Acompanhar" },
+  { href: "/materiais", label: "Materiais", curto: "Materiais", icon: FolderOpen, roles: null, grupo: "Programa" },
+  { href: "/formularios", label: "Formulários", curto: "Forms", icon: ListChecks, roles: ["coordenacao"], grupo: "Programa" },
+  { href: "/turmas", label: "Turmas", curto: "Turmas", icon: ChalkboardTeacher, roles: ["coordenacao"], grupo: "Programa" },
+  { href: "/registros", label: "Registros", curto: "Registros", icon: ClipboardText, roles: ["coordenacao", "supervisor"], grupo: "Dados" },
+  { href: "/relatorios", label: "Relatórios", curto: "Relatórios", icon: Table, roles: ["coordenacao"], grupo: "Dados" },
+  { href: "/pessoas", label: "Pessoas", curto: "Pessoas", icon: UsersThree, roles: ["coordenacao", "supervisor", "mentor_dpp", "mentor_especialista"], grupo: "Dados" },
 ] as const;
+
+type Item = (typeof NAV)[number];
+type Secao<T> = { titulo: Grupo | null; itens: T[] };
+
+const GRUPOS: readonly (Grupo | null)[] = [null, "Acompanhar", "Programa", "Dados"];
+
+/** Agrupa por trabalho, na ordem fixa dos grupos (a ordem dos itens vem da NAV). */
+function porGrupo<T extends { grupo: Grupo | null }>(itens: readonly T[]): Secao<T>[] {
+  return GRUPOS.map((titulo) => ({
+    titulo,
+    itens: itens.filter((i) => i.grupo === titulo),
+  })).filter((s) => s.itens.length > 0);
+}
+
+// até 7 itens a lista é simples (supervisor = 7, mentor = 5); acima disso,
+// só a coordenação, e ela agrupa por trabalho
+const LIMITE_LISTA_SIMPLES = 7;
 
 export function AppShell({
   me,
@@ -69,33 +91,51 @@ export function AppShell({
   const pathname = usePathname();
   const items = NAV.filter((i) => !i.roles || (me.role && (i.roles as readonly string[]).includes(me.role)));
   const [abertoMais, setAbertoMais] = useState(false);
+  // rodapé da sidebar: a pílula "float" da demo se encaixa aqui no desktop
+  const [slotDemo, setSlotDemo] = useState<HTMLDivElement | null>(null);
 
-  // nav mobile com no máx. 5 cells — coordenação (7) e supervisor (6) passam
-  // disso; mentor chega a 5 e o "Mais" nem aparece.
-  // Primárias = rotina diária da operação (Início/Duplas/Pessoas/Agenda);
-  // leitura consolidada (Registros) e gestão menos diária (Materiais/
-  // Formulários) ficam a 1 toque no "Mais". A ordem da sidebar desktop não
-  // muda — a prioridade mobile é só do bottom nav.
+  // nav mobile com no máx. 5 cells — coordenação (10) e supervisor (7) passam
+  // disso; mentor tem 5 e o "Mais" nem aparece.
+  // Primárias = rotina diária da operação (Início/Duplas/Pessoas/Agenda); o
+  // resto (Chamados, Registros, Materiais, Formulários, Turmas, Relatórios)
+  // fica a 1 toque no "Mais". A ordem da sidebar desktop não muda — a
+  // prioridade mobile é só do bottom nav.
   const MOBILE_PRIMEIRO = [
     "/",
     "/duplas",
     "/pessoas",
     "/agenda",
+    "/chamados",
     "/registros",
     "/materiais",
     "/formularios",
+    "/turmas",
     "/relatorios",
   ];
+  // rota fora da lista vai pro fim; indexOf -1 subiria pro topo
+  const prioridade = (href: string) => {
+    const i = MOBILE_PRIMEIRO.indexOf(href);
+    return i === -1 ? Infinity : i;
+  };
+  // Infinity - Infinity dá NaN, que o sort trata como empate e mantém a
+  // ordem da NAV entre as rotas fora da lista
   const itemsMobile =
     items.length > 5
-      ? [...items].sort(
-          (a, b) =>
-            MOBILE_PRIMEIRO.indexOf(a.href) - MOBILE_PRIMEIRO.indexOf(b.href)
-        )
+      ? [...items].sort((a, b) => prioridade(a.href) - prioridade(b.href))
       : items;
   const visiveis = items.length > 5 ? itemsMobile.slice(0, 4) : items;
   const overflow = items.length > 5 ? itemsMobile.slice(4) : [];
   const maisAtivo = overflow.some((i) => pathname.startsWith(i.href));
+  const chamadosNoMais =
+    chamadosSemDono > 0 && overflow.some((i) => i.href === "/chamados");
+
+  const agrupado = items.length > LIMITE_LISTA_SIMPLES;
+  const secoesSidebar: Secao<Item>[] = agrupado
+    ? porGrupo(items)
+    : [{ titulo: null, itens: items }];
+  const secoesMais: Secao<Item>[] = agrupado
+    ? porGrupo(overflow)
+    : [{ titulo: null, itens: overflow }];
 
   // navegar pelo popover (ou por fora) fecha o Mais — ajuste durante o
   // render (padrão "props mudaram", igual ao provider de notificações)
@@ -107,6 +147,7 @@ export function AppShell({
 
   return (
     <NotificacoesProvider inicial={notificacoes}>
+    <DemoSlotProvider alvo={slotDemo}>
     {/* coluna no mobile, linha no desktop — o flex sem gate é o que estica
         a coluna de conteúdo (flex-1) a 100dvh em qualquer viewport e põe o
         footer encostado na borda inferior em página curta (antes o flex só
@@ -116,7 +157,7 @@ export function AppShell({
           inteira e cai direto no <main id="conteudo"> */}
       <a
         href="#conteudo"
-        className="pointer-events-none fixed left-4 top-3 z-50 inline-flex min-h-11 -translate-y-24 items-center rounded-lg bg-[var(--brand-ink)] px-4 text-sm font-semibold text-[var(--brand-lime)] opacity-0 shadow-[var(--shadow-border)] transition-[transform,opacity] duration-200 focus:pointer-events-auto focus:translate-y-0 focus:opacity-100"
+        className="pointer-events-none fixed left-4 top-3 z-50 inline-flex min-h-11 -translate-y-24 items-center rounded-lg bg-[var(--brand-lime)] px-4 text-sm font-semibold text-[var(--brand-ink)] opacity-0 shadow-[var(--shadow-border)] transition-[transform,opacity] duration-200 focus:pointer-events-auto focus:translate-y-0 focus:opacity-100"
       >
         Pular pro conteúdo
       </a>
@@ -151,7 +192,7 @@ export function AppShell({
 
       {/* sidebar — só desktop */}
       <aside className="hidden md:flex w-56 shrink-0 bg-sidebar text-sidebar-foreground border-r border-sidebar-border flex-col fixed inset-y-0">
-        <div className="px-5 pt-6 pb-8">
+        <div className="px-5 pt-6 pb-6">
           {/* convenção logo→home, igual à top bar mobile */}
           <Link href="/" className="inline-block">
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -160,47 +201,64 @@ export function AppShell({
           <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mt-2">Programa de Mentoria Social</p>
         </div>
 
-        <nav aria-label="Navegação principal" className="flex-1 px-3 space-y-1">
-          {items.map((item) => {
-            const ativo = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                aria-current={ativo ? "page" : undefined}
-                className={cn(
-                  "relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
-                  ativo
-                    ? "text-[var(--brand-ink)] font-semibold"
-                    : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                )}
-              >
-                {/* continuidade espacial: a pill viaja pra nova seção na troca
-                    de rota — o AppShell persiste entre páginas (§2) */}
-                {ativo && (
-                  <motion.span
-                    layoutId="nav-side"
-                    transition={T.pill}
-                    aria-hidden
-                    className="absolute inset-0 -z-10 rounded-lg bg-[var(--brand-lime)]"
-                  />
-                )}
-                <item.icon size={18} weight={ativo ? "fill" : "regular"} aria-hidden className="relative" />
-                <span className="relative">{item.label}</span>
-                {item.href === "/chamados" && chamadosSemDono > 0 && (
-                  <span
-                    aria-label={`${chamadosSemDono} chamados na fila`}
-                    className="relative ml-auto grid min-w-5 place-items-center rounded-full bg-[var(--warn)]/20 px-1.5 py-0.5 text-[10px] font-semibold text-[var(--warn-text)]"
+        {/* min-h-0 + overflow: com os grupos a lista passa da altura em telas
+            baixas — ela rola e o rodapé (demo + usuário) fica sempre visível */}
+        <nav aria-label="Navegação principal" className="min-h-0 flex-1 overflow-y-auto px-3 pb-3">
+
+          {secoesSidebar.map((secao) => (
+            // mais espaço acima do título de grupo do que abaixo: o título
+            // fica preso ao grupo que ele nomeia
+            <div key={secao.titulo ?? "geral"} className="mt-5 space-y-1 first:mt-0">
+              {secao.titulo && (
+                <p className="px-3 pb-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                  {secao.titulo}
+                </p>
+              )}
+              {secao.itens.map((item) => {
+                const ativo = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    aria-current={ativo ? "page" : undefined}
+                    className={cn(
+                      "relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
+                      ativo
+                        ? "text-[var(--brand-ink)] font-semibold"
+                        : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                    )}
                   >
-                    {chamadosSemDono}
-                  </span>
-                )}
-              </Link>
-            );
-          })}
+                    {/* continuidade espacial: a pill viaja pra nova seção na troca
+                        de rota — o AppShell persiste entre páginas (§2) */}
+                    {ativo && (
+                      <motion.span
+                        layoutId="nav-side"
+                        transition={T.pill}
+                        aria-hidden
+                        className="absolute inset-0 -z-10 rounded-lg bg-[var(--brand-lime)]"
+                      />
+                    )}
+                    <item.icon size={18} weight={ativo ? "fill" : "regular"} aria-hidden className="relative" />
+                    <span className="relative">{item.label}</span>
+                    {item.href === "/chamados" && chamadosSemDono > 0 && (
+                      <span
+                        aria-label={`${chamadosSemDono} chamados na fila`}
+                        className="relative ml-auto grid min-w-5 place-items-center rounded-full bg-[var(--warn)]/20 px-1.5 py-0.5 text-[10px] font-semibold text-[var(--warn-text)]"
+                      >
+                        {chamadosSemDono}
+                      </span>
+                    )}
+                  </Link>
+                );
+              })}
+            </div>
+          ))}
         </nav>
 
         <div className="border-t border-sidebar-border px-3 pb-4 pt-4">
+          {/* encaixe da pílula da demo (DemoBar float): vazio fora da demo,
+              então não ocupa altura; em demo a pílula entra aqui, acima do usuário */}
+          <div ref={setSlotDemo} />
           <div className="flex items-center gap-1">
             <Link
               href="/perfil"
@@ -288,7 +346,10 @@ export function AppShell({
           {overflow.length > 0 && (
             <Popover open={abertoMais} onOpenChange={setAbertoMais}>
               <PopoverTrigger
-                aria-label={maisAtivo ? `Mais seções, seção atual em ${overflow.find((i) => pathname.startsWith(i.href))?.label}` : "Mais seções"}
+                aria-label={[
+                  maisAtivo ? `Mais seções, seção atual em ${overflow.find((i) => pathname.startsWith(i.href))?.label}` : "Mais seções",
+                  chamadosNoMais ? `${chamadosSemDono} chamados na fila` : null,
+                ].filter(Boolean).join(", ")}
                 className={cn(
                   "group relative flex flex-1 flex-col items-center gap-1 py-2.5 text-[11px] transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:ring-inset",
                   maisAtivo ? "font-semibold text-[var(--brand-ink)]" : "font-medium text-sidebar-foreground/75 active:text-sidebar-foreground"
@@ -304,12 +365,22 @@ export function AppShell({
                     className="absolute top-0 h-0.5 w-8 rounded-full bg-[var(--brand-lime)]"
                   />
                 )}
-                <DotsThree
-                  size={20}
-                  weight={maisAtivo ? "bold" : "regular"}
-                  aria-hidden
-                  className="transition-transform group-active:scale-90"
-                />
+                <span className="relative">
+                  <DotsThree
+                    size={20}
+                    weight={maisAtivo ? "bold" : "regular"}
+                    aria-hidden
+                    className="transition-transform group-active:scale-90"
+                  />
+                  {/* fila de chamados mora no Mais — sem o ponto a pendência
+                      só aparece abrindo o popover */}
+                  {chamadosNoMais && (
+                    <span
+                      aria-hidden
+                      className="absolute -top-0.5 -right-1 size-2 rounded-full bg-[var(--warn)] ring-2 ring-sidebar"
+                    />
+                  )}
+                </span>
                 Mais
               </PopoverTrigger>
               <PopoverContent
@@ -318,42 +389,52 @@ export function AppShell({
                 sideOffset={8}
                 className="w-56 p-1.5"
               >
-                <ul>
-                  {overflow.map((item) => {
-                    const ativo = pathname.startsWith(item.href);
-                    return (
-                      <li key={item.href}>
-                        <Link
-                          href={item.href}
-                          aria-current={ativo ? "page" : undefined}
-                          className={cn(
-                            "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors outline-none focus-visible:bg-muted",
-                            ativo
-                              ? "font-semibold text-[var(--brand-ink)]"
-                              : "text-foreground/80 hover:bg-muted"
-                          )}
-                        >
-                          <item.icon size={18} weight={ativo ? "fill" : "regular"} aria-hidden />
-                          {item.label}
-                          {item.href === "/chamados" && chamadosSemDono > 0 && (
-                            <span
-                              aria-label={`${chamadosSemDono} chamados na fila`}
-                              className="ml-auto grid min-w-5 place-items-center rounded-full bg-[var(--warn)]/20 px-1.5 py-0.5 text-[10px] font-semibold text-[var(--warn-text)]"
+                {secoesMais.map((secao) => (
+                  <div key={secao.titulo ?? "geral"} className="mt-1 first:mt-0">
+                    {secao.titulo && (
+                      <p className="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                        {secao.titulo}
+                      </p>
+                    )}
+                    <ul>
+                      {secao.itens.map((item) => {
+                        const ativo = pathname.startsWith(item.href);
+                        return (
+                          <li key={item.href}>
+                            <Link
+                              href={item.href}
+                              aria-current={ativo ? "page" : undefined}
+                              className={cn(
+                                "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors outline-none focus-visible:bg-muted",
+                                ativo
+                                  ? "font-semibold text-[var(--brand-ink)]"
+                                  : "text-foreground/80 hover:bg-muted"
+                              )}
                             >
-                              {chamadosSemDono}
-                            </span>
-                          )}
-                        </Link>
-                      </li>
-                    );
-                  })}
-                </ul>
+                              <item.icon size={18} weight={ativo ? "fill" : "regular"} aria-hidden />
+                              {item.label}
+                              {item.href === "/chamados" && chamadosSemDono > 0 && (
+                                <span
+                                  aria-label={`${chamadosSemDono} chamados na fila`}
+                                  className="ml-auto grid min-w-5 place-items-center rounded-full bg-[var(--warn)]/20 px-1.5 py-0.5 text-[10px] font-semibold text-[var(--warn-text)]"
+                                >
+                                  {chamadosSemDono}
+                                </span>
+                              )}
+                            </Link>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                ))}
               </PopoverContent>
             </Popover>
           )}
         </div>
       </nav>
     </div>
+    </DemoSlotProvider>
     </NotificacoesProvider>
   );
 }

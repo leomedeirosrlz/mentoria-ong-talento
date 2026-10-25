@@ -1670,7 +1670,7 @@ export function AgendaCalendario({
         <div className="mt-3 rounded-xl bg-muted/50 p-3 shadow-[var(--shadow-inset)]">
           {itensDupla.length > 0 && (
             <>
-              <h3 className="px-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+              <h3 className="px-2 text-xs sm:text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
                 {ehMentorUi ? "Sua dupla" : "Duplas"}
               </h3>
               {/* chave dos dots de status — contextual, junto de onde eles aparecem */}
@@ -1726,7 +1726,7 @@ export function AgendaCalendario({
                   "mt-2 border-t border-border/70"
               )}
             >
-              <p className="px-2 pb-0.5 pt-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+              <p className="px-2 pb-0.5 pt-2 text-xs sm:text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
                 Sem o {oficialDoDia!.numero}º encontro (
                 {faltantesDoDia.length})
               </p>
@@ -1787,7 +1787,7 @@ export function AgendaCalendario({
               acima: separa "o que o programa marca pro dia" do "seu"
               na ordem nova do painel (K5) */}
           {(itensDupla.length > 0 || faltantesDoDia.length > 0) && (
-            <h3 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+            <h3 className="text-xs sm:text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
               {eventosSelecionados.length > 1
                 ? "Eventos oficiais"
                 : "Evento oficial"}
@@ -1885,7 +1885,7 @@ export function AgendaCalendario({
                   o bloco não renderiza (nada de seção vazia) */}
               {materiaisDoEncontro.length > 0 && (
                 <div className="pt-1.5">
-                  <h3 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                  <h3 className="text-xs sm:text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
                     Materiais do encontro
                   </h3>
                   <ul className="mt-0.5">
@@ -2147,7 +2147,7 @@ export function AgendaCalendario({
               <div className="ms-auto flex items-center gap-2">
                 <Label
                   htmlFor="agenda-cronograma"
-                  className="shrink-0 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground"
+                  className="shrink-0 text-xs sm:text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground"
                 >
                   Turma
                 </Label>
@@ -2399,7 +2399,7 @@ export function AgendaCalendario({
                 "realizada"); o anel lime marca a semana corrente. O anel
                 cinza de "semana exibida" é affordance de seleção e fica
                 fora da legenda, como o dia selecionado do grid */}
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pt-1 pb-1 text-[11px] text-muted-foreground">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pt-1 pb-1 text-xs sm:text-[11px] text-muted-foreground">
               <span className="inline-flex items-center gap-1.5">
                 <span
                   aria-hidden
@@ -2720,7 +2720,7 @@ export function AgendaCalendario({
             style={{ "--dir": `${direcao * 8}px` } as CSSProperties}
           >
             <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
-              <h2 className="text-lg font-semibold tracking-tight">
+              <h2 className="text-base font-semibold tracking-tight sm:text-lg">
                 {capitalizar(formatDiaSemana(selecionado))}, {diaSel} de{" "}
                 {mesSelLongo}
                 {anoSuffix}
@@ -2892,7 +2892,7 @@ export function AgendaCalendario({
               {oficialSemana?.numero != null &&
                 semEncontroSemana.length > 0 && (
                   <div>
-                    <p className="px-2 pb-0.5 pt-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                    <p className="px-2 pb-0.5 pt-2 text-xs sm:text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
                       Sem o {oficialSemana.numero}º encontro marcado (
                       {semEncontroSemana.length})
                     </p>
@@ -2926,8 +2926,8 @@ export function AgendaCalendario({
             semana do encontro ===== */}
         {visaoEfetiva === "ciclo" && (
           <div>
-            <p className="px-4 pb-1 pt-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground sm:px-5">
-              Encontros do ciclo — cobertura por número
+            <p className="px-4 pb-1 pt-3 text-xs sm:text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground sm:px-5">
+              Encontros do ciclo: cobertura por número
             </p>
             {/* timeline: uma célula por encontro oficial, altura = fração
                 realizada sobre as ativas daquela semana (denominador do
@@ -2935,7 +2935,7 @@ export function AgendaCalendario({
                 tracejado sem preenchimento */}
             <div
               role="region"
-              aria-label="Timeline dos encontros do ciclo — role horizontalmente"
+              aria-label="Timeline dos encontros do ciclo. Role horizontalmente"
               tabIndex={0}
               className="scroll-fina overflow-x-auto px-4 pt-2 sm:px-5"
             >
@@ -2951,7 +2951,7 @@ export function AgendaCalendario({
                       : 0;
                   const rotulo = `${e.numero}º encontro${
                     e.data ? `, ${diaCompacto(e.data)}` : ", sem data"
-                  } — ${
+                  }: ${
                     passouN
                       ? `${feitos} de ${total} realizaram`
                       : "ainda não chegou"
@@ -3017,7 +3017,7 @@ export function AgendaCalendario({
                 <b className="font-semibold text-foreground tabular-nums">
                   {acumCiclo.comRegistro} de {acumCiclo.esperados}
                 </b>{" "}
-                encontros oficiais com registro — acumulado do ciclo
+                encontros oficiais com registro · acumulado do ciclo
               </p>
               {acumCiclo.esperados > 0 && (
                 <BarraSegmentada
@@ -3190,7 +3190,7 @@ export function AgendaCalendario({
               className="inline-flex items-center gap-1 rounded-md py-0.5 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               {espAtivas} {espAtivas === 1 ? "dupla" : "duplas"} em trilha
-              especialista — fora do calendário oficial
+              especialista, fora do calendário oficial
               <ArrowUpRight aria-hidden size={12} />
             </Link>
           </p>
@@ -3257,7 +3257,7 @@ export function AgendaCalendario({
         aria-label={`Todos os eventos de ${rotuloMes}`}
         className="lg:col-span-2"
       >
-        <h2 className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+        <h2 className="mb-3 px-1 text-base font-semibold">
           Todos os eventos de {rotuloMes}
         </h2>
         <div
@@ -3471,7 +3471,7 @@ function AcaoDiaMentor({
   );
   const notaResolvido = diaResolvido ? (
     <p className="w-full text-xs text-muted-foreground">
-      O encontro deste dia já tem registro — aqui você registra outro que
+      O encontro deste dia já tem registro. Aqui você registra outro que
       ficou faltando.
     </p>
   ) : null;
@@ -4310,7 +4310,7 @@ function MarcadorDiaSemana({
         <span
           aria-hidden
           className={cn(
-            "grid size-3.5 shrink-0 place-items-center rounded-full bg-[var(--brand-lime)] text-[8px] font-semibold leading-none tabular-nums text-[var(--brand-ink)]",
+            "grid size-3.5 shrink-0 place-items-center rounded-full bg-[var(--brand-lime)] text-[10px] font-semibold leading-none tabular-nums text-[var(--brand-ink)]",
             e.id === eventoSemanaId &&
               "ring-2 ring-[var(--brand-lime)]/60 ring-offset-1 ring-offset-card"
           )}
@@ -4444,7 +4444,7 @@ function SemanaMentor({
     >
       <div
         role="region"
-        aria-label="Grade da semana — role horizontalmente"
+        aria-label="Grade da semana. Role horizontalmente"
         tabIndex={0}
         className="scroll-fina overflow-x-auto"
       >
@@ -4776,7 +4776,7 @@ function HorariosMentor({
           o conjunto rola horizontal em vez de esmagar os blocos */}
       <div
         role="region"
-        aria-label="Grade da semana — role horizontalmente"
+        aria-label="Grade da semana. Role horizontalmente"
         tabIndex={0}
         className="scroll-fina overflow-x-auto"
       >

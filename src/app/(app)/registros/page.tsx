@@ -7,6 +7,7 @@ import {
   getAlertasRegistros,
   getCicloEventos,
   getCronogramas,
+  getDuplas,
   getDuplasOpcoes,
   getEncontrosPorDuplas,
   getEspecialistaEventos,
@@ -29,12 +30,15 @@ import {
 } from "@/lib/ciclo";
 import { RegistrosFiltros, type OrdemRegistros } from "@/components/registros-filtros";
 import { RegistrosPainel } from "@/components/registros-painel";
+import { RegistrosMestreDetalhe, type SecaoLista } from "@/components/registros-mestre-detalhe";
+import type { EntradaRegistro } from "@/components/registros-detalhe";
 import {
   agruparRegistros,
   grupoRegistrosDe,
   PERIODO_REGISTROS_OPCOES,
   periodoRegistrosDe,
 } from "@/lib/registros";
+import { saudeDoRecorte } from "@/lib/agenda-coordenacao";
 import { turmaCurta, turmaLonga } from "@/lib/turma";
 import { buttonVariants } from "@/components/ui/button";
 import { ImportarRegistrosDialog } from "@/components/importar-registros-dialog";
@@ -94,6 +98,17 @@ function scoreAlerta(r: RegistroResumo): number {
   return 0;
 }
 
+/** Os nomes da dupla de um grupo "por dupla" — o cabeçalho os mostra no padrão
+ *  do app (DuplaNomes), sem o prefixo "Dupla:". */
+function duplaDoBloco(
+  itens: RegistroResumo[]
+): { mentor: string; mentorado: string } | null {
+  const d = itens[0]?.encontro?.dupla;
+  return d?.mentor && d?.mentorado
+    ? { mentor: d.mentor.nome, mentorado: d.mentorado.nome }
+    : null;
+}
+
 /** A data que a timeline exibe — quando o encontro aconteceu de fato. */
 function aconteceuEmDe(r: RegistroResumo): string {
   return (
@@ -127,16 +142,41 @@ export default async function RegistrosPage({
   // ?grupo=dupla|semana|avaliacao — "dupla" é o default implícito e não
   // viaja na URL; lixo no param cai no default (grupoRegistrosDe)
   const grupo = grupoRegistrosDe(primeiro(params.grupo));
+  // ?r= é o registro aberto no painel desktop; id inválido cai no primeiro
+  const rParam = primeiro(params.r);
+  const rId = rParam && UUID_RE.test(rParam) ? rParam : null;
 
-  const [{ itens, total }, duplas, alertas, espEventos, panorama, cronogramas] =
-    await Promise.all([
-      getRegistros(filtros),
-      getDuplasOpcoes(),
-      getAlertasRegistros(),
-      getEspecialistaEventos(),
-      getRegistrosPanorama(filtros),
-      getCronogramas(),
-    ]);
+  const [
+    { itens: itensIniciais, total },
+    duplas,
+    alertas,
+    espEventos,
+    panorama,
+    cronogramas,
+    todasDuplas,
+  ] = await Promise.all([
+    getRegistros(filtros),
+    getDuplasOpcoes(),
+    getAlertasRegistros(),
+    getEspecialistaEventos(),
+    getRegistrosPanorama(filtros),
+    getCronogramas(),
+    getDuplas(),
+  ]);
+  // situação das duplas: o mesmo resumo de /duplas, /agenda e da home, no
+  // recorte de turma do painel (a URL é a fonte do recorte)
+  const saude = saudeDoRecorte(todasDuplas, eventos, new Date(), filtros.turma ?? null);
+
+  // ?r= de um registro fora da página carregada: sobe as páginas (cumulativas)
+  // até achá-lo, para o link de um registro antigo abrir o registro certo
+  let itens = itensIniciais;
+  for (
+    let p = filtros.pagina + 1;
+    rId && p <= 50 && itens.length < total && !itens.some((x) => x.id === rId);
+    p++
+  ) {
+    itens = (await getRegistros({ ...filtros, pagina: p })).itens;
+  }
 
   // trilha especialista (0074): encontro.numero é a TENTATIVA — o passo do
   // guia é o rank entre realizados, e derivá-lo exige o histórico da dupla
@@ -240,7 +280,6 @@ export default async function RegistrosPage({
     const qs = p.toString();
     return `/registros${qs ? `?${qs}` : ""}`;
   };
-  const hrefPagina = (pagina: number) => hrefCom({ pagina: String(pagina) });
   // "limpar filtros" zera TUDO — inclusive o recorte do panorama (turma/
   // período), que também filtra a lista. Ordem e agrupamento são preferência
   // de leitura e sobrevivem
@@ -276,7 +315,7 @@ export default async function RegistrosPage({
             <span className="block text-sm font-semibold tabular-nums">
               {formatDiaNum(aconteceuEm)}
             </span>
-            <span className="mt-1 block text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+            <span className="mt-1 block text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground sm:text-[11px]">
               {formatMesAbrev(aconteceuEm)}
             </span>
           </p>
@@ -314,27 +353,13 @@ export default async function RegistrosPage({
   function listaAgrupada(lista: RegistroResumo[], Tag: "h2" | "h3") {
     const grupos = agruparRegistros(lista, grupo);
     return (
-      <div
-        className={cn(
-          "space-y-6",
-          // por dupla a grade em xl põe duas duplas lado a lado (o ganho de
-          // densidade da issue); semana/avaliação seguem sequenciais — a
-          // timeline conta a linha do tempo, não um board
-          grupo === "dupla" &&
-            "xl:grid xl:grid-cols-2 xl:items-start xl:gap-8 xl:space-y-0"
-        )}
-      >
+      <div className="space-y-6">
         {grupos.map((g) => (
           // div, não <section>: 16 landmarks nomeados seriam ruído de
           // navegação — o cabeçalho dentro já dá o nome ao grupo
           <div
             key={g.chave}
-            className={cn(
-              "border-t border-border/60 pt-5 first:border-t-0 first:pt-0",
-              // na grade o 1º da fila também ganha a hairline — sem ela a
-              // coluna da direita nasceria com borda e a da esquerda não
-              grupo === "dupla" && "xl:first:border-t xl:first:pt-5"
-            )}
+            className="border-t border-border/60 pt-5 first:border-t-0 first:pt-0"
           >
             <Tag className="text-[13px] font-semibold">
               {g.rotulo}
@@ -354,6 +379,67 @@ export default async function RegistrosPage({
       </div>
     );
   }
+
+  // desktop: as mesmas seções e blocos do mobile, com o que o cliente precisa
+  // para desenhar cada linha e o registro aberto
+  const entradaDe = (r: RegistroResumo): EntradaRegistro => ({
+    r,
+    tituloEncontro: tituloEncontro(r),
+    passoEsp: passoDoEncontro(r),
+  });
+  const blocosDe = (lista: RegistroResumo[]) =>
+    agruparRegistros(lista, grupo).map((b) => ({
+      chave: b.chave,
+      rotulo: b.rotulo,
+      dupla: grupo === "dupla" ? duplaDoBloco(b.itens) : null,
+      itens: b.itens.map(entradaDe),
+    }));
+  const secoesLista: SecaoLista[] = agrupado
+    ? [
+        {
+          chave: "atencao",
+          titulo: `Precisam de olho (${atencao.length})`,
+          blocos: blocosDe(atencao),
+        },
+        {
+          chave: "demais",
+          titulo: "Sem sinais de atenção",
+          blocos: blocosDe(demais),
+        },
+      ]
+    : [{ chave: "todos", titulo: null, blocos: blocosDe(ordenados) }];
+  const exibidos = secoesLista.flatMap((s) =>
+    s.blocos.flatMap((b) => b.itens)
+  );
+  const selecionadoId =
+    rId && exibidos.some((e) => e.r.id === rId)
+      ? rId
+      : (exibidos[0]?.r.id ?? null);
+  // "Mostrar mais" parte da última página já carregada (o ?r= pode ter subido)
+  const paginaCarregada = Math.max(
+    filtros.pagina,
+    Math.ceil(itens.length / REGISTROS_PAGINA)
+  );
+  const hrefBase = hrefCom({ r: null });
+  // filtro, busca, ordem ou agrupamento trocados remontam a lista (animam);
+  // trocar só a seleção ou carregar mais não remonta
+  const chaveLista = JSON.stringify([{ ...filtros, pagina: 0 }, ordem, grupo]);
+  const linkMais =
+    itens.length < total ? (
+      <div className="flex justify-center pt-1">
+        <Link
+          href={hrefCom({
+            pagina: String(paginaCarregada + 1),
+            r: selecionadoId,
+          })}
+          scroll={false}
+          className={buttonVariants({ variant: "outline" })}
+        >
+          Mostrar mais ({Math.min(total - itens.length, REGISTROS_PAGINA)}{" "}
+          restantes)
+        </Link>
+      </div>
+    ) : null;
 
   const hoje = toDateStr(new Date());
   // pills de turma do panorama: só cronogramas com duplas no escopo do
@@ -404,7 +490,7 @@ export default async function RegistrosPage({
         <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
           <h2
             id="panorama-titulo"
-            className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground"
+            className="text-base font-semibold"
           >
             Panorama do ciclo
           </h2>
@@ -473,11 +559,8 @@ export default async function RegistrosPage({
               })}
             </div>
           </div>
-          <p className="text-[11px] text-muted-foreground">
-            os gráficos e a lista refletem o recorte ativo
-          </p>
         </div>
-        <RegistrosPainel panorama={panorama} hoje={hoje} />
+        <RegistrosPainel panorama={panorama} hoje={hoje} saude={saude} />
       </section>
 
       {/* resumo operacional: o que pede ação vem logo antes da lista; clicar
@@ -580,6 +663,8 @@ export default async function RegistrosPage({
           {/* timeline: o rail mostra o dia em que o encontro aconteceu e a
               linha conecta os nós — a página conta a sequência, não uma
               coleção genérica de cards */}
+          {/* celular (< lg): a timeline de sempre */}
+          <div className="lg:hidden">
           {agrupado ? (
             // prioridade é um agrupamento de blocos — o `?grupo=` corrente
             // particiona DENTRO de cada um (ex.: as duplas que pedem olho)
@@ -587,7 +672,7 @@ export default async function RegistrosPage({
               <section aria-labelledby="reg-atencao-titulo">
                 <h2
                   id="reg-atencao-titulo"
-                  className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground"
+                  className="text-base font-semibold"
                 >
                   Precisam de olho ({atencao.length})
                 </h2>
@@ -598,7 +683,7 @@ export default async function RegistrosPage({
               <section aria-labelledby="reg-demais-titulo">
                 <h2
                   id="reg-demais-titulo"
-                  className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground"
+                  className="text-base font-semibold"
                 >
                   Sem sinais de atenção
                 </h2>
@@ -610,18 +695,20 @@ export default async function RegistrosPage({
           ) : (
             listaAgrupada(ordenados, "h2")
           )}
-          {itens.length < total && (
-            <div className="flex justify-center pt-1">
-              <Link
-                href={hrefPagina(filtros.pagina + 1)}
-                scroll={false}
-                className={buttonVariants({ variant: "outline" })}
-              >
-                Mostrar mais ({Math.min(total - itens.length, REGISTROS_PAGINA)}{" "}
-                restantes)
-              </Link>
-            </div>
-          )}
+          {linkMais}
+          </div>
+          {/* desktop (lg+): mestre e detalhe; a seleção mora em ?r= */}
+          <div className="hidden lg:block">
+            <RegistrosMestreDetalhe
+              secoes={secoesLista}
+              selecionadoId={selecionadoId}
+              hrefBase={hrefBase}
+              chaveLista={chaveLista}
+              souCoord={souCoord}
+              agrupadoPorDupla={grupo === "dupla"}
+              rodape={linkMais}
+            />
+          </div>
         </>
       )}
     </div>

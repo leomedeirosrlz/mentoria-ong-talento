@@ -31,7 +31,7 @@ export async function generateMetadata({
   const titulo = form?.titulo ?? "Formulário";
   const descricao =
     form?.descricao?.trim() ||
-    "Responda o formulário do Programa de Mentoria Social — leva poucos minutos.";
+    "Responda o formulário do Programa de Mentoria Social: leva poucos minutos.";
   return {
     title: titulo,
     description: descricao,
@@ -190,7 +190,7 @@ export default async function FormularioTokenPage({
               {demo && (
                 <p className="mb-4 flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
                   <Flask size={13} aria-hidden />
-                  Modo demonstração — respostas não são gravadas.
+                  Modo demonstração: respostas não são gravadas.
                 </p>
               )}
               <FormularioPublico

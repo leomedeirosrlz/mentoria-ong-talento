@@ -132,7 +132,7 @@ function CelulaEstacao({
     estado === "trancada"
       ? `abre no enc. ${ESTACOES[chave].encIni}`
       : atrasada
-        ? "fora da janela do guia"
+        ? "fora do prazo do guia"
         : {
             respondido: "respondido",
             pendente: "link enviado, aguardando",
@@ -145,7 +145,7 @@ function CelulaEstacao({
     <span
       title={titulo}
       className={cn(
-        "inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium tabular-nums",
+        "inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-medium tabular-nums sm:text-[11px]",
         estilo,
         atrasada && estado !== "trancada" && "ring-1 ring-[var(--warn)]"
       )}
@@ -181,7 +181,7 @@ function MiniBarraTurma({
     chave !== "avaliacao_encontro" && c.trancada === total;
   return (
     <div>
-      <p className="flex items-baseline justify-between gap-2 text-[11px]">
+      <p className="flex items-baseline justify-between gap-2 text-xs">
         <span className="font-semibold text-muted-foreground">
           {grupo.sigla}
         </span>
@@ -198,7 +198,7 @@ function MiniBarraTurma({
         )}
       </p>
       {todasTrancadas ? (
-        <p className="mt-0.5 flex items-center gap-1 text-[11px] text-muted-foreground">
+        <p className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
           <LockSimple size={11} aria-hidden />
           {diaMesEvento(grupo.ctx.dataEnc(ESTACOES[chave].encIni)) ??
             `enc. ${ESTACOES[chave].encIni}`}
@@ -253,9 +253,9 @@ function MiniBarraTurma({
             />
           )}
           {c.fora > 0 && (
-            <p className="mt-1 inline-flex items-center gap-1 text-[11px] font-medium text-[var(--warn-text)]">
+            <p className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-[var(--warn-text)]">
               <Warning size={11} weight="fill" aria-hidden />
-              {c.fora} fora da janela
+              {c.fora} fora do prazo
             </p>
           )}
         </>
@@ -294,12 +294,12 @@ function SegmentoInstrumento({
   const trancadaToda = estacaoTrancadaToda(chave, resolvidas);
   return (
     <li className="w-44 shrink-0 snap-start rounded-lg border border-border/70 p-3 lg:w-auto lg:min-w-0 lg:flex-1">
-      <p className="text-xs font-semibold leading-snug">{meta.titulo}</p>
-      <p className="mt-0.5 text-[11px] text-muted-foreground">
+      <p className="text-sm font-semibold leading-snug">{meta.titulo}</p>
+      <p className="mt-0.5 text-xs text-muted-foreground">
         {meta.chipLabel}
       </p>
       {trancadaToda ? (
-        <p className="mt-3 flex items-start gap-1.5 text-[11px] font-medium leading-snug text-muted-foreground">
+        <p className="mt-3 flex items-start gap-1.5 text-xs font-medium leading-snug text-muted-foreground">
           <LockSimple size={12} aria-hidden className="mt-px shrink-0" />
           {liberaCopia(chave, grupos)}
         </p>
@@ -379,7 +379,7 @@ function ForaItem({
                   mentoradoNome: linha.jovem_nome,
                 },
                 {
-                  casoMentor: `A jornada de ${linha.jovem_nome.split(" ")[0]} tem pendências fora da janela do guia (${falta}). O link vai pro jovem pela ficha da dupla.`,
+                  casoMentor: `A jornada de ${linha.jovem_nome.split(" ")[0]} tem pendências fora do prazo do guia (${falta}). O link vai pro jovem pela ficha da dupla.`,
                 }
               ).mentor ?? ""
             }
@@ -441,26 +441,20 @@ export function PainelJornada({
   const resumoTurmas = grupos
     .map(
       (g) =>
-        `${g.nome}: ${g.linhas.length} ${g.linhas.length === 1 ? "dupla" : "duplas"}, encontro ${g.ctx.encVigente || "—"}`
+        `${g.nome}: ${g.linhas.length} ${g.linhas.length === 1 ? "dupla" : "duplas"}, ${g.ctx.encVigente ? `encontro ${g.ctx.encVigente}` : "antes do primeiro encontro"}`
     )
     .join(" · ");
 
   return (
     <section className="space-y-5 rounded-xl bg-card p-4 shadow-[var(--shadow-border)] sm:p-5">
       <div>
-        <h2 className="flex items-center gap-2 font-semibold">
-          Progresso da jornada
-        </h2>
-        <p className="mt-1 text-xs text-muted-foreground">
-          {resumoTurmas}
-        </p>
-        {/* o "você vê / você não vê" mora na caixa do topo da página — aqui
-            fica a linha de uso do painel (v5c) */}
-        <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-          {ehSupervisor
-            ? "O estado por instrumento nas duplas que você supervisiona — sem respostas e sem ações por aqui: a ficha da dupla é o detalhe."
-            : "O estado por instrumento, turma a turma — detalhe, respostas e envio por dupla ficam na ficha."}
-        </p>
+        <h2 className="text-base font-semibold">Progresso da jornada</h2>
+        <p className="mt-1 text-xs text-muted-foreground">{resumoTurmas}</p>
+        {ehSupervisor && (
+          <p className="mt-1 text-xs text-muted-foreground">
+            Só as duplas que você supervisiona. Respostas e detalhes ficam na ficha.
+          </p>
+        )}
       </div>
 
       {/* a faixa por instrumento — 7 segmentos em trilho rolável (mobile)
@@ -485,7 +479,7 @@ export function PainelJornada({
       </ul>
 
       {/* legenda — os mesmos 5 estados da matriz */}
-      <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
+      <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
         <span className="inline-flex items-center gap-1">
           <Check
             size={11}
@@ -517,7 +511,7 @@ export function PainelJornada({
             className="text-[var(--warn-text)]"
             aria-hidden
           />
-          fora da janela do guia
+          fora do prazo do guia
         </span>
       </p>
 
@@ -525,19 +519,25 @@ export function PainelJornada({
           mais críticas + <details> pro resto */}
       {foraLista.length > 0 && (
         <div>
-          <h3 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--warn-text)]">
-            Fora da janela do guia
+          <h3 className="text-sm font-semibold text-[var(--warn-text)]">
+            Duplas fora do prazo
           </h3>
           <p className="mt-0.5 text-xs text-muted-foreground">
             {foraLista.length}{" "}
             {foraLista.length === 1
-              ? "dupla tem instrumento"
-              : "duplas têm instrumentos"}{" "}
-            que já passaram do ponto do guia sem resposta — o instrumento
-            não fecha sozinho, vale lembrar o mentor de enviar o link na
-            ficha. A avaliação do encontro é da jovem: o link nasce sozinho
-            quando o encontro vira realizado.
+              ? "dupla com instrumento fora do prazo"
+              : "duplas com instrumentos fora do prazo"}
           </p>
+          <details className="group mt-1">
+            <summary className="inline-flex min-h-11 cursor-pointer list-none items-center text-xs text-muted-foreground underline-offset-2 transition-colors select-none marker:hidden hover:text-foreground hover:underline focus-visible:ring-2 focus-visible:ring-ring sm:min-h-6 [&::-webkit-details-marker]:hidden">
+              Como calculamos
+            </summary>
+            <p className="max-w-prose text-xs leading-relaxed text-muted-foreground">
+              Passaram do prazo do guia sem resposta. Vale lembrar o mentor de
+              enviar o link pela ficha. A avaliação do encontro nasce sozinha
+              quando o encontro vira realizado.
+            </p>
+          </details>
           <ul className="mt-2 divide-y divide-border/60">
             {foraTopo.map((r) => (
               <ForaItem
@@ -557,7 +557,7 @@ export function PainelJornada({
                   aria-hidden
                   className="shrink-0 transition-transform group-open:rotate-180"
                 />
-                Ver as outras {foraResto.length}{" "}
+                Ver mais {foraResto.length}{" "}
                 {foraResto.length === 1 ? "dupla" : "duplas"}
               </summary>
               <ul className="divide-y divide-border/60 border-t border-border/60">
@@ -594,10 +594,13 @@ export function PainelJornada({
         <div className="mt-2 space-y-5">
           {grupos.map((g) => (
             <div key={g.cronogramaId}>
-              <h3 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+              <h3 className="text-sm font-semibold">
                 {g.nome}
-                <span className="ml-2 font-normal normal-case tracking-normal">
-                  · encontro {g.ctx.encVigente || "—"} do calendário ·{" "}
+                <span className="ml-2 text-xs font-normal text-muted-foreground">
+                  {g.ctx.encVigente
+                    ? `encontro ${g.ctx.encVigente} do calendário`
+                    : "antes do primeiro encontro"}{" "}
+                  ·{" "}
                   {g.linhas.length}{" "}
                   {g.linhas.length === 1 ? "dupla" : "duplas"}
                 </span>
@@ -627,7 +630,7 @@ export function PainelJornada({
                             c === "avaliacao_encontro"
                               ? r.linha.avaliacoes_encontro.realizados > 0
                                 ? `Aval. ${r.linha.avaliacoes_encontro.feitas}/${r.linha.avaliacoes_encontro.realizados}`
-                                : "Aval. —"
+                                : "Aval. sem encontro"
                               : null
                           }
                         />

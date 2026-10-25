@@ -139,12 +139,12 @@ export default async function JovemPerfil({
         <div className="border-t border-border px-6 pb-6 pt-5">
           {!perfil ? (
             <p className="text-sm text-muted-foreground">
-              Sua ficha de mentorado ainda não está vinculada à sua conta — a
+              Sua ficha de mentorado ainda não está vinculada à sua conta. A
               coordenação faz essa conexão no seu cadastro.
             </p>
           ) : fichaVazia ? (
             <p className="text-sm text-muted-foreground">
-              Sua ficha ainda está vazia — ela é preenchida a partir da sua
+              Sua ficha ainda está vazia: ela é preenchida a partir da sua
               inscrição e do papo com a coordenação.
             </p>
           ) : (

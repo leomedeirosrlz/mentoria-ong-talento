@@ -119,12 +119,12 @@ export default async function AgendaPage({
   const avisoVisao =
     visao === "especialista" && !visaoEsp ? (
       <p className="rounded-lg border border-border bg-muted/50 px-4 py-2.5 text-sm text-muted-foreground">
-        A visão de especialista não se aplica ao seu papel — mostrando a
+        A visão de especialista não se aplica ao seu papel. Mostrando a
         agenda normal.
       </p>
     ) : visao === "dpp" && !mostraDpp ? (
       <p className="rounded-lg border border-border bg-muted/50 px-4 py-2.5 text-sm text-muted-foreground">
-        Você não tem dupla DPP — mostrando a agenda da trilha de
+        Você não tem dupla DPP. Mostrando a agenda da trilha de
         especialista.
       </p>
     ) : null;

@@ -46,7 +46,7 @@ export default async function TurmasPage() {
       <PageHeader
         kicker="Operação"
         title="Turmas e cronogramas"
-        meta="O calendário oficial de cada turma — encontros, preparação e encerramento"
+        meta="O calendário oficial de cada turma: encontros, preparação e encerramento"
         actions={
           !demo && (
             <Link
@@ -62,7 +62,7 @@ export default async function TurmasPage() {
 
       {demo && (
         <p className="rounded-lg bg-muted/60 px-4 py-2.5 text-sm text-muted-foreground">
-          Modo demonstração — os cronogramas de exemplo são só leitura.
+          Modo demonstração: os cronogramas de exemplo são só leitura.
         </p>
       )}
 
