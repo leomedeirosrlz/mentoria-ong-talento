@@ -70,7 +70,7 @@ Diagnóstico (3 audits com skills): tudo `--background`=`--card`=branco puro (se
 - [x] **Infra de navegação** — `!me` no layout virou tela bloqueada (era loop infinito de redirect), nudges da página da dupla logam `duplaId`+`t=contato`, `encontro.link` visível na timeline, rows com pendência fora do `<details>` (âncora sempre alcançável), scroll-to-card após registro retroativo, `duplasPorDia` filtra ativas, `podeExcluir` alinhado ao guard do servidor (`temQualquerDupla` inclui encerrada)
 - [x] **Login polish** — email trim+lowercase, autofocus, painel ecoa o e-mail, "Reenviar link ou usar outro e-mail", copy PKCE ("abra no mesmo navegador"), catch nos submits
 - [x] **Forms** — autosave flush no unmount (não perde os últimos 500ms), `aviso`→`toast.warning`, editar-registro auto-colapsa, retroativo reseta ao fechar, `accept` restrito (pdf/png/jpg/webp — fora SVG/HEIC), "Baixar modelo" CSV, url required em material-link, "(em dupla)" no editar-dupla, erro de e-mail duplicado nomeia o campo, sonner 8s
-- **Manual restante**: template do magic link no dashboard Supabase (PKCE prende o link ao navegador que pediu — se usar `{{ .ConfirmationURL }}`, considerar `{{ .TokenHash }}` ou código OTP pra fluxo in-app-browser)
+- **Manual restante**: template do magic link no dashboard Supabase (PKCE prende o link ao navegador que pediu — se usar `{{ .ConfirmationURL }}`, considerar `{{ .TokenHash }}` ou código OTP pra fluxo in-app-browser) — **virou item em "Login & marca"** abaixo
 
 ## Sprint UX — auditoria de arquitetura da informação (set/2026) ✅ executada
 
@@ -308,3 +308,22 @@ de tela é seco. Rodar como sprint com recon de inventário primeiro.
 - [ ] **Gates:** demo e2e existente segue verde (skeletons não devem vazar
   pro DOM estável), + spec visual simples de transição se o mecanismo
   escolhido for verificável.
+
+## Login & marca — pendências (out/2026)
+
+- [ ] **"Esqueci minha senha / e-mail" na tela de login** — recuperação
+  visível: senha esquecida → link de acesso resolve (entra e redefine em
+  `/perfil`) ou `resetPasswordForEmail` se fizer sentido; e-mail esquecido
+  → caminho pra falar com a coordenação (conta é pré-cadastrada, a plataforma
+  não "descobre" qual e-mail a pessoa usou).
+- [ ] **Refazer o template do e-mail OTP/magic link** — hoje é o default
+  do Supabase; identidade própria (logo, pt-BR, aviso "abra no mesmo
+  navegador", instrução do fluxo em 2 abas). Absorve o "Manual restante"
+  da sprint caça-gaps: `{{ .ConfirmationURL }}` prende ao navegador que
+  pediu (PKCE) — avaliar `{{ .TokenHash }}`/código OTP pra in-app-browser.
+  Editado no dashboard Supabase Auth, não em código.
+- [ ] **Mudar o favicon** — trocar o atual pela marca (alinhar com a
+  família icon/apple-icon/maskable que o PWA já tem).
+- [ ] **Centralizar o logo na tela de login** — lockup de marca
+  centralizado; revisar junto o débito já documentado do h1 `text-lg`
+  fora da escala (tela de marca é exceção aceita, mas o alinhamento não).
