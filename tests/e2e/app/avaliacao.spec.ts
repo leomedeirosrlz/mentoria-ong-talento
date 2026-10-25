@@ -231,14 +231,21 @@ test.describe("avaliação estrela do jovem (REALIZA-109)", () => {
     await expect(
       secao.getByRole("heading", { name: "Suas avaliações" })
     ).toBeVisible();
-    const pendente = secao.locator("li", { hasText: "16º encontro — como foi?" });
+    // as pendências moram recolhidas na seção — o trigger "N esperando sua
+    // resposta" abre a lista (a ação primária delas vive em "Para fazer
+    // agora"; aqui fica o atalho que não repete os botões)
+    await secao.getByText(/esperando sua resposta/).click();
+    const pendente = secao.locator("li", {
+      hasText: "16º encontro",
+      has: page.getByRole("button", { name: "Avaliar" }),
+    });
     await expect(pendente).toBeVisible();
 
     await pendente.getByRole("button", { name: "Avaliar" }).click();
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
     await expect(
-      dialog.getByText("16º encontro — como foi?")
+      dialog.getByText("16º encontro: como foi?")
     ).toBeVisible();
 
     // radios/checkbox do form moram sr-only dentro do label — o clique
@@ -261,12 +268,13 @@ test.describe("avaliação estrela do jovem (REALIZA-109)", () => {
       .click();
 
     await expect(
-      page.getByText("Avaliação enviada — obrigado por contar!")
+      page.getByText("Avaliação enviada. Obrigado por contar!")
     ).toBeVisible();
 
     // a pendência vira linha de histórico com a nota — o refresh re-renderiza
+    // (o bloco recolhido desmonta quando zera, então a marca dela some)
     await expect(
-      secao.getByText("16º encontro — como foi?")
+      secao.getByText("aguardando sua resposta")
     ).toHaveCount(0);
     const feita = secao.locator("li", { hasText: "16º encontro" });
     await expect(
@@ -370,8 +378,13 @@ test.describe("avaliação estrela do jovem (REALIZA-109)", () => {
     await page.waitForURL((u) => u.pathname === "/jovem", { timeout: 15_000 });
 
     const secao = page.locator('section[aria-labelledby="avaliacoes-titulo"]');
+    // mesma pendência recolhida do spec acima — abre antes de achar a linha
+    await secao.getByText(/esperando sua resposta/).click();
     await secao
-      .locator("li", { hasText: "14º encontro — como foi?" })
+      .locator("li", {
+        hasText: "14º encontro",
+        has: page.getByRole("button", { name: "Avaliar" }),
+      })
       .getByRole("button", { name: "Avaliar" })
       .click();
     const dialog = page.getByRole("dialog");
@@ -386,7 +399,7 @@ test.describe("avaliação estrela do jovem (REALIZA-109)", () => {
       .click();
     await expect(
       page.getByText(
-        "Pedido enviado — a coordenação foi avisada e fala com você."
+        "Pedido enviado. A coordenação foi avisada e fala com você."
       )
     ).toBeVisible({ timeout: 15_000 });
 
@@ -416,12 +429,16 @@ test.describe("avaliação estrela do jovem (REALIZA-109)", () => {
     );
     expect(notifs.map((n) => n.profile_id)).toContain(IDS.coordProfile);
 
-    // a coord atende na ficha — dois logins no mesmo teste via cookies limpos
+    // a coord atende na ficha — dois logins no mesmo teste via cookies
+    // limpos; o pedido virou sinal inline na linha do encontro (aba
+    // Encontros): pill "Apoio aberto" no cabeçalho + badge "pediu ajuda"
+    // na linha (o cartão "Pedido de ajuda em aberto" migrou pra aba
+    // Instrumentos, dentro de "Voz do jovem")
     await page.context().clearCookies();
     await loginComSenha(page, COORD_EMAIL, COORD_SENHA);
-    await page.goto(`/duplas/${DUPLA_ID}`);
+    await page.goto(`/duplas/${DUPLA_ID}?aba=encontros`);
     await expect(
-      page.getByText("Pedido de ajuda em aberto", { exact: false })
+      page.getByText("Apoio aberto · do mentorado")
     ).toBeVisible();
     await expect(page.getByText("pediu ajuda", { exact: true })).toBeVisible();
     await page
@@ -464,7 +481,7 @@ test.describe("avaliação estrela do jovem (REALIZA-109)", () => {
     ).toBeVisible();
     await expect(page.getByText(/Encontro 13 com Mentor/)).toBeVisible();
     await expect(
-      page.getByText(/a nota só aparece na média/)
+      page.getByText(/Seu mentor vê só a média das notas/)
     ).toBeVisible();
 
     const marcar = (campo: string, valor: string) =>
@@ -574,10 +591,11 @@ test.describe("avaliação estrela do jovem (REALIZA-109)", () => {
     });
 
     await loginComSenha(page, COORD_EMAIL, COORD_SENHA);
-    await page.goto(`/duplas/${DUPLA_ID}`);
+    await page.goto(`/duplas/${DUPLA_ID}?aba=instrumentos`);
 
-    // rail da ficha — a média direta (coord lê as linhas, não o agregado
-    // quantizado) e a contagem de pendências (a fixture 16 segue sem estrela)
+    // rail da ficha (aba Instrumentos) — a média direta (coord lê as
+    // linhas, não o agregado quantizado) e a contagem de pendências (a
+    // fixture 16 segue sem estrela)
     await expect(
       page.getByRole("heading", { name: "Voz do jovem" })
     ).toBeVisible();
@@ -586,7 +604,9 @@ test.describe("avaliação estrela do jovem (REALIZA-109)", () => {
       page.getByText(/aguardando a resposta dele/)
     ).toBeVisible();
 
-    // a linha inteira na linha do encontro — comentário chega pra coord
+    // a linha inteira na linha do encontro (aba Encontros) — o comentário
+    // chega pra coord
+    await page.goto(`/duplas/${DUPLA_ID}?aba=encontros`);
     await expect(page.getByText("Avaliação do jovem", { exact: true })).toBeVisible();
     await expect(
       page.getByRole("img", { name: "5 de 5 estrelas" }).first()
@@ -626,7 +646,7 @@ test.describe("avaliação estrela do jovem (REALIZA-109)", () => {
     });
 
     await loginComSenha(page, MENTOR_EMAIL, SENHA);
-    await page.goto(`/duplas/${DUPLA_ID}`);
+    await page.goto(`/duplas/${DUPLA_ID}?aba=instrumentos`);
 
     await expect(
       page.getByRole("heading", { name: "Voz do jovem" })
@@ -638,6 +658,8 @@ test.describe("avaliação estrela do jovem (REALIZA-109)", () => {
 
     // a fronteira de privacidade é o assert principal: o comentário da
     // linha não-liberada não vaza — nem no rail, nem na linha do encontro
+    // (a linha mora na aba Encontros)
+    await page.goto(`/duplas/${DUPLA_ID}?aba=encontros`);
     await expect(
       page.getByText("E2E: comentário que o mentor não lê")
     ).toHaveCount(0);

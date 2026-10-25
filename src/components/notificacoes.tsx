@@ -42,6 +42,7 @@ import {
   marcarNotificacaoLida,
   marcarTodasNotificacoesLidas,
 } from "@/lib/actions";
+import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTitle, PopoverTrigger } from "@/components/ui/popover";
 import { tempoRelativo } from "@/lib/ciclo";
 import { cn, pathInterno } from "@/lib/utils";
@@ -329,13 +330,15 @@ export function NotificacoesBell({
         <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-3">
           <PopoverTitle className="text-sm">Notificações</PopoverTitle>
           {naoLidas > 0 && (
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="xs"
               onClick={marcarTodas}
-              className="-my-2 rounded-md px-3 py-2.5 text-xs font-medium text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 min-h-11 sm:min-h-0 sm:py-2"
+              className="-my-2 text-muted-foreground"
             >
               Marcar todas como lidas
-            </button>
+            </Button>
           )}
         </div>
         {itens.length === 0 ? (
@@ -396,15 +399,17 @@ export function NotificacoesBell({
                     );
                   })()}
                   {!lida && (
-                    <button
+                    <Button
                       type="button"
+                      variant="ghost"
+                      size="icon-sm"
                       onClick={() => marcar(n.id)}
                       aria-label="Marcar como lida"
                       title="Marcar como lida"
-                      className="grid w-11 shrink-0 place-items-center text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:bg-muted/60 focus-visible:ring-3 focus-visible:ring-inset focus-visible:ring-ring/50"
+                      className="size-auto w-11 shrink-0 rounded-none text-muted-foreground focus-visible:ring-inset md:size-auto"
                     >
-                      <Check size={14} aria-hidden />
-                    </button>
+                      <Check aria-hidden />
+                    </Button>
                   )}
                 </li>
               );

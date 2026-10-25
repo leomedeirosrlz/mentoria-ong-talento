@@ -34,8 +34,8 @@ export default async function NovaTurmaPage() {
           </div>
           <p className="mt-3 font-medium">A demo é só leitura.</p>
           <p className="mt-1 max-w-sm text-sm text-muted-foreground">
-            No ambiente real o builder gera o calendário oficial da turma — os
-            encontros, a preparação e o encerramento — editável antes de gravar.
+            No ambiente real o builder gera o calendário oficial da turma (os
+            encontros, a preparação e o encerramento), editável antes de gravar.
           </p>
         </div>
       ) : (

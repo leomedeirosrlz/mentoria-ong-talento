@@ -67,7 +67,7 @@ export function ReverRespostaDialog({
           <DialogTitle>{titulo}</DialogTitle>
           <DialogDescription>
             Sua resposta
-            {respondidoEm ? ` — enviada em ${formatDate(respondidoEm)}` : ""}.
+            {respondidoEm ? ` · enviada em ${formatDate(respondidoEm)}` : ""}.
           </DialogDescription>
         </DialogHeader>
         {ehInstrumento(sistema) ? (

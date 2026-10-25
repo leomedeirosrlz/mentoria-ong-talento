@@ -35,13 +35,13 @@ const OPCOES_SAIDA: {
   {
     value: "desistente",
     titulo: "Desistente",
-    detalhe: "Saiu do programa antes do fim — o motivo fica na ficha.",
+    detalhe: "Saiu do programa antes do fim. O motivo fica na ficha.",
   },
   {
     value: "concluido",
     titulo: "Concluiu o programa",
     detalhe:
-      "Terminou a jornada — sai do grupo dos ativos sem contar como evasão.",
+      "Terminou a jornada. Sai do grupo dos ativos sem contar como evasão.",
   },
 ];
 
@@ -86,7 +86,7 @@ export function SaidaMentoradoDialog({
         ? detalhe.trim() || null
         : motivoSaida(motivoSel, detalhe);
     if (situacao === "desistente" && !motivo) {
-      setErro("Conte o motivo da saída — ele aparece na ficha e na lista.");
+      setErro("Conte o motivo da saída. Ele aparece na ficha e na lista.");
       return;
     }
     setErro(null);
@@ -100,7 +100,7 @@ export function SaidaMentoradoDialog({
         }
         toast.success(
           situacao === "desistente"
-            ? `Saída de ${primeiroNome} registrada — o cadastro foi pra "Fora do programa".`
+            ? `Saída de ${primeiroNome} registrada. O cadastro foi pra "Fora do programa".`
             : `${primeiroNome} marcada como quem concluiu o programa.`
         );
         onOpenChange(false);
@@ -130,7 +130,7 @@ export function SaidaMentoradoDialog({
         <DialogHeader>
           <DialogTitle>Marcar saída de {primeiroNome}</DialogTitle>
           <DialogDescription>
-            A pessoa sai da lista principal e da fila de pareamento — o
+            A pessoa sai da lista principal e da fila de pareamento. O
             cadastro e o histórico ficam. Dá pra reverter com “Reativar”.
           </DialogDescription>
         </DialogHeader>
@@ -142,7 +142,7 @@ export function SaidaMentoradoDialog({
                 {primeiroNome} tem dupla em andamento.
               </p>
               <p className="mt-0.5 text-muted-foreground">
-                Registre o encerramento na ficha da dupla — o checklist e o
+                Registre o encerramento na ficha da dupla: o checklist e o
                 resumo da jornada ficam guardados lá. A saída do programa vem
                 depois, aqui mesmo.
               </p>
@@ -252,7 +252,7 @@ export function SaidaMentoradoDialog({
 
             {mentorado.profile_id && (
               <p className="rounded-lg bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
-                {primeiroNome} tem conta na plataforma — o acesso continua até
+                {primeiroNome} tem conta na plataforma. O acesso continua até
                 o cadastro dela ser desativado na seção “Com acesso”.
               </p>
             )}

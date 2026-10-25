@@ -14,7 +14,7 @@ import { toast } from "sonner";
 import { enviarLembrete, type LembreteDestino } from "@/lib/actions-lembrete";
 import { formatDiaMes, LEMBRETE_INTERVALO_MS, waLink } from "@/lib/ciclo";
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -28,13 +28,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-
-/* Verde WhatsApp (#25D366) — cor de marca, não do sistema (decisão consciente
- *  do plano v6a). As variantes suaves seguem os tons do mock. */
-const WA_SOFT =
-  "border-[hsl(151_55%_40%/0.38)] bg-[hsl(151_60%_42%/0.12)] text-[hsl(151_68%_25%)] hover:bg-[hsl(151_60%_42%/0.2)]";
-const WA_SOLID =
-  "border border-[hsl(151_60%_32%/0.45)] bg-[#25D366] text-white hover:bg-[#1fb856]";
 
 export type NudgeWA = {
   destino: LembreteDestino;
@@ -57,7 +50,7 @@ export type NudgeWA = {
  *    · "Lembrar" = nudge real (`enviar_lembrete`: notificação in-app + abre
  *      o wa.me com o mesmo texto) — só onde há pendência apontável em dupla
  *      ativa; o cap de 48h por dupla vira "Lembrada dd/mm" desabilitado.
- *  Desktop: split [ação | ▾]. Mobile: quadrado verde 44px cujo menu carrega
+ *  Desktop: grupo outline [ação | ▾]. Mobile: botão 44px cujo menu carrega
  *  a ação como 1º item. O ▾ abre wa.me / copiar / ver texto — a mensagem é
  *  a mesma nas três saídas. Sem telefone: o wa.me fica desabilitado com o
  *  motivo visível; o "Lembrar" segue (a notificação sai mesmo sem wa.me). */
@@ -106,7 +99,7 @@ export function DuplaWaAcao({
   // 13/10" (a dupla foi lembrada/chamada naquela data)
   const rotuloPassado = rotulo === "Chamar" ? "Chamada" : "Lembrada";
   const rotuloLongo = nudge
-    ? `${rotulo} ${nomeCurto} — notificação + WhatsApp`
+    ? `${rotulo} ${nomeCurto}: notificação + WhatsApp`
     : `Chamar ${nomeCurto} no WhatsApp`;
 
   function lembrar() {
@@ -125,7 +118,7 @@ export function DuplaWaAcao({
         if (res.demo) {
           // no demo o número é fictício — a mensagem não abre o wa.me de
           // verdade, só a notificação simulada
-          toast.success("Modo demo — nada é enviado de verdade.");
+          toast.success("Modo demo: nada é enviado de verdade.");
         } else {
           toast.success("Lembrete enviado.");
           if (wa) window.open(wa, "_blank", "noopener,noreferrer");
@@ -226,7 +219,7 @@ export function DuplaWaAcao({
         {nudge && (
           <div className="mt-1 border-t border-border px-1.5 pt-1.5 pb-0.5 text-[11px] leading-snug text-muted-foreground">
             <b className="font-semibold text-foreground">{rotulo}</b> envia a
-            notificação no app e abre a conversa — no máx. 1 a cada 48h por
+            notificação no app e abre a conversa. No máx. 1 a cada 48h por
             dupla.
           </div>
         )}
@@ -235,19 +228,28 @@ export function DuplaWaAcao({
   }
 
   const menuCls = "w-60";
+  // mesmo botão de todo o app (outline sm, o "Lembrar" da home): a marca do
+  // WhatsApp fica só no ícone, a superfície é a neutra do sistema
+  const primariaCls = cn(
+    buttonVariants({ variant: "outline", size: "sm" }),
+    "rounded-r-none"
+  );
+  const icone = (
+    <WhatsappLogo weight="fill" aria-hidden className="text-[var(--ok-text)]" />
+  );
 
   return (
     <>
       <span className="inline-flex items-stretch">
-        {/* ── desktop (≥sm): split [primária | ▾] ─────────────────── */}
+        {/* ── desktop: [ação | ▾] como um grupo de botões outline ───── */}
         <span className="hidden md:inline-flex">
           {bloqueado ? (
             <span
               aria-disabled="true"
-              title={`1 lembrete a cada 48h por dupla — destrava ${destravaEm}`}
-              className="inline-flex h-7 cursor-not-allowed items-center gap-1 rounded-l-lg border border-dashed border-border bg-card px-2 text-xs font-semibold text-muted-foreground/60"
+              title={`1 lembrete a cada 48h por dupla. Destrava ${destravaEm}`}
+              className={cn(primariaCls, "cursor-not-allowed text-muted-foreground hover:bg-background hover:text-muted-foreground")}
             >
-              <ChatsCircle size={13} aria-hidden />
+              <ChatsCircle aria-hidden />
               {rotuloPassado} {enviadoEm}
             </span>
           ) : nudge ? (
@@ -262,14 +264,11 @@ export function DuplaWaAcao({
               title={
                 wa
                   ? rotuloLongo
-                  : `${rotulo} ${nomeCurto} — só notificação (sem WhatsApp cadastrado)`
+                  : `${rotulo} ${nomeCurto}: só notificação (sem WhatsApp cadastrado)`
               }
-              className={cn(
-                "inline-flex h-7 items-center gap-1 rounded-l-lg border px-2 text-xs font-bold transition-colors focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-60",
-                WA_SOFT
-              )}
+              className={primariaCls}
             >
-              <WhatsappLogo size={13} weight="fill" aria-hidden />
+              {icone}
               {pending ? "Enviando…" : rotulo}
             </button>
           ) : waContato ? (
@@ -279,12 +278,9 @@ export function DuplaWaAcao({
               rel="noopener noreferrer"
               aria-label={rotuloLongo}
               title={rotuloLongo}
-              className={cn(
-                "inline-flex h-7 items-center gap-1 rounded-l-lg border px-2 text-xs font-bold transition-colors focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
-                WA_SOFT
-              )}
+              className={primariaCls}
             >
-              <WhatsappLogo size={13} weight="fill" aria-hidden />
+              {icone}
               {rotulo}
             </a>
           ) : (
@@ -292,12 +288,9 @@ export function DuplaWaAcao({
               role="link"
               aria-disabled="true"
               title="Sem WhatsApp cadastrado"
-              className={cn(
-                "inline-flex h-7 cursor-not-allowed items-center gap-1 rounded-l-lg border border-dashed px-2 text-xs font-bold opacity-60",
-                WA_SOFT
-              )}
+              className={cn(primariaCls, "cursor-not-allowed opacity-50 hover:bg-background")}
             >
-              <WhatsappLogo size={13} weight="fill" aria-hidden />
+              {icone}
               {rotulo}
             </span>
           )}
@@ -307,34 +300,28 @@ export function DuplaWaAcao({
             aria-label="Opções da mensagem"
             title="Opções da mensagem"
             className={cn(
-              "hidden h-7 items-center rounded-r-lg border border-l-0 px-1.5 transition-colors focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50 md:inline-flex",
-              WA_SOFT
+              buttonVariants({ variant: "outline", size: "icon-sm" }),
+              "hidden rounded-l-none border-l-0 md:inline-flex md:w-6"
             )}
           >
-            <CaretDown size={11} weight="bold" aria-hidden />
+            <CaretDown weight="bold" aria-hidden className="size-3" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className={menuCls}>
             {itensMenu(false)}
           </DropdownMenuContent>
         </DropdownMenu>
 
-        {/* ── mobile (<sm): quadrado verde 44px — o menu carrega a ação ── */}
+        {/* ── mobile: botão quadrado 44px — o menu carrega a ação ───── */}
         <DropdownMenu>
           <DropdownMenuTrigger
-            aria-label={`${rotuloLongo} — opções da mensagem`}
+            aria-label={`${rotuloLongo}: opções da mensagem`}
             className={cn(
-              "relative grid size-11 shrink-0 place-items-center rounded-xl transition-colors focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50 md:hidden",
-              WA_SOLID,
-              !waContato && !nudge && "opacity-60"
+              buttonVariants({ variant: "outline", size: "icon" }),
+              "md:hidden [&_svg:not([class*='size-'])]:size-5",
+              !waContato && !nudge && "opacity-50"
             )}
           >
-            <WhatsappLogo size={19} weight="fill" aria-hidden />
-            <CaretDown
-              size={9}
-              weight="bold"
-              aria-hidden
-              className="absolute bottom-1 right-1"
-            />
+            {icone}
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className={menuCls}>
             {itensMenu(true)}

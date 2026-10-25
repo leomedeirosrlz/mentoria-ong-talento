@@ -363,7 +363,7 @@ describe("paraAcompanhar", () => {
     expect(itens).toHaveLength(1);
     expect(itens[0].motivos).toEqual(["sem_data"]);
     expect(itens[0].contexto).toBe(
-      "Encontro 8 · T1 — ainda sem data nesta semana (prazo: dom 11)"
+      "Encontro 8 da Turma 1 ainda sem data nesta semana (prazo: dom 11)"
     );
     expect(itens[0].rotuloLembrete).toBe("Lembrar");
     expect(itens[0].saude.semaforo).toBe("atencao"); // preventivo aceso
@@ -374,7 +374,7 @@ describe("paraAcompanhar", () => {
     const itens = paraAcompanhar([dFutura], EVENTOS, {}, AGORA);
     expect(itens[0].motivos).toEqual(["sem_data"]);
     expect(itens[0].contexto).toBe(
-      "Encontro 1 · T3 — ainda sem data para 13/10 (prazo: dom 18)"
+      "Encontro 1 da Turma 3 ainda sem data para 13/10 (prazo: dom 18)"
     );
   });
 
@@ -383,7 +383,7 @@ describe("paraAcompanhar", () => {
     expect(itens).toHaveLength(1);
     expect(itens[0].motivos).toEqual(["atraso", "sem_data"]);
     expect(itens[0].contexto).toBe(
-      "3 encontros atrasados (enc. 6 e 7 e 8 · T1) — sem data para o 8"
+      "3 encontros atrasados (encontros 6 e 7 e 8 da Turma 1). Sem data para o 8"
     );
     expect(itens[0].saude.semaforo).toBe("risco");
     expect(itens[0].rotuloLembrete).toBe("Lembrar");
@@ -402,7 +402,7 @@ describe("paraAcompanhar", () => {
     expect(pend.motivos).toEqual(["registro_pendente"]);
     expect(pend.rotuloLembrete).toBe("Lembrar registro");
     expect(pend.contexto).toBe(
-      "Encontro 8 · T1 agendado qui 8, 19h · registro do 6º encontro pendente"
+      "Encontro 8 da Turma 1 agendado qui 8, 19h. Registro do 6º encontro pendente"
     );
     // sem registro_pendente na lista, o botão é o genérico
     const [combo] = paraAcompanhar([dSemData], EVENTOS, {}, AGORA);
@@ -449,7 +449,7 @@ describe("paraAcompanhar", () => {
     );
     expect(limbo.contexto).toContain("2ª sessão agendada já passou");
     expect(limbo.contexto).not.toContain("encontro");
-    expect(pend.contexto).toContain("registro da 1ª sessão pendente");
+    expect(pend.contexto).toContain("Registro da 1ª sessão pendente");
     expect(pend.rotuloLembrete).toBe("Lembrar registro");
   });
 
@@ -522,7 +522,7 @@ describe("paraAcompanhar", () => {
     );
     expect(item.motivos).toEqual(["encerramento"]);
     expect(item.contexto).toBe(
-      "Rito de encerramento pendente — concluir na ficha"
+      "Rito de encerramento pendente. Concluir na ficha"
     );
     expect(item.contextoPartes).toEqual([item.contexto]);
     expect(item.rotuloLembrete).toBe("Concluir rito");
@@ -790,17 +790,17 @@ describe("dimensoesDoItem + sinteseMonitoramento", () => {
   it("contextoPartes: [0] é o caso decisório, o resto segue — contexto intacto", () => {
     const [item] = paraAcompanhar([dAtrasada], EVENTOS, {}, AGORA_SEG);
     expect(item.contextoPartes).toEqual([
-      "2 encontros atrasados (enc. 6 e 7 · T1)",
-      "sem data para o 8",
+      "2 encontros atrasados (encontros 6 e 7 da Turma 1)",
+      "Sem data para o 8",
     ]);
     // o texto legado continua colando o lead com " — "
     expect(item.contexto).toBe(
-      "2 encontros atrasados (enc. 6 e 7 · T1) — sem data para o 8"
+      "2 encontros atrasados (encontros 6 e 7 da Turma 1). Sem data para o 8"
     );
     const [pend] = paraAcompanhar([dReg], EVENTOS, {}, AGORA_SEG);
     // a pendência é o motivo que pôs a dupla na fila — encabeça as partes
     // (o "ainda sem data" vira contexto secundário, não a boa notícia)
-    expect(pend.contextoPartes[0]).toBe("registro do 6º encontro pendente");
+    expect(pend.contextoPartes[0]).toBe("Registro do 6º encontro pendente");
     expect(pend.contextoPartes[1]).toContain("ainda sem data");
   });
 
@@ -883,13 +883,13 @@ describe("itensDaSemanaPrograma", () => {
       AGORA
     );
     const porTitulo = Object.fromEntries(itens.map((i) => [i.titulo, i]));
-    expect(porTitulo["Encontro 8 · T1"]).toMatchObject({
+    expect(porTitulo["Encontro 8 · Turma 1"]).toMatchObject({
       tipoItem: "encontro",
       turma: "T1",
       eventoId: null,
       diaKey: "2026-10-06",
     });
-    expect(porTitulo["Encontro 5 · T2"].turma).toBe("T2");
+    expect(porTitulo["Encontro 5 · Turma 2"].turma).toBe("T2");
     expect(porTitulo["Formação de mentores"]).toMatchObject({
       tipoItem: "formacao",
       detalhe: "10h–12h · Sede",
@@ -901,7 +901,7 @@ describe("itensDaSemanaPrograma", () => {
     expect(porTitulo["Recesso de outubro"].tipoItem).toBe("evento");
   });
 
-  it("encontro oficial carrega o meta 'N duplas — cada uma marca a sua'", () => {
+  it("encontro oficial carrega o meta 'N duplas, cada uma marca o seu'", () => {
     const itens = itensDaSemanaPrograma(
       programacao,
       [C1, C2],
@@ -911,16 +911,16 @@ describe("itensDaSemanaPrograma", () => {
       [dA, dB, dC, dD, dE]
     );
     const porTitulo = Object.fromEntries(itens.map((i) => [i.titulo, i]));
-    expect(porTitulo["Encontro 8 · T1"].detalhe).toBe(
-      "3 duplas — cada uma marca a sua"
+    expect(porTitulo["Encontro 8 · Turma 1"].detalhe).toBe(
+      "3 duplas, cada uma marca o seu"
     );
-    expect(porTitulo["Encontro 5 · T2"].detalhe).toBe(
-      "1 dupla — cada uma marca a sua"
+    expect(porTitulo["Encontro 5 · Turma 2"].detalhe).toBe(
+      "1 dupla, cada uma marca o seu"
     );
     // sem a coorte, o meta some — a observação (se houver) segue valendo
     const semCoorte = itensDaSemanaPrograma(programacao, [C1, C2], [], AGORA);
     expect(
-      Object.fromEntries(semCoorte.map((i) => [i.titulo, i]))["Encontro 8 · T1"]
+      Object.fromEntries(semCoorte.map((i) => [i.titulo, i]))["Encontro 8 · Turma 1"]
         .detalhe
     ).toBeNull();
   });
@@ -998,8 +998,8 @@ describe("itensDaSemanaPrograma", () => {
     ];
     const itens = itensDaSemanaPrograma(evs, [C1], [], quartaDeSetembro);
     expect(itens.map((i) => i.titulo)).toEqual([
-      "Encontro 3 · T1",
-      "Encontro 4 · T1",
+      "Encontro 3 · Turma 1",
+      "Encontro 4 · Turma 1",
     ]);
   });
 });
@@ -1181,7 +1181,7 @@ describe("itensSemanaProgramaMentor", () => {
       AGORA,
       AGORA.getTime()
     );
-    expect(itens.map((i) => i.titulo)).toEqual(["Retiro · T1"]);
+    expect(itens.map((i) => i.titulo)).toEqual(["Retiro · Turma 1"]);
     expect(itens[0].diaKey).toBe("2026-10-03");
   });
 });

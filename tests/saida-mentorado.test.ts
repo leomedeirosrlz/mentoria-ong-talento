@@ -21,10 +21,10 @@ describe("foraDoPrograma", () => {
 });
 
 describe("motivoSaida", () => {
-  it("categoria conhecida vira rótulo canônico, com detalhe depois do travessão", () => {
+  it("categoria conhecida vira rótulo canônico, com detalhe depois de dois-pontos", () => {
     expect(motivoSaida("mudou_cidade", "")).toBe("Mudou de cidade");
     expect(motivoSaida("desistencia", "falta de tempo")).toBe(
-      "Desistiu do programa — falta de tempo"
+      "Desistiu do programa: falta de tempo"
     );
   });
 

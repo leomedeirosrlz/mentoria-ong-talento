@@ -60,6 +60,12 @@ function dowCurto(iso: string): string {
   return DOW_CURTO[new Date(`${iso}T12:00:00`).getDay()];
 }
 
+/** Turma por extenso dentro de frase: " da Turma 1" (vazio sem turma). */
+function daTurma(turma: string | null | undefined): string {
+  const nome = turmaLonga(turma);
+  return nome ? ` da ${nome}` : "";
+}
+
 /** "2026-10-07" → 7 — só o dia do mês, sem zero. */
 function diaNum(iso: string): number {
   return Number(iso.slice(8, 10));
@@ -91,7 +97,7 @@ function quandoTxt(iso: string, hoje: Date): string {
  *  oficial é só data (coluna `date`), não existe "hora oficial". Sem
  *  agendado ainda, fica só o dia ("terças"). */
 function metaTurma(duplasAtivas: Dupla[], vig: EventoDatado | null): string {
-  if (!vig) return "—";
+  if (!vig) return "sem encontro nesta semana";
   const dow = DOW_PLURAL[diaSemanaDe(vig.data)];
   const horas = new Map<string, number>();
   for (const d of duplasAtivas)
@@ -308,7 +314,7 @@ function contextoAcompanhar(
   // com 2+ atrasados o lead é a gravidade, não o encontro da semana
   const lead =
     atraso >= 2
-      ? `${atraso} ${esp ? "sessões" : "encontros"} atrasados${detAtraso ? ` (enc. ${detAtraso} · ${turmaCurta(d.turma)})` : ""}`
+      ? `${atraso} ${esp ? "sessões" : "encontros"} atrasados${detAtraso ? ` (${esp ? "sessões" : "encontros"} ${detAtraso}${daTurma(d.turma)})` : ""}`
       : null;
 
   if (motivos.includes("sem_data") && vig?.numero != null) {
@@ -321,10 +327,10 @@ function contextoAcompanhar(
     const nestaSemana = vig.data >= seg && vig.data <= domCorrente;
     partes.push(
       novaNaTurma
-        ? `${rotuloEnc} ${vig.numero} · ${turmaCurta(d.turma)} — dupla nova, 1º agendamento pendente`
+        ? `${rotuloEnc} ${vig.numero}${daTurma(d.turma)}. Dupla nova: 1º agendamento pendente`
         : lead
-          ? `sem data para o ${vig.numero}`
-          : `${rotuloEnc} ${vig.numero} · ${turmaCurta(d.turma)} — ainda sem data${
+          ? `Sem data para o ${vig.numero}`
+          : `${rotuloEnc} ${vig.numero}${daTurma(d.turma)} ainda sem data${
               nestaSemana
                 ? " nesta semana"
                 : ` para ${vig.data.slice(8, 10)}/${vig.data.slice(5, 7)}`
@@ -332,10 +338,10 @@ function contextoAcompanhar(
     );
   } else if (saude.proximo?.data_hora) {
     partes.push(
-      `${rotuloEnc} ${saude.proximo.numero} · ${turmaCurta(d.turma)} agendado ${quandoTxt(saude.proximo.data_hora, hoje)}`
+      `${rotuloEnc} ${saude.proximo.numero}${daTurma(d.turma)} agendado ${quandoTxt(saude.proximo.data_hora, hoje)}`
     );
   } else if (lead) {
-    partes.push(`sem ${encLow} agendad${encFem}`);
+    partes.push(`Sem ${encLow} agendad${encFem}`);
   }
   if (atraso === 1) partes.push(`1 ${encLow} atrasad${encFem}`);
   // a pendência de registro/limbo é o que tira a dupla da régua — guardada
@@ -343,12 +349,12 @@ function contextoAcompanhar(
   // legado (que abre com o agendamento como boa notícia de propósito)
   let pendencia: string | null = null;
   if (pend?.status === "agendado")
-    pendencia = `${pend.numero}${encOrd} ${encLow} agendad${encFem} já passou — falta o registro`;
+    pendencia = `${pend.numero}${encOrd} ${encLow} agendad${encFem} já passou. Falta o registro`;
   else if (pend)
-    pendencia = `registro d${encFem} ${pend.numero}${encOrd} ${encLow} pendente`;
+    pendencia = `Registro d${encFem} ${pend.numero}${encOrd} ${encLow} pendente`;
   if (pendencia) partes.push(pendencia);
 
-  const corpo = partes.join(" · ") || saude.motivo;
+  const corpo = partes.join(". ") || saude.motivo;
   // o lead de atraso (2+) é o caso decisório — primeira parte da lista e
   // prefixo do texto legado (que continua colando com " — ")
   const lista = lead ? [lead, ...partes] : partes;
@@ -360,7 +366,7 @@ function contextoAcompanhar(
     ? [pendencia, ...lista.filter((p) => p !== pendencia)]
     : lista;
   return {
-    contexto: lead ? `${lead} — ${corpo}` : corpo,
+    contexto: lead ? `${lead}. ${corpo}` : corpo,
     contextoPartes: partesOrd.length ? partesOrd : [saude.motivo],
   };
 }
@@ -465,7 +471,7 @@ export function paraAcompanhar(
       d.mentor?.nome ??
       ""
     ).split(/\s+/)[0];
-    const contexto = "Rito de encerramento pendente — concluir na ficha";
+    const contexto = "Rito de encerramento pendente. Concluir na ficha";
     const ult = nudges[d.id];
     const ultimoNudge = ult?.tipo === "nudge" ? ult : null;
     itens.push({
@@ -567,7 +573,8 @@ export function dimensoesDoItem(item: ItemParaAcompanhar): DimensoesItem {
 export type SinteseMonitoramento = {
   /** tamanho da fila "Para acompanhar". */
   total: number;
-  /** dimensão acompanhamento em danger — as que pedem intervenção. */
+  /** dimensão acompanhamento em danger — as que pedem intervenção (o chip
+   *  "Urgentes" da fila). */
   criticas: number;
   /** o resto da fila (não-críticas) — soma com `criticas` = `total`. */
   atencao: number;
@@ -701,6 +708,7 @@ export function itensDaSemanaPrograma(
     const st = statusDo.get(ev.cronograma_id);
     if (st != null && st !== "ativo") continue;
     const turma = turmaCurta(turmaDo.get(ev.cronograma_id));
+    const turmaNome = turmaLonga(turmaDo.get(ev.cronograma_id));
     if (ev.tipo === "encontro") {
       // o card é da janela oficial — o meta diz QUANTAS duplas correm ela
       // (ativa DPP do mesmo cronograma); "cada uma marca a sua" é a regra
@@ -713,14 +721,14 @@ export function itensDaSemanaPrograma(
       ).length;
       const meta =
         nDuplas > 0
-          ? `${nDuplas} ${nDuplas === 1 ? "dupla" : "duplas"} — cada uma marca a sua`
+          ? `${nDuplas} ${nDuplas === 1 ? "dupla" : "duplas"}, cada uma marca o seu`
           : null;
       itens.push({
         id: `ev-${ev.id}`,
         diaKey: ev.data,
         titulo:
           ev.numero != null
-            ? `Encontro ${ev.numero} · ${turma || ev.titulo}`
+            ? `Encontro ${ev.numero} · ${turmaNome || ev.titulo}`
             : ev.titulo,
         detalhe: [meta, ev.observacao].filter(Boolean).join(" · ") || null,
         tipoItem: "encontro",
@@ -819,6 +827,7 @@ export function itensSemanaProgramaMentor(
     const c = cronos.get(cronId);
     if (c && c.status !== "ativo") continue;
     const turma = turmaCurta(c?.turma ?? minhas.find((d) => d.cronograma_id === cronId)?.turma);
+    const turmaNome = turmaLonga(c?.turma ?? minhas.find((d) => d.cronograma_id === cronId)?.turma);
     for (const ev of eventosDoCronograma(eventos, cronId)) {
       // mesma janela com overlap da versão coordenação — recesso/retiro
       // que atravessa a semana aparece no dia de início
@@ -847,7 +856,7 @@ export function itensSemanaProgramaMentor(
             diaKey: row?.data_hora
               ? toDateStr(new Date(row.data_hora))
               : ev.data,
-            titulo: `Encontro ${ev.numero}${turma ? ` · ${turma}` : ""} — com ${primeiroNomeDaDupla(d)}`,
+            titulo: `Encontro ${ev.numero}${turmaNome ? ` · ${turmaNome}` : ""}, com ${primeiroNomeDaDupla(d)}`,
             detalhe,
             tipoItem: "encontro",
             eventoId: null,
@@ -857,7 +866,7 @@ export function itensSemanaProgramaMentor(
             guia: guiaDeNumero(ev.numero),
             nota:
               row?.status === "nao_aconteceu" || row?.status === "cancelado"
-                ? "não aconteceu — remarcar"
+                ? "não aconteceu, vale remarcar"
                 : null,
             aviso:
               row == null
@@ -876,7 +885,7 @@ export function itensSemanaProgramaMentor(
         itens.push({
           id: `ev-${ev.id}-${cronId}`,
           diaKey: ev.data,
-          titulo: `${ev.titulo}${turma ? ` · ${turma}` : ""}`,
+          titulo: `${ev.titulo}${turmaNome ? ` · ${turmaNome}` : ""}`,
           detalhe: ev.observacao,
           tipoItem: ev.tipo === "formacao" ? "formacao" : "evento",
           eventoId: null,
@@ -996,49 +1005,59 @@ function coberturaDoVigente(
   };
 }
 
-/** Semáforo do recorte — apoio.aberto é eixo separado (--info, trabalho),
- *  não estado de saúde: a dupla com pedido aberto entra na fatia `apoio`
- *  em vez da do semáforo, pra rosca fechar o denominador sem mentira. */
-export type SemaforoRecorte = {
-  total: number;
+/** Saúde do programa — a ÚNICA regra de contagem de /duplas, da agenda
+ *  (coordenação e supervisão) e da home. Mesmo recorte de duplas, mesmo
+ *  `saudadeDaDupla`, mesmo número em qualquer tela.
+ *
+ *  - `emAndamento`: status ativa (inclui trilhas de especialista).
+ *  - `risco` + `atencao` + `emDia` PARTICIONAM `emAndamento` pelo semáforo.
+ *  - `apoio` é SOBREPOSIÇÃO: conta pedido de apoio aberto (ativa ou pausada)
+ *    à parte e nunca tira a dupla da sua situação.
+ *  - `pausadas` e `concluidas` (concluída + encerrada) ficam fora da régua.
+ *  - `total` = emAndamento + pausadas + concluidas: o denominador da barra. */
+export type SaudeRecorte = {
+  emAndamento: number;
   risco: number;
   atencao: number;
-  emAndamento: number;
+  emDia: number;
   apoio: number;
-  pausada: number;
+  pausadas: number;
+  concluidas: number;
+  total: number;
 };
 
-function semaforoDoRecorte(
+export function saudeDoRecorte(
   duplas: Dupla[],
   eventos: CicloEvento[],
   hoje: Date,
-  cronogramaId: string | null
-): SemaforoRecorte {
-  const vivas = duplas.filter(
-    (d) =>
-      d.trilha !== "especialista" &&
-      (d.status === "ativa" || d.status === "pausada") &&
-      (cronogramaId == null || d.cronograma_id === cronogramaId)
-  );
-  const s: SemaforoRecorte = {
-    total: vivas.length,
+  cronogramaId: string | null = null
+): SaudeRecorte {
+  const s: SaudeRecorte = {
+    emAndamento: 0,
     risco: 0,
     atencao: 0,
-    emAndamento: 0,
+    emDia: 0,
     apoio: 0,
-    pausada: 0,
+    pausadas: 0,
+    concluidas: 0,
+    total: 0,
   };
-  for (const d of vivas) {
-    if (d.status === "pausada") {
-      s.pausada++;
-      continue;
-    }
+  for (const d of duplas) {
+    if (cronogramaId != null && d.cronograma_id !== cronogramaId) continue;
     const saude = saudadeDaDupla(d, eventos, hoje);
     if (saude.apoio.aberto) s.apoio++;
-    else if (saude.semaforo === "risco") s.risco++;
-    else if (saude.semaforo === "atencao") s.atencao++;
-    else s.emAndamento++;
+    if (d.status === "ativa") {
+      s.emAndamento++;
+      if (saude.semaforo === "risco") s.risco++;
+      else if (saude.semaforo === "atencao") s.atencao++;
+      else s.emDia++;
+    } else if (d.status === "pausada") {
+      s.pausadas++;
+    } else if (d.status === "concluida" || d.status === "encerrada") {
+      s.concluidas++;
+    }
   }
+  s.total = s.emAndamento + s.pausadas + s.concluidas;
   return s;
 }
 
@@ -1114,7 +1133,7 @@ function pulsoDoRecorte(
  *  tela só troca a chave; NUNCA recicla o `cronogramaSel` do calendário). */
 export type NumerosSemana = {
   coberturas: CoberturaVigente[];
-  semaforo: SemaforoRecorte;
+  saude: SaudeRecorte;
   pulso: PulsoSemana;
 };
 
@@ -1143,14 +1162,14 @@ export function numerosDaSemana(
   const agregados: Record<string, NumerosSemana> = {
     todas: {
       coberturas,
-      semaforo: semaforoDoRecorte(duplas, eventos, hoje, null),
+      saude: saudeDoRecorte(duplas, eventos, hoje, null),
       pulso: pulsoDoRecorte(duplas, acompanhar, hoje, agoraMs, null),
     },
   };
   for (const c of ativos) {
     agregados[c.id] = {
       coberturas: coberturas.filter((x) => x.cronogramaId === c.id),
-      semaforo: semaforoDoRecorte(duplas, eventos, hoje, c.id),
+      saude: saudeDoRecorte(duplas, eventos, hoje, c.id),
       pulso: pulsoDoRecorte(duplas, acompanhar, hoje, agoraMs, c.id),
     };
   }

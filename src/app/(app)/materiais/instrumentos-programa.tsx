@@ -1,9 +1,9 @@
 import Link from "next/link";
-import { Eye, LockSimple } from "@phosphor-icons/react/dist/ssr";
+import { Check, Clock, Eye, LockSimple, Warning } from "@phosphor-icons/react/dist/ssr";
 import { EnviarInstrumentoLote } from "@/components/enviar-instrumento-lote";
+import { LembreteButton } from "@/components/lembrete-button";
 import {
   InstrumentoEmblema,
-  instrumentoVars,
   type InstrumentoChave,
 } from "@/components/instrumento-icone";
 import { Badge } from "@/components/ui/badge";
@@ -12,31 +12,31 @@ import type { FormularioSistema } from "@/lib/forms/schema";
 import {
   agrupaPorTurma,
   elegiveisLote,
+  ESTACAO_CHAVES,
   ESTACOES,
   liberaCopia,
   resolveLinhasPainel,
   SISTEMA_DA_ESTACAO,
   type EstacaoChave,
+  type LinhaResolvida,
   type PainelJornadaLinha,
 } from "@/lib/jornada";
+import { lembreteBloqueadoAte } from "@/lib/ciclo";
+import type { Interacao } from "@/lib/interacoes";
+import { turmaCurta } from "@/lib/turma";
 import type { CicloEvento } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-// REALIZA-194 (v5c) — "Instrumentos do programa": a régua oficial da
-// jornada DPP, separada da biblioteca (guias/modelos/links continuam na
-// seção de baixo). São os 8 cards do mock na ordem de jornada — os 7
+// Aba "Instrumentos" de /materiais: a régua oficial da jornada DPP — os 7
 // instrumentos da régua + a avaliação por terceiros (0103), que não é
-// formulário `sistema` mas é instrumento do programa (o "quem disse o
-// quê" nunca aparece: o consolidado anonimizado mora na ficha).
-//
-// Os estados são agregados das MESMAS linhas do painel (resolveLinhas-
-// Painel + estacoesPainelDupla) — janela aberta × trancado com a data de
-// liberação por turma, deduplicados: a contagem "x de y" fica na faixa do
-// painel, o card carrega janela, estado e a ação do papel. Coord envia
-// em lote nas 5 estações emissíveis (roda inicial e formal dividem
-// `roda_vida` — o momento certo por dupla é o que o core resolve) e abre
-// as respostas no formulário oficial; supervisor e mentor veem o catálogo
-// (estado/ação por dupla fica na ficha — sem reimplementar a ficha aqui).
+// formulário `sistema` mas é instrumento do programa (o "quem disse o quê"
+// nunca aparece: o consolidado anonimizado mora na ficha). Pra staff cada
+// card resume a coorte em 3 estados (responderam · aguardando · atrasados)
+// e a lista abaixo é a única fila de ação: jovem com instrumento fora do
+// prazo do guia, lembrado direto (o link já está na jornada dele, emitido
+// sozinho — 0099). O estado fino por dupla (link enviado, expirado…) mora
+// na ficha. Coord envia em lote e abre as respostas; o mentor vê o
+// catálogo com o atalho pra ficha.
 
 type Papel = "coordenacao" | "supervisor" | "mentor";
 
@@ -44,7 +44,7 @@ type CardSpec = {
   chave: InstrumentoChave;
   titulo: string;
   descricao: string;
-  /** chips da janela do guia (a linha .jw do mock). */
+  /** chips do momento do guia (ex.: "Enc. 1"). */
   chips: string[];
   /** estação da régua quando o card é um dos 7 — ativa estado/lote. */
   estacao?: EstacaoChave;
@@ -58,7 +58,7 @@ const CARDS: CardSpec[] = [
     chave: "roda_inicial",
     titulo: ESTACOES.roda_inicial.titulo,
     descricao:
-      "Satisfação 1–10 nas 16 áreas da vida — o ponto de partida que a aplicação formal compara.",
+      "Satisfação 1–10 nas 16 áreas da vida: o ponto de partida que a aplicação formal compara.",
     chips: ["Enc. 1"],
     estacao: "roda_inicial",
     sistemaForm: "roda_vida",
@@ -109,7 +109,7 @@ const CARDS: CardSpec[] = [
     chave: "roda_formal",
     titulo: ESTACOES.roda_formal.titulo,
     descricao:
-      "O jovem refaz as 16 notas e a dupla vê o antes × depois sobre a leitura inicial.",
+      "O jovem refaz as 16 notas e a dupla vê o antes e o depois sobre a leitura inicial.",
     chips: ["Enc. 12–14"],
     estacao: "roda_formal",
     sistemaForm: "roda_vida",
@@ -125,12 +125,11 @@ const CARDS: CardSpec[] = [
   },
 ];
 
-/** A linha de estado do card — a tag da janela (.jw do mock): "janela
- *  aberta" quando ao menos uma turma já alcançou o encIni, "trancado"
- *  quando nenhuma alcançou (aí o card esmaece e a ação vira a data de
- *  liberação por turma). A avaliação do encontro é recorrente — não tranca
- *  e não tem "janela": a tag dela diz o formato, não o estado. */
-function TagJanela({
+/** Estado do card: "ainda não abriu" enquanto nenhuma turma alcançou o
+ *  encontro de abertura (o card fica esmaecido e a ação vira a data de
+ *  liberação por turma); "liberado" quando ao menos uma turma já chegou.
+ *  A avaliação do encontro é recorrente: a tag diz o formato, não o estado. */
+function TagEstado({
   trancado,
   recorrente = false,
 }: {
@@ -141,24 +140,148 @@ function TagJanela({
     return (
       <Badge
         variant="outline"
-        className="border-transparent bg-muted text-[11px] font-semibold text-muted-foreground"
+        className="bg-muted text-xs font-medium text-muted-foreground"
       >
         <LockSimple data-icon="inline-start" size={11} aria-hidden />
-        trancado
-      </Badge>
-    );
-  }
-  if (recorrente) {
-    return (
-      <Badge className="bg-[var(--ok)]/15 text-[11px] font-semibold text-[var(--ok-text)]">
-        recorrente
+        ainda não abriu
       </Badge>
     );
   }
   return (
-    <Badge className="bg-[var(--ok)]/15 text-[11px] font-semibold text-[var(--ok-text)]">
-      janela aberta
+    <Badge variant="outline" className="text-xs font-medium">
+      {recorrente ? "a cada encontro" : "liberado"}
     </Badge>
+  );
+}
+
+
+/** Os 3 estados da coorte num instrumento — o resto (enviado × expirado ×
+ *  a fazer) é detalhe de ficha. Atrasado ganha de aguardando. */
+function contas(resolvidas: LinhaResolvida[], chave: EstacaoChave) {
+  let responderam = 0;
+  let aguardando = 0;
+  let atrasados = 0;
+  for (const r of resolvidas) {
+    const e = r.estados[chave];
+    if (e === "trancada") continue;
+    if (r.atrasadas.has(chave)) atrasados++;
+    else if (e === "respondido") responderam++;
+    else aguardando++;
+  }
+  return { responderam, aguardando, atrasados };
+}
+
+function LinhaEstados({
+  resolvidas,
+  chave,
+}: {
+  resolvidas: LinhaResolvida[];
+  chave: EstacaoChave;
+}) {
+  const c = contas(resolvidas, chave);
+  // a avaliação do encontro é recorrente: o retrato é avaliações feitas
+  // sobre encontros realizados, não duplas
+  const recorrente = chave === "avaliacao_encontro";
+  const feitas = resolvidas.reduce(
+    (n, r) => n + r.linha.avaliacoes_encontro.feitas,
+    0
+  );
+  const realizados = resolvidas.reduce(
+    (n, r) => n + r.linha.avaliacoes_encontro.realizados,
+    0
+  );
+  return (
+    <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+      {recorrente ? (
+        <span className="inline-flex items-center gap-1">
+          <Check size={12} weight="bold" aria-hidden className="text-[var(--ok-text)]" />
+          <b className="font-semibold tabular-nums">{feitas}</b> de {realizados} avaliados
+        </span>
+      ) : (
+        <>
+          <span className="inline-flex items-center gap-1">
+            <Check size={12} weight="bold" aria-hidden className="text-[var(--ok-text)]" />
+            <b className="font-semibold tabular-nums">{c.responderam}</b> responderam
+          </span>
+          <span className="inline-flex items-center gap-1 text-muted-foreground">
+            <Clock size={12} aria-hidden />
+            <b className="font-semibold tabular-nums text-foreground">{c.aguardando}</b> aguardando
+          </span>
+        </>
+      )}
+      {c.atrasados > 0 && (
+        <span className="inline-flex items-center gap-1 text-[var(--warn-text)]">
+          <Warning size={12} weight="fill" aria-hidden />
+          <b className="font-semibold tabular-nums">{c.atrasados}</b>{" "}
+          {c.atrasados === 1 ? "atrasado" : "atrasados"}
+        </span>
+      )}
+    </p>
+  );
+}
+
+/** Linha da fila "atrasados": quem é, o que falta, e o lembrete direto
+ *  pro jovem — o link mora na jornada dele, não depende do mentor. */
+function LinhaAtrasado({
+  r,
+  info,
+  nudge,
+  meuNome,
+}: {
+  r: LinhaResolvida;
+  info: { status: string; jovemWhatsapp: string | null } | undefined;
+  nudge: Interacao | null;
+  meuNome: string;
+}) {
+  const { linha } = r;
+  const nomes = ESTACAO_CHAVES.filter((c) => r.atrasadas.has(c)).map((c) =>
+    c === "avaliacao_encontro"
+      ? "avaliação do encontro"
+      : ESTACOES[c].titulo
+  );
+  const primeiro = linha.jovem_nome.split(" ")[0];
+  const turma = linha.turma ? turmaCurta(linha.turma) : null;
+  const lista =
+    nomes.length === 1
+      ? nomes[0]
+      : `${nomes.slice(0, -1).join(", ")} e ${nomes[nomes.length - 1]}`;
+  const eu = meuNome.split(" ")[0];
+  return (
+    <li className="flex flex-wrap items-center gap-x-4 gap-y-2 py-2.5">
+      <div className="min-w-40 flex-1">
+        <p className="text-sm font-medium">
+          {linha.jovem_nome}
+          <span className="ml-2 text-xs font-normal text-muted-foreground">
+            {[turma, `mentor ${linha.mentor_nome}`].filter(Boolean).join(" · ")}
+          </span>
+        </p>
+        <p className="mt-0.5 text-xs text-muted-foreground">{lista}</p>
+      </div>
+      <div className="flex items-center gap-2">
+        <Link
+          href={`/duplas/${linha.dupla_id}#instrumentos`}
+          className={buttonVariants({ variant: "ghost", size: "sm" })}
+        >
+          Ver ficha
+        </Link>
+        {info?.status === "ativa" ? (
+          <LembreteButton
+            duplaId={linha.dupla_id}
+            destino="mentorado"
+            rotulo={`Lembrar ${primeiro}`}
+            telefone={info.jovemWhatsapp}
+            titulo="Sua jornada tem atividade esperando"
+            corpo={`Oi ${primeiro}, tudo bem? Aqui é ${eu}, da equipe do Realiza.vc. ${
+              nomes.length === 1 ? "Uma atividade" : "Algumas atividades"
+            } da sua jornada ${nomes.length === 1 ? "está" : "estão"} esperando por você: ${lista}. É só abrir Minha jornada no app.`}
+            href="/jovem/materiais"
+            bloqueadoAte={lembreteBloqueadoAte(nudge)}
+          />
+        ) : (
+          <Badge variant="secondary">dupla pausada</Badge>
+        )}
+      </div>
+    </li>
   );
 }
 
@@ -170,41 +293,52 @@ export function InstrumentosPrograma({
   formIds,
   envioLiberado,
   fichasMentor = [],
+  nudges = {},
+  meuNome = "",
 }: {
   papel: Papel;
   /** as mesmas linhas do painel — vazio pro mentor (o painel é staff-only;
    *  o card dele vira catálogo sem estado agregado). */
   linhas: PainelJornadaLinha[];
   eventos: CicloEvento[];
-  /** flags de e-mail/status das duplas — só a prévia do lote usa (coord). */
+  /** flags de e-mail das duplas — só a prévia do lote usa (coord). */
   duplasInfo: Map<
     string,
-    { jovemTemEmail: boolean; mentorTemEmail: boolean }
+    {
+      status: string;
+      jovemWhatsapp: string | null;
+      jovemTemEmail: boolean;
+      mentorTemEmail: boolean;
+    }
   >;
   /** sistema → id do formulário oficial (getFormularios) — monta o
    *  "Ver respostas"; vazio pra não-coord (RLS do form é coord-only). */
   formIds: Map<FormularioSistema, string>;
   envioLiberado: boolean;
-  /** mentor: as duplas DPP vivas dele — o rodapé linka cada ficha (o
-   *  estado por instrumento continua lá, não duplicamos as ações). */
+  /** mentor: as duplas DPP vivas dele — o rodapé linka cada ficha. */
   fichasMentor?: { id: string; jovemNome: string }[];
+  /** último nudge por dupla — o cap de 48h do Lembrar. */
+  nudges?: Record<string, Interacao>;
+  meuNome?: string;
 }) {
   const ehCoord = papel === "coordenacao";
   const resolvidas = resolveLinhasPainel(linhas, eventos);
   const grupos = agrupaPorTurma(resolvidas);
   const temEscopo = resolvidas.length > 0;
+  const atrasados = resolvidas
+    .filter((r) => r.atrasadas.size > 0)
+    .sort(
+      (a, b) =>
+        b.atrasadas.size - a.atrasadas.size ||
+        a.linha.jovem_nome.localeCompare(b.linha.jovem_nome, "pt-BR")
+    );
 
   return (
-    <section aria-labelledby="instrumentos-titulo">
-      <h2 id="instrumentos-titulo" className="font-semibold">
+    <section aria-labelledby="instrumentos-titulo" className="space-y-3">
+      <h2 id="instrumentos-titulo" className="text-base font-semibold">
         Instrumentos do programa
       </h2>
-      <p className="mt-1 text-sm text-muted-foreground">
-        {ehCoord
-          ? "Os instrumentos oficiais da jornada DPP. Cada um entra num encontro-alvo do guia — antes da janela abrir fica trancado com a data de liberação."
-          : "Os instrumentos oficiais da jornada DPP — o que cada um é e quando entra. Estado e envio por dupla ficam na ficha dela."}
-      </p>
-      <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {CARDS.map((card) => {
           const estacao = card.estacao;
           // trancado = TODA a coorte abaixo do encIni (sem linhas — mentor —
@@ -213,9 +347,7 @@ export function InstrumentosPrograma({
             temEscopo &&
             estacao != null &&
             estacao !== "avaliacao_encontro" &&
-            resolvidas.every(
-              (r) => r.estados[estacao] === "trancada"
-            );
+            resolvidas.every((r) => r.estados[estacao] === "trancada");
           const sistemaLote = estacao ? SISTEMA_DA_ESTACAO[estacao] : null;
           const elegiveis =
             ehCoord && sistemaLote && temEscopo && estacao != null
@@ -228,16 +360,7 @@ export function InstrumentosPrograma({
           return (
             <article
               key={card.chave}
-              style={{
-                ...instrumentoVars(card.chave),
-                borderTopColor: trancado
-                  ? "var(--border)"
-                  : "var(--ic)",
-              }}
-              className={cn(
-                "flex flex-col gap-2 rounded-xl border border-border/70 border-t-[3px] bg-card p-3.5",
-                trancado && "bg-muted/40"
-              )}
+              className="flex flex-col gap-2.5 rounded-xl bg-card p-3.5 shadow-[var(--shadow-border)]"
             >
               <div className="flex items-start gap-2.5">
                 <InstrumentoEmblema
@@ -247,7 +370,7 @@ export function InstrumentosPrograma({
                 <div className="min-w-0">
                   <h3
                     className={cn(
-                      "text-sm font-semibold leading-snug tracking-tight",
+                      "text-sm font-semibold leading-snug",
                       trancado && "text-muted-foreground"
                     )}
                   >
@@ -257,16 +380,13 @@ export function InstrumentosPrograma({
                     {card.chips.map((chip) => (
                       <span
                         key={chip}
-                        className="rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground"
+                        className="rounded-md bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground sm:text-[11px]"
                       >
                         {chip}
                       </span>
                     ))}
-                    {/* estado da janela — só com o retrato do escopo (a
-                        avaliação do encontro é recorrente: nunca tranca e
-                        a tag diz "recorrente", não "janela aberta") */}
                     {temEscopo && estacao && (
-                      <TagJanela
+                      <TagEstado
                         trancado={trancado}
                         recorrente={estacao === "avaliacao_encontro"}
                       />
@@ -277,19 +397,19 @@ export function InstrumentosPrograma({
               <p className="text-xs leading-relaxed text-muted-foreground">
                 {card.descricao}
               </p>
+              {temEscopo && estacao && !trancado && (
+                <LinhaEstados resolvidas={resolvidas} chave={estacao} />
+              )}
 
               {/* ações do papel — a data de liberação é leitura pública do
-                  programa (todo staff a vê, não só a coord); emitir em lote
-                  e ler respostas seguem coord-only; o mentor tem o deep
-                  link pra ficha de cada dupla dele */}
+                  programa (todo staff a vê); emitir em lote e ler respostas
+                  seguem coord-only; o mentor tem o deep link da ficha */}
               {(trancado && estacao) ||
               ehCoord ||
               (papel === "mentor" && fichasMentor.length > 0) ? (
                 <div className="mt-auto flex flex-wrap items-center gap-2 pt-1">
                   {trancado && estacao ? (
-                    // a convenção "desabilitado explica o porquê": o pill
-                    // carrega a data de liberação por turma
-                    <span className="inline-flex items-center gap-1.5 rounded-md bg-muted px-2 py-1 text-[11px] font-semibold text-muted-foreground">
+                    <span className="inline-flex items-center gap-1.5 rounded-md bg-muted px-2 py-1 text-xs font-medium text-muted-foreground">
                       <LockSimple size={12} aria-hidden />
                       {liberaCopia(estacao, grupos)}
                     </span>
@@ -304,9 +424,9 @@ export function InstrumentosPrograma({
                           contador={elegiveis.length}
                         />
                       ) : (
-                        <span className="text-[11px] text-muted-foreground">
+                        <span className="text-xs text-muted-foreground">
                           {temEscopo
-                            ? "Nada a enviar agora — as duplas já receberam ou já responderam."
+                            ? "Nada a enviar agora: as duplas já receberam ou já responderam."
                             : "Sem duplas no escopo ainda."}
                         </span>
                       )
@@ -324,7 +444,7 @@ export function InstrumentosPrograma({
                       </Link>
                     ) : (
                       // 360º — a emissão é manual de encerramento, por dupla
-                      <span className="text-[11px] text-muted-foreground">
+                      <span className="text-xs text-muted-foreground">
                         A coordenação emite na ficha de cada dupla.
                       </span>
                     )
@@ -344,26 +464,25 @@ export function InstrumentosPrograma({
                   {/* mentor — deep link pra seção de instrumentos da ficha
                       de cada dupla dele; com várias duplas, um link por
                       ficha rotulado pelo nome do jovem */}
-                  {papel === "mentor" &&
-                    fichasMentor.length === 1 && (
-                      <Link
-                        href={`/duplas/${fichasMentor[0]!.id}#instrumentos`}
-                        className={buttonVariants({
-                          variant: "outline",
-                          size: "sm",
-                        })}
-                      >
-                        <Eye aria-hidden />
-                        Na ficha
-                      </Link>
-                    )}
+                  {papel === "mentor" && fichasMentor.length === 1 && (
+                    <Link
+                      href={`/duplas/${fichasMentor[0]!.id}#instrumentos`}
+                      className={buttonVariants({
+                        variant: "outline",
+                        size: "sm",
+                      })}
+                    >
+                      <Eye aria-hidden />
+                      Na ficha
+                    </Link>
+                  )}
                   {papel === "mentor" &&
                     fichasMentor.length > 1 &&
                     fichasMentor.map((f) => (
                       <Link
                         key={f.id}
                         href={`/duplas/${f.id}#instrumentos`}
-                        className="text-[11px] font-medium underline underline-offset-2 hover:text-foreground"
+                        className="text-xs font-medium underline underline-offset-2 hover:text-foreground"
                       >
                         {f.jovemNome}
                       </Link>
@@ -374,12 +493,39 @@ export function InstrumentosPrograma({
           );
         })}
       </div>
-      {/* mentor: a ficha continua sendo a casa do instrumento por dupla —
-          o rodapé linka direto em vez de reimplementar estado/ação aqui
-          (decisão do plano: deep link, não duplicação) */}
+      {atrasados.length > 0 && (
+        <section
+          aria-labelledby="atrasados-titulo"
+          className="rounded-xl bg-card px-4 pt-3.5 pb-1.5 shadow-[var(--shadow-border)] sm:px-5"
+        >
+          <h3 id="atrasados-titulo" className="text-sm font-semibold">
+            Atrasados no prazo do guia
+            <span className="ml-1.5 font-normal text-muted-foreground">
+              {atrasados.length}
+            </span>
+          </h3>
+          <ul className="mt-1 divide-y divide-border/60">
+            {atrasados.map((r) => (
+              <LinhaAtrasado
+                key={r.linha.dupla_id}
+                r={r}
+                info={duplasInfo.get(r.linha.dupla_id)}
+                nudge={
+                  nudges[r.linha.dupla_id]?.tipo === "nudge"
+                    ? nudges[r.linha.dupla_id]!
+                    : null
+                }
+                meuNome={meuNome}
+              />
+            ))}
+          </ul>
+        </section>
+      )}
+      {/* mentor: o estado e o envio ficam na ficha da dupla — o rodapé linka
+          direto em vez de reimplementar estado/ação aqui */}
       {papel === "mentor" && fichasMentor.length > 0 && (
-        <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
-          O estado e o envio de cada instrumento ficam na ficha da dupla:{" "}
+        <p className="text-xs leading-relaxed text-muted-foreground">
+          Estado e envio por dupla na ficha:{" "}
           {fichasMentor.map((f, i) => (
             <span key={f.id}>
               {i > 0 && " · "}
@@ -393,11 +539,9 @@ export function InstrumentosPrograma({
           ))}
         </p>
       )}
-      {/* coord-only: os forms de bordo (anamnese, intakes, autoavaliação)
-          moram em /formularios — a régua aqui é só dos instrumentos da
-          jornada */}
+      {/* coord-only: anamnese, intakes e autoavaliação moram em /formularios */}
       {ehCoord && (
-        <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
+        <p className="text-xs leading-relaxed text-muted-foreground">
           Anamnese, intakes e autoavaliação ficam em{" "}
           <Link
             href="/formularios"

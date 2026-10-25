@@ -7,13 +7,14 @@ import { motion } from "motion/react";
 import {
   CalendarDots,
   DotsThree,
-  FolderOpen,
   House,
+  Path,
   Sparkle,
   UserCircle,
   Users,
 } from "@phosphor-icons/react";
 import { Avatar } from "@/components/avatar";
+import { DemoSlotProvider } from "@/components/demo-bar";
 import { T } from "@/components/motion";
 import { NotificacoesBell, NotificacoesProvider } from "@/components/notificacoes";
 import { SignOutButton } from "@/components/signout-button";
@@ -35,7 +36,8 @@ const NAV = [
   { href: "/jovem/agenda", label: "Agenda", icon: CalendarDots },
   { href: "/jovem/especialistas", label: "Especialistas", icon: Sparkle },
   { href: "/jovem/pessoas", label: "Pessoas", icon: Users },
-  { href: "/jovem/materiais", label: "Jornada", icon: FolderOpen },
+  // trilha de progresso, não pasta: jornada é avanço, o acervo é /materiais
+  { href: "/jovem/materiais", label: "Jornada", icon: Path },
   { href: "/jovem/perfil", label: "Perfil", icon: UserCircle },
 ] as const;
 
@@ -71,6 +73,8 @@ export function JovemShell({
 }) {
   const pathname = usePathname();
   const [abertoMais, setAbertoMais] = useState(false);
+  // rodapé da sidebar: a pílula "float" da demo se encaixa aqui no desktop
+  const [slotDemo, setSlotDemo] = useState<HTMLDivElement | null>(null);
   const itemsMobile = [...NAV].sort(
     (a, b) =>
       MOBILE_PRIMEIRO.indexOf(a.href as (typeof MOBILE_PRIMEIRO)[number]) -
@@ -95,6 +99,7 @@ export function JovemShell({
 
   return (
     <NotificacoesProvider inicial={notificacoes}>
+    <DemoSlotProvider alvo={slotDemo}>
       {/* coluna no mobile, linha no desktop — o flex sem gate estica a
           coluna de conteúdo (flex-1) a 100dvh e ancora o footer na borda
           inferior em página curta (mesmo fix do AppShell: o md:flex
@@ -103,7 +108,7 @@ export function JovemShell({
         {/* skip-link — mesmo contrato do shell de staff */}
         <a
           href="#conteudo"
-          className="pointer-events-none fixed left-4 top-3 z-50 -translate-y-24 rounded-lg bg-[var(--brand-ink)] px-4 py-2.5 text-sm font-semibold text-[var(--brand-lime)] opacity-0 shadow-[var(--shadow-border)] transition-[transform,opacity] duration-200 focus:pointer-events-auto focus:translate-y-0 focus:opacity-100"
+          className="pointer-events-none fixed left-4 top-3 z-50 -translate-y-24 rounded-lg bg-[var(--brand-lime)] px-4 py-2.5 text-sm font-semibold text-[var(--brand-ink)] opacity-0 shadow-[var(--shadow-border)] transition-[transform,opacity] duration-200 focus:pointer-events-auto focus:translate-y-0 focus:opacity-100"
         >
           Pular pro conteúdo
         </a>
@@ -187,6 +192,9 @@ export function JovemShell({
           </nav>
 
           <div className="border-t border-sidebar-border px-3 pb-4 pt-4">
+            {/* encaixe da pílula da demo (DemoBar float): vazio fora da demo,
+                então não ocupa altura; em demo a pílula entra aqui, acima do usuário */}
+            <div ref={setSlotDemo} />
             <div className="flex items-center gap-1">
               <Link
                 href="/jovem/perfil"
@@ -311,6 +319,7 @@ export function JovemShell({
           </div>
         </nav>
       </div>
+    </DemoSlotProvider>
     </NotificacoesProvider>
   );
 }

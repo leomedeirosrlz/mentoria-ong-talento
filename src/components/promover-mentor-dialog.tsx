@@ -34,13 +34,13 @@ const OPCOES_PAPEL: {
     value: "mentor_dpp",
     titulo: "Mentor de jornada (DPP)",
     detalhe:
-      "Acompanha um jovem semana a semana dentro de uma turma — você escolhe qual.",
+      "Acompanha um jovem semana a semana dentro de uma turma. Você escolhe qual.",
   },
   {
     value: "mentor_especialista",
     titulo: "Mentor especialista",
     detalhe:
-      "Atende jovens por trilha pontual (saúde mental, carreira…) — fica disponível pro programa inteiro.",
+      "Atende jovens por trilha pontual (saúde mental, carreira…). Fica disponível pro programa inteiro.",
   },
 ];
 
@@ -128,7 +128,7 @@ export function PromoverMentorDialog({
         }
         const profileId = res.profileId;
         toast.success(
-          `${primeiroNome} agora é ${papel === "mentor_dpp" ? "mentor de jornada" : "mentor especialista"} — a ficha de equipe já está no ar.`,
+          `${primeiroNome} agora é ${papel === "mentor_dpp" ? "mentor de jornada" : "mentor especialista"}. A ficha de equipe já está no ar.`,
           {
             description:
               "Lembre de gerar o termo de voluntário na ficha da pessoa.",
@@ -166,7 +166,7 @@ export function PromoverMentorDialog({
           <DialogTitle>Promover {primeiroNome} a mentor</DialogTitle>
           <DialogDescription>
             Quem concluiu o programa pode voltar como mentor. O cadastro de
-            jovem e o histórico ficam intactos — duplas, encontros e
+            jovem e o histórico ficam intactos: duplas, encontros e
             formulários continuam na ficha dela.
           </DialogDescription>
         </DialogHeader>
@@ -232,7 +232,7 @@ export function PromoverMentorDialog({
               </Select>
               {falhaTurmas ? (
                 <p className="text-xs text-muted-foreground">
-                  A lista de turmas não carregou — feche e abra de novo.
+                  A lista de turmas não carregou. Feche e abra de novo.
                 </p>
               ) : carregandoTurmas ? (
                 <p className="text-xs text-muted-foreground">
@@ -240,12 +240,12 @@ export function PromoverMentorDialog({
                 </p>
               ) : turmas.length === 0 ? (
                 <p className="text-xs text-muted-foreground">
-                  Nenhuma turma ativa ou em preparação — crie o cronograma da
+                  Nenhuma turma ativa ou em preparação. Crie o cronograma da
                   turma antes de promover pra jornada.
                 </p>
               ) : (
                 <p className="text-xs text-muted-foreground">
-                  É o recorte do papel — enquanto mentor, {primeiroNome} vê e
+                  É o recorte do papel: enquanto mentor, {primeiroNome} vê e
                   escreve só nessa turma.
                 </p>
               )}
@@ -268,17 +268,17 @@ export function PromoverMentorDialog({
               uma (pré-cadastro) e o magic link precisa do e-mail do jovem */}
           {mentorado.profile_id ? (
             <p className="rounded-lg bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
-              {primeiroNome} já tem conta na plataforma — ela continua a
+              {primeiroNome} já tem conta na plataforma. Ela continua a
               mesma, com o login de hoje. O que muda é o que ela vê dentro.
             </p>
           ) : mentorado.email ? (
             <p className="rounded-lg bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
-              Uma conta nova é criada pra {primeiroNome} — o primeiro magic
+              Uma conta nova é criada pra {primeiroNome}. O primeiro magic
               link vai pro e-mail do cadastro do jovem.
             </p>
           ) : (
             <p className="rounded-lg border border-[var(--warn)]/40 bg-[var(--warn)]/5 px-3 py-2 text-xs">
-              {primeiroNome} ainda não tem conta — a promoção cria uma, mas o
+              {primeiroNome} ainda não tem conta. A promoção cria uma, mas o
               magic link precisa de um e-mail. Cadastre um na ficha dela
               antes de promover.
             </p>

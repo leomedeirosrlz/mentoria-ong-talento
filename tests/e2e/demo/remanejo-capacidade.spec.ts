@@ -107,7 +107,7 @@ test.describe("demo — sugestão de remanejo e capacidade", () => {
     const dialog = page.getByRole("dialog");
     await expect(dialog.getByText(/Capacidade de André/)).toBeVisible();
     await expect(
-      dialog.getByText(/Cuida de 2 duplas em andamento — o mínimo é 2/)
+      dialog.getByText(/Cuida de 2 duplas em andamento\. O mínimo é 2/)
     ).toBeVisible();
     await dialog.getByRole("button", { name: "Cancelar" }).click();
   });

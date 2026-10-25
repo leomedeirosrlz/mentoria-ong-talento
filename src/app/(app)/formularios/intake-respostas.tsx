@@ -73,7 +73,7 @@ export function IntakeRespostas({
   if (!respostas.length) {
     return (
       <p className="rounded-lg border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
-        Nenhuma inscrição ainda. Compartilhe o link de inscrição acima — cada
+        Nenhuma inscrição ainda. Compartilhe o link de inscrição acima. Cada
         envio aparece aqui como um(a) candidato(a).
       </p>
     );

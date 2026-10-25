@@ -61,14 +61,14 @@ type Linha = EventoRascunho & { key: string };
 const novaChave = () => crypto.randomUUID();
 
 const STATUS_OPCOES = {
-  rascunho: "Rascunho — ainda não é o calendário de nenhuma dupla",
-  ativo: "Ativo — já pode ser escolhido ao parear duplas",
+  rascunho: "Rascunho: ainda não é o calendário de nenhuma dupla",
+  ativo: "Ativo: já pode ser escolhido ao parear duplas",
 } as const;
 
 const CONTEUDO_OPCOES = {
-  guia_dpp: "Guia DPP oficial — os 16 encontros com fases e instrumentos",
+  guia_dpp: "Guia DPP oficial: os 16 encontros com fases e instrumentos",
   copiar: "Copiar conteúdo de um cronograma existente",
-  vazio: "Em branco — títulos genéricos pra editar depois",
+  vazio: "Em branco: títulos genéricos pra editar depois",
 } as const;
 
 type ConteudoFonte = keyof typeof CONTEUDO_OPCOES;
@@ -241,7 +241,7 @@ export function CronogramaBuilder({
           <p className="mt-0.5 text-sm text-muted-foreground">
             {totais.inicio_em
               ? `${formatDiaSemanaMes(totais.inicio_em)} → ${formatDiaSemanaMes(totais.fim_em)}`
-              : "Sem datas — revise a prévia"}
+              : "Sem datas: revise a prévia"}
           </p>
         </div>
 
@@ -414,7 +414,7 @@ export function CronogramaBuilder({
               onChange={(e) => setTurma(e.target.value)}
             />
             <p className="text-xs text-muted-foreground">
-              A turma agrupa cronograma e duplas — duplas novas ganham esse selo.
+              A turma agrupa cronograma e duplas. Duplas novas ganham esse selo.
             </p>
           </div>
           <div className="space-y-2">
@@ -427,7 +427,7 @@ export function CronogramaBuilder({
               onChange={(e) => setNome(e.target.value)}
             />
             <p className="text-xs text-muted-foreground">
-              Duas turmas podem dividir o mesmo nome — ex.: “Calendário oficial”.
+              Duas turmas podem dividir o mesmo nome, ex.: “Calendário oficial”.
             </p>
           </div>
           <div className="space-y-2">
@@ -505,7 +505,7 @@ export function CronogramaBuilder({
             />
             {primeiro && (
               <p className="text-xs text-muted-foreground">
-                Cai numa {formatDiaSemana(primeiro)} — os encontros seguem esse
+                Cai numa {formatDiaSemana(primeiro)}: os encontros seguem esse
                 dia da semana.
               </p>
             )}
@@ -542,7 +542,7 @@ export function CronogramaBuilder({
           {/* rotula o grupo de linhas abaixo — <p> em vez de <Label> órfão */}
           <p className="text-sm font-medium">Exceções de intervalo</p>
           <p className="text-xs text-muted-foreground">
-            Sempre que um par de encontros não segue o intervalo padrão — a
+            Sempre que um par de encontros não segue o intervalo padrão. A
             folga de 15 dias entre o 8º e o 9º é o exemplo do guia.
           </p>
           {intervalos.map((iv, i) => (
@@ -669,8 +669,8 @@ export function CronogramaBuilder({
                 />
               </div>
               <p className="text-xs text-muted-foreground sm:col-span-4">
-                O encontro seguinte cai no primeiro dia-da-semana depois do fim
-                — a retomada do PDF (“1ª terça de janeiro”).
+                O encontro seguinte cai no primeiro dia-da-semana depois do
+                fim: a retomada do PDF (“1ª terça de janeiro”).
               </p>
             </div>
           )}
@@ -692,7 +692,7 @@ export function CronogramaBuilder({
               htmlFor="cb-prep"
               className="cursor-pointer font-normal"
             >
-              Etapas de preparação do guia — inscrições, triagem e matching,
+              Etapas de preparação do guia: inscrições, triagem e matching,
               onboardings e formações
             </Label>
           </div>

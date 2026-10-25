@@ -3404,6 +3404,36 @@ export async function marcarNaoAconteceuJovem(encontroId: string) {
   return { ok: true };
 }
 
+/** "Aconteceu" do jovem (0121) — o encontro agendado que já passou vira
+ *  realizado pela ponta do jovem: libera a avaliação dele, o próximo
+ *  instrumento e o material do encontro seguinte sem esperar o registro do
+ *  mentor (que segue devido e é avisado). O último encontro fica de fora. */
+export async function marcarAconteceuJovem(encontroId: string) {
+  if (await demoAtivo()) return { error: DEMO_MSG };
+  const { supabase, me: eu } = await me();
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
+  const { data: enc } = await supabase
+    .from("encontros")
+    .select("dupla_id")
+    .eq("id", encontroId)
+    .maybeSingle();
+  const { data, error } = await supabase.rpc("marcar_aconteceu_mentorado", {
+    p_encontro: encontroId,
+  });
+  if (error) return { error: erroAmigavel(error) };
+  const ret = retornoRpc(data);
+  if (ret.error) return { error: ret.error };
+  revalidatePath("/jovem");
+  revalidatePath("/jovem/agenda");
+  revalidatePath("/jovem/materiais");
+  revalidatePath("/");
+  revalidatePath("/agenda");
+  revalidatePath("/duplas");
+  revalidatePath("/materiais");
+  if (enc?.dupla_id) revalidatePath(`/duplas/${enc.dupla_id}`);
+  return { ok: true };
+}
+
 /** Desmarcar = DELETE do agendado FUTURO — bilateral (jovem, mentor da
  *  dupla, coord). Passado não se apaga: a RPC aponta o 'nao_aconteceu'. */
 export async function desmarcarEncontro(encontroId: string) {

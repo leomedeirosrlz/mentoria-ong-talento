@@ -19,7 +19,7 @@ const jbMono = JetBrains_Mono({
 });
 
 const DESCRICAO =
-  "Plataforma do Programa de Mentoria Social do Instituto Realiza.vc — encontros, registros e acompanhamento das duplas num lugar só.";
+  "Plataforma do Programa de Mentoria Social do Instituto Realiza.vc: encontros, registros e acompanhamento das duplas num lugar só.";
 
 export const metadata: Metadata = {
   // resolve os URLs relativos de openGraph (images, url, canonical) —

@@ -50,7 +50,7 @@ export function msgAguardandoPar(
 ): string {
   const oi = pn(nome) ? `Oi ${pn(nome)}` : "Oi";
   return lado === "mentorado"
-    ? `${oi}, tudo bem? ${autoria(autorNome)}. Sua inscrição no Programa de Mentoria já está com a gente — estamos cuidando do seu pareamento e te aviso assim que fechar. Precisa de algo por aí?`
+    ? `${oi}, tudo bem? ${autoria(autorNome)}. Sua inscrição no Programa de Mentoria já está com a gente. Estamos cuidando do seu pareamento e te aviso assim que fechar. Precisa de algo por aí?`
     : `${oi}, tudo bem? ${autoria(autorNome)}. Passando pra confirmar: você segue na reserva de mentores pra próxima dupla. A disponibilidade continua a mesma?`;
 }
 
@@ -96,7 +96,7 @@ const CATALOGO: Record<ContextoWA, Msgs> = {
   // acolhe sem expor o teor — ele sabe o que pediu.
   apoio_jovem: {
     mentorado: (i) =>
-      `${oiMd(i)}, tudo bem? ${autoria(i.autorNome)}. Vimos o seu pedido e queremos te ouvir — quando puder, chama a gente por aqui.`,
+      `${oiMd(i)}, tudo bem? ${autoria(i.autorNome)}. Vimos o seu pedido e queremos te ouvir. Quando puder, chama a gente por aqui.`,
   },
   // agendado vencido sem virar realizado — a pergunta honesta é "rolou?"
   limbo: {

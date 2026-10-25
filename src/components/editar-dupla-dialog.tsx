@@ -424,7 +424,7 @@ export function EditarDuplaDialog({ dupla }: { dupla: Dupla }) {
               )}
               <p className="text-xs text-muted-foreground">
                 {ehHibrido && !temEncontros
-                  ? "O mentor atua nas duas trilhas — escolha de qual será essa dupla."
+                  ? "O mentor atua nas duas trilhas: escolha de qual será essa dupla."
                   : `Definido pelo papel do mentor${
                       temEncontros
                         ? ". Não muda mais, a dupla já tem encontros."
@@ -463,8 +463,8 @@ export function EditarDuplaDialog({ dupla }: { dupla: Dupla }) {
                 {!dupla.cronograma_id &&
                   (dupla.status === "ativa" || dupla.status === "pausada") && (
                     <p className="text-xs text-[var(--danger)]">
-                      Dupla ativa sem cronograma — escolha um pra destravar
-                      agenda e semáforo.
+                      Dupla ativa sem cronograma: escolha um pra destravar
+                      agenda e acompanhamento.
                     </p>
                   )}
               </div>

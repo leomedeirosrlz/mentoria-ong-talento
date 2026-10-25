@@ -30,7 +30,7 @@ import {
   CampoUf,
 } from "@/components/campos-pessoais";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -401,7 +401,7 @@ function FormCadastro({
         <Label htmlFor="email">E-mail</Label>
         <Input id="email" value={me.email} disabled />
         <p className="text-xs text-muted-foreground">
-          O e-mail é sua credencial de acesso — a troca é na seção Conta,
+          O e-mail é sua credencial de acesso. A troca é na seção Conta,
           mais abaixo.
         </p>
       </div>
@@ -507,7 +507,7 @@ function DialogoCadastro({
         <DialogHeader>
           <DialogTitle>Dados de cadastro</DialogTitle>
           <DialogDescription>
-            Os dados do seu cadastro no programa — a coordenação usa pra
+            Os dados do seu cadastro no programa. A coordenação usa pra
             contato e pra formar as duplas.
           </DialogDescription>
         </DialogHeader>
@@ -726,7 +726,7 @@ export function DialogoSenha({ email }: { email: string }) {
           <div className="rounded-lg border border-border px-4 py-3">
             <p className="text-sm font-medium">Link enviado</p>
             <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-              Confira {email} — o link abre a página de senha direto, sem
+              Confira {email}: o link abre a página de senha direto, sem
               precisar da senha atual.
             </p>
           </div>
@@ -775,14 +775,16 @@ export function DialogoSenha({ email }: { email: string }) {
               {salvando ? "Salvando…" : "Salvar senha"}
             </Button>
             {temSenha && (
-              <button
+              <Button
                 type="button"
+                variant="link"
+                size="sm"
+                className="w-full"
                 onClick={() => void esqueci()}
                 disabled={salvando}
-                className="w-full min-h-11 text-xs text-muted-foreground transition-colors hover:text-foreground"
               >
-                Esqueci minha senha — enviar link por e-mail
-              </button>
+                Esqueci minha senha: enviar link por e-mail
+              </Button>
             )}
           </form>
         )}
@@ -867,8 +869,8 @@ export function DialogoEmail({ email }: { email: string }) {
           <DialogTitle>Trocar e-mail</DialogTitle>
           <DialogDescription>
             {temSenha
-              ? "Confirme sua senha pra trocar na hora — o próximo acesso já é pelo endereço novo."
-              : "Sua sessão ativa confirma a posse — a troca aplica na hora e o próximo acesso já é pelo endereço novo."}
+              ? "Confirme sua senha pra trocar na hora. O próximo acesso já é pelo endereço novo."
+              : "Sua sessão ativa confirma a posse. A troca aplica na hora e o próximo acesso já é pelo endereço novo."}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={enviar} className="space-y-4">
@@ -916,6 +918,7 @@ export function PerfilForm({
   avatarUrl,
   gravatarUrl,
   assinaturaTermo,
+  horarios,
 }: {
   me: Profile;
   mentorProfile: MentorProfile | null;
@@ -924,6 +927,9 @@ export function PerfilForm({
   /** Termo de voluntariado do próprio usuário — pendência do cadastro que
    *  não é campo de form (a assinatura é outra página, /assinar). */
   assinaturaTermo: Assinatura | null;
+  /** Seção "Quando você pode atender" — node pronto da page, só existe pra
+   *  quem tem o papel de especialista (inclusive o híbrido DPP+esp). */
+  horarios?: React.ReactNode;
 }) {
   const supabase = useMemo(() => createClient(), []);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -1272,7 +1278,7 @@ export function PerfilForm({
           <section className="rounded-xl bg-card p-6 shadow-[var(--shadow-border)]">
             <div className="flex items-start gap-3">
               <div className="min-w-0 flex-1">
-                <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                <h2 className="text-base font-semibold">
                   Perfil público
                 </h2>
                 <p className="mt-1 text-xs text-muted-foreground">
@@ -1369,6 +1375,10 @@ export function PerfilForm({
               </div>
             </details>
           )}
+
+          {/* horários do especialista — seção própria, vem montada da page
+              (undefined pros demais papéis) */}
+          {horarios}
         </div>
 
         {/* rail — o burocrático (cadastro + termo) e a conta */}
@@ -1447,16 +1457,22 @@ export function PerfilForm({
                     href={`/api/assinatura/${assinaturaTermo!.id}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-lg px-2 text-xs text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline"
+                    className={cn(
+                      buttonVariants({ variant: "link", size: "sm" }),
+                      "shrink-0 text-muted-foreground"
+                    )}
                   >
-                    <FileArrowDown size={14} aria-hidden />
+                    <FileArrowDown aria-hidden />
                     Ver PDF
                     <span className="sr-only"> (abre em nova aba)</span>
                   </a>
                 ) : (
                   <Link
                     href="/assinar"
-                    className="inline-flex min-h-9 shrink-0 items-center rounded-lg px-2 text-xs font-medium text-primary underline-offset-4 transition-colors hover:underline"
+                    className={cn(
+                      buttonVariants({ variant: "link", size: "sm" }),
+                      "shrink-0"
+                    )}
                   >
                     Ler e assinar
                   </Link>
@@ -1468,7 +1484,7 @@ export function PerfilForm({
           {/* conta — credenciais no mesmo card: e-mail, senha e saída são
               o mesmo assunto. Cada linha abre um Dialog com o form real */}
           <section className="rounded-xl bg-card shadow-[var(--shadow-border)]">
-            <h2 className="px-6 pt-5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+            <h2 className="px-6 pt-5 text-base font-semibold">
               Conta
             </h2>
             <ContaLinha
@@ -1476,7 +1492,7 @@ export function PerfilForm({
               descricao={
                 emailPendente ? (
                   <>
-                    {me.email} — confirmação pendente em{" "}
+                    {me.email}: confirmação pendente em{" "}
                     <span className="text-[var(--warn-text)]">{emailPendente}</span>
                   </>
                 ) : (

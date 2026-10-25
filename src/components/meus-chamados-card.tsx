@@ -38,7 +38,7 @@ export function MeusChamadosCard({
               </h2>
               <p className="mt-0.5 text-sm text-muted-foreground">
                 {abertos.length
-                  ? `${abertos.length} em andamento — a equipe responde por lá.`
+                  ? `${abertos.length} em andamento. A equipe responde por lá.`
                   : "Nenhum pedido em andamento."}
               </p>
             </div>

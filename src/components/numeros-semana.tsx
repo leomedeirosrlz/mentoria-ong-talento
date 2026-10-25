@@ -4,15 +4,16 @@ import Link from "next/link";
 import { useState } from "react";
 import { Star } from "@phosphor-icons/react";
 import type { NumerosSemana } from "@/lib/agenda-coordenacao";
-import { BarraSegmentada, Donut } from "@/components/viz";
+import { BarraSegmentada } from "@/components/viz";
+import { SaudePrograma } from "@/components/saude-programa";
 import { PillTurma } from "@/components/agenda-partes";
 import { filterChipCls } from "@/components/ui/filter-chip";
 
 // ============================================================
 // "Números da semana" (REALIZA-195 · mock v8b) — os três eixos
 // honestos do monitoramento: cobertura do encontro vigente por
-// turma (uma barra por cronograma, denominador literal), semáforo
-// das duplas (rosca; apoio aberto é eixo --info separado) e pulso
+// turma (uma barra por cronograma, denominador literal), situação
+// das duplas (a mesma leitura de /duplas) e pulso
 // de registro (entregue × aguardando + ★ dos jovens + lembretes
 // no cap). O toggle T1/T2/Todas é ESTADO PRÓPRIO da seção — não
 // recicla `cronogramaSel` nem `?visao=` (contrato REALIZA-195).
@@ -57,7 +58,7 @@ export function NumerosSemanaSecao({
             fatias literais sobre o denominador da turma; "sem data" é
             segmento neutro visível, nunca omissão */}
         <div className="rounded-xl border bg-card p-4">
-          <h3 className="text-sm font-semibold">
+          <h3 className="text-base font-semibold">
             Cobertura do encontro da semana
           </h3>
           <ul className="mt-3 space-y-4">
@@ -84,7 +85,7 @@ export function NumerosSemanaSecao({
                 {c.eventoData && (
                   <p className="mt-0.5 text-xs text-muted-foreground">
                     {c.meta}
-                    {c.eventoTitulo ? ` — “${c.eventoTitulo}”` : ""}
+                    {c.eventoTitulo ? ` · “${c.eventoTitulo}”` : ""}
                   </p>
                 )}
                 {c.total > 0 && (
@@ -128,42 +129,17 @@ export function NumerosSemanaSecao({
           </ul>
         </div>
 
-        {/* (b) semáforo — a urgência pinta primeiro no arco (risco abre
-            no topo, sentido horário) e a legenda nomeia o porquê; apoio
-            aberto entra na rosca como eixo azul (trabalho a fazer, não
-            falha) pra fechar o denominador */}
+        {/* (b) situação das duplas — a mesma leitura da /duplas: em andamento
+            particionado em risco, atenção e em dia; apoio aberto é pill à
+            parte e nunca tira a dupla da sua situação */}
         <div className="rounded-xl border bg-card p-4">
-          <h3 className="text-sm font-semibold">Semáforo das duplas</h3>
-          <Donut
-            className="mt-3"
-            tamanho={126}
-            rotuloCentro="duplas"
-            fatias={[
-              { valor: ag.semaforo.risco, rotulo: "risco", cor: "var(--destructive)", obs: "— agir hoje" },
-              { valor: ag.semaforo.atencao, rotulo: "atenção", cor: "var(--warn)" },
-              { valor: ag.semaforo.emAndamento, rotulo: "em andamento", cor: "var(--ok)" },
-              { valor: ag.semaforo.apoio, rotulo: "com apoio aberto", cor: "var(--info)" },
-              { valor: ag.semaforo.pausada, rotulo: "pausada", cor: "var(--pausa)" },
-            ]}
-            notaLegenda={
-              <>
-                Apoio aberto é trabalho, não estado da dupla — o atendimento
-                corre em{" "}
-                <Link
-                  href="/chamados"
-                  className="font-medium text-foreground underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                  Chamados →
-                </Link>
-              </>
-            }
-          />
+          <SaudePrograma saude={ag.saude} nivel="h3" />
         </div>
 
         {/* (c) pulso — sinais do registro semanal + a voz do jovem; cada
             número com denominador ou escala, nunca solto */}
         <div className="rounded-xl border bg-card p-4">
-          <h3 className="text-sm font-semibold">Pulso da semana</h3>
+          <h3 className="text-base font-semibold">Pulso da semana</h3>
           <div className="mt-3 space-y-3">
             <div>
               <p className="flex items-baseline justify-between text-xs text-muted-foreground">
@@ -211,12 +187,12 @@ export function NumerosSemanaSecao({
                       maximumFractionDigits: 1,
                     })}
                   </b>{" "}
-                  de 5 — média das avaliações dos jovens (
+                  de 5, média das avaliações dos jovens (
                   {ag.pulso.avaliacoes}{" "}
                   {ag.pulso.avaliacoes === 1 ? "resposta" : "respostas"})
                 </>
               ) : (
-                "Sem avaliação do jovem na janela"
+                "Sem avaliação do jovem nos últimos 14 dias"
               )}
             </p>
             <p className="text-xs text-muted-foreground">
@@ -228,8 +204,8 @@ export function NumerosSemanaSecao({
                 : "lembretes enviados"}{" "}
               nas últimas 48h
             </p>
-            <p className="border-t border-border/60 pt-2 text-[11px] leading-relaxed text-muted-foreground">
-              Últimos 14 dias — o registro corre no pós-encontro.
+            <p className="border-t border-border/60 pt-2 text-xs leading-relaxed text-muted-foreground sm:text-[11px]">
+              Últimos 14 dias.
             </p>
           </div>
         </div>

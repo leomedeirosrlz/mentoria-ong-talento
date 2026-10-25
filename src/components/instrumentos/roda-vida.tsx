@@ -257,7 +257,7 @@ export function RodaVida({
               Roda completa
               {roda.media != null && (
                 <span className="font-normal">
-                  — média {roda.media.toLocaleString("pt-BR")}
+                  · média {roda.media.toLocaleString("pt-BR")}
                 </span>
               )}
             </p>

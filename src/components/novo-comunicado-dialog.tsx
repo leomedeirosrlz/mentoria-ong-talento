@@ -35,7 +35,13 @@ const PRIORIDADE_OPCOES = [
   { valor: "urgente", rotulo: "Urgente", descricao: "crítico ou com prazo" },
 ] as const;
 
-export function NovoComunicadoDialog() {
+// default = lima (ação principal da tela); outline = secundária, quando a
+// home já tem uma ação preenchida
+export function NovoComunicadoDialog({
+  variant = "default",
+}: {
+  variant?: "default" | "outline";
+}) {
   const [open, setOpen] = useState(false);
   const [titulo, setTitulo] = useState("");
   const [corpoLen, setCorpoLen] = useState(0);
@@ -61,7 +67,7 @@ export function NovoComunicadoDialog() {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button size="sm" />}>
+      <DialogTrigger render={<Button size="sm" variant={variant} />}>
         <Megaphone size={15} aria-hidden />
         Novo aviso
       </DialogTrigger>
@@ -146,7 +152,7 @@ export function NovoComunicadoDialog() {
                     className="sr-only"
                   />
                   {p.rotulo}
-                  <span className="text-[11px] leading-tight font-normal opacity-70">
+                  <span className="text-xs leading-tight font-normal opacity-70">
                     {p.descricao}
                   </span>
                 </label>

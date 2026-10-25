@@ -47,7 +47,7 @@ export function JovemChamados({
             Meus pedidos de ajuda
           </h2>
           <p className="text-xs text-muted-foreground">
-            O que você pediu e o que a equipe respondeu — só você e a equipe veem.
+            O que você pediu e o que a equipe respondeu. Só você e a equipe veem.
           </p>
         </div>
       </div>

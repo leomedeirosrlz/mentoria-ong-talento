@@ -134,7 +134,7 @@ export function PdmDupla({
         status === "atingida"
           ? `"${item.titulo}" marcada como atingida.`
           : status === "descartada"
-            ? `"${item.titulo}" foi descartada — segue no histórico.`
+            ? `"${item.titulo}" foi descartada. Segue no histórico.`
             : `"${item.titulo}" voltou a ficar em andamento.`
       ),
     onEditar: (item: PdmNo) => setItemDialog({ modo: "editar", item }),
@@ -169,12 +169,12 @@ export function PdmDupla({
     >
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h2 className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+          <h2 className="flex items-center gap-2 text-base font-semibold">
             <span aria-hidden className="size-1.5 rounded-full bg-[var(--brand-lime)]" />
             Plano de desenvolvimento
           </h2>
           <p className="mt-1 text-xs text-muted-foreground">
-            o documento vivo da dupla — visão, metas e o caminho até elas
+            o documento vivo da dupla: visão, metas e o caminho até elas
           </p>
         </div>
         {tudoAtingido && (
@@ -196,24 +196,25 @@ export function PdmDupla({
             <blockquote className="mt-1.5 text-sm italic leading-relaxed">
               “{doc.visao}”
             </blockquote>
-            <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-muted-foreground">
+            <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground sm:text-[11px]">
               {doc.visaoEm && <span>escrita em {formatDate(doc.visaoEm)}</span>}
               {podeEditar && (
-                <button
+                <Button
                   type="button"
+                  variant="link"
+                  size="sm"
                   onClick={() => setVisaoAberta(true)}
-                  className="inline-flex min-h-11 items-center gap-1 rounded-md px-1 font-medium text-foreground underline-offset-2 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring sm:min-h-8"
                 >
-                  <PencilSimple size={12} aria-hidden />
+                  <PencilSimple aria-hidden />
                   Editar
-                </button>
+                </Button>
               )}
             </p>
           </>
         ) : podeEditar ? (
           <div className="mt-2">
             <p className="text-xs leading-relaxed text-muted-foreground">
-              A frase que aponta o norte da jornada — o que{" "}
+              A frase que aponta o norte da jornada: o que{" "}
               {mentoradoNome.split(" ")[0]} quer ser, alcançar ou conquistar.
               Ela pode sair do instrumento Visão ou ser escrita aqui com a
               dupla.
@@ -230,7 +231,7 @@ export function PdmDupla({
           </div>
         ) : (
           <p className="mt-1.5 text-xs italic text-muted-foreground">
-            Ainda não escrita — sai do instrumento Visão ou da conversa da
+            Ainda não escrita. Sai do instrumento Visão ou da conversa da
             dupla.
           </p>
         )}
@@ -250,8 +251,8 @@ export function PdmDupla({
               </span>{" "}
               metas atingidas
             </p>
-            <p className="text-[11px] text-muted-foreground">
-              A ordem é a prioridade — a primeira meta é a mais importante
+            <p className="text-xs text-muted-foreground sm:text-[11px]">
+              A ordem é a prioridade. A primeira meta é a mais importante
               agora.
             </p>
           </div>
@@ -281,7 +282,7 @@ export function PdmDupla({
               Nenhuma meta no plano ainda
             </p>
             <p className="mx-auto mt-1 max-w-72 text-xs leading-relaxed text-muted-foreground">
-              As metas chegam pelos instrumentos Metas e PDM da jornada — ou
+              As metas chegam pelos instrumentos Metas e PDM da jornada, ou
               nascem aqui, na conversa da dupla.
             </p>
             {podeEditar && cabeMeta && (
@@ -311,7 +312,7 @@ export function PdmDupla({
                   {metasDescartadas.length === 1
                     ? "meta descartada"
                     : "metas descartadas"}{" "}
-                  — fora do plano, guardadas no histórico
+                  · fora do plano, guardadas no histórico
                 </summary>
                 <div className="border-t border-dashed border-border px-1 pb-2">
                   <PdmArvore
@@ -336,7 +337,7 @@ export function PdmDupla({
                   </Button>
                 ) : (
                   <p className="text-xs text-muted-foreground">
-                    Limite de {PDM_MAX_METAS} metas por plano — descarte uma
+                    Limite de {PDM_MAX_METAS} metas por plano: descarte uma
                     pra abrir espaço.
                   </p>
                 )}
@@ -406,7 +407,7 @@ export function PdmDupla({
           onDescartar={() =>
             executar(
               () => pdmStatusItem(duplaId, excluirItem.id, "descartada"),
-              `"${excluirItem.titulo}" foi descartada — segue no histórico.`
+              `"${excluirItem.titulo}" foi descartada. Segue no histórico.`
             )
           }
           onExcluir={() =>
@@ -516,10 +517,10 @@ function ItemDialog({
           <DialogTitle>{tituloDialog}</DialogTitle>
           <DialogDescription>
             {estado.modo === "nova-submeta"
-              ? `Dentro de "${estado.pai.titulo}" — o que precisa acontecer pra essa meta sair do papel?`
+              ? `Dentro de "${estado.pai.titulo}": o que precisa acontecer pra essa meta sair do papel?`
               : ehMeta
                 ? "Meta SMART: específica, com indicador de sucesso e prazo. A ordem da lista é a prioridade."
-                : "O passo concreto dentro da meta — realizável de imediato, com prazo quando fizer sentido."}
+                : "O passo concreto dentro da meta: realizável de imediato, com prazo quando fizer sentido."}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
@@ -565,7 +566,7 @@ function ItemDialog({
               htmlFor="pdm-indicador"
               className="text-xs font-semibold text-foreground"
             >
-              Indicador de sucesso — como saber que cumpriu
+              Indicador de sucesso (como saber que cumpriu)
             </label>
             <Input
               id="pdm-indicador"

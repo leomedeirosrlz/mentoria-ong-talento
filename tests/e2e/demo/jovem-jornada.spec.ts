@@ -43,10 +43,10 @@ test.describe("demo — Minha jornada do mentorado", () => {
       page.getByRole("img", { name: "5 de 7 entregas feitas" })
     ).toBeVisible();
     // próxima parada = primeira estação trancada (nenhuma a_fazer na
-    // fixture): a aplicação formal da roda, que abre no enc. 12
+    // fixture): a aplicação formal da roda, que abre no encontro 12
     await expect(
       page.getByText(
-        /Próxima parada: Roda da Vida · aplicação formal — libera no enc\. 12/
+        /Próxima parada: Roda da Vida · aplicação formal · libera no encontro 12/
       )
     ).toBeVisible();
 
@@ -134,9 +134,9 @@ test.describe("demo — Minha jornada do mentorado", () => {
     ]) {
       const card = trilha.locator("article", { hasText: titulo });
       await expect(card).toBeVisible();
-      await expect(card.getByText("trancada")).toBeVisible();
+      await expect(card.getByText("Ainda não liberado")).toBeVisible();
     }
-    await expect(trilha.getByText(/libera no enc\. \d+/)).toHaveCount(2);
+    await expect(trilha.getByText(/libera no encontro \d+/)).toHaveCount(2);
 
     // trancado nunca tem gesto — nem link /f/, nem botão nesses cards
     await expect(trilha.locator('a[href^="/f/"]')).toHaveCount(0);
@@ -324,119 +324,63 @@ test.describe("demo — Minha jornada do mentorado", () => {
   });
 });
 
-test.describe("demo — painel Progresso da jornada (staff)", () => {
-  test("coordenação vê KPIs, stackbars, fora-da-janela e Lembrar demo", async ({
+test.describe("demo — instrumentos da jornada (staff)", () => {
+  test("coordenação: 2 abas, 3 estados por instrumento, atrasados e Lembrar o jovem", async ({
     page,
   }) => {
     await entrarNaDemo(page, "coordenacao");
     await page.goto("/materiais");
 
-    const painel = page.locator("section", {
-      has: page.getByRole("heading", {
-        name: "Progresso da jornada",
-        level: 2,
-      }),
-    });
-    await expect(painel).toBeVisible();
-    // o "Você vê / você não vê" (v5c) subiu pro topo da página — a caixa
-    // de escopo cobre painel + instrumentos + biblioteca de uma vez
-    await expect(page.getByText(/Você vê:/).first()).toBeVisible();
+    // REALIZA-209: só Instrumentos e Biblioteca — a coord abre em
+    // Instrumentos; a antiga aba Jornada (matriz, 6 estados) saiu
+    const abas = page.getByRole("tablist", { name: "Seções de materiais" });
+    await expect(abas.getByRole("tab")).toHaveCount(2);
+    await expect(
+      abas.getByRole("tab", { name: "Instrumentos" })
+    ).toHaveAttribute("aria-selected", "true");
+    await expect(abas.getByRole("tab", { name: "Biblioteca" })).toBeVisible();
+    await expect(page.getByText("Progresso da jornada")).toHaveCount(0);
 
-    // a faixa segmentada (v5c) — um segmento por instrumento com as
-    // mini-barras por turma; denominadores honestos, nunca "x de 26"
-    // agregado (o KPI quadrado virou esta faixa rolável)
-    // a faixa é região focável (scroll por teclado, v5c) — o nome vem do
-    // aria-label e os segmentos continuam filhos dela
+    const inst = page.locator('section[aria-labelledby="instrumentos-titulo"]');
+    // cada instrumento liberado resume a coorte em 3 estados
+    const roda = inst.locator("article", { hasText: "Roda da Vida · leitura inicial" });
+    await expect(roda.getByText(/responderam/)).toBeVisible();
+    await expect(roda.getByText(/aguardando/)).toBeVisible();
+    // a recorrente lê avaliações sobre encontros realizados
     await expect(
-      painel.getByRole("region", { name: "Cobertura por instrumento" })
+      inst.locator("article", { hasText: "Avaliação do encontro" }).getByText(/de \d+ avaliados/)
     ).toBeVisible();
+
+    // a fila de atrasados: o lembrete vai direto pro jovem (o link já está
+    // na jornada dele), e a ficha guarda o detalhe
+    const fila = page.locator('section[aria-labelledby="atrasados-titulo"]');
+    await expect(fila.getByRole("heading", { name: /Atrasados no prazo do guia/ })).toBeVisible();
     await expect(
-      painel.getByText("Roda da Vida · leitura inicial").first()
-    ).toBeVisible();
-    // fração honesta por turma — "feitos/duplas da turma" com a sigla
+      fila.getByRole("link", { name: "Ver ficha" }).first()
+    ).toHaveAttribute("href", /^\/duplas\/.+#instrumentos$/);
+    const lembrar = fila.getByRole("button", { name: /^Lembrar / });
     await expect(
-      painel.getByText(/T1|T2/).first()
-    ).toBeVisible();
-    await expect(
-      painel.getByText(/\d+\/\d+/).first()
-    ).toBeVisible();
-    await expect(
-      painel.locator('[role="img"][aria-label*="feitos"]').first()
-    ).toBeVisible();
-    // a recorrente conta feitas/realizados por turma, sem "fechar"
-    await expect(
-      painel
-        .locator('[role="img"][aria-label*="avaliações de encontro"]')
+      lembrar
+        .or(fila.getByRole("button", { name: /Lembrada / }))
+        .or(fila.getByText("dupla pausada"))
         .first()
     ).toBeVisible();
-
-    // a lista de ação — a fixture demo tem duplas com instrumento fora da
-    // janela do guia de propósito (Dandara, Eduardo, a pausada do Pedro)
-    await expect(
-      painel.getByRole("heading", { name: "Fora da janela do guia" })
-    ).toBeVisible();
-    const verFicha = painel.getByRole("link", { name: "Ver ficha" }).first();
-    await expect(verFicha).toBeVisible();
-    await expect(verFicha).toHaveAttribute("href", /^\/duplas\//);
-    // Lembrar só vale pra dupla ativa — a pausada exibe o badge em vez do
-    // botão; um lembrete recente vira o botão desabilitado "Lembrada dd/mm".
-    // No dataset demo os três estados coexistem — a união com .first() no
-    // fim prova "há affordance de lembrete" sem violar o strict mode.
-    const lembrarLivre = painel.getByRole("button", { name: /^Lembrar / });
-    const lembreteOuPausa = lembrarLivre
-      .or(painel.getByRole("button", { name: /Lembrada / }))
-      .or(painel.getByText("dupla pausada"))
-      .first();
-    await expect(lembreteOuPausa).toBeVisible();
-
-    // a matriz por dupla ficou atrás de gesto (v5c) — abre o <details>
-    // agrupado por turma antes de conferir células
-    await painel.getByText("Ver a matriz por dupla").click();
-
-    // agrupamento por turma com o encontro vigente do calendário oficial
-    await expect(
-      painel.getByText(/· encontro \d+ do calendário/).first()
-    ).toBeVisible();
-    // células das estações na linha da dupla — cada <span> leva o rótulo
-    // curto + um sufixo sr-only com o estado (" · respondido", " · abre no
-    // enc. N"), então o texto normalizado da célula não é mais só o nome
-    // da estação (o exact:true que lia "Roda inicial" parou de casar). O
-    // title é o contrato "<rótulo> · <detalhe>" (CelulaEstacao em
-    // painel-jornada.tsx) — o prefixo ancora no label e tolera o estado.
-    for (const celula of [
-      "Roda inicial",
-      "Visão",
-      "Metas",
-      "PDM",
-      "Roda formal",
-      "360º",
-    ]) {
+    // o lembrete não é mais pro mentor: nenhum "Lembrar <mentor>"
+    await expect(fila.getByRole("button", { name: /Lembrar (Carlos|João|Ricardo)/ })).toHaveCount(0);
+    if (await lembrar.first().isVisible().catch(() => false)) {
+      await lembrar.first().click();
       await expect(
-        painel.getByTitle(new RegExp(`^${celula} ·`)).first()
+        page.getByText("Modo demo: nada é enviado de verdade.")
       ).toBeVisible();
     }
 
-    // o Lembrar do demo toca a action — que responde o modo demo, sem
-    // mandar nada de verdade (read-only como todo spec demo)
-    if (await lembrarLivre
-      .first()
-      .isVisible()
-      .catch(() => false)) {
-      await lembrarLivre.first().click();
-      await expect(
-        page.getByText("Modo demo — nada é enviado de verdade.")
-      ).toBeVisible();
-    }
-
-    // a régua oficial separada da biblioteca (v5c): os 8 instrumentos do
-    // programa em cards próprios — a devolutiva de terceiros entre eles,
-    // nunca material solto de acervo
-    const instrumentos = page.locator("section", {
-      has: page.getByRole("heading", {
-        name: "Instrumentos do programa",
-        level: 2,
-      }),
-    });
+    // a régua oficial separada da biblioteca (v5c), agora na própria aba:
+    // os 8 instrumentos do programa em cards — a devolutiva de terceiros
+    // entre eles, nunca material solto de acervo
+    await page.goto("/materiais?aba=instrumentos");
+    const instrumentos = page.locator(
+      'section[aria-labelledby="instrumentos-titulo"]'
+    );
     await expect(instrumentos).toBeVisible();
     for (const titulo of [
       "Roda da Vida · leitura inicial",
@@ -471,7 +415,7 @@ test.describe("demo — painel Progresso da jornada (staff)", () => {
     const cardTrancado = instrumentos.locator("article", {
       hasText: "Avaliação 360º",
     });
-    await expect(cardTrancado.getByText("trancado")).toBeVisible();
+    await expect(cardTrancado.getByText("ainda não abriu")).toBeVisible();
     await expect(cardTrancado.getByRole("link")).toHaveCount(0);
     await expect(cardTrancado.getByRole("button")).toHaveCount(0);
 
@@ -480,15 +424,21 @@ test.describe("demo — painel Progresso da jornada (staff)", () => {
       instrumentos.getByRole("link", { name: "Formulários" })
     ).toBeVisible();
 
-    // a biblioteca continua abaixo do painel — grupos + badge "sem
-    // conteúdo" (rótulo staff; pro jovem o mesmo estado diz "em breve").
-    // Com o hub por encontro (REALIZA-173) parte desses badges mora em
-    // <details> fechados — o primeiro match no DOM pode estar oculto; o
-    // filtro garante um visível (os transversais seguem abertos)
-    await expect(page.getByRole("heading", { name: "Guias" })).toBeVisible();
-    await expect(
-      page.getByText("sem conteúdo").filter({ visible: true }).first()
-    ).toBeVisible();
+    // a biblioteca mora na aba própria — grupos + badge "sem conteúdo"
+    // (rótulo staff; pro jovem o mesmo estado diz "em breve"). Com o hub
+    // por encontro (REALIZA-173) parte desses badges mora em <details>
+    // fechados — o primeiro match no DOM pode estar oculto; o filtro
+    // garante um visível (os transversais seguem abertos)
+    // REALIZA-210: a biblioteca é uma lista só, com busca — sem grupos
+    // por encontro/tipo; "sem conteúdo" é o rótulo staff do "em breve"
+    await page.goto("/materiais?aba=biblioteca");
+    const bib = page.locator('section[aria-labelledby="biblioteca-titulo"]');
+    await expect(bib.getByRole("heading", { name: /Todos os materiais/ })).toBeVisible();
+    await expect(bib.getByText("sem conteúdo").first()).toBeVisible();
+    await expect(page.locator("details")).toHaveCount(0);
+    await bib.getByRole("searchbox", { name: "Buscar material" }).fill("guia do mentor");
+    await expect(bib.getByText("Guia do Mentor DPP")).toBeVisible();
+    await expect(bib.getByText("Plataforma de mentoria")).toHaveCount(0);
   });
 
   // REALIZA-194 — fronteira de papel: o supervisor lê a régua escopada
@@ -501,29 +451,23 @@ test.describe("demo — painel Progresso da jornada (staff)", () => {
     await entrarNaDemo(page, "supervisor");
     await page.goto("/materiais");
 
-    const painel = page.locator("section", {
-      has: page.getByRole("heading", {
-        name: "Progresso da jornada",
-        level: 2,
-      }),
-    });
-    await expect(painel).toBeVisible();
-    // Lembrar fica — supervisor nudge nas duplas que supervisiona
-    // (decisão mantida do v5c: é a ação do auxiliar, não da coord)
+    // o supervisor também abre em Instrumentos, com a fila de atrasados
+    // das duplas dele e o Lembrar direto pro jovem
+    const fila = page.locator('section[aria-labelledby="atrasados-titulo"]');
     await expect(
-      painel
+      fila
         .getByRole("button", { name: /^Lembrar / })
-        .or(painel.getByRole("button", { name: /Lembrada / }))
-        .or(painel.getByText("dupla pausada"))
+        .or(fila.getByRole("button", { name: /Lembrada / }))
+        .or(fila.getByText("dupla pausada"))
         .first()
     ).toBeVisible();
 
-    const instrumentos = page.locator("section", {
-      has: page.getByRole("heading", {
-        name: "Instrumentos do programa",
-        level: 2,
-      }),
-    });
+    // a régua oficial mora na aba "Instrumentos" — a leitura escopada é
+    // a mesma pra ele (estado e envio por dupla ficam na ficha)
+    await page.goto("/materiais?aba=instrumentos");
+    const instrumentos = page.locator(
+      'section[aria-labelledby="instrumentos-titulo"]'
+    );
     await expect(instrumentos).toBeVisible();
     // a data de liberação é leitura de todo staff — o pill trancado
     // aparece pro supervisor igual
@@ -551,8 +495,11 @@ test.describe("demo — painel Progresso da jornada (staff)", () => {
   });
 
   // REALIZA-194 — o mentor lê catálogo + deep link, não espelho da ficha:
-  // os cards linkam pra seção de instrumentos da ficha de cada dupla dele
-  // e o acervo (o conteúdo útil) vem ANTES do catálogo na página.
+  // os cards linkam pra seção de instrumentos da ficha de cada dupla dele.
+  // Com as abas (Jornada/Instrumentos/Biblioteca) o "acervo primeiro" do
+  // v5c virou a aba PADRÃO dele: sem painel staff, /materiais abre na
+  // Biblioteca — o conteúdo útil é o primeiro eixo, o catálogo é a aba
+  // ao lado.
   test("mentor vê acervo primeiro, catálogo com links pra ficha depois", async ({
     page,
   }) => {
@@ -560,30 +507,27 @@ test.describe("demo — painel Progresso da jornada (staff)", () => {
     await page.goto("/materiais");
 
     // o painel staff-only não renderiza pro mentor — a régua dele é o
-    // catálogo "Instrumentos do programa"
+    // catálogo "Instrumentos do programa" na aba própria
     await expect(
-      page.getByRole("heading", { name: "Progresso da jornada" })
+      page.locator('section[aria-labelledby="atrasados-titulo"]')
     ).toHaveCount(0);
-    const instrumentos = page.locator("section", {
-      has: page.getByRole("heading", {
-        name: "Instrumentos do programa",
-        level: 2,
-      }),
-    });
-    await expect(instrumentos).toBeVisible();
 
-    // ordem v5c: a biblioteca (Resumo) vem ANTES do catálogo — o acervo
-    // é o conteúdo útil pro mentor
-    const yAcervo = (
-      await page
-        .getByRole("region", { name: "Resumo da biblioteca" })
-        .boundingBox()
-    )?.y;
-    const yCatalogo = (await instrumentos.boundingBox())?.y;
-    if (yAcervo == null || yCatalogo == null) {
-      throw new Error("seção sem bounding box");
-    }
-    expect(yAcervo).toBeLessThan(yCatalogo);
+    // a aba padrão do mentor é a Biblioteca — o equivalente em abas do
+    // "acervo antes do catálogo" (o Resumo é o primeiro bloco útil)
+    const abas = page.getByRole("tablist", { name: "Seções de materiais" });
+    await expect(
+      abas.getByRole("tab", { name: "Biblioteca" })
+    ).toHaveAttribute("aria-selected", "true");
+    await expect(
+      page.getByRole("region", { name: "Resumo da biblioteca" })
+    ).toBeVisible();
+
+    // o catálogo mora na aba "Instrumentos"
+    await page.goto("/materiais?aba=instrumentos");
+    const instrumentos = page.locator(
+      'section[aria-labelledby="instrumentos-titulo"]'
+    );
+    await expect(instrumentos).toBeVisible();
 
     // cada card linka a ficha específica (âncora #instrumentos) — a
     // fixture do Ricardo tem 2 duplas DPP vivas (Bia e Matheus), então
@@ -603,9 +547,7 @@ test.describe("demo — painel Progresso da jornada (staff)", () => {
     }
     // o rodapé lista a ficha de cada dupla dele
     await expect(
-      instrumentos.getByText(
-        /O estado e o envio de cada instrumento ficam na ficha da dupla:/
-      )
+      instrumentos.getByText(/Estado e envio por dupla na ficha:/)
     ).toBeVisible();
     // mentor nunca vê gesto de coord
     await expect(

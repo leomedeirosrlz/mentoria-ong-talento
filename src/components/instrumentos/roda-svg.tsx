@@ -103,7 +103,7 @@ export function RodaSvg({
           }
         : {
             role: "img",
-            "aria-label": `Roda da Vida — média ${roda.media?.toLocaleString("pt-BR") ?? "sem notas"} em ${total} áreas`,
+            "aria-label": `Roda da Vida: média ${roda.media?.toLocaleString("pt-BR") ?? "sem notas"} em ${total} áreas`,
           })}
       onPointerDown={
         interativo

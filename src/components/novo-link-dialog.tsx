@@ -90,7 +90,7 @@ function Copiavel({ texto, label }: { texto: string; label: string }) {
             setCopiado(true);
             setTimeout(() => setCopiado(false), 1600);
           } catch {
-            toast.error("Não consegui copiar — selecione e copie manualmente.");
+            toast.error("Não consegui copiar. Selecione e copie manualmente.");
           }
         }}
       >
@@ -267,7 +267,7 @@ function NovoLinkForm({
   const tituloSugerido = useMemo(() => {
     const base = TIPO_RELATORIO_LABEL[tipo];
     const escopo =
-      tipo === "assinaturas" ? "" : turma ? ` — ${turmaLonga(turma)}` : " — Todas as turmas";
+      tipo === "assinaturas" ? "" : turma ? ` · ${turmaLonga(turma)}` : " · Todas as turmas";
     return base + escopo;
   }, [tipo, turma]);
   const tituloFinal = (tituloEditado ? titulo : tituloSugerido).trim();
@@ -320,7 +320,7 @@ function NovoLinkForm({
       senhaTrim &&
       (senhaTrim.length < 6 || new TextEncoder().encode(senhaTrim).length > 72)
     ) {
-      setErro("A senha precisa ter de 6 a 72 caracteres — ou deixe em branco pra gerar uma forte.");
+      setErro("A senha precisa ter de 6 a 72 caracteres. Ou deixe em branco pra gerar uma forte.");
       return;
     }
     setErro(null);
@@ -350,8 +350,8 @@ function NovoLinkForm({
           <DialogTitle>Link criado</DialogTitle>
           <DialogDescription>
             {resultado.senha
-              ? "Copie link e senha agora — a senha não aparece de novo."
-              : "Copie o link — ele abre direto, sem senha."}
+              ? "Copie link e senha agora. A senha não aparece de novo."
+              : "Copie o link. Ele abre direto, sem senha."}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
@@ -368,7 +368,7 @@ function NovoLinkForm({
               <p className="flex items-start gap-2 rounded-lg bg-[var(--brand-lime)]/15 p-3 text-xs leading-relaxed text-foreground">
                 <Warning size={15} className="mt-0.5 shrink-0" aria-hidden />
                 <span>
-                  A senha não fica salva em texto — só o hash. Se perder, gere
+                  A senha não fica salva em texto, só o hash. Se perder, gere
                   uma nova em “Compartilhar → Redefinir senha”.
                 </span>
               </p>
@@ -541,7 +541,7 @@ function NovoLinkForm({
               <span className="text-sm">
                 Compartilhar contato
                 <span className="block text-xs text-muted-foreground">
-                  E-mail e WhatsApp das pessoas no link — inclusive de
+                  E-mail e WhatsApp das pessoas no link, inclusive de
                   mentorados menores.
                 </span>
               </span>
@@ -566,7 +566,7 @@ function NovoLinkForm({
             </label>
             {exporContato && (
               <AvisoExposicao>
-                Contato é dado pessoal — e de menor, no caso dos mentorados.
+                Contato é dado pessoal, e de menor, no caso dos mentorados.
                 Em link público, ligue só quando o destinatário realmente
                 precisar falar com as pessoas.
               </AvisoExposicao>
@@ -707,7 +707,7 @@ function NovoLinkForm({
           <span className="text-sm">
             Link sem senha
             <span className="block text-xs text-muted-foreground">
-              Quem tiver o endereço abre direto — sem digitar nada.
+              Quem tiver o endereço abre direto, sem digitar nada.
             </span>
           </span>
           <Switch
@@ -721,8 +721,8 @@ function NovoLinkForm({
         </label>
         {semSenha && (
           <AvisoExposicao>
-            Todo o recorte fica visível pra qualquer pessoa com o link —
-            escolha só quando não houver dado sensível no relatório.
+            Todo o recorte fica visível pra qualquer pessoa com o link.
+            Escolha só quando não houver dado sensível no relatório.
           </AvisoExposicao>
         )}
 

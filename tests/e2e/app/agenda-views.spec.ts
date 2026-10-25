@@ -344,7 +344,7 @@ test.describe("agenda do mentor — visões Semana e Horários (REALIZA-25)", ()
       .getByRole("button", { name: "Confirmar agendamento" })
       .click();
     await expect(
-      page.getByText(/Agendamento confirmado — 1º encontro\./)
+      page.getByText(/Agendamento confirmado: 1º encontro\./)
     ).toBeVisible();
     await expect(dialog).not.toBeVisible();
 

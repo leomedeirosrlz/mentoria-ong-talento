@@ -44,7 +44,7 @@ const DICAS: Record<Tipo, string> = {
   mentorados:
     "Colunas: nome, whatsapp, email, ong, notas e a ficha opcional: nome_social, data_nascimento (dd/mm/aaaa), genero, cor_raca, cidade, uf, escolaridade, interesses (por vírgula), objetivos, motivacao, pref_genero_par, origem, disponibilidade (JSON {dias,periodos}) e form_bruto (JSON). Só o nome é obrigatório. Documentos pro termo: rg, cpf, cep, logradouro, numero, complemento, bairro; e do responsável: resp_nome, resp_parentesco, resp_rg, resp_cpf, resp_nascimento, resp_cidade, resp_uf, resp_cep, resp_logradouro, resp_numero, resp_complemento, resp_bairro.",
   duplas:
-    "Uma linha = uma dupla. Obrigatórias: mentor e mentorado (nome ou e-mail — nome resolve sem acento e aceita o nome de exibição, ex.: \"Juliana Novaes\" acha \"Juliana Novaes de Oliveira\"; apelido que não é pedaço do nome não resolve — prefira o e-mail). Opcionais: auxiliar executivo (nome ou e-mail — informado e não achado falha a linha), trilha (dpp ou especialista — obrigatória só quando o mentor tem os dois papéis; sem a coluna a trilha sai do papel dele), turma (label exato, ex.: \"T2 · 2026/2027\"; em branco só vale quando existe um único cronograma ativo), demanda/eixo e iniciada_em (dd/mm/aaaa ou aaaa-mm-dd). Cada linha vira uma dupla ativa: a demanda vai pro campo demanda e, sem iniciada_em, a dupla DPP nasce uma semana antes do 1º encontro do cronograma. Par já existente (ativo ou pausado), mentor sem vaga e nome ambíguo pulam a linha — nada é gravado antes da prévia.",
+    "Uma linha = uma dupla. Obrigatórias: mentor e mentorado (nome ou e-mail: o nome resolve sem acento e aceita o nome de exibição, ex.: \"Juliana Novaes\" acha \"Juliana Novaes de Oliveira\"; apelido que não é pedaço do nome não resolve, prefira o e-mail). Opcionais: auxiliar executivo (nome ou e-mail: informado e não achado, falha a linha), trilha (dpp ou especialista: obrigatória só quando o mentor tem os dois papéis; sem a coluna a trilha sai do papel dele), turma (label exato, ex.: \"T2 · 2026/2027\"; em branco só vale quando existe um único cronograma ativo), demanda/eixo e iniciada_em (dd/mm/aaaa ou aaaa-mm-dd). Cada linha vira uma dupla ativa: a demanda vai pro campo demanda e, sem iniciada_em, a dupla DPP nasce uma semana antes do 1º encontro do cronograma. Par já existente (ativo ou pausado), mentor sem vaga e nome ambíguo pulam a linha. Nada é gravado antes da prévia.",
 };
 
 const MODELO: Record<Tipo, string> = {
@@ -286,7 +286,7 @@ export function ImportarCsvDialog({
         <DialogHeader>
           <DialogTitle>Importar de planilha</DialogTitle>
           <DialogDescription>
-            Cole ou suba o CSV — cada linha só é gravada depois da prévia.
+            Cole ou suba o CSV: cada linha só é gravada depois da prévia.
           </DialogDescription>
         </DialogHeader>
 
@@ -377,7 +377,7 @@ export function ImportarCsvDialog({
             </div>
             <p className="text-xs text-muted-foreground">
               Mentor e mentorado resolvem por e-mail ou nome (sem acento, com nome
-              de exibição). Linha com problema não é criada — as prontas entram
+              de exibição). Linha com problema não é criada. As prontas entram
               mesmo se houver puladas. Mentores e auxiliares executivos são avisados.
             </p>
             <div className="flex gap-2">
@@ -470,7 +470,7 @@ export function ImportarCsvDialog({
                                       title={d.aviso ?? "valor precisou de resgate"}
                                     >
                                       <Warning size={12} aria-hidden className="shrink-0" />
-                                      {`revisar${d.aviso ? ` — ${curto(d.aviso, 44)}` : ""}`}
+                                      {`revisar${d.aviso ? `: ${curto(d.aviso, 44)}` : ""}`}
                                     </span>
                                   )}
                                 </li>
@@ -493,7 +493,7 @@ export function ImportarCsvDialog({
             </div>
             <p className="text-xs text-muted-foreground">
               Ficha conta os campos de matching reconhecidos (nascimento, gênero,
-              cidade/UF, interesses, motivação, preferência de par) — os sensíveis
+              cidade/UF, interesses, motivação, preferência de par). Os sensíveis
               ficam visíveis só pra coordenação. Normalizado mostra o que a planilha
               trouxe torto e já entra corrigido (e-mail, telefone, data, link); o que
               pede revisão sai sinalizado.

@@ -40,7 +40,7 @@ import { formatDate, formatDateTime } from "@/lib/ciclo";
 import { turmaLonga } from "@/lib/turma";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -68,11 +68,6 @@ const itemCls =
 
 const itemIconCls =
   "mt-0.5 grid size-7 shrink-0 place-items-center rounded-md bg-muted text-foreground";
-
-/** Mini-ação da linha de link (copiar/abrir/senha/revogar) — chip pequeno
- *  com borda; ≥44px no mobile, compacta no desktop. */
-const miniActCls =
-  "inline-flex min-h-11 sm:min-h-8 items-center gap-1.5 rounded-md border border-border bg-card px-2.5 py-1 text-xs font-medium text-muted-foreground transition-colors outline-none hover:border-input hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50";
 
 /** Painel "Compartilhar" da toolbar do builder (REALIZA-201): concentra
  *  criar link (com o recorte da grade na tela), listar/gerir os links
@@ -181,7 +176,7 @@ export function RelatorioLinksMenu({
                 </span>
                 <span className="mt-0.5 block text-xs leading-snug text-muted-foreground">
                   Usa o recorte da grade na tela
-                  {resumoCurto ? ` — ${resumoCurto}` : ""}
+                  {resumoCurto ? `: ${resumoCurto}` : ""}
                 </span>
               </span>
             </button>
@@ -202,7 +197,7 @@ export function RelatorioLinksMenu({
 
           {links.length === 0 ? (
             <p className="px-3.5 pb-3 text-xs leading-relaxed text-muted-foreground">
-              Nenhum link publicado ainda — o primeiro sai pelo “Novo link
+              Nenhum link publicado ainda. O primeiro sai pelo “Novo link
               público” acima.
             </p>
           ) : (
@@ -272,25 +267,27 @@ export function RelatorioLinksMenu({
                     </p>
                     {est === "ativo" && (
                       <div className="mt-2 flex flex-wrap gap-1.5">
-                        <button
+                        <Button
                           type="button"
-                          className={miniActCls}
+                          variant="outline"
+                          size="xs"
                           onClick={() => copiar(l.slug)}
                         >
-                          <Copy size={12} aria-hidden /> Copiar link
-                        </button>
+                          <Copy aria-hidden /> Copiar link
+                        </Button>
                         <a
                           href={`/resumo/${l.slug}`}
                           target="_blank"
                           rel="noreferrer"
                           aria-label={`Abrir “${l.titulo}” em nova aba`}
-                          className={miniActCls}
+                          className={buttonVariants({ variant: "outline", size: "xs" })}
                         >
-                          <ArrowSquareOut size={12} aria-hidden /> Abrir
+                          <ArrowSquareOut aria-hidden /> Abrir
                         </a>
-                        <button
+                        <Button
                           type="button"
-                          className={miniActCls}
+                          variant="outline"
+                          size="xs"
                           title={
                             l.protegido
                               ? "A senha atual para de valer na hora"
@@ -298,34 +295,36 @@ export function RelatorioLinksMenu({
                           }
                           onClick={() => setRedefinindo(l.id)}
                         >
-                          <Key size={12} aria-hidden />{" "}
+                          <Key aria-hidden />{" "}
                           {l.protegido ? "Redefinir senha" : "Definir senha"}
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                           type="button"
-                          className={cn(miniActCls, "text-destructive hover:border-destructive/50 hover:text-destructive")}
+                          variant="destructive"
+                          size="xs"
                           onClick={() => setRevogando(l.id)}
                         >
-                          <LinkBreak size={12} aria-hidden /> Revogar
-                        </button>
+                          <LinkBreak aria-hidden /> Revogar
+                        </Button>
                       </div>
                     )}
                     {est !== "ativo" && (
                       <div className="mt-2">
-                        <button
+                        <Button
                           type="button"
-                          className={miniActCls}
+                          variant="outline"
+                          size="xs"
                           onClick={() => copiar(l.slug)}
                         >
-                          <Copy size={12} aria-hidden /> Copiar link
-                        </button>
+                          <Copy aria-hidden /> Copiar link
+                        </Button>
                       </div>
                     )}
                     <ConfirmDeleteButton
                       open={revogando === l.id}
                       onOpenChange={(v) => setRevogando(v ? l.id : null)}
                       titulo="Revogar link público"
-                      descricao={`Quem tiver “${l.titulo}” perde o acesso na hora — o endereço deixa de abrir o relatório. O histórico de acessos é mantido.`}
+                      descricao={`Quem tiver “${l.titulo}” perde o acesso na hora. O endereço deixa de abrir o relatório. O histórico de acessos é mantido.`}
                       acao="Revogar"
                       sucesso="Link revogado."
                       onConfirm={async () => {
@@ -348,8 +347,8 @@ export function RelatorioLinksMenu({
                       }
                       descricao={
                         l.protegido
-                          ? `A senha atual de “${l.titulo}” para de valer na hora — quem a tiver perde o acesso. Geramos uma senha nova forte, que aparece uma única vez pra copiar.`
-                          : `“${l.titulo}” passa a pedir senha — quem tiver o endereço não abre mais direto. Geramos uma senha forte, que aparece uma única vez pra copiar.`
+                          ? `A senha atual de “${l.titulo}” para de valer na hora. Quem a tiver perde o acesso. Geramos uma senha nova forte, que aparece uma única vez pra copiar.`
+                          : `“${l.titulo}” passa a pedir senha. Quem tiver o endereço não abre mais direto. Geramos uma senha forte, que aparece uma única vez pra copiar.`
                       }
                       acao={l.protegido ? "Redefinir" : "Definir"}
                       sucesso={
@@ -368,7 +367,7 @@ export function RelatorioLinksMenu({
                         <ShieldCheck size={14} className="shrink-0" aria-hidden />
                         <span>
                           Nova senha{" "}
-                          <code className="font-semibold">{nova}</code> —
+                          <code className="font-semibold">{nova}</code>:
                           copie agora, ela não aparece de novo.
                         </span>
                         <button
@@ -411,7 +410,7 @@ export function RelatorioLinksMenu({
               <span className="min-w-0">
                 <span className="block text-sm font-medium">Ver acessos</span>
                 <span className="mt-0.5 block text-xs leading-snug text-muted-foreground">
-                  Aberturas e tentativas de senha — guardado por 13 meses
+                  Aberturas e tentativas de senha, guardadas por 13 meses
                 </span>
               </span>
             </button>
@@ -419,7 +418,7 @@ export function RelatorioLinksMenu({
 
           <p className="flex items-center gap-1.5 border-t border-border px-3.5 py-2 text-[11px] text-muted-foreground">
             <Lock size={11} aria-hidden />
-            Só dados operacionais saem por link — respostas de instrumentos
+            Só dados operacionais saem por link. Respostas de instrumentos
             nunca.
           </p>
         </PopoverContent>
@@ -488,7 +487,7 @@ function AcessosDialog({
         <DialogHeader>
           <DialogTitle>Acessos aos links</DialogTitle>
           <DialogDescription>
-            Aberturas e tentativas de senha do /resumo — guardado por 13
+            Aberturas e tentativas de senha do /resumo, guardadas por 13
             meses, mostrando os ~60 mais recentes. “Origem” é o pseudônimo
             do visitante (mesma sigla = mesmo acesso provável).
           </DialogDescription>

@@ -421,7 +421,7 @@ export function RespostasSection({
                       </Link>
                     ) : (
                       <span className="text-xs text-muted-foreground">
-                        Link genérico de antes da exigência de vínculo — diga
+                        Link genérico de antes da exigência de vínculo. Diga
                         de quem é a resposta pra ela contar na jornada.
                       </span>
                     )}

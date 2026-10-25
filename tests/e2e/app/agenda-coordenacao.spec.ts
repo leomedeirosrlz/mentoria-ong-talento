@@ -108,8 +108,10 @@ test.describe("agenda da coordenação — monitoramento e lembrete real (WP5/D5
     await expect(
       page.getByRole("heading", { name: "Agenda do programa" })
     ).toBeVisible();
+    // a postura da página virou a linha da semana (redesign sem parágrafo
+    // explicativo): "Semana N · D a D de Mês · hoje, {dia da semana}"
     await expect(
-      page.getByText("Monitoramento — a agenda de cada dupla é da dupla")
+      page.getByText(/Semana \d+ · \d+ a \d+ de .+ · hoje,/)
     ).toBeVisible();
 
     // abas links role=tab — Monitoramento selecionado por default
@@ -285,7 +287,7 @@ test.describe("agenda da coordenação — monitoramento e lembrete real (WP5/D5
           `&created_by=eq.${IDS.coordProfile}&created_at=gte.${t0}`
       );
       expect(notifs).toHaveLength(1);
-      expect(notifs[0].titulo).toMatch(/^Lembrete — /);
+      expect(notifs[0].titulo).toMatch(/^Lembrete: /);
       expect(notifs[0].href).toBe(`/duplas/${IDS.dupla2}`);
 
       // o cap de 48h chega na UI: refresh → a linha mostra "Lembrada dd/mm"
@@ -300,7 +302,7 @@ test.describe("agenda da coordenação — monitoramento e lembrete real (WP5/D5
       await expect(bloqueada).toBeDisabled();
       await expect(bloqueada).toHaveAttribute(
         "title",
-        /1 lembrete a cada 48h por dupla — destrava \d{2}\/\d{2}/
+        /^1 lembrete a cada 48h por dupla\. Destrava \d{2}\/\d{2}$/
       );
 
       // e o mesmo cap barra na RPC — segundo envio como coord devolve o

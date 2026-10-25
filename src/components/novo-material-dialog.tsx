@@ -291,9 +291,7 @@ export function NovoMaterialDialog({
             )}
           </fieldset>
           <div className="space-y-2">
-            <Label htmlFor="encontro_num">
-              Encontro relacionado (opcional)
-            </Label>
+            <Label htmlFor="encontro_num">Encontro (nº)</Label>
             <Input
               id="encontro_num"
               name="encontro_num"
@@ -305,7 +303,7 @@ export function NovoMaterialDialog({
               onChange={(e) => setEncontroNum(e.target.value)}
             />
             <p className="text-xs text-muted-foreground">
-              Agrupa o material na seção daquele encontro na biblioteca
+              Opcional. Agrupa o material na seção daquele encontro na biblioteca
               {audiencia === "especialista" ? " (a trilha tem 5)" : ""}.
               {audiencia === "todos"
                 ? " Pro jovem, libera quando a dupla chegar nele."

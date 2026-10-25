@@ -50,11 +50,12 @@ export function SolicitacaoStatusChip({
       );
     case "sugerida":
       // WP6: a sugestão do mentor espera a resposta do jovem — ainda não é
-      // pedido (não entra na mesa nem nos tetos)
+      // pedido (não entra na mesa nem nos tetos). Neutro: é espera, não
+      // alerta — laranja fica pra atenção da dupla
       return (
         <Badge
           variant="outline"
-          className="border-[var(--warn)]/60 text-[var(--warn-text)]"
+          className="border-[var(--pausa-border)] bg-[var(--pausa-bg)] text-[var(--pausa-text)]"
         >
           Sugestão com o jovem
         </Badge>

@@ -4,7 +4,6 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { BarraSegmentada } from "../src/components/viz/barra-segmentada";
 import { Sparkline } from "../src/components/viz/sparkline";
-import { Donut } from "../src/components/viz/donut";
 
 describe("viz kit — render sem explodir", () => {
   it("BarraSegmentada desenha fração literal do denominador + neutro", () => {
@@ -51,22 +50,5 @@ describe("viz kit — render sem explodir", () => {
     expect(html).toContain("var(--warn)"); // ponto de atenção
     expect(html).toContain('role="img"');
     expect(html).toContain("sem dado"); // buraco narrado no aria-label
-  });
-
-  it("Donut renderiza fatias + total no centro + legenda com zeros", () => {
-    const html = renderToStaticMarkup(
-      createElement(Donut, {
-        fatias: [
-          { valor: 19, rotulo: "em andamento", cor: "var(--ok)" },
-          { valor: 0, rotulo: "com apoio aberto", cor: "var(--info)" },
-          { valor: 2, rotulo: "em risco", cor: "var(--danger)" },
-        ],
-        rotuloCentro: "duplas",
-      })
-    );
-    expect(html).toContain("stroke-dasharray");
-    expect(html).toContain(">21<"); // total no centro
-    expect(html).toContain("com apoio aberto"); // zero fica na legenda
-    expect(html).toContain("Rosca:");
   });
 });

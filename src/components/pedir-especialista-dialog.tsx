@@ -261,7 +261,7 @@ export function PedirEspecialistaDialog({
           <DialogTitle>Pedir apoio de um especialista</DialogTitle>
         </DialogHeader>
         <DialogDescription className="leading-relaxed">
-          Especialistas são mentors pra temas pontuais — uma prova, um
+          Especialistas são mentores pra temas pontuais: uma prova, um
           projeto, uma decisão. Você manda o pedido, a pessoa responde e
           vocês marcam a sessão juntos.
         </DialogDescription>
@@ -358,7 +358,7 @@ export function PedirEspecialistaDialog({
               ) : slotsDoEsp.length === 0 ? (
                 <p className="text-xs leading-relaxed text-muted-foreground">
                   {primeiro(esp.nome_social || esp.nome)} não abriu horários
-                  livres nas próximas semanas — manda o pedido e quem aceita
+                  livres nas próximas semanas. Manda o pedido e quem aceita
                   propõe um horário com você.
                 </p>
               ) : (
@@ -385,8 +385,8 @@ export function PedirEspecialistaDialog({
 
           {modo === "qualquer" && (
             <p className="rounded-lg border border-dashed border-border px-3 py-2 text-xs leading-relaxed text-muted-foreground">
-              Seu nome e o pedido aparecem no mural de todos os especialistas
-              — quem puder te atender aceita e propõe um horário.
+              Seu nome e o pedido aparecem no mural de todos os especialistas.
+              Quem puder te atender aceita e propõe um horário.
             </p>
           )}
 
@@ -413,7 +413,7 @@ export function PedirEspecialistaDialog({
                     rows={4}
                     value={texto}
                     onChange={(e) => setTexto(e.target.value)}
-                    placeholder="Conta por que você quer esse apoio — o especialista lê isso antes de aceitar."
+                    placeholder="Conta por que você quer esse apoio. O especialista lê isso antes de aceitar."
                   />
                   <p className="text-xs text-muted-foreground">
                     Mínimo de 10 caracteres.
@@ -498,7 +498,7 @@ export function JovemEspSlots({
             <li key={s}>
               <button
                 type="button"
-                title={`Pedir sessão ${rotuloSlot(s)}${compat ? " — encaixa com você" : ""}`}
+                title={`Pedir sessão ${rotuloSlot(s)}${compat ? " · encaixa com você" : ""}`}
                 onClick={() => {
                   setSlotSel(s);
                   setOpen(true);

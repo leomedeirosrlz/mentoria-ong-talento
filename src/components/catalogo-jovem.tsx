@@ -72,7 +72,7 @@ export function CatalogoJovem({
       {catalogo.length === 0 ? (
         <Card>
           <CardContent className="py-5 text-sm text-muted-foreground">
-            Ainda não tem especialista disponível — a coordenação avisa
+            Ainda não tem especialista disponível. A coordenação avisa
             quando entrar alguém.
           </CardContent>
         </Card>

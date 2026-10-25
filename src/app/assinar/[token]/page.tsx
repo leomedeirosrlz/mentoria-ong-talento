@@ -73,7 +73,7 @@ function AvisoDemo({ className }: { className?: string }) {
       className={`flex items-center justify-center gap-1.5 text-xs text-muted-foreground ${className ?? ""}`}
     >
       <Flask size={13} aria-hidden />
-      Demonstração — nada aqui é assinado de verdade.
+      Demonstração: nada aqui é assinado de verdade.
     </p>
   );
 }
@@ -219,7 +219,7 @@ export default async function AssinarTokenPage({
           <strong className="font-semibold text-foreground">
             {info.alvo.nome}
           </strong>{" "}
-          precisa ser assinada pelo responsável legal — ele não tem conta na
+          precisa ser assinada pelo responsável legal, que não tem conta na
           plataforma. Encaminhe este link para a pessoa responsável abrir no
           celular dela.
         </p>

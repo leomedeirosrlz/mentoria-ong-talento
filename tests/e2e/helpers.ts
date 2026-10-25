@@ -20,6 +20,31 @@ export const test = base.extend({
         })
       );
     }
+    // Carga de página inteira faz streaming: o loading.tsx (que espelha a
+    // anatomia — mesmo título, mesmas seções) fica no <main> e a página pronta
+    // chega num <div id="S:N" hidden> no fim do body até o React trocar (~300ms
+    // local, mais no CI). Nesse intervalo todo texto existe 2x no DOM e asserção
+    // estrita acusa "resolved to 2 elements". Esperar o fim da troca depois de
+    // goto/reload fecha a janela pra todo spec; navegação client-side (Link)
+    // não gera S:N. Sem troca em 15s o teste segue e a própria asserção decide.
+    const esperarStream = () =>
+      page
+        .waitForFunction(() => !document.querySelector('div[hidden][id^="S:"]'), null, {
+          timeout: 15_000,
+        })
+        .catch(() => {});
+    const goto = page.goto.bind(page);
+    page.goto = async (...args: Parameters<Page["goto"]>) => {
+      const resp = await goto(...args);
+      await esperarStream();
+      return resp;
+    };
+    const reload = page.reload.bind(page);
+    page.reload = async (...args: Parameters<Page["reload"]>) => {
+      const resp = await reload(...args);
+      await esperarStream();
+      return resp;
+    };
     await provide(page);
   },
 });

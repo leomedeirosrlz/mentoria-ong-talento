@@ -46,7 +46,7 @@ function GrupoLabel({ id, children }: { id: string; children: string }) {
   return (
     <span
       id={id}
-      className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground"
+      className="text-xs sm:text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground"
     >
       {children}
     </span>
@@ -348,7 +348,7 @@ export function RelatorioBuilder({
           <div className="ml-auto flex flex-wrap items-center justify-end gap-x-3 gap-y-1">
             {editando && (
               <span className="animate-in fade-in text-xs text-muted-foreground duration-150">
-                Clique numa célula pra editar — Enter confirma, Esc desfaz
+                Clique numa célula pra editar. Enter confirma, Esc desfaz
               </span>
             )}
             <button

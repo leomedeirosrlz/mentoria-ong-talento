@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { createContext, useContext, useState, useTransition, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import {
   ArrowsCounterClockwise,
@@ -42,13 +43,30 @@ const PAPEL_ICON: Record<AppRole, Icon> = {
   mentorado: Student,
 };
 
+/** Encaixe do desktop. O shell (AppShell / JovemShell) publica o nó do rodapé
+ *  da sidebar: a pílula "float" entra ali em vez de flutuar sobre o conteúdo.
+ *  undefined = sem shell (wizard de onboarding) → pílula fixa de canto;
+ *  null = shell ainda sem o nó montado → não renderiza (evita piscar sobre a
+ *  página no primeiro paint). */
+const DemoSlotContext = createContext<HTMLElement | null | undefined>(undefined);
+
+export function DemoSlotProvider({
+  alvo,
+  children,
+}: {
+  alvo: HTMLElement | null;
+  children: ReactNode;
+}) {
+  return <DemoSlotContext.Provider value={alvo}>{children}</DemoSlotContext.Provider>;
+}
+
 /** Pill do modo demo — montada pelo layout do (app) quando o cookie
  *  demo_role está ativo, inclusive por cima do OnboardingFlow. As actions já
  *  navegam (redirect na server action); aqui só fecha o popover e toasta erro.
- *  variant="float": pill fixa no canto (só desktop — o layout embrulha em
- *  hidden md:block). variant="dock": pill compacta que vive dockada no
- *  header mobile / no header do wizard — não cobre conteúdo nem colide com
- *  toast, e substitui o span de papel que truncava. */
+ *  variant="float": pill do desktop — dentro de um shell ela vive no rodapé da
+ *  sidebar (ocupa lugar no layout); fora dele (onboarding) fica fixa no canto.
+ *  Nunca fica por cima do conteúdo. variant="dock": pill compacta que vive
+ *  dockada no header mobile / no header do wizard. */
 export function DemoBar({
   papel,
   personas,
@@ -60,7 +78,9 @@ export function DemoBar({
 }) {
   const [aberto, setAberto] = useState(false);
   const [pending, start] = useTransition();
+  const alvo = useContext(DemoSlotContext);
   const dock = variant === "dock";
+  const naSidebar = !dock && !!alvo;
 
   function executar(acao: () => Promise<{ error: string } | void>) {
     start(async () => {
@@ -70,8 +90,11 @@ export function DemoBar({
     });
   }
 
+  const rotulo = `Demo · ${papelLabel(papel)}`;
+
   const trigger = (
-    /* inversão de marca (ink sobre lime) = "modo alternativo", não chrome do app */
+    /* tinta, não lima: na sidebar a pill fica perto do item ativo e lima é
+       reservado à ação/navegação ativa; o frasco em amarelo marca "demo" */
     <PopoverTrigger
       aria-label={
         dock
@@ -79,21 +102,27 @@ export function DemoBar({
           : "Controles da demonstração"
       }
       className={cn(
-        "flex items-center rounded-full bg-[var(--brand-ink)] font-semibold text-[var(--brand-lime)] ring-1 ring-foreground/10 outline-none transition-transform hover:scale-[1.03] focus-visible:ring-2 focus-visible:ring-[var(--brand-lime)] active:scale-[0.97]",
-        dock
-          ? "min-h-11 gap-1.5 px-3 text-xs"
-          : "gap-2 px-4 py-2.5 text-sm shadow-lg"
+        "flex items-center rounded-full bg-[var(--brand-ink)] font-semibold text-white ring-1 ring-foreground/10 outline-none transition-transform hover:scale-[1.03] focus-visible:ring-2 focus-visible:ring-[var(--brand-lime)] focus-visible:ring-offset-2 active:scale-[0.97]",
+        dock && "min-h-11 gap-1.5 px-3 text-xs",
+        naSidebar && "min-h-11 w-full gap-2 px-3 text-sm",
+        !dock && !naSidebar && "gap-2 px-4 py-2.5 text-sm shadow-lg"
       )}
     >
       {/* o popover fecha no clique, então o "trabalhando" mora na pill — sem
           ele a troca de papel parece não pegar enquanto a action+redirect roda */}
       {pending ? (
-        <CircleNotch size={dock ? 14 : 15} className="animate-spin" aria-hidden />
+        <CircleNotch size={dock ? 14 : 15} className="shrink-0 animate-spin" aria-hidden />
       ) : (
-        <Flask size={dock ? 14 : 15} weight="fill" aria-hidden />
+        <Flask size={dock ? 14 : 15} weight="fill" className="shrink-0 text-[var(--destaque)]" aria-hidden />
       )}
-      {/* nowrap: no header mobile o flex espremeria a pill em 2 linhas */}
-      <span className="whitespace-nowrap">{dock ? "Demo" : `Demo · ${papelLabel(papel)}`}</span>
+      {/* nowrap: no header mobile o flex espremeria a pill em 2 linhas; na
+          sidebar o rótulo trunca e o título completo fica no tooltip */}
+      <span
+        className={cn("whitespace-nowrap", naSidebar && "min-w-0 flex-1 truncate text-left")}
+        title={naSidebar ? rotulo : undefined}
+      >
+        {dock ? "Demo" : rotulo}
+      </span>
       {dock ? (
         <CaretDown
           size={12}
@@ -106,7 +135,7 @@ export function DemoBar({
           size={13}
           weight="bold"
           aria-hidden
-          className={cn("transition-transform duration-200", aberto && "rotate-180")}
+          className={cn("shrink-0 transition-transform duration-200", aberto && "rotate-180")}
         />
       )}
     </PopoverTrigger>
@@ -118,14 +147,16 @@ export function DemoBar({
           a pill não pode ficar escondida em nenhum estado da demo */}
       {dock ? (
         trigger
-      ) : (
+      ) : alvo === undefined ? (
         <div className="fixed right-4 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-50 md:bottom-6">
           {trigger}
         </div>
-      )}
+      ) : alvo ? (
+        createPortal(<div className="mb-3">{trigger}</div>, alvo)
+      ) : null}
       <PopoverContent
         side={dock ? "bottom" : "top"}
-        align={dock ? "start" : "end"}
+        align={dock || naSidebar ? "start" : "end"}
         sideOffset={8}
         className="w-72 max-w-[calc(100vw-2rem)] p-0"
       >

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CaretDown } from "@phosphor-icons/react/dist/ssr";
+import { GuiaPopover } from "@/components/guia-popover";
 import type { ItemPrograma, TipoItemPrograma } from "@/lib/agenda-coordenacao";
 import { formatDate } from "@/lib/ciclo";
 import { dowCurto, PillTurma, Tag } from "@/components/agenda-partes";
@@ -105,7 +105,7 @@ function CardPrograma({
         )}
       </div>
 
-      <h3 className="mt-2 text-sm leading-snug font-semibold">
+      <h3 className="mt-2 line-clamp-2 text-sm leading-snug font-semibold">
         {comLinkDia ? (
           <Link
             href={href}
@@ -118,7 +118,12 @@ function CardPrograma({
         )}
       </h3>
       {item.detalhe && (
-        <p className="mt-0.5 text-xs text-muted-foreground">{item.detalhe}</p>
+        <p
+          className="mt-0.5 truncate text-xs text-muted-foreground"
+          title={item.detalhe}
+        >
+          {item.detalhe}
+        </p>
       )}
       {item.aviso && (
         <p className="mt-1.5">
@@ -126,19 +131,23 @@ function CardPrograma({
         </p>
       )}
 
-      {/* tema da semana: título editorial + fase + chips de instrumento
-          (os nomes que o cronograma declara — a fonte é ciclo_eventos,
-          não dicionário nosso) */}
+      {/* tema da semana: título editorial + fase em uma linha de meta +
+          chips de instrumento (os nomes que o cronograma declara — a fonte
+          é ciclo_eventos, não dicionário nosso) */}
       {item.tema && (
         <div className="mt-2">
-          <p className="text-[13px] leading-snug font-medium">
-            “{item.tema.titulo}”
+          <p
+            className="truncate text-xs"
+            title={`${item.tema.titulo}${item.tema.fase ? ` · ${item.tema.fase}` : ""}`}
+          >
+            <span className="font-medium">“{item.tema.titulo}”</span>
+            {item.tema.fase && (
+              <span className="text-muted-foreground">
+                {" "}
+                · {item.tema.fase}
+              </span>
+            )}
           </p>
-          {item.tema.fase && (
-            <p className="mt-0.5 text-[11px] text-muted-foreground">
-              {item.tema.fase}
-            </p>
-          )}
           {item.tema.instrumentos.length > 0 && (
             <p className="mt-1.5 flex flex-wrap gap-1">
               {item.tema.instrumentos.map((i) => (
@@ -154,31 +163,21 @@ function CardPrograma({
         </div>
       )}
 
-      {/* condução atrás de <details> nativo — disclosure com teaser,
-          sem estado JS; voz por papel (conduzir × cobre) */}
+      {/* condução em popover: o texto do guia é um parágrafo inteiro e,
+          expandido no card, virava coluna estreita e alta; o card não muda
+          de tamanho. Voz por papel (conduzir × cobre) */}
       {guia && (
-        <details className="group mt-2 border-t border-border/60 pt-1.5">
-          <summary className="flex min-h-11 cursor-pointer list-none items-center gap-1.5 rounded-md text-xs font-medium text-muted-foreground select-none hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-8 [&::-webkit-details-marker]:hidden">
-            <CaretDown
-              aria-hidden
-              size={12}
-              className="shrink-0 transition-transform group-open:rotate-180"
-            />
-            {guia.rotulo}
-            <span className="min-w-0 flex-1 truncate text-right font-normal group-open:hidden">
-              {guia.texto.slice(0, 42).trimEnd()}…
-            </span>
-          </summary>
-          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-            {guia.texto}
-          </p>
-        </details>
+        <div className="mt-2 border-t border-border/60 pt-1">
+          <GuiaPopover rotulo={guia.rotulo} texto={guia.texto} titulo={item.titulo} />
+        </div>
       )}
 
       {/* rodapé: nota contextual + ação da coordenação (chamada só no
-          dia e só pra quem tem o painel — `podeChamada` resolve no RSC) */}
+          dia e só pra quem tem o painel — `podeChamada` resolve no RSC).
+          Encosta no conteúdo (mt-2.5): com items-start no scroller cada
+          card mede só a própria altura — não existe "fundo" pra empurrar */}
       {(item.nota || (item.eventoId && ehHoje && podeChamada)) && (
-        <p className="mt-auto flex items-center gap-2 border-t border-border/60 pt-2 text-xs text-muted-foreground">
+        <p className="mt-2.5 flex items-center gap-2 border-t border-border/60 pt-2 text-xs text-muted-foreground">
           {item.nota && <span className="min-w-0 flex-1">{item.nota}</span>}
           {item.eventoId && ehHoje && podeChamada && (
             <Link
@@ -194,15 +193,13 @@ function CardPrograma({
   );
 }
 
-/** A faixa completa — heading + caption + scroller. `ariaLabel` nomeia a
- *  seção (a spec e o leitor de tela leem "Semana do programa" / "Minha
- *  agenda"). */
+/** A faixa completa — heading + scroller. `ariaLabel` nomeia a seção (a
+ *  spec e o leitor de tela leem "Semana do programa" / "Minha agenda"). */
 export function SemanaDoPrograma({
   itens,
   hoje,
   modo,
   titulo,
-  nota,
   ariaLabel,
   sufixoVisao = "",
   comLinkDia = true,
@@ -213,7 +210,6 @@ export function SemanaDoPrograma({
   hoje: string;
   modo: "coord" | "mentor";
   titulo: string;
-  nota?: string;
   ariaLabel: string;
   sufixoVisao?: string;
   /** false ⇒ os cards são leitura pura — sem link `?dia=` e sem
@@ -225,7 +221,6 @@ export function SemanaDoPrograma({
   return (
     <section aria-label={ariaLabel}>
       <h2 className="text-base font-semibold">{titulo}</h2>
-      {nota && <p className="mt-0.5 text-xs text-muted-foreground">{nota}</p>}
       {itens.length === 0 ? (
         <p className="mt-3 rounded-xl border border-dashed px-4 py-3 text-sm text-muted-foreground">
           Nada marcado na semana do programa.
@@ -233,12 +228,12 @@ export function SemanaDoPrograma({
       ) : (
         <div
           role="region"
-          aria-label={`${titulo} — role horizontalmente`}
+          aria-label={`${titulo}. Role horizontalmente`}
           tabIndex={0}
           className="scroll-fina -mx-4 mt-3 overflow-x-auto px-4 pb-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           style={FADE_LATERAL}
         >
-          <ul className="flex w-max snap-x snap-proximity gap-3">
+          <ul className="flex w-max snap-x snap-proximity items-start gap-3">
             {itens.map((item) => (
               <CardPrograma
                 key={item.id}

@@ -5,38 +5,43 @@ import { entrarNaDemo, expect, test } from "../helpers";
 // de 2s), 1º "Semana do programa" (os oficiais do seg–dom em cards de
 // scroll lateral — tema, instrumentos e "o que cobre" atrás de <details>),
 // 2º "Números da semana" (cobertura honesta por turma — denominador
-// literal com "sem data" visível — semáforo com o eixo azul do apoio e o
-// pulso de registro com a ★ do jovem; o recorte T1/T2/Todas é estado
+// literal com "sem data" visível — "Situação das duplas" (o SaudePrograma
+// de /duplas: apoio em pill à parte, regras no popover "Como calculamos")
+// e o pulso de registro com a ★ do jovem; o recorte T1/T2/Todas é estado
 // próprio da seção), e por último o "Painel da semana" — a fila "Para
-// acompanhar" (badges por dimensão — vermelho só no acompanhamento —,
-// chips que filtram de verdade, agrupamento críticas × demais e o Lembrar
-// universal com o cap D5 de 48h). A coordenação NÃO agenda por ninguém:
-// a única ação sobre dupla aqui é o nudge.
+// acompanhar" na linha canônica DuplaLinha (pill de situação + pill de
+// apoio + motivo em texto — o vermelho mora no risco, não num badge —,
+// chips com contador que filtram de verdade, agrupamento Urgentes × Demais
+// e o Lembrar universal com o cap D5 de 48h). A coordenação NÃO agenda por
+// ninguém: a única ação sobre dupla aqui é o nudge.
 //
 // Dataset demo (src/lib/demo/data.ts):
 //   · vigentes da semana: enc. 5 da T1 e enc. 1 da T2 — as duas turmas rolam
 //     a mesma terça, a T2 começou agora (o desencontro é o caso que a tela
 //     foi desenhada pra explicar)
-//   · d-risco (Dandara · Fernanda): pedido de apoio → badge danger "Apoio
-//     pedido" + atraso warn ("N encontros atrasados" — 2 na maior parte da
-//     semana, 3 na terça antes das 19h quando o enc. 5 entra na conta) +
-//     combinado vencido; nudge da Marina há ~20h → cap D5 ativo: linha
-//     esmaecida "aguardando a dupla" + botão BLOQUEADO "Lembrada dd/mm"
-//   · d-pend (Caio · Carlos): sem row do enc. 5 + registro do 4 pendente →
-//     badges "sem data" (até seg) / "1 encontro atrasado" (de terça em
-//     diante o vigente já vencido conta) + "registro pendente"; "Lembrar
-//     registro" livre (o nudge dela tem 5 dias)
-//   · d-atraso (Eduardo · João): 1 atraso + enc. 5 em limbo; d-t2c (Matheus
-//     · Ricardo): limbo + registro do 2 pendente → "Lembrar" livre
-//   · d-esp3 (Eduardo · Sofia): trilha de especialista com registro do 1º
-//     passo pendente — entra na fila como "Lembrar registro"; depois das
-//     19h30 o 2º passo cai em limbo e o rótulo vira "Lembrar" (a regex cobre
-//     os dois)
-//   · d-rito (Gustavo · Ricardo): a concluída com o rito de encerramento
-//     aberto — pendência da coordenação, CTA "Concluir rito" linkando a
-//     ficha (REALIZA-172)
+//   · d-risco (Fernanda Alves e Dandara Souza): pedido de apoio → pill
+//     "Apoio pedido" (danger, origem no title) + lead de atraso no motivo
+//     ("N encontros atrasados" — 2 na maior parte da semana, 3 na terça
+//     antes das 19h quando o enc. 5 entra na conta); nudge da Marina há
+//     ~20h → cap D5 ativo: meta "aguardando a dupla" + botão BLOQUEADO
+//     "Lembrada dd/mm"
+//   · d-pend (Carlos Menezes e Caio Henrique Oliveira): sem row do enc. 5
+//     + registro do 4 pendente → motivo "Encontro 5 ... ainda sem data"
+//     (até seg) / "1 encontro atrasado" (de terça em diante o vigente já
+//     vencido conta) + "Registro do Nº encontro pendente"; "Chamar" livre
+//     (o pedido de apoio é do jovem → o nudge vai pro mentorado)
+//   · d-atraso (João Pedro Vital e Eduardo Lima): 1 atraso + enc. 5 em
+//     limbo; d-t2c (Ricardo Tavares e Matheus Gonçalves): limbo + registro
+//     do 2 pendente → "Lembrar registro" livre
+//   · d-esp3 (Sofia Nogueira e Eduardo Lima): trilha de especialista com
+//     registro do 1º passo pendente — entra na fila como "Lembrar
+//     registro"; depois das 19h30 o 2º passo cai em limbo e o rótulo vira
+//     "Lembrar" (a regex cobre os dois)
+//   · d-rito (Ricardo Tavares e Gustavo Batista): a concluída com o rito
+//     de encerramento aberto — pendência da coordenação, CTA "Concluir
+//     rito" linkando a ficha (REALIZA-172)
 // Público, sem writes: o LembreteButton do modo demo responde o toast
-// "Modo demo — nada é enviado de verdade." — a superfície vale em qualquer
+// "Modo demo: nada é enviado de verdade." — a superfície vale em qualquer
 // deploy, produção inclusive.
 
 // uid(0x0602) — dupla do Caio, id estável do dataset demo
@@ -62,9 +67,15 @@ test.describe("agenda demo da coordenação — Monitoramento (WP5)", () => {
     await expect(
       page.getByRole("heading", { name: "Agenda do programa" })
     ).toBeVisible();
-    // a etiqueta da postura — monitora e faz nudge, nunca agenda pela dupla
+    // a etiqueta de postura saiu com o polimento (a UI não se explica em
+    // parágrafo) — a leitura do topo virou a semana corrente + a faixa de
+    // síntese, e o contrato "a dupla agenda, a coordenação faz nudge" é
+    // coberto pelo teste "coordenação não agenda" abaixo
     await expect(
-      page.getByText("Monitoramento — a agenda de cada dupla é da dupla")
+      page.getByText(/Semana \d+ · \d+ a \d+ de \w+ · hoje,/)
+    ).toBeVisible();
+    await expect(
+      page.getByRole("note", { name: "Síntese do monitoramento" })
     ).toBeVisible();
 
     // as abas são links com role=tab + aria-selected — deep-link por ?aba=
@@ -109,13 +120,13 @@ test.describe("agenda demo da coordenação — Monitoramento (WP5)", () => {
       sec.getByRole("heading", { name: "Números da semana" })
     ).toBeVisible();
 
-    // os três eixos do mock: cobertura do vigente por turma, semáforo das
-    // duplas (rosca) e pulso de registro
+    // os três eixos do mock: cobertura do vigente por turma, situação das
+    // duplas (o SaudePrograma de /duplas) e pulso de registro
     await expect(
       sec.getByRole("heading", { name: "Cobertura do encontro da semana" })
     ).toBeVisible();
     await expect(
-      sec.getByRole("heading", { name: "Semáforo das duplas" })
+      sec.getByRole("heading", { name: "Situação das duplas" })
     ).toBeVisible();
     await expect(
       sec.getByRole("heading", { name: "Pulso da semana" })
@@ -159,7 +170,7 @@ test.describe("agenda demo da coordenação — Monitoramento (WP5)", () => {
     // em vez de chumbar o número da semana.
     const barraT2Label =
       (await linhaT2.getByRole("img").getAttribute("aria-label")) ?? "";
-    const mT2 = barraT2Label.match(/(\d) com registro.*— total (\d)/);
+    const mT2 = barraT2Label.match(/(\d) com registro.*· total (\d)/);
     await expect(linhaT2).toContainText(
       `${mT2?.[1] ?? "?"} de ${mT2?.[2] ?? "?"} com registro`
     );
@@ -173,12 +184,12 @@ test.describe("agenda demo da coordenação — Monitoramento (WP5)", () => {
     if (t1Vigente5) {
       await expect(barraT1).toHaveAttribute(
         "aria-label",
-        /3 (agendadas|aguardando registro), 1 sem data — total 4/
+        /3 (agendadas|aguardando registro), 1 sem data · total 4/
       );
     } else {
       await expect(barraT1).toHaveAttribute(
         "aria-label",
-        "1 com registro, 1 aguardando registro, 1 não aconteceu, 1 sem data — total 4"
+        "1 com registro, 1 aguardando registro, 1 não aconteceu, 1 sem data · total 4"
       );
     }
     await expect(linhaT2.getByRole("img")).toHaveAttribute(
@@ -186,28 +197,29 @@ test.describe("agenda demo da coordenação — Monitoramento (WP5)", () => {
       /\d com registro, \d (agendadas|aguardando registro)/
     );
 
-    // o hint do desencontro vive na intro do Painel da semana — "por
-    // turma, nunca misturado" continua sendo o contrato
-    const painel = page.locator('section[aria-label="Painel da semana"]');
-    await expect(
-      painel.getByText(/As turmas não começaram juntas/)
-    ).toBeVisible();
-    await expect(
-      painel.getByText(/Turma 1 está no encontro [45]/)
-    ).toBeVisible();
-    await expect(
-      painel.getByText(/Turma 2 está no encontro 1/)
-    ).toBeVisible();
+    // a intro explicativa do Painel saiu com o polimento — o desencontro
+    // das turmas é dito pela própria cobertura (uma linha por turma, cada
+    // uma com o vigente dela: os links "Encontro [45]" × "Encontro 1"
+    // acima já cobrem o contrato "por turma, nunca misturado")
 
-    // (b) semáforo — a rosca inclui o eixo azul do apoio (trabalho a
-    // fazer, não estado) e a nota aponta a fila certa (/chamados)
-    await expect(sec.getByText(/com apoio aberto/)).toBeVisible();
+    // (b) situação das duplas — o apoio é pill à parte (trabalho a fazer,
+    // não estado da dupla) e as regras da leitura vivem no popover "Como
+    // calculamos", nunca fixas na tela. O link pra fila do apoio mudou de
+    // lugar: agora é o "N pedidos de apoio" da síntese (assert do teste da
+    // fila), não mais um "Chamados →" dentro do card
+    const saude = sec.locator('section[aria-label="Situação das duplas"]');
+    await expect(saude.getByText(/com apoio aberto/)).toBeVisible();
+    await saude
+      .getByRole("button", { name: /Como calculamos/ })
+      .click();
     await expect(
-      sec.getByText(/Apoio aberto é trabalho, não estado da dupla/)
+      page.getByText(
+        /Pedido de apoio do mentor ou do jovem\. Não muda a situação da dupla/
+      )
     ).toBeVisible();
-    await expect(
-      sec.getByRole("link", { name: "Chamados →" })
-    ).toHaveAttribute("href", "/chamados");
+    // o popover mora num portal fora da seção — fecha antes de seguir pra
+    // não segurar o clique do recorte mais abaixo
+    await page.keyboard.press("Escape");
 
     // (c) pulso — "N de M registros entregues" + a média ★ do jovem +
     // lembretes nas últimas 48h (o do Dandara foi há ~20h — é ele que
@@ -216,6 +228,9 @@ test.describe("agenda demo da coordenação — Monitoramento (WP5)", () => {
     // o contador do pulso — "N aguardando" (a barra de cobertura também
     // tem "aguardando registro" na legenda; o dígito desambigua)
     await expect(sec.getByText(/\d+ aguardando$/)).toBeVisible();
+    await expect(
+      sec.getByText(/média das avaliações dos jovens/)
+    ).toBeVisible();
     await expect(
       sec.getByText(/1 lembrete enviado nas últimas 48h/)
     ).toBeVisible();
@@ -241,37 +256,54 @@ test.describe("agenda demo da coordenação — Monitoramento (WP5)", () => {
     page,
   }) => {
     // a fila mora dentro do "Painel da semana" como role=group nomeado
-    // (REALIZA-195): o heading leva a contagem viva "Para acompanhar · N"
+    // (REALIZA-195): o heading leva a contagem viva "Para acompanhar · N";
+    // a frase de escopo saiu da tela pro title do grupo (o polimento tirou
+    // os parágrafos explicativos — o domínio segue acessível ali)
     const fila = page.locator(
       '[role="group"][aria-label="Duplas para acompanhar"]'
     );
     await expect(
       fila.getByRole("heading", { name: /^Para acompanhar/ })
     ).toBeVisible();
-    await expect(fila.getByText(/Sem agendamento ou atrasadas/)).toBeVisible();
+    await expect(fila).toHaveAttribute(
+      "title",
+      /Sem agendamento ou atrasadas/
+    );
 
     // a faixa de síntese no topo — leitura de 2s: total casa com as linhas
-    // renderizadas e 1 lembrete preso no cap. As críticas saem do DOM —
-    // a Dandara é a estável, mas o Caio também traz "Apoio pedido" (o
-    // pedido é do JOVEM dele) quando a linha dele entra com o relógio
-    // do enc. 4 — número fixo aqui quebraria seg/ter
-    const sintese = page.locator('p[aria-label="Síntese do monitoramento"]');
+    // renderizadas e 1 lembrete preso no cap. Sem seleção a fila se divide
+    // em "Urgentes" (a dimensão acompanhamento em danger: apoio aberto ou
+    // avaliação baixa com dificuldade) × "Demais duplas" — a conta honesta
+    // sai do grupo renderizado, porque nem toda urgente carrega a pill de
+    // apoio. Número chumbado quebraria seg/ter com o relógio do enc. 4
+    const sintese = page.getByRole("note", {
+      name: "Síntese do monitoramento",
+    });
     await expect(sintese).toBeVisible();
     const nLinhas = await fila.locator("li").count();
-    const nCriticas =
-      (await fila.locator('li span[title^="pedido"]').count()) +
-      (await fila
-        .getByText("Acompanhamento crítico", { exact: true })
-        .count());
+    const cabUrgentes = fila.getByRole("heading", {
+      name: /^Urgentes \(\d+\)$/,
+    });
+    await expect(cabUrgentes).toBeVisible();
+    const nUrgentes = await cabUrgentes
+      .locator("xpath=..")
+      .locator("li")
+      .count();
     await expect(sintese).toContainText(`${nLinhas} para acompanhar`);
     await expect(sintese).toContainText(
-      `${nCriticas} ${nCriticas === 1 ? "crítica" : "críticas"}`
+      `${nUrgentes} ${nUrgentes === 1 ? "urgente" : "urgentes"}`
     );
-    await expect(sintese).toContainText(`${nLinhas - nCriticas} atenção`);
     await expect(sintese).toContainText(/\d+ sem agendamento/);
+    // o badge "registro pendente" virou texto do motivo — a linha lê
+    // "Registro d@ Nº encontro/sessão pendente" direto (a pendência é o
+    // que encabeça o motivo; o limbo diz "...agendado já passou. Falta o
+    // registro" e conta no sem agendamento, não aqui — mesmo predicado da
+    // síntese)
     const nRegistros = await fila
       .locator("li")
-      .getByText("registro pendente", { exact: true })
+      .filter({
+        hasText: /Registro d[oa] \d+[ºª] (encontro|sessão) pendente/,
+      })
       .count();
     await expect(sintese).toContainText(
       `${nRegistros} ${nRegistros === 1 ? "registro pendente" : "registros pendentes"}`
@@ -285,40 +317,31 @@ test.describe("agenda demo da coordenação — Monitoramento (WP5)", () => {
     await expect(linkApoio).toBeVisible();
     await expect(linkApoio).toHaveAttribute("href", "/chamados");
 
-    // sem seleção a fila se divide: "Precisam de intervenção" (danger no
-    // acompanhamento) encabeça, o resto cai em "Demais duplas"
+    // o segundo grupo fecha a conta com o total de linhas
     await expect(
       fila.getByRole("heading", {
-        name: `Precisam de intervenção (${nCriticas})`,
-      })
-    ).toBeVisible();
-    await expect(
-      fila.getByRole("heading", {
-        name: `Demais duplas (${nLinhas - nCriticas})`,
+        name: `Demais duplas (${nLinhas - nUrgentes})`,
       })
     ).toBeVisible();
 
-    // d-risco — badges por dimensão: "Apoio pedido" é o ÚNICO danger (a
-    // origem mentor sai no title); o atraso sai warn, nunca vermelho; o
-    // combinado vencido é operacional
-    const risco = fila.locator("li", { hasText: "Dandara · Fernanda" });
+    // d-risco — a linha canônica: a pill "Apoio pedido" é o único danger
+    // (a origem mentor sai no title); o atraso vem no motivo, nunca em
+    // badge vermelho; o combinado vencido saiu da linha (dimensão
+    // operacional não é motivo — mora na ficha)
+    const risco = fila.locator("li", { hasText: "Dandara Souza" });
     const apoio = risco.locator('span[title="pedido do mentor"]');
     await expect(apoio).toBeVisible();
     await expect(apoio).toContainText("Apoio pedido");
     // 2 atrasados na maior parte da semana — na terça o vigente já conta:
     // 3 antes das 19h (agendado por vir) e 2 depois (o agendado cai em
-    // limbo e cobre o esperado). O .first() cobre a terça à noite, quando
-    // o headline vira exatamente "2 encontros atrasados" sem parentético
+    // limbo e cobre o esperado)
     await expect(
-      risco.getByText(/^[23] encontros atrasados$/).first()
-    ).toBeVisible();
-    await expect(
-      risco.getByText("encaminhamento vencido", { exact: true })
+      risco.getByText(/[23] encontros atrasados/).first()
     ).toBeVisible();
 
-    // o nudge de ~20h atrás dispara o cap D5: a linha esmaece ("aguardando
-    // a dupla", com a data de envio) e o botão vem desabilitado
-    await expect(risco.locator(".opacity-60")).toBeVisible();
+    // o nudge de ~20h atrás dispara o cap D5: a meta da linha diz
+    // "lembrete enviado dd/mm, aguardando a dupla" e o botão vem
+    // desabilitado
     await expect(
       risco.getByText(/lembrete enviado \d{2}\/\d{2}/)
     ).toBeVisible();
@@ -330,24 +353,29 @@ test.describe("agenda demo da coordenação — Monitoramento (WP5)", () => {
     await expect(bloqueada).toBeDisabled();
     await expect(bloqueada).toHaveAttribute(
       "title",
-      /^1 lembrete a cada 48h por dupla — destrava \d{2}\/\d{2}$/
+      /^1 lembrete a cada 48h por dupla\. Destrava \d{2}\/\d{2}$/
     );
 
     // d-pend — entra e sai da fila com o relógio do enc. 4: registro vira
     // pendente só 24h depois do encontro (quarta de dia ela some; quarta à
     // noite em diante volta), e "sem data"/"1 atrasado" só quando o enc. 5
-    // é o vigente (seg/ter). Os estáveis com registro_pendente são a trilha
-    // da Sofia × Eduardo e o Matheus · Ricardo — a Sofia sempre assina
-    // "Lembrar registro" (o motivo está sempre na lista dela)
-    const pend = fila.locator("li", { hasText: "Caio · Carlos" });
+    // é o vigente (seg/ter). Na linha canônica as dimensões viraram motivo
+    // em texto — o que era badge segue dito, sem chip por dimensão
+    const pend = fila.locator("li", { hasText: "Caio Henrique Oliveira" });
     const dowHoje = new Date(`${hojeSP()}T12:00:00Z`).getUTCDay();
     if ((await pend.count()) > 0) {
+      // a pendência encabeça o motivo — a forma é a do estado da row
+      // ("Registro do Nº ... pendente" quando realizado; "...agendado já
+      // passou. Falta o registro" quando cai em limbo)
       await expect(
-        pend.getByText("registro pendente", { exact: true })
+        pend.getByText(
+          /Registro do \d+º encontro pendente|encontro agendado já passou\. Falta o registro/
+        )
       ).toBeVisible();
       // o pedido de apoio do Caio partiu do JOVEM — o domínio diz "chamar
-      // o jovem, nunca o mentor": o badge diz a origem e o botão vira
-      // "Chamar" (destino mentorado, texto que acolhe sem expor o teor)
+      // o jovem, nunca o mentor": a pill "Apoio pedido" leva a origem no
+      // title e o botão vira "Chamar" (destino mentorado, texto que acolhe
+      // sem expor o teor)
       await expect(
         pend.locator('span[title="pedido do jovem"]')
       ).toBeVisible();
@@ -356,19 +384,19 @@ test.describe("agenda demo da coordenação — Monitoramento (WP5)", () => {
       ).toBeVisible();
       if (dowHoje === 1) {
         await expect(
-          pend.getByText("sem data", { exact: true })
+          pend.getByText(/Encontro \d+ da Turma 1 ainda sem data/)
         ).toBeVisible();
-        await expect(pend).toContainText(/ainda sem data/);
       }
       if (dowHoje === 2) {
         await expect(
-          pend.getByText("1 encontro atrasado", { exact: true })
+          pend.getByText(/1 encontro atrasado/)
         ).toBeVisible();
         await expect(pend).toContainText(/ainda sem data/);
       }
-      // "Ver ficha ›" aponta pra ficha da dupla — id estável do dataset
+      // "Ver ficha" aponta pra ficha da dupla — o nome acessível leva o
+      // primeiro nome do mentorado; id estável do dataset
       await expect(
-        pend.getByRole("link", { name: "Ver ficha ›" })
+        pend.getByRole("link", { name: "Ver ficha da dupla de Caio" })
       ).toHaveAttribute("href", `/duplas/${DUPLA_PEND}`);
     } else {
       // quarta de dia o relógio do enc. 4 ainda não fez o registro vencer —
@@ -379,39 +407,50 @@ test.describe("agenda demo da coordenação — Monitoramento (WP5)", () => {
       });
     }
 
-    // o Lembrar livre da Sofia (nudge dela não preenche o cap) — o clique
-    // no demo só simula: toast, sem wa.me
-    const sofia = fila.locator("li", { hasText: "Eduardo · Sofia" });
+    // o Lembrar livre da trilha Sofia × Eduardo (nudge dela não preenche
+    // o cap) — linha de trilha lê "sessão", e o rótulo segue o caso
+    // dominante ("Lembrar registro" enquanto a pendência é a sessão 1;
+    // pode virar "Lembrar" depois das 19h30 quando o passo 2 entra em
+    // limbo). O clique no demo só simula: toast, sem wa.me
+    const sofia = fila
+      .locator("li", { hasText: "Sofia Nogueira" })
+      .filter({ hasText: "Eduardo Lima" });
+    await expect(
+      sofia.getByText(/sessão pendente|sessão agendada já passou/)
+    ).toBeVisible();
     const lembrarSofia = sofia.getByRole("button", {
-      name: "Lembrar registro",
-      exact: true,
+      name: /^Lembrar( registro)?$/,
     });
     await expect(lembrarSofia).toBeEnabled();
     await lembrarSofia.click();
     await expect(
-      page.getByText("Modo demo — nada é enviado de verdade.")
+      page.getByText("Modo demo: nada é enviado de verdade.")
     ).toBeVisible();
 
     // as outras duplas da fila com o Lembrar livre — o rótulo segue o caso
     // dominante: "Lembrar registro" quando a única pendência é o registro
     // (t2c e esp3), "Lembrar" quando há limbo/atraso junto (d-atraso)
-    for (const nomes of ["Eduardo · João", "Matheus · Ricardo"])
+    for (const nomes of ["João Pedro Vital", "Matheus Gonçalves"])
       await expect(
         fila
           .locator("li", { hasText: nomes })
           .getByRole("button", { name: /^Lembrar( .*)?$/ })
       ).toBeEnabled();
 
-    // d-rito (Gustavo · Ricardo) — a concluída com o rito de encerramento
+    // d-rito (Ricardo × Gustavo) — a concluída com o rito de encerramento
     // aberto (REALIZA-172): pendência da coordenação, não da dupla — a
-    // linha leva o badge operacional e o CTA é link pra ficha, sem Lembrar
-    const rito = fila.locator("li", { hasText: "Gustavo · Ricardo" });
+    // linha lê pill "Concluída" + legenda "jornada fechada" e o motivo
+    // aponta a ficha; o CTA é link, sem Lembrar
+    const rito = fila.locator("li", { hasText: "Gustavo Batista" });
     await expect(rito).toBeVisible();
     await expect(
-      rito.getByText("Rito de encerramento pendente — concluir na ficha")
+      rito.getByText("Concluída", { exact: true })
     ).toBeVisible();
     await expect(
-      rito.getByText("encerramento pendente", { exact: true })
+      rito.getByText("jornada fechada", { exact: true })
+    ).toBeVisible();
+    await expect(
+      rito.getByText("Rito de encerramento pendente. Concluir na ficha")
     ).toBeVisible();
     await expect(
       rito.getByRole("link", { name: "Concluir rito" })
@@ -420,39 +459,49 @@ test.describe("agenda demo da coordenação — Monitoramento (WP5)", () => {
       rito.getByRole("button", { name: /^Lembrar/ })
     ).toHaveCount(0);
 
-    // chips de filtro — cada um conta o recorte; clicar isola as linhas e
-    // desliga o agrupamento. A conta do chip casa com a síntese calculada
-    // acima (mesma derivacao dos badges)
+    // chips de filtro — cada um conta o recorte no próprio rótulo
+    // ("Todas5"/"Urgentes2": o número é span sem separador); clicar isola
+    // as linhas e desliga o agrupamento. A conta casa com a síntese
+    // calculada acima (mesma derivação de motivos)
     const chips = fila.getByRole("group", {
       name: "Filtrar a fila de acompanhamento",
     });
     await expect(
-      chips.getByRole("button", { name: /^Todas · \d+$/ })
+      chips.getByRole("button", { name: /^Todas\s?\d+$/ })
     ).toHaveAttribute("aria-pressed", "true");
     await expect(
-      chips.getByRole("button", { name: new RegExp(`^Críticas · ${nCriticas}$`) })
+      chips.getByRole("button", {
+        name: new RegExp(`^Urgentes\\s?${nUrgentes}$`),
+      })
     ).toBeVisible();
     const chipRegistro = chips.getByRole("button", {
-      name: new RegExp(`^Registro pendente · ${nRegistros}$`),
+      name: new RegExp(`^Registro pendente\\s?${nRegistros}$`),
     });
     await expect(chipRegistro).toBeVisible();
     await chipRegistro.click();
     await expect(chipRegistro).toHaveAttribute("aria-pressed", "true");
-    // o filtro isola exatamente as linhas com o badge — Sofia e Matheus
-    // são as estáveis; a do Caio oscila (bloco acima cobre quando existe)
+    // o filtro isola exatamente as linhas com a pendência — a trilha da
+    // Sofia e a dupla do Matheus são as estáveis; a do Caio oscila (bloco
+    // acima cobre quando existe)
     await expect(fila.locator("li")).toHaveCount(nRegistros);
-    await expect(fila.getByText("Matheus · Ricardo")).toBeVisible();
-    await expect(fila.getByText("Eduardo · Sofia")).toBeVisible();
-    await expect(fila.getByText("Dandara · Fernanda")).toHaveCount(0);
+    await expect(
+      fila.locator("li", { hasText: "Matheus Gonçalves" })
+    ).toBeVisible();
+    await expect(
+      fila
+        .locator("li", { hasText: "Sofia Nogueira" })
+        .filter({ hasText: "Eduardo Lima" })
+    ).toBeVisible();
+    await expect(
+      fila.locator("li", { hasText: "Dandara Souza" })
+    ).toHaveCount(0);
     // com filtro ativo a lista não agrupa — os cabeçalhos somem
     await expect(
-      fila.getByRole("heading", { name: /Precisam de intervenção/ })
+      fila.getByRole("heading", { name: /^Urgentes \(/ })
     ).toHaveCount(0);
-    await chips.getByRole("button", { name: /^Todas ·/ }).click();
+    await chips.getByRole("button", { name: /^Todas\s?\d+$/ }).click();
     await expect(
-      fila.getByRole("heading", {
-        name: `Precisam de intervenção (${nCriticas})`,
-      })
+      fila.getByRole("heading", { name: `Urgentes (${nUrgentes})` })
     ).toBeVisible();
   });
 
@@ -468,15 +517,15 @@ test.describe("agenda demo da coordenação — Monitoramento (WP5)", () => {
     // do dataset depende de quando o servidor demo subiu (rebuild
     // re-ancora), não só do dia da semana do relógio do teste.
     const ancoraNaSemana =
-      (await sec.getByRole("link", { name: "Encontro 5 · T1" }).count()) > 0;
+      (await sec.getByRole("link", { name: "Encontro 5 · Turma 1" }).count()) > 0;
     await expect(
       sec.getByRole("link", {
-        name: `Encontro ${ancoraNaSemana ? 5 : 4} · T1`,
+        name: `Encontro ${ancoraNaSemana ? 5 : 4} · Turma 1`,
       })
     ).toBeVisible();
     if (ancoraNaSemana)
       await expect(
-        sec.getByRole("link", { name: "Encontro 1 · T2" })
+        sec.getByRole("link", { name: "Encontro 1 · Turma 2" })
       ).toBeVisible();
     await expect(
       sec.getByRole("link", {
@@ -498,29 +547,29 @@ test.describe("agenda demo da coordenação — Monitoramento (WP5)", () => {
         sec.getByText("Turma 2", { exact: true }).first()
       ).toBeVisible();
 
-    // os cards carregam o "O que cobre" do guia atrás de <details> nativo
-    // — a voz da coordenação (o mentor lê "Como conduzir" na dele). O
-    // summary é alvo de toque de verdade (min-h-11 no mobile) e abre de
-    // verdade: o texto do guia aparece depois do clique
-    const guia = sec
-      .locator("summary", { hasText: "O que cobre" })
-      .first();
+    // os cards carregam o "O que cobre" do guia num popover — a voz da
+    // coordenação (o mentor lê "Como conduzir" na dele). O gatilho é alvo
+    // de toque de verdade (min-h-11 no mobile) e o texto do guia abre fora
+    // do card, que não muda de altura
+    const guia = sec.getByRole("button", { name: /O que cobre/ }).first();
     await expect(guia).toBeVisible();
-    const details = guia.locator("xpath=..");
-    await expect(details).not.toHaveJSProperty("open", true);
+    const card = guia.locator("xpath=ancestor::li[1]");
+    const altura = (await card.boundingBox())!.height;
     await guia.click();
-    await expect(details).toHaveJSProperty("open", true);
-    await expect(
-      details.locator("p", { hasText: /[a-zá-ú]{4}/ }).last()
-    ).toBeVisible();
+    const pop = page.getByRole("dialog", { name: "O que cobre" });
+    await expect(pop).toBeVisible();
+    await expect(pop.locator("p", { hasText: /[a-zá-ú]{4}/ }).last()).toBeVisible();
+    expect((await card.boundingBox())!.height).toBe(altura);
+    await page.keyboard.press("Escape");
+    await expect(pop).toBeHidden();
 
-    // o encontro oficial carrega o meta da coorte no detalhe — "N duplas
-    // — cada uma marca a sua" (a coordenação nunca agenda pela dupla)
+    // o encontro oficial carrega o meta da coorte no detalhe — "N duplas,
+    // cada uma marca o seu" (a coordenação nunca agenda pela dupla)
     const cardEncontro = sec.locator("li", {
-      hasText: `Encontro ${ancoraNaSemana ? 5 : 4} · T1`,
+      hasText: `Encontro ${ancoraNaSemana ? 5 : 4} · Turma 1`,
     });
     await expect(
-      cardEncontro.getByText(/\d+ duplas — cada uma marca a sua/)
+      cardEncontro.getByText(/\d+ duplas?, cada uma marca o seu/)
     ).toBeVisible();
 
     // "Abrir chamada" só existe quando um evento tipo 'formacao' é HOJE.

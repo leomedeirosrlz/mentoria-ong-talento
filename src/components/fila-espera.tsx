@@ -60,7 +60,7 @@ export function FilaEspera({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2
           id="fila-espera-titulo"
-          className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground tabular-nums"
+          className="text-base font-semibold tabular-nums"
         >
           Aguardando par · {total}
         </h2>
@@ -80,11 +80,11 @@ export function FilaEspera({
           <p className="text-sm font-medium">Todo mundo pareado</p>
           <p className="max-w-sm text-sm text-muted-foreground">
             Quando uma inscrição chegar ou um mentor abrir vaga, a espera
-            aparece aqui — com quanto tempo a pessoa aguarda.
+            aparece aqui, com quanto tempo a pessoa aguarda.
           </p>
         </div>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-4 sm:grid-cols-2">
           <FilaColuna
             titulo="Mentorados"
             itens={mentorados}
@@ -134,8 +134,9 @@ function FilaColuna({
   euNome?: string | null;
   agoraMs: number;
 }) {
+  // min-w-0: a coluna cede largura ao grid em vez de herdar o nowrap da linha
   return (
-    <div className="space-y-1">
+    <div className="min-w-0 space-y-1">
       <p className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground tabular-nums">
         {lado === "mentorado" ? (
           <Student aria-hidden size={14} />
@@ -199,6 +200,8 @@ function FilaLinha({
   ]
     .filter(Boolean)
     .join(" · ");
+  // o metadado trunca; o texto completo vai no title
+  const meta = [espera, resto].filter(Boolean).join(" · ");
   return (
     <li
       className="animate-enter flex items-center gap-3 py-2"
@@ -216,10 +219,11 @@ function FilaLinha({
           size={30}
         />
         <span className="min-w-0">
-          <span className="block truncate text-sm font-medium underline-offset-4 transition-colors group-hover:underline">
+          {/* nome quebra linha em vez de truncar (título de item não trunca) */}
+          <span className="block break-words text-sm font-medium underline-offset-4 transition-colors group-hover:underline">
             {p.nome}
           </span>
-          <span className="block truncate text-xs text-muted-foreground">
+          <span className="block truncate text-xs text-muted-foreground" title={meta || undefined}>
             {espera && (
               <span className="font-medium text-foreground/70">
                 {espera}

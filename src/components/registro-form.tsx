@@ -490,7 +490,7 @@ export function RegistroForm({
     if (fechado)
       return (
         <p className="py-2 text-sm text-muted-foreground">
-          Registro salvo — as evidências ficam na ficha da dupla.
+          Registro salvo. As evidências ficam na ficha da dupla.
         </p>
       );
     return (
@@ -535,8 +535,8 @@ export function RegistroForm({
           {trilhaForm === "especialista"
             ? "A equipe do programa e o mentor DPP do jovem leem este registro."
             : trilhaForm === "dpp"
-              ? "Só você e a equipe do programa leem este registro — o jovem não vê."
-              : "A equipe do programa lê este registro — o jovem não vê."}
+              ? "Só você e a equipe do programa leem este registro. O jovem não vê."
+              : "A equipe do programa lê este registro. O jovem não vê."}
         </p>
       </div>
 
@@ -959,10 +959,10 @@ function PosSaveRegistro({
     <div className="space-y-4">
       <div className="space-y-1">
         <p className="text-sm font-medium">
-          Registro salvo — anexe as evidências
+          Registro salvo: anexe as evidências
         </p>
         <p className="text-xs text-muted-foreground">
-          Foto do encontro, print, atividade feita — PDF ou imagem até
+          Foto do encontro, print, atividade feita: PDF ou imagem até
           10&nbsp;MB. Dá pra anexar depois na ficha da dupla também.
         </p>
         {aviso && <p className="text-xs text-muted-foreground">{aviso}</p>}

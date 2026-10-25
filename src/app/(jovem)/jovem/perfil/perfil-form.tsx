@@ -49,7 +49,7 @@ function DialogoDados({ me }: { me: Profile }) {
         <DialogHeader>
           <DialogTitle>Seus dados</DialogTitle>
           <DialogDescription>
-            É daqui que seu mentor e a coordenação falam com você — cidade e
+            É daqui que seu mentor e a coordenação falam com você. Cidade e
             interesses também aparecem pros colegas da turma em Pessoas.
           </DialogDescription>
         </DialogHeader>
@@ -107,7 +107,7 @@ export function DadosSecao({ me }: { me: Profile }) {
     <section className="rounded-xl bg-card p-6 shadow-[var(--shadow-border)]">
       <div className="flex items-start gap-3">
         <div className="min-w-0 flex-1">
-          <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+          <h2 className="text-base font-semibold">
             Seus dados
           </h2>
           <p className="mt-1 text-xs text-muted-foreground">
@@ -201,11 +201,11 @@ export function DisponibilidadeCard({
     <section className="rounded-xl bg-card p-6 shadow-[var(--shadow-border)]">
       <div className="flex items-start gap-3">
         <div className="min-w-0 flex-1">
-          <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+          <h2 className="text-base font-semibold">
             Sua disponibilidade
           </h2>
           <p className="mt-1 text-xs text-muted-foreground">
-            Os dias e períodos que costumam ser livres pra você — a agenda
+            Os dias e períodos que costumam ser livres pra você. A agenda
             do seu mentor cruza com eles pra marcar os encontros.
           </p>
         </div>
@@ -248,7 +248,7 @@ export function ContaSecao({ me }: { me: Profile }) {
   return (
     <>
       <section className="rounded-xl bg-card shadow-[var(--shadow-border)]">
-        <h2 className="px-6 pt-5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+        <h2 className="px-6 pt-5 text-base font-semibold">
           Conta
         </h2>
         <ContaLinha

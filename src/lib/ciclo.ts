@@ -221,7 +221,7 @@ export function motivoRemanejo(
   const texto = detalhe.trim();
   const cat = MOTIVOS_REMANEJO.find((m) => m.value === categoria);
   if (!cat || cat.value === "outro") return texto || null;
-  return texto ? `${cat.label} — ${texto}` : cat.label;
+  return texto ? `${cat.label}: ${texto}` : cat.label;
 }
 
 /** Resumo do que o remanejo faz — "Ana + Bia → Ana + Célia" — exibido no
@@ -282,7 +282,7 @@ export function motivoSaida(
   const texto = detalhe.trim();
   const cat = MOTIVOS_SAIDA.find((m) => m.value === categoria);
   if (!cat || cat.value === "outro") return texto || null;
-  return texto ? `${cat.label} — ${texto}` : cat.label;
+  return texto ? `${cat.label}: ${texto}` : cat.label;
 }
 
 // ---------- matching/cadastro (0034) ----------
@@ -1462,7 +1462,7 @@ export function saudadeDaDupla(dupla: Dupla, eventos: CicloEvento[], hoje = new 
         ? {
             tipo: "limbo",
             tom: "atencao",
-            texto: `${pendencia.numero}º encontro agendado já passou: falta o registro`,
+            texto: `${pendencia.numero}º encontro agendado já passou. Falta o registro`,
             ...(haDias(quando) ? { detalhe: haDias(quando) } : {}),
           }
         : {
@@ -1511,7 +1511,7 @@ export function saudadeDaDupla(dupla: Dupla, eventos: CicloEvento[], hoje = new 
     sinais.push({
       tipo: "estagnacao",
       tom: "atencao",
-      texto: "Trilha com 3 meses sem sessão nova — checar se segue fazendo sentido",
+      texto: "Trilha com 3 meses sem sessão nova. Vale checar se ainda faz sentido",
     });
 
   // o veredito é a pior faixa acesa — e o motivo o primeiro texto, como

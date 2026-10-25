@@ -104,7 +104,7 @@ export function resumoPedidoJovem(
 ): string {
   switch (efetivo) {
     case "sugerida":
-      return "Seu mentor sugeriu — decide na página de especialistas.";
+      return "Seu mentor sugeriu. Você decide na página de especialistas.";
     case "aguardando_coord":
       return "A coordenação tá olhando seu pedido antes de liberar.";
     case "aberta":
@@ -116,13 +116,13 @@ export function resumoPedidoJovem(
         ? `Negociando horário com ${nomeEsp}.`
         : "Negociando horário.";
     case "expirada":
-      return "O horário desse pedido passou — ele expirou.";
+      return "O horário desse pedido passou. Ele expirou.";
     case "recusada":
       return nomeEsp
         ? `${nomeEsp} não pôde pegar esse pedido.`
         : "O pedido foi recusado.";
     case "aceita":
-      return "Sessão marcada — tá na sua agenda.";
+      return "Sessão marcada. Está na sua agenda.";
     case "cancelada":
       return "Pedido cancelado.";
   }

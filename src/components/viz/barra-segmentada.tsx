@@ -81,7 +81,7 @@ export function BarraSegmentada({
   const rotulo =
     ariaLabel ??
     (total > 0
-      ? `${descricao || "nenhum"} — total ${total}`
+      ? `${descricao || "nenhum"} · total ${total}`
       : descricao || "sem dados");
   return (
     <div className={className}>

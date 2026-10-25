@@ -21,7 +21,7 @@ test.describe("demo — /turmas (REALIZA-203 · card v1a)", () => {
 
     // modo demo: aviso de só-leitura no lugar do CTA "Novo cronograma"
     await expect(
-      page.getByText(/Modo demonstração — os cronogramas de exemplo/)
+      page.getByText(/Modo demonstração: os cronogramas de exemplo/)
     ).toBeVisible();
     await expect(
       page.getByRole("link", { name: /Novo cronograma/ })

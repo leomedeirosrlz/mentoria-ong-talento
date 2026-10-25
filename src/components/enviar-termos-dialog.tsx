@@ -147,7 +147,7 @@ function TermoCheckRow({
           competia por espaço e escondia quem é a pessoa */}
       {status !== "assinado" && faltantes.length > 0 && (
         <p
-          title={`Falta: ${faltantes.join(" · ")} — quem assina completa na hora`}
+          title={`Falta: ${faltantes.join(" · ")}. Quem assina completa na hora`}
           className="mt-0.5 truncate pl-7 text-xs text-[var(--warn-text)]"
         >
           falta: {faltantes.join(" · ")}
@@ -279,7 +279,7 @@ export function EnviarTermosDialog({
       if (reusos)
         partes.push(`${reusos} ${reusos === 1 ? "reuso" : "reusos"} de link já emitido`);
       if (partes.length) toast.success(partes.join(" · ") + ".");
-      else toast.error("Nenhum link emitido — veja cada item na lista.");
+      else toast.error("Nenhum link emitido. Veja cada item na lista.");
     });
   }
 
@@ -362,7 +362,7 @@ export function EnviarTermosDialog({
               className="min-w-0 space-y-3"
             >
               <p className="text-sm font-medium">
-                {resultado.docTitulo} — links prontos
+                {resultado.docTitulo} · links prontos
               </p>
               <ul className="scroll-fina max-h-64 space-y-2 overflow-y-auto pr-1">
                 {resultado.itens.map((i) => (
@@ -375,7 +375,7 @@ export function EnviarTermosDialog({
                         <p className="truncate text-sm font-medium">{i.nome}</p>
                         <p className="truncate text-xs text-muted-foreground">
                           {i.assinado
-                            ? "já assinado — nada a emitir"
+                            ? "já assinado, nada a emitir"
                             : i.link
                               ? `${i.existente ? "link reutilizado" : "link emitido"}${
                                   i.criado_em
@@ -423,7 +423,7 @@ export function EnviarTermosDialog({
                     {comEmail.length === 1
                       ? "pessoa tem e-mail cadastrado"
                       : "pessoas têm e-mail cadastrado"}
-                    {enviado ? " — enviado." : "."}
+                    {enviado ? ". Enviado." : "."}
                   </p>
                   <Button
                     type="button"
@@ -536,7 +536,7 @@ export function EnviarTermosDialog({
               </fieldset>
 
               <p className="text-xs leading-relaxed text-muted-foreground">
-                Dados faltantes não bloqueiam a emissão — a pessoa completa na
+                Dados faltantes não bloqueiam a emissão: a pessoa completa na
                 hora de assinar. Quem já assinou não recebe link de novo.
               </p>
 

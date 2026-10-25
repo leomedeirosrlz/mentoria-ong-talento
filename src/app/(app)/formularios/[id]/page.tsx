@@ -246,7 +246,7 @@ export default async function FormularioPage({
       <section aria-labelledby="sec-perguntas">
         <h2
           id="sec-perguntas"
-          className="mb-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground"
+          className="mb-3 text-base font-semibold"
         >
           Perguntas
         </h2>
@@ -346,7 +346,7 @@ export default async function FormularioPage({
       <section aria-labelledby="sec-links">
         <h2
           id="sec-links"
-          className="mb-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground"
+          className="mb-3 text-base font-semibold"
         >
           {ehIntake ? "Link de inscrição" : "Links de resposta"}
         </h2>
@@ -377,7 +377,7 @@ export default async function FormularioPage({
       <section aria-labelledby="sec-respostas">
         <h2
           id="sec-respostas"
-          className="mb-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground"
+          className="mb-3 text-base font-semibold"
         >
           {ehIntake ? "Inscrições" : "Respostas"}
           {respondidos > 0 && ` (${respondidos})`}

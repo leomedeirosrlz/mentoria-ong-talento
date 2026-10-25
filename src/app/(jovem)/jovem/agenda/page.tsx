@@ -22,6 +22,7 @@ import { JovemAgendarDialog } from "@/components/jovem-agendar-dialog";
 import { EditarLinkDialog } from "@/components/editar-link-dialog";
 import {
   DesmarcarEncontroJovem,
+  AconteceuJovem,
   NaoAconteceuJovem,
 } from "@/components/jovem-encontro-acoes";
 import { PedidoJovemMesa } from "@/components/jovem-pedido-item";
@@ -197,7 +198,7 @@ export default async function JovemAgenda() {
           avatar_path: contato?.avatar_path ?? d.mentor_avatar_path,
           wa: waLink(
             contato?.whatsapp,
-            `Olá, ${nome.split(" ")[0]}! Sou ${primeiroNome}, seu/sua mentorado(a) — quero combinar nosso próximo encontro.`
+            `Olá, ${nome.split(" ")[0]}! Sou ${primeiroNome}, seu/sua mentorado(a). Quero combinar nosso próximo encontro.`
           ),
         },
       ] as const;
@@ -249,7 +250,7 @@ export default async function JovemAgenda() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Agenda</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Os encontros das suas mentorias — vocês combinam as datas juntos.
+            Os encontros das suas mentorias. Vocês combinam as datas juntos.
           </p>
         </div>
         {duplaDpp?.id && numerosLivres.length > 0 && (
@@ -265,7 +266,7 @@ export default async function JovemAgenda() {
         <section aria-labelledby="agenda-esp" className="space-y-2">
           <h2
             id="agenda-esp"
-            className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground"
+            className="text-base font-semibold"
           >
             Mentoria especializada
           </h2>
@@ -297,8 +298,8 @@ export default async function JovemAgenda() {
                           Horários de {esp.primeiro}
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          Sessões de 1h · escolhe um horário e manda o pedido
-                          — quando {esp.primeiro} aceitar, a sessão aparece
+                          Sessões de 1h · escolhe um horário e manda o pedido.
+                          Quando {esp.primeiro} aceitar, a sessão aparece
                           aqui na agenda.
                         </p>
                       </div>
@@ -336,8 +337,8 @@ export default async function JovemAgenda() {
                     ) : slots.length === 0 ? (
                       <div className="space-y-2">
                         <p className="text-sm text-muted-foreground">
-                          {esp.primeiro} ainda não abriu horários livres —
-                          pede por aqui que quem aceita propõe um com você
+                          {esp.primeiro} ainda não abriu horários livres.
+                          Pede por aqui que quem aceita propõe um com você
                           {esp.wa ? ", ou chama no WhatsApp" : ""}.
                         </p>
                         <PedirEspecialistaDialog
@@ -391,7 +392,7 @@ export default async function JovemAgenda() {
             <section aria-labelledby="agenda-proximos" className="space-y-2">
               <h2
                 id="agenda-proximos"
-                className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground"
+                className="text-base font-semibold"
               >
                 Próximos
               </h2>
@@ -416,7 +417,7 @@ export default async function JovemAgenda() {
             <section aria-labelledby="agenda-historico" className="space-y-2">
               <h2
                 id="agenda-historico"
-                className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground"
+                className="text-base font-semibold"
               >
                 Histórico
               </h2>
@@ -571,6 +572,12 @@ function EncontroLinha({
             alvo futuro) — "não aconteceu" não é a única saída do limbo */}
         {agendadoPassado && (
           <>
+            {/* "Aconteceu" libera a avaliação e a jornada sem esperar o
+                registro do mentor (0121) — menos o último encontro, que
+                conclui a dupla e segue sendo registro dele */}
+            {e.numero < (trilha === "especialista" ? 5 : 16) && (
+              <AconteceuJovem encontroId={e.id} />
+            )}
             {trilha !== "especialista" && (
               <JovemAgendarDialog
                 duplaId={e.dupla_id}

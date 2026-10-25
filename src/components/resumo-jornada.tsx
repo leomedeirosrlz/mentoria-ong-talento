@@ -21,7 +21,7 @@ export function ResumoJornadaSection({
       className="resumo-jornada rounded-xl bg-card p-4 shadow-[var(--shadow-border)] print:shadow-none"
     >
       <div className="flex items-center justify-between gap-2">
-        <h2 className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+        <h2 className="flex items-center gap-2 text-base font-semibold">
           <span aria-hidden className="size-1.5 rounded-full bg-[var(--brand-lime)]" />
           Resumo da jornada
         </h2>

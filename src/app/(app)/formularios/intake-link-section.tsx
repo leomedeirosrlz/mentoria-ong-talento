@@ -68,7 +68,7 @@ export function IntakeLinkSection({
             <CopiarLink token={intake.token} />
             <ConfirmDeleteButton
               titulo="Desativar o link de inscrição?"
-              descricao="O endereço deixa de aceitar inscrições na hora — quem abrir vê “link expirado”. As respostas já recebidas ficam salvas. Gerar de novo cria um endereço diferente (o antigo não volta)."
+              descricao="O endereço deixa de aceitar inscrições na hora. Quem abrir vê “link expirado”. As respostas já recebidas ficam salvas. Gerar de novo cria um endereço diferente (o antigo não volta)."
               acao="Desativar"
               sucesso="Link de inscrição desativado."
               onConfirm={() => desativarLinkIntake(intake.id, formularioId)}
@@ -84,7 +84,7 @@ export function IntakeLinkSection({
         <div className="rounded-xl border border-dashed border-border p-5 text-center">
           <p className="mx-auto max-w-md text-sm leading-relaxed text-muted-foreground">
             {intake
-              ? "O link de inscrição está desativado — ninguém se inscreve por ele agora."
+              ? "O link de inscrição está desativado. Ninguém se inscreve por ele agora."
               : "Nenhum link de inscrição ainda. Ele é um endereço público único que aceita várias inscrições anônimas."}
           </p>
           <Button

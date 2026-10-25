@@ -18,6 +18,7 @@ import {
   LockSimple,
   MapPin,
   PuzzlePiece,
+  UsersThree,
 } from "@phosphor-icons/react/dist/ssr";
 import {
   AvaliarPendenteButton,
@@ -360,7 +361,7 @@ export default async function JovemMateriais() {
                 <strong className="font-semibold text-foreground">
                   {resumo.proxima.titulo}
                 </strong>
-                {resumo.proxima.detalhe ? ` — ${resumo.proxima.detalhe}` : ""}
+                {resumo.proxima.detalhe ? ` · ${resumo.proxima.detalhe}` : ""}
               </span>
             </p>
           ) : (
@@ -371,9 +372,9 @@ export default async function JovemMateriais() {
                 aria-hidden
               />
               <span>
-                Você completou os {resumo.total} instrumentos da jornada —{" "}
+                Você completou os {resumo.total} instrumentos da jornada.{" "}
                 <strong className="font-semibold text-foreground">
-                  parabéns por chegar até aqui.
+                  Parabéns por chegar até aqui.
                 </strong>
               </span>
             </p>
@@ -413,11 +414,11 @@ export default async function JovemMateriais() {
         className="scroll-mt-28 space-y-4 md:scroll-mt-14"
       >
         <div>
-          <h2 id="meus-instrumentos-titulo" className="font-semibold">
+          <h2 id="meus-instrumentos-titulo" className="text-base font-semibold">
             Meus instrumentos
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Cada instrumento tem um encontro-alvo no guia — toque no card
+            Cada instrumento tem um encontro-alvo no guia. Toque no card
             pra abrir ou continuar. O que está por vir abre sozinho no
             encontro certo.
           </p>
@@ -433,7 +434,7 @@ export default async function JovemMateriais() {
                 Você não vê:
               </strong>{" "}
               respostas de outros jovens, nem quem disse o quê na avaliação
-              por terceiros — ela chega como consolidado anônimo.
+              por terceiros: ela chega como consolidado anônimo.
             </p>
           </div>
         </div>
@@ -470,6 +471,32 @@ export default async function JovemMateriais() {
         </p>
       </section>
 
+      {/* Como as pessoas próximas te veem (0103): a síntese anônima que o
+          mentor publica. Saiu da home do jovem e mora aqui, junto da
+          devolutiva de terceiros que a origina */}
+      {consolidadoTerc && (
+        <section
+          aria-labelledby="terceiros-titulo"
+          className="scroll-mt-28 space-y-3 md:scroll-mt-14"
+        >
+          <h2 id="terceiros-titulo" className="flex items-center gap-2 text-base font-semibold">
+            <UsersThree size={18} className="text-muted-foreground" aria-hidden />
+            Como as pessoas próximas te veem
+          </h2>
+          <Card className="animate-enter">
+            <CardContent>
+              <p className="whitespace-pre-wrap text-sm leading-relaxed">
+                {consolidadoTerc.consolidado}
+              </p>
+              <p className="mt-3 border-t border-border/60 pt-2 text-xs text-muted-foreground">
+                Síntese que seu mentor fez das respostas. Quem respondeu fica
+                anônimo. Vale comparar com a sua autoavaliação.
+              </p>
+            </CardContent>
+          </Card>
+        </section>
+      )}
+
       {/* ---------- acervo: a biblioteca, agora progressiva (REALIZA-160 —
           material com encontro_num libera quando a jornada alcança) ------- */}
       <section
@@ -480,7 +507,7 @@ export default async function JovemMateriais() {
         <div>
           <h2
             id="acervo-titulo"
-            className="flex items-center gap-2 font-semibold"
+            className="flex items-center gap-2 text-base font-semibold"
           >
             <FolderOpen
               size={18}
@@ -490,7 +517,7 @@ export default async function JovemMateriais() {
             Acervo
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Para ler e consultar quando quiser — não conta no seu progresso.
+            Para ler e consultar quando quiser. Não conta no seu progresso.
           </p>
         </div>
         <MateriaisLista
@@ -553,7 +580,7 @@ function EstadoTag({ est }: { est: Estacao }) {
     return (
       <Badge variant="outline" className="text-muted-foreground">
         <LockSimple data-icon="inline-start" aria-hidden />
-        trancada
+        Ainda não liberado
       </Badge>
     );
   }
@@ -700,7 +727,7 @@ function InstrumentoCard(props: EstacaoProps) {
       <span className="flex flex-1 flex-col gap-1.5 p-3.5">
         <h3 className="text-sm font-semibold leading-snug tracking-tight">
           {est.titulo}
-          <span className="block text-[11px] font-normal text-muted-foreground">
+          <span className="block text-xs font-normal text-muted-foreground sm:text-[11px]">
             {SUB_ESTACAO[est.chave]}
           </span>
         </h3>
@@ -721,13 +748,13 @@ function InstrumentoCard(props: EstacaoProps) {
           )}
         </span>
         {est.respondidoEm && (
-          <span className="flex items-center gap-1.5 text-[11px] font-medium text-[var(--ok-text)]">
+          <span className="flex items-center gap-1.5 text-xs font-medium text-[var(--ok-text)] sm:text-[11px]">
             <CalendarCheck size={12} aria-hidden />
             Respondido em {formatDate(est.respondidoEm)}
           </span>
         )}
         {est.detalhe && (
-          <span className="text-[11px] leading-snug text-muted-foreground">
+          <span className="text-xs leading-snug text-muted-foreground sm:text-[11px]">
             {est.detalhe}
           </span>
         )}
@@ -766,7 +793,7 @@ function InstrumentoCard(props: EstacaoProps) {
     const card = (
       <article
         style={instrumentoVars(est.chave)}
-        aria-label={`Rever resposta — ${est.titulo}`}
+        aria-label={`Rever resposta: ${est.titulo}`}
         className={cn(
           shell,
           "w-full cursor-pointer text-left outline-none transition-shadow hover:ring-2 hover:ring-[var(--ic)]/50 focus-visible:ring-2 focus-visible:ring-ring"
@@ -821,12 +848,12 @@ function TerceirosCard({ consolidado }: { consolidado: boolean }) {
       <span className="flex flex-1 flex-col gap-1.5 p-3.5">
         <h3 className="text-sm font-semibold leading-snug tracking-tight">
           Avaliação por terceiros
-          <span className="block text-[11px] font-normal text-muted-foreground">
+          <span className="block text-xs font-normal text-muted-foreground sm:text-[11px]">
             devolutiva
           </span>
         </h3>
         <p className="line-clamp-3 text-xs leading-relaxed text-muted-foreground">
-          Pessoas próximas respondem 2 perguntas — vira um consolidado,
+          Pessoas próximas respondem 2 perguntas: vira um consolidado,
           sem quem disse o quê.
         </p>
         <span className="mt-auto flex flex-wrap items-center gap-x-2 gap-y-1 pt-2">
@@ -851,9 +878,9 @@ function TerceirosCard({ consolidado }: { consolidado: boolean }) {
             />
           )}
         </span>
-        <span className="text-[11px] leading-snug text-muted-foreground">
+        <span className="text-xs leading-snug text-muted-foreground sm:text-[11px]">
           {consolidado
-            ? "Síntese que seu mentor publicou — quem respondeu fica anônimo."
+            ? "Síntese que seu mentor publicou. Quem respondeu fica anônimo."
             : "Seu mentor publica a síntese no encontro 2."}
         </span>
       </span>
@@ -864,7 +891,7 @@ function TerceirosCard({ consolidado }: { consolidado: boolean }) {
   if (consolidado) {
     return (
       <Link
-        href="/jovem#terceiros-titulo"
+        href="#terceiros-titulo"
         style={instrumentoVars("avaliacao_terceiros")}
         className={cn(
           shell,

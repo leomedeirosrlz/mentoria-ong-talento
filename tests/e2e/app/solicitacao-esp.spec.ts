@@ -126,6 +126,17 @@ async function convergirSolicitacoes() {
 const mural = (page: Page) =>
   page.locator('section[aria-label="Pedidos de mentoria especializada"]');
 
+/** A lista do mural mora num <details> fechado por padrão (rodada
+ *  out/2026) — abre antes de ler os cards. Idempotente: chamar com o
+ *  painel aberto não faz nada. */
+async function abrirMural(page: Page) {
+  const det = page.locator("details#mural-especialista");
+  await det.locator("summary").waitFor({ state: "visible", timeout: 15_000 });
+  if (!(await det.evaluate((el) => el.hasAttribute("open")))) {
+    await det.locator("summary").click();
+  }
+}
+
 /** A turma real da dupla — o sol semeado carrega a da dupla DPP, como o
  *  insert do app faz. */
 async function turmaDa(duplaId: string): Promise<string | null> {
@@ -152,10 +163,12 @@ test.describe("solicitação de especialista v2 — fluxo staff (REALIZA-112)", 
     await expect(
       page.getByRole("button", { name: "Agendar encontro", exact: true })
     ).toHaveCount(0);
-    // dupla sem tentativa aberta explica a regra em vez de esconder
+    // dupla sem tentativa aberta: o card da trilha diz de onde a sessão
+    // vem, sem CTA de agendar nem de "propor"
     await expect(
-      page.getByText(/Sessão nova nasce de um pedido aceito/).first()
+      page.getByText(/ainda não tem data\. Ela é marcada quando .+ pedir e você aceitar/).first()
     ).toBeVisible();
+    await expect(page.getByRole("link", { name: /Propor/ })).toHaveCount(0);
 
     await page.goto("/");
     // home do especialista: o card "O que fazer agora" da trilha também não
@@ -206,12 +219,15 @@ test.describe("solicitação de especialista v2 — fluxo staff (REALIZA-112)", 
     ).toBeVisible();
     await expect(mural(page).getByText(DEMANDA_EXPIRADA)).toHaveCount(0);
 
-    // ficha DPP do autor: o chip conta o que houve, sem rail de negociação
+    // ficha DPP do autor: o chip conta o que houve (header, toda aba), sem
+    // rail de negociação — o card "Mentor especialista" só nasce com
+    // pedido em aberto dentro de "Pedidos em aberto"
     await relogar(page, MENTOR_EMAIL, SENHA);
     await page.goto(`/duplas/${IDS.dupla}`);
     await expect(page.getByText("Horário expirado")).toBeVisible();
+    await expect(page.getByText("Mentor especialista")).toHaveCount(0);
     await expect(
-      page.getByRole("heading", { name: "Pedido de especialista", exact: true })
+      page.getByRole("button", { name: /^Aceitar / })
     ).toHaveCount(0);
   });
 
@@ -229,7 +245,8 @@ test.describe("solicitação de especialista v2 — fluxo staff (REALIZA-112)", 
       name: "Solicitar mentor especialista",
     });
     await agirComConfirma(
-      () => page.getByRole("button", { name: "Mais" }).click(),
+      () =>
+        page.getByRole("button", { name: "Mais ações da dupla" }).click(),
       () => item.isVisible()
     );
     const dialog = page.getByRole("dialog");
@@ -289,6 +306,7 @@ test.describe("solicitação de especialista v2 — fluxo staff (REALIZA-112)", 
     // ---- lado especialista: o mural mostra o dirigido; aceitar pede slot
     await relogar(page, ESP_EMAIL, SENHA);
     await page.goto("/");
+    await abrirMural(page);
     const card = mural(page).locator("li", { hasText: DEMANDA_ACEITE });
     await expect(card.getByText("Direcionada a você")).toBeVisible();
 
@@ -385,6 +403,7 @@ test.describe("solicitação de especialista v2 — fluxo staff (REALIZA-112)", 
     // o especialista vê o dirigido e responde com outro horário + recado
     await loginComSenha(page, ESP_EMAIL, SENHA);
     await page.goto("/");
+    await abrirMural(page);
     const card = mural(page).locator("li", { hasText: DEMANDA_CONTRA });
     await expect(card.getByText("Direcionada a você")).toBeVisible();
     // a contra-proposta não é mais um Select: é a grade de dias do mock v6 —
@@ -465,13 +484,11 @@ test.describe("solicitação de especialista v2 — fluxo staff (REALIZA-112)", 
     // a última proposta da mesa é do especialista
     await relogar(page, COORD_EMAIL, SENHA_COORD);
     await page.goto(`/duplas/${IDS.dupla2}`);
-    const rail = page.locator("section", {
-      has: page.getByRole("heading", {
-        name: "Pedido de especialista",
-        exact: true,
-      }),
-    });
+    // o rail virou o card "Mentor especialista" dentro de "Pedidos em
+    // aberto" (aba Agora) — mesma mesa de propostas, outra moldura
+    const rail = page.locator('section[aria-labelledby="pedidos-abertos"]');
     await expect(rail).toBeVisible();
+    await expect(rail.getByText("Mentor especialista")).toBeVisible();
     await agirComConfirma(
       () => rail.getByRole("button", { name: /^Aceitar / }).click(),
       async () => {
@@ -547,6 +564,7 @@ test.describe("solicitação de especialista v2 — fluxo staff (REALIZA-112)", 
 
     await loginComSenha(page, ESP_EMAIL, SENHA);
     await page.goto("/");
+    await abrirMural(page);
     const card = mural(page).locator("li", { hasText: DEMANDA_RECUSA });
     await expect(card.getByText("Direcionada a você")).toBeVisible();
     // a recusa saiu do botão solto pro ⋯ "Ações do pedido" (REALIZA-186,

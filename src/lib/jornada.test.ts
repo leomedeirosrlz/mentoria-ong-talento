@@ -186,7 +186,7 @@ describe("estacoesJornada — esqueleto", () => {
     expect(v.janela.dataIni).toBeNull();
     expect(v.janela.dataFim).toBeNull();
     // trancada sem data da turma → detalhe sem o "(dd/mm)"
-    expect(por(est, "avaliacao_360").detalhe).toBe("libera no enc. 16");
+    expect(por(est, "avaliacao_360").detalhe).toBe("libera no encontro 16");
   });
 });
 
@@ -403,10 +403,10 @@ describe("estacoesJornada — a_fazer", () => {
   it("sem entrega com a janela já passada → copy honesta, sem promessa futura", () => {
     const est = estacoesJornada(base({ encontros: realizados(16) }));
     expect(por(est, "visao").detalhe).toBe(
-      "o link ainda não chegou — fala com teu mentor"
+      "o link ainda não chegou: fala com teu mentor"
     );
     expect(por(est, "roda_formal").detalhe).toBe(
-      "o link ainda não chegou — fala com teu mentor"
+      "o link ainda não chegou: fala com teu mentor"
     );
     // a janela da 360º é o próprio enc. 16 — no teto da régua ela segue
     // "dentro da janela"; atraso dela aparece via link expirado
@@ -428,7 +428,7 @@ describe("estacoesJornada — a_fazer", () => {
     const v = por(est, "visao");
     expect(v.estado).toBe("a_fazer");
     expect(v.token).toBeNull();
-    expect(v.detalhe).toBe("o link expirou — peça ao mentor pra reenviar");
+    expect(v.detalhe).toBe("o link expirou: peça ao mentor pra reenviar");
   });
 
   it("pendente com expira_em já passada conta como expirado (agora decide)", () => {
@@ -442,7 +442,7 @@ describe("estacoesJornada — a_fazer", () => {
         ],
       })
     );
-    expect(por(est, "visao").detalhe).toBe("o link expirou — peça ao mentor pra reenviar");
+    expect(por(est, "visao").detalhe).toBe("o link expirou: peça ao mentor pra reenviar");
   });
 
   it("expirado da coordenação (360º) pede reenvio à coordenação", () => {
@@ -453,7 +453,7 @@ describe("estacoesJornada — a_fazer", () => {
       })
     );
     expect(por(est, "avaliacao_360").detalhe).toBe(
-      "o link expirou — peça à coordenação pra reenviar"
+      "o link expirou: peça à coordenação pra reenviar"
     );
   });
 });
@@ -466,10 +466,10 @@ describe("estacoesJornada — trancada", () => {
     const rf = por(est, "roda_formal");
     const a360 = por(est, "avaliacao_360");
     expect(rf.estado).toBe("trancada");
-    expect(rf.detalhe).toBe(`libera no enc. 12 (${dataEnc(12).slice(8, 10)}/${dataEnc(12).slice(5, 7)})`);
-    expect(rf.detalhe).toBe("libera no enc. 12 (19/05)");
+    expect(rf.detalhe).toBe(`libera no encontro 12 (${dataEnc(12).slice(8, 10)}/${dataEnc(12).slice(5, 7)})`);
+    expect(rf.detalhe).toBe("libera no encontro 12 (19/05)");
     expect(a360.estado).toBe("trancada");
-    expect(a360.detalhe).toBe("libera no enc. 16 (16/06)");
+    expect(a360.detalhe).toBe("libera no encontro 16 (16/06)");
     expect(rf.token).toBeNull();
     expect(a360.token).toBeNull();
   });
@@ -477,7 +477,7 @@ describe("estacoesJornada — trancada", () => {
   it("jovem no enc. 0: metas (enc. 2) trancada; enc. 1 abre roda inicial, visão, PDM e avaliação", () => {
     const est = estacoesJornada(base());
     expect(por(est, "metas").estado).toBe("trancada");
-    expect(por(est, "metas").detalhe).toBe("libera no enc. 2 (10/03)");
+    expect(por(est, "metas").detalhe).toBe("libera no encontro 2 (10/03)");
     for (const c of ["roda_inicial", "visao", "pdm", "avaliacao_encontro"] as const)
       expect(por(est, c).estado).toBe("a_fazer");
   });

@@ -78,7 +78,7 @@ export function MentoradoActions({
         if (res?.error) toast.error(res.error);
         else {
           toast.success(
-            `Cadastro de ${primeiroNome} reativado — de volta pra lista principal.`
+            `Cadastro de ${primeiroNome} reativado. De volta pra lista principal.`
           );
           router.refresh();
         }
@@ -344,7 +344,7 @@ export function MentoradoActions({
           <DialogHeader>
             <DialogTitle>Editar {primeiroNome}</DialogTitle>
             <DialogDescription>
-              Os dados do cadastro em etapas — salve no fim.
+              Os dados do cadastro em etapas: salve no fim.
             </DialogDescription>
           </DialogHeader>
           <WizardFicha

@@ -57,9 +57,13 @@ export function Tag({
 export function PillTurma({ turma }: { turma: string }) {
   const { nome, ano } = partesTurma(turma);
   return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">
-      <span className="text-foreground/80">{nome}</span>
-      {ano && <span className="font-normal">{ano}</span>}
+    // só "Turma 1" na tela: o ciclo não distingue nada dentro da agenda e
+    // dobrava o pill; fica no title pra quem precisar
+    <span
+      title={ano ? `${nome} · ${ano}` : undefined}
+      className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold text-foreground/80"
+    >
+      {nome}
     </span>
   );
 }
@@ -119,8 +123,8 @@ export function lembreteDaDupla(
   if (d.trilha === "especialista") {
     if (caso === "registro_pendente") {
       return {
-        titulo: "Lembrete — registro pendente",
-        corpo: `Oi ${mentorNome}, tudo bem? A sessão de ${mentoradoNome} já aconteceu, mas ainda falta o registro — completa quando puder, leva poucos minutos.`,
+        titulo: "Lembrete: registro pendente",
+        corpo: `Oi ${mentorNome}, tudo bem? A sessão de ${mentoradoNome} já aconteceu, mas ainda falta o registro. Completa quando puder, leva poucos minutos.`,
       };
     }
     const pendEsp = [...d.encontros]
@@ -128,8 +132,8 @@ export function lembreteDaDupla(
       .find((e) => !e.registro && emLimbo(e, agora.getTime()));
     return {
       titulo: pendEsp
-        ? "Lembrete — sessão por confirmar"
-        : "Lembrete — marcar a sessão",
+        ? "Lembrete: sessão por confirmar"
+        : "Lembrete: marcar a sessão",
       corpo: pendEsp
         ? `Oi ${mentorNome}, tudo bem? A sessão de ${mentoradoNome} estava agendada e já passou. Rolou? Se rolou, dá pra registrar como foi; se não, vale remarcar.`
         : `Oi ${mentorNome}! Passando pra lembrar de marcar a próxima sessão de ${mentoradoNome} na trilha de especialista. Qualquer coisa me chama :)`,
@@ -148,13 +152,13 @@ export function lembreteDaDupla(
 
   if (caso === "registro_pendente") {
     return {
-      titulo: "Lembrete — registro pendente",
+      titulo: "Lembrete: registro pendente",
       corpo: msgsContato("registro_pendente", info).mentor ?? "",
     };
   }
   if (caso === "limbo") {
     return {
-      titulo: "Lembrete — encontro por confirmar",
+      titulo: "Lembrete: encontro por confirmar",
       corpo:
         msgsContato("limbo", {
           ...info,
@@ -164,7 +168,7 @@ export function lembreteDaDupla(
   }
   if (caso === "atraso") {
     return {
-      titulo: "Lembrete — encontros em atraso",
+      titulo: "Lembrete: encontros em atraso",
       corpo:
         msgsContato(
           { mentorNome, mentoradoNome },
@@ -178,7 +182,7 @@ export function lembreteDaDupla(
   // sem_data (e qualquer caso não mapeado): o lembrete padrão é "marcar o
   // encontro da semana" — a mensagem carrega o nº oficial pra orientar
   return {
-    titulo: "Lembrete — marcar o encontro",
+    titulo: "Lembrete: marcar o encontro",
     corpo:
       msgsContato("sem_encontro", { ...info, extra: extraVigente }).mentor ??
       "",

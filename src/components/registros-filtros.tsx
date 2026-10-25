@@ -58,7 +58,7 @@ function draftDe(f: FiltrosRegistro, ordem: OrdemRegistros): Draft {
 }
 
 const OVERLINE =
-  "text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground";
+  "text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground sm:text-[11px]";
 
 /** Opção compacta (grade de encontros / avaliações) — radio nativo sr-only
  *  mantém setas do teclado e leitura de tela de graça. */
@@ -462,7 +462,7 @@ export function RegistrosFiltros({
             {ativos > 0 && (
               <span
                 aria-hidden
-                className="grid size-5 place-items-center rounded-full bg-[var(--brand-ink)] text-[11px] font-bold text-[var(--brand-lime)]"
+                className="grid size-5 place-items-center rounded-full bg-[var(--brand-ink)] text-[11px] font-bold text-white"
               >
                 {ativos}
               </span>
@@ -507,7 +507,7 @@ export function RegistrosFiltros({
                   href={c.href}
                   scroll={false}
                   aria-label={`Remover filtro ${c.rotulo}`}
-                  className="inline-flex min-h-11 items-center gap-1 rounded-full border bg-card px-3 text-xs font-medium transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)] sm:min-h-7"
+                  className="inline-flex min-h-11 items-center gap-1 rounded-full border bg-card px-3 text-xs font-semibold transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)] sm:min-h-7"
                 >
                   {c.rotulo}
                   <X size={12} aria-hidden className="text-muted-foreground" />
