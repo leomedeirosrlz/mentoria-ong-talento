@@ -38,6 +38,7 @@ import { SupervisaoDialog } from "@/components/supervisao-dialog";
 import { SupervisoesSection } from "@/components/supervisoes-section";
 import { TrilhasCoordPanel } from "@/components/trilhas-coord-panel";
 import { BarraSegmentada } from "@/components/viz";
+import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 
 /** Limite do pedido de especialista parado — o mesmo do painel de trilhas
@@ -252,11 +253,13 @@ export function DashboardCoordenacao({
                     )}
                     <Link
                       href="/duplas"
-                      className="group inline-flex min-h-11 items-center gap-1 rounded-md px-1.5 font-medium text-foreground underline underline-offset-2 md:min-h-8"
+                      className={cn(
+                        buttonVariants({ variant: "link", size: "sm" }),
+                        "group"
+                      )}
                     >
                       Ver todas
                       <ArrowRight
-                        size={13}
                         aria-hidden
                         className="transition-transform group-hover:translate-x-0.5"
                       />
@@ -328,11 +331,13 @@ export function DashboardCoordenacao({
                         <div className="flex items-center gap-1">
                           <Link
                             href={`/registros?encontro=${resumo.evento.numero}`}
-                            className="group inline-flex min-h-11 items-center gap-1 rounded-md px-1.5 text-xs font-medium underline underline-offset-2 transition-colors hover:text-foreground md:min-h-8"
+                            className={cn(
+                              buttonVariants({ variant: "link", size: "sm" }),
+                              "group"
+                            )}
                           >
                             Ver registros
                             <ArrowRight
-                              size={13}
                               aria-hidden
                               className="transition-transform group-hover:translate-x-0.5"
                             />
@@ -476,7 +481,10 @@ function PedidoParadoLinha({ alerta, i }: { alerta: AlertaPedido; i: number }) {
       </div>
       <Link
         href="#pedidos-especialista"
-        className="ml-auto inline-flex min-h-11 items-center rounded-lg px-2 text-sm font-medium underline underline-offset-2 md:min-h-8"
+        className={cn(
+          buttonVariants({ variant: "link", size: "sm" }),
+          "ml-auto"
+        )}
       >
         Ver pedido
       </Link>

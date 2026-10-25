@@ -36,141 +36,54 @@ const DUPLA_ID =
 
 test.skip(!appEnvOk(), "sem credenciais de teste (E2E_*) — pula specs de app");
 
-test.describe("coordenação — painel Progresso da jornada em /materiais", () => {
+test.describe("coordenação — instrumentos da jornada em /materiais", () => {
   test.beforeEach(async () => {
-    // o painel só lista duplas DPP ativas/pausadas — um spec vizinho que
+    // a fila só lista duplas DPP ativas/pausadas — um spec vizinho que
     // recriou o encontro 16 deixou a fixture 'concluida' e a linha some
     await convergirDuplaAtiva(DUPLA_ID);
   });
 
-  test("KPIs, barras por instrumento, fora-da-janela e a linha da dupla", async ({
+  test("3 estados por instrumento, fila de atrasados e Lembrar o jovem", async ({
     page,
   }) => {
     await loginComSenha(page, COORD_EMAIL, COORD_SENHA);
     await page.goto("/materiais");
 
-    const painel = page.locator("section", {
-      has: page.getByRole("heading", {
-        name: "Progresso da jornada",
-        level: 2,
-      }),
-    });
-    await expect(painel).toBeVisible();
-    // a caixa "Você vê:" (v5c) saiu no redesign das abas — quem explica a
-    // régua agora é o "Como calculamos" da própria lista de ação
-    await expect(painel.getByText("Como calculamos")).toBeVisible();
+    // REALIZA-209: duas abas, a coord abre em Instrumentos
+    const abas = page.getByRole("tablist", { name: "Seções de materiais" });
+    await expect(abas.getByRole("tab")).toHaveCount(2);
+    await expect(
+      abas.getByRole("tab", { name: "Instrumentos" })
+    ).toHaveAttribute("aria-selected", "true");
 
-    // a faixa segmentada (v5c) — um segmento por instrumento com a
-    // mini-barra de cada turma (fração própria, nunca agregado misturado)
-    // a faixa é região focável (scroll por teclado, v5c) — o nome vem do
-    // aria-label e os segmentos continuam filhos dela
+    const inst = page.locator('section[aria-labelledby="instrumentos-titulo"]');
+    const roda = inst.locator("article", { hasText: "Roda da Vida · leitura inicial" });
+    await expect(roda.getByText(/responderam/)).toBeVisible();
     await expect(
-      painel.getByRole("region", { name: "Cobertura por instrumento" })
+      inst.locator("article", { hasText: "Avaliação do encontro" }).getByText(/de \d+ avaliados/)
     ).toBeVisible();
+
+    // a fila de atrasados: cada linha aponta pra ficha (âncora de
+    // instrumentos) e lembra o JOVEM, não o mentor
+    const fila = page.locator('section[aria-labelledby="atrasados-titulo"]');
     await expect(
-      painel.getByText("Roda da Vida · leitura inicial").first()
-    ).toBeVisible();
+      fila.getByRole("link", { name: "Ver ficha" }).first()
+    ).toHaveAttribute("href", /^\/duplas\/.+#instrumentos$/);
     await expect(
-      painel.locator('[role="img"][aria-label*="feitos"]').first()
-    ).toBeVisible();
-    // a avaliação do encontro é a única que não "fecha": conta
-    // feitas/realizados por turma no rótulo acessível da mini-barra
-    await expect(
-      painel
-        .locator('[role="img"][aria-label*="avaliações de encontro"]')
+      fila
+        .getByRole("button", { name: /^Lembrar / })
+        .or(fila.getByRole("button", { name: /Lembrada / }))
+        .or(fila.getByText("dupla pausada"))
         .first()
     ).toBeVisible();
+    await expect(fila.getByRole("button", { name: /^Lembrar Mentor E2E/ })).toHaveCount(0);
 
-    // a lista de ação — as duplas e2e sem link nenhum marcam instrumentos
-    // fora do prazo do guia (enc. vigente do calendário > fim do prazo)
-    await expect(
-      painel.getByRole("heading", { name: "Duplas fora do prazo" })
-    ).toBeVisible();
-    const verFichaFora = painel
-      .getByRole("link", { name: "Ver ficha" })
-      .first();
-    await expect(verFichaFora).toBeVisible();
-    await expect(verFichaFora).toHaveAttribute("href", /^\/duplas\//);
-    // Lembrar só vale pra dupla ativa — a pausada exibe o badge; um nudge
-    // recente (cap 48h) vira o botão desabilitado "Lembrada dd/mm". Os três
-    // estados podem coexistir entre duplas — .first() na união prova "há
-    // affordance" sem violar o strict mode.
-    const acao = painel
-      .getByRole("button", { name: /^Lembrar / })
-      .or(painel.getByRole("button", { name: /Lembrada / }))
-      .or(painel.getByText("dupla pausada"))
-      .first();
-    await expect(acao).toBeVisible();
-
-    // a matriz por dupla ficou atrás de gesto (v5c) — abre o <details>
-    // agrupado por turma antes de conferir a linha da dupla
-    await painel.getByText("Ver a matriz por dupla").click();
-
-    // agrupamento por turma com o encontro vigente do calendário oficial
-    await expect(
-      painel.getByText(/encontro \d+ do calendário/).first()
-    ).toBeVisible();
-
-    // a linha da dupla fixture — nome da mentorada + mentor + as 7 células
-    // (a avaliação do encontro conta X de Y em vez do rótulo curto). O
-    // exact na ficha separa a "Mentorada E2E" da "Mentorada E2E Dois" da
-    // dupla2; o filtro Aval. descarta a row da lista fora-da-janela (que
-    // não tem células).
-    const linhaDupla = painel
-      .locator("li", {
-        has: page.getByText("Mentorada E2E", { exact: true }),
-      })
-      .filter({ has: page.getByText(/Aval\. \d+\/\d+/) });
-    await expect(linhaDupla).toBeVisible();
-    await expect(linhaDupla.getByText(/mentor Mentor E2E/)).toBeVisible();
-    // as células ganharam um sufixo sr-only com o detalhe do estado
-    // (REALIZA-51) — o texto exato da estação quebraria; o title da célula
-    // é `${rótulo} · ${detalhe}` pra qualquer estado, âncora estável
-    for (const celula of [
-      "Roda inicial",
-      "Visão",
-      "Metas",
-      "PDM",
-      "Roda formal",
-      "360º",
-    ]) {
-      await expect(
-        linhaDupla.locator(`span[title^="${celula} ·"]`)
-      ).toBeVisible();
-    }
-    await expect(linhaDupla.getByText(/Aval\. \d+\/\d+/)).toBeVisible();
-    // o "Ver ficha" da linha aponta pra ficha da dupla certa
-    await expect(
-      linhaDupla.getByRole("link", { name: "Ver ficha" }).first()
-    ).toHaveAttribute("href", `/duplas/${DUPLA_ID}`);
-
-    // legenda — os estados honestos do painel, um ícone por estado igual
-    // às células da matriz (Clock pro link expirado, CircleDashed pro "a
-    // fazer" — a linha combinada "a fazer / link expirado" foi separada)
-    for (const item of [
-      "respondido",
-      "link enviado, aguardando",
-      "link expirado",
-      "a fazer",
-      "ainda não abriu na turma",
-    ]) {
-      await expect(
-        painel.getByText(item, { exact: true }).first()
-      ).toBeVisible();
-    }
-
-    // a biblioteca virou a terceira aba (REALIZA-184 redesign) — o acervo
-    // progressivo por encontro segue lá: o landmark estável é o resumo
-    // dela + o grupo Transversais (o "Guias" virou h3 dentro dele e cada
-    // encontro fechado tem um "Nenhum material" escondido que pegava o
-    // .or().first)
+    // REALIZA-210: a biblioteca é uma lista só
     await page.goto("/materiais?aba=biblioteca");
     await expect(
-      page.getByRole("region", { name: "Resumo da biblioteca" })
+      page.getByRole("heading", { name: /Todos os materiais/ })
     ).toBeVisible();
-    await expect(
-      page.getByRole("heading", { name: "Transversais" })
-    ).toBeVisible();
+    await expect(page.locator("details")).toHaveCount(0);
   });
 
   // REALIZA-194 — a régua "Instrumentos do programa" do lado staff:
@@ -258,20 +171,14 @@ test.describe("coordenação — painel Progresso da jornada em /materiais", () 
     await loginComSenha(page, SUP_EMAIL, SENHA_STAFF);
     await page.goto("/materiais");
 
-    const painel = page.locator("section", {
-      has: page.getByRole("heading", {
-        name: "Progresso da jornada",
-        level: 2,
-      }),
-    });
-    await expect(painel).toBeVisible();
-    // Lembrar fica pro supervisor (decisão mantida do v5c) — mesma união
-    // de estados do spec de coord
+    // Lembrar fica pro supervisor, agora na fila de atrasados e direto pro
+    // jovem — mesma união de estados do spec de coord
+    const fila = page.locator('section[aria-labelledby="atrasados-titulo"]');
     await expect(
-      painel
+      fila
         .getByRole("button", { name: /^Lembrar / })
-        .or(painel.getByRole("button", { name: /Lembrada / }))
-        .or(painel.getByText("dupla pausada"))
+        .or(fila.getByRole("button", { name: /Lembrada / }))
+        .or(fila.getByText("dupla pausada"))
         .first()
     ).toBeVisible();
 
@@ -337,7 +244,7 @@ test.describe("coordenação — painel Progresso da jornada em /materiais", () 
     // painel staff-only some pro mentor — e o acervo é a aba de abertura
     // dele (a ordem "acervo antes do catálogo" virou a aba default)
     await expect(
-      page.getByRole("heading", { name: "Progresso da jornada" })
+      page.locator('section[aria-labelledby="atrasados-titulo"]')
     ).toHaveCount(0);
     await expect(
       page.getByRole("region", { name: "Resumo da biblioteca" })

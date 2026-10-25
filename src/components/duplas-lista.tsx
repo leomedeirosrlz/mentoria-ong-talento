@@ -373,10 +373,13 @@ function LinhaMini({
           href={`/duplas/${d.id}`}
           aria-label={`Ver ficha da dupla de ${d.mentorado.nome.split(" ")[0]}`}
           title="Ver ficha"
-          className="inline-grid size-11 shrink-0 place-items-center rounded-xl border border-border bg-card text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50 md:size-auto md:h-8 md:rounded md:border-0 md:bg-transparent md:px-1 md:py-1 md:text-xs md:font-semibold md:hover:bg-muted md:hover:text-foreground @4xl:h-7 @4xl:py-0.5"
+          className={cn(
+            buttonVariants({ variant: "ghost", size: "sm" }),
+            "w-11 shrink-0 px-0 text-muted-foreground md:w-auto md:px-2.5"
+          )}
         >
-          <span className="hidden whitespace-nowrap md:inline">Ver ficha ›</span>
-          <CaretRight size={15} weight="bold" aria-hidden className="md:hidden" />
+          <span className="hidden whitespace-nowrap md:inline">Ver ficha</span>
+          <CaretRight weight="bold" aria-hidden />
         </Link>
       </span>
     </div>
@@ -1052,13 +1055,14 @@ function VisaoCoordenacao({
           {mentores.length > 1 && (
             <>
               {!mentorAberto && !mentorSel ? (
-                <button
+                <Button
                   type="button"
+                  variant="link"
+                  size="sm"
                   onClick={() => setMentorAberto(true)}
-                  className="min-h-11 rounded px-1 text-[13px] font-semibold text-muted-foreground underline underline-offset-[3px] hover:text-foreground sm:min-h-8"
                 >
                   + mentor
-                </button>
+                </Button>
               ) : (
                 <Select
                   value={mentorSel ?? "todos"}

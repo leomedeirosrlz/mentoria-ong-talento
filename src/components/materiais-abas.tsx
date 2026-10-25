@@ -5,7 +5,7 @@ import { useRef } from "react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
-export type AbaMateriais = "jornada" | "instrumentos" | "biblioteca";
+export type AbaMateriais = "instrumentos" | "biblioteca";
 
 export type AbaMaterialItem = { id: AbaMateriais; rotulo: string };
 

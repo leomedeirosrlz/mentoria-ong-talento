@@ -286,11 +286,13 @@ export function MentorHome({
                       affordance própria, visível mesmo sem pendência */}
                   <Link
                     href={`/duplas/${dupla.id}`}
-                    className="group inline-flex min-h-11 items-center gap-0.5 rounded-lg px-2 text-xs font-medium text-white/70 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-lime)] md:min-h-7"
+                    className={cn(
+                      buttonVariants({ variant: "ghost", size: "sm" }),
+                      "group text-white/80 hover:bg-white/10 hover:text-white focus-visible:ring-[var(--brand-lime)]"
+                    )}
                   >
                     Abrir dupla
                     <CaretRight
-                      size={13}
                       aria-hidden
                       className="transition-transform group-hover:translate-x-0.5"
                     />
@@ -390,9 +392,9 @@ export function MentorHome({
                             href={linkSeguro(agendado.link)!}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-[var(--ok)]/40 bg-[var(--ok)]/10 px-2.5 text-sm font-medium text-[var(--ok-text)] transition-colors hover:bg-[var(--ok)]/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:min-h-7"
+                            className={buttonVariants({ variant: "outline", size: "sm" })}
                           >
-                            <VideoCamera size={16} aria-hidden />
+                            <VideoCamera aria-hidden />
                             Entrar na chamada
                             <span className="sr-only"> (abre em nova aba)</span>
                           </a>
@@ -592,11 +594,13 @@ export function MentorHome({
                   </div>
                   <Link
                     href={`/duplas/${dupla.id}`}
-                    className="group inline-flex min-h-11 items-center gap-0.5 rounded-lg px-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:min-h-7"
+                    className={cn(
+                      buttonVariants({ variant: "ghost", size: "sm" }),
+                      "group text-muted-foreground"
+                    )}
                   >
                     Abrir dupla
                     <CaretRight
-                      size={13}
                       aria-hidden
                       className="transition-transform group-hover:translate-x-0.5"
                     />

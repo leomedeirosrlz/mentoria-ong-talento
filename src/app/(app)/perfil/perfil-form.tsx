@@ -30,7 +30,7 @@ import {
   CampoUf,
 } from "@/components/campos-pessoais";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -775,14 +775,16 @@ export function DialogoSenha({ email }: { email: string }) {
               {salvando ? "Salvando…" : "Salvar senha"}
             </Button>
             {temSenha && (
-              <button
+              <Button
                 type="button"
+                variant="link"
+                size="sm"
+                className="w-full"
                 onClick={() => void esqueci()}
                 disabled={salvando}
-                className="w-full min-h-11 text-xs text-muted-foreground transition-colors hover:text-foreground"
               >
                 Esqueci minha senha: enviar link por e-mail
-              </button>
+              </Button>
             )}
           </form>
         )}
@@ -1455,16 +1457,22 @@ export function PerfilForm({
                     href={`/api/assinatura/${assinaturaTermo!.id}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-lg px-2 text-xs text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline"
+                    className={cn(
+                      buttonVariants({ variant: "link", size: "sm" }),
+                      "shrink-0 text-muted-foreground"
+                    )}
                   >
-                    <FileArrowDown size={14} aria-hidden />
+                    <FileArrowDown aria-hidden />
                     Ver PDF
                     <span className="sr-only"> (abre em nova aba)</span>
                   </a>
                 ) : (
                   <Link
                     href="/assinar"
-                    className="inline-flex min-h-9 shrink-0 items-center rounded-lg px-2 text-xs font-medium text-primary underline-offset-4 transition-colors hover:underline"
+                    className={cn(
+                      buttonVariants({ variant: "link", size: "sm" }),
+                      "shrink-0"
+                    )}
                   >
                     Ler e assinar
                   </Link>

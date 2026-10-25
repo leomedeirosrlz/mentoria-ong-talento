@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import { descartarChamadoAnexo } from "@/lib/actions-chamados";
 import { formatTamanho } from "@/lib/ciclo";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 const LIMITE_BYTES = 10 * 1024 * 1024;
@@ -189,15 +190,17 @@ export function ChamadoAnexos({
         aria-hidden
         tabIndex={-1}
       />
-      <button
+      <Button
         type="button"
+        variant="ghost"
+        size="sm"
         onClick={() => fileRef.current?.click()}
         disabled={disabled}
-        className="flex min-h-11 items-center gap-1.5 rounded-lg px-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 md:min-h-9"
+        className="text-muted-foreground"
       >
-        <Paperclip size={15} aria-hidden />
+        <Paperclip aria-hidden />
         Anexar arquivo
-      </button>
+      </Button>
     </>
   );
 }
@@ -290,15 +293,17 @@ export function AnexosPendentes({
                 <CircleNotch size={15} className="animate-spin" aria-hidden />
               </span>
             ) : (
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="icon-sm"
                 onClick={() => onRemover(a.key)}
                 disabled={travado}
                 aria-label={`Remover anexo ${a.file.name}`}
-                className="grid size-11 shrink-0 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 disabled:hover:bg-transparent md:size-8"
+                className="shrink-0 text-muted-foreground"
               >
-                <X size={14} aria-hidden />
-              </button>
+                <X aria-hidden />
+              </Button>
             )}
           </li>
         );

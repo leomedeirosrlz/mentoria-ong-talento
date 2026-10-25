@@ -707,8 +707,10 @@ export function OnboardingFlow({
           pt safe-area tira o header de sob o notch em standalone */}
       <header className="fixed inset-x-0 top-0 z-40 border-b border-border/60 bg-background/85 pt-[env(safe-area-inset-top)] backdrop-blur">
         <div className="mx-auto flex h-14 w-full max-w-xl items-center gap-3 px-4 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))]">
-          <button
+          <Button
             type="button"
+            variant="outline"
+            size="icon"
             onClick={() => {
               // demo no passo 0: voltar sai da demo e devolve a seleção de
               // papel — troca de visão sem precisar abrir a pill
@@ -725,15 +727,15 @@ export function OnboardingFlow({
               step === 0 && demo ? "Escolher outro papel" : "Voltar um passo"
             }
             title={step === 0 && demo ? "Escolher outro papel" : undefined}
-            className="grid size-11 shrink-0 place-items-center rounded-full border border-border bg-card text-foreground transition-colors outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-40 md:size-9"
+            className="shrink-0 rounded-full"
           >
             {/* pending no passo 0 só pode ser o recomecarDemo — spinner enquanto sai */}
             {pending && step === 0 ? (
-              <CircleNotch size={17} className="animate-spin" aria-hidden />
+              <CircleNotch className="animate-spin" aria-hidden />
             ) : (
-              <ArrowLeft size={17} aria-hidden />
+              <ArrowLeft aria-hidden />
             )}
-          </button>
+          </Button>
           <div
             role="progressbar"
             aria-valuenow={step + 1}
@@ -800,14 +802,15 @@ export function OnboardingFlow({
               {/* saída honesta pros passos opcionais acumulados: conclui o
                   onboarding direto (mesmo concluirOnboarding do último
                   passo) — a ficha pode ser completada depois no Perfil */}
-              <button
+              <Button
                 type="button"
+                variant="link"
+                size="sm"
                 onClick={concluir}
                 disabled={pending}
-                className="min-h-9 px-4 text-xs text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline disabled:opacity-50"
               >
                 Pular tudo e começar
-              </button>
+              </Button>
             </div>
           )}
           {/* sempre type=button + requestSubmit explícito: um botão que vira

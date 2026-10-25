@@ -28,7 +28,7 @@ import { CopiarLink } from "@/components/forms/copiar-link";
 import { msgLinkWhatsApp } from "@/components/forms/link-shared";
 import { useOrigem } from "@/components/forms/use-origem";
 import { fade, T } from "@/components/motion";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -236,9 +236,9 @@ export function EnviarInstrumentoLote({
                               href={wa}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 rounded-md border border-input px-2 py-1 text-xs font-medium transition-colors hover:bg-muted"
+                              className={buttonVariants({ variant: "outline", size: "xs" })}
                             >
-                              <WhatsappLogo size={13} aria-hidden />
+                              <WhatsappLogo aria-hidden />
                               WhatsApp
                             </a>
                           )}

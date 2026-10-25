@@ -72,9 +72,22 @@ test.describe("agenda demo do especialista (REALIZA-207)", () => {
     await sec.getByRole("button", { name: "Remover quintas 18h–21h" }).click();
     await expect(page.getByText(DEMO_MSG).first()).toBeVisible();
 
-    // validação no cliente: sem dia nem horário não chega a chamar a action
+    // REALIZA-212: sem input nativo — dias são botões, o horário são rodas
+    // (spinbutton no teclado) e a data é uma faixa de dias
+    await expect(sec.locator('input[type="time"], input[type="date"]')).toHaveCount(0);
+    const inicioHora = sec.getByRole("spinbutton", { name: "Início: hora" }).first();
+    await expect(inicioHora).toHaveAttribute("aria-valuetext", "18 horas");
+    await inicioHora.press("ArrowDown");
+    await expect(inicioHora).toHaveAttribute("aria-valuetext", "19 horas");
+    await expect(sec.getByRole("radiogroup", { name: "Data" }).getByRole("radio").first()).toBeVisible();
+
+    // validação no cliente: sem dia escolhido não chega a chamar a action
     await sec.getByRole("button", { name: "Adicionar" }).first().click();
-    await expect(sec.getByText("Escolha o dia e os dois horários.")).toBeVisible();
+    await expect(sec.getByText("Escolha ao menos um dia.")).toBeVisible();
+    // vários dias de uma vez: um clique por dia, um Adicionar
+    await sec.getByRole("button", { name: "Segunda" }).click();
+    await sec.getByRole("button", { name: "Quarta" }).click();
+    await expect(sec.getByRole("button", { name: "Quarta" })).toHaveAttribute("aria-pressed", "true");
   });
 });
 

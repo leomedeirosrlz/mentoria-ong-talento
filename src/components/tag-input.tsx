@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { Plus } from "@phosphor-icons/react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { cn } from "cn";
 
 /** Teto default = CHECK profiles_areas_ok (0030). Interesses (0034,
@@ -104,7 +106,7 @@ export function TagInput({
         })}
       </div>
       <div className="flex items-center gap-2">
-        <input
+        <Input
           type="text"
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
@@ -118,17 +120,18 @@ export function TagInput({
           disabled={cheio}
           placeholder={placeholder}
           aria-label={inputLabel ?? placeholder}
-          className="min-h-11 min-w-0 flex-1 rounded-full border border-input bg-transparent px-4 text-sm outline-none transition-[border-color,box-shadow] duration-150 ease-snappy placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50"
+          className="min-w-0 flex-1 rounded-full px-4"
         />
-        <button
+        <Button
           type="button"
+          size="icon"
           onClick={adicionar}
           disabled={cheio || !draft.trim()}
           aria-label="Adicionar"
-          className="grid size-11 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground transition-all outline-none hover:bg-primary/80 active:scale-[0.97] focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-50 md:size-9"
+          className="shrink-0 rounded-full"
         >
-          <Plus size={16} weight="bold" aria-hidden />
-        </button>
+          <Plus weight="bold" aria-hidden />
+        </Button>
       </div>
       {/* contador vira o aviso de teto — aria-live anuncia a virada */}
       <p aria-live="polite" className="text-xs tabular-nums text-muted-foreground">

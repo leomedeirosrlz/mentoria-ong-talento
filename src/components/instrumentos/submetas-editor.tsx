@@ -6,6 +6,7 @@ import { Plus, X } from "@phosphor-icons/react";
 import { parseSubmetasLinhas, PDM_MAX_SUBITENS } from "@/lib/pdm";
 import type { FormularioCampo } from "@/lib/forms/schema";
 import { T } from "@/components/motion";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { campoErroId, ErroCampo, RotuloCampo } from "./campos";
 import type { RespostaApi } from "./use-resposta";
@@ -147,14 +148,16 @@ export function SubmetasEditor({
                 aria-invalid={erro ? true : undefined}
                 aria-describedby={erro ? campoErroId(campo) : undefined}
               />
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="icon-sm"
                 onClick={() => commit(linhas.filter((x) => x.k !== l.k))}
                 aria-label={`Remover submeta ${i + 1}${rotulo}`}
-                className="grid size-11 shrink-0 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:size-8"
+                className="shrink-0 text-muted-foreground"
               >
-                <X size={15} aria-hidden />
-              </button>
+                <X aria-hidden />
+              </Button>
             </motion.li>
           ))}
         </AnimatePresence>
@@ -165,14 +168,15 @@ export function SubmetasEditor({
           Até {PDM_MAX_SUBITENS} submetas por meta.
         </p>
       ) : (
-        <button
+        <Button
           type="button"
+          variant="outline"
+          className="w-full border-dashed"
           onClick={() => adicionar()}
-          className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-input px-4 py-3 text-sm font-medium text-muted-foreground transition-colors hover:border-[var(--brand-lime)] hover:text-foreground"
         >
-          <Plus size={15} aria-hidden />
+          <Plus aria-hidden />
           Adicionar submeta
-        </button>
+        </Button>
       )}
 
       <ErroCampo campo={campo} msg={erro} />

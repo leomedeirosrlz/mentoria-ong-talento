@@ -1,3 +1,4 @@
+import type { Locator } from "@playwright/test";
 import {
   appEnvOk,
   atualizarViaServiceRole,
@@ -197,6 +198,23 @@ async function convergirPiso() {
   );
 }
 
+/** Gira a roda de hora (`n`-ésimo seletor da seção: 0 = toda semana,
+ *  1 = exceção) até `h` — Home zera, cada ↓ sobe uma hora. */
+async function roda(sec: Locator, n: number, qual: "Início" | "Fim", h: number) {
+  const hora = sec.getByRole("spinbutton", { name: `${qual}: hora` }).nth(n);
+  await hora.press("Home");
+  for (let i = 0; i < h; i++) await hora.press("ArrowDown");
+  await expect(hora).toHaveAttribute("aria-valuetext", `${h} horas`);
+}
+const datas = (sec: Locator) => sec.getByRole("radiogroup", { name: "Data" });
+const DOW = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
+const MES = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+/** nome acessível do dia na faixa de datas: "qua, 29 de out". */
+function rotuloData(iso: string): string {
+  const d = new Date(`${iso}T12:00:00Z`);
+  return `${DOW[d.getUTCDay()]}, ${d.getUTCDate()} de ${MES[d.getUTCMonth()]}`;
+}
+
 test.describe("mentor especialista — agenda (REALIZA-111)", () => {
   test.beforeEach(convergirPiso);
   test.afterEach(convergirPiso);
@@ -259,10 +277,10 @@ test.describe("mentor especialista — agenda (REALIZA-111)", () => {
     await expect(sec.getByText("Terças 19h–21h")).toBeVisible();
 
     // ---- adiciona faixa: quarta 19:00–21:00 (dia novo, não pisa na fixture)
-    await sec.getByRole("combobox", { name: /^Dia/ }).click();
-    await page.getByRole("option", { name: "Quarta" }).click();
-    await sec.locator("#horarios-de").fill("19:00");
-    await sec.locator("#horarios-ate").fill("21:00");
+    // REALIZA-212: dia é botão, horário é roda (spinbutton no teclado)
+    await sec.getByRole("button", { name: "Quarta" }).click();
+    await roda(sec, 0, "Início", 19);
+    await roda(sec, 0, "Fim", 21);
     await sec.getByRole("button", { name: "Adicionar" }).first().click();
     // pós-write: server action + refresh (convenção da suite: 15s)
     await expect(sec.getByText("Quartas 19h–21h")).toBeVisible({
@@ -281,9 +299,9 @@ test.describe("mentor especialista — agenda (REALIZA-111)", () => {
 
     // ---- horário a mais, datado: amanhã 14–16
     await sec.getByText("Posso a mais", { exact: true }).click();
-    await sec.locator("#horarios-exc-data").fill(dataExtra);
-    await sec.locator("#horarios-exc-de").fill("14:00");
-    await sec.locator("#horarios-exc-ate").fill("16:00");
+    await datas(sec).getByRole("radio", { name: rotuloData(dataExtra) }).click();
+    await roda(sec, 1, "Início", 14);
+    await roda(sec, 1, "Fim", 16);
     await sec.getByRole("button", { name: "Adicionar" }).last().click();
     await expect(
       sec.getByText(`Atende também em ${ddmm(dataExtra)}, 14h–16h`)
@@ -291,9 +309,9 @@ test.describe("mentor especialista — agenda (REALIZA-111)", () => {
 
     // ---- bloqueio: a terça da semana seguinte, na faixa inteira
     await sec.getByText("Não posso", { exact: true }).click();
-    await sec.locator("#horarios-exc-data").fill(isoBloqueio);
-    await sec.locator("#horarios-exc-de").fill("19:00");
-    await sec.locator("#horarios-exc-ate").fill("21:00");
+    await datas(sec).getByRole("radio", { name: rotuloData(isoBloqueio) }).click();
+    await roda(sec, 1, "Início", 19);
+    await roda(sec, 1, "Fim", 21);
     await sec.getByRole("button", { name: "Adicionar" }).last().click();
     await expect(
       sec.getByText(`Não atende em ${ddmm(isoBloqueio)}, 19h–21h`)

@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { headers } from "next/headers";
 import Link from "next/link";
 import {
   getCicloEventos,
@@ -18,12 +17,11 @@ import {
 } from "@/lib/ciclo";
 import { EMAIL_ENVIO_LIBERADO } from "@/lib/email";
 import { turmaLonga } from "@/lib/turma";
-import { temPapel, type Material } from "@/lib/types";
+import { temPapel } from "@/lib/types";
 import { FolderOpen } from "@phosphor-icons/react/dist/ssr";
 import { NovoMaterialDialog } from "@/components/novo-material-dialog";
-import { PainelJornada } from "@/components/painel-jornada";
 import { PageHeader } from "@/components/page-header";
-import { MateriaisBiblioteca } from "@/components/materiais-biblioteca";
+import { BibliotecaLista } from "@/components/biblioteca-lista";
 import {
   MateriaisAbas,
   type AbaMateriais,
@@ -32,7 +30,6 @@ import {
 import { InstrumentosPrograma } from "./instrumentos-programa";
 import {
   particionarMateriais,
-  temConteudo,
   titulosPorNumero,
 } from "@/components/materiais-hub";
 import {
@@ -71,16 +68,14 @@ export default async function MateriaisPage({
   // encontro_num do material é por programa (o guia do 5º vale pras duas
   // turmas) — o teto do hub é o maior nº que existe, não a soma das linhas
   const maxEncontro = maxNumeroEncontro(eventos);
-  const { porEncontro, nums, transversais } = particionarMateriais(
+  const { porEncontro, transversais } = particionarMateriais(
     visiveis,
     maxEncontro
   );
   const titulos = titulosPorNumero(eventos);
 
-  // REALIZA-184 — dashboard da biblioteca:
-  // · encontroAtual = o vigente do calendário oficial (eventoDaSemana por
-  //   cronograma — com duas turmas defasadas fica o MENOR nº: a semana em
-  //   que as duas ainda convivem); abre e marca a linha dele no desktop.
+  // encontroAtual = o vigente do calendário oficial (eventoDaSemana por
+  // cronograma — com duas turmas defasadas fica o MENOR nº)
   const agora = new Date();
   const cronogramaIds = [...new Set(eventos.map((e) => e.cronograma_id))];
   const numsVigentes = cronogramaIds
@@ -89,33 +84,6 @@ export default async function MateriaisPage({
     )
     .filter((n): n is number => n != null);
   const encontroAtual = numsVigentes.length ? Math.min(...numsVigentes) : null;
-  // · KPI "último item": a tabela materiais tem created_at e o select("*")
-  //   devolve — o tipo Material é que ainda não declara (demora do schema).
-  const datasCriacao = (visiveis as (Material & { created_at?: string })[])
-    .map((m) => m.created_at)
-    .filter((d): d is string => Boolean(d))
-    .sort();
-  const ultimoIso = datasCriacao.at(-1) ?? null;
-  const stats = {
-    cobertos: nums.filter((n) =>
-      (porEncontro.get(n) ?? []).some(temConteudo)
-    ).length,
-    teto: nums.length,
-    publicados: visiveis.filter(temConteudo).length,
-    emBreve: visiveis.length - visiveis.filter(temConteudo).length,
-    ultimo: ultimoIso
-      ? new Intl.DateTimeFormat("pt-BR", {
-          day: "numeric",
-          month: "short",
-          timeZone: "America/Sao_Paulo",
-        }).format(new Date(ultimoIso))
-      : null,
-  };
-  // · default por viewport via UA — heurística de DEFAULT (quem receber
-  //   "errado" só desfaz com um toque), não detecção de feature: SSR sai no
-  //   estado certo sem flash de collapse pós-hidratação
-  const ua = (await headers()).get("user-agent") ?? "";
-  const mobile = /Android|iPhone|iPad|iPod|Mobile/i.test(ua);
 
   // WP7 — o painel "Progresso da jornada" é staff-only (a RPC valida
   // coord/supervisor; a chamada nem rola fora dos dois papéis). status +
@@ -149,6 +117,7 @@ export default async function MateriaisPage({
       {
         status: d.status,
         mentorWhatsapp: d.mentor?.whatsapp ?? null,
+        jovemWhatsapp: d.mentorado?.whatsapp ?? null,
         jovemTemEmail: !!d.mentorado?.email?.trim(),
         mentorTemEmail: !!d.mentor?.email?.trim(),
       },
@@ -263,19 +232,18 @@ export default async function MateriaisPage({
     }
   }
 
-  // abas por papel: coord/supervisor abrem na Jornada; mentor e especialista
-  // abrem na Biblioteca (o acervo é o que eles mais usam)
+  // duas abas: Instrumentos (staff abre aqui — o estado da coorte e a fila
+  // de atrasados moram nos cards) e Biblioteca. A antiga aba Jornada saiu:
+  // o retrato fino por dupla é da ficha. Mentor e especialista abrem na
+  // Biblioteca (o acervo é o que eles mais usam)
   const abas: AbaMaterialItem[] = [
-    ...(painel.length > 0 && me
-      ? [{ id: "jornada" as const, rotulo: "Jornada" }]
-      : []),
     ...(veInstrumentos
       ? [{ id: "instrumentos" as const, rotulo: "Instrumentos" }]
       : []),
     { id: "biblioteca" as const, rotulo: "Biblioteca" },
   ];
   const padrao: AbaMateriais =
-    painel.length > 0 && me ? "jornada" : "biblioteca";
+    painel.length > 0 && veInstrumentos ? "instrumentos" : "biblioteca";
   const ativa: AbaMateriais = abas.some((a) => a.id === abaParam)
     ? (abaParam as AbaMateriais)
     : padrao;
@@ -288,7 +256,7 @@ export default async function MateriaisPage({
         title="Materiais"
         meta={
           ehCoord
-            ? "Guias, modelos e instrumentos do programa, publicados por encontro"
+            ? "Instrumentos da jornada e o acervo do programa"
             : "Guias e instrumentos do programa. A coordenação publica conforme a jornada avança"
         }
         actions={
@@ -299,16 +267,7 @@ export default async function MateriaisPage({
       />
 
       <MateriaisAbas abas={abas} ativa={ativa}>
-        {ativa === "jornada" && me && painel.length > 0 ? (
-          <PainelJornada
-            linhas={painel}
-            eventos={eventos}
-            nudges={nudges}
-            duplasInfo={duplasInfo}
-            meuNome={me.nome_social || me.nome}
-            ehSupervisor={!ehCoord}
-          />
-        ) : ativa === "instrumentos" && veInstrumentos ? (
+        {ativa === "instrumentos" && veInstrumentos ? (
           <InstrumentosPrograma
             papel={papelInstrumentos}
             linhas={painel}
@@ -317,6 +276,8 @@ export default async function MateriaisPage({
             formIds={formIds}
             envioLiberado={EMAIL_ENVIO_LIBERADO}
             fichasMentor={fichasMentor}
+            nudges={nudges}
+            meuNome={me?.nome_social || me?.nome || ""}
           />
         ) : visiveis.length === 0 ? (
           <div className="flex flex-col items-center gap-1.5 rounded-xl bg-card px-5 py-10 text-center shadow-[var(--shadow-border)]">
@@ -360,24 +321,12 @@ export default async function MateriaisPage({
             }
           />
         ) : (
-          /* hub por encontro (REALIZA-173) com cara de dashboard (REALIZA-184):
-             a trilha de cobertura responde "o que falta" num olhar e ancora no
-             <details> do encontro; chips filtram por audiência/tipo sem reload.
-             Só staff chega aqui agora — MaterialActions e NovoMaterialDialog
-             continuam renderizando só pra coord via ehCoord */
-          <MateriaisBiblioteca
-            stats={stats}
-            encontros={nums.map((n) => ({
-              n,
-              titulo: titulos.get(n),
-              itens: porEncontro.get(n) ?? [],
-            }))}
-            transversais={transversais}
+          /* staff: a biblioteca inteira numa lista só (REALIZA-210) —
+             editar/anexar/excluir no ⋯ de cada linha pra coord */
+          <BibliotecaLista
+            materiais={visiveis}
             ehCoord={ehCoord}
             maxEncontro={maxEncontro}
-            encontroAtual={encontroAtual}
-            mobile={mobile}
-            guiaPapel={vePainel ? "staff" : null}
           />
         )}
       </MateriaisAbas>

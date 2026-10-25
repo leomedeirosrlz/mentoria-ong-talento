@@ -51,6 +51,13 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 
@@ -383,18 +390,26 @@ function EditarContatoDialog({
           />
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor={`vinculo-${contato.id}`}>Vínculo</Label>
-          <select
-            id={`vinculo-${contato.id}`}
+          <Label id={`vinculo-${contato.id}-label`}>Vínculo</Label>
+          <Select
             value={vinculo}
-            onChange={(e) => setVinculo(e.target.value as TerceiroVinculo)}
-            className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+            onValueChange={(v) => v && setVinculo(v)}
+            items={VINCULO_LABEL}
           >
-            <option value="amigo">Amigo(a)</option>
-            <option value="familiar">Familiar</option>
-            <option value="colega">Colega</option>
-            <option value="outro">Outro</option>
-          </select>
+            <SelectTrigger
+              id={`vinculo-${contato.id}`}
+              aria-labelledby={`vinculo-${contato.id}-label vinculo-${contato.id}`}
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {(Object.keys(VINCULO_LABEL) as TerceiroVinculo[]).map((v) => (
+                <SelectItem key={v} value={v}>
+                  {VINCULO_LABEL[v]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         <div className="space-y-1.5">
           <Label htmlFor={`wa-${contato.id}`}>WhatsApp (opcional)</Label>
@@ -476,18 +491,26 @@ function NovoContatoDialog({
           />
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="novo-vinculo">Vínculo</Label>
-          <select
-            id="novo-vinculo"
+          <Label id="novo-vinculo-label">Vínculo</Label>
+          <Select
             value={vinculo}
-            onChange={(e) => setVinculo(e.target.value as TerceiroVinculo)}
-            className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+            onValueChange={(v) => v && setVinculo(v)}
+            items={VINCULO_LABEL}
           >
-            <option value="amigo">Amigo(a)</option>
-            <option value="familiar">Familiar</option>
-            <option value="colega">Colega</option>
-            <option value="outro">Outro</option>
-          </select>
+            <SelectTrigger
+              id="novo-vinculo"
+              aria-labelledby="novo-vinculo-label novo-vinculo"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {(Object.keys(VINCULO_LABEL) as TerceiroVinculo[]).map((v) => (
+                <SelectItem key={v} value={v}>
+                  {VINCULO_LABEL[v]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="novo-wa">WhatsApp (opcional)</Label>
