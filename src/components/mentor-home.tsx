@@ -42,7 +42,7 @@ export function MentorHome({
   espEventos = [],
   cronogramas = [],
   me,
-  aposPrimeiraDupla,
+  termo,
 }: {
   duplas: Dupla[];
   /** Calendário oficial DPP — a trilha especialista não o usa. */
@@ -53,9 +53,9 @@ export function MentorHome({
    *  não tem dupla DPP (o banner da semana continua fazendo sentido pra ele). */
   cronogramas?: Cronograma[];
   me: Profile;
-  /** Slot renderizado logo após o primeiro card de dupla ativa; sem dupla
-   *  ativa, no topo da home. */
-  aposPrimeiraDupla?: ReactNode;
+  /** Faixa de pendência (ex.: termo de adesão) em largura total — entra logo
+   *  abaixo do cabeçalho, antes dos cards de dupla, nunca dentro da grade. */
+  termo?: ReactNode;
 }) {
   const hoje = new Date();
   // "Semana do Nº" é do cronograma da dupla DPP do mentor (0061) — mentor com
@@ -104,34 +104,34 @@ export function MentorHome({
   return (
     // >1 dupla: em xl os cards abrem 2 colunas — a 1280px o card cheio deixa
     // os sub-painéis internos (sm:grid-cols-2) largos demais pra leitura.
-    // gap-8 no lugar de space-y-8 mantém o ritmo vertical idêntico; header e
-    // empty state cravam col-span-2 pra continuar full-width no xl
+    // gap-8 no lugar de space-y-8 mantém o ritmo vertical idêntico; o grupo
+    // do cabeçalho e o empty state cravam col-span-2 pra continuar full-width
     <div className={cn("grid gap-8", duplas.length > 1 && "xl:grid-cols-2")}>
-      <header className={duplas.length > 1 ? "xl:col-span-2" : undefined}>
-        <h1 className="text-2xl font-semibold tracking-tight">Olá, {me.nome.split(" ")[0]}</h1>
-        {eventoSemana && !soEspecialista && (
-          <p className="text-sm text-muted-foreground mt-1 flex items-center gap-1.5">
-            <span aria-hidden className="size-2 shrink-0 rounded-full bg-[var(--brand-lime)]" />
-            <span>
-              <span className="font-medium text-foreground">
-                Semana do {eventoSemana.numero}º encontro
+      {/* cabeçalho + faixa de pendência formam um grupo só: a faixa é linha
+          única de largura total logo abaixo da "Semana do Nº", nunca célula
+          da grade (em xl ela esticava na altura do 1º card) */}
+      <div className={cn("space-y-4", duplas.length > 1 && "xl:col-span-2")}>
+        <header>
+          <h1 className="text-2xl font-semibold tracking-tight">Olá, {me.nome.split(" ")[0]}</h1>
+          {eventoSemana && !soEspecialista && (
+            <p className="text-sm text-muted-foreground mt-1 flex items-center gap-1.5">
+              <span aria-hidden className="size-2 shrink-0 rounded-full bg-[var(--brand-lime)]" />
+              <span>
+                <span className="font-medium text-foreground">
+                  Semana do {eventoSemana.numero}º encontro
+                </span>
+                {eventoSemana.fase ? ` · ${eventoSemana.fase}` : ""}
               </span>
-              {eventoSemana.fase ? ` · ${eventoSemana.fase}` : ""}
-            </span>
-          </p>
-        )}
-        {algumSemRegistro && (
-          <p className="mt-1 text-sm text-muted-foreground">
-            Vocês marcam o encontro; depois registram aqui como foi.
-          </p>
-        )}
-      </header>
-
-      {ativas.length === 0 && aposPrimeiraDupla && (
-        <div className={duplas.length > 1 ? "xl:col-span-2" : undefined}>
-          {aposPrimeiraDupla}
-        </div>
-      )}
+            </p>
+          )}
+          {algumSemRegistro && (
+            <p className="mt-1 text-sm text-muted-foreground">
+              Vocês marcam o encontro; depois registram aqui como foi.
+            </p>
+          )}
+        </header>
+        {termo}
+      </div>
 
       {duplas.length === 0 && (
         <Card>
@@ -235,10 +235,12 @@ export function MentorHome({
               )?.data ?? undefined)
             : undefined;
 
+        // --card-spacing=5 no sm+: padding uniforme p-4→sm:p-5 no card
+        // inteiro via a var (header, content e gap vertical seguem juntos)
         const card = (
           <Card
             style={{ "--i": Math.min(i, 10) } as CSSProperties}
-            className="animate-enter overflow-hidden"
+            className="animate-enter overflow-hidden sm:[--card-spacing:--spacing(5)]"
           >
             {/* -mt cobre o py do Card — o banner ink encosta no topo;
                 pt/pb devolvem o respiro interno; a keyline lime na base é
@@ -284,11 +286,13 @@ export function MentorHome({
                       affordance própria, visível mesmo sem pendência */}
                   <Link
                     href={`/duplas/${dupla.id}`}
-                    className="group inline-flex min-h-11 items-center gap-0.5 rounded-lg px-2 text-xs font-medium text-white/70 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-lime)] md:min-h-7"
+                    className={cn(
+                      buttonVariants({ variant: "ghost", size: "sm" }),
+                      "group text-white/80 hover:bg-white/10 hover:text-white focus-visible:ring-[var(--brand-lime)]"
+                    )}
                   >
                     Abrir dupla
                     <CaretRight
-                      size={13}
                       aria-hidden
                       className="transition-transform group-hover:translate-x-0.5"
                     />
@@ -356,7 +360,9 @@ export function MentorHome({
                           ? "Se rolou, conte como foi."
                           : "Falta só o registro de como foi."}
                       </p>
-                      <div className="mt-3">
+                      {/* ação do painel sempre à direita — mesma régua do
+                          "n de N" da Jornada e do "Abrir dupla" no header */}
+                      <div className="mt-3 flex justify-end">
                         <Link
                           href={`/duplas/${dupla.id}?aba=encontros#registrar-${semRegistro.id}`}
                           className={buttonVariants({ size: "sm" })}
@@ -378,7 +384,7 @@ export function MentorHome({
                       <p className="text-sm text-muted-foreground mt-0.5">
                         {formatDateTime(agendado.data_hora)}
                       </p>
-                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                      <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
                         {/* na hora do encontro o link da chamada é a ação nº1 —
                             chip próprio, não texto corrido (mesmo fix do CC-1) */}
                         {linkSeguro(agendado.link) && (
@@ -386,9 +392,9 @@ export function MentorHome({
                             href={linkSeguro(agendado.link)!}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-[var(--ok)]/40 bg-[var(--ok)]/10 px-2.5 text-sm font-medium text-[var(--ok-text)] transition-colors hover:bg-[var(--ok)]/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:min-h-7"
+                            className={buttonVariants({ variant: "outline", size: "sm" })}
                           >
-                            <VideoCamera size={16} aria-hidden />
+                            <VideoCamera aria-hidden />
                             Entrar na chamada
                             <span className="sr-only"> (abre em nova aba)</span>
                           </a>
@@ -431,7 +437,7 @@ export function MentorHome({
                           ? "Remarque quando puder."
                           : "Se rolou, registre na ficha da dupla; se não, remarque."}
                       </p>
-                      <div className="mt-3">
+                      <div className="mt-3 flex justify-end">
                         <AgendarEncontroDialog
                           duplaId={dupla.id}
                           numero={proximoNumero}
@@ -464,7 +470,7 @@ export function MentorHome({
                           ? `Sugerido: ${formatDate(sugeridoProximo)}`
                           : "Data a combinar"}
                       </p>
-                      <div className="mt-3">
+                      <div className="mt-3 flex justify-end">
                         <AgendarEncontroDialog
                           duplaId={dupla.id}
                           numero={proximoNumero}
@@ -496,8 +502,10 @@ export function MentorHome({
                 </div>
               </section>
 
-              {/* combinados: mesma superfície, separados por divisória */}
-              <section className="border-t border-border/60 pt-4">
+              {/* combinados: mesma superfície, separados por divisória —
+                  pt-5 espelha o space-y-5 acima dela (a régua fica centrada
+                  no mesmo respiro de 20px que separa os blocos) */}
+              <section className="border-t border-border/60 pt-5">
                 <h3 className="text-sm font-semibold">Combinados abertos</h3>
                 <div className="mt-2">
                   {pendentes.length === 0 ? (
@@ -552,14 +560,7 @@ export function MentorHome({
             </CardContent>
           </Card>
         );
-        // no xl o slot cai na 2ª coluna ao lado do primeiro card, sem span:
-        // ocupa a célula vazia em vez de abrir um buraco na grade
-        return (
-          <Fragment key={dupla.id}>
-            {card}
-            {i === 0 && aposPrimeiraDupla}
-          </Fragment>
-        );
+        return <Fragment key={dupla.id}>{card}</Fragment>;
       })}
 
       {concluidas.length > 0 && (
@@ -593,11 +594,13 @@ export function MentorHome({
                   </div>
                   <Link
                     href={`/duplas/${dupla.id}`}
-                    className="group inline-flex min-h-11 items-center gap-0.5 rounded-lg px-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:min-h-7"
+                    className={cn(
+                      buttonVariants({ variant: "ghost", size: "sm" }),
+                      "group text-muted-foreground"
+                    )}
                   >
                     Abrir dupla
                     <CaretRight
-                      size={13}
                       aria-hidden
                       className="transition-transform group-hover:translate-x-0.5"
                     />

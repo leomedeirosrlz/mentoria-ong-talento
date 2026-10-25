@@ -121,10 +121,6 @@ export function AgendaSuaSemana({
           );
         })}
       </ol>
-      <p className="text-xs text-muted-foreground">
-        Contador colorido = é seu · âmbar tracejado = só acompanha. Toque num
-        dia pra abrir no calendário.
-      </p>
     </section>
   );
 }

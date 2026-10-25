@@ -42,18 +42,13 @@ import type {
 
 const METRICAS_BARRA = [
   {
+    // um gráfico só pra "aconteceu" e "registrou" (REALIZA-211): cor cheia
+    // = realizado com registro, cor clara = aconteceu e falta o registro
     id: "entregues",
-    rotulo: "Registros",
-    titulo: "Registros entregues por encontro",
-    legendaFeito: "entregues",
+    rotulo: "Encontros",
+    titulo: "Encontros realizados e registrados",
+    legendaFeito: "registrados",
     ariaFeito: "registros entregues",
-  },
-  {
-    id: "realizados",
-    rotulo: "Realizados",
-    titulo: "Encontros realizados por encontro",
-    legendaFeito: "realizados",
-    ariaFeito: "encontros realizados",
   },
   {
     id: "avaliados",
@@ -77,7 +72,10 @@ type ModoLinha = (typeof MODOS_LINHA)[number]["id"];
 const corTurma = (i: number) => `var(--chart-${(i % 5) + 1})`;
 
 const feitoDe = (c: PanoramaCelula, m: MetricaBarra): number =>
-  m === "realizados" ? c.realizados : m === "avaliados" ? c.avaliados : c.entregues;
+  m === "avaliados" ? c.avaliados : c.entregues;
+/** aconteceu mas o mentor ainda não registrou — a faixa clara da barra. */
+const semRegistroDe = (c: PanoramaCelula): number =>
+  Math.max(c.realizados - c.entregues, 0);
 
 const mediaDe = (vs: number[]): number | null =>
   vs.length ? vs.reduce((s, v) => s + v, 0) / vs.length : null;
@@ -417,12 +415,19 @@ export function RegistrosPainel({
                   {
                     termo: "Parte vazia do trilho",
                     texto:
-                      metrica === "realizados"
-                        ? "Encontro que ainda não aconteceu."
-                        : metrica === "avaliados"
-                          ? "Encontro sem a avaliação do jovem."
-                          : "Registro pendente ou encontro não realizado.",
+                      metrica === "avaliados"
+                        ? "Encontro sem a avaliação do jovem."
+                        : "Encontro que não aconteceu (ou ainda vai acontecer).",
                   },
+                  ...(metrica === "entregues"
+                    ? [
+                        {
+                          termo: "Cor cheia × cor clara",
+                          texto:
+                            "Cheia: o encontro aconteceu e o mentor registrou. Clara: aconteceu, mas o registro ainda não chegou.",
+                        },
+                      ]
+                    : []),
                   ...(notaEsp ? [{ termo: "Trilhas de especialista", texto: notaEsp }] : []),
                 ]}
               />
@@ -514,7 +519,9 @@ export function RegistrosPainel({
                             let base = 0;
                             return vivos.map((c) => {
                               const feitoC = feitoDe(c, metrica);
-                              const falta = Math.max(c.esperadas - feitoC, 0);
+                              const claro =
+                                metrica === "entregues" ? semRegistroDe(c) : 0;
+                              const falta = Math.max(c.esperadas - feitoC - claro, 0);
                               const cor = corDe.get(c.cronogramaId)!;
                               const seg = (
                                 <span key={c.cronogramaId}>
@@ -526,11 +533,21 @@ export function RegistrosPainel({
                                       backgroundColor: cor,
                                     }}
                                   />
-                                  {c.estado === "semana" && falta > 0 && (
+                                  {claro > 0 && (
                                     <span
                                       className="absolute inset-x-0 transition-[height,bottom] duration-500 ease-snappy"
                                       style={{
                                         bottom: base + feitoC * escala,
+                                        height: claro * escala,
+                                        backgroundColor: `color-mix(in srgb, ${cor} 35%, transparent)`,
+                                      }}
+                                    />
+                                  )}
+                                  {c.estado === "semana" && falta > 0 && (
+                                    <span
+                                      className="absolute inset-x-0 transition-[height,bottom] duration-500 ease-snappy"
+                                      style={{
+                                        bottom: base + (feitoC + claro) * escala,
                                         height: falta * escala,
                                         backgroundImage: `repeating-linear-gradient(135deg, color-mix(in srgb, ${cor} 22%, transparent) 0 5px, transparent 5px 11px)`,
                                       }}
@@ -609,6 +626,18 @@ export function RegistrosPainel({
                   {t.rotulo}
                 </span>
               ))}
+              {metrica === "entregues" && (
+                <span className="inline-flex items-center gap-1.5">
+                  <i
+                    aria-hidden
+                    className="inline-block size-2.5 rounded-[3px]"
+                    style={{
+                      backgroundColor: `color-mix(in srgb, ${corTurma(0)} 35%, transparent)`,
+                    }}
+                  />
+                  aconteceu, falta o registro
+                </span>
+              )}
               <span className="inline-flex items-center gap-1.5">
                 <i
                   aria-hidden
@@ -652,7 +681,7 @@ export function RegistrosPainel({
                         Enc.
                       </th>
                       <th scope="col" className="py-1 pr-3 font-medium">
-                        {met.rotulo}
+                        {metrica === "entregues" ? "Registrados" : met.rotulo}
                       </th>
                       <th scope="col" className="py-1 pr-3 font-medium">
                         Esperados

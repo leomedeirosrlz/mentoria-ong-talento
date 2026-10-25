@@ -1,13 +1,23 @@
 "use client";
 
-// /registros no desktop (lg+): lista compacta à esquerda, registro completo à
-// direita. A seleção mora na URL (`?r=<id>`), então o deep link, o voltar do
-// navegador e o Cmd+click funcionam como nos chips da página. Setas movem o
-// foco entre as linhas e trocam a seleção com `replace` (não enche o histórico).
+// /registros: lista compacta + registro completo. No desktop (lg+) o
+// registro fica à direita; no celular a mesma lista ocupa a tela e o
+// registro abre numa folha por cima (REALIZA-211 — a timeline de cards
+// inteiros dava ~17 mil px de rolagem). A seleção mora na URL (`?r=<id>`),
+// então o deep link, o voltar do navegador e o Cmd+click funcionam como nos
+// chips da página. Setas movem o foco entre as linhas e trocam a seleção
+// com `replace` (não enche o histórico).
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useRef, type CSSProperties, type KeyboardEvent, type ReactNode } from "react";
+import {
+  useRef,
+  useSyncExternalStore,
+  type CSSProperties,
+  type KeyboardEvent,
+  type ReactNode,
+} from "react";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { DuplaNomes } from "@/components/dupla-nomes";
 import { RegistroDetalhe, type EntradaRegistro } from "@/components/registros-detalhe";
 import { AVALIACAO_LABEL, formatDiaMes, registroTardio } from "@/lib/ciclo";
@@ -37,6 +47,13 @@ const AVALIACAO_TEXTO: Record<string, string> = {
   baixa: "text-[var(--warn-text)]",
 };
 
+const MQ_DESKTOP = "(min-width: 1024px)";
+function assinaDesktop(cb: () => void) {
+  const mq = window.matchMedia(MQ_DESKTOP);
+  mq.addEventListener("change", cb);
+  return () => mq.removeEventListener("change", cb);
+}
+
 export function RegistrosMestreDetalhe({
   secoes,
   selecionadoId,
@@ -61,6 +78,13 @@ export function RegistrosMestreDetalhe({
 }) {
   const router = useRouter();
   const listaRef = useRef<HTMLDivElement>(null);
+  // SSR = desktop: a folha só abre depois da hidratação no celular, nunca
+  // pisca aberta no desktop
+  const desktop = useSyncExternalStore(
+    assinaDesktop,
+    () => window.matchMedia(MQ_DESKTOP).matches,
+    () => true
+  );
   const exibidos = secoes.flatMap((s) => s.blocos.flatMap((b) => b.itens));
   const sel =
     exibidos.find((e) => e.r.id === selecionadoId) ?? exibidos[0] ?? null;
@@ -101,13 +125,17 @@ export function RegistrosMestreDetalhe({
   if (!sel) return null;
 
   const posicao = new Map(exibidos.map((e, i) => [e.r.id, i]));
+  // no celular só há seleção quando a URL pede (?r=) — sem ela a lista
+  // não marca ninguém e a folha fica fechada
+  const escolhido = selecionadoId != null && sel.r.id === selecionadoId;
+  const marcado = desktop || escolhido ? sel.r.id : null;
   return (
     <div className="grid gap-4 lg:grid-cols-[minmax(17rem,2fr)_minmax(0,3fr)] lg:items-start">
       <div
         key={chaveLista}
         ref={listaRef}
         onKeyDown={onKeyDown}
-        className="scroll-fina min-w-0 lg:max-h-[38rem] lg:overflow-y-auto lg:pr-1"
+        className="scroll-fina min-w-0 rounded-xl bg-card p-1.5 shadow-[var(--shadow-border)] lg:max-h-[38rem] lg:overflow-y-auto"
       >
         {secoes.map((sec) => {
           const TagGrupo = sec.titulo ? "h3" : "h2";
@@ -141,7 +169,8 @@ export function RegistrosMestreDetalhe({
                       <li key={e.r.id}>
                         <LinhaRegistro
                           entrada={e}
-                          ativo={e.r.id === sel.r.id}
+                          ativo={e.r.id === marcado}
+                          foco={e.r.id === sel.r.id}
                           href={hrefDe(e.r.id)}
                           indice={posicao.get(e.r.id) ?? 0}
                           mostrarTema={agrupadoPorDupla}
@@ -157,9 +186,24 @@ export function RegistrosMestreDetalhe({
         {rodape && <div className="pt-3">{rodape}</div>}
       </div>
 
-      <div className="min-w-0 lg:sticky lg:top-4">
+      <div className="hidden min-w-0 lg:sticky lg:top-4 lg:block">
         <RegistroDetalhe key={sel.r.id} entrada={sel} souCoord={souCoord} />
       </div>
+
+      <Dialog
+        open={!desktop && escolhido}
+        onOpenChange={(aberto) => {
+          if (!aberto) router.replace(hrefBase, { scroll: false });
+        }}
+      >
+        <DialogContent
+          size="xl"
+          className="gap-0 bg-transparent p-0 shadow-none"
+        >
+          <DialogTitle className="sr-only">Registro do encontro</DialogTitle>
+          <RegistroDetalhe entrada={sel} souCoord={souCoord} />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -169,12 +213,15 @@ export function RegistrosMestreDetalhe({
 function LinhaRegistro({
   entrada,
   ativo,
+  foco,
   href,
   indice,
   mostrarTema,
 }: {
   entrada: EntradaRegistro;
   ativo: boolean;
+  /** a linha que recebe o Tab (roving tabindex) — a selecionada, ou a 1ª */
+  foco: boolean;
   href: string;
   indice: number;
   mostrarTema: boolean;
@@ -192,7 +239,7 @@ function LinhaRegistro({
       href={href}
       scroll={false}
       data-registro={r.id}
-      tabIndex={ativo ? 0 : -1}
+      tabIndex={foco ? 0 : -1}
       aria-current={ativo ? "true" : undefined}
       style={{ "--i": Math.min(indice, 10) } as CSSProperties}
       className={cn(

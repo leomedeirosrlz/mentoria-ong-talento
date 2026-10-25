@@ -1,4 +1,4 @@
-import type { Page } from "@playwright/test";
+import type { Locator } from "@playwright/test";
 import {
   appEnvOk,
   atualizarViaServiceRole,
@@ -11,8 +11,8 @@ import {
 } from "../helpers";
 
 // Agenda real do especialista (REALIZA-111 / migration 0073) contra backend
-// real. Cobre o card "Sua agenda" do /agenda (grade semanal, exceções
-// datadas e a projeção "Próximos horários livres" que acompanha cada edição)
+// real. Cobre a agenda do especialista (lista + resumo dos horários) e o
+// editor de horários do perfil (#horarios: faixas semanais e exceções),
 // e o lado do jovem na /jovem/agenda (seção "Mentoria especializada": slots
 // chegam por PROJEÇÃO da RPC definer — nunca a grade crua; combinar é fora
 // do app, via WhatsApp; e "Remarcar" não renderiza na trilha esp porque a
@@ -198,23 +198,21 @@ async function convergirPiso() {
   );
 }
 
-/** WP4: a grade visual semanal é a superfície default do card "Sua
- *  agenda" — as seções de edição ("Toda semana"/"Dias específicos") agora
- *  moram num <details> "Editar grade" fechado por default quando a grade
- *  não é vazia (a fixture tem a janela de terça → fechado). Idempotente:
- *  chamar de novo com o details aberto não faz nada, então vai antes de
- *  TODO write/leitura do editor — um router.refresh() pós-action pode
- *  re-colapsar o painel. */
-async function abrirEditarGrade(page: Page) {
-  const summary = page
-    .locator("summary")
-    .filter({ hasText: /Editar grade/ })
-    .first();
-  await summary.waitFor({ state: "visible", timeout: 15_000 });
-  const aberto = await summary.evaluate((el) =>
-    el.parentElement?.hasAttribute("open")
-  );
-  if (!aberto) await summary.click();
+/** Gira a roda de hora (`n`-ésimo seletor da seção: 0 = toda semana,
+ *  1 = exceção) até `h` — Home zera, cada ↓ sobe uma hora. */
+async function roda(sec: Locator, n: number, qual: "Início" | "Fim", h: number) {
+  const hora = sec.getByRole("spinbutton", { name: `${qual}: hora` }).nth(n);
+  await hora.press("Home");
+  for (let i = 0; i < h; i++) await hora.press("ArrowDown");
+  await expect(hora).toHaveAttribute("aria-valuetext", `${h} horas`);
+}
+const datas = (sec: Locator) => sec.getByRole("radiogroup", { name: "Data" });
+const DOW = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
+const MES = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+/** nome acessível do dia na faixa de datas: "qua, 29 de out". */
+function rotuloData(iso: string): string {
+  const d = new Date(`${iso}T12:00:00Z`);
+  return `${DOW[d.getUTCDay()]}, ${d.getUTCDate()} de ${MES[d.getUTCMonth()]}`;
 }
 
 test.describe("mentor especialista — agenda (REALIZA-111)", () => {
@@ -243,99 +241,52 @@ test.describe("mentor especialista — agenda (REALIZA-111)", () => {
     );
   });
 
-  test("especialista edita grade e exceções e a projeção acompanha", async ({
+  test("especialista edita horários no perfil e a agenda resume em frase", async ({
     page,
   }) => {
-    // a terça a bloquear é a SEGUINTE à próxima — o encontro do spec, de
-    // volta pra próxima terça no afterEach, é quem come os slots 19:00/19:30
-    // dela (é o que o teste do jovem usa pra provar a subtração)
+    // a terça a bloquear é a SEGUINTE à próxima — a próxima tem o encontro
+    // do piso, que o teste do jovem usa pra provar a subtração
     const tercaEncontro = proximaDataDow(2);
     const dataBloqueio = new Date(`${tercaEncontro}T12:00:00Z`);
     dataBloqueio.setUTCDate(dataBloqueio.getUTCDate() + 7);
     const isoBloqueio = dataBloqueio.toISOString().slice(0, 10);
-    const dataExtra = diaBrt(1); // amanhã — fora de qualquer janela da grade
-
-    // WP4: o bloco de sessão só desenha se cair na semana exibida (seg–dom)
-    // — a fixture senta na próxima terça, que já é a semana que vem quando
-    // o teste roda de qua a sáb. Ancora em hoje só pra este teste (o
-    // convergirPiso do afterEach devolve pra próxima terça).
-    await atualizarViaServiceRole("encontros", `id=eq.${IDS.encontroEsp}`, {
-      data_hora: `${diaBrt(0)}T19:30:00-03:00`,
-    });
+    const dataExtra = diaBrt(1); // amanhã, fora de qualquer faixa da grade
 
     await loginComSenha(page, ESP_EMAIL, SENHA);
     await page.goto("/agenda");
 
-    // card do editor + a fila real da dupla ao lado (mesma mentorada da DPP)
+    // REALIZA-207: a agenda é lista (próximas sessões + card da trilha) e o
+    // resumo dos horários em frase, com a edição no perfil
     await expect(
-      page.getByText("Sua agenda", { exact: true })
+      page
+        .locator('section[aria-label="Próximas sessões"]')
+        .getByText(/Mentorada/)
+        .first()
     ).toBeVisible();
     await expect(
-      page.getByText("Mentorada E2E", { exact: true })
+      page
+        .locator('section[aria-label="Suas trilhas"]')
+        .locator(`a[href^="/duplas/${IDS.duplaEsp}"]`)
     ).toBeVisible();
-    // o agendado da trilha já aparece na fila de "Próximos" do especialista —
-    // a linha é link com a data e o passo ("1º encontro, agendado para … ·
-    // próximo passo"), então ancora pelo nome parcial, não pelo texto exato.
-    // O href da dupla da fixture casa só a fila dela: o calendário ao lado
-    // linka o mesmo dia ("Ir para o 1º encontro, …") e duplas esp residuais
-    // de runs mortos em staging também teriam um "1º encontro" na fila.
-    await expect(
-      page.locator(
-        `a[href^="/duplas/${IDS.duplaEsp}"][aria-label^="1º encontro"]`
-      )
-    ).toBeVisible();
+    const atende = page.locator('section[aria-label="Quando você atende"]');
+    await expect(atende).toContainText("Terças 19h–21h");
+    await atende.getByRole("link", { name: "Editar no perfil" }).click();
+    await expect(page).toHaveURL(/\/perfil#horarios$/);
 
-    // WP4: a grade visual semanal renderiza a janela da fixture (terça
-    // 19–21) e a sessão …00d3 posicionada na terça — blocos com
-    // aria-label do contrato ("Terça 19h–21h disponível", "Sessão …")
-    await expect(
-      page.locator('[aria-label^="Terça"][aria-label*="disponível"]').first()
-    ).toBeVisible();
-    await expect(
-      page.locator('[aria-label^="Sessão"]').first()
-    ).toBeVisible();
+    const sec = page.locator("#horarios");
+    await expect(sec.getByText("Terças 19h–21h")).toBeVisible();
 
-    // as seções do editor moram no <details> "Editar grade" (fechado por
-    // default — a fixture já tem janela) — abre antes de ler/escrever nelas
-    await abrirEditarGrade(page);
-
-    const grade = page
-      .locator("section")
-      .filter({ has: page.getByRole("heading", { name: "Toda semana" }) });
-    const excecoes = page
-      .locator("section")
-      .filter({ has: page.getByRole("heading", { name: "Dias específicos" }) });
-    const livres = page
-      .locator("section")
-      .filter({
-        has: page.getByRole("heading", { name: "Próximos horários livres" }),
-      });
-
-    // a janela da fixture (terça 19–21) já projeta slots
-    const linhaTerca = grade.locator("li", { hasText: "Terça" });
-    await expect(linhaTerca.getByText("19:00–21:00")).toBeVisible();
-    await expect(
-      livres.getByText(/terça \d{2}\/\d{2} às 19:00/).first()
-    ).toBeVisible();
-
-    // ---- adiciona janela: quarta 19:00–21:00 (dia novo, não pisa na fixture)
-    await grade.getByLabel("Dia da semana").click();
-    await page.getByRole("option", { name: "Quarta" }).click();
-    await grade.getByLabel("Início do horário").fill("19:00");
-    await grade.getByLabel("Fim do horário").fill("21:00");
-    await grade.getByRole("button", { name: "Adicionar" }).click();
-
-    const linhaQuarta = grade.locator("li", { hasText: "Quarta" });
-    // os asserts pós-write deste spec esperam server action + refresh —
-    // em preview frio isso passa dos 5s default (convenção da suite: 15s)
-    await expect(linhaQuarta.getByText("19:00–21:00")).toBeVisible({
+    // ---- adiciona faixa: quarta 19:00–21:00 (dia novo, não pisa na fixture)
+    // REALIZA-212: dia é botão, horário é roda (spinbutton no teclado)
+    await sec.getByRole("button", { name: "Quarta" }).click();
+    await roda(sec, 0, "Início", 19);
+    await roda(sec, 0, "Fim", 21);
+    await sec.getByRole("button", { name: "Adicionar" }).first().click();
+    // pós-write: server action + refresh (convenção da suite: 15s)
+    await expect(sec.getByText("Quartas 19h–21h")).toBeVisible({
       timeout: 15_000,
     });
-    await expect(
-      livres.getByText(/quarta \d{2}\/\d{2} às 19:00/).first()
-    ).toBeVisible({ timeout: 15_000 });
 
-    // write real: a janela de quarta existe no banco (com as horas certas)
     const janelas = await buscarViaServiceRole<
       { id: string; hora_inicio: string; hora_fim: string }[]
     >(
@@ -346,64 +297,41 @@ test.describe("mentor especialista — agenda (REALIZA-111)", () => {
     expect(janelas[0].hora_inicio).toBe("19:00:00");
     expect(janelas[0].hora_fim).toBe("21:00:00");
 
-    // ---- horário extra datado: amanhã, fora da grade — vira slot no dia
-    await abrirEditarGrade(page); // o refresh pós-write pode re-colapsar
-    await excecoes.getByLabel("Tipo da exceção").click();
-    await page.getByRole("option", { name: "Horário extra" }).click();
-    await excecoes.getByLabel("Data da exceção").fill(dataExtra);
-    await excecoes.getByLabel("Início da exceção").fill("14:00");
-    await excecoes.getByLabel("Fim da exceção").fill("16:00");
-    await excecoes.getByRole("button", { name: "Adicionar" }).click();
-
-    const linhaExtra = excecoes.locator("li", { hasText: "14:00–16:00" });
-    await expect(linhaExtra.getByText("Extra", { exact: true })).toBeVisible({
-      timeout: 15_000,
-    });
-    // o extra projeta chips no dia — "dd/mm às 14:00" no dia de amanhã
+    // ---- horário a mais, datado: amanhã 14–16
+    await sec.getByText("Posso a mais", { exact: true }).click();
+    await datas(sec).getByRole("radio", { name: rotuloData(dataExtra) }).click();
+    await roda(sec, 1, "Início", 14);
+    await roda(sec, 1, "Fim", 16);
+    await sec.getByRole("button", { name: "Adicionar" }).last().click();
     await expect(
-      livres.getByText(new RegExp(`${ddmm(dataExtra)} às 14:00`))
+      sec.getByText(`Atende também em ${ddmm(dataExtra)}, 14h–16h`)
     ).toBeVisible({ timeout: 15_000 });
 
-    // ---- bloqueio datado: a terça da semana seguinte sai inteira da projeção
+    // ---- bloqueio: a terça da semana seguinte, na faixa inteira
+    await sec.getByText("Não posso", { exact: true }).click();
+    await datas(sec).getByRole("radio", { name: rotuloData(isoBloqueio) }).click();
+    await roda(sec, 1, "Início", 19);
+    await roda(sec, 1, "Fim", 21);
+    await sec.getByRole("button", { name: "Adicionar" }).last().click();
     await expect(
-      livres
-        .getByText(new RegExp(`terça ${ddmm(isoBloqueio)} às`))
-        .first()
-    ).toBeVisible();
-    await abrirEditarGrade(page);
-    await excecoes.getByLabel("Tipo da exceção").click();
-    await page.getByRole("option", { name: "Bloquear um dia" }).click();
-    await excecoes.getByLabel("Data da exceção").fill(isoBloqueio);
-    await excecoes.getByLabel("Início da exceção").fill("00:00");
-    await excecoes.getByLabel("Fim da exceção").fill("23:59");
-    await excecoes.getByRole("button", { name: "Adicionar" }).click();
-
-    const linhaBloqueio = excecoes.locator("li", { hasText: "00:00–23:59" });
-    await expect(
-      linhaBloqueio.getByText("Bloqueio", { exact: true })
+      sec.getByText(`Não atende em ${ddmm(isoBloqueio)}, 19h–21h`)
     ).toBeVisible({ timeout: 15_000 });
-    // o dia bloqueado some da projeção; as demais terças seguem com slots
-    await expect(
-      livres.getByText(new RegExp(`terça ${ddmm(isoBloqueio)} às`))
-    ).toHaveCount(0, { timeout: 15_000 });
-    await expect(
-      livres.getByText(/terça \d{2}\/\d{2} às/).first()
-    ).toBeVisible();
 
-    // ---- remove a janela criada pela UI — a fixture de terça fica intacta
-    await abrirEditarGrade(page);
-    await linhaQuarta
-      .getByRole("button", { name: "Remover horário de Quarta das 19:00" })
-      .click();
-    // a remoção é server action — a lista só some depois do roundtrip;
-    // em preview frio isso passa dos 5s default
-    await expect(linhaQuarta.getByText("19:00–21:00")).toHaveCount(0, {
+    const excs = await buscarViaServiceRole<{ data: string; tipo: string }[]>(
+      "especialista_excecoes",
+      `select=data,tipo&profile_id=eq.${IDS.espProfile}&order=data`
+    );
+    expect(excs).toEqual([
+      { data: dataExtra, tipo: "extra" },
+      { data: isoBloqueio, tipo: "bloqueio" },
+    ]);
+
+    // ---- remove a faixa criada pela UI; a fixture de terça fica intacta
+    await sec.getByRole("button", { name: "Remover quartas 19h–21h" }).click();
+    await expect(sec.getByText("Quartas 19h–21h")).toHaveCount(0, {
       timeout: 15_000,
     });
-    await expect(
-      livres.getByText(/quarta \d{2}\/\d{2} às 19:00/)
-    ).toHaveCount(0, { timeout: 15_000 });
-    await expect(linhaTerca.getByText("19:00–21:00")).toBeVisible();
+    await expect(sec.getByText("Terças 19h–21h")).toBeVisible();
     const janelasDepois = await buscarViaServiceRole<{ id: string }[]>(
       "especialista_grade",
       `select=id&profile_id=eq.${IDS.espProfile}&dia_semana=eq.3`

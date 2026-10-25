@@ -5,6 +5,7 @@ import { AutoavaliacaoMentorForm } from "@/components/autoavaliacao-mentor-form"
 import { EncerrarDuplaDialog } from "@/components/encerrar-dupla-dialog";
 import { EnviarFormularioDialog, type FormularioOpcao } from "@/components/enviar-formulario-dialog";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import type { Dupla, Encerramento } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -172,13 +173,10 @@ export function EncerramentoDupla({
                       }}
                       sugestao="360"
                       trigger={
-                        <button
-                          type="button"
-                          className="inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-[11px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-                        >
-                          <PaperPlaneTilt size={12} aria-hidden />
+                        <Button type="button" variant="outline" size="xs">
+                          <PaperPlaneTilt aria-hidden />
                           Gerar link de avaliação
-                        </button>
+                        </Button>
                       }
                     />
                   </span>

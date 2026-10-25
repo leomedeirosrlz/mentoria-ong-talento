@@ -68,6 +68,7 @@ import { DocumentosPessoa } from "@/components/documentos-pessoa";
 import { AssinaturasPessoa } from "@/components/assinaturas-pessoa";
 import { Avatar } from "@/components/avatar";
 import { Badge } from "@/components/ui/badge";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { DuplaAvatares } from "@/components/dupla-avatares";
 import { DuplaNomes } from "@/components/dupla-nomes";
 import { MentoradoActions } from "@/components/mentorado-actions";
@@ -456,9 +457,9 @@ export default async function PessoaPerfilPage({
                   href={wa}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-border px-2.5 text-xs text-muted-foreground transition-colors hover:border-[var(--brand-lime)]/60 hover:bg-[var(--brand-lime)]/15 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className={buttonVariants({ variant: "outline", size: "sm" })}
                 >
-                  <WhatsappLogo size={14} aria-hidden />
+                  <WhatsappLogo aria-hidden />
                   WhatsApp
                   <span className="sr-only"> (abre em nova aba)</span>
                 </a>
@@ -466,9 +467,13 @@ export default async function PessoaPerfilPage({
               {"email" in p && p.email && (
                 <a
                   href={`mailto:${p.email}`}
-                  className="inline-flex min-h-9 max-w-56 items-center gap-1.5 rounded-lg border border-border px-2.5 text-xs text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className={buttonVariants({
+                    variant: "outline",
+                    size: "sm",
+                    className: "max-w-56",
+                  })}
                 >
-                  <EnvelopeSimple size={14} aria-hidden className="shrink-0" />
+                  <EnvelopeSimple aria-hidden />
                   <span className="truncate">{p.email}</span>
                 </a>
               )}
@@ -479,9 +484,9 @@ export default async function PessoaPerfilPage({
                   href={perfilPro.linkedin}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-border px-2.5 text-xs text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className={buttonVariants({ variant: "outline", size: "sm" })}
                 >
-                  <LinkedinLogo size={14} aria-hidden />
+                  <LinkedinLogo aria-hidden />
                   LinkedIn
                   <span className="sr-only"> (abre em nova aba)</span>
                 </a>
@@ -616,14 +621,16 @@ export default async function PessoaPerfilPage({
                         emUso={emUso ?? 0}
                         trilha={t}
                         trigger={
-                          <button
+                          <Button
                             type="button"
-                            className="mt-0.5 inline-block text-xs font-normal text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline"
+                            variant="link"
+                            size="xs"
+                            className="mt-0.5"
                           >
                             {emUso != null && emUso >= capacidade
                               ? "aumentar →"
                               : "ajustar"}
-                          </button>
+                          </Button>
                         }
                       />
                     ) : undefined

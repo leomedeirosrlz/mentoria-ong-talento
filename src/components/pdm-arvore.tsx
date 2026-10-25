@@ -24,7 +24,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { buttonVariants } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { formatDate } from "@/lib/ciclo";
 import type { PdmItemStatus, PdmNo } from "@/lib/pdm";
 import { PDM_STATUS_LABEL } from "@/lib/pdm";
@@ -139,22 +139,23 @@ function NoPdm({
         {/* caret do nó — 44px de alvo no mobile (32px a partir de sm),
             gira com o estado */}
         {temFilhos ? (
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="icon-sm"
             onClick={() => setAberto((v) => !v)}
             aria-label={
               aberto
                 ? `Recolher subitens de "${no.titulo}"`
                 : `Expandir ${filhosVisiveis.length} subitens de "${no.titulo}"`
             }
-            className="grid size-11 shrink-0 place-items-center rounded-md text-muted-foreground outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring sm:size-8"
+            className="shrink-0 text-muted-foreground"
           >
             <CaretRight
-              size={15}
               className={cn("transition-transform", aberto && "rotate-90")}
               aria-hidden
             />
-          </button>
+          </Button>
         ) : (
           <span aria-hidden className="size-11 shrink-0 sm:size-8" />
         )}

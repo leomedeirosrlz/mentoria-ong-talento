@@ -3,6 +3,7 @@ import Link from "next/link";
 import { CaretRight, Lifebuoy } from "@phosphor-icons/react/dist/ssr";
 import { DuplaAvatares } from "@/components/dupla-avatares";
 import { DuplaNomes } from "@/components/dupla-nomes";
+import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 // ============================================================
@@ -243,10 +244,13 @@ export function DuplaLinha({
               href={fichaHref}
               aria-label={`Ver ficha da dupla de ${fichaNome}`}
               title="Ver ficha"
-              className="inline-grid size-11 shrink-0 place-items-center rounded-xl border border-border bg-card text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50 md:size-auto md:h-8 md:min-w-0 md:rounded-lg md:border-0 md:bg-transparent md:px-1.5 md:text-xs md:font-semibold md:text-foreground/80 md:hover:bg-muted md:hover:text-foreground"
+              className={cn(
+                buttonVariants({ variant: "ghost", size: "sm" }),
+                "w-11 shrink-0 px-0 text-muted-foreground md:w-auto md:px-2.5"
+              )}
             >
-              <span className="hidden whitespace-nowrap md:inline">Ver ficha ›</span>
-              <CaretRight size={15} weight="bold" aria-hidden className="md:hidden" />
+              <span className="hidden whitespace-nowrap md:inline">Ver ficha</span>
+              <CaretRight weight="bold" aria-hidden />
             </Link>
           </span>
         </div>

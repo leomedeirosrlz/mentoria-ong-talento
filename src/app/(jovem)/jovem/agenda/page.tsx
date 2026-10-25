@@ -22,6 +22,7 @@ import { JovemAgendarDialog } from "@/components/jovem-agendar-dialog";
 import { EditarLinkDialog } from "@/components/editar-link-dialog";
 import {
   DesmarcarEncontroJovem,
+  AconteceuJovem,
   NaoAconteceuJovem,
 } from "@/components/jovem-encontro-acoes";
 import { PedidoJovemMesa } from "@/components/jovem-pedido-item";
@@ -571,6 +572,12 @@ function EncontroLinha({
             alvo futuro) — "não aconteceu" não é a única saída do limbo */}
         {agendadoPassado && (
           <>
+            {/* "Aconteceu" libera a avaliação e a jornada sem esperar o
+                registro do mentor (0121) — menos o último encontro, que
+                conclui a dupla e segue sendo registro dele */}
+            {e.numero < (trilha === "especialista" ? 5 : 16) && (
+              <AconteceuJovem encontroId={e.id} />
+            )}
             {trilha !== "especialista" && (
               <JovemAgendarDialog
                 duplaId={e.dupla_id}

@@ -163,10 +163,12 @@ test.describe("solicitação de especialista v2 — fluxo staff (REALIZA-112)", 
     await expect(
       page.getByRole("button", { name: "Agendar encontro", exact: true })
     ).toHaveCount(0);
-    // dupla sem tentativa aberta explica a regra em vez de esconder
+    // dupla sem tentativa aberta: o card da trilha diz de onde a sessão
+    // vem, sem CTA de agendar nem de "propor"
     await expect(
-      page.getByText(/Sessão nova nasce de um pedido aceito/).first()
+      page.getByText(/ainda não tem data\. Ela é marcada quando .+ pedir e você aceitar/).first()
     ).toBeVisible();
+    await expect(page.getByRole("link", { name: /Propor/ })).toHaveCount(0);
 
     await page.goto("/");
     // home do especialista: o card "O que fazer agora" da trilha também não

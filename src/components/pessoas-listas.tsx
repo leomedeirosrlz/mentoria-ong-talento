@@ -1022,12 +1022,14 @@ function PessoaRow({
                   emUso={usoPrimario}
                   trilha={trilhaPrimaria}
                   trigger={
-                    <button
+                    <Button
                       type="button"
-                      className="-my-2 min-h-11 rounded-sm font-medium text-foreground underline underline-offset-2 transition-colors hover:text-foreground/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:my-0 sm:min-h-0"
+                      variant="link"
+                      size="sm"
+                      className="-my-2 sm:my-0"
                     >
                       ajustar
-                    </button>
+                    </Button>
                   }
                 />
               </>
@@ -1061,12 +1063,14 @@ function PessoaRow({
                           emUso={uso2}
                           trilha={trilha2}
                           trigger={
-                            <button
+                            <Button
                               type="button"
-                              className="-my-2 min-h-11 rounded-sm font-medium text-foreground underline underline-offset-2 transition-colors hover:text-foreground/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:my-0 sm:min-h-0"
+                              variant="link"
+                              size="sm"
+                              className="-my-2 sm:my-0"
                             >
                               ajustar
-                            </button>
+                            </Button>
                           }
                         />
                       </>

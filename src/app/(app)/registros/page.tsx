@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
-import type { CSSProperties } from "react";
 import { ClipboardText } from "@phosphor-icons/react/dist/ssr";
 import {
   getAlertasRegistros,
@@ -21,11 +20,8 @@ import {
 import {
   AVALIACAO_LABEL,
   DIFICULDADE_LABEL,
-  formatDiaNum,
-  formatMesAbrev,
   maxNumeroEncontro,
   passoEsp,
-  registroTardio,
   toDateStr,
 } from "@/lib/ciclo";
 import { RegistrosFiltros, type OrdemRegistros } from "@/components/registros-filtros";
@@ -43,7 +39,6 @@ import { turmaCurta, turmaLonga } from "@/lib/turma";
 import { buttonVariants } from "@/components/ui/button";
 import { ImportarRegistrosDialog } from "@/components/importar-registros-dialog";
 import { PageHeader } from "@/components/page-header";
-import { RegistroCard } from "@/components/registro-card";
 import { cn } from "@/lib/utils";
 import type { AvaliacaoJovem, Dificuldade, Encontro } from "@/lib/types";
 
@@ -296,92 +291,6 @@ export default async function RegistrosPage({
     pagina: null,
   });
 
-  /** Um item da timeline — extraído porque no modo prioridade a lista
-   *  vira duas ("Precisam de olho" / "Sem sinais de atenção"). */
-  function linhaRegistro(r: RegistroResumo, i: number, ultimo: boolean) {
-    const aconteceuEm = aconteceuEmDe(r);
-    const tardio = registroTardio(r, r.encontro);
-    return (
-      <li
-        key={r.id}
-        className="animate-enter flex gap-3 sm:gap-4"
-        style={{ "--i": Math.min(i, 10) } as CSSProperties}
-      >
-        <div
-          aria-hidden
-          className="flex w-10 shrink-0 flex-col items-center sm:w-12"
-        >
-          <p className="pt-4 text-center leading-none">
-            <span className="block text-sm font-semibold tabular-nums">
-              {formatDiaNum(aconteceuEm)}
-            </span>
-            <span className="mt-1 block text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground sm:text-[11px]">
-              {formatMesAbrev(aconteceuEm)}
-            </span>
-          </p>
-          {/* precedência do nó: apoio > tardio > ok — a cor é sinal
-              secundário; os badges no card carregam a informação */}
-          <span
-            className={cn(
-              "mt-2 size-2 shrink-0 rounded-full",
-              r.precisa_apoio
-                ? "bg-[var(--danger)]"
-                : tardio
-                  ? "bg-[var(--warn)]"
-                  : "bg-[var(--ok)]"
-            )}
-          />
-          {!ultimo && <span className="mt-1.5 w-px flex-1 bg-border" />}
-        </div>
-        <div className={cn("min-w-0 flex-1", !ultimo && "pb-5")}>
-          <RegistroCard
-            r={r}
-            tituloEncontro={tituloEncontro(r)}
-            passoEsp={passoDoEncontro(r)}
-            souCoord={souCoord}
-          />
-        </div>
-      </li>
-    );
-  }
-
-  /** Uma lista de registros particionada pelo `?grupo=` corrente — cada
-   *  bloco é cabeçalho + <ol> própria: o rail da timeline vive
-   *  dentro do grupo (o nó final de cada um fecha a linha, nada pendura
-   *  entre grupos). `Tag` desce o nível do cabeçalho quando a lista já está
-   *  sob a seção de prioridade ("Precisam de olho"). */
-  function listaAgrupada(lista: RegistroResumo[], Tag: "h2" | "h3") {
-    const grupos = agruparRegistros(lista, grupo);
-    return (
-      <div className="space-y-6">
-        {grupos.map((g) => (
-          // div, não <section>: 16 landmarks nomeados seriam ruído de
-          // navegação — o cabeçalho dentro já dá o nome ao grupo
-          <div
-            key={g.chave}
-            className="border-t border-border/60 pt-5 first:border-t-0 first:pt-0"
-          >
-            <Tag className="text-[13px] font-semibold">
-              {g.rotulo}
-              <span className="font-normal text-muted-foreground">
-                {" · "}
-                {g.itens.length}{" "}
-                {g.itens.length === 1 ? "registro" : "registros"}
-              </span>
-            </Tag>
-            <ol className="mt-3">
-              {g.itens.map((r, i) =>
-                linhaRegistro(r, i, i === g.itens.length - 1)
-              )}
-            </ol>
-          </div>
-        ))}
-      </div>
-    );
-  }
-
-  // desktop: as mesmas seções e blocos do mobile, com o que o cliente precisa
-  // para desenhar cada linha e o registro aberto
   const entradaDe = (r: RegistroResumo): EntradaRegistro => ({
     r,
     tituloEncontro: tituloEncontro(r),
@@ -411,10 +320,10 @@ export default async function RegistrosPage({
   const exibidos = secoesLista.flatMap((s) =>
     s.blocos.flatMap((b) => b.itens)
   );
-  const selecionadoId =
-    rId && exibidos.some((e) => e.r.id === rId)
-      ? rId
-      : (exibidos[0]?.r.id ?? null);
+  // só a seleção pedida na URL — sem ?r= o componente marca o 1º no
+  // desktop e, no celular, mantém a folha fechada
+  const pedidoId = rId && exibidos.some((e) => e.r.id === rId) ? rId : null;
+  const selecionadoId = pedidoId ?? exibidos[0]?.r.id ?? null;
   // "Mostrar mais" parte da última página já carregada (o ?r= pode ter subido)
   const paginaCarregada = Math.max(
     filtros.pagina,
@@ -660,48 +569,12 @@ export default async function RegistrosPage({
         </div>
       ) : (
         <>
-          {/* timeline: o rail mostra o dia em que o encontro aconteceu e a
-              linha conecta os nós — a página conta a sequência, não uma
-              coleção genérica de cards */}
-          {/* celular (< lg): a timeline de sempre */}
-          <div className="lg:hidden">
-          {agrupado ? (
-            // prioridade é um agrupamento de blocos — o `?grupo=` corrente
-            // particiona DENTRO de cada um (ex.: as duplas que pedem olho)
-            <div className="space-y-8">
-              <section aria-labelledby="reg-atencao-titulo">
-                <h2
-                  id="reg-atencao-titulo"
-                  className="text-base font-semibold"
-                >
-                  Precisam de olho ({atencao.length})
-                </h2>
-                <div className="mt-4">
-                  {listaAgrupada(atencao, "h3")}
-                </div>
-              </section>
-              <section aria-labelledby="reg-demais-titulo">
-                <h2
-                  id="reg-demais-titulo"
-                  className="text-base font-semibold"
-                >
-                  Sem sinais de atenção
-                </h2>
-                <div className="mt-4">
-                  {listaAgrupada(demais, "h3")}
-                </div>
-              </section>
-            </div>
-          ) : (
-            listaAgrupada(ordenados, "h2")
-          )}
-          {linkMais}
-          </div>
-          {/* desktop (lg+): mestre e detalhe; a seleção mora em ?r= */}
-          <div className="hidden lg:block">
+          {/* lista + registro em todas as larguras (REALIZA-211): no
+              desktop o registro fica ao lado, no celular abre numa folha */}
+          <div>
             <RegistrosMestreDetalhe
               secoes={secoesLista}
-              selecionadoId={selecionadoId}
+              selecionadoId={pedidoId}
               hrefBase={hrefBase}
               chaveLista={chaveLista}
               souCoord={souCoord}

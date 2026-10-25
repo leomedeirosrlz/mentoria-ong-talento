@@ -69,7 +69,9 @@ test("fluxo completo: convite → resposta pública → consolidado pro jovem", 
 
   await page.getByRole("button", { name: "Indicar pessoa" }).click();
   await page.locator("#novo-nome").fill(CONVIDADO);
-  await page.locator("#novo-vinculo").selectOption("amigo");
+  // Vínculo é o Select do kit (REALIZA-208), não <select> nativo
+  await page.locator("#novo-vinculo").click();
+  await page.getByRole("option", { name: /^amigo/i }).click();
   await page.getByRole("button", { name: "Criar convite" }).click();
 
   // a linha do convite aparece com o token mintado no banco

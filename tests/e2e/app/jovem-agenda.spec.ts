@@ -421,6 +421,59 @@ test.describe("mentorado — agenda livre (REALIZA-110)", () => {
     );
   });
 
+  test("agendado já passado vira realizado pelo 'Aconteceu' do jovem", async ({
+    page,
+  }) => {
+    // 0121: qualquer ponta libera a jornada — o jovem confirma o encontro,
+    // a avaliação dele nasce na hora e o mentor é lembrado de registrar
+    const enc = await criarAgendado(7, -1);
+    await entrarComoJovem(page);
+    await page.goto("/jovem/agenda");
+
+    const historico = page.locator(
+      'section[aria-labelledby="agenda-historico"]'
+    );
+    await linha(historico, 7)
+      .getByRole("button", { name: "Aconteceu", exact: true })
+      .click();
+    await expect(
+      page.getByText("Encontro confirmado. Conta pra gente como foi.")
+    ).toBeVisible({ timeout: 15_000 });
+
+    const [row] = await buscarViaServiceRole<
+      { status: string; realizado_em: string | null; data_hora: string }[]
+    >(
+      "encontros",
+      `select=status,realizado_em,data_hora&id=eq.${String(enc.id)}`
+    );
+    expect(row.status).toBe("realizado");
+    expect(new Date(row.realizado_em!).getTime()).toBe(
+      new Date(row.data_hora).getTime()
+    );
+    // o trigger da 0071 minta o link de avaliação do jovem
+    const links = await buscarViaServiceRole<{ id: string }[]>(
+      "avaliacao_links",
+      `select=id&encontro_id=eq.${String(enc.id)}`
+    );
+    expect(links).toHaveLength(1);
+
+    // o mentor recebe o lembrete apontando o registro do encontro
+    const lembretes = (
+      await buscarViaServiceRole<Notif[]>(
+        "notificacoes",
+        `select=titulo,corpo,href&profile_id=eq.${IDS.mentorProfile}&tipo=eq.lembrete`
+      )
+    ).filter((n) => /confirmou o 7º encontro$/.test(n.titulo));
+    expect(lembretes).toHaveLength(1);
+    expect(lembretes[0]!.href).toBe(
+      `/duplas/${DUPLA_ID}#registrar-${String(enc.id)}`
+    );
+    await limparViaServiceRole(
+      "notificacoes",
+      `profile_id=eq.${IDS.mentorProfile}&tipo=eq.lembrete&titulo=like.*confirmou*`
+    );
+  });
+
   test("guards do banco: data passada, remarcação sem motivo e nº inválido", async ({
     page,
   }) => {

@@ -47,7 +47,7 @@ import { EncontroDetalheDialog } from "@/components/encontro-detalhe-dialog";
 import { RevelarApos } from "@/components/revelar-apos";
 import { fade, T } from "@/components/motion";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { filterChipCls } from "@/components/ui/filter-chip";
 import {
   Dialog,
@@ -2198,8 +2198,10 @@ export function AgendaCalendario({
             e não navega */}
         {visaoEfetiva !== "ciclo" && (
           <div className="flex items-center gap-1 border-b px-2 py-1.5 sm:px-3">
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="icon"
               aria-label={
                 navegaPorDia
                   ? "Dia anterior"
@@ -2221,12 +2223,14 @@ export function AgendaCalendario({
                     ? irParaSemana(paraISO(somarDias(parseDia(semanaIso), -7)))
                     : irParaMes(mes - 1)
               }
-              className="grid size-11 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-40 md:size-9"
+              className="text-muted-foreground"
             >
-              <CaretLeft size={18} />
-            </button>
-            <button
+              <CaretLeft aria-hidden />
+            </Button>
+            <Button
               type="button"
+              variant="ghost"
+              size="icon"
               aria-label={
                 navegaPorDia
                   ? "Próximo dia"
@@ -2248,12 +2252,14 @@ export function AgendaCalendario({
                     ? irParaSemana(paraISO(somarDias(parseDia(semanaIso), 7)))
                     : irParaMes(mes + 1)
               }
-              className="grid size-11 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-40 md:size-9"
+              className="text-muted-foreground"
             >
-              <CaretRight size={18} />
-            </button>
-            <button
+              <CaretRight aria-hidden />
+            </Button>
+            <Button
               type="button"
+              variant="outline"
+              size="sm"
               disabled={
                 navegaPorDia
                   ? selecionado === hoje || !hojeNoAlcance
@@ -2268,10 +2274,10 @@ export function AgendaCalendario({
                     ? irParaSemana(segHoje)
                     : irParaMes(mesHoje)
               }
-              className="ms-0.5 min-h-11 rounded-lg px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-40 md:min-h-9"
+              className="ms-0.5 text-muted-foreground"
             >
               Hoje
-            </button>
+            </Button>
             <p
               id="agenda-mes-rotulo"
               aria-live="polite"
@@ -3732,9 +3738,9 @@ function EncontroDuplaRow({
         href={linkChamada}
         target="_blank"
         rel="noopener noreferrer"
-        className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-[var(--ok)]/40 bg-[var(--ok)]/10 px-2.5 text-xs font-medium text-[var(--ok-text)] transition-colors hover:bg-[var(--ok)]/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:min-h-9"
+        className={buttonVariants({ variant: "outline", size: "sm" })}
       >
-        <VideoCamera size={14} aria-hidden />
+        <VideoCamera aria-hidden />
         Entrar na chamada
         <span className="sr-only"> (abre em nova aba)</span>
       </a>

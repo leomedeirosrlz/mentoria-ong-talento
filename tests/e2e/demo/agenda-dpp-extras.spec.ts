@@ -26,7 +26,7 @@ test.describe("agenda demo do mentor DPP — Sua semana / Do programa / Lembrar 
     await page.goto("/agenda?aba=por-mentorado");
   });
 
-  test("sua semana — strip de 7 células com a legenda de contadores", async ({
+  test("sua semana — strip de 7 células com contadores", async ({
     page,
   }) => {
     const semana = page.locator('section[aria-label="Sua semana"]');
@@ -40,13 +40,6 @@ test.describe("agenda demo do mentor DPP — Sua semana / Do programa / Lembrar 
     await expect(celulas).toHaveCount(7);
     await expect(celulas.first()).toContainText("seg");
     await expect(celulas.last()).toContainText("dom");
-
-    // a legenda do mock v6 — colorido é seu, âmbar/cinza é "só acompanha"
-    await expect(
-      semana.getByText(
-        "Contador colorido = é seu · âmbar tracejado = só acompanha."
-      )
-    ).toBeVisible();
 
     // a célula de domingo recebe a supervisão (dada pelo Paulo) e a roda de
     // casos — labels vivem em texto mesmo quando escondidos no mobile

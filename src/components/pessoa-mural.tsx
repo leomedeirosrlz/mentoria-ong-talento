@@ -12,6 +12,7 @@ import { CircleNotch, Trash } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { addPessoaNota, deletePessoaNota } from "@/lib/actions";
 import { demoAtivoClient } from "@/lib/demo/shared";
+import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ExitItem, ExitList } from "@/components/motion";
 import { formatDiaMes } from "@/lib/ciclo";
@@ -177,20 +178,22 @@ export function PessoaMural({
                   <p className="text-xs text-muted-foreground">{formatDiaMes(n.created_at)}</p>
                   <p className="mt-0.5 whitespace-pre-wrap text-sm">{n.texto}</p>
                 </div>
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="xs"
                   onClick={() => apagar(n.id)}
                   disabled={apagando === n.id}
                   aria-label="Apagar nota"
-                  className="inline-flex min-h-11 shrink-0 items-center gap-1 rounded-md text-xs text-muted-foreground transition-colors hover:text-[var(--danger)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:min-h-6 md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100"
+                  className="shrink-0 text-muted-foreground hover:text-[var(--danger)] md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100"
                 >
                   {apagando === n.id ? (
-                    <CircleNotch size={13} className="animate-spin" aria-hidden />
+                    <CircleNotch className="animate-spin" aria-hidden />
                   ) : (
-                    <Trash size={13} aria-hidden />
+                    <Trash aria-hidden />
                   )}
                   Apagar
-                </button>
+                </Button>
               </ExitItem>
             ))}
           </ExitList>

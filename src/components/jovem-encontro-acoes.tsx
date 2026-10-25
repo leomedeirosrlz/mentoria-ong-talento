@@ -3,11 +3,46 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { desmarcarEncontro, marcarNaoAconteceuJovem } from "@/lib/actions";
+import {
+  desmarcarEncontro,
+  marcarAconteceuJovem,
+  marcarNaoAconteceuJovem,
+} from "@/lib/actions";
 import { Button } from "@/components/ui/button";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
+
+/** "Aconteceu" do jovem (0121) — o encontro que já passou vira realizado
+ *  pela ponta dele: a avaliação abre na hora e o próximo passo da jornada
+ *  libera sem esperar o registro do mentor (que é avisado). Um toque, sem
+ *  dialog: confirmar um fato bom não pede fricção. */
+export function AconteceuJovem({ encontroId }: { encontroId: string }) {
+  const [pending, start] = useTransition();
+  const router = useRouter();
+  return (
+    <Button
+      size="sm"
+      disabled={pending}
+      onClick={() =>
+        start(async () => {
+          try {
+            const res = await marcarAconteceuJovem(encontroId);
+            if (res?.error) toast.error(res.error);
+            else {
+              toast.success("Encontro confirmado. Conta pra gente como foi.");
+              router.refresh();
+            }
+          } catch {
+            toast.error("Sem conexão. Tente de novo.");
+          }
+        })
+      }
+    >
+      {pending ? "Salvando…" : "Aconteceu"}
+    </Button>
+  );
+}
 
 /** "Não aconteceu" do jovem (0072) — encontro agendado já passado, qualquer
  *  trilha da dupla ativa. A cópia não promete desfazer: quem reverte a

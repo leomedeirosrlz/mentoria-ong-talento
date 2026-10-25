@@ -199,14 +199,15 @@ export function PdmDupla({
             <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground sm:text-[11px]">
               {doc.visaoEm && <span>escrita em {formatDate(doc.visaoEm)}</span>}
               {podeEditar && (
-                <button
+                <Button
                   type="button"
+                  variant="link"
+                  size="sm"
                   onClick={() => setVisaoAberta(true)}
-                  className="inline-flex min-h-11 items-center gap-1 rounded-md px-1 font-medium text-foreground underline-offset-2 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring sm:min-h-8"
                 >
-                  <PencilSimple size={12} aria-hidden />
+                  <PencilSimple aria-hidden />
                   Editar
-                </button>
+                </Button>
               )}
             </p>
           </>

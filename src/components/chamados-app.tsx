@@ -667,16 +667,19 @@ export function ChamadoDetalhe({
     <article className="min-w-0 overflow-hidden rounded-xl bg-card shadow-[var(--shadow-border)]">
       <div className="border-b border-border px-4 py-3.5 sm:px-5">
         <div className="flex items-start gap-3">
-          <button
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
             onClick={onVoltar}
             aria-label="Voltar pra lista"
             className={cn(
-              "grid size-11 shrink-0 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:size-8",
+              "shrink-0 text-muted-foreground",
               voltarDesktop ? "lg:grid" : "lg:hidden"
             )}
           >
-            <ArrowLeft size={17} aria-hidden />
-          </button>
+            <ArrowLeft aria-hidden />
+          </Button>
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
               <span className="font-mono text-xs text-muted-foreground">
