@@ -5349,6 +5349,10 @@ export type Database = {
         Args: { p_feito: boolean; p_id: string }
         Returns: undefined
       }
+      marcar_aconteceu_mentorado: {
+        Args: { p_encontro: string }
+        Returns: Json
+      }
       marcar_nao_aconteceu_mentorado: {
         Args: { p_encontro: string }
         Returns: Json
