@@ -3396,6 +3396,45 @@ export type Database = {
           },
         ]
       }
+      registro_lembretes: {
+        Row: {
+          encontro_id: string
+          enviado_em: string
+          id: string
+          marco: string
+          notificacao_id: string | null
+        }
+        Insert: {
+          encontro_id: string
+          enviado_em?: string
+          id?: string
+          marco: string
+          notificacao_id?: string | null
+        }
+        Update: {
+          encontro_id?: string
+          enviado_em?: string
+          id?: string
+          marco?: string
+          notificacao_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "registro_lembretes_encontro_id_fkey"
+            columns: ["encontro_id"]
+            isOneToOne: false
+            referencedRelation: "encontros"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "registro_lembretes_notificacao_id_fkey"
+            columns: ["notificacao_id"]
+            isOneToOne: false
+            referencedRelation: "notificacoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       registros: {
         Row: {
           atividades: string[]
@@ -5420,6 +5459,10 @@ export type Database = {
       postar_devolutiva: {
         Args: { p_dupla_id: string; p_texto: string }
         Returns: string
+      }
+      processar_lembretes_registro: {
+        Args: { p_agora?: string }
+        Returns: Json
       }
       processar_lembretes_trilha: { Args: { p_hoje?: string }; Returns: Json }
       promover_mentorado_mentor: {

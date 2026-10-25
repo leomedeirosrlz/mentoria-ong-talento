@@ -246,25 +246,10 @@ export function DashboardCoordenacao({
                 <h2 id="precisa-titulo" className="text-base font-semibold">
                   Precisa de você hoje
                 </h2>
-                {precisa.length > 0 && (
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    {precisa.length > 5 && (
-                      <span className="tabular-nums">{precisa.length} no total</span>
-                    )}
-                    <Link
-                      href="/duplas"
-                      className={cn(
-                        buttonVariants({ variant: "link", size: "sm" }),
-                        "group"
-                      )}
-                    >
-                      Ver todas
-                      <ArrowRight
-                        aria-hidden
-                        className="transition-transform group-hover:translate-x-0.5"
-                      />
-                    </Link>
-                  </div>
+                {precisa.length > 5 && (
+                  <span className="text-xs tabular-nums text-muted-foreground">
+                    {precisa.length} no total
+                  </span>
                 )}
               </div>
 
@@ -273,22 +258,31 @@ export function DashboardCoordenacao({
                   Nenhuma dupla precisa de você hoje.
                 </p>
               ) : (
-                <ul className="space-y-2 @4xl:space-y-0 @4xl:divide-y @4xl:divide-border/60 @4xl:overflow-hidden @4xl:rounded-xl @4xl:bg-card @4xl:shadow-[var(--shadow-border)]">
-                  {precisa.slice(0, 5).map((e, i) => (
-                    <li key={e.chave}>
-                      {e.tipo === "dupla" ? (
-                        <DuplaLinha
-                          {...e.linha}
-                          fichaHref={`/duplas/${e.duplaId}`}
-                          fichaNome={e.fichaNome}
-                          i={i}
+                <>
+                  <ul className={FILA_CLS}>
+                    {precisa.slice(0, 5).map((e, i) => (
+                      <ItemFila key={e.chave} e={e} i={i} />
+                    ))}
+                  </ul>
+                  {/* o resto da MESMA fila, aqui mesmo — /duplas é outra
+                      lista (sem os pedidos parados, outro recorte) */}
+                  {precisa.length > 5 && (
+                    <details className="group/fila">
+                      <summary className="inline-flex min-h-11 cursor-pointer list-none items-center gap-1 rounded-md px-1 text-sm font-semibold underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:min-h-8 [&::-webkit-details-marker]:hidden">
+                        Ver mais {precisa.length - 5}
+                        <CaretDown
+                          aria-hidden
+                          className="size-3.5 transition-transform group-open/fila:rotate-180"
                         />
-                      ) : (
-                        <PedidoParadoLinha alerta={e.alerta} i={i} />
-                      )}
-                    </li>
-                  ))}
-                </ul>
+                      </summary>
+                      <ul className={cn(FILA_CLS, "mt-2")}>
+                        {precisa.slice(5).map((e, i) => (
+                          <ItemFila key={e.chave} e={e} i={i} />
+                        ))}
+                      </ul>
+                    </details>
+                  )}
+                </>
               )}
             </section>
           )}
@@ -454,6 +448,27 @@ function Recolhido({
 
 /** Pedido de especialista parado — linha própria (não é dupla ainda). A ação
  *  leva ao bloco de pedidos da própria home, que abre pelo fragmento. */
+const FILA_CLS =
+  "space-y-2 @4xl:space-y-0 @4xl:divide-y @4xl:divide-border/60 @4xl:overflow-hidden @4xl:rounded-xl @4xl:bg-card @4xl:shadow-[var(--shadow-border)]";
+
+/** Um item da fila "Precisa de você hoje": dupla ou pedido parado. */
+function ItemFila({ e, i }: { e: Excecao; i: number }) {
+  return (
+    <li>
+      {e.tipo === "dupla" ? (
+        <DuplaLinha
+          {...e.linha}
+          fichaHref={`/duplas/${e.duplaId}`}
+          fichaNome={e.fichaNome}
+          i={i}
+        />
+      ) : (
+        <PedidoParadoLinha alerta={e.alerta} i={i} />
+      )}
+    </li>
+  );
+}
+
 function PedidoParadoLinha({ alerta, i }: { alerta: AlertaPedido; i: number }) {
   const onde =
     alerta.onde === "triagem"
