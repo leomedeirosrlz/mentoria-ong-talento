@@ -207,7 +207,6 @@ test.describe("mentorado — shell /jovem", () => {
     const combinados = page.locator(
       'section[aria-labelledby="combinados-titulo"]'
     );
-    const checkbox = combinados.getByRole("checkbox");
     // o input é sr-only — o clique honesto é no label que o embrulha
     await combinados
       .locator("label", { hasText: COMBINADO_JOVEM })
@@ -216,14 +215,28 @@ test.describe("mentorado — shell /jovem", () => {
       page.getByText("Combinado marcado como feito.")
     ).toBeVisible();
     // checked vem do server (RPC + router.refresh) — preview frio leva
-    // mais que os 5s default; a suite já usa 15s pra roundtrip assim
-    await expect(checkbox).toBeChecked({ timeout: 15_000 });
+    // mais que os 5s default; a suite já usa 15s pra roundtrip assim.
+    // Redesign: o item sai da lista de abertos e recolhe em "Ver N feitos"
+    // (o painel fica desmontado até abrir) — é lá que o checked mora agora
+    const checkboxFeito = combinados
+      .locator("label", { hasText: COMBINADO_JOVEM })
+      .getByRole("checkbox");
+    await combinados
+      .getByRole("button", { name: /Ver \d+ feito/ })
+      .click({ timeout: 15_000 });
+    await expect(checkboxFeito).toBeChecked({ timeout: 15_000 });
     // o router.refresh re-renderizou — e o estado sobrevive a um reload de
     // verdade (write passou pelo banco, não por estado local)
     await page.reload();
+    const recarregados = page.locator(
+      'section[aria-labelledby="combinados-titulo"]'
+    );
+    await recarregados
+      .getByRole("button", { name: /Ver \d+ feito/ })
+      .click();
     await expect(
-      page
-        .locator('section[aria-labelledby="combinados-titulo"]')
+      recarregados
+        .locator("label", { hasText: COMBINADO_JOVEM })
         .getByRole("checkbox")
     ).toBeChecked();
   });
@@ -232,7 +245,11 @@ test.describe("mentorado — shell /jovem", () => {
     page,
   }) => {
     await page.goto("/jovem");
-    await page.getByRole("button", { name: "Pedir ajuda" }).click();
+    // o botão solto virou a linha discreta "Precisa de ajuda?" — abre o
+    // mesmo diálogo de chamado (0084)
+    await page
+      .getByRole("button", { name: "Precisa de ajuda? Fale com a equipe" })
+      .click();
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
     // 0084: o canal de segurança é um chamado — opção na linguagem dele

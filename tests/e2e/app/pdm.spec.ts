@@ -518,7 +518,7 @@ test.describe("PDM vivo (REALIZA-181)", () => {
       .click();
     await anuncioDe(
       secao,
-      '"Meta que sai do plano e2e" foi descartada — segue no histórico.'
+      '"Meta que sai do plano e2e" foi descartada. Segue no histórico.'
     );
     // fora da vista ativa…
     const arvore = secao.locator('ul[role="tree"]').first();
@@ -649,7 +649,7 @@ test.describe("PDM vivo (REALIZA-181)", () => {
     ).toHaveCount(0);
     await expect(
       secao.getByText(
-        "Limite de 10 metas por plano — descarte uma pra abrir espaço."
+        "Limite de 10 metas por plano: descarte uma pra abrir espaço."
       )
     ).toBeVisible();
     // as ações por item seguem — descartar é o caminho que a copy aponta

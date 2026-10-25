@@ -430,12 +430,15 @@ test.describe("avaliação estrela do jovem (REALIZA-109)", () => {
     expect(notifs.map((n) => n.profile_id)).toContain(IDS.coordProfile);
 
     // a coord atende na ficha — dois logins no mesmo teste via cookies
-    // limpos; o card do pedido mora na linha do encontro (aba Encontros)
+    // limpos; o pedido virou sinal inline na linha do encontro (aba
+    // Encontros): pill "Apoio aberto" no cabeçalho + badge "pediu ajuda"
+    // na linha (o cartão "Pedido de ajuda em aberto" migrou pra aba
+    // Instrumentos, dentro de "Voz do jovem")
     await page.context().clearCookies();
     await loginComSenha(page, COORD_EMAIL, COORD_SENHA);
     await page.goto(`/duplas/${DUPLA_ID}?aba=encontros`);
     await expect(
-      page.getByText("Pedido de ajuda em aberto", { exact: false })
+      page.getByText("Apoio aberto · do mentorado")
     ).toBeVisible();
     await expect(page.getByText("pediu ajuda", { exact: true })).toBeVisible();
     await page
@@ -478,7 +481,7 @@ test.describe("avaliação estrela do jovem (REALIZA-109)", () => {
     ).toBeVisible();
     await expect(page.getByText(/Encontro 13 com Mentor/)).toBeVisible();
     await expect(
-      page.getByText(/a nota só aparece na média/)
+      page.getByText(/Seu mentor vê só a média das notas/)
     ).toBeVisible();
 
     const marcar = (campo: string, valor: string) =>

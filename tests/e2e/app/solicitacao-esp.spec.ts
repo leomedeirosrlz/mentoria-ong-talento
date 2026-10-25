@@ -126,6 +126,17 @@ async function convergirSolicitacoes() {
 const mural = (page: Page) =>
   page.locator('section[aria-label="Pedidos de mentoria especializada"]');
 
+/** A lista do mural mora num <details> fechado por padrão (rodada
+ *  out/2026) — abre antes de ler os cards. Idempotente: chamar com o
+ *  painel aberto não faz nada. */
+async function abrirMural(page: Page) {
+  const det = page.locator("details#mural-especialista");
+  await det.locator("summary").waitFor({ state: "visible", timeout: 15_000 });
+  if (!(await det.evaluate((el) => el.hasAttribute("open")))) {
+    await det.locator("summary").click();
+  }
+}
+
 /** A turma real da dupla — o sol semeado carrega a da dupla DPP, como o
  *  insert do app faz. */
 async function turmaDa(duplaId: string): Promise<string | null> {
@@ -293,6 +304,7 @@ test.describe("solicitação de especialista v2 — fluxo staff (REALIZA-112)", 
     // ---- lado especialista: o mural mostra o dirigido; aceitar pede slot
     await relogar(page, ESP_EMAIL, SENHA);
     await page.goto("/");
+    await abrirMural(page);
     const card = mural(page).locator("li", { hasText: DEMANDA_ACEITE });
     await expect(card.getByText("Direcionada a você")).toBeVisible();
 
@@ -389,6 +401,7 @@ test.describe("solicitação de especialista v2 — fluxo staff (REALIZA-112)", 
     // o especialista vê o dirigido e responde com outro horário + recado
     await loginComSenha(page, ESP_EMAIL, SENHA);
     await page.goto("/");
+    await abrirMural(page);
     const card = mural(page).locator("li", { hasText: DEMANDA_CONTRA });
     await expect(card.getByText("Direcionada a você")).toBeVisible();
     // a contra-proposta não é mais um Select: é a grade de dias do mock v6 —
@@ -549,6 +562,7 @@ test.describe("solicitação de especialista v2 — fluxo staff (REALIZA-112)", 
 
     await loginComSenha(page, ESP_EMAIL, SENHA);
     await page.goto("/");
+    await abrirMural(page);
     const card = mural(page).locator("li", { hasText: DEMANDA_RECUSA });
     await expect(card.getByText("Direcionada a você")).toBeVisible();
     // a recusa saiu do botão solto pro ⋯ "Ações do pedido" (REALIZA-186,

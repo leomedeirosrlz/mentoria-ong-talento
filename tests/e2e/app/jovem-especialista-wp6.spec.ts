@@ -328,15 +328,22 @@ test.describe("WP6 — especialista do lado do jovem", () => {
 
     await relogar(page, JOVEM_EMAIL, SENHA);
     await page.goto("/jovem/especialistas");
-    // feed datado dentro do card da trilha — stepper de 5 passos + feed
+    // feed datado dentro do card da trilha — stepper de 5 passos + feed,
+    // recolhidos no <details> "Ver trilha completa" (rodada out/2026)
     const trilha = page.locator("section#trilhas");
+    await trilha.getByText("Ver trilha completa").click();
     await expect(
       trilha.locator('ol[aria-label="Passos da trilha"] li')
     ).toHaveCount(5);
     await expect(trilha.getByText("Devolutivas da trilha")).toBeVisible();
-    await expect(trilha.getByText(TEXTO_DEVOLUTIVA)).toBeVisible();
+    // o texto aparece mais de uma vez no card — prévia "Última devolutiva"
+    // + item do feed — então o assert ancora na lista datada do feed
+    const feedJovem = trilha
+      .getByText("Devolutivas da trilha")
+      .locator("xpath=following-sibling::ul[1]");
+    await expect(feedJovem.getByText(TEXTO_DEVOLUTIVA)).toBeVisible();
     // autor assinado — o jovem lê quem escreveu
-    await expect(trilha.getByText(/Esp E2E ·/)).toBeVisible();
+    await expect(feedJovem.getByText(/Esp E2E ·/)).toBeVisible();
   });
 
   test("mentor híbrido aparece no catálogo do jovem (has_papel)", async ({

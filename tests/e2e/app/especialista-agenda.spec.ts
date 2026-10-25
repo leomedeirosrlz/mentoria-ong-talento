@@ -321,8 +321,8 @@ test.describe("mentor especialista — agenda (REALIZA-111)", () => {
     // ---- adiciona janela: quarta 19:00–21:00 (dia novo, não pisa na fixture)
     await grade.getByLabel("Dia da semana").click();
     await page.getByRole("option", { name: "Quarta" }).click();
-    await grade.getByLabel("Início da janela").fill("19:00");
-    await grade.getByLabel("Fim da janela").fill("21:00");
+    await grade.getByLabel("Início do horário").fill("19:00");
+    await grade.getByLabel("Fim do horário").fill("21:00");
     await grade.getByRole("button", { name: "Adicionar" }).click();
 
     const linhaQuarta = grade.locator("li", { hasText: "Quarta" });
@@ -393,7 +393,7 @@ test.describe("mentor especialista — agenda (REALIZA-111)", () => {
     // ---- remove a janela criada pela UI — a fixture de terça fica intacta
     await abrirEditarGrade(page);
     await linhaQuarta
-      .getByRole("button", { name: "Remover janela de Quarta das 19:00" })
+      .getByRole("button", { name: "Remover horário de Quarta das 19:00" })
       .click();
     // a remoção é server action — a lista só some depois do roundtrip;
     // em preview frio isso passa dos 5s default

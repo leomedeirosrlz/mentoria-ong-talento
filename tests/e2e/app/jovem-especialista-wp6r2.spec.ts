@@ -135,9 +135,9 @@ test.describe("WP6-R2 — encaixa, autor da sugestão e CTA de triagem", () => {
 
     // superfície 1 — /jovem/agenda: os chips "Pedir sessão" da trilha com
     // o Esp E2E (grade de terça à noite ⊂ grade do jovem) trazem o título
-    // "… — encaixa com você"
+    // "… · encaixa com você"
     await page.goto("/jovem/agenda");
-    const chips = page.getByTitle(/Pedir sessão .*— encaixa com você/);
+    const chips = page.getByTitle(/Pedir sessão .*· encaixa com você/);
     await expect(chips.first()).toBeVisible({ timeout: 15_000 });
 
     // superfície 2 — mesa de negociação em /jovem/especialistas: semeia
@@ -207,7 +207,7 @@ test.describe("WP6-R2 — encaixa, autor da sugestão e CTA de triagem", () => {
 
     const radios = item.getByRole("radio", { name: / às \d{2}:\d{2}/ });
     const encaixados = item.getByRole("radio", {
-      name: /— encaixa com você/,
+      name: /· encaixa com você/,
     });
     await expect(encaixados.first()).toBeVisible();
     const total = await radios.count();

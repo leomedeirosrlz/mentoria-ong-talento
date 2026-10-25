@@ -118,6 +118,16 @@ const secaoPedidos = (page: Page) => page.locator("section#pedidos");
 const mural = (page: Page) =>
   page.locator('section[aria-label="Pedidos de mentoria especializada"]');
 
+/** A lista do mural mora num <details> fechado por padrão (rodada
+ *  out/2026) — abre antes de ler os cards. Idempotente. */
+async function abrirMural(page: Page) {
+  const det = page.locator("details#mural-especialista");
+  await det.locator("summary").waitFor({ state: "visible", timeout: 15_000 });
+  if (!(await det.evaluate((el) => el.hasAttribute("open")))) {
+    await det.locator("summary").click();
+  }
+}
+
 /** A turma real da dupla — o sol semeado carrega a da dupla DPP, como o
  *  insert da RPC faz (sol_efetivar usa a turma da sol pro par). */
 async function turmaDa(duplaId: string): Promise<string | null> {
@@ -539,6 +549,7 @@ test.describe("pedido de especialista pelo jovem (REALIZA-112 PR2)", () => {
     // jovem e o selo de origem — a leitura é a do staff, não a do autor
     await relogar(page, ESP_EMAIL, SENHA);
     await page.goto("/");
+    await abrirMural(page);
     const card = mural(page).locator("li", { hasText: MOTIVO_MURAL });
     await expect(card.getByText("Mentorada E2E")).toBeVisible();
     await expect(card.getByText("pedido do jovem")).toBeVisible();
