@@ -17,10 +17,12 @@ import {
   extraiMetas,
   extraiRodaDaVida,
   type FormularioCampo,
+  type InstrumentoSistema,
   type RespostaValor,
   type RodaArea,
 } from "./forms/schema";
 import { TRILHA_LEN } from "./ciclo";
+import { turmaCurta, turmaLonga } from "./turma";
 
 export type EstacaoChave =
   | "roda_inicial"
@@ -228,7 +230,7 @@ export const ESTACOES: Record<
   avaliacao_encontro: {
     titulo: "Avaliação do encontro",
     descricao:
-      "Depois de cada encontro, uma nota de 1 a 5 e um comentário. É recorrente — acompanha o ciclo inteiro.",
+      "Depois de cada encontro, uma nota de 1 a 5 e um comentário. É recorrente: acompanha o ciclo inteiro.",
     encIni: 1,
     encFim: 16,
     chipLabel: "Todo encontro",
@@ -448,7 +450,7 @@ function resolveEstacao<
       respondidoEm: ultima!.respondido_em ?? ultima!.usado_em ?? null,
       token: reemissao.token,
       snippet: null,
-      detalhe: "o mentor enviou uma nova rodada — a resposta anterior segue salva",
+      detalhe: "o mentor enviou uma nova rodada: a resposta anterior segue salva",
       respostas: ultima!.respostas,
     };
   }
@@ -474,7 +476,7 @@ function resolveEstacao<
       respondidoEm: null,
       token: null,
       snippet: null,
-      detalhe: `libera no enc. ${ESTACOES[chave].encIni}${dm ? ` (${dm})` : ""}`,
+      detalhe: `libera no encontro ${ESTACOES[chave].encIni}${dm ? ` (${dm})` : ""}`,
       respostas: null,
     };
   }
@@ -502,12 +504,12 @@ function resolveEstacao<
   const passou = ctx.encCorrente > ctx.encFim;
   const detalhe = expirada
     ? ctx.emissor === "mentor"
-      ? "o link expirou — peça ao mentor pra reenviar"
-      : "o link expirou — peça à coordenação pra reenviar"
+      ? "o link expirou: peça ao mentor pra reenviar"
+      : "o link expirou: peça à coordenação pra reenviar"
     : passou
       ? ctx.emissor === "mentor"
-        ? "o link ainda não chegou — fala com teu mentor"
-        : "o link ainda não chegou — a coordenação pode ajudar"
+        ? "o link ainda não chegou: fala com teu mentor"
+        : "o link ainda não chegou: a coordenação pode ajudar"
       : ctx.emissor === "mentor"
         ? "o mentor envia quando chegar a hora"
         : "a coordenação envia quando chegar a hora";
@@ -848,7 +850,6 @@ function entregasDaEstacao(
  *  recorrente de feitas × realizados. */
 export function estacoesPainelDupla(
   linha: PainelJornadaLinha,
-  ctx: PainelTurmaCtx,
   /** régua da DUPLA (posição dela na jornada) — a janela "aberta" usa a
    *  posição dela, a mesma que a jovem vê como encCorrente: a coorte pode
    *  estar no enc. 12 e a dupla no 4 — a estação que abre no 9 segue
@@ -902,7 +903,6 @@ export function estacoesPainelDupla(
  *  nunca existiu do lado dela (o nudge ao mentor ficaria injusto). */
 export function atrasadasPainel(
   estados: Record<EstacaoChave, EstacaoPainelEstado>,
-  ctx: PainelTurmaCtx,
   encCorrDupla: number
 ): EstacaoChave[] {
   const regua = encCorrDupla;
@@ -912,4 +912,166 @@ export function atrasadasPainel(
     }
     return regua > ESTACOES[chave].encFim && estados[chave] !== "respondido";
   });
+}
+
+// ---------- agregados do painel/coordenação (REALIZA-194, spec v5c) ----------
+// As resoluções por cima de estacoesPainelDupla/atrasadasPainel que a
+// faixa segmentada do painel e a seção "Instrumentos do programa"
+// compartilham — mesma matemática nas duas seções, domínio puro testável.
+
+/** Estação → sistema emissível (REALIZA-51): os 4 instrumentos do core
+ *  ganham "Enviar em lote" pra coord. A avaliação de encontro nasce
+ *  sozinha no realizado e o 360º é emissão manual de encerramento — nenhum
+ *  dos dois é lote. As duas pontas da roda dividem `roda_vida`: o momento
+ *  certo por dupla é o que o core resolve (inicial sem resposta, formal
+ *  depois da primeira). */
+export const SISTEMA_DA_ESTACAO: Partial<
+  Record<EstacaoChave, InstrumentoSistema>
+> = {
+  roda_inicial: "roda_vida",
+  visao: "visao",
+  metas: "metas",
+  pdm: "pdm",
+  roda_formal: "roda_vida",
+};
+
+/** Estados que aceitam o lote — "a fazer" do painel: link vivo pra lembrar,
+ *  expirado pra reemitir, nunca enviado pra mintar. Respondido descansa
+ *  (re-emissão é gesto por dupla) e trancada espera a janela da dupla. */
+export const ESTADOS_LOTE = new Set<EstacaoPainelEstado>([
+  "pendente",
+  "expirado",
+  "nao_enviado",
+]);
+
+export type LinhaResolvida = {
+  linha: PainelJornadaLinha;
+  encVigente: number;
+  ctx: PainelTurmaCtx;
+  encCorrDupla: number;
+  estados: Record<EstacaoChave, EstacaoPainelEstado>;
+  atrasadas: Set<EstacaoChave>;
+};
+
+export type GrupoTurma = {
+  /** chave de agrupamento — o cronograma (a turma do painel é texto). */
+  cronogramaId: string;
+  /** "Turma 1" — o nome de exibição canônico (turmaLonga). */
+  nome: string;
+  /** "T1" — a sigla curta das mini-barras e da lista de ação. */
+  sigla: string;
+  ctx: PainelTurmaCtx;
+  linhas: LinhaResolvida[];
+};
+
+/** Resolve estados/janelas das linhas do painel — a mesma régua que a
+ *  jornada do jovem usa: janela aberta pela POSIÇÃO da dupla, fora da
+ *  janela só quando a coorte passou do fim E ela também. */
+export function resolveLinhasPainel(
+  linhas: PainelJornadaLinha[],
+  eventos: CicloEventoMinimo[]
+): LinhaResolvida[] {
+  return linhas.map((linha) => {
+    const ctx = painelTurmaCtx(eventos, linha.cronograma_id);
+    const encCorrDupla = Math.min(
+      TRILHA_LEN.dpp,
+      (linha.avaliacoes_encontro.max_numero ?? 0) + 1
+    );
+    const estados = estacoesPainelDupla(linha, encCorrDupla);
+    return {
+      linha,
+      encVigente: ctx.encVigente,
+      ctx,
+      encCorrDupla,
+      estados,
+      atrasadas: new Set(atrasadasPainel(estados, encCorrDupla)),
+    };
+  });
+}
+
+/** Agrupa as linhas resolvidas por turma (cronograma), já com o contexto
+ *  compartilhado e os rótulos canônicos — "Turma 1"/"T1" em vez do texto
+ *  cru "T1 · 2026/2027" que lia como período (turmas.md). */
+export function agrupaPorTurma(resolvidas: LinhaResolvida[]): GrupoTurma[] {
+  const mapa = new Map<string, LinhaResolvida[]>();
+  for (const r of resolvidas) {
+    const k = r.linha.cronograma_id || r.linha.turma || "sem-turma";
+    mapa.set(k, [...(mapa.get(k) ?? []), r]);
+  }
+  const grupos: GrupoTurma[] = [...mapa.entries()].map(
+    ([cronogramaId, linhas]) => {
+      const turma = linhas[0]?.linha.turma ?? "";
+      return {
+        cronogramaId,
+        nome: turma ? turmaLonga(turma) : "Sem turma",
+        sigla: turma ? turmaCurta(turma) : "",
+        ctx: linhas[0]!.ctx,
+        linhas,
+      };
+    }
+  );
+  // ordem de exibição: sigla crescente (T1 antes de T2), "Sem turma" por
+  // último — a ordem do array de cronogramas não é garantida
+  grupos.sort(
+    (a, b) =>
+      (a.nome === "Sem turma" ? 1 : 0) - (b.nome === "Sem turma" ? 1 : 0) ||
+      a.nome.localeCompare(b.nome)
+  );
+  return grupos;
+}
+
+/** O formato de dupla que o lote e os cards de instrumento consomem —
+ *  estruturalmente o DuplaLote do componente de envio (mesmas 5 chaves). */
+export type DuplaElegivelLote = {
+  duplaId: string;
+  jovemNome: string;
+  mentorNome: string;
+  jovemTemEmail: boolean;
+  mentorTemEmail: boolean;
+};
+
+/** As duplas elegíveis ao lote de uma estação — mesma seleção do painel:
+ *  link vivo (lembra), expirado (reemite) ou nunca enviado (minta). */
+export function elegiveisLote(
+  resolvidas: LinhaResolvida[],
+  chave: EstacaoChave,
+  duplasInfo: Map<string, { jovemTemEmail: boolean; mentorTemEmail: boolean }>
+): DuplaElegivelLote[] {
+  return resolvidas
+    .filter((r) => ESTADOS_LOTE.has(r.estados[chave]))
+    .map((r) => {
+      const info = duplasInfo.get(r.linha.dupla_id);
+      return {
+        duplaId: r.linha.dupla_id,
+        jovemNome: r.linha.jovem_nome,
+        mentorNome: r.linha.mentor_nome,
+        jovemTemEmail: info?.jovemTemEmail ?? false,
+        mentorTemEmail: info?.mentorTemEmail ?? false,
+      };
+    });
+}
+
+/** "dd/mm" do encontro n no cronograma — substring pura, sem Date (a data
+ *  oficial é dia de calendário; o fuso de Brasília não muda o dia). */
+export function diaMesEvento(iso: string | null): string | null {
+  if (!iso || !/^\d{4}-\d{2}-\d{2}/.test(iso)) return null;
+  return `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
+}
+
+/** A linha "libera no encontro N · T1 dd/mm · T2 dd/mm" — a data de
+ *  abertura por turma (o encIni da estação no cronograma de cada uma),
+ *  omitindo turma sem data oficial. Sem turmas com data, volta pro número
+ *  do encontro sozinho. */
+export function liberaCopia(
+  chave: EstacaoChave,
+  grupos: GrupoTurma[]
+): string {
+  const porTurma = grupos
+    .map((g) => {
+      const dm = diaMesEvento(g.ctx.dataEnc(ESTACOES[chave].encIni));
+      return dm ? `${g.sigla} ${dm}` : null;
+    })
+    .filter((s): s is string => s != null);
+  const base = `libera no encontro ${ESTACOES[chave].encIni}`;
+  return porTurma.length ? `${base} · ${porTurma.join(" · ")}` : base;
 }

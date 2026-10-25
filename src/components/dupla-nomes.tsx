@@ -48,9 +48,11 @@ export function DuplaNomes({
         >
           e
         </span>
+        {/* amarelo da marca tem ~1,4:1 sobre branco: o contorno âmbar dá
+            borda ao ponto sem trocar a cor de identidade do mentorado */}
         <span
           aria-hidden
-          className="size-1.5 shrink-0 rounded-full bg-[var(--role-mentorado)]"
+          className="size-1.5 shrink-0 rounded-full bg-[var(--role-mentorado)] shadow-[0_0_0_1px_hsl(40_75%_38%/0.55)]"
         />
         <span className={truncar ? "min-w-0 truncate" : undefined}>{mentorado}</span>
       </span>

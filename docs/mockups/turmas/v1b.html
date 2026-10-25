@@ -1,0 +1,345 @@
+<!-- MOCKUP turmas v1b — variante "credencial" (lombada lateral com sigla gigante) -->
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Turmas · v1b · Realiza.vc</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --brand-lime: hsl(78 56% 53%);
+    --brand-ink: hsl(0 0% 15%);
+    --amber: hsl(48 100% 60%);
+    --background: hsl(75 10% 95%);
+    --card: hsl(0 0% 100%);
+    --muted: hsl(75 7% 93%);
+    --muted-foreground: hsl(75 4% 40%);
+    --accent: hsl(75 8% 91%);
+    --border: hsl(75 6% 87%);
+    --input: hsl(75 8% 54%);
+    --ok: hsl(78 58% 38%);
+    --ok-text: hsl(78 55% 30%);
+    --warn: hsl(43 95% 44%);
+    --warn-text: hsl(43 90% 30%);
+    --danger: hsl(0 80% 48%);
+    --radius: 0.75rem;
+  }
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  html{ -webkit-text-size-adjust:100%; }
+  body{ font-family:'Inter', system-ui, sans-serif; background:var(--background); color:var(--brand-ink); font-size:14px; line-height:1.45; -webkit-font-smoothing:antialiased; }
+  a{ color:inherit; } button{ font:inherit; color:inherit; }
+  :focus-visible{ outline:2px solid var(--input); outline-offset:2px; border-radius:6px; }
+  @media (prefers-reduced-motion:reduce){ *{transition:none!important} }
+
+  /* ---------- chrome do mockup ---------- */
+  .board-head{ background:var(--brand-ink); color:hsl(75 20% 88%); padding:12px 20px; display:flex; flex-wrap:wrap; align-items:center; gap:6px 18px; font-size:12.5px; }
+  .board-head b{ color:var(--brand-lime); font-weight:700; letter-spacing:.03em; }
+  .board-head .dir{ color:hsl(75 10% 62%); flex:1 1 320px; min-width:0; }
+  .board-head nav{ display:flex; gap:6px; flex-wrap:wrap; }
+  .board-head nav a{ font-size:12px; font-weight:600; padding:5px 12px; border-radius:99px; border:1px solid hsl(75 10% 38%); color:hsl(75 20% 85%); text-decoration:none; }
+  .board-head nav a:hover{ border-color:var(--brand-lime); color:var(--brand-lime); }
+  .asrole{ background:#2b2b2b; padding:10px 20px; display:flex; flex-wrap:wrap; gap:8px 12px; align-items:center; position:sticky; top:0; z-index:30; font-size:13px; color:hsl(75 20% 88%); }
+  .asrole .who{ font-size:13px; font-weight:650; padding:6px 14px; border-radius:99px; background:var(--brand-lime); color:var(--brand-ink); }
+  .asrole .why{ font-size:12.5px; color:hsl(75 10% 62%); }
+
+  /* ---------- topbar ---------- */
+  .topbar{ position:sticky; top:0; z-index:10; background:hsl(75 10% 95% / .88); backdrop-filter:blur(10px); border-bottom:1px solid var(--border); }
+  .topbar-in{ max-width:1120px; margin:0 auto; padding:.7rem 1.25rem; display:flex; align-items:center; gap:1.4rem; }
+  .brand{ display:flex; align-items:center; gap:.55rem; text-decoration:none; }
+  .brand-mark{ width:30px; height:30px; border-radius:9px; background:var(--brand-lime); display:grid; place-items:center; box-shadow:inset 0 0 0 1px hsl(78 55% 40% / .25); }
+  .brand-name{ font-size:17px; font-weight:800; letter-spacing:-.02em; }
+  .brand-name span{ color:var(--ok-text); font-weight:700; }
+  .topnav{ display:flex; gap:.15rem; }
+  .topnav a{ text-decoration:none; font-size:13.5px; font-weight:550; color:var(--muted-foreground); padding:.42rem .75rem; border-radius:999px; }
+  .topnav a:hover{ background:var(--accent); color:var(--brand-ink); }
+  .topnav a.is-on{ background:var(--brand-lime); color:hsl(78 60% 18%); font-weight:650; }
+  .user{ margin-left:auto; display:flex; align-items:center; gap:.6rem; }
+  .user-id{ text-align:right; line-height:1.15; }
+  .user-id b{ display:block; font-size:13px; font-weight:650; }
+  .user-id small{ font-size:11px; color:var(--muted-foreground); }
+  .uav{ width:32px; height:32px; border-radius:50%; background:var(--brand-ink); color:#fff; display:grid; place-items:center; font-size:11px; font-weight:700; }
+
+  /* ---------- página ---------- */
+  .wrap{ max-width:1120px; margin:0 auto; padding:1.6rem 1.25rem 4.5rem; }
+  .page-head{ display:flex; align-items:flex-end; justify-content:space-between; gap:1rem; flex-wrap:wrap; }
+  .page-head .kicker{ font-size:11.5px; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:var(--muted-foreground); }
+  .page-head h1{ font-size:26px; font-weight:750; letter-spacing:-.02em; margin-top:.1rem; }
+  .page-head .sub{ margin-top:.15rem; font-size:13px; color:var(--muted-foreground); }
+  .page-head .sub b{ color:var(--brand-ink); }
+  .btn-new{ display:inline-flex; align-items:center; gap:.45rem; background:var(--brand-lime); color:hsl(78 60% 17%); border:none; border-radius:999px; padding:.55rem 1.05rem; font-size:13.5px; font-weight:650; cursor:pointer; box-shadow:inset 0 0 0 1px hsl(78 55% 40% / .3); text-decoration:none; }
+  .btn-new:hover{ filter:brightness(.96); }
+
+  /* ---------- identidade por turma ---------- */
+  .t-t1{ --tt: var(--brand-lime); --tt-ink: hsl(78 60% 17%); --tt-soft: hsl(78 56% 93%); --tt-border: hsl(78 45% 78%); }
+  .t-t2{ --tt: var(--amber);     --tt-ink: hsl(43 85% 20%);  --tt-soft: hsl(48 90% 93%);  --tt-border: hsl(46 75% 74%); }
+
+  /* ---------- card: credencial da turma ----------
+     lombada colorida à esquerda (a "via" que fica) + corpo denso à direita,
+     separados por perfuração com picotes — linguagem de crachá/ticket. */
+  .tgrid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,460px),1fr)); gap:1.1rem; margin-top:1.4rem; list-style:none; }
+  .cred{ position:relative; display:flex; background:var(--card); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; box-shadow:0 1px 2px rgb(0 0 0/.04); transition:transform .15s, box-shadow .15s; }
+  .cred:hover{ transform:translateY(-1px); box-shadow:0 8px 22px hsl(0 0% 15% / .08); }
+
+  /* lombada: tinta da turma, sigla gigante, etiqueta vertical e emblema-dial */
+  .spine{ position:relative; flex:0 0 108px; background:var(--tt); display:flex; flex-direction:column; align-items:center; padding:.85rem .4rem .7rem; color:var(--tt-ink); border-right:2px dashed hsl(0 0% 15% / .22); }
+  .spine .sp-tag{ writing-mode:vertical-rl; font-size:10px; font-weight:700; letter-spacing:.34em; text-transform:uppercase; opacity:.68; }
+  .spine .sp-n{ flex:1; display:grid; place-items:center; font-size:74px; font-weight:800; letter-spacing:-.05em; line-height:1; }
+  .spine .sp-sigla{ font-size:11px; font-weight:800; letter-spacing:.1em; margin-top:.15rem; }
+  .spine svg{ margin-top:.4rem; opacity:.9; }
+  /* picotes da perfuração — círculos na cor do fundo da página */
+  .cred::before, .cred::after{ content:""; position:absolute; left:108px; width:18px; height:18px; border-radius:50%; background:var(--background); transform:translateX(-50%); z-index:2; border:1px solid var(--border); }
+  .cred::before{ top:-10px; }
+  .cred::after{ bottom:-10px; }
+
+  .cbody{ flex:1; min-width:0; padding:13px 16px 12px; display:flex; flex-direction:column; gap:8px; }
+  .crow1{ display:flex; align-items:center; gap:.55rem; flex-wrap:wrap; }
+  .crow1 h3{ font-size:18px; font-weight:800; letter-spacing:-.02em; }
+  .crow1 .ano{ font-size:11.5px; font-weight:600; color:var(--muted-foreground); }
+  .pill{ display:inline-flex; align-items:center; gap:.35rem; font-size:11px; font-weight:650; padding:.24rem .6rem; border-radius:999px; white-space:nowrap; margin-left:auto; }
+  .pill::before{ content:""; width:6px; height:6px; border-radius:50%; background:currentColor; }
+  .p-ok{ background:hsl(78 58% 90%); color:var(--ok-text); }
+  .cmeta{ font-size:12.5px; color:var(--muted-foreground); }
+  .cmeta b{ font-weight:600; color:var(--brand-ink); }
+
+  /* stats como chips compactos */
+  .cchips{ display:flex; flex-wrap:wrap; gap:.4rem; }
+  .cchips span{ display:inline-flex; align-items:baseline; gap:.32rem; font-size:12px; font-weight:600; color:var(--muted-foreground); background:var(--muted); border:1px solid var(--border); border-radius:999px; padding:.28rem .68rem; }
+  .cchips b{ font-size:13.5px; font-weight:800; color:var(--brand-ink); }
+
+  /* encontro da semana — linha densa tintada */
+  .cagora{ display:flex; align-items:center; gap:.55rem; font-size:12.5px; background:var(--tt-soft); border:1px solid var(--tt-border); border-radius:8px; padding:.5rem .7rem; }
+  .cagora .dot{ flex:none; width:9px; height:9px; border-radius:50%; background:var(--tt-ink); }
+  .cagora b{ font-weight:750; }
+  .cagora small{ display:block; font-size:11.5px; color:var(--muted-foreground); }
+  .cagora .num{ margin-left:auto; flex:none; font-size:12px; font-weight:800; color:var(--tt-ink); white-space:nowrap; }
+
+  .cacts{ display:flex; flex-wrap:wrap; gap:.45rem; margin-top:auto; padding-top:2px; }
+  .cacts .btn{ display:inline-flex; align-items:center; gap:.35rem; font-size:12.5px; font-weight:650; padding:.45rem .85rem; border-radius:9px; border:1px solid var(--border); background:var(--card); color:var(--brand-ink); text-decoration:none; }
+  .cacts .btn:hover{ background:var(--accent); }
+  .cacts .btn.pri{ background:var(--tt); border-color:var(--tt); color:var(--tt-ink); }
+  .cacts .btn.pri:hover{ filter:brightness(.95); }
+  .cacts .btn.ghost{ border-color:transparent; color:var(--muted-foreground); }
+  .cacts .btn.ghost:hover{ color:var(--brand-ink); background:var(--accent); }
+
+  /* ---------- cronograma oficial (apoio) ---------- */
+  .crono{ margin-top:2rem; }
+  .crono-head{ display:flex; align-items:baseline; justify-content:space-between; gap:1rem; flex-wrap:wrap; }
+  .crono-head h2{ font-size:16px; font-weight:750; letter-spacing:-.01em; }
+  .crono-head p{ font-size:12px; color:var(--muted-foreground); }
+  .crono-list{ margin-top:.7rem; background:var(--card); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; }
+  .crow{ padding:.8rem 1.1rem .9rem; }
+  .crow + .crow{ border-top:1px solid var(--border); }
+  .crow-top{ display:flex; align-items:center; gap:.6rem; flex-wrap:wrap; }
+  .cchip{ font-size:12px; font-weight:800; padding:.15rem .55rem; border-radius:6px; }
+  .cchip.c-t1{ background:var(--brand-lime); color:hsl(78 60% 17%); }
+  .cchip.c-t2{ background:var(--amber); color:hsl(43 85% 20%); box-shadow:inset 0 0 0 1px hsl(45 80% 40% / .25); }
+  .crow-top b{ font-size:13.5px; font-weight:700; }
+  .crow-top small{ font-size:12px; color:var(--muted-foreground); }
+  .crow-top .cr-stat{ margin-left:auto; font-size:12px; color:var(--muted-foreground); }
+  .crow-top .cr-stat b{ font-size:12px; color:var(--brand-ink); }
+  .cells{ list-style:none; display:flex; flex-wrap:wrap; gap:4px; margin-top:.55rem; }
+  .cells li{ width:26px; height:24px; border-radius:6px; display:grid; place-items:center; font-size:10.5px; font-weight:700; border:1px solid var(--border); color:var(--muted-foreground); background:var(--card); }
+  .cells li.done{ background:var(--brand-ink); border-color:var(--brand-ink); color:#fff; }
+  .cells li.now{ background:var(--background); border:2px solid var(--ttb, var(--ok)); color:var(--brand-ink); box-shadow:0 0 0 3px hsl(78 56% 53% / .25); }
+  .crow.cr-t2 .cells li.now{ box-shadow:0 0 0 3px hsl(48 100% 60% / .35); }
+  .crow-leg{ display:flex; flex-wrap:wrap; gap:.4rem 1.1rem; margin-top:.55rem; font-size:11.5px; color:var(--muted-foreground); align-items:center; }
+  .crow-leg .tag{ font-size:10.5px; font-weight:700; background:var(--muted); border-radius:5px; padding:.08rem .45rem; }
+  .crow-leg .tag.ev{ background:hsl(75 8% 91%); border:1px dashed var(--input); }
+  .crow.arch{ background:var(--muted); }
+  .arch-line{ display:flex; align-items:center; gap:.6rem; flex-wrap:wrap; font-size:12.5px; color:var(--muted-foreground); }
+  .arch-line .cchip{ background:var(--accent); color:var(--muted-foreground); box-shadow:inset 0 0 0 1px var(--border); }
+  .arch-line a{ font-weight:600; color:var(--muted-foreground); text-decoration:underline; text-underline-offset:3px; }
+  .arch-line a:hover{ color:var(--brand-ink); }
+
+  /* ---------- bottom nav (mobile) ---------- */
+  .bnav{ position:fixed; left:0; right:0; bottom:0; z-index:70; display:flex; background:#fff; border-top:1px solid var(--border); padding-bottom:env(safe-area-inset-bottom); }
+  .bnav a{ flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; min-height:58px; font-size:12px; font-weight:600; color:var(--muted-foreground); text-decoration:none; position:relative; }
+  .bnav a.on{ color:var(--brand-ink); font-weight:700; }
+  .bnav a.on::before{ content:""; position:absolute; top:0; width:36px; height:3px; border-radius:0 0 3px 3px; background:var(--brand-lime); }
+  @media (min-width:900px){ .bnav{ display:none; } }
+
+  /* ---------- notas ---------- */
+  .notes{ display:grid; gap:8px; margin-top:36px; padding:16px 22px 18px; background:var(--brand-ink); color:hsl(75 14% 76%); border-radius:var(--radius); font-size:12.5px; line-height:1.6; }
+  .notes b{ color:var(--brand-lime); font-weight:700; }
+  .notes li{ margin-left:18px; }
+  .notes .warn{ color:hsl(48 100% 70%); }
+
+  /* ---------- responsivo ---------- */
+  @media (max-width: 1020px){
+    .topnav{ display:none; }
+  }
+  @media (max-width: 640px){
+    .wrap{ padding:1.1rem .9rem 6rem; }
+    .page-head h1{ font-size:22px; }
+    .page-head{ flex-direction:column; align-items:stretch; }
+    .btn-new{ justify-content:center; min-height:44px; }
+    .user-id{ display:none; }
+    .asrole{ position:static; padding:8px 12px; }
+    .spine{ flex-basis:88px; }
+    .spine .sp-n{ font-size:58px; }
+    .cred::before, .cred::after{ left:88px; }
+    .cbody{ padding:11px 12px 10px; }
+    .cacts .btn{ min-height:44px; }
+    .cells li{ width:24px; height:22px; }
+    .crow{ padding:.75rem .85rem .85rem; }
+    .crow-top .cr-stat{ margin-left:0; flex-basis:100%; }
+  }
+</style>
+</head>
+<body>
+
+<header class="board-head">
+  <span><b>MOCKUP</b> · turmas · <b>v1b</b> — variante “credencial”</span>
+  <span class="dir"><b>Direção:</b> card compacto tipo crachá — lombada colorida com a sigla gigante (T1 lima · T2 âmbar), perfuração com picotes, corpo denso com stats em chips. Título “Turma N”; o ano fica pequeno na meta.</span>
+  <nav>
+    <a href="#cards">Cards</a>
+    <a href="#crono">Cronograma</a>
+    <a href="#notas">Notas</a>
+  </nav>
+</header>
+
+<div class="asrole"><span class="who">Coordenação</span><span class="why">/turmas é exclusiva desse papel — os demais redirecionam pro início (por isso não há seletor de visão nesta tela).</span></div>
+
+<div class="app">
+
+  <div class="topbar"><div class="topbar-in">
+    <a class="brand" href="#"><span class="brand-mark" aria-hidden="true"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="hsl(78 60% 20%)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21v-9"/><path d="M12 12c0-3.9 2.7-6.5 6.5-6.5 0 3.8-2.7 6.5-6.5 6.5z"/><path d="M12 12c0-3.9-2.7-6.5-6.5-6.5 0 3.8 2.7 6.5 6.5 6.5z"/></svg></span><span class="brand-name">realiza<span>.vc</span></span></a>
+    <nav class="topnav" aria-label="Principal"><a href="#">Início</a><a href="#">Duplas</a><a href="#">Agenda</a><a href="#">Pessoas</a><a href="#">Materiais</a><a href="#" class="is-on" aria-current="page">Turmas</a></nav>
+    <div class="user"><div class="user-id"><b>Marina Costa</b><small>Coordenação</small></div><span class="uav" aria-hidden="true">MC</span></div>
+  </div></div>
+
+  <main class="wrap">
+    <div class="page-head">
+      <div>
+        <p class="kicker">Operação</p>
+        <h1>Turmas e cronogramas</h1>
+        <p class="sub"><b>2 turmas ativas</b> · 26 duplas no ciclo · o calendário oficial de cada turma</p>
+      </div>
+      <a class="btn-new" href="#"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Novo cronograma</a>
+    </div>
+
+    <!-- ======================= CARDS ======================= -->
+    <ul class="tgrid" id="cards">
+
+      <!-- TURMA 1 — lombada lima -->
+      <li><article class="cred t-t1">
+        <div class="spine" aria-hidden="true">
+          <span class="sp-tag">turma</span>
+          <span class="sp-n">1</span>
+          <span class="sp-sigla">T1</span>
+          <!-- emblema-dial: anel + 1 traço + ponto cheio -->
+          <svg width="34" height="34" viewBox="0 0 34 34"><circle cx="17" cy="17" r="14" fill="none" stroke="hsl(78 60% 17%)" stroke-width="2"/><line x1="17" y1="7.5" x2="17" y2="12" stroke="hsl(78 60% 17%)" stroke-width="3" stroke-linecap="round"/><circle cx="17" cy="17" r="2.6" fill="hsl(78 60% 17%)"/></svg>
+        </div>
+        <div class="cbody">
+          <div class="crow1"><h3>Turma 1</h3><span class="ano">ciclo 2026/2027</span><span class="pill p-ok">Ativa</span></div>
+          <p class="cmeta">Encontros às <b>terças, 19h</b> · 19 ago → fev/27</p>
+          <div class="cchips"><span><b>14</b> duplas</span><span><b>14</b> mentores</span><span><b>14</b> jovens</span><span><b>16</b> encontros</span></div>
+          <div class="cagora">
+            <i class="dot" aria-hidden="true"></i>
+            <div><b>Semana do encontro 8</b> — hoje, ter 7/out · 19h no Meet<small>11 de 14 duplas com encontro agendado · roda de conversa qui 9/out</small></div>
+            <span class="num">8/16</span>
+          </div>
+          <div class="cacts">
+            <a class="btn pri" href="#">Abrir cronograma ›</a>
+            <a class="btn" href="#">Editar</a>
+            <a class="btn ghost" href="#">Ver duplas</a>
+          </div>
+        </div>
+      </article></li>
+
+      <!-- TURMA 2 — lombada âmbar -->
+      <li><article class="cred t-t2">
+        <div class="spine" aria-hidden="true">
+          <span class="sp-tag">turma</span>
+          <span class="sp-n">2</span>
+          <span class="sp-sigla">T2</span>
+          <!-- emblema-dial: anel + 2 traços + ponto cheio -->
+          <svg width="34" height="34" viewBox="0 0 34 34"><circle cx="17" cy="17" r="14" fill="none" stroke="hsl(43 85% 20%)" stroke-width="2"/><line x1="11.5" y1="9.5" x2="13.7" y2="13.4" stroke="hsl(43 85% 20%)" stroke-width="3" stroke-linecap="round"/><line x1="22.5" y1="9.5" x2="20.3" y2="13.4" stroke="hsl(43 85% 20%)" stroke-width="3" stroke-linecap="round"/><circle cx="17" cy="17" r="2.6" fill="hsl(43 85% 20%)"/></svg>
+        </div>
+        <div class="cbody">
+          <div class="crow1"><h3>Turma 2</h3><span class="ano">ciclo 2026/2027</span><span class="pill p-ok">Ativa</span></div>
+          <p class="cmeta">Encontros às <b>quartas, 19h</b> · 10 set → mar/27 · <b>começou 3 semanas depois</b></p>
+          <div class="cchips"><span><b>12</b> duplas</span><span><b>11</b> mentores</span><span><b>12</b> jovens</span><span><b>16</b> encontros</span></div>
+          <div class="cagora">
+            <i class="dot" aria-hidden="true"></i>
+            <div><b>Semana do encontro 5</b> — amanhã, qua 8/out · 19h presencial<small>9 de 12 duplas com encontro agendado · formação sáb 11/out</small></div>
+            <span class="num">5/16</span>
+          </div>
+          <div class="cacts">
+            <a class="btn pri" href="#">Abrir cronograma ›</a>
+            <a class="btn" href="#">Editar</a>
+            <a class="btn ghost" href="#">Ver duplas</a>
+          </div>
+        </div>
+      </article></li>
+    </ul>
+
+    <!-- ======================= CRONOGRAMA (apoio) ======================= -->
+    <section class="crono" id="crono" aria-label="Cronograma oficial">
+      <div class="crono-head">
+        <h2>Os 16 encontros de cada turma</h2>
+        <p>referência do semáforo — “semana do encontro N” é por cronograma, nunca global</p>
+      </div>
+      <div class="crono-list">
+
+        <div class="crow cr-t1" style="--ttb: var(--ok)">
+          <div class="crow-top">
+            <span class="cchip c-t1">T1</span><b>Turma 1</b><small>terças 19h · ciclo 2026/2027</small>
+            <span class="cr-stat"><b>7 realizados</b> · encontro 8 hoje · 8 futuros</span>
+          </div>
+          <ol class="cells" aria-label="Encontros da Turma 1: 1 a 7 realizados, 8 hoje, 9 a 16 futuros">
+            <li class="done">1</li><li class="done">2</li><li class="done">3</li><li class="done">4</li><li class="done">5</li><li class="done">6</li><li class="done">7</li><li class="now" title="Encontro 8 — hoje, ter 7/out 19h">8</li><li>9</li><li>10</li><li>11</li><li>12</li><li>13</li><li>14</li><li>15</li><li>16</li>
+          </ol>
+          <div class="crow-leg">
+            <span class="tag">◂ realizados</span><span class="tag">8 = hoje</span><span class="tag">previstos ▸</span>
+            <span class="tag ev">＋ roda de conversa qui 9/out · encerramento fev/27</span>
+          </div>
+        </div>
+
+        <div class="crow cr-t2" style="--ttb: hsl(45 85% 38%)">
+          <div class="crow-top">
+            <span class="cchip c-t2">T2</span><b>Turma 2</b><small>quartas 19h · ciclo 2026/2027 · começou 3 semanas depois</small>
+            <span class="cr-stat"><b>4 realizados</b> · encontro 5 amanhã · 11 futuros</span>
+          </div>
+          <ol class="cells" aria-label="Encontros da Turma 2: 1 a 4 realizados, 5 amanhã, 6 a 16 futuros">
+            <li class="done">1</li><li class="done">2</li><li class="done">3</li><li class="done">4</li><li class="now" title="Encontro 5 — amanhã, qua 8/out 19h">5</li><li>6</li><li>7</li><li>8</li><li>9</li><li>10</li><li>11</li><li>12</li><li>13</li><li>14</li><li>15</li><li>16</li>
+          </ol>
+          <div class="crow-leg">
+            <span class="tag">◂ realizados</span><span class="tag">5 = amanhã</span><span class="tag">previstos ▸</span>
+            <span class="tag ev">＋ formação sáb 11/out · encerramento mar/27</span>
+          </div>
+        </div>
+
+        <div class="crow arch">
+          <div class="arch-line">
+            <span class="cchip">2025</span><span><b style="color:var(--brand-ink)">Ciclo piloto 2025</b> · encerrado em fev/2026 · 11 duplas · 13 encontros realizados</span>
+            <a href="#">ver arquivo ›</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======================= NOTAS ======================= -->
+    <ul class="notes" id="notas">
+      <li><b>Papel × ação:</b> só <b>Coordenação</b> vê /turmas — mentor, auxiliar e jovem são redirecionados (RLS + guarda de rota), por isso esta tela não tem seletor de visão. Ações dela: abrir/editar cronograma e criar novo. Ela <b>monitora</b>: quem agenda encontro é a dupla — não há “agendar” aqui, e nudge mora na agenda/duplas.</li>
+      <li><b>Nomeação (o pedido do feedback):</b> título vira <b>“Turma N”</b> e o ano sai do título — fica pequeno ao lado (“ciclo 2026/2027”) e na lombada como etiqueta. Sigla <b>T1/T2</b> é a forma curta pra chips, pills e filtros em outras telas. No código, <code>partesTurma()</code> já quebra “T1 · 2026/2027” → {nome, ano} (REALIZA-151); falta o sweep nos consumers que mostram “2026/2027” solto.</li>
+      <li><b>Marca de turma:</b> a lombada é a credencial — numeral gigante + etiqueta vertical “TURMA” + sigla + <b>emblema-dial com N traços</b> (T1 = um, T2 = dois). A cor da lombada é a tinta da turma (T1 lima, T2 âmbar); perfuração com picotes separa a “via” do corpo.</li>
+      <li><b>Variante v1b (este arquivo):</b> card mais baixo e denso — a identidade mora na lombada lateral, não num banner; stats viram chips em linha; encontro da semana é uma linha tintada. Comparar com v1a (banner de perfil: campo ink + sigla fantasma + stats em faixa).</li>
+      <li><b>Sem banner de escopo</b> (“Você vê…”) — decisão já tomada nos mocks de duplas: privacidade é RLS; escopo fica aqui nas notas.</li>
+      <li class="warn"><b>Decisões em aberto:</b> (a) “terças 19h” não é campo do cronograma hoje — vira campo (`dia_semana`/`hora`) ou deriva dos encontros marcados? (b) tinta por turma: fixa por ordem (T1 lima, T2 âmbar) esgota os tokens na T3 — alternativa: seedada do id como o relevo da pessoa; (c) âmbar hoje é “a cor do jovem” — reusar como tinta de turma dilui a gramática de papel? (d) “N de M duplas agendadas” exige contagem por cronograma na semana — custo de query aceitável? (e) a cor da turma vaza pros pills T1/T2 na agenda/duplas ou fica só nesta página?</li>
+    </ul>
+  </main>
+
+  <nav class="bnav" aria-label="Navegação principal">
+    <a href="#"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m4 10.5 8-7 8 7"/><path d="M6 9.3V20h12V9.3"/></svg>Início</a>
+    <a href="#"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9.5" cy="8" r="3.2"/><path d="M3.6 19.2c.7-3.3 3-5.2 5.9-5.2s5.2 1.9 5.9 5.2"/><path d="M15.2 5.3a3.2 3.2 0 0 1 0 5.5"/><path d="M17 14.4c2 .7 3.2 2.4 3.6 4.8"/></svg>Duplas</a>
+    <a href="#"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9.5" cy="8" r="3.2"/><path d="M3.6 19.2c.7-3.3 3-5.2 5.9-5.2s5.2 1.9 5.9 5.2"/><path d="M15.2 5.3a3.2 3.2 0 0 1 0 5.5"/><path d="M17 14.4c2 .7 3.2 2.4 3.6 4.8"/></svg>Pessoas</a>
+    <a href="#"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5.5" width="16" height="15" rx="2.2"/><path d="M4 10.5h16M8.5 3.5v4M15.5 3.5v4"/></svg>Agenda</a>
+    <a href="#" class="on" aria-current="page"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="7" r="2.6"/><circle cx="17" cy="7" r="2.6"/><circle cx="12" cy="17" r="2.6"/></svg>Mais</a>
+  </nav>
+</div>
+</body>
+</html>

@@ -38,7 +38,7 @@ const RECURSOS: Recurso[] = [
   {
     icon: Handshake,
     texto:
-      "Um mentor ou mentora que caminha com você — encontros pra conversar sobre estudos, planos e o que você quiser construir.",
+      "Um mentor ou mentora que caminha com você: encontros pra conversar sobre estudos, planos e o que você quiser construir.",
   },
   {
     icon: CalendarCheck,
@@ -48,7 +48,7 @@ const RECURSOS: Recurso[] = [
   {
     icon: HandHeart,
     texto:
-      "Um botão de ajuda sempre à mão — avisa a equipe e alguém responde quando você precisar.",
+      "Um botão de ajuda sempre à mão: avisa a equipe e alguém responde quando você precisar.",
   },
 ];
 
@@ -162,7 +162,7 @@ export function OnboardingJovem({
   const hint = (() => {
     switch (step) {
       case 0:
-        return "O Programa de Mentoria Social te conecta com um mentor pra caminhar junto — encontros, planos e o que você quiser construir. Três passos rápidos e você entra.";
+        return "O Programa de Mentoria Social te conecta com um mentor pra caminhar junto: encontros, planos e o que você quiser construir. Três passos rápidos e você entra.";
       case 1:
         return "Marque os dias e períodos em que costuma ter tempo livre. A agenda cruza a sua grade com a do seu mentor pra achar horários em comum.";
       default:
@@ -203,7 +203,7 @@ export function OnboardingJovem({
           <CampoDisponibilidade value={grade} onChange={setGrade} />
         ) : (
           <p className="rounded-2xl border border-border bg-card px-4 py-3 text-sm leading-relaxed text-muted-foreground">
-            Sua ficha ainda não foi conectada à sua conta — a coordenação faz
+            Sua ficha ainda não foi conectada à sua conta. A coordenação faz
             esse vínculo. Quando ela estiver no lugar, você conta seus
             horários em Perfil.
           </p>
@@ -221,7 +221,7 @@ export function OnboardingJovem({
                   <dd className="truncate text-sm font-medium">
                     {perfil?.whatsapp
                       ? formatWhatsApp(perfil.whatsapp)
-                      : "Ainda não cadastrado — a coordenação inclui"}
+                      : "Ainda não cadastrado. A coordenação inclui"}
                   </dd>
                 </div>
               </div>
@@ -257,8 +257,8 @@ export function OnboardingJovem({
                     </span>{" "}
                     <span className="text-muted-foreground">
                       {temWhatsapp
-                        ? "— ligado, os colegas da sua turma que têm conta na plataforma veem seu número em Pessoas; desligado, ninguém vê."
-                        : "— seu cadastro ainda não tem WhatsApp. Quando ele estiver lá, ligar aqui compartilha com os colegas."}
+                        ? "(ligado, os colegas da sua turma que têm conta na plataforma veem seu número em Pessoas; desligado, ninguém vê)"
+                        : "(seu cadastro ainda não tem WhatsApp; quando ele estiver lá, ligar aqui compartilha com os colegas)"}
                     </span>
                   </span>
                 </label>
@@ -279,8 +279,10 @@ export function OnboardingJovem({
           pt safe-area tira o header de sob o notch em standalone */}
       <header className="fixed inset-x-0 top-0 z-40 border-b border-border/60 bg-background/85 pt-[env(safe-area-inset-top)] backdrop-blur">
         <div className="mx-auto flex h-14 w-full max-w-xl items-center gap-3 px-4 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))]">
-          <button
+          <Button
             type="button"
+            variant="outline"
+            size="icon"
             onClick={() => {
               // demo no passo 0: voltar sai da demo e devolve a seleção de
               // papel — troca de visão sem precisar abrir a pill
@@ -297,14 +299,14 @@ export function OnboardingJovem({
               step === 0 && demo ? "Escolher outro papel" : "Voltar um passo"
             }
             title={step === 0 && demo ? "Escolher outro papel" : undefined}
-            className="grid size-11 shrink-0 place-items-center rounded-full border border-border bg-card text-foreground transition-colors outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-40 md:size-9"
+            className="shrink-0 rounded-full"
           >
             {pending && step === 0 ? (
-              <CircleNotch size={17} className="animate-spin" aria-hidden />
+              <CircleNotch className="animate-spin" aria-hidden />
             ) : (
-              <ArrowLeft size={17} aria-hidden />
+              <ArrowLeft aria-hidden />
             )}
-          </button>
+          </Button>
           <div
             role="progressbar"
             aria-valuenow={step + 1}

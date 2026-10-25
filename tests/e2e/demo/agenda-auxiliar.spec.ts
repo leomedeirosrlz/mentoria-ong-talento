@@ -18,8 +18,8 @@ import { agirComConfirma, entrarNaDemo, expect, test } from "../helpers";
 //     grupo "Trilhas de especialista" (sem cronograma; o componente relata
 //     o tipo em vez de "Sem turma") e na consolidada entra como convidado
 //     âmbar
-//   · d-fim (concluída) e d-esp4 (concluída) — contam no total do header,
-//     não no "Por turma" (que só lista ativa/pausada)
+//   · d-fim (concluída) e d-esp4 (concluída) — contam no resumo "Situação
+//     das duplas", não no "Por turma" (que só lista ativa/pausada)
 // A Beatriz supervisiona a d-risco/d-atraso/d-esp2/d-esp3 — nenhuma delas
 // pode aparecer na agenda do Paulo (checagem negativa de escopo).
 // Público, sem writes: Lembrar e o dialog de supervisão respondem o modo
@@ -42,11 +42,26 @@ test.describe("agenda demo do supervisor — Por turma / Consolidada (WP5)", () 
     await expect(
       page.getByRole("heading", { name: "Agenda das minhas duplas" })
     ).toBeVisible();
-    // correndo = ativa/pausada: ok, pend, esp1, t2b, t2c — fim e esp4 são
-    // concluídas e entram no contador de encerradas do cabeçalho
+    // o cabeçalho abriu espaço pra semana; os números do escopo moram no
+    // resumo "Situação das duplas" (o mesmo SaudePrograma de /duplas e da
+    // agenda da coordenação): 5 correndo (ok, pend, esp1, t2b, t2c) + 2
+    // concluídas (fim, esp4) — e o apoio lê como pill à parte, nunca como
+    // situação da dupla
     await expect(
-      page.getByText(/5 duplas supervisionadas · 2 encerradas/)
+      page.getByText(/Turma 1 e Turma 2 · semana \d+, \d+ a \d+ de \w+/)
     ).toBeVisible();
+    const saude = page.locator('section[aria-label="Situação das duplas"]');
+    await expect(saude).toBeVisible();
+    await expect(
+      saude.getByText(/5 em andamento · 2 concluídas · 0 pausadas/)
+    ).toBeVisible();
+    // a barra nomeia o split inteiro — risco/atenção/dia drifta com o
+    // relógio; o denominador (5) e o apoio do Caio (pedido do jovem) não
+    await expect(saude.getByRole("img")).toHaveAttribute(
+      "aria-label",
+      /5 em andamento: \d+ em risco, \d+ em atenção, \d+ em dia\. 2 pausadas ou concluídas\. 1 com apoio aberto\./
+    );
+    await expect(saude.getByText(/com apoio aberto/)).toBeVisible();
 
     // as abas do auxiliar: "Por turma" é o default, "Consolidada" vive em
     // ?aba=consolidada — links com role=tab, como no resto da agenda
@@ -58,16 +73,24 @@ test.describe("agenda demo do supervisor — Por turma / Consolidada (WP5)", () 
       abas.getByRole("tab", { name: "Consolidada" })
     ).toHaveAttribute("aria-selected", "false");
 
-    // o desencontro das turmas — 3 grupos (T1, T2 e "Trilhas de
-    // especialista", o rótulo honesto do grupo sem cronograma)
-    await expect(
-      page.getByText(/As turmas não começaram juntas/)
-    ).toBeVisible();
+    // a faixa "Semana do programa" existe no escopo das supervisionadas —
+    // mas é leitura pura: o supervisor sem papel mentor não tem superfície
+    // de dia, então os títulos não podem linkar ?dia= (o param cairia no
+    // ramo errado do page.tsx). Sem link nenhum na faixa: sem ?dia= e sem
+    // "Abrir chamada" — presença é painel da coordenação
+    const faixa = page.locator('section[aria-label="Semana do programa"]');
+    await expect(faixa).toBeVisible();
+    await expect(faixa.getByRole("link")).toHaveCount(0);
+    await expect(faixa.locator('a[href*="dia="]')).toHaveCount(0);
+
+    // o desencontro das turmas deixou de ser texto explicativo — a frase
+    // saiu e a prova agora é a própria estrutura: 3 grupos (T1, T2 e
+    // "Trilhas de especialista", o rótulo honesto do grupo sem cronograma)
 
     // grupos por cronograma: T1 com Bia e Caio, T2 com Laura e Matheus, e
     // o grupo sem cronograma da trilha esp supervisionada
-    const t1 = page.locator('section[aria-label="Duplas da T1 · 2026/2027"]');
-    const t2 = page.locator('section[aria-label="Duplas da T2 · 2026/2027"]');
+    const t1 = page.locator('section[aria-label="Duplas da Turma 1"]');
+    const t2 = page.locator('section[aria-label="Duplas da Turma 2"]');
     await expect(t1).toBeVisible();
     await expect(t1.getByRole("heading", { name: /Turma 1/ })).toBeVisible();
     await expect(t2).toBeVisible();
@@ -81,12 +104,39 @@ test.describe("agenda demo do supervisor — Por turma / Consolidada (WP5)", () 
       semTurma.getByRole("heading", { name: "Trilhas de especialista" })
     ).toBeVisible();
 
-    // card da Bia (d-ok) — nome_social no título, o mentor no contexto
+    // card da Bia (d-ok) — nome_social no título, o mentor no contexto.
+    // Mesmo drift do Caio abaixo: com pendência apontável o "Lembrar"
+    // vira primária e "Ver ficha" recolhe no ⋯ "Mais ações" (REALIZA-186);
+    // em dia o link solto segue no rodapé. O ⋯ no DOM decide o ramo.
     const cardBia = t1.locator("article", { hasText: "Bia" });
     await expect(cardBia.getByText("mentor: Ricardo Tavares")).toBeVisible();
-    await expect(
-      cardBia.getByRole("link", { name: "Ver ficha ›" })
-    ).toBeVisible();
+    const maisAcoesBia = cardBia.getByRole("button", {
+      name: "Mais ações da dupla de Bia",
+    });
+    if ((await maisAcoesBia.count()) > 0) {
+      // o menu é nomeado pelo trigger — o card do Caio pode montar um ⋯
+      // idêntico no mesmo view, então nunca pesquisa "menu" a seco
+      const menuBia = page.getByRole("menu", {
+        name: "Mais ações da dupla de Bia",
+      });
+      await agirComConfirma(
+        () => maisAcoesBia.click(),
+        () => menuBia.isVisible()
+      );
+      await expect(
+        menuBia.getByRole("menuitem", { name: "Ver ficha" })
+      ).toBeVisible();
+      // fecha de verdade antes de seguir — menu aberto segue na árvore
+      // de a11y e colide com o ⋯ do Caio logo abaixo
+      await agirComConfirma(
+        () => page.keyboard.press("Escape"),
+        () => menuBia.isHidden()
+      );
+    } else {
+      await expect(
+        cardBia.getByRole("link", { name: "Ver ficha ›" })
+      ).toBeVisible();
+    }
 
     // card do Caio (d-pend) — o contexto drifta com o relógio do enc. 4:
     // "sem encontro agendado" quando o vigente não tem row (seg/ter de
@@ -116,12 +166,16 @@ test.describe("agenda demo do supervisor — Por turma / Consolidada (WP5)", () 
         cardCaio.getByRole("button", { name: /^Lembrar/ }).first()
       ).toBeEnabled();
       // clique com confirmação: em preview frio o handler do trigger pode
-      // ainda não ter hidratado — repete até o popup abrir
+      // ainda não ter hidratado — repete até o popup abrir. O menu é
+      // nomeado pelo trigger: o card da Bia pode montar um ⋯ no mesmo
+      // view, então nunca pesquisa "menu" a seco.
+      const menuAcoes = page.getByRole("menu", {
+        name: "Mais ações da dupla de Caio Henrique Oliveira",
+      });
       await agirComConfirma(
         () => maisAcoesCaio.click(),
-        () => page.getByRole("menu").isVisible()
+        () => menuAcoes.isVisible()
       );
-      const menuAcoes = page.getByRole("menu");
       await expect(
         menuAcoes.getByRole("menuitem", { name: "Registrar supervisão" })
       ).toBeVisible();
@@ -158,7 +212,7 @@ test.describe("agenda demo do supervisor — Por turma / Consolidada (WP5)", () 
         page.getByText("Sem encontro agendado (1)")
       ).toBeVisible();
       await expect(
-        page.getByText(/Caio \(T1 · 2026\/2027\).*Use/)
+        page.getByText(/Caio \(T1\).*Use/)
       ).toBeVisible();
     } else {
       test.info().annotations.push({
@@ -202,27 +256,28 @@ test.describe("agenda demo do supervisor — Por turma / Consolidada (WP5)", () 
     const dias = page.locator("section[aria-label]");
     await expect(dias.first()).toBeVisible();
 
-    // o item sintético do Caio — vigente sem row: "enc. N a agendar" com
-    // o detalhe da dupla e Lembrar livre. O N drifta com a semana (enc. 5
-    // na semana do vigente sem row; nas semanas em que o enc. 4 já rolou
-    // o item some da lista) — o assert casa qualquer número de encontro.
+    // o item sintético do Caio — vigente sem row: "Encontro N a agendar"
+    // com o detalhe da dupla e Lembrar livre. O N drifta com a semana
+    // (enc. 5 na semana do vigente sem row; nas semanas em que o enc. 4
+    // já rolou o item some da lista) — o assert casa qualquer número de
+    // encontro.
     const aAgendar = page
       .locator("article")
-      .filter({ hasText: /enc\. \d+ a agendar/ })
+      .filter({ hasText: /Encontro \d+ a agendar/ })
       .filter({ hasText: /Caio com Carlos Menezes/ });
     if ((await aAgendar.count()) > 0) {
       await expect(
-        aAgendar.getByRole("heading", { name: /enc\. \d+ a agendar/ })
+        aAgendar.getByRole("heading", { name: /Encontro \d+ a agendar/ })
       ).toBeVisible();
       await expect(aAgendar).toContainText("A agendar");
       await expect(
-        aAgendar.getByText(/Caio com Carlos Menezes · T1 · 2026\/2027/)
+        aAgendar.getByText(/Caio com Carlos Menezes · Turma 1/)
       ).toBeVisible();
       await aAgendar
         .getByRole("button", { name: "Lembrar", exact: true })
         .click();
       await expect(
-        page.getByText("Modo demo — nada é enviado de verdade.")
+        page.getByText("Modo demo: nada é enviado de verdade.")
       ).toBeVisible();
     } else {
       test.info().annotations.push({
@@ -252,17 +307,20 @@ test.describe("agenda demo do supervisor — Por turma / Consolidada (WP5)", () 
     ).toBeVisible();
     await page.keyboard.press("Escape");
 
-    // sessão da trilha supervisionada (Sofia × Bia, sábado) — convidado:
-    // a tag âmbar marca e o item não tem nenhuma ação pro supervisor
-    const convidado = page
+    // sessões da trilha supervisionada (Sofia × Bia) — convidado: a tag
+    // âmbar marca e o item não tem nenhuma ação pro supervisor. A âncora
+    // nova da semana deixa MAIS de uma sessão da dupla na janela — o
+    // invariante vale pra todas (filter por nome só resolve 2 → strict).
+    const convidados = page
       .locator("article")
-      .filter({ hasText: /Bia × Sofia Nogueira/ });
-    await expect(convidado.getByText("só acompanhamento")).toBeVisible();
-    await expect(
-      convidado.getByText(/Trilha de especialista · sessão \d de 5/)
-    ).toBeVisible();
-    await expect(convidado.getByRole("button")).toHaveCount(0);
-    await expect(convidado.getByRole("link")).toHaveCount(0);
+      .filter({ hasText: /Bia × Sofia Nogueira/ })
+      .filter({ hasText: /Trilha de especialista · sessão \d de 5/ });
+    await expect(convidados.first()).toBeVisible();
+    for (const convidado of await convidados.all()) {
+      await expect(convidado.getByText("só acompanhamento")).toBeVisible();
+      await expect(convidado.getByRole("button")).toHaveCount(0);
+      await expect(convidado.getByRole("link")).toHaveCount(0);
+    }
 
     // evento oficial entra como convidado também — a roda de casos do
     // domingo (formação continuada da T1)

@@ -380,7 +380,7 @@ export function AssinaturasPessoa({
       if (res.faltantes?.length) {
         toast.warning(
           `Ficha incompleta: falta ${res.faltantes.join(" · ")}. ` +
-            "Quem assina pode completar na hora — ou edite a ficha antes."
+            "Quem assina pode completar na hora, ou edite a ficha antes."
         );
       }
       await carregar();

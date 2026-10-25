@@ -32,7 +32,7 @@ export function TrilhaPrazoBadge({
       <Badge
         variant="outline"
         className="border-[var(--warn)]/60 text-[var(--warn-text)]"
-        title="O guia prevê ~3 meses de trilha — se o foco já foi cumprido, é hora de fechar com devolutiva."
+        title="O guia prevê ~3 meses de trilha. Se o foco já foi cumprido, é hora de fechar com devolutiva."
       >
         <CalendarCheck size={12} aria-hidden />
         3 meses completos · guia sugere fechar

@@ -243,7 +243,7 @@ describe("saudadeDaDupla — pendência de registro (limbo e >24h)", () => {
     });
     const s = saudadeDaDupla(dupla, CICLO_16, dt("2025-10-08"));
     expect(s.semaforo).toBe("atencao");
-    expect(s.motivo).toBe("1º encontro agendado já passou: falta o registro");
+    expect(s.motivo).toBe("1º encontro agendado já passou. Falta o registro");
     // o limbo cobre o evento esperado do seu número: esperado sai de 1 pra 0
     expect(s.esperado).toBe(0);
     expect(s.registroPendente).toBe(true);
@@ -278,7 +278,7 @@ describe("saudadeDaDupla — pendência de registro (limbo e >24h)", () => {
     });
     const s = saudadeDaDupla(dupla, CICLO_16, dt("2025-10-16"));
     expect(s.semaforo).toBe("atencao");
-    expect(s.motivo).toBe("1º encontro agendado já passou: falta o registro");
+    expect(s.motivo).toBe("1º encontro agendado já passou. Falta o registro");
   });
 
   it("agendado passado COM registro não é limbo nem pendência", () => {
@@ -493,7 +493,7 @@ describe("saudadeDaDupla — trilha de especialista (sem calendário)", () => {
   it("sinais próprios seguem valendo: limbo vira pendência", () => {
     const s = saudadeDaDupla(esp([encAgendado(1, "2025-10-07")]), CICLO_16, dt("2025-10-14"));
     expect(s.semaforo).toBe("atencao");
-    expect(s.motivo).toBe("1º encontro agendado já passou: falta o registro");
+    expect(s.motivo).toBe("1º encontro agendado já passou. Falta o registro");
   });
 
   it("avaliação baixa + dificuldade também é risco na especialista", () => {
@@ -525,7 +525,7 @@ describe("saudadeDaDupla — trilha de especialista (sem calendário)", () => {
     );
     expect(s.semaforo).toBe("atencao");
     expect(s.motivo).toBe(
-      "Trilha com 3 meses sem sessão nova — checar se segue fazendo sentido"
+      "Trilha com 3 meses sem sessão nova. Vale checar se ainda faz sentido"
     );
   });
 
@@ -604,7 +604,7 @@ describe("saudadeDaDupla — trilha de especialista (sem calendário)", () => {
       dt("2025-10-15")
     );
     expect(s.semaforo).toBe("atencao");
-    expect(s.motivo).toBe("1º encontro agendado já passou: falta o registro");
+    expect(s.motivo).toBe("1º encontro agendado já passou. Falta o registro");
   });
 
   it("estagnação não se aplica a DPP nem a trilha sem início registrado", () => {

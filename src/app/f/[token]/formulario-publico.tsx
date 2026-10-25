@@ -627,7 +627,7 @@ function CampoOutro({ campo, ativo }: { campo: FormularioCampo; ativo: boolean }
         placeholder="Qual?"
         maxLength={120}
         required
-        aria-label={`${campo.label} — outro`}
+        aria-label={`${campo.label}: outro`}
       />
     </div>
   );
@@ -660,7 +660,7 @@ function CampoArquivo({
     if (!file || pending) return;
     const maxMb = campo.max_mb ?? ARQUIVO_MAX_MB;
     if (file.size > maxMb * 1024 * 1024) {
-      setErroUp(`Arquivo grande demais — máximo ${maxMb} MB.`);
+      setErroUp(`Arquivo grande demais. Máximo ${maxMb} MB.`);
       return;
     }
     const fd = new FormData();
@@ -695,14 +695,16 @@ function CampoArquivo({
               enviado
             </p>
           </div>
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="icon-sm"
             onClick={() => onValor(campo.id, null)}
             aria-label={`Remover ${arq.nome}`}
-            className="grid size-8 shrink-0 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            className="shrink-0 text-muted-foreground"
           >
-            <X size={16} aria-hidden />
-          </button>
+            <X aria-hidden />
+          </Button>
         </div>
       ) : (
         <label

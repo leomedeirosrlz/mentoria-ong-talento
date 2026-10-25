@@ -4,25 +4,31 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import {
   dimensoesDoItem,
-  type DimensaoBadge,
   type DimensoesItem,
   type ItemParaAcompanhar,
 } from "@/lib/agenda-coordenacao";
 import { formatDiaMes, LEMBRETE_INTERVALO_MS } from "@/lib/ciclo";
-import { cn, normaliza } from "@/lib/utils";
+import { turmaLonga } from "@/lib/turma";
+import { normaliza } from "@/lib/utils";
 import type { LembreteDestino } from "@/lib/actions-lembrete";
 import { LembreteButton } from "@/components/lembrete-button";
-import { PillTurma, Tag } from "@/components/agenda-partes";
+import {
+  DuplaLinha,
+  type PessoaLinha,
+  type ProgressoDupla,
+  type TomSituacao,
+} from "@/components/dupla-linha";
 import { buttonVariants } from "@/components/ui/button";
 import { filterChipCls } from "@/components/ui/filter-chip";
 import { Input } from "@/components/ui/input";
 
 // ============================================================
 // A fila "Para acompanhar" interativa (REALIZA-161): chips de filtro,
-// busca por nome e o agrupamento críticas × demais — mais o estado
-// "aguardando a dupla" das linhas dentro do cap D5. Recebe as linhas já
-// enriquecidas do server (lembrete e telefone resolvidos lá): Dupla e
-// CicloEvento não cruzam a boundary.
+// busca por nome e o agrupamento urgentes × demais. Cada linha é a
+// mesma linha canônica de /duplas (DuplaLinha): situação pela régua da
+// dupla, apoio em pill à parte, motivo em uma linha e UMA ação. Recebe
+// as linhas já enriquecidas do server: Dupla e CicloEvento não cruzam a
+// boundary.
 // ============================================================
 
 /** Uma linha da fila pronta pra render. */
@@ -43,26 +49,46 @@ export type LinhaFila = {
    *  link pra ficha (rito de encerramento), sem LembreteButton. Default
    *  "lembrete". */
   acao?: "lembrete" | "ficha";
+  mentor: PessoaLinha;
+  mentorado: PessoaLinha;
+  progresso: ProgressoDupla;
 };
 
 type LinhaComDimensoes = LinhaFila & { dimensoes: DimensoesItem };
 
-type FiltroFila = "todas" | "criticas" | "sem_data" | "registro_pendente";
+type FiltroFila = "todas" | "urgentes" | "sem_data" | "registro_pendente";
 
 const FILTROS: { id: FiltroFila; rotulo: string }[] = [
   { id: "todas", rotulo: "Todas" },
-  { id: "criticas", rotulo: "Críticas" },
+  { id: "urgentes", rotulo: "Urgentes" },
   { id: "sem_data", rotulo: "Sem data" },
   { id: "registro_pendente", rotulo: "Registro pendente" },
 ];
 
-/** O predicado de cada chip — "crítica" é a dimensão acompanhamento em
- *  danger (a única que pode chegar a vermelho). */
+/** O predicado de cada chip. "Urgente" é o pedido de apoio ou a avaliação
+ *  baixa com dificuldade: as únicas linhas que a coordenação atende antes
+ *  de qualquer outra. */
 const MATCH_FILTRO: Record<FiltroFila, (l: LinhaComDimensoes) => boolean> = {
   todas: () => true,
-  criticas: (l) => l.dimensoes.acompanhamento?.tom === "danger",
+  urgentes: (l) => l.dimensoes.acompanhamento?.tom === "danger",
   sem_data: (l) => l.item.motivos.includes("sem_data"),
   registro_pendente: (l) => l.item.motivos.includes("registro_pendente"),
+};
+
+/** A situação da linha: a mesma régua de /duplas. O rito de encerramento
+ *  é de dupla concluída, então o rótulo é o da jornada fechada. */
+function situacaoDaFila(item: ItemParaAcompanhar): { rotulo: string; tom: TomSituacao } {
+  if (item.motivos.includes("encerramento"))
+    return { rotulo: "Concluída", tom: "pausa" };
+  if (item.saude.semaforo === "risco") return { rotulo: "Em risco", tom: "risco" };
+  if (item.saude.semaforo === "atencao") return { rotulo: "Atenção", tom: "atencao" };
+  return { rotulo: "Em dia", tom: "neutro" };
+}
+
+const ORIGEM_APOIO: Record<string, string> = {
+  mentor: "pedido do mentor",
+  mentorado: "pedido do jovem",
+  ambos: "pedido do mentor e do jovem",
 };
 
 export function FilaAcompanhar({ linhas }: { linhas: LinhaFila[] }) {
@@ -70,7 +96,7 @@ export function FilaAcompanhar({ linhas }: { linhas: LinhaFila[] }) {
   const [busca, setBusca] = useState("");
 
   // as dimensões derivam uma vez por render — a mesma régua alimenta os
-  // badges da linha, os counts dos chips e o agrupamento
+  // counts dos chips e o agrupamento
   const itens = useMemo<LinhaComDimensoes[]>(
     () => linhas.map((l) => ({ ...l, dimensoes: dimensoesDoItem(l.item) })),
     [linhas]
@@ -81,16 +107,16 @@ export function FilaAcompanhar({ linhas }: { linhas: LinhaFila[] }) {
   // continuar escondendo linhas sem jeito de limpar
   const q = linhas.length > 10 ? normaliza(busca.trim()) : "";
   const visiveis = itens.filter(
-    (l) => MATCH_FILTRO[filtro](l) && (!q || normaliza(l.item.nomes).includes(q))
+    (l) => MATCH_FILTRO[filtro](l) && (!q || normaliza(l.mentorado.nome).includes(q) || normaliza(l.mentor.nome).includes(q))
   );
 
   // sem seleção ativa a fila se divide: quem precisa de intervenção em cima,
   // o resto abaixo (a ordem risco→atenção do paraAcompanhar se mantém dentro
   // de cada grupo). Um grupo só não ganha cabeçalho — seria só ruído.
   const semSelecao = filtro === "todas" && q === "";
-  const criticas = visiveis.filter(MATCH_FILTRO.criticas);
-  const demais = visiveis.filter((l) => !MATCH_FILTRO.criticas(l));
-  const dividir = semSelecao && criticas.length > 0 && demais.length > 0;
+  const urgentes = visiveis.filter(MATCH_FILTRO.urgentes);
+  const demais = visiveis.filter((l) => !MATCH_FILTRO.urgentes(l));
+  const dividir = semSelecao && urgentes.length > 0 && demais.length > 0;
 
   return (
     <>
@@ -106,10 +132,13 @@ export function FilaAcompanhar({ linhas }: { linhas: LinhaFila[] }) {
               key={f.id}
               type="button"
               aria-pressed={filtro === f.id}
-              onClick={() => setFiltro(f.id)}
+              onClick={() => setFiltro(filtro === f.id && f.id !== "todas" ? "todas" : f.id)}
               className={filterChipCls(filtro === f.id)}
             >
-              {f.rotulo} · <span className="tabular-nums">{n}</span>
+              {f.rotulo}
+              <span className={filtro === f.id ? "text-background/70 tabular-nums" : "tabular-nums text-muted-foreground"}>
+                {n}
+              </span>
             </button>
           );
         })}
@@ -122,7 +151,7 @@ export function FilaAcompanhar({ linhas }: { linhas: LinhaFila[] }) {
             placeholder="Buscar por nome"
             value={busca}
             onChange={(e) => setBusca(e.target.value)}
-            className="ml-auto w-52"
+            className="w-full sm:ml-auto sm:w-52"
           />
         )}
       </div>
@@ -132,24 +161,22 @@ export function FilaAcompanhar({ linhas }: { linhas: LinhaFila[] }) {
           Nenhuma dupla nesse recorte.
         </p>
       ) : dividir ? (
-        <div className="mt-3 space-y-4">
+        <div className="mt-3 space-y-5">
           <GrupoFila
-            titulo={`Precisam de intervenção (${criticas.length})`}
-            linhas={criticas}
+            titulo={`Urgentes (${urgentes.length})`}
+            linhas={urgentes}
+            chave={`${filtro}|${q}|u`}
           />
-          {/* "Demais duplas", não "Acompanhamento" — o nome de grupo não
-              pode colidir com a dimensão de badge de mesmo nome */}
           <GrupoFila
             titulo={`Demais duplas (${demais.length})`}
             linhas={demais}
+            chave={`${filtro}|${q}|d`}
           />
         </div>
       ) : (
-        <ul className="mt-3 divide-y divide-border/60 overflow-hidden rounded-xl border bg-card">
-          {visiveis.map((l) => (
-            <LinhaAcompanhar key={l.item.duplaId} linha={l} />
-          ))}
-        </ul>
+        <div className="mt-3">
+          <ListaFila linhas={visiveis} chave={`${filtro}|${q}`} />
+        </div>
       )}
     </>
   );
@@ -158,87 +185,79 @@ export function FilaAcompanhar({ linhas }: { linhas: LinhaFila[] }) {
 function GrupoFila({
   titulo,
   linhas,
+  chave,
 }: {
   titulo: string;
   linhas: LinhaComDimensoes[];
+  chave: string;
 }) {
   return (
     <div>
-      <h3 className="mb-1.5 text-xs font-semibold text-muted-foreground">
-        {titulo}
-      </h3>
-      <ul className="divide-y divide-border/60 overflow-hidden rounded-xl border bg-card">
-        {linhas.map((l) => (
-          <LinhaAcompanhar key={l.item.duplaId} linha={l} />
-        ))}
-      </ul>
+      <h3 className="mb-2 text-sm font-semibold">{titulo}</h3>
+      <ListaFila linhas={linhas} chave={chave} />
     </div>
   );
 }
 
+/** A lista de linhas. Filtro e busca trocam a `key`, então a entrada anima
+ *  de novo (convenção de movimento do AGENTS.md). */
+function ListaFila({ linhas, chave }: { linhas: LinhaComDimensoes[]; chave: string }) {
+  return (
+    <section
+      aria-label="Duplas para acompanhar"
+      className="@container"
+    >
+      <ul
+        key={chave}
+        className="space-y-3 @4xl:space-y-0 @4xl:divide-y @4xl:divide-border/60 @4xl:overflow-hidden @4xl:rounded-xl @4xl:bg-card @4xl:shadow-[var(--shadow-border)]"
+      >
+        {linhas.map((l) => (
+          <li key={l.item.duplaId}>
+            <LinhaAcompanhar linha={l} />
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 function LinhaAcompanhar({ linha }: { linha: LinhaComDimensoes }) {
-  const { item, dimensoes, lembrete, telefone } = linha;
-  const badges = [
-    dimensoes.acompanhamento,
-    dimensoes.cronograma,
-    dimensoes.operacional,
-  ].filter((b): b is DimensaoBadge => b != null);
+  const { item, lembrete, telefone } = linha;
   // cap D5 em curso = "aguardando a dupla": o lembrete saiu há <48h e a
-  // próxima ação é dela — a linha esmaece e diz isso (o botão já mostra
-  // "Lembrada dd/mm"). `bloqueadoAte` não-null ⟺ bloqueada no render do
+  // próxima ação é dela. `bloqueadoAte` não-null ⟺ bloqueada no render do
   // server — sem re-derivar relógio aqui.
   const ate = item.bloqueadoAte != null ? new Date(item.bloqueadoAte) : null;
   const enviadoEm = ate ? new Date(ate.getTime() - LEMBRETE_INTERVALO_MS) : null;
+  const aguardando = enviadoEm
+    ? `lembrete enviado ${formatDiaMes(enviadoEm.toISOString()).replace(/\/\d{4}$/, "")}, aguardando a dupla`
+    : null;
+  const meta = [turmaLonga(item.turma), aguardando].filter(Boolean).join(" · ");
   const [headline = "", ...resto] = item.contextoPartes;
+  const motivo = [headline, ...resto].filter(Boolean).join(" · ");
+  const situacao = situacaoDaFila(item);
+  const origem = item.saude.apoio.origem ?? "mentor";
+
   return (
-    <li className="flex flex-wrap items-center gap-3 px-4 py-3">
-      <div className={cn("min-w-0 flex-1 basis-56", ate && "opacity-60")}>
-        <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-semibold">
-          {item.nomes}
-          <PillTurma turma={item.turma} />
-        </p>
-        <p className="mt-0.5 text-[13px] leading-snug text-foreground">
-          {headline}
-        </p>
-        {resto.length > 0 && (
-          <p className="mt-0.5 text-xs leading-snug text-muted-foreground">
-            {resto.join(" · ")}
-          </p>
-        )}
-        {enviadoEm && (
-          <p className="mt-0.5 text-xs leading-snug text-muted-foreground">
-            lembrete enviado{" "}
-            {formatDiaMes(enviadoEm.toISOString()).replace(/\/\d{4}$/, "")} —
-            aguardando a dupla
-          </p>
-        )}
-      </div>
-      {badges.map((b) => (
-        <span
-          key={b.rotulo}
-          title={b.detalhe}
-          className="inline-flex"
-        >
-          <Tag tom={b.tom}>
-            {b.rotulo}
-            {/* o detalhe (ex.: "pedido do jovem") não pode viver só no
-                title — inalcançável por teclado/leitor de tela */}
-            {b.detalhe && <span className="sr-only"> — {b.detalhe}</span>}
-          </Tag>
-        </span>
-      ))}
-      {linha.acao === "ficha" ? (
-        // pendência da coordenação (rito de encerramento): o Lembrar seria
-        // nudge pra dupla errada — a ação mora na ficha, que já carrega o
-        // checklist inteiro. "Ver ficha ›" some pra não duplicar o destino
-        <Link
-          href={`/duplas/${item.duplaId}`}
-          className={buttonVariants({ size: "sm" })}
-        >
-          {linha.rotulo}
-        </Link>
-      ) : (
-        <>
+    <DuplaLinha
+      mentor={linha.mentor}
+      mentorado={linha.mentorado}
+      situacao={situacao}
+      apoio={item.saude.apoio.aberto ? { detalhe: ORIGEM_APOIO[origem] } : null}
+      meta={meta || null}
+      motivo={motivo || null}
+      progresso={linha.progresso}
+      acao={
+        linha.acao === "ficha" ? (
+          // pendência da coordenação (rito de encerramento): o Lembrar seria
+          // nudge pra dupla errada — a ação mora na ficha, que já carrega o
+          // checklist inteiro
+          <Link
+            href={`/duplas/${item.duplaId}`}
+            className={buttonVariants({ size: "sm" })}
+          >
+            {linha.rotulo}
+          </Link>
+        ) : (
           <LembreteButton
             duplaId={item.duplaId}
             destino={linha.destino}
@@ -253,14 +272,10 @@ function LinhaAcompanhar({ linha }: { linha: LinhaComDimensoes }) {
             }
             bloqueadoAte={item.bloqueadoAte}
           />
-          <Link
-            href={`/duplas/${item.duplaId}`}
-            className="inline-flex min-h-11 items-center rounded-lg px-2 text-xs font-semibold text-foreground/80 transition-colors hover:bg-muted hover:text-foreground sm:min-h-8"
-          >
-            Ver ficha ›
-          </Link>
-        </>
-      )}
-    </li>
+        )
+      }
+      fichaHref={`/duplas/${item.duplaId}`}
+      fichaNome={linha.mentorado.nome.split(" ")[0]}
+    />
   );
 }

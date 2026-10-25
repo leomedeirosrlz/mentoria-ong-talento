@@ -33,7 +33,7 @@ test.describe("demo — /t/[token] estados do convite de terceiros", () => {
     await entrarNaDemo(page, "coordenacao");
     await page.goto(`/t/${TOKEN_PENDENTE}`);
     await expect(
-      page.getByText("Modo demonstração — respostas não são gravadas.")
+      page.getByText("Modo demonstração: respostas não são gravadas.")
     ).toBeVisible();
     // o form do convidado — a saudação usa o primeiro nome do link e o
     // jovem-alvo aparece no título ("Olá, Bruno! Como você vê Ana?")

@@ -141,7 +141,7 @@ test.describe("mentor DPP — fluxos reais", () => {
     await expect(dialog).toBeVisible();
 
     // a data oficial do seed é fixa e já passou — preencher ela cairia no
-    // fluxo retroativo ("Registrar encontro"). O spec força data futura pra
+    // fluxo retroativo ("Registrar Nº encontro"). O spec força data futura pra
     // exercitar o agendamento de verdade; o cleanup no afterEach desfaz.
     const futuro = new Date(Date.now() + 3 * 86400e3);
     const ymd = `${futuro.getFullYear()}-${String(futuro.getMonth() + 1).padStart(2, "0")}-${String(futuro.getDate()).padStart(2, "0")}`;
@@ -153,9 +153,9 @@ test.describe("mentor DPP — fluxos reais", () => {
 
     // toast de sucesso e o dialog fecha — o refresh traz o card novo.
     // O card da home fala "Nº encontro agendado" — o toast novo é
-    // "Agendamento confirmado — Nº encontro."; o \. final ancora nele.
+    // "Agendamento confirmado: Nº encontro."; o \. final ancora nele.
     await expect(
-      page.getByText(/Agendamento confirmado — \d+º encontro\./i)
+      page.getByText(/Agendamento confirmado: \d+º encontro\./i)
     ).toBeVisible({ timeout: 15_000 });
     await expect(dialog).not.toBeVisible({ timeout: 15_000 });
   });
@@ -190,7 +190,7 @@ test.describe("mentor DPP — fluxos reais", () => {
     }) => {
       // agendado futuro SEM link — o lápis é o "adicionar" da linha
       const enc = await criarAgendado(5, 4);
-      await page.goto(`/duplas/${DUPLA_ID}`);
+      await page.goto(`/duplas/${DUPLA_ID}?aba=encontros`);
 
       const linha = linhaFicha(page, String(enc.id));
       await abrirProximosSePreciso(linha, page);
@@ -204,7 +204,7 @@ test.describe("mentor DPP — fluxos reais", () => {
       ).toBeVisible();
       // a data não se mexe — o dialog só fala do link
       await expect(
-        dialog.getByText("O horário continua o mesmo — só o link muda.")
+        dialog.getByText("O horário continua o mesmo. Só o link muda.")
       ).toBeVisible();
 
       await dialog.locator("#link").fill("https://meet.google.com/e2e-ficha");
@@ -242,7 +242,7 @@ test.describe("mentor DPP — fluxos reais", () => {
       page,
     }) => {
       const enc = await criarAgendado(5, 4, "https://meet.google.com/e2e-velho");
-      await page.goto(`/duplas/${DUPLA_ID}`);
+      await page.goto(`/duplas/${DUPLA_ID}?aba=encontros`);
 
       const linha = linhaFicha(page, String(enc.id));
       await abrirProximosSePreciso(linha, page);
@@ -285,7 +285,7 @@ test.describe("mentor DPP — fluxos reais", () => {
       // limbo: agendado de anteontem — o encontro ficou pra trás sem registro
       // e o "Remarcar" da linha é a saída honesta (ao lado do "não aconteceu")
       const enc = await criarAgendado(4, -1);
-      await page.goto(`/duplas/${DUPLA_ID}`);
+      await page.goto(`/duplas/${DUPLA_ID}?aba=encontros`);
 
       const linha = linhaFicha(page, String(enc.id));
       // agendado vencido é pendência — a linha nasce fora do <details>
@@ -313,7 +313,7 @@ test.describe("mentor DPP — fluxos reais", () => {
         .click();
 
       await expect(
-        page.getByText("Remarcação confirmada — 4º encontro.")
+        page.getByText("Remarcação confirmada: 4º encontro.")
       ).toBeVisible({ timeout: 15_000 });
       await expect(dialog).not.toBeVisible({ timeout: 15_000 });
 
@@ -387,7 +387,7 @@ test.describe("mentor DPP — fluxos reais", () => {
     }) => {
       const enc = await criarAgendado(5, 3, "https://meet.google.com/e2e-coord");
       await relogar(page, COORD_EMAIL, COORD_SENHA);
-      await page.goto(`/duplas/${DUPLA_ID}`);
+      await page.goto(`/duplas/${DUPLA_ID}?aba=encontros`);
 
       const linha = linhaFicha(page, String(enc.id));
       await abrirProximosSePreciso(linha, page);

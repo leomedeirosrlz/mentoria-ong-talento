@@ -125,7 +125,7 @@ export function JovemEspecialistaCard({
         )}
 
         {e.bio && (
-          <p className="line-clamp-3 text-sm leading-relaxed text-muted-foreground">
+          <p className="line-clamp-2 text-sm leading-relaxed text-muted-foreground sm:line-clamp-3">
             {e.bio}
           </p>
         )}
@@ -145,7 +145,7 @@ export function JovemEspecialistaCard({
             <dl className="space-y-1.5 border-t border-border/60 px-3 py-2.5">
               {formacao.map(([rotulo, texto]) => (
                 <div key={rotulo}>
-                  <dt className="text-[11px] font-medium text-muted-foreground">
+                  <dt className="text-xs font-medium text-muted-foreground">
                     {rotulo}
                   </dt>
                   <dd className="text-xs leading-relaxed">{texto}</dd>
@@ -168,7 +168,7 @@ export function JovemEspecialistaCard({
         <div className="mt-auto space-y-2 pt-1">
           {variante === "andamento" ? (
             <p className="text-xs leading-relaxed text-muted-foreground">
-              Seu pedido tá na mesa acima.{" "}
+              Seu pedido já está em aberto.{" "}
               <a
                 href="#pedidos"
                 className="font-medium text-foreground underline underline-offset-2"
@@ -178,7 +178,7 @@ export function JovemEspecialistaCard({
             </p>
           ) : lotado ? (
             <p className="text-xs text-muted-foreground">
-              Você já tem 3 pedidos em aberto — é o máximo por ciclo. Espera
+              Você já tem 3 pedidos em aberto, o máximo por ciclo. Espere
               uma resposta antes de pedir de novo.
             </p>
           ) : variante === "sua" ? (
@@ -195,8 +195,8 @@ export function JovemEspecialistaCard({
             <>
               <p className="text-xs leading-relaxed text-muted-foreground">
                 {variante === "sem_vagas"
-                  ? "Agenda cheia no momento — seu pedido vai pro mural."
-                  : "Ainda não liberou horários — seu pedido vai pro mural."}
+                  ? "Agenda cheia no momento. Seu pedido vai pro mural."
+                  : "Ainda não liberou horários. Seu pedido vai pro mural."}
               </p>
               <Button
                 size="sm"

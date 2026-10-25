@@ -6,11 +6,11 @@ import { CalendarBlank, Plus } from "@phosphor-icons/react/dist/ssr";
 import { getCicloEventos, getCronogramas, getMe } from "@/lib/queries";
 import { getVinculosCronogramas } from "@/lib/queries-cronogramas";
 import { demoAtivo } from "@/lib/demo/mode";
-import { eventosDoCronograma, formatDiaMes, rotuloCronograma } from "@/lib/ciclo";
+import { eventosDoCronograma } from "@/lib/ciclo";
 import type { Cronograma } from "@/lib/types";
 import { buttonVariants } from "@/components/ui/button";
 import { PageHeader } from "@/components/page-header";
-import { StatusBadge } from "@/components/cronograma-editor";
+import { TurmaCard } from "@/components/turma-card";
 
 export const metadata: Metadata = { title: "Turmas" };
 
@@ -32,6 +32,7 @@ export default async function TurmasPage() {
     getVinculosCronogramas(),
     demoAtivo(),
   ]);
+  const hoje = new Date();
 
   const ordenados = [...cronogramas].sort(
     (a, b) =>
@@ -45,7 +46,7 @@ export default async function TurmasPage() {
       <PageHeader
         kicker="Operação"
         title="Turmas e cronogramas"
-        meta="O calendário oficial de cada turma — encontros, preparação e encerramento"
+        meta="O calendário oficial de cada turma: encontros, preparação e encerramento"
         actions={
           !demo && (
             <Link
@@ -61,7 +62,7 @@ export default async function TurmasPage() {
 
       {demo && (
         <p className="rounded-lg bg-muted/60 px-4 py-2.5 text-sm text-muted-foreground">
-          Modo demonstração — os cronogramas de exemplo são só leitura.
+          Modo demonstração: os cronogramas de exemplo são só leitura.
         </p>
       )}
 
@@ -88,52 +89,24 @@ export default async function TurmasPage() {
           )}
         </div>
       ) : (
-        <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {ordenados.map((c, i) => {
-            const evs = eventosDoCronograma(eventos, c.id);
-            const encontros = evs.filter((e) => e.tipo === "encontro").length;
-            const vinc = vinculos.filter((v) => v.cronogramaId === c.id);
-            const vivas = vinc.filter(
-              (v) => v.status === "ativa" || v.status === "pausada"
-            ).length;
-            return (
-              <li
-                key={c.id}
-                className="animate-enter"
-                style={{ "--i": Math.min(i, 10) } as CSSProperties}
-              >
-                {/* hover em 2 camadas, paridade com formularios/dashboard:
-                    lift de 1px + sombra-hover sobre o bg-muted/40 que já tinha */}
-                <Link
-                  href={`/turmas/${c.id}`}
-                  className="flex h-full flex-col rounded-xl bg-card p-4 shadow-[var(--shadow-border)] transition-[background-color,border-color,box-shadow,translate] ease-snappy hover:-translate-y-px hover:bg-muted/40 hover:shadow-[var(--shadow-border-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:p-5"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <p className="min-w-0 text-sm font-semibold leading-snug">
-                      {rotuloCronograma(c)}
-                    </p>
-                    <StatusBadge status={c.status} />
-                  </div>
-                  <p className="mt-1.5 text-sm text-muted-foreground">
-                    {c.inicio_em
-                      ? `${formatDiaMes(c.inicio_em)} → ${formatDiaMes(c.fim_em)}`
-                      : "Sem datas definidas"}
-                  </p>
-                  <p className="mt-auto pt-3 text-xs text-muted-foreground">
-                    {encontros}{" "}
-                    {encontros === 1 ? "encontro oficial" : "encontros oficiais"}
-                    {" · "}
-                    {evs.length} {evs.length === 1 ? "evento" : "eventos"}
-                    {" · "}
-                    {vinc.length === 0
-                      ? "nenhuma dupla"
-                      : `${vinc.length} ${vinc.length === 1 ? "dupla" : "duplas"}` +
-                        (vivas < vinc.length ? ` (${vivas} no ciclo)` : "")}
-                  </p>
-                </Link>
-              </li>
-            );
-          })}
+        /* card = banner de perfil (v1a): identidade visual por turma +
+           bloco funcional "semana do encontro N" + stats em faixa
+           (REALIZA-200) */
+        <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {ordenados.map((c, i) => (
+            <li
+              key={c.id}
+              className="animate-enter"
+              style={{ "--i": Math.min(i, 10) } as CSSProperties}
+            >
+              <TurmaCard
+                cronograma={c}
+                eventos={eventosDoCronograma(eventos, c.id)}
+                vinculos={vinculos.filter((v) => v.cronogramaId === c.id)}
+                hoje={hoje}
+              />
+            </li>
+          ))}
         </ul>
       )}
     </div>

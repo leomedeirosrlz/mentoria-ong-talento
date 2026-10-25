@@ -82,11 +82,16 @@ describe("cronogramaVigente", () => {
 });
 
 describe("cronogramasOpcoes + rotuloCronograma", () => {
-  it("ordena por turma e nome; rótulo é 'turma · nome'", () => {
+  it("ordena por turma e nome; rótulo é 'Turma N · nome' (forma narrativa)", () => {
     const b = mkCronograma({ id: "b", turma: "T2", nome: "Quintas" });
     const a = mkCronograma({ id: "a", turma: "T1", nome: "Terças" });
     expect(cronogramasOpcoes([b, a]).map((c) => c.id)).toEqual(["a", "b"]);
-    expect(rotuloCronograma(a)).toBe("T1 · Terças");
+    // o label exibe a turma canônica — o valor cru c.turma segue intacto
+    expect(rotuloCronograma(a)).toBe("Turma 1 · Terças");
+    // fora do padrão passa inteiro (nunca "Turma 2025/2026")
+    expect(rotuloCronograma(mkCronograma({ turma: "2025/2026", nome: "X" }))).toBe(
+      "2025/2026 · X"
+    );
   });
 });
 

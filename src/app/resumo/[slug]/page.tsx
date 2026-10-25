@@ -246,7 +246,7 @@ export default async function ResumoPage({
             <h1 className="text-xl font-semibold">{titulo}</h1>
             <p className="mt-1 text-sm text-muted-foreground">
               Dados vivos, atualizados em {formatDateTime(new Date().toISOString())}.
-              Link não listado — trate como documento interno.
+              Link não listado. Trate como documento interno.
             </p>
           </div>
 

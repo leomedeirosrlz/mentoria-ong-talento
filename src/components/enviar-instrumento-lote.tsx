@@ -28,7 +28,7 @@ import { CopiarLink } from "@/components/forms/copiar-link";
 import { msgLinkWhatsApp } from "@/components/forms/link-shared";
 import { useOrigem } from "@/components/forms/use-origem";
 import { fade, T } from "@/components/motion";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -47,8 +47,10 @@ import {
 // da ficha da dupla.
 
 /** Dupla elegível do painel — nomes já vêm da linha; e-mail/whatsapp do
- *  destinatário NÃO atravessam pro client (revisão de segurança): aqui
- *  só os flags que montam a prévia "quem recebe". */
+ *  destinatário não atravessam pelas PROPS (revisão de segurança): aqui
+ *  só os flags que montam a prévia "quem recebe". O retorno da server
+ *  action, esse sim, traz `waFone`/token no relatório por linha — ok
+ *  porque o componente é coord-only. */
 export type DuplaLote = {
   duplaId: string;
   jovemNome: string;
@@ -66,7 +68,7 @@ function destinoDe(d: DuplaLote): "jovem" | "mentor" | "nenhum" {
 const DESTINO_DETALHE: Record<ReturnType<typeof destinoDe>, string> = {
   jovem: "e-mail do jovem",
   mentor: "repassa pelo mentor",
-  nenhum: "sem e-mail — WhatsApp",
+  nenhum: "sem e-mail: WhatsApp",
 };
 
 export function EnviarInstrumentoLote({
@@ -74,6 +76,7 @@ export function EnviarInstrumentoLote({
   estacaoTitulo,
   linhas,
   envioLiberado,
+  contador,
 }: {
   sistema: InstrumentoSistema;
   /** Nome da estação do painel ("Visão", "Roda formal") — o cabeçalho diz
@@ -81,6 +84,9 @@ export function EnviarInstrumentoLote({
   estacaoTitulo: string;
   linhas: DuplaLote[];
   envioLiberado: boolean;
+  /** Contagem de elegíveis no gatilho ("Enviar em lote · N") — o icard do
+   *  v5c traz o número de cara; sem ele o gatilho fica só o rótulo. */
+  contador?: number;
 }) {
   const uid = useId();
   const listaId = `${uid}-duplas`;
@@ -138,7 +144,7 @@ export function EnviarInstrumentoLote({
       );
       if (!r.envioLiberado) {
         toast.info(
-          "Links emitidos — o envio de e-mail está desligado neste ambiente."
+          "Links emitidos. O envio de e-mail está desligado neste ambiente."
         );
       } else if (r.enviados > 0) {
         toast.success(
@@ -172,6 +178,9 @@ export function EnviarInstrumentoLote({
           <Button variant="outline" size="sm">
             <PaperPlaneTilt aria-hidden />
             Enviar em lote
+            {contador != null && (
+              <span className="tabular-nums"> · {contador}</span>
+            )}
           </Button>
         }
       />
@@ -179,7 +188,7 @@ export function EnviarInstrumentoLote({
         <DialogHeader>
           <DialogTitle>Enviar “{estacaoTitulo}” em lote</DialogTitle>
           <DialogDescription>
-            O link do instrumento sai por e-mail pro jovem — quem não tem
+            O link do instrumento sai por e-mail pro jovem. Quem não tem
             e-mail cadastrado recebe pelo mentor.
           </DialogDescription>
         </DialogHeader>
@@ -227,9 +236,9 @@ export function EnviarInstrumentoLote({
                               href={wa}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 rounded-md border border-input px-2 py-1 text-xs font-medium transition-colors hover:bg-muted"
+                              className={buttonVariants({ variant: "outline", size: "xs" })}
                             >
-                              <WhatsappLogo size={13} aria-hidden />
+                              <WhatsappLogo aria-hidden />
                               WhatsApp
                             </a>
                           )}
@@ -279,7 +288,7 @@ export function EnviarInstrumentoLote({
               {!envioLiberado && (
                 <p className="flex items-start gap-2 rounded-lg bg-[var(--warn)]/10 px-3 py-2 text-xs leading-relaxed text-[var(--warn-text)]">
                   <Warning size={14} weight="fill" aria-hidden className="mt-0.5 shrink-0" />
-                  O envio de e-mail está desligado neste ambiente — os links
+                  O envio de e-mail está desligado neste ambiente. Os links
                   são emitidos do mesmo jeito e o relatório deixa o WhatsApp
                   de cada um pronto pra mandar à mão.
                 </p>
@@ -348,7 +357,7 @@ export function EnviarInstrumentoLote({
                     <strong className="font-semibold text-foreground">
                       {nNenhum}
                     </strong>{" "}
-                    sem e-mail nenhum — {nNenhum === 1 ? "sai" : "saem"} pra
+                    sem e-mail nenhum: {nNenhum === 1 ? "sai" : "saem"} pra
                     WhatsApp manual
                   </>
                 )}
@@ -361,13 +370,13 @@ export function EnviarInstrumentoLote({
                 </summary>
                 <div className="mt-1.5 rounded-lg border border-border/60 bg-muted/40 px-3 py-2.5 text-xs leading-relaxed">
                   <p className="font-semibold">
-                    {instrumento} — chegou a sua vez na jornada
+                    {instrumento}: chegou a sua vez na jornada
                   </p>
                   <p className="mt-1 text-muted-foreground">
                     “Oi, Ana! Chegou a sua vez de responder{" "}
-                    <strong>{instrumento}</strong> — um exercício da sua
+                    <strong>{instrumento}</strong>, um exercício da sua
                     jornada de mentoria. Responda no seu tempo, direto pelo
-                    botão — sem senha nem cadastro.” + o link pessoal.
+                    botão, sem senha nem cadastro.” + o link pessoal.
                   </p>
                 </div>
               </details>
@@ -433,7 +442,7 @@ function ResumoRelatorio({ linhas }: { linhas: LoteInstrumentoLinha[] }) {
     enviados > 0 &&
       `${enviados} ${enviados === 1 ? "e-mail enviado" : "e-mails enviados"}`,
     desligado > 0 &&
-      `${desligado} ${desligado === 1 ? "link emitido" : "links emitidos"} — envio desligado`,
+      `${desligado} ${desligado === 1 ? "link emitido" : "links emitidos"} (envio desligado)`,
     falhas > 0 && `${falhas} ${falhas === 1 ? "falhou" : "falharam"}`,
     pulados > 0 &&
       `${pulados} ${pulados === 1 ? "pulada" : "puladas"}`,
@@ -444,7 +453,7 @@ function ResumoRelatorio({ linhas }: { linhas: LoteInstrumentoLinha[] }) {
       <strong className="font-semibold">{partes.join(" · ")}.</strong>
       {linhas.some((l) => l.token) && (
         <span className="mt-1 block text-xs text-muted-foreground">
-          Nas linhas sem e-mail o link já está emitido — mande pelo WhatsApp
+          Nas linhas sem e-mail o link já está emitido: mande pelo WhatsApp
           ou copie o endereço.
         </span>
       )}

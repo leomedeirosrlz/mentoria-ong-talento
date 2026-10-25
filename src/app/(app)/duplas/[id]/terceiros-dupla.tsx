@@ -51,6 +51,13 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 
@@ -94,7 +101,7 @@ function msgConviteWhatsApp(
   token: string,
   origem: string
 ): string {
-  return `Olá, ${nomeExib(convidadoNome)}! ${nomeExib(jovemNome)} indicou você pra contar como vê essa pessoa — é a avaliação por terceiros do Programa de Mentoria Realiza.vc. São só 2 perguntas rápidas e sua resposta é confidencial: ${urlPublica(token, origem, "/t")}`;
+  return `Olá, ${nomeExib(convidadoNome)}! ${nomeExib(jovemNome)} indicou você pra contar como vê essa pessoa. É a avaliação por terceiros do Programa de Mentoria Realiza.vc. São só 2 perguntas rápidas e sua resposta é confidencial: ${urlPublica(token, origem, "/t")}`;
 }
 
 /** Expiração é lazy no banco (só vira 'expirado' quando o link é tocado) —
@@ -143,14 +150,14 @@ function LinhaContato({
         );
         toast.success(
           r.reutilizado
-            ? "O link pendente é o mesmo — copiado de novo."
-            : "Link novo copiado — o anterior morreu."
+            ? "O link pendente é o mesmo. Copiado de novo."
+            : "Link novo copiado. O anterior morreu."
         );
       } catch {
         toast.success(
           r.reutilizado
-            ? "O link pendente é o mesmo — copie na linha do contato."
-            : "Link novo gerado — copie na linha do contato."
+            ? "O link pendente é o mesmo. Copie na linha do contato."
+            : "Link novo gerado. Copie na linha do contato."
         );
       }
       router.refresh();
@@ -294,7 +301,7 @@ function LinhaContato({
                   open={cancelando}
                   onOpenChange={setCancelando}
                   titulo={`Cancelar o convite de ${primeiroNome(contato.nome)}?`}
-                  descricao="O link para de funcionar na hora — quem ainda não respondeu perde o acesso."
+                  descricao="O link para de funcionar na hora. Quem ainda não respondeu perde o acesso."
                   acao="Cancelar convite"
                   onConfirm={() => cancelarContatoTerceiro(contato.id)}
                   sucesso={`Convite de ${primeiroNome(contato.nome)} cancelado.`}
@@ -369,7 +376,7 @@ function EditarContatoDialog({
       <DialogHeader>
         <DialogTitle>Editar contato</DialogTitle>
         <DialogDescription>
-          O link continua o mesmo — só o cadastro muda.
+          O link continua o mesmo. Só o cadastro muda.
         </DialogDescription>
       </DialogHeader>
       <div className="space-y-3">
@@ -383,18 +390,26 @@ function EditarContatoDialog({
           />
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor={`vinculo-${contato.id}`}>Vínculo</Label>
-          <select
-            id={`vinculo-${contato.id}`}
+          <Label id={`vinculo-${contato.id}-label`}>Vínculo</Label>
+          <Select
             value={vinculo}
-            onChange={(e) => setVinculo(e.target.value as TerceiroVinculo)}
-            className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+            onValueChange={(v) => v && setVinculo(v)}
+            items={VINCULO_LABEL}
           >
-            <option value="amigo">Amigo(a)</option>
-            <option value="familiar">Familiar</option>
-            <option value="colega">Colega</option>
-            <option value="outro">Outro</option>
-          </select>
+            <SelectTrigger
+              id={`vinculo-${contato.id}`}
+              aria-labelledby={`vinculo-${contato.id}-label vinculo-${contato.id}`}
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {(Object.keys(VINCULO_LABEL) as TerceiroVinculo[]).map((v) => (
+                <SelectItem key={v} value={v}>
+                  {VINCULO_LABEL[v]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         <div className="space-y-1.5">
           <Label htmlFor={`wa-${contato.id}`}>WhatsApp (opcional)</Label>
@@ -445,9 +460,9 @@ function NovoContatoDialog({
       }
       try {
         await navigator.clipboard.writeText(urlPublica(r.token, origem, "/t"));
-        toast.success("Convite criado — link copiado pra enviar.");
+        toast.success("Convite criado. Link copiado pra enviar.");
       } catch {
-        toast.success("Convite criado — copie o link na linha do contato.");
+        toast.success("Convite criado. Copie o link na linha do contato.");
       }
       onClose();
       router.refresh();
@@ -460,7 +475,7 @@ function NovoContatoDialog({
         <DialogTitle>Indicar pessoa</DialogTitle>
         <DialogDescription>
           O guia prevê até 9 pessoas: 3 amigos, 3 familiares e 3 colegas
-          (restam {vagas}). Cada uma recebe um link próprio — sem login.
+          (restam {vagas}). Cada uma recebe um link próprio, sem login.
         </DialogDescription>
       </DialogHeader>
       <div className="space-y-3">
@@ -476,18 +491,26 @@ function NovoContatoDialog({
           />
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="novo-vinculo">Vínculo</Label>
-          <select
-            id="novo-vinculo"
+          <Label id="novo-vinculo-label">Vínculo</Label>
+          <Select
             value={vinculo}
-            onChange={(e) => setVinculo(e.target.value as TerceiroVinculo)}
-            className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+            onValueChange={(v) => v && setVinculo(v)}
+            items={VINCULO_LABEL}
           >
-            <option value="amigo">Amigo(a)</option>
-            <option value="familiar">Familiar</option>
-            <option value="colega">Colega</option>
-            <option value="outro">Outro</option>
-          </select>
+            <SelectTrigger
+              id="novo-vinculo"
+              aria-labelledby="novo-vinculo-label novo-vinculo"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {(Object.keys(VINCULO_LABEL) as TerceiroVinculo[]).map((v) => (
+                <SelectItem key={v} value={v}>
+                  {VINCULO_LABEL[v]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="novo-wa">WhatsApp (opcional)</Label>
@@ -495,7 +518,7 @@ function NovoContatoDialog({
             id="novo-wa"
             value={whatsapp}
             onChange={(e) => setWhatsapp(e.target.value)}
-            placeholder="11999998888 — pra enviar o link direto"
+            placeholder="11999998888 · pra enviar o link direto"
             inputMode="tel"
             maxLength={25}
           />
@@ -536,9 +559,9 @@ function Consolidacao({
       }
       toast.success(
         publicar
-          ? "Consolidação publicada — o jovem já vê na área dele."
+          ? "Consolidação publicada. O jovem já vê na área dele."
           : publicado
-            ? "Despublicado — o jovem não vê mais."
+            ? "Despublicado. O jovem não vê mais."
             : "Rascunho salvo."
       );
       router.refresh();
@@ -558,7 +581,7 @@ function Consolidacao({
               publicada
             </Badge>
           ) : (
-            <Badge variant="secondary">rascunho — o jovem não vê</Badge>
+            <Badge variant="secondary">rascunho · o jovem não vê</Badge>
           )}
         </div>
         <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed">
@@ -579,11 +602,11 @@ function Consolidacao({
             <CheckCircle aria-hidden /> publicada
           </Badge>
         ) : (
-          <Badge variant="secondary">rascunho — o jovem não vê</Badge>
+          <Badge variant="secondary">rascunho · o jovem não vê</Badge>
         )}
       </div>
       <p className="text-xs leading-relaxed text-muted-foreground">
-        Reescreva o que se repete nas respostas SEM dizer quem falou — o
+        Reescreva o que se repete nas respostas SEM dizer quem falou. O
         jovem lê só este texto, nunca as respostas individuais.
       </p>
       <Textarea
@@ -651,10 +674,7 @@ export function TerceirosDupla({
       )}
     >
       <div className="flex flex-wrap items-center gap-2">
-        <h2 className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-          <span aria-hidden className="size-1.5 rounded-full bg-[var(--info)]" />
-          Avaliação por terceiros
-        </h2>
+        <h2 className="text-base font-semibold">Avaliação por terceiros</h2>
         {aberto && (
           <Badge variant="secondary" className="tabular-nums">
             {respondidos}/{contatos.length} respostas
@@ -669,7 +689,7 @@ export function TerceirosDupla({
       <p className="mt-1 text-xs text-muted-foreground">
         Guia semana 1→2: o jovem indica até 9 pessoas (3 amigos, 3 familiares,
         3 colegas); cada uma responde 2 perguntas por link próprio. Você lê
-        identificado e consolida anônimo — o jovem só vê a síntese publicada.
+        identificado e consolida anônimo. O jovem só vê a síntese publicada.
       </p>
 
       {aberto && (
@@ -690,7 +710,7 @@ export function TerceirosDupla({
       {!aberto && (
         <p className="mt-2 flex items-center gap-1.5 rounded-lg bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
           <Clock aria-hidden />
-          Nenhuma pessoa indicada ainda — comece pela lista do jovem.
+          Nenhuma pessoa indicada ainda. Comece pela lista do jovem.
         </p>
       )}
 

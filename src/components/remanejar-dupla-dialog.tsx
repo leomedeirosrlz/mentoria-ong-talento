@@ -278,13 +278,13 @@ export function RemanejarDuplaDialog({
       return;
     }
     if (!motivo) {
-      setErro("Conte o motivo da troca — ele vai pra ficha de quem sai.");
+      setErro("Conte o motivo da troca. Ele vai pra ficha de quem sai.");
       return;
     }
     const devolutiva = String(fd.get("devolutiva_pdm") ?? "").trim();
     if (ehEsp && (devolutiva.length < 10 || devolutiva.length > 4000)) {
       setErro(
-        "A devolutiva pro PDM precisa de 10 a 4.000 caracteres — é a entrega de quem sai da trilha."
+        "A devolutiva pro PDM precisa de 10 a 4.000 caracteres: é a entrega de quem sai da trilha."
       );
       return;
     }
@@ -555,7 +555,7 @@ export function RemanejarDuplaDialog({
                     placeholder="Metas alcançadas, o que segue em aberto e recomendações pro plano do jovem"
                   />
                   <p className="text-xs text-muted-foreground">
-                    A entrega de quem sai da trilha — em remanejo de jovem, o
+                    A entrega de quem sai da trilha. Em remanejo de jovem, o
                     especialista devolve a do jovem que sai. O mentor DPP lê na
                     ficha da dupla dele.
                   </p>
@@ -572,7 +572,7 @@ export function RemanejarDuplaDialog({
                 <span>
                   Registrar saída na ficha de quem está saindo
                   <span className="block text-xs text-muted-foreground">
-                    O motivo vira nota no mural da pessoa — só a coordenação lê.
+                    O motivo vira nota no mural da pessoa. Só a coordenação lê.
                   </span>
                 </span>
               </label>
@@ -582,7 +582,7 @@ export function RemanejarDuplaDialog({
                 // até o clique final, com o que a dupla nova herda
                 <div className="rounded-lg border border-[var(--warn)]/40 bg-[var(--warn)]/5 px-3.5 py-3 text-sm">
                   <p>
-                    <strong>{resumo.antes}</strong> será encerrada — nasce{" "}
+                    <strong>{resumo.antes}</strong> será encerrada e nasce{" "}
                     <strong>{resumo.depois}</strong>.
                   </p>
                   <p className="mt-0.5 text-xs text-muted-foreground">

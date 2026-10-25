@@ -37,7 +37,8 @@ test.describe("guarda — Enviar formulário não oferece instrumentos da jornad
     // especialista; REALIZA-157 tirou o Dialog.Trigger de dentro do popup)
     const item = page.getByRole("menuitem", { name: "Enviar formulário" });
     await agirComConfirma(
-      () => page.getByRole("button", { name: "Mais" }).click(),
+      () =>
+        page.getByRole("button", { name: "Mais ações da dupla" }).click(),
       () => item.isVisible()
     );
     const dialog = page.getByRole("dialog");

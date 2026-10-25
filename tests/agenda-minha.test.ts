@@ -443,7 +443,7 @@ describe("sessões de especialista — sempre convidadas", () => {
     const item = todosOsItens(a).find((i) => i.id === "esp-s3");
     expect(item).toBeDefined();
     expect(item!.convidado).toBe(true);
-    expect(item!.notaConvidado).toBe("agenda de Ana — você não participa");
+    expect(item!.notaConvidado).toBe("agenda de Ana: você não participa");
     expect(item!.rotulo).toBe(
       "Trilha de especialista · sessão 3 de 5 · 2026/2027"
     );

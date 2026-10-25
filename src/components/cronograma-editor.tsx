@@ -204,7 +204,7 @@ export function CronogramaAcoes({
 
   const avisoDuplas =
     vinculadas > 0
-      ? ` ${vinculadas} ${vinculadas === 1 ? "dupla segue" : "duplas seguem"} este calendário — mudanças de datas e números mexem no semáforo delas.`
+      ? ` ${vinculadas} ${vinculadas === 1 ? "dupla segue" : "duplas seguem"} este calendário. Mudanças de datas e números mexem no acompanhamento delas.`
       : "";
 
   return (
@@ -228,7 +228,7 @@ export function CronogramaAcoes({
             </Button>
           }
           titulo="Encerrar este cronograma?"
-          descricao={`Ele sai do lugar de calendário vigente — a agenda das duplas continua apontando pra ele, mas novas duplas não devem mais entrar. Reabrir é possível depois.${avisoDuplas}`}
+          descricao={`Ele sai do lugar de calendário vigente. A agenda das duplas continua apontando pra ele, mas novas duplas não devem mais entrar. Reabrir é possível depois.${avisoDuplas}`}
           acao="Encerrar"
           onConfirm={() => atualizarCronograma(cronograma.id, { status: "encerrado" })}
         />
@@ -267,7 +267,7 @@ export function CronogramaAcoes({
           <DialogHeader>
             <DialogTitle>Dados do cronograma</DialogTitle>
             <DialogDescription>
-              Nome, turma e status — a agenda de encontros muda no editor
+              Nome, turma e status. A agenda de encontros muda no editor
               abaixo.
             </DialogDescription>
           </DialogHeader>
@@ -317,8 +317,8 @@ export function CronogramaAcoes({
               {vinculadas > 0 && (
                 <p className="text-xs text-muted-foreground">
                   As {vinculadas} {vinculadas === 1 ? "dupla vinculada guarda" : "duplas vinculadas guardam"} a
-                  label de turma gravada no pareamento — renomear aqui não
-                  reescreve a ficha delas.
+                  turma gravada no pareamento. Renomear aqui não
+                  muda a ficha delas.
                 </p>
               )}
             </div>
@@ -356,7 +356,7 @@ export function CronogramaAcoes({
         titulo={`Excluir "${cronograma.nome}"?`}
         descricao={
           totalVinculos > 0
-            ? `A exclusão só é liberada sem duplas vinculadas — e ${totalVinculos === 1 ? "há 1 dupla" : `há ${totalVinculos} duplas`} apontando pra este calendário. Remaneje as duplas ou encerre o cronograma.`
+            ? `A exclusão só é liberada sem duplas vinculadas, e ${totalVinculos === 1 ? "há 1 dupla" : `há ${totalVinculos} duplas`} apontando pra este calendário. Remaneje as duplas ou encerre o cronograma.`
             : "O cronograma e todos os eventos saem do calendário oficial. A exclusão é definitiva."
         }
         sucesso="Cronograma excluído."
@@ -517,7 +517,7 @@ function EventoAcoes({
         titulo={`Excluir "${evento.titulo}"?`}
         descricao={
           evento.tipo === "encontro"
-            ? "O encontro oficial sai do calendário da turma — o semáforo das duplas recalcula sem ele. A exclusão é definitiva."
+            ? "O encontro oficial sai do calendário da turma. O acompanhamento das duplas recalcula sem ele. A exclusão é definitiva."
             : "O evento sai do calendário oficial da turma. A exclusão é definitiva."
         }
         sucesso={`"${evento.titulo}" removido do cronograma.`}
@@ -651,8 +651,8 @@ export function CronogramaEventos({
           <Warning aria-hidden size={16} className="mt-0.5 shrink-0 text-[var(--warn-text)]" />
           <span>
             {vinculadas} {vinculadas === 1 ? "dupla segue" : "duplas seguem"} este
-            calendário — mudar datas, números ou remover encontros altera o
-            semáforo e a trilha delas.
+            calendário. Mudar datas, números ou remover encontros altera o
+            acompanhamento e a trilha delas.
           </span>
         </p>
       )}
@@ -663,7 +663,7 @@ export function CronogramaEventos({
           <p className="mt-1 text-sm text-muted-foreground">
             {readOnly
               ? "O calendário desta turma está vazio."
-              : "Adicione o primeiro evento — ou apague o rascunho e crie de novo pelo builder."}
+              : "Adicione o primeiro evento, ou apague o rascunho e crie de novo pelo builder."}
           </p>
         </div>
       ) : (
@@ -676,7 +676,7 @@ export function CronogramaEventos({
                 {secao !== anterior && (
                   <div
                     className={cn(
-                      "px-4 pb-1 pt-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground sm:px-5",
+                      "px-4 pb-1 pt-3 text-xs sm:text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground sm:px-5",
                       i > 0 && "border-t"
                     )}
                   >
@@ -808,7 +808,7 @@ export function CronogramaDuplas({ vinculos }: { vinculos: VinculoCronograma[] }
           <li key={v.duplaId}>
             <Link
               href={`/duplas/${v.duplaId}`}
-              className="flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-muted/50 sm:px-5"
+              className="flex min-h-11 items-center gap-3 px-4 py-2.5 transition-colors hover:bg-muted/50 sm:min-h-10 sm:px-5"
             >
               <span className="min-w-0 flex-1 truncate text-sm">
                 {v.mentoradoNome} <span className="text-muted-foreground">com</span>{" "}

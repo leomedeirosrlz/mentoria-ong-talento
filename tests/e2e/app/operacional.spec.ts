@@ -1,4 +1,5 @@
 import {
+  agirComConfirma,
   appEnvOk,
   atualizarViaServiceRole,
   buscarViaServiceRole,
@@ -155,13 +156,16 @@ test.describe("coordenação — fluxos operacionais", () => {
   test("remanejar o mentorado encerra a dupla e abre a sucessora", async ({
     page,
   }) => {
+    // a janela de navegação pós-submit ganhou folga (45s) pro preview frio
+    // — combinada com restore+login+dialog isso passa dos 60s do projeto
+    test.setTimeout(90_000);
     await page.goto(`/duplas/${DUPLA2_ID}`);
-    // o "Remanejar" do header é o trigger do dialog (data-slot próprio) —
-    // quando a dupla está em risco a sugestão da 115 adiciona botões com
-    // o mesmo rótulo por candidato, então role+name sozinhos não bastam
-    await page
-      .locator('button[data-slot="dialog-trigger"]', { hasText: "Remanejar" })
-      .click();
+    // REALIZA-157: "Remanejar" saiu do header pro overflow "Mais" — o
+    // menuitem abre o dialog de sempre. Quando a dupla está em risco a
+    // sugestão da 115 também cria botões "Remanejar" por candidato, mas o
+    // item do menu é único
+    await page.getByRole("button", { name: "Mais ações da dupla" }).click();
+    await page.getByRole("menuitem", { name: "Remanejar dupla" }).click();
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
 
@@ -180,18 +184,50 @@ test.describe("coordenação — fluxos operacionais", () => {
     // a troca é irreversível — o resumo "antes → depois" aparece antes de
     // confirmar
     await expect(dialog.getByText(/será encerrada/)).toBeVisible();
-    await dialog
-      .getByRole("button", { name: "Remanejar a dupla" })
-      .click();
+    // clique pré-hidratação é no-op silencioso — repete até o botão entrar
+    // em pending ("Remanejando…") ou a página já ter virado (a action
+    // também fecha o dialog no sucesso). Rematch é idempotente do ponto de
+    // vista do spec: se o 1º clique submeteu, o botão desabilita e um 2º
+    // nem dispara; se errou, o alert embaixo explica em vez de estourar
+    // cego no waitForURL.
+    await agirComConfirma(
+      () =>
+        dialog.getByRole("button", { name: "Remanejar a dupla" }).click(),
+      async () =>
+        (await dialog
+          .getByRole("button", { name: "Remanejando…" })
+          .isVisible()
+          .catch(() => false)) ||
+        !(await dialog.isVisible().catch(() => false)) ||
+        !page.url().includes(`/duplas/${DUPLA2_ID}`)
+    );
 
-    // a action empurra pra ficha da dupla nova (URL ≠ da antiga)
-    await page.waitForURL(
+    // a action empurra pra ficha da dupla nova (URL ≠ da antiga). Se a RPC
+    // recusou, o alert inline do dialog é a resposta — a corrida falha com
+    // a mensagem real em vez de um timeout de navegação que não diz nada.
+    const alvo = page.waitForURL(
       (url) =>
         /^\/duplas\/[0-9a-f-]{36}$/.test(url.pathname) &&
         !url.pathname.includes(DUPLA2_ID),
       // action pesada (RPC + sinos + revalidate) + router.push em preview frio
-      { timeout: 30_000 }
+      { timeout: 45_000 }
     );
+    const recusa = dialog
+      .getByRole("alert")
+      .waitFor({ state: "visible", timeout: 45_000 })
+      .then(async () => {
+        throw new Error(
+          `remanejo recusado pela action: ${(await dialog.getByRole("alert").textContent())?.trim()}`
+        );
+      });
+    try {
+      await Promise.race([alvo, recusa]);
+    } finally {
+      // o ramo perdedor segue pendente até o próprio timeout — sem o catch
+      // ele vira unhandled rejection depois que o spec já seguiu em frente
+      alvo.catch(() => {});
+      recusa.catch(() => {});
+    }
     await expect(
       page.getByRole("heading", { name: /Mentorada E2E Livre/ })
     ).toBeVisible({ timeout: 15_000 });
@@ -206,10 +242,20 @@ test.describe("coordenação — fluxos operacionais", () => {
     await expect(
       page.getByText("Dupla encerrada", { exact: true })
     ).toBeVisible({ timeout: 15_000 });
-    // remanejo é de dupla viva — a encerrada não oferece o botão de novo
+    // remanejo é de dupla viva — a encerrada não oferece o gesto de novo:
+    // nem botão solto, nem item no "Mais" (que sequer renderiza se nenhum
+    // item couber no menu)
+    const mais = page.getByRole("button", { name: "Mais ações da dupla" });
+    if (await mais.isVisible().catch(() => false)) {
+      await mais.click();
+      await expect(
+        page.getByRole("menuitem", { name: /Remanejar/ })
+      ).toHaveCount(0);
+      await page.keyboard.press("Escape");
+    }
     await expect(
       page.getByRole("button", { name: "Remanejar", exact: true })
-    ).not.toBeVisible();
+    ).toHaveCount(0);
   });
 
   test("import CSV de pareamento resolve a prévia e cria a dupla", async ({

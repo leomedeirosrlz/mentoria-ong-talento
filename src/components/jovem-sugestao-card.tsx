@@ -65,7 +65,7 @@ export function SugestaoEspecialistaCard({
           toast.error(res.error);
           return;
         }
-        toast.success("Pedido enviado — o especialista já pode responder.");
+        toast.success("Pedido enviado. O especialista já pode responder.");
         setOpen(false);
         router.refresh();
       } catch {
@@ -140,7 +140,7 @@ export function SugestaoEspecialistaCard({
           <DialogHeader>
             <DialogTitle>Confirmar pedido de especialista</DialogTitle>
             <DialogDescription>
-              A sugestão é do seu mentor, mas a demanda é sua — ajuste o que
+              A sugestão é do seu mentor, mas a demanda é sua. Ajuste o que
               quiser antes de enviar.
             </DialogDescription>
           </DialogHeader>

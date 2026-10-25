@@ -178,12 +178,13 @@ test.describe("mentorado — shell /jovem", () => {
     page,
   }) => {
     await page.goto("/jovem");
+    // o hero "Seu próximo encontro" (redesign) é o card de abertura — a
+    // home mostra só o PRÓXIMO encontro (futuros[0]); em run paralelo a
+    // trilha esp ou outro spec pode pôr um mais perto, então o assert é
+    // "o card de próximo existe", não "é o nº 8"
     const encontros = page.locator(
-      'section[aria-labelledby="encontros-titulo"]'
+      'section[aria-labelledby="proximo-titulo"]'
     );
-    // a home mostra só o PRÓXIMO encontro (futuros[0]) — em run paralelo a
-    // trilha esp ou outro spec pode pôr um mais perto; o assert é "o card de
-    // próximo existe", não "é o nº 8"
     await expect(encontros.getByText(/\d+º encontro/)).toBeVisible();
 
     const docs = page.locator('section[aria-labelledby="docs-titulo"]');
@@ -206,7 +207,6 @@ test.describe("mentorado — shell /jovem", () => {
     const combinados = page.locator(
       'section[aria-labelledby="combinados-titulo"]'
     );
-    const checkbox = combinados.getByRole("checkbox");
     // o input é sr-only — o clique honesto é no label que o embrulha
     await combinados
       .locator("label", { hasText: COMBINADO_JOVEM })
@@ -215,14 +215,28 @@ test.describe("mentorado — shell /jovem", () => {
       page.getByText("Combinado marcado como feito.")
     ).toBeVisible();
     // checked vem do server (RPC + router.refresh) — preview frio leva
-    // mais que os 5s default; a suite já usa 15s pra roundtrip assim
-    await expect(checkbox).toBeChecked({ timeout: 15_000 });
+    // mais que os 5s default; a suite já usa 15s pra roundtrip assim.
+    // Redesign: o item sai da lista de abertos e recolhe em "Ver N feitos"
+    // (o painel fica desmontado até abrir) — é lá que o checked mora agora
+    const checkboxFeito = combinados
+      .locator("label", { hasText: COMBINADO_JOVEM })
+      .getByRole("checkbox");
+    await combinados
+      .getByRole("button", { name: /Ver \d+ feito/ })
+      .click({ timeout: 15_000 });
+    await expect(checkboxFeito).toBeChecked({ timeout: 15_000 });
     // o router.refresh re-renderizou — e o estado sobrevive a um reload de
     // verdade (write passou pelo banco, não por estado local)
     await page.reload();
+    const recarregados = page.locator(
+      'section[aria-labelledby="combinados-titulo"]'
+    );
+    await recarregados
+      .getByRole("button", { name: /Ver \d+ feito/ })
+      .click();
     await expect(
-      page
-        .locator('section[aria-labelledby="combinados-titulo"]')
+      recarregados
+        .locator("label", { hasText: COMBINADO_JOVEM })
         .getByRole("checkbox")
     ).toBeChecked();
   });
@@ -231,7 +245,11 @@ test.describe("mentorado — shell /jovem", () => {
     page,
   }) => {
     await page.goto("/jovem");
-    await page.getByRole("button", { name: "Pedir ajuda" }).click();
+    // o botão solto virou a linha discreta "Precisa de ajuda?" — abre o
+    // mesmo diálogo de chamado (0084)
+    await page
+      .getByRole("button", { name: "Precisa de ajuda? Fale com a equipe" })
+      .click();
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
     // 0084: o canal de segurança é um chamado — opção na linguagem dele
@@ -288,7 +306,7 @@ test.describe("mentorado — shell /jovem", () => {
   // estações canônicas do guia com datas da turma dela (RPC jovem_jornada,
   // 0096) + a biblioteca de sempre como "Acervo". Sem dupla/cronograma a
   // página cai no fallback "Materiais" — a fixture …0030 tem os dois.
-  test("materiais é o hub Minha jornada — trilha das 7 estações + acervo", async ({
+  test("materiais é o hub Minha jornada — estante dos instrumentos + acervo", async ({
     page,
   }) => {
     await page.goto("/jovem/materiais");
@@ -303,15 +321,21 @@ test.describe("mentorado — shell /jovem", () => {
       page.getByRole("img", { name: /\d+ de 7 entregas feitas/ })
     ).toBeVisible();
 
-    // a trilha — estações sempre na ordem narrativa do guia. Com o realizado
-    // no lugar (enc. corrente 16) as 7 estão visíveis, sem exceção.
-    const trilha = page.locator('section[aria-label="Sua jornada"]');
-    await expect(trilha.getByText(/Estação 1/)).toBeVisible();
+    // a estante "Meus instrumentos" (v5c) — os 7 instrumentos sempre na
+    // ordem narrativa do guia + a devolutiva de terceiros entre eles.
+    // Com o realizado no lugar (enc. corrente 16) todos estão visíveis.
+    const trilha = page.locator(
+      'section[aria-labelledby="meus-instrumentos-titulo"]'
+    );
+    // o termo "Estação" saiu da interface (v5c) — a régua se lê pelos
+    // títulos e pelos chips de janela ("Enc. 1", "Enc. 1–4"…)
+    await expect(trilha.getByText("Enc. 1–4").first()).toBeVisible();
     for (const titulo of [
       "Roda da Vida · leitura inicial",
       "Construindo a sua Visão",
       "Definindo minhas metas",
       "PDM · Plano de Desenvolvimento",
+      "Avaliação por terceiros",
       "Avaliação do encontro",
       "Roda da Vida · aplicação formal",
       "Avaliação 360º",
@@ -348,7 +372,7 @@ test.describe("mentorado — shell /jovem", () => {
     ).toBeVisible();
   });
 
-  test("estação com link pendente vira CTA 'Continuar' — e 'Em andamento' com rascunho local", async ({
+  test("instrumento com link pendente vira card-link /f/ — e 'Em andamento' com rascunho local", async ({
     page,
   }) => {
     // O recorte "a_fazer + token → link /f/<token>" + o overlay do pill
@@ -387,38 +411,33 @@ test.describe("mentorado — shell /jovem", () => {
       );
       await page.goto("/jovem/materiais");
 
-      const trilha = page.locator('section[aria-label="Sua jornada"]');
-      const visao = trilha.locator("article", {
-        hasText: "Construindo a sua Visão",
-      });
-      const cta = visao.getByRole("link", { name: "Continuar" });
-      await expect(cta).toHaveAttribute("href", `/f/${token}`);
+      const trilha = page.locator(
+        'section[aria-labelledby="meus-instrumentos-titulo"]'
+      );
+      // v5c — o card aberto É o link pro /f/<token> (gesto único, sem
+      // botão "Continuar" redundante dentro). :is() cobre os dois formatos
+      // honestos: âncora inteira quando não há resposta anterior, article
+      // com os gestos listados quando há (re-emissão). O pill vira "Em
+      // andamento" com o rascunho local deste aparelho
+      const visao = trilha
+        .locator(":is(article, a)", {
+          hasText: "Construindo a sua Visão",
+        })
+        .first();
+      await expect(visao).toBeVisible();
+      await expect(
+        trilha.locator(`a[href="/f/${token}"]`)
+      ).toBeVisible();
       await expect(visao.getByText("Em andamento")).toBeVisible();
       await expect(
         visao.getByText("rascunho salvo neste aparelho")
       ).toBeVisible();
 
-      // REALIZA-162 — a estação aberta saiu da trilha e virou o bloco de
-      // ação "A fazer agora" logo abaixo do hero: ela mora só nele, sem
-      // repetir título nem CTA no <ol> da trilha (recibos + trancadas)
-      const afazer = page.locator(
-        'section[aria-labelledby="afazer-titulo"]'
-      );
+      // e não há bloco duplicado: o instrumento aberto mora só na estante
+      // (o "A fazer agora" da REALIZA-162 foi aposentado pelo v5c)
       await expect(
-        afazer.getByRole("heading", { name: "A fazer agora" })
-      ).toBeVisible();
-      await expect(visao).toBeVisible();
-      const listaTrilha = trilha.locator("ol");
-      await expect(
-        listaTrilha.getByText("Construindo a sua Visão")
+        page.getByRole("heading", { name: "A fazer agora" })
       ).toHaveCount(0);
-      // a ordem física: o bloco de ação vem antes da trilha
-      const yAfazer = (await afazer.boundingBox())?.y;
-      const yTrilha = (await listaTrilha.boundingBox())?.y;
-      if (yAfazer == null || yTrilha == null) {
-        throw new Error("bloco da jornada sem bounding box");
-      }
-      expect(yAfazer).toBeLessThan(yTrilha);
     } finally {
       await limparViaServiceRole("formulario_links", `token=eq.${token}`);
     }

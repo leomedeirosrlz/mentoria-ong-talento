@@ -8,6 +8,7 @@ import { campoRespondido } from "@/lib/forms/resposta";
 import { type FormularioCampo } from "@/lib/forms/schema";
 import { T } from "@/components/motion";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { RespostaApi } from "./use-resposta";
 import { SubmetasEditor } from "./submetas-editor";
@@ -262,16 +263,17 @@ function CorpoMetas({
       </AnimatePresence>
 
       {proximaFechada && (
-        <button
+        <Button
           type="button"
+          variant="outline"
+          className="w-full border-dashed"
           onClick={() =>
             setAbertas((prev) => new Set(prev).add(proximaFechada.n))
           }
-          className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-input px-4 py-3 text-sm font-medium text-muted-foreground transition-colors hover:border-[var(--brand-lime)] hover:text-foreground"
         >
-          <Plus size={15} aria-hidden />
+          <Plus aria-hidden />
           Adicionar meta {proximaFechada.n}
-        </button>
+        </Button>
       )}
 
       {fora.map((c) => {
@@ -353,14 +355,16 @@ function FichaMeta({
             </Badge>
           )}
           {onRemover && (
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="icon-sm"
               onClick={onRemover}
               aria-label={`Remover meta ${g.n}`}
-              className="grid size-11 shrink-0 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:size-8"
+              className="shrink-0 text-muted-foreground"
             >
-              <X size={15} aria-hidden />
-            </button>
+              <X aria-hidden />
+            </Button>
           )}
         </div>
 

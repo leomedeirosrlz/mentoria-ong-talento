@@ -60,7 +60,7 @@ function toastResultado(r: {
   const total = r.destinatarios ?? enviados + falhas;
   if (falhas) {
     toast.warning(
-      `E-mail enviado para ${enviados} de ${total} — ${falhas} ${
+      `E-mail enviado para ${enviados} de ${total}. ${falhas} ${
         falhas === 1 ? "falhou" : "falharam"
       }.`
     );
@@ -161,7 +161,7 @@ export function EnviarEmailDialog({
           </div>
           {encontroNum != null && selecionados.includes("todos") && (
             <p className="rounded-xl border border-warn/50 bg-warn/10 px-3 py-2 text-xs text-foreground">
-              Programado pra liberar no encontro {encontroNum} — marcando
+              Programado pra liberar no encontro {encontroNum}. Marcando
               “Todos”, o link chega pros jovens agora, antes do acervo abrir.
             </p>
           )}

@@ -1,8 +1,23 @@
 "use client";
 
-import { Fragment, useEffect, useId, useRef, useState, useTransition } from "react";
+import {
+  createContext,
+  Fragment,
+  useContext,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  useTransition,
+  type ReactNode,
+} from "react";
 import { useRouter } from "next/navigation";
-import { motion } from "motion/react";
+import {
+  motion,
+  Reorder,
+  useDragControls,
+  type DragControls,
+} from "motion/react";
 import { toast } from "sonner";
 import {
   CalendarBlank,
@@ -12,6 +27,7 @@ import {
   Circle,
   CircleNotch,
   Copy,
+  DotsSixVertical,
   DotsThreeVertical,
   Eye,
   FileArrowUp,
@@ -134,17 +150,48 @@ function novoCampo(): DraftCampo {
  *  do `formato` ausente (o Select não aceita item de valor vazio). */
 const FORMATO_OPCOES = { livre: "Texto livre", ...CAMPO_FORMATO_LABEL };
 
+/** Numeração do builder — o MESMO mapa do /f/<token> e da leitura da
+ *  ficha (REALIZA-199): perguntas e seções têm réguas próprias. "Pergunta
+ *  2" é a 2ª pergunta (secao não consome número — é rótulo de estrutura),
+ *  "seção 1" é a 1ª seção. Antes o builder usava i+1 cru e a seção comia
+ *  um número que o respondente nunca veria. */
+function numera(campos: DraftCampo[]) {
+  const numeroPorId = new Map<string, number>();
+  const secaoPorId = new Map<string, number>();
+  let np = 0;
+  let ns = 0;
+  for (const c of campos) {
+    if (c.tipo === "secao") secaoPorId.set(c.id, ++ns);
+    else numeroPorId.set(c.id, ++np);
+  }
+  return { numeroPorId, secaoPorId };
+}
+
+/** Rótulo ordinal do campo pra aria-labels e anúncios — "a pergunta 2" /
+ *  "a seção 1", combinando com "Ações d…", "Arrastar pra reordenar …". */
+function rotuloCampo(c: DraftCampo, n: number, sn: number): string {
+  return c.tipo === "secao" ? `a seção ${sn}` : `a pergunta ${n}`;
+}
+
+/** DragControls do Reorder.Item do card — a alça no rodapé dispara o gesto
+ *  sem transformar o card inteiro em alça: inputs, selects e switches
+ *  precisam do pointerdown deles. Um contexto por card, não um por lista. */
+const AlcaControlsContext = createContext<DragControls | null>(null);
+
+/** Form existente que o builder edita (ausente = criação em /novo). */
+export type FormularioEdicao = {
+  id: string;
+  titulo: string;
+  descricao: string | null;
+  campos: FormularioCampo[];
+  versao: number;
+};
+
 export function FormularioBuilder({
   formulario,
 }: {
   /** presente = edição; ausente = criação */
-  formulario?: {
-    id: string;
-    titulo: string;
-    descricao: string | null;
-    campos: FormularioCampo[];
-    versao: number;
-  };
+  formulario?: FormularioEdicao;
 }) {
   const [titulo, setTitulo] = useState(formulario?.titulo ?? "");
   const [descricao, setDescricao] = useState(formulario?.descricao ?? "");
@@ -163,9 +210,21 @@ export function FormularioBuilder({
   const [dirty, setDirty] = useState(false);
   const [preview, setPreview] = useState(false);
   const [pending, start] = useTransition();
+  /** anúncio de reordenação pra leitor de tela — mover pelo menu ⋯ e
+   *  soltar o arraste passam por aqui; sem isso o AT não sabe que a ordem
+   *  mudou (a reordenação em si é silenciosa). */
+  const [dragMsg, setDragMsg] = useState("");
+  /** ordem no momento em que o arraste começou — o dirty de um gesto de
+   *  reordenação só liga se a posição solta for diferente da posição
+   *  pega (pegar e devolver no lugar não suja o rascunho). */
+  const antesDoArraste = useRef<DraftCampo[] | null>(null);
   const router = useRouter();
   const edicao = Boolean(formulario);
   const maxCampos = campos.length >= MAX_CAMPOS;
+  // a régua de numeração do builder é a do /f/<token>: perguntas e seções
+  // contam separado — recalculado a cada render (reorder/insert/remove
+  // já reflete no chip e nos aria-labels sem esperar save)
+  const { numeroPorId, secaoPorId } = numera(campos);
 
   /* Alvos de foco por chave — `en:<id>` enunciado, `op:<id>:<j>` opção.
    * pendingFocus é consumido no ref callback: foca o elemento assim que ele
@@ -242,14 +301,46 @@ export function FormularioBuilder({
     );
   }
 
+  /** Anuncia a posição nova de um campo depois de mover/arrastar — o
+   *  número sai da régua certa ("pergunta N" conta só perguntas). */
+  function anunciaPosicao(campo: DraftCampo, lista: DraftCampo[]) {
+    const mapa = numera(lista);
+    const ehSecao = campo.tipo === "secao";
+    const titulo = campo.label.trim();
+    const nome = titulo
+      ? `“${titulo.length > 40 ? `${titulo.slice(0, 40)}…` : titulo}”`
+      : ehSecao
+        ? "A seção"
+        : "A pergunta";
+    const pos = ehSecao
+      ? `seção ${mapa.secaoPorId.get(campo.id)}`
+      : `pergunta ${mapa.numeroPorId.get(campo.id)}`;
+    setDragMsg(`${nome} agora é a ${pos}.`);
+  }
+
   function move(i: number, dir: -1 | 1) {
-    alteraCampos((cs) => {
-      const j = i + dir;
-      if (j < 0 || j >= cs.length) return cs;
-      const out = [...cs];
-      [out[i], out[j]] = [out[j], out[i]];
-      return out;
-    });
+    const j = i + dir;
+    if (j < 0 || j >= campos.length) {
+      // borda: o menu ⋯ desabilita o item, mas a seta ↑/↓ do grip chega
+      // aqui sem barreira — sem anúncio o AT fica no escuro sobre a tecla
+      // não ter feito nada (mesma régua pergunta×seção de anunciaPosicao)
+      const c = campos[i];
+      const rotulo = rotuloCampo(
+        c,
+        c.tipo === "secao" ? 0 : (numeroPorId.get(c.id) ?? 0),
+        c.tipo === "secao" ? (secaoPorId.get(c.id) ?? 0) : 0
+      );
+      setDragMsg(
+        `${rotulo.charAt(0).toUpperCase()}${rotulo.slice(1)} já é ${
+          dir === -1 ? "a primeira" : "a última"
+        }.`
+      );
+      return;
+    }
+    const out = [...campos];
+    [out[i], out[j]] = [out[j], out[i]];
+    alteraCampos(() => out);
+    anunciaPosicao(out[j], out);
   }
 
   function remove(i: number) {
@@ -512,16 +603,49 @@ export function FormularioBuilder({
           </div>
         </div>
 
-        <ol className="space-y-3">
+        <p className="sr-only">
+          Pra reordenar pelo teclado, foque a alça no rodapé do campo e
+          use as setas pra cima e pra baixo, ou abra o menu de ações e
+          escolha Mover pra cima ou Mover pra baixo. Pelo ponteiro,
+          arraste pela alça.
+        </p>
+        {/* Reorder do motion (a lib já era da casa — sem dependência nova):
+            FLIP dos irmãos no reorder, auto-scroll na borda do viewport e
+            snap-back no drop. O gesto começa só na alça (dragControls) —
+            o card inteiro é cheio de controle, listener nele quebraria
+            input/select. O menu ⋯ de cada card segue como caminho de
+            teclado (mover ↑/↓), não substituído pelo arraste */}
+        <Reorder.Group
+          as="ol"
+          axis="y"
+          values={campos}
+          // sempre converte pro estado a ordem que o Group calculou —
+          // comparar com o closure aqui abriria race (2 cruzamentos no
+          // mesmo batch veriam o campos velho). O dirty sai no drop: se a
+          // ordem final for a de antes do arraste, nada mudou de verdade
+          onReorder={(nova) => setCampos(nova)}
+          className="space-y-3"
+        >
           {campos.map((c, i) => {
             const msg = erros[c.id];
             const erroId = `erro-${c.id}`;
+            const ehSecao = c.tipo === "secao";
+            // n = posição na régua de perguntas (o "N." que o respondente
+            // vê); sn = posição na régua de seções — nunca se misturam
+            const n = ehSecao ? 0 : (numeroPorId.get(c.id) ?? 0);
+            const sn = ehSecao ? (secaoPorId.get(c.id) ?? 0) : 0;
+            const rotulo = rotuloCampo(c, n, sn);
             return (
               <Fragment key={c.id}>
                 {i > 0 && (
                   // separador também é layout: insere/remove/reordena deslizando
-                  // junto em vez de teletransportar enquanto o card anima
+                  // junto em vez de teletransportar enquanto o card anima.
+                  // role="none" tira a semântica de listitem do <li> — sem
+                  // ele o <ol> conta os separadores e o AT anuncia "2N-1
+                  // itens". O botão dentro segue exposto normal (padrão
+                  // APG de li-padrão com conteúdo interativo).
                   <motion.li
+                    role="none"
                     layout
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
@@ -541,14 +665,33 @@ export function FormularioBuilder({
                     </Button>
                   </motion.li>
                 )}
-                {/* continuidade espacial no editor: reorder (move) desliza os
-                    cards; inserir/duplicar entra com o fade+y:4 padrão; remover
-                    sai direto e os irmãos deslizam pra ocupar o espaço (§2) */}
-                <motion.li
-                  layout
-                  initial={fade.initial}
-                  animate={fade.animate}
-                  transition={T.enter}
+                {/* continuidade espacial no editor: reorder (menu ⋯ e
+                    arraste) desliza os cards; inserir/duplicar entra com o
+                    fade+y:4 padrão; remover sai direto e os irmãos deslizam
+                    pra ocupar o espaço (§2) */}
+                <CampoReorderItem
+                  value={c}
+                  onDragStart={() => {
+                    antesDoArraste.current = campos;
+                    setDragMsg(
+                      `Arrastando ${rotulo}. Solte na nova posição.`
+                    );
+                  }}
+                  onDragEnd={() => {
+                    const antes = antesDoArraste.current;
+                    antesDoArraste.current = null;
+                    const mudou =
+                      antes !== null &&
+                      (antes.length !== campos.length ||
+                        antes.some((d, idx) => d !== campos[idx]));
+                    // drop que não mudou a ordem (drag-no-op, clique seco
+                    // no grip) fica em silêncio — anunciar posição seria
+                    // mentir que algo moveu
+                    if (mudou) {
+                      setDirty(true);
+                      anunciaPosicao(c, campos);
+                    }
+                  }}
                   className={cn(
                     "rounded-xl bg-card shadow-[var(--shadow-border)]",
                     msg && "ring-2 ring-destructive/60"
@@ -556,12 +699,32 @@ export function FormularioBuilder({
                 >
                   <div className="space-y-3 p-4 sm:p-5">
                     <div className="flex flex-col gap-3 sm:flex-row">
+                      {/* o "N." do builder é o mesmo do /f/<token> — seção
+                          ganha selo próprio (com ícone) fora da contagem,
+                          igual à linha-divisória que ela vira pro público */}
+                      <span
+                        className={cn(
+                          "inline-flex h-9 shrink-0 items-center justify-center gap-1 self-start rounded-lg px-2.5 text-xs font-semibold tabular-nums sm:self-auto",
+                          ehSecao
+                            ? "bg-[var(--brand-lime)]/15 text-foreground"
+                            : "bg-muted text-muted-foreground"
+                        )}
+                      >
+                        {ehSecao ? (
+                          <>
+                            <Rows size={12} aria-hidden />
+                            Seção {sn}
+                          </>
+                        ) : (
+                          `${n}.`
+                        )}
+                      </span>
                       <Input
                         ref={reg(`en:${c.id}`)}
                         aria-label={
-                          c.tipo === "secao"
-                            ? `Título da seção ${i + 1}`
-                            : `Texto da pergunta ${i + 1}`
+                          ehSecao
+                            ? `Título da seção ${sn}`
+                            : `Texto da pergunta ${n}`
                         }
                         aria-invalid={msg ? true : undefined}
                         aria-describedby={msg ? erroId : undefined}
@@ -583,9 +746,7 @@ export function FormularioBuilder({
                             mudaTipo(i, v as FormularioCampoTipo)
                           }
                         >
-                          <SelectTrigger
-                            aria-label={`Tipo da pergunta ${i + 1}`}
-                          >
+                          <SelectTrigger aria-label={`Tipo d${rotulo}`}>
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -617,7 +778,7 @@ export function FormularioBuilder({
                     {TIPOS_COM_OPCOES.includes(c.tipo) ? (
                       <OpcoesEditor
                         campo={c}
-                        n={i + 1}
+                        n={n}
                         regOpcao={(j) => reg(`op:${c.id}:${j}`)}
                         onUpdate={(j, v) => updateOpcao(i, j, v)}
                         onAdd={(depoisDe) => addOpcao(i, depoisDe)}
@@ -648,7 +809,7 @@ export function FormularioBuilder({
                               }
                             >
                               <SelectTrigger
-                                aria-label={`Formato da resposta da pergunta ${i + 1}`}
+                                aria-label={`Formato da resposta da pergunta ${n}`}
                               >
                                 <SelectValue />
                               </SelectTrigger>
@@ -665,7 +826,7 @@ export function FormularioBuilder({
                           </div>
                           {c.formato && (
                             <span className="text-xs leading-snug text-muted-foreground">
-                              — a resposta é normalizada na entrada
+                              A resposta é normalizada na entrada
                             </span>
                           )}
                         </div>
@@ -674,14 +835,14 @@ export function FormularioBuilder({
                       // a seção leva texto de apoio (instrução do bloco),
                       // não maquete de resposta — não há o que responder
                       <Textarea
-                        aria-label={`Texto de apoio da seção ${i + 1}`}
+                        aria-label={`Texto de apoio da seção ${sn}`}
                         value={c.descricao}
                         onChange={(e) =>
                           update(i, { descricao: e.target.value })
                         }
                         rows={2}
                         maxLength={1000}
-                        placeholder="Texto de apoio sob o título (opcional) — instruções do bloco."
+                        placeholder="Texto de apoio sob o título (opcional): instruções do bloco."
                       />
                     ) : (
                       <MockTipo tipo={c.tipo} />
@@ -698,61 +859,69 @@ export function FormularioBuilder({
                   </div>
 
                   <div className="flex items-center justify-between gap-2 border-t border-border px-2 py-1.5 sm:px-3">
-                    {/* REALIZA-186: duplicar/↑/↓/remover eram 4 ícones-
-                        fantasma por card — ⋯ por pergunta (padrão ⋯ do
-                        pdm-arvore). Tudo é estado local do builder; não há
-                        confirm pra preservar */}
-                    <DropdownMenu>
-                      <DropdownMenuTrigger
-                        aria-label={`Ações da pergunta ${i + 1}`}
-                        className={cn(
-                          buttonVariants({ variant: "ghost", size: "icon" }),
-                          "size-11 shrink-0 sm:size-8"
-                        )}
-                      >
-                        <DotsThreeVertical
-                          size={18}
-                          weight="bold"
-                          aria-hidden
-                        />
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-56">
-                        <DropdownMenuItem
-                          disabled={maxCampos}
-                          onClick={() => duplicar(i)}
+                    {/* REALIZA-186/199: alça de arraste (ponteiro) + ⋯
+                        (teclado) — dois caminhos de reordenar lado a lado.
+                        ⋯ por campo é o padrão do pdm-arvore; tudo é estado
+                        local do builder, não há confirm pra preservar */}
+                    <div className="flex items-center gap-0.5">
+                      <AlcaArraste
+                        rotulo={rotulo}
+                        onMove={(dir) => move(i, dir)}
+                      />
+                      <DropdownMenu>
+                        <DropdownMenuTrigger
+                          aria-label={`Ações d${rotulo}`}
+                          className={cn(
+                            buttonVariants({ variant: "ghost", size: "icon" }),
+                            // md:, não sm: — tablet 640–767 segue touch e
+                            // precisa dos 44px; o 32px é coisa de desktop
+                            "size-11 shrink-0 md:size-8"
+                          )}
                         >
-                          <Copy size={16} data-icon="inline-start" aria-hidden />
-                          Duplicar pergunta
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          disabled={i === 0}
-                          onClick={() => move(i, -1)}
-                        >
-                          <CaretUp size={16} data-icon="inline-start" aria-hidden />
-                          Mover pra cima
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          disabled={i === campos.length - 1}
-                          onClick={() => move(i, 1)}
-                        >
-                          <CaretDown
-                            size={16}
-                            data-icon="inline-start"
+                          <DotsThreeVertical
+                            size={18}
+                            weight="bold"
                             aria-hidden
                           />
-                          Mover pra baixo
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          variant="destructive"
-                          disabled={campos.length === 1}
-                          onClick={() => remove(i)}
-                        >
-                          <Trash size={16} data-icon="inline-start" aria-hidden />
-                          Remover pergunta
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-56">
+                          <DropdownMenuItem
+                            disabled={maxCampos}
+                            onClick={() => duplicar(i)}
+                          >
+                            <Copy size={16} data-icon="inline-start" aria-hidden />
+                            Duplicar {ehSecao ? "seção" : "pergunta"}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            disabled={i === 0}
+                            onClick={() => move(i, -1)}
+                          >
+                            <CaretUp size={16} data-icon="inline-start" aria-hidden />
+                            Mover pra cima
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            disabled={i === campos.length - 1}
+                            onClick={() => move(i, 1)}
+                          >
+                            <CaretDown
+                              size={16}
+                              data-icon="inline-start"
+                              aria-hidden
+                            />
+                            Mover pra baixo
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            variant="destructive"
+                            disabled={campos.length === 1}
+                            onClick={() => remove(i)}
+                          >
+                            <Trash size={16} data-icon="inline-start" aria-hidden />
+                            Remover {ehSecao ? "seção" : "pergunta"}
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
                     {c.tipo !== "secao" && (
                       <div className="flex items-center gap-2">
                         <Switch
@@ -774,11 +943,11 @@ export function FormularioBuilder({
                       </div>
                     )}
                   </div>
-                </motion.li>
+                </CampoReorderItem>
               </Fragment>
             );
           })}
-        </ol>
+        </Reorder.Group>
 
         <div>
           <Button
@@ -793,6 +962,12 @@ export function FormularioBuilder({
           </Button>
         </div>
       </fieldset>
+
+      {/* anúncio de reordenação — live region estável (sempre montada), o
+          texto muda por gesto: menu ⋯ e drop do arraste escrevem aqui */}
+      <p aria-live="polite" className="sr-only">
+        {dragMsg}
+      </p>
 
       <p
         role="alert"
@@ -849,6 +1024,125 @@ export function FormularioBuilder({
         )}
       </div>
     </div>
+  );
+}
+
+/** O <details> "Editar formulário" da ficha — monta o builder só no
+ *  primeiro open. Montado dentro de um details fechado, o Reorder.Item
+ *  media 0×0 e o primeiro arraste reordenava em cima de medida vazia;
+ *  com o mount adiado a lista já nasce com dimensões reais. Depois de
+ *  aberto o builder fica montado — o rascunho local não pode morrer
+ *  quando a pessoa fecha o details no meio da edição. */
+export function FormularioBuilderDetails({
+  formulario,
+}: {
+  formulario: FormularioEdicao;
+}) {
+  const [montado, setMontado] = useState(false);
+  return (
+    <details
+      className="group"
+      onToggle={(e) => {
+        if (e.currentTarget.open) setMontado(true);
+      }}
+    >
+      <summary className="flex min-h-11 cursor-pointer list-none items-center gap-1.5 rounded-lg py-3 text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
+        Editar formulário
+        <CaretDown
+          size={14}
+          aria-hidden
+          className="transition-transform group-open:rotate-180"
+        />
+      </summary>
+      {montado && <FormularioBuilder formulario={formulario} />}
+    </details>
+  );
+}
+
+/** Card arrastável do builder — Reorder.Item com o gesto preso na alça
+ *  (dragListener={false} + dragControls): o card é cheio de input/select/
+ *  switch, um listener nele sequestraria o pointerdown de todo controle.
+ *  O `value` é o DraftCampo — o Group reordena o array e devolve em
+ *  onReorder; layout/zIndex/medida são internos do Reorder (irmãos
+ *  deslizam via FLIP, o arrastado flutua por cima com zIndex próprio).
+ *  O y do fade de entrada escreve no MESMO motion value do offset de
+ *  arraste — a animação de entrada não briga com o gesto, é o mesmo canal. */
+function CampoReorderItem({
+  value,
+  className,
+  onDragStart,
+  onDragEnd,
+  children,
+}: {
+  value: DraftCampo;
+  className?: string;
+  onDragStart?: () => void;
+  onDragEnd?: () => void;
+  children: ReactNode;
+}) {
+  const controls = useDragControls();
+  return (
+    <Reorder.Item
+      as="li"
+      value={value}
+      dragListener={false}
+      dragControls={controls}
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
+      initial={fade.initial}
+      animate={fade.animate}
+      transition={T.enter}
+      // "card levantado": sombra de overlay + respiro de 1% — uma passada
+      // só no lift, nada anima durante o arraste (o movimento é o gesto)
+      whileDrag={{ scale: 1.01, boxShadow: "var(--shadow-overlay)" }}
+      className={className}
+    >
+      <AlcaControlsContext.Provider value={controls}>
+        {children}
+      </AlcaControlsContext.Provider>
+    </Reorder.Item>
+  );
+}
+
+/** A alça do card (rodapé, ao lado do ⋯) — controle de reordenação com
+ *  dois gestos: ponteiro arrasta (dragControls → controls.start no
+ *  pointerdown), teclado move com as setas ↑/↓ pelo mesmo `move` do menu
+ *  ⋯ (o anúncio da posição nova cai na live region igual). Um botão
+ *  focável que não faz nada no Enter/Tab é controle morto — por isso a
+ *  seta no grip, convenção do padrão drag-handle. `touch-none` é
+ *  obrigatório: sem ele o gesto vertical vira scroll da página antes do
+ *  drag começar — em qualquer outro ponto do card o scroll segue normal.
+ *  size-11 no mobile garante os ≥44px do gesto. */
+function AlcaArraste({
+  rotulo,
+  onMove,
+}: {
+  rotulo: string;
+  onMove: (dir: -1 | 1) => void;
+}) {
+  const controls = useContext(AlcaControlsContext);
+  return (
+    <button
+      type="button"
+      aria-label={`Reordenar ${rotulo}`}
+      aria-keyshortcuts="ArrowUp ArrowDown"
+      title="Arraste pra reordenar. Pelo teclado, as setas ↑/↓ movem"
+      onPointerDown={(e) => controls?.start(e)}
+      onKeyDown={(e) => {
+        if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+          // sem preventDefault a seta rolaria a página atrás do card
+          e.preventDefault();
+          onMove(e.key === "ArrowUp" ? -1 : 1);
+        }
+      }}
+      className={cn(
+        buttonVariants({ variant: "ghost", size: "icon" }),
+        // md:, não sm: — tablet 640–767 segue touch e precisa dos 44px
+        "size-11 shrink-0 cursor-grab touch-none text-muted-foreground active:cursor-grabbing md:size-8"
+      )}
+    >
+      <DotsSixVertical size={18} weight="bold" aria-hidden />
+    </button>
   );
 }
 
@@ -969,7 +1263,7 @@ function MockTipo({ tipo }: { tipo: FormularioCampoTipo }) {
       {tipo === "secao" && (
         <span className="flex items-center gap-2.5 text-sm text-muted-foreground">
           <Rows aria-hidden className="size-4 shrink-0" />
-          Título de bloco — organiza as perguntas, não espera resposta
+          Título de bloco · organiza as perguntas, não espera resposta
         </span>
       )}
       {tipo === "sim_nao" && (

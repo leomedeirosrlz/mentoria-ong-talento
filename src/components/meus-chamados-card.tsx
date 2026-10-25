@@ -3,13 +3,11 @@
 import Link from "next/link";
 import { Lifebuoy } from "@phosphor-icons/react";
 import type { ChamadoFilaItem } from "@/lib/types";
-import {
-  CHAMADO_CATEGORIA_LABEL,
-  CHAMADO_STATUS_LABEL,
-} from "@/lib/ciclo";
+import { CHAMADO_CATEGORIA_LABEL } from "@/lib/ciclo";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
+import { ChamadoStatusBadge } from "@/components/chamados-app";
 import { NovoChamadoDialog } from "@/components/novo-chamado-dialog";
 import { Button } from "@/components/ui/button";
 import { Plus } from "@phosphor-icons/react";
@@ -40,7 +38,7 @@ export function MeusChamadosCard({
               </h2>
               <p className="mt-0.5 text-sm text-muted-foreground">
                 {abertos.length
-                  ? `${abertos.length} em andamento — a equipe responde por lá.`
+                  ? `${abertos.length} em andamento. A equipe responde por lá.`
                   : "Nenhum pedido em andamento."}
               </p>
             </div>
@@ -82,9 +80,12 @@ export function MeusChamadosCard({
                     <Badge variant="outline" className="shrink-0 text-[10px] font-normal">
                       {CHAMADO_CATEGORIA_LABEL[c.categoria]}
                     </Badge>
-                    <Badge variant="outline" className="shrink-0 text-[10px] font-normal">
-                      {CHAMADO_STATUS_LABEL[c.status]}
-                    </Badge>
+                    <ChamadoStatusBadge
+                      status={c.status}
+                      dono={c.atribuido_nome}
+                      visao="autor"
+                      className="shrink-0 text-[10px]"
+                    />
                   </Link>
                 </li>
               ))}

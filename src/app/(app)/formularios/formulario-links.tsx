@@ -343,9 +343,12 @@ export function FormularioLinks({
   const [buscaLink, setBuscaLink] = useState("");
   const [ordemLinks, setOrdemLinks] = useState<OrdemLinks>("status");
   // os 4 instrumentos de jornada só emitem pela ficha da dupla
-  // (emitir_link_instrumento carrega dupla_id + momento); o link genérico
-  // daqui é rejeitado pela action — esconder é melhor que falhar
+  // (emitir_link_instrumento carrega dupla_id + momento); a avaliação da
+  // trilha de especialista sai sozinha no encerramento (0104) — nos dois
+  // casos o link manual daqui é rejeitado pela action: esconder é melhor
+  // que falhar
   const instrumento = ehInstrumento(formularioSistema);
+  const avaliacaoTrilha = formularioSistema === "avaliacao_especialista";
   const [pending, start] = useTransition();
   // opções do "Vincular a um jovem" nos links genéricos legados (REALIZA-16)
   // — a mesma lista de mentorados que alimenta o dialog de emissão
@@ -557,12 +560,18 @@ export function FormularioLinks({
     <div className="space-y-4">
       {instrumento && (
         <p className="rounded-lg bg-muted px-3 py-2 text-xs text-muted-foreground">
-          Instrumento oficial da jornada — os links são emitidos pela ficha
+          Instrumento oficial da jornada: os links são emitidos pela ficha
           da dupla, em <em>Instrumentos da dupla</em>.
         </p>
       )}
+      {avaliacaoTrilha && (
+        <p className="rounded-lg bg-muted px-3 py-2 text-xs text-muted-foreground">
+          Avaliação oficial da trilha: o link é emitido sozinho quando a
+          trilha de especialista é encerrada.
+        </p>
+      )}
       <div className="flex flex-wrap items-center gap-2">
-        {!instrumento && (
+        {!instrumento && !avaliacaoTrilha && (
         <Dialog open={open} onOpenChange={aoAbrir}>
           <DialogTrigger render={<Button size="sm" />}>
             <LinkIcon aria-hidden />
@@ -821,7 +830,7 @@ export function FormularioLinks({
 
       {links.length === 0 ? (
         <p className="rounded-lg border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
-          Nenhum link gerado ainda. Gere links individuais — cada resposta
+          Nenhum link gerado ainda. Gere links individuais: cada resposta
           precisa de um destinatário.
         </p>
       ) : linksVisiveis.length === 0 && linksView.length === links.length ? (

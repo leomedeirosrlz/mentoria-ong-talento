@@ -42,7 +42,7 @@ export function PedidoJovemMesa({
   if (efetivoDe(s) === "aguardando_coord") {
     return (
       <div className="space-y-1.5">
-        <p className="text-xs text-muted-foreground">
+        <p className="text-sm text-muted-foreground">
           A coordenação libera o pedido pra ele chegar aos especialistas.
         </p>
         {s.created_by === meuId && (
@@ -136,7 +136,7 @@ export function PedidoJovemItem({
             {tempoRelativo(s.created_at, agoraMs)}
           </p>
           {recado && (
-            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+            <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
               “{recado}”
             </p>
           )}

@@ -4,7 +4,7 @@ import { entrarNaDemo, expect, test } from "../helpers";
 // dataset: role primário DPP + papel efetivo mentor_especialista em
 // profile_papeis. O edge case da auditoria: antes do WP6b, todas as
 // decisões de superfície liam só o primário e o lado especialista dele
-// sumia — sem mural na home, sem aba de agenda, sem grade editável.
+// sumia — sem mural na home e sem editor de horários.
 // Público, sem writes: vale em qualquer deploy, produção inclusive.
 
 test("home do híbrido: mural de especialista monta junto com a visão DPP", async ({
@@ -14,49 +14,46 @@ test("home do híbrido: mural de especialista monta junto com a visão DPP", asy
   await page.goto("/");
 
   // o mural que só existia pro especialista puro — o híbrido recebe e
-  // responde pedidos (a pedido broadcast da Dandara é visível pra ele)
+  // responde pedidos. Na home nova ele vem recolhido com o contador de
+  // abertos no título — abrir mostra os cards (o broadcast da Dandara
+  // chega pra ele)
+  const mural = page.locator("details#mural-especialista");
+  await expect(mural).toBeAttached();
   await expect(
-    page.getByRole("heading", { name: "Pedidos de especialista" })
+    mural.getByRole("heading", { name: /Pedidos de especialista \(\d+\)/ })
   ).toBeVisible();
-  await expect(page.getByText(/Dandara/).first()).toBeVisible();
+  await expect(mural).not.toHaveJSProperty("open", true);
+  await mural.locator("summary").click();
+  await expect(mural).toHaveJSProperty("open", true);
+  await expect(mural.getByText(/Dandara/).first()).toBeVisible();
 });
 
-test("agenda do híbrido: duas abas — Ciclo DPP + Especialista com grade editável", async ({
+test("agenda do híbrido sem trilha: sem aba Especialista, horários no perfil", async ({
   page,
 }) => {
   await entrarNaDemo(page, "mentor_dpp");
   await page.goto("/agenda");
 
-  // a aterrissagem é a aba do papel primário (DPP) com as duas visões. A
-  // aba DPP carrega o ?visao= explícito: /agenda pelado recai no default
-  // do primário e a aba ficaria inalcançável pro híbrido esp-primário
-  const abas = page.getByRole("navigation", { name: "Visão da agenda" });
-  const abaDpp = abas.getByRole("link", { name: "Ciclo DPP" });
-  const abaEsp = abas.getByRole("link", { name: "Especialista" });
-  await expect(abaDpp).toBeVisible();
-  await expect(abaEsp).toBeVisible();
-  await expect(abaDpp).toHaveAttribute("href", "/agenda?visao=dpp");
-  await expect(abaDpp).toHaveAttribute("aria-current", "page");
-
-  // DPP → especialista: a agenda própria (grade semanal editável) — antes,
-  // o editor de disponibilidade era inalcançável pro híbrido
-  await abaEsp.click();
-  await expect(page).toHaveURL(/visao=especialista/);
-  await expect(abaEsp).toHaveAttribute("aria-current", "page");
-  await expect(page.getByText("Sua agenda")).toBeVisible();
+  // REALIZA-207: a aba Especialista só existe com trilha pra mostrar. O
+  // Ricardo é especialista sem trilha ativa → a agenda é só a do ciclo DPP
   await expect(
-    page.getByText("Toda semana", { exact: true })
-  ).toBeVisible();
-  // sem trilha esp ativa ainda: o estado vazio honesto
-  await expect(
-    page.getByText(/ainda não tem trilhas de especialista/)
-  ).toBeVisible();
+    page.getByRole("navigation", { name: "Visão da agenda" })
+  ).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Minha agenda" })).toBeVisible();
 
-  // especialista → DPP: a aba explícita devolve o calendário oficial do
-  // ciclo — sem o ?visao=dpp o clique pousaria de novo no default
-  await abaDpp.click();
-  await expect(page).toHaveURL(/\/agenda\?visao=dpp$/);
-  await expect(abaDpp).toHaveAttribute("aria-current", "page");
+  // ?visao=especialista cai mudo na visão DPP (sem banner de erro: ele é
+  // especialista, só não tem o que mostrar ali)
+  await page.goto("/agenda?visao=especialista");
+  await expect(page.getByRole("heading", { name: "Minha agenda" })).toBeVisible();
+  await expect(page.getByText(/não se aplica ao seu papel/)).toHaveCount(0);
+
+  // os horários de especialista seguem editáveis: moram no perfil
+  await page.goto("/perfil#horarios");
+  await expect(
+    page.locator("#horarios").getByRole("heading", {
+      name: "Quando você pode atender",
+    })
+  ).toBeVisible();
 });
 
 test("agenda do híbrido: ?visao= fora do vocabulário vale como ausente", async ({
@@ -65,15 +62,9 @@ test("agenda do híbrido: ?visao= fora do vocabulário vale como ausente", async
   await entrarNaDemo(page, "mentor_dpp");
   await page.goto("/agenda?visao=foo");
 
-  // valor inválido cai no default do papel primário — com as abas
-  // montadas, não numa visão quebrada nem num redirect
-  const abas = page.getByRole("navigation", { name: "Visão da agenda" });
-  await expect(
-    abas.getByRole("link", { name: "Ciclo DPP" })
-  ).toHaveAttribute("aria-current", "page");
-  await expect(
-    abas.getByRole("link", { name: "Especialista" })
-  ).toBeVisible();
+  // valor inválido cai no default do papel primário (DPP), não numa visão
+  // quebrada nem num redirect
+  await expect(page.getByRole("heading", { name: "Minha agenda" })).toBeVisible();
 });
 
 test("duplas do híbrido: seção DPP presente (esp aparece quando houver trilha)", async ({

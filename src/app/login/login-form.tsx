@@ -433,17 +433,19 @@ export function LoginForm() {
                     "Reenviar link"
                   )}
                 </Button>
-                <button
+                <Button
                   type="button"
+                  variant="link"
+                  size="sm"
+                  className="w-full"
                   onClick={() => {
                     setEnviado(false);
                     setCooldown(0);
                     setErro(null);
                   }}
-                  className="w-full min-h-11 text-xs text-muted-foreground hover:text-foreground transition-colors"
                 >
                   Usar outro e-mail
-                </button>
+                </Button>
               </div>
             </motion.div>
           ) : (
@@ -562,16 +564,18 @@ export function LoginForm() {
                 </Button>
 
                 {modo === "senha" && (
-                  <button
+                  <Button
                     type="button"
+                    variant="link"
+                    size="sm"
+                    className="w-full"
                     onClick={() => {
                       setModo("link");
                       setErro(null);
                     }}
-                    className="w-full min-h-11 text-xs text-muted-foreground hover:text-foreground transition-colors"
                   >
                     Esqueceu a senha? Entre pelo link de e-mail
-                  </button>
+                  </Button>
                 )}
               </form>
             </motion.div>

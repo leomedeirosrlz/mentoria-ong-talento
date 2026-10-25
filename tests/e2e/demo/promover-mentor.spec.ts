@@ -49,7 +49,9 @@ test.describe("demo — promover ex-mentorado a mentor", () => {
     await seletor.click();
     const opcoes = page.getByRole("option");
     await expect(opcoes).toHaveCount(2);
-    await opcoes.filter({ hasText: "T2 · 2026/2027" }).click();
+    // a opção exibe a forma narrativa ("Turma 2"); o valor gravado segue
+    // sendo a string crua da turma
+    await opcoes.filter({ hasText: "Turma 2" }).click();
 
     await dialog.getByRole("radio", { name: /Mentor especialista/ }).check();
     await expect(dialog.getByRole("combobox")).toHaveCount(0);

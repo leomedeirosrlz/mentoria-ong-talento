@@ -78,28 +78,32 @@ test.describe("jornada — auto-emissão de instrumentos (REALIZA-152)", () => {
     await loginComSenha(page, JOVEM2_EMAIL, SENHA);
     await page.goto("/jovem/materiais");
 
-    const trilha = page.locator('section[aria-label="Sua jornada"]');
+    const trilha = page.locator(
+      'section[aria-labelledby="meus-instrumentos-titulo"]'
+    );
     // enc. corrente 1 → os instrumentos do enc. 1 já nasceram com link:
     // Roda da Vida disponível antes mesmo do programa começar de fato,
-    // sem ninguém clicar "Gerar link". Metas segue trancada — a janela
-    // dela é enc. 2–3 e o encontro 1 ainda não aconteceu.
+    // sem ninguém clicar "Gerar link" (v5c: o card inteiro é o link /f/).
+    // Metas segue trancada — a janela dela é enc. 2–3 e o encontro 1
+    // ainda não aconteceu.
     for (const titulo of [
       "Roda da Vida · leitura inicial",
       "Construindo a sua Visão",
       "PDM · Plano de Desenvolvimento",
     ]) {
-      const estacao = trilha.locator("article", { hasText: titulo });
       await expect(
-        estacao.getByRole("link", { name: "Continuar" })
+        trilha.locator('a[href^="/f/"]', { hasText: titulo })
       ).toBeVisible();
     }
-    const trancadas = trilha.locator("details", {
-      hasText: "Daqui pra frente",
+    // trancado é card dessaturado com a tag "Ainda não liberado" + a data
+    // de liberação — não details
+    const metas = trilha.locator("article", {
+      hasText: "Definindo minhas metas",
     });
-    await expect(trancadas).toContainText("Definindo minhas metas");
-    await expect(
-      trilha.locator("article", { hasText: "Definindo minhas metas" })
-    ).toHaveCount(0);
+    await expect(metas).toBeVisible();
+    await expect(metas.getByText("Ainda não liberado")).toBeVisible();
+    await expect(metas.getByText(/libera no encontro \d+/)).toBeVisible();
+    await expect(metas.locator('a[href^="/f/"]')).toHaveCount(0);
 
     // emissão automática é auditável: um link por instrumento, origem 'auto'
     let links = await linksJornada(DUPLA_COLEGA);
@@ -126,9 +130,9 @@ test.describe("jornada — auto-emissão de instrumentos (REALIZA-152)", () => {
     await page.reload();
 
     await expect(
-      trilha
-        .locator("article", { hasText: "Definindo minhas metas" })
-        .getByRole("link", { name: "Continuar" })
+      trilha.locator('a[href^="/f/"]', {
+        hasText: "Definindo minhas metas",
+      })
     ).toBeVisible();
     // e a re-emissão é idempotente: os três do enc. 1 seguem únicos
     for (const titulo of [
@@ -137,9 +141,7 @@ test.describe("jornada — auto-emissão de instrumentos (REALIZA-152)", () => {
       "PDM · Plano de Desenvolvimento",
     ]) {
       await expect(
-        trilha
-          .locator("article", { hasText: titulo })
-          .getByRole("link", { name: "Continuar" })
+        trilha.locator('a[href^="/f/"]', { hasText: titulo })
       ).toBeVisible();
     }
     links = await linksJornada(DUPLA_COLEGA);

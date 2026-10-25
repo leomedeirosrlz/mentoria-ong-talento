@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactElement } from "react";
 import { Eye } from "@phosphor-icons/react";
 import { InstrumentoResultado } from "@/components/instrumento-resultado";
 import { Button } from "@/components/ui/button";
@@ -33,6 +34,7 @@ export function ReverRespostaDialog({
   campos,
   respostas,
   label = "Rever resposta",
+  trigger,
 }: {
   titulo: string;
   respondidoEm: string | null;
@@ -40,15 +42,22 @@ export function ReverRespostaDialog({
   campos: FormularioCampo[];
   respostas: Record<string, RespostaValor>;
   label?: string;
+  /** gatilho custom — o card inteiro da estante (v5c) é render prop com
+   *  `nativeButton={false}` (role=button + tabstop pela base); sem ele,
+   *  o botão "Rever resposta" de sempre. */
+  trigger?: ReactElement;
 }) {
   return (
     <Dialog>
       <DialogTrigger
+        nativeButton={trigger == null}
         render={
-          <Button size="sm" variant="outline">
-            <Eye aria-hidden />
-            {label}
-          </Button>
+          trigger ?? (
+            <Button size="sm" variant="outline">
+              <Eye aria-hidden />
+              {label}
+            </Button>
+          )
         }
       />
       {/* xl, não 2xl: a resposta estruturada (roda + áreas, metas) é
@@ -58,7 +67,7 @@ export function ReverRespostaDialog({
           <DialogTitle>{titulo}</DialogTitle>
           <DialogDescription>
             Sua resposta
-            {respondidoEm ? ` — enviada em ${formatDate(respondidoEm)}` : ""}.
+            {respondidoEm ? ` · enviada em ${formatDate(respondidoEm)}` : ""}.
           </DialogDescription>
         </DialogHeader>
         {ehInstrumento(sistema) ? (

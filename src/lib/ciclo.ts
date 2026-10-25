@@ -20,6 +20,7 @@ import type {
   SituacaoMentorado,
   Trilha,
 } from "./types";
+import { turmaLonga } from "./turma";
 
 export type Semaforo = "ok" | "atencao" | "risco";
 
@@ -220,7 +221,7 @@ export function motivoRemanejo(
   const texto = detalhe.trim();
   const cat = MOTIVOS_REMANEJO.find((m) => m.value === categoria);
   if (!cat || cat.value === "outro") return texto || null;
-  return texto ? `${cat.label} — ${texto}` : cat.label;
+  return texto ? `${cat.label}: ${texto}` : cat.label;
 }
 
 /** Resumo do que o remanejo faz — "Ana + Bia → Ana + Célia" — exibido no
@@ -281,7 +282,7 @@ export function motivoSaida(
   const texto = detalhe.trim();
   const cat = MOTIVOS_SAIDA.find((m) => m.value === categoria);
   if (!cat || cat.value === "outro") return texto || null;
-  return texto ? `${cat.label} — ${texto}` : cat.label;
+  return texto ? `${cat.label}: ${texto}` : cat.label;
 }
 
 // ---------- matching/cadastro (0034) ----------
@@ -939,9 +940,12 @@ export function cronogramasOpcoes(cronogramas: Cronograma[]): Cronograma[] {
   );
 }
 
-/** Label curto do seletor: "2026/2027 · Calendário oficial". */
+/** Label do cronograma em seletores e títulos: "Turma 1 · Calendário
+ *  oficial" — a turma entra na forma narrativa canônica (turmaLonga) e o
+ *  nome do calendário desambigua quando a mesma turma tem dois
+ *  cronogramas. Exibição pura: `c.turma` segue sendo o valor cru. */
 export function rotuloCronograma(c: Cronograma): string {
-  return `${c.turma} · ${c.nome}`;
+  return `${turmaLonga(c.turma)} · ${c.nome}`;
 }
 
 /** Encontros esperados = datas de encontro já passadas (ou hoje) desde o início da dupla. */
@@ -1458,7 +1462,7 @@ export function saudadeDaDupla(dupla: Dupla, eventos: CicloEvento[], hoje = new 
         ? {
             tipo: "limbo",
             tom: "atencao",
-            texto: `${pendencia.numero}º encontro agendado já passou: falta o registro`,
+            texto: `${pendencia.numero}º encontro agendado já passou. Falta o registro`,
             ...(haDias(quando) ? { detalhe: haDias(quando) } : {}),
           }
         : {
@@ -1507,7 +1511,7 @@ export function saudadeDaDupla(dupla: Dupla, eventos: CicloEvento[], hoje = new 
     sinais.push({
       tipo: "estagnacao",
       tom: "atencao",
-      texto: "Trilha com 3 meses sem sessão nova — checar se segue fazendo sentido",
+      texto: "Trilha com 3 meses sem sessão nova. Vale checar se ainda faz sentido",
     });
 
   // o veredito é a pior faixa acesa — e o motivo o primeiro texto, como
@@ -1877,17 +1881,10 @@ function paraData(iso: string): Date {
 // o ciclo cruza a virada do ano ("2026/2027" = out→jun) — "15 de jan." sem
 // ano é ambíguo em registro e log, então os formatos de prosa levam ano
 // sempre; os compactos de grid/trilha (diaCompacto, formatDiaNum) ficam sem
-/** "T1 · 2026/2027" → { nome: "Turma 1", ano: "2026/2027" } — o rótulo
- *  curto vira o nome forte e o ano perde peso visual (decisão REALIZA-151).
- *  Turma sem o padrão ("2025/2026", texto livre) devolve o valor inteiro
- *  como nome — dado do usuário não é normalizado à força. */
-export function partesTurma(
-  turma: string
-): { nome: string; ano: string | null } {
-  const m = turma.match(/^T(\d+)\s*[·\-.]?\s*(.+)$/);
-  if (!m) return { nome: turma, ano: null };
-  return { nome: `Turma ${m[1]}`, ano: m[2].trim() };
-}
+// os labels de turma moram em ./turma (helper único — turmaCurta,
+// turmaLonga, turmaAno, turmaNumero); partesTurma segue importável daqui
+// por compat com quem já lia do ciclo
+export { partesTurma } from "./turma";
 
 export function formatDate(iso: string | null | undefined): string {
   if (!iso) return "a definir";

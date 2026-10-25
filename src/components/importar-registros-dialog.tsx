@@ -44,13 +44,13 @@ const IGNORAR = "__ignorar__";
 const DICAS =
   "O CSV que o Google Forms exporta das respostas da avaliação semanal. " +
   "Cada linha vira um encontro realizado (origem externa) + o registro do mentor: " +
-  'o match sai de "Nome" × "Nome do Mentorando" — nome exato ou pedaço do nome cadastrado ' +
+  'o match sai de "Nome" × "Nome do Mentorando": nome exato ou pedaço do nome cadastrado ' +
   'resolve sozinho ("Fernando Toledo" acha "Fernando Toledo Martins"); grafia ambígua ou ' +
   "desconhecida cai na fila de revisão pra você apontar a dupla certa. O número vem de " +
-  '"Qual encontro/semana está sendo avaliado?" e a data de "Data do encontro" — ano ' +
+  '"Qual encontro/semana está sendo avaliado?" e a data de "Data do encontro". Ano ' +
   "improvável é corrigido e sinalizado. Documentos/fotos ficam de fora (são links do " +
   "Drive) e pedido de apoio não se importa: ele é feito pelo mentor dentro da plataforma. " +
-  "Reimportar o mesmo arquivo não duplica — o registro do encontro é atualizado.";
+  "Reimportar o mesmo arquivo não duplica: o registro do encontro é atualizado.";
 
 const curto = (v: string, max = 56) => {
   const s = v.replace(/\s+/g, " ").trim();
@@ -179,7 +179,7 @@ export function ImportarRegistrosDialog() {
       const rev = res.stats?.revisar ?? 0;
       if (rev)
         toast.warning(
-          `${rev} ${rev === 1 ? "linha pede" : "linhas pedem"} revisão — escolha a dupla ou ignore.`
+          `${rev} ${rev === 1 ? "linha pede" : "linhas pedem"} revisão. Escolha a dupla ou ignore.`
         );
     });
   }
@@ -379,7 +379,7 @@ export function ImportarRegistrosDialog() {
                   {d.revisar && (
                     <span className="ml-1 inline-flex items-center gap-1 text-[var(--warn-text)]">
                       <Warning size={11} aria-hidden />
-                      {`revisar${d.aviso ? ` — ${curto(d.aviso, 40)}` : ""}`}
+                      {`revisar${d.aviso ? ` · ${curto(d.aviso, 40)}` : ""}`}
                     </span>
                   )}
                 </li>
@@ -398,7 +398,7 @@ export function ImportarRegistrosDialog() {
           ) : l.duplaId ? (
             <p className="text-xs text-muted-foreground">
               <span className="text-foreground">{l.mentoradoNome} × {l.mentorNome}</span>
-              {l.status === "ok" && " — entra direto"}
+              {l.status === "ok" && " · entra direto"}
             </p>
           ) : l.status === "ignorar" ? (
             <p className="text-xs text-muted-foreground">{l.motivo ?? "fora do lote"}</p>
@@ -514,7 +514,7 @@ export function ImportarRegistrosDialog() {
                 ) : undefined
               )}
               {grupoImport(
-                `Prováveis — confira a sugestão (${provaveis.length})`,
+                `Prováveis · confira a sugestão (${provaveis.length})`,
                 provaveis
               )}
               {grupoImport(`Ignoradas no CSV (${ignorCsv.length})`, ignorCsv)}
@@ -523,7 +523,7 @@ export function ImportarRegistrosDialog() {
                   defaultOpen={!manuais.length && !provaveis.length && !ignorCsv.length}
                 >
                   <Collapsible.Trigger className="group mb-1.5 flex min-h-11 w-full cursor-pointer items-center gap-1.5 text-left text-xs font-semibold text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                    {`Prontas — entram direto (${prontas.length})`}
+                    {`Prontas · entram direto (${prontas.length})`}
                     <CaretDown
                       size={13}
                       aria-hidden
@@ -541,7 +541,7 @@ export function ImportarRegistrosDialog() {
 
             <p className="text-xs text-muted-foreground">
               Encontro ou registro já existente é atualizado, nunca duplicado.
-              Linha pendente não entra — escolha a dupla ou marque &quot;ignorar&quot;.
+              Linha pendente não entra. Escolha a dupla ou marque &quot;ignorar&quot;.
             </p>
             <div className="flex gap-2">
               <Button variant="outline" onClick={() => { setLinhas(null); setEscolhas(new Map()); setBusca(""); }}>

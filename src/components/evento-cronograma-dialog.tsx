@@ -74,7 +74,7 @@ export function EventoCronogramaDialog({
         <DialogHeader>
           <DialogTitle>{titulo}</DialogTitle>
           <DialogDescription>
-            O evento oficial do ciclo — a data e o conteúdo valem pra todas
+            O evento oficial do ciclo: a data e o conteúdo valem pra todas
             as duplas deste cronograma.
           </DialogDescription>
         </DialogHeader>
@@ -278,7 +278,7 @@ function FormularioEvento({
           id={id("obs")}
           rows={2}
           maxLength={300}
-          placeholder="Ex.: Feriado municipal — confirmar local"
+          placeholder="Ex.: Feriado municipal, confirmar local"
           value={draft.observacao ?? ""}
           onChange={(e) => patch({ observacao: e.target.value || null })}
         />

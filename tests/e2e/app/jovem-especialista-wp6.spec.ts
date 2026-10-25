@@ -126,7 +126,9 @@ test.describe("WP6 — especialista do lado do jovem", () => {
     // --- o mentor DPP registra a sugestão na ficha da dupla ---
     await loginComSenha(page, MENTOR_EMAIL, SENHA);
     await page.goto(`/duplas/${IDS.duplaDpp}`);
-    await page.getByRole("button", { name: /^Mais$/ }).click();
+    await page
+      .getByRole("button", { name: "Mais ações da dupla" })
+      .click();
     await page
       .getByRole("menuitem", { name: /Sugerir especialista pro jovem/ })
       .click();
@@ -176,13 +178,18 @@ test.describe("WP6 — especialista do lado do jovem", () => {
     await relogar(page, JOVEM_EMAIL, SENHA);
     await page.goto("/jovem");
     const cardHome = page.locator('section[aria-labelledby="esp-titulo"]');
+    // o card inteiro é o link — título "1 sugestão esperando você", sub
+    // com o primeiro nome do autor ("Mentor sugeriu…", o stitch do RLS)
     await expect(
-      cardHome.getByText("Sugestão esperando sua resposta")
+      cardHome.getByText("1 sugestão esperando você")
     ).toBeVisible();
-    await expect(cardHome.getByText(/Mentor sugeriu/)).toBeVisible();
     await expect(
-      cardHome.getByRole("link", { name: "Ver a sugestão" })
-    ).toHaveAttribute("href", "/jovem/especialistas");
+      cardHome.getByText(/Mentor sugeriu um especialista pra você/)
+    ).toBeVisible();
+    await expect(cardHome.getByRole("link")).toHaveAttribute(
+      "href",
+      "/jovem/especialistas"
+    );
 
     await page.goto("/jovem/especialistas");
     await expect(
@@ -205,15 +212,16 @@ test.describe("WP6 — especialista do lado do jovem", () => {
     expect(sol!.especialista_desejado_id).toBe(IDS.esp2Profile);
 
     // o card-CTA da home troca de estado: a sugestão saiu e a prioridade
-    // cai pra trilha em andamento (pedido dirigido aberto apareceria no
-    // mural-badge, mas a trilha viva com o Esp E2E é mais urgente)
+    // cai pra trilha em andamento sem horário (pedido dirigido aberto
+    // apareceria na negociação, mas a trilha viva com o Esp E2E ganha)
     await page.goto("/jovem");
     await expect(
-      cardHome.getByText(/Trilha em andamento · sessão \d de 5/)
+      cardHome.getByText(/A sessão \d ainda precisa de horário/)
     ).toBeVisible();
-    await expect(
-      cardHome.getByRole("link", { name: "Abrir minha trilha" })
-    ).toHaveAttribute("href", "/jovem/especialistas#trilhas");
+    await expect(cardHome.getByRole("link")).toHaveAttribute(
+      "href",
+      "/jovem/especialistas#trilhas"
+    );
 
     // o especialista foi avisado; o mentor autor também
     const sinos = await buscarViaServiceRole<
@@ -242,7 +250,9 @@ test.describe("WP6 — especialista do lado do jovem", () => {
   }) => {
     await loginComSenha(page, MENTOR_EMAIL, SENHA);
     await page.goto(`/duplas/${IDS.duplaDpp}`);
-    await page.getByRole("button", { name: /^Mais$/ }).click();
+    await page
+      .getByRole("button", { name: "Mais ações da dupla" })
+      .click();
     await page
       .getByRole("menuitem", { name: /Sugerir especialista pro jovem/ })
       .click();
@@ -256,7 +266,9 @@ test.describe("WP6 — especialista do lado do jovem", () => {
 
     // com a sugestão pendente, o gesto some do menu (a RPC também deduplica)
     await page.reload();
-    await page.getByRole("button", { name: /^Mais$/ }).click();
+    await page
+      .getByRole("button", { name: "Mais ações da dupla" })
+      .click();
     await expect(
       page.getByRole("menuitem", { name: /Sugerir especialista pro jovem/ })
     ).toHaveCount(0);
@@ -284,7 +296,8 @@ test.describe("WP6 — especialista do lado do jovem", () => {
     page,
   }) => {
     await loginComSenha(page, ESP_EMAIL, SENHA);
-    await page.goto(`/duplas/${IDS.duplaEsp}`);
+    // o feed mora na aba Encontros da ficha da trilha
+    await page.goto(`/duplas/${IDS.duplaEsp}?aba=encontros`);
     await expect(
       page.getByRole("heading", { name: /Devolutivas da trilha/i })
     ).toBeVisible();
@@ -315,15 +328,22 @@ test.describe("WP6 — especialista do lado do jovem", () => {
 
     await relogar(page, JOVEM_EMAIL, SENHA);
     await page.goto("/jovem/especialistas");
-    // feed datado dentro do card da trilha — stepper de 5 passos + feed
+    // feed datado dentro do card da trilha — stepper de 5 passos + feed,
+    // recolhidos no <details> "Ver trilha completa" (rodada out/2026)
     const trilha = page.locator("section#trilhas");
+    await trilha.getByText("Ver trilha completa").click();
     await expect(
       trilha.locator('ol[aria-label="Passos da trilha"] li')
     ).toHaveCount(5);
     await expect(trilha.getByText("Devolutivas da trilha")).toBeVisible();
-    await expect(trilha.getByText(TEXTO_DEVOLUTIVA)).toBeVisible();
+    // o texto aparece mais de uma vez no card — prévia "Última devolutiva"
+    // + item do feed — então o assert ancora na lista datada do feed
+    const feedJovem = trilha
+      .getByText("Devolutivas da trilha")
+      .locator("xpath=following-sibling::ul[1]");
+    await expect(feedJovem.getByText(TEXTO_DEVOLUTIVA)).toBeVisible();
     // autor assinado — o jovem lê quem escreveu
-    await expect(trilha.getByText(/Esp E2E ·/)).toBeVisible();
+    await expect(feedJovem.getByText(/Esp E2E ·/)).toBeVisible();
   });
 
   test("mentor híbrido aparece no catálogo do jovem (has_papel)", async ({

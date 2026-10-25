@@ -12,13 +12,16 @@ import { createClient } from "@/lib/supabase/server";
 import { demoAtivo } from "@/lib/demo/mode";
 import { demoDuplas, demoMentorados, demoPessoas } from "@/lib/demo/queries";
 import { PageHeader } from "@/components/page-header";
-import { RelatorioLinksCard } from "@/components/relatorio-links-card";
 import { RelatorioBuilder } from "./relatorio-builder";
 import type { DuplaFonte, PessoaFonte } from "@/lib/relatorio";
 
 export const metadata: Metadata = { title: "Relatórios" };
 
-export default async function RelatoriosPage() {
+export default async function RelatoriosPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const me = await getMe();
   if (me?.role !== "coordenacao") redirect("/");
 
@@ -26,8 +29,9 @@ export default async function RelatoriosPage() {
   let duplas: DuplaFonte[];
   let profs: PessoaFonte[];
   let mentorados: PessoaFonte[];
-  // fila "Sem dupla" de todas as turmas (turma_inscricoes) + o painel de
-  // links públicos (170) com os seletores dos recortes ciclo/assinaturas
+  // fila "Sem dupla" de todas as turmas (turma_inscricoes) + os links
+  // públicos (170) pro painel "Compartilhar" da toolbar do builder (201),
+  // com os seletores dos recortes ciclo/assinaturas
   const [inscricoes, links, cronogramas, templates] = await Promise.all([
     getTurmaInscricoesAguardando(null),
     getRelatorioLinks(),
@@ -131,27 +135,33 @@ export default async function RelatoriosPage() {
   turmas = [...new Set([...turmas, ...inscricoes.map((i) => i.turma)])].sort(
     (a, b) => b.localeCompare(a, "pt-BR")
   );
+
+  // deep-link ?turma=<valor cru> — só vira recorte se a turma existir;
+  // valor estranho cai no default (turma mais recente) sem quebrar a URL
+  const { turma: turmaParam } = await searchParams;
+  const turmaInicial =
+    typeof turmaParam === "string" &&
+    (turmaParam === "todas" || turmas.includes(turmaParam))
+      ? turmaParam
+      : undefined;
+
   return (
     <div className="space-y-6">
       <PageHeader
         kicker="Operação"
         title="Relatórios"
-        meta="Escolha turma, granularidade e colunas — a grade abaixo é livre: redimensione, ordene e exporte"
-      />
-      <RelatorioLinksCard
-        links={links}
-        turmas={turmas}
-        cronogramas={cronogramas}
-        templates={templates}
+        meta="Escolha turma, granularidade e colunas. A grade abaixo é livre: redimensione, ordene e exporte"
       />
       <RelatorioBuilder
         turmas={turmas}
+        turmaInicial={turmaInicial}
         duplas={duplas}
         profs={profs}
         mentorados={mentorados}
         inscricoes={inscricoes}
         cronogramas={cronogramas}
         templates={templates}
+        links={links}
       />
     </div>
   );

@@ -49,63 +49,131 @@
      fundo tingido e 5% abaixo do branco pra que --card leia como superfície
      elevada de verdade (97% neutro era separação invisível) */
   --background: hsl(75 10% 95%);
-  /* texto corpo na mesma profundidade de --brand-ink (15%) — foregrounds de
+  /* texto corpo na tinta da marca (#323232 = 20%) — foregrounds de
      card/popover/sidebar seguem o mesmo valor: um papel de texto, um valor */
-  --foreground: hsl(0 0% 15%);
+  --foreground: hsl(0 0% 20%);
   --card: hsl(0 0% 100%);
-  --card-foreground: hsl(0 0% 15%);
+  --card-foreground: hsl(0 0% 20%);
   --popover: hsl(0 0% 100%);
-  --popover-foreground: hsl(0 0% 15%);
-  --primary: hsl(78 56% 53%);
-  --primary-foreground: hsl(0 0% 12%);
-  --secondary: hsl(0 0% 15%);
+  --popover-foreground: hsl(0 0% 20%);
+  /* lima da marca (#A0C644) = ação: o único botão preenchido da tela e o item
+     ativo da nav. Texto sobre o lima é a tinta (--foreground), nunca branco */
+  --primary: hsl(78 54% 52%);
+  --primary-foreground: hsl(0 0% 20%);
+  --secondary: hsl(0 0% 20%);
   --secondary-foreground: hsl(0 0% 100%);
   /* painéis internos/hover: mesma temperatura do fundo, um degrau abaixo do
      card — o inset lê como recorte, não como mancha cinza fria */
   --muted: hsl(75 7% 93%);
-  --muted-foreground: hsl(75 4% 40%);
+  --muted-foreground: hsl(75 5% 38%);
   /* hover de menu/select/dropdown: superfície neutra quente (mesma lightness
      de --sidebar-accent) — um acento só no app: lime */
   --accent: hsl(75 8% 91%);
-  --accent-foreground: hsl(0 0% 15%);
+  --accent-foreground: hsl(0 0% 20%);
   /* um vermelho só: destructive (usado pelos primitives ui/*) e danger são o
      mesmo valor — dois tokens, uma cor, sem escolha ambígua */
-  --destructive: hsl(0 80% 48%);
+  --destructive: hsl(0 78% 48%);
   --destructive-foreground: hsl(0 0% 100%);
   --border: hsl(75 6% 87%);
   /* campos precisam de borda visível — 87% de lightness era ~1.3:1 sobre
      card branco (WCAG 1.4.11 pede 3:1 pra fronteira de controle) */
   --input: hsl(75 8% 54%);
   --ring: hsl(78 58% 38%);
-  --brand-lime: hsl(78 56% 53%);
-  --brand-ink: hsl(0 0% 15%);
-  --ok: hsl(78 58% 38%);
-  --warn: hsl(43 95% 44%);
-  --danger: hsl(0 80% 48%);
-  /* versões escuras para texto (AA ≥4.5:1 sobre fundo claro) — fills/dots seguem com as cores claras acima */
-  --ok-text: hsl(78 55% 30%);
-  --warn-text: hsl(43 90% 27%);
-  /* apoio/chamado: eixo informativo separado do semáforo (WP2) — azul
-     sinaliza "trabalho a fazer", nunca falha; danger/warn ficam reservados
-     à saúde da jornada */
-  --info: hsl(207 82% 45%);
-  --info-text: hsl(207 82% 33%);
-  --info-bg: hsl(207 82% 96%);
-  --info-border: hsl(207 82% 80%);
+  --brand-lime: hsl(78 54% 52%);
+  --brand-ink: hsl(0 0% 20%);
+  /* status: o fill (ponto, segmento, ícone) fica ≥3:1 no branco; o -text é a
+     cor de texto (≥4,5:1 sobre o próprio -bg); -bg e -border são o pill. O
+     estado é sempre dito por um rótulo de texto, nunca só pela cor */
+  --ok: hsl(105 42% 40%);
+  --ok-text: hsl(105 48% 27%);
+  --ok-bg: hsl(100 45% 94%);
+  --ok-border: hsl(100 35% 78%);
+  --warn: hsl(28 90% 44%);
+  --warn-text: hsl(28 85% 32%);
+  --warn-bg: hsl(34 100% 95%);
+  --warn-border: hsl(32 85% 80%);
+  --danger: hsl(0 78% 48%);
+  --danger-text: hsl(0 72% 40%);
+  --danger-bg: hsl(0 85% 96%);
+  --danger-border: hsl(0 75% 85%);
+  /* apoio/chamado: eixo informativo separado do semáforo (WP2) — petróleo da
+     marca sinaliza "trabalho a fazer", nunca falha; danger/warn ficam
+     reservados à saúde da jornada */
+  --info: hsl(195 55% 38%);
+  --info-text: hsl(205 59% 25%);
+  --info-bg: hsl(193 55% 95%);
+  --info-border: hsl(193 45% 78%);
+  /* dupla pausada: fora do semáforo por congelamento (decisão da dupla), não
+     por falha — cinza da família do papel, mais escuro que --muted pra a
+     fatia/segmento ler como dado sobre o trilho. Mocks citavam --pausa e
+     --pausada com valores diferentes; --pausa é o nome canônico */
+  --pausa: hsl(75 4% 50%);
+  --pausa-text: hsl(75 4% 36%);
+  --pausa-bg: hsl(75 5% 94%);
+  --pausa-border: hsl(75 5% 78%);
+  /* destaque positivo da marca (amarelo #FFD531): próximo passo, jornada,
+     celebração — nunca alerta; texto sobre ele é sempre --foreground */
+  --destaque: hsl(48 100% 60%);
+  --destaque-suave: hsl(48 100% 93%);
+  --destaque-borda: hsl(48 90% 70%);
   /* identidade de papel na dupla: mentor = lime do disco (quem age);
-     mentorado = amarelo do ponto do logo (rgb 255,213,49) — sempre como
-     marcador (dot/disco), nunca como cor de texto. Spec §1 */
+     mentorado = destaque amarelo da marca — sempre como marcador (dot/disco),
+     nunca como cor de texto. Spec §1 */
   --role-mentor: var(--brand-lime);
-  --role-mentorado: hsl(48 100% 60%);
+  --role-mentorado: var(--destaque);
+  /* identidade por instrumento oficial do programa (spec v5c de
+     /materiais): par cor-de-traço + tinta-do-emblema — os cards aplicam
+     --ic/--ict via instrumentoVars() e o InstrumentoIcone/Emblema lê daqui;
+     sempre marcador/fundo de emblema, nunca cor de texto solto. Os traços
+     são as complementares da marca (plano 01) */
+  --inst-roda: hsl(180 45% 32%);
+  --inst-roda-t: hsl(180 45% 92%);
+  --inst-visao: hsl(304 36% 30%);
+  --inst-visao-t: hsl(304 35% 94%);
+  --inst-metas: hsl(36 88% 38%);
+  --inst-metas-t: hsl(40 95% 91%);
+  --inst-pdm: hsl(205 59% 25%);
+  --inst-pdm-t: hsl(205 50% 93%);
+  --inst-terceiros: hsl(94 40% 32%);
+  --inst-terceiros-t: hsl(94 45% 92%);
+  --inst-avaliacao: hsl(193 55% 34%);
+  --inst-avaliacao-t: hsl(193 55% 93%);
+  --inst-roda-formal: hsl(180 50% 24%);
+  --inst-roda-formal-t: hsl(180 40% 90%);
+  --inst-360: hsl(304 30% 42%);
+  --inst-360-t: hsl(304 30% 93%);
+  /* sistemas fora da régua DPP (sem cor travada no mock) — mesma
+     gramática, matizes fora das faixas já ocupadas */
+  --inst-anamnese: hsl(300 40% 42%);
+  --inst-anamnese-t: hsl(300 45% 94%);
+  --inst-autoavaliacao: hsl(330 45% 42%);
+  --inst-autoavaliacao-t: hsl(330 50% 94%);
+  --inst-avaliacao-especialista: hsl(140 55% 28%);
+  --inst-avaliacao-especialista-t: hsl(140 45% 92%);
+  --inst-intake-mentor: hsl(95 55% 32%);
+  --inst-intake-mentor-t: hsl(95 55% 92%);
+  --inst-intake-mentorado: hsl(45 95% 34%);
+  --inst-intake-mentorado-t: hsl(45 95% 92%);
+  /* série categórica do mini-kit viz/ — 5 tons com distinção preattentiva
+     sobre o papel, sempre como preenchimento/marcador (nunca texto).
+     chart-1 e chart-2 leem ok×info por var(), então acompanham a troca de
+     valor (a gramática T1×T2 dos mocks aprovados); chart-3 é o amarelo do
+     mentorado aprofundado; 4–5 cobrem séries extras sem pisar no vermelho/âmbar
+     reservados ao semáforo */
+  --chart-1: var(--ok);
+  --chart-2: var(--info);
+  --chart-3: hsl(48 92% 50%);
+  --chart-4: hsl(304 36% 35%);
+  --chart-5: hsl(180 45% 34%);
   --radius: 0.75rem;
   --sidebar: hsl(75 8% 96.5%);
-  --sidebar-foreground: hsl(0 0% 15%);
-  --sidebar-primary: hsl(78 56% 53%);
-  --sidebar-primary-foreground: hsl(0 0% 12%);
+  --sidebar-foreground: hsl(0 0% 20%);
+  --sidebar-primary: hsl(78 54% 52%);
+  --sidebar-primary-foreground: hsl(0 0% 20%);
   --sidebar-accent: hsl(75 8% 91%);
-  --sidebar-accent-foreground: hsl(0 0% 15%);
+  --sidebar-accent-foreground: hsl(0 0% 20%);
   --sidebar-border: hsl(75 6% 87%);
-  --sidebar-ring: hsl(78 56% 53%);
+  --sidebar-ring: hsl(78 54% 52%);
 }
 
 /* === Micro-interações (fundação) === */
@@ -219,6 +287,18 @@
   );
 }
 
+/* segmento neutro das barras do kit viz/ — "sem data"/"a fazer": afirma que
+   a posição existe no denominador mas ainda não é mensurável. Distinto do
+   trilho vazio (muted) e de toda cor de estado — a mesma gramática do hatch
+   da agenda v8b. Uso: cls omitido no SegmentoBarra vira este padrão. */
+.viz-hatch {
+  background-image: repeating-linear-gradient(
+    135deg,
+    hsl(75 7% 88%) 0 3px,
+    hsl(75 7% 80%) 3px 6px
+  );
+}
+
 /* varredura do sheen no Skeleton — com background-size 200% o ciclo fecha sem salto */
 @keyframes shimmer {
   from {
@@ -291,8 +371,8 @@
   html {
     @apply font-sans;
   }
-  /* seleção de texto em lime cheio — craft de marca barato; tinta ink mantém
-     contraste AA (~7:1) sobre o lime */
+  /* seleção de texto em lime cheio — craft de marca barato; a tinta da marca
+     mantém contraste AA (~6,4:1) sobre o lime */
   ::selection {
     background: var(--brand-lime);
     color: var(--brand-ink);
@@ -324,8 +404,8 @@
 .capa-perfil {
   background-color: var(--brand-ink);
   background-image:
-    radial-gradient(circle at 88% -40%, hsl(78 56% 53% / 0.22) 0 88px, transparent 89px),
-    radial-gradient(circle at 97% 130%, hsl(78 56% 53% / 0.13) 0 120px, transparent 121px);
+    radial-gradient(circle at 88% -40%, color-mix(in srgb, var(--brand-lime) 22%, transparent) 0 88px, transparent 89px),
+    radial-gradient(circle at 97% 130%, color-mix(in srgb, var(--brand-lime) 13%, transparent) 0 120px, transparent 121px);
 }
 
 /* trilhas e rails horizontais — a barra nativa ocupa ~12px de faixa; fina e

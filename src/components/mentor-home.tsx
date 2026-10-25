@@ -1,6 +1,6 @@
-import type { CSSProperties } from "react";
+import { Fragment, type CSSProperties, type ReactNode } from "react";
 import Link from "next/link";
-import { ArrowUpRight, CalendarPlus, ClipboardText, HandHeart, VideoCamera } from "@phosphor-icons/react/dist/ssr";
+import { CalendarPlus, CaretRight, ClipboardText, HandHeart, VideoCamera } from "@phosphor-icons/react/dist/ssr";
 import {
   alvoAgendamento,
   cronogramaVigente,
@@ -33,12 +33,16 @@ import { TrilhaJornada } from "@/components/trilha-jornada";
 import { TrilhaPrazoBadge } from "@/components/trilha-prazo-badge";
 import { MarcoNotifier } from "@/components/marco-notifier";
 
+/** Ciclo que já não pede ação: sai da lista de ativas e vai pro bloco final. */
+const finalizada = (d: Dupla) => d.status === "concluida" || d.status === "encerrada";
+
 export function MentorHome({
   duplas,
   eventos,
   espEventos = [],
   cronogramas = [],
   me,
+  termo,
 }: {
   duplas: Dupla[];
   /** Calendário oficial DPP — a trilha especialista não o usa. */
@@ -49,6 +53,9 @@ export function MentorHome({
    *  não tem dupla DPP (o banner da semana continua fazendo sentido pra ele). */
   cronogramas?: Cronograma[];
   me: Profile;
+  /** Faixa de pendência (ex.: termo de adesão) em largura total — entra logo
+   *  abaixo do cabeçalho, antes dos cards de dupla, nunca dentro da grade. */
+  termo?: ReactNode;
 }) {
   const hoje = new Date();
   // "Semana do Nº" é do cronograma da dupla DPP do mentor (0061) — mentor com
@@ -86,27 +93,45 @@ export function MentorHome({
       rankSemaforo[saudes.get(a.id)!.semaforo] -
       rankSemaforo[saudes.get(b.id)!.semaforo]
   );
+  const ativas = duplasOrdenadas.filter((d) => !finalizada(d));
+  const concluidas = duplasOrdenadas.filter(finalizada);
+  // a explicação do fluxo aparece uma vez, enquanto alguma dupla ainda não
+  // tem encontro registrado — repetida em cada card era ruído
+  const algumSemRegistro = ativas.some(
+    (d) => d.status === "ativa" && d.encontros.every((e) => !e.registro)
+  );
 
   return (
     // >1 dupla: em xl os cards abrem 2 colunas — a 1280px o card cheio deixa
     // os sub-painéis internos (sm:grid-cols-2) largos demais pra leitura.
-    // gap-8 no lugar de space-y-8 mantém o ritmo vertical idêntico; header e
-    // empty state cravam col-span-2 pra continuar full-width no xl
+    // gap-8 no lugar de space-y-8 mantém o ritmo vertical idêntico; o grupo
+    // do cabeçalho e o empty state cravam col-span-2 pra continuar full-width
     <div className={cn("grid gap-8", duplas.length > 1 && "xl:grid-cols-2")}>
-      <header className={duplas.length > 1 ? "xl:col-span-2" : undefined}>
-        <h1 className="text-2xl font-semibold tracking-tight">Olá, {me.nome.split(" ")[0]}</h1>
-        {eventoSemana && !soEspecialista && (
-          <p className="text-sm text-muted-foreground mt-1 flex items-center gap-1.5">
-            <span aria-hidden className="size-2 shrink-0 rounded-full bg-[var(--brand-lime)]" />
-            <span>
-              <span className="font-medium text-foreground">
-                Semana do {eventoSemana.numero}º encontro
+      {/* cabeçalho + faixa de pendência formam um grupo só: a faixa é linha
+          única de largura total logo abaixo da "Semana do Nº", nunca célula
+          da grade (em xl ela esticava na altura do 1º card) */}
+      <div className={cn("space-y-4", duplas.length > 1 && "xl:col-span-2")}>
+        <header>
+          <h1 className="text-2xl font-semibold tracking-tight">Olá, {me.nome.split(" ")[0]}</h1>
+          {eventoSemana && !soEspecialista && (
+            <p className="text-sm text-muted-foreground mt-1 flex items-center gap-1.5">
+              <span aria-hidden className="size-2 shrink-0 rounded-full bg-[var(--brand-lime)]" />
+              <span>
+                <span className="font-medium text-foreground">
+                  Semana do {eventoSemana.numero}º encontro
+                </span>
+                {eventoSemana.fase ? ` · ${eventoSemana.fase}` : ""}
               </span>
-              {eventoSemana.fase ? ` · ${eventoSemana.fase}` : ""}
-            </span>
-          </p>
-        )}
-      </header>
+            </p>
+          )}
+          {algumSemRegistro && (
+            <p className="mt-1 text-sm text-muted-foreground">
+              Vocês marcam o encontro; depois registram aqui como foi.
+            </p>
+          )}
+        </header>
+        {termo}
+      </div>
 
       {duplas.length === 0 && (
         <Card>
@@ -127,7 +152,7 @@ export function MentorHome({
         </Card>
       )}
 
-      {duplasOrdenadas.map((dupla, i) => {
+      {ativas.map((dupla, i) => {
         const ativa = dupla.status === "ativa";
         const ehEsp = dupla.trilha === "especialista";
         // saude.proximo já vem ordenado por data_hora — o find sem sort podia
@@ -210,11 +235,12 @@ export function MentorHome({
               )?.data ?? undefined)
             : undefined;
 
-        return (
+        // --card-spacing=5 no sm+: padding uniforme p-4→sm:p-5 no card
+        // inteiro via a var (header, content e gap vertical seguem juntos)
+        const card = (
           <Card
-            key={dupla.id}
             style={{ "--i": Math.min(i, 10) } as CSSProperties}
-            className="animate-enter overflow-hidden"
+            className="animate-enter overflow-hidden sm:[--card-spacing:--spacing(5)]"
           >
             {/* -mt cobre o py do Card — o banner ink encosta no topo;
                 pt/pb devolvem o respiro interno; a keyline lime na base é
@@ -224,7 +250,7 @@ export function MentorHome({
                 <div className="min-w-0">
                   {/* "Sua dupla" vira redundante com várias — o nome do
                       mentorado é o que distingue um card do outro */}
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-white/50">
+                  <p className="text-xs font-semibold uppercase tracking-[0.08em] text-white/50 sm:text-[11px]">
                     {duplas.length > 1
                       ? `Dupla · ${dupla.mentorado.nome}`
                       : "Sua dupla"}
@@ -232,9 +258,6 @@ export function MentorHome({
                   <CardTitle className="text-lg font-semibold mt-1">
                     <DuplaNomes mentor="Você" mentorado={dupla.mentorado.nome} onDark />
                   </CardTitle>
-                  <p className="mt-1 text-xs text-white/60">
-                    Vocês marcam o encontro; depois registram aqui como foi.
-                  </p>
                   {/* prazo de 3 meses da trilha — o diferenciador entre duplas
                       especialistas concorrentes; a retintada adapta o badge
                       outline ao banner ink (o componente é superfície clara) */}
@@ -245,35 +268,33 @@ export function MentorHome({
                   )}
                 </div>
                 <div className="flex flex-col items-end gap-0.5 text-right">
-                  <span className="text-sm text-[var(--brand-lime)]">
+                  <span className="text-sm text-white">
                     <span className="font-mono tabular-nums">{feitos}/{totalDupla}</span>{" "}
                     encontros
                   </span>
                   {ehEsp && (
-                    <span className="text-[11px] uppercase tracking-wider text-white/50">
+                    <span className="text-xs uppercase tracking-wider text-white/50 sm:text-[11px]">
                       Mentoria especializada
                     </span>
                   )}
                   {!ativa && (
-                    <span className="text-[11px] uppercase tracking-wider text-white/50">
-                      {dupla.status === "pausada"
-                        ? "Pausada"
-                        : dupla.status === "concluida"
-                          ? "Concluída"
-                          : "Encerrada"}
+                    <span className="text-xs uppercase tracking-wider text-white/50 sm:text-[11px]">
+                      Pausada
                     </span>
                   )}
                   {/* o card todo não é link — a saída pra ficha precisa de
                       affordance própria, visível mesmo sem pendência */}
                   <Link
                     href={`/duplas/${dupla.id}`}
-                    className="group inline-flex min-h-11 items-center gap-1 rounded-lg px-2 text-xs font-medium text-white/70 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-lime)] md:min-h-7"
+                    className={cn(
+                      buttonVariants({ variant: "ghost", size: "sm" }),
+                      "group text-white/80 hover:bg-white/10 hover:text-white focus-visible:ring-[var(--brand-lime)]"
+                    )}
                   >
                     Abrir dupla
-                    <ArrowUpRight
-                      size={13}
+                    <CaretRight
                       aria-hidden
-                      className="transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5"
+                      className="transition-transform group-hover:translate-x-0.5"
                     />
                   </Link>
                 </div>
@@ -305,25 +326,27 @@ export function MentorHome({
                 duplaId={dupla.id}
               />
               <MarcoNotifier duplaId={dupla.id} feitos={jornada.feitos} total={jornada.total} />
-              <div className="grid gap-4 sm:grid-cols-2">
-                {/* um primário por dupla — a máquina de estados acima decide
-                    qual é o próximo passo; o resto fica quieto ou some */}
-                <div
-                  className={cn(
-                    "rounded-lg p-4",
-                    semRegistro && ativa
-                      ? "border border-[var(--warn)]/50 bg-[var(--warn)]/8"
-                      : "bg-muted/50 shadow-[var(--shadow-inset)]"
-                  )}
-                >
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-1">O que fazer agora</p>
+
+              {/* o que fazer agora: o próximo passo é o destaque da marca
+                  (amarelo), não alerta. Mesmo cartão, separado por divisória */}
+              <section
+                aria-labelledby={`fazer-${dupla.id}`}
+                className={cn(
+                  "rounded-lg p-4",
+                  ativa
+                    ? "bg-[var(--destaque-suave)] border border-[var(--destaque-borda)]"
+                    : "bg-muted/50"
+                )}
+              >
+                <h3 id={`fazer-${dupla.id}`} className="text-sm font-semibold">
+                  O que fazer agora
+                </h3>
+                <div className="mt-2">
                   {!ativa ? (
                     <p className="font-medium text-muted-foreground">
                       {dupla.status === "pausada"
                         ? "Dupla pausada. A coordenação retoma quando for a hora."
-                        : dupla.status === "concluida"
-                          ? "Jornada concluída. Agradecemos pelo ciclo!"
-                          : "Dupla encerrada. Agradecemos pela jornada!"}
+                        : "Dupla encerrada. Agradecemos pela jornada!"}
                     </p>
                   ) : semRegistro ? (
                     <>
@@ -337,9 +360,11 @@ export function MentorHome({
                           ? "Se rolou, conte como foi."
                           : "Falta só o registro de como foi."}
                       </p>
-                      <div className="mt-3">
+                      {/* ação do painel sempre à direita — mesma régua do
+                          "n de N" da Jornada e do "Abrir dupla" no header */}
+                      <div className="mt-3 flex justify-end">
                         <Link
-                          href={`/duplas/${dupla.id}#registrar-${semRegistro.id}`}
+                          href={`/duplas/${dupla.id}?aba=encontros#registrar-${semRegistro.id}`}
                           className={buttonVariants({ size: "sm" })}
                         >
                           <ClipboardText size={16} />
@@ -359,7 +384,7 @@ export function MentorHome({
                       <p className="text-sm text-muted-foreground mt-0.5">
                         {formatDateTime(agendado.data_hora)}
                       </p>
-                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                      <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
                         {/* na hora do encontro o link da chamada é a ação nº1 —
                             chip próprio, não texto corrido (mesmo fix do CC-1) */}
                         {linkSeguro(agendado.link) && (
@@ -367,9 +392,9 @@ export function MentorHome({
                             href={linkSeguro(agendado.link)!}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-[var(--ok)]/40 bg-[var(--ok)]/10 px-2.5 text-sm font-medium text-[var(--ok-text)] transition-colors hover:bg-[var(--ok)]/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:min-h-7"
+                            className={buttonVariants({ variant: "outline", size: "sm" })}
                           >
-                            <VideoCamera size={16} aria-hidden />
+                            <VideoCamera aria-hidden />
                             Entrar na chamada
                             <span className="sr-only"> (abre em nova aba)</span>
                           </a>
@@ -412,7 +437,7 @@ export function MentorHome({
                           ? "Remarque quando puder."
                           : "Se rolou, registre na ficha da dupla; se não, remarque."}
                       </p>
-                      <div className="mt-3">
+                      <div className="mt-3 flex justify-end">
                         <AgendarEncontroDialog
                           duplaId={dupla.id}
                           numero={proximoNumero}
@@ -434,7 +459,7 @@ export function MentorHome({
                     // toda sessão nasce de um pedido aceito (jovem ou staff)
                     // — o dialog daqui criaria a row que a action recusa
                     <p className="font-medium">
-                      Sessão nova nasce de um pedido aceito — do jovem ou da
+                      Sessão nova nasce de um pedido aceito: do jovem ou da
                       coordenação.
                     </p>
                   ) : (
@@ -445,7 +470,7 @@ export function MentorHome({
                           ? `Sugerido: ${formatDate(sugeridoProximo)}`
                           : "Data a combinar"}
                       </p>
-                      <div className="mt-3">
+                      <div className="mt-3 flex justify-end">
                         <AgendarEncontroDialog
                           duplaId={dupla.id}
                           numero={proximoNumero}
@@ -475,9 +500,14 @@ export function MentorHome({
                     </p>
                   )}
                 </div>
+              </section>
 
-                <div className="rounded-lg bg-muted/50 p-4 shadow-[var(--shadow-inset)]">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">Combinados abertos</p>
+              {/* combinados: mesma superfície, separados por divisória —
+                  pt-5 espelha o space-y-5 acima dela (a régua fica centrada
+                  no mesmo respiro de 20px que separa os blocos) */}
+              <section className="border-t border-border/60 pt-5">
+                <h3 className="text-sm font-semibold">Combinados abertos</h3>
+                <div className="mt-2">
                   {pendentes.length === 0 ? (
                     <p className="text-sm text-muted-foreground">Nenhum pendente.</p>
                   ) : (
@@ -526,12 +556,66 @@ export function MentorHome({
                     </ul>
                   )}
                 </div>
-              </div>
-
+              </section>
             </CardContent>
           </Card>
         );
+        return <Fragment key={dupla.id}>{card}</Fragment>;
       })}
+
+      {concluidas.length > 0 && (
+        <section aria-labelledby="ciclos-concluidos" className="xl:col-span-2 space-y-3">
+          <h2 id="ciclos-concluidos" className="text-base font-semibold">
+            Ciclos concluídos
+          </h2>
+          {concluidas.map((dupla) => {
+            const saude = saudes.get(dupla.id)!;
+            const totalDupla = totalDaTrilha(
+              dupla.trilha,
+              eventosDoCronograma(eventos, dupla.cronograma_id)
+            );
+            return (
+              <div
+                key={dupla.id}
+                className="rounded-xl bg-card p-4 shadow-[var(--shadow-border)]"
+              >
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold">
+                      <DuplaNomes mentor="Você" mentorado={dupla.mentorado.nome} />
+                    </p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      {dupla.status === "concluida" ? "Concluída" : "Encerrada"} ·{" "}
+                      <span className="tabular-nums">
+                        {saude.feitos}/{totalDupla}
+                      </span>{" "}
+                      encontros
+                    </p>
+                  </div>
+                  <Link
+                    href={`/duplas/${dupla.id}`}
+                    className={cn(
+                      buttonVariants({ variant: "ghost", size: "sm" }),
+                      "group text-muted-foreground"
+                    )}
+                  >
+                    Abrir dupla
+                    <CaretRight
+                      aria-hidden
+                      className="transition-transform group-hover:translate-x-0.5"
+                    />
+                  </Link>
+                </div>
+                <p className="mt-3 rounded-lg border border-[var(--destaque-borda)] bg-[var(--destaque-suave)] px-3 py-2 text-sm">
+                  {dupla.status === "concluida"
+                    ? "Jornada concluída. Agradecemos pelo ciclo!"
+                    : "Dupla encerrada. Agradecemos pela jornada!"}
+                </p>
+              </div>
+            );
+          })}
+        </section>
+      )}
     </div>
   );
 }

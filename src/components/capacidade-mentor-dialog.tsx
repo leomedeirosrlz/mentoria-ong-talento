@@ -95,7 +95,7 @@ export function CapacidadeMentorDialog({
           <DialogTitle>Capacidade de {primeiro}</DialogTitle>
           <DialogDescription>
             Quantas duplas {primeiro} pode cuidar ao mesmo tempo. Ativas e
-            pausadas contam — pausada volta a andar e segura a vaga.
+            pausadas contam: pausada volta a andar e segura a vaga.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={submit} className="space-y-4">
@@ -112,8 +112,8 @@ export function CapacidadeMentorDialog({
             />
             <p className="text-xs text-muted-foreground">
               {emUso > 0
-                ? `Cuida de ${emUso} ${emUso === 1 ? "dupla" : "duplas"} em andamento — o mínimo é ${minimo}.`
-                : "Sem dupla em andamento — qualquer valor a partir de 1."}
+                ? `Cuida de ${emUso} ${emUso === 1 ? "dupla" : "duplas"} em andamento. O mínimo é ${minimo}.`
+                : "Sem dupla em andamento: qualquer valor a partir de 1."}
             </p>
           </div>
           {erro && (

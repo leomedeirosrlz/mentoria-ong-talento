@@ -496,7 +496,7 @@ export function PessoaActions({
           <DialogHeader>
             <DialogTitle>Editar {primeiroNome}</DialogTitle>
             <DialogDescription>
-              Os dados do cadastro em etapas — salve no fim.
+              Os dados do cadastro em etapas: salve no fim.
             </DialogDescription>
           </DialogHeader>
           <WizardFicha

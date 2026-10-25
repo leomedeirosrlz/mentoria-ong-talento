@@ -34,6 +34,9 @@ import {
   type EscopoAgenda,
   type AgendaSecao,
 } from "@/lib/agenda-minha";
+import { itensSemanaProgramaMentor } from "@/lib/agenda-coordenacao";
+import { turmaCurta } from "@/lib/turma";
+import { SemanaDoPrograma } from "@/components/semana-do-programa";
 import type {
   CicloEvento,
   Cronograma,
@@ -74,31 +77,54 @@ const ICONE_TIPO = {
   a_agendar: CalendarPlus,
 } as const;
 
-function iconeDoItem(item: AgendaItem): React.ReactNode {
-  // formação tem ícone próprio — o resto dos "programa" é evento oficial
+/** Ícone do tipo — a coluna de horário o usa quando o item é por dia
+ *  (supervisão, programa, "a agendar") e não finge hora que o domínio não
+ *  tem. Formação tem ícone próprio; o resto dos "programa" é evento
+ *  oficial. */
+function iconeDoItem(
+  item: AgendaItem,
+  size: number,
+  className?: string
+): React.ReactNode {
   const Icone =
     item.tipo === "programa" && item.rotulo.startsWith("Formação")
       ? GraduationCap
       : ICONE_TIPO[item.tipo];
-  return <Icone size={13} aria-hidden className="shrink-0" />;
+  return <Icone size={size} aria-hidden className={className} />;
 }
 
 /** Ações do item — decodifica os marcadores declarativos da derivação nos
  *  controles reais: link de chamada, deep-link de registro e o mesmo
- *  AgendarEncontroDialog da ficha/agenda semanal (nada de fluxo paralelo). */
-function AcoesItem({ item, dupla }: { item: AgendaItem; dupla: Dupla | undefined }) {
+ *  AgendarEncontroDialog da ficha/agenda semanal (nada de fluxo paralelo).
+ *  `primario` vem da página: só UM CTA decisivo por agenda fica preenchido
+ *  (o warnrow do topo tem precedência); os demais "Registrar"/"Agendar"
+ *  saem em outline. A coluna é o 3º trilho da grade da linha — w-full no
+ *  celular joga os botões pra uma linha própria abaixo do conteúdo; em sm+
+ *  encolhe pro conteúdo e se centraliza na altura da linha. */
+function AcoesItem({
+  item,
+  dupla,
+  primario,
+}: {
+  item: AgendaItem;
+  dupla: Dupla | undefined;
+  primario: boolean;
+}) {
   if (item.acoes.length === 0) return null;
   const jovemNome = dupla ? primeiroNomeDaDupla(dupla) : undefined;
   return (
-    <div className="mt-2.5 flex flex-wrap items-center gap-2">
+    <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto sm:shrink-0 sm:self-center">
       {item.acoes.includes("entrar") && item.link && (
         <a
           href={item.link}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-[var(--ok)]/40 bg-[var(--ok)]/10 px-2.5 text-xs font-medium text-[var(--ok-text)] transition-colors hover:bg-[var(--ok)]/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:min-h-9"
+          className={cn(
+            buttonVariants({ variant: "outline", size: "sm" }),
+            "border-[var(--ok)]/40 bg-[var(--ok)]/10 text-[var(--ok-text)] hover:bg-[var(--ok)]/15 hover:text-[var(--ok-text)]"
+          )}
         >
-          <VideoCamera size={14} aria-hidden />
+          <VideoCamera aria-hidden />
           Entrar na chamada
           <span className="sr-only"> (abre em nova aba)</span>
         </a>
@@ -106,7 +132,10 @@ function AcoesItem({ item, dupla }: { item: AgendaItem; dupla: Dupla | undefined
       {item.acoes.includes("registrar") && item.encontro && item.duplaId && (
         <Link
           href={`/duplas/${item.duplaId}#registrar-${item.encontro.id}`}
-          className={buttonVariants({ variant: "default", size: "sm" })}
+          className={buttonVariants({
+            variant: primario ? "default" : "outline",
+            size: "sm",
+          })}
         >
           Registrar como foi
         </Link>
@@ -120,7 +149,7 @@ function AcoesItem({ item, dupla }: { item: AgendaItem; dupla: Dupla | undefined
           jovemNome={jovemNome}
           trigger={
             <Button variant="outline" size="sm">
-              <CalendarPlus size={14} aria-hidden />
+              <CalendarPlus aria-hidden />
               Remarcar
             </Button>
           }
@@ -135,8 +164,8 @@ function AcoesItem({ item, dupla }: { item: AgendaItem; dupla: Dupla | undefined
           piso={dupla?.iniciada_em ?? undefined}
           jovemNome={jovemNome}
           trigger={
-            <Button size="sm">
-              <CalendarPlus size={14} aria-hidden />
+            <Button variant={primario ? "default" : "outline"} size="sm">
+              <CalendarPlus aria-hidden />
               Agendar
             </Button>
           }
@@ -150,10 +179,12 @@ function LinhaItem({
   item,
   dupla,
   indice,
+  primario,
 }: {
   item: AgendaItem;
   dupla: Dupla | undefined;
   indice: number;
+  primario: boolean;
 }) {
   return (
     <li
@@ -162,15 +193,17 @@ function LinhaItem({
     >
       <article
         className={cn(
-          "rounded-xl border bg-card px-3.5 py-3",
-          (item.convidado || item.tipo === "a_agendar") && "border-dashed",
-          item.convidado && "bg-[var(--warn)]/[0.03]"
+          "rounded-xl border bg-card px-4 py-3 sm:px-5",
+          // convidado/a_agendar: tracejada é o marcador — "você não
+          // participa" é info, não alerta (warn mentia urgência)
+          (item.convidado || item.tipo === "a_agendar") && "border-dashed"
         )}
       >
-        <div className="flex gap-3">
-          {/* coluna de horário — itens por dia (supervisão, programa, "a
-              agendar") não fingem hora que o domínio não tem */}
-          <div className="w-12 shrink-0 pt-0.5 text-right">
+        <div className="flex flex-wrap items-start gap-x-3 gap-y-2.5 sm:flex-nowrap sm:gap-x-4">
+          {/* coluna de horário de largura fixa — itens por dia (supervisão,
+              programa, "a agendar") não fingem hora que o domínio não tem:
+              o ícone do tipo ocupa o mesmo trilho, centralizado */}
+          <div className="w-18 shrink-0 pt-0.5 text-center">
             {item.hora ? (
               <>
                 <span className="block text-sm font-semibold tabular-nums">
@@ -183,28 +216,16 @@ function LinhaItem({
                 )}
               </>
             ) : (
-              <span aria-hidden className="text-xs text-muted-foreground">
-                —
-              </span>
+              iconeDoItem(item, 18, "inline text-muted-foreground")
             )}
           </div>
           <div className="min-w-0 flex-1">
-            <p className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs font-medium text-muted-foreground">
-              {iconeDoItem(item)}
+            <p className="text-xs font-medium text-muted-foreground">
               {item.rotulo}
             </p>
             <h3 className="mt-0.5 text-sm font-semibold leading-snug">
               {item.titulo}
             </h3>
-            <div className="mt-1 flex flex-wrap items-center gap-1.5">
-              {item.estado && <Tag tom={item.tom}>{item.estado}</Tag>}
-              {item.notaConvidado && (
-                <Tag tom="warn">
-                  <Eye size={11} aria-hidden />
-                  {item.notaConvidado}
-                </Tag>
-              )}
-            </div>
             {item.meta.length > 0 && (
               <div className="mt-1 space-y-0.5">
                 {item.meta.map((m) => (
@@ -214,8 +235,19 @@ function LinhaItem({
                 ))}
               </div>
             )}
-            <AcoesItem item={item} dupla={dupla} />
+            {(item.estado || item.notaConvidado) && (
+              <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                {item.estado && <Tag tom={item.tom}>{item.estado}</Tag>}
+                {item.notaConvidado && (
+                  <Tag tom="info">
+                    <Eye size={11} aria-hidden />
+                    {item.notaConvidado}
+                  </Tag>
+                )}
+              </div>
+            )}
           </div>
+          <AcoesItem item={item} dupla={dupla} primario={primario} />
         </div>
       </article>
     </li>
@@ -224,24 +256,41 @@ function LinhaItem({
 
 /** Warnrow do topo do "Hoje" — a pendência é tarefa do mentor (registrar o
  *  encontro, resolver o combinado), não só um evento do dia. Limbo traz
- *  "Remarcar" além do registro porque a pergunta real é "rolou?". */
-function LinhaAviso({ aviso, dupla }: { aviso: AvisoAgenda; dupla: Dupla | undefined }) {
+ *  "Remarcar" além do registro porque a pergunta real é "rolou?". Mesma
+ *  grade de 3 colunas das linhas comuns; `destaque` = só o 1º aviso carrega
+ *  o CTA preenchido (um lima por contexto — o resto fica em outline). */
+function LinhaAviso({
+  aviso,
+  dupla,
+  destaque,
+}: {
+  aviso: AvisoAgenda;
+  dupla: Dupla | undefined;
+  destaque: boolean;
+}) {
   const limbo = aviso.remarcar;
   return (
-    <div className="flex flex-wrap items-center gap-3 rounded-xl border border-[var(--warn)]/40 bg-[var(--warn)]/[0.07] px-3.5 py-3">
-      <ClockCounterClockwise
-        size={20}
-        aria-hidden
-        className="shrink-0 text-[var(--warn-text)]"
-      />
+    <div className="flex flex-wrap items-start gap-x-3 gap-y-2.5 rounded-xl border border-[var(--warn)]/40 bg-[var(--warn)]/[0.07] px-4 py-3 sm:flex-nowrap sm:px-5">
+      <div className="w-18 shrink-0 pt-0.5 text-center">
+        <ClockCounterClockwise
+          size={20}
+          aria-hidden
+          className="inline text-[var(--warn-text)]"
+        />
+      </div>
       <div className="min-w-0 flex-1">
         <p className="text-sm font-semibold leading-snug">{aviso.titulo}</p>
-        <p className="text-xs leading-snug text-muted-foreground">{aviso.detalhe}</p>
+        <p className="mt-0.5 text-xs leading-snug text-muted-foreground">
+          {aviso.detalhe}
+        </p>
       </div>
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto sm:shrink-0 sm:self-center">
         <Link
           href={aviso.href}
-          className={buttonVariants({ variant: "default", size: "sm" })}
+          className={buttonVariants({
+            variant: destaque ? "default" : "outline",
+            size: "sm",
+          })}
         >
           {limbo ? "Registrar como foi" : aviso.cta}
         </Link>
@@ -254,7 +303,7 @@ function LinhaAviso({ aviso, dupla }: { aviso: AvisoAgenda; dupla: Dupla | undef
             jovemNome={dupla ? primeiroNomeDaDupla(dupla) : undefined}
             trigger={
               <Button variant="outline" size="sm">
-                <CalendarPlus size={14} aria-hidden />
+                <CalendarPlus aria-hidden />
                 Remarcar
               </Button>
             }
@@ -269,11 +318,15 @@ function Secao({
   secao,
   avisos,
   duplasPorId,
+  primarioId,
 }: {
   secao: AgendaSecao;
   /** warnrows — só a seção "hoje" as recebe; as outras passam []. */
   avisos: AvisoAgenda[];
   duplasPorId: Map<string, Dupla>;
+  /** id do item que renderiza o CTA decisivo preenchido — null quando um
+   *  warnrow já carrega o lima da agenda (o destaque é um por contexto). */
+  primarioId: string | null;
 }) {
   const vazia = secao.grupos.length === 0;
   return (
@@ -285,11 +338,16 @@ function Secao({
         )}
       </div>
       <div className="mt-2.5 space-y-2">
-        {avisos.map((av) => (
-          <LinhaAviso key={av.id} aviso={av} dupla={duplasPorId.get(av.duplaId)} />
+        {avisos.map((av, i) => (
+          <LinhaAviso
+            key={av.id}
+            aviso={av}
+            dupla={duplasPorId.get(av.duplaId)}
+            destaque={i === 0}
+          />
         ))}
         {vazia && avisos.length === 0 && (
-          <p className="rounded-xl border border-dashed px-3.5 py-3 text-sm text-muted-foreground">
+          <p className="rounded-xl border border-dashed px-4 py-3 text-sm text-muted-foreground sm:px-5">
             {secao.id === "hoje"
               ? "Nada para hoje."
               : secao.id === "amanha"
@@ -311,6 +369,7 @@ function Secao({
                   item={item}
                   dupla={item.duplaId ? duplasPorId.get(item.duplaId) : undefined}
                   indice={i}
+                  primario={item.id === primarioId}
                 />
               ))}
             </ul>
@@ -340,7 +399,7 @@ function Rail({ agenda }: { agenda: AgendaMinhaDerivada }) {
   return (
     <aside className="space-y-4 lg:pt-1" aria-label="Resumo da agenda">
       <section className="rounded-xl border bg-card p-4">
-        <h2 className="text-sm font-semibold">Esta semana</h2>
+        <h2 className="font-semibold">Esta semana</h2>
         <div className="mt-2.5 space-y-2.5 text-xs">
           {nadaNaSemana && (
             <p className="text-muted-foreground">Semana livre por aqui.</p>
@@ -353,7 +412,7 @@ function Rail({ agenda }: { agenda: AgendaMinhaDerivada }) {
                   {semana.encontros}{" "}
                   {semana.encontros === 1 ? "encontro" : "encontros"}
                 </b>
-                {semana.encontrosDetalhe ? ` — ${semana.encontrosDetalhe}` : ""}
+                {semana.encontrosDetalhe ? ` · ${semana.encontrosDetalhe}` : ""}
                 {semana.realizados > 0 && (
                   <span className="text-[var(--ok-text)]">
                     {" "}
@@ -372,7 +431,7 @@ function Rail({ agenda }: { agenda: AgendaMinhaDerivada }) {
                   {semana.sessoesEsp}{" "}
                   {semana.sessoesEsp === 1 ? "sessão de especialista" : "sessões de especialista"}
                 </b>
-                {semana.sessoesEspDetalhe ? ` — ${semana.sessoesEspDetalhe}` : ""}{" "}
+                {semana.sessoesEspDetalhe ? ` · ${semana.sessoesEspDetalhe}` : ""}{" "}
                 <span className="text-muted-foreground">(você acompanha)</span>
               </span>
             </p>
@@ -407,7 +466,7 @@ function Rail({ agenda }: { agenda: AgendaMinhaDerivada }) {
                   {semana.pendencias}{" "}
                   {semana.pendencias === 1 ? "pendência" : "pendências"}
                 </b>{" "}
-                — {semana.pendencias === 1 ? "está" : "estão"} no topo de hoje
+                {semana.pendencias === 1 ? "está" : "estão"} no topo de hoje
               </span>
             </p>
           )}
@@ -415,8 +474,8 @@ function Rail({ agenda }: { agenda: AgendaMinhaDerivada }) {
       </section>
 
       <section className="rounded-xl border bg-card p-4">
-        <h2 className="text-sm font-semibold">Suas duplas</h2>
-        <ul className="mt-2 space-y-1">
+        <h2 className="font-semibold">Suas duplas</h2>
+        <ul className="mt-2.5 space-y-1">
           {duplasRail.map((d) => {
             const foraDaRegua = d.status !== "ativa";
             const sem = SEMAFORO[d.saude.semaforo];
@@ -439,7 +498,7 @@ function Rail({ agenda }: { agenda: AgendaMinhaDerivada }) {
                     <span className="block truncate text-sm font-medium">
                       {d.nome}{" "}
                       <span className="text-xs font-normal text-muted-foreground">
-                        · {d.turma}
+                        · {turmaCurta(d.turma)}
                       </span>
                     </span>
                     <span
@@ -487,6 +546,8 @@ export type AgendaMinhaProps = {
    *  usaria Date.now() no cliente e SSR×hidratação podiam discordar na
    *  janela de 15min do "Entrar" (hydration mismatch). */
   agora: number;
+  /** usuário híbrido — os links da faixa precisam preservar `&visao=dpp`. */
+  hibrido?: boolean;
 };
 
 export function AgendaMinha({
@@ -498,6 +559,7 @@ export function AgendaMinha({
   meuId,
   hoje,
   agora,
+  hibrido = false,
 }: AgendaMinhaProps) {
   const [escopo, setEscopo] = useState<EscopoAgenda>("tudo");
   const agenda = useMemo(
@@ -522,13 +584,25 @@ export function AgendaMinha({
     () => new Map(duplas.map((d) => [d.id, d])),
     [duplas]
   );
+  // o CTA preenchido (lima) é um por agenda: o 1º warnrow do "Hoje" leva —
+  // sem warnrow, o destaque cai na 1ª ação decisiva da lista (registrar ou
+  // agendar). Tudo o mais renderiza outline.
+  const primarioAcaoId = useMemo(() => {
+    if (avisos.length > 0) return null;
+    for (const s of secoes)
+      for (const g of s.grupos)
+        for (const i of g.itens)
+          if (i.acoes.includes("registrar") || i.acoes.includes("agendar"))
+            return i.id;
+    return null;
+  }, [avisos, secoes]);
 
   if (duplas.length === 0) {
     return (
       <div className="rounded-xl bg-card px-5 py-10 text-center shadow-[var(--shadow-border)]">
         <p className="text-sm text-muted-foreground">
           Você ainda não está em nenhuma dupla. Quando a coordenação formar
-          uma, seus encontros aparecem aqui — junto com a agenda que seu
+          uma, seus encontros aparecem aqui, junto com a agenda que seu
           mentorado tem com os especialistas.
         </p>
       </div>
@@ -537,8 +611,33 @@ export function AgendaMinha({
 
   return (
     <div className="space-y-4">
+      {/* faixa "Minha agenda" (v8b): a semana do programa recortada na
+          agenda dele — um card por encontro×dupla, formações e eventos
+          oficiais dos cronogramas dele e as supervisões sobre ele. Some
+          quando um chip de escopo filtra uma dupla só — a faixa é a
+          leitura da agenda inteira, não do recorte */}
+      {escopo === "tudo" && (
+        <SemanaDoPrograma
+          itens={itensSemanaProgramaMentor(
+            duplas,
+            eventos,
+            cronogramas,
+            supervisoes,
+            meuId,
+            new Date(hoje + "T12:00:00"),
+            agora
+          )}
+          hoje={hoje}
+          modo="mentor"
+          titulo="Minha agenda"
+          ariaLabel="Minha agenda · semana do programa"
+          sufixoVisao={hibrido ? "&visao=dpp" : ""}
+        />
+      )}
+
       {/* escopo interno — estado local, nunca URL: é um recorte de leitura,
-          não um endereço compartilhável */}
+          não um endereço compartilhável. O "você não participa" dos itens
+          convidados já explica o recorte — sem parágrafo de legenda */}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <span className="text-xs font-medium text-muted-foreground">
           Agenda de:
@@ -557,10 +656,6 @@ export function AgendaMinha({
           ))}
         </div>
       </div>
-      <p className="text-xs leading-relaxed text-muted-foreground">
-        “Tudo” inclui o que seus jovens têm marcado — itens que não são seus
-        vêm sinalizados “você não participa”.
-      </p>
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_290px]">
         <div className="min-w-0 space-y-6">
@@ -570,6 +665,7 @@ export function AgendaMinha({
               secao={s}
               avisos={s.id === "hoje" ? avisos : []}
               duplasPorId={duplasPorId}
+              primarioId={primarioAcaoId}
             />
           ))}
         </div>

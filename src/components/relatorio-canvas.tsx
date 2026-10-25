@@ -602,8 +602,8 @@ export function RelatorioCanvas({
         </span>
         <span className="max-sm:hidden">
           Arraste a borda de uma coluna pra redimensionar · clique no título pra ordenar ·
-          clique numa linha e Shift+clique em outra pra selecionar — Ctrl+C copia pra planilha.
-          {editavel && " Clique numa célula destacada pra editar — Enter confirma, Esc desfaz."}
+          clique numa linha e Shift+clique em outra pra selecionar. Ctrl+C copia pra planilha.
+          {editavel && " Clique numa célula destacada pra editar: Enter confirma, Esc desfaz."}
         </span>
       </p>
     </div>

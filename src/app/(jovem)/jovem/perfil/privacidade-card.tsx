@@ -52,7 +52,7 @@ export function PrivacidadeCard({
 
   return (
     <section className="rounded-xl bg-card p-6 shadow-[var(--shadow-border)]">
-      <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+      <h2 className="text-base font-semibold">
         Privacidade
       </h2>
       <p className="mt-1 text-xs text-muted-foreground">
@@ -78,8 +78,8 @@ export function PrivacidadeCard({
             </span>{" "}
             <span className="text-muted-foreground">
               {temWhatsapp
-                ? "— ligado, os colegas da sua turma que têm conta na plataforma veem o número do seu cadastro em Pessoas; desligado, ninguém vê."
-                : "— seu cadastro no programa ainda não tem WhatsApp (a coordenação mantém a ficha). Quando ele estiver lá, ligar aqui compartilha com os colegas."}
+                ? "Ligado, os colegas da sua turma que têm conta na plataforma veem o número do seu cadastro em Pessoas; desligado, ninguém vê."
+                : "Seu cadastro no programa ainda não tem WhatsApp (a coordenação mantém a ficha). Quando ele estiver lá, ligar aqui compartilha com os colegas."}
             </span>
           </span>
         </label>

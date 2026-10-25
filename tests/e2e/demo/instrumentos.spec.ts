@@ -8,7 +8,10 @@ import { entrarNaDemo, expect, test } from "../helpers";
 // novos tipos (secao + escala_1_10). Sem writes — spec demo segura.
 
 const DUPLA_OK = "de000000-0000-4000-8000-000000001537"; // Ricardo × Ana
-const DUPLA_FIM = "de000000-0000-4000-8000-000000000605"; // Luiza × Isabela (concluída)
+// Luiza × Isabela (concluída): o uid() do dataset formata o literal
+// 0x0605 em DECIMAL ("1541") — "…000605" é um id inexistente e a ficha
+// dele caía no 404, fazendo o teste abaixo passar no vazio
+const DUPLA_FIM = "de000000-0000-4000-8000-000000001541";
 const DUPLA_MATHEUS = "de000000-0000-4000-8000-000000001549"; // Ricardo × Matheus
 const TOK_VISAO_EDUARDO = "demo-tok-visao-eduardo-00001";
 const TOK_RODA_EDUARDO = "demo-tok-roda-eduardo-000001";
@@ -18,7 +21,9 @@ test.describe("demo — instrumentos oficiais da jornada", () => {
     page,
   }) => {
     await entrarNaDemo(page, "coordenacao");
-    await page.goto(`/duplas/${DUPLA_OK}`);
+    // a ficha virou abas por URL: instrumentos/PDM/terceiros/voz do jovem
+    // moram em ?aba=instrumentos
+    await page.goto(`/duplas/${DUPLA_OK}?aba=instrumentos`);
 
     const sec = page.locator("section", {
       hasText: "Instrumentos da jornada",
@@ -55,8 +60,8 @@ test.describe("demo — instrumentos oficiais da jornada", () => {
   }) => {
     await entrarNaDemo(page, "mentor_dpp");
     // Matheus: visão respondida + roda pendente — metas/PDM seguem
-    // "não enviado", que é onde o Enviar vive
-    await page.goto(`/duplas/${DUPLA_MATHEUS}`);
+    // "não enviado", que é onde o Enviar vive (aba Instrumentos da ficha)
+    await page.goto(`/duplas/${DUPLA_MATHEUS}?aba=instrumentos`);
 
     const sec = page.locator("section", {
       hasText: "Instrumentos da jornada",
@@ -90,11 +95,17 @@ test.describe("demo — instrumentos oficiais da jornada", () => {
     page,
   }) => {
     await entrarNaDemo(page, "coordenacao");
-    await page.goto(`/duplas/${DUPLA_FIM}`);
+    // a seção segue visível pra leitura na aba Instrumentos — o que morre
+    // são as ações de link (jornada congelada), não o histórico
+    await page.goto(`/duplas/${DUPLA_FIM}?aba=instrumentos`);
 
     const sec = page.locator("section", {
       hasText: "Instrumentos da jornada",
     });
+    // pin anti-vácuo: a seção renderiza de verdade (os 4 instrumentos
+    // aparecem) antes de medir a ausência de ações
+    await expect(sec.getByText("Construindo a sua Visão")).toBeVisible();
+    await expect(sec.getByText("Roda da Vida")).toBeVisible();
     await expect(
       sec.getByRole("button", { name: "Gerar link" })
     ).toHaveCount(0);

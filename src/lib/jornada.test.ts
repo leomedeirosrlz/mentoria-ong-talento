@@ -5,7 +5,6 @@ import {
   estacoesPainelDupla,
   resumoJornada,
   type PainelJornadaLinha,
-  type PainelTurmaCtx,
   type Entrega360,
   type EntregaJornada,
   type EncontroJornada,
@@ -187,7 +186,7 @@ describe("estacoesJornada — esqueleto", () => {
     expect(v.janela.dataIni).toBeNull();
     expect(v.janela.dataFim).toBeNull();
     // trancada sem data da turma → detalhe sem o "(dd/mm)"
-    expect(por(est, "avaliacao_360").detalhe).toBe("libera no enc. 16");
+    expect(por(est, "avaliacao_360").detalhe).toBe("libera no encontro 16");
   });
 });
 
@@ -404,10 +403,10 @@ describe("estacoesJornada — a_fazer", () => {
   it("sem entrega com a janela já passada → copy honesta, sem promessa futura", () => {
     const est = estacoesJornada(base({ encontros: realizados(16) }));
     expect(por(est, "visao").detalhe).toBe(
-      "o link ainda não chegou — fala com teu mentor"
+      "o link ainda não chegou: fala com teu mentor"
     );
     expect(por(est, "roda_formal").detalhe).toBe(
-      "o link ainda não chegou — fala com teu mentor"
+      "o link ainda não chegou: fala com teu mentor"
     );
     // a janela da 360º é o próprio enc. 16 — no teto da régua ela segue
     // "dentro da janela"; atraso dela aparece via link expirado
@@ -429,7 +428,7 @@ describe("estacoesJornada — a_fazer", () => {
     const v = por(est, "visao");
     expect(v.estado).toBe("a_fazer");
     expect(v.token).toBeNull();
-    expect(v.detalhe).toBe("o link expirou — peça ao mentor pra reenviar");
+    expect(v.detalhe).toBe("o link expirou: peça ao mentor pra reenviar");
   });
 
   it("pendente com expira_em já passada conta como expirado (agora decide)", () => {
@@ -443,7 +442,7 @@ describe("estacoesJornada — a_fazer", () => {
         ],
       })
     );
-    expect(por(est, "visao").detalhe).toBe("o link expirou — peça ao mentor pra reenviar");
+    expect(por(est, "visao").detalhe).toBe("o link expirou: peça ao mentor pra reenviar");
   });
 
   it("expirado da coordenação (360º) pede reenvio à coordenação", () => {
@@ -454,7 +453,7 @@ describe("estacoesJornada — a_fazer", () => {
       })
     );
     expect(por(est, "avaliacao_360").detalhe).toBe(
-      "o link expirou — peça à coordenação pra reenviar"
+      "o link expirou: peça à coordenação pra reenviar"
     );
   });
 });
@@ -467,10 +466,10 @@ describe("estacoesJornada — trancada", () => {
     const rf = por(est, "roda_formal");
     const a360 = por(est, "avaliacao_360");
     expect(rf.estado).toBe("trancada");
-    expect(rf.detalhe).toBe(`libera no enc. 12 (${dataEnc(12).slice(8, 10)}/${dataEnc(12).slice(5, 7)})`);
-    expect(rf.detalhe).toBe("libera no enc. 12 (19/05)");
+    expect(rf.detalhe).toBe(`libera no encontro 12 (${dataEnc(12).slice(8, 10)}/${dataEnc(12).slice(5, 7)})`);
+    expect(rf.detalhe).toBe("libera no encontro 12 (19/05)");
     expect(a360.estado).toBe("trancada");
-    expect(a360.detalhe).toBe("libera no enc. 16 (16/06)");
+    expect(a360.detalhe).toBe("libera no encontro 16 (16/06)");
     expect(rf.token).toBeNull();
     expect(a360.token).toBeNull();
   });
@@ -478,7 +477,7 @@ describe("estacoesJornada — trancada", () => {
   it("jovem no enc. 0: metas (enc. 2) trancada; enc. 1 abre roda inicial, visão, PDM e avaliação", () => {
     const est = estacoesJornada(base());
     expect(por(est, "metas").estado).toBe("trancada");
-    expect(por(est, "metas").detalhe).toBe("libera no enc. 2 (10/03)");
+    expect(por(est, "metas").detalhe).toBe("libera no encontro 2 (10/03)");
     for (const c of ["roda_inicial", "visao", "pdm", "avaliacao_encontro"] as const)
       expect(por(est, c).estado).toBe("a_fazer");
   });
@@ -907,11 +906,6 @@ describe("regressão — re-emissão depois de respondida reabre a estação (M3
 // ---------- painel coord/supervisor (B5 — paridade com a jornada) ----------
 
 describe("painel — estacoesPainelDupla + atrasadasPainel", () => {
-  const ctxPainel = (encVigente: number): PainelTurmaCtx => ({
-    encVigente,
-    dataEnc: (n) => dataEnc(n),
-  });
-
   const linha = (over: Partial<PainelJornadaLinha> = {}): PainelJornadaLinha => ({
     dupla_id: "d1",
     turma: "T1",
@@ -934,7 +928,7 @@ describe("painel — estacoesPainelDupla + atrasadasPainel", () => {
           ],
         },
       });
-    const estados = estacoesPainelDupla(l, ctxPainel(13), 13);
+    const estados = estacoesPainelDupla(l, 13);
     expect(estados.roda_inicial).toBe("respondido");
     expect(estados.roda_formal).toBe("pendente");
   });
@@ -948,7 +942,6 @@ describe("painel — estacoesPainelDupla + atrasadasPainel", () => {
           ],
         },
       }),
-      ctxPainel(13),
       13
     );
     expect(estados.roda_inicial).toBe("respondido");
@@ -964,7 +957,6 @@ describe("painel — estacoesPainelDupla + atrasadasPainel", () => {
           ],
         },
       }),
-      ctxPainel(13),
       13
     );
     expect(estados.roda_inicial).toBe("respondido");
@@ -980,20 +972,19 @@ describe("painel — estacoesPainelDupla + atrasadasPainel", () => {
           ],
         },
       }),
-      ctxPainel(3),
       3
     );
     expect(estados.visao).not.toBe("respondido");
   });
 
   it("régua da dupla: dupla recém-emparelhada não fica 'fora da janela' pela coorte", () => {
-    const estados = estacoesPainelDupla(linha(), ctxPainel(10), 1);
+    const estados = estacoesPainelDupla(linha(), 1);
     // coorte no enc. 10, dupla ainda sem encontro realizado (max_numero null → posição 1)
-    const atrasadas = atrasadasPainel(estados, ctxPainel(10), 1);
+    const atrasadas = atrasadasPainel(estados, 1);
     expect(atrasadas).not.toContain("visao");
     expect(atrasadas).not.toContain("metas");
     // coorte no enc. 10, dupla acompanhando (posição 10): visao/metas fora da janela
-    const atrasadas2 = atrasadasPainel(estados, ctxPainel(10), 10);
+    const atrasadas2 = atrasadasPainel(estados, 10);
     expect(atrasadas2).toContain("visao");
     expect(atrasadas2).toContain("metas");
   });
@@ -1010,7 +1001,7 @@ describe("painel — estacoesPainelDupla + atrasadasPainel", () => {
       });
     // janela aberta pra dupla (regua 9 ≥ encIni 1) → pendente: a coord vê
     // que há link novo esperando a jovem
-    expect(estacoesPainelDupla(mk(), ctxPainel(9), 9).pdm).toBe("pendente");
+    expect(estacoesPainelDupla(mk(), 9).pdm).toBe("pendente");
     // janela ainda não abriu pra ela (dupla em 0, estação encIni 12) —
     // resposta anterior continua sendo o fato (paridade com a jornada)
     const mk2 = () =>
@@ -1023,26 +1014,24 @@ describe("painel — estacoesPainelDupla + atrasadasPainel", () => {
           ],
         },
       });
-    expect(estacoesPainelDupla(mk2(), ctxPainel(13), 1).roda_formal).toBe("respondido");
+    expect(estacoesPainelDupla(mk2(), 1).roda_formal).toBe("respondido");
   });
 
   it("avaliação recorrente: realizados=0 trancada, feitas=realizados em dia, senão pendente", () => {
     const base_ = { realizados: 0, feitas: 0, max_numero: null };
     expect(
-      estacoesPainelDupla(linha({ avaliacoes_encontro: base_ }), ctxPainel(5), 5)
+      estacoesPainelDupla(linha({ avaliacoes_encontro: base_ }), 5)
         .avaliacao_encontro
     ).toBe("trancada");
     expect(
       estacoesPainelDupla(
         linha({ avaliacoes_encontro: { realizados: 3, feitas: 3, max_numero: 3 } }),
-        ctxPainel(5),
         4
       ).avaliacao_encontro
     ).toBe("respondido");
     expect(
       estacoesPainelDupla(
         linha({ avaliacoes_encontro: { realizados: 3, feitas: 1, max_numero: 3 } }),
-        ctxPainel(5),
         4
       ).avaliacao_encontro
     ).toBe("pendente");

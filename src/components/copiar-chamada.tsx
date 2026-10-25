@@ -48,19 +48,21 @@ export function CopiarChamada({
 
   if (icone) {
     return (
-      <button
+      <Button
         type="button"
+        variant="ghost"
+        size="icon-sm"
         onClick={copiar}
         aria-label={copiado ? "Copiado" : "Copiar link da chamada"}
         title="Copiar link da chamada"
-        className="grid size-11 shrink-0 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:size-8"
+        className="shrink-0 text-muted-foreground"
       >
         {copiado ? (
-          <Check size={16} weight="bold" className="text-[var(--ok)]" aria-hidden />
+          <Check weight="bold" className="text-[var(--ok)]" aria-hidden />
         ) : (
-          <LinkSimple size={16} aria-hidden />
+          <LinkSimple aria-hidden />
         )}
-      </button>
+      </Button>
     );
   }
 

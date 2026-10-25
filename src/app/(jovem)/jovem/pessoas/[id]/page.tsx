@@ -20,7 +20,7 @@ import { getMe } from "@/lib/queries";
 import type { JovemContato } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-export const metadata: Metadata = { title: "Perfil — Pessoas" };
+export const metadata: Metadata = { title: "Perfil · Pessoas" };
 
 /** O perfil de quem o jovem enxerga — mesmo cartão-banner do perfil de
  *  todo mundo, dados SÓ das projeções seguras (jovem_contatos /
@@ -192,7 +192,7 @@ function SecaoContato({ c, nomeJovem }: { c: JovemContato; nomeJovem: string }) 
   );
   return (
     <section className="rounded-xl bg-card p-6 shadow-[var(--shadow-border)]">
-      <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+      <h2 className="text-base font-semibold">
         Contato
       </h2>
       <dl className="mt-4 space-y-4">
@@ -253,7 +253,7 @@ function SecaoColega({
   );
   return (
     <section className="rounded-xl bg-card p-6 shadow-[var(--shadow-border)]">
-      <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+      <h2 className="text-base font-semibold">
         Colega da sua turma
       </h2>
       <dl className="mt-4 space-y-4">
@@ -280,7 +280,7 @@ function SecaoColega({
             </a>
           ) : (
             <p className="text-xs text-muted-foreground">
-              Ele ainda não compartilhou o contato — quando compartilhar, o
+              Ele ainda não compartilhou o contato. Quando compartilhar, o
               WhatsApp aparece aqui.
             </p>
           )}
@@ -299,7 +299,7 @@ function SecaoEspecialista({
 }) {
   return (
     <section className="rounded-xl bg-card p-6 shadow-[var(--shadow-border)]">
-      <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+      <h2 className="text-base font-semibold">
         Especialista do programa
       </h2>
       <dl className="mt-4 space-y-4">
@@ -308,8 +308,8 @@ function SecaoEspecialista({
           valor={e.areas?.length ? <ChipsTags itens={e.areas} /> : "—"}
         />
         <p className="text-xs leading-relaxed text-muted-foreground">
-          O contato direto abre quando a sua trilha de especialista começar
-          — até lá, o pedido passa pela coordenação.
+          O contato direto abre quando a sua trilha de especialista começar.
+          Até lá, o pedido passa pela coordenação.
         </p>
       </dl>
     </section>

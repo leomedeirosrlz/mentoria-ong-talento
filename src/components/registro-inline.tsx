@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { Collapsible } from "@base-ui/react/collapsible";
 import { CaretDown } from "@phosphor-icons/react";
@@ -48,12 +48,61 @@ export function RegistroInline({
     };
   }, [alvo]);
 
+  const aberto = forcado ?? hashBate;
+  // abriu pelo hash (deep link ou navegação de fora), não por clique local
+  const abriuPeloHash = forcado === null && hashBate;
+  const abertoAnt = useRef(aberto);
+
+  // O clique no CTA também dispara hashchange depois de abrir localmente; a
+  // transição só conta quando `aberto` vai de falso pra verdadeiro e veio do
+  // hash, então esse eco não rola a página de novo.
+  useEffect(() => {
+    const abriu = aberto && !abertoAnt.current;
+    abertoAnt.current = aberto;
+    if (!abriu || !abriuPeloHash) return;
+    // rAF: o form monta no mesmo commit, mas o alvo só ganha altura depois
+    const frame = requestAnimationFrame(() => {
+      const card = document.getElementById(`registrar-${encontroId}`);
+      if (!card) return;
+      const reduzir = window.matchMedia(
+        "(prefers-reduced-motion: reduce)"
+      ).matches;
+      card.scrollIntoView({
+        block: "start",
+        behavior: reduzir ? "auto" : "smooth",
+      });
+      primeiroCampo(
+        document.getElementById(`registro-form-${encontroId}`)
+      )?.focus({ preventScroll: true });
+    });
+    // StrictMode roda o efeito duas vezes: desfazer a marca deixa a 2ª passada
+    // enxergar a abertura de novo
+    return () => {
+      cancelAnimationFrame(frame);
+      abertoAnt.current = false;
+    };
+  }, [aberto, abriuPeloHash, encontroId]);
+
   return (
     <RegistroInlineCtx.Provider
-      value={{ aberto: forcado ?? hashBate, alternar: setForcado }}
+      value={{ aberto, alternar: setForcado }}
     >
       {children}
     </RegistroInlineCtx.Provider>
+  );
+}
+
+/** Primeiro campo que o mentor consegue preencher: pula os steps ocultos
+ *  (`hidden`) e os controles fora da ordem de Tab. */
+function primeiroCampo(painel: HTMLElement | null): HTMLElement | null {
+  const campos = painel?.querySelectorAll<HTMLElement>(
+    'input:not([type="hidden"]), textarea, select, [role="combobox"]'
+  );
+  if (!campos) return null;
+  return (
+    Array.from(campos).find(
+      (el) => !el.closest("[hidden]") && el.getAttribute("tabindex") !== "-1"
+    ) ?? null
   );
 }
 

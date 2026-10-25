@@ -1,0 +1,396 @@
+<!-- MOCKUP turmas v1a — variante "banner de perfil" (port da linguagem PessoaBanner) -->
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Turmas · v1a · Realiza.vc</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --brand-lime: hsl(78 56% 53%);
+    --brand-ink: hsl(0 0% 15%);
+    --amber: hsl(48 100% 60%);
+    --background: hsl(75 10% 95%);
+    --card: hsl(0 0% 100%);
+    --muted: hsl(75 7% 93%);
+    --muted-foreground: hsl(75 4% 40%);
+    --accent: hsl(75 8% 91%);
+    --border: hsl(75 6% 87%);
+    --input: hsl(75 8% 54%);
+    --ok: hsl(78 58% 38%);
+    --ok-text: hsl(78 55% 30%);
+    --warn: hsl(43 95% 44%);
+    --warn-text: hsl(43 90% 30%);
+    --danger: hsl(0 80% 48%);
+    --radius: 0.75rem;
+  }
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  html{ -webkit-text-size-adjust:100%; }
+  body{ font-family:'Inter', system-ui, sans-serif; background:var(--background); color:var(--brand-ink); font-size:14px; line-height:1.45; -webkit-font-smoothing:antialiased; }
+  a{ color:inherit; } button{ font:inherit; color:inherit; }
+  :focus-visible{ outline:2px solid var(--input); outline-offset:2px; border-radius:6px; }
+  @media (prefers-reduced-motion:reduce){ *{transition:none!important} }
+
+  /* ---------- chrome do mockup ---------- */
+  .board-head{ background:var(--brand-ink); color:hsl(75 20% 88%); padding:12px 20px; display:flex; flex-wrap:wrap; align-items:center; gap:6px 18px; font-size:12.5px; }
+  .board-head b{ color:var(--brand-lime); font-weight:700; letter-spacing:.03em; }
+  .board-head .dir{ color:hsl(75 10% 62%); flex:1 1 320px; min-width:0; }
+  .board-head nav{ display:flex; gap:6px; flex-wrap:wrap; }
+  .board-head nav a{ font-size:12px; font-weight:600; padding:5px 12px; border-radius:99px; border:1px solid hsl(75 10% 38%); color:hsl(75 20% 85%); text-decoration:none; }
+  .board-head nav a:hover{ border-color:var(--brand-lime); color:var(--brand-lime); }
+  .asrole{ background:#2b2b2b; padding:10px 20px; display:flex; flex-wrap:wrap; gap:8px 12px; align-items:center; position:sticky; top:0; z-index:30; font-size:13px; color:hsl(75 20% 88%); }
+  .asrole .who{ font-size:13px; font-weight:650; padding:6px 14px; border-radius:99px; background:var(--brand-lime); color:var(--brand-ink); }
+  .asrole .why{ font-size:12.5px; color:hsl(75 10% 62%); }
+
+  /* ---------- topbar ---------- */
+  .topbar{ position:sticky; top:0; z-index:10; background:hsl(75 10% 95% / .88); backdrop-filter:blur(10px); border-bottom:1px solid var(--border); }
+  .topbar-in{ max-width:1120px; margin:0 auto; padding:.7rem 1.25rem; display:flex; align-items:center; gap:1.4rem; }
+  .brand{ display:flex; align-items:center; gap:.55rem; text-decoration:none; }
+  .brand-mark{ width:30px; height:30px; border-radius:9px; background:var(--brand-lime); display:grid; place-items:center; box-shadow:inset 0 0 0 1px hsl(78 55% 40% / .25); }
+  .brand-name{ font-size:17px; font-weight:800; letter-spacing:-.02em; }
+  .brand-name span{ color:var(--ok-text); font-weight:700; }
+  .topnav{ display:flex; gap:.15rem; }
+  .topnav a{ text-decoration:none; font-size:13.5px; font-weight:550; color:var(--muted-foreground); padding:.42rem .75rem; border-radius:999px; }
+  .topnav a:hover{ background:var(--accent); color:var(--brand-ink); }
+  .topnav a.is-on{ background:var(--brand-lime); color:hsl(78 60% 18%); font-weight:650; }
+  .user{ margin-left:auto; display:flex; align-items:center; gap:.6rem; }
+  .user-id{ text-align:right; line-height:1.15; }
+  .user-id b{ display:block; font-size:13px; font-weight:650; }
+  .user-id small{ font-size:11px; color:var(--muted-foreground); }
+  .uav{ width:32px; height:32px; border-radius:50%; background:var(--brand-ink); color:#fff; display:grid; place-items:center; font-size:11px; font-weight:700; }
+
+  /* ---------- página ---------- */
+  .wrap{ max-width:1120px; margin:0 auto; padding:1.6rem 1.25rem 4.5rem; }
+  .page-head{ display:flex; align-items:flex-end; justify-content:space-between; gap:1rem; flex-wrap:wrap; }
+  .page-head .kicker{ font-size:11.5px; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:var(--muted-foreground); }
+  .page-head h1{ font-size:26px; font-weight:750; letter-spacing:-.02em; margin-top:.1rem; }
+  .page-head .sub{ margin-top:.15rem; font-size:13px; color:var(--muted-foreground); }
+  .page-head .sub b{ color:var(--brand-ink); }
+  .btn-new{ display:inline-flex; align-items:center; gap:.45rem; background:var(--brand-lime); color:hsl(78 60% 17%); border:none; border-radius:999px; padding:.55rem 1.05rem; font-size:13.5px; font-weight:650; cursor:pointer; box-shadow:inset 0 0 0 1px hsl(78 55% 40% / .3); text-decoration:none; }
+  .btn-new:hover{ filter:brightness(.96); }
+
+  /* ---------- identidade por turma ----------
+     --tt = tinta da turma · --tt-ink = versão escura (texto sobre --tt ou tint) · --tt-soft = fundo tintado */
+  .t-t1{ --tt: var(--brand-lime); --tt-ink: hsl(78 60% 17%); --tt-soft: hsl(78 56% 93%); --tt-border: hsl(78 45% 78%); }
+  .t-t2{ --tt: var(--amber);     --tt-ink: hsl(43 85% 20%);  --tt-soft: hsl(48 90% 93%);  --tt-border: hsl(46 75% 74%); }
+
+  /* ---------- card: banner de perfil da turma ---------- */
+  .tgrid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,460px),1fr)); gap:1.1rem; margin-top:1.4rem; list-style:none; }
+  .tcard{ background:var(--card); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; box-shadow:0 1px 2px rgb(0 0 0/.04); display:flex; flex-direction:column; transition:transform .15s, box-shadow .15s; }
+  .tcard:hover{ transform:translateY(-1px); box-shadow:0 8px 22px hsl(0 0% 15% / .08); }
+
+  /* banner — mesmo vocabulário do PessoaBanner: campo ink, relevo de arcos,
+     sigla fantasma, emblema-dial no canto, linha de dados mono */
+  .tban{ position:relative; height:132px; flex:none; }
+  .tban-art{ display:block; width:100%; height:100%; }
+  .tban::after{ content:""; position:absolute; inset:auto 0 0 0; height:3px; background:var(--tt); }
+  .bline{ position:absolute; top:11px; left:16px; font-family:ui-monospace, SFMono-Regular, Menlo, monospace; font-size:10.5px; letter-spacing:.12em; color:hsl(0 0% 100% / .82); text-transform:uppercase; }
+  /* emblema em HTML por cima do SVG — o slice do viewBox corta os lados
+     nos estreitos, então o que não pode sumir fica ancorado por CSS */
+  .bemblem{ position:absolute; top:9px; right:14px; }
+
+  .tbody{ padding:14px 18px 16px; display:flex; flex-direction:column; gap:10px; flex:1; }
+  .trow{ display:flex; align-items:center; justify-content:space-between; gap:.6rem; }
+  .trow h3{ font-size:19px; font-weight:800; letter-spacing:-.02em; }
+  .trow h3 .sigla{ font-size:12px; font-weight:800; color:var(--tt-ink); background:var(--tt-soft); border:1px solid var(--tt-border); border-radius:6px; padding:.1rem .45rem; vertical-align:2px; margin-left:.35rem; }
+  .pill{ display:inline-flex; align-items:center; gap:.35rem; font-size:11px; font-weight:650; padding:.24rem .6rem; border-radius:999px; white-space:nowrap; }
+  .pill::before{ content:""; width:6px; height:6px; border-radius:50%; background:currentColor; }
+  .p-ok{ background:hsl(78 58% 90%); color:var(--ok-text); }
+  .tmeta{ font-size:12.5px; color:var(--muted-foreground); }
+  .tmeta b{ font-weight:600; color:var(--brand-ink); }
+
+  /* encontro da semana — destaque funcional, tintado na cor da turma */
+  .agora{ display:flex; gap:.7rem; align-items:flex-start; background:var(--tt-soft); border:1px solid var(--tt-border); border-radius:10px; padding:.65rem .8rem; }
+  .agora .a-ic{ flex:none; width:30px; height:30px; border-radius:8px; background:var(--tt); display:grid; place-items:center; color:var(--tt-ink); }
+  .agora .a-tx{ min-width:0; flex:1; }
+  .agora .a-tx b{ display:block; font-size:13.5px; font-weight:750; }
+  .agora .a-tx span{ display:block; font-size:12.5px; color:hsl(75 4% 32%); margin-top:.08rem; }
+  .agora .a-tx small{ display:block; font-size:11.5px; color:var(--muted-foreground); margin-top:.15rem; }
+  .a-prog{ flex:none; text-align:right; }
+  .a-prog b{ font-size:15px; font-weight:800; color:var(--tt-ink); }
+  .a-prog small{ display:block; font-size:10px; font-weight:600; color:var(--muted-foreground); text-transform:uppercase; letter-spacing:.05em; }
+  .a-prog .mini-bar{ margin-top:.3rem; width:74px; height:5px; border-radius:99px; background:hsl(0 0% 100% / .9); border:1px solid var(--tt-border); overflow:hidden; }
+  .a-prog .mini-bar i{ display:block; height:100%; background:var(--tt-ink); border-radius:99px; }
+
+  /* stats em faixa — edge-to-edge, divisão vertical */
+  .faixa{ display:grid; grid-template-columns:repeat(3,1fr); border-top:1px solid var(--border); background:var(--muted); }
+  .faixa>div{ padding:.6rem .9rem .55rem; }
+  .faixa>div + div{ border-left:1px solid var(--border); }
+  .faixa b{ display:block; font-size:20px; font-weight:800; letter-spacing:-.02em; }
+  .faixa b i{ font-style:normal; color:var(--tt-ink); }
+  .faixa span{ display:block; font-size:10.5px; font-weight:650; text-transform:uppercase; letter-spacing:.06em; color:var(--muted-foreground); margin-top:.05rem; }
+  .faixa small{ display:block; font-size:10.5px; color:var(--muted-foreground); }
+
+  .tacts{ display:flex; flex-wrap:wrap; gap:.5rem; padding:0 18px 16px; }
+  .tacts .btn{ display:inline-flex; align-items:center; gap:.4rem; font-size:13px; font-weight:650; padding:.5rem .95rem; border-radius:10px; border:1px solid var(--border); background:var(--card); color:var(--brand-ink); text-decoration:none; }
+  .tacts .btn:hover{ background:var(--accent); }
+  .tacts .btn.pri{ background:var(--tt); border-color:var(--tt); color:var(--tt-ink); }
+  .tacts .btn.pri:hover{ filter:brightness(.95); }
+  .tacts .btn.ghost{ border-color:transparent; color:var(--muted-foreground); }
+  .tacts .btn.ghost:hover{ color:var(--brand-ink); background:var(--accent); }
+
+  /* ---------- cronograma oficial (apoio) ---------- */
+  .crono{ margin-top:2rem; }
+  .crono-head{ display:flex; align-items:baseline; justify-content:space-between; gap:1rem; flex-wrap:wrap; }
+  .crono-head h2{ font-size:16px; font-weight:750; letter-spacing:-.01em; }
+  .crono-head p{ font-size:12px; color:var(--muted-foreground); }
+  .crono-list{ margin-top:.7rem; background:var(--card); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; }
+  .crow{ padding:.8rem 1.1rem .9rem; }
+  .crow + .crow{ border-top:1px solid var(--border); }
+  .crow-top{ display:flex; align-items:center; gap:.6rem; flex-wrap:wrap; }
+  .cchip{ font-size:12px; font-weight:800; padding:.15rem .55rem; border-radius:6px; }
+  .cchip.c-t1{ background:var(--brand-lime); color:hsl(78 60% 17%); }
+  .cchip.c-t2{ background:var(--amber); color:hsl(43 85% 20%); box-shadow:inset 0 0 0 1px hsl(45 80% 40% / .25); }
+  .crow-top b{ font-size:13.5px; font-weight:700; }
+  .crow-top small{ font-size:12px; color:var(--muted-foreground); }
+  .crow-top .cr-stat{ margin-left:auto; font-size:12px; color:var(--muted-foreground); }
+  .crow-top .cr-stat b{ font-size:12px; color:var(--brand-ink); }
+  .cells{ list-style:none; display:flex; flex-wrap:wrap; gap:4px; margin-top:.55rem; }
+  .cells li{ width:26px; height:24px; border-radius:6px; display:grid; place-items:center; font-size:10.5px; font-weight:700; border:1px solid var(--border); color:var(--muted-foreground); background:var(--card); }
+  .cells li.done{ background:var(--brand-ink); border-color:var(--brand-ink); color:#fff; }
+  .cells li.now{ background:var(--background); border:2px solid var(--ttb, var(--ok)); color:var(--brand-ink); box-shadow:0 0 0 3px hsl(78 56% 53% / .25); }
+  .crow.cr-t2 .cells li.now{ box-shadow:0 0 0 3px hsl(48 100% 60% / .35); }
+  .crow-leg{ display:flex; flex-wrap:wrap; gap:.4rem 1.1rem; margin-top:.55rem; font-size:11.5px; color:var(--muted-foreground); align-items:center; }
+  .crow-leg .tag{ font-size:10.5px; font-weight:700; background:var(--muted); border-radius:5px; padding:.08rem .45rem; }
+  .crow-leg .tag.ev{ background:hsl(75 8% 91%); border:1px dashed var(--input); }
+  .crow.arch{ background:var(--muted); }
+  .crow.arch .cells li{ width:auto; height:auto; border:none; background:none; font-size:12px; font-weight:500; padding:0; }
+  .arch-line{ display:flex; align-items:center; gap:.6rem; flex-wrap:wrap; font-size:12.5px; color:var(--muted-foreground); }
+  .arch-line .cchip{ background:var(--accent); color:var(--muted-foreground); box-shadow:inset 0 0 0 1px var(--border); }
+  .arch-line a{ font-weight:600; color:var(--muted-foreground); text-decoration:underline; text-underline-offset:3px; }
+  .arch-line a:hover{ color:var(--brand-ink); }
+
+  /* ---------- bottom nav (mobile) ---------- */
+  .bnav{ position:fixed; left:0; right:0; bottom:0; z-index:70; display:flex; background:#fff; border-top:1px solid var(--border); padding-bottom:env(safe-area-inset-bottom); }
+  .bnav a{ flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; min-height:58px; font-size:12px; font-weight:600; color:var(--muted-foreground); text-decoration:none; position:relative; }
+  .bnav a.on{ color:var(--brand-ink); font-weight:700; }
+  .bnav a.on::before{ content:""; position:absolute; top:0; width:36px; height:3px; border-radius:0 0 3px 3px; background:var(--brand-lime); }
+  @media (min-width:900px){ .bnav{ display:none; } }
+
+  /* ---------- notas ---------- */
+  .notes{ display:grid; gap:8px; margin-top:36px; padding:16px 22px 18px; background:var(--brand-ink); color:hsl(75 14% 76%); border-radius:var(--radius); font-size:12.5px; line-height:1.6; }
+  .notes b{ color:var(--brand-lime); font-weight:700; }
+  .notes li{ margin-left:18px; }
+  .notes .warn{ color:hsl(48 100% 70%); }
+
+  /* ---------- responsivo ---------- */
+  @media (max-width: 1020px){
+    .topnav{ display:none; }
+  }
+  @media (max-width: 640px){
+    .wrap{ padding:1.1rem .9rem 6rem; }
+    .page-head h1{ font-size:22px; }
+    .page-head{ flex-direction:column; align-items:stretch; }
+    .btn-new{ justify-content:center; min-height:44px; }
+    .user-id{ display:none; }
+    .asrole{ position:static; padding:8px 12px; }
+    .tban{ height:118px; }
+    .tbody{ padding:12px 14px 12px; }
+    .tacts{ padding:0 14px 14px; }
+    .tacts .btn{ min-height:44px; flex:1; justify-content:center; }
+    .tacts .btn.ghost{ flex:0 1 auto; }
+    .cells li{ width:24px; height:22px; }
+    .crow{ padding:.75rem .85rem .85rem; }
+    .crow-top .cr-stat{ margin-left:0; flex-basis:100%; }
+  }
+</style>
+</head>
+<body>
+
+<header class="board-head">
+  <span><b>MOCKUP</b> · turmas · <b>v1a</b> — variante “banner de perfil”</span>
+  <span class="dir"><b>Direção:</b> port do PessoaBanner pra turma — campo ink, tinta própria (T1 lima · T2 âmbar), sigla fantasma gigante, emblema-dial, linha de dados mono. Título “Turma N”; o ano sai do título e fica pequeno.</span>
+  <nav>
+    <a href="#cards">Cards</a>
+    <a href="#crono">Cronograma</a>
+    <a href="#notas">Notas</a>
+  </nav>
+</header>
+
+<div class="asrole"><span class="who">Coordenação</span><span class="why">/turmas é exclusiva desse papel — os demais redirecionam pro início (por isso não há seletor de visão nesta tela).</span></div>
+
+<div class="app">
+
+  <div class="topbar"><div class="topbar-in">
+    <a class="brand" href="#"><span class="brand-mark" aria-hidden="true"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="hsl(78 60% 20%)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21v-9"/><path d="M12 12c0-3.9 2.7-6.5 6.5-6.5 0 3.8-2.7 6.5-6.5 6.5z"/><path d="M12 12c0-3.9-2.7-6.5-6.5-6.5 0 3.8 2.7 6.5 6.5 6.5z"/></svg></span><span class="brand-name">realiza<span>.vc</span></span></a>
+    <nav class="topnav" aria-label="Principal"><a href="#">Início</a><a href="#">Duplas</a><a href="#">Agenda</a><a href="#">Pessoas</a><a href="#">Materiais</a><a href="#" class="is-on" aria-current="page">Turmas</a></nav>
+    <div class="user"><div class="user-id"><b>Marina Costa</b><small>Coordenação</small></div><span class="uav" aria-hidden="true">MC</span></div>
+  </div></div>
+
+  <main class="wrap">
+    <div class="page-head">
+      <div>
+        <p class="kicker">Operação</p>
+        <h1>Turmas e cronogramas</h1>
+        <p class="sub"><b>2 turmas ativas</b> · 26 duplas no ciclo · o calendário oficial de cada turma</p>
+      </div>
+      <a class="btn-new" href="#"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Novo cronograma</a>
+    </div>
+
+    <!-- ======================= CARDS ======================= -->
+    <ul class="tgrid" id="cards">
+
+      <!-- TURMA 1 — tinta lima -->
+      <li><article class="tcard t-t1">
+        <div class="tban" aria-hidden="true">
+          <svg class="tban-art" viewBox="0 0 800 150" preserveAspectRatio="xMidYMid slice">
+            <rect width="800" height="150" fill="var(--brand-ink)"/>
+            <!-- relevo: arcos concêntricos (impressão da turma) -->
+            <g fill="none" stroke="var(--brand-lime)" stroke-opacity=".13">
+              <circle cx="150" cy="168" r="38"/><circle cx="150" cy="168" r="66"/><circle cx="150" cy="168" r="96"/><circle cx="150" cy="168" r="128"/><circle cx="150" cy="168" r="164"/><circle cx="150" cy="168" r="204"/>
+            </g>
+            <g fill="none" stroke="var(--brand-lime)" stroke-opacity=".09">
+              <circle cx="470" cy="-30" r="42"/><circle cx="470" cy="-30" r="72"/><circle cx="470" cy="-30" r="104"/>
+            </g>
+            <!-- sigla fantasma — identificação imediata (central: o slice
+                 corta as laterais nos estreitos, o miolo nunca sai de cena) -->
+            <text x="430" y="140" text-anchor="middle" font-family="Inter, sans-serif" font-weight="800" font-size="150" letter-spacing="-.05em" fill="var(--brand-lime)" fill-opacity=".16">T1</text>
+          </svg>
+          <p class="bline">Ciclo 2026/2027 · Terças 19h · Semana do enc. 8/16</p>
+          <!-- emblema-dial: anel + 1 traço + ponto cheio -->
+          <svg class="bemblem" width="52" height="52" viewBox="0 0 52 52">
+            <circle cx="26" cy="26" r="22" fill="none" stroke="var(--brand-lime)" stroke-width="2.5"/>
+            <line x1="26" y1="11.5" x2="26" y2="18" stroke="var(--brand-lime)" stroke-width="3.5" stroke-linecap="round"/>
+            <circle cx="26" cy="26" r="4" fill="var(--brand-lime)"/>
+          </svg>
+        </div>
+
+        <div class="tbody">
+          <div class="trow"><h3>Turma 1<span class="sigla">T1</span></h3><span class="pill p-ok">Ativa</span></div>
+          <p class="tmeta">Ciclo <b>2026/2027</b> · 19 ago → fev/27 · encontros às <b>terças, 19h</b></p>
+          <div class="agora">
+            <span class="a-ic" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 1.8"/></svg></span>
+            <div class="a-tx"><b>Semana do encontro 8 — hoje, ter 7/out</b><span>19h no Meet · 11 de 14 duplas com encontro agendado</span><small>Roda de conversa com as famílias qui 9/out 19h30 (evento oficial)</small></div>
+            <div class="a-prog"><b>8<span style="font-size:11px;font-weight:700;color:var(--muted-foreground)">/16</span></b><small>encontros</small><span class="mini-bar"><i style="width:50%"></i></span></div>
+          </div>
+        </div>
+
+        <div class="faixa" role="group" aria-label="Números da Turma 1">
+          <div><b>14</b><span>duplas</span><small>1 pausada fora da conta</small></div>
+          <div><b>14</b><span>mentores</span><small>inclui André (também na T2)</small></div>
+          <div><b>14</b><span>jovens</span><small>1 supervisionada por dupla</small></div>
+        </div>
+
+        <div class="tacts">
+          <a class="btn pri" href="#">Abrir cronograma</a>
+          <a class="btn" href="#">Editar</a>
+          <a class="btn ghost" href="#">Ver duplas da turma ›</a>
+        </div>
+      </article></li>
+
+      <!-- TURMA 2 — tinta âmbar -->
+      <li><article class="tcard t-t2">
+        <div class="tban" aria-hidden="true">
+          <svg class="tban-art" viewBox="0 0 800 150" preserveAspectRatio="xMidYMid slice">
+            <rect width="800" height="150" fill="var(--brand-ink)"/>
+            <g fill="none" stroke="var(--amber)" stroke-opacity=".14">
+              <circle cx="180" cy="-22" r="34"/><circle cx="180" cy="-22" r="62"/><circle cx="180" cy="-22" r="92"/><circle cx="180" cy="-22" r="124"/><circle cx="180" cy="-22" r="158"/>
+            </g>
+            <g fill="none" stroke="var(--amber)" stroke-opacity=".09">
+              <circle cx="500" cy="176" r="46"/><circle cx="500" cy="176" r="78"/><circle cx="500" cy="176" r="112"/>
+            </g>
+            <text x="430" y="140" text-anchor="middle" font-family="Inter, sans-serif" font-weight="800" font-size="150" letter-spacing="-.05em" fill="var(--amber)" fill-opacity=".17">T2</text>
+          </svg>
+          <p class="bline">Ciclo 2026/2027 · Quartas 19h · Semana do enc. 5/16</p>
+          <!-- emblema-dial: anel + 2 traços + ponto cheio -->
+          <svg class="bemblem" width="52" height="52" viewBox="0 0 52 52">
+            <circle cx="26" cy="26" r="22" fill="none" stroke="var(--amber)" stroke-width="2.5"/>
+            <line x1="17.5" y1="13.5" x2="20.5" y2="19.5" stroke="var(--amber)" stroke-width="3.5" stroke-linecap="round"/>
+            <line x1="34.5" y1="13.5" x2="31.5" y2="19.5" stroke="var(--amber)" stroke-width="3.5" stroke-linecap="round"/>
+            <circle cx="26" cy="26" r="4" fill="var(--amber)"/>
+          </svg>
+        </div>
+
+        <div class="tbody">
+          <div class="trow"><h3>Turma 2<span class="sigla">T2</span></h3><span class="pill p-ok">Ativa</span></div>
+          <p class="tmeta">Ciclo <b>2026/2027</b> · 10 set → mar/27 · encontros às <b>quartas, 19h</b> · <b>começou 3 semanas depois</b></p>
+          <div class="agora">
+            <span class="a-ic" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 1.8"/></svg></span>
+            <div class="a-tx"><b>Semana do encontro 5 — amanhã, qua 8/out</b><span>19h · presencial (locais por dupla) · 9 de 12 duplas com encontro agendado</span><small>Formação de mentores sáb 11/out 10h–12h (evento oficial)</small></div>
+            <div class="a-prog"><b>5<span style="font-size:11px;font-weight:700;color:var(--muted-foreground)">/16</span></b><small>encontros</small><span class="mini-bar"><i style="width:31%"></i></span></div>
+          </div>
+        </div>
+
+        <div class="faixa" role="group" aria-label="Números da Turma 2">
+          <div><b>12</b><span>duplas</span><small>1 pausada, 1 em risco</small></div>
+          <div><b>11</b><span>mentores</span><small>Renata com 2 duplas</small></div>
+          <div><b>12</b><span>jovens</span><small>pedido “Finanças” no mural</small></div>
+        </div>
+
+        <div class="tacts">
+          <a class="btn pri" href="#">Abrir cronograma</a>
+          <a class="btn" href="#">Editar</a>
+          <a class="btn ghost" href="#">Ver duplas da turma ›</a>
+        </div>
+      </article></li>
+    </ul>
+
+    <!-- ======================= CRONOGRAMA (apoio) ======================= -->
+    <section class="crono" id="crono" aria-label="Cronograma oficial">
+      <div class="crono-head">
+        <h2>Os 16 encontros de cada turma</h2>
+        <p>referência do semáforo — “semana do encontro N” é por cronograma, nunca global</p>
+      </div>
+      <div class="crono-list">
+
+        <div class="crow cr-t1" style="--ttb: var(--ok)">
+          <div class="crow-top">
+            <span class="cchip c-t1">T1</span><b>Turma 1</b><small>terças 19h · ciclo 2026/2027</small>
+            <span class="cr-stat"><b>7 realizados</b> · encontro 8 hoje · 8 futuros</span>
+          </div>
+          <ol class="cells" aria-label="Encontros da Turma 1: 1 a 7 realizados, 8 hoje, 9 a 16 futuros">
+            <li class="done">1</li><li class="done">2</li><li class="done">3</li><li class="done">4</li><li class="done">5</li><li class="done">6</li><li class="done">7</li><li class="now" title="Encontro 8 — hoje, ter 7/out 19h">8</li><li>9</li><li>10</li><li>11</li><li>12</li><li>13</li><li>14</li><li>15</li><li>16</li>
+          </ol>
+          <div class="crow-leg">
+            <span class="tag">◂ realizados</span><span class="tag">8 = hoje</span><span class="tag">previstos ▸</span>
+            <span class="tag ev">＋ roda de conversa qui 9/out · encerramento fev/27</span>
+          </div>
+        </div>
+
+        <div class="crow cr-t2" style="--ttb: hsl(45 85% 38%)">
+          <div class="crow-top">
+            <span class="cchip c-t2">T2</span><b>Turma 2</b><small>quartas 19h · ciclo 2026/2027 · começou 3 semanas depois</small>
+            <span class="cr-stat"><b>4 realizados</b> · encontro 5 amanhã · 11 futuros</span>
+          </div>
+          <ol class="cells" aria-label="Encontros da Turma 2: 1 a 4 realizados, 5 amanhã, 6 a 16 futuros">
+            <li class="done">1</li><li class="done">2</li><li class="done">3</li><li class="done">4</li><li class="now" title="Encontro 5 — amanhã, qua 8/out 19h">5</li><li>6</li><li>7</li><li>8</li><li>9</li><li>10</li><li>11</li><li>12</li><li>13</li><li>14</li><li>15</li><li>16</li>
+          </ol>
+          <div class="crow-leg">
+            <span class="tag">◂ realizados</span><span class="tag">5 = amanhã</span><span class="tag">previstos ▸</span>
+            <span class="tag ev">＋ formação sáb 11/out · encerramento mar/27</span>
+          </div>
+        </div>
+
+        <div class="crow arch">
+          <div class="arch-line">
+            <span class="cchip">2025</span><span><b style="color:var(--brand-ink)">Ciclo piloto 2025</b> · encerrado em fev/2026 · 11 duplas · 13 encontros realizados</span>
+            <a href="#">ver arquivo ›</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======================= NOTAS ======================= -->
+    <ul class="notes" id="notas">
+      <li><b>Papel × ação:</b> só <b>Coordenação</b> vê /turmas — mentor, auxiliar e jovem são redirecionados (RLS + guarda de rota), por isso esta tela não tem seletor de visão. Ações dela: abrir/editar cronograma e criar novo. Ela <b>monitora</b>: quem agenda encontro é a dupla — não há “agendar” aqui, e nudge mora na agenda/duplas.</li>
+      <li><b>Nomeação (o pedido do feedback):</b> título vira <b>“Turma N”</b> e o ano sai do título — fica pequeno na linha de dados do banner (“CICLO 2026/2027 · TERÇAS 19H”) e na meta do corpo. Sigla <b>T1/T2</b> é a forma curta pra chips, pills e filtros em outras telas. No código, <code>partesTurma()</code> já quebra “T1 · 2026/2027” → {nome, ano} (REALIZA-151); falta o sweep nos consumers que mostram “2026/2027” solto.</li>
+      <li><b>Marca de turma:</b> mesma gramática do PessoaBanner — campo ink, relevo de arcos, nome/sigla fantasma sangrando, emblema no canto e linha de dados mono. O emblema é um <b>dial com N traços</b> (T1 = um, T2 = dois) + ponto cheio — escala pra T3 sem virar ornamento.</li>
+      <li><b>Variante v1a (este arquivo):</b> banner alto ocupando o topo do card — identidade na largura toda; stats em faixa edge-to-edge; “semana do encontro N” como bloco funcional tintado. Comparar com v1b (credencial: sigla gigante em lombada lateral + corpo denso).</li>
+      <li><b>Sem banner de escopo</b> (“Você vê…”) — decisão já tomada nos mocks de duplas: privacidade é RLS; escopo fica aqui nas notas.</li>
+      <li class="warn"><b>Decisões em aberto:</b> (a) “terças 19h” não é campo do cronograma hoje — vira campo (`dia_semana`/`hora`) ou deriva dos encontros marcados? (b) tinta por turma: fixa por ordem (T1 lima, T2 âmbar) esgota os tokens na T3 — alternativa: seedada do id como o relevo da pessoa; (c) âmbar hoje é “a cor do jovem” — reusar como tinta de turma dilui a gramática de papel? (d) “11 de 14 com encontro agendado” exige contagem por cronograma na semana — custo de query aceitável? (e) a cor da turma vaza pros pills T1/T2 na agenda/duplas ou fica só nesta página?</li>
+    </ul>
+  </main>
+
+  <nav class="bnav" aria-label="Navegação principal">
+    <a href="#"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m4 10.5 8-7 8 7"/><path d="M6 9.3V20h12V9.3"/></svg>Início</a>
+    <a href="#"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9.5" cy="8" r="3.2"/><path d="M3.6 19.2c.7-3.3 3-5.2 5.9-5.2s5.2 1.9 5.9 5.2"/><path d="M15.2 5.3a3.2 3.2 0 0 1 0 5.5"/><path d="M17 14.4c2 .7 3.2 2.4 3.6 4.8"/></svg>Duplas</a>
+    <a href="#"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9.5" cy="8" r="3.2"/><path d="M3.6 19.2c.7-3.3 3-5.2 5.9-5.2s5.2 1.9 5.9 5.2"/><path d="M15.2 5.3a3.2 3.2 0 0 1 0 5.5"/><path d="M17 14.4c2 .7 3.2 2.4 3.6 4.8"/></svg>Pessoas</a>
+    <a href="#"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5.5" width="16" height="15" rx="2.2"/><path d="M4 10.5h16M8.5 3.5v4M15.5 3.5v4"/></svg>Agenda</a>
+    <a href="#" class="on" aria-current="page"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="7" r="2.6"/><circle cx="17" cy="7" r="2.6"/><circle cx="12" cy="17" r="2.6"/></svg>Mais</a>
+  </nav>
+</div>
+</body>
+</html>

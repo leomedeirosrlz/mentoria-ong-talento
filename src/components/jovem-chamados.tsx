@@ -5,10 +5,12 @@ import { CaretRight, Lifebuoy } from "@phosphor-icons/react";
 import type { ChamadoFilaItem, ChamadoTimelineItem, Profile } from "@/lib/types";
 import {
   CHAMADO_CATEGORIA_LABEL,
-  CHAMADO_STATUS_LABEL,
   formatDiaMes,
 } from "@/lib/ciclo";
-import { ChamadoDetalhe } from "@/components/chamados-app";
+import {
+  ChamadoDetalhe,
+  ChamadoStatusBadge,
+} from "@/components/chamados-app";
 
 /** "Meus pedidos" do jovem dentro do perfil (0084): os chamados dele com a
  *  conversa pública — sem comentário interno, sem nome de quem respondeu,
@@ -45,7 +47,7 @@ export function JovemChamados({
             Meus pedidos de ajuda
           </h2>
           <p className="text-xs text-muted-foreground">
-            O que você pediu e o que a equipe respondeu — só você e a equipe veem.
+            O que você pediu e o que a equipe respondeu. Só você e a equipe veem.
           </p>
         </div>
       </div>
@@ -53,6 +55,7 @@ export function JovemChamados({
       {detalhe && cSel === detalhe.chamado.id ? (
         <div className="mt-4">
           <ChamadoDetalhe
+            key={detalhe.chamado.id}
             papel="mentorado"
             meuId={meuId}
             meuNome={meuNome}
@@ -60,6 +63,9 @@ export function JovemChamados({
             timeline={detalhe.timeline}
             equipe={detalhe.equipe}
             onVoltar={() => router.push("/jovem/perfil")}
+            // aqui o detalhe substitui a lista — o voltar precisa existir
+            // no desktop também, senão não há caminho de volta
+            voltarDesktop
           />
         </div>
       ) : itens.length === 0 ? (
@@ -81,17 +87,15 @@ export function JovemChamados({
                     <span className="font-mono text-xs text-muted-foreground">
                       {c.numero}
                     </span>
-                    <span className="text-xs font-medium">
-                      {CHAMADO_STATUS_LABEL[c.status]}
-                    </span>
+                    <ChamadoStatusBadge
+                      status={c.status}
+                      dono={c.atribuido_nome}
+                      visao="autor"
+                      className="text-[10px]"
+                    />
                     <span className="text-xs text-muted-foreground">
                       {CHAMADO_CATEGORIA_LABEL[c.categoria]}
                     </span>
-                    {c.atribuido_nome && c.status !== "resolvido" && (
-                      <span className="text-xs text-muted-foreground">
-                        Responsável: {c.atribuido_nome.split(" ")[0]}
-                      </span>
-                    )}
                   </div>
                   <p className="mt-0.5 truncate text-sm">{c.assunto}</p>
                 </div>

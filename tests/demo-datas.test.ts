@@ -15,10 +15,12 @@ describe("datas do dataset demo", () => {
   const hojeSP = toDateStr(new Date());
   const { seg, dom } = semanaBounds(new Date());
 
-  it("o 5º encontro da T1 cai na próxima terça (inclusive se hoje for terça)", () => {
-    // Âncora do cronograma T1: `((2 - dow) + 7) % 7` dias à frente — de
-    // quarta a domingo a "semana corrente" da história é a da próxima terça,
-    // pra o encontro recente nunca ficar no passado demais.
+  it("o 5º encontro da T1 cai na terça da semana corrente (seg–dom)", () => {
+    // Âncora do cronograma T1: a terça DESTA semana ISO — de quarta a
+    // domingo ela já passou (o encontro recente fica vencido, a coluna
+    // "semana" do panorama acende e a T2 empilha: o 1º enc. dela é esta
+    // mesma terça); seg/ter ainda está por vir. A âncora anterior mirava
+    // a próxima terça e deixava a semana sem célula "a acontecer".
     const ev5 = data.cicloEventos.find(
       (e) =>
         e.tipo === "encontro" &&
@@ -28,10 +30,7 @@ describe("datas do dataset demo", () => {
     );
     expect(ev5).toBeDefined();
     expect(dowDaData(ev5!.data!)).toBe(2); // terça
-    const limite = new Date(`${hojeSP}T12:00:00Z`);
-    limite.setUTCDate(limite.getUTCDate() + 6);
-    expect(ev5!.data! >= hojeSP).toBe(true);
-    expect(ev5!.data! <= limite.toISOString().slice(0, 10)).toBe(true);
+    expect(ev5!.data! >= seg && ev5!.data! <= dom).toBe(true);
   });
 
   it("as exceções ancoradas em HOJE caem dentro da semana corrente", () => {

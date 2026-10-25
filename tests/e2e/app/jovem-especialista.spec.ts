@@ -22,8 +22,8 @@ import type { Page } from "@playwright/test";
 // (REALIZA-139/146) mudou o endereço: a home /jovem ficou só com o
 // card-CTA vivo e a mesa de pedidos + o cardápio foram pra
 // /jovem/especialistas — os asserts de pedido leem a seção #pedidos de lá:
-//   1) home /jovem: o card-CTA — trilha em andamento pro jovem com trilha,
-//      convite "Quer o apoio?" pra quem não tem nada;
+//   1) home /jovem: o card-CTA — trilha sem horário pro jovem com trilha,
+//      seção ausente pra quem não tem nada (o convite quieto saiu);
 //   2) pedido DIRIGIDO com slot da grade real — par novo, então a demanda
 //      rica é exigida (o gate é por PAR: a trilha ativa do jovem é com OUTRO
 //      especialista, não libera motivo-curto pro alvo novo — bug que este
@@ -117,6 +117,16 @@ const secaoPedidos = (page: Page) => page.locator("section#pedidos");
 /** Mural do especialista — section rotulada da home staff. */
 const mural = (page: Page) =>
   page.locator('section[aria-label="Pedidos de mentoria especializada"]');
+
+/** A lista do mural mora num <details> fechado por padrão (rodada
+ *  out/2026) — abre antes de ler os cards. Idempotente. */
+async function abrirMural(page: Page) {
+  const det = page.locator("details#mural-especialista");
+  await det.locator("summary").waitFor({ state: "visible", timeout: 15_000 });
+  if (!(await det.evaluate((el) => el.hasAttribute("open")))) {
+    await det.locator("summary").click();
+  }
+}
 
 /** A turma real da dupla — o sol semeado carrega a da dupla DPP, como o
  *  insert da RPC faz (sol_efetivar usa a turma da sol pro par). */
@@ -259,37 +269,29 @@ test.describe("pedido de especialista pelo jovem (REALIZA-112 PR2)", () => {
     await expect(
       secao.getByRole("heading", { name: "Especialistas" })
     ).toBeVisible();
-    // estado "trilha em andamento": badge de sessão, tema do pedido de
-    // origem, próximo passo sem horário (o cleanup zera os encontros dela)
+    // estado "trilha em andamento sem horário": o card inteiro é o gesto —
+    // título "A sessão N ainda precisa de horário", sub com tema do pedido
+    // + esp (o cleanup zera os encontros dela)
     await expect(
-      secao.getByText(/Trilha em andamento · sessão \d de 5/)
+      secao.getByText(/A sessão \d ainda precisa de horário/)
     ).toBeVisible();
     await expect(
       secao.getByText(/mentoria especializada \(vestibular e rotina de estudos\)\.? com Esp/i)
     ).toBeVisible();
-    await expect(
-      secao.getByText(/sessão \d ainda precisa de horário/i)
-    ).toBeVisible();
-    // o gesto é ir pra página — o link ancora na seção de trilhas
-    const link = secao.getByRole("link", { name: /Abrir minha trilha/ });
+    // o gesto é ir pra página — o card é o link e ancora nas trilhas
+    const link = secao.getByRole("link");
     await expect(link).toHaveAttribute(
       "href",
       "/jovem/especialistas#trilhas"
     );
 
-    // jovem2 — sem trilha nem pedido: o card cai no convite quieto
+    // jovem2 — sem trilha nem pedido: a seção some da home (ela só aparece
+    // com ação; o convite quieto saiu no redesign) e a página de
+    // especialistas segue aberta direto, com o cardápio pra ele
     await relogar(page, JOVEM2_EMAIL, SENHA);
     await page.goto("/jovem");
-    const secao2 = secaoEsp(page);
-    await expect(
-      secao2.getByText("Quer o apoio de um especialista?")
-    ).toBeVisible();
-    await expect(
-      secao2.getByRole("link", { name: "Conhecer" })
-    ).toHaveAttribute("href", "/jovem/especialistas");
-    // e a página de especialistas abre com o cardápio pra ele
-    await secao2.getByRole("link", { name: "Conhecer" }).click();
-    await page.waitForURL("**/jovem/especialistas");
+    await expect(secaoEsp(page)).toHaveCount(0);
+    await page.goto("/jovem/especialistas");
     await expect(
       page.getByRole("heading", { name: "Especialistas" })
     ).toBeVisible();
@@ -547,6 +549,7 @@ test.describe("pedido de especialista pelo jovem (REALIZA-112 PR2)", () => {
     // jovem e o selo de origem — a leitura é a do staff, não a do autor
     await relogar(page, ESP_EMAIL, SENHA);
     await page.goto("/");
+    await abrirMural(page);
     const card = mural(page).locator("li", { hasText: MOTIVO_MURAL });
     await expect(card.getByText("Mentorada E2E")).toBeVisible();
     await expect(card.getByText("pedido do jovem")).toBeVisible();

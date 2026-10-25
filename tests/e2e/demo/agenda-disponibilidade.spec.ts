@@ -32,7 +32,7 @@ test("agenda do mentor demo: legenda + tinta 'ambos livres' + detalhe do dia", a
   await expect(celAmbos).toBeVisible();
   await expect(
     page
-      .locator('div[role="gridcell"] button span[style*="linear-gradient"]')
+      .locator('div[role="gridcell"] button span[data-tinta="ambos"]')
       .first()
   ).toBeAttached();
 
@@ -61,4 +61,8 @@ test("agenda demo da coordenação não tem o overlay", async ({ page }) => {
   await expect(page.locator('div[role="grid"]')).toBeVisible();
   await expect(page.getByText("Disponibilidade:")).toHaveCount(0);
   await expect(page.getByRole("button", { name: /livre/ })).toHaveCount(0);
+  // nem uma célula pintada — o overlay é prop exclusiva do mentor DPP
+  // puro: staff nunca recebe `mentorDisponibilidade` (o gate do page.tsx
+  // exclui híbridos também — nada de grade de mentor em superfície staff)
+  await expect(page.locator("[data-tinta]")).toHaveCount(0);
 });

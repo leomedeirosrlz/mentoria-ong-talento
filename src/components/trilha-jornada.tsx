@@ -42,46 +42,17 @@ const DISCO: Record<EstadoNoJornada, string> = {
   futuro: "bg-muted text-muted-foreground",
 };
 
-/** Mini-chave da legenda — mesmo código visual do DISCO, em ponto de 8px.
- *  Só entram na legenda os estados presentes na jornada (a chave explica o
- *  que existe naquela trilha, não o universo possível). */
-const CHAVE_ORDEM: EstadoNoJornada[] = [
-  "realizado_completo",
-  "pendente_registro",
-  "limbo",
-  "agendado",
-  "nao_aconteceu",
-  "futuro",
-];
-
-const CHAVE_LABEL: Record<EstadoNoJornada, string> = {
-  realizado_completo: "com registro",
-  pendente_registro: "registro pendente",
-  limbo: "a confirmar",
-  agendado: "agendado",
-  nao_aconteceu: "não aconteceu",
-  futuro: "a caminho",
-};
-
-function chaveDot(estado: EstadoNoJornada): React.ReactNode {
+/** Legenda visível só com o que o mentor precisa ler: feito, pendente e o
+ *  próximo passo. Os demais estados (agendado, a confirmar, não aconteceu,
+ *  a caminho) seguem no aria-label/title de cada bolinha. */
+function chaveDot(estado: "realizado_completo" | "pendente_registro" | "proximo"): React.ReactNode {
   switch (estado) {
     case "realizado_completo":
       return <span aria-hidden className="size-2 rounded-full bg-[var(--brand-lime)]" />;
     case "pendente_registro":
       return <span aria-hidden className="size-2 rounded-full bg-[var(--warn)]" />;
-    case "limbo":
-      return <span aria-hidden className="size-2 rounded-full ring-1 ring-inset ring-[var(--warn)]/70" />;
-    case "agendado":
-      return <span aria-hidden className="size-2 rounded-full bg-[var(--brand-lime)]/20 ring-1 ring-inset ring-[var(--brand-lime)]/60" />;
-    case "nao_aconteceu":
-      // disco apagado e riscado, como o nó na trilha
-      return (
-        <span aria-hidden className="relative size-2 rounded-full bg-muted">
-          <span className="absolute inset-x-[-1px] top-1/2 h-px -translate-y-1/2 -rotate-45 bg-muted-foreground/70" />
-        </span>
-      );
-    case "futuro":
-      return <span aria-hidden className="size-2 rounded-full bg-muted" />;
+    case "proximo":
+      return <span aria-hidden className="size-2 rounded-full ring-2 ring-[var(--brand-lime)]" />;
   }
 }
 
@@ -151,8 +122,8 @@ export function TrilhaJornada({
   const refStrip = useRef<HTMLOListElement | null>(null);
 
   // fade de 16px nas bordas do scroll horizontal — só quando há overflow de
-  // fato; trilha que cabe inteira (desktop largo, os 5 nós da especialista)
-  // não pode esmaecer os nós das pontas
+  // fato (mobile: os 16 nós não cabem); no sm+ a trilha preenche o card sem
+  // rolar e a máscara sai, senão esmaecia os nós das pontas
   useEffect(() => {
     const el = refStrip.current;
     if (!el) return;
@@ -174,10 +145,11 @@ export function TrilhaJornada({
     return () => ro.disconnect();
   }, []);
 
-  // strip rola horizontal no mobile (16 nós ≈ 470px > 375px) — sem o scroll
-  // o passo atual sairia da tela; mesmo padrão do rail da agenda. Rola o ol
-  // direto (nunca o documento): scrollIntoView agiria no scrollport mais
-  // próximo, que é a página inteira — ela descia até o nó ao carregar
+  // strip rola horizontal só no mobile (16 alvos de 44px ≈ 800px > 375px) —
+  // sem o scroll o passo atual sairia da tela; mesmo padrão do rail da
+  // agenda. Rola o ol direto (nunca o documento): scrollIntoView agiria no
+  // scrollport mais próximo, que é a página inteira — ela descia até o nó
+  // ao carregar
   useEffect(() => {
     const el = refAtual.current;
     const strip = el?.closest("ol");
@@ -197,6 +169,15 @@ export function TrilhaJornada({
 
   const noAtual = jornada.nos.find((n) => n.numero === jornada.proximoNumero);
   const estadosPresentes = new Set(jornada.nos.map((n) => n.estado));
+  const legenda: { chave: "realizado_completo" | "pendente_registro" | "proximo"; texto: string }[] = [
+    ...(estadosPresentes.has("realizado_completo")
+      ? [{ chave: "realizado_completo" as const, texto: "feito" }]
+      : []),
+    ...(estadosPresentes.has("pendente_registro")
+      ? [{ chave: "pendente_registro" as const, texto: "pendente" }]
+      : []),
+    ...(noAtual ? [{ chave: "proximo" as const, texto: "próximo" }] : []),
+  ];
   const percorrido = (n: NoJornada) =>
     n.estado === "realizado_completo" ||
     n.estado === "pendente_registro" ||
@@ -216,18 +197,18 @@ export function TrilhaJornada({
   return (
     <section aria-label="Jornada da dupla">
       <div className="flex items-center justify-between gap-2">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-          Jornada
-        </p>
+        <h2 className="text-base font-semibold">Jornada</h2>
         <p className="text-xs font-medium text-muted-foreground tabular-nums">
           {jornada.feitos} de {jornada.total}
         </p>
       </div>
 
-      {/* pt-2.5 abre espaço pro marcador de marco que flutua acima do disco */}
+      {/* pt-2.5 abre espaço pro marcador de marco que flutua acima do disco.
+          Barra oculta sempre: quando rola (mobile) a máscara de fade é o
+          indicador de continuação, não a barra */}
       <ol
         ref={refStrip}
-        className="scroll-fina mt-1 flex items-center overflow-x-auto pt-2.5 pb-1"
+        className="mt-1 flex items-center overflow-x-auto pt-2.5 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {jornada.nos.map((no, i) => {
           const atual = no.numero === jornada.proximoNumero;
@@ -246,27 +227,31 @@ export function TrilhaJornada({
                   className={cn(
                     "h-px flex-1",
                     // gap maior na virada de fase — os grupos ficam implícitos,
-                    // o nome da fase corrente vive na caption
-                    viradaFase ? "min-w-3" : "min-w-1.5",
+                    // o nome da fase corrente vive na caption. No sm+ o mínimo
+                    // encolhe: 16 nós de 24px + mínimos precisam caber no card
+                    // de ~448px (xl com 2 colunas) sem rolar
+                    viradaFase ? "min-w-3 sm:min-w-2" : "min-w-1.5 sm:min-w-0.5",
                     percorrido(jornada.nos[i - 1]) && percorrido(no)
                       ? "bg-[var(--brand-lime)]"
                       : "bg-border"
                   )}
                 />
               )}
-                {/* size-11→sm:size-9 = hit area de 44px (mobile) / 36px (sm+)
-                    em volta do disco de 24–28px — tocar o passo abre o card
-                    dele na ficha */}
+                {/* size-11→sm:size-6 = hit area de 44px (mobile, por isso a
+                    trilha rola) / 24px (sm+, mínimo de alvo pointer — assim os
+                    16 nós cabem no card sem rolagem). Tocar o passo abre o
+                    card dele na ficha */}
                 <Link
+                  // o nó abre a aba Encontros; com encontro, leva ao card dele
                   href={
                     no.encontro
-                      ? `/duplas/${duplaId}#registrar-${no.encontro.id}`
-                      : `/duplas/${duplaId}`
+                      ? `/duplas/${duplaId}?aba=encontros#registrar-${no.encontro.id}`
+                      : `/duplas/${duplaId}?aba=encontros`
                   }
                   aria-label={rotulo}
                   title={rotulo}
                   aria-current={atual ? "step" : undefined}
-                  className="group grid size-11 place-items-center rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring sm:size-9"
+                  className="group grid size-11 place-items-center rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring sm:size-6"
                 >
                   <span className="relative">
                     {atual && (
@@ -283,7 +268,7 @@ export function TrilhaJornada({
                     )}
                     <span
                       className={cn(
-                        "relative grid size-6 place-items-center rounded-full font-mono text-[11px] font-semibold leading-none tabular-nums transition-transform group-hover:scale-110 sm:size-7",
+                        "relative grid size-6 place-items-center rounded-full font-mono text-[11px] font-semibold leading-none tabular-nums transition-transform group-hover:scale-110",
                         DISCO[no.estado]
                       )}
                     >
@@ -330,14 +315,16 @@ export function TrilhaJornada({
       {/* mini-chave junto dos dots — só os estados presentes na jornada:
           trilha no início não fala de pendência, trilha limpa não fala de
           "não aconteceu" (chave explica o que existe, não o universo) */}
-      <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-        {CHAVE_ORDEM.filter((e) => estadosPresentes.has(e)).map((e) => (
-          <span key={e} className="flex items-center gap-1.5">
-            {chaveDot(e)}
-            {CHAVE_LABEL[e]}
-          </span>
-        ))}
-      </p>
+      {legenda.length > 0 && (
+        <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+          {legenda.map((item) => (
+            <span key={item.chave} className="flex items-center gap-1.5">
+              {chaveDot(item.chave)}
+              {item.texto}
+            </span>
+          ))}
+        </p>
+      )}
     </section>
   );
 }

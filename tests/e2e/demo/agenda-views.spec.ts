@@ -32,17 +32,15 @@ test.describe("agenda demo — visões Semana e Horários (REALIZA-25)", () => {
       .click();
 
     // o grid horário — o template de colunas distingue do rail (ambos usam
-    // .scroll-fina); a tinta "ambos" assina linear-gradient(135deg — a trama
-    // de linhas é repeating-linear-gradient e ficaria num contains largo
+    // .scroll-fina); a tinta "ambos" marca com data-tinta — o gradiente
+    // inline é detalhe de render que o spec não conhece
     const grade = page.locator("div[class*='grid-cols-[2.5rem']");
     // a régua de horas cobre a noite inteira
     await expect(grade.getByText("19h", { exact: true })).toBeVisible();
 
     // Ricardo × Bia cruzam à noite de ter/qui — o split "ambos" pinta as
     // quatro faixas 18–21h nos dois dias (diagonal, como na visão real)
-    await expect(
-      grade.locator('span[style*="linear-gradient(135deg"]')
-    ).toHaveCount(8);
+    await expect(grade.locator('span[data-tinta="ambos"]')).toHaveCount(8);
 
     // clique num slot vazio (quarta ~10h — fora da tinta e longe do bloco do
     // 5º encontro, que fica na terça às 19h) abre o seletor de dupla —
@@ -81,7 +79,9 @@ test.describe("agenda demo — visões Semana e Horários (REALIZA-25)", () => {
     await entrarNaDemo(page, "coordenacao");
     await page.goto("/agenda?aba=calendario");
 
-    for (const v of ["dia", "semana", "mes", "lista"])
+    // os quatro chips staff — dia/semana/mês/ciclo (o "lista" do rascunho
+    // virou a timeline agregada do REALIZA-195)
+    for (const v of ["dia", "semana", "mes", "ciclo"])
       await expect(
         page.locator(`input[name="agenda-visao"][value="${v}"]`)
       ).toBeAttached();
@@ -91,5 +91,32 @@ test.describe("agenda demo — visões Semana e Horários (REALIZA-25)", () => {
     await expect(
       page.getByRole("button", { name: /^Agendar encontro na / })
     ).toHaveCount(0);
+
+    // o chip Ciclo abre a timeline agregada — region própria da visão
+    await page
+      .locator("label", {
+        has: page.locator('input[name="agenda-visao"][value="ciclo"]'),
+      })
+      .click();
+    await expect(
+      page.getByRole("region", { name: /Timeline dos encontros do ciclo/ })
+    ).toBeVisible();
+  });
+
+  test("?jw=ciclo é deep-link staff: abre o calendário na timeline — com e sem ?aba=", async ({
+    page,
+  }) => {
+    await entrarNaDemo(page, "coordenacao");
+    const timeline = page.getByRole("region", {
+      name: /Timeline dos encontros do ciclo/,
+    });
+
+    // ?jw= implica aba=calendario — o param sozinho já pousa na visão
+    await page.goto("/agenda?jw=ciclo");
+    await expect(timeline).toBeVisible();
+
+    // idem com a aba explícita — os dois caminhos convergem no mesmo estado
+    await page.goto("/agenda?aba=calendario&jw=ciclo");
+    await expect(timeline).toBeVisible();
   });
 });

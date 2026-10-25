@@ -1,4 +1,3 @@
-import { headers } from "next/headers";
 import {
   getCicloEventos,
   getComunicados,
@@ -17,6 +16,7 @@ import {
 } from "@/lib/queries-especialista";
 import { getSupervisaoAlvos, getSupervisoesRecentes } from "@/lib/queries-supervisao";
 import { getMinhaAssinaturaTermo } from "@/lib/queries-assinaturas";
+import { getEncerramentosPendentes } from "@/lib/queries-encerramento";
 import { getChamados } from "@/lib/queries-chamados";
 import { temPapel } from "@/lib/types";
 import { DashboardCoordenacao } from "@/components/dashboard-coordenacao";
@@ -26,17 +26,11 @@ import { MentorHome } from "@/components/mentor-home";
 import { TermoBanner } from "@/components/termo-banner";
 import { AvisosSection } from "@/components/avisos-section";
 
-export default async function HomePage({
-  searchParams,
-}: {
-  searchParams: Promise<{ filtro?: string | string[] }>;
-}) {
-  const [me, eventos, cronogramas, h, params, avisos, assinatura] = await Promise.all([
+export default async function HomePage() {
+  const [me, eventos, cronogramas, avisos, assinatura] = await Promise.all([
     getMe(),
     getCicloEventos(),
     getCronogramas(),
-    headers(),
-    searchParams,
     getComunicados(),
     // termo de voluntariado vale pra equipe inteira (coord/sup/mentores) —
     // busca uma vez no topo; o branch de mentor reusa via React.cache
@@ -44,15 +38,13 @@ export default async function HomePage({
   ]);
   // um único instante pra página inteira — semáforo e "semana do encontro" consistentes
   const agora = new Date().toISOString();
-  const origem = `${h.get("x-forwarded-proto") ?? "https"}://${h.get("host")}`;
-  // ?filtro= alimenta os stat-cards do painel (risco | atencao | pendentes)
-  const filtro = typeof params.filtro === "string" ? params.filtro : undefined;
 
   if (me?.role === "coordenacao") {
-    const [duplas, pessoas, solicitacoes] = await Promise.all([
+    const [duplas, pessoas, solicitacoes, encerramentos] = await Promise.all([
       getDuplas(),
       getContagemPessoas(),
       getSolicitacoesVisiveis(),
+      getEncerramentosPendentes(),
     ]);
     const interacoes = await getUltimasInteracoes(duplas.map((d) => d.id), "nudge");
     // staff+especialista (papel secundário): o sino já notifica os pedidos —
@@ -69,20 +61,19 @@ export default async function HomePage({
     ]);
     return (
       <div className="space-y-8">
-        {assinatura?.status !== "assinado" && <TermoBanner />}
         <DashboardCoordenacao
           duplas={duplas}
           eventos={eventos}
           cronogramas={cronogramas}
           agora={agora}
-          origem={origem}
           interacoes={interacoes}
           pessoas={pessoas}
           avisos={avisos}
-          filtro={filtro}
           solicitacoes={solicitacoes}
+          encerramentos={new Set(Object.keys(encerramentos))}
           turmas={[...new Set(cronogramas.map((c) => c.turma))]}
           meuNome={me?.nome.split(" ")[0]}
+          termo={assinatura?.status !== "assinado" ? <TermoBanner /> : null}
         />
         {ehEsp && (
           <DemandasEspecialista
@@ -129,20 +120,18 @@ export default async function HomePage({
       : {};
     return (
       <div className="space-y-8">
-        {assinatura?.status !== "assinado" && <TermoBanner />}
         <DashboardCoordenacao
           duplas={duplas}
           eventos={eventos}
           cronogramas={cronogramas}
           agora={agora}
-          origem={origem}
           interacoes={interacoes}
           supervisor
           avisos={avisos}
-          filtro={filtro}
           supervisaoItens={supervisoes}
           supervisaoAlvos={supervisaoAlvos}
           meuNome={me?.nome.split(" ")[0]}
+          termo={assinatura?.status !== "assinado" ? <TermoBanner /> : null}
         />
         {ehEspSup && (
           <DemandasEspecialista
@@ -204,16 +193,18 @@ export default async function HomePage({
     }));
   return (
     <div className="space-y-8">
-      {/* null = nunca assinou — qualquer estado ≠ assinado pede a assinatura */}
-      {assinatura?.status !== "assinado" && <TermoBanner />}
       {/* contexto próprio → fila de pedidos → avisos: a saudação abre a
           página; o mural do especialista vem antes dos comunicados */}
+      {/* termo em faixa de largura total logo abaixo da saudação, antes das
+          duplas. null = nunca assinou — qualquer estado ≠ assinado pede a
+          assinatura */}
       <MentorHome
         duplas={duplas}
         eventos={eventos}
         espEventos={espEventos}
         cronogramas={cronogramas}
         me={me!}
+        termo={assinatura?.status !== "assinado" ? <TermoBanner /> : null}
       />
       <MeusChamadosCard
         chamados={meusChamados.itens}

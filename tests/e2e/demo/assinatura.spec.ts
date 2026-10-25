@@ -1,7 +1,7 @@
 import { entrarNaDemo, expect, test } from "../helpers";
 
 // REALIZA-172 — a página pública de assinatura no modo demo:
-//   · a faixa "Demonstração — nada aqui é assinado de verdade" no topo (a
+//   · a faixa "Demonstração: nada aqui é assinado de verdade." no topo (a
 //     mesma etiqueta das irmãs /t e /f — vale no form e nos cards de estado)
 //   · o ramo `outra_pessoa` (0070) finalmente exercitável: o stub agora
 //     espelha a regra da RPC — a persona logada só abre documento
@@ -21,7 +21,7 @@ import { entrarNaDemo, expect, test } from "../helpers";
 const TOKEN_ISABELA = "de000000-0000-4000-8000-000000013319"; // uid(0x3407)
 const TOKEN_RICARDO = "de000000-0000-4000-8000-000000013318"; // uid(0x3406)
 const TOKEN_KAUA = "de000000-0000-4000-8000-000000013316"; // uid(0x3404)
-const FAIXA = "Demonstração — nada aqui é assinado de verdade";
+const FAIXA = "Demonstração: nada aqui é assinado de verdade.";
 
 test.describe("demo — /assinar/[token] (REALIZA-172)", () => {
   test("outra_pessoa: token da Isabela resolve o card pra qualquer papel", async ({

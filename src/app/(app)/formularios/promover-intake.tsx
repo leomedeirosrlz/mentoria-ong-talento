@@ -149,7 +149,7 @@ export function PromoverIntakeButton({ respostaId }: { respostaId: string }) {
                 <Linha
                   rotulo="Cidade/UF"
                   valor={
-                    [prefill.cidade, prefill.uf].filter(Boolean).join(" — ") ||
+                    [prefill.cidade, prefill.uf].filter(Boolean).join(" · ") ||
                     null
                   }
                 />

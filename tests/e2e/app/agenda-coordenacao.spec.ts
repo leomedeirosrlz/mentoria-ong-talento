@@ -108,8 +108,10 @@ test.describe("agenda da coordenação — monitoramento e lembrete real (WP5/D5
     await expect(
       page.getByRole("heading", { name: "Agenda do programa" })
     ).toBeVisible();
+    // a postura da página virou a linha da semana (redesign sem parágrafo
+    // explicativo): "Semana N · D a D de Mês · hoje, {dia da semana}"
     await expect(
-      page.getByText("Monitoramento — a agenda de cada dupla é da dupla")
+      page.getByText(/Semana \d+ · \d+ a \d+ de .+ · hoje,/)
     ).toBeVisible();
 
     // abas links role=tab — Monitoramento selecionado por default
@@ -121,25 +123,31 @@ test.describe("agenda da coordenação — monitoramento e lembrete real (WP5/D5
       abas.getByRole("tab", { name: "Calendário" })
     ).toHaveAttribute("aria-selected", "false");
 
-    // as três seções do modo existem mesmo com fila vazia (o conteúdo delas
-    // depende do estado do staging — a moldura é o contrato), e a primeira
-    // é a fila operacional (REALIZA-176: a resposta dos 5s no topo)
+    // as seções do modo existem mesmo com fila vazia, na ordem do v8b
+    // (REALIZA-195): orientação do programa antes do detalhe operacional
+    // — 1º "Semana do programa", 2º "Números da semana", por último o
+    // "Painel da semana" que abriga a fila "Duplas para acompanhar"
+    // (role=group; o conteúdo depende do staging — a moldura é o contrato)
     await expect(page.locator("section[aria-label]").first()).toHaveAttribute(
       "aria-label",
-      "Duplas para acompanhar"
+      "Semana do programa"
     );
     for (const label of [
-      "Semana do encontro por cronograma",
-      "Duplas para acompanhar",
-      "Semana no programa",
+      "Semana do programa",
+      "Números da semana",
+      "Painel da semana",
     ])
       await expect(
         page.locator(`section[aria-label="${label}"]`)
       ).toBeVisible();
+    await expect(
+      page.locator('[role="group"][aria-label="Duplas para acompanhar"]')
+    ).toBeVisible();
 
-    // deep-link pro calendário: os chips da coord são Dia/Semana/Mês/Lista
-    // — "Horários" e a superfície de agendar são só do mentor (REALIZA-25 já
-    // cobre os valores; aqui basta a transição + a ausência do clique-vazio)
+    // deep-link pro calendário: os chips da coord são Dia/Semana/Mês/Ciclo
+    // (REALIZA-195) — "Horários" e a superfície de agendar são só do mentor
+    // (REALIZA-25 já cobre os valores; aqui basta a transição + a ausência
+    // do clique-vazio)
     await abas.getByRole("tab", { name: "Calendário" }).click();
     await page.waitForURL(/aba=calendario/);
     await expect(
@@ -238,8 +246,11 @@ test.describe("agenda da coordenação — monitoramento e lembrete real (WP5/D5
 
       // a dupla sem data cai na fila — as linhas mostram primeiro nome
       // ("Mentorada · Mentor"), que colide entre fixtures; o "Ver ficha ›"
-      // com o href da dupla é o discriminante estável
-      const fila = page.locator('section[aria-label="Duplas para acompanhar"]');
+      // com o href da dupla é o discriminante estável. A fila é um
+      // role=group dentro do "Painel da semana" (REALIZA-195)
+      const fila = page.locator(
+        '[role="group"][aria-label="Duplas para acompanhar"]'
+      );
       const linha = fila.locator("li", {
         has: page.locator(`a[href="/duplas/${IDS.dupla2}"]`),
       });
@@ -276,7 +287,7 @@ test.describe("agenda da coordenação — monitoramento e lembrete real (WP5/D5
           `&created_by=eq.${IDS.coordProfile}&created_at=gte.${t0}`
       );
       expect(notifs).toHaveLength(1);
-      expect(notifs[0].titulo).toMatch(/^Lembrete — /);
+      expect(notifs[0].titulo).toMatch(/^Lembrete: /);
       expect(notifs[0].href).toBe(`/duplas/${IDS.dupla2}`);
 
       // o cap de 48h chega na UI: refresh → a linha mostra "Lembrada dd/mm"
@@ -291,7 +302,7 @@ test.describe("agenda da coordenação — monitoramento e lembrete real (WP5/D5
       await expect(bloqueada).toBeDisabled();
       await expect(bloqueada).toHaveAttribute(
         "title",
-        /1 lembrete a cada 48h por dupla — destrava \d{2}\/\d{2}/
+        /^1 lembrete a cada 48h por dupla\. Destrava \d{2}\/\d{2}$/
       );
 
       // e o mesmo cap barra na RPC — segundo envio como coord devolve o

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowRight, Eye, Warning } from "@phosphor-icons/react/dist/ssr";
 import { formatDiaHora, formatDiaMes } from "@/lib/ciclo";
 import { painelTrilhasCoord, type PainelTrilhas } from "@/lib/trilhas-coord";
+import { turmaCurta } from "@/lib/turma";
 import type { Dupla, SolicitacaoEspecialista } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -123,7 +124,7 @@ export function TrilhasCoordPanel({
                   <div className="min-w-0">
                     <p className="text-sm">
                       <span className="font-medium">{a.jovemNome}</span>
-                      {a.turma ? ` · ${a.turma}` : ""}
+                      {a.turma ? ` · ${turmaCurta(a.turma)}` : ""}
                       {a.demanda ? ` · ${corta(a.demanda)}` : ""}
                     </p>
                     <p className="mt-0.5 text-xs text-muted-foreground">
@@ -141,7 +142,7 @@ export function TrilhasCoordPanel({
               ))}
             </ul>
             <p className="mt-2 text-xs text-muted-foreground">
-              Sem ação de designar — quem aceita é o especialista.
+              Sem ação de designar. Quem aceita é o especialista.
             </p>
           </section>
         )}
@@ -198,8 +199,8 @@ export function TrilhasCoordPanel({
             não aqui */}
         <p className="border-t border-border/60 pt-3 text-xs leading-relaxed text-muted-foreground">
           Leitura apenas: quem aceita pedido é o especialista e a sessão é da
-          dupla. A única ação de exceção — encerrar uma trilha antes do prazo
-          — acontece na ficha da dupla.
+          dupla. A única ação de exceção, encerrar uma trilha antes do prazo,
+          acontece na ficha da dupla.
         </p>
       </CardContent>
     </Card>

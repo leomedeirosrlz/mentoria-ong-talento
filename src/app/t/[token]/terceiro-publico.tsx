@@ -139,7 +139,7 @@ export function TerceiroPublico({
           <h1 className="mt-4 text-lg font-semibold">Resposta enviada!</h1>
           <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-muted-foreground">
             Obrigado{convidado ? `, ${convidado}` : ""}. Sua percepção ajuda{" "}
-            {jovem} a construir o plano de desenvolvimento — e chega ao
+            {jovem} a construir o plano de desenvolvimento e chega ao
             mentor sem te expor.
           </p>
         </motion.div>
@@ -160,7 +160,7 @@ export function TerceiroPublico({
             </h1>
             <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
               {jovem} indicou você na avaliação por terceiros do Programa de
-              Mentoria — são só 2 perguntas. O mentor reúne as respostas de
+              Mentoria: são só 2 perguntas. O mentor reúne as respostas de
               várias pessoas e entrega uma síntese anônima:{" "}
               <strong className="font-medium text-foreground">
                 {jovem} nunca sabe quem disse o quê

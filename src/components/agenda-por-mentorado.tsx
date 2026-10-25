@@ -41,6 +41,7 @@ import {
   TRILHA_LEN,
   foraDoPrograma,
 } from "@/lib/ciclo";
+import { turmaCurta, turmaLonga } from "@/lib/turma";
 import type {
   CicloEvento,
   Cronograma,
@@ -99,6 +100,9 @@ export type AgendaPorMentoradoProps = {
   /** Primeiro nome do mentor — assina o check-in do Lembrar. */
   meuNome: string;
   hoje: string;
+  /** epoch ms do mesmo "agora" da page — semáforo/limbo/cap ancoram no
+   *  snapshot do request, não num segundo `new Date()` do RSC. */
+  agora: number;
 };
 
 /** Aba "Por mentorado" da agenda DPP (WP3, mock v6) — um card por jovem com
@@ -135,9 +139,9 @@ export function AgendaPorMentorado({
   meuId,
   meuNome,
   hoje,
+  agora: agoraMs,
 }: AgendaPorMentoradoProps) {
-  const agora = new Date();
-  const agoraMs = agora.getTime();
+  const agora = new Date(agoraMs);
   // o dialog pede areas:string[]|null — a página projeta só {id,nome}; o
   // select dele já cai no ramo sem áreas quando null
   const especialistasDialog = especialistas.map((e) => ({
@@ -360,7 +364,7 @@ function CardMentorado({
         <div className="min-w-28 flex-1">
           <h3 className="flex flex-wrap items-center gap-x-2 gap-y-1 font-semibold leading-snug">
             <span className="truncate">{nome}</span>
-            <Badge variant="secondary">{dupla.turma}</Badge>
+            <Badge variant="secondary">{turmaLonga(dupla.turma)}</Badge>
             {dupla.status !== "ativa" && (
               <Badge variant="outline" className="text-muted-foreground">
                 {dupla.status === "pausada"
@@ -394,7 +398,10 @@ function CardMentorado({
             {jornada.completa
               ? `${total} de ${total} encontros`
               : `Encontro ${alvo.proximoNumero} de ${total}`}
-            <span className="text-muted-foreground"> · {dupla.turma}</span>
+            <span className="text-muted-foreground">
+              {" "}
+              · {turmaCurta(dupla.turma)}
+            </span>
           </p>
           <span className="tabular-nums text-muted-foreground">{pct}%</span>
         </div>
@@ -465,12 +472,12 @@ function CardMentorado({
 
       {/* pendências acionáveis — deep link direto pro ponto da ficha */}
       <section aria-label="Pendências da dupla" className="space-y-2">
-        <h4 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+        <h4 className="text-xs sm:text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
           Pendências da dupla
         </h4>
         {semPendencia ? (
           <p className="text-sm text-muted-foreground">
-            Nada pendente — a dupla está em dia.
+            Nada pendente. A dupla está em dia.
           </p>
         ) : (
           <ul className="space-y-1.5">
@@ -492,8 +499,8 @@ function CardMentorado({
                     </p>
                     <p className="text-xs text-muted-foreground">
                       {noLimbo
-                        ? `estava agendado ${formatDiaHora(e.data_hora)} — aconteceu? registre ou remarque`
-                        : "encontro realizado sem registro — atividades, avaliação e próximo passo"}
+                        ? `estava agendado ${formatDiaHora(e.data_hora)} · aconteceu? registre ou remarque`
+                        : "encontro realizado sem registro: atividades, avaliação e próximo passo"}
                     </p>
                   </div>
                   <Link
@@ -546,8 +553,8 @@ function CardMentorado({
                   </p>
                   <p className="text-xs text-muted-foreground">
                     {encerramentoPendente.autoavaliacao
-                      ? "sua autoavaliação já chegou — a coordenação conclui o rito na ficha"
-                      : "falta sua autoavaliação — o rito fecha na ficha da dupla"}
+                      ? "sua autoavaliação já chegou. A coordenação conclui o rito na ficha"
+                      : "falta sua autoavaliação. O rito fecha na ficha da dupla"}
                   </p>
                 </div>
                 <Link
@@ -628,7 +635,7 @@ function ProximoEncontro({
   let detalhe: ReactNode = null;
 
   if (dupla.status === "pausada") {
-    titulo = "Dupla pausada — encontros congelados por ora";
+    titulo = "Dupla pausada · encontros congelados por ora";
   } else if (dupla.status === "concluida") {
     titulo = "Jornada concluída";
     detalhe = `${feitos} de ${total} encontros realizados`;
@@ -644,7 +651,7 @@ function ProximoEncontro({
     detalhe = (
       <>
         <span className="block">
-          não aconteceu? — se rolou, o registro também é na ficha
+          não aconteceu? Se rolou, o registro também é na ficha
         </span>
         <Link
           href={`/duplas/${dupla.id}`}
@@ -693,7 +700,7 @@ function ProximoEncontro({
       alvo.sugeridoProximo
         ? ` sugerido ${formatDiaSemanaMes(alvo.sugeridoProximo)}`
         : ""
-    } — o agendamento é na ficha`;
+    } · o agendamento é na ficha`;
   }
 
   return (
@@ -707,7 +714,7 @@ function ProximoEncontro({
         )}
       />
       <div className="min-w-0">
-        <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
+        <p className="text-xs sm:text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
           Próximo encontro
         </p>
         <p className="mt-0.5 text-sm font-medium">{titulo}</p>
@@ -759,7 +766,7 @@ function TrilhaBlock({
 
   return (
     <section
-      aria-label={`Trilha de especialista — ${nomeEsp}`}
+      aria-label={`Trilha de especialista · ${nomeEsp}`}
       className="space-y-3 rounded-lg border border-dashed border-[var(--warn)]/50 bg-[var(--warn)]/8 p-4"
     >
       <header className="flex items-start gap-2.5">
@@ -774,7 +781,7 @@ function TrilhaBlock({
             Trilha com {nomeEsp}
             {trilha.demanda && (
               <>
-                {" — "}
+                {" · "}
                 <span className="italic">{trilha.demanda}</span>
               </>
             )}
@@ -824,7 +831,7 @@ function TrilhaBlock({
         <div className="rounded-md border-l-2 border-[var(--brand-lime)] bg-card/70 px-3 py-2">
           <p className="flex items-center gap-1.5 text-xs font-semibold text-[var(--ok-text)]">
             <FlagCheckered size={13} aria-hidden />
-            Devolutiva final — segue pro PDM de {primeiroNome}
+            Devolutiva final: segue pro PDM de {primeiroNome}
           </p>
           <p className="mt-1 whitespace-pre-line break-words text-sm text-muted-foreground">
             {trilha.devolutiva_pdm}
@@ -925,7 +932,7 @@ function SessaoRow({
     // sessão marcada já passou e ninguém confirmou — a plataforma não
     // sabe se rolou; afirmar "concluída" mentiria
     titulo = "A confirmar";
-    detalhe = `estava marcada ${formatDiaHora(rep!.data_hora)} — ${nomeEsp} confirma se aconteceu · sem ação sua`;
+    detalhe = `estava marcada ${formatDiaHora(rep!.data_hora)} · ${nomeEsp} confirma se aconteceu · sem ação sua`;
     icone = <Clock size={14} aria-hidden />;
     tom = "warn";
   } else if (
@@ -935,7 +942,7 @@ function SessaoRow({
     // tentativa morta como representante do passo: ela morreu, o passo
     // segue aberto — a remarcação é entre os dois, nunca do mentor
     titulo = rep.status === "cancelado" ? "Cancelada" : "Não aconteceu";
-    detalhe = `remarcação entre ${primeiroNome} e ${nomeEsp} — o passo não se perde · sem ação sua`;
+    detalhe = `remarcação entre ${primeiroNome} e ${nomeEsp} · o passo não se perde · sem ação sua`;
     icone = <CalendarX size={14} aria-hidden />;
     tom = "muted";
   } else if (rep != null) {
@@ -959,7 +966,7 @@ function SessaoRow({
     icone = <Plus size={14} aria-hidden />;
     tom = "muted";
   } else {
-    titulo = "Trancada";
+    titulo = "Ainda não liberada";
     detalhe = `abre após a sessão ${passo - 1}`;
     icone = <LockSimple size={14} aria-hidden />;
     tom = "muted";
@@ -984,7 +991,7 @@ function SessaoRow({
         <div className="min-w-0 flex-1">
           <p className="text-sm">
             <span className="font-medium">Sessão {passo}</span>
-            <span className="text-muted-foreground"> — {titulo}</span>
+            <span className="text-muted-foreground"> · {titulo}</span>
           </p>
           {detalhe && (
             <p className="text-xs text-muted-foreground">{detalhe}</p>
@@ -1028,7 +1035,7 @@ function RegistroSessao({ registro }: { registro: TrilhaJovemRegistro }) {
       `${
         DIFICULDADE_LABEL[registro.dificuldade as Dificuldade] ??
         registro.dificuldade
-      }${registro.dificuldade_detalhe ? ` — ${registro.dificuldade_detalhe}` : ""}`,
+      }${registro.dificuldade_detalhe ? `: ${registro.dificuldade_detalhe}` : ""}`,
     ]);
   if (registro.reflexoes) linhas.push(["Reflexões", registro.reflexoes]);
   if (registro.observacoes)
@@ -1039,7 +1046,7 @@ function RegistroSessao({ registro }: { registro: TrilhaJovemRegistro }) {
       `${
         PROXIMO_PASSO_LABEL[registro.proximo_passo] ??
         registro.proximo_passo
-      }${registro.proximo_passo_detalhe ? ` — ${registro.proximo_passo_detalhe}` : ""}`,
+      }${registro.proximo_passo_detalhe ? `: ${registro.proximo_passo_detalhe}` : ""}`,
     ]);
 
   return (
@@ -1101,7 +1108,7 @@ function TrilhasAnteriores({ trilhas }: { trilhas: TrilhaJovem[] }) {
                 {t.especialista_nome ?? "Especialista"}
                 {t.demanda && (
                   <span className="font-normal text-muted-foreground">
-                    {" — "}
+                    {" · "}
                     <span className="italic">{t.demanda}</span>
                   </span>
                 )}
@@ -1113,7 +1120,7 @@ function TrilhasAnteriores({ trilhas }: { trilhas: TrilhaJovem[] }) {
                   ` · ${
                     t.status === "concluida" ? "concluída" : "encerrada"
                   } ${formatDate(t.encerrada_em)}`}
-                {t.motivo_encerramento && ` — ${t.motivo_encerramento}`}
+                {t.motivo_encerramento && ` · ${t.motivo_encerramento}`}
               </p>
               {t.devolutiva_pdm && (
                 <p className="mt-1.5 whitespace-pre-line break-words rounded-md border-l-2 border-[var(--brand-lime)] bg-card/70 px-3 py-2 text-sm text-muted-foreground">
@@ -1157,18 +1164,18 @@ function PedidoEspecialistaBlock({
       passos = [
         [
           "current",
-          `sugestão sua aguardando ${primeiroNome} confirmar — ainda não virou pedido`,
+          `sugestão sua aguardando ${primeiroNome} confirmar · ainda não virou pedido`,
         ],
         ["open", "a coordenação libera pro mural"],
-        ["open", "um especialista aceita — atômico"],
+        ["open", "um especialista aceita e a trilha começa"],
         ["open", "5 sessões em ~3 meses"],
       ];
       break;
     case "aguardando_coord":
       passos = [
         ["done", `pedido registrado em ${formatDate(s.created_at)}`],
-        ["current", "com a coordenação — ainda não foi pro mural"],
-        ["open", "um especialista aceita — atômico"],
+        ["current", "com a coordenação · ainda não foi pro mural"],
+        ["open", "um especialista aceita e a trilha começa"],
         ["open", "5 sessões em ~3 meses"],
       ];
       break;
@@ -1180,7 +1187,7 @@ function PedidoEspecialistaBlock({
           "current",
           `negociação de horário${
             s.slot_proposto
-              ? ` — ${quem ?? "o especialista"} propôs ${rotuloSlot(s.slot_proposto)}`
+              ? `: ${quem ?? "o especialista"} propôs ${rotuloSlot(s.slot_proposto)}`
               : ""
           } · a resposta é dos dois`,
         ],
@@ -1192,7 +1199,7 @@ function PedidoEspecialistaBlock({
         ["done", `pedido de ${formatDate(s.created_at)}`],
         ["done", "aceito no mural"],
         ["done", `${quem ?? "o especialista"} assumiu`],
-        ["current", "a trilha está nascendo — aparece aqui quando abrir"],
+        ["current", "a trilha está nascendo · aparece aqui quando abrir"],
       ];
       break;
     default: // "aberta" e qualquer estado novo que o banco aprender
@@ -1201,12 +1208,12 @@ function PedidoEspecialistaBlock({
         [
           "current",
           diasNoMural <= 0
-            ? "no mural desde hoje — nenhum especialista aceitou ainda"
+            ? "no mural desde hoje · nenhum especialista aceitou ainda"
             : `no mural há ${diasNoMural} ${
                 diasNoMural === 1 ? "dia" : "dias"
-              } — nenhum especialista aceitou ainda`,
+              } · nenhum especialista aceitou ainda`,
         ],
-        ["open", "um especialista aceita — atômico"],
+        ["open", "um especialista aceita e a trilha começa"],
         ["open", "5 sessões em ~3 meses"],
       ];
   }
@@ -1228,7 +1235,7 @@ function PedidoEspecialistaBlock({
             {primeiroNome} ainda <b>não tem trilha</b>
             {tema && (
               <>
-                {" — "}
+                {" · "}
                 <span className="italic">{tema}</span>
               </>
             )}
@@ -1275,7 +1282,7 @@ function PedidoEspecialistaBlock({
         ))}
       </ol>
       <p className="px-2 text-xs leading-relaxed text-muted-foreground">
-        Horários nascem dentro da trilha, na agenda do especialista — o
+        Horários nascem dentro da trilha, na agenda do especialista. O
         mentor acompanha daqui.
       </p>
     </section>
@@ -1307,9 +1314,9 @@ function SemTrilhaBlock({
       />
       <p className="min-w-0 flex-1 text-sm text-muted-foreground">
         {tinhaHistorico
-          ? `Nenhuma trilha de especialista ativa — as anteriores ficam no histórico abaixo.`
+          ? `Nenhuma trilha de especialista ativa. As anteriores ficam no histórico abaixo.`
           : `${primeiroNome} ainda não tem trilha de especialista.`}
-        {" Se fizer sentido pro PDM, você pode sugerir — "}
+        {" Se fizer sentido pro PDM, você pode sugerir. "}
         {primeiroNome} confirma antes de virar pedido.
       </p>
       <SugerirEspecialistaDialog
