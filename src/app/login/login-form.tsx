@@ -349,11 +349,11 @@ export function LoginForm() {
     // encolhendo o viewport (resizes-content), o topo continua rolável.
     // flex, não grid: em grid o w-full do filho resolve contra o padding
     // box e vaza o padding lateral (1rem ou o safe-area, o que for maior)
-    // lg:pl-[46%] reserva a metade esquerda pro painel fixo da marca
+    // lg:pl-[50%] reserva a metade esquerda pro painel fixo da marca
     // (LoginHero) — o form continua centrado na metade que sobra
-    <div className="flex min-h-[100dvh] flex-col bg-background pb-[calc(1.5rem+env(safe-area-inset-bottom))] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] lg:pl-[46%]">
+    <div className="flex min-h-[100dvh] flex-col bg-background pb-[calc(1.5rem+env(safe-area-inset-bottom))] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] lg:pl-[50%]">
       <LoginHero />
-      <div className="m-auto w-full max-w-sm">
+      <div className="m-auto w-full max-w-sm lg:max-w-md">
         <div className="mb-8">
           <Logo size="xl" />
           <h1 className="text-lg font-semibold tracking-tight mt-3">Programa de Mentoria Social</h1>
@@ -364,10 +364,10 @@ export function LoginForm() {
         <motion.div {...fade} transition={T.enter} className="mb-8 rotate-[-1.5deg] lg:hidden">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src="/login/parceiros.webp"
+            src="/login/dupla.webp"
             alt=""
-            width={1400}
-            height={788}
+            width={1300}
+            height={731}
             className="aspect-[2/1] w-full rounded-2xl object-cover shadow-md ring-1 ring-border"
           />
         </motion.div>
@@ -603,101 +603,157 @@ export function LoginForm() {
   );
 }
 
-/** Painel institucional do /login — só desktop (lg+), position:fixed, não
- *  entra no fluxo; a coluna reserva o espaço com lg:pl-[46%]. Superfície
- *  ink da marca (a mesma do SiteFooter tone="ink") com fotos reais do
- *  programa flutuando em bob lento e dessincronizado. O float é
+type FotoHero = {
+  src: string;
+  w: number;
+  h: number;
+  /** classes de posicionamento + rotação de repouso (propriedade `rotate`
+   *  do CSS — compõe com o transform do float no filho) */
+  pos: string;
+  /** aspect-[a/b] + largura relativa */
+  ar: string;
+  largura: string;
+  legenda?: string;
+  entradaDelay: number;
+  bobDur: number;
+  bobAmp: number;
+  bobDelay: number;
+};
+
+const FOTOS: FotoHero[] = [
+  {
+    src: "/login/parceiros.webp",
+    w: 1400,
+    h: 788,
+    pos: "top-[2%] left-0 rotate-[-4deg]",
+    ar: "aspect-[16/10]",
+    largura: "w-[44%]",
+    legenda: "Sede parceira",
+    entradaDelay: 0.05,
+    bobDur: 6.5,
+    bobAmp: -9,
+    bobDelay: 0,
+  },
+  {
+    src: "/login/aluna.webp",
+    w: 900,
+    h: 1600,
+    pos: "top-0 right-[1%] rotate-[3deg]",
+    ar: "aspect-[3/4]",
+    largura: "w-[29%]",
+    legenda: "Aluna em atividade",
+    entradaDelay: 0.2,
+    bobDur: 7.5,
+    bobAmp: -12,
+    bobDelay: 0.8,
+  },
+  {
+    src: "/login/atividade.webp",
+    w: 900,
+    h: 1600,
+    pos: "bottom-[10%] left-[4%] rotate-[2.5deg]",
+    ar: "aspect-[3/4]",
+    largura: "w-[30%]",
+    entradaDelay: 0.35,
+    bobDur: 8.5,
+    bobAmp: -8,
+    bobDelay: 1.6,
+  },
+  {
+    src: "/login/dupla.webp",
+    w: 1300,
+    h: 731,
+    pos: "bottom-0 right-[5%] rotate-[-2.5deg]",
+    ar: "aspect-[16/10]",
+    largura: "w-[57%]",
+    legenda: "Mentoria em dupla",
+    entradaDelay: 0.5,
+    bobDur: 7,
+    bobAmp: -10,
+    bobDelay: 0.4,
+  },
+];
+
+/** Painel institucional do /login — só desktop (lg+), position:fixed, metade
+ *  esquerda da tela; a coluna reserva o espaço com lg:pl-1/2. Superfície ink
+ *  da marca com o wordmark centralizado sobre um glow lime que respira, e
+ *  uma colagem de fotos reais do programa com entrada escalonada + bob
+ *  dessincronizado (com sway de rotação). Tudo decorativo (aria-hidden) e
  *  transform/motion: o MotionConfig reducedMotion="user" do layout zera a
- *  animação pra quem prefere menos movimento. O aside inteiro é
- *  decorativo (aria-hidden) — a página já diz o que é no h1/logo. */
+ *  animação pra quem prefere menos movimento. */
 function LoginHero() {
   return (
     <aside
       aria-hidden="true"
-      className="fixed inset-y-0 left-0 hidden w-[46%] flex-col overflow-hidden bg-[var(--brand-ink)] p-10 lg:flex xl:p-14"
+      className="fixed inset-y-0 left-0 hidden w-1/2 flex-col overflow-hidden bg-[var(--brand-ink)] p-10 lg:flex xl:p-14"
     >
-      <div className="flex items-center justify-between gap-4">
-        {/* wordmark em texto puro — o PNG oficial some sobre ink no tema
-            claro; mesma construção do SiteFooter e da variante dark do Logo */}
-        <span className="text-2xl font-black italic tracking-tight">
+      {/* glow lime atrás do logo — disco borrado que respira devagar */}
+      <motion.div
+        aria-hidden
+        className="pointer-events-none absolute left-1/2 top-4 size-80 -translate-x-1/2 rounded-full bg-[var(--brand-lime)]/20 blur-3xl"
+        animate={{ scale: [1, 1.15, 1], opacity: [0.5, 0.85, 0.5] }}
+        transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+      />
+
+      {/* marca centralizada — wordmark em texto puro (o PNG some sobre ink
+          no tema claro); mesma construção do SiteFooter/Logo dark */}
+      <div className="relative mt-3 text-center">
+        <p className="text-4xl font-black italic tracking-tight xl:text-5xl">
           <span className="text-white">REALIZA</span>
           <span className="text-[var(--role-mentorado)]">.</span>
           <span className="text-[var(--brand-lime)]">VC</span>
-        </span>
-        <span className="rounded-full border border-white/15 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-white/65">
-          Mentoria Social
-        </span>
+        </p>
+        <p className="mt-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/60">
+          Programa de Mentoria Social
+        </p>
+        <p className="mx-auto mt-6 max-w-sm text-xl font-semibold tracking-tight text-balance text-white xl:text-2xl">
+          A jornada da mentoria,{" "}
+          <span className="text-[var(--brand-lime)]">toda num lugar só.</span>
+        </p>
       </div>
 
-      <p className="mt-12 max-w-md text-3xl font-semibold tracking-tight text-balance text-white xl:text-[2.5rem] xl:leading-[1.15]">
-        A jornada da mentoria,{" "}
-        <span className="text-[var(--brand-lime)]">toda num lugar só.</span>
-      </p>
-      <p className="mt-3 max-w-sm text-sm leading-relaxed text-white/60">
-        Encontros, registros e acompanhamento das duplas: mentores, jovens e
-        coordenação juntos no programa.
-      </p>
-
-      {/* colagem: entrada sobe uma vez no wrapper externo (que também segura
-          a rotação — rotate-* do Tailwind v4 usa a propriedade `rotate`, que
-          compõe com o translateY do float); o bob infinito mora no interno */}
-      <div className="relative mt-6 min-h-0 flex-1">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, ease: EASE }}
-          className="absolute bottom-0 left-0 w-[68%] rotate-[-3deg]"
-        >
+      {/* colagem flutuante: cada foto sobe uma vez na entrada (wrapper com a
+          rotação de repouso) e o bob+sway infinito mora no filho interno */}
+      <div className="relative mt-4 min-h-0 flex-1">
+        {FOTOS.map((f) => (
           <motion.div
-            animate={{ y: [0, -9, 0] }}
-            transition={{ duration: 6.5, repeat: Infinity, ease: "easeInOut" }}
-            className="relative"
+            key={f.src}
+            // a largura tem que morar no absolute (o pai shrink-wrap);
+            // w-% no filho resolveria contra um pai que depende dele
+            className={`absolute ${f.pos} ${f.largura}`}
+            initial={{ opacity: 0, y: 26, scale: 0.94 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ duration: 0.55, ease: EASE, delay: f.entradaDelay }}
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/login/parceiros.webp"
-              alt=""
-              width={1400}
-              height={788}
-              className="aspect-[16/10] w-full rounded-2xl object-cover shadow-2xl ring-1 ring-white/15"
-            />
-            <span className="absolute bottom-2.5 left-2.5 rounded-full bg-black/55 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur-sm">
-              Sede parceira
-            </span>
+            <motion.div
+              animate={{ y: [0, f.bobAmp, 0], rotate: [0, 1.2, 0] }}
+              transition={{
+                duration: f.bobDur,
+                repeat: Infinity,
+                ease: "easeInOut",
+                delay: f.bobDelay,
+              }}
+              className="relative"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={f.src}
+                alt=""
+                width={f.w}
+                height={f.h}
+                className={`${f.ar} w-full rounded-2xl object-cover shadow-2xl ring-1 ring-white/15`}
+              />
+              {f.legenda && (
+                <span className="absolute bottom-2.5 left-2.5 rounded-full bg-black/55 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur-sm">
+                  {f.legenda}
+                </span>
+              )}
+            </motion.div>
           </motion.div>
-        </motion.div>
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, ease: EASE, delay: 0.12 }}
-          className="absolute right-0 top-0 w-[38%] rotate-[3deg]"
-        >
-          <motion.div
-            animate={{ y: [0, -11, 0] }}
-            transition={{
-              duration: 7.5,
-              repeat: Infinity,
-              ease: "easeInOut",
-              delay: 0.9,
-            }}
-            className="relative"
-          >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/login/formacao.webp"
-              alt=""
-              width={900}
-              height={1600}
-              className="aspect-[3/4] w-full rounded-2xl object-cover object-center shadow-2xl ring-1 ring-white/15"
-            />
-            <span className="absolute bottom-2.5 left-2.5 rounded-full bg-black/55 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur-sm">
-              Equipe Realiza.vc
-            </span>
-          </motion.div>
-        </motion.div>
+        ))}
       </div>
 
-      <div className="mt-8 flex flex-wrap gap-2">
+      <div className="mt-8 flex flex-wrap justify-center gap-2">
         {["Coordenação", "Supervisoras", "Mentores", "Jovens", "Especialistas"].map(
           (papel) => (
             <span
