@@ -944,6 +944,31 @@ export function itemNoEscopo(item: { escopo: EscopoId }, escopo: EscopoAgenda): 
   return escopo === "tudo" || item.escopo === escopo;
 }
 
+/** Identidade `duplaId:numero` dos encontros que a agenda já apresenta —
+ *  como item da lista (encontro real ou "a agendar", com as ações da
+ *  dupla) ou como aviso de pendência no topo. A faixa "Minha agenda"
+ *  (`itensSemanaProgramaMentor`) usa o conjunto pra não repetir o card
+ *  do mesmo encontro: o gesto mora na lista, então a cópia da faixa é
+ *  que sai — dedup no sentido inverso do `repeteFaixa`, que esvazia a
+ *  lista do que a faixa já mostra (programa/supervisão sem ação).
+ *  `numero`, não `encontro.id`: o "a agendar" sem row e o aviso de
+ *  registro identificam o mesmo compromisso oficial. */
+export function encontrosCobertos(agenda: AgendaMinhaDerivada): Set<string> {
+  const ids = new Set<string>();
+  for (const s of agenda.secoes)
+    for (const g of s.grupos)
+      for (const i of g.itens)
+        if (
+          (i.tipo === "encontro" || i.tipo === "a_agendar") &&
+          i.duplaId != null &&
+          i.numero != null
+        )
+          ids.add(`${i.duplaId}:${i.numero}`);
+  for (const a of agenda.avisos)
+    if (a.encontro != null) ids.add(`${a.duplaId}:${a.encontro.numero}`);
+  return ids;
+}
+
 /** Recorte da agenda por chip — itens E avisos são do escopo (o warnrow do
  *  Caio some no chip da Ana, mas não no "Tudo"). Estrutura preservada:
  *  seções e grupos vazios saem pra a tela não desenhar cabeçalho órfão. */
@@ -965,7 +990,8 @@ export function filtraAgenda(
   // em "tudo" a faixa "Minha agenda" já mostra a semana do programa —
   // evento oficial e supervisão desta semana, sem ação, seriam o mesmo
   // card duas vezes. A lista fica com o que pede gesto e com o resto do
-  // calendário (encontros sempre ficam: carregam hora e ações da dupla)
+  // calendário (encontros sempre ficam: carregam hora e ações da dupla —
+  // o dedup deles é na faixa, via `encontrosCobertos`)
   const { seg, dom } = agenda.semana;
   const repeteFaixa = (i: AgendaItem) =>
     escopo === "tudo" &&

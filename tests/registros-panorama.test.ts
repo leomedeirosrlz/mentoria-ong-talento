@@ -332,12 +332,6 @@ describe("panoramaRegistros — recortes", () => {
     const p = base([mkDupla()], { recorte: { periodo: "8s" } });
     expect(p.slots.map((s) => s.numero)).toEqual([1, 2, 3, 4, 5]);
   });
-
-  it("período não reduz o donut — semáforo é do ciclo vigente", () => {
-    const p = base([mkDupla(), mkDupla({ id: "d-2" })], {
-      recorte: { periodo: "4s" },
-    });
-  });
 });
 
 describe("panoramaRegistros — linha de avaliação", () => {

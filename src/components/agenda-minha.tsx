@@ -26,6 +26,7 @@ import { filterChipCls } from "@/components/ui/filter-chip";
 import { avatarPublicUrl } from "@/lib/avatar";
 import {
   deriveAgendaMinha,
+  encontrosCobertos,
   filtraAgenda,
   primeiroNomeDaDupla,
   type AgendaItem,
@@ -584,6 +585,24 @@ export function AgendaMinha({
     () => new Map(duplas.map((d) => [d.id, d])),
     [duplas]
   );
+  // a faixa e a lista apresentam o MESMO encontro: o dedup é na faixa —
+  // a lista detém as ações (entrar/remarcar/agendar/registrar), então o
+  // card coberto por `encontrosCobertos` sai. Sem item restante a seção
+  // inteira some: "Nada marcado" mentiria (o encontro está na lista)
+  const itensFaixa = useMemo(
+    () =>
+      itensSemanaProgramaMentor(
+        duplas,
+        eventos,
+        cronogramas,
+        supervisoes,
+        meuId,
+        new Date(hoje + "T12:00:00"),
+        agora,
+        encontrosCobertos(agenda)
+      ),
+    [duplas, eventos, cronogramas, supervisoes, meuId, hoje, agora, agenda]
+  );
   // o CTA preenchido (lima) é um por agenda: o 1º warnrow do "Hoje" leva —
   // sem warnrow, o destaque cai na 1ª ação decisiva da lista (registrar ou
   // agendar). Tudo o mais renderiza outline.
@@ -612,21 +631,14 @@ export function AgendaMinha({
   return (
     <div className="space-y-4">
       {/* faixa "Minha agenda" (v8b): a semana do programa recortada na
-          agenda dele — um card por encontro×dupla, formações e eventos
-          oficiais dos cronogramas dele e as supervisões sobre ele. Some
-          quando um chip de escopo filtra uma dupla só — a faixa é a
-          leitura da agenda inteira, não do recorte */}
-      {escopo === "tudo" && (
+          agenda dele — formações e eventos oficiais, supervisões sobre
+          ele e o encontro oficial ainda fora da lista (o coberto por item
+          ou aviso já aparece uma vez lá embaixo). Some quando um chip de
+          escopo filtra uma dupla só — a faixa é a leitura da agenda
+          inteira, não do recorte */}
+      {escopo === "tudo" && itensFaixa.length > 0 && (
         <SemanaDoPrograma
-          itens={itensSemanaProgramaMentor(
-            duplas,
-            eventos,
-            cronogramas,
-            supervisoes,
-            meuId,
-            new Date(hoje + "T12:00:00"),
-            agora
-          )}
+          itens={itensFaixa}
           hoje={hoje}
           modo="mentor"
           titulo="Minha agenda"

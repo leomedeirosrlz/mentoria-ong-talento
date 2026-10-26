@@ -31,3 +31,4 @@ openwa/
 
 # Sentry Config File
 .env.sentry-build-plugin
+.devin-ctx/

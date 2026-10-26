@@ -27,7 +27,7 @@ import {
   ultimoRegistro,
 } from "@/lib/ciclo";
 import { prazoTrilhaEspecialista } from "@/lib/encerramento";
-import { saudeDoRecorte } from "@/lib/agenda-coordenacao";
+import { saudeDoRecorte, type RecorteFatia } from "@/lib/agenda-coordenacao";
 import { turmaLonga } from "@/lib/turma";
 import { rotuloDiaAgenda } from "@/lib/agenda-minha";
 import { acaoWhatsAppDupla, encontroPendente } from "@/lib/acao-lembrete";
@@ -411,14 +411,9 @@ function CabecalhoColunas() {
 
 // ---------- chips de categoria ----------
 
-type FiltroCat =
-  | "todas"
-  | "risco"
-  | "atencao"
-  | "andamento"
-  | "pausada"
-  | "concluida"
-  | "apoio";
+/** Recorte da lista — "todas" é a ausência de fatia; os demais são os ids
+ *  compartilhados com o `?recorte=` da página e os atalhos do SaudePrograma. */
+type FiltroCat = "todas" | RecorteFatia;
 
 const CATS: { id: FiltroCat; nome: string; dot: string | null }[] = [
   { id: "todas", nome: "Todas", dot: null },
@@ -630,6 +625,7 @@ export function DuplasLista({
   especialistaEventos = [],
   nudges = {},
   origem,
+  recorteInicial = null,
 }: {
   lista: Dupla[];
   eventos: CicloEvento[];
@@ -647,6 +643,10 @@ export function DuplasLista({
   /** proto+host do deploy (headers da page) — o texto do Lembrar embute
    *  link de registro ABSOLUTO; sem ele o trecho sai da mensagem */
   origem?: string;
+  /** `?recorte=` já validado pela page — semeia o chip de situação nas
+   *  visões com o modelo de filtro (coordenação e supervisão). Nas demais
+   *  a lista não tem recorte e o param se perde de propósito. */
+  recorteInicial?: RecorteFatia | null;
 }) {
   const hoje = new Date(agora);
   const hojeStr = toDateStr(hoje);
@@ -666,6 +666,7 @@ export function DuplasLista({
         meuNome={meuNome}
         nudges={nudges}
         origem={origem}
+        recorteInicial={recorteInicial}
       />
     );
   if (visao === "supervisor")
@@ -680,6 +681,7 @@ export function DuplasLista({
         meuNome={meuNome}
         nudges={nudges}
         origem={origem}
+        recorteInicial={recorteInicial}
       />
     );
   if (visao === "especialista")
@@ -769,6 +771,7 @@ function VisaoCoordenacao({
   meuNome,
   nudges,
   origem,
+  recorteInicial,
 }: {
   lista: Dupla[];
   eventos: CicloEvento[];
@@ -778,9 +781,12 @@ function VisaoCoordenacao({
   meuNome?: string;
   nudges: Record<string, Interacao>;
   origem?: string;
+  /** `?recorte=` validado — semeia o chip de situação na aterrissagem
+   *  (os atalhos do SaudePrograma da home/agenda/registros pousam aqui). */
+  recorteInicial?: RecorteFatia | null;
 }) {
   const [busca, setBusca] = useState("");
-  const [filtro, setFiltro] = useState<FiltroCat>("todas");
+  const [filtro, setFiltro] = useState<FiltroCat>(recorteInicial ?? "todas");
   const [turmaSel, setTurmaSel] = useState<string | null>(null);
   const [supSel, setSupSel] = useState<string>("todas");
   const [mentorSel, setMentorSel] = useState<string | null>(null);
@@ -951,10 +957,11 @@ function VisaoCoordenacao({
         </div>
       </header>
 
-      {/* situação do programa (ou do recorte): o mesmo resumo da agenda */}
+      {/* situação do programa (ou do recorte): o mesmo resumo da agenda —
+          aqui a fatia não navega, ativa o chip equivalente da própria página */}
       {lista.length > 0 && (
         <div className="mt-5 rounded-xl border border-border bg-card p-4">
-          <SaudePrograma saude={saude} nivel="h2" />
+          <SaudePrograma saude={saude} nivel="h2" onRecorte={setFiltro} />
         </div>
       )}
 
@@ -1198,6 +1205,7 @@ function VisaoSupervisor({
   meuNome,
   nudges,
   origem,
+  recorteInicial,
 }: {
   lista: Dupla[];
   eventos: CicloEvento[];
@@ -1211,8 +1219,12 @@ function VisaoSupervisor({
    *  `enviar_lembrete` já autoriza o supervisor da dupla */
   nudges: Record<string, Interacao>;
   origem?: string;
+  /** `?recorte=` validado — o supervisor não tem linha de chips por
+   *  padrão; ela aparece só enquanto um recorte estiver ativo */
+  recorteInicial?: RecorteFatia | null;
 }) {
   const [busca, setBusca] = useState("");
+  const [filtro, setFiltro] = useState<FiltroCat>(recorteInicial ?? "todas");
 
   const pesoFila = (d: Dupla) => {
     const s = saudePorId.get(d.id)!;
@@ -1232,17 +1244,25 @@ function VisaoSupervisor({
       normaliza(d.mentor.nome).includes(q) ||
       normaliza(d.mentorado.nome).includes(q)
   );
+  // o mesmo chipBate da coordenação — fatia chega pela URL ou pelo atalho
+  // do resumo; "todas" é a ausência de recorte
+  const exibidas = base.filter((d) =>
+    chipBate(filtro, d, saudePorId.get(d.id)!)
+  );
 
   // sub-headers por turma dentro da mesma tabela — supervisionadas podem
   // misturar estados dentro da turma, a régua de critérios não se repete
   const grupos = new Map<string, Dupla[]>();
-  for (const d of base) {
+  for (const d of exibidas) {
     const chave = d.turma || "Sem turma";
     grupos.set(chave, [...(grupos.get(chave) ?? []), d]);
   }
   const gruposOrdenados = [...grupos.entries()].sort(([a], [b]) =>
     a.localeCompare(b, "pt-BR")
   );
+
+  const contagem = (id: FiltroCat) =>
+    lista.filter((d) => chipBate(id, d, saudePorId.get(d.id)!)).length;
 
   let i = 0;
   return (
@@ -1278,14 +1298,38 @@ function VisaoSupervisor({
           <SaudePrograma
             saude={saudeDoRecorte(lista, eventos, hoje)}
             nivel="h2"
+            onRecorte={setFiltro}
           />
+        </div>
+      )}
+
+      {/* chips só enquanto houver recorte ativo — a visão default do
+          supervisor não tem linha de filtro; "Todas" (ou clicar de novo
+          no chip ativo) devolve a lista inteira e esconde a linha */}
+      {filtro !== "todas" && (
+        <div
+          className="mt-5 flex gap-2 overflow-x-auto pb-1 sm:flex-wrap"
+          role="group"
+          aria-label="Filtrar por situação"
+        >
+          {CATS.map((c) => (
+            <CatChip
+              key={c.id}
+              nome={c.nome}
+              dot={c.dot}
+              apoio={c.id === "apoio"}
+              n={contagem(c.id)}
+              ativo={filtro === c.id}
+              onClick={() => setFiltro(filtro === c.id ? "todas" : c.id)}
+            />
+          ))}
         </div>
       )}
 
       <div className="mb-2 mt-5 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <p className="text-[13px] text-muted-foreground">
           <b className="font-semibold text-foreground">
-            {base.length} {base.length === 1 ? "dupla" : "duplas"}
+            {exibidas.length} {exibidas.length === 1 ? "dupla" : "duplas"}
           </b>{" "}
           · agrupadas por turma
         </p>
@@ -1297,15 +1341,15 @@ function VisaoSupervisor({
         </p>
       </div>
 
-      {base.length === 0 ? (
+      {exibidas.length === 0 ? (
         <EstadoVazio
           lista={lista}
           visao="supervisor"
           podeCriar={false}
           busca={busca}
-          filtroAtivo={false}
+          filtroAtivo={filtro !== "todas"}
           onLimparBusca={() => setBusca("")}
-          onLimparFiltro={() => {}}
+          onLimparFiltro={() => setFiltro("todas")}
         />
       ) : (
         <section
@@ -1314,9 +1358,10 @@ function VisaoSupervisor({
         >
           <div className="@4xl:overflow-hidden @4xl:rounded-xl @4xl:bg-card @4xl:shadow-[var(--shadow-border)]">
             <CabecalhoColunas />
-            {/* sem re-key por busca — remontar a cada tecla recolhia os
-                  grupos e matava o dialog de supervisão aberto */}
-            <div>
+            {/* re-key só no recorte (nunca na busca) — remontar a cada
+                  tecla recolhia os grupos e matava o dialog de supervisão
+                  aberto; a troca de chip re-roda o animate-enter das linhas */}
+            <div key={filtro}>
               {gruposOrdenados.map(([turma, duplas], gi) => {
                 // o próximo encontro oficial do calendário da turma — o "esta
                 // semana é o N" do sub-header (duplas da turma correm o mesmo

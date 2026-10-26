@@ -1,7 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { Info, Lifebuoy } from "@phosphor-icons/react";
-import type { SaudeRecorte } from "@/lib/agenda-coordenacao";
+import type { RecorteFatia, SaudeRecorte } from "@/lib/agenda-coordenacao";
 import { cn } from "@/lib/utils";
 import { BarraSegmentada } from "@/components/viz";
 import {
@@ -58,6 +59,8 @@ export function SaudePrograma({
   nivel = "h2",
   comoCalculamos = true,
   className,
+  linkBase,
+  onRecorte,
 }: {
   /** Números de `saudeDoRecorte` — mesmo objeto em qualquer tela. */
   saude: SaudeRecorte;
@@ -67,6 +70,13 @@ export function SaudePrograma({
   /** Mostra o "Como calculamos" com as regras acima. */
   comoCalculamos?: boolean;
   className?: string;
+  /** Fora da /duplas: as fatias que têm chip lá viram link
+   *  `{linkBase}?recorte=<id>` — o resumo navega pra lista já filtrada. */
+  linkBase?: string;
+  /** Na própria /duplas: a fatia ativa o chip correspondente em vez de
+   *  navegar (mutuamente exclusivo com `linkBase` — ganha se os dois
+   *  vierem). Sem os dois o resumo é leitura pura. */
+  onRecorte?: (id: RecorteFatia) => void;
 }) {
   const Titulo = nivel;
   const { emAndamento, risco, atencao, emDia, apoio, pausadas, concluidas, total } =
@@ -87,26 +97,39 @@ export function SaudePrograma({
         <div className="min-w-0">
           <Titulo className="text-base font-semibold">{titulo}</Titulo>
           <p className="mt-1 text-sm text-muted-foreground">
-            <b className="font-semibold text-foreground tabular-nums">
-              {emAndamento} em andamento
-            </b>
+            {/* cada fatia com chip na /duplas vira atalho ("em dia" e
+                "pausadas ou concluídas" não têm chip próprio — ficam texto) */}
+            <Atalho id="andamento" linkBase={linkBase} onRecorte={onRecorte}>
+              <b className="font-semibold text-foreground tabular-nums">
+                {emAndamento} em andamento
+              </b>
+            </Atalho>
             {" · "}
-            <span className="tabular-nums">
-              {concluidas} {concluidas === 1 ? "concluída" : "concluídas"}
-            </span>
+            <Atalho id="concluida" linkBase={linkBase} onRecorte={onRecorte}>
+              <span className="tabular-nums">
+                {concluidas} {concluidas === 1 ? "concluída" : "concluídas"}
+              </span>
+            </Atalho>
             {" · "}
-            <span className="tabular-nums">
-              {pausadas} {pausadas === 1 ? "pausada" : "pausadas"}
-            </span>
+            <Atalho id="pausada" linkBase={linkBase} onRecorte={onRecorte}>
+              <span className="tabular-nums">
+                {pausadas} {pausadas === 1 ? "pausada" : "pausadas"}
+              </span>
+            </Atalho>
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {apoio > 0 && (
-            <span className="inline-flex min-h-8 items-center gap-1.5 rounded-full border border-[var(--info-border)] bg-[var(--info-bg)] px-2.5 text-xs font-semibold text-[var(--info-text)]">
+            <Atalho
+              id="apoio"
+              linkBase={linkBase}
+              onRecorte={onRecorte}
+              className="inline-flex min-h-8 items-center gap-1.5 rounded-full border border-[var(--info-border)] bg-[var(--info-bg)] px-2.5 text-xs font-semibold text-[var(--info-text)] hover:no-underline"
+            >
               <Lifebuoy size={13} aria-hidden />
               <span className="tabular-nums">{apoio}</span>
               com apoio aberto
-            </span>
+            </Atalho>
           )}
           {comoCalculamos && <ComoCalculamos />}
         </div>
@@ -123,8 +146,24 @@ export function SaudePrograma({
             ariaLabel={`${emAndamento} em andamento: ${risco} em risco, ${atencao} em atenção, ${emDia} em dia. ${foraDaRegua} pausadas ou concluídas. ${apoio} com apoio aberto.`}
           />
           <ul className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-sm">
-            <Item n={risco} rotulo="em risco" dot="bg-[var(--danger)]" texto="text-[var(--danger-text)]" />
-            <Item n={atencao} rotulo="em atenção" dot="bg-[var(--warn)]" texto="text-[var(--warn-text)]" />
+            <Item
+              id="risco"
+              n={risco}
+              rotulo="em risco"
+              dot="bg-[var(--danger)]"
+              texto="text-[var(--danger-text)]"
+              linkBase={linkBase}
+              onRecorte={onRecorte}
+            />
+            <Item
+              id="atencao"
+              n={atencao}
+              rotulo="em atenção"
+              dot="bg-[var(--warn)]"
+              texto="text-[var(--warn-text)]"
+              linkBase={linkBase}
+              onRecorte={onRecorte}
+            />
             <Item n={emDia} rotulo="em dia" dot="bg-muted-foreground" texto="text-foreground" />
             <Item
               n={foraDaRegua}
@@ -143,22 +182,79 @@ export function SaudePrograma({
   );
 }
 
+/** Atalho de fatia — `<Link>` fora da /duplas (`linkBase?recorte=<id>`),
+ *  `<button>` na própria (`onRecorte` ativa o chip). Sem nenhum dos dois é
+ *  um `<span>`: o item existe igual, só não é clicável. */
+function Atalho({
+  id,
+  linkBase,
+  onRecorte,
+  className,
+  children,
+}: {
+  id: RecorteFatia;
+  linkBase?: string;
+  onRecorte?: (id: RecorteFatia) => void;
+  className?: string;
+  children?: React.ReactNode;
+}) {
+  const cls = cn(
+    "rounded-sm underline-offset-2 transition-colors hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+    className
+  );
+  if (onRecorte)
+    return (
+      <button
+        type="button"
+        onClick={() => onRecorte(id)}
+        className={cn(cls, "cursor-pointer")}
+      >
+        {children}
+      </button>
+    );
+  if (linkBase)
+    return (
+      <Link href={`${linkBase}?recorte=${id}`} className={cls}>
+        {children}
+      </Link>
+    );
+  return <span className={className}>{children}</span>;
+}
+
 function Item({
   n,
   rotulo,
   dot,
   texto,
+  id,
+  linkBase,
+  onRecorte,
 }: {
   n: number;
   rotulo: string;
   dot: string;
   texto: string;
+  /** fatia com chip na /duplas — o item vira atalho; sem id fica texto. */
+  id?: RecorteFatia;
+  linkBase?: string;
+  onRecorte?: (id: RecorteFatia) => void;
 }) {
+  const conteudo = (
+    <>
+      <b className={cn("font-semibold tabular-nums", texto)}>{n}</b>
+      <span className={texto}>{rotulo}</span>
+    </>
+  );
   return (
     <li className="inline-flex items-center gap-1.5">
       <span aria-hidden className={cn("size-2.5 shrink-0 rounded-full", dot)} />
-      <b className={cn("font-semibold tabular-nums", texto)}>{n}</b>
-      <span className={texto}>{rotulo}</span>
+      {id ? (
+        <Atalho id={id} linkBase={linkBase} onRecorte={onRecorte}>
+          {conteudo}
+        </Atalho>
+      ) : (
+        conteudo
+      )}
     </li>
   );
 }

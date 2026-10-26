@@ -229,6 +229,18 @@ test.describe("agenda demo da coordenação — Monitoramento (WP5)", () => {
     // não segurar o clique do recorte mais abaixo
     await page.keyboard.press("Escape");
 
+    // cada fatia com chip na /duplas é atalho pra lista já filtrada — o
+    // resumo é o "ver todas" por situação e pousa com o recorte nomeado
+    await expect(
+      saude.getByRole("link", { name: /em risco/ })
+    ).toHaveAttribute("href", "/duplas?recorte=risco");
+    await expect(
+      saude.getByRole("link", { name: /em atenção/ })
+    ).toHaveAttribute("href", "/duplas?recorte=atencao");
+    await expect(
+      saude.getByRole("link", { name: /com apoio aberto/ })
+    ).toHaveAttribute("href", "/duplas?recorte=apoio");
+
     // (c) pulso — "N de M registros entregues" + a média ★ do jovem +
     // lembretes nas últimas 48h (o do Dandara foi há ~20h — é ele que
     // trava o botão dela; a métrica conta enviados na janela, não "presos")

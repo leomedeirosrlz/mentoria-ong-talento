@@ -198,9 +198,10 @@ export function DashboardCoordenacao({
         />
       )}
 
-      {/* situação das duplas: a régua do programa, a mesma de /duplas */}
+      {/* situação das duplas: a régua do programa, a mesma de /duplas —
+          cada fatia com chip lá é atalho pra lista já filtrada (?recorte=) */}
       <div className="animate-enter rounded-xl bg-card px-4 py-4 shadow-[var(--shadow-border)] sm:px-5">
-        <SaudePrograma saude={situacao} />
+        <SaudePrograma saude={situacao} linkBase="/duplas" />
       </div>
 
       <div

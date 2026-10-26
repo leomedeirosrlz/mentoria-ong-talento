@@ -11,6 +11,7 @@ import {
 import { getSupervisaoAlvos } from "@/lib/queries-supervisao";
 import { duplaSupervisionada } from "@/lib/auxiliar-escopo";
 import { getUltimasInteracoes } from "@/lib/interacoes";
+import { RECORTES_FATIA, type RecorteFatia } from "@/lib/agenda-coordenacao";
 import { temPapel } from "@/lib/types";
 import { DuplasLista, type VisaoDuplas } from "@/components/duplas-lista";
 
@@ -18,7 +19,11 @@ export const metadata: Metadata = {
   title: "Duplas",
 };
 
-export default async function DuplasPage() {
+export default async function DuplasPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ recorte?: string | string[] }>;
+}) {
   const me = await getMe();
   if (!me) redirect("/login");
   // mentor também entra — a RLS já limita a lista às próprias duplas.
@@ -42,7 +47,7 @@ export default async function DuplasPage() {
   // sem baixar o ciclo inteiro pra filtrar em JS). Os extras são por visão:
   // alvos do dialog de supervisão (auxiliar) e os 5 passos da trilha
   // (especialista) — os demais não pagam essa leitura
-  const [lista, eventos, alvos, espEventos, h] = await Promise.all([
+  const [lista, eventos, alvos, espEventos, h, sp] = await Promise.all([
     me.role === "coordenacao"
       ? getDuplas()
       : me.role === "supervisor"
@@ -59,6 +64,7 @@ export default async function DuplasPage() {
       ? getEspecialistaEventos()
       : Promise.resolve([]),
     headers(),
+    searchParams,
   ]);
   // o "Lembrar" lê o cap de 48h (último nudge da dupla) — coordenação e
   // auxiliar executivo renderizam o botão no próprio escopo (a RPC
@@ -73,6 +79,13 @@ export default async function DuplasPage() {
   // morto). Mesma técnica do dashboard: x-forwarded-proto + host
   const origem = `${h.get("x-forwarded-proto") ?? "https"}://${h.get("host")}`;
 
+  // ?recorte=<fatia> — os atalhos do SaudePrograma (home, agenda, registros)
+  // pousam aqui já filtrados. Vocabulário único em RECORTES_FATIA; valor
+  // desconhecido cai fora (ausência de recorte), nunca 404 nem chip fantasma
+  const recorteParam = Array.isArray(sp.recorte) ? sp.recorte[0] : sp.recorte;
+  const recorteInicial: RecorteFatia | null =
+    RECORTES_FATIA.find((r) => r === recorteParam) ?? null;
+
   return (
     <DuplasLista
       lista={lista}
@@ -84,6 +97,7 @@ export default async function DuplasPage() {
       especialistaEventos={espEventos}
       nudges={nudges}
       origem={origem}
+      recorteInicial={recorteInicial}
     />
   );
 }
