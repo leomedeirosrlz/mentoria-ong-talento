@@ -91,8 +91,10 @@ export async function POST(req: Request) {
   ];
   const toolsUsadas: string[] = [];
 
+  // sessão estável por usuário — o provider Go exige pra rotear/cachear;
+  // profile_id é pseudônimo e não revela nada além do que a sessão já diz
   for (let i = 0; i < MAX_ITERACOES; i++) {
-    const r = await chamarModelo(historico);
+    const r = await chamarModelo(historico, me.id);
     if (!r.ok) {
       return NextResponse.json({ error: r.erro }, { status: 503 });
     }
