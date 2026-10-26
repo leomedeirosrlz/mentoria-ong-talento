@@ -64,14 +64,16 @@ export async function registrarSupervisao(formData: FormData) {
     return { error: "O resumo precisa de 10 a 4.000 caracteres." };
   }
 
-  // elegibilidade: mentor de dupla ativa/pausada que eu supervisiono —
-  // a mesma lista que alimenta os selects do dialog (getSupervisaoAlvos)
+  // elegibilidade: mentor de dupla ativa/pausada no meu escopo de
+  // supervisão (RLS, 0125 — supervisionada direta OU turma dele) — a mesma
+  // lista que alimenta os selects do dialog (getSupervisaoAlvos). O .or
+  // tira a dupla que EU mentoro, que não é alvo de supervisão
   const { data: duplasSup, error: eSup } = await supabase
     .from("duplas")
     .select(
       `id, mentorado:mentorados!duplas_mentorado_id_fkey(nome)`
     )
-    .eq("supervisor_id", eu.id)
+    .or(`supervisor_id.eq.${eu.id},mentor_id.neq.${eu.id}`)
     .eq("mentor_id", mentorId)
     .in("status", ["ativa", "pausada"]);
   if (eSup) return { error: erroAmigavel(eSup) };

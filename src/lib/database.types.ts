@@ -1278,6 +1278,7 @@ export type Database = {
       }
       duplas: {
         Row: {
+          concluida_em: string | null
           created_at: string
           cronograma_id: string | null
           demanda: string | null
@@ -1296,6 +1297,7 @@ export type Database = {
           turma: string
         }
         Insert: {
+          concluida_em?: string | null
           created_at?: string
           cronograma_id?: string | null
           demanda?: string | null
@@ -1314,6 +1316,7 @@ export type Database = {
           turma: string
         }
         Update: {
+          concluida_em?: string | null
           created_at?: string
           cronograma_id?: string | null
           demanda?: string | null
@@ -3175,6 +3178,7 @@ export type Database = {
       profile_papeis: {
         Row: {
           created_at: string
+          escopo_supervisao: string
           escopo_turma: string | null
           id: string
           papel: Database["public"]["Enums"]["app_role"]
@@ -3183,6 +3187,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          escopo_supervisao?: string
           escopo_turma?: string | null
           id?: string
           papel: Database["public"]["Enums"]["app_role"]
@@ -3191,6 +3196,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          escopo_supervisao?: string
           escopo_turma?: string | null
           id?: string
           papel?: Database["public"]["Enums"]["app_role"]
@@ -5284,6 +5290,11 @@ export type Database = {
         Args: { p_id: string; p_visivel: boolean }
         Returns: Json
       }
+      desfecho_agregado: {
+        Args: { p_cronograma?: string }
+        Returns: Json
+      }
+      desfecho_elegiveis_6m: { Args: never; Returns: Json }
       desmarcar_encontro: { Args: { p_encontro: string }; Returns: Json }
       devolver_chamado_fila: { Args: { p_id: string }; Returns: undefined }
       dispensar_sugestao_especialista: {
@@ -5296,6 +5307,19 @@ export type Database = {
       emitir_avaliacao_esp: {
         Args: { p_dupla: string; p_mentor: string }
         Returns: undefined
+      }
+      emitir_desfecho_6m_lote: {
+        Args: { p_dupla_ids: string[] }
+        Returns: Json
+      }
+      emitir_desfecho_core: {
+        Args: {
+          p_created_by: string
+          p_dupla_id: string
+          p_momento: string
+          p_origem?: string
+        }
+        Returns: Json
       }
       emitir_instrumento_core: {
         Args: {
@@ -5633,6 +5657,7 @@ export type Database = {
         }
         Returns: string
       }
+      supervisiona_dupla: { Args: { p_dupla: string }; Returns: boolean }
       terceiro_por_token: { Args: { p_token: string }; Returns: Json }
       trilha_do_jovem: { Args: { p_dupla_dpp_id: string }; Returns: Json }
     }

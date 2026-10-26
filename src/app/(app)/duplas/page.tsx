@@ -9,6 +9,7 @@ import {
   getMinhasDuplas,
 } from "@/lib/queries";
 import { getSupervisaoAlvos } from "@/lib/queries-supervisao";
+import { duplaSupervisionada } from "@/lib/auxiliar-escopo";
 import { getUltimasInteracoes } from "@/lib/interacoes";
 import { temPapel } from "@/lib/types";
 import { DuplasLista, type VisaoDuplas } from "@/components/duplas-lista";
@@ -45,11 +46,11 @@ export default async function DuplasPage() {
     me.role === "coordenacao"
       ? getDuplas()
       : me.role === "supervisor"
-        ? // getMinhasDuplas abrange mentor_id OU supervisor_id — a visão do
-          // auxiliar é "duplas que você supervisiona", então o lado mentor
-          // (caso ela também seja mentora de alguém) sai do radar daqui
+        ? // getMinhasDuplas vem escopada da RLS (0125 — supervisionadas +
+          // turma dele + as que ele mentora). A visão do auxiliar é "duplas
+          // que você supervisiona", então o lado mentor sai do radar daqui
           getMinhasDuplas().then((ds) =>
-            ds.filter((d) => d.supervisor?.id === me.id)
+            ds.filter((d) => duplaSupervisionada(d, me.id))
           )
         : getMinhasDuplas(),
     getCicloEventos(),

@@ -1,6 +1,10 @@
 import Link from "next/link";
 import { Check, Clock, Eye, LockSimple, Warning } from "@phosphor-icons/react/dist/ssr";
-import { EnviarInstrumentoLote } from "@/components/enviar-instrumento-lote";
+import {
+  EnviarDesfechoLote,
+  EnviarInstrumentoLote,
+  type DuplaLote,
+} from "@/components/enviar-instrumento-lote";
 import { LembreteButton } from "@/components/lembrete-button";
 import {
   InstrumentoEmblema,
@@ -292,6 +296,7 @@ export function InstrumentosPrograma({
   duplasInfo,
   formIds,
   envioLiberado,
+  desfechoElegiveis = [],
   fichasMentor = [],
   nudges = {},
   meuNome = "",
@@ -315,6 +320,9 @@ export function InstrumentosPrograma({
    *  "Ver respostas"; vazio pra não-coord (RLS do form é coord-only). */
   formIds: Map<FormularioSistema, string>;
   envioLiberado: boolean;
+  /** a fila do "Depois da mentoria · 6 meses" — concluídas há ≥180 dias
+   *  sem link 6m (desfecho_elegiveis_6m, 0124); só preenchida pra coord. */
+  desfechoElegiveis?: DuplaLote[];
   /** mentor: as duplas DPP vivas dele — o rodapé linka cada ficha. */
   fichasMentor?: { id: string; jovemNome: string }[];
   /** último nudge por dupla — o cap de 48h do Lembrar. */
@@ -492,6 +500,59 @@ export function InstrumentosPrograma({
             </article>
           );
         })}
+        {/* desfecho (0124): o card do 6 meses é coord-only — a régua é o
+            tempo de conclusão, não a janela do guia, e a emissão é gesto
+            humano em lote (nunca automático) */}
+        {ehCoord && (
+          <article className="flex flex-col gap-2.5 rounded-xl bg-card p-3.5 shadow-[var(--shadow-border)]">
+            <div className="flex items-start gap-2.5">
+              <InstrumentoEmblema instrumento="desfecho" />
+              <div className="min-w-0">
+                <h3 className="text-sm font-semibold leading-snug">
+                  Depois da mentoria · 6 meses
+                </h3>
+                <p className="mt-1 flex flex-wrap items-center gap-1.5">
+                  <span className="rounded-md bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground sm:text-[11px]">
+                    6 meses depois
+                  </span>
+                  <Badge variant="outline" className="text-xs font-medium">
+                    sob demanda
+                  </Badge>
+                </p>
+              </div>
+            </div>
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              O jovem conta como está depois da jornada: estudando,
+              trabalhando ou empreendendo. Vai pra quem concluiu há pelo
+              menos 6 meses e ainda não respondeu.
+            </p>
+            <div className="mt-auto flex flex-wrap items-center gap-2 pt-1">
+              {desfechoElegiveis.length > 0 ? (
+                <EnviarDesfechoLote
+                  linhas={desfechoElegiveis}
+                  envioLiberado={envioLiberado}
+                  contador={desfechoElegiveis.length}
+                />
+              ) : (
+                <span className="text-xs text-muted-foreground">
+                  Nenhuma dupla chegou aos 6 meses sem resposta.
+                </span>
+              )}
+              {formIds.get("desfecho") && (
+                <Link
+                  href={`/formularios/${formIds.get("desfecho")}`}
+                  className={buttonVariants({
+                    variant: "outline",
+                    size: "sm",
+                  })}
+                >
+                  <Eye aria-hidden />
+                  Ver respostas
+                </Link>
+              )}
+            </div>
+          </article>
+        )}
       </div>
       {atrasados.length > 0 && (
         <section
