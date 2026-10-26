@@ -48,7 +48,7 @@ test.describe("demo — contexto de turma (REALIZA-73 · fase A)", () => {
     // (2) clicar o card da T2 filtra a home — URL honesta + faixa + cookie
     await cards.filter({ hasText: "Turma 2" }).click();
     await page.waitForURL(/\?turma=/);
-    expect(decodeURIComponent(page.url())).toContain(`turma=${T2}`);
+    expect(new URL(page.url()).searchParams.get("turma")).toBe(T2);
     await expect(
       page.getByRole("status").filter({ hasText: /Mostrando: Turma 2/ })
     ).toBeVisible();
@@ -114,12 +114,12 @@ test.describe("demo — contexto de turma (REALIZA-73 · fase A)", () => {
 
     // trocar pelo seletor — mesma gravação, sem sair da página. A URL já
     // tem ?turma= (estamos no foco T2): esperar pelo valor novo, não pelo
-    // param — /turma=/ resolveria na hora e correria com o router.replace
+    // param — /turma=/ resolveria na hora e correria com o router.replace.
+    // searchParams (não decodeURIComponent): o seletor escreve via
+    // URLSearchParams.toString(), que codifica espaço como "+"
     await page.getByRole("combobox", { name: "Turma em foco" }).click();
     await page.getByRole("option", { name: /^Turma 1/ }).click();
-    await page.waitForURL((url) =>
-      decodeURIComponent(url.href).includes(`turma=${T1}`)
-    );
+    await page.waitForURL((url) => url.searchParams.get("turma") === T1);
     await esperaCookie(page, T1);
 
     // param lixo → todas, sem erro, cookie preservado
