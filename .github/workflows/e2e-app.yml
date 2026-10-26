@@ -1,80 +1,86 @@
 name: e2e-app
 
-# E2E do app real (login + writes) como GATE do dia a dia: o código do push
-# builda no runner (`pnpm build && pnpm start` em :3000) e aponta pro
-# Supabase de STAGING via secrets E2E_* — os mesmos do e2e-preview. Não
-# depende de deploy Vercel: imune ao Ignored Build Step, que deixava push
-# sem deploy com zero e2e.
+# E2E do app real (login + writes) como GATE do dia a dia: o código do PR
+# builda no runner (`pnpm build && pnpm start` em :3000) e roda a suite
+# inteira. Não depende de deploy Vercel: imune ao Ignored Build Step.
 #
-# Gatilhos: push em branch ≠ main (main só muda via merge de PR já verde),
-# pull_request → main (alimenta o required check no contexto do PR), nightly
-# 10:00 BRT (canário de flake — separa "suite instável" de "código quebrou")
-# e workflow_dispatch com input `backend`:
-#   staging (default) → o caminho acima; exige os secrets E2E_*
-#   local             → `supabase start` no runner (Docker funciona lá) com
-#                       migrations + seed.sql frescos e gate de types —
-#                       valida o stack local sem nenhum secret externo
+# Backend por gatilho:
+#   pull_request / dispatch local (default) → `supabase start` NO RUNNER:
+#     migrations + seed.sql + fixtures frescos, gate de freshness dos types.
+#     Cada run tem banco próprio → sem fila entre PRs, sem 504 do free tier
+#     do staging, e a suite divide em shards paralelos (cada shard sobe o
+#     próprio stack — as fixtures e2e00000-* não se cruzam).
+#   schedule / dispatch staging → app no runner × Supabase de STAGING via
+#     secrets E2E_*. Canário diário do ambiente real; serial e na fila
+#     global `e2e-staging` (fixtures globais divididas com o e2e-preview).
 #
-# `e2e-app / e2e` é required check do main: o guard de secrets FALHA com
-# ::error:: em vez de skipar — step/job skipped conta como verde no GitHub
-# e o gate viraria teatro. PR de fork não recebe secrets → vermelho
-# explícito (repo single-dev; se um fork aparecer, maintainer dispara a mão).
+# Antes (out/2026) o gate rodava contra o staging em push E em PR: dois
+# runs por push numa fila única, e staging lento (login → 504) segurava
+# cada run até o teto de 70min (runs 40252040155, 40241021023).
+#
+# `e2e-app / e2e` é required check do main: o job `e2e` agrega os shards
+# e FALHA se algum falhou ou foi cancelado — skip contaria como verde.
+# No modo staging o guard de secrets também falha com ::error:: em vez
+# de skipar.
 on:
-  push:
-    branches-ignore: [main]
   pull_request:
-    branches: [main]
   schedule:
     - cron: "0 13 * * *" # 10:00 BRT — uma hora depois do demo-smoke em prod
   workflow_dispatch:
     inputs:
       backend:
-        description: "staging (default — app no runner × Supabase staging) ou local (supabase start no runner, sem secrets)"
+        description: "local (default — supabase start no runner, sem secrets) ou staging (app no runner × Supabase staging)"
         type: choice
         options:
-          - staging
           - local
-        default: staging
+          - staging
+        default: local
 
-# As fixtures e2e00000-*/de* são GLOBAIS no staging e divididas com o
-# e2e-preview: dois runs e2e concorrentes — de qualquer workflow — apagam a
-# fixture um do outro (flake garantido). Concurrency groups são repo-wide:
-# este nome é compartilhado com e2e-preview.yml e serializa TODOS os runs da
-# suite numa fila única. Sem cancel-in-progress: um run cortado no meio
-# deixa fixture em estado parcial — push novo espera na fila.
+# Staging: fila única repo-wide (mesmo nome do e2e-preview.yml), sem
+# cancel-in-progress — run cortado deixa fixture em estado parcial.
+# Local: um run por ref; push novo no PR cancela o anterior (banco é
+# descartável).
 concurrency:
-  group: e2e-staging
-  cancel-in-progress: false
+  group: >-
+    ${{ (github.event_name == 'schedule' || inputs.backend == 'staging')
+        && 'e2e-staging' || format('e2e-app-{0}', github.ref) }}
+  cancel-in-progress: >-
+    ${{ !(github.event_name == 'schedule' || inputs.backend == 'staging') }}
 
 permissions:
   contents: read
 
 jobs:
-  e2e:
+  # O modo sai UMA vez daqui; os shards leem o output. Staging exige os 3
+  # secrets E2E_* — faltando, FALHA (nunca skip). Segunda trava: a URL não
+  # pode conter o ref de prod — specs app escrevem de verdade (defesa em
+  # profundidade sobre o hard-stop de tests/e2e/helpers.ts).
+  modo:
     runs-on: ubuntu-latest
-    # setup (install+build) ~3-4min + suite serial ~50min medida local
-    # (114 specs hoje) — 70 dá margem; regressão de duração é o alarme
-    timeout-minutes: 70
+    outputs:
+      backend: ${{ steps.modo.outputs.backend }}
+      shards: ${{ steps.modo.outputs.shards }}
+      total: ${{ steps.modo.outputs.total }}
     steps:
-      # O modo sai UMA vez daqui; todo step condicional usa o output.
-      # Staging exige os 3 secrets E2E_* — faltando, FALHA (nunca skip:
-      # required check não pode ser verde-gratuito). Segunda trava: a URL
-      # não pode conter o ref de prod — specs app escrevem de verdade
-      # (defesa em profundidade sobre o hard-stop de tests/e2e/helpers.ts).
       - name: modo do backend + guard de secrets
         id: modo
         env:
           BACKEND: >-
-            ${{ github.event_name == 'workflow_dispatch' &&
-                inputs.backend == 'local' && 'local' || 'staging' }}
+            ${{ (github.event_name == 'schedule' || inputs.backend == 'staging')
+                && 'staging' || 'local' }}
           E2E_URL: ${{ secrets.E2E_SUPABASE_URL }}
           E2E_KEY: ${{ secrets.E2E_SUPABASE_SERVICE_ROLE_KEY }}
           E2E_ANON: ${{ secrets.E2E_SUPABASE_ANON_KEY }}
         run: |
           echo "backend=$BACKEND" >> "$GITHUB_OUTPUT"
           if [ "$BACKEND" = "local" ]; then
+            echo 'shards=[1,2,3]' >> "$GITHUB_OUTPUT"
+            echo "total=3" >> "$GITHUB_OUTPUT"
             exit 0
           fi
+          # staging é um banco só: shards em paralelo se apagariam
+          echo 'shards=[1]' >> "$GITHUB_OUTPUT"
+          echo "total=1" >> "$GITHUB_OUTPUT"
           falta=""
           if [ -z "$E2E_URL" ]; then falta="$falta E2E_SUPABASE_URL"; fi
           if [ -z "$E2E_KEY" ]; then falta="$falta E2E_SUPABASE_SERVICE_ROLE_KEY"; fi
@@ -87,6 +93,21 @@ jobs:
             echo "::error::E2E_SUPABASE_URL aponta pra PRODUÇÃO — os specs app fazem writes; o alvo certo é o staging (ref onkosatlcvircdrfgyzq)"
             exit 1
           fi
+
+  shard:
+    needs: modo
+    runs-on: ubuntu-latest
+    # setup (install + supabase start + build) ~5min + 1/3 da suite.
+    # Staging roda serial inteiro: teto maior. Regressão de duração é o
+    # alarme — e o maxFailures do playwright.config corta backend quebrado.
+    timeout-minutes: ${{ needs.modo.outputs.backend == 'local' && 30 || 70 }}
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ${{ fromJSON(needs.modo.outputs.shards) }}
+    env:
+      BACKEND: ${{ needs.modo.outputs.backend }}
+    steps:
       - uses: actions/checkout@v4
       # pnpm sai do packageManager do package.json — pinar version aqui
       # conflita ("Multiple versions of pnpm specified")
@@ -97,11 +118,14 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       # ---- modo local: stack supabase inteiro no runner ----
-      # CLI pinado pela devDep `supabase` — sem setup-cli@latest derivando
-      - if: steps.modo.outputs.backend == 'local'
+      # CLI pinado pela devDep `supabase` — sem setup-cli@latest derivando.
+      # Fora os serviços que a suite não toca (encurta o pull de imagens).
+      - if: env.BACKEND == 'local'
         name: supabase local
-        run: pnpm exec supabase start
-      - if: steps.modo.outputs.backend == 'local'
+        run: >-
+          pnpm exec supabase start
+          -x studio,imgproxy,edge-runtime,logflare,vector,supavisor
+      - if: env.BACKEND == 'local'
         name: capturar envs do supabase local
         # status -o env emite valores COM aspas (API_URL="http://...") e
         # $GITHUB_ENV não desquota — o seed e o fetch quebrariam no URL
@@ -113,7 +137,8 @@ jobs:
       # com o que as migrations produzem. gen types emite os schemas que o
       # stack local expõe (graphql_public etc.) — --schema não filtra — então
       # compara-se só o bloco public (o mesmo que o contract check lê).
-      - if: steps.modo.outputs.backend == 'local'
+      # Uma vez por run basta: só no shard 1.
+      - if: env.BACKEND == 'local' && matrix.shard == 1
         name: types atualizados vs migrations
         run: |
           pnpm exec supabase gen types typescript --db-url "$DB_URL" \
@@ -155,23 +180,24 @@ jobs:
           EMAIL_FROM: noreply@realiza.vc
       - name: playwright browsers
         run: pnpm exec playwright install --with-deps chromium
-      # Fixtures só no modo local (stack nasce zerada). No STAGING o seed é
+      # Fixtures só no modo local (stack nasce zerada): as do e2e e o
+      # dataset demo, igual ao e2e local do dia a dia. No STAGING o seed é
       # manual (`pnpm seed:e2e` com .env.staging): re-seed a cada run
-      # derrubava o PostgREST do free tier e gerava flake em massa — os
-      # pisos convergirPiso dos specs re-criam o estado volátil (mesma
-      # decisão do e2e-preview.yml). Staging sem fixtures → o primeiro spec
-      # falha com erro claro; o runbook é o seed manual.
-      - if: steps.modo.outputs.backend == 'local'
-        name: fixtures e2e
-        run: node scripts/seed-e2e-staging.mjs
+      # derrubava o PostgREST do free tier — os pisos convergirPiso dos
+      # specs re-criam o estado volátil (mesma decisão do e2e-preview.yml).
+      - if: env.BACKEND == 'local'
+        name: fixtures e2e + demo
+        run: |
+          node scripts/seed-e2e-staging.mjs
+          node scripts/seed-demo-staging.mjs
         env:
           E2E_SUPABASE_URL: ${{ env.API_URL }}
           E2E_SUPABASE_SERVICE_ROLE_KEY: ${{ env.SERVICE_ROLE_KEY }}
           E2E_MENTOR_PASSWORD: e2e-senha-teste
           # secret opcional — sem ele o seed cai na senha do mentor
           E2E_COORD_PASSWORD: ${{ secrets.E2E_COORD_PASSWORD || 'e2e-senha-teste' }}
-      - name: playwright (demo + app)
-        run: pnpm test:e2e
+      - name: playwright (demo + app) — shard ${{ matrix.shard }}/${{ needs.modo.outputs.total }}
+        run: pnpm test:e2e --shard=${{ matrix.shard }}/${{ needs.modo.outputs.total }}
         env:
           E2E_BASE_URL: http://localhost:3000
           E2E_SUPABASE_URL: ${{ env.API_URL || secrets.E2E_SUPABASE_URL }}
@@ -189,7 +215,23 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: playwright-report
+          name: playwright-report-${{ matrix.shard }}
           path: |
             playwright-report/
             test-results/
+
+  # Nome estável pro required check (`e2e-app / e2e`), independente de
+  # quantos shards rodaram. always() + checagem explícita: shard falho ou
+  # cancelado deixa este job vermelho, nunca skipped.
+  e2e:
+    needs: [modo, shard]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: todos os shards verdes
+        env:
+          MODO: ${{ needs.modo.result }}
+          SHARDS: ${{ needs.shard.result }}
+        run: |
+          echo "modo=$MODO shards=$SHARDS"
+          [ "$MODO" = "success" ] && [ "$SHARDS" = "success" ]

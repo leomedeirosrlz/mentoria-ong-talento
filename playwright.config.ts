@@ -11,6 +11,9 @@ export default defineConfig({
   testDir: "tests/e2e",
   timeout: 30_000,
   retries: process.env.CI ? 1 : 0,
+  // backend quebrado (staging lento → login 504) fazia cada spec gastar o
+  // teto + retry e o run morria nos 70min do job; 10 falhas = desiste
+  maxFailures: process.env.CI ? 10 : 0,
   // serial em todo ambiente: os specs app dividem as mesmas fixtures
   // (dupla e2e…030 e afins) — beforeEach de um arquivo deleta o que outro
   // criou no meio do teste. `--workers=N` na CLI segue disponível.
