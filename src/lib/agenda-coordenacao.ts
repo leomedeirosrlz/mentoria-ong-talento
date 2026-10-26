@@ -652,6 +652,10 @@ export type ItemPrograma = {
   aviso: string | null;
   /** Item de agenda alheia que o mentor assiste de fora (convidado). */
   convidado: boolean;
+  /** Dupla dona do card — só o card encontro×dupla do mentor a tem; é a
+   *  identidade do dedup contra a Minha agenda (`duplaId:numero`). Null
+   *  nos demais itens (evento único, supervisão, meta da coorte). */
+  duplaId: string | null;
 };
 
 /** Guia por encontro — a fonte é `guiaDoEncontro` (como-conduzir.ts):
@@ -740,6 +744,7 @@ export function itensDaSemanaPrograma(
         nota: null,
         aviso: null,
         convidado: false,
+        duplaId: null,
       });
     } else {
       const ehFormacao = ev.tipo === "formacao";
@@ -757,6 +762,7 @@ export function itensDaSemanaPrograma(
         nota: null,
         aviso: null,
         convidado: false,
+        duplaId: null,
       });
     }
   }
@@ -780,6 +786,7 @@ export function itensDaSemanaPrograma(
       nota: null,
       aviso: null,
       convidado: false,
+      duplaId: null,
     });
   }
 
@@ -795,7 +802,14 @@ export function itensDaSemanaPrograma(
  *  dupla ativa dele (duas duplas na mesma turma geram dois cards, porque
  *  cada uma marca a sua), as formações/eventos oficiais dos cronogramas
  *  dele e as supervisões sobre ele. A roda/encerramento entra como
- *  convidado ("você não participa") — o mock explicita o caso. */
+ *  convidado ("você não participa") — o mock explicita o caso.
+ *
+ *  `cobertos` (chaves `duplaId:numero`, de `encontrosCobertos`) suprime o
+ *  card do encontro que a lista cronológica já apresenta — ela carrega
+ *  hora e as ações da dupla (entrar, remarcar, agendar, registrar), então
+ *  o encontro mora lá e a faixa não repete. O que sobra na faixa é o
+ *  compromisso do programa e o encontro oficial ainda fora do radar
+ *  (sem item nem aviso — o "por agendar" que ninguém olhou). */
 export function itensSemanaProgramaMentor(
   duplas: Dupla[],
   eventos: CicloEvento[],
@@ -808,7 +822,8 @@ export function itensSemanaProgramaMentor(
   }[],
   meuId: string,
   hoje: Date = new Date(),
-  agoraMs: number = hoje.getTime()
+  agoraMs: number = hoje.getTime(),
+  cobertos?: ReadonlySet<string>
 ): ItemPrograma[] {
   const { seg, dom } = semanaBounds(hoje);
   const cronos = new Map(cronogramas.map((c) => [c.id, c]));
@@ -836,6 +851,10 @@ export function itensSemanaProgramaMentor(
       if (ev.tipo === "encontro" && ev.numero != null) {
         // um card por dupla — cada dupla marca o seu encontro
         for (const d of minhas.filter((x) => x.cronograma_id === cronId)) {
+          // encontro já coberto pela Minha agenda (item ou aviso): a cópia
+          // da faixa sai — o encontro aparece uma vez só, na lista, com as
+          // ações que o card não tem
+          if (cobertos?.has(`${d.id}:${ev.numero}`)) continue;
           const row = d.encontros.find((e) => e.numero === ev.numero);
           const limbo = row != null && emLimbo(row, agoraMs);
           const faltaRegistro =
@@ -878,6 +897,7 @@ export function itensSemanaProgramaMentor(
                       .filter(Boolean)
                       .join(" · ") || null,
             convidado: false,
+            duplaId: d.id,
           });
         }
       } else {
@@ -903,6 +923,7 @@ export function itensSemanaProgramaMentor(
               : null,
           aviso: null,
           convidado,
+          duplaId: null,
         });
       }
     }
@@ -927,6 +948,7 @@ export function itensSemanaProgramaMentor(
       nota: null,
       aviso: null,
       convidado: false,
+      duplaId: null,
     });
   }
 
@@ -1060,6 +1082,26 @@ export function saudeDoRecorte(
   s.total = s.emAndamento + s.pausadas + s.concluidas;
   return s;
 }
+
+/** Fatia de situação que a /duplas sabe filtrar — os ids dos chips da
+ *  lista (duplas-lista), dos atalhos do SaudePrograma e do `?recorte=`
+ *  da página. "todas" não é valor: é a ausência de recorte. */
+export type RecorteFatia =
+  | "risco"
+  | "atencao"
+  | "andamento"
+  | "pausada"
+  | "concluida"
+  | "apoio";
+
+export const RECORTES_FATIA: readonly RecorteFatia[] = [
+  "risco",
+  "atencao",
+  "andamento",
+  "pausada",
+  "concluida",
+  "apoio",
+];
 
 /** Pulso de registro da semana — encontros realizados nos últimos 14 dias
  *  (a janela do mock) das duplas do recorte: entregue × aguardando + a

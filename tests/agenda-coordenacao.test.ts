@@ -1133,6 +1133,74 @@ describe("itensSemanaProgramaMentor", () => {
     expect(item.diaKey).toBe("2026-10-06");
   });
 
+  it("card de encontro carrega duplaId; compromisso do programa usa null", () => {
+    const itens = itensSemanaProgramaMentor(
+      [dSemLocal],
+      [
+        ...EV_M,
+        mkEvento(null, "2026-10-09", "formacao", "c1", {
+          titulo: "Formação",
+        }),
+      ],
+      [C1],
+      [],
+      "p-qualquer",
+      AGORA,
+      AGORA.getTime()
+    );
+    expect(itens.find((i) => i.tipoItem === "encontro")?.duplaId).toBe("dSL");
+    expect(itens.find((i) => i.tipoItem === "formacao")?.duplaId).toBeNull();
+  });
+
+  it("cobertos suprime só o encontro já na lista — a outra dupla fica", () => {
+    // a lista cronológica carrega as ações (entrar/remarcar/registrar) —
+    // o card da faixa sai pra não apresentar o mesmo encontro duas vezes
+    const itens = itensSemanaProgramaMentor(
+      [dSemLocal, dComLink],
+      EV_M,
+      [C1],
+      [],
+      "p-qualquer",
+      AGORA,
+      AGORA.getTime(),
+      new Set(["dSL:8"])
+    );
+    expect(itens.map((i) => i.duplaId)).toEqual(["dCL"]);
+  });
+
+  it("cobertos também vale pro 'por agendar' — aviso na lista já cobre", () => {
+    const itens = itensSemanaProgramaMentor(
+      [mkDupla({ id: "dSA" })],
+      EV_M,
+      [C1],
+      [],
+      "p-qualquer",
+      AGORA,
+      AGORA.getTime(),
+      new Set(["dSA:8"])
+    );
+    expect(itens).toEqual([]);
+  });
+
+  it("cobertos não esconde compromisso do programa — formação fica", () => {
+    const itens = itensSemanaProgramaMentor(
+      [mkDupla({ id: "dSA" })],
+      [
+        ...EV_M,
+        mkEvento(null, "2026-10-09", "formacao", "c1", {
+          titulo: "Formação",
+        }),
+      ],
+      [C1],
+      [],
+      "p-qualquer",
+      AGORA,
+      AGORA.getTime(),
+      new Set(["dSA:8"])
+    );
+    expect(itens.map((i) => i.tipoItem)).toEqual(["formacao"]);
+  });
+
   it("formação chama presença; encerramento é convidado; recesso não promete nada", () => {
     const evs = [
       mkEvento(null, "2026-10-10", "formacao", "c1", {

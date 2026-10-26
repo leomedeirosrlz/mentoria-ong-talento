@@ -69,6 +69,25 @@ test.describe("mentorado — home, página e ciclo de vida", () => {
     ).toBeVisible();
   });
 
+  test("a página abre direto no trabalho — sem bloco explicativo", async ({
+    page,
+  }) => {
+    await entrarNaDemo(page, "mentorado");
+    await page.goto("/jovem/especialistas");
+
+    // REALIZA-220: as três caixas "Pedir uma trilha / Agendar uma sessão /
+    // Pedir apoio à coordenação" saíram — a essência virou a linha do header;
+    // os gestos são os próprios CTAs (Pedir trilha, Falar com a coordenação)
+    await expect(
+      page.getByRole("heading", { name: "Especialistas", level: 1 })
+    ).toBeVisible();
+    await expect(page.getByRole("note")).toHaveCount(0);
+    // o primeiro h2 depois do título já é seção de trabalho, não didática
+    await expect(page.getByRole("heading", { level: 2 }).first()).toHaveText(
+      /Suas trilhas|Pedidos em aberto|Quem pode te ajudar/
+    );
+  });
+
   test("trilhas: stepper dos 5 passos na ativa + feed datado na concluída", async ({
     page,
   }) => {

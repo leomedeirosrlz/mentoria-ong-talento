@@ -192,6 +192,7 @@ export function AgendaAuxiliar({
               <SaudePrograma
                 saude={saudeDoRecorte(duplas, eventos, agora)}
                 nivel="h2"
+                linkBase="/duplas"
               />
             </div>
           )}

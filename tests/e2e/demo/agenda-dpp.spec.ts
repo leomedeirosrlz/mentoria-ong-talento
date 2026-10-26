@@ -114,6 +114,47 @@ test.describe("agenda demo do mentor DPP — Minha agenda / Por mentorado / Cale
     );
   });
 
+  test("o encontro aparece uma vez — a faixa cede à lista que tem as ações", async ({
+    page,
+  }) => {
+    await entrarNaDemo(page, "mentor_dpp");
+    await page.goto("/agenda");
+
+    const lista = page.locator('section[aria-label^="Agenda de"]');
+    // âncora: o 5º oficial da T1 é a terça da semana corrente e a Bia já
+    // tem row — na lista ele é item (ainda por vir) ou warnrow (vencido
+    // sem registro). "Encontro 5 · Turma 1" / "encontro 5 · Bia · Turma 1"
+    await expect(
+      lista
+        .getByText(/encontro 5 · (?:[^·]+ · )?Turma 1/i)
+        .first()
+    ).toBeVisible();
+
+    // …então a faixa não pode repetir o card do mesmo encontro — o dedup
+    // por (dupla, nº) tira da faixa o que a lista já apresenta; se sobrar
+    // faixa, ficam só os oficiais fora do radar e os compromissos do
+    // programa
+    const faixa = page.locator(
+      'section[aria-label="Minha agenda · semana do programa"]'
+    );
+    await expect(
+      faixa.getByText(/Encontro 5 · Turma 1/)
+    ).toHaveCount(0);
+
+    // invariante geral: nenhum "Encontro N · <turma>" da faixa coexiste
+    // com item ou warnrow do mesmo encontro na lista
+    const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    for (const t of await faixa.locator("li h3").allTextContents()) {
+      const m = t.match(/^Encontro (\d+)(?: · ([^,]+))?/);
+      if (!m?.[2]) continue;
+      await expect(
+        lista.getByText(
+          new RegExp(`encontro ${m[1]} · (?:[^·]+ · )?${esc(m[2].trim())}`, "i")
+        )
+      ).toHaveCount(0);
+    }
+  });
+
   test("Por mentorado: card da Ana com as trilhas e card do Matheus com o pedido no mural", async ({
     page,
   }) => {

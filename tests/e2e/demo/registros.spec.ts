@@ -213,7 +213,7 @@ test.describe("panorama do ciclo", () => {
       page.getByRole("heading", { name: "Avaliação média do jovem" })
     ).toBeVisible();
     // a situação é uma barra segmentada nomeada com os números por
-    // extenso (o mesmo resumo de /duplas e da agenda, não um donut)
+    // extenso (o mesmo resumo de /duplas e da agenda)
     await expect(
       page.getByRole("img", { name: /em andamento: \d+ em risco/ })
     ).toBeVisible();

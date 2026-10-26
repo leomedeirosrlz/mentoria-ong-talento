@@ -463,6 +463,103 @@ test.describe("demo — /duplas (REALIZA-197 · v6a)", () => {
     await page.keyboard.press("Escape");
   });
 
+  test("coordenação: ?recorte= pousa com a fatia ativa — chip + lista", async ({
+    page,
+  }) => {
+    await entrarNaDemo(page, "coordenacao");
+
+    const chips = page.getByRole("group", { name: "Filtrar por situação" });
+    const linhas = page.locator(LINHAS_COORD);
+    // o número do chip é a promessa da régua — a contagem de linhas é
+    // conferida contra ele, não contra um número chumbado do fixture
+    const nDoChip = async (nome: RegExp) => {
+      const txt =
+        (await chips.getByRole("button", { name: nome }).textContent()) ?? "";
+      return Number(txt.match(/(\d+)/)?.[1] ?? -1);
+    };
+
+    // ?recorte=risco — a dupla em risco do fixture é a única linha
+    await page.goto("/duplas?recorte=risco");
+    await expect(
+      chips.getByRole("button", { name: /Em risco \d+/ })
+    ).toHaveAttribute("aria-pressed", "true");
+    await expect(linhas).toHaveCount(await nDoChip(/Em risco \d+/));
+    await expect(linhas.first()).toContainText("Dandara");
+
+    // ?recorte=atencao — outra fatia, mesmo contrato
+    await page.goto("/duplas?recorte=atencao");
+    await expect(
+      chips.getByRole("button", { name: /Atenção \d+/ })
+    ).toHaveAttribute("aria-pressed", "true");
+    await expect(linhas).toHaveCount(await nDoChip(/Atenção \d+/));
+
+    // ?recorte=apoio — sobreposição: toda linha do recorte traz a pill
+    // "Apoio pedido" (a dupla segue na situação dela e está no apoio).
+    // a pill carrega a origem do pedido no sr-only ("Apoio pedido, <origem>"),
+    // então o match é substring, nunca exact
+    await page.goto("/duplas?recorte=apoio");
+    await expect(
+      chips.getByRole("button", { name: /Apoio \d+/ })
+    ).toHaveAttribute("aria-pressed", "true");
+    const nApoio = await nDoChip(/Apoio \d+/);
+    await expect(linhas).toHaveCount(nApoio);
+    for (let i = 0; i < nApoio; i++)
+      await expect(linhas.nth(i).getByText("Apoio pedido")).toBeVisible();
+
+    // recorte desconhecido não vira chip fantasma — cai em "Todas"
+    await page.goto("/duplas?recorte=bogus");
+    await expect(
+      chips.getByRole("button", { name: /Todas \d+/ })
+    ).toHaveAttribute("aria-pressed", "true");
+
+    // na própria /duplas a fatia do resumo é botão, não link — ativa o
+    // chip equivalente sem recarregar a página
+    await page
+      .locator(RESUMO)
+      .getByRole("button", { name: /em risco/ })
+      .click();
+    await expect(
+      chips.getByRole("button", { name: /Em risco \d+/ })
+    ).toHaveAttribute("aria-pressed", "true");
+    // a troca de recorte remonta as linhas com a entrada escalonada —
+    // re-key no container e o animate-enter re-roda (convenção de filtro).
+    // LINHAS_* mira o wrapper @container; a classe mora no filho da linha
+    await expect(
+      linhas.first().locator(":scope > .animate-enter")
+    ).toHaveCount(1);
+  });
+
+  test("supervisor: ?recorte= abre a linha de chips só enquanto há recorte", async ({
+    page,
+  }) => {
+    await entrarNaDemo(page, "supervisor");
+
+    // o default segue sem linha de filtro (desenho enxuto do auxiliar)
+    await page.goto("/duplas");
+    await expect(
+      page.getByRole("group", { name: "Filtrar por situação" })
+    ).toHaveCount(0);
+
+    // com ?recorte= a fatia chega ativa e os chips aparecem pra devolver
+    // o controle — o apoio supervisionado do fixture é o do Caio (1)
+    await page.goto("/duplas?recorte=apoio");
+    const chips = page.getByRole("group", { name: "Filtrar por situação" });
+    await expect(chips).toBeVisible();
+    await expect(
+      chips.getByRole("button", { name: /Apoio \d+/ })
+    ).toHaveAttribute("aria-pressed", "true");
+    const linhas = page.locator(LINHAS_SUP);
+    await expect(linhas).toHaveCount(1);
+    await expect(linhas.first()).toContainText("Caio");
+
+    // "Todas" desfaz o recorte — a linha de chips volta a sumir
+    await chips.getByRole("button", { name: /Todas \d+/ }).click();
+    await expect(
+      page.getByRole("group", { name: "Filtrar por situação" })
+    ).toHaveCount(0);
+    expect(await linhas.count()).toBeGreaterThan(1);
+  });
+
   test("mentor: ação única no header, registrar no 'Próximo passo', sem footer", async ({
     page,
   }) => {

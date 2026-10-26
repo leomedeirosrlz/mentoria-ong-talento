@@ -359,8 +359,8 @@ export function RegistrosPainel({
   }
   const temDados = slots.length > 0;
   // trilhas de especialista não têm calendário oficial — a nota explica por
-  // que elas entram no donut mas nunca nas colunas (vale inclusive quando o
-  // recorte não tem encontro nenhum: é justamente o caso que mais confunde)
+  // que elas nunca viram coluna (vale inclusive quando o recorte não tem
+  // encontro nenhum: é justamente o caso que mais confunde)
   const notaEsp =
     espNoRecorte > 0
       ? `${espNoRecorte} ${espNoRecorte === 1 ? "trilha" : "trilhas"} de especialista segue${espNoRecorte === 1 ? "" : "m"} calendário próprio, fora das colunas.`
@@ -898,12 +898,13 @@ export function RegistrosPainel({
       </section>
 
       {/* ==================== situação das duplas ==================== */}
-      {/* o mesmo resumo de /duplas, /agenda e da home (saudeDoRecorte) */}
+      {/* o mesmo resumo de /duplas, /agenda e da home (saudeDoRecorte) —
+          cada fatia com chip lá é atalho pra lista já filtrada (?recorte=) */}
       <div
         className="animate-enter flex min-w-0 flex-col rounded-xl bg-card p-5 shadow-[var(--shadow-border)] lg:col-span-5 lg:col-start-8 lg:row-start-1"
         style={{ "--i": 2 } as CSSProperties}
       >
-        <SaudePrograma saude={saude} nivel="h3" className="flex-1" />
+        <SaudePrograma saude={saude} nivel="h3" className="flex-1" linkBase="/duplas" />
       </div>
     </div>
   );
