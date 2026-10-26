@@ -1,5 +1,6 @@
 import { Skeleton } from "@/components/ui/skeleton";
 import { SiteFooter } from "@/components/site-footer";
+import { Logo } from "@/components/logo";
 
 // Espelho de /f/[token] (público): navegação fria via WhatsApp + RPC mostrava
 // só o spinner do browser. Mesma anatomia do form — logo + kicker, pill de
@@ -15,14 +16,7 @@ export default function Loading() {
       <main className="flex flex-1 flex-col px-4 py-10 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))]">
         <div className="m-auto w-full max-w-xl">
           <header className="mb-6">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/logo-realiza.png"
-              alt="Realiza.vc"
-              width={1920}
-              height={262}
-              className="h-7 w-auto"
-            />
+            <Logo size="lg" />
             <p className="mt-1.5 text-xs text-muted-foreground">
               Programa de Mentoria Social
             </p>

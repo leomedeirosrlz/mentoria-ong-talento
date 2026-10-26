@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { cn, pathInterno } from "@/lib/utils";
+import { Logo } from "@/components/logo";
 
 // janela do resend do supabase — quando o 429 traz "after N seconds" usa o N real
 const COOLDOWN = 60;
@@ -351,8 +352,7 @@ export function LoginForm() {
     <div className="flex min-h-[100dvh] flex-col bg-background pb-[calc(4rem+env(safe-area-inset-bottom))] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))]">
       <div className="m-auto w-full max-w-sm">
         <div className="mb-8">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo-realiza.png" alt="Realiza.vc" className="h-8 w-auto" />
+          <Logo size="xl" />
           <h1 className="text-lg font-semibold tracking-tight mt-3">Programa de Mentoria Social</h1>
         </div>
 

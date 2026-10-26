@@ -112,10 +112,26 @@
   --pausa-bg: hsl(75 5% 94%);
   --pausa-border: hsl(75 5% 78%);
   /* destaque positivo da marca (amarelo #FFD531): próximo passo, jornada,
-     celebração — nunca alerta; texto sobre ele é sempre --foreground */
+     celebração — nunca alerta; texto sobre o destaque cheio é a tinta
+     (--destaque-foreground — constante nos dois temas: o amarelo segue
+     claro no dark, então --foreground claro apagaria) */
   --destaque: hsl(48 100% 60%);
   --destaque-suave: hsl(48 100% 93%);
   --destaque-borda: hsl(48 90% 70%);
+  --destaque-foreground: var(--brand-ink);
+  /* texto/ícone sobre fill SÓLIDO de status (--ok, --ok-text, --warn…):
+     branco no papel claro; no dark a base clareia pra ler como texto e
+     quem senta em cima vira tinta (ver bloco .dark) */
+  --status-foreground: hsl(0 0% 100%);
+  /* scrim de overlay (dialog/sheet): vela a página, não a superfície —
+     no escuro preto a 10% some no fundo, por isso sobe no .dark */
+  --overlay: hsl(0 0% 0% / 0.10);
+  --overlay-forte: hsl(0 0% 0% / 0.20);
+  /* hatches semânticos (recesso na agenda, segmento "a fazer" do viz/) —
+     tokenizados pra acompanhar o tema */
+  --hatch-recesso: hsl(75 5% 89%);
+  --viz-hatch-a: hsl(75 7% 88%);
+  --viz-hatch-b: hsl(75 7% 80%);
   /* identidade de papel na dupla: mentor = lime do disco (quem age);
      mentorado = destaque amarelo da marca — sempre como marcador (dot/disco),
      nunca como cor de texto. Spec §1 */
@@ -176,6 +192,160 @@
   --sidebar-accent-foreground: hsl(0 0% 20%);
   --sidebar-border: hsl(75 6% 87%);
   --sidebar-ring: hsl(78 54% 52%);
+  color-scheme: light;
+}
+
+/* === Tema escuro (REALIZA-192) ===
+   `.dark` no <html> — resolvido no server pelo cookie `tema` (escuro/
+   claro), ou pelo script inline do <head> quando `auto` (segue o
+   prefers-color-scheme). Mesma paleta, mesmo matiz: o dark se constrói
+   mexendo só em S%/L% — a marca vive nos matizes, não na lightness.
+
+   Direção geral: superfícies escuras quentes da família do papel (hue 75,
+   S baixa); elevação por lightness (card/popover acima do background);
+   foregrounds quentes claros; as bases de status clareiam pra servir de
+   fill E texto solto; os -text viram claros sobre os -bg, que viram
+   tintas escuras da mesma hue. As constantes de marca (--brand-lime,
+   --brand-ink, --destaque, --role-*) NÃO mudam: lime e amarelo já leem
+   sobre escuro, e ink segue ink nos dois temas. */
+.dark {
+  color-scheme: dark;
+
+  /* núcleo — fundo quente escuro; card um degrau acima; popover acima do
+     card (overlay elevado, não cinza neutro) */
+  --background: hsl(75 8% 8%);
+  --foreground: hsl(75 8% 93%);
+  --card: hsl(75 6% 11%);
+  --card-foreground: hsl(75 8% 93%);
+  --popover: hsl(75 6% 13%);
+  --popover-foreground: hsl(75 8% 93%);
+  /* lima da marca segue cheio (hsl(78 54% 52%) do :root): sobre escuro lê
+     ótimo e o texto continua tinta */
+  --primary-foreground: hsl(0 0% 20%);
+  /* pill neutro (Badge secondary): ink puro sumiria na borda do card —
+     cinza quente acima do card mantém o papel "chip escuro neutro" */
+  --secondary: hsl(75 6% 24%);
+  --secondary-foreground: hsl(75 8% 93%);
+  /* painéis internos/hover: no escuro o recorte CLAREIA em vez de
+     escurecer — muted/accent sobem acima do card */
+  --muted: hsl(75 6% 16%);
+  /* 66% garante ≥4,5:1 sobre card/muted/background (metadado dominante) */
+  --muted-foreground: hsl(75 5% 66%);
+  --accent: hsl(75 7% 18%);
+  --accent-foreground: hsl(75 8% 93%);
+  --destructive: hsl(0 72% 58%);
+  --destructive-foreground: hsl(0 0% 20%);
+  /* hairline visível sobre card (≈+12% de lightness sobre o card, o mesmo
+     delta relativo do claro); input = fronteira de controle ≥3:1 */
+  --border: hsl(75 6% 23%);
+  --input: hsl(75 8% 42%);
+  /* anel de foco não pode sumir: lime clareado pra ~56% */
+  --ring: hsl(78 50% 56%);
+
+  /* semáforo: base ~55-62% L (serve de fill e de texto solto ≥4,5:1 sobre
+     card); -text ~72-76% L sobre o -bg virado tinta escura (~16% L);
+     -border ~30-40% L separa a pill do card */
+  --ok: hsl(105 40% 58%);
+  --ok-text: hsl(105 45% 74%);
+  --ok-bg: hsl(105 30% 16%);
+  --ok-border: hsl(105 30% 38%);
+  --warn: hsl(28 88% 55%);
+  --warn-text: hsl(32 90% 72%);
+  --warn-bg: hsl(30 55% 16%);
+  --warn-border: hsl(30 60% 38%);
+  --danger: hsl(0 75% 62%);
+  --danger-text: hsl(0 80% 76%);
+  --danger-bg: hsl(0 45% 17%);
+  --danger-border: hsl(0 50% 40%);
+  --info: hsl(195 65% 62%);
+  --info-text: hsl(198 75% 76%);
+  --info-bg: hsl(198 40% 16%);
+  --info-border: hsl(198 45% 38%);
+  --pausa: hsl(75 4% 60%);
+  --pausa-text: hsl(75 5% 72%);
+  --pausa-bg: hsl(75 4% 15%);
+  --pausa-border: hsl(75 4% 30%);
+  --status-foreground: var(--brand-ink);
+
+  /* destaque cheio mantém (amarelo ~60% lê bem no escuro); a tinta suave
+     vira âmbar escuro e a borda segue visível */
+  --destaque-suave: hsl(45 55% 17%);
+  --destaque-borda: hsl(45 70% 40%);
+
+  /* instrumentos: inversão do par — traço escuro→claro (~58-70% L), tinta
+     clara→escura (~16-19% L) da mesma hue */
+  --inst-roda: hsl(180 45% 62%);
+  --inst-roda-t: hsl(180 30% 17%);
+  --inst-visao: hsl(304 42% 68%);
+  --inst-visao-t: hsl(304 25% 18%);
+  --inst-metas: hsl(36 90% 62%);
+  --inst-metas-t: hsl(38 55% 17%);
+  --inst-pdm: hsl(205 60% 66%);
+  --inst-pdm-t: hsl(205 40% 17%);
+  --inst-terceiros: hsl(94 45% 62%);
+  --inst-terceiros-t: hsl(94 30% 16%);
+  --inst-avaliacao: hsl(193 60% 62%);
+  --inst-avaliacao-t: hsl(193 40% 17%);
+  --inst-roda-formal: hsl(180 50% 58%);
+  --inst-roda-formal-t: hsl(180 35% 16%);
+  --inst-360: hsl(304 45% 70%);
+  --inst-360-t: hsl(304 22% 19%);
+  --inst-anamnese: hsl(300 45% 68%);
+  --inst-anamnese-t: hsl(300 28% 18%);
+  --inst-autoavaliacao: hsl(330 55% 68%);
+  --inst-autoavaliacao-t: hsl(330 30% 18%);
+  --inst-avaliacao-especialista: hsl(140 45% 60%);
+  --inst-avaliacao-especialista-t: hsl(140 30% 16%);
+  --inst-intake-mentor: hsl(95 55% 62%);
+  --inst-intake-mentor-t: hsl(95 35% 16%);
+  --inst-intake-mentorado: hsl(45 95% 60%);
+  --inst-intake-mentorado-t: hsl(45 60% 16%);
+  --inst-desfecho: hsl(160 50% 58%);
+  --inst-desfecho-t: hsl(160 32% 16%);
+
+  /* série categórica: chart-1/2 são var() de ok/info e já acompanham;
+     3–5 clareiam pra distinguir sobre o papel escuro */
+  --chart-3: hsl(48 90% 55%);
+  --chart-4: hsl(304 40% 62%);
+  --chart-5: hsl(180 45% 55%);
+
+  /* scrims e hatches */
+  --overlay: hsl(0 0% 0% / 0.5);
+  --overlay-forte: hsl(0 0% 0% / 0.6);
+  --hatch-recesso: hsl(75 6% 24%);
+  --viz-hatch-a: hsl(75 5% 26%);
+  --viz-hatch-b: hsl(75 5% 34%);
+
+  /* sombras: o ring preto 5-6% some no escuro → hairline branco sutil +
+     drop preto denso; --shadow-inset afunda com sombra, não com luz */
+  --shadow-border:
+    0 0 0 1px hsl(0 0% 100% / 0.10),
+    0 1px 2px -1px hsl(0 0% 0% / 0.5),
+    0 4px 8px -2px hsl(0 0% 0% / 0.45);
+  --shadow-border-hover:
+    0 0 0 1px hsl(0 0% 100% / 0.14),
+    0 1px 2px -1px hsl(0 0% 0% / 0.55),
+    0 4px 8px -2px hsl(0 0% 0% / 0.5);
+  --shadow-overlay:
+    0 0 0 1px hsl(0 0% 100% / 0.10),
+    0 4px 12px -2px hsl(0 0% 0% / 0.55),
+    0 16px 32px -12px hsl(0 0% 0% / 0.65);
+  --shadow-modal:
+    0 0 0 1px hsl(0 0% 100% / 0.12),
+    0 8px 24px -8px hsl(0 0% 0% / 0.6),
+    0 32px 64px -24px hsl(0 0% 0% / 0.75);
+  --shadow-inset: inset 0 1px 2px 0 hsl(0 0% 0% / 0.35);
+
+  /* sidebar: superfície própria um degrau acima do fundo; accent = hover;
+     primary/ring seguem o lima do núcleo */
+  --sidebar: hsl(75 7% 10%);
+  --sidebar-foreground: hsl(75 8% 93%);
+  --sidebar-primary: hsl(78 54% 52%);
+  --sidebar-primary-foreground: hsl(0 0% 20%);
+  --sidebar-accent: hsl(75 7% 17%);
+  --sidebar-accent-foreground: hsl(75 8% 93%);
+  --sidebar-border: hsl(75 6% 20%);
+  --sidebar-ring: hsl(78 50% 56%);
 }
 
 /* === Micro-interações (fundação) === */
@@ -285,7 +455,7 @@
   background-image: repeating-linear-gradient(
     45deg,
     transparent 0 4px,
-    hsl(75 5% 89%) 4px 5px
+    var(--hatch-recesso) 4px 5px
   );
 }
 
@@ -296,8 +466,8 @@
 .viz-hatch {
   background-image: repeating-linear-gradient(
     135deg,
-    hsl(75 7% 88%) 0 3px,
-    hsl(75 7% 80%) 3px 6px
+    var(--viz-hatch-a) 0 3px,
+    var(--viz-hatch-b) 3px 6px
   );
 }
 

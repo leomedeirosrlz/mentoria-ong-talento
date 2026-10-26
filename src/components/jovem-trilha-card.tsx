@@ -344,9 +344,9 @@ export function JovemTrilhaCard({
                     className={cn(
                       "z-10 grid size-6 shrink-0 place-items-center rounded-full border-2 border-border bg-card text-xs font-extrabold text-muted-foreground",
                       p.estado === "feito" &&
-                        "border-[var(--ok)] bg-[var(--ok)] text-white",
+                        "border-[var(--ok)] bg-[var(--ok)] text-[var(--status-foreground)]",
                       p.estado === "atual" &&
-                        "border-[var(--brand-ink)] bg-[var(--role-mentorado)] text-[var(--brand-ink)]"
+                        "border-[var(--brand-ink)] bg-[var(--role-mentorado)] text-[var(--destaque-foreground)]"
                     )}
                   >
                     {p.estado === "feito" ? (

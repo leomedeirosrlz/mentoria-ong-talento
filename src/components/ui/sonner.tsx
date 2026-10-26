@@ -1,12 +1,33 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import { Toaster as Sonner, type ToasterProps } from "sonner"
 import { CheckCircle, Info, Warning, XCircle, SpinnerGap } from "@phosphor-icons/react"
+
+/** Tema resolvido do <html> (REALIZA-192): o <Sonner> tem theme próprio —
+ *  seguir a classe .dark cobre tanto o "escuro" explícito quanto o "auto"
+ *  (que o script inline/TemaSync aplicam antes e depois da hidratação). */
+function useTemaResolvido(): "light" | "dark" {
+  const [escuro, setEscuro] = useState(
+    () =>
+      typeof document !== "undefined" &&
+      document.documentElement.classList.contains("dark")
+  )
+  useEffect(() => {
+    const d = document.documentElement
+    const obs = new MutationObserver(() =>
+      setEscuro(d.classList.contains("dark"))
+    )
+    obs.observe(d, { attributes: true, attributeFilter: ["class"] })
+    return () => obs.disconnect()
+  }, [])
+  return escuro ? "dark" : "light"
+}
 
 const Toaster = ({ ...props }: ToasterProps) => {
   return (
     <Sonner
-      theme="light"
+      theme={useTemaResolvido()}
       className="toaster group"
       /* sonner 2.x não tem duração por tipo no toastOptions — 8s global pra dar
          tempo de ler erro com copy longa; um erro específico ainda pode pedir

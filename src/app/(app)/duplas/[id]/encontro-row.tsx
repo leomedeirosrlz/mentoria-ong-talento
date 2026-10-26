@@ -248,7 +248,7 @@ export function EncontroRow({
                 : naoAconteceu
                   ? "bg-muted text-muted-foreground/60 line-through"
                   : marcado
-                    ? "bg-[var(--brand-lime)]/20 text-[var(--brand-ink)] ring-1 ring-[var(--brand-lime)]/60"
+                    ? "bg-[var(--brand-lime)]/20 text-foreground ring-1 ring-[var(--brand-lime)]/60"
                     : "bg-muted text-muted-foreground"
             )}
           >

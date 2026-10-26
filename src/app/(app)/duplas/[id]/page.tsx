@@ -913,7 +913,7 @@ export default async function DuplaPage({
                 className={cn(
                   "grid size-8 shrink-0 place-items-center rounded-full font-mono text-xs font-semibold tabular-nums",
                   noAtual.estado === "agendado"
-                    ? "bg-[var(--brand-lime)]/20 text-[var(--brand-ink)] ring-1 ring-[var(--brand-lime)]/60"
+                    ? "bg-[var(--brand-lime)]/20 text-foreground ring-1 ring-[var(--brand-lime)]/60"
                     : "bg-muted text-muted-foreground"
                 )}
               >

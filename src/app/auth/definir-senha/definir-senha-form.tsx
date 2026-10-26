@@ -12,6 +12,7 @@ import { fade, T } from "@/components/motion";
 import { Button } from "@/components/ui/button";
 import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
+import { Logo } from "@/components/logo";
 
 export function DefinirSenhaForm() {
   const [senha, setSenha] = useState("");
@@ -134,8 +135,7 @@ export function DefinirSenhaForm() {
     <div className="min-h-[100dvh] grid place-items-center bg-background px-4 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))]">
       <div className="w-full max-w-sm">
         <div className="mb-8">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo-realiza.png" alt="Realiza.vc" className="h-8 w-auto" />
+          <Logo size="xl" />
           <h1 className="text-lg font-semibold tracking-tight mt-3">
             {recovery ? "Redefina sua senha" : "Crie sua senha"}
           </h1>

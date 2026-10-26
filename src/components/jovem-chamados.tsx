@@ -39,7 +39,7 @@ export function JovemChamados({
       className="rounded-xl bg-card p-5 shadow-[var(--shadow-border)] sm:p-6"
     >
       <div className="flex items-center gap-2.5">
-        <span className="grid size-9 shrink-0 place-items-center rounded-full bg-[var(--role-mentorado)]/30 text-[var(--brand-ink)]">
+        <span className="grid size-9 shrink-0 place-items-center rounded-full bg-[var(--role-mentorado)]/30 text-foreground">
           <Lifebuoy size={17} aria-hidden />
         </span>
         <div>

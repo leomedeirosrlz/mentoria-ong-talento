@@ -25,6 +25,7 @@ import type {
 } from "@/lib/relatorio";
 import { formatDateTime } from "@/lib/ciclo";
 import { montaDesfechoCard, parseDesfechoAgregado } from "@/lib/desfecho";
+import { Logo } from "@/components/logo";
 
 // Relatório público por link (167 + 170): o gate não é mais uma constante
 // nem um recorte na query — relatorio_link_info devolve o shell (existe/
@@ -247,8 +248,7 @@ export default async function ResumoPage({
       <main className="flex flex-1 flex-col px-4 py-8 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))]">
         <div className="w-full">
           <header className="mx-auto max-w-6xl">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo-realiza.png" alt="Realiza.vc" width={1920} height={262} className="h-7 w-auto" />
+            <Logo size="lg" />
             <p className="mt-1.5 text-xs text-muted-foreground">Programa de Mentoria Social</p>
           </header>
 

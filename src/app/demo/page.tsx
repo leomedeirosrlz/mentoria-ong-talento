@@ -17,6 +17,7 @@ import { entrarNaDemo } from "@/lib/demo/actions";
 import { getDemoData } from "@/lib/demo/data";
 import { demoRole } from "@/lib/demo/mode";
 import type { AppRole } from "@/lib/types";
+import { Logo } from "@/components/logo";
 
 export const metadata: Metadata = {
   title: "Demonstração",
@@ -70,8 +71,7 @@ export default async function DemoPage() {
       {/* animate-rise: mesma entrada suave do onboarding — coberta pelo guard
           global de prefers-reduced-motion */}
       <div className="m-auto w-full max-w-xl animate-rise">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/logo-realiza.png" alt="Realiza.vc" className="h-6 w-auto" />
+        <Logo />
 
         <p className="mt-6 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
           Ambiente de demonstração

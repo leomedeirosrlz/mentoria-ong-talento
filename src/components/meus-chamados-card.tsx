@@ -29,7 +29,7 @@ export function MeusChamadosCard({
       <Card>
         <CardContent className="py-5">
           <div className="flex flex-wrap items-center gap-3">
-            <span className="grid size-11 shrink-0 place-items-center rounded-full bg-[var(--brand-lime)]/25 text-[var(--brand-ink)]">
+            <span className="grid size-11 shrink-0 place-items-center rounded-full bg-[var(--brand-lime)]/25 text-foreground">
               <Lifebuoy size={20} aria-hidden />
             </span>
             <div className="min-w-0 flex-1 basis-48">

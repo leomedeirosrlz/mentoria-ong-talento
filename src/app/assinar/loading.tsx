@@ -1,5 +1,6 @@
 import { Skeleton } from "@/components/ui/skeleton";
 import { SiteFooter } from "@/components/site-footer";
+import { Logo } from "@/components/logo";
 
 // Espelho de /assinar/[token] (público): página fora do shell — logo real,
 // kicker + título + índice de etapas, card do documento e card do form de
@@ -12,8 +13,7 @@ export default function Loading() {
       className="flex min-h-[100dvh] flex-col bg-background"
     >
       <main className="mx-auto w-full max-w-2xl flex-1 px-4 py-10 sm:px-6">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/logo-realiza.png" alt="Realiza.vc" className="h-6 w-auto" />
+        <Logo />
 
         <Skeleton className="mt-8 h-3 w-32" />
         <Skeleton className="mt-2 h-8 w-4/5" />

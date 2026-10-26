@@ -56,6 +56,7 @@ import type {
   MentorProfile,
   Profile,
 } from "@/lib/types";
+import { Logo } from "@/components/logo";
 
 /** Um form por passo — o botão do footer fixo submete via atributo `form`. */
 const FORM_ID = "onboarding-passo";
@@ -758,8 +759,7 @@ export function OnboardingFlow({
 
       {/* coluna central — pb/pt compensam header e footer fixos */}
       <main className="mx-auto flex min-h-[100dvh] w-full max-w-xl flex-col justify-center px-4 pb-32 pt-20 sm:px-6">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/logo-realiza.png" alt="Realiza.vc" className="mb-6 h-5 w-auto self-start" />
+        <Logo size="sm" className="mb-6 self-start" />
         <div key={step} className="animate-rise">
           <div className="rounded-3xl rounded-bl-md border border-border bg-card px-5 py-4">
             <h1

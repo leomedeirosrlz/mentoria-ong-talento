@@ -15,6 +15,7 @@ import {
 } from "@phosphor-icons/react";
 import { Avatar } from "@/components/avatar";
 import { DemoSlotProvider } from "@/components/demo-bar";
+import { Logo } from "@/components/logo";
 import { T } from "@/components/motion";
 import { NotificacoesBell, NotificacoesProvider } from "@/components/notificacoes";
 import { SignOutButton } from "@/components/signout-button";
@@ -115,8 +116,7 @@ export function JovemShell({
               className="flex min-h-11 shrink-0 items-center"
               aria-label="Início"
             >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/logo-realiza.png" alt="Realiza.vc" className="h-5 w-auto" />
+              <Logo size="sm" />
             </Link>
             {demo ?? (
               <span
@@ -141,8 +141,7 @@ export function JovemShell({
         <aside className="hidden md:flex w-56 shrink-0 bg-sidebar text-sidebar-foreground border-r border-sidebar-border flex-col fixed inset-y-0">
           <div className="px-5 pt-6 pb-8">
             <Link href="/jovem" className="inline-block" aria-label="Início">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/logo-realiza.png" alt="Realiza.vc" className="h-6 w-auto" />
+              <Logo />
             </Link>
             <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mt-2">
               Programa de Mentoria Social
@@ -160,7 +159,7 @@ export function JovemShell({
                   className={cn(
                     "relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
                     at
-                      ? "text-[var(--brand-ink)] font-semibold"
+                      ? "text-[var(--destaque-foreground)] font-semibold"
                       : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                   )}
                 >
@@ -240,7 +239,7 @@ export function JovemShell({
                   className={cn(
                     "relative flex flex-1 flex-col items-center gap-1 py-2.5 text-[11px] transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:ring-inset",
                     at
-                      ? "font-semibold text-[var(--brand-ink)]"
+                      ? "font-semibold text-sidebar-foreground"
                       : "font-medium text-sidebar-foreground/75 active:text-sidebar-foreground"
                   )}
                 >
@@ -263,7 +262,7 @@ export function JovemShell({
                 className={cn(
                   "relative flex flex-1 flex-col items-center gap-1 py-2.5 text-[11px] transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:ring-inset",
                   menuAtivo
-                    ? "font-semibold text-[var(--brand-ink)]"
+                    ? "font-semibold text-sidebar-foreground"
                     : "font-medium text-sidebar-foreground/75 active:text-sidebar-foreground"
                 )}
               >
@@ -283,8 +282,7 @@ export function JovemShell({
               <SheetContent side="left" className="pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
                 <div className="px-5 pt-5 pb-5">
                   <SheetTitle className="sr-only">Menu</SheetTitle>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src="/logo-realiza.png" alt="Realiza.vc" className="h-6 w-auto" />
+                  <Logo />
                   <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
                     Programa de Mentoria Social
                   </p>
@@ -300,7 +298,7 @@ export function JovemShell({
                         className={cn(
                           "relative flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
                           at
-                            ? "font-semibold text-[var(--brand-ink)]"
+                            ? "font-semibold text-[var(--destaque-foreground)]"
                             : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                         )}
                       >

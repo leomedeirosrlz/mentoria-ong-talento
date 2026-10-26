@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import type { Metadata } from "next";
 import { CircleNotch } from "@phosphor-icons/react/dist/ssr";
 import { DefinirSenhaForm } from "./definir-senha-form";
+import { Logo } from "@/components/logo";
 
 export const metadata: Metadata = {
   title: "Criar senha",
@@ -20,8 +21,7 @@ function DefinirSenhaFallback() {
     >
       <div className="w-full max-w-sm">
         <div className="mb-8">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo-realiza.png" alt="Realiza.vc" className="h-8 w-auto" />
+          <Logo size="xl" />
           <h1 className="text-lg font-semibold tracking-tight mt-3">
             Crie sua senha
           </h1>

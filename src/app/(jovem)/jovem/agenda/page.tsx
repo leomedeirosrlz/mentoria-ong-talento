@@ -500,7 +500,7 @@ function EncontroLinha({
             ? "bg-[var(--ok)]/15 text-[var(--ok-text)]"
             : e.status === "nao_aconteceu" || e.status === "cancelado"
               ? "bg-muted text-muted-foreground"
-              : "bg-[var(--role-mentorado)]/25 text-[var(--brand-ink)]"
+              : "bg-[var(--role-mentorado)]/25 text-foreground"
         )}
       >
         {e.status === "realizado" ? (
