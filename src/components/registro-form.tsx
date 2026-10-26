@@ -8,6 +8,11 @@ import { salvarRegistro } from "@/lib/actions";
 import { demoAtivoClient } from "@/lib/demo/shared";
 import { createClient } from "@/lib/supabase/client";
 import {
+  atualizarTentativa,
+  concluirTentativa,
+  iniciarTentativa,
+} from "@/lib/tentativa-registro";
+import {
   ATIVIDADES_ENCONTRO,
   formatDiaMes,
   PROXIMO_PASSO_LABEL,
@@ -96,6 +101,7 @@ export function RegistroForm({
   combinadosPendentes,
   onSaved,
   embutido = false,
+  origem,
 }: {
   encontroId: string;
   duplaId: string;
@@ -112,6 +118,10 @@ export function RegistroForm({
   /** Dentro de outra superfície (modal): sem moldura nem título próprios —
    *  o host fornece ambos. */
   embutido?: boolean;
+  /** Telemetria (REALIZA-217): a superfície que abriu o form. Os hosts
+   *  derivam de `encontro.origem` ("externo" = retroativo); sem a prop o
+   *  form infere do `registro` (edição) — nunca afeta comportamento. */
+  origem?: "novo" | "retroativo";
 }) {
   const [encaminhamentos, setEncaminhamentos] = useState<Enc[]>([]);
   const [concluirIds, setConcluirIds] = useState<Set<string>>(new Set());
@@ -163,6 +173,93 @@ export function RegistroForm({
   const [fechado, setFechado] = useState(false);
   // trilha pra linha de privacidade (K6) — quando o host não repassa
   const [trilhaForm, setTrilhaForm] = useState<Trilha | null>(trilha);
+
+  // ---------- telemetria do preenchimento (REALIZA-217, fase 1) ----------
+  // Uma linha por abertura do form; fire-and-forget — a RPC pode falhar ou
+  // nunca resolver sem custo pro mentor. A origem resolve do `registro`
+  // (edição) ou da prop que os hosts derivam de `encontro.origem` —
+  // "externo" nasce no RegistrarRetroativoDialog (catch-up de encontro que
+  // já rolou); o default é o fluxo novo.
+  const tentativaId = useRef<string | null>(null);
+  const tentativaIniciada = useRef(false);
+  // marco zero da duração: o cliente mede (o server só carimba `inicio`) —
+  // "quanto tempo o form ficou aberto até o salvar", o número da issue
+  const inicioMs = useRef(Date.now());
+  // tempo acumulado por passo do wizard — o estado `etapa` é 0-based, mas
+  // no payload a chave casa com o "Passo N de 3" da interface
+  const etapasMs = useRef<Record<number, number>>({});
+  const etapaDesde = useRef(Date.now());
+  const etapaMedida = useRef(0);
+  // atividade desde a última batida — o heartbeat só sai se algo mudou
+  const telemetriaDirty = useRef(false);
+
+  /** {1..3: ms} das etapas — inclui o parcial da etapa corrente, pra última
+   *  batida antes do abandono já contar o passo em andamento. */
+  const etapasSnapshot = useCallback((): Record<string, number> => {
+    const out: Record<string, number> = {};
+    for (const [k, v] of Object.entries(etapasMs.current)) {
+      out[k] = Math.round(v);
+    }
+    const corrente = etapaMedida.current + 1;
+    out[String(corrente)] = Math.round(
+      (out[String(corrente)] ?? 0) + Date.now() - etapaDesde.current
+    );
+    return out;
+  }, []);
+
+  // abertura do form = uma tentativa. O id pode chegar depois das
+  // primeiras interações — o flush ao resolver não perde a atividade que
+  // já aconteceu (telemetriaDirty cobre a janela)
+  useEffect(() => {
+    if (demo || tentativaIniciada.current) return;
+    tentativaIniciada.current = true;
+    const o = registro ? "edicao" : (origem ?? "novo");
+    iniciarTentativa(duplaId, encontroId, o)
+      .then((id) => {
+        tentativaId.current = id;
+        if (id && telemetriaDirty.current) {
+          telemetriaDirty.current = false;
+          atualizarTentativa(id, etapasSnapshot());
+        }
+      })
+      .catch(() => {});
+  }, [demo, duplaId, encontroId, registro, origem, etapasSnapshot]);
+
+  // troca de passo: fecha a fatia da etapa anterior e já manda a batida —
+  // a etapa em que o mentor desiste é o dado que o redesign precisa
+  useEffect(() => {
+    const agora = Date.now();
+    const anterior = etapaMedida.current;
+    etapasMs.current[anterior + 1] =
+      (etapasMs.current[anterior + 1] ?? 0) + agora - etapaDesde.current;
+    etapaDesde.current = agora;
+    etapaMedida.current = etapa;
+    telemetriaDirty.current = true;
+    atualizarTentativa(tentativaId.current, etapasSnapshot());
+  }, [etapa, etapasSnapshot]);
+
+  // batida a cada 15s COM atividade — `ultima_atividade` é o sinal de
+  // vida; abandono se mede pelo silêncio depois dela. Aba escondida tem o
+  // intervalo estrangulado pelo browser: a batida do visibilitychange é a
+  // que fecha a sessão no mobile (trocar de app é o fim real do
+  // preenchimento)
+  useEffect(() => {
+    if (demo) return;
+    const batida = () => {
+      if (!telemetriaDirty.current || salvoOk.current) return;
+      telemetriaDirty.current = false;
+      atualizarTentativa(tentativaId.current, etapasSnapshot());
+    };
+    const timer = setInterval(batida, 15_000);
+    const onHidden = () => {
+      if (document.visibilityState === "hidden") batida();
+    };
+    document.addEventListener("visibilitychange", onHidden);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", onHidden);
+    };
+  }, [demo, etapasSnapshot]);
 
   // host não passou a trilha (ex.: ficha monta o form só com ids) — busca
   // direto na dupla, uma vez. Sem ela a linha de privacidade fica neutra
@@ -228,6 +325,9 @@ export function RegistroForm({
   }, [demo, draftKey, encaminhamentos, concluirIds]);
 
   const scheduleSave = useCallback(() => {
+    // toda mudança no form passa por aqui — a mesma marca alimenta o
+    // heartbeat da telemetria (atividade desde a última batida)
+    telemetriaDirty.current = true;
     // guarda o form a cada mudança — o flush de desmonte pode precisar dele
     // depois que o formRef for desanexado
     ultimoForm.current = formRef.current ?? ultimoForm.current;
@@ -415,6 +515,9 @@ export function RegistroForm({
       .filter((id) => pendentes.has(id))
       .forEach((id) => fd.append("concluir_encaminhamento", id));
     start(async () => {
+      // duração da sessão até o gesto de salvar — o round-trip da action
+      // não conta como tempo de preenchimento
+      const duracaoMs = Math.max(0, Date.now() - inicioMs.current);
       try {
         const res = await salvarRegistro(fd);
         if (res?.error) toast.error(res.error);
@@ -443,6 +546,7 @@ export function RegistroForm({
           if (registro) {
             // edição inline recolhe depois de salvar — evidências já moram
             // no bloco de anexos do host
+            concluirTentativa(tentativaId.current, registro.id, duracaoMs);
             onSaved?.();
             router.refresh();
           } else {
@@ -456,6 +560,9 @@ export function RegistroForm({
               .select("id, created_by")
               .eq("encontro_id", encontroId)
               .maybeSingle();
+            // fecha a sessão de preenchimento mesmo sem a row à mão — a
+            // duração vale mais que o link pro registro
+            concluirTentativa(tentativaId.current, reg?.id ?? null, duracaoMs);
             if (reg?.id && reg.created_by) {
               setPosSave({
                 registroId: reg.id,

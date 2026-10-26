@@ -1,3 +1,4 @@
+import { cookies } from "next/headers";
 import {
   getCicloEventos,
   getComunicados,
@@ -19,23 +20,42 @@ import { getMinhaAssinaturaTermo } from "@/lib/queries-assinaturas";
 import { getEncerramentosPendentes } from "@/lib/queries-encerramento";
 import { getChamados } from "@/lib/queries-chamados";
 import { temPapel } from "@/lib/types";
+import {
+  resolveTurmaFoco,
+  TURMA_FOCO_COOKIE,
+  turmasDisponiveis,
+} from "@/lib/turma-contexto";
 import { DashboardCoordenacao } from "@/components/dashboard-coordenacao";
+import { TurmaContextoSelect } from "@/components/turma-contexto-select";
+import {
+  FaixaTurmaEscopo,
+  FaixaTurmaFoco,
+  TurmaHub,
+} from "@/components/turma-hub";
 import { DemandasEspecialista } from "@/components/demandas-especialista";
 import { MeusChamadosCard } from "@/components/meus-chamados-card";
 import { MentorHome } from "@/components/mentor-home";
 import { TermoBanner } from "@/components/termo-banner";
 import { AvisosSection } from "@/components/avisos-section";
 
-export default async function HomePage() {
-  const [me, eventos, cronogramas, avisos, assinatura] = await Promise.all([
-    getMe(),
-    getCicloEventos(),
-    getCronogramas(),
-    getComunicados(),
-    // termo de voluntariado vale pra equipe inteira (coord/sup/mentores) —
-    // busca uma vez no topo; o branch de mentor reusa via React.cache
-    getMinhaAssinaturaTermo(),
-  ]);
+export default async function HomePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ turma?: string | string[] }>;
+}) {
+  const [me, eventos, cronogramas, avisos, assinatura, sp, cookieStore] =
+    await Promise.all([
+      getMe(),
+      getCicloEventos(),
+      getCronogramas(),
+      getComunicados(),
+      // termo de voluntariado vale pra equipe inteira (coord/sup/mentores) —
+      // busca uma vez no topo; o branch de mentor reusa via React.cache
+      getMinhaAssinaturaTermo(),
+      searchParams,
+      cookies(),
+    ]);
+  const cookieTurma = cookieStore.get(TURMA_FOCO_COOKIE)?.value;
   // um único instante pra página inteira — semáforo e "semana do encontro" consistentes
   const agora = new Date().toISOString();
 
@@ -47,6 +67,22 @@ export default async function HomePage() {
       getEncerramentosPendentes(),
     ]);
     const interacoes = await getUltimasInteracoes(duplas.map((d) => d.id), "nudge");
+    // contexto de turma (REALIZA-73): ?turma= vence o cookie, que vence o
+    // "todas". O painel recebe já recortado — SaudePrograma, "Precisa de
+    // você hoje" e os resumos da semana falam só da turma em foco.
+    const foco = resolveTurmaFoco(sp.turma, cookieTurma, cronogramas, {
+      papel: me.role,
+    });
+    const navegaveis = turmasDisponiveis(cronogramas, { papel: me.role });
+    const duplasFoco = foco.turma
+      ? duplas.filter((d) => d.turma === foco.turma)
+      : duplas;
+    // o hub cobre as navegáveis + a turma em foco quando ela não é
+    // navegável (encerrada com contexto ativo segue visível — aceitação 16)
+    const hubTurmas =
+      foco.turma && !navegaveis.includes(foco.turma)
+        ? [...navegaveis, foco.turma].sort((a, b) => a.localeCompare(b, "pt-BR"))
+        : navegaveis;
     // staff+especialista (papel secundário): o sino já notifica os pedidos —
     // a home tem que dar a superfície de agir, senão o ping morre aqui
     const ehEsp = temPapel(me, "mentor_especialista");
@@ -62,9 +98,9 @@ export default async function HomePage() {
     return (
       <div className="space-y-8">
         <DashboardCoordenacao
-          duplas={duplas}
+          duplas={duplasFoco}
           eventos={eventos}
-          cronogramas={cronogramas}
+          cronogramas={foco.cronogramas}
           agora={agora}
           interacoes={interacoes}
           pessoas={pessoas}
@@ -74,6 +110,27 @@ export default async function HomePage() {
           turmas={[...new Set(cronogramas.map((c) => c.turma))]}
           meuNome={me?.nome.split(" ")[0]}
           termo={assinatura?.status !== "assinado" ? <TermoBanner /> : null}
+          turmaFoco={foco.turma}
+          seletorContexto={
+            // o sync do cookie mora dentro do seletor mesmo quando ele se
+            // esconde (1 turma) — a ?turma= aterrissada grava igual
+            <TurmaContextoSelect
+              turmas={navegaveis}
+              foco={{ turma: foco.turma, origem: foco.origem }}
+            />
+          }
+          contextoTurma={
+            foco.turma || hubTurmas.length > 1 ? (
+              <TurmaHub
+                turmas={hubTurmas}
+                foco={foco.turma}
+                cronogramas={cronogramas}
+                duplas={duplas}
+                eventos={eventos}
+                agora={agora}
+              />
+            ) : undefined
+          }
         />
         {ehEsp && (
           <DemandasEspecialista
@@ -118,12 +175,30 @@ export default async function HomePage() {
     const propostasSup = emNegSup.length
       ? await getPropostasMap(emNegSup.map((s) => s.id))
       : {};
+    // contexto de turma do auxiliar: o seletor lista só as turmas que o
+    // escopo dele já enxerga (as turmas das duplas que a RLS entregou) —
+    // o seletor nunca nomeia turma alheia (sdr.md). Mono-turma → nada
+    // renderiza, como sempre.
+    const escopoTurmas = [
+      ...new Set(duplas.map((d) => d.turma).filter((t): t is string => !!t)),
+    ];
+    const focoSup = resolveTurmaFoco(sp.turma, cookieTurma, cronogramas, {
+      papel: me.role,
+      escopoTurmas,
+    });
+    const navegaveisSup = turmasDisponiveis(cronogramas, {
+      papel: me.role,
+      escopoTurmas,
+    });
+    const duplasSup = focoSup.turma
+      ? duplas.filter((d) => d.turma === focoSup.turma)
+      : duplas;
     return (
       <div className="space-y-8">
         <DashboardCoordenacao
-          duplas={duplas}
+          duplas={duplasSup}
           eventos={eventos}
-          cronogramas={cronogramas}
+          cronogramas={focoSup.cronogramas}
           agora={agora}
           interacoes={interacoes}
           supervisor
@@ -132,6 +207,23 @@ export default async function HomePage() {
           supervisaoAlvos={supervisaoAlvos}
           meuNome={me?.nome.split(" ")[0]}
           termo={assinatura?.status !== "assinado" ? <TermoBanner /> : null}
+          turmaFoco={focoSup.turma}
+          seletorContexto={
+            <TurmaContextoSelect
+              turmas={navegaveisSup}
+              foco={{ turma: focoSup.turma, origem: focoSup.origem }}
+            />
+          }
+          contextoTurma={
+            // pro auxiliar o bloco é só a faixa — o hub-mapa é leitura da
+            // coordenação. Mono-turma: faixa informativa nomeando a turma
+            // dele (design.md §permissão), sem seletor nem saída.
+            focoSup.turma ? (
+              <FaixaTurmaFoco foco={focoSup.turma} />
+            ) : escopoTurmas.length === 1 ? (
+              <FaixaTurmaEscopo turma={escopoTurmas[0]} />
+            ) : undefined
+          }
         />
         {ehEspSup && (
           <DemandasEspecialista

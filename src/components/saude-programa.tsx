@@ -213,8 +213,13 @@ function Atalho({
       </button>
     );
   if (linkBase)
+    // linkBase pode já trazer params (a home com turma em foco manda
+    // `/duplas?turma=<label>` — o recorte tem que somar, não partir a URL)
     return (
-      <Link href={`${linkBase}?recorte=${id}`} className={cls}>
+      <Link
+        href={`${linkBase}${linkBase.includes("?") ? "&" : "?"}recorte=${id}`}
+        className={cls}
+      >
         {children}
       </Link>
     );

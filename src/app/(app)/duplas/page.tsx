@@ -1,8 +1,9 @@
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import {
   getCicloEventos,
+  getCronogramas,
   getDuplas,
   getEspecialistaEventos,
   getMe,
@@ -12,8 +13,16 @@ import { getSupervisaoAlvos } from "@/lib/queries-supervisao";
 import { duplaSupervisionada } from "@/lib/auxiliar-escopo";
 import { getUltimasInteracoes } from "@/lib/interacoes";
 import { RECORTES_FATIA, type RecorteFatia } from "@/lib/agenda-coordenacao";
+import {
+  resolveTurmaFoco,
+  TURMA_FOCO_COOKIE,
+  TURMA_TODAS,
+  turmasDisponiveis,
+} from "@/lib/turma-contexto";
 import { temPapel } from "@/lib/types";
 import { DuplasLista, type VisaoDuplas } from "@/components/duplas-lista";
+import { TurmaFocoSync } from "@/components/turma-contexto-select";
+import { FaixaTurmaFoco } from "@/components/turma-hub";
 
 export const metadata: Metadata = {
   title: "Duplas",
@@ -22,7 +31,7 @@ export const metadata: Metadata = {
 export default async function DuplasPage({
   searchParams,
 }: {
-  searchParams: Promise<{ recorte?: string | string[] }>;
+  searchParams: Promise<{ recorte?: string | string[]; turma?: string | string[] }>;
 }) {
   const me = await getMe();
   if (!me) redirect("/login");
@@ -47,7 +56,7 @@ export default async function DuplasPage({
   // sem baixar o ciclo inteiro pra filtrar em JS). Os extras são por visão:
   // alvos do dialog de supervisão (auxiliar) e os 5 passos da trilha
   // (especialista) — os demais não pagam essa leitura
-  const [lista, eventos, alvos, espEventos, h, sp] = await Promise.all([
+  const [lista, eventos, alvos, espEventos, h, sp, cronogramas, cookieStore] = await Promise.all([
     me.role === "coordenacao"
       ? getDuplas()
       : me.role === "supervisor"
@@ -65,6 +74,13 @@ export default async function DuplasPage({
       : Promise.resolve([]),
     headers(),
     searchParams,
+    // a tabela de cronogramas é paga por quem honra o contexto de turma:
+    // coordenação (labels navegáveis) e auxiliar (resolve label e
+    // cronograma_id no escopo dele — vem escopada da RLS como tudo mais)
+    visao === "coordenacao" || visao === "supervisor"
+      ? getCronogramas()
+      : Promise.resolve([]),
+    cookies(),
   ]);
   // o "Lembrar" lê o cap de 48h (último nudge da dupla) — coordenação e
   // auxiliar executivo renderizam o botão no próprio escopo (a RPC
@@ -86,18 +102,75 @@ export default async function DuplasPage({
   const recorteInicial: RecorteFatia | null =
     RECORTES_FATIA.find((r) => r === recorteParam) ?? null;
 
+  // ?turma= (REALIZA-73): o contexto semeia o chip de turma da coordenação
+  // e recorta a lista do auxiliar — mesma regra da home (param > cookie >
+  // todas), labels resolvidos contra cronogramas + o escopo do papel.
+  // Fora dos labels navegáveis, a coordenação ainda honra o param quando
+  // ele bate um label presente na lista (a turma histórica "2025/2026" é
+  // chip aqui, só não é contexto global) — o param da /duplas é recorte da
+  // lista, não só contexto.
+  const escopoTurmas =
+    visao === "supervisor"
+      ? [...new Set(lista.map((d) => d.turma).filter((t): t is string => !!t))]
+      : undefined;
+  const foco =
+    visao === "coordenacao" || visao === "supervisor"
+      ? resolveTurmaFoco(
+          sp.turma,
+          cookieStore.get(TURMA_FOCO_COOKIE)?.value,
+          cronogramas,
+          { papel: me.role, escopoTurmas }
+        )
+      : null;
+  const turmaParam = (
+    Array.isArray(sp.turma) ? sp.turma[0] : sp.turma
+  )?.trim();
+  const turmaInicial =
+    foco?.turma ??
+    (turmaParam &&
+    turmaParam !== TURMA_TODAS &&
+    lista.some((d) => d.turma === turmaParam)
+      ? turmaParam
+      : null);
+  // labels navegáveis da coordenação — os chips de turma escrevem contexto
+  // (cookie + ?turma=) só quando o chip é turma navegável ou "Todas"
+  const turmasContexto = foco
+    ? turmasDisponiveis(cronogramas, { papel: me.role, escopoTurmas })
+    : [];
+  // o auxiliar não tem chip de turma — o contexto recorta a lista no server
+  // (a faixa "Mostrando" no rodapé do header dá a saída óbvia)
+  const listaFinal =
+    visao === "supervisor" && foco?.turma
+      ? lista.filter((d) => d.turma === foco.turma)
+      : lista;
+
   return (
-    <DuplasLista
-      lista={lista}
-      eventos={eventos}
-      agora={new Date().toISOString()}
-      visao={visao}
-      meuNome={me.nome.split(" ")[0]}
-      supervisaoAlvos={alvos}
-      especialistaEventos={espEventos}
-      nudges={nudges}
-      origem={origem}
-      recorteInicial={recorteInicial}
-    />
+    <>
+      {/* o cookie turma_foco grava na aterrissagem do deep link — na
+          coordenação a linha de chips é o controle de contexto da página
+          (mesma chave duplas.turma), então não existe um segundo seletor */}
+      {foco && (
+        <TurmaFocoSync foco={{ turma: foco.turma, origem: foco.origem }} />
+      )}
+      {visao === "supervisor" && (
+        // sem chip de turma na visão do auxiliar, a faixa é o único aviso
+        // do recorte — e o "ver todas" limpa o cookie em lugar
+        <FaixaTurmaFoco foco={foco?.turma ?? null} hrefTodas="/duplas?turma=todas" />
+      )}
+      <DuplasLista
+        lista={listaFinal}
+        eventos={eventos}
+        agora={new Date().toISOString()}
+        visao={visao}
+        meuNome={me.nome.split(" ")[0]}
+        supervisaoAlvos={alvos}
+        especialistaEventos={espEventos}
+        nudges={nudges}
+        origem={origem}
+        recorteInicial={recorteInicial}
+        turmaInicial={turmaInicial}
+        turmasContexto={turmasContexto}
+      />
+    </>
   );
 }

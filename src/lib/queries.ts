@@ -37,6 +37,10 @@ import { demoPainelInstrumentosJornada } from "./demo/forms-data";
 import type { PainelJornadaLinha } from "./jornada";
 import type { InscricaoFilaTurma, RelatorioLinkItem } from "./relatorio";
 import {
+  agregarTentativas,
+  type MetricasRegistro,
+} from "./metricas-registro";
+import {
   panoramaRegistros,
   type PeriodoRegistros,
   type RegistrosPanorama,
@@ -1052,6 +1056,32 @@ export async function getAlertasRegistros(): Promise<{
     tardios,
   };
 }
+
+/** Telemetria de preenchimento do form de registro (REALIZA-217, fase 1):
+ *  agrega as tentativas dos últimos 30 dias — total, % concluídas,
+ *  mediana de duração, split de dispositivo. Coord-only (o relatório é
+ *  dela): mentor e auxiliar recebem null sem disparar query; demo não
+ *  telemetra (dataset não tem a tabela). Falha → null com log: o card
+ *  simplesmente não renderiza. */
+export const getMetricasRegistro = cache(
+  async (): Promise<MetricasRegistro | null> => {
+    const demo = await demoRole();
+    if (demo) return null;
+    const me = await getMe();
+    if (me?.role !== "coordenacao") return null;
+    const supabase = await createClient();
+    const desde = new Date(Date.now() - 30 * 86400e3).toISOString();
+    const { data, error } = await supabase
+      .from("registro_tentativas")
+      .select("origem, dispositivo, duracao_ms, concluido")
+      .gte("inicio", desde);
+    if (error) {
+      console.error("getMetricasRegistro:", error);
+      return null;
+    }
+    return agregarTentativas(data ?? []);
+  }
+);
 
 /** Opções do filtro de dupla — RLS devolve só o escopo do papel.
  *  `cronograma_id` precisa vir junto: o filtro "encontro nº N" de /registros

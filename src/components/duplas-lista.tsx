@@ -2,6 +2,7 @@
 
 import { type CSSProperties, useState } from "react";
 import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
 import {
   CaretRight,
   ChatsCircle,
@@ -28,6 +29,7 @@ import {
 } from "@/lib/ciclo";
 import { prazoTrilhaEspecialista } from "@/lib/encerramento";
 import { saudeDoRecorte, type RecorteFatia } from "@/lib/agenda-coordenacao";
+import { gravarTurmaFocoClient } from "@/lib/turma-contexto";
 import { turmaLonga } from "@/lib/turma";
 import { rotuloDiaAgenda } from "@/lib/agenda-minha";
 import { acaoWhatsAppDupla, encontroPendente } from "@/lib/acao-lembrete";
@@ -626,6 +628,8 @@ export function DuplasLista({
   nudges = {},
   origem,
   recorteInicial = null,
+  turmaInicial = null,
+  turmasContexto = [],
 }: {
   lista: Dupla[];
   eventos: CicloEvento[];
@@ -647,6 +651,14 @@ export function DuplasLista({
    *  visões com o modelo de filtro (coordenação e supervisão). Nas demais
    *  a lista não tem recorte e o param se perde de propósito. */
   recorteInicial?: RecorteFatia | null;
+  /** `?turma=`/cookie resolvido pela page (REALIZA-73) — semeia o chip de
+   *  turma da coordenação. O contexto é estado inicial, não trava: os
+   *  chips locais continuam livres. */
+  turmaInicial?: string | null;
+  /** labels navegáveis (`turmasDisponiveis`) — chip de turma navegável
+   *  também grava o contexto (cookie + ?turma=); chip histórico
+   *  ("2025/2026") é só recorte local, não vira contexto. */
+  turmasContexto?: readonly string[];
 }) {
   const hoje = new Date(agora);
   const hojeStr = toDateStr(hoje);
@@ -667,6 +679,8 @@ export function DuplasLista({
         nudges={nudges}
         origem={origem}
         recorteInicial={recorteInicial}
+        turmaInicial={turmaInicial}
+        turmasContexto={turmasContexto}
       />
     );
   if (visao === "supervisor")
@@ -772,6 +786,8 @@ function VisaoCoordenacao({
   nudges,
   origem,
   recorteInicial,
+  turmaInicial = null,
+  turmasContexto = [],
 }: {
   lista: Dupla[];
   eventos: CicloEvento[];
@@ -784,17 +800,57 @@ function VisaoCoordenacao({
   /** `?recorte=` validado — semeia o chip de situação na aterrissagem
    *  (os atalhos do SaudePrograma da home/agenda/registros pousam aqui). */
   recorteInicial?: RecorteFatia | null;
+  /** contexto de turma resolvido pela page (?turma= → cookie → todas) —
+   *  semeia o chip de turma; é estado inicial, não trava. */
+  turmaInicial?: string | null;
+  /** labels navegáveis — chip navegável grava contexto (cookie + ?turma=);
+   *  chip histórico é só recorte local da lista. */
+  turmasContexto?: readonly string[];
 }) {
+  const router = useRouter();
+  const pathname = usePathname();
   const [busca, setBusca] = useState("");
   const [filtro, setFiltro] = useState<FiltroCat>(recorteInicial ?? "todas");
-  const [turmaSel, setTurmaSel] = useState<string | null>(null);
+  const [turmaSel, setTurmaSel] = useState<string | null>(turmaInicial);
   const [supSel, setSupSel] = useState<string>("todas");
   const [mentorSel, setMentorSel] = useState<string | null>(null);
   const [mentorAberto, setMentorAberto] = useState(false);
 
+  // link da home pousa aqui sem remontar a rota — realinha o chip quando
+  // o contexto resolvido muda. Ajuste durante o render (padrão react.dev),
+  // não em effect: o render termina já com o valor novo, sem cascata — e
+  // só quando o inicial muda, então não pisa na escolha local.
+  const [turmaInicialVisto, setTurmaInicialVisto] = useState(turmaInicial);
+  if (turmaInicialVisto !== turmaInicial) {
+    setTurmaInicialVisto(turmaInicial);
+    setTurmaSel(turmaInicial);
+  }
+
+  // o chip de turma É o controle de contexto da página: turma navegável ou
+  // "Todas" gravam o cookie (o seletor da home concorda); a URL sempre
+  // segue o chip — refresh/deep link pousa no mesmo recorte, mesmo que a
+  // turma seja histórica ("2025/2026", fora das navegáveis — aí o param é
+  // recorte da lista, não contexto, e o cookie fica intocado)
+  const escolherTurma = (t: string | null) => {
+    setTurmaSel(t);
+    if (t == null || turmasContexto.includes(t)) {
+      // o cookie guarda o label cru ou NÃO existe — null aqui é apagar,
+      // nunca gravar o sentinel "todas" (ele só existe na URL)
+      gravarTurmaFocoClient(t);
+    }
+    const qs = new URLSearchParams(window.location.search);
+    if (t == null) {
+      qs.delete("turma");
+    } else {
+      qs.set("turma", t);
+    }
+    const q = qs.toString();
+    router.replace(q ? `${pathname}?${q}` : pathname, { scroll: false });
+  };
+
   const limparRecortes = () => {
     setFiltro("todas");
-    setTurmaSel(null);
+    escolherTurma(null);
     setSupSel("todas");
     setMentorSel(null);
   };
@@ -991,14 +1047,18 @@ function VisaoCoordenacao({
       {(turmas.length > 1 || supervisores.length > 0) && (
         <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
           {turmas.length > 1 && (
-            <span className="flex flex-wrap items-center gap-1.5">
+            <span
+              className="flex flex-wrap items-center gap-1.5"
+              role="group"
+              aria-label="Filtrar por turma"
+            >
               <span className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground sm:text-[11px]">
                 Turma
               </span>
               <button
                 type="button"
                 aria-pressed={turmaSel === null}
-                onClick={() => setTurmaSel(null)}
+                onClick={() => escolherTurma(null)}
                 className={filterChipCls(turmaSel === null)}
               >
                 Todas
@@ -1008,7 +1068,7 @@ function VisaoCoordenacao({
                   key={t}
                   type="button"
                   aria-pressed={turmaSel === t}
-                  onClick={() => setTurmaSel(turmaSel === t ? null : t)}
+                  onClick={() => escolherTurma(turmaSel === t ? null : t)}
                   className={filterChipCls(turmaSel === t)}
                   /* chip mostra o nome; o valor cru segue no estado/
                      comparação e vai no title pra desambiguar colisões
