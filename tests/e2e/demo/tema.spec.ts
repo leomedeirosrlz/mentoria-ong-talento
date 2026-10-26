@@ -23,30 +23,34 @@ async function cookieTema(
   ]);
 }
 
-/** hsl(H S% L%) → luminância relativa WCAG (os tokens são declarados em
- *  hsl — o getPropertyValue devolve a string crua). */
-function luminanciaHsl(hsl: string): number {
-  const m = hsl.match(
-    /hsl\(\s*([\d.]+)\s+([\d.]+)%\s+([\d.]+)%\s*(?:\/[^)]*)?\)/
-  );
-  if (!m) throw new Error(`cor fora de hsl(): ${hsl}`);
-  const s = Number(m[2]) / 100;
-  const l = Number(m[3]) / 100;
-  const c = (1 - Math.abs(2 * l - 1)) * s;
-  const h = Number(m[1]) / 60;
-  const x = c * (1 - Math.abs((h % 2) - 1));
-  const [r, g, b] =
-    h < 1 ? [c, x, 0]
-    : h < 2 ? [x, c, 0]
-    : h < 3 ? [0, c, x]
-    : h < 4 ? [0, x, c]
-    : h < 5 ? [x, 0, c]
-    : [c, 0, x];
-  const lin = (v: number) => {
-    const u = v + (l - c / 2);
-    return u <= 0.04045 ? u / 12.92 : Math.pow((u + 0.055) / 1.055, 2.4);
-  };
-  return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+/** Luminância relativa WCAG de uma var de cor resolvida pelo próprio
+ *  browser: um probe recebe `color: var(--x)` e o getComputedStyle
+ *  devolve sempre `rgb()` — cobre hsl()/hex/var() encadeado sem
+ *  reimplementar parser de cor. */
+async function luminancias(page: import("@playwright/test").Page) {
+  return page.evaluate(() => {
+    const linear = (v: number) => {
+      const u = v / 255;
+      return u <= 0.04045 ? u / 12.92 : Math.pow((u + 0.055) / 1.055, 2.4);
+    };
+    const probe = document.createElement("div");
+    document.body.appendChild(probe);
+    const de = (prop: string) => {
+      probe.style.color = `var(${prop})`;
+      const m = getComputedStyle(probe).color.match(/[\d.]+/g);
+      if (!m || m.length < 3) throw new Error(`cor não resolvida: ${prop}`);
+      return (
+        0.2126 * linear(+m[0]) + 0.7152 * linear(+m[1]) + 0.0722 * linear(+m[2])
+      );
+    };
+    const r = {
+      background: de("--background"),
+      foreground: de("--foreground"),
+      muted: de("--muted-foreground"),
+    };
+    probe.remove();
+    return r;
+  });
 }
 
 function contraste(a: number, b: number) {
@@ -126,19 +130,12 @@ test.describe("tema — cookie e resolução (REALIZA-192)", () => {
       await entrarNaDemo(page, "mentorado");
       await cookieTema(page, tema);
       await page.goto("/jovem");
-      const { background, foreground, mutedFg } = await page.evaluate(() => {
-        const cs = getComputedStyle(document.documentElement);
-        return {
-          background: cs.getPropertyValue("--background"),
-          foreground: cs.getPropertyValue("--foreground"),
-          mutedFg: cs.getPropertyValue("--muted-foreground"),
-        };
-      });
-      expect(contraste(luminanciaHsl(foreground), luminanciaHsl(background)))
-        .toBeGreaterThanOrEqual(4.5);
-      // metadado dominante também precisa passar (texto muted sobre card)
-      expect(contraste(luminanciaHsl(mutedFg), luminanciaHsl(background)))
-        .toBeGreaterThanOrEqual(4.5);
+      const lum = await luminancias(page);
+      expect(contraste(lum.foreground, lum.background)).toBeGreaterThanOrEqual(
+        4.5
+      );
+      // metadado dominante também precisa passar (texto muted sobre fundo)
+      expect(contraste(lum.muted, lum.background)).toBeGreaterThanOrEqual(4.5);
     }
   });
 });
