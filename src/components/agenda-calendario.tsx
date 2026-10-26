@@ -3905,6 +3905,9 @@ function EncontroDuplaRow({
               trilha={dupla.trilha}
               combinadosPendentes={combinadosPendentes}
               onSaved={onRegistroSalvo}
+              // telemetria (REALIZA-217): encontro "externo" é o catch-up
+              // retroativo (criado já realizado), não um follow-up novo
+              origem={encontro.origem === "externo" ? "retroativo" : "novo"}
             />
           </DialogContent>
         </Dialog>

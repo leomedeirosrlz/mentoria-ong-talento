@@ -3441,6 +3441,111 @@ export type Database = {
           },
         ]
       }
+      registro_tentativas: {
+        Row: {
+          concluido: boolean
+          created_at: string
+          dispositivo: string | null
+          dupla_id: string
+          duracao_ms: number | null
+          encontro_id: string | null
+          etapas: Json | null
+          id: string
+          inicio: string
+          origem: string
+          profile_id: string | null
+          registro_id: string | null
+          ultima_atividade: string | null
+        }
+        Insert: {
+          concluido?: boolean
+          created_at?: string
+          dispositivo?: string | null
+          dupla_id: string
+          duracao_ms?: number | null
+          encontro_id?: string | null
+          etapas?: Json | null
+          id?: string
+          inicio?: string
+          origem: string
+          profile_id?: string | null
+          registro_id?: string | null
+          ultima_atividade?: string | null
+        }
+        Update: {
+          concluido?: boolean
+          created_at?: string
+          dispositivo?: string | null
+          dupla_id?: string
+          duracao_ms?: number | null
+          encontro_id?: string | null
+          etapas?: Json | null
+          id?: string
+          inicio?: string
+          origem?: string
+          profile_id?: string | null
+          registro_id?: string | null
+          ultima_atividade?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "registro_tentativas_dupla_id_fkey"
+            columns: ["dupla_id"]
+            isOneToOne: false
+            referencedRelation: "duplas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "registro_tentativas_dupla_id_fkey"
+            columns: ["dupla_id"]
+            isOneToOne: false
+            referencedRelation: "jovem_duplas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "registro_tentativas_encontro_id_fkey"
+            columns: ["encontro_id"]
+            isOneToOne: false
+            referencedRelation: "encontros"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "registro_tentativas_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "jovem_especialistas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "registro_tentativas_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "registro_tentativas_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_contato"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "registro_tentativas_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_pessoal"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "registro_tentativas_registro_id_fkey"
+            columns: ["registro_id"]
+            isOneToOne: false
+            referencedRelation: "registros"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       registros: {
         Row: {
           atividades: string[]
@@ -5219,6 +5324,10 @@ export type Database = {
         Args: { p_id: string; p_para: string }
         Returns: undefined
       }
+      atualizar_tentativa_registro: {
+        Args: { p_etapas?: Json; p_id: string }
+        Returns: undefined
+      }
       avaliacao_esp_da_dupla: { Args: { p_dupla: string }; Returns: Json }
       avaliacao_media_dpp: { Args: { p_dupla_id: string }; Returns: Json }
       avaliacao_por_token: { Args: { p_token: string }; Returns: Json }
@@ -5253,6 +5362,10 @@ export type Database = {
       civis_btrim: { Args: { d: Json }; Returns: Json }
       comentar_chamado: {
         Args: { p_id: string; p_mencionados?: string[]; p_texto: string }
+        Returns: undefined
+      }
+      concluir_tentativa_registro: {
+        Args: { p_duracao_ms: number; p_id: string; p_registro: string }
         Returns: undefined
       }
       confirmar_sugestao_especialista: {
@@ -5400,6 +5513,15 @@ export type Database = {
             Returns: boolean
           }
       importar_registros: { Args: { itens: Json }; Returns: Json }
+      iniciar_tentativa_registro: {
+        Args: {
+          p_dispositivo: string
+          p_dupla: string
+          p_encontro: string
+          p_origem: string
+        }
+        Returns: string
+      }
       instrumentos_da_dupla: { Args: { p_dupla_id: string }; Returns: Json }
       interesses_ok: { Args: { interesses: string[] }; Returns: boolean }
       jornada_autoemit: { Args: { p_dupla_id: string }; Returns: undefined }

@@ -498,6 +498,9 @@ export function EncontroRow({
               duplaId={duplaId}
               evento={passo}
               combinadosPendentes={combinadosPendentes}
+              // telemetria (REALIZA-217): o encontro "externo" nasceu no
+              // fluxo retroativo — a sessão do form é catch-up, não novo
+              origem={encontro.origem === "externo" ? "retroativo" : "novo"}
             />
           </RegistroInlinePanel>
         )}
