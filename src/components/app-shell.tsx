@@ -13,6 +13,7 @@ import {
   Lifebuoy,
   List,
   ListChecks,
+  Sparkle,
   Table,
   UserCircle,
   UsersThree,
@@ -40,6 +41,9 @@ type Grupo = "Acompanhar" | "Programa" | "Dados";
 // a ordem do array é a ordem de exibição dentro de cada grupo
 const NAV = [
   { href: "/", label: "Visão geral", curto: "Início", icon: ChartLineUp, roles: null, grupo: null },
+  // staff-only na v1: o jovem tem shell próprio ((jovem)/jovem) — a página
+  // dele entra quando o chat abrir praquele papel (design §1)
+  { href: "/assistente", label: "Assistente", curto: "Assistente", icon: Sparkle, roles: ["coordenacao", "supervisor", "mentor_dpp", "mentor_especialista"], grupo: null },
   { href: "/duplas", label: "Duplas", curto: "Duplas", icon: UserCircle, roles: ["coordenacao", "supervisor", "mentor_dpp", "mentor_especialista"], grupo: "Acompanhar" },
   { href: "/agenda", label: "Agenda", curto: "Agenda", icon: CalendarDots, roles: null, grupo: "Acompanhar" },
   // 0084: a fila de chamados é casa nova da coordenação/auxiliar — badge =
