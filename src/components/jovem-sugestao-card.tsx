@@ -16,6 +16,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -95,7 +96,7 @@ export function SugestaoEspecialistaCard({
       <div className="flex items-start gap-3">
         <span
           aria-hidden
-          className="grid size-9 shrink-0 place-items-center rounded-full bg-[var(--role-mentorado)] text-[var(--brand-ink)]"
+          className="grid size-9 shrink-0 place-items-center rounded-full bg-[var(--role-mentorado)] text-[var(--destaque-foreground)]"
         >
           <Sparkle size={18} weight="fill" />
         </span>
@@ -136,7 +137,7 @@ export function SugestaoEspecialistaCard({
       </div>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent size="xl">
+        <DialogContent size="lg">
           <DialogHeader>
             <DialogTitle>Confirmar pedido de especialista</DialogTitle>
             <DialogDescription>
@@ -211,14 +212,18 @@ export function SugestaoEspecialistaCard({
                 </p>
               )}
             </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpen(false)}>
+              Cancelar
+            </Button>
             <Button
-              className="w-full"
               onClick={confirmar}
               disabled={pending || demanda.trim().length < 10}
             >
               {pending ? "Enviando…" : "Enviar pedido"}
             </Button>
-          </div>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

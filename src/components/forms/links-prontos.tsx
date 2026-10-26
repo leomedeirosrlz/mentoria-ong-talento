@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Check, CopySimple } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { DialogClose, DialogFooter } from "@/components/ui/dialog";
 import { NudgeButton } from "@/components/nudge-button";
 import { CopiarLink } from "./copiar-link";
 import { urlPublica } from "./link-shared";
@@ -83,13 +84,21 @@ export function LinksProntos({
           </li>
         ))}
       </ul>
-      <div className="flex flex-wrap justify-end gap-2">
+      {/* footer do componente: voltar é a terciária à esquerda, Copiar
+          todos é a primária do estado de links prontos */}
+      <DialogFooter>
         <Button
           type="button"
-          variant="outline"
-          size="sm"
-          onClick={copiarTodos}
+          variant="ghost"
+          className="sm:me-auto"
+          onClick={onOutros}
         >
+          Gerar outros links
+        </Button>
+        <DialogClose render={<Button type="button" variant="outline" />}>
+          Fechar
+        </DialogClose>
+        <Button type="button" onClick={copiarTodos}>
           {copiouTodos ? (
             <Check aria-hidden className="text-[var(--ok)]" />
           ) : (
@@ -97,10 +106,7 @@ export function LinksProntos({
           )}
           {copiouTodos ? "Copiados" : "Copiar todos"}
         </Button>
-        <Button type="button" variant="ghost" size="sm" onClick={onOutros}>
-          Gerar outros links
-        </Button>
-      </div>
+      </DialogFooter>
     </div>
   );
 }

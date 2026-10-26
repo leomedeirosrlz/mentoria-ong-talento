@@ -177,7 +177,7 @@ export function EscopoAuxiliarDialog({
         }
       }}
     >
-      <DialogContent size="xl">
+      <DialogContent size="lg">
         <DialogHeader>
           <DialogTitle>
             {atribuir

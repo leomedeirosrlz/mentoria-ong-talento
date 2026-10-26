@@ -5,6 +5,7 @@ import { sharedOg } from "@/lib/og";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SiteFooter } from "@/components/site-footer";
 import { LoginForm } from "./login-form";
+import { Logo } from "@/components/logo";
 
 export const metadata: Metadata = {
   title: "Entrar",
@@ -27,8 +28,7 @@ function LoginFallback() {
     >
       <div className="m-auto w-full max-w-sm">
         <div className="mb-8">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo-realiza.png" alt="Realiza.vc" className="h-8 w-auto" />
+          <Logo size="xl" />
           <h1 className="text-lg font-semibold tracking-tight mt-3">
             Programa de Mentoria Social
           </h1>

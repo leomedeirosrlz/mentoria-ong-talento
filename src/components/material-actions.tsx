@@ -314,7 +314,7 @@ export function MaterialActions({ material, maxEncontro }: { material: Material;
       >
         {/* mesmo teto do dialog de criação — os dois grids de 2 colunas
             (tipo×audiência, encontro×url) respiram melhor que no md */}
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent size="lg">
           <DialogHeader>
             <DialogTitle>Editar material</DialogTitle>
             <DialogDescription>
@@ -402,6 +402,13 @@ export function MaterialActions({ material, maxEncontro }: { material: Material;
               </div>
             </div>
             <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setEditOpen(false)}
+              >
+                Cancelar
+              </Button>
               <Button type="submit" disabled={pending}>
                 {pending ? "Salvando…" : "Salvar"}
               </Button>

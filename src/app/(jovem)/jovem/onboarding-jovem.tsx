@@ -27,6 +27,7 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { formatWhatsApp } from "@/lib/ciclo";
 import type { Disponibilidade, JovemPerfil, Profile } from "@/lib/types";
+import { Logo } from "@/components/logo";
 
 const TOTAL = 3;
 
@@ -181,7 +182,7 @@ export function OnboardingJovem({
                   key={r.texto}
                   className="flex items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3"
                 >
-                  <span className="grid size-10 shrink-0 place-items-center rounded-full bg-[var(--role-mentorado)] text-[var(--brand-ink)]">
+                  <span className="grid size-10 shrink-0 place-items-center rounded-full bg-[var(--role-mentorado)] text-[var(--destaque-foreground)]">
                     <r.icon size={18} weight="fill" aria-hidden />
                   </span>
                   <span className="text-sm leading-snug">{r.texto}</span>
@@ -213,7 +214,7 @@ export function OnboardingJovem({
           <div className="space-y-4">
             <dl className="space-y-2">
               <div className="flex items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3">
-                <span className="grid size-10 shrink-0 place-items-center rounded-full bg-[var(--role-mentorado)] text-[var(--brand-ink)]">
+                <span className="grid size-10 shrink-0 place-items-center rounded-full bg-[var(--role-mentorado)] text-[var(--destaque-foreground)]">
                   <WhatsappLogo size={18} weight="fill" aria-hidden />
                 </span>
                 <div className="min-w-0 flex-1">
@@ -226,7 +227,7 @@ export function OnboardingJovem({
                 </div>
               </div>
               <div className="flex items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3">
-                <span className="grid size-10 shrink-0 place-items-center rounded-full bg-[var(--role-mentorado)] text-[var(--brand-ink)]">
+                <span className="grid size-10 shrink-0 place-items-center rounded-full bg-[var(--role-mentorado)] text-[var(--destaque-foreground)]">
                   <EnvelopeSimple size={18} weight="fill" aria-hidden />
                 </span>
                 <div className="min-w-0 flex-1">
@@ -329,8 +330,7 @@ export function OnboardingJovem({
 
       {/* coluna central — pb/pt compensam header e footer fixos */}
       <main className="mx-auto flex min-h-[100dvh] w-full max-w-xl flex-col justify-center px-4 pb-32 pt-20 sm:px-6">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/logo-realiza.png" alt="Realiza.vc" className="mb-6 h-5 w-auto self-start" />
+        <Logo size="sm" className="mb-6 self-start" />
         <div key={step} className="animate-rise">
           <div className="rounded-3xl rounded-bl-md border border-border bg-card px-5 py-4">
             <h1

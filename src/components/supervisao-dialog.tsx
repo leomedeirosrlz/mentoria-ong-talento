@@ -12,6 +12,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -120,7 +121,7 @@ export function SupervisaoDialog({
           }
         />
       )}
-      <DialogContent size="xl">
+      <DialogContent size="lg">
         <DialogHeader>
           <DialogTitle>Registrar supervisão</DialogTitle>
           <DialogDescription>
@@ -234,9 +235,18 @@ export function SupervisaoDialog({
               </p>
             </div>
 
-            <Button type="submit" className="w-full" disabled={pending}>
-              {pending ? "Registrando…" : "Registrar supervisão"}
-            </Button>
+            <DialogFooter sticky>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setOpen(false)}
+              >
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={pending}>
+                {pending ? "Registrando…" : "Registrar supervisão"}
+              </Button>
+            </DialogFooter>
           </form>
         )}
       </DialogContent>

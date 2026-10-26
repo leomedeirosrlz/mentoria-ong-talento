@@ -135,7 +135,7 @@ export function EnviarEmailDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent size="xl">
+      <DialogContent size="lg">
         <DialogHeader>
           <DialogTitle>Enviar material por e-mail</DialogTitle>
           <DialogDescription>
@@ -209,6 +209,13 @@ export function EnviarEmailDialog({
             </div>
           </fieldset>
           <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+            >
+              Cancelar
+            </Button>
             <Button type="submit" disabled={pending || !selecionados.length}>
               {pending ? "Enviando…" : "Enviar e-mail"}
             </Button>

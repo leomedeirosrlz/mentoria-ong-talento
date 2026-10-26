@@ -31,7 +31,7 @@ function DialogOverlay({
     <DialogPrimitive.Backdrop
       data-slot="dialog-overlay"
       className={cn(
-        "fixed inset-0 isolate z-50 bg-black/10 duration-150 ease-[cubic-bezier(0.2,0,0,1)] supports-backdrop-filter:backdrop-blur-xs data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0",
+        "fixed inset-0 isolate z-50 bg-[var(--overlay)] duration-150 ease-[cubic-bezier(0.2,0,0,1)] supports-backdrop-filter:backdrop-blur-xs data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0",
         className
       )}
       {...props}
@@ -122,16 +122,23 @@ function DialogHeader({ className, ...props }: React.ComponentProps<"div">) {
 function DialogFooter({
   className,
   showCloseButton = false,
+  sticky = false,
   children,
   ...props
 }: React.ComponentProps<"div"> & {
   showCloseButton?: boolean
+  /** Fixa o footer no pé da área rolante do popup — forms altos onde a
+   *  ação principal sumiria abaixo da dobra. O `-mb-4` do chrome faz o
+   *  padding inferior sangrar pra fora do scrollport quando preso, então
+   *  os botões ficam rentes à borda sem gap visível. */
+  sticky?: boolean
 }) {
   return (
     <div
       data-slot="dialog-footer"
       className={cn(
         "-mx-4 -mb-4 flex flex-col-reverse gap-2 rounded-b-xl border-t bg-muted/50 p-4 sm:flex-row sm:justify-end",
+        sticky && "sticky bottom-0",
         className
       )}
       {...props}

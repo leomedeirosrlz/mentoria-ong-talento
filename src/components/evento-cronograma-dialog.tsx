@@ -13,6 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -293,7 +294,11 @@ function FormularioEvento({
         </p>
       )}
 
-      <DialogFooter>
+      {/* sticky: o form cresce bastante nos tipos encontro/etapa */}
+      <DialogFooter sticky>
+        <DialogClose render={<Button type="button" variant="outline" />}>
+          Cancelar
+        </DialogClose>
         <Button type="submit" disabled={pending}>
           {pending && <CircleNotch className="animate-spin" />}
           {pending ? "Salvando…" : salvarLabel}

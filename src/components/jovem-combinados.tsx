@@ -93,7 +93,7 @@ export function JovemCombinados({
             className={cn(
               "mt-0.5 grid size-4.5 shrink-0 place-items-center rounded-md border transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-card",
               feito
-                ? "border-[var(--ok-text)] bg-[var(--ok-text)] text-white"
+                ? "border-[var(--ok-text)] bg-[var(--ok-text)] text-[var(--status-foreground)]"
                 : "border-muted-foreground/40 group-hover:border-foreground"
             )}
           >

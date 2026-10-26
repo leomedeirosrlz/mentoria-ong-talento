@@ -263,7 +263,7 @@ export function CronogramaAcoes({
             </Button>
           }
         />
-        <DialogContent size="xl">
+        <DialogContent size="md">
           <DialogHeader>
             <DialogTitle>Dados do cronograma</DialogTitle>
             <DialogDescription>
@@ -342,6 +342,13 @@ export function CronogramaAcoes({
               </Select>
             </div>
             <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setMetaOpen(false)}
+              >
+                Cancelar
+              </Button>
               <Button type="submit" disabled={pending}>
                 {pending && <CircleNotch className="animate-spin" />}
                 {pending ? "Salvando…" : "Salvar"}

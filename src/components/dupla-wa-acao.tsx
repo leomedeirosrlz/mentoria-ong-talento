@@ -19,6 +19,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -332,7 +333,7 @@ export function DuplaWaAcao({
       {/* "Ver texto da mensagem" — o mesmo texto que vai pro wa.me e pra
           notificação, lido antes de enviar */}
       <Dialog open={verTexto} onOpenChange={setVerTexto}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent size="md">
           <DialogHeader>
             <DialogTitle>Texto da mensagem</DialogTitle>
             <DialogDescription>
@@ -344,21 +345,22 @@ export function DuplaWaAcao({
           <p className="whitespace-pre-wrap rounded-lg bg-muted px-3 py-2.5 text-sm leading-relaxed">
             {mensagem}
           </p>
-          <div className="flex flex-wrap justify-end gap-2">
-            <Button variant="outline" size="sm" onClick={copiar}>
-              <Copy size={14} aria-hidden />
+          {/* leitura + atalhos do mesmo texto: copiar é a secundária, abrir
+              a conversa é a primária; o X do header fecha */}
+          <DialogFooter>
+            <Button variant="outline" onClick={copiar}>
+              <Copy aria-hidden />
               Copiar mensagem
             </Button>
             {waContato && (
               <Button
-                size="sm"
                 render={<a href={waContato} target="_blank" rel="noopener noreferrer" />}
               >
-                <WhatsappLogo size={14} weight="fill" aria-hidden />
+                <WhatsappLogo weight="fill" aria-hidden />
                 Abrir wa.me
               </Button>
             )}
-          </div>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </>

@@ -170,7 +170,7 @@ function DuplaIcone() {
 }
 
 /** Stat do resumo de mentoria — valor com estado: "ok" verde com check,
- *  "pendente" amber com Warning (o que pede ação da coordenação). */
+ *  "pendente" warn com Warning (o que pede ação da coordenação). */
 function Stat({
   rotulo,
   valor,
@@ -802,7 +802,7 @@ export default async function PessoaPerfilPage({
                               )}
                             </dl>
                             {anos != null && anos < 18 && (
-                              <p className="mt-1 rounded-lg bg-amber-50 px-2.5 py-1.5 text-xs text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+                              <p className="mt-1 rounded-lg bg-[var(--warn-bg)] px-2.5 py-1.5 text-xs text-[var(--warn-text)]">
                                 Menor de idade: a autorização do responsável precisa
                                 estar assinada.
                                 {souCoord && " Confira Documentos e assinaturas no painel lateral."}

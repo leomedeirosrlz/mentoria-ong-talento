@@ -168,7 +168,7 @@ export function NovoChamadoDialog({
       <DialogContent size="xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <HandHeart size={19} aria-hidden className="text-[var(--brand-ink)]" />
+            <HandHeart size={19} aria-hidden className="text-foreground" />
             {jovem ? "Pedir ajuda" : "Novo chamado"}
           </DialogTitle>
           <DialogDescription>
@@ -349,7 +349,14 @@ export function NovoChamadoDialog({
           )}
         </div>
 
-        <DialogFooter>
+        <DialogFooter sticky>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setOpen(false)}
+          >
+            Cancelar
+          </Button>
           <Button onClick={enviar} disabled={pending || !pronto}>
             {pending && <CircleNotch size={15} className="animate-spin" aria-hidden />}
             {jovem ? "Enviar pedido" : "Abrir chamado"}

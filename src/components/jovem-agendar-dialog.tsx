@@ -13,7 +13,7 @@ import { formatDate, formatDiaHora, MOTIVOS_REAGENDAMENTO } from "@/lib/ciclo";
 import type { JovemEncontro } from "@/lib/queries-jovem";
 import { Button } from "@/components/ui/button";
 import {
-  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger,
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -162,7 +162,7 @@ export function JovemAgendarDialog({
           </Button>
         )
       } />
-      <DialogContent size="xl">
+      <DialogContent size="lg">
         <DialogHeader>
           <DialogTitle>
             {atual || numero ? `${numeroFinal ?? numero}º encontro` : "Agendar encontro"}
@@ -272,9 +272,18 @@ export function JovemAgendarDialog({
             <Label htmlFor="link">Link da chamada (opcional)</Label>
             <Input id="link" name="link" type="url" placeholder="https://meet.google.com/…" defaultValue={atual?.link ?? ""} />
           </div>
-          <Button type="submit" className="w-full" disabled={pending || numeroFinal == null}>
-            {pending ? "Salvando…" : atual ? "Confirmar remarcação" : "Confirmar agendamento"}
-          </Button>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setOpen(false)}
+            >
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={pending || numeroFinal == null}>
+              {pending ? "Salvando…" : atual ? "Confirmar remarcação" : "Confirmar agendamento"}
+            </Button>
+          </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>

@@ -9,7 +9,7 @@ import { deleteDupla, updateDupla } from "@/lib/actions";
 import type { Dupla, DuplaStatus } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import {
-  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger,
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
 import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
 import { Input } from "@/components/ui/input";
@@ -664,23 +664,33 @@ export function EditarDuplaDialog({ dupla }: { dupla: Dupla }) {
                 Em branco, mantém a data atual.
               </p>
             </div>
-            <Button type="submit" className="w-full" disabled={pending}>
-              {pending ? "Salvando…" : "Salvar"}
-            </Button>
             </>
             )}
+            {/* sticky: o form é alto — a ação não pode rolar pra fora da
+                viewport. A exclusão mora à esquerda do footer (mesma
+                gramática do Limpar em registros-filtros): é a única porta
+                pra apagar a dupla — a ficha não tem menu ⋯ pra abrigá-la */}
+            <DialogFooter sticky>
+              <Button
+                type="button"
+                variant="ghost"
+                className="text-destructive sm:me-auto"
+                onClick={() => { setOpen(false); setDelOpen(true); }}
+              >
+                Excluir dupla
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setOpen(false)}
+              >
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={pending || !pronto}>
+                {pending ? "Salvando…" : "Salvar"}
+              </Button>
+            </DialogFooter>
           </form>
-
-          <div className="border-t pt-4">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-destructive w-full"
-              onClick={() => { setOpen(false); setDelOpen(true); }}
-            >
-              Excluir dupla
-            </Button>
-          </div>
         </DialogContent>
       </Dialog>
 

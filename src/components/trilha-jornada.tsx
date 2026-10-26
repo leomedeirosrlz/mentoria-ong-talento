@@ -37,7 +37,7 @@ const DISCO: Record<EstadoNoJornada, string> = {
   pendente_registro: "bg-[var(--warn)] text-[var(--brand-ink)]",
   limbo: "ring-2 ring-inset ring-[var(--warn)]/70 text-[var(--warn-text)]",
   agendado:
-    "bg-[var(--brand-lime)]/20 text-[var(--brand-ink)] ring-1 ring-inset ring-[var(--brand-lime)]/60",
+    "bg-[var(--brand-lime)]/20 text-foreground ring-1 ring-inset ring-[var(--brand-lime)]/60",
   nao_aconteceu: "bg-muted text-muted-foreground/60 line-through",
   futuro: "bg-muted text-muted-foreground",
 };

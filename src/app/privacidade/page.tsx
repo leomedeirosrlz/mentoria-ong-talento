@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { sharedOg } from "@/lib/og";
 import { SiteFooter } from "@/components/site-footer";
+import { Logo } from "@/components/logo";
 
 export const metadata: Metadata = {
   title: "Privacidade e LGPD",
@@ -170,8 +171,7 @@ export default function PrivacidadePage() {
         <div className="mx-auto flex max-w-3xl items-center justify-between py-4 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] sm:px-6">
           {/* convenção logo→home (cai no /login pra anônimo) */}
           <Link href="/" className="inline-flex min-h-11 items-center outline-none focus-visible:ring-3 focus-visible:ring-ring/50">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo-realiza.png" alt="Realiza.vc" className="h-5 w-auto" />
+            <Logo size="sm" />
           </Link>
           {/* caminho óbvio de volta pra quem chegou pela assinatura pública */}
           <Link

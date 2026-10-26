@@ -10,6 +10,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -107,7 +108,7 @@ export function SolicitarEspecialistaDialog({
           }
         />
       )}
-      <DialogContent size="xl">
+      <DialogContent size="lg">
         <DialogHeader>
           <DialogTitle>Solicitar mentor especialista</DialogTitle>
           <DialogDescription>
@@ -173,9 +174,18 @@ export function SolicitarEspecialistaDialog({
               </SelectContent>
             </Select>
           </div>
-          <Button type="submit" className="w-full" disabled={pending}>
-            {pending ? "Enviando…" : "Enviar solicitação"}
-          </Button>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setOpen(false)}
+            >
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={pending}>
+              {pending ? "Enviando…" : "Enviar solicitação"}
+            </Button>
+          </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>

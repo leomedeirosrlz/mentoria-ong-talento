@@ -20,6 +20,8 @@ import { Avatar } from "@/components/avatar";
 import { PessoaBanner } from "@/components/pessoa-banner";
 import { SignOutButton } from "@/components/signout-button";
 import { TagInput } from "@/components/tag-input";
+import { TemaToggle } from "@/components/tema-toggle";
+import type { Tema } from "@/lib/tema";
 import {
   CampoConsentimento,
   CampoDisponibilidade,
@@ -33,8 +35,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -246,9 +250,16 @@ export function FormSecao({
   return (
     <form onSubmit={salvar} className="space-y-4">
       {children}
-      <Button type="submit" className="w-full" disabled={salvando}>
-        {salvando ? "Salvando…" : "Salvar"}
-      </Button>
+      {/* sticky: os dialogs de seção são altos — a ação não rola pra fora
+          da viewport. O Cancelar é DialogClose (sem prop de fecha) */}
+      <DialogFooter sticky>
+        <DialogClose render={<Button type="button" variant="outline" />}>
+          Cancelar
+        </DialogClose>
+        <Button type="submit" disabled={salvando}>
+          {salvando ? "Salvando…" : "Salvar"}
+        </Button>
+      </DialogFooter>
     </form>
   );
 }
@@ -723,13 +734,16 @@ export function DialogoSenha({ email }: { email: string }) {
           </DialogDescription>
         </DialogHeader>
         {resetEnviado ? (
-          <div className="rounded-lg border border-border px-4 py-3">
-            <p className="text-sm font-medium">Link enviado</p>
-            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-              Confira {email}: o link abre a página de senha direto, sem
-              precisar da senha atual.
-            </p>
-          </div>
+          <>
+            <div className="rounded-lg border border-border px-4 py-3">
+              <p className="text-sm font-medium">Link enviado</p>
+              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                Confira {email}: o link abre a página de senha direto, sem
+                precisar da senha atual.
+              </p>
+            </div>
+            <DialogFooter showCloseButton />
+          </>
         ) : (
           <form onSubmit={salvar} className="space-y-4">
             {temSenha ? (
@@ -771,21 +785,29 @@ export function DialogoSenha({ email }: { email: string }) {
                 onChange={(e) => setConfirmacao(e.target.value)}
               />
             </div>
-            <Button type="submit" className="w-full" disabled={salvando}>
-              {salvando ? "Salvando…" : "Salvar senha"}
-            </Button>
-            {temSenha && (
+            <DialogFooter>
+              {temSenha && (
+                <Button
+                  type="button"
+                  variant="link"
+                  className="sm:me-auto"
+                  onClick={() => void esqueci()}
+                  disabled={salvando}
+                >
+                  Esqueci minha senha: enviar link por e-mail
+                </Button>
+              )}
               <Button
                 type="button"
-                variant="link"
-                size="sm"
-                className="w-full"
-                onClick={() => void esqueci()}
-                disabled={salvando}
+                variant="outline"
+                onClick={() => aoAbrir(false)}
               >
-                Esqueci minha senha: enviar link por e-mail
+                Cancelar
               </Button>
-            )}
+              <Button type="submit" disabled={salvando}>
+                {salvando ? "Salvando…" : "Salvar senha"}
+              </Button>
+            </DialogFooter>
           </form>
         )}
       </DialogContent>
@@ -903,9 +925,18 @@ export function DialogoEmail({ email }: { email: string }) {
               />
             </div>
           )}
-          <Button type="submit" className="w-full" disabled={enviando}>
-            {enviando ? "Trocando…" : "Trocar e-mail"}
-          </Button>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => aoAbrir(false)}
+            >
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={enviando}>
+              {enviando ? "Trocando…" : "Trocar e-mail"}
+            </Button>
+          </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>
@@ -914,6 +945,7 @@ export function DialogoEmail({ email }: { email: string }) {
 
 export function PerfilForm({
   me,
+  tema,
   mentorProfile,
   avatarUrl,
   gravatarUrl,
@@ -921,6 +953,8 @@ export function PerfilForm({
   horarios,
 }: {
   me: Profile;
+  /** preferência de tema do cookie (lida na page) — alimenta o TemaToggle */
+  tema: Tema;
   mentorProfile: MentorProfile | null;
   avatarUrl: string | null;
   gravatarUrl: string;
@@ -1505,6 +1539,14 @@ export function PerfilForm({
               titulo="Senha"
               descricao="O link de e-mail continua valendo mesmo com senha definida."
               acao={<DialogoSenha email={me.email} />}
+              borda
+            />
+            {/* aparência é preferência do dispositivo — vive junto das
+                credenciais (Conta), não dos dados do programa */}
+            <ContaLinha
+              titulo="Aparência"
+              descricao="Tema da interface neste dispositivo."
+              acao={<TemaToggle tema={tema} />}
               borda
             />
             {/* saída — junto das outras credenciais */}

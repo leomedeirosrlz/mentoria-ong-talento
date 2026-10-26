@@ -9,11 +9,17 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   AVALIACAO_LABEL,
   DIFICULDADE_LABEL,
@@ -140,50 +146,6 @@ function OpcaoCheck({
         />
       </span>
       <span className="flex-1">{children}</span>
-    </label>
-  );
-}
-
-/** Opção em linha (listas longas) — check aparece só no selecionado. */
-function OpcaoLinha({
-  nome,
-  valor,
-  atual,
-  onSelect,
-  children,
-}: {
-  nome: string;
-  valor: string;
-  atual: string;
-  onSelect: (v: string) => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <label
-      className={cn(
-        "flex min-h-11 cursor-pointer items-center gap-2.5 rounded-lg px-3 text-sm transition-colors sm:min-h-10",
-        "hover:bg-muted has-checked:bg-muted has-checked:font-medium",
-        "has-focus-visible:ring-2 has-focus-visible:ring-ring"
-      )}
-    >
-      <input
-        type="radio"
-        name={nome}
-        value={valor}
-        checked={atual === valor}
-        onChange={() => onSelect(valor)}
-        className="sr-only"
-      />
-      <Check
-        size={15}
-        weight="bold"
-        aria-hidden
-        className={cn(
-          "shrink-0 transition-opacity",
-          atual === valor ? "opacity-100" : "opacity-0"
-        )}
-      />
-      <span className="min-w-0 flex-1 truncate">{children}</span>
     </label>
   );
 }
@@ -528,17 +490,15 @@ export function RegistrosFiltros({
       </div>
 
       <Dialog open={aberto} onOpenChange={setAberto}>
-        {/* md, não lg: o corpo são pílulas e checks em coluna — acima de md
-            sobrava fundo ocioso; o scroll interno já vem do DialogContent */}
+        {/* md, não lg: o corpo são pílulas, checks e um select em coluna —
+            acima de md sobrava fundo ocioso; o scroll interno já vem do
+            DialogContent */}
         <DialogContent size="md">
           <DialogHeader>
             <DialogTitle>Filtros</DialogTitle>
-            <DialogDescription>
-              Refine a lista por sinal, encontro, avaliação, dificuldade ou dupla.
-            </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-5">
+          <div className="space-y-4">
             <fieldset>
               <legend className={OVERLINE}>Sinal</legend>
               <div className="mt-1.5 -mx-1 space-y-0.5">
@@ -612,59 +572,73 @@ export function RegistrosFiltros({
 
             <fieldset>
               <legend className={OVERLINE}>Dificuldade sinalizada</legend>
-              <div className="mt-1.5 -mx-1 space-y-0.5">
-                <OpcaoLinha
+              {/* mesma gramática das outras dimensões — a lista de linhas
+                  ocupava oito fileiras; os rótulos são fragmentos
+                  ("aprendizagem"), então a pílula mostra a inicial maiúscula */}
+              <div className="mt-1.5 grid grid-cols-2 gap-1.5">
+                <OpcaoPilula
                   nome="flt-dificuldade"
                   valor={TODAS}
                   atual={draft.dificuldade}
                   onSelect={sel("dificuldade")}
                 >
                   Todas
-                </OpcaoLinha>
-                <OpcaoLinha
+                </OpcaoPilula>
+                <OpcaoPilula
                   nome="flt-dificuldade"
                   valor="com"
                   atual={draft.dificuldade}
                   onSelect={sel("dificuldade")}
                 >
                   Qualquer dificuldade
-                </OpcaoLinha>
+                </OpcaoPilula>
                 {Object.entries(DIFICULDADE_LABEL).map(([v, l]) => (
-                  <OpcaoLinha
+                  <OpcaoPilula
                     key={v}
                     nome="flt-dificuldade"
                     valor={v}
                     atual={draft.dificuldade}
                     onSelect={sel("dificuldade")}
                   >
-                    {l}
-                  </OpcaoLinha>
+                    {l.charAt(0).toUpperCase() + l.slice(1)}
+                  </OpcaoPilula>
                 ))}
               </div>
             </fieldset>
 
             <fieldset>
-              <legend className={OVERLINE}>Dupla</legend>
-              <div className="scroll-fina mt-1.5 -mx-1 max-h-52 space-y-0.5 overflow-y-auto">
-                <OpcaoLinha
-                  nome="flt-dupla"
-                  valor={TODAS}
-                  atual={draft.dupla}
-                  onSelect={sel("dupla")}
+              <legend id="flt-dupla-label" className={OVERLINE}>Dupla</legend>
+              {/* lista longa demais pra pílula — o Select do kit rola no
+                  popup em vez de criar scroll dentro do scroll do dialog */}
+              <div className="mt-1.5">
+                <Select
+                  value={draft.dupla}
+                  onValueChange={(v) => sel("dupla")(v ?? TODAS)}
+                  items={{
+                    [TODAS]: "Todas as duplas",
+                    ...Object.fromEntries(
+                      duplas.map((d) => [
+                        d.id,
+                        `${d.mentor?.nome ?? "—"} e ${d.mentorado?.nome ?? "—"}`,
+                      ])
+                    ),
+                  }}
                 >
-                  Todas as duplas
-                </OpcaoLinha>
-                {duplas.map((d) => (
-                  <OpcaoLinha
-                    key={d.id}
-                    nome="flt-dupla"
-                    valor={d.id}
-                    atual={draft.dupla}
-                    onSelect={sel("dupla")}
+                  <SelectTrigger
+                    id="flt-dupla-select"
+                    aria-labelledby="flt-dupla-label flt-dupla-select"
                   >
-                    {d.mentor?.nome ?? "—"} e {d.mentorado?.nome ?? "—"}
-                  </OpcaoLinha>
-                ))}
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={TODAS}>Todas as duplas</SelectItem>
+                    {duplas.map((d) => (
+                      <SelectItem key={d.id} value={d.id}>
+                        {d.mentor?.nome ?? "—"} e {d.mentorado?.nome ?? "—"}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </fieldset>
 
@@ -703,7 +677,7 @@ export function RegistrosFiltros({
 
           {/* sticky no pé da área rolante do DialogContent — em tela
               baixa o "Aplicar" não fica escondido abaixo da lista */}
-          <DialogFooter className="sticky bottom-0 bg-popover">
+          <DialogFooter sticky>
             <Button
               type="button"
               variant="ghost"

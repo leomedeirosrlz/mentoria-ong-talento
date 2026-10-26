@@ -1003,7 +1003,7 @@ export function ChamadoDetalhe({
           if (!o) setResumo(""); // fechar (ou resolver) larga o rascunho
         }}
       >
-        <DialogContent size="xl">
+        <DialogContent size="md">
           <DialogHeader>
             <DialogTitle>Resolver {chamado.numero}</DialogTitle>
             <DialogDescription>
@@ -1023,6 +1023,12 @@ export function ChamadoDetalhe({
             />
           </div>
           <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setResolveOpen(false)}
+            >
+              Cancelar
+            </Button>
             <Button
               disabled={pending || resumo.trim().length < 2}
               onClick={() => {
@@ -1070,8 +1076,11 @@ export function ChamadoDetalhe({
             </SelectContent>
           </Select>
           <DialogFooter>
+            {/* ação secundária do próprio fluxo (devolve à fila) fica à
+                esquerda — não é um "cancelar" */}
             <Button
-              variant="outline"
+              variant="ghost"
+              className="sm:me-auto"
               disabled={pending || !chamado.atribuido_a}
               onClick={() => {
                 acao(() => atribuirChamado(chamado.id, null), "Chamado devolvido à fila.");
@@ -1079,6 +1088,12 @@ export function ChamadoDetalhe({
               }}
             >
               Tirar responsável
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setAtribuirOpen(false)}
+            >
+              Cancelar
             </Button>
             <Button
               disabled={pending || !para}
@@ -1830,7 +1845,7 @@ function ChamadoComposer({
             // o ✓ ficaria disabled (campo limpo) — fora do disabled E sem
             // o opacity-50, senão o verde de sucesso saía apagado
             enviado &&
-              "bg-[var(--ok)] text-white hover:bg-[var(--ok)] disabled:opacity-100"
+              "bg-[var(--ok)] text-[var(--status-foreground)] hover:bg-[var(--ok)] disabled:opacity-100"
           )}
         >
           <AnimatePresence mode="wait" initial={false}>
@@ -1978,7 +1993,7 @@ function AutorComposer({
             // o ✓ ficaria disabled (campo limpo) — fora do disabled E sem
             // o opacity-50, senão o verde de sucesso saía apagado
             enviado &&
-              "bg-[var(--ok)] text-white hover:bg-[var(--ok)] disabled:opacity-100"
+              "bg-[var(--ok)] text-[var(--status-foreground)] hover:bg-[var(--ok)] disabled:opacity-100"
           )}
         >
           <AnimatePresence mode="wait" initial={false}>

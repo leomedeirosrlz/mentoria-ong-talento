@@ -15,6 +15,7 @@ import { sharedOg } from "@/lib/og";
 import { SiteFooter } from "@/components/site-footer";
 import { EstadoCard } from "@/components/estado-card";
 import { FormularioPublico } from "./formulario-publico";
+import { Logo } from "@/components/logo";
 
 const TOKEN_RE = /^[A-Za-z0-9_-]{20,128}$/;
 
@@ -70,14 +71,7 @@ export default async function FormularioTokenPage({
         <div className="m-auto w-full max-w-xl">
           <header className="mb-6">
             {/* width/height naturais reservam a proporção — sem CLS */}
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/logo-realiza.png"
-              alt="Realiza.vc"
-              width={1920}
-              height={262}
-              className="h-7 w-auto"
-            />
+            <Logo size="lg" />
             <p className="mt-1.5 text-xs text-muted-foreground">
               Programa de Mentoria Social
             </p>

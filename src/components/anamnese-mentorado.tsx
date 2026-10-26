@@ -20,6 +20,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -149,6 +150,7 @@ export function AnamneseMentoradoChip({
               />
             </div>
           )}
+          <DialogFooter showCloseButton />
         </DialogContent>
       </Dialog>
     </div>

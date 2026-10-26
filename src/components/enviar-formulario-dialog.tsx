@@ -213,7 +213,7 @@ export function EnviarFormularioDialog({
           }
         />
       )}
-      <DialogContent size="xl">
+      <DialogContent size="lg">
         <DialogHeader>
           <DialogTitle>Enviar formulário</DialogTitle>
           <DialogDescription>
@@ -316,7 +316,13 @@ export function EnviarFormularioDialog({
               <DialogFooter>
                 <Button
                   type="button"
-                  className="w-full sm:w-auto"
+                  variant="outline"
+                  onClick={() => setOpen(false)}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type="button"
                   onClick={gerar}
                   disabled={pending || !formId || nDestinos === 0}
                 >

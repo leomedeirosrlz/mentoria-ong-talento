@@ -1109,9 +1109,9 @@ function VisaoCoordenacao({
           · ordenadas por prioridade
         </p>
         <p className="text-xs text-muted-foreground">
-          <span aria-hidden className="mx-1 inline-block size-2 rounded-full bg-[var(--role-mentorado)] align-[-1px] ring-1 ring-black/10" />
+          <span aria-hidden className="mx-1 inline-block size-2 rounded-full bg-[var(--role-mentorado)] align-[-1px] ring-1 ring-foreground/15" />
           mentorado(a)
-          <span aria-hidden className="mx-1 ml-3 inline-block size-2 rounded-full bg-[var(--role-mentor)] align-[-1px] ring-1 ring-black/10" />
+          <span aria-hidden className="mx-1 ml-3 inline-block size-2 rounded-full bg-[var(--role-mentor)] align-[-1px] ring-1 ring-foreground/15" />
           mentor(a)
         </p>
       </div>
@@ -1334,9 +1334,9 @@ function VisaoSupervisor({
           · agrupadas por turma
         </p>
         <p className="text-xs text-muted-foreground">
-          <span aria-hidden className="mx-1 inline-block size-2 rounded-full bg-[var(--role-mentorado)] align-[-1px] ring-1 ring-black/10" />
+          <span aria-hidden className="mx-1 inline-block size-2 rounded-full bg-[var(--role-mentorado)] align-[-1px] ring-1 ring-foreground/15" />
           mentorado(a)
-          <span aria-hidden className="mx-1 ml-3 inline-block size-2 rounded-full bg-[var(--role-mentor)] align-[-1px] ring-1 ring-black/10" />
+          <span aria-hidden className="mx-1 ml-3 inline-block size-2 rounded-full bg-[var(--role-mentor)] align-[-1px] ring-1 ring-foreground/15" />
           mentor(a)
         </p>
       </div>
@@ -1777,7 +1777,7 @@ function VisaoEspecialista({
                   <p className="flex min-w-0 flex-wrap items-center gap-1.5 font-semibold">
                     <span
                       aria-hidden
-                      className="size-2.5 shrink-0 rounded-full bg-[var(--role-mentorado)] ring-1 ring-black/10"
+                      className="size-2.5 shrink-0 rounded-full bg-[var(--role-mentorado)] ring-1 ring-foreground/15"
                     />
                     <span>{d.mentorado.nome}</span>
                     {d.turma && (
@@ -1832,7 +1832,7 @@ function VisaoEspecialista({
                           className={cn(
                             "grid h-7 flex-1 place-items-center rounded-lg border text-xs font-bold",
                             done
-                              ? "border-[var(--ok)] bg-[var(--ok)] text-white"
+                              ? "border-[var(--ok)] bg-[var(--ok)] text-[var(--status-foreground)]"
                               : cur
                                 ? "border-2 border-[var(--foreground)] bg-card text-foreground"
                                 : "border-border bg-card text-muted-foreground"

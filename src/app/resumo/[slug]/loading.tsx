@@ -1,5 +1,6 @@
 import { Skeleton } from "@/components/ui/skeleton";
 import { SiteFooter } from "@/components/site-footer";
+import { Logo } from "@/components/logo";
 
 // Espelho de /resumo/[slug] (público, fora do shell): logo + título do
 // recorte e a grade do relatório na faixa border-y — mesma anatomia do
@@ -16,14 +17,7 @@ export default function Loading() {
       <main className="flex flex-1 flex-col px-4 py-8 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))]">
         <div className="w-full">
           <header className="mx-auto max-w-6xl">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/logo-realiza.png"
-              alt="Realiza.vc"
-              width={1920}
-              height={262}
-              className="h-7 w-auto"
-            />
+            <Logo size="lg" />
             <Skeleton className="mt-1.5 h-3 w-44" />
           </header>
 

@@ -45,6 +45,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -372,7 +373,7 @@ function EditarContatoDialog({
   }
 
   return (
-    <DialogContent size="xl">
+    <DialogContent size="md">
       <DialogHeader>
         <DialogTitle>Editar contato</DialogTitle>
         <DialogDescription>
@@ -422,11 +423,16 @@ function EditarContatoDialog({
             maxLength={25}
           />
         </div>
-        <Button onClick={salvar} disabled={pending} className="w-full">
+      </div>
+      <DialogFooter>
+        <Button type="button" variant="outline" onClick={onFechar}>
+          Cancelar
+        </Button>
+        <Button onClick={salvar} disabled={pending}>
           {pending ? <CircleNotch className="animate-spin" aria-hidden /> : null}
           Salvar
         </Button>
-      </div>
+      </DialogFooter>
     </DialogContent>
   );
 }
@@ -470,7 +476,7 @@ function NovoContatoDialog({
   }
 
   return (
-    <DialogContent size="xl">
+    <DialogContent size="md">
       <DialogHeader>
         <DialogTitle>Indicar pessoa</DialogTitle>
         <DialogDescription>
@@ -523,7 +529,12 @@ function NovoContatoDialog({
             maxLength={25}
           />
         </div>
-        <Button onClick={criar} disabled={pending || nome.trim().length < 2} className="w-full">
+      </div>
+      <DialogFooter>
+        <Button type="button" variant="outline" onClick={onClose}>
+          Cancelar
+        </Button>
+        <Button onClick={criar} disabled={pending || nome.trim().length < 2}>
           {pending ? (
             <CircleNotch className="animate-spin" aria-hidden />
           ) : (
@@ -531,7 +542,7 @@ function NovoContatoDialog({
           )}
           Criar convite
         </Button>
-      </div>
+      </DialogFooter>
     </DialogContent>
   );
 }
