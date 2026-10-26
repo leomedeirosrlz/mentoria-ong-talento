@@ -95,6 +95,9 @@ export function DashboardCoordenacao({
   encerramentos = new Set<string>(),
   meuNome,
   termo,
+  seletorContexto,
+  contextoTurma,
+  turmaFoco = null,
 }: {
   duplas: Dupla[];
   eventos: CicloEvento[];
@@ -123,6 +126,14 @@ export function DashboardCoordenacao({
   encerramentos?: ReadonlySet<string>;
   /** faixa do termo de adesão pendente — entra depois do primeiro bloco de trabalho. */
   termo?: ReactNode;
+  /** Contexto de turma (REALIZA-73): o seletor vai no header, à direita do
+   *  h1; `contextoTurma` é a faixa "Mostrando: …" + o hub de turmas entre
+   *  o header e a Situação; `turmaFoco` é o label em foco (null = todas) —
+   *  a página já entrega `duplas`/`cronogramas` recortadas, e o painel usa
+   *  o label só pra escrever o contexto nos links que gera (?turma=). */
+  seletorContexto?: ReactNode;
+  contextoTurma?: ReactNode;
+  turmaFoco?: string | null;
 }) {
   const hoje = new Date(agora);
   // um resumo por cronograma ATIVO que tem encontro — com duas turmas, uma
@@ -182,12 +193,16 @@ export function DashboardCoordenacao({
 
   return (
     <div className="space-y-6">
-      {/* saudação, igual à home do mentor */}
-      <header>
+      {/* saudação, igual à home do mentor — o seletor de contexto de
+          turma encosta à direita quando a página manda (multi-turma) */}
+      <header className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
         <h1 className="text-2xl font-semibold tracking-tight">
           {meuNome ? `Olá, ${meuNome}` : "Visão geral"}
         </h1>
+        {seletorContexto}
       </header>
+
+      {contextoTurma}
 
       {!supervisor && (
         <SetupChecklist
@@ -201,7 +216,16 @@ export function DashboardCoordenacao({
       {/* situação das duplas: a régua do programa, a mesma de /duplas —
           cada fatia com chip lá é atalho pra lista já filtrada (?recorte=) */}
       <div className="animate-enter rounded-xl bg-card px-4 py-4 shadow-[var(--shadow-border)] sm:px-5">
-        <SaudePrograma saude={situacao} linkBase="/duplas" />
+        {/* com turma em foco os atalhos pousam na /duplas já com ela —
+            a URL carrega o contexto (?turma=<label> é recorte lá) */}
+        <SaudePrograma
+          saude={situacao}
+          linkBase={
+            turmaFoco
+              ? `/duplas?turma=${encodeURIComponent(turmaFoco)}`
+              : "/duplas"
+          }
+        />
       </div>
 
       <div
@@ -219,12 +243,14 @@ export function DashboardCoordenacao({
                   <span className="-ml-2.5 size-8 rounded-full bg-[var(--role-mentorado)] ring-2 ring-card" />
                 </span>
                 <p className="mt-3 font-medium text-foreground">
-                  {supervisor
-                    ? "Nenhuma dupla atribuída a você ainda."
-                    : "Nenhuma dupla ativa ainda."}
+                  {turmaFoco
+                    ? "Nenhuma dupla nesta turma ainda."
+                    : supervisor
+                      ? "Nenhuma dupla atribuída a você ainda."
+                      : "Nenhuma dupla ativa ainda."}
                 </p>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  {supervisor ? (
+                  {supervisor && !turmaFoco ? (
                     "Quando a coordenação atribuir duplas, elas aparecem aqui."
                   ) : (
                     <>
@@ -325,7 +351,13 @@ export function DashboardCoordenacao({
                         </p>
                         <div className="flex items-center gap-1">
                           <Link
-                            href={`/registros?encontro=${resumo.evento.numero}`}
+                            href={`/registros?encontro=${resumo.evento.numero}${
+                              // ?turma= do /registros é cronograma_id — o
+                              // resumo já é por cronograma, então o link
+                              // sempre desambigua o encontro N (duas turmas
+                              // podem ter o mesmo número)
+                              cronograma ? `&turma=${cronograma.id}` : ""
+                            }`}
                             className={cn(
                               buttonVariants({ variant: "link", size: "sm" }),
                               "group"
