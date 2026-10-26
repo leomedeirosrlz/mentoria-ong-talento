@@ -351,7 +351,7 @@ export function LoginForm() {
     // box e vaza o padding lateral (1rem ou o safe-area, o que for maior)
     // lg:pl-[46%] reserva a metade esquerda pro painel fixo da marca
     // (LoginHero) — o form continua centrado na metade que sobra
-    <div className="flex min-h-[100dvh] flex-col bg-background pb-[calc(4rem+env(safe-area-inset-bottom))] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] lg:pl-[46%]">
+    <div className="flex min-h-[100dvh] flex-col bg-background pb-[calc(1.5rem+env(safe-area-inset-bottom))] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] lg:pl-[46%]">
       <LoginHero />
       <div className="m-auto w-full max-w-sm">
         <div className="mb-8">
